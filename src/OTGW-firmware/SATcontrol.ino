@@ -1227,7 +1227,11 @@ void satDisable()
   satSaveEnergyState(); // Persist energy total before reset (Task #196)
   satPidReset();
   satHCRReset();        // Reset daily-median recommendation (Task #228)
-  // Send CS=0 to release control setpoint override -- thermostat regains control
+  // Intentional: release boiler control to the thermostat (CS=0) rather than holding
+  // a warm-idle setpoint like Python SAT's COLD_SETPOINT=22C. OTGW is a gateway
+  // sitting between the thermostat and the boiler -- when SAT is disabled, the physical
+  // thermostat resumes authority. Python SAT uses a warm-idle setpoint because it *is*
+  // the thermostat (standalone HA replacement); OTGW firmware is not, so it defers.
   addCommandToQueue("CS=0", 4, false, 0);
   DebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
 }

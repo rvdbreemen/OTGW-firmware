@@ -229,26 +229,23 @@ void weatherSendStatusJSON()
   }
 
   // Forecast array as inline JSON array
+  // Single buffer: prefix "forecast": (12 chars) + array max ~169 chars = ~181 total, well within 300
   {
-    char forecastBuf[256];  // 24 temps * ~6 chars each = ~144
-    size_t pos = 0;
-    forecastBuf[pos++] = '[';
+    char entryBuf[300];
+    // Write the JSON key prefix first; snprintf_P returns chars written (excluding NUL)
+    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast\":["));
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
-      if (i > 0 && pos < sizeof(forecastBuf) - 8) forecastBuf[pos++] = ',';
+      if (i > 0 && pos < sizeof(entryBuf) - 9) entryBuf[pos++] = ',';
       char tmpBuf[8];
       dtostrf(_weather_forecastTemp[i], 1, 1, tmpBuf);
       size_t len = strlen(tmpBuf);
-      if (pos + len < sizeof(forecastBuf) - 2) {
-        memcpy(forecastBuf + pos, tmpBuf, len);
+      if (pos + len < sizeof(entryBuf) - 2) {
+        memcpy(entryBuf + pos, tmpBuf, len);
         pos += len;
       }
     }
-    forecastBuf[pos++] = ']';
-    forecastBuf[pos] = '\0';
-
-    // Send forecast as raw JSON array value
-    char entryBuf[300];
-    snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast\":%s"), forecastBuf);
+    entryBuf[pos++] = ']';
+    entryBuf[pos] = '\0';
     sendBeforenext();
     httpServer.sendContent(entryBuf);
   }
