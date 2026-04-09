@@ -25,6 +25,7 @@ static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained over
 static const float    SAT_UNDERSHOOT_MARGIN_C       = 2.0f;    // Below setpoint margin for underheat
 static const float    SAT_UNDERHEAT_SUSTAIN_SEC     = 180.0f;  // Sustained underheat before continuous switch
 static const float    SAT_SATURATION_SUSTAIN_SEC    = 300.0f;  // Sustained saturation before continuous switch
+static const uint32_t SAT_DHW_OVERSHOOT_GUARD_MS    = 300000UL; // 300s guard: skip overshoot->PWM switch during/after DHW
 
 // --- Current Cycle State ---
 static bool     _cycle_flameOn          = false;
@@ -45,6 +46,10 @@ static float    _sustain_overshootSec   = 0.0f;
 static float    _sustain_underheatSec   = 0.0f;
 static float    _sustain_saturationSec  = 0.0f;
 static uint32_t _sustain_lastCheckMs    = 0;
+// Initialised to a sentinel far enough in the past that the guard is inactive at boot.
+// SAT_DHW_OVERSHOOT_GUARD_MS (300000) is the guard window; subtracting it from 0 wraps to UINT32_MAX-300000,
+// which means (millis() - _sustain_dhwEndMs) will always exceed the threshold unless DHW actually ran.
+static uint32_t _sustain_dhwEndMs       = (uint32_t)(0UL - SAT_DHW_OVERSHOOT_GUARD_MS); // inactive at boot
 
 // --- EMA Fractions (lightweight sliding window) ---
 static float _ema_dutyRatio       = 0.0f;  // fraction of time flame is on
@@ -267,9 +272,17 @@ bool satCycleCheckAutoSwitch()
   float flowTemp = OTcurrentSystemState.Tboiler;
   float setpoint = state.sat.fFinalSetpoint;
 
+  // --- DHW post-overshoot guard: track end of DHW heating ---
+  if (state.sat.bDhwActive) {
+    _sustain_dhwEndMs = now; // Keep refreshing while DHW is active
+  }
+
   // --- Overshoot detection (continuous → PWM) ---
   if (state.sat.eControlMode == SAT_MODE_CONTINUOUS) {
-    if (flowTemp > setpoint + settings.sat.fOvershootMargin) {
+    // Skip overshoot→PWM switch while DHW is active or within 300s of DHW end
+    bool dhwGuardActive = state.sat.bDhwActive ||
+                          (now - _sustain_dhwEndMs < SAT_DHW_OVERSHOOT_GUARD_MS);
+    if (!dhwGuardActive && flowTemp > setpoint + settings.sat.fOvershootMargin) {
       _sustain_overshootSec += dt;
     } else {
       _sustain_overshootSec = 0.0f;

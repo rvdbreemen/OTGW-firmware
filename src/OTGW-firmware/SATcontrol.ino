@@ -991,17 +991,22 @@ void satHandleEnabled(const char* value)
   DebugTf(PSTR("SAT: %s\r\n"), enabled ? "enabled" : "disabled");
 }
 
-//=== PID State Persistence (Tasks #6, #49) ===
+//=== PID State Persistence (Tasks #6, #49, #222) ===
 static const char* SAT_PID_STATE_FILE PROGMEM = "/sat_pid_state.json";
 static uint32_t _pidLastSaveMs = 0;
+
+// Max age (seconds) before a saved PID state is considered stale and discarded on restore.
+// 30 minutes: covers brief power cuts and OTA updates; rejects summer/long-downtime state.
+static const uint32_t SAT_PID_STALE_SEC = 1800UL;
 
 void satSavePidState()
 {
   File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "w");
   if (!f) return;
-  char buf[128];
-  snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"err\":%.2f}"),
-             state.sat.fPidI, state.sat.fPidD, state.sat.fError);
+  char buf[160];
+  time_t ts = time(nullptr);
+  snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"err\":%.2f,\"ts\":%lu}"),
+             state.sat.fPidI, state.sat.fPidD, state.sat.fError, (unsigned long)ts);
   f.print(buf);
   f.close();
   _pidLastSaveMs = millis();
@@ -1011,20 +1016,74 @@ void satLoadPidState()
 {
   File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "r");
   if (!f) return;
-  char buf[128];
+  char buf[160];
   size_t len = f.readBytes(buf, sizeof(buf) - 1);
   buf[len] = 0;
   f.close();
-  // Simple parse: extract values from {"i":X,"d":Y,"err":Z}
+  // Simple parse: extract values from {"i":X,"d":Y,"err":Z,"ts":N}
   float i = 0, d = 0, err = 0;
+  unsigned long savedTs = 0;
   char* p;
-  if ((p = strstr(buf, "\"i\":")) != nullptr) i = atof(p + 4);
-  if ((p = strstr(buf, "\"d\":")) != nullptr) d = atof(p + 4);
-  if ((p = strstr(buf, "\"err\":")) != nullptr) err = atof(p + 6);
+  if ((p = strstr(buf, "\"i\":"))   != nullptr) i      = atof(p + 4);
+  if ((p = strstr(buf, "\"d\":"))   != nullptr) d      = atof(p + 4);
+  if ((p = strstr(buf, "\"err\":")) != nullptr) err    = atof(p + 6);
+  if ((p = strstr(buf, "\"ts\":"))  != nullptr) savedTs = strtoul(p + 5, nullptr, 10);
+
+  // Staleness guard (Task #222): discard if NTP not yet synced or saved > 30 min ago.
+  time_t nowTs = time(nullptr);
+  if (nowTs < 1000000L) {
+    // NTP not yet synced at boot — skip restore; PID starts from zero.
+    DebugTln(F("SAT: PID state skipped (NTP not synced yet)"));
+    return;
+  }
+  if (savedTs == 0 || (uint32_t)(nowTs - (time_t)savedTs) > SAT_PID_STALE_SEC) {
+    DebugTf(PSTR("SAT: PID state discarded (stale, age=%lus)\r\n"),
+            (unsigned long)(nowTs - (time_t)savedTs));
+    return;
+  }
   state.sat.fPidI = i;
   state.sat.fPidD = d;
   state.sat.fError = err;
-  DebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f err=%.2f)\r\n"), i, d, err);
+  DebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f err=%.2f age=%lus)\r\n"),
+          i, d, err, (unsigned long)(nowTs - (time_t)savedTs));
+}
+
+//=== Energy State Persistence (Task #196) ===
+static const char* SAT_ENERGY_FILE PROGMEM = "/sat_energy.json";
+static uint32_t _energyLastSaveMs = 0;
+
+// Save interval: every hour. Energy changes slowly; hourly saves balance
+// data loss vs. LittleFS write wear (rated ~100k cycles per sector).
+static const uint32_t SAT_ENERGY_SAVE_INTERVAL_MS = 3600000UL; // 1 hour
+
+void satSaveEnergyState()
+{
+  File f = LittleFS.open(FPSTR(SAT_ENERGY_FILE), "w");
+  if (!f) return;
+  char buf[64];
+  snprintf_P(buf, sizeof(buf), PSTR("{\"kwh\":%.3f}"), state.sat.fEnergyTotal);
+  f.print(buf);
+  f.close();
+  _energyLastSaveMs = millis();
+  DebugTf(PSTR("SAT: energy saved (%.3f kWh)\r\n"), state.sat.fEnergyTotal);
+}
+
+void satLoadEnergyState()
+{
+  File f = LittleFS.open(FPSTR(SAT_ENERGY_FILE), "r");
+  if (!f) return;
+  char buf[64];
+  size_t len = f.readBytes(buf, sizeof(buf) - 1);
+  buf[len] = 0;
+  f.close();
+  // Simple parse: extract value from {"kwh":X.XXX}
+  char* p;
+  float kwh = 0.0f;
+  if ((p = strstr(buf, "\"kwh\":")) != nullptr) kwh = atof(p + 6);
+  if (kwh >= 0.0f) {
+    state.sat.fEnergyTotal = kwh;
+    DebugTf(PSTR("SAT: energy restored (%.3f kWh)\r\n"), state.sat.fEnergyTotal);
+  }
 }
 
 //=== Cleanly disable SAT and release boiler control ===
@@ -1033,7 +1092,8 @@ void satDisable()
   state.sat.eControlMode = SAT_MODE_OFF;
   state.sat.bActive = false;
   state.sat.fFinalSetpoint = 0.0f;
-  satSavePidState(); // Persist PID state before reset
+  satSavePidState();    // Persist PID state before reset
+  satSaveEnergyState(); // Persist energy total before reset (Task #196)
   satPidReset();
   // Send CS=0 to release control setpoint override -- thermostat regains control
   addCommandToQueue("CS=0", 4, false, 0);
@@ -2310,7 +2370,8 @@ static void satUpdateFlameStatus()
 void initSAT()
 {
   satPidReset();
-  satLoadPidState(); // Restore PID state from LittleFS after reset
+  satLoadPidState();    // Restore PID state from LittleFS after reset (Task #222)
+  satLoadEnergyState(); // Restore energy total from LittleFS after reset (Task #196)
   satCycleInit();
   state.sat.bActive = false;
   state.sat.eControlMode = SAT_MODE_OFF;
@@ -3163,6 +3224,10 @@ void satControlLoop()
   // Periodically save PID state to LittleFS (every 5 min)
   if ((millis() - _pidLastSaveMs) >= 300000UL) {
     satSavePidState();
+  }
+  // Periodically save energy total to LittleFS (every hour, Task #196)
+  if ((millis() - _energyLastSaveMs) >= SAT_ENERGY_SAVE_INTERVAL_MS) {
+    satSaveEnergyState();
   }
 
   DebugTf(PSTR("SAT: room=%.1f target=%.1f outside=%.1f curve=%.1f pid=%.1f final=%.1f mode=%d\r\n"),
