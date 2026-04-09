@@ -48,3 +48,5 @@ discord_backlog_last_checkted.txt
 .claude/discord_last_checked.txt
 .claude/github_last_checked.txt
 .claude/tweakers_last_checked.txt
+
+logs-issue/*
