@@ -351,7 +351,6 @@ static float    _bs_prevBoilerTemp     = 0.0f;
 static uint32_t _bs_stateEntryMs       = 0;
 static uint32_t _bs_flameOnMs          = 0;
 static uint32_t _bs_flameOffMs         = 0;
-static uint32_t _bs_lastCycleDurationMs = 0;
 
 // --- Previous flame state for edge detection ---
 static bool     _sat_prevFlameState = false;
@@ -385,8 +384,10 @@ static float satCalcHeatingCurve(float targetTemp, float outsideTemp)
 //=== Boiler Status Evaluator ===
 //=====================================================================
 // SAT Python status.py timing constants
-static const uint32_t BS_ANTI_CYCLE_MIN_OFF_MS   = 180000UL;  // 180s min OFF between cycles
-static const uint32_t BS_STALLED_IGNITION_MIN_MS  = 600000UL;  // 600s default stalled threshold
+static const uint32_t BS_ANTI_CYCLE_MIN_OFF_MS    = 180000UL;  // 180s min OFF between cycles
+static const uint32_t BS_STALLED_IGNITION_MIN_MS  = 600000UL;  // 600s fallback stalled threshold (no prior cycle)
+static const uint32_t BS_STALLED_IGNITION_FLOOR_MS = 120000UL; // 120s adaptive threshold floor
+static const uint32_t BS_STALLED_IGNITION_CAP_MS   = 900000UL; // 900s adaptive threshold cap
 static const uint32_t BS_POST_CYCLE_SETTLE_MS     = 60000UL;   // 60s post-cycle settling
 static const uint32_t BS_IGNITION_SURGE_WINDOW_MS = 30000UL;   // 30s window for ignition surge
 static const float    BS_DEMAND_HYSTERESIS        = 0.7f;      // demand = setpoint > flow + 0.7C
@@ -408,9 +409,6 @@ static void satUpdateBoilerStatus()
     _bs_flameOnMs = now;
   }
   if (!flame && _bs_prevFlame) {
-    if (_bs_flameOnMs > 0) {
-      _bs_lastCycleDurationMs = now - _bs_flameOnMs;
-    }
     _bs_flameOffMs = now;
   }
 
@@ -445,9 +443,16 @@ static void satUpdateBoilerStatus()
       newStatus = SAT_BS_ANTI_CYCLING;
     }
     else if (hasDemand && _bs_flameOffMs > 0) {
-      uint32_t stalledThreshold = BS_STALLED_IGNITION_MIN_MS;
-      if (_bs_lastCycleDurationMs > 0 && _bs_lastCycleDurationMs * 3 > stalledThreshold) {
-        stalledThreshold = _bs_lastCycleDurationMs * 3;
+      // Adaptive stall threshold: max(last_cycle_duration * 1.5, 120s), cap at 900s.
+      // Falls back to fixed 600s when no prior cycle duration is available (cold start).
+      uint32_t stalledThreshold;
+      if (state.sat.fLastCycleDuration > 0.0f) {
+        uint32_t adaptive = (uint32_t)(state.sat.fLastCycleDuration * 1500.0f); // * 1000 ms/s * 1.5
+        if (adaptive < BS_STALLED_IGNITION_FLOOR_MS) adaptive = BS_STALLED_IGNITION_FLOOR_MS;
+        if (adaptive > BS_STALLED_IGNITION_CAP_MS)   adaptive = BS_STALLED_IGNITION_CAP_MS;
+        stalledThreshold = adaptive;
+      } else {
+        stalledThreshold = BS_STALLED_IGNITION_MIN_MS; // 600s fallback
       }
       if (offDuration > stalledThreshold) {
         newStatus = SAT_BS_STALLED_IGNITION;
@@ -1221,6 +1226,7 @@ void satDisable()
   satSavePidState();    // Persist PID state before reset
   satSaveEnergyState(); // Persist energy total before reset (Task #196)
   satPidReset();
+  satHCRReset();        // Reset daily-median recommendation (Task #228)
   // Send CS=0 to release control setpoint override -- thermostat regains control
   addCommandToQueue("CS=0", 4, false, 0);
   DebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
@@ -1338,6 +1344,7 @@ void satSendStatusJSON()
     int crIdx = (int)state.sat.eCurveRecommendation;
     if (crIdx < 0 || crIdx > 3) crIdx = 0;
     sendJsonMapEntry(F("curve_recommendation"), crNames[crIdx]); }
+  sendJsonMapEntry(F("heating_curve_recommendation"), state.sat.sHeatCurveRec);
   satSendJsonFloat(F("mean_error"),            state.sat.fMeanError, 2);
   satSendJsonFloat(F("error_stddev"),          state.sat.fErrorStdDev, 3);
   satSendJsonFloat(F("target_temp_step"),      settings.sat.fTargetTempStep, 1);
@@ -1696,6 +1703,9 @@ void satPublishMQTT()
       state.sat.fError);
     sendMQTTData(F("sat/curve_recommendation_attributes"), jBuf, false);
   }
+
+  // Daily median heating curve recommendation (Task #228) — retained so HA sees it after restart
+  sendMQTTData(F("sat/heating_curve_recommendation"), state.sat.sHeatCurveRec, true);
 
   // Error statistics
   { char sBuf[12];
@@ -2537,6 +2547,7 @@ void initSAT()
   satPidReset();
   satLoadPidState();    // Restore PID state from LittleFS after reset (Task #222)
   satLoadEnergyState(); // Restore energy total from LittleFS after reset (Task #196)
+  satHCRLoadState();    // Restore daily-median recommendation ring from LittleFS (Task #228)
   satCycleInit();
   state.sat.bActive = false;
   state.sat.eControlMode = SAT_MODE_OFF;
@@ -3258,6 +3269,9 @@ void satControlLoop()
 
   // --- Heating curve recommendation ---
   satUpdateCurveRecommendation();
+
+  // --- Daily median recommendation (Task #228): collect intra-day sample ---
+  satHCRAddSample();
 
   // --- Modulation reliability (skip if manufacturer doesn't support relative modulation) ---
   if (!(satGetManufacturerQuirks() & SAT_QUIRK_NO_REL_MOD))

@@ -1,9 +1,11 @@
 ---
 id: TASK-223
 title: 'SAT: Implement stalled-ignition adaptive threshold'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-09 05:29'
+updated_date: '2026-04-09 06:21'
 labels:
   - audit-fix
   - sat
@@ -30,9 +32,33 @@ Risk: Low. The existing fixed 600s is a safe fallback if no previous cycle durat
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Last completed CH cycle duration is tracked in state.sat
-- [ ] #2 Stalled ignition threshold is computed as max(last_cycle_duration * 1.5, 120s), capped at 900s
-- [ ] #3 Falls back to fixed 600s when no previous cycle duration is available
-- [ ] #4 Threshold is recalculated on each new cycle completion
-- [ ] #5 No regression on STALLED_IGNITION detection in normal operation
+- [x] #1 Last completed CH cycle duration is tracked in state.sat
+- [x] #2 Stalled ignition threshold is computed as max(last_cycle_duration * 1.5, 120s), capped at 900s
+- [x] #3 Falls back to fixed 600s when no previous cycle duration is available
+- [x] #4 Threshold is recalculated on each new cycle completion
+- [x] #5 No regression on STALLED_IGNITION detection in normal operation
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Replace the static _bs_lastCycleDurationMs tracking in satUpdateBoilerStatus() with state.sat.fLastCycleDuration (already set by SATcycles.ino in seconds).
+2. Rewrite the stall threshold calculation per AC: stalledThreshold = max(last_cycle_duration_ms * 1.5, 120000), capped at 900000ms. Fall back to 600000ms (BS_STALLED_IGNITION_MIN_MS) when fLastCycleDuration == 0.
+3. Remove the static _bs_lastCycleDurationMs variable (no longer needed) and the manual assignment in the flame-off tracking block.
+4. Add named constants for the adaptive threshold minimum (120s) and maximum (900s).
+5. Verify no regression: STALLED_IGNITION still fires at the right time in normal operation.
+<!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced the fixed-plus-ad-hoc stalled ignition threshold in satUpdateBoilerStatus() with a proper adaptive formula matching Python parity.
+
+Changes:
+- Removed static _bs_lastCycleDurationMs variable; the boiler status evaluator now reads state.sat.fLastCycleDuration (seconds, set by SATcycles.ino) directly.
+- Added BS_STALLED_IGNITION_FLOOR_MS (120s) and BS_STALLED_IGNITION_CAP_MS (900s) constants.
+- Stall threshold = max(last_cycle_duration * 1.5, 120s), capped at 900s; falls back to 600s (BS_STALLED_IGNITION_MIN_MS) on cold start when no prior cycle exists.
+- Threshold is recalculated on each call to satUpdateBoilerStatus() using the latest state.sat.fLastCycleDuration, which is updated on every cycle completion.
+
+No change to STALLED_IGNITION detection logic or any other boiler status path.
+<!-- SECTION:FINAL_SUMMARY:END -->
