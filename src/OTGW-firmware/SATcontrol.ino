@@ -1217,14 +1217,48 @@ void satLoadEnergyState()
   }
 }
 
+//=== Estimated Gas Energy Persistence (Task #232) ===
+static const char* SAT_EST_ENERGY_FILE PROGMEM = "/sat_energy_estimate.json";
+
+static void satSaveEstimatedEnergy()
+{
+  File f = LittleFS.open(FPSTR(SAT_EST_ENERGY_FILE), "w");
+  if (!f) return;
+  char buf[48];
+  snprintf_P(buf, sizeof(buf), PSTR("{\"kwh\":%.3f}"), state.sat.fEnergyEstimatedKWh);
+  f.print(buf);
+  f.close();
+  state.sat.fEstEnergyLastSavedKWh = state.sat.fEnergyEstimatedKWh;
+  DebugTf(PSTR("SAT: estimated energy saved (%.3f kWh)\r\n"), state.sat.fEnergyEstimatedKWh);
+}
+
+static void satLoadEstimatedEnergy()
+{
+  File f = LittleFS.open(FPSTR(SAT_EST_ENERGY_FILE), "r");
+  if (!f) return;
+  char buf[48];
+  size_t len = f.readBytes(buf, sizeof(buf) - 1);
+  buf[len] = 0;
+  f.close();
+  char* p;
+  float kwh = 0.0f;
+  if ((p = strstr(buf, "\"kwh\":")) != nullptr) kwh = atof(p + 6);
+  if (kwh >= 0.0f) {
+    state.sat.fEnergyEstimatedKWh    = kwh;
+    state.sat.fEstEnergyLastSavedKWh = kwh;
+    DebugTf(PSTR("SAT: estimated energy restored (%.3f kWh)\r\n"), kwh);
+  }
+}
+
 //=== Cleanly disable SAT and release boiler control ===
 void satDisable()
 {
   state.sat.eControlMode = SAT_MODE_OFF;
   state.sat.bActive = false;
   state.sat.fFinalSetpoint = 0.0f;
-  satSavePidState();    // Persist PID state before reset
-  satSaveEnergyState(); // Persist energy total before reset (Task #196)
+  satSavePidState();         // Persist PID state before reset
+  satSaveEnergyState();      // Persist energy total before reset (Task #196)
+  satSaveEstimatedEnergy();  // Persist estimated gas energy before reset (Task #232)
   satPidReset();
   satHCRReset();        // Reset daily-median recommendation (Task #228)
   // Intentional: release boiler control to the thermostat (CS=0) rather than holding
@@ -1355,6 +1389,10 @@ void satSendStatusJSON()
   satSendJsonFloat(F("power_kw"),              state.sat.fCurrentPower, 2);
   satSendJsonFloat(F("energy_kwh"),            state.sat.fEnergyTotal, 3);
   satSendJsonFloat(F("boiler_capacity"),       settings.sat.fBoilerCapacity, 1);
+  // Gas consumption estimation (Task #232)
+  satSendJsonFloat(F("boiler_rated_kw"),       settings.sat.fBoilerRatedKW, 1);
+  satSendJsonFloat(F("boiler_efficiency"),     settings.sat.fBoilerEfficiency, 2);
+  satSendJsonFloat(F("energy_estimated_kwh"),  state.sat.fEnergyEstimatedKWh, 3);
   // Preset sync (Task #46)
   sendJsonMapEntry(F("preset_sync"),           settings.sat.bPresetSync);
   // Thermal drop learning (Task #21)
@@ -1725,6 +1763,12 @@ void satPublishMQTT()
   dtostrf(state.sat.fEnergyTotal, 1, 3, valBuf);
   sendMQTTData(F("sat/energy_total"), valBuf, true);  // retained for HA energy dashboard
 
+  // Gas consumption estimate (Task #232)
+  if (settings.sat.fBoilerRatedKW > 0.0f) {
+    dtostrf(state.sat.fEnergyEstimatedKWh, 1, 3, valBuf);
+    sendMQTTData(F("sat/energy_estimated_kwh"), valBuf, true); // retained for HA energy dashboard
+  }
+
   // Manufacturer
   { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
     sendMQTTData(F("sat/manufacturer"), mfrName, true); }
@@ -1975,6 +2019,12 @@ void satPublishMQTT()
     dtostrf(settings.sat.fBoilerCapacity, 1, 1, valBuf);
     sendMQTTData(F("sat/boiler_capacity"), valBuf, true);
 
+    dtostrf(settings.sat.fBoilerRatedKW, 1, 1, valBuf);
+    sendMQTTData(F("sat/boiler_rated_kw"), valBuf, true);
+
+    dtostrf(settings.sat.fBoilerEfficiency, 1, 2, valBuf);
+    sendMQTTData(F("sat/boiler_efficiency"), valBuf, true);
+
     dtostrf(settings.sat.fComfortHumidity, 1, 0, valBuf);
     sendMQTTData(F("sat/comfort_humidity"), valBuf, true);
 
@@ -2196,6 +2246,38 @@ static void satUpdatePowerEnergy()
     }
   }
   state.sat.iEnergyLastMs = now;
+
+  // --- Gas consumption estimation (Task #232) ---
+  // Only accumulate when rated power is configured (> 0) and flame is on.
+  if (settings.sat.fBoilerRatedKW > 0.0f && flame) {
+    float estPowerKW = 0.0f;
+
+    // Prefer thermal power from flow rate (MsgID 19, DHW circuit) if available.
+    // DHWFlowRate is in L/min; convert to L/s for P = m_dot * Cp * dT.
+    float flowLmin = OTcurrentSystemState.DHWFlowRate;
+    float tFlow    = OTcurrentSystemState.Tboiler; // flow water temp (MsgID 25)
+    float tRet     = OTcurrentSystemState.Tret;    // return water temp (MsgID 28)
+    if (flowLmin > 0.1f && tFlow > 0.0f && tRet > 0.0f && (tFlow - tRet) > 0.5f) {
+      // P_thermal (kW) = (L/min / 60) * 4186 J/(kg·K) * dT / 1000
+      float flowLs = flowLmin / 60.0f;
+      estPowerKW = flowLs * 4186.0f * (tFlow - tRet) / 1000.0f;
+    } else {
+      // Fallback: modulation-based estimate
+      estPowerKW = (modulation / 100.0f) * settings.sat.fBoilerRatedKW * settings.sat.fBoilerEfficiency;
+    }
+
+    // Clamp to rated power (with 10% headroom for measurement noise)
+    if (estPowerKW < 0.0f)  estPowerKW = 0.0f;
+    if (estPowerKW > settings.sat.fBoilerRatedKW * 1.1f) estPowerKW = settings.sat.fBoilerRatedKW;
+
+    if (state.sat.iEstEnergyLastMs > 0) {
+      float dtHours = (float)(now - state.sat.iEstEnergyLastMs) / 3600000.0f;
+      if (dtHours > 0.0f && dtHours < 1.0f) {
+        state.sat.fEnergyEstimatedKWh += estPowerKW * dtHours;
+      }
+    }
+  }
+  state.sat.iEstEnergyLastMs = now;
 }
 
 //=====================================================================
@@ -2554,9 +2636,10 @@ static void satUpdateFlameStatus()
 void initSAT()
 {
   satPidReset();
-  satLoadPidState();    // Restore PID state from LittleFS after reset (Task #222)
-  satLoadEnergyState(); // Restore energy total from LittleFS after reset (Task #196)
-  satHCRLoadState();    // Restore daily-median recommendation ring from LittleFS (Task #228)
+  satLoadPidState();         // Restore PID state from LittleFS after reset (Task #222)
+  satLoadEnergyState();      // Restore energy total from LittleFS after reset (Task #196)
+  satLoadEstimatedEnergy();  // Restore estimated gas energy from LittleFS (Task #232)
+  satHCRLoadState();         // Restore daily-median recommendation ring from LittleFS (Task #228)
   satCycleInit();
   state.sat.bActive = false;
   state.sat.eControlMode = SAT_MODE_OFF;
@@ -3456,6 +3539,11 @@ void satControlLoop()
   // Periodically save energy total to LittleFS (every hour, Task #196)
   if ((millis() - _energyLastSaveMs) >= SAT_ENERGY_SAVE_INTERVAL_MS) {
     satSaveEnergyState();
+  }
+  // Save estimated gas energy on every 0.1 kWh boundary crossed (Task #232)
+  if (settings.sat.fBoilerRatedKW > 0.0f &&
+      floorf(state.sat.fEnergyEstimatedKWh * 10.0f) != floorf(state.sat.fEstEnergyLastSavedKWh * 10.0f)) {
+    satSaveEstimatedEnergy();
   }
 
   DebugTf(PSTR("SAT: room=%.1f target=%.1f outside=%.1f curve=%.1f pid=%.1f final=%.1f mode=%d\r\n"),

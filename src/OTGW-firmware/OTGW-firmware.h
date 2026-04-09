@@ -514,6 +514,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fCurrentPower          = 0.0f;   // Current power in kW (modulation * capacity)
   float    fEnergyTotal           = 0.0f;   // Cumulative energy in kWh
   uint32_t iEnergyLastMs          = 0;      // Last energy integration timestamp
+  // Gas consumption estimation (Task #232)
+  float    fEnergyEstimatedKWh    = 0.0f;   // Cumulative estimated gas energy in kWh
+  float    fEstEnergyLastSavedKWh = 0.0f;   // Value at last LittleFS save (for 0.1 kWh threshold)
+  uint32_t iEstEnergyLastMs       = 0;      // Last integration timestamp for estimated energy
   // Simulation (Task #37)
   float    fSimRoomTemp           = 20.0f;
   float    fSimFlowTemp           = 20.0f;
@@ -793,6 +797,9 @@ struct SATSection {
   uint16_t iWeatherInterval   = 900;    // Poll interval in seconds (default 15 min, min 5 min)
   // Power/energy (Task #45)
   float    fBoilerCapacity    = 24.0f;  // Boiler capacity in kW (for power calculation)
+  // Gas consumption estimation (Task #232)
+  float    fBoilerRatedKW     = 0.0f;   // Rated boiler input power in kW (0=disabled)
+  float    fBoilerEfficiency  = 0.92f;  // Boiler efficiency (0.0-1.0, default 0.92)
   // Preset sync (Task #46) — broadcast preset changes to secondary entities
   bool     bPresetSync        = false;         // Sync preset to secondary entities via MQTT
   char     sPresetSyncTopic[65] = "";          // MQTT topic for preset sync
