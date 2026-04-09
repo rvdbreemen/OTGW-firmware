@@ -3308,7 +3308,9 @@ var SAT_SETTINGS_GROUPS = [
       { key: 'satdeadband',    label: 'Deadband',              type: 'f', unit: '\u00B0C', min: 0.05, max: 2.0, step: 0.05 },
       { key: 'satinterval',    label: 'Control Interval',      type: 'i', unit: 's', min: 30, max: 600, step: 10 },
       { key: 'satheatingmode', label: 'Heating Mode',          type: 'select',
-        options: [[0,'Comfort'],[1,'Eco']] }
+        options: [[0,'Comfort'],[1,'Eco']] },
+      { key: 'sattargettemp',  label: 'Target Temperature',    type: 'f', unit: '\u00B0C', min: 5.0, max: 30.0, step: 0.5 },
+      { key: 'sattempstep',    label: 'Temp Adjust Step',      type: 'f', unit: '\u00B0C', min: 0.1, max: 1.0, step: 0.1 }
     ]
   },
   {
@@ -3385,7 +3387,12 @@ var SAT_SETTINGS_GROUPS = [
       { key: 'satcomforthumidity', label: 'Comfort Humidity',       type: 'f', unit: '%', min: 10.0, max: 90.0, step: 1.0 },
       { key: 'satcomfortmaxoffset',label: 'Comfort Max Offset',     type: 'f', unit: '\u00B0C', min: 0.0, max: 3.0, step: 0.1 },
       { key: 'satmultiarea',       label: 'Multi-Area Enable',      type: 'b' },
-      { key: 'satmultiareacount',  label: 'Multi-Area Count',       type: 'i', min: 0, max: 4, step: 1 }
+      { key: 'satmultiareacount',  label: 'Multi-Area Count',       type: 'i', min: 0, max: 4, step: 1 },
+      { key: 'satareaweight0',     label: 'Area 0 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satareaweight1',     label: 'Area 1 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satareaweight2',     label: 'Area 2 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satareaweight3',     label: 'Area 3 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satthermalcoeff',    label: 'Thermal Coefficient',    type: 'f', min: 0.005, max: 0.3, step: 0.005 }
     ]
   },
   {
@@ -3407,6 +3414,16 @@ var SAT_SETTINGS_GROUPS = [
     ]
   },
   {
+    id: 'sat-grp-weather',
+    title: 'Weather',
+    fields: [
+      { key: 'satweatherenable',   label: 'Weather Enable',         type: 'b' },
+      { key: 'satweatherlat',      label: 'Latitude',               type: 'f', min: -90.0, max: 90.0, step: 0.0001 },
+      { key: 'satweatherlon',      label: 'Longitude',              type: 'f', min: -180.0, max: 180.0, step: 0.0001 },
+      { key: 'satweatherinterval', label: 'Fetch Interval',         type: 'i', unit: 's', min: 60, max: 3600, step: 60 }
+    ]
+  },
+  {
     id: 'sat-grp-sync',
     title: 'Sync',
     fields: [
@@ -3419,6 +3436,8 @@ var SAT_SETTINGS_GROUPS = [
     title: 'Advanced',
     fields: [
       { key: 'satsimulation',    label: 'Simulation Mode',       type: 'b' },
+      { key: 'satsimheatrate',   label: 'Sim Heat Rate',         type: 'f', unit: '\u00B0C/min', min: 0.01, max: 5.0, step: 0.01 },
+      { key: 'satsimcoolrate',   label: 'Sim Cool Rate',         type: 'f', unit: '\u00B0C/min', min: 0.01, max: 5.0, step: 0.01 },
       { key: 'satautotune',      label: 'Auto-Tune',             type: 'b' },
       { key: 'satautotunerate',  label: 'Auto-Tune Rate',        type: 'f', min: 0.005, max: 0.1, step: 0.005 },
       { key: 'saterrormon',      label: 'Error Monitoring',      type: 'b' },

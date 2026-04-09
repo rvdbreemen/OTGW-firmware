@@ -1677,6 +1677,8 @@ void sendDeviceSettings()
     char tmpBuf[8];
     dtostrf(settings.sat.fTargetTemp, 1, 1, tmpBuf);
     sendJsonSettingObj(F("sattargettemp"), tmpBuf, "f", 5, 30);
+    dtostrf(settings.sat.fTargetTempStep, 1, 1, tmpBuf);
+    sendJsonSettingObj(F("sattempstep"), tmpBuf, "f", 0.1, 1.0);
     dtostrf(settings.sat.fHeatingCurveCoeff, 1, 1, tmpBuf);
     sendJsonSettingObj(F("satcoefficient"), tmpBuf, "f", 0, 5);
     dtostrf(settings.sat.fDeadband, 1, 2, tmpBuf);
@@ -1883,7 +1885,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation",
   "satsolargain", "satsolarminrise", "satsolaroffset",
   "satsummerminhours", "satsummersimmer", "satsummerthreshold",
-  "satsystem", "sattargettemp", "satthermalcoeff",
+  "satsystem", "sattargettemp", "sattempstep", "satthermalcoeff",
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
