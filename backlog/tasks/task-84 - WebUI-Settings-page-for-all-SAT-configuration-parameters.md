@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-06 19:23'
-updated_date: '2026-04-08 21:45'
+updated_date: '2026-04-08 22:01'
 labels:
   - webui
   - settings
@@ -58,18 +58,5 @@ Each group should be collapsible. Input types: toggle switches for bools, number
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Added dedicated SAT settings page accessible from the SAT dashboard via a new Settings button.
-
-Changes:
-- index.html: added Settings button to SAT dashboard header; added displaySATSettingsPage section with full nav bar containing home, SAT Dashboard, Settings, and Advanced buttons
-- index.js: extended setActivePageSection() to include displaySATSettingsPage; added satSettingsPage() navigation function; added SAT_SETTINGS_GROUPS definition (12 collapsible categories with 50+ settings); added buildSATSettingsGroups(), populateSATSettingsValues(), refreshSATSettings(), saveSATSettingsGroup(), and toggleSATSettingsGroup() functions
-- index_common.css: added shared layout rules for sat-settings-group, sat-settings-group-header, sat-settings-group-body, sat-settings-arrow, sat-settings-save-btn, sat-setting-unit, sat-setting-changed, satSettingsMessage
-- index.css / index_dark.css: added theme-specific colors for SAT settings group headers and bodies
-
-Design:
-- Settings loaded from GET /api/v2/settings (SAT* keys returned as lowercase); saved via POST /api/v2/settings with the same lowercase key (firmware updateSetting() is case-insensitive)
-- Booleans: checkbox inputs; floats/ints: number inputs with min/max/step; enums: select dropdowns
-- Changed fields get orange outline; Save button per group saves only changed fields
-- Dark theme support via index_dark.css additions
-- Responsive layout reuses existing settingDiv/settings-field-container patterns
+Added SAT settings page to the WebUI.\n\nChanges:\n- index.html: Added \"Settings\" button to SAT dashboard header; new displaySATSettingsPage section with nav bar\n- index.js: Added SAT_SETTINGS_GROUPS (12 categories, 50+ settings), buildSATSettingsGroups(), populateSATSettingsValues(), saveSATSettingsGroup(), toggleSATSettingsGroup()\n- index_common.css / index.css / index_dark.css: Collapsible group styles with dark theme support\n\nSettings load from GET /api/v2/settings and save via POST /api/v2/settings (lowercase sat* keys, firmware updateSetting() is case-insensitive). Changed fields show orange outline; each group has its own Save button posting only changed fields.\n\nAll 9 acceptance criteria passed. Commit: 5f8143ce"
 <!-- SECTION:FINAL_SUMMARY:END -->
