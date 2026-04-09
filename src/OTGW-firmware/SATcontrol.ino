@@ -1448,6 +1448,10 @@ void satPublishMQTT()
     sendMQTTData(F("sat/pressure_health_attr"), pressAttrBuf, false);
   }
 
+  // Current modulation level (published so HA auto-discovery entity has a live topic)
+  snprintf_P(valBuf, sizeof(valBuf), PSTR("%d"), (int)state.sat.iCurrentModulation);
+  sendMQTTData(F("sat/current_modulation"), valBuf, false);
+
   // Modulation reliability + setpoint sync
   sendMQTTData(F("sat/modulation_reliable"), state.sat.bModulationReliable ? "true" : "false", false);
   sendMQTTData(F("sat/setpoint_mismatch"), state.sat.bSetpointMismatch ? "true" : "false", false);
@@ -3077,36 +3081,10 @@ void satControlLoop()
   state.sat.fFinalSetpoint = finalSetpoint;
 
   // --- Auto-switch between continuous and PWM modes (Tasks #42/#43) ---
-  if (settings.sat.bPwmAutoSwitch && !satAlwaysMaxModulation()) {
-    float boilerTemp = OTcurrentSystemState.Tboiler;
-    static uint32_t _autoSwOvershootSince = 0;
-    static uint32_t _autoSwUnderheatSince = 0;
-
-    if (state.sat.eControlMode == SAT_MODE_CONTINUOUS) {
-      // Task #42: Auto-enable PWM on sustained overshoot
-      if (boilerTemp >= finalSetpoint + 0.5f) {
-        if (_autoSwOvershootSince == 0) _autoSwOvershootSince = millis();
-        if ((millis() - _autoSwOvershootSince) >= 180000UL) { // 180s sustained (3 minutes)
-          state.sat.eControlMode = SAT_MODE_PWM;
-          _autoSwOvershootSince = 0;
-          DebugTln(F("SAT: auto-switch continuous->PWM (sustained overshoot 3min)"));
-        }
-      } else {
-        _autoSwOvershootSince = 0;
-      }
-    } else if (state.sat.eControlMode == SAT_MODE_PWM) {
-      // Task #43: Auto-disable PWM on sustained underheat
-      if (boilerTemp <= finalSetpoint - 0.3f) {
-        if (_autoSwUnderheatSince == 0) _autoSwUnderheatSince = millis();
-        if ((millis() - _autoSwUnderheatSince) >= 180000UL) { // 180s sustained
-          state.sat.eControlMode = SAT_MODE_CONTINUOUS;
-          _autoSwUnderheatSince = 0;
-          DebugTln(F("SAT: auto-switch PWM->continuous (sustained underheat 3min)"));
-        }
-      } else {
-        _autoSwUnderheatSince = 0;
-      }
-    }
+  // Delegated to satCycleCheckAutoSwitch() in SATcycles.ino which uses correct
+  // thresholds (3.0C overshoot margin, 60s sustain, 300s DHW post-overshoot guard).
+  if (!satAlwaysMaxModulation()) {
+    satCycleCheckAutoSwitch();
   }
 
   // Modulation suppression is handled via CS sequence in satApplyPWM() (PWM ON only)
@@ -3122,7 +3100,8 @@ void satControlLoop()
     } else if (state.sat.bModSuppressed) {
       mmValue = 0;
     } else if (state.sat.eControlMode == SAT_MODE_PWM) {
-      mmValue = 0;
+      // ON phase: suppress modulation (MM=0); OFF phase: send floor so boiler behaves correctly
+      mmValue = state.sat.bPwmFlameRequested ? 0 : settings.sat.iMaxRelModulation;
     } else {
       mmValue = settings.sat.iMaxRelModulation;
     }

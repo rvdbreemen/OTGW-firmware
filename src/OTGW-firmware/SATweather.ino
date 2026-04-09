@@ -127,7 +127,7 @@ void weatherFetch()
 
   WiFiClient client;
   HTTPClient http;
-  http.setTimeout(10000);  // 10s timeout
+  http.setTimeout(5000);   // 5s timeout — ESP8266 HW WDT fires at ~8s; stay well within margin
 
   if (!http.begin(client, url)) {
     DebugTln(F("Weather: http.begin() failed"));
