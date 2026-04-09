@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.3.7-beta
+**  Version  : v1.3.8-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1157,8 +1157,8 @@ static bool resolveSourceIndex(byte rsptype, uint8_t &sourceIndex) {
   switch (rsptype) {
     case OTGW_THERMOSTAT:        sourceIndex = 0; return true;
     case OTGW_BOILER:            sourceIndex = 1; return true;
-    case OTGW_REQUEST_BOILER:
-    case OTGW_ANSWER_THERMOSTAT: sourceIndex = 2; return true;
+    case OTGW_ANSWER_THERMOSTAT: sourceIndex = 1; return true;  // OTGW answers as boiler — value is boiler-side
+    case OTGW_REQUEST_BOILER:    sourceIndex = 2; return true;  // OTGW requests for itself — gateway source
     default: return false;
   }
 }
