@@ -1,7 +1,7 @@
 ---
 id: TASK-215
 title: 'SAT: Document WebUI settings fields for SAT (all settings not in dashboard)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 05:25'
