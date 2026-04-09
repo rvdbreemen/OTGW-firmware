@@ -4,7 +4,160 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-**Current version: v1.3.5** -- [Release notes](RELEASE_NOTES_1.3.5.md) | [Previous releases](docs/releases/)
+## What's New in v1.4.0
+
+Version 1.4.0 is a major feature release. It adds SAT (Smart Autotune Thermostat), an embedded heating controller that turns the OTGW into a standalone smart thermostat. It also introduces ESP32 support through a unified platform abstraction layer. Full release notes: [RELEASE_NOTES_1.4.0.md](RELEASE_NOTES_1.4.0.md)
+
+### Highlights
+
+- **SAT (Smart Autotune Thermostat):** Embedded heating controller running entirely on the ESP. Weather-compensated heating curve + PID v3 controller with automatic gain tuning. Supports continuous modulation and PWM flame cycling, radiator and underfloor heating. Six independent safety layers. Web UI dashboard, REST API, MQTT, and Home Assistant auto-discovery. No HA or external controller required.
+- **ESP32 support (experimental):** The firmware now compiles for both ESP8266 and ESP32 from one source tree. 30+ platform shim functions abstract away SDK differences at compile time.
+- **PlatformIO build system:** New `platformio.ini` with `esp8266` and `esp32` environments. Build with `pio run -e esp8266` or `pio run -e esp32`.
+- **Board-level GPIO definitions:** Auto-detected pin mappings per platform via `boards.h`.
+- **OpenTherm enum modernization:** Binary literals updated to C++14 standard format for better compiler compatibility.
+- **No breaking changes** vs v1.3.4. The ESP8266 build is functionally identical.
+
+## SAT - Smart Autotune Thermostat
+
+SAT is an embedded heating controller that runs entirely on the ESP and turns the OTGW into a standalone smart thermostat. It sits between the OpenTherm bus and the boiler, computing and sending the optimal flow temperature setpoint without needing an external controller or Home Assistant.
+
+### What SAT does
+
+SAT combines a **weather-compensated heating curve** with a **PID v3 controller** that adjusts the flow temperature setpoint based on measured room temperature error. It learns your boiler's behavior over time through automatic gain tuning and a thermal model.
+
+Key capabilities:
+
+- **Weather-compensated heating curve**: calculates the base flow temperature from the outdoor temperature using a configurable coefficient.
+- **PID v3 control**: proportional + integral + derivative correction on top of the heating curve to hold the target room temperature.
+- **Auto-tune**: automatically adjusts PID gains based on cycle analysis, so you don't have to tune them manually.
+- **Two control modes**: continuous modulation (modulates boiler flame directly) and PWM cycling (on/off flame with configurable duty cycle).
+- **Six independent safety layers**: flame health, CH sync, setpoint mismatch, pressure monitoring, cycle classification, and overshoot detection.
+- **Heating curve recommendation**: analyzes error statistics and suggests whether to increase or decrease the curve coefficient.
+- **OPV calibration**: finds your boiler's Overpressure Valve (pressure relief valve) opening temperature so SAT stays below it.
+- **Presets**: six named presets (comfort, eco, away, sleep, activity, home) with configurable target temperatures.
+- **Multi-area room temperature**: averages temperature readings from up to four zones for more accurate control.
+- **Solar gain compensation**: detects solar gain from indoor temperature rise rate and sun elevation, and reduces the setpoint to avoid overheating.
+- **Summer simmer mode**: suppresses heating when outdoor temperature stays above a threshold for a configurable number of hours.
+- **Pressure monitoring**: tracks system pressure and raises an alarm when it drops below the minimum or falls too fast.
+- **BLE temperature sensor** (ESP32 only): receives room temperature and humidity from a Bluetooth LE sensor (e.g., Xiaomi/PVVX).
+
+### Hardware support
+
+| Platform | SAT | BLE sensor |
+| -------- | --- | ---------- |
+| ESP8266 (NodeMCU, Wemos D1 mini) | Full support | Not available |
+| ESP32 | Full support | Available |
+
+### Quick start
+
+1. Open the OTGW Web UI and go to **SAT** in the navigation.
+2. Enable SAT and set your target room temperature.
+3. Configure your heating system type (radiators / underfloor / heat pump).
+4. Set your boiler capacity (kW) for accurate power estimation.
+5. Let the auto-tune run for a few days to optimize PID gains.
+
+For detailed setup, including heating curve tuning, OPV calibration, and Home Assistant automation examples, see the [SAT integration guide](backlog/docs/doc-3%20-%20sat-integration-guide.md).
+
+### Integration
+
+SAT integrates with Home Assistant via MQTT auto-discovery. When SAT is enabled and MQTT is configured:
+
+- A `climate` entity appears in HA with target temperature control and heat/off mode.
+- 40+ sensor and binary_sensor entities appear for all SAT state, diagnostics, and settings.
+- Commands can be sent via MQTT topics or the REST API.
+
+| Interface | Reference |
+| --------- | --------- |
+| MQTT topics (published and subscribed) | [MQTT topic reference](docs/api/MQTT.md) / [Full SAT topic inventory](backlog/docs/doc-1%20-%20sat-mqtt-topics.md) |
+| REST API | [OpenAPI spec](docs/api/openapi.yaml) — all `/api/v2/sat/*` endpoints |
+| OPV calibration guide | [OPV calibration](backlog/docs/doc-2%20-%20sat-opv-calibration.md) |
+| Preset configuration | [Preset configuration](backlog/docs/doc-4%20-%20sat-preset-configuration.md) |
+
+---
+
+## What was new in v1.3.4
+
+Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](RELEASE_NOTES_1.3.4.md)
+
+## What was new in v1.3.3
+
+Version 1.3.3 adds PIC-less OTGW support and fixes the dashboard showing empty values for unsupported OpenTherm message IDs. Full release notes: [RELEASE_NOTES_1.3.3.md](RELEASE_NOTES_1.3.3.md)
+
+## What was new in v1.3.2
+
+Version 1.3.2 fixes the persistent file explorer failures reported after v1.3.1. Full release notes: [RELEASE_NOTES_1.3.2.md](RELEASE_NOTES_1.3.2.md)
+
+## What was new in v1.3.1
+
+Version 1.3.1 was a stability release fixing command queue reliability, CS override interference, and serial coordination issues reported after v1.3.0. Full release notes: [RELEASE_NOTES_1.3.1.md](RELEASE_NOTES_1.3.1.md)
+
+## What was new in v1.3.0
+
+Version 1.3.0 is a major feature release building on v1.2.0 with PIC settings visibility, safer upgrades, better recovery, optional admin protection, fuller `PS=1` integration, and significantly lower RAM pressure. Full release notes: [RELEASE_NOTES_1.3.0.md](RELEASE_NOTES_1.3.0.md) / [Breaking Changes Log](docs/BREAKING_CHANGES.md)
+
+### Highlights
+
+- **PIC Gateway Settings Panel:** All 15 PIC configuration registers (setpoint override, GPIO, LEDs, tweaks, smart power, thermostat detection, etc.) are now exposed via REST API (`/api/v2/pic/settings`), MQTT, and a new "Gateway Settings" section in the Web UI. Settings are read on-demand from the PIC (one PR= every 3s, full cycle ~45s) and cached in the browser with localStorage for up to 7 days. Live values show in green, cached in amber.
+- **Single-Click GitHub Release OTA:** The update page now lists GitHub releases with Installed/Update/Rollback badges. One-click download and flash with semver-aware version comparison including pre-release tags.
+- **Optional Protected Admin Endpoints:** Settings, maintenance, file-management, reboot, and OTA routes can now be protected with HTTP Basic Auth.
+- **Configurable MQTT Publish Gating:** OpenTherm and `PS=1` summary publishing can now be rate-limited to reduce MQTT broker load and WiFi chatter, with better status republish behavior after boot and reconnect.
+- **Full `PS=1` Summary Integration:** `PS=1` output is now translated into the normal data pipeline, published to MQTT, and exposed to Home Assistant discovery.
+- **Web UI Enhancements:** Light/dark theme toggle, one-shot OTGW PIC commands from the monitor page, richer settings tooltips, gateway mode indicator, WebSocket connection status with tooltips, simulation badge, and improved heap/device reporting.
+- **Safer OTA / LittleFS Updates:** Reboot verification via `/api/v2/health`, browser backups of `settings.ini` and `dallas_labels.ini`, Dallas labels auto-preserved through localStorage, hardened filesystem flashing against WiFi reconnect corruption.
+- **Triple-Reset WiFi Recovery:** Three quick hardware resets within 10 seconds clear stored WiFi credentials and reopen the captive portal without requiring a reflash.
+- **Non-Blocking WiFi Reconnect:** The blocking 30-second reconnect loop is replaced with a state machine, preventing main-loop freezes on a heating system controller.
+- **Security Hardening:** Centralized HTTP Basic Auth enforcement for all POST/PUT API endpoints. CORS wildcard replaced with dynamic origin validation. Webhook hostname SSRF prevention via DNS resolution. XSS fix in statistics table. Boot command and MQTT payload validation. ~450 lines of dead code removed.
+- **Memory and Stability:** ArduinoJson removed, settings/state reorganized into structs, String class eliminated from hot paths including CSRF validation. MQTT autodiscovery memory reduced via streaming. ~1,400 bytes of stack pressure eliminated through centralized buffers. Fixed `millis()` wraparound bug, f8.8 negative value encoding, and OT message parse validation.
+- **No New Breaking Changes:** For v1.2.0 users, this release adds features and hardening without introducing new MQTT topic, REST API, or settings-format breaks.
+
+## What was new in v1.2.0
+
+Version 1.2.0 was the protocol-alignment and discovery release. It expanded Home Assistant coverage across the OpenTherm specification and tightened MQTT, REST API, and Web UI behavior. Full release notes: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md)
+
+### Highlights
+
+- **Complete Home Assistant discovery expansion:** 309 auto-discovery configurations across 80+ OpenTherm message IDs, covering heating, cooling, solar, DHW, ventilation, CH2, humidity, counters, and system status.
+- **OpenTherm v4.2 alignment:** Added missing IDs `39` and `93-97`, corrected types and units, and introduced compatibility handling for legacy IDs `50-63`.
+- **MQTT / webhook / diagnostics improvements:** Added optional source-separated MQTT topics, webhook support, safer MQTT auto-configuration, and richer serial/WebSocket diagnostics.
+- **v2-only API baseline:** `/api/v0/` and `/api/v1/` were removed in favor of `/api/v2/`, with related device-info key updates for raw API consumers.
+- **Upgrade note:** v1.2.0 introduced real migration items for MQTT topics, Home Assistant entities, and some raw API fields. See [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) and [docs/fixes/opentherm-v42-mqtt-breaking-changes.md](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
+
+## What was new in v1.1.0
+
+Version 1.1.0 builds on the stable v1.0.0 foundation with Dallas temperature sensor enhancements, a complete RESTful API v2, WebUI data persistence, and 20 bug fixes from a comprehensive codebase review. Full release notes: [RELEASE_NOTES_1.1.0.md](RELEASE_NOTES_1.1.0.md)
+
+### Dallas Sensors, RESTful API v2, and 20-Bug Codebase Overhaul
+
+**v1.1.0 delivers custom labels and real-time graphs for Dallas temperature sensors, a fully RESTful API v2 with 13 new endpoints (compliance score 5.4 → 8.5/10), and resolution of 20 bugs spanning memory safety, data integrity, concurrency, and security.**
+
+- **Dallas Sensor Custom Labels & Graphs** — Inline label editing in the Web UI, stored in `/dallas_labels.ini` with zero backend RAM, automatic backup/restore during filesystem flash, and real-time graph visualization with 16-color palette. REST API: `GET/POST /api/v2/sensors/labels`.
+- **RESTful API v2** — 13 new endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS/OPTIONS support, RESTful resource naming (`messages/{id}`, `commands`, `device/info`). All frontend calls migrated to v2. See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
+- **20-bug codebase review** — Memory safety (OOB write, stack overflow), data integrity (MQTT hour bitmask, −127°C sensor published to MQTT), concurrency (ISR race in S0 counter), security (reflected XSS), reliability (file descriptor leak, null pointer crash, 750ms blocking sensor read), GPIO output feature fix, flash wear reduction (20 writes → 1). Full details: [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md).
+- **WebUI Data Persistence** — Automatic `localStorage` persistence with debounced saves, dynamic memory management, normal/capture modes, and auto-restoration on page load.
+- **Heap Memory Monitoring** — 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control ([ADR-030](docs/adr/ADR-030-heap-memory-monitoring.md)).
+- **Browser Debug Console (`otgwDebug`)** — Full diagnostic toolkit in the browser console: `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `sendCmd()`, `exportLogs()`, and more.
+- **PS Mode detection** — Automatic detection of `PS=1`; hides the OT log section, disables WebSocket streaming, suppresses time-sync commands.
+- **MQTT auth fix** — Whitespace automatically trimmed from MQTT credentials, fixing auth failures when upgrading from v0.10.x.
+
+### Notes for upgraders from v1.0.x
+
+No breaking API or MQTT changes. A filesystem flash and hard browser refresh (Ctrl+F5) are recommended. The v0 and unversioned REST API endpoints deprecated in this release were removed in v1.2.0 (return 410 Gone).
+
+## 🏁 Introduced in v1.0.0
+
+Version 1.0.0 was a major milestone delivering improved stability, a modern user interface, and robust integration.
+
+> 📝 Full release notes: [RELEASE_NOTES_1.0.0.md](RELEASE_NOTES_1.0.0.md)
+
+### Highlights
+
+- **Real-Time Graphs & Statistics**: Live boiler data visualization (temperatures, setpoints) with responsive graphs and a long-term statistics dashboard.
+- **Modern Web UI**: Fully integrated Dark Mode, responsive mobile design, redesigned File System Explorer, and WebSocket-based live log viewer.
+- **Improved Flashing**: Reliable web-based firmware and filesystem flashing with health-check reboot verification. New `flash_esp.py` script for easy updates.
+- **MQTT Auto Discovery**: Added Outside Temperature override (`outside`) support; static 1350-byte MQTT buffer prevents heap fragmentation.
+- **Binary Safety**: Critical fix for Exception (2) crashes during PIC flashing (`strncmp_P` → `memcmp_P`).
+- **Connectivity & Security**: Rewritten Wi-Fi logic with improved watchdog handling; CSRF protection, masked password fields, input sanitization.
+- **Gateway Mode**: Reliable detection using `PR=M` command. New `NTPsendtime` setting.
 
 ---
 
