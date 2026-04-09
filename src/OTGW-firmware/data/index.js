@@ -2901,6 +2901,12 @@ function initMainPage() {
   );
 
 
+  // WiFi reset button on settings page
+  var wifiResetBtn = document.getElementById('btnResetWifi');
+  if (wifiResetBtn) {
+    wifiResetBtn.addEventListener('click', resetWifi);
+  }
+
   // Restore data from localStorage to prevent loss on page reload
   restoreDataFromLocalStorage();
   
@@ -5295,6 +5301,30 @@ function handleFlashMessage(data) {
     }
     return false;
 }
+
+//============================================================================
+function resetWifi() {
+  if (!confirm('This will clear the saved WiFi credentials and reboot the device into WiFi setup mode.\n\nAre you sure?')) return;
+
+  var btn = document.getElementById('btnResetWifi');
+  var hint = document.querySelector('.wifi-reset-hint');
+  if (btn) { btn.disabled = true; btn.textContent = 'Resetting\u2026'; }
+  if (hint) hint.textContent = 'Clearing WiFi credentials and rebooting\u2026';
+
+  fetch(APIGW + 'v2/wifi/reset', { method: 'POST' })
+    .then(function(response) {
+      if (!response.ok) { throw new Error('HTTP ' + response.status); }
+      return response.json();
+    })
+    .then(function() {
+      if (hint) hint.textContent = 'Device is rebooting into WiFi setup mode. Connect to the OTGW access point to reconfigure WiFi.';
+    })
+    .catch(function(error) {
+      console.error('WiFi reset error:', error);
+      if (hint) hint.textContent = 'Error: ' + error.message;
+      if (btn) { btn.disabled = false; btn.textContent = 'Reset WiFi'; }
+    });
+} // resetWifi()
 
 /*
 ***************************************************************************

@@ -144,6 +144,7 @@ static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPM
 static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleWifi(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTGWvalue(int msgid);
 void sendOTGWlabel(const char *msglabel);
@@ -396,6 +397,22 @@ static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
   }
 }
 
+// POST /api/v2/wifi/reset — clear WiFi credentials and reboot into AP config portal.
+// Auth required (enforced centrally for all POST mutations).
+static void handleWifi(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (wc > 4 && strcmp_P(words[4], PSTR("reset")) == 0) {
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
+    DebugTln(F("WiFi reset requested via API"));
+    resetWiFiSettings();
+    sendCorsOriginHeader();
+    httpServer.send(200, F("application/json"),
+      F("{\"wifi_reset\":{\"success\":true,\"message\":\"WiFi credentials cleared, rebooting...\"}}"));
+    doRestart("WiFi reset via API");
+  } else {
+    sendApiNotFound(originalURI);
+  }
+}
+
 //=== Route dispatch table (ADR-050) ===
 // Adding a new v2 resource: (1) write handler function above, (2) add entry below.
 typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
@@ -416,6 +433,7 @@ static const char kRouteFilesystem[] PROGMEM = "filesystem";
 static const char kRouteSimulate[]   PROGMEM = "simulate";
 static const char kRouteOtgw[]       PROGMEM = "otgw";
 static const char kRouteWebhook[]    PROGMEM = "webhook";
+static const char kRouteWifi[]       PROGMEM = "wifi";
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -429,6 +447,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteSimulate,   handleSimulate },
   { kRouteOtgw,       handleOtgw },
   { kRouteWebhook,    handleWebhook },
+  { kRouteWifi,       handleWifi },
   { nullptr,          nullptr }  // sentinel
 };
 

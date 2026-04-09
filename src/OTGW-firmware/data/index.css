@@ -1152,3 +1152,27 @@ body.disable-interaction {
   margin-right: 8px;
   cursor: pointer;
 }
+
+/* WiFi reset section on settings page */
+.wifi-reset-section {
+  margin-top: 24px;
+  padding: 12px 16px;
+  border-top: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.btn-wifi-reset {
+  background-color: #ffc107 !important;
+  color: #000 !important;
+  width: auto !important;
+  padding: 0 14px !important;
+  white-space: nowrap;
+}
+.btn-wifi-reset:hover {
+  background-color: #e0a800 !important;
+}
+.wifi-reset-hint {
+  font-size: 0.875em;
+  color: #555;
+}
