@@ -35,23 +35,8 @@ static uint8_t  _hourCycleHead  = 0;  // next write position
 static uint8_t  _hourCycleCount = 0;  // valid entries (0..SAT_MAX_CYCLES_PER_HOUR)
 
 // --- Rolling 4-hour cycle window (Task #227) ---
-// ESP8266: 30 slots x 24 bytes =  720 bytes SRAM (covers ~2h at 4-min avg cycle period).
-// ESP32:  360 slots x 24 bytes = 8640 bytes SRAM (covers 12h of 2-min cycle history).
-#if defined(ESP8266)
-  #define SAT_WIN4H_SIZE 30
-#else
-  #define SAT_WIN4H_SIZE 360
-#endif
+// SAT_WIN4H_SIZE and SATWindowRecord are defined in OTGW-firmware.h (ahead of all .ino files).
 static const uint32_t SAT_WIN4H_SPAN_MS = 4UL * 3600UL * 1000UL; // 4 hours in ms
-
-struct SATWindowRecord {
-  uint32_t endMs;          // millis() when flame went OFF (cycle end)
-  uint32_t onDurationMs;   // flame-ON duration for this cycle
-  uint32_t offDurationMs;  // flame-OFF gap that preceded this cycle
-  float    p90FlowTemp;    // 90th percentile flow temp during this cycle (°C)
-  float    avgFlowRetDelta;// average (Tboiler - Tret) during this cycle (°C); <0 if no data
-  uint8_t  eClass;         // SATCycleClass cast to uint8_t
-};
 
 static SATWindowRecord _win4h[SAT_WIN4H_SIZE];
 #if defined(ESP8266)
@@ -147,7 +132,8 @@ static uint8_t        _cycleHistoryCount = 0;
 #endif
 static const float    HCR_THRESHOLD_C   = 0.5f;  // median error threshold (°C)
 static const uint8_t  HCR_SUSTAIN_DAYS  = 3;     // consecutive days needed for a recommendation
-static const char*    SAT_HCR_FILE PROGMEM = "/sat_hcr.json";
+static const char SAT_HCR_FILE_OLD[] PROGMEM = "/sat_hcr.json";
+static const char SAT_HCR_FILE[]     PROGMEM = "/sat/sat_hcr.json";
 
 // Ring buffer of daily median errors (oldest → newest)
 static float    _hcr_dailyMedian[HCR_DAYS]; // raw daily medians
@@ -764,36 +750,44 @@ void satHCRSaveState()
 {
   File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "w");
   if (!f) return;
-  // Format: {"n":N,"h":H,"d":[v0,v1,...,vN-1]}
-  // Buffer: header(~20) + HCR_DAYS * 8 chars/float + footer(2); sized for largest platform.
-#if defined(ESP8266)
-  char buf[128];   // 7 days: ~71 bytes needed
-#else
-  char buf[320];   // 30 days: ~252 bytes needed
-#endif
-  int pos = snprintf_P(buf, sizeof(buf), PSTR("{\"n\":%u,\"h\":%u,\"d\":["),
-                       (unsigned)_hcr_count, (unsigned)_hcr_head);
+  // Format: {"ts":T,"n":N,"h":H,"d":[v0,...,vN-1],"sn":SC,"s":[s0,...,sSC-1]}
+  // Written chunk-by-chunk to avoid a large stack buffer.
+  time_t ts = time(nullptr);
+  char hdr[48];
+  snprintf_P(hdr, sizeof(hdr), PSTR("{\"ts\":%lu,\"n\":%u,\"h\":%u,\"d\":["),
+             (unsigned long)ts, (unsigned)_hcr_count, (unsigned)_hcr_head);
+  f.print(hdr);
   for (uint8_t i = 0; i < HCR_DAYS; i++) {
     char fBuf[8];
     dtostrf(_hcr_dailyMedian[i], 1, 2, fBuf);
-    pos += snprintf_P(buf + pos, sizeof(buf) - pos, PSTR("%s%s"),
-                      fBuf, (i < HCR_DAYS - 1) ? "," : "");
+    f.print(fBuf);
+    if (i < HCR_DAYS - 1) f.print(F(","));
   }
-  strlcat(buf, "]}", sizeof(buf));
-  f.print(buf);
+  // Intraday samples: cap at 96 to bound file size on all platforms
+  uint16_t saveSamples = (_hcr_sCount > 96) ? 96 : _hcr_sCount;
+  char shdr[24];
+  snprintf_P(shdr, sizeof(shdr), PSTR("],\"sn\":%u,\"s\":["), (unsigned)saveSamples);
+  f.print(shdr);
+  for (uint16_t i = 0; i < saveSamples; i++) {
+    uint16_t src = (uint16_t)((_hcr_sHead + HCR_INTRADAY_SIZE - saveSamples + i) % HCR_INTRADAY_SIZE);
+    char fBuf[8];
+    dtostrf(_hcr_samples[src], 1, 2, fBuf);
+    f.print(fBuf);
+    if (i < saveSamples - 1) f.print(F(","));
+  }
+  f.print(F("]}"));
   f.close();
 }
 
 //--- Load HCR state from LittleFS (called from satCycleInit when NTP is valid) ---
 void satHCRLoadState()
 {
+  satMigrateFile(SAT_HCR_FILE_OLD, SAT_HCR_FILE);
   File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "r");
   if (!f) return;
-#if defined(ESP8266)
-  char buf[128];   // 7 days: ~71 bytes in file
-#else
-  char buf[320];   // 30 days: ~252 bytes in file
-#endif
+  // File now includes intraday samples; max size on ESP8266 ~878 bytes.
+  // Static buffer: persists in BSS, not re-entrant, called once at boot.
+  static char buf[960];
   size_t len = f.readBytes(buf, sizeof(buf) - 1);
   buf[len] = 0;
   f.close();
@@ -807,16 +801,36 @@ void satHCRLoadState()
   _hcr_count = (uint8_t)n;
   _hcr_head  = (uint8_t)h;
 
-  // Parse array: walk past "d":[ then read comma-separated floats
+  // Parse daily median array
   p = strstr(buf, "\"d\":[");
   if (p) {
-    p += 5; // skip past "d":[
+    p += 5;
     for (uint8_t i = 0; i < HCR_DAYS; i++) {
       _hcr_dailyMedian[i] = strtof(p, &p);
       if (*p == ',') p++;
     }
   }
-  DebugTf(PSTR("SAT HCR: loaded %u days\r\n"), (unsigned)_hcr_count);
+
+  // Restore intraday samples (Task #237)
+  unsigned sn = 0;
+  if ((p = strstr(buf, "\"sn\":")) != nullptr) sn = (unsigned)atoi(p + 5);
+  p = strstr(buf, "\"s\":[");
+  if (p && sn > 0) {
+    p += 5;
+    uint16_t limit = (sn > HCR_INTRADAY_SIZE) ? HCR_INTRADAY_SIZE : (uint16_t)sn;
+    _hcr_sHead  = 0;
+    _hcr_sCount = 0;
+    for (uint16_t i = 0; i < limit; i++) {
+      float v = strtof(p, &p);
+      _hcr_samples[_hcr_sHead] = v;
+      _hcr_sHead = (_hcr_sHead + 1) % HCR_INTRADAY_SIZE;
+      if (_hcr_sCount < HCR_INTRADAY_SIZE) _hcr_sCount++;
+      if (*p == ',') p++;
+    }
+  }
+
+  DebugTf(PSTR("SAT HCR: loaded %u days, %u intraday samples\r\n"),
+          (unsigned)_hcr_count, (unsigned)_hcr_sCount);
 }
 
 //--- Reset the daily median recommendation (called when SAT disabled) ---
@@ -913,5 +927,117 @@ const char* satHeatingCurveRecommendation()
   DebugTf(PSTR("SAT HCR: recommendation=%s (inc=%u dec=%u n=%u)\r\n"),
           rec, (unsigned)consecIncrease, (unsigned)consecDecrease, (unsigned)_hcr_count);
   return state.sat.sHeatCurveRec;
+}
+
+//=== Cycle Window Persistence (Task #237) ===
+// Persists the _win4h ring buffer to /sat/sat_cycles.json, capped at 60 entries.
+// SAT_CYCLES_FILE is defined in SATcontrol.ino (compiled before SATcycles.ino).
+static const uint32_t SAT_CYCLES_STALE_SEC = 14400UL; // 4h stale threshold
+
+void satSaveCycleWindow()
+{
+  File f = LittleFS.open(FPSTR(SAT_CYCLES_FILE), "w");
+  if (!f) return;
+  uint8_t toWrite = (_win4hCount > 60) ? 60 : (uint8_t)_win4hCount;
+  time_t ts = time(nullptr);
+  char hdr[48];
+  snprintf_P(hdr, sizeof(hdr), PSTR("{\"ts\":%lu,\"n\":%u,\"r\":["),
+             (unsigned long)ts, (unsigned)toWrite);
+  f.print(hdr);
+  for (uint8_t i = 0; i < toWrite; i++) {
+    uint8_t idx = (uint8_t)((_win4hHead + SAT_WIN4H_SIZE - toWrite + i) % SAT_WIN4H_SIZE);
+    char fBuf1[8], fBuf2[8];
+    dtostrf(_win4h[idx].p90FlowTemp, 1, 1, fBuf1);
+    dtostrf(_win4h[idx].avgFlowRetDelta, 1, 1, fBuf2);
+    char rec[80];
+    snprintf_P(rec, sizeof(rec),
+               PSTR("{\"e\":%lu,\"on\":%lu,\"off\":%lu,\"f\":%s,\"d\":%s,\"c\":%u}%s"),
+               (unsigned long)_win4h[idx].endMs,
+               (unsigned long)_win4h[idx].onDurationMs,
+               (unsigned long)_win4h[idx].offDurationMs,
+               fBuf1, fBuf2, (unsigned)_win4h[idx].eClass,
+               (i < toWrite - 1) ? "," : "");
+    f.print(rec);
+  }
+  f.print(F("]}"));
+  f.close();
+  DebugTf(PSTR("SAT: cycle window saved (%u records)\r\n"), (unsigned)toWrite);
+}
+
+void satLoadCycleWindow()
+{
+  File f = LittleFS.open(FPSTR(SAT_CYCLES_FILE), "r");
+  if (!f) return;
+  // Read header first to get ts and n
+  char hdr[48];
+  size_t hlen = f.readBytes(hdr, sizeof(hdr) - 1);
+  hdr[hlen] = 0;
+  f.close();
+
+  unsigned long savedTs = 0;
+  unsigned n = 0;
+  char* p;
+  if ((p = strstr(hdr, "\"ts\":")) != nullptr) savedTs = strtoul(p + 5, nullptr, 10);
+  if ((p = strstr(hdr, "\"n\":"))  != nullptr) n = (unsigned)atoi(p + 4);
+
+  // Stale check: discard if NTP available and data is too old
+  time_t nowTs = time(nullptr);
+  if (nowTs > 1000000L && savedTs > 0) {
+    uint32_t age = (uint32_t)((unsigned long)nowTs - savedTs);
+    if (age > SAT_CYCLES_STALE_SEC) {
+      DebugTf(PSTR("SAT: cycle window discarded (stale, age=%lus)\r\n"), (unsigned long)age);
+      LittleFS.remove(FPSTR(SAT_CYCLES_FILE));
+      return;
+    }
+  }
+  if (n == 0) return;
+
+  // Re-read full file.
+#if defined(ESP8266)
+  static char fbuf[2560]; // 30 records * ~80 chars + header ~50 = ~2450 bytes
+#else
+  static char fbuf[4896]; // 60 records * ~80 chars + header ~50 = ~4850 bytes
+#endif
+  f = LittleFS.open(FPSTR(SAT_CYCLES_FILE), "r");
+  if (!f) return;
+  size_t flen = f.readBytes(fbuf, sizeof(fbuf) - 1);
+  fbuf[flen] = 0;
+  f.close();
+
+  char* arr = strstr(fbuf, "\"r\":[");
+  if (!arr) return;
+  arr += 5;
+
+  uint8_t loaded = 0;
+  while (*arr && *arr != ']' && loaded < n && loaded < SAT_WIN4H_SIZE) {
+    if (*arr != '{') { arr++; continue; }
+    SATWindowRecord rec;
+    memset(&rec, 0, sizeof(rec));
+    char* ep = arr;
+    char* vp;
+    if ((vp = strstr(ep, "\"e\":"))   != nullptr) rec.endMs           = strtoul(vp + 4,  nullptr, 10);
+    if ((vp = strstr(ep, "\"on\":"))  != nullptr) rec.onDurationMs    = strtoul(vp + 5,  nullptr, 10);
+    if ((vp = strstr(ep, "\"off\":")) != nullptr) rec.offDurationMs   = strtoul(vp + 6,  nullptr, 10);
+    if ((vp = strstr(ep, "\"f\":"))   != nullptr) rec.p90FlowTemp     = strtof(vp + 4,   nullptr);
+    if ((vp = strstr(ep, "\"d\":"))   != nullptr) rec.avgFlowRetDelta = strtof(vp + 4,   nullptr);
+    if ((vp = strstr(ep, "\"c\":"))   != nullptr) rec.eClass          = (uint8_t)atoi(vp + 4);
+    _win4h[_win4hHead] = rec;
+    _win4hHead = (_win4hHead + 1) % SAT_WIN4H_SIZE;
+    if (_win4hCount < SAT_WIN4H_SIZE) _win4hCount++;
+    loaded++;
+    char* end = strchr(arr, '}');
+    if (!end) break;
+    arr = end + 1;
+    if (*arr == ',') arr++;
+  }
+  DebugTf(PSTR("SAT: cycle window restored (%u records)\r\n"), (unsigned)loaded);
+}
+
+void satFlushCycleWindow()
+{
+  LittleFS.remove(FPSTR(SAT_CYCLES_FILE));
+  _win4hHead  = 0;
+  _win4hCount = 0;
+  DebugTln(F("SAT: cycle window flushed"));
 }
 

@@ -639,6 +639,7 @@ static bool satRequestHasDetailFull()
 // POST /api/v2/sat/externaloutdoor      — push outdoor temp
 // POST /api/v2/sat/humidity             — push indoor humidity (0-100%)
 // POST /api/v2/sat/area/<0-3>           — push area temperature (multi-area)
+// POST /api/v2/sat/flush                — flush short-lived data (PID integral + cycle window)
 // POST /api/v2/sat/settings/<name>      — update any SAT setting (mirrors all MQTT sat/* commands)
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
 {
@@ -712,6 +713,12 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
     satResetIntegral();
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\",\"integral\":0}"));
+  }
+  else if (strcasecmp_P(sub, PSTR("flush")) == 0) {
+    // POST /api/v2/sat/flush — clear short-lived SAT data (PID integral + cycle window) (Task #237)
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    satFlushShortLivedData();
+    httpServer.send(200, F("application/json"), F("{\"result\":\"ok\",\"flushed\":[\"pid\",\"cycles\"]}"));
   }
   else if (strcasecmp_P(sub, PSTR("window")) == 0) {
     if (method == HTTP_POST || method == HTTP_PUT) {

@@ -3,9 +3,11 @@ id: TASK-206
 title: >-
   SAT fix: COLD_SETPOINT behavior mismatch - Python uses 22C idle, C++ uses CS=0
   release
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-09 05:23'
+updated_date: '2026-04-09 10:34'
 labels:
   - audit-fix
 dependencies: []
@@ -20,7 +22,21 @@ Python uses COLD_SETPOINT=22C as the boiler setpoint when SAT is in OFF mode or 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Behavior is documented: intentional CS=0 (release to thermostat) or CS=22 (warm idle)
+- [x] #1 Behavior is documented: intentional CS=0 (release to thermostat) or CS=22 (warm idle)
 - [ ] #2 If CS=22 is chosen: summer mode, valve-closed, and DHW-priority correctly set warm idle
-- [ ] #3 If CS=0 is chosen: existing behavior is preserved and documented as deliberate design choice
+- [x] #3 If CS=0 is chosen: existing behavior is preserved and documented as deliberate design choice
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Find CS=0 release in satDisable
+2. Add explanatory comment
+3. Document as deliberate design choice
+<!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Documented CS=0 (release to thermostat) as the deliberate OTGW design choice when SAT is disabled. Python SAT uses CS=22 warm-idle because it is a standalone HA thermostat replacement; OTGW firmware is a gateway sitting between thermostat and boiler, so it defers to the physical thermostat instead. Added a 5-line explanatory comment in satDisable() in SATcontrol.ino at the addCommandToQueue(CS=0) call site, replacing the previous single-line comment. No logic changed -- existing behavior is correct and preserved.
+<!-- SECTION:FINAL_SUMMARY:END -->

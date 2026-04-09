@@ -864,6 +864,13 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             } else if (strcasecmp_P(satSubCmd, PSTR("solar_min_elevation")) == 0) {
               // sat/solar_min_elevation — set minimum sun elevation threshold (Task #68)
               updateSetting("SATsolarminelev", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("flush")) == 0) {
+              // sat/flush — clear short-lived SAT data (PID integral + cycle window) (Task #237)
+              satFlushShortLivedData();
+              MQTTDebugln(F("SAT: flushed short-lived data via MQTT"));
+            } else if (strcasecmp_P(satSubCmd, PSTR("flush_threshold_h")) == 0) {
+              // sat/flush_threshold_h — configure auto-flush threshold in hours (Task #237)
+              updateSetting("SATflushtreshold", msgPayload);
             } else {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }

@@ -1,11 +1,11 @@
 ---
 id: TASK-223
 title: 'SAT: Implement stalled-ignition adaptive threshold'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 05:29'
-updated_date: '2026-04-09 06:21'
+updated_date: '2026-04-09 06:24'
 labels:
   - audit-fix
   - sat

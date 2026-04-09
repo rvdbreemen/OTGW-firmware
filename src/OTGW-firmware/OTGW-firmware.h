@@ -193,6 +193,11 @@ uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();
 bool    satCycleIsHourLimitReached();
 uint8_t satCycleGetCyclesThisHour();
+void satHCRSaveState();
+void satHCRLoadState();
+void satHCRReset();
+void satHCRAddSample();
+const char* satHeatingCurveRecommendation();
 
 //===================[ Hardware Mode — detected at boot ]===================
 enum OTGWHardwareMode : uint8_t {
@@ -389,6 +394,24 @@ enum SATBoilerStatus : uint8_t {
   SAT_BS_HEATING, SAT_BS_COOLING
 };
 
+// --- SAT rolling 4-hour window buffer size (Task #227/#236) ---
+// ESP8266: 30 slots (covers ~2h at 4-min avg cycle); ESP32: 360 slots (covers 12h of 2-min cycle history).
+#if defined(ESP8266)
+  #define SAT_WIN4H_SIZE 30
+#else
+  #define SAT_WIN4H_SIZE 360
+#endif
+
+// Record for each completed flame cycle stored in the rolling 4-hour window
+struct SATWindowRecord {
+  uint32_t endMs;           // millis() when flame went OFF (cycle end)
+  uint32_t onDurationMs;    // flame-ON duration for this cycle
+  uint32_t offDurationMs;   // flame-OFF gap that preceded this cycle
+  float    p90FlowTemp;     // 90th percentile flow temp during this cycle (°C)
+  float    avgFlowRetDelta; // average (Tboiler - Tret) during this cycle (°C); <0 if no data
+  uint8_t  eClass;          // SATCycleClass cast to uint8_t
+};
+
 struct SATRuntimeSection {         // state.sat — SAT thermostat controller state
   bool            bActive        = false;
   SATControlMode  eControlMode   = SAT_MODE_OFF;
@@ -495,7 +518,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fErrorStdDev           = 0.0f;
   uint8_t  iErrorSampleCount      = 0;     // Number of samples in error ring buffer
   // Daily median recommendation (Task #228): "INCREASE", "DECREASE", "HOLD", or "insufficient"
-  char     sHeatCurveRec[12]      = "insufficient";  // result string for MQTT / status JSON
+  char     sHeatCurveRec[13]      = "insufficient";  // result string for MQTT / status JSON
   // Flame health (Task #70/#71)
   SATFlameStatus eFlameStatus     = SAT_FS_INSUFFICIENT_DATA;
   // OT setpoint sync
@@ -844,6 +867,8 @@ struct SATSection {
   uint8_t  iCyclesPerHour     = 3;     // Target cycles per hour (2-6)
   float    fValveOffset       = 0.0f;  // Offset for TRV valve position detection (-1 to 1)
   bool     bSolarFreezeIntegral = true; // Freeze PID integral during solar gain compensation
+  // LittleFS persistence (Task #237)
+  uint16_t iSatFlushThresholdH = 24;   // Hours offline before short-lived SAT data is auto-flushed on next enable
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning
