@@ -25,12 +25,14 @@ static const float SAT_HC_REF_TEMP           = 20.0f;   // Reference temperature
 static const float SAT_MIN_SETPOINT          = 10.0f;   // Minimum boiler setpoint °C
 static const float SAT_MAX_SETPOINT_DEFAULT  = 75.0f;   // Default max boiler setpoint °C
 static const float SAT_FLOW_OFFSET_CONTINUOUS = 5.0f;   // Flow temp offset for continuous mode smoothing
-static const float SAT_PWM_MIN_ON_SEC        = 30.0f;   // Minimum flame-on time in PWM mode
+static const float SAT_PWM_MIN_ON_SEC        = 180.0f;  // Min flame-on time in PWM mode (matches Python HEATER_STARTUP_TIMEFRAME = 180s)
 
 // --- Safety Constants ---
 static const float    SAT_HARD_MAX_FLOOR     = 50.0f;   // Absolute ceiling for underfloor heating
 static const float    SAT_HARD_MAX_RAD       = 80.0f;   // Absolute ceiling for radiator heating
-static const uint32_t SAT_STALE_TEMP_MS      = 300000UL; // 5 min: external indoor temp considered stale
+static const float    SAT_GLOBAL_MAX_SETPOINT = 65.0f;  // Python MAXIMUM_SETPOINT: global safety ceiling for all heating systems
+static const uint32_t SAT_STALE_TEMP_BLE_MS  = 300000UL; // 5 min: BLE indoor temp considered stale
+static const uint32_t SAT_STALE_TEMP_MS      = 300000UL; // 5 min: legacy alias (kept for any future use)
 static const uint32_t SAT_STALE_OUTDOOR_MS   = 600000UL; // 10 min: external outdoor temp considered stale
 static const uint8_t  SAT_MAX_SKIP_COUNT     = 10;       // Consecutive invalid-input skips before disable
 static const uint8_t  SAT_MAX_PIC_FAILS      = 5;        // Consecutive PIC comm failures before disable
@@ -145,14 +147,25 @@ static uint8_t satGetEffectiveHeatingSystem()
   return settings.sat.iHeatingSystem;
 }
 
-// Returns max boiler setpoint for the current heating system
+// Returns max boiler setpoint for the current heating system.
+//
+// Task #230 -- 62C vs Python 55C for radiators: intentional and correct.
+// Python SAT calculate_default_maximum_setpoint() returns 55C as a conservative default
+// for modern condensing boilers with weather compensation. The C++ value of 62C is the
+// correct ceiling for traditional European high-temperature radiator systems (EN 12831,
+// typical design at -10C outdoor temp requires 70/60C or 75/65C flow/return). Modern
+// condensing boilers are typically limited by their own MaxTSet OT parameter (read in
+// satControlLoop), which caps this value in practice. 62C is therefore the right upper
+// bound for legacy radiators; the Python 55C is a conservative out-of-the-box default
+// for new installs and does not represent an OT spec requirement.
+// Heat pump: C++ 40C matches Python's heat pump cap -- no discrepancy there.
 static float satGetMaxSetpoint()
 {
   switch (satGetEffectiveHeatingSystem()) {
     case SAT_HSYS_HEAT_PUMP:  return 40.0f;
     case SAT_HSYS_UNDERFLOOR: return 45.0f;
     case SAT_HSYS_RADIATORS:
-    default:                  return 62.0f;
+    default:                  return 62.0f;  // 62C: correct for high-temp radiator systems (see comment above)
   }
 }
 
@@ -534,7 +547,10 @@ static float    _pwm_effectiveBoilerTemp    = 0.0f;
 static uint32_t _pwm_flameOnMs             = 0;
 static uint32_t _pwm_lastSampleMs          = 0;
 static bool     _pwm_waitingForFlame       = false;
+static uint32_t _pwm_waitForFlameStartMs   = 0;    // Timestamp when flame wait began (for 180s timeout)
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
+// Python HEATER_STARTUP_TIMEFRAME: max wait for ignition before giving up
+static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeout
 
 static float satApplyPWM(float pidOutput)
 {
@@ -569,9 +585,11 @@ static float satApplyPWM(float pidOutput)
   if (flame && _pwm_waitingForFlame) {
     _pwm_flameOnMs = millis();
     _pwm_waitingForFlame = false;
+    _pwm_waitForFlameStartMs = 0;  // Clear ignition timeout on successful ignition
   }
   if (!flame && !_pwm_waitingForFlame && state.sat.bPwmFlameRequested) {
     _pwm_waitingForFlame = true;
+    _pwm_waitForFlameStartMs = millis();  // Start ignition timeout timer
   }
 
   // --- Duty cycle thresholds derived from cycles_per_hour (per SAT Python pwm.py) ---
@@ -629,6 +647,17 @@ static float satApplyPWM(float pidOutput)
     }
     // Step 2: waiting for flame - send low CS to avoid overshoot on ignition
     if (_pwm_waitingForFlame) {
+      // 180s ignition timeout (Python HEATER_STARTUP_TIMEFRAME): if boiler fails to ignite,
+      // give up and switch to OFF phase, matching Python pwm.py:194-202 behavior.
+      if (_pwm_waitForFlameStartMs > 0 &&
+          (millis() - _pwm_waitForFlameStartMs) >= PWM_IGNITION_TIMEOUT_MS) {
+        DebugTln(F("SAT PWM: ignition timeout (180s), aborting ON phase"));
+        _pwm_waitingForFlame = false;
+        _pwm_waitForFlameStartMs = 0;
+        state.sat.bPwmFlameRequested = false;
+        _pwm_flameOffHoldSetpoint = 0.0f;
+        return SAT_MIN_SETPOINT;
+      }
       float cs = OTcurrentSystemState.Tret + settings.sat.fFlameOffOffset;
       if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
       if (cs > maxSetpoint) cs = maxSetpoint;
@@ -668,6 +697,7 @@ static float satApplyPWM(float pidOutput)
       _hourLimitLogged = false;  // reset latch when limit clears
       state.sat.bPwmFlameRequested = true;
       _pwm_waitingForFlame = true;
+      _pwm_waitForFlameStartMs = millis();  // Start ignition timeout timer (180s, Task #208)
       return pidOutput;
     }
     return SAT_MIN_SETPOINT;
@@ -715,7 +745,20 @@ void satHandlePreset(const char* value)
     state.sat.fPidI = 0.0f;
     DebugTf(PSTR("SAT: preset '%s' -> target %.1f, integral reset\r\n"), satGetPresetName(newPreset), newTarget);
   } else {
-    // Preset cleared: reset pre-custom temperature (Task #67)
+    // Preset cleared: restore pre-custom temperature if one was saved (Task #219).
+    // Mirrors Python climate.py:614-616: preset_mode=PRESET_NONE restores the temperature
+    // that was active before the preset was activated, so the user's manual setpoint survives.
+    if (state.sat.fPreCustomTemp > 0.0f) {
+      settings.sat.fTargetTemp = state.sat.fPreCustomTemp;
+      state.sat.fPidI = 0.0f;  // Reset integral to avoid overshoot on temp jump
+      DebugTf(PSTR("SAT: preset cleared, restored pre-custom target %.1f\r\n"), settings.sat.fTargetTemp);
+      // Publish restored target immediately so MQTT stays in sync
+      if (state.mqtt.bConnected) {
+        char valBuf[12];
+        dtostrf(settings.sat.fTargetTemp, 1, 1, valBuf);
+        sendMQTTData(F("sat/target"), valBuf, true);
+      }
+    }
     state.sat.fPreCustomTemp = 0.0f;
   }
 
@@ -784,12 +827,37 @@ static float satApplyContinuous(float pidOutput)
 {
   // Asymmetric setpoint clamping (Task #44, SAT Python heating_control.py):
   // minimum_allowed = boiler_temp - flow_offset (configurable, default 2.0C)
-  // Prevents setpoint spikes on overheat and ensures smooth ramp-down
+  // Prevents setpoint spikes on overheat and ensures smooth ramp-down.
+  //
+  // Task #194: Mirror Python _compute_continuous_control_setpoint() bypass cases.
+  // Python bypasses the clamp in three situations; we must do the same or the clamp
+  // incorrectly prevents the PID output from lowering the setpoint when flame is off:
+  //   1. Flame is off  -- clamp would wrongly block setpoint from falling with PID
+  //   2. boiler_temperature is invalid/unavailable (None in Python, 0 or out-of-range here)
+  //   3. boilerTemp <= pidOutput -- setpoint already above boiler temp, no clamping needed
+
+  // Case 1: flame is off -- return pidOutput directly
+  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+  if (!flame) {
+    return pidOutput;
+  }
+
   float boilerTemp = OTcurrentSystemState.Tboiler;
+
+  // Case 2: boilerTemp invalid / unavailable (sensor absent or not yet received)
+  if (boilerTemp <= 0.0f || boilerTemp > 100.0f) {
+    return pidOutput;
+  }
+
+  // Case 3: boilerTemp at or below the requested setpoint -- no asymmetric correction needed
+  if (boilerTemp <= pidOutput) {
+    return pidOutput;
+  }
+
   float flowOffset = settings.sat.fFlowOffset;
   float minAllowed = boilerTemp - flowOffset;
 
-  if (pidOutput < minAllowed && boilerTemp > pidOutput + flowOffset) {
+  if (pidOutput < minAllowed) {
     return minAllowed;
   }
 
@@ -810,7 +878,7 @@ static float satGetRoomTemp()
   // Temperature source priority: BLE > MQTT external > OT bus MsgID 24
   if (settings.sat.bBleEnable && state.sat.bBleTempValid) {
     // Check staleness: if no update for 5 min, fall back to next source
-    if ((millis() - state.sat.iBleTempLastMs) > SAT_STALE_TEMP_MS) {
+    if ((millis() - state.sat.iBleTempLastMs) > SAT_STALE_TEMP_BLE_MS) {
       state.sat.bBleTempValid = false;
       DebugTln(F("SAT: BLE temp stale, falling back to next source"));
     } else {
@@ -825,8 +893,8 @@ static float satGetRoomTemp()
     // No valid areas: fall through to single-sensor logic
   }
   if (settings.sat.bUseExternalTemp && state.sat.bExternalTempValid) {
-    // Check staleness — if no update for 5 min, fall back to OT bus
-    if ((millis() - state.sat.iExternalTempLastMs) > SAT_STALE_TEMP_MS) {
+    // Check staleness — use settings.sat.iSensorMaxAgeS (default 6h, Python CONF_SENSOR_MAX_VALUE_AGE)
+    if ((millis() - state.sat.iExternalTempLastMs) > ((uint32_t)settings.sat.iSensorMaxAgeS * 1000UL)) {
       state.sat.bExternalTempValid = false;
       DebugTln(F("SAT: external indoor temp stale, falling back to OT bus"));
     } else {
@@ -984,7 +1052,25 @@ bool satHandleTargetTemp(const char* value)
   float temp = strtof(value, &endp);
   if (endp == value || *endp != '\0') return false;  // non-numeric input
   if (temp >= 5.0f && temp <= 30.0f) {
-    // Go through updateSetting() to persist via deferred flush
+    // Auto-map to preset if temperature exactly matches a preset value (Task #218).
+    // Mirrors Python climate.py:562-568 behaviour: set_temperature auto-activates the preset
+    // so that HA preset display and MQTT preset topic stay in sync.
+    struct { const char* name; float val; } presets[] = {
+      { "comfort",  settings.sat.fPresetComfort  },
+      { "eco",      settings.sat.fPresetEco      },
+      { "away",     settings.sat.fPresetAway     },
+      { "sleep",    settings.sat.fPresetSleep    },
+      { "activity", settings.sat.fPresetActivity },
+      { "home",     settings.sat.fPresetHome     },
+    };
+    for (uint8_t i = 0; i < sizeof(presets) / sizeof(presets[0]); i++) {
+      if (fabsf(temp - presets[i].val) < 0.05f) {
+        DebugTf(PSTR("SAT: target %.1f matches preset '%s', activating preset\r\n"), temp, presets[i].name);
+        satHandlePreset(presets[i].name);
+        return true;
+      }
+    }
+    // No preset match: go through updateSetting() to persist via deferred flush
     updateSetting("SATtargettemp", value);
     DebugTf(PSTR("SAT: target temp set to %.1f°C\r\n"), temp);
     return true;
