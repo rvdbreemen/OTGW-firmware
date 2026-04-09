@@ -17,7 +17,7 @@
 */
 
 // --- PID Constants ---
-static const float SAT_PID_DEADBAND_DEFAULT     = 0.25f;
+static const float SAT_PID_DEADBAND_DEFAULT     = 0.1f;   // Matches Python DEADBAND=0.1 (const.py)
 static const float SAT_PID_SAMPLE_TIME_LIMIT    = 10.0f;   // seconds
 static const float SAT_PID_UPDATE_INTERVAL      = 60.0f;   // seconds
 // Derivative alpha is now adaptive: alpha = dt / (PID_UPDATE_INTERVAL + dt)
@@ -71,8 +71,19 @@ void satPidReset()
 }
 
 //=== Auto-Gain Calculation (Version 3) ===
+// When settings.sat.bAutoGains is true (default): automatic formula from heating curve.
+// When settings.sat.bAutoGains is false: pass through manual fKpManual/fKiManual/fKdManual
+// directly to state, matching Python pid.py automatic_gains=False behavior.
 static void _pidCalculateGains(float curveValue)
 {
+  if (!settings.sat.bAutoGains) {
+    // Manual gains mode: user-configured values bypass the formula entirely
+    state.sat.fKp = settings.sat.fKpManual;
+    state.sat.fKi = settings.sat.fKiManual;
+    state.sat.fKd = settings.sat.fKdManual;
+    return;
+  }
+
   float coeff = settings.sat.fHeatingCurveCoeff;
   float divisor = (settings.sat.iHeatingSystem == 1) ? SAT_PID_KP_DIVISOR_FLOOR : SAT_PID_KP_DIVISOR_RAD;
 

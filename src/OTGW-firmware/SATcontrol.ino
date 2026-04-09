@@ -1221,11 +1221,14 @@ void satDisable()
 void satHandleControlMode(const char* value)
 {
   if (!value || !*value) return;
-  if (strcasecmp_P(value, PSTR("continuous")) == 0 || strcmp(value, "1") == 0) {
+  // TASK-205: avoid strcmp() with bare string literals -- use atoi() for numeric
+  // forms and strcmp_P(..., PSTR(...)) for named forms. No bare string compares.
+  int numericVal = atoi(value);
+  if (strcasecmp_P(value, PSTR("continuous")) == 0 || numericVal == 1) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;
-  } else if (strcasecmp_P(value, PSTR("pwm")) == 0 || strcmp(value, "2") == 0) {
+  } else if (strcasecmp_P(value, PSTR("pwm")) == 0 || numericVal == 2) {
     state.sat.eControlMode = SAT_MODE_PWM;
-  } else if (strcasecmp_P(value, PSTR("auto")) == 0 || strcmp(value, "0") == 0) {
+  } else if (strcasecmp_P(value, PSTR("auto")) == 0 || numericVal == 0) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS; // Start in continuous, auto-switch
   }
 }
@@ -1374,6 +1377,13 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("sensor_max_age"),        (int32_t)settings.sat.iSensorMaxAgeS);
   sendJsonMapEntry(F("error_monitoring"),      settings.sat.bErrorMonitoring);
   satSendJsonFloat(F("auto_gains_value"),      settings.sat.fAutoGainsValue, 2);
+  // TASK-193: manual gains mode
+  sendJsonMapEntry(F("auto_gains"),            settings.sat.bAutoGains);
+  satSendJsonFloat(F("kp_manual"),             settings.sat.fKpManual, 4);
+  satSendJsonFloat(F("ki_manual"),             settings.sat.fKiManual, 6);
+  satSendJsonFloat(F("kd_manual"),             settings.sat.fKdManual, 2);
+  // TASK-204: thermal comfort mode (SSI as PID room temp)
+  sendJsonMapEntry(F("thermal_comfort"),       settings.sat.bThermalComfort);
   sendJsonMapEntry(F("heating_mode"),          settings.sat.iHeatingMode == 1 ? "eco" : "comfort");
   sendJsonMapEntry(F("cycles_per_hour"),       (int32_t)settings.sat.iCyclesPerHour);
   satSendJsonFloat(F("valve_offset"),          settings.sat.fValveOffset, 2);
@@ -1997,6 +2007,8 @@ void satPublishMQTT()
     sendMQTTData(F("sat/solar_gain_enable"), settings.sat.bSolarGainEnable ? "true" : "false", true);
     sendMQTTData(F("sat/summer_simmer_enable"), settings.sat.bSummerSimmer ? "true" : "false", true);
     sendMQTTData(F("sat/comfort_adjust_enable"), settings.sat.bComfortAdjust ? "true" : "false", true);
+    // TASK-204: thermal comfort mode state (SSI substitution for PID room temp)
+    sendMQTTData(F("sat/thermal_comfort"), settings.sat.bThermalComfort ? "true" : "false", true);
     sendMQTTData(F("sat/multi_area_enable"), settings.sat.bMultiArea ? "true" : "false", true);
     sendMQTTData(F("sat/auto_tune_enable"), settings.sat.bAutoTune ? "true" : "false", true);
     sendMQTTData(F("sat/simulation_enable"), settings.sat.bSimulation ? "true" : "false", true);
