@@ -755,7 +755,7 @@ struct SATSection {
   uint8_t  iHeatingSystem     = SAT_HSYS_AUTO; // SATHeatingSystem enum: auto/radiators/heat_pump/underfloor
   float    fTargetTemp        = 20.0f;  // Default room target °C
   float    fHeatingCurveCoeff = 1.5f;   // Heating curve coefficient
-  float    fDeadband          = 0.25f;  // PID deadband °C
+  float    fDeadband          = 0.1f;   // PID deadband °C (matches Python DEADBAND=0.1)
   uint16_t iControlInterval   = 30;     // Control loop interval (seconds)
   bool     bUseExternalTemp   = false;  // Prefer MQTT-pushed indoor temp over OT msg 24
   float    fPresetComfort     = 21.0f;  // Preset: Comfort
@@ -821,9 +821,15 @@ struct SATSection {
   bool     bAutoTune          = false;  // Enable automatic PID gains tuning
   float    fAutoTuneRate      = 0.02f;  // Adjustment rate per tuning cycle (2%)
   // SAT Python parity settings (Task #82)
+  float    fMaxSetpoint        = 65.0f; // Global safety ceiling for all heating systems (Python MAXIMUM_SETPOINT)
   uint32_t iSensorMaxAgeS     = 21600; // Max age of sensor reading before considered stale (seconds, 6h default)
   bool     bErrorMonitoring   = false; // Enable detailed error stats tracking
   float    fAutoGainsValue    = 2.0f;  // Multiplier for auto-tune PID gain calculation
+  bool     bAutoGains         = true;  // true=automatic gain formula; false=use fKpManual/fKiManual/fKdManual
+  float    fKpManual          = 5.0f;  // Manual proportional gain (used when bAutoGains=false)
+  float    fKiManual          = 0.0005f; // Manual integral gain (used when bAutoGains=false)
+  float    fKdManual          = 0.0f;  // Manual derivative gain (used when bAutoGains=false)
+  bool     bThermalComfort    = false; // true=use SummerSimmer index as PID room temp input
   uint8_t  iHeatingMode       = 0;     // 0=COMFORT, 1=ECO
   uint8_t  iCyclesPerHour     = 3;     // Target cycles per hour (2-6)
   float    fValveOffset       = 0.0f;  // Offset for TRV valve position detection (-1 to 1)

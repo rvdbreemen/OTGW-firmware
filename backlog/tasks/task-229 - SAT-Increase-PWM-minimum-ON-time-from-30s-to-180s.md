@@ -1,9 +1,11 @@
 ---
 id: TASK-229
 title: 'SAT: Increase PWM minimum ON time from 30s to 180s'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-09 05:30'
+updated_date: '2026-04-09 06:12'
 labels:
   - audit-fix
   - sat
@@ -38,3 +40,11 @@ Risk: Low. Increasing the minimum ON time means longer cycles in edge cases, but
 - [ ] #4 Change is documented in a code comment referencing the Python HEATER_STARTUP_TIMEFRAME constant
 - [ ] #5 No regression on PWM on/off state machine transitions
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Verify SAT_PWM_MIN_ON_SEC (30s) is declared but unused (actual code uses satGetMinOnTimeSec() = 180s for gas)
+2. Update the dead constant to 180s with comment referencing Python HEATER_STARTUP_TIMEFRAME
+3. Verify no regression: satGetMinOnTimeSec() already returns 180 for gas/underfloor, 1800 for heat pumps
+<!-- SECTION:PLAN:END -->

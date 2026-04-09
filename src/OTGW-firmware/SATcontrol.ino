@@ -909,6 +909,22 @@ static float satGetRoomTemp()
       return satEstimateRoomTemp(outside);
     }
   }
+
+  // TASK-204: Thermal comfort mode -- substitute Summer Simmer Index as PID room temp input.
+  // Matches Python climate.py thermal_comfort: the PID targets heat-index-adjusted perceived
+  // temperature rather than raw sensor temp, so e.g. 22C at 70% humidity "feels like" 23C.
+  // Only active when bThermalComfort is enabled AND humidity data is fresh (< 30 min).
+  // Falls back silently to raw room temp if humidity is unavailable or stale.
+  if (settings.sat.bThermalComfort && state.sat.bHumidityValid) {
+    if ((millis() - state.sat.iHumidityLastMs) <= 1800000UL) {
+      float ssi = satCalcSimmerIndex(otRoom, state.sat.fHumidity);
+      DebugTf(PSTR("SAT: thermal_comfort: raw=%.1f SSI=%.1f H=%.0f%%\r\n"),
+              otRoom, ssi, state.sat.fHumidity);
+      return ssi;
+    }
+    DebugTln(F("SAT: thermal_comfort: humidity stale, using raw room temp"));
+  }
+
   return otRoom;
 }
 
@@ -3269,8 +3285,22 @@ void satControlLoop()
   if (maxSetpoint > sysMax) maxSetpoint = sysMax;
   if (maxSetpoint > hardMax) maxSetpoint = hardMax;
 
+  // Global safety cap (Python MAXIMUM_SETPOINT = 65C): applies to ALL heating systems.
+  // settings.sat.fMaxSetpoint defaults to 65C and is the universal ceiling before system limits.
+  float globalMax = settings.sat.fMaxSetpoint;
+  if (globalMax < 30.0f || globalMax > SAT_HARD_MAX_RAD) globalMax = SAT_GLOBAL_MAX_SETPOINT; // sanity
+  if (maxSetpoint > globalMax) maxSetpoint = globalMax;
+
   if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;
   if (pidOutput > maxSetpoint) pidOutput = maxSetpoint;
+
+  // AC#2: When PID output reaches the system maximum setpoint, use continuous mode
+  // instead of PWM — matches Python behavior where requested_setpoint >= maximum_setpoint
+  // disables PWM (full power needed, no duty cycling required).
+  if (pidOutput >= sysMax && state.sat.eControlMode == SAT_MODE_PWM) {
+    state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+    DebugTln(F("SAT: PID at system max, switching to continuous mode"));
+  }
 
   // --- Force PWM if configured (Task #41) ---
   if (settings.sat.bForcePWM && state.sat.eControlMode != SAT_MODE_PWM) {

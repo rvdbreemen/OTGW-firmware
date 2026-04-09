@@ -3,9 +3,11 @@ id: TASK-207
 title: >-
   SAT fix: sensor staleness timeout mismatch (5 min C++ vs 6 hours Python
   default)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-09 05:24'
+updated_date: '2026-04-09 06:12'
 labels:
   - audit-fix
 dependencies: []
@@ -24,3 +26,13 @@ Python CONF_SENSOR_MAX_VALUE_AGE defaults to 6 hours (21600s). C++ SAT_STALE_TEM
 - [ ] #2 Default value of settings.sat.iSensorMaxAgeS is 21600 (6 hours) matching Python
 - [ ] #3 BLE and outdoor sensor staleness remain on their own appropriate timeouts
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. SAT_STALE_TEMP_MS=300000ms (5 min) is used in satGetRoomTemp() for external indoor and BLE staleness checks
+2. settings.sat.iSensorMaxAgeS already exists and defaults to 21600s (6 hours) - AC#2 confirmed
+3. Change external indoor temp staleness check (lines 813, 829) to use settings.sat.iSensorMaxAgeS * 1000UL
+4. BLE staleness stays on SAT_STALE_TEMP_MS (its own appropriate timeout per AC#3)
+5. Rename SAT_STALE_TEMP_MS to clarify it is now for BLE only
+<!-- SECTION:PLAN:END -->

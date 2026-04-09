@@ -1,9 +1,11 @@
 ---
 id: TASK-214
 title: 'SAT fix: missing 65C global setpoint cap and PWM disable at maximum setpoint'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-09 05:25'
+updated_date: '2026-04-09 06:12'
 labels:
   - audit-fix
 dependencies: []
@@ -23,3 +25,12 @@ Python has MAXIMUM_SETPOINT=65C as a global safety ceiling for ALL heating syste
 - [ ] #3 The 65C cap is configurable (maps to settings.sat.fMaxSetpoint) with system defaults
 - [ ] #4 Pressure monitoring defaults (min=0.8, max=2.5, drop=0.3) verified in OTGW-firmware.h
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add fMaxSetpoint=65.0f to SATSection struct in OTGW-firmware.h
+2. In satControlLoop(), after PID output clamping, apply global max cap before satApplyPWM/satApplyContinuous
+3. AC#2: if pidOutput >= system max setpoint (satGetMaxSetpoint()), switch to continuous mode (disable PWM)
+4. The global cap uses settings.sat.fMaxSetpoint (default 65C) matching Python MAXIMUM_SETPOINT
+<!-- SECTION:PLAN:END -->

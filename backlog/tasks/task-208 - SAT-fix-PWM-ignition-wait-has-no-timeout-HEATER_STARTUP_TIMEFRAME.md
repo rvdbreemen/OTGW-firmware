@@ -1,9 +1,11 @@
 ---
 id: TASK-208
 title: 'SAT fix: PWM ignition wait has no timeout (HEATER_STARTUP_TIMEFRAME)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-09 05:24'
+updated_date: '2026-04-09 06:12'
 labels:
   - audit-fix
 dependencies: []
@@ -23,3 +25,13 @@ Python pwm.py:194-202 implements a 180s (HEATER_STARTUP_TIMEFRAME) timeout for f
 - [ ] #3 Start PWM timer normally after timeout (matching Python behavior)
 - [ ] #4 Verify no regression in normal ignition path
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add static _pwm_waitForFlameStartMs to track when waitingForFlame begins
+2. In the _pwm_waitingForFlame=true set-point (line 574), record timestamp
+3. In step 2 of PWM state machine (line 631-637), check if elapsed > 180s
+4. On timeout: clear _pwm_waitingForFlame, clear bPwmFlameRequested, log warning, return SAT_MIN_SETPOINT (OFF)
+5. On flame detection: clear the timeout timestamp (normal path unchanged)
+<!-- SECTION:PLAN:END -->
