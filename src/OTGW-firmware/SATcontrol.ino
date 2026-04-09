@@ -243,6 +243,7 @@ static const uint32_t SAT_CALIB_FLAME_WAIT_MS = 180000UL;  // 3 min wait for fla
 static const uint32_t SAT_CALIB_MEASURE_MS    = 1200000UL; // 20 min measuring phase
 static const uint32_t SAT_CALIB_SAMPLE_MS     = 10000UL;   // Sample every 10s
 static const float    SAT_CALIB_WARM_DELTA    = 5.0f;      // Temp must rise 5C above start
+static const uint16_t SAT_CALIB_MIN_SAMPLES   = 40;        // Minimum samples before accepting result (Python parity)
 
 // OPV calibration state machine - called from control loop when calibration is active
 static void satOvpCalibrate()
@@ -295,12 +296,19 @@ static void satOvpCalibrate()
       addCommandToQueue("MM=0", 4, false, 0);
       elapsed = millis() - state.sat.iCalibStartMs;
       if (elapsed >= SAT_CALIB_MEASURE_MS) {
-        // Measurement complete
-        settings.sat.fOvpValue = state.sat.fCalibMaxTemp;
-        settings.sat.bOvpEnabled = true;
-        DebugTf(PSTR("OPV: calibration DONE! OPV=%.1f from %u samples\r\n"),
-                state.sat.fCalibMaxTemp, state.sat.iCalibSamples);
-        state.sat.eCalibPhase = SAT_CALIB_DONE;
+        // Enforce minimum sample count before accepting result (Python: OVERSHOOT_PROTECTION_REQUIRED_DATASET = 40)
+        if (state.sat.iCalibSamples < SAT_CALIB_MIN_SAMPLES) {
+          DebugTf(PSTR("OPV: FAILED - only %u/%u samples collected, result rejected\r\n"),
+                  (unsigned)state.sat.iCalibSamples, (unsigned)SAT_CALIB_MIN_SAMPLES);
+          state.sat.eCalibPhase = SAT_CALIB_FAILED;
+        } else {
+          // Measurement complete with sufficient samples
+          settings.sat.fOvpValue = state.sat.fCalibMaxTemp;
+          settings.sat.bOvpEnabled = true;
+          DebugTf(PSTR("OPV: calibration DONE! OPV=%.1f from %u/%u samples\r\n"),
+                  state.sat.fCalibMaxTemp, (unsigned)state.sat.iCalibSamples, (unsigned)SAT_CALIB_MIN_SAMPLES);
+          state.sat.eCalibPhase = SAT_CALIB_DONE;
+        }
       }
       break;
     }
