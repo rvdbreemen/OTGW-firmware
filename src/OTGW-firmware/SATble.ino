@@ -179,8 +179,8 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     // Try ATC/pvvx format: service data UUID 0x181A
     if (advertisedDevice.haveServiceData()) {
       BLEUUID svcUUID = advertisedDevice.getServiceDataUUID();
-      // Use std::string from BLE API directly — avoids Arduino String heap churn
-      std::string svcData = advertisedDevice.getServiceData();
+      // ESP32 BLE API (arduino-esp32 v3.x) returns Arduino String, not std::string
+      String svcData = advertisedDevice.getServiceData();
       uint16_t uuid16 = 0;
 
       // Extract 16-bit UUID
@@ -190,7 +190,7 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
         // Some BLE stacks return the full 128-bit form for 16-bit UUIDs
         // Try matching by comparing the UUID string in a fixed char buffer
         char uuidBuf[40];
-        std::string uuidStr = svcUUID.toString();
+        String uuidStr = svcUUID.toString();
         strlcpy(uuidBuf, uuidStr.c_str(), sizeof(uuidBuf));
         // tolower in-place for case-insensitive compare
         for (int i = 0; uuidBuf[i]; i++) uuidBuf[i] = tolower((unsigned char)uuidBuf[i]);
@@ -202,16 +202,16 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
       }
 
       if (uuid16 == ATC_SERVICE_UUID_16 && svcData.length() >= 13) {
-        parsed = parseBLEAtcFormat((const uint8_t*)svcData.data(), svcData.length(), &temp, &hum, &batt);
+        parsed = parseBLEAtcFormat((const uint8_t*)svcData.c_str(), svcData.length(), &temp, &hum, &batt);
       } else if (uuid16 == BTHOME_SERVICE_UUID_16 && svcData.length() >= 3) {
-        parsed = parseBLEBTHomeFormat((const uint8_t*)svcData.data(), svcData.length(), &temp, &hum, &batt);
+        parsed = parseBLEBTHomeFormat((const uint8_t*)svcData.c_str(), svcData.length(), &temp, &hum, &batt);
       }
     }
 
     if (!parsed) return;
 
-    // Get MAC address string — use std::string from BLE API, copy to fixed char buffer
-    std::string macStr = advertisedDevice.getAddress().toString();
+    // Get MAC address string — copy to fixed char buffer via c_str()
+    String macStr = advertisedDevice.getAddress().toString();
     char macBuf[18];
     strlcpy(macBuf, macStr.c_str(), sizeof(macBuf));
     // Convert to uppercase AA:BB:CC:DD:EE:FF format

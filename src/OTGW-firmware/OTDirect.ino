@@ -1335,6 +1335,9 @@ struct FlameRatioBuf {
   uint8_t  current;   // accumulator for current minute
 };
 
+// Forward declaration — prevents ESP32 auto-prototype conflict (type not yet visible at sketch top)
+static void flameRatioBufCommit(FlameRatioBuf &b);
+
 static struct {
   FlameRatioBuf on;      // seconds of flame-on per minute
   FlameRatioBuf cycles;  // flame-on transitions per minute
