@@ -375,6 +375,30 @@
           <div class="sat-feedback" id="sat-feedback"></div>
         </div>
 
+        <!-- DHW Controls -->
+        <div class="sat-section" id="sat-dhw-section" data-view="simple expert diag">
+          <h3>DHW (Domestic Hot Water)</h3>
+          <div class="sat-grid">
+            <div class="sat-row">
+              <span class="sat-label">DHW Setpoint</span>
+              <span class="sat-value">
+                <input type="range" id="sat-dhw-slider" min="40" max="60" step="1" value="50"
+                  style="vertical-align:middle;width:120px;" oninput="SAT.onDhwSliderInput(this.value)" onchange="SAT.onDhwSliderChange(this.value)" aria-label="DHW setpoint slider" />
+                <span id="sat-dhw-slider-value" style="min-width:3.5em;display:inline-block;text-align:right;">50&deg;C</span>
+              </span>
+            </div>
+            <div class="sat-row" id="sat-dhw-hw-row" style="display:none;">
+              <span class="sat-label">Hot Water Force</span>
+              <span class="sat-value">
+                <label class="sat-toggle-label">
+                  <input type="checkbox" id="sat-dhw-hw-switch" onchange="SAT.onDhwHwSwitch(this.checked)" aria-label="Force DHW on/off" />
+                  <span id="sat-dhw-hw-label">Off</span>
+                </label>
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Weather -->
         <div class="sat-section" id="sat-weather-section" data-view="expert diag" style="display:none">
           <h3>Weather (Open-Meteo)</h3>

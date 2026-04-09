@@ -309,6 +309,9 @@ var SAT = (function() {
     // Update charts
     updateChart(d);
     updateCurveChart(d);
+
+    // Update DHW controls
+    updateDHWControls(d);
   }
 
   // --- Chart ---
@@ -575,6 +578,8 @@ var SAT = (function() {
     initView();
     initChart();
     initCurveChart();
+    fetchSlaveConfig();  // detect storage tank boiler (MsgID 3 bit 3)
+    fetchDHWBounds();    // get DHW setpoint upper/lower bounds (MsgID 48)
     fetchStatus(); // immediate first fetch
     fetchWeather(); // immediate weather fetch
     _pollTimer = setInterval(fetchStatus, POLL_INTERVAL_MS);
@@ -625,6 +630,12 @@ var SAT = (function() {
   var _lastSimEnabled = false;
   var _lastPresetIdx = 0;
   var _lastModeIdx = 0;
+
+  // --- DHW state ---
+  var _dhwStorageTank = false;   // true = storage tank boiler (MsgID 3 bit 3 set)
+  var _dhwSliderMin = 40;        // TdhwSetLB (MsgID 48 low byte), default fallback
+  var _dhwSliderMax = 60;        // TdhwSetUB (MsgID 48 high byte), default fallback
+  var _dhwSliderDirty = false;   // slider being dragged, defer sending command
 
   function satPost(endpoint, value) {
     return fetch('/api/v2/sat/' + endpoint, {
@@ -778,6 +789,130 @@ var SAT = (function() {
     if (arrow) { arrow.innerHTML = raw.style.display === 'none' ? '&#9654;' : '&#9660;'; }
   }
 
+  // --- DHW controls ---
+
+  // Send an OTGW command via the REST API
+  function sendOTGWCommand(cmd) {
+    fetch(APIGW + 'v2/otgw/command/' + cmd, {
+      method: 'POST'
+    }).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+    }).catch(function(e) {
+      showFeedback('DHW cmd error: ' + e.message, true);
+    });
+  }
+
+  // Fetch MsgID 3 (Slave Config) to detect storage tank bit (bit 3 of high byte)
+  function fetchSlaveConfig() {
+    fetch(APIGW + 'v2/otgw/messages/3')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(r.statusText);
+        return r.json();
+      })
+      .then(function(d) {
+        // value = uint16: high byte = slave config flags, low byte = member ID
+        var raw = (d && d.value !== undefined) ? parseInt(d.value, 10) : 0;
+        var slaveConfigHB = (raw >> 8) & 0xFF;
+        _dhwStorageTank = !!(slaveConfigHB & 0x08); // bit 3 of slave config HB
+        updateDHWHwSwitch();
+      })
+      .catch(function() {
+        _dhwStorageTank = false;
+        updateDHWHwSwitch();
+      });
+  }
+
+  // Fetch MsgID 48 (TdhwSetUBTdhwSetLB) for slider bounds
+  // HB = upper bound, LB = lower bound
+  function fetchDHWBounds() {
+    fetch(APIGW + 'v2/otgw/messages/48')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(r.statusText);
+        return r.json();
+      })
+      .then(function(d) {
+        var raw = (d && d.value !== undefined) ? parseInt(d.value, 10) : 0;
+        if (raw > 0) {
+          var ub = (raw >> 8) & 0xFF;  // high byte = upper bound
+          var lb = raw & 0xFF;         // low byte = lower bound
+          if (ub > lb && lb >= 0 && ub <= 100) {
+            _dhwSliderMax = ub;
+            _dhwSliderMin = lb;
+          }
+        }
+        updateDHWSliderBounds();
+      })
+      .catch(function() {
+        updateDHWSliderBounds();
+      });
+  }
+
+  function updateDHWSliderBounds() {
+    var slider = el('sat-dhw-slider');
+    if (!slider) return;
+    slider.min = _dhwSliderMin;
+    slider.max = _dhwSliderMax;
+    // Clamp current value to new bounds
+    var cur = parseInt(slider.value, 10);
+    if (cur < _dhwSliderMin) slider.value = _dhwSliderMin;
+    if (cur > _dhwSliderMax) slider.value = _dhwSliderMax;
+    updateDHWSliderLabel(slider.value);
+  }
+
+  function updateDHWSliderLabel(value) {
+    var lbl = el('sat-dhw-slider-value');
+    if (lbl) lbl.textContent = Math.round(value) + '\u00B0C';
+  }
+
+  function updateDHWHwSwitch() {
+    var row = el('sat-dhw-hw-row');
+    if (!row) return;
+    row.style.display = _dhwStorageTank ? '' : 'none';
+  }
+
+  // Called live as slider moves (update label only)
+  function onDhwSliderInput(value) {
+    _dhwSliderDirty = true;
+    updateDHWSliderLabel(value);
+  }
+
+  // Called on slider release (send command)
+  function onDhwSliderChange(value) {
+    _dhwSliderDirty = false;
+    var intVal = Math.round(parseFloat(value));
+    sendOTGWCommand('SW=' + intVal);
+  }
+
+  // Called when HW switch is toggled
+  function onDhwHwSwitch(checked) {
+    var lbl = el('sat-dhw-hw-label');
+    if (lbl) lbl.textContent = checked ? 'On' : 'Off';
+    sendOTGWCommand(checked ? 'HW=1' : 'HW=0');
+  }
+
+  // Update DHW dashboard controls from SAT status data
+  function updateDHWControls(d) {
+    // Update slider value from dhw_setpoint (only if not being dragged)
+    var slider = el('sat-dhw-slider');
+    if (slider && !_dhwSliderDirty && d.dhw_setpoint !== undefined) {
+      var sp = Math.round(d.dhw_setpoint);
+      if (sp < _dhwSliderMin) sp = _dhwSliderMin;
+      if (sp > _dhwSliderMax) sp = _dhwSliderMax;
+      slider.value = sp;
+      updateDHWSliderLabel(sp);
+    }
+
+    // Update HW switch display state from dhw_active (= SlaveStatus bit 0x04)
+    if (_dhwStorageTank) {
+      var hwSwitch = el('sat-dhw-hw-switch');
+      var hwLbl = el('sat-dhw-hw-label');
+      if (hwSwitch && d.dhw_active !== undefined) {
+        hwSwitch.checked = !!d.dhw_active;
+        if (hwLbl) hwLbl.textContent = d.dhw_active ? 'On' : 'Off';
+      }
+    }
+  }
+
   return {
     start: start,
     stop: stop,
@@ -790,6 +925,9 @@ var SAT = (function() {
     setMode: setMode,
     toggleEnable: toggleEnable,
     toggleSimulation: toggleSimulation,
-    detectLocation: detectLocation
+    detectLocation: detectLocation,
+    onDhwSliderInput: onDhwSliderInput,
+    onDhwSliderChange: onDhwSliderChange,
+    onDhwHwSwitch: onDhwHwSwitch
   };
 })();
