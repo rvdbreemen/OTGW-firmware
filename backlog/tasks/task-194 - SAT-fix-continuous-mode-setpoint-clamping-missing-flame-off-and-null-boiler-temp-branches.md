@@ -3,9 +3,11 @@ id: TASK-194
 title: >-
   SAT fix: continuous mode setpoint clamping missing flame-off and
   null-boiler-temp branches
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-09 05:19'
+updated_date: '2026-04-09 06:14'
 labels:
   - audit-fix
 dependencies: []
@@ -20,7 +22,22 @@ Python _compute_continuous_control_setpoint() has 3 cases that bypass the boiler
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 When flame is off, satApplyContinuous() returns pidOutput directly without applying boilerTemp clamp
-- [ ] #2 When boilerTemp is invalid (0 or out of range), satApplyContinuous() returns pidOutput directly
-- [ ] #3 When boilerTemp <= pidOutput (setpoint below boiler temp), clamp is not applied
+- [x] #1 When flame is off, satApplyContinuous() returns pidOutput directly without applying boilerTemp clamp
+- [x] #2 When boilerTemp is invalid (0 or out of range), satApplyContinuous() returns pidOutput directly
+- [x] #3 When boilerTemp <= pidOutput (setpoint below boiler temp), clamp is not applied
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. In satApplyContinuous(): add flame-off bypass: read flame from OTcurrentSystemState.Statusflags & 0x08; if !flame, return pidOutput directly
+2. Add boilerTemp validity bypass: if boilerTemp <= 0.0f or boilerTemp > 100.0f, return pidOutput
+3. Add boilerTemp <= pidOutput bypass: if boilerTemp <= pidOutput, clamp is not needed, return pidOutput
+4. Only then apply the existing minAllowed clamp logic
+<!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+satApplyContinuous() reworked to add three early-return bypass cases before applying the boilerTemp-offset clamp: (1) flame off -- Statusflags bit 3 check; (2) boilerTemp invalid (<=0 or >100); (3) boilerTemp <= pidOutput (setpoint is above boiler, no correction needed). The original condition 'pidOutput < minAllowed && boilerTemp > pidOutput + flowOffset' is simplified to 'pidOutput < minAllowed' since the other guard is now covered by case 3. Matches Python _compute_continuous_control_setpoint() exactly.
+<!-- SECTION:FINAL_SUMMARY:END -->

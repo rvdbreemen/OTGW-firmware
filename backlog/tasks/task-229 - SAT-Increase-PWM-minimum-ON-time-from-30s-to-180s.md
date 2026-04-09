@@ -1,11 +1,11 @@
 ---
 id: TASK-229
 title: 'SAT: Increase PWM minimum ON time from 30s to 180s'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 05:30'
-updated_date: '2026-04-09 06:12'
+updated_date: '2026-04-09 06:15'
 labels:
   - audit-fix
   - sat
@@ -34,11 +34,11 @@ Risk: Low. Increasing the minimum ON time means longer cycles in edge cases, but
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SAT_PWM_MIN_ON_SEC is increased from 30 to 180 seconds
-- [ ] #2 PWM on-phase is not terminated before 180 seconds have elapsed regardless of duty cycle
-- [ ] #3 Existing auto-switch logic (60s sustained overshoot -> enable PWM) remains unaffected
-- [ ] #4 Change is documented in a code comment referencing the Python HEATER_STARTUP_TIMEFRAME constant
-- [ ] #5 No regression on PWM on/off state machine transitions
+- [x] #1 SAT_PWM_MIN_ON_SEC is increased from 30 to 180 seconds
+- [x] #2 PWM on-phase is not terminated before 180 seconds have elapsed regardless of duty cycle
+- [x] #3 Existing auto-switch logic (60s sustained overshoot -> enable PWM) remains unaffected
+- [x] #4 Change is documented in a code comment referencing the Python HEATER_STARTUP_TIMEFRAME constant
+- [x] #5 No regression on PWM on/off state machine transitions
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -48,3 +48,9 @@ Risk: Low. Increasing the minimum ON time means longer cycles in edge cases, but
 2. Update the dead constant to 180s with comment referencing Python HEATER_STARTUP_TIMEFRAME
 3. Verify no regression: satGetMinOnTimeSec() already returns 180 for gas/underfloor, 1800 for heat pumps
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Updated SAT_PWM_MIN_ON_SEC from 30s to 180s to match Python HEATER_STARTUP_TIMEFRAME. The constant was declared but not used (satGetMinOnTimeSec() already returns 180s for gas boilers); updated for consistency and added explanatory comment. No behavioral change in gas/underfloor systems; heat pump path (1800s) remains unaffected.
+<!-- SECTION:FINAL_SUMMARY:END -->

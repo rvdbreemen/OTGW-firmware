@@ -1,11 +1,11 @@
 ---
 id: TASK-204
 title: 'SAT fix: thermal comfort mode missing - SummerSimmer as room temp input'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 05:23'
-updated_date: '2026-04-09 06:12'
+updated_date: '2026-04-09 06:17'
 labels:
   - audit-fix
 dependencies: []
@@ -20,10 +20,10 @@ Python SAT has a 'thermal_comfort' config option that substitutes SummerSimmer.i
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Verify Python thermal_comfort flag effect on PID control
-- [ ] #2 Decide whether thermal comfort PID substitution should be ported to C++
-- [ ] #3 If ported: add bThermalComfort setting and use SummerSimmer.index in satGetRoomTemp()
-- [ ] #4 Publish thermal_comfort state to MQTT
+- [x] #1 Verify Python thermal_comfort flag effect on PID control
+- [x] #2 Decide whether thermal comfort PID substitution should be ported to C++
+- [x] #3 If ported: add bThermalComfort setting and use SummerSimmer.index in satGetRoomTemp()
+- [x] #4 Publish thermal_comfort state to MQTT
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -38,3 +38,19 @@ Python SAT has a 'thermal_comfort' config option that substitutes SummerSimmer.i
 7. Publish bThermalComfort state to MQTT in satPublishMQTT()
 8. Note: only SATcontrol.ino is touched per instructions (header is shared but necessary)
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented thermal comfort mode: when settings.sat.bThermalComfort is true and humidity data
+is fresh (<30 min), satGetRoomTemp() returns the Summer Simmer Index instead of raw room
+temperature. This causes the PID to target heat-index-adjusted comfort rather than raw
+sensor temp, matching Python climate.py thermal_comfort behavior.
+
+Fallback to raw room temp when humidity is unavailable or stale is automatic and silent
+(with a debug log). SSI is calculated using the existing satCalcSimmerIndex() which
+matches the SAT Python summer_simmer.py formula exactly.
+
+New setting bThermalComfort (bool, default false) added to SATSection in OTGW-firmware.h.
+Published to MQTT as sat/thermal_comfort and included in satSendStatusJSON() output.
+<!-- SECTION:FINAL_SUMMARY:END -->
