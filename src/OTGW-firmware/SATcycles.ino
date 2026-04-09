@@ -35,12 +35,12 @@ static uint8_t  _hourCycleHead  = 0;  // next write position
 static uint8_t  _hourCycleCount = 0;  // valid entries (0..SAT_MAX_CYCLES_PER_HOUR)
 
 // --- Rolling 4-hour cycle window (Task #227) ---
-// ESP8266: 30 slots x 24 bytes = 720 bytes SRAM (covers 2h at 4-min avg cycle period).
-// ESP32:   60 slots x 24 bytes = 1440 bytes SRAM (covers 4h at 4-min avg cycle period).
+// ESP8266: 30 slots x 24 bytes =  720 bytes SRAM (covers ~2h at 4-min avg cycle period).
+// ESP32:  360 slots x 24 bytes = 8640 bytes SRAM (covers 12h of 2-min cycle history).
 #if defined(ESP8266)
   #define SAT_WIN4H_SIZE 30
 #else
-  #define SAT_WIN4H_SIZE 60
+  #define SAT_WIN4H_SIZE 360
 #endif
 static const uint32_t SAT_WIN4H_SPAN_MS = 4UL * 3600UL * 1000UL; // 4 hours in ms
 
@@ -54,19 +54,34 @@ struct SATWindowRecord {
 };
 
 static SATWindowRecord _win4h[SAT_WIN4H_SIZE];
+#if defined(ESP8266)
 static uint8_t         _win4hHead  = 0;   // next write position
 static uint8_t         _win4hCount = 0;   // valid entries (0..SAT_WIN4H_SIZE)
+#else
+static uint16_t        _win4hHead  = 0;   // next write position (needs uint16 for ESP32 360-slot ring)
+static uint16_t        _win4hCount = 0;   // valid entries (0..SAT_WIN4H_SIZE)
+#endif
 
 // Accumulator for flow-return delta during active cycle
 static float    _cycle_sumFlowRetDelta = 0.0f;
 static uint16_t _cycle_deltasamples   = 0;
 
 // --- Per-cycle flow temperature sample buffer (Task #225, p90/p10 classifier) ---
-// Samples are collected at the same rate as satCycleSample(); 64 slots covers ~5 min at 5s intervals.
-static const uint8_t SAT_FLOW_SAMPLE_SIZE = 64;
+// ESP8266:  64 slots x 4 bytes =  256 bytes SRAM (~5 min at 5s intervals).
+// ESP32:   256 slots x 4 bytes = 1024 bytes SRAM (better p90/p10 accuracy).
+#if defined(ESP8266)
+  #define SAT_FLOW_SAMPLE_SIZE 64
+#else
+  #define SAT_FLOW_SAMPLE_SIZE 256
+#endif
 static float    _flow_samples[SAT_FLOW_SAMPLE_SIZE];
+#if defined(ESP8266)
 static uint8_t  _flow_sampleHead  = 0;  // next write position (ring)
 static uint8_t  _flow_sampleCount = 0;  // valid sample count (0..SAT_FLOW_SAMPLE_SIZE)
+#else
+static uint16_t _flow_sampleHead  = 0;  // next write position (needs uint16 for ESP32 256-slot ring)
+static uint16_t _flow_sampleCount = 0;  // valid sample count (0..SAT_FLOW_SAMPLE_SIZE)
+#endif
 
 // --- Current Cycle State ---
 static bool     _cycle_flameOn          = false;
@@ -112,6 +127,49 @@ struct SATCycleRecord {
 static SATCycleRecord _cycleHistory[SAT_CYCLE_HISTORY_SIZE];
 static uint8_t        _cycleHistoryIdx = 0;
 static uint8_t        _cycleHistoryCount = 0;
+
+// --- Heating Curve Recommendation (HCR) — buffer declares (Task #228) ---
+// Defined here so satCycleInit() can zero them before _hcrIntraMedian() is defined below.
+
+// ESP8266:   7 days x 4 bytes =   28 bytes SRAM (one week of daily medians).
+// ESP32:    30 days x 4 bytes =  120 bytes SRAM (4-week heating curve trend).
+#if defined(ESP8266)
+  #define HCR_DAYS         7
+#else
+  #define HCR_DAYS         30
+#endif
+// ESP8266:   96 samples x 4 bytes =   384 bytes SRAM (15-min intervals for one day).
+// ESP32:   1440 samples x 4 bytes =  5760 bytes SRAM (per-minute sampling for one day).
+#if defined(ESP8266)
+  #define HCR_INTRADAY_SIZE 96
+#else
+  #define HCR_INTRADAY_SIZE 1440
+#endif
+static const float    HCR_THRESHOLD_C   = 0.5f;  // median error threshold (°C)
+static const uint8_t  HCR_SUSTAIN_DAYS  = 3;     // consecutive days needed for a recommendation
+static const char*    SAT_HCR_FILE PROGMEM = "/sat_hcr.json";
+
+// Ring buffer of daily median errors (oldest → newest)
+static float    _hcr_dailyMedian[HCR_DAYS]; // raw daily medians
+static uint8_t  _hcr_head   = 0;            // next write position (HCR_DAYS <= 30, fits uint8)
+static uint8_t  _hcr_count  = 0;            // valid entries (0..HCR_DAYS)
+
+// Intra-day sample accumulator: collect (room - target) readings until midnight.
+// ESP8266: 96 samples at 15-min intervals = one day. ESP32: 1440 samples at 1-min intervals.
+static float    _hcr_samples[HCR_INTRADAY_SIZE];
+#if defined(ESP8266)
+static uint8_t  _hcr_sHead    = 0;          // next write position
+static uint8_t  _hcr_sCount   = 0;          // valid samples
+#else
+static uint16_t _hcr_sHead    = 0;          // next write position (needs uint16 for ESP32 1440-slot ring)
+static uint16_t _hcr_sCount   = 0;          // valid samples
+#endif
+static uint32_t _hcr_lastDayNum = 0;        // last calendar day that was committed (time/86400)
+
+//--- Forward declarations for HCR functions ---
+static float _hcrIntraMedian();
+void satHCRSaveState();
+void satHCRLoadState();
 
 //=== Initialize cycle tracking ===
 void satCycleInit()
@@ -214,18 +272,18 @@ void satGetWindow4hStats()
   uint32_t sumOnMs      = 0;
   uint32_t sumOffMs     = 0;
   float    sumP90Flow   = 0.0f;
-  uint8_t  nOvershoot   = 0;
-  uint8_t  nUnderheat   = 0;
-  uint8_t  nValid       = 0;
+  uint16_t nOvershoot   = 0;
+  uint16_t nUnderheat   = 0;
+  uint16_t nValid       = 0;
 
   // Collect per-cycle flow-return deltas into a local scratch array for percentile sort.
-  // Max SAT_WIN4H_SIZE floats on stack: 30*4=120 bytes (ESP8266) or 60*4=240 bytes (ESP32) — acceptable.
+  // Max SAT_WIN4H_SIZE floats on stack: 30*4=120 bytes (ESP8266) or 360*4=1440 bytes (ESP32) — acceptable on ESP32.
   float deltas[SAT_WIN4H_SIZE];
-  uint8_t nDeltas = 0;
+  uint16_t nDeltas = 0;
 
-  for (uint8_t i = 0; i < _win4hCount; i++) {
+  for (uint16_t i = 0; i < _win4hCount; i++) {
     // Walk backwards so newest entries are checked first (avoids counting stale wrap-arounds)
-    uint8_t idx = (_win4hHead + SAT_WIN4H_SIZE - 1 - i) % SAT_WIN4H_SIZE;
+    uint16_t idx = (_win4hHead + SAT_WIN4H_SIZE - 1 - i) % SAT_WIN4H_SIZE;
     if ((nowMs - _win4h[idx].endMs) > SAT_WIN4H_SPAN_MS) continue; // outside 4h window
     sumOnMs    += _win4h[idx].onDurationMs;
     sumOffMs   += _win4h[idx].offDurationMs;
@@ -268,18 +326,18 @@ void satGetWindow4hStats()
     state.sat.f4hFlowRetDeltaP50 = 0.0f;
     state.sat.f4hFlowRetDeltaP90 = 0.0f;
   } else {
-    // Insertion sort (n <= 60, runs once per minute — fine)
-    for (uint8_t i = 1; i < nDeltas; i++) {
+    // Insertion sort (n <= SAT_WIN4H_SIZE, runs once per minute)
+    for (uint16_t i = 1; i < nDeltas; i++) {
       float key = deltas[i];
-      int8_t j = (int8_t)i - 1;
+      int16_t j = (int16_t)i - 1;
       while (j >= 0 && deltas[j] > key) {
         deltas[j + 1] = deltas[j];
         j--;
       }
       deltas[j + 1] = key;
     }
-    uint8_t idx50 = (uint8_t)((uint16_t)50 * (nDeltas - 1) / 100);
-    uint8_t idx90 = (uint8_t)((uint16_t)90 * (nDeltas - 1) / 100);
+    uint16_t idx50 = (uint16_t)((uint32_t)50 * (nDeltas - 1) / 100);
+    uint16_t idx90 = (uint16_t)((uint32_t)90 * (nDeltas - 1) / 100);
     if (idx50 >= nDeltas) idx50 = nDeltas - 1;
     if (idx90 >= nDeltas) idx90 = nDeltas - 1;
     state.sat.f4hFlowRetDeltaP50 = deltas[idx50];
@@ -304,16 +362,16 @@ static float _flowPercentile(uint8_t pct)
 
   // Copy to local buffer for sorting (avoids mutating the ring)
   float sorted[SAT_FLOW_SAMPLE_SIZE];
-  uint8_t n = _flow_sampleCount;
-  for (uint8_t i = 0; i < n; i++) {
-    uint8_t src = (_flow_sampleHead + SAT_FLOW_SAMPLE_SIZE - n + i) % SAT_FLOW_SAMPLE_SIZE;
+  uint16_t n = _flow_sampleCount;
+  for (uint16_t i = 0; i < n; i++) {
+    uint16_t src = (_flow_sampleHead + SAT_FLOW_SAMPLE_SIZE - n + i) % SAT_FLOW_SAMPLE_SIZE;
     sorted[i] = _flow_samples[src];
   }
 
-  // Insertion sort — O(n^2) but n≤64, runs once at cycle end
-  for (uint8_t i = 1; i < n; i++) {
+  // Insertion sort — O(n^2) but n<=SAT_FLOW_SAMPLE_SIZE, runs once at cycle end
+  for (uint16_t i = 1; i < n; i++) {
     float key = sorted[i];
-    int8_t j = (int8_t)i - 1;
+    int16_t j = (int16_t)i - 1;
     while (j >= 0 && sorted[j] > key) {
       sorted[j + 1] = sorted[j];
       j--;
@@ -322,7 +380,7 @@ static float _flowPercentile(uint8_t pct)
   }
 
   // Index for requested percentile (0-based, clamped)
-  uint8_t idx = (uint8_t)((uint16_t)pct * (n - 1) / 100);
+  uint16_t idx = (uint16_t)((uint32_t)pct * (n - 1) / 100);
   if (idx >= n) idx = n - 1;
   return sorted[idx];
 }
@@ -678,43 +736,22 @@ uint32_t satCycleGetPhaseDurationSec()
 //   - Daily error ring buffer persists to LittleFS (/sat_hcr.json) so the recommendation
 //     survives reboots.
 
-static const uint8_t  HCR_DAYS          = 7;     // rolling-day window size
-static const float    HCR_THRESHOLD_C   = 0.5f;  // median error threshold (°C)
-static const uint8_t  HCR_SUSTAIN_DAYS  = 3;     // consecutive days needed for a recommendation
-static const char*    SAT_HCR_FILE PROGMEM = "/sat_hcr.json";
-
-// Ring buffer of daily median errors (oldest → newest)
-static float    _hcr_dailyMedian[HCR_DAYS]; // raw daily medians
-static uint8_t  _hcr_head   = 0;            // next write position
-static uint8_t  _hcr_count  = 0;            // valid entries (0..HCR_DAYS)
-
-// Intra-day sample accumulator: collect (room - target) readings until midnight.
-// Using a small ring (up to 96 samples at 15-min intervals = one day).
-static const uint8_t HCR_INTRADAY_SIZE = 96;
-static float    _hcr_samples[HCR_INTRADAY_SIZE];
-static uint8_t  _hcr_sHead    = 0;          // next write position
-static uint8_t  _hcr_sCount   = 0;          // valid samples
-static uint32_t _hcr_lastDayNum = 0;        // last calendar day that was committed (time/86400)
-
-//--- Forward declarations ---
-static float _hcrIntraMedian();
-void satHCRSaveState();
-void satHCRLoadState();
-
 //--- Compute median of the intra-day sample buffer (insertion-sort on local copy) ---
+// sorted[] is static to avoid a large stack frame: on ESP32 HCR_INTRADAY_SIZE=1440 (5760 bytes).
+// This function runs once per day and is not re-entrant, so static is safe.
 static float _hcrIntraMedian()
 {
   if (_hcr_sCount == 0) return 0.0f;
-  float sorted[HCR_INTRADAY_SIZE];
-  uint8_t n = _hcr_sCount;
-  for (uint8_t i = 0; i < n; i++) {
-    uint8_t src = (_hcr_sHead + HCR_INTRADAY_SIZE - n + i) % HCR_INTRADAY_SIZE;
+  static float sorted[HCR_INTRADAY_SIZE];
+  uint16_t n = _hcr_sCount;
+  for (uint16_t i = 0; i < n; i++) {
+    uint16_t src = (_hcr_sHead + HCR_INTRADAY_SIZE - n + i) % HCR_INTRADAY_SIZE;
     sorted[i] = _hcr_samples[src];
   }
-  // Insertion sort — n ≤ 96, runs once per day
-  for (uint8_t i = 1; i < n; i++) {
+  // Insertion sort — n <= HCR_INTRADAY_SIZE, runs once per day
+  for (uint16_t i = 1; i < n; i++) {
     float key = sorted[i];
-    int8_t j  = (int8_t)i - 1;
+    int16_t j  = (int16_t)i - 1;
     while (j >= 0 && sorted[j] > key) { sorted[j + 1] = sorted[j]; j--; }
     sorted[j + 1] = key;
   }
@@ -727,8 +764,13 @@ void satHCRSaveState()
 {
   File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "w");
   if (!f) return;
-  // Format: {"n":7,"h":3,"d":[v0,v1,...,v6]}
-  char buf[128];
+  // Format: {"n":N,"h":H,"d":[v0,v1,...,vN-1]}
+  // Buffer: header(~20) + HCR_DAYS * 8 chars/float + footer(2); sized for largest platform.
+#if defined(ESP8266)
+  char buf[128];   // 7 days: ~71 bytes needed
+#else
+  char buf[320];   // 30 days: ~252 bytes needed
+#endif
   int pos = snprintf_P(buf, sizeof(buf), PSTR("{\"n\":%u,\"h\":%u,\"d\":["),
                        (unsigned)_hcr_count, (unsigned)_hcr_head);
   for (uint8_t i = 0; i < HCR_DAYS; i++) {
@@ -747,7 +789,11 @@ void satHCRLoadState()
 {
   File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "r");
   if (!f) return;
-  char buf[128];
+#if defined(ESP8266)
+  char buf[128];   // 7 days: ~71 bytes in file
+#else
+  char buf[320];   // 30 days: ~252 bytes in file
+#endif
   size_t len = f.readBytes(buf, sizeof(buf) - 1);
   buf[len] = 0;
   f.close();
