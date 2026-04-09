@@ -321,6 +321,11 @@ static char    otTempSensor      = 'O';      // TS= temp sensor function
 static char    otForceThermostat = 'A';      // FT= thermostat detection
 static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
 
+// BS= fake room setpoint — intercepts thermostat MsgID 16 READ_DATA frames
+// and replaces the data bytes with the fake setpoint before forwarding to boiler.
+// 0.0 = disabled (BS=0 clears the fake). Mirrors PIC gateway.asm:3019-3024.
+static float otFakeRoomSetpoint = 0.0f;
+
 // SR/CR response override table
 static constexpr uint8_t OT_RESPONSE_OVERRIDE_MAX = 16;
 struct OTResponseOverride {
@@ -1687,6 +1692,8 @@ static void resetTransientState() {
   otPiInit       = false;
   otPiDeltaT     = 0.0f;
   otNextPiCtrl   = 0;
+  // BS= fake room setpoint — clear on reset
+  otFakeRoomSetpoint = 0.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -1949,6 +1956,25 @@ void handleOTDirectCommand(const char* buf, int len) {
     } else {
       uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
       enqueueWriteCommand(16, f88, "TT");
+    }
+    dtostrf(temp, 1, 2, rspBuf);
+    synthesizeResponse(buf, rspBuf);
+  }
+  // BS=xx.x — Fake boiler room setpoint (MsgID 16 frame interception).
+  // Intercepts the thermostat's own MsgID 16 READ_DATA and replaces the data bytes
+  // with the fake setpoint before forwarding to the boiler. This is the same
+  // mechanism as the PIC firmware (gateway.asm:3019-3024): the modified frame
+  // is the thermostat's own request, not a separate WRITE_DATA from the gateway.
+  // BS=0 clears the fake and restores the thermostat's original room setpoint.
+  else if (cmd0 == 'B' && cmd1 == 'S') {
+    float temp = atof(value);
+    if (temp == 0.0f) {
+      otFakeRoomSetpoint = 0.0f;
+      clearOverride(16);
+    } else {
+      otFakeRoomSetpoint = temp;
+      uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
+      setOverride(16, f88);
     }
     dtostrf(temp, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
