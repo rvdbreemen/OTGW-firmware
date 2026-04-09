@@ -1548,6 +1548,8 @@ void satPublishMQTT()
                       state.sat.iLastSeenPressureMs / 1000UL);
     sendMQTTData(F("sat/pressure_health_attr"), pressAttrBuf, false);
   }
+  // Task #226: publish sat/ch_pressure + sat/ch_pressure_status
+  satPressureHealthPublish();
 
   // Current modulation level (published so HA auto-discovery entity has a live topic)
   snprintf_P(valBuf, sizeof(valBuf), PSTR("%d"), (int)state.sat.iCurrentModulation);
@@ -3092,6 +3094,7 @@ void satControlLoop()
 
   // --- Pressure monitoring ---
   satUpdatePressure();
+  satPressureHealthUpdate();  // Task #226: update fBoilerPressure + sPressureStatus
 
   // --- Solar gain compensation (Task #23) ---
   satUpdateSolarGain();

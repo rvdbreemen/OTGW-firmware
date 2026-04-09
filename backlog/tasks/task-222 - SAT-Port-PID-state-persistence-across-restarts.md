@@ -1,11 +1,11 @@
 ---
 id: TASK-222
 title: 'SAT: Port PID state persistence across restarts'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 05:29'
-updated_date: '2026-04-09 05:36'
+updated_date: '2026-04-09 06:07'
 labels:
   - audit-fix
   - sat
@@ -32,11 +32,11 @@ Risk: If stale state is restored after an unusually long downtime (e.g. summer m
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 PID integral term is written to LittleFS when it changes (debounced, not every second)
-- [ ] #2 PID state is restored on startup if saved timestamp is within 30 minutes of current time
-- [ ] #3 If saved state is stale or missing, PID starts from zero (current behavior)
-- [ ] #4 State is stored in settings.sat struct or a dedicated SAT state file in LittleFS
-- [ ] #5 No regression on existing PID behavior in the normal (non-restart) path
+- [x] #1 PID integral term is written to LittleFS when it changes (debounced, not every second)
+- [x] #2 PID state is restored on startup if saved timestamp is within 30 minutes of current time
+- [x] #3 If saved state is stale or missing, PID starts from zero (current behavior)
+- [x] #4 State is stored in settings.sat struct or a dedicated SAT state file in LittleFS
+- [x] #5 No regression on existing PID behavior in the normal (non-restart) path
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,3 +49,18 @@ Risk: If stale state is restored after an unusually long downtime (e.g. summer m
 5. If time(nullptr) returns 0 (NTP not yet synced on boot), skip restore - start from zero
 6. No changes to the periodic save interval (every 5 min) or satDisable() call path
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Extended /sat_pid_state.json to include a Unix timestamp ("ts" field) so staleness can be detected on restore.
+
+Changes:
+- satSavePidState(): adds "ts":<unix_epoch> to the JSON using time(nullptr); buf size increased 128→160 bytes
+- satLoadPidState(): reads "ts" field; discards state if NTP not synced (time < 1000000) or age > 1800s (30 min)
+- Deferred restore: initSAT() calls satLoadPidState() at boot (skipped when NTP not ready); satControlLoop() retries once when isNTPtimeSet() becomes true, ensuring the integral is actually restored
+- Existing periodic save (5 min) and satDisable() save path unchanged
+- SAT_PID_STALE_SEC = 1800 constant documents the policy
+
+Risk mitigation: 30-minute window guards against summer/long-downtime stale state; NTP guard prevents restoring from an unverifiable epoch.
+<!-- SECTION:FINAL_SUMMARY:END -->

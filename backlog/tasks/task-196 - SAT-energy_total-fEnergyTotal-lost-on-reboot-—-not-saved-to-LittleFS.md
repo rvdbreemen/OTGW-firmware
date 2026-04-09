@@ -1,11 +1,11 @@
 ---
 id: TASK-196
 title: 'SAT: energy_total (fEnergyTotal) lost on reboot — not saved to LittleFS'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 05:21'
-updated_date: '2026-04-09 05:36'
+updated_date: '2026-04-09 06:07'
 labels:
   - audit-fix
 dependencies: []
@@ -20,9 +20,9 @@ state.sat.fEnergyTotal accumulates kWh consumed and is published to sat/energy_t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Add energy_total to a separate /sat_energy.json state file (like /sat_pid_state.json)
-- [ ] #2 Load energy on boot in satLoadPidState() or equivalent satLoadEnergyState()
-- [ ] #3 Save energy periodically (e.g. every hour) and on SAT disable
+- [x] #1 Add energy_total to a separate /sat_energy.json state file (like /sat_pid_state.json)
+- [x] #2 Load energy on boot in satLoadPidState() or equivalent satLoadEnergyState()
+- [x] #3 Save energy periodically (e.g. every hour) and on SAT disable
 - [ ] #4 Verified on both ESP8266 and ESP32 builds
 <!-- AC:END -->
 
@@ -36,3 +36,18 @@ state.sat.fEnergyTotal accumulates kWh consumed and is published to sat/energy_t
 5. Add _energyLastSaveMs static tracker alongside _pidLastSaveMs
 6. Both functions are symmetric to satSavePidState/satLoadPidState
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added satSaveEnergyState() and satLoadEnergyState() to SATcontrol.ino, following the exact pattern of satSavePidState/satLoadPidState.
+
+Changes:
+- New /sat_energy.json file: {"kwh":X.XXX} format, written with snprintf_P/PSTR per coding rules
+- satLoadEnergyState() called in initSAT() to restore energy on boot
+- satSaveEnergyState() called in satDisable() (on SAT disable) and periodically every hour in satControlLoop()
+- _energyLastSaveMs static tracker added alongside existing _pidLastSaveMs
+- Save interval 1h (SAT_ENERGY_SAVE_INTERVAL_MS) balances wear vs. loss: worst case 1h of kWh lost
+
+Note: AC #4 (verified on both builds) could not be fully confirmed — pre-existing unrelated build errors exist in OTDirect.ino and SATble.ino on this branch. The energy persistence code itself compiles cleanly; the failures are in unrelated files.
+<!-- SECTION:FINAL_SUMMARY:END -->
