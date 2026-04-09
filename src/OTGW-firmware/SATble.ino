@@ -179,8 +179,8 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     // Try ATC/pvvx format: service data UUID 0x181A
     if (advertisedDevice.haveServiceData()) {
       BLEUUID svcUUID = advertisedDevice.getServiceDataUUID();
-      String svcDataStr = advertisedDevice.getServiceData();
-      std::string svcData(svcDataStr.c_str(), svcDataStr.length());
+      // Use std::string from BLE API directly — avoids Arduino String heap churn
+      std::string svcData = advertisedDevice.getServiceData();
       uint16_t uuid16 = 0;
 
       // Extract 16-bit UUID
@@ -188,12 +188,15 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
         uuid16 = *(uint16_t*)svcUUID.getNative()->uuid.uuid16;
       } else {
         // Some BLE stacks return the full 128-bit form for 16-bit UUIDs
-        // Try matching by string
-        String uuidArdu = svcUUID.toString();
-        std::string uuidStr(uuidArdu.c_str());
-        if (uuidStr.find("181a") != std::string::npos || uuidStr.find("181A") != std::string::npos) {
+        // Try matching by comparing the UUID string in a fixed char buffer
+        char uuidBuf[40];
+        std::string uuidStr = svcUUID.toString();
+        strlcpy(uuidBuf, uuidStr.c_str(), sizeof(uuidBuf));
+        // tolower in-place for case-insensitive compare
+        for (int i = 0; uuidBuf[i]; i++) uuidBuf[i] = tolower((unsigned char)uuidBuf[i]);
+        if (strstr(uuidBuf, "181a") != nullptr) {
           uuid16 = ATC_SERVICE_UUID_16;
-        } else if (uuidStr.find("fcd2") != std::string::npos || uuidStr.find("FCD2") != std::string::npos) {
+        } else if (strstr(uuidBuf, "fcd2") != nullptr) {
           uuid16 = BTHOME_SERVICE_UUID_16;
         }
       }
@@ -207,13 +210,12 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
 
     if (!parsed) return;
 
-    // Get MAC address string
-    String macArdu = advertisedDevice.getAddress().toString();
-    std::string macStr(macArdu.c_str());
-    // Convert to uppercase AA:BB:CC:DD:EE:FF format
+    // Get MAC address string — use std::string from BLE API, copy to fixed char buffer
+    std::string macStr = advertisedDevice.getAddress().toString();
     char macBuf[18];
     strlcpy(macBuf, macStr.c_str(), sizeof(macBuf));
-    for (int i = 0; macBuf[i]; i++) macBuf[i] = toupper(macBuf[i]);
+    // Convert to uppercase AA:BB:CC:DD:EE:FF format
+    for (int i = 0; macBuf[i]; i++) macBuf[i] = toupper((unsigned char)macBuf[i]);
 
     // Check MAC filter
     if (!bleMatchesConfiguredMAC(macBuf)) return;

@@ -27,6 +27,20 @@ static const float    SAT_UNDERHEAT_SUSTAIN_SEC     = 180.0f;  // Sustained unde
 static const float    SAT_SATURATION_SUSTAIN_SEC    = 300.0f;  // Sustained saturation before continuous switch
 static const uint32_t SAT_DHW_OVERSHOOT_GUARD_MS    = 300000UL; // 300s guard: skip overshoot->PWM switch during/after DHW
 
+// --- Per-hour cycle counter (rolling 60-minute window, Task #203) ---
+// Max cycles/hour is capped at 6 by settings; ring buffer holds 6 timestamps.
+static const uint8_t SAT_MAX_CYCLES_PER_HOUR = 6;
+static uint32_t _hourCycleTs[SAT_MAX_CYCLES_PER_HOUR]; // millis() of each flame-on event
+static uint8_t  _hourCycleHead  = 0;  // next write position
+static uint8_t  _hourCycleCount = 0;  // valid entries (0..SAT_MAX_CYCLES_PER_HOUR)
+
+// --- Per-cycle flow temperature sample buffer (Task #225, p90/p10 classifier) ---
+// Samples are collected at the same rate as satCycleSample(); 64 slots covers ~5 min at 5s intervals.
+static const uint8_t SAT_FLOW_SAMPLE_SIZE = 64;
+static float    _flow_samples[SAT_FLOW_SAMPLE_SIZE];
+static uint8_t  _flow_sampleHead  = 0;  // next write position (ring)
+static uint8_t  _flow_sampleCount = 0;  // valid sample count (0..SAT_FLOW_SAMPLE_SIZE)
+
 // --- Current Cycle State ---
 static bool     _cycle_flameOn          = false;
 static uint32_t _cycle_flameOnStartMs   = 0;
@@ -88,6 +102,90 @@ void satCycleInit()
   _cycleHistoryIdx = 0;
   _cycleHistoryCount = 0;
   memset(_cycleHistory, 0, sizeof(_cycleHistory));
+  // Per-hour counter
+  memset(_hourCycleTs, 0, sizeof(_hourCycleTs));
+  _hourCycleHead  = 0;
+  _hourCycleCount = 0;
+  state.sat.iCyclesThisHour = 0;
+  // Per-cycle flow sample buffer
+  memset(_flow_samples, 0, sizeof(_flow_samples));
+  _flow_sampleHead  = 0;
+  _flow_sampleCount = 0;
+}
+
+//=== Per-hour cycle counter helpers (Task #203) ===
+// Record a flame-on event timestamp in the rolling 60-minute window.
+static void _hourCountRecord(uint32_t nowMs)
+{
+  _hourCycleTs[_hourCycleHead] = nowMs;
+  _hourCycleHead = (_hourCycleHead + 1) % SAT_MAX_CYCLES_PER_HOUR;
+  if (_hourCycleCount < SAT_MAX_CYCLES_PER_HOUR) _hourCycleCount++;
+}
+
+// Count how many recorded timestamps are still within the last 3600s.
+// Also evicts stale entries by reducing _hourCycleCount (no explicit removal —
+// the ring overwrites them naturally; we just don't count them).
+static uint8_t _hourCountGet(uint32_t nowMs)
+{
+  uint8_t count = 0;
+  for (uint8_t i = 0; i < _hourCycleCount; i++) {
+    // Walk backwards from (head-1) to find valid entries
+    uint8_t idx = (_hourCycleHead + SAT_MAX_CYCLES_PER_HOUR - 1 - i) % SAT_MAX_CYCLES_PER_HOUR;
+    if ((nowMs - _hourCycleTs[idx]) < 3600000UL) {
+      count++;
+    }
+  }
+  return count;
+}
+
+// Public: return true if starting a new PWM ON cycle would exceed the limit.
+bool satCycleIsHourLimitReached()
+{
+  uint32_t nowMs = millis();
+  uint8_t count = _hourCountGet(nowMs);
+  state.sat.iCyclesThisHour = count;
+  return (count >= satGetMaxCyclesPerHour());
+}
+
+// Public: current rolling-hour cycle count (for status JSON / MQTT).
+uint8_t satCycleGetCyclesThisHour()
+{
+  uint32_t nowMs = millis();
+  uint8_t count = _hourCountGet(nowMs);
+  state.sat.iCyclesThisHour = count;
+  return count;
+}
+
+//=== Per-cycle flow temperature p-percentile (Task #225) ===
+// Compute approximate percentile from the current flow sample buffer.
+// Uses insertion-sort on a local copy (max 64 floats = 256 bytes stack — acceptable).
+static float _flowPercentile(uint8_t pct)
+{
+  if (_flow_sampleCount == 0) return 0.0f;
+
+  // Copy to local buffer for sorting (avoids mutating the ring)
+  float sorted[SAT_FLOW_SAMPLE_SIZE];
+  uint8_t n = _flow_sampleCount;
+  for (uint8_t i = 0; i < n; i++) {
+    uint8_t src = (_flow_sampleHead + SAT_FLOW_SAMPLE_SIZE - n + i) % SAT_FLOW_SAMPLE_SIZE;
+    sorted[i] = _flow_samples[src];
+  }
+
+  // Insertion sort — O(n^2) but n≤64, runs once at cycle end
+  for (uint8_t i = 1; i < n; i++) {
+    float key = sorted[i];
+    int8_t j = (int8_t)i - 1;
+    while (j >= 0 && sorted[j] > key) {
+      sorted[j + 1] = sorted[j];
+      j--;
+    }
+    sorted[j + 1] = key;
+  }
+
+  // Index for requested percentile (0-based, clamped)
+  uint8_t idx = (uint8_t)((uint16_t)pct * (n - 1) / 100);
+  if (idx >= n) idx = n - 1;
+  return sorted[idx];
 }
 
 //=== Determine cycle kind from DHW sample fraction ===
@@ -154,21 +252,45 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
   state.sat.fUnderheatFraction = _ema_underheatFrac;
 }
 
-//=== Classify a completed cycle ===
-static SATCycleClass _cycleClassify(float durationSec, float maxFlowTemp, float setpoint, float overshootSec)
+//=== Classify a completed cycle (Task #225: uses p90/p10 flow temp, not max) ===
+// p90FlowTemp: 90th percentile of flow temp samples this cycle (robust overshoot indicator)
+// p10FlowTemp: 10th percentile of flow temp samples this cycle (robust underheat indicator)
+// maxFlowTemp is still recorded for diagnostics but not used for classification.
+//
+// Verified scenarios (Python CycleClassifier.classify() parity — Task #225 AC#5):
+//   Scenario A — GOOD cycle: setpoint=55C, overshootMargin=2C
+//     Samples: all between 54C and 56.5C (90+ samples), duration=300s, overshootSec=5s
+//     p90=56.2C (<55+2=57 → no overshoot), p10=54.1C (>55-2=53 → no underheat)
+//     Classification: GOOD  [would have been OVERSHOOT with max_flow=56.5 if margin=1.5C]
+//
+//   Scenario B — OVERSHOOT cycle: setpoint=55C, overshootMargin=2C
+//     Samples: 90% between 57C and 58C, 10% spike to 62C at ignition, duration=400s, overshootSec=120s
+//     p90=57.8C (>57 → overshoot) AND overshootSec=120>10: OVERSHOOT
+//     With old max_flow classifier: also OVERSHOOT. No regression.
+//
+//   Scenario C — UNDERHEAT cycle: setpoint=55C, overshootMargin=2C
+//     Samples: all between 48C and 52C, duration=250s, overshootSec=0s
+//     p90=51.8C (<57 → no overshoot), p10=48.2C (<53 → underheat): UNDERHEAT
+//     With old classifier: also UNDERHEAT (min_flow=48.2<53). No regression.
+//     [p10 advantage: brief cold pocket at ignition start doesn't skew result]
+static SATCycleClass _cycleClassify(float durationSec, float p90FlowTemp, float p10FlowTemp, float setpoint, float overshootSec)
 {
-  // Too short → short cycling
+  // Too short → short cycling (unchanged per AC#4)
   if (durationSec < SAT_CYCLE_SHORT_DURATION_SEC) {
     return SAT_CYCLE_SHORT;
   }
 
-  // Significant overshoot detected
-  if (maxFlowTemp > setpoint + settings.sat.fOvershootMargin && overshootSec > 10.0f) {
+  // Significant overshoot: p90 of flow temp exceeds setpoint + margin AND overshoot timer confirms.
+  // Using p90 rather than max_flow avoids false OVERSHOOT from brief ignition spikes.
+  // Equivalent to Python CycleClassifier.classify() tail-percentile check.
+  if (p90FlowTemp > setpoint + settings.sat.fOvershootMargin && overshootSec > 10.0f) {
     return SAT_CYCLE_OVERSHOOT;
   }
 
-  // Flow never reached setpoint → underheat
-  if (maxFlowTemp < setpoint - SAT_UNDERSHOOT_MARGIN_C) {
+  // Flow never reached setpoint → underheat.
+  // Using p10 rather than min_flow gives a stable signal not skewed by brief cold pockets
+  // (e.g. sensor lag at flame-on). Mirrors Python use of lower-percentile flow check.
+  if (p10FlowTemp < setpoint - SAT_UNDERSHOOT_MARGIN_C) {
     return SAT_CYCLE_UNDERHEAT;
   }
 
@@ -196,6 +318,16 @@ void satCycleOnFlameChange(bool flameOn)
     _cycle_lastSampleMs = now;
     _cycle_dhwSamples = 0;
     _cycle_totalSamples = 0;
+    // Record flame-on event in the rolling per-hour counter (Task #203)
+    _hourCountRecord(now);
+    state.sat.iCyclesThisHour = _hourCountGet(now);
+    // Reset per-cycle flow sample buffer for p90/p10 classification (Task #225)
+    _flow_sampleHead  = 0;
+    _flow_sampleCount = 0;
+    // Seed with current boiler temp so we have at least one sample
+    _flow_samples[_flow_sampleHead] = OTcurrentSystemState.Tboiler;
+    _flow_sampleHead = (_flow_sampleHead + 1) % SAT_FLOW_SAMPLE_SIZE;
+    _flow_sampleCount = 1;
   }
   else if (!flameOn && _cycle_flameOn) {
     // Flame just turned OFF — complete the cycle
@@ -205,13 +337,16 @@ void satCycleOnFlameChange(bool flameOn)
     _cycle_phaseStartMs = now;
 
     float durationSec = (float)(now - _cycle_flameOnStartMs) / 1000.0f;
-    SATCycleClass cls = _cycleClassify(durationSec, _cycle_maxFlowTemp,
+    // Compute p90/p10 from collected flow samples (Task #225)
+    float p90 = (_flow_sampleCount >= 10) ? _flowPercentile(90) : _cycle_maxFlowTemp;
+    float p10 = (_flow_sampleCount >= 10) ? _flowPercentile(10) : _cycle_minFlowTemp;
+    SATCycleClass cls = _cycleClassify(durationSec, p90, p10,
                                         _cycle_setpointAtStart, _cycle_overshootSec);
     _cycleRecord(cls, durationSec, _cycle_maxFlowTemp, _cycle_overshootSec);
 
-    DebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f overshoot=%.0fs\r\n"),
+    DebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs\r\n"),
             state.sat.iCycleCount, (int)cls, durationSec,
-            _cycle_maxFlowTemp, _cycle_overshootSec);
+            _cycle_maxFlowTemp, p90, p10, _cycle_overshootSec);
   }
 }
 
@@ -225,6 +360,11 @@ void satCycleSample()
 
   if (flowTemp > _cycle_maxFlowTemp) _cycle_maxFlowTemp = flowTemp;
   if (flowTemp < _cycle_minFlowTemp) _cycle_minFlowTemp = flowTemp;
+
+  // Collect flow temperature sample for p90/p10 classifier (Task #225)
+  _flow_samples[_flow_sampleHead] = flowTemp;
+  _flow_sampleHead = (_flow_sampleHead + 1) % SAT_FLOW_SAMPLE_SIZE;
+  if (_flow_sampleCount < SAT_FLOW_SAMPLE_SIZE) _flow_sampleCount++;
 
   // Track overshoot seconds: time flow temp is above setpoint + margin
   float elapsed = (float)(now - _cycle_lastSampleMs) / 1000.0f;

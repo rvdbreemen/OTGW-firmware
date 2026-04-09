@@ -651,6 +651,19 @@ static float satApplyPWM(float pidOutput)
     _pwm_flameOffHoldSetpoint = 0.0f;
     uint32_t sinceFlameOff = millis() - satCycleGetFlameOffStartMs();
     if (sinceFlameOff >= offTimeMs) {
+      // Per-hour cycle limit (Task #203): suppress new ON cycle if rolling-hour count is reached
+      static bool _hourLimitLogged = false;
+      if (satCycleIsHourLimitReached()) {
+        // Stay in OFF until the oldest timestamp leaves the 60-minute window.
+        // Log once per suppression event (guard against log spam via a latch).
+        if (!_hourLimitLogged) {
+          DebugTf(PSTR("SAT PWM: cycle limit %u/hr reached, suppressing new cycle\r\n"),
+                  (unsigned)satGetMaxCyclesPerHour());
+          _hourLimitLogged = true;
+        }
+        return SAT_MIN_SETPOINT;
+      }
+      _hourLimitLogged = false;  // reset latch when limit clears
       state.sat.bPwmFlameRequested = true;
       _pwm_waitingForFlame = true;
       return pidOutput;
@@ -1158,6 +1171,7 @@ void satSendStatusJSON()
   satSendJsonFloat(F("deadband"),             settings.sat.fDeadband, 2);
   satSendJsonFloat(F("overshoot_margin"),     settings.sat.fOvershootMargin, 1);
   sendJsonMapEntry(F("cycle_count"),          state.sat.iCycleCount);
+  sendJsonMapEntry(F("cycles_this_hour"),     (int32_t)satCycleGetCyclesThisHour());
   sendJsonMapEntry(F("last_cycle_class"),     (int32_t)state.sat.eLastCycleClass);
   satSendJsonFloat(F("cycle_max_flow"),       state.sat.fCycleMaxFlow, 1);
   satSendJsonFloat(F("cycle_overshoot_sec"),  state.sat.fCycleOvershootSec, 0);
@@ -1412,6 +1426,10 @@ void satPublishMQTT()
 
   // Cycle phase
   sendMQTTData(F("sat/cycle_phase"), satCycleGetPhaseName(), false);
+
+  // Per-hour cycle counter (Task #203)
+  snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)satCycleGetCyclesThisHour());
+  sendMQTTData(F("sat/cycles_this_hour"), valBuf, false);
 
   // Overshoot margin
   dtostrf(settings.sat.fOvershootMargin, 1, 1, valBuf);

@@ -191,6 +191,8 @@ void satCycleOnFlameChange(bool flameOn);
 void satSendStatusJSON();
 uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();
+bool    satCycleIsHourLimitReached();
+uint8_t satCycleGetCyclesThisHour();
 
 //===================[ Hardware Mode — detected at boot ]===================
 enum OTGWHardwareMode : uint8_t {
@@ -406,6 +408,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Cycle tracking
   SATCycleClass eLastCycleClass  = SAT_CYCLE_NONE;
   uint32_t iCycleCount           = 0;
+  uint8_t  iCyclesThisHour       = 0;      // Flame-on events in the rolling 60-min window
   float    fCycleMaxFlow         = 0.0f;
   float    fCycleOvershootSec    = 0.0f;
   float    fLastCycleDuration     = 0.0f;   // Duration of last completed cycle (sec)
