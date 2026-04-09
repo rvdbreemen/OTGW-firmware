@@ -1,5 +1,0 @@
-load i tests/setup.stc
-
-loadee macro file
-    load e p16f1847 file
-endm

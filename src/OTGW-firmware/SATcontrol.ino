@@ -337,6 +337,8 @@ static bool     _sat_prevFlameState = false;
 
 // --- Timer for control loop (initial value, updated from settings in initSAT) ---
 DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInterval, CATCH_UP_MISSED_TICKS);
+// --- Timer for 4-hour window stats (Task #227): update once per minute ---
+DECLARE_TIMER_SEC(timerSAT4hStats, 60, SKIP_MISSED_TICKS);
 
 //=====================================================================
 //=== Heating Curve Calculation ===
@@ -1430,6 +1432,26 @@ void satPublishMQTT()
   // Per-hour cycle counter (Task #203)
   snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)satCycleGetCyclesThisHour());
   sendMQTTData(F("sat/cycles_this_hour"), valBuf, false);
+
+  // Rolling 4-hour window statistics (Task #227)
+  snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)state.sat.i4hCycles);
+  sendMQTTData(F("sat/4h_cycles"), valBuf, false);
+  dtostrf(state.sat.f4hAvgOnSec, 1, 1, valBuf);
+  sendMQTTData(F("sat/4h_avg_on_sec"), valBuf, false);
+  dtostrf(state.sat.f4hAvgOffSec, 1, 1, valBuf);
+  sendMQTTData(F("sat/4h_avg_off_sec"), valBuf, false);
+  dtostrf(state.sat.f4hAvgFlow, 1, 1, valBuf);
+  sendMQTTData(F("sat/4h_avg_flow_temp"), valBuf, false);
+  dtostrf(state.sat.f4hDutyRatio, 1, 3, valBuf);
+  sendMQTTData(F("sat/4h_duty_ratio"), valBuf, false);
+  dtostrf(state.sat.f4hOvershootFraction, 1, 3, valBuf);
+  sendMQTTData(F("sat/4h_overshoot_fraction"), valBuf, false);
+  dtostrf(state.sat.f4hUnderheatFraction, 1, 3, valBuf);
+  sendMQTTData(F("sat/4h_underheat_fraction"), valBuf, false);
+  dtostrf(state.sat.f4hFlowRetDeltaP50, 1, 1, valBuf);
+  sendMQTTData(F("sat/4h_flow_ret_delta_p50"), valBuf, false);
+  dtostrf(state.sat.f4hFlowRetDeltaP90, 1, 1, valBuf);
+  sendMQTTData(F("sat/4h_flow_ret_delta_p90"), valBuf, false);
 
   // Overshoot margin
   dtostrf(settings.sat.fOvershootMargin, 1, 1, valBuf);
@@ -2977,6 +2999,11 @@ void satControlLoop()
 
   // Sample cycle data frequently (every loop call)
   satCycleSample();
+
+  // Update rolling 4-hour window statistics once per minute (Task #227)
+  if (DUE(timerSAT4hStats)) {
+    satGetWindow4hStats();
+  }
 
   // Main control loop on timer
   if (!DUE(timerSATControl)) return;

@@ -34,6 +34,29 @@ static uint32_t _hourCycleTs[SAT_MAX_CYCLES_PER_HOUR]; // millis() of each flame
 static uint8_t  _hourCycleHead  = 0;  // next write position
 static uint8_t  _hourCycleCount = 0;  // valid entries (0..SAT_MAX_CYCLES_PER_HOUR)
 
+// --- Rolling 4-hour cycle window (Task #227) ---
+// 60 slots: covers 4h at a 4-min average cycle period, or 2h at 2-min average.
+// Each record is ~24 bytes; 60 records = ~1.4 KB — acceptable on ESP8266.
+static const uint8_t  SAT_WIN4H_SIZE    = 60;
+static const uint32_t SAT_WIN4H_SPAN_MS = 4UL * 3600UL * 1000UL; // 4 hours in ms
+
+struct SATWindowRecord {
+  uint32_t endMs;          // millis() when flame went OFF (cycle end)
+  uint32_t onDurationMs;   // flame-ON duration for this cycle
+  uint32_t offDurationMs;  // flame-OFF gap that preceded this cycle
+  float    p90FlowTemp;    // 90th percentile flow temp during this cycle (°C)
+  float    avgFlowRetDelta;// average (Tboiler - Tret) during this cycle (°C); <0 if no data
+  uint8_t  eClass;         // SATCycleClass cast to uint8_t
+};
+
+static SATWindowRecord _win4h[SAT_WIN4H_SIZE];
+static uint8_t         _win4hHead  = 0;   // next write position
+static uint8_t         _win4hCount = 0;   // valid entries (0..SAT_WIN4H_SIZE)
+
+// Accumulator for flow-return delta during active cycle
+static float    _cycle_sumFlowRetDelta = 0.0f;
+static uint16_t _cycle_deltasamples   = 0;
+
 // --- Per-cycle flow temperature sample buffer (Task #225, p90/p10 classifier) ---
 // Samples are collected at the same rate as satCycleSample(); 64 slots covers ~5 min at 5s intervals.
 static const uint8_t SAT_FLOW_SAMPLE_SIZE = 64;
@@ -111,6 +134,21 @@ void satCycleInit()
   memset(_flow_samples, 0, sizeof(_flow_samples));
   _flow_sampleHead  = 0;
   _flow_sampleCount = 0;
+  // Rolling 4-hour window (Task #227)
+  memset(_win4h, 0, sizeof(_win4h));
+  _win4hHead  = 0;
+  _win4hCount = 0;
+  _cycle_sumFlowRetDelta = 0.0f;
+  _cycle_deltasamples    = 0;
+  state.sat.i4hCycles            = 0;
+  state.sat.f4hAvgOnSec          = 0.0f;
+  state.sat.f4hAvgOffSec         = 0.0f;
+  state.sat.f4hAvgFlow           = 0.0f;
+  state.sat.f4hDutyRatio         = 0.0f;
+  state.sat.f4hOvershootFraction = 0.0f;
+  state.sat.f4hUnderheatFraction = 0.0f;
+  state.sat.f4hFlowRetDeltaP50   = 0.0f;
+  state.sat.f4hFlowRetDeltaP90   = 0.0f;
 }
 
 //=== Per-hour cycle counter helpers (Task #203) ===
@@ -154,6 +192,99 @@ uint8_t satCycleGetCyclesThisHour()
   uint8_t count = _hourCountGet(nowMs);
   state.sat.iCyclesThisHour = count;
   return count;
+}
+
+//=== Rolling 4-hour window statistics (Task #227) ===
+// Iterates the ring buffer, filters entries within SAT_WIN4H_SPAN_MS of now,
+// and computes: cycle count, avg on/off durations, avg p90 flow temp,
+// duty ratio, overshoot/underheat fractions, and flow-return delta p50/p90.
+// Results are written directly to state.sat.
+void satGetWindow4hStats()
+{
+  uint32_t nowMs = millis();
+
+  uint32_t sumOnMs      = 0;
+  uint32_t sumOffMs     = 0;
+  float    sumP90Flow   = 0.0f;
+  uint8_t  nOvershoot   = 0;
+  uint8_t  nUnderheat   = 0;
+  uint8_t  nValid       = 0;
+
+  // Collect per-cycle flow-return deltas into a local scratch array for percentile sort.
+  // Max SAT_WIN4H_SIZE (60) floats = 240 bytes on stack — acceptable.
+  float deltas[SAT_WIN4H_SIZE];
+  uint8_t nDeltas = 0;
+
+  for (uint8_t i = 0; i < _win4hCount; i++) {
+    // Walk backwards so newest entries are checked first (avoids counting stale wrap-arounds)
+    uint8_t idx = (_win4hHead + SAT_WIN4H_SIZE - 1 - i) % SAT_WIN4H_SIZE;
+    if ((nowMs - _win4h[idx].endMs) > SAT_WIN4H_SPAN_MS) continue; // outside 4h window
+    sumOnMs    += _win4h[idx].onDurationMs;
+    sumOffMs   += _win4h[idx].offDurationMs;
+    sumP90Flow += _win4h[idx].p90FlowTemp;
+    if (_win4h[idx].eClass == (uint8_t)SAT_CYCLE_OVERSHOOT) nOvershoot++;
+    if (_win4h[idx].eClass == (uint8_t)SAT_CYCLE_UNDERHEAT) nUnderheat++;
+    if (_win4h[idx].avgFlowRetDelta >= 0.0f) {  // sentinel -1 means no data
+      deltas[nDeltas++] = _win4h[idx].avgFlowRetDelta;
+    }
+    nValid++;
+  }
+
+  state.sat.i4hCycles = nValid;
+
+  if (nValid == 0) {
+    state.sat.f4hAvgOnSec          = 0.0f;
+    state.sat.f4hAvgOffSec         = 0.0f;
+    state.sat.f4hAvgFlow           = 0.0f;
+    state.sat.f4hDutyRatio         = 0.0f;
+    state.sat.f4hOvershootFraction = 0.0f;
+    state.sat.f4hUnderheatFraction = 0.0f;
+    state.sat.f4hFlowRetDeltaP50   = 0.0f;
+    state.sat.f4hFlowRetDeltaP90   = 0.0f;
+    return;
+  }
+
+  float n = (float)nValid;
+  state.sat.f4hAvgOnSec          = (float)sumOnMs  / (n * 1000.0f);
+  state.sat.f4hAvgOffSec         = (float)sumOffMs / (n * 1000.0f);
+  state.sat.f4hAvgFlow           = sumP90Flow / n;
+  state.sat.f4hOvershootFraction = (float)nOvershoot / n;
+  state.sat.f4hUnderheatFraction = (float)nUnderheat / n;
+
+  // Duty ratio: on / (on + off) per cycle, averaged
+  float totalMs = (float)(sumOnMs + sumOffMs);
+  state.sat.f4hDutyRatio = (totalMs > 0.0f) ? ((float)sumOnMs / totalMs) : 0.0f;
+
+  // Percentiles for flow-return delta: insertion-sort the collected deltas
+  if (nDeltas == 0) {
+    state.sat.f4hFlowRetDeltaP50 = 0.0f;
+    state.sat.f4hFlowRetDeltaP90 = 0.0f;
+  } else {
+    // Insertion sort (n <= 60, runs once per minute — fine)
+    for (uint8_t i = 1; i < nDeltas; i++) {
+      float key = deltas[i];
+      int8_t j = (int8_t)i - 1;
+      while (j >= 0 && deltas[j] > key) {
+        deltas[j + 1] = deltas[j];
+        j--;
+      }
+      deltas[j + 1] = key;
+    }
+    uint8_t idx50 = (uint8_t)((uint16_t)50 * (nDeltas - 1) / 100);
+    uint8_t idx90 = (uint8_t)((uint16_t)90 * (nDeltas - 1) / 100);
+    if (idx50 >= nDeltas) idx50 = nDeltas - 1;
+    if (idx90 >= nDeltas) idx90 = nDeltas - 1;
+    state.sat.f4hFlowRetDeltaP50 = deltas[idx50];
+    state.sat.f4hFlowRetDeltaP90 = deltas[idx90];
+  }
+
+  DebugTf(PSTR("SAT 4h: n=%u avgOn=%.0fs avgOff=%.0fs flow=%.1f duty=%.2f overshoot=%.2f underheat=%.2f dP50=%.1f dP90=%.1f\r\n"),
+          nValid,
+          state.sat.f4hAvgOnSec, state.sat.f4hAvgOffSec,
+          state.sat.f4hAvgFlow,
+          state.sat.f4hDutyRatio,
+          state.sat.f4hOvershootFraction, state.sat.f4hUnderheatFraction,
+          state.sat.f4hFlowRetDeltaP50, state.sat.f4hFlowRetDeltaP90);
 }
 
 //=== Per-cycle flow temperature p-percentile (Task #225) ===
@@ -328,6 +459,9 @@ void satCycleOnFlameChange(bool flameOn)
     _flow_samples[_flow_sampleHead] = OTcurrentSystemState.Tboiler;
     _flow_sampleHead = (_flow_sampleHead + 1) % SAT_FLOW_SAMPLE_SIZE;
     _flow_sampleCount = 1;
+    // Reset flow-return delta accumulator (Task #227)
+    _cycle_sumFlowRetDelta = 0.0f;
+    _cycle_deltasamples    = 0;
   }
   else if (!flameOn && _cycle_flameOn) {
     // Flame just turned OFF — complete the cycle
@@ -343,6 +477,25 @@ void satCycleOnFlameChange(bool flameOn)
     SATCycleClass cls = _cycleClassify(durationSec, p90, p10,
                                         _cycle_setpointAtStart, _cycle_overshootSec);
     _cycleRecord(cls, durationSec, _cycle_maxFlowTemp, _cycle_overshootSec);
+
+    // Record completed cycle into the rolling 4-hour window (Task #227)
+    {
+      uint32_t onMs  = now - _cycle_flameOnStartMs;
+      uint32_t offMs = (_cycle_flameOffStartMs > 0 && _cycle_flameOnStartMs > _cycle_flameOffStartMs)
+                       ? (_cycle_flameOnStartMs - _cycle_flameOffStartMs)
+                       : 0;
+      float avgDelta = (_cycle_deltasamples > 0)
+                       ? (_cycle_sumFlowRetDelta / (float)_cycle_deltasamples)
+                       : -1.0f;  // sentinel: no valid data
+      _win4h[_win4hHead].endMs          = now;
+      _win4h[_win4hHead].onDurationMs   = onMs;
+      _win4h[_win4hHead].offDurationMs  = offMs;
+      _win4h[_win4hHead].p90FlowTemp    = p90;
+      _win4h[_win4hHead].avgFlowRetDelta = avgDelta;
+      _win4h[_win4hHead].eClass         = (uint8_t)cls;
+      _win4hHead = (_win4hHead + 1) % SAT_WIN4H_SIZE;
+      if (_win4hCount < SAT_WIN4H_SIZE) _win4hCount++;
+    }
 
     DebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs\r\n"),
             state.sat.iCycleCount, (int)cls, durationSec,
@@ -360,6 +513,14 @@ void satCycleSample()
 
   if (flowTemp > _cycle_maxFlowTemp) _cycle_maxFlowTemp = flowTemp;
   if (flowTemp < _cycle_minFlowTemp) _cycle_minFlowTemp = flowTemp;
+
+  // Accumulate flow-return delta for 4-hour window record (Task #227)
+  // Tret may be 0 when return temp sensor is absent; only accumulate when plausible.
+  float retTemp = OTcurrentSystemState.Tret;
+  if (retTemp > 10.0f && retTemp < 100.0f) {
+    _cycle_sumFlowRetDelta += (flowTemp - retTemp);
+    _cycle_deltasamples++;
+  }
 
   // Collect flow temperature sample for p90/p10 classifier (Task #225)
   _flow_samples[_flow_sampleHead] = flowTemp;

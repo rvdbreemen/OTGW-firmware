@@ -418,6 +418,16 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fDutyRatio            = 0.0f;   // EMA flame-on fraction
   float    fOvershootFraction    = 0.0f;   // EMA overshoot cycle fraction
   float    fUnderheatFraction    = 0.0f;   // EMA underheat cycle fraction
+  // Rolling 4-hour cycle window statistics (Task #227)
+  uint8_t  i4hCycles             = 0;      // Number of complete cycles in last 4h
+  float    f4hAvgOnSec           = 0.0f;   // Average flame-on duration in last 4h (seconds)
+  float    f4hAvgOffSec          = 0.0f;   // Average flame-off duration in last 4h (seconds)
+  float    f4hAvgFlow            = 0.0f;   // Average p90 flow temp in last 4h (°C)
+  float    f4hDutyRatio          = 0.0f;   // Windowed duty ratio in last 4h
+  float    f4hOvershootFraction  = 0.0f;   // Fraction of overshoot cycles in last 4h
+  float    f4hUnderheatFraction  = 0.0f;   // Fraction of underheat cycles in last 4h
+  float    f4hFlowRetDeltaP50    = 0.0f;   // Median flow-return delta across last 4h cycles (°C)
+  float    f4hFlowRetDeltaP90    = 0.0f;   // p90 flow-return delta across last 4h cycles (°C)
   // PWM state
   float fPwmDutyCycle            = 0.0f;
   bool  bPwmFlameRequested       = false;
