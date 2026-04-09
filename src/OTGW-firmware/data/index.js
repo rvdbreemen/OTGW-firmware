@@ -4387,7 +4387,7 @@ function refreshSettings() {
             resetWifiBtn.textContent = "Reset WiFi";
             resetWifiBtn.className = "btn-wifi-reset";
             resetWifiBtn.title = "Clear stored Wi-Fi credentials and reboot the device in Access Point mode";
-            resetWifiBtn.addEventListener('click', function() { resetWiFiSettingsUI(); });
+            resetWifiBtn.addEventListener('click', resetWiFiSettingsUI);
             inputDiv.appendChild(resetWifiBtn);
           }
 

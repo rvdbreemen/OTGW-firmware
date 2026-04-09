@@ -928,7 +928,7 @@ void sendDeviceSettings()
   //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
 
   sendJsonSettingObj(F("hostname"), CSTR(settings.sHostname), "s", 32);
-  sendJsonSettingObj(F("ssid"), CSTR(WiFi.SSID()), "r", 32);
+  { char ssidBuf[33]; strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf)); sendJsonSettingObj(F("ssid"), ssidBuf, "r", 32); }
   sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
   sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
   sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
