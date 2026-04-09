@@ -248,27 +248,179 @@ The exact set of published topics depends on which OpenTherm message IDs the the
 
 ### SAT (Smart Autotune Thermostat)
 
-Published every control loop interval (default 30s) when SAT is enabled. Topics are under the standard publish namespace.
+Published every control loop interval (default 30 s) when SAT is enabled. Topics are under the standard publish namespace. The complete topic inventory is in [backlog/docs/doc-1 - sat-mqtt-topics.md](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
+
+#### Core Control State
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
 | `sat/mode` | `"off"` / `"continuous"` / `"pwm"` | yes | Current control mode |
+| `sat/active` | `"true"` / `"false"` | yes | Whether SAT controller is actively controlling |
 | `sat/setpoint` | `"43.1"` | yes | Final flow temperature setpoint sent to boiler (°C) |
+| `sat/target` | `"21.0"` | yes | Target room temperature (°C) |
 | `sat/heating_curve` | `"42.3"` | yes | Heating curve calculated value (°C) |
 | `sat/pid_output` | `"43.1"` | yes | PID output = curve + P + I + D (°C) |
-| `sat/target` | `"21.0"` | yes | Target room temperature (°C) |
+| `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C) |
+
+#### PID Components
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
 | `sat/error` | `"0.50"` | no | PID error = target - room temp (°C) |
-| `sat/pid_p` | `"0.82"` | no | Proportional term |
-| `sat/pid_i` | `"0.03"` | no | Integral term |
-| `sat/pid_d` | `"-0.04"` | no | Derivative term |
-| `sat/boiler_status` | `"3"` | no | Boiler status code (0-14) |
-| `sat/cycle_class` | `"1"` | no | Last cycle classification (0-5) |
+| `sat/pid_p` | `"0.82"` | no | Proportional term (°C) |
+| `sat/pid_i` | `"0.03"` | no | Integral term (°C) |
+| `sat/pid_d` | `"-0.04"` | no | Derivative term (°C) |
+| `sat/pid_attributes` | JSON | no | Extended PID attributes (`kp`, `ki`, `kd`, `p_term`, `i_term`, `d_term`, `raw_derivative`) |
+| `sat/raw_derivative` | `"-0.04"` | no | Raw (unfiltered) derivative term |
+| `sat/kp` | `"5.0"` | no | Current Kp gain |
+| `sat/ki` | `"0.5"` | no | Current Ki gain |
+| `sat/kd` | `"0.05"` | no | Current Kd gain |
+| `sat/error_mean` | `"0.12"` | no | Mean PID error over ring buffer (when error monitoring enabled) |
+| `sat/error_stddev` | `"0.34"` | no | Std deviation of PID error over ring buffer |
+
+#### Temperature Sensors
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/room_temp` | `"20.8"` | no | Room temperature used by PID (°C) |
+| `sat/outside_temp` | `"8.0"` | no | Outside temperature used by heating curve (°C) |
+| `sat/estimated_room` | `"20.5"` | no | Estimated room temp during sensor fallback (°C) |
+| `sat/humidity` | `"58.0"` | no | Indoor humidity % (when humidity sensor active) |
+| `sat/humidity_valid` | `"true"` / `"false"` | no | Whether humidity reading is valid |
+| `sat/comfort_offset` | `"0.5"` | no | Comfort adjustment applied to target (°C) |
+
+#### Boiler and Cycle Status
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/boiler_status` | `"3"` | no | Boiler status code (see table below) |
+| `sat/flame_status` | `"healthy"` | no | Flame health status string (see table below) |
+| `sat/flame_health` | `"ON"` / `"OFF"` | yes | Binary: ON = flame healthy |
+| `sat/cycle_class` | `"good"` | no | Last cycle classification string (see table below) |
+| `sat/cycle_attributes` | JSON | no | Extended cycle attributes (`class`, `duration_sec`, `max_flow`, `overshoot_sec`, `kind`, `duty_ratio`) |
+| `sat/cycle_phase` | `"startup"` / `"steady"` / `"cooldown"` / `"idle"` | no | Current cycle phase |
 | `sat/pwm_duty` | `"0.65"` | no | PWM duty cycle (0.00-1.00) |
+| `sat/duty_ratio` | `"0.70"` | no | EMA duty ratio (flame-on fraction) |
+| `sat/overshoot_fraction` | `"0.12"` | no | EMA fraction of cycles with overshoot |
+
+#### System Health and Safety
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
 | `sat/safety_tripped` | `"false"` | no | Safety shutdown active |
+| `sat/valves_open` | `"true"` / `"false"` | no | Whether TRV valves are reported open |
+| `sat/window_open` | `"false"` | no | Window-open detection state |
+| `sat/ch_sync` | `"ON"` / `"OFF"` | yes | CH sync health (ON = OK) |
+| `sat/modulation_reliable` | `"true"` | no | Whether boiler modulation feedback is reliable |
+| `sat/setpoint_mismatch` | `"false"` | no | Setpoint mismatch between SAT and OT bus detected |
 
-**Boiler status codes**: 0=Off, 1=Idle, 2=Preheating, 3=At Setpoint, 4=Modulating Up, 5=Modulating Down, 6=Ignition Surge, 7=Stalled Ignition, 8=Anti-Cycling, 9=Pump Starting, 10=Waiting Flame, 11=Overshoot Cooling, 12=Post-Cycle, 13=Heating, 14=Cooling
+#### Pressure Monitoring
 
-**Cycle class codes**: 0=None, 1=Good, 2=Overshoot, 3=Underheat, 4=Short, 5=Uncertain
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/pressure` | `"1.5"` | no | Smoothed system pressure (bar) |
+| `sat/pressure_drop_rate` | `"-0.02"` | no | Pressure drop rate (bar/hour, negative = dropping) |
+| `sat/pressure_alarm` | `"false"` | no | Pressure alarm active |
+| `sat/pressure_health` | `"ON"` / `"OFF"` | yes | Binary: ON = pressure healthy |
+| `sat/pressure_health_attr` | JSON | no | Extended pressure health attributes |
+
+#### Power and Energy
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/power` | `"12.5"` | no | Current boiler power (kW, modulation × capacity) |
+| `sat/energy_total` | `"234.5"` | yes | Cumulative energy (kWh, retained for HA energy dashboard) |
+
+#### Heating Curve Recommendation
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/curve_recommendation` | `"increase"` / `"decrease"` / `"hold"` / `"insufficient"` | no | Automatic heating curve recommendation |
+| `sat/curve_recommendation_attributes` | JSON | no | Extended recommendation attributes (error stats, sample count) |
+
+#### Presets
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/preset_comfort` | `"21.0"` | yes | Comfort preset target temperature (°C) |
+| `sat/preset_eco` | `"18.0"` | yes | Eco preset target temperature (°C) |
+| `sat/preset_away` | `"15.0"` | yes | Away preset target temperature (°C) |
+| `sat/preset_sleep` | `"16.0"` | yes | Sleep preset target temperature (°C) |
+| `sat/preset_activity` | `"10.0"` | yes | Activity preset target temperature (°C) |
+| `sat/preset_home` | `"18.0"` | yes | Home preset target temperature (°C) |
+
+#### Settings Echo Topics
+
+The following topics are published (retained) when SAT settings change. They echo the current configured values.
+
+| Topic | Example | Description |
+| ----- | ------- | ----------- |
+| `sat/heating_curve_coeff` | `"1.5"` | Heating curve coefficient |
+| `sat/deadband` | `"0.25"` | PID deadband (°C) |
+| `sat/control_interval` | `"30"` | Control loop interval (seconds) |
+| `sat/max_modulation` | `"100"` | Max relative modulation % |
+| `sat/flame_off_offset` | `"0.0"` | Setpoint offset when flame is off (°C) |
+| `sat/flow_offset` | `"2.0"` | Continuous mode max setpoint drop (°C) |
+| `sat/boiler_capacity` | `"24.0"` | Boiler capacity (kW) |
+| `sat/summer_threshold` | `"18.0"` | Summer simmer outdoor temperature threshold (°C) |
+| `sat/ovp_value` | `"52.5"` | OPV calibrated maximum flow temperature (°C) |
+| `sat/ovp_enabled` | `"false"` | Whether OPV is enabled |
+| `sat/heating_system` | `"1"` | Heating system type (0=auto, 1=radiators, 2=heat pump, 3=underfloor) |
+| `sat/simulation` | `"ON"` / `"OFF"` | Simulation mode active |
+| `sat/auto_tune` | `"ON"` / `"OFF"` | Auto-tune analysis active |
+| `sat/manufacturer` | `"Remeha"` | Detected/configured boiler manufacturer name |
+
+Settings echo topics are retained. More settings echo topics exist; the full list is in the [SAT MQTT topics reference](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
+
+#### Thermal Model
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/thermal_coeff` | `"0.05"` | yes | Learned thermal drop coefficient (°C/hr per °C delta) |
+| `sat/thermal_drop_rate` | `"0.03"` | no | Current thermal drop rate sample |
+| `sat/thermal_model_valid` | `"true"` | yes | Whether thermal model has sufficient data |
+
+#### Solar Gain
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/solar_gain` | `"true"` / `"false"` | no | Solar gain compensation currently active |
+| `sat/indoor_rise_rate` | `"0.8"` | no | Measured indoor temperature rise rate (°C/hr) |
+| `sat/solar_gain_sun_elevation` | `"32.5"` | no | Current sun elevation (degrees) |
+
+#### Summer Simmer
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/summer_active` | `"false"` | no | Summer simmer mode currently suppressing heating |
+| `sat/summer_hours_above` | `"4.5"` | no | Hours outdoor temp has been above threshold |
+
+#### Climate Entity Attributes
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/climate_attributes` | JSON | no | HA climate entity JSON attributes (mode, setpoint, heating_curve, pid_output, error, boiler_status, cycle_class, safety_tripped) |
+
+#### BLE Temperature Sensor (ESP32 only)
+
+These topics are only available when BLE is enabled on ESP32 hardware.
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/ble_temp` | `"20.5"` | no | BLE sensor temperature (°C) |
+| `sat/ble_humidity` | `"55.0"` | no | BLE sensor humidity (%) |
+| `sat/ble_sensor_rssi` | `"-72"` | no | BLE sensor RSSI (dBm) |
+| `sat/ble_battery` | `"85"` | no | BLE sensor battery level (%) |
+| `sat/ble_sensor_count` | `"1"` | no | Number of active BLE sensors seen |
+| `sat/ble_temp_valid` | `"true"` | no | BLE temperature reading is valid and non-stale |
+
+#### Value Tables
+
+**Boiler status codes** (`sat/boiler_status`): 0=Off, 1=Idle, 2=Preheating, 3=At Setpoint, 4=Modulating Up, 5=Modulating Down, 6=Ignition Surge, 7=Stalled Ignition, 8=Anti-Cycling, 9=Pump Starting, 10=Waiting Flame, 11=Overshoot Cooling, 12=Post-Cycle, 13=Heating, 14=Cooling
+
+**Cycle class** (`sat/cycle_class`): `none`, `good`, `overshoot`, `underheat`, `short`, `uncertain`
+
+**Flame status** (`sat/flame_status`): `insufficient_data`, `healthy`, `idle_ok`, `stuck_on`, `stuck_off`, `pwm_short`, `short_cycling`
 
 ### Raw OpenTherm Message (Optional)
 
@@ -459,15 +611,59 @@ All `LA=` through `LF=` commands are accepted and echoed back as a valid respons
 
 #### SAT Commands
 
-SAT-specific commands are nested under the `sat/` sub-topic:
+SAT-specific commands are nested under the `sat/` sub-topic. All commands are subscribed under `{TopTopic}/set/{UniqueId}/sat/<subtopic>`.
+
+**Core Control Commands:**
 
 | Topic Suffix | Payload | Description |
 | ------------ | ------- | ----------- |
-| `sat/target` | `"21.5"` | Set SAT target room temperature (5-30 °C, persisted to flash) |
-| `sat/indoor_temp` | `"20.8"` | Push external indoor temperature (expires after 5 min) |
-| `sat/outdoor_temp` | `"8.0"` | Push external outdoor temperature (expires after 10 min) |
+| `sat/target` | `"21.5"` | Set SAT target room temperature (5.0-30.0 °C, persisted to flash) |
+| `sat/indoor_temp` | `"20.8"` | Push external indoor temperature (expires after sensor max age) |
+| `sat/outdoor_temp` | `"8.0"` | Push external outdoor temperature (expires after sensor max age) |
 | `sat/enabled` | `"true"` / `"false"` | Enable or disable SAT controller |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` | Set control mode (or `"0"`, `"1"`, `"2"`) |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` or `"0"` / `"1"` / `"2"` | Set control mode |
+| `sat/preset` | `"away"` / `"eco"` / `"comfort"` / `"sleep"` / `"activity"` / `"home"` | Activate a named preset |
+
+**Window and Humidity Commands:**
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `sat/window` | `"open"` / `"closed"` / `"1"` / `"0"` / `"ON"` | Window open/closed detection |
+| `sat/humidity` | `"62.5"` | Push indoor humidity (0-100%) |
+| `sat/valves_open` | `"true"` / `"false"` / `"1"` / `"open"` | Report TRV valves open state |
+
+**Multi-Area Temperature:**
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `sat/area/0` | `"21.3"` | Push area 0 temperature (°C) |
+| `sat/area/1` | `"20.1"` | Push area 1 temperature (°C) |
+| `sat/area/2` | `"19.8"` | Push area 2 temperature (°C) |
+| `sat/area/3` | `"22.0"` | Push area 3 temperature (°C) |
+
+**Solar and Sun Elevation:**
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `sat/sun_elevation` | `"32.5"` | Push sun elevation in degrees (from HA sun entity) |
+| `sat/solar_min_elevation` | `"12.0"` | Set minimum sun elevation for solar gain activation |
+
+**OPV Calibration:**
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `sat/ovp_start` | (any) | Start OPV calibration sequence |
+| `sat/ovp_stop` | (any) | Cancel OPV calibration |
+| `sat/ovp_value` | `"52.5"` | Manually set OPV value (°C) |
+| `sat/ovp_enabled` | `"true"` / `"false"` | Enable or disable OPV |
+
+**PID Control:**
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `sat/reset_integral` | (any) | Reset PID integral accumulator to zero |
+
+**Settings Commands** — any SAT setting can be updated by publishing to its topic suffix. For example: `sat/heating_curve`, `sat/deadband`, `sat/boiler_capacity`, `sat/heating_system`, `sat/manufacturer`, `sat/simulation`, etc. The full list of 40+ settings commands is in the [SAT MQTT topics reference](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
 
 **Example** — Set SAT target to 21.5°C:
 ```bash
@@ -477,6 +673,11 @@ mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.5
 **Example** — Push room temperature from external sensor:
 ```bash
 mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/indoor_temp" -m "20.8"
+```
+
+**Example** — Activate the Away preset:
+```bash
+mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/preset" -m "away"
 ```
 
 **Example** — Disable SAT:
@@ -533,20 +734,87 @@ When `settings.mqtt.bSeparateSources` is enabled, discovery entries with source-
 
 ### SAT Discovery Entities
 
-When SAT is enabled, the following HA entities are auto-discovered:
+When SAT is enabled, the following HA entities are auto-discovered. Entities marked **ESP32 only** require BLE to be enabled and are published only on ESP32 builds.
+
+**Climate Entity:**
 
 | Entity Type | Entity ID | Description |
 |-------------|-----------|-------------|
-| `climate` | `sat_climate` | Climate entity with target temp control and mode display |
-| `sensor` | `sat_setpoint` | Flow temperature setpoint (°C) |
-| `sensor` | `sat_heating_curve` | Heating curve value (°C) |
-| `sensor` | `sat_pid_output` | PID output (°C) |
-| `sensor` | `sat_error` | PID error (°C) |
-| `sensor` | `sat_mode` | Control mode (off/continuous/pwm) |
-| `sensor` | `sat_boiler_status` | Boiler status code |
-| `sensor` | `sat_pwm_duty` | PWM duty cycle (%) |
+| `climate` | `sat_climate` | Climate entity: target temp control, mode (off/heat), current room temp from OT bus. `json_attributes_topic` provides extended state. `action_topic` maps off/pwm/continuous to off/heating. |
 
-The climate entity publishes its target temperature to `sat/target` and reads current temperature from the room temp on the OT bus.
+**Sensor Entities:**
+
+| Entity Type | Entity ID | Unit | Notes |
+|-------------|-----------|------|-------|
+| `sensor` | `sat_setpoint` | °C | Flow temperature setpoint sent to boiler |
+| `sensor` | `sat_heating_curve` | °C | Heating curve calculated value |
+| `sensor` | `sat_pid_output` | °C | PID output; `json_attributes_topic` = `sat/pid_attributes` |
+| `sensor` | `sat_error` | °C | PID error (target - room temp) |
+| `sensor` | `sat_mode` | - | Control mode string (off/continuous/pwm) |
+| `sensor` | `sat_boiler_status` | - | Boiler status code (0-14) |
+| `sensor` | `sat_pwm_duty` | % | PWM duty cycle (value_template multiplies raw 0.00-1.00 by 100) |
+| `sensor` | `sat_room_temp` | °C | Room temperature used by PID |
+| `sensor` | `sat_outside_temp` | °C | Outside temperature used by heating curve |
+| `sensor` | `sat_estimated_room` | °C | Estimated room temp during sensor fallback |
+| `sensor` | `sat_humidity` | % | Indoor humidity |
+| `sensor` | `sat_comfort_offset` | °C | Comfort adjustment applied to target |
+| `sensor` | `sat_current_modulation` | % | Current boiler modulation (from `sat/current_modulation`) |
+| `sensor` | `sat_pressure` | bar | Smoothed system pressure |
+| `sensor` | `sat_pressure_drop_rate` | bar/h | Pressure drop rate |
+| `sensor` | `sat_power` | kW | Current boiler power |
+| `sensor` | `sat_energy_total` | kWh | Cumulative energy (total_increasing state class for HA energy dashboard) |
+| `sensor` | `sat_duty_ratio` | - | EMA duty ratio (flame-on fraction) |
+| `sensor` | `sat_manufacturer` | - | Detected/configured boiler manufacturer |
+| `sensor` | `sat_pid_p` | °C | Proportional PID term |
+| `sensor` | `sat_pid_i` | °C | Integral PID term |
+| `sensor` | `sat_pid_d` | °C | Derivative PID term |
+| `sensor` | `sat_kp` | - | Current Kp gain |
+| `sensor` | `sat_ki` | - | Current Ki gain |
+| `sensor` | `sat_kd` | - | Current Kd gain |
+| `sensor` | `sat_raw_derivative` | - | Raw (unfiltered) derivative term |
+| `sensor` | `sat_error_mean` | °C | Mean PID error over ring buffer |
+| `sensor` | `sat_error_stddev` | °C | Std deviation of PID error |
+| `sensor` | `sat_thermal_coeff` | - | Learned thermal drop coefficient |
+| `sensor` | `sat_thermal_drop_rate` | °C/h | Current thermal drop rate sample |
+| `sensor` | `sat_indoor_rise_rate` | °C/h | Measured indoor temperature rise rate |
+| `sensor` | `sat_overshoot_fraction` | - | EMA fraction of cycles with overshoot |
+| `sensor` | `sat_cycle_class` | - | Cycle classification string; `json_attributes_topic` = `sat/cycle_attributes` |
+| `sensor` | `sat_curve_recommendation` | - | Heating curve recommendation; `json_attributes_topic` = `sat/curve_recommendation_attributes` |
+| `sensor` | `sat_flame_status` | - | Flame health status string |
+| `sensor` | `sat_summer_hours_above` | h | Hours outdoor temp above summer threshold |
+| `sensor` | `sat_auto_tune_score` | - | Auto-tune PID score |
+| `sensor` | `sat_consumption` | m³/h | Gas consumption |
+| `sensor` | `sat_ble_temp` | °C | BLE sensor temperature (ESP32 only) |
+| `sensor` | `sat_ble_humidity` | % | BLE sensor humidity (ESP32 only) |
+| `sensor` | `sat_ble_rssi` | dBm | BLE sensor RSSI, diagnostic category (ESP32 only) |
+
+**Binary Sensor Entities:**
+
+| Entity Type | Entity ID | Device Class | Notes |
+|-------------|-----------|--------------|-------|
+| `binary_sensor` | `sat_flame_health` | problem | ON = flame healthy |
+| `binary_sensor` | `sat_active` | - | Whether SAT is actively controlling |
+| `binary_sensor` | `sat_safety_tripped` | problem | Safety shutdown active |
+| `binary_sensor` | `sat_valves_open` | - | TRV valves reported open |
+| `binary_sensor` | `sat_window_open` | window | Window open detection |
+| `binary_sensor` | `sat_pressure_alarm` | problem | Pressure alarm active |
+| `binary_sensor` | `sat_pressure_health` | problem | Pressure healthy; `json_attributes_topic` = `sat/pressure_health_attr` |
+| `binary_sensor` | `sat_modulation_reliable` | - | Boiler modulation feedback reliable |
+| `binary_sensor` | `sat_setpoint_mismatch` | problem | Setpoint mismatch detected on OT bus |
+| `binary_sensor` | `sat_thermal_model_valid` | - | Thermal model has sufficient data |
+| `binary_sensor` | `sat_solar_gain` | - | Solar gain compensation active |
+| `binary_sensor` | `sat_summer_active` | - | Summer simmer suppressing heating |
+| `binary_sensor` | `sat_humidity_valid` | - | Humidity reading is valid |
+| `binary_sensor` | `sat_auto_tune_active` | - | Auto-tune analysis running |
+| `binary_sensor` | `sat_setpoint_sync` | problem | Setpoint sync health |
+| `binary_sensor` | `sat_modulation_sync` | problem | Modulation sync health |
+| `binary_sensor` | `sat_ch_sync` | problem | CH sync health |
+
+**Number Entity:**
+
+| Entity Type | Entity ID | Unit | Description |
+|-------------|-----------|------|-------------|
+| `number` | `sat_dhw_setpoint` | °C | DHW setpoint slider (30-60 °C, 0.5 step) |
 
 ### Discovery Lifecycle
 

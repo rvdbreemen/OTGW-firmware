@@ -17,6 +17,64 @@ Version 1.4.0 is a major feature release. It adds SAT (Smart Autotune Thermostat
 - **OpenTherm enum modernization:** Binary literals updated to C++14 standard format for better compiler compatibility.
 - **No breaking changes** vs v1.3.4. The ESP8266 build is functionally identical.
 
+## SAT - Smart Autotune Thermostat
+
+SAT is an embedded heating controller that runs entirely on the ESP and turns the OTGW into a standalone smart thermostat. It sits between the OpenTherm bus and the boiler, computing and sending the optimal flow temperature setpoint without needing an external controller or Home Assistant.
+
+### What SAT does
+
+SAT combines a **weather-compensated heating curve** with a **PID v3 controller** that adjusts the flow temperature setpoint based on measured room temperature error. It learns your boiler's behavior over time through automatic gain tuning and a thermal model.
+
+Key capabilities:
+
+- **Weather-compensated heating curve**: calculates the base flow temperature from the outdoor temperature using a configurable coefficient.
+- **PID v3 control**: proportional + integral + derivative correction on top of the heating curve to hold the target room temperature.
+- **Auto-tune**: automatically adjusts PID gains based on cycle analysis, so you don't have to tune them manually.
+- **Two control modes**: continuous modulation (modulates boiler flame directly) and PWM cycling (on/off flame with configurable duty cycle).
+- **Six independent safety layers**: flame health, CH sync, setpoint mismatch, pressure monitoring, cycle classification, and overshoot detection.
+- **Heating curve recommendation**: analyzes error statistics and suggests whether to increase or decrease the curve coefficient.
+- **OPV calibration**: finds your boiler's Overpressure Valve (pressure relief valve) opening temperature so SAT stays below it.
+- **Presets**: six named presets (comfort, eco, away, sleep, activity, home) with configurable target temperatures.
+- **Multi-area room temperature**: averages temperature readings from up to four zones for more accurate control.
+- **Solar gain compensation**: detects solar gain from indoor temperature rise rate and sun elevation, and reduces the setpoint to avoid overheating.
+- **Summer simmer mode**: suppresses heating when outdoor temperature stays above a threshold for a configurable number of hours.
+- **Pressure monitoring**: tracks system pressure and raises an alarm when it drops below the minimum or falls too fast.
+- **BLE temperature sensor** (ESP32 only): receives room temperature and humidity from a Bluetooth LE sensor (e.g., Xiaomi/PVVX).
+
+### Hardware support
+
+| Platform | SAT | BLE sensor |
+| -------- | --- | ---------- |
+| ESP8266 (NodeMCU, Wemos D1 mini) | Full support | Not available |
+| ESP32 | Full support | Available |
+
+### Quick start
+
+1. Open the OTGW Web UI and go to **SAT** in the navigation.
+2. Enable SAT and set your target room temperature.
+3. Configure your heating system type (radiators / underfloor / heat pump).
+4. Set your boiler capacity (kW) for accurate power estimation.
+5. Let the auto-tune run for a few days to optimize PID gains.
+
+For detailed setup, including heating curve tuning, OPV calibration, and Home Assistant automation examples, see the [SAT integration guide](backlog/docs/doc-3%20-%20sat-integration-guide.md).
+
+### Integration
+
+SAT integrates with Home Assistant via MQTT auto-discovery. When SAT is enabled and MQTT is configured:
+
+- A `climate` entity appears in HA with target temperature control and heat/off mode.
+- 40+ sensor and binary_sensor entities appear for all SAT state, diagnostics, and settings.
+- Commands can be sent via MQTT topics or the REST API.
+
+| Interface | Reference |
+| --------- | --------- |
+| MQTT topics (published and subscribed) | [MQTT topic reference](docs/api/MQTT.md) / [Full SAT topic inventory](backlog/docs/doc-1%20-%20sat-mqtt-topics.md) |
+| REST API | [OpenAPI spec](docs/api/openapi.yaml) — all `/api/v2/sat/*` endpoints |
+| OPV calibration guide | [OPV calibration](backlog/docs/doc-2%20-%20sat-opv-calibration.md) |
+| Preset configuration | [Preset configuration](backlog/docs/doc-4%20-%20sat-preset-configuration.md) |
+
+---
+
 ## What was new in v1.3.4
 
 Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](RELEASE_NOTES_1.3.4.md)

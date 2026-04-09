@@ -64,6 +64,15 @@ tags:
     description: OTGW simulation mode control
   - name: Webhook
     description: Webhook testing
+  - name: SAT
+    description: |
+      SAT (Smart Autotune Thermostat) is an embedded heating controller that runs entirely
+      on the ESP and turns the OTGW into a standalone smart thermostat. It implements a
+      weather-compensated heating curve combined with a PID v3 controller with automatic
+      gain tuning. Supports continuous modulation and PWM flame cycling.
+
+      SAT endpoints are available on all builds but will return an error if SAT is not
+      compiled in or not enabled.
   - name: OT Direct (OTGW32)
     description: |
       OT Direct endpoints are only available on OTGW32 hardware (`HAS_DIRECT_OT=1`).
@@ -1639,8 +1648,541 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
+  # SAT (Smart Autotune Thermostat) endpoints
+  /v2/sat:
+    get:
+      tags:
+        - SAT
+      summary: Get SAT status
+      description: |
+        Returns the full SAT runtime state. Equivalent to `GET /v2/sat/status`.
+      operationId: getSatRoot
+      responses:
+        '200':
+          description: SAT status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SatStatus'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/status:
+    get:
+      tags:
+        - SAT
+      summary: Get SAT runtime status
+      description: |
+        Returns the full SAT runtime state as a JSON object with ~50 fields covering
+        control mode, setpoints, PID state, temperature sensors, cycle diagnostics,
+        pressure, power, and safety status.
+
+        Add `?detail=full` to get extended health diagnostics including cycle statistics,
+        auto-tune state, OPV calibration phase, and pressure health details.
+      operationId: getSatStatus
+      parameters:
+        - name: detail
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [full]
+          description: |
+            Pass `full` to get extended health diagnostics instead of the standard status JSON.
+      responses:
+        '200':
+          description: SAT status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SatStatus'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/target:
+    post:
+      tags:
+        - SAT
+      summary: Set SAT target temperature
+      description: |
+        Sets the target room temperature for the SAT controller. The value is
+        validated (5.0–30.0 °C) and persisted to flash.
+
+        Body may be a plain numeric string (`"21.5"`) or a JSON object (`{"value":"21.5"}`).
+      operationId: setSatTarget
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "21.5"
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: string
+                  example: "21.5"
+      responses:
+        '200':
+          description: Target temperature set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/externaltemp:
+    post:
+      tags:
+        - SAT
+      summary: Push indoor temperature from external sensor
+      description: |
+        Injects an indoor temperature reading from an external sensor. The reading
+        expires after the configured `sensor_max_age` (default 6 hours). Body is a
+        plain numeric string or JSON `{"value":"20.8"}`.
+      operationId: setSatExternalTemp
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "20.8"
+      responses:
+        '200':
+          description: Indoor temperature accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/externaloutdoor:
+    post:
+      tags:
+        - SAT
+      summary: Push outdoor temperature from external source
+      description: |
+        Injects an outdoor temperature reading. Expires after sensor max age.
+        Body is a plain numeric string or JSON `{"value":"8.0"}`.
+      operationId: setSatExternalOutdoor
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "8.0"
+      responses:
+        '200':
+          description: Outdoor temperature accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/reset_integral:
+    post:
+      tags:
+        - SAT
+      summary: Reset PID integral accumulator
+      description: |
+        Resets the PID I-term to zero. Useful after large setpoint changes to
+        prevent integral windup from causing overshoot.
+      operationId: satResetIntegral
+      responses:
+        '200':
+          description: Integral reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/window:
+    post:
+      tags:
+        - SAT
+      summary: Set window open/closed state
+      description: |
+        Reports window open/closed state to SAT. When a window is open, SAT
+        reduces the setpoint to avoid heating a ventilated room. Payload:
+        `"open"`, `"closed"`, `"1"`, `"0"`, or `"ON"`.
+      operationId: setSatWindow
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "open"
+      responses:
+        '200':
+          description: Window state accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/preset:
+    post:
+      tags:
+        - SAT
+      summary: Activate a named preset
+      description: |
+        Switches the SAT target temperature to the configured value for the named
+        preset. Valid preset names: `comfort`, `eco`, `away`, `sleep`, `activity`, `home`.
+      operationId: setSatPreset
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              enum: [comfort, eco, away, sleep, activity, home]
+              example: "away"
+      responses:
+        '200':
+          description: Preset activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/enable:
+    post:
+      tags:
+        - SAT
+      summary: Enable or disable SAT controller
+      description: |
+        Enables or disables the SAT controller. Payload: `"1"`, `"true"`, `"on"` to enable;
+        `"0"`, `"false"`, `"off"` to disable.
+      operationId: setSatEnable
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "1"
+      responses:
+        '200':
+          description: SAT enabled/disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/mode:
+    post:
+      tags:
+        - SAT
+      summary: Set SAT control mode
+      description: |
+        Sets the SAT control mode. Valid values: `"continuous"`, `"pwm"`, `"auto"`,
+        or the numeric equivalents `"0"`, `"1"`, `"2"`.
+      operationId: setSatMode
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              enum: [continuous, pwm, auto, "0", "1", "2"]
+              example: "continuous"
+      responses:
+        '200':
+          description: Control mode set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/humidity:
+    post:
+      tags:
+        - SAT
+      summary: Push indoor humidity
+      description: |
+        Injects an indoor humidity reading (0-100 %). Used when humidity-based comfort
+        adjustment is enabled. Body is a plain numeric string or JSON `{"value":"62.5"}`.
+      operationId: setSatHumidity
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "62.5"
+      responses:
+        '200':
+          description: Humidity accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/weather:
+    get:
+      tags:
+        - SAT
+      summary: Get weather integration status
+      description: |
+        Returns the current weather integration status as a JSON object, including
+        the last received sun elevation and outdoor temperature from the weather source.
+      operationId: getSatWeather
+      responses:
+        '200':
+          description: Weather integration status
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Weather integration state (fields vary by implementation)
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/area/{index}:
+    post:
+      tags:
+        - SAT
+      summary: Push area temperature for multi-area control
+      description: |
+        Injects a temperature reading for the specified area (0-3). When multi-area
+        mode is enabled, SAT averages (or weights) the area temperatures as the room
+        temperature input for the PID. Body is a plain numeric string or JSON `{"value":"21.3"}`.
+      operationId: setSatAreaTemp
+      parameters:
+        - name: index
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 3
+          description: Area index (0-3)
+          example: 0
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "21.3"
+      responses:
+        '200':
+          description: Area temperature accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/settings/{name}:
+    post:
+      tags:
+        - SAT
+      summary: Update a SAT setting
+      description: |
+        Updates any named SAT setting. This mirrors all MQTT `sat/<name>` command
+        handlers. The setting name corresponds to the MQTT subtopic (e.g.,
+        `heating_curve`, `deadband`, `boiler_capacity`, `heating_system`,
+        `overshoot_margin`, `manufacturer`, `simulation`, `auto_tune`, etc.).
+
+        Special no-value commands (`reset_integral`, `ovp_start`, `ovp_stop`) are
+        also accepted here without a body.
+
+        See the [SAT MQTT topics reference](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/backlog/docs/doc-1%20-%20sat-mqtt-topics.md)
+        for the full list of setting names and valid payload formats.
+      operationId: setSatSetting
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: SAT setting name (e.g., `heating_curve`, `deadband`, `boiler_capacity`)
+          example: "heating_curve"
+      requestBody:
+        required: false
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "1.5"
+      responses:
+        '200':
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
 components:
   schemas:
+    StatusOk:
+      type: object
+      description: Standard success response for SAT write operations
+      properties:
+        status:
+          type: string
+          enum: [ok]
+      example:
+        status: ok
+
+    SatStatus:
+      type: object
+      description: |
+        SAT runtime status. Contains ~50 fields covering control mode, setpoints,
+        PID state, temperature sensors, cycle diagnostics, pressure, power, and safety.
+        Add `?detail=full` to the request URL for extended health diagnostics.
+      properties:
+        sat_status:
+          type: object
+          properties:
+            mode:
+              type: string
+              enum: [off, continuous, pwm]
+              description: Current control mode
+            active:
+              type: boolean
+              description: Whether SAT is actively controlling
+            setpoint:
+              type: number
+              description: Final flow temperature setpoint sent to boiler (°C)
+            target:
+              type: number
+              description: Target room temperature (°C)
+            heating_curve:
+              type: number
+              description: Heating curve calculated value (°C)
+            pid_output:
+              type: number
+              description: PID output = curve + P + I + D (°C)
+            error:
+              type: number
+              description: PID error = target - room temp (°C)
+            pid_p:
+              type: number
+              description: Proportional PID term (°C)
+            pid_i:
+              type: number
+              description: Integral PID term (°C)
+            pid_d:
+              type: number
+              description: Derivative PID term (°C)
+            kp:
+              type: number
+              description: Current Kp gain
+            ki:
+              type: number
+              description: Current Ki gain
+            kd:
+              type: number
+              description: Current Kd gain
+            room_temp:
+              type: number
+              description: Room temperature used by PID (°C)
+            outside_temp:
+              type: number
+              description: Outside temperature used by heating curve (°C)
+            boiler_status:
+              type: integer
+              minimum: 0
+              maximum: 14
+              description: "Boiler status code: 0=Off, 1=Idle, 2=Preheating, 3=At Setpoint, 4=Modulating Up, 5=Modulating Down, 6=Ignition Surge, 7=Stalled Ignition, 8=Anti-Cycling, 9=Pump Starting, 10=Waiting Flame, 11=Overshoot Cooling, 12=Post-Cycle, 13=Heating, 14=Cooling"
+            cycle_class:
+              type: string
+              enum: [none, good, overshoot, underheat, short, uncertain]
+              description: Last cycle classification
+            pwm_duty:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+              description: PWM duty cycle (0.00-1.00)
+            safety_tripped:
+              type: boolean
+              description: Safety shutdown active
+            pressure:
+              type: number
+              description: Smoothed system pressure (bar)
+            pressure_alarm:
+              type: boolean
+              description: Pressure alarm active
+            power:
+              type: number
+              description: Current boiler power (kW)
+            energy_total:
+              type: number
+              description: Cumulative energy (kWh)
+            flame_status:
+              type: string
+              enum: [insufficient_data, healthy, idle_ok, stuck_on, stuck_off, pwm_short, short_cycling]
+              description: Flame health status
+      example:
+        sat_status:
+          mode: continuous
+          active: true
+          setpoint: 43.1
+          target: 21.0
+          heating_curve: 42.3
+          pid_output: 43.1
+          error: 0.5
+          pid_p: 0.82
+          pid_i: 0.03
+          pid_d: -0.04
+          room_temp: 20.5
+          outside_temp: 8.0
+          boiler_status: 3
+          cycle_class: good
+          pwm_duty: 0.0
+          safety_tripped: false
+          pressure: 1.5
+          pressure_alarm: false
+          power: 12.5
+          energy_total: 234.5
+          flame_status: healthy
+
     ApiError:
       type: object
       description: Standard API error response (ADR-035)
