@@ -1122,6 +1122,19 @@ void satHandleEnabled(const char* value)
   DebugTf(PSTR("SAT: %s\r\n"), enabled ? "enabled" : "disabled");
 }
 
+//=== SAT LittleFS file paths (Task #237) ===
+// Defined in SATcontrol.ino so they are visible to SATcycles.ino (alphabetically later).
+static const char SAT_CYCLES_FILE[]    PROGMEM = "/sat/sat_cycles.json";
+
+//=== File migration helper (Task #237): move a file from old to new path if old exists ===
+static void satMigrateFile(const char* oldPath, const char* newPath)
+{
+  if (!LittleFS.exists(oldPath)) return;
+  if (LittleFS.exists(newPath)) { LittleFS.remove(oldPath); return; } // new already present
+  LittleFS.rename(oldPath, newPath);
+  DebugTf(PSTR("SAT: migrated %s -> %s\r\n"), oldPath, newPath);
+}
+
 //=== PID State Persistence (Tasks #6, #49, #222) ===
 static const char* SAT_PID_STATE_FILE PROGMEM = "/sat_pid_state.json";
 static uint32_t _pidLastSaveMs = 0;
@@ -1268,6 +1281,19 @@ void satDisable()
   // the thermostat (standalone HA replacement); OTGW firmware is not, so it defers.
   addCommandToQueue("CS=0", 4, false, 0);
   DebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
+}
+
+//=== Flush short-lived SAT data (Task #237) ===
+// Clears PID integral and cycle window from both memory and LittleFS.
+// Called on manual flush (MQTT sat/flush or REST POST /api/v2/sat/flush).
+void satFlushShortLivedData()
+{
+  // Reset PID integral (only the integral — P and D terms don't need clearing)
+  state.sat.fPidI = 0.0f;
+  satPidReset();
+  // Flush cycle window (in-memory and file)
+  satFlushCycleWindow();
+  DebugTln(F("SAT: short-lived data flushed (PID integral + cycle window)"));
 }
 
 void satHandleControlMode(const char* value)

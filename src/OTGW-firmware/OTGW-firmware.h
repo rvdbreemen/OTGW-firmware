@@ -198,6 +198,11 @@ void satHCRLoadState();
 void satHCRReset();
 void satHCRAddSample();
 const char* satHeatingCurveRecommendation();
+// Cycle window persistence and flush (Task #237, defined in SATcycles.ino / SATcontrol.ino)
+void satSaveCycleWindow();
+void satLoadCycleWindow();
+void satFlushCycleWindow();
+void satFlushShortLivedData();
 
 //===================[ Hardware Mode — detected at boot ]===================
 enum OTGWHardwareMode : uint8_t {
