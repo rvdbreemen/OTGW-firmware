@@ -483,6 +483,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fLastPressure          = 0.0f;  // last raw pressure reading
   uint32_t iLastPressureMs        = 0;     // millis() of last pressure reading
   uint32_t iLastSeenPressureMs    = 0;     // millis() of last non-zero pressure seen
+  // CH pressure health (Task #226): named fields for sat/ch_pressure + sat/ch_pressure_status
+  float    fBoilerPressure        = 0.0f;  // raw OT MsgID 18 reading (bar)
+  char     sPressureStatus[8]     = "ok";  // "ok", "low", or "high"
   // Modulation reliability
   bool     bModulationReliable    = true;
   uint8_t  iModChangeCount        = 0;   // changes observed in window
