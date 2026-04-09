@@ -125,6 +125,10 @@ void weatherFetch()
 
   DebugTf(PSTR("Weather: fetching %s\r\n"), url);
 
+  // WiFiClient and HTTPClient are resolved via the platform include chain:
+  //   ESP8266: platform_esp8266.h → <ESP8266HTTPClient.h> (provides WiFiClient, HTTPClient)
+  //   ESP32:   platform_esp32.h   → <HTTPClient.h>        (provides WiFiClient, HTTPClient)
+  // Both expose the same http.begin(WiFiClient&, url) API, so no #if guard is needed here.
   WiFiClient client;
   HTTPClient http;
   http.setTimeout(5000);   // 5s timeout — ESP8266 HW WDT fires at ~8s; stay well within margin
