@@ -1,8 +1,10 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(*)",
-      "Write(.claude/discord_backlog_last_checked.txt)"
+      "Write(.claude/*)",
+      "Edit(.claude/*)"
     ]
   }
 }

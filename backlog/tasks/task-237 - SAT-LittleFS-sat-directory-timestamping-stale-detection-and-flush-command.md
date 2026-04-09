@@ -1,11 +1,11 @@
 ---
 id: TASK-237
 title: 'SAT LittleFS: /sat directory, timestamping, stale detection, and flush command'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 10:47'
-updated_date: '2026-04-09 11:50'
+updated_date: '2026-04-09 15:25'
 labels:
   - sat
   - littlefs

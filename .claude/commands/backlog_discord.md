@@ -7,7 +7,7 @@ Monitor the `#dev-sat-mqtt` Discord channel for backlog-related requests AND @bo
 - **Allowed channel**: `#dev-sat-mqtt` -- channel ID `1105556725714649128`
 - **Bot user ID**: `1487467924351357049` (OTGW bot#0128)
 - **Bot token env var**: `DISCORD_TOKEN`
-- **Timestamp file**: `.claude/discord_backlog_last_checked.txt`
+- **Timestamp file**: `discord_backlog_last_checked.txt`
 - **Discord server (guild)**: `812969634638725140`
 
 **CRITICAL: Only operate in channel `1105556725714649128` (`#dev-sat-mqtt`). Never read from, respond to, or interact with any other channel on the server unless the project owner explicitly instructs otherwise.**
@@ -67,15 +67,18 @@ When an admin (verified via Discord roles) directly addresses the bot and explic
 **After completing a task, always present the admin with clear next steps:**
 - Which tasks are now unblocked
 - What the recommended next task is (based on the implementation plan/phases)
-- Whether a commit or PR is needed before continuing
 - Any blockers or dependencies that need attention
 
-**Post-commit workflow:**
-1. `git commit` with descriptive title (not task ID)
-2. `git push` to remote
-3. Run `python build.py --firmware` in background (incremental, no --clean)
-4. Post completion to Discord
-5. Start next task immediately (don't wait for build)
+**Task completion workflow (MANDATORY — in this exact order):**
+1. `git add <specific files changed by this task>`
+2. `git commit -m "descriptive title (not task ID)"`
+3. `git push` to remote
+4. `backlog task edit <id> -s Done` — mark done in backlog
+5. Run `python build.py --firmware` in background (incremental, no --clean)
+6. Post completion summary to Discord
+7. Start next task immediately (don't wait for build)
+
+**Agents MUST include git add + commit + push in their task prompt.** A task is not finished until its changes are committed. Never leave uncommitted task changes on the working tree.
 
 The bot should keep the admin informed and in control of the implementation flow. Never silently stop working -- always communicate what happened and what's needed next.
 
@@ -88,11 +91,11 @@ All three modes are always active simultaneously.
 ### Phase 1: Connect and read new messages
 
 1. **Login to Discord** using `mcp__discord__discord_login`. If login fails, report the error to the user and stop. Always use the MCP Discord tools, never curl or direct API calls.
-2. **Read the last-checked timestamp** from `.claude/discord_backlog_last_checked.txt`. If the file does not exist, default to the last 1 hour.
+2. **Read the last-checked timestamp** from `discord_backlog_last_checked.txt`. If the file does not exist, default to the last 1 hour.
 3. **Read messages** from `#dev-sat-mqtt` using `mcp__discord__discord_read_messages` with channel ID `1105556725714649128` (limit 30).
 4. **Filter** to messages posted after the last-checked timestamp.
 5. **Ignore** messages sent by the bot itself (author ID `1487467924351357049`).
-6. **Save the current timestamp** to `.claude/discord_backlog_last_checked.txt`.
+6. **Save the current timestamp** to `discord_backlog_last_checked.txt`.
 
 ### Phase 2: Classify each message
 
@@ -231,6 +234,7 @@ Just share your thoughts on tasks in the channel. If your feedback is actionable
 - **Always announce task start AND finish on Discord** -- two posts per task: one at start, one at completion.
 - **ALWAYS run implementation agents in background** (`run_in_background: true`) -- never block the main conversation. This keeps Discord monitoring and user interaction responsive while code is being written.
 - **ALWAYS run builds in background** -- after committing, run `python build.py --firmware` (incremental, no --clean) with `run_in_background: true`. Don't wait for build results before starting next task.
+- **Always commit task changes before marking Done** -- `git add <files> && git commit && git push` is MANDATORY at task completion. A task is not Done if its code changes are uncommitted.
 - **Commit with descriptive titles** -- use feature descriptions, not task IDs. Task IDs are forgotten, descriptions persist in git history.
 - **Push after every commit** -- always `git push` to remote immediately after committing.
 - **Maximize parallel execution** -- after each task completes (or at the start of a cron cycle), check the full backlog for tasks that can run in parallel with any already-running agents. A task can run in parallel if it touches different files/subsystems. Launch all eligible tasks in background simultaneously. Do NOT wait for one to finish before starting the next. Blocked tasks (marked "waiting for information" or similar) are skipped. Make the decision autonomously — do not ask for permission.

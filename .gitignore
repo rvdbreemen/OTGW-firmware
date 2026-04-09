@@ -44,11 +44,7 @@ OT-Thing-Pkunfazir/Tester PCB/.gitignore
 other-projects/*
 !other-projects/README.md
 other-projects/.gitignore
-discord_backlog_last_checkted.txt
+discord_backlog_last_checked.txt
 .claude/discord_backlog_last_checked.txt
 .claude/github_last_checked.txt
 .claude/tweakers_last_checked.txt
-other-projects/*
-!other-projects/README.md
-.claude/discord_backlog_last_checked.txt
-.claude/discord_backlog_last_checked.txt

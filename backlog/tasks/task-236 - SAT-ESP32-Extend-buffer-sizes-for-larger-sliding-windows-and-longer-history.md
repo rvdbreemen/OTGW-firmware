@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 10:46'
-updated_date: '2026-04-09 11:13'
+updated_date: '2026-04-09 12:32'
 labels:
   - sat
   - esp32
@@ -45,18 +45,27 @@ On ESP32 (520KB SRAM, 13x more than ESP8266) the current platform-conditional bu
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Expanded SAT buffer sizes on ESP32 using #if defined(ESP8266) guards in SATcycles.ino.
+Expanded SAT buffer sizes on ESP32 for extended prediction windows using platform-conditional defines.
 
-Changes:
-- SAT_WIN4H_SIZE: 30 → 360 on ESP32 (12h at 2-min cycle rate vs 2h); win4hHead/Count upgraded to uint16_t on ESP32
-- SAT_FLOW_SAMPLE_SIZE: 64 → 256 on ESP32 (better p90/p10 accuracy); flow_sampleHead/Count upgraded to uint16_t on ESP32
-- HCR_DAYS: 7 → 30 on ESP32 (4-week heating curve trend vs 1 week)
-- HCR_INTRADAY_SIZE: 96 → 1440 on ESP32 (per-minute sampling vs 15-min intervals); hcr_sHead/sCount upgraded to uint16_t on ESP32
-- Loop variables (i, idx, src, j) upgraded to uint16_t/int16_t in _flowPercentile() and _hcrIntraMedian() to handle ESP32 buffer sizes correctly
-- sorted[] in _hcrIntraMedian() made static to avoid a 5760-byte stack frame on ESP32 (1440 floats x 4 bytes)
-- satHCRSaveState/LoadState: platform-conditional buf size (128B ESP8266, 320B ESP32) to fit 30-day JSON
-- All guards use #if defined(ESP8266) pattern, consistent with existing SAT_WIN4H_SIZE guard
-- ESP8266 behaviour is entirely unchanged; ESP32 build verified via background build
+Changes in src/OTGW-firmware/SATcycles.ino:
+- SAT_WIN4H_SIZE: 30 (ESP8266) -> 360 (ESP32), covering 12h of 2-min cycle history
+- HCR_DAYS: 7 (ESP8266) -> 30 (ESP32), 4-week daily median heating curve trend
+- HCR_INTRADAY_SIZE: 96 (ESP8266) -> 1440 (ESP32), per-minute intraday sampling
+- SAT_FLOW_SAMPLE_SIZE: 64 (ESP8266) -> 256 (ESP32), better p90/p10 accuracy
+- Counter/head variables upgraded to uint16_t on ESP32 where buffer > 255 entries
+- Insertion sort loop variables upgraded to uint16_t/int16_t accordingly
+- sorted[] in _hcrIntraMedian() made static to avoid 5760-byte stack frame on ESP32
+- SAT_WIN4H_SIZE and SATWindowRecord struct moved to OTGW-firmware.h for Arduino compilation order
 
-The SAT_WIN4H_SIZE guard was already present in the original file (set to 60 on ESP32); this commit raises it to 360 and adds the remaining three buffer defines.
+Changes in src/OTGW-firmware/OTGW-firmware.h:
+- SAT_WIN4H_SIZE define + SATWindowRecord struct added (moved from SATcycles.ino)
+- Forward declarations added for satHCR* and satFlush* functions
+- sHeatCurveRec buffer fixed: [12] -> [13] (insufficient is 12 chars + null)
+- Added SAT_WIN4H_SIZE/SATWindowRecord before SATRuntimeSection to fix Arduino compilation order
+
+Also fixed pre-existing build errors from Task 237 (in separate commit):
+- Added SAT_CYCLES_FILE, satMigrateFile, satFlushShortLivedData to SATcontrol.ino
+- Added forward declarations for cycle window persistence functions
+
+ESP8266 build: PASSES. ESP32 build: pre-existing OTDirect.ino/SATble.ino issues unrelated to this task remain.
 <!-- SECTION:FINAL_SUMMARY:END -->
