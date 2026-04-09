@@ -345,6 +345,8 @@ void writeSettings(bool show)
   writeJsonIntKV(file, F("SATheatingmode"), settings.sat.iHeatingMode, true);
   writeJsonIntKV(file, F("SATcyclesperhour"), settings.sat.iCyclesPerHour, true);
   writeJsonFloatKV(file, F("SATvalveoffset"), settings.sat.fValveOffset, true);
+  writeJsonBoolKV(file, F("SATthermalcomfort"), settings.sat.bThermalComfort, true);
+  writeJsonIntKV(file, F("SAThumiditytimeout"), settings.sat.iHumidityTimeoutS, true);
   writeJsonBoolKV(file, F("SATsolarfreezeint"), settings.sat.bSolarFreezeIntegral, false);
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
@@ -848,6 +850,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATheatingmode")) == 0)   settings.sat.iHeatingMode = constrain(atoi(newValue), 0, 1);
   else if (strcasecmp_P(field, PSTR("SATcyclesperhour")) == 0) settings.sat.iCyclesPerHour = constrain(atoi(newValue), 2, 6);
   else if (strcasecmp_P(field, PSTR("SATvalveoffset")) == 0)   settings.sat.fValveOffset = constrain(atof(newValue), -1.0f, 1.0f);
+  else if (strcasecmp_P(field, PSTR("SATthermalcomfort")) == 0) settings.sat.bThermalComfort = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SAThumiditytimeout")) == 0) settings.sat.iHumidityTimeoutS = (uint16_t)constrain(atoi(newValue), 60, 65535);
   else if (strcasecmp_P(field, PSTR("SATsolarfreezeint")) == 0) settings.sat.bSolarFreezeIntegral = EVALBOOLEAN(newValue);
 #if defined(ESP32)
   // --- BLE temperature sensor settings (Task #20) ---

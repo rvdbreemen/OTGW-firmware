@@ -926,10 +926,10 @@ static float satGetRoomTemp()
   // TASK-204: Thermal comfort mode -- substitute Summer Simmer Index as PID room temp input.
   // Matches Python climate.py thermal_comfort: the PID targets heat-index-adjusted perceived
   // temperature rather than raw sensor temp, so e.g. 22C at 70% humidity "feels like" 23C.
-  // Only active when bThermalComfort is enabled AND humidity data is fresh (< 30 min).
+  // Only active when bThermalComfort is enabled AND humidity data is fresh (< iHumidityTimeoutS).
   // Falls back silently to raw room temp if humidity is unavailable or stale.
   if (settings.sat.bThermalComfort && state.sat.bHumidityValid) {
-    if ((millis() - state.sat.iHumidityLastMs) <= 1800000UL) {
+    if ((millis() - state.sat.iHumidityLastMs) <= ((uint32_t)settings.sat.iHumidityTimeoutS * 1000UL)) {
       float ssi = satCalcSimmerIndex(otRoom, state.sat.fHumidity);
       DebugTf(PSTR("SAT: thermal_comfort: raw=%.1f SSI=%.1f H=%.0f%%\r\n"),
               otRoom, ssi, state.sat.fHumidity);
@@ -1760,9 +1760,9 @@ void satPublishMQTT()
     sendMQTTData(F("sat/summer_hours_above"), suBuf, false);
   }
 
-  // Thermal comfort (Task #28/#47)
+  // Thermal comfort (Task #28/#47/#231)
   { char cBuf[12];
-    dtostrf(state.sat.fHumidity, 1, 0, cBuf);
+    dtostrf(state.sat.fHumidity, 1, 1, cBuf);   // 1 decimal (TASK-231)
     sendMQTTData(F("sat/humidity"), cBuf, false);
     sendMQTTData(F("sat/humidity_valid"), state.sat.bHumidityValid ? "true" : "false", false);
     dtostrf(state.sat.fComfortOffset, 1, 2, cBuf);
@@ -1826,6 +1826,8 @@ void satPublishMQTT()
   // Summer Simmer Index (Task #64): requires valid humidity
   if (state.sat.bHumidityValid && state.sat.fHumidity > 0) {
     float simmerIdx = satCalcSimmerIndex(satGetRoomTemp(), state.sat.fHumidity);
+    snprintf_P(valBuf, sizeof(valBuf), PSTR("%.2f"), simmerIdx);
+    sendMQTTData(F("sat/ssi"), valBuf, false);          // short alias (TASK-231)
     snprintf_P(valBuf, sizeof(valBuf), PSTR("%.1f"), simmerIdx);
     sendMQTTData(F("sat/summer_simmer_index"), valBuf, false);
     sendMQTTData(F("sat/summer_simmer_perception"), satSimmerPerception(simmerIdx), false);
@@ -2029,8 +2031,11 @@ void satPublishMQTT()
     sendMQTTData(F("sat/solar_gain_enable"), settings.sat.bSolarGainEnable ? "true" : "false", true);
     sendMQTTData(F("sat/summer_simmer_enable"), settings.sat.bSummerSimmer ? "true" : "false", true);
     sendMQTTData(F("sat/comfort_adjust_enable"), settings.sat.bComfortAdjust ? "true" : "false", true);
-    // TASK-204: thermal comfort mode state (SSI substitution for PID room temp)
+    // TASK-204/231: thermal comfort mode state (SSI substitution for PID room temp)
     sendMQTTData(F("sat/thermal_comfort"), settings.sat.bThermalComfort ? "true" : "false", true);
+    { char tcBuf[8];
+      snprintf_P(tcBuf, sizeof(tcBuf), PSTR("%u"), (unsigned)settings.sat.iHumidityTimeoutS);
+      sendMQTTData(F("sat/humidity_timeout_s"), tcBuf, true); }
     sendMQTTData(F("sat/multi_area_enable"), settings.sat.bMultiArea ? "true" : "false", true);
     sendMQTTData(F("sat/auto_tune_enable"), settings.sat.bAutoTune ? "true" : "false", true);
     sendMQTTData(F("sat/simulation_enable"), settings.sat.bSimulation ? "true" : "false", true);

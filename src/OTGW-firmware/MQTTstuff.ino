@@ -751,6 +751,12 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               updateSetting("SATsummerminhours", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("humidity")) == 0) {
               satHandleHumidity(msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("thermal_comfort")) == 0) {
+              // TASK-231: enable/disable SSI-as-room-temp substitution
+              updateSetting("SATthermalcomfort", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("humidity_timeout_s")) == 0) {
+              // TASK-231: configurable humidity staleness timeout (seconds)
+              updateSetting("SAThumiditytimeout", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("comfort_adjust")) == 0) {
               updateSetting("SATcomfortadjust", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("comfort_humidity")) == 0) {

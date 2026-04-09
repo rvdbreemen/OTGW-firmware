@@ -832,6 +832,7 @@ struct SATSection {
   float    fKiManual          = 0.0005f; // Manual integral gain (used when bAutoGains=false)
   float    fKdManual          = 0.0f;  // Manual derivative gain (used when bAutoGains=false)
   bool     bThermalComfort    = false; // true=use SummerSimmer index as PID room temp input
+  uint16_t iHumidityTimeoutS  = 1800; // Seconds before humidity reading is considered stale (default 30 min)
   uint8_t  iHeatingMode       = 0;     // 0=COMFORT, 1=ECO
   uint8_t  iCyclesPerHour     = 3;     // Target cycles per hour (2-6)
   float    fValveOffset       = 0.0f;  // Offset for TRV valve position detection (-1 to 1)
