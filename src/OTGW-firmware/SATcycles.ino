@@ -149,6 +149,10 @@ void satCycleInit()
   state.sat.f4hUnderheatFraction = 0.0f;
   state.sat.f4hFlowRetDeltaP50   = 0.0f;
   state.sat.f4hFlowRetDeltaP90   = 0.0f;
+  // Daily median recommendation (Task #228): reset intra-day buffer, keep daily ring intact
+  _hcr_sHead  = 0;
+  _hcr_sCount = 0;
+  strlcpy(state.sat.sHeatCurveRec, "insufficient", sizeof(state.sat.sHeatCurveRec));
 }
 
 //=== Per-hour cycle counter helpers (Task #203) ===
@@ -654,5 +658,210 @@ uint32_t satCycleGetPhaseDurationSec()
 {
   if (_cycle_phaseStartMs == 0) return 0;
   return (millis() - _cycle_phaseStartMs) / 1000;
+}
+
+//=== Heating Curve Daily Median Recommendation (Task #228) ===
+//
+// Algorithm:
+//   - Once per day: compute the median of intra-day (room - target) error samples.
+//     Error = -(state.sat.fError)  because fError = target - room.
+//   - Store the daily median for the last 7 days in a ring buffer (7 floats = 28 bytes).
+//   - Recommendation:
+//       INCREASE  if median < -0.5 C for 3+ consecutive days  (room too cold)
+//       DECREASE  if median > +0.5 C for 3+ consecutive days  (room too warm)
+//       HOLD      otherwise
+//   - Resets to "insufficient" when SAT is disabled or room sensor unavailable.
+//   - Daily error ring buffer persists to LittleFS (/sat_hcr.json) so the recommendation
+//     survives reboots.
+
+static const uint8_t  HCR_DAYS          = 7;     // rolling-day window size
+static const float    HCR_THRESHOLD_C   = 0.5f;  // median error threshold (°C)
+static const uint8_t  HCR_SUSTAIN_DAYS  = 3;     // consecutive days needed for a recommendation
+static const char*    SAT_HCR_FILE PROGMEM = "/sat_hcr.json";
+
+// Ring buffer of daily median errors (oldest → newest)
+static float    _hcr_dailyMedian[HCR_DAYS]; // raw daily medians
+static uint8_t  _hcr_head   = 0;            // next write position
+static uint8_t  _hcr_count  = 0;            // valid entries (0..HCR_DAYS)
+
+// Intra-day sample accumulator: collect (room - target) readings until midnight.
+// Using a small ring (up to 96 samples at 15-min intervals = one day).
+static const uint8_t HCR_INTRADAY_SIZE = 96;
+static float    _hcr_samples[HCR_INTRADAY_SIZE];
+static uint8_t  _hcr_sHead    = 0;          // next write position
+static uint8_t  _hcr_sCount   = 0;          // valid samples
+static uint32_t _hcr_lastDayNum = 0;        // last calendar day that was committed (time/86400)
+
+//--- Forward declarations ---
+static float _hcrIntraMedian();
+void satHCRSaveState();
+void satHCRLoadState();
+
+//--- Compute median of the intra-day sample buffer (insertion-sort on local copy) ---
+static float _hcrIntraMedian()
+{
+  if (_hcr_sCount == 0) return 0.0f;
+  float sorted[HCR_INTRADAY_SIZE];
+  uint8_t n = _hcr_sCount;
+  for (uint8_t i = 0; i < n; i++) {
+    uint8_t src = (_hcr_sHead + HCR_INTRADAY_SIZE - n + i) % HCR_INTRADAY_SIZE;
+    sorted[i] = _hcr_samples[src];
+  }
+  // Insertion sort — n ≤ 96, runs once per day
+  for (uint8_t i = 1; i < n; i++) {
+    float key = sorted[i];
+    int8_t j  = (int8_t)i - 1;
+    while (j >= 0 && sorted[j] > key) { sorted[j + 1] = sorted[j]; j--; }
+    sorted[j + 1] = key;
+  }
+  // Median: lower-middle for even n
+  return sorted[n / 2];
+}
+
+//--- Save HCR state to LittleFS (called on day-commit) ---
+void satHCRSaveState()
+{
+  File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "w");
+  if (!f) return;
+  // Format: {"n":7,"h":3,"d":[v0,v1,...,v6]}
+  char buf[128];
+  int pos = snprintf_P(buf, sizeof(buf), PSTR("{\"n\":%u,\"h\":%u,\"d\":["),
+                       (unsigned)_hcr_count, (unsigned)_hcr_head);
+  for (uint8_t i = 0; i < HCR_DAYS; i++) {
+    char fBuf[8];
+    dtostrf(_hcr_dailyMedian[i], 1, 2, fBuf);
+    pos += snprintf_P(buf + pos, sizeof(buf) - pos, PSTR("%s%s"),
+                      fBuf, (i < HCR_DAYS - 1) ? "," : "");
+  }
+  strlcat(buf, "]}", sizeof(buf));
+  f.print(buf);
+  f.close();
+}
+
+//--- Load HCR state from LittleFS (called from satCycleInit when NTP is valid) ---
+void satHCRLoadState()
+{
+  File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "r");
+  if (!f) return;
+  char buf[128];
+  size_t len = f.readBytes(buf, sizeof(buf) - 1);
+  buf[len] = 0;
+  f.close();
+
+  char* p;
+  unsigned n = 0, h = 0;
+  if ((p = strstr(buf, "\"n\":")) != nullptr) n = (unsigned)atoi(p + 4);
+  if ((p = strstr(buf, "\"h\":")) != nullptr) h = (unsigned)atoi(p + 4);
+  if (n > HCR_DAYS) n = HCR_DAYS;
+  if (h >= HCR_DAYS) h = 0;
+  _hcr_count = (uint8_t)n;
+  _hcr_head  = (uint8_t)h;
+
+  // Parse array: walk past "d":[ then read comma-separated floats
+  p = strstr(buf, "\"d\":[");
+  if (p) {
+    p += 5; // skip past "d":[
+    for (uint8_t i = 0; i < HCR_DAYS; i++) {
+      _hcr_dailyMedian[i] = strtof(p, &p);
+      if (*p == ',') p++;
+    }
+  }
+  DebugTf(PSTR("SAT HCR: loaded %u days\r\n"), (unsigned)_hcr_count);
+}
+
+//--- Reset the daily median recommendation (called when SAT disabled) ---
+void satHCRReset()
+{
+  memset(_hcr_dailyMedian, 0, sizeof(_hcr_dailyMedian));
+  _hcr_head   = 0;
+  _hcr_count  = 0;
+  _hcr_sHead  = 0;
+  _hcr_sCount = 0;
+  strlcpy(state.sat.sHeatCurveRec, "insufficient", sizeof(state.sat.sHeatCurveRec));
+}
+
+//--- Collect an intra-day sample (call from control loop, ~every 15 min) ---
+// room_error = room_temp - target_temp = -(state.sat.fError)
+void satHCRAddSample()
+{
+  if (!state.sat.bActive) return;
+
+  float roomError = -state.sat.fError;  // positive: room warmer than target
+
+  _hcr_samples[_hcr_sHead] = roomError;
+  _hcr_sHead = (_hcr_sHead + 1) % HCR_INTRADAY_SIZE;
+  if (_hcr_sCount < HCR_INTRADAY_SIZE) _hcr_sCount++;
+
+  // Check for day boundary: commit previous day's data
+  time_t nowTs = time(nullptr);
+  if (nowTs < 1000000L) return;  // NTP not synced yet
+  uint32_t dayNum = (uint32_t)(nowTs / 86400UL);
+
+  if (_hcr_lastDayNum == 0) {
+    // First call after boot: just record which day we are on
+    _hcr_lastDayNum = dayNum;
+    return;
+  }
+
+  if (dayNum > _hcr_lastDayNum) {
+    // New day: commit the accumulated intra-day samples as a daily median
+    if (_hcr_sCount >= 2) {
+      float med = _hcrIntraMedian();
+      _hcr_dailyMedian[_hcr_head] = med;
+      _hcr_head = (_hcr_head + 1) % HCR_DAYS;
+      if (_hcr_count < HCR_DAYS) _hcr_count++;
+      DebugTf(PSTR("SAT HCR: day %lu committed median=%.2f (%u days stored)\r\n"),
+              (unsigned long)dayNum, med, (unsigned)_hcr_count);
+    }
+    // Reset intra-day buffer for the new day
+    _hcr_sHead  = 0;
+    _hcr_sCount = 0;
+    _hcr_lastDayNum = dayNum;
+
+    // Compute and update the recommendation after each new day
+    satHeatingCurveRecommendation();
+    satHCRSaveState();
+  }
+}
+
+//--- Compute the current heating curve recommendation from daily medians ---
+// Returns a PSTR-safe const char* (stored in state.sat.sHeatCurveRec for MQTT/JSON).
+const char* satHeatingCurveRecommendation()
+{
+  if (!state.sat.bActive) {
+    strlcpy(state.sat.sHeatCurveRec, "insufficient", sizeof(state.sat.sHeatCurveRec));
+    return state.sat.sHeatCurveRec;
+  }
+
+  if (_hcr_count < HCR_SUSTAIN_DAYS) {
+    strlcpy(state.sat.sHeatCurveRec, "insufficient", sizeof(state.sat.sHeatCurveRec));
+    return state.sat.sHeatCurveRec;
+  }
+
+  // Walk the last HCR_SUSTAIN_DAYS entries (newest-first) from the ring buffer
+  // and count how many consecutive days exceed each threshold.
+  uint8_t consecIncrease = 0;
+  uint8_t consecDecrease = 0;
+  for (uint8_t i = 0; i < HCR_SUSTAIN_DAYS; i++) {
+    // Walk backwards from newest: index = (head - 1 - i) mod HCR_DAYS
+    uint8_t idx = (_hcr_head + HCR_DAYS - 1 - i) % HCR_DAYS;
+    float med   = _hcr_dailyMedian[idx];
+    if (med < -HCR_THRESHOLD_C) consecIncrease++;  // room too cold
+    if (med >  HCR_THRESHOLD_C) consecDecrease++;  // room too warm
+  }
+
+  const char* rec;
+  if (consecIncrease == HCR_SUSTAIN_DAYS) {
+    rec = "INCREASE";
+  } else if (consecDecrease == HCR_SUSTAIN_DAYS) {
+    rec = "DECREASE";
+  } else {
+    rec = "HOLD";
+  }
+
+  strlcpy(state.sat.sHeatCurveRec, rec, sizeof(state.sat.sHeatCurveRec));
+  DebugTf(PSTR("SAT HCR: recommendation=%s (inc=%u dec=%u n=%u)\r\n"),
+          rec, (unsigned)consecIncrease, (unsigned)consecDecrease, (unsigned)_hcr_count);
+  return state.sat.sHeatCurveRec;
 }
 

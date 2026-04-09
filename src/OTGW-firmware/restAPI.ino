@@ -608,6 +608,7 @@ static void satSendHealthJSON()
   satSendJsonFloat(F("error_mean"),          state.sat.fMeanError, 2);
   satSendJsonFloat(F("error_stddev"),        state.sat.fErrorStdDev, 3);
   sendJsonMapEntry(F("error_samples"),       (int32_t)state.sat.iErrorSampleCount);
+  sendJsonMapEntry(F("heating_curve_recommendation"), state.sat.sHeatCurveRec);
 
   // Health booleans (AC#7)
   sendJsonMapEntry(F("flame_health"),        flameHealth);

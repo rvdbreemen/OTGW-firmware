@@ -494,6 +494,8 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fMeanError             = 0.0f;
   float    fErrorStdDev           = 0.0f;
   uint8_t  iErrorSampleCount      = 0;     // Number of samples in error ring buffer
+  // Daily median recommendation (Task #228): "INCREASE", "DECREASE", "HOLD", or "insufficient"
+  char     sHeatCurveRec[12]      = "insufficient";  // result string for MQTT / status JSON
   // Flame health (Task #70/#71)
   SATFlameStatus eFlameStatus     = SAT_FS_INSUFFICIENT_DATA;
   // OT setpoint sync
