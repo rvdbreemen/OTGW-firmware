@@ -1074,6 +1074,138 @@ static float satGetWeightedRoomTemp()
   return sumWeightedTemp / sumWeight;
 }
 
+//=====================================================================
+//=== Multi-zone PID support (Task #233) ===
+//=====================================================================
+
+// Static zone state array — BSS, not stack. 4 zones × 28 bytes ≈ 112 bytes.
+static SATZoneState satZones[4];
+
+// Maximum number of zones supported
+static const uint8_t SAT_MAX_ZONES = 4;
+
+// Handler: push room temperature for zone n (1-based)
+bool satHandleZoneRoomTemp(uint8_t zone, const char* value)
+{
+  if (zone < 1 || zone > SAT_MAX_ZONES) return false;
+  if (!value || !*value) return false;
+  char* endp = nullptr;
+  float temp = strtof(value, &endp);
+  if (endp == value || *endp != '\0') return false;
+  if (temp < -10.0f || temp > 50.0f) return false;
+  uint8_t idx = zone - 1;
+  satZones[idx].fRoomTemp     = temp;
+  satZones[idx].bRoomValid    = true;
+  satZones[idx].iLastUpdateMs = millis();
+  DebugTf(PSTR("SAT zone %u: room_temp=%.1f\r\n"), zone, temp);
+  return true;
+}
+
+// Handler: push setpoint for zone n (1-based)
+bool satHandleZoneSetpoint(uint8_t zone, const char* value)
+{
+  if (zone < 1 || zone > SAT_MAX_ZONES) return false;
+  if (!value || !*value) return false;
+  char* endp = nullptr;
+  float sp = strtof(value, &endp);
+  if (endp == value || *endp != '\0') return false;
+  if (sp < 5.0f || sp > 30.0f) return false;
+  uint8_t idx = zone - 1;
+  satZones[idx].fSetpoint     = sp;
+  satZones[idx].bSpValid      = true;
+  satZones[idx].iLastUpdateMs = millis();
+  DebugTf(PSTR("SAT zone %u: setpoint=%.1f\r\n"), zone, sp);
+  return true;
+}
+
+// Run a simplified PID step for a single zone and return requested CH setpoint.
+// Uses zone-local integral + prev_error state. Reuses heating curve from zone setpoint
+// and shared gain calculation for consistent behavior.
+// Returns SAT_MIN_SETPOINT (10°C) if zone is inactive or inputs are invalid.
+static float satZonePidStep(uint8_t idx, float outsideTemp)
+{
+  SATZoneState& z = satZones[idx];
+  uint32_t timeoutMs = (uint32_t)settings.sat.iZoneTimeoutS * 1000UL;
+  uint32_t now = millis();
+
+  // Mark zone inactive if stale
+  if (!z.bRoomValid || !z.bSpValid) return SAT_MIN_SETPOINT;
+  if ((now - z.iLastUpdateMs) > timeoutMs) return SAT_MIN_SETPOINT;
+
+  float roomTemp = z.fRoomTemp;
+  float target   = z.fSetpoint;
+
+  // Validate inputs
+  if (roomTemp < -10.0f || roomTemp > 50.0f) return SAT_MIN_SETPOINT;
+  if (target < 5.0f || target > 30.0f) return SAT_MIN_SETPOINT;
+
+  // Heating curve for this zone's target
+  float curveValue = satCalcHeatingCurve(target, outsideTemp);
+
+  // Gains from shared auto-gain formula (zone uses same Kp/Ki as primary).
+  // Constants mirror SATpid.ino: KP_DIVISOR_FLOOR=4, KP_DIVISOR_RAD=3, AGGRESSION=8400.
+  float coeff   = settings.sat.fHeatingCurveCoeff;
+  float divisor = (settings.sat.iHeatingSystem == 1) ? 4.0f : 3.0f;
+  float kp      = (coeff * curveValue) / divisor;
+  float ki      = kp / 8400.0f;   // SAT_PID_AGGRESSION_V3
+
+  float error = target - roomTemp;
+  float deadband = settings.sat.fDeadband;
+
+  // Integral: only inside deadband (matches SAT Python convention)
+  if (fabsf(error) <= deadband) {
+    z.fPidIntegral += ki * error * 60.0f;   // SAT_PID_UPDATE_INTERVAL = 60s
+    if (z.fPidIntegral < 0.0f)        z.fPidIntegral = 0.0f;
+    if (z.fPidIntegral > curveValue)  z.fPidIntegral = curveValue;
+  } else {
+    z.fPidIntegral = 0.0f;
+  }
+
+  float P = kp * error;
+  float I = z.fPidIntegral;
+
+  float output = curveValue + P + I;
+  float sysMax = satGetMaxSetpoint();
+  if (output < SAT_MIN_SETPOINT) output = SAT_MIN_SETPOINT;
+  if (output > sysMax)           output = sysMax;
+
+  z.fPidOutput = output;
+  z.fPrevError = error;
+
+  return output;
+}
+
+// Publish per-zone diagnostics to MQTT (retained).
+// Topics: sat/zone/<n>/output, sat/zone/<n>/error, sat/zone/<n>/active  (n is 1-based)
+static void satPublishZoneDiagnostics()
+{
+  char topicBuf[48];
+  char valBuf[12];
+  uint8_t zoneCount = settings.sat.iZoneCount;
+  if (zoneCount > SAT_MAX_ZONES) zoneCount = SAT_MAX_ZONES;
+  uint32_t timeoutMs = (uint32_t)settings.sat.iZoneTimeoutS * 1000UL;
+  uint32_t now = millis();
+
+  for (uint8_t i = 0; i < zoneCount; i++) {
+    SATZoneState& z = satZones[i];
+    bool active = z.bRoomValid && z.bSpValid && ((now - z.iLastUpdateMs) <= timeoutMs);
+
+    // sat/zone/<n>/active
+    snprintf_P(topicBuf, sizeof(topicBuf), PSTR("sat/zone/%u/active"), i + 1);
+    sendMQTTData(topicBuf, active ? "true" : "false", true);
+
+    // sat/zone/<n>/output
+    dtostrf(z.fPidOutput, 1, 1, valBuf);
+    snprintf_P(topicBuf, sizeof(topicBuf), PSTR("sat/zone/%u/output"), i + 1);
+    sendMQTTData(topicBuf, valBuf, true);
+
+    // sat/zone/<n>/error (target - room_temp)
+    dtostrf(z.fSetpoint - z.fRoomTemp, 1, 2, valBuf);
+    snprintf_P(topicBuf, sizeof(topicBuf), PSTR("sat/zone/%u/error"), i + 1);
+    sendMQTTData(topicBuf, valBuf, true);
+  }
+}
+
 bool satHandleTargetTemp(const char* value)
 {
   if (!value || !*value) return false;
@@ -3421,6 +3553,31 @@ void satControlLoop()
 
   // --- Calculate PID output (includes heating curve value) ---
   float pidOutput = satPidUpdate(roomTemp, effectiveTarget, curveValue, OTcurrentSystemState.Tboiler);
+
+  // --- Multi-zone PID override (Task #233) ---
+  // When sat_zone_count > 1: run each zone's PID and use the most-demanding setpoint.
+  // Zone 1 is always computed; its output replaces the primary PID output.
+  // Zones 2-4 are only evaluated when sat_zone_count > 1.
+  // If all zones are inactive, falls back to single-zone (primary) pidOutput.
+  if (settings.sat.iZoneCount > 1) {
+    float zoneMax = SAT_MIN_SETPOINT;
+    uint8_t activeZones = 0;
+    uint8_t zoneCount = settings.sat.iZoneCount;
+    if (zoneCount > SAT_MAX_ZONES) zoneCount = SAT_MAX_ZONES;
+    for (uint8_t z = 0; z < zoneCount; z++) {
+      float zOut = satZonePidStep(z, outsideTemp);
+      if (zOut > SAT_MIN_SETPOINT) {
+        if (zOut > zoneMax) zoneMax = zOut;
+        activeZones++;
+      }
+    }
+    if (activeZones > 0) {
+      pidOutput = zoneMax;
+      DebugTf(PSTR("SAT: multi-zone %u active zones, max setpoint=%.1f\r\n"), activeZones, pidOutput);
+    }
+    // Publish zone diagnostics (retained MQTT)
+    satPublishZoneDiagnostics();
+  }
 
   // Task #21: Restore original deadband after PID used the widened value
   if (thermalDeadbandWidened) {

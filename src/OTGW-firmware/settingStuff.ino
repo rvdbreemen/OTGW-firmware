@@ -350,7 +350,10 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATthermalcomfort"), settings.sat.bThermalComfort, true);
   writeJsonIntKV(file, F("SAThumiditytimeout"), settings.sat.iHumidityTimeoutS, true);
   writeJsonBoolKV(file, F("SATsolarfreezeint"), settings.sat.bSolarFreezeIntegral, true);
-  writeJsonIntKV(file, F("SATflushtreshold"), settings.sat.iSatFlushThresholdH, false);
+  writeJsonIntKV(file, F("SATflushtreshold"), settings.sat.iSatFlushThresholdH, true);
+  // Multi-zone PID (Task #233)
+  writeJsonIntKV(file, F("SATzonecount"), settings.sat.iZoneCount, true);
+  writeJsonIntKV(file, F("SATzonetimeout"), settings.sat.iZoneTimeoutS, false);
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
@@ -859,6 +862,9 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SAThumiditytimeout")) == 0) settings.sat.iHumidityTimeoutS = (uint16_t)constrain(atoi(newValue), 60, 65535);
   else if (strcasecmp_P(field, PSTR("SATsolarfreezeint")) == 0) settings.sat.bSolarFreezeIntegral = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATflushtreshold")) == 0)  settings.sat.iSatFlushThresholdH = (uint16_t)constrain(atoi(newValue), 1, 720);
+  // Multi-zone PID (Task #233)
+  else if (strcasecmp_P(field, PSTR("SATzonecount")) == 0)    settings.sat.iZoneCount = (uint8_t)constrain(atoi(newValue), 1, 4);
+  else if (strcasecmp_P(field, PSTR("SATzonetimeout")) == 0)  settings.sat.iZoneTimeoutS = (uint16_t)constrain(atoi(newValue), 30, 3600);
 #if defined(ESP32)
   // --- BLE temperature sensor settings (Task #20) ---
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);

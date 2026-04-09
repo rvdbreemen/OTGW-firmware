@@ -858,6 +858,28 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
                   MQTTDebugTf(PSTR("SAT: area index out of range [%s]\r\n"), areaIdx);
                 }
               }
+            } else if (strcasecmp_P(satSubCmd, PSTR("zone")) == 0) {
+              // sat/zone/<n>/room_temp or sat/zone/<n>/setpoint (n is 1-based)
+              char zoneIdx[4];
+              if (readMQTTTopicToken(topicCursor, zoneIdx, sizeof(zoneIdx))) {
+                int zn = atoi(zoneIdx);
+                char zoneCmd[16];
+                if (readMQTTTopicToken(topicCursor, zoneCmd, sizeof(zoneCmd))) {
+                  if (strcasecmp_P(zoneCmd, PSTR("room_temp")) == 0) {
+                    satHandleZoneRoomTemp((uint8_t)zn, msgPayload);
+                  } else if (strcasecmp_P(zoneCmd, PSTR("setpoint")) == 0) {
+                    satHandleZoneSetpoint((uint8_t)zn, msgPayload);
+                  } else {
+                    MQTTDebugTf(PSTR("SAT zone: unknown cmd [%s]\r\n"), zoneCmd);
+                  }
+                }
+              }
+            } else if (strcasecmp_P(satSubCmd, PSTR("zone_count")) == 0) {
+              // sat/zone_count — set number of active zones (1-4)
+              updateSetting("SATzonecount", msgPayload);
+            } else if (strcasecmp_P(satSubCmd, PSTR("zone_timeout_s")) == 0) {
+              // sat/zone_timeout_s — set zone inactivity timeout in seconds
+              updateSetting("SATzonetimeout", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("sun_elevation")) == 0) {
               // sat/sun_elevation — receive sun elevation from HA (Task #68)
               satHandleSunElevation(msgPayload);

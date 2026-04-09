@@ -184,6 +184,8 @@ void satPublishMQTT();
 bool satHandleExternalTemp(const char* value);
 bool satHandleExternalOutdoor(const char* value);
 bool satHandleTargetTemp(const char* value);
+bool satHandleZoneRoomTemp(uint8_t zone, const char* value);
+bool satHandleZoneSetpoint(uint8_t zone, const char* value);
 void satHandleEnabled(const char* value);
 void satDisable();
 void satHandleControlMode(const char* value);
@@ -415,6 +417,19 @@ struct SATWindowRecord {
   float    p90FlowTemp;     // 90th percentile flow temp during this cycle (°C)
   float    avgFlowRetDelta; // average (Tboiler - Tret) during this cycle (°C); <0 if no data
   uint8_t  eClass;          // SATCycleClass cast to uint8_t
+};
+
+// Per-zone state for multi-zone PID heating control (Task #233)
+// Kept compact: 4 zones × 20 bytes = 80 bytes total on BSS
+struct SATZoneState {
+  float    fRoomTemp     = 0.0f;   // Last received room temperature (°C)
+  float    fSetpoint     = 0.0f;   // Last received zone setpoint (°C)
+  float    fPidOutput    = 0.0f;   // Zone PID output (CH setpoint requested by this zone)
+  float    fPidIntegral  = 0.0f;   // Zone PID integral accumulator
+  float    fPrevError    = 0.0f;   // Previous PID error (for derivative)
+  uint32_t iLastUpdateMs = 0;      // millis() of last room_temp or setpoint update
+  bool     bRoomValid    = false;  // Room temp has been received at least once
+  bool     bSpValid      = false;  // Setpoint has been received at least once
 };
 
 struct SATRuntimeSection {         // state.sat — SAT thermostat controller state
@@ -874,6 +889,9 @@ struct SATSection {
   bool     bSolarFreezeIntegral = true; // Freeze PID integral during solar gain compensation
   // LittleFS persistence (Task #237)
   uint16_t iSatFlushThresholdH = 24;   // Hours offline before short-lived SAT data is auto-flushed on next enable
+  // Multi-zone PID (Task #233)
+  uint8_t  iZoneCount          = 1;    // Number of active heating zones (1-4, default 1 = single-zone)
+  uint16_t iZoneTimeoutS       = 300;  // Seconds without update before zone is considered inactive (default 5 min)
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning
