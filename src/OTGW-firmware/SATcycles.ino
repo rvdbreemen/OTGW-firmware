@@ -35,9 +35,13 @@ static uint8_t  _hourCycleHead  = 0;  // next write position
 static uint8_t  _hourCycleCount = 0;  // valid entries (0..SAT_MAX_CYCLES_PER_HOUR)
 
 // --- Rolling 4-hour cycle window (Task #227) ---
-// 60 slots: covers 4h at a 4-min average cycle period, or 2h at 2-min average.
-// Each record is ~24 bytes; 60 records = ~1.4 KB — acceptable on ESP8266.
-static const uint8_t  SAT_WIN4H_SIZE    = 60;
+// ESP8266: 30 slots x 24 bytes = 720 bytes SRAM (covers 2h at 4-min avg cycle period).
+// ESP32:   60 slots x 24 bytes = 1440 bytes SRAM (covers 4h at 4-min avg cycle period).
+#if defined(ESP8266)
+  #define SAT_WIN4H_SIZE 30
+#else
+  #define SAT_WIN4H_SIZE 60
+#endif
 static const uint32_t SAT_WIN4H_SPAN_MS = 4UL * 3600UL * 1000UL; // 4 hours in ms
 
 struct SATWindowRecord {
@@ -215,7 +219,7 @@ void satGetWindow4hStats()
   uint8_t  nValid       = 0;
 
   // Collect per-cycle flow-return deltas into a local scratch array for percentile sort.
-  // Max SAT_WIN4H_SIZE (60) floats = 240 bytes on stack — acceptable.
+  // Max SAT_WIN4H_SIZE floats on stack: 30*4=120 bytes (ESP8266) or 60*4=240 bytes (ESP32) — acceptable.
   float deltas[SAT_WIN4H_SIZE];
   uint8_t nDeltas = 0;
 
