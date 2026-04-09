@@ -27,13 +27,15 @@ Each mode requires different hardware configuration: the relay position, step-up
 
 ```cpp
 enum OTDirectMode : uint8_t {
-  OT_MODE_GATEWAY  = 0,  // Intercept thermostat <-> boiler traffic
-  OT_MODE_MONITOR  = 1,  // Passive listen only
-  OT_MODE_BYPASS   = 2,  // Transparent relay, no modification
-  OT_MODE_MASTER   = 3,  // Standalone master, no thermostat
-  OT_MODE_LOOPBACK = 4   // Internal diagnostic loopback
+  OTD_MODE_BYPASS   = 0,  // Transparent relay, no modification (relay ON, OT-direct inactive)
+  OTD_MODE_GATEWAY  = 1,  // Intercept thermostat <-> boiler traffic (default)
+  OTD_MODE_MONITOR  = 2,  // Passive listen only
+  OTD_MODE_MASTER   = 3,  // Standalone master, no thermostat
+  OTD_MODE_LOOPBACK = 4   // Internal diagnostic loopback
 };
 ```
+
+Note: The `OTD_MODE_*` prefix is used (not `OT_MODE_*`). `BYPASS=0` is the numeric default but `GATEWAY=1` is the logical default (stored as `iMode=1` in settings). This ordering places bypass at 0 so that a zero-initialized struct doesn't accidentally activate bypass mode at boot without a relay.
 
 ### Centralized mode transition: `setOTDirectMode()`
 
@@ -52,13 +54,16 @@ The active mode is stored in the `OTDirectSettingsSection` of the LittleFS setti
 
 ### Convenience flags
 
-For readability in hot-path code (the cooperative loop), convenience booleans are derived from the enum:
+For readability in hot-path code (the cooperative loop), convenience macros compare against the single-source-of-truth `otCurrentMode` variable:
 
-- `otBypassActive` -- true when mode is Bypass
-- `otMonitorMode` -- true when mode is Monitor
-- `otMasterMode` -- true when mode is Master
+```cpp
+#define IS_BYPASS_MODE()   (otCurrentMode == OTD_MODE_BYPASS)
+#define IS_MONITOR_MODE()  (otCurrentMode == OTD_MODE_MONITOR)
+#define IS_MASTER_MODE()   (otCurrentMode == OTD_MODE_MASTER)
+#define IS_LOOPBACK_MODE() (otCurrentMode == OTD_MODE_LOOPBACK)
+```
 
-These are set exclusively by `setOTDirectMode()` and are read-only everywhere else. They exist to avoid repeated enum comparisons in timing-sensitive code and to make conditionals self-documenting.
+These macros (not boolean variables as originally drafted) expand inline and the compiler optimizes the comparison away when the mode is constant in a branch. They exist to make conditionals self-documenting and match the PIC-era coding style for mode checks.
 
 ### Compile-time guard
 

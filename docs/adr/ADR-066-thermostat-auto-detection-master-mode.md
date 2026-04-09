@@ -69,7 +69,7 @@ Both `bAutoDetect` and `bEnableSlave` are persisted in the `OTDirectSettingsSect
 - Zero-config for users without thermostats -- device auto-detects and enters Master mode
 - Zero-config for users with thermostats -- device stays in Gateway mode as expected
 - Virtual boiler mode enables hybrid thermostat + automation deployments
-- Boiler cache is lightweight (128 x 4 bytes = 512 bytes) and provides instant responses to thermostat queries
+- Boiler cache is lightweight (128 x uint16_t data + 128 x bool valid = ~384 bytes) and provides instant responses to thermostat queries
 - All master mode data flows through the existing frame bridge, so MQTT/REST/WebSocket work without modification
 
 ### Trade-offs:

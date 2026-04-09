@@ -103,7 +103,7 @@ New board section in `boards.h` with ESP32-S3 pin map from OT-Thing NODO variant
 
 ### Trade-offs:
 - `#if HAS_PIC` / `#if HAS_DIRECT_OT` guards add conditional compilation complexity
-- New `OTDirect.ino` file (~200 lines) must be maintained alongside PIC code paths
+- New `OTDirect.ino` file (~2400 lines as of v1.4.0-beta) must be maintained alongside PIC code paths
 - Pin numbers need verification against production OTGW32 hardware (currently based on OT-Thing reference design)
 - `opentherm_library` dependency added for OTGW32 builds only
 
