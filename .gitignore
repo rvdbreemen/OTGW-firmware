@@ -24,7 +24,7 @@ evaluation-report.json
 .claude/settings.local.json
 .claude/.vscode/mcp.json
 .mcp.json
-
+logs-issue/*
 /src/OTGW-firmware/build
 *.ino.map
 tmpclaude-*
@@ -51,4 +51,3 @@ discord_backlog_last_checkted.txt
 
 logs-issue/*
 .claude/settings.20260412_173718.bak
-other-projects/*
