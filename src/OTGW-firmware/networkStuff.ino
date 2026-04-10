@@ -345,7 +345,12 @@ void loopNTP()
   switch (NtpStatus) {
     case TIME_NOTSET:
     case TIME_NEEDSYNC:
-      NtpLastSync = now;
+      // Guard: only store a valid timestamp as the sync baseline. If time() still
+      // returns the SDK bogus initial value (0xFFFFFFFF = year 2106) or a small
+      // pre-epoch value, use 0 instead. This prevents NtpLastSync from being
+      // poisoned to 4294967295, which would make the TIME_WAITFORSYNC check
+      //   (now >= NtpLastSync)  always fail once real NTP time arrives.
+      NtpLastSync = ((now > EPOCH_2000_01_01) && (now < EPOCH_2038_01_19)) ? now : 0;
       DebugTln(F("Start time syncing"));
       startNTP();
       DebugTf(PSTR("Starting timezone lookup for [%s]\r\n"), CSTR(settings.ntp.sTimezone));
