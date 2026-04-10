@@ -262,9 +262,10 @@ void satGetWindow4hStats()
   uint16_t nUnderheat   = 0;
   uint16_t nValid       = 0;
 
-  // Collect per-cycle flow-return deltas into a local scratch array for percentile sort.
-  // Max SAT_WIN4H_SIZE floats on stack: 30*4=120 bytes (ESP8266) or 360*4=1440 bytes (ESP32) — acceptable on ESP32.
-  float deltas[SAT_WIN4H_SIZE];
+  // Collect per-cycle flow-return deltas into a scratch array for percentile sort.
+  // static: avoids 1440 bytes on the ESP32 stack (SAT_WIN4H_SIZE=360 on ESP32).
+  // Safe: satUpdate4hWindow() is only ever called from the main loop, never re-entrant.
+  static float deltas[SAT_WIN4H_SIZE];
   uint16_t nDeltas = 0;
 
   for (uint16_t i = 0; i < _win4hCount; i++) {

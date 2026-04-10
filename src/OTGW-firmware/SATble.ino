@@ -179,8 +179,16 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     // Try ATC/pvvx format: service data UUID 0x181A
     if (advertisedDevice.haveServiceData()) {
       BLEUUID svcUUID = advertisedDevice.getServiceDataUUID();
-      // ESP32 BLE API (arduino-esp32 v3.x) returns Arduino String, not std::string
-      String svcData = advertisedDevice.getServiceData();
+      // Copy service data to a fixed buffer immediately to avoid String heap churn
+      // in this BLE scan callback (called on every advertisement).
+      uint8_t svcBytes[32];
+      size_t svcLen = 0;
+      {
+        String svcData = advertisedDevice.getServiceData();
+        svcLen = svcData.length();
+        if (svcLen > sizeof(svcBytes)) svcLen = sizeof(svcBytes);
+        memcpy(svcBytes, svcData.c_str(), svcLen);
+      } // String freed here
       uint16_t uuid16 = 0;
 
       // Extract 16-bit UUID
@@ -190,8 +198,7 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
         // Some BLE stacks return the full 128-bit form for 16-bit UUIDs
         // Try matching by comparing the UUID string in a fixed char buffer
         char uuidBuf[40];
-        String uuidStr = svcUUID.toString();
-        strlcpy(uuidBuf, uuidStr.c_str(), sizeof(uuidBuf));
+        strlcpy(uuidBuf, svcUUID.toString().c_str(), sizeof(uuidBuf));
         // tolower in-place for case-insensitive compare
         for (int i = 0; uuidBuf[i]; i++) uuidBuf[i] = tolower((unsigned char)uuidBuf[i]);
         if (strstr(uuidBuf, "181a") != nullptr) {
@@ -201,19 +208,18 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
         }
       }
 
-      if (uuid16 == ATC_SERVICE_UUID_16 && svcData.length() >= 13) {
-        parsed = parseBLEAtcFormat((const uint8_t*)svcData.c_str(), svcData.length(), &temp, &hum, &batt);
-      } else if (uuid16 == BTHOME_SERVICE_UUID_16 && svcData.length() >= 3) {
-        parsed = parseBLEBTHomeFormat((const uint8_t*)svcData.c_str(), svcData.length(), &temp, &hum, &batt);
+      if (uuid16 == ATC_SERVICE_UUID_16 && svcLen >= 13) {
+        parsed = parseBLEAtcFormat(svcBytes, svcLen, &temp, &hum, &batt);
+      } else if (uuid16 == BTHOME_SERVICE_UUID_16 && svcLen >= 3) {
+        parsed = parseBLEBTHomeFormat(svcBytes, svcLen, &temp, &hum, &batt);
       }
     }
 
     if (!parsed) return;
 
-    // Get MAC address string — copy to fixed char buffer via c_str()
-    String macStr = advertisedDevice.getAddress().toString();
+    // Get MAC address — copy to fixed char buffer, avoid named String object
     char macBuf[18];
-    strlcpy(macBuf, macStr.c_str(), sizeof(macBuf));
+    strlcpy(macBuf, advertisedDevice.getAddress().toString().c_str(), sizeof(macBuf));
     // Convert to uppercase AA:BB:CC:DD:EE:FF format
     for (int i = 0; macBuf[i]; i++) macBuf[i] = toupper((unsigned char)macBuf[i]);
 

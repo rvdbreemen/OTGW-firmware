@@ -1187,6 +1187,7 @@ static void satPublishZoneDiagnostics()
   uint32_t now = millis();
 
   for (uint8_t i = 0; i < zoneCount; i++) {
+    feedWatchDog();
     SATZoneState& z = satZones[i];
     bool active = z.bRoomValid && z.bSpValid && ((now - z.iLastUpdateMs) <= timeoutMs);
 
@@ -1711,6 +1712,8 @@ void satPublishMQTT()
   dtostrf(state.sat.fRawDerivative, 1, 4, valBuf);
   sendMQTTData(F("sat/raw_derivative"), valBuf, false);
 
+  feedWatchDog(); // ~15 publishes done; prevent WDT trip on slow broker
+
   // Boiler status (string label)
   { char bsName[20]; satGetBoilerStatusName(bsName, sizeof(bsName));
     sendMQTTData(F("sat/boiler_status"), bsName, false); }
@@ -1779,6 +1782,8 @@ void satPublishMQTT()
   sendMQTTData(F("sat/4h_flow_ret_delta_p50"), valBuf, false);
   dtostrf(state.sat.f4hFlowRetDeltaP90, 1, 1, valBuf);
   sendMQTTData(F("sat/4h_flow_ret_delta_p90"), valBuf, false);
+
+  feedWatchDog(); // ~35 publishes done; prevent WDT trip on slow broker
 
   // Overshoot margin
   dtostrf(settings.sat.fOvershootMargin, 1, 1, valBuf);
