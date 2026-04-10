@@ -4977,6 +4977,13 @@ function refreshSettings() {
               sInput.min = s.min;
               sInput.step = 1;
             }
+            else if (s.type == "r") {
+              sInput.setAttribute("type", "text");
+              sInput.setAttribute("maxlength", s.maxlen);
+              sInput.setAttribute("size", (s.maxlen > 20 ? 20 : s.maxlen));
+              sInput.setAttribute("disabled", "disabled");
+              sInput.className = "input-readonly";
+            }
             if (isPasswordPlaceholderField(key) && isHttpPasswordPlaceholder(s.value)) {
               sInput.setAttribute("value", getHttpPasswordPlaceholderLength(s.value) > 0 ? s.value : "");
             } else {
@@ -4986,6 +4993,16 @@ function refreshSettings() {
           if (tooltipText) {
             sInput.setAttribute("title", tooltipText);
           }
+          if (key === "ssid") {
+            var resetWifiBtn = document.createElement("button");
+            resetWifiBtn.type = "button";
+            resetWifiBtn.textContent = "Reset WiFi";
+            resetWifiBtn.className = "btn-wifi-reset";
+            resetWifiBtn.title = "Clear stored Wi-Fi credentials and reboot the device in Access Point mode";
+            resetWifiBtn.addEventListener('click', resetWiFiSettingsUI);
+            inputDiv.appendChild(resetWifiBtn);
+          }
+          if (s.type !== "r") {
           sInput.addEventListener('change',
             function () {
               if (fieldName === "otdmode") {
@@ -5025,6 +5042,7 @@ function refreshSettings() {
             },
             false
           );
+          } // end if (s.type !== "r")
           inputDiv.appendChild(sInput);
 
           rowDiv.appendChild(inputDiv);
@@ -5034,7 +5052,9 @@ function refreshSettings() {
           //----document.getElementById("setFld_"+key).style.background = "white";
           const inputEl = document.getElementById(key);
           if (inputEl) {
-            inputEl.className = "input-normal";
+            if (s.type !== "r") {
+              inputEl.className = "input-normal";
+            }
             //----document.getElementById("setFld_"+key).value = s.value;
             // document.getElementById(key).value = s.value;
             // FIX If checkbox change checked iso value
@@ -6660,4 +6680,11 @@ function saveInlineSensorLabel() {
       }
       editor.saving = false;
     });
+}
+
+//============================================================================
+function resetWiFiSettingsUI() {
+  if (confirm('Reset Wi-Fi settings?\n\nThis will clear the stored Wi-Fi credentials and reboot the device in Access Point (AP) mode.\n\nAfter the reboot, connect to the "OTGW-XXXXXX" Wi-Fi network to reconfigure.')) {
+    window.location.href = localURL + '/ResetWireless';
+  }
 }
