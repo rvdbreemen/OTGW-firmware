@@ -1165,41 +1165,49 @@ void sendOTLabel(const char *msglabel){
 
 //=======================================================================
 // Helpers for Map-based JSON functions (sendJsonOTmonMapEntry)
+// Concrete overloads instead of templates: ctags (Arduino builder) scans all
+// .ino files and generates forward declarations for template functions using
+// the template parameter name as a type (e.g. TVal), which GCC rejects because
+// TVal is unknown at the point the ctags block is compiled. Concrete overloads
+// with real types produce valid ctags forward declarations.
+// All call sites use F() for both label and unit, so only the F/value/F overloads
+// are needed. The F/value/char* and char*/value/F combinations are unused.
 //=======================================================================
 
-template <typename T>
-void sendJsonOTmonMapEntry(const __FlashStringHelper* label, T value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char labelBuf[35]; 
-  char unitBuf[10];
-  
-  strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf));
-  labelBuf[sizeof(labelBuf)-1] = 0;
-  
-  strncpy_P(unitBuf, (PGM_P)unit, sizeof(unitBuf));
-  unitBuf[sizeof(unitBuf)-1] = 0;
-  
+// Convert both flash-string label and unit to char buffers, then dispatch to
+// the concrete sendJsonOTmonMapEntry(char*, T, char*, time_t) in jsonStuff.ino.
+void sendJsonOTmonMapEntry(const __FlashStringHelper* label, const char* value, const __FlashStringHelper* unit, unsigned long lastupdated) {
+  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
+  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
+  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
+}
+void sendJsonOTmonMapEntry(const __FlashStringHelper* label, float value, const __FlashStringHelper* unit, unsigned long lastupdated) {
+  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
+  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
+  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
+}
+void sendJsonOTmonMapEntry(const __FlashStringHelper* label, uint16_t value, const __FlashStringHelper* unit, unsigned long lastupdated) {
+  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
+  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
+  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
+}
+void sendJsonOTmonMapEntry(const __FlashStringHelper* label, uint32_t value, const __FlashStringHelper* unit, unsigned long lastupdated) {
+  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
+  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
+  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
+}
+void sendJsonOTmonMapEntry(const __FlashStringHelper* label, int value, const __FlashStringHelper* unit, unsigned long lastupdated) {
+  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
+  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
+  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
+}
+void sendJsonOTmonMapEntry(const __FlashStringHelper* label, bool value, const __FlashStringHelper* unit, unsigned long lastupdated) {
+  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
+  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
   sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
 }
 
-template <typename T>
-void sendJsonOTmonMapEntry(const __FlashStringHelper* label, T value, const char* unit, unsigned long lastupdated) {
-  char labelBuf[35];
-  strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf));
-  labelBuf[sizeof(labelBuf)-1] = 0;
-  
-  sendJsonOTmonMapEntry(labelBuf, value, unit, lastupdated);
-}
-
-template <typename T>
-void sendJsonOTmonMapEntry(const char* label, T value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char unitBuf[10];
-  strncpy_P(unitBuf, (PGM_P)unit, sizeof(unitBuf));
-  unitBuf[sizeof(unitBuf)-1] = 0;
-  
-  sendJsonOTmonMapEntry(label, value, unitBuf, lastupdated);
-}
-
-// Helpers for start/end map
+// Helpers for start/end map (non-template)
 void sendStartJsonMap(const __FlashStringHelper* objName) {
   char buf[33];
   strncpy_P(buf, (PGM_P)objName, sizeof(buf));

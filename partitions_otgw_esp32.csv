@@ -1,9 +1,11 @@
-# OTGW-firmware ESP32 partition table — OTA-capable
-# 4MB flash: 2x 1.5MB app (OTA) + 768KB LittleFS
+# OTGW-firmware ESP32 partition table — single app (no OTA), 4MB flash
+# The full ESP32 build (WiFi + BLE + Ethernet + OTDirect) exceeds 2MB, so
+# OTA with two app partitions does not fit in 4MB flash. To enable OTA a
+# board with 8MB flash is required (use a custom 8MB partition table then).
+# 4MB flash layout: 1x 2.875MB app + 1MB LittleFS + 64KB coredump
 # Name,   Type, SubType, Offset,  Size,    Flags
 nvs,      data, nvs,     0x9000,  0x5000,
 otadata,  data, ota,     0xE000,  0x2000,
-app0,     app,  ota_0,   0x10000, 0x180000,
-app1,     app,  ota_1,   0x190000,0x180000,
-littlefs, data, spiffs,  0x310000,0xC0000,
-coredump, data, coredump,0x3D0000,0x10000,
+app0,     app,  ota_0,   0x10000, 0x2E0000,
+littlefs, data, spiffs,  0x2F0000,0x100000,
+coredump, data, coredump,0x3F0000,0x10000,

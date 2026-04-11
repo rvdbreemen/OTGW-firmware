@@ -32,6 +32,12 @@ static OpenTherm otSlave(PIN_OT_SLAVE_IN, PIN_OT_SLAVE_OUT, true);  // true = sl
 static void IRAM_ATTR masterISR() { otMaster.handleInterrupt(); }
 static void IRAM_ATTR slaveISR()  { otSlave.handleInterrupt(); }
 
+// Forward declarations for static helpers defined later in this file.
+// ctags does not evaluate #if guards, so it may not generate these
+// declarations when scanning a single-TU build (PlatformIO Arduino builder).
+static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data);
+static unsigned long applyResponseModifiers(unsigned long response);
+
 // ---------------------------------------------------------------------------
 // Master request scheduler — periodic polls and writes to the boiler
 // ---------------------------------------------------------------------------

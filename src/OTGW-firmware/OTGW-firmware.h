@@ -1012,6 +1012,11 @@ struct
 } DallasrealDevice[MAXDALLASDEVICES];
 // prototype to allow use in restAPI.ino
 char* getDallasAddress(DeviceAddress deviceAddress);
+// forward declarations — defined in sensors_ext.ino (concatenated after handleDebug.ino)
+void pollSensors();
+// forward declarations — defined in s0PulseCount.ino (concatenated after OTGW-firmware.ino)
+void initS0Count();
+void sendS0Counters();
 
 // S0 Counter variables — definitions here, used across modules
 uint16_t  OTGWs0pulseCount;                       // Number of S0 pulses in measurement interval
@@ -1023,6 +1028,7 @@ byte      OTGWs0dataid = 245;                     // foney dataid for counter au
 //Now load Debug & network library
 #include "Debug.h"
 #include "networkStuff.h"
+#include "helperStuff.h"
 
 
     // That's all folks...

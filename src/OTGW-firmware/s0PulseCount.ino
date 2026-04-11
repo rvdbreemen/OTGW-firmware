@@ -14,6 +14,8 @@
  Settings are in settings.s0.* (see OTGW-firmware.h).
  */
  #include <Arduino.h>
+ // forward declaration — s0sendMQ is defined later in this file
+ void s0sendMQ();
  //-----------------------------------------------------------------------------------------------------------
  volatile uint16_t pulseCount = 0;                 // Number of pulses, used to measure energy.
  volatile uint32_t last_pulse_duration = 0;     // Duration of the time between last pulses

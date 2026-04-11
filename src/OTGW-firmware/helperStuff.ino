@@ -11,11 +11,7 @@
 */
 
 #include <Arduino.h>  // for type definitions
-
-template <typename T> void PROGMEM_readAnything (const T * sce, T& dest)
-{
-  memcpy_P (&dest, sce, sizeof (T));
-}
+// PROGMEM_readAnything template is defined in helperStuff.h (included via OTGW-firmware.h)
 
 //===========================================================================================
 // Get High Resolution Timestamp for Logs

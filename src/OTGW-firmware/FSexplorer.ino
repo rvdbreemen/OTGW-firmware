@@ -40,6 +40,9 @@
 **        .
 **      }
 */
+// forward declaration — contentType is defined later in this file (line ~565)
+const String &contentType(String& filename);
+
 #define MAX_FILES_IN_LIST   40
 
 const char Helper[] PROGMEM =
@@ -217,8 +220,17 @@ void startWebserver(){
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
   // Enable collection of If-None-Match so index.html ETag conditional requests work.
-    static const char* reqHeaders[] = { "If-None-Match" };
-    httpServer.collectHeaders(reqHeaders, 1);
+  // ESP8266 Core 3.x: use the variadic template (single string literal).
+  //   Passing array+count causes the template to win over the non-template
+  //   due to int→size_t conversion ranking; the template body then tries to
+  //   convert the char* array to String and fails. Single literal is fine.
+  // ESP32 WebServer: only the array+count overload exists; no variadic template.
+#ifdef ESP8266
+  httpServer.collectHeaders("If-None-Match");
+#else
+  static const char* collectHeaderKeys[] = {"If-None-Match"};
+  httpServer.collectHeaders(collectHeaderKeys, 1);
+#endif
 
   httpServer.begin();
   // Set up first message as the IP address

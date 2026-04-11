@@ -6,16 +6,18 @@ replicating the CI/CD workflow for local development.
 
 Requirements:
 - Python 3.x
-- arduino-cli (installed automatically if not found)
+- PlatformIO (installed automatically if not found)  [default backend]
+- arduino-cli (installed automatically if not found) [legacy backend]
 
 Usage:
-    python build.py                      # Full build for ESP8266 + ESP32 (default)
+    python build.py                      # Full build for ESP8266 + ESP32 (PlatformIO, incremental)
     python build.py --target esp8266     # Build for ESP8266 only
     python build.py --target esp32       # Build for ESP32 only
     python build.py --firmware           # Build firmware only
     python build.py --filesystem         # Build filesystem only
     python build.py --clean              # Clean build artifacts
     python build.py --distclean          # Clean build + cached dependencies
+    python build.py --arduino-cli        # Use arduino-cli backend instead
     python build.py --help               # Show help
 """
 
@@ -903,21 +905,69 @@ PIO_ENV_MAP = {
 
 
 def check_platformio():
-    """Check if PlatformIO CLI is available. Exit if not found."""
+    """Find PlatformIO CLI, add to PATH if needed, auto-install if missing."""
     print_step("Checking for PlatformIO")
-    try:
-        result = subprocess.run(
-            ["pio", "--version"],
-            capture_output=True,
-            text=True,
-            check=False,
+    system = platform.system()
+
+    def _pio_in_path():
+        try:
+            r = subprocess.run(["pio", "--version"], capture_output=True, text=True, check=False)
+            if r.returncode == 0:
+                print_success(f"PlatformIO: {r.stdout.strip()}")
+                return True
+        except FileNotFoundError:
+            pass
+        return False
+
+    if _pio_in_path():
+        return True
+
+    # Common install locations that may not be in PATH
+    if system == "Windows":
+        python_scripts = (
+            Path(os.environ.get("LOCALAPPDATA", ""))
+            / "Programs" / "Python"
+            / f"Python{sys.version_info.major}{sys.version_info.minor}"
+            / "Scripts"
         )
-        if result.returncode == 0:
-            print_success(f"PlatformIO found: {result.stdout.strip()}")
-            return True
-    except FileNotFoundError:
-        pass
-    print_error("PlatformIO CLI (pio) not found. Install it: pip install platformio")
+        candidates = [
+            Path.home() / ".platformio" / "penv" / "Scripts",
+            python_scripts,
+        ]
+    else:
+        candidates = [
+            Path.home() / ".platformio" / "penv" / "bin",
+            Path.home() / ".local" / "bin",
+        ]
+
+    exe_name = "pio.exe" if system == "Windows" else "pio"
+    for scripts_dir in candidates:
+        if (scripts_dir / exe_name).is_file():
+            os.environ["PATH"] = f"{scripts_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+            print_info(f"Added {scripts_dir} to PATH")
+            if _pio_in_path():
+                return True
+
+    # Not found anywhere — try to install via pip
+    print_info("PlatformIO not found — installing via pip...")
+    for cmd in [
+        [sys.executable, "-m", "pip", "install", "--user", "platformio"],
+        [sys.executable, "-m", "pip", "install", "platformio"],
+    ]:
+        r = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if r.returncode == 0:
+            print_success("PlatformIO installed successfully")
+            if _pio_in_path():
+                return True
+            # Re-check the candidate paths after install
+            for scripts_dir in candidates:
+                if (scripts_dir / exe_name).is_file():
+                    os.environ["PATH"] = f"{scripts_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+                    if _pio_in_path():
+                        return True
+            break
+
+    print_error("Could not find or install PlatformIO. Run: pip install platformio")
     sys.exit(1)
 
 
@@ -985,23 +1035,34 @@ def collect_pio_artifacts(project_dir, target):
     return collected
 
 
-def clean_build(project_dir):
-    """Clean build artifacts and optionally dependencies"""
-    print_step("Cleaning build artifacts")
-    
-    build_dir = config.BUILD_DIR
-    arduino_dir = project_dir / "arduino"
-    staging_dir = project_dir / "staging"
-    temp_dir = config.TEMP_DIR
-    
-    for d in [build_dir, arduino_dir, staging_dir, temp_dir]:
+def clean_build(project_dir, distclean=False):
+    """Clean build artifacts. distclean also removes downloaded cores/libraries and PlatformIO cache."""
+    print_step("Cleaning build artifacts" + (" (distclean)" if distclean else ""))
+
+    # Always clean
+    always_clean = [
+        config.BUILD_DIR,
+        config.TEMP_DIR,
+        project_dir / ".pio" / "build",   # PlatformIO incremental build cache
+    ]
+
+    # Only on distclean: arduino-cli downloads and full PlatformIO directory
+    distclean_extras = [
+        project_dir / "arduino",
+        project_dir / "staging",
+        project_dir / ".pio",             # Also removes libdeps, cache, etc.
+    ]
+
+    targets = always_clean + (distclean_extras if distclean else [])
+
+    for d in targets:
         if d.exists():
             print_info(f"Removing {d}...")
             try:
                 shutil.rmtree(d)
             except Exception as e:
                 print_warning(f"Could not remove {d}: {e}")
-                
+
     print_success("Clean complete")
 
 
@@ -1012,15 +1073,16 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python build.py                              # Full build (arduino-cli, default)
+  python build.py                              # Full build (PlatformIO, incremental, default)
   python build.py --target esp8266             # ESP8266 only
-  python build.py --pio --target esp8266       # ESP8266 with PlatformIO backend
+  python build.py --target esp32               # ESP32 only
   python build.py --firmware                   # Build firmware only
   python build.py --filesystem                 # Build filesystem only
   python build.py --merged                     # Build and create merged binary
   python build.py --merged --compress          # Build and create compressed merged binary
-  python build.py --clean                      # Clean build artifacts
-  python build.py --distclean                  # Also remove cores/libraries cache
+  python build.py --clean                      # Clean build artifacts (keeps PlatformIO libdeps)
+  python build.py --distclean                  # Full clean including cores/libraries cache
+  python build.py --arduino-cli                # Use legacy arduino-cli backend
         """
     )
 
@@ -1029,8 +1091,8 @@ Examples:
     backend_group.add_argument(
         "--backend",
         choices=["arduino-cli", "platformio"],
-        default="arduino-cli",
-        help="Build backend (default: arduino-cli)"
+        default="platformio",
+        help="Build backend (default: platformio)"
     )
     backend_group.add_argument(
         "--arduino-cli",
@@ -1131,7 +1193,7 @@ Examples:
         clean_build(project_dir)
         return
     if args.distclean:
-        clean_build(project_dir)
+        clean_build(project_dir, distclean=True)
         return
 
     # Resolve target list

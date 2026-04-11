@@ -15,6 +15,16 @@
 #ifndef PLATFORM_ESP8266_H
 #define PLATFORM_ESP8266_H
 
+// ---- PlatformIO / Windows include-order guard ----------------------------
+// On Windows (case-insensitive FS), the framework's Stream.h may pull in
+// this project's Debug.h instead of the framework's own debug.h, causing
+// ESP8266WebServer.h (included below) to use DEBUGV before it is defined.
+// Pre-defining DEBUGV as empty is safe: it matches the framework's own
+// definition in non-debug builds (no DEBUG_ESP_PORT set).
+#ifndef DEBUGV
+#define DEBUGV(...)
+#endif
+
 // ---- Core ESP8266 libraries ----------------------------------------------
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
