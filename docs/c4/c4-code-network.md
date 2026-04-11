@@ -541,7 +541,7 @@ graph TB
 
 - Static buffers used strategically: `baseMacChr[13]`, `uniqueId[32]`, `_hn[64]` in platform functions
 - WebSocket buffer reduced from 512 to 256 bytes per client (via `WEBSOCKETS_MAX_DATA_SIZE`)
-- WiFiManager disabled debug output (would allocate Strings from misaligned flash addresses, causing Exception 3)
+- WiFiManager debug output disabled via `#define WM_NODEBUG` (before the WiFiManager include in `networkStuff.h`): on ESP8266 Core 3.x, the `handleWifiSave()` debug block builds `String` objects from raw string literals stored in flash at potentially misaligned addresses; `strlen()` then generates an unaligned word-load resulting in Exception 3 (LoadStoreAlignmentCause). `WM_NODEBUG` undefines `WM_DEBUG_LEVEL` so those `#ifdef WM_DEBUG_LEVEL` blocks are excluded at compile time.
 - HTTP server streams large files (e.g., `index.html` ~11KB) rather than loading into RAM
 
 ### Platform Differences

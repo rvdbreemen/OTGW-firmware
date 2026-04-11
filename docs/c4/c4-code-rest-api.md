@@ -88,6 +88,7 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
   - `GET /api/v2/settings` → `sendDeviceSettings()` (sensitive data, auth required)
   - `POST/PUT /api/v2/settings` → `postSettings()` (auth required)
 - **Auth**: Required for all methods
+- **Notable read-only field**: `ssid` (type `"r"`) — returns the connected WiFi SSID via `WiFi.SSID()`. Not writable; exposed so the Settings page can display the current network without additional API calls. When on Ethernet, the device info endpoint returns `"ssid": "Wired"` via `sendDeviceInfoV2()`.
 
 #### `void handleSensors()`
 - **Location**: `restAPI.ino:233–245`
@@ -360,7 +361,7 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
   - Registers reboot: `GET /ReBoot` → `reBootESP()`
   - Registers WiFi reset: `GET /ResetWireless` → `resetWirelessButton()`
   - Sets up `onNotFound()` handler for `/api/*` and file routing
-- **Notes**: Old endpoints will be removed in v1.3.0 (ADR-035)
+- **Notes**: Old endpoints were scheduled for removal in v1.3.0 (ADR-035) but remain in v1.4.0 for backward compatibility
 
 #### `void apifirmwarefilelist()`
 - **Location**: `FSexplorer.ino:291–379`
@@ -707,7 +708,7 @@ Commands are validated before queuing:
 ## Notes
 
 - **No ArduinoJson library** (ADR-001): JSON is built manually with `snprintf_P` and streamed via `httpServer.sendContent()`
-- **Backward compatibility**: v0/v1 endpoints return 410 Gone (scheduled removal v1.3.0, per ADR-035)
+- **Backward compatibility**: v0/v1 endpoints return 410 Gone; unversioned legacy endpoints (`/api/firmwarefilelist`, `/api/listfiles`) remain in v1.4.0 for backward compatibility (scheduled removal per ADR-035)
 - **OTGW32 hardware detection**: OTDirect endpoints guarded by `#if HAS_DIRECT_OT` (OTGW32 exclusive)
 - **Cooperative scheduling**: Static buffers in `processAPI()` avoid re-entrancy issues with `feedWatchDog()` yields
 - **File upload security**: Auth check prevents file write if credentials invalid (no partial uploads)

@@ -150,7 +150,7 @@
 
 #### Settings & Form Handling
 
-- `settingsPage(): void` — Render settings form from `/api/v2/device/settings` (WiFi, MQTT, NTP, OTGWcommands, etc.)
+- `settingsPage(): void` — Render settings form from `/api/v2/device/settings` (WiFi, MQTT, NTP, OTGWcommands, etc.). Includes a read-only `ssid` field that displays the currently connected WiFi SSID, and a **Reset WiFi** button that navigates to `/ResetWireless` to wipe saved credentials and force the captive portal on next boot.
 - `refreshSettings(): void` — Fetch latest settings, populate form fields
 - `saveSettings(): void` — POST all form fields to `/api/v2/device/settings`
 - `sendPostSetting(field: string, value: any): void` — POST single setting change to `/api/v2/device/settings`

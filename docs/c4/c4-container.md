@@ -212,9 +212,9 @@ All containers live on a single physical device. There is no Docker, no Kubernet
 ### Weather API (SAT, outbound)
 
 - **From**: ESP8266 Firmware / ESP32 Firmware (SAT component)
-- **To**: External weather API
-- **Protocol**: HTTP GET
-- **Description**: Optional outdoor temperature source for the SAT heating curve when outdoor temperature is not available from OpenTherm MsgID 27 or MQTT push. Configurable URL.
+- **To**: Open-Meteo API (`http://api.open-meteo.com/v1/forecast`)
+- **Protocol**: HTTP GET (plain HTTP; Open-Meteo serves this endpoint without TLS)
+- **Description**: Optional outdoor temperature and 24-hour forecast fetch for the SAT heating curve. URL is fixed to the Open-Meteo free-tier endpoint. Latitude/longitude are configurable in SAT settings. Called every 15 minutes when enabled; uses a 5-second HTTP timeout to stay within ESP8266 watchdog margin.
 
 ### BLE Sensor Scanning (ESP32 SAT only)
 
@@ -353,12 +353,13 @@ C4Container
 - **Purpose**: Wired Ethernet connectivity. When cable is present, WiFi is disabled. Provides network failover or a wire-only installation option.
 - **Required**: No (ESP32 only, auto-detected at boot)
 
-### External Weather API
+### Open-Meteo Weather API
 
-- **Type**: Web service (internet)
-- **Protocol**: HTTP GET
-- **Purpose**: Outdoor temperature source for SAT heating curve when temperature is not available from OpenTherm MsgID 27 or MQTT push.
-- **Required**: No (SAT falls back to MQTT push or OT MsgID 27)
+- **Type**: Web service (internet, `api.open-meteo.com`)
+- **Protocol**: HTTP GET (plain HTTP only; no API key required)
+- **Purpose**: Outdoor temperature and 24-hour forecast source for the SAT heating curve. Fetches current temperature, relative humidity, and wind speed. Polled every 15 minutes (configurable, minimum 5 minutes).
+- **Required**: No (SAT falls back to MQTT-pushed outdoor temp or OT MsgID 27 if this API is disabled or unreachable)
+- **Privacy note**: Requires configuring latitude and longitude coordinates in SAT settings. No user account or key is needed.
 
 ---
 

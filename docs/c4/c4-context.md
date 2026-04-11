@@ -215,7 +215,7 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 | BLE Temperature Sensor (ESP32 only) | Bluetooth LE hardware sensor | Bluetooth LE passive scan | No | Provides room temperature to the SAT PID controller when no OpenTherm or MQTT source is available |
 | W5500 Ethernet Module (ESP32 only) | SPI network chip (on-device) | Ethernet, DHCP | No | Wired Ethernet fallback for ESP32; disables Wi-Fi when a cable is connected |
 | GitHub Releases | Cloud software repository | HTTPS | No | Source of firmware binaries for one-click OTA update from the web interface |
-| External Weather API | Internet HTTP service | HTTP GET | No | Optional outdoor temperature source for SAT heating curve when OT MsgID 27 and MQTT are not available |
+| Open-Meteo API (`api.open-meteo.com`) | Internet HTTP service | HTTP GET | No | Optional outdoor temperature and 24-hour forecast source for SAT heating curve; free, no API key required |
 | Webhook Target (Node-RED, HA, etc.) | HTTP server (local or remote) | HTTP POST | No | Receives outbound callbacks when configured OpenTherm status bits change (flame on, fault, etc.) |
 | OTmonitor / TCP Serial Client | Desktop software | Raw TCP port 25238 | No | Connects to the TCP serial bridge for advanced diagnostics and manual PIC command entry |
 | Web Browser | Client software | HTTP port 80, WebSocket ws:// | Yes (for web UI) | Renders the browser SPA served by the device; requires Chrome, Firefox, or Safari |
@@ -241,7 +241,7 @@ C4Context
     System_Ext(nodered, "MQTT Clients (Node-RED, scripts)", "Subscribe to heating data topics; publish control commands; feed data into databases and dashboards")
     System_Ext(ntp, "NTP Server", "Provides accurate time for boiler clock sync and log timestamps")
     System_Ext(github, "GitHub Releases", "Provides firmware update binaries for one-click OTA from the web interface")
-    System_Ext(weather, "External Weather API", "Optional outdoor temperature source for the Smart Adaptive Thermostat")
+    System_Ext(weather, "Open-Meteo API", "Free outdoor temperature and 24-hour forecast API; used by SAT when OT MsgID 27 and MQTT outdoor temp are absent")
     System_Ext(sensors, "DS18B20 / S0 / BLE Sensors", "Physical temperature sensors and energy meter attached to the device")
     System_Ext(otmonitor, "OTmonitor / TCP Client", "Desktop tool connecting via TCP serial bridge for raw OpenTherm diagnostics")
 
