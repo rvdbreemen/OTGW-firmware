@@ -1260,12 +1260,18 @@ void satHandleEnabled(const char* value)
 static const char SAT_CYCLES_FILE[]    PROGMEM = "/sat/sat_cycles.json";
 
 //=== File migration helper (Task #237): move a file from old to new path if old exists ===
-static void satMigrateFile(const char* oldPath, const char* newPath)
+// Both paths are PROGMEM pointers (PGM_P). Copy to RAM before passing to LittleFS,
+// which internally calls strlen() and expects a RAM pointer. Passing a flash pointer
+// directly causes Exception 3 (LoadStoreAlignmentCause).
+static void satMigrateFile(PGM_P oldPath, PGM_P newPath)
 {
-  if (!LittleFS.exists(oldPath)) return;
-  if (LittleFS.exists(newPath)) { LittleFS.remove(oldPath); return; } // new already present
-  LittleFS.rename(oldPath, newPath);
-  DebugTf(PSTR("SAT: migrated %s -> %s\r\n"), oldPath, newPath);
+  char oldBuf[32], newBuf[32];
+  strncpy_P(oldBuf, oldPath, sizeof(oldBuf) - 1); oldBuf[sizeof(oldBuf) - 1] = '\0';
+  strncpy_P(newBuf, newPath, sizeof(newBuf) - 1); newBuf[sizeof(newBuf) - 1] = '\0';
+  if (!LittleFS.exists(oldBuf)) return;
+  if (LittleFS.exists(newBuf)) { LittleFS.remove(oldBuf); return; } // new already present
+  LittleFS.rename(oldBuf, newBuf);
+  DebugTf(PSTR("SAT: migrated %s -> %s\r\n"), oldBuf, newBuf);
 }
 
 //=== PID State Persistence (Tasks #6, #49, #222) ===
