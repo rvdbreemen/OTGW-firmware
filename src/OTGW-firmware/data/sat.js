@@ -36,6 +36,15 @@ var SAT = (function() {
   var HC_BASE_OFFSET_RAD   = 27.2;
   var HC_REF_TEMP          = 20.0;
 
+  // --- Debug helper (set window.SAT_DEBUG = true in browser console to enable) ---
+  function _debug() {
+    if (window.SAT_DEBUG) {
+      var args = Array.prototype.slice.call(arguments);
+      args.unshift('[SAT]');
+      console.log.apply(console, args);
+    }
+  }
+
   // --- Mode / Status label maps ---
   var MODE_LABELS  = ['Off', 'Continuous', 'PWM'];
   var CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain'];
@@ -85,9 +94,9 @@ var SAT = (function() {
         if (ct.indexOf('application/json') === -1) return Promise.reject('Not JSON');
         return r.json();
       })
-      .then(function(d) { updateDashboard(d); })
+      .then(function(d) { _debug('fetch ok', 'enabled=' + d.enabled, 'mode=' + d.control_mode, 'room=' + d.room_temp, 'target=' + d.target_temp, 'flame=' + d.flame); updateDashboard(d); })
       .catch(function(err) {
-        console.warn('SAT fetch error:', err);
+        console.warn('[SAT] fetch error:', err);
         setText('sat-status-badge', 'Error');
         addClass('sat-status-badge', 'sat-badge-error');
       });
@@ -95,6 +104,7 @@ var SAT = (function() {
 
   // --- Update the dashboard with fresh data ---
   function updateDashboard(d) {
+    _debug('updateDashboard', 'room=' + d.room_temp, 'target=' + d.target_temp, 'setpoint=' + d.final_setpoint, 'mode=' + (MODE_LABELS[d.control_mode] || d.control_mode), 'flame=' + d.flame, 'active=' + d.active);
     // Status badge
     var badge = el('sat-status-badge');
     if (badge) {
@@ -555,6 +565,7 @@ var SAT = (function() {
   function switchView(view) {
     var valid = ['simple', 'expert', 'diag'];
     if (valid.indexOf(view) === -1) view = 'simple';
+    _debug('switchView', view);
     try { localStorage.setItem('sat-dashboard-view', view); } catch (e) {}
     var dash = document.querySelector('.sat-dashboard');
     if (dash) {
@@ -707,7 +718,7 @@ var SAT = (function() {
       })
       .then(function(w) { updateWeather(w); })
       .catch(function(err) {
-        console.warn('Weather fetch error:', err);
+        console.warn('[SAT] weather fetch error:', err);
       });
   }
 
