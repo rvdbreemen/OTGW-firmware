@@ -1142,11 +1142,11 @@ void PrintMQTTError(){
   json:   <string> , payload to send
   retain: <bool> , retain mqtt message  
 */
-void sendMQTTData(const char* topic, const char *json, const bool retain) 
+void sendMQTTData(const char* topic, const char *json, const bool retain)
 {
   if (!settings.mqtt.bEnable) return;
   if (!mqttPublishAllowed) return;
-  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
+  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   
   // Check heap health before publishing
@@ -1184,7 +1184,7 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
 {
   if (!settings.mqtt.bEnable) return;
   if (!mqttPublishAllowed) return;
-  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;}
+  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;}
   if (!canPublishMQTT()) return;
 
@@ -1332,10 +1332,10 @@ void sendMQTT(const char* topic, const char *json) {
   sendMQTTStreaming(topic, json, strlen(json));
 }
 
-void sendMQTTStreaming(const char* topic, const char *json, const size_t len) 
+void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
 {
   if (!settings.mqtt.bEnable) return;
-  if (!MQTTclient.connected()) {DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return;} 
+  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
   
   // Check heap health before publishing
