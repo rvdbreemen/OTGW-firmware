@@ -919,10 +919,11 @@ def check_platformio():
             pass
         return False
 
-    if _pio_in_path():
-        return True
-
-    # Common install locations that may not be in PATH
+    # Common install locations that may not be in PATH.
+    # Always check the PlatformIO penv FIRST: it runs under PlatformIO's own
+    # bundled Python (3.11.x) and will not be rejected by PlatformIO's own
+    # Python-version guard. System-wide pip-installed pio may run under a newer
+    # Python (e.g. 3.14) that PlatformIO rejects.
     if system == "Windows":
         python_scripts = (
             Path(os.environ.get("LOCALAPPDATA", ""))
@@ -947,6 +948,10 @@ def check_platformio():
             print_info(f"Added {scripts_dir} to PATH")
             if _pio_in_path():
                 return True
+
+    # penv not found or non-functional — fall back to whatever pio is in PATH
+    if _pio_in_path():
+        return True
 
     # Not found anywhere — try to install via pip
     print_info("PlatformIO not found — installing via pip...")
