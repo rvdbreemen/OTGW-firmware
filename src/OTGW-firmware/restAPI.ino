@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1068,12 +1068,6 @@ void processAPI()
     }
   }
 
-  if (state.debug.bRestAPI) {
-    DebugT(F(">>"));
-    for (uint_fast8_t w = 0; w < wc; w++) { Debugf(PSTR("word[%d] => [%s], "), w, words[w]); }
-    Debugln(F(" "));
-  }
-
   // Route: /api/v2/{resource}/...
   if (wc > 1 && strcmp_P(words[1], PSTR("api")) == 0) {
     if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0) {
@@ -1121,7 +1115,6 @@ void sendOTValue(int msgid){
     sendEndJsonMap("");
     return;
   }
-  RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
   sendStartJsonMap("");
   sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
@@ -1151,7 +1144,6 @@ void sendOTLabel(const char *msglabel){
     sendEndJsonMap("");
     return;
   }
-  RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
   sendStartJsonMap("");
   sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
@@ -1226,7 +1218,6 @@ void sendEndJsonMap(const __FlashStringHelper* objName) {
 void sendOTmonitorV2() 
 {
   time_t now = time(nullptr); // needed for Dallas sensor display
-  RESTDebugTln(F("sending OT monitor values (V2)...\r"));
 
   sendStartJsonMap(F("otmonitor"));
 
@@ -1625,7 +1616,6 @@ void sendDeviceTimeV2()
 //=======================================================================
 void sendDeviceSettings()
 {
-  RESTDebugTln(F("sending device settings ...\r"));
 
   sendStartJsonMap(F("settings"));
 

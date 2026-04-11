@@ -15,6 +15,11 @@
 ***************************************************************************
 */
 
+// Per-module conditional debug — toggle with key '5' in telnet debug menu
+#define SATDebugTf(fmt, ...)  do { if (state.debug.bSAT) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
+#define SATDebugTln(s)        do { if (state.debug.bSAT) DebugTln(s);                  } while(0)
+#define SATDebugf(fmt, ...)   do { if (state.debug.bSAT) Debugf(fmt,   ##__VA_ARGS__); } while(0)
+
 // --- Cycle Kind & Phase enums are in OTGW-firmware.h ---
 
 // --- Cycle Constants ---
@@ -331,7 +336,7 @@ void satGetWindow4hStats()
     state.sat.f4hFlowRetDeltaP90 = deltas[idx90];
   }
 
-  DebugTf(PSTR("SAT 4h: n=%u avgOn=%.0fs avgOff=%.0fs flow=%.1f duty=%.2f overshoot=%.2f underheat=%.2f dP50=%.1f dP90=%.1f\r\n"),
+  SATDebugTf(PSTR("SAT 4h: n=%u avgOn=%.0fs avgOff=%.0fs flow=%.1f duty=%.2f overshoot=%.2f underheat=%.2f dP50=%.1f dP90=%.1f\r\n"),
           nValid,
           state.sat.f4hAvgOnSec, state.sat.f4hAvgOffSec,
           state.sat.f4hAvgFlow,
@@ -505,6 +510,9 @@ void satCycleOnFlameChange(bool flameOn)
     // Record flame-on event in the rolling per-hour counter (Task #203)
     _hourCountRecord(now);
     state.sat.iCyclesThisHour = _hourCountGet(now);
+    SATDebugTf(PSTR("SAT cycle: flame ON flow=%.1f sp=%.1f cycles/hr=%u\r\n"),
+               OTcurrentSystemState.Tboiler, _cycle_setpointAtStart,
+               (unsigned)state.sat.iCyclesThisHour);
     // Reset per-cycle flow sample buffer for p90/p10 classification (Task #225)
     _flow_sampleHead  = 0;
     _flow_sampleCount = 0;
@@ -524,6 +532,8 @@ void satCycleOnFlameChange(bool flameOn)
     _cycle_phaseStartMs = now;
 
     float durationSec = (float)(now - _cycle_flameOnStartMs) / 1000.0f;
+    SATDebugTf(PSTR("SAT cycle: flame OFF dur=%.0fs maxFlow=%.1f\r\n"),
+               durationSec, _cycle_maxFlowTemp);
     // Compute p90/p10 from collected flow samples (Task #225)
     float p90 = (_flow_sampleCount >= 10) ? _flowPercentile(90) : _cycle_maxFlowTemp;
     float p10 = (_flow_sampleCount >= 10) ? _flowPercentile(10) : _cycle_minFlowTemp;
@@ -550,7 +560,7 @@ void satCycleOnFlameChange(bool flameOn)
       if (_win4hCount < SAT_WIN4H_SIZE) _win4hCount++;
     }
 
-    DebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs\r\n"),
+    SATDebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs\r\n"),
             state.sat.iCycleCount, (int)cls, durationSec,
             _cycle_maxFlowTemp, p90, p10, _cycle_overshootSec);
   }
@@ -579,6 +589,10 @@ void satCycleSample()
   _flow_samples[_flow_sampleHead] = flowTemp;
   _flow_sampleHead = (_flow_sampleHead + 1) % SAT_FLOW_SAMPLE_SIZE;
   if (_flow_sampleCount < SAT_FLOW_SAMPLE_SIZE) _flow_sampleCount++;
+  if ((_flow_sampleCount & 0x0F) == 0) { // log every 16th sample to avoid flood
+    SATDebugTf(PSTR("SAT sample: flow=%.1f n=%u sp=%.1f os=%.0fs\r\n"),
+               flowTemp, (unsigned)_flow_sampleCount, _cycle_setpointAtStart, _cycle_overshootSec);
+  }
 
   // Track overshoot seconds: time flow temp is above setpoint + margin
   float elapsed = (float)(now - _cycle_lastSampleMs) / 1000.0f;
@@ -626,6 +640,10 @@ bool satCycleCheckAutoSwitch()
   float flowTemp = OTcurrentSystemState.Tboiler;
   float setpoint = state.sat.fFinalSetpoint;
 
+  SATDebugTf(PSTR("SAT autoswitch: mode=%d flow=%.1f sp=%.1f os=%.0fs uh=%.0fs\r\n"),
+             (int)state.sat.eControlMode, flowTemp, setpoint,
+             _sustain_overshootSec, _sustain_underheatSec);
+
   // --- DHW post-overshoot guard: track end of DHW heating ---
   if (state.sat.bDhwActive) {
     _sustain_dhwEndMs = now; // Keep refreshing while DHW is active
@@ -642,7 +660,7 @@ bool satCycleCheckAutoSwitch()
       _sustain_overshootSec = 0.0f;
     }
     if (_sustain_overshootSec >= SAT_OVERSHOOT_SUSTAIN_SEC) {
-      DebugTln(F("SAT: sustained overshoot detected, switching to PWM mode"));
+      SATDebugTln(F("SAT: sustained overshoot detected, switching to PWM mode"));
       state.sat.eControlMode = SAT_MODE_PWM;
       _sustain_overshootSec = 0.0f;
       return true;
@@ -657,7 +675,7 @@ bool satCycleCheckAutoSwitch()
       _sustain_underheatSec = 0.0f;
     }
     if (_sustain_underheatSec >= SAT_UNDERHEAT_SUSTAIN_SEC) {
-      DebugTln(F("SAT: sustained underheat detected, switching to continuous mode"));
+      SATDebugTln(F("SAT: sustained underheat detected, switching to continuous mode"));
       state.sat.eControlMode = SAT_MODE_CONTINUOUS;
       _sustain_underheatSec = 0.0f;
       return true;
@@ -667,7 +685,7 @@ bool satCycleCheckAutoSwitch()
     if (_cycle_flameOn) {
       float flameDur = (float)(now - _cycle_flameOnStartMs) / 1000.0f;
       if (flameDur > SAT_SATURATION_SUSTAIN_SEC) {
-        DebugTln(F("SAT: PWM saturation detected, switching to continuous mode"));
+        SATDebugTln(F("SAT: PWM saturation detected, switching to continuous mode"));
         state.sat.eControlMode = SAT_MODE_CONTINUOUS;
         _sustain_saturationSec = 0.0f;
         return true;
@@ -685,6 +703,8 @@ uint8_t satCycleCountClass(SATCycleClass cls)
   for (uint8_t i = 0; i < _cycleHistoryCount; i++) {
     if (_cycleHistory[i].eClass == cls) count++;
   }
+  SATDebugTf(PSTR("SAT countClass: class=%d count=%u total=%u\r\n"),
+             (int)cls, (unsigned)count, (unsigned)_cycleHistoryCount);
   return count;
 }
 
@@ -778,6 +798,8 @@ void satHCRSaveState()
   }
   f.print(F("]}"));
   f.close();
+  SATDebugTf(PSTR("SAT HCR: saved %u days %u intraday samples\r\n"),
+             (unsigned)_hcr_count, (unsigned)_hcr_sCount);
 }
 
 //--- Load HCR state from LittleFS (called from satCycleInit when NTP is valid) ---
@@ -830,7 +852,7 @@ void satHCRLoadState()
     }
   }
 
-  DebugTf(PSTR("SAT HCR: loaded %u days, %u intraday samples\r\n"),
+  SATDebugTf(PSTR("SAT HCR: loaded %u days, %u intraday samples\r\n"),
           (unsigned)_hcr_count, (unsigned)_hcr_sCount);
 }
 
@@ -856,6 +878,8 @@ void satHCRAddSample()
   _hcr_samples[_hcr_sHead] = roomError;
   _hcr_sHead = (_hcr_sHead + 1) % HCR_INTRADAY_SIZE;
   if (_hcr_sCount < HCR_INTRADAY_SIZE) _hcr_sCount++;
+  SATDebugTf(PSTR("SAT HCR: sample err=%.2f n=%u\r\n"),
+             roomError, (unsigned)_hcr_sCount);
 
   // Check for day boundary: commit previous day's data
   time_t nowTs = time(nullptr);
@@ -875,7 +899,7 @@ void satHCRAddSample()
       _hcr_dailyMedian[_hcr_head] = med;
       _hcr_head = (_hcr_head + 1) % HCR_DAYS;
       if (_hcr_count < HCR_DAYS) _hcr_count++;
-      DebugTf(PSTR("SAT HCR: day %lu committed median=%.2f (%u days stored)\r\n"),
+      SATDebugTf(PSTR("SAT HCR: day %lu committed median=%.2f (%u days stored)\r\n"),
               (unsigned long)dayNum, med, (unsigned)_hcr_count);
     }
     // Reset intra-day buffer for the new day
@@ -925,7 +949,7 @@ const char* satHeatingCurveRecommendation()
   }
 
   strlcpy(state.sat.sHeatCurveRec, rec, sizeof(state.sat.sHeatCurveRec));
-  DebugTf(PSTR("SAT HCR: recommendation=%s (inc=%u dec=%u n=%u)\r\n"),
+  SATDebugTf(PSTR("SAT HCR: recommendation=%s (inc=%u dec=%u n=%u)\r\n"),
           rec, (unsigned)consecIncrease, (unsigned)consecDecrease, (unsigned)_hcr_count);
   return state.sat.sHeatCurveRec;
 }
@@ -938,7 +962,10 @@ static const uint32_t SAT_CYCLES_STALE_SEC = 14400UL; // 4h stale threshold
 void satSaveCycleWindow()
 {
   File f = LittleFS.open(FPSTR(SAT_CYCLES_FILE), "w");
-  if (!f) return;
+  if (!f) {
+    SATDebugTln(F("SAT: cycle window save failed (open error)"));
+    return;
+  }
   uint8_t toWrite = (_win4hCount > 60) ? 60 : (uint8_t)_win4hCount;
   time_t ts = time(nullptr);
   char hdr[48];
@@ -962,13 +989,16 @@ void satSaveCycleWindow()
   }
   f.print(F("]}"));
   f.close();
-  DebugTf(PSTR("SAT: cycle window saved (%u records)\r\n"), (unsigned)toWrite);
+  SATDebugTf(PSTR("SAT: cycle window saved (%u records)\r\n"), (unsigned)toWrite);
 }
 
 void satLoadCycleWindow()
 {
   File f = LittleFS.open(FPSTR(SAT_CYCLES_FILE), "r");
-  if (!f) return;
+  if (!f) {
+    SATDebugTln(F("SAT: cycle window load — no file"));
+    return;
+  }
   // Read header first to get ts and n
   char hdr[48];
   size_t hlen = f.readBytes(hdr, sizeof(hdr) - 1);
@@ -986,7 +1016,7 @@ void satLoadCycleWindow()
   if (nowTs > 1000000L && savedTs > 0) {
     uint32_t age = (uint32_t)((unsigned long)nowTs - savedTs);
     if (age > SAT_CYCLES_STALE_SEC) {
-      DebugTf(PSTR("SAT: cycle window discarded (stale, age=%lus)\r\n"), (unsigned long)age);
+      SATDebugTf(PSTR("SAT: cycle window discarded (stale, age=%lus)\r\n"), (unsigned long)age);
       LittleFS.remove(FPSTR(SAT_CYCLES_FILE));
       return;
     }
@@ -1031,7 +1061,7 @@ void satLoadCycleWindow()
     arr = end + 1;
     if (*arr == ',') arr++;
   }
-  DebugTf(PSTR("SAT: cycle window restored (%u records)\r\n"), (unsigned)loaded);
+  SATDebugTf(PSTR("SAT: cycle window restored (%u records)\r\n"), (unsigned)loaded);
 }
 
 void satFlushCycleWindow()
@@ -1039,6 +1069,6 @@ void satFlushCycleWindow()
   LittleFS.remove(FPSTR(SAT_CYCLES_FILE));
   _win4hHead  = 0;
   _win4hCount = 0;
-  DebugTln(F("SAT: cycle window flushed"));
+  SATDebugTln(F("SAT: cycle window flushed"));
 }
 

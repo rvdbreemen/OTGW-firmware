@@ -16,6 +16,11 @@
 ***************************************************************************
 */
 
+// Per-module conditional debug — toggle with key '5' in telnet debug menu
+#define SATDebugTf(fmt, ...)  do { if (state.debug.bSAT) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
+#define SATDebugTln(s)        do { if (state.debug.bSAT) DebugTln(s);                  } while(0)
+#define SATDebugf(fmt, ...)   do { if (state.debug.bSAT) Debugf(fmt,   ##__VA_ARGS__); } while(0)
+
 // --- Heating Curve Constants ---
 static const float SAT_HC_BASE_OFFSET_FLOOR  = 20.0f;   // Underfloor base offset
 static const float SAT_HC_BASE_OFFSET_RAD    = 27.2f;   // Radiator base offset
@@ -130,12 +135,12 @@ void satDetectManufacturer(uint8_t slaveMemberID)
       char name[12];
       strncpy_P(name, satManufacturerTable[i].name, sizeof(name) - 1);
       name[sizeof(name) - 1] = '\0';
-      DebugTf(PSTR("SAT: Detected manufacturer: %s (MemberID %d)\r\n"), name, slaveMemberID);
+      SATDebugTf(PSTR("SAT: Detected manufacturer: %s (MemberID %d)\r\n"), name, slaveMemberID);
       return;
     }
   }
   state.sat.iDetectedManufacturer = SAT_MFR_OTHER;
-  DebugTf(PSTR("SAT: Unknown manufacturer (MemberID %d)\r\n"), slaveMemberID);
+  SATDebugTf(PSTR("SAT: Unknown manufacturer (MemberID %d)\r\n"), slaveMemberID);
 }
 
 // --- Heating System Helper Functions ---
@@ -263,7 +268,7 @@ static void satOvpCalibrate()
       state.sat.fCalibStartTemp = boilerTemp;
       state.sat.fCalibMaxTemp   = boilerTemp;
       state.sat.iCalibSamples   = 0;
-      DebugTf(PSTR("OPV: calibration started, CS=%.1f MM=0, boiler=%.1f\r\n"), calibSetpoint, boilerTemp);
+      SATDebugTf(PSTR("OPV: calibration started, CS=%.1f MM=0, boiler=%.1f\r\n"), calibSetpoint, boilerTemp);
       state.sat.eCalibPhase = SAT_CALIB_WARMING;
       break;
     }
@@ -275,7 +280,7 @@ static void satOvpCalibrate()
         break;
       }
       if (boilerTemp > state.sat.fCalibStartTemp + SAT_CALIB_WARM_DELTA) {
-        DebugTf(PSTR("OPV: warming done, boiler=%.1f, starting measurement\r\n"), boilerTemp);
+        SATDebugTf(PSTR("OPV: warming done, boiler=%.1f, starting measurement\r\n"), boilerTemp);
         state.sat.fCalibMaxTemp = boilerTemp;
         state.sat.iCalibStartMs = millis(); // Reset timer for measuring phase
         state.sat.eCalibPhase = SAT_CALIB_MEASURING;
@@ -305,7 +310,7 @@ static void satOvpCalibrate()
           // Measurement complete with sufficient samples
           settings.sat.fOvpValue = state.sat.fCalibMaxTemp;
           settings.sat.bOvpEnabled = true;
-          DebugTf(PSTR("OPV: calibration DONE! OPV=%.1f from %u/%u samples\r\n"),
+          SATDebugTf(PSTR("OPV: calibration DONE! OPV=%.1f from %u/%u samples\r\n"),
                   state.sat.fCalibMaxTemp, (unsigned)state.sat.iCalibSamples, (unsigned)SAT_CALIB_MIN_SAMPLES);
           state.sat.eCalibPhase = SAT_CALIB_DONE;
         }
@@ -333,14 +338,14 @@ static void satOvpStartCalibration()
   if (state.sat.eCalibPhase != SAT_CALIB_IDLE) return; // Already running
   state.sat.eCalibPhase  = SAT_CALIB_STARTING;
   state.sat.iCalibStartMs = millis();
-  DebugTln(F("OPV: calibration requested"));
+  SATDebugTln(F("OPV: calibration requested"));
 }
 
 // Cancel OPV calibration
 static void satOvpStopCalibration()
 {
   if (state.sat.eCalibPhase == SAT_CALIB_IDLE) return;
-  DebugTln(F("OPV: calibration cancelled"));
+  SATDebugTln(F("OPV: calibration cancelled"));
   state.sat.eCalibPhase = SAT_CALIB_FAILED; // Will trigger recovery on next call
 }
 
@@ -664,7 +669,7 @@ static float satApplyPWM(float pidOutput)
       // give up and switch to OFF phase, matching Python pwm.py:194-202 behavior.
       if (_pwm_waitForFlameStartMs > 0 &&
           (millis() - _pwm_waitForFlameStartMs) >= PWM_IGNITION_TIMEOUT_MS) {
-        DebugTln(F("SAT PWM: ignition timeout (180s), aborting ON phase"));
+        SATDebugTln(F("SAT PWM: ignition timeout (180s), aborting ON phase"));
         _pwm_waitingForFlame = false;
         _pwm_waitForFlameStartMs = 0;
         state.sat.bPwmFlameRequested = false;
@@ -701,7 +706,7 @@ static float satApplyPWM(float pidOutput)
         // Stay in OFF until the oldest timestamp leaves the 60-minute window.
         // Log once per suppression event (guard against log spam via a latch).
         if (!_hourLimitLogged) {
-          DebugTf(PSTR("SAT PWM: cycle limit %u/hr reached, suppressing new cycle\r\n"),
+          SATDebugTf(PSTR("SAT PWM: cycle limit %u/hr reached, suppressing new cycle\r\n"),
                   (unsigned)satGetMaxCyclesPerHour());
           _hourLimitLogged = true;
         }
@@ -756,7 +761,7 @@ void satHandlePreset(const char* value)
     settings.sat.fTargetTemp = newTarget;
     // Reset PID integral to prevent overshoot on large temp jumps
     state.sat.fPidI = 0.0f;
-    DebugTf(PSTR("SAT: preset '%s' -> target %.1f, integral reset\r\n"), satGetPresetName(newPreset), newTarget);
+    SATDebugTf(PSTR("SAT: preset '%s' -> target %.1f, integral reset\r\n"), satGetPresetName(newPreset), newTarget);
   } else {
     // Preset cleared: restore pre-custom temperature if one was saved (Task #219).
     // Mirrors Python climate.py:614-616: preset_mode=PRESET_NONE restores the temperature
@@ -764,7 +769,7 @@ void satHandlePreset(const char* value)
     if (state.sat.fPreCustomTemp > 0.0f) {
       settings.sat.fTargetTemp = state.sat.fPreCustomTemp;
       state.sat.fPidI = 0.0f;  // Reset integral to avoid overshoot on temp jump
-      DebugTf(PSTR("SAT: preset cleared, restored pre-custom target %.1f\r\n"), settings.sat.fTargetTemp);
+      SATDebugTf(PSTR("SAT: preset cleared, restored pre-custom target %.1f\r\n"), settings.sat.fTargetTemp);
       // Publish restored target immediately so MQTT stays in sync
       if (state.mqtt.bConnected) {
         char valBuf[12];
@@ -780,7 +785,7 @@ void satHandlePreset(const char* value)
     const char* presetName = satGetPresetName(newPreset);
     if (presetName && state.mqtt.bConnected) {
       sendMQTTData(settings.sat.sPresetSyncTopic, presetName, true);
-      DebugTf(PSTR("SAT: Preset synced to %s: %s\r\n"), settings.sat.sPresetSyncTopic, presetName);
+      SATDebugTf(PSTR("SAT: Preset synced to %s: %s\r\n"), settings.sat.sPresetSyncTopic, presetName);
     }
   }
 }
@@ -796,7 +801,7 @@ void satHandleWindow(bool isOpen)
     // Window just opened - start timer
     state.sat.bWindowOpen = true;
     state.sat.iWindowOpenSinceMs = millis();
-    DebugTln(F("SAT: window opened, starting timer"));
+    SATDebugTln(F("SAT: window opened, starting timer"));
   }
   else if (!isOpen && state.sat.bWindowOpen) {
     // Window closed - restore previous state
@@ -808,7 +813,7 @@ void satHandleWindow(bool isOpen)
       state.sat.fPreWindowTarget = 0.0f;
       state.sat.fPreActivityTemp = 0.0f;  // Task #67: clear MQTT-visible pre-activity temp
       satResetIntegral();
-      DebugTf(PSTR("SAT: window closed, restored target %.1f\r\n"), settings.sat.fTargetTemp);
+      SATDebugTf(PSTR("SAT: window closed, restored target %.1f\r\n"), settings.sat.fTargetTemp);
     }
   }
 }
@@ -828,7 +833,7 @@ static void _satCheckWindowTimer()
     state.sat.eActivePreset = SAT_PRESET_ACTIVITY;
     settings.sat.fTargetTemp = settings.sat.fPresetActivity;
     satResetIntegral();
-    DebugTf(PSTR("SAT: window open > %us, switched to Activity (%.1f)\r\n"),
+    SATDebugTf(PSTR("SAT: window open > %us, switched to Activity (%.1f)\r\n"),
             settings.sat.iWindowMinOpenSec, settings.sat.fPresetActivity);
   }
 }
@@ -893,7 +898,7 @@ static float satGetRoomTemp()
     // Check staleness: if no update for 5 min, fall back to next source
     if ((millis() - state.sat.iBleTempLastMs) > SAT_STALE_TEMP_BLE_MS) {
       state.sat.bBleTempValid = false;
-      DebugTln(F("SAT: BLE temp stale, falling back to next source"));
+      SATDebugTln(F("SAT: BLE temp stale, falling back to next source"));
     } else {
       return state.sat.fBleTemp;  // BLE has 0.01C precision
     }
@@ -909,7 +914,7 @@ static float satGetRoomTemp()
     // Check staleness — use settings.sat.iSensorMaxAgeS (default 6h, Python CONF_SENSOR_MAX_VALUE_AGE)
     if ((millis() - state.sat.iExternalTempLastMs) > ((uint32_t)settings.sat.iSensorMaxAgeS * 1000UL)) {
       state.sat.bExternalTempValid = false;
-      DebugTln(F("SAT: external indoor temp stale, falling back to OT bus"));
+      SATDebugTln(F("SAT: external indoor temp stale, falling back to OT bus"));
     } else {
       return state.sat.fExternalTemp;
     }
@@ -931,11 +936,11 @@ static float satGetRoomTemp()
   if (settings.sat.bThermalComfort && state.sat.bHumidityValid) {
     if ((millis() - state.sat.iHumidityLastMs) <= ((uint32_t)settings.sat.iHumidityTimeoutS * 1000UL)) {
       float ssi = satCalcSimmerIndex(otRoom, state.sat.fHumidity);
-      DebugTf(PSTR("SAT: thermal_comfort: raw=%.1f SSI=%.1f H=%.0f%%\r\n"),
+      SATDebugTf(PSTR("SAT: thermal_comfort: raw=%.1f SSI=%.1f H=%.0f%%\r\n"),
               otRoom, ssi, state.sat.fHumidity);
       return ssi;
     }
-    DebugTln(F("SAT: thermal_comfort: humidity stale, using raw room temp"));
+    SATDebugTln(F("SAT: thermal_comfort: humidity stale, using raw room temp"));
   }
 
   return otRoom;
@@ -952,7 +957,7 @@ static float satGetOutsideTemp()
     // Check staleness — if no update for 10 min, fall back to OT bus
     if ((millis() - state.sat.iExternalOutdoorLastMs) > SAT_STALE_OUTDOOR_MS) {
       state.sat.bExternalOutdoorValid = false;
-      DebugTln(F("SAT: external outdoor temp stale, falling back to OT bus"));
+      SATDebugTln(F("SAT: external outdoor temp stale, falling back to OT bus"));
     } else {
       return state.sat.fExternalOutdoor;
     }
@@ -977,7 +982,7 @@ bool satHandleExternalTemp(const char* value)
     state.sat.fExternalTemp = temp;
     state.sat.bExternalTempValid = true;
     state.sat.iExternalTempLastMs = millis();
-    DebugTf(PSTR("SAT: external indoor temp set to %.1f°C\r\n"), temp);
+    SATDebugTf(PSTR("SAT: external indoor temp set to %.1f°C\r\n"), temp);
     return true;
   }
   return false;
@@ -993,7 +998,7 @@ bool satHandleExternalOutdoor(const char* value)
     state.sat.fExternalOutdoor = temp;
     state.sat.bExternalOutdoorValid = true;
     state.sat.iExternalOutdoorLastMs = millis();
-    DebugTf(PSTR("SAT: external outdoor temp set to %.1f°C\r\n"), temp);
+    SATDebugTf(PSTR("SAT: external outdoor temp set to %.1f°C\r\n"), temp);
     return true;
   }
   return false;
@@ -1010,7 +1015,7 @@ bool satHandleHumidity(const char* value)
   state.sat.fHumidity = h;
   state.sat.bHumidityValid = true;
   state.sat.iHumidityLastMs = millis();
-  DebugTf(PSTR("SAT: humidity set to %.0f%%\r\n"), h);
+  SATDebugTf(PSTR("SAT: humidity set to %.0f%%\r\n"), h);
   return true;
 }
 
@@ -1025,7 +1030,7 @@ bool satHandleSunElevation(const char* value)
   state.sat.fSunElevation = elev;
   state.sat.bSunElevationValid = true;
   state.sat.iSunElevLastMs = millis();
-  DebugTf(PSTR("SAT: sun elevation set to %.1f deg\r\n"), elev);
+  SATDebugTf(PSTR("SAT: sun elevation set to %.1f deg\r\n"), elev);
   return true;
 }
 
@@ -1041,7 +1046,7 @@ bool satHandleAreaTemp(uint8_t area, const char* value)
     state.sat.fAreaTemp[area] = temp;
     state.sat.bAreaValid[area] = true;
     state.sat.iAreaLastMs[area] = millis();
-    DebugTf(PSTR("SAT: area %u temp set to %.1f\r\n"), area, temp);
+    SATDebugTf(PSTR("SAT: area %u temp set to %.1f\r\n"), area, temp);
     return true;
   }
   return false;
@@ -1062,7 +1067,7 @@ static float satGetWeightedRoomTemp()
     // Stale check: mark invalid if no update for 5 min
     if ((now - state.sat.iAreaLastMs[i]) > SAT_AREA_STALE_MS) {
       state.sat.bAreaValid[i] = false;
-      DebugTf(PSTR("SAT: area %u temp stale\r\n"), i);
+      SATDebugTf(PSTR("SAT: area %u temp stale\r\n"), i);
       continue;
     }
     float w = settings.sat.fAreaWeight[i];
@@ -1097,7 +1102,7 @@ bool satHandleZoneRoomTemp(uint8_t zone, const char* value)
   satZones[idx].fRoomTemp     = temp;
   satZones[idx].bRoomValid    = true;
   satZones[idx].iLastUpdateMs = millis();
-  DebugTf(PSTR("SAT zone %u: room_temp=%.1f\r\n"), zone, temp);
+  SATDebugTf(PSTR("SAT zone %u: room_temp=%.1f\r\n"), zone, temp);
   return true;
 }
 
@@ -1114,7 +1119,7 @@ bool satHandleZoneSetpoint(uint8_t zone, const char* value)
   satZones[idx].fSetpoint     = sp;
   satZones[idx].bSpValid      = true;
   satZones[idx].iLastUpdateMs = millis();
-  DebugTf(PSTR("SAT zone %u: setpoint=%.1f\r\n"), zone, sp);
+  SATDebugTf(PSTR("SAT zone %u: setpoint=%.1f\r\n"), zone, sp);
   return true;
 }
 
@@ -1227,14 +1232,14 @@ bool satHandleTargetTemp(const char* value)
     };
     for (uint8_t i = 0; i < sizeof(presets) / sizeof(presets[0]); i++) {
       if (fabsf(temp - presets[i].val) < 0.05f) {
-        DebugTf(PSTR("SAT: target %.1f matches preset '%s', activating preset\r\n"), temp, presets[i].name);
+        SATDebugTf(PSTR("SAT: target %.1f matches preset '%s', activating preset\r\n"), temp, presets[i].name);
         satHandlePreset(presets[i].name);
         return true;
       }
     }
     // No preset match: go through updateSetting() to persist via deferred flush
     updateSetting("SATtargettemp", value);
-    DebugTf(PSTR("SAT: target temp set to %.1f°C\r\n"), temp);
+    SATDebugTf(PSTR("SAT: target temp set to %.1f°C\r\n"), temp);
     return true;
   }
   return false;
@@ -1252,7 +1257,7 @@ void satHandleEnabled(const char* value)
     _sat_consecutiveSkips = 0;
     _sat_picFailCount = 0;
   }
-  DebugTf(PSTR("SAT: %s\r\n"), enabled ? "enabled" : "disabled");
+  SATDebugTf(PSTR("SAT: %s\r\n"), enabled ? "enabled" : "disabled");
 }
 
 //=== SAT LittleFS file paths (Task #237) ===
@@ -1271,7 +1276,7 @@ static void satMigrateFile(PGM_P oldPath, PGM_P newPath)
   if (!LittleFS.exists(oldBuf)) return;
   if (LittleFS.exists(newBuf)) { LittleFS.remove(oldBuf); return; } // new already present
   LittleFS.rename(oldBuf, newBuf);
-  DebugTf(PSTR("SAT: migrated %s -> %s\r\n"), oldBuf, newBuf);
+  SATDebugTf(PSTR("SAT: migrated %s -> %s\r\n"), oldBuf, newBuf);
 }
 
 //=== PID State Persistence (Tasks #6, #49, #222) ===
@@ -1316,18 +1321,18 @@ void satLoadPidState()
   time_t nowTs = time(nullptr);
   if (nowTs < 1000000L) {
     // NTP not yet synced at boot — skip restore; PID starts from zero.
-    DebugTln(F("SAT: PID state skipped (NTP not synced yet)"));
+    SATDebugTln(F("SAT: PID state skipped (NTP not synced yet)"));
     return;
   }
   if (savedTs == 0 || (uint32_t)(nowTs - (time_t)savedTs) > SAT_PID_STALE_SEC) {
-    DebugTf(PSTR("SAT: PID state discarded (stale, age=%lus)\r\n"),
+    SATDebugTf(PSTR("SAT: PID state discarded (stale, age=%lus)\r\n"),
             (unsigned long)(nowTs - (time_t)savedTs));
     return;
   }
   state.sat.fPidI = i;
   state.sat.fPidD = d;
   state.sat.fError = err;
-  DebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f err=%.2f age=%lus)\r\n"),
+  SATDebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f err=%.2f age=%lus)\r\n"),
           i, d, err, (unsigned long)(nowTs - (time_t)savedTs));
 }
 
@@ -1348,7 +1353,7 @@ void satSaveEnergyState()
   f.print(buf);
   f.close();
   _energyLastSaveMs = millis();
-  DebugTf(PSTR("SAT: energy saved (%.3f kWh)\r\n"), state.sat.fEnergyTotal);
+  SATDebugTf(PSTR("SAT: energy saved (%.3f kWh)\r\n"), state.sat.fEnergyTotal);
 }
 
 void satLoadEnergyState()
@@ -1365,7 +1370,7 @@ void satLoadEnergyState()
   if ((p = strstr(buf, "\"kwh\":")) != nullptr) kwh = atof(p + 6);
   if (kwh >= 0.0f) {
     state.sat.fEnergyTotal = kwh;
-    DebugTf(PSTR("SAT: energy restored (%.3f kWh)\r\n"), state.sat.fEnergyTotal);
+    SATDebugTf(PSTR("SAT: energy restored (%.3f kWh)\r\n"), state.sat.fEnergyTotal);
   }
 }
 
@@ -1381,7 +1386,7 @@ static void satSaveEstimatedEnergy()
   f.print(buf);
   f.close();
   state.sat.fEstEnergyLastSavedKWh = state.sat.fEnergyEstimatedKWh;
-  DebugTf(PSTR("SAT: estimated energy saved (%.3f kWh)\r\n"), state.sat.fEnergyEstimatedKWh);
+  SATDebugTf(PSTR("SAT: estimated energy saved (%.3f kWh)\r\n"), state.sat.fEnergyEstimatedKWh);
 }
 
 static void satLoadEstimatedEnergy()
@@ -1398,13 +1403,15 @@ static void satLoadEstimatedEnergy()
   if (kwh >= 0.0f) {
     state.sat.fEnergyEstimatedKWh    = kwh;
     state.sat.fEstEnergyLastSavedKWh = kwh;
-    DebugTf(PSTR("SAT: estimated energy restored (%.3f kWh)\r\n"), kwh);
+    SATDebugTf(PSTR("SAT: estimated energy restored (%.3f kWh)\r\n"), kwh);
   }
 }
 
 //=== Cleanly disable SAT and release boiler control ===
 void satDisable()
 {
+  SATDebugTf(PSTR("SAT: satDisable called (safety=%d fallback=%d)\r\n"),
+             (int)state.sat.bSafetyTripped, (int)state.sat.bFallbackActive);
   state.sat.eControlMode = SAT_MODE_OFF;
   state.sat.bActive = false;
   state.sat.fFinalSetpoint = 0.0f;
@@ -1419,7 +1426,7 @@ void satDisable()
   // thermostat resumes authority. Python SAT uses a warm-idle setpoint because it *is*
   // the thermostat (standalone HA replacement); OTGW firmware is not, so it defers.
   addCommandToQueue("CS=0", 4, false, 0);
-  DebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
+  SATDebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
 }
 
 //=== Flush short-lived SAT data (Task #237) ===
@@ -1432,7 +1439,7 @@ void satFlushShortLivedData()
   satPidReset();
   // Flush cycle window (in-memory and file)
   satFlushCycleWindow();
-  DebugTln(F("SAT: short-lived data flushed (PID integral + cycle window)"));
+  SATDebugTln(F("SAT: short-lived data flushed (PID integral + cycle window)"));
 }
 
 void satHandleControlMode(const char* value)
@@ -1440,6 +1447,7 @@ void satHandleControlMode(const char* value)
   if (!value || !*value) return;
   // TASK-205: avoid strcmp() with bare string literals -- use atoi() for numeric
   // forms and strcmp_P(..., PSTR(...)) for named forms. No bare string compares.
+  int prevMode = (int)state.sat.eControlMode;
   int numericVal = atoi(value);
   if (strcasecmp_P(value, PSTR("continuous")) == 0 || numericVal == 1) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;
@@ -1448,6 +1456,8 @@ void satHandleControlMode(const char* value)
   } else if (strcasecmp_P(value, PSTR("auto")) == 0 || numericVal == 0) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS; // Start in continuous, auto-switch
   }
+  SATDebugTf(PSTR("SAT: control mode %d -> %d (value='%s')\r\n"),
+             prevMode, (int)state.sat.eControlMode, value);
 }
 
 //=====================================================================
@@ -1673,6 +1683,8 @@ void satPublishMQTT()
 {
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
   if (!settings.sat.bEnabled) return;
+
+  SATDebugTln(F("SAT: publishing MQTT state"));
 
   char valBuf[16];
 
@@ -2599,7 +2611,7 @@ static void satUpdatePressure()
       if (!state.sat.bPressureAlarm) {
         state.sat.bPressureAlarm = true;
         state.sat.bPressureHealthy = false;
-        DebugTf(PSTR("SAT: PRESSURE ALARM (smoothed=%.2f drop=%.3f bar/hr)\r\n"),
+        SATDebugTf(PSTR("SAT: PRESSURE ALARM (smoothed=%.2f drop=%.3f bar/hr)\r\n"),
                 smoothed, state.sat.fPressureDropRate);
       }
     }
@@ -2608,7 +2620,7 @@ static void satUpdatePressure()
     if (state.sat.bPressureAlarm) {
       state.sat.bPressureAlarm = false;
       state.sat.bPressureHealthy = true;
-      DebugTln(F("SAT: Pressure alarm cleared"));
+      SATDebugTln(F("SAT: Pressure alarm cleared"));
     }
   }
 }
@@ -2824,7 +2836,7 @@ void initSAT()
   if (hasOTCommandInterface()) {
     addCommandToQueue("CS=0", 4, false, 0);
     _sat_bootCS0sent = true;
-    DebugTln(F("SAT: boot safety - sent CS=0 to release stale control override"));
+    SATDebugTln(F("SAT: boot safety - sent CS=0 to release stale control override"));
   }
   // If no OT command interface is ready yet, _sat_bootCS0sent stays false and
   // the control loop will send CS=0 on its first call when one becomes available.
@@ -2848,7 +2860,7 @@ void initSAT()
       // Manufacturer boot quirk: MI=500 for faster OT polling
       if (satGetManufacturerQuirks() & SAT_QUIRK_MI_500_BOOT) {
         addCommandToQueue("MI=500", 6, false, 0);
-        DebugTln(F("SAT: MI=500 sent (manufacturer boot quirk)"));
+        SATDebugTln(F("SAT: MI=500 sent (manufacturer boot quirk)"));
       }
     }
   } else {
@@ -2868,7 +2880,7 @@ static void satUpdateSimulation()
     // First call — initialize timestamp, skip delta calculation
     state.sat.iSimLastUpdateMs = now;
     state.sat.bSimWarmupDone = false;
-    DebugTln(F("SAT SIM: simulation started"));
+    SATDebugTln(F("SAT SIM: simulation started"));
     return;
   }
 
@@ -3011,7 +3023,7 @@ static void satUpdateThermalLearning()
             dtostrf(_thermal_coeffEma, 1, 4, coeffBuf);
             updateSetting("SATthermalcoeff", coeffBuf);
             _thermal_lastSaveMs = now;
-            DebugTf(PSTR("SAT thermal: coeff updated %.4f\r\n"), _thermal_coeffEma);
+            SATDebugTf(PSTR("SAT thermal: coeff updated %.4f\r\n"), _thermal_coeffEma);
           }
         }
       }
@@ -3087,7 +3099,7 @@ static void satUpdateSolarGain()
     // Stale check: sun elevation older than 1 hour is invalid
     if ((now - state.sat.iSunElevLastMs) > 3600000UL) {
       state.sat.bSunElevationValid = false;
-      DebugTln(F("SAT: sun elevation data stale, falling back to rise rate"));
+      SATDebugTln(F("SAT: sun elevation data stale, falling back to rise rate"));
     } else if (state.sat.fSunElevation < settings.sat.fSolarMinElevation) {
       // Sun too low, no solar gain regardless of rise rate
       state.sat.bSolarGainActive = false;
@@ -3111,7 +3123,7 @@ static void satUpdateSolarGain()
         state.sat.bSolarGainActive = true;
         _solar_wasActive = true;
         _solar_conditionMs = 0;
-        DebugTln(F("SAT: solar gain detected"));
+        SATDebugTln(F("SAT: solar gain detected"));
       }
     } else {
       _solar_conditionMs = 0;
@@ -3124,7 +3136,7 @@ static void satUpdateSolarGain()
         state.sat.bSolarGainActive = false;
         _solar_wasActive = false;
         _solar_conditionMs = 0;
-        DebugTln(F("SAT: solar gain cleared"));
+        SATDebugTln(F("SAT: solar gain cleared"));
       }
     } else {
       _solar_conditionMs = 0; // Still rising, stay active
@@ -3166,7 +3178,7 @@ static void satUpdateSummerSimmer()
       state.sat.fSummerHoursAbove += dtHours;
       if (state.sat.fSummerHoursAbove >= (float)settings.sat.iSummerMinHours) {
         state.sat.bSummerActive = true;
-        DebugTf(PSTR("SAT: summer simmer activated (outdoor=%.1f >= %.1f for %.1fh)\r\n"),
+        SATDebugTf(PSTR("SAT: summer simmer activated (outdoor=%.1f >= %.1f for %.1fh)\r\n"),
                 outsideTemp, settings.sat.fSummerThreshold, state.sat.fSummerHoursAbove);
       }
     } else {
@@ -3180,7 +3192,7 @@ static void satUpdateSummerSimmer()
       if (state.sat.fSummerHoursAbove <= 0.0f) {
         state.sat.fSummerHoursAbove = 0.0f;
         state.sat.bSummerActive = false;
-        DebugTf(PSTR("SAT: summer simmer deactivated (outdoor=%.1f < %.1f)\r\n"),
+        SATDebugTf(PSTR("SAT: summer simmer deactivated (outdoor=%.1f < %.1f)\r\n"),
                 outsideTemp, settings.sat.fSummerThreshold - hysteresis);
       }
     } else {
@@ -3281,27 +3293,27 @@ static void satAutoTuneUpdate()
   if (_at_oscillationCount > _at_cyclesSinceTune / 3) {
     coeff *= (1.0f - rate * 2.0f);
     adjusted = true;
-    DebugTf(PSTR("SAT AutoTune: oscillation detected (%u/%lu), reducing coeff\r\n"),
+    SATDebugTf(PSTR("SAT AutoTune: oscillation detected (%u/%lu), reducing coeff\r\n"),
             _at_oscillationCount, (unsigned long)_at_cyclesSinceTune);
   }
   // Overshoot dominant: reduce aggression
   else if (score > 0.3f) {
     coeff *= (1.0f - rate);
     adjusted = true;
-    DebugTf(PSTR("SAT AutoTune: overshoot dominant (score=%.2f), reducing coeff\r\n"), score);
+    SATDebugTf(PSTR("SAT AutoTune: overshoot dominant (score=%.2f), reducing coeff\r\n"), score);
   }
   // Undershoot dominant: increase aggression
   else if (score < -0.3f) {
     coeff *= (1.0f + rate);
     adjusted = true;
-    DebugTf(PSTR("SAT AutoTune: undershoot dominant (score=%.2f), increasing coeff\r\n"), score);
+    SATDebugTf(PSTR("SAT AutoTune: undershoot dominant (score=%.2f), increasing coeff\r\n"), score);
   }
 
   // Slow convergence: slightly increase coefficient (faster response)
   if (avgConvergence > 30.0f && !adjusted) {
     coeff *= (1.0f + rate * 0.5f);
     adjusted = true;
-    DebugTf(PSTR("SAT AutoTune: slow convergence (%.1f min), increasing coeff\r\n"), avgConvergence);
+    SATDebugTf(PSTR("SAT AutoTune: slow convergence (%.1f min), increasing coeff\r\n"), avgConvergence);
   }
 
   // Clamp coefficient to reasonable range
@@ -3310,7 +3322,7 @@ static void satAutoTuneUpdate()
 
   if (adjusted) {
     settings.sat.fHeatingCurveCoeff = coeff;
-    DebugTf(PSTR("SAT AutoTune: new coefficient=%.2f (cycles=%lu, os=%u, us=%u, osc=%u)\r\n"),
+    SATDebugTf(PSTR("SAT AutoTune: new coefficient=%.2f (cycles=%lu, os=%u, us=%u, osc=%u)\r\n"),
             coeff, (unsigned long)_at_cyclesSinceTune,
             _at_overshootCount, _at_undershootCount, _at_oscillationCount);
 
@@ -3383,7 +3395,7 @@ void satControlLoop()
   if (!_sat_bootCS0sent && hasOTCommandInterface()) {
     addCommandToQueue("CS=0", 4, false, 0);
     _sat_bootCS0sent = true;
-    DebugTln(F("SAT: deferred boot safety — sent CS=0"));
+    SATDebugTln(F("SAT: deferred boot safety — sent CS=0"));
   }
 
   // Flame edge detection — always process, independent of timer
@@ -3420,7 +3432,7 @@ void satControlLoop()
       char twCmd[16];
       snprintf_P(twCmd, sizeof(twCmd), PSTR("TW=%d"), (int)settings.sat.fDhwSetpoint);
       addCommandToQueue(twCmd, strlen(twCmd), false, 0);
-      DebugTf(PSTR("SAT: DHW active, sent %s\r\n"), twCmd);
+      SATDebugTf(PSTR("SAT: DHW active, sent %s\r\n"), twCmd);
     }
     _sat_prevDhwActive = true;
     return;
@@ -3431,6 +3443,9 @@ void satControlLoop()
   float roomTemp = satGetRoomTemp();
   float outsideTemp = satGetOutsideTemp();
   float targetTemp = settings.sat.fTargetTemp;
+
+  SATDebugTf(PSTR("SAT loop: room=%.1f target=%.1f mode=%d enabled=%d\r\n"),
+             roomTemp, targetTemp, (int)state.sat.eControlMode, (int)settings.sat.bEnabled);
 
   // Validate room temp — count consecutive failures
   if (roomTemp < -10.0f || roomTemp > 50.0f) {
@@ -3446,7 +3461,7 @@ void satControlLoop()
 
   // Task #38: OT error flag monitoring -- check for critical boiler faults
   if (OTcurrentSystemState.SlaveStatus & 0x01) { // Bit 0 = fault indication
-    DebugTln(F("SAT: boiler fault flag detected, skipping control cycle"));
+    SATDebugTln(F("SAT: boiler fault flag detected, skipping control cycle"));
     return; // Skip this control cycle, let boiler handle the fault
   }
 
@@ -3584,7 +3599,7 @@ void satControlLoop()
     }
     if (activeZones > 0) {
       pidOutput = zoneMax;
-      DebugTf(PSTR("SAT: multi-zone %u active zones, max setpoint=%.1f\r\n"), activeZones, pidOutput);
+      SATDebugTf(PSTR("SAT: multi-zone %u active zones, max setpoint=%.1f\r\n"), activeZones, pidOutput);
     }
     // Publish zone diagnostics (retained MQTT)
     satPublishZoneDiagnostics();
@@ -3619,7 +3634,7 @@ void satControlLoop()
   // disables PWM (full power needed, no duty cycling required).
   if (pidOutput >= sysMax && state.sat.eControlMode == SAT_MODE_PWM) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;
-    DebugTln(F("SAT: PID at system max, switching to continuous mode"));
+    SATDebugTln(F("SAT: PID at system max, switching to continuous mode"));
   }
 
   // --- Force PWM if configured (Task #41) ---
@@ -3740,7 +3755,7 @@ void satControlLoop()
     satSaveEstimatedEnergy();
   }
 
-  DebugTf(PSTR("SAT: room=%.1f target=%.1f outside=%.1f curve=%.1f pid=%.1f final=%.1f mode=%d\r\n"),
+  SATDebugTf(PSTR("SAT: room=%.1f target=%.1f outside=%.1f curve=%.1f pid=%.1f final=%.1f mode=%d\r\n"),
           roomTemp, targetTemp, outsideTemp, curveValue, pidOutput, finalSetpoint,
           (int)state.sat.eControlMode);
 

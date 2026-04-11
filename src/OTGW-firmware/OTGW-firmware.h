@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -304,6 +304,8 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bSensors               = false;  // was bDebugSensors — Dallas sensor scan trace
   bool     bSensorSim             = false;  // was bDebugSensorSimulation
   bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
+  bool     bSAT                   = true;   // SAT control loop + cycle + HCR trace (default on)
+  bool     bOTDirect              = true;   // OTDirect frame handling + PI loop trace (default on)
   uint32_t iOTGWSimulationIntervalMs = 750;
   uint32_t iOTGWSimulationNextDueMs  = 0;
 };

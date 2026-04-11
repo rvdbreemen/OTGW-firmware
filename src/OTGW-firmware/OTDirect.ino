@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -21,6 +21,13 @@
 #if HAS_DIRECT_OT
 
 #include <OpenTherm.h>
+
+// ---------------------------------------------------------------------------
+// Per-module conditional debug — toggle with key '6' in telnet debug menu
+// ---------------------------------------------------------------------------
+#define OTDDebugTf(fmt, ...)  do { if (state.debug.bOTDirect) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
+#define OTDDebugTln(s)        do { if (state.debug.bOTDirect) DebugTln(s);                  } while(0)
+#define OTDDebugf(fmt, ...)   do { if (state.debug.bOTDirect) Debugf(fmt,   ##__VA_ARGS__); } while(0)
 
 // ---------------------------------------------------------------------------
 // OpenTherm interface instances — master talks to boiler, slave listens to thermostat
@@ -394,9 +401,12 @@ static unsigned long applyOverrides(unsigned long frame, bool &modified) {
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
     if (otOverrides[i].active && otOverrides[i].msgId == msgId) {
       // Replace data value (lower 16 bits) while keeping msg type + data-id
+      uint16_t origData = frame & 0xFFFF;
       frame = (frame & 0xFFFF0000UL) | otOverrides[i].overrideValue;
       setOTParityBit(frame);
       modified = true;
+      OTDDebugTf(PSTR("OTD: override MsgID=%u orig=0x%04X new=0x%04X\r\n"),
+                 msgId, origData, otOverrides[i].overrideValue);
       break;
     }
   }
@@ -462,7 +472,7 @@ static void enableStepUp() {
   pinMode(PIN_STEPUP_ENABLE, OUTPUT);
   digitalWrite(PIN_STEPUP_ENABLE, HIGH);
   delay(50);  // Allow voltage to stabilize
-  DebugTln(F("OT-direct: 24V step-up enabled"));
+  OTDDebugTln(F("OT-direct: 24V step-up enabled"));
 }
 
 // ---------------------------------------------------------------------------
@@ -493,7 +503,7 @@ void initOTDirect() {
 #else
   // Runtime check: even if board has relay, it must be enabled in settings
   if (otCurrentMode == OTD_MODE_BYPASS && !settings.otd.bHasBypassRelay) {
-    DebugTln(F("OT-direct: Bypass relay not enabled in settings — forcing gateway mode"));
+    OTDDebugTln(F("OT-direct: Bypass relay not enabled in settings — forcing gateway mode"));
     otCurrentMode = OTD_MODE_GATEWAY;
   }
 #endif
@@ -501,10 +511,10 @@ void initOTDirect() {
 #if HAS_BYPASS_RELAY
   pinMode(PIN_BYPASS_RELAY, OUTPUT);
   digitalWrite(PIN_BYPASS_RELAY, IS_BYPASS_MODE() ? HIGH : LOW);
-  DebugTf(PSTR("OT-direct: Bypass relay initialized (%s)\r\n"),
+  OTDDebugTf(PSTR("OT-direct: Bypass relay initialized (%s)\r\n"),
           IS_BYPASS_MODE() ? "BYPASS mode" : "off");
 #else
-  DebugTln(F("OT-direct: No bypass relay on this board"));
+  OTDDebugTln(F("OT-direct: No bypass relay on this board"));
 #endif
 
   // TASK-184: initialize flame ratio ring buffers
@@ -520,7 +530,7 @@ void initOTDirect() {
   {
     const char* modeNames[] = { "bypass", "gateway", "monitor", "master" };
     uint8_t modeIdx = (uint8_t)otCurrentMode;
-    DebugTf(PSTR("OT-direct: Mode=%d (%s)\r\n"), modeIdx,
+    OTDDebugTf(PSTR("OT-direct: Mode=%d (%s)\r\n"), modeIdx,
             modeIdx <= 3 ? modeNames[modeIdx] : "unknown");
   }
 
@@ -530,32 +540,32 @@ void initOTDirect() {
   // 3. Probe OT master input for idle bus
   bool busPresent = probeOTBus();
   if (busPresent) {
-    DebugTln(F("OT-direct: OT bus idle detected on master input"));
+    OTDDebugTln(F("OT-direct: OT bus idle detected on master input"));
   } else {
     DebugTln(F("OT-direct: WARNING — OT master input not idle, boiler may be disconnected"));
   }
 
   // 4. Start OpenTherm master (talks to boiler)
   otMaster.begin(masterISR);
-  DebugTln(F("OT-direct: Master interface started"));
+  OTDDebugTln(F("OT-direct: Master interface started"));
 
   // 5. Start OpenTherm slave (listens to thermostat)
   //    In master mode with slave disabled, skip starting the slave interface.
   bool startSlave = true;
   if (IS_MASTER_MODE() && !settings.otd.bEnableSlave) {
     startSlave = false;
-    DebugTln(F("OT-direct: Slave interface DISABLED (master mode, bEnableSlave=false)"));
+    OTDDebugTln(F("OT-direct: Slave interface DISABLED (master mode, bEnableSlave=false)"));
   }
   if (startSlave) {
     otSlave.begin(slaveISR, handleSlaveRequest);
-    DebugTln(F("OT-direct: Slave interface started"));
+    OTDDebugTln(F("OT-direct: Slave interface started"));
   }
 
   // 6. Always set OT_DIRECT mode — this is OTGW32 hardware.
   //    Bus liveness is tracked via state.otBus.bOnline, not eMode.
   //    The OT-direct loop must keep running so it can retry/recover.
   state.hw.eMode = HW_MODE_OT_DIRECT;
-  DebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
+  OTDDebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
 
   if (!busPresent) {
     DebugTln(F("OT-direct: WARNING — OT bus not idle, boiler may be disconnected"));
@@ -567,7 +577,8 @@ void initOTDirect() {
   unsigned long response = otMaster.sendRequest(request);
   if (otMaster.isValidResponse(response)) {
     state.otBus.bOnline = true;
-    DebugTln(F("OT-direct: Boiler responded — OT bus online"));
+    OTDDebugTln(F("OT-direct: Boiler responded — OT bus online"));
+    sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: connected\"}");
     bridgeFrameToParser('R', request);
     bridgeFrameToParser('B', response);
   } else {
@@ -604,7 +615,7 @@ void initOTDirect() {
     if (otMaster.isValidResponse(response)) {
       bridgeFrameToParser('B', response);
       uint8_t slaveConfig = (response >> 8) & 0xFF;
-      DebugTf(PSTR("OT-direct: Slave config=0x%02X (DHW=%d ModCtrl=%d Cool=%d CH2=%d)\r\n"),
+      OTDDebugTf(PSTR("OT-direct: Slave config=0x%02X (DHW=%d ModCtrl=%d Cool=%d CH2=%d)\r\n"),
         slaveConfig,
         (slaveConfig & 0x01) ? 1 : 0,  // DHW present
         (slaveConfig & 0x02) ? 0 : 1,  // 0=modulating, 1=on-off
@@ -632,7 +643,7 @@ void initOTDirect() {
     bridgeFrameToParser('R', handshake);
     if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
 
-    DebugTln(F("OT-direct: Protocol handshake complete"));
+    OTDDebugTln(F("OT-direct: Protocol handshake complete"));
   }
 
   // 9. Auto-detect thermostat presence (if enabled and mode is gateway)
@@ -640,14 +651,14 @@ void initOTDirect() {
   //    OpenTherm thermostats send MsgID 0 every ~1 second, so 5 seconds gives
   //    high confidence. If none seen, switch to master (standalone) mode.
   if (settings.otd.bAutoDetect && otCurrentMode == OTD_MODE_GATEWAY) {
-    DebugTln(F("OT-direct: Auto-detecting thermostat (5 second window)..."));
+    OTDDebugTln(F("OT-direct: Auto-detecting thermostat (5 second window)..."));
     uint32_t detectStart = millis();
     bool thermostatFound = false;
     while ((millis() - detectStart) < 5000UL) {
       otSlave.process();
       if (otSlaveFramePending) {
         thermostatFound = true;
-        DebugTln(F("OT-direct: Thermostat detected!"));
+        OTDDebugTln(F("OT-direct: Thermostat detected!"));
         otLastThermostatMs = millis();
         otThermostatSeen = true;
         state.otd.bThermostatConnected = true;
@@ -657,10 +668,10 @@ void initOTDirect() {
       delay(50);
     }
     if (!thermostatFound) {
-      DebugTln(F("OT-direct: No thermostat detected — switching to master (standalone) mode"));
+      OTDDebugTln(F("OT-direct: No thermostat detected — switching to master (standalone) mode"));
       setOTDirectMode(OTD_MODE_MASTER);
     } else {
-      DebugTln(F("OT-direct: Thermostat present — staying in gateway mode"));
+      OTDDebugTln(F("OT-direct: Thermostat present — staying in gateway mode"));
     }
   }
 }
@@ -928,6 +939,11 @@ static void handleMasterResponse() {
 
   if (status == OpenThermResponseStatus::SUCCESS) {
     bridgeFrameToParser('B', response);
+    if (!state.otBus.bOnline) {
+      // Transition: was offline, now online
+      OTDDebugTln(F("OTD: boiler responded — OT bus back online"));
+      sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: connected\"}");
+    }
     state.otBus.bOnline = true;
 
     // Cache boiler response data for master mode slave responses
@@ -959,7 +975,7 @@ static void handleMasterResponse() {
           for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
             if (otSchedule[i].msgId == respMsgId && !otSchedule[i].disabled) {
               otSchedule[i].disabled = true;
-              DebugTf(PSTR("OT-direct: MsgID %u disabled (3× UNKNOWN_DATA_ID)\r\n"), respMsgId);
+              OTDDebugTf(PSTR("OTD: MsgID %u disabled (3x UNKNOWN_DATA_ID)\r\n"), respMsgId);
               break;
             }
           }
@@ -977,7 +993,7 @@ static void handleMasterResponse() {
         otDHWPushState = PUSH_IDLE;
         otMasterStatusFlags &= ~0x02;
         otDHWOverride = 0xFF;
-        DebugTln(F("OT-direct: DHW push timed out"));
+        OTDDebugTln(F("OTD: DHW push timed out"));
       } else {
         uint8_t slaveByte4 = response & 0xFF;
         if (otDHWPushState == PUSH_PENDING) {
@@ -989,7 +1005,7 @@ static void handleMasterResponse() {
             otDHWPushState = PUSH_IDLE;
             otMasterStatusFlags &= ~0x02;  // clear DHW enable
             otDHWOverride = 0xFF;          // back to auto
-            DebugTln(F("OT-direct: DHW push complete"));
+            OTDDebugTln(F("OTD: DHW push complete"));
           }
         }
       }
@@ -1000,11 +1016,26 @@ static void handleMasterResponse() {
       otSummaryPending = true;
     }
 
+    // Log per-frame: MsgID, data value, override applied
+    {
+      uint8_t logMsgId = (response >> 16) & 0xFF;
+      uint16_t logData = response & 0xFFFF;
+      OTDDebugTf(PSTR("OTD: resp MsgID=%u data=0x%04X origin=%u\r\n"),
+                 logMsgId, logData, (uint8_t)otLastRequestOrigin);
+    }
+
     // If this was a forwarded thermostat frame, send response back
     if (otLastRequestOrigin == OT_DIRECT_ORIGIN_THERMOSTAT) {
       // In gateway mode, apply response-path modifications before forwarding
       if (otCurrentMode == OTD_MODE_GATEWAY) {
+        unsigned long origResp = response;
         response = applyResponseModifiers(response);
+        if (response != origResp) {
+          OTDDebugTf(PSTR("OTD: resp-modify MsgID=%u orig=0x%04X new=0x%04X\r\n"),
+                     (uint8_t)((origResp >> 16) & 0xFF),
+                     (uint16_t)(origResp & 0xFFFF),
+                     (uint16_t)(response & 0xFFFF));
+        }
       }
       otSlave.sendResponse(response);
     }
@@ -1012,6 +1043,11 @@ static void handleMasterResponse() {
     // Only mark offline on status request (MsgID 0) failures
     uint8_t msgId = (otLastSentRequest >> 16) & 0xFF;
     if (msgId == 0) {
+      if (state.otBus.bOnline) {
+        // Transition: was online, now offline
+        sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: disconnected\"}");
+        OTDDebugTln(F("OTD: boiler no response — OT bus offline"));
+      }
       state.otBus.bOnline = false;
     }
   }
@@ -1322,10 +1358,9 @@ static void loopPiCtrl() {
   if (otPiDeltaT < -5.0f)  otPiDeltaT = -5.0f;
   if (otPiDeltaT > 12.0f)  otPiDeltaT = 12.0f;
 
-  if (state.debug.bOTmsg) {
-    DebugTf(PSTR("OTD PI: rt=%.1f rsp=%.1f e=%.2f p=%.2f I=%.2f boost=%.2f dT=%.2f\r\n"),
-            rt, rsp, e, p, otPiIntegState, boost, otPiDeltaT);
-  }
+  OTDDebugTf(PSTR("OTD: PI rt=%.1f rsp=%.1f e=%.2f p=%.2f I=%.2f boost=%.2f dT=%.2f clamp=%s\r\n"),
+             rt, rsp, e, p, otPiIntegState, boost, otPiDeltaT,
+             (otPiDeltaT <= -5.0f || otPiDeltaT >= 12.0f) ? "yes" : "no");
 }
 
 // ===========================================================================
@@ -1366,15 +1401,20 @@ static void flameRatioAccum() {
     uint32_t diff = (millis() - otFlame.lastEdge) / 1000;
     if (diff > 60) diff = 60;  // clamp to one minute slot
     otFlame.on.current += (uint8_t)diff;
+    OTDDebugTf(PSTR("OTD: flame-accum on+%lus cur=%us cycles=%u\r\n"),
+               diff, (unsigned)otFlame.on.current, (unsigned)otFlame.cycles.current);
   }
   otFlame.lastEdge = millis();
 }
 
 // Commit current minute into ring buffer, advance index
 static void flameRatioBufCommit(FlameRatioBuf &b) {
-  b.sum -= b.buf[otFlame.idx];
+  uint8_t prev = b.buf[otFlame.idx];
+  b.sum -= prev;
   b.buf[otFlame.idx] = b.current;
   b.sum += b.current;
+  OTDDebugTf(PSTR("OTD: flame-commit idx=%u prev=%u cur=%u sum=%lu\r\n"),
+             (unsigned)otFlame.idx, (unsigned)prev, (unsigned)b.current, b.sum);
   b.current = 0;
 }
 
@@ -1557,6 +1597,20 @@ void loopOTDirect() {
     loopFlameRatio();
   }
 
+  // Periodic state log — every 30s for diagnostics
+  DECLARE_TIMER_SEC(timerOTDStateLog, 30, SKIP_MISSED_TICKS);
+  if (DUE(timerOTDStateLog)) {
+    bool flameOn = otBoilerCacheValid[0] && ((otBoilerCache[0] & 0x08) != 0);
+    float flowTemp = otBoilerCacheValid[25] ? (int16_t)otBoilerCache[25] / 256.0f : 0.0f;
+    const char* modeStr = IS_BYPASS_MODE() ? "bypass" :
+                          IS_MONITOR_MODE() ? "monitor" :
+                          IS_MASTER_MODE()  ? "master" : "gateway";
+    OTDDebugTf(PSTR("OTD: state online=%d mode=%s flow=%.1f flame=%s thermostat=%d\r\n"),
+               (int)state.otBus.bOnline, modeStr, flowTemp,
+               flameOn ? "on" : "off",
+               (int)state.otd.bThermostatConnected);
+  }
+
   // TASK-183: PI room compensation — run every 60s
   if ((millis() - otNextPiCtrl) >= OT_PI_INTERVAL_MS || otNextPiCtrl == 0) {
     loopPiCtrl();
@@ -1590,7 +1644,7 @@ static void enqueueWriteCommand(uint8_t msgId, uint16_t dataValue, const char* l
   updateWriteCache(msgId, dataValue);
   // Activate repeater override so thermostat frames for this MsgID get modified
   setOverride(msgId, dataValue);
-  if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: %s -> MsgID %u frame 0x%08lX\r\n"), label, msgId, frame);
+  OTDDebugTf(PSTR("OTD: %s -> MsgID %u frame 0x%08lX\r\n"), label, msgId, frame);
 }
 
 // ---------------------------------------------------------------------------
@@ -1716,7 +1770,8 @@ static void setOTDirectMode(OTDirectMode newMode) {
     case OTD_MODE_BYPASS:
 #if HAS_BYPASS_RELAY
       digitalWrite(PIN_BYPASS_RELAY, HIGH);
-      DebugTln(F("OT-direct: Bypass mode ON (thermostat direct to boiler)"));
+      OTDDebugTln(F("OTD: mode -> bypass (thermostat direct to boiler)"));
+      sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: mode bypass\"}");
 #endif
       break;
 
@@ -1726,7 +1781,8 @@ static void setOTDirectMode(OTDirectMode newMode) {
 #endif
       // Ensure slave interface is running (may have been stopped in master mode)
       otSlave.begin(slaveISR, handleSlaveRequest);
-      DebugTln(F("OT-direct: Gateway mode ON (OT-direct active, overrides enabled)"));
+      OTDDebugTln(F("OTD: mode -> gateway (OT-direct active, overrides enabled)"));
+      sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: mode gateway\"}");
       break;
 
     case OTD_MODE_MONITOR:
@@ -1735,7 +1791,8 @@ static void setOTDirectMode(OTDirectMode newMode) {
 #endif
       // Ensure slave interface is running (may have been stopped in master mode)
       otSlave.begin(slaveISR, handleSlaveRequest);
-      DebugTln(F("OT-direct: Monitor mode ON (transparent pass-through, no overrides)"));
+      OTDDebugTln(F("OTD: mode -> monitor (transparent pass-through)"));
+      sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: mode monitor\"}");
       break;
 
     case OTD_MODE_MASTER:
@@ -1745,18 +1802,20 @@ static void setOTDirectMode(OTDirectMode newMode) {
       // Start or stop slave interface based on bEnableSlave setting
       if (settings.otd.bEnableSlave) {
         otSlave.begin(slaveISR, handleSlaveRequest);
-        DebugTln(F("OT-direct: Master mode ON (slave interface enabled for thermostat)"));
+        OTDDebugTln(F("OTD: mode -> master (slave enabled for thermostat)"));
       } else {
         otSlave.end();
-        DebugTln(F("OT-direct: Master mode ON (slave interface disabled, pure standalone)"));
+        OTDDebugTln(F("OTD: mode -> master (pure standalone, no slave)"));
       }
+      sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: mode master\"}");
       break;
 
     case OTD_MODE_LOOPBACK:
 #if HAS_BYPASS_RELAY
       digitalWrite(PIN_BYPASS_RELAY, LOW);
 #endif
-      DebugTln(F("OT-direct: Loopback test mode ON (simulated boiler responses)"));
+      OTDDebugTln(F("OTD: mode -> loopback (simulated boiler responses)"));
+      sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: mode loopback\"}");
       break;
   }
 
@@ -1782,8 +1841,9 @@ static void checkThermostatTimeout() {
     // Thermostat disconnected
     if (state.otd.bThermostatConnected) {
       state.otd.bThermostatConnected = false;
-      DebugTf(PSTR("OT-direct: Thermostat disconnected (no frame for %lus)\r\n"),
+      OTDDebugTf(PSTR("OTD: thermostat disconnected (no frame for %lus)\r\n"),
               elapsed / 1000UL);
+      sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: disconnected\"}");
     }
     // Engage setback if fail-safe enabled and in gateway mode
     if (otFailSafeEnabled && otCurrentMode == OTD_MODE_GATEWAY && !otSetbackEngaged) {
@@ -1793,7 +1853,7 @@ static void checkThermostatTimeout() {
       setOverride(1, f88);        // Override TSet (MsgID 1) to setback temp
       updateWriteCache(1, f88);   // Keep writing it to boiler
       char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb);
-      DebugTf(PSTR("OT-direct: Setback engaged — TSet overridden to %s°C\r\n"), tb);
+      OTDDebugTf(PSTR("OTD: setback engaged — TSet overridden to %s C\r\n"), tb);
     }
   } else {
     state.otd.bThermostatConnected = true;
@@ -1802,7 +1862,8 @@ static void checkThermostatTimeout() {
       otSetbackEngaged = false;
       state.otd.bSetbackActive = false;
       clearOverride(1);           // Release TSet override
-      DebugTln(F("OT-direct: Thermostat reconnected, setback released"));
+      OTDDebugTln(F("OTD: thermostat reconnected, setback released"));
+      sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: connected\"}");
     }
   }
 }
@@ -1922,6 +1983,8 @@ static unsigned long applyResponseModifiers(unsigned long response) {
 // ---------------------------------------------------------------------------
 void handleOTDirectCommand(const char* buf, int len) {
   if (len < 4) return;  // minimum "XX=Y"
+
+  OTDDebugTf(PSTR("OTD: cmd \"%s\" (len=%d)\r\n"), buf, len);
 
   char cmd0 = buf[0];
   char cmd1 = buf[1];
@@ -2097,7 +2160,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         unsigned long frame99 = OpenTherm::buildRequest(
           OpenThermMessageType::WRITE_DATA,
           static_cast<OpenThermMessageID>(99), data99);
-        if (!otCmdEnqueue(frame99)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+        if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
       }
     } else if (v == '1') {
       otMasterStatusFlags |= 0x02;
@@ -2108,7 +2171,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       // Abort DHW push if in progress
       if (otDHWPushState != PUSH_IDLE) {
         otDHWPushState = PUSH_IDLE;
-        DebugTln(F("OT-direct: DHW push aborted"));
+        OTDDebugTln(F("OTD: DHW push aborted"));
       }
     } else {
       // Any other char = auto (thermostat controls DHW)
@@ -2208,7 +2271,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -2221,7 +2284,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -2234,7 +2297,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -2244,7 +2307,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame4 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(4), (uint16_t)code << 8);
-    if (!otCmdEnqueue(frame4)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame4); }
+    if (!otCmdEnqueue(frame4)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame4); }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), code);
     synthesizeResponse(buf, rspBuf);
   }
@@ -2259,14 +2322,14 @@ void handleOTDirectCommand(const char* buf, int len) {
 #if HAS_BYPASS_RELAY
       // Runtime check: relay must also be enabled in settings for this board
       if (!settings.otd.bHasBypassRelay) {
-        DebugTln(F("OT-direct: GW=0 rejected (bypass relay not enabled in settings)"));
+        OTDDebugTln(F("OTD: GW=0 rejected (bypass relay not enabled in settings)"));
         processOT("NG", 2);
         return;
       }
       setOTDirectMode(OTD_MODE_BYPASS);
 #else
       // No bypass relay on this board — reject command
-      DebugTln(F("OT-direct: GW=0 not supported (no bypass relay on this board)"));
+      OTDDebugTln(F("OTD: GW=0 not supported (no bypass relay on this board)"));
       processOT("NG", 2);
       return;
 #endif
@@ -2284,7 +2347,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       setOTDirectMode(OTD_MODE_LOOPBACK);
     } else if (value[0] == 'R') {
       // Full reset: clear all transient state (mirrors PIC hardware reset)
-      DebugTln(F("OT-direct: Full gateway reset"));
+      OTDDebugTln(F("OTD: full gateway reset"));
       resetTransientState();
       // Restart OT interfaces
       otMaster.end();
@@ -2292,7 +2355,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       delay(100);
       otMaster.begin(masterISR);
       otSlave.begin(slaveISR, handleSlaveRequest);
-      DebugTln(F("OT-direct: OT interfaces restarted"));
+      OTDDebugTln(F("OTD: OT interfaces restarted"));
     }
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
@@ -2419,7 +2482,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         processOT(prBuf, strlen(prBuf));
         break;
       default:
-        if (state.debug.bOTmsg) DebugTf(PSTR("OT-direct: PR=%c unknown register\r\n"), reg);
+        OTDDebugTf(PSTR("OTD: PR=%c unknown register\r\n"), reg);
         break;
     }
   }
@@ -2502,7 +2565,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       unsigned long frame = OpenTherm::buildRequest(
         OpenThermMessageType::READ_DATA,
         static_cast<OpenThermMessageID>(msgId), 0);
-      if (!otCmdEnqueue(frame)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
+      if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
     }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
@@ -2651,7 +2714,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned long frame = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(targetMsgId), 0);
-    if (!otCmdEnqueue(frame)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
+    if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
     synthesizeResponse(buf, value);
   }
   // MI=nnn — Message interval (minimum gap between OT messages, 100-1275ms)
@@ -2701,7 +2764,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       OpenThermMessageType::WRITE_DATA : OpenThermMessageType::READ_DATA;
     unsigned long tpFrame = OpenTherm::buildRequest(
       tpType, static_cast<OpenThermMessageID>(tpMsgId), tpData);
-    if (!otCmdEnqueue(tpFrame)) { DebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), tpFrame); }
+    if (!otCmdEnqueue(tpFrame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), tpFrame); }
     if (isWrite) {
       snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u:%u=%u"), tpMsgId, tpIndex, tpValue);
     } else {
@@ -2753,6 +2816,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // Unknown command
   else {
+    OTDDebugTf(PSTR("OTD: unknown cmd %c%c= (rejected)\r\n"), cmd0, cmd1);
     processOT("NG", 2);  // No Good — unknown command code
   }
 }

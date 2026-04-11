@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -313,8 +313,6 @@ static bool sendMQTTTemplateStreaming(const char *topic, const char *templateStr
   if (!canPublishMQTT()) return false;
 
   size_t renderedLen = measureRenderedTemplate(templateStr, ctxPtr);
-  MQTTDebugTf(PSTR("Sending MQTT (template streaming): server %s:%d => TopicId [%s] (len=%d bytes)\r\n"),
-              settings.mqtt.sBroker, settings.mqtt.iBrokerPort, topic, renderedLen);
 
   if (!MQTTclient.beginPublish(topic, renderedLen, true)) {
     PrintMQTTError();
@@ -664,7 +662,6 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     return;
   } else {
     //remove the top topic part
-    MQTTDebugTf(PSTR("Parsing topic: %s/"), CSTR(settings.mqtt.sTopTopic));
     topicCursor += topTopicLen;
     while (*topicCursor == '/') {
       topicCursor++;
@@ -675,25 +672,22 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     MQTTDebugln(F("MQTT: missing 'set' token"));
     return;
   }
-  MQTTDebugf(PSTR("%s/"), topicToken);
   if (strcasecmp_P(topicToken, PSTR("set")) == 0) {
     if (!readMQTTTopicToken(topicCursor, topicToken, sizeof(topicToken))) {
       MQTTDebugln(F("MQTT: missing node-id token"));
       return;
     }
-    MQTTDebugf(PSTR("%s/"), topicToken);
     if (strcasecmp(topicToken, NodeId) == 0) {
       if (!readMQTTTopicToken(topicCursor, topicToken, sizeof(topicToken))) {
         MQTTDebugln(F("MQTT: missing command token"));
         return;
       }
-      MQTTDebugf(PSTR("%s"), topicToken);
       if (topicToken[0] != '\0') {
         // --- SAT MQTT commands: set/<nodeId>/sat/<sub-command> ---
         if (strcasecmp_P(topicToken, PSTR("sat")) == 0) {
           char satSubCmd[20];
           if (readMQTTTopicToken(topicCursor, satSubCmd, sizeof(satSubCmd))) {
-            MQTTDebugf(PSTR("/%s [%s]\r\n"), satSubCmd, msgPayload);
+            MQTTDebugTf(PSTR("MQTT SAT cmd: %s [%s]\r\n"), satSubCmd, msgPayload);
             if (strcasecmp_P(satSubCmd, PSTR("target")) == 0) {
               satHandleTargetTemp(msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("indoor_temp")) == 0) {
@@ -897,7 +891,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }
           } else {
-            MQTTDebugln(F(" SAT: missing sub-command"));
+            MQTTDebugTln(F("MQTT SAT: missing sub-command"));
           }
           return;
         }
@@ -906,7 +900,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
           char otgw32Cmd[20];
           if (readMQTTTopicToken(topicCursor, otgw32Cmd, sizeof(otgw32Cmd))) {
-            MQTTDebugf(PSTR("/%s [%s]\r\n"), otgw32Cmd, msgPayload);
+            MQTTDebugTf(PSTR("MQTT OTGW32 cmd: %s [%s]\r\n"), otgw32Cmd, msgPayload);
             float val = atof(msgPayload);
             if (strcasecmp_P(otgw32Cmd, PSTR("room_temp")) == 0) {
               otdMqttSetRoomTemp(val);
@@ -916,15 +910,15 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
               MQTTDebugTf(PSTR("OTGW32: unknown sub-command [%s]\r\n"), otgw32Cmd);
             }
           } else {
-            MQTTDebugln(F(" OTGW32: missing sub-command"));
+            MQTTDebugTln(F("MQTT OTGW32: missing sub-command"));
           }
 #else
-          MQTTDebugln(F(" OTGW32: OT-direct not available on this build"));
+          MQTTDebugTln(F("MQTT OTGW32: OT-direct not available on this build"));
 #endif
           return;
         }
         if (!hasOTCommandInterface()) {
-          MQTTDebugln(F(" MQTT command ignored: no OT command interface detected"));
+          MQTTDebugTln(F("MQTT: command ignored, no OT command interface detected"));
           return;
         }
         const int cmdIndex = findMQTTSetCommandIndex(topicToken);
@@ -935,7 +929,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
           if (pOtType == s_raw){
             //raw command
             snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
-            MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
+            MQTTDebugTf(PSTR("MQTT cmd: sending [%s]\r\n"), otgwcmd);
             addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
           } else {
             //all other commands are <otgwcmd>=<payload message>
@@ -945,13 +939,12 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             cmdBuf[sizeof(cmdBuf)-1] = 0; // Ensure null termination
 
             snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), cmdBuf, msgPayload);
-            MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
+            MQTTDebugTf(PSTR("MQTT cmd: sending [%s]\r\n"), otgwcmd);
             addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
           }
         } else {
           //no match found
-          MQTTDebugln();
-          MQTTDebugTf(PSTR("No match found for command: [%s]\r\n"), topicToken);
+          MQTTDebugTf(PSTR("MQTT: no match found for command: [%s]\r\n"), topicToken);
         }
       }
     }
@@ -976,12 +969,6 @@ void handleMQTT()
   DECLARE_TIMER_SEC(timerMQTTwaitforconnect, 42, CATCH_UP_MISSED_TICKS);   // wait before trying to connect again
   DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // wait for retry
 
-  //State debug timers
-  DECLARE_TIMER_SEC(timerMQTTdebugwaitforreconnect, 13);
-  DECLARE_TIMER_SEC(timerMQTTdebugerrorstate, 13);
-  DECLARE_TIMER_SEC(timerMQTTdebugwaitconnectionattempt, 1);
-  DECLARE_TIMER_SEC(timerMQTTdebugisconnected, 60);
-  
   if (MQTTclient.connected()) MQTTclient.loop();  //always do a MQTTclient.loop() first
 
   switch(stateMQTT) 
@@ -1018,29 +1005,24 @@ void handleMQTT()
       MQTTDebugTln(F("MQTT State: MQTT try to connect"));
       MQTTDebugTf(PSTR("MQTT server is [%s], IP[%s]\r\n"), settings.mqtt.sBroker, MQTTbrokerIPchar);
       
-      MQTTDebugT(F("Attempting MQTT connection .. "));
       reconnectAttempts++;
 
       //If no username, then anonymous connection to broker, otherwise assume username/password.
-      if (strlen(settings.mqtt.sUser) == 0) 
+      if (strlen(settings.mqtt.sUser) == 0)
       {
-        MQTTDebug(F("without a Username/Password "));
         if(!MQTTclient.connect(MQTTclientId, MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
       } 
       else 
       {
-        MQTTDebugf(PSTR("Username [%s] "), CSTR(settings.mqtt.sUser));
         if(!MQTTclient.connect(MQTTclientId, CSTR(settings.mqtt.sUser), CSTR(settings.mqtt.sPasswd), MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
       }
 
       //If connection was made succesful, move on to next state...
       if (MQTTclient.connected())
       {
-        reconnectAttempts = 0;  
-        MQTTDebugln(F(" .. connected\r"));
-        Debugln(F("MQTT connected"));	
+        reconnectAttempts = 0;
+        Debugln(F("MQTT connected"));
         stateMQTT = MQTT_STATE_IS_CONNECTED;
-        MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default
         sendMQTT(MQTTPubNamespace, "online");
 
@@ -1055,7 +1037,6 @@ void handleMQTT()
         char topic[MQTT_TOPIC_MAX_LEN];
         strlcpy(topic, MQTTSubNamespace, sizeof(topic));
         strlcat(topic, "/#", sizeof(topic));
-        MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
         if (MQTTclient.subscribe(topic)){
           MQTTDebugTf(PSTR("MQTT: Subscribed successfully to TopicId [%s]\r\n"), topic);
         }
@@ -1070,67 +1051,58 @@ void handleMQTT()
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
-        MQTTDebugln(F(" .. \r"));
-        MQTTDebugTf(PSTR("failed, retrycount=[%d], rc=[%d] ..  try again in 3 seconds\r\n"), reconnectAttempts, MQTTclient.state());
+        MQTTDebugTf(PSTR("MQTT: connect failed, retrycount=[%d], rc=[%d], retry in 3s\r\n"), reconnectAttempts, MQTTclient.state());
         RESTART_TIMER(timerMQTTwaitforretry);
         stateMQTT = MQTT_STATE_WAIT_CONNECTION_ATTEMPT;  // if the re-connect did not work, then return to wait for reconnect
-        MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_CONNECTION_ATTEMPT"));
       }
-      
+
       //After 5 attempts... go wait for a while.
       if (reconnectAttempts >= 5)
       {
-        MQTTDebugTln(F("5 attempts have failed. Retry wait for next reconnect in 10 minutes\r"));
+        MQTTDebugTln(F("MQTT: 5 connect attempts failed, waiting 10 minutes before retry"));
         RESTART_TIMER(timerMQTTwaitforconnect);
         stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;  // if the re-connect did not work, then return to wait for reconnect
-        MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
       }   
     break;
     
     case MQTT_STATE_IS_CONNECTED:
-      if DUE(timerMQTTdebugisconnected) MQTTDebugTln(F("MQTT State: MQTT is Connected"));
-      if (MQTTclient.connected()) 
+      if (MQTTclient.connected())
       { //if the MQTT client is connected, then please do a .loop call...
         MQTTclient.loop();
       }
       else
       { //else go and wait 10 minutes, before trying again.
+        MQTTDebugTln(F("MQTT: connection lost, waiting before reconnect"));
         RESTART_TIMER(timerMQTTwaitforconnect);
         stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;
-        MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
-      }  
+      }
     break;
 
     case MQTT_STATE_WAIT_CONNECTION_ATTEMPT:
       //do non-blocking wait for 3 seconds
-      if  DUE(timerMQTTdebugwaitconnectionattempt) MQTTDebugTln(F("MQTT State: MQTT_WAIT_CONNECTION_ATTEMPT"));
       if (DUE(timerMQTTwaitforretry))
       {
         //Try again... after waitforretry non-blocking delay
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
-        MQTTDebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
       }
     break;
-    
+
     case MQTT_STATE_WAIT_FOR_RECONNECT:
-      //do non-blocking wait for 10 minutes, then try to connect again. 
-      if DUE(timerMQTTdebugwaitforreconnect) MQTTDebugTln(F("MQTT State: MQTT wait for reconnect"));
+      //do non-blocking wait for 10 minutes, then try to connect again.
       if (DUE(timerMQTTwaitforconnect))
       {
         //remember when you tried last time to reconnect
         RESTART_TIMER(timerMQTTwaitforretry);
-        reconnectAttempts = 0; 
+        reconnectAttempts = 0;
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
-        MQTTDebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
       }
     break;
 
     case MQTT_STATE_ERROR:
-      if DUE(timerMQTTdebugerrorstate) MQTTDebugTln(F("MQTT State: MQTT ERROR, wait for 10 minutes, before trying again"));
+      MQTTDebugTln(F("MQTT: DNS/IP error, waiting before retry"));
       //wait for next retry
       RESTART_TIMER(timerMQTTwaitforconnect);
       stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;
-      MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
     break;
 
     default:
@@ -1183,7 +1155,6 @@ void sendMQTTData(const char* topic, const char *json, const bool retain)
   char full_topic[MQTT_TOPIC_MAX_LEN];
   snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
   strlcat(full_topic, topic, sizeof(full_topic));
-  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settings.mqtt.sBroker, settings.mqtt.iBrokerPort, full_topic, json);
   const size_t payloadLen = strlen(json);
   if (!beginMqttPublish(full_topic, payloadLen, retain)) return;
   if (!writeMqttChunk(json, payloadLen)) {
@@ -1220,13 +1191,6 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   topicBuf[sizeof(topicBuf) - 1] = '\0';
   snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
   strlcat(full_topic, topicBuf, sizeof(full_topic));
-
-  MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message ["),
-              settings.mqtt.sBroker,
-              settings.mqtt.iBrokerPort,
-              full_topic);
-  MQTTDebug(json);
-  MQTTDebugln(F("]"));
 
   PGM_P payload = reinterpret_cast<PGM_P>(json);
   const size_t payloadLen = strlen_P(payload);
@@ -1377,9 +1341,6 @@ void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
     return;
   }
   
-  MQTTDebugTf(PSTR("Sending MQTT (streaming): server %s:%d => TopicId [%s] (len=%d bytes)\r\n"), 
-              settings.mqtt.sBroker, settings.mqtt.iBrokerPort, topic, len);
-
   // Use beginPublish which tells PubSubClient the total length upfront
   // This allows it to use its buffer efficiently without reallocation
   if (!beginMqttPublish(topic, len, true)) return;
@@ -1523,7 +1484,6 @@ bool getMQTTConfigDone(const uint8_t MSGid)
   group = group>>5;
   uint8_t index = MSGid & 0b00011111;
   uint32_t result = bitRead(MQTTautoConfigMap[group], index);
-  MQTTDebugTf(PSTR("Reading bit %d from group %d for MSGid %d: result = %d\r\n"), index, group, MSGid, result);
   if (result > 0) {
     return true;
   } else {
@@ -1536,10 +1496,7 @@ void setMQTTConfigDone(const uint8_t MSGid)
   uint8_t group = MSGid & 0b11100000;
   group = group>>5;
   uint8_t index = MSGid & 0b00011111;
-  MQTTDebugTf(PSTR("Setting bit %d from group %d for MSGid %d\r\n"), index, group, MSGid);
-  MQTTDebugTf(PSTR("Value before setting bit %d\r\n"), MQTTautoConfigMap[group]);
   bitSet(MQTTautoConfigMap[group], index);
-  MQTTDebugTf(PSTR("Value after setting bit  %d\r\n"), MQTTautoConfigMap[group]);
 }
 //===========================================================================================
 void clearMQTTConfigDone()
@@ -1578,7 +1535,6 @@ static bool expandAndPublishSourceTemplates(byte msgid,
     variantCtx.sourceName = srcNameBuf;
     variantCtx.sourceTopicSegment = srcKeyBuf;
     if (!renderTemplateToBuffer(topicTemplate, renderedTopic, MQTT_TOPIC_MAX_LEN, &variantCtx)) continue;
-    MQTTDebugTf(PSTR("MQTT source discovery (%s) msgid %d -> %s\r\n"), logLabel, (int)msgid, renderedTopic);
     if (!sendMQTTTemplateStreaming(renderedTopic, msgTemplate, &variantCtx)) continue;
     published = true;
     feedWatchDog();
@@ -1646,9 +1602,6 @@ void doAutoConfigure(){
       if (!isOTDirectEnabled() && strstr_P(sLine, PSTR("otgw-otdirect/"))) continue;
 
       {
-
-         MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
-
          MQTTAutoConfigTemplateContext renderCtx;
          renderCtx.nodeId = NodeId;
          renderCtx.sensorId = "";
@@ -1782,8 +1735,6 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     // Old config dump method (dumping all lines) is no longer used - we now fetch specific lines by ID
     if (lineID != OTid) continue;
 
-    MQTTDebugTf(PSTR("Found line in config file for %d: [%d][%s] \r\n"), OTid, lineID, lineView.topicTemplate);
-
     MQTTAutoConfigTemplateContext renderCtx;
     renderCtx.nodeId = NodeId;
     renderCtx.sensorId = sensorId;
@@ -1793,13 +1744,8 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     renderCtx.mqttSubTopic = MQTTSubNamespace;
 
     // discovery topic prefix (rendered into cMsg via sTopic pointer)
-    MQTTDebugTf(PSTR("sTopic[%s]==>"), lineView.topicTemplate); 
     if (!renderTemplateToBuffer(lineView.topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) { MQTTDebugTln(F("MQTT: topic template rendering overflow")); continue; }
     if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); continue; }
-
-    MQTTDebugf(PSTR("[%s]\r\n"), sTopic); 
-    /// ----------------------
-    MQTTDebugTf(PSTR("sMsg template len[%d]\r\n"), (int)strlen(lineView.msgTemplate));
     DebugFlush();
     
     // ADR-040: Source template detection — entries with source placeholders in mqttha.cfg
