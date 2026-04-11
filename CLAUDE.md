@@ -783,3 +783,133 @@ Project-specific skills for GitHub Copilot live in `.github/skills/`. The `adr` 
 - **Always** use `addOTWGcmdtoqueue()` for OTGW commands
 - **Always** validate buffer sizes before string operations
 - **Always** feed watchdog in long-running loops: `feedWatchDog()`
+
+---
+
+# Project Navigation Guide — How to Start Fresh
+
+**MANDATORY: Never start any work — bug fix, feature, or refactor — without first reading the relevant context below. Skipping this step leads to wrong assumptions, wasted effort, and broken things. The documentation exists precisely so you don't have to guess.**
+
+## The Discovery Flow
+
+Always follow this sequence when starting a new task. Not all steps apply to every task — use judgment — but never skip Step 1 and Step 2.
+
+### Step 1 — System Orientation (always)
+
+Read `docs/c4/c4-context.md` first. This gives:
+- What the system is and what it does
+- Who uses it (personas) and how
+- All external dependencies (MQTT broker, Home Assistant, OTGW PIC, SAT)
+
+This takes 2 minutes and prevents misunderstanding the purpose of any component.
+
+### Step 2 — Component Boundaries (always)
+
+Read `docs/c4/c4-component.md` (master index) to find which component owns the code you are about to touch. Then read the relevant `docs/c4/c4-component-*.md`:
+
+| Component file | Covers |
+|---|---|
+| `c4-component-opentherm-core.md` | OT protocol, OTGW-Core, OTDirect, PIC serial |
+| `c4-component-integration-layer.md` | MQTT, REST API, WebSocket, Home Assistant auto-config |
+| `c4-component-web-interface.md` | Web UI, FSexplorer, file serving |
+| `c4-component-network.md` | WiFi, Ethernet, OTA, mDNS, NTP |
+| `c4-component-smart-thermostat.md` | SAT subsystem, BLE, simulation mode |
+| `c4-component-sensors-hardware.md` | Dallas temperature, S0 pulse counter, SSD1306 OLED |
+| `c4-component-configuration-state.md` | Settings persistence, OTGWSettings, OTGWState |
+
+### Step 3 — Code Detail (when touching specific files)
+
+Read the relevant `docs/c4/c4-code-*.md` for the source directory you are about to modify. These files contain:
+- Every function signature with parameters, return type, and line number
+- Internal dependencies between functions
+- What each file in the directory does
+
+Available code docs: `mqtt`, `network`, `otdirect`, `otgw-core`, `rest-api`, `sat`, `sensors`, `settings`, `utilities`, `web-assets`.
+
+### Step 4 — Protocol Specification (when touching OpenTherm logic)
+
+For any work that touches OpenTherm message IDs, data formats, flag bits, or the PIC command set:
+
+- **OpenTherm protocol**: `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md`
+- **Message IDs reference**: `docs/opentherm specification/OpenTherm-specifications.md` (project-specific mapping)
+- **Member ID JSON**: `docs/opentherm specification/` — `otgw-message-ids.json` (machine-readable)
+- **PIC firmware behavior**: `other-projects/otgw-6.6/` — cleanroom reference for PIC command semantics
+
+Do not guess what a message ID means. Look it up. The spec is there.
+
+### Step 5 — API Contracts (when touching MQTT, REST, or WebSocket)
+
+Read the relevant API documentation before changing any interface:
+
+- **MQTT topics and payloads**: `docs/api/MQTT.md` — all publish/subscribe topics, payload formats, retained flags
+- **WebSocket protocol**: `docs/api/WEBSOCKET_FLOW.md` — full flow documentation
+- **WebSocket quick ref**: `docs/api/WEBSOCKET_QUICK_REFERENCE.md` — message types and format
+
+Breaking an API contract silently will break Home Assistant integrations in the field.
+
+### Step 6 — Architectural Decisions (when making structural changes)
+
+Before changing architecture, adding dependencies, modifying API contracts, or touching build tooling:
+
+1. `ls docs/adr/` to see all 81+ ADRs
+2. Search for relevant ones: `grep -l "keyword" docs/adr/`
+3. Read every ADR that touches your area — ADRs are short by design
+
+Key ADRs to know by heart:
+- **ADR-004**: No `String` class in hot paths (heap fragmentation)
+- **ADR-051**: Settings/State architecture (`OTGWSettings` / `OTGWState`)
+- Any ADR marked **Accepted** is binding — do not silently violate it
+
+If your change warrants a new ADR (new dependency, API change, architectural shift), create one. See the ADR format above.
+
+### Step 7 — Feature Documentation (when implementing or extending features)
+
+Check `docs/features/` for existing feature design docs before implementing. These explain the intended behavior and design constraints that are not visible from the code alone.
+
+Check `docs/reviews/` for past review reports — especially `opentherm-spec-deep-audit` — which document known issues, constraints, and things that were deliberately not changed.
+
+---
+
+## Reference Implementations in `other-projects/`
+
+The `other-projects/` directory contains read-only reference codebases. **Never copy code from them directly.** Use them for cleanroom analysis: understand how something works, then implement it from scratch to match this project's patterns.
+
+| Directory | Purpose |
+|---|---|
+| `other-projects/OT-Thing-OTGW32/` | Primary ESP32 reference — OTDirect, EthernetESP32, BLE, ESP32 platform setup. Read this when porting or adding ESP32-specific features. |
+| `other-projects/SAT-releases-thermo-nova/` | SAT (Smart Autotune Thermostat) Python reference implementation. Read this when working on the SAT subsystem or BLE protocol. |
+| `other-projects/otgw-6.6/` | PIC firmware source. Authoritative reference for OTGW PIC command set, responses, and timing behavior. Read this when the PIC behavior is ambiguous. |
+| `other-projects/otmonitor-6.6/` | OTmonitor Tcl/Tk reference client. Read this to understand how a well-tested client drives the OTGW PIC. |
+
+When a feature exists in a reference project but not here, the workflow is:
+1. Read and understand the reference implementation
+2. Identify the relevant C4 component in this project
+3. Read the ADRs that apply
+4. Design from scratch, matching this project's conventions
+5. Do not port code verbatim — architectural context differs
+
+---
+
+## Decision Matrix: What to Read for What
+
+| Scenario | Minimum reading |
+|---|---|
+| Bug in MQTT publishing | `c4-component-integration-layer.md` + `docs/api/MQTT.md` + `c4-code-mqtt.md` |
+| Bug in OT message parsing | `c4-component-opentherm-core.md` + OT spec v4.2 + `c4-code-otgw-core.md` |
+| Bug in web UI | `c4-component-web-interface.md` + `c4-code-web-assets.md` |
+| New REST endpoint | `c4-component-integration-layer.md` + `c4-code-rest-api.md` + REST API Versioning section above |
+| New MQTT topic | `docs/api/MQTT.md` + `c4-code-mqtt.md` + relevant ADRs |
+| Settings/config change | `c4-component-configuration-state.md` + ADR-051 + `c4-code-settings.md` |
+| Network/WiFi/OTA change | `c4-component-network.md` + `c4-code-network.md` |
+| SAT/BLE feature | `c4-component-smart-thermostat.md` + `other-projects/SAT-releases-thermo-nova/` |
+| ESP32 port/feature | `c4-container.md` + `other-projects/OT-Thing-OTGW32/` + relevant ADRs |
+| Architecture change | `c4-context.md` + `c4-component.md` + all relevant ADRs + create new ADR |
+| Any new dependency | Relevant ADRs + PROGMEM/RAM budget check + create ADR if dependency is significant |
+
+---
+
+## The Non-Negotiable Rule
+
+**If you cannot name the C4 component that owns the code you are about to change, stop. Go back to Step 1.**
+
+The C4 documentation exists so that every session starts with accurate context instead of exploratory guesswork. Reading it is not overhead — it is the work.
