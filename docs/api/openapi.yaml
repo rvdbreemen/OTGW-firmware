@@ -468,6 +468,17 @@ paths:
                       maxfreeblock:
                         type: integer
                         description: Largest contiguous free block
+                      wifiquality:
+                        type: integer
+                        minimum: 0
+                        maximum: 100
+                        description: WiFi signal quality as a percentage (0-100). Returns 0 when in AP fallback mode, 100 when connected via Ethernet.
+                      networkmode:
+                        type: string
+                        description: Active network mode ("wifi", "ethernet", or "ap")
+                      apfallback:
+                        type: boolean
+                        description: "True when the device has fallen back to AP mode (SSID: OTGW-<MAC>, IP: 192.168.4.1). Only present in pre-release builds and only when AP fallback is active."
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 

@@ -1,282 +1,214 @@
-# OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
+# OTGW-firmware v2.0.0
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
+[![GitHub release](https://img.shields.io/github/v/release/rvdbreemen/OTGW-firmware?style=flat-square)](https://github.com/rvdbreemen/OTGW-firmware/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
-This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
+OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on the ESP8266 or ESP32 Wi-Fi module inside the OTGW device, monitors the OpenTherm bus between your thermostat and boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API. With v2.0.0, the firmware also runs natively on the OTGW32 board with an ESP32, adding direct GPIO OpenTherm control, Ethernet, BLE room sensors, and a OLED display.
 
-## What's New in v1.4.0
+---
 
-Version 1.4.0 is a major feature release. It adds SAT (Smart Autotune Thermostat), an embedded heating controller that turns the OTGW into a standalone smart thermostat. It also introduces ESP32 support through a unified platform abstraction layer. Full release notes: [RELEASE_NOTES_1.4.0.md](RELEASE_NOTES_1.4.0.md)
+## What's New in v2.0.0
+
+Version 2.0.0 is a major platform release. It ships full ESP32/OTGW32 support alongside the established ESP8266/OTGW path in a single unified codebase. Both platforms build from the same source tree via PlatformIO.
 
 ### Highlights
 
-- **SAT (Smart Autotune Thermostat):** Embedded heating controller running entirely on the ESP. Weather-compensated heating curve + PID v3 controller with automatic gain tuning. Supports continuous modulation and PWM flame cycling, radiator and underfloor heating. Six independent safety layers. Web UI dashboard, REST API, MQTT, and Home Assistant auto-discovery. No HA or external controller required.
-- **ESP32 support (experimental):** The firmware now compiles for both ESP8266 and ESP32 from one source tree. 30+ platform shim functions abstract away SDK differences at compile time.
-- **PlatformIO build system:** New `platformio.ini` with `esp8266` and `esp32` environments. Build with `pio run -e esp8266` or `pio run -e esp32`.
-- **Board-level GPIO definitions:** Auto-detected pin mappings per platform via `boards.h`.
-- **OpenTherm enum modernization:** Binary literals updated to C++14 standard format for better compiler compatibility.
-- **No breaking changes** vs v1.3.4. The ESP8266 build is functionally identical.
+- **OTGW32 / ESP32 platform**: Native ESP32 support. The OTGW32 board combines an ESP32 with onboard OpenTherm circuitry so the PIC gateway chip is optional. Build with `pio run -e esp32`.
+- **OTDirect**: ESP32-only direct GPIO OpenTherm master/slave. Five operating modes let the ESP32 act as thermostat, boiler, gateway, monitor, or a combined master+slave pair, all without a PIC co-processor.
+- **Ethernet (W5500)**: Wired Ethernet via W5500 SPI on the OTGW32 board. The firmware auto-detects cable presence and switches between Ethernet and Wi-Fi, with transparent failover in both directions.
+- **BLE temperature sensors**: On ESP32, up to four Xiaomi LYWSD03MMC sensors are read passively over Bluetooth LE using the BTHome v2 protocol. Room temperature and humidity feed directly into SAT and Home Assistant.
+- **OLED display**: 128x64 SSD1306 I2C display on both platforms. Four information pages (status, temperatures, network, boiler). Button cycles pages; display auto-off after configurable timeout.
+- **SAT enhancements**: Summer Simmer Index, improved solar gain compensation, expanded multi-zone support, and BLE sensor integration.
+- **250+ Home Assistant entities**: Full climate entity, all SAT entities, pressure monitoring, BLE sensor entities, and OLED status — all via MQTT auto-discovery.
+- **Wi-Fi resilience**: AP fallback mode (beta) keeps the web UI reachable when the home network is unavailable. Wi-Fi signal quality indicator in the web UI header. Triple-reset credential recovery.
+- **PlatformIO build**: Unified `platformio.ini` with `esp8266` and `esp32` environments. Arduino IDE still works for ESP8266.
 
-## SAT - Smart Autotune Thermostat
+No breaking changes to MQTT topics or REST API from v1.x. Settings files from v1.3.x load without modification.
 
-SAT is an embedded heating controller that runs entirely on the ESP and turns the OTGW into a standalone smart thermostat. It sits between the OpenTherm bus and the boiler, computing and sending the optimal flow temperature setpoint without needing an external controller or Home Assistant.
+---
+
+## Features at a Glance
+
+### Both platforms (ESP8266 and ESP32)
+
+- Full OpenTherm bus monitoring: all 80+ message IDs decoded in real time
+- MQTT integration with 250+ Home Assistant auto-discovery entities
+- Web interface: live OT log, real-time graphs, dark/light theme, settings panel
+- REST API v2 with consistent JSON and proper HTTP status codes
+- SAT (Smart Autotune Thermostat): weather-compensated PID heating controller
+- DS18B20 Dallas temperature sensors with custom labels (up to 16)
+- S0 pulse-counting energy meter
+- SSD1306 OLED display (128x64, I2C, 4 pages)
+- OTA firmware and filesystem updates via the web interface
+- TCP serial bridge on port 25238 (OTmonitor, HA built-in integration)
+- Telnet debug log on port 23
+- Webhook callbacks on OpenTherm status bit changes
+- Triple-reset Wi-Fi credential recovery
+- Optional HTTP Basic Auth for settings and maintenance endpoints
+
+### ESP32 / OTGW32 only
+
+- OTDirect: direct GPIO OpenTherm with five operating modes (no PIC required)
+- W5500 Ethernet with auto-failover to/from Wi-Fi
+- BLE room temperature and humidity sensors (Xiaomi/BTHome v2, up to 4)
+- AP fallback mode (beta): web UI stays reachable when home network is down
+
+---
+
+## Hardware Support
+
+### Platform overview
+
+| Feature | ESP8266 (NodeMCU / Wemos D1 mini) | ESP32 / OTGW32 |
+|---|---|---|
+| OpenTherm via PIC co-processor | Yes (required) | Yes (optional) |
+| OpenTherm via direct GPIO (OTDirect) | No | Yes |
+| Wi-Fi | Yes | Yes |
+| Ethernet (W5500) | No | Yes |
+| BLE sensors | No | Yes (up to 4) |
+| OLED display | Yes | Yes |
+| SAT thermostat | Yes | Yes |
+| Dallas sensors | Yes | Yes |
+| S0 pulse counter | Yes | Yes |
+
+### NodoShop OTGW board variants
+
+| NodoShop OTGW version | ESP8266 module |
+|---|---|
+| 1.x through 2.0 | NodeMCU ESP8266 |
+| 2.3 and later | Wemos D1 mini ESP8266 |
+
+The OTGW32 is a separate board from NodoShop with an ESP32 and onboard OpenTherm interface. It can run with or without the PIC firmware chip installed.
+
+---
+
+## SAT: Smart Autotune Thermostat
+
+SAT is an embedded heating controller that runs entirely on the device. It replaces the room thermostat's role in controlling the boiler: it computes the optimal boiler flow temperature from outdoor temperature and room temperature error, learns your heating system's behaviour over time, and keeps your home at the target temperature without needing Home Assistant or any external controller to be involved in the control loop.
 
 ### What SAT does
 
-SAT combines a **weather-compensated heating curve** with a **PID v3 controller** that adjusts the flow temperature setpoint based on measured room temperature error. It learns your boiler's behavior over time through automatic gain tuning and a thermal model.
+SAT combines a **weather-compensated heating curve** with a **PID v3 controller**. The heating curve calculates a base flow setpoint from outdoor temperature using a configurable coefficient. The PID loop adds a correction on top, based on the difference between actual and target room temperature. Over several days, the auto-tune function analyses heating cycles and adjusts PID gains automatically.
 
-Key capabilities:
+### Key capabilities
 
-- **Weather-compensated heating curve**: calculates the base flow temperature from the outdoor temperature using a configurable coefficient.
-- **PID v3 control**: proportional + integral + derivative correction on top of the heating curve to hold the target room temperature.
-- **Auto-tune**: automatically adjusts PID gains based on cycle analysis, so you don't have to tune them manually.
-- **Two control modes**: continuous modulation (modulates boiler flame directly) and PWM cycling (on/off flame with configurable duty cycle).
-- **Six independent safety layers**: flame health, CH sync, setpoint mismatch, pressure monitoring, cycle classification, and overshoot detection.
-- **Heating curve recommendation**: analyzes error statistics and suggests whether to increase or decrease the curve coefficient.
-- **OPV calibration**: finds your boiler's Overpressure Valve (pressure relief valve) opening temperature so SAT stays below it.
-- **Presets**: six named presets (comfort, eco, away, sleep, activity, home) with configurable target temperatures.
-- **Multi-area room temperature**: averages temperature readings from up to four zones for more accurate control.
-- **Solar gain compensation**: detects solar gain from indoor temperature rise rate and sun elevation, and reduces the setpoint to avoid overheating.
-- **Summer simmer mode**: suppresses heating when outdoor temperature stays above a threshold for a configurable number of hours.
-- **Pressure monitoring**: tracks system pressure and raises an alarm when it drops below the minimum or falls too fast.
-- **BLE temperature sensor** (ESP32 only): receives room temperature and humidity from a Bluetooth LE sensor (e.g., Xiaomi/PVVX).
-
-### Hardware support
-
-| Platform | SAT | BLE sensor |
-| -------- | --- | ---------- |
-| ESP8266 (NodeMCU, Wemos D1 mini) | Full support | Not available |
-| ESP32 | Full support | Available |
+- **Weather compensation**: configurable heating curve coefficient; curve recommendation based on error statistics
+- **PID v3 control**: proportional + integral + derivative correction with automatic gain tuning
+- **Two control modes**: continuous modulation (direct boiler modulation) and PWM flame cycling (on/off duty cycle)
+- **Heating system types**: radiators, underfloor heating, heat pump
+- **Six presets**: comfort, eco, away, sleep, activity, home, each with a configurable target temperature
+- **Multi-zone room temperature**: averages readings from up to four sources (OT, MQTT, BLE, Dallas)
+- **BLE room sensor** (ESP32 only): reads temperature and humidity from a Xiaomi LYWSD03MMC via BTHome v2
+- **Solar gain compensation**: detects solar gain from indoor temperature rise rate and sun elevation angle; reduces setpoint to prevent overheating
+- **Summer Simmer Index**: calculates perceived outdoor heat; suppresses heating when the index stays above a threshold
+- **Summer suppression**: independent outdoor-temperature-based heating cutoff with configurable duration threshold
+- **Pressure monitoring**: tracks system pressure; raises alarm on low pressure or fast pressure drop
+- **OPV calibration**: finds the boiler's Overpressure Valve temperature so SAT stays below it
+- **Six safety layers**: flame health, CH circuit sync, setpoint mismatch, pressure, cycle classification, overshoot detection
+- **Open-Meteo integration**: optional free weather API for outdoor temperature when no local source is available
 
 ### Quick start
 
-1. Open the OTGW Web UI and go to **SAT** in the navigation.
+1. Open the OTGW web interface and go to **SAT** in the navigation.
 2. Enable SAT and set your target room temperature.
-3. Configure your heating system type (radiators / underfloor / heat pump).
-4. Set your boiler capacity (kW) for accurate power estimation.
-5. Let the auto-tune run for a few days to optimize PID gains.
+3. Select your heating system type (radiators / underfloor / heat pump).
+4. Enter your boiler capacity in kW.
+5. Set an initial heating curve coefficient (start with 1.0 for radiators, 0.6 for underfloor; the curve recommendation will guide further tuning).
+6. Save. SAT takes over the flow setpoint immediately. Let auto-tune run for a few days to optimize PID gains.
 
-For detailed setup, including heating curve tuning, OPV calibration, and Home Assistant automation examples, see the [SAT integration guide](backlog/docs/doc-3%20-%20sat-integration-guide.md).
+For detailed setup including OPV calibration and Home Assistant automation examples, see the [SAT integration guide](backlog/docs/doc-3%20-%20sat-integration-guide.md).
 
-### Integration
+### Home Assistant integration
 
-SAT integrates with Home Assistant via MQTT auto-discovery. When SAT is enabled and MQTT is configured:
+When SAT is enabled and MQTT is configured, Home Assistant receives:
 
-- A `climate` entity appears in HA with target temperature control and heat/off mode.
-- 40+ sensor and binary_sensor entities appear for all SAT state, diagnostics, and settings.
-- Commands can be sent via MQTT topics or the REST API.
+- A `climate` entity with target temperature control and heat/off mode selection
+- 40+ sensor and binary_sensor entities for SAT state, diagnostics, and settings
+- BLE sensor entities (ESP32 only): temperature and humidity per sensor
 
-| Interface | Reference |
-| --------- | --------- |
-| MQTT topics (published and subscribed) | [MQTT topic reference](docs/api/MQTT.md) / [Full SAT topic inventory](backlog/docs/doc-1%20-%20sat-mqtt-topics.md) |
-| REST API | [OpenAPI spec](docs/api/openapi.yaml) — all `/api/v2/sat/*` endpoints |
-| OPV calibration guide | [OPV calibration](backlog/docs/doc-2%20-%20sat-opv-calibration.md) |
-| Preset configuration | [Preset configuration](backlog/docs/doc-4%20-%20sat-preset-configuration.md) |
+Commands via MQTT or the REST API (`/api/v2/sat/*`) control all SAT parameters at runtime.
 
----
-
-## What was new in v1.3.4
-
-Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](RELEASE_NOTES_1.3.4.md)
-
-## What was new in v1.3.3
-
-Version 1.3.3 adds PIC-less OTGW support and fixes the dashboard showing empty values for unsupported OpenTherm message IDs. Full release notes: [RELEASE_NOTES_1.3.3.md](RELEASE_NOTES_1.3.3.md)
-
-## What was new in v1.3.2
-
-Version 1.3.2 fixes the persistent file explorer failures reported after v1.3.1. Full release notes: [RELEASE_NOTES_1.3.2.md](RELEASE_NOTES_1.3.2.md)
-
-## What was new in v1.3.1
-
-Version 1.3.1 was a stability release fixing command queue reliability, CS override interference, and serial coordination issues reported after v1.3.0. Full release notes: [RELEASE_NOTES_1.3.1.md](RELEASE_NOTES_1.3.1.md)
-
-## What was new in v1.3.0
-
-Version 1.3.0 is a major feature release building on v1.2.0 with PIC settings visibility, safer upgrades, better recovery, optional admin protection, fuller `PS=1` integration, and significantly lower RAM pressure. Full release notes: [RELEASE_NOTES_1.3.0.md](RELEASE_NOTES_1.3.0.md) / [Breaking Changes Log](docs/BREAKING_CHANGES.md)
-
-### Highlights
-
-- **PIC Gateway Settings Panel:** All 15 PIC configuration registers (setpoint override, GPIO, LEDs, tweaks, smart power, thermostat detection, etc.) are now exposed via REST API (`/api/v2/pic/settings`), MQTT, and a new "Gateway Settings" section in the Web UI. Settings are read on-demand from the PIC (one PR= every 3s, full cycle ~45s) and cached in the browser with localStorage for up to 7 days. Live values show in green, cached in amber.
-- **Single-Click GitHub Release OTA:** The update page now lists GitHub releases with Installed/Update/Rollback badges. One-click download and flash with semver-aware version comparison including pre-release tags.
-- **Optional Protected Admin Endpoints:** Settings, maintenance, file-management, reboot, and OTA routes can now be protected with HTTP Basic Auth.
-- **Configurable MQTT Publish Gating:** OpenTherm and `PS=1` summary publishing can now be rate-limited to reduce MQTT broker load and WiFi chatter, with better status republish behavior after boot and reconnect.
-- **Full `PS=1` Summary Integration:** `PS=1` output is now translated into the normal data pipeline, published to MQTT, and exposed to Home Assistant discovery.
-- **Web UI Enhancements:** Light/dark theme toggle, one-shot OTGW PIC commands from the monitor page, richer settings tooltips, gateway mode indicator, WebSocket connection status with tooltips, simulation badge, and improved heap/device reporting.
-- **Safer OTA / LittleFS Updates:** Reboot verification via `/api/v2/health`, browser backups of `settings.ini` and `dallas_labels.ini`, Dallas labels auto-preserved through localStorage, hardened filesystem flashing against WiFi reconnect corruption.
-- **Triple-Reset WiFi Recovery:** Three quick hardware resets within 10 seconds clear stored WiFi credentials and reopen the captive portal without requiring a reflash.
-- **Non-Blocking WiFi Reconnect:** The blocking 30-second reconnect loop is replaced with a state machine, preventing main-loop freezes on a heating system controller.
-- **Security Hardening:** Centralized HTTP Basic Auth enforcement for all POST/PUT API endpoints. CORS wildcard replaced with dynamic origin validation. Webhook hostname SSRF prevention via DNS resolution. XSS fix in statistics table. Boot command and MQTT payload validation. ~450 lines of dead code removed.
-- **Memory and Stability:** ArduinoJson removed, settings/state reorganized into structs, String class eliminated from hot paths including CSRF validation. MQTT autodiscovery memory reduced via streaming. ~1,400 bytes of stack pressure eliminated through centralized buffers. Fixed `millis()` wraparound bug, f8.8 negative value encoding, and OT message parse validation.
-- **No New Breaking Changes:** For v1.2.0 users, this release adds features and hardening without introducing new MQTT topic, REST API, or settings-format breaks.
-
-## What was new in v1.2.0
-
-Version 1.2.0 was the protocol-alignment and discovery release. It expanded Home Assistant coverage across the OpenTherm specification and tightened MQTT, REST API, and Web UI behavior. Full release notes: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md)
-
-### Highlights
-
-- **Complete Home Assistant discovery expansion:** 309 auto-discovery configurations across 80+ OpenTherm message IDs, covering heating, cooling, solar, DHW, ventilation, CH2, humidity, counters, and system status.
-- **OpenTherm v4.2 alignment:** Added missing IDs `39` and `93-97`, corrected types and units, and introduced compatibility handling for legacy IDs `50-63`.
-- **MQTT / webhook / diagnostics improvements:** Added optional source-separated MQTT topics, webhook support, safer MQTT auto-configuration, and richer serial/WebSocket diagnostics.
-- **v2-only API baseline:** `/api/v0/` and `/api/v1/` were removed in favor of `/api/v2/`, with related device-info key updates for raw API consumers.
-- **Upgrade note:** v1.2.0 introduced real migration items for MQTT topics, Home Assistant entities, and some raw API fields. See [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) and [docs/fixes/opentherm-v42-mqtt-breaking-changes.md](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
-
-## What was new in v1.1.0
-
-Version 1.1.0 builds on the stable v1.0.0 foundation with Dallas temperature sensor enhancements, a complete RESTful API v2, WebUI data persistence, and 20 bug fixes from a comprehensive codebase review. Full release notes: [RELEASE_NOTES_1.1.0.md](RELEASE_NOTES_1.1.0.md)
-
-### Dallas Sensors, RESTful API v2, and 20-Bug Codebase Overhaul
-
-**v1.1.0 delivers custom labels and real-time graphs for Dallas temperature sensors, a fully RESTful API v2 with 13 new endpoints (compliance score 5.4 → 8.5/10), and resolution of 20 bugs spanning memory safety, data integrity, concurrency, and security.**
-
-- **Dallas Sensor Custom Labels & Graphs** — Inline label editing in the Web UI, stored in `/dallas_labels.ini` with zero backend RAM, automatic backup/restore during filesystem flash, and real-time graph visualization with 16-color palette. REST API: `GET/POST /api/v2/sensors/labels`.
-- **RESTful API v2** — 13 new endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS/OPTIONS support, RESTful resource naming (`messages/{id}`, `commands`, `device/info`). All frontend calls migrated to v2. See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
-- **20-bug codebase review** — Memory safety (OOB write, stack overflow), data integrity (MQTT hour bitmask, −127°C sensor published to MQTT), concurrency (ISR race in S0 counter), security (reflected XSS), reliability (file descriptor leak, null pointer crash, 750ms blocking sensor read), GPIO output feature fix, flash wear reduction (20 writes → 1). Full details: [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md).
-- **WebUI Data Persistence** — Automatic `localStorage` persistence with debounced saves, dynamic memory management, normal/capture modes, and auto-restoration on page load.
-- **Heap Memory Monitoring** — 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control ([ADR-030](docs/adr/ADR-030-heap-memory-monitoring.md)).
-- **Browser Debug Console (`otgwDebug`)** — Full diagnostic toolkit in the browser console: `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `sendCmd()`, `exportLogs()`, and more.
-- **PS Mode detection** — Automatic detection of `PS=1`; hides the OT log section, disables WebSocket streaming, suppresses time-sync commands.
-- **MQTT auth fix** — Whitespace automatically trimmed from MQTT credentials, fixing auth failures when upgrading from v0.10.x.
-
-### Notes for upgraders from v1.0.x
-
-No breaking API or MQTT changes. A filesystem flash and hard browser refresh (Ctrl+F5) are recommended. The v0 and unversioned REST API endpoints deprecated in this release were removed in v1.2.0 (return 410 Gone).
-
-## 🏁 Introduced in v1.0.0
-
-Version 1.0.0 was a major milestone delivering improved stability, a modern user interface, and robust integration.
-
-> 📝 Full release notes: [RELEASE_NOTES_1.0.0.md](RELEASE_NOTES_1.0.0.md)
-
-### Highlights
-
-- **Real-Time Graphs & Statistics**: Live boiler data visualization (temperatures, setpoints) with responsive graphs and a long-term statistics dashboard.
-- **Modern Web UI**: Fully integrated Dark Mode, responsive mobile design, redesigned File System Explorer, and WebSocket-based live log viewer.
-- **Improved Flashing**: Reliable web-based firmware and filesystem flashing with health-check reboot verification. New `flash_esp.py` script for easy updates.
-- **MQTT Auto Discovery**: Added Outside Temperature override (`outside`) support; static 1350-byte MQTT buffer prevents heap fragmentation.
-- **Binary Safety**: Critical fix for Exception (2) crashes during PIC flashing (`strncmp_P` → `memcmp_P`).
-- **Connectivity & Security**: Rewritten Wi-Fi logic with improved watchdog handling; CSRF protection, masked password fields, input sanitization.
-- **Gateway Mode**: Reliable detection using `PR=M` command. New `NTPsendtime` setting.
+| Reference | Link |
+|---|---|
+| MQTT topics | [docs/api/MQTT.md](docs/api/MQTT.md) |
+| Full SAT topic list | [backlog/docs/doc-1 - sat-mqtt-topics.md](backlog/docs/doc-1%20-%20sat-mqtt-topics.md) |
+| REST API | [docs/api/openapi.yaml](docs/api/openapi.yaml) |
+| OPV calibration guide | [backlog/docs/doc-2 - sat-opv-calibration.md](backlog/docs/doc-2%20-%20sat-opv-calibration.md) |
+| Preset configuration | [backlog/docs/doc-4 - sat-preset-configuration.md](backlog/docs/doc-4%20-%20sat-preset-configuration.md) |
 
 ---
 
-## Features at a glance
+## Quick Start
 
-### Home Assistant integration via MQTT
+### 1. Flash the firmware
 
-The recommended way to integrate with Home Assistant. The firmware publishes all OpenTherm data to MQTT and supports automatic discovery of entities.
+**Recommended** (downloads and flashes the latest release):
 
-- **309 auto-discovery configurations** across 80+ OpenTherm message IDs -- heating, cooling, solar thermal, DHW, ventilation, CH2, humidity, operational counters, fault diagnostics.
-- Climate entity with temperature override support.
-- Configurable publish interval to reduce broker load while keeping data fresh.
-- Source-separated MQTT topics (optional) for per-device breakdown.
-- Webhook support for triggering HTTP calls on status bit changes (flame on, fault detected, etc.).
+```bash
+python3 flash_esp.py
+```
 
-See [Setting up MQTT with Home Assistant](#setting-up-mqtt-with-home-assistant) below for configuration steps.
+Build from source and flash:
 
-### Web interface
+```bash
+pio run -e esp8266 --target upload    # ESP8266
+pio run -e esp32   --target upload    # ESP32 / OTGW32
+```
 
-- Live OpenTherm message log via WebSocket (port 81), with filtering, pausing, and raw message decoding.
-- Real-time graphs for boiler temperatures, setpoints, water pressure, and modulation level ([ECharts](https://echarts.apache.org/)).
-- Dallas temperature sensors shown in graphs with custom labels and a 16-color palette.
-- Dark/light theme toggle with per-browser persistence.
-- PIC gateway settings panel -- all 15 PIC configuration registers readable from the browser.
-- File system explorer with upload, download, and delete.
-- Firmware and filesystem OTA updates with health-check verification after reboot.
+See [docs/FLASH_GUIDE.md](docs/FLASH_GUIDE.md) for full instructions including filesystem flashing.
 
-### REST API
+### 2. Connect to Wi-Fi
 
-A documented, versioned REST API for automation and integration beyond MQTT.
+On first boot the device creates an access point named `<hostname>-<mac>`. Connect to it. A captive portal opens where you enter your home Wi-Fi credentials. On ESP32/OTGW32 with a W5500 and an Ethernet cable plugged in, wired Ethernet is used directly and the Wi-Fi setup is optional.
 
-- All endpoints under `/api/v2/` with consistent JSON responses and proper HTTP status codes.
-- OpenTherm data queries by message ID or label.
-- Command submission, settings management, sensor label CRUD, PIC settings readout.
-- CORS support for browser-based tools.
-- **[REST API reference](docs/api/README.md)** -- full endpoint documentation with examples for Home Assistant, Python, and JavaScript.
-- **[OpenAPI 3.0 specification](docs/api/openapi.yaml)** -- machine-readable spec for Swagger UI, Postman, or code generation.
+### 3. Open the Web UI
 
-### MQTT reference
+Navigate to `http://<device-ip>/` or `http://otgw.local/`. The dashboard shows the live OpenTherm log, temperatures, and boiler status.
 
-Full MQTT topic documentation including namespace conventions, published topics, command topics, and Home Assistant discovery details.
+### 4. Configure MQTT
 
-- **[MQTT topic reference](docs/api/MQTT.md)**
+Go to **Settings** and fill in your MQTT broker details. Enable **HA Discovery**. Click **Save**. Home Assistant discovers the device within seconds.
 
-### Ser2net / OTmonitor
+### 5. Check Home Assistant
 
-- TCP serial socket on port **25238** for OTmonitor and other tools that speak the OTGW serial protocol.
-- Command queue coordination: the firmware detects ser2net traffic and pauses its own queued commands to avoid PIC serial bus conflicts ([ADR-059](docs/adr/ADR-059-ser2net-queue-awareness.md)).
-- `NTPsendtime` setting available to disable time synchronization when your ser2net workflow handles time independently.
-
-### Dallas temperature sensors
-
-- DS18B20/DS18S20/DS1822 support with Home Assistant auto-discovery.
-- Custom labels editable in the Web UI (click to rename). Stored in `/dallas_labels.ini` with zero backend RAM usage.
-- Automatic backup and restore of labels during filesystem flash.
-- REST API: `GET/POST /api/v2/sensors/labels`. See [Dallas sensor API](docs/api/DALLAS_SENSOR_LABELS_API.md) and [sensor documentation](docs/features/dallas-temperature-sensors.md).
-
-### S0 pulse counter
-
-- kWh meter pulse counting on a configurable GPIO pin.
-
-### Stability and memory
-
-- Extensive use of PROGMEM to keep string literals in flash, not RAM.
-- ArduinoJson removed; `String` class eliminated from all hot paths.
-- Non-blocking WiFi reconnect state machine -- heating continues while WiFi recovers.
-- Triple-reset WiFi recovery: three quick resets reopen the captive portal without reflashing.
-- Heap monitoring with adaptive throttling and WebSocket backpressure.
-- Optional HTTP Basic Auth for settings and maintenance endpoints.
+Go to **Settings > Devices and Services > MQTT**. The OTGW device appears with 250+ entities already created and ready to use.
 
 ---
 
-## Setting up MQTT with Home Assistant
+## Setting Up MQTT with Home Assistant
 
 ### Prerequisites
 
-- Home Assistant with MQTT integration installed (Settings > Devices & Services > MQTT).
-- An MQTT broker running (e.g., Mosquitto add-on in Home Assistant, or an external broker).
+- Home Assistant with the MQTT integration installed (Settings > Devices and Services > MQTT).
+- An MQTT broker running (Mosquitto add-on, or an external broker).
 - Your OTGW device connected to the same network.
 
-### Step 1: Configure MQTT in the OTGW Web UI
+### Step 1: Configure MQTT in the web UI
 
-Open `http://<device-ip>/` in your browser and go to **Settings**.
+Open `http://<device-ip>/` and go to **Settings**.
 
-| Setting | What to enter | Example |
-| --- | --- | --- |
-| **MQTT Broker** | IP address or hostname of your broker | `192.168.1.100` |
-| **MQTT Port** | Broker port (usually 1883) | `1883` |
-| **MQTT User** | Broker username (if authentication is enabled) | `mqttuser` |
-| **MQTT Password** | Broker password | `••••••` |
-| **MQTT Top Topic** | Prefix for all topics published by the gateway | `OTGW` |
-| **MQTT Unique ID** | Unique identifier for this device | `otgw` |
-| **HA Discovery** | Enable Home Assistant MQTT auto-discovery | Checked |
-
-Click **Save** and the device will connect to your broker. The status bar at the bottom of the Web UI shows MQTT connection state.
+| Setting | Description | Example |
+|---|---|---|
+| MQTT Broker | IP or hostname of your broker | `192.168.1.100` |
+| MQTT Port | Broker port | `1883` |
+| MQTT User | Broker username | `mqttuser` |
+| MQTT Password | Broker password | (your password) |
+| MQTT Top Topic | Prefix for all published topics | `OTGW` |
+| MQTT Unique ID | Identifier for this device in HA | `otgw` |
+| HA Discovery | Enables auto-discovery payloads | checked |
 
 ### Step 2: Verify in Home Assistant
 
-After saving, Home Assistant should discover the OTGW device within a few seconds:
-
-1. Go to **Settings > Devices & Services > MQTT**.
-2. Look for a new device named after your OTGW.
-3. Click it to see all discovered entities -- heating status, temperatures, setpoints, modulation, flame, DHW, and more.
-
-If your boiler supports cooling, solar thermal, ventilation, or a second heating circuit, those entities appear automatically too. No manual YAML configuration needed.
+After saving, Home Assistant discovers the OTGW device. Go to **Settings > Devices and Services > MQTT** to see all entities: temperatures, setpoints, modulation, flame, DHW, faults, and more. No manual YAML required.
 
 ### Step 3: Tune the publish interval
 
-By default (`0`), the gateway publishes every OpenTherm message as it arrives -- multiple times per second. This is the freshest data but creates high MQTT traffic.
+The default publish interval (`0`) publishes every OpenTherm message as it arrives. This gives the freshest data but creates high MQTT traffic. Set **Publish Interval** to `10`-`60` seconds to publish on change and re-publish unchanged values as a heartbeat.
 
-Set the **Publish Interval** (under Settings > MQTT) to a value like `60` seconds. The gateway will then:
-- Publish immediately when a value **changes**.
-- Re-publish unchanged values once per interval as a heartbeat (so Home Assistant does not mark sensors as unavailable).
+### Step 4: Send commands from Home Assistant
 
-A value of `10`-`60` is a good starting point. Adjust based on how responsive you need your automations to be.
-
-### Step 4: Optional -- send commands from Home Assistant
-
-The gateway accepts commands on its MQTT subscribe topic. The topic structure is:
+The gateway subscribes to a command topic. Structure:
 
 ```
 <TopTopic>/set/<UniqueId>/<command>
@@ -285,7 +217,7 @@ The gateway accepts commands on its MQTT subscribe topic. The topic structure is
 Common commands:
 
 | Command | Description | Example payload |
-| --- | --- | --- |
+|---|---|---|
 | `setpoint` | Temporary temperature override (TT) | `21.5` |
 | `constant` | Constant temperature override (TC) | `22.0` |
 | `outside` | Override outside temperature (OT) | `15.5` |
@@ -293,7 +225,7 @@ Common commands:
 | `maxchsetpt` | Max CH water setpoint (SH) | `60` |
 | `maxdhwsetpt` | Max DHW setpoint (SW) | `55` |
 
-**Example automation -- sync outside temperature from another sensor:**
+Example: sync outdoor temperature from another HA sensor:
 
 ```yaml
 automation:
@@ -308,157 +240,127 @@ automation:
           payload: "{{ states('sensor.outdoor_temperature') }}"
 ```
 
-For more examples: [Outside Temperature Override](example-api/outside_temperature_override_examples.md) | [Hot Water Control](example-api/hotwater_examples.md)
+More examples: [Outside Temperature Override](example-api/outside_temperature_override_examples.md) | [Hot Water Control](example-api/hotwater_examples.md)
 
-### Alternative: OpenTherm Gateway integration (no MQTT)
+### Alternative: built-in HA OpenTherm Gateway integration
 
-If you prefer not to use MQTT, Home Assistant has a built-in [OpenTherm Gateway integration](https://www.home-assistant.io/integrations/opentherm_gw/) that connects directly via the TCP serial socket:
+The Home Assistant [OpenTherm Gateway integration](https://www.home-assistant.io/integrations/opentherm_gw/) can connect directly via the TCP serial bridge without MQTT:
 
 ```
 socket://<device-ip>:25238
 ```
 
-Use port **25238**, not 23. Port 23 is the telnet debug console.
-
-This integration provides basic thermostat control but does not expose the full range of OpenTherm data that MQTT auto-discovery covers.
+This provides basic thermostat control but does not expose the full range of data that MQTT auto-discovery covers.
 
 ---
 
-## Quick start
-
-1. **Flash the firmware** to your ESP8266.
-   - **Recommended**: Use the included script: `python3 flash_esp.py` (downloads and flashes the latest release).
-   - `python3 flash_esp.py --build` to build from source instead.
-   - See [FLASH_GUIDE.md](docs/FLASH_GUIDE.md) for detailed instructions.
-2. **Connect to WiFi**: The device starts an AP named `<hostname>-<mac>`. Connect and configure your WiFi credentials.
-3. **Open the Web UI** at `http://<device-ip>/` and configure MQTT (see [above](#setting-up-mqtt-with-home-assistant)).
-4. **Check Home Assistant** for auto-discovered entities.
-
-## Hardware support
-
-Starting with hardware version 2.3, the included ESP8266 devkit changed from NodeMCU to a Wemos D1 mini. Both are supported.
-
-| NodoShop OTGW version | ESP8266 devkit |
-| --- | --- |
-| 1.x--2.0 | NodeMCU ESP8266 devkit |
-| 2.3--2.x | Wemos D1 mini ESP8266 devkit |
-
-## Connectivity summary
+## Connectivity Summary
 
 | Port | Protocol | Purpose |
-| --- | --- | --- |
+|---|---|---|
 | 80 | HTTP | Web UI and REST API |
-| 23 | Telnet | Debug logging |
-| 25238 | TCP | OTGW serial interface (OTmonitor, HA OpenTherm integration) |
-| -- | MQTT | Home automation integration (recommended) |
+| 81 | WebSocket | Live OpenTherm log stream |
+| 23 | Telnet | Debug log output |
+| 25238 | TCP | OTGW serial bridge (OTmonitor, HA built-in integration) |
+| 1883 | MQTT (outbound) | Home automation integration |
 
-The firmware also exposes a Wi-Fi configuration portal (AP mode) when it cannot connect to a saved network.
+The device also exposes a Wi-Fi configuration portal (AP mode) on first boot or after triple-reset recovery.
 
-## Security note
+---
 
-The Web UI and APIs are designed for use on a trusted local network. Do not expose the device directly to the internet; use a VPN for remote access. A reverse proxy can help with HTTP UI/API access, but WebSocket features assume plain HTTP/WS and may not work through an HTTPS proxy.
+## Security Notes
+
+The web UI and APIs are designed for use on a trusted local network. Do not expose the device directly to the internet. Use a VPN for remote access. A reverse proxy works for the HTTP/REST interface, but WebSocket (live log) requires plain `ws://` and does not work through an HTTPS-terminating proxy.
 
 ### Protected endpoints (optional)
 
-Set an **endpoint password** in Settings (field: `httppasswd`) to require HTTP Basic Auth for:
+Set an **endpoint password** in Settings (`httppasswd`) to require HTTP Basic Auth for:
 
-- Settings (reading and changing device configuration)
-- File management (upload/delete)
+- Reading and changing device settings
+- File upload, download, and delete
 - Reboot and wireless reset
-- OTA firmware updates
+- OTA firmware and filesystem updates
 - Webhook test
 
-Read-only monitoring (sensor values, device status, WebSocket connection) stays open.
+Live monitoring, sensor values, and the WebSocket stream remain open without authentication.
+
+---
 
 ## Documentation
 
 | Topic | Link |
-| --- | --- |
+|---|---|
 | Wiki (recommended starting point) | <https://github.com/rvdbreemen/OTGW-firmware/wiki> |
+| Flash guide | [docs/FLASH_GUIDE.md](docs/FLASH_GUIDE.md) |
+| Local build guide | [docs/BUILD.md](docs/BUILD.md) |
 | REST API reference | [docs/api/README.md](docs/api/README.md) |
 | OpenAPI specification | [docs/api/openapi.yaml](docs/api/openapi.yaml) |
 | MQTT topic reference | [docs/api/MQTT.md](docs/api/MQTT.md) |
+| WebSocket protocol | [docs/api/WEBSOCKET_FLOW.md](docs/api/WEBSOCKET_FLOW.md) |
 | Dallas sensor labels API | [docs/api/DALLAS_SENSOR_LABELS_API.md](docs/api/DALLAS_SENSOR_LABELS_API.md) |
 | Webhook documentation | [docs/features/webhook.md](docs/features/webhook.md) |
-| Flash guide | [docs/FLASH_GUIDE.md](docs/FLASH_GUIDE.md) |
-| Local build guide | [docs/BUILD.md](docs/BUILD.md) |
-| Code quality checker | [docs/EVALUATION.md](docs/EVALUATION.md) |
+| Dallas sensor documentation | [docs/features/dallas-temperature-sensors.md](docs/features/dallas-temperature-sensors.md) |
 | Architecture Decision Records | [docs/adr/README.md](docs/adr/README.md) |
-| WebSocket architecture | [docs/api/WEBSOCKET_FLOW.md](docs/api/WEBSOCKET_FLOW.md) |
-| Upgrading from 0.9.x / 0.10.y | [docs/upgrade-from-0.x.md](docs/upgrade-from-0.x.md) |
+| C4 architecture context | [docs/c4/c4-context.md](docs/c4/c4-context.md) |
+| Code quality checker | [docs/EVALUATION.md](docs/EVALUATION.md) |
+| Upgrading from 0.x | [docs/upgrade-from-0.x.md](docs/upgrade-from-0.x.md) |
+| Release notes | [docs/releases/](docs/releases/) |
 
-## Important warnings
+---
 
-- **Do not flash OTGW PIC firmware over Wi-Fi using OTmonitor.** You can brick the PIC. Use the built-in PIC firmware upgrade feature instead.
-- **Dallas GPIO default changed in v1.0.0**: Default pin moved from GPIO 13 (D7) to GPIO 10 (SD3). If upgrading from an older version, verify your wiring or change the setting back to 13.
-- **REST API v0/v1 removed in v1.2.0**: Only `/api/v2/` remains. See the [REST API reference](docs/api/README.md).
-- **MQTT topic spelling corrections in v1.2.0**: A few typos were fixed (`eletric_production` -> `electric_production`, etc.). Delete orphaned HA entities and let discovery recreate them. See [breaking changes details](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
+## Important Warnings
 
-## History and scope
+- **Do not flash PIC firmware over Wi-Fi using OTmonitor.** This can brick the PIC microcontroller. Use the built-in PIC firmware upgrade feature in the web UI instead.
+- **Dallas GPIO default changed in v1.0.0**: The default pin moved from GPIO 13 (D7) to GPIO 10 (SD3). If upgrading from a version before v1.0.0, verify your wiring or change the setting back to 13.
+- **REST API v0/v1 removed in v1.2.0**: Only `/api/v2/` endpoints remain. See the [REST API reference](docs/api/README.md).
+- **MQTT topic corrections in v1.2.0**: A few spelling fixes changed topic names (`eletric_production` to `electric_production`, etc.). Delete orphaned Home Assistant entities and let discovery recreate them. Details: [breaking changes](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
+- **ESP32 OTDirect note**: When OTDirect is active, the PIC UART is bypassed. Do not attempt PIC firmware upgrades while OTDirect is the active OpenTherm path.
 
-The OpenTherm Gateway itself (hardware + PIC firmware + OTmonitor tooling) originates from **Schelte Bron's OTGW project**. This firmware builds on that ecosystem by running on the ESP8266 inside the **NodoShop OTGW** to expose OTGW data and controls over the network.
+---
 
-This project is primarily designed for the NodoShop OTGW hardware with an ESP8266 (NodeMCU / Wemos D1 mini). If you have a different OTGW build, it may work, but NodoShop OTGW compatibility is the main target.
+## History and Scope
 
-## Release history
+The OpenTherm Gateway hardware and PIC firmware originate from **Schelte Bron's OTGW project** (<https://otgw.tclcode.com/>). This firmware builds on that ecosystem by running on the ESP8266 or ESP32 inside the NodoShop OTGW to expose the gateway's data and controls over the network.
 
-Release notes for all versions are in [docs/releases/](docs/releases/). Prebuilt firmware binaries are on the [GitHub releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).
+Primary hardware targets are the NodoShop OTGW (ESP8266, NodeMCU or Wemos D1 mini) and the NodoShop OTGW32 (ESP32). Other boards may work, but these are the tested and supported configurations.
 
-<details><summary>Version history (click to expand)</summary>
+---
 
-| Version | Highlights |
-| --- | --- |
-| **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/RELEASE_NOTES_1.3.4.md) [1.3.5](RELEASE_NOTES_1.3.5.md) |
-| **1.2.0** | Complete HA discovery expansion (309 configs, 80+ message IDs), OpenTherm v4.2 alignment, webhook support, source-separated MQTT topics, v0/v1 API removed. [Notes](docs/releases/RELEASE_NOTES_1.2.0.md) |
-| **1.1.0** | Dallas sensor custom labels and graphs, RESTful API v2 (13 new endpoints), WebUI data persistence, browser debug console, PS mode detection, 20 bug fixes. [Notes](docs/releases/RELEASE_NOTES_1.1.0.md) |
-| **1.0.0** | Milestone release: real-time graphs, modern Web UI with dark mode, WebSocket live log, MQTT auto-discovery, interactive flashing tool, PROGMEM memory safety. [Notes](docs/releases/RELEASE_NOTES_1.0.0.md) |
-| 0.10.3 | MQTT password masking, HA discovery template improvements, status function fixes. |
-| 0.10.2 | PIC firmware update fix, filesystem update with latest PIC firmware. |
-| 0.10.1 | Build process improvements, VH status parsing fix, WiFi quality indicator. |
-| 0.10.0 | PIC16F1847 (6.x firmware) support, DHCP NTP override, S0 pulse counter, Dallas auto-configure. |
-| 0.9.x | JIT HA auto-discovery, climate entity, MQTT set commands, time setup, NTP improvements. |
-| 0.8.x | MQTT topic convention change, HA device grouping, climate entity, PIC firmware integration, Dallas sensors, command queue. |
-| 0.7.x | LittleFS migration, ser2net on port 25238, ventilation/heat recovery message IDs, PIC reset on boot. |
-| 0.6.x | Standalone Web UI, OTA support. |
-| 0.5.x | REST API v1, settings UI. |
-| 0.4.x | Ser2net, REST API v0. |
-| 0.2--0.3 | MQTT integration, serial stream. |
-| 0.0.1 | Initial OT protocol parsing. |
-
-</details>
-
-## Community and support
+## Community and Support
 
 - Discord: <https://discord.gg/zjW3ju7vGQ>
-- Issues / bug reports: <https://github.com/rvdbreemen/OTGW-firmware/issues>
+- Issues and bug reports: <https://github.com/rvdbreemen/OTGW-firmware/issues>
+- GitHub Releases (prebuilt binaries): <https://github.com/rvdbreemen/OTGW-firmware/releases>
+
+---
 
 ## Credits
 
-Shoutout to early adopters helping me out testing and discussing the firmware in development. For pushing features, testing and living on the edge.
+Reaching v2.0.0 would not have been possible without years of community testing, feedback, and contribution. Thank you to everyone who has reported issues, pushed for features, and helped others in the Discord.
 
-Reaching version 1.0.0 wouldn't have been possible without the community. So shoutout to the following people for the collaboration on development:
+Special thanks to:
 
-- @hvxl for all his work on the OTGW hardware, PIC firmware and ESP coding.
-- @sjorsjuhmaniac for improving the MQTT naming convention and HA integration, adding climate entity and otgw device
-- @vampywiz17 early adopter and tester
-- @Stemplar reporting issues realy on
-- @proditaki for creating Domiticz plugin for OTGW-firmware
-- @tjfsteele for endless hours of testing
-- @DaveDavenport for fixing all known and unknown issues with the codebase, it's stable with you
-- @DutchessNicole for fixing the Web UI over time
-- @RobR for his work in the s0 counter implementation
-- @GeorgeZ83 for improving Home Assistant MQTT integration and climate entity support
+- **@hvxl (Schelte Bron)** for all his work on the OTGW hardware, PIC firmware, and ESP coding, and for providing access to the PIC upgrade routines that make reliable PIC firmware flashing possible. If you want to thank Schelte for his work, head over to <https://otgw.tclcode.com/> and donate.
+- **@sjorsjuhmaniac** for improving the MQTT naming convention and Home Assistant integration, and for the climate entity and OTGW device model.
+- **@GeorgeZ83** for improving Home Assistant MQTT integration and climate entity support across many releases.
+- **@DaveDavenport** for fixing known and unknown codebase issues and making the firmware substantially more stable.
+- **@DutchessNicole** for improving the Web UI over multiple releases.
+- **@vampywiz17** for early adoption and thorough testing.
+- **@Stemplar** for early issue reporting.
+- **@proditaki** for creating the Domoticz plugin for OTGW-firmware.
+- **@tjfsteele** for endless hours of testing.
+- **@RobR** for the S0 pulse counter implementation.
 
-And for all those people that keep reporting issue, pushing for more and helping other in the community all the time.
+And to everyone who keeps reporting issues, pushing for more, and helping others in the community.
 
-A big thank should goto **Schelte Bron** @hvxl for amazing work on the OpenTherm Gateway project and for providing access to the upgrade routines of the PIC. Enabling this custom firmware a reliable way to upgrade you PIC firmware. If you want to thank Schelte Bron for his work on the OpenTherm Gateway project, just head over to his homepage and donate to him: <https://otgw.tclcode.com/>
+---
 
-## Buy me a coffee
-
-In case you want to buy me a coffee, head over here:
+## Buy Me a Coffee
 
 [![Buy me a coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=rvdbreemen&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00)](https://www.buymeacoffee.com/rvdbreemen)
 
+---
+
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [LICENSE](LICENSE).
