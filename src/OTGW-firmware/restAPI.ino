@@ -1618,8 +1618,19 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
   sendJsonMapEntry(F("networkmode"), networkModeName());
 #if defined(_VERSION_PRERELEASE)
-  if (state.net.bAPFallback) sendJsonMapEntry(F("apfallback"), true);
+  if (state.net.bAPFallback) {
+    sendJsonMapEntry(F("apfallback"), true);
+    sendJsonMapEntry(F("wifiquality"), 0);
+  } else
 #endif
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) {
+    sendJsonMapEntry(F("wifiquality"), 100);
+  } else
+#endif
+  {
+    sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
+  }
 
   sendEndJsonMap(F("devtime"));
 

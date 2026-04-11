@@ -359,6 +359,13 @@
   .net-status.net-ap .net-icon { color: #ffb74d; }
   .net-status.net-ap .net-status-text { color: #ffb74d; font-weight: bold; }
 
+  /* Signal strength bars — dark theme overrides */
+  .sig-bar { background: #444; }
+  .net-signal-bars[data-quality="good"]   .sig-bar.active { background: #66bb6a; }
+  .net-signal-bars[data-quality="medium"] .sig-bar.active { background: #ffb74d; }
+  .net-signal-bars[data-quality="poor"]   .sig-bar.active { background: #ef5350; }
+  .net-signal-bars[data-quality="none"]   .sig-bar.active { background: #757575; }
+
   /* PIC firmware page */
 .pictable {
   display: table;
