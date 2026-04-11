@@ -356,6 +356,8 @@
 
   .net-status.net-wifi .net-icon { color: #66bb6a; }
   .net-status.net-ethernet .net-icon { color: #42a5f5; }
+  .net-status.net-ap .net-icon { color: #ffb74d; }
+  .net-status.net-ap .net-status-text { color: #ffb74d; font-weight: bold; }
 
   /* PIC firmware page */
 .pictable {

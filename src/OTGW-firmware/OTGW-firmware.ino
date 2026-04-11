@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -153,7 +153,16 @@ void setup() {
   bool forceWifiPortal = shouldForceWifiConfigPortal();
   startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal);  // timeout 240 seconds
 
+#if defined(_VERSION_PRERELEASE)
+  if (state.net.bAPFallback) {
+    SetupDebugf(PSTR("BETA: running in AP fallback mode, SSID=[%s]\r\n"), state.net.sAPSSID);
+  }
+#endif
+
   //setup NTP after WiFi; startNTP() restores hostname after configTime()
+#if defined(_VERSION_PRERELEASE)
+  if (!state.net.bAPFallback)
+#endif
   startNTP();
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
@@ -164,6 +173,9 @@ void setup() {
   setupFSexplorer();
   startWebserver();
   startWebSocket();          // start the WebSocket server for OT log streaming
+#if defined(_VERSION_PRERELEASE)
+  if (!state.net.bAPFallback)
+#endif
   startMQTT();               // start the MQTT after webserver, always.
  
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog

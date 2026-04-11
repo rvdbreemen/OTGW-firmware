@@ -963,9 +963,12 @@ void sendMQTT(const char* topic, const char *json);
 // Forward declaration; implementation is provided later in this file
 void sendMQTTStreaming(const char* topic, const char *json, const size_t len);
 
-void handleMQTT() 
-{  
+void handleMQTT()
+{
   if (!settings.mqtt.bEnable) return;
+#if defined(_VERSION_PRERELEASE)
+  if (state.net.bAPFallback) return;  // BETA: no MQTT in AP fallback mode
+#endif
   DECLARE_TIMER_SEC(timerMQTTwaitforconnect, 42, CATCH_UP_MISSED_TICKS);   // wait before trying to connect again
   DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // wait for retry
 

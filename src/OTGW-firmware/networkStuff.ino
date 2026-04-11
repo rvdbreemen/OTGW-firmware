@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -132,6 +132,23 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 
   if (!wifiConnected)
   {
+#if defined(_VERSION_PRERELEASE)
+    if (wifiSaved && !forcePortal) {
+      // BETA: credentials stored but WiFi unreachable at boot — enter AP fallback
+      // instead of blocking in the config portal.
+      DebugTln(F("BETA: WiFi unavailable at boot, skipping config portal → AP fallback"));
+      startAPFallback();
+      // Set up OTA updater so firmware flashing works from AP mode
+      httpUpdater.setup(&httpServer);
+      httpUpdater.setIndexPage(UpdateServerIndex);
+      httpUpdater.setSuccessPage(UpdateServerSuccess);
+      if (settings.sHTTPpasswd[0] != '\0') {
+        httpUpdater.updateCredentials("admin", settings.sHTTPpasswd);
+      }
+      DebugTf(PSTR(" took [%lu] seconds => AP fallback\r\n"), (millis() - lTime) / 1000);
+      return;
+    }
+#endif
     DebugTln(F("Starting config portal..."));
     if (!manageWiFi.startConfigPortal(thisAP))
     {
@@ -190,18 +207,59 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 } // startWiFi()
 
 //===========================================================================================
+#if defined(_VERSION_PRERELEASE)
+// *** BETA ONLY — AP fallback ***
+// All code in this block is guarded by _VERSION_PRERELEASE.
+// Production builds (no prerelease tag) will never compile or run this code.
+// WARNING: DO NOT enable in production — remove _VERSION_PRERELEASE tag before release.
+
+static void startAPFallback() {
+  // Build SSID: OTGW-<last 3 bytes of MAC, uppercase hex>
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  char apSSID[32];
+  snprintf_P(apSSID, sizeof(apSSID), PSTR("OTGW-%02X%02X%02X"), mac[3], mac[4], mac[5]);
+
+  strlcpy(state.net.sAPSSID, apSSID, sizeof(state.net.sAPSSID));
+  state.net.bAPFallback = true;
+
+  WiFi.mode(WIFI_AP_STA);  // AP + STA so WiFi.begin() can retry without dropping AP
+  WiFi.softAP(apSSID, "otgw123");
+
+  DebugTf(PSTR("BETA AP: fallback started SSID=[%s] IP=192.168.4.1 pass=otgw123\r\n"), apSSID);
+}
+
+static void stopAPFallback() {
+  if (!state.net.bAPFallback) return;
+  WiFi.softAPdisconnect(true);
+  WiFi.mode(WIFI_STA);
+  state.net.bAPFallback = false;
+  state.net.sAPSSID[0] = '\0';
+  DebugTln(F("BETA AP: fallback stopped, WiFi connected"));
+}
+#endif  // _VERSION_PRERELEASE
+
+//===========================================================================================
 enum WifiState_t {
   WIFI_IDLE,         // connected, monitoring
   WIFI_DISCONNECTED, // just dropped — start reconnect
   WIFI_CONNECTING,   // waiting non-blocking for connection
   WIFI_RECONNECTED,  // just came back — restart services
-  WIFI_FAILED        // too many retries — trigger reboot
+  WIFI_FAILED,       // too many retries — trigger reboot
+#if defined(_VERSION_PRERELEASE)
+  WIFI_AP_FALLBACK,  // BETA: SoftAP active, retry WiFi every 5 min
+  WIFI_AP_RETRY,     // BETA: attempting WiFi reconnect from AP mode
+#endif
 };
 static WifiState_t wifiState = WIFI_IDLE;
 static int wifiRetryCount = 0;
 
 void loopWifi() {
-  DECLARE_TIMER_SEC(timerWifiRetry, 30, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timerWifiRetry,  30, CATCH_UP_MISSED_TICKS);
+#if defined(_VERSION_PRERELEASE)
+  DECLARE_TIMER_SEC(timerAPRetry,   300, CATCH_UP_MISSED_TICKS);  // 5 min between AP→WiFi retries
+  DECLARE_TIMER_SEC(timerAPConnWait, 30, CATCH_UP_MISSED_TICKS);  // 30 s to wait for reconnect from AP
+#endif
 
   switch (wifiState) {
     case WIFI_IDLE:
@@ -229,17 +287,32 @@ void loopWifi() {
       } else if (DUE(timerWifiRetry)) {
         wifiRetryCount++;
         DebugTf(PSTR("WiFi: connect attempt %d failed\r\n"), wifiRetryCount);
+#if defined(_VERSION_PRERELEASE)
+        // BETA: after 2 retries (≈60s) enter AP fallback instead of rebooting
+        if (wifiRetryCount >= 2) {
+          DebugTln(F("BETA: WiFi retries exhausted, entering AP fallback mode"));
+          startAPFallback();
+          RESTART_TIMER(timerAPRetry);
+          wifiState = WIFI_AP_FALLBACK;
+        } else {
+          wifiState = WIFI_DISCONNECTED;
+        }
+#else
         if (wifiRetryCount >= 10) {
           wifiState = WIFI_FAILED;
         } else {
           wifiState = WIFI_DISCONNECTED;  // retry
         }
+#endif
       }
       break;
 
     case WIFI_RECONNECTED:
       // Match the startup path: re-apply the configured hostname and force a
       // DHCP re-announce so the renewed lease uses the expected name.
+#if defined(_VERSION_PRERELEASE)
+      stopAPFallback();  // tear down AP if it was active
+#endif
       platformSetHostname(CSTR(settings.sHostname));
       DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
               CSTR(settings.sHostname));
@@ -256,6 +329,32 @@ void loopWifi() {
     case WIFI_FAILED:
       doRestart("WiFi: too many reconnect failures");
       break;
+
+#if defined(_VERSION_PRERELEASE)
+    case WIFI_AP_FALLBACK:
+      // Periodically attempt to reconnect to the configured WiFi network
+      if (DUE(timerAPRetry)) {
+        DebugTln(F("BETA AP: 5-min timer — attempting WiFi reconnect"));
+        platformSetHostname(CSTR(settings.sHostname));
+        WiFi.begin();  // uses stored credentials
+        RESTART_TIMER(timerAPConnWait);
+        wifiState = WIFI_AP_RETRY;
+      }
+      break;
+
+    case WIFI_AP_RETRY:
+      if (WiFi.status() == WL_CONNECTED) {
+        DebugTln(F("BETA AP: WiFi reconnected from AP mode"));
+        wifiState = WIFI_RECONNECTED;
+        wifiRetryCount = 0;
+      } else if (DUE(timerAPConnWait)) {
+        DebugTln(F("BETA AP: WiFi reconnect timed out, staying in AP fallback"));
+        WiFi.disconnect();
+        RESTART_TIMER(timerAPRetry);
+        wifiState = WIFI_AP_FALLBACK;
+      }
+      break;
+#endif  // _VERSION_PRERELEASE
   }
 }
 

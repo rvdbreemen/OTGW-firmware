@@ -216,8 +216,11 @@ enum OTGWHardwareMode : uint8_t {
 
 //===================[ Network Transport — WiFi vs Ethernet ]===================
 enum OTGWNetworkMode : uint8_t {
-  NET_WIFI     = 0,   // Using WiFi (default)
-  NET_ETHERNET = 1,   // Using wired Ethernet (W5500)
+  NET_WIFI        = 0,   // Using WiFi (default)
+  NET_ETHERNET    = 1,   // Using wired Ethernet (W5500)
+#if defined(_VERSION_PRERELEASE)
+  NET_AP_FALLBACK = 2,   // BETA ONLY — SoftAP when WiFi unavailable
+#endif
 };
 
 struct HardwareSection {       // state.hw — detected hardware capabilities
@@ -230,12 +233,20 @@ struct HardwareSection {       // state.hw — detected hardware capabilities
 #endif
 };
 
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+// NetworkSection is always present; Ethernet fields only on capable hardware.
 struct NetworkSection {        // state.net — active network transport state
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   OTGWNetworkMode eMode        = NET_WIFI;
   bool bEthernetLink           = false;   // physical link up on W5500
-};
 #endif
+#if defined(_VERSION_PRERELEASE)
+  // *** BETA ONLY — AP fallback flag ***
+  // Guarded by _VERSION_PRERELEASE. If this define is absent (production release),
+  // this field does not exist and AP fallback cannot activate under any circumstance.
+  bool bAPFallback             = false;   // true while SoftAP fallback is active
+  char sAPSSID[32]             = "";      // SSID of the active fallback AP
+#endif
+};
 
 
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
@@ -612,9 +623,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
 
 struct OTGWState {
   HardwareSection    hw;          // state.hw.eMode, state.hw.bOLEDPresent
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  NetworkSection     net;         // state.net.eMode, state.net.bEthernetLink
-#endif
+  NetworkSection     net;         // state.net (always present; fields vary by platform/build)
   PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   OTDirectSection    otd;         // state.otd — OT-direct schedule/override stats (OTGW32)
@@ -683,6 +692,18 @@ inline const __FlashStringHelper* networkModeName() {
 inline bool isNetworkUp() {
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (state.net.eMode == NET_ETHERNET) return true;  // Ethernet: link was verified by loopEthernet()
+#endif
+#if defined(_VERSION_PRERELEASE)
+  if (state.net.bAPFallback) return true;  // BETA: SoftAP counts as network-up for web/telnet
+#endif
+  return (WiFi.status() == WL_CONNECTED);
+}
+
+// Returns true only when a real WiFi or Ethernet connection is available.
+// Use this (not isNetworkUp) to gate services that need internet/LAN: MQTT, NTP.
+inline bool isWiFiConnected() {
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) return true;
 #endif
   return (WiFi.status() == WL_CONNECTED);
 }

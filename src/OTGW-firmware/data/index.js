@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -365,8 +365,9 @@ function updateGatewayModeIndicator(value) {
 // Network mode indicator (WiFi / Ethernet icon in header)
 var currentNetworkMode = 'WiFi';
 
-function updateNetworkIndicator(mode) {
-  if (!mode) return;
+function updateNetworkIndicator(mode, apFallback) {
+  if (!mode && !apFallback) return;
+  if (apFallback) mode = 'AP';
   currentNetworkMode = mode;
   var container = document.getElementById('netStatus');
   var wifiIcon = document.getElementById('netIconWifi');
@@ -375,11 +376,13 @@ function updateNetworkIndicator(mode) {
   if (!container || !wifiIcon || !ethIcon) return;
 
   var isEth = (mode === 'Ethernet');
-  container.className = 'headercolumn net-status ' + (isEth ? 'net-ethernet' : 'net-wifi');
-  container.title = 'Network: ' + mode;
+  var isAP  = (mode === 'AP');
+  var cssClass = isEth ? 'net-ethernet' : (isAP ? 'net-ap' : 'net-wifi');
+  container.className = 'headercolumn net-status ' + cssClass;
+  container.title = isAP ? 'AP Fallback mode (no WiFi)' : ('Network: ' + mode);
   wifiIcon.classList.toggle('hidden', isEth);
   ethIcon.classList.toggle('hidden', !isEth);
-  if (textEl) textEl.textContent = mode;
+  if (textEl) textEl.textContent = isAP ? 'AP MODE' : mode;
 }
 
 function parseGatewayModeValue(modeValue) {
@@ -3753,7 +3756,7 @@ function refreshDevTime() {
       if (devtime.freeheap !== undefined)    currentFreeHeap = devtime.freeheap;
       if (devtime.maxfreeblock !== undefined) currentMaxFreeBlock = devtime.maxfreeblock;
       updateHeapDisplay();
-      if (devtime.networkmode) updateNetworkIndicator(devtime.networkmode);
+      if (devtime.networkmode || devtime.apfallback) updateNetworkIndicator(devtime.networkmode, devtime.apfallback);
 
       if (hasPsmode) {
         if (newPSmode !== isPSmode) {
@@ -4455,7 +4458,7 @@ function refreshDevInfo() {
       applyOTGWSimulationState(device.otgwsimulation);
       applyPICAvailability(device.picavailable, device.otcommandinterface);
       applyOTDirectAvailability(device.otdirectavailable);
-      updateNetworkIndicator(device.networkmode);
+      updateNetworkIndicator(device.networkmode, device.apfallback);
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;

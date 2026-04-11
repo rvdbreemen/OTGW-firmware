@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -203,22 +203,36 @@ static void drawPageSystem() {
   oledDisplay.setRow(2);
   oledDisplay.setCol(0);
   if (isNetworkUp()) {
-    oledDisplay.print(networkModeName());
-    oledDisplay.print(F(": "));
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-    if (state.net.eMode == NET_ETHERNET) {
-      oledDisplay.print(F("Wired"));
+#if defined(_VERSION_PRERELEASE)
+    if (state.net.bAPFallback) {
+      oledDisplay.print(F("AP MODE: "));
+      // Truncate SSID to fit display
+      char apSSID[15];
+      strlcpy(apSSID, state.net.sAPSSID, sizeof(apSSID));
+      oledDisplay.print(apSSID);
+      oledDisplay.setRow(3);
+      oledDisplay.setCol(0);
+      oledDisplay.print(F("IP: 192.168.4.1"));
     } else
 #endif
     {
-      String ssid = WiFi.SSID();
-      if (ssid.length() > 14) ssid = ssid.substring(0, 14);
-      oledDisplay.print(ssid);
+      oledDisplay.print(networkModeName());
+      oledDisplay.print(F(": "));
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+      if (state.net.eMode == NET_ETHERNET) {
+        oledDisplay.print(F("Wired"));
+      } else
+#endif
+      {
+        String ssid = WiFi.SSID();
+        if (ssid.length() > 14) ssid = ssid.substring(0, 14);
+        oledDisplay.print(ssid);
+      }
+      oledDisplay.setRow(3);
+      oledDisplay.setCol(0);
+      oledDisplay.print(F("IP: "));
+      oledDisplay.print(getActiveIP());
     }
-    oledDisplay.setRow(3);
-    oledDisplay.setCol(0);
-    oledDisplay.print(F("IP: "));
-    oledDisplay.print(getActiveIP());
   } else {
     oledDisplay.print(F("Network: offline"));
   }

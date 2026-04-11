@@ -1351,6 +1351,15 @@ void sendDeviceInfoV2()
 
   uint8_t ideMode = platformFlashChipMode();
   sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode < 4 ? ideMode : 4]);
+#if defined(_VERSION_PRERELEASE)
+  if (state.net.bAPFallback) {
+    sendJsonMapEntry(F("ssid"), CSTR(state.net.sAPSSID));
+    sendJsonMapEntry(F("wifirssi"), 0);
+    sendJsonMapEntry(F("wifiquality"), 0);
+    sendJsonMapEntry(F("wifiquality_text"), F("AP Mode"));
+    sendJsonMapEntry(F("apfallback"), true);
+  } else
+#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (state.net.eMode == NET_ETHERNET) {
     sendJsonMapEntry(F("ssid"), F("Wired"));
@@ -1608,6 +1617,9 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("freeheap"), platformFreeHeap());
   sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
   sendJsonMapEntry(F("networkmode"), networkModeName());
+#if defined(_VERSION_PRERELEASE)
+  if (state.net.bAPFallback) sendJsonMapEntry(F("apfallback"), true);
+#endif
 
   sendEndJsonMap(F("devtime"));
 

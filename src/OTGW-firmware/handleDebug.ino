@@ -14,6 +14,9 @@ void handleDebug(){
                 Debugln(F("--- Status ---"));
                 Debugf(PSTR("Network: %s (%s) | MQTT: %s | OTGW: %s\r\n"),
                     isNetworkUp() ? "Connected" : "Disconnected",
+#if defined(_VERSION_PRERELEASE)
+                    state.net.bAPFallback ? "AP Fallback" :
+#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
                     (state.net.eMode == NET_ETHERNET) ? "Ethernet" : "WiFi",
 #else
@@ -21,6 +24,11 @@ void handleDebug(){
 #endif
                     CBOOLEAN(state.mqtt.bConnected),
                     CBOOLEAN(state.otBus.bOnline));
+#if defined(_VERSION_PRERELEASE)
+                if (state.net.bAPFallback) {
+                  Debugf(PSTR("BETA AP MODE: SSID=[%s] IP=192.168.4.1 pass=otgw123\r\n"), state.net.sAPSSID);
+                }
+#endif
                 Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway Mode: %s\r\n"),
                     CCONOFF(state.otBus.bThermostatState),
                     CCONOFF(state.otBus.bBoilerState),
