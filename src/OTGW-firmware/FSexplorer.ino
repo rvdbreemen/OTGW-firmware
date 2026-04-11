@@ -220,9 +220,16 @@ void startWebserver(){
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
   // Enable collection of If-None-Match so index.html ETag conditional requests work.
-  // ESP8266 Core 2.7.4 only has the array+count overload — no variadic template.
+  // ESP8266 Core 3.x has BOTH overloads; the variadic template wins over the
+  // array+count form when the count is int (int→size_t conversion ranking).
+  // Passing a single string literal bypasses the ambiguity on ESP8266.
+  // ESP32 WebServer only has the array+count overload, no variadic template.
+#ifdef ESP8266
+  httpServer.collectHeaders("If-None-Match");
+#else
   static const char* collectHeaderKeys[] = {"If-None-Match"};
   httpServer.collectHeaders(collectHeaderKeys, 1);
+#endif
 
   httpServer.begin();
   // Set up first message as the IP address
