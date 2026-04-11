@@ -31,6 +31,12 @@
 #include "platform.h"           // Unified ESP8266/ESP32 abstraction layer
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
 #include "updateServerHtml.h"
+// Disable WiFiManager debug: the debug block in handleWifiSave() builds Strings
+// from raw string literals stored in ESP8266 flash at potentially misaligned
+// addresses. strlen() then generates an unaligned word-load → Exception 3
+// (LoadStoreAlignmentCause). WM_NODEBUG undefines WM_DEBUG_LEVEL so those
+// #ifdef WM_DEBUG_LEVEL blocks are excluded at compile time.
+#define WM_NODEBUG
 #include <WiFiManager.h>        // version 2.0.4-beta
 
 // Optimize WebSocket memory usage: reduce per-client buffer from 512 to 256 bytes
