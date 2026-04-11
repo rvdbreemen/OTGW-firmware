@@ -640,6 +640,14 @@ def rename_build_artifacts(project_dir, semver, target):
         renamed.append(new_path)
         print_info(f"Renamed: {file_path.name} -> {new_name}")
 
+    # Rename ELF file that belongs to this target
+    for file_path in build_dir.glob(f"*-{target}.elf"):
+        new_name = file_path.stem + f"-{semver}.elf"
+        new_path = file_path.parent / new_name
+        file_path.rename(new_path)
+        renamed.append(new_path)
+        print_info(f"Renamed: {file_path.name} -> {new_name}")
+
     if renamed:
         print_success(f"Renamed {len(renamed)} artifact(s)")
 
@@ -1021,6 +1029,14 @@ def collect_pio_artifacts(project_dir, target):
         shutil.copy2(fs_src, fs_dest)
         print_info(f"Copied: littlefs.bin -> {fs_dest.name}")
         collected.append(fs_dest)
+
+    # ELF file — always collected for crash debugging (addr2line, exception decoder)
+    elf_src = pio_build_dir / "firmware.elf"
+    if elf_src.exists():
+        elf_dest = build_dir / f"{config.PROJECT_NAME}-{target}.elf"
+        shutil.copy2(elf_src, elf_dest)
+        print_info(f"Copied: firmware.elf -> {elf_dest.name}")
+        collected.append(elf_dest)
 
     # ESP32 extras needed for merged binary
     if target == "esp32":
