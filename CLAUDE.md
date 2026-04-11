@@ -636,14 +636,27 @@ ESP8266 firmware for the NodoShop OpenTherm Gateway. Provides Web UI, MQTT, REST
 
 ## Task Management (MANDATORY)
 
-All implementation work MUST use the Backlog.md system. Before starting any task:
-1. Check if a backlog task exists for the work (`backlog task <id> --plain`)
-2. If no task exists, create one before starting implementation
-3. Set the task to "In Progress" and assign to yourself when starting
-4. Check off acceptance criteria as you complete them
-5. Add implementation notes as you work
-6. Write a final summary when done
-7. Never start coding without an approved plan in the task
+**Backlog.md is the ONLY task manager for this project. Every piece of work — features, bug fixes, debugging, refactors — MUST have a backlog task before any code is written. No exceptions.**
+
+### Before writing a single line of code:
+1. Search for an existing task: `backlog search "<topic>" --plain`
+2. If no task exists, create one: `backlog task create "Title" -d "..." --ac "..."`
+3. Set the task In Progress and assign to yourself: `backlog task edit <id> -s "In Progress" -a @claude`
+4. Write an implementation plan in the task: `backlog task edit <id> --plan "..."`
+5. Share the plan with the user and **wait for approval** before coding
+
+### During implementation:
+6. Mark acceptance criteria as done as you go: `backlog task edit <id> --check-ac <n>`
+7. Append progress notes: `backlog task edit <id> --append-notes "..."`
+
+### When done:
+8. Write a final summary (PR description): `backlog task edit <id> --final-summary "..."`
+9. Set status to Done: `backlog task edit <id> -s Done`
+
+### For bugs and crash investigations:
+- Create a task BEFORE starting the investigation
+- Document root cause in implementation notes as you find it
+- The fix goes in the task, not in a free-form edit session
 
 **Note:** `backlog task list` has a known bug and returns empty results. Use `backlog task <id> --plain` to view individual tasks, or read files directly from `backlog/tasks/`.
 
