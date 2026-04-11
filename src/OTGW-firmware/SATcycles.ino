@@ -513,6 +513,11 @@ void satCycleOnFlameChange(bool flameOn)
     SATDebugTf(PSTR("SAT cycle: flame ON flow=%.1f sp=%.1f cycles/hr=%u\r\n"),
                OTcurrentSystemState.Tboiler, _cycle_setpointAtStart,
                (unsigned)state.sat.iCyclesThisHour);
+    {
+      static char _wsMsg[80];
+      snprintf_P(_wsMsg, sizeof(_wsMsg), PSTR("{\"type\":\"status\",\"msg\":\"Heating active, setpoint %.1f deg C\"}"), _cycle_setpointAtStart);
+      sendWebSocketJSON(_wsMsg);
+    }
     // Reset per-cycle flow sample buffer for p90/p10 classification (Task #225)
     _flow_sampleHead  = 0;
     _flow_sampleCount = 0;
@@ -534,6 +539,11 @@ void satCycleOnFlameChange(bool flameOn)
     float durationSec = (float)(now - _cycle_flameOnStartMs) / 1000.0f;
     SATDebugTf(PSTR("SAT cycle: flame OFF dur=%.0fs maxFlow=%.1f\r\n"),
                durationSec, _cycle_maxFlowTemp);
+    {
+      static char _wsMsg[72];
+      snprintf_P(_wsMsg, sizeof(_wsMsg), PSTR("{\"type\":\"status\",\"msg\":\"Heating off, room %.1f deg C\"}"), OTcurrentSystemState.Tr);
+      sendWebSocketJSON(_wsMsg);
+    }
     // Compute p90/p10 from collected flow samples (Task #225)
     float p90 = (_flow_sampleCount >= 10) ? _flowPercentile(90) : _cycle_maxFlowTemp;
     float p10 = (_flow_sampleCount >= 10) ? _flowPercentile(10) : _cycle_minFlowTemp;
@@ -951,6 +961,11 @@ const char* satHeatingCurveRecommendation()
   strlcpy(state.sat.sHeatCurveRec, rec, sizeof(state.sat.sHeatCurveRec));
   SATDebugTf(PSTR("SAT HCR: recommendation=%s (inc=%u dec=%u n=%u)\r\n"),
           rec, (unsigned)consecIncrease, (unsigned)consecDecrease, (unsigned)_hcr_count);
+  if (consecIncrease == HCR_SUSTAIN_DAYS || consecDecrease == HCR_SUSTAIN_DAYS) {
+    static char _wsMsg[80];
+    snprintf_P(_wsMsg, sizeof(_wsMsg), PSTR("{\"type\":\"status\",\"msg\":\"Heating curve: %s gradient recommended\"}"), rec);
+    sendWebSocketJSON(_wsMsg);
+  }
   return state.sat.sHeatCurveRec;
 }
 

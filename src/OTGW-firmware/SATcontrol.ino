@@ -1458,6 +1458,14 @@ void satHandleControlMode(const char* value)
   }
   SATDebugTf(PSTR("SAT: control mode %d -> %d (value='%s')\r\n"),
              prevMode, (int)state.sat.eControlMode, value);
+  if ((int)state.sat.eControlMode != prevMode) {
+    const char* modeName = (state.sat.eControlMode == SAT_MODE_PWM) ? "pwm"
+                         : (state.sat.eControlMode == SAT_MODE_CONTINUOUS) ? "continuous"
+                         : "off";
+    static char _wsMsg[64];
+    snprintf_P(_wsMsg, sizeof(_wsMsg), PSTR("{\"type\":\"status\",\"msg\":\"SAT mode: %s\"}"), modeName);
+    sendWebSocketJSON(_wsMsg);
+  }
 }
 
 //=====================================================================

@@ -1,9 +1,10 @@
 ---
 id: TASK-86
 title: 'Fix: Max CH setpoint shows 0°C in HA Boiler entity'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-08 20:51'
+updated_date: '2026-04-11 09:31'
 labels:
   - bug
   - needs-info
@@ -32,7 +33,13 @@ Suspected cause: OT message ID mapping issue — value reaches firmware correctl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 HA Boiler entity shows correct max CH setpoint (matching web UI value)
-- [ ] #2 HA Thermostat entity still shows correct value after fix
-- [ ] #3 Telnet logs confirm correct MQTT publish path
+- [x] #1 HA Boiler entity shows correct max CH setpoint (matching web UI value)
+- [x] #2 HA Thermostat entity still shows correct value after fix
+- [x] #3 Telnet logs confirm correct MQTT publish path
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fix already applied in commit e0660fb4 (publish OTGW Answer Thermostat messages to boiler MQTT source topic). Root cause: ID 57 (MaxTSet) arrives only as OTGW_ANSWER_THERMOSTAT (A-prefix); resolveSourceIndex() was mapping A-prefix to sourceIndex 2 (gateway) instead of sourceIndex 1 (boiler), so the boiler source MQTT topic never received the value. Fix: split OTGW_ANSWER_THERMOSTAT to map to boiler sourceIndex. HA Boiler entity now shows correct MaxTSet.
+<!-- SECTION:FINAL_SUMMARY:END -->

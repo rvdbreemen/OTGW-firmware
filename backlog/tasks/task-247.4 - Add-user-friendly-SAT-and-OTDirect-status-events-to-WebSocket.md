@@ -1,9 +1,11 @@
 ---
 id: TASK-247.4
 title: Add user-friendly SAT and OTDirect status events to WebSocket
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-11 09:13'
+updated_date: '2026-04-11 09:31'
 labels:
   - sat
   - otdirect
@@ -22,12 +24,18 @@ Send concise, non-technical status messages to the OT Monitor WebSocket for SAT 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SAT: flame on/off sends 'Heating active, setpoint Xdeg C' / 'Heating off, room Xdeg C'
-- [ ] #2 SAT: control mode change sends 'SAT mode: <mode name>'
-- [ ] #3 SAT: heating curve recommendation sends 'Heating curve: gradient X recommended'
-- [ ] #4 OTDirect: connected sends 'OTDirect connected, flow Xdeg C'
-- [ ] #5 OTDirect: disconnected sends 'OTDirect disconnected'
-- [ ] #6 OTDirect: mode change sends 'OTDirect mode: <mode name>'
-- [ ] #7 Messages are human-readable (no raw hex, no PID internals, no frame numbers)
-- [ ] #8 Build clean
+- [x] #1 SAT: flame on/off sends 'Heating active, setpoint Xdeg C' / 'Heating off, room Xdeg C'
+- [x] #2 SAT: control mode change sends 'SAT mode: <mode name>'
+- [x] #3 SAT: heating curve recommendation sends 'Heating curve: gradient X recommended'
+- [x] #4 OTDirect: connected sends 'OTDirect connected, flow Xdeg C'
+- [x] #5 OTDirect: disconnected sends 'OTDirect disconnected'
+- [x] #6 OTDirect: mode change sends 'OTDirect mode: <mode name>'
+- [x] #7 Messages are human-readable (no raw hex, no PID internals, no frame numbers)
+- [x] #8 Build clean
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added user-friendly WebSocket status events for SAT (SATcycles.ino) and confirmed OTDirect events already added by agent 247.2 (OTDirect.ino). SAT events: flame ON sends 'Heating active, setpoint X.X deg C'; flame OFF sends 'Heating off, room X.X deg C'; HCR INCREASE/DECREASE sends 'Heating curve: X gradient recommended' (HOLD suppressed); mode change sends 'SAT mode: <continuous|pwm|off>'. All messages use sendWebSocketJSON() with snprintf_P into static buffers, type=status. No WebSocket events for REST API or MQTT.
+<!-- SECTION:FINAL_SUMMARY:END -->
