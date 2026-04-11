@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index_dark.css
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1228,6 +1228,26 @@ body.disable-interaction {
 }
 .sat-value {
   color: #eee;
+}
+.sat-grid {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+.sat-row {
+  display: table-row;
+}
+.sat-row .sat-label,
+.sat-row .sat-value {
+  display: table-cell;
+  padding: 3px 8px 3px 0;
+  vertical-align: top;
+}
+.sat-row .sat-label {
+  white-space: nowrap;
+  font-weight: 500;
+  width: 1%;
+  padding-right: 16px;
 }
 .sat-badge-active {
   background: #1b5e20;
