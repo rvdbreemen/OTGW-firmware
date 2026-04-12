@@ -77,46 +77,31 @@ Check whether any architectural changes since the previous release require new o
 
 ### Phase 4: Gather changes, contributors & generate documentation
 
-On `main`, gather all information AND generate all documentation in one pass. Present everything together for a single review.
+On `main`, run the `/update-docs` workflow in release mode. This handles all documentation in a single efficient parallel pass — do not duplicate work here.
 
-**Changes:**
-1. Detect the previous release tag: `git describe --tags --abbrev=0`
-2. List all commits since that tag: `git log <prev-tag>..HEAD --oneline` (exclude "CI: update version.h" commits)
-3. Categorize each commit as: new feature, bug fix, internal improvement, or breaking change
-4. Check `docs/adr/` for new or updated ADRs since the previous release
+**Invoke update-docs:**
 
-**Contributors (automated from 3 sources):**
+```
+/update-docs --release <version>
+```
 
-*Source 1 - GitHub Issues & PRs:*
-- `gh issue list --state closed --search "closed:>YYYY-MM-DD" --json author,title --jq '.[] | "\(.author.login): \(.title)"'`
-- `gh pr list --state merged --search "merged:>YYYY-MM-DD" --json author,title --jq '.[] | "\(.author.login): \(.title)"'`
+The update-docs workflow (`/.claude/skills/update-docs/SKILL.md`) will:
+1. Detect all source changes since the previous release tag
+2. Update affected manual chapters (EN + NL) in parallel
+3. Update API docs (openapi.yaml, MQTT.md, REST README) if API changed
+4. Update C4 architecture docs if structural changes occurred
+5. Gather contributors from GitHub PRs, Discord #beta-testing, and #devs-esp-firmware
+6. Generate `RELEASE_NOTES_<version>.md`, `RELEASE_GITHUB_<version>.md`, `docs/BREAKING_CHANGES.md`, and README What's New
+7. Clean up docs folder: archive old release notes, move misplaced files, organize reviews
 
-*Source 2 - Discord #beta-testing channel:*
-- Log in to Discord: `mcp__discord__discord_login` (bot: OTGW bot)
-- Read messages from `#beta-testing` (channel ID: `914498730001072149`) with limit 100
-- Filter messages since the previous release date
-- Extract unique contributors (exclude bot accounts and the maintainer `number3nl` / user ID `384411356616720384`)
-- For each contributor, note what they did: tested builds, reported bugs, shared logs, provided diagnostic insights
-- **Username formatting**: Discord usernames often have a 4-digit numeric suffix (e.g., `fuzzyduck3793`, `simontemplar6623`). Strip the trailing digits to get the display name (e.g., `fuzzyduck`, `simontemplar`). Exception: if removing digits makes the name ambiguous or clearly wrong, keep the original.
+**Discord context for contributor gathering:**
+- Guild ID: `812969634638725140`
+- #beta-testing: channel ID `914498730001072149`
+- #devs-esp-firmware: channel ID `924989767966425158`
+- Maintainer to exclude: `384411356616720384` (`number3nl`)
+- Username formatting: strip trailing 4-digit suffixes (e.g., `fuzzyduck3793` → `fuzzyduck`), except where removal makes the name ambiguous
 
-*Source 3 - Discord #devs-esp-firmware channel:*
-- Read messages from `#devs-esp-firmware` (channel ID: `924989767966425158`) with limit 100
-- Filter messages since the previous release date
-- Issues and bug reports are also reported here; extract them alongside contributors
-
-**Discord server reference:** Guild ID `812969634638725140` (OTGW-firmware community).
-
-**Compile the contributor list:**
-- Deduplicate across all sources (same person may appear on GitHub and Discord)
-- Identify the **most active contributor** for a special shoutout
-- Present as: shoutout paragraph + bullet list of remaining contributors with their contribution
-
-**Documentation (generate all files):**
-
-1. **`RELEASE_NOTES_<version>.md`** (repository root): Full technical release notes following the template in `docs/process/RELEASE_PROCESS.md`
-2. **`RELEASE_GITHUB_<version>.md`** (repository root): Concise GitHub release body with bug fixes, improvements, upgrade notes, and Thank You section (shoutout + contributor list + Discord invite link)
-3. **`docs/BREAKING_CHANGES.md`**: Prepend a new version section. Always declare explicitly whether there are breaking changes or not.
-4. **`README.md`**: Demote current "What's New" to "What was new", add new "What's New in v<version>" section with highlights
+The update-docs workflow returns without committing (release mode). All generated files are staged for the CHECKPOINT review.
 
 **CHECKPOINT 1: Present the categorized changes, contributor list, AND all generated documentation content to the user for review. Wait for approval before proceeding.**
 

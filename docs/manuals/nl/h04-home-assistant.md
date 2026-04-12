@@ -1,0 +1,364 @@
+## Hoofdstuk 4: Home Assistant-integratie
+
+### Vereisten
+
+Voor de integratie van OTGW-firmware met Home Assistant heeft u nodig:
+
+- **Een werkende MQTT-broker** op uw thuisnetwerk. De meest gebruikte optie is de Mosquitto MQTT-broker als Home Assistant add-on.
+- **De Home Assistant MQTT-integratie** geconfigureerd en verbonden met diezelfde broker.
+- **OTGW-firmware geconfigureerd** met het IP-adres (of hostnaam) van de broker en optioneel inloggegevens.
+
+Home Assistant zelf is niet vereist voor de basisfunctionaliteit van de firmware (MQTT-publicatie werkt ook zonder HA), maar is het primaire integratieplatform waarvoor auto-discovery is ontworpen.
+
+---
+
+### MQTT-broker instellen
+
+#### Mosquitto als Home Assistant add-on (aanbevolen)
+
+Als u Home Assistant OS of Home Assistant Supervised gebruikt, kunt u Mosquitto installeren als officiële add-on:
+
+1. Ga in Home Assistant naar **Instellingen > Add-ons > Add-on Store**.
+2. Zoek naar **Mosquitto broker** en klik op **Installeren**.
+3. Start de add-on. Ga naar de tabblad **Configuratie** en voeg een gebruiker toe:
+
+```yaml
+logins:
+  - username: otgw
+    password: uw-wachtwoord
+```
+
+4. Sla op en herstart de add-on.
+5. Ga naar **Instellingen > Apparaten en services > MQTT** en controleer de broker-verbinding.
+
+Het IP-adres van de broker is in dit geval het IP-adres van uw Home Assistant-server. De standaard TCP-poort is `1883`.
+
+#### Externe MQTT-broker
+
+Als u al een zelfstandige Mosquitto-installatie, EMQX, HiveMQ of een andere broker heeft, gebruik dan het IP-adres en de inloggegevens van die broker. Zorg dat de OTGW en Home Assistant dezelfde broker gebruiken.
+
+---
+
+### Firmware configureren voor MQTT
+
+1. Open de webinterface van de OTGW (`http://otgw.local/`).
+2. Ga naar **Instellingen > MQTT**.
+3. Vul de volgende velden in:
+
+| Veld | Waarde | Voorbeeld |
+|---|---|---|
+| Broker | IP of hostnaam van de MQTT-broker | `192.168.1.10` |
+| Poort | TCP-poort (standaard 1883) | `1883` |
+| Gebruikersnaam | MQTT-gebruikersnaam (optioneel) | `otgw` |
+| Wachtwoord | MQTT-wachtwoord (optioneel) | `uw-wachtwoord` |
+| TopTopic | Bovenste namespace voor alle topics | `OTGW` |
+| UniqueID | Uniek apparaat-ID in topics | `otgw-{MAC}` |
+| HA Discovery | Aanvinken voor auto-discovery | aangevinkt |
+| HA Prefix | Auto-discovery topic-prefix | `homeassistant` |
+
+4. Klik op **Opslaan**.
+
+De firmware verbindt onmiddellijk met de broker en publiceert het geboorte-bericht (`online`). Daarna beginnen de auto-discovery payloads te verschijnen.
+
+---
+
+### MQTT topic-structuur
+
+#### Publish topics (firmware → broker)
+
+Alle gepubliceerde waarden staan onder de namespace:
+
+```
+{TopTopic}/value/{UniqueId}/{topic}
+```
+
+Met standaardinstellingen wordt dit:
+
+```
+OTGW/value/otgw-AABBCCDDEEFF/{topic}
+```
+
+Voorbeelden:
+
+```
+OTGW/value/otgw-AABBCCDDEEFF/boilertemperature        → "45.50"
+OTGW/value/otgw-AABBCCDDEEFF/flamestatus              → "ON"
+OTGW/value/otgw-AABBCCDDEEFF/roomtemperature          → "20.80"
+OTGW/value/otgw-AABBCCDDEEFF/otgw-firmware/version    → "2.0.0"
+```
+
+De meeste waarden worden gepubliceerd met `retain = true`, zodat clients die later subscriben de laatste waarde meteen ontvangen.
+
+#### Command topics (broker → firmware)
+
+Opdrachten worden gestuurd naar:
+
+```
+{TopTopic}/set/{UniqueId}/{commando}
+```
+
+Voorbeelden:
+
+```
+OTGW/set/otgw-AABBCCDDEEFF/setpoint       → "21.5"
+OTGW/set/otgw-AABBCCDDEEFF/dhw            → "ON"
+OTGW/set/otgw-AABBCCDDEEFF/otgwcmnd       → "TT=21.00"
+```
+
+#### Geboorte- en LWT-berichten
+
+| Topic | Waarde | Omschrijving |
+|---|---|---|
+| `{TopTopic}/value/{UniqueId}` | `online` | Gepubliceerd bij verbinden (retained) |
+| `{TopTopic}/value/{UniqueId}` | `offline` | Gepubliceerd door broker bij verbindingsverlies (LWT, retained) |
+
+Home Assistant gebruikt het `online`/`offline`-bericht om de beschikbaarheidsstatus van het apparaat bij te houden.
+
+---
+
+### Home Assistant auto-discovery
+
+#### Hoe het werkt
+
+OTGW-firmware implementeert de MQTT-auto-discovery van Home Assistant. Bij elke verbinding met de broker (inclusief na een Home Assistant herstart) publiceert de firmware discovery-payloads naar het geconfigureerde prefix (standaard `homeassistant/`).
+
+Een discovery-payload is een JSON-bericht dat Home Assistant vertelt:
+- Welk type entiteit het is (sensor, binaire sensor, klimaatentiteit)
+- Wat de naam en het unieke ID zijn
+- Op welk MQTT-topic de waarden worden gepubliceerd
+- Op welk topic opdrachten kunnen worden gestuurd (voor klimaatentiteiten)
+- Welke meeteenheid van toepassing is
+
+Voorbeeld van een discovery-payload voor de aanvoertemperatuur:
+
+```json
+{
+  "name": "Boiler flow temperature",
+  "unique_id": "otgw-AABBCCDDEEFF_boilertemperature",
+  "state_topic": "OTGW/value/otgw-AABBCCDDEEFF/boilertemperature",
+  "unit_of_measurement": "°C",
+  "device_class": "temperature",
+  "availability_topic": "OTGW/value/otgw-AABBCCDDEEFF",
+  "payload_available": "online",
+  "payload_not_available": "offline",
+  "device": { "identifiers": ["otgw-AABBCCDDEEFF"], "name": "OTGW", "model": "...", ... }
+}
+```
+
+#### Just-in-Time (JIT) discovery
+
+De firmware gebruikt JIT-discovery: een entiteit krijgt pas zijn discovery-payload wanneer de bijbehorende OpenTherm-waarde daadwerkelijk ontvangen is. Dit vermijdt dat Home Assistant entiteiten aanmaakt voor bericht-ID's die uw specifieke ketel nooit stuurt.
+
+#### Herstart-detectie
+
+De firmware abonneert op `homeassistant/status`. Wanneer Home Assistant herstart en `homeassistant_started` publiceert, verzendt de firmware alle discovery-payloads opnieuw. Zo blijven de entiteiten ook na een HA-herstart beschikbaar zonder dat u de OTGW hoeft te herstarten.
+
+---
+
+### Auto-ontdekte entiteiten
+
+#### Sensoren (selectie)
+
+| Entiteitnaam | Topic (suffix) | Eenheid | Omschrijving |
+|---|---|---|---|
+| Boiler aanvoertemperatuur | `boilertemperature` | °C | CH aanvoertemperatuur |
+| Retourtemperatuur | `returnwatertemperature` | °C | CH retourtemperatuur |
+| Ruimtetemperatuur | `roomtemperature` | °C | Gemeten ruimtetemperatuur |
+| Buitentemperatuur | `outsidetemperature` | °C | Buitentemperatuur |
+| Warmwatertemperatuur | `dhwtemperature` | °C | DHW temperatuur |
+| Relatieve modulatie | `relmodlvl` | % | Modulatieniveau van de ketel |
+| CH waterdruk | `chwaterpressure` | bar | Systeemdruk |
+| Aanvoersetpoint | `controlsetpoint` | °C | Aanvraag aanvoertemperatuur |
+| Ruimtetemperatuursetpoint | `roomsetpoint` | °C | Gewenste ruimtetemperatuur |
+| OEM diagnostiekcode | `oemdiagnosticcode` | - | Ketelspecifieke diagnosecode |
+
+De exacte set sensoren is afhankelijk van welke OpenTherm bericht-ID's uw ketel en thermostaat uitwisselen. Alle 80+ gedefinieerde bericht-ID's kunnen een entiteit genereren.
+
+#### Binaire sensoren (selectie)
+
+| Entiteitnaam | Topic (suffix) | Omschrijving |
+|---|---|---|
+| Vlam | `flamestatus` | Branderstatus (aan/uit) |
+| CV actief | `chmodus` | Centrale verwarming actief |
+| Warm water actief | `dhwmode` | Warmwaterbereiding actief |
+| Storing | `faultindicator` | Ketelstoring aanwezig |
+| Koeling actief | `coolingactive` | Koeling actief |
+| CH2 actief | `ch2modus` | Tweede CV-circuit actief |
+| Diagnostische indicator | `diagnosticindicator` | Diagnostische indicator ketel |
+| PIC beschikbaar | `otgw-pic/picavailable` | PIC co-processor aanwezig |
+| Ketel verbonden | `otgw-pic/boiler_connected` | Ketelcommunicatie OK |
+| Thermostaat verbonden | `otgw-pic/thermostat_connected` | Thermostaatcommunicatie OK |
+
+#### Klimaatentiteit
+
+Als SAT is ingeschakeld, maakt de firmware één klimaatentiteit aan in Home Assistant. Via deze entiteit kunt u:
+
+- De doeltemperatuur instellen (5-30 °C, in stappen van 0,5 °C)
+- De bedrijfsmodus selecteren (verwarmen, uit, eco, comfort, weg, slaap)
+- De huidige ruimtetemperatuur aflezen
+- De huidige modus aflezen
+
+---
+
+### Commando's sturen vanuit Home Assistant
+
+#### Setpoint instellen
+
+Stuur een getal (als tekst) naar het setpoint-commando-topic:
+
+```yaml
+# Home Assistant automation voorbeeld
+service: mqtt.publish
+data:
+  topic: "OTGW/set/otgw-AABBCCDDEEFF/setpoint"
+  payload: "21.5"
+```
+
+Of via de klimaatentiteit (als SAT actief is):
+
+```yaml
+service: climate.set_temperature
+target:
+  entity_id: climate.otgw
+data:
+  temperature: 21.5
+```
+
+#### Warm water inschakelen
+
+```yaml
+service: mqtt.publish
+data:
+  topic: "OTGW/set/otgw-AABBCCDDEEFF/dhw"
+  payload: "ON"
+```
+
+#### Ruwe OTGW-commando's sturen
+
+Voor gevorderde gebruikers: u kunt ruwe PIC-commando's sturen via het `otgwcmnd`-topic. Dit is gelijkwaardig aan het typen van een commando in de TCP serial bridge.
+
+```yaml
+service: mqtt.publish
+data:
+  topic: "OTGW/set/otgw-AABBCCDDEEFF/otgwcmnd"
+  payload: "TT=21.00"
+```
+
+**Let op:** Ruwe commando's worden direct doorgestuurd naar de PIC zonder validatie. Gebruik uitsluitend geldige OTGW-commando's. Raadpleeg de PIC-firmware documentatie voor de volledige commandolijst.
+
+---
+
+### Voorbeeldautomatiseringen
+
+#### Weg-modus: setpoint verlagen als iedereen weg is
+
+```yaml
+automation:
+  - alias: "OTGW: verlaag setpoint bij afwezigheid"
+    trigger:
+      - platform: state
+        entity_id: group.personen_thuis
+        to: "not_home"
+    action:
+      - service: climate.set_preset_mode
+        target:
+          entity_id: climate.otgw
+        data:
+          preset_mode: "away"
+```
+
+#### Buitentemperatuur doorsturen naar SAT
+
+Als uw thermostaat geen buitentemperatuur via OpenTherm publiceert, kunt u een weerstation of de Home Assistant weerservice gebruiken om de buitentemperatuur door te sturen naar SAT:
+
+```yaml
+automation:
+  - alias: "OTGW: buitentemperatuur naar SAT sturen"
+    trigger:
+      - platform: state
+        entity_id: sensor.buitentemperatuur
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "OTGW/set/otgw-AABBCCDDEEFF/sat/outdoor_temp"
+          payload_template: "{{ states('sensor.buitentemperatuur') }}"
+```
+
+#### Melding bij ketelstoring
+
+```yaml
+automation:
+  - alias: "OTGW: melding bij ketelstoring"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.otgw_storing
+        to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          message: "Ketelstoring gedetecteerd! Controleer de ketel."
+          title: "OTGW Waarschuwing"
+```
+
+---
+
+### Handmatige HA-configuratie zonder auto-discovery
+
+Als u auto-discovery niet wenst in te schakelen, kunt u entiteiten handmatig definiëren in `configuration.yaml`. Dit is optioneel en voor de meeste gebruikers niet nodig.
+
+#### Sensor (YAML-voorbeeld)
+
+```yaml
+mqtt:
+  sensor:
+    - name: "Ketel aanvoertemperatuur"
+      state_topic: "OTGW/value/otgw-AABBCCDDEEFF/boilertemperature"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      availability_topic: "OTGW/value/otgw-AABBCCDDEEFF"
+      payload_available: "online"
+      payload_not_available: "offline"
+
+    - name: "Relatieve modulatie"
+      state_topic: "OTGW/value/otgw-AABBCCDDEEFF/relmodlvl"
+      unit_of_measurement: "%"
+```
+
+#### Binaire sensor (YAML-voorbeeld)
+
+```yaml
+mqtt:
+  binary_sensor:
+    - name: "Ketel vlam"
+      state_topic: "OTGW/value/otgw-AABBCCDDEEFF/flamestatus"
+      payload_on: "ON"
+      payload_off: "OFF"
+      device_class: heat
+
+    - name: "Ketelstoring"
+      state_topic: "OTGW/value/otgw-AABBCCDDEEFF/faultindicator"
+      payload_on: "ON"
+      payload_off: "OFF"
+      device_class: problem
+```
+
+#### Klimaatentiteit voor SAT (YAML-voorbeeld)
+
+```yaml
+mqtt:
+  climate:
+    - name: "OTGW Thermostaat"
+      mode_state_topic: "OTGW/value/otgw-AABBCCDDEEFF/sat/mode"
+      mode_command_topic: "OTGW/set/otgw-AABBCCDDEEFF/sat/control_mode"
+      temperature_state_topic: "OTGW/value/otgw-AABBCCDDEEFF/sat/target"
+      temperature_command_topic: "OTGW/set/otgw-AABBCCDDEEFF/sat/target"
+      current_temperature_topic: "OTGW/value/otgw-AABBCCDDEEFF/sat/room_temp"
+      modes:
+        - "off"
+        - "heat"
+      min_temp: 5
+      max_temp: 30
+      temp_step: 0.5
+```
+
+**Opmerking:** Bij handmatige configuratie werkt `availability_topic` naar behoren zolang u het juiste `{TopTopic}/value/{UniqueId}`-topic gebruikt en `payload_available: "online"` instelt.
