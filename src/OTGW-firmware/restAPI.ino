@@ -514,6 +514,7 @@ void processAPI()
   memset(words, 0, sizeof(words));
 
   const HTTPMethod method = httpServer.method();
+  const unsigned long startMs = millis();
   const size_t uriLen = strlcpy(URI, httpServer.uri().c_str(), sizeof(URI));
   strlcpy(originalURI, URI, sizeof(originalURI));
 
@@ -546,7 +547,7 @@ void processAPI()
       // OPTIONS preflight for all v2 endpoints (CORS)
       if (method == HTTP_OPTIONS) {
         sendApiOptions();
-        RESTDebugTf(PSTR("REST OPTIONS %s => 204 preflight\r\n"), originalURI);
+        RESTDebugTf(PSTR("REST OPTIONS %s => 204 preflight %lums\r\n"), originalURI, millis() - startMs);
         return;
       }
 
@@ -561,23 +562,23 @@ void processAPI()
           if (strcmp_P(words[3], r->segment) == 0) {
             restResponseStatus = 200; // default; overwritten by sendApiError if handler fails
             r->handler(words, wc, method, originalURI);
-            RESTDebugTf(PSTR("REST %s %s => %d v2/%S\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r->segment);
+            RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r->segment, millis() - startMs);
             return;
           }
         }
       }
       sendApiNotFound(originalURI);
-      RESTDebugTf(PSTR("REST %s %s => %d not found\r\n"), httpMethodToStr(method), originalURI, restResponseStatus);
+      RESTDebugTf(PSTR("REST %s %s => %d not found %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, millis() - startMs);
     } else if (wc > 2 && (strcmp_P(words[2], PSTR("v0")) == 0 || strcmp_P(words[2], PSTR("v1")) == 0)) {
       sendApiError(410, F("API version removed; use /api/v2"));
-      RESTDebugTf(PSTR("REST %s %s => %d deprecated\r\n"), httpMethodToStr(method), originalURI, restResponseStatus);
+      RESTDebugTf(PSTR("REST %s %s => %d deprecated %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, millis() - startMs);
     } else {
       sendApiNotFound(originalURI);
-      RESTDebugTf(PSTR("REST %s %s => %d\r\n"), httpMethodToStr(method), originalURI, restResponseStatus);
+      RESTDebugTf(PSTR("REST %s %s => %d %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, millis() - startMs);
     }
   } else {
     sendApiNotFound(originalURI);
-    RESTDebugTf(PSTR("REST %s %s => %d non-api\r\n"), httpMethodToStr(method), originalURI, restResponseStatus);
+    RESTDebugTf(PSTR("REST %s %s => %d non-api %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, millis() - startMs);
   }
 } // processAPI()
 
