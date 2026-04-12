@@ -276,6 +276,7 @@ void do5minevent(){
 
 static void handleEspFlashBackgroundTasks()
 {
+  debugTelnet.loop();         // Process new connections and disconnections
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // MUST continue - processes upload chunks
   MDNS.update();              // Keep MDNS active for network discovery
@@ -313,6 +314,7 @@ void doBackgroundTasks()
       handlePicFlashBackgroundTasks();
     } else {
       //while connected handle everything that uses network stuff
+      debugTelnet.loop();         // Process new connections, fire onConnect banner
       handleDebug();
       handleMQTT();                 // MQTT transmissions
       handleOTGW();                 // OTGW handling

@@ -145,9 +145,13 @@ static void sendEventToWebSocket_P(char prefix, PGM_P msg_P) {
   AddLog(getOTLogTimestamp());
   AddLogf_P(PSTR(" %c "), prefix);
   if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) {
-    size_t _rem = OT_LOG_BUFFER_SIZE - ot_log_pos;
-    size_t _src = strlcpy_P(ot_log_buffer + ot_log_pos, msg_P, _rem);
-    ot_log_pos += (_src < _rem) ? _src : (_rem - 1);
+    size_t _rem  = OT_LOG_BUFFER_SIZE - ot_log_pos;
+    size_t _src  = strlen_P(msg_P);
+    // strlcpy_P is absent from ESP8266 2.7.4; replicate with memcpy_P.
+    size_t _copy = (_src < _rem - 1) ? _src : (_rem - 1);
+    memcpy_P(ot_log_buffer + ot_log_pos, msg_P, _copy);
+    ot_log_buffer[ot_log_pos + _copy] = '\0';
+    ot_log_pos += _copy;
   }
   AddLogln();
   sendLogToWebSocket(ot_log_buffer);
@@ -3830,7 +3834,7 @@ void processOT(const char *buf, int len){
       sendLogToWebSocket(ot_log_buffer);
 
       // Throttle TCP flush to once per second instead of per-message (~10/sec).
-      // TelnetStream buffers output; flushing just forces a TCP push.
+      // debugTelnet (ESPTelnet) buffers output; flushing just forces a TCP push.
       // At 10 msg/sec the per-message flush was the single largest TCP cost.
       { static unsigned long lastOTFlushMs = 0;
         unsigned long now = millis();

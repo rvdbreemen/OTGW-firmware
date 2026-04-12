@@ -93,7 +93,7 @@ extern ESP8266WebServer  httpServer;
 extern ESP8266HTTPUpdateServer httpUpdater;
 extern FSInfo            LittleFSinfo;
 extern bool              LittleFSmounted;
-#define WM_DEBUG_PORT TelnetStream
+#define WM_DEBUG_PORT debugTelnet
 
 //=====[ Forward declarations ]================================================
 

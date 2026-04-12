@@ -16,11 +16,11 @@
 /*---- start macro's ------------------------------------------------------------------*/
 
 
-#define Debug(...)      ({ TelnetStream.print(__VA_ARGS__);    })
-#define Debugln(...)    ({ TelnetStream.println(__VA_ARGS__);  })
-#define Debugf(...)     ({ TelnetStream.printf_P(__VA_ARGS__);   })
+#define Debug(...)      ({ debugTelnet.print(__VA_ARGS__);    })
+#define Debugln(...)    ({ debugTelnet.println(__VA_ARGS__);  })
+#define Debugf(...)     ({ _debugPrintf_P(__VA_ARGS__);       })
 
-#define DebugFlush()    ({ TelnetStream.flush(); })
+#define DebugFlush()    ({ debugTelnet.flush(); })
 
 
 #define DebugT(...)     ({ _debugBOL(__FUNCTION__, __LINE__);  \
@@ -46,12 +46,25 @@
 // Modules: OTGWDebug* (bOTmsg), MQTTDebug* (bMQTT), RESTDebug* (bRestAPI),
 //          SensorDebug* (bSensors) — see each .ino file header.
 
-// needs #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
+// needs extern ESPTelnet debugTelnet;   // declared in OTGW-firmware.h, defined in networkStuff.ino
 
 //#include <sys/time.h>
 // #include <time.h>
 // extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
 
+
+// ESPTelnet does not inherit from Print, so printf_P() is absent.
+// This helper replicates it: format a PROGMEM format string via vsnprintf_P
+// into a 256-byte stack buffer, then send via debugTelnet.print().
+// Debug strings that exceed 255 chars are silently truncated — acceptable.
+void _debugPrintf_P(PGM_P fmt, ...) {
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf_P(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    debugTelnet.print(buf);
+}
 
 void _debugBOL(const char *fn, int line)
 {
@@ -119,6 +132,6 @@ void _debugBOL(const char *fn, int line)
        _bol[sizeof(_bol) - 1] = '\0';
    }
 
-   TelnetStream.print(_bol);
+   debugTelnet.print(_bol);
 }
 #endif

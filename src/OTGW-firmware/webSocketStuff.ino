@@ -29,7 +29,6 @@
 */
 
 #include <WebSocketsServer.h>
-#include <TelnetStream.h>
 #include "Debug.h"
 
 // WebSocket server on port 81 (no built-in authentication; local network use only)
