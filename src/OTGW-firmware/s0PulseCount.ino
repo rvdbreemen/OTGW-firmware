@@ -62,8 +62,7 @@
 
    if (localPulseCount != 0) {
      OTGWs0powerkw = (float)3600000 / (float)settings.s0.iPulsekw / (float)localPulseDuration;
-     if (state.debug.bSensors) DebugTf(PSTR("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n"), OTGWs0pulseCount, OTGWs0pulseCountTot) ;
-     if (state.debug.bSensors) DebugTf(PSTR("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n"), last_pulse_duration, OTGWs0powerkw) ;
+     if (state.debug.bSensors) DebugTf(PSTR("S0: pulses=%d total=%d interval=%dms power=%4.3fkW\r\n"), OTGWs0pulseCount, OTGWs0pulseCountTot, last_pulse_duration, OTGWs0powerkw);
      OTGWs0lasttime = now ;
      if (settings.mqtt.bEnable ) {
        sensorAutoConfigure(OTGWs0dataid, true , "" ) ;     // Configure S0 sensor with the  

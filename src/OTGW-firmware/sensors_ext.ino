@@ -148,7 +148,7 @@ void initSensors() {
     return;
   }
 
-  if (state.debug.bSensors)DebugTf(PSTR("init GPIO Temperature sensors on GPIO%d...\r\n"), settings.sensors.iPin);
+  if (state.debug.bSensors) DebugTf(PSTR("Sensors: init on GPIO%d\r\n"), settings.sensors.iPin);
 
   oneWire.begin(settings.sensors.iPin);
 
@@ -166,7 +166,7 @@ void initSensors() {
     DebugTf(PSTR("***ERR More (%d) sensor devices found than allowed(%d) on the bus\r\n"), numberOfDevices, MAXDALLASDEVICES);
     numberOfDevices = MAXDALLASDEVICES ;  // limit to max number of devices
   }
-  if (state.debug.bSensors) DebugTf(PSTR("Sensors: Found %d device(s)\r\n"), numberOfDevices);
+  if (state.debug.bSensors) DebugTf(PSTR("Sensors: found %d on bus\r\n"), numberOfDevices);
    // Loop through each device, check if it is real temp sensor
 
   for (int i = 0; i < numberOfDevices; i++)
@@ -174,7 +174,7 @@ void initSensors() {
     // Search the wire for address
     if (sensors.getAddress(DallasrealDevice[i].addr, i))
     {
-    if (state.debug.bSensors) DebugTf(PSTR("Device address %u device(s)\r\n"), (unsigned int) DallasrealDevice[i].addr);
+    if (state.debug.bSensors) DebugTf(PSTR("Sensors: [%d] addr=%s\r\n"), i, getDallasAddress(DallasrealDevice[i].addr));
     DallasrealDevice[i].id = DallasrealDeviceCount ;
     DallasrealDevice[i].tempC = 0 ;
     DallasrealDevice[i].lasttime = 0 ;
@@ -205,13 +205,12 @@ void initSensors() {
 void configSensors() 
 {
 if (settings.mqtt.bEnable) {
-    if (state.debug.bSensors) DebugTf(PSTR("Sensor Device MQ configuration started \r\n"));
+    if (state.debug.bSensors) DebugTf(PSTR("Sensors: MQTT discovery for %d device(s)\r\n"), DallasrealDeviceCount);
 
-    for (int i = 0; i < DallasrealDeviceCount ; i++) 
+    for (int i = 0; i < DallasrealDeviceCount ; i++)
     {
       // Now configure the MQ interface, it will return immediatly when already configured
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-      if (state.debug.bSensors) DebugTf(PSTR("Sensor Device MQ configuration for device no[%d] addr[%s] \r\n"), i, strDeviceAddress);
       sensorAutoConfigure(OTGWdallasdataid, false, strDeviceAddress) ;     // Configure sensor with the Dallas Deviceaddress
     }
     // after last sensor set the ConfigDone flag
@@ -265,17 +264,11 @@ if (settings.mqtt.bEnable) {
     }
     DallasrealDevice[i].lasttime = now ;
     
-    // Debug logging: always show simulated values in telnet for visibility
-    if (state.debug.bSensorSim)
-    {
-      if (simUpdateDue)
-      {
-        DebugTf(PSTR("[SIM] Sensor device no[%d] addr[%s] TempC: %4.1f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
-      }
-    }
-    else if (state.debug.bSensors)
-    {
-      DebugTf(PSTR("Sensor device no[%d] addr[%s] TempC: %f\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+    // Debug logging: one line per sensor with consistent format
+    if (state.debug.bSensorSim && simUpdateDue) {
+      DebugTf(PSTR("Sensor [%d] %s = %4.1f°C [sim]\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
+    } else if (state.debug.bSensors) {
+      DebugTf(PSTR("Sensor [%d] %s = %4.1f°C\r\n"), i, strDeviceAddress, DallasrealDevice[i].tempC);
     }
 
     if (settings.mqtt.bEnable ) {
