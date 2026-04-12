@@ -174,7 +174,7 @@ void handleWebSocket() {
 // Simplified: no queue, no JSON, just direct text broadcasting
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
-  if (hasWebSocketClients() && logMessage != nullptr) {
+  if (hasWebSocketClients() && logMessage != nullptr && canSendWebSocket()) {
     webSocket.broadcastTXT(logMessage);
   }
 }

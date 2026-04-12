@@ -3825,11 +3825,20 @@ void processOT(const char *buf, int len){
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTGWDebugT(skipOTLogTimestamp(ot_log_buffer));
-   
+
       // Send log buffer directly to WebSocket (no JSON, no queue)
       sendLogToWebSocket(ot_log_buffer);
-      
-      OTGWDebugFlush();
+
+      // Throttle TCP flush to once per second instead of per-message (~10/sec).
+      // TelnetStream buffers output; flushing just forces a TCP push.
+      // At 10 msg/sec the per-message flush was the single largest TCP cost.
+      { static unsigned long lastOTFlushMs = 0;
+        unsigned long now = millis();
+        if ((uint32_t)(now - lastOTFlushMs) >= 1000) {
+          OTGWDebugFlush();
+          lastOTFlushMs = now;
+        }
+      }
       ClrLog();
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was

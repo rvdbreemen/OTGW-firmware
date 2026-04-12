@@ -22,25 +22,44 @@ template <typename T> void PROGMEM_readAnything (const T * sce, T& dest)
 //===========================================================================================
 const char* getOTLogTimestamp() {
   static char timestamp[16]; // "HH:MM:SS.mmmmmm"
+
+  // Cache timezone object and time decomposition once per second.
+  // Same pattern as _debugBOL() — avoids recreating the timezone object
+  // and running ZonedDateTime conversion on every OT message (~10/sec).
+  static TimeZone cachedTz;
+  static time_t   lastTzUpdate = 0;
+  static bool     tzInitialized = false;
+  static time_t   lastCachedSec = 0;
+  static char     cachedHMS[9] = "00:00:00"; // "HH:MM:SS"
+
   timeval now;
   gettimeofday(&now, nullptr);
-  // Default to UTC if not initialized, but typically settings.ntp.sTimezone is valid
-  // Recreating the timezone object is what _debugBOL does, so we follow that pattern
-  // assuming timezoneManager is available.
-  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
-  if (myTz.isError()) {
-    // Fallback if generic name failed
-    myTz = TimeZone::forTimeOffset(TimeOffset::forMinutes(0)); 
+  time_t now_sec = now.tv_sec;
+
+  // Refresh timezone object every 5 minutes
+  if (now_sec > 0 && (!tzInitialized || now_sec - lastTzUpdate > 300)) {
+    TimeZone newTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+    if (!newTz.isError()) {
+      cachedTz = newTz;
+      lastTzUpdate = now_sec;
+      tzInitialized = true;
+    }
   }
-  
-  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now.tv_sec, myTz);
+  if (!tzInitialized) {
+    cachedTz = TimeZone::forTimeOffset(TimeOffset::forMinutes(0));
+    tzInitialized = true;
+  }
 
-  // 6 digit subsecond resolution from microseconds (0..999999)
-  const unsigned long subSeconds = (unsigned long)(now.tv_usec);
+  // Refresh HH:MM:SS once per second
+  if (now_sec != lastCachedSec) {
+    ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, cachedTz);
+    snprintf_P(cachedHMS, sizeof(cachedHMS), PSTR("%02d:%02d:%02d"),
+               myTime.hour(), myTime.minute(), myTime.second());
+    lastCachedSec = now_sec;
+  }
 
-  snprintf_P(timestamp, sizeof(timestamp), PSTR("%02d:%02d:%02d.%06lu"),
-           myTime.hour(), myTime.minute(), myTime.second(), subSeconds);
-
+  snprintf_P(timestamp, sizeof(timestamp), PSTR("%s.%06lu"),
+             cachedHMS, (unsigned long)(now.tv_usec));
   return timestamp;
 }
 
