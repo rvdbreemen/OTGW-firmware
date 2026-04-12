@@ -216,7 +216,7 @@ def install_dependencies(project_dir, config_file):
         "ESP Telnet@2.2.3",
         "AceCommon@1.6.2",
         "AceSorting@1.0.0",
-        "AceTime@2.0.1",
+        "AceTime@4.1.0",
         "OneWire@2.3.8",
         "DallasTemperature@4.0.6",
         "WebSockets@2.7.2"
