@@ -215,7 +215,7 @@ Files that are version-specific or clearly superseded go to `docs/archive/`.
 
 ---
 
-## Phase 5: Verify and Report
+## Phase 5: Verify, Commit, and Report
 
 After all agents complete and cleanup is done:
 
@@ -224,9 +224,17 @@ After all agents complete and cleanup is done:
 3. Report any docs that could not be auto-updated (e.g., architectural decision required)
 4. If in `--release` mode: present the full release documents (RELEASE_NOTES, RELEASE_GITHUB, README What's New) for user review before committing
 
-**In standalone mode (`/update-docs` without `--release`):**
-- Commit all documentation changes directly: `git add docs/ README.md CHANGELOG.md && git commit -m "docs: update documentation for recent changes"`
-- Push to current branch
+**In standalone mode (`/update-docs` without `--release`) — MANDATORY:**
+
+Every standalone run MUST end with a commit and push. No exceptions. Do not ask the user whether to commit — just do it.
+
+```bash
+git add docs/ README.md CHANGELOG.md
+git commit -m "docs: update documentation for recent changes"
+git push
+```
+
+If there are no changes (`git diff --name-only` returns empty), skip the commit and report "no documentation changes detected."
 
 **In release mode:**
 - Do NOT commit yet — the release skill handles the commit as part of Phase 5 execution
@@ -251,3 +259,4 @@ The `/release` skill calls this workflow in its Phase 4. When called from `/rele
 - **Accuracy over completeness**: a correct partial update is better than a comprehensive inaccurate one
 - **Dutch chapters must be in Dutch**: never let English creep into NL files except for technical terms
 - **OpenAPI spec must match implementation**: always verify endpoints in spec against `kV2Routes[]` in `restAPI.ino`
+- **Always commit and push at end of standalone run**: every `/update-docs` run (without `--release`) must end with `git add docs/ README.md CHANGELOG.md && git commit && git push`. Never leave doc changes uncommitted.
