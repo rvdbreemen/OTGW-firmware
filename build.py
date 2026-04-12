@@ -209,11 +209,12 @@ def install_dependencies(project_dir, config_file):
     run_command(cmd_base + ["lib", "update-index"])
     
     # Install libraries
+    # Note: TelnetStream and ESP Telnet are no longer downloaded here.
+    # They are replaced by SimpleTelnet (src/libraries/SimpleTelnet/),
+    # which is picked up via the --libraries src/libraries flag in compile().
     libraries = [
         "WiFiManager@2.0.17",
         "pubsubclient@2.8.0",
-        "TelnetStream@1.3.0",
-        "ESP Telnet@2.2.3",
         "AceCommon@1.6.2",
         "AceSorting@1.0.0",
         "AceTime@4.1.0",
@@ -480,11 +481,17 @@ def build_filesystem(project_dir, config_file):
     # Ensure build dir exists
     output_file.parent.mkdir(exist_ok=True)
     
+    # Filesystem size must match FS_PHYS_SIZE from the linker script for the chosen
+    # partition variant.  For eesz=4M2M (eagle.flash.4m2m.ld):
+    #   _FS_start = 0x40400000, _FS_end = 0x405FA000
+    #   FS_PHYS_SIZE = 0x1FA000 = 2,072,576 bytes
+    # Using a smaller value (e.g. 1,024,000) causes LittleFS to store a mismatched
+    # block_count in the superblock; core 3.x rejects this with a mount failure.
     cmd = [
         str(mklittlefs_path),
         "-p", "256",
         "-b", "8192",
-        "-s", "1024000",
+        "-s", "2072576",
         "-c", str(fs_dir),
         str(output_file)
     ]
