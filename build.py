@@ -177,7 +177,7 @@ def setup_arduino_config(project_dir):
     # Set config values
     configs = [
         ["directories.data", str(arduino_dir)],
-        ["board_manager.additional_urls", "https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json"],
+        ["board_manager.additional_urls", "https://github.com/esp8266/Arduino/releases/download/3.1.2/package_esp8266com_index.json"],
         ["directories.downloads", str(project_dir / "staging")],
         ["directories.user", str(project_dir)],
         ["sketch.always_export_binaries", "true"],
@@ -218,7 +218,7 @@ def install_dependencies(project_dir, config_file):
         "AceTime@2.0.1",
         "OneWire@2.3.8",
         "DallasTemperature@4.0.6",
-        "WebSockets@2.3.6"
+        "WebSockets@2.7.2"
     ]
     
     for lib in libraries:

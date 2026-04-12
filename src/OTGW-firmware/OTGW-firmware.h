@@ -13,6 +13,23 @@
 #define OTGW_FIRMWARE_H
 
 #include <Arduino.h>
+
+// strlcpy_P: copy a PROGMEM string into a RAM buffer, return source length.
+// Standard strlcpy semantics: copies at most (size-1) chars, always NUL-terminates.
+// Provided here because ESP8266 Arduino 3.x newlib does not expose strlcpy_P;
+// the #ifndef guard keeps it from conflicting if a future core adds it back.
+#ifndef strlcpy_P
+inline size_t strlcpy_P(char *dst, PGM_P src, size_t size) {
+  size_t srcLen = strlen_P(src);
+  if (size > 0) {
+    size_t n = (srcLen < size - 1) ? srcLen : (size - 1);
+    memcpy_P(dst, src, n);
+    dst[n] = '\0';
+  }
+  return srcLen;
+}
+#endif
+
 #include <AceTime.h>
 // #include <TimeLib.h>
 

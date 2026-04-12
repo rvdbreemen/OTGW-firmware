@@ -318,7 +318,7 @@ void sendJsonOTmonMapEntry(const char *cName, const char *cValue, const char *cU
   char jsonBuff[JSON_ENTRY_BUF] = "";
   
   // Compact format: "name": {"value": "val", "unit": "u", "epoch": 123}
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": \"%s\", \"unit\": \"%s\", \"epoch\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": \"%s\", \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, cValue, cUnit, (uint32_t)epoch);
 
   sendBeforenext();
@@ -330,7 +330,7 @@ void sendJsonOTmonMapEntry(const char *cName, int32_t iValue, const char *cUnit,
 {
   char jsonBuff[200] = "";
   
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %d, \"unit\": \"%s\", \"epoch\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %d, \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, iValue, cUnit, (uint32_t)epoch);
 
   sendBeforenext();
@@ -342,7 +342,7 @@ void sendJsonOTmonMapEntry(const char *cName, uint32_t uValue, const char *cUnit
 {
   char jsonBuff[200] = "";
   
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %u, \"unit\": \"%s\", \"epoch\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %u, \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, uValue, cUnit, (uint32_t)epoch);
 
   sendBeforenext();
@@ -354,7 +354,7 @@ void sendJsonOTmonMapEntry(const char *cName, float fValue, const char *cUnit, t
 {
   char jsonBuff[200] = "";
   
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.3f, \"unit\": \"%s\", \"epoch\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.3f, \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, fValue, cUnit, (uint32_t)epoch);
 
   sendBeforenext();
@@ -366,7 +366,7 @@ void sendJsonOTmonMapEntry(const char *cName, bool bValue, const char *cUnit, ti
 {
   char jsonBuff[200] = "";
   
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %s, \"unit\": \"%s\", \"epoch\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %s, \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, CBOOLEAN(bValue), cUnit, (uint32_t)epoch);
 
   sendBeforenext();
@@ -381,7 +381,7 @@ void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const char
 {
   char jsonBuff[200] = "";
   
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%s\", \"type\": \"dallas\", \"epoch\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%s\", \"type\": \"dallas\", \"epoch\": %u}")
                                       , cName, fValue, cUnit, (uint32_t)epoch);
 
   sendBeforenext();
@@ -393,7 +393,7 @@ void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const __Fl
 {
   char jsonBuff[200] = "";
 
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%S\", \"type\": \"dallas\", \"epoch\": %d}")
+  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%S\", \"type\": \"dallas\", \"epoch\": %u}")
                                       , cName, fValue, reinterpret_cast<PGM_P>(cUnit), (uint32_t)epoch);
 
   sendBeforenext();
