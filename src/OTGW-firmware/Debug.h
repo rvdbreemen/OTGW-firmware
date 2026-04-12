@@ -46,16 +46,16 @@
 // Modules: OTGWDebug* (bOTmsg), MQTTDebug* (bMQTT), RESTDebug* (bRestAPI),
 //          SensorDebug* (bSensors) — see each .ino file header.
 
-// needs extern ESPTelnet debugTelnet;   // declared in OTGW-firmware.h, defined in networkStuff.ino
+// needs extern SimpleTelnet<1> debugTelnet;   // declared in OTGW-firmware.h, defined in networkStuff.ino
 
 //#include <sys/time.h>
 // #include <time.h>
 // extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
 
 
-// ESPTelnet does not inherit from Print, so printf_P() is absent.
-// This helper replicates it: format a PROGMEM format string via vsnprintf_P
-// into a 256-byte stack buffer, then send via debugTelnet.print().
+// SimpleTelnet inherits from Stream/Print but printf_P() is used here as a
+// standalone helper for PROGMEM format strings via vsnprintf_P into a
+// 256-byte stack buffer, then sent via debugTelnet.print().
 // Debug strings that exceed 255 chars are silently truncated — acceptable.
 void _debugPrintf_P(PGM_P fmt, ...) {
     char buf[256];

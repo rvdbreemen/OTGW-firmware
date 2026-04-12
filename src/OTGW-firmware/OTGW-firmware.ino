@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.3.10-beta
+**  Version  : v1.4.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -277,6 +277,7 @@ void do5minevent(){
 static void handleEspFlashBackgroundTasks()
 {
   debugTelnet.loop();         // Process new connections and disconnections
+  OTGWstream.loop();          // Keep OTGWstream clients alive during flash
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // MUST continue - processes upload chunks
   MDNS.update();              // Keep MDNS active for network discovery
@@ -315,6 +316,7 @@ void doBackgroundTasks()
     } else {
       //while connected handle everything that uses network stuff
       debugTelnet.loop();         // Process new connections, fire onConnect banner
+      OTGWstream.loop();          // Keep OTGWstream clients alive (SimpleTelnet requires loop())
       handleDebug();
       handleMQTT();                 // MQTT transmissions
       handleOTGW();                 // OTGW handling

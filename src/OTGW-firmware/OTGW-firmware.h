@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.3.10-beta
+**  Version  : v1.4.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -36,9 +36,8 @@ inline size_t strlcpy_P(char *dst, PGM_P src, size_t size) {
 // DEBUGGING: Uncomment the next line to disable WebSocket functionality
 // #define DISABLE_WEBSOCKET
 
-#include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
-#include <ESPTelnet.h>          // https://github.com/LennartHennigs/ESPTelnet — onConnect callback, replaces TelnetStream for debug port 23
-extern ESPTelnet debugTelnet;   // defined in networkStuff.ino
+#include <SimpleTelnet.h>       // https://github.com/RvdB/SimpleTelnet — unified multi-client telnet (replaces TelnetStream + ESPTelnet)
+extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 #include "Wire.h"
 #include "safeTimers.h"
 #include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
