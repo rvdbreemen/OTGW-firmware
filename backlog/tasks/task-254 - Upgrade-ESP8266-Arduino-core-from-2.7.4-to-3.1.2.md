@@ -1,11 +1,11 @@
 ---
 id: TASK-254
 title: Upgrade ESP8266 Arduino core from 2.7.4 to 3.1.2
-status: In Progress
+status: Done
 assignee:
   - '@RvdB'
 created_date: '2026-04-12 11:51'
-updated_date: '2026-04-12 12:02'
+updated_date: '2026-04-12 15:48'
 labels:
   - build
   - esp8266
@@ -22,20 +22,20 @@ The firmware is pinned to ESP8266 Arduino core 2.7.4, which is several years old
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 build.py updated to use ESP8266 3.1.2 core URL and version pin
-- [ ] #2 Firmware builds cleanly with ESP8266 3.1.2
-- [ ] #3 All breaking changes from 2.7.4 to 3.1.2 identified and resolved (WiFi API, user_interface.h, pgmspace, etc.)
+- [x] #1 build.py updated to use ESP8266 3.1.2 core URL and version pin
+- [x] #2 Firmware builds cleanly with ESP8266 3.1.2
+- [x] #3 All breaking changes from 2.7.4 to 3.1.2 identified and resolved (WiFi API, user_interface.h, pgmspace, etc.)
 - [ ] #4 feature/telnet-cli-welcome branch builds successfully after core upgrade is merged
-- [ ] #5 Fix user_interface.h: remove include and replace wifi_station_dhcpc_start/stop() with ESP8266WiFi stack equivalent (networkStuff.ino:219, networkStuff.h:38)
-- [ ] #6 Fix axTLS namespace: remove axTLS typedef in OTGW-ModUpdateServer.h:99-100 (axTLS is gone in 3.x, only BearSSL exists)
-- [ ] #7 Fix ESP.getResetInfoPtr(): replace rst_info* usage in OTGW-firmware.ino:72 with alternative (function removed in 3.x)
-- [ ] #8 Verify rtcUserMemoryRead/Write() still works in 3.x (OTGW-firmware.ino:59,63) or replace with file-based storage
-- [ ] #9 Verify FSInfo struct and LittleFS.info() still work in 3.x (FSexplorer.ino, restAPI.ino, networkStuff.ino)
-- [ ] #10 All pinned libraries verified compatible with ESP8266 3.1.2 (see TASK-255)
-- [ ] #11 Fix axTLS namespace in OTGW-ModUpdateServer.h:99-100 (TASK-256 AC1)
-- [ ] #12 Fix time_t format strings: %lu/%ld -> %lld for time_t values throughout codebase (time_t is now 64-bit in 3.x) (TASK-256 AC2)
-- [ ] #13 Replace ICACHE_RAM_ATTR with IRAM_ATTR (TASK-256 AC3)
-- [ ] #14 Verify WiFi-at-boot behaviour and OOM safety (TASK-256 AC4 and AC5)
+- [x] #5 Fix user_interface.h: remove include and replace wifi_station_dhcpc_start/stop() with ESP8266WiFi stack equivalent (networkStuff.ino:219, networkStuff.h:38)
+- [x] #6 Fix axTLS namespace: remove axTLS typedef in OTGW-ModUpdateServer.h:99-100 (axTLS is gone in 3.x, only BearSSL exists)
+- [x] #7 Fix ESP.getResetInfoPtr(): replace rst_info* usage in OTGW-firmware.ino:72 with alternative (function removed in 3.x)
+- [x] #8 Verify rtcUserMemoryRead/Write() still works in 3.x (OTGW-firmware.ino:59,63) or replace with file-based storage
+- [x] #9 Verify FSInfo struct and LittleFS.info() still work in 3.x (FSexplorer.ino, restAPI.ino, networkStuff.ino)
+- [x] #10 All pinned libraries verified compatible with ESP8266 3.1.2 (see TASK-255)
+- [x] #11 Fix axTLS namespace in OTGW-ModUpdateServer.h:99-100 (TASK-256 AC1)
+- [x] #12 Fix time_t format strings: %lu/%ld -> %lld for time_t values throughout codebase (time_t is now 64-bit in 3.x) (TASK-256 AC2)
+- [x] #13 Replace ICACHE_RAM_ATTR with IRAM_ATTR (TASK-256 AC3)
+- [x] #14 Verify WiFi-at-boot behaviour and OOM safety (TASK-256 AC4 and AC5)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -93,3 +93,9 @@ Actual breaking changes:
 
 Library situation: only WebSockets needs upgrading (2.3.6->2.7.2). See TASK-255.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ESP8266 Arduino core upgraded from 2.7.4 to 3.1.2. All breaking changes resolved (see TASK-256). WebSockets updated to 2.7.2 (see TASK-255). Firmware builds cleanly on esp8266:esp8266@3.1.2 / GCC 10.2. AC4 (feature/telnet-cli-welcome builds after merge) remains open — that branch is still blocked on ESPTelnet 2.x which is unblocked by this upgrade.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-255
 title: Update all pinned Arduino libraries to latest compatible versions
-status: In Progress
+status: Done
 assignee:
   - '@RvdB'
 created_date: '2026-04-12 11:58'
-updated_date: '2026-04-12 15:31'
+updated_date: '2026-04-12 15:36'
 labels:
   - build
   - dependencies
@@ -29,7 +29,7 @@ All Arduino libraries in build.py are pinned to versions from 2021-2023. As part
 - [x] #5 OneWire and DallasTemperature updated to latest versions in build.py
 - [x] #6 WebSockets updated to latest version compatible with ESP8266 3.1.2 in build.py
 - [x] #7 ESP Telnet (for feature/telnet-cli-welcome) version verified and pinned
-- [ ] #8 Full firmware build passes cleanly with all updated library versions
+- [x] #8 Full firmware build passes cleanly with all updated library versions
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -68,3 +68,9 @@ Research complete (2026-04-12). Only WebSockets needs updating (2.3.6->2.7.2). A
 
 WebSockets: 2.3.6 -> 2.7.2 done. All other libs already at latest. AceTime held at 2.0.1 (4.x has major API breaks).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Updated WebSockets from 2.3.6 to 2.7.2 in build.py. All changes additive (added Pico W, UNO R4, custom interface support). No API removed. All other pinned libraries are already at their latest versions: WiFiManager 2.0.17, pubsubclient 2.8.0, AceCommon 1.6.2, AceSorting 1.0.0, OneWire 2.3.8, DallasTemperature 4.0.6. AceTime held at 2.0.1 by design (4.x has major API breaks: LocalDate->PlainDate, getUtcOffset() removed, etc.). Build passes cleanly.
+<!-- SECTION:FINAL_SUMMARY:END -->

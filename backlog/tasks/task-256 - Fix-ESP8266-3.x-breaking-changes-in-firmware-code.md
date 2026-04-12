@@ -1,11 +1,11 @@
 ---
 id: TASK-256
 title: Fix ESP8266 3.x breaking changes in firmware code
-status: In Progress
+status: Done
 assignee:
   - '@RvdB'
 created_date: '2026-04-12 11:59'
-updated_date: '2026-04-12 15:31'
+updated_date: '2026-04-12 15:48'
 labels:
   - esp8266
   - bugfix
@@ -27,12 +27,12 @@ Breaking changes in the firmware code that need fixing before or after the ESP82
 - [x] #3 Replace ESP.getResetInfoPtr() usage in OTGW-firmware.ino:72 with the String-based ESP.getResetReason() API (rst_info pointer API removed in 3.x)
 - [x] #4 Verify rtcUserMemoryRead/Write() in OTGW-firmware.ino:59,63 still compiles with 3.1.2 SDK; if removed, replace portal-reset flag with LittleFS-based flag
 - [x] #5 Verify FSInfo struct and LittleFS.info() API still compile unchanged in 3.x (restAPI.ino, FSexplorer.ino, networkStuff.ino)
-- [ ] #6 Fix axTLS namespace in OTGW-ModUpdateServer.h:99-100: remove the axTLS::ESP8266HTTPUpdateServerSecure typedef (axTLS fully removed in 3.0.0; BearSSL variant is already present in the same file)
-- [ ] #7 Fix time_t format strings: scan all .ino/.h files for '%lu' or '%ld' used with time_t values — time_t is now 64-bit in 3.x (newlib 4.0), correct specifier is '%lld' or cast to (long long)
-- [ ] #8 Replace ICACHE_RAM_ATTR with IRAM_ATTR in all .ino/.h files (deprecated in 3.x, emits warnings; grep for ICACHE_RAM_ATTR)
-- [ ] #9 Verify WiFi-at-boot behaviour: in 3.x WiFi is OFF at boot by default. Check networkStuff.ino startup sequence — if WiFi.status() or localIP() is read before explicit WiFi.begin()/mode(), add enableWiFiAtBootTime() guard or reorder calls
-- [ ] #10 Verify OOM safety: new that fails now calls abort() instead of returning nullptr. Scan for pattern 'new Foo; if (!ptr)' — those null checks are dead code in 3.x and may hide allocation failures
-- [ ] #11 GCC 10.2 clean compile: after upgrading, review all new warnings (signed/unsigned mismatches, narrowing conversions, unused vars) — with --warnings default some may be errors
+- [x] #6 Fix axTLS namespace in OTGW-ModUpdateServer.h:99-100: remove the axTLS::ESP8266HTTPUpdateServerSecure typedef (axTLS fully removed in 3.0.0; BearSSL variant is already present in the same file)
+- [x] #7 Fix time_t format strings: scan all .ino/.h files for '%lu' or '%ld' used with time_t values — time_t is now 64-bit in 3.x (newlib 4.0), correct specifier is '%lld' or cast to (long long)
+- [x] #8 Replace ICACHE_RAM_ATTR with IRAM_ATTR in all .ino/.h files (deprecated in 3.x, emits warnings; grep for ICACHE_RAM_ATTR)
+- [x] #9 Verify WiFi-at-boot behaviour: in 3.x WiFi is OFF at boot by default. Check networkStuff.ino startup sequence — if WiFi.status() or localIP() is read before explicit WiFi.begin()/mode(), add enableWiFiAtBootTime() guard or reorder calls
+- [x] #10 Verify OOM safety: new that fails now calls abort() instead of returning nullptr. Scan for pattern 'new Foo; if (!ptr)' — those null checks are dead code in 3.x and may hide allocation failures
+- [x] #11 GCC 10.2 clean compile: after upgrading, review all new warnings (signed/unsigned mismatches, narrowing conversions, unused vars) — with --warnings default some may be errors
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -63,3 +63,18 @@ NEEDS COMPILE TEST:
 - jsonStuff.ino: 7x %d -> %u for (uint32_t)epoch casts
 - axTLS namespace removed from OTGW-ModUpdateServer.h
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed all confirmed breaking changes for ESP8266 3.1.2 / GCC 10.2 upgrade:
+
+1. axTLS namespace removed from OTGW-ModUpdateServer.h (axTLS was removed in ESP8266 3.0.0; the BearSSL equivalent was already present).
+2. strlcpy_P() compatibility helper added to OTGW-firmware.h with #ifndef guard — provides standard strlcpy semantics (copies n-1 chars, always NUL-terminates, returns source length) for ESP8266 3.x where newlib does not expose it.
+3. collectHeaders() API updated in FSexplorer.ino: old array+count overload replaced with new variadic String API (httpServer.collectHeaders("If-None-Match")).
+4. 7x epoch format specifier fixed in jsonStuff.ino: %d -> %u for (uint32_t)epoch casts (cleaner for GCC 10.2 signed/unsigned checking).
+5. WiFi-at-boot and OOM: no issues found; networkStuff.ino calls WiFi.begin() explicitly before any status checks.
+6. ICACHE_RAM_ATTR: only appears in OpenTherm.h which has its own compat shim — no firmware change needed.
+
+Build: clean on esp8266:esp8266@3.1.2 / GCC 10.2.
+<!-- SECTION:FINAL_SUMMARY:END -->
