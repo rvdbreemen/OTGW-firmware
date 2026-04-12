@@ -20,6 +20,10 @@
 #define RESTDebugT(...)   ({ if (state.debug.bRestAPI) DebugT(__VA_ARGS__);    })
 #define RESTDebug(...)    ({ if (state.debug.bRestAPI) Debug(__VA_ARGS__);    })
 
+// REST API debug: tracks last response status for the access-log line.
+// Set by sendApiError/sendApiOptions; defaults to 200 before each handler.
+static int16_t restResponseStatus = 0;
+
 // Zero-allocation HTTP method to string (returns PROGMEM pointer).
 // Replaces strHTTPmethod() which returned String (heap allocation per call).
 static const char* httpMethodToStr(HTTPMethod m) {
@@ -49,6 +53,7 @@ static void sendCorsOriginHeader() {
 // Returns: {"error":{"status":N,"message":"..."}}
 //=======================================================================
 static void sendApiError(int httpCode, const __FlashStringHelper* message) {
+  restResponseStatus = httpCode;
   char jsonBuff[200];
   snprintf_P(jsonBuff, sizeof(jsonBuff),
     PSTR("{\"error\":{\"status\":%d,\"message\":\"%S\"}}"),
@@ -489,8 +494,8 @@ void processAPI()
     if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0) {
       // OPTIONS preflight for all v2 endpoints (CORS)
       if (method == HTTP_OPTIONS) {
-        RESTDebugTf(PSTR("REST OPTIONS %s => 204 preflight\r\n"), originalURI);
         sendApiOptions();
+        RESTDebugTf(PSTR("REST OPTIONS %s => 204 preflight\r\n"), originalURI);
         return;
       }
 
@@ -503,24 +508,25 @@ void processAPI()
       if (wc > 3) {
         for (const ApiRoute* r = kV2Routes; r->segment != nullptr; r++) {
           if (strcmp_P(words[3], r->segment) == 0) {
-            RESTDebugTf(PSTR("REST %s %s => v2/%S\r\n"), httpMethodToStr(method), originalURI, r->segment);
+            restResponseStatus = 200; // default; overwritten by sendApiError if handler fails
             r->handler(words, wc, method, originalURI);
+            RESTDebugTf(PSTR("REST %s %s => %d v2/%S\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r->segment);
             return;
           }
         }
       }
-      RESTDebugTf(PSTR("REST %s %s => 404\r\n"), httpMethodToStr(method), originalURI);
       sendApiNotFound(originalURI);
+      RESTDebugTf(PSTR("REST %s %s => %d not found\r\n"), httpMethodToStr(method), originalURI, restResponseStatus);
     } else if (wc > 2 && (strcmp_P(words[2], PSTR("v0")) == 0 || strcmp_P(words[2], PSTR("v1")) == 0)) {
-      RESTDebugTf(PSTR("REST %s %s => 410 deprecated\r\n"), httpMethodToStr(method), originalURI);
       sendApiError(410, F("API version removed; use /api/v2"));
+      RESTDebugTf(PSTR("REST %s %s => %d deprecated\r\n"), httpMethodToStr(method), originalURI, restResponseStatus);
     } else {
-      RESTDebugTf(PSTR("REST %s %s => 404\r\n"), httpMethodToStr(method), originalURI);
       sendApiNotFound(originalURI);
+      RESTDebugTf(PSTR("REST %s %s => %d\r\n"), httpMethodToStr(method), originalURI, restResponseStatus);
     }
   } else {
-    RESTDebugTf(PSTR("REST %s %s => 404 non-api\r\n"), httpMethodToStr(method), originalURI);
     sendApiNotFound(originalURI);
+    RESTDebugTf(PSTR("REST %s %s => %d non-api\r\n"), httpMethodToStr(method), originalURI, restResponseStatus);
   }
 } // processAPI()
 
