@@ -20,6 +20,21 @@
 #define RESTDebugT(...)   ({ if (state.debug.bRestAPI) DebugT(__VA_ARGS__);    })
 #define RESTDebug(...)    ({ if (state.debug.bRestAPI) Debug(__VA_ARGS__);    })
 
+// Zero-allocation HTTP method to string (returns PROGMEM pointer).
+// Replaces strHTTPmethod() which returned String (heap allocation per call).
+static const char* httpMethodToStr(HTTPMethod m) {
+  switch (m) {
+    case HTTP_GET:     return "GET";
+    case HTTP_POST:    return "POST";
+    case HTTP_PUT:     return "PUT";
+    case HTTP_PATCH:   return "PATCH";
+    case HTTP_DELETE:  return "DELETE";
+    case HTTP_OPTIONS: return "OPTIONS";
+    case HTTP_HEAD:    return "HEAD";
+    default:           return "?";
+  }
+}
+
 // H3: Send dynamic CORS Allow-Origin header echoing the request Origin,
 // instead of a wildcard. Only sends the header when Origin is present.
 static void sendCorsOriginHeader() {
@@ -446,16 +461,14 @@ void processAPI()
   const size_t uriLen = strlcpy(URI, httpServer.uri().c_str(), sizeof(URI));
   strlcpy(originalURI, URI, sizeof(originalURI));
 
-  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
-
   if (uriLen >= sizeof(URI)) {
-    RESTDebugTln(F("==> Bailout due to oversized URI"));
+    RESTDebugTf(PSTR("REST %s %s => 414 URI too long\r\n"), httpMethodToStr(method), originalURI);
     httpServer.send_P(414, PSTR("text/plain"), PSTR("414: URI too long\r\n"));
     return;
   }
 
   if (ESP.getFreeHeap() < 4096) {
-    RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), ESP.getFreeHeap());
+    RESTDebugTf(PSTR("REST %s %s => 500 low heap (%u)\r\n"), httpMethodToStr(method), originalURI, ESP.getFreeHeap());
     httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n"));
     return;
   }
@@ -471,17 +484,15 @@ void processAPI()
     }
   }
 
-  if (state.debug.bRestAPI) {
-    DebugT(F(">>"));
-    for (uint_fast8_t w = 0; w < wc; w++) { Debugf(PSTR("word[%d] => [%s], "), w, words[w]); }
-    Debugln(F(" "));
-  }
-
   // Route: /api/v2/{resource}/...
   if (wc > 1 && strcmp_P(words[1], PSTR("api")) == 0) {
     if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0) {
       // OPTIONS preflight for all v2 endpoints (CORS)
-      if (method == HTTP_OPTIONS) { sendApiOptions(); return; }
+      if (method == HTTP_OPTIONS) {
+        RESTDebugTf(PSTR("REST OPTIONS %s => 204 preflight\r\n"), originalURI);
+        sendApiOptions();
+        return;
+      }
 
       // H5: Centralized auth check — all POST/PUT mutations require auth
       if (method == HTTP_POST || method == HTTP_PUT) {
@@ -492,18 +503,23 @@ void processAPI()
       if (wc > 3) {
         for (const ApiRoute* r = kV2Routes; r->segment != nullptr; r++) {
           if (strcmp_P(words[3], r->segment) == 0) {
+            RESTDebugTf(PSTR("REST %s %s => v2/%S\r\n"), httpMethodToStr(method), originalURI, r->segment);
             r->handler(words, wc, method, originalURI);
             return;
           }
         }
       }
+      RESTDebugTf(PSTR("REST %s %s => 404\r\n"), httpMethodToStr(method), originalURI);
       sendApiNotFound(originalURI);
     } else if (wc > 2 && (strcmp_P(words[2], PSTR("v0")) == 0 || strcmp_P(words[2], PSTR("v1")) == 0)) {
+      RESTDebugTf(PSTR("REST %s %s => 410 deprecated\r\n"), httpMethodToStr(method), originalURI);
       sendApiError(410, F("API version removed; use /api/v2"));
     } else {
+      RESTDebugTf(PSTR("REST %s %s => 404\r\n"), httpMethodToStr(method), originalURI);
       sendApiNotFound(originalURI);
     }
   } else {
+    RESTDebugTf(PSTR("REST %s %s => 404 non-api\r\n"), httpMethodToStr(method), originalURI);
     sendApiNotFound(originalURI);
   }
 } // processAPI()
@@ -524,7 +540,6 @@ void sendOTGWvalue(int msgid){
     sendEndJsonMap("");
     return;
   }
-  RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
   sendStartJsonMap("");
   sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
@@ -539,7 +554,7 @@ void sendOTGWvalue(int msgid){
 void sendOTGWlabel(const char *msglabel){
   uint_fast8_t msgid;
   for (msgid = 0; msgid <= OT_MSGID_MAX; msgid++){
-    PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
+    PROGMEM_readAnything(&OTmap[msgid], OTlookupitem);
     if (strcasecmp(OTlookupitem.label, msglabel) == 0) break;
   }
   if (msgid > OT_MSGID_MAX){
@@ -554,7 +569,6 @@ void sendOTGWlabel(const char *msglabel){
     sendEndJsonMap("");
     return;
   }
-  RESTDebugTf(PSTR("%s = %s %s\r\n"), OTlookupitem.label, getOTGWValue(msgid), OTlookupitem.unit);
   sendStartJsonMap("");
   sendJsonMapEntry(F("label"), OTlookupitem.label);
   if (OTlookupitem.type == ot_f88) {
@@ -621,7 +635,6 @@ void sendEndJsonMap(const __FlashStringHelper* objName) {
 void sendOTmonitorV2() 
 {
   time_t now = time(nullptr); // needed for Dallas sensor display
-  RESTDebugTln(F("sending OT monitor values (V2)...\r"));
 
   sendStartJsonMap(F("otmonitor"));
 
@@ -918,7 +931,6 @@ void sendDeviceTimeV2()
 //=======================================================================
 void sendDeviceSettings()
 {
-  RESTDebugTln(F("sending device settings ...\r"));
 
   sendStartJsonMap(F("settings"));
 
