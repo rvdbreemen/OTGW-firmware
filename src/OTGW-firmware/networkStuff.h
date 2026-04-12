@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v1.3.10-beta
+**  Version  : v1.4.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -42,12 +42,7 @@ extern "C" {
 #include <LittleFS.h>
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
 #include "updateServerHtml.h"
-#include <WiFiManager.h>        // version 2.0.4-beta
-
-// Optimize WebSocket memory usage: reduce per-client buffer from 512 to 256 bytes
-// This must be defined BEFORE including WebSocketsServer.h
-// Saves ~256 bytes per client (768 bytes with 3 clients)
-#define WEBSOCKETS_MAX_DATA_SIZE 256
+#include <WiFiManager.h>        // version 2.0.17
 
 #include <WebSocketsServer.h>   // WebSocket server for streaming OT log messages to WebUI
 

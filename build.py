@@ -212,7 +212,7 @@ def install_dependencies(project_dir, config_file):
     libraries = [
         "WiFiManager@2.0.17",
         "pubsubclient@2.8.0",
-        "TelnetStream@1.2.4",
+        "TelnetStream@1.3.0",
         "ESP Telnet@2.2.3",
         "AceCommon@1.6.2",
         "AceSorting@1.0.0",
