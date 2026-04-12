@@ -18,7 +18,7 @@
 
 #define Debug(...)      ({ debugTelnet.print(__VA_ARGS__);    })
 #define Debugln(...)    ({ debugTelnet.println(__VA_ARGS__);  })
-#define Debugf(...)     ({ debugTelnet.printf_P(__VA_ARGS__);   })
+#define Debugf(...)     ({ _debugPrintf_P(__VA_ARGS__);       })
 
 #define DebugFlush()    ({ debugTelnet.flush(); })
 
@@ -52,6 +52,19 @@
 // #include <time.h>
 // extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
 
+
+// ESPTelnet does not inherit from Print, so printf_P() is absent.
+// This helper replicates it: format a PROGMEM format string via vsnprintf_P
+// into a 256-byte stack buffer, then send via debugTelnet.print().
+// Debug strings that exceed 255 chars are silently truncated — acceptable.
+void _debugPrintf_P(PGM_P fmt, ...) {
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf_P(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    debugTelnet.print(buf);
+}
 
 void _debugBOL(const char *fn, int line)
 {

@@ -274,32 +274,42 @@ void loopWifi() {
 static void sendTelnetBanner(String ip)
 {
   debugTelnet.println(F("\r\n============================================"));
-  debugTelnet.println(F("  OpenTherm Gateway — OTGW-firmware"));
-  debugTelnet.printf_P(PSTR("  Version : %s\r\n"), _VERSION);
+  debugTelnet.println(F("  OpenTherm Gateway -- OTGW-firmware"));
+  _debugPrintf_P(PSTR("  Version : %s\r\n"), _VERSION);
   debugTelnet.println(F("============================================"));
-  debugTelnet.printf_P(PSTR("  IP      : %s\r\n"), WiFi.localIP().toString().c_str());
-  debugTelnet.printf_P(PSTR("  WiFi    : %s\r\n"), WiFi.SSID().c_str());
-  debugTelnet.printf_P(PSTR("  OTGW    : %-10s  MQTT : %s\r\n"),
+  _debugPrintf_P(PSTR("  IP      : %s\r\n"), WiFi.localIP().toString().c_str());
+  _debugPrintf_P(PSTR("  WiFi    : %s\r\n"), WiFi.SSID().c_str());
+  _debugPrintf_P(PSTR("  OTGW    : %-10s  MQTT : %s\r\n"),
     state.otgw.bOnline     ? "online"     : "offline",
     state.mqtt.bConnected  ? "connected"  : "disconnected");
-  debugTelnet.printf_P(PSTR("  Heap    : %u bytes free\r\n"), ESP.getFreeHeap());
+  _debugPrintf_P(PSTR("  Heap    : %u bytes free\r\n"), ESP.getFreeHeap());
   debugTelnet.println(F("--------------------------------------------"));
   debugTelnet.println(F("  Debug flags (key to toggle):"));
-  debugTelnet.printf_P(PSTR("    1 OT messages : %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
-  debugTelnet.printf_P(PSTR("    2 REST API    : %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
-  debugTelnet.printf_P(PSTR("    3 MQTT comms  : %s\r\n"), CBOOLEAN(state.debug.bMQTT));
-  debugTelnet.printf_P(PSTR("    4 MQTT gating : %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
-  debugTelnet.printf_P(PSTR("    5 Sensors     : %s\r\n"), CBOOLEAN(state.debug.bSensors));
+  _debugPrintf_P(PSTR("    1 OT messages : %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
+  _debugPrintf_P(PSTR("    2 REST API    : %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
+  _debugPrintf_P(PSTR("    3 MQTT comms  : %s\r\n"), CBOOLEAN(state.debug.bMQTT));
+  _debugPrintf_P(PSTR("    4 MQTT gating : %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
+  _debugPrintf_P(PSTR("    5 Sensors     : %s\r\n"), CBOOLEAN(state.debug.bSensors));
   debugTelnet.println(F("--------------------------------------------"));
   debugTelnet.println(F("  Press 'h' for the full debug menu."));
-  debugTelnet.printf_P(PSTR("  Connected from: %s\r\n"), ip.c_str());
+  _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip.c_str());
   debugTelnet.println(F("============================================\r\n"));
 }
 
 //===========================================================================================
+// Forward declaration — defined in handleDebug.ino.
+void handleDebugChar(char c);
+
+// ESPTelnet input callback: line mode off means one String(char) per keypress.
+static void onTelnetInput(String s) {
+  if (s.length() > 0) handleDebugChar(s[0]);
+}
+
 void startTelnet()
 {
   debugTelnet.onConnect(sendTelnetBanner);
+  debugTelnet.setLineMode(false);
+  debugTelnet.onInputReceived(onTelnetInput);
   debugTelnet.begin(23);
   DebugT(F("\r\nTelnet debug server started on "));
   DebugT(WiFi.localIP());

@@ -1,8 +1,7 @@
-void handleDebug(){
-    if (debugTelnet.available()>0){
-        //read the next
-        char c;
-        c = debugTelnet.read();
+// Dispatch a single keypress from the telnet debug session.
+// Called from onTelnetInput() in networkStuff.ino via the ESPTelnet
+// onInputReceived callback (line mode off — one char per call).
+void handleDebugChar(char c){
         switch (c){
             case 'h':
                 Debugln();
@@ -158,6 +157,8 @@ void handleDebug(){
             default:
                 break;
         }
-
-    }
 }
+
+// Called from doBackgroundTasks() — no-op now that input is handled via
+// the ESPTelnet onInputReceived callback registered in startTelnet().
+void handleDebug(){}
