@@ -166,7 +166,8 @@ struct FlashSection {          // state.flash — Firmware upgrade operations
 struct DebugSection {          // state.debug — Runtime diagnostic output flags
   bool     bOTmsg                 = true;   // was bDebugOTmsg — OpenTherm message trace
   bool     bRestAPI               = false;  // was bDebugRestAPI — REST API request trace
-  bool     bMQTT                  = false;  // was bDebugMQTT — MQTT publish/receive trace
+  bool     bMQTT                  = false;  // was bDebugMQTT — MQTT communication trace (connect/send/receive)
+  bool     bMQTTGate              = false;  // MQTT interval gating decisions (high volume)
   bool     bSensors               = false;  // was bDebugSensors — Dallas sensor scan trace
   bool     bSensorSim             = false;  // was bDebugSensorSimulation
   bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
