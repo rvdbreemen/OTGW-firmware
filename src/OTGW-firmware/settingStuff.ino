@@ -274,7 +274,7 @@ void writeSettings(bool show)
     DebugTln(F("\r\n[Settings] JSON content:"));
     File showFile = LittleFS.open(SETTINGS_FILE, "r");
     while (showFile && showFile.available()) {
-      TelnetStream.write(showFile.read());
+      debugTelnet.write(showFile.read());
     }
     if (showFile) showFile.close();
   }

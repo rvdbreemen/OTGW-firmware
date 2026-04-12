@@ -20,6 +20,8 @@
 // #define DISABLE_WEBSOCKET
 
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
+#include <ESPTelnet.h>          // https://github.com/LennartHennigs/ESPTelnet — onConnect callback, replaces TelnetStream for debug port 23
+extern ESPTelnet debugTelnet;   // defined in networkStuff.ino
 #include "Wire.h"
 #include "safeTimers.h"
 #include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more

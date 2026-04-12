@@ -3830,7 +3830,7 @@ void processOT(const char *buf, int len){
       sendLogToWebSocket(ot_log_buffer);
 
       // Throttle TCP flush to once per second instead of per-message (~10/sec).
-      // TelnetStream buffers output; flushing just forces a TCP push.
+      // debugTelnet (ESPTelnet) buffers output; flushing just forces a TCP push.
       // At 10 msg/sec the per-message flush was the single largest TCP cost.
       { static unsigned long lastOTFlushMs = 0;
         unsigned long now = millis();

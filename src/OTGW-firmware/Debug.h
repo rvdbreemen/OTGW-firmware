@@ -16,11 +16,11 @@
 /*---- start macro's ------------------------------------------------------------------*/
 
 
-#define Debug(...)      ({ TelnetStream.print(__VA_ARGS__);    })
-#define Debugln(...)    ({ TelnetStream.println(__VA_ARGS__);  })
-#define Debugf(...)     ({ TelnetStream.printf_P(__VA_ARGS__);   })
+#define Debug(...)      ({ debugTelnet.print(__VA_ARGS__);    })
+#define Debugln(...)    ({ debugTelnet.println(__VA_ARGS__);  })
+#define Debugf(...)     ({ debugTelnet.printf_P(__VA_ARGS__);   })
 
-#define DebugFlush()    ({ TelnetStream.flush(); })
+#define DebugFlush()    ({ debugTelnet.flush(); })
 
 
 #define DebugT(...)     ({ _debugBOL(__FUNCTION__, __LINE__);  \
@@ -46,7 +46,7 @@
 // Modules: OTGWDebug* (bOTmsg), MQTTDebug* (bMQTT), RESTDebug* (bRestAPI),
 //          SensorDebug* (bSensors) — see each .ino file header.
 
-// needs #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
+// needs extern ESPTelnet debugTelnet;   // declared in OTGW-firmware.h, defined in networkStuff.ino
 
 //#include <sys/time.h>
 // #include <time.h>
@@ -119,6 +119,6 @@ void _debugBOL(const char *fn, int line)
        _bol[sizeof(_bol) - 1] = '\0';
    }
 
-   TelnetStream.print(_bol);
+   debugTelnet.print(_bol);
 }
 #endif
