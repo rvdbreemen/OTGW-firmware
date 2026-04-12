@@ -250,8 +250,59 @@ static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   }
 }
 
+static void sendSensorStatus() {
+  time_t now = time(nullptr);
+  sendStartJsonMap(F("sensors"));
+
+  // Dallas temperature sensors
+  sendJsonMapEntry(F("dallas_enabled"), settings.sensors.bEnabled);
+  sendJsonMapEntry(F("dallas_detected"), bSensorsDetected);
+  sendJsonMapEntry(F("dallas_count"), (int32_t)DallasrealDeviceCount);
+  sendJsonMapEntry(F("dallas_gpio"), (int32_t)settings.sensors.iPin);
+  sendJsonMapEntry(F("dallas_poll_sec"), (int32_t)settings.sensors.iInterval);
+  sendJsonMapEntry(F("simulated"), state.debug.bSensorSim);
+
+  // Individual sensor readings
+  if (bSensorsDetected || state.debug.bSensorSim) {
+    // Start "devices" sub-object — use chunked JSON
+    httpServer.sendContent_P(PSTR(",\r\n  \"devices\": {"));
+    for (int i = 0; i < DallasrealDeviceCount; i++) {
+      const char *addr = getDallasAddress(DallasrealDevice[i].addr);
+      if (!addr) continue;
+      char entry[100];
+      snprintf_P(entry, sizeof(entry),
+                 PSTR("%s\r\n    \"%s\": {\"temp\": %4.1f, \"epoch\": %u}"),
+                 (i > 0) ? "," : "",
+                 addr, DallasrealDevice[i].tempC, (uint32_t)DallasrealDevice[i].lasttime);
+      httpServer.sendContent(entry);
+    }
+    httpServer.sendContent_P(PSTR("\r\n  }"));
+  }
+
+  // S0 pulse counter
+  httpServer.sendContent_P(PSTR(",\r\n  \"s0\": {"));
+  {
+    char s0buf[120];
+    snprintf_P(s0buf, sizeof(s0buf),
+               PSTR("\r\n    \"enabled\": %s, \"gpio\": %d, \"poll_sec\": %d,"
+                    "\r\n    \"pulses\": %u, \"total\": %lu, \"power_kw\": %4.3f, \"epoch\": %u"
+                    "\r\n  }"),
+               settings.s0.bEnabled ? "true" : "false",
+               settings.s0.iPin, settings.s0.iInterval,
+               OTGWs0pulseCount, (unsigned long)OTGWs0pulseCountTot,
+               OTGWs0powerkw, (uint32_t)OTGWs0lasttime);
+    httpServer.sendContent(s0buf);
+  }
+
+  sendEndJsonMap(F("sensors"));
+}
+
 static void handleSensors(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
-  if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
+  if (wc == 4 || (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0)) {
+    // GET /api/v2/sensors or GET /api/v2/sensors/status
+    if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendSensorStatus();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
     if (method == HTTP_GET) {
       getDallasLabels();
     } else if (method == HTTP_POST || method == HTTP_PUT) {
