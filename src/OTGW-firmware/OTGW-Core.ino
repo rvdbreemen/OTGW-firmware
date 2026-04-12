@@ -95,12 +95,27 @@ const char *hexheaders[] = {
 
 #define OT_LOG_BUFFER_SIZE 512
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
+size_t ot_log_pos = 0;  // tracked write position — eliminates O(n²) strlen per AddLog call
 
-#define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
-#define AddLogf(...)        ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
-#define AddLogf_P(...)      ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf_P(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
-#define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
-#define AddLogln()          ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); } })
+#define ClrLog()            ({ ot_log_buffer[0] = '\0'; ot_log_pos = 0; })
+#define AddLogf(...)        ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
+                                 int _w = snprintf(ot_log_buffer + ot_log_pos, OT_LOG_BUFFER_SIZE - ot_log_pos, __VA_ARGS__); \
+                                 if (_w > 0) { size_t _rem = OT_LOG_BUFFER_SIZE - 1 - ot_log_pos; ot_log_pos += ((size_t)_w < _rem) ? (size_t)_w : _rem; } \
+                               } })
+#define AddLogf_P(...)      ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
+                                 int _w = snprintf_P(ot_log_buffer + ot_log_pos, OT_LOG_BUFFER_SIZE - ot_log_pos, __VA_ARGS__); \
+                                 if (_w > 0) { size_t _rem = OT_LOG_BUFFER_SIZE - 1 - ot_log_pos; ot_log_pos += ((size_t)_w < _rem) ? (size_t)_w : _rem; } \
+                               } })
+#define AddLog(logstring)   ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
+                                 size_t _rem = OT_LOG_BUFFER_SIZE - ot_log_pos; \
+                                 size_t _src = strlcpy(ot_log_buffer + ot_log_pos, logstring, _rem); \
+                                 ot_log_pos += (_src < _rem) ? _src : (_rem - 1); \
+                               } })
+#define AddLogln()          ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 2)) { \
+                                 ot_log_buffer[ot_log_pos++] = '\r'; \
+                                 ot_log_buffer[ot_log_pos++] = '\n'; \
+                                 ot_log_buffer[ot_log_pos] = '\0'; \
+                               } })
 
 static uint32_t gOTGWStartupQuietStartMs = 0;
 static bool     gOTGWStartupQuietActive  = false;
@@ -117,15 +132,9 @@ static const uint32_t OTGW_STARTUP_QUIET_PERIOD_MS = 15000;
 static void sendEventToWebSocket(char prefix, const char *msg, int len = -1) {
   ClrLog();
   AddLog(getOTLogTimestamp());
-  size_t _hlen = strlen(ot_log_buffer);
-  if (_hlen < (OT_LOG_BUFFER_SIZE - 1))
-    snprintf_P(ot_log_buffer + _hlen, OT_LOG_BUFFER_SIZE - _hlen, PSTR(" %c "), prefix);
+  AddLogf_P(PSTR(" %c "), prefix);
   if (len < 0) AddLog(msg);
-  else {
-    size_t _mlen = strlen(ot_log_buffer);
-    if (_mlen < (OT_LOG_BUFFER_SIZE - 1))
-      snprintf_P(ot_log_buffer + _mlen, OT_LOG_BUFFER_SIZE - _mlen, PSTR("%.*s"), len, msg);
-  }
+  else AddLogf_P(PSTR("%.*s"), len, msg);
   AddLogln();
   sendLogToWebSocket(ot_log_buffer);
   ClrLog();
@@ -134,12 +143,12 @@ static void sendEventToWebSocket(char prefix, const char *msg, int len = -1) {
 static void sendEventToWebSocket_P(char prefix, PGM_P msg_P) {
   ClrLog();
   AddLog(getOTLogTimestamp());
-  size_t _hlen = strlen(ot_log_buffer);
-  if (_hlen < (OT_LOG_BUFFER_SIZE - 1))
-    snprintf_P(ot_log_buffer + _hlen, OT_LOG_BUFFER_SIZE - _hlen, PSTR(" %c "), prefix);
-  size_t _mlen = strlen(ot_log_buffer);
-  if (_mlen < (OT_LOG_BUFFER_SIZE - 1))
-    strncat_P(ot_log_buffer, msg_P, OT_LOG_BUFFER_SIZE - _mlen - 1);
+  AddLogf_P(PSTR(" %c "), prefix);
+  if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) {
+    size_t _rem = OT_LOG_BUFFER_SIZE - ot_log_pos;
+    size_t _src = strlcpy_P(ot_log_buffer + ot_log_pos, msg_P, _rem);
+    ot_log_pos += (_src < _rem) ? _src : (_rem - 1);
+  }
   AddLogln();
   sendLogToWebSocket(ot_log_buffer);
   ClrLog();
