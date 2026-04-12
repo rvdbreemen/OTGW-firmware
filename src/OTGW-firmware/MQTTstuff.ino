@@ -1216,7 +1216,6 @@ bool getMQTTConfigDone(const uint8_t MSGid)
   group = group>>5;
   uint8_t index = MSGid & 0b00011111;
   uint32_t result = bitRead(MQTTautoConfigMap[group], index);
-  MQTTDebugTf(PSTR("Reading bit %d from group %d for MSGid %d: result = %d\r\n"), index, group, MSGid, result);
   if (result > 0) {
     return true;
   } else {

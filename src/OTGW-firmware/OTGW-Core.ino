@@ -1180,7 +1180,7 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 }
 
 // =====================[ MQTT throttle helpers ]==================
-#define CoreMQTTDebugTf(...) ({ if (state.debug.bMQTT) DebugTf(__VA_ARGS__); })
+#define CoreMQTTDebugTf(...) ({ if (state.debug.bMQTTGate) DebugTf(__VA_ARGS__); })
 
 static char mqttPublishSourceTag(byte masterslave)
 {
@@ -1200,8 +1200,8 @@ static void logMQTTValueGateDecision(byte id,
                                      bool allowPublish,
                                      const __FlashStringHelper *reason)
 {
-  if (!allowPublish) return; // suppress noisy "skip" lines to reduce debug volume
-  CoreMQTTDebugTf(PSTR("MQTT gate id=%u src=%c slot=%u prev=0x%04X curr=0x%04X first=%s changed=%s interval=%s last=%u now=%u => %s [%S]\r\n"),
+  if (!state.debug.bMQTTGate) return;
+  DebugTf(PSTR("MQTT gate id=%u src=%c slot=%u prev=0x%04X curr=0x%04X first=%s changed=%s interval=%s last=%u now=%u => %s [%S]\r\n"),
                   id,
                   mqttPublishSourceTag(masterslave),
                   idx,
@@ -1225,12 +1225,12 @@ static void logMQTTStatusBitDecision(uint8_t bitSlot,
                                      bool forcePublish,
                                      bool allowPublish)
 {
-  if (!allowPublish) return; // suppress noisy "skip" lines to reduce debug volume
+  if (!state.debug.bMQTTGate) return;
   char previousBitsText[9] {0};
   char currentBitsText[9] {0};
   copyBinaryByteString(previousBits, previousBitsText, sizeof(previousBitsText));
   copyBinaryByteString(currentBits, currentBitsText, sizeof(currentBitsText));
-  CoreMQTTDebugTf(PSTR("MQTT gate bit[%u] %s prev=%s curr=%s prev_bits=%s curr_bits=%s force=%s => %s\r\n"),
+  DebugTf(PSTR("MQTT gate bit[%u] %s prev=%s curr=%s prev_bits=%s curr_bits=%s force=%s => %s\r\n"),
                   bitSlot,
                   topic,
                   CBOOLEAN(previousValue),
@@ -1394,14 +1394,15 @@ bool shouldPublishMQTTForPSField(byte id) {
   uint16_t now      = currentTrackedSeconds();
   const bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
   const bool allowPublish = firstSeen || intervalElapsed;
+  CoreMQTTDebugTf(PSTR("MQTT gate PS id=%u slot=%u first=%s interval=%s last=%u now=%u => %s\r\n"),
+                  id,
+                  idx,
+                  CBOOLEAN(firstSeen),
+                  CBOOLEAN(intervalElapsed),
+                  lastTime,
+                  now,
+                  allowPublish ? "publish" : "skip");
   if (allowPublish) {
-    CoreMQTTDebugTf(PSTR("MQTT gate PS id=%u slot=%u first=%s interval=%s last=%u now=%u => publish\r\n"),
-                    id,
-                    idx,
-                    CBOOLEAN(firstSeen),
-                    CBOOLEAN(intervalElapsed),
-                    lastTime,
-                    now);
     mqttPendingSlot = {idx, 0, now, true, true}; // isTimeOnly for PS=1
     return true;
   }
@@ -1526,13 +1527,14 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.MasterStatus;
   const bool forcePublish = shouldForceMasterStatusPublish();
   const bool publishCombined = shouldPublishStatusByte(0, valueHB, previousStatus, forcePublish);
-  if (publishCombined && state.debug.bMQTT) {
+  if (state.debug.bMQTTGate) {
     char previousBitsText[9] {0};
     char currentBitsText[9] {0};
     copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
     copyBinaryByteString(valueHB, currentBitsText, sizeof(currentBitsText));
-    DebugTf(PSTR("MQTT gate status_master prev=0x%02X[%s] curr=0x%02X[%s] force=%s => publish\r\n"),
-            previousStatus, previousBitsText, valueHB, currentBitsText, CBOOLEAN(forcePublish));
+    DebugTf(PSTR("MQTT gate status_master prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
+            previousStatus, previousBitsText, valueHB, currentBitsText,
+            CBOOLEAN(forcePublish), publishCombined ? "publish" : "skip");
   }
   OTcurrentSystemState.MasterStatus = valueHB;
   mqttForceNextMasterStatusPublish = false;
@@ -1554,13 +1556,14 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.SlaveStatus;
   const bool forcePublish = shouldForceSlaveStatusPublish();
   const bool publishCombined = shouldPublishStatusByte(1, valueLB, previousStatus, forcePublish);
-  if (publishCombined && state.debug.bMQTT) {
+  if (state.debug.bMQTTGate) {
     char previousBitsText[9] {0};
     char currentBitsText[9] {0};
     copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
     copyBinaryByteString(valueLB, currentBitsText, sizeof(currentBitsText));
-    DebugTf(PSTR("MQTT gate status_slave prev=0x%02X[%s] curr=0x%02X[%s] force=%s => publish\r\n"),
-            previousStatus, previousBitsText, valueLB, currentBitsText, CBOOLEAN(forcePublish));
+    DebugTf(PSTR("MQTT gate status_slave prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
+            previousStatus, previousBitsText, valueLB, currentBitsText,
+            CBOOLEAN(forcePublish), publishCombined ? "publish" : "skip");
   }
   OTcurrentSystemState.SlaveStatus = valueLB;
   mqttForceNextSlaveStatusPublish = false;
@@ -1622,13 +1625,14 @@ static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.MasterStatusVH;
   const bool forcePublish = shouldForceMasterStatusVHPublish();
   const bool publishCombined = shouldPublishStatusVHByte(0, valueHB, previousStatus, forcePublish);
-  if (publishCombined && state.debug.bMQTT) {
+  if (state.debug.bMQTTGate) {
     char previousBitsText[9] {0};
     char currentBitsText[9] {0};
     copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
     copyBinaryByteString(valueHB, currentBitsText, sizeof(currentBitsText));
-    DebugTf(PSTR("MQTT gate status_vh_master prev=0x%02X[%s] curr=0x%02X[%s] force=%s => publish\r\n"),
-            previousStatus, previousBitsText, valueHB, currentBitsText, CBOOLEAN(forcePublish));
+    DebugTf(PSTR("MQTT gate status_vh_master prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
+            previousStatus, previousBitsText, valueHB, currentBitsText,
+            CBOOLEAN(forcePublish), publishCombined ? "publish" : "skip");
   }
   OTcurrentSystemState.MasterStatusVH = valueHB;
   mqttForceNextMasterStatusVHPublish = false;
@@ -1647,13 +1651,14 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.SlaveStatusVH;
   const bool forcePublish = shouldForceSlaveStatusVHPublish();
   const bool publishCombined = shouldPublishStatusVHByte(1, valueLB, previousStatus, forcePublish);
-  if (publishCombined && state.debug.bMQTT) {
+  if (state.debug.bMQTTGate) {
     char previousBitsText[9] {0};
     char currentBitsText[9] {0};
     copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
     copyBinaryByteString(valueLB, currentBitsText, sizeof(currentBitsText));
-    DebugTf(PSTR("MQTT gate status_vh_slave prev=0x%02X[%s] curr=0x%02X[%s] force=%s => publish\r\n"),
-            previousStatus, previousBitsText, valueLB, currentBitsText, CBOOLEAN(forcePublish));
+    DebugTf(PSTR("MQTT gate status_vh_slave prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
+            previousStatus, previousBitsText, valueLB, currentBitsText,
+            CBOOLEAN(forcePublish), publishCombined ? "publish" : "skip");
   }
   OTcurrentSystemState.SlaveStatusVH = valueLB;
   mqttForceNextSlaveStatusVHPublish = false;

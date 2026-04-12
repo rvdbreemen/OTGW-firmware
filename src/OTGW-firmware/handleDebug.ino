@@ -28,8 +28,9 @@ void handleDebug(){
                 Debugln();
                 Debugf(PSTR("1) Toggle debuglog - OT message parsing: %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
                 Debugf(PSTR("2) Toggle debuglog - API handeling: %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
-                Debugf(PSTR("3) Toggle debuglog - MQTT module: %s\r\n"), CBOOLEAN(state.debug.bMQTT));
+                Debugf(PSTR("3) Toggle debuglog - MQTT communication: %s\r\n"), CBOOLEAN(state.debug.bMQTT));
                 Debugf(PSTR("4) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(state.debug.bSensors));
+                Debugf(PSTR("5) Toggle debuglog - MQTT interval gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
                 Debugf(PSTR("d) Toggle debug helper - Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));
                 Debugln(F("--- Commands ---"));
                 Debugln(F("q/k) Force read settings"));
@@ -100,9 +101,13 @@ void handleDebug(){
                 state.debug.bMQTT = !state.debug.bMQTT; 
                 DebugTf(PSTR("\r\nDebug MQTT: %s\r\n"), CBOOLEAN(state.debug.bMQTT)); 
                 break;
-            case '4':   
+            case '4':
                 state.debug.bSensors = !state.debug.bSensors;
-                DebugTf(PSTR("\r\nDebug Sensors: %s\r\n"), CBOOLEAN(state.debug.bSensors)); 
+                DebugTf(PSTR("\r\nDebug Sensors: %s\r\n"), CBOOLEAN(state.debug.bSensors));
+                break;
+            case '5':
+                state.debug.bMQTTGate = !state.debug.bMQTTGate;
+                DebugTf(PSTR("\r\nDebug MQTT Gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
                 break;
             case 'd':
                 state.debug.bSensorSim = !state.debug.bSensorSim;
