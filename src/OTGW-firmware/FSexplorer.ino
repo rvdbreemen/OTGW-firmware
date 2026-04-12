@@ -63,21 +63,15 @@ const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCa
 //=====================================================================================
 void startWebserver(){
   if (!LittleFS.exists("/index.html")) {
-    httpServer.on("/", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
-    httpServer.on("/index", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
-    httpServer.on("/index.html", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
+    // LittleFS not mounted or index.html missing — show the upload helper page.
+    // Helper is a PROGMEM string with a form to upload FSexplorer.html and a
+    // link to the Flash Utility at /update.
+    auto sendHelper = []() {
+      httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper);
+    };
+    httpServer.on("/", sendHelper);
+    httpServer.on("/index", sendHelper);
+    httpServer.on("/index.html", sendHelper);
   } else{
     // Serve index.html with ETag-based caching:
     //  - Browser caches index.html but always revalidates via If-None-Match (ETag = fsHash).
@@ -176,14 +170,17 @@ void startWebserver(){
   
   // Serve CSS and JS files with appropriate caching headers
   httpServer.on("/index.css", []() {
+    File f = LittleFS.open("/index.css", "r");
+    if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
     // CSS can be cached for longer periods (1 day)
     httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
-    File f = LittleFS.open("/index.css", "r");
     httpServer.streamFile(f, F("text/css"));
     f.close();
   });
   
   httpServer.on("/index.js", []() {
+    File f = LittleFS.open("/index.js", "r");
+    if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
     // ?v=<hash> versioned requests get long-term cache; bare /index.js gets no-cache.
     const char* fsHash = getFilesystemHash();
     // httpServer.arg() returns String by value — compare directly to avoid dangling c_str()
@@ -192,12 +189,13 @@ void startWebserver(){
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
-    File f = LittleFS.open("/index.js", "r");
     httpServer.streamFile(f, F("application/javascript"));
     f.close();
   });
 
   httpServer.on("/graph.js", []() {
+    File f = LittleFS.open("/graph.js", "r");
+    if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
     // Same versioned-URL caching strategy as index.js (see above).
     const char* fsHash = getFilesystemHash();
     if (httpServer.hasArg("v") && fsHash[0] != '\0' && strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
@@ -205,7 +203,6 @@ void startWebserver(){
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
-    File f = LittleFS.open("/graph.js", "r");
     httpServer.streamFile(f, F("application/javascript"));
     f.close();
   });
@@ -224,24 +221,33 @@ void startWebserver(){
   DebugTf(PSTR("\nAssigned IP=%s\r\n"), cMsg);
 }
 //=====================================================================================
-void setupFSexplorer(){    
+void setupFSexplorer(){
   LittleFS.begin();
-  if (LittleFS.exists("/FSexplorer.html")) 
+  if (LittleFS.exists("/FSexplorer.html"))
   {
     httpServer.on("/FSexplorer.html", []() {
       File f = LittleFS.open("/FSexplorer.html", "r");
+      if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
       httpServer.streamFile(f, F("text/html; charset=UTF-8"));
       f.close();
     });
     httpServer.on("/FSexplorer", []() {
       File f = LittleFS.open("/FSexplorer.html", "r");
+      if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
       httpServer.streamFile(f, F("text/html; charset=UTF-8"));
       f.close();
     });
   }
-  else 
+  else
   {
-    httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper); //Upload the FSexplorer.html
+    // FSexplorer.html not on filesystem (FS not mounted or file missing).
+    // Register routes that serve the Helper page, which includes a link to the
+    // Flash Utility at /update so the user can upload the filesystem image.
+    auto sendHelper = []() {
+      httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper);
+    };
+    httpServer.on("/FSexplorer.html", sendHelper);
+    httpServer.on("/FSexplorer", sendHelper);
   }
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist);  // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
   httpServer.on("/api/listfiles", apilistfiles);               // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
