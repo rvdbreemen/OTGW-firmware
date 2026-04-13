@@ -55,7 +55,7 @@ TARGETS = {
     "esp8266": {
         "name": "ESP8266",
         "core": "esp8266:esp8266",
-        "board_manager_url": "https://github.com/esp8266/Arduino/releases/download/2.7.4/package_esp8266com_index.json",
+        "board_manager_url": "https://github.com/esp8266/Arduino/releases/download/3.1.2/package_esp8266com_index.json",
         "fqbn": "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160",
         "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP8266",
         "chip": "esp8266",
@@ -67,7 +67,7 @@ TARGETS = {
         "fs_tool_path": "esp8266/tools/mklittlefs",
         "fs_block": 8192,
         "fs_page": 256,
-        "fs_size": 1024000,
+        "fs_size": 2072576,    # FS_PHYS_SIZE from eagle.flash.4m2m.ld (0x1FA000)
     },
     "esp32": {
         "name": "ESP32",

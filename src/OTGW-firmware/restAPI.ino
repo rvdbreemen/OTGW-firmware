@@ -20,6 +20,25 @@
 #define RESTDebugT(...)   ({ if (state.debug.bRestAPI) DebugT(__VA_ARGS__);    })
 #define RESTDebug(...)    ({ if (state.debug.bRestAPI) Debug(__VA_ARGS__);    })
 
+// REST API debug: tracks last response status for the access-log line.
+// Set by sendApiError/sendApiOptions; defaults to 200 before each handler.
+static int16_t restResponseStatus = 0;
+
+// Zero-allocation HTTP method to string (returns PROGMEM pointer).
+// Replaces strHTTPmethod() which returned String (heap allocation per call).
+static const char* httpMethodToStr(HTTPMethod m) {
+  switch (m) {
+    case HTTP_GET:     return "GET";
+    case HTTP_POST:    return "POST";
+    case HTTP_PUT:     return "PUT";
+    case HTTP_PATCH:   return "PATCH";
+    case HTTP_DELETE:  return "DELETE";
+    case HTTP_OPTIONS: return "OPTIONS";
+    case HTTP_HEAD:    return "HEAD";
+    default:           return "?";
+  }
+}
+
 // H3: Send dynamic CORS Allow-Origin header echoing the request Origin,
 // instead of a wildcard. Only sends the header when Origin is present.
 static void sendCorsOriginHeader() {
@@ -34,6 +53,7 @@ static void sendCorsOriginHeader() {
 // Returns: {"error":{"status":N,"message":"..."}}
 //=======================================================================
 static void sendApiError(int httpCode, const __FlashStringHelper* message) {
+  restResponseStatus = httpCode;
   char jsonBuff[200];
   snprintf_P(jsonBuff, sizeof(jsonBuff),
     PSTR("{\"error\":{\"status\":%d,\"message\":\"%S\"}}"),
@@ -231,8 +251,59 @@ static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   }
 }
 
+static void sendSensorStatus() {
+  time_t now = time(nullptr);
+  sendStartJsonMap(F("sensors"));
+
+  // Dallas temperature sensors
+  sendJsonMapEntry(F("dallas_enabled"), settings.sensors.bEnabled);
+  sendJsonMapEntry(F("dallas_detected"), bSensorsDetected);
+  sendJsonMapEntry(F("dallas_count"), (int32_t)DallasrealDeviceCount);
+  sendJsonMapEntry(F("dallas_gpio"), (int32_t)settings.sensors.iPin);
+  sendJsonMapEntry(F("dallas_poll_sec"), (int32_t)settings.sensors.iInterval);
+  sendJsonMapEntry(F("simulated"), state.debug.bSensorSim);
+
+  // Individual sensor readings
+  if (bSensorsDetected || state.debug.bSensorSim) {
+    // Start "devices" sub-object — use chunked JSON
+    httpServer.sendContent_P(PSTR(",\r\n  \"devices\": {"));
+    for (int i = 0; i < DallasrealDeviceCount; i++) {
+      const char *addr = getDallasAddress(DallasrealDevice[i].addr);
+      if (!addr) continue;
+      char entry[100];
+      snprintf_P(entry, sizeof(entry),
+                 PSTR("%s\r\n    \"%s\": {\"temp\": %4.1f, \"epoch\": %u}"),
+                 (i > 0) ? "," : "",
+                 addr, DallasrealDevice[i].tempC, (uint32_t)DallasrealDevice[i].lasttime);
+      httpServer.sendContent(entry);
+    }
+    httpServer.sendContent_P(PSTR("\r\n  }"));
+  }
+
+  // S0 pulse counter
+  httpServer.sendContent_P(PSTR(",\r\n  \"s0\": {"));
+  {
+    char s0buf[120];
+    snprintf_P(s0buf, sizeof(s0buf),
+               PSTR("\r\n    \"enabled\": %s, \"gpio\": %d, \"poll_sec\": %d,"
+                    "\r\n    \"pulses\": %u, \"total\": %lu, \"power_kw\": %4.3f, \"epoch\": %u"
+                    "\r\n  }"),
+               settings.s0.bEnabled ? "true" : "false",
+               settings.s0.iPin, settings.s0.iInterval,
+               OTGWs0pulseCount, (unsigned long)OTGWs0pulseCountTot,
+               OTGWs0powerkw, (uint32_t)OTGWs0lasttime);
+    httpServer.sendContent(s0buf);
+  }
+
+  sendEndJsonMap(F("sensors"));
+}
+
 static void handleSensors(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
-  if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
+  if (wc == 4 || (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0)) {
+    // GET /api/v2/sensors or GET /api/v2/sensors/status
+    if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendSensorStatus();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("labels")) == 0) {
     if (method == HTTP_GET) {
       getDallasLabels();
     } else if (method == HTTP_POST || method == HTTP_PUT) {
@@ -1040,19 +1111,18 @@ void processAPI()
   memset(words, 0, sizeof(words));
 
   const HTTPMethod method = httpServer.method();
+  const unsigned long startMs = millis();
   const size_t uriLen = strlcpy(URI, httpServer.uri().c_str(), sizeof(URI));
   strlcpy(originalURI, URI, sizeof(originalURI));
 
-  RESTDebugTf(PSTR("from[%s] URI[%s] method[%s] \r\n"), httpServer.client().remoteIP().toString().c_str(), URI, strHTTPmethod(method).c_str());
-
   if (uriLen >= sizeof(URI)) {
-    RESTDebugTln(F("==> Bailout due to oversized URI"));
+    RESTDebugTf(PSTR("REST %s %s => 414 URI too long\r\n"), httpMethodToStr(method), originalURI);
     httpServer.send_P(414, PSTR("text/plain"), PSTR("414: URI too long\r\n"));
     return;
   }
 
   if (platformFreeHeap() < 4096) {
-    RESTDebugTf(PSTR("==> Bailout due to low heap (%d bytes))\r\n"), platformFreeHeap());
+    RESTDebugTf(PSTR("REST %s %s => 500 low heap (%u)\r\n"), httpMethodToStr(method), originalURI, platformFreeHeap());
     httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n"));
     return;
   }
@@ -1072,7 +1142,11 @@ void processAPI()
   if (wc > 1 && strcmp_P(words[1], PSTR("api")) == 0) {
     if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0) {
       // OPTIONS preflight for all v2 endpoints (CORS)
-      if (method == HTTP_OPTIONS) { sendApiOptions(); return; }
+      if (method == HTTP_OPTIONS) {
+        sendApiOptions();
+        RESTDebugTf(PSTR("REST OPTIONS %s => 204 preflight %lums\r\n"), originalURI, millis() - startMs);
+        return;
+      }
 
       // H5: Centralized auth check — all POST/PUT mutations require auth
       if (method == HTTP_POST || method == HTTP_PUT) {
@@ -1083,19 +1157,25 @@ void processAPI()
       if (wc > 3) {
         for (const ApiRoute* r = kV2Routes; r->segment != nullptr; r++) {
           if (strcmp_P(words[3], r->segment) == 0) {
+            restResponseStatus = 200; // default; overwritten by sendApiError if handler fails
             r->handler(words, wc, method, originalURI);
+            RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r->segment, millis() - startMs);
             return;
           }
         }
       }
       sendApiNotFound(originalURI);
+      RESTDebugTf(PSTR("REST %s %s => %d not found %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, millis() - startMs);
     } else if (wc > 2 && (strcmp_P(words[2], PSTR("v0")) == 0 || strcmp_P(words[2], PSTR("v1")) == 0)) {
       sendApiError(410, F("API version removed; use /api/v2"));
+      RESTDebugTf(PSTR("REST %s %s => %d deprecated %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, millis() - startMs);
     } else {
       sendApiNotFound(originalURI);
+      RESTDebugTf(PSTR("REST %s %s => %d %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, millis() - startMs);
     }
   } else {
     sendApiNotFound(originalURI);
+    RESTDebugTf(PSTR("REST %s %s => %d non-api %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, millis() - startMs);
   }
 } // processAPI()
 
@@ -1129,7 +1209,7 @@ void sendOTValue(int msgid){
 void sendOTLabel(const char *msglabel){
   uint_fast8_t msgid;
   for (msgid = 0; msgid <= OT_MSGID_MAX; msgid++){
-    PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
+    PROGMEM_readAnything(&OTmap[msgid], OTlookupitem);
     if (strcasecmp(OTlookupitem.label, msglabel) == 0) break;
   }
   if (msgid > OT_MSGID_MAX){

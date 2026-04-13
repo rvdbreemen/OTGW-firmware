@@ -97,12 +97,27 @@ const char *hexheaders[] = {
 
 #define OT_LOG_BUFFER_SIZE 512
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
+size_t ot_log_pos = 0;  // tracked write position — eliminates O(n²) strlen per AddLog call
 
-#define ClrLog()            ({ ot_log_buffer[0] = '\0'; })
-#define AddLogf(...)        ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
-#define AddLogf_P(...)      ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { snprintf_P(ot_log_buffer + _len, OT_LOG_BUFFER_SIZE - _len, __VA_ARGS__); } })
-#define AddLog(logstring)   ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, logstring, OT_LOG_BUFFER_SIZE); } })
-#define AddLogln()          ({ size_t _len = strlen(ot_log_buffer); if (_len < (OT_LOG_BUFFER_SIZE - 1)) { strlcat(ot_log_buffer, "\r\n", OT_LOG_BUFFER_SIZE); } })
+#define ClrLog()            ({ ot_log_buffer[0] = '\0'; ot_log_pos = 0; })
+#define AddLogf(...)        ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
+                                 int _w = snprintf(ot_log_buffer + ot_log_pos, OT_LOG_BUFFER_SIZE - ot_log_pos, __VA_ARGS__); \
+                                 if (_w > 0) { size_t _rem = OT_LOG_BUFFER_SIZE - 1 - ot_log_pos; ot_log_pos += ((size_t)_w < _rem) ? (size_t)_w : _rem; } \
+                               } })
+#define AddLogf_P(...)      ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
+                                 int _w = snprintf_P(ot_log_buffer + ot_log_pos, OT_LOG_BUFFER_SIZE - ot_log_pos, __VA_ARGS__); \
+                                 if (_w > 0) { size_t _rem = OT_LOG_BUFFER_SIZE - 1 - ot_log_pos; ot_log_pos += ((size_t)_w < _rem) ? (size_t)_w : _rem; } \
+                               } })
+#define AddLog(logstring)   ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
+                                 size_t _rem = OT_LOG_BUFFER_SIZE - ot_log_pos; \
+                                 size_t _src = strlcpy(ot_log_buffer + ot_log_pos, logstring, _rem); \
+                                 ot_log_pos += (_src < _rem) ? _src : (_rem - 1); \
+                               } })
+#define AddLogln()          ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 2)) { \
+                                 ot_log_buffer[ot_log_pos++] = '\r'; \
+                                 ot_log_buffer[ot_log_pos++] = '\n'; \
+                                 ot_log_buffer[ot_log_pos] = '\0'; \
+                               } })
 
 static uint32_t gOTGWStartupQuietStartMs = 0;
 static bool     gOTGWStartupQuietActive  = false;
@@ -119,15 +134,9 @@ static const uint32_t OTGW_STARTUP_QUIET_PERIOD_MS = 15000;
 static void sendEventToWebSocket(char prefix, const char *msg, int len = -1) {
   ClrLog();
   AddLog(getOTLogTimestamp());
-  size_t _hlen = strlen(ot_log_buffer);
-  if (_hlen < (OT_LOG_BUFFER_SIZE - 1))
-    snprintf_P(ot_log_buffer + _hlen, OT_LOG_BUFFER_SIZE - _hlen, PSTR(" %c "), prefix);
+  AddLogf_P(PSTR(" %c "), prefix);
   if (len < 0) AddLog(msg);
-  else {
-    size_t _mlen = strlen(ot_log_buffer);
-    if (_mlen < (OT_LOG_BUFFER_SIZE - 1))
-      snprintf_P(ot_log_buffer + _mlen, OT_LOG_BUFFER_SIZE - _mlen, PSTR("%.*s"), len, msg);
-  }
+  else AddLogf_P(PSTR("%.*s"), len, msg);
   AddLogln();
   sendLogToWebSocket(ot_log_buffer);
   ClrLog();
@@ -136,12 +145,16 @@ static void sendEventToWebSocket(char prefix, const char *msg, int len = -1) {
 static void sendEventToWebSocket_P(char prefix, PGM_P msg_P) {
   ClrLog();
   AddLog(getOTLogTimestamp());
-  size_t _hlen = strlen(ot_log_buffer);
-  if (_hlen < (OT_LOG_BUFFER_SIZE - 1))
-    snprintf_P(ot_log_buffer + _hlen, OT_LOG_BUFFER_SIZE - _hlen, PSTR(" %c "), prefix);
-  size_t _mlen = strlen(ot_log_buffer);
-  if (_mlen < (OT_LOG_BUFFER_SIZE - 1))
-    strncat_P(ot_log_buffer, msg_P, OT_LOG_BUFFER_SIZE - _mlen - 1);
+  AddLogf_P(PSTR(" %c "), prefix);
+  if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) {
+    size_t _rem  = OT_LOG_BUFFER_SIZE - ot_log_pos;
+    size_t _src  = strlen_P(msg_P);
+    // strlcpy_P is absent from ESP8266 2.7.4; replicate with memcpy_P.
+    size_t _copy = (_src < _rem - 1) ? _src : (_rem - 1);
+    memcpy_P(ot_log_buffer + ot_log_pos, msg_P, _copy);
+    ot_log_buffer[ot_log_pos + _copy] = '\0';
+    ot_log_pos += _copy;
+  }
   AddLogln();
   sendLogToWebSocket(ot_log_buffer);
   ClrLog();
@@ -400,19 +413,13 @@ enum OTSpecCompatMode : uint8_t {
 
 // Default behavior:
 // - AUTO keeps pre-v4.2 compatibility until a 4.x OpenTherm version is detected,
-//   then applies v4.x reserved-ID rules (IDs 50-55 and 58-69).
-// Note: IDs 56 (TdhwSet) and 57 (MaxTSet) are valid in OpenTherm v4.2 and are NOT
-// reserved; only IDs 50-55 and 58-69 are reserved/legacy in v4.x mode.
+//   then applies v4.x reserved-ID rules (notably IDs 50-63).
 static OTSpecCompatMode gOTSpecCompatMode = OT_SPEC_COMPAT_AUTO;
 
 //===================[ OT Spec Profile Helpers ]====================
-// Returns true for IDs that were pre-v4.2 parameter IDs but are reserved/redefined
-// in OpenTherm v4.x. Per OpenTherm v4.2 spec, the reserved ranges are 50-55 and
-// 58-69. IDs 56 (TdhwSet) and 57 (MaxTSet) remain valid in v4.2 and must NOT be
-// included here.
 static bool isLegacyPreV42CompatibilityId(uint8_t msgid)
 {
-  return (msgid >= 50U && msgid <= 55U) || (msgid >= 58U && msgid <= 69U);
+  return (msgid >= 50U && msgid <= 63U);
 }
 
 static bool useV4xReservedIdRules()
@@ -462,6 +469,50 @@ static void appendProgmemSuffix(char *dst, size_t dstSize, PGM_P suffix)
   size_t len = strlen(dst);
   if (len >= (dstSize - 1)) return;
   strncat_P(dst, suffix, dstSize - len - 1);
+}
+
+static void handlePicFlashBackgroundTasks()
+{
+  handleDebug();              // Keep telnet debug active for monitoring
+  httpServer.handleClient();  // Keep HTTP active
+#if MDNS_NEEDS_UPDATE
+  MDNS.update();              // Keep MDNS active for network discovery
+#endif
+  handleOTGW();               // REQUIRED for PIC flash - processes serial communication
+  handleWebSocket();          // Keep WebSocket service responsive during flash
+}
+
+//===================[ Send useful information to MQTT ]======================
+
+/*
+Publish usefull firmware version information to MQTT broker.
+*/
+void sendMQTTversioninfo(){
+  char rebootCountBuf[12];
+  snprintf_P(rebootCountBuf, sizeof(rebootCountBuf), PSTR("%lu"), static_cast<unsigned long>(state.uptime.iRebootCount));
+  sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
+  sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
+  sendMQTTData("otgw-firmware/reboot_reason", lastReset);
+  if (isPICEnabled()) {
+    sendMQTTData("otgw-pic/version", state.pic.sFwversion);
+    sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
+    sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
+  }
+  sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
+}
+
+/*
+Publish state information of PIC firmware version information to MQTT broker.
+*/
+void sendMQTTstateinformation(){
+  if (!isPICEnabled()) return;
+  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+  sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+  if (state.otgw.bGatewayModeKnown) {
+    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
+  }
+  sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
+  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
 }
 
 //===================[ Reset OTGW ]===============================
@@ -1201,13 +1252,8 @@ const char *byte_to_binary(int x)
   Rules are:
   - if the message is overriden (R and A messages override B and T messages), then the value is not valid for use.
   - if the OT message is a READ message, and the received OT msg is being read and acknowledged, then the value is valid.
-  - if the OT message is a WRITE message, and the received OT msg is being written (OT_WRITE_DATA) or
-    write-acknowledged by the slave (OT_WRITE_ACK), then the value is valid. The slave's WRITE-ACK may contain a
-    different (e.g., clamped) value than the master's WRITE-DATA request, so both are captured.
-    This also enables source-separated MQTT topics: WRITE-DATA publishes to the thermostat source,
-    WRITE-ACK publishes to the boiler source.
-  - if the OT message is a READ/WRITE message, and receive OT msg is being read and acknowledged, written, or
-    write-acknowledged by the slave (OT_WRITE_ACK), then the value is valid.
+  - if the OT message is a WRITE message, and the received OT msg is being written (OT_WRITE_DATA), then the value is valid.
+  - if the OT message is a READ/WRITE message, and receive OT msg is being read and ackownledge, or, is being written, then the value is valid.
   - if the OT message is a status message (from Heating, HAVC or Solar), then the message is always valid.
 */
 bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
@@ -1215,14 +1261,14 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (isMsgIdReservedInActiveProfile(OT.id)) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
-  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && (OT.type==OT_WRITE_DATA || OT.type==OT_WRITE_ACK));
-  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA || OT.type==OT_WRITE_ACK));
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA));
   _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);;
   return _valid;
 }
 
 // =====================[ MQTT throttle helpers ]==================
-#define CoreMQTTDebugTf(...) ({ if (state.debug.bMQTT) DebugTf(__VA_ARGS__); })
+#define CoreMQTTDebugTf(...) ({ if (state.debug.bMQTTGate) DebugTf(__VA_ARGS__); })
 
 static char mqttPublishSourceTag(byte masterslave)
 {
@@ -1242,7 +1288,8 @@ static void logMQTTValueGateDecision(byte id,
                                      bool allowPublish,
                                      const __FlashStringHelper *reason)
 {
-  CoreMQTTDebugTf(PSTR("MQTT gate id=%u src=%c slot=%u prev=0x%04X curr=0x%04X first=%s changed=%s interval=%s last=%u now=%u => %s [%S]\r\n"),
+  if (!state.debug.bMQTTGate) return;
+  DebugTf(PSTR("MQTT gate id=%u src=%c slot=%u prev=0x%04X curr=0x%04X first=%s changed=%s interval=%s last=%u now=%u => %s [%S]\r\n"),
                   id,
                   mqttPublishSourceTag(masterslave),
                   idx,
@@ -1261,24 +1308,21 @@ static void logMQTTStatusBitDecision(uint8_t bitSlot,
                                      const char *topic,
                                      bool previousValue,
                                      bool currentValue,
-                                     uint8_t previousBits,
-                                     uint8_t currentBits,
                                      bool forcePublish,
                                      bool allowPublish)
 {
-  char previousBitsText[9] {0};
-  char currentBitsText[9] {0};
-  copyBinaryByteString(previousBits, previousBitsText, sizeof(previousBitsText));
-  copyBinaryByteString(currentBits, currentBitsText, sizeof(currentBitsText));
-  CoreMQTTDebugTf(PSTR("MQTT gate bit[%u] %s prev=%s curr=%s prev_bits=%s curr_bits=%s force=%s => %s\r\n"),
+  if (!state.debug.bMQTTGate) return;
+  if (!allowPublish) return;  // skips are not interesting
+  if (settings.mqtt.iInterval == 0 && previousValue == currentValue && !forcePublish) return;  // interval=0 always-publish: only log actual changes
+  const char *reason = forcePublish                    ? "force"
+                     : (previousValue != currentValue) ? "changed"
+                     :                                   "first-seen";
+  DebugTf(PSTR("MQTT bit[%u] %s %s->%s [%s]\r\n"),
                   bitSlot,
                   topic,
                   CBOOLEAN(previousValue),
                   CBOOLEAN(currentValue),
-                  previousBitsText,
-                  currentBitsText,
-                  CBOOLEAN(forcePublish),
-                  allowPublish ? "publish" : "skip");
+                  reason);
 }
 
 static bool shouldForceMasterStatusPublish()
@@ -1459,7 +1503,10 @@ static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlo
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
     return true;
   }
-  if (settings.mqtt.iInterval == 0) return true;   // legacy: always publish
+  if (settings.mqtt.iInterval == 0) {
+    mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
+    return true;   // interval=0: always publish every OT message
+  }
   bool valueChanged    = (newVal != prevVal);
   bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
   if (firstSeen || valueChanged || intervalElapsed) {
@@ -1488,7 +1535,10 @@ static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteS
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
     return true;
   }
-  if (settings.mqtt.iInterval == 0) return true;
+  if (settings.mqtt.iInterval == 0) {
+    mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
+    return true;   // interval=0: always publish every OT message
+  }
   const bool valueChanged = (newVal != prevVal);
   const bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
   if (firstSeen || valueChanged || intervalElapsed) {
@@ -1514,7 +1564,7 @@ static bool shouldPublishStatusVHByte(uint8_t byteSlot, uint8_t newVal, uint8_t 
 void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal,
                           bool forcePublish, uint8_t previousBits, uint8_t currentBits) {
   const bool allowPublish = shouldPublishStatusBit(bitSlot, newVal, prevVal, forcePublish);
-  logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, previousBits, currentBits, forcePublish, allowPublish);
+  logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   publishMQTTOnOff(topic, newVal);
 }
@@ -1523,7 +1573,7 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
                                    bool forcePublish, uint8_t previousBits, uint8_t currentBits)
 {
   const bool allowPublish = shouldPublishStatusVHBit(bitSlot, newVal, prevVal, forcePublish);
-  logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, previousBits, currentBits, forcePublish, allowPublish);
+  logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   publishMQTTOnOff(topic, newVal);
 }
@@ -1567,17 +1617,22 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.MasterStatus;
   const bool forcePublish = shouldForceMasterStatusPublish();
   const bool publishCombined = shouldPublishStatusByte(0, valueHB, previousStatus, forcePublish);
-  char previousBitsText[9] {0};
-  char currentBitsText[9] {0};
-  copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
-  copyBinaryByteString(valueHB, currentBitsText, sizeof(currentBitsText));
-  CoreMQTTDebugTf(PSTR("MQTT gate status_master prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
-                  previousStatus,
-                  previousBitsText,
-                  valueHB,
-                  currentBitsText,
-                  CBOOLEAN(forcePublish),
-                  publishCombined ? "publish" : "skip");
+  if (state.debug.bMQTTGate) {
+    const bool logWorthy = forcePublish || (valueHB != previousStatus) || (settings.mqtt.iInterval > 0);
+    if (logWorthy) {
+      char previousBitsText[9] {0};
+      char currentBitsText[9] {0};
+      copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
+      copyBinaryByteString(valueHB, currentBitsText, sizeof(currentBitsText));
+      const char *reason = forcePublish                ? "force"
+                         : (valueHB != previousStatus) ? "changed"
+                         : publishCombined             ? "interval"
+                         :                              "no-change";
+      DebugTf(PSTR("MQTT gate status_master 0x%02X[%s]->0x%02X[%s] => %s[%s]\r\n"),
+              previousStatus, previousBitsText, valueHB, currentBitsText,
+              publishCombined ? "publish" : "skip", reason);
+    }
+  }
   OTcurrentSystemState.MasterStatus = valueHB;
   mqttForceNextMasterStatusPublish = false;
   {
@@ -1598,17 +1653,22 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.SlaveStatus;
   const bool forcePublish = shouldForceSlaveStatusPublish();
   const bool publishCombined = shouldPublishStatusByte(1, valueLB, previousStatus, forcePublish);
-  char previousBitsText[9] {0};
-  char currentBitsText[9] {0};
-  copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
-  copyBinaryByteString(valueLB, currentBitsText, sizeof(currentBitsText));
-  CoreMQTTDebugTf(PSTR("MQTT gate status_slave prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
-                  previousStatus,
-                  previousBitsText,
-                  valueLB,
-                  currentBitsText,
-                  CBOOLEAN(forcePublish),
-                  publishCombined ? "publish" : "skip");
+  if (state.debug.bMQTTGate) {
+    const bool logWorthy = forcePublish || (valueLB != previousStatus) || (settings.mqtt.iInterval > 0);
+    if (logWorthy) {
+      char previousBitsText[9] {0};
+      char currentBitsText[9] {0};
+      copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
+      copyBinaryByteString(valueLB, currentBitsText, sizeof(currentBitsText));
+      const char *reason = forcePublish                ? "force"
+                         : (valueLB != previousStatus) ? "changed"
+                         : publishCombined             ? "interval"
+                         :                              "no-change";
+      DebugTf(PSTR("MQTT gate status_slave 0x%02X[%s]->0x%02X[%s] => %s[%s]\r\n"),
+              previousStatus, previousBitsText, valueLB, currentBitsText,
+              publishCombined ? "publish" : "skip", reason);
+    }
+  }
   OTcurrentSystemState.SlaveStatus = valueLB;
   mqttForceNextSlaveStatusPublish = false;
   {
@@ -1669,17 +1729,22 @@ static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.MasterStatusVH;
   const bool forcePublish = shouldForceMasterStatusVHPublish();
   const bool publishCombined = shouldPublishStatusVHByte(0, valueHB, previousStatus, forcePublish);
-  char previousBitsText[9] {0};
-  char currentBitsText[9] {0};
-  copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
-  copyBinaryByteString(valueHB, currentBitsText, sizeof(currentBitsText));
-  CoreMQTTDebugTf(PSTR("MQTT gate status_vh_master prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
-                  previousStatus,
-                  previousBitsText,
-                  valueHB,
-                  currentBitsText,
-                  CBOOLEAN(forcePublish),
-                  publishCombined ? "publish" : "skip");
+  if (state.debug.bMQTTGate) {
+    const bool logWorthy = forcePublish || (valueHB != previousStatus) || (settings.mqtt.iInterval > 0);
+    if (logWorthy) {
+      char previousBitsText[9] {0};
+      char currentBitsText[9] {0};
+      copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
+      copyBinaryByteString(valueHB, currentBitsText, sizeof(currentBitsText));
+      const char *reason = forcePublish                ? "force"
+                         : (valueHB != previousStatus) ? "changed"
+                         : publishCombined             ? "interval"
+                         :                              "no-change";
+      DebugTf(PSTR("MQTT gate status_vh_master 0x%02X[%s]->0x%02X[%s] => %s[%s]\r\n"),
+              previousStatus, previousBitsText, valueHB, currentBitsText,
+              publishCombined ? "publish" : "skip", reason);
+    }
+  }
   OTcurrentSystemState.MasterStatusVH = valueHB;
   mqttForceNextMasterStatusVHPublish = false;
   {
@@ -1697,17 +1762,22 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
   const uint8_t previousStatus = OTcurrentSystemState.SlaveStatusVH;
   const bool forcePublish = shouldForceSlaveStatusVHPublish();
   const bool publishCombined = shouldPublishStatusVHByte(1, valueLB, previousStatus, forcePublish);
-  char previousBitsText[9] {0};
-  char currentBitsText[9] {0};
-  copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
-  copyBinaryByteString(valueLB, currentBitsText, sizeof(currentBitsText));
-  CoreMQTTDebugTf(PSTR("MQTT gate status_vh_slave prev=0x%02X[%s] curr=0x%02X[%s] force=%s => %s\r\n"),
-                  previousStatus,
-                  previousBitsText,
-                  valueLB,
-                  currentBitsText,
-                  CBOOLEAN(forcePublish),
-                  publishCombined ? "publish" : "skip");
+  if (state.debug.bMQTTGate) {
+    const bool logWorthy = forcePublish || (valueLB != previousStatus) || (settings.mqtt.iInterval > 0);
+    if (logWorthy) {
+      char previousBitsText[9] {0};
+      char currentBitsText[9] {0};
+      copyBinaryByteString(previousStatus, previousBitsText, sizeof(previousBitsText));
+      copyBinaryByteString(valueLB, currentBitsText, sizeof(currentBitsText));
+      const char *reason = forcePublish                ? "force"
+                         : (valueLB != previousStatus) ? "changed"
+                         : publishCombined             ? "interval"
+                         :                              "no-change";
+      DebugTf(PSTR("MQTT gate status_vh_slave 0x%02X[%s]->0x%02X[%s] => %s[%s]\r\n"),
+              previousStatus, previousBitsText, valueLB, currentBitsText,
+              publishCombined ? "publish" : "skip", reason);
+    }
+  }
   OTcurrentSystemState.SlaveStatusVH = valueLB;
   mqttForceNextSlaveStatusVHPublish = false;
   {
@@ -3874,11 +3944,20 @@ void processOT(const char *buf, int len){
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTDebugT(skipOTLogTimestamp(ot_log_buffer));
-   
+
       // Send log buffer directly to WebSocket (no JSON, no queue)
       sendLogToWebSocket(ot_log_buffer);
-      
-      OTDebugFlush();
+
+      // Throttle TCP flush to once per second instead of per-message (~10/sec).
+      // debugTelnet (SimpleTelnet) buffers output; flushing just forces a TCP push.
+      // At 10 msg/sec the per-message flush was the single largest TCP cost.
+      { static unsigned long lastOTFlushMs = 0;
+        unsigned long now = millis();
+        if ((uint32_t)(now - lastOTFlushMs) >= 1000) {
+          OTDebugFlush();
+          lastOTFlushMs = now;
+        }
+      }
       ClrLog();
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
@@ -4314,7 +4393,7 @@ const char* getOTGWValue(int msgid)
 
 void startPICStream()
 {
-  OTGWstream.begin();
+  OTGWstream.begin(false);    // false = skip WiFi check; bind unconditionally
 }
 
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------

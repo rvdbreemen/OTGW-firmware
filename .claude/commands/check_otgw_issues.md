@@ -40,11 +40,17 @@ Follow these phases strictly and in order.
 ### Phase 1c: Fetch Tweakers forum posts
 
 1. **Read the last-checked Tweakers timestamp** from `.claude/tweakers_last_checked.txt`. If the file does not exist, default to posts from the last 7 days.
-2. **Fetch the Tweakers RSS feed** using curl (WebFetch is blocked by Tweakers; the RSS feed works fine):
+2. **Fetch the Tweakers RSS feed** using curl and pipe through Python to strip surrogate characters before parsing (WebFetch is blocked by Tweakers; direct XML parse of the raw bytes fails on Windows with Python 3.14+ due to surrogate chars `\udc8d` in the feed):
 
    ```bash
-   curl -s --max-time 10 -A "Mozilla/5.0" "https://gathering.tweakers.net/rss/list_messages/1653967"
+   curl -s --max-time 10 -A "Mozilla/5.0" "https://gathering.tweakers.net/rss/list_messages/1653967" > .tmp/tweakers_rss.bin
+   python3 -c "
+   data = open('.tmp/tweakers_rss.bin', 'rb').read().decode('utf-8', errors='replace')
+   open('.tmp/tweakers_rss.xml', 'w', encoding='utf-8').write(data)
+   "
    ```
+
+   Then parse `.tmp/tweakers_rss.xml` as UTF-8 text. The `errors='replace'` step ensures surrogate bytes become `\ufffd` (replacement character) instead of raising `UnicodeEncodeError`.
 
 3. **Parse the RSS XML** to extract individual `<item>` elements with:
    - `<dc:creator>` — post author (username)

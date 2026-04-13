@@ -1,8 +1,7 @@
-void handleDebug(){
-    if (TelnetStream.available()>0){
-        //read the next 
-        char c;
-        c = TelnetStream.read();
+// Dispatch a single keypress from the telnet debug session.
+// Called from onTelnetInput() in networkStuff.ino via the SimpleTelnet
+// onInputReceived callback (line mode off — one char per call).
+void handleDebugChar(char c){
         switch (c){
             case 'h':
                 Debugln();
@@ -39,15 +38,17 @@ void handleDebug(){
                     OTcurrentSystemState.Tr,
                     OTcurrentSystemState.TrSet);
                 Debugln();
+                Debugln(F("--- Debug toggles ---"));
                 Debugf(PSTR("1) Toggle debuglog - OT message parsing: %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
                 Debugf(PSTR("2) Toggle debuglog - API handling: %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
                 Debugf(PSTR("3) Toggle debuglog - MQTT module: %s\r\n"), CBOOLEAN(state.debug.bMQTT));
                 Debugf(PSTR("4) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(state.debug.bSensors));
                 Debugf(PSTR("5) Toggle debuglog - SAT control loop + cycles + HCR: %s\r\n"), CBOOLEAN(state.debug.bSAT));
                 Debugf(PSTR("6) Toggle debuglog - OTDirect frame handling + PI loop: %s\r\n"), CBOOLEAN(state.debug.bOTDirect));
+                Debugf(PSTR("g) Toggle debuglog - MQTT interval gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
                 Debugf(PSTR("d) Toggle debug helper - Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));
                 Debugln(F("--- Commands ---"));
-                Debugln(F("q/k) Force read settings"));
+                Debugln(F("q) Force read settings"));
                 Debugln(F("F) Force MQTT discovery for ALL message IDs"));
                 Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
                 Debugln(F("p) Reset PIC manually"));
@@ -59,9 +60,8 @@ void handleDebug(){
                 Debugln(F("u) GPIO output ON"));
                 Debugln(F("o) GPIO output OFF"));
                 Debugln(F("j) Read GPIO output state"));
-                Debugln(F("l) Set MyDEBUG = true"));
+                Debugln(F("l) Toggle MyDEBUG"));
                 Debugln(F("f) Show MyDEBUG status"));
-                Debugln(F("d) Toggle Dallas sensor simulation"));
                 Debugln();
                 break;
             case 'p':
@@ -92,32 +92,32 @@ void handleDebug(){
                 DebugTf(PSTR("Enable MQTT: %s\r\n"), CBOOLEAN(settings.mqtt.bEnable));
                 doAutoConfigure();
                 break;
-            case 'r':   
+            case 'r':
                 if (WiFi.status() != WL_CONNECTED)
                 {
                     DebugTln(F("Reconnecting to wifi"));
                     startWiFi(CSTR(settings.sHostname), 240);
                     //check OTGW and telnet
                     startTelnet();
-                    startPICStream(); 
+                    startPICStream();
                 } else DebugTln(F("Wifi is connected"));
-                    
+
                 if (!state.mqtt.bConnected) {
                     DebugTln(F("Reconnecting MQTT"));
                     startMQTT();
                 } else DebugTln(F("MQTT is connected"));
                 break;
-            case '1':   
-                state.debug.bOTmsg = !state.debug.bOTmsg; 
-                DebugTf(PSTR("\r\nDebug OTmsg: %s\r\n"), CBOOLEAN(state.debug.bOTmsg)); 
+            case '1':
+                state.debug.bOTmsg = !state.debug.bOTmsg;
+                DebugTf(PSTR("\r\nDebug OTmsg: %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
                 break;
-            case '2':   
-                state.debug.bRestAPI = !state.debug.bRestAPI; 
-                DebugTf(PSTR("\r\nDebug RestAPI: %s\r\n"), CBOOLEAN(state.debug.bRestAPI)); 
+            case '2':
+                state.debug.bRestAPI = !state.debug.bRestAPI;
+                DebugTf(PSTR("\r\nDebug RestAPI: %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
                 break;
-            case '3':   
-                state.debug.bMQTT = !state.debug.bMQTT; 
-                DebugTf(PSTR("\r\nDebug MQTT: %s\r\n"), CBOOLEAN(state.debug.bMQTT)); 
+            case '3':
+                state.debug.bMQTT = !state.debug.bMQTT;
+                DebugTf(PSTR("\r\nDebug MQTT: %s\r\n"), CBOOLEAN(state.debug.bMQTT));
                 break;
             case '4':
                 state.debug.bSensors = !state.debug.bSensors;
@@ -130,6 +130,10 @@ void handleDebug(){
             case '6':
                 state.debug.bOTDirect = !state.debug.bOTDirect;
                 DebugTf(PSTR("\r\nDebug OTDirect: %s\r\n"), CBOOLEAN(state.debug.bOTDirect));
+                break;
+            case 'g':
+                state.debug.bMQTTGate = !state.debug.bMQTTGate;
+                DebugTf(PSTR("\r\nDebug MQTT Gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
                 break;
             case 'd':
                 state.debug.bSensorSim = !state.debug.bSensorSim;
@@ -166,29 +170,22 @@ void handleDebug(){
             case 'j':
                 DebugTf(PSTR("read gpio output state (0== led ON): %d \r\n"), digitalRead(settings.outputs.iPin));
                 break;
-            case 'k':
-                DebugTln(F("read settings"));
-                readSettings(true);
-                break;
             case 'o':
                 DebugTln(F("gpio output off"));
                 digitalWrite(settings.outputs.iPin, OFF);
                 break;
             case 'l':
-                DebugTln(F("MyDEBUG =true"));
-                settings.bMyDEBUG = true;
+                settings.bMyDEBUG = !settings.bMyDEBUG;
+                DebugTf(PSTR("\r\nMyDEBUG: %s\r\n"), CBOOLEAN(settings.bMyDEBUG));
                 break;
             case 'f':
-                if(settings.bMyDEBUG)
-                {
-                    DebugTln(F("MyDEBUG = true"));
-                }else{
-                    DebugTln(F("MyDEBUG = false"));
-                }
+                DebugTf(PSTR("MyDEBUG: %s\r\n"), CBOOLEAN(settings.bMyDEBUG));
                 break;
             default:
                 break;
         }
-
-    }
 }
+
+// Called from doBackgroundTasks() — no-op now that input is handled via
+// the SimpleTelnet onInputReceived callback registered in startTelnet().
+void handleDebug(){}
