@@ -49,6 +49,7 @@ static unsigned long applyResponseModifiers(unsigned long response);
 // Master request scheduler — periodic polls and writes to the boiler
 // ---------------------------------------------------------------------------
 static constexpr uint32_t OT_STATUS_INTERVAL_MS   = 800;    // MsgID 0 (status) every 800ms (OT-Thing parity)
+static constexpr uint32_t OT_OFFLINE_RETRY_MS     = 5000;   // When bus is offline: retry MsgID 0 every 5s, skip rest
 static constexpr uint32_t OT_TEMP_INTERVAL_MS     = 10000;  // Temperature reads every 10s
 static constexpr uint32_t OT_SLOW_INTERVAL_MS     = 60000;  // Slow-poll items every 60s
 static constexpr uint32_t OT_WRITE_INTERVAL_MS    = 15000;  // Periodic writes every 15s (keep boiler values alive)
@@ -1078,6 +1079,10 @@ static void scheduleMasterRequest() {
     return;
   }
 
+  // When the bus is offline: only probe MsgID 0 at a slow rate — no point
+  // cycling through the full schedule if nobody is home.
+  bool busOffline = !state.otBus.bOnline;
+
   // Round-robin through the schedule table, skipping disabled entries
   uint8_t startIdx = otScheduleIdx;
   do {
@@ -1086,10 +1091,16 @@ static void scheduleMasterRequest() {
 
     if (entry.disabled) continue;  // boiler doesn't support this MsgID
 
+    // Offline: skip everything except MsgID 0 (the online/offline probe)
+    if (busOffline && entry.msgId != 0) continue;
+
     // Write entries only fire when a value has been set by a command
     if (entry.isWrite && !entry.valueSet) continue;
 
-    if ((now - entry.lastSentMs) >= entry.intervalMs) {
+    // Offline: use slow retry interval for MsgID 0 to avoid hammering a dead bus
+    uint32_t interval = (busOffline && entry.msgId == 0) ? OT_OFFLINE_RETRY_MS : entry.intervalMs;
+
+    if ((now - entry.lastSentMs) >= interval) {
       unsigned long request;
       if (entry.msgId == 0) {
         request = buildStatusRequest();
