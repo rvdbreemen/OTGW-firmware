@@ -20,6 +20,10 @@ NtpStatus_t NtpStatus  = TIME_NOTSET;
 time_t      NtpLastSync = 0;
 static bool sDhcpHostnameFixed = false;  // tracks whether DHCP re-announce has been done
 
+// Debug telnet instance (port 23). SimpleTelnet replaces ESPTelnet for debug output.
+// Port is fixed in the constructor; begin() needs no port argument.
+SimpleTelnet<1> debugTelnet(23);
+
 OTGWWebServer           httpServer(80);
 OTGWUpdateServer        httpUpdater(true);
 
@@ -359,14 +363,52 @@ void loopWifi() {
 }
 
 //===========================================================================================
+// Send the welcome banner to a freshly-connected telnet client.
+// Called from the SimpleTelnet onConnect callback — receives client IP as const char*.
+static void sendTelnetBanner(const char* ip)
+{
+  debugTelnet.println(F("\r\n============================================"));
+  debugTelnet.println(F("  OpenTherm Gateway -- OTGW-firmware"));
+  _debugPrintf_P(PSTR("  Version : %s\r\n"), _VERSION);
+  debugTelnet.println(F("============================================"));
+  _debugPrintf_P(PSTR("  IP      : %s\r\n"), WiFi.localIP().toString().c_str());
+  _debugPrintf_P(PSTR("  WiFi    : %s\r\n"), WiFi.SSID().c_str());
+  _debugPrintf_P(PSTR("  OTGW    : %-10s  MQTT : %s\r\n"),
+    state.otBus.bOnline    ? "online"     : "offline",
+    state.mqtt.bConnected  ? "connected"  : "disconnected");
+  _debugPrintf_P(PSTR("  Heap    : %u bytes free\r\n"), platformFreeHeap());
+  debugTelnet.println(F("--------------------------------------------"));
+  debugTelnet.println(F("  Debug flags (key to toggle):"));
+  _debugPrintf_P(PSTR("    1 OT messages : %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
+  _debugPrintf_P(PSTR("    2 REST API    : %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
+  _debugPrintf_P(PSTR("    3 MQTT comms  : %s\r\n"), CBOOLEAN(state.debug.bMQTT));
+  _debugPrintf_P(PSTR("    4 MQTT gating : %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
+  _debugPrintf_P(PSTR("    5 Sensors     : %s\r\n"), CBOOLEAN(state.debug.bSensors));
+  debugTelnet.println(F("--------------------------------------------"));
+  debugTelnet.println(F("  Press 'h' for the full debug menu."));
+  _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip);
+  debugTelnet.println(F("============================================\r\n"));
+}
+
+//===========================================================================================
+// Forward declaration — defined in handleDebug.ino.
+void handleDebugChar(char c);
+
+// SimpleTelnet input callback: line mode off means one char per keypress.
+static void onTelnetInput(const char* s) {
+  if (s && s[0] != '\0') handleDebugChar(s[0]);
+}
+
+//===========================================================================================
 void startTelnet()
 {
-  DebugT(F("\r\nUse  'telnet "));
+  debugTelnet.onConnect(sendTelnetBanner);
+  debugTelnet.setLineMode(false);
+  debugTelnet.onInputReceived(onTelnetInput);
+  debugTelnet.begin();             // port was fixed in the constructor (23)
+  DebugT(F("\r\nTelnet debug server started on "));
   DebugT(WiFi.localIP());
-  DebugTln(F("' for debugging"));
-  TelnetStream.begin();
-  DebugTln(F("\nTelnet server started .."));
-  TelnetStream.flush();
+  DebugTln(F(":23"));
 } // startTelnet()
 
 //=======================================================================

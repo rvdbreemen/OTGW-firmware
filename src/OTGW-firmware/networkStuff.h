@@ -86,7 +86,7 @@ extern OTGWWebServer     httpServer;
 extern OTGWUpdateServer  httpUpdater;
 extern FSInfo            LittleFSinfo;
 extern bool              LittleFSmounted;
-#define WM_DEBUG_PORT TelnetStream
+#define WM_DEBUG_PORT debugTelnet
 
 //=====[ Forward declarations ]================================================
 

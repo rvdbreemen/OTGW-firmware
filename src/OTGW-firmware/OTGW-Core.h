@@ -14,10 +14,10 @@
 #ifndef OTGWCore_h
 #define OTGWCore_h
 
-// OTGW Serial 2 network port  
-// #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
-#define OTGW_SERIAL_PORT 25238     // changed the port to original default of OTmonitor 
-TelnetStreamClass OTGWstream(OTGW_SERIAL_PORT); 
+// OTGW Serial 2 network port
+// SimpleTelnet<4> in streaming mode — drop-in replacement for TelnetStreamClass
+#define OTGW_SERIAL_PORT 25238     // changed the port to original default of OTmonitor
+SimpleTelnet<4> OTGWstream(OTGW_SERIAL_PORT);
 
 //Depends on the library 
 #define OTGW_COMMAND_TOPIC "command"

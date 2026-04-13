@@ -471,50 +471,6 @@ static void appendProgmemSuffix(char *dst, size_t dstSize, PGM_P suffix)
   strncat_P(dst, suffix, dstSize - len - 1);
 }
 
-static void handlePicFlashBackgroundTasks()
-{
-  handleDebug();              // Keep telnet debug active for monitoring
-  httpServer.handleClient();  // Keep HTTP active
-#if MDNS_NEEDS_UPDATE
-  MDNS.update();              // Keep MDNS active for network discovery
-#endif
-  handleOTGW();               // REQUIRED for PIC flash - processes serial communication
-  handleWebSocket();          // Keep WebSocket service responsive during flash
-}
-
-//===================[ Send useful information to MQTT ]======================
-
-/*
-Publish usefull firmware version information to MQTT broker.
-*/
-void sendMQTTversioninfo(){
-  char rebootCountBuf[12];
-  snprintf_P(rebootCountBuf, sizeof(rebootCountBuf), PSTR("%lu"), static_cast<unsigned long>(state.uptime.iRebootCount));
-  sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
-  sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
-  sendMQTTData("otgw-firmware/reboot_reason", lastReset);
-  if (isPICEnabled()) {
-    sendMQTTData("otgw-pic/version", state.pic.sFwversion);
-    sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
-    sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
-  }
-  sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
-}
-
-/*
-Publish state information of PIC firmware version information to MQTT broker.
-*/
-void sendMQTTstateinformation(){
-  if (!isPICEnabled()) return;
-  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
-  sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
-  if (state.otgw.bGatewayModeKnown) {
-    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
-  }
-  sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
-  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
-}
-
 //===================[ Reset OTGW ]===============================
 #if HAS_PIC
 void resetOTGW() {

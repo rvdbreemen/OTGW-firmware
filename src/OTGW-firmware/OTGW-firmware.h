@@ -19,7 +19,8 @@
 // DEBUGGING: Uncomment the next line to disable WebSocket functionality
 // #define DISABLE_WEBSOCKET
 
-#include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
+#include <SimpleTelnet.h>       // https://github.com/RvdB/SimpleTelnet — unified multi-client telnet (replaces TelnetStream + ESPTelnet)
+extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 #include "Wire.h"
 #include "safeTimers.h"
 #include "boards.h"             // Board-specific pin maps and feature flags (HAS_PIC, HAS_DIRECT_OT)
@@ -312,6 +313,7 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bOTmsg                 = true;   // was bDebugOTmsg — OpenTherm message trace
   bool     bRestAPI               = false;  // was bDebugRestAPI — REST API request trace
   bool     bMQTT                  = false;  // was bDebugMQTT — MQTT publish/receive trace
+  bool     bMQTTGate              = false;  // MQTT gate decisions: interval/change-based publish logic
   bool     bSensors               = false;  // was bDebugSensors — Dallas sensor scan trace
   bool     bSensorSim             = false;  // was bDebugSensorSimulation
   bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
