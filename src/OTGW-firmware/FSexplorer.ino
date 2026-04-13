@@ -262,21 +262,14 @@ void setupFSexplorer(){
  
   httpServer.onNotFound([]() 
   {
-    if (state.debug.bRestAPI) DebugTf(PSTR("in 'onNotFound()'!! [%s] => \r\n"), httpServer.uri().c_str());
     if (httpServer.uri().indexOf("/api/") == 0)
     {
-      if (state.debug.bRestAPI) DebugTf(PSTR("next: processAPI(%s)\r\n"), httpServer.uri().c_str());
       processAPI();
     }
-    // else if (httpServer.uri() == "/")
-    // {
-    //   DebugTln(F("index requested.."));
-    //   sendIndexPage();
-    // }
     else
     {
-      if (state.debug.bRestAPI) DebugTf(PSTR("next: handleFile(%s)\r\n")
-                      , String(httpServer.urlDecode(httpServer.uri())).c_str());
+      if (state.debug.bRestAPI) DebugTf(PSTR("onNotFound: handleFile(%s)\r\n"),
+                      String(httpServer.urlDecode(httpServer.uri())).c_str());
       if (!handleFile(httpServer.urlDecode(httpServer.uri())))
       {
         httpServer.send_P(404, PSTR("text/plain"), PSTR("FileNotFound\r\n"));
