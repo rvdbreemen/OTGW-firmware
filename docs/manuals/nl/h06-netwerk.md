@@ -50,9 +50,12 @@ Wanneer de Web UI niet bereikbaar is:
 De firmware implementeert een twee­laags herstel­mechanisme (ADR-047):
 
 - **Laag 1**: De WiFi SDK probeert automatisch opnieuw verbinding te maken bij kortdurende onderbrekingen (typisch binnen 30 seconden).
-- **Laag 2**: Een toestandsmachine in de firmware (`loopWifi()`) detecteert langere uitvallen. Na maximaal 10 mislukte verbindingspogingen herstart het apparaat zichzelf automatisch.
+- **Laag 2**: Een toestandsmachine in de firmware (`loopWifi()`) detecteert langere uitvallen. In productie­builds herstart het apparaat zichzelf na maximaal 10 mislukte pogingen. In beta­builds activeert de firmware na 2 mislukte pogingen de AP-fallbackmodus (zie paragraaf 6.10) in plaats van te herstarten.
 
-Bij herstel van de verbinding worden MQTT, de WebSocket-verbinding en de Telnet-debugserver automatisch opnieuw gestart.
+Bij herstel van de verbinding:
+- Herstelt de firmware de geconfigureerde hostnaam.
+- Stuurt de firmware een DHCP-heraankondiging zodat de router de juiste hostnaam leert.
+- Worden MQTT, de WebSocket-verbinding en de Telnet-debugserver automatisch opnieuw gestart.
 
 ---
 
@@ -251,7 +254,7 @@ De Web UI maakt een WebSocket-verbinding op poort 81 voor de live OpenTherm-log.
 
 #### Poort 23: Telnet-debugserver
 
-De volledige firmware-debuglog is real-time beschikbaar via Telnet. Verbinden:
+De volledige firmware-debuglog is real-time beschikbaar via Telnet. De Telnet-server is geïmplementeerd met de SimpleTelnet-bibliotheek, die de oudere TelnetStream- en ESPTelnet-bibliotheken vervangt. Verbinden:
 
 ```bash
 telnet <ip-adres>
@@ -269,7 +272,7 @@ De log bevat alle `DebugTln()`/`DebugTf()`-uitvoer: WiFi-events, MQTT-verbinding
 
 #### Poort 25238: TCP serieel bridge
 
-Poort 25238 is de OTmonitor-compatibele TCP serieel bridge. Hierop wordt de ruwe PIC-serieel­stroom doorgegeven, precies zoals een directe serieel­verbinding. Gebruik:
+Poort 25238 is de OTmonitor-compatibele TCP serieel bridge, ook geïmplementeerd met de SimpleTelnet-bibliotheek (in streaming-modus). Hierop wordt de ruwe PIC-serieel­stroom doorgegeven, precies zoals een directe serieel­verbinding. Gebruik:
 
 - OTmonitor (stel als host het IP-adres of `otgw.local` in, poort 25238)
 - Home Assistant built-in OTGW-integration
@@ -325,39 +328,51 @@ De WebSocket-verbinding (poort 81, live OT-log) veronderstelt plain HTTP/WS. WSS
 
 ---
 
-### 6.10 AP-fallback: wanneer activeert het en hoe herstelt u
+### 6.10 AP-fallback (beta): wanneer activeert het en hoe herstelt u
 
-#### Wanneer activeert de AP-fallback?
+De beta AP-fallbackmodus is beschikbaar in beta­builds (v2.0.0-beta en later, alle platformen). Dit is een andere modus dan de WiFiManager captive portal die bij de eerste installatie of na een WiFi-reset wordt gebruikt.
 
-De AP-fallbackmodus activeert in de volgende situaties:
+#### Wanneer activeert de beta AP-fallback?
 
 | Situatie | Gedrag |
 |----------|--------|
-| Geen opgeslagen WiFi-gegevens (eerste opstart) | Direct AP-modus |
-| Opgeslagen gegevens kloppen niet meer (SSID/wachtwoord gewijzigd) | AP-modus na mislukte verbindingspoging |
-| Driedubbele reset gedetecteerd | Gegevens gewist, AP-modus |
-| Reset WiFi via Web UI | Gegevens gewist, herstart naar AP-modus |
+| WiFi-uitval tijdens bedrijf: 2 mislukte pogingen | Firmware schakelt over naar AP-fallbackmodus |
+| WiFi niet bereikbaar bij opstart, maar gegevens zijn opgeslagen | Firmware slaat de WiFiManager-portal over en gaat direct naar AP-fallbackmodus |
 
-#### Hoe herkent u de AP-modus?
+De standaard WiFiManager captive portal (voor eerste installatie of na Reset WiFi) heeft een andere SSID-notatie: `<hostname>-<MAC-adres>`. De beta AP-fallback heeft een vaste, kortere SSID-notatie.
 
-- De SSID `<hostname>-<MAC>` verschijnt in de WiFi-scannerlijst van uw apparaat.
-- De Telnet-debuglog (indien bereikbaar) toont: `Entered config mode SSID: otgw-XXXX`.
-- De Web UI is niet bereikbaar op `otgw.local`.
+#### Hoe herkent u de beta AP-fallbackmodus?
+
+- De SSID `OTGW-XXXXXX` verschijnt in de WiFi-scannerlijst (waarbij XXXXXX de laatste 3 bytes van het MAC-adres zijn in hoofdletters hexadecimaal, bijv. `OTGW-AABBCC`).
+- De Web UI is bereikbaar op `http://192.168.4.1`.
+- De Telnet-debuglog toont: `BETA AP: fallback started SSID=[OTGW-XXXXXX] IP=192.168.4.1 pass=otgw123`.
+
+#### AP-fallback gegevens
+
+| Gegeven | Waarde |
+|---------|--------|
+| SSID | `OTGW-<laatste 3 bytes MAC, hoofdletters hex>` |
+| Wachtwoord | `otgw123` |
+| IP-adres | `192.168.4.1` |
+| OTA-update | Beschikbaar via `http://192.168.4.1/update` |
+| MQTT | Uitgeschakeld in fallbackmodus |
+
+In AP-fallbackmodus probeert de firmware elke 5 minuten opnieuw verbinding te maken met het geconfigureerde WiFi-netwerk. Zodra WiFi beschikbaar is, worden alle services automatisch hersteld en wordt de AP afgesloten.
 
 #### Herstelstappen
 
-1. Verbind uw telefoon of laptop met de SSID `otgw-<MAC>`.
-2. Er opent automatisch een configuratiepagina. Zo niet: navigeer naar `http://192.168.4.1`.
-3. Klik op **Configure WiFi**.
-4. Selecteer uw netwerk, vul het wachtwoord in en sla op.
-5. Het apparaat herstart en verbindt met uw netwerk.
-6. Controleer of `otgw.local` weer bereikbaar is.
+1. Verbind uw telefoon of laptop met de SSID `OTGW-XXXXXX` met wachtwoord `otgw123`.
+2. Navigeer naar `http://192.168.4.1` in uw browser.
+3. Pas de WiFi-instellingen aan via de Settings-pagina of gebruik Reset WiFi.
+4. Herstart het apparaat.
+5. Controleer of `otgw.local` weer bereikbaar is.
 
-#### Wat als de portal niet verschijnt?
+#### Wat als het apparaat in AP-fallback blijft?
 
-- Controleer of u verbonden bent met de `otgw-<MAC>` SSID.
-- Open handmatig `http://192.168.4.1` in een browser.
-- Sommige apparaten (Android) blokkeren verbindingen via een accesspoint zonder internet. Schakel in dat geval de mobiele data tijdelijk uit.
+- Controleer of het geconfigureerde SSID en wachtwoord correct zijn.
+- Zorg dat het WiFi-accesspoint van uw router bereikbaar is.
+- Gebruik de OTA-updatepagina (`http://192.168.4.1/update`) om eventueel een nieuwe firmware te flashen als de huidige build problemen heeft.
+- Sommige telefoons (Android) blokkeren het gebruik van een accesspoint zonder internet. Schakel in dat geval de mobiele data tijdelijk uit.
 
 ---
 

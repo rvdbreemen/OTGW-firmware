@@ -62,6 +62,36 @@ De firmware verbindt onmiddellijk met de broker en publiceert het geboorte-beric
 
 ---
 
+### MQTT-publicatiefilter (intervalpoort)
+
+Standaard publiceert de firmware elke OpenTherm-waarde zodra die ontvangen wordt. Op drukke installaties kunnen dit tientallen berichten per seconde zijn. De instelling `MQTT Interval` maakt het mogelijk het berichtenverkeer te beperken.
+
+#### Hoe het werkt
+
+De instelling `MQTT Interval` (instellingenpagina, veld `iInterval`) bepaalt wanneer een waarde gepubliceerd wordt:
+
+| Waarde `iInterval` | Publiceergedrag |
+|---|---|
+| `0` (standaard) | Publiceer bij elk ontvangen bericht, geen filtering |
+| `> 0` (seconden) | Publiceer alleen als: de waarde voor het eerst gezien wordt (`firstSeen`), de waarde veranderd is ten opzichte van de vorige publicatie (`valueChanged`), of het ingestelde interval verstreken is (`intervalElapsed`) |
+
+Met een interval van 60 seconden wordt een stabiele keteltemperatuur maximaal eenmaal per minuut gepubliceerd. Een waarde die tussentijds verandert, wordt alsnog direct gepubliceerd.
+
+Het interval geldt alleen voor OpenTherm-databerichten. SAT-topics, verbindingsstatus, versie-informatie en andere niet-OT-topics worden altijd gepubliceerd zodra ze wijzigen.
+
+#### Debuggen van het publicatiefilter
+
+Als u verbinding maakt via telnet (poort 23) en de toets `g` indrukt, wordt de MQTT-poort-debug ingeschakeld. De firmware logt dan elke beslissing:
+
+```
+MQTT gate id=25 src=S slot=25 prev=0x0000 curr=0x0510 first=true changed=true interval=false last=0 now=42 => publish [tracked update]
+MQTT gate id=25 src=S slot=25 prev=0x0510 curr=0x0510 first=false changed=false interval=false last=42 now=71 => skip [suppressed by interval]
+```
+
+Dit is handig bij het vaststellen waarom een sensor wel of niet verschijnt in Home Assistant.
+
+---
+
 ### MQTT topic-structuur
 
 #### Publish topics (firmware → broker)
@@ -191,12 +221,44 @@ De exacte set sensoren is afhankelijk van welke OpenTherm bericht-ID's uw ketel 
 
 #### Klimaatentiteit
 
-Als SAT is ingeschakeld, maakt de firmware één klimaatentiteit aan in Home Assistant. Via deze entiteit kunt u:
+Als SAT is ingeschakeld, maakt de firmware een SAT-klimaatentiteit aan in Home Assistant. Via deze entiteit kunt u:
 
 - De doeltemperatuur instellen (5-30 °C, in stappen van 0,5 °C)
-- De bedrijfsmodus selecteren (verwarmen, uit, eco, comfort, weg, slaap)
+- De bedrijfsmodus selecteren (`off`, `heat` / continuous, `pwm`)
+- Een voorinstelling kiezen (comfort, eco, weg, slaap) indien geconfigureerd
 - De huidige ruimtetemperatuur aflezen
-- De huidige modus aflezen
+- De actuele SAT-modus aflezen
+
+#### SAT-sensorentiteiten
+
+Wanneer SAT is ingeschakeld, worden ook diagnostische entiteiten automatisch aangemeld bij Home Assistant. Deze worden gepubliceerd onder het topic-prefix `sat/`.
+
+**Kern SAT-topics (altijd gepubliceerd als SAT actief is):**
+
+| Topic-suffix | Omschrijving | Eenheid |
+|---|---|---|
+| `sat/setpoint` | Definitief aanvoertemperatuur-setpoint naar de ketel | °C |
+| `sat/target` | Doelruimtetemperatuur | °C |
+| `sat/mode` | Bedrijfsmodus: `off`, `continuous` of `pwm` | - |
+| `sat/heating_curve` | Berekende verwarmingscurvewaarde | °C |
+| `sat/pid_output` | PID-gecorrigeerde uitvoer | °C |
+| `sat/error` | PID-fout (doel minus ruimtetemp) | °C |
+| `sat/room_temp` | Ruimtetemperatuur gebruikt door PID | °C |
+| `sat/outside_temp` | Buitentemperatuur gebruikt door de verwarmingscurve | °C |
+| `sat/boiler_status` | Actuele ketelstatus (tekstlabel) | - |
+| `sat/active` | Of SAT actief is | bool |
+| `sat/safety_tripped` | Of een veiligheidslaag is geactiveerd | bool |
+| `sat/simulation` | Simulatiemodus aan/uit | - |
+
+**SAT-commando-topics (firmware abonneert hierop):**
+
+| Topic-suffix | Geaccepteerde waarden | Omschrijving |
+|---|---|---|
+| `sat/target` | Getal, bijv. `21.0` | Stel doelruimtetemperatuur in |
+| `sat/control_mode` | `off`, `continuous`, `pwm`, `auto` | Stel bedrijfsmodus in |
+| `sat/enabled` | `true` / `false` | SAT in- of uitschakelen |
+| `sat/indoor_temp` | Getal, bijv. `20.5` | Stuur binnentemperatuur van externe sensor |
+| `sat/outdoor_temp` | Getal, bijv. `5.2` | Stuur buitentemperatuur van externe bron |
 
 ---
 

@@ -84,6 +84,7 @@ Returns the current health status of the device.
     "status": "UP",
     "uptime": "2d 3h 45m",
     "heap": 25600,
+    "networkmode": "wifi",
     "wifirssi": -65,
     "mqttconnected": "true",
     "otgwconnected": "true",
@@ -98,7 +99,8 @@ Returns the current health status of the device.
 | `status` | string | `"UP"` or `"DEGRADED"` |
 | `uptime` | string | Human-readable uptime |
 | `heap` | integer | Free heap memory in bytes |
-| `wifirssi` | integer | WiFi signal strength in dBm |
+| `networkmode` | string | Active network mode: `"wifi"`, `"ethernet"`, or `"ap"` |
+| `wifirssi` | integer | WiFi signal strength in dBm (0 in AP or Ethernet mode) |
 | `mqttconnected` | string | `"true"` / `"false"` |
 | `otgwconnected` | string | `"true"` / `"false"` |
 | `picavailable` | string | `"true"` / `"false"` |
@@ -156,7 +158,11 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "boilerconnected": true,
     "otgwmode": "on",
     "otgwconnected": true,
+    "otcommandinterface": true,
     "otgwsimulation": false,
+    "board": "esp8266",
+    "hardwaremode": "pic",
+    "networkmode": "wifi",
     "otdirectavailable": true,
     "otdmode": "gateway",
     "otdbypass": false,
@@ -172,6 +178,13 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
   }
 }
 ```
+
+The `otcommandinterface` field is `true` when either a PIC or OT-direct hardware interface is present and active.
+
+The `board`, `hardwaremode`, and `networkmode` fields indicate the hardware platform and active modes:
+- `board`: hardware identifier (e.g., `"esp8266"`, `"esp32s3"`)
+- `hardwaremode`: `"pic"` for standard PIC-based OTGW, `"otdirect"` for OTGW32
+- `networkmode`: `"wifi"`, `"ethernet"`, or `"ap"` (AP fallback mode)
 
 The `otd*` fields are only present when `otdirectavailable` is `true` (OTGW32 builds). On standard ESP8266+PIC builds, only `otdirectavailable: false` is included.
 
@@ -191,10 +204,25 @@ Returns the current device date and time.
     "psmode": false,
     "otgwsimulation": false,
     "freeheap": 25600,
-    "maxfreeblock": 20480
+    "maxfreeblock": 20480,
+    "networkmode": "wifi",
+    "wifiquality": 80
   }
 }
 ```
+
+| Field | Description |
+|-------|-------------|
+| `dateTime` | Current date/time in device timezone |
+| `epoch` | Unix timestamp |
+| `message` | Current status message text |
+| `psmode` | Priority Service mode active |
+| `otgwsimulation` | OTGW simulation mode active |
+| `freeheap` | Free heap memory in bytes |
+| `maxfreeblock` | Largest contiguous free block |
+| `networkmode` | Active network mode: `"wifi"`, `"ethernet"`, or `"ap"` |
+| `wifiquality` | WiFi signal quality 0-100 (0 in AP mode or Ethernet, 100 for wired Ethernet) |
+| `apfallback` | Only present in pre-release builds when AP fallback is active: `true` |
 
 #### `GET /api/v2/device/crashlog`
 
@@ -427,6 +455,56 @@ Triggers a full MQTT autodiscovery cycle, sending all HA discovery configs from 
 ---
 
 ### Sensors
+
+#### `GET /api/v2/sensors` | `GET /api/v2/sensors/status`
+
+Returns the current hardware sensor status. Both paths return the same response.
+
+**Authentication**: Not required
+
+**Response** `200 OK`:
+```json
+{
+  "sensors": {
+    "dallas_enabled": true,
+    "dallas_detected": true,
+    "dallas_count": 2,
+    "dallas_gpio": 4,
+    "dallas_poll_sec": 30,
+    "simulated": false,
+    "devices": {
+      "28FF64D1841703F1": {"temp": 21.5, "epoch": 1774548600},
+      "28FF94E2841703F2": {"temp": 18.3, "epoch": 1774548600}
+    },
+    "s0": {
+      "enabled": false,
+      "gpio": 0,
+      "poll_sec": 10,
+      "pulses": 0,
+      "total": 0,
+      "power_kw": 0.000,
+      "epoch": 0
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dallas_enabled` | boolean | Whether Dallas sensors are enabled in settings |
+| `dallas_detected` | boolean | Whether at least one Dallas sensor was found on the bus |
+| `dallas_count` | integer | Number of detected Dallas sensors |
+| `dallas_gpio` | integer | GPIO pin used for the 1-Wire bus |
+| `dallas_poll_sec` | integer | Sensor polling interval in seconds |
+| `simulated` | boolean | Whether sensor simulation mode is active |
+| `devices` | object | Per-device readings (only present when sensors are detected or simulation is active). Keys are 16-character 1-Wire addresses; values contain `temp` (°C) and `epoch` (seconds since boot). |
+| `s0.enabled` | boolean | Whether S0 pulse counter is enabled |
+| `s0.gpio` | integer | GPIO pin for S0 input |
+| `s0.poll_sec` | integer | S0 reporting interval in seconds |
+| `s0.pulses` | integer | Pulse count in the current interval |
+| `s0.total` | integer | Total pulse count since boot |
+| `s0.power_kw` | number | Calculated power in kW |
+| `s0.epoch` | integer | Timestamp of last pulse (seconds since boot) |
 
 #### `GET /api/v2/sensors/labels`
 

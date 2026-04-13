@@ -33,6 +33,22 @@ OTGW-firmware kan in principe ook gebouwd worden voor andere ESP8266- of ESP32-b
 
 ---
 
+### Hardware-capability-vlaggen (boards.h)
+
+Het headerbestand `boards.h` definieert compile-time capability-vlaggen die bepalen welke code in elke firmwarebinary wordt opgenomen. Deze vlaggen zijn nuttig bij het lezen van buildlogs of bij bijdragen aan de firmware.
+
+| Vlag | ESP8266 OTGW | ESP32 OTGW32 | Betekenis |
+|---|---|---|---|
+| `HAS_PIC` | 1 | 0 | PIC co-processor aanwezig. Omvat OTGWSerial, PIC-detectie, PIC-firmware-upgrade en I2C-watchdog. |
+| `HAS_DIRECT_OT` | 0 | 1 | Directe GPIO OpenTherm-businterface aanwezig. Omvat OTDirect.ino, de opentherm_library, step-up converter-aansturing en de GPIO OT-pinnen. |
+| `HAS_ETH_CAPABLE` | 0 | 1 | W5500 SPI Ethernet aanwezig. Omvat Ethernet.ino en de EthernetESP32-bibliotheek. |
+
+Deze vlaggen sluiten elkaar uit tussen de twee buildtargets: een enkele firmwarebinary voor beide boards is niet mogelijk omdat de GPIO-pinnen voor OT-direct en I2C op hardwareniveau conflicteren. Het commando `python build.py` (of `pio run`) bouwt beide binaries vanuit dezelfde broncode.
+
+Applicatiecode bewaakt platformspecifieke blokken met `#if HAS_PIC`, `#if HAS_DIRECT_OT` en `#if HAS_ETH_CAPABLE`. Gebruiksvriendelijke runtimecontroles maken gebruik van de helperfuncties `isPICEnabled()` en `isOTDirectEnabled()`, die een runtimedetectielaag toevoegen bovenop de compile-time vlag.
+
+---
+
 ### Fysieke aansluitingen
 
 #### OpenTherm bus bedrading
@@ -142,10 +158,10 @@ git clone https://github.com/rvdbreemen/OTGW-firmware.git
 cd OTGW-firmware
 
 # Bouw voor ESP8266
-pio run -e nodoshop_esp8266
+pio run -e esp8266
 
 # Bouw voor ESP32
-pio run -e nodoshop_esp32
+pio run -e esp32
 
 # Of gebruik het build-script
 python build.py              # firmware + filesystem

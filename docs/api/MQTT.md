@@ -53,6 +53,9 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 | `otgw-firmware/reboot_count` | `"42"` | Number of reboots since first boot |
 | `otgw-firmware/reboot_reason` | `"Software/System restart"` | Last reboot reason |
 | `otgw-firmware/uptime` | `"12345"` | Uptime in seconds (not retained) |
+| `otgw-firmware/board` | `"esp8266"` / `"esp32s3"` | Hardware board identifier |
+| `otgw-firmware/hardware_mode` | `"pic"` / `"otdirect"` | Active hardware mode |
+| `otgw-firmware/network_mode` | `"wifi"` / `"ethernet"` / `"ap"` | Active network mode |
 | `otgw-firmware/error` | `"LittleFS mount failed..."` | Error messages (not retained, only when applicable) |
 
 ### PIC Gateway Information
@@ -91,6 +94,28 @@ Published at startup, on MQTT (re)connect, every 5 minutes, and when settings ar
 | `otgw-pic/settings/reset_cause` | `"Power-on"` | Last PIC reset cause |
 | `otgw-pic/settings/standalone_interval` | `"0"` | Standalone mode interval |
 | `otgw-pic/settings/voltage_ref` | `"3.3"` | Voltage reference |
+
+### OT Direct (OTGW32)
+
+Published at startup, on MQTT (re)connect, and every 5 minutes. Only present in OTGW32 builds (`HAS_DIRECT_OT=1`). On standard ESP8266+PIC hardware, only `otgw-otdirect/available` is published with value `"OFF"`.
+
+| Topic | Value | Description |
+| ----- | ----- | ----------- |
+| `otgw-otdirect/available` | `"ON"` / `"OFF"` | Whether OT-direct hardware is present and enabled |
+| `otgw-otdirect/mode` | `"gateway"` / `"monitor"` / `"bypass"` / `"master"` / `"loopback"` | Current operating mode of the OT-direct engine |
+| `otgw-otdirect/bypass` | `"ON"` / `"OFF"` | Whether the bypass relay is active |
+| `otgw-otdirect/monitor_mode` | `"ON"` / `"OFF"` | Whether transparent pass-through mode is active |
+| `otgw-otdirect/master_mode` | `"ON"` / `"OFF"` | Whether OTGW32 is acting as sole OT master |
+| `otgw-otdirect/stepup` | `"ON"` / `"OFF"` | Whether the 24V step-up converter is active |
+| `otgw-otdirect/thermostat_connected` | `"ON"` / `"OFF"` | Whether a thermostat frame has been received within the setback timeout |
+| `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Whether setback override is active (thermostat disconnected) |
+| `otgw-otdirect/schedule_active` | `"11"` | Number of OT polling schedule entries currently active |
+| `otgw-otdirect/schedule_disabled` | `"1"` | Number of schedule entries disabled because boiler returned UNKNOWN_DATA_ID |
+| `otgw-otdirect/overrides_active` | `"2"` | Number of active write-override slots |
+| `otgw-otdirect/boiler_connected` | `"ON"` / `"OFF"` | Whether the boiler OT bus side is active |
+| `otgw-otdirect/ot_online` | `"ON"` / `"OFF"` | Whether the OT serial bus is alive (frames recently received) |
+
+These topics are only published when `isOTDirectEnabled()` returns true. Topics prefixed `otgw-otdirect/` are skipped during MQTT discovery replay when OT-direct is not enabled.
 
 ### OpenTherm Status Flags (Message ID 0)
 
@@ -870,6 +895,14 @@ The `canPublishMQTT()` function checks heap health before each publish. When fre
 ### Republish on Reconnect
 
 On MQTT (re)connect, the firmware calls `requestMQTTRepublishAll()` to reset all value-change tracking, ensuring the next observed value for each message ID is published regardless of whether it matches the previously published value.
+
+### MQTT Gate Debug Flag
+
+The `bMQTTGate` flag (`state.debug.bMQTTGate`) enables verbose telnet debug output for the MQTT interval gating and value-change deduplication logic. When enabled, the firmware logs each publish decision including whether a message was suppressed by the gate, the interval timer state, and the value-change check result.
+
+Toggle via telnet debug console: press `g` to enable/disable MQTT gate logging.
+
+This flag is runtime-only and is not persisted across reboots.
 
 ---
 

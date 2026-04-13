@@ -83,7 +83,7 @@ v2.0.0 is de eerste release met volledige ondersteuning voor het nieuwe ESP32-pl
 | Ethernet | Niet ondersteund | W5500 SPI (optioneel) |
 | BLE sensoren | Niet ondersteund | Xiaomi LYWSD03MMC via BTHome v2 |
 | Bluetooth | Niet aanwezig | Aanwezig, passieve scan |
-| PlatformIO target | `nodoshop_esp8266` | `nodoshop_esp32` |
+| PlatformIO target | `esp8266` | `esp32` |
 | Build flag | `BOARD_NODOSHOP_ESP8266` | `BOARD_NODOSHOP_ESP32` |
 | OTA-slots | 2 (standaard ESP8266) | 2 x 1,5 MB (custom partitie) |
 | OLED-display | Ondersteund (I2C) | Ondersteund (I2C) |

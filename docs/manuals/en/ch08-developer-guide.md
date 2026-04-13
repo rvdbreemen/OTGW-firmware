@@ -53,7 +53,7 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 
 | File / Directory | Purpose |
 |-----------------|---------|
-| `build.py` | Primary build script: invokes `arduino-cli`, optionally `mkspiffs`, packages artifacts |
+| `build.py` | Primary build script: invokes PlatformIO internally, packages firmware and LittleFS artifacts |
 | `platformio.ini` | PlatformIO project: `esp8266` and `esp32` environments |
 | `evaluate.py` | Static code quality checker: PROGMEM usage, unsafe patterns, String class audit |
 | `scripts/` | PlatformIO pre-build scripts: version injection, library patching |
@@ -66,9 +66,9 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 
 ### Build System
 
-#### build.py (Arduino CLI)
+#### build.py (release builds)
 
-The primary build method for ESP8266. Wraps `arduino-cli` and handles version embedding, filesystem packaging, and artifact collection.
+The primary build script for producing release artifacts. It invokes PlatformIO internally, handles version embedding, filesystem packaging, and artifact collection.
 
 ```bash
 python build.py              # Build firmware + LittleFS filesystem image
@@ -77,16 +77,18 @@ python build.py --clean      # Clean build artifacts before building
 python build.py --upload     # Build and upload to connected device
 ```
 
-The script reads `arduino-cli.yaml` for board configuration and reads the Git tag to embed the version string.
+The script reads the Git tag to embed the version string and places output in the `build/` directory.
 
 #### PlatformIO
 
-PlatformIO is the preferred build system for ESP32 and is fully supported for ESP8266. Two environments are defined in `platformio.ini`:
+PlatformIO is the preferred build system and is used for both ESP8266 and ESP32. Two environments are defined in `platformio.ini`:
 
-| Environment | Target | Board | CPU |
-|-------------|--------|-------|-----|
-| `esp8266` | Wemos D1 mini / NodeMCU (NodoShop OTGW) | `d1_mini` | 160 MHz |
-| `esp32` | NodoShop OTGW32 | `esp32dev` | 240 MHz |
+| Environment | Target | Board | Core | CPU |
+|-------------|--------|-------|------|-----|
+| `esp8266` | Wemos D1 mini / NodeMCU (NodoShop OTGW) | `d1_mini` | Arduino Core 3.1.2 (espressif8266) | 160 MHz |
+| `esp32` | NodoShop OTGW32 | `esp32dev` | pioarduino espressif32 fork | 240 MHz |
+
+The ESP8266 LittleFS partition size is 2 072 576 bytes (approximately 2 MB). This is configured in `platformio.ini` via the board options.
 
 ```bash
 pio run                          # Build all environments
@@ -193,6 +195,28 @@ const char label[] PROGMEM = "boilertemperature";     // PROGMEM constant in fla
 For comparisons use `strcmp_P(ram_ptr, PSTR("keyword"))` or `strcasecmp_P()`. Never pass a PROGMEM pointer to a function expecting a RAM pointer.
 
 Binary data (non-null-terminated buffers) must use `memcmp_P()`. Using `strncmp_P` or `strstr_P` on binary data causes an Exception 2 crash.
+
+#### Platform Abstraction Layer (ADR-061)
+
+All ESP8266/ESP32 SDK differences are isolated in three files: `platform.h`, `platform_esp8266.h`, and `platform_esp32.h`. Application code includes only `platform.h` and calls the unified functions. Never call platform-specific SDK functions directly in `.ino` files.
+
+Key functions provided by the abstraction layer:
+
+| Function | Description |
+|----------|-------------|
+| `platformSetHostname(hostname)` | Set the WiFi station hostname for DHCP |
+| `platformGetHostname()` | Read back the current hostname |
+| `platformRestartDHCP()` | Force a DHCP re-announce (e.g., after hostname change) |
+| `platformFreeHeap()` | Free heap in bytes |
+| `platformMaxFreeBlock()` | Largest contiguous free block (fragmentation indicator) |
+| `platformRestart()` | Platform-safe reboot |
+| `platformCoreVersion()` | Arduino core version string |
+| `platformChipId()` | Unique chip identifier |
+| `platformGetMacAddress(mac)` | Fill a 6-byte buffer with the MAC address |
+
+On ESP8266, `MDNS_NEEDS_UPDATE` is defined as `1`, which means the main loop must call `MDNS.update()` on every iteration. On ESP32 this is not needed (`MDNS_NEEDS_UPDATE` is not defined). The main loop guards this with `#if defined(MDNS_NEEDS_UPDATE)`.
+
+The `PlatformDir` class in `platform.h` provides a unified directory iteration interface over LittleFS (ESP8266 uses `Dir`; ESP32 uses `File`-based iteration). Use `PlatformDir` instead of calling filesystem APIs directly.
 
 #### No ArduinoJson
 
@@ -453,7 +477,7 @@ For a text field:
 
 #### Telnet Debug Console (Port 23)
 
-The firmware streams diagnostic output to Telnet port 23. Connect with any Telnet client:
+The firmware streams diagnostic output to Telnet port 23 via the SimpleTelnet library (`SimpleTelnet<1> debugTelnet`, declared extern in `OTGW-firmware.h` and defined in `networkStuff.ino`). SimpleTelnet replaces the older TelnetStream and ESPTelnet libraries and provides a unified API on both ESP8266 and ESP32. Connect with any Telnet client:
 
 ```bash
 telnet otgw.local 23
@@ -461,7 +485,26 @@ telnet otgw.local 23
 telnet 192.168.1.x 23
 ```
 
-Output includes OpenTherm message decoding, MQTT state transitions, heap stats, sensor readings, and any text output from `DebugTln()`/`DebugTf()`. The stream is plain text, one line per event.
+Output includes OpenTherm message decoding, MQTT state transitions, heap stats, sensor readings, and any text output from `DebugTln()`/`DebugTf()`. The stream is plain text, one line per event. Each line is prefixed with timestamp, free heap, and max free block size.
+
+When you connect, a banner is printed listing all available debug toggle keys. Press `h` to redisplay the full menu. The current key bindings are:
+
+| Key | Action |
+|-----|--------|
+| `1` | Toggle OT message parsing log (`state.debug.bOTmsg`) |
+| `2` | Toggle REST API handler log (`state.debug.bRestAPI`) |
+| `3` | Toggle MQTT module log (`state.debug.bMQTT`) |
+| `4` | Toggle sensor module log (`state.debug.bSensors`) |
+| `5` | Toggle SAT control loop log (`state.debug.bSAT`) |
+| `6` | Toggle OTDirect frame log (`state.debug.bOTDirect`) |
+| `g` | Toggle MQTT interval gating log (`state.debug.bMQTTGate`) |
+| `d` | Toggle Dallas sensor simulation (`state.debug.bSensorSim`) |
+| `s` / `S` | Toggle OTGW serial simulation replay |
+| `r` | Reconnect WiFi, Telnet, OTGW stream, MQTT |
+| `F` | Force MQTT HA discovery for all message IDs |
+| `q` | Force re-read of settings from LittleFS |
+| `p` | Reset PIC manually |
+| `h` | Print the full debug help menu |
 
 #### Debug Macros
 
@@ -471,7 +514,17 @@ DebugTf(PSTR("Value: %d\r\n"), myInt);        // Printf-style, format string in 
 DebugT(F("Partial: "));                       // Print without newline
 ```
 
-The macros send output to `TelnetStream` and are conditionally compiled based on `debug` flags in `state.debug`. Most flags default to `true`. The `bRestAPI`, `bMQTT`, and `bSensors` flags are gated debug categories that can be toggled at runtime via REST API or Telnet.
+The macros send output to the `debugTelnet` instance (a `SimpleTelnet<1>` on port 23). They are never written to `Serial`. Module-specific conditional macros follow a per-module flag in `state.debug`:
+
+| Flag | Module macros | Description |
+|------|--------------|-------------|
+| `state.debug.bOTmsg` | `OTDebugTln()`, `OTDebugTf()` | OpenTherm message parsing |
+| `state.debug.bRestAPI` | `RESTDebugTln()`, `RESTDebugTf()` | REST API handler logging |
+| `state.debug.bMQTT` | `MQTTDebugTln()`, `MQTTDebugTf()` | MQTT client and publish/subscribe |
+| `state.debug.bMQTTGate` | (inline checks) | MQTT interval gating decisions |
+| `state.debug.bSensors` | `SensorDebugTln()`, `SensorDebugTf()` | Dallas, S0, sensor polling |
+| `state.debug.bSAT` | `SATDebugTln()`, `SATDebugTf()` | SAT control loop, cycles, heating curve |
+| `state.debug.bOTDirect` | `OTDDebugTln()`, `OTDDebugTf()` | OTDirect GPIO frame handling (ESP32) |
 
 #### Browser Console Debug
 

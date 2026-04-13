@@ -15,16 +15,23 @@ When no credentials are stored, the device starts a WiFi access point named afte
 The firmware uses a two-tier reconnection strategy:
 
 1. The ESP SDK's built-in auto-reconnect handles short blips (typically under 30 seconds).
-2. If the connection stays down longer, the application-level `loopWifi()` state machine retries up to 10 times with a 30-second window each. If all 10 retries fail, the device reboots.
+2. If the connection stays down longer, the application-level `loopWifi()` state machine retries non-blocking with a 30-second window per attempt. In production builds it retries up to 10 times before rebooting. In beta builds it enters AP fallback mode after 2 failed retries (see section 6.1.3).
+
+After reconnecting, the firmware re-applies the configured hostname, forces a DHCP re-announce so the router learns the correct hostname, and restarts Telnet, MQTT, and WebSocket services automatically.
 
 #### 6.1.3 AP Fallback Mode
 
-Available in v2.0.0 beta builds on ESP32. When WiFi retries are exhausted, the device switches into AP fallback mode instead of rebooting indefinitely:
+Available in beta builds (v2.0.0-beta and later, all platforms). When WiFi retries are exhausted at runtime, the device switches into AP fallback mode instead of rebooting indefinitely. In production releases the device reboots after 10 failed retries instead.
 
-- **SSID**: `OTGW-<MAC suffix>`
+At boot, if credentials are stored but WiFi is unreachable, beta builds also skip the WiFiManager config portal and go straight to AP fallback.
+
+- **SSID**: `OTGW-<last 3 bytes of MAC address in uppercase hex>`, for example `OTGW-AABBCC`
 - **IP address**: `192.168.4.1`
 - **Password**: `otgw123`
 - **MQTT**: disabled in fallback mode
+- **OTA update**: available from fallback mode so you can flash a corrected firmware without serial access
+
+In AP fallback mode the device keeps attempting to reconnect to the configured WiFi network every 5 minutes. When WiFi comes back, services (MQTT, Telnet, WebSocket) restart automatically and the AP is torn down.
 
 **How to recover from fallback:**
 1. Connect to the `OTGW-XXXXXX` SSID using password `otgw123`.
@@ -117,8 +124,8 @@ OTA is available from AP fallback mode as well, so you can recover a device stuc
 |---|---|---|---|
 | 80 | TCP / HTTP | Web interface and REST API | All web UI routes, file serving, OTA update |
 | 81 | TCP / WebSocket | Live OpenTherm log stream | Used by the web UI for real-time data |
-| 23 | TCP / Telnet | Debug console | Plain-text debug log |
-| 25238 | TCP | Serial bridge (ser2net) | Raw OTGW PIC serial over TCP; OTmonitor compatible |
+| 23 | TCP / Telnet | Debug console | Plain-text debug log; served by SimpleTelnet library |
+| 25238 | TCP | Serial bridge (ser2net) | Raw OTGW PIC serial over TCP; served by SimpleTelnet library; OTmonitor compatible |
 | 123 | UDP (outbound) | NTP (SNTP) | Outbound only |
 | 5353 | UDP | mDNS | Local network name resolution |
 | 5355 | UDP | LLMNR | Windows name resolution (ESP8266 only) |

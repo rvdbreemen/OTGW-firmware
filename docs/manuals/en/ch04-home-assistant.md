@@ -122,7 +122,37 @@ OTGW/value/otgw-AABBCCDDEEFF   →  "offline" (retained, last will on disconnect
 
 ---
 
-### 4.5 Home Assistant Auto-Discovery
+### 4.5 MQTT Publish Gate (Interval Filtering)
+
+By default, the firmware publishes an OpenTherm value every time it is received from the bus. For busy installations this can mean dozens of messages per second. The publish interval setting lets you reduce this traffic.
+
+#### How it works
+
+The `MQTT Interval` setting (Settings page, field `iInterval`) controls when a value is published:
+
+| `iInterval` value | Publish behavior |
+|---|---|
+| `0` (default) | Publish on every received message, no filtering |
+| `> 0` (seconds) | Publish only when: the value is seen for the first time (`firstSeen`), the value has changed since the last publish (`valueChanged`), or the configured interval has elapsed since the last publish (`intervalElapsed`) |
+
+When the interval is set to, say, 60 seconds, a stable boiler temperature will be published at most once per minute. A value that changes mid-interval is still published immediately.
+
+The interval gate applies to OpenTherm data messages only. SAT topics, connection status, version info, and other non-OT topics are always published when they change, regardless of the interval setting.
+
+#### Debugging the gate
+
+If you connect to the firmware telnet debug port (port 23) and press `g`, the MQTT gate debug flag toggles. With it enabled, the firmware logs every gate decision to the debug console:
+
+```
+MQTT gate id=25 src=S slot=25 prev=0x0000 curr=0x0510 first=true changed=true interval=false last=0 now=42 => publish [tracked update]
+MQTT gate id=25 src=S slot=25 prev=0x0510 curr=0x0510 first=false changed=false interval=false last=42 now=71 => skip [suppressed by interval]
+```
+
+This is useful when diagnosing why a sensor is or is not appearing in Home Assistant.
+
+---
+
+### 4.6 Home Assistant Auto-Discovery
 
 When the firmware connects to the MQTT broker, it automatically publishes discovery configuration messages to Home Assistant. You do not need to write any YAML.
 
@@ -146,7 +176,7 @@ curl -X POST http://otgw.local/api/v2/otgw/discovery
 
 ---
 
-### 4.6 Auto-Discovered Entities
+### 4.7 Auto-Discovered Entities
 
 #### OpenTherm Sensors
 
@@ -177,11 +207,42 @@ curl -X POST http://otgw.local/api/v2/otgw/discovery
 
 #### Climate Entity
 
-The firmware publishes a climate entity showing the current room temperature, the active setpoint, and allows setting a new target temperature from the HA dashboard. If SAT is enabled, a second climate entity (`sat_climate`) appears.
+The firmware publishes a climate entity showing the current room temperature, the active setpoint, and allows setting a new target temperature from the HA dashboard. If SAT is enabled, a dedicated SAT climate entity (`sat_climate`) appears with full mode and preset support.
+
+#### SAT Sensor Entities
+
+When SAT is enabled, the firmware auto-discovers additional diagnostic entities. These are published under the `sat/` topic prefix.
+
+**Core SAT topics (always published when SAT is active):**
+
+| Topic suffix | Description | Unit |
+|---|---|---|
+| `sat/setpoint` | Final flow temperature sent to boiler | °C |
+| `sat/target` | Target room temperature | °C |
+| `sat/mode` | Control mode: `off`, `continuous`, or `pwm` | - |
+| `sat/heating_curve` | Heating curve base value | °C |
+| `sat/pid_output` | PID corrected output | °C |
+| `sat/error` | PID error (target minus room temperature) | °C |
+| `sat/room_temp` | Room temperature used by PID | °C |
+| `sat/outside_temp` | Outdoor temperature used by heating curve | °C |
+| `sat/boiler_status` | Current boiler status (text label) | - |
+| `sat/active` | Whether SAT is actively controlling | bool |
+| `sat/safety_tripped` | Whether a safety layer has tripped | bool |
+| `sat/simulation` | Simulation mode on/off | - |
+
+**SAT command topics (gateway subscribes to these):**
+
+| Topic suffix | Accepted values | Description |
+|---|---|---|
+| `sat/target` | Float, e.g. `21.0` | Set target room temperature |
+| `sat/control_mode` | `off`, `continuous`, `pwm`, `auto` | Set control mode |
+| `sat/enabled` | `true` / `false` | Enable or disable SAT |
+| `sat/indoor_temp` | Float, e.g. `20.5` | Push indoor temperature from external sensor |
+| `sat/outdoor_temp` | Float, e.g. `5.2` | Push outdoor temperature from external source |
 
 ---
 
-### 4.7 Sending Commands from Home Assistant
+### 4.8 Sending Commands from Home Assistant
 
 #### Setting the Boiler CH Setpoint
 
@@ -215,7 +276,7 @@ action:
 
 ---
 
-### 4.8 Example Home Assistant Automations
+### 4.9 Example Home Assistant Automations
 
 #### Turn down heating when everyone leaves
 
@@ -250,7 +311,7 @@ automation:
 
 ---
 
-### 4.9 Manual Home Assistant Configuration (Without Auto-Discovery)
+### 4.10 Manual Home Assistant Configuration (Without Auto-Discovery)
 
 Example manual sensor configuration:
 

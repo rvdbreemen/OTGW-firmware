@@ -118,7 +118,11 @@ paths:
                         description: Free heap memory in bytes
                       wifirssi:
                         type: integer
-                        description: WiFi signal strength in dBm
+                        description: WiFi signal strength in dBm (0 when in AP or Ethernet mode)
+                      networkmode:
+                        type: string
+                        enum: [wifi, ethernet, ap]
+                        description: Active network mode
                       mqttconnected:
                         type: string
                         enum: ["true", "false"]
@@ -219,6 +223,74 @@ paths:
           description: Authentication required
         '403':
           description: CSRF protection - invalid origin
+
+  /v2/sensors:
+    get:
+      tags:
+        - Sensors
+      summary: Get sensor status (root alias)
+      description: |
+        Alias for `GET /v2/sensors/status`. Returns the current hardware sensor status
+        including Dallas temperature sensor configuration and readings, and S0 pulse counter state.
+      operationId: getSensorStatusRoot
+      responses:
+        '200':
+          description: Sensor status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensorStatus'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sensors/status:
+    get:
+      tags:
+        - Sensors
+      summary: Get sensor hardware status
+      description: |
+        Returns the current hardware sensor status as a JSON object with a `sensors` wrapper.
+
+        Includes:
+        - Dallas 1-Wire temperature sensor configuration (enabled, GPIO pin, poll interval)
+        - Detection state and per-device readings with temperature (°C) and last-update epoch
+        - S0 pulse counter configuration and current state (enabled, GPIO pin, pulse counts, power in kW)
+
+        The `devices` sub-object is only present when sensors are detected or sensor simulation
+        is active (`state.debug.bSensorSim`).
+      operationId: getSensorStatus
+      responses:
+        '200':
+          description: Sensor status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensorStatus'
+              example:
+                sensors:
+                  dallas_enabled: true
+                  dallas_detected: true
+                  dallas_count: 2
+                  dallas_gpio: 4
+                  dallas_poll_sec: 30
+                  simulated: false
+                  devices:
+                    "28FF64D1841703F1":
+                      temp: 21.5
+                      epoch: 1774548600
+                    "28FF94E2841703F2":
+                      temp: 18.3
+                      epoch: 1774548600
+                  s0:
+                    enabled: false
+                    gpio: 0
+                    poll_sec: 10
+                    pulses: 0
+                    total: 0
+                    power_kw: 0.000
+                    epoch: 0
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
 
   /v2/sensors/labels:
     get:
@@ -371,8 +443,22 @@ paths:
                         description: '"on", "off", or "detecting"'
                       otgwconnected:
                         type: boolean
+                      otcommandinterface:
+                        type: boolean
+                        description: True when an OT command interface is available (PIC or OT-direct)
                       otgwsimulation:
                         type: boolean
+                      # Hardware platform fields
+                      board:
+                        type: string
+                        description: Hardware board identifier (e.g., "esp8266", "esp32s3")
+                      hardwaremode:
+                        type: string
+                        description: Active hardware mode ("pic" or "otdirect")
+                      networkmode:
+                        type: string
+                        enum: [wifi, ethernet, ap]
+                        description: Active network mode
                       # OT Direct fields — only present when otdirectavailable=true (OTGW32 builds)
                       otdirectavailable:
                         type: boolean
@@ -2071,6 +2157,72 @@ paths:
 
 components:
   schemas:
+    SensorStatus:
+      type: object
+      description: |
+        Hardware sensor status. Returned by `GET /v2/sensors` and `GET /v2/sensors/status`.
+      properties:
+        sensors:
+          type: object
+          properties:
+            dallas_enabled:
+              type: boolean
+              description: Whether Dallas 1-Wire temperature sensors are enabled in settings
+            dallas_detected:
+              type: boolean
+              description: Whether at least one Dallas sensor was detected on the bus
+            dallas_count:
+              type: integer
+              description: Number of detected Dallas sensors
+            dallas_gpio:
+              type: integer
+              description: GPIO pin used for the 1-Wire bus
+            dallas_poll_sec:
+              type: integer
+              description: Sensor polling interval in seconds
+            simulated:
+              type: boolean
+              description: Whether sensor simulation mode is active (state.debug.bSensorSim)
+            devices:
+              type: object
+              description: |
+                Per-device readings. Only present when sensors are detected or simulation is active.
+                Keys are 1-Wire addresses (16 hex characters); values are objects with `temp` (float, °C)
+                and `epoch` (uint32, seconds since boot).
+              additionalProperties:
+                type: object
+                properties:
+                  temp:
+                    type: number
+                    description: Temperature in °C
+                  epoch:
+                    type: integer
+                    description: Timestamp of last reading (seconds since boot)
+            s0:
+              type: object
+              description: S0 pulse counter state
+              properties:
+                enabled:
+                  type: boolean
+                gpio:
+                  type: integer
+                  description: GPIO pin for S0 input
+                poll_sec:
+                  type: integer
+                  description: S0 reporting interval in seconds
+                pulses:
+                  type: integer
+                  description: Pulse count in the current interval
+                total:
+                  type: integer
+                  description: Total pulse count since boot
+                power_kw:
+                  type: number
+                  description: Calculated power in kW
+                epoch:
+                  type: integer
+                  description: Timestamp of last pulse (seconds since boot)
+
     StatusOk:
       type: object
       description: Standard success response for SAT write operations

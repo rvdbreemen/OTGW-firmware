@@ -136,19 +136,29 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/simulation" -m "
 
 When MQTT is enabled, SAT entities are automatically discovered by Home Assistant.
 
-**Climate entity**: The `sat_climate` entity shows current room temperature, target temperature, and mode. Setting the target temperature persists the value to ESP flash storage.
+**Climate entity**: The `sat_climate` entity shows current room temperature, target temperature, and mode. Available modes are `off`, `heat` (continuous), and `pwm`. Setting the target temperature persists the value to ESP flash storage.
 
 **Key sensor entities**:
 
-| Entity | Description |
-|---|---|
-| `sensor.otgw_sat_setpoint` | Final flow temperature sent to boiler (°C) |
-| `sensor.otgw_sat_heating_curve` | Heating curve base value (°C) |
-| `sensor.otgw_sat_pid_output` | PID corrected output (°C) |
-| `sensor.otgw_sat_error` | PID error: target minus room temperature (°C) |
-| `sensor.otgw_sat_mode` | Control mode: off, continuous, or pwm |
-| `sensor.otgw_sat_room_temp` | Room temperature used by PID (°C) |
-| `sensor.otgw_sat_outside_temp` | Outdoor temperature used by heating curve (°C) |
+| Entity | Topic suffix | Description |
+|---|---|---|
+| `sensor.otgw_sat_setpoint` | `sat/setpoint` | Final flow temperature sent to boiler (°C) |
+| `sensor.otgw_sat_heating_curve` | `sat/heating_curve` | Heating curve base value (°C) |
+| `sensor.otgw_sat_pid_output` | `sat/pid_output` | PID corrected output (°C) |
+| `sensor.otgw_sat_error` | `sat/error` | PID error: target minus room temperature (°C) |
+| `sensor.otgw_sat_mode` | `sat/mode` | Control mode: `off`, `continuous`, or `pwm` |
+| `sensor.otgw_sat_room_temp` | `sat/room_temp` | Room temperature used by PID (°C) |
+| `sensor.otgw_sat_outside_temp` | `sat/outside_temp` | Outdoor temperature used by heating curve (°C) |
+| `sensor.otgw_sat_boiler_status` | `sat/boiler_status` | Current boiler status (text label) |
+| `sensor.otgw_sat_pwm_duty` | `sat/pwm_duty` | PWM duty cycle (0-1) |
+| `sensor.otgw_sat_power` | `sat/power` | Estimated boiler power output (W) |
+| `sensor.otgw_sat_energy_total` | `sat/energy_total` | Accumulated energy estimate (kWh) |
+| `binary_sensor.otgw_sat_safety_tripped` | `sat/safety_tripped` | Whether a safety layer has tripped |
+| `binary_sensor.otgw_sat_modulation_reliable` | `sat/modulation_reliable` | Whether boiler modulation feedback is reliable |
+| `binary_sensor.otgw_sat_setpoint_mismatch` | `sat/setpoint_mismatch` | Setpoint mismatch between SAT and boiler |
+| `binary_sensor.otgw_sat_thermal_model_valid` | `sat/thermal_model_valid` | Whether the thermal model has enough data |
+| `binary_sensor.otgw_sat_solar_gain` | `sat/solar_gain` | Solar gain compensation active |
+| `binary_sensor.otgw_sat_auto_tune_active` | `sat/auto_tune_active` | Auto-tune in progress |
 
 **Using an external sensor from Home Assistant**:
 
@@ -164,6 +174,23 @@ automation:
           topic: "OTGW/set/otgw-AABBCCDDEEFF/sat/indoor_temp"
           payload: "{{ states('sensor.living_room_temperature') }}"
 ```
+
+**Using an external outdoor temperature source**:
+
+```yaml
+automation:
+  - alias: "Push outdoor temperature to SAT"
+    trigger:
+      - platform: state
+        entity_id: sensor.outdoor_temperature
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "OTGW/set/otgw-AABBCCDDEEFF/sat/outdoor_temp"
+          payload: "{{ states('sensor.outdoor_temperature') }}"
+```
+
+External temperature values expire automatically (5 minutes for indoor, 10 minutes for outdoor). If the push stops, SAT falls back to OpenTherm bus values without alarming.
 
 ---
 

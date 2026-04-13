@@ -243,24 +243,34 @@ Wanneer SAT is ingeschakeld en MQTT met auto-discovery is geconfigureerd, maakt 
 
 Via deze entiteit kunt u:
 - De doeltemperatuur instellen (slider of numeriek invoerveld)
-- Een voorinstelling kiezen (comfort, eco, weg, slaap)
+- De bedrijfsmodus selecteren (`off`, `continuous`, `pwm`)
+- Een voorinstelling kiezen (comfort, eco, weg, slaap) indien geconfigureerd
 - De huidige ruimtetemperatuur aflezen
-- De actuele SAT-modus aflezen (uit, continu, PWM)
+- De actuele SAT-modus aflezen (`off`, `continuous`, `pwm`)
 
 #### SAT-sensorentiteiten
 
 SAT publiceert ook afzonderlijke diagnostische entiteiten via auto-discovery:
 
-| Entiteit | Omschrijving |
-|---|---|
-| `sensor.otgw_sat_setpoint` | Definitief aanvoertemperatuur-setpoint dat naar de ketel gestuurd wordt |
-| `sensor.otgw_sat_heating_curve` | Berekende waarde van de verwarmingscurve |
-| `sensor.otgw_sat_pid_output` | PID-uitvoer (curve + P + I + D) |
-| `sensor.otgw_sat_error` | PID-fout (doeltemp minus ruimtetemp) |
-| `sensor.otgw_sat_mode` | Bedrijfsmodus (uit, continu, pwm) |
-| `sensor.otgw_sat_boiler_status` | Ketelstatuswaarde (0-14) |
-| `sensor.otgw_sat_room_temp` | Ruimtetemperatuur gebruikt door PID |
-| `sensor.otgw_sat_outside_temp` | Buitentemperatuur gebruikt door de verwarmingscurve |
+| Entiteit | Topic-suffix | Omschrijving |
+|---|---|---|
+| `sensor.otgw_sat_setpoint` | `sat/setpoint` | Definitief aanvoertemperatuur-setpoint naar de ketel (°C) |
+| `sensor.otgw_sat_heating_curve` | `sat/heating_curve` | Berekende waarde van de verwarmingscurve (°C) |
+| `sensor.otgw_sat_pid_output` | `sat/pid_output` | PID-uitvoer (curve + P + I + D) (°C) |
+| `sensor.otgw_sat_error` | `sat/error` | PID-fout (doeltemp minus ruimtetemp) (°C) |
+| `sensor.otgw_sat_mode` | `sat/mode` | Bedrijfsmodus: `off`, `continuous` of `pwm` |
+| `sensor.otgw_sat_boiler_status` | `sat/boiler_status` | Ketelstatus (tekstlabel) |
+| `sensor.otgw_sat_room_temp` | `sat/room_temp` | Ruimtetemperatuur gebruikt door PID (°C) |
+| `sensor.otgw_sat_outside_temp` | `sat/outside_temp` | Buitentemperatuur gebruikt door de verwarmingscurve (°C) |
+| `sensor.otgw_sat_pwm_duty` | `sat/pwm_duty` | PWM-duty-cycle (0-1) |
+| `sensor.otgw_sat_power` | `sat/power` | Geschat ketelvermogen (W) |
+| `sensor.otgw_sat_energy_total` | `sat/energy_total` | Gecumuleerde energieschatting (kWh) |
+| `binary_sensor.otgw_sat_safety_tripped` | `sat/safety_tripped` | Of een veiligheidslaag is geactiveerd |
+| `binary_sensor.otgw_sat_modulation_reliable` | `sat/modulation_reliable` | Of modulatiefeedback van de ketel betrouwbaar is |
+| `binary_sensor.otgw_sat_setpoint_mismatch` | `sat/setpoint_mismatch` | Setpoint-mismatch tussen SAT en ketel |
+| `binary_sensor.otgw_sat_thermal_model_valid` | `sat/thermal_model_valid` | Of het thermisch model voldoende data heeft |
+| `binary_sensor.otgw_sat_solar_gain` | `sat/solar_gain` | Zonnewinstcompensatie actief |
+| `binary_sensor.otgw_sat_auto_tune_active` | `sat/auto_tune_active` | Auto-tune bezig |
 
 #### Externe ruimtetemperatuur doorsturen
 
@@ -296,7 +306,7 @@ automation:
           payload_template: "{{ states('sensor.buitentemperatuur') }}"
 ```
 
-De externe temperatuurwaarden vervallen automatisch na respectievelijk 5 en 10 minuten, zodat SAT terugvalt op de OpenTherm-buswaarden als de automatisering stopt.
+De externe temperatuurwaarden vervallen automatisch na respectievelijk 5 minuten (binnentemp) en 10 minuten (buitentemp), zodat SAT terugvalt op de OpenTherm-buswaarden als de automatisering stopt.
 
 ---
 

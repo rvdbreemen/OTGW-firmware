@@ -45,15 +45,16 @@ De testbare bestanden van de bibliotheek bevinden zich in `src/libraries/`. Dit 
 
 #### build.py (aanbevolen voor releases)
 
-Het `build.py`-script bovenin de repository bouwt firmware én filesystem en verzorgt versienummering:
+Het `build.py`-script bovenin de repository bouwt firmware én filesystem en verzorgt versienummering. Het roept PlatformIO intern aan en plaatst de uitvoer in `build/`:
 
 ```bash
 python build.py              # Bouw firmware + filesystem (LittleFS-image)
 python build.py --firmware   # Alleen firmware, geen filesystem
 python build.py --clean      # Verwijder build-artefacten en bouw opnieuw
+python build.py --upload     # Bouw en flash naar aangesloten apparaat
 ```
 
-Het script roept intern PlatformIO aan en plaatst de uitvoer in `build/`.
+Het script leest de Git-tag voor versienummer­inbedding.
 
 #### PlatformIO (dagelijks gebruik)
 
@@ -79,10 +80,12 @@ pio device monitor
 
 De twee omgevingen in `platformio.ini`:
 
-| Omgeving | Platform | Board | Notitie |
-|----------|---------|-------|---------|
-| `esp8266` | `espressif8266@4.2.1` | `d1_mini` | Arduino Core 3.1.2, GCC 10.3, 160 MHz |
-| `esp32` | pioarduino fork espressif32 | `esp32dev` | Arduino-ESP32 v3.3.5, Ethernet/BLE |
+| Omgeving | Platform | Board | Core | CPU |
+|----------|---------|-------|------|-----|
+| `esp8266` | `espressif8266` | `d1_mini` | Arduino Core 3.1.2, GCC 10.3 | 160 MHz |
+| `esp32` | pioarduino fork espressif32 | `esp32dev` | Arduino-ESP32 v3.3.5, Ethernet/BLE | 240 MHz |
+
+De ESP8266 LittleFS-partitie is 2 072 576 bytes (circa 2 MB). Dit is geconfigureerd in `platformio.ini` via de board­opties.
 
 Bibliotheken worden gedefinieerd in `[env]`-sectie van `platformio.ini` en lokaal geplaatst in `src/libraries/`. De PlatformIO-packagemanager wordt gebruikt voor downloadbare bibliotheken; het script `scripts/patch_pio_libs.py` past bij de build automatisch noodzakelijke patches toe.
 
@@ -165,6 +168,28 @@ Wissel nooit een PROGMEM-pointer uit voor een RAM-pointer en omgekeerd: dit vero
 #### Geen re-entrancy
 
 De watchdog-functie `feedWatchDog()` roept geen `yield()` aan (uitgecommentarieerd). `handleOTGW()` gebruikt `static`-lokale buffers als beveiliging tegen re-entrancy vanuit `doBackgroundTasks()`.
+
+#### Platformabstractielaag (ADR-061)
+
+Alle ESP8266/ESP32 SDK-verschillen zijn geïsoleerd in `platform.h`, `platform_esp8266.h` en `platform_esp32.h`. Applicatiecode includeert uitsluitend `platform.h` en roept de platformonafhankelijke functies aan. Roep nooit platform-specifieke SDK-functies rechtstreeks aan in `.ino`-bestanden.
+
+Belangrijke functies:
+
+| Functie | Beschrijving |
+|---------|-------------|
+| `platformSetHostname(hostname)` | Stel de WiFi-hostnaam in voor DHCP |
+| `platformGetHostname()` | Lees de huidige hostnaam terug |
+| `platformRestartDHCP()` | Forceer een DHCP-heraankondiging (bijv. na hostnaamwijziging) |
+| `platformFreeHeap()` | Vrij heap in bytes |
+| `platformMaxFreeBlock()` | Grootste aaneengesloten vrij blok (fragmentatie-indicator) |
+| `platformRestart()` | Platformveilige herstart |
+| `platformCoreVersion()` | Arduino-core versiestring |
+| `platformChipId()` | Uniek chip-ID |
+| `platformGetMacAddress(mac)` | Vul een 6-byte buffer met het MAC-adres |
+
+Op ESP8266 is `MDNS_NEEDS_UPDATE` gedefinieerd als `1`: de hoofdlus moet dan `MDNS.update()` aanroepen. Op ESP32 is dat niet nodig. De hoofdlus bewaakt dit met `#if defined(MDNS_NEEDS_UPDATE)`.
+
+De klasse `PlatformDir` in `platform.h` biedt een uniforme interface voor directoryiteratie over LittleFS. Gebruik `PlatformDir` in plaats van filesystem-API's direct aan te roepen.
 
 ---
 
@@ -330,7 +355,7 @@ Leidend principe: schrijf code die een andere ontwikkelaar na zes maanden nog di
 
 #### Telnet (poort 23)
 
-Alle debuguitvoer gaat naar de Telnet-server, nooit naar `Serial.print()` (de seriële poort is exclusief voor PIC-communicatie na initialisatie).
+Alle debuguitvoer gaat naar de Telnet-server, nooit naar `Serial.print()` (de seriële poort is exclusief voor PIC-communicatie na initialisatie). De Telnet-server is geïmplementeerd met de SimpleTelnet-bibliotheek (`SimpleTelnet<1> debugTelnet` op poort 23, gedeclareerd in `OTGW-firmware.h` en gedefinieerd in `networkStuff.ino`). SimpleTelnet vervangt de oudere TelnetStream- en ESPTelnet-bibliotheken.
 
 Verbinden:
 ```bash
@@ -348,10 +373,26 @@ Debugmacro's (gedefinieerd in `Debug.h`):
 | `DebugTf(PSTR("fmt"), ...)` | Printf-stijl met PROGMEM-formaatstring |
 | `DebugFlush()` | Doorsturen van buffers |
 
-Schakel extra debuguitvoer in via `settings.bMyDEBUG = true` of de REST API:
-```
-POST /api/v2/settings  {"mydebug": "true"}
-```
+Bij verbinding toont de firmware een banner met de actuele status en alle beschikbare debugtoetsen. Druk op `h` om het menu opnieuw te tonen. De huidige toetsen:
+
+| Toets | Actie |
+|-------|-------|
+| `1` | Zet OT-berichtparsering aan/uit (`state.debug.bOTmsg`) |
+| `2` | Zet REST API-handler­log aan/uit (`state.debug.bRestAPI`) |
+| `3` | Zet MQTT-module­log aan/uit (`state.debug.bMQTT`) |
+| `4` | Zet sensor­module­log aan/uit (`state.debug.bSensors`) |
+| `5` | Zet SAT-regellus­log aan/uit (`state.debug.bSAT`) |
+| `6` | Zet OTDirect-framelog aan/uit (`state.debug.bOTDirect`, ESP32) |
+| `g` | Zet MQTT interval-gating­log aan/uit (`state.debug.bMQTTGate`) |
+| `d` | Zet Dallas-sensorsimulatie aan/uit (`state.debug.bSensorSim`) |
+| `s` / `S` | Zet OTGW serieel-simulatie-replay aan/uit |
+| `r` | Herstel WiFi, Telnet, OTGW-stream en MQTT |
+| `F` | Forceer MQTT HA-discovery voor alle bericht-ID's |
+| `q` | Herlees instellingen uit LittleFS |
+| `p` | Reset PIC handmatig |
+| `h` | Toon het volledige help-menu |
+
+De `bMQTTGate`-vlag (toets `g`) stuurt berichten over het MQTT-interval­filter: wanneer een waarde te snel achter elkaar publiceert, legt de gate uit waarom het bericht wordt overgeslagen. Dit is nuttig voor diagnose van MQTT-publicatiefrequenties, maar genereert veel uitvoer bij hoge OT-berichtfrequentie.
 
 #### evaluate.py
 
