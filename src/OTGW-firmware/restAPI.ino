@@ -1460,7 +1460,10 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("lastreset"), lastReset);
   sendJsonMapEntry(F("bootcount"), state.uptime.iRebootCount);
   sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
-  sendJsonMapEntry(F("otcommandinterface"), hasOTCommandInterface());
+  // "otcommandinterface" names which OT interface is active — always one or the other, never both.
+  if (isPICEnabled())        sendJsonMapEntry(F("otcommandinterface"), F("PIC"));
+  else if (isOTDirectEnabled()) sendJsonMapEntry(F("otcommandinterface"), F("OT-Direct"));
+  else                       sendJsonMapEntry(F("otcommandinterface"), F("None"));
   if (hasOTCommandInterface()) {
     sendJsonMapEntry(F("thermostatconnected"), state.otBus.bThermostatState);
     sendJsonMapEntry(F("boilerconnected"), state.otBus.bBoilerState);

@@ -58,50 +58,58 @@
 // ---------------------------------------------------------------------------
 #elif defined(BOARD_NODOSHOP_ESP32)
 // ---------------------------------------------------------------------------
-// Nodoshop OTGW32 — ESP32
+// Nodoshop OTGW32 — ESP32-S3 (4 MB flash)
 //
-// This is the new Nodoshop platform: an ESP32-based OpenTherm gateway that
-// implements the OT protocol directly in software (OTDirect), without a
-// separate PIC microcontroller.  HAS_PIC is therefore 0.
+// Pin assignments from OT-Thing-OTGW32/Firmware/include/hwdef.h (#ifdef NODO).
+// This is the Nodoshop PCB variant of the OT-Thing design.
 //
-// The Nodoshop OTGW WiFi (ESP8266) is the dual-controller board: it has a
-// PIC that handles the OpenTherm protocol and communicates with the ESP8266
-// over serial.  That design choice is board-level, not MCU-level.  Replacing
-// an ESP8266 with an ESP32 in an OTGW WiFi board is not an official Nodoshop
-// configuration and is not modelled here.
-//
-// GPIO numbers below are provisional — verify against the actual OTGW32
-// schematic before deploying.
+// No PIC: OT protocol is handled directly by OTDirect running on the ESP32-S3.
+// The Nodoshop OTGW WiFi (ESP8266 + PIC) is a different product entirely.
 
-#warning "OTGW32 pin definitions are provisional — verify against actual hardware schematic before deploying"
+// Buttons
+#define PIN_BUTTON        0    // Boot button (active LOW, pull-up)
+#define PIN_CONFIG_BUTTON 9    // Config button (active LOW)
 
-#define PIN_I2C_SCL       22   // Standard ESP32 I2C SCL
-#define PIN_I2C_SDA       21   // Standard ESP32 I2C SDA
-#define PIN_BUTTON        0    // BOOT button (active LOW, pull-up)
-#define PIN_LED1          2    // Onboard LED on many ESP32 dev boards
-#define PIN_LED2          4    // Secondary LED
+// LEDs (all active LOW except PIN_LED_GREEN which is active HIGH)
+#define PIN_LED1          2    // OT Red LED (active LOW)
+#define PIN_LED2          8    // Status LED (active LOW)
+#define PIN_LED_GREEN     48   // OT Green LED (active HIGH)
 
-// OT-Direct master pins (ESP32 drives OT bus directly, no PIC)
-#define PIN_OT_MASTER_IN  32   // OpenTherm master input
-#define PIN_OT_MASTER_OUT 33   // OpenTherm master output
+// I2C (OLED display)
+#define PIN_I2C_SCL       17
+#define PIN_I2C_SDA       18
 
-// OT-Direct slave pins (gateway mode: listen to thermostat)
-#define PIN_OT_SLAVE_IN   25   // OpenTherm slave input (thermostat signal)
-#define PIN_OT_SLAVE_OUT  26   // OpenTherm slave output (response to thermostat)
+// OpenTherm Direct — master (boiler side)
+#define PIN_OT_MASTER_IN  21   // OT master input (from boiler)
+#define PIN_OT_MASTER_OUT 1    // OT master output (to boiler)
 
-// Step-up converter enable (18V OT bus power)
-#define PIN_STEPUP_ENABLE 27   // HIGH = enable 18V step-up for OT bus
+// OpenTherm Direct — slave (thermostat side)
+#define PIN_OT_SLAVE_IN   6    // OT slave input (from thermostat)
+#define PIN_OT_SLAVE_OUT  7    // OT slave output (to thermostat)
 
-// SPI pins for W5500 Ethernet module (present on OTGW32)
-#define PIN_SPI_CS        5    // W5500 chip select
-#define PIN_SPI_INT       34   // W5500 interrupt (input only on ESP32)
-#define PIN_SPI_RST       15   // W5500 reset
-#define PIN_SPI_SCK       18   // SPI clock
-#define PIN_SPI_MISO      19   // SPI MISO
-#define PIN_SPI_MOSI      23   // SPI MOSI
+// Step-up converter (18V OT bus power)
+#define PIN_STEPUP_ENABLE 10   // HIGH = enable 18V step-up
+
+// Dallas 1-Wire temperature sensor
+#define PIN_1WIRE         4
+
+// Bypass relay
+#define PIN_BYPASS_RELAY  47
+
+// SPI pins for W5500 Ethernet module
+#define PIN_SPI_CS        14   // W5500 chip select
+#define PIN_SPI_INT       15   // W5500 interrupt
+#define PIN_SPI_RST       16   // W5500 reset
+#define PIN_SPI_SCK       12   // SPI clock
+#define PIN_SPI_MISO      13   // SPI MISO
+#define PIN_SPI_MOSI      11   // SPI MOSI
+
+// LED PWM brightness (ledc, 8-bit resolution, active-LOW LEDs use output inversion)
+// 5/255 ≈ 2% on-time → dim glow, same as OT-Thing firmware LED_BRIGHTNESS
+#define LED_BRIGHTNESS    5
 
 // Feature flags for Nodoshop OTGW32
-#define HAS_PIC           0    // No PIC: OT protocol handled by OTDirect (ESP32 native)
+#define HAS_PIC           0    // No PIC: OT protocol handled by OTDirect (ESP32-S3 native)
 #define HAS_DIRECT_OT     1    // Direct OT master/slave via OTDirect library
 #define HAS_ETH_CAPABLE   1    // Has W5500 Ethernet module
 

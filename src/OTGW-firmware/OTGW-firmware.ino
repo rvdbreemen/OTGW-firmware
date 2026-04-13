@@ -55,6 +55,10 @@ struct WifiPortalResetState {
 uint32_t wifiPortalResetWindowDeadline = 0;
 bool wifiPortalResetWindowOpen = false;
 
+// Last millis() timestamp of a valid OT message received from processOT().
+// Updated by OTGW-Core.ino. Used by LED heartbeat to detect "no OT traffic".
+uint32_t lastOTmsgMs = 0;
+
 bool readWifiPortalResetState(WifiPortalResetState &portalState) {
   return platformRtcRead(WIFI_PORTAL_RESET_RTC_SLOT, reinterpret_cast<uint32_t*>(&portalState), sizeof(portalState));
 }
@@ -123,11 +127,14 @@ void setup() {
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
   WatchDogEnabled(0); // turn off watchdog
-  
+
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf(PSTR("Booting....[%s]\r\n\r\n"), _VERSION);
-  
+
   detectPIC();
+#if HAS_DIRECT_OT
+  initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)
+#endif
 
   //setup randomseed the right way
   randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
@@ -215,10 +222,71 @@ void setup() {
 //=====================================================================
 
 //===[ blink status led ]===
+
+#if defined(BOARD_NODOSHOP_ESP32)
+// --- ESP32-S3: PWM-dimmed LEDs via ledc ------------------------------------
+// LED1 (GPIO2, OT Red) and LED2 (GPIO8, Status) are active LOW.
+// ledc output inversion: duty=0 → pin HIGH → LED off;
+//                        duty=LED_BRIGHTNESS → pin briefly LOW → LED dim on.
+// Same technique as OT-Thing firmware (LED_BRIGHTNESS=5, ~2% on-time).
+
+#define LED1_LEDC_CHANNEL  0
+#define LED2_LEDC_CHANNEL  1
+#define LED_FREQ_HZ        5000
+#define LED_RESOLUTION     8      // 8-bit: 0..255
+
+static bool _led_state[2] = { false, false };  // index 0=LED1, 1=LED2
+
+static inline uint8_t _ledIdx(uint8_t led) { return (led == LED2) ? 1 : 0; }
+
+static void _ensureLEDsInit() {
+  static bool done = false;
+  if (done) return;
+  ledcAttachChannel(LED1, LED_FREQ_HZ, LED_RESOLUTION, LED1_LEDC_CHANNEL);
+  ledcOutputInvert(LED1, true);   // active LOW → invert PWM
+  ledcWrite(LED1, 0);
+  ledcAttachChannel(LED2, LED_FREQ_HZ, LED_RESOLUTION, LED2_LEDC_CHANNEL);
+  ledcOutputInvert(LED2, true);
+  ledcWrite(LED2, 0);
+  done = true;
+}
+
+void setLed(uint8_t led, uint8_t status) {
+  _ensureLEDsInit();
+  bool on = (status == ON);
+  _led_state[_ledIdx(led)] = on;
+  ledcWrite(led, on ? LED_BRIGHTNESS : 0);
+}
+
+void blinkLEDnow(uint8_t led) {
+  _ensureLEDsInit();
+  if (settings.bLEDblink) {
+    bool on = !_led_state[_ledIdx(led)];
+    _led_state[_ledIdx(led)] = on;
+    ledcWrite(led, on ? LED_BRIGHTNESS : 0);
+  } else {
+    setLed(led, OFF);
+  }
+}
+
+#else  // ESP8266 --------------------------------------------------------------
+
 void setLed(uint8_t led, uint8_t status){
   pinMode(led, OUTPUT);
   digitalWrite(led, status);
 }
+
+void blinkLEDnow(uint8_t led){
+  pinMode(led, OUTPUT);
+  if (settings.bLEDblink) {
+    digitalWrite(led, !digitalRead(led));
+  } else setLed(led, OFF);
+}
+
+#endif  // BOARD_NODOSHOP_ESP32
+
+// Zero-argument wrapper — calls LED1 variant. Defined once for both boards.
+void blinkLEDnow() { blinkLEDnow(LED1); }
 
 void blinkLEDms(uint32_t delay){
   //blink the statusled, when time passed
@@ -237,14 +305,6 @@ void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
     }
 }
 
-void blinkLEDnow(uint8_t led = LED1){
-  pinMode(led, OUTPUT);
-  if (settings.bLEDblink) {
-    digitalWrite(led, !digitalRead(led));
-  } else setLed(led, OFF);
-
-}
-
 //===[ no-blocking delay with running background tasks in ms ]===
 void delayms(unsigned long delay_ms)
 {
@@ -260,6 +320,46 @@ void doTaskEvery1s(){
   //== do tasks ==
   handleCommandQueue(); //just check if there are commands to retry
   state.uptime.iSeconds++;
+
+  // LED status indicators (evaluated every 1s):
+  //   No WiFi          → LED2 blinks 1x/s, LED1 off
+  //   WiFi + no OT >10s → LED1 blinks 1x/s, LED2 blinks 2x/s (handled by timer500ms in loop)
+  //   WiFi + OT active → LEDs off (normal operation takes over)
+  {
+    static bool _hbLed2    = false;
+    static bool _hbLed1    = false;
+    static bool _wasNoWiFi = false;
+    static bool _wasNoOT   = false;
+
+    bool noWiFi = (WiFi.status() != WL_CONNECTED);
+    bool noOT   = !noWiFi &&
+                  ((lastOTmsgMs == 0) || ((millis() - lastOTmsgMs) > 10000UL));
+
+    if (noWiFi) {
+      _hbLed2 = !_hbLed2;
+      setLed(LED2, _hbLed2 ? ON : OFF);
+      setLed(LED1, OFF);
+      _wasNoWiFi = true;
+    } else {
+      if (_wasNoWiFi) {
+        // Just got WiFi: clear LED2 so normal op can take over
+        setLed(LED2, OFF);
+        _wasNoWiFi = false;
+      }
+
+      if (noOT) {
+        // LED1 @ 1x/s; LED2 @ 2x/s is driven by timer500ms in loop()
+        _hbLed1 = !_hbLed1;
+        setLed(LED1, _hbLed1 ? ON : OFF);
+        _wasNoOT = true;
+      } else if (_wasNoOT) {
+        // OT traffic resumed: turn both indicators off
+        setLed(LED1, OFF);
+        setLed(LED2, OFF);
+        _wasNoOT = false;
+      }
+    }
+  }
 
   if (wifiPortalResetWindowExpired()) {
     SetupDebugTln(F("Reset trigger window expired, clearing pending reset count"));
@@ -383,7 +483,10 @@ void doBackgroundTasks()
       //while connected handle everything that uses network stuff
       handleDebug();
       handleMQTT();                 // MQTT transmissions
-      handlePICSerial();                 // OTGW handling
+      handlePICSerial();            // OTGW/PIC handling
+#if HAS_DIRECT_OT
+      loopOTDirect();               // OT-direct GPIO poll (OTGW32 only)
+#endif
       handleWebSocket();            // WebSocket handling for OT log streaming
       httpServer.handleClient();
     #if MDNS_NEEDS_UPDATE
@@ -398,8 +501,9 @@ void doBackgroundTasks()
 
 void loop()
 {
-  DECLARE_TIMER_SEC(timer1s, 1, SKIP_MISSED_TICKS);
-  DECLARE_TIMER_SEC(timer3s, 3, SKIP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timer1s,   1,   SKIP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timer3s,   3,   SKIP_MISSED_TICKS);
+  DECLARE_TIMER_MS(timer500ms, 500, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
 
@@ -412,6 +516,16 @@ void loop()
       if (DUE(timer60s))                doTaskEvery60s();
       if (DUE(timer3s))                 doTaskEvery3s();
       if (DUE(timer1s))                 doTaskEvery1s();
+      if (DUE(timer500ms)) {
+        // LED2 fast blink (2x/s) when WiFi is up but no OT traffic for >10s
+        bool noOT = (WiFi.status() == WL_CONNECTED) &&
+                    ((lastOTmsgMs == 0) || ((millis() - lastOTmsgMs) > 10000UL));
+        if (noOT) {
+          static bool _led2Fast = false;
+          _led2Fast = !_led2Fast;
+          setLed(LED2, _led2Fast ? ON : OFF);
+        }
+      }
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook

@@ -88,6 +88,10 @@ void startWebserver(){
     //  - FS upgraded → ETag changes → server replies 200 with fresh content.
     //  - JS assets use ?v=<fsHash> versioned URLs for independent long-term caching.
     auto sendIndex = []() {
+      // Auth guard: if a password is configured, require it upfront so the browser
+      // caches credentials before any API calls are made — avoids mid-session popup.
+      if (!checkHttpAuth()) return;
+
       File f = LittleFS.open("/index.html", "r");
       if (!f) {
         httpServer.send(404, F("text/plain"), F("File not found"));

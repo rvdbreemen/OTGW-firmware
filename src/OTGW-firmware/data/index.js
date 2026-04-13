@@ -1769,7 +1769,8 @@ function parseSimulationValue(rawValue) {
 // Called once after the first /api/v2/device/info response.
 function applyPICAvailability(available, otCommandAvailable) {
   picAvailable = !!available;
-  otCommandInterfaceAvailable = !!otCommandAvailable;
+  // otCommandAvailable is now a string: "PIC", "OT-Direct", or "None" (or legacy bool)
+  otCommandInterfaceAvailable = (otCommandAvailable === "PIC" || otCommandAvailable === "OT-Direct" || otCommandAvailable === true || otCommandAvailable === "true");
   // Static HTML elements marked with class "pic-only"
   Array.from(document.getElementsByClassName('pic-only')).forEach(function(el) {
     if (picAvailable) el.classList.remove('hidden');
@@ -1842,23 +1843,32 @@ function refreshOTDStatus() {
     .then(function(json) {
       if (!json || !json.otdirect_status) return;
       var s = json.otdirect_status;
-      var el;
+      var el, dot;
+      function setDot(dotId, on) {
+        var d = document.getElementById(dotId);
+        if (d) d.className = 'sat-indicator ' + (on ? 'sat-indicator-on' : 'sat-indicator-off');
+      }
       el = document.getElementById('otd-st-mode');
-      if (el) { el.textContent = (s.mode || '--').toUpperCase(); }
+      if (el) el.textContent = (s.mode || '--').toUpperCase();
       el = document.getElementById('otd-st-online');
-      if (el) { el.textContent = s.ot_online ? 'Online' : 'Offline'; el.className = 'otd-value ' + (s.ot_online ? 'otd-val-ok' : 'otd-val-err'); }
+      if (el) el.textContent = s.ot_online ? 'Online' : 'Offline';
+      setDot('otd-st-online-dot', s.ot_online);
       el = document.getElementById('otd-st-therm');
-      if (el) { el.textContent = s.thermostat_connected ? 'Connected' : 'None'; el.className = 'otd-value ' + (s.thermostat_connected ? 'otd-val-ok' : 'otd-val-warn'); }
+      if (el) el.textContent = s.thermostat_connected ? 'Connected' : 'None';
+      setDot('otd-st-therm-dot', s.thermostat_connected);
       el = document.getElementById('otd-st-boiler');
-      if (el) { el.textContent = s.boiler ? 'Active' : 'Idle'; el.className = 'otd-value ' + (s.boiler ? 'otd-val-ok' : 'otd-val-warn'); }
+      if (el) el.textContent = s.boiler ? 'Active' : 'Idle';
+      setDot('otd-st-boiler-dot', s.boiler);
       el = document.getElementById('otd-st-setback');
-      if (el) { el.textContent = s.setback_active ? 'ACTIVE' : 'Off'; el.className = 'otd-value ' + (s.setback_active ? 'otd-val-warn' : 'otd-val-ok'); }
-      el = document.getElementById('otd-st-sched');
-      if (el) { el.textContent = (s.schedule_active || 0) + '/' + (s.schedule_total || 0); }
-      el = document.getElementById('otd-st-ovr');
-      if (el) { el.textContent = String(s.overrides_active || 0); }
+      if (el) el.textContent = s.setback_active ? 'Active' : 'Off';
+      setDot('otd-st-setback-dot', s.setback_active);
       el = document.getElementById('otd-st-stepup');
-      if (el) { el.textContent = s.stepup ? 'On' : 'Off'; }
+      if (el) el.textContent = s.stepup ? 'On' : 'Off';
+      setDot('otd-st-stepup-dot', s.stepup);
+      el = document.getElementById('otd-st-sched');
+      if (el) el.textContent = (s.schedule_active || 0) + '/' + (s.schedule_total || 0);
+      el = document.getElementById('otd-st-ovr');
+      if (el) el.textContent = String(s.overrides_active || 0);
     })
     .catch(function() {});
 }
@@ -5524,6 +5534,8 @@ var translateFields = [
   , ["flashchipspeed", "Flash Chip Speed (MHz)"]
   , ["flashchipmode", "Flash Mode"]
   , ["boardtype", "Board Type"]
+  , ["picavailable", "PIC Co-Processor"]
+  , ["otcommandinterface", "OT Interface"]
   , ["otdirectavailable", "OT-Direct Active"]
   , ["otdmode", "OT-Direct Mode"]
   , ["otdbypass", "Bypass Relay"]

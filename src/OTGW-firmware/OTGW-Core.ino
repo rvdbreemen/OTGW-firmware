@@ -100,12 +100,12 @@ char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 size_t ot_log_pos = 0;  // tracked write position — eliminates O(n²) strlen per AddLog call
 
 #define ClrLog()            ({ ot_log_buffer[0] = '\0'; ot_log_pos = 0; })
-#define AddLogf(...)        ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
-                                 int _w = snprintf(ot_log_buffer + ot_log_pos, OT_LOG_BUFFER_SIZE - ot_log_pos, __VA_ARGS__); \
+#define AddLogf(fmt, ...)   ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
+                                 int _w = snprintf(ot_log_buffer + ot_log_pos, OT_LOG_BUFFER_SIZE - ot_log_pos, fmt, ##__VA_ARGS__); \
                                  if (_w > 0) { size_t _rem = OT_LOG_BUFFER_SIZE - 1 - ot_log_pos; ot_log_pos += ((size_t)_w < _rem) ? (size_t)_w : _rem; } \
                                } })
-#define AddLogf_P(...)      ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
-                                 int _w = snprintf_P(ot_log_buffer + ot_log_pos, OT_LOG_BUFFER_SIZE - ot_log_pos, __VA_ARGS__); \
+#define AddLogf_P(fmt, ...) ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
+                                 int _w = snprintf_P(ot_log_buffer + ot_log_pos, OT_LOG_BUFFER_SIZE - ot_log_pos, fmt, ##__VA_ARGS__); \
                                  if (_w > 0) { size_t _rem = OT_LOG_BUFFER_SIZE - 1 - ot_log_pos; ot_log_pos += ((size_t)_w < _rem) ? (size_t)_w : _rem; } \
                                } })
 #define AddLog(logstring)   ({ if (ot_log_pos < (OT_LOG_BUFFER_SIZE - 1)) { \
@@ -995,8 +995,17 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
     .idle_core_mask = 0,
     .trigger_panic = true,
   };
-  esp_task_wdt_init(&twdtConfig);
-  esp_task_wdt_add(NULL);        // watch current (loop) task
+  // Arduino-ESP32 may have already initialized the TWDT before setup() runs.
+  // Try reconfigure first; fall back to init if not yet running.
+  esp_err_t err = esp_task_wdt_reconfigure(&twdtConfig);
+  if (err == ESP_ERR_INVALID_STATE) {
+    // TWDT not yet initialized — initialize it
+    esp_task_wdt_init(&twdtConfig);
+  }
+  // Subscribe the loop task only if not already subscribed
+  if (esp_task_wdt_status(NULL) != ESP_OK) {
+    esp_task_wdt_add(NULL);
+  }
 }
 
 void WatchDogEnabled(byte stateWatchdog) {
@@ -3720,12 +3729,15 @@ void processOT(const char *buf, int len){
   static bool bOTGWpreviousstate = false;
   time_t now = time(nullptr);
 
-  if (isvalidotmsg(buf, len)) { 
+  if (isvalidotmsg(buf, len)) {
     // Raw OT frames indicate normal streaming mode (PS=0).
     if (state.otBus.bPSmode) {
       leavePSMode(PSTR("PS mode auto-detected as OFF (raw OT stream resumed)"),
                   PSTR("PS=0 [auto-detected, raw mode resumed]"));
     }
+
+    // Update LED heartbeat timestamp — resets the "no OT" warning
+    lastOTmsgMs = millis();
 
     //OT protocol messages are 9 chars long
     if (settings.mqtt.bOTmessage) sendMQTTData(F("otmessage"), buf);

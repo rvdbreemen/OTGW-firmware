@@ -60,7 +60,8 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   char thisAP[64];
   strlcpy(thisAP, hostname, sizeof(thisAP));
   strlcat(thisAP, "-", sizeof(thisAP));
-  strlcat(thisAP, WiFi.macAddress().c_str(), sizeof(thisAP));
+  // Use eFuse MAC (always valid) — WiFi.macAddress() returns 00:00:00:00:00:00 before WiFi.begin()
+  strlcat(thisAP, getMacAddress() + 6, sizeof(thisAP)); // last 6 chars = last 3 MAC bytes (e.g. "21B4F8")
 
   DebugTln(F("\nStart Wifi ..."));
   manageWiFi.setDebugOutput(true);

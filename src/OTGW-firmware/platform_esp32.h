@@ -26,6 +26,7 @@
 #include <esp_system.h>
 #include <esp_mac.h>
 #include <esp_netif.h>
+#include <esp_flash.h>
 
 // ---- Platform name -------------------------------------------------------
 #define PLATFORM_NAME "ESP32"
@@ -142,8 +143,10 @@ inline uint32_t platformFlashChipSpeed() {
 }
 
 inline uint32_t platformFlashChipId() {
-  // ESP32 doesn't expose flash chip ID the same way; return 0
-  return 0;
+  // Read JEDEC flash chip ID via ESP-IDF esp_flash API (ESP32 / ESP32-S3)
+  uint32_t id = 0;
+  esp_flash_read_id(NULL, &id);  // NULL = default/main flash chip
+  return id;
 }
 
 inline uint8_t platformFlashChipMode() {

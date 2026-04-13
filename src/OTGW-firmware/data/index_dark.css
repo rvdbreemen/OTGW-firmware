@@ -1330,6 +1330,11 @@ body.disable-interaction {
 .sat-btn-toggle.active { background: #c62828; border-color: #b71c1c; }
 .sat-feedback-ok { color: #66bb6a; }
 .sat-feedback-error { color: #ef5350; }
+.sat-toggle-label { color: #aaa; }
+.sat-toggle-slider { background: #555; }
+.sat-toggle-slider::before { background: #ddd; }
+.sat-toggle input:checked + .sat-toggle-slider { background: #30d158; }
+.sat-toggle input:focus-visible + .sat-toggle-slider { outline-color: #30d158; }
 
 /* SAT Settings Groups (dark theme) */
 .sat-settings-group-header {

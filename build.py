@@ -70,22 +70,22 @@ TARGETS = {
         "fs_size": 2072576,    # FS_PHYS_SIZE from eagle.flash.4m2m.ld (0x1FA000)
     },
     "esp32": {
-        "name": "ESP32",
+        "name": "ESP32-S3",
         "core": "esp32:esp32",
         "board_manager_url": "https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json",
-        "fqbn": "esp32:esp32:esp32:PartitionScheme=custom",
+        "fqbn": "esp32:esp32:esp32s3:PartitionScheme=custom",
         "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32",
-        "chip": "esp32",
-        "flash_mode": "dio",
-        "flash_freq": "40m",
+        "chip": "esp32s3",       # Nodoshop OTGW32 uses ESP32-S3
+        "flash_mode": "qio",     # ESP32-S3 uses QIO (not DIO)
+        "flash_freq": "80m",
         "flash_size": "4MB",
         "firmware_offset": "0x10000",
-        "fs_offset": "0x310000",
+        "fs_offset": "0x2F0000",   # from partitions_otgw_esp32.csv (partition labeled "spiffs" for LittleFS.begin() compat)
         "fs_tool_path": "esp32/tools/mklittlefs",
         "fs_block": 4096,
         "fs_page": 256,
-        "fs_size": 786432,       # 0xC0000 — custom OTA partition (768KB LittleFS)
-        "bootloader_offset": "0x1000",
+        "fs_size": 1048576,       # 0x100000 = 1 MB — matches partitions_otgw_esp32.csv
+        "bootloader_offset": "0x0",  # ESP32-S3 bootloader is at 0x0 (not 0x1000)
     },
 }
 

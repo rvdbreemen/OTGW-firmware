@@ -734,7 +734,7 @@ inline String getActiveMAC() {
 inline const __FlashStringHelper* boardName() {
 #if defined(BOARD_NODOSHOP_ESP8266)
   return F("Nodoshop OTGW (ESP8266)");
-#elif defined(BOARD_NODOSHOP_OTGW32)
+#elif defined(BOARD_NODOSHOP_ESP32)
   return F("Nodoshop OTGW32 (ESP32-S3)");
 #elif defined(BOARD_SEEGEL_OTTHING)
   return F("OT-Thing Seegel (ESP32-S3)");

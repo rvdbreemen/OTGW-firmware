@@ -193,7 +193,7 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
 
       // Extract 16-bit UUID
       if (svcUUID.bitSize() == 16) {
-        uuid16 = *(uint16_t*)svcUUID.getNative()->uuid.uuid16;
+        uuid16 = svcUUID.getNative()->u16.value;
       } else {
         // Some BLE stacks return the full 128-bit form for 16-bit UUIDs
         // Try matching by comparing the UUID string in a fixed char buffer

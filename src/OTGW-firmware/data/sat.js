@@ -180,12 +180,9 @@ var SAT = (function() {
     if (contBtn) contBtn.className = 'sat-btn sat-btn-mode' + (_lastModeIdx === 1 ? ' active' : '');
     if (pwmBtn) pwmBtn.className = 'sat-btn sat-btn-mode' + (_lastModeIdx === 2 ? ' active' : '');
 
-    // Enable/disable toggle button state
-    var enBtn = el('sat-btn-enable');
-    if (enBtn) {
-      enBtn.textContent = _lastSATEnabled ? 'Disable SAT' : 'Enable SAT';
-      enBtn.className = 'sat-btn sat-btn-toggle' + (_lastSATEnabled ? ' active' : '');
-    }
+    // Sync macOS-style toggle switch in header
+    var enToggle = el('sat-toggle-enable');
+    if (enToggle) enToggle.checked = _lastSATEnabled;
 
     var hsNames = ['Auto', 'Radiators', 'Heat Pump', 'Underfloor'];
     var hsIdx = d.heating_system !== undefined ? d.heating_system : 0;
@@ -690,12 +687,18 @@ var SAT = (function() {
   }
 
   function toggleEnable() {
-    satPost('enable', _lastSATEnabled ? '0' : '1');
+    var toggle = el('sat-toggle-enable');
+    // Use checkbox state as desired target (browser already flipped it on click)
+    var newVal = toggle ? (toggle.checked ? '1' : '0') : (_lastSATEnabled ? '0' : '1');
+    satPost('enable', newVal).catch(function() {
+      // Revert toggle to last known state on error
+      if (toggle) toggle.checked = _lastSATEnabled;
+    });
   }
 
   function toggleSimulation() {
     var newVal = _lastSimEnabled ? '0' : '1';
-    fetch(APIGW + 'v1/settings', {
+    fetch(APIGW + 'v2/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{"name":"satsimulation","value":"' + newVal + '"}'
@@ -774,7 +777,7 @@ var SAT = (function() {
       var promises = [];
       for (var i = 0; i < settings.length; i++) {
         promises.push(
-          fetch(APIGW + 'v1/settings', {
+          fetch(APIGW + 'v2/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: '{"name":"' + settings[i].name + '","value":"' + settings[i].value + '"}'

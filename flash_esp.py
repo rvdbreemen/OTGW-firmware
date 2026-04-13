@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-ESP8266 Flash Tool for OTGW-firmware
-Platform-independent script to flash firmware and filesystem to ESP8266 devices.
+ESP Flash Tool for OTGW-firmware
+Platform-independent script to flash firmware and filesystem to ESP8266 and ESP32 devices.
 
-This script automates the flashing process for NodeMCU and Wemos D1 mini ESP8266 boards.
-It handles dependency installation, port detection, and provides an interactive interface.
+This script automates the flashing process for Nodoshop OTGW WiFi (ESP8266)
+and Nodoshop OTGW32 (ESP32) boards.
 
 Usage:
     python3 flash_esp.py              # Interactive mode
@@ -25,17 +25,38 @@ import shutil
 from pathlib import Path
 import config
 
-# Flash addresses for ESP8266
-FIRMWARE_ADDRESS = "0x0"
-FILESYSTEM_ADDRESS = "0x200000"
+# ---- Board configuration ---------------------------------------------------
 
-# Default baud rate
-DEFAULT_BAUD = 460800
+BOARD_CONFIGS = {
+    "esp8266": {
+        "name": "Nodoshop OTGW WiFi (ESP8266)",
+        "chip": "esp8266",
+        "default_baud": 460800,
+        "firmware_address": "0x0",
+        "filesystem_address": "0x200000",
+        "bootloader_address": None,
+        "partitions_address": None,
+    },
+    "esp32": {
+        "name": "Nodoshop OTGW32 (ESP32-S3)",
+        "chip": "esp32s3",
+        "default_baud": 921600,
+        "firmware_address": "0x10000",
+        "filesystem_address": "0x2F0000",  # from partitions_otgw_esp32.csv
+        "bootloader_address": "0x0",       # ESP32-S3 bootloader is at 0x0, not 0x1000
+        "partitions_address": "0x8000",
+    },
+}
+
+# PlatformIO intermediate build output (bootloader/partitions live here)
+PIO_BUILD_DIR = Path(__file__).parent / ".pio" / "build"
 
 # GitHub repository
 GITHUB_REPO = "rvdbreemen/OTGW-firmware"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
+
+# ---- Terminal colours ------------------------------------------------------
 
 class Colors:
     """ANSI color codes for terminal output."""
@@ -51,7 +72,6 @@ class Colors:
 
     @staticmethod
     def disable():
-        """Disable colors for non-terminal output."""
         Colors.HEADER = ''
         Colors.OKBLUE = ''
         Colors.OKCYAN = ''
@@ -64,439 +84,453 @@ class Colors:
 
 
 def print_header(text):
-    """Print formatted header."""
     print(f"\n{Colors.BOLD}{Colors.HEADER}{'=' * 60}{Colors.ENDC}")
     print(f"{Colors.BOLD}{Colors.HEADER}{text}{Colors.ENDC}")
     print(f"{Colors.BOLD}{Colors.HEADER}{'=' * 60}{Colors.ENDC}\n")
 
 
 def print_success(text):
-    """Print success message."""
-    print(f"{Colors.OKGREEN}✓ {text}{Colors.ENDC}")
+    print(f"{Colors.OKGREEN}v {text}{Colors.ENDC}")
 
 
 def print_error(text):
-    """Print error message."""
-    print(f"{Colors.FAIL}✗ {text}{Colors.ENDC}", file=sys.stderr)
+    print(f"{Colors.FAIL}x {text}{Colors.ENDC}", file=sys.stderr)
 
 
 def print_warning(text):
-    """Print warning message."""
-    print(f"{Colors.WARNING}⚠ {text}{Colors.ENDC}")
+    print(f"{Colors.WARNING}! {text}{Colors.ENDC}")
 
 
 def print_info(text):
-    """Print info message."""
-    print(f"{Colors.OKCYAN}ℹ {text}{Colors.ENDC}")
+    print(f"{Colors.OKCYAN}i {text}{Colors.ENDC}")
 
 
-def get_latest_release_info():
-    """Get information about the latest GitHub release."""
-    try:
-        print_info("Fetching latest release information from GitHub...")
-        
-        req = urllib.request.Request(GITHUB_API_URL)
-        req.add_header('Accept', 'application/vnd.github.v3+json')
-        req.add_header('User-Agent', 'OTGW-firmware-flash-tool')
-        
-        with urllib.request.urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode())
-        
-        tag_name = data.get('tag_name', 'unknown')
-        release_name = data.get('name', tag_name)
-        assets = data.get('assets', [])
-        
-        print_success(f"Found release: {release_name} ({tag_name})")
-        
-        return {
-            'tag_name': tag_name,
-            'name': release_name,
-            'assets': assets,
-            'zipball_url': data.get('zipball_url'),
-        }
-    except Exception as e:
-        print_error(f"Failed to fetch release information: {e}")
-        return None
-
-
-def download_release_assets(release_info, download_dir):
-    """Download firmware and filesystem files from GitHub release."""
-    assets = release_info.get('assets', [])
-    
-    # Look for firmware and filesystem files
-    firmware_asset = None
-    filesystem_asset = None
-    
-    for asset in assets:
-        name = asset['name'].lower()
-        # Match firmware files: .ino.bin, -fw.bin, firmware.bin
-        if not firmware_asset and ('.ino.bin' in name or 'fw.bin' in name or 'firmware.bin' in name) and 'littlefs' not in name:
-            firmware_asset = asset
-        # Match filesystem files: .littlefs.bin, -fs.bin, filesystem.bin
-        elif not filesystem_asset and ('littlefs.bin' in name or 'fs.bin' in name or 'filesystem.bin' in name):
-            filesystem_asset = asset
-    
-    downloaded_files = {}
-    
-    # Download firmware
-    if firmware_asset:
-        print_info(f"Downloading firmware: {firmware_asset['name']}...")
-        firmware_path = download_dir / firmware_asset['name']
-        
-        try:
-            urllib.request.urlretrieve(
-                firmware_asset['browser_download_url'],
-                firmware_path
-            )
-            print_success(f"Downloaded: {firmware_asset['name']} ({firmware_asset['size']} bytes)")
-            downloaded_files['firmware'] = firmware_path
-        except Exception as e:
-            print_error(f"Failed to download firmware: {e}")
-    
-    # Download filesystem
-    if filesystem_asset:
-        print_info(f"Downloading filesystem: {filesystem_asset['name']}...")
-        filesystem_path = download_dir / filesystem_asset['name']
-        
-        try:
-            urllib.request.urlretrieve(
-                filesystem_asset['browser_download_url'],
-                filesystem_path
-            )
-            print_success(f"Downloaded: {filesystem_asset['name']} ({filesystem_asset['size']} bytes)")
-            downloaded_files['filesystem'] = filesystem_path
-        except Exception as e:
-            print_error(f"Failed to download filesystem: {e}")
-    
-    if not downloaded_files:
-        print_warning("No firmware or filesystem files found in release assets")
-    
-    return downloaded_files
-
-
-def build_firmware():
-    """Build the firmware using build.py script."""
-    script_dir = Path(__file__).parent.resolve()
-    build_script = script_dir / "build.py"
-    
-    if not build_script.exists():
-        print_error("build.py script not found in repository root")
-        return None
-    
-    print_header("Building Firmware")
-    print_info("Running build.py to build firmware and filesystem...")
-    print_info("This may take several minutes...")
-    print_info("The build script will automatically install arduino-cli if needed...")
-    
-    try:
-        # Run build.py script (will rename artifacts with version info)
-        result = subprocess.run(
-            [sys.executable, str(build_script)],
-            cwd=script_dir,
-            check=False
-        )
-        
-        if result.returncode != 0:
-            print_error("Build failed!")
-            return None
-        
-        print_success("Build completed successfully")
-        
-        # Look for the build artifacts
-        build_dir = config.BUILD_DIR
-        if not build_dir.exists():
-            print_error("Build directory not found")
-            return None
-        
-        # Find firmware file
-        firmware_file = None
-        for pattern in ["*.ino.bin", f"{config.PROJECT_NAME}.ino.bin"]:
-            matches = list(build_dir.glob(pattern))
-            if matches:
-                firmware_file = matches[0]
-                break
-        
-        if not firmware_file:
-            print_error("Firmware binary not found in build directory")
-            return None
-        
-        print_info(f"Found firmware: {firmware_file.name}")
-        
-        # Find filesystem file
-        filesystem_file = None
-        for pattern in ["*.littlefs.bin", f"{config.PROJECT_NAME}.ino.littlefs.bin"]:
-            matches = list(build_dir.glob(pattern))
-            if matches:
-                filesystem_file = matches[0]
-                break
-        
-        if filesystem_file:
-            print_info(f"Found filesystem: {filesystem_file.name}")
-        else:
-            print_warning("Filesystem binary not found (optional)")
-        
-        return {
-            'firmware': firmware_file,
-            'filesystem': filesystem_file
-        }
-        
-    except Exception as e:
-        print_error(f"Build failed: {e}")
-        return None
-
+# ---- Python / tool checks --------------------------------------------------
 
 def check_python_version():
-    """Ensure Python 3.6 or higher is being used."""
     if sys.version_info < (3, 6):
         print_error("Python 3.6 or higher is required.")
         sys.exit(1)
 
 
 def check_esptool():
-    """Check if esptool is installed, and install it if not."""
+    """Check if esptool is available, install if missing."""
     try:
         result = subprocess.run(
             [sys.executable, "-m", "esptool", "version"],
-            capture_output=True,
-            text=True,
-            check=False
+            capture_output=True, text=True, check=False
         )
         if result.returncode == 0:
-            print_success(f"esptool is already installed")
+            print_success("esptool is available")
             return True
     except Exception:
         pass
 
     print_info("esptool not found. Installing...")
-    
-    # Try multiple installation strategies for different environments
+
     install_attempts = [
-        # Try with --user flag first (works on most systems)
         ([sys.executable, "-m", "pip", "install", "--user", "esptool"], "user installation"),
-        # Try with --break-system-packages for PEP 668 environments (newer macOS/Python)
-        ([sys.executable, "-m", "pip", "install", "--break-system-packages", "esptool"], "system installation with override"),
-        # Try without any flags (works in virtual environments)
+        ([sys.executable, "-m", "pip", "install", "--break-system-packages", "esptool"], "system installation"),
         ([sys.executable, "-m", "pip", "install", "esptool"], "standard installation"),
     ]
-    
+
     for cmd, description in install_attempts:
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=False
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
             if result.returncode == 0:
-                print_success(f"esptool installed successfully ({description})")
+                print_success(f"esptool installed ({description})")
                 return True
         except Exception:
             continue
-    
-    # All installation attempts failed
+
     print_error("Failed to install esptool automatically")
-    print_info("\nPlease install esptool manually using one of these methods:")
-    print_info("  1. Using pipx (recommended on macOS with Homebrew):")
-    print_info("     brew install pipx")
-    print_info("     pipx install esptool")
-    print_info("  2. Using Homebrew:")
-    print_info("     brew install esptool")
-    print_info("  3. Using pip in a virtual environment:")
-    print_info("     python3 -m venv venv")
-    print_info("     source venv/bin/activate")
-    print_info("     pip install esptool")
-    print_info("  4. Using pip with --break-system-packages (not recommended):")
-    print_info("     pip install --break-system-packages esptool")
-    
+    print_info("Install it manually:  pip install esptool")
     return False
 
 
+# ---- Board selection -------------------------------------------------------
+
+def select_board(args_board=None):
+    """Return board key ('esp8266' or 'esp32'), either from arg or interactive menu."""
+    if args_board:
+        if args_board not in BOARD_CONFIGS:
+            print_error(f"Unknown board '{args_board}'. Choose: {', '.join(BOARD_CONFIGS)}")
+            sys.exit(1)
+        return args_board
+
+    print_header("Select Target Board")
+    boards = list(BOARD_CONFIGS.items())
+    for i, (key, cfg) in enumerate(boards, 1):
+        print(f"  {i}. {cfg['name']} ({key})")
+
+    while True:
+        choice = input(f"\n{Colors.BOLD}Select board (1-{len(boards)}): {Colors.ENDC}").strip()
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(boards):
+                board_key = boards[idx][0]
+                print_success(f"Selected: {BOARD_CONFIGS[board_key]['name']}")
+                return board_key
+        except ValueError:
+            pass
+        print_error("Invalid selection.")
+
+
+# ---- Serial port detection -------------------------------------------------
+
 def detect_serial_ports():
-    """Detect available serial ports based on the operating system."""
+    """Detect available serial ports."""
     ports = []
     system = platform.system()
 
     if system == "Windows":
-        # Windows COM ports
-        for i in range(1, 257):
-            port = f"COM{i}"
+        try:
+            import serial.tools.list_ports
+            ports = [p.device for p in serial.tools.list_ports.comports()]
+        except ImportError:
+            # Fallback: probe COM1..COM30
             try:
-                # Try to open the port to check if it exists
                 import serial
-                s = serial.Serial(port)
-                s.close()
-                ports.append(port)
-            except:
+                for i in range(1, 31):
+                    port = f"COM{i}"
+                    try:
+                        s = serial.Serial(port)
+                        s.close()
+                        ports.append(port)
+                    except Exception:
+                        pass
+            except ImportError:
                 pass
-        
-        # If pyserial is not available, use glob patterns
-        if not ports:
-            for i in range(1, 257):
-                port = f"COM{i}"
-                # Just add common ports if we can't detect
-                if i <= 20:
-                    ports.append(port)
-    
     elif system == "Darwin":
-        # macOS
-        ports = glob.glob("/dev/tty.usb*")
-        ports.extend(glob.glob("/dev/cu.usb*"))
-        ports.extend(glob.glob("/dev/tty.wchusbserial*"))
-        ports.extend(glob.glob("/dev/cu.wchusbserial*"))
-    
+        ports = glob.glob("/dev/tty.usb*") + glob.glob("/dev/cu.usb*")
+        ports += glob.glob("/dev/tty.wchusbserial*") + glob.glob("/dev/cu.wchusbserial*")
     elif system == "Linux":
-        # Linux
-        ports = glob.glob("/dev/ttyUSB*")
-        ports.extend(glob.glob("/dev/ttyACM*"))
-        ports.extend(glob.glob("/dev/serial/by-id/*"))
-    
+        ports = glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*")
+
     return sorted(set(ports))
 
 
 def select_port(ports, default_port=None):
-    """Interactively select a serial port from the list."""
+    """Interactively select a serial port."""
     if not ports:
         print_error("No serial ports detected!")
-        print_info("Please ensure your ESP8266 is connected via USB.")
-        print_info("You may need to install USB drivers (CP210x or CH340).")
-        
-        # Offer manual input
-        manual = input(f"\n{Colors.BOLD}Enter port manually (or press Enter to exit): {Colors.ENDC}").strip()
+        print_info("Ensure the device is connected and drivers are installed.")
+        manual = input(f"\n{Colors.BOLD}Enter port manually (or Enter to exit): {Colors.ENDC}").strip()
         if manual:
             return manual
         sys.exit(1)
-    
+
     if len(ports) == 1:
         print_info(f"Auto-detected port: {ports[0]}")
         return ports[0]
-    
+
     print_info("Available serial ports:")
     for i, port in enumerate(ports, 1):
         print(f"  {i}. {port}")
-    
-    if default_port and default_port in ports:
-        default_idx = ports.index(default_port) + 1
-        prompt = f"Select port (1-{len(ports)}) [default: {default_idx}]: "
-    else:
-        prompt = f"Select port (1-{len(ports)}): "
-    
+
     while True:
+        prompt = f"Select port (1-{len(ports)}): "
         choice = input(f"\n{Colors.BOLD}{prompt}{Colors.ENDC}").strip()
-        
-        if not choice and default_port and default_port in ports:
-            return default_port
-        
         try:
             idx = int(choice) - 1
             if 0 <= idx < len(ports):
                 return ports[idx]
         except ValueError:
             pass
-        
-        print_error("Invalid selection. Please try again.")
+        print_error("Invalid selection.")
 
 
-def find_firmware_files():
-    """Find firmware and filesystem binary files."""
-    script_dir = Path(__file__).parent.resolve()
-    
-    # Look for binary files in common locations
-    search_paths = [
-        script_dir,
-        script_dir / "build",
-        script_dir / "releases",
-    ]
-    
-    firmware_files = []
-    filesystem_files = []
-    
-    for search_path in search_paths:
-        if search_path.exists():
-            # Look for firmware files
-            firmware_files.extend(search_path.glob("*.bin"))
-            firmware_files.extend(search_path.glob("*-fw.bin"))
-            firmware_files.extend(search_path.glob("*.ino.bin"))
-            
-            # Look for filesystem files
-            filesystem_files.extend(search_path.glob("*-fs.bin"))
-            filesystem_files.extend(search_path.glob("*.littlefs.bin"))
-    
-    # Remove duplicates and sort
-    firmware_files = sorted(set(firmware_files))
-    filesystem_files = sorted(set(filesystem_files))
-    
-    return firmware_files, filesystem_files
+# ---- Build artifact detection ----------------------------------------------
 
+def find_build_artifacts(board):
+    """Find firmware and filesystem binaries in the build directory for the given board.
 
-def check_build_artifacts():
-    """Check if build artifacts exist in the build directory."""
-    script_dir = Path(__file__).parent.resolve()
-    build_dir = script_dir / "build"
-    
+    build.py copies artifacts to config.BUILD_DIR with these naming conventions:
+      Firmware:    OTGW-firmware-<board>[-<semver>].ino.bin
+      Filesystem:  OTGW-firmware-<board>[-<semver>].littlefs.bin
+      Merged:      OTGW-firmware-<board>[-<semver>]-merged.bin
+      Bootloader:  esp32-bootloader.bin     (ESP32 only)
+      Partitions:  esp32-partitions.bin     (ESP32 only)
+    """
+    build_dir = config.BUILD_DIR
     if not build_dir.exists():
-        return None
-    
-    # Look for firmware file
-    firmware_file = None
-    for pattern in ["*.ino.bin", "OTGW-firmware.ino.bin"]:
+        return {}
+
+    result = {}
+
+    # Firmware: prefer versioned names, fall back to unversioned
+    for pattern in [f"*-{board}-*.ino.bin", f"*-{board}.ino.bin"]:
+        matches = [m for m in build_dir.glob(pattern) if "merged" not in m.name]
+        if matches:
+            result["firmware"] = sorted(matches)[-1]
+            break
+
+    # Filesystem
+    for pattern in [f"*-{board}-*.littlefs.bin", f"*-{board}.littlefs.bin"]:
         matches = list(build_dir.glob(pattern))
         if matches:
-            firmware_file = matches[0]
+            result["filesystem"] = sorted(matches)[-1]
             break
-    
-    # Look for filesystem file
-    filesystem_file = None
-    for pattern in ["*.littlefs.bin", "OTGW-firmware.ino.littlefs.bin"]:
+
+    # Merged binary (ESP32 convenience image from build.py create_merged_binary)
+    for pattern in [f"*-{board}-*-merged.bin", f"*-{board}-merged.bin"]:
         matches = list(build_dir.glob(pattern))
         if matches:
-            filesystem_file = matches[0]
+            result["merged"] = sorted(matches)[-1]
             break
-    
-    if firmware_file:
-        return {
-            'firmware': firmware_file,
-            'filesystem': filesystem_file
-        }
-    
+
+    # ESP32: bootloader and partition table (build.py copies these as esp32-*.bin)
+    if board == "esp32":
+        bl = build_dir / "esp32-bootloader.bin"
+        pt = build_dir / "esp32-partitions.bin"
+        if bl.exists():
+            result["bootloader"] = bl
+        elif (PIO_BUILD_DIR / "esp32" / "bootloader.bin").exists():
+            # Fallback to PlatformIO intermediate output
+            result["bootloader"] = PIO_BUILD_DIR / "esp32" / "bootloader.bin"
+        if pt.exists():
+            result["partitions"] = pt
+        elif (PIO_BUILD_DIR / "esp32" / "partitions.bin").exists():
+            result["partitions"] = PIO_BUILD_DIR / "esp32" / "partitions.bin"
+
+    return result
+
+
+def check_build_artifacts(board):
+    """Return build artifacts dict for board, or None if firmware missing."""
+    artifacts = find_build_artifacts(board)
+    if artifacts.get("firmware") or artifacts.get("merged"):
+        return artifacts
     return None
 
 
-def interactive_mode_selection():
-    """Interactive menu for selecting flash mode when no arguments provided."""
-    print_header("OTGW-firmware Flash Tool - Interactive Mode")
-    
-    print(f"{Colors.BOLD}Available Options:{Colors.ENDC}\n")
-    print(f"{Colors.OKBLUE}1. BUILD MODE{Colors.ENDC}")
-    print("   - Build firmware locally from source code")
-    print("   - Requires build tools (arduino-cli, make)")
-    print("   - Best for developers making code changes")
-    print("   - Takes several minutes to complete\n")
-    
-    print(f"{Colors.OKBLUE}2. DOWNLOAD MODE{Colors.ENDC}")
-    print("   - Download latest official release from GitHub")
-    print("   - Fast and easy")
-    print("   - Best for regular users")
-    print("   - Requires internet connection\n")
-    
-    # Check for existing build artifacts
-    artifacts = check_build_artifacts()
-    
+# ---- GitHub release --------------------------------------------------------
+
+def get_latest_release_info():
+    try:
+        print_info("Fetching latest release info from GitHub...")
+        req = urllib.request.Request(GITHUB_API_URL)
+        req.add_header('Accept', 'application/vnd.github.v3+json')
+        req.add_header('User-Agent', 'OTGW-firmware-flash-tool')
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode())
+
+        tag_name = data.get('tag_name', 'unknown')
+        print_success(f"Found release: {data.get('name', tag_name)} ({tag_name})")
+        return {
+            'tag_name': tag_name,
+            'name': data.get('name', tag_name),
+            'assets': data.get('assets', []),
+        }
+    except Exception as e:
+        print_error(f"Failed to fetch release info: {e}")
+        return None
+
+
+def download_release_assets(release_info, download_dir, board):
+    """Download firmware and filesystem files for the given board from a GitHub release."""
+    assets = release_info.get('assets', [])
+    downloaded = {}
+
+    # For merged binary (preferred for ESP32), firmware .ino.bin, and littlefs.bin
+    # Assets are expected to contain the board name (esp8266 / esp32) in the filename.
+    merged_asset = None
+    firmware_asset = None
+    filesystem_asset = None
+
+    for asset in assets:
+        name = asset['name'].lower()
+        if board not in name:
+            continue
+        if "merged" in name and name.endswith(".bin"):
+            merged_asset = asset
+        elif ("ino.bin" in name or "fw.bin" in name) and "littlefs" not in name and "merged" not in name:
+            if not firmware_asset:
+                firmware_asset = asset
+        elif "littlefs.bin" in name or "fs.bin" in name:
+            if not filesystem_asset:
+                filesystem_asset = asset
+
+    def _download(asset, key, label):
+        path = download_dir / asset['name']
+        try:
+            print_info(f"Downloading {label}: {asset['name']}...")
+            urllib.request.urlretrieve(asset['browser_download_url'], path)
+            print_success(f"Downloaded {asset['name']} ({asset['size']} bytes)")
+            downloaded[key] = path
+        except Exception as e:
+            print_error(f"Failed to download {label}: {e}")
+
+    if merged_asset:
+        _download(merged_asset, "merged", "merged binary")
+    if firmware_asset:
+        _download(firmware_asset, "firmware", "firmware")
+    if filesystem_asset:
+        _download(filesystem_asset, "filesystem", "filesystem")
+
+    if not downloaded:
+        print_warning(f"No {board} firmware files found in release assets")
+
+    return downloaded
+
+
+# ---- Build -----------------------------------------------------------------
+
+def build_firmware():
+    """Build firmware + filesystem using build.py."""
+    script_dir = Path(__file__).parent.resolve()
+    build_script = script_dir / "build.py"
+
+    if not build_script.exists():
+        print_error("build.py not found")
+        return None
+
+    print_header("Building Firmware")
+    print_info("Running build.py (this may take a few minutes)...")
+
+    result = subprocess.run([sys.executable, str(build_script)], cwd=script_dir, check=False)
+    if result.returncode != 0:
+        print_error("Build failed")
+        return None
+
+    print_success("Build completed")
+    return True
+
+
+# ---- Flashing --------------------------------------------------------------
+
+def erase_flash(port, chip):
+    """Erase the entire flash of the connected device."""
+    print_header("Erasing Flash")
+    cmd = [sys.executable, "-m", "esptool", "--port", port, "--chip", chip, "erase_flash"]
+    print_info(f"Command: {' '.join(cmd)}")
+    try:
+        subprocess.run(cmd, check=True)
+        print_success("Flash erased")
+        return True
+    except subprocess.CalledProcessError as e:
+        print_error(f"Erase failed: {e}")
+        return False
+
+
+def flash_device(board, port, artifacts, baud=None, do_erase=False):
+    """Flash the device. Handles both ESP8266 and ESP32."""
+    cfg = BOARD_CONFIGS[board]
+    if baud is None:
+        baud = cfg["default_baud"]
+
+    print_header("Flash Summary")
+    print(f"{Colors.BOLD}Board:{Colors.ENDC}     {cfg['name']}")
+    print(f"{Colors.BOLD}Port:{Colors.ENDC}      {port}")
+    print(f"{Colors.BOLD}Baud:{Colors.ENDC}      {baud}")
+
+    for key in ("merged", "firmware", "filesystem", "bootloader", "partitions"):
+        if key in artifacts:
+            size_kb = artifacts[key].stat().st_size / 1024
+            print(f"{Colors.BOLD}{key.capitalize():<12}{Colors.ENDC} {artifacts[key].name} ({size_kb:.0f} KB)")
+
+    if do_erase:
+        if not erase_flash(port, cfg["chip"]):
+            return False
+
+    # --- Build write_flash command ---
+
+    # ESP32 with merged binary: flash at 0x0 (merge_bin already embedded addresses)
+    use_merged = "merged" in artifacts and board == "esp32"
+
+    cmd = [
+        sys.executable, "-m", "esptool",
+        "--port", port,
+        "--chip", cfg["chip"],
+        "-b", str(baud),
+        "write_flash",
+    ]
+
+    if use_merged:
+        print_header("Flashing ESP32 (merged binary)")
+        cmd.extend(["0x0", str(artifacts["merged"])])
+        print_info(f"Merged image @ 0x0")
+    else:
+        print_header(f"Flashing {cfg['name']}")
+
+        if board == "esp32":
+            # Individual components
+            if "bootloader" in artifacts:
+                cmd.extend([cfg["bootloader_address"], str(artifacts["bootloader"])])
+                print_info(f"Bootloader     @ {cfg['bootloader_address']}")
+            else:
+                print_warning("Bootloader not found — flashing may fail on fresh hardware")
+
+            if "partitions" in artifacts:
+                cmd.extend([cfg["partitions_address"], str(artifacts["partitions"])])
+                print_info(f"Partitions     @ {cfg['partitions_address']}")
+            else:
+                print_warning("Partition table not found — flashing may fail on fresh hardware")
+
+            if "firmware" in artifacts:
+                cmd.extend([cfg["firmware_address"], str(artifacts["firmware"])])
+                print_info(f"Firmware       @ {cfg['firmware_address']}")
+
+            if "filesystem" in artifacts:
+                cmd.extend([cfg["filesystem_address"], str(artifacts["filesystem"])])
+                print_info(f"Filesystem     @ {cfg['filesystem_address']}")
+        else:
+            # ESP8266
+            if "firmware" in artifacts:
+                cmd.extend([cfg["firmware_address"], str(artifacts["firmware"])])
+                print_info(f"Firmware       @ {cfg['firmware_address']}")
+
+            if "filesystem" in artifacts:
+                cmd.extend([cfg["filesystem_address"], str(artifacts["filesystem"])])
+                print_info(f"Filesystem     @ {cfg['filesystem_address']}")
+
+    if len(cmd) <= 8:
+        print_error("No files to flash!")
+        return False
+
+    print_info(f"\nCommand: {' '.join(cmd)}\n")
+
+    try:
+        subprocess.run(cmd, check=True)
+        print_success("Flashing completed successfully!")
+        print_info("Next steps:")
+        print_info("  1. Disconnect the device from USB")
+        print_info("  2. Reconnect it to the OTGW board")
+        print_info("  3. Power on and connect to the web UI")
+        return True
+    except subprocess.CalledProcessError as e:
+        print_error(f"Flashing failed: {e}")
+        print_info("Troubleshooting:")
+        print_info("  - Check the USB connection and cable")
+        print_info("  - Verify drivers are installed (CP210x or CH340)")
+        print_info("  - Try a lower baud rate:  --baud 115200")
+        if board == "esp32":
+            print_info("  - Hold BOOT button on the ESP32 while connecting")
+        return False
+
+
+# ---- Interactive mode selection --------------------------------------------
+
+def interactive_mode_selection(board):
+    """Interactive menu: flash existing artifacts, rebuild, or download."""
+    artifacts = check_build_artifacts(board)
+
+    print_header(f"OTGW-firmware Flash Tool - {BOARD_CONFIGS[board]['name']}")
+
     if artifacts:
-        print_success("Found existing build artifacts!")
-        if artifacts['firmware']:
-            print(f"  Firmware: {artifacts['firmware'].name}")
-        if artifacts['filesystem']:
-            print(f"  Filesystem: {artifacts['filesystem'].name}")
-        
+        print_success("Found existing build artifacts:")
+        for key in ("merged", "firmware", "filesystem", "bootloader", "partitions"):
+            if key in artifacts:
+                print(f"  {key.capitalize():<12} {artifacts[key].name}")
+
         print(f"\n{Colors.BOLD}What would you like to do?{Colors.ENDC}")
-        print("  1. Flash existing build artifacts")
-        print("  2. Rebuild and flash")
+        print("  1. Flash existing artifacts")
+        print("  2. Rebuild from source and flash")
         print("  3. Download latest release and flash")
         print("  4. Exit")
-        
+
         while True:
-            choice = input(f"\n{Colors.BOLD}Enter your choice (1-4): {Colors.ENDC}").strip()
-            
+            choice = input(f"\n{Colors.BOLD}Choice (1-4): {Colors.ENDC}").strip()
             if choice == "1":
                 return "flash_artifacts", artifacts
             elif choice == "2":
@@ -507,18 +541,17 @@ def interactive_mode_selection():
                 print_info("Exiting...")
                 sys.exit(0)
             else:
-                print_error("Invalid choice. Please enter 1, 2, 3, or 4.")
+                print_error("Enter 1, 2, 3, or 4.")
     else:
         print_info("No existing build artifacts found in build/ directory.\n")
-        
+
         print(f"{Colors.BOLD}What would you like to do?{Colors.ENDC}")
-        print("  1. Build firmware locally and flash")
+        print("  1. Build from source and flash")
         print("  2. Download latest release and flash")
         print("  3. Exit")
-        
+
         while True:
-            choice = input(f"\n{Colors.BOLD}Enter your choice (1-3): {Colors.ENDC}").strip()
-            
+            choice = input(f"\n{Colors.BOLD}Choice (1-3): {Colors.ENDC}").strip()
             if choice == "1":
                 return "build", None
             elif choice == "2":
@@ -527,400 +560,182 @@ def interactive_mode_selection():
                 print_info("Exiting...")
                 sys.exit(0)
             else:
-                print_error("Invalid choice. Please enter 1, 2, or 3.")
+                print_error("Enter 1, 2, or 3.")
 
 
-def select_file(files, file_type):
-    """Interactively select a file from the list."""
-    if not files:
-        print_warning(f"No {file_type} files found automatically.")
-        manual = input(f"\n{Colors.BOLD}Enter {file_type} file path (or press Enter to skip): {Colors.ENDC}").strip()
-        if manual:
-            path = Path(manual)
-            if path.exists():
-                return path
-            else:
-                print_error(f"File not found: {manual}")
-        return None
-    
-    if len(files) == 1:
-        print_info(f"Auto-detected {file_type}: {files[0].name}")
-        return files[0]
-    
-    print_info(f"Available {file_type} files:")
-    for i, file in enumerate(files, 1):
-        print(f"  {i}. {file}")
-    
-    print(f"  {len(files) + 1}. Skip {file_type}")
-    
-    while True:
-        choice = input(f"\n{Colors.BOLD}Select {file_type} (1-{len(files) + 1}): {Colors.ENDC}").strip()
-        
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(files):
-                return files[idx]
-            elif idx == len(files):
-                return None
-        except ValueError:
-            pass
-        
-        print_error("Invalid selection. Please try again.")
-
-
-def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_BAUD, erase_flash=False, mode="manual", version_info=None):
-    """Flash the ESP8266 with firmware and/or filesystem."""
-    
-    # Print mode and version information
-    print_header("Flash Information")
-    print(f"{Colors.BOLD}Mode:{Colors.ENDC} {mode.upper()}")
-    
-    if version_info:
-        print(f"{Colors.BOLD}Version:{Colors.ENDC} {version_info}")
-    
-    if firmware_file:
-        print(f"{Colors.BOLD}Firmware:{Colors.ENDC} {firmware_file}")
-        if firmware_file.exists():
-            size_mb = firmware_file.stat().st_size / 1024 / 1024
-            print(f"{Colors.BOLD}Firmware Size:{Colors.ENDC} {size_mb:.2f} MB")
-    
-    if filesystem_file:
-        print(f"{Colors.BOLD}Filesystem:{Colors.ENDC} {filesystem_file}")
-        if filesystem_file.exists():
-            size_mb = filesystem_file.stat().st_size / 1024 / 1024
-            print(f"{Colors.BOLD}Filesystem Size:{Colors.ENDC} {size_mb:.2f} MB")
-    
-    print(f"{Colors.BOLD}Port:{Colors.ENDC} {port}")
-    print(f"{Colors.BOLD}Baud Rate:{Colors.ENDC} {baud}")
-    
-    if erase_flash:
-        print_header("Erasing Flash")
-        print_info(f"Erasing flash on {port}...")
-        
-        cmd = [
-            sys.executable, "-m", "esptool",
-            "--port", port,
-            "erase_flash"
-        ]
-        
-        print_info(f"Command: {' '.join(cmd)}")
-        
-        try:
-            subprocess.run(cmd, check=True)
-            print_success("Flash erased successfully")
-        except subprocess.CalledProcessError as e:
-            print_error(f"Failed to erase flash: {e}")
-            return False
-    
-    # Build flash command
-    if not firmware_file and not filesystem_file:
-        print_error("No files to flash!")
-        return False
-    
-    print_header("Flashing ESP8266")
-    
-    cmd = [
-        sys.executable, "-m", "esptool",
-        "--port", port,
-        "-b", str(baud),
-        "write_flash"
-    ]
-    
-    if firmware_file:
-        cmd.extend([FIRMWARE_ADDRESS, str(firmware_file)])
-        print_info(f"Firmware: {firmware_file.name} @ {FIRMWARE_ADDRESS}")
-    
-    if filesystem_file:
-        cmd.extend([FILESYSTEM_ADDRESS, str(filesystem_file)])
-        print_info(f"Filesystem: {filesystem_file.name} @ {FILESYSTEM_ADDRESS}")
-    
-    print_info(f"\nCommand: {' '.join(cmd)}\n")
-    
-    try:
-        subprocess.run(cmd, check=True)
-        print_success("\n✓ Flashing completed successfully!")
-        print_info("\nYou can now:")
-        print_info("  1. Disconnect the ESP8266 from USB")
-        print_info("  2. Reconnect it to the OTGW")
-        print_info("  3. Power on the device")
-        print_info("  4. Connect to the Web UI or configure WiFi via AP mode")
-        return True
-    except subprocess.CalledProcessError as e:
-        print_error(f"\nFlashing failed: {e}")
-        print_info("\nTroubleshooting tips:")
-        print_info("  - Ensure the ESP8266 is properly connected")
-        print_info("  - Try a different USB cable")
-        print_info("  - Check if drivers are installed (CP210x or CH340)")
-        print_info("  - Try reducing baud rate with --baud 115200")
-        return False
-
+# ---- Main ------------------------------------------------------------------
 
 def main():
-    """Main entry point."""
     check_python_version()
 
-    # Disable colors on Windows if not supported
     if platform.system() == "Windows" and not os.environ.get("ANSICON"):
         Colors.disable()
-    
+
     parser = argparse.ArgumentParser(
-        description="Flash OTGW-firmware to ESP8266 (NodeMCU/Wemos D1 mini)",
+        description="Flash OTGW-firmware to ESP8266 (OTGW WiFi) or ESP32 (OTGW32)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Flash Modes:
-  (default)         Interactive mode - choose between build or download
-  --download        Explicitly use download mode (fetch latest release from GitHub)
-  --build           Build firmware locally then flash (developer mode)
-  --firmware/--filesystem    Use manual mode with specific files
+Board selection:
+  --board esp8266    Nodoshop OTGW WiFi (default when omitted: interactive)
+  --board esp32      Nodoshop OTGW32
+
+Flash modes:
+  (default)          Interactive — shows what is available and asks what to do
+  --download         Download latest GitHub release and flash
+  --build            Build from source and flash (developer mode)
+  --firmware/--filesystem  Manual mode: specify binary files directly
 
 Examples:
-  # Interactive mode - explains options and guides you (default)
-  python3 flash_esp.py
-  
-  # Explicitly download and flash latest release
-  python3 flash_esp.py --download
-  
-  # Download and flash without prompts (automation)
-  python3 flash_esp.py --download --yes
-  python3 flash_esp.py --download -y
-  
-  # Build locally and flash (developer mode)
-  python3 flash_esp.py --build
-  
-  # Build and flash without prompts
-  python3 flash_esp.py --build --no-interactive
-  
-  # Flash specific firmware file (manual mode)
-  python3 flash_esp.py --firmware build/OTGW-firmware.ino.bin
-  
-  # Flash both firmware and filesystem (manual mode)
-  python3 flash_esp.py --firmware build/OTGW-firmware.ino.bin --filesystem build/OTGW-firmware.ino.littlefs.bin
-  
-  # Specify port and baud rate
-  python3 flash_esp.py --port /dev/ttyUSB0 --baud 115200
-  
-  # Erase flash before flashing (recommended for first install)
-  python3 flash_esp.py --erase
-  
-  # Full automation example
-  python3 flash_esp.py --download --port COM5 --erase --yes
-  
-For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
+  python3 flash_esp.py                          # interactive board + mode selection
+  python3 flash_esp.py --board esp8266          # select board, then interactive
+  python3 flash_esp.py --board esp32 --build    # build ESP32 firmware and flash
+  python3 flash_esp.py --board esp32 --download # download latest ESP32 release
+  python3 flash_esp.py --board esp8266 --firmware build/OTGW-firmware-esp8266.ino.bin
+  python3 flash_esp.py --port COM5 --erase --board esp32 --download --yes
 """
     )
-    
-    # Mode selection
+
+    board_group = parser.add_argument_group('Board Selection')
+    board_group.add_argument(
+        "--board",
+        choices=list(BOARD_CONFIGS.keys()),
+        help="Target board: esp8266 (OTGW WiFi) or esp32 (OTGW32)"
+    )
+
     mode_group = parser.add_argument_group('Flash Mode')
-    mode_group.add_argument(
-        "-d", "--download",
-        action="store_true",
-        help="Download latest release from GitHub and flash"
-    )
-    mode_group.add_argument(
-        "--build",
-        action="store_true",
-        help="Build firmware locally and flash (developer mode)"
-    )
-    
-    # Connection options
+    mode_group.add_argument("-d", "--download", action="store_true",
+                            help="Download latest release from GitHub and flash")
+    mode_group.add_argument("--build", action="store_true",
+                            help="Build firmware locally and flash (developer mode)")
+
     conn_group = parser.add_argument_group('Connection Options')
-    conn_group.add_argument(
-        "-p", "--port",
-        help="Serial port (e.g., COM5, /dev/ttyUSB0). If not specified, will auto-detect."
-    )
-    conn_group.add_argument(
-        "-b", "--baud",
-        type=int,
-        default=DEFAULT_BAUD,
-        help=f"Baud rate for flashing (default: {DEFAULT_BAUD})"
-    )
-    
-    # File options
+    conn_group.add_argument("-p", "--port",
+                            help="Serial port (e.g. COM5, /dev/ttyUSB0)")
+    conn_group.add_argument("-b", "--baud", type=int,
+                            help="Baud rate (default: board-specific: 460800 for ESP8266, 921600 for ESP32)")
+
     file_group = parser.add_argument_group('Manual File Options')
-    file_group.add_argument(
-        "-f", "--firmware",
-        help="Path to firmware binary file (.bin)"
-    )
-    file_group.add_argument(
-        "-s", "--filesystem",
-        help="Path to filesystem binary file (.littlefs.bin)"
-    )
-    
-    # Additional options
-    parser.add_argument(
-        "-e", "--erase",
-        action="store_true",
-        help="Erase flash before flashing (recommended for first install)"
-    )
-    parser.add_argument(
-        "--no-interactive",
-        action="store_true",
-        help="Disable interactive prompts (for automation)"
-    )
-    parser.add_argument(
-        "-y", "--yes",
-        action="store_true",
-        dest="no_interactive",
-        help="Same as --no-interactive, assume yes to all prompts"
-    )
-    
+    file_group.add_argument("-f", "--firmware", help="Path to firmware binary (.bin)")
+    file_group.add_argument("-s", "--filesystem", help="Path to filesystem binary (.littlefs.bin)")
+
+    parser.add_argument("-e", "--erase", action="store_true",
+                        help="Erase flash before flashing (recommended for first install)")
+    parser.add_argument("--no-interactive", action="store_true",
+                        help="Disable interactive prompts (for automation)")
+    parser.add_argument("-y", "--yes", action="store_true", dest="no_interactive",
+                        help="Same as --no-interactive")
+
     args = parser.parse_args()
-    
-    # Determine mode
-    mode = "manual"
-    version_info = None
-    
-    if args.download and args.build:
-        print_error("Cannot specify both --download and --build modes")
-        sys.exit(1)
-    
-    # Print header
-    print_header("OTGW-firmware ESP8266 Flash Tool")
+
+    print_header("OTGW-firmware Flash Tool")
     print(f"{Colors.BOLD}Platform:{Colors.ENDC} {platform.system()} {platform.machine()}")
-    print(f"{Colors.BOLD}Python:{Colors.ENDC} {sys.version.split()[0]}\n")
-    
-    # Check and install esptool
+    print(f"{Colors.BOLD}Python:{Colors.ENDC}   {sys.version.split()[0]}\n")
+
     if not check_esptool():
         sys.exit(1)
-    
-    # Get firmware files based on mode
-    firmware_file = None
-    filesystem_file = None
-    
-    if args.download:
-        # Download mode
+
+    if args.download and args.build:
+        print_error("Cannot combine --download and --build")
+        sys.exit(1)
+
+    # Board selection
+    board = select_board(args.board if args.board else (None if not args.no_interactive else None))
+    if board is None:
+        print_error("No board selected")
+        sys.exit(1)
+
+    cfg = BOARD_CONFIGS[board]
+
+    # Determine flash artifacts
+    artifacts = {}
+    mode = "manual"
+    version_info = None
+
+    if args.firmware or args.filesystem:
+        # Manual file mode
+        mode = "manual"
+        if args.firmware:
+            p = Path(args.firmware)
+            if not p.exists():
+                print_error(f"Firmware file not found: {args.firmware}")
+                sys.exit(1)
+            artifacts["firmware"] = p
+        if args.filesystem:
+            p = Path(args.filesystem)
+            if not p.exists():
+                print_error(f"Filesystem file not found: {args.filesystem}")
+                sys.exit(1)
+            artifacts["filesystem"] = p
+        # Also pick up bootloader and partitions from build dir if available (ESP32)
+        if board == "esp32":
+            bl = config.BUILD_DIR / "esp32-bootloader.bin"
+            pt = config.BUILD_DIR / "esp32-partitions.bin"
+            if bl.exists():
+                artifacts["bootloader"] = bl
+            if pt.exists():
+                artifacts["partitions"] = pt
+        version_info = "Manual Selection"
+
+    elif args.download:
         mode = "download"
-        print_header("Download Mode - Fetching Latest Release")
-        
+        print_header(f"Download Mode - {cfg['name']}")
         release_info = get_latest_release_info()
         if not release_info:
-            print_error("Failed to fetch release information")
             sys.exit(1)
-        
         version_info = f"{release_info['name']} ({release_info['tag_name']})"
-        
-        # Create temporary directory for downloads
         temp_dir = Path(tempfile.mkdtemp(prefix="otgw_flash_"))
         print_info(f"Download directory: {temp_dir}")
-        
-        try:
-            downloaded = download_release_assets(release_info, temp_dir)
-            firmware_file = downloaded.get('firmware')
-            filesystem_file = downloaded.get('filesystem')
-            
-            if not firmware_file:
-                print_error("No firmware file found in release")
-                sys.exit(1)
-        except Exception as e:
-            print_error(f"Download failed: {e}")
+        artifacts = download_release_assets(release_info, temp_dir, board)
+        if not artifacts.get("firmware") and not artifacts.get("merged"):
+            print_error(f"No {board} firmware found in release")
             sys.exit(1)
-    
+
     elif args.build:
-        # Build mode
         mode = "build"
-        print_header("Build Mode - Building Firmware Locally")
-        
-        build_result = build_firmware()
-        if not build_result:
-            print_error("Build failed")
+        if not build_firmware():
             sys.exit(1)
-        
-        firmware_file = build_result.get('firmware')
-        filesystem_file = build_result.get('filesystem')
+        artifacts = find_build_artifacts(board)
+        if not artifacts.get("firmware") and not artifacts.get("merged"):
+            print_error("Build succeeded but no firmware binary found")
+            sys.exit(1)
         version_info = "Local Build"
-        
-        if not firmware_file:
-            print_error("Build did not produce firmware file")
-            sys.exit(1)
-    
+
     else:
-        # No mode specified - check if manual files provided or use interactive mode
-        if not args.firmware and not args.filesystem:
-            # No files specified - use interactive mode (unless --no-interactive)
-            if args.no_interactive:
-                print_error("When using --no-interactive, you must specify a mode (--download, --build) or files (--firmware/--filesystem)")
+        if args.no_interactive:
+            print_error("Specify a mode (--download / --build) or files (--firmware / --filesystem) when using --no-interactive")
+            sys.exit(1)
+
+        selected_mode, existing_artifacts = interactive_mode_selection(board)
+
+        if selected_mode == "flash_artifacts":
+            mode = "artifacts"
+            artifacts = existing_artifacts
+            version_info = "Existing Build"
+
+        elif selected_mode == "build":
+            mode = "build"
+            if not build_firmware():
                 sys.exit(1)
-            
-            # Interactive mode selection
-            selected_mode, artifacts = interactive_mode_selection()
-            
-            if selected_mode == "flash_artifacts":
-                # Flash existing build artifacts
-                mode = "artifacts"
-                firmware_file = artifacts.get('firmware')
-                filesystem_file = artifacts.get('filesystem')
-                version_info = "Existing Build Artifacts"
-                print_header("Flashing Existing Build Artifacts")
-                
-            elif selected_mode == "build":
-                # Build mode
-                mode = "build"
-                print_header("Build Mode - Building Firmware Locally")
-                
-                build_result = build_firmware()
-                if not build_result:
-                    print_error("Build failed")
-                    sys.exit(1)
-                
-                firmware_file = build_result.get('firmware')
-                filesystem_file = build_result.get('filesystem')
-                version_info = "Local Build"
-                
-                if not firmware_file:
-                    print_error("Build did not produce firmware file")
-                    sys.exit(1)
-                    
-            elif selected_mode == "download":
-                # Download mode
-                mode = "download"
-                print_header("Download Mode - Fetching Latest Release")
-                
-                release_info = get_latest_release_info()
-                if not release_info:
-                    print_error("Failed to fetch release information")
-                    sys.exit(1)
-                
-                version_info = f"{release_info['name']} ({release_info['tag_name']})"
-                
-                # Create temporary directory for downloads
-                temp_dir = Path(tempfile.mkdtemp(prefix="otgw_flash_"))
-                print_info(f"Download directory: {temp_dir}")
-                
-                try:
-                    downloaded = download_release_assets(release_info, temp_dir)
-                    firmware_file = downloaded.get('firmware')
-                    filesystem_file = downloaded.get('filesystem')
-                    
-                    if not firmware_file:
-                        print_error("No firmware file found in release")
-                        sys.exit(1)
-                except Exception as e:
-                    print_error(f"Download failed: {e}")
-                    sys.exit(1)
-        else:
-            # Manual mode - use provided files or search for them
-            if args.firmware:
-                firmware_file = Path(args.firmware)
-                if not firmware_file.exists():
-                    print_error(f"Firmware file not found: {args.firmware}")
-                    sys.exit(1)
-            
-            if args.filesystem:
-                filesystem_file = Path(args.filesystem)
-                if not filesystem_file.exists():
-                    print_error(f"Filesystem file not found: {args.filesystem}")
-                    sys.exit(1)
-            
-            # If no files specified and not in no-interactive mode, search for files
-            if not firmware_file and not filesystem_file and not args.no_interactive:
-                print_header("Manual Mode - Searching for Binary Files")
-                firmware_files, filesystem_files = find_firmware_files()
-                firmware_file = select_file(firmware_files, "firmware")
-                filesystem_file = select_file(filesystem_files, "filesystem")
-            
-            version_info = "Manual Selection"
-    
-    # Detect or select port
+            artifacts = find_build_artifacts(board)
+            if not artifacts.get("firmware") and not artifacts.get("merged"):
+                print_error("Build succeeded but no firmware binary found")
+                sys.exit(1)
+            version_info = "Local Build"
+
+        elif selected_mode == "download":
+            mode = "download"
+            release_info = get_latest_release_info()
+            if not release_info:
+                sys.exit(1)
+            version_info = f"{release_info['name']} ({release_info['tag_name']})"
+            temp_dir = Path(tempfile.mkdtemp(prefix="otgw_flash_"))
+            print_info(f"Download directory: {temp_dir}")
+            artifacts = download_release_assets(release_info, temp_dir, board)
+            if not artifacts.get("firmware") and not artifacts.get("merged"):
+                print_error(f"No {board} firmware found in release")
+                sys.exit(1)
+
+    # Port selection
     port = args.port
     if not port:
         ports = detect_serial_ports()
@@ -932,37 +747,38 @@ For more information, see: https://github.com/rvdbreemen/OTGW-firmware/wiki
                 print_error("No serial port detected and --no-interactive specified")
                 sys.exit(1)
         else:
-            port = select_port(ports, default_port="/dev/ttyUSB0" if platform.system() == "Linux" else None)
-    
-    # Show flash summary and confirm (unless --no-interactive)
-    print("\n" + "=" * 60)
-    print(f"{Colors.BOLD}Ready to flash:{Colors.ENDC}")
-    print(f"  Mode: {mode.upper()}")
-    if version_info:
-        print(f"  Version: {version_info}")
-    print(f"  Port: {port}")
-    if firmware_file:
-        print(f"  Firmware: {firmware_file}")
-    if filesystem_file:
-        print(f"  Filesystem: {filesystem_file}")
-    print(f"  Baud rate: {args.baud}")
-    if args.erase:
-        print(f"  {Colors.WARNING}Erase flash: Yes{Colors.ENDC}")
-    print("=" * 60)
-    
-    print_info("\nStarting flash process...")
-    
-    # Flash the device
-    success = flash_esp8266(
+            port = select_port(ports)
+
+    # Baud rate
+    baud = args.baud if args.baud else cfg["default_baud"]
+
+    # Confirm before flashing (unless --no-interactive)
+    if not args.no_interactive:
+        print(f"\n{'=' * 60}")
+        print(f"{Colors.BOLD}Ready to flash:{Colors.ENDC}")
+        print(f"  Board:   {cfg['name']}")
+        print(f"  Mode:    {mode.upper()}")
+        if version_info:
+            print(f"  Version: {version_info}")
+        print(f"  Port:    {port}")
+        print(f"  Baud:    {baud}")
+        if args.erase:
+            print(f"  {Colors.WARNING}Erase flash: YES{Colors.ENDC}")
+        print(f"{'=' * 60}")
+
+        confirm = input(f"\n{Colors.BOLD}Proceed? [Y/n]: {Colors.ENDC}").strip().lower()
+        if confirm not in ("", "y", "yes"):
+            print_info("Aborted.")
+            sys.exit(0)
+
+    success = flash_device(
+        board=board,
         port=port,
-        firmware_file=firmware_file,
-        filesystem_file=filesystem_file,
-        baud=args.baud,
-        erase_flash=args.erase,
-        mode=mode,
-        version_info=version_info
+        artifacts=artifacts,
+        baud=baud,
+        do_erase=args.erase,
     )
-    
+
     sys.exit(0 if success else 1)
 
 
@@ -970,7 +786,7 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n\n{Colors.WARNING}Interrupted by user.{Colors.ENDC}")
+        print(f"\n\n{Colors.WARNING}Interrupted.{Colors.ENDC}")
         sys.exit(1)
     except Exception as e:
         print_error(f"Unexpected error: {e}")

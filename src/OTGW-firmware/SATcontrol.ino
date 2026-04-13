@@ -3368,8 +3368,12 @@ void satControlLoop()
   satUpdateThermalLearning();
   // --- Fallback detection (Task #19): auto-enable SAT when external control lost ---
   if (!settings.sat.bEnabled && !state.sat.bFallbackActive) {
-    // Check if we should auto-enable as fallback
-    bool mqttLost = !state.mqtt.bConnected &&
+    // Only fall back if MQTT is enabled AND was previously connected but has now been
+    // lost for >5 minutes. iLastConnectedMs == 0 means never connected (fresh boot or
+    // MQTT not configured) — do not treat that as a loss.
+    bool mqttLost = settings.mqtt.bEnable &&
+                    state.mqtt.iLastConnectedMs > 0 &&
+                    !state.mqtt.bConnected &&
                     (millis() - state.mqtt.iLastConnectedMs > 300000UL); // 5 min MQTT loss
     if (mqttLost) {
       state.sat.bFallbackActive = true;
