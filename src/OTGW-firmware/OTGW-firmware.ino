@@ -299,6 +299,7 @@ void doTaskEvery60s(){
   // only automatic path to re-detect a real PIC and re-enable all PIC functions.
   // Writes directly to serial (bypassing the guarded command queue).
   // Banner response in processOT() sets state.pic.bAvailable = true on success.
+#if HAS_PIC
   if ((strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0)
       || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
       || (state.pic.sDeviceid[0] == '\0')) {
@@ -306,6 +307,7 @@ void doTaskEvery60s(){
     OTGWSerial.write("PR=A\r\n");
     OTGWSerial.flush();
   }
+#endif
   
   // Log heap statistics every minute for monitoring
   logHeapStats();
@@ -418,7 +420,9 @@ void loop()
       satBLELoop();                     // BLE temperature sensor scan (timer-guarded, Task #20)
 #endif
       weatherLoop();                    // Weather data fetch (timer-guarded, Task #50)
+#if HAS_PIC
       handlePendingUpgrade();           // Check if we need to start an upgrade
+#endif
     } 
 
   doBackgroundTasks();              // run background tasks

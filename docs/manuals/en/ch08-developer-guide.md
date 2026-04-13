@@ -108,6 +108,10 @@ The ESP8266 build excludes `OTDirect.ino` (ESP32-only) via `build_src_filter`. P
 
 The `OpenTherm Library` is explicitly excluded in `lib_ignore` because PlatformIO's LDF scanner ignores `#if` guards and would otherwise compile the ESP32-only OT library for ESP8266.
 
+##### ESP32-specific PlatformIO notes
+
+PlatformIO's ctags scanner processes all `.ino` files regardless of `#if` guards and generates forward declarations for every function it finds. On ESP32 (`HAS_PIC=0`), `OTGWSerial.h` is never included, so `OTGWFirmware` (an enum type used as a parameter in `fwreportinfo()`) is unknown at ctags forward-declaration time. The flag `-DOTGWFirmware=int` stubs it out so the generated forward declaration compiles. The actual `fwreportinfo()` body is inside a `#if HAS_PIC` block and is never compiled on ESP32. This follows the same pattern as the OTDirect type stubs for ESP8266.
+
 #### Arduino IDE
 
 Arduino IDE is supported for ESP8266 only. Install the ESP8266 Arduino core, then open `src/OTGW-firmware/OTGW-firmware.ino`. Required libraries are in `libraries/` — add that directory to your Arduino sketchbook library path. The IDE does not support the ESP32 target or `OTDirect.ino`.
@@ -127,6 +131,49 @@ The checker flags:
 - `String` class usage in non-setup code
 - `strcpy`/`sprintf` without bounds (should use `strlcpy`/`snprintf_P`)
 - `strncmp_P`/`strstr_P` on binary data (use `memcmp_P`)
+
+---
+
+### Board Hardware Variants
+
+The firmware supports two official Nodoshop hardware variants, defined in `boards.h`. The board is selected at build time by a `BOARD_*` preprocessor flag set in `platformio.ini`. When no explicit flag is set, the board is auto-detected from the MCU type (`ESP8266` or `ESP32`).
+
+**These flags are board-level, not MCU-level.** The presence of a PIC, Ethernet hardware, or a direct OpenTherm GPIO interface is a property of the specific Nodoshop PCB, not of the MCU family. Replacing an ESP8266 with an ESP32 on the OTGW WiFi board is not an official Nodoshop configuration and is not modelled.
+
+#### Feature Flags
+
+Three compile-time flags in `boards.h` describe the hardware capabilities of each board:
+
+| Flag | Type | OTGW WiFi (ESP8266) | OTGW32 (ESP32) | Meaning |
+|------|------|---------------------|----------------|---------|
+| `HAS_PIC` | `0` / `1` | `1` | `0` | Board has a PIC co-processor that handles the OpenTherm electrical bus over UART |
+| `HAS_DIRECT_OT` | `0` / `1` | `0` | `1` | Board drives the OpenTherm bus directly from GPIO via the OTDirect ISR |
+| `HAS_ETH_CAPABLE` | `0` / `1` | `0` | `1` | Board has a W5500 SPI Ethernet module |
+
+Use these flags in conditional compilation:
+
+```cpp
+#if HAS_PIC
+  // PIC-specific code: addCommandToQueue(), OTGWSerial, fwreportinfo(), etc.
+#endif
+
+#if HAS_DIRECT_OT
+  // OTDirect GPIO code: loopOTDirect(), OTDirectMode, etc.
+#endif
+
+#if HAS_ETH_CAPABLE
+  // Ethernet code: loopEthernet(), state.hw.bEthernetPresent, etc.
+#endif
+```
+
+#### W5500 Runtime Detection
+
+`HAS_ETH_CAPABLE=1` means the board design includes a W5500 module header, but the module may not be physically installed on every unit. At boot, `probeW5500()` in `Ethernet.ino` reads the W5500 VERSION register via SPI:
+
+- If the register returns the expected value, `state.hw.bEthernetPresent` is set to `true` and Ethernet is initialised.
+- If the read fails or returns an unexpected value, `state.hw.bEthernetPresent` is set to `false` and the firmware runs in WiFi-only mode.
+
+No user configuration is required. `loopEthernet()` guards itself with `if (!state.hw.bEthernetPresent) return;` so it is a no-op when no hardware is present.
 
 ---
 

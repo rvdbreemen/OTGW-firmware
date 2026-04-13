@@ -89,6 +89,10 @@ De ESP8266 LittleFS-partitie is 2 072 576 bytes (circa 2 MB). Dit is geconfigure
 
 Bibliotheken worden gedefinieerd in `[env]`-sectie van `platformio.ini` en lokaal geplaatst in `src/libraries/`. De PlatformIO-packagemanager wordt gebruikt voor downloadbare bibliotheken; het script `scripts/patch_pio_libs.py` past bij de build automatisch noodzakelijke patches toe.
 
+##### ESP32-specifieke build-vlaggen
+
+PlatformIO's ctags-scanner verwerkt alle `.ino`-bestanden, ongeacht `#if`-bewakers, en genereert forward declarations voor elke gevonden functie. Op ESP32 (`HAS_PIC=0`) wordt `OTGWSerial.h` nooit geïncludeerd, waardoor `OTGWFirmware` (een enum type gebruikt als parameter in `fwreportinfo()`) onbekend is op het moment dat de ctags-forward declaration wordt gecompileerd. De bouwvlag `-DOTGWFirmware=int` stelt het type tijdelijk in als `int` zodat de gegenereerde forward declaration compileert. De eigenlijke `fwreportinfo()`-functie bevindt zich in een `#if HAS_PIC`-blok en wordt nooit gecompileerd op ESP32. Dit volgt hetzelfde patroon als de OTDirect type-stubs voor ESP8266 (`-DOpenThermResponseStatus=int`, `-DOTDirectMode=int`, `-DOTDirectRequestOrigin=int`).
+
 #### Arduino IDE (ESP8266 only)
 
 Open `src/OTGW-firmware/OTGW-firmware.ino` in de Arduino IDE. Stel in:
@@ -107,7 +111,50 @@ python evaluate.py --quick   # Snelle scan (subset van checks)
 
 ---
 
-### 8.3 C4-architectuuroverzicht
+### 8.3 Boardhardwarevarianten
+
+De firmware ondersteunt twee officiële Nodoshop-hardwarevarianten, gedefinieerd in `boards.h`. Het board wordt geselecteerd tijdens de build via een `BOARD_*`-preprocessorvlag in `platformio.ini`. Wanneer geen expliciete vlag is ingesteld, wordt het board automatisch afgeleid van het MCU-type (`ESP8266` of `ESP32`).
+
+**Deze vlaggen zijn boardniveau, niet MCU-niveau.** De aanwezigheid van een PIC, Ethernet-hardware of een directe OpenTherm GPIO-interface is een eigenschap van het specifieke Nodoshop-printboard, niet van de MCU-familie. Het vervangen van een ESP8266 door een ESP32 op het OTGW WiFi-board is geen officiële Nodoshop-configuratie en wordt hier niet gemodelleerd.
+
+#### Compilatievlaggen
+
+Drie compilatietijdvlaggen in `boards.h` beschrijven de hardwaremogelijkheden van elk board:
+
+| Vlag | Type | OTGW WiFi (ESP8266) | OTGW32 (ESP32) | Betekenis |
+|------|------|---------------------|----------------|-----------|
+| `HAS_PIC` | `0` / `1` | `1` | `0` | Board heeft een PIC-co-processor die de OpenTherm-bus afhandelt via UART |
+| `HAS_DIRECT_OT` | `0` / `1` | `0` | `1` | Board stuurt de OpenTherm-bus rechtstreeks aan via GPIO en de OTDirect ISR |
+| `HAS_ETH_CAPABLE` | `0` / `1` | `0` | `1` | Board heeft een W5500 SPI-Ethernetmodule |
+
+Gebruik deze vlaggen in conditionele compilatie:
+
+```cpp
+#if HAS_PIC
+  // PIC-specifieke code: addCommandToQueue(), OTGWSerial, fwreportinfo(), etc.
+#endif
+
+#if HAS_DIRECT_OT
+  // OTDirect GPIO-code: loopOTDirect(), OTDirectMode, etc.
+#endif
+
+#if HAS_ETH_CAPABLE
+  // Ethernetcode: loopEthernet(), state.hw.bEthernetPresent, etc.
+#endif
+```
+
+#### W5500-runtimedetectie
+
+`HAS_ETH_CAPABLE=1` betekent dat het boardontwerp een W5500-module bevat, maar de module hoeft niet op elke unit fysiek aanwezig te zijn. Bij het opstarten leest `probeW5500()` in `Ethernet.ino` het VERSION-register van de W5500 via SPI:
+
+- Als het register de verwachte waarde teruggeeft, wordt `state.hw.bEthernetPresent` op `true` gezet en wordt Ethernet geïnitialiseerd.
+- Als het lezen mislukt of een onverwachte waarde teruggeeft, wordt `state.hw.bEthernetPresent` op `false` gezet en draait de firmware in WiFi-only modus.
+
+Er is geen gebruikersconfiguratie vereist. `loopEthernet()` bewaakt zichzelf met `if (!state.hw.bEthernetPresent) return;` en doet niets wanneer er geen hardware aanwezig is.
+
+---
+
+### 8.4 C4-architectuuroverzicht
 
 De architectuur is gedocumenteerd in vier niveaus (C4-model), te vinden in `docs/c4/`:
 
@@ -127,7 +174,7 @@ Wanneer je code aanraakt zonder eerst de C4-documentatie te raadplegen, werk je 
 
 ---
 
-### 8.4 Sleutelpatronen
+### 8.5 Sleutelpatronen
 
 #### Coöperatieve scheduling
 
@@ -193,7 +240,7 @@ De klasse `PlatformDir` in `platform.h` biedt een uniforme interface voor direct
 
 ---
 
-### 8.5 Een nieuw REST-eindpunt toevoegen
+### 8.6 Een nieuw REST-eindpunt toevoegen
 
 Voeg een route toe in drie stappen. Geen wijzigingen in de router zelf nodig.
 
@@ -249,7 +296,7 @@ sendApiError(400, F("Ongeldige parameter"));  // JSON: {"error":{"status":400,..
 
 ---
 
-### 8.6 Een nieuw MQTT-onderwerp toevoegen
+### 8.7 Een nieuw MQTT-onderwerp toevoegen
 
 #### Publiceren
 
@@ -289,7 +336,7 @@ Voeg een configuratieregel toe aan `data/mqttha.cfg`. Dit bestand wordt gelezen 
 
 ---
 
-### 8.7 Een nieuwe instelling toevoegen
+### 8.8 Een nieuwe instelling toevoegen
 
 Instellingen volgen het patroon uit ADR-051: twee niveaus, Hongaarse prefixen.
 
@@ -335,7 +382,7 @@ pendingSideEffects |= SIDE_EFFECT_MQTT;
 
 ---
 
-### 8.8 Codeerstijl
+### 8.9 Codeerstijl
 
 | Element | Conventie | Voorbeeld |
 |---------|-----------|-----------|
@@ -351,7 +398,7 @@ Leidend principe: schrijf code die een andere ontwikkelaar na zes maanden nog di
 
 ---
 
-### 8.9 Debugtools
+### 8.10 Debugtools
 
 #### Telnet (poort 23)
 
@@ -411,7 +458,7 @@ Het script waarschuwt onder andere voor:
 
 ---
 
-### 8.10 Timerbeheer
+### 8.11 Timerbeheer
 
 De firmware gebruikt een coöperatief timer-systeem uit `safeTimers.h`. Gebruik nooit `delay()` of `millis()`-vergelijkingen direct.
 
@@ -452,7 +499,7 @@ De `timerFlushSettings`-timer (2 seconden debounce) coalesceert meerdere instell
 
 ---
 
-### 8.11 Commandowachtrij
+### 8.12 Commandowachtrij
 
 Stuur **nooit** rechtstreeks naar de PIC-seriële poort. Gebruik altijd:
 
@@ -474,7 +521,7 @@ Zie `OTGW-Core.ino` en `docs/adr/ADR-016-opentherm-command-queue.md` voor volled
 
 ---
 
-### 8.12 OpenTherm-berichtverwerking
+### 8.13 OpenTherm-berichtverwerking
 
 De gegevensstroom van PIC naar MQTT verloopt als volgt:
 
@@ -507,7 +554,7 @@ Het globale object `OTcurrentSystemState` (type `OTdataStruct`) is de canonieke 
 
 ---
 
-### 8.13 Architecture Decision Records (ADRs)
+### 8.14 Architecture Decision Records (ADRs)
 
 ADRs documenteren belangrijke architectuurbeslissingen en bevinden zich in `docs/adr/`. Er zijn momenteel meer dan 75 ADRs.
 
@@ -556,7 +603,7 @@ Formaat (korte versie):
 
 ---
 
-### 8.14 Bijdragenworkflow
+### 8.15 Bijdragenworkflow
 
 ```
 1. Fork de repository op GitHub
