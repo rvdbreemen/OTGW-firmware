@@ -1,5 +1,5 @@
 // Dispatch a single keypress from the telnet debug session.
-// Called from onTelnetInput() in networkStuff.ino via the ESPTelnet
+// Called from onTelnetInput() in networkStuff.ino via the SimpleTelnet
 // onInputReceived callback (line mode off — one char per call).
 void handleDebugChar(char c){
         switch (c){
@@ -160,5 +160,5 @@ void handleDebugChar(char c){
 }
 
 // Called from doBackgroundTasks() — no-op now that input is handled via
-// the ESPTelnet onInputReceived callback registered in startTelnet().
+// the SimpleTelnet onInputReceived callback registered in startTelnet().
 void handleDebug(){}

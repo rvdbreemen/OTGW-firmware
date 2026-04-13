@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.3.10-beta
+**  Version  : v1.4.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -477,6 +477,8 @@ static void appendProgmemSuffix(char *dst, size_t dstSize, PGM_P suffix)
 
 static void handlePicFlashBackgroundTasks()
 {
+  debugTelnet.loop();         // Keep debug telnet connections alive
+  OTGWstream.loop();          // Keep OTGWstream clients alive during PIC flash
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // Keep HTTP active
   MDNS.update();              // Keep MDNS active for network discovery
@@ -3834,7 +3836,7 @@ void processOT(const char *buf, int len){
       sendLogToWebSocket(ot_log_buffer);
 
       // Throttle TCP flush to once per second instead of per-message (~10/sec).
-      // debugTelnet (ESPTelnet) buffers output; flushing just forces a TCP push.
+      // debugTelnet (SimpleTelnet) buffers output; flushing just forces a TCP push.
       // At 10 msg/sec the per-message flush was the single largest TCP cost.
       { static unsigned long lastOTFlushMs = 0;
         unsigned long now = millis();
@@ -4271,7 +4273,7 @@ const char* getOTGWValue(int msgid)
 
 void startOTGWstream()
 {
-  OTGWstream.begin();
+  OTGWstream.begin(false);    // false = skip WiFi check; bind unconditionally
 }
 
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------

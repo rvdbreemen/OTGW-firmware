@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.3.10-beta
+**  Version  : v1.4.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -19,9 +19,9 @@
 NtpStatus_t NtpStatus  = TIME_NOTSET;
 time_t      NtpLastSync = 0;
 
-// Debug telnet instance (port 23). Replaces the TelnetStream global for debug
-// output. TelnetStream library is still present for OTGWstream (serial wrapper).
-ESPTelnet debugTelnet;
+// Debug telnet instance (port 23). SimpleTelnet replaces ESPTelnet for debug output.
+// Port is fixed in the constructor; begin() needs no port argument.
+SimpleTelnet<1> debugTelnet(23);
 
 ESP8266WebServer        httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater(true);
@@ -269,9 +269,9 @@ void loopWifi() {
 
 //===========================================================================================
 // Send the welcome banner to a freshly-connected telnet client.
-// Called from the ESPTelnet onConnect callback — receives client IP as String.
+// Called from the SimpleTelnet onConnect callback — receives client IP as const char*.
 // Uses a series of small PROGMEM prints to stay off the stack.
-static void sendTelnetBanner(String ip)
+static void sendTelnetBanner(const char* ip)
 {
   debugTelnet.println(F("\r\n============================================"));
   debugTelnet.println(F("  OpenTherm Gateway -- OTGW-firmware"));
@@ -292,7 +292,7 @@ static void sendTelnetBanner(String ip)
   _debugPrintf_P(PSTR("    5 Sensors     : %s\r\n"), CBOOLEAN(state.debug.bSensors));
   debugTelnet.println(F("--------------------------------------------"));
   debugTelnet.println(F("  Press 'h' for the full debug menu."));
-  _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip.c_str());
+  _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip);
   debugTelnet.println(F("============================================\r\n"));
 }
 
@@ -300,9 +300,9 @@ static void sendTelnetBanner(String ip)
 // Forward declaration — defined in handleDebug.ino.
 void handleDebugChar(char c);
 
-// ESPTelnet input callback: line mode off means one String(char) per keypress.
-static void onTelnetInput(String s) {
-  if (s.length() > 0) handleDebugChar(s[0]);
+// SimpleTelnet input callback: line mode off means one char per keypress (as const char*).
+static void onTelnetInput(const char* s) {
+  if (s && s[0] != '\0') handleDebugChar(s[0]);
 }
 
 void startTelnet()
@@ -310,7 +310,7 @@ void startTelnet()
   debugTelnet.onConnect(sendTelnetBanner);
   debugTelnet.setLineMode(false);
   debugTelnet.onInputReceived(onTelnetInput);
-  debugTelnet.begin(23);
+  debugTelnet.begin();             // port was fixed in the constructor (23)
   DebugT(F("\r\nTelnet debug server started on "));
   DebugT(WiFi.localIP());
   DebugTln(F(":23"));
