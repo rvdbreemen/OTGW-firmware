@@ -352,3 +352,23 @@
 #satSettingsMessage.error {
   color: #e53935;
 }
+
+/* Signal strength bars — structure (theme colors stay in index.css / index_dark.css) */
+.net-signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+.net-signal-bars.hidden { display: none; }
+.sig-bar {
+  width: 4px;
+  border-radius: 1px;
+  transition: background 0.4s ease, height 0.4s ease;
+}
+.sig-bar-1 { height: 25%; }
+.sig-bar-2 { height: 50%; }
+.sig-bar-3 { height: 75%; }
+.sig-bar-4 { height: 100%; }

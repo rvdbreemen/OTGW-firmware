@@ -359,26 +359,8 @@
   .net-status.net-ap .net-icon { color: #ff9800; }
   .net-status.net-ap .net-status-text { color: #ff9800; font-weight: bold; }
 
-  /* Signal strength bars */
-  .net-signal-bars {
-    display: inline-flex;
-    align-items: flex-end;
-    gap: 2px;
-    height: 14px;
-    margin-left: 2px;
-    vertical-align: middle;
-  }
-  .net-signal-bars.hidden { display: none; }
-  .sig-bar {
-    width: 4px;
-    background: #ccc;
-    border-radius: 1px;
-    transition: background 0.4s ease, height 0.4s ease;
-  }
-  .sig-bar-1 { height: 25%; }
-  .sig-bar-2 { height: 50%; }
-  .sig-bar-3 { height: 75%; }
-  .sig-bar-4 { height: 100%; }
+  /* Signal strength bars — inactive color (structure in index_common.css) */
+  .sig-bar { background: #ccc; }
   /* Signal quality tiers — applied by JS setting data-quality on .net-signal-bars */
   .net-signal-bars[data-quality="good"]   .sig-bar.active { background: #4caf50; }
   .net-signal-bars[data-quality="medium"] .sig-bar.active { background: #ff9800; }
