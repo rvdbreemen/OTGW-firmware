@@ -1418,13 +1418,19 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   }
   if (!MQTTclient.connected()) {
-    DebugTln(F("Error: MQTT broker not connected.")); 
-    return _result;
-  } 
+    return _result;   // silent: caller rate-limits retries, no per-message spam
+  }
   if (!isValidIP(MQTTbrokerIP)) {
-    DebugTln(F("Error: MQTT broker IP not valid.")); 
+    DebugTln(F("Error: MQTT broker IP not valid."));
     return _result;
-  } 
+  }
+  // Heap guard: a single discovery publish needs ~1200 bytes of lwIP pbuf.
+  // On ESP8266 core 3.x (lwIP 2.x) the baseline heap is lower than on 2.x;
+  // attempting the allocation when heap is critically low disconnects MQTT.
+  // Caller will retry on the next rate-limit window.
+  if (ESP.getFreeHeap() < 12000) {
+    return _result;
+  }
 
   // Workspace (ADR-053 two-buffer design):
   //   sLine[SLINE_SIZE=1200] — global, holds raw config file lines (≤900 bytes). Guarded by

@@ -430,7 +430,7 @@ def build_firmware(project_dir, config_file):
     """Build firmware using arduino-cli"""
     print_step("Building firmware")
     
-    fqbn = "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160"
+    fqbn = "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160,ip=lm2f"
     cflags = "-DNO_GLOBAL_HTTPUPDATE"
     
     # Use temporary directory for build artifacts

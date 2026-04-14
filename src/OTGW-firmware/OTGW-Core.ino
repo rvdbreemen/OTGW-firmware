@@ -3796,19 +3796,24 @@ void processOT(const char *buf, int len){
         setMsgLastUpdated(OTdata.id, currentTrackedSeconds());
       }
 
-      // check wheter MQTT topic needs to be configuered
-      if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable ) {
-        if(getMQTTConfigDone(OTdata.id)==false) {
-          MQTTDebugTf(PSTR("Need to set MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
-          bool success = doAutoConfigureMsgid(OTdata.id, NodeId, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
-          if(success) {
-            MQTTDebugTf(PSTR("Successfully sent MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
-            setMQTTConfigDone(OTdata.id);
-          } else {
-            MQTTDebugTf(PSTR("Not able to complete MQTT configuration for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
+      // Auto-configure MQTT discovery for this OT message ID.
+      // Rate-limited to at most once per second to reduce heap pressure from
+      // repeated lwIP pbuf allocations when broker is unavailable or heap is low.
+      // Skip entirely when MQTT is not connected (doAutoConfigureMsgid is silent
+      // on disconnect; the timer ensures we don't hammer it every OT message).
+      if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable && state.mqtt.bConnected) {
+        if (getMQTTConfigDone(OTdata.id) == false) {
+          DECLARE_TIMER_SEC(tAutoConfigRetry, 1);
+          if (DUE(tAutoConfigRetry)) {
+            MQTTDebugTf(PSTR("Need to set MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
+            bool success = doAutoConfigureMsgid(OTdata.id, NodeId, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)));
+            if (success) {
+              MQTTDebugTf(PSTR("Successfully sent MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
+              setMQTTConfigDone(OTdata.id);
+            } else {
+              MQTTDebugTf(PSTR("Not able to complete MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
+            }
           }
-        } else {
-          // MQTTDebugTf(PSTR("No need to set MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
         }
       }
 
