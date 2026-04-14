@@ -746,9 +746,10 @@ def create_merged_binary(project_dir, semver, target, compress=False):
 
     # ESP32 needs bootloader + partition table in the merged image
     if "bootloader_offset" in tcfg:
-        # Search paths: arduino-cli temp dir AND build/ (PlatformIO artifacts)
+        # Search paths: arduino-cli temp dir, build/ (PlatformIO artifacts), and .pio/build/<env>
         temp_build_dir = config.TEMP_DIR / f"build-{target}"
-        search_dirs = [d for d in [temp_build_dir, build_dir] if d.exists()]
+        pio_build_dir = project_dir / ".pio" / "build" / PIO_ENV_MAP.get(target, target)
+        search_dirs = [d for d in [temp_build_dir, pio_build_dir, build_dir] if d.exists()]
 
         # Find bootloader
         bootloader = None
