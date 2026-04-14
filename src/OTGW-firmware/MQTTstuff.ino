@@ -40,6 +40,11 @@ constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
 constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
 constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
+// Minimum free heap required before attempting a discovery publish.
+// A single discovery message needs ~1200 bytes of lwIP pbuf (ESP8266 core 3.x / lwIP 2.x).
+// 12000 bytes provides ~10x margin to absorb concurrent TCP stack overhead.
+// Keep in sync with the HEAP_WARNING tier in canPublishMQTT().
+constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 8000;
 
 struct MQTTAutoConfigLineView {
   byte id;
@@ -1428,7 +1433,9 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
   // On ESP8266 core 3.x (lwIP 2.x) the baseline heap is lower than on 2.x;
   // attempting the allocation when heap is critically low disconnects MQTT.
   // Caller will retry on the next rate-limit window.
-  if (ESP.getFreeHeap() < 12000) {
+  if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) {
+    DECLARE_TIMER_SEC(tHeapGuardLog, 30);
+    if (DUE(tHeapGuardLog)) MQTTDebugTf(PSTR("[autoconfig] heap guard: skipped (free=%u < %u)\r\n"), ESP.getFreeHeap(), (unsigned)MQTT_DISCOVERY_HEAP_MIN);
     return _result;
   }
 

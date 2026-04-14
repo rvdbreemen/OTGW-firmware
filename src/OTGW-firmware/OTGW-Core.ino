@@ -3286,7 +3286,11 @@ static void publishPSSummarySplitBytes(const char *label, const char *hbSuffix, 
 
 static void ensurePSSummaryDiscovery(uint8_t msgid)
 {
-  if (settings.mqtt.bEnable && !getMQTTConfigDone(msgid)) {
+  // Mirror the outer guards from the processOT call site: skip when MQTT is
+  // not connected to avoid unthrottled lock-acquire + LittleFS open on every
+  // PS1 message. Inner guards in doAutoConfigureMsgid() are a second line of
+  // defence but this avoids the overhead entirely when not needed.
+  if (settings.mqtt.bEnable && state.mqtt.bConnected && !getMQTTConfigDone(msgid)) {
     if (doAutoConfigureMsgid(msgid, NodeId)) {
       setMQTTConfigDone(msgid);
     }
