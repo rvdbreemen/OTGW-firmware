@@ -432,6 +432,13 @@ def flash_device(board, port, artifacts, baud=None, do_erase=False):
     if baud is None:
         baud = cfg["default_baud"]
 
+    # ESP32-S3 always erases before flashing: the otadata partition (0xE000)
+    # must be cleared so the bootloader starts fresh from the app0 slot.
+    # Without this, a corrupt otadata entry causes a TG0WDT boot loop even
+    # after reflashing the firmware.
+    if board == "esp32":
+        do_erase = True
+
     print_header("Flash Summary")
     print(f"{Colors.BOLD}Board:{Colors.ENDC}     {cfg['name']}")
     print(f"{Colors.BOLD}Port:{Colors.ENDC}      {port}")
