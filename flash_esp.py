@@ -272,9 +272,17 @@ def find_build_artifacts(board):
             result["filesystem"] = sorted(matches)[-1]
             break
 
-    # Merged binary (ESP32 convenience image from build.py create_merged_binary)
-    for pattern in [f"*-{board}-*-merged.bin", f"*-{board}-merged.bin"]:
+    # Merged binaries (ESP32: two variants produced by build.py)
+    #   merged_full = bootloader + partitions + app + filesystem  (factory install)
+    #   merged      = bootloader + partitions + app only          (firmware update, preserves filesystem)
+    for pattern in [f"*-{board}-*-merged-full.bin", f"*-{board}-merged-full.bin"]:
         matches = list(build_dir.glob(pattern))
+        if matches:
+            result["merged_full"] = sorted(matches)[-1]
+            break
+
+    for pattern in [f"*-{board}-*-merged.bin", f"*-{board}-merged.bin"]:
+        matches = [m for m in build_dir.glob(pattern) if "full" not in m.name]
         if matches:
             result["merged"] = sorted(matches)[-1]
             break
@@ -299,7 +307,7 @@ def find_build_artifacts(board):
 def check_build_artifacts(board):
     """Return build artifacts dict for board, or None if firmware missing."""
     artifacts = find_build_artifacts(board)
-    if artifacts.get("firmware") or artifacts.get("merged"):
+    if artifacts.get("firmware") or artifacts.get("merged") or artifacts.get("merged_full"):
         return artifacts
     return None
 
@@ -334,16 +342,19 @@ def download_release_assets(release_info, download_dir, board):
 
     # For merged binary (preferred for ESP32), firmware .ino.bin, and littlefs.bin
     # Assets are expected to contain the board name (esp8266 / esp32) in the filename.
-    merged_asset = None
-    firmware_asset = None
-    filesystem_asset = None
+    merged_full_asset = None
+    merged_fw_asset   = None
+    firmware_asset    = None
+    filesystem_asset  = None
 
     for asset in assets:
         name = asset['name'].lower()
         if board not in name:
             continue
-        if "merged" in name and name.endswith(".bin"):
-            merged_asset = asset
+        if "merged-full" in name and name.endswith(".bin"):
+            merged_full_asset = asset
+        elif "merged" in name and "full" not in name and name.endswith(".bin"):
+            merged_fw_asset = asset
         elif ("ino.bin" in name or "fw.bin" in name) and "littlefs" not in name and "merged" not in name:
             if not firmware_asset:
                 firmware_asset = asset
@@ -361,8 +372,10 @@ def download_release_assets(release_info, download_dir, board):
         except Exception as e:
             print_error(f"Failed to download {label}: {e}")
 
-    if merged_asset:
-        _download(merged_asset, "merged", "merged binary")
+    if merged_full_asset:
+        _download(merged_full_asset, "merged_full", "merged binary (full)")
+    if merged_fw_asset:
+        _download(merged_fw_asset, "merged", "merged binary (firmware-only)")
     if firmware_asset:
         _download(firmware_asset, "firmware", "firmware")
     if filesystem_asset:
@@ -424,10 +437,10 @@ def flash_device(board, port, artifacts, baud=None, do_erase=False):
     print(f"{Colors.BOLD}Port:{Colors.ENDC}      {port}")
     print(f"{Colors.BOLD}Baud:{Colors.ENDC}      {baud}")
 
-    for key in ("merged", "firmware", "filesystem", "bootloader", "partitions"):
+    for key in ("merged_full", "merged", "firmware", "filesystem", "bootloader", "partitions"):
         if key in artifacts:
             size_kb = artifacts[key].stat().st_size / 1024
-            print(f"{Colors.BOLD}{key.capitalize():<12}{Colors.ENDC} {artifacts[key].name} ({size_kb:.0f} KB)")
+            print(f"{Colors.BOLD}{key.capitalize():<14}{Colors.ENDC} {artifacts[key].name} ({size_kb:.0f} KB)")
 
     if do_erase:
         if not erase_flash(port, cfg["chip"]):
@@ -435,8 +448,17 @@ def flash_device(board, port, artifacts, baud=None, do_erase=False):
 
     # --- Build write_flash command ---
 
-    # ESP32 with merged binary: flash at 0x0 (merge_bin already embedded addresses)
-    use_merged = "merged" in artifacts and board == "esp32"
+    # ESP32: prefer merged binaries (merge_bin embeds all offsets, flash at 0x0).
+    # merged_full = bootloader + partitions + app + filesystem (factory install / full reset)
+    # merged      = bootloader + partitions + app only         (firmware update, keeps filesystem)
+    merged_full = artifacts.get("merged_full") if board == "esp32" else None
+    merged_fw   = artifacts.get("merged")      if board == "esp32" else None
+
+    # Pick the best available merged binary.
+    # If both exist, default to merged_full for a clean install. Users who only
+    # want a firmware update without touching the filesystem should pass
+    # --firmware with the *-merged.bin path explicitly.
+    use_merged_file = merged_full or merged_fw
 
     cmd = [
         sys.executable, "-m", "esptool",
@@ -446,10 +468,11 @@ def flash_device(board, port, artifacts, baud=None, do_erase=False):
         "write_flash",
     ]
 
-    if use_merged:
-        print_header("Flashing ESP32 (merged binary)")
-        cmd.extend(["0x0", str(artifacts["merged"])])
-        print_info(f"Merged image @ 0x0")
+    if use_merged_file:
+        label = "factory (full)" if use_merged_file == merged_full else "firmware-only"
+        print_header(f"Flashing ESP32 (merged binary — {label})")
+        cmd.extend(["0x0", str(use_merged_file)])
+        print_info(f"Merged image ({label}) @ 0x0: {use_merged_file.name}")
     else:
         print_header(f"Flashing {cfg['name']}")
 
@@ -519,9 +542,9 @@ def interactive_mode_selection(board):
 
     if artifacts:
         print_success("Found existing build artifacts:")
-        for key in ("merged", "firmware", "filesystem", "bootloader", "partitions"):
+        for key in ("merged_full", "merged", "firmware", "filesystem", "bootloader", "partitions"):
             if key in artifacts:
-                print(f"  {key.capitalize():<12} {artifacts[key].name}")
+                print(f"  {key.capitalize():<14} {artifacts[key].name}")
 
         print(f"\n{Colors.BOLD}What would you like to do?{Colors.ENDC}")
         print("  1. Flash existing artifacts")
