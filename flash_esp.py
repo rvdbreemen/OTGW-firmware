@@ -448,7 +448,7 @@ def build_firmware():
 def erase_flash(port, chip):
     """Erase the entire flash of the connected device."""
     print_header("Erasing Flash")
-    cmd = [sys.executable, "-m", "esptool", "--port", port, "--chip", chip, "erase_flash"]
+    cmd = [sys.executable, "-m", "esptool", "--port", port, "--chip", chip, "erase-flash"]
     print_info(f"Command: {' '.join(cmd)}")
     try:
         subprocess.run(cmd, check=True)
@@ -505,7 +505,7 @@ def flash_device(board, port, artifacts, baud=None, do_erase=False):
         "--port", port,
         "--chip", cfg["chip"],
         "-b", str(baud),
-        "write_flash",
+        "write-flash",
     ]
 
     if use_merged_file:
