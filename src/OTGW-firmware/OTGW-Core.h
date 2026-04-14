@@ -15,9 +15,10 @@
 #define OTGWCore_h
 
 // OTGW Serial 2 network port
-// SimpleTelnet<4> in streaming mode — drop-in replacement for TelnetStreamClass
+// SimpleTelnet<2> in streaming mode — drop-in replacement for TelnetStreamClass
+// Two clients: enough for HA + one debug consumer; saves heap vs <4> on lwIP 2.x.
 #define OTGW_SERIAL_PORT 25238     // changed the port to original default of OTmonitor
-SimpleTelnet<4> OTGWstream(OTGW_SERIAL_PORT);
+SimpleTelnet<2> OTGWstream(OTGW_SERIAL_PORT);
 
 //Depends on the library 
 #define OTGW_COMMAND_TOPIC "command"

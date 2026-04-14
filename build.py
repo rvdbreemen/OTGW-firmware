@@ -56,7 +56,7 @@ TARGETS = {
         "name": "ESP8266",
         "core": "esp8266:esp8266",
         "board_manager_url": "https://github.com/esp8266/Arduino/releases/download/3.1.2/package_esp8266com_index.json",
-        "fqbn": "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160",
+        "fqbn": "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160,ip=lm2f",
         "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP8266",
         "chip": "esp8266",
         "flash_mode": "dio",

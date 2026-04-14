@@ -1684,9 +1684,12 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   }
   if (!MQTTclient.connected()) {
-    DebugTln(F("Error: MQTT broker not connected.")); 
+    return _result;   // silent: caller rate-limits retries, no per-message spam
+  }
+  // Heap guard: a single discovery publish needs ~1200 bytes of lwIP pbuf.
+  if (ESP.getFreeHeap() < 12000) {
     return _result;
-  } 
+  }
   if (!isValidIP(MQTTbrokerIP)) {
     DebugTln(F("Error: MQTT broker IP not valid.")); 
     return _result;
