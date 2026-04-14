@@ -47,7 +47,8 @@ public:
     : _serial_output(serial_debug), _server(nullptr), _authenticated(false),
       _serverIndex(nullptr), _serverSuccess(nullptr),
       _uploadTarget(UploadTarget::None),
-      _uploadExpectedBytes(0), _uploadWrittenBytes(0), _uploadBlockIndex(0) {
+      _uploadExpectedBytes(0), _uploadWrittenBytes(0), _uploadBlockIndex(0),
+      _mergedSkipBytes(0), _mergedWriteLimit(0) {
     _updaterError[0] = '\0';
   }
 
@@ -124,11 +125,17 @@ public:
   void setSuccessPage(const char *successPage) { _serverSuccess = successPage; }
 
 private:
+  // Merged binary layout (from partitions_otgw_esp32.csv)
+  static constexpr size_t MERGED_APP_OFFSET = 0x10000;   // bootloader + partition table
+  static constexpr size_t MERGED_APP_SIZE   = 0x2E0000;  // app0 partition size
+
   void _resetUploadTracking() {
     _uploadTarget = UploadTarget::None;
     _uploadExpectedBytes = 0;
     _uploadWrittenBytes = 0;
     _uploadBlockIndex = 0;
+    _mergedSkipBytes = 0;
+    _mergedWriteLimit = 0;
   }
 
   size_t _parseUploadTotalSize() const {
@@ -176,13 +183,29 @@ private:
     } else {
       _uploadTarget = UploadTarget::Firmware;
       uint32_t maxSketchSpace = (platformFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-      if (_serial_output) {
-        DebugTf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
-      }
-      if (uploadTotal > 0 && uploadTotal > maxSketchSpace) {
-        strlcpy(_updaterError, "firmware image too large", sizeof(_updaterError));
-      } else if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)) {
-        _setUpdaterError();
+
+      if (uploadTotal > maxSketchSpace) {
+        // Merged binary (bootloader + partitions + app + filesystem).
+        // Extract only the app portion: skip MERGED_APP_OFFSET bytes, write up to MERGED_APP_SIZE.
+        _mergedSkipBytes  = MERGED_APP_OFFSET;
+        _mergedWriteLimit = MERGED_APP_SIZE;
+        _uploadExpectedBytes = MERGED_APP_SIZE;  // progress bar vs. app portion only
+        if (_serial_output) {
+          DebugTf(PSTR("[OTA] Merged binary detected (%u bytes) — extracting app at 0x%x (%u bytes)\r\n"),
+                  static_cast<unsigned>(uploadTotal),
+                  static_cast<unsigned>(MERGED_APP_OFFSET),
+                  static_cast<unsigned>(MERGED_APP_SIZE));
+        }
+        if (!Update.begin(MERGED_APP_SIZE, U_FLASH)) {
+          _setUpdaterError();
+        }
+      } else {
+        if (_serial_output) {
+          DebugTf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
+        }
+        if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)) {
+          _setUpdaterError();
+        }
       }
     }
   }
@@ -195,8 +218,32 @@ private:
     Wire.write(0xA5);
     Wire.endTransmission();
 
-    size_t written = Update.write(upload.buf, upload.currentSize);
-    if (written != upload.currentSize) {
+    uint8_t *buf = upload.buf;
+    size_t   len = upload.currentSize;
+
+    // Merged binary: skip the bootloader + partition table header
+    if (_mergedSkipBytes > 0) {
+      if (len <= _mergedSkipBytes) {
+        _mergedSkipBytes -= len;
+        return;  // entire chunk is header — discard
+      }
+      buf += _mergedSkipBytes;
+      len -= _mergedSkipBytes;
+      _mergedSkipBytes = 0;
+    }
+
+    // Merged binary: stop writing once we've covered the full app partition;
+    // the remainder of the upload is the filesystem image which must not
+    // be written into the app OTA slot.
+    if (_mergedWriteLimit > 0) {
+      if (len > _mergedWriteLimit) len = _mergedWriteLimit;
+      _mergedWriteLimit -= len;
+    }
+
+    if (len == 0) return;
+
+    size_t written = Update.write(buf, len);
+    if (written != len) {
       _setUpdaterError();
       return;
     }
@@ -285,6 +332,8 @@ private:
   size_t _uploadExpectedBytes;
   size_t _uploadWrittenBytes;
   uint32_t _uploadBlockIndex;
+  size_t _mergedSkipBytes;   // bytes remaining to skip (merged binary header)
+  size_t _mergedWriteLimit;  // bytes remaining to write (0 = no limit); stops at app/fs boundary
   const char *_serverIndex;
   const char *_serverSuccess;
 };
