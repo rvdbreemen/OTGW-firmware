@@ -36,6 +36,13 @@ BOARD_CONFIGS = {
         "filesystem_address": "0x200000",
         "bootloader_address": None,
         "partitions_address": None,
+        # Common USB-serial adapters used on ESP8266 NodeMCU/D1 mini boards
+        "usb_ids": [
+            (0x1A86, 0x7523),  # CH340
+            (0x10C4, 0xEA60),  # CP2102
+            (0x0403, 0x6001),  # FTDI FT232R
+            (0x0403, 0x6015),  # FTDI FT231X
+        ],
     },
     "esp32": {
         "name": "Nodoshop OTGW32 (ESP32-S3)",
@@ -45,6 +52,10 @@ BOARD_CONFIGS = {
         "filesystem_address": "0x2F0000",  # from partitions_otgw_esp32.csv
         "bootloader_address": "0x0",       # ESP32-S3 bootloader is at 0x0, not 0x1000
         "partitions_address": "0x8000",
+        # ESP32-S3 built-in USB-Serial/JTAG (same VID/PID as OT-Thing)
+        "usb_ids": [
+            (0x303A, 0x1001),  # Espressif ESP32-S3 USB-Serial/JTAG
+        ],
     },
 }
 
@@ -208,6 +219,28 @@ def detect_serial_ports():
         ports = glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*")
 
     return sorted(set(ports))
+
+
+def detect_board_port(board):
+    """Try to find the port for a specific board using USB VID/PID matching.
+
+    Returns the matched port string, or None if no match found.
+    Requires pyserial (serial.tools.list_ports).
+    """
+    usb_ids = BOARD_CONFIGS.get(board, {}).get("usb_ids", [])
+    if not usb_ids:
+        return None
+    try:
+        from serial.tools import list_ports
+        for port_info in list_ports.comports():
+            if port_info.vid is None:
+                continue
+            for vid, pid in usb_ids:
+                if port_info.vid == vid and port_info.pid == pid:
+                    return port_info.device
+    except ImportError:
+        pass
+    return None
 
 
 def select_port(ports, default_port=None):
@@ -768,16 +801,21 @@ Examples:
     # Port selection
     port = args.port
     if not port:
-        ports = detect_serial_ports()
-        if args.no_interactive:
-            if ports:
-                port = ports[0]
-                print_info(f"Auto-selected port: {port}")
-            else:
-                print_error("No serial port detected and --no-interactive specified")
-                sys.exit(1)
+        # Try VID/PID match first — reliable, no user interaction needed
+        port = detect_board_port(board)
+        if port:
+            print_info(f"Auto-detected port by VID/PID: {port}")
         else:
-            port = select_port(ports)
+            ports = detect_serial_ports()
+            if args.no_interactive:
+                if ports:
+                    port = ports[0]
+                    print_info(f"Auto-selected port: {port}")
+                else:
+                    print_error("No serial port detected and --no-interactive specified")
+                    sys.exit(1)
+            else:
+                port = select_port(ports)
 
     # Baud rate
     baud = args.baud if args.baud else cfg["default_baud"]
