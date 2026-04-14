@@ -677,20 +677,24 @@ def list_build_artifacts(project_dir):
     print()
 
 
-def create_merged_binary(project_dir, semver, target, compress=False):
-    """Create a merged binary containing both firmware and filesystem using esptool merge_bin.
+def create_merged_binary(project_dir, semver, target, compress=False, include_filesystem=True):
+    """Create a merged binary using esptool merge_bin.
 
     Args:
-        project_dir: Project directory path
-        semver: Semantic version string
-        target: Target key ("esp8266" or "esp32")
-        compress: If True, also create a gzip-compressed version
+        project_dir:        Project directory path
+        semver:             Semantic version string
+        target:             Target key ("esp8266" or "esp32")
+        compress:           If True, also create a gzip-compressed version
+        include_filesystem: If True, include the LittleFS image (full factory binary).
+                            If False, produce bootloader + partitions + app only
+                            (preserves existing filesystem when flashed).
 
     Returns:
         Path to the merged binary (or compressed version if compress=True)
     """
     tcfg = TARGETS[target]
-    print_step(f"Creating merged binary [{tcfg['name']}]")
+    variant = "full" if include_filesystem else "fw"
+    print_step(f"Creating merged binary [{tcfg['name']}] (variant: {variant})")
 
     build_dir = project_dir / "build"
     if not build_dir.exists():
@@ -718,18 +722,22 @@ def create_merged_binary(project_dir, semver, target, compress=False):
         print_error(f"Firmware binary not found for {tcfg['name']}")
         return None
 
-    if not filesystem_file:
-        print_warning("Filesystem binary not found - creating firmware-only merged binary")
+    if include_filesystem and not filesystem_file:
+        print_warning("Filesystem binary not found - falling back to firmware-only merged binary")
+        include_filesystem = False
 
     print_info(f"Firmware: {firmware_file.name}")
-    if filesystem_file:
+    if include_filesystem and filesystem_file:
         print_info(f"Filesystem: {filesystem_file.name}")
 
     # Create output filename
+    # -merged-full.bin  = bootloader + partitions + app + filesystem (factory flash)
+    # -merged.bin       = bootloader + partitions + app only (preserves existing filesystem)
+    suffix = "merged-full" if include_filesystem else "merged"
     if semver and semver != "unknown":
-        merged_name = f"OTGW-firmware-{target}-{semver}-merged.bin"
+        merged_name = f"OTGW-firmware-{target}-{semver}-{suffix}.bin"
     else:
-        merged_name = f"OTGW-firmware-{target}-merged.bin"
+        merged_name = f"OTGW-firmware-{target}-{suffix}.bin"
 
     merged_file = build_dir / merged_name
 
@@ -800,8 +808,8 @@ def create_merged_binary(project_dir, semver, target, compress=False):
     # Firmware
     cmd.extend([tcfg["firmware_offset"], str(firmware_file)])
 
-    # Filesystem
-    if filesystem_file:
+    # Filesystem (only for full variant)
+    if include_filesystem and filesystem_file:
         cmd.extend([tcfg["fs_offset"], str(filesystem_file)])
 
     print_info("Running: esptool merge_bin...")
@@ -1283,20 +1291,39 @@ Examples:
         # Rename artifacts with version
         rename_build_artifacts(project_dir, semver, target)
 
-        # Create merged binary if requested
+        # Create merged binaries if requested
         if args.merged:
             if not check_esptool():
                 print_error("esptool is required for creating merged binaries")
                 sys.exit(1)
 
-            merged_file = create_merged_binary(project_dir, semver, target, compress=args.compress)
-            if not merged_file:
-                print_error(f"Failed to create merged binary for {tcfg['name']}")
-                sys.exit(1)
-
-            print_info(f"Merged binary ready for flashing: {merged_file.name}")
             flash_offset = "0x0" if target == "esp8266" else tcfg.get("bootloader_offset", "0x0")
-            print_info(f"Flash command: esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {merged_file}")
+
+            if target == "esp8266":
+                # ESP8266 has no separate bootloader — one merged binary covers all cases
+                merged_file = create_merged_binary(project_dir, semver, target,
+                                                   compress=args.compress, include_filesystem=True)
+                if not merged_file:
+                    print_error(f"Failed to create merged binary for {tcfg['name']}")
+                    sys.exit(1)
+                print_info(f"Flash command: esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {merged_file}")
+            else:
+                # ESP32: produce both variants
+                # 1) firmware-only merged (preserves existing filesystem/settings on flash)
+                fw_merged = create_merged_binary(project_dir, semver, target,
+                                                 compress=False, include_filesystem=False)
+                if not fw_merged:
+                    print_error(f"Failed to create firmware-only merged binary for {tcfg['name']}")
+                    sys.exit(1)
+                print_info(f"Firmware flash:  esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {fw_merged.name}")
+
+                # 2) full merged (bootloader + partitions + app + filesystem, for factory install)
+                full_merged = create_merged_binary(project_dir, semver, target,
+                                                   compress=args.compress, include_filesystem=True)
+                if not full_merged:
+                    print_error(f"Failed to create full merged binary for {tcfg['name']}")
+                    sys.exit(1)
+                print_info(f"Factory flash:   esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {full_merged.name}")
 
     # List build artifacts
     list_build_artifacts(project_dir)
