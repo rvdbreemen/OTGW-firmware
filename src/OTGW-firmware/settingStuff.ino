@@ -238,6 +238,8 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("NTPsendtime"), settings.ntp.bSendtime, true);
   writeJsonBoolKV(file, F("LEDblink"), settings.bLEDblink, true);
   writeJsonBoolKV(file, F("darktheme"), settings.bDarkTheme, true);
+  writeJsonBoolKV(file, F("nightlyrestart"), settings.bNightlyRestart, true);
+  writeJsonIntKV(file, F("nightlyrestarthour"), settings.iRestartHour, true);
   writeJsonBoolKV(file, F("ui_autoscroll"), settings.ui.bAutoScroll, true);
   writeJsonBoolKV(file, F("ui_timestamps"), settings.ui.bShowTimestamp, true);
   writeJsonBoolKV(file, F("ui_capture"), settings.ui.bCaptureMode, true);
@@ -383,6 +385,7 @@ void readSettings(bool show)
     Debugf(PSTR("NPT hostname          : %s\r\n"), CSTR(settings.ntp.sHostname));
     Debugf(PSTR("NPT send time         : %s\r\n"), CBOOLEAN(settings.ntp.bSendtime));
     Debugf(PSTR("Led Blink             : %s\r\n"), CBOOLEAN(settings.bLEDblink));
+    Debugf(PSTR("Nightly Restart       : %s (hour=%d)\r\n"), CBOOLEAN(settings.bNightlyRestart), settings.iRestartHour);
     Debugf(PSTR("GPIO Sensors          : %s\r\n"), CBOOLEAN(settings.sensors.bEnabled));
     Debugf(PSTR("GPIO Sen. Legacy      : %s\r\n"), CBOOLEAN(settings.sensors.bLegacyFormat));
     Debugf(PSTR("GPIO Sen. Pin         : %d\r\n"), settings.sensors.iPin);
@@ -512,6 +515,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("NTPsendtime"))==0)    settings.ntp.bSendtime = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("LEDblink"))==0)      settings.bLEDblink = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("darktheme"))==0)     settings.bDarkTheme = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("nightlyrestart"))==0)     settings.bNightlyRestart = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("nightlyrestarthour"))==0) { int h = atoi(newValue); settings.iRestartHour = (h >= 0 && h <= 23) ? h : 4; }
 
   else if (strcasecmp_P(field, PSTR("ui_autoscroll"))==0)      settings.ui.bAutoScroll = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("ui_timestamps"))==0)      settings.ui.bShowTimestamp = EVALBOOLEAN(newValue);

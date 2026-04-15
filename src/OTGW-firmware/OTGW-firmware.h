@@ -670,6 +670,8 @@ struct OTGWSettings {
   bool bLEDblink     = true;
   bool bDarkTheme    = false;
   bool bMyDEBUG      = false;
+  bool bNightlyRestart = false;  // Scheduled nightly restart for heap recovery (opt-in)
+  uint8_t iRestartHour = 4;     // Hour (0-23, local time) for nightly restart (default 04:00)
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
   MQTTSettingsSection mqtt;
