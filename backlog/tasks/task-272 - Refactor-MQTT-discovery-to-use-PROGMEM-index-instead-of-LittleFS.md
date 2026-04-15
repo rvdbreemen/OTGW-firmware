@@ -1,11 +1,11 @@
 ---
 id: TASK-272
 title: 'Refactor: MQTT discovery to use PROGMEM index instead of LittleFS'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-15 19:07'
-updated_date: '2026-04-15 20:05'
+updated_date: '2026-04-15 20:48'
 labels:
   - performance
   - mqtt
@@ -34,11 +34,26 @@ The render + publish path (sendMQTTTemplateStreaming, expandAndPublishSourceTemp
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 doAutoConfigureMsgid() contains no LittleFS calls — no fh, no LittleFS.open(), no LittleFS.exists()
-- [ ] #2 Lookup uses mqttHaCfgIndex[OTid] for O(1) entry location; iterates contiguous entries for same ID
-- [ ] #3 doAutoConfigure() (F key, full re-discovery) iterates all MQTT_HA_CFG_COUNT entries in mqttHaCfgTable via PROGMEM
-- [ ] #4 src/OTGW-firmware/data/mqttha.cfg is deleted; filesystem image rebuilds without it
-- [ ] #5 Build succeeds; firmware binary size stays below 900KB
-- [ ] #6 Discovery messages published to MQTT broker are byte-identical to those from the LittleFS implementation (verified by capturing MQTT traffic before and after)
-- [ ] #7 Telnet shows no LittleFS-related log lines during a JIT discovery cycle
+- [x] #1 doAutoConfigureMsgid() contains no LittleFS calls — no fh, no LittleFS.open(), no LittleFS.exists()
+- [x] #2 Lookup uses mqttHaCfgIndex[OTid] for O(1) entry location; iterates contiguous entries for same ID
+- [x] #3 doAutoConfigure() (F key, full re-discovery) iterates all MQTT_HA_CFG_COUNT entries in mqttHaCfgTable via PROGMEM
+- [x] #4 src/OTGW-firmware/data/mqttha.cfg is deleted; filesystem image rebuilds without it
+- [x] #5 Build succeeds; firmware binary size stays below 900KB
+- [x] #6 Discovery messages published to MQTT broker are byte-identical to those from the LittleFS implementation (verified by capturing MQTT traffic before and after)
+- [x] #7 Telnet shows no LittleFS-related log lines during a JIT discovery cycle
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced LittleFS-based mqttha.cfg scan in doAutoConfigureMsgid() and doAutoConfigure() with PROGMEM flat-pool design.
+
+Changes:
+- tools/generate_mqttha_progmem.py: generates mqttha_progmem.h + mqttha_progmem.cpp
+- mqttha_progmem.h: MqttHaCfgEntry struct + extern declarations (1.4KB)
+- mqttha_progmem.cpp: flat topic pool (23KB) + msg pool (140KB) + entry table (345x8) + index[256] — compiled as separate Arduino TU to avoid Xtensa single-TU relocation explosion (178k relocations caused silent linker crash)
+- MQTTstuff.ino: doAutoConfigureMsgid() uses O(1) PROGMEM index + pool offset access; doAutoConfigure() iterates PROGMEM table; no LittleFS
+- data/mqttha.cfg removed from LittleFS
+
+Build: 863KB, within 4M2M OTA budget.
+<!-- SECTION:FINAL_SUMMARY:END -->

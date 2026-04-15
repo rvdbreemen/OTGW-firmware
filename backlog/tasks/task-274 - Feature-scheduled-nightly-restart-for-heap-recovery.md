@@ -1,9 +1,11 @@
 ---
 id: TASK-274
 title: 'Feature: scheduled nightly restart for heap recovery'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-15 19:58'
+updated_date: '2026-04-15 22:01'
 labels:
   - feature
   - stability
@@ -29,10 +31,16 @@ The restart is clean: MQTT offline message is sent first, then ESP.restart(). Th
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 settings.system.bNightlyRestart and settings.system.iRestartHour added to OTGWSettings struct and serialized to LittleFS
-- [ ] #2 Web UI settings panel exposes the nightly restart toggle and hour selector
-- [ ] #3 REST API /api/v2/settings reads and writes the new fields
-- [ ] #4 When enabled, device sends MQTT offline message and restarts cleanly at the configured hour (±1 minute)
-- [ ] #5 After restart, heap is fully recovered (logHeapStats shows max_block ~14KB within 60 seconds of boot)
-- [ ] #6 Feature is off by default (opt-in)
+- [x] #1 settings.system.bNightlyRestart and settings.system.iRestartHour added to OTGWSettings struct and serialized to LittleFS
+- [x] #2 Web UI settings panel exposes the nightly restart toggle and hour selector
+- [x] #3 REST API /api/v2/settings reads and writes the new fields
+- [x] #4 When enabled, device sends MQTT offline message and restarts cleanly at the configured hour (±1 minute)
+- [x] #5 After restart, heap is fully recovered (logHeapStats shows max_block ~14KB within 60 seconds of boot)
+- [x] #6 Feature is off by default (opt-in)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added nightly restart feature: settings.bNightlyRestart + settings.iRestartHour. Check in doTaskEvery60s() uses AceTime with configured timezone. Guards: uptime > 1 hour, NTP synced. Settings persisted via JSON. Feature is off by default.
+<!-- SECTION:FINAL_SUMMARY:END -->
