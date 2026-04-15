@@ -14,6 +14,7 @@
 #include <ctype.h>
 #include <pgmspace.h>
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
+#include "mqttha_progmem.h"         // PROGMEM discovery config table (auto-generated from mqttha.cfg)
 
 // MQTT Streaming Mode - ALWAYS ENABLED
 // Large auto-discovery messages are sent in 128-byte chunks instead of
@@ -69,9 +70,9 @@ struct MQTTAutoConfigTemplateContext {
 //                          discovery topic, ≤200 bytes) during autoconfig.  cMsg is safe for
 //                          sTopic because template pointers (topicTemplate/msgTemplate) point
 //                          into sLine, not cMsg.
-//   sLine[SLINE_SIZE=1200] — global, exclusively holds raw config file lines (≤900 bytes from
-//                          mqttha.cfg).  Only used by MQTT autoconfig; guarded by
-//                          mqttAutoConfigInProgress.
+//   sLine[SLINE_SIZE=1200] — global, used as staging buffer for PROGMEM msg templates
+//                          (strcpy_P from mqttha_progmem.h). Only used by MQTT autoconfig;
+//                          guarded by mqttAutoConfigInProgress.
 // feedWatchDog() is used (not doBackgroundTasks()) inside expandAndPublishSourceTemplates()
 // and in the per-line loop to prevent cMsg or sLine from being overwritten by HTTP/MQTT
 // callbacks between the three per-source renders within a single iteration (ADR-053).
@@ -815,11 +816,13 @@ void handleMQTT()
         // birth message, sendMQTT retains  by default
         sendMQTT(MQTTPubNamespace, "online");
 
-        // Reset discovery state on every connect so JIT (Path B) re-publishes
-        // discovery configs as OpenTherm messages arrive. This handles both
-        // normal reconnects and broker restarts (lost retained messages) without
-        // flooding the broker with configs for message IDs never seen in the wild.
-        clearMQTTConfigDone();
+        // Force re-publish of all OT values so HA gets current state after reconnect.
+        // Discovery state is intentionally NOT cleared here: MQTT retained messages
+        // survive an ESP reconnect intact on the broker, so re-running discovery on
+        // every network blip causes an unnecessary burst of LittleFS I/O and MQTT
+        // publishes. Discovery is re-triggered by two correct paths only:
+        //   (a) startMQTT() — on firmware boot or MQTT settings change
+        //   (b) homeassistant/status = online after offline — HA/broker restart
         requestMQTTRepublishAll();
 
         //Subscribe to topics
@@ -1284,12 +1287,12 @@ static bool expandAndPublishSourceTemplates(byte msgid,
 }
 //===========================================================================================
 void doAutoConfigure(){
-  // Force-publishes HA discovery configs for all message IDs in mqttha.cfg.
+  // Force-publishes HA discovery configs for all entries in mqttha_progmem.h.
   // Intended only as an explicit utility (Serial 'F', REST API); never called
-  // automatically. Use shared static buffers (zero heap allocation).
-  // Lock scope is limited to the file-parse/publish loop so it is released
-  // before configSensors() is called.  configSensors() -> sensorAutoConfigure()
-  // -> doAutoConfigureMsgid() can then acquire the lock independently.
+  // automatically. Uses shared static buffers (zero heap allocation for table lookup).
+  // Lock scope is limited to the publish loop so it is released before configSensors()
+  // is called.  configSensors() -> sensorAutoConfigure() -> doAutoConfigureMsgid() can
+  // then acquire the lock independently.
 
   if (!settings.mqtt.bEnable) return;
 
@@ -1301,92 +1304,78 @@ void doAutoConfigure(){
       return;
     }
 
-    char *sTopic = cMsg;                         // cMsg reused as rendered topic (≤200 bytes, fits in CMSG_SIZE)
+    // Buffer aliasing: sTopic = cMsg (rendered topic, ≤200 bytes). sLine is repurposed
+    // as msg template staging buffer (strcpy_P from PROGMEM). topicBuf holds topic
+    // template (stack, ≤200 bytes). All three are disjoint.
+    // feedWatchDog() (NOT doBackgroundTasks) is the only yield — guarantees no HTTP/MQTT
+    // callback overwrites cMsg or sLine between topic render and streaming publish.
+    char *sTopic = cMsg;
     initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
+    char topicBuf[MQTT_TOPIC_MAX_LEN];
 
-    // 2. Open File ONCE
-    LittleFS.begin();
-    if (!LittleFS.exists(F("/mqttha.cfg"))) {
-      DebugTln(F("Error: configuration file not found.")); 
-      return;
-    } 
+    MQTTAutoConfigTemplateContext renderCtx;
+    renderCtx.nodeId   = NodeId;
+    renderCtx.sensorId = "";
+    renderCtx.hostname = CSTR(settings.sHostname);
+    renderCtx.version  = _VERSION;
+    renderCtx.mqttPubTopic = MQTTPubNamespace;
+    renderCtx.mqttSubTopic = MQTTSubNamespace;
 
-    File fh = LittleFS.open(F("/mqttha.cfg"), "r");
-    if (!fh) {
-      DebugTln(F("Error: could not open configuration file.")); 
-      return;
-    } 
+    for (uint16_t i = 0; i < MQTT_HA_CFG_COUNT; i++) {
+      feedWatchDog(); // Keep the dog happy between PROGMEM reads and publishes
 
-    byte lineID = 0;
-    
-    // 3. Loop through file once
-    while (fh.available()) {
-      feedWatchDog(); // Keep the dog happy during IO
-      
-      // Read line into sLine (the dedicated global config-line buffer, guarded by mqttAutoConfigInProgress)
-      size_t len = fh.readBytesUntil('\n', sLine, SLINE_SIZE - 1);
-      sLine[len] = '\0';
-      MQTTAutoConfigLineView lineView;
-      
-      // Parse Line
-      if (!parseAutoConfigLine(sLine, ';', &lineView)) continue;
-      lineID = lineView.id;
+      MqttHaCfgEntry entry;
+      memcpy_P(&entry, &mqttHaCfgTable[i], sizeof(entry));
 
-      // 4. Decision: Do we send this line?
-      // Skip Dallas sensors - they need per-sensor addresses from configSensors()
-      if (lineID == OTGWdallasdataid) continue;
+      // Skip Dallas sensors — handled separately by configSensors() after lock release
+      if (entry.id == OTGWdallasdataid) continue;
+
+      // Copy topic template from PROGMEM pool to RAM for PIC check and rendering
+      strcpy_P(topicBuf, mqttHaTopicPool + entry.topicOff);
+
       // Skip PIC-specific discovery entries when no PIC is detected.
       // Relies on the "otgw-pic/" topic prefix convention — update if topics are renamed.
-      if (!isPICEnabled() && strstr_P(sLine, PSTR("otgw-pic/"))) continue;
+      if (!isPICEnabled() && strstr(topicBuf, "otgw-pic/")) continue;
 
-      {
+      // Copy msg template from PROGMEM pool to sLine (RAM staging buffer, guarded by session lock)
+      strcpy_P(sLine, mqttHaMsgPool + entry.msgOff);
 
-         MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), lineID);
+      MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), entry.id);
 
-         MQTTAutoConfigTemplateContext renderCtx;
-         renderCtx.nodeId = NodeId;
-         renderCtx.sensorId = "";
-         renderCtx.hostname = CSTR(settings.sHostname);
-         renderCtx.version = _VERSION;
-         renderCtx.mqttPubTopic = MQTTPubNamespace;
-         renderCtx.mqttSubTopic = MQTTSubNamespace;
+      // Render topic into sTopic (= cMsg)
+      if (!renderTemplateToBuffer(topicBuf, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) continue;
+      if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) continue;
 
-         if (!renderTemplateToBuffer(lineView.topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) continue;
-         if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) continue;
+      // ADR-040: source token detection on RAM copies (topicBuf and sLine)
+      bool hasSourceSuffixToken       = (strstr(topicBuf, s_sourceSuffixToken)       || strstr(sLine, s_sourceSuffixToken));
+      bool hasSourceNameToken         = (strstr(topicBuf, s_sourceNameToken)         || strstr(sLine, s_sourceNameToken));
+      bool hasSourceTopicSegmentToken = (strstr(topicBuf, s_sourceTopicSegmentToken) || strstr(sLine, s_sourceTopicSegmentToken));
 
-         // ADR-040 source templates expand to 3 discovery entries from one line.
-         // This is used by manual/bulk discovery paths (doAutoConfigure()).
-         bool hasSourceSuffixToken = (strstr(lineView.topicTemplate, s_sourceSuffixToken) || strstr(lineView.msgTemplate, s_sourceSuffixToken));
-         bool hasSourceNameToken = (strstr(lineView.topicTemplate, s_sourceNameToken) || strstr(lineView.msgTemplate, s_sourceNameToken));
-         bool hasSourceTopicSegmentToken = (strstr(lineView.topicTemplate, s_sourceTopicSegmentToken) || strstr(lineView.msgTemplate, s_sourceTopicSegmentToken));
-         if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
-           if (!sourceTemplateSchemaLogged) {
-             if (hasSourceTopicSegmentToken) MQTTDebugTln(F("MQTT source template schema: nested %source_topic_segment% placeholders detected (likely updated mqttha.cfg)"));
-             else MQTTDebugTln(F("MQTT source template schema: legacy source placeholders only (older flashed mqttha.cfg may still be in use)"));
-             sourceTemplateSchemaLogged = true;
-           }
-           if (settings.mqtt.bSeparateSources) {
-             if (expandAndPublishSourceTemplates(lineID, "bulk", lineView.topicTemplate, lineView.msgTemplate, &renderCtx, sTopic)) {
-               setMQTTConfigDone(lineID);
-             }
-           }
-           continue; // source template handled (or intentionally skipped when disabled)
-         }
-
-         if (!sendMQTTTemplateStreaming(sTopic, lineView.msgTemplate, &renderCtx)) continue;
-         setMQTTConfigDone(lineID);
-
-         feedWatchDog(); // Keep the dog happy between publishes (not doBackgroundTasks — cMsg is live as sTopic)
+      if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
+        if (!sourceTemplateSchemaLogged) {
+          if (hasSourceTopicSegmentToken) MQTTDebugTln(F("MQTT source template schema: nested %source_topic_segment% placeholders detected"));
+          else MQTTDebugTln(F("MQTT source template schema: legacy source placeholders only"));
+          sourceTemplateSchemaLogged = true;
+        }
+        if (settings.mqtt.bSeparateSources) {
+          if (expandAndPublishSourceTemplates(entry.id, "bulk", topicBuf, sLine, &renderCtx, sTopic)) {
+            setMQTTConfigDone(entry.id);
+          }
+        }
+        continue; // source template handled (or intentionally skipped when disabled)
       }
+
+      if (!sendMQTTTemplateStreaming(sTopic, sLine, &renderCtx)) continue;
+      setMQTTConfigDone(entry.id);
+
+      feedWatchDog(); // Keep the dog happy between publishes (not doBackgroundTasks — cMsg is live as sTopic)
     }
 
-    fh.close();
-    
     // Note: cMsg (sTopic) and sLine are globals; they persist across calls.
     // No cleanup needed; guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
     resetMQTTBufferSize();
-  } // Lock released here - configSensors() can now acquire it independently
+  } // Lock released here — configSensors() can now acquire it independently
 
   // Trigger Dallas configuration separately as it requires specific sensor addresses
   if (settings.mqtt.bEnable && !getMQTTConfigDone(OTGWdallasdataid)) {
@@ -1439,98 +1428,75 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     return _result;
   }
 
+  // PROGMEM index lookup — O(1), no LittleFS open required.
+  uint16_t idx = pgm_read_word(&mqttHaCfgIndex[OTid]);
+  if (idx == 0xFFFF) return _result;  // OT ID not in discovery config table
+
   // Workspace (ADR-053 two-buffer design):
-  //   sLine[SLINE_SIZE=1200] — global, holds raw config file lines (≤900 bytes). Guarded by
+  //   topicBuf[MQTT_TOPIC_MAX_LEN] — stack, RAM copy of PROGMEM topic template (≤200 bytes).
+  //   sLine[SLINE_SIZE=1200] — global, RAM staging for PROGMEM msg template. Guarded by
   //                            mqttAutoConfigInProgress (acquired above via sessionLock).
-  //   sTopic = cMsg — cMsg global reused as rendered topic (≤200 bytes). Safe because
-  //                   topicTemplate/msgTemplate point into sLine, not cMsg.
+  //   sTopic = cMsg — cMsg reused as rendered topic (≤200 bytes). Safe because topicBuf
+  //                   and sLine are disjoint from cMsg.
   //   feedWatchDog() is the only yield — prevents HTTP/MQTT callbacks from overwriting cMsg.
-  char *sTopic = cMsg;                         // cMsg reused for rendered topic (≤200 bytes, fits in CMSG_SIZE)
+  char *sTopic = cMsg;
   initSourceTokens();
-  byte lineID = 39; // 39 is unused in OT protocol so is a safe value
+  char topicBuf[MQTT_TOPIC_MAX_LEN];
 
-  //Let's open the MQTT autoconfig file
-  File fh; //filehandle
-  // const char *cfgFilename = "/mqttha.cfg"; // moved to usage
-  LittleFS.begin();
+  MQTTAutoConfigTemplateContext renderCtx;
+  renderCtx.nodeId   = NodeId;
+  renderCtx.sensorId = sensorId;
+  renderCtx.hostname = CSTR(settings.sHostname);
+  renderCtx.version  = _VERSION;
+  renderCtx.mqttPubTopic = MQTTPubNamespace;
+  renderCtx.mqttSubTopic = MQTTSubNamespace;
 
-  if (!LittleFS.exists(F("/mqttha.cfg"))) {
-    DebugTln(F("Error: configuration file not found.")); 
-    return _result;
-  } 
+  // Iterate all contiguous entries for OTid in mqttHaCfgTable (sorted by id).
+  while (idx < MQTT_HA_CFG_COUNT) {
+    feedWatchDog();
 
-  fh = LittleFS.open(F("/mqttha.cfg"), "r");
+    MqttHaCfgEntry entry;
+    memcpy_P(&entry, &mqttHaCfgTable[idx], sizeof(entry));
+    if (entry.id != OTid) break;  // Past this ID's entries; table is sorted by id
 
-  if (!fh) {
-    DebugTln(F("Error: could not open configuration file.")); 
-    return _result;
-  } 
+    // Copy templates from PROGMEM string pools to RAM buffers
+    strcpy_P(topicBuf, mqttHaTopicPool + entry.topicOff);
+    strcpy_P(sLine,    mqttHaMsgPool   + entry.msgOff);
 
-  //Lets go read the config and send it out to MQTT line by line
-  while (fh.available())
-  {
-    //read file line by line, split and send to MQTT (topic, msg)
-    feedWatchDog(); //start with feeding the dog
-    
-    // Read line into sLine (global config-line buffer, guarded by mqttAutoConfigInProgress)
-    size_t len = fh.readBytesUntil('\n', sLine, SLINE_SIZE - 1);
-    sLine[len] = '\0';
-    MQTTAutoConfigLineView lineView;
-    if (!parseAutoConfigLine(sLine, ';', &lineView)) {  // parseAutoConfigLine() also filters comments
-      continue;
-    }
-    lineID = lineView.id;
-
-    // check if this is the specific line we are looking for
-    // Old config dump method (dumping all lines) is no longer used - we now fetch specific lines by ID
-    if (lineID != OTid) continue;
-
-    MQTTDebugTf(PSTR("Found line in config file for %d: [%d][%s] \r\n"), OTid, lineID, lineView.topicTemplate);
-
-    MQTTAutoConfigTemplateContext renderCtx;
-    renderCtx.nodeId = NodeId;
-    renderCtx.sensorId = sensorId;
-    renderCtx.hostname = CSTR(settings.sHostname);
-    renderCtx.version = _VERSION;
-    renderCtx.mqttPubTopic = MQTTPubNamespace;
-    renderCtx.mqttSubTopic = MQTTSubNamespace;
-
-    // discovery topic prefix (rendered into cMsg via sTopic pointer)
-    MQTTDebugTf(PSTR("sTopic[%s]==>"), lineView.topicTemplate); 
-    if (!renderTemplateToBuffer(lineView.topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) { MQTTDebugTln(F("MQTT: topic template rendering overflow")); continue; }
-    if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); continue; }
-
-    MQTTDebugf(PSTR("[%s]\r\n"), sTopic); 
-    /// ----------------------
-    MQTTDebugTf(PSTR("sMsg template len[%d]\r\n"), (int)strlen(lineView.msgTemplate));
+    MQTTDebugTf(PSTR("Found PROGMEM entry for %d: [%s]\r\n"), OTid, topicBuf);
+    MQTTDebugTf(PSTR("sMsg template len[%d]\r\n"), (int)strlen(sLine));
     DebugFlush();
-    
-    // ADR-040: Source template detection — entries with source placeholders in mqttha.cfg
-    // are emitted 3× (thermostat/boiler/gateway).
-    bool hasSourceSuffixToken = (strstr(lineView.topicTemplate, s_sourceSuffixToken) || strstr(lineView.msgTemplate, s_sourceSuffixToken));
-    bool hasSourceNameToken = (strstr(lineView.topicTemplate, s_sourceNameToken) || strstr(lineView.msgTemplate, s_sourceNameToken));
-    bool hasSourceTopicSegmentToken = (strstr(lineView.topicTemplate, s_sourceTopicSegmentToken) || strstr(lineView.msgTemplate, s_sourceTopicSegmentToken));
+
+    // Render topic into sTopic (= cMsg)
+    if (!renderTemplateToBuffer(topicBuf, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) { MQTTDebugTln(F("MQTT: topic template rendering overflow")); idx++; continue; }
+    if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); idx++; continue; }
+    MQTTDebugf(PSTR("[%s]\r\n"), sTopic);
+
+    // ADR-040: Source template detection — entries with source placeholders are emitted
+    // 3× (thermostat/boiler/gateway). strstr on RAM copies (topicBuf and sLine).
+    bool hasSourceSuffixToken       = (strstr(topicBuf, s_sourceSuffixToken)       || strstr(sLine, s_sourceSuffixToken));
+    bool hasSourceNameToken         = (strstr(topicBuf, s_sourceNameToken)         || strstr(sLine, s_sourceNameToken));
+    bool hasSourceTopicSegmentToken = (strstr(topicBuf, s_sourceTopicSegmentToken) || strstr(sLine, s_sourceTopicSegmentToken));
+
     if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
       if (settings.mqtt.bSeparateSources && baseMqttTopic != nullptr) {
-        if (expandAndPublishSourceTemplates(OTid, "jit", lineView.topicTemplate, lineView.msgTemplate, &renderCtx, sTopic)) _result = true;
+        if (expandAndPublishSourceTemplates(OTid, "jit", topicBuf, sLine, &renderCtx, sTopic)) _result = true;
       }
+      idx++;
       continue; // skip regular single-send below (source templates on or off)
     }
 
-    if (sendMQTTTemplateStreaming(sTopic, lineView.msgTemplate, &renderCtx)) {
+    if (sendMQTTTemplateStreaming(sTopic, sLine, &renderCtx)) {
       _result = true;
     }
 
-  } // while available()
-
-  fh.close();
+    idx++;
+  }
 
   // Note: cMsg (sTopic) and sLine are globals; they persist across calls.
   // No cleanup needed; guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
   resetMQTTBufferSize();
-
   return _result;
-
 }
 
 void sensorAutoConfigure(byte dataid, bool finishflag , const char *cfgSensorId = nullptr) {
