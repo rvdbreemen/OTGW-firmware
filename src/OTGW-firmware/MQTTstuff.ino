@@ -65,24 +65,19 @@ struct MQTTAutoConfigTemplateContext {
   const char *sourceTopicSegment;
 };
 
-// MQTT autoconfig scratch buffers (ADR-053 two-buffer design):
+// MQTT autoconfig buffer design:
 //   cMsg[CMSG_SIZE=512] — global general-purpose scratch, reused as sTopic (rendered MQTT
-//                          discovery topic, ≤200 bytes) during autoconfig.  cMsg is safe for
-//                          sTopic because template pointers (topicTemplate/msgTemplate) point
-//                          into sLine, not cMsg.
-//   sLine[SLINE_SIZE=1200] — global, used as staging buffer for PROGMEM msg templates
-//                          (strcpy_P from mqttha_progmem.h). Only used by MQTT autoconfig;
-//                          guarded by mqttAutoConfigInProgress.
+//                          discovery topic, ≤200 bytes) during autoconfig.  Safe because
+//                          template strings are read directly from PROGMEM pools (flash),
+//                          not from cMsg.  No staging buffer needed on ESP8266 where PROGMEM
+//                          is memory-mapped at 0x40200000+ and byte-accessible via *ptr.
 // feedWatchDog() is used (not doBackgroundTasks()) inside expandAndPublishSourceTemplates()
-// and in the per-line loop to prevent cMsg or sLine from being overwritten by HTTP/MQTT
-// callbacks between the three per-source renders within a single iteration (ADR-053).
+// and in the per-entry loop to prevent cMsg from being overwritten by HTTP/MQTT callbacks
+// between the three per-source renders within a single iteration (ADR-053).
 
-// Guard shared MQTT autoconfig buffers (cMsg for sTopic, sLine for config lines) against
-// accidental re-entry.  Acquiring this lock is the exclusive gate for using sLine; it also
-// guarantees cMsg is held for sTopic since feedWatchDog() (not doBackgroundTasks()) is the
-// only yield used during autoconfig, so no HTTP/MQTT callback can overwrite cMsg mid-use.
-// Current firmware is effectively single-threaded, but this protects future
-// callback/timer refactors from clobbering the shared workspace.
+// Guard shared MQTT autoconfig buffer (cMsg for sTopic) against accidental re-entry.
+// feedWatchDog() (not doBackgroundTasks()) is the only yield used during autoconfig,
+// so no HTTP/MQTT callback can overwrite cMsg mid-use.
 // Not volatile: ESP8266 is cooperative single-threaded; no ISR enters this path.
 static bool mqttAutoConfigInProgress = false;
 
@@ -1304,15 +1299,13 @@ void doAutoConfigure(){
       return;
     }
 
-    // Buffer aliasing: sTopic = cMsg (rendered topic, ≤200 bytes). sLine is repurposed
-    // as msg template staging buffer (strcpy_P from PROGMEM). topicBuf holds topic
-    // template (stack, ≤200 bytes). All three are disjoint.
+    // sTopic = cMsg is the only RAM buffer used.  Topic and msg templates are read
+    // directly from PROGMEM pools (ESP8266 memory-mapped flash, byte-accessible via *ptr).
     // feedWatchDog() (NOT doBackgroundTasks) is the only yield — guarantees no HTTP/MQTT
-    // callback overwrites cMsg or sLine between topic render and streaming publish.
+    // callback overwrites cMsg between topic render and streaming publish.
     char *sTopic = cMsg;
     initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
-    char topicBuf[MQTT_TOPIC_MAX_LEN];
 
     MQTTAutoConfigTemplateContext renderCtx;
     renderCtx.nodeId   = NodeId;
@@ -1323,7 +1316,7 @@ void doAutoConfigure(){
     renderCtx.mqttSubTopic = MQTTSubNamespace;
 
     for (uint16_t i = 0; i < MQTT_HA_CFG_COUNT; i++) {
-      feedWatchDog(); // Keep the dog happy between PROGMEM reads and publishes
+      feedWatchDog();
 
       MqttHaCfgEntry entry;
       memcpy_P(&entry, &mqttHaCfgTable[i], sizeof(entry));
@@ -1331,26 +1324,23 @@ void doAutoConfigure(){
       // Skip Dallas sensors — handled separately by configSensors() after lock release
       if (entry.id == OTGWdallasdataid) continue;
 
-      // Copy topic template from PROGMEM pool to RAM for PIC check and rendering
-      strcpy_P(topicBuf, mqttHaTopicPool + entry.topicOff);
+      // Direct PROGMEM pointers — no RAM staging needed on ESP8266
+      const char *topicTemplate = mqttHaTopicPool + entry.topicOff;
+      const char *msgTemplate   = mqttHaMsgPool   + entry.msgOff;
 
       // Skip PIC-specific discovery entries when no PIC is detected.
-      // Relies on the "otgw-pic/" topic prefix convention — update if topics are renamed.
-      if (!isPICEnabled() && strstr(topicBuf, "otgw-pic/")) continue;
-
-      // Copy msg template from PROGMEM pool to sLine (RAM staging buffer, guarded by session lock)
-      strcpy_P(sLine, mqttHaMsgPool + entry.msgOff);
+      if (!isPICEnabled() && strstr(topicTemplate, "otgw-pic/")) continue;
 
       MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), entry.id);
 
       // Render topic into sTopic (= cMsg)
-      if (!renderTemplateToBuffer(topicBuf, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) continue;
+      if (!renderTemplateToBuffer(topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) continue;
       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) continue;
 
-      // ADR-040: source token detection on RAM copies (topicBuf and sLine)
-      bool hasSourceSuffixToken       = (strstr(topicBuf, s_sourceSuffixToken)       || strstr(sLine, s_sourceSuffixToken));
-      bool hasSourceNameToken         = (strstr(topicBuf, s_sourceNameToken)         || strstr(sLine, s_sourceNameToken));
-      bool hasSourceTopicSegmentToken = (strstr(topicBuf, s_sourceTopicSegmentToken) || strstr(sLine, s_sourceTopicSegmentToken));
+      // ADR-040: source token detection on PROGMEM pointers (byte-accessible on ESP8266)
+      bool hasSourceSuffixToken       = (strstr(topicTemplate, s_sourceSuffixToken)       || strstr(msgTemplate, s_sourceSuffixToken));
+      bool hasSourceNameToken         = (strstr(topicTemplate, s_sourceNameToken)         || strstr(msgTemplate, s_sourceNameToken));
+      bool hasSourceTopicSegmentToken = (strstr(topicTemplate, s_sourceTopicSegmentToken) || strstr(msgTemplate, s_sourceTopicSegmentToken));
 
       if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
         if (!sourceTemplateSchemaLogged) {
@@ -1359,21 +1349,21 @@ void doAutoConfigure(){
           sourceTemplateSchemaLogged = true;
         }
         if (settings.mqtt.bSeparateSources) {
-          if (expandAndPublishSourceTemplates(entry.id, "bulk", topicBuf, sLine, &renderCtx, sTopic)) {
+          if (expandAndPublishSourceTemplates(entry.id, "bulk", topicTemplate, msgTemplate, &renderCtx, sTopic)) {
             setMQTTConfigDone(entry.id);
           }
         }
-        continue; // source template handled (or intentionally skipped when disabled)
+        continue;
       }
 
-      if (!sendMQTTTemplateStreaming(sTopic, sLine, &renderCtx)) continue;
+      if (!sendMQTTTemplateStreaming(sTopic, msgTemplate, &renderCtx)) continue;
       setMQTTConfigDone(entry.id);
 
-      feedWatchDog(); // Keep the dog happy between publishes (not doBackgroundTasks — cMsg is live as sTopic)
+      feedWatchDog();
     }
 
-    // Note: cMsg (sTopic) and sLine are globals; they persist across calls.
-    // No cleanup needed; guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
+    // cMsg (sTopic) is a global; no cleanup needed.
+    // Guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
     resetMQTTBufferSize();
   } // Lock released here — configSensors() can now acquire it independently
 
@@ -1432,16 +1422,11 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
   uint16_t idx = pgm_read_word(&mqttHaCfgIndex[OTid]);
   if (idx == 0xFFFF) return _result;  // OT ID not in discovery config table
 
-  // Workspace (ADR-053 two-buffer design):
-  //   topicBuf[MQTT_TOPIC_MAX_LEN] — stack, RAM copy of PROGMEM topic template (≤200 bytes).
-  //   sLine[SLINE_SIZE=1200] — global, RAM staging for PROGMEM msg template. Guarded by
-  //                            mqttAutoConfigInProgress (acquired above via sessionLock).
-  //   sTopic = cMsg — cMsg reused as rendered topic (≤200 bytes). Safe because topicBuf
-  //                   and sLine are disjoint from cMsg.
-  //   feedWatchDog() is the only yield — prevents HTTP/MQTT callbacks from overwriting cMsg.
+  // sTopic = cMsg is the only RAM buffer used.  Topic and msg templates are read
+  // directly from PROGMEM pools (ESP8266 memory-mapped flash, byte-accessible via *ptr).
+  // feedWatchDog() is the only yield — prevents HTTP/MQTT callbacks from overwriting cMsg.
   char *sTopic = cMsg;
   initSourceTokens();
-  char topicBuf[MQTT_TOPIC_MAX_LEN];
 
   MQTTAutoConfigTemplateContext renderCtx;
   renderCtx.nodeId   = NodeId;
@@ -1459,42 +1444,41 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     memcpy_P(&entry, &mqttHaCfgTable[idx], sizeof(entry));
     if (entry.id != OTid) break;  // Past this ID's entries; table is sorted by id
 
-    // Copy templates from PROGMEM string pools to RAM buffers
-    strcpy_P(topicBuf, mqttHaTopicPool + entry.topicOff);
-    strcpy_P(sLine,    mqttHaMsgPool   + entry.msgOff);
+    // Direct PROGMEM pointers — no RAM staging needed on ESP8266
+    const char *topicTemplate = mqttHaTopicPool + entry.topicOff;
+    const char *msgTemplate   = mqttHaMsgPool   + entry.msgOff;
 
-    MQTTDebugTf(PSTR("Found PROGMEM entry for %d: [%s]\r\n"), OTid, topicBuf);
-    MQTTDebugTf(PSTR("sMsg template len[%d]\r\n"), (int)strlen(sLine));
+    MQTTDebugTf(PSTR("Found PROGMEM entry for %d: [%s]\r\n"), OTid, topicTemplate);
+    MQTTDebugTf(PSTR("sMsg template len[%d]\r\n"), (int)strlen_P(msgTemplate));
     DebugFlush();
 
     // Render topic into sTopic (= cMsg)
-    if (!renderTemplateToBuffer(topicBuf, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) { MQTTDebugTln(F("MQTT: topic template rendering overflow")); idx++; continue; }
+    if (!renderTemplateToBuffer(topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) { MQTTDebugTln(F("MQTT: topic template rendering overflow")); idx++; continue; }
     if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); idx++; continue; }
     MQTTDebugf(PSTR("[%s]\r\n"), sTopic);
 
-    // ADR-040: Source template detection — entries with source placeholders are emitted
-    // 3× (thermostat/boiler/gateway). strstr on RAM copies (topicBuf and sLine).
-    bool hasSourceSuffixToken       = (strstr(topicBuf, s_sourceSuffixToken)       || strstr(sLine, s_sourceSuffixToken));
-    bool hasSourceNameToken         = (strstr(topicBuf, s_sourceNameToken)         || strstr(sLine, s_sourceNameToken));
-    bool hasSourceTopicSegmentToken = (strstr(topicBuf, s_sourceTopicSegmentToken) || strstr(sLine, s_sourceTopicSegmentToken));
+    // ADR-040: Source template detection — strstr on PROGMEM pointers (byte-accessible on ESP8266)
+    bool hasSourceSuffixToken       = (strstr(topicTemplate, s_sourceSuffixToken)       || strstr(msgTemplate, s_sourceSuffixToken));
+    bool hasSourceNameToken         = (strstr(topicTemplate, s_sourceNameToken)         || strstr(msgTemplate, s_sourceNameToken));
+    bool hasSourceTopicSegmentToken = (strstr(topicTemplate, s_sourceTopicSegmentToken) || strstr(msgTemplate, s_sourceTopicSegmentToken));
 
     if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
       if (settings.mqtt.bSeparateSources && baseMqttTopic != nullptr) {
-        if (expandAndPublishSourceTemplates(OTid, "jit", topicBuf, sLine, &renderCtx, sTopic)) _result = true;
+        if (expandAndPublishSourceTemplates(OTid, "jit", topicTemplate, msgTemplate, &renderCtx, sTopic)) _result = true;
       }
       idx++;
       continue; // skip regular single-send below (source templates on or off)
     }
 
-    if (sendMQTTTemplateStreaming(sTopic, sLine, &renderCtx)) {
+    if (sendMQTTTemplateStreaming(sTopic, msgTemplate, &renderCtx)) {
       _result = true;
     }
 
     idx++;
   }
 
-  // Note: cMsg (sTopic) and sLine are globals; they persist across calls.
-  // No cleanup needed; guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
+  // cMsg (sTopic) is a global; no cleanup needed.
+  // Guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
   resetMQTTBufferSize();
   return _result;
 }

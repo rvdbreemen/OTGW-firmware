@@ -72,10 +72,8 @@ void setLed(int8_t, uint8_t);
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
 #define CMSG_SIZE  512   // General-purpose scratch buffer (webhook, REST API, JSON, MQTT topic render).
-                         // All known users need ≤512 bytes.  MQTT autoconfig lines (≤900 bytes)
-                         // use sLine[SLINE_SIZE] instead, so cMsg stays at its original size.
-#define SLINE_SIZE 1200  // MQTT autoconfig line buffer.  mqttha.cfg lines reach ~900 bytes max.
-                         // Exclusively owned by MQTTstuff.ino; guarded by mqttAutoConfigInProgress.
+                         // All known users need ≤512 bytes.  MQTT autoconfig reads templates
+                         // directly from PROGMEM pools (no RAM staging needed on ESP8266).
 #define OT_TOPIC_LEN 50  // Shared MQTT topic scratch for OT print_* functions.
 #define JSON_BUFF_MAX   1024
 #define JSON_ENTRY_BUF   256  // max bytes for a single serialized JSON entry/object
@@ -692,7 +690,6 @@ OTGWSettings settings;
 //===================[ Global variables — not part of settings or state ]===================
 WiFiClient  wifiClient;
 char        cMsg[CMSG_SIZE];
-char        sLine[SLINE_SIZE];  // MQTT autoconfig line scratch (MQTTstuff.ino, guarded by mqttAutoConfigInProgress)
 char        otTopic[OT_TOPIC_LEN];  // Shared MQTT topic scratch for OT print_* functions (sequential, not re-entrant)
 char        lastReset[129] = "";
 uint32_t    MQTTautoConfigMap[8] = { 0 };
