@@ -4,103 +4,77 @@
 
 ### Medium Severity
 
-**SEC-1: MQTT pending slot overwrite on re-entrancy (CWE-362)**
-- **Files:** OTGW-Core.ino:245-261, MQTTstuff.ino:958-960
-- **Issue:** Single pending slot for MQTT throttle deferral. `shouldPublishMQTTForID()` sets `mqttPendingSlot` expecting one `sendMQTTData()` to confirm it. If re-entrant `processOT()` fires (via `doBackgroundTasks()`), the slot can be overwritten. Bit/byte variants have defensive `pending = false` discard at entry; value slot does not.
-- **Impact:** Under high OT rates with MQTT failures, throttle state could become inconsistent — causing duplicate publishes or missed updates. Not remotely exploitable but affects reliability.
-- **Fix:** Add `mqttPendingSlot.pending = false` at top of `shouldPublishMQTTForID()` and `shouldPublishMQTTForPSField()`.
+1. **`strstr()` on PROGMEM pointers -- undefined behavior** (CWE-758, MQTTstuff.ino:1711-1724, 1842-1844)
+   - Works on ESP8266 (exception handler) and ESP32 (PROGMEM=no-op). Not exploitable but correctness risk on future platforms/SDK updates.
+   - Also affects `renderTemplateToBuffer()`, `sendMQTTTemplateStreaming()`, and `writeMqttChunk()` which pass PROGMEM pointers where RAM expected.
+   - `writeMqttProgmemChunk()` (line 282) already exists as the correct pattern but is unused in the streaming path.
+
+2. **Generator not in build pipeline** (CWE-1104 adapted, tools/generate_mqttha_progmem.py)
+   - No automated staleness check. Editing `mqttha.cfg` without regenerating silently uses stale discovery data. No hash verification between source and generated output.
 
 ### Low Severity
 
-**SEC-2: Direct serial write bypasses flash-in-progress guard (CWE-662)**
-- **File:** OTGW-firmware.ino:410
-- **Issue:** 60-second PIC probe (`PR=A`) doesn't check `state.flash.bPICactive`. Could corrupt PIC flash protocol if timing coincides with firmware upgrade.
-- **Fix:** Add `!isFlashing()` guard.
+3. **Stray files committed** (CWE-540, networkStuff.h.tmp, $f) -- hygiene issue, no credentials exposed.
+4. **Nightly restart auth/timing** (CWE-400) -- properly auth-gated, input validated, narrow timing window. Within trusted-LAN threat model.
+5. **Template rendering trusts null terminator** (CWE-120) -- safe under normal conditions (generator adds \0). Corrupted build artifact could leak flash content to MQTT. Not remotely exploitable.
+6. **Dead `sLine[1200]` buffer** (CWE-561) -- 1200 bytes wasted RAM, not a security issue but reclaim opportunity.
+7. **`delay(200)` before restart, no settings flush** -- pending settings write could be lost. Nightly restart is deliberate, so impact minimal.
 
-**SEC-3: PIC upgrade filename path traversal (CWE-22, pre-existing)**
-- **File:** OTGW-Core.ino:4628-4656
-- **Issue:** `upgradepic()` uses `httpServer.arg("name")` in LittleFS path without sanitizing `../`. Pre-existing issue, not introduced by this changeset. Mitigated by HTTP auth and LittleFS path constraints.
-- **Fix:** Reject filenames containing `/` or `..`.
+### Positive Findings (Informational)
 
-**SEC-4: REST API conditional field omission (CWE-754)**
-- **Files:** restAPI.ino:699-753, 882-1067
-- **Issue:** PIC-related and unseen OT fields now conditionally omitted from JSON. Backwards-incompatible schema change within v2 API. `picavailable` is always present (correct discriminator).
-- **Fix:** Document or use sentinel values for stable schema.
-
-**SEC-5: `strstr_P` on text buffer — correct but needs clarifying comment**
-- **File:** MQTTstuff.ino:1297
-- **Issue:** Usage is safe (text data, not binary), but proximity to project guideline warnings could cause future confusion.
-
-### Informational
-
-**SEC-6: XSS via tooltip content — No issue found**
-- Tooltip feature uses `setAttribute("title", ...)` with static lookup table. No injection vector.
-
-**SEC-7: No authentication on GET endpoints — Accepted risk per LAN-only design**
-- Consistent with project security model. New `picavailable` field is low-sensitivity.
-
-### Positive Security Improvements
-
-1. PIC availability guard pattern — defense-in-depth across 12+ entry points
-2. MQTT throttle deferral — prevents state corruption on publish failure
-3. Default `bOnline = false` — safer fail-closed default
-4. REST 503 for PIC-disabled commands — correct HTTP semantics
-5. Frontend PIC-only visibility — reduces interaction surface for non-functional features
-
-### OWASP IoT Top 10 Assessment
-
-| Category | Status |
-|----------|--------|
-| I1: Weak Passwords | Acceptable |
-| I2: Insecure Network Services | Acceptable |
-| I3: Insecure Ecosystem Interfaces | Low Risk (schema change) |
-| I4: Lack of Secure Update | Pre-existing (no signature verification) |
-| I7: Insecure Data Transfer | Accepted (HTTP-only by design) |
-| I9: Insecure Default Settings | Improved (bOnline=false) |
+- MQTT drip rate limiting: well-designed, no DoS concern. One publish per tick, timer-gated, heap-guarded.
+- Bitmap bounds checking: correct, no out-of-bounds possible (uint8_t input, 8-element array).
+- REST API auth for new settings: properly secured, consistent with existing patterns.
+- Input validation: `nightlyrestarthour` correctly clamped 0-23, `nightlyrestart` uses EVALBOOLEAN.
 
 ## Performance Findings
 
-### Overall Assessment: No material negative performance impact
+### High Severity
 
-The changes add minimal overhead (~20 bytes RAM, <2µs per cycle) while improving MQTT reliability and reducing REST response sizes.
+1. **`strstr()` on PROGMEM triggers exception handler -- ~60-120ms per entry** (MQTTstuff.ino:1711-1724, 1842-1844)
+   - Every unaligned byte access on ESP8266 PROGMEM costs ~20-40us (Xtensa LoadStoreErrorCause exception handler).
+   - 6 strstr calls per entry x ~500 avg chars = ~3000 byte accesses = ~60-120ms per entry.
+   - `doAutoConfigure()` (345 entries): **~20-40 seconds** in exception handler overhead.
+   - `doAutoConfigureMsgid()` (drip, 1 entry): ~60-120ms per invocation (tolerable at 3s intervals).
+   - Same issue in `renderTemplateToBuffer()`, `sendMQTTTemplateStreaming()`, `tryGetTemplateReplacement()`.
+   - **Fix**: Add precomputed `flags` field to `MqttHaCfgEntry` (isPIC, isOTDirect, hasSourceTokens). Generator precomputes. Eliminates all 6 strstr calls per entry. For template rendering: use `writeMqttProgmemChunk` pattern for PROGMEM literal spans.
 
-### Positive Changes
+### Medium Severity
 
-**PERF+1: REST API response size reduction (~200-500 bytes)**
-- Conditional omission of unseen OT fields reduces JSON payload, meaningful on ESP8266.
+2. **17-minute discovery window** (MQTTstuff.ino loopMQTTDiscovery)
+   - 345 entries at 3s each = ~17 minutes for full HA discovery. Under heap pressure (30s): ~2.8 hours.
+   - Old JIT approach discovered ~60 active IDs in ~2 minutes as OT traffic arrived.
+   - **Fix**: Reduce normal interval to 1s (6 minutes), or hybrid JIT+drip for active IDs.
 
-**PERF+2: `setMsgLastUpdated` now behind `is_value_valid` check**
-- Avoids wasted switch-case lookup for invalid/skipped OT messages.
+3. **sLine[1200] now reclaimable** (OTGW-firmware.h:1002)
+   - 1200 bytes = 3% of 40KB RAM budget. Only remaining user: restAPI.ino OTDirect JSON.
+   - **Fix**: Remove or shrink; use local buffer in REST handler.
 
-**PERF+3: -8 bytes static RAM from removed `processOT` variables**
-- `epochGatewaylastseen` and `bOTGWgatewaypreviousstate` eliminated.
+4. **sendMQTTTemplateStreaming uses writeMqttChunk on PROGMEM** (MQTTstuff.ino:346)
+   - `MQTTclient.write()` receives PROGMEM pointer where RAM expected. Works via exception handler but slow.
+   - **Fix**: Use existing `writeMqttProgmemChunk()` (line 282) which correctly stages via RAM buffer.
 
 ### Low Severity
 
-**PERF-1: +20 bytes static RAM for pending throttle structs**
-- Three new `MQTTPending*` structs. 0.05% of usable RAM. Acceptable.
+5. **getHeapHealth() called every loop iteration** (MQTTstuff.ino:1573)
+   - `ESP.getFreeHeap()` ~1-2us per call, at 1000Hz = ~1-2ms/s. Unnecessary before timer fires.
+   - **Fix**: Move adaptive interval logic after `DUE()` check.
 
-**PERF-2: Double `getMsgLastUpdated()` in `sendOTmonitorV2`**
-- ~30µs extra per REST call (15 fields × 2µs each). Optional micro-optimization: cache in local variable.
+6. **Failed discovery silently dropped** (MQTTstuff.ino:1614)
+   - Pending bit cleared on publish failure. Entry missing from HA until next restart/reconnect.
+   - **Fix**: Keep bit set on failure with backoff, or add retry counter.
 
-**PERF-3: 3× `confirmMQTTPublish*()` calls per `sendMQTTData`**
-- ~0.3µs per publish (three bool checks). Negligible vs TCP I/O cost.
+7. **mqttha.cfg possibly still in LittleFS image** -- ~170KB wasted flash if no longer read at runtime. Remove from `data/`.
 
-**PERF-4: `isPICEnabled()` ~20 inline bool reads per cycle**
-- <2µs total. Compiler inlines to single load instruction.
+### Major Positive Improvements
 
-**PERF-5: `applyPICAvailability()` DOM operations**
-- ~10 DOM lookups, ~1ms, called 2-3x during page load. No layout thrashing.
-
-### No Regressions Found
-
-- No new Flash I/O in hot paths
-- No new blocking operations
-- No new memory leaks or unbounded allocations
-- Watchdog timing unchanged (`feedWatchDog` still at same position)
+- **processOT() latency: 50-200ms reduced to ~1us** -- bitmap set replaces LittleFS open/scan/close + MQTT publish inline.
+- **Heap fragmentation elimination** -- zero LittleFS I/O during normal operation. No more file handle/sector cache/read buffer alloc/free cycles.
+- **New RAM usage negligible** -- 47 bytes total (32 bytes bitmap + 2 bytes settings + 13 bytes timer).
+- **Flash usage roughly neutral** -- ~164KB PROGMEM replaces ~170KB LittleFS file. Index overhead <4KB.
 
 ## Critical Issues for Phase 3 Context
 
-1. **No test infrastructure exists** — ESP8266 Arduino project without unit test framework. Security and correctness concerns (SEC-1, SEC-2) cannot be validated via automated tests.
-2. **REST API schema change** (SEC-4) — Documentation review should check if API contract is documented anywhere for third-party consumers.
-3. **Path traversal in PIC upgrade** (SEC-3, pre-existing) — Should be added to test backlog if testing is ever introduced.
+- **Testing gap**: The strstr-on-PROGMEM performance issue should be validated with timing measurements on real hardware. The 20-40s estimate for full discovery is based on exception handler cost modeling, not measurement.
+- **Documentation gap**: The PROGMEM pointer access pattern (relying on exception handler) is a deliberate engineering choice but undocumented. Future contributors may "fix" it by adding _P helpers that don't exist for this use case.
+- **Integration test need**: The 17-minute discovery window should be tested with HA to verify entities appear correctly during the drip phase.

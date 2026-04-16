@@ -2,73 +2,74 @@
 
 ## Code Quality Findings
 
+### High Severity
+
+1. **`strstr()` on PROGMEM pointers -- platform assumption** (MQTTstuff.ino:1711-1724, 1842-1844)
+   - `strstr(topicTemplate, "otgw-pic/")` where `topicTemplate` points into PROGMEM pool. Works on ESP8266 due to load-store exception handler for flash reads, and on ESP32 where PROGMEM is a no-op. But technically UB for libc. Neither `strstr` nor `strstr_P` is fully correct here (haystack is PROGMEM, not needle).
+   - **Action**: Document as explicit platform assumption. No correct libc function exists for PROGMEM-haystack + RAM-needle without copying.
+
+2. **`%s` format with PROGMEM pointer in debug log** (MQTTstuff.ino:1832)
+   - `MQTTDebugTf(PSTR("Found PROGMEM entry for %d: [%s]\r\n"), OTid, topicTemplate)` -- same PROGMEM pointer issue. Works on ESP8266 but slow (exception per byte). Debug-only, acceptable.
+
 ### Medium Severity
 
-**CQ-1: `sendMQTTStreaming` missing throttle confirm calls**
-- **File:** MQTTstuff.ino:1021-1065
-- **Issue:** `sendMQTTStreaming()` does not call `confirmMQTTPublishSlot()` / `confirmMQTTPublishBitSlot()` / `confirmMQTTPublishByteSlot()` on success. Currently only used for non-throttled topics (LWT, autoconfigure), but if throttle-gated data is ever routed through this path, pending slots will never confirm — causing infinite republish.
-- **Fix:** Add confirm calls after successful `endPublish()`, or add a comment documenting the exclusion.
+3. **Stray/temporary files committed** (src/OTGW-firmware/$f, src/OTGW-firmware/networkStuff.h.tmp)
+   - Editor/build artifacts. Neither referenced by any build or #include. Pollutes repo.
+   - **Action**: Remove files, add `*.tmp` to `.gitignore`.
 
-**CQ-2: `isGatewayFirmware()` silently disables PIC settings for non-gateway firmware**
-- **File:** OTGW-firmware.h:505, line 607
-- **Issue:** `queryNextPICsetting()` guard `if (!isPICEnabled() || !isGatewayFirmware()) return;` skips all PIC settings readout for monitor-mode firmware. This may be intentional but is undocumented.
-- **Fix:** Add a comment explaining that PR= queries are only supported by gateway firmware.
+4. **Nightly restart has narrow 60s match window** (OTGW-firmware.ino:418-427)
+   - Checks `hour == iRestartHour && minute == 0`. If the 60s timer drifts or main loop is delayed, the restart could be missed for that day. The `uptime > 3600` guard prevents restart loops.
+   - **Action**: Acceptable with current guards. Document as latent fragility.
 
-**CQ-3: Direct serial write in 60s probe bypasses flash-in-progress guard**
-- **File:** OTGW-firmware.ino:410-411
-- **Issue:** `OTGWSerial.write("PR=A\r\n")` bypasses `addOTWGcmdtoqueue()` intentionally, but also bypasses the flashing check (`state.flash.bESPactive || state.flash.bPICactive`). Sending `PR=A` during PIC flashing could interfere with the flash protocol.
-- **Fix:** Add a flash-in-progress guard before the serial write.
+5. **Stale comment: says 12000 but value is 8000** (MQTTstuff.ino:46-50)
+   - Comment references old threshold `12000` but `MQTT_DISCOVERY_HEAP_MIN = 8000`.
+   - **Action**: Fix comment to match actual value.
+
+6. **Duplicated source token detection block** (MQTTstuff.ino:1722-1724 and 1842-1844)
+   - Identical 3-line `strstr` block in both `doAutoConfigure()` and `doAutoConfigureMsgid()`.
+   - **Action**: Extract to a `detectSourceTokens()` helper.
+
+7. **Stale `sLine[1200]` global buffer** (OTGW-firmware.h:89, 1002)
+   - 1200 bytes of RAM. No longer used by MQTT autoconfig (switched to PROGMEM). Only remaining users appear to be in restAPI.ino for OT-direct JSON.
+   - **Action**: Audit usage; reduce size or make local if only used by REST handler.
 
 ### Low Severity
 
-**CQ-4: `bOnline` default changed from `true` to `false`**
-- **File:** OTGW-firmware.h:146
-- **Issue:** Users may see a brief "offline" blip on every reboot in HA dashboards until first OT message arrives. Behavioral change is correct but should be documented.
-
-**CQ-5: Scattered `isPICEnabled()` guards across ~15 functions**
-- **Files:** OTGW-Core.ino, restAPI.ino, MQTTstuff.ino (multiple locations)
-- **Issue:** Defense-in-depth is good, but the enforcement boundaries vs. early-exit guards are not documented, making it easy to miss a guard when adding new PIC-dependent code.
-- **Fix:** Document which functions are enforcement boundaries (addOTWGcmdtoqueue, sendOTGW, executeCommand).
-
-**CQ-6: Double `getMsgLastUpdated()` evaluation in `sendOTmonitorV2`**
-- **File:** restAPI.ino:642+
-- **Issue:** Each conditional OT field calls `getMsgLastUpdated()` twice — once for the guard, once as parameter. Negligible performance impact but slightly wasteful.
-
-**CQ-7: Frontend `applyPICAvailability` called with cached state in `refreshSettings`**
-- **File:** index.js:4393
-- **Issue:** Relies on `refreshDevInfo()` running before `refreshSettings()` to set `picAvailable`. Fragile ordering dependency, though currently correct.
+8. **Inconsistent bitmap helper style** (MQTTstuff.ino:1487-1535) -- old uses `0b11100000`, new uses `0x07`. Cosmetic.
+9. **`getMQTTConfigPending()` defined but never called** (MQTTstuff.ino:1524-1529) -- dead code, wastes flash.
+10. **Direct access to timer macro internals** (MQTTstuff.ino:1574) -- `timerDiscoveryDrip_interval` couples to macro naming.
+11. **No string deduplication in PROGMEM generator** (generate_mqttha_progmem.py) -- msg pool is 140KB, could shrink 30-50% with interning.
 
 ## Architecture Findings
 
+### Critical Severity
+
+1. **`strstr()` on PROGMEM pointers -- ESP32 portability risk** (MQTTstuff.ino:1711-1724)
+   - Works on ESP8266 (exception handler) and ESP32 (PROGMEM=no-op), but if ESP32-C3/C6 (RISC-V) or future cores change PROGMEM behavior, these break silently.
+   - **Action**: Use `strstr_P()` where possible, or add compile-time guard/static_assert for non-ESP8266/ESP32 platforms. At minimum, document the assumption.
+
 ### Medium Severity
 
-**AR-1: Single pending slot vulnerable to re-entrancy**
-- **File:** OTGW-Core.ino:1425,1454 / MQTTstuff.ino pending slot structs
-- **Issue:** Only one `mqttPendingSlot` exists. The contract is: `shouldPublishMQTTForID()` sets pending, then exactly one `sendMQTTData()` confirms it. If `doBackgroundTasks()` re-enters via `feedWatchDog()` → `yield()` → `handleOTGW()` → `processOT()`, another `shouldPublishMQTTForID()` could overwrite the pending slot before the outer publish confirms.
-- **Note:** The bit/byte variants have a mitigation (`pending = false` at entry of `shouldPublishTrackedStatusBit`), but `shouldPublishMQTTForID` does NOT.
-- **Fix:** Add `mqttPendingSlot.pending = false;` at the top of `shouldPublishMQTTForID()` and `shouldPublishMQTTForPSField()` to match the bit/byte pattern. Document the single-slot/single-threaded assumption.
+2. **Unused Python struct format in generator** (generate_mqttha_progmem.py:28)
+   - `ENTRY_FMT = '<BxHI'` is defined but never used (generator outputs C source, not binary). Creates false sense of verification.
+   - **Action**: Remove dead code or add clarifying comment.
+
+3. **Heap guard threshold inconsistency** (MQTTstuff.ino:50 vs helperStuff.ino:609)
+   - `MQTT_DISCOVERY_HEAP_MIN=8000` vs `HEAP_WARNING_THRESHOLD=5120`. Comment says "keep in sync" but values differ intentionally (8000 is more conservative). Misleading comment.
+   - **Action**: Clarify comment to document the intentional two-tier design.
+
+4. **Code generator not integrated in build pipeline** (tools/generate_mqttha_progmem.py)
+   - Generated files committed but `build.py` does not invoke the generator. If `mqttha.cfg` is edited without regenerating, firmware silently uses stale discovery data.
+   - **Action**: Add CI check or pre-build step to verify generated files match source.
 
 ### Low Severity
 
-**AR-2: REST API conditional fields may break third-party parsers**
-- **Files:** restAPI.ino (`sendDeviceInfoV2`, `sendOTmonitorV2`)
-- **Issue:** PIC-related and unseen OT fields are now conditionally omitted from JSON responses. The frontend handles this correctly via `picavailable` discriminator, but third-party integrations expecting a fixed schema will see missing keys.
-- **Fix:** Document conditional field behavior in REST API docs or changelog.
-
-**AR-3: `queryNextPICsetting` guard correctly refined**
-- **File:** OTGW-firmware.h:607
-- **Issue:** Removed `bOnline` dependency (correct — PIC settings don't need OT bus traffic) and added `isGatewayFirmware()` check (correct — PR=* commands are gateway-specific). Good change.
-
-### Positive Findings (Commendations)
-
-**AR+1: PIC guard defense-in-depth is well-layered** — Guards at entry points, mid-level orchestrators, and low-level serial functions. ADR-060 documents the pattern.
-
-**AR+2: Frontend `pic-only` CSS class pattern** — Clean separation of concerns using CSS-driven visibility toggling.
-
-**AR+3: Architectural consistency maintained** — PROGMEM discipline, state architecture (ADR-051), command queue discipline, no String class in hot paths, proper ADR documentation.
+5. **Nightly restart settings not in named sub-section per ADR-051** (OTGW-firmware.h:975-976) -- acceptable for two fields.
+6. **Silent failure in drip discovery** (MQTTstuff.ino loopMQTTDiscovery) -- pending bit cleared on publish failure without counter/log. Recovered by next reconnect cycle.
+7. **`doAutoConfigure()` iterates all 345 entries without early exit** (MQTTstuff.ino) -- intentional force-republish for manual trigger. No regression.
 
 ## Critical Issues for Phase 2 Context
 
-1. **MQTT throttle slot re-entrancy** (AR-1) — Security/performance reviewers should consider whether the `feedWatchDog()` yield window in `sendMQTTData` could cause message duplication or lost updates under load.
-2. **Direct serial write during flash** (CQ-3) — Could have safety implications if PIC firmware upgrade is in progress.
-3. **REST API schema changes** (AR-2) — May affect integrations; security reviewer should check if missing fields could cause null-reference issues in consumers.
+- **PROGMEM pointer dereference pattern**: The `strstr()` / `%s` on flash pointers is the central platform concern. Security and performance review should evaluate whether this creates any exploitable behavior or measurable performance impact.
+- **Heap thresholds**: Two different subsystems use different heap thresholds. Performance review should verify the 8000-byte threshold is appropriate for the MQTT discovery publish path.
+- **Stale sLine buffer**: 1200 bytes of potentially reclaimable RAM on a 40KB platform.

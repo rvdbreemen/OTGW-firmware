@@ -2,64 +2,45 @@
 
 ## Target
 
-All changes since the v1.3.2 release to current HEAD on the `dev` branch. This covers the v1.3.3 release and ongoing v1.3.4-beta development. 28 source files changed with 309 insertions and 125 deletions.
+Merge commit of dev branch into feature-dev-2.0.0-otgw32-esp32-sat-support branch.
+This merge integrates ESP8266 heap pressure fixes, async bitmap-driven MQTT discovery drip publisher,
+PROGMEM-based MQTT HA config index, nightly restart scheduling, and related optimizations into the
+2.0.0 multi-platform (ESP8266/ESP32) firmware branch.
 
-## Key Commits
+The merge also required conflict resolution across core firmware files, adding missing forward
+declarations, struct members, and fixing type name mismatches between the two branches.
 
-- `afd77dc` fix: defer MQTT throttle slot update until publish succeeds
-- `c3c1184` fix: add tooltips to Debug Info page, rename OTGW Connected to OpenTherm Active, support thermostat-only setups
-- `5f5ee4f` feat: Bump version to v1.3.4-beta for development
-- `541cb1b` release: v1.3.3
-- `008bc6f` Fix gateway mode detection and misleading HA Integration label (#528)
-- `ae4487a` fix: hide unsupported OT values from dashboard
-- `fad2ce7` Disable all PIC-related functions when no PIC is detected at boot (#522)
-- `10f8a59` docs: add ADR-060 PIC Availability Guard Pattern
+## Files
 
-## Files (Source Code)
+Source files changed in the merge (11 files, 2770 insertions, 194 deletions):
 
-### Core Firmware (.ino/.h)
-- src/OTGW-firmware/OTGW-firmware.ino
-- src/OTGW-firmware/OTGW-firmware.h
-- src/OTGW-firmware/OTGW-Core.ino
-- src/OTGW-firmware/OTGW-Core.h
-- src/OTGW-firmware/MQTTstuff.ino
-- src/OTGW-firmware/networkStuff.ino
-- src/OTGW-firmware/networkStuff.h
-- src/OTGW-firmware/restAPI.ino
-- src/OTGW-firmware/settingStuff.ino
-- src/OTGW-firmware/jsonStuff.ino
-- src/OTGW-firmware/helperStuff.ino
-- src/OTGW-firmware/FSexplorer.ino
-- src/OTGW-firmware/sensors_ext.ino
-- src/OTGW-firmware/outputs_ext.ino
-- src/OTGW-firmware/s0PulseCount.ino
-- src/OTGW-firmware/webSocketStuff.ino
-- src/OTGW-firmware/webhook.ino
-- src/OTGW-firmware/version.h
+- `src/OTGW-firmware/MQTTstuff.ino` - MQTT discovery drip publisher, PROGMEM index, heap guards (432 lines changed)
+- `src/OTGW-firmware/OTGW-Core.ino` - Non-blocking setMQTTConfigPending() integration (24 lines changed)
+- `src/OTGW-firmware/OTGW-firmware.h` - Forward declarations, MQTTautoCfgPendingMap, nightly restart settings (7 lines added)
+- `src/OTGW-firmware/OTGW-firmware.ino` - loopMQTTDiscovery() in main loop, nightly restart logic (18 lines added)
+- `src/OTGW-firmware/data/index.js` - Web UI nightly restart labels (4 lines added)
+- `src/OTGW-firmware/mqttha_progmem.cpp` - Generated PROGMEM MQTT HA config tables (2145 lines, new file)
+- `src/OTGW-firmware/mqttha_progmem.h` - PROGMEM index header (36 lines, new file)
+- `src/OTGW-firmware/restAPI.ino` - REST API nightly restart settings exposure (4 lines changed)
+- `src/OTGW-firmware/sensors_ext.ino` - Minor sensor changes (6 lines changed)
+- `src/OTGW-firmware/settingStuff.ino` - Nightly restart settings persistence (5 lines added)
+- `tools/generate_mqttha_progmem.py` - Build tool: generates PROGMEM tables from mqttha.cfg (283 lines, new file)
 
-### Frontend (Web UI)
-- src/OTGW-firmware/data/index.html
-- src/OTGW-firmware/data/index.js
-- src/OTGW-firmware/data/index.css
-- src/OTGW-firmware/data/index_dark.css
-- src/OTGW-firmware/data/graph.js
-- src/OTGW-firmware/data/FSexplorer.html
-- src/OTGW-firmware/data/FSexplorer.css
-- src/OTGW-firmware/data/FSexplorer_dark.css
-- src/OTGW-firmware/data/mqttha.cfg
-- src/OTGW-firmware/data/version.hash
+## Project Context
 
-### Documentation
-- docs/adr/ADR-060-pic-availability-guard-pattern.md
-- RELEASE_NOTES_1.3.3.md
-- README.md
+- **Platform**: ESP8266 (NodeMCU/Wemos D1 mini, ~40KB usable RAM) + ESP32-S3 (OTGW32)
+- **Language**: Arduino C/C++ (.ino files), single translation unit per platform
+- **Critical constraints**: PROGMEM mandatory for strings, no String class in hot paths, no ArduinoJson,
+  stream files (never load into RAM), HTTP/WS only (no HTTPS), cooperative scheduling with feedWatchDog()
+- **Serial**: Reserved for PIC communication, debug via Telnet port 23
 
 ## Flags
 
 - Security Focus: no
-- Performance Critical: no
+- Performance Critical: yes (ESP8266 heap pressure is the primary motivation for these changes)
 - Strict Mode: no
-- Framework: Arduino/ESP8266
+- Framework: Arduino/ESP8266+ESP32
+- Relevant ADRs: ADR-004 (no String in hot paths), ADR-040 (MQTT discovery), ADR-051 (Settings/State)
 
 ## Review Phases
 

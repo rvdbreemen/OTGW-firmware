@@ -1,11 +1,11 @@
 ---
 id: TASK-253
 title: Write comprehensive user and developer manual for OTGW-firmware 2.0.0
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-11 15:50'
-updated_date: '2026-04-12 08:17'
+updated_date: '2026-04-16 10:10'
 labels:
   - documentation
   - 2.0.0
@@ -25,8 +25,14 @@ Write a single cohesive documentation manual covering the full OTGW-firmware v2.
 - [x] #2 User-facing chapters: Getting Started, Web Interface, Home Assistant, SAT Thermostat, Troubleshooting
 - [x] #3 Developer chapters: Architecture, MQTT/REST API reference, Build system, Contributing
 - [x] #4 Consistent style throughout, no em dashes, English
-- [ ] #5 Saved to docs/MANUAL.md, committed and pushed
+- [x] #5 Saved to docs/MANUAL.md, committed and pushed
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+MANUAL.md created by concatenating all 10 English chapters from docs/manuals/en/. Committed as a15f2196.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
