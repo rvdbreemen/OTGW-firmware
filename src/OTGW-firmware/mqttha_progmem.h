@@ -1,7 +1,7 @@
 // AUTO-GENERATED - DO NOT EDIT.
 // Run tools/generate_mqttha_progmem.py to regenerate.
 // Source: src/OTGW-firmware/data/mqttha.cfg
-// Generated: 2026-04-15T20:44:24Z
+// Generated: 2026-04-16T20:12:58Z
 //
 // Declarations only — actual PROGMEM data lives in mqttha_progmem.cpp
 // which Arduino compiles as a separate translation unit.  This avoids
@@ -16,15 +16,24 @@
 // Entry descriptor — 8 bytes with natural alignment
 // Fields after memcpy_P to RAM:
 //   id        : uint8_t  — OT message ID
+//   flags     : uint8_t  — pre-computed flags (avoids strstr on PROGMEM at runtime)
 //   topicOff  : uint16_t — byte offset into mqttHaTopicPool (23758 bytes)
 //   msgOff    : uint32_t — byte offset into mqttHaMsgPool   (140767 bytes)
 // ---------------------------------------------------------------------------
 struct MqttHaCfgEntry {
   uint8_t  id;
+  uint8_t  flags;
   uint16_t topicOff;
   uint32_t msgOff;
 };
 static_assert(sizeof(MqttHaCfgEntry) == 8, "MqttHaCfgEntry must be 8 bytes");
+
+// Flag bit definitions
+constexpr uint8_t MQTT_HA_FLAG_SOURCE_SUFFIX        = 0x01;
+constexpr uint8_t MQTT_HA_FLAG_SOURCE_NAME          = 0x02;
+constexpr uint8_t MQTT_HA_FLAG_SOURCE_TOPIC_SEGMENT = 0x04;
+constexpr uint8_t MQTT_HA_FLAG_IS_PIC_ENTRY         = 0x08;
+constexpr uint8_t MQTT_HA_FLAG_ANY_SOURCE           = 0x07;  // mask for any source token
 
 // Total number of entries in mqttHaCfgTable
 constexpr uint16_t MQTT_HA_CFG_COUNT = 345;

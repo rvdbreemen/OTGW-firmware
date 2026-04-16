@@ -100,6 +100,28 @@ struct MQTTAutoConfigSessionLock {
   MQTTAutoConfigSessionLock& operator=(const MQTTAutoConfigSessionLock&) = delete;
 };
 
+// ---------------------------------------------------------------------------
+// PROGMEM-safe string helpers
+// On ESP8266, standard strstr/strncmp may use word-aligned reads internally.
+// Unaligned 32-bit reads from flash (0x402xxxxx) cause Exception (3) on
+// Arduino Core 3.1.2+. These helpers use pgm_read_byte for safe byte access.
+// ---------------------------------------------------------------------------
+static int pgm_strncmp_PP(PGM_P s1, const char *s2, size_t n)
+{
+  for (size_t i = 0; i < n; i++) {
+    uint8_t c1 = pgm_read_byte(s1 + i);
+    uint8_t c2 = static_cast<uint8_t>(s2[i]);
+    if (c1 != c2) return (int)c1 - (int)c2;
+    if (c1 == 0) return 0;
+  }
+  return 0;
+}
+
+static char pgm_read_char(PGM_P p)
+{
+  return static_cast<char>(pgm_read_byte(p));
+}
+
 static            PubSubClient MQTTclient(wifiClient);
 
 int8_t            reconnectAttempts = 0;
@@ -160,50 +182,51 @@ static bool parseAutoConfigLine(char *sIn, char del, void *viewPtr) {
   return true;
 }
 
-static bool tryGetTemplateReplacement(const char *cursor, const void *ctxPtr, const char *&replacement, size_t &tokenLen)
+static bool tryGetTemplateReplacement(PGM_P cursor, const void *ctxPtr, const char *&replacement, size_t &tokenLen)
 {
+  // cursor may point into PROGMEM (flash) — use pgm_strncmp_PP for safe byte access.
   const MQTTAutoConfigTemplateContext &ctx = *static_cast<const MQTTAutoConfigTemplateContext*>(ctxPtr);
-  if (strncmp(cursor, "%mqtt_sub_topic%", 16) == 0) {
+  if (pgm_strncmp_PP(cursor, "%mqtt_sub_topic%", 16) == 0) {
     replacement = ctx.mqttSubTopic;
     tokenLen = 16;
     return true;
   }
-  if (strncmp(cursor, "%mqtt_pub_topic%", 16) == 0) {
+  if (pgm_strncmp_PP(cursor, "%mqtt_pub_topic%", 16) == 0) {
     replacement = ctx.mqttPubTopic;
     tokenLen = 16;
     return true;
   }
-  if (strncmp(cursor, "%source_topic_segment%", 22) == 0) {
+  if (pgm_strncmp_PP(cursor, "%source_topic_segment%", 22) == 0) {
     replacement = ctx.sourceTopicSegment;
     tokenLen = 22;
     return true;
   }
-  if (strncmp(cursor, "%source_suffix%", 15) == 0) {
+  if (pgm_strncmp_PP(cursor, "%source_suffix%", 15) == 0) {
     replacement = ctx.sourceSuffix;
     tokenLen = 15;
     return true;
   }
-  if (strncmp(cursor, "%source_name%", 13) == 0) {
+  if (pgm_strncmp_PP(cursor, "%source_name%", 13) == 0) {
     replacement = ctx.sourceName;
     tokenLen = 13;
     return true;
   }
-  if (strncmp(cursor, "%sensor_id%", 11) == 0) {
+  if (pgm_strncmp_PP(cursor, "%sensor_id%", 11) == 0) {
     replacement = ctx.sensorId;
     tokenLen = 11;
     return true;
   }
-  if (strncmp(cursor, "%hostname%", 10) == 0) {
+  if (pgm_strncmp_PP(cursor, "%hostname%", 10) == 0) {
     replacement = ctx.hostname;
     tokenLen = 10;
     return true;
   }
-  if (strncmp(cursor, "%node_id%", 9) == 0) {
+  if (pgm_strncmp_PP(cursor, "%node_id%", 9) == 0) {
     replacement = ctx.nodeId;
     tokenLen = 9;
     return true;
   }
-  if (strncmp(cursor, "%version%", 9) == 0) {
+  if (pgm_strncmp_PP(cursor, "%version%", 9) == 0) {
     replacement = ctx.version;
     tokenLen = 9;
     return true;
@@ -213,15 +236,16 @@ static bool tryGetTemplateReplacement(const char *cursor, const void *ctxPtr, co
   return false;
 }
 
-static bool renderTemplateToBuffer(const char *templateStr, char *dest, size_t destSize, const void *ctxPtr)
+static bool renderTemplateToBuffer(PGM_P templateStr, char *dest, size_t destSize, const void *ctxPtr)
 {
+  // templateStr may point into PROGMEM — use pgm_read_char for safe byte access.
   const MQTTAutoConfigTemplateContext &ctx = *static_cast<const MQTTAutoConfigTemplateContext*>(ctxPtr);
   if (!templateStr || !dest || destSize == 0) return false;
   dest[0] = '\0';
 
   size_t destLen = 0;
-  const char *cursor = templateStr;
-  while (*cursor != '\0') {
+  PGM_P cursor = templateStr;
+  while (pgm_read_char(cursor) != '\0') {
     const char *replacement = nullptr;
     size_t tokenLen = 0;
     if (tryGetTemplateReplacement(cursor, &ctx, replacement, tokenLen)) {
@@ -235,19 +259,20 @@ static bool renderTemplateToBuffer(const char *templateStr, char *dest, size_t d
     }
 
     if (destLen + 1 >= destSize) return false;
-    dest[destLen++] = *cursor++;
+    dest[destLen++] = pgm_read_char(cursor++);
     dest[destLen] = '\0';
   }
 
   return true;
 }
 
-static size_t measureRenderedTemplate(const char *templateStr, const void *ctxPtr)
+static size_t measureRenderedTemplate(PGM_P templateStr, const void *ctxPtr)
 {
+  // templateStr may point into PROGMEM — use pgm_read_char for safe byte access.
   const MQTTAutoConfigTemplateContext &ctx = *static_cast<const MQTTAutoConfigTemplateContext*>(ctxPtr);
   size_t renderedLen = 0;
-  const char *cursor = templateStr;
-  while (*cursor != '\0') {
+  PGM_P cursor = templateStr;
+  while (pgm_read_char(cursor) != '\0') {
     const char *replacement = nullptr;
     size_t tokenLen = 0;
     if (tryGetTemplateReplacement(cursor, &ctx, replacement, tokenLen)) {
@@ -308,8 +333,10 @@ static bool beginMqttPublish(const char *topic, size_t len, bool retain)
   return true;
 }
 
-static bool sendMQTTTemplateStreaming(const char *topic, const char *templateStr, const void *ctxPtr)
+static bool sendMQTTTemplateStreaming(const char *topic, PGM_P templateStr, const void *ctxPtr)
 {
+  // templateStr may point into PROGMEM — use pgm_read_char for safe byte access,
+  // and writeMqttProgmemChunk (not writeMqttChunk) for literal PROGMEM spans.
   const MQTTAutoConfigTemplateContext &ctx = *static_cast<const MQTTAutoConfigTemplateContext*>(ctxPtr);
   if (!settings.mqtt.bEnable) return false;
   if (!MQTTclient.connected()) { DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return false; }
@@ -325,8 +352,8 @@ static bool sendMQTTTemplateStreaming(const char *topic, const char *templateStr
     return false;
   }
 
-  const char *cursor = templateStr;
-  while (*cursor != '\0') {
+  PGM_P cursor = templateStr;
+  while (pgm_read_char(cursor) != '\0') {
     const char *replacement = nullptr;
     size_t tokenLen = 0;
     if (tryGetTemplateReplacement(cursor, &ctx, replacement, tokenLen)) {
@@ -338,14 +365,14 @@ static bool sendMQTTTemplateStreaming(const char *topic, const char *templateStr
       continue;
     }
 
-    const char *literalStart = cursor;
-    while (*cursor != '\0') {
+    PGM_P literalStart = cursor;
+    while (pgm_read_char(cursor) != '\0') {
       if (tryGetTemplateReplacement(cursor, &ctx, replacement, tokenLen)) break;
       cursor++;
     }
 
     size_t literalLen = static_cast<size_t>(cursor - literalStart);
-    if (literalLen > 0 && !writeMqttChunk(literalStart, literalLen)) {
+    if (literalLen > 0 && !writeMqttProgmemChunk(literalStart, literalLen)) {
       MQTTclient.endPublish();
       return false;
     }
@@ -450,24 +477,10 @@ const char s_mqtt_source_suffix_token[] PROGMEM = "%source_suffix%";
 const char s_mqtt_source_name_token[] PROGMEM = "%source_name%";
 const char s_mqtt_source_topic_segment_token[] PROGMEM = "%source_topic_segment%";
 
-// RAM copies of the above tokens — initialized once by initSourceTokens().
-// Made module-level static so both doAutoConfigure and doAutoConfigureMsgid share them
-// without re-copying from PROGMEM on every call.
-static char s_sourceSuffixToken[16];
-static char s_sourceNameToken[16];
-static char s_sourceTopicSegmentToken[24];
-
-static void initSourceTokens() {
-  static bool initialized = false;
-  if (initialized) return;
-  strncpy_P(s_sourceSuffixToken,       s_mqtt_source_suffix_token,         sizeof(s_sourceSuffixToken) - 1);
-  s_sourceSuffixToken[sizeof(s_sourceSuffixToken) - 1] = '\0';
-  strncpy_P(s_sourceNameToken,         s_mqtt_source_name_token,           sizeof(s_sourceNameToken) - 1);
-  s_sourceNameToken[sizeof(s_sourceNameToken) - 1] = '\0';
-  strncpy_P(s_sourceTopicSegmentToken, s_mqtt_source_topic_segment_token,  sizeof(s_sourceTopicSegmentToken) - 1);
-  s_sourceTopicSegmentToken[sizeof(s_sourceTopicSegmentToken) - 1] = '\0';
-  initialized = true;
-}
+// Source token RAM copies removed — source token detection now uses
+// pre-computed flags in MqttHaCfgEntry.flags (set at code generation time).
+// This eliminates strstr() on PROGMEM pointers that caused Exception (3)
+// on ESP8266 with Arduino Core 3.1.2+.
 
 const char s_mqtt_src_suffix_thermostat[] PROGMEM = "_thermostat";
 const char s_mqtt_src_suffix_boiler[] PROGMEM = "_boiler";
@@ -1364,8 +1377,8 @@ void loopMQTTDiscovery()
 // Returns true if at least one variant was successfully published.
 static bool expandAndPublishSourceTemplates(byte msgid,
                                            const char *logLabel,
-                                           const char *topicTemplate,
-                                           const char *msgTemplate,
+                                           PGM_P topicTemplate,
+                                           PGM_P msgTemplate,
                                            const void *baseCtxPtr,
                                            char *renderedTopic)
 {
@@ -1416,7 +1429,6 @@ void doAutoConfigure(){
     // feedWatchDog() (NOT doBackgroundTasks) is the only yield — guarantees no HTTP/MQTT
     // callback overwrites cMsg between topic render and streaming publish.
     char *sTopic = cMsg;
-    initSourceTokens();
     bool sourceTemplateSchemaLogged = false;
 
     MQTTAutoConfigTemplateContext renderCtx;
@@ -1436,12 +1448,13 @@ void doAutoConfigure(){
       // Skip Dallas sensors — handled separately by configSensors() after lock release
       if (entry.id == OTGWdallasdataid) continue;
 
-      // Direct PROGMEM pointers — no RAM staging needed on ESP8266
-      const char *topicTemplate = mqttHaTopicPool + entry.topicOff;
-      const char *msgTemplate   = mqttHaMsgPool   + entry.msgOff;
+      // PROGMEM pointers into flash pools
+      PGM_P topicTemplate = mqttHaTopicPool + entry.topicOff;
+      PGM_P msgTemplate   = mqttHaMsgPool   + entry.msgOff;
 
       // Skip PIC-specific discovery entries when no PIC is detected.
-      if (!isPICEnabled() && strstr(topicTemplate, "otgw-pic/")) continue;
+      // Flag pre-computed at generation time — no strstr on PROGMEM needed.
+      if (!isPICEnabled() && (entry.flags & MQTT_HA_FLAG_IS_PIC_ENTRY)) continue;
 
       MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), entry.id);
 
@@ -1449,10 +1462,10 @@ void doAutoConfigure(){
       if (!renderTemplateToBuffer(topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) continue;
       if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) continue;
 
-      // ADR-040: source token detection on PROGMEM pointers (byte-accessible on ESP8266)
-      bool hasSourceSuffixToken       = (strstr(topicTemplate, s_sourceSuffixToken)       || strstr(msgTemplate, s_sourceSuffixToken));
-      bool hasSourceNameToken         = (strstr(topicTemplate, s_sourceNameToken)         || strstr(msgTemplate, s_sourceNameToken));
-      bool hasSourceTopicSegmentToken = (strstr(topicTemplate, s_sourceTopicSegmentToken) || strstr(msgTemplate, s_sourceTopicSegmentToken));
+      // ADR-040: source token detection via pre-computed flags (no strstr on PROGMEM)
+      bool hasSourceSuffixToken       = (entry.flags & MQTT_HA_FLAG_SOURCE_SUFFIX);
+      bool hasSourceNameToken         = (entry.flags & MQTT_HA_FLAG_SOURCE_NAME);
+      bool hasSourceTopicSegmentToken = (entry.flags & MQTT_HA_FLAG_SOURCE_TOPIC_SEGMENT);
 
       if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
         if (!sourceTemplateSchemaLogged) {
@@ -1538,7 +1551,6 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
   // directly from PROGMEM pools (ESP8266 memory-mapped flash, byte-accessible via *ptr).
   // feedWatchDog() is the only yield — prevents HTTP/MQTT callbacks from overwriting cMsg.
   char *sTopic = cMsg;
-  initSourceTokens();
 
   MQTTAutoConfigTemplateContext renderCtx;
   renderCtx.nodeId   = NodeId;
@@ -1556,11 +1568,11 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     memcpy_P(&entry, &mqttHaCfgTable[idx], sizeof(entry));
     if (entry.id != OTid) break;  // Past this ID's entries; table is sorted by id
 
-    // Direct PROGMEM pointers — no RAM staging needed on ESP8266
-    const char *topicTemplate = mqttHaTopicPool + entry.topicOff;
-    const char *msgTemplate   = mqttHaMsgPool   + entry.msgOff;
+    // PROGMEM pointers into flash pools
+    PGM_P topicTemplate = mqttHaTopicPool + entry.topicOff;
+    PGM_P msgTemplate   = mqttHaMsgPool   + entry.msgOff;
 
-    MQTTDebugTf(PSTR("Found PROGMEM entry for %d: [%s]\r\n"), OTid, topicTemplate);
+    MQTTDebugTf(PSTR("Found PROGMEM entry for %d\r\n"), OTid);
     MQTTDebugTf(PSTR("sMsg template len[%d]\r\n"), (int)strlen_P(msgTemplate));
     DebugFlush();
 
@@ -1569,10 +1581,10 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); idx++; continue; }
     MQTTDebugf(PSTR("[%s]\r\n"), sTopic);
 
-    // ADR-040: Source template detection — strstr on PROGMEM pointers (byte-accessible on ESP8266)
-    bool hasSourceSuffixToken       = (strstr(topicTemplate, s_sourceSuffixToken)       || strstr(msgTemplate, s_sourceSuffixToken));
-    bool hasSourceNameToken         = (strstr(topicTemplate, s_sourceNameToken)         || strstr(msgTemplate, s_sourceNameToken));
-    bool hasSourceTopicSegmentToken = (strstr(topicTemplate, s_sourceTopicSegmentToken) || strstr(msgTemplate, s_sourceTopicSegmentToken));
+    // ADR-040: Source template detection via pre-computed flags (no strstr on PROGMEM)
+    bool hasSourceSuffixToken       = (entry.flags & MQTT_HA_FLAG_SOURCE_SUFFIX);
+    bool hasSourceNameToken         = (entry.flags & MQTT_HA_FLAG_SOURCE_NAME);
+    bool hasSourceTopicSegmentToken = (entry.flags & MQTT_HA_FLAG_SOURCE_TOPIC_SEGMENT);
 
     if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
       if (settings.mqtt.bSeparateSources && baseMqttTopic != nullptr) {
