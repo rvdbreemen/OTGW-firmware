@@ -1294,20 +1294,21 @@ void markAllMQTTConfigPending()
 // This avoids adding lwIP pbuf allocations when the system is already
 // memory-constrained, while still making progress on discovery.
 //===========================================================================================
-constexpr uint32_t DISCOVERY_INTERVAL_NORMAL_MS = 3000;
-constexpr uint32_t DISCOVERY_INTERVAL_SLOW_MS   = 30000;
+constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 3;   // seconds
+constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 30;  // seconds
 
 void loopMQTTDiscovery()
 {
-  DECLARE_TIMER_SEC(timerDiscoveryDrip, 3, SKIP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
 
-  // Adaptive interval: switch only on state transition to avoid resetting _due every loop
+  // Adaptive interval: only change on state transition (guard prevents resetting _due every loop)
   bool heapPressure = (getHeapHealth() >= HEAP_WARNING);
-  uint32_t desiredInterval = heapPressure ? DISCOVERY_INTERVAL_SLOW_MS : DISCOVERY_INTERVAL_NORMAL_MS;
-  if (timerDiscoveryDrip_interval != desiredInterval) {
-    timerDiscoveryDrip_interval = desiredInterval;
-    MQTTDebugTf(PSTR("[drip] interval changed to %lu ms (heap %s)\r\n"),
-                desiredInterval, heapPressure ? "pressure" : "healthy");
+  if (heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_SLOW * 1000UL) {
+    CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_SLOW, SKIP_MISSED_TICKS);
+    MQTTDebugTf(PSTR("[drip] slowed to %ds (heap pressure)\r\n"), DISCOVERY_INTERVAL_SLOW);
+  } else if (!heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_NORMAL * 1000UL) {
+    CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
+    MQTTDebugTf(PSTR("[drip] restored to %ds (heap healthy)\r\n"), DISCOVERY_INTERVAL_NORMAL);
   }
 
   if (!DUE(timerDiscoveryDrip)) return;
