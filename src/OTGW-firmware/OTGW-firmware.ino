@@ -411,6 +411,23 @@ void doTaskEvery60s(){
   
   // Log heap statistics every minute for monitoring
   logHeapStats();
+
+  // Scheduled nightly restart for heap recovery (opt-in via settings).
+  // Checks once per minute if the current local hour matches the configured restart hour.
+  // Only restarts if uptime > 1 hour (prevents restart loops after a recent reboot).
+  if (settings.bNightlyRestart && settings.ntp.bEnable && state.uptime.iSeconds > 3600) {
+    int64_t now_sec = time(nullptr);
+    if (now_sec > 946684800) {  // sanity: after 2000-01-01 (NTP synced)
+      TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+      ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, myTz);
+      if (myTime.hour() == settings.iRestartHour && myTime.minute() == 0) {
+        DebugTf(PSTR("Nightly restart triggered at %02d:00 (uptime=%lu s)\r\n"),
+                settings.iRestartHour, (unsigned long)state.uptime.iSeconds);
+        delay(200);  // brief delay for any pending I/O to flush
+        ESP.restart();
+      }
+    }
+  }
 }
 
 //===[ Do task exactly on the minute ]===
@@ -527,6 +544,7 @@ void loop()
         }
       }
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
+      loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, 3s interval)
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook
       satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)

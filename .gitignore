@@ -49,4 +49,7 @@ discord_backlog_last_checked.txt
 .claude/github_last_checked.txt
 .claude/tweakers_last_checked.txt
 .claude/discord_last_checked.txt
+
+log-issues/*
+logs-issue/*
 .claude/settings.20260412_173718.bak

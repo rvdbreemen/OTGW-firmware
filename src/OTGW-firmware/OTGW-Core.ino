@@ -3337,10 +3337,9 @@ static void publishPSSummarySplitBytes(const char *label, const char *hbSuffix, 
 
 static void ensurePSSummaryDiscovery(uint8_t msgid)
 {
+  // Non-blocking: just mark pending; drainOnePendingDiscovery() publishes later.
   if (settings.mqtt.bEnable && !getMQTTConfigDone(msgid)) {
-    if (doAutoConfigureMsgid(msgid, NodeId)) {
-      setMQTTConfigDone(msgid);
-    }
+    setMQTTConfigPending(msgid);
   }
 }
 
@@ -3847,19 +3846,12 @@ void processOT(const char *buf, int len){
         setMsgLastUpdated(OTdata.id, currentTrackedSeconds());
       }
 
-      // check wheter MQTT topic needs to be configuered
-      if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable ) {
-        if(getMQTTConfigDone(OTdata.id)==false) {
-          MQTTDebugTf(PSTR("Need to set MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
-          bool success = doAutoConfigureMsgid(OTdata.id, NodeId, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)));
-          if(success) {
-            MQTTDebugTf(PSTR("Successfully sent MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
-            setMQTTConfigDone(OTdata.id);
-          } else {
-            MQTTDebugTf(PSTR("Not able to complete MQTT configuration for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
-          }
-        } else {
-          // MQTTDebugTf(PSTR("No need to set MQTT config for message %s (%d)\r\n"), OTlookupitem.label, OTdata.id);
+      // Queue MQTT HA discovery for this OT message ID if not yet published.
+      // Non-blocking: just sets the pending bit; drainOnePendingDiscovery()
+      // (3-second timer in main loop) handles the actual publish.
+      if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable) {
+        if (!getMQTTConfigDone(OTdata.id)) {
+          setMQTTConfigPending(OTdata.id);
         }
       }
 

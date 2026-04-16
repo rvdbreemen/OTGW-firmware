@@ -130,6 +130,10 @@ void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
 void publishToSourceTopic(const char*, const char*, byte);
+void loopMQTTDiscovery();
+void setMQTTConfigPending(const uint8_t MSGid);
+void markAllMQTTConfigPending();
+const char *messageIDToString(OTLibMessageID message_id);
 void addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);
 
@@ -969,6 +973,8 @@ struct OTGWSettings {
   bool bLEDblink     = true;
   bool bDarkTheme    = false;
   bool bMyDEBUG      = false;
+  bool bNightlyRestart = false;  // scheduled daily restart for heap recovery
+  uint8_t iRestartHour = 4;     // hour (0-23) for nightly restart
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
   MQTTSettingsSection mqtt;
@@ -997,6 +1003,7 @@ char        sLine[SLINE_SIZE];  // MQTT autoconfig line scratch (MQTTstuff.ino, 
 char        otTopic[OT_TOPIC_LEN];  // Shared MQTT topic scratch for OT print_* functions (sequential, not re-entrant)
 char        lastReset[129] = "";
 uint32_t    MQTTautoConfigMap[8] = { 0 };
+uint32_t    MQTTautoCfgPendingMap[8] = { 0 };  // bitmap for async MQTT discovery drip
 // Deferred settings write timer (Finding #23: coalesce flash writes)
 uint32_t  timerFlushSettings_interval = 2000;  // 2 second debounce
 uint32_t  timerFlushSettings_due = 0;          // initially not due

@@ -1755,6 +1755,8 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("ntpsendtime"), settings.ntp.bSendtime, "b");
   sendJsonSettingObj(F("ledblink"), settings.bLEDblink, "b");
   sendJsonSettingObj(F("darktheme"), settings.bDarkTheme, "b");
+  sendJsonSettingObj(F("nightlyrestart"), settings.bNightlyRestart, "b");
+  sendJsonSettingObj(F("nightlyrestarthour"), (int)settings.iRestartHour, "i", 0, 23);
   sendJsonSettingObj(F("ui_autoscroll"), settings.ui.bAutoScroll, "b");
   sendJsonSettingObj(F("ui_timestamps"), settings.ui.bShowTimestamp, "b");
   sendJsonSettingObj(F("ui_capture"), settings.ui.bCaptureMode, "b");
@@ -1978,7 +1980,7 @@ static const char* const PROGMEM knownSettings[] = {
 #endif
   "gpiooutputsenabled", "gpiooutputspin", "gpiooutputstriggerbit",
   "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
-  "hostname", "httppasswd", "ledblink",
+  "hostname", "httppasswd", "ledblink", "nightlyrestart", "nightlyrestarthour",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
   "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",
