@@ -1625,10 +1625,10 @@ void loopMQTTDiscovery()
 // expandAndPublishSourceTemplates()
 // Expands a source-template discovery line into 3 per-source variants and publishes each.
 // Renders topic variants into renderedTopic (cMsg global, passed as sTopic pointer) and
-// stream-renders the JSON payload from the original template (in sLine global).
+// stream-renders the JSON payload directly from the PROGMEM template.
 // feedWatchDog() is used (not doBackgroundTasks()) between per-source publishes to prevent
 // cMsg from being overwritten by HTTP/MQTT callbacks mid-iteration: topicTemplate/msgTemplate
-// point into sLine; renderedTopic points into cMsg — keeping the two buffers disjoint.
+// point into PROGMEM pools; renderedTopic points into cMsg.
 // Returns true if at least one variant was successfully published.
 static bool expandAndPublishSourceTemplates(byte msgid,
                                            const char *logLabel,

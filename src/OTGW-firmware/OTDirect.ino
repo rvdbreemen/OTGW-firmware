@@ -704,49 +704,57 @@ void updateOTDirectStatus() {
 }
 
 // ---------------------------------------------------------------------------
-// getOTDirectOverridesJSON — serialize all active overrides into a JSON string.
-// Called from restAPI.ino. Buffer must be at least 512 bytes.
-// Returns actual length written.
+// sendOTDirectOverridesJSON — stream all active overrides as chunked JSON response.
+// Uses HTTP chunked transfer encoding: no large buffer needed, only a 48-byte
+// formatting scratch on the stack per entry.  Called from restAPI.ino.
+// Caller must set CORS headers before calling this function.
 // ---------------------------------------------------------------------------
-int getOTDirectOverridesJSON(char* buf, size_t bufSize) {
-  int pos = 0;
-  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("{\"overrides\":{\"write\":["));
+void sendOTDirectOverridesJSON() {
+  char chunk[48];
+
+  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  httpServer.send_P(200, PSTR("application/json"), PSTR(""));
+  httpServer.sendContent_P(PSTR("{\"overrides\":{\"write\":["));
 
   bool first = true;
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
     if (!otOverrides[i].active) continue;
-    pos += snprintf_P(buf + pos, bufSize - pos, PSTR("%s{\"msgid\":%u,\"value\":%u}"),
-                       first ? "" : ",", otOverrides[i].msgId, otOverrides[i].overrideValue);
+    snprintf_P(chunk, sizeof(chunk), PSTR("%s{\"msgid\":%u,\"value\":%u}"),
+               first ? "" : ",", otOverrides[i].msgId, otOverrides[i].overrideValue);
+    httpServer.sendContent(chunk);
     first = false;
   }
 
-  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("],\"response\":["));
+  httpServer.sendContent_P(PSTR("],\"response\":["));
   first = true;
   for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
     if (!otResponseOverrides[i].active) continue;
-    pos += snprintf_P(buf + pos, bufSize - pos, PSTR("%s{\"msgid\":%u,\"value\":%u}"),
-                       first ? "" : ",", otResponseOverrides[i].msgId, otResponseOverrides[i].value);
+    snprintf_P(chunk, sizeof(chunk), PSTR("%s{\"msgid\":%u,\"value\":%u}"),
+               first ? "" : ",", otResponseOverrides[i].msgId, otResponseOverrides[i].value);
+    httpServer.sendContent(chunk);
     first = false;
   }
 
-  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("],\"modify\":["));
+  httpServer.sendContent_P(PSTR("],\"modify\":["));
   first = true;
   for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
     if (!otResponseModifiers[i].active) continue;
-    pos += snprintf_P(buf + pos, bufSize - pos, PSTR("%s{\"msgid\":%u,\"value\":%u}"),
-                       first ? "" : ",", otResponseModifiers[i].msgId, otResponseModifiers[i].value);
+    snprintf_P(chunk, sizeof(chunk), PSTR("%s{\"msgid\":%u,\"value\":%u}"),
+               first ? "" : ",", otResponseModifiers[i].msgId, otResponseModifiers[i].value);
+    httpServer.sendContent(chunk);
     first = false;
   }
 
-  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("],\"unknown\":["));
+  httpServer.sendContent_P(PSTR("],\"unknown\":["));
   first = true;
   for (uint8_t i = 0; i < otUnknownIdCount; i++) {
-    pos += snprintf_P(buf + pos, bufSize - pos, PSTR("%s%u"), first ? "" : ",", otUnknownIds[i]);
+    snprintf_P(chunk, sizeof(chunk), PSTR("%s%u"), first ? "" : ",", otUnknownIds[i]);
+    httpServer.sendContent(chunk);
     first = false;
   }
 
-  pos += snprintf_P(buf + pos, bufSize - pos, PSTR("]}}"));
-  return pos;
+  httpServer.sendContent_P(PSTR("]}}"));
+  httpServer.sendContent(F(""));  // end chunked stream
 }
 
 // ---------------------------------------------------------------------------

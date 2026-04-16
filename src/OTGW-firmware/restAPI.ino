@@ -423,12 +423,9 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   // POST /api/v2/otdirect/overrides?action=ui&msgid=X — mark unknown ID
   // POST /api/v2/otdirect/overrides?action=ki&msgid=X — mark known ID
   else if (wc > 4 && strcmp_P(words[4], PSTR("overrides")) == 0) {
-    // Reuse global sLine[] buffer (1200 bytes) — sufficient for override JSON (~1050 max).
-    // REST handlers don't run concurrently with MQTT autoconfig that also uses sLine.
     if (method == HTTP_GET) {
-      getOTDirectOverridesJSON(sLine, sizeof(sLine));
       sendCorsOriginHeader();
-      httpServer.send(200, F("application/json"), sLine);
+      sendOTDirectOverridesJSON();
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (!httpServer.hasArg("action") || !httpServer.hasArg("msgid")) {
         sendApiError(400, F("Missing 'action' and/or 'msgid' parameter")); return;
@@ -468,9 +465,8 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       }
       addCommandToQueue(cmdBuf, strlen(cmdBuf), true);
       // Return updated override list
-      getOTDirectOverridesJSON(sLine, sizeof(sLine));
       sendCorsOriginHeader();
-      httpServer.send(200, F("application/json"), sLine);
+      sendOTDirectOverridesJSON();
     } else {
       sendApiMethodNotAllowed(F("GET, POST"));
     }
