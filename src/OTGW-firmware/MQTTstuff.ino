@@ -31,7 +31,7 @@
 void doAutoConfigure();
 void setMQTTConfigPending(const uint8_t MSGid);
 void markAllMQTTConfigPending();
-void drainOnePendingDiscovery();
+void loopMQTTDiscovery();
 
 // Declare some variables within global scope
 
@@ -1284,13 +1284,17 @@ void markAllMQTTConfigPending()
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }
 //===========================================================================================
-// drainOnePendingDiscovery() — called from the main loop on a 3-second timer.
-// Finds the next pending OT ID, publishes its discovery config, clears its
-// pending bit, and sets its "done" bit.  Publishes exactly ONE ID per call
+// loopMQTTDiscovery() — call from the main loop on every iteration.
+// Manages its own 3-second timer internally.  When the timer fires, finds
+// the next pending OT ID, publishes its discovery config, clears its pending
+// bit, and sets its "done" bit.  Publishes exactly ONE ID per timer tick
 // to spread broker load over time.
 //===========================================================================================
-void drainOnePendingDiscovery()
+void loopMQTTDiscovery()
 {
+  DECLARE_TIMER_SEC(timerDiscoveryDrip, 3, SKIP_MISSED_TICKS);
+  if (!DUE(timerDiscoveryDrip)) return;
+
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
   if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return;
