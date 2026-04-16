@@ -48,9 +48,10 @@ Common MQTT return codes:
 1. MQTT integration enabled in HA: Settings, Devices and Services.
 2. Discovery prefix matches: default is `homeassistant` in both HA and firmware.
 3. Discovery enabled in firmware: check Settings in the web UI.
-4. Wait 30-60 seconds after MQTT connect for discovery to run.
+4. **Be patient.** MQTT discovery now uses an async drip publisher that sends one discovery message every 3 seconds. With approximately 250 entities, a full discovery cycle takes roughly 12 to 15 minutes under normal conditions. Under heap pressure the interval slows to 30 seconds per entity, which can extend the total to over an hour. This gradual approach is intentional: it prevents the heap exhaustion that occurred in earlier firmware versions when all discovery messages were sent in a burst.
 5. Check HA MQTT logs in Settings, System, Logs, filter for `mqtt`.
 6. If you run multiple OTGW devices, each must have a unique `settingMQTTuniqueid`.
+7. After a firmware update or MQTT reconnect, all discovery messages are re-queued automatically. You do not need to restart the device.
 
 ---
 
@@ -83,7 +84,37 @@ Common MQTT return codes:
 
 ---
 
-### 7.7 Serial Overrun and OTGW Online-Offline Flapping
+### 7.7 Heap Health Monitoring
+
+The firmware continuously monitors free heap memory and classifies it into four tiers:
+
+| Level | Free heap threshold | Behaviour |
+|---|---|---|
+| HEALTHY | Above 8,192 bytes | Normal operation. All services active. |
+| LOW | 5,120 to 8,191 bytes | Message frequency begins to decrease. MQTT discovery drip interval slows from 3s to 30s. |
+| WARNING | 3,072 to 5,119 bytes | WebSocket and MQTT messages are throttled. Non-essential transmissions are skipped. |
+| CRITICAL | Below 3,072 bytes | All non-essential operations blocked. Emergency heap recovery is triggered automatically. |
+
+The current heap level is logged every 60 seconds in the Telnet debug log. Look for lines starting with `Heap:` followed by the free byte count and the tier name. The Web UI footer also displays the current free heap value.
+
+#### Emergency heap recovery
+
+When free heap drops below the CRITICAL threshold, the firmware automatically attempts recovery by:
+
+1. Reducing the MQTT buffer to its minimum size.
+2. Yielding to let the network stack release pending buffers.
+
+The Telnet log reports `Emergency heap recovery starting` and shows the bytes recovered. If the situation persists across reboots, consider enabling the nightly restart option (see section 7.7.1).
+
+#### 7.7.1 Nightly restart
+
+As a preventive measure against gradual heap fragmentation, the firmware supports an optional scheduled nightly restart. When enabled in Settings, the device reboots automatically at the configured hour (local time, based on your NTP timezone). The restart only fires if the device has been running for more than one hour, preventing restart loops after a recent reboot.
+
+To enable: go to Settings in the Web UI and enable "Nightly Restart", then choose the preferred restart hour (default: 04:00).
+
+---
+
+### 7.8 Serial Overrun and OTGW Online-Offline Flapping
 
 **Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the cooperative stack. The ESP8266 CONT stack is only 4 KB. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
 
@@ -91,18 +122,27 @@ If you see this on v2.0.0: update to the latest build. If the problem persists, 
 
 ---
 
-### 7.8 LED Patterns
+### 7.9 LED Patterns
 
-The firmware does not implement a dedicated LED status pattern on ESP8266 NodeMCU or Wemos D1 Mini boards.
+The firmware drives status LEDs to indicate the device state. On ESP32 boards (OTGW32), LEDs are PWM-dimmed for reduced brightness.
+
+| LED pattern | Meaning |
+|---|---|
+| LED2 blinks once per second, LED1 off | No WiFi connection. The device is attempting to reconnect. |
+| LED1 blinks once per second, LED2 blinks twice per second | WiFi is connected but no OpenTherm traffic has been received for more than 10 seconds. Check the PIC and boiler connection. |
+| Both LEDs off (normal operation) | WiFi connected, OpenTherm traffic flowing. LEDs are only used for brief blinks during processing. |
+| Rapid blinks during boot | Setup phase. Three quick blinks signal completion of a setup step. |
 
 The physical OTGW board itself has indicator LEDs driven by the PIC:
 - **Green LED**: PIC is running and communicating.
 - **Yellow LED**: Boiler communication active.
 - **Red LED**: Error or fault condition.
 
+LED blinking can be disabled entirely in Settings (`LED blink`).
+
 ---
 
-### 7.9 Telnet Debug Output
+### 7.10 Telnet Debug Output
 
 The firmware streams a real-time debug log over Telnet on port 23.
 
@@ -126,10 +166,60 @@ Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw.local`, por
 | `Exception (2)` | Illegal memory access; note the stack trace and report as a bug |
 | `Exception (3)` | Load/store alignment error; PROGMEM pointer mismatch |
 | `NTP: bogus initial time ignored` | Normal on first boot; SDK quirk guard working correctly |
+| `Heap: XXXXX (HEALTHY)` | Normal heap status logged every 60 seconds |
+| `Heap: XXXXX (LOW)` | Heap is getting low; message frequency is being reduced |
+| `HEAP-CRITICAL: Blocking WebSocket` | Heap critically low; WebSocket messages are being dropped |
+| `HEAP-CRITICAL: Blocking MQTT` | Heap critically low; MQTT messages are being dropped |
+| `Emergency heap recovery starting` | Automatic recovery triggered due to critical heap |
+| `[drip] publishing discovery for OT ID ...` | MQTT discovery publishing one entity at a time (normal) |
+| `[drip] slowed to 30s (heap pressure)` | Discovery interval increased due to low heap |
+| `Nightly restart triggered` | Scheduled restart executing at the configured hour |
 
 ---
 
-### 7.10 Factory Reset
+### 7.11 Crash Log
+
+Starting with v2.0.0, the firmware saves crash information to flash storage when an unhandled exception or watchdog reset occurs. After a crash reboot, this information is available in several ways:
+
+1. **Web UI:** The Device Info section on the main page shows crash log details when available.
+2. **REST API:** `GET /api/v2/device/crashlog` returns a JSON object with `available`, `summary`, and `details` fields.
+3. **Telnet:** Register dumps and exception causes are printed during boot.
+
+When reporting a bug on GitHub, include the crash log output. The `summary` field contains the exception type, and `details` contains register values (epc1, epc2, excvaddr, etc.) that help developers locate the crash in the code.
+
+---
+
+### 7.12 ESP32-Specific Troubleshooting (OTGW32)
+
+The OTGW32 board uses an ESP32-S3 and introduces hardware capabilities not present on the ESP8266 version.
+
+#### OTDirect (direct OpenTherm without PIC)
+
+The OTGW32 has no PIC microcontroller. Instead, the ESP32-S3 handles the OpenTherm protocol directly via GPIO (OTDirect). If OpenTherm communication is not working:
+
+1. Verify that the 18V step-up converter is enabled (hardware prerequisite for OT signalling).
+2. Check the Telnet debug log for OTDirect-related messages. Enable debug channel 6 in the Telnet console to see detailed OTDirect frame handling.
+3. Ensure the boiler and thermostat are connected to the correct MASTER and SLAVE terminals.
+
+#### BLE Temperature Sensors
+
+The ESP32 supports BLE (Bluetooth Low Energy) temperature sensor scanning. If BLE sensors are not appearing:
+
+1. Confirm BLE scanning is enabled in Settings.
+2. BLE sensors are polled on a timer-guarded interval. Allow at least one full scan cycle after enabling.
+3. Check the Telnet debug log for BLE scan results.
+
+#### Ethernet (W5500)
+
+The OTGW32 board supports a W5500 Ethernet module as an alternative to WiFi:
+
+1. Ethernet is only available on boards where `HAS_ETH_CAPABLE` is set (OTGW32).
+2. When Ethernet is connected and active, WiFi can remain as a fallback.
+3. Check the Telnet debug log for Ethernet link status messages.
+
+---
+
+### 7.13 Factory Reset
 
 **Method 1: Web UI**
 1. Open `http://otgw.local/fsexplorer`.
@@ -144,10 +234,10 @@ Connect on port 23 and type `resetwifi` to clear WiFi credentials only.
 
 ---
 
-### 7.11 Where to Get Help
+### 7.14 Where to Get Help
 
 1. **GitHub Issues:** `https://github.com/rvdbreemen/OTGW-firmware/issues`
-   Include: firmware version, board type, Telnet debug log, and settings (redact passwords).
+   Include: firmware version, board type (ESP8266 or ESP32), Telnet debug log, crash log (if available), and settings (redact passwords).
 
 2. **Discord:** Check the GitHub repository for the invite link.
 

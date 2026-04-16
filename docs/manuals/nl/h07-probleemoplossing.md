@@ -16,7 +16,7 @@ Dit hoofdstuk beschrijft veelvoorkomende problemen, hun oorzaken en de stappen o
 
 **Oorzaak 1: PIC reageert niet**
 
-De PIC-microcontroller (het OpenTherm-protocol­verwerkende deel van de hardware) communiceert via een seriele verbinding met de ESP. Als de PIC niet reageert, ziet het apparaat geen OpenTherm-activiteit.
+De PIC-microcontroller (het OpenTherm-protocolverwerkende deel van de hardware) communiceert via een seriele verbinding met de ESP. Als de PIC niet reageert, ziet het apparaat geen OpenTherm-activiteit.
 
 Controleer:
 - Is de boiler ingeschakeld en verbonden via de OTGW-klemmen?
@@ -31,15 +31,15 @@ Controleer via de Telnet-debuglog (`telnet <ip>`): verschijnen er regelmatig reg
 
 **Oorzaak 3: PIC in diagnostische modus of interfacemodus**
 
-Als de PIC-firmware in een niet-gateway­modus draait (bijv. door een eerdere OTmonitor-sessie), verwerkt de ESP de uitvoer niet als verwachte OTGW-regels.
+Als de PIC-firmware in een niet-gatewaymodus draait (bijv. door een eerdere OTmonitor-sessie), verwerkt de ESP de uitvoer niet als verwachte OTGW-regels.
 
-Controleer de Telnet-log op de huidige gateway­modus. Verstuur via de Web UI of MQTT het commando `GW=G` om de PIC terug te zetten in gateway­modus.
+Controleer de Telnet-log op de huidige gatewaymodus. Verstuur via de Web UI of MQTT het commando `GW=G` om de PIC terug te zetten in gatewaymodus.
 
 **Oorzaak 4: Seriele overrun**
 
 Bij hoog berichtenverkeer op de OpenTherm-bus kan er een seriele overrun optreden. Versie 2.0.0 rapporteert overruns als events via MQTT en WebSocket, zodat ze zichtbaar zijn.
 
-Controleer in de Telnet-log op meldingen met `SERIAL OVERRUN` of bekijk het WebSocket-event­log in de Web UI.
+Controleer in de Telnet-log op meldingen met `SERIAL OVERRUN` of bekijk het WebSocket-eventlog in de Web UI.
 
 ---
 
@@ -103,7 +103,7 @@ Home Assistant luistert standaard op `homeassistant/` voor auto-discovery berich
 
 1. Ga naar Settings in de Web UI.
 2. Controleer het veld **HA MQTT Prefix** (standaard `homeassistant`).
-3. Zorg dat dit overeenkomt met de `discovery_prefix` in de Home Assistant MQTT-integratie­configuratie.
+3. Zorg dat dit overeenkomt met de `discovery_prefix` in de Home Assistant MQTT-integratieconfiguratie.
 
 #### Oorzaak 2: MQTT-integratie niet geconfigureerd in Home Assistant
 
@@ -111,13 +111,15 @@ Home Assistant auto-discovery vereist dat de MQTT-integratie is geconfigureerd e
 
 Controleer: **Instellingen** > **Apparaten en Services** > **MQTT** en zorg dat de integratie actief is.
 
-#### Oorzaak 3: Discovery-berichten verlopen of niet opnieuw verzonden
+#### Oorzaak 3: Discovery is geleidelijk (drip publisher)
 
-De firmware verstuurt discovery-berichten bij iedere MQTT-verbinding. U kunt een hernieuwde discovery forceren door de MQTT-verbinding te verbreken en te herstellen, of door de firmware te herstarten.
+Vanaf v2.0.0 verstuurt de firmware discovery-berichten niet meer in een burst, maar via een async drip publisher: een bericht per 3 seconden. Met circa 250 entiteiten duurt een volledige discovery-cyclus ongeveer 12 tot 15 minuten onder normale omstandigheden. Wanneer het geheugen onder druk staat, wordt het interval verlaagd naar 30 seconden per bericht, wat de totale tijd tot meer dan een uur kan verlengen. Dit geleidelijke proces is bewust ontworpen om heap-uitputting te voorkomen.
+
+**Wacht dus geduldig af.** Entiteiten verschijnen stuk voor stuk in Home Assistant. Na een firmware-update of MQTT-herverbinding worden alle discovery-berichten automatisch opnieuw ingepland. Een herstart is niet nodig.
 
 #### Oorzaak 4: Retained berichten van een eerdere installatie
 
-Verouderde retained discovery-berichten van een eerdere firmware­versie of ander topic­prefix kunnen conflicten veroorzaken. Verwijder de retained berichten via een MQTT-client (bijv. MQTT Explorer) of via de Home Assistant MQTT-debug­pagina.
+Verouderde retained discovery-berichten van een eerdere firmwareversie of ander topicprefix kunnen conflicten veroorzaken. Verwijder de retained berichten via een MQTT-client (bijv. MQTT Explorer) of via de Home Assistant MQTT-debugpagina.
 
 ---
 
@@ -133,7 +135,7 @@ Verouderde retained discovery-berichten van een eerdere firmware­versie of ande
 
 **Zwak WiFi-signaal**
 
-Controleer de signaalsterkte (RSSI). De Web UI toont signaal­kwaliteitsbalkjes in de header (toegevoegd in v2.0.0). RSSI hoger dan -70 dBm is doorgaans stabiel; lager dan -80 dBm geeft problemen.
+Controleer de signaalsterkte (RSSI). De Web UI toont signaalkwaliteitsbalkjes in de header (toegevoegd in v2.0.0). RSSI hoger dan -70 dBm is doorgaans stabiel; lager dan -80 dBm geeft problemen.
 
 Oplossingen:
 - Plaats een WiFi-repeater dichter bij het OTGW-apparaat.
@@ -149,7 +151,7 @@ Wanneer het WiFi-signaal langdurig wegvalt, probeert de firmware maximaal 10 kee
 
 **ESP8266 SDK auto-reconnect race condition**
 
-In zeldzame gevallen kan een race condition in de ESP8266 SDK ervoor zorgen dat automatisch opnieuw verbinden mislukt. De tweelaagsige herstel­logica van de firmware (ADR-047) is specifiek ontworpen om dit op te vangen.
+In zeldzame gevallen kan een race condition in de ESP8266 SDK ervoor zorgen dat automatisch opnieuw verbinden mislukt. De tweelaagsige herstellogica van de firmware (ADR-047) is specifiek ontworpen om dit op te vangen.
 
 ---
 
@@ -165,7 +167,7 @@ In zeldzame gevallen kan een race condition in de ESP8266 SDK ervoor zorgen dat 
 
 | Probleem | Oplossing |
 |---------|-----------|
-| Verkeerd `.bin`-bestand | Zorg dat u het juiste platform­bestand gebruikt (ESP8266 `.bin` op ESP8266, ESP32 `.bin` op ESP32) |
+| Verkeerd `.bin`-bestand | Zorg dat u het juiste platformbestand gebruikt (ESP8266 `.bin` op ESP8266, ESP32 `.bin` op ESP32) |
 | Bestand te groot | Controleer de beschikbare OTA-ruimte (zichtbaar in `build.py`-uitvoer) |
 | HTTP-wachtwoord vergeten | Stel het wachtwoord opnieuw in via seriele verbinding of reset de firmware |
 | Verbinding verbroken tijdens upload | Probeer opnieuw via een stabielere verbinding (bedraad netwerk of dichterbij de router) |
@@ -188,7 +190,7 @@ Als de firmware niet meer reageert na een mislukte update:
 - `http://otgw.local` geeft geen reactie of een foutpagina.
 - De pagina laadt deels maar toont lege secties.
 
-#### Stap 1: Controleer netwerk­bereikbaarheid
+#### Stap 1: Controleer netwerkbereikbaarheid
 
 ```bash
 ping otgw.local
@@ -210,15 +212,45 @@ Oplossing: upload het filesysteem opnieuw via `build.py --filesystem` of Platfor
 
 #### Stap 4: Geheugengebrek
 
-Op ESP8266 is het beschikbare geheugen (~40KB DRAM) beperkt. Bij ernstig geheugengebrek kunnen HTTP-verzoeken mislukken. De Web UI toont de vrije heap in de voettekst. Beneden 5KB is een herstart aanbevolen.
+Op ESP8266 is het beschikbare geheugen (~40KB DRAM) beperkt. Bij ernstig geheugengebrek kunnen HTTP-verzoeken mislukken. De Web UI toont de vrije heap in de voettekst. Zie paragraaf 7.7 voor de heap health tiers en wat u kunt doen bij een lage heap.
 
 ---
 
-### 7.7 Seriële overrun en OTGW online-offline­flikkeringen
+### 7.7 Heap health monitoring
+
+De firmware bewaakt continu het vrije heap-geheugen en classificeert het in vier niveaus:
+
+| Niveau | Vrije heap drempel | Gedrag |
+|--------|-------------------|--------|
+| HEALTHY | Boven 8.192 bytes | Normale werking. Alle services actief. |
+| LOW | 5.120 tot 8.191 bytes | Berichtfrequentie begint af te nemen. MQTT discovery drip-interval vertraagt van 3s naar 30s. |
+| WARNING | 3.072 tot 5.119 bytes | WebSocket- en MQTT-berichten worden beperkt (throttled). Niet-essentiele verzendingen worden overgeslagen. |
+| CRITICAL | Onder 3.072 bytes | Alle niet-essentiele operaties geblokkeerd. Emergency heap recovery wordt automatisch uitgevoerd. |
+
+Het huidige heap-niveau wordt elke 60 seconden gelogd in de Telnet-debuglog. Zoek naar regels die beginnen met `Heap:` gevolgd door het aantal vrije bytes en de tier-naam. De Web UI voettekst toont ook de huidige vrije heap-waarde.
+
+#### Emergency heap recovery
+
+Wanneer de vrije heap onder de CRITICAL-drempel zakt, probeert de firmware automatisch geheugen terug te winnen door:
+
+1. De MQTT-buffer te verkleinen tot het minimumformaat.
+2. Een yield uit te voeren zodat de netwerkstack pending buffers kan vrijgeven.
+
+De Telnet-log toont `Emergency heap recovery starting` met het aantal herwonnen bytes. Als het probleem na herstarts aanhoudt, overweeg dan de nachtelijke herstart te activeren (zie paragraaf 7.7.1).
+
+#### 7.7.1 Nachtelijke herstart
+
+Als preventieve maatregel tegen geleidelijke heap-fragmentatie biedt de firmware een optionele geplande nachtelijke herstart. Wanneer ingeschakeld in Settings, herstart het apparaat automatisch op het geconfigureerde uur (lokale tijd, gebaseerd op uw NTP-tijdzone). De herstart vindt alleen plaats als het apparaat langer dan een uur draait, om herstartlussen na een recente reboot te voorkomen.
+
+Inschakelen: ga naar Settings in de Web UI, schakel "Nightly Restart" in en kies het gewenste herstartuur (standaard: 04:00).
+
+---
+
+### 7.8 Seriële overrun en OTGW online-offline-flikkeringen
 
 #### Wat zijn seriële overruns?
 
-Een seriële overrun treedt op wanneer de PIC meer data naar de ESP stuurt dan de firmware kan verwerken voordat de UART-buffer vol is. Individuele bytes gaan verloren. De firmware detecteert dit via de hardware fout­vlag van de UART.
+Een seriële overrun treedt op wanneer de PIC meer data naar de ESP stuurt dan de firmware kan verwerken voordat de UART-buffer vol is. Individuele bytes gaan verloren. De firmware detecteert dit via de hardware foutvlag van de UART.
 
 #### Symptomen
 
@@ -230,13 +262,13 @@ Een seriële overrun treedt op wanneer de PIC meer data naar de ESP stuurt dan d
 
 Seriële overruns duiden vaak op een achterliggend probleem:
 
-1. **MQTT-verbinding­problemen**: Een drukke MQTT-verbinding kan de verwerking vertragen en indirecte overruns veroorzaken.
-2. **Heap­druk**: Bij laag geheugen vertraagt de firmware. Controleer de vrije heap.
+1. **MQTT-verbindingsproblemen**: Een drukke MQTT-verbinding kan de verwerking vertragen en indirecte overruns veroorzaken.
+2. **Heapdruk**: Bij laag geheugen vertraagt de firmware. Controleer de vrije heap (zie paragraaf 7.7).
 3. **OTmonitor actief op poort 25238**: Wanneer OTmonitor actief is en commands stuurt, kan dit extra belasting geven.
 
-#### OTGW online-offline­flikkeringen opgelost in v2.0.0
+#### OTGW online-offline-flikkeringen opgelost in v2.0.0
 
-In versies voor 2.0.0 konden herhaalde disconnectie­events op de MQTT-verbinding zorgen voor een cascade van publice­ringen, waardoor de OTGW-beschikbaarheids­berichten snel achter elkaar `online` en `offline` publiceerden. De stack­overloopproblemen in `publishToSourceTopic` (te grote lokale buffers op de 4KB CONT-stack) zijn opgelost door alle grote buffers statisch te maken. Dit elimineert de crashes die de flikkeringen veroorzaakten.
+In versies voor 2.0.0 konden herhaalde disconnectie-events op de MQTT-verbinding zorgen voor een cascade van publicaties, waardoor de OTGW-beschikbaarheidsberichten snel achter elkaar `online` en `offline` publiceerden. De stackoverloopproblemen in `publishToSourceTopic` (te grote lokale buffers op de 4KB CONT-stack) zijn opgelost door alle grote buffers statisch te maken. Dit elimineert de crashes die de flikkeringen veroorzaakten.
 
 Als u flikkeringen ziet na een upgrade naar v2.0.0, controleer dan:
 - Of u daadwerkelijk v2.0.0 draait (zie Web UI voettekst).
@@ -244,9 +276,29 @@ Als u flikkeringen ziet na een upgrade naar v2.0.0, controleer dan:
 
 ---
 
-### 7.8 Telnet-debuglog: verbinden en lezen
+### 7.9 LED-patronen
 
-De Telnet-debuglog op poort 23 is het krachtigste diagnose­hulpmiddel dat de firmware biedt. Alle interne events worden hier in real-time gerapporteerd.
+De firmware gebruikt status-LEDs om de apparaatstatus aan te geven. Op ESP32-borden (OTGW32) worden de LEDs via PWM gedimd voor een lagere helderheid.
+
+| LED-patroon | Betekenis |
+|-------------|-----------|
+| LED2 knippert 1x per seconde, LED1 uit | Geen WiFi-verbinding. Het apparaat probeert opnieuw te verbinden. |
+| LED1 knippert 1x per seconde, LED2 knippert 2x per seconde | WiFi is verbonden maar er is al meer dan 10 seconden geen OpenTherm-verkeer ontvangen. Controleer de PIC- en boilerverbinding. |
+| Beide LEDs uit (normale werking) | WiFi verbonden, OpenTherm-verkeer actief. LEDs worden alleen kort gebruikt voor verwerkingsindicatie. |
+| Snelle knipperingen tijdens opstarten | Setup-fase. Drie snelle knipperingen signaleren voltooiing van een setup-stap. |
+
+De fysieke OTGW-print heeft ook indicator-LEDs die door de PIC worden aangestuurd:
+- **Groene LED**: PIC draait en communiceert.
+- **Gele LED**: Boilercommunicatie actief.
+- **Rode LED**: Fout of storing.
+
+LED-knipperen kan volledig worden uitgeschakeld in Settings (`LED blink`).
+
+---
+
+### 7.10 Telnet-debuglog: verbinden en lezen
+
+De Telnet-debuglog op poort 23 is het krachtigste diagnosehulpmiddel dat de firmware biedt. Alle interne events worden hier in real-time gerapporteerd.
 
 #### Verbinden
 
@@ -278,7 +330,14 @@ Telnet is in Windows standaard uitgeschakeld. Activeer het via **Programma's en 
 | `T:XXXX YYYY` | OpenTherm-frame ontvangen van thermostaat (T = Thermostat) |
 | `B:XXXX YYYY` | OpenTherm-frame ontvangen van boiler (B = Boiler) |
 | `SERIAL OVERRUN` | UART-buffer overgelopen |
-| `Heap: XXXXX` | Vrij geheugen in bytes |
+| `Heap: XXXXX (HEALTHY)` | Normaal heap-niveau, elke 60 seconden gelogd |
+| `Heap: XXXXX (LOW)` | Heap wordt laag; berichtfrequentie vermindert |
+| `HEAP-CRITICAL: Blocking WebSocket` | Heap kritiek laag; WebSocket-berichten worden gedropt |
+| `HEAP-CRITICAL: Blocking MQTT` | Heap kritiek laag; MQTT-berichten worden gedropt |
+| `Emergency heap recovery starting` | Automatisch herstel geactiveerd vanwege kritiek lage heap |
+| `[drip] publishing discovery for OT ID ...` | MQTT discovery publiceert een entiteit tegelijk (normaal) |
+| `[drip] slowed to 30s (heap pressure)` | Discovery-interval verhoogd vanwege heapdruk |
+| `Nightly restart triggered` | Geplande herstart wordt uitgevoerd op het ingestelde uur |
 | `MQTT: Connection refused` | MQTT-verbinding geweigerd door broker |
 | `LittleFS mount failed` | Bestandssysteem niet beschikbaar |
 
@@ -292,9 +351,51 @@ nc <ip-adres> 23 | tee otgw-debug.log
 
 ---
 
-### 7.9 Terugzetten naar fabrieksinstellingen
+### 7.11 Crash log
 
-"Fabrieksinstellingen" voor OTGW-firmware betekent: alle opgeslagen instellingen (WiFi, MQTT, NTP, enzovoort) verwijderen zodat het apparaat terugkeert naar de standaard­configuratie.
+Vanaf v2.0.0 slaat de firmware crash-informatie op in flash-geheugen wanneer een onafgehandelde exception of watchdog-reset optreedt. Na een crash-reboot is deze informatie op meerdere manieren beschikbaar:
+
+1. **Web UI:** De Device Info-sectie op de hoofdpagina toont crash log details wanneer beschikbaar.
+2. **REST API:** `GET /api/v2/device/crashlog` retourneert een JSON-object met `available`, `summary` en `details` velden.
+3. **Telnet:** Register-dumps en exception-oorzaken worden getoond tijdens het opstarten.
+
+Voeg bij het melden van een bug op GitHub altijd de crash log uitvoer toe. Het `summary`-veld bevat het type exception en `details` bevat registerwaarden (epc1, epc2, excvaddr, etc.) die ontwikkelaars helpen de crash in de code te lokaliseren.
+
+---
+
+### 7.12 ESP32-specifieke probleemoplossing (OTGW32)
+
+Het OTGW32-bord gebruikt een ESP32-S3 en beschikt over hardwaremogelijkheden die niet aanwezig zijn op de ESP8266-versie.
+
+#### OTDirect (direct OpenTherm zonder PIC)
+
+De OTGW32 heeft geen PIC-microcontroller. In plaats daarvan verwerkt de ESP32-S3 het OpenTherm-protocol rechtstreeks via GPIO (OTDirect). Als de OpenTherm-communicatie niet werkt:
+
+1. Controleer of de 18V step-up converter is ingeschakeld (hardwarevereiste voor OT-signalering).
+2. Bekijk de Telnet-debuglog voor OTDirect-gerelateerde berichten. Schakel debug-kanaal 6 in via de Telnet-console voor gedetailleerde OTDirect frame handling.
+3. Zorg dat de boiler en thermostaat op de juiste MASTER- en SLAVE-klemmen zijn aangesloten.
+
+#### BLE-temperatuursensoren
+
+De ESP32 ondersteunt BLE (Bluetooth Low Energy) temperatuursensor-scanning. Als BLE-sensoren niet verschijnen:
+
+1. Controleer of BLE-scanning is ingeschakeld in Settings.
+2. BLE-sensoren worden gescand op een timer-bewaakt interval. Wacht minstens een volledige scancyclus na het inschakelen.
+3. Bekijk de Telnet-debuglog voor BLE-scanresultaten.
+
+#### Ethernet (W5500)
+
+Het OTGW32-bord ondersteunt een W5500 Ethernet-module als alternatief voor WiFi:
+
+1. Ethernet is alleen beschikbaar op borden waar `HAS_ETH_CAPABLE` is ingesteld (OTGW32).
+2. Wanneer Ethernet is aangesloten en actief, kan WiFi als fallback blijven functioneren.
+3. Bekijk de Telnet-debuglog voor Ethernet link status berichten.
+
+---
+
+### 7.13 Terugzetten naar fabrieksinstellingen
+
+"Fabrieksinstellingen" voor OTGW-firmware betekent: alle opgeslagen instellingen (WiFi, MQTT, NTP, enzovoort) verwijderen zodat het apparaat terugkeert naar de standaardconfiguratie.
 
 #### Methode 1: Via de Web UI (volledig)
 
@@ -307,7 +408,7 @@ Via de REST API:
 GET http://otgw.local/api/v2/device/settings/reset
 ```
 
-Dit wist alle instellingen en herstart het apparaat met standaard­waarden.
+Dit wist alle instellingen en herstart het apparaat met standaardwaarden.
 
 #### Methode 2: WiFi-gegevens wissen (WiFi-reset)
 
@@ -328,7 +429,7 @@ Dit wist alle opgeslagen gegevens inclusief instellingen, WiFi-gegevens en de Li
 
 ---
 
-### 7.10 Hulp krijgen
+### 7.14 Hulp krijgen
 
 #### GitHub Issues
 
@@ -339,8 +440,9 @@ https://github.com/rvdbreemen/OTGW-firmware/issues
 ```
 
 Voeg bij een bugrapport altijd het volgende mee:
-- Firmware­versie (zichtbaar in de Web UI voettekst of via `/api/v2/device/info`)
+- Firmwareversie (zichtbaar in de Web UI voettekst of via `/api/v2/device/info`)
 - Platform (ESP8266 of ESP32)
+- Crash log (indien beschikbaar, via Web UI of `/api/v2/device/crashlog`)
 - Een beschrijving van het probleem en de stappen om het te reproduceren
 - Relevante uitvoer uit de Telnet-debuglog
 
@@ -354,7 +456,7 @@ Voor Nederlandstalige discussies is het Tweakers-forum een actieve community voo
 
 ---
 
-### 7.11 Debuglog lezen: veelvoorkomende foutpatronen
+### 7.15 Debuglog lezen: veelvoorkomende foutpatronen
 
 Hieronder een overzicht van patronen die regelmatig in de debuglog verschijnen en wat ze betekenen.
 
@@ -390,11 +492,11 @@ Foutcode `5` betekent fout inloggegevens. Controleer gebruikersnaam en wachtwoor
 
 | MQTT rc-code | Betekenis |
 |-------------|-----------|
-| -4 | Verbindings­time-out |
+| -4 | Verbindingstime-out |
 | -3 | Verbinding verbroken |
 | -2 | Broker niet bereikbaar |
 | -1 | Foutief protocol |
-| 1 | Verkeerde protocol­versie |
+| 1 | Verkeerde protocolversie |
 | 2 | Afgewezen client-ID |
 | 3 | Broker niet beschikbaar |
 | 4 | Fout gebruikersnaam/wachtwoord |
@@ -406,7 +508,7 @@ Foutcode `5` betekent fout inloggegevens. Controleer gebruikersnaam en wachtwoor
 SERIAL OVERRUN detected
 ```
 
-UART-buffer overgelopen. Zie paragraaf 7.7.
+UART-buffer overgelopen. Zie paragraaf 7.8.
 
 ```
 PIC not responding
@@ -418,7 +520,7 @@ De PIC reageert niet op het verwachte OTGW-startbericht. Controleer de seriele v
 OT frame parse error: XXXXXXXX
 ```
 
-Een ontvangen OpenTherm-frame kon niet worden ge­decodeerd. Dit kan duiden op ruis op de OpenTherm-bus of een defecte verbinding.
+Een ontvangen OpenTherm-frame kon niet worden gedecodeerd. Dit kan duiden op ruis op de OpenTherm-bus of een defecte verbinding.
 
 #### NTP-problemen
 
@@ -428,15 +530,27 @@ NTP: waiting for sync...
 NTP: Synced, local time: 2026-04-11 14:32:00
 ```
 
-Normale NTP-opstart­reeks. Als de firmware lang in `waiting for sync` blijft, controleer:
+Normale NTP-opstartvolgorde. Als de firmware lang in `waiting for sync` blijft, controleer:
 - Is NTP ingeschakeld in de instellingen?
 - Is de NTP-server bereikbaar (poort 123 UDP outbound)?
 - Heeft het apparaat een werkende internetverbinding of lokale NTP-server?
 
-#### Geheugenprobleem
+#### Geheugenproblemen
 
 ```
-Heap low: 3200 bytes free
+Heap: 3200 (WARNING)
 ```
 
-Het vrije geheugen is onder een kritieke drempel gezakt. Dit kan leiden tot instabiliteit. Herstart het apparaat. Als het probleem aanhoudt, meld het als issue op GitHub met de bijbehorende firmwareversie en debuglog.
+Het vrije geheugen zakt onder de WARNING-drempel. De firmware beperkt automatisch WebSocket- en MQTT-verkeer. Zie paragraaf 7.7 voor de volledige tabel met heap health tiers.
+
+```
+Emergency heap recovery starting (heap=2800 bytes)
+```
+
+De firmware probeert automatisch geheugen terug te winnen. Als dit regelmatig voorkomt, overweeg de nachtelijke herstart in te schakelen (paragraaf 7.7.1).
+
+```
+HEAP-CRITICAL: Blocking MQTT (dropped 5 msgs, heap=2500 bytes)
+```
+
+Heap is kritiek laag. MQTT-berichten worden gedropt om het apparaat stabiel te houden. Herstart het apparaat als directe maatregel. Meld het als issue op GitHub met de bijbehorende firmwareversie en debuglog als het probleem aanhoudt.

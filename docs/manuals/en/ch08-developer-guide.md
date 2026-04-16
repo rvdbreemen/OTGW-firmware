@@ -44,7 +44,7 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Single-page application shell (~11 KB — always stream, never load into RAM) |
+| `index.html` | Single-page application shell (~11 KB; always stream, never load into RAM) |
 | `index.js` | Main SPA JavaScript: live OT log, WebSocket client, settings forms |
 | `graph.js` | ECharts-based real-time temperature graphs |
 | `index.css` | Stylesheet with dark/light theme support |
@@ -71,13 +71,18 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 The primary build script for producing release artifacts. It invokes PlatformIO internally, handles version embedding, filesystem packaging, and artifact collection.
 
 ```bash
-python build.py              # Build firmware + LittleFS filesystem image
-python build.py --firmware   # Build firmware only (skip filesystem)
-python build.py --clean      # Clean build artifacts before building
-python build.py --upload     # Build and upload to connected device
+python build.py                      # Full build for ESP8266 + ESP32 (PlatformIO, incremental)
+python build.py --target esp8266     # Build for ESP8266 only
+python build.py --target esp32       # Build for ESP32 only
+python build.py --firmware           # Build firmware only (skip filesystem)
+python build.py --filesystem         # Build filesystem only
+python build.py --clean              # Clean build artifacts before building
+python build.py --distclean          # Clean build + cached dependencies
+python build.py --arduino-cli        # Use legacy arduino-cli backend instead of PlatformIO
+python build.py --help               # Show help
 ```
 
-The script reads the Git tag to embed the version string and places output in the `build/` directory.
+By default `build.py` uses PlatformIO as backend and builds both ESP8266 and ESP32 targets. The `--arduino-cli` flag selects the legacy arduino-cli backend (ESP8266 only). The script reads the Git tag to embed the version string and places output in the `build/` directory.
 
 #### PlatformIO
 
@@ -114,23 +119,47 @@ PlatformIO's ctags scanner processes all `.ino` files regardless of `#if` guards
 
 #### Arduino IDE
 
-Arduino IDE is supported for ESP8266 only. Install the ESP8266 Arduino core, then open `src/OTGW-firmware/OTGW-firmware.ino`. Required libraries are in `libraries/` — add that directory to your Arduino sketchbook library path. The IDE does not support the ESP32 target or `OTDirect.ino`.
+Arduino IDE is supported for ESP8266 only. Install the ESP8266 Arduino core, then open `src/OTGW-firmware/OTGW-firmware.ino`. Required libraries are in `libraries/`. Add that directory to your Arduino sketchbook library path. The IDE does not support the ESP32 target or `OTDirect.ino`.
 
 #### evaluate.py
 
 Run the code quality checker after making changes to catch common ESP8266-specific mistakes:
 
 ```bash
-python evaluate.py           # Full analysis (all files)
-python evaluate.py --quick   # Fast pass (changed files only)
+python evaluate.py           # Full evaluation (all files)
+python evaluate.py --quick   # Quick check (essentials only)
+python evaluate.py --report  # Generate detailed report
+python evaluate.py --fix     # Auto-fix issues where possible
 ```
 
-The checker flags:
+The checker performs comprehensive evaluation including:
+- Code quality metrics (PROGMEM usage, unsafe patterns, String class audit)
+- Build system validation
+- Dependency health checks
+- Documentation coverage
+- Security analysis
+- Memory and resource analysis
+
+Key patterns it flags:
 - `Serial.print()` calls (must never appear after init)
 - String literal not wrapped in `F()` or `PSTR()`
 - `String` class usage in non-setup code
 - `strcpy`/`sprintf` without bounds (should use `strlcpy`/`snprintf_P`)
 - `strncmp_P`/`strstr_P` on binary data (use `memcmp_P`)
+
+#### tools/generate_mqttha_progmem.py
+
+Generates compiled PROGMEM data for MQTT Home Assistant auto-discovery from the template configuration file `mqttha.cfg`:
+
+```bash
+python tools/generate_mqttha_progmem.py
+```
+
+This reads `src/OTGW-firmware/data/mqttha.cfg` and produces two files in the sketch directory:
+- `mqttha_progmem.h`: struct definition and extern declarations (included by `.ino` files)
+- `mqttha_progmem.cpp`: actual PROGMEM data definitions (compiled as a separate translation unit)
+
+The generated code uses two flat PROGMEM string pools (topics and messages concatenated) with a struct index. Placing the data in a separate `.cpp` translation unit avoids the Xtensa single-TU section/relocation explosion that occurs when large PROGMEM data is placed in the main sketch. Run this tool whenever `mqttha.cfg` is modified.
 
 ---
 
@@ -342,7 +371,7 @@ void handleMyFeature(const char words[][API_WORD_LEN], uint8_t wc,
 ```
 
 Rules:
-- Never use `Serial.print()` for debug — use `DebugTln()` or `DebugTf()`.
+- Never use `Serial.print()` for debug. Use `DebugTln()` or `DebugTf()`.
 - Use `CMSG_SIZE` (512 bytes) as the standard response buffer unless you need a larger response.
 - For responses larger than `CMSG_SIZE`, use `httpServer.sendContent()` in a chunked loop with `httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN)`.
 - All mutation endpoints (POST, PUT, DELETE) must call `checkHttpAuth()` and return immediately if it returns false.
@@ -378,7 +407,7 @@ void sendMQTTData(const __FlashStringHelper* topic, const __FlashStringHelper* v
 
 The function prepends the configured topic namespace (`{TopTopic}/value/{UniqueId}/`) automatically. It also checks `canPublishMQTT()` before sending.
 
-Example — publish a new float value:
+Example, publish a new float value:
 
 ```cpp
 if (canPublishMQTT()) {
@@ -417,7 +446,7 @@ For commands that do not map to a PIC command (e.g., SAT-specific topics), add a
 
 #### Home Assistant Auto-Discovery
 
-HA discovery payloads are generated from `mqttha.cfg` (stored in LittleFS). This is a template file processed by `doAutoConfigure()` / `doAutoConfigureMsgid()`. If your new topic needs a HA entity, add an entry to `mqttha.cfg` following the existing template format. The file is too large to document fully here — examine existing entries for the pattern.
+HA discovery payloads are generated from `mqttha.cfg` (stored in LittleFS). This is a template file processed by `doAutoConfigure()` / `doAutoConfigureMsgid()`. If your new topic needs a HA entity, add an entry to `mqttha.cfg` following the existing template format. The file is too large to document fully here. Examine existing entries for the pattern.
 
 ---
 

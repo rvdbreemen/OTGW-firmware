@@ -4,7 +4,7 @@ This directory contains formal API documentation for the OTGW-firmware REST API.
 
 ## OpenAPI Specification
 
-The `openapi.yaml` file provides a complete OpenAPI 3.0 specification of the REST API.
+The `openapi.yaml` file provides a complete OpenAPI 3.1 specification of the REST API.
 
 ### Using the Specification
 
@@ -284,7 +284,14 @@ Update a single device setting.
 - `401` - Authentication required
 - `403` - CSRF protection: invalid origin
 
-**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satpwmautoswitch`
+**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satpwmautoswitch`
+
+**Nightly restart settings**:
+
+| Setting | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| `nightlyrestart` | bool | - | `false` | Enable a scheduled daily restart to recover heap memory |
+| `nightlyrestarthour` | int | 0-23 | `4` | Local hour when the nightly restart runs (requires NTP to be enabled and synced) |
 
 **SAT setting details**:
 
@@ -441,7 +448,7 @@ Backward compatibility alias. The command is passed in the URL path instead of t
 
 #### `POST /api/v2/otgw/discovery` | `PUT /api/v2/otgw/discovery`
 
-Triggers a full MQTT autodiscovery cycle, sending all HA discovery configs from the `mqttha.cfg` file.
+Triggers a full MQTT autodiscovery cycle, marking all discovery IDs as pending and drip-publishing their configs asynchronously (one every 3 seconds). Discovery templates are compiled from PROGMEM (not read from LittleFS at runtime).
 
 **Authentication**: Not required
 
@@ -744,7 +751,7 @@ Triggers a test webhook call to verify the configured webhook URL is reachable.
 
 ### SAT (Smart Autotune Thermostat)
 
-The SAT endpoints provide access to the embedded smart heating controller. SAT runs entirely on the ESP — these endpoints are for monitoring state and pushing external inputs.
+The SAT endpoints provide access to the embedded smart heating controller. SAT runs entirely on the ESP  - these endpoints are for monitoring state and pushing external inputs.
 
 #### `GET /api/v2/sat/status`
 
@@ -845,7 +852,7 @@ or:
 
 #### `POST /api/v2/sat/externaltemp`
 
-Push an external indoor temperature reading (e.g., from a more accurate room sensor). The reading expires after 5 minutes if not refreshed, falling back to the OT bus room temperature.
+Push an external indoor temperature reading (e.g., from a more accurate room sensor). The reading expires after the configured `sensor_max_age` (default 6 hours) if not refreshed, falling back to the OT bus room temperature.
 
 **Authentication**: Required (when password is configured)
 
@@ -867,7 +874,7 @@ or:
 
 #### `POST /api/v2/sat/externaloutdoor`
 
-Push an external outdoor temperature reading. Expires after 10 minutes if not refreshed, falling back to the OT bus outdoor temperature.
+Push an external outdoor temperature reading. Expires after `sensor_max_age` if not refreshed, falling back to the OT bus outdoor temperature.
 
 **Authentication**: Required (when password is configured)
 
@@ -880,9 +887,20 @@ Push an external outdoor temperature reading. Expires after 10 minutes if not re
 {"status": "ok"}
 ```
 
+#### `POST /api/v2/sat/flush`
+
+Flushes short-lived SAT data (PID integral accumulator and cycle statistics window). Useful after large configuration changes or when troubleshooting.
+
+**Authentication**: Required (when password is configured)
+
+**Response** `200 OK`:
+```json
+{"result": "ok", "flushed": ["pid", "cycles"]}
+```
+
 ---
 
-### OT Direct — OTGW32 Only
+### OT Direct -- OTGW32 Only
 
 The `/api/v2/otdirect/*` endpoints are only present in OTGW32 builds (`HAS_DIRECT_OT=1`).
 On standard ESP8266+PIC hardware all these endpoints return `503 Service Unavailable`.
@@ -936,8 +954,8 @@ Switch the OT-direct engine to the requested operating mode. Send `mode` as a fo
 **Response** `200 OK`: Full `otdirect_status` object reflecting the mode after the switch command has been queued.
 
 **Error responses**:
-- `400` — Missing or invalid `mode` parameter
-- `503` — OT Direct hardware not available
+- `400`  - Missing or invalid `mode` parameter
+- `503`  - OT Direct hardware not available
 
 #### `GET /api/v2/otdirect/settings`
 
@@ -951,7 +969,18 @@ Returns the persisted OT-direct configuration settings.
   "otdirect_settings": {
     "mode": 1,
     "setback_temp": 15.0,
-    "setback_timeout": 300
+    "setback_timeout": 300,
+    "ch_mode": 0,
+    "flow_temp": 55.0,
+    "flow_max": 80.0,
+    "room_setpoint": 20.0,
+    "gradient": 1.5,
+    "exponent": 1.3,
+    "offset": 0.0,
+    "room_comp": false,
+    "kp": 2.0,
+    "ki": 0.001,
+    "kboost": 5.0
   }
 }
 ```
@@ -959,8 +988,19 @@ Returns the persisted OT-direct configuration settings.
 | Field | Type | Description |
 |-------|------|-------------|
 | `mode` | integer | Persisted mode index: 0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback |
-| `setback_temp` | float | Setback temperature applied when thermostat disconnects (°C, range 1-30) |
+| `setback_temp` | float | Setback temperature applied when thermostat disconnects (C, range 1-30) |
 | `setback_timeout` | integer | Seconds without a thermostat frame before setback activates |
+| `ch_mode` | integer | CH control mode (0=fixed setpoint, 1=heating curve, 2=PI room compensation) |
+| `flow_temp` | float | Fixed flow temperature setpoint (C, used when ch_mode=0) |
+| `flow_max` | float | Maximum flow temperature limit (C) |
+| `room_setpoint` | float | Room temperature setpoint for PI compensation (C) |
+| `gradient` | float | Heating curve gradient |
+| `exponent` | float | Heating curve exponent |
+| `offset` | float | Heating curve offset (C) |
+| `room_comp` | boolean | Whether PI room compensation is enabled |
+| `kp` | float | PI proportional gain |
+| `ki` | float | PI integral gain |
+| `kboost` | float | PI boost gain for large errors |
 
 #### `POST /api/v2/otdirect/settings`
 
@@ -968,7 +1008,7 @@ Update OT-direct settings. Only provided parameters are updated.
 
 **Authentication**: Not required
 
-**Form parameters**: `setbacktemp` (float, 1.0-30.0), `setbacktimeout` (integer, seconds)
+**Form parameters**: `setbacktemp` (float, 1.0-30.0), `setbacktimeout` (integer, seconds), `chmode` (int), `flowtemp` (float), `flowmax` (float), `roomsetpoint` (float), `gradient` (float), `exponent` (float), `offset` (float), `roomcomp` (bool), `kp` (float), `ki` (float), `kboost` (float)
 
 **Response** `200 OK`: Full `otdirect_status` object.
 
@@ -1004,16 +1044,16 @@ Add, clear, or manage override entries. All actions require `action` and `msgid`
 **Response** `200 OK`: Updated override list.
 
 **Error responses**:
-- `400` — Invalid or missing parameters
-- `503` — OT Direct hardware not available
+- `400`  - Invalid or missing parameters
+- `503`  - OT Direct hardware not available
 
 ---
 
 #### OT Direct State Field Reference
 
 The `state.otd.*` struct fields are exposed via two REST endpoints:
-1. `/api/v2/otdirect/status` — as an `otdirect_status` object with unprefixed field names
-2. `/api/v2/device/info` — as flattened fields with `otd` prefix (only when `otdirectavailable` is `true`)
+1. `/api/v2/otdirect/status`  - as an `otdirect_status` object with unprefixed field names
+2. `/api/v2/device/info`  - as flattened fields with `otd` prefix (only when `otdirectavailable` is `true`)
 
 All fields are **read-only** runtime state except where noted.
 
@@ -1056,7 +1096,7 @@ These routes are served directly by the web server (not under `/api`):
 | `/update` | OTA firmware update (provided by ESP8266HTTPUpdateServer) |
 | `/FSexplorer` or `/FSexplorer.html` | Filesystem explorer (debug builds only) |
 
-**Deprecated unversioned routes** (will be removed in v1.3.0):
+**Deprecated unversioned routes** (may be removed in a future release):
 | Route | Replacement |
 |-------|-------------|
 | `/api/firmwarefilelist` | `GET /api/v2/firmware/files` |

@@ -67,6 +67,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **AceTime** | Arduino timezone library used by the firmware for NTP time management and zone-aware timestamps. |
 | **ArduinoJson** | A popular Arduino JSON parsing library. Explicitly excluded from this project (ADR-042) due to RAM and flash cost. JSON is handled via manual `snprintf_P` construction and `parseJsonKVLine()` parsing. |
 | **BLE** | Bluetooth Low Energy. On ESP32 hardware (OTGW32), the firmware can receive room temperature and humidity from a BTHome-compatible BLE sensor (e.g., a Xiaomi sensor). |
+| **boards.h** | Board-specific pin mapping header. Defines GPIO assignments per hardware variant (e.g., `BOARD_NODOSHOP_ESP32`). Located at `src/OTGW-firmware/boards.h`. |
 | **BTHome** | An open BLE advertisement protocol for home sensor devices. Used by the SAT BLE integration for passive scanning of room temperature sensors. |
 | **C4 model** | A four-level architecture documentation model: Context, Container, Component, Code. The firmware's architecture is documented using C4 in `docs/c4/`. |
 | **CH** | Central Heating. Refers to the radiator or underfloor heating circuit, as opposed to DHW. |
@@ -77,6 +78,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **ESP8266** | The Espressif Wi-Fi microcontroller used in the NodoShop OTGW board. Runs at 80 or 160 MHz, approximately 40 KB usable heap. |
 | **ESP32** | The more powerful Espressif microcontroller used in the NodoShop OTGW32 board. Runs at 240 MHz, significantly more RAM and flash, supports BLE, Ethernet, and OTDirect. |
 | **f8.8** | OpenTherm fixed-point data format: an 8-bit signed integer plus an 8-bit fractional part (1/256 per LSB). Used for all temperature values in the protocol. |
+| **Frame Bridge** | The abstraction layer (ADR-065) that provides a uniform OpenTherm frame interface regardless of whether the underlying transport is PIC UART (ESP8266) or OTDirect GPIO (ESP32). |
 | **HA** | Home Assistant. The primary target home automation platform for this firmware. |
 | **HEAP_CRITICAL** | Heap level below ~3 KB. Emergency mode: MQTT and WebSocket sends are blocked. |
 | **HEAP_HEALTHY** | Heap level above ~8 KB. Normal operation. |
@@ -92,10 +94,12 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **OT** | OpenTherm. The communication protocol used between room thermostats and central heating boilers. |
 | **OTGW** | OpenTherm Gateway. The NodoShop hardware device that sits in-line on the OpenTherm bus and allows monitoring and override of messages. Refers to both the hardware and to this firmware project. |
 | **OTGW32** | The NodoShop OpenTherm Gateway board based on ESP32 with direct GPIO OpenTherm interface (OTDirect), W5500 Ethernet, BLE, and OLED. |
-| **OTDirect** | The ESP32-native direct GPIO OpenTherm bus interface. Replaces the PIC co-processor on OTGW32 boards. Implemented in `OTDirect.ino` and guarded by `#if HAS_DIRECT_OT`. |
+| **OTDirect** | The ESP32-native direct GPIO OpenTherm bus interface. Replaces the PIC co-processor on OTGW32 boards. Implemented in `OTDirect.ino` and guarded by `#if HAS_DIRECT_OT`. Supports gateway, monitor, bypass, master, and loopback operating modes (ADR-064). |
+| **OPV** | Overshoot Protection Value. SAT calibration parameter (ADR-076) that limits flow temperature overshoot during burner ignition by capping the initial setpoint boost. |
 | **PIC** | The PIC16F88 or PIC16F1847 microcontroller co-processor on the NodoShop OTGW board. Handles the OpenTherm electrical bus and communicates with the ESP over UART at 9600 baud. |
 | **PROGMEM** | Program Memory. On ESP8266, string literals declared with `PROGMEM` (or wrapped in `F()` / `PSTR()`) are stored in flash memory instead of RAM, conserving the scarce ~40 KB RAM budget. |
 | **PubSubClient** | The Arduino MQTT client library used by the firmware. Pinned to version 2.8.0 in `platformio.ini`. |
+| **platform.h** | The unified platform abstraction header (ADR-061). Provides `#define` guards and typedefs that isolate ESP8266-specific and ESP32-specific code behind a single interface. |
 | **PlatformIO** | Cross-platform embedded development toolchain and IDE plugin. Used for building the ESP32 target and optionally ESP8266. Config: `platformio.ini`. |
 | **SAT** | Smart Autotune Thermostat. The embedded heating controller in the firmware that replaces the room thermostat's role. Combines a weather-compensated heating curve with a PID v3 control loop and automatic gain tuning. |
 | **SLINE_SIZE** | 1200-byte MQTT autoconfig line buffer. Used exclusively in `MQTTstuff.ino` for `mqttha.cfg` processing. Larger than `CMSG_SIZE` to accommodate HA discovery JSON lines up to ~900 bytes. |
@@ -253,6 +257,12 @@ Version 2.0.0 is a major release. The headline changes are:
 **AP fallback mode (beta only).** When no saved WiFi is available, the device opens a fallback access point rather than going fully offline. Guarded by `_VERSION_PRERELEASE`.
 
 **MQTT routing fix.** OTGW "Answer Thermostat" messages (A-prefix frames) are now correctly routed to the boiler source topic rather than the thermostat source topic.
+
+**Async bitmap-driven MQTT discovery drip publisher.** HA auto-discovery payloads are now published asynchronously in small batches using a bitmap scheduler, avoiding the memory spikes caused by publishing all discovery messages at once on MQTT connect.
+
+**Nightly restart.** A configurable scheduled restart can be enabled to reclaim heap memory over long uptimes. The restart hour and enable flag are exposed via the REST API and settings whitelist.
+
+**16 new ADRs (061-076).** Covering the unified platform abstraction, OTGW32 hardware, OTDirect operating modes, SAT PID v3, heating curve algorithm, SAT MQTT topics, BLE platform compatibility, and WiFi reconnect timeout tuning. See section M for the full reference.
 
 **Full CHANGELOG:** see `CHANGELOG.md` in the repository root.
 
@@ -499,3 +509,132 @@ Key differences from ESP8266:
 - OLED display uses I2C.
 - BLE uses the integrated ESP32 radio; no additional hardware required.
 - The PIC UART pins are absent (no PIC co-processor).
+
+---
+
+### M. Architecture Decision Record (ADR) Reference
+
+All ADRs live in `docs/adr/`. An ADR captures a significant architectural choice, its context, alternatives considered, and consequences. Once Accepted, an ADR is immutable; changes require a new ADR that supersedes the old one.
+
+The full ADR index with topic grouping and dependency diagrams is in `docs/adr/README.md`.
+
+#### ADRs added since v1.3.5
+
+These ADRs were introduced as part of the v2.0.0 development cycle (ESP32/OTGW32 dual-platform support, SAT thermostat, and related work):
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| 061 | Unified ESP8266/ESP32 Platform Abstraction | Accepted |
+| 062 | SAT Smart Autotune Thermostat Integration | Accepted |
+| 063 | OTGW32 Hardware Support | Accepted |
+| 064 | OTDirect Operating Mode Architecture | Accepted |
+| 065 | Frame Bridge Pattern | Accepted |
+| 066 | Thermostat Auto-Detection Master Mode | Accepted |
+| 067 | SSD1306Ascii OLED Library | Accepted |
+| 068 | OTDirect Schedule Tuning Constants | Accepted |
+| 069 | SAT PID v3 Implementation | Accepted |
+| 070 | SAT Memory Allocation Strategy | Accepted |
+| 071 | SAT Heating Curve Algorithm | Accepted |
+| 072 | SAT Platform Compatibility Layer | Accepted |
+| 073 | SAT MQTT Topic Structure | Accepted |
+| 074 | ADR Audit SAT Integration Phase | Accepted |
+| 075 | WiFi Reconnect Timeout Tuning | Accepted |
+| 076 | SAT OPV Calibration | Accepted |
+
+#### ADR status changes since v1.3.5
+
+| ADR | Old Status | New Status |
+|-----|-----------|------------|
+| 001 | Accepted | Superseded by ADR-061 |
+| 047 | Superseded by ADR-061 | Superseded by ADR-075 |
+
+#### Complete ADR catalog (all 76 ADRs)
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| 001 | ESP8266 Platform Selection | Superseded by ADR-061 |
+| 002 | Modular .ino File Architecture | Accepted |
+| 003 | HTTP-Only Network Architecture (No HTTPS) | Accepted |
+| 004 | Static Buffer Allocation Strategy | Superseded by ADR-053 |
+| 005 | WebSocket for Real-Time Streaming | Accepted |
+| 006 | MQTT Integration Pattern | Accepted |
+| 007 | Timer-Based Task Scheduling | Accepted |
+| 008 | LittleFS for Configuration Persistence | Accepted |
+| 009 | PROGMEM Usage for String Literals | Accepted |
+| 010 | Multiple Concurrent Network Services | Accepted |
+| 011 | External Hardware Watchdog for Reliability | Accepted |
+| 012 | PIC Firmware Upgrade via Web UI | Accepted |
+| 013 | Arduino Framework Over ESP-IDF | Accepted |
+| 014 | Dual Build System (Makefile + Python Script) | Accepted |
+| 015 | NTP and AceTime for Time Management | Accepted |
+| 016 | OpenTherm Command Queue with Deduplication | Accepted |
+| 017 | WiFiManager for Initial Configuration | Accepted |
+| 018 | ArduinoJson for Data Interchange | Superseded by ADR-042 |
+| 019 | REST API Versioning Strategy | Accepted |
+| 020 | Dallas DS18B20 Temperature Sensor Integration | Accepted |
+| 021 | S0 Pulse Counter Hardware Interrupt Architecture | Accepted |
+| 022 | GPIO Output Control (Bit-Flag Triggered Relays) | Accepted |
+| 023 | File System Explorer HTTP Architecture | Accepted |
+| 024 | Debug Telnet Command Console | Accepted |
+| 025 | Safari WebSocket Connection Management | Accepted |
+| 026 | Conditional JavaScript Cache-Busting | Accepted |
+| 027 | Version Mismatch Warning System in Web UI | Accepted |
+| 028 | File Streaming Over Loading for Memory Safety | Accepted |
+| 029 | Simple XHR-Based OTA Flash (KISS Principle) | Accepted |
+| 030 | Heap Memory Monitoring and Emergency Recovery | Accepted |
+| 031 | Two-Microcontroller Coordination Architecture | Accepted |
+| 032 | No Authentication Pattern (Local Network Security Model) | Accepted |
+| 033 | Dallas Sensor Custom Labels and Graph Visualization | Accepted |
+| 034 | Non-Blocking Modal Dialogs for User Input | Accepted |
+| 035 | RESTful API Compliance Strategy | Accepted |
+| 036 | Boot Sequence Initialization Ordering | Accepted |
+| 037 | Gateway Mode Detection via PR=M Polling | Accepted |
+| 038 | OpenTherm Message Data Flow Pipeline | Accepted |
+| 039 | Real-Time OTGraph Charting Architecture | Accepted |
+| 040 | MQTT Source-Specific Topics for OpenTherm Values | Accepted |
+| 041 | JIT Home Assistant Discovery | Accepted |
+| 042 | Streaming JSON I/O (No ArduinoJson) | Accepted |
+| 043 | Reset-Pattern WiFi Recovery Trigger | Accepted |
+| 044 | Global State Header Definition Pattern | Accepted |
+| 045 | PS=1 Print Summary Parsing | Superseded by ADR-046 |
+| 046 | PS=1 Summary Translation with Shared Publish Helpers | Accepted |
+| 047 | Non-Blocking WiFi Reconnect State Machine | Superseded by ADR-075 |
+| 048 | Non-Blocking Webhook State Machine with Retry | Accepted |
+| 049 | String Class Prohibition in Protocol Paths | Accepted |
+| 050 | Centralized API Route Dispatch Table | Accepted |
+| 051 | Dual Encapsulating Structs (Settings + State) | Accepted |
+| 052 | MQTT Publish Eligibility and Reconnect Refresh Contract | Accepted |
+| 053 | Large Feature Buffer Static Allocation | Accepted |
+| 054 | Optional HTTP Basic Authentication for Settings | Superseded by ADR-056 |
+| 055 | Webhook Outbound HTTP Integration | Superseded by ADR-057 |
+| 056 | Protected Admin Endpoint Security and Secret-Handling Contract | Accepted |
+| 057 | Webhook Delivery, Retry, and Protected Test Endpoint Policy | Accepted |
+| 058 | Non-Blocking PIC Command Response | Accepted |
+| 059 | Ser2net Queue Awareness | Accepted |
+| 060 | PIC Availability Guard Pattern | Accepted |
+| 061 | Unified ESP8266/ESP32 Platform Abstraction | Accepted |
+| 062 | SAT Smart Autotune Thermostat Integration | Accepted |
+| 063 | OTGW32 Hardware Support | Accepted |
+| 064 | OTDirect Operating Mode Architecture | Accepted |
+| 065 | Frame Bridge Pattern | Accepted |
+| 066 | Thermostat Auto-Detection Master Mode | Accepted |
+| 067 | SSD1306Ascii OLED Library | Accepted |
+| 068 | OTDirect Schedule Tuning Constants | Accepted |
+| 069 | SAT PID v3 Implementation | Accepted |
+| 070 | SAT Memory Allocation Strategy | Accepted |
+| 071 | SAT Heating Curve Algorithm | Accepted |
+| 072 | SAT Platform Compatibility Layer | Accepted |
+| 073 | SAT MQTT Topic Structure | Accepted |
+| 074 | ADR Audit SAT Integration Phase | Accepted |
+| 075 | WiFi Reconnect Timeout Tuning | Accepted |
+| 076 | SAT OPV Calibration | Accepted |
+
+#### Supersession chain summary
+
+- ADR-001 (ESP8266 Platform) -> ADR-061 (Unified Platform Abstraction)
+- ADR-004 (Static Buffers) -> ADR-053 (Large Feature Buffer Static Allocation)
+- ADR-018 (ArduinoJson) -> ADR-042 (Streaming JSON, No ArduinoJson)
+- ADR-045 (PS=1 Parsing) -> ADR-046 (PS=1 Summary Translation)
+- ADR-047 (WiFi Reconnect) -> ADR-075 (WiFi Reconnect Timeout Tuning)
+- ADR-054 (HTTP Basic Auth) -> ADR-056 (Protected Admin Security Contract)
+- ADR-055 (Webhook HTTP) -> ADR-057 (Webhook Delivery + Test Endpoint Policy)

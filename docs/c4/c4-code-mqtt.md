@@ -16,18 +16,27 @@
 
 - `enum states_of_MQTT { MQTT_STATE_INIT, MQTT_STATE_TRY_TO_CONNECT, MQTT_STATE_IS_CONNECTED, MQTT_STATE_WAIT_CONNECTION_ATTEMPT, MQTT_STATE_WAIT_FOR_RECONNECT, MQTT_STATE_ERROR }`
   - Description: State machine states for MQTT connection lifecycle
-  - Location: MQTTstuff.ino:103
+  - Location: MQTTstuff.ino:108
   - Usage: Controls the MQTT connection state transitions in `handleMQTT()`
 
 #### Data Structures
 
+- `struct MqttHaCfgEntry` (mqttha_progmem.h)
+  - Description: PROGMEM discovery table entry descriptor (8 bytes, naturally aligned)
+  - Fields:
+    - `uint8_t id`: OT message ID
+    - `uint16_t topicOff`: Byte offset into `mqttHaTopicPool` (23,758 bytes)
+    - `uint32_t msgOff`: Byte offset into `mqttHaMsgPool` (140,767 bytes)
+  - Location: mqttha_progmem.h:22-26
+  - Note: Table and pools are auto-generated from `mqttha.cfg` by `tools/generate_mqttha_progmem.py`
+
 - `struct MQTTAutoConfigLineView`
-  - Description: Parsed line view from mqttha.cfg discovery config file
+  - Description: Parsed view for discovery config rendering (used internally during template expansion)
   - Fields:
     - `byte id`: Message ID for Home Assistant entity
-    - `char *topicTemplate`: Topic template string (pointer into parsed sLine buffer)
-    - `char *msgTemplate`: Message/payload template string (pointer into parsed sLine buffer)
-  - Location: MQTTstuff.ino:43-47
+    - `char *topicTemplate`: Topic template string (pointer into PROGMEM pool or parsed buffer)
+    - `char *msgTemplate`: Message/payload template string (pointer into PROGMEM pool or parsed buffer)
+  - Location: MQTTstuff.ino:53-57
 
 - `struct MQTTAutoConfigTemplateContext`
   - Description: Context for template variable substitution during discovery config rendering
@@ -41,15 +50,15 @@
     - `const char *sourceSuffix`: Source suffix token replacement (_thermostat, _boiler, _gateway)
     - `const char *sourceName`: Source friendly name (Thermostat, Boiler, Gateway)
     - `const char *sourceTopicSegment`: Source key for topic (thermostat, boiler, gateway)
-  - Location: MQTTstuff.ino:49-59
+  - Location: MQTTstuff.ino:59-69
 
 - `struct MQTTAutoConfigSessionLock`
-  - Description: RAII guard for exclusive MQTT auto-discovery file access
+  - Description: RAII guard for exclusive MQTT auto-discovery buffer access
   - Methods:
     - Constructor: Acquires lock if not already in progress
     - Destructor: Releases lock
     - Deleted copy/move constructors: Prevents accidental double-release
-  - Location: MQTTstuff.ino:82-96
+  - Location: MQTTstuff.ino:87-101
   - Pattern: RAII lock guard using `mqttAutoConfigInProgress` flag
 
 - `struct MQTT_set_cmd_t`
@@ -346,16 +355,27 @@
 
 ### Home Assistant Auto-Discovery
 
+Discovery configs are stored in PROGMEM tables (`mqttha_progmem.cpp/h`), auto-generated from `mqttha.cfg` by `tools/generate_mqttha_progmem.py`. The `mqttHaCfgIndex[256]` array maps each OT message ID to its first entry in `mqttHaCfgTable[345]` (0xFFFF if absent), enabling O(1) lookup. Topic and message templates live in two PROGMEM string pools (`mqttHaTopicPool`, `mqttHaMsgPool`) referenced by byte offset from each table entry.
+
+The previous LittleFS file-scan approach (reading `mqttha.cfg` line by line and parsing into an `sLine[1200]` buffer) has been replaced entirely by this PROGMEM table lookup. The `sLine` global buffer has been eliminated.
+
+Three discovery paths exist:
+
+**Path A (Bulk)**: `doAutoConfigure()` iterates the full PROGMEM table synchronously.
+
+**Path B (JIT)**: `doAutoConfigureMsgid()` uses `mqttHaCfgIndex[OTid]` for O(1) lookup on first OT message arrival.
+
+**Path C (Drip)**: `loopMQTTDiscovery()` publishes one pending discovery config per timer tick from the main loop. This is the primary path after MQTT connect or HA restart.
+
 - `void doAutoConfigure()`
-  - Description: Force-publish all Home Assistant discovery configs from mqttha.cfg file
-  - Location: MQTTstuff.ino:1589-1700
+  - Description: Force-publish all Home Assistant discovery configs from PROGMEM table
+  - Location: MQTTstuff.ino:1663-1755
   - Intended use: Explicit utility (Serial 'F' command, REST API); never called automatically
-  - Acquisition: Acquires `MQTTAutoConfigSessionLock` for exclusive file access
+  - Acquisition: Acquires `MQTTAutoConfigSessionLock` for exclusive buffer access
   - Algorithm:
-    - Opens `/mqttha.cfg` from LittleFS
-    - Reads file line by line into `sLine` buffer (guarded by lock)
-    - Parses each line into `MQTTAutoConfigLineView`
-    - Skips Dallas sensor entries (handled separately via `configSensors()`)
+    - Iterates `mqttHaCfgTable[MQTT_HA_CFG_COUNT]` entries via `memcpy_P()`
+    - Reads topic and message templates directly from PROGMEM pools (byte-accessible on ESP8266 via memory-mapped flash)
+    - Skips Dallas sensor entries (handled separately via `configSensors()` after lock release)
     - Skips PIC-specific entries if PIC not enabled
     - Skips OT-direct entries if OT-direct not active
     - Detects source template lines (containing source placeholders)
@@ -363,30 +383,30 @@
     - Otherwise: renders and publishes single discovery entry via `sendMQTTTemplateStreaming()`
     - Marks each successfully published entry in `MQTTautoConfigMap` bitfield
   - Buffer usage:
-    - `sLine`: Global config-line buffer (1200 bytes)
-    - `cMsg` reused as `sTopic`: Rendered discovery topic (≤200 bytes)
-  - Dependencies: MQTTAutoConfigSessionLock, parseAutoConfigLine, expandAndPublishSourceTemplates, sendMQTTTemplateStreaming, setMQTTConfigDone
+    - `cMsg` reused as `sTopic`: Rendered discovery topic (up to 200 bytes)
+    - No `sLine` buffer needed; templates read directly from PROGMEM
+  - Dependencies: MQTTAutoConfigSessionLock, expandAndPublishSourceTemplates, sendMQTTTemplateStreaming, setMQTTConfigDone
 
 - `bool doAutoConfigureMsgid(byte OTid)`
 - `bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId)`
 - `bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMqttTopic)`
   - Description: Publish Home Assistant discovery config for a specific OpenTherm message ID
-  - Location: MQTTstuff.ino:1702-1831
-  - Usage: Just-In-Time (JIT) discovery on first message arrival (Path B in ADR-041)
+  - Location: MQTTstuff.ino:1757-1860
+  - Usage: Just-In-Time (JIT) discovery on first message arrival (Path B), also called by drip publisher (Path C)
   - Parameters:
-    - `byte OTid`: OpenTherm message ID (0-127)
+    - `byte OTid`: OpenTherm message ID (0-255)
     - `const char *cfgSensorId`: Optional sensor ID for Dallas temp sensors
     - `const char *baseMqttTopic`: Optional base MQTT topic override
   - Algorithm:
     - Validates MQTT enabled, broker connected, broker IP valid
-    - Opens `/mqttha.cfg` and reads line by line
-    - Finds entry matching `OTid`
-    - If found: parses and renders discovery config with provided context
+    - Checks heap guard (`MQTT_DISCOVERY_HEAP_MIN = 8000` bytes free required)
+    - Uses `mqttHaCfgIndex[OTid]` for O(1) PROGMEM lookup (no LittleFS file scan)
+    - Iterates contiguous entries for `OTid` in sorted `mqttHaCfgTable`
+    - Reads templates directly from PROGMEM pools
     - Detects source template lines; if separate sources enabled, calls `expandAndPublishSourceTemplates()`
     - Marks entry as configured in `MQTTautoConfigMap` if successful
-    - Closes file (lock released by sessionLock dtor)
   - Return: true if config was published, false otherwise
-  - Dependencies: MQTTAutoConfigSessionLock, parseAutoConfigLine, renderTemplateToBuffer, expandAndPublishSourceTemplates, sendMQTTTemplateStreaming
+  - Dependencies: MQTTAutoConfigSessionLock, mqttHaCfgIndex, mqttHaCfgTable, renderTemplateToBuffer, expandAndPublishSourceTemplates, sendMQTTTemplateStreaming
 
 - `static bool expandAndPublishSourceTemplates(byte msgid, const char *logLabel, const char *topicTemplate, const char *msgTemplate, const void *baseCtxPtr, char *renderedTopic)`
   - Description: Expand source-template discovery line into 3 per-source variants (thermostat/boiler/gateway)
@@ -422,9 +442,11 @@
 
 ### Discovery State Management
 
+Two bitmaps track discovery state: `MQTTautoConfigMap[8]` (published/done) and `MQTTautoCfgPendingMap[8]` (needs publishing). Both are 8 x uint32_t = 256 bits, one per OT message ID.
+
 - `bool getMQTTConfigDone(const uint8_t MSGid)`
   - Description: Check if discovery config has been published for a message ID
-  - Location: MQTTstuff.ino:1520-1532
+  - Location: MQTTstuff.ino:1499-1511
   - Implementation:
     - Splits MSGid into group (bits 7-5) and index (bits 4-0)
     - Reads bit from `MQTTautoConfigMap[group]` at index position
@@ -432,14 +454,54 @@
 
 - `void setMQTTConfigDone(const uint8_t MSGid)`
   - Description: Mark discovery config as published for a message ID
-  - Location: MQTTstuff.ino:1534-1543
+  - Location: MQTTstuff.ino:1513-1522
   - Implementation: Splits MSGid, sets bit in `MQTTautoConfigMap[group]`
 
 - `void clearMQTTConfigDone()`
   - Description: Clear all discovery configuration flags
-  - Location: MQTTstuff.ino:1545-1548
+  - Location: MQTTstuff.ino:1524-1527
   - Usage: Called on MQTT connection, Home Assistant online/offline events
   - Rationale: Triggers re-publication of discovery configs on reconnect or HA restart
+
+- `void setMQTTConfigPending(const uint8_t MSGid)`
+  - Description: Mark a message ID as needing its discovery config (re-)published
+  - Location: MQTTstuff.ino:1517-1522
+  - Implementation: Sets bit in `MQTTautoCfgPendingMap[group]`
+
+- `bool getMQTTConfigPending(const uint8_t MSGid)`
+  - Description: Check if a message ID has a pending discovery publish
+  - Location: MQTTstuff.ino:1524-1529
+
+- `void clearMQTTConfigPending(const uint8_t MSGid)`
+  - Description: Clear pending bit for a message ID
+  - Location: MQTTstuff.ino:1531-1536
+
+- `void markAllMQTTConfigPending()`
+  - Description: Mark every OT ID present in the PROGMEM discovery table as pending for async drip publish
+  - Location: MQTTstuff.ino:1538-1553
+  - Algorithm:
+    - Clears both published and pending bitmaps
+    - Iterates `mqttHaCfgIndex[256]`; for each non-0xFFFF entry, sets the pending bit
+    - Also marks the Dallas sensor pseudo-ID (`OTGWdallasdataid`)
+  - Usage: Called on MQTT connect and HA restart detection
+
+- `void loopMQTTDiscovery()`
+  - Description: Async drip publisher for MQTT discovery configs; called from the main loop on every iteration
+  - Location: MQTTstuff.ino:1568-1623
+  - Algorithm:
+    - Manages its own timer internally (no external timer registration)
+    - Adaptive interval: 3s when heap is healthy, 30s under heap pressure (avoids lwIP pbuf allocations when memory-constrained)
+    - On each timer tick, scans `MQTTautoCfgPendingMap` for the next set bit
+    - Skips already-published IDs (checks `getMQTTConfigDone()`)
+    - Dallas sensor pseudo-ID handled via `configSensors()` call
+    - Calls `doAutoConfigureMsgid()` for one pending ID per tick
+    - Clears pending bit regardless of success (avoids busy-looping; JIT path or next `markAllMQTTConfigPending()` will re-queue if needed)
+    - Returns after publishing one ID (spreads broker load over time)
+  - Constants:
+    - `DISCOVERY_INTERVAL_NORMAL`: 3 seconds
+    - `DISCOVERY_INTERVAL_SLOW`: 30 seconds
+    - `MQTT_DISCOVERY_HEAP_MIN`: 8000 bytes minimum free heap
+  - Dependencies: MQTTautoCfgPendingMap, doAutoConfigureMsgid, configSensors, getHeapHealth
 
 ### Error Handling & Debugging
 
@@ -559,7 +621,8 @@
 - `static char MQTTPubNamespace[MQTT_NAMESPACE_MAX_LEN]`: Publication topic namespace
 - `static char MQTTSubNamespace[MQTT_NAMESPACE_MAX_LEN]`: Subscription topic namespace
 - `static char NodeId[MQTT_ID_MAX_LEN]`: Unique node ID from settings
-- `static bool mqttAutoConfigInProgress`: Lock flag for auto-discovery file access
+- `static bool mqttAutoConfigInProgress`: Lock flag for auto-discovery buffer access
+- `uint32_t MQTTautoCfgPendingMap[8]`: Bitmap of OT IDs pending async drip discovery publish
 - `bool bHAcycle`: Home Assistant online/offline cycle flag
 - `const char* const mqttSourceKeys[] PROGMEM`: Source key strings (thermostat/boiler/gateway)
 - `const char* const mqttSourceSuffixes[] PROGMEM`: Source suffix strings (_thermostat/_boiler/_gateway)
@@ -583,7 +646,7 @@
 - **OTGW-Core.h**: Core data structures (OTGWSettings, OTGWState), OpenTherm message types
 - **safeTimers.h**: Timer macros (DECLARE_TIMER_SEC, DUE, RESTART_TIMER)
 - **WiFi (ESP8266WiFiClient)**: `wifiClient` global for MQTT socket
-- **LittleFS**: File system access for `/mqttha.cfg` configuration
+- **mqttha_progmem.cpp/h**: Auto-generated PROGMEM discovery tables (replaces LittleFS `/mqttha.cfg` file scan)
 - **Debug functions**: DebugTln, DebugTf, DebugT, Debug, DebugFlush (telnet debug output)
 - **Utility functions**:
   - `feedWatchDog()`: Keep watchdog alive during long operations
@@ -639,19 +702,35 @@ PubSubClient's `beginPublish()` → `write()` → `endPublish()` API allows effi
 
 ### Home Assistant Auto-Discovery
 
-The module supports two auto-discovery paths (ADR-041):
+Discovery configs are compiled into PROGMEM tables at build time (auto-generated from `mqttha.cfg` by `tools/generate_mqttha_progmem.py`). The previous approach of reading `mqttha.cfg` line by line from LittleFS has been eliminated. Key data structures in `mqttha_progmem.cpp/h`:
 
-**Path A (Bulk)**: `doAutoConfigure()` publishes all discovery configs from `/mqttha.cfg` at once.
-- Used for initial setup or explicit refresh via Serial 'F' command
+- `mqttHaCfgTable[345]`: Array of `MqttHaCfgEntry` structs (8 bytes each), sorted by OT message ID. Each entry contains the OT ID plus byte offsets into the topic and message pools.
+- `mqttHaCfgIndex[256]`: Per-OT-ID index array mapping ID to its first entry in `mqttHaCfgTable`. 0xFFFF means no discovery config exists for that ID.
+- `mqttHaTopicPool` (23,758 bytes): Concatenated null-terminated topic templates in PROGMEM.
+- `mqttHaMsgPool` (140,767 bytes): Concatenated null-terminated message templates in PROGMEM.
+
+The module supports three auto-discovery paths (ADR-041):
+
+**Path A (Bulk)**: `doAutoConfigure()` iterates the full PROGMEM table synchronously.
+- Used only for explicit refresh via Serial 'F' command or REST API trigger
 - Publishes all non-Dallas sensor entries
-- Publishes Dallas sensor discovery via separate `configSensors()` call
+- Publishes Dallas sensor discovery via separate `configSensors()` call after lock release
 
-**Path B (JIT)**: `doAutoConfigureMsgid()` publishes discovery config when first OpenTherm message arrives.
+**Path B (JIT)**: `doAutoConfigureMsgid()` uses O(1) `mqttHaCfgIndex[]` lookup when first OpenTherm message arrives.
 - Called from `processOT()` when new message type detected
 - Only publishes if not already in `MQTTautoConfigMap` bitfield
 - Avoids flooding broker with configs for message IDs never seen in real deployments
 
-**Path B is preferred** in production to minimize startup MQTT traffic.
+**Path C (Drip)**: `loopMQTTDiscovery()` is the primary discovery path after MQTT connect or HA restart.
+- Called from the main loop on every iteration; manages its own internal timer
+- Publishes exactly one pending discovery config per timer tick (3s normal, 30s under heap pressure)
+- Uses `MQTTautoCfgPendingMap[8]` bitmap (8 x uint32_t = 256 bits) to track which OT IDs need publishing
+- `markAllMQTTConfigPending()` populates the pending bitmap from the PROGMEM index on connect/reconnect
+- Spreads discovery publishes over time to avoid broker and heap pressure spikes
+- Adaptive interval: slows to 30s when `getHeapHealth() >= HEAP_WARNING`, restores to 3s when healthy
+- Guards against low heap via `MQTT_DISCOVERY_HEAP_MIN` (8000 bytes) check before each publish
+
+**Path C is the default** production path. Path A is an explicit utility. Path B handles late-arriving message IDs not yet covered by the drip.
 
 ### Source-Separated Topics
 
@@ -677,17 +756,15 @@ The module subscribes to `homeassistant/status` topic to detect Home Assistant l
 
 ### Buffer Management (ADR-053)
 
-The module uses two global buffers for auto-discovery:
+The module uses a single global buffer for auto-discovery:
 
-- **cMsg (global)**: 512-byte general-purpose scratch, reused as `sTopic` (rendered topic ≤200 bytes) during discovery
-  - Safe because template pointers (topicTemplate/msgTemplate) point into `sLine`, not `cMsg`
-  - Guard: `feedWatchDog()` is the only yield during discovery → no HTTP/MQTT callback overwrites cMsg mid-use
+- **cMsg (global)**: 512-byte general-purpose scratch, reused as `sTopic` (rendered topic up to 200 bytes) during discovery
+  - Safe because template pointers (topicTemplate/msgTemplate) point into PROGMEM pools, not `cMsg`
+  - Guard: `feedWatchDog()` is the only yield during discovery, so no HTTP/MQTT callback overwrites cMsg mid-use
 
-- **sLine (global)**: 1200-byte dedicated config-line buffer, exclusively for `mqttAutoConfigInProgress`
-  - Holds raw `/mqttha.cfg` lines (≤900 bytes typical)
-  - Guarded by `MQTTAutoConfigSessionLock` (sets `mqttAutoConfigInProgress` flag)
+The former `sLine[1200]` global buffer has been eliminated. Discovery templates are read directly from PROGMEM pools (`mqttHaTopicPool`, `mqttHaMsgPool`) which are memory-mapped flash on ESP8266, byte-accessible via pointer dereference. No RAM staging buffer is needed for template data.
 
-Both buffers persist across function calls; no cleanup needed. Lock is RAII — released by sessionLock destructor.
+Lock is RAII (released by `MQTTAutoConfigSessionLock` destructor).
 
 ### Command Processing
 
@@ -765,27 +842,35 @@ MQTTclient.loop() (async)
 ### Home Assistant Discovery Publication
 
 ```
-doAutoConfigure() [manual trigger via Serial 'F']
-  OR
-  doAutoConfigureMsgid() [JIT on first message arrival]
+MQTT connect / HA restart detected
   ↓
-  Acquire MQTTAutoConfigSessionLock
+  markAllMQTTConfigPending()
+    ├─ Clears MQTTautoConfigMap (published) and MQTTautoCfgPendingMap (pending)
+    └─ Iterates mqttHaCfgIndex[256]: sets pending bit for each ID with entries
   ↓
-  Open /mqttha.cfg from LittleFS
+  loopMQTTDiscovery() [called from main loop, every iteration]
+    ├─ Timer check (3s normal / 30s under heap pressure)
+    ├─ Scan MQTTautoCfgPendingMap for next set bit
+    ├─ Skip if already published (getMQTTConfigDone)
+    ├─ Publish ONE pending ID via doAutoConfigureMsgid()
+    └─ Clear pending bit; return (one per tick)
   ↓
-  For each line [or specific line by ID]:
-    ├─ Parse: id;topicTemplate;msgTemplate
+  doAutoConfigureMsgid(OTid) [also called JIT from processOT()]
+    ├─ Acquire MQTTAutoConfigSessionLock
+    ├─ O(1) lookup: mqttHaCfgIndex[OTid]
+    ├─ Read topic/msg templates from PROGMEM pools (byte-accessible on ESP8266)
     ├─ Render: templates with substitutions (nodeId, hostname, version, etc.)
     ├─ If source template: expandAndPublishSourceTemplates() → 3 per-source variants
     └─ Otherwise: sendMQTTTemplateStreaming() → single entry
   ↓
   Mark as configured: setMQTTConfigDone(id)
   ↓
-  Close file
-  ↓
   Release sessionLock (mqttAutoConfigInProgress = false)
   ↓
   Home Assistant ingests discovery configs, auto-creates entities
+
+doAutoConfigure() [manual trigger via Serial 'F' or REST API]
+  ↓ (same PROGMEM table iteration, but synchronous bulk publish)
 ```
 
 ### Home Assistant Status → Discovery Refresh
@@ -837,18 +922,20 @@ The module avoids large stack allocations by:
 - Staging PROGMEM data in small (63-byte) buffers
 - Streaming large payloads instead of buffering in RAM
 
-### Configuration File Format (mqttha.cfg)
+### Discovery Data Source (mqttha.cfg and PROGMEM tables)
 
+The source file `data/mqttha.cfg` uses the format:
 ```
 id;topicTemplate;msgTemplate
 // Comments start with //
-39;homeassistant/sensor/%homeassistant%/otgw_%node_id%_%sensor_id%/config;{"name":"OTGW Boiler Temp", "unit_of_measurement":"C", ...}
+39;homeassistant/sensor/%homeassistant%/otgw_%node_id%_%sensor_id%/config;{"name":"OTGW Boiler Temp", ...}
 ```
 
-- Delimiter: `;` (three fields per line)
-- Comments: `//` (automatically stripped by parser)
-- Tokens: `%token%` syntax for variable substitution
-- One discovery entry per OpenTherm message ID
+At build time, `tools/generate_mqttha_progmem.py` compiles this into:
+- `mqttha_progmem.cpp`: PROGMEM string pools and table (compiled as a separate translation unit to avoid Xtensa relocation limits)
+- `mqttha_progmem.h`: Entry struct, table size constant, extern declarations, and `mqttHaCfgIndex[256]`
+
+The firmware reads templates directly from PROGMEM at runtime. The `mqttha.cfg` file is no longer read from LittleFS.
 
 ---
 
@@ -901,6 +988,24 @@ classDiagram
             +doAutoConfigure() void
             +doAutoConfigureMsgid(OTid) bool
             +sensorAutoConfigure(dataid, flag) void
+        }
+        
+        class DripPublisher {
+            -MQTTautoCfgPendingMap: uint32_t[8]
+            -DISCOVERY_INTERVAL_NORMAL: 3s
+            -DISCOVERY_INTERVAL_SLOW: 30s
+            +loopMQTTDiscovery() void
+            +setMQTTConfigPending(id) void
+            +markAllMQTTConfigPending() void
+            +getMQTTConfigPending(id) bool
+            +clearMQTTConfigPending(id) void
+        }
+        
+        class ProgmemTable {
+            -mqttHaCfgTable: MqttHaCfgEntry[345]
+            -mqttHaCfgIndex: uint16_t[256]
+            -mqttHaTopicPool: char[] PROGMEM
+            -mqttHaMsgPool: char[] PROGMEM
         }
         
         class DiscoveryState {
@@ -974,6 +1079,10 @@ classDiagram
     PublishingAPI --> ChunkedTransport : chunks data
     AutoDiscovery --> TemplateRendering : renders templates
     AutoDiscovery --> SourceExpansion : expands sources
+    AutoDiscovery --> ProgmemTable : reads PROGMEM entries
+    DripPublisher --> AutoDiscovery : calls doAutoConfigureMsgid
+    DripPublisher --> DiscoveryState : checks done state
+    DripPublisher --> ProgmemTable : reads mqttHaCfgIndex
     TemplateRendering --> ChunkedTransport : sends templates
     DiscoveryState --> AutoDiscovery : tracks state
     CommandDispatch --> CommandHandler : dispatches commands
@@ -987,8 +1096,8 @@ classDiagram
 
 ## File Statistics
 
-- **Lines of Code**: ~1,850 (including comments and blank lines)
+- **Lines of Code**: MQTTstuff.ino ~1,900 lines; mqttha_progmem.cpp ~2,145 lines (auto-generated)
 - **Key Functions**: 40+ public/static functions
 - **Global Variables**: 25+ module-level globals
-- **PROGMEM Data**: Extensive use of PROGMEM strings and tables
-- **Buffer Allocations**: 2 global buffers (cMsg: 512B, sLine: 1200B) + local staging buffers
+- **PROGMEM Data**: Extensive use of PROGMEM strings, tables, and discovery pools (~165 KB in flash for topic+message pools)
+- **Buffer Allocations**: 1 global buffer (cMsg: 512B) + local staging buffers. Former sLine[1200] buffer eliminated.

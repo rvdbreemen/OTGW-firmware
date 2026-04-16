@@ -666,6 +666,15 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | `sat/area/2` | `"19.8"` | Push area 2 temperature (°C) |
 | `sat/area/3` | `"22.0"` | Push area 3 temperature (°C) |
 
+**Multi-Zone Temperature Control:**
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `sat/zone/<n>/room_temp` | `"20.5"` | Push room temperature for zone n (1-based index) |
+| `sat/zone/<n>/setpoint` | `"21.0"` | Push setpoint for zone n (1-based index) |
+| `sat/zone_count` | `"2"` | Set number of active zones (1-4) |
+| `sat/zone_timeout_s` | `"600"` | Set zone inactivity timeout in seconds |
+
 **Solar and Sun Elevation:**
 
 | Topic Suffix | Payload | Description |
@@ -682,32 +691,48 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | `sat/ovp_value` | `"52.5"` | Manually set OPV value (°C) |
 | `sat/ovp_enabled` | `"true"` / `"false"` | Enable or disable OPV |
 
-**PID Control:**
+**PID Control and Maintenance:**
 
 | Topic Suffix | Payload | Description |
 | ------------ | ------- | ----------- |
 | `sat/reset_integral` | (any) | Reset PID integral accumulator to zero |
+| `sat/flush` | (any) | Flush short-lived data (PID integral + cycle statistics window) |
+| `sat/flush_threshold_h` | `"4"` | Configure auto-flush threshold in hours |
 
-**Settings Commands** — any SAT setting can be updated by publishing to its topic suffix. For example: `sat/heating_curve`, `sat/deadband`, `sat/boiler_capacity`, `sat/heating_system`, `sat/manufacturer`, `sat/simulation`, etc. The full list of 40+ settings commands is in the [SAT MQTT topics reference](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
+**Settings Commands**  - any SAT setting can be updated by publishing to its topic suffix. For example: `sat/heating_curve`, `sat/deadband`, `sat/boiler_capacity`, `sat/heating_system`, `sat/manufacturer`, `sat/simulation`, etc. The full list of 40+ settings commands is in the [SAT MQTT topics reference](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
 
-**Example** — Set SAT target to 21.5°C:
+**Example**  - Set SAT target to 21.5°C:
 ```bash
 mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.5"
 ```
 
-**Example** — Push room temperature from external sensor:
+**Example**  - Push room temperature from external sensor:
 ```bash
 mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/indoor_temp" -m "20.8"
 ```
 
-**Example** — Activate the Away preset:
+**Example**  - Activate the Away preset:
 ```bash
 mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/preset" -m "away"
 ```
 
-**Example** — Disable SAT:
+**Example**  - Disable SAT:
 ```bash
 mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "false"
+```
+
+#### OTGW32 Commands (OT-direct)
+
+OTGW32-specific commands are nested under the `otgw32/` sub-topic. All commands are subscribed under `{TopTopic}/set/{UniqueId}/otgw32/<subtopic>`. These are only processed on OTGW32 builds (`HAS_DIRECT_OT=1`); on standard PIC firmware, they are ignored.
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `otgw32/room_temp` | `"20.8"` | Push room temperature to OT-direct engine |
+| `otgw32/room_setpoint` | `"21.0"` | Push room setpoint to OT-direct engine |
+
+**Example** -- Push room temperature to OTGW32:
+```bash
+mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/otgw32/room_temp" -m "20.8"
 ```
 
 #### Alternative Topic Names
@@ -743,11 +768,13 @@ Where:
 
 ### Discovery Modes
 
-The firmware uses two discovery paths:
+The firmware uses three discovery paths:
 
-1. **Bulk discovery (Path A)**: Triggered manually via REST API (`POST /api/v2/otgw/discovery`) or serial command (`F`). Publishes all configs from the `mqttha.cfg` file.
+1. **Drip publisher (background)**: After boot, MQTT connect, or Home Assistant restart, all known OT message IDs are queued in a bitmap. The `loopMQTTDiscovery()` function in the main loop drip-publishes one discovery config every 3 seconds (slowed to 30 seconds under heap pressure). This avoids MQTT burst storms that previously caused heap exhaustion on the ESP8266.
 
-2. **JIT discovery (Path B)**: Automatically publishes discovery configs the first time an OpenTherm message ID is observed. This avoids publishing configs for message IDs that the specific thermostat/boiler combination never uses.
+2. **JIT discovery (on OT message)**: When an OpenTherm message ID is observed for the first time and its discovery config has not yet been published, the config is sent immediately. This ensures discovery is available even before the drip publisher reaches that ID.
+
+3. **Manual force**: Triggered via REST API (`POST /api/v2/otgw/discovery`) or the `F` serial command. Marks all IDs as pending and the drip publisher re-publishes them over the following minutes.
 
 ### Source-Separated Discovery
 
@@ -843,17 +870,18 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 
 ### Discovery Lifecycle
 
-- On MQTT connect: discovery state is reset, JIT re-publishes as messages arrive
-- On Home Assistant restart (detected via `homeassistant/status`): discovery state is reset
+- On firmware boot (`startMQTT()`): all discovery IDs are marked pending for drip publishing
+- On MQTT connect: OT value-change tracking is reset (all values re-published), but discovery state is NOT reset (retained messages survive a reconnect on the broker)
+- On Home Assistant restart (detected via `homeassistant/status` transitioning from `offline` to `online`): all discovery IDs are re-queued for drip publishing
+- On manual force (`POST /api/v2/otgw/discovery`): all IDs are re-queued
 - Discovery configs are published with `retain = true`
+- The drip publisher runs at 3-second intervals (or 30-second intervals when free heap is below 8KB)
 
-### Configuration File
+### Discovery Templates
 
-Discovery templates are stored in `/mqttha.cfg` on the LittleFS filesystem. The file format uses semicolon-delimited lines:
+Discovery templates are stored in PROGMEM (compiled into firmware flash) via `mqttha_progmem.h`, which is auto-generated from the `mqttha.cfg` source file at build time. Templates are no longer read from LittleFS at runtime; this eliminates file I/O during discovery and avoids the previous `sLine[1200]` staging buffer.
 
-```
-{msg_id};{topic_template};{message_template}
-```
+The PROGMEM table is indexed by OT message ID (0-255), allowing O(1) lookup. Each entry contains pointers to topic and message template strings in flash.
 
 Template placeholders:
 

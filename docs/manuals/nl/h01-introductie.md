@@ -4,16 +4,21 @@
 
 OTGW-firmware is de open-source firmware voor de NodoShop OpenTherm Gateway (OTGW). De firmware draait op een ESP8266 of ESP32 Wi-Fi-microcontroller op het OTGW-printje en verbindt de OpenTherm verwarmingsbus in uw woning met uw thuisnetwerk, een domotica-platform en een webbrowser.
 
+De firmware wordt geleverd als een enkele, uniforme codebase die zowel de ESP8266-gebaseerde OTGW (NodeMCU of Wemos D1 mini) als het nieuwere ESP32-gebaseerde OTGW32-printje ondersteunt. Beide platformen worden volledig ondersteund en gebouwd vanuit dezelfde broncode via PlatformIO.
+
 Zonder firmware is de OpenTherm Gateway een slimme maar moeilijk toegankelijke hardware. Met OTGW-firmware wordt het een volledig netwerk-connected verwarmingscontroller die:
 
 - Alle 80+ OpenTherm-berichttypen realtime decodeert en publiceert
 - Via MQTT meer dan 250 Home Assistant-entiteiten automatisch aanmaakt, zonder handmatige YAML
+- MQTT discovery payloads opslaat in flash (PROGMEM) en asynchroon publiceert via een bitmap-gestuurd drip-mechanisme, waardoor grote RAM-buffers overbodig worden
 - Een browsergebaseerde interface biedt voor monitoring, configuratie en firmware-updates
 - Een REST API v2 beschikbaar stelt voor scripts, dashboards en directe integratie
 - Een TCP serial bridge aanbiedt op poort 25238, compatibel met OTmonitor
 - Optioneel de slimme thermostaat SAT (Smart Autotune Thermostat) uitvoert, volledig op het apparaat zelf
+- Weergegevens ophaalt via Open-Meteo voor buitentemperatuur en zonnestand wanneer er geen lokale sensor beschikbaar is
+- Een nachtelijke herstart kan inplannen om heap-fragmentatie op te lossen bij langlopende apparaten
 
-De firmware is ontworpen voor een vertrouwd thuisnetwerk. Er is geen clouddienst, geen app-store-account en geen internetverbinding vereist. NTP-tijdsynchronisatie en de optionele weergegevens voor SAT zijn de enige optionele online functies.
+De firmware is ontworpen voor een vertrouwd thuisnetwerk. Er is geen clouddienst, geen app-store-account en geen internetverbinding vereist. NTP-tijdsynchronisatie, optionele OTA-updates via GitHub en de optionele weergegevens voor SAT via Open-Meteo zijn de enige online functies.
 
 ---
 
@@ -37,38 +42,54 @@ De ESP8266 of ESP32 op het printje voert de eigenlijke firmware uit. Hij verzorg
 
 - Wi-Fi (en optioneel bekabeld Ethernet via W5500 op de ESP32)
 - De webserver, WebSocket-server en REST API
-- MQTT-communicatie
-- SAT-regeling
-- Temperatuursensoren (Dallas DS18B20, S0-puls, BLE)
+- MQTT-communicatie met PROGMEM-gebaseerde auto-discovery
+- SAT-regeling met weercompensatie via Open-Meteo
+- Temperatuursensoren (Dallas DS18B20, S0-puls, BLE op ESP32)
 - OTA-updates
+- Telnet debug log via SimpleTelnet (multi-client)
+
+#### Platformabstractie (boards.h)
+
+Sinds v2.0.0 bevat de firmware een `boards.h`-header die pin-mappings, feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`) en hardwaremogelijkheden per printvariant definieert. Dit scheidt platformspecifieke configuratie netjes van de applicatielogica.
 
 ---
 
 ### Nieuwe functies in v2.0.0
 
-v2.0.0 is de eerste release met volledige ondersteuning voor het nieuwe ESP32-platform en de OTGW32-hardware. De voornaamste toevoegingen ten opzichte van v1.x zijn:
+v2.0.0 is een grote platformrelease. Het levert volledige ondersteuning voor het ESP32-platform en de OTGW32-hardware, naast het bestaande ESP8266-pad, in een enkele uniforme codebase. Er zijn geen breaking changes aan MQTT-topics of de REST API ten opzichte van v1.x. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
 
 **ESP32 / OTGW32-ondersteuning**
 - Volledige compilatie en werking op ESP32 naast de bestaande ESP8266
-- OTDirect: directe GPIO-implementatie van OpenTherm, zonder PIC co-processor
-- W5500 SPI Ethernet: bekabeld netwerk als failover of primair netwerk
-- BLE temperatuursensoren: passieve Bluetooth LE-scan van Xiaomi LYWSD03MMC via BTHome v2
+- OTDirect: directe GPIO-implementatie van OpenTherm, zonder PIC co-processor, met vijf werkingsmodi (thermostaat, ketel, gateway, monitor en gecombineerd master+slave)
+- W5500 SPI Ethernet: bekabeld netwerk met automatische failover van en naar Wi-Fi
+- BLE temperatuursensoren: passieve Bluetooth LE-scan van Xiaomi LYWSD03MMC via BTHome v2 (maximaal 4 sensoren)
 - Aangepaste partitietabel met twee OTA-sloten van 1,5 MB en 768 KB LittleFS
 
-**Netwerk en installatie**
+**SAT (Smart Autotune Thermostat)**
+- Ingebouwde weergecompenseerde PID-verwarmingsregelaar die volledig op het apparaat draait
+- Weercompensatie via Open-Meteo: gratis weer-API voor buitentemperatuur en zonnestand wanneer er geen lokale sensor is
+- Summer Simmer Index: onderdrukt verwarming bij hoge buitentemperaturen
+- Zonnewarmtecompensatie: detecteert zonnewinst en verlaagt het setpoint om oververhitting te voorkomen
+- Multi-zone ondersteuning: tot vier temperatuurbronnen (OT, MQTT, BLE, Dallas)
+- Drukbewaking met alarm bij lage druk of snel drukverlies
+- OPV-kalibratie: vindt de overpressure valve temperatuur van de ketel
+- Zes presets: comfort, eco, afwezig, slaap, activiteit, thuis
+
+**MQTT en Home Assistant**
+- 250+ auto-discovery entiteiten: climate entity, SAT-sensoren, BLE-sensoren, drukbewaking, OLED-status
+- PROGMEM MQTT discovery: discovery payloads worden gecompileerd in flash en asynchroon gepubliceerd via een bitmap-gestuurd drip-mechanisme. Dit vervangt de eerdere LittleFS-benadering en elimineert grote RAM-buffers.
+
+**Netwerk en stabiliteit**
 - AP-fallbackmodus: als Wi-Fi drie keer achter elkaar mislukt, opent het apparaat een accesspoint
 - Wi-Fi-signaalniveauindicator in de webinterface (balkjes-icoon)
-- Reset WiFi-knop op de instellingenpagina
 - Driedubbele reset-procedure om Wi-Fi-instellingen te wissen zonder serieel
+- Nachtelijke herstart: configureerbare automatische reboot (tijdstip en dagkeuze) om heap-fragmentatie op te lossen bij langlopende ESP8266-apparaten
 
 **Build en tooling**
 - Gecentraliseerde PlatformIO-build voor zowel ESP8266 als ESP32
-- Verbeterd `build.py`-script met ESP32-target
-
-**Geen breaking changes**
-- MQTT-topicstructuur ongewijzigd ten opzichte van v1.x
-- REST API-eindpunten ongewijzigd
-- Instellingen van v1.3.x worden automatisch geladen zonder conversie
+- Platformabstractie via `boards.h` met feature flags per printvariant
+- SimpleTelnet: uniforme multi-client telnet-bibliotheek ter vervanging van TelnetStream en ESPTelnet
+- Verbeterd `build.py`-script en `flash_esp.py` met ESP32-ondersteuning
 
 ---
 
@@ -83,12 +104,12 @@ v2.0.0 is de eerste release met volledige ondersteuning voor het nieuwe ESP32-pl
 | Ethernet | Niet ondersteund | W5500 SPI (optioneel) |
 | BLE sensoren | Niet ondersteund | Xiaomi LYWSD03MMC via BTHome v2 |
 | Bluetooth | Niet aanwezig | Aanwezig, passieve scan |
+| OLED-display | Ondersteund (I2C) | Ondersteund (I2C) |
+| Dallas DS18B20 | Ondersteund (1-Wire) | Ondersteund (1-Wire) |
+| S0-pulsteller | Ondersteund | Ondersteund |
 | PlatformIO target | `esp8266` | `esp32` |
 | Build flag | `BOARD_NODOSHOP_ESP8266` | `BOARD_NODOSHOP_ESP32` |
 | OTA-slots | 2 (standaard ESP8266) | 2 x 1,5 MB (custom partitie) |
-| OLED-display | Ondersteund (I2C) | Ondersteund (I2C) |
-| Dallas DS18B20 | Ondersteund (1-Wire) | Ondersteund (1-Wire) |
-| S0-pulstemeller | Ondersteund | Ondersteund |
 | Status | Productie | Nieuw in v2.0.0 |
 
 ---
@@ -115,6 +136,8 @@ Voor gebruik van OTGW-firmware heeft u nodig:
 - Een USB-kabel (micro-USB of USB-C, afhankelijk van de ESP-module) voor de eerste installatie
 - Python 3.x voor het `flash_esp.py`-script, of PlatformIO voor compilatie vanuit broncode
 
+De firmware vereist geen internetverbinding voor normaal gebruik. Een internetverbinding wordt optioneel gebruikt voor: NTP-tijdsynchronisatie, OTA-updates via GitHub, en de Open-Meteo weer-API voor buitentemperatuur en zonnestand in SAT.
+
 ---
 
 ### Hoe dit handboek te gebruiken
@@ -126,7 +149,7 @@ Dit handboek is ingedeeld langs de gebruikelijke opstapvolgorde:
 - **Hoofdstuk 4** legt uit hoe u OTGW-firmware koppelt aan Home Assistant via MQTT en auto-discovery.
 - **Hoofdstuk 5** beschrijft SAT, de ingebouwde slimme thermostaat.
 
-Technische termen als MQTT, REST API, OTA, BLE en OLED worden in dit document in het Engels gebruikt, omdat dat de gangbare termen zijn in de Nederlandse domotica-gemeenschap.
+Technische termen als MQTT, REST API, OTA, BLE, OLED, PROGMEM en PlatformIO worden in dit document in het Engels gebruikt, omdat dat de gangbare termen zijn in de Nederlandse domotica-gemeenschap.
 
 Codefragmenten en commando's staan in kaders:
 
@@ -150,7 +173,7 @@ Meld fouten en verbeterverzoeken via de GitHub Issues-pagina. Voeg bij een bugre
 De community is actief op de OTGW Discord-server. Hier kunt u terecht voor hulp bij installatie, configuratie en Home Assistant-integratie. Beginners zijn welkom; de community is internationaal en communiceert in het Engels.
 
 **Releases**
-Nieuwe releases worden gepubliceerd als GitHub Releases en bevatten voor- en afgebakende binaries voor zowel ESP8266 als ESP32. De webinterface biedt een ingebouwde update-functie waarmee u direct kunt updaten vanuit de lijst met beschikbare releases.
+Nieuwe releases worden gepubliceerd als GitHub Releases en bevatten voorgebouwde binaries voor zowel ESP8266 als ESP32. De webinterface biedt een ingebouwde update-functie waarmee u direct kunt updaten vanuit de lijst met beschikbare releases.
 
 **Documentatie**
 De volledige technische documentatie, inclusief C4-architectuurdiagrammen, API-referentie en ADR's, staat in de `docs/`-map van de repository.

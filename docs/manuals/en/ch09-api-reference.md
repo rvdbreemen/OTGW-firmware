@@ -26,11 +26,13 @@ The device hostname defaults to `otgw.local` (mDNS / LLMNR). Alternatively, use 
 
 #### Authentication
 
-Mutation endpoints (POST, PUT, DELETE) require HTTP Basic Authentication when an HTTP password is configured in Settings. The username is the device hostname (default `OTGW`). Authentication is checked via the `Authorization: Basic` header.
+All POST and PUT requests require HTTP Basic Authentication when an HTTP password is configured in Settings. The username is the device hostname (default `OTGW`). Authentication is checked centrally before any mutation handler runs.
 
 GET endpoints for sensitive data (settings, PIC settings) also require authentication.
 
 Unauthenticated GET endpoints (health, sensor data, OT values) are intentionally public.
+
+CSRF same-origin validation is enforced for authenticated browser requests: the `Origin`/`Referer` header must match the `Host` header (ADR-054).
 
 #### Error Response Format
 
@@ -55,8 +57,10 @@ HTTP status codes follow RFC 7231. Common error codes:
 | 404 | Not Found: unknown endpoint or resource |
 | 405 | Method Not Allowed |
 | 410 | Gone: deprecated API version (v0, v1) |
+| 413 | Request Entity Too Large: command string too long |
+| 414 | URI Too Long |
 | 500 | Internal Server Error |
-| 503 | Service Unavailable: low heap, PIC unavailable, etc. |
+| 503 | Service Unavailable: low heap, no OT command interface, etc. |
 
 ---
 
@@ -68,37 +72,41 @@ HTTP status codes follow RFC 7231. Common error codes:
 
 Returns system health metrics. No authentication required.
 
+**Side effect:** Each call writes a small probe file (`/.health`) to LittleFS to verify the filesystem is writable. Poll at 30-60 second intervals minimum.
+
 **Request:** None
 
 **Response:**
 
 ```json
 {
-  "uptime": 86400,
-  "heap_free": 18432,
-  "heap_health": "healthy",
-  "mqtt_connected": true,
-  "pic_available": true,
-  "otgw_online": true,
-  "wifi_rssi": -58,
-  "firmware_version": "2.0.0",
-  "timestamp": 1712345678
+  "health": {
+    "status": "UP",
+    "uptime": "2d 3h 45m",
+    "heap": 25600,
+    "networkmode": "wifi",
+    "wifirssi": -65,
+    "mqttconnected": "true",
+    "otgwconnected": "true",
+    "picavailable": "true",
+    "littlefsMounted": "true"
+  }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `uptime` | integer | Seconds since last boot |
-| `heap_free` | integer | Free heap in bytes |
-| `heap_health` | string | `healthy`, `low`, `warning`, `critical` |
-| `mqtt_connected` | boolean | MQTT broker connection status |
-| `pic_available` | boolean | PIC co-processor detected and responding |
-| `otgw_online` | boolean | OpenTherm serial link active |
-| `wifi_rssi` | integer | WiFi signal strength in dBm (absent when on Ethernet) |
-| `firmware_version` | string | Installed firmware version |
-| `timestamp` | integer | Current Unix timestamp (requires NTP sync) |
+| `status` | string | `"UP"` or `"DEGRADED"` |
+| `uptime` | string | Human-readable uptime |
+| `heap` | integer | Free heap in bytes |
+| `networkmode` | string | `"wifi"`, `"ethernet"`, or `"ap"` |
+| `wifirssi` | integer | WiFi signal strength in dBm (0 in AP or Ethernet mode) |
+| `mqttconnected` | string | MQTT broker connection status |
+| `otgwconnected` | string | PIC or OTDirect link active |
+| `picavailable` | string | PIC co-processor detected and responding |
+| `littlefsMounted` | string | LittleFS filesystem healthy |
 
-This endpoint is safe to poll frequently. Typical use: OTA update completion detection, watchdog integration, Home Assistant availability sensor.
+This endpoint is safe to poll at 30-60 second intervals. Typical use: OTA update completion detection, watchdog integration, Home Assistant availability sensor.
 
 ---
 
@@ -110,7 +118,7 @@ Returns all device settings. Authentication required.
 
 **Request:** None
 
-**Response:** A flat JSON object containing all configurable settings fields. Example subset:
+**Response:** A JSON object containing all configurable settings fields. Example subset:
 
 ```json
 {
@@ -127,23 +135,26 @@ Returns all device settings. Authentication required.
   "ntptimezone": "Europe/Amsterdam",
   "ntphost": "pool.ntp.org",
   "ssid": "MyHomeNetwork",
-  "satenable": false
+  "satenable": false,
+  "nightlyrestart": false,
+  "nightlyrestarthour": 4
 }
 ```
 
 The `ssid` field is read-only and returns the currently connected WiFi SSID. On Ethernet, `ssid` is not present; check `/api/v2/device/info` for `"ssid": "Wired"`. The `httppassword` field returns a masked placeholder, never the actual password.
 
+**Nightly restart settings:** The `nightlyrestart` boolean enables a scheduled daily reboot. The `nightlyrestarthour` integer (0-23) controls the hour at which the restart occurs.
+
 ##### POST /api/v2/settings
 
 Update one or more settings. Authentication required.
 
-**Request body:** JSON object with any subset of setting key-value pairs.
+**Request body:** JSON object with setting name and value.
 
 ```json
 {
-  "mqttbroker": "192.168.1.20",
-  "mqttport": 1883,
-  "mqtthadiscovery": true
+  "name": "mqttbroker",
+  "value": "192.168.1.20"
 }
 ```
 
@@ -158,6 +169,8 @@ Update one or more settings. Authentication required.
 
 Settings are validated server-side. Invalid values are silently ignored or constrained to safe ranges. Side effects (MQTT reconnect, NTP resync, mDNS restart) are applied within 2 seconds via a deferred-write timer.
 
+**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, and many more SAT-related settings.
+
 ---
 
 #### Device Information
@@ -170,22 +183,35 @@ Returns hardware and platform information. No authentication required.
 
 ```json
 {
-  "hostname": "otgw",
-  "firmware_version": "2.0.0",
-  "platform": "ESP8266",
-  "board": "NODOSHOP_ESP8266",
-  "cpu_freq_mhz": 160,
-  "flash_size": 4194304,
-  "chip_id": "AABBCC",
-  "ssid": "MyHomeNetwork",
-  "ip": "192.168.1.50",
-  "mac": "AA:BB:CC:DD:EE:FF",
-  "reboot_count": 7,
-  "reboot_reason": "Software/System restart"
+  "device": {
+    "author": "Robert van den Breemen",
+    "fwversion": "2.0.0",
+    "hostname": "OTGW",
+    "board": "esp8266",
+    "hardwaremode": "pic",
+    "networkmode": "wifi",
+    "ipaddress": "192.168.1.50",
+    "macaddress": "AA:BB:CC:DD:EE:FF",
+    "ssid": "MyHomeNetwork",
+    "cpufreq": 80,
+    "freeheap": 25600,
+    "maxfreeblock": 20480,
+    "chipid": "AABBCC",
+    "picavailable": true,
+    "picfwversion": "5.4",
+    "bootcount": 42,
+    "lastreset": "Software/System restart",
+    "mqttconnected": true,
+    "otgwconnected": true,
+    "otcommandinterface": true,
+    "otdirectavailable": false
+  }
 }
 ```
 
-On Ethernet (ESP32): `"ssid": "Wired"` and `"ip"` reflects the Ethernet address.
+On OTGW32 hardware: the `otdirectavailable` field is `true`, and additional `otd*` fields are included (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`). On standard ESP8266+PIC builds, only `otdirectavailable: false` is present.
+
+The `otcommandinterface` field is `true` when either a PIC or OT-direct hardware interface is present and active.
 
 ##### GET /api/v2/device/time
 
@@ -195,10 +221,17 @@ Returns current device time.
 
 ```json
 {
-  "epoch": 1712345678,
-  "iso": "2026-04-06T12:34:38+02:00",
-  "ntp_synced": true,
-  "ntp_last_sync": 1712344678
+  "devtime": {
+    "dateTime": "2026-04-12T10:00:00+02:00",
+    "epoch": 1712870400,
+    "message": "OpenTherm Gateway",
+    "psmode": false,
+    "otgwsimulation": false,
+    "freeheap": 25600,
+    "maxfreeblock": 20480,
+    "networkmode": "wifi",
+    "wifiquality": 80
+  }
 }
 ```
 
@@ -210,27 +243,11 @@ Returns the most recent crash log summary from LittleFS. Returns empty object if
 
 #### OpenTherm Gateway
 
-##### GET /api/v2/otgw/status
+##### GET /api/v2/otgw/otmonitor
 
-Returns current OpenTherm state: all message ID values received from the boiler and thermostat. This is the same data available over MQTT but in a single request-response snapshot.
+Returns all current OpenTherm values in a structured key-value format. Each field includes its value, unit, and last-updated timestamp. Compatible with Telegraf and OTmonitor.
 
-**Response:**
-
-```json
-{
-  "Tr": 20.5,
-  "Tboiler": 62.3,
-  "TSet": 55.0,
-  "RelModLevel": 45.2,
-  "CHPressure": 1.4,
-  "flamestatus": true,
-  "chmodus": true,
-  "dhwmode": false,
-  "faultindicator": false
-}
-```
-
-The exact fields depend on which OpenTherm message IDs your boiler and thermostat exchange. Fields are absent when the corresponding message ID has not yet been received.
+Alias: `GET /api/v2/otgw/telegraf`
 
 ##### GET /api/v2/otgw/messages/{id}
 
@@ -242,11 +259,9 @@ Returns the current value for a specific OpenTherm message ID.
 
 ```json
 {
-  "id": 25,
-  "label": "Tboiler",
-  "value": "62.31",
-  "type": "f8.8",
-  "last_update": 1712345600
+  "label": "boilertemperature",
+  "value": 62.31,
+  "unit": "C"
 }
 ```
 
@@ -256,13 +271,9 @@ Alias: `GET /api/v2/otgw/id/{id}`
 
 Returns the current value for a specific OpenTherm label string.
 
-**Parameters:** `{label}` is the label name (case-sensitive), e.g., `Tboiler`, `Tr`, `RelModLevel`.
+**Parameters:** `{label}` is the label name (case-insensitive), e.g., `boilertemperature`, `roomtemperature`, `relmodlvl`.
 
-##### GET /api/v2/otgw/otmonitor
-
-Returns all current OpenTherm values in a flat key-value format compatible with Telegraf and OTmonitor. Alias: `GET /api/v2/otgw/telegraf`.
-
-##### POST /api/v2/otgw/command
+##### POST /api/v2/otgw/commands
 
 Send a raw command to the OTGW PIC (or OTDirect on ESP32). Authentication required.
 
@@ -276,14 +287,15 @@ Send a raw command to the OTGW PIC (or OTDirect on ESP32). Authentication requir
 
 Alternatively, the command string can be sent as a plain text body without JSON wrapping.
 
-**Response:**
+**Response (HTTP 202 Accepted):**
 
 ```json
 {
-  "status": "queued",
-  "command": "TT=21.50"
+  "status": "queued"
 }
 ```
+
+**Error (HTTP 503):** Returned when no OT command interface (PIC or OTDirect) is detected.
 
 Common PIC command codes:
 
@@ -300,25 +312,23 @@ Common PIC command codes:
 
 Commands are validated and queued. Responses are processed asynchronously and published to MQTT. The REST endpoint returns `"queued"` immediately without waiting for the PIC response.
 
-##### POST /api/v2/otgw/commands
-
-Alias for `/api/v2/otgw/command`. Preferred spelling per ADR-035.
+Alias: `POST /api/v2/otgw/command` (backward compatibility)
 
 ##### POST /api/v2/otgw/discovery
 
-Force a full Home Assistant MQTT auto-discovery republish. Useful after a HA restart when discovery messages were missed. Authentication required.
+Force a full Home Assistant MQTT auto-discovery republish. Authentication required.
 
 **Request:** No body required.
 
-**Response:**
+**Response (HTTP 202 Accepted):**
 
 ```json
 {
-  "status": "started"
+  "status": "accepted"
 }
 ```
 
-Discovery runs asynchronously in the background. All ~200 entity configurations are republished to the `homeassistant/` MQTT prefix. This is equivalent to clicking "Rediscover" in the web UI.
+Discovery uses an async bitmap-driven drip publisher: all message IDs are marked pending, then published one at a time from the main loop at a controlled pace (see "MQTT Discovery Drip Publisher" below). This avoids a burst of 200+ messages that could exhaust heap or overwhelm the broker.
 
 Alias: `POST /api/v2/otgw/autoconfigure`
 
@@ -328,34 +338,35 @@ Alias: `POST /api/v2/otgw/autoconfigure`
 
 ##### GET /api/v2/sensors
 
-Returns all Dallas DS18B20 sensor addresses and their labels. No authentication required.
+Returns all Dallas DS18B20 sensor data and S0 pulse counter status. No authentication required. Alias: `GET /api/v2/sensors/status`.
 
 **Response:**
 
 ```json
 {
-  "sensors": [
-    {
-      "address": "28FF64D1841703F1",
-      "label": "Attic",
-      "temperature": 18.3,
-      "last_seen": 1712345650
+  "sensors": {
+    "dallas_enabled": true,
+    "dallas_detected": true,
+    "dallas_count": 2,
+    "dallas_gpio": 4,
+    "dallas_poll_sec": 30,
+    "simulated": false,
+    "devices": {
+      "28FF64D1841703F1": {"temp": 21.5, "epoch": 1774548600},
+      "28FF9A3B71120502": {"temp": 18.3, "epoch": 1774548600}
     },
-    {
-      "address": "28FF9A3B71120502",
-      "label": "",
-      "temperature": 22.1,
-      "last_seen": 1712345651
+    "s0": {
+      "enabled": false,
+      "gpio": 0,
+      "poll_sec": 10,
+      "pulses": 0,
+      "total": 0,
+      "power_kw": 0.000,
+      "epoch": 0
     }
-  ]
+  }
 }
 ```
-
-##### GET /api/v2/sensors/{address}
-
-Returns data for a single sensor by its 1-Wire address.
-
-**Parameters:** `{address}` is the 16-character hex address string.
 
 ##### GET /api/v2/sensors/labels
 
@@ -384,21 +395,9 @@ Labels are persisted to `/dallas_labels.ini` on LittleFS and republished to MQTT
 
 Returns ESP flash memory usage and OTA partition status.
 
-**Response:**
-
-```json
-{
-  "sketch_size": 524288,
-  "sketch_md5": "abc123...",
-  "free_sketch_space": 1048576,
-  "ota_running_partition": "app0",
-  "ota_update_partition": "app1"
-}
-```
-
 ##### GET /api/v2/firmware/files
 
-Returns available firmware files on GitHub (fetches the releases list). Used by the web UI OTA update page.
+Returns available firmware files on the filesystem. Used by the web UI OTA update page.
 
 ---
 
@@ -410,21 +409,23 @@ Returns PIC firmware flash operation status.
 
 ##### GET /api/v2/pic/update-check
 
-Checks whether a newer PIC firmware is available.
+Checks whether a newer PIC firmware is available (makes outbound HTTP request to otgw.tclcode.com).
 
 ##### GET /api/v2/pic/settings
 
-Returns current PIC settings (queried via PR= commands). Only available when PIC is detected (`isPICEnabled()`).
+Returns current PIC settings (queried via PR= commands). Only available when a PIC or OTDirect interface is detected.
 
 ---
 
 #### SAT (Smart Autotune Thermostat)
 
-The SAT endpoints require authentication for all mutation operations.
+All SAT endpoints require authentication.
 
 ##### GET /api/v2/sat
 
-Returns full SAT status. Add `?detail=full` for extended diagnostics including pressure metrics, cycle diagnostics, PID error statistics, and sync health.
+Returns full SAT status. Alias: `GET /api/v2/sat/status`.
+
+Add `?detail=full` for extended diagnostics including synchronization health, pressure metrics, cycle diagnostics, PID error statistics, and auto-tune scores.
 
 **Response (abbreviated):**
 
@@ -432,16 +433,13 @@ Returns full SAT status. Add `?detail=full` for extended diagnostics including p
 {
   "enabled": true,
   "active": true,
-  "mode": "continuous",
-  "setpoint": 43.1,
-  "target": 21.0,
+  "control_mode": 1,
+  "target_temp": 21.0,
   "room_temp": 20.5,
   "outside_temp": 8.0,
   "heating_curve": 42.3,
   "pid_output": 43.1,
-  "pid_p": 0.82,
-  "pid_i": 0.03,
-  "pid_d": -0.04,
+  "final_setpoint": 43.1,
   "boiler_status": 3,
   "flame_status": "healthy",
   "cycle_class": "good",
@@ -457,21 +455,17 @@ Set the target room temperature.
 
 **Request body:** Plain numeric string or JSON `{"value": "21.0"}`.
 
-```
-21.5
-```
-
-Valid range: 5.0 to 30.0 °C.
+Valid range: 5.0 to 30.0 degrees C.
 
 ##### POST /api/v2/sat/externaltemp
 
-Push an indoor temperature reading to the SAT PID controller. Used when the room temperature sensor is an external source (Node-RED, HA automation, BLE sensor).
+Push an indoor temperature reading to the SAT PID controller. Used when the room temperature sensor is an external source (Node-RED, HA automation, BLE sensor). Expires after 5 minutes if not refreshed.
 
 **Request body:** Plain numeric string, e.g., `"20.8"`.
 
 ##### POST /api/v2/sat/externaloutdoor
 
-Push an outdoor temperature reading. Overrides the OT MsgID 27 value and the Open-Meteo weather source.
+Push an outdoor temperature reading. Overrides the OT MsgID 27 value and the Open-Meteo weather source. Expires after 10 minutes if not refreshed.
 
 **Request body:** Plain numeric string, e.g., `"7.5"`.
 
@@ -485,11 +479,23 @@ Apply a named comfort preset.
 
 **Request body:** One of: `comfort`, `eco`, `away`, `sleep`, `activity`, `home`.
 
+##### POST /api/v2/sat/enable
+
+Enable or disable the SAT controller.
+
+**Request body:** `"true"` / `"false"` or `"1"` / `"0"`.
+
+##### POST /api/v2/sat/mode
+
+Set SAT control mode.
+
+**Request body:** `"continuous"`, `"pwm"`, or `"auto"`.
+
 ##### POST /api/v2/sat/window
 
 Set window-open state. When open, SAT suppresses heating.
 
-**Request body:** `"1"` (open) or `"0"` (closed).
+**Request body:** `"open"` / `"closed"`, `"1"` / `"0"`, or `"ON"`.
 
 ##### POST /api/v2/sat/flush
 
@@ -499,23 +505,58 @@ Flush SAT short-lived data: resets the PID integral and cycle window. Useful aft
 
 Reset only the PID integral accumulator.
 
+##### POST /api/v2/sat/area/{index}
+
+Push a temperature reading for a specific area (multi-area mode). Index range: 0-3.
+
+**Request body:** Plain numeric string, e.g., `"20.5"`.
+
+##### GET /api/v2/sat/weather
+
+Returns the current weather data used by the SAT heating curve (outside temperature source, forecast, etc.).
+
 ##### POST /api/v2/sat/settings/{name}
 
 Update a named SAT setting. Authentication required.
 
-**Parameters:** `{name}` is the setting name, e.g., `heating_curve_coeff`, `boiler_capacity`, `deadband`.
+**Parameters:** `{name}` is the setting name, e.g., `heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `summer_threshold`, `ovp_value`, `ovp_enabled`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, and many more.
 
-**Request body:** New value as plain string.
+**Request body:** New value as plain string or JSON `{"value": "..."}`.
+
+This endpoint mirrors all the MQTT `sat/*` setting commands, providing parity between REST and MQTT configuration.
 
 ---
 
 #### OTDirect (ESP32 / OTGW32 only)
 
-These endpoints are only available on OTGW32 hardware (`HAS_DIRECT_OT`).
+These endpoints are only available on OTGW32 hardware (`HAS_DIRECT_OT`). On standard ESP8266+PIC hardware, all endpoints return 503 Service Unavailable.
 
 ##### GET /api/v2/otdirect/status
 
-Returns OTDirect operating mode, schedule counts, thermostat connection status, and bypass relay state.
+Returns OTDirect operating mode, schedule counts, thermostat connection status, bypass relay state, and boiler connection state.
+
+**Response:**
+
+```json
+{
+  "otdirect_status": {
+    "mode": "gateway",
+    "bypass": false,
+    "stepup": true,
+    "monitor_mode": false,
+    "master_mode": false,
+    "thermostat_connected": true,
+    "setback_active": false,
+    "schedule_total": 12,
+    "schedule_active": 11,
+    "schedule_disabled": 1,
+    "overrides_active": 2,
+    "ot_online": true,
+    "thermostat": true,
+    "boiler": true
+  }
+}
+```
 
 ##### POST /api/v2/otdirect/mode
 
@@ -531,21 +572,52 @@ Set OTDirect operating mode.
 | `master` | Standalone OT master: scheduler only, no thermostat expected |
 | `loopback` | Internal test: simulated boiler responses, no hardware needed |
 
+##### GET /api/v2/otdirect/settings
+
+Returns the persisted OT-direct configuration settings, including heating curve and PI room compensation parameters.
+
+**Response:**
+
+```json
+{
+  "otdirect_settings": {
+    "mode": 1,
+    "setback_temp": 15.0,
+    "setback_timeout": 300,
+    "ch_mode": 0,
+    "flow_temp": 55.0,
+    "flow_max": 80.0,
+    "room_setpoint": 20.0,
+    "gradient": 1.5,
+    "exponent": 1.3,
+    "offset": 0.0,
+    "room_comp": false,
+    "kp": 1.0,
+    "ki": 0.01,
+    "kboost": 2.0
+  }
+}
+```
+
+##### POST /api/v2/otdirect/settings
+
+Update OT-direct settings. Only provided parameters are updated. Accepts form parameters: `setbacktemp`, `setbacktimeout`, `chmode`, `flowtemp`, `flowmax`, `roomsetpoint`, `gradient`, `exponent`, `offset`, `roomcomp`, `kp`, `ki`, `kboost`.
+
 ##### GET /api/v2/otdirect/overrides
 
-Returns all active stored response overrides.
+Returns all active stored response overrides and response modifiers. Uses chunked JSON streaming transfer for potentially large override lists.
 
 ##### POST /api/v2/otdirect/overrides
 
 Manage per-message-ID overrides.
 
 **Query parameters:**
-- `action=sr&msgid=X&value=HHHH` — set stored response for message ID X to 4-hex-digit value
-- `action=cr&msgid=X` — clear stored response for message ID X
-- `action=rm&msgid=X&value=HHHH` — set response modifier (mask applied to boiler response)
-- `action=cm&msgid=X` — clear response modifier
-- `action=ui&msgid=X` — mark message ID as unknown (gateway returns UNKNOWN_DATA_ID)
-- `action=ki&msgid=X` — mark message ID as known again
+- `action=sr&msgid=X&value=HHHH` : set stored response for message ID X to 4-hex-digit value
+- `action=cr&msgid=X` : clear stored response for message ID X
+- `action=rm&msgid=X&value=HHHH` : set response modifier (mask applied to boiler response)
+- `action=cm&msgid=X` : clear response modifier
+- `action=ui&msgid=X` : mark message ID as unknown (gateway returns UNKNOWN_DATA_ID)
+- `action=ki&msgid=X` : mark message ID as known again
 
 ---
 
@@ -553,9 +625,9 @@ Manage per-message-ID overrides.
 
 ##### POST /api/v2/webhook/test
 
-Trigger a test webhook delivery. Sends the configured webhook URL an HTTP POST with a test payload. No authentication required.
+Trigger a test webhook delivery. Sends the configured webhook URL an HTTP POST with a test payload. Authentication required.
 
-**Query parameter:** `state=on|off|1|0` — payload state to simulate.
+**Query parameter:** `state=on|off|1|0` : payload state to simulate.
 
 ---
 
@@ -583,7 +655,7 @@ Returns a listing of all files in LittleFS with sizes.
 
 ##### GET /api/v2/filesystem/hash-check
 
-Returns the filesystem content hash (used for cache-busting ETag on `index.html`).
+Returns the filesystem content hash compared to the firmware hash. Used to detect mismatches after a firmware-only OTA update.
 
 ---
 
@@ -704,15 +776,15 @@ Configure in Settings (web UI or REST API):
 All topics follow this structure:
 
 ```
-{TopTopic}/value/{UniqueId}/{subtopic}      ← published by firmware
-{TopTopic}/set/{UniqueId}/{command}         ← subscribed by firmware
+{TopTopic}/value/{UniqueId}/{subtopic}      <-- published by firmware
+{TopTopic}/set/{UniqueId}/{command}         <-- subscribed by firmware
 ```
 
 Default example (with `TopTopic=OTGW`, `UniqueId=otgw-AABBCCDDEEFF`):
 
 ```
-OTGW/value/otgw-AABBCCDDEEFF/boilertemperature    ← "62.31"
-OTGW/set/otgw-AABBCCDDEEFF/setpoint               ← "21.5"
+OTGW/value/otgw-AABBCCDDEEFF/boilertemperature    <-- "62.31"
+OTGW/set/otgw-AABBCCDDEEFF/setpoint               <-- "21.5"
 ```
 
 #### Connection Lifecycle
@@ -722,8 +794,10 @@ On connect:
 2. Configures Last Will to publish `"offline"` to the same topic on disconnect (retained).
 3. Subscribes to `{TopTopic}/set/{UniqueId}/#` for incoming commands.
 4. Subscribes to `homeassistant/status` for Home Assistant lifecycle detection.
-5. Clears discovery state and triggers JIT (just-in-time) republishing of HA discovery payloads.
+5. Requests republish of all OT values so HA gets current state after reconnect.
 6. Publishes firmware version, PIC status, and device info.
+
+Note: Discovery state is intentionally not cleared on reconnect. MQTT retained messages survive an ESP reconnect on the broker. Discovery is only re-triggered on (a) firmware boot or MQTT settings change, and (b) Home Assistant restart (detected via `homeassistant/status` going offline then online).
 
 #### Published Topics
 
@@ -739,6 +813,9 @@ Published at startup, on reconnect, and every 5 minutes.
 | `otgw-firmware/reboot_count` | `"7"` | Total reboots since first flash |
 | `otgw-firmware/reboot_reason` | `"Software/System restart"` | Last reboot cause |
 | `otgw-firmware/uptime` | `"86400"` | Uptime in seconds (not retained) |
+| `otgw-firmware/board` | `"esp8266"` | Hardware board identifier |
+| `otgw-firmware/hardware_mode` | `"pic"` | Active hardware mode (`pic` or `otdirect`) |
+| `otgw-firmware/network_mode` | `"wifi"` | Network mode (`wifi`, `ethernet`, or `ap`) |
 
 ##### PIC Gateway Status
 
@@ -752,6 +829,22 @@ Published at startup, on reconnect, and every 5 minutes.
 | `otgw-pic/boiler_connected` | `"ON"` / `"OFF"` | Boiler OT traffic seen |
 | `otgw-pic/thermostat_connected` | `"ON"` / `"OFF"` | Thermostat OT traffic seen |
 | `otgw-pic/otgw_connected` | `"ON"` / `"OFF"` | Serial link to PIC alive |
+
+##### OT Direct Status (OTGW32 only)
+
+Published only when OT-direct hardware is enabled. On standard ESP8266+PIC, only `otgw-otdirect/available` is published with value `"OFF"`.
+
+| Topic suffix | Value | Description |
+|-------------|-------|-------------|
+| `otgw-otdirect/available` | `"ON"` / `"OFF"` | OT-direct hardware present |
+| `otgw-otdirect/mode` | `"gateway"` | Current operating mode |
+| `otgw-otdirect/bypass` | `"ON"` / `"OFF"` | Bypass relay active |
+| `otgw-otdirect/thermostat_connected` | `"ON"` / `"OFF"` | Thermostat frame received within timeout |
+| `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Setback override engaged |
+| `otgw-otdirect/schedule_active` | `"11"` | Active schedule entry count |
+| `otgw-otdirect/overrides_active` | `"2"` | Active write-override count |
+| `otgw-otdirect/boiler_connected` | `"ON"` / `"OFF"` | Boiler OT bus active |
+| `otgw-otdirect/ot_online` | `"ON"` / `"OFF"` | OT serial bus alive |
 
 ##### OpenTherm Status Flags (Message ID 0)
 
@@ -775,22 +868,22 @@ Published when the corresponding message ID is received from the boiler or therm
 
 | Topic suffix | Unit | OpenTherm Message ID |
 |-------------|------|---------------------|
-| `controlsetpoint` | °C | 1 |
-| `roomsetpoint` | °C | 16 |
-| `roomtemperature` | °C | 24 |
-| `boilertemperature` | °C | 25 |
-| `dhwtemperature` | °C | 26 |
-| `outsidetemperature` | °C | 27 |
-| `returnwatertemperature` | °C | 28 |
-| `dhwsetpoint` | °C | 56 |
-| `maxchwatersetpoint` | °C | 57 |
+| `controlsetpoint` | C | 1 |
+| `roomsetpoint` | C | 16 |
+| `roomtemperature` | C | 24 |
+| `boilertemperature` | C | 25 |
+| `dhwtemperature` | C | 26 |
+| `outsidetemperature` | C | 27 |
+| `returnwatertemperature` | C | 28 |
+| `dhwsetpoint` | C | 56 |
+| `maxchwatersetpoint` | C | 57 |
 | `chwaterpressure` | bar | 18 |
 | `relmodlvl` | % | 17 |
 | `maxrelmodlvl` | % | 14 |
 | `dhw_flowrate` | l/min | 13 |
-| `exhaust_temperature` | °C | 33 |
+| `exhaust_temperature` | C | 33 |
 | `boiler_fan_speed` | rpm | 35 |
-| `electrical_current_burner_flame` | µA | 36 |
+| `electrical_current_burner_flame` | uA | 36 |
 
 The exact set of published topics depends on which message IDs your boiler and thermostat exchange. Any message ID with a defined label generates a corresponding topic.
 
@@ -799,9 +892,9 @@ The exact set of published topics depends on which message IDs your boiler and t
 When `mqttseparatesources` is enabled:
 
 ```
-{TopTopic}/value/{UniqueId}/{label}/thermostat   ← thermostat-side value (T-prefix frame)
-{TopTopic}/value/{UniqueId}/{label}/boiler       ← boiler-side value (B-prefix frame)
-{TopTopic}/value/{UniqueId}/{label}/gateway      ← gateway-injected value (A-prefix frame)
+{TopTopic}/value/{UniqueId}/{label}/thermostat   <-- thermostat-side value (T-prefix frame)
+{TopTopic}/value/{UniqueId}/{label}/boiler       <-- boiler-side value (B-prefix frame)
+{TopTopic}/value/{UniqueId}/{label}/gateway      <-- gateway-injected value (A-prefix frame)
 ```
 
 This allows Home Assistant automations to distinguish between what the thermostat requested and what the boiler confirmed.
@@ -820,10 +913,6 @@ Published when S0 counting is enabled.
 
 Published when sensors are enabled. The topic suffix is the 1-Wire address (e.g., `28FF64D1841703F1`) or the assigned label if `gpiosensorslegacyformat` is off.
 
-| Topic suffix | Unit | Description |
-|-------------|------|-------------|
-| `{address}` | °C | Temperature from DS18B20 sensor |
-
 ##### SAT Topics
 
 Published every SAT control loop interval (default 30 seconds) when SAT is enabled.
@@ -832,16 +921,16 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 |-------------|---------|-------------|
 | `sat/mode` | yes | `"off"`, `"continuous"`, `"pwm"` |
 | `sat/active` | yes | `"true"` when SAT is actively controlling |
-| `sat/setpoint` | yes | Final flow temperature setpoint sent to boiler (°C) |
-| `sat/target` | yes | Target room temperature (°C) |
-| `sat/heating_curve` | yes | Heating curve calculated value (°C) |
+| `sat/setpoint` | yes | Final flow temperature setpoint sent to boiler (C) |
+| `sat/target` | yes | Target room temperature (C) |
+| `sat/heating_curve` | yes | Heating curve calculated value (C) |
 | `sat/pid_output` | yes | PID controller output = curve + P + I + D |
-| `sat/error` | no | PID error = target - room temperature (°C) |
+| `sat/error` | no | PID error = target - room temperature (C) |
 | `sat/pid_p` | no | Proportional term |
 | `sat/pid_i` | no | Integral term |
 | `sat/pid_d` | no | Derivative term |
-| `sat/room_temp` | no | Room temperature used by PID (°C) |
-| `sat/outside_temp` | no | Outside temperature used by heating curve (°C) |
+| `sat/room_temp` | no | Room temperature used by PID (C) |
+| `sat/outside_temp` | no | Outside temperature used by heating curve (C) |
 | `sat/boiler_status` | no | Boiler state code (0=Off ... 14=Cooling) |
 | `sat/flame_status` | no | `"healthy"`, `"stuck_on"`, `"short_cycling"`, etc. |
 | `sat/cycle_class` | no | `"good"`, `"overshoot"`, `"underheat"`, `"short"` |
@@ -851,10 +940,10 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/power` | no | Estimated boiler power (kW) |
 | `sat/energy_total` | yes | Cumulative energy usage (kWh, for HA energy dashboard) |
 | `sat/curve_recommendation` | no | `"increase"`, `"decrease"`, `"hold"`, `"insufficient"` |
-| `sat/preset_comfort` | yes | Comfort preset temperature (°C) |
-| `sat/preset_eco` | yes | Eco preset temperature (°C) |
-| `sat/preset_away` | yes | Away preset temperature (°C) |
-| `sat/preset_sleep` | yes | Sleep preset temperature (°C) |
+| `sat/preset_comfort` | yes | Comfort preset temperature (C) |
+| `sat/preset_eco` | yes | Eco preset temperature (C) |
+| `sat/preset_away` | yes | Away preset temperature (C) |
+| `sat/preset_sleep` | yes | Sleep preset temperature (C) |
 | `sat/thermal_coeff` | yes | Learned thermal drop coefficient |
 | `sat/window_open` | no | Window-open detection state |
 | `sat/solar_gain` | no | Solar gain compensation active |
@@ -885,37 +974,74 @@ Publish a plain text payload to these topics:
 | `outside` | `"8.0"` | `OT=8.0` | Outside temperature override |
 | `hotwater` | `"1"` / `"0"` / `"P"` | `HW=1` / `HW=0` / `HW=P` | Hot water on / off / one-time push |
 | `gatewaymode` | `"1"` / `"0"` | `GW=1` / `GW=0` | Gateway mode / monitor mode |
-| `maxchsetpt` | `"80"` | `SH=80` | Max CH water setpoint (°C) |
-| `maxdhwsetpt` | `"60"` | `SW=60` | Max DHW setpoint (°C) |
+| `maxchsetpt` | `"80"` | `SH=80` | Max CH water setpoint (C) |
+| `maxdhwsetpt` | `"60"` | `SW=60` | Max DHW setpoint (C) |
 | `maxmodulation` | `"100"` | `MM=100` | Max relative modulation level (%) |
 | `ctrlsetpt` | `"55.0"` | `CS=55.0` | Direct control setpoint (bypasses thermostat) |
 | `chenable` | `"1"` / `"0"` | `CH=1` / `CH=0` | Central heating enable bit |
+| `coolingenable` | `"1"` / `"0"` | `CE=1` / `CE=0` | Cooling enable bit |
 | `summermode` | `"1"` / `"0"` | `SM=1` / `SM=0` | Summer mode (persisted to flash) |
 | `command` | `"TT=21.50"` | (raw) | Raw OTGW command passthrough |
+
+Note: Commands are only processed when an OT command interface (PIC or OTDirect) is detected. If no interface is available, MQTT commands are silently ignored with a debug log message.
 
 ##### SAT Command Topics
 
 | Topic suffix | Payload | Description |
 |-------------|---------|-------------|
 | `sat/target` | `"21.0"` | Set target room temperature |
-| `sat/enable` | `"on"` / `"off"` | Enable / disable SAT |
-| `sat/mode` | `"continuous"` / `"pwm"` / `"off"` | Set control mode |
+| `sat/enabled` | `"true"` / `"false"` | Enable / disable SAT |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` | Set control mode |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` | Apply comfort preset |
-| `sat/externaltemp` | `"20.8"` | Push external room temperature |
-| `sat/externaloutdoor` | `"7.5"` | Push external outdoor temperature |
+| `sat/indoor_temp` | `"20.8"` | Push external room temperature |
+| `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature |
 | `sat/humidity` | `"58"` | Push indoor humidity (%) |
-| `sat/window` | `"1"` / `"0"` | Set window open / closed state |
+| `sat/window` | `"open"` / `"closed"` / `"1"` / `"0"` | Set window open / closed state |
+| `sat/valves_open` | `"true"` / `"false"` | Report TRV valves open state |
+| `sat/flush` | (any) | Flush short-lived data (PID integral + cycle window) |
+| `sat/reset_integral` | (any) | Reset PID integral accumulator |
+| `sat/area/{0-3}` | `"20.5"` | Push area temperature (multi-area mode) |
+| `sat/sun_elevation` | `"32.5"` | Push sun elevation from HA |
+| `sat/heating_curve` | `"1.5"` | Update heating curve coefficient |
+| `sat/deadband` | `"0.25"` | Update PID deadband |
+| `sat/boiler_capacity` | `"24.0"` | Update boiler capacity (kW) |
+
+Many more SAT settings can be updated via MQTT. The full list of 40+ setting commands is documented in `backlog/docs/doc-1 - sat-mqtt-topics.md`.
+
+##### OTGW32 Command Topics
+
+On OTGW32 builds only, the following command topics are available under `{TopTopic}/set/{UniqueId}/otgw32/`:
+
+| Topic suffix | Payload | Description |
+|-------------|---------|-------------|
+| `otgw32/room_temp` | `"20.5"` | Set room temperature for OT-direct heating curve |
+| `otgw32/room_setpoint` | `"21.0"` | Set room setpoint for OT-direct |
 
 #### Home Assistant Auto-Discovery
 
 When `mqtthadiscovery` is enabled, the firmware publishes MQTT discovery payloads to the `homeassistant/` prefix (configurable via `mqtthaprefix`). Home Assistant processes these payloads and creates entities automatically.
 
+##### Discovery Drip Publisher
+
+Discovery uses an async bitmap-driven drip publisher. Instead of sending all 200+ entity configurations in a burst, the firmware:
+
+1. Marks all message IDs as "pending" in a bitmap.
+2. From the main loop, publishes one discovery message per interval (typically 2 seconds).
+3. When free heap drops below 8000 bytes, the interval slows down to reduce memory pressure.
+4. When heap recovers, the interval returns to normal.
+
+This approach prevents heap exhaustion and MQTT broker flooding that could occur with bulk discovery. A full discovery cycle takes approximately 6-8 minutes at normal pace.
+
 Discovery is triggered:
-- On MQTT connect (just-in-time, per message ID as data is received).
-- When `POST /api/v2/otgw/discovery` is called.
-- When Home Assistant sends `"online"` to `homeassistant/status`.
+- On firmware boot or MQTT settings change (all IDs marked pending for drip publish).
+- When `POST /api/v2/otgw/discovery` is called (all IDs marked pending).
+- When Home Assistant sends `"online"` to `homeassistant/status` after being offline (all IDs marked pending).
+
+**Integration note:** After triggering a discovery republish, entities appear in Home Assistant gradually over several minutes as the drip publisher works through the pending bitmap. This is normal behavior, not an error.
 
 Discovery payloads include device metadata, entity names, unit of measurement, device class, and state topics. The firmware creates approximately 200+ entities covering all sensors, binary sensors, and a climate entity for SAT.
+
+Discovery templates are now compiled into PROGMEM (flash memory) at build time from the `mqttha.cfg` file, eliminating LittleFS I/O during discovery publishing.
 
 ---
 
@@ -947,6 +1073,7 @@ The stream is plain ASCII, one line per event. Output lines include:
 - Heap statistics: free heap, heap health level.
 - Network events: WiFi connect/disconnect, IP address.
 - Error messages and warnings.
+- REST API access log (when `bRestAPI` debug flag is enabled): method, URI, status code, timing.
 
 Example output:
 
@@ -956,6 +1083,7 @@ Example output:
 [MQTT] sendMQTTData: OTGW/value/otgw-AABBCC/flamestatus = ON
 [SAT]  Control loop: Tr=20.5 Tboiler=62.3 setpoint=43.1 error=0.50
 [HEAP] Free: 19234 bytes (healthy)
+REST GET /api/v2/health => 200 v2/health 12ms
 ```
 
 The verbosity of each category is controlled by boolean flags in `state.debug`:
@@ -968,6 +1096,7 @@ The verbosity of each category is controlled by boolean flags in `state.debug`:
 | `bSensors` | Dallas sensor scan trace | false |
 | `bSAT` | SAT control loop trace | true |
 | `bOTDirect` | OTDirect frame handling | true |
+| `bMQTTGate` | MQTT publish gating and value-change dedup | false |
 
 Debug flags can be toggled at runtime via the REST API settings endpoint or via web UI settings. High-verbosity flags (`bMQTT`, `bRestAPI`) should be disabled in normal operation to avoid flooding the Telnet stream and consuming heap.
 

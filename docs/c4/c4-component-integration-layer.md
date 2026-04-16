@@ -17,8 +17,9 @@ Both sub-systems share the same JSON formatting infrastructure (`jsonStuff.ino`)
 
 - **MQTT state machine**: Six-state connection lifecycle (INIT, TRY_CONNECT, CONNECTED, WAIT_ATTEMPT, WAIT_RECONNECT, ERROR) with configurable retry intervals (3s between attempts, 10 minutes after 5 failures)
 - **Chunked MQTT publishing**: Streams payloads in 128-byte RAM chunks or 63-byte PROGMEM chunks via `beginPublish()`/`endPublish()`; never copies full payload into a single buffer
-- **Home Assistant auto-discovery**: Reads `mqttha.cfg` line-by-line from LittleFS; renders template variables (`%mqtt_pub_topic%`, `%node_id%`, `%version%`, `%source_topic_segment%`, etc.); publishes to `homeassistant/<domain>/<node_id>/<entity>/config`
-- **Just-In-Time (JIT) MQTT discovery** (ADR-041): Publishes discovery config for a message ID on first OT message arrival, without scanning the full `mqttha.cfg` on every boot
+- **Home Assistant auto-discovery**: Uses PROGMEM lookup tables (`mqttha_progmem.cpp/h`, auto-generated from `mqttha.cfg`) for O(1) discovery config access per OT message ID. Template variables (`%mqtt_pub_topic%`, `%node_id%`, `%version%`, `%source_topic_segment%`, etc.) rendered from PROGMEM string pools. Publishes to `homeassistant/<domain>/<node_id>/<entity>/config`. LittleFS file scan has been eliminated.
+- **Async drip discovery** (ADR-041 + bitmap-driven): `loopMQTTDiscovery()` publishes one pending discovery config per timer tick from the main loop (3s normal, 30s under heap pressure). `MQTTautoCfgPendingMap[8]` bitmap tracks which IDs need publishing. `markAllMQTTConfigPending()` populates the bitmap on MQTT connect or HA restart.
+- **Just-In-Time (JIT) MQTT discovery**: `doAutoConfigureMsgid()` publishes discovery config for a message ID on first OT message arrival, using O(1) PROGMEM index lookup via `mqttHaCfgIndex[256]`
 - **Source-separated MQTT topics**: Optionally publishes each OT message to three sub-topics (`/thermostat`, `/boiler`, `/gateway`) for fine-grained Home Assistant entity mapping
 - **MQTT command dispatch**: Routes incoming `{topTopic}/set/{nodeId}/{command}` payloads to PIC command queue or SAT functions via PROGMEM lookup table
 - **Home Assistant reboot detection**: Subscribes to `homeassistant/status`; re-publishes discovery on HA restart
@@ -125,7 +126,7 @@ Both sub-systems share the same JSON formatting infrastructure (`jsonStuff.ino`)
 ### External Systems
 
 - **PubSubClient** (nick-o-mathew): MQTT 3.1.1 client library
-- **LittleFS**: `mqttha.cfg` (discovery config), `dallas_labels.ini`, `index.html`, `index.js`, `sat.js`, `graph.js`, CSS files, PIC hex files
+- **LittleFS**: `dallas_labels.ini`, `index.html`, `index.js`, `sat.js`, `graph.js`, CSS files, PIC hex files (note: `mqttha.cfg` discovery config has been moved to PROGMEM tables at build time)
 - **MQTT Broker**: External broker (Mosquitto, Home Assistant Mosquitto add-on, etc.)
 - **Home Assistant**: Consumes MQTT discovery payloads and published OT telemetry
 
@@ -163,6 +164,6 @@ C4Component
     Rel(restapi, sensors, "Sensor labels", "getDallasLabels()")
     Rel(mqtt, utilities, "Heap backpressure", "canPublishMQTT(), feedWatchDog()")
     Rel(restapi, network, "Uses HTTP server", "httpServer registration")
-    Rel(mqtt, lfs, "Reads discovery config", "mqttha.cfg")
+    Rel(mqtt, lfs, "Reads sensor labels", "dallas_labels.ini")
     Rel(restapi, lfs, "Serves web assets", "index.html, index.js, etc.")
 ```

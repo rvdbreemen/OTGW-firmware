@@ -164,15 +164,37 @@ Home Assistant listens on `homeassistant/#` for discovery messages. The firmware
 homeassistant/{component}/{node_id}/{entity_id}/config
 ```
 
-The firmware uses Just-In-Time (JIT) discovery: rather than flooding the broker with 200+ discovery messages at startup, it publishes a discovery config the first time it sees a particular OpenTherm message ID.
+#### Async drip publisher
 
-If you restart Home Assistant, the firmware detects this by monitoring `homeassistant/status`. When HA comes back online, the firmware re-publishes all discovery configurations automatically.
+Starting with v2.0.0, discovery uses an async "drip" publisher. Instead of sending all 345 discovery messages in a single burst at startup, the firmware publishes one entity every 3 seconds in the background. This means a full discovery cycle takes approximately 17 minutes, but the approach is far gentler on the ESP8266's limited heap and on the MQTT broker.
+
+The drip publisher includes two protective mechanisms:
+
+- **Heap guard.** If free heap drops below 8 KB, the discovery publish is skipped until memory recovers. This prevents out-of-memory crashes during periods of high network activity.
+- **Adaptive interval.** Under heap pressure the interval automatically widens from 3 seconds to 30 seconds. When heap recovers, the interval returns to 3 seconds. This ensures the system stays stable while still making progress on discovery.
+
+During the initial 17 minutes, entities appear gradually in Home Assistant. Sensors that have not yet been discovered will show up as they are published. Once all entities are discovered, the state is remembered and no re-discovery is needed unless you explicitly trigger one.
+
+#### Discovery templates in PROGMEM
+
+Discovery templates are compiled into flash memory (PROGMEM) rather than loaded from the LittleFS filesystem at runtime. This is transparent to the user, but it eliminates filesystem I/O during discovery and slightly reduces RAM usage. The `mqttha.cfg` file is no longer read at runtime; it serves only as the source for the build-time code generator.
+
+#### Re-discovery triggers
+
+The firmware re-publishes all discovery configurations in two situations:
+
+1. **Firmware boot or MQTT settings change.** All discovery IDs are queued for drip publishing.
+2. **Home Assistant restart.** The firmware monitors `homeassistant/status`. When HA comes back online, all IDs are re-queued.
+
+On a simple MQTT reconnect (e.g. a brief network interruption), discovery is *not* re-run. The broker retains the discovery messages, so re-publishing them on every reconnect would be unnecessary.
 
 #### Triggering a full rediscovery manually
 
 ```bash
 curl -X POST http://otgw.local/api/v2/otgw/discovery
 ```
+
+This queues all discovery IDs for drip publishing. The entities will appear over the following ~17 minutes.
 
 ---
 
@@ -349,6 +371,19 @@ mqtt:
       max_temp: 30
       temp_step: 0.5
 ```
+
+---
+
+### 4.11 Nightly Restart
+
+The firmware supports an optional scheduled nightly restart to recover heap memory. This is useful for long-running installations where gradual heap fragmentation can eventually cause instability.
+
+| Setting | Default | Description |
+|---|---|---|
+| Nightly Restart | off | Enable or disable the scheduled daily restart |
+| Nightly Restart Hour | 4 | Hour (0-23) when the restart occurs. Only active when NTP is enabled and synced. |
+
+These settings are available in the Web UI (Settings page), via the REST API (`/api/v2/settings`), and via the MQTT settings topic. The restart causes a brief interruption of approximately 30 seconds.
 
 ---
 

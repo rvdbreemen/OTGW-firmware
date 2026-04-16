@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: OTGW-firmware REST API
   description: |
@@ -92,7 +92,7 @@ paths:
         **Side effect**: Each call writes a small probe file (`/.health`) to LittleFS
         to verify the filesystem is writable (not just mounted). This incurs a flash
         write on every request. Do not poll this endpoint at high frequency from
-        external monitoring tools — use 30-60 second intervals at minimum.
+        external monitoring tools  - use 30-60 second intervals at minimum.
         The intended use-case is post-OTA boot detection, where polling stops
         immediately once `status: UP` is received.
       operationId: getHealth
@@ -459,7 +459,7 @@ paths:
                         type: string
                         enum: [wifi, ethernet, ap]
                         description: Active network mode
-                      # OT Direct fields — only present when otdirectavailable=true (OTGW32 builds)
+                      # OT Direct fields  - only present when otdirectavailable=true (OTGW32 builds)
                       otdirectavailable:
                         type: boolean
                         description: True when OTGW32 OT-direct hardware is present and enabled
@@ -1115,9 +1115,10 @@ paths:
         - OTGW Commands
       summary: Trigger MQTT autodiscovery
       description: |
-        Sends all MQTT autodiscovery topics for Home Assistant integration.
-        Use this to register or re-register all entities with Home Assistant.
-        Returns 202 Accepted because discovery messages are sent asynchronously.
+        Marks all known OT message IDs as pending and triggers asynchronous
+        drip-publishing of MQTT autodiscovery configs for Home Assistant integration.
+        Discovery templates are read from PROGMEM (not LittleFS). One config is
+        published every 3 seconds to avoid MQTT burst storms. Returns 202 Accepted.
       operationId: triggerDiscovery
       security:
         - basicAuth: []
@@ -1220,7 +1221,7 @@ paths:
         Returns the full OTGW32 OT-direct runtime status. All fields reflect the
         current in-memory state of the OT-direct engine.
 
-        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+        **OTGW32 only**  - returns 503 on standard ESP8266+PIC hardware.
       operationId: getOTDirectStatus
       responses:
         '200':
@@ -1276,7 +1277,7 @@ paths:
         The response echoes the current status *after* the mode switch command has
         been queued; the `mode` field in the response reflects the new mode.
 
-        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+        **OTGW32 only**  - returns 503 on standard ESP8266+PIC hardware.
       operationId: setOTDirectMode
       requestBody:
         required: true
@@ -1370,7 +1371,7 @@ paths:
       description: |
         Returns the persisted OT-direct configuration settings.
 
-        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+        **OTGW32 only**  - returns 503 on standard ESP8266+PIC hardware.
       operationId: getOTDirectSettings
       responses:
         '200':
@@ -1388,18 +1389,61 @@ paths:
                         description: Persisted mode index (0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback)
                       setback_temp:
                         type: number
-                        format: float
-                        description: Setback temperature applied when thermostat disconnects (°C, range 1-30)
+                        description: Setback temperature applied when thermostat disconnects (C, range 1-30)
                         example: 15.0
                       setback_timeout:
                         type: integer
                         description: Seconds without a thermostat frame before setback activates
                         example: 300
+                      ch_mode:
+                        type: integer
+                        description: CH control mode (0=fixed setpoint, 1=heating curve, 2=PI room compensation)
+                      flow_temp:
+                        type: number
+                        description: Fixed flow temperature setpoint (C, used when ch_mode=0)
+                      flow_max:
+                        type: number
+                        description: Maximum flow temperature limit (C)
+                      room_setpoint:
+                        type: number
+                        description: Room temperature setpoint for PI compensation (C)
+                      gradient:
+                        type: number
+                        description: Heating curve gradient
+                      exponent:
+                        type: number
+                        description: Heating curve exponent
+                      offset:
+                        type: number
+                        description: Heating curve offset (C)
+                      room_comp:
+                        type: boolean
+                        description: Whether PI room compensation is enabled
+                      kp:
+                        type: number
+                        description: PI proportional gain
+                      ki:
+                        type: number
+                        description: PI integral gain
+                      kboost:
+                        type: number
+                        description: PI boost gain for large errors
               example:
                 otdirect_settings:
                   mode: 1
                   setback_temp: 15.0
                   setback_timeout: 300
+                  ch_mode: 0
+                  flow_temp: 55.0
+                  flow_max: 80.0
+                  room_setpoint: 20.0
+                  gradient: 1.5
+                  exponent: 1.3
+                  offset: 0.0
+                  room_comp: false
+                  kp: 2.0
+                  ki: 0.001
+                  kboost: 5.0
         '503':
           description: OT Direct hardware not available (standard PIC build)
           content:
@@ -1416,7 +1460,7 @@ paths:
         Update one or both OT-direct settings. Only provided parameters are updated.
         Returns the current full OT-direct status after the update.
 
-        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+        **OTGW32 only**  - returns 503 on standard ESP8266+PIC hardware.
       operationId: updateOTDirectSettings
       requestBody:
         required: false
@@ -1427,12 +1471,45 @@ paths:
               properties:
                 setbacktemp:
                   type: string
-                  description: Setback temperature in °C (range 1.0-30.0)
+                  description: Setback temperature in C (range 1.0-30.0)
                   example: "15.0"
                 setbacktimeout:
                   type: string
                   description: Setback timeout in seconds
                   example: "300"
+                chmode:
+                  type: string
+                  description: CH control mode (0=fixed, 1=heating curve, 2=PI room comp)
+                flowtemp:
+                  type: string
+                  description: Fixed flow temperature setpoint (C)
+                flowmax:
+                  type: string
+                  description: Maximum flow temperature limit (C)
+                roomsetpoint:
+                  type: string
+                  description: Room setpoint for PI compensation (C)
+                gradient:
+                  type: string
+                  description: Heating curve gradient
+                exponent:
+                  type: string
+                  description: Heating curve exponent
+                offset:
+                  type: string
+                  description: Heating curve offset (C)
+                roomcomp:
+                  type: string
+                  description: PI room compensation enabled (true/false)
+                kp:
+                  type: string
+                  description: PI proportional gain
+                ki:
+                  type: string
+                  description: PI integral gain
+                kboost:
+                  type: string
+                  description: PI boost gain
       responses:
         '200':
           description: Settings updated; response contains current full OT-direct status
@@ -1476,7 +1553,7 @@ paths:
         Returns all currently active write overrides and response overrides in the
         OT-direct engine as a JSON object.
 
-        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+        **OTGW32 only**  - returns 503 on standard ESP8266+PIC hardware.
       operationId: getOTDirectOverrides
       responses:
         '200':
@@ -1507,16 +1584,16 @@ paths:
 
         | Action | OT command | Description |
         |--------|------------|-------------|
-        | `sr` | `SR=MsgID:HHHH` | Set stored response — gateway answers thermostat with fixed data for this MsgID |
+        | `sr` | `SR=MsgID:HHHH` | Set stored response  - gateway answers thermostat with fixed data for this MsgID |
         | `cr` | `CR=MsgID` | Clear stored response |
-        | `rm` | `RM=MsgID:HHHH` | Set response modifier — modify boiler→thermostat response data for this MsgID |
+        | `rm` | `RM=MsgID:HHHH` | Set response modifier  - modify boiler→thermostat response data for this MsgID |
         | `cm` | `CM=MsgID` | Clear response modifier |
-        | `ui` | `UI=MsgID` | Mark MsgID as unknown — gateway responds UNKNOWN_DATAID to thermostat |
-        | `ki` | `KI=MsgID` | Mark MsgID as known again — restore normal forwarding |
+        | `ui` | `UI=MsgID` | Mark MsgID as unknown  - gateway responds UNKNOWN_DATAID to thermostat |
+        | `ki` | `KI=MsgID` | Mark MsgID as known again  - restore normal forwarding |
 
         Returns the updated override list after the command is queued.
 
-        **OTGW32 only** — returns 503 on standard ESP8266+PIC hardware.
+        **OTGW32 only**  - returns 503 on standard ESP8266+PIC hardware.
       operationId: manageOTDirectOverrides
       requestBody:
         required: true
@@ -1906,6 +1983,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusOk'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/flush:
+    post:
+      tags:
+        - SAT
+      summary: Flush short-lived SAT data
+      description: |
+        Clears short-lived SAT data including the PID integral accumulator and
+        cycle statistics window. Useful after large configuration changes or
+        when troubleshooting control behavior.
+      operationId: satFlush
+      responses:
+        '200':
+          description: Data flushed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+                    enum: [ok]
+                  flushed:
+                    type: array
+                    items:
+                      type: string
+              example:
+                result: ok
+                flushed: ["pid", "cycles"]
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -2382,11 +2490,11 @@ components:
               enum: [gateway, monitor, bypass, master, loopback]
               description: |
                 Current operating mode of the OT-direct engine.
-                - `gateway` (default) — full gateway with scheduler, thermostat forwarding, and overrides
-                - `monitor` — transparent pass-through; all frames forwarded unmodified
-                - `bypass` — thermostat direct to boiler via hardware relay; OT-direct inactive (requires bypass relay)
-                - `master` — OTGW32 is the sole OT master; scheduler only, no thermostat expected
-                - `loopback` — internal test mode with simulated boiler responses; no hardware required
+                - `gateway` (default)  - full gateway with scheduler, thermostat forwarding, and overrides
+                - `monitor`  - transparent pass-through; all frames forwarded unmodified
+                - `bypass`  - thermostat direct to boiler via hardware relay; OT-direct inactive (requires bypass relay)
+                - `master`  - OTGW32 is the sole OT master; scheduler only, no thermostat expected
+                - `loopback`  - internal test mode with simulated boiler responses; no hardware required
             bypass:
               type: boolean
               description: True when the bypass relay is active (thermostat direct to boiler)

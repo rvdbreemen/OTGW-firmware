@@ -1,113 +1,164 @@
 ## Hoofdstuk 8: Ontwikkelaarsgids
 
-Dit hoofdstuk is bedoeld voor ontwikkelaars die willen bijdragen aan de OTGW-firmware, nieuwe functionaliteit willen toevoegen, of de interne werking willen begrijpen. Kennis van Arduino C/C++ en het ESP8266/ESP32-platform wordt verondersteld.
+Dit hoofdstuk is de primaire referentie voor iedereen die bijdraagt aan of ontwikkelt met de OTGW-firmware broncode. Het behandelt de projectindeling, het bouwsysteem, het architectuurmodel, belangrijke codeerpatronen en de stapsgewijze workflows voor het toevoegen van nieuwe REST-eindpunten, MQTT-topics en instellingen. Lees dit hoofdstuk voordat je ook maar een regel code schrijft.
 
 ---
 
 ### 8.1 Projectindeling
 
-De broncode bevindt zich in `src/OTGW-firmware/`. Elk `.ino`-bestand vormt een logische module; de Arduino IDE en PlatformIO behandelen alle `.ino`-bestanden in dezelfde map als één vertaaleenheid (single translation unit). Declaratievolgorde telt dus: `OTGW-firmware.h` wordt als eerste verwerkt en bevat alle globale structs en `extern`-verklaringen.
+De broncode bevindt zich in `src/OTGW-firmware/`. Elk `.ino`-bestand vormt een logische module; de Arduino IDE en PlatformIO behandelen alle `.ino`-bestanden in dezelfde map als een single translation unit. Declaratievolgorde telt dus: `OTGW-firmware.h` wordt als eerste verwerkt en bevat alle globale structs en `extern`-verklaringen.
 
-| Bestand | Beschrijving |
-|---------|-------------|
-| `OTGW-firmware.ino` | Hoofdbestand: `setup()`, `loop()`, `doBackgroundTasks()` |
-| `OTGW-firmware.h` | Globale types, structs (`OTGWSettings`, `OTGWState`), constanten, macro's |
-| `OTGW-Core.ino` | OpenTherm-protocolverwerking, PIC-seriële communicatie, commandowachtrij, firmware-upgrade |
-| `OTDirect.ino` | ESP32-only: directe GPIO OpenTherm zonder PIC (OTGW32-hardware) |
-| `MQTTstuff.ino` | MQTT-client, publiceer/abonneer, Home Assistant auto-discovery |
-| `restAPI.ino` | REST API v2, dispatchtabel `kV2Routes[]`, JSON-helpers |
-| `jsonStuff.ino` | JSON-hulpfuncties: `sendStartJsonMap()`, `sendJsonMapEntry()`, `sendEndJsonMap()` |
-| `networkStuff.ino` | WiFi, OTA, mDNS, LLMNR, NTP, Telnet-debugserver |
-| `Ethernet.ino` | W5500 Ethernet-ondersteuning (ESP32 + HAS\_ETH\_CAPABLE) |
-| `settingStuff.ino` | Instellingen laden/opslaan via LittleFS, validatie, side-effects |
-| `FSexplorer.ino` | Bestandsbeheer via web, LittleFS-bestandsserver |
-| `webSocketStuff.ino` | WebSocket-server (poort 81), realtime OpenTherm-logstroom |
-| `SAT*.ino` | Smart Autotune Thermostat: SATcontrol, SATpid, SATcycles, SATpressure, SATweather, SATble |
-| `sensors_ext.ino` | Dallas DS18B20 temperatuursensoren, S0-pulsteller |
-| `OLED.ino` | SSD1306 OLED-display (optioneel) |
-| `outputs_ext.ino` | GPIO-relaisuitgang |
-| `s0PulseCount.ino` | S0-pulsteller voor energiemeting |
-| `webhook.ino` | HTTP-webhook bij boilerstatuswijziging |
-| `helperStuff.ino` | Heap-monitoring, crashlog, diverse hulpfuncties |
-| `handleDebug.ino` | Telnet-debuginvoer en -afhandeling |
-| `versionStuff.ino` | Versiebeheer, buildinfo |
-| `version.h` | `_VERSION`, `_VERSION_MAJOR/MINOR/PATCH` |
-| `safeTimers.h` | Timer-macro's: `DECLARE_TIMER_SEC()`, `DUE()`, etc. |
-| `Debug.h` | Debugmacro's: `DebugTln()`, `DebugTf()`, `DebugT()` |
-| `boards.h` | Boardspecifieke pinnummers en compilatievlaggen |
-| `platform.h` / `platform_esp8266.h` / `platform_esp32.h` | Platformabstractielaag |
+#### Bronbestanden
 
-De testbare bestanden van de bibliotheek bevinden zich in `src/libraries/`. Dit zijn lokale kopieën; gebruik nooit externe packagemanagers om ze bij te werken zonder de projectspecifieke patches van `scripts/patch_pio_libs.py` te controleren.
+| Bestand | Domein |
+|---------|--------|
+| `OTGW-firmware.ino` | Hoofdbestand: `setup()`, `loop()`, bootsequentie, LED-beheer |
+| `OTGW-Core.ino` | OpenTherm-protocoldecodering, PIC serieel I/O, commandowachtrij, MQTT-throttle |
+| `OTGW-Core.h` | OpenTherm-datastructuren: `OTdataStruct`, `OTLibMessageID`, frame type enums |
+| `OTGW-firmware.h` | Gedeelde typedefs, alle struct-definities (`OTGWSettings`, `OTGWState`), forward declarations, constanten |
+| `MQTTstuff.ino` | MQTT-client state machine, HA auto-discovery, commandoabonnementen, `sendMQTTData()` |
+| `networkStuff.ino` | WiFi, mDNS, LLMNR, NTP, OTA, platformabstractie netwerk |
+| `restAPI.ino` | REST API v2 dispatchtabel, alle resource handlers, HTTP Basic Auth, CSRF, bestandsserving |
+| `FSexplorer.ino` | LittleFS-browser: bestandslijst, upload/verwijder-eindpunten |
+| `jsonStuff.ino` | Low-level JSON formatting helpers: `sendJsonMapEntry()`, `sendJsonKVLine()`, streaming map builders |
+| `settingStuff.ino` | Instellingen laden/opslaan (LittleFS JSON), `updateSetting()` validatie, side-effect dispatch |
+| `webSocketStuff.ino` | WebSocket-server poort 81, OT-logstreaming, heap backpressure gate |
+| `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS-statushelpers |
+| `OTDirect.ino` | ESP32-only: directe GPIO OpenTherm-bus via ISR, OTDirect operating modes, frame bridge |
+| `SAT.ino` | Smart Autotune Thermostat: master enable/disable, SAT-instellingenbrug |
+| `SATcontrol.ino` | SAT-regellus, verwarmingscurve, boiler state machine, setpoint-injectie |
+| `SATpid.ino` | PID v3 implementatie: proportioneel, integraal, derivaat met deadband |
+| `SATcycles.ino` | Cyclusclassificatie, overshootdetectie, anti-cycling |
+| `SATweather.ino` | Open-Meteo weersophaling, buitentemperatuur voor SAT-verwarmingscurve |
+| `SATble.ino` | ESP32 BLE-kamertemperatuursensor (BTHome-protocol) |
+| `sensorStuff.ino` | Dallas DS18B20 temperatuursensoren, S0-pulsteller, OLED-display |
+| `boards.h` | Boardspecifieke pin maps en feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`) |
+| `safeTimers.h` | Timer-macro's: `DECLARE_TIMER_SEC()`, `DUE()`, `RESTART_TIMER()` |
+| `platform.h`, `platform_esp8266.h`, `platform_esp32.h` | Platformabstractielaag |
+
+#### Web Assets
+
+De browser-SPA bevindt zich in `src/OTGW-firmware/data/`. Deze bestanden worden naar LittleFS geflasht:
+
+| Bestand | Doel |
+|---------|------|
+| `index.html` | Single-page application shell (~11 KB, altijd streamen, nooit in RAM laden) |
+| `index.js` | Hoofd-SPA JavaScript: live OT-log, WebSocket-client, instellingenformulieren |
+| `graph.js` | ECharts-gebaseerde realtime temperatuurgrafieken |
+| `index.css` | Stylesheet met donker/licht thema-ondersteuning |
+
+#### Bouwinfrastructuur
+
+| Bestand / Map | Doel |
+|--------------|------|
+| `build.py` | Primair bouwscript: roept PlatformIO intern aan, verpakt firmware- en LittleFS-artefacten |
+| `platformio.ini` | PlatformIO-project: `esp8266` en `esp32` omgevingen |
+| `evaluate.py` | Statische codekwaliteitscontrole: PROGMEM-gebruik, onveilige patronen, String-klasse audit |
+| `tools/generate_mqttha_progmem.py` | Generator voor MQTT HA auto-discovery PROGMEM-data uit `mqttha.cfg` |
+| `scripts/` | PlatformIO pre-build scripts: versie-injectie, bibliotheekpatching |
+| `libraries/` | Vendored Arduino-bibliotheken gebruikt door beide bouwsystemen |
+| `docs/` | C4-architectuurdocs, ADRs, API-referenties, functiedocumentatie |
+| `other-projects/` | Read-only referentiecodebases (PIC-firmware, OTmonitor, OT-Thing, SAT) |
+| `backlog/` | Projecttaakbeheer (Backlog.md) |
 
 ---
 
 ### 8.2 Bouwsysteem
 
-#### build.py (aanbevolen voor releases)
+#### build.py (releasebouwen)
 
-Het `build.py`-script bovenin de repository bouwt firmware én filesystem en verzorgt versienummering. Het roept PlatformIO intern aan en plaatst de uitvoer in `build/`:
-
-```bash
-python build.py              # Bouw firmware + filesystem (LittleFS-image)
-python build.py --firmware   # Alleen firmware, geen filesystem
-python build.py --clean      # Verwijder build-artefacten en bouw opnieuw
-python build.py --upload     # Bouw en flash naar aangesloten apparaat
-```
-
-Het script leest de Git-tag voor versienummer­inbedding.
-
-#### PlatformIO (dagelijks gebruik)
+Het primaire bouwscript voor het produceren van release-artefacten. Het roept PlatformIO intern aan, verzorgt versie-inbedding, filesystemverpakking en artefactverzameling.
 
 ```bash
-# Bouw voor ESP8266 (standaard Nodoshop OTGW)
-pio run -e esp8266
-
-# Bouw voor ESP32 (OTGW32)
-pio run -e esp32
-
-# Bouw alle omgevingen
-pio run
-
-# Flash naar apparaat
-pio run -e esp8266 -t upload
-
-# Filesystem uploaden (LittleFS)
-pio run -e esp8266 -t uploadfs
-
-# Seriële monitor (9600 baud)
-pio device monitor
+python build.py                      # Volledige build voor ESP8266 + ESP32 (PlatformIO, incrementeel)
+python build.py --target esp8266     # Bouw alleen voor ESP8266
+python build.py --target esp32       # Bouw alleen voor ESP32
+python build.py --firmware           # Alleen firmware, geen filesystem
+python build.py --filesystem         # Alleen filesystem
+python build.py --clean              # Verwijder build-artefacten en bouw opnieuw
+python build.py --distclean          # Clean build + gecachte afhankelijkheden
+python build.py --arduino-cli        # Gebruik legacy arduino-cli backend in plaats van PlatformIO
+python build.py --help               # Toon help
 ```
 
-De twee omgevingen in `platformio.ini`:
+Standaard gebruikt `build.py` PlatformIO als backend en bouwt beide targets (ESP8266 + ESP32). De `--arduino-cli` vlag selecteert de legacy arduino-cli backend (alleen ESP8266). Het script leest de Git-tag voor versienummerinbedding en plaatst uitvoer in de `build/`-map.
 
-| Omgeving | Platform | Board | Core | CPU |
-|----------|---------|-------|------|-----|
-| `esp8266` | `espressif8266` | `d1_mini` | Arduino Core 3.1.2, GCC 10.3 | 160 MHz |
-| `esp32` | pioarduino fork espressif32 | `esp32dev` | Arduino-ESP32 v3.3.5, Ethernet/BLE | 240 MHz |
+#### PlatformIO
 
-De ESP8266 LittleFS-partitie is 2 072 576 bytes (circa 2 MB). Dit is geconfigureerd in `platformio.ini` via de board­opties.
+PlatformIO is het voorkeursbouwsysteem en wordt gebruikt voor zowel ESP8266 als ESP32. Twee omgevingen zijn gedefinieerd in `platformio.ini`:
 
-Bibliotheken worden gedefinieerd in `[env]`-sectie van `platformio.ini` en lokaal geplaatst in `src/libraries/`. De PlatformIO-packagemanager wordt gebruikt voor downloadbare bibliotheken; het script `scripts/patch_pio_libs.py` past bij de build automatisch noodzakelijke patches toe.
+| Omgeving | Target | Board | Core | CPU |
+|----------|--------|-------|------|-----|
+| `esp8266` | Wemos D1 mini / NodeMCU (NodoShop OTGW) | `d1_mini` | Arduino Core 3.1.2 (espressif8266) | 160 MHz |
+| `esp32` | NodoShop OTGW32 | `esp32-s3-devkitc-1` | pioarduino espressif32 fork | 240 MHz |
 
-##### ESP32-specifieke build-vlaggen
-
-PlatformIO's ctags-scanner verwerkt alle `.ino`-bestanden, ongeacht `#if`-bewakers, en genereert forward declarations voor elke gevonden functie. Op ESP32 (`HAS_PIC=0`) wordt `OTGWSerial.h` nooit geïncludeerd, waardoor `OTGWFirmware` (een enum type gebruikt als parameter in `fwreportinfo()`) onbekend is op het moment dat de ctags-forward declaration wordt gecompileerd. De bouwvlag `-DOTGWFirmware=int` stelt het type tijdelijk in als `int` zodat de gegenereerde forward declaration compileert. De eigenlijke `fwreportinfo()`-functie bevindt zich in een `#if HAS_PIC`-blok en wordt nooit gecompileerd op ESP32. Dit volgt hetzelfde patroon als de OTDirect type-stubs voor ESP8266 (`-DOpenThermResponseStatus=int`, `-DOTDirectMode=int`, `-DOTDirectRequestOrigin=int`).
-
-#### Arduino IDE (ESP8266 only)
-
-Open `src/OTGW-firmware/OTGW-firmware.ino` in de Arduino IDE. Stel in:
-- Board: "LOLIN(Wemos) D1 mini"
-- Flash size: "4MB (FS: 2MB OTA: ~1019KB)"
-- CPU frequency: 160 MHz
-
-Zorg dat alle bibliotheken uit `src/libraries/` zijn geïnstalleerd.
-
-#### Kwaliteitscontrole
+De ESP8266 LittleFS-partitie is 2 072 576 bytes (circa 2 MB). Dit is geconfigureerd in `platformio.ini` via de boardopties.
 
 ```bash
-python evaluate.py           # Controleer PROGMEM-gebruik, onveilige patronen
-python evaluate.py --quick   # Snelle scan (subset van checks)
+pio run                          # Bouw alle omgevingen
+pio run -e esp8266               # Bouw alleen ESP8266
+pio run -e esp32                 # Bouw alleen ESP32
+pio run -e esp8266 -t upload     # Bouw en upload ESP8266
+pio run -e esp8266 -t uploadfs   # Upload LittleFS-filesystem (ESP8266)
+pio run -e esp32 -t upload       # Bouw en upload ESP32
+pio run -e esp32 -t uploadfs     # Upload LittleFS-filesystem (ESP32)
 ```
+
+De pre-build scripts in `scripts/` verzorgen versie-injectie (`platformio_version.py`) en compatibiliteitspatching van bibliotheken (`patch_pio_libs.py`).
+
+##### ESP8266-specifieke PlatformIO-opmerkingen
+
+De ESP8266-build sluit `OTDirect.ino` (ESP32-only) uit via `build_src_filter`. PlatformIO's ctags-scanner verwerkt alle `.ino`-bestanden ongeacht het filter, dus ESP32-specifieke types (`OpenThermResponseStatus`, `OTDirectMode`, `OTDirectRequestOrigin`) worden als `-D`-vlaggen gestubbed om ctags-gerelateerde forward declaration fouten te voorkomen. Deze stubs hebben geen runtime-effect.
+
+De `OpenTherm Library` is expliciet uitgesloten in `lib_ignore` omdat PlatformIO's LDF-scanner `#if`-bewakers negeert en de ESP32-only OT-bibliotheek anders ook voor ESP8266 zou compileren.
+
+##### ESP32-specifieke PlatformIO-opmerkingen
+
+PlatformIO's ctags-scanner verwerkt alle `.ino`-bestanden ongeacht `#if`-bewakers en genereert forward declarations voor elke gevonden functie. Op ESP32 (`HAS_PIC=0`) wordt `OTGWSerial.h` nooit geincludeerd, waardoor `OTGWFirmware` (een enum type gebruikt als parameter in `fwreportinfo()`) onbekend is op het moment dat de ctags-forward declaration wordt gecompileerd. De bouwvlag `-DOTGWFirmware=int` stelt het type tijdelijk in als `int` zodat de gegenereerde forward declaration compileert. De eigenlijke `fwreportinfo()`-functie bevindt zich in een `#if HAS_PIC`-blok en wordt nooit gecompileerd op ESP32. Dit volgt hetzelfde patroon als de OTDirect type-stubs voor ESP8266.
+
+#### Arduino IDE
+
+De Arduino IDE wordt ondersteund voor alleen ESP8266. Installeer de ESP8266 Arduino-core en open `src/OTGW-firmware/OTGW-firmware.ino`. Vereiste bibliotheken staan in `libraries/`. Voeg die map toe aan het Arduino sketchbook-bibliotheekpad. De IDE ondersteunt niet het ESP32-target of `OTDirect.ino`.
+
+#### evaluate.py
+
+Voer de codekwaliteitscontrole uit na wijzigingen om veelvoorkomende ESP8266-specifieke fouten te detecteren:
+
+```bash
+python evaluate.py           # Volledige evaluatie (alle bestanden)
+python evaluate.py --quick   # Snelle controle (alleen essentials)
+python evaluate.py --report  # Genereer gedetailleerd rapport
+python evaluate.py --fix     # Auto-fix problemen waar mogelijk
+```
+
+Het script voert uitgebreide evaluaties uit, waaronder:
+- Codekwaliteitsmetrieken (PROGMEM-gebruik, onveilige patronen, String-klasse audit)
+- Build system validatie
+- Gezondheidscontrole van afhankelijkheden
+- Documentatiedekking
+- Beveiligingsanalyse
+- Geheugen- en bronnenanalyse
+
+Belangrijkste patronen die worden gemarkeerd:
+- `Serial.print()`-aanroepen (mogen nooit verschijnen na initialisatie)
+- Letterlijke tekenreeksen niet verpakt in `F()` of `PSTR()`
+- `String`-klasse in hot paths
+- `strcpy`/`sprintf` zonder grenzen (moet `strlcpy`/`snprintf_P` zijn)
+- `strncmp_P`/`strstr_P` op binaire data (gebruik `memcmp_P`)
+
+#### tools/generate_mqttha_progmem.py
+
+Genereert gecompileerde PROGMEM-data voor MQTT Home Assistant auto-discovery vanuit het templateconfiguratiebestand `mqttha.cfg`:
+
+```bash
+python tools/generate_mqttha_progmem.py
+```
+
+Dit leest `src/OTGW-firmware/data/mqttha.cfg` en produceert twee bestanden in de sketchmap:
+- `mqttha_progmem.h`: struct-definitie en extern declarations (geincludeerd door `.ino`-bestanden)
+- `mqttha_progmem.cpp`: de eigenlijke PROGMEM-datadefinities (gecompileerd als aparte translation unit)
+
+De gegenereerde code gebruikt twee platte PROGMEM string pools (topics en berichten samengevoegd) met een struct-index. Het plaatsen van de data in een aparte `.cpp` translation unit voorkomt de Xtensa single-TU section/relocation-explosie die optreedt wanneer grote PROGMEM-data in de hoofd-sketch wordt geplaatst. Voer dit script uit wanneer `mqttha.cfg` wordt gewijzigd.
 
 ---
 
@@ -156,21 +207,35 @@ Er is geen gebruikersconfiguratie vereist. `loopEthernet()` bewaakt zichzelf met
 
 ### 8.4 C4-architectuuroverzicht
 
-De architectuur is gedocumenteerd in vier niveaus (C4-model), te vinden in `docs/c4/`:
+De firmware gebruikt een vierniveau C4-model, gedocumenteerd in `docs/c4/`. Lees het relevante niveau voordat je code aanraakt.
 
-| Niveau | Bestand | Inhoud |
-|--------|---------|--------|
-| Context | `c4-context.md` | Systeem, gebruikers, externe afhankelijkheden |
-| Container | `c4-container.md` | ESP8266/ESP32-firmware, PIC, LittleFS, externe diensten |
-| Component | `c4-component.md` | Index van alle componentdocumenten |
-| Code | `c4-code-*.md` | Functielijsten per bronbestand met regelnummers |
+#### Niveau 1: Context (`c4-context.md`)
 
-**Verplichte lesvolgorde** bij de start van elke sessie:
-1. `c4-context.md` — begrijp het systeem en zijn gebruikers
-2. `c4-component.md` — vind de juiste component voor de code die je aanraakt
-3. Relevante `c4-code-*.md` — exacte functiehandtekeningen en regelnummers
+De OTGW-firmware bevindt zich tussen de OpenTherm-verwarmingsbus en het domotica-netwerk. Externe actoren zijn: kamerthermostaat, ketel (via PIC co-processor of OTDirect GPIO op ESP32), MQTT-broker, Home Assistant, NTP-server, webbrowser, OTmonitor TCP-client, Dallas/S0/BLE-sensoren.
 
-Wanneer je code aanraakt zonder eerst de C4-documentatie te raadplegen, werk je met aannames in plaats van feiten. Dat is de kortste weg naar een bug.
+#### Niveau 2: Container (`c4-container.md`)
+
+Twee deployment targets delen een codebase:
+- **ESP8266 (OTGW)**: NodoShop-board met PIC16F co-processor. De PIC handelt de OpenTherm-bus af via UART aan 9600 baud.
+- **ESP32 (OTGW32)**: NodoShop-board met directe GPIO OpenTherm-interface (`OTDirect`), W5500 Ethernet, BLE en OLED. Geen PIC; de ESP32 stuurt de OT-bus rechtstreeks aan via interrupt-gedreven Manchester-codering.
+
+#### Niveau 3: Component (`c4-component.md`)
+
+Zeven componenten, elk met een eigen document in `docs/c4/c4-component-*.md`:
+
+| Component | Primaire bestanden | Verantwoordelijkheid |
+|-----------|-------------------|---------------------|
+| OpenTherm Core | `OTGW-Core.ino`, `OTDirect.ino` | Protocoldecode, PIC UART, commandowachtrij |
+| Netwerk en connectiviteit | `networkStuff.ino` | WiFi, NTP, mDNS, Ethernet failover |
+| Integratielaag | `MQTTstuff.ino`, `restAPI.ino`, `jsonStuff.ino` | MQTT, REST API, HA discovery |
+| Configuratie en status | `settingStuff.ino`, `OTGW-firmware.h` | Instellingenpersistentie, OTGWSettings/State |
+| Smart Thermostat (SAT) | `SAT*.ino`, `SATcontrol.ino`, `SATpid.ino` | Verwarmingscurve, PID, cyclusbeheer |
+| Sensoren en hardware | `sensorStuff.ino` | Dallas, S0, GPIO-relais, OLED |
+| Webinterface | `webSocketStuff.ino`, `helperStuff.ino`, `data/` | WebSocket, telnet, heap gate, browser-SPA |
+
+#### Niveau 4: Code (`c4-code-*.md`)
+
+Gedetailleerde functiehandtekeningen, regelnummers en afhankelijkheden tussen bestanden voor elke module. Lees het relevante `c4-code-*.md`-bestand voordat je een niet-triviale functie wijzigt.
 
 ---
 
@@ -216,6 +281,36 @@ Wissel nooit een PROGMEM-pointer uit voor een RAM-pointer en omgekeerd: dit vero
 
 De watchdog-functie `feedWatchDog()` roept geen `yield()` aan (uitgecommentarieerd). `handleOTGW()` gebruikt `static`-lokale buffers als beveiliging tegen re-entrancy vanuit `doBackgroundTasks()`.
 
+#### Geen ArduinoJson
+
+Voeg ArduinoJson niet toe aan dit project. JSON wordt:
+- **Opgebouwd**: met `snprintf_P`, `sendJsonMapEntry()` en chunked `httpServer.sendContent()`.
+- **Geparsed**: met de eigen `parseJsonKVLine()` helper (key-value line scanner, voldoende voor de platte settings JSON en MQTT-commandopayloads).
+
+#### Heap Backpressure Gate
+
+Twee gate-functies beschermen de heap-gezondheid tijdens normaal gebruik:
+
+```cpp
+bool canPublishMQTT();     // false wanneer heap onder HEAP_LOW drempel
+bool canSendWebSocket();   // false wanneer heap onder HEAP_WARNING drempel
+```
+
+Controleer altijd de juiste gate voordat je MQTT-berichten verstuurt in achtergrondtaken. De heap-monitor in `helperStuff.ino` definieert vier niveaus: `HEAP_HEALTHY` (>8 KB), `HEAP_LOW` (5-8 KB), `HEAP_WARNING` (3-5 KB), `HEAP_CRITICAL` (<3 KB).
+
+#### Settings / State scheiding (ADR-051)
+
+Alle persistente configuratie leeft in `OTGWSettings settings` (geserialiseerd naar `/settings.ini` op LittleFS). Alle transiente runtime-status leeft in `OTGWState state`. Beide structs zijn gedefinieerd in `OTGW-firmware.h` en gebruiken tweeniveau benoemde subsecties met Hongaarse prefixen:
+
+```cpp
+settings.mqtt.sBroker          // persistent: MQTT-brokerhostnaam
+settings.sat.fHeatingCurveCoeff // persistent: SAT-verwarmingscurvecoefficient
+state.otgw.bOnline             // transient: PIC serieel verbinding actief
+state.pic.sFwversion           // transient: PIC-firmwareversiestring
+```
+
+Persisteer nooit transiente status. Benader nooit `state`-velden vanuit `writeSettings()`.
+
 #### Platformabstractielaag (ADR-061)
 
 Alle ESP8266/ESP32 SDK-verschillen zijn geïsoleerd in `platform.h`, `platform_esp8266.h` en `platform_esp32.h`. Applicatiecode includeert uitsluitend `platform.h` en roept de platformonafhankelijke functies aan. Roep nooit platform-specifieke SDK-functies rechtstreeks aan in `.ino`-bestanden.
@@ -242,97 +337,124 @@ De klasse `PlatformDir` in `platform.h` biedt een uniforme interface voor direct
 
 ### 8.6 Een nieuw REST-eindpunt toevoegen
 
-Voeg een route toe in drie stappen. Geen wijzigingen in de router zelf nodig.
+De REST API v2 gebruikt een gecentraliseerde dispatchtabel (ADR-050) in `restAPI.ino`. Een eindpunt toevoegen vereist:
 
-**Stap 1: Voeg een route-constante toe** (bovenin `restAPI.ino`):
+1. Schrijf de handler-functie.
+2. Voeg een vermelding toe aan `kV2Routes[]`.
+3. Geen wijzigingen aan de router.
+
+#### Stap 1: Schrijf de handler
+
+Handler-handtekening:
 
 ```cpp
-static const char kRouteMijnDing[] PROGMEM = "mijnding";
+void handleMijnDing(const char words[][API_WORD_LEN], uint8_t wc,
+                    HTTPMethod method, const char* originalURI)
 ```
 
-**Stap 2: Schrijf de handler-functie**:
+Parameters:
+- `words`: URI-tokens na `/api/v2/`, bijv. `words[0]` = `"mijnding"`, `words[1]` = `"status"`.
+- `wc`: Aantal tokens.
+- `method`: `HTTP_GET`, `HTTP_POST`, etc.
+- `originalURI`: De volledige originele URI-string.
+
+Voorbeeldhandler voor `GET /api/v2/mijnding/status`:
 
 ```cpp
-static void handleMijnDing(const char words[][API_WORD_LEN], uint8_t wc,
-                            HTTPMethod method, const char* originalURI) {
-  if (method == HTTP_GET) {
-    // Stuur JSON-antwoord via chunked transfer
-    sendStartJsonMap(nullptr);         // begin JSON-object
-    sendJsonMapEntry(F("status"), F("ok"), true);
-    // true = laatste veld (geen komma achteraan)
-    sendEndJsonMap();
-  } else {
-    sendApiError(405, F("Method Not Allowed"));
+void handleMijnDing(const char words[][API_WORD_LEN], uint8_t wc,
+                    HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) {
+    httpServer.send(405, F("application/json"),
+                    F("{\"error\":{\"status\":405,\"message\":\"Method Not Allowed\"}}"));
+    return;
   }
+  if (!checkHttpAuth()) return;
+
+  char buf[CMSG_SIZE];
+  snprintf_P(buf, sizeof(buf),
+    PSTR("{\"mijnwaarde\":%d,\"status\":\"ok\"}"),
+    mijnGlobaleWaarde);
+  httpServer.send(200, F("application/json"), buf);
 }
 ```
 
-Handtekening is altijd identiek aan het voorbeeld hierboven. `words[]` bevat de URI-tokens na `/api/v2/`; `wc` is het aantal tokens.
+Regels:
+- Gebruik nooit `Serial.print()` voor debug. Gebruik `DebugTln()` of `DebugTf()`.
+- Gebruik `CMSG_SIZE` (512 bytes) als standaard responsbuffer, tenzij je een groter antwoord nodig hebt.
+- Voor antwoorden groter dan `CMSG_SIZE`, gebruik `httpServer.sendContent()` in een chunked loop met `httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN)`.
+- Alle mutatie-eindpunten (POST, PUT, DELETE) moeten `checkHttpAuth()` aanroepen en direct terugkeren als het `false` retourneert.
+- Gebruik `sendApiError(httpCode, F("bericht"))` voor consistente JSON-foutantwoorden.
+- Bestandsserving moet `httpServer.streamFile()` gebruiken voor bestanden groter dan 2 KB.
 
-**Stap 3: Voeg een vermelding toe in `kV2Routes[]`**:
+#### Stap 2: Registreer in de dispatchtabel
 
-```cpp
-static const ApiRoute kV2Routes[] = {
-  { kRouteHealth,     handleHealth },
-  // ... bestaande routes ...
-  { kRouteMijnDing,   handleMijnDing },   // nieuw
-  { nullptr,          nullptr }           // sentinel blijft altijd als laatste
-};
-```
-
-Het eindpunt is nu bereikbaar op `GET /api/v2/mijnding`.
-
-**Authenticatie** voor schrijfoperaties:
+Zoek `kV2Routes[]` in `restAPI.ino`. Voeg een vermelding toe:
 
 ```cpp
-if (!checkHttpAuth()) return;   // Stuur automatisch 401; return daarna direct
+{ PSTR("mijnding"), handleMijnDing },
 ```
 
-**Foutafhandeling**:
+Het eerste veld is de PROGMEM-resourcenaam die overeenkomt met het eerste URI-token na `/api/v2/`. Het tweede is de handler function pointer. Volgorde in de tabel heeft geen invloed op routering.
 
-```cpp
-sendApiError(400, F("Ongeldige parameter"));  // JSON: {"error":{"status":400,...}}
-```
+Dat is alles. De router in `processAPI()` matcht `words[0]` tegen de tabel en dispatcht automatisch.
 
 ---
 
-### 8.7 Een nieuw MQTT-onderwerp toevoegen
+### 8.7 Een nieuw MQTT-topic toevoegen
 
 #### Publiceren
 
-Gebruik `sendMQTTData()` voor enkelvoudige publicaties:
+Alle MQTT-publicaties verlopen via `sendMQTTData()` in `MQTTstuff.ino`:
 
 ```cpp
-// Publiceer naar {TopTopic}/value/{UniqueId}/mijnwaarde
-sendMQTTData(F("mijnwaarde"), F("42"), true);  // true = retained
+void sendMQTTData(const char* topic, const char* value, const bool retain = false);
+void sendMQTTData(const __FlashStringHelper* topic, const char* value, const bool retain = false);
+void sendMQTTData(const __FlashStringHelper* topic, const __FlashStringHelper* value,
+                  const bool retain = false);
 ```
 
-Voor OpenTherm-gerelateerde waarden die worden gestuurd vanuit `OTGW-Core.ino`, gebruik `publishToSourceTopic()`:
+De functie voegt automatisch de geconfigureerde topic-namespace (`{TopTopic}/value/{UniqueId}/`) toe. De functie controleert ook `canPublishMQTT()` voordat er wordt verstuurd.
+
+Voorbeeld: publiceer een nieuwe float-waarde:
 
 ```cpp
-// Publiceert naar boiler/thermostat/gateway subtopic afhankelijk van berichtrichting
-publishToSourceTopic("roomtemperature", "20.5", OT_MSGTYPE_READ_ACK);
+if (canPublishMQTT()) {
+  char payload[16];
+  dtostrf(mijnFloatWaarde, 0, 2, payload);
+  sendMQTTData(F("mijnnieuwetopic"), payload, true);  // retain=true voor sensorwaarden
+}
 ```
 
-Publiceer nooit grote buffers op de stack. Gebruik `static` of de gedeelde scratch-buffer `mqttAutoCfgScratch` (alleen in de MQTT-module, bewaakt door een `inUse`-vlag).
+Voor brongescheiden topics (wanneer `settings.mqtt.bSeparateSources` is ingeschakeld), gebruik `publishToSourceTopic()`:
+
+```cpp
+publishToSourceTopic(label, valueStr, sourceFlag);  // sourceFlag: 'T', 'B', of 'A' (Answer)
+```
+
+Publiceer nooit grote buffers op de stack. Gebruik `static` of de gedeelde scratch-buffer `mqttAutoCfgScratch` (alleen in de MQTT-module, bewaakt door een `inUse`-vlag). Voor periodiek gepubliceerde waarden, roep `sendMQTTData()` aan binnen een `DUE()`-controle zodat de broker niet wordt overspoeld.
 
 #### Abonneren en verwerken
 
-De firmware abonneert op `{TopTopic}/set/{UniqueId}/#`. Inkomende berichten worden afgehandeld in `handleMQTTcallback()` in `MQTTstuff.ino`. Voeg een nieuwe `MQTT_set_cmd_t`-vermelding toe aan de opdrachttabel (rond regel 540 in `MQTTstuff.ino`):
+De firmware abonneert op `{TopTopic}/set/{UniqueId}/#` bij MQTT-verbinding. Inkomende berichten worden gedispatcht in `mqttCallback()` in `MQTTstuff.ino`. De dispatchtabel is `cmdtable[]`, een array van `MQTT_set_cmd_t`-structs:
 
 ```cpp
-static const MQTT_set_cmd_t MQTTsetCmds[] PROGMEM = {
-  // ...
-  { PSTR("mijncommando"), PSTR("XX"), PSTR("temperature") },
+static const MQTT_set_cmd_t cmdtable[] PROGMEM = {
+  { PSTR("setpoint"),    PSTR("TT"), PSTR("temperature") },
+  { PSTR("mijncommando"), PSTR("XX"), PSTR("raw")        },  // nieuw
   // ...
 };
 ```
 
-Of behandel het expliciet in de callback voor niet-standaard logica.
+Velden:
+- `setcmd`: Het MQTT-topicsuffix (wat na `{UniqueId}/` komt).
+- `otgwcmd`: De tweeletterige OTGW PIC-commandocode die naar `addCommandToQueue()` wordt gestuurd.
+- `ottype`: Waardetype: `"temperature"`, `"on/off"`, `"level"`, `"raw"`, of `"int"`.
+
+Voor commando's die niet naar een PIC-commando mappen (bijv. SAT-specifieke topics), voeg een aparte handler toe in `mqttCallback()` voor de tabeldispatch.
 
 #### Home Assistant auto-discovery
 
-Voeg een configuratieregel toe aan `data/mqttha.cfg`. Dit bestand wordt gelezen door `doAutoConfigure()` en genereert discovery-berichten voor Home Assistant. Raadpleeg de bestaande vermeldingen in dat bestand voor de opmaak.
+HA discovery payloads worden gegenereerd uit `mqttha.cfg` (opgeslagen op LittleFS). Dit is een templatebestand dat wordt verwerkt door `doAutoConfigure()` / `doAutoConfigureMsgid()`. Als je nieuwe topic een HA-entiteit nodig heeft, voeg dan een vermelding toe aan `mqttha.cfg` volgens het bestaande templateformaat. Raadpleeg de bestaande vermeldingen voor het patroon.
 
 ---
 
@@ -375,10 +497,28 @@ writeJsonStringKV(f, PSTR("mijnstring"), settings.mqtt.sMijnString);
 Wanneer een instelling een service-herstart vereist (bijv. MQTT opnieuw verbinden):
 
 ```cpp
-pendingSideEffects |= SIDE_EFFECT_MQTT;
+pendingSideEffects |= SIDE_EFFECT_MQTT;  // of SIDE_EFFECT_NTP, SIDE_EFFECT_MDNS
 ```
 
-**Stap 4: Voeg het UI-veld toe** in `data/index.html` (of `index.js`) als het zichtbaar moet zijn in de web-interface. Gebruik de bestaande invulvelden als sjabloon.
+De `settingsDirty`-vlag triggert een uitgestelde LittleFS-schrijfoperatie (doorgaans na een 2-seconden debounce timer).
+
+**Stap 4: Stel beschikbaar via REST API (optioneel)**
+
+`GET /api/v2/settings` retourneert alle instellingen. Het antwoord wordt opgebouwd in `sendDeviceSettings()`. Voeg het nieuwe veld toe aan de JSON-uitvoer daar. Voor `POST /api/v2/settings` itereert de bestaande `postSettings()`-functie over de JSON-body en roept `updateSetting()` aan voor elk sleutel-waardepaar, dus nieuwe instellingen worden automatisch geaccepteerd zonder codewijzigingen in de POST-handler.
+
+**Stap 5: Web UI-veld (optioneel)**
+
+Instellingenvelden bevinden zich in `data/index.js`. Voeg een vermelding toe aan het instellingenformulier-configuratieobject volgens het bestaande patroon. Voor een boolean toggle:
+
+```javascript
+{ key: 'mijnoptie', label: 'Mijn Nieuwe Functie', type: 'checkbox', section: 'device' }
+```
+
+Voor een tekstveld:
+
+```javascript
+{ key: 'mijnstring', label: 'Mijn Stringwaarde', type: 'text', section: 'device', maxlength: 40 }
+```
 
 ---
 
@@ -393,6 +533,14 @@ pendingSideEffects |= SIDE_EFFECT_MQTT;
 | Struct-velden | Hongaars prefix + camelCase | `bEnabled`, `sHostname`, `fTargetTemp`, `iInterval` |
 | Enum-klassen | PascalCase | `OTGWHardwareMode`, `HeapHealthLevel` |
 | PROGMEM-strings | Inline `F()` of `PSTR()` | `F("tekst")`, `PSTR("format %d")` |
+
+#### Veiligheidsregels
+
+- Schrijf nooit naar `Serial` na de bootsequentie. De UART is de PIC serieel link. Gebruik `DebugTln(F("..."))` in plaats daarvan.
+- Stuur nooit OTGW-commando's rechtstreeks naar de serieel poort. Gebruik altijd `addCommandToQueue(cmd, len)`.
+- Valideer altijd buffergroottes voor stringoperaties. Gebruik `strlcpy()`, `snprintf_P()`, nooit `strcpy()` of `sprintf()`.
+- Bewak `#ifdef ESP8266` / `#ifdef ESP32`-blokken waar platformspecifieke hardware betrokken is, inclusief debug-macrosecties die platformspecifieke I/O gebruiken.
+- Gebruik `enum class` voor interne discriminatoren, geen string tokens.
 
 Leidend principe: schrijf code die een andere ontwikkelaar na zes maanden nog direct kan begrijpen. Slim is minder waard dan duidelijk.
 
@@ -439,22 +587,31 @@ Bij verbinding toont de firmware een banner met de actuele status en alle beschi
 | `p` | Reset PIC handmatig |
 | `h` | Toon het volledige help-menu |
 
-De `bMQTTGate`-vlag (toets `g`) stuurt berichten over het MQTT-interval­filter: wanneer een waarde te snel achter elkaar publiceert, legt de gate uit waarom het bericht wordt overgeslagen. Dit is nuttig voor diagnose van MQTT-publicatiefrequenties, maar genereert veel uitvoer bij hoge OT-berichtfrequentie.
+De macro's sturen uitvoer naar de `debugTelnet`-instantie (een `SimpleTelnet<1>` op poort 23). Er wordt nooit naar `Serial` geschreven. Modulespecifieke conditionele macro's volgen een per-modulevlag in `state.debug`:
+
+| Vlag | Modulemacro's | Beschrijving |
+|------|--------------|-------------|
+| `state.debug.bOTmsg` | `OTDebugTln()`, `OTDebugTf()` | OpenTherm-berichtparsering |
+| `state.debug.bRestAPI` | `RESTDebugTln()`, `RESTDebugTf()` | REST API-handlerlogging |
+| `state.debug.bMQTT` | `MQTTDebugTln()`, `MQTTDebugTf()` | MQTT-client en publish/subscribe |
+| `state.debug.bMQTTGate` | (inline checks) | MQTT interval-gatingbeslissingen |
+| `state.debug.bSensors` | `SensorDebugTln()`, `SensorDebugTf()` | Dallas, S0, sensorpolling |
+| `state.debug.bSAT` | `SATDebugTln()`, `SATDebugTf()` | SAT-regellus, cycli, verwarmingscurve |
+| `state.debug.bOTDirect` | `OTDDebugTln()`, `OTDDebugTf()` | OTDirect GPIO frame handling (ESP32) |
+
+#### Browser Console Debug
+
+Wanneer `window.otgwDebug = true` is ingesteld in de browserconsole voor het laden van de pagina, logt de JavaScript-SPA uitgebreide diagnostiek. Het SAT-subsysteem heeft een aparte vlag: `window.SAT_DEBUG = true`.
 
 #### evaluate.py
 
-Statische analyse van de broncode:
+Na het aanbrengen van wijzigingen, voer altijd uit:
 
 ```bash
-python evaluate.py           # Volledig rapport: PROGMEM-gebruik, onveilige patronen
-python evaluate.py --quick   # Snelle scan
+python evaluate.py
 ```
 
-Het script waarschuwt onder andere voor:
-- Gebruik van `Serial.print()` na de initialisatiefase
-- Ontbrekende `F()` of `PSTR()` bij letterlijke tekenreeksen
-- `String`-klasse in hot paths
-- `strncmp_P`/`strstr_P` op binaire data
+Dit controleert op de patronen die het meest waarschijnlijk crashes veroorzaken op ESP8266. Verhelp alle waarschuwingen voordat je een pull request indient.
 
 ---
 
@@ -523,34 +680,45 @@ Zie `OTGW-Core.ino` en `docs/adr/ADR-016-opentherm-command-queue.md` voor volled
 
 ### 8.13 OpenTherm-berichtverwerking
 
-De gegevensstroom van PIC naar MQTT verloopt als volgt:
+Het begrijpen van deze pipeline is essentieel voordat je OT-berichtverwerking wijzigt:
 
 ```
-PIC UART (9600 baud)
-      |
-      v
-handlePICSerial()            -- niet-blokkerend, leest regels uit serieële buffer
-      |
-      v
-handleOTGW()                 -- verwerkt complete regel (T/B/R/A prefix)
-      |
-      v
-processOT(line, msgType)     -- decodeert OT-berichttype en -waarde
-      |
-      +---> OTcurrentSystemState.*   -- bijwerken van de globale toestandsstructuur
-      |
-      +---> sendMQTTData()           -- publiceer naar MQTT (met throttle)
-      |
-      +---> sendEventToWebSocket()   -- stuur naar WebSocket-clients
+Ketel/Thermostaat
+       |
+  OpenTherm-bus (2-draads)
+       |
+  PIC co-processor (ESP8266) of OTDirect GPIO ISR (ESP32)
+       |
+  UART 9600 baud ASCII-regel (bijv. "BA000001\r")   [ESP8266]
+  of gedecodeerd OT frame struct                     [ESP32]
+       |
+  handleOTGW() / OTGW-Core.ino
+    - leest serieel byte voor byte in sRead[256] (static)
+    - bij CR: dispatcht naar processOT()
+       |
+  processOT(buf, len) / OTGW-Core.ino
+    - parset frame type prefix (T=thermostaat, B=ketel, R=response, A=answer, E=error)
+    - extraheert 8-hex-digit datawoord
+    - decodeert message ID (bits 23-16)
+    - decodeert message type (bits 31-28)
+    - extraheert getypeerde waarde via OTValueType (f8.8, s16, u16, flag8, status, datetime, ...)
+    - werkt OTcurrentSystemState bij (het globale OTdataStruct)
+    - controleert mqttlastsent[msgId] throttle timestamp
+    - roept sendMQTTData(label, value) aan als throttle toestaat
+    - roept sendEventToWebSocket(frame) aan voor elk frame
+    - roept publishToSourceTopic() aan bij ingeschakelde bronscheiding
+       |
+  sendMQTTData(topic, value) / MQTTstuff.ino
+    - controleert canPublishMQTT()
+    - voegt {TopTopic}/value/{UniqueId}/ namespace toe
+    - roept PubSubClient.publish() aan
+       |
+  MQTT-broker
+       |
+  Home Assistant / automatiseringsclients
 ```
 
-Berichtprefixen van de PIC:
-- `T` — bericht van thermostaat naar boiler (WRITE_DATA)
-- `B` — antwoord van boiler (WRITE_ACK of READ_ACK)
-- `R` — verzoek ingespoten door gateway
-- `A` — antwoord van gateway
-
-Het globale object `OTcurrentSystemState` (type `OTdataStruct`) is de canonieke bron van alle gedecodeerde OpenTherm-waarden. Andere modules lezen hieruit; schrijven gaat alleen via `processOT()`.
+De `sRead[256]`-buffer in `handleOTGW()` is een `static` lokale variabele, wat het re-entrancy-veilig maakt. De functie kan worden aangeroepen vanuit zowel de hoofdlus als vanuit de yield-punten van MQTT autoconfig's bestandsleesfunctie.
 
 ---
 
@@ -570,15 +738,20 @@ Voor puur refactoren, bugfixes en kleine functies binnen bestaande patronen is g
 
 #### Sleutel-ADRs
 
-| ADR | Titel | Samenvatting |
-|-----|-------|-------------|
-| ADR-003 | HTTP-only | Geen HTTPS of WSS, nooit |
-| ADR-004 | Geen `String`-klasse in hot paths | Gebruik `char[]`, `strlcpy`, `snprintf_P` |
-| ADR-005 | WebSocket realtime streaming | Poort 81, platte ws:// |
-| ADR-009 | PROGMEM voor letterlijke tekenreeksen | `F()` en `PSTR()` verplicht |
-| ADR-016 | OpenTherm-commandowachtrij | Altijd `addCommandToQueue()`, nooit direct serial |
-| ADR-051 | Settings/State architectuur | `OTGWSettings` vs `OTGWState`, sub-secties, Hongaarse prefixen |
-| ADR-054 | HTTP Basic Auth + CSRF | Beveiligingsmodel voor REST API |
+| ADR | Onderwerp | Impact |
+|-----|-----------|--------|
+| ADR-004 | Static buffer allocation | Geen `String` in hot paths; alle buffers `char[]` |
+| ADR-009 | PROGMEM string literals | Alle literals in flash via `F()` / `PSTR()` |
+| ADR-014 | Dual build system | `build.py` voor Arduino CLI, PlatformIO voor ESP32 |
+| ADR-016 | OpenTherm command queue | Altijd `addCommandToQueue()` |
+| ADR-019 | REST API versioning | `/api/v2/` is huidig; v0/v1 retourneren 410 Gone |
+| ADR-028 | File streaming | Bestanden >2 KB moeten `streamFile()` gebruiken, nooit laden |
+| ADR-040 | MQTT source-specific topics | Bronscheiding topicstructuur |
+| ADR-042 | Streaming JSON | Geen ArduinoJson; handmatige `snprintf_P`-constructie |
+| ADR-050 | Centralized API dispatch | Enkele `kV2Routes[]`-tabel; geen per-route routerwijzigingen |
+| ADR-051 | Dual encapsulating structs | `OTGWSettings` / `OTGWState`-architectuur |
+| ADR-053 | Large feature buffer allocation | Statische allocatie voor grote per-feature buffers |
+| ADR-061 | ESP8266/ESP32 platform abstraction | Gebruik `platform.h`-abstracties, geen directe SDK-aanroepen |
 
 #### Levenscyclus
 
@@ -586,12 +759,8 @@ Voor puur refactoren, bugfixes en kleine functies binnen bestaande patronen is g
 
 #### Nieuwe ADR aanmaken
 
-```bash
-# Gebruik het adr-skill commando als dat beschikbaar is, anders handmatig:
-# Kopieer de ADR-README.md template, nummer opvolgend aan de laatste ADR
-```
+Maak een nieuwe ADR aan wanneer je wijziging: een nieuwe afhankelijkheid introduceert, een API-contract wijzigt, het bouwsysteem verandert, of architectuurgrenzen verschuift. Gebruik het formaat:
 
-Formaat (korte versie):
 ```
 # ADR-NNN-Korte-Titel
 ## Status: Proposed
@@ -601,39 +770,23 @@ Formaat (korte versie):
 ## Related
 ```
 
+Om een Accepted ADR terug te draaien: maak een nieuwe ADR die deze superseded en markeer de oude als "Superseded by ADR-NNN".
+
 ---
 
 ### 8.15 Bijdragenworkflow
 
-```
-1. Fork de repository op GitHub
-2. Maak een feature branch aan vanaf 'dev':
-      git checkout dev
-      git pull origin dev
-      git checkout -b feature/mijn-functie
+1. Fork de repository op GitHub.
+2. Maak een feature branch aan vanaf `dev`: `git checkout -b feature/mijn-functie dev`.
+3. Zoek een bestaande backlog-taak: `backlog search "mijn onderwerp" --plain`. Maak er een aan als er geen is.
+4. Zet de taak op in progress en wijs aan jezelf toe: `backlog task edit <id> -s "In Progress" -a @jouwnaam`.
+5. Schrijf een implementatieplan in de taak voordat je code schrijft.
+6. Implementeer de wijziging. Markeer acceptatiecriteria als gereed terwijl je vordert.
+7. Voer `python evaluate.py` uit en los alle gerapporteerde problemen op.
+8. Bouw voor beide targets en bevestig dat er geen compileerfouten zijn: `pio run`.
+9. Test op echte hardware indien mogelijk; gebruik de simulatiemodus in `state.debug.bOTGWSimulation` als er geen hardware beschikbaar is.
+10. Schrijf een final summary in de backlog-taak.
+11. Open een pull request naar de `dev`-branch, niet `main`.
+12. Vermeld het backlog-taak-ID in de PR-beschrijving.
 
-3. Maak een backlog-taak aan (zie CLAUDE.md):
-      backlog task create "Mijn functie" -d "Beschrijving" --ac "Criterium 1"
-
-4. Schrijf code, volg de richtlijnen in dit hoofdstuk
-
-5. Controleer kwaliteit:
-      python evaluate.py
-
-6. Bouw lokaal:
-      pio run -e esp8266
-
-7. Test op hardware (of simulatie indien van toepassing)
-
-8. Commit met beschrijvende commit-boodschap:
-      git commit -m "feat: voeg mijn-functie toe voor ..."
-
-9. Open een Pull Request naar de 'dev' branch
-   - Beschrijf wat je hebt gedaan en waarom
-   - Voeg teststappen toe
-   - Verwijs naar de backlog-taak
-
-10. Wacht op review; de 'dev' branch wordt door de maintainer samengevoegd
-```
-
-Branches worden **nooit** rechtstreeks samengevoegd naar `main` zonder expliciete goedkeuring van de maintainer.
+Pull requests naar `main` worden niet direct geaccepteerd. Alle merges naar `main` verlopen via `dev` en worden gecoordineerd door de maintainer.

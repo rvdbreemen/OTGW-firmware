@@ -1,147 +1,127 @@
 ## Hoofdstuk 6: Netwerkconfiguratie
 
-Dit hoofdstuk beschrijft alle netwerkaspecten van OTGW-firmware: hoe het apparaat verbinding maakt met uw thuis­netwerk, hoe hostnamen worden geadverteerd, hoe de tijd wordt gesynchroniseerd en welke poorten het apparaat gebruikt. Het geeft ook richtlijnen voor gebruik achter een reverse proxy en voor firewall­instellingen.
+Dit hoofdstuk beschrijft alle netwerkaspecten van OTGW-firmware: hoe het apparaat verbinding maakt met uw thuisnetwerk, hoe hostnamen worden geadverteerd, hoe de tijd wordt gesynchroniseerd en welke poorten het apparaat gebruikt. Het geeft ook richtlijnen voor gebruik achter een reverse proxy en voor firewallinstellingen.
 
 ---
 
 ### 6.1 WiFi-installatie en de AP-fallbackmodus
 
-#### Eerste verbinding
+#### 6.1.1 Eerste verbinding
 
 Bij de eerste opstart beschikt het apparaat nog over geen opgeslagen WiFi-instellingen. De firmware start dan automatisch de WiFiManager captive portal:
 
-1. Het apparaat start als WiFi-accesspoint met de SSID `<hostname>-<MAC>`, standaard iets als `otgw-00112233AABB`.
+1. Het apparaat start als WiFi-accesspoint met de SSID `<hostname>-<MAC>`, standaard iets als `otgw-AABBCCDD`.
 2. Verbind uw telefoon of laptop met dit netwerk.
-3. Er opent automatisch een captivaportal­pagina (of navigeer handmatig naar `192.168.4.1`).
+3. Er opent automatisch een captiveportalpagina (of navigeer handmatig naar `192.168.4.1`).
 4. Kies uw thuisnetwerk uit de lijst, vul het wachtwoord in en sla op.
 5. Het apparaat herstart en verbindt met uw netwerk.
 
 Zodra de verbinding is gemaakt, slaat de firmware de gegevens op in flash. Bij iedere volgende opstart verbindt het apparaat automatisch.
 
-#### AP-fallbackmodus
+#### 6.1.2 Automatisch herstel bij WiFi-uitval
 
-Zijn de opgeslagen gegevens niet meer geldig (SSID gewijzigd, wachtwoord veranderd), dan activeert de firmware na het mislukken van de verbindingspoging opnieuw de captive portal. U herkent dit aan de `<hostname>-<MAC>` SSID die opnieuw zichtbaar wordt in de WiFi-scanner.
-
-De portal-SSID bevat geen Info- of Erase-knoppen: die zijn om veiligheidsredenen uitgeschakeld.
-
-#### WiFi-gegevens wissen
-
-Er zijn twee manieren om opgeslagen WiFi-gegevens te wissen en zo de captive portal te forceren:
-
-**Methode 1: Via de Web UI (aanbevolen)**
-
-1. Ga naar de Settings-pagina in de Web UI.
-2. Het huidige verbonden SSID staat weergegeven als een alleen-lezen veld.
-3. Klik op de knop **Reset WiFi**.
-4. Het apparaat wist de gegevens en herstart naar de captive portal.
-
-**Methode 2: Driedubbele hardware-reset (noodherstel)**
-
-Wanneer de Web UI niet bereikbaar is:
-
-1. Druk de hardware-resetknop van het ESP8266/ESP32-board **3 keer binnen 10 seconden** in.
-2. Bij de derde reset detecteert de firmware het patroon.
-3. De WiFi-gegevens worden gewist en de captive portal opent.
-
-> Deze methode werkt ook als u bent opgesloten en geen toegang hebt tot de Web UI of de REST API. Druk te langzaam (meer dan 10 seconden voor alle drie resets), dan werkt de detectie niet en start het apparaat normaal op.
-
-#### Automatisch herstel bij WiFi-uitval
-
-De firmware implementeert een twee­laags herstel­mechanisme (ADR-047):
+De firmware implementeert een tweelaags herstelmechanisme:
 
 - **Laag 1**: De WiFi SDK probeert automatisch opnieuw verbinding te maken bij kortdurende onderbrekingen (typisch binnen 30 seconden).
-- **Laag 2**: Een toestandsmachine in de firmware (`loopWifi()`) detecteert langere uitvallen. In productie­builds herstart het apparaat zichzelf na maximaal 10 mislukte pogingen. In beta­builds activeert de firmware na 2 mislukte pogingen de AP-fallbackmodus (zie paragraaf 6.10) in plaats van te herstarten.
+- **Laag 2**: Een toestandsmachine in de firmware (`loopWifi()`) detecteert langere uitvallen. In productiebuilds herstart het apparaat zichzelf na maximaal 10 mislukte pogingen. In betabuilds activeert de firmware na 2 mislukte pogingen de AP-fallbackmodus (zie paragraaf 6.1.3) in plaats van te herstarten.
 
 Bij herstel van de verbinding:
 - Herstelt de firmware de geconfigureerde hostnaam.
 - Stuurt de firmware een DHCP-heraankondiging zodat de router de juiste hostnaam leert.
 - Worden MQTT, de WebSocket-verbinding en de Telnet-debugserver automatisch opnieuw gestart.
 
+#### 6.1.3 AP-fallbackmodus (beta)
+
+Beschikbaar in betabuilds (v2.0.0-beta en later, alle platformen). Wanneer WiFi-pogingen uitgeput zijn, schakelt het apparaat over naar AP-fallbackmodus in plaats van eindeloos te herstarten. In productiereleases herstart het apparaat na 10 mislukte pogingen.
+
+Bij opstart, als er credentials opgeslagen zijn maar WiFi niet bereikbaar is, slaan betabuilds de WiFiManager config portal over en gaan direct naar AP-fallback.
+
+- **SSID**: `OTGW-<laatste 3 bytes van het MAC-adres in hoofdletters hex>`, bijvoorbeeld `OTGW-AABBCC`
+- **IP-adres**: `192.168.4.1`
+- **Wachtwoord**: `otgw123`
+- **MQTT**: uitgeschakeld in fallbackmodus
+- **OTA-update**: beschikbaar vanuit fallbackmodus, zodat u een gecorrigeerde firmware kunt flashen zonder serieel toegang
+
+In AP-fallbackmodus probeert de firmware elke 5 minuten opnieuw verbinding te maken met het geconfigureerde WiFi-netwerk. Zodra WiFi beschikbaar is, worden alle services automatisch hersteld en wordt de AP afgesloten.
+
+**Herstelstappen:**
+1. Verbind met de SSID `OTGW-XXXXXX` met wachtwoord `otgw123`.
+2. Open `http://192.168.4.1` in uw browser.
+3. Pas de WiFi-instellingen aan via de Settings-pagina of gebruik Reset WiFi.
+4. Herstart het apparaat.
+
+#### 6.1.4 WiFi-gegevens wissen
+
+| Methode | Hoe |
+|---|---|
+| Web UI | Settings-pagina, klik op de knop "Reset WiFi" |
+| Driedubbele reset | Druk de hardware-resetknop 3 keer binnen 10 seconden in |
+| Telnet-debugconsole | Stuur het commando `resetwifi` op poort 23 |
+
 ---
 
-### 6.2 Ethernet (W5500) op ESP32
+### 6.2 Ethernet (ESP32 + W5500)
 
-Op ESP32-boards met een aangesloten W5500 SPI Ethernet-controller kan de firmware wired Ethernet gebruiken als primaire netwerkverbinding. Dit is uitsluitend van toepassing op ESP32-hardware; ESP8266-boards ondersteunen geen Ethernet.
+Wired Ethernet is beschikbaar op ESP32-boards met een W5500 SPI Ethernet-controller. Niet beschikbaar op ESP8266.
 
-#### Bedrading
+#### 6.2.1 Hardwaredetectie
 
-De W5500 is aangesloten via de SPI-bus. De exacte pinout hangt af van het boardvariant dat is geconfigureerd in `boards.h`. Raadpleeg de hardware­documentatie van uw specifieke OTGW32-bord voor de precieze GPIO-nummers.
+De firmware leest bij het opstarten het SPI VERSION-register (adres 0x0039) van de W5500. Als het register 0x04 retourneert, wordt de chip herkend als W5500 en wordt Ethernet-ondersteuning geactiveerd. Er is geen aparte instelling nodig: als de chip aanwezig en correct bedraad is, wordt hij automatisch gebruikt.
+
+#### 6.2.2 GPIO-aansluitingen
+
+De W5500 is aangesloten via de SPI-bus. De exacte pinout hangt af van het boardvariant dat is geconfigureerd in `boards.h`. Raadpleeg de hardwaredocumentatie van uw specifieke OTGW32-bord voor de precieze GPIO-nummers.
 
 Typische aansluitingen:
 
-| W5500 pin | ESP32 GPIO |
-|-----------|-----------|
-| MOSI | Zie boards.h `PIN_SPI_MOSI` |
+| W5500 signaal | ESP32 GPIO |
+|---|---|
+| CS (chip select) | Zie boards.h `PIN_SPI_CS` |
+| INT (interrupt) | Zie boards.h `PIN_SPI_INT` |
+| RST (reset) | Zie boards.h `PIN_SPI_RST` |
+| SCK (SPI clock) | Zie boards.h `PIN_SPI_SCK` |
 | MISO | Zie boards.h `PIN_SPI_MISO` |
-| SCK | Zie boards.h `PIN_SPI_SCK` |
-| CS | Zie boards.h `PIN_SPI_CS` |
-| RST | Zie boards.h `PIN_ETH_RST` |
+| MOSI | Zie boards.h `PIN_SPI_MOSI` |
 
-#### Inschakelen en detectie
+#### 6.2.3 Prioriteit boven WiFi
 
-De W5500-ondersteuning wordt automatisch geactiveerd wanneer de firmware het hardware-feature-flag `HAS_ETH_CAPABLE` heeft en een W5500-chip detecteert via het SPI VERSION-register bij het opstarten. Er is geen aparte instelling om Ethernet aan te zetten: als de chip aanwezig en correct bedraad is, wordt hij gebruikt.
+Ethernet heeft altijd prioriteit. Wanneer de W5500 aanwezig is en een kabel is aangesloten, wordt WiFi uitgeschakeld. Als de kabel tijdens bedrijf wordt verwijderd, detecteert de firmware dit (elke 5 seconden gecontroleerd) en schakelt automatisch terug naar WiFi. Wordt de kabel teruggeplaatst, dan schakelt de firmware terug naar Ethernet. Deze failover verloopt zonder herstart en zonder configuratie.
 
-#### Prioriteit boven WiFi
+#### 6.2.4 MAC-adres
 
-Wanneer Ethernet actief is, heeft het prioriteit:
+De firmware leidt een uniek lokaal-beheerd MAC-adres af van het ESP32-eFuse MAC. Dit MAC-adres verschilt van het WiFi MAC-adres maar is per apparaat uniek en consistent over herstarts.
 
-1. Bij opstart probeert de firmware DHCP op het Ethernet-interface (timeout: 1 seconde).
-2. Slaagt DHCP, dan schakelt WiFi uit. Het apparaat opereert volledig via Ethernet.
-3. Faalt DHCP of er is geen kabel, dan valt de firmware terug op WiFi.
-4. Tijdens bedrijf controleert de firmware elke 5 seconden de kabelstatus.
-5. Wordt de kabel verwijderd, dan herstart WiFi automatisch.
-6. Wordt de kabel teruggeplaatst, dan schakelt de firmware terug naar Ethernet.
+#### 6.2.5 Statisch IP op Ethernet
 
-Deze automatische failover verloopt zonder herstart en zonder configuratie.
-
-#### MAC-adres
-
-De firmware leidt een uniek lokaal-beheerd MAC-adres af van het ESP32-eFuse MAC. Dit MAC-adres verschilt van het WiFi MAC-adres maar is per apparaat uniek en consistent.
+Ethernet ondersteunt een eigen statische IP-configuratie, los van WiFi. Configureer dit op de Settings-pagina onder het Ethernet-gedeelte. Wanneer de velden leeg zijn, gebruikt Ethernet DHCP met een timeout van 1 seconde bij het opstarten.
 
 ---
 
 ### 6.3 Statisch IP vs. DHCP
 
-Standaard gebruikt het apparaat DHCP voor zowel WiFi als Ethernet. Dit is de aanbevolen instelling voor de meeste situaties.
+Standaard gebruikt het apparaat DHCP voor zowel WiFi als Ethernet. Dit is de aanbevolen instelling voor de meeste situaties. Als uw router DHCP-reserveringen ondersteunt, is het toewijzen van een vast IP-adres op basis van MAC-adres de beste aanpak.
 
-#### DHCP (standaard)
-
-- Het apparaat vraagt automatisch een IP-adres aan bij de router.
-- Gebruikt mDNS (`otgw.local`) zodat u het apparaat op naam kunt bereiken, ongeacht het IP-adres.
-- Geen handmatige configuratie vereist.
-
-#### Statisch IP
-
-Wanneer u een vast IP-adres vereist (bijv. voor strikte firewallregels of wanneer mDNS niet beschikbaar is):
+Voor een statisch IP geconfigureerd in de firmware:
 
 1. Open de **Settings-pagina** in de Web UI.
 2. Vul het gewenste IP-adres, subnetmasker, gateway en DNS-server in.
 3. Sla op en herstart.
 
-> Controleer bij het gebruik van een statisch IP altijd of het adres buiten het DHCP-bereik van uw router valt om adresconflicten te vermijden. Een conflict veroorzaakt intermitterende verbindingsproblemen die lastig te diagnosticeren zijn.
+Laat alle velden leeg om terug te keren naar DHCP.
+
+> Controleer bij het gebruik van een statisch IP altijd of het adres buiten het DHCP-bereik van uw router valt om adresconflicten te vermijden.
 
 ---
 
 ### 6.4 mDNS en hostnaam
 
-#### Standaardhostnaam
+De standaard hostnaam is `otgw`. Het apparaat is hiermee bereikbaar als `otgw.local` in browsers en andere mDNS-compatibele clients (macOS, iOS, Linux met Avahi, Windows 10+ met Bonjour).
 
-De standaard hostnaam is `otgw`. Het apparaat is hiermee bereikbaar als `otgw.local` in browsers en andere mDNS-compatibele clients.
+mDNS werkt op zowel ESP8266 als ESP32. Wanneer het netwerkinterface wisselt (bijvoorbeeld van WiFi naar Ethernet), registreert de firmware de mDNS-hostnaam automatisch opnieuw op het nieuwe interface.
 
-#### Hostnaam aanpassen
+Op ESP8266 wordt ook LLMNR (Link-Local Multicast Name Resolution, UDP poort 5355) geregistreerd. Dit maakt het apparaat vindbaar onder de naam `<hostname>` (zonder `.local`) in Windows-netwerkomgevingen, ook zonder Bonjour. LLMNR is niet beschikbaar op ESP32.
 
-De hostnaam is instelbaar via de Settings-pagina. Pas ook de hostnaam aan in uw MQTT-instellingen als u die gebruikt voor het bepalen van topic-prefixen.
-
-#### mDNS
-
-De firmware registreert:
-
-- `<hostname>.local` als mDNS-hostnaam (UDP poort 5353, alle platforms)
-- Een HTTP-service op poort 80, zodat applicaties die mDNS-service-discovery ondersteunen het apparaat automatisch vinden
-
-#### LLMNR (Windows, ESP8266)
-
-Op ESP8266 wordt ook LLMNR (Link-Local Multicast Name Resolution, UDP poort 5355) geregistreerd. Dit maakt het apparaat vindbaar onder de naam `<hostname>` (zonder `.local`) in Windows-netwerkomgevingen, ook zonder Bonjour.
+De hostnaam is instelbaar via de Settings-pagina. De nieuwe hostnaam werkt door in het DHCP-verzoek, de mDNS-advertentie, het MQTT client ID en de Web UI-titel.
 
 #### Bekende beperking op ESP8266
 
@@ -151,228 +131,106 @@ De ESP8266 SDK bevat een bug waarbij `configTime()` (de NTP-initialisatiefunctie
 
 ### 6.5 NTP-tijdsynchronisatie
 
-#### Waarvoor wordt NTP gebruikt?
+#### 6.5.1 Instellingen
 
-NTP-tijdsynchronisatie heeft twee doelen:
+| Instelling | Standaard | Beschrijving |
+|---|---|---|
+| NTP-server | `pool.ntp.org` | Elk NTP-serveradres (hostnaam of IP) |
+| Tijdzone | `Europe/Amsterdam` | IANA-tijdzonenaam (zie hieronder) |
+| NTP ingeschakeld | `true` | Kan worden uitgeschakeld als er geen internettoegang is |
 
-1. **Boilertijd instellen**: De firmware stuurt periodiek tijdcommando's naar de PIC (`SC=HH:MM/DOW`, `SR=21:` voor datum, `SR=22:` voor jaar), zodat de boiler de correcte tijd kent voor tijdgerelateerde functies.
-2. **Logstempels**: Tijdstempels in MQTT-berichten, de Web UI en de Telnet-debuglog zijn alleen zinvol als de tijd gesynchroniseerd is.
+#### 6.5.2 Tijdzoneafhandeling (AceTime)
 
-#### NTP in- en uitschakelen
+De firmware gebruikt de AceTime-bibliotheek voor tijdzoneafhandeling. U configureert de tijdzone met standaard IANA-tijdzonenamen (bijvoorbeeld `Europe/Amsterdam`, `America/New_York`, `Asia/Tokyo`). Deze namen worden opgezocht in de ingebouwde tijdzonedatabase van AceTime, die DST-regels en historische wijzigingen automatisch afhandelt.
 
-NTP staat standaard ingeschakeld. U kunt het uitschakelen via de Settings-pagina als uw netwerk geen internettoegang heeft en u geen lokale NTP-server gebruikt.
+In tegenstelling tot een POSIX-tijdzonestring hoeft u geen DST-overgangsregels handmatig op te geven. Voer gewoon de IANA-naam in en AceTime regelt de rest.
 
-#### NTP-server instellen
+Als de geconfigureerde tijdzonenaam ongeldig is of niet wordt gevonden in de database, valt de firmware terug op de standaardwaarde (`Europe/Amsterdam`) en registreert een waarschuwing in de debuglog.
 
-De standaard NTP-server is `pool.ntp.org`. U kunt een eigen server opgeven, bijv. een lokale NTP-server op uw thuisnetwerk:
+#### 6.5.3 Waarvoor wordt NTP gebruikt?
 
-1. Ga naar **Settings** in de Web UI.
-2. Vul onder NTP het serveradres in (hostnaam of IP).
-3. Sla op en herstart.
+De firmware controleert de tijd elke 30 minuten opnieuw. Na elke geslaagde NTP-synchronisatie stuurt de firmware tijdcommando's naar de boiler-PIC (`SC=HH:MM/D`, `SR=21:MM,DD`, `SR=22:YH,YL`).
 
-#### Tijdzone instellen
+NTP-tijd is ook vereist voor de nachtelijke herstart (zie paragraaf 6.5.4) en voor tijdstempels in debuglogs en MQTT-berichten.
 
-De firmware gebruikt de POSIX-tijdzone-notatie voor lokale tijdconversie. Voorbeelden:
+#### 6.5.4 Nachtelijke herstart voor geheugenherstel
 
-| Tijdzone | POSIX-string |
-|----------|-------------|
-| Midden-Europa (CET/CEST) | `CET-1CEST,M3.5.0,M10.5.0/3` |
-| Groot-Brittannie (GMT/BST) | `GMT0BST,M3.5.0/1,M10.5.0` |
-| UTC | `UTC0` |
+De ESP8266 heeft last van heap-fragmentatie over langere tijd. De firmware biedt een optionele geplande nachtelijke herstart om geheugen terug te winnen. Deze functie is standaard uitgeschakeld.
 
-Stel de tijdzone in via de Settings-pagina.
+| Instelling | Standaard | Beschrijving |
+|---|---|---|
+| Nightly Restart | `uit` | Inschakelen om eenmaal per dag te herstarten op het geconfigureerde uur |
+| Nightly Restart Hour | `4` | Lokaal uur (0-23) waarop de herstart plaatsvindt |
 
-#### NTP-synchronisatiestatus
+Voorwaarden voor de herstart:
+- De instelling moet ingeschakeld zijn.
+- NTP moet ingeschakeld en gesynchroniseerd zijn.
+- Het apparaat moet langer dan 1 uur draaien (voorkomt herstartlussen na een recente herstart).
 
-Na het opstarten doorloopt de firmware de volgende toestanden:
+De herstart veroorzaakt een korte serviceonderbreking van ongeveer 30 seconden.
 
-1. `TIME_NOTSET`: Nog geen synchronisatie geprobeerd.
-2. `TIME_WAITFORSYNC`: Wacht op eerste synchronisatie.
-3. `TIME_SYNC`: Tijd gesynchroniseerd.
-4. `TIME_NEEDSYNC`: Tijd verlopen, hernieuwde synchronisatie nodig.
+#### 6.5.5 ESP8266 SDK-tijdbug
 
-De Telnet-debuglog meldt de lokale datum en tijd zodra de eerste synchronisatie slaagt.
-
-> De firmware bevat een beveiliging tegen een bekende ESP8266 SDK-bug waarbij het tijdsregister voor de eerste synchronisatie de waarde `0xFFFFFFFF` bevat (het jaar 2106). Deze waarde wordt herkend en genegeerd, zodat uw tijdstempels niet worden vergiftigd door een verkeerde begintijd.
+De ESP8266 SDK initialiseert `time()` met de waarde `0xFFFFFFFF` (jaar 2106) voordat de eerste SNTP-synchronisatie is voltooid. De firmware herkent deze foutieve waarde en negeert deze, zodat tijdstempels nooit worden vergiftigd door een verkeerde begintijd.
 
 ---
 
 ### 6.6 OTA-updates
 
-OTA (Over-The-Air) staat voor draadloze firmware­updates. Hiermee kunt u de firmware bijwerken zonder USB-kabel.
+OTA (Over-The-Air) staat voor draadloze firmware-updates. Hiermee kunt u de firmware bijwerken zonder USB-kabel.
 
-#### OTA activeren
+Het OTA-update-endpoint is `/update`. Wanneer een HTTP-wachtwoord is ingesteld, is de pagina beveiligd met HTTP Basic Auth.
 
-OTA is ingebouwd en altijd beschikbaar via de webinterface op:
+**Stappen:**
+1. Navigeer naar `http://otgw.local/update` in uw browser.
+2. Selecteer het firmwarebestand.
+3. Klik op Upload.
+4. Het apparaat flashed de firmware, verifieert de image en herstart.
 
-```
-http://otgw.local/update
-```
+OTA is ook beschikbaar vanuit de AP-fallbackmodus, zodat u een apparaat dat vastzit op een slechte firmware kunt herstellen zonder serieel toegang.
 
-of via het IP-adres van het apparaat. U ziet hier een pagina waarmee u een `.bin`-bestand kunt uploaden.
+#### 6.6.1 ESP32: Merged binary-ondersteuning
 
-#### Beveiliging
+Op ESP32 accepteert de OTA-updatepagina een merged binary (firmware + bestandssysteem gecombineerd in een enkel `.bin`-bestand). De updateserver detecteert het merged formaat automatisch en schrijft elk onderdeel naar de juiste partitie. U hoeft firmware en bestandssysteem niet apart te uploaden.
 
-Wanneer u een HTTP-wachtwoord hebt ingesteld in de Settings-pagina (`sHTTPpasswd`), is de OTA-updatepagina beveiligd met HTTP Basic Auth. Zonder wachtwoord is de pagina voor iedereen op het lokale netwerk bereikbaar.
+#### 6.6.2 Beperkingen
 
-> Het project is uitsluitend bedoeld voor gebruik op een vertrouwd thuisnetwerk, niet rechtstreeks op het internet. Zie ADR-032 voor de security­overwegingen. Stel een wachtwoord in als u het apparaat niet volledig vertrouwt op uw netwerk.
-
-#### OTA-beperkingen
-
-- **Nooit PIC-firmware via OTA flashen**: Via de OTA-update­pagina kan uitsluitend de ESP-firmware worden geupload, niet de PIC-firmware. Het flashen van PIC-firmware over het netwerk met OTmonitor kan de PIC permanent beschadigen.
-- **Schetsgrootte**: Op ESP8266 is de beschikbare OTA-ruimte beperkt door de flashgrootte. De `build.py`-tool rapporteert de beschikbare ruimte.
-
-#### Processtappen voor een OTA-update
-
-1. Download het nieuwe `.bin`-bestand van de GitHub releases-pagina.
-2. Navigeer naar `http://otgw.local/update`.
-3. Klik op **Choose File** en selecteer het `.bin`-bestand.
-4. Klik op **Update**.
-5. Wacht tot het apparaat herstart (typisch 30-60 seconden).
-6. Ververs de pagina en controleer de firmwareversie in de Web UI.
+- Flash nooit PIC-firmware via OTA. De OTA-updatepagina is uitsluitend voor ESP-firmware. Het flashen van PIC-firmware over het netwerk met OTmonitor kan de PIC permanent beschadigen.
+- Op ESP8266 is de beschikbare OTA-ruimte beperkt door de flashgrootte. Het `build.py`-script rapporteert de beschikbare ruimte.
 
 ---
 
-### 6.7 Poortgebruik
+### 6.7 ESP8266: lwIP Low Memory-variant
 
-Het apparaat luistert op vier TCP-poorten:
-
-| Poort | Protocol | Functie |
-|-------|----------|---------|
-| 80 | HTTP | Web UI, REST API (`/api/v1/`, `/api/v2/`), OTA-update (`/update`) |
-| 81 | WebSocket | Live OpenTherm-logstream voor de Web UI |
-| 23 | TCP (Telnet) | Firmware-debuglog (real-time, leesbaar via `telnet <ip>`) |
-| 25238 | TCP (raw) | Serieel bridge (OTmonitor-compatibel, HA built-in integration) |
-
-#### Poort 80: HTTP
-
-Alle gebruikersinteractie gaat via poort 80: de Web UI, alle REST API-endpoints en de OTA-updatepagina. Optionele HTTP Basic Auth beschermt de UI en het API wanneer een wachtwoord is ingesteld.
-
-#### Poort 81: WebSocket
-
-De Web UI maakt een WebSocket-verbinding op poort 81 voor de live OpenTherm-log. Dit is een ongeauthenticeerde stroom; het is bewuste keuze conform de security-policy (vertrouwd LAN). WSS (beveiligde WebSocket) wordt niet ondersteund.
-
-#### Poort 23: Telnet-debugserver
-
-De volledige firmware-debuglog is real-time beschikbaar via Telnet. De Telnet-server is geïmplementeerd met de SimpleTelnet-bibliotheek, die de oudere TelnetStream- en ESPTelnet-bibliotheken vervangt. Verbinden:
-
-```bash
-telnet <ip-adres>
-```
-
-of met netcat:
-
-```bash
-nc <ip-adres> 23
-```
-
-De log bevat alle `DebugTln()`/`DebugTf()`-uitvoer: WiFi-events, MQTT-verbinding, NTP-synchronisatie, OpenTherm-verwerking en foutmeldingen.
-
-> Nooit `Serial.print()` gebruiken voor debug­uitvoer. De UART is exclusief gereserveerd voor de PIC-serieelverbinding. Alle debug­uitvoer loopt via Telnet poort 23.
-
-#### Poort 25238: TCP serieel bridge
-
-Poort 25238 is de OTmonitor-compatibele TCP serieel bridge, ook geïmplementeerd met de SimpleTelnet-bibliotheek (in streaming-modus). Hierop wordt de ruwe PIC-serieel­stroom doorgegeven, precies zoals een directe serieel­verbinding. Gebruik:
-
-- OTmonitor (stel als host het IP-adres of `otgw.local` in, poort 25238)
-- Home Assistant built-in OTGW-integration
-- `nc <ip> 25238` voor handmatige inspectie
-
-> Flashen van PIC-firmware via deze poort met OTmonitor is gevaarlijk en kan de PIC permanent beschadigen. Gebruik uitsluitend de webgebaseerde PIC-flashfunctie in de Web UI.
+Op ESP8266 wordt de firmware gebouwd met de lwIP v2 Low Memory-variant (TCP MSS=536). Dit verlaagt het geheugengebruik per verbinding vergeleken met de Higher Bandwidth-variant, wat belangrijk is gezien het beperkte werkgeheugen van de ESP8266 (~40KB bruikbaar RAM). De lwIP-variant wordt ingesteld tijdens het bouwen en vereist geen gebruikersconfiguratie.
 
 ---
 
-### 6.8 Firewall- en routeroverwegingen
+### 6.8 Poortgebruik
 
-OTGW-firmware is uitsluitend bedoeld voor gebruik op een vertrouwd lokaal netwerk. Het apparaat heeft geen authenticatie op poorten 81 en 25238, conform ADR-032 (geen authenticatie op LAN).
-
-#### Aanbevolen firewallconfiguratie
-
-- Blokkeer alle poorten (80, 81, 23, 25238) op de internetgrens van uw router.
-- Het apparaat heeft uitsluitend toegang nodig tot:
-  - Uw WiFi-router/DHCP-server (intern)
-  - Uw MQTT-broker (intern, of VPN)
-  - De NTP-server (UDP poort 123, outbound; of een lokale NTP-server)
-
-#### Toegang op afstand
-
-Gebruik een VPN (bijv. WireGuard) voor toegang op afstand. Stel het apparaat nooit direct bloot aan het internet.
-
-#### MQTT-broker op een andere host
-
-Als uw MQTT-broker op een andere server in uw netwerk draait (wat gebruikelijk is), zorgt u ervoor dat de broker bereikbaar is op de ingestelde poort (standaard 1883). De firmware ondersteunt alleen onbeveiligd MQTT (poort 1883) en MQTT over TLS (poort 8883) is niet geimplementeerd.
+| Poort | Protocol | Functie | Opmerkingen |
+|---|---|---|---|
+| 80 | TCP / HTTP | Web UI, REST API en OTA-update | Alle webroutes, bestandsbediening, firmware-update |
+| 81 | TCP / WebSocket | Live OpenTherm-logstream | Gebruikt door de Web UI voor realtime data |
+| 23 | TCP / Telnet | Debugconsole | Tekstuele debuglog; bediend door SimpleTelnet-bibliotheek |
+| 25238 | TCP | Seriele bridge (ser2net) | Ruwe OTGW PIC-serieel over TCP; OTmonitor-compatibel |
+| 123 | UDP (uitgaand) | NTP (SNTP) | Alleen uitgaand |
+| 5353 | UDP | mDNS | Lokale naamresolutie (beide platformen) |
+| 5355 | UDP | LLMNR | Windows-naamresolutie (alleen ESP8266) |
+| 1883 | TCP (uitgaand) | MQTT | Uitgaand naar uw MQTT-broker |
 
 ---
 
-### 6.9 Gebruik achter een reverse proxy
+### 6.9 Firewall- en routeroverwegingen
 
-#### HTTP
+OTGW-firmware is uitsluitend bedoeld voor gebruik op een vertrouwd lokaal netwerk. Er hoeven geen poorten te worden doorgestuurd op uw router.
 
-De REST API en Web UI werken volledig achter een HTTPS-terminating reverse proxy (bijv. nginx, Caddy). De firmware zelf spreekt alleen HTTP; de proxy verzorgt de TLS-terminatie.
-
-Minimale nginx-configuratie:
-
-```nginx
-location /otgw/ {
-    proxy_pass http://otgw.local/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-}
-```
-
-#### WebSocket
-
-De WebSocket-verbinding (poort 81, live OT-log) veronderstelt plain HTTP/WS. WSS (WebSocket Secure) wordt niet ondersteund. Wanneer de Web UI via HTTPS wordt aangeboden via een reverse proxy, zal de browser een mixed-content-fout geven voor de WS-verbinding op poort 81, tenzij de proxy ook de WebSocket-verbinding termineert en via `wss://` doorstuurt.
-
-> Dit is een bekende beperking. Het project draait op een vertrouwd LAN; de aanbeveling is VPN voor externe toegang in plaats van HTTPS-reverse proxy voor de volledige stack.
+mDNS (`otgw.local`) werkt alleen binnen een enkel Layer 2 broadcast-domein. Als Home Assistant op een ander VLAN staat, gebruik dan het statische IP-adres of een DNS-vermelding in plaats van `.local`.
 
 ---
 
-### 6.10 AP-fallback (beta): wanneer activeert het en hoe herstelt u
+### 6.10 Gebruik achter een reverse proxy
 
-De beta AP-fallbackmodus is beschikbaar in beta­builds (v2.0.0-beta en later, alle platformen). Dit is een andere modus dan de WiFiManager captive portal die bij de eerste installatie of na een WiFi-reset wordt gebruikt.
-
-#### Wanneer activeert de beta AP-fallback?
-
-| Situatie | Gedrag |
-|----------|--------|
-| WiFi-uitval tijdens bedrijf: 2 mislukte pogingen | Firmware schakelt over naar AP-fallbackmodus |
-| WiFi niet bereikbaar bij opstart, maar gegevens zijn opgeslagen | Firmware slaat de WiFiManager-portal over en gaat direct naar AP-fallbackmodus |
-
-De standaard WiFiManager captive portal (voor eerste installatie of na Reset WiFi) heeft een andere SSID-notatie: `<hostname>-<MAC-adres>`. De beta AP-fallback heeft een vaste, kortere SSID-notatie.
-
-#### Hoe herkent u de beta AP-fallbackmodus?
-
-- De SSID `OTGW-XXXXXX` verschijnt in de WiFi-scannerlijst (waarbij XXXXXX de laatste 3 bytes van het MAC-adres zijn in hoofdletters hexadecimaal, bijv. `OTGW-AABBCC`).
-- De Web UI is bereikbaar op `http://192.168.4.1`.
-- De Telnet-debuglog toont: `BETA AP: fallback started SSID=[OTGW-XXXXXX] IP=192.168.4.1 pass=otgw123`.
-
-#### AP-fallback gegevens
-
-| Gegeven | Waarde |
-|---------|--------|
-| SSID | `OTGW-<laatste 3 bytes MAC, hoofdletters hex>` |
-| Wachtwoord | `otgw123` |
-| IP-adres | `192.168.4.1` |
-| OTA-update | Beschikbaar via `http://192.168.4.1/update` |
-| MQTT | Uitgeschakeld in fallbackmodus |
-
-In AP-fallbackmodus probeert de firmware elke 5 minuten opnieuw verbinding te maken met het geconfigureerde WiFi-netwerk. Zodra WiFi beschikbaar is, worden alle services automatisch hersteld en wordt de AP afgesloten.
-
-#### Herstelstappen
-
-1. Verbind uw telefoon of laptop met de SSID `OTGW-XXXXXX` met wachtwoord `otgw123`.
-2. Navigeer naar `http://192.168.4.1` in uw browser.
-3. Pas de WiFi-instellingen aan via de Settings-pagina of gebruik Reset WiFi.
-4. Herstart het apparaat.
-5. Controleer of `otgw.local` weer bereikbaar is.
-
-#### Wat als het apparaat in AP-fallback blijft?
-
-- Controleer of het geconfigureerde SSID en wachtwoord correct zijn.
-- Zorg dat het WiFi-accesspoint van uw router bereikbaar is.
-- Gebruik de OTA-updatepagina (`http://192.168.4.1/update`) om eventueel een nieuwe firmware te flashen als de huidige build problemen heeft.
-- Sommige telefoons (Android) blokkeren het gebruik van een accesspoint zonder internet. Schakel in dat geval de mobiele data tijdelijk uit.
+De REST API en Web UI werken correct achter een HTTPS-terminating reverse proxy (Nginx, Caddy, etc.). De WebSocket live log (poort 81) vereist een plain `ws://`-verbinding en ondersteunt geen `wss://`. Een reverse proxy die WebSocket-verbindingen opwaardeert naar WSS zal de live log in de webinterface breken.
 
 ---
-

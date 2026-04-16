@@ -53,18 +53,36 @@ In AP fallback mode the device keeps attempting to reconnect to the configured W
 
 Wired Ethernet is available on ESP32 boards with a W5500 SPI Ethernet controller. Not available on ESP8266.
 
-The W5500 uses these default GPIO assignments:
+#### 6.2.1 Hardware Detection
+
+The firmware probes the W5500 chip at boot by reading its SPI VERSION register (address 0x0039). If the register returns 0x04, the chip is recognized as a W5500 and Ethernet support is activated. No separate setting is needed: if the chip is present and correctly wired, it is used automatically.
+
+#### 6.2.2 GPIO Assignments
+
+The W5500 uses the SPI bus. The exact GPIO assignments depend on the board variant configured in `boards.h`. Consult the hardware documentation for your specific OTGW32 board for the precise pin numbers.
+
+Typical connections:
 
 | W5500 Signal | ESP32 GPIO |
 |---|---|
-| CS (chip select) | GPIO 5 |
-| INT (interrupt) | GPIO 34 |
-| RST (reset) | GPIO 15 |
-| SCK (SPI clock) | GPIO 18 |
-| MISO | GPIO 19 |
-| MOSI | GPIO 23 |
+| CS (chip select) | See boards.h `PIN_SPI_CS` |
+| INT (interrupt) | See boards.h `PIN_SPI_INT` |
+| RST (reset) | See boards.h `PIN_SPI_RST` |
+| SCK (SPI clock) | See boards.h `PIN_SPI_SCK` |
+| MISO | See boards.h `PIN_SPI_MISO` |
+| MOSI | See boards.h `PIN_SPI_MOSI` |
 
-**Priority over WiFi**: Ethernet always takes priority. When the W5500 is present and a cable is plugged in, WiFi is disabled. If the cable is unplugged at runtime, the firmware detects this (checked every 5 seconds) and switches back to WiFi automatically.
+#### 6.2.3 Priority over WiFi
+
+Ethernet always takes priority. When the W5500 is present and a cable is plugged in, WiFi is disabled. If the cable is unplugged at runtime, the firmware detects this (checked every 5 seconds) and switches back to WiFi automatically. When the cable is reconnected, it switches back to Ethernet. This failover happens without a reboot and without configuration.
+
+#### 6.2.4 MAC Address
+
+The firmware derives a unique locally-administered MAC address from the ESP32 eFuse MAC. This MAC address differs from the WiFi MAC address but is unique per device and consistent across reboots.
+
+#### 6.2.5 Static IP on Ethernet
+
+Ethernet supports static IP configuration separately from WiFi. Configure it in the Settings page under the Ethernet section. When left empty, the default is DHCP with a 1-second timeout at boot.
 
 ---
 
@@ -86,7 +104,9 @@ Leave all fields empty to revert to DHCP.
 
 The default hostname is `otgw`. After connecting to your network the device is reachable as `otgw.local` from any mDNS-capable client (macOS, iOS, Linux with Avahi, Windows 10+ with Bonjour).
 
-The firmware also registers an LLMNR responder on ESP8266, which allows Windows machines to resolve `otgw` (without the `.local` suffix).
+mDNS works on both ESP8266 and ESP32. When the network interface changes (for example, switching from WiFi to Ethernet), the firmware re-registers the mDNS hostname on the new interface automatically.
+
+The firmware also registers an LLMNR responder on ESP8266, which allows Windows machines to resolve `otgw` (without the `.local` suffix). LLMNR is not available on ESP32.
 
 Set the hostname in Settings. The new hostname propagates to the DHCP request, mDNS advertisement, MQTT client ID, and web UI title.
 
@@ -94,13 +114,47 @@ Set the hostname in Settings. The new hostname propagates to the DHCP request, m
 
 ### 6.5 NTP Time Synchronization
 
+#### 6.5.1 Settings
+
 | Setting | Default | Description |
 |---|---|---|
 | NTP server | `pool.ntp.org` | Any NTP server hostname or IP address |
-| Timezone | `Europe/Amsterdam` | IANA timezone database name |
+| Timezone | `Europe/Amsterdam` | IANA timezone database name (see below) |
 | NTP enabled | `true` | Can be disabled if no internet access |
 
+#### 6.5.2 Timezone Handling (AceTime)
+
+The firmware uses the AceTime library for timezone handling. You configure the timezone using standard IANA timezone names (for example `Europe/Amsterdam`, `America/New_York`, `Asia/Tokyo`). These names are resolved using AceTime's built-in timezone database, which covers DST rules and historical changes automatically.
+
+Unlike a raw POSIX timezone string, you do not need to specify DST transition rules manually. Just enter the IANA name and AceTime handles the rest.
+
+If the configured timezone name is invalid or not found in the database, the firmware falls back to the default (`Europe/Amsterdam`) and logs a warning.
+
+#### 6.5.3 What NTP Is Used For
+
 The firmware re-checks the time every 30 minutes. After each successful NTP sync, it sends clock commands to the boiler PIC (`SC=HH:MM/D`, `SR=21:MM,DD`, `SR=22:YH,YL`).
+
+NTP time is also required for the nightly restart feature (see section 6.5.4) and for timestamps in debug logs and MQTT messages.
+
+#### 6.5.4 Nightly Restart for Heap Recovery
+
+The ESP8266 suffers from heap fragmentation over time. The firmware offers an optional scheduled nightly restart to reclaim memory. This feature is disabled by default.
+
+| Setting | Default | Description |
+|---|---|---|
+| Nightly Restart | `off` | Enable to restart once per day at the configured hour |
+| Nightly Restart Hour | `4` | Local hour (0-23) when the restart happens |
+
+Requirements for the restart to trigger:
+- The setting must be enabled.
+- NTP must be enabled and synchronized.
+- The device must have been running for more than 1 hour (prevents restart loops after a fresh reboot).
+
+The restart causes a brief service interruption of approximately 30 seconds.
+
+#### 6.5.5 ESP8266 SDK Time Bug
+
+The ESP8266 SDK initializes `time()` to `0xFFFFFFFF` (year 2106) before the first SNTP sync completes. The firmware detects this bogus value and ignores it, so timestamps are never poisoned by a wrong initial time.
 
 ---
 
@@ -110,15 +164,30 @@ The OTA update endpoint is at `/update`. Authentication uses HTTP Basic Auth whe
 
 **Steps:**
 1. Open `http://otgw.local/update` in your browser.
-2. Select the `.bin` firmware file.
+2. Select the firmware file.
 3. Click Upload.
 4. The device flashes the firmware, verifies the image, and reboots.
 
 OTA is available from AP fallback mode as well, so you can recover a device stuck on a bad firmware image without serial access.
 
+#### 6.6.1 ESP32: Merged Binary Support
+
+On ESP32, the OTA update page accepts a merged binary (firmware + filesystem combined in a single `.bin` file). The update server detects the merged format automatically and writes each part to the correct partition. You do not need to upload firmware and filesystem separately.
+
+#### 6.6.2 Limitations
+
+- Never flash PIC firmware via OTA. The OTA update page is for ESP firmware only. Flashing PIC firmware over the network with OTmonitor can permanently damage the PIC.
+- On ESP8266, the available OTA space is limited by flash size. The `build.py` tool reports the available space.
+
 ---
 
-### 6.7 Port Usage
+### 6.7 ESP8266: lwIP Low Memory Variant
+
+On ESP8266, the firmware is built with the lwIP v2 Low Memory variant (TCP MSS=536). This reduces per-connection memory usage compared to the Higher Bandwidth variant, which is important given the ESP8266's limited ~40KB of usable RAM. The lwIP variant is set at build time and requires no user configuration.
+
+---
+
+### 6.8 Port Usage
 
 | Port | Protocol | Service | Notes |
 |---|---|---|---|
@@ -127,13 +196,13 @@ OTA is available from AP fallback mode as well, so you can recover a device stuc
 | 23 | TCP / Telnet | Debug console | Plain-text debug log; served by SimpleTelnet library |
 | 25238 | TCP | Serial bridge (ser2net) | Raw OTGW PIC serial over TCP; served by SimpleTelnet library; OTmonitor compatible |
 | 123 | UDP (outbound) | NTP (SNTP) | Outbound only |
-| 5353 | UDP | mDNS | Local network name resolution |
+| 5353 | UDP | mDNS | Local network name resolution (both platforms) |
 | 5355 | UDP | LLMNR | Windows name resolution (ESP8266 only) |
 | 1883 | TCP (outbound) | MQTT | Outbound to your MQTT broker |
 
 ---
 
-### 6.8 Firewall and Router Considerations
+### 6.9 Firewall and Router Considerations
 
 The firmware is designed for a local, trusted network. No inbound ports need to be forwarded through your router.
 
@@ -141,9 +210,8 @@ mDNS (`otgw.local`) only works within a single Layer 2 broadcast domain. If Home
 
 ---
 
-### 6.9 Using Behind a Reverse Proxy
+### 6.10 Using Behind a Reverse Proxy
 
 The REST API works correctly behind an HTTPS-terminating reverse proxy (Nginx, Caddy, etc.). The WebSocket live log (port 81) requires a plain `ws://` connection and does not support `wss://`. A reverse proxy that upgrades WebSocket connections to WSS will break the live log in the web interface.
 
 ---
-

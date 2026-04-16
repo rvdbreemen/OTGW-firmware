@@ -8,7 +8,7 @@ The OTGW-firmware synthesizes 10 code-level modules into 6 logical components. T
 |-----------|------|-------------|---------------|
 | OpenTherm Core | Application Component | Protocol decoding, PIC serial comm, command queue, MQTT throttle, watchdog management, OTDirect GPIO stack (ESP32) | [c4-component-opentherm-core.md](./c4-component-opentherm-core.md) |
 | Network and Connectivity | Application Component | WiFi, NTP, mDNS/LLMNR, Ethernet failover (ESP32+W5500), platform abstraction | [c4-component-network.md](./c4-component-network.md) |
-| Integration Layer | Application Component | MQTT client + HA auto-discovery, REST API v2, JSON streaming, file serving, auth/CSRF | [c4-component-integration-layer.md](./c4-component-integration-layer.md) |
+| Integration Layer | Application Component | MQTT client + HA auto-discovery (PROGMEM drip publisher), REST API v2, JSON streaming, file serving, auth/CSRF | [c4-component-integration-layer.md](./c4-component-integration-layer.md) |
 | Configuration and State | Application Component | Persistent settings (OTGWSettings), runtime state (OTGWState), LittleFS JSON, deferred write, side-effect coordination | [c4-component-configuration-state.md](./c4-component-configuration-state.md) |
 | Smart Thermostat (SAT) | Application Component | Heating curve, PID v3 with deadband, anti-cycling, OPV calibration, boiler state machine, weather compensation, BLE | [c4-component-smart-thermostat.md](./c4-component-smart-thermostat.md) |
 | Sensors and Hardware | Application Component | Dallas DS18B20 (1-Wire), S0 pulse energy meter, GPIO relay, OLED display, sensor simulation | [c4-component-sensors-hardware.md](./c4-component-sensors-hardware.md) |
@@ -57,7 +57,7 @@ C4Component
     Container_Boundary(fw, "OTGW-Firmware (ESP8266 / ESP32)") {
         Component(otcore, "OpenTherm Core", "Arduino C++", "OT protocol, PIC serial, command queue, OTDirect GPIO (ESP32)")
         Component(network, "Network & Connectivity", "Arduino C++", "WiFi, NTP, mDNS, Ethernet failover, platform abstraction")
-        Component(integlayer, "Integration Layer", "Arduino C++", "MQTT client + HA discovery, REST API v2, JSON streaming, file serving")
+        Component(integlayer, "Integration Layer", "Arduino C++", "MQTT client + HA discovery (PROGMEM drip), REST API v2, JSON streaming, file serving")
         Component(cfgstate, "Configuration & State", "Arduino C++", "OTGWSettings, OTGWState, LittleFS JSON, deferred write")
         Component(sat, "Smart Thermostat (SAT)", "Arduino C++", "Heating curve, PID v3, anti-cycling, OPV calibration, boiler state machine")
         Component(sensors, "Sensors & Hardware", "Arduino C++", "Dallas DS18B20, S0 pulse counter, GPIO relay, OLED")
@@ -71,7 +71,7 @@ C4Component
     System_Ext(ha, "Home Assistant", "Consumes MQTT telemetry and discovery")
     System_Ext(browser, "Web Browser", "Chrome / Firefox / Safari")
     System_Ext(router, "WiFi / Network", "Home LAN, DHCP, NTP server")
-    SystemDb_Ext(lfs, "LittleFS", "Settings, web assets, HA config, PIC firmware")
+    SystemDb_Ext(lfs, "LittleFS", "Settings, web assets, sensor labels, PIC firmware")
 
     Rel(otcore, pic, "UART serial 9600 baud", "TX/RX OpenTherm frames")
     Rel(pic, boiler, "OpenTherm bus", "1-wire Manchester")
@@ -107,7 +107,7 @@ C4Component
     Rel(integlayer, webui, "Heap backpressure gate", "canPublishMQTT()")
 
     Rel(cfgstate, lfs, "Read/write settings.ini", "JSON file I/O")
-    Rel(integlayer, lfs, "Read mqttha.cfg, serve web assets", "HTTP streaming")
+    Rel(integlayer, lfs, "Serve web assets, read sensor labels", "HTTP streaming")
     Rel(sensors, lfs, "Persist sensor labels", "/dallas_labels.ini")
     Rel(sat, lfs, "Persist PID state", "/pid_state.json")
     Rel(webui, lfs, "Crash log, reboot count, version hash", "/reboot_log.txt, /version.hash")

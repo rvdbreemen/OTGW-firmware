@@ -150,7 +150,7 @@ Home Assistant gebruikt het `online`/`offline`-bericht om de beschikbaarheidssta
 
 #### Hoe het werkt
 
-OTGW-firmware implementeert de MQTT-auto-discovery van Home Assistant. Bij elke verbinding met de broker (inclusief na een Home Assistant herstart) publiceert de firmware discovery-payloads naar het geconfigureerde prefix (standaard `homeassistant/`).
+OTGW-firmware implementeert de MQTT-auto-discovery van Home Assistant. De firmware publiceert discovery-payloads naar het geconfigureerde prefix (standaard `homeassistant/`).
 
 Een discovery-payload is een JSON-bericht dat Home Assistant vertelt:
 - Welk type entiteit het is (sensor, binaire sensor, klimaatentiteit)
@@ -175,13 +175,29 @@ Voorbeeld van een discovery-payload voor de aanvoertemperatuur:
 }
 ```
 
-#### Just-in-Time (JIT) discovery
+#### Async drip publisher
 
-De firmware gebruikt JIT-discovery: een entiteit krijgt pas zijn discovery-payload wanneer de bijbehorende OpenTherm-waarde daadwerkelijk ontvangen is. Dit vermijdt dat Home Assistant entiteiten aanmaakt voor bericht-ID's die uw specifieke ketel nooit stuurt.
+Vanaf v2.0.0 gebruikt de firmware een asynchrone "drip" publisher voor discovery. In plaats van alle 345 discovery-berichten in een keer te versturen bij het opstarten, publiceert de firmware elke 3 seconden een entiteit op de achtergrond. Een volledige discovery-cyclus duurt daardoor ongeveer 17 minuten, maar deze aanpak is veel vriendelijker voor het beperkte geheugen van de ESP8266 en voor de MQTT-broker.
 
-#### Herstart-detectie
+De drip publisher bevat twee beschermingsmechanismen:
 
-De firmware abonneert op `homeassistant/status`. Wanneer Home Assistant herstart en `homeassistant_started` publiceert, verzendt de firmware alle discovery-payloads opnieuw. Zo blijven de entiteiten ook na een HA-herstart beschikbaar zonder dat u de OTGW hoeft te herstarten.
+- **Heap guard.** Als het vrije geheugen onder 8 KB zakt, wordt de discovery-publicatie overgeslagen totdat er weer voldoende geheugen beschikbaar is. Dit voorkomt crashes door geheugentekort tijdens periodes van hoge netwerkactiviteit.
+- **Adaptief interval.** Bij geheugendruk wordt het interval automatisch verbreed van 3 seconden naar 30 seconden. Zodra het geheugen herstelt, keert het interval terug naar 3 seconden. Zo blijft het systeem stabiel terwijl de discovery toch vordert.
+
+Tijdens de eerste 17 minuten verschijnen entiteiten geleidelijk in Home Assistant. Sensoren die nog niet ontdekt zijn, worden zichtbaar zodra ze gepubliceerd worden. Wanneer alle entiteiten ontdekt zijn, wordt de status onthouden en is er geen nieuwe discovery nodig, tenzij u er handmatig een afdwingt.
+
+#### Discovery-templates in PROGMEM
+
+Discovery-templates worden bij het compileren in het flashgeheugen (PROGMEM) opgeslagen in plaats van bij runtime uit het LittleFS-bestandssysteem geladen. Dit is transparant voor de gebruiker, maar elimineert bestandssysteem-I/O tijdens discovery en vermindert het RAM-gebruik enigszins. Het bestand `mqttha.cfg` wordt niet meer tijdens runtime gelezen; het dient alleen als bron voor de build-time codegenerator.
+
+#### Wanneer wordt discovery opnieuw uitgevoerd?
+
+De firmware publiceert alle discovery-configuraties opnieuw in twee situaties:
+
+1. **Firmware-opstart of wijziging van MQTT-instellingen.** Alle discovery-ID's worden in de wachtrij geplaatst voor drip publishing.
+2. **Home Assistant herstart.** De firmware bewaakt `homeassistant/status`. Wanneer HA weer online komt, worden alle ID's opnieuw in de wachtrij geplaatst.
+
+Bij een eenvoudige MQTT-herverbinding (bijvoorbeeld een korte netwerkonderbreking) wordt discovery *niet* opnieuw uitgevoerd. De broker bewaart de discovery-berichten (retained), dus het opnieuw publiceren bij elke herverbinding zou onnodig zijn.
 
 ---
 
@@ -424,3 +440,16 @@ mqtt:
 ```
 
 **Opmerking:** Bij handmatige configuratie werkt `availability_topic` naar behoren zolang u het juiste `{TopTopic}/value/{UniqueId}`-topic gebruikt en `payload_available: "online"` instelt.
+
+---
+
+### Nachtelijke herstart
+
+De firmware ondersteunt een optionele geplande nachtelijke herstart om heap-geheugen vrij te maken. Dit is nuttig voor langlopende installaties waar geleidelijke heap-fragmentatie uiteindelijk instabiliteit kan veroorzaken.
+
+| Instelling | Standaard | Omschrijving |
+|---|---|---|
+| Nightly Restart | uit | Schakel de dagelijkse geplande herstart in of uit |
+| Nightly Restart Hour | 4 | Uur (0-23) waarop de herstart plaatsvindt. Alleen actief als NTP ingeschakeld en gesynchroniseerd is. |
+
+Deze instellingen zijn beschikbaar in de Web UI (instellingenpagina), via de REST API (`/api/v2/settings`) en via het MQTT settings-topic. De herstart veroorzaakt een korte onderbreking van ongeveer 30 seconden.

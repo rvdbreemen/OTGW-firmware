@@ -76,7 +76,7 @@
   - **Side-effect coordination**: Sets `pendingSideEffects` bitmask (SIDE_EFFECT_MQTT, SIDE_EFFECT_NTP, SIDE_EFFECT_MDNS) instead of immediate service restart
   - **Deferred write**: Sets `settingsDirty=true` and restarts `timerFlushSettings` to batch multiple updates
   - Covers all sub-sections:
-    - Device: hostname, HTTP password, LED blink, dark theme
+    - Device: hostname, HTTP password, LED blink, dark theme, nightly restart (enable + hour)
     - MQTT: 13 fields (enable, broker, port, user, passwd, topic, HA prefix, unique ID, OT msg, interval, separate sources, HA reboot detect)
     - NTP: timezone, hostname, send-time, enable
     - GPIO Sensors: enabled, legacy format, pin (D7/SDIO3), interval
@@ -248,6 +248,8 @@ struct OTGWSettings {
   bool bLEDblink;               // LED blink enable
   bool bDarkTheme;              // UI dark theme
   bool bMyDEBUG;                // Reserved
+  bool bNightlyRestart;         // Scheduled daily restart for heap recovery (default false)
+  uint8_t iRestartHour;         // Hour (0-23) for nightly restart (default 4)
   
   // Named sub-sections
   MQTTSettingsSection mqtt;     // 13 fields: broker, auth, topics, HA discovery

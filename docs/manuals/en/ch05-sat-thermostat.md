@@ -12,22 +12,24 @@ The result is weather-compensated heating that keeps room temperatures stable wi
 
 With SAT, every control loop cycle (default 30 seconds):
 
-1. Reads room temperature (from the OT bus, or an external sensor pushed via MQTT).
-2. Reads outdoor temperature (from the OT bus, an external MQTT push, or a weather API call).
+1. Reads room temperature (from the OT bus, an external sensor pushed via MQTT, a BLE sensor on ESP32, or a weighted multi-area average).
+2. Reads outdoor temperature (from the OT bus, an external MQTT push, or the built-in Open-Meteo weather API).
 3. Calculates the heating curve value: the base flow temperature needed given current outdoor conditions.
-4. Applies a PID correction on top of the heating curve.
-5. Clamps the result within safety limits.
-6. Sends a `CS=` command to the PIC gateway to inject the setpoint into the OpenTherm stream.
-7. Publishes all state to MQTT and the web UI dashboard.
+4. Applies a PID v3 correction on top of the heating curve (with automatic or manual gain selection).
+5. Applies optional adjustments: solar gain compensation, thermal comfort (humidity) correction, multi-zone override.
+6. Clamps the result within safety limits.
+7. Sends a `CS=` command to the PIC gateway to inject the setpoint into the OpenTherm stream.
+8. Publishes all state to MQTT and the web UI dashboard.
 
 ---
 
 ### 5.2 Prerequisites and Compatibility
 
-- An OpenTherm-compatible boiler.
-- A room temperature source: OT bus (MsgID 24), external MQTT push, or BLE sensor (ESP32 only).
-- An outdoor temperature source: OT bus (MsgID 27), external MQTT push, or weather API fetch.
+- An OpenTherm-compatible boiler. SAT includes a manufacturer table with quirk flags for Atag, Baxi, Ferroli, Geminox, Ideal, Immergas, Intergas, Itho, Nefit, Radiant, Remeha, Sime, Vaillant, Viessmann, Worcester, and others. Auto-detection is the default.
+- A room temperature source (in priority order): OT bus (MsgID 24), external MQTT push, REST API push, multi-area weighted average, or BLE sensor (ESP32 only).
+- An outdoor temperature source: OT bus (MsgID 27), external MQTT push, or the built-in Open-Meteo weather API fetch.
 - You do not need to remove your wall thermostat. SAT intercepts the setpoint; your thermostat's away mode and schedule still work.
+- The OTGW must be in gateway mode (GW=1), not bypass or monitor mode.
 
 ---
 
@@ -35,11 +37,12 @@ With SAT, every control loop cycle (default 30 seconds):
 
 #### Via the Web UI
 
-1. Open Settings and find the SAT section.
-2. Set "SAT Enabled" to on.
-3. Choose your heating system type: radiator or underfloor.
-4. Set the target room temperature and heating curve coefficient.
-5. Save settings.
+1. Open the web interface (`http://otgw.local/`).
+2. Go to the SAT tab or Settings > SAT.
+3. Set "SAT Enabled" to on.
+4. Choose your heating system type (auto-detect, radiators, heat pump, or underfloor).
+5. Set the target room temperature and heating curve coefficient.
+6. Save settings.
 
 #### Via MQTT
 
@@ -48,20 +51,68 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "tru
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0"
 ```
 
+#### Via REST API
+
+```bash
+curl -X POST -d '{"name":"satenabled","value":"true"}' \
+  http://otgw.local/api/v2/settings
+```
+
 ---
 
 ### 5.4 Configuration Parameters
 
+#### Core settings
+
 | Setting | Default | Range | Description |
 |---|---|---|---|
 | `satenabled` | false | bool | Master on/off switch |
-| `satsystem` | 0 | 0-1 | 0 = radiator, 1 = underfloor |
-| `sattargettemp` | 20.0 | 5-30 °C | Desired room temperature |
+| `satheatsystem` | 0 | 0-3 | 0 = auto-detect, 1 = radiators, 2 = heat pump, 3 = underfloor |
+| `sattargettemp` | 20.0 | 5-30 C | Desired room temperature |
 | `satcoefficient` | 1.5 | 0.1-5.0 | Heating curve steepness |
-| `satdeadband` | 0.25 | 0.05-2.0 °C | PID deadband width |
+| `satdeadband` | 0.1 | 0.05-2.0 C | PID deadband width |
 | `satinterval` | 30 | 10-300 s | Control loop interval |
 | `satexternaltemp` | false | bool | Use external indoor sensor via MQTT |
 | `satpwmautoswitch` | true | bool | Automatically switch between continuous and PWM modes |
+| `satforcepwm` | false | bool | Force PWM mode regardless of boiler modulation |
+| `satmaxrelmod` | 100 | 0-100 % | Maximum relative modulation sent to boiler (MM= command) |
+| `satmanufacturer` | 0 | 0-18 | Boiler manufacturer (0 = auto-detect) |
+
+#### Preset temperatures
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satpresetcomfort` | 21.0 | 15-28 C | Comfort preset |
+| `satpreseteco` | 18.0 | 10-22 C | Eco preset |
+| `satpresetaway` | 15.0 | 5-18 C | Away preset |
+| `satpresetsleep` | 16.0 | 5-22 C | Sleep preset |
+| `satpresethome` | 18.0 | 5-28 C | Home preset |
+| `satpresetactivity` | 10.0 | 5-20 C | Activity preset (used by window detection) |
+| `satpresetsync` | false | bool | Sync preset changes to secondary entities via MQTT |
+
+#### PID tuning
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satautogains` | true | bool | Automatic PID gain calculation from heating curve |
+| `satkpmanual` | 5.0 | 0-100 | Manual proportional gain (when autogains = false) |
+| `satkimanual` | 0.0005 | 0-1 | Manual integral gain |
+| `satkdmanual` | 0.0 | 0-10 | Manual derivative gain |
+| `satautotune` | false | bool | Enable automatic PID gains tuning |
+| `satautotunerate` | 0.02 | 0-1 | Adjustment rate per tuning cycle (2%) |
+
+#### Advanced control
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satmaxsetpoint` | 65.0 | 30-80 C | Global safety ceiling for flow setpoint |
+| `satflameoffoffset` | 0.0 | 0-5 C | Setpoint offset when flame off (anti-cycling hysteresis) |
+| `satovershootmargin` | 2.0 | 0-10 C | Overshoot margin for cycle classification |
+| `satmodsupdelay` | 20.0 | 0-60 s | Modulation suppression delay |
+| `satmodsupoffset` | 1.0 | 0-5 C | Modulation suppression offset below setpoint |
+| `satflowoffset` | 2.0 | 0-10 C | Continuous mode: max setpoint drop from boiler temp |
+| `satcyclesperhour` | 3 | 2-6 | Target cycles per hour |
+| `satpushsetpoint` | false | bool | Push SAT target to thermostat display (TC= command) |
 
 #### Choosing the heating curve coefficient
 
@@ -72,7 +123,7 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0
 | Average | 1970s-2000s, partial insulation | 1.2 - 1.8 |
 | Poor | Pre-1970, single glazing, no cavity insulation | 1.8 - 2.5 |
 
-Start in the middle of the appropriate range. If the room consistently fails to reach the target, increase the coefficient by 0.2-0.3. If the room overshoots, decrease it.
+Start in the middle of the appropriate range. If the room consistently fails to reach the target, increase the coefficient by 0.2-0.3. If the room overshoots, decrease it. SAT also publishes a heating curve recommendation (see section 5.12) to help you dial in the correct value.
 
 ---
 
@@ -86,26 +137,41 @@ curve_value = 4 * (T_target - 20)
             - 0.4  * (T_outside - 20)
 ```
 
-Where `base_offset` is 27.2°C for radiators and 20.0°C for underfloor.
+Where `base_offset` is 27.2 C for radiators and 20.0 C for underfloor.
 
 Worked examples for a radiator system, coefficient 1.5:
 
 | Outside temp | Target | Flow setpoint |
 |---|---|---|
-| +15°C | 20°C | ~28°C |
-| +5°C | 20°C | ~32°C |
-| -5°C | 20°C | ~38°C |
-| -10°C | 21°C | ~43°C |
+| +15 C | 20 C | ~28 C |
+| +5 C | 20 C | ~32 C |
+| -5 C | 20 C | ~38 C |
+| -10 C | 21 C | ~43 C |
 
 ---
 
 ### 5.6 Control Modes: Continuous and PWM
 
-**Continuous mode (default)**: SAT sends the PID output directly as a flow temperature setpoint. The boiler modulates to reach and hold it. Preferred for modern condensing boilers.
+**Continuous mode (default)**: SAT sends the PID output directly as a flow temperature setpoint. The boiler modulates to reach and hold it. Preferred for modern condensing boilers with good modulation range.
 
-**PWM mode**: For boilers that cannot modulate below 30-40%, SAT cycles the flame on and off at a calculated duty cycle. Within each control interval, the boiler runs at full setpoint for `duty * interval` seconds, then idles.
+Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the boiler water is still hot, the minimum setpoint is clamped to `boiler_temp - flow_offset` (default 2 C). This prevents the boiler from stopping and immediately restarting (short cycling).
 
-**Auto-switch**: When `satpwmautoswitch` is enabled (default), SAT monitors boiler behavior and switches modes automatically.
+**PWM mode**: For boilers that cannot modulate below 30-40%, SAT cycles the flame on and off at a calculated duty cycle. Minimum flame-on time is 180 seconds to prevent excessively short burner cycles.
+
+**Force PWM**: Setting `satforcepwm` to true forces PWM mode regardless of boiler behavior.
+
+**Auto-switch**: When `satpwmautoswitch` is enabled (default), SAT monitors boiler behavior using cycle classification (see section 5.11) and switches modes automatically:
+
+- Continuous to PWM: when flow temperature stays more than the overshoot margin above setpoint for 60 seconds (sustained overshoot, indicating the boiler cannot modulate low enough).
+- PWM to continuous: when flow temperature stays more than 2 C below setpoint for 180 seconds (sustained underheat) or after 300 seconds of saturation (boiler at max but room still cold).
+
+| Situation | Recommended mode |
+|---|---|
+| Modern condensing boiler with good modulation | Continuous |
+| Boiler with high minimum modulation (>30%) | PWM |
+| Underfloor heating (slow response) | Continuous |
+| Oversized boiler with radiators | PWM |
+| Not sure | Start with Continuous, auto-switch enabled |
 
 ---
 
@@ -113,18 +179,40 @@ Worked examples for a radiator system, coefficient 1.5:
 
 SAT implements six independent safety layers. Any single layer tripping sends `CS=0`, releasing the setpoint override and returning control to the wall thermostat immediately.
 
-1. **Boot safety**: `CS=0` is sent before the first control cycle.
-2. **Disable safety**: When SAT is turned off, `CS=0` is sent immediately.
-3. **Stale sensor fallback**: External temps expire (5 min indoor, 10 min outdoor); SAT falls back to OT bus values.
-4. **Hard temperature ceiling**: Underfloor capped at 50°C, radiators at 80°C. Minimum is 10°C.
-5. **Consecutive sensor failure counter**: 10 invalid room temperature readings trips the safety.
-6. **PIC communication check**: 5 consecutive failed `CS=` commands trips the safety.
+**Fundamental safety principles:**
+- Fail-safe: every error results in `CS=0`. The boiler falls back to the wall thermostat.
+- No automatic recovery: SAT stays disabled until the user explicitly re-enables it.
+- Independent layers: a bug in one layer does not affect the others.
+
+**Layer 1: Boot safety.** At every startup, restart, or power failure, SAT sends `CS=0` before the first control cycle. This prevents the boiler from running indefinitely at the last setpoint while the ESP is still booting.
+
+**Layer 2: Disable safety.** When SAT is turned off (via settings, MQTT, or REST API), `CS=0` is sent immediately, the PID is reset, and all state variables are cleared.
+
+**Layer 3: Stale sensor fallback.** External temperatures expire (5 min indoor, 10 min outdoor, 5 min BLE). SAT falls back to OT bus values without alarming. If the OT bus value is also unavailable, Layer 5 activates.
+
+**Layer 4: Hard temperature ceiling.** After every calculation, the setpoint is clamped: underfloor max 50 C, radiators max 80 C, global safety ceiling configurable (default 65 C). Minimum is 10 C.
+
+**Layer 5: Consecutive sensor failure counter.** 10 consecutive invalid room temperature readings trips the safety.
+
+**Layer 6: PIC communication check.** 5 consecutive failed `CS=` commands trips the safety.
+
+**Recovery after safety shutdown:**
+1. The `safety_tripped` field is visible in the web interface (red badge), MQTT (`sat/safety_tripped`), and REST API.
+2. SAT stays inactive until the user explicitly re-enables it.
+3. Recovery via web interface: toggle the SAT switch off and back on.
+4. Recovery via MQTT: publish `true` to `OTGW/set/{UniqueId}/sat/enabled`.
 
 ---
 
 ### 5.8 Simulation Mode
 
-Simulation mode lets you run the SAT control loop without sending real commands to the PIC. Useful for testing configuration without affecting the actual heating system.
+Simulation mode lets you run the SAT control loop without sending real commands to the PIC. In simulation mode:
+- SAT calculates all setpoints and PID values normally.
+- SAT does NOT send commands to the PIC.
+- All MQTT topics and REST API values are available with simulated data.
+- The simulated room temperature responds to the calculated setpoint using configurable heating and cooling rates (`fSimHeatRate`, `fSimCoolRate`).
+
+Useful for testing Home Assistant automations, verifying that the heating curve produces logical values, and demonstrations without an active heating system.
 
 ```bash
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/simulation" -m "ON"
@@ -132,33 +220,265 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/simulation" -m "
 
 ---
 
-### 5.9 Home Assistant Integration
+### 5.9 Weather Integration (Open-Meteo)
+
+SAT can fetch outdoor temperature, humidity, wind speed, and a 24-hour hourly temperature forecast from the Open-Meteo API. This is a free API that requires no API key.
+
+Weather data provides:
+- Outdoor temperature for the heating curve (fallback or primary, depending on configuration).
+- Humidity data for thermal comfort adjustment.
+- Sun elevation data for solar gain gating.
+- Forecast data for proactive setpoint planning.
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satweatherenable` | false | bool | Enable weather data fetching |
+| `satweatherlat` | 0.0 | -90 to 90 | Latitude (from browser geolocation or manual entry) |
+| `satweatherlon` | 0.0 | -180 to 180 | Longitude |
+| `satweatherinterval` | 900 | 300-3600 s | Poll interval (default 15 min, minimum 5 min) |
+
+The web UI can auto-detect your location using browser geolocation. Weather data is fetched via plain HTTP (no HTTPS).
+
+---
+
+### 5.10 Solar Gain Compensation
+
+Solar gain compensation detects when sunlight through windows is heating the room and reduces the flow setpoint to prevent overheating.
+
+**How it works:**
+1. SAT tracks the indoor temperature rise rate using an EMA (exponential moving average).
+2. When the rise rate exceeds the configured minimum and boiler modulation is low (<20%), a solar gain condition is detected.
+3. If sun elevation data is available (from the weather API), SAT also checks that the sun is above the minimum elevation before triggering.
+4. The condition must be sustained for 10 minutes before activation (to avoid false triggers).
+5. Once active, the flow setpoint is reduced by `fSolarSetpointOffset` (default 2 C).
+6. When the rise rate drops below the threshold for 10 minutes, solar gain is cleared.
+7. Optionally, the PID integral term is frozen during solar gain to prevent integral windup.
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satsolargain` | false | bool | Enable solar gain compensation |
+| `satsolarminrise` | 0.5 | 0.1-5.0 C/hr | Minimum rise rate to trigger |
+| `satsolaroffset` | 2.0 | 0.5-5.0 C | Setpoint reduction during solar gain |
+| `satsolarminelevation` | 12.0 | 0-90 degrees | Minimum sun elevation for activation |
+| `satsolarfreezeintegral` | true | bool | Freeze PID integral during solar gain |
+
+---
+
+### 5.11 Cycle Monitoring
+
+SAT tracks flame on/off transitions and classifies each completed heating cycle. This drives automatic PWM/continuous mode switching and provides diagnostic data.
+
+**Per-cycle metrics collected:**
+- Duration (seconds)
+- Maximum flow temperature
+- Overshoot time (seconds above setpoint + margin)
+- Flow-setpoint error
+- Flow-return temperature delta (average)
+
+**Cycle classification:**
+- NORMAL: healthy cycle with appropriate duration and no sustained overshoot.
+- SHORT_CYCLING: cycle shorter than 60 seconds (indicates boiler cannot modulate low enough).
+- OVERSHOOT: flow temperature exceeded setpoint plus overshoot margin for more than 60 seconds.
+- UNDERHEAT: flow temperature stayed more than 2 C below setpoint for more than 180 seconds.
+
+**Rolling statistics:**
+- Cycles per hour counter (rolling 60-minute window, max 6).
+- 4-hour rolling window with per-cycle records.
+- EMA-smoothed fractions: duty ratio, overshoot fraction, underheat fraction, long-cycle fraction.
+
+**Heating Curve Recommendation (HCR):**
+SAT collects intra-day error samples (the difference between the room temperature and the target) and computes a daily median. Using a rolling window of up to 30 daily medians persisted to LittleFS (`/sat/sat_hcr.json`), SAT publishes a recommendation:
+
+| Condition | Recommendation |
+|---|---|
+| Daily median error > +0.5 C for 3+ consecutive days | DECREASE (room consistently too warm) |
+| Daily median error < -0.5 C for 3+ consecutive days | INCREASE (room consistently too cold) |
+| Otherwise | HOLD (curve is well tuned) |
+
+The recommendation is published to MQTT as `sat/curve_recommendation` and shown in the web UI. It survives reboots.
+
+---
+
+### 5.12 Pressure Monitoring
+
+SAT monitors boiler CH water pressure (OT MsgID 18) and generates alarms when pressure leaves the configured band.
+
+**Features:**
+- EMA-smoothed pressure reading to filter noise.
+- Linear regression drop rate detection (bar/hour).
+- 120-second confirmation window before alarm activation (avoids false triggers from brief transients).
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satminpressure` | 0.8 | 0-5 bar | Low pressure alarm threshold |
+| `satmaxpressure` | 2.5 | 0-5 bar | High pressure alarm threshold |
+| `satmaxpressuredrop` | 0.3 | 0-2 bar/hr | Maximum pressure drop rate before alarm |
+
+**MQTT topics:**
+- `sat/ch_pressure`: current raw OT MsgID 18 reading (bar).
+- `sat/ch_pressure_status`: `ok`, `low`, or `high`.
+
+---
+
+### 5.13 Summer Suppression (Summer Simmer)
+
+When enabled, SAT automatically disables heating when the outdoor temperature stays above a threshold for a configurable number of consecutive hours. This prevents the boiler from running unnecessarily during warm weather.
+
+**How it works:**
+1. SAT checks the outdoor temperature every 5 minutes.
+2. When the outdoor temperature stays at or above the threshold, hours are accumulated.
+3. When accumulated hours reach the minimum, summer mode activates and heating is suppressed.
+4. Summer mode deactivates when the outdoor temperature drops below `threshold - 2 C` and the accumulated hours decay to zero.
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satsummersimmer` | false | bool | Enable summer auto-disable |
+| `satsummerthreshold` | 18.0 | 5-35 C | Outdoor temperature threshold |
+| `satsummerminhours` | 6 | 1-48 h | Consecutive hours above threshold to trigger |
+
+**Summer Simmer Index:** SAT also calculates a thermal comfort index based on the Summer Simmer formula (using indoor temperature and humidity). This index is optionally used as PID input instead of raw room temperature when `satthermalcomfort` is enabled, providing humidity-aware temperature control.
+
+---
+
+### 5.14 Multi-Area Temperature
+
+SAT supports up to 4 temperature input areas with configurable weights. The effective room temperature used by the PID controller is the weighted average of all valid, non-stale area temperatures.
+
+Areas are pushed via MQTT:
+```bash
+mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/area/0" -m "21.5"
+mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/area/1" -m "20.8"
+```
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satmultiarea` | false | bool | Enable multi-area weighted temperature |
+| `satmultiareacount` | 0 | 0-4 | Number of configured areas |
+| `satareaweight0..3` | 1.0 | 0-10 | Weight per area |
+
+Each area value expires after 5 minutes without an update. Stale areas are excluded from the weighted average. If all areas become stale, SAT falls back to the primary room temperature source.
+
+---
+
+### 5.15 Multi-Zone PID Control
+
+For homes with multiple independently controlled heating zones (e.g., separate radiator circuits or zone valves), SAT supports up to 4 PID zones. Each zone runs its own PID calculation, and the highest (most demanding) setpoint wins.
+
+Zones receive their temperature and target via MQTT. Zone 1 always maps to the primary SAT target temperature. Zones 2-4 receive independent targets and temperature inputs.
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satzonecount` | 1 | 1-4 | Number of active heating zones |
+| `satzonetimeout` | 300 | 60-3600 s | Seconds without update before a zone goes inactive |
+
+When `satzonecount` is 1 (default), SAT operates in single-zone mode and this feature has no overhead.
+
+---
+
+### 5.16 BLE Temperature Sensor (ESP32 Only)
+
+On ESP32 builds, SAT can scan for BLE temperature sensors and use them as room temperature input. Supported sensor formats:
+
+- **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC with custom firmware): service data UUID 0x181A. Reports temperature, humidity, and battery level.
+- **BTHome v2**: service data UUID 0xFCD2. Standard BTHome protocol for temperature and humidity sensors.
+
+Up to 4 BLE sensors can be tracked simultaneously.
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satbleenable` | false | bool | Enable BLE temperature sensor scanning |
+| `satblemac` | "" | MAC address | Bind to specific sensor (empty = accept all) |
+| `satbleinterval` | 30 | 10-300 s | Scan interval |
+
+BLE temperature values expire after 5 minutes without a new advertisement. SAT falls back to MQTT or OT bus values when BLE data is stale.
+
+---
+
+### 5.17 Thermal Comfort (Humidity Adjustment)
+
+SAT can adjust the effective target temperature based on indoor humidity. At high humidity, air feels warmer, so the target can be slightly reduced. At low humidity, the target is slightly increased.
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satcomfortadjust` | false | bool | Enable humidity-based target adjustment |
+| `satcomforthumidity` | 50.0 | 20-80 % | Reference humidity (no adjustment at this level) |
+| `satcomfortmaxoffset` | 1.0 | 0-3 C | Maximum target temperature adjustment |
+
+Humidity data comes from: BLE sensor humidity, MQTT push, or weather API fallback. Values expire after 30 minutes (`iHumidityTimeoutS`).
+
+---
+
+### 5.18 Window Detection
+
+SAT can detect open windows via MQTT input and reduce heating to the Activity preset temperature while the window is open.
+
+```bash
+mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/window" -m "open"
+```
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satwindowdetection` | false | bool | Enable window detection |
+| `satwindowminopentime` | 60 | 10-600 s | Minimum seconds window must stay open before action |
+
+---
+
+### 5.19 DHW Control
+
+SAT can control domestic hot water setpoint in standalone or fallback mode.
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satdhwenabled` | false | bool | Enable DHW control |
+| `satdhwsetpoint` | 0.0 | 30-60 C | DHW setpoint (0 = inactive) |
+
+---
+
+### 5.20 Power and Energy Tracking
+
+SAT estimates boiler power output and tracks cumulative energy consumption.
+
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| `satboilercapacity` | 24.0 | 1-100 kW | Boiler thermal capacity for power calculation |
+| `satboilerratedkw` | 0.0 | 0-100 kW | Rated boiler input power (0 = disabled) |
+| `satboilerefficiency` | 0.92 | 0-1.0 | Boiler efficiency |
+
+Published to MQTT as `sat/power` (W) and `sat/energy_total` (kWh).
+
+---
+
+### 5.21 Home Assistant Integration
 
 When MQTT is enabled, SAT entities are automatically discovered by Home Assistant.
 
-**Climate entity**: The `sat_climate` entity shows current room temperature, target temperature, and mode. Available modes are `off`, `heat` (continuous), and `pwm`. Setting the target temperature persists the value to ESP flash storage.
+**Climate entity**: The `sat_climate` entity shows current room temperature, target temperature, and mode. Available modes are `off`, `heat` (continuous), and `pwm`. Setting the target temperature persists the value to ESP flash storage. Presets (comfort, eco, away, sleep, home, activity) are available if configured.
 
 **Key sensor entities**:
 
 | Entity | Topic suffix | Description |
 |---|---|---|
-| `sensor.otgw_sat_setpoint` | `sat/setpoint` | Final flow temperature sent to boiler (°C) |
-| `sensor.otgw_sat_heating_curve` | `sat/heating_curve` | Heating curve base value (°C) |
-| `sensor.otgw_sat_pid_output` | `sat/pid_output` | PID corrected output (°C) |
-| `sensor.otgw_sat_error` | `sat/error` | PID error: target minus room temperature (°C) |
+| `sensor.otgw_sat_setpoint` | `sat/setpoint` | Final flow temperature sent to boiler (C) |
+| `sensor.otgw_sat_heating_curve` | `sat/heating_curve` | Heating curve base value (C) |
+| `sensor.otgw_sat_pid_output` | `sat/pid_output` | PID corrected output (C) |
+| `sensor.otgw_sat_error` | `sat/error` | PID error: target minus room temperature (C) |
 | `sensor.otgw_sat_mode` | `sat/mode` | Control mode: `off`, `continuous`, or `pwm` |
-| `sensor.otgw_sat_room_temp` | `sat/room_temp` | Room temperature used by PID (°C) |
-| `sensor.otgw_sat_outside_temp` | `sat/outside_temp` | Outdoor temperature used by heating curve (°C) |
+| `sensor.otgw_sat_room_temp` | `sat/room_temp` | Room temperature used by PID (C) |
+| `sensor.otgw_sat_outside_temp` | `sat/outside_temp` | Outdoor temperature used by heating curve (C) |
 | `sensor.otgw_sat_boiler_status` | `sat/boiler_status` | Current boiler status (text label) |
 | `sensor.otgw_sat_pwm_duty` | `sat/pwm_duty` | PWM duty cycle (0-1) |
 | `sensor.otgw_sat_power` | `sat/power` | Estimated boiler power output (W) |
 | `sensor.otgw_sat_energy_total` | `sat/energy_total` | Accumulated energy estimate (kWh) |
+| `sensor.otgw_sat_ch_pressure` | `sat/ch_pressure` | CH water pressure (bar) |
+| `sensor.otgw_sat_ch_pressure_status` | `sat/ch_pressure_status` | Pressure status: ok, low, or high |
+| `sensor.otgw_sat_curve_recommendation` | `sat/curve_recommendation` | Heating curve recommendation: INCREASE, DECREASE, or HOLD |
 | `binary_sensor.otgw_sat_safety_tripped` | `sat/safety_tripped` | Whether a safety layer has tripped |
 | `binary_sensor.otgw_sat_modulation_reliable` | `sat/modulation_reliable` | Whether boiler modulation feedback is reliable |
 | `binary_sensor.otgw_sat_setpoint_mismatch` | `sat/setpoint_mismatch` | Setpoint mismatch between SAT and boiler |
 | `binary_sensor.otgw_sat_thermal_model_valid` | `sat/thermal_model_valid` | Whether the thermal model has enough data |
 | `binary_sensor.otgw_sat_solar_gain` | `sat/solar_gain` | Solar gain compensation active |
 | `binary_sensor.otgw_sat_auto_tune_active` | `sat/auto_tune_active` | Auto-tune in progress |
+| `binary_sensor.otgw_sat_summer_active` | `sat/summer_active` | Summer suppression active |
 
 **Using an external sensor from Home Assistant**:
 
@@ -194,21 +514,32 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 
 ---
 
-### 5.10 Known Limitations
+### 5.22 Known Limitations
 
-- Not all thermostats report room temperature on OT MsgID 24. If yours does not, use an external sensor pushed via MQTT.
-- Outdoor temperature (MsgID 27) is rarely exchanged on the bus. An external push or weather API call is typically needed.
+- Not all thermostats report room temperature on OT MsgID 24. If yours does not, use an external sensor pushed via MQTT, REST API, or BLE (ESP32).
+- Outdoor temperature (MsgID 27) is rarely exchanged on the bus. An external push, weather API fetch, or REST API push is typically needed.
 - BLE temperature sensor scanning requires an ESP32 build.
 - SAT controls the flow temperature setpoint, but the wall thermostat still controls whether heating is enabled or disabled.
+- Multi-zone support runs independent PID loops per zone, but SAT controls a single boiler. Individual boiler circuits per zone are not supported.
+- The PIC co-processor holds the last `CS=` setpoint if the ESP fails. Layer 1 (boot safety) corrects this at the next startup.
+- Weather data is fetched via plain HTTP only. No HTTPS is used.
 
 ---
 
-### 5.11 Troubleshooting
+### 5.23 Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Room never reaches target temperature | Coefficient too low | Increase by 0.2-0.3 |
-| Room consistently overshoots target | Coefficient too high | Decrease by 0.2-0.3 |
-| Frequent short boiler cycles | Boiler minimum modulation too high | Enable PWM auto-switch |
+| Room never reaches target temperature | Coefficient too low | Increase by 0.2-0.3. Check `sat/curve_recommendation`. |
+| Room consistently overshoots target | Coefficient too high | Decrease by 0.2-0.3. Check `sat/curve_recommendation`. |
+| Frequent short boiler cycles | Boiler minimum modulation too high | Enable PWM auto-switch, or force PWM mode. Reduce `satcyclesperhour`. |
 | Safety tripped on startup | PIC not ready at SAT init | Normal behavior. Re-enable SAT. |
-| "External temp stale" in logs | MQTT push stopped | Check HA automation and broker connectivity |
+| "External temp stale" in logs | MQTT push stopped | Check HA automation and broker connectivity. |
+| SAT sends no setpoints | PIC not reachable | Check serial connection. Check `otgw-pic/picavailable` via MQTT. |
+| Temperature oscillates strongly | Deadband too narrow or poor boiler modulation | Widen deadband, or switch to PWM mode. |
+| Setpoint always at minimum (10 C) | SAT active but safety tripped | Check `sat/safety_tripped`. Re-enable SAT via web UI or MQTT. |
+| SAT tab not visible in web interface | SAT not yet enabled | Enable SAT in settings. |
+| Home Assistant climate entity missing | Auto-discovery disabled or MQTT not connected | Check MQTT connection and HA discovery setting. |
+| Pressure alarm keeps triggering | Pressure band too narrow or boiler filling issue | Adjust `satminpressure`/`satmaxpressure`. Check boiler pressure gauge. |
+| Solar gain never activates | Rise rate threshold too high or sun elevation data missing | Lower `satsolarminrise`. Enable weather API for sun elevation. |
+| Summer mode does not activate | Threshold too high or hours too long | Lower `satsummerthreshold` or `satsummerminhours`. |

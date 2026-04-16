@@ -91,10 +91,11 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 - **Notable read-only field**: `ssid` (type `"r"`) — returns the connected WiFi SSID via `WiFi.SSID()`. Not writable; exposed so the Settings page can display the current network without additional API calls. When on Ethernet, the device info endpoint returns `"ssid": "Wired"` via `sendDeviceInfoV2()`.
 
 #### `void handleSensors()`
-- **Location**: `restAPI.ino:233–245`
-- **Purpose**: Read/update Dallas temperature sensor labels
+- **Location**: `restAPI.ino:301–317`
+- **Purpose**: Read current sensor readings and manage Dallas temperature sensor labels
 - **HTTP Methods**: GET, POST, PUT
 - **Routes**:
+  - `GET /api/v2/sensors` or `GET /api/v2/sensors/status` → `sendSensorStatus()` (current Dallas + S0 readings)
   - `GET /api/v2/sensors/labels` → `getDallasLabels()`
   - `POST/PUT /api/v2/sensors/labels` → `updateAllDallasLabels()`
 - **Auth**: Not specified (defaults to no auth for GET)
@@ -522,6 +523,8 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 | GET | `/api/v2/health` | handleHealth | No | System health metrics |
 | GET | `/api/v2/settings` | handleSettings | Yes | Read device settings (sensitive) |
 | POST/PUT | `/api/v2/settings` | handleSettings | Yes | Update device settings |
+| GET | `/api/v2/sensors` | handleSensors | No | Current sensor readings (Dallas + S0) |
+| GET | `/api/v2/sensors/status` | handleSensors | No | Alias for /sensors |
 | GET | `/api/v2/sensors/labels` | handleSensors | No | Dallas temperature labels |
 | POST/PUT | `/api/v2/sensors/labels` | handleSensors | No | Update labels |
 | GET | `/api/v2/device/info` | handleDevice | No | Device metadata |
