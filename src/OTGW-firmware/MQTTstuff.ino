@@ -29,6 +29,9 @@
 #define MQTTDebug(...)    ({ if (state.debug.bMQTT) Debug(__VA_ARGS__);    })
 
 void doAutoConfigure();
+void setMQTTConfigPending(const uint8_t MSGid);
+void markAllMQTTConfigPending();
+void drainOnePendingDiscovery();
 
 // Declare some variables within global scope
 
@@ -594,14 +597,12 @@ void startMQTT()
   MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
   
   stateMQTT = MQTT_STATE_INIT;
-  //setup for mqtt discovery
-  clearMQTTConfigDone();
+  //setup for mqtt discovery — mark all IDs pending for async drip publish
   strlcpy(NodeId, CSTR(settings.mqtt.sUniqueid), sizeof(NodeId));
   buildNamespace(MQTTPubNamespace, sizeof(MQTTPubNamespace), CSTR(settings.mqtt.sTopTopic), "value", NodeId);
   buildNamespace(MQTTSubNamespace, sizeof(MQTTSubNamespace), CSTR(settings.mqtt.sTopTopic), "set", NodeId);
+  markAllMQTTConfigPending();  // queue all discovery for async drip publish
   handleMQTT(); //initialize the MQTT statemachine
-  // handleMQTT(); //then try to connect to MQTT
-  // handleMQTT(); //now you should be connected to MQTT ready to send
 }
 
 bool bHAcycle = false;
@@ -643,9 +644,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       DebugTln(F("Home Assistant went online!"));
       bHAcycle = false; //clear flag, so it does not trigger again
       // HA restart does not affect the MQTT broker connection; no reconnect needed.
-      // Clearing the discovery bitfield is sufficient: JIT (Path B) re-publishes
-      // discovery configs as OpenTherm messages arrive (ADR-041).
-      clearMQTTConfigDone();
+      // Mark all discovery pending for async drip re-publish.
+      markAllMQTTConfigPending();
     } else {
       DebugTf(PSTR("Home Assistant Status=[%s] and HA cycle status [%s]\r\n"), msgPayload, CBOOLEAN(bHAcycle)); 
     }
@@ -1240,6 +1240,96 @@ void setMQTTConfigDone(const uint8_t MSGid)
 void clearMQTTConfigDone()
 {
   memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
+}
+//===========================================================================================
+// Pending-bitmap helpers for async drip-discovery (ADR-pending).
+// MQTTautoCfgPendingMap[8] mirrors MQTTautoConfigMap layout: 8 × uint32_t = 256 bits.
+// Setting a bit means "this OT ID needs its discovery config (re-)published".
+//===========================================================================================
+void setMQTTConfigPending(const uint8_t MSGid)
+{
+  uint8_t group = (MSGid >> 5) & 0x07;
+  uint8_t bit   = MSGid & 0x1F;
+  bitSet(MQTTautoCfgPendingMap[group], bit);
+}
+//===========================================================================================
+bool getMQTTConfigPending(const uint8_t MSGid)
+{
+  uint8_t group = (MSGid >> 5) & 0x07;
+  uint8_t bit   = MSGid & 0x1F;
+  return bitRead(MQTTautoCfgPendingMap[group], bit) != 0;
+}
+//===========================================================================================
+void clearMQTTConfigPending(const uint8_t MSGid)
+{
+  uint8_t group = (MSGid >> 5) & 0x07;
+  uint8_t bit   = MSGid & 0x1F;
+  bitClear(MQTTautoCfgPendingMap[group], bit);
+}
+//===========================================================================================
+void markAllMQTTConfigPending()
+{
+  // Mark every OT ID that appears in the PROGMEM discovery table as pending.
+  // Also clears the "published" bitmap so drainOnePendingDiscovery re-publishes.
+  clearMQTTConfigDone();
+  memset(MQTTautoCfgPendingMap, 0, sizeof(MQTTautoCfgPendingMap));
+  for (uint16_t i = 0; i < 256; i++) {
+    uint16_t idx = pgm_read_word(&mqttHaCfgIndex[i]);
+    if (idx != 0xFFFF) {
+      setMQTTConfigPending((uint8_t)i);
+    }
+  }
+  // Also mark the Dallas sensor pseudo-ID
+  setMQTTConfigPending(OTGWdallasdataid);
+  MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
+}
+//===========================================================================================
+// drainOnePendingDiscovery() — called from the main loop on a 3-second timer.
+// Finds the next pending OT ID, publishes its discovery config, clears its
+// pending bit, and sets its "done" bit.  Publishes exactly ONE ID per call
+// to spread broker load over time.
+//===========================================================================================
+void drainOnePendingDiscovery()
+{
+  if (!settings.mqtt.bEnable) return;
+  if (!state.mqtt.bConnected) return;
+  if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return;
+
+  // Scan pending bitmap for the next set bit
+  for (uint8_t group = 0; group < 8; group++) {
+    if (MQTTautoCfgPendingMap[group] == 0) continue;
+    for (uint8_t bit = 0; bit < 32; bit++) {
+      if (!bitRead(MQTTautoCfgPendingMap[group], bit)) continue;
+
+      uint8_t msgId = (group << 5) | bit;
+
+      // Already published (e.g. by explicit doAutoConfigure while drip was pending)
+      if (getMQTTConfigDone(msgId)) {
+        bitClear(MQTTautoCfgPendingMap[group], bit);
+        continue;  // check next pending bit in same call
+      }
+
+      // Dallas sensors use a separate path (configSensors)
+      if (msgId == OTGWdallasdataid) {
+        MQTTDebugTln(F("[drip] publishing Dallas sensor discovery"));
+        configSensors();
+        bitClear(MQTTautoCfgPendingMap[group], bit);
+        return;  // one per tick
+      }
+
+      MQTTDebugTf(PSTR("[drip] publishing discovery for OT ID %d\r\n"), msgId);
+      bool success = doAutoConfigureMsgid(msgId, NodeId,
+                       messageIDToString(static_cast<OpenThermMessageID>(msgId)));
+      if (success) {
+        setMQTTConfigDone(msgId);
+      }
+      // Clear pending regardless — if it failed (heap, broker down), the bit
+      // stays cleared to avoid busy-looping.  The JIT path or next
+      // markAllMQTTConfigPending() will re-queue it if still needed.
+      bitClear(MQTTautoCfgPendingMap[group], bit);
+      return;  // one per tick
+    }
+  }
 }
 //===========================================================================================
 // expandAndPublishSourceTemplates()

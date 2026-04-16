@@ -233,8 +233,10 @@ if (settings.mqtt.bEnable) {
     simUpdateDue = false;
   }
 
-  // check if HA Autoconfigure must be performed (initial or as repeat for HA reboot)
-  if (settings.mqtt.bEnable && getMQTTConfigDone(OTGWdallasdataid)==false) configSensors() ;
+  // Queue sensor discovery if not yet published; drainOnePendingDiscovery() handles it.
+  if (settings.mqtt.bEnable && !getMQTTConfigDone(OTGWdallasdataid)) {
+    setMQTTConfigPending(OTGWdallasdataid);
+  }
   // Loop through each real device, store temperature data and send to MQ 
   for (int i = 0; i < DallasrealDeviceCount; i++)
   {

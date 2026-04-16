@@ -351,6 +351,7 @@ void loop()
 {
   DECLARE_TIMER_SEC(timer1s, 1, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer3s, 3, SKIP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timerDiscoveryDrip, 3, SKIP_MISSED_TICKS); // async MQTT discovery drip publisher
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
 
@@ -362,6 +363,7 @@ void loop()
       if (DUE(timer5min))               do5minevent();
       if (DUE(timer60s))                doTaskEvery60s();
       if (DUE(timer3s))                 doTaskEvery3s();
+      if (DUE(timerDiscoveryDrip))      drainOnePendingDiscovery(); // publish one pending HA discovery entry
       if (DUE(timer1s))                 doTaskEvery1s();
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
       evalOutputs();                    // when the bits change, the output gpio bit will follow
