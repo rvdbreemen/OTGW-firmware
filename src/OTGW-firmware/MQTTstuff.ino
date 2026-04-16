@@ -1285,14 +1285,31 @@ void markAllMQTTConfigPending()
 }
 //===========================================================================================
 // loopMQTTDiscovery() — call from the main loop on every iteration.
-// Manages its own 3-second timer internally.  When the timer fires, finds
-// the next pending OT ID, publishes its discovery config, clears its pending
-// bit, and sets its "done" bit.  Publishes exactly ONE ID per timer tick
-// to spread broker load over time.
+// Manages its own timer internally.  When the timer fires, finds the next
+// pending OT ID, publishes its discovery config, clears its pending bit,
+// and sets its "done" bit.  Publishes exactly ONE ID per timer tick to
+// spread broker load over time.
+//
+// Adaptive interval: 3s when heap is healthy, 30s under heap pressure.
+// This avoids adding lwIP pbuf allocations when the system is already
+// memory-constrained, while still making progress on discovery.
 //===========================================================================================
+constexpr uint32_t DISCOVERY_INTERVAL_NORMAL_MS = 3000;
+constexpr uint32_t DISCOVERY_INTERVAL_SLOW_MS   = 30000;
+
 void loopMQTTDiscovery()
 {
   DECLARE_TIMER_SEC(timerDiscoveryDrip, 3, SKIP_MISSED_TICKS);
+
+  // Adaptive interval: switch only on state transition to avoid resetting _due every loop
+  bool heapPressure = (getHeapHealth() >= HEAP_WARNING);
+  uint32_t desiredInterval = heapPressure ? DISCOVERY_INTERVAL_SLOW_MS : DISCOVERY_INTERVAL_NORMAL_MS;
+  if (timerDiscoveryDrip_interval != desiredInterval) {
+    timerDiscoveryDrip_interval = desiredInterval;
+    MQTTDebugTf(PSTR("[drip] interval changed to %lu ms (heap %s)\r\n"),
+                desiredInterval, heapPressure ? "pressure" : "healthy");
+  }
+
   if (!DUE(timerDiscoveryDrip)) return;
 
   if (!settings.mqtt.bEnable) return;
