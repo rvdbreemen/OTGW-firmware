@@ -174,6 +174,10 @@ typedef struct {
 
 static OTdataStruct OTcurrentSystemState;
 
+// OT status bit helpers (prevent wrong-register bugs: flame is in slave byte, not master)
+inline bool isFlameOn()   { return (OTcurrentSystemState.Statusflags & 0x08) != 0; }  // Slave bit 3
+inline bool isDHWActive() { return (OTcurrentSystemState.SlaveStatus  & 0x04) != 0; }  // Slave bit 2
+
 // Value type enum for OTlogStruct
 enum OTValueType {
 	OT_VALTYPE_NONE = 0,

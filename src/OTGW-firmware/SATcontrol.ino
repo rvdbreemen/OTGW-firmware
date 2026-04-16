@@ -254,7 +254,7 @@ static const uint16_t SAT_CALIB_MIN_SAMPLES   = 40;        // Minimum samples be
 static void satOvpCalibrate()
 {
   float boilerTemp = OTcurrentSystemState.Tboiler;
-  bool  flameOn    = (OTcurrentSystemState.MasterStatus & 0x08) != 0;
+  bool  flameOn    = (OTcurrentSystemState.Statusflags & 0x08) != 0;
   uint32_t elapsed = millis() - state.sat.iCalibStartMs;
 
   switch (state.sat.eCalibPhase) {
@@ -589,7 +589,7 @@ static float satApplyPWM(float pidOutput)
   uint32_t maxMs     = upperMs * 2;                      // Max cycle time
 
   // --- Effective temperature tracking (EMA during first 30s of flame-on) ---
-  bool flame = (OTcurrentSystemState.MasterStatus & 0x08) != 0;
+  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
   float boilerTemp = OTcurrentSystemState.Tboiler;
   if (flame && !_pwm_waitingForFlame) {
     uint32_t sinceFlamOn = millis() - _pwm_flameOnMs;
