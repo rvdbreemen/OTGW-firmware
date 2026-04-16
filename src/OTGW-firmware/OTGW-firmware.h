@@ -694,7 +694,8 @@ WiFiClient  wifiClient;
 char        cMsg[CMSG_SIZE];
 char        otTopic[OT_TOPIC_LEN];  // Shared MQTT topic scratch for OT print_* functions (sequential, not re-entrant)
 char        lastReset[129] = "";
-uint32_t    MQTTautoConfigMap[8] = { 0 };
+uint32_t    MQTTautoConfigMap[8] = { 0 };       // "already published" bitmap (256 bits)
+uint32_t    MQTTautoCfgPendingMap[8] = { 0 };  // "needs publishing" bitmap (256 bits)
 // Deferred settings write timer (Finding #23: coalesce flash writes)
 uint32_t  timerFlushSettings_interval = 2000;  // 2 second debounce
 uint32_t  timerFlushSettings_due = 0;          // initially not due
