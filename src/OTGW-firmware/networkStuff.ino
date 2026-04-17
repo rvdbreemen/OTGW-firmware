@@ -290,6 +290,7 @@ static void sendTelnetBanner(const char* ip)
   _debugPrintf_P(PSTR("    3 MQTT comms  : %s\r\n"), CBOOLEAN(state.debug.bMQTT));
   _debugPrintf_P(PSTR("    4 MQTT gating : %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
   _debugPrintf_P(PSTR("    5 Sensors     : %s\r\n"), CBOOLEAN(state.debug.bSensors));
+  _debugPrintf_P(PSTR("    6 NTP sync    : %s\r\n"), CBOOLEAN(state.debug.bNTP));
   debugTelnet.println(F("--------------------------------------------"));
   debugTelnet.println(F("  Press 'h' for the full debug menu."));
   _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip);
