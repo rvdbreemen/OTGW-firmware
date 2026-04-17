@@ -131,13 +131,6 @@ enum class HaEntityCat : uint8_t {
     _count
 };
 
-// HA entity type (for climate/number special entries)
-enum class HaEntityType : uint8_t {
-    climate = 0,
-    number,
-    _count
-};
-
 // ---------------------------------------------------------------------------
 // Enum-to-string lookup functions -- return PGM_P (flash pointer)
 // Returns nullptr for ::none values (caller should omit the JSON key).
@@ -187,21 +180,12 @@ struct MqttHaBinSensorCfg {
     bool          enabledByDefault;
 };
 
-// Climate/Number discovery config -- full JSON PROGMEM templates
-struct MqttHaSpecialCfg {
-    uint8_t       id;              // OT message ID
-    uint8_t       flags;           // MQTT_HA_FLAG_* bits
-    HaEntityType  entityType;
-    PGM_P         topic;           // PROGMEM topic template
-    PGM_P         msg;             // PROGMEM JSON message template
-};
-
 // ---------------------------------------------------------------------------
 // PROGMEM arrays -- defined in mqtt_configuratie.cpp (generated from mqttha.cfg)
+// Climate and Number discovery are handled by streaming functions directly.
 // ---------------------------------------------------------------------------
 extern const MqttHaSensorCfg    PROGMEM mqttHaSensors[];
 extern const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[];
-extern const MqttHaSpecialCfg   PROGMEM mqttHaSpecials[];
 
 // OT ID -> first entry index lookup tables
 extern const uint16_t PROGMEM mqttHaSensorIndex[256];
@@ -210,7 +194,6 @@ extern const uint16_t PROGMEM mqttHaBinSensorIndex[256];
 // Entry counts
 extern const uint16_t MQTT_HA_SENSOR_COUNT;
 extern const uint16_t MQTT_HA_BINSENSOR_COUNT;
-extern const uint16_t MQTT_HA_SPECIAL_COUNT;
 
 // ---------------------------------------------------------------------------
 // PROGMEM read helpers

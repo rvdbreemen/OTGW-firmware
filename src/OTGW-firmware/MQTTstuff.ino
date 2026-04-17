@@ -1051,12 +1051,9 @@ void markAllMQTTConfigPending()
       setMQTTConfigPending(static_cast<uint8_t>(i));
     }
   }
-  // Mark climate/number special IDs
-  for (uint16_t i = 0; i < MQTT_HA_SPECIAL_COUNT; i++) {
-    MqttHaSpecialCfg special;
-    memcpy_P(&special, &mqttHaSpecials[i], sizeof(special));
-    setMQTTConfigPending(special.id);
-  }
+  // Mark climate (ID 0) and number (ID 27) as pending
+  setMQTTConfigPending(0);   // climate thermostat + DHW
+  setMQTTConfigPending(27);  // number Toutside override
   // Also mark the Dallas sensor pseudo-ID
   setMQTTConfigPending(OTGWdallasdataid);
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
@@ -1194,16 +1191,14 @@ void doAutoConfigure(){
       ctx.isFirstEntity = false;
     }
 
-    // Climate and number entities use the specials table (template-based PROGMEM)
-    for (uint16_t i = 0; i < MQTT_HA_SPECIAL_COUNT; i++) {
-      feedWatchDog();
-      if (i < 2) {
-        streamClimateDiscovery(MQTTclient, static_cast<uint8_t>(i), ctx);
-      } else {
-        streamNumberDiscovery(MQTTclient, ctx);
-      }
-      ctx.isFirstEntity = false;
-    }
+    // Climate and number entities (hardcoded, not in PROGMEM arrays)
+    feedWatchDog();
+    streamClimateDiscovery(MQTTclient, 0, ctx);  // Thermostat
+    ctx.isFirstEntity = false;
+    feedWatchDog();
+    streamClimateDiscovery(MQTTclient, 1, ctx);  // DHW Control
+    feedWatchDog();
+    streamNumberDiscovery(MQTTclient, ctx);       // Toutside Override
     // Mark climate/number IDs done
     setMQTTConfigDone(0);   // climate entries are OT ID 0
     setMQTTConfigDone(27);  // number entry is OT ID 27
@@ -1296,16 +1291,14 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     }
   }
 
-  // Check specials (climate/number) for this OT ID
-  for (uint16_t i = 0; i < MQTT_HA_SPECIAL_COUNT; i++) {
-    MqttHaSpecialCfg special;
-    memcpy_P(&special, &mqttHaSpecials[i], sizeof(special));
-    if (special.id != OTid) continue;
-    if (special.entityType == HaEntityType::climate) {
-      if (streamClimateDiscovery(MQTTclient, static_cast<uint8_t>(i), ctx)) result = true;
-    } else if (special.entityType == HaEntityType::number) {
-      if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
-    }
+  // Climate discovery (OT ID 0)
+  if (OTid == 0) {
+    if (streamClimateDiscovery(MQTTclient, 0, ctx)) result = true;  // Thermostat
+    if (streamClimateDiscovery(MQTTclient, 1, ctx)) result = true;  // DHW Control
+  }
+  // Number discovery (OT ID 27)
+  if (OTid == 27) {
+    if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
   }
 
   resetMQTTBufferSize();
