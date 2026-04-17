@@ -524,8 +524,9 @@ const char ha_name_remote_override_program_change_priority[] PROGMEM = "remote_o
 const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storage_slave_fault_indicator";
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
 
-// ========== Sensor array (289 entries, sorted by id) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 289;
+// ========== Sensor array (288 entries, sorted by id) ==========
+// Note: OT ID 246 (Dallas temp sensors) is handled dynamically by configSensors()
+const uint16_t MQTT_HA_SENSOR_COUNT = 288;
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -934,8 +935,9 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {245, 0x00, ha_lbl_s0pulsecount, ha_name_s0_pulse_count, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
     {245, 0x00, ha_lbl_s0pulsecounttot, ha_name_s0_pulse_count_total, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
     {245, 0x00, ha_lbl_s0pulsetime, ha_name_s0_pulse_time, HaDeviceClass::none, HaUnit::mS, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    // --- OT ID 246 ---
-    {246, 0x00, ha_lbl_sensor_id, ha_name_sensor_id, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
+    // OT ID 246 (Dallas temperature sensors) is NOT in this array.
+    // Dallas sensors have dynamic addresses and are configured at runtime
+    // via configSensors() / sensorAutoConfigure().
 };
 
 // ========== Binary sensor array (53 entries, sorted by id) ==========
@@ -1256,7 +1258,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 243
     0xFFFF, // id 244
     284, // id 245, 4 entries
-    288, // id 246, 1 entry
+    0xFFFF, // id 246 (Dallas sensors handled by configSensors)
     0xFFFF, // id 247
     0xFFFF, // id 248
     0xFFFF, // id 249
