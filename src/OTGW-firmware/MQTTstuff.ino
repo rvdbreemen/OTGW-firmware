@@ -1147,6 +1147,10 @@ void doAutoConfigure(){
       return;
     }
 
+    // Force mode: clear all "done" flags so every entry is re-published
+    clearMQTTConfigDone();
+    MQTTDebugTln(F("Cleared all MQTT config done flags (force re-publish)"));
+
     HaDiscoveryContext ctx;
     ctx.nodeId = NodeId;
     ctx.hostname = CSTR(settings.sHostname);
@@ -1206,8 +1210,9 @@ void doAutoConfigure(){
     resetMQTTBufferSize();
   } // Lock released here -- configSensors() can now acquire it independently
 
-  // Trigger Dallas configuration separately as it requires specific sensor addresses
-  if (settings.mqtt.bEnable && !getMQTTConfigDone(OTGWdallasdataid)) {
+  // Trigger Dallas configuration separately as it requires specific sensor addresses.
+  // Always run after force (clearMQTTConfigDone above cleared the done flag).
+  if (settings.mqtt.bEnable) {
     configSensors();
   }
 }
