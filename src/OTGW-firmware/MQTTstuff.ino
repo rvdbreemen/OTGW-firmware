@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.4.0-beta
+**  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1010,18 +1010,56 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
 }
 
+static void publishBoilerConnectedState()
+{
+  sendMQTTData(F("boiler_connected"), CCONOFF(state.otBus.bBoilerState));
+  if (isPICEnabled()) {
+    sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otBus.bBoilerState));
+  }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/boiler_connected"), CCONOFF(state.otBus.bBoilerState));
+  }
+#endif
+}
+
+static void publishThermostatConnectedState()
+{
+  sendMQTTData(F("thermostat_connected"), CCONOFF(state.otBus.bThermostatState));
+  if (isPICEnabled()) {
+    sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otBus.bThermostatState));
+  }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/thermostat_connected"), CCONOFF(state.otBus.bThermostatState));
+  }
+#endif
+}
+
+static void publishOTGWConnectedState()
+{
+  sendMQTTData(F("otgw_connected"), CCONOFF(state.otBus.bOnline));
+  if (isPICEnabled()) {
+    sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otBus.bOnline));
+  }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  if (isOTDirectEnabled()) {
+    sendMQTTData(F("otgw-otdirect/ot_online"), CCONOFF(state.otBus.bOnline));
+  }
+#endif
+  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otBus.bOnline));
+}
+
 /*
 Publish state information of PIC firmware version information to MQTT broker.
 */
 void sendMQTTstateinformation(){
-  if (!isPICEnabled()) return;
-  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
-  sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
-  if (state.otgw.bGatewayModeKnown) {
-    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
+  publishBoilerConnectedState();
+  publishThermostatConnectedState();
+  if (state.otBus.bGatewayModeKnown) {
+    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otBus.bGatewayMode));
   }
-  sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
-  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+  publishOTGWConnectedState();
 }
 
 /*
