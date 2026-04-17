@@ -697,6 +697,13 @@ For string comparisons: use `strcmp_P()`, `strcasecmp_P()` with `PSTR()`.
 
 **Post-mortem rule**: If a bug involves `_P` helpers, `PGM_P`, or `__FlashStringHelper`, assume a storage-domain mismatch until proven otherwise. The RAM/flash domain must match the helper — never pass a PROGMEM pointer where RAM is expected or vice versa.
 
+### PROGMEM pointer safety on Arduino Core 3.1.2+
+Standard C functions (`strstr`, `strncmp`, `strlen`) may use word-aligned reads internally.
+On ESP8266, unaligned 32-bit reads from flash (0x402xxxxx) cause Exception (3).
+Use `pgm_strncmp_PP()` and `pgm_read_char()` (defined in `MQTTstuff.h`) for safe byte access.
+Never pass PROGMEM pointers to `printf %s`, `MQTTclient.write()`, or `writeMqttChunk()`.
+Use `writeMqttProgmemChunk()` for PROGMEM data to MQTT.
+
 ### No String class in hot paths (ADR-004)
 - Use `char[]` buffers with `strlcpy`, `strncat`, `snprintf_P`
 - `String` is only acceptable in setup/init code or truly one-off contexts
