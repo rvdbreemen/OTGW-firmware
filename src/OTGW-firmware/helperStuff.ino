@@ -853,9 +853,6 @@ void emergencyHeapRecovery() {
   uint32_t heapBefore = ESP.getFreeHeap();
   DebugTf(PSTR("Emergency heap recovery starting (heap=%u bytes)\r\n"), heapBefore);
   
-  // Force MQTT buffer to minimum size
-  resetMQTTBufferSize();
-  
   // Yield to allow ESP8266 to do housekeeping
   yield();
   delay(10);

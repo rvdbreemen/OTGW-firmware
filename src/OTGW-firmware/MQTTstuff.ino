@@ -89,23 +89,6 @@ static char       MQTTPubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       MQTTSubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       NodeId[MQTT_ID_MAX_LEN];
 
-// Trim whitespace on both sides in-place
-static void trimInPlace(char *buffer) {
-  if (buffer == nullptr) return;
-  size_t len = strlen(buffer);
-  while (len > 0 && isspace(static_cast<unsigned char>(buffer[len - 1]))) {
-    buffer[--len] = '\0';
-  }
-  size_t start = 0;
-  while (buffer[start] != '\0' && isspace(static_cast<unsigned char>(buffer[start]))) {
-    start++;
-  }
-  if (start > 0) {
-    memmove(buffer, buffer + start, len - start + 1);
-  }
-}
-
-
 static bool writeMqttChunk(const char *data, size_t len)
 {
   const size_t CHUNK_SIZE = 128;
@@ -499,16 +482,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-//===========================================================================================
-// sendMQTT - streaming version for large messages (auto-discovery)
-//===========================================================================================
-// sendMQTT - streaming version for large messages (auto-discovery)
-// Sends the message in small chunks to avoid buffer reallocation
-// This prevents heap fragmentation on ESP8266
-//===========================================================================================
 void sendMQTT(const char* topic, const char *json);
-
-// Forward declaration; implementation is provided later in this file
 void sendMQTTStreaming(const char* topic, const char *json, const size_t len);
 
 void handleMQTT() 
@@ -838,48 +812,15 @@ void sendMQTT(const char* topic, const char *json) {
 void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
 {
   if (!settings.mqtt.bEnable) return;
-  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
-  
-  // Check heap health before publishing
-  if (!canPublishMQTT()) {
-    // Message dropped due to low heap - canPublishMQTT() handles logging
-    return;
-  }
-  
-  MQTTDebugTf(PSTR("Sending MQTT (streaming): server %s:%d => TopicId [%s] (len=%d bytes)\r\n"), 
-              settings.mqtt.sBroker, settings.mqtt.iBrokerPort, topic, len);
+  if (!MQTTclient.connected()) return;
+  if (!isValidIP(MQTTbrokerIP)) return;
+  if (!canPublishMQTT()) return;
 
-  // Use beginPublish which tells PubSubClient the total length upfront
-  // This allows it to use its buffer efficiently without reallocation
   if (!beginMqttPublish(topic, len, true)) return;
-
-  // Write message in small chunks to avoid buffer overflow
-  // PubSubClient's write() method handles buffering internally
-  const size_t CHUNK_SIZE = 128; // Small chunks fit comfortably in 256-byte buffer
-  size_t pos = 0;
-  
-  while (pos < len) {
-    size_t chunkLen = (len - pos) > CHUNK_SIZE ? CHUNK_SIZE : (len - pos);
-    
-    // Write chunk as a bulk block instead of byte-by-byte
-    size_t written = MQTTclient.write((const uint8_t*)(json + pos), chunkLen);
-    if (written != chunkLen) {
-      PrintMQTTError();
-      MQTTclient.endPublish(); // Clean up even on error
-      return;
-    }
-    
-    pos += chunkLen;
-    feedWatchDog(); // Feed watchdog during long write operations
-  }
-  
-  if (!MQTTclient.endPublish()) {
-    PrintMQTTError();
-  }
-
+  if (!writeMqttChunk(json, len)) { MQTTclient.endPublish(); return; }
+  if (!MQTTclient.endPublish()) PrintMQTTError();
   feedWatchDog();
-} // sendMQTTStreaming()
+}
 
 //===========================================================================================
 // Helper functions to reduce duplicated MQTT topic building patterns
@@ -969,43 +910,14 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 }
 
 //===========================================================================================
-// resetMQTTBufferSize() - fixed inbound buffer strategy
-//
-// INTENTIONALLY A NO-OP.
-//
-// Current strategy:
-// - PubSubClient buffer is allocated once at startup
-// - Outbound publishes stream via beginPublish/write/endPublish
-// - Buffer is never resized at runtime, avoiding heap churn
-// - Function is kept for API compatibility with existing discovery call sites
-//
-// Memory impact: fixed MQTT client buffer of MQTT_CLIENT_BUFFER_SIZE bytes.
-//===========================================================================================
-void resetMQTTBufferSize()
-{
-  if (!settings.mqtt.bEnable) return;
-  // Intentionally empty - buffer is fixed for app lifetime
-}
-//===========================================================================================
 bool getMQTTConfigDone(const uint8_t MSGid)
 {
-  uint8_t group = MSGid & 0b11100000;
-  group = group>>5;
-  uint8_t index = MSGid & 0b00011111;
-  uint32_t result = bitRead(MQTTautoConfigMap[group], index);
-  if (result > 0) {
-    return true;
-  } else {
-    return false;
-  }
+  return bitRead(MQTTautoConfigMap[MSGid >> 5], MSGid & 0x1F) != 0;
 }
 //===========================================================================================
 void setMQTTConfigDone(const uint8_t MSGid)
 {
-  uint8_t group = MSGid & 0b11100000;
-  group = group>>5;
-  uint8_t index = MSGid & 0b00011111;
-  bitSet(MQTTautoConfigMap[group], index);
+  bitSet(MQTTautoConfigMap[MSGid >> 5], MSGid & 0x1F);
 }
 //===========================================================================================
 void clearMQTTConfigDone()

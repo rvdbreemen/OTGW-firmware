@@ -106,7 +106,6 @@ bool canSendWebSocket();
 bool canPublishMQTT();
 void logHeapStats();
 void emergencyHeapRecovery();
-void resetMQTTBufferSize();
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
