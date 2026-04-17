@@ -120,6 +120,24 @@ enum class HaIcon : uint8_t {
     // Climate / number
     thermostat_icon,        // mdi:thermostat
     thermometer_lines,      // mdi:thermometer-lines
+    // New icons from mqttha_icons.cfg
+    air_filter,             // mdi:air-filter
+    alert_outline,          // mdi:alert-outline
+    antenna,                // mdi:antenna
+    arrow_expand_horizontal, // mdi:arrow-expand-horizontal
+    calendar,               // mdi:calendar
+    card_account_details,   // mdi:card-account-details
+    cog,                    // mdi:cog
+    console,                // mdi:console
+    format_list_numbered,   // mdi:format-list-numbered
+    history,                // mdi:history
+    list_status,            // mdi:list-status
+    remote,                 // mdi:remote
+    solar_panel,            // mdi:solar-panel
+    speedometer,            // mdi:speedometer
+    tag,                    // mdi:tag
+    tune_variant,           // mdi:tune-variant
+    water,                  // mdi:water
     _count
 };
 

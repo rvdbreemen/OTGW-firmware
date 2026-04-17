@@ -28,6 +28,7 @@ REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 SKETCH_DIR = os.path.join(REPO_ROOT, "src", "OTGW-firmware")
 
 INPUT_FILE = os.path.join(SKETCH_DIR, "data", "mqttha.cfg")
+ICONS_CFG_FILE = os.path.join(SKETCH_DIR, "data", "mqttha_icons.cfg")
 CPP_FILE = os.path.join(SKETCH_DIR, "mqtt_configuratie.cpp")
 
 # Flag bit definitions
@@ -68,11 +69,20 @@ STATE_CLASSES = [
 ]
 
 ICONS = [
+    # Must match HaIcon enum in MQTTstuff.h -- do NOT reorder existing entries
     'none', 'thermometer', 'gauge', 'water_percent', 'flash',
     'angle_acute', 'lightning_bolt', 'molecule_co2', 'percent_outline',
-    'timer_outline', 'counter', 'fan', 'fire', 'information_outline',
-    'alert_circle', 'radiator', 'water_boiler', 'snowflake',
-    'information', 'lan_connect', 'toggle_switch', 'checkbox_marked_circle',
+    'timer_outline', 'counter', 'information_outline', 'fan',
+    'current_ac', 'clock_outline', 'pulse',
+    'alert_circle', 'fire', 'radiator', 'water_boiler', 'snowflake',
+    'information', 'toggle_switch', 'lan_connect', 'checkbox_marked_circle',
+    # Climate / number (existing in enum)
+    'thermostat_icon', 'thermometer_lines',
+    # New icons from mqttha_icons.cfg
+    'air_filter', 'alert_outline', 'antenna', 'arrow_expand_horizontal',
+    'calendar', 'card_account_details', 'cog', 'console',
+    'format_list_numbered', 'history', 'list_status', 'remote',
+    'solar_panel', 'speedometer', 'tag', 'tune_variant', 'water',
 ]
 
 ENTITY_CATS = [
@@ -109,29 +119,54 @@ DC_TO_ICON_SENSOR = {
 }
 
 # Icon strings for the enum-to-string function
+# Returns the mdi icon name WITHOUT the "mdi:" prefix -- the streaming code
+# in the hand-written section adds the "mdi:" prefix when writing the JSON.
 ICON_STRINGS = {
     'none': None,
-    'thermometer': 'mdi:thermometer',
-    'gauge': 'mdi:gauge',
-    'water_percent': 'mdi:water-percent',
-    'flash': 'mdi:flash',
-    'angle_acute': 'mdi:angle-acute',
-    'lightning_bolt': 'mdi:lightning-bolt',
-    'molecule_co2': 'mdi:molecule-co2',
-    'percent_outline': 'mdi:percent-outline',
-    'timer_outline': 'mdi:timer-outline',
-    'counter': 'mdi:counter',
-    'fan': 'mdi:fan',
-    'fire': 'mdi:fire',
-    'information_outline': 'mdi:information-outline',
-    'alert_circle': 'mdi:alert-circle',
-    'radiator': 'mdi:radiator',
-    'water_boiler': 'mdi:water-boiler',
-    'snowflake': 'mdi:snowflake',
-    'information': 'mdi:information',
-    'lan_connect': 'mdi:lan-connect',
-    'toggle_switch': 'mdi:toggle-switch',
-    'checkbox_marked_circle': 'mdi:checkbox-marked-circle',
+    'thermometer': 'thermometer',
+    'gauge': 'gauge',
+    'water_percent': 'water-percent',
+    'flash': 'flash',
+    'angle_acute': 'angle-acute',
+    'lightning_bolt': 'lightning-bolt',
+    'molecule_co2': 'molecule-co2',
+    'percent_outline': 'percent-outline',
+    'timer_outline': 'timer-outline',
+    'counter': 'counter',
+    'information_outline': 'information-outline',
+    'fan': 'fan',
+    'current_ac': 'current-ac',
+    'clock_outline': 'clock-outline',
+    'pulse': 'pulse',
+    'alert_circle': 'alert-circle',
+    'fire': 'fire',
+    'radiator': 'radiator',
+    'water_boiler': 'water-boiler',
+    'snowflake': 'snowflake',
+    'information': 'information',
+    'toggle_switch': 'toggle-switch',
+    'lan_connect': 'lan-connect',
+    'checkbox_marked_circle': 'checkbox-marked-circle',
+    'thermostat_icon': 'thermostat',
+    'thermometer_lines': 'thermometer-lines',
+    # New icons from mqttha_icons.cfg
+    'air_filter': 'air-filter',
+    'alert_outline': 'alert-outline',
+    'antenna': 'antenna',
+    'arrow_expand_horizontal': 'arrow-expand-horizontal',
+    'calendar': 'calendar',
+    'card_account_details': 'card-account-details',
+    'cog': 'cog',
+    'console': 'console',
+    'format_list_numbered': 'format-list-numbered',
+    'history': 'history',
+    'list_status': 'list-status',
+    'remote': 'remote',
+    'solar_panel': 'solar-panel',
+    'speedometer': 'speedometer',
+    'tag': 'tag',
+    'tune_variant': 'tune-variant',
+    'water': 'water',
 }
 
 # Unit strings for the enum-to-string function
@@ -151,6 +186,70 @@ UNIT_STRINGS = {
     'mS': 'mS',
     'h': 'h',
 }
+
+
+# ---- Icon config alias (mdi hyphenated -> enum underscore) ----------------- #
+
+# Maps mdi icon names (hyphenated) to enum names (underscored).
+# Special cases where the cfg name differs from the enum name.
+ICON_CFG_ALIASES = {
+    'thermostat': 'thermostat_icon',  # cfg uses "thermostat", enum uses "thermostat_icon"
+}
+
+
+def _mdi_to_enum(mdi_name: str) -> str:
+    """Convert an mdi icon name (hyphenated) to the Python/C++ enum name (underscored).
+    Applies aliases for special cases."""
+    enum_name = mdi_name.replace('-', '_')
+    return ICON_CFG_ALIASES.get(enum_name, enum_name)
+
+
+def load_icon_overrides(path: str) -> dict:
+    """Load icon overrides from mqttha_icons.cfg.
+
+    Returns a dict mapping label -> icon_enum_name.
+    Empty labels (for climate/number entries) are stored as empty string key.
+    Handles comments, blank lines, and the `label ; icon-name // comment` format.
+    """
+    overrides = {}
+    if not os.path.isfile(path):
+        return overrides  # No override file = use heuristics only
+
+    with open(path, encoding='utf-8') as fh:
+        for lineno, raw in enumerate(fh, 1):
+            line = raw.rstrip('\n').rstrip('\r')
+            stripped = line.strip()
+            if not stripped or stripped.startswith('//'):
+                continue
+            # Strip trailing // comment
+            comment_pos = line.find('//')
+            if comment_pos >= 0:
+                line = line[:comment_pos]
+            parts = line.split(';', 1)
+            if len(parts) != 2:
+                continue
+            label = parts[0].strip()
+            icon_mdi = parts[1].strip()
+            if not icon_mdi:
+                continue
+            enum_name = _mdi_to_enum(icon_mdi)
+            if enum_name not in ICONS:
+                print(f'  WARNING: icon "{icon_mdi}" (enum: {enum_name}) at line {lineno} '
+                      f'not in ICONS list -- skipping', file=sys.stderr)
+                continue
+            overrides[label] = enum_name
+            # Also store with otgw-pic/ prefix stripped, since extract_label
+            # strips it when processing mqttha.cfg entries
+            stripped = re.sub(r'^otgw-pic/', '', label)
+            if stripped != label:
+                overrides[stripped] = enum_name
+
+    print(f'  Loaded {len(overrides)} icon overrides from {os.path.basename(path)}.')
+    return overrides
+
+
+# Global icon overrides dict, loaded in main()
+_icon_overrides: dict = {}
 
 
 # ---- Helpers --------------------------------------------------------------- #
@@ -245,26 +344,117 @@ def extract_friendly_name(msg_json: dict) -> str:
 
 
 def determine_sensor_icon(device_class: str, label: str, unit: str) -> str:
-    """Determine icon for a sensor entry."""
+    """Determine icon for a sensor entry.
+    First checks icon overrides from mqttha_icons.cfg, then falls back to heuristics."""
+    # Check icon override first (from mqttha_icons.cfg if it exists)
+    if label in _icon_overrides:
+        return _icon_overrides[label]
+    # By device_class
     if device_class and device_class in DC_TO_ICON_SENSOR:
         return DC_TO_ICON_SENSOR[device_class]
-    # Heuristic fallbacks
-    label_lower = label.lower()
+    # Comprehensive label-based heuristics
+    ll = label.lower()
+    # Status/flags
+    if 'status' in ll and ('master' in ll or 'slave' in ll or 'vh' in ll):
+        return 'list_status'
+    # Config/version/brand
+    if 'config' in ll or 'configuration' in ll:
+        return 'cog'
+    if 'memberid' in ll or 'member_id' in ll:
+        return 'card_account_details'
+    if 'version' in ll:
+        return 'tag'
+    if 'brand' in ll and 'serial' not in ll:
+        return 'tag'
+    if 'serial' in ll:
+        return 'tag'
+    # Faults/diagnostics
+    if 'fault' in ll or 'asf' in ll:
+        return 'alert_outline'
+    if 'oem' in ll and ('fault' in ll or 'diagnostic' in ll):
+        return 'alert_outline'
+    if 'oemdiagnostic' in ll:
+        return 'alert_outline'
+    # Commands
+    if 'command' in ll:
+        return 'console'
+    # Remote parameters/override
+    if 'rbp' in ll or 'remoteoverride' in ll:
+        return 'remote'
+    if 'remoteparameter' in ll and 'boundaries' in ll:
+        return 'arrow_expand_horizontal'
+    if 'remoteparameter' in ll:
+        return 'tune_variant'
+    # TSP/FHB
+    if 'tsp' in ll:
+        return 'format_list_numbered'
+    if 'fhb' in ll:
+        return 'history'
+    # Capacity/modulation
+    if 'maxcapacity' in ll or 'maxrelmod' in ll:
+        return 'speedometer'
+    # Counters/hours
+    if 'operationhours' in ll:
+        return 'timer_outline'
+    if 'starts' in ll or 'cycles' in ll:
+        return 'counter'
+    if 'unsuccessful' in ll or 'toolow' in ll:
+        return 'alert_outline'
+    # Physical quantities
+    if 'pressure' in ll:
+        return 'gauge'
+    if 'flow' in ll:
+        return 'water'
+    # Time/date
+    if 'date' in ll or 'day' in ll:
+        return 'calendar'
+    if 'year' in ll:
+        return 'calendar'
+    if 'time' in ll or 'daytime' in ll:
+        return 'clock_outline'
+    # Solar
+    if 'solar' in ll:
+        return 'solar_panel'
+    # Ventilation/heat recovery
+    if 'vh' in ll or 'ventilation' in ll or 'exhaust' in ll or 'supply' in ll:
+        return 'air_filter'
+    # Fan
+    if 'fan' in ll:
+        return 'fan'
+    # RF/wireless
+    if 'rf' in ll and ('sensor' in ll or 'strength' in ll):
+        return 'antenna'
+    # S0 pulse
+    if 's0pulse' in ll:
+        return 'pulse'
+    # Electricity
+    if 'electricity' in ll or 'electric' in ll:
+        return 'lightning_bolt'
+    # Heating ratio/mode
+    if 'hcratio' in ll:
+        return 'thermostat_icon'
+    if 'mode' in ll and 'operating' in ll:
+        return 'thermostat_icon'
+    # Current
+    if 'current' in ll and 'burner' in ll:
+        return 'current_ac'
+    # Flame
+    if 'flame' in ll:
+        return 'fire'
+    # Unit-based fallbacks
     if unit == '%':
         return 'percent_outline'
     if unit in ('h', 'hours'):
         return 'timer_outline'
-    if 'starts' in label_lower or 'start' in label_lower:
-        return 'counter'
-    if 'fan' in label_lower:
-        return 'fan'
-    if 'flame' in label_lower:
-        return 'fire'
     return 'information_outline'
 
 
 def determine_binsensor_icon(label: str) -> str:
-    """Determine icon for a binary sensor entry."""
+    """Determine icon for a binary sensor entry.
+    First checks icon overrides from mqttha_icons.cfg, then falls back to heuristics."""
+    # Check icon override first
+    if label in _icon_overrides:
+        return _icon_overrides[label]
     ll = label.lower()
     if 'fault' in ll:
         return 'alert_circle'
@@ -571,39 +761,13 @@ def generate_cpp(sensors, bin_sensors, specials, labels, names, output_path, tim
     lines.append('};')
     lines.append('')
 
-    # ========== Climate/Number entries (full JSON PROGMEM) ==========
+    # Climate and Number entries are handled by streaming functions
+    # (streamClimateDiscovery, streamNumberDiscovery) in the hand-written section.
+    # No static PROGMEM templates generated for these.
     if specials:
-        lines.append('// ========== Climate and Number entries (handcrafted JSON) ==========')
-        for s in specials:
-            var_topic = f'ha_{s.entity_type}_topic_{s.ot_id}_{to_c_ident(s.topic.split("/")[-2] if "/" in s.topic else s.entity_type)}'
-            var_msg = f'ha_{s.entity_type}_msg_{s.ot_id}_{to_c_ident(s.topic.split("/")[-2] if "/" in s.topic else s.entity_type)}'
-            lines.append(f'// {s.entity_type} -- OT ID {s.ot_id}')
-            lines.append(f'const char {var_topic}[] PROGMEM =')
-            lines.append(f'    "{c_escape(s.topic)}";')
-            lines.append(f'const char {var_msg}[] PROGMEM =')
-            # Format JSON for readability
-            try:
-                obj = json.loads(s.msg)
-                formatted = json.dumps(obj, indent=2, ensure_ascii=False)
-                json_lines = formatted.split('\n')
-                for i, jl in enumerate(json_lines):
-                    suffix = ';' if i == len(json_lines) - 1 else ''
-                    lines.append(f'    "{c_escape(jl)}"{suffix}')
-            except (json.JSONDecodeError, ValueError):
-                lines.append(f'    "{c_escape(s.msg)}";')
-            lines.append('')
-
-        # Climate/Number table
-        lines.append(f'const uint16_t MQTT_HA_SPECIAL_COUNT = {len(specials)};')
-        lines.append('')
-        lines.append('const MqttHaSpecialCfg PROGMEM mqttHaSpecials[] = {')
-        for s in specials:
-            var_topic = f'ha_{s.entity_type}_topic_{s.ot_id}_{to_c_ident(s.topic.split("/")[-2] if "/" in s.topic else s.entity_type)}'
-            var_msg = f'ha_{s.entity_type}_msg_{s.ot_id}_{to_c_ident(s.topic.split("/")[-2] if "/" in s.topic else s.entity_type)}'
-            flag_str = f'0x{s.flags:02X}' if s.flags else '0x00'
-            type_enum = f'HaEntityType::{s.entity_type}'
-            lines.append(f'    {{{s.ot_id}, {flag_str}, {type_enum}, {var_topic}, {var_msg}}},')
-        lines.append('};')
+        lines.append(f'// Climate ({sum(1 for s in specials if s.entity_type == "climate")}) and '
+                     f'Number ({sum(1 for s in specials if s.entity_type == "number")}) entries '
+                     f'are handled by streaming functions below.')
         lines.append('')
 
     # ========== Enum-to-string lookup functions ==========
@@ -716,6 +880,8 @@ def generate_cpp(sensors, bin_sensors, specials, labels, names, output_path, tim
 # ---- Main ------------------------------------------------------------------ #
 
 def main():
+    global _icon_overrides
+
     if not os.path.isfile(INPUT_FILE):
         print(f'ERROR: input file not found: {INPUT_FILE}', file=sys.stderr)
         sys.exit(1)
@@ -723,6 +889,8 @@ def main():
     print(f'Parsing {INPUT_FILE} ...')
     raw_entries = parse_config(INPUT_FILE)
     print(f'  Parsed {len(raw_entries)} data entries.')
+
+    _icon_overrides = load_icon_overrides(ICONS_CFG_FILE)
 
     sensors, bin_sensors, specials = process_entries(raw_entries)
 

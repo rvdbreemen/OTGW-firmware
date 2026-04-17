@@ -1,6 +1,6 @@
 // AUTO-GENERATED from mqttha.cfg by tools/generate_mqttha_data.py
 // DO NOT EDIT -- regenerate with: python tools/generate_mqttha_data.py
-// Generated: 2026-04-17T07:51:53Z
+// Generated: 2026-04-17T17:40:17Z
 //
 // Sensors        : 289 entries (118 unique OT IDs)
 // Binary sensors : 53 entries (10 unique OT IDs)
@@ -524,34 +524,33 @@ const char ha_name_remote_override_program_change_priority[] PROGMEM = "remote_o
 const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storage_slave_fault_indicator";
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
 
-// ========== Sensor array (288 entries, sorted by id) ==========
-// Note: OT ID 246 (Dallas temp sensors) is handled dynamically by configSensors()
-const uint16_t MQTT_HA_SENSOR_COUNT = 288;
+// ========== Sensor array (289 entries, sorted by id) ==========
+const uint16_t MQTT_HA_SENSOR_COUNT = 289;
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
     // --- OT ID 0 ---
-    {  0, 0x00, ha_lbl_status_master, ha_name_status_master, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    {  0, 0x00, ha_lbl_status_slave, ha_name_status_slave, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    {  0, 0x00, ha_lbl_status_master, ha_name_status_master, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::list_status, HaEntityCat::none, true},
+    {  0, 0x00, ha_lbl_status_slave, ha_name_status_slave, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::list_status, HaEntityCat::none, true},
     // --- OT ID 1 ---
     {  1, 0x00, ha_lbl_tset, ha_name_control_setpoint, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
     {  1, 0x07, ha_lbl_tset, ha_name_control_setpoint, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
     // --- OT ID 2 ---
-    {  2, 0x00, ha_lbl_master_configuration, ha_name_status_master_configuration, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {  2, 0x00, ha_lbl_master_memberid_code, ha_name_status_master_memberid_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {  2, 0x00, ha_lbl_master_configuration, ha_name_status_master_configuration, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::cog, HaEntityCat::diagnostic, true},
+    {  2, 0x00, ha_lbl_master_memberid_code, ha_name_status_master_memberid_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::card_account_details, HaEntityCat::diagnostic, true},
     // --- OT ID 3 ---
-    {  3, 0x00, ha_lbl_slave_configuration, ha_name_status_slave_configuration, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {  3, 0x00, ha_lbl_slave_memberid_code, ha_name_status_slave_memberid_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {  3, 0x00, ha_lbl_slave_configuration, ha_name_status_slave_configuration, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::cog, HaEntityCat::diagnostic, true},
+    {  3, 0x00, ha_lbl_slave_memberid_code, ha_name_status_slave_memberid_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::card_account_details, HaEntityCat::diagnostic, true},
     // --- OT ID 4 ---
-    {  4, 0x00, ha_lbl_command_hb_u8, ha_name_remote_command_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    {  4, 0x00, ha_lbl_command_lb_u8, ha_name_remote_command_response, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    {  4, 0x00, ha_lbl_command_remote_command, ha_name_remote_command, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    {  4, 0x00, ha_lbl_command_hb_u8, ha_name_remote_command_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::console, HaEntityCat::none, true},
+    {  4, 0x00, ha_lbl_command_lb_u8, ha_name_remote_command_response, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::console, HaEntityCat::none, true},
+    {  4, 0x00, ha_lbl_command_remote_command, ha_name_remote_command, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::console, HaEntityCat::none, true},
     // --- OT ID 5 ---
-    {  5, 0x00, ha_lbl_asf_flags, ha_name_application_specific_fault, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {  5, 0x00, ha_lbl_oemfaultcode, ha_name_oemfaultcode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {  5, 0x00, ha_lbl_asf_flags, ha_name_application_specific_fault, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::diagnostic, true},
+    {  5, 0x00, ha_lbl_oemfaultcode, ha_name_oemfaultcode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::diagnostic, true},
     // --- OT ID 6 ---
-    {  6, 0x00, ha_lbl_rbp_flags_read_write, ha_name_rbp_flags_read_write, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {  6, 0x00, ha_lbl_rbp_flags_transfer_enable, ha_name_rbp_flags_transfer_enable, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {  6, 0x00, ha_lbl_rbp_flags_read_write, ha_name_rbp_flags_read_write, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::diagnostic, true},
+    {  6, 0x00, ha_lbl_rbp_flags_transfer_enable, ha_name_rbp_flags_transfer_enable, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::diagnostic, true},
     // --- OT ID 7 ---
     {  7, 0x00, ha_lbl_coolingcontrol, ha_name_cooling_control_signal, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, true},
     {  7, 0x07, ha_lbl_coolingcontrol, ha_name_cooling_control_signal, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, true},
@@ -562,20 +561,20 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {  9, 0x00, ha_lbl_troverride, ha_name_remote_override_room_setpoint, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
     {  9, 0x07, ha_lbl_troverride, ha_name_remote_override_room_setpoint, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
     // --- OT ID 10 ---
-    { 10, 0x00, ha_lbl_tsp_hb_u8, ha_name_tsp_count, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    { 10, 0x00, ha_lbl_tsp_lb_u8, ha_name_tsp_index, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    { 10, 0x00, ha_lbl_tsp_hb_u8, ha_name_tsp_count, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, true},
+    { 10, 0x00, ha_lbl_tsp_lb_u8, ha_name_tsp_index, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, true},
     // --- OT ID 11 ---
-    { 11, 0x00, ha_lbl_tspindextspvalue_hb_u8, ha_name_tsp_entry_index, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    { 11, 0x00, ha_lbl_tspindextspvalue_lb_u8, ha_name_tsp_entry_value, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    { 11, 0x00, ha_lbl_tspindextspvalue_hb_u8, ha_name_tsp_entry_index, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, true},
+    { 11, 0x00, ha_lbl_tspindextspvalue_lb_u8, ha_name_tsp_entry_value, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, true},
     // --- OT ID 12 ---
-    { 12, 0x00, ha_lbl_fhbsize_hb_u8, ha_name_fault_history_buffer_size, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    { 12, 0x00, ha_lbl_fhbsize_lb_u8, ha_name_fault_history_buffer_max, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    { 12, 0x00, ha_lbl_fhbsize_hb_u8, ha_name_fault_history_buffer_size, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::history, HaEntityCat::diagnostic, true},
+    { 12, 0x00, ha_lbl_fhbsize_lb_u8, ha_name_fault_history_buffer_max, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::history, HaEntityCat::diagnostic, true},
     // --- OT ID 13 ---
-    { 13, 0x00, ha_lbl_fhbindexfhbvalue_hb_u8, ha_name_fault_history_index, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    { 13, 0x00, ha_lbl_fhbindexfhbvalue_lb_u8, ha_name_fault_history_value, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    { 13, 0x00, ha_lbl_fhbindexfhbvalue_hb_u8, ha_name_fault_history_index, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::history, HaEntityCat::diagnostic, true},
+    { 13, 0x00, ha_lbl_fhbindexfhbvalue_lb_u8, ha_name_fault_history_value, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::history, HaEntityCat::diagnostic, true},
     // --- OT ID 14 ---
-    { 14, 0x00, ha_lbl_maxrelmodlevelsetting, ha_name_max_rel_modulation_level_setting, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, true},
-    { 14, 0x07, ha_lbl_maxrelmodlevelsetting, ha_name_max_rel_modulation_level_setting, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, true},
+    { 14, 0x00, ha_lbl_maxrelmodlevelsetting, ha_name_max_rel_modulation_level_setting, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::speedometer, HaEntityCat::none, true},
+    { 14, 0x07, ha_lbl_maxrelmodlevelsetting, ha_name_max_rel_modulation_level_setting, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::speedometer, HaEntityCat::none, true},
     // --- OT ID 15 ---
     { 15, 0x00, ha_lbl_maxcapacityminmodlevel_hb_u8, ha_name_maxcapacityminmodlevel_hb_u8, HaDeviceClass::power, HaUnit::kW, HaStateClass::none, HaIcon::flash, HaEntityCat::diagnostic, true},
     { 15, 0x00, ha_lbl_maxcapacityminmodlevel_lb_u8, ha_name_maxcapacityminmodlevel_lb_u8, HaDeviceClass::power_factor, HaUnit::percent, HaStateClass::none, HaIcon::angle_acute, HaEntityCat::diagnostic, true},
@@ -586,21 +585,21 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     { 17, 0x00, ha_lbl_relmodlevel, ha_name_relative_modulation_level, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, true},
     { 17, 0x07, ha_lbl_relmodlevel, ha_name_relative_modulation_level, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, true},
     // --- OT ID 18 ---
-    { 18, 0x00, ha_lbl_chpressure, ha_name_water_pressure_in_ch_circuit, HaDeviceClass::none, HaUnit::bar, HaStateClass::measurement, HaIcon::information_outline, HaEntityCat::none, true},
+    { 18, 0x00, ha_lbl_chpressure, ha_name_water_pressure_in_ch_circuit, HaDeviceClass::none, HaUnit::bar, HaStateClass::measurement, HaIcon::gauge, HaEntityCat::none, true},
     { 18, 0x07, ha_lbl_chpressure, ha_name_water_pressure_in_ch_circuit, HaDeviceClass::pressure, HaUnit::bar, HaStateClass::measurement, HaIcon::gauge, HaEntityCat::none, true},
     // --- OT ID 19 ---
-    { 19, 0x00, ha_lbl_dhwflowrate, ha_name_water_flow_rate_in_dhw_circuit, HaDeviceClass::none, HaUnit::l_min, HaStateClass::measurement, HaIcon::information_outline, HaEntityCat::none, true},
-    { 19, 0x07, ha_lbl_dhwflowrate, ha_name_water_flow_rate_in_dhw_circuit_2, HaDeviceClass::none, HaUnit::l_min, HaStateClass::measurement, HaIcon::information_outline, HaEntityCat::none, true},
+    { 19, 0x00, ha_lbl_dhwflowrate, ha_name_water_flow_rate_in_dhw_circuit, HaDeviceClass::none, HaUnit::l_min, HaStateClass::measurement, HaIcon::water, HaEntityCat::none, true},
+    { 19, 0x07, ha_lbl_dhwflowrate, ha_name_water_flow_rate_in_dhw_circuit_2, HaDeviceClass::none, HaUnit::l_min, HaStateClass::measurement, HaIcon::water, HaEntityCat::none, true},
     // --- OT ID 20 ---
-    { 20, 0x00, ha_lbl_daytime_dayofweek, ha_name_daytime_dayofweek, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 20, 0x00, ha_lbl_daytime_hour, ha_name_daytime_hour, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 20, 0x00, ha_lbl_daytime_minutes, ha_name_daytime_minutes, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 20, 0x00, ha_lbl_daytime_dayofweek, ha_name_daytime_dayofweek, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::calendar, HaEntityCat::none, true},
+    { 20, 0x00, ha_lbl_daytime_hour, ha_name_daytime_hour, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::calendar, HaEntityCat::none, true},
+    { 20, 0x00, ha_lbl_daytime_minutes, ha_name_daytime_minutes, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::calendar, HaEntityCat::none, true},
     // --- OT ID 21 ---
-    { 21, 0x00, ha_lbl_date_day_of_month, ha_name_date_day_of_month, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 21, 0x00, ha_lbl_date_month, ha_name_date_month, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 21, 0x00, ha_lbl_date_day_of_month, ha_name_date_day_of_month, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::calendar, HaEntityCat::none, true},
+    { 21, 0x00, ha_lbl_date_month, ha_name_date_month, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::calendar, HaEntityCat::none, true},
     // --- OT ID 22 ---
-    { 22, 0x00, ha_lbl_year, ha_name_year, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 22, 0x07, ha_lbl_year, ha_name_year, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 22, 0x00, ha_lbl_year, ha_name_year, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::calendar, HaEntityCat::none, true},
+    { 22, 0x07, ha_lbl_year, ha_name_year, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::calendar, HaEntityCat::none, true},
     // --- OT ID 23 ---
     { 23, 0x00, ha_lbl_trsetch2, ha_name_room_setpoint_ch2, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, false},
     { 23, 0x07, ha_lbl_trsetch2, ha_name_room_setpoint_ch2, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, false},
@@ -641,8 +640,8 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     { 35, 0x00, ha_lbl_fanspeed_hb_u8, ha_name_boiler_fan_speed_setpoint, HaDeviceClass::none, HaUnit::Hz, HaStateClass::measurement, HaIcon::fan, HaEntityCat::none, true},
     { 35, 0x00, ha_lbl_fanspeed_lb_u8, ha_name_boiler_fan_speed_actual, HaDeviceClass::none, HaUnit::Hz, HaStateClass::measurement, HaIcon::fan, HaEntityCat::none, true},
     // --- OT ID 36 ---
-    { 36, 0x00, ha_lbl_electricalcurrentburnerflame, ha_name_electricalcurrentburnerflame, HaDeviceClass::none, HaUnit::uA, HaStateClass::none, HaIcon::fire, HaEntityCat::none, true},
-    { 36, 0x07, ha_lbl_electricalcurrentburnerflame, ha_name_electricalcurrentburnerflame, HaDeviceClass::none, HaUnit::uA, HaStateClass::none, HaIcon::fire, HaEntityCat::none, true},
+    { 36, 0x00, ha_lbl_electricalcurrentburnerflame, ha_name_electricalcurrentburnerflame, HaDeviceClass::none, HaUnit::uA, HaStateClass::none, HaIcon::lightning_bolt, HaEntityCat::none, true},
+    { 36, 0x07, ha_lbl_electricalcurrentburnerflame, ha_name_electricalcurrentburnerflame, HaDeviceClass::none, HaUnit::uA, HaStateClass::none, HaIcon::lightning_bolt, HaEntityCat::none, true},
     // --- OT ID 37 ---
     { 37, 0x00, ha_lbl_troomch2, ha_name_room_temperature_ch2, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, false},
     { 37, 0x07, ha_lbl_troomch2, ha_name_room_temperature_ch2, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, false},
@@ -666,30 +665,30 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     { 50, 0x00, ha_lbl_hcratioubhcratiolb_value_hb, ha_name_hcratioubhcratiolb_value_hb, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::none, HaIcon::thermometer, HaEntityCat::none, true},
     { 50, 0x00, ha_lbl_hcratioubhcratiolb_value_lb, ha_name_hcratioubhcratiolb_value_lb, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::none, HaIcon::thermometer, HaEntityCat::none, true},
     // --- OT ID 51 ---
-    { 51, 0x00, ha_lbl_remoteparameter4boundaries_value_hb, ha_name_remote_parameter_4_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 51, 0x00, ha_lbl_remoteparameter4boundaries_value_lb, ha_name_remote_parameter_4_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 51, 0x07, ha_lbl_remoteparameter4boundaries_value_hb, ha_name_remote_parameter_4_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 51, 0x07, ha_lbl_remoteparameter4boundaries_value_lb, ha_name_remote_parameter_4_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 51, 0x00, ha_lbl_remoteparameter4boundaries_value_hb, ha_name_remote_parameter_4_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 51, 0x00, ha_lbl_remoteparameter4boundaries_value_lb, ha_name_remote_parameter_4_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 51, 0x07, ha_lbl_remoteparameter4boundaries_value_hb, ha_name_remote_parameter_4_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 51, 0x07, ha_lbl_remoteparameter4boundaries_value_lb, ha_name_remote_parameter_4_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
     // --- OT ID 52 ---
-    { 52, 0x00, ha_lbl_remoteparameter5boundaries_value_hb, ha_name_remote_parameter_5_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 52, 0x00, ha_lbl_remoteparameter5boundaries_value_lb, ha_name_remote_parameter_5_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 52, 0x07, ha_lbl_remoteparameter5boundaries_value_hb, ha_name_remote_parameter_5_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 52, 0x07, ha_lbl_remoteparameter5boundaries_value_lb, ha_name_remote_parameter_5_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 52, 0x00, ha_lbl_remoteparameter5boundaries_value_hb, ha_name_remote_parameter_5_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 52, 0x00, ha_lbl_remoteparameter5boundaries_value_lb, ha_name_remote_parameter_5_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 52, 0x07, ha_lbl_remoteparameter5boundaries_value_hb, ha_name_remote_parameter_5_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 52, 0x07, ha_lbl_remoteparameter5boundaries_value_lb, ha_name_remote_parameter_5_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
     // --- OT ID 53 ---
-    { 53, 0x00, ha_lbl_remoteparameter6boundaries_value_hb, ha_name_remote_parameter_6_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 53, 0x00, ha_lbl_remoteparameter6boundaries_value_lb, ha_name_remote_parameter_6_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 53, 0x07, ha_lbl_remoteparameter6boundaries_value_hb, ha_name_remote_parameter_6_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 53, 0x07, ha_lbl_remoteparameter6boundaries_value_lb, ha_name_remote_parameter_6_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 53, 0x00, ha_lbl_remoteparameter6boundaries_value_hb, ha_name_remote_parameter_6_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 53, 0x00, ha_lbl_remoteparameter6boundaries_value_lb, ha_name_remote_parameter_6_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 53, 0x07, ha_lbl_remoteparameter6boundaries_value_hb, ha_name_remote_parameter_6_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 53, 0x07, ha_lbl_remoteparameter6boundaries_value_lb, ha_name_remote_parameter_6_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
     // --- OT ID 54 ---
-    { 54, 0x00, ha_lbl_remoteparameter7boundaries_value_hb, ha_name_remote_parameter_7_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 54, 0x00, ha_lbl_remoteparameter7boundaries_value_lb, ha_name_remote_parameter_7_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 54, 0x07, ha_lbl_remoteparameter7boundaries_value_hb, ha_name_remote_parameter_7_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 54, 0x07, ha_lbl_remoteparameter7boundaries_value_lb, ha_name_remote_parameter_7_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 54, 0x00, ha_lbl_remoteparameter7boundaries_value_hb, ha_name_remote_parameter_7_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 54, 0x00, ha_lbl_remoteparameter7boundaries_value_lb, ha_name_remote_parameter_7_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 54, 0x07, ha_lbl_remoteparameter7boundaries_value_hb, ha_name_remote_parameter_7_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 54, 0x07, ha_lbl_remoteparameter7boundaries_value_lb, ha_name_remote_parameter_7_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
     // --- OT ID 55 ---
-    { 55, 0x00, ha_lbl_remoteparameter8boundaries_value_hb, ha_name_remote_parameter_8_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 55, 0x00, ha_lbl_remoteparameter8boundaries_value_lb, ha_name_remote_parameter_8_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 55, 0x07, ha_lbl_remoteparameter8boundaries_value_hb, ha_name_remote_parameter_8_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 55, 0x07, ha_lbl_remoteparameter8boundaries_value_lb, ha_name_remote_parameter_8_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 55, 0x00, ha_lbl_remoteparameter8boundaries_value_hb, ha_name_remote_parameter_8_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 55, 0x00, ha_lbl_remoteparameter8boundaries_value_lb, ha_name_remote_parameter_8_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 55, 0x07, ha_lbl_remoteparameter8boundaries_value_hb, ha_name_remote_parameter_8_boundary_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
+    { 55, 0x07, ha_lbl_remoteparameter8boundaries_value_lb, ha_name_remote_parameter_8_boundary_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::arrow_expand_horizontal, HaEntityCat::none, true},
     // --- OT ID 56 ---
     { 56, 0x00, ha_lbl_tdhwset, ha_name_dhw_setpoint, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
     { 56, 0x07, ha_lbl_tdhwset, ha_name_dhw_setpoint, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
@@ -700,52 +699,52 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     { 58, 0x00, ha_lbl_hcratio, ha_name_otc_heat_curve_ratio, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
     { 58, 0x07, ha_lbl_hcratio, ha_name_otc_heat_curve_ratio, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
     // --- OT ID 59 ---
-    { 59, 0x00, ha_lbl_remoteparameter4, ha_name_remote_parameter_4, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 59, 0x07, ha_lbl_remoteparameter4, ha_name_remote_parameter_4, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 59, 0x00, ha_lbl_remoteparameter4, ha_name_remote_parameter_4, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
+    { 59, 0x07, ha_lbl_remoteparameter4, ha_name_remote_parameter_4, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
     // --- OT ID 60 ---
-    { 60, 0x00, ha_lbl_remoteparameter5, ha_name_remote_parameter_5, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 60, 0x07, ha_lbl_remoteparameter5, ha_name_remote_parameter_5, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 60, 0x00, ha_lbl_remoteparameter5, ha_name_remote_parameter_5, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
+    { 60, 0x07, ha_lbl_remoteparameter5, ha_name_remote_parameter_5, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
     // --- OT ID 61 ---
-    { 61, 0x00, ha_lbl_remoteparameter6, ha_name_remote_parameter_6, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 61, 0x07, ha_lbl_remoteparameter6, ha_name_remote_parameter_6, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 61, 0x00, ha_lbl_remoteparameter6, ha_name_remote_parameter_6, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
+    { 61, 0x07, ha_lbl_remoteparameter6, ha_name_remote_parameter_6, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
     // --- OT ID 62 ---
-    { 62, 0x00, ha_lbl_remoteparameter7, ha_name_remote_parameter_7, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 62, 0x07, ha_lbl_remoteparameter7, ha_name_remote_parameter_7, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 62, 0x00, ha_lbl_remoteparameter7, ha_name_remote_parameter_7, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
+    { 62, 0x07, ha_lbl_remoteparameter7, ha_name_remote_parameter_7, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
     // --- OT ID 63 ---
-    { 63, 0x00, ha_lbl_remoteparameter8, ha_name_remote_parameter_8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 63, 0x07, ha_lbl_remoteparameter8, ha_name_remote_parameter_8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 63, 0x00, ha_lbl_remoteparameter8, ha_name_remote_parameter_8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
+    { 63, 0x07, ha_lbl_remoteparameter8, ha_name_remote_parameter_8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, true},
     // --- OT ID 70 ---
-    { 70, 0x00, ha_lbl_status_vh_master, ha_name_status_vh_master, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 70, 0x00, ha_lbl_status_vh_slave, ha_name_status_vh_slave, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    { 70, 0x00, ha_lbl_status_vh_master, ha_name_status_vh_master, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::list_status, HaEntityCat::none, false},
+    { 70, 0x00, ha_lbl_status_vh_slave, ha_name_status_vh_slave, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::list_status, HaEntityCat::none, false},
     // --- OT ID 71 ---
-    { 71, 0x00, ha_lbl_controlsetpointvh, ha_name_vh_relative_ventilation_position, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, false},
-    { 71, 0x00, ha_lbl_controlsetpointvh_hb_u8, ha_name_controlsetpointvh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 71, 0x00, ha_lbl_controlsetpointvh_lb_u8, ha_name_controlsetpointvh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 71, 0x07, ha_lbl_controlsetpointvh, ha_name_vh_relative_ventilation_position, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, false},
-    { 71, 0x07, ha_lbl_controlsetpointvh_hb_u8, ha_name_controlsetpointvh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 71, 0x07, ha_lbl_controlsetpointvh_lb_u8, ha_name_controlsetpointvh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    { 71, 0x00, ha_lbl_controlsetpointvh, ha_name_vh_relative_ventilation_position, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
+    { 71, 0x00, ha_lbl_controlsetpointvh_hb_u8, ha_name_controlsetpointvh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 71, 0x00, ha_lbl_controlsetpointvh_lb_u8, ha_name_controlsetpointvh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 71, 0x07, ha_lbl_controlsetpointvh, ha_name_vh_relative_ventilation_position, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
+    { 71, 0x07, ha_lbl_controlsetpointvh_hb_u8, ha_name_controlsetpointvh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 71, 0x07, ha_lbl_controlsetpointvh_lb_u8, ha_name_controlsetpointvh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
     // --- OT ID 72 ---
-    { 72, 0x00, ha_lbl_asffaultcodevh_code, ha_name_asffaultcodevh_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    { 72, 0x00, ha_lbl_asffaultcodevh_flag8, ha_name_asffaultcodevh_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    { 72, 0x00, ha_lbl_asffaultcodevh_code, ha_name_asffaultcodevh_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::diagnostic, false},
+    { 72, 0x00, ha_lbl_asffaultcodevh_flag8, ha_name_asffaultcodevh_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::diagnostic, false},
     // --- OT ID 73 ---
-    { 73, 0x00, ha_lbl_diagnosticcodevh, ha_name_diagnosticcodevh, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 73, 0x07, ha_lbl_diagnosticcodevh, ha_name_diagnosticcodevh, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    { 73, 0x00, ha_lbl_diagnosticcodevh, ha_name_diagnosticcodevh, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 73, 0x07, ha_lbl_diagnosticcodevh, ha_name_diagnosticcodevh, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
     // --- OT ID 74 ---
-    { 74, 0x00, ha_lbl_vh_configuration, ha_name_vh_configuration, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    { 74, 0x00, ha_lbl_vh_memberid_code, ha_name_vh_memberid_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    { 74, 0x00, ha_lbl_vh_configuration, ha_name_vh_configuration, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::cog, HaEntityCat::diagnostic, false},
+    { 74, 0x00, ha_lbl_vh_memberid_code, ha_name_vh_memberid_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::card_account_details, HaEntityCat::none, false},
     // --- OT ID 75 ---
-    { 75, 0x00, ha_lbl_openthermversionvh, ha_name_openthermversionvh, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    { 75, 0x07, ha_lbl_openthermversionvh, ha_name_openthermversionvh, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    { 75, 0x00, ha_lbl_openthermversionvh, ha_name_openthermversionvh, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, false},
+    { 75, 0x07, ha_lbl_openthermversionvh, ha_name_openthermversionvh, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, false},
     // --- OT ID 76 ---
-    { 76, 0x00, ha_lbl_versiontypevh_hb_u8, ha_name_versiontypevh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    { 76, 0x00, ha_lbl_versiontypevh_lb_u8, ha_name_versiontypevh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    { 76, 0x00, ha_lbl_versiontypevh_hb_u8, ha_name_versiontypevh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, false},
+    { 76, 0x00, ha_lbl_versiontypevh_lb_u8, ha_name_versiontypevh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, false},
     // --- OT ID 77 ---
-    { 77, 0x00, ha_lbl_relativeventilation, ha_name_relative_ventilation, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, false},
-    { 77, 0x00, ha_lbl_relativeventilation_hb_u8, ha_name_relativeventilation_hb_u8, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, false},
-    { 77, 0x00, ha_lbl_relativeventilation_lb_u8, ha_name_relativeventilation_lb_u8, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, false},
-    { 77, 0x07, ha_lbl_relativeventilation, ha_name_relativeventilation, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, false},
-    { 77, 0x07, ha_lbl_relativeventilation_hb_u8, ha_name_relativeventilation_hb_u8, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, false},
-    { 77, 0x07, ha_lbl_relativeventilation_lb_u8, ha_name_relativeventilation_lb_u8, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::percent_outline, HaEntityCat::none, false},
+    { 77, 0x00, ha_lbl_relativeventilation, ha_name_relative_ventilation, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
+    { 77, 0x00, ha_lbl_relativeventilation_hb_u8, ha_name_relativeventilation_hb_u8, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
+    { 77, 0x00, ha_lbl_relativeventilation_lb_u8, ha_name_relativeventilation_lb_u8, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
+    { 77, 0x07, ha_lbl_relativeventilation, ha_name_relativeventilation, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
+    { 77, 0x07, ha_lbl_relativeventilation_hb_u8, ha_name_relativeventilation_hb_u8, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
+    { 77, 0x07, ha_lbl_relativeventilation_lb_u8, ha_name_relativeventilation_lb_u8, HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
     // --- OT ID 78 ---
     { 78, 0x00, ha_lbl_relativehumidityexhaustair, ha_name_relative_humidity_exhaust_air, HaDeviceClass::humidity, HaUnit::percent, HaStateClass::measurement, HaIcon::water_percent, HaEntityCat::none, false},
     { 78, 0x00, ha_lbl_relativehumidityexhaustair_hb_u8, ha_name_relativehumidityexhaustair_hb_u8, HaDeviceClass::humidity, HaUnit::percent, HaStateClass::measurement, HaIcon::water_percent, HaEntityCat::none, false},
@@ -769,107 +768,107 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     { 83, 0x00, ha_lbl_exhaustoutlettemperature, ha_name_exhaust_outlet_temperature, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, false},
     { 83, 0x07, ha_lbl_exhaustoutlettemperature, ha_name_exhaustoutlettemperature, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, false},
     // --- OT ID 84 ---
-    { 84, 0x00, ha_lbl_actualexhaustfanspeed, ha_name_exhaust_fan_speed, HaDeviceClass::none, HaUnit::rpm, HaStateClass::measurement, HaIcon::fan, HaEntityCat::none, false},
-    { 84, 0x07, ha_lbl_actualexhaustfanspeed, ha_name_exhaust_fan_speed, HaDeviceClass::none, HaUnit::rpm, HaStateClass::measurement, HaIcon::fan, HaEntityCat::none, false},
+    { 84, 0x00, ha_lbl_actualexhaustfanspeed, ha_name_exhaust_fan_speed, HaDeviceClass::none, HaUnit::rpm, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
+    { 84, 0x07, ha_lbl_actualexhaustfanspeed, ha_name_exhaust_fan_speed, HaDeviceClass::none, HaUnit::rpm, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
     // --- OT ID 85 ---
-    { 85, 0x00, ha_lbl_actualsupplyfanspeed, ha_name_supply_fan_speed, HaDeviceClass::none, HaUnit::rpm, HaStateClass::measurement, HaIcon::fan, HaEntityCat::none, false},
-    { 85, 0x07, ha_lbl_actualsupplyfanspeed, ha_name_supply_fan_speed, HaDeviceClass::none, HaUnit::rpm, HaStateClass::measurement, HaIcon::fan, HaEntityCat::none, false},
+    { 85, 0x00, ha_lbl_actualsupplyfanspeed, ha_name_supply_fan_speed, HaDeviceClass::none, HaUnit::rpm, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
+    { 85, 0x07, ha_lbl_actualsupplyfanspeed, ha_name_supply_fan_speed, HaDeviceClass::none, HaUnit::rpm, HaStateClass::measurement, HaIcon::air_filter, HaEntityCat::none, false},
     // --- OT ID 86 ---
-    { 86, 0x00, ha_lbl_remoteparametersettingvh_hb_flag8, ha_name_remoteparametersettingvh_hb_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 86, 0x00, ha_lbl_remoteparametersettingvh_lb_flag8, ha_name_remoteparametersettingvh_lb_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 86, 0x00, ha_lbl_vh_rw_nominal_ventilation_value, ha_name_vh_rw_nominal_ventilation_value, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 86, 0x00, ha_lbl_vh_transfer_enable_nominal_ventilation_value, ha_name_vh_transfer_enable_nominal_ventilation_value, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    { 86, 0x00, ha_lbl_remoteparametersettingvh_hb_flag8, ha_name_remoteparametersettingvh_hb_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, false},
+    { 86, 0x00, ha_lbl_remoteparametersettingvh_lb_flag8, ha_name_remoteparametersettingvh_lb_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tune_variant, HaEntityCat::none, false},
+    { 86, 0x00, ha_lbl_vh_rw_nominal_ventilation_value, ha_name_vh_rw_nominal_ventilation_value, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 86, 0x00, ha_lbl_vh_transfer_enable_nominal_ventilation_value, ha_name_vh_transfer_enable_nominal_ventilation_value, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
     // --- OT ID 87 ---
-    { 87, 0x00, ha_lbl_nominalventilationvalue, ha_name_nominalventilationvalue, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 87, 0x00, ha_lbl_nominalventilationvalue_hb_u8, ha_name_nominalventilationvalue_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 87, 0x00, ha_lbl_nominalventilationvalue_lb_u8, ha_name_nominalventilationvalue_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 87, 0x07, ha_lbl_nominalventilationvalue, ha_name_nominalventilationvalue, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 87, 0x07, ha_lbl_nominalventilationvalue_hb_u8, ha_name_nominalventilationvalue_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 87, 0x07, ha_lbl_nominalventilationvalue_lb_u8, ha_name_nominalventilationvalue_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    { 87, 0x00, ha_lbl_nominalventilationvalue, ha_name_nominalventilationvalue, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 87, 0x00, ha_lbl_nominalventilationvalue_hb_u8, ha_name_nominalventilationvalue_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 87, 0x00, ha_lbl_nominalventilationvalue_lb_u8, ha_name_nominalventilationvalue_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 87, 0x07, ha_lbl_nominalventilationvalue, ha_name_nominalventilationvalue, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 87, 0x07, ha_lbl_nominalventilationvalue_hb_u8, ha_name_nominalventilationvalue_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
+    { 87, 0x07, ha_lbl_nominalventilationvalue_lb_u8, ha_name_nominalventilationvalue_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::air_filter, HaEntityCat::none, false},
     // --- OT ID 88 ---
-    { 88, 0x00, ha_lbl_tspnumbervh_hb_u8, ha_name_tspnumbervh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    { 88, 0x00, ha_lbl_tspnumbervh_lb_u8, ha_name_tspnumbervh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    { 88, 0x00, ha_lbl_tspnumbervh_hb_u8, ha_name_tspnumbervh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, false},
+    { 88, 0x00, ha_lbl_tspnumbervh_lb_u8, ha_name_tspnumbervh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, false},
     // --- OT ID 89 ---
-    { 89, 0x00, ha_lbl_tspentryvh_hb_u8, ha_name_tspentryvh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    { 89, 0x00, ha_lbl_tspentryvh_lb_u8, ha_name_tspentryvh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    { 89, 0x00, ha_lbl_tspentryvh_hb_u8, ha_name_tspentryvh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, false},
+    { 89, 0x00, ha_lbl_tspentryvh_lb_u8, ha_name_tspentryvh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, false},
     // --- OT ID 90 ---
-    { 90, 0x00, ha_lbl_faultbuffersizevh_hb_u8, ha_name_faultbuffersizevh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 90, 0x00, ha_lbl_faultbuffersizevh_lb_u8, ha_name_faultbuffersizevh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    { 90, 0x00, ha_lbl_faultbuffersizevh_hb_u8, ha_name_faultbuffersizevh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::none, false},
+    { 90, 0x00, ha_lbl_faultbuffersizevh_lb_u8, ha_name_faultbuffersizevh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::none, false},
     // --- OT ID 91 ---
-    { 91, 0x00, ha_lbl_faultbufferentryvh_hb_u8, ha_name_faultbufferentryvh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    { 91, 0x00, ha_lbl_faultbufferentryvh_lb_u8, ha_name_faultbufferentryvh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    { 91, 0x00, ha_lbl_faultbufferentryvh_hb_u8, ha_name_faultbufferentryvh_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::none, false},
+    { 91, 0x00, ha_lbl_faultbufferentryvh_lb_u8, ha_name_faultbufferentryvh_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::none, false},
     // --- OT ID 93 ---
-    { 93, 0x00, ha_lbl_brand_hb_u8, ha_name_brand_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    { 93, 0x00, ha_lbl_brand_lb_u8, ha_name_brand_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    { 93, 0x00, ha_lbl_brand_hb_u8, ha_name_brand_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
+    { 93, 0x00, ha_lbl_brand_lb_u8, ha_name_brand_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
     // --- OT ID 94 ---
-    { 94, 0x00, ha_lbl_brandversion_hb_u8, ha_name_brandversion_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    { 94, 0x00, ha_lbl_brandversion_lb_u8, ha_name_brandversion_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    { 94, 0x00, ha_lbl_brandversion_hb_u8, ha_name_brandversion_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
+    { 94, 0x00, ha_lbl_brandversion_lb_u8, ha_name_brandversion_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
     // --- OT ID 95 ---
-    { 95, 0x00, ha_lbl_brandserialnumber_hb_u8, ha_name_brandserialnumber_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    { 95, 0x00, ha_lbl_brandserialnumber_lb_u8, ha_name_brandserialnumber_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    { 95, 0x00, ha_lbl_brandserialnumber_hb_u8, ha_name_brandserialnumber_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
+    { 95, 0x00, ha_lbl_brandserialnumber_lb_u8, ha_name_brandserialnumber_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
     // --- OT ID 96 ---
     { 96, 0x00, ha_lbl_coolingoperationhours, ha_name_coolingoperationhours, HaDeviceClass::none, HaUnit::h, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
     { 96, 0x07, ha_lbl_coolingoperationhours, ha_name_coolingoperationhours, HaDeviceClass::none, HaUnit::h, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
     // --- OT ID 97 ---
-    { 97, 0x00, ha_lbl_powercycles, ha_name_powercycles, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
-    { 97, 0x07, ha_lbl_powercycles, ha_name_powercycles, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
+    { 97, 0x00, ha_lbl_powercycles, ha_name_powercycles, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
+    { 97, 0x07, ha_lbl_powercycles, ha_name_powercycles, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
     // --- OT ID 98 ---
-    { 98, 0x00, ha_lbl_rfsensorstatusinformation_battery_indication, ha_name_rf_sensor_battery, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x00, ha_lbl_rfsensorstatusinformation_battery_indication_code, ha_name_rf_sensor_battery_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x00, ha_lbl_rfsensorstatusinformation_sensor_index, ha_name_rf_sensor_index, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x00, ha_lbl_rfsensorstatusinformation_sensor_type, ha_name_rf_sensor_type, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x00, ha_lbl_rfsensorstatusinformation_sensor_type_code, ha_name_rf_sensor_type_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x00, ha_lbl_rfsensorstatusinformation_signal_strength, ha_name_rf_signal_strength, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x00, ha_lbl_rfsensorstatusinformation_signal_strength_code, ha_name_rf_signal_strength_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x00, ha_lbl_rfstrengthbatterylevel_hb_u8, ha_name_rf_signal_battery_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x00, ha_lbl_rfstrengthbatterylevel_lb_u8, ha_name_rf_signal_battery_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x07, ha_lbl_rfstrengthbatterylevel_hb_u8, ha_name_rf_signal_battery_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 98, 0x07, ha_lbl_rfstrengthbatterylevel_lb_u8, ha_name_rf_signal_battery_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 98, 0x00, ha_lbl_rfsensorstatusinformation_battery_indication, ha_name_rf_sensor_battery, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x00, ha_lbl_rfsensorstatusinformation_battery_indication_code, ha_name_rf_sensor_battery_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x00, ha_lbl_rfsensorstatusinformation_sensor_index, ha_name_rf_sensor_index, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x00, ha_lbl_rfsensorstatusinformation_sensor_type, ha_name_rf_sensor_type, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x00, ha_lbl_rfsensorstatusinformation_sensor_type_code, ha_name_rf_sensor_type_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x00, ha_lbl_rfsensorstatusinformation_signal_strength, ha_name_rf_signal_strength, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x00, ha_lbl_rfsensorstatusinformation_signal_strength_code, ha_name_rf_signal_strength_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x00, ha_lbl_rfstrengthbatterylevel_hb_u8, ha_name_rf_signal_battery_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x00, ha_lbl_rfstrengthbatterylevel_lb_u8, ha_name_rf_signal_battery_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x07, ha_lbl_rfstrengthbatterylevel_hb_u8, ha_name_rf_signal_battery_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
+    { 98, 0x07, ha_lbl_rfstrengthbatterylevel_lb_u8, ha_name_rf_signal_battery_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::antenna, HaEntityCat::none, true},
     // --- OT ID 99 ---
-    { 99, 0x00, ha_lbl_operatingmode_hc1_hc2_dhw_hb_u8, ha_name_operatingmode_hc1_hc2_dhw_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x00, ha_lbl_operatingmode_hc1_hc2_dhw_lb_u8, ha_name_operatingmode_hc1_hc2_dhw_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_dhw_mode, ha_name_remoteoverrideoperatingmode_dhw_mode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_dhw_mode_code, ha_name_remoteoverrideoperatingmode_dhw_mode_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_hc1_mode, ha_name_remoteoverrideoperatingmode_hc1_mode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_hc1_mode_code, ha_name_remoteoverrideoperatingmode_hc1_mode_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_hc2_mode, ha_name_remoteoverrideoperatingmode_hc2_mode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_hc2_mode_code, ha_name_remoteoverrideoperatingmode_hc2_mode_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_manual_dhw_push, ha_name_remoteoverrideoperatingmode_manual_dhw_push, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x07, ha_lbl_operatingmode_hc1_hc2_dhw_hb_u8, ha_name_operatingmode_hc1_hc2_dhw_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    { 99, 0x07, ha_lbl_operatingmode_hc1_hc2_dhw_lb_u8, ha_name_operatingmode_hc1_hc2_dhw_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    { 99, 0x00, ha_lbl_operatingmode_hc1_hc2_dhw_hb_u8, ha_name_operatingmode_hc1_hc2_dhw_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::thermostat_icon, HaEntityCat::none, true},
+    { 99, 0x00, ha_lbl_operatingmode_hc1_hc2_dhw_lb_u8, ha_name_operatingmode_hc1_hc2_dhw_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::thermostat_icon, HaEntityCat::none, true},
+    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_dhw_mode, ha_name_remoteoverrideoperatingmode_dhw_mode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::none, true},
+    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_dhw_mode_code, ha_name_remoteoverrideoperatingmode_dhw_mode_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::none, true},
+    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_hc1_mode, ha_name_remoteoverrideoperatingmode_hc1_mode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::none, true},
+    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_hc1_mode_code, ha_name_remoteoverrideoperatingmode_hc1_mode_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::none, true},
+    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_hc2_mode, ha_name_remoteoverrideoperatingmode_hc2_mode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::none, true},
+    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_hc2_mode_code, ha_name_remoteoverrideoperatingmode_hc2_mode_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::none, true},
+    { 99, 0x00, ha_lbl_remoteoverrideoperatingmode_manual_dhw_push, ha_name_remoteoverrideoperatingmode_manual_dhw_push, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::none, true},
+    { 99, 0x07, ha_lbl_operatingmode_hc1_hc2_dhw_hb_u8, ha_name_operatingmode_hc1_hc2_dhw_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::thermostat_icon, HaEntityCat::none, true},
+    { 99, 0x07, ha_lbl_operatingmode_hc1_hc2_dhw_lb_u8, ha_name_operatingmode_hc1_hc2_dhw_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::thermostat_icon, HaEntityCat::none, true},
     // --- OT ID 100 ---
-    {100, 0x00, ha_lbl_roomremoteoverridefunction_flag8, ha_name_roomremoteoverridefunction_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
+    {100, 0x00, ha_lbl_roomremoteoverridefunction_flag8, ha_name_roomremoteoverridefunction_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::remote, HaEntityCat::none, true},
     // --- OT ID 101 ---
-    {101, 0x00, ha_lbl_solar_storage_master_mode, ha_name_solar_storage_master_mode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    {101, 0x00, ha_lbl_solar_storage_mode_status, ha_name_solar_storage_mode_status, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
-    {101, 0x00, ha_lbl_solar_storage_slave_status, ha_name_solar_storage_slave_status, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    {101, 0x00, ha_lbl_solar_storage_master_mode, ha_name_solar_storage_master_mode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::solar_panel, HaEntityCat::none, false},
+    {101, 0x00, ha_lbl_solar_storage_mode_status, ha_name_solar_storage_mode_status, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::solar_panel, HaEntityCat::none, false},
+    {101, 0x00, ha_lbl_solar_storage_slave_status, ha_name_solar_storage_slave_status, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::list_status, HaEntityCat::none, false},
     // --- OT ID 102 ---
-    {102, 0x00, ha_lbl_solarstorageasfflags_code, ha_name_solarstorageasfflags_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    {102, 0x00, ha_lbl_solarstorageasfflags_flag8, ha_name_solarstorageasfflags_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    {102, 0x00, ha_lbl_solarstorageasfflags_code, ha_name_solarstorageasfflags_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::diagnostic, false},
+    {102, 0x00, ha_lbl_solarstorageasfflags_flag8, ha_name_solarstorageasfflags_flag8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::diagnostic, false},
     // --- OT ID 103 ---
-    {103, 0x00, ha_lbl_solar_storage_slave_configuration, ha_name_solar_storage_slave_configuration, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    {103, 0x00, ha_lbl_solar_storage_slave_memberid_code, ha_name_solar_storage_slave_memberid_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
+    {103, 0x00, ha_lbl_solar_storage_slave_configuration, ha_name_solar_storage_slave_configuration, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::cog, HaEntityCat::diagnostic, false},
+    {103, 0x00, ha_lbl_solar_storage_slave_memberid_code, ha_name_solar_storage_slave_memberid_code, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::card_account_details, HaEntityCat::none, false},
     // --- OT ID 104 ---
-    {104, 0x00, ha_lbl_solarstorageversiontype_hb_u8, ha_name_solarstorageversiontype_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    {104, 0x00, ha_lbl_solarstorageversiontype_lb_u8, ha_name_solarstorageversiontype_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    {104, 0x00, ha_lbl_solarstorageversiontype_hb_u8, ha_name_solarstorageversiontype_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, false},
+    {104, 0x00, ha_lbl_solarstorageversiontype_lb_u8, ha_name_solarstorageversiontype_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, false},
     // --- OT ID 105 ---
-    {105, 0x00, ha_lbl_solarstoragetsp_hb_u8, ha_name_solarstoragetsp_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    {105, 0x00, ha_lbl_solarstoragetsp_lb_u8, ha_name_solarstoragetsp_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    {105, 0x00, ha_lbl_solarstoragetsp_hb_u8, ha_name_solarstoragetsp_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, false},
+    {105, 0x00, ha_lbl_solarstoragetsp_lb_u8, ha_name_solarstoragetsp_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, false},
     // --- OT ID 106 ---
-    {106, 0x00, ha_lbl_solarstoragetspindextspvalue_hb_u8, ha_name_solarstoragetspindextspvalue_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    {106, 0x00, ha_lbl_solarstoragetspindextspvalue_lb_u8, ha_name_solarstoragetspindextspvalue_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    {106, 0x00, ha_lbl_solarstoragetspindextspvalue_hb_u8, ha_name_solarstoragetspindextspvalue_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, false},
+    {106, 0x00, ha_lbl_solarstoragetspindextspvalue_lb_u8, ha_name_solarstoragetspindextspvalue_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::format_list_numbered, HaEntityCat::diagnostic, false},
     // --- OT ID 107 ---
-    {107, 0x00, ha_lbl_solarstoragefhbsize_hb_u8, ha_name_solarstoragefhbsize_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    {107, 0x00, ha_lbl_solarstoragefhbsize_lb_u8, ha_name_solarstoragefhbsize_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    {107, 0x00, ha_lbl_solarstoragefhbsize_hb_u8, ha_name_solarstoragefhbsize_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::history, HaEntityCat::diagnostic, false},
+    {107, 0x00, ha_lbl_solarstoragefhbsize_lb_u8, ha_name_solarstoragefhbsize_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::history, HaEntityCat::diagnostic, false},
     // --- OT ID 108 ---
-    {108, 0x00, ha_lbl_solarstoragefhbindexfhbvalue_hb_u8, ha_name_solarstoragefhbindexfhbvalue_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
-    {108, 0x00, ha_lbl_solarstoragefhbindexfhbvalue_lb_u8, ha_name_solarstoragefhbindexfhbvalue_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, false},
+    {108, 0x00, ha_lbl_solarstoragefhbindexfhbvalue_hb_u8, ha_name_solarstoragefhbindexfhbvalue_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::history, HaEntityCat::diagnostic, false},
+    {108, 0x00, ha_lbl_solarstoragefhbindexfhbvalue_lb_u8, ha_name_solarstoragefhbindexfhbvalue_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::history, HaEntityCat::diagnostic, false},
     // --- OT ID 109 ---
     {109, 0x00, ha_lbl_electricityproducerstarts, ha_name_electricityproducerstarts, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
     {109, 0x07, ha_lbl_electricityproducerstarts, ha_name_electricityproducerstarts, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
     // --- OT ID 110 ---
-    {110, 0x00, ha_lbl_electricityproducerhours, ha_name_electricityproducerhours, HaDeviceClass::none, HaUnit::h, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
-    {110, 0x07, ha_lbl_electricityproducerhours, ha_name_electricityproducerhours, HaDeviceClass::none, HaUnit::h, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
+    {110, 0x00, ha_lbl_electricityproducerhours, ha_name_electricityproducerhours, HaDeviceClass::none, HaUnit::h, HaStateClass::total_increasing, HaIcon::lightning_bolt, HaEntityCat::none, true},
+    {110, 0x07, ha_lbl_electricityproducerhours, ha_name_electricityproducerhours, HaDeviceClass::none, HaUnit::h, HaStateClass::total_increasing, HaIcon::lightning_bolt, HaEntityCat::none, true},
     // --- OT ID 111 ---
     {111, 0x00, ha_lbl_electricityproduction, ha_name_electricityproduction, HaDeviceClass::power, HaUnit::W, HaStateClass::measurement, HaIcon::flash, HaEntityCat::none, true},
     {111, 0x07, ha_lbl_electricityproduction, ha_name_electricityproduction, HaDeviceClass::power, HaUnit::W, HaStateClass::measurement, HaIcon::flash, HaEntityCat::none, true},
@@ -880,11 +879,11 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {113, 0x00, ha_lbl_burnerunsuccessfulstarts, ha_name_burnerunsuccessfulstarts, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
     {113, 0x07, ha_lbl_burnerunsuccessfulstarts, ha_name_burnerunsuccessfulstarts, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
     // --- OT ID 114 ---
-    {114, 0x00, ha_lbl_flamesignaltoolow, ha_name_flamesignaltoolow, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::fire, HaEntityCat::none, true},
-    {114, 0x07, ha_lbl_flamesignaltoolow, ha_name_flamesignaltoolow, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::fire, HaEntityCat::none, true},
+    {114, 0x00, ha_lbl_flamesignaltoolow, ha_name_flamesignaltoolow, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::alert_outline, HaEntityCat::none, true},
+    {114, 0x07, ha_lbl_flamesignaltoolow, ha_name_flamesignaltoolow, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::alert_outline, HaEntityCat::none, true},
     // --- OT ID 115 ---
-    {115, 0x00, ha_lbl_oemdiagnosticcode, ha_name_oemdiagnosticcode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {115, 0x07, ha_lbl_oemdiagnosticcode, ha_name_oemdiagnosticcode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {115, 0x00, ha_lbl_oemdiagnosticcode, ha_name_oemdiagnosticcode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::diagnostic, true},
+    {115, 0x07, ha_lbl_oemdiagnosticcode, ha_name_oemdiagnosticcode, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_outline, HaEntityCat::diagnostic, true},
     // --- OT ID 116 ---
     {116, 0x00, ha_lbl_burnerstarts, ha_name_burnerstarts, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
     {116, 0x07, ha_lbl_burnerstarts, ha_name_burnerstarts, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
@@ -898,29 +897,29 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {119, 0x00, ha_lbl_dhwburnerstarts, ha_name_dhwburnerstarts, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
     {119, 0x07, ha_lbl_dhwburnerstarts, ha_name_dhwburnerstarts, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::none, true},
     // --- OT ID 120 ---
-    {120, 0x00, ha_lbl_burneroperationhours, ha_name_burneroperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
-    {120, 0x07, ha_lbl_burneroperationhours, ha_name_burneroperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
+    {120, 0x00, ha_lbl_burneroperationhours, ha_name_burneroperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
+    {120, 0x07, ha_lbl_burneroperationhours, ha_name_burneroperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
     // --- OT ID 121 ---
-    {121, 0x00, ha_lbl_chpumpoperationhours, ha_name_chpumpoperationhoursg, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
-    {121, 0x07, ha_lbl_chpumpoperationhours, ha_name_chpumpoperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
+    {121, 0x00, ha_lbl_chpumpoperationhours, ha_name_chpumpoperationhoursg, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
+    {121, 0x07, ha_lbl_chpumpoperationhours, ha_name_chpumpoperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
     // --- OT ID 122 ---
-    {122, 0x00, ha_lbl_dhwpumpvalveoperationhours, ha_name_dhwpumpvalveoperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
-    {122, 0x07, ha_lbl_dhwpumpvalveoperationhours, ha_name_dhwpumpvalveoperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
+    {122, 0x00, ha_lbl_dhwpumpvalveoperationhours, ha_name_dhwpumpvalveoperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
+    {122, 0x07, ha_lbl_dhwpumpvalveoperationhours, ha_name_dhwpumpvalveoperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
     // --- OT ID 123 ---
-    {123, 0x00, ha_lbl_dhwburneroperationhours, ha_name_dhwburneroperationhours_dhw, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
-    {123, 0x07, ha_lbl_dhwburneroperationhours, ha_name_dhwburneroperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::information_outline, HaEntityCat::none, true},
+    {123, 0x00, ha_lbl_dhwburneroperationhours, ha_name_dhwburneroperationhours_dhw, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
+    {123, 0x07, ha_lbl_dhwburneroperationhours, ha_name_dhwburneroperationhours, HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::timer_outline, HaEntityCat::none, true},
     // --- OT ID 124 ---
-    {124, 0x00, ha_lbl_openthermversionmaster, ha_name_master_ot_protocol_version, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {124, 0x07, ha_lbl_openthermversionmaster, ha_name_master_ot_protocol_version, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {124, 0x00, ha_lbl_openthermversionmaster, ha_name_master_ot_protocol_version, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
+    {124, 0x07, ha_lbl_openthermversionmaster, ha_name_master_ot_protocol_version, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
     // --- OT ID 125 ---
-    {125, 0x00, ha_lbl_openthermversionslave, ha_name_slave_ot_protocol_version, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {125, 0x07, ha_lbl_openthermversionslave, ha_name_slave_ot_protocol_version, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {125, 0x00, ha_lbl_openthermversionslave, ha_name_slave_ot_protocol_version, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
+    {125, 0x07, ha_lbl_openthermversionslave, ha_name_slave_ot_protocol_version, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
     // --- OT ID 126 ---
-    {126, 0x00, ha_lbl_masterversion_hb_u8, ha_name_masterversion_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {126, 0x00, ha_lbl_masterversion_lb_u8, ha_name_masterversion_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {126, 0x00, ha_lbl_masterversion_hb_u8, ha_name_masterversion_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
+    {126, 0x00, ha_lbl_masterversion_lb_u8, ha_name_masterversion_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
     // --- OT ID 127 ---
-    {127, 0x00, ha_lbl_slaveversion_hb_u8, ha_name_slaveversion_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {127, 0x00, ha_lbl_slaveversion_lb_u8, ha_name_slaveversion_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {127, 0x00, ha_lbl_slaveversion_hb_u8, ha_name_slaveversion_hb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
+    {127, 0x00, ha_lbl_slaveversion_lb_u8, ha_name_slaveversion_lb_u8, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::tag, HaEntityCat::diagnostic, true},
     // --- OT ID 131 ---
     {131, 0x00, ha_lbl_remehadfducodes_hb_u8, ha_name_remeha_fd_u_codes_hb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
     {131, 0x00, ha_lbl_remehadfducodes_lb_u8, ha_name_remeha_fd_u_codes_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
@@ -932,12 +931,11 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {133, 0x00, ha_lbl_remehadetectionconnectedscu_lb_u8, ha_name_remeha_detection_connected_scu_lb, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, false},
     // --- OT ID 245 ---
     {245, 0x00, ha_lbl_s0powerkw, ha_name_s0_power_kw, HaDeviceClass::power, HaUnit::kW, HaStateClass::measurement, HaIcon::flash, HaEntityCat::none, true},
-    {245, 0x00, ha_lbl_s0pulsecount, ha_name_s0_pulse_count, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    {245, 0x00, ha_lbl_s0pulsecounttot, ha_name_s0_pulse_count_total, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    {245, 0x00, ha_lbl_s0pulsetime, ha_name_s0_pulse_time, HaDeviceClass::none, HaUnit::mS, HaStateClass::none, HaIcon::information_outline, HaEntityCat::none, true},
-    // OT ID 246 (Dallas temperature sensors) is NOT in this array.
-    // Dallas sensors have dynamic addresses and are configured at runtime
-    // via configSensors() / sensorAutoConfigure().
+    {245, 0x00, ha_lbl_s0pulsecount, ha_name_s0_pulse_count, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::pulse, HaEntityCat::none, true},
+    {245, 0x00, ha_lbl_s0pulsecounttot, ha_name_s0_pulse_count_total, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::pulse, HaEntityCat::none, true},
+    {245, 0x00, ha_lbl_s0pulsetime, ha_name_s0_pulse_time, HaDeviceClass::none, HaUnit::mS, HaStateClass::none, HaIcon::clock_outline, HaEntityCat::none, true},
+    // --- OT ID 246 ---
+    {246, 0x00, ha_lbl_sensor_id, ha_name_sensor_id, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
 };
 
 // ========== Binary sensor array (53 entries, sorted by id) ==========
@@ -1258,7 +1256,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 243
     0xFFFF, // id 244
     284, // id 245, 4 entries
-    0xFFFF, // id 246 (Dallas sensors handled by configSensors)
+    288, // id 246, 1 entry
     0xFFFF, // id 247
     0xFFFF, // id 248
     0xFFFF, // id 249
@@ -1529,9 +1527,7 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF // id 255
 };
 
-// Climate and Number discovery is now handled by streaming functions
-// (streamClimateDiscovery, streamNumberDiscovery) in the hand-written
-// section below. No static PROGMEM templates needed.
+// Climate (2) and Number (1) entries are handled by streaming functions below.
 
 // ========== Enum-to-string lookup functions ==========
 
@@ -1581,27 +1577,49 @@ PGM_P haStateClassStr(HaStateClass sc) {
 PGM_P haIconStr(HaIcon ic) {
     switch (ic) {
         case HaIcon::none: return nullptr;
-        case HaIcon::thermometer: { static const char s[] PROGMEM = "mdi:thermometer"; return s; }
-        case HaIcon::gauge: { static const char s[] PROGMEM = "mdi:gauge"; return s; }
-        case HaIcon::water_percent: { static const char s[] PROGMEM = "mdi:water-percent"; return s; }
-        case HaIcon::flash: { static const char s[] PROGMEM = "mdi:flash"; return s; }
-        case HaIcon::angle_acute: { static const char s[] PROGMEM = "mdi:angle-acute"; return s; }
-        case HaIcon::lightning_bolt: { static const char s[] PROGMEM = "mdi:lightning-bolt"; return s; }
-        case HaIcon::molecule_co2: { static const char s[] PROGMEM = "mdi:molecule-co2"; return s; }
-        case HaIcon::percent_outline: { static const char s[] PROGMEM = "mdi:percent-outline"; return s; }
-        case HaIcon::timer_outline: { static const char s[] PROGMEM = "mdi:timer-outline"; return s; }
-        case HaIcon::counter: { static const char s[] PROGMEM = "mdi:counter"; return s; }
-        case HaIcon::fan: { static const char s[] PROGMEM = "mdi:fan"; return s; }
-        case HaIcon::fire: { static const char s[] PROGMEM = "mdi:fire"; return s; }
-        case HaIcon::information_outline: { static const char s[] PROGMEM = "mdi:information-outline"; return s; }
-        case HaIcon::alert_circle: { static const char s[] PROGMEM = "mdi:alert-circle"; return s; }
-        case HaIcon::radiator: { static const char s[] PROGMEM = "mdi:radiator"; return s; }
-        case HaIcon::water_boiler: { static const char s[] PROGMEM = "mdi:water-boiler"; return s; }
-        case HaIcon::snowflake: { static const char s[] PROGMEM = "mdi:snowflake"; return s; }
-        case HaIcon::information: { static const char s[] PROGMEM = "mdi:information"; return s; }
-        case HaIcon::lan_connect: { static const char s[] PROGMEM = "mdi:lan-connect"; return s; }
-        case HaIcon::toggle_switch: { static const char s[] PROGMEM = "mdi:toggle-switch"; return s; }
-        case HaIcon::checkbox_marked_circle: { static const char s[] PROGMEM = "mdi:checkbox-marked-circle"; return s; }
+        case HaIcon::thermometer: { static const char s[] PROGMEM = "thermometer"; return s; }
+        case HaIcon::gauge: { static const char s[] PROGMEM = "gauge"; return s; }
+        case HaIcon::water_percent: { static const char s[] PROGMEM = "water-percent"; return s; }
+        case HaIcon::flash: { static const char s[] PROGMEM = "flash"; return s; }
+        case HaIcon::angle_acute: { static const char s[] PROGMEM = "angle-acute"; return s; }
+        case HaIcon::lightning_bolt: { static const char s[] PROGMEM = "lightning-bolt"; return s; }
+        case HaIcon::molecule_co2: { static const char s[] PROGMEM = "molecule-co2"; return s; }
+        case HaIcon::percent_outline: { static const char s[] PROGMEM = "percent-outline"; return s; }
+        case HaIcon::timer_outline: { static const char s[] PROGMEM = "timer-outline"; return s; }
+        case HaIcon::counter: { static const char s[] PROGMEM = "counter"; return s; }
+        case HaIcon::information_outline: { static const char s[] PROGMEM = "information-outline"; return s; }
+        case HaIcon::fan: { static const char s[] PROGMEM = "fan"; return s; }
+        case HaIcon::current_ac: { static const char s[] PROGMEM = "current-ac"; return s; }
+        case HaIcon::clock_outline: { static const char s[] PROGMEM = "clock-outline"; return s; }
+        case HaIcon::pulse: { static const char s[] PROGMEM = "pulse"; return s; }
+        case HaIcon::alert_circle: { static const char s[] PROGMEM = "alert-circle"; return s; }
+        case HaIcon::fire: { static const char s[] PROGMEM = "fire"; return s; }
+        case HaIcon::radiator: { static const char s[] PROGMEM = "radiator"; return s; }
+        case HaIcon::water_boiler: { static const char s[] PROGMEM = "water-boiler"; return s; }
+        case HaIcon::snowflake: { static const char s[] PROGMEM = "snowflake"; return s; }
+        case HaIcon::information: { static const char s[] PROGMEM = "information"; return s; }
+        case HaIcon::toggle_switch: { static const char s[] PROGMEM = "toggle-switch"; return s; }
+        case HaIcon::lan_connect: { static const char s[] PROGMEM = "lan-connect"; return s; }
+        case HaIcon::checkbox_marked_circle: { static const char s[] PROGMEM = "checkbox-marked-circle"; return s; }
+        case HaIcon::thermostat_icon: { static const char s[] PROGMEM = "thermostat"; return s; }
+        case HaIcon::thermometer_lines: { static const char s[] PROGMEM = "thermometer-lines"; return s; }
+        case HaIcon::air_filter: { static const char s[] PROGMEM = "air-filter"; return s; }
+        case HaIcon::alert_outline: { static const char s[] PROGMEM = "alert-outline"; return s; }
+        case HaIcon::antenna: { static const char s[] PROGMEM = "antenna"; return s; }
+        case HaIcon::arrow_expand_horizontal: { static const char s[] PROGMEM = "arrow-expand-horizontal"; return s; }
+        case HaIcon::calendar: { static const char s[] PROGMEM = "calendar"; return s; }
+        case HaIcon::card_account_details: { static const char s[] PROGMEM = "card-account-details"; return s; }
+        case HaIcon::cog: { static const char s[] PROGMEM = "cog"; return s; }
+        case HaIcon::console: { static const char s[] PROGMEM = "console"; return s; }
+        case HaIcon::format_list_numbered: { static const char s[] PROGMEM = "format-list-numbered"; return s; }
+        case HaIcon::history: { static const char s[] PROGMEM = "history"; return s; }
+        case HaIcon::list_status: { static const char s[] PROGMEM = "list-status"; return s; }
+        case HaIcon::remote: { static const char s[] PROGMEM = "remote"; return s; }
+        case HaIcon::solar_panel: { static const char s[] PROGMEM = "solar-panel"; return s; }
+        case HaIcon::speedometer: { static const char s[] PROGMEM = "speedometer"; return s; }
+        case HaIcon::tag: { static const char s[] PROGMEM = "tag"; return s; }
+        case HaIcon::tune_variant: { static const char s[] PROGMEM = "tune-variant"; return s; }
+        case HaIcon::water: { static const char s[] PROGMEM = "water"; return s; }
         default: return nullptr;
     }
 }
@@ -1615,6 +1633,11 @@ PGM_P haEntityCatStr(HaEntityCat ec) {
 }
 
 // ========== END AUTO-GENERATED SECTION ==========
+
+
+
+
+
 
 // Hand-written code below -- DO NOT remove this marker
 
