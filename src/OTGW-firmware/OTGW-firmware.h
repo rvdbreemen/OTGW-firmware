@@ -225,6 +225,7 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bMQTT                  = false;  // was bDebugMQTT — MQTT communication trace (connect/send/receive)
   bool     bMQTTGate              = false;  // MQTT interval gating decisions (high volume)
   bool     bSensors               = false;  // was bDebugSensors — Dallas sensor scan trace
+  bool     bNTP                   = true;   // NTP time sync telemetry (on by default for diagnostics)
   bool     bSensorSim             = false;  // was bDebugSensorSimulation
   bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
 #if defined(ENABLE_SAT)

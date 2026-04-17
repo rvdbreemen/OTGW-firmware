@@ -31,6 +31,7 @@ void handleDebugChar(char c){
                 Debugf(PSTR("3) Toggle debuglog - MQTT communication: %s\r\n"), CBOOLEAN(state.debug.bMQTT));
                 Debugf(PSTR("4) Toggle debuglog - MQTT interval gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
                 Debugf(PSTR("5) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(state.debug.bSensors));
+                Debugf(PSTR("6) Toggle debuglog - NTP time sync: %s\r\n"), CBOOLEAN(state.debug.bNTP));
                 Debugf(PSTR("d) Toggle Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));
                 Debugln(F("--- Commands ---"));
                 Debugln(F("q) Force read settings"));
@@ -107,6 +108,10 @@ void handleDebugChar(char c){
             case '5':
                 state.debug.bSensors = !state.debug.bSensors;
                 DebugTf(PSTR("\r\nDebug Sensors: %s\r\n"), CBOOLEAN(state.debug.bSensors));
+                break;
+            case '6':
+                state.debug.bNTP = !state.debug.bNTP;
+                DebugTf(PSTR("\r\nDebug NTP: %s\r\n"), CBOOLEAN(state.debug.bNTP));
                 break;
             case 'd':
                 state.debug.bSensorSim = !state.debug.bSensorSim;
