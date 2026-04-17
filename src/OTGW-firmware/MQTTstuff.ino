@@ -1424,8 +1424,16 @@ void doAutoConfigure(){
       return;
     }
 
+    // Validate PROGMEM pool linkage — catches broken extern/definition mismatches
+    // that would cause pool pointers to be NULL (offset used as raw address → crash).
+    if (reinterpret_cast<uintptr_t>(mqttHaTopicPool) < 0x40200000 ||
+        reinterpret_cast<uintptr_t>(mqttHaMsgPool)   < 0x40200000) {
+      DebugTln(F("FATAL: MQTT PROGMEM pools not in flash! Skipping autodiscovery."));
+      return;
+    }
+
     // sTopic = cMsg is the only RAM buffer used.  Topic and msg templates are read
-    // directly from PROGMEM pools (ESP8266 memory-mapped flash, byte-accessible via *ptr).
+    // directly from PROGMEM pools (ESP8266 memory-mapped flash, byte-accessible via pgm_read_byte).
     // feedWatchDog() (NOT doBackgroundTasks) is the only yield — guarantees no HTTP/MQTT
     // callback overwrites cMsg between topic render and streaming publish.
     char *sTopic = cMsg;
@@ -1547,8 +1555,15 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
   uint16_t idx = pgm_read_word(&mqttHaCfgIndex[OTid]);
   if (idx == 0xFFFF) return _result;  // OT ID not in discovery config table
 
+  // Validate PROGMEM pool linkage — catches broken extern/definition mismatches.
+  if (reinterpret_cast<uintptr_t>(mqttHaTopicPool) < 0x40200000 ||
+      reinterpret_cast<uintptr_t>(mqttHaMsgPool)   < 0x40200000) {
+    DebugTln(F("FATAL: MQTT PROGMEM pools not in flash!"));
+    return _result;
+  }
+
   // sTopic = cMsg is the only RAM buffer used.  Topic and msg templates are read
-  // directly from PROGMEM pools (ESP8266 memory-mapped flash, byte-accessible via *ptr).
+  // directly from PROGMEM pools (ESP8266 memory-mapped flash, byte-accessible via pgm_read_byte).
   // feedWatchDog() is the only yield — prevents HTTP/MQTT callbacks from overwriting cMsg.
   char *sTopic = cMsg;
 
