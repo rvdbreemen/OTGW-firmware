@@ -1069,8 +1069,8 @@ void markAllMQTTConfigPending()
 // This avoids adding lwIP pbuf allocations when the system is already
 // memory-constrained, while still making progress on discovery.
 //===========================================================================================
-constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 3;   // seconds
-constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 30;  // seconds
+constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 1;   // seconds (streaming is lightweight)
+constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 10;  // seconds (heap pressure backoff)
 
 void loopMQTTDiscovery()
 {
@@ -1115,8 +1115,7 @@ void loopMQTTDiscovery()
       }
 
       MQTTDebugTf(PSTR("[drip] publishing discovery for OT ID %d\r\n"), msgId);
-      bool success = doAutoConfigureMsgid(msgId, NodeId,
-                       messageIDToString(static_cast<OpenThermMessageID>(msgId)));
+      bool success = doAutoConfigureMsgid(msgId);
       if (success) {
         setMQTTConfigDone(msgId);
       }
@@ -1129,39 +1128,40 @@ void loopMQTTDiscovery()
   }
 }
 //===========================================================================================
+// Build a discovery context from the current MQTT state.
+// Caller sets ctx.isFirstEntity as appropriate.
+static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
+  HaDiscoveryContext ctx;
+  ctx.nodeId = NodeId;
+  ctx.hostname = CSTR(settings.sHostname);
+  ctx.version = _VERSION;
+  ctx.mqttPubTopic = MQTTPubNamespace;
+  ctx.mqttSubTopic = MQTTSubNamespace;
+  ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
+  ctx.isFirstEntity = isFirst;
+  ctx.sourceSuffix = "";
+  ctx.sourceName = "";
+  ctx.sourceTopicSegment = "";
+  return ctx;
+}
+
 void doAutoConfigure(){
-  // Force-publishes HA discovery configs for all sensor/binary_sensor/climate/number entries.
-  // Uses the streaming API (streamSensorDiscovery, streamBinarySensorDiscovery, etc.)
-  // with PROGMEM data arrays from mqtt_configuratie.cpp.
-  // Lock scope is limited to the publish loop so it is released before configSensors()
-  // is called.  configSensors() -> sensorAutoConfigure() -> doAutoConfigureMsgid() can
-  // then acquire the lock independently.
+  // Force-publishes HA discovery configs for ALL entries.
+  // Clears the "done" bitmap first so everything is re-sent.
+  // Lock scope is limited to the publish loop; configSensors() acquires its own lock.
 
   if (!settings.mqtt.bEnable) return;
 
   {
-    // Lock released at end of this block, before configSensors() is called.
     MQTTAutoConfigSessionLock sessionLock;
     if (!sessionLock.locked) {
-      MQTTDebugTln(F("MQTT autoconfig already running, skipping doAutoConfigure()"));
+      MQTTDebugTln(F("MQTT autoconfig already running, skipping"));
       return;
     }
 
-    // Force mode: clear all "done" flags so every entry is re-published
     clearMQTTConfigDone();
-    MQTTDebugTln(F("Cleared all MQTT config done flags (force re-publish)"));
 
-    HaDiscoveryContext ctx;
-    ctx.nodeId = NodeId;
-    ctx.hostname = CSTR(settings.sHostname);
-    ctx.version = _VERSION;
-    ctx.mqttPubTopic = MQTTPubNamespace;
-    ctx.mqttSubTopic = MQTTSubNamespace;
-    ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
-    ctx.isFirstEntity = true;
-    ctx.sourceSuffix = "";
-    ctx.sourceName = "";
-    ctx.sourceTopicSegment = "";
+    HaDiscoveryContext ctx = buildDiscoveryContext(true);
 
     // Stream sensor discoveries
     for (uint16_t i = 0; i < MQTT_HA_SENSOR_COUNT; i++) {
@@ -1206,9 +1206,7 @@ void doAutoConfigure(){
     // Mark climate/number IDs done
     setMQTTConfigDone(0);   // climate entries are OT ID 0
     setMQTTConfigDone(27);  // number entry is OT ID 27
-
-    resetMQTTBufferSize();
-  } // Lock released here -- configSensors() can now acquire it independently
+  } // Lock released here
 
   // Trigger Dallas configuration separately as it requires specific sensor addresses.
   // Always run after force (clearMQTTConfigDone above cleared the done flag).
@@ -1219,61 +1217,30 @@ void doAutoConfigure(){
 //===========================================================================================
 bool doAutoConfigureMsgid(byte OTid)
 {
-  // check if foney dataid is called to do autoconfigure for temp sensors, call configsensors instead
+  // Dallas sensors have their own discovery path
   if (OTid == OTGWdallasdataid) {
-    MQTTDebugTf(PSTR("Sending auto configuration for temp sensors %d\r\n"), OTid);
     configSensors();
     return true;
   }
-  return doAutoConfigureMsgid(OTid, nullptr);
-}
-
-bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId) {
-  return doAutoConfigureMsgid(OTid, cfgSensorId, nullptr);
-}
-
-bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMqttTopic)
-{
-  bool result = false;
 
   MQTTAutoConfigSessionLock sessionLock;
-  if (!sessionLock.locked) {
-    MQTTDebugTln(F("MQTT autoconfig already running, skipping doAutoConfigureMsgid()"));
-    return result;
-  }
-  if (!settings.mqtt.bEnable) return result;
-  if (!MQTTclient.connected()) return result;
-  if (!isValidIP(MQTTbrokerIP)) {
-    DebugTln(F("Error: MQTT broker IP not valid."));
-    return result;
-  }
-  if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) {
-    DECLARE_TIMER_SEC(tHeapGuardLog, 30);
-    if (DUE(tHeapGuardLog)) MQTTDebugTf(PSTR("[autoconfig] heap guard: skipped (free=%u < %u)\r\n"), ESP.getFreeHeap(), (unsigned)MQTT_DISCOVERY_HEAP_MIN);
-    return result;
-  }
+  if (!sessionLock.locked) return false;
+  if (!settings.mqtt.bEnable) return false;
+  if (!MQTTclient.connected()) return false;
+  if (!isValidIP(MQTTbrokerIP)) return false;
+  if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return false;
 
-  HaDiscoveryContext ctx;
-  ctx.nodeId = NodeId;
-  ctx.hostname = CSTR(settings.sHostname);
-  ctx.version = _VERSION;
-  ctx.mqttPubTopic = MQTTPubNamespace;
-  ctx.mqttSubTopic = MQTTSubNamespace;
-  ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
-  ctx.isFirstEntity = false;  // JIT discovery is never the first entity
-  ctx.sourceSuffix = "";
-  ctx.sourceName = "";
-  ctx.sourceTopicSegment = "";
+  bool result = false;
+  HaDiscoveryContext ctx = buildDiscoveryContext();
 
-  // Check sensor index
+  // Sensors
   uint16_t sIdx = readSensorIndex(OTid);
   if (sIdx != MQTT_HA_INDEX_NONE) {
     while (sIdx < MQTT_HA_SENSOR_COUNT) {
       MqttHaSensorCfg cfg = readSensorCfg(sIdx);
       if (cfg.id != OTid) break;
-
       if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
-        if (settings.mqtt.bSeparateSources && baseMqttTopic != nullptr) {
+        if (settings.mqtt.bSeparateSources) {
           if (expandAndStreamSensorSources(MQTTclient, cfg, ctx)) result = true;
         }
       } else {
@@ -1284,7 +1251,7 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     }
   }
 
-  // Check binary sensor index
+  // Binary sensors
   uint16_t bIdx = readBinSensorIndex(OTid);
   if (bIdx != MQTT_HA_INDEX_NONE) {
     while (bIdx < MQTT_HA_BINSENSOR_COUNT) {
@@ -1296,41 +1263,27 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
     }
   }
 
-  // Climate discovery (OT ID 0)
+  // Climate (OT ID 0)
   if (OTid == 0) {
-    if (streamClimateDiscovery(MQTTclient, 0, ctx)) result = true;  // Thermostat
-    if (streamClimateDiscovery(MQTTclient, 1, ctx)) result = true;  // DHW Control
+    if (streamClimateDiscovery(MQTTclient, 0, ctx)) result = true;
+    if (streamClimateDiscovery(MQTTclient, 1, ctx)) result = true;
   }
-  // Number discovery (OT ID 27)
+  // Number (OT ID 27)
   if (OTid == 27) {
     if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
   }
 
-  resetMQTTBufferSize();
   return result;
 }
+
 
 void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId = nullptr) {
   // Dallas temperature sensor discovery via streaming API.
   // cfgSensorId is the Dallas device address string (e.g. "28FF1234567890").
   if (getMQTTConfigDone(dataid) && finishflag) return;
-
   if (!cfgSensorId || cfgSensorId[0] == '\0') return;
 
-  MQTTDebugTf(PSTR("Dallas discovery for sensor [%s]\r\n"), cfgSensorId);
-
-  HaDiscoveryContext ctx;
-  ctx.nodeId = NodeId;
-  ctx.hostname = CSTR(settings.sHostname);
-  ctx.version = _VERSION;
-  ctx.mqttPubTopic = MQTTPubNamespace;
-  ctx.mqttSubTopic = MQTTSubNamespace;
-  ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
-  ctx.isFirstEntity = false;
-  ctx.sourceSuffix = "";
-  ctx.sourceName = "";
-  ctx.sourceTopicSegment = "";
-
+  HaDiscoveryContext ctx = buildDiscoveryContext();
   bool success = streamDallasSensorDiscovery(MQTTclient, cfgSensorId, ctx);
   if (success) {
     MQTTDebugTf(PSTR("Dallas discovery sent for [%s]\r\n"), cfgSensorId);
