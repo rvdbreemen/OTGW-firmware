@@ -531,41 +531,39 @@ void handleMQTT()
     case MQTT_STATE_TRY_TO_CONNECT:
       MQTTDebugTln(F("MQTT State: MQTT try to connect"));
       MQTTDebugTf(PSTR("MQTT server is [%s], IP[%s]\r\n"), settings.mqtt.sBroker, MQTTbrokerIPchar);
-      
+      DebugTf(PSTR("[HEAP] pre-connect: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
+
       MQTTDebugT(F("Attempting MQTT connection .. "));
       reconnectAttempts++;
 
       //If no username, then anonymous connection to broker, otherwise assume username/password.
-      if (strlen(settings.mqtt.sUser) == 0) 
+      if (strlen(settings.mqtt.sUser) == 0)
       {
         MQTTDebug(F("without a Username/Password "));
         if(!MQTTclient.connect(MQTTclientId, MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
-      } 
-      else 
+      }
+      else
       {
         MQTTDebugf(PSTR("Username [%s] "), CSTR(settings.mqtt.sUser));
         if(!MQTTclient.connect(MQTTclientId, CSTR(settings.mqtt.sUser), CSTR(settings.mqtt.sPasswd), MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
       }
+      DebugTf(PSTR("[HEAP] post-connect: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
 
       //If connection was made succesful, move on to next state...
       if (MQTTclient.connected())
       {
-        reconnectAttempts = 0;  
+        reconnectAttempts = 0;
         MQTTDebugln(F(" .. connected\r"));
-        Debugln(F("MQTT connected"));	
+        Debugln(F("MQTT connected"));
         stateMQTT = MQTT_STATE_IS_CONNECTED;
         MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default
         sendMQTT(MQTTPubNamespace, "online");
+        DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
 
         // Force re-publish of all OT values so HA gets current state after reconnect.
-        // Discovery state is intentionally NOT cleared here: MQTT retained messages
-        // survive an ESP reconnect intact on the broker, so re-running discovery on
-        // every network blip causes an unnecessary burst of LittleFS I/O and MQTT
-        // publishes. Discovery is re-triggered by two correct paths only:
-        //   (a) startMQTT() — on firmware boot or MQTT settings change
-        //   (b) homeassistant/status = online after offline — HA/broker restart
         requestMQTTRepublishAll();
+        DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
 
         //Subscribe to topics
         char topic[MQTT_TOPIC_MAX_LEN];
@@ -580,9 +578,11 @@ void handleMQTT()
           MQTTDebugTf(PSTR("MQTT: Subscribe TopicId [%s] FAILED! \r\n"), topic);
           PrintMQTTError();
         }
-        MQTTclient.subscribe("homeassistant/status"); //start monitoring the status of homeassistant, if it goes down, then force a restart after it comes back online.
+        MQTTclient.subscribe("homeassistant/status");
+        DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
         sendMQTTversioninfo();
-        publishAllPICsettings();  // Republish any cached PIC settings on (re)connect
+        publishAllPICsettings();
+        DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.

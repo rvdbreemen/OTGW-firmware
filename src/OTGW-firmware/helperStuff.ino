@@ -497,10 +497,21 @@ bool minuteChanged(){
   int8_t thisminute = myTime.minute();
   bool _ret = (lastminute != thisminute);
   if (_ret){
-    //minute changed
     lastminute = thisminute;
   }
   return _ret;
+}
+
+bool hourChanged(){
+  static int8_t lasthour = -1;
+  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  int8_t thishour = myTime.hour();
+  bool changed = (lasthour != thishour);
+  if (changed) {
+    lasthour = thishour;
+  }
+  return changed;
 }
 
 // Path to the LittleFS file containing the build git hash (used by checklittlefshash and getFilesystemHash)
