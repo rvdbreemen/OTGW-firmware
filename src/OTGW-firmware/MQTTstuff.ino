@@ -21,6 +21,16 @@
 // requiring a large buffer resize. This prevents heap fragmentation on ESP8266.
 // Similar to ESPHome's chunked MQTT publishing strategy.
 
+// MQTT_MAX_FREE_BLOCK() is ESP8266-only; ESP32 does not expose an
+// equivalent. Use 0 as a sentinel on ESP32 so the heap-diagnostics format
+// strings compile unchanged and users understand "not available on this
+// platform" when the value shows as 0 in the trace.
+#ifdef ARDUINO_ARCH_ESP8266
+  #define MQTT_MAX_FREE_BLOCK() ESP.getMaxFreeBlockSize()
+#else
+  #define MQTT_MAX_FREE_BLOCK() ((uint32_t)0)
+#endif
+
 #define MQTTDebugTln(...) ({ if (state.debug.bMQTT) DebugTln(__VA_ARGS__);    })
 #define MQTTDebugln(...)  ({ if (state.debug.bMQTT) Debugln(__VA_ARGS__);    })
 #define MQTTDebugTf(...)  ({ if (state.debug.bMQTT) DebugTf(__VA_ARGS__);    })
@@ -351,7 +361,11 @@ void startMQTT()
 
   // Eliminate the TCP_SND_BUF temporary copy in WiFiClient (~1072 bytes saved).
   // With sync mode, writes flush directly to lwIP without intermediate buffering.
+  // setSync is ESP8266-only: the ESP32 NetworkClient has no equivalent API, and
+  // ESP32 already streams writes without the same intermediate copy.
+#ifdef ARDUINO_ARCH_ESP8266
   wifiClient.setSync(true);
+#endif
   wifiClient.setNoDelay(true);
 
   // Outbound publishes stream via beginPublish/write/endPublish.
@@ -757,7 +771,7 @@ void handleMQTT()
     case MQTT_STATE_TRY_TO_CONNECT:
       MQTTDebugTln(F("MQTT State: MQTT try to connect"));
       MQTTDebugTf(PSTR("MQTT server is [%s], IP[%s]\r\n"), settings.mqtt.sBroker, MQTTbrokerIPchar);
-      DebugTf(PSTR("[HEAP] pre-connect: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
+      DebugTf(PSTR("[HEAP] pre-connect: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
 
       MQTTDebugT(F("Attempting MQTT connection .. "));
       reconnectAttempts++;
@@ -773,7 +787,7 @@ void handleMQTT()
         MQTTDebugf(PSTR("Username [%s] "), CSTR(settings.mqtt.sUser));
         if(!MQTTclient.connect(MQTTclientId, CSTR(settings.mqtt.sUser), CSTR(settings.mqtt.sPasswd), MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
       }
-      DebugTf(PSTR("[HEAP] post-connect: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
+      DebugTf(PSTR("[HEAP] post-connect: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
 
       //If connection was made succesful, move on to next state...
       if (MQTTclient.connected())
@@ -785,11 +799,11 @@ void handleMQTT()
         MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default
         sendMQTT(MQTTPubNamespace, "online");
-        DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
+        DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
 
         // Force re-publish of all OT values so HA gets current state after reconnect.
         requestMQTTRepublishAll();
-        DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
+        DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
 
         //Subscribe to topics
         char topic[MQTT_TOPIC_MAX_LEN];
@@ -805,10 +819,10 @@ void handleMQTT()
           PrintMQTTError();
         }
         MQTTclient.subscribe("homeassistant/status");
-        DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
+        DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
         sendMQTTversioninfo();
         publishAllPICsettings();
-        DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
+        DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
