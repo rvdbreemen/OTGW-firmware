@@ -4,7 +4,7 @@ title: 'Fix: upgrade to v6.6 fails (reported by Tomba on Tweakers)'
 status: To Do
 assignee: []
 created_date: '2026-04-09 16:44'
-updated_date: '2026-04-09 16:44'
+updated_date: '2026-04-17 07:12'
 labels:
   - bug
   - needs-info
@@ -30,4 +30,6 @@ User Tomba reports that upgrading to firmware version 6.6 fails. No error detail
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-04-09: Tomba reports upgrade to v6.6 fails. Post contains screenshots that are not visible in RSS feed. No error text available yet. Waiting for: actual error message or screenshot content from Tweakers thread.
+
+2026-04-17: TASK-269 was duplicate, merged here. Both still needs-info - waiting for actual error message from Tomba. Cannot investigate without error details.
 <!-- SECTION:NOTES:END -->

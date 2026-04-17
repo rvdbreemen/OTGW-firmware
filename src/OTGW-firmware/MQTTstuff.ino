@@ -14,7 +14,7 @@
 #include <ctype.h>
 #include <pgmspace.h>
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
-#include "mqttha_progmem.h"         // PROGMEM discovery config table (auto-generated from mqttha.cfg)
+#include "MQTTstuff.h"              // Structured discovery data layer (enums, structs, streaming API)
 
 // MQTT Streaming Mode - ALWAYS ENABLED
 // Large auto-discovery messages are sent in 128-byte chunks instead of
@@ -42,41 +42,15 @@ constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
 constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
-constexpr size_t  MQTT_MSG_MAX_LEN = 1200;
-constexpr size_t  MQTT_CFG_LINE_MAX_LEN = 1200;
 // Minimum free heap required before attempting a discovery publish.
 // A single discovery message needs ~1200 bytes of lwIP pbuf (ESP8266 core 3.x / lwIP 2.x).
 // 12000 bytes provides ~10x margin to absorb concurrent TCP stack overhead.
 // Keep in sync with the HEAP_WARNING tier in canPublishMQTT().
 constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 8000;
 
-struct MQTTAutoConfigLineView {
-  byte id;
-  char *topicTemplate;
-  char *msgTemplate;
-};
-
-struct MQTTAutoConfigTemplateContext {
-  const char *nodeId;
-  const char *sensorId;
-  const char *hostname;
-  const char *version;
-  const char *mqttPubTopic;
-  const char *mqttSubTopic;
-  const char *sourceSuffix;
-  const char *sourceName;
-  const char *sourceTopicSegment;
-};
-
 // MQTT autoconfig buffer design:
-//   cMsg[CMSG_SIZE=512] — global general-purpose scratch, reused as sTopic (rendered MQTT
-//                          discovery topic, ≤200 bytes) during autoconfig.  Safe because
-//                          template strings are read directly from PROGMEM pools (flash),
-//                          not from cMsg.  No staging buffer needed on ESP8266 where PROGMEM
-//                          is memory-mapped at 0x40200000+ and byte-accessible via *ptr.
-// feedWatchDog() is used (not doBackgroundTasks()) inside expandAndPublishSourceTemplates()
-// and in the per-entry loop to prevent cMsg from being overwritten by HTTP/MQTT callbacks
-// between the three per-source renders within a single iteration (ADR-053).
+// feedWatchDog() is used (not doBackgroundTasks()) during autoconfig iterations
+// to prevent cMsg from being overwritten by HTTP/MQTT callbacks.
 
 // Guard shared MQTT autoconfig buffer (cMsg for sTopic) against accidental re-entry.
 // feedWatchDog() (not doBackgroundTasks()) is the only yield used during autoconfig,
@@ -100,27 +74,7 @@ struct MQTTAutoConfigSessionLock {
   MQTTAutoConfigSessionLock& operator=(const MQTTAutoConfigSessionLock&) = delete;
 };
 
-// ---------------------------------------------------------------------------
-// PROGMEM-safe string helpers
-// On ESP8266, standard strstr/strncmp may use word-aligned reads internally.
-// Unaligned 32-bit reads from flash (0x402xxxxx) cause Exception (3) on
-// Arduino Core 3.1.2+. These helpers use pgm_read_byte for safe byte access.
-// ---------------------------------------------------------------------------
-static int pgm_strncmp_PP(PGM_P s1, const char *s2, size_t n)
-{
-  for (size_t i = 0; i < n; i++) {
-    uint8_t c1 = pgm_read_byte(s1 + i);
-    uint8_t c2 = static_cast<uint8_t>(s2[i]);
-    if (c1 != c2) return (int)c1 - (int)c2;
-    if (c1 == 0) return 0;
-  }
-  return 0;
-}
-
-static char pgm_read_char(PGM_P p)
-{
-  return static_cast<char>(pgm_read_byte(p));
-}
+// pgm_strncmp_PP() and pgm_read_char() are in MQTTstuff.h (inline, shared with mqtt_configuratie.cpp)
 
 static            PubSubClient MQTTclient(wifiClient);
 
@@ -151,141 +105,6 @@ static void trimInPlace(char *buffer) {
   }
 }
 
-static bool parseAutoConfigLine(char *sIn, char del, void *viewPtr) {
-  MQTTAutoConfigLineView &view = *static_cast<MQTTAutoConfigLineView*>(viewPtr);
-  if (!sIn) return false;
-  char *comment = strstr(sIn, "//");
-  if (comment) *comment = '\0';
-
-  trimInPlace(sIn);
-  if (strlen(sIn) <= 3) return false;
-
-  char *firstDel = strchr(sIn, del);
-  if (firstDel == nullptr || firstDel == sIn || *(firstDel + 1) == '\0') return false;
-  char *secondDel = strchr(firstDel + 1, del);
-  if (secondDel == nullptr || secondDel <= firstDel + 1 || *(secondDel + 1) == '\0') return false;
-
-  *firstDel = '\0';
-  *secondDel = '\0';
-
-  trimInPlace(sIn);
-  char *topicTemplate = firstDel + 1;
-  char *msgTemplate = secondDel + 1;
-  trimInPlace(topicTemplate);
-  trimInPlace(msgTemplate);
-
-  if (strlen(sIn) == 0 || strlen(topicTemplate) == 0 || strlen(msgTemplate) == 0) return false;
-
-  view.id = static_cast<byte>(strtoul(sIn, nullptr, 10));
-  view.topicTemplate = topicTemplate;
-  view.msgTemplate = msgTemplate;
-  return true;
-}
-
-static bool tryGetTemplateReplacement(PGM_P cursor, const void *ctxPtr, const char *&replacement, size_t &tokenLen)
-{
-  // cursor may point into PROGMEM (flash) — use pgm_strncmp_PP for safe byte access.
-  const MQTTAutoConfigTemplateContext &ctx = *static_cast<const MQTTAutoConfigTemplateContext*>(ctxPtr);
-  if (pgm_strncmp_PP(cursor, "%mqtt_sub_topic%", 16) == 0) {
-    replacement = ctx.mqttSubTopic;
-    tokenLen = 16;
-    return true;
-  }
-  if (pgm_strncmp_PP(cursor, "%mqtt_pub_topic%", 16) == 0) {
-    replacement = ctx.mqttPubTopic;
-    tokenLen = 16;
-    return true;
-  }
-  if (pgm_strncmp_PP(cursor, "%source_topic_segment%", 22) == 0) {
-    replacement = ctx.sourceTopicSegment;
-    tokenLen = 22;
-    return true;
-  }
-  if (pgm_strncmp_PP(cursor, "%source_suffix%", 15) == 0) {
-    replacement = ctx.sourceSuffix;
-    tokenLen = 15;
-    return true;
-  }
-  if (pgm_strncmp_PP(cursor, "%source_name%", 13) == 0) {
-    replacement = ctx.sourceName;
-    tokenLen = 13;
-    return true;
-  }
-  if (pgm_strncmp_PP(cursor, "%sensor_id%", 11) == 0) {
-    replacement = ctx.sensorId;
-    tokenLen = 11;
-    return true;
-  }
-  if (pgm_strncmp_PP(cursor, "%hostname%", 10) == 0) {
-    replacement = ctx.hostname;
-    tokenLen = 10;
-    return true;
-  }
-  if (pgm_strncmp_PP(cursor, "%node_id%", 9) == 0) {
-    replacement = ctx.nodeId;
-    tokenLen = 9;
-    return true;
-  }
-  if (pgm_strncmp_PP(cursor, "%version%", 9) == 0) {
-    replacement = ctx.version;
-    tokenLen = 9;
-    return true;
-  }
-  replacement = nullptr;
-  tokenLen = 0;
-  return false;
-}
-
-static bool renderTemplateToBuffer(PGM_P templateStr, char *dest, size_t destSize, const void *ctxPtr)
-{
-  // templateStr may point into PROGMEM — use pgm_read_char for safe byte access.
-  const MQTTAutoConfigTemplateContext &ctx = *static_cast<const MQTTAutoConfigTemplateContext*>(ctxPtr);
-  if (!templateStr || !dest || destSize == 0) return false;
-  dest[0] = '\0';
-
-  size_t destLen = 0;
-  PGM_P cursor = templateStr;
-  while (pgm_read_char(cursor) != '\0') {
-    const char *replacement = nullptr;
-    size_t tokenLen = 0;
-    if (tryGetTemplateReplacement(cursor, &ctx, replacement, tokenLen)) {
-      size_t replacementLen = strlen(replacement);
-      if (destLen + replacementLen >= destSize) return false;
-      memcpy(dest + destLen, replacement, replacementLen);
-      destLen += replacementLen;
-      dest[destLen] = '\0';
-      cursor += tokenLen;
-      continue;
-    }
-
-    if (destLen + 1 >= destSize) return false;
-    dest[destLen++] = pgm_read_char(cursor++);
-    dest[destLen] = '\0';
-  }
-
-  return true;
-}
-
-static size_t measureRenderedTemplate(PGM_P templateStr, const void *ctxPtr)
-{
-  // templateStr may point into PROGMEM — use pgm_read_char for safe byte access.
-  const MQTTAutoConfigTemplateContext &ctx = *static_cast<const MQTTAutoConfigTemplateContext*>(ctxPtr);
-  size_t renderedLen = 0;
-  PGM_P cursor = templateStr;
-  while (pgm_read_char(cursor) != '\0') {
-    const char *replacement = nullptr;
-    size_t tokenLen = 0;
-    if (tryGetTemplateReplacement(cursor, &ctx, replacement, tokenLen)) {
-      renderedLen += strlen(replacement);
-      cursor += tokenLen;
-      continue;
-    }
-
-    renderedLen++;
-    cursor++;
-  }
-  return renderedLen;
-}
 
 static bool writeMqttChunk(const char *data, size_t len)
 {
@@ -333,59 +152,27 @@ static bool beginMqttPublish(const char *topic, size_t len, bool retain)
   return true;
 }
 
-static bool sendMQTTTemplateStreaming(const char *topic, PGM_P templateStr, const void *ctxPtr)
-{
-  // templateStr may point into PROGMEM — use pgm_read_char for safe byte access,
-  // and writeMqttProgmemChunk (not writeMqttChunk) for literal PROGMEM spans.
-  const MQTTAutoConfigTemplateContext &ctx = *static_cast<const MQTTAutoConfigTemplateContext*>(ctxPtr);
-  if (!settings.mqtt.bEnable) return false;
-  if (!MQTTclient.connected()) { DebugTln(F("Error: MQTT broker not connected.")); PrintMQTTError(); return false; }
-  if (!isValidIP(MQTTbrokerIP)) { DebugTln(F("Error: MQTT broker IP not valid.")); return false; }
-  if (!canPublishMQTT()) return false;
-
-  size_t renderedLen = measureRenderedTemplate(templateStr, ctxPtr);
-  MQTTDebugTf(PSTR("Sending MQTT (template streaming): server %s:%d => TopicId [%s] (len=%d bytes)\r\n"),
-              settings.mqtt.sBroker, settings.mqtt.iBrokerPort, topic, renderedLen);
-
-  if (!MQTTclient.beginPublish(topic, renderedLen, true)) {
-    PrintMQTTError();
-    return false;
-  }
-
-  PGM_P cursor = templateStr;
-  while (pgm_read_char(cursor) != '\0') {
-    const char *replacement = nullptr;
-    size_t tokenLen = 0;
-    if (tryGetTemplateReplacement(cursor, &ctx, replacement, tokenLen)) {
-      if (!writeMqttChunk(replacement, strlen(replacement))) {
-        MQTTclient.endPublish();
-        return false;
-      }
-      cursor += tokenLen;
-      continue;
-    }
-
-    PGM_P literalStart = cursor;
-    while (pgm_read_char(cursor) != '\0') {
-      if (tryGetTemplateReplacement(cursor, &ctx, replacement, tokenLen)) break;
-      cursor++;
-    }
-
-    size_t literalLen = static_cast<size_t>(cursor - literalStart);
-    if (literalLen > 0 && !writeMqttProgmemChunk(literalStart, literalLen)) {
-      MQTTclient.endPublish();
-      return false;
-    }
-  }
-
-  if (!MQTTclient.endPublish()) {
-    PrintMQTTError();
-    return false;
-  }
-
-  feedWatchDog();
-  return true;
+// ---------------------------------------------------------------------------
+// Forwarding functions for MqttJsonWriter (MQTTstuff.h).
+// Bridge to the file-static writeMqttChunk helpers and MQTTclient.
+// ---------------------------------------------------------------------------
+bool writeMqttChunkExt(const char *data, size_t len) {
+  return writeMqttChunk(data, len);
 }
+
+bool writeMqttProgmemChunkExt(PGM_P data, size_t len) {
+  return writeMqttProgmemChunk(data, len);
+}
+
+bool writeMqttByteExt(uint8_t b) {
+  return MQTTclient.write(b) == 1;
+}
+
+// ---------------------------------------------------------------------------
+// The streaming JSON helpers, compose functions, topic builders, and the
+// public streamXxxDiscovery() API live in mqtt_configuratie.cpp to avoid
+// Arduino's auto-prototype generator mangling custom-type parameters.
+// ---------------------------------------------------------------------------
 
 static void buildNamespace(char *dest, size_t destSize, const char *base, const char *segment, const char *node) {
   if (!dest) return;
@@ -472,42 +259,16 @@ const char s_cmd_forcethermostat[] PROGMEM = "forcethermostat";
 const char s_cmd_voltageref[] PROGMEM = "voltageref";
 const char s_cmd_debugptr[] PROGMEM = "debugptr";
 
-// ADR-009: Keep source-template discovery literals in PROGMEM.
-const char s_mqtt_source_suffix_token[] PROGMEM = "%source_suffix%";
-const char s_mqtt_source_name_token[] PROGMEM = "%source_name%";
-const char s_mqtt_source_topic_segment_token[] PROGMEM = "%source_topic_segment%";
-
-// Source token RAM copies removed — source token detection now uses
-// pre-computed flags in MqttHaCfgEntry.flags (set at code generation time).
-// This eliminates strstr() on PROGMEM pointers that caused Exception (3)
-// on ESP8266 with Arduino Core 3.1.2+.
-
-const char s_mqtt_src_suffix_thermostat[] PROGMEM = "_thermostat";
-const char s_mqtt_src_suffix_boiler[] PROGMEM = "_boiler";
-const char s_mqtt_src_suffix_gateway[] PROGMEM = "_gateway";
+// Source variant strings for separate-source MQTT data publishing.
+// Used by publishToSourceTopic() via copySourceTableEntry().
 const char s_mqtt_src_key_thermostat[] PROGMEM = "thermostat";
 const char s_mqtt_src_key_boiler[] PROGMEM = "boiler";
 const char s_mqtt_src_key_gateway[] PROGMEM = "gateway";
-const char s_mqtt_src_name_thermostat[] PROGMEM = "Thermostat";
-const char s_mqtt_src_name_boiler[] PROGMEM = "Boiler";
-const char s_mqtt_src_name_gateway[] PROGMEM = "Gateway";
 
 const char* const mqttSourceKeys[] PROGMEM = {
   s_mqtt_src_key_thermostat,
   s_mqtt_src_key_boiler,
   s_mqtt_src_key_gateway
-};
-
-const char* const mqttSourceSuffixes[] PROGMEM = {
-  s_mqtt_src_suffix_thermostat,
-  s_mqtt_src_suffix_boiler,
-  s_mqtt_src_suffix_gateway
-};
-
-const char* const mqttSourceNames[] PROGMEM = {
-  s_mqtt_src_name_thermostat,
-  s_mqtt_src_name_boiler,
-  s_mqtt_src_name_gateway
 };
 
 const char s_otgw_TT[] PROGMEM = "TT";
@@ -1282,15 +1043,22 @@ void clearMQTTConfigPending(const uint8_t MSGid)
 //===========================================================================================
 void markAllMQTTConfigPending()
 {
-  // Mark every OT ID that appears in the PROGMEM discovery table as pending.
+  // Mark every OT ID that appears in the PROGMEM discovery tables as pending.
   // Also clears the "published" bitmap so drainOnePendingDiscovery re-publishes.
   clearMQTTConfigDone();
   memset(MQTTautoCfgPendingMap, 0, sizeof(MQTTautoCfgPendingMap));
   for (uint16_t i = 0; i < 256; i++) {
-    uint16_t idx = pgm_read_word(&mqttHaCfgIndex[i]);
-    if (idx != 0xFFFF) {
-      setMQTTConfigPending((uint8_t)i);
+    uint16_t sIdx = readSensorIndex(static_cast<uint8_t>(i));
+    uint16_t bIdx = readBinSensorIndex(static_cast<uint8_t>(i));
+    if (sIdx != MQTT_HA_INDEX_NONE || bIdx != MQTT_HA_INDEX_NONE) {
+      setMQTTConfigPending(static_cast<uint8_t>(i));
     }
+  }
+  // Mark climate/number special IDs
+  for (uint16_t i = 0; i < MQTT_HA_SPECIAL_COUNT; i++) {
+    MqttHaSpecialCfg special;
+    memcpy_P(&special, &mqttHaSpecials[i], sizeof(special));
+    setMQTTConfigPending(special.id);
   }
   // Also mark the Dallas sensor pseudo-ID
   setMQTTConfigPending(OTGWdallasdataid);
@@ -1367,49 +1135,10 @@ void loopMQTTDiscovery()
   }
 }
 //===========================================================================================
-// expandAndPublishSourceTemplates()
-// Expands a source-template discovery line into 3 per-source variants and publishes each.
-// Renders topic variants into renderedTopic (cMsg global, passed as sTopic pointer) and
-// stream-renders the JSON payload from the original template (in sLine global).
-// feedWatchDog() is used (not doBackgroundTasks()) between per-source publishes to prevent
-// cMsg from being overwritten by HTTP/MQTT callbacks mid-iteration: topicTemplate/msgTemplate
-// point into sLine; renderedTopic points into cMsg — keeping the two buffers disjoint.
-// Returns true if at least one variant was successfully published.
-static bool expandAndPublishSourceTemplates(byte msgid,
-                                           const char *logLabel,
-                                           PGM_P topicTemplate,
-                                           PGM_P msgTemplate,
-                                           const void *baseCtxPtr,
-                                           char *renderedTopic)
-{
-  const MQTTAutoConfigTemplateContext &baseCtx = *static_cast<const MQTTAutoConfigTemplateContext*>(baseCtxPtr);
-  if (!topicTemplate || !msgTemplate || !renderedTopic) return false;
-
-  bool published = false;
-  for (uint8_t i = 0; i < 3; i++) {
-    char srcSuffixBuf[16];
-    char srcKeyBuf[16];
-    char srcNameBuf[16];
-    if (!copySourceTableEntry(mqttSourceSuffixes, i, srcSuffixBuf, sizeof(srcSuffixBuf))) continue;
-    if (!copySourceTableEntry(mqttSourceKeys,     i, srcKeyBuf,    sizeof(srcKeyBuf)))    continue;
-    if (!copySourceTableEntry(mqttSourceNames,    i, srcNameBuf,   sizeof(srcNameBuf)))   continue;
-    MQTTAutoConfigTemplateContext variantCtx = baseCtx;
-    variantCtx.sourceSuffix = srcSuffixBuf;
-    variantCtx.sourceName = srcNameBuf;
-    variantCtx.sourceTopicSegment = srcKeyBuf;
-    if (!renderTemplateToBuffer(topicTemplate, renderedTopic, MQTT_TOPIC_MAX_LEN, &variantCtx)) continue;
-    MQTTDebugTf(PSTR("MQTT source discovery (%s) msgid %d -> %s\r\n"), logLabel, (int)msgid, renderedTopic);
-    if (!sendMQTTTemplateStreaming(renderedTopic, msgTemplate, &variantCtx)) continue;
-    published = true;
-    feedWatchDog();
-  }
-  return published;
-}
-//===========================================================================================
 void doAutoConfigure(){
-  // Force-publishes HA discovery configs for all entries in mqttha_progmem.h.
-  // Intended only as an explicit utility (Serial 'F', REST API); never called
-  // automatically. Uses shared static buffers (zero heap allocation for table lookup).
+  // Force-publishes HA discovery configs for all sensor/binary_sensor/climate/number entries.
+  // Uses the streaming API (streamSensorDiscovery, streamBinarySensorDiscovery, etc.)
+  // with PROGMEM data arrays from mqtt_configuratie.cpp.
   // Lock scope is limited to the publish loop so it is released before configSensors()
   // is called.  configSensors() -> sensorAutoConfigure() -> doAutoConfigureMsgid() can
   // then acquire the lock independently.
@@ -1424,81 +1153,66 @@ void doAutoConfigure(){
       return;
     }
 
-    // Validate PROGMEM pool linkage — catches broken extern/definition mismatches
-    // that would cause pool pointers to be NULL (offset used as raw address → crash).
-    if (reinterpret_cast<uintptr_t>(mqttHaTopicPool) < 0x40200000 ||
-        reinterpret_cast<uintptr_t>(mqttHaMsgPool)   < 0x40200000) {
-      DebugTln(F("FATAL: MQTT PROGMEM pools not in flash! Skipping autodiscovery."));
-      return;
-    }
+    HaDiscoveryContext ctx;
+    ctx.nodeId = NodeId;
+    ctx.hostname = CSTR(settings.sHostname);
+    ctx.version = _VERSION;
+    ctx.mqttPubTopic = MQTTPubNamespace;
+    ctx.mqttSubTopic = MQTTSubNamespace;
+    ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
+    ctx.isFirstEntity = true;
+    ctx.sourceSuffix = "";
+    ctx.sourceName = "";
+    ctx.sourceTopicSegment = "";
 
-    // sTopic = cMsg is the only RAM buffer used.  Topic and msg templates are read
-    // directly from PROGMEM pools (ESP8266 memory-mapped flash, byte-accessible via pgm_read_byte).
-    // feedWatchDog() (NOT doBackgroundTasks) is the only yield — guarantees no HTTP/MQTT
-    // callback overwrites cMsg between topic render and streaming publish.
-    char *sTopic = cMsg;
-    bool sourceTemplateSchemaLogged = false;
-
-    MQTTAutoConfigTemplateContext renderCtx;
-    renderCtx.nodeId   = NodeId;
-    renderCtx.sensorId = "";
-    renderCtx.hostname = CSTR(settings.sHostname);
-    renderCtx.version  = _VERSION;
-    renderCtx.mqttPubTopic = MQTTPubNamespace;
-    renderCtx.mqttSubTopic = MQTTSubNamespace;
-
-    for (uint16_t i = 0; i < MQTT_HA_CFG_COUNT; i++) {
+    // Stream sensor discoveries
+    for (uint16_t i = 0; i < MQTT_HA_SENSOR_COUNT; i++) {
       feedWatchDog();
+      MqttHaSensorCfg cfg = readSensorCfg(i);
 
-      MqttHaCfgEntry entry;
-      memcpy_P(&entry, &mqttHaCfgTable[i], sizeof(entry));
+      if (!isPICEnabled() && (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY)) continue;
+      if (cfg.id == OTGWdallasdataid) continue;  // Dallas handled separately
 
-      // Skip Dallas sensors — handled separately by configSensors() after lock release
-      if (entry.id == OTGWdallasdataid) continue;
-
-      // PROGMEM pointers into flash pools
-      PGM_P topicTemplate = mqttHaTopicPool + entry.topicOff;
-      PGM_P msgTemplate   = mqttHaMsgPool   + entry.msgOff;
-
-      // Skip PIC-specific discovery entries when no PIC is detected.
-      // Flag pre-computed at generation time — no strstr on PROGMEM needed.
-      if (!isPICEnabled() && (entry.flags & MQTT_HA_FLAG_IS_PIC_ENTRY)) continue;
-
-      MQTTDebugTf(PSTR("Processing AutoConfig for ID %d\r\n"), entry.id);
-
-      // Render topic into sTopic (= cMsg)
-      if (!renderTemplateToBuffer(topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) continue;
-      if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) continue;
-
-      // ADR-040: source token detection via pre-computed flags (no strstr on PROGMEM)
-      bool hasSourceSuffixToken       = (entry.flags & MQTT_HA_FLAG_SOURCE_SUFFIX);
-      bool hasSourceNameToken         = (entry.flags & MQTT_HA_FLAG_SOURCE_NAME);
-      bool hasSourceTopicSegmentToken = (entry.flags & MQTT_HA_FLAG_SOURCE_TOPIC_SEGMENT);
-
-      if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
-        if (!sourceTemplateSchemaLogged) {
-          if (hasSourceTopicSegmentToken) MQTTDebugTln(F("MQTT source template schema: nested %source_topic_segment% placeholders detected"));
-          else MQTTDebugTln(F("MQTT source template schema: legacy source placeholders only"));
-          sourceTemplateSchemaLogged = true;
-        }
+      if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
         if (settings.mqtt.bSeparateSources) {
-          if (expandAndPublishSourceTemplates(entry.id, "bulk", topicTemplate, msgTemplate, &renderCtx, sTopic)) {
-            setMQTTConfigDone(entry.id);
-          }
+          expandAndStreamSensorSources(MQTTclient, cfg, ctx);
         }
-        continue;
+        // Skip source-template entries when separate sources disabled
+      } else {
+        streamSensorDiscovery(MQTTclient, cfg, ctx);
       }
-
-      if (!sendMQTTTemplateStreaming(sTopic, msgTemplate, &renderCtx)) continue;
-      setMQTTConfigDone(entry.id);
-
-      feedWatchDog();
+      setMQTTConfigDone(cfg.id);
+      ctx.isFirstEntity = false;
     }
 
-    // cMsg (sTopic) is a global; no cleanup needed.
-    // Guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
+    // Stream binary sensor discoveries
+    for (uint16_t i = 0; i < MQTT_HA_BINSENSOR_COUNT; i++) {
+      feedWatchDog();
+      MqttHaBinSensorCfg cfg = readBinSensorCfg(i);
+
+      if (!isPICEnabled() && (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY)) continue;
+
+      streamBinarySensorDiscovery(MQTTclient, cfg, ctx);
+      setMQTTConfigDone(cfg.id);
+      ctx.isFirstEntity = false;
+    }
+
+    // Climate and number entities use the specials table (template-based PROGMEM)
+    for (uint16_t i = 0; i < MQTT_HA_SPECIAL_COUNT; i++) {
+      feedWatchDog();
+      if (i < 2) {
+        streamClimateDiscovery(MQTTclient, static_cast<uint8_t>(i), ctx);
+      } else {
+        streamNumberDiscovery(MQTTclient, ctx);
+      }
+      ctx.isFirstEntity = false;
+    }
+    // Mark climate/number IDs done
+    setMQTTConfigDone(0);   // climate entries are OT ID 0
+    setMQTTConfigDone(27);  // number entry is OT ID 27
+
     resetMQTTBufferSize();
-  } // Lock released here — configSensors() can now acquire it independently
+  } // Lock released here -- configSensors() can now acquire it independently
 
   // Trigger Dallas configuration separately as it requires specific sensor addresses
   if (settings.mqtt.bEnable && !getMQTTConfigDone(OTGWdallasdataid)) {
@@ -1507,13 +1221,13 @@ void doAutoConfigure(){
 }
 //===========================================================================================
 bool doAutoConfigureMsgid(byte OTid)
-{ 
-  // check if foney dataid is called to do autoconfigure for temp sensors, call configsensors instead 
+{
+  // check if foney dataid is called to do autoconfigure for temp sensors, call configsensors instead
   if (OTid == OTGWdallasdataid) {
     MQTTDebugTf(PSTR("Sending auto configuration for temp sensors %d\r\n"), OTid);
-    configSensors() ;
+    configSensors();
     return true;
-  }  
+  }
   return doAutoConfigureMsgid(OTid, nullptr);
 }
 
@@ -1523,103 +1237,82 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId) {
 
 bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMqttTopic)
 {
-  bool _result = false;
-  const char *sensorId = (cfgSensorId != nullptr) ? cfgSensorId : "";
+  bool result = false;
 
   MQTTAutoConfigSessionLock sessionLock;
   if (!sessionLock.locked) {
     MQTTDebugTln(F("MQTT autoconfig already running, skipping doAutoConfigureMsgid()"));
-    return _result;
+    return result;
   }
-  if (!settings.mqtt.bEnable) {
-    return _result;
-  }
-  if (!MQTTclient.connected()) {
-    return _result;   // silent: caller rate-limits retries, no per-message spam
-  }
+  if (!settings.mqtt.bEnable) return result;
+  if (!MQTTclient.connected()) return result;
   if (!isValidIP(MQTTbrokerIP)) {
     DebugTln(F("Error: MQTT broker IP not valid."));
-    return _result;
+    return result;
   }
-  // Heap guard: a single discovery publish needs ~1200 bytes of lwIP pbuf.
-  // On ESP8266 core 3.x (lwIP 2.x) the baseline heap is lower than on 2.x;
-  // attempting the allocation when heap is critically low disconnects MQTT.
-  // Caller will retry on the next rate-limit window.
   if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) {
     DECLARE_TIMER_SEC(tHeapGuardLog, 30);
     if (DUE(tHeapGuardLog)) MQTTDebugTf(PSTR("[autoconfig] heap guard: skipped (free=%u < %u)\r\n"), ESP.getFreeHeap(), (unsigned)MQTT_DISCOVERY_HEAP_MIN);
-    return _result;
+    return result;
   }
 
-  // PROGMEM index lookup — O(1), no LittleFS open required.
-  uint16_t idx = pgm_read_word(&mqttHaCfgIndex[OTid]);
-  if (idx == 0xFFFF) return _result;  // OT ID not in discovery config table
+  HaDiscoveryContext ctx;
+  ctx.nodeId = NodeId;
+  ctx.hostname = CSTR(settings.sHostname);
+  ctx.version = _VERSION;
+  ctx.mqttPubTopic = MQTTPubNamespace;
+  ctx.mqttSubTopic = MQTTSubNamespace;
+  ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
+  ctx.isFirstEntity = false;  // JIT discovery is never the first entity
+  ctx.sourceSuffix = "";
+  ctx.sourceName = "";
+  ctx.sourceTopicSegment = "";
 
-  // Validate PROGMEM pool linkage — catches broken extern/definition mismatches.
-  if (reinterpret_cast<uintptr_t>(mqttHaTopicPool) < 0x40200000 ||
-      reinterpret_cast<uintptr_t>(mqttHaMsgPool)   < 0x40200000) {
-    DebugTln(F("FATAL: MQTT PROGMEM pools not in flash!"));
-    return _result;
-  }
+  // Check sensor index
+  uint16_t sIdx = readSensorIndex(OTid);
+  if (sIdx != MQTT_HA_INDEX_NONE) {
+    while (sIdx < MQTT_HA_SENSOR_COUNT) {
+      MqttHaSensorCfg cfg = readSensorCfg(sIdx);
+      if (cfg.id != OTid) break;
 
-  // sTopic = cMsg is the only RAM buffer used.  Topic and msg templates are read
-  // directly from PROGMEM pools (ESP8266 memory-mapped flash, byte-accessible via pgm_read_byte).
-  // feedWatchDog() is the only yield — prevents HTTP/MQTT callbacks from overwriting cMsg.
-  char *sTopic = cMsg;
-
-  MQTTAutoConfigTemplateContext renderCtx;
-  renderCtx.nodeId   = NodeId;
-  renderCtx.sensorId = sensorId;
-  renderCtx.hostname = CSTR(settings.sHostname);
-  renderCtx.version  = _VERSION;
-  renderCtx.mqttPubTopic = MQTTPubNamespace;
-  renderCtx.mqttSubTopic = MQTTSubNamespace;
-
-  // Iterate all contiguous entries for OTid in mqttHaCfgTable (sorted by id).
-  while (idx < MQTT_HA_CFG_COUNT) {
-    feedWatchDog();
-
-    MqttHaCfgEntry entry;
-    memcpy_P(&entry, &mqttHaCfgTable[idx], sizeof(entry));
-    if (entry.id != OTid) break;  // Past this ID's entries; table is sorted by id
-
-    // PROGMEM pointers into flash pools
-    PGM_P topicTemplate = mqttHaTopicPool + entry.topicOff;
-    PGM_P msgTemplate   = mqttHaMsgPool   + entry.msgOff;
-
-    MQTTDebugTf(PSTR("Found PROGMEM entry for %d\r\n"), OTid);
-    MQTTDebugTf(PSTR("sMsg template len[%d]\r\n"), (int)strlen_P(msgTemplate));
-    DebugFlush();
-
-    // Render topic into sTopic (= cMsg)
-    if (!renderTemplateToBuffer(topicTemplate, sTopic, MQTT_TOPIC_MAX_LEN, &renderCtx)) { MQTTDebugTln(F("MQTT: topic template rendering overflow")); idx++; continue; }
-    if (!replaceAll(sTopic, MQTT_TOPIC_MAX_LEN, "%homeassistant%", CSTR(settings.mqtt.sHaprefix))) { MQTTDebugTln(F("MQTT: topic replacement overflow")); idx++; continue; }
-    MQTTDebugf(PSTR("[%s]\r\n"), sTopic);
-
-    // ADR-040: Source template detection via pre-computed flags (no strstr on PROGMEM)
-    bool hasSourceSuffixToken       = (entry.flags & MQTT_HA_FLAG_SOURCE_SUFFIX);
-    bool hasSourceNameToken         = (entry.flags & MQTT_HA_FLAG_SOURCE_NAME);
-    bool hasSourceTopicSegmentToken = (entry.flags & MQTT_HA_FLAG_SOURCE_TOPIC_SEGMENT);
-
-    if (hasSourceSuffixToken || hasSourceNameToken || hasSourceTopicSegmentToken) {
-      if (settings.mqtt.bSeparateSources && baseMqttTopic != nullptr) {
-        if (expandAndPublishSourceTemplates(OTid, "jit", topicTemplate, msgTemplate, &renderCtx, sTopic)) _result = true;
+      if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
+        if (settings.mqtt.bSeparateSources && baseMqttTopic != nullptr) {
+          if (expandAndStreamSensorSources(MQTTclient, cfg, ctx)) result = true;
+        }
+      } else {
+        if (streamSensorDiscovery(MQTTclient, cfg, ctx)) result = true;
       }
-      idx++;
-      continue; // skip regular single-send below (source templates on or off)
+      sIdx++;
+      feedWatchDog();
     }
-
-    if (sendMQTTTemplateStreaming(sTopic, msgTemplate, &renderCtx)) {
-      _result = true;
-    }
-
-    idx++;
   }
 
-  // cMsg (sTopic) is a global; no cleanup needed.
-  // Guard (mqttAutoConfigInProgress) is released by sessionLock dtor.
+  // Check binary sensor index
+  uint16_t bIdx = readBinSensorIndex(OTid);
+  if (bIdx != MQTT_HA_INDEX_NONE) {
+    while (bIdx < MQTT_HA_BINSENSOR_COUNT) {
+      MqttHaBinSensorCfg cfg = readBinSensorCfg(bIdx);
+      if (cfg.id != OTid) break;
+      if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+      bIdx++;
+      feedWatchDog();
+    }
+  }
+
+  // Check specials (climate/number) for this OT ID
+  for (uint16_t i = 0; i < MQTT_HA_SPECIAL_COUNT; i++) {
+    MqttHaSpecialCfg special;
+    memcpy_P(&special, &mqttHaSpecials[i], sizeof(special));
+    if (special.id != OTid) continue;
+    if (special.entityType == HaEntityType::climate) {
+      if (streamClimateDiscovery(MQTTclient, static_cast<uint8_t>(i), ctx)) result = true;
+    } else if (special.entityType == HaEntityType::number) {
+      if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
+    }
+  }
+
   resetMQTTBufferSize();
-  return _result;
+  return result;
 }
 
 void sensorAutoConfigure(byte dataid, bool finishflag , const char *cfgSensorId = nullptr) {

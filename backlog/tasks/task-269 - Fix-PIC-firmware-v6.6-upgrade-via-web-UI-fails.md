@@ -1,10 +1,10 @@
 ---
 id: TASK-269
 title: 'Fix: PIC firmware v6.6 upgrade via web UI fails'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-13 22:18'
-updated_date: '2026-04-13 22:18'
+updated_date: '2026-04-17 07:12'
 labels:
   - bug
   - needs-info
@@ -32,3 +32,9 @@ Reported by Tomba on Tweakers forum (2026-04-09). Upgrading PIC firmware to vers
 <!-- SECTION:NOTES:BEGIN -->
 Waiting for: error message/screenshot from reporter — not readable from RSS feed. Need to contact Tomba on Tweakers for details.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Duplicate of TASK-240. Both report PIC firmware v6.6 upgrade failure by Tomba on Tweakers. Merged into TASK-240.
+<!-- SECTION:FINAL_SUMMARY:END -->
