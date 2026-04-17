@@ -340,6 +340,16 @@ bool streamClimateDiscovery(PubSubClient &client,
 bool streamNumberDiscovery(PubSubClient &client,
                            HaDiscoveryContext &ctx);
 
+// SAT enable/disable switches (boolean settings). switchIdx = 0..12, see implementation.
+bool streamSatSwitchDiscovery(PubSubClient &client,
+                              uint8_t switchIdx,
+                              HaDiscoveryContext &ctx);
+
+// SAT select entities (dropdowns). selectIdx = 0 (sat_heating_system) for now.
+bool streamSatSelectDiscovery(PubSubClient &client,
+                              uint8_t selectIdx,
+                              HaDiscoveryContext &ctx);
+
 bool streamDallasSensorDiscovery(PubSubClient &client,
                                  const char *sensorAddress,
                                  HaDiscoveryContext &ctx);

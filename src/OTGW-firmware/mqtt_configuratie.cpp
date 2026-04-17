@@ -2491,3 +2491,248 @@ bool streamNumberDiscovery(PubSubClient &client,
   feedWatchDog();
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// SAT switch (boolean) and select discovery (TASK-284).
+// Matches the switch/select entries at the bottom of the archived 2.0.0
+// mqttha.cfg. Hardcoded per index (like climate/number) to avoid PROGMEM
+// arrays for a small fixed set. The 13 switches share the same JSON shape,
+// so they route through a single streamSatBoolSwitch() helper.
+// ---------------------------------------------------------------------------
+
+static bool streamSatBoolSwitch(PubSubClient &client,
+                                HaDiscoveryContext &ctx,
+                                PGM_P uniqSuffix,
+                                PGM_P nameSuffix,
+                                PGM_P cmdSub,
+                                PGM_P statSub,
+                                PGM_P icon)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+
+  // Derive topic object-id from uniqSuffix: strip leading dash, swap '-' to '_'.
+  // e.g. "-sat-solar-gain-enable" -> "sat_solar_gain_enable".
+  char objectId[48];
+  {
+    PGM_P p = uniqSuffix;
+    if (pgm_read_byte(p) == '-') p++;
+    size_t i = 0;
+    while (i < sizeof(objectId) - 1) {
+      char c = (char)pgm_read_byte(p + i);
+      if (c == '\0') break;
+      objectId[i] = (c == '-') ? '_' : c;
+      i++;
+    }
+    objectId[i] = '\0';
+  }
+
+  char topic[STREAM_TOPIC_MAX];
+  snprintf_P(topic, sizeof(topic), PSTR("%s/switch/%s/%s/config"),
+             ctx.haPrefix, ctx.nodeId, objectId);
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
+    if (!w.writeRam(ctx.nodeId)) return false;
+    if (!w.writeProgmem(uniqSuffix)) return false;
+    if (!w.writeProgmem(PSTR("\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+    if (!w.writeRam(ctx.hostname)) return false;
+    if (!w.writeProgmem(nameSuffix)) return false;
+    if (!w.writeProgmem(PSTR("\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttSubTopic)) return false;
+    if (!w.writeProgmem(cmdSub)) return false;
+    if (!w.writeProgmem(PSTR("\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"stat_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (!w.writeProgmem(statSub)) return false;
+    if (!w.writeProgmem(PSTR("\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // Boolean payload conventions from mqttha.cfg 2.0.0 archive
+    if (!w.writeProgmem(PSTR("\"pl_on\":\"true\",\"pl_off\":\"false\",\"stat_on\":\"true\",\"stat_off\":\"false\""))) return false;
+
+    if (!writeJsonComma(w)) return false;
+    if (!writeJsonKV_P(w, kIcon, icon)) return false;
+
+    if (!writeJsonComma(w)) return false;
+    if (!writeOriginBlock(w, ctx)) return false;
+
+    return writeJsonClose(w);
+  };
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.endPublish();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  feedWatchDog();
+  return true;
+}
+
+bool streamSatSwitchDiscovery(PubSubClient &client,
+                              uint8_t switchIdx,
+                              HaDiscoveryContext &ctx)
+{
+  // uniqSuffix, nameSuffix, cmdSub, statSub, icon
+  switch (switchIdx) {
+    case 0:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-solar-gain-enable"),       PSTR("_SAT_Solar_Gain"),
+        PSTR("/sat/solar_gain"),              PSTR("/sat/solar_gain_enable"),
+        PSTR("mdi:white-balance-sunny"));
+    case 1:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-summer-simmer-enable"),    PSTR("_SAT_Summer_Simmer"),
+        PSTR("/sat/summer_simmer"),           PSTR("/sat/summer_simmer_enable"),
+        PSTR("mdi:weather-sunny-alert"));
+    case 2:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-comfort-adjust-enable"),   PSTR("_SAT_Comfort_Adjust"),
+        PSTR("/sat/comfort_adjust"),          PSTR("/sat/comfort_adjust_enable"),
+        PSTR("mdi:water-thermometer"));
+    case 3:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-multi-area-enable"),       PSTR("_SAT_Multi_Area"),
+        PSTR("/sat/multi_area"),              PSTR("/sat/multi_area_enable"),
+        PSTR("mdi:home-group"));
+    case 4:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-auto-tune-enable"),        PSTR("_SAT_Auto_Tune"),
+        PSTR("/sat/auto_tune"),               PSTR("/sat/auto_tune_enable"),
+        PSTR("mdi:auto-fix"));
+    case 5:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-simulation-enable"),       PSTR("_SAT_Simulation"),
+        PSTR("/sat/simulation"),              PSTR("/sat/simulation_enable"),
+        PSTR("mdi:flask"));
+    case 6:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-window-detection-enable"), PSTR("_SAT_Window_Detection"),
+        PSTR("/sat/window_detection"),        PSTR("/sat/window_detection_enable"),
+        PSTR("mdi:window-open-variant"));
+    case 7:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-force-pwm-enable"),        PSTR("_SAT_Force_PWM"),
+        PSTR("/sat/force_pwm"),               PSTR("/sat/force_pwm_enable"),
+        PSTR("mdi:pulse"));
+    case 8:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-push-setpoint-enable"),    PSTR("_SAT_Push_Setpoint"),
+        PSTR("/sat/push_setpoint"),           PSTR("/sat/push_setpoint_enable"),
+        PSTR("mdi:upload"));
+    case 9:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-ovp-enabled"),             PSTR("_SAT_OVP_Enabled"),
+        PSTR("/sat/ovp_enabled"),             PSTR("/sat/ovp_enabled"),
+        PSTR("mdi:shield-check"));
+    case 10:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-preset-sync-enable"),      PSTR("_SAT_Preset_Sync"),
+        PSTR("/sat/preset_sync"),             PSTR("/sat/preset_sync_enable"),
+        PSTR("mdi:sync"));
+    case 11:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-dhw-enabled"),             PSTR("_SAT_DHW_Enabled"),
+        PSTR("/sat/dhw_enabled"),             PSTR("/sat/dhw_enabled"),
+        PSTR("mdi:water-boiler"));
+    case 12:
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-pwm-auto-switch-enable"),  PSTR("_SAT_PWM_Auto_Switch"),
+        PSTR("/sat/pwm_auto_switch"),         PSTR("/sat/pwm_auto_switch_enable"),
+        PSTR("mdi:swap-horizontal"));
+    default:
+      return false;
+  }
+}
+
+bool streamSatSelectDiscovery(PubSubClient &client,
+                              uint8_t selectIdx,
+                              HaDiscoveryContext &ctx)
+{
+  if (selectIdx != 0) return false;
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+
+  char topic[STREAM_TOPIC_MAX];
+  snprintf_P(topic, sizeof(topic), PSTR("%s/select/%s/sat_heating_system/config"),
+             ctx.haPrefix, ctx.nodeId);
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
+    if (!w.writeRam(ctx.nodeId)) return false;
+    if (!w.writeProgmem(PSTR("-sat-heating-system\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+    if (!w.writeRam(ctx.hostname)) return false;
+    if (!w.writeProgmem(PSTR("_SAT_Heating_System\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttSubTopic)) return false;
+    if (!w.writeProgmem(PSTR("/sat/heating_system\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"stat_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (!w.writeProgmem(PSTR("/sat/heating_system\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"options\":[\"0\",\"1\",\"2\",\"3\"]"))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeJsonKV_P(w, kIcon, PSTR("mdi:radiator"))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeOriginBlock(w, ctx)) return false;
+    return writeJsonClose(w);
+  };
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.endPublish();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  feedWatchDog();
+  return true;
+}

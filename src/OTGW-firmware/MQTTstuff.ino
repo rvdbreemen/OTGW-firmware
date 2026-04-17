@@ -1364,8 +1364,15 @@ void doAutoConfigure(){
     streamClimateDiscovery(MQTTclient, 1, ctx);  // DHW Control
     feedWatchDog();
     streamNumberDiscovery(MQTTclient, ctx);       // Toutside Override
+    // SAT switches + select (TASK-284, piggyback on climate pseudo-ID 0)
+    for (uint8_t swIdx = 0; swIdx < 13; swIdx++) {
+      feedWatchDog();
+      streamSatSwitchDiscovery(MQTTclient, swIdx, ctx);
+    }
+    feedWatchDog();
+    streamSatSelectDiscovery(MQTTclient, 0, ctx);
     // Mark climate/number IDs done
-    setMQTTConfigDone(0);   // climate entries are OT ID 0
+    setMQTTConfigDone(0);   // climate + SAT switch/select entries are OT ID 0
     setMQTTConfigDone(27);  // number entry is OT ID 27
   } // Lock released here
 
@@ -1424,10 +1431,16 @@ bool doAutoConfigureMsgid(byte OTid)
     }
   }
 
-  // Climate (OT ID 0)
+  // Climate + SAT switches/select (OT ID 0 — TASK-284 piggyback)
   if (OTid == 0) {
     if (streamClimateDiscovery(MQTTclient, 0, ctx)) result = true;
     if (streamClimateDiscovery(MQTTclient, 1, ctx)) result = true;
+    for (uint8_t swIdx = 0; swIdx < 13; swIdx++) {
+      feedWatchDog();
+      if (streamSatSwitchDiscovery(MQTTclient, swIdx, ctx)) result = true;
+    }
+    feedWatchDog();
+    if (streamSatSelectDiscovery(MQTTclient, 0, ctx)) result = true;
   }
   // Number (OT ID 27)
   if (OTid == 27) {
