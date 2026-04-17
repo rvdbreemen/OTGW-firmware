@@ -248,6 +248,8 @@ struct HaDiscoveryContext {
     const char *mqttPubTopic;
     const char *mqttSubTopic;
     const char *haPrefix;
+    const char *manufacturer;      // Hardware manufacturer (from settings.device)
+    const char *model;             // Hardware model (from settings.device)
     bool        isFirstEntity;
     // Source template expansion (set per-source iteration)
     const char *sourceSuffix;

@@ -664,6 +664,13 @@ struct SATSection {
 };
 #endif // ENABLE_SAT
 
+// Hardware identity for HA device registry discovery.
+// Defaults set per platform; user can override via settings.ini or web UI.
+struct DeviceSection {
+  char sManufacturer[32] = "NodoShop";
+  char sModel[32]        = "OTGW";
+};
+
 struct OTGWSettings {
   // Device-level fields (universal device identity)
   char sHostname[41] = _HOSTNAME;
@@ -675,6 +682,7 @@ struct OTGWSettings {
   uint8_t iRestartHour = 4;     // Hour (0-23, local time) for nightly restart (default 04:00)
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
+  DeviceSection       device;
   MQTTSettingsSection mqtt;
   NTPSection          ntp;
   SensorsSection      sensors;

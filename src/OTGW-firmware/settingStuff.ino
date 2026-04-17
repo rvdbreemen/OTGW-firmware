@@ -220,6 +220,8 @@ void writeSettings(bool show)
   file.print(F("{\n"));
   writeJsonStringKV(file, F("hostname"), settings.sHostname, true);
   writeJsonStringKV(file, F("httppasswd"), settings.sHTTPpasswd, true);
+  writeJsonStringKV(file, F("DeviceManufacturer"), settings.device.sManufacturer, true);
+  writeJsonStringKV(file, F("DeviceModel"), settings.device.sModel, true);
   writeJsonBoolKV(file, F("MQTTenable"), settings.mqtt.bEnable, true);
   writeJsonStringKV(file, F("MQTTbroker"), settings.mqtt.sBroker, true);
   writeJsonIntKV(file, F("MQTTbrokerPort"), settings.mqtt.iBrokerPort, true);
@@ -440,6 +442,12 @@ void updateSetting(const char *field, const char *newValue)
     DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settings.sHostname);
   }
 
+  else if (strcasecmp_P(field, PSTR("DeviceManufacturer")) == 0) {
+    strlcpy(settings.device.sManufacturer, newValue, sizeof(settings.device.sManufacturer));
+  }
+  else if (strcasecmp_P(field, PSTR("DeviceModel")) == 0) {
+    strlcpy(settings.device.sModel, newValue, sizeof(settings.device.sModel));
+  }
   else if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
     // Only update if not the placeholder value.
     if (newValue && !isHttpPasswordPlaceholder(newValue)) {

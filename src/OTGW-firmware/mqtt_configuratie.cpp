@@ -1724,8 +1724,6 @@ static const char kOrigin[]   PROGMEM = "origin";
 static const char kUrl[]      PROGMEM = "url";
 
 // Fixed PROGMEM values
-static const char kMfrValue[]   PROGMEM = "Schelte Bron";
-static const char kModelValue[] PROGMEM = "otgw-nodo";
 static const char kValTplVal[]  PROGMEM = "{{ value }}";
 static const char kOriginName[] PROGMEM = "OTGW-firmware";
 static const char kOriginUrl[]  PROGMEM = "https://github.com/rvdbreemen/OTGW-firmware";
@@ -1741,9 +1739,9 @@ static bool writeDeviceBlock(MqttJsonWriter &w, const HaDiscoveryContext &ctx) {
 
   if (ctx.isFirstEntity) {
     if (!writeJsonComma(w)) return false;
-    if (!writeJsonKV_P(w, kMfr, kMfrValue)) return false;
+    if (!writeJsonKV(w, kMfr, ctx.manufacturer)) return false;
     if (!writeJsonComma(w)) return false;
-    if (!writeJsonKV_P(w, kModel, kModelValue)) return false;
+    if (!writeJsonKV(w, kModel, ctx.model)) return false;
     if (!writeJsonComma(w)) return false;
     if (!w.writeChar('"')) return false;
     if (!w.writeProgmem(kDevName)) return false;

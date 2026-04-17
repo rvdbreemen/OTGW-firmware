@@ -780,6 +780,7 @@ void sendMQTTversioninfo(){
     sendMQTTData("otgw-pic/version", state.pic.sFwversion);
     sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
     sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
+    sendMQTTData(F("otgw-pic/designer"), F("Schelte Bron"));
   }
   sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
 }
@@ -936,19 +937,6 @@ void setMQTTConfigPending(const uint8_t MSGid)
   bitSet(MQTTautoCfgPendingMap[group], bit);
 }
 //===========================================================================================
-bool getMQTTConfigPending(const uint8_t MSGid)
-{
-  uint8_t group = (MSGid >> 5) & 0x07;
-  uint8_t bit   = MSGid & 0x1F;
-  return bitRead(MQTTautoCfgPendingMap[group], bit) != 0;
-}
-//===========================================================================================
-void clearMQTTConfigPending(const uint8_t MSGid)
-{
-  uint8_t group = (MSGid >> 5) & 0x07;
-  uint8_t bit   = MSGid & 0x1F;
-  bitClear(MQTTautoCfgPendingMap[group], bit);
-}
 //===========================================================================================
 void markAllMQTTConfigPending()
 {
@@ -1050,6 +1038,8 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   ctx.mqttPubTopic = MQTTPubNamespace;
   ctx.mqttSubTopic = MQTTSubNamespace;
   ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
+  ctx.manufacturer = settings.device.sManufacturer;
+  ctx.model = settings.device.sModel;
   ctx.isFirstEntity = isFirst;
   ctx.sourceSuffix = "";
   ctx.sourceName = "";
