@@ -2316,13 +2316,260 @@ bool expandAndStreamSensorSources(PubSubClient &client,
 // ---------------------------------------------------------------------------
 // Stubs for climate and number discovery (remain template-based for now)
 // ---------------------------------------------------------------------------
-bool streamClimateDiscovery(PubSubClient & /*client*/,
-                            uint8_t /*climateIdx*/,
-                            HaDiscoveryContext & /*ctx*/) {
-  return false;
+// ---------------------------------------------------------------------------
+// Climate: Thermostat (climateIdx=0) and DHW Control (climateIdx=1)
+// ---------------------------------------------------------------------------
+bool streamClimateDiscovery(PubSubClient &client,
+                            uint8_t climateIdx,
+                            HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (climateIdx > 1) return false;
+
+  // Topic
+  char topic[STREAM_TOPIC_MAX];
+  if (climateIdx == 0) {
+    snprintf_P(topic, sizeof(topic), PSTR("%s/climate/%s/climate/config"), ctx.haPrefix, ctx.nodeId);
+  } else {
+    snprintf_P(topic, sizeof(topic), PSTR("%s/climate/%s/dhw_control/config"), ctx.haPrefix, ctx.nodeId);
+  }
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    if (climateIdx == 0) {
+      // === Thermostat ===
+      if (!writeJsonKV_P(w, PSTR("action_template"), PSTR("{% if value == 'ON' %}heating{% else %}idle{% endif %}"))) return false;
+      if (!writeJsonComma(w)) return false;
+
+      // "action_topic":"<pub>/ch_enable"
+      if (!w.writeProgmem(PSTR("\"action_topic\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(PSTR("/ch_enable\""))) return false;
+      if (!writeJsonComma(w)) return false;
+    } else {
+      // === DHW Control ===
+      if (!writeJsonKV_P(w, PSTR("action_template"), PSTR("{% if value == 'ON' %}heating{% else %}idle{% endif %}"))) return false;
+      if (!writeJsonComma(w)) return false;
+
+      if (!w.writeProgmem(PSTR("\"action_topic\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(PSTR("/domestichotwater\""))) return false;
+      if (!writeJsonComma(w)) return false;
+    }
+
+    // avty_t
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // device block
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // name + uniq_id
+    if (climateIdx == 0) {
+      if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+      if (!w.writeRam(ctx.hostname)) return false;
+      if (!w.writeProgmem(PSTR("_Thermostat\""))) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
+      if (!w.writeRam(ctx.nodeId)) return false;
+      if (!w.writeProgmem(PSTR("-thermostat\""))) return false;
+    } else {
+      if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+      if (!w.writeRam(ctx.hostname)) return false;
+      if (!w.writeProgmem(PSTR("_DHW_Control\""))) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
+      if (!w.writeRam(ctx.nodeId)) return false;
+      if (!w.writeProgmem(PSTR("-dhw_control\""))) return false;
+    }
+    if (!writeJsonComma(w)) return false;
+
+    if (climateIdx == 1) {
+      if (!w.writeProgmem(PSTR("\"optimistic\":true"))) return false;
+      if (!writeJsonComma(w)) return false;
+    }
+
+    // modes
+    if (climateIdx == 0) {
+      if (!w.writeProgmem(PSTR("\"modes\":[\"off\",\"heat\"]"))) return false;
+    } else {
+      if (!w.writeProgmem(PSTR("\"modes\":[\"off\",\"auto\"]"))) return false;
+    }
+    if (!writeJsonComma(w)) return false;
+
+    // mode_stat_t + mode_stat_tpl
+    if (!w.writeProgmem(PSTR("\"mode_stat_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (climateIdx == 0) {
+      if (!w.writeProgmem(PSTR("/otgw-pic/thermostat_connected\""))) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV_P(w, PSTR("mode_stat_tpl"), PSTR("{% if value == 'ON' %}heat{% else %}off{% endif %}"))) return false;
+    } else {
+      if (!w.writeProgmem(PSTR("/dhw_enable\""))) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV_P(w, PSTR("mode_stat_tpl"), PSTR("{% if value == 'ON' %}auto{% else %}off{% endif %}"))) return false;
+    }
+    if (!writeJsonComma(w)) return false;
+
+    // curr_temp_t
+    if (!w.writeProgmem(PSTR("\"curr_temp_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (climateIdx == 0) {
+      if (!w.writeProgmem(PSTR("/Tr\""))) return false;
+    } else {
+      if (!w.writeProgmem(PSTR("/Tdhw\""))) return false;
+    }
+    if (!writeJsonComma(w)) return false;
+
+    // temp_stat_t
+    if (!w.writeProgmem(PSTR("\"temp_stat_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (climateIdx == 0) {
+      if (!w.writeProgmem(PSTR("/TrSet\""))) return false;
+    } else {
+      if (!w.writeProgmem(PSTR("/TdhwSet\""))) return false;
+    }
+    if (!writeJsonComma(w)) return false;
+
+    // temp_cmd_t + temp_cmd_tpl
+    if (!w.writeProgmem(PSTR("\"temp_cmd_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttSubTopic)) return false;
+    if (!w.writeProgmem(PSTR("/command\""))) return false;
+    if (!writeJsonComma(w)) return false;
+    if (climateIdx == 0) {
+      if (!writeJsonKV_P(w, PSTR("temp_cmd_tpl"), PSTR("TT={{ value }}"))) return false;
+    } else {
+      if (!writeJsonKV_P(w, PSTR("temp_cmd_tpl"), PSTR("SW={{ value }}"))) return false;
+    }
+    if (!writeJsonComma(w)) return false;
+
+    // temp bounds + settings
+    if (climateIdx == 0) {
+      if (!w.writeProgmem(PSTR("\"initial\":\"20\",\"min_temp\":\"12\",\"max_temp\":\"28\",\"temp_step\":\"0.5\",\"precision\":0.1"))) return false;
+    } else {
+      if (!w.writeProgmem(PSTR("\"initial\":\"43\",\"min_temp\":\"40\",\"max_temp\":\"60\",\"temp_step\":\"1\",\"precision\":1"))) return false;
+    }
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeJsonKV_P(w, PSTR("temp_unit"), PSTR("C"))) return false;
+
+    if (climateIdx == 0) {
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeProgmem(PSTR("\"payload_off\":0,\"payload_on\":1"))) return false;
+    }
+
+    // icon
+    if (!writeJsonComma(w)) return false;
+    if (climateIdx == 0) {
+      if (!writeJsonKV_P(w, kIcon, PSTR("mdi:radiator"))) return false;
+    } else {
+      if (!writeJsonKV_P(w, kIcon, PSTR("mdi:water-boiler"))) return false;
+    }
+
+    // origin
+    if (!writeJsonComma(w)) return false;
+    if (!writeOriginBlock(w, ctx)) return false;
+
+    return writeJsonClose(w);
+  };
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.endPublish();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  feedWatchDog();
+  return true;
 }
 
-bool streamNumberDiscovery(PubSubClient & /*client*/,
-                           HaDiscoveryContext & /*ctx*/) {
-  return false;
+// ---------------------------------------------------------------------------
+// Number: Outside Temperature Override (OT ID 27)
+// ---------------------------------------------------------------------------
+bool streamNumberDiscovery(PubSubClient &client,
+                           HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+
+  char topic[STREAM_TOPIC_MAX];
+  snprintf_P(topic, sizeof(topic), PSTR("%s/number/%s/Toutside_override/config"),
+             ctx.haPrefix, ctx.nodeId);
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    // avty_t
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // device block
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // uniq_id
+    if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
+    if (!w.writeRam(ctx.nodeId)) return false;
+    if (!w.writeProgmem(PSTR("-Toutside_override\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // device_class + name
+    if (!writeJsonKV_P(w, kDevCls, PSTR("temperature"))) return false;
+    if (!writeJsonComma(w)) return false;
+    if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+    if (!w.writeRam(ctx.hostname)) return false;
+    if (!w.writeProgmem(PSTR("_Outside_Temperature_Override\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // cmd_t
+    if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttSubTopic)) return false;
+    if (!w.writeProgmem(PSTR("/outside\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // stat_t
+    if (!w.writeProgmem(PSTR("\"stat_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (!w.writeProgmem(PSTR("/Toutside\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // unit, min, max, step, mode
+    if (!w.writeProgmem(PSTR("\"unit_of_measurement\":\"\xC2\xB0""C\",\"min\":-40,\"max\":50,\"step\":0.5,\"mode\":\"box\""))) return false;
+
+    // icon
+    if (!writeJsonComma(w)) return false;
+    if (!writeJsonKV_P(w, kIcon, PSTR("mdi:thermometer"))) return false;
+
+    // origin
+    if (!writeJsonComma(w)) return false;
+    if (!writeOriginBlock(w, ctx)) return false;
+
+    return writeJsonClose(w);
+  };
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.endPublish();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  feedWatchDog();
+  return true;
 }
