@@ -684,9 +684,9 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 // - WARNING (5KB): Below this, aggressive throttling needed
 // - LOW (8KB): Below this, start reducing message frequency
 // - HEALTHY (>8KB): Sufficient for normal operation with WebSocket server (~4KB baseline)
-#define HEAP_CRITICAL_THRESHOLD   3072   // Critical: Stop all non-essential operations
-#define HEAP_WARNING_THRESHOLD    5120   // Warning: Start throttling messages
-#define HEAP_LOW_THRESHOLD        8192   // Low: Begin reducing message frequency
+#define HEAP_CRITICAL_THRESHOLD   2048   // Critical: Stop all non-essential operations
+#define HEAP_WARNING_THRESHOLD    4096   // Warning: Start throttling messages
+#define HEAP_LOW_THRESHOLD        6144   // Low: Begin reducing message frequency
 
 // Throttling state
 static uint32_t lastWebSocketSendMs = 0;

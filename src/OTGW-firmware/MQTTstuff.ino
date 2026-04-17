@@ -46,7 +46,7 @@ constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 // A single discovery message needs ~1200 bytes of lwIP pbuf (ESP8266 core 3.x / lwIP 2.x).
 // 12000 bytes provides ~10x margin to absorb concurrent TCP stack overhead.
 // Keep in sync with the HEAP_WARNING tier in canPublishMQTT().
-constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 8000;
+constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 4000;  // Streaming needs ~200 bytes, not 1200+
 
 // MQTT autoconfig buffer design:
 // feedWatchDog() is used (not doBackgroundTasks()) during autoconfig iterations

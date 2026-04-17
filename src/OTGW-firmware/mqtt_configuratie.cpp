@@ -1972,7 +1972,7 @@ static bool buildBinSensorDiscoveryTopic(char *dest, size_t destSize,
 // ---------------------------------------------------------------------------
 // Minimum free heap for discovery publish (same as MQTTstuff.ino)
 // ---------------------------------------------------------------------------
-static constexpr uint32_t STREAM_HEAP_MIN = 8000;
+static constexpr uint32_t STREAM_HEAP_MIN = 4000;  // Streaming needs ~200 bytes, not 1200+
 static constexpr size_t   STREAM_TOPIC_MAX = 200;
 
 // ---------------------------------------------------------------------------
