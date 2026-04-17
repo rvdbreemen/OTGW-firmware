@@ -1118,12 +1118,12 @@ paths:
         Marks all known OT message IDs as pending and triggers asynchronous
         drip-publishing of MQTT autodiscovery configs for Home Assistant integration.
 
-        Discovery configs are composed by streaming functions in
-        `mqtt_configuratie.cpp` (auto-generated from `mqttha.cfg` via
-        `tools/generate_mqttha_data.py`; the old runtime `data/mqttha.cfg` is
-        archived under `docs/archive/`). The drip publisher issues one config
-        every 3 seconds (slowed to every 30 seconds under heap pressure) to
-        avoid MQTT burst storms.
+        Discovery configs are composed by hand-written streaming functions in
+        `mqtt_configuratie.cpp` (see ADR-077). The legacy runtime template file
+        `data/mqttha.cfg` is archived under `docs/archive/` as historical
+        reference only. The drip publisher issues one config every 3 seconds
+        (slowed to every 30 seconds under heap pressure) to avoid MQTT burst
+        storms.
 
         Produced entity categories: 289 sensors, 53 binary_sensors, 2 climate
         (Thermostat + DHW Control), 1 number (Toutside_override), 13 SAT switches

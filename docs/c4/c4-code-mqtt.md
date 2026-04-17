@@ -35,7 +35,7 @@
     - `HaEntityCat entityCat`: HA entity category enum (diagnostic, config)
     - `bool enabledByDefault`: Whether entity is enabled in HA by default
   - Location: MQTTstuff.h:177-188
-  - Generated from: `mqttha.cfg` by `tools/generate_mqttha_data.py`
+  - Source: hand-written table in `mqtt_configuratie.cpp` (see ADR-077; `docs/archive/mqttha.cfg` is historical reference only)
   - Array: `mqttHaSensors[289]` (118 unique OT IDs)
 
 - `struct MqttHaBinSensorCfg` (MQTTstuff.h)

@@ -450,7 +450,7 @@ Backward compatibility alias. The command is passed in the URL path instead of t
 
 Triggers a full MQTT autodiscovery cycle. Marks all discovery IDs as pending and drip-publishes their configs asynchronously (one every 3 seconds, slowed to 30 seconds under heap pressure).
 
-Discovery configs are composed on the fly by streaming functions in `mqtt_configuratie.cpp`, which is auto-generated from `mqttha.cfg` by `tools/generate_mqttha_data.py`. The old filesystem template (`data/mqttha.cfg`) has been archived under `docs/archive/` and is no longer read at runtime.
+Discovery configs are composed on the fly by hand-written streaming functions in `mqtt_configuratie.cpp` (see ADR-077). The old filesystem template (`data/mqttha.cfg`) has been archived under `docs/archive/` and is no longer read at runtime.
 
 Produced entity categories:
 - `sensor`: 289 entries (PROGMEM table)
