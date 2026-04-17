@@ -345,11 +345,16 @@ static int findMQTTSetCommandIndex(const char *topicToken)
 }
 
 //===========================================================================================
-void startMQTT() 
+void startMQTT()
 {
   if (!settings.mqtt.bEnable) return;
-  
-  // Outbound publishes now stream via beginPublish/write/endPublish.
+
+  // Eliminate the TCP_SND_BUF temporary copy in WiFiClient (~1072 bytes saved).
+  // With sync mode, writes flush directly to lwIP without intermediate buffering.
+  wifiClient.setSync(true);
+  wifiClient.setNoDelay(true);
+
+  // Outbound publishes stream via beginPublish/write/endPublish.
   // Keep only enough client buffer for inbound subscribed topics and payloads.
   MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
   
