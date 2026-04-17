@@ -23,7 +23,9 @@ Usage:
 
 import argparse
 import gzip
+import hashlib
 import io
+import json
 import multiprocessing
 import os
 import platform
@@ -1096,6 +1098,77 @@ def clean_build(project_dir, distclean=False):
     print_success("Clean complete")
 
 
+def setup_reproducible_env(project_dir, use_ccache=False):
+    """Configure environment variables for reproducible builds and optional ccache.
+
+    Per the deep-research flash-esp32 report (TASK-287): pin locale, timezone,
+    PYTHONHASHSEED and SOURCE_DATE_EPOCH so repeated builds on the same source
+    produce identical binaries. Also wire ccache into the build when the user
+    asks for it. ccache with CCACHE_COMPILERCHECK=content is robust against
+    silent compiler-version drift (ccache docs).
+
+    Mutates os.environ in place and returns a dict of the keys set for logging.
+    """
+    pinned = {
+        "LC_ALL": "C",
+        "LANG": "C",
+        "TZ": "UTC",
+        "PYTHONHASHSEED": "0",
+        # Pinned epoch (2024-01-01 UTC) so timestamps embedded in objects match
+        # across machines. Override by exporting SOURCE_DATE_EPOCH before build.
+        "SOURCE_DATE_EPOCH": os.environ.get("SOURCE_DATE_EPOCH", "1704067200"),
+    }
+    if use_ccache:
+        ccache_dir = project_dir / ".cache" / "ccache"
+        ccache_dir.mkdir(parents=True, exist_ok=True)
+        pinned["CCACHE_DIR"] = str(ccache_dir)
+        pinned["CCACHE_COMPILERCHECK"] = "content"
+        pinned["CCACHE_LOGFILE"] = str(ccache_dir / "ccache.log")
+
+    for k, v in pinned.items():
+        os.environ[k] = v
+    return pinned
+
+
+def write_build_manifest(project_dir, semver):
+    """Compute sha256 hashes for every build artifact under build/ and write
+    build/manifest.sha256.json. Used for release integrity checks and factory
+    flash provenance (TASK-287).
+    """
+    build_dir = project_dir / "build"
+    if not build_dir.exists():
+        print_warning("Build directory not found, skipping manifest")
+        return None
+
+    artifacts = sorted(
+        list(build_dir.rglob("*.bin")) + list(build_dir.rglob("*.elf"))
+    )
+    if not artifacts:
+        print_warning("No build artifacts found, skipping manifest")
+        return None
+
+    print_step("Writing build manifest (sha256)")
+
+    manifest = {
+        "semver": semver,
+        "generated": "build.py --manifest",
+        "files": {},
+    }
+    for artifact in artifacts:
+        h = hashlib.sha256()
+        h.update(artifact.read_bytes())
+        rel = artifact.relative_to(build_dir).as_posix()
+        manifest["files"][rel] = {
+            "sha256": h.hexdigest(),
+            "size_bytes": artifact.stat().st_size,
+        }
+
+    manifest_path = build_dir / "manifest.sha256.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print_success(f"Manifest: {manifest_path} ({len(manifest['files'])} artifacts)")
+    return manifest_path
+
+
 def main():
     """Main build script entry point"""
     parser = argparse.ArgumentParser(
@@ -1185,6 +1258,21 @@ Examples:
         action="store_true",
         help="Disable colored output"
     )
+    parser.add_argument(
+        "--ccache",
+        action="store_true",
+        help="Route compiler invocations through ccache (requires ccache on PATH)"
+    )
+    parser.add_argument(
+        "--manifest",
+        action="store_true",
+        help="Write build/manifest.sha256.json with sha256 of every produced artifact"
+    )
+    parser.add_argument(
+        "--reproducible",
+        action="store_true",
+        help="Pin LC_ALL, TZ, PYTHONHASHSEED, SOURCE_DATE_EPOCH for reproducible builds"
+    )
 
     args = parser.parse_args()
     
@@ -1199,7 +1287,14 @@ Examples:
     
     # Get project directory (script should be in project root)
     project_dir = Path(__file__).parent.resolve()
-    
+
+    # Apply reproducible-build env and ccache wiring before any tool runs.
+    if args.reproducible or args.ccache:
+        pinned = setup_reproducible_env(project_dir, use_ccache=args.ccache)
+        print_info(
+            "Build env pinned: " + ", ".join(f"{k}={v}" for k, v in pinned.items())
+        )
+
     use_pio = (args.backend == "platformio")
 
     print(f"{Colors.HEADER}{Colors.BOLD}")
@@ -1324,6 +1419,10 @@ Examples:
                     print_error(f"Failed to create full merged binary for {tcfg['name']}")
                     sys.exit(1)
                 print_info(f"Factory flash:   esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {full_merged.name}")
+
+    # Optional sha256 manifest before listing
+    if args.manifest:
+        write_build_manifest(project_dir, semver)
 
     # List build artifacts
     list_build_artifacts(project_dir)
