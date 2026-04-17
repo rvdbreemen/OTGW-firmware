@@ -16,9 +16,15 @@ Generated files:
 
 Struct layout (natural alignment, sizeof = 8):
   uint8_t  id        : offset 0  (1 byte)
-  [padding]          : offset 1  (1 byte)
+  uint8_t  flags     : offset 1  (1 byte)  — pre-computed source token flags
   uint16_t topicOff  : offset 2  (2 bytes)  — byte offset into mqttHaTopicPool
   uint32_t msgOff    : offset 4  (4 bytes)  — byte offset into mqttHaMsgPool
+
+Flags byte layout:
+  bit 0: hasSourceSuffix       — topic or msg contains %source_suffix%
+  bit 1: hasSourceName         — topic or msg contains %source_name%
+  bit 2: hasSourceTopicSegment — topic or msg contains %source_topic_segment%
+  bit 3: isPicEntry            — topic contains "otgw-pic/"
 """
 
 import os
@@ -37,9 +43,15 @@ HEADER_FILE = os.path.join(SKETCH_DIR, "mqttha_progmem.h")
 CPP_FILE    = os.path.join(SKETCH_DIR, "mqttha_progmem.cpp")
 
 # Python struct format for MqttHaCfgEntry (8 bytes, little-endian):
-# '<' = little-endian, 'B' = uint8, 'x' = 1 pad byte, 'H' = uint16, 'I' = uint32
-ENTRY_FMT = '<BxHI'
+# '<' = little-endian, 'B' = uint8, 'B' = uint8 flags, 'H' = uint16, 'I' = uint32
+ENTRY_FMT = '<BBHI'
 assert pystructmod.calcsize(ENTRY_FMT) == 8, "entry struct must be 8 bytes"
+
+# Flag bit definitions (must match MQTT_HA_FLAG_* in mqttha_progmem.h)
+FLAG_HAS_SOURCE_SUFFIX        = 0x01
+FLAG_HAS_SOURCE_NAME          = 0x02
+FLAG_HAS_SOURCE_TOPIC_SEGMENT = 0x04
+FLAG_IS_PIC_ENTRY             = 0x08
 
 # ---- Helpers --------------------------------------------------------------- #
 
@@ -93,17 +105,29 @@ def build_index(entries):
 
 # ---- Build string pools ---------------------------------------------------- #
 
+def compute_flags(topic: str, msg: str) -> int:
+    flags = 0
+    combined = topic + msg
+    if "%source_suffix%" in combined:        flags |= FLAG_HAS_SOURCE_SUFFIX
+    if "%source_name%" in combined:          flags |= FLAG_HAS_SOURCE_NAME
+    if "%source_topic_segment%" in combined: flags |= FLAG_HAS_SOURCE_TOPIC_SEGMENT
+    if "otgw-pic/" in topic or "otgw-pic/" in msg:  flags |= FLAG_IS_PIC_ENTRY
+    return flags
+
+
 def build_pools(sorted_entries):
     topic_pool = bytearray()
     msg_pool   = bytearray()
     t_offsets  = []
     m_offsets  = []
+    flags_list = []
     for _, topic, msg in sorted_entries:
         t_offsets.append(len(topic_pool))
         topic_pool.extend(topic.encode("utf-8") + b"\x00")
         m_offsets.append(len(msg_pool))
         msg_pool.extend(msg.encode("utf-8") + b"\x00")
-    return bytes(topic_pool), bytes(msg_pool), t_offsets, m_offsets
+        flags_list.append(compute_flags(topic, msg))
+    return bytes(topic_pool), bytes(msg_pool), t_offsets, m_offsets, flags_list
 
 
 # ---- Pool → C string literal ----------------------------------------------- #
@@ -155,15 +179,24 @@ def generate_header(count, topic_pool_size, msg_pool_size, output_path, timestam
 // Entry descriptor — 8 bytes with natural alignment
 // Fields after memcpy_P to RAM:
 //   id        : uint8_t  — OT message ID
+//   flags     : uint8_t  — pre-computed flags (avoids strstr on PROGMEM at runtime)
 //   topicOff  : uint16_t — byte offset into mqttHaTopicPool ({topic_pool_size} bytes)
 //   msgOff    : uint32_t — byte offset into mqttHaMsgPool   ({msg_pool_size} bytes)
 // ---------------------------------------------------------------------------
 struct MqttHaCfgEntry {{
   uint8_t  id;
+  uint8_t  flags;
   uint16_t topicOff;
   uint32_t msgOff;
 }};
 static_assert(sizeof(MqttHaCfgEntry) == 8, "MqttHaCfgEntry must be 8 bytes");
+
+// Flag bit definitions
+constexpr uint8_t MQTT_HA_FLAG_SOURCE_SUFFIX        = 0x01;
+constexpr uint8_t MQTT_HA_FLAG_SOURCE_NAME          = 0x02;
+constexpr uint8_t MQTT_HA_FLAG_SOURCE_TOPIC_SEGMENT = 0x04;
+constexpr uint8_t MQTT_HA_FLAG_IS_PIC_ENTRY         = 0x08;
+constexpr uint8_t MQTT_HA_FLAG_ANY_SOURCE           = 0x07;  // mask for any source token
 
 // Total number of entries in mqttHaCfgTable
 constexpr uint16_t MQTT_HA_CFG_COUNT = {count};
@@ -181,7 +214,7 @@ extern const uint16_t mqttHaCfgIndex[256];
 
 # ---- Generate cpp ---------------------------------------------------------- #
 
-def generate_cpp(sorted_entries, topic_pool, msg_pool, t_offsets, m_offsets,
+def generate_cpp(sorted_entries, topic_pool, msg_pool, t_offsets, m_offsets, flags_list,
                  output_path, timestamp):
     index = build_index(sorted_entries)
     count = len(sorted_entries)
@@ -228,8 +261,10 @@ def generate_cpp(sorted_entries, topic_pool, msg_pool, t_offsets, m_offsets,
     for n, (ot_id, topic, _) in enumerate(sorted_entries):
         t_off = t_offsets[n]
         m_off = m_offsets[n]
-        short = topic[:60] + ("..." if len(topic) > 60 else "")
-        lines.append(f"  {{{ot_id}, {t_off}, {m_off}}},  // [{n}] {short}")
+        flg = flags_list[n]
+        short = topic[:55] + ("..." if len(topic) > 55 else "")
+        flag_str = f"0x{flg:02X}" if flg else "0"
+        lines.append(f"  {{{ot_id}, {flag_str}, {t_off}, {m_off}}},  // [{n}] {short}")
     lines.append("};")
     lines.append("")
 
@@ -265,12 +300,12 @@ def main():
     print(f"  Parsed {len(entries)} data entries.")
 
     sorted_entries = sorted(entries, key=lambda e: e[0])
-    topic_pool, msg_pool, t_offsets, m_offsets = build_pools(sorted_entries)
+    topic_pool, msg_pool, t_offsets, m_offsets, flags_list = build_pools(sorted_entries)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     generate_header(len(sorted_entries), len(topic_pool), len(msg_pool), HEADER_FILE, timestamp)
-    generate_cpp(sorted_entries, topic_pool, msg_pool, t_offsets, m_offsets, CPP_FILE, timestamp)
+    generate_cpp(sorted_entries, topic_pool, msg_pool, t_offsets, m_offsets, flags_list, CPP_FILE, timestamp)
 
     print(f"  Entries       : {len(sorted_entries)}")
     print(f"  Topic pool    : {len(topic_pool):,} bytes (offsets fit uint16)")

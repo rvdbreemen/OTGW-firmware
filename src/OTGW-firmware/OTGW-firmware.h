@@ -118,7 +118,6 @@ bool canSendWebSocket();
 bool canPublishMQTT();
 void logHeapStats();
 void emergencyHeapRecovery();
-void resetMQTTBufferSize();
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
@@ -317,6 +316,7 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bMQTT                  = false;  // was bDebugMQTT — MQTT publish/receive trace
   bool     bMQTTGate              = false;  // MQTT gate decisions: interval/change-based publish logic
   bool     bSensors               = false;  // was bDebugSensors — Dallas sensor scan trace
+  bool     bNTP                   = true;   // NTP time sync telemetry (on by default for diagnostics)
   bool     bSensorSim             = false;  // was bDebugSensorSimulation
   bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
   bool     bSAT                   = true;   // SAT control loop + cycle + HCR trace (default on)
@@ -964,6 +964,13 @@ struct EthernetSection {
 #endif
 
 
+// Hardware identity for HA device registry discovery.
+// Defaults set per platform; user can override via settings.ini or web UI.
+struct DeviceSection {
+  char sManufacturer[32] = "NodoShop";
+  char sModel[32]        = "OTGW";
+};
+
 struct OTGWSettings {
   // Device-level fields (universal device identity)
   char sHostname[41] = _HOSTNAME;
@@ -975,6 +982,7 @@ struct OTGWSettings {
   uint8_t iRestartHour = 4;     // hour (0-23) for nightly restart
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
+  DeviceSection       device;
   MQTTSettingsSection mqtt;
   NTPSection          ntp;
   SensorsSection      sensors;

@@ -429,10 +429,21 @@ bool minuteChanged(){
   int8_t thisminute = myTime.minute();
   bool _ret = (lastminute != thisminute);
   if (_ret){
-    //minute changed
     lastminute = thisminute;
   }
   return _ret;
+}
+
+bool hourChanged(){
+  static int8_t lasthour = -1;
+  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
+  int8_t thishour = myTime.hour();
+  bool changed = (lasthour != thishour);
+  if (changed) {
+    lasthour = thishour;
+  }
+  return changed;
 }
 
 // Path to the LittleFS file containing the build git hash (used by checklittlefshash and getFilesystemHash)
@@ -605,9 +616,9 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 // - WARNING (5KB): Below this, aggressive throttling needed
 // - LOW (8KB): Below this, start reducing message frequency
 // - HEALTHY (>8KB): Sufficient for normal operation with WebSocket server (~4KB baseline)
-#define HEAP_CRITICAL_THRESHOLD   3072   // Critical: Stop all non-essential operations
-#define HEAP_WARNING_THRESHOLD    5120   // Warning: Start throttling messages
-#define HEAP_LOW_THRESHOLD        8192   // Low: Begin reducing message frequency
+#define HEAP_CRITICAL_THRESHOLD   2048   // Critical: Stop all non-essential operations
+#define HEAP_WARNING_THRESHOLD    4096   // Warning: Start throttling messages
+#define HEAP_LOW_THRESHOLD        6144   // Low: Begin reducing message frequency
 
 // Throttling state
 static uint32_t lastWebSocketSendMs = 0;
@@ -784,9 +795,6 @@ void emergencyHeapRecovery() {
   
   uint32_t heapBefore = platformFreeHeap();
   DebugTf(PSTR("Emergency heap recovery starting (heap=%u bytes)\r\n"), heapBefore);
-  
-  // Force MQTT buffer to minimum size
-  resetMQTTBufferSize();
   
   // Yield to allow ESP8266 to do housekeeping
   yield();

@@ -385,6 +385,7 @@ static void sendTelnetBanner(const char* ip)
   _debugPrintf_P(PSTR("    3 MQTT comms  : %s\r\n"), CBOOLEAN(state.debug.bMQTT));
   _debugPrintf_P(PSTR("    4 MQTT gating : %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
   _debugPrintf_P(PSTR("    5 Sensors     : %s\r\n"), CBOOLEAN(state.debug.bSensors));
+  _debugPrintf_P(PSTR("    6 NTP sync    : %s\r\n"), CBOOLEAN(state.debug.bNTP));
   debugTelnet.println(F("--------------------------------------------"));
   debugTelnet.println(F("  Press 'h' for the full debug menu."));
   _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip);
@@ -484,46 +485,94 @@ void loopNTP()
 {
   time_t now = time(nullptr);
   if (!settings.ntp.bEnable) return;
+
+  // Periodic NTP telemetry (every 60s unsynced, 300s synced) — toggle with key '6'
+  if (state.debug.bNTP) {
+    static uint32_t lastNtpTelemetry = 0;
+    uint32_t interval = (NtpStatus == TIME_SYNC) ? 300000 : 60000;
+    if ((millis() - lastNtpTelemetry) > interval) {
+      lastNtpTelemetry = millis();
+      const char *stateStr = "?";
+      switch (NtpStatus) {
+        case TIME_NOTSET:       stateStr = "NOTSET"; break;
+        case TIME_SYNC:         stateStr = "SYNC"; break;
+        case TIME_WAITFORSYNC:  stateStr = "WAITFORSYNC"; break;
+        case TIME_NEEDSYNC:     stateStr = "NEEDSYNC"; break;
+      }
+      DebugTf(PSTR("[NTP] state=%s now=%lu (0x%08lX) NtpLastSync=%lu (0x%08lX) delta=%ld host=[%s] tz=[%s]\r\n"),
+              stateStr,
+              (unsigned long)now, (unsigned long)now,
+              (unsigned long)NtpLastSync, (unsigned long)NtpLastSync,
+              (long)(now - NtpLastSync),
+              settings.ntp.sHostname,
+              CSTR(settings.ntp.sTimezone));
+      DebugTf(PSTR("[NTP] now>EPOCH2000=%s now<EPOCH2038=%s now>=LastSync=%s\r\n"),
+              (now > EPOCH_2000_01_01) ? "Y" : "N",
+              (now < EPOCH_2038_01_19) ? "Y" : "N",
+              (now >= NtpLastSync) ? "Y" : "N");
+    }
+  }
+
   switch (NtpStatus) {
     case TIME_NOTSET:
     case TIME_NEEDSYNC:
+    {
       // Guard: only store a valid timestamp as the sync baseline. If time() still
       // returns the SDK bogus initial value (0xFFFFFFFF = year 2106) or a small
       // pre-epoch value, use 0 instead. This prevents NtpLastSync from being
       // poisoned to 4294967295, which would make the TIME_WAITFORSYNC check
       //   (now >= NtpLastSync)  always fail once real NTP time arrives.
-      NtpLastSync = ((now > EPOCH_2000_01_01) && (now < EPOCH_2038_01_19)) ? now : 0;
+      time_t prevSync = NtpLastSync;
+      bool nowValid = (now > EPOCH_2000_01_01) && (now < EPOCH_2038_01_19);
+      NtpLastSync = nowValid ? now : 0;
+      if (state.debug.bNTP) DebugTf(PSTR("[NTP] NEEDSYNC: now=%lu (0x%08lX) valid=%s prevSync=%lu -> NtpLastSync=%lu\r\n"),
+              (unsigned long)now, (unsigned long)now,
+              nowValid ? "Y" : "N",
+              (unsigned long)prevSync, (unsigned long)NtpLastSync);
       DebugTln(F("Start time syncing"));
       startNTP();
       DebugTf(PSTR("Starting timezone lookup for [%s]\r\n"), CSTR(settings.ntp.sTimezone));
       NtpStatus = TIME_WAITFORSYNC;
       break;
+    }
     case TIME_WAITFORSYNC:
+    {
       // Guard: ESP8266 SDK initialises time() to 0xFFFFFFFF (year 2106) before
       // SNTP sync. That value passes the lower-bound check alone, so we also
       // require an upper bound to reject the bogus SDK initial value.
-      if ((now > EPOCH_2000_01_01) && (now < EPOCH_2038_01_19) && (now >= NtpLastSync)) {
+      bool aboveEpoch = (now > EPOCH_2000_01_01);
+      bool belowMax   = (now < EPOCH_2038_01_19);
+      bool aboveSync  = (now >= NtpLastSync);
+      if (aboveEpoch && belowMax && aboveSync) {
         NtpLastSync = now;
+        if (state.debug.bNTP) DebugTf(PSTR("[NTP] SYNC candidate: now=%lu (0x%08lX) -> NtpLastSync updated\r\n"),
+                (unsigned long)now, (unsigned long)now);
         TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
         if (myTz.isError()) {
-          DebugTf(PSTR("Error: Timezone Invalid/Not Found: [%s]\r\n"), CSTR(settings.ntp.sTimezone));
+          DebugTf(PSTR("[NTP] Error: Timezone Invalid/Not Found: [%s]\r\n"), CSTR(settings.ntp.sTimezone));
           strlcpy(settings.ntp.sTimezone, NTP_DEFAULT_TIMEZONE, sizeof(settings.ntp.sTimezone));
           myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
         } else {
           ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
-          DebugTf(PSTR("%02d:%02d:%02d %02d-%02d-%04d\n\r"),
+          if (state.debug.bNTP) DebugTf(PSTR("[NTP] ZonedDateTime: %02d:%02d:%02d %02d-%02d-%04d isError=%s\r\n"),
                   myTime.hour(), myTime.minute(), myTime.second(),
-                  myTime.day(), myTime.month(), myTime.year());
+                  myTime.day(), myTime.month(), myTime.year(),
+                  myTime.isError() ? "Y" : "N");
           if (!myTime.isError()) {
             NtpStatus = TIME_SYNC;
-            DebugTln(F("Time synced!"));
+            DebugTln(F("[NTP] Time synced!"));
+          } else {
+            if (state.debug.bNTP) DebugTln(F("[NTP] ZonedDateTime error, staying in WAITFORSYNC"));
           }
         }
       }
       break;
+    }
     case TIME_SYNC:
       if ((now - NtpLastSync) > NTP_RESYNC_TIME) {
-        DebugTln(F("Time resync needed"));
+        if (state.debug.bNTP) DebugTf(PSTR("[NTP] Resync needed: now=%lu NtpLastSync=%lu delta=%ld > %d\r\n"),
+                (unsigned long)now, (unsigned long)NtpLastSync,
+                (long)(now - NtpLastSync), NTP_RESYNC_TIME);
         NtpStatus = TIME_NEEDSYNC;
       }
       break;
