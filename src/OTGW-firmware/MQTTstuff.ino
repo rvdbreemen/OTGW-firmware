@@ -483,7 +483,6 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 }
 
 void sendMQTT(const char* topic, const char *json);
-void sendMQTTStreaming(const char* topic, const char *json, const size_t len);
 
 void handleMQTT() 
 {  
@@ -807,16 +806,12 @@ void sendMQTTstateinformation(){
 // Streaming version - sends message in 128-byte chunks to avoid buffer reallocation
 // This prevents heap fragmentation on ESP8266 (similar to ESPHome's approach)
 void sendMQTT(const char* topic, const char *json) {
-  sendMQTTStreaming(topic, json, strlen(json));
-}
-
-void sendMQTTStreaming(const char* topic, const char *json, const size_t len)
-{
   if (!settings.mqtt.bEnable) return;
   if (!MQTTclient.connected()) return;
   if (!isValidIP(MQTTbrokerIP)) return;
   if (!canPublishMQTT()) return;
 
+  const size_t len = strlen(json);
   if (!beginMqttPublish(topic, len, true)) return;
   if (!writeMqttChunk(json, len)) { MQTTclient.endPublish(); return; }
   if (!MQTTclient.endPublish()) PrintMQTTError();
