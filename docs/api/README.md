@@ -448,7 +448,18 @@ Backward compatibility alias. The command is passed in the URL path instead of t
 
 #### `POST /api/v2/otgw/discovery` | `PUT /api/v2/otgw/discovery`
 
-Triggers a full MQTT autodiscovery cycle, marking all discovery IDs as pending and drip-publishing their configs asynchronously (one every 3 seconds). Discovery templates are compiled from PROGMEM (not read from LittleFS at runtime).
+Triggers a full MQTT autodiscovery cycle. Marks all discovery IDs as pending and drip-publishes their configs asynchronously (one every 3 seconds, slowed to 30 seconds under heap pressure).
+
+Discovery configs are composed on the fly by streaming functions in `mqtt_configuratie.cpp`, which is auto-generated from `mqttha.cfg` by `tools/generate_mqttha_data.py`. The old filesystem template (`data/mqttha.cfg`) has been archived under `docs/archive/` and is no longer read at runtime.
+
+Produced entity categories:
+- `sensor`: 289 entries (PROGMEM table)
+- `binary_sensor`: 53 entries (PROGMEM table)
+- `climate`: 2 (Thermostat + DHW Control)
+- `number`: 1 (`Toutside_override`)
+- `switch` (SAT, TASK-284): 13 (solar gain, summer simmer, comfort adjust, multi-area, auto-tune, simulation, window detection, force PWM, push setpoint, OVP enabled, preset sync, DHW enabled, PWM auto-switch)
+- `select` (SAT, TASK-284): 1 (`sat_heating_system`, options `"0"`..`"3"`)
+- `sensor` (Dallas): runtime, one per detected 1-Wire address
 
 **Authentication**: Not required
 

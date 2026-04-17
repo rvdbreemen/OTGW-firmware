@@ -110,6 +110,7 @@ Volledige specificatie: `docs/opentherm specification/OpenTherm-Protocol-Specifi
 | **REST** | Representational State Transfer — architectuurstijl voor HTTP-API's. |
 | **S0** | Pulsteller-interface (DIN 43864) voor energiemeters; geeft pulsen per kWh. |
 | **SAT** | Smart Autotune Thermostat — ingebedde PID-ruimtetemperatuurregelaar in de firmware. |
+| **SimpleTelnet** | Meegeleverde multi-client Telnet-bibliotheek (1.0.0) met zowel streaming- als regel-invoer (CLI) modus. Vervangt de eerdere TelnetStream- en ESPTelnet-bibliotheken. Gebruikt voor de debugconsole op poort 23 en de PIC-seriële TCP-brug op poort 25238. Locatie: `src/libraries/SimpleTelnet/`. |
 | **SSD1306** | I2C OLED-displaycontroller, 128×64 pixels. |
 | **TCP** | Transmission Control Protocol — verbindingsgericht transportprotocol. |
 | **TRV** | Thermostatic Radiator Valve — thermostatische radiatorkraan. |
@@ -250,13 +251,24 @@ De firmware opent de volgende netwerk-poorten. Alle diensten zijn beschikbaar op
 
 #### Bibliotheken
 
-| Bibliotheek | Gebruik |
-|------------|---------|
-| PubSubClient | MQTT-client (`https://github.com/knolleary/pubsubclient`) |
-| WebSockets | WebSocket-server (`https://github.com/Links2004/arduinoWebSockets`) |
-| WiFiManager | WiFi-initialisatieportal (`https://github.com/tzapu/WiFiManager`) |
-| AceTime | Tijdzonebeheer, IANA-database |
-| DallasTemperature + OneWire | DS18B20 temperatuursensoren |
+Vastgeprikte versies staan in `platformio.ini`. Meegeleverde bibliotheken bevinden zich in `src/libraries/`.
+
+| Bibliotheek | Versie | Gebruik |
+|-------------|--------|---------|
+| WiFiManager | 2.0.17 | WiFi-initialisatieportal (`https://github.com/tzapu/WiFiManager`) |
+| PubSubClient | 2.8.0 | MQTT 3.1.1 client (`https://github.com/knolleary/pubsubclient`) |
+| SimpleTelnet | 1.0.0 (meegeleverd) | Multi-client Telnet voor debug en CLI; vervangt TelnetStream en ESPTelnet (`https://github.com/rvdbreemen/SimpleTelnet`) |
+| WebSockets (Links2004) | 2.3.6 | WebSocket-server voor live OT-logstroom (`https://github.com/Links2004/arduinoWebSockets`) |
+| AceTime | 2.0.1 (via GitHub-tag) | Tijdzonebeheer, IANA-database (`https://github.com/bxparks/AceTime`) |
+| AceCommon | 1.6.2 | Ondersteuningsbibliotheek voor AceTime |
+| AceSorting | 1.0.0 | Ondersteuningsbibliotheek voor AceTime |
+| NetApiHelpers | 1.0.2 | Build-time gepatcht voor Arduino Core 3.x compatibiliteit |
+| OneWire | 2.3.8 | 1-Wire transport voor DS18B20 |
+| DallasTemperature | 4.0.6 | DS18B20 temperatuursensoren (`https://github.com/milesburton/Arduino-Temperature-Control-Library`) |
+| EthernetESP32 | 1.0.2 (alleen ESP32) | W5500 SPI Ethernet-driver voor OTGW32 |
+| OpenTherm Library | 1.1.5 (meegeleverd, alleen ESP32) | OTDirect GPIO OT-transport (`https://github.com/ihormelnyk/opentherm_library`) |
+| OTGWSerial (Schelte Bron) | meegeleverd (alleen ESP8266) | PIC-microcontroller UART-protocol |
+| SSD1306Ascii | geïnstalleerd (alleen ESP32) | OLED-display driver (ADR-067) |
 
 ---
 

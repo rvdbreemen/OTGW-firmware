@@ -2,11 +2,11 @@
 
 ## Overview
 
-- **Name**: MQTT Client Module (MQTTstuff.ino)
-- **Description**: Complete MQTT client implementation for the OTGW-firmware ESP8266 gateway. Provides MQTT publish/subscribe functionality, Home Assistant auto-discovery configuration, command handling, and OpenTherm message-to-MQTT mapping.
-- **Location**: `/src/OTGW-firmware/MQTTstuff.ino`
+- **Name**: MQTT Client and Home Assistant Auto-Discovery Module
+- **Description**: Complete MQTT client implementation for the OTGW-firmware ESP8266/ESP32 gateway. Provides MQTT publish/subscribe functionality, streaming Home Assistant auto-discovery configuration, command handling, and OpenTherm message-to-MQTT mapping. Discovery architecture shifted from file-based PROGMEM table generation to data-driven streaming functions with two-pass JSON writing.
+- **Location**: `/src/OTGW-firmware/MQTTstuff.ino`, `/src/OTGW-firmware/MQTTstuff.h`, `/src/OTGW-firmware/mqtt_configuratie.cpp`
 - **Language**: Arduino C/C++ (with PubSubClient library integration)
-- **Purpose**: Enables MQTT-based integration with home automation systems (Home Assistant), publishes OpenTherm data to configurable topics, handles MQTT commands for controlling the OTGW gateway, and manages auto-discovery of sensors/controls in Home Assistant.
+- **Purpose**: Enables MQTT-based integration with home automation systems (Home Assistant), publishes OpenTherm data to configurable topics, handles MQTT commands for controlling the OTGW gateway, and manages streaming auto-discovery of sensors, binary sensors, climate entities, and SAT controls in Home Assistant.
 
 ## Code Elements
 
@@ -21,45 +21,56 @@
 
 #### Data Structures
 
-- `struct MqttHaCfgEntry` (mqttha_progmem.h)
-  - Description: PROGMEM discovery table entry descriptor (8 bytes, naturally aligned)
+- `struct MqttHaSensorCfg` (MQTTstuff.h)
+  - Description: Sensor discovery config for a single OpenTherm message ID
   - Fields:
-    - `uint8_t id`: OT message ID
-    - `uint16_t topicOff`: Byte offset into `mqttHaTopicPool` (23,758 bytes)
-    - `uint32_t msgOff`: Byte offset into `mqttHaMsgPool` (140,767 bytes)
-  - Location: mqttha_progmem.h:22-26
-  - Note: Table and pools are auto-generated from `mqttha.cfg` by `tools/generate_mqttha_progmem.py`
+    - `uint8_t id`: OT message ID (0-255), or 245/246 for S0/Dallas
+    - `uint8_t flags`: MQTT_HA_FLAG_* bit flags for source expansion
+    - `PGM_P label`: Sensor label for MQTT topic (e.g., "TSet")
+    - `PGM_P friendlyName`: Display name for Home Assistant
+    - `HaDeviceClass deviceClass`: HA device class enum
+    - `HaUnit unit`: HA unit of measurement enum
+    - `HaStateClass stateClass`: HA state class enum
+    - `HaIcon icon`: MDI icon enum
+    - `HaEntityCat entityCat`: HA entity category enum (diagnostic, config)
+    - `bool enabledByDefault`: Whether entity is enabled in HA by default
+  - Location: MQTTstuff.h:177-188
+  - Generated from: `mqttha.cfg` by `tools/generate_mqttha_data.py`
+  - Array: `mqttHaSensors[289]` (118 unique OT IDs)
 
-- `struct MQTTAutoConfigLineView`
-  - Description: Parsed view for discovery config rendering (used internally during template expansion)
-  - Fields:
-    - `byte id`: Message ID for Home Assistant entity
-    - `char *topicTemplate`: Topic template string (pointer into PROGMEM pool or parsed buffer)
-    - `char *msgTemplate`: Message/payload template string (pointer into PROGMEM pool or parsed buffer)
-  - Location: MQTTstuff.ino:53-57
+- `struct MqttHaBinSensorCfg` (MQTTstuff.h)
+  - Description: Binary sensor discovery config
+  - Fields: Similar to MqttHaSensorCfg, but without unit and stateClass
+  - Location: MQTTstuff.h:191-199
+  - Array: `mqttHaBinSensors[53]` (10 unique OT IDs)
 
-- `struct MQTTAutoConfigTemplateContext`
-  - Description: Context for template variable substitution during discovery config rendering
+- `struct HaDiscoveryContext` (MQTTstuff.h)
+  - Description: Runtime context passed to streaming discovery functions
   - Fields:
-    - `const char *nodeId`: Unique node ID for this gateway
-    - `const char *sensorId`: Sensor ID for per-sensor discovery (e.g., Dallas temp sensor address)
+    - `const char *nodeId`: Unique gateway ID
     - `const char *hostname`: Gateway hostname
-    - `const char *version`: Firmware version string
-    - `const char *mqttPubTopic`: Publication namespace prefix
-    - `const char *mqttSubTopic`: Subscription namespace prefix
-    - `const char *sourceSuffix`: Source suffix token replacement (_thermostat, _boiler, _gateway)
+    - `const char *version`: Firmware version
+    - `const char *mqttPubTopic`: Publication namespace
+    - `const char *mqttSubTopic`: Subscription namespace
+    - `const char *haPrefix`: Home Assistant prefix (default "homeassistant")
+    - `const char *manufacturer`: Hardware manufacturer
+    - `const char *model`: Hardware model
+    - `bool isFirstEntity`: First entity flag (for JSON array handling)
+    - `const char *sourceSuffix`: Source suffix for per-source expansion (_thermostat, _boiler, _gateway)
     - `const char *sourceName`: Source friendly name (Thermostat, Boiler, Gateway)
-    - `const char *sourceTopicSegment`: Source key for topic (thermostat, boiler, gateway)
-  - Location: MQTTstuff.ino:59-69
+    - `const char *sourceTopicSegment`: Source key (thermostat, boiler, gateway)
+  - Location: MQTTstuff.h:244-258
 
-- `struct MQTTAutoConfigSessionLock`
-  - Description: RAII guard for exclusive MQTT auto-discovery buffer access
+- `struct MqttJsonWriter` (MQTTstuff.h)
+  - Description: Two-mode JSON writer for streaming discovery payloads
+  - Modes: MEASURE (size calculation only), WRITE (actual chunk output)
   - Methods:
-    - Constructor: Acquires lock if not already in progress
-    - Destructor: Releases lock
-    - Deleted copy/move constructors: Prevents accidental double-release
-  - Location: MQTTstuff.ino:87-101
-  - Pattern: RAII lock guard using `mqttAutoConfigInProgress` flag
+    - `writeRam(const char *s)`: Write RAM data
+    - `writeProgmem(PGM_P s)`: Write PROGMEM data via pgm_read_byte helpers
+    - `writeChar(char c)`: Write single byte
+    - `writeRamN(const char *s, size_t len)`: Write N bytes from RAM
+  - Purpose: Avoid buffer reallocation; measure first, then write exactly that many bytes in chunks
+  - Location: MQTTstuff.h:280-323
 
 - `struct MQTT_set_cmd_t`
   - Description: Mapping of MQTT command topics to OTGW command codes
@@ -67,7 +78,8 @@
     - `PGM_P setcmd`: MQTT command name (e.g., "setpoint")
     - `PGM_P otgwcmd`: OTGW command code (e.g., "TT" for setpoint)
     - `PGM_P ottype`: Value type (temperature, on/off, level, raw, etc.)
-  - Location: MQTTstuff.ino:525-530
+  - Location: MQTTstuff.ino
+  - Array: `setcmds[]` PROGMEM dispatch table for standard OTGW commands
 
 ### Initialization & Connection
 
@@ -262,183 +274,174 @@
   - Location: MQTTstuff.ino:1305-1343
   - Topics published to multiple prefixes (base, otgw-pic/, otgw-otdirect/)
 
-### Template Rendering & Discovery Configuration
+### Streaming JSON Writing (Two-Pass Architecture)
 
-- `static bool tryGetTemplateReplacement(const char *cursor, const void *ctxPtr, const char *&replacement, size_t &tokenLen)`
-  - Description: Check if cursor points to a template variable token and return replacement string
-  - Location: MQTTstuff.ino:158-210
-  - Parameters:
-    - `const char *cursor`: Pointer to potential token start
-    - `const void *ctxPtr`: Context pointer (cast to MQTTAutoConfigTemplateContext)
-    - `const char *&replacement`: Output: replacement string pointer
-    - `size_t &tokenLen`: Output: token length for cursor advancement
-  - Supported tokens:
-    - `%mqtt_sub_topic%`: Subscription namespace
-    - `%mqtt_pub_topic%`: Publication namespace
-    - `%source_topic_segment%`: Source key (thermostat/boiler/gateway)
-    - `%source_suffix%`: Source suffix (_thermostat/_boiler/_gateway)
-    - `%source_name%`: Source friendly name
-    - `%sensor_id%`: Sensor-specific ID (e.g., Dallas address)
-    - `%hostname%`: Gateway hostname
-    - `%node_id%`: Gateway unique node ID
-    - `%version%`: Firmware version
-  - Returns: true if token matched at cursor, false otherwise
+The MqttJsonWriter struct enables efficient streaming discovery payloads without buffer reallocation:
 
-- `static bool renderTemplateToBuffer(const char *templateStr, char *dest, size_t destSize, const void *ctxPtr)`
-  - Description: Render template string with variable substitutions into destination buffer
-  - Location: MQTTstuff.ino:212-239
-  - Parameters:
-    - `const char *templateStr`: Template with `%token%` placeholders
-    - `char *dest`: Destination buffer
-    - `size_t destSize`: Destination buffer size
-    - `const void *ctxPtr`: Context with substitution values
-  - Algorithm:
-    - Iterates through template character by character
-    - When token found, appends replacement string
-    - Otherwise appends literal character
-    - Null-terminates output
-  - Returns: true if rendered successfully, false on overflow
+1. **MEASURE pass**: Writer accumulates byte count without MQTT I/O
+2. **WRITE pass**: Writer streams exact bytes via chunk helpers
 
-- `static size_t measureRenderedTemplate(const char *templateStr, const void *ctxPtr)`
-  - Description: Calculate final rendered size without allocating buffer
-  - Location: MQTTstuff.ino:241-259
-  - Parameters: template string, context
-  - Returns: Total byte count after token substitution
-  - Usage: Pre-compute size for `beginPublish()` before rendering
+This approach allows discovery functions to compose JSON once and reuse the same code for both passes.
 
-- `static bool sendMQTTTemplateStreaming(const char *topic, const char *templateStr, const void *ctxPtr)`
-  - Description: Render and stream template to MQTT in one operation
-  - Location: MQTTstuff.ino:307-357
-  - Parameters:
-    - `const char *topic`: Destination topic
-    - `const char *templateStr`: Template to render
-    - `const void *ctxPtr`: Context with variables
-  - Algorithm:
-    - Measures rendered size via `measureRenderedTemplate()`
-    - Begins publish with actual size
-    - Iterates template, streaming each replacement string and literal segments via `writeMqttChunk()`
-    - Feeds watchdog between writes
-    - Ends publish
-  - Returns: true if published successfully
-  - Dependencies: measureRenderedTemplate, tryGetTemplateReplacement, writeMqttChunk, feedWatchDog
+- `struct MqttJsonWriter` (MQTTstuff.h)
+  - Description: Dual-mode JSON writer for streaming discovery payloads
+  - Modes: MEASURE = 0 (size calculation), WRITE = 1 (actual output)
+  - Public methods:
+    - `writeRam(const char *s)`: Write null-terminated RAM string
+    - `writeProgmem(PGM_P s)`: Write null-terminated PROGMEM string via pgm_read_byte
+    - `writeChar(char c)`: Write single character
+    - `writeRamN(const char *s, size_t len)`: Write N bytes from RAM
+  - Workflow:
+    1. Create writer in MEASURE mode: `MqttJsonWriter measure(MqttJsonWriter::MEASURE)`
+    2. Compose JSON: `measure.writeRam(...), measure.writeChar(...), measure.writeProgmem(...)`
+    3. Get size: `size_t sz = measure.byteCount`
+    4. Begin MQTT publish: `client.beginPublish(topic, sz)`
+    5. Create writer in WRITE mode: `MqttJsonWriter writer(MqttJsonWriter::WRITE)`
+    6. Compose identical JSON (same code path): produces chunked output
+    7. End publish: `client.endPublish()`
+  - Location: MQTTstuff.h:280-323
+
+- `bool writeMqttChunkExt(const char *data, size_t len)` (mqtt_configuratie.cpp)
+  - Description: Write RAM data chunk to MQTT during WRITE pass
+  - Location: mqtt_configuratie.cpp
+  - Called by MqttJsonWriter.writeRam and writeRamN in WRITE mode
+  - Chunking handled by underlying MQTT layer
+
+- `bool writeMqttProgmemChunkExt(PGM_P data, size_t len)` (mqtt_configuratie.cpp)
+  - Description: Write PROGMEM data chunk to MQTT during WRITE pass
+  - Location: mqtt_configuratie.cpp
+  - Uses pgm_read_byte for safe byte-by-byte PROGMEM access (no word-aligned reads)
+
+- `bool writeMqttByteExt(uint8_t b)` (mqtt_configuratie.cpp)
+  - Description: Write single byte to MQTT
+  - Location: mqtt_configuratie.cpp
+  - Called by MqttJsonWriter.writeChar in WRITE mode
 
 ### Buffer Management & Chunked Writing
 
-- `static bool writeMqttChunk(const char *data, size_t len)`
-  - Description: Write RAM data to MQTT in 128-byte chunks
-  - Location: MQTTstuff.ino:261-276
-  - Parameters: data pointer, byte count
-  - Implementation: Loops in CHUNK_SIZE (128) increments, calls `MQTTclient.write()`, feeds watchdog
-  - Returns: true if all bytes written, false on error
+The module avoids large heap allocations by streaming discovery payloads in small chunks. All writes go through two-mode MqttJsonWriter, which delegates to external chunk helpers in WRITE mode.
 
-- `static bool writeMqttProgmemChunk(PGM_P data, size_t len)`
-  - Description: Write PROGMEM data to MQTT in 63-byte chunks
-  - Location: MQTTstuff.ino:278-296
-  - Parameters: PROGMEM pointer, byte count
-  - Implementation:
-    - Stages 63-byte chunks into local `stage` buffer
-    - Reads bytes from PROGMEM via `pgm_read_byte()`
-    - Writes to MQTT via `MQTTclient.write()`
-    - Feeds watchdog between chunks
-  - Chunk size: 63 bytes (small enough to avoid oversized staging buffer)
+- `bool writeMqttChunkExt(const char *data, size_t len)` (mqtt_configuratie.cpp)
+  - Description: Write RAM data to MQTT in chunks
+  - Called by MqttJsonWriter.writeRam during WRITE pass
+  - Handles chunking to PubSubClient.write()
 
-- `static bool beginMqttPublish(const char *topic, size_t len, bool retain)`
-  - Description: Start MQTT publish operation with known payload size
-  - Location: MQTTstuff.ino:298-305
-  - Wrapper: Calls `MQTTclient.beginPublish()`, logs error on failure
+- `bool writeMqttProgmemChunkExt(PGM_P data, size_t len)` (mqtt_configuratie.cpp)
+  - Description: Write PROGMEM data to MQTT in chunks
+  - Called by MqttJsonWriter.writeProgmem during WRITE pass
+  - Uses pgm_read_byte for safe byte access (no unaligned 32-bit reads from flash)
+
+- `bool writeMqttByteExt(uint8_t b)` (mqtt_configuratie.cpp)
+  - Description: Write single byte to MQTT
+  - Called by MqttJsonWriter.writeChar during WRITE pass
 
 - `void resetMQTTBufferSize()`
   - Description: INTENTIONALLY A NO-OP (documented in code)
-  - Location: MQTTstuff.ino:1514-1518
+  - Location: MQTTstuff.ino
   - Rationale: Buffer is sized once at startup; no runtime resizing to avoid heap churn
   - Kept for API compatibility with existing discovery call sites
 
-### Home Assistant Auto-Discovery
+### Home Assistant Auto-Discovery (Streaming Architecture)
 
-Discovery configs are stored in PROGMEM tables (`mqttha_progmem.cpp/h`), auto-generated from `mqttha.cfg` by `tools/generate_mqttha_progmem.py`. The `mqttHaCfgIndex[256]` array maps each OT message ID to its first entry in `mqttHaCfgTable[345]` (0xFFFF if absent), enabling O(1) lookup. Topic and message templates live in two PROGMEM string pools (`mqttHaTopicPool`, `mqttHaMsgPool`) referenced by byte offset from each table entry.
-
-The previous LittleFS file-scan approach (reading `mqttha.cfg` line by line and parsing into an `sLine[1200]` buffer) has been replaced entirely by this PROGMEM table lookup. The `sLine` global buffer has been eliminated.
+Discovery configs are generated on-the-fly by streaming functions in `mqtt_configuratie.cpp`. The previous file-based PROGMEM generation (mqttha.cfg parsed by tools/generate_mqttha_progmem.py into pools) has been replaced by data-driven tables (`mqttHaSensors[289]`, `mqttHaBinSensors[53]`) with corresponding streaming functions. Discovery includes hardcoded stream functions for climate (Thermostat + DHW Control pseudo-ID 0), number (Toutside Override pseudo-ID 27), SAT switches (13 boolean controls via switchIdx 0-12), SAT select (sat_heating_system pseudo-ID), and Dallas sensors (runtime address-based).
 
 Three discovery paths exist:
 
-**Path A (Bulk)**: `doAutoConfigure()` iterates the full PROGMEM table synchronously.
+**Path A (Bulk)**: `doAutoConfigure()` iterates sensor/binary sensor tables and calls hardcoded stream functions. Used only for explicit refresh (Serial 'F' command, REST API).
 
-**Path B (JIT)**: `doAutoConfigureMsgid()` uses `mqttHaCfgIndex[OTid]` for O(1) lookup on first OT message arrival.
+**Path B (JIT)**: `doAutoConfigureMsgid(OTid)` called from processOT() on first message of type not yet discovered.
 
-**Path C (Drip)**: `loopMQTTDiscovery()` publishes one pending discovery config per timer tick from the main loop. This is the primary path after MQTT connect or HA restart.
+**Path C (Drip)**: `loopMQTTDiscovery()` publishes one pending config per timer tick (3s normal, 30s under heap pressure). Primary production path.
+
+- `bool streamSensorDiscovery(PubSubClient &client, const MqttHaSensorCfg &cfg, HaDiscoveryContext &ctx)`
+  - Description: Stream a single sensor discovery config to MQTT
+  - Location: mqtt_configuratie.cpp:1979+
+  - Parameters:
+    - `PubSubClient &client`: MQTT client instance
+    - `const MqttHaSensorCfg &cfg`: Sensor config from mqttHaSensors[] table
+    - `HaDiscoveryContext &ctx`: Runtime values (nodeId, hostname, version, etc.)
+  - Algorithm:
+    - Builds discovery topic from haPrefix, sensor label, nodeId
+    - Uses MqttJsonWriter in MEASURE mode to calculate payload size
+    - Begins MQTT publish with calculated size
+    - Uses MqttJsonWriter in WRITE mode to emit JSON (name, unit_of_measurement, device_class, state_class, icon, value_template, stat_t, unique_id, device)
+    - Handles source-separated variants via expandAndStreamSensorSources if flag set
+  - Return: true if published successfully
+  - Dependencies: MqttJsonWriter, writeMqttChunkExt, expandAndStreamSensorSources
+
+- `bool streamBinarySensorDiscovery(PubSubClient &client, const MqttHaBinSensorCfg &cfg, HaDiscoveryContext &ctx)`
+  - Description: Stream a single binary sensor discovery config
+  - Location: mqtt_configuratie.cpp:similar pattern
+  - Similar to streamSensorDiscovery but omits unit and state_class
+
+- `bool streamClimateDiscovery(PubSubClient &client, uint8_t climateIdx, HaDiscoveryContext &ctx)`
+  - Description: Stream climate entity discovery (Thermostat or DHW Control)
+  - Location: mqtt_configuratie.cpp:2240+
+  - Parameters:
+    - `uint8_t climateIdx`: 0 = Thermostat, 1 = DHW Control
+  - Generates hardcoded JSON with modes, temp setpoint, current temp, etc.
+
+- `bool streamNumberDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)`
+  - Description: Stream number entity discovery (Toutside Override)
+  - Location: mqtt_configuratie.cpp:2417+
+  - Single hardcoded number entity for external temperature override
+
+- `bool streamSatSwitchDiscovery(PubSubClient &client, uint8_t switchIdx, HaDiscoveryContext &ctx)`
+  - Description: Stream SAT boolean switch discovery (13 switches)
+  - Location: mqtt_configuratie.cpp:2596+
+  - Parameters:
+    - `uint8_t switchIdx`: 0-12 for each SAT boolean control
+  - Uses helper streamSatBoolSwitch() with parameterised PROGMEM strings (uniqSuffix, nameSuffix, cmdSub, statSub, icon)
+  - Topic object-ids derived from uniqSuffix at runtime (strip leading '-', swap '-' to '_')
+
+- `bool streamSatSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryContext &ctx)`
+  - Description: Stream SAT select entity discovery
+  - Location: mqtt_configuratie.cpp
+  - Currently: selectIdx = 0 for sat_heating_system dropdown
+
+- `bool streamDallasSensorDiscovery(PubSubClient &client, const char *sensorAddress, HaDiscoveryContext &ctx)`
+  - Description: Stream Dallas temperature sensor discovery
+  - Location: mqtt_configuratie.cpp:similar pattern
+  - Parameters:
+    - `const char *sensorAddress`: Runtime sensor address string
+  - Generated on first sensor discovery call; topic includes address in uniq_id
+
+- `bool expandAndStreamSensorSources(PubSubClient &client, const MqttHaSensorCfg &cfg, HaDiscoveryContext &ctx)`
+  - Description: Expand sensor config into 3 per-source variants (thermostat/boiler/gateway)
+  - Location: mqtt_configuratie.cpp:2180+
+  - Iterates 3 sources, sets source tokens in ctx, calls streamSensorDiscovery for each
 
 - `void doAutoConfigure()`
-  - Description: Force-publish all Home Assistant discovery configs from PROGMEM table
-  - Location: MQTTstuff.ino:1663-1755
-  - Intended use: Explicit utility (Serial 'F' command, REST API); never called automatically
-  - Acquisition: Acquires `MQTTAutoConfigSessionLock` for exclusive buffer access
+  - Description: Force-publish all Home Assistant discovery configs
+  - Location: MQTTstuff.ino
+  - Intended use: Explicit utility (Serial 'F' command, REST API)
   - Algorithm:
-    - Iterates `mqttHaCfgTable[MQTT_HA_CFG_COUNT]` entries via `memcpy_P()`
-    - Reads topic and message templates directly from PROGMEM pools (byte-accessible on ESP8266 via memory-mapped flash)
-    - Skips Dallas sensor entries (handled separately via `configSensors()` after lock release)
-    - Skips PIC-specific entries if PIC not enabled
-    - Skips OT-direct entries if OT-direct not active
-    - Detects source template lines (containing source placeholders)
-    - If source template and separate sources enabled: calls `expandAndPublishSourceTemplates()`
-    - Otherwise: renders and publishes single discovery entry via `sendMQTTTemplateStreaming()`
-    - Marks each successfully published entry in `MQTTautoConfigMap` bitfield
-  - Buffer usage:
-    - `cMsg` reused as `sTopic`: Rendered discovery topic (up to 200 bytes)
-    - No `sLine` buffer needed; templates read directly from PROGMEM
-  - Dependencies: MQTTAutoConfigSessionLock, expandAndPublishSourceTemplates, sendMQTTTemplateStreaming, setMQTTConfigDone
+    - Iterates mqttHaSensors[289] and calls streamSensorDiscovery for each
+    - Iterates mqttHaBinSensors[53] and calls streamBinarySensorDiscovery for each
+    - Calls streamClimateDiscovery for climateIdx 0, 1
+    - Calls streamNumberDiscovery
+    - Calls streamSatSwitchDiscovery for switchIdx 0-12
+    - Calls streamSatSelectDiscovery for selectIdx 0
+    - Calls configSensors() for Dallas sensors
+    - Marks all as published in MQTTautoConfigMap
+  - Dependencies: All streaming functions, configSensors
 
 - `bool doAutoConfigureMsgid(byte OTid)`
-- `bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId)`
-- `bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMqttTopic)`
   - Description: Publish Home Assistant discovery config for a specific OpenTherm message ID
-  - Location: MQTTstuff.ino:1757-1860
-  - Usage: Just-In-Time (JIT) discovery on first message arrival (Path B), also called by drip publisher (Path C)
+  - Location: MQTTstuff.ino
+  - Usage: JIT discovery on first message arrival (Path B), also called by drip publisher (Path C)
   - Parameters:
-    - `byte OTid`: OpenTherm message ID (0-255)
-    - `const char *cfgSensorId`: Optional sensor ID for Dallas temp sensors
-    - `const char *baseMqttTopic`: Optional base MQTT topic override
+    - `byte OTid`: OpenTherm message ID (0-255), or pseudo-IDs 0 (climate), 27 (number), 245-246 (Dallas)
   - Algorithm:
-    - Validates MQTT enabled, broker connected, broker IP valid
-    - Checks heap guard (`MQTT_DISCOVERY_HEAP_MIN = 8000` bytes free required)
-    - Uses `mqttHaCfgIndex[OTid]` for O(1) PROGMEM lookup (no LittleFS file scan)
-    - Iterates contiguous entries for `OTid` in sorted `mqttHaCfgTable`
-    - Reads templates directly from PROGMEM pools
-    - Detects source template lines; if separate sources enabled, calls `expandAndPublishSourceTemplates()`
-    - Marks entry as configured in `MQTTautoConfigMap` if successful
-  - Return: true if config was published, false otherwise
-  - Dependencies: MQTTAutoConfigSessionLock, mqttHaCfgIndex, mqttHaCfgTable, renderTemplateToBuffer, expandAndPublishSourceTemplates, sendMQTTTemplateStreaming
-
-- `static bool expandAndPublishSourceTemplates(byte msgid, const char *logLabel, const char *topicTemplate, const char *msgTemplate, const void *baseCtxPtr, char *renderedTopic)`
-  - Description: Expand source-template discovery line into 3 per-source variants (thermostat/boiler/gateway)
-  - Location: MQTTstuff.ino:1558-1587
-  - Parameters:
-    - `byte msgid`: Message ID for logging
-    - `const char *logLabel`: Label for debug output ("bulk" or "jit")
-    - `const char *topicTemplate`: Discovery topic template (from mqttha.cfg)
-    - `const char *msgTemplate`: Discovery payload template (from mqttha.cfg)
-    - `const void *baseCtxPtr`: Base template context (source tokens will be set per iteration)
-    - `char *renderedTopic`: Buffer for rendered topics (cMsg global, reused as sTopic)
-  - Algorithm:
-    - Iterates over 3 source types (0=thermostat, 1=boiler, 2=gateway)
-    - For each source: copies source suffix, key, and name from PROGMEM tables
-    - Creates variant context with source tokens set
-    - Renders topic template into `renderedTopic`
-    - Streams message template with variant context via `sendMQTTTemplateStreaming()`
-    - Feeds watchdog between per-source publishes
-  - Return: true if at least one variant published, false if all failed
-  - Note: `feedWatchDog()` is used (not `doBackgroundTasks()`) to keep `cMsg` buffer held as `sTopic`
-
-- `void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId = nullptr)`
-  - Description: Configure Dallas temperature sensor discovery
-  - Location: MQTTstuff.ino:1833-1850
-  - Parameters:
-    - `byte dataid`: Fake OT data ID for sensor (not a real OT message)
-    - `bool finishflag`: Whether to immediately mark config as done
-    - `const char *cfgSensorId`: Sensor address string
-  - Algorithm:
-    - Checks if config already sent via `getMQTTConfigDone(dataid)`
-    - If not done: calls `doAutoConfigureMsgid(dataid, cfgSensorId)` to send discovery
-    - If finishflag true: marks dataid as configured via `setMQTTConfigDone()`
+    - OTid = 0: streams climate discovery (both indices 0, 1)
+    - OTid = 27: streams number discovery
+    - OTid in [0-12] when called from climate/drip: streams SAT switch discovery + select
+    - OTid in [245-256]: Dallas sensor (address from parameter)
+    - Otherwise: looks up in mqttHaSensorIndex/mqttHaBinSensorIndex, streams via streamSensorDiscovery/streamBinarySensorDiscovery
+    - Checks heap guard (MQTT_DISCOVERY_HEAP_MIN = 8000 bytes)
+    - Marks entry as configured in MQTTautoConfigMap if successful
+  - Return: true if config was published
+  - Dependencies: All streaming functions, getMQTTConfigDone, setMQTTConfigDone
 
 ### Discovery State Management
 
@@ -635,9 +638,12 @@ Two bitmaps track discovery state: `MQTTautoConfigMap[8]` (published/done) and `
 - `MQTT_NAMESPACE_MAX_LEN`: 192 bytes
 - `MQTT_TOPIC_MAX_LEN`: 200 bytes
 - `MQTT_CLIENT_BUFFER_SIZE`: 384 bytes (PubSubClient inbound buffer)
-- `MQTT_PROGMEM_STAGE_LEN`: 63 bytes (staging buffer for PROGMEM reads)
-- `MQTT_MSG_MAX_LEN`: 1200 bytes (max discovery config message size)
-- `MQTT_CFG_LINE_MAX_LEN`: 1200 bytes (max mqttha.cfg line length)
+- `MQTT_HA_SENSOR_COUNT`: 289 (total sensor entries in mqttHaSensors[])
+- `MQTT_HA_BINSENSOR_COUNT`: 53 (total binary sensor entries in mqttHaBinSensors[])
+- `MQTT_HA_INDEX_NONE`: 0xFFFF (sentinel for no discovery entry in index table)
+- `DISCOVERY_INTERVAL_NORMAL`: 3 seconds (drip publisher interval, healthy heap)
+- `DISCOVERY_INTERVAL_SLOW`: 30 seconds (drip publisher interval, low heap pressure)
+- `MQTT_DISCOVERY_HEAP_MIN`: 8000 bytes (minimum free heap for discovery publish)
 
 ## Dependencies
 
@@ -700,32 +706,35 @@ All MQTT publishes use chunked transmission to prevent heap fragmentation:
 
 PubSubClient's `beginPublish()` → `write()` → `endPublish()` API allows efficient buffering without heap reallocation.
 
-### Home Assistant Auto-Discovery
+### Home Assistant Auto-Discovery (Streaming Architecture)
 
-Discovery configs are compiled into PROGMEM tables at build time (auto-generated from `mqttha.cfg` by `tools/generate_mqttha_progmem.py`). The previous approach of reading `mqttha.cfg` line by line from LittleFS has been eliminated. Key data structures in `mqttha_progmem.cpp/h`:
+Discovery configs are generated on-the-fly by streaming functions in `mqtt_configuratie.cpp` that use the two-pass MqttJsonWriter. Configs are driven by:
 
-- `mqttHaCfgTable[345]`: Array of `MqttHaCfgEntry` structs (8 bytes each), sorted by OT message ID. Each entry contains the OT ID plus byte offsets into the topic and message pools.
-- `mqttHaCfgIndex[256]`: Per-OT-ID index array mapping ID to its first entry in `mqttHaCfgTable`. 0xFFFF means no discovery config exists for that ID.
-- `mqttHaTopicPool` (23,758 bytes): Concatenated null-terminated topic templates in PROGMEM.
-- `mqttHaMsgPool` (140,767 bytes): Concatenated null-terminated message templates in PROGMEM.
+- `mqttHaSensors[289]` and `mqttHaSensorIndex[256]`: Sensor discovery table (118 unique OT IDs)
+- `mqttHaBinSensors[53]` and `mqttHaBinSensorIndex[256]`: Binary sensor discovery table (10 unique OT IDs)
+- Hardcoded streaming functions: `streamClimateDiscovery()`, `streamNumberDiscovery()`, `streamSatSwitchDiscovery()`, `streamSatSelectDiscovery()`, `streamDallasSensorDiscovery()`
 
-The module supports three auto-discovery paths (ADR-041):
+The module supports three auto-discovery paths:
 
-**Path A (Bulk)**: `doAutoConfigure()` iterates the full PROGMEM table synchronously.
+**Path A (Bulk)**: `doAutoConfigure()` calls all streaming functions in sequence.
 - Used only for explicit refresh via Serial 'F' command or REST API trigger
-- Publishes all non-Dallas sensor entries
-- Publishes Dallas sensor discovery via separate `configSensors()` call after lock release
+- Iterates sensor and binary sensor tables, calling corresponding stream functions
+- Calls hardcoded stream functions for climate, number, SAT switches/selects
+- Publishes Dallas sensor discovery via separate `configSensors()` call
+- Publishes all entries synchronously in one operation
 
-**Path B (JIT)**: `doAutoConfigureMsgid()` uses O(1) `mqttHaCfgIndex[]` lookup when first OpenTherm message arrives.
-- Called from `processOT()` when new message type detected
+**Path B (JIT)**: `doAutoConfigureMsgid(OTid)` called from `processOT()` on first message of a new type.
+- Looks up OT ID in sensor/binary sensor index tables
+- Calls corresponding stream function if entry found
+- Handles pseudo-IDs: 0 (climate), 27 (number), SAT switches via switchIdx mapping
 - Only publishes if not already in `MQTTautoConfigMap` bitfield
 - Avoids flooding broker with configs for message IDs never seen in real deployments
 
 **Path C (Drip)**: `loopMQTTDiscovery()` is the primary discovery path after MQTT connect or HA restart.
-- Called from the main loop on every iteration; manages its own internal timer
+- Called from main loop on every iteration; manages its own internal timer
 - Publishes exactly one pending discovery config per timer tick (3s normal, 30s under heap pressure)
-- Uses `MQTTautoCfgPendingMap[8]` bitmap (8 x uint32_t = 256 bits) to track which OT IDs need publishing
-- `markAllMQTTConfigPending()` populates the pending bitmap from the PROGMEM index on connect/reconnect
+- Uses `MQTTautoCfgPendingMap[8]` bitmap (8 x uint32_t = 256 bits) to track pending OT IDs and pseudo-IDs
+- `markAllMQTTConfigPending()` populates the pending bitmap from indices on connect/reconnect
 - Spreads discovery publishes over time to avoid broker and heap pressure spikes
 - Adaptive interval: slows to 30s when `getHeapHealth() >= HEAP_WARNING`, restores to 3s when healthy
 - Guards against low heap via `MQTT_DISCOVERY_HEAP_MIN` (8000 bytes) check before each publish
@@ -839,38 +848,64 @@ MQTTclient.loop() (async)
   OTGW PIC processes command on next cycle
 ```
 
-### Home Assistant Discovery Publication
+### Home Assistant Discovery Publication (Streaming)
 
 ```
-MQTT connect / HA restart detected
+doAutoConfigure() [manual trigger via Serial 'F' or REST API]
+  ↓
+  Iterate mqttHaSensors[289]: for each entry, call streamSensorDiscovery()
+    ├─ MEASURE pass: MqttJsonWriter calculates payload size
+    ├─ client.beginPublish(topic, size)
+    ├─ WRITE pass: MqttJsonWriter composes JSON, delegates to writeMqttChunkExt()
+    ├─ client.endPublish()
+    └─ setMQTTConfigDone(OTid)
+  ↓
+  Iterate mqttHaBinSensors[53]: for each entry, call streamBinarySensorDiscovery()
+  ↓
+  Call streamClimateDiscovery(0) and streamClimateDiscovery(1) for climate entities
+  ↓
+  Call streamNumberDiscovery() for Toutside Override
+  ↓
+  Call streamSatSwitchDiscovery(switchIdx) for switchIdx 0..12 (13 SAT boolean controls)
+  ↓
+  Call streamSatSelectDiscovery(0) for sat_heating_system dropdown
+  ↓
+  Call configSensors() for Dallas temperature sensors
+  ↓
+  Home Assistant ingests all discovery configs, auto-creates entities
+
+MQTT connect or HA restart detected
   ↓
   markAllMQTTConfigPending()
-    ├─ Clears MQTTautoConfigMap (published) and MQTTautoCfgPendingMap (pending)
-    └─ Iterates mqttHaCfgIndex[256]: sets pending bit for each ID with entries
+    ├─ Clears MQTTautoConfigMap (published) bitmap
+    └─ Iterates mqttHaSensorIndex[256] + pseudo-IDs: sets pending bit for each
   ↓
   loopMQTTDiscovery() [called from main loop, every iteration]
     ├─ Timer check (3s normal / 30s under heap pressure)
     ├─ Scan MQTTautoCfgPendingMap for next set bit
     ├─ Skip if already published (getMQTTConfigDone)
-    ├─ Publish ONE pending ID via doAutoConfigureMsgid()
-    └─ Clear pending bit; return (one per tick)
+    ├─ Call doAutoConfigureMsgid(OTid) to publish ONE pending ID
+    ├─ Clear pending bit; return (one per timer tick)
+    └─ Adaptive interval: 30s when heap >= HEAP_WARNING, 3s when healthy
   ↓
   doAutoConfigureMsgid(OTid) [also called JIT from processOT()]
-    ├─ Acquire MQTTAutoConfigSessionLock
-    ├─ O(1) lookup: mqttHaCfgIndex[OTid]
-    ├─ Read topic/msg templates from PROGMEM pools (byte-accessible on ESP8266)
-    ├─ Render: templates with substitutions (nodeId, hostname, version, etc.)
-    ├─ If source template: expandAndPublishSourceTemplates() → 3 per-source variants
-    └─ Otherwise: sendMQTTTemplateStreaming() → single entry
+    ├─ Check heap guard: MQTT_DISCOVERY_HEAP_MIN
+    ├─ Dispatch based on OTid:
+    │   ├─ OTid = 0: streamClimateDiscovery(0) and (1)
+    │   ├─ OTid = 27: streamNumberDiscovery()
+    │   ├─ OTid in SAT pseudo range: streamSatSwitchDiscovery() / streamSatSelectDiscovery()
+    │   ├─ OTid = 245-246 (Dallas): streamDallasSensorDiscovery(address)
+    │   ├─ OTid in sensor range: lookup mqttHaSensorIndex[OTid], call streamSensorDiscovery()
+    │   └─ OTid in binary range: lookup mqttHaBinSensorIndex[OTid], call streamBinarySensorDiscovery()
+    ├─ Each streaming function:
+    │   ├─ MEASURE pass: MqttJsonWriter accumulates byte count
+    │   ├─ beginPublish(topic, byteCount)
+    │   ├─ WRITE pass: MqttJsonWriter calls writeMqttChunkExt/writeMqttProgmemChunkExt
+    │   └─ endPublish()
+    ├─ If source-separated: call expandAndStreamSensorSources() → 3 per-source variants
+    └─ Mark as published: setMQTTConfigDone(OTid)
   ↓
-  Mark as configured: setMQTTConfigDone(id)
-  ↓
-  Release sessionLock (mqttAutoConfigInProgress = false)
-  ↓
-  Home Assistant ingests discovery configs, auto-creates entities
-
-doAutoConfigure() [manual trigger via Serial 'F' or REST API]
-  ↓ (same PROGMEM table iteration, but synchronous bulk publish)
+  Home Assistant ingests discovery configs as they arrive, auto-creates entities
 ```
 
 ### Home Assistant Status → Discovery Refresh
@@ -899,43 +934,41 @@ HA goes back online
 
 The module implements re-entrance guards in critical sections:
 
-1. **mqttAutoConfigInProgress** (global flag):
-   - Set by `MQTTAutoConfigSessionLock` constructor
-   - Prevents simultaneous file reads into shared `sLine` buffer
-   - Released by destructor (RAII pattern)
-
-2. **inUse** (static in `publishToSourceTopic()`):
+1. **publishToSourceTopic_inUse** (static in `publishToSourceTopic()`):
    - Prevents nested calls from corrupting `sourceTopic` static buffer
-   - Simple bool flag; adequate because ESP8266 is single-threaded (cooperative multitasking)
+   - Simple bool flag; adequate because ESP8266/ESP32 is single-threaded (cooperative multitasking)
 
 ### PROGMEM Strategy
 
 All string literals are in PROGMEM to save RAM:
-- Strings prefixed with `PSTR()` macro in format strings
-- Table lookups via `pgm_read_ptr()` then `strncpy_P()`
-- PROGMEM data staged through small buffers (63 bytes) to avoid oversized stack buffers
+- Sensor/binary sensor labels and friendly names in PROGMEM arrays
+- Streaming functions use PGM_P pointers and pgm_read_byte for safe byte access
+- Avoids unaligned 32-bit flash reads that cause Exception (3) on ESP8266
+- PROGMEM data streamed directly via MqttJsonWriter without RAM staging
 
 ### Stack Efficiency
 
 The module avoids large stack allocations by:
-- Using global buffers (cMsg, sLine) for temporary data during discovery
-- Staging PROGMEM data in small (63-byte) buffers
-- Streaming large payloads instead of buffering in RAM
+- Using MqttJsonWriter for composed JSON (no intermediate buffer)
+- Streaming data in chunks during WRITE pass
+- No global discovery buffers (cMsg is for other uses)
+- HaDiscoveryContext passed by reference, not copied
 
-### Discovery Data Source (mqttha.cfg and PROGMEM tables)
+### Discovery Data Source (mqttha.cfg)
 
-The source file `data/mqttha.cfg` uses the format:
+The source file `data/mqttha.cfg` defines sensor and binary sensor entries using the format:
 ```
-id;topicTemplate;msgTemplate
+id;label;friendlyName;deviceClass;unit;stateClass;icon;entityCat;enabledByDefault;flags
 // Comments start with //
-39;homeassistant/sensor/%homeassistant%/otgw_%node_id%_%sensor_id%/config;{"name":"OTGW Boiler Temp", ...}
+0;status_master;Status Master;none;none;none;none;none;true;0x00
+39;TSet;Control setpoint;temperature;degC;measurement;thermometer;none;true;0x00
 ```
 
-At build time, `tools/generate_mqttha_progmem.py` compiles this into:
-- `mqttha_progmem.cpp`: PROGMEM string pools and table (compiled as a separate translation unit to avoid Xtensa relocation limits)
-- `mqttha_progmem.h`: Entry struct, table size constant, extern declarations, and `mqttHaCfgIndex[256]`
+At build time, `tools/generate_mqttha_data.py` compiles this into:
+- `mqtt_configuratie.cpp`: PROGMEM label/name strings, sensor/binary sensor config arrays, index lookup tables, streaming function definitions
+- `mqtt_configuratie.h` (generated): Array declarations and lookup functions
 
-The firmware reads templates directly from PROGMEM at runtime. The `mqttha.cfg` file is no longer read from LittleFS.
+The firmware calls streaming functions with config structs from the arrays. Hardcoded streaming functions for climate, number, SAT controls, and Dallas sensors complement the data-driven sensor/binary sensor tables.
 
 ---
 
@@ -943,7 +976,7 @@ The firmware reads templates directly from PROGMEM at runtime. The `mqttha.cfg` 
 
 ```mermaid
 ---
-title: MQTT Module Architecture
+title: MQTT Module Architecture (Streaming Discovery)
 ---
 classDiagram
     namespace MQTT_Core {
@@ -977,56 +1010,58 @@ classDiagram
         }
         
         class ChunkedTransport {
-            -writeMqttChunk(data, len) bool
-            -writeMqttProgmemChunk(data, len) bool
-            -beginMqttPublish(topic, len, retain) bool
+            +writeMqttChunkExt(data, len) bool
+            +writeMqttProgmemChunkExt(data, len) bool
+            +writeMqttByteExt(b) bool
         }
     }
     
-    namespace DiscoveryEngine {
-        class AutoDiscovery {
+    namespace StreamingDiscovery {
+        class MqttJsonWriter {
+            -mode: Mode
+            -byteCount: size_t
+            -ok: bool
+            +writeRam(s) bool
+            +writeProgmem(s) bool
+            +writeChar(c) bool
+            +writeRamN(s, len) bool
+        }
+        
+        class DataDrivenStreamers {
+            +streamSensorDiscovery(cfg, ctx) bool
+            +streamBinarySensorDiscovery(cfg, ctx) bool
+            +expandAndStreamSensorSources(cfg, ctx) bool
+        }
+        
+        class HardcodedStreamers {
+            +streamClimateDiscovery(climateIdx, ctx) bool
+            +streamNumberDiscovery(ctx) bool
+            +streamSatSwitchDiscovery(switchIdx, ctx) bool
+            +streamSatSelectDiscovery(selectIdx, ctx) bool
+            +streamDallasSensorDiscovery(address, ctx) bool
+        }
+        
+        class DiscoveryTables {
+            -mqttHaSensors: MqttHaSensorCfg[289]
+            -mqttHaBinSensors: MqttHaBinSensorCfg[53]
+            -mqttHaSensorIndex: uint16_t[256]
+            -mqttHaBinSensorIndex: uint16_t[256]
+        }
+        
+        class DiscoveryOrchestration {
             +doAutoConfigure() void
             +doAutoConfigureMsgid(OTid) bool
-            +sensorAutoConfigure(dataid, flag) void
-        }
-        
-        class DripPublisher {
-            -MQTTautoCfgPendingMap: uint32_t[8]
-            -DISCOVERY_INTERVAL_NORMAL: 3s
-            -DISCOVERY_INTERVAL_SLOW: 30s
             +loopMQTTDiscovery() void
-            +setMQTTConfigPending(id) void
             +markAllMQTTConfigPending() void
-            +getMQTTConfigPending(id) bool
-            +clearMQTTConfigPending(id) void
-        }
-        
-        class ProgmemTable {
-            -mqttHaCfgTable: MqttHaCfgEntry[345]
-            -mqttHaCfgIndex: uint16_t[256]
-            -mqttHaTopicPool: char[] PROGMEM
-            -mqttHaMsgPool: char[] PROGMEM
         }
         
         class DiscoveryState {
-            -MQTTautoConfigMap: uint32_t[]
+            -MQTTautoConfigMap: uint32_t[8]
+            -MQTTautoCfgPendingMap: uint32_t[8]
             +getMQTTConfigDone(id) bool
             +setMQTTConfigDone(id) void
-            +clearMQTTConfigDone() void
-        }
-        
-        class TemplateRendering {
-            -renderTemplateToBuffer(tmpl, buf) bool
-            -measureRenderedTemplate(tmpl) size_t
-            -sendMQTTTemplateStreaming(topic, tmpl) bool
-            -tryGetTemplateReplacement(cursor) bool
-        }
-        
-        class SourceExpansion {
-            -expandAndPublishSourceTemplates(msgid, tmpl) bool
-            -initSourceTokens() void
-            -resolveSourceIndex(rsptype) bool
-            -copySourceTableEntry(table, idx, buf) bool
+            +getMQTTConfigPending(id) bool
+            +setMQTTConfigPending(id) void
         }
     }
     
@@ -1050,7 +1085,6 @@ classDiagram
         class BufferOps {
             -copyMQTTPayloadToBuffer(payload, len, buf) size_t
             -readMQTTTopicToken(cursor, token, size) bool
-            -parseAutoConfigLine(line, delim) bool
             -trimInPlace(buf) void
             -buildNamespace(base, segment, node) void
         }
@@ -1062,33 +1096,21 @@ classDiagram
         }
     }
     
-    namespace Synchronization {
-        class SessionLock {
-            -mqttAutoConfigInProgress: bool
-            +MQTTAutoConfigSessionLock()
-            +~MQTTAutoConfigSessionLock()
-        }
-        
-        class ReentranceGuards {
-            -publishToSourceTopic_inUse: bool
-        }
-    }
-    
     MQTTStateMachine --> MQTTConnection : uses PubSubClient
     MQTTConnection --> PublishingAPI : queues messages
-    PublishingAPI --> ChunkedTransport : chunks data
-    AutoDiscovery --> TemplateRendering : renders templates
-    AutoDiscovery --> SourceExpansion : expands sources
-    AutoDiscovery --> ProgmemTable : reads PROGMEM entries
-    DripPublisher --> AutoDiscovery : calls doAutoConfigureMsgid
-    DripPublisher --> DiscoveryState : checks done state
-    DripPublisher --> ProgmemTable : reads mqttHaCfgIndex
-    TemplateRendering --> ChunkedTransport : sends templates
-    DiscoveryState --> AutoDiscovery : tracks state
+    PublishingAPI --> ChunkedTransport : streams data
+    
+    MqttJsonWriter --> ChunkedTransport : delegates to ext writers
+    DataDrivenStreamers --> MqttJsonWriter : composes JSON
+    HardcodedStreamers --> MqttJsonWriter : composes JSON
+    DataDrivenStreamers --> DiscoveryTables : reads config
+    DiscoveryOrchestration --> DataDrivenStreamers : calls stream functions
+    DiscoveryOrchestration --> HardcodedStreamers : calls stream functions
+    DiscoveryOrchestration --> DiscoveryState : tracks state
+    DiscoveryState --> PublishingAPI : publishes configs
+    
     CommandDispatch --> CommandHandler : dispatches commands
     CommandHandler --> BufferOps : parses topics
-    SessionLock --> AutoDiscovery : guards file access
-    ReentranceGuards --> PublishingAPI : prevents re-entry
     ErrorHandling --> MQTTStateMachine : validates state
 ```
 
@@ -1096,8 +1118,10 @@ classDiagram
 
 ## File Statistics
 
-- **Lines of Code**: MQTTstuff.ino ~1,900 lines; mqttha_progmem.cpp ~2,145 lines (auto-generated)
-- **Key Functions**: 40+ public/static functions
+- **MQTTstuff.ino**: 1,494 lines (MQTT state machine, publishing, command dispatch)
+- **MQTTstuff.h**: 361 lines (header with enums, structs, streaming function declarations)
+- **mqtt_configuratie.cpp**: 2,737 lines (auto-generated from mqttha.cfg: data tables, streaming discovery functions)
+- **Key Functions**: 50+ public/static functions
 - **Global Variables**: 25+ module-level globals
-- **PROGMEM Data**: Extensive use of PROGMEM strings, tables, and discovery pools (~165 KB in flash for topic+message pools)
-- **Buffer Allocations**: 1 global buffer (cMsg: 512B) + local staging buffers. Former sLine[1200] buffer eliminated.
+- **PROGMEM Data**: Sensor/binary sensor label and name strings, discovery context strings
+- **Buffer Allocations**: No global discovery buffers. Streaming functions use stack-local MqttJsonWriter + chunked output. Former sLine[1200] and cMsg reuse eliminated.

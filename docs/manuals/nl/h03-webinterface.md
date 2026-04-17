@@ -30,7 +30,9 @@ De navigatiebalk toont rechts ook de Wi-Fi-signaalbalkjes (of Ethernet-icoon), d
 
 #### De log-stream
 
-Het centrale element van de startpagina is de live OpenTherm-log. Elk bericht dat via de OpenTherm-bus wordt uitgewisseld tussen thermostaat en ketel, wordt in realtime weergegeven. De log wordt via een WebSocket-verbinding (ws://) gestreamd; er is geen herladen van de pagina nodig.
+Het centrale element van de startpagina is de live OpenTherm-log. Elk bericht dat via de OpenTherm-bus wordt uitgewisseld tussen thermostaat en ketel, wordt in realtime weergegeven. De log wordt via een gewone WebSocket-verbinding gestreamd (`ws://<apparaat>/ws` op poort 80); er is geen herladen van de pagina nodig.
+
+> **Alleen HTTP/WS**: De firmware ondersteunt geen HTTPS of WSS. Dit is een bewuste keuze voor een apparaat dat op een vertrouwd thuisnetwerk draait met beperkte ESP8266-resources. De REST API kan achter een HTTPS-reverse proxy gezet worden, maar de live OpenTherm-log gaat uit van een directe `ws://`-verbinding en werkt niet via een HTTPS-proxy die `ws://` niet naar `wss://` overbrugt. Gebruik een VPN voor toegang van buitenaf.
 
 #### Berichtstructuur
 
@@ -197,9 +199,11 @@ Klik op **Opslaan** onderaan een sectie om de wijzigingen toe te passen. De mees
 
 | Instelling | Omschrijving | Standaard |
 |---|---|---|
-| Hostname | mDNS-hostnaam, bereikbaar als `<hostname>.local` | `otgw` |
-| SSID | Naam van het Wi-Fi-netwerk (alleen-lezen) | (huidig verbonden netwerk) |
-| Reset WiFi | Knop om Wi-Fi-instellingen te wissen en AP-modus te starten | n.v.t. |
+| Hostname | mDNS- en DHCP-hostnaam, bereikbaar als `<hostname>.local` | `otgw` |
+| Wi-Fi Network (SSID) | Alleen-lezen weergave van het huidig verbonden Wi-Fi-netwerk | (huidige SSID) |
+| Reset WiFi | Knop naast het SSID-veld. Wist de opgeslagen Wi-Fi-gegevens en herstart het apparaat in Access Point (AP) modus | n.v.t. |
+
+Om naar een ander Wi-Fi-netwerk over te schakelen, klikt u op **Reset WiFi** en bevestigt u de dialoog. Het apparaat herstart, start een AP met de naam `OTGW-XXXXXX` (waarbij `XXXXXX` afgeleid is van het chip-ID) en opent opnieuw de captive portal, zodat u tegen het nieuwe netwerk kunt authenticeren. Dezelfde actie is beschikbaar onder **FSexplorer > System Actions** via de knop *Reset Wireless*.
 
 #### MQTT sectie
 
@@ -257,12 +261,19 @@ Bij het wijzigen van de modus verschijnt een bevestigingsdialoog die de gevolgen
 
 | Instelling | Omschrijving | Standaard |
 |---|---|---|
-| Gebruikersnaam | HTTP Basic Auth gebruikersnaam | (leeg = uitgeschakeld) |
-| Wachtwoord | HTTP Basic Auth wachtwoord | (leeg) |
+| Protected Endpoints Password | HTTP Basic Auth wachtwoord voor beveiligde admin-endpoints. De gebruikersnaam is vast `admin` | (leeg = uitgeschakeld) |
 
-Als u een gebruikersnaam en wachtwoord instelt, wordt de volledige webinterface en REST API beveiligd met HTTP Basic Authentication. Gebruik dit als extra beschermingslaag op netwerken die u niet volledig vertrouwt.
+Wanneer een wachtwoord is ingesteld, vragen de volgende acties om authenticatie:
 
-**Opmerking:** De firmware ondersteunt uitsluitend HTTP (geen HTTPS). Stel HTTP Basic Auth alleen in op een vertrouwd thuisnetwerk. Voor externe toegang wordt aangeraden een HTTPS-reverse proxy te gebruiken.
+- Instellingen lezen en wijzigen
+- Bestanden uploaden, downloaden en verwijderen
+- Reboot en Reset Wireless
+- OTA firmware- en filesystem-updates
+- Webhook-test
+
+Live monitoring, sensorwaarden en de WebSocket-stream blijven zonder authenticatie toegankelijk, zodat dashboards en integraties niet stuk gaan.
+
+**Opmerking:** De firmware ondersteunt uitsluitend HTTP en WS (geen HTTPS, geen WSS). Stel HTTP Basic Auth alleen in op een vertrouwd thuisnetwerk. Voor externe toegang wordt een VPN aangeraden; een HTTPS-reverse proxy werkt wel voor de REST API, maar de live OpenTherm-log via WebSocket vereist een plain `ws://`-verbinding.
 
 #### Webhook sectie
 
@@ -323,18 +334,21 @@ Op dezelfde pagina kunt u ook de PIC co-processor firmware updaten. Selecteer he
 
 ### Bestandsbeheer (FSexplorer)
 
-De FSexplorer (onder **Geavanceerd > Bestandsbeheer**) geeft toegang tot het LittleFS-bestandssysteem van het apparaat.
+De FSexplorer is bereikbaar via de Geavanceerd-tab onder **File system contents**, of rechtstreeks op `http://otgw.local/FSexplorer.html`. De pagina geeft toegang tot het LittleFS-bestandssysteem van het apparaat.
 
 Mogelijkheden:
-- Bestanden bekijken (naam, grootte, datum)
-- Bestanden downloaden naar uw computer
-- Bestanden uploaden (bijv. aangepaste CSS of configuratiebestanden)
-- Bestanden verwijderen
-- Beschikbare en gebruikte schijfruimte bekijken
 
-**Let op:** Verwijder geen systeembestanden zoals `/settings.ini`, `/index.html`, `/index.js`, `/sat.js` of `/graph.js`. Dit kan de werking van de webinterface verstoren. Herstel is mogelijk door het LittleFS-bestandssysteem opnieuw te flashen via USB.
+- Bladeren door bestanden en submappen. Mappen staan bovenaan en de lijst is alfabetisch gesorteerd (hoofdletter-ongevoelig). In een submap verschijnt een `.. (Parent)`-link om terug te navigeren.
+- Bestanden uploaden via het **Upload File** formulier. Een voortgangsbalk toont de uploadstatus en de bestandsgrootte wordt vooraf gecontroleerd tegen de beschikbare vrije ruimte.
+- Bestanden downloaden via de **Download** link in de rij van een bestand.
+- Bestanden verwijderen met de **Delete** link. Beveiligde systeembestanden (`FSexplorer.html`, `FSexplorer.css`, `FSexplorer.png`, `index.html`, `index.js`, `index.css`, `settings.png`) kunnen niet via de UI worden verwijderd.
+- Beschikbare en gebruikte schijfruimte van de LittleFS-partitie bekijken onderaan de lijst.
 
-De FSexplorer is bereikbaar als afzonderlijke pagina op `http://otgw.local/FSexplorer.html`.
+Onder de bestandenlijst staat een **System Actions**-paneel met snelkoppelingen naar **Update Firmware** (alleen op desktopbrowsers), **ReBoot**, **Reset Wireless** (identieke actie als Reset WiFi op de Instellingen-pagina) en **Exit FSexplorer** (terug naar de hoofdpagina).
+
+**Let op:** Verwijder ook geen niet-beveiligde systeembestanden zoals `/settings.ini`, `/sat.js`, `/graph.js`, `/index_common.css` of `/index_dark.css`. Dit kan de werking van de webinterface verstoren. Herstel is mogelijk door het LittleFS-bestandssysteem opnieuw te flashen via USB.
+
+De firmware streamt bestanden in plaats van ze in RAM te bufferen, dus er is geen harde uploadlimiet anders dan de beschikbare ruimte in de LittleFS-partitie. Grote assets zoals `index.html` (~11 KB) worden altijd via `streamFile()` geserveerd om de beperkte ESP8266-heap te ontzien.
 
 ---
 

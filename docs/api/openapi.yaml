@@ -1117,8 +1117,19 @@ paths:
       description: |
         Marks all known OT message IDs as pending and triggers asynchronous
         drip-publishing of MQTT autodiscovery configs for Home Assistant integration.
-        Discovery templates are read from PROGMEM (not LittleFS). One config is
-        published every 3 seconds to avoid MQTT burst storms. Returns 202 Accepted.
+
+        Discovery configs are composed by streaming functions in
+        `mqtt_configuratie.cpp` (auto-generated from `mqttha.cfg` via
+        `tools/generate_mqttha_data.py`; the old runtime `data/mqttha.cfg` is
+        archived under `docs/archive/`). The drip publisher issues one config
+        every 3 seconds (slowed to every 30 seconds under heap pressure) to
+        avoid MQTT burst storms.
+
+        Produced entity categories: 289 sensors, 53 binary_sensors, 2 climate
+        (Thermostat + DHW Control), 1 number (Toutside_override), 13 SAT switches
+        and 1 SAT select (TASK-284), plus runtime Dallas sensor entries.
+
+        Returns 202 Accepted.
       operationId: triggerDiscovery
       security:
         - basicAuth: []

@@ -25,13 +25,15 @@ De broncode bevindt zich in `src/OTGW-firmware/`. Elk `.ino`-bestand vormt een l
 | `webSocketStuff.ino` | WebSocket-server poort 81, OT-logstreaming, heap backpressure gate |
 | `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS-statushelpers |
 | `OTDirect.ino` | ESP32-only: directe GPIO OpenTherm-bus via ISR, OTDirect operating modes, frame bridge |
-| `SAT.ino` | Smart Autotune Thermostat: master enable/disable, SAT-instellingenbrug |
-| `SATcontrol.ino` | SAT-regellus, verwarmingscurve, boiler state machine, setpoint-injectie |
+| `SATcontrol.ino` | SAT-regellus, verwarmingscurve, boiler state machine, setpoint-injectie, master enable/disable |
 | `SATpid.ino` | PID v3 implementatie: proportioneel, integraal, derivaat met deadband |
 | `SATcycles.ino` | Cyclusclassificatie, overshootdetectie, anti-cycling |
+| `SATpressure.ino` | SAT boilerdrukbewaking, lage-drukwaarschuwing, trenddetectie |
 | `SATweather.ino` | Open-Meteo weersophaling, buitentemperatuur voor SAT-verwarmingscurve |
 | `SATble.ino` | ESP32 BLE-kamertemperatuursensor (BTHome-protocol) |
-| `sensorStuff.ino` | Dallas DS18B20 temperatuursensoren, S0-pulsteller, OLED-display |
+| `mqtt_configuratie.cpp` | Gegenereerde PROGMEM-tabellen voor MQTT Home Assistant auto-discovery (sensors, binary sensors, climate, number) |
+| `sensors_ext.ino`, `s0PulseCount.ino`, `OLED.ino` | Dallas DS18B20 temperatuursensoren, S0-pulsteller, OLED-display |
+| `Ethernet.ino` | W5500 SPI-Ethernet runtime-probe en failover (alleen ESP32) |
 | `boards.h` | Boardspecifieke pin maps en feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`) |
 | `safeTimers.h` | Timer-macro's: `DECLARE_TIMER_SEC()`, `DUE()`, `RESTART_TIMER()` |
 | `platform.h`, `platform_esp8266.h`, `platform_esp32.h` | Platformabstractielaag |
@@ -51,10 +53,10 @@ De browser-SPA bevindt zich in `src/OTGW-firmware/data/`. Deze bestanden worden 
 
 | Bestand / Map | Doel |
 |--------------|------|
-| `build.py` | Primair bouwscript: roept PlatformIO intern aan, verpakt firmware- en LittleFS-artefacten |
+| `build.py` | Primair bouwscript: roept PlatformIO (of arduino-cli) intern aan, verpakt firmware- en LittleFS-artefacten |
 | `platformio.ini` | PlatformIO-project: `esp8266` en `esp32` omgevingen |
 | `evaluate.py` | Statische codekwaliteitscontrole: PROGMEM-gebruik, onveilige patronen, String-klasse audit |
-| `tools/generate_mqttha_progmem.py` | Generator voor MQTT HA auto-discovery PROGMEM-data uit `mqttha.cfg` |
+| `tools/generate_mqttha_data.py` | Legacy-regenerator voor `mqtt_configuratie.cpp` uit een gearchiveerd `mqttha.cfg`-template |
 | `scripts/` | PlatformIO pre-build scripts: versie-injectie, bibliotheekpatching |
 | `libraries/` | Vendored Arduino-bibliotheken gebruikt door beide bouwsystemen |
 | `docs/` | C4-architectuurdocs, ADRs, API-referenties, functiedocumentatie |
@@ -67,21 +69,33 @@ De browser-SPA bevindt zich in `src/OTGW-firmware/data/`. Deze bestanden worden 
 
 #### build.py (releasebouwen)
 
-Het primaire bouwscript voor het produceren van release-artefacten. Het roept PlatformIO intern aan, verzorgt versie-inbedding, filesystemverpakking en artefactverzameling.
+Het primaire bouwscript voor het produceren van release-artefacten. Het roept PlatformIO (of arduino-cli) intern aan, verzorgt versie-inbedding, filesystemverpakking en artefactverzameling.
 
 ```bash
-python build.py                      # Volledige build voor ESP8266 + ESP32 (PlatformIO, incrementeel)
-python build.py --target esp8266     # Bouw alleen voor ESP8266
-python build.py --target esp32       # Bouw alleen voor ESP32
-python build.py --firmware           # Alleen firmware, geen filesystem
-python build.py --filesystem         # Alleen filesystem
-python build.py --clean              # Verwijder build-artefacten en bouw opnieuw
-python build.py --distclean          # Clean build + gecachte afhankelijkheden
-python build.py --arduino-cli        # Gebruik legacy arduino-cli backend in plaats van PlatformIO
-python build.py --help               # Toon help
+python build.py                                   # Volledige build voor ESP8266 + ESP32 (PlatformIO, incrementeel)
+python build.py --target esp8266                  # Alleen ESP8266
+python build.py --target esp32                    # Alleen ESP32
+python build.py --target all                      # Beide targets (standaard)
+python build.py --backend platformio              # PlatformIO backend expliciet (standaard)
+python build.py --backend arduino-cli             # Legacy arduino-cli backend (alleen ESP8266)
+python build.py --pio                             # Verkort voor --backend platformio
+python build.py --arduino-cli                     # Verkort voor --backend arduino-cli
+python build.py --firmware                        # Alleen firmware, geen filesystem
+python build.py --filesystem                      # Alleen filesystem
+python build.py --clean                           # Verwijder build-artefacten, behoud libdeps-cache
+python build.py --distclean                       # Verwijder build-artefacten + cores + bibliotheken-cache
+python build.py --merged                          # Bouw een samengevoegde firmware+filesystem-binary
+python build.py --merged --compress               # Samengevoegde binary, gzip-gecomprimeerd
+python build.py --no-install-cli                  # Sla arduino-cli install-controle over
+python build.py --no-color                        # Schakel gekleurde uitvoer uit
+python build.py --help                            # Toon help
 ```
 
-Standaard gebruikt `build.py` PlatformIO als backend en bouwt beide targets (ESP8266 + ESP32). De `--arduino-cli` vlag selecteert de legacy arduino-cli backend (alleen ESP8266). Het script leest de Git-tag voor versienummerinbedding en plaatst uitvoer in de `build/`-map.
+Standaard gebruikt `build.py` de PlatformIO-backend en bouwt beide targets (ESP8266 + ESP32). De `--arduino-cli` vlag selecteert de legacy arduino-cli backend, die alleen ESP8266 ondersteunt. Het script leest de Git-tag voor versienummerinbedding en plaatst uitvoer in de `build/`-map.
+
+**Python-versie**: PlatformIO vereist Python 3.10 tot en met 3.13. Python 3.14 wordt afgewezen door PlatformIO's eigen versiecontrole. `build.py` geeft voorrang aan de door PlatformIO zelf meegeleverde Python in `~/.platformio/penv/` (meestal 3.11.x) wanneer beschikbaar, zodat een systeembrede Python 3.14-installatie het bouwen niet blokkeert zolang de PlatformIO-virtualenv aanwezig is.
+
+**esptool**: `build.py` gebruikt esptool v5 voor het maken van samengevoegde binaries (`--merged`). Het wordt automatisch geinstalleerd bij het eerste gebruik via `pip install esptool` als het nog niet aanwezig is.
 
 #### PlatformIO
 
@@ -90,7 +104,7 @@ PlatformIO is het voorkeursbouwsysteem en wordt gebruikt voor zowel ESP8266 als 
 | Omgeving | Target | Board | Core | CPU |
 |----------|--------|-------|------|-----|
 | `esp8266` | Wemos D1 mini / NodeMCU (NodoShop OTGW) | `d1_mini` | Arduino Core 3.1.2 (espressif8266) | 160 MHz |
-| `esp32` | NodoShop OTGW32 | `esp32-s3-devkitc-1` | pioarduino espressif32 fork | 240 MHz |
+| `esp32` | NodoShop OTGW32 (ESP32-S3) | `esp32-s3-devkitc-1` | pioarduino espressif32 fork | 240 MHz |
 
 De ESP8266 LittleFS-partitie is 2 072 576 bytes (circa 2 MB). Dit is geconfigureerd in `platformio.ini` via de boardopties.
 
@@ -125,10 +139,12 @@ De Arduino IDE wordt ondersteund voor alleen ESP8266. Installeer de ESP8266 Ardu
 Voer de codekwaliteitscontrole uit na wijzigingen om veelvoorkomende ESP8266-specifieke fouten te detecteren:
 
 ```bash
-python evaluate.py           # Volledige evaluatie (alle bestanden)
-python evaluate.py --quick   # Snelle controle (alleen essentials)
-python evaluate.py --report  # Genereer gedetailleerd rapport
-python evaluate.py --fix     # Auto-fix problemen waar mogelijk
+python evaluate.py                  # Volledige evaluatie (alle bestanden)
+python evaluate.py --quick          # Alleen essentiele controles
+python evaluate.py --report         # Genereer gedetailleerd JSON-rapport
+python evaluate.py --output FILE    # Aangepast rapportpad (standaard: evaluation-report.json)
+python evaluate.py --verbose        # Toon alle controles, niet alleen fouten
+python evaluate.py --no-color       # Schakel gekleurde uitvoer uit
 ```
 
 Het script voert uitgebreide evaluaties uit, waaronder:
@@ -146,19 +162,19 @@ Belangrijkste patronen die worden gemarkeerd:
 - `strcpy`/`sprintf` zonder grenzen (moet `strlcpy`/`snprintf_P` zijn)
 - `strncmp_P`/`strstr_P` op binaire data (gebruik `memcmp_P`)
 
-#### tools/generate_mqttha_progmem.py
+#### tools/generate_mqttha_data.py (legacy-regenerator)
 
-Genereert gecompileerde PROGMEM-data voor MQTT Home Assistant auto-discovery vanuit het templateconfiguratiebestand `mqttha.cfg`:
+De MQTT Home Assistant auto-discovery-metadata bevindt zich in gecompileerde vorm als `src/OTGW-firmware/mqtt_configuratie.cpp`. Dat bestand is de **source of truth** en is in de repository opgenomen. Het bevat gestructureerde PROGMEM-arrays voor sensors, binary sensors, climate en number entities, geindexeerd op OT-message-ID.
+
+Het teksttemplate `mqttha.cfg` dat dit bestand oorspronkelijk genereerde is gearchiveerd naar `docs/archive/mqttha.cfg` en maakt geen deel meer uit van de build. Mocht je `mqtt_configuratie.cpp` uit een bijgewerkt template willen regenereren, herstel dan `mqttha.cfg` naar `src/OTGW-firmware/data/mqttha.cfg` en voer uit:
 
 ```bash
-python tools/generate_mqttha_progmem.py
+python tools/generate_mqttha_data.py
 ```
 
-Dit leest `src/OTGW-firmware/data/mqttha.cfg` en produceert twee bestanden in de sketchmap:
-- `mqttha_progmem.h`: struct-definitie en extern declarations (geincludeerd door `.ino`-bestanden)
-- `mqttha_progmem.cpp`: de eigenlijke PROGMEM-datadefinities (gecompileerd als aparte translation unit)
+Voor normaal ontwikkelwerk pas je `mqtt_configuratie.cpp` rechtstreeks aan en houd je het consistent met de streaming-discovery-consumer in `MQTTstuff.ino`. De legacy-generators `tools/generate_mqttha_progmem.py` en `tools/generate_mqttha_readable.py` zijn behouden als referentie maar worden vervangen door `generate_mqttha_data.py`.
 
-De gegenereerde code gebruikt twee platte PROGMEM string pools (topics en berichten samengevoegd) met een struct-index. Het plaatsen van de data in een aparte `.cpp` translation unit voorkomt de Xtensa single-TU section/relocation-explosie die optreedt wanneer grote PROGMEM-data in de hoofd-sketch wordt geplaatst. Voer dit script uit wanneer `mqttha.cfg` wordt gewijzigd.
+Het gegenereerde bestand is bewust in een eigen `.cpp` translation unit geplaatst om de Xtensa single-TU section/relocation-explosie te voorkomen die optreedt wanneer grote PROGMEM-data in de hoofd-sketch wordt geplaatst.
 
 ---
 
@@ -454,7 +470,9 @@ Voor commando's die niet naar een PIC-commando mappen (bijv. SAT-specifieke topi
 
 #### Home Assistant auto-discovery
 
-HA discovery payloads worden gegenereerd uit `mqttha.cfg` (opgeslagen op LittleFS). Dit is een templatebestand dat wordt verwerkt door `doAutoConfigure()` / `doAutoConfigureMsgid()`. Als je nieuwe topic een HA-entiteit nodig heeft, voeg dan een vermelding toe aan `mqttha.cfg` volgens het bestaande templateformaat. Raadpleeg de bestaande vermeldingen voor het patroon.
+HA discovery-payloads worden tijdens runtime opgebouwd uit compile-time PROGMEM-tabellen in `mqtt_configuratie.cpp`. De streaming-discovery-emitter in `MQTTstuff.ino` (`doAutoConfigure()` / `doAutoConfigureMsgid()`) doorloopt die tabellen en streamt elk discovery-bericht rechtstreeks naar de broker zonder een volledige payload in RAM te bufferen. `mqtt_configuratie.cpp` is de source of truth; het oudere `mqttha.cfg`-template is gearchiveerd naar `docs/archive/`.
+
+Om een nieuwe discoverable entity toe te voegen, plaats een extra vermelding in de passende PROGMEM-array (sensors, binary sensors, climate, number) in `mqtt_configuratie.cpp`, met bestaande vermeldingen als voorbeeld. Velden die per entity varieren (device class, unit, state class, icon, entity category) zijn als enum-waarden gecodeerd om flash-gebruik te beperken. Bouw de firmware opnieuw en forceer discovery (toets `F` op de telnet-debugconsole) om de nieuwe entity te publiceren.
 
 ---
 
@@ -661,15 +679,20 @@ De `timerFlushSettings`-timer (2 seconden debounce) coalesceert meerdere instell
 Stuur **nooit** rechtstreeks naar de PIC-seriële poort. Gebruik altijd:
 
 ```cpp
-addCommandToQueue(cmd, strlen(cmd));           // Standaard, 1000 ms vertraging
-addCommandToQueue(cmd, strlen(cmd), true);     // Verplicht (force = true)
-addCommandToQueue(cmd, strlen(cmd), false, 500); // Aangepaste vertraging (ms)
+// Signatuur:
+void addCommandToQueue(const char* buf, int len,
+                       const bool forceQueue = false,
+                       const int16_t delay = 1000);   // inter-command verzendvertraging in ms
+
+addCommandToQueue(cmd, strlen(cmd));                  // Standaard, 1000 ms vertraging
+addCommandToQueue(cmd, strlen(cmd), true);            // forceQueue: omzeil deduplicatie
+addCommandToQueue(cmd, strlen(cmd), false, 500);      // Aangepaste verzendvertraging (ms)
 ```
 
-De wachtrij is een FIFO-buffer met retry/backoff. Hij levert commando's één voor één aan de PIC en handelt seriële fouten af zonder verlies. Voorbeeldcommando's:
+De wachtrij is een FIFO-buffer met retry/backoff. Hij levert commando's een voor een aan de PIC en handelt seriele fouten af zonder verlies. Voorbeeldcommando's:
 
 ```cpp
-addCommandToQueue(PSTR("TT=20.50"), 8);   // Tijdelijk setpoint 20.5 °C
+addCommandToQueue(PSTR("TT=20.50"), 8);   // Tijdelijk setpoint 20.5 graden Celsius
 addCommandToQueue(PSTR("GW=1"), 4);       // Gateway-modus aan
 addCommandToQueue(PSTR("CS=1"), 4);       // Control setpoint 1
 ```
@@ -740,18 +763,24 @@ Voor puur refactoren, bugfixes en kleine functies binnen bestaande patronen is g
 
 | ADR | Onderwerp | Impact |
 |-----|-----------|--------|
+| ADR-003 | Alleen HTTP/WS, geen HTTPS/WSS | Plain HTTP en WebSocket; beveiligingsmodel is vertrouwd LAN |
 | ADR-004 | Static buffer allocation | Geen `String` in hot paths; alle buffers `char[]` |
 | ADR-009 | PROGMEM string literals | Alle literals in flash via `F()` / `PSTR()` |
-| ADR-014 | Dual build system | `build.py` voor Arduino CLI, PlatformIO voor ESP32 |
+| ADR-014 | Dual build system | `build.py` wrapt PlatformIO (standaard) en arduino-cli (alleen ESP8266) |
 | ADR-016 | OpenTherm command queue | Altijd `addCommandToQueue()` |
 | ADR-019 | REST API versioning | `/api/v2/` is huidig; v0/v1 retourneren 410 Gone |
 | ADR-028 | File streaming | Bestanden >2 KB moeten `streamFile()` gebruiken, nooit laden |
 | ADR-040 | MQTT source-specific topics | Bronscheiding topicstructuur |
 | ADR-042 | Streaming JSON | Geen ArduinoJson; handmatige `snprintf_P`-constructie |
+| ADR-049 | String-verbod op protocolpaden | Geen `String`-klasse op MQTT/REST/WebSocket hot paths |
 | ADR-050 | Centralized API dispatch | Enkele `kV2Routes[]`-tabel; geen per-route routerwijzigingen |
 | ADR-051 | Dual encapsulating structs | `OTGWSettings` / `OTGWState`-architectuur |
 | ADR-053 | Large feature buffer allocation | Statische allocatie voor grote per-feature buffers |
 | ADR-061 | ESP8266/ESP32 platform abstraction | Gebruik `platform.h`-abstracties, geen directe SDK-aanroepen |
+| ADR-063 | OTGW32 hardware support | ESP32-S3 NodoShop OTGW32-board met directe GPIO OT-bus |
+| ADR-064 | OTDirect operating-mode architectuur | Gateway / Monitor / Thermostat / Off modi op ESP32 |
+| ADR-069 | SAT PID v3 implementatie | Huidige PID-regelwet voor Smart Autotune Thermostat |
+| ADR-072 | SAT platformcompatibiliteitslaag | SAT bouwt op zowel ESP8266 als ESP32 via gedeelde abstracties |
 
 #### Levenscyclus
 
@@ -783,8 +812,8 @@ Om een Accepted ADR terug te draaien: maak een nieuwe ADR die deze superseded en
 5. Schrijf een implementatieplan in de taak voordat je code schrijft.
 6. Implementeer de wijziging. Markeer acceptatiecriteria als gereed terwijl je vordert.
 7. Voer `python evaluate.py` uit en los alle gerapporteerde problemen op.
-8. Bouw voor beide targets en bevestig dat er geen compileerfouten zijn: `pio run`.
-9. Test op echte hardware indien mogelijk; gebruik de simulatiemodus in `state.debug.bOTGWSimulation` als er geen hardware beschikbaar is.
+8. Bouw voor beide targets en bevestig dat er geen compileerfouten zijn: `python build.py` (of rechtstreeks `pio run`).
+9. Test op echte hardware indien mogelijk. Als er geen hardware beschikbaar is, gebruik dan de OTGW seriele-simulatie-replay (toets `s` / `S` op de telnet-debugconsole, aangestuurd door `state.debug.bOTGWSimulation`) of de Dallas-sensorsimulatie (toets `d`).
 10. Schrijf een final summary in de backlog-taak.
 11. Open een pull request naar de `dev`-branch, niet `main`.
 12. Vermeld het backlog-taak-ID in de PR-beschrijving.

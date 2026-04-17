@@ -2,6 +2,14 @@
 
 Dit hoofdstuk beschrijft alle externe interfaces van de OTGW-firmware: de REST API v2, de WebSocket-interface, de MQTT-interface en het Telnet-debugprotocol.
 
+Dit hoofdstuk is een gebruikersgericht overzicht. Voor de volledige, machine-leesbare specificatie (request/response schemas, statuscodes, voorbeelden) raadpleeg de OpenAPI 3.1-documenten in de repository:
+
+- `docs/api/openapi.yaml`: volledige REST API-specificatie, gezaghebbende bron
+- `docs/api/MQTT.md`: volledige MQTT-topicreferentie met payload-voorbeelden
+- `docs/api/WEBSOCKET_FLOW.md`: WebSocket-verbindingslevenscyclus en berichtformaat
+
+Wanneer dit hoofdstuk en de OpenAPI-specificatie elkaar tegenspreken, wint OpenAPI. Meld het als issue zodat dit hoofdstuk kan worden gecorrigeerd.
+
 ---
 
 ### 9.1 REST API -- Overzicht
@@ -16,17 +24,29 @@ Vervang `<hostname>` door het IP-adres of de mDNS-naam van het apparaat (standaa
 
 #### Versioning
 
+Er zijn drie gereserveerde prefixen; slechts een is actief:
+
 | Versie | Pad | Status |
 |--------|-----|--------|
-| v2 | `/api/v2/` | Huidig, aanbevolen |
-| v1 | `/api/v1/` | Verouderd; retourneert 410 Gone |
-| v0 | `/api/v0/` | Verouderd; retourneert 410 Gone |
+| v0 | `/api/v0/` | Legacy, verwijderd. Retourneert HTTP 410 Gone. |
+| v1 | `/api/v1/` | Standaard (verwijderd in 2.x). Retourneert HTTP 410 Gone. |
+| v2 | `/api/v2/` | Huidig, aanbevolen. Alle nieuwe integraties gebruiken deze prefix. |
+
+#### Route-dispatch (ADR-050)
+
+Intern worden `/api/v2/`-verzoeken afgehandeld door een statische routetabel `kV2Routes[]` in `src/OTGW-firmware/restAPI.ino`. Elk top-level resourcepadsegment wijst naar een handlerfunctie:
+
+`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (alleen OTGW32), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`.
+
+Een nieuw eindpunt toevoegen kost twee regels: registreer een handler en voeg een regel toe aan `kV2Routes[]`. Zo blijft de API stabiel over builds heen: het dispatch-oppervlak is klein, expliciet en herleesbaar.
 
 #### Berichtformaat
 
 Alle verzoeken en antwoorden gebruiken `application/json`. Aanvraagtekst bij POST/PUT mag zowel JSON als een enkelvoudige waarde als platte tekst zijn (afhankelijk van het eindpunt).
 
 #### Foutformaat
+
+Alle fouten worden gegenereerd door de helperfunctie `sendApiError(httpCode, F("message"))` en gebruiken dezelfde JSON-envelope:
 
 ```json
 {
@@ -59,6 +79,8 @@ Alle POST- en PUT-verzoeken vereisen HTTP Basic Auth wanneer een HTTP-wachtwoord
 ---
 
 ### 9.2 REST API -- Eindpunten
+
+De onderstaande secties beschrijven de meest gebruikte eindpunten met gebruiksaanwijzingen en voorbeelden. Dit is geen uitputtende lijst. Voor de complete set eindpunten, inclusief elk veld, elke enum-waarde en elke foutvorm, zie `docs/api/openapi.yaml`. Dit bestand kan worden weergegeven als interactieve documentatie met Swagger UI, Redoc of elk ander OpenAPI-compatibel hulpmiddel.
 
 #### GET /api/v2/health
 
@@ -241,7 +263,11 @@ OpenTherm-berichtwaarde opvragen op labelnaam (niet hoofdlettergevoelig).
 
 #### GET /api/v2/sensors
 
-Alle Dallas DS18B20 temperatuursensoren en S0-pulsteller opvragen. Alias: `GET /api/v2/sensors/status`.
+Alle Dallas DS18B20 temperatuursensoren en S0-pulsteller opvragen. Geen authenticatie vereist.
+
+#### GET /api/v2/sensors/status
+
+Alias van `GET /api/v2/sensors`. Toegevoegd in 2.x zodat externe monitoringtools een voorspelbaar `/status`-pad kunnen pollen, zoals bij `/health` en `/sat/status`. Beide paden leveren exact dezelfde payload.
 
 **Antwoord:**
 ```json
@@ -564,6 +590,8 @@ Een test-webhook versturen. Authenticatie vereist.
 
 ### 9.3 WebSocket-API
 
+Voor de volledige verbindingslevenscyclus, broadcast-gating-regels en de heap-backpressure-toestandsmachine, zie `docs/api/WEBSOCKET_FLOW.md`.
+
 #### Verbinding
 
 ```
@@ -624,6 +652,8 @@ Bij laag vrij geheugen stopt de server met het versturen van WebSocket-berichten
 ---
 
 ### 9.4 MQTT-API
+
+Voor de volledige topicinventaris (alle gepubliceerde waarden, alle geaccepteerde commando's, retained/niet-retained vlaggen en payload-voorbeelden), zie `docs/api/MQTT.md`. De tabellen in dit hoofdstuk zijn een snelle referentie voor de meest gebruikte topics. Binnenkomende commandotopics worden verwerkt door `handleMQTTcallback()` in `MQTTstuff.ino`, dat het laatste topicsegment parseert en naar de bijbehorende handler routeert.
 
 #### Onderwerpsstructuur
 
@@ -792,9 +822,11 @@ Wanneer `mqttotmessage` is ingeschakeld:
 
 #### Geabonneerde onderwerpen (commando's)
 
-De firmware abonneert op `{TopTopic}/set/{UniqueId}/#`.
+De firmware abonneert op `{TopTopic}/set/{UniqueId}/#`. Het laatste segment na `set/{UniqueId}/` bepaalt het commando; `handleMQTTcallback()` routeert elke match naar het juiste OTGW PIC-commando of de interne handler.
 
-**Directe besturingscommando's:**
+**Directe besturingscommando's (snelle referentie):**
+
+Publiceer een platte-tekstpayload naar deze topics. Deze tabel is een snelle referentie voor de meest gebruikte commandotopics; de gezaghebbende lijst staat in `docs/api/MQTT.md`.
 
 | Onderwerpsuffix | Voorbeeld payload | OT-commando | Beschrijving |
 |----------------|-------------------|-------------|-------------|
@@ -915,7 +947,7 @@ De Telnet-server (poort 23) streamt alle debuguitvoer die via `DebugTln()`, `Deb
 - Opstartberichten (WiFi-verbinding, MQTT-verbinding, NTP-synchronisatie)
 - Inkomende en uitgaande OTGW-seriele berichten
 - MQTT-publicaties en -abonnementen
-- REST API-verzoeken, statuscode en timing (wanneer `bRestAPI` debug-vlag actief is)
+- REST API-verzoeken (wanneer `bRestAPI` debug-vlag actief is): methode, URI, HTTP-statuscode, geselecteerd routesegment en totale handler-wandkloktijd in milliseconden
 - SAT-regelkringuitvoer: setpointberekening, PID-termen, ketelstatus
 - Timer-gebeurtenissen en achtergrondtaken
 - Storings- en waarschuwingsmeldingen
@@ -929,7 +961,10 @@ De Telnet-server (poort 23) streamt alle debuguitvoer die via `DebugTln()`, `Deb
 [MQTT] Publiceer boilertemperature = 55.25
 [SAT]  Control loop: Tr=20.5 Tboiler=62.3 setpoint=43.1 error=0.50
 REST GET /api/v2/health => 200 v2/health 12ms
+REST POST /api/v2/otgw/commands => 202 v2/otgw 4ms
 ```
+
+Het laatste getal is de tijd doorgebracht in de handler, gemeten van URI-parse tot responsflush. Handig om trage eindpunten of flash-/LittleFS-onderbrekingen op te sporen zonder externe profiler.
 
 #### Debug-vlaggen
 

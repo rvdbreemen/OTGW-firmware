@@ -14,9 +14,9 @@
 
 The REST API v2 uses a **centralized route dispatch table** pattern:
 
-1. **Single entry point**: `processAPI()` at line 1033
+1. **Single entry point**: `processAPI()` at line 1100
 2. **URL parsing**: URI split into tokens (max 8 words, 32 chars each)
-3. **Route matching**: Dispatch table `kV2Routes[]` maps resource names to handler functions
+3. **Route matching**: Dispatch table `kV2Routes[]` at line 1080 maps resource names to handler functions
 4. **Handler isolation**: Each resource (health, settings, sensors, device, otgw, sat, etc.) has its own handler
 
 This design allows adding new endpoints by simply:
@@ -56,17 +56,19 @@ No changes needed to the router itself.
 ### Main API Handler
 
 #### `void processAPI()`
-- **Location**: `restAPI.ino:1033–1106`
-- **Purpose**: Central dispatcher for all `/api/v2/*` requests
+- **Location**: `restAPI.ino:1100–1176`
+- **Purpose**: Central dispatcher for all `/api/v2/*` requests with handler timing and access logging
 - **Signature**: `void processAPI()`
 - **Behavior**:
+  - Records `startMs = millis()` at entry for timing measurement
   - Parses URI into tokens via `strtok_r()`
   - Validates heap (>4KB) and URI length (<50 chars)
   - Routes to resource handlers via `kV2Routes[]` dispatch table
   - Forwards deprecated v0/v1 with 410 Gone error
   - Sends 404 for unknown routes
+  - Logs one-line access log to telnet debug: method, URI, response status code, handler elapsed time via `RESTDebugTf()` (v1.3.5+, commit 583dd59c). Example: `REST GET /api/v2/sensors/status => 200 v2/sensors 42ms`
 - **Dependencies**: `httpServer`, `kV2Routes[]`, per-resource handlers
-- **Notes**: Uses static buffers (356 bytes) to save stack; cooperative scheduler — not re-entrant with yield()
+- **Notes**: Uses static buffers (URI[50], words[8][32], originalURI) totaling ~356 bytes to save stack; cooperative scheduler — not re-entrant with yield()
 
 ### Resource Handlers (Route Dispatch)
 
@@ -81,21 +83,22 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 - **Auth**: Not required
 
 #### `void handleSettings()`
-- **Location**: `restAPI.ino:221–231`
+- **Location**: `restAPI.ino:242–252`
 - **Purpose**: Read device settings (GET) or update settings (POST/PUT)
 - **HTTP Methods**: GET, POST, PUT
 - **Routes**:
   - `GET /api/v2/settings` → `sendDeviceSettings()` (sensitive data, auth required)
   - `POST/PUT /api/v2/settings` → `postSettings()` (auth required)
 - **Auth**: Required for all methods
-- **Notable read-only field**: `ssid` (type `"r"`) — returns the connected WiFi SSID via `WiFi.SSID()`. Not writable; exposed so the Settings page can display the current network without additional API calls. When on Ethernet, the device info endpoint returns `"ssid": "Wired"` via `sendDeviceInfoV2()`.
+- **Notable read-only field**: `ssid` (type `"r"`) — returns the connected WiFi SSID via `WiFi.SSID()`. Not writable; exposed so the Settings page can display the current network without additional API calls. When on Ethernet, the device info endpoint returns `"ssid": "Wired"` via `sendDeviceInfoV2()`. Line 1730 shows SSID metadata: `sendJsonSettingObj(F("ssid"), ssidBuf, "r", 32)` where `"r"` marks it read-only.
+- **Nightly restart settings** (v1.3.5+, commit 06c62770): Endpoints expose `nightlyrestart` (bool) and `nightlyrestarthour` (int 0-23) for scheduling automatic device restart; frontend Settings page now provides Reset WiFi button alongside settings; lines 1754-1755 in sendDeviceSettings
 
 #### `void handleSensors()`
-- **Location**: `restAPI.ino:301–317`
+- **Location**: `restAPI.ino:254–317` (implemented via `sendSensorStatus()` starting at line 254)
 - **Purpose**: Read current sensor readings and manage Dallas temperature sensor labels
 - **HTTP Methods**: GET, POST, PUT
 - **Routes**:
-  - `GET /api/v2/sensors` or `GET /api/v2/sensors/status` → `sendSensorStatus()` (current Dallas + S0 readings)
+  - `GET /api/v2/sensors` or `GET /api/v2/sensors/status` → `sendSensorStatus()` at line 254 (current Dallas + S0 readings; new endpoint added commit 583dd59c)
   - `GET /api/v2/sensors/labels` → `getDallasLabels()`
   - `POST/PUT /api/v2/sensors/labels` → `updateAllDallasLabels()`
 - **Auth**: Not specified (defaults to no auth for GET)
@@ -497,7 +500,7 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 ### Data Structures
 
 #### `struct ApiRoute`
-- **Location**: `restAPI.ino:992–995`
+- **Location**: `restAPI.ino` (defined before dispatch table)
 - **Definition**:
   ```cpp
   struct ApiRoute {
@@ -505,8 +508,9 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
     ApiResourceHandler handler;     // Function pointer to handler
   };
   ```
+- **Dispatch Table**: `kV2Routes[]` at line 1080-1097 maps resource names to handlers. Authoritative endpoint list: add new endpoints by adding one entry to this table and implementing the handler function. Sentinel entry `{ nullptr, nullptr }` marks table end.
 - **Purpose**: Dispatch table entry mapping route to handler
-- **Notes**: Sentinel entry has `segment = nullptr`
+- **Notes**: Sentinel entry has `segment = nullptr`; no changes needed to `processAPI()` router when adding endpoints
 
 #### `struct FSInfo`
 - **Location**: ESP8266 platform header
@@ -521,8 +525,8 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 | Method | Endpoint | Handler | Auth | Purpose |
 |--------|----------|---------|------|---------|
 | GET | `/api/v2/health` | handleHealth | No | System health metrics |
-| GET | `/api/v2/settings` | handleSettings | Yes | Read device settings (sensitive) |
-| POST/PUT | `/api/v2/settings` | handleSettings | Yes | Update device settings |
+| GET | `/api/v2/settings` | handleSettings | Yes | Read device settings (sensitive data; includes WiFi SSID, nightly restart time) |
+| POST/PUT | `/api/v2/settings` | handleSettings | Yes | Update device settings (supports all setting keys; nightly restart settings exposed v1.3.5+) |
 | GET | `/api/v2/sensors` | handleSensors | No | Current sensor readings (Dallas + S0) |
 | GET | `/api/v2/sensors/status` | handleSensors | No | Alias for /sensors |
 | GET | `/api/v2/sensors/labels` | handleSensors | No | Dallas temperature labels |
@@ -687,6 +691,17 @@ Commands are validated before queuing:
 4. **Async response**: 202 Accepted with `{"status":"queued"}`
 5. **Queuing**: Via `addCommandToQueue()`, executed in background
 
+### Handler Timing & Access Logging (v1.3.5+)
+
+Each request generates a one-line telnet debug log when `state.debug.bRestAPI` flag is set (key 7):
+
+- **Format**: `REST <METHOD> <URI> => <STATUS> <HANDLER_NAME> <ELAPSED_MS>ms`
+- **Example**: `REST GET /api/v2/sensors => 200 v2/sensors 15ms`
+- **Timing**: Measured from `processAPI()` entry to handler exit (includes routing overhead)
+- **Non-API routes**: Logged with suffix `non-api`, deprecated v0/v1 with `deprecated`, routing failures with `not found`
+- **Low-level errors**: Heap check and URI length errors logged separately before routing
+- **Purpose**: One-line access log for performance diagnostics and request auditing without full request body logging
+
 ### SAT Extended Diagnostics
 
 `GET /api/v2/sat/status?detail=full` returns:
@@ -716,6 +731,9 @@ Commands are validated before queuing:
 - **Cooperative scheduling**: Static buffers in `processAPI()` avoid re-entrancy issues with `feedWatchDog()` yields
 - **File upload security**: Auth check prevents file write if credentials invalid (no partial uploads)
 - **Tornado-safe**: No `String` class in hot paths; `strlcpy()` and `snprintf_P()` prevent buffer overflows
+- **Adding endpoints**: Modify `kV2Routes[]` dispatch table (line 1080-1097) only; implement handler function using pattern of existing handlers; no router changes needed
+- **Handler timing**: All requests logged with response code and elapsed milliseconds when REST debug flag enabled (telnet debug key 7), supporting performance diagnostics and request auditing
+- **Nightly restart settings** (v1.3.5+): `nightlyrestart` and `nightlyrestarthour` exposed via `/api/v2/settings` (lines 1754-1755); WiFi SSID and Reset WiFi button added to Settings API
 
 ## References
 

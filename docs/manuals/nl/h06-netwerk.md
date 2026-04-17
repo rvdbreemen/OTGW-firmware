@@ -22,13 +22,15 @@ Zodra de verbinding is gemaakt, slaat de firmware de gegevens op in flash. Bij i
 
 De firmware implementeert een tweelaags herstelmechanisme:
 
-- **Laag 1**: De WiFi SDK probeert automatisch opnieuw verbinding te maken bij kortdurende onderbrekingen (typisch binnen 30 seconden).
-- **Laag 2**: Een toestandsmachine in de firmware (`loopWifi()`) detecteert langere uitvallen. In productiebuilds herstart het apparaat zichzelf na maximaal 10 mislukte pogingen. In betabuilds activeert de firmware na 2 mislukte pogingen de AP-fallbackmodus (zie paragraaf 6.1.3) in plaats van te herstarten.
+- **Laag 1**: De WiFi SDK (`WiFi.setAutoReconnect(true)`) herstelt kortdurende onderbrekingen (typisch binnen 30 seconden) transparant op radioniveau.
+- **Laag 2**: Bij langere uitval neemt de toestandsmachine `loopWifi()` het over. Deze is volledig non-blocking: elke aanroep keert binnen minder dan een milliseconde terug, zodat de watchdog, de OpenTherm-berichtenverwerking, de MQTT-keepalives en de Web UI gewoon blijven draaien tijdens een herverbindingspoging. Per poging krijgt WiFi 30 seconden om scan, associatie en DHCP te voltooien. In productiebuilds herstart het apparaat na 10 mislukte pogingen. In betabuilds activeert de firmware na 2 mislukte pogingen de AP-fallbackmodus (zie paragraaf 6.1.3) in plaats van te herstarten.
 
 Bij herstel van de verbinding:
 - Herstelt de firmware de geconfigureerde hostnaam.
 - Stuurt de firmware een DHCP-heraankondiging zodat de router de juiste hostnaam leert.
 - Worden MQTT, de WebSocket-verbinding en de Telnet-debugserver automatisch opnieuw gestart.
+
+Sinds de fix voor issue #525 wordt de SDK DHCP-client uitsluitend herstart wanneer het station *niet* verbonden is. Het aanroepen van `wifi_station_dhcpc_start()` op een geassocieerd station reset het IP-adres naar `0.0.0.0` en voorkomt herstel na een routerreboot.
 
 #### 6.1.3 AP-fallbackmodus (beta)
 
@@ -141,7 +143,7 @@ De ESP8266 SDK bevat een bug waarbij `configTime()` (de NTP-initialisatiefunctie
 
 #### 6.5.2 Tijdzoneafhandeling (AceTime)
 
-De firmware gebruikt de AceTime-bibliotheek voor tijdzoneafhandeling. U configureert de tijdzone met standaard IANA-tijdzonenamen (bijvoorbeeld `Europe/Amsterdam`, `America/New_York`, `Asia/Tokyo`). Deze namen worden opgezocht in de ingebouwde tijdzonedatabase van AceTime, die DST-regels en historische wijzigingen automatisch afhandelt.
+De firmware gebruikt de AceTime-bibliotheek (4.x) voor tijdzoneafhandeling. U configureert de tijdzone met standaard IANA-tijdzonenamen (bijvoorbeeld `Europe/Amsterdam`, `America/New_York`, `Asia/Tokyo`). Deze namen worden opgezocht in de ingebouwde tijdzonedatabase van AceTime, die DST-regels en historische wijzigingen automatisch afhandelt.
 
 In tegenstelling tot een POSIX-tijdzonestring hoeft u geen DST-overgangsregels handmatig op te geven. Voer gewoon de IANA-naam in en AceTime regelt de rest.
 
@@ -200,9 +202,11 @@ Op ESP32 accepteert de OTA-updatepagina een merged binary (firmware + bestandssy
 
 ---
 
-### 6.7 ESP8266: lwIP Low Memory-variant
+### 6.7 ESP8266: lwIP Low Memory-variant en Arduino-core 3.1.2
 
-Op ESP8266 wordt de firmware gebouwd met de lwIP v2 Low Memory-variant (TCP MSS=536). Dit verlaagt het geheugengebruik per verbinding vergeleken met de Higher Bandwidth-variant, wat belangrijk is gezien het beperkte werkgeheugen van de ESP8266 (~40KB bruikbaar RAM). De lwIP-variant wordt ingesteld tijdens het bouwen en vereist geen gebruikersconfiguratie.
+Sinds v2.0.0-beta is de ESP8266-build overgezet van Arduino-core 2.7.4 naar 3.1.2 en wordt gebouwd met de lwIP v2 Low Memory-variant (`ip=lm2f`, TCP MSS=536). Ten opzichte van de Higher Bandwidth-variant halveert dit ruwweg de TCP-ontvangst- en verzendbuffers per socket, wat belangrijk is gezien het beperkte werkgeheugen van de ESP8266 (~40KB bruikbaar RAM). De lwIP-variant is een keuze op buildtijd en vereist geen gebruikersconfiguratie.
+
+Op het MQTT-publicatiepad activeert de firmware bovendien WiFiClient sync-mode (`setSync(true)`). Hierdoor wordt de tijdelijke ~1KB `TCP_SND_BUF`-kopie binnen de Arduino WiFiClient overgeslagen: writes gaan rechtstreeks naar lwIP in plaats van via een tussenbuffer. Samen met `setNoDelay(true)` daalt het data-plane-RAM per MQTT-verbinding van ongeveer 4,8KB naar 3,7KB. Dit geldt uitsluitend voor het MQTT-publicatiepad; de webserver, WebSocket en telnet-sockets blijven de standaard (gebufferde) WiFiClient-modus gebruiken.
 
 ---
 
@@ -213,7 +217,7 @@ Op ESP8266 wordt de firmware gebouwd met de lwIP v2 Low Memory-variant (TCP MSS=
 | 80 | TCP / HTTP | Web UI, REST API en OTA-update | Alle webroutes, bestandsbediening, firmware-update |
 | 81 | TCP / WebSocket | Live OpenTherm-logstream | Gebruikt door de Web UI voor realtime data |
 | 23 | TCP / Telnet | Debugconsole | Tekstuele debuglog; bediend door SimpleTelnet-bibliotheek |
-| 25238 | TCP | Seriele bridge (ser2net) | Ruwe OTGW PIC-serieel over TCP; OTmonitor-compatibel |
+| 25238 | TCP | Seriele bridge (ser2net) | Ruwe OTGW PIC-serieel over TCP; bediend door SimpleTelnet-bibliotheek; OTmonitor-compatibel |
 | 123 | UDP (uitgaand) | NTP (SNTP) | Alleen uitgaand |
 | 5353 | UDP | mDNS | Lokale naamresolutie (beide platformen) |
 | 5355 | UDP | LLMNR | Windows-naamresolutie (alleen ESP8266) |

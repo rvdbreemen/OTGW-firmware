@@ -3,10 +3,10 @@
 ## Overview
 
 - **Name**: Network & WiFi Management Module (OTGW-firmware)
-- **Description**: Unified network connectivity layer providing WiFi (with auto-reconnect), NTP time synchronization, mDNS/LLMNR hostname resolution, TCP serial bridge, and optional Ethernet failover (ESP32 + W5500). Handles platform abstraction across ESP8266 and ESP32.
-- **Location**: `/src/OTGW-firmware/` (primary files: `networkStuff.ino`, `networkStuff.h`, `Ethernet.ino`, `platform.h`, `platform_esp8266.h`, `platform_esp32.h`)
-- **Language**: Arduino C/C++ (ESP8266/ESP32)
-- **Purpose**: Abstracts WiFi/Ethernet connectivity, NTP time sync, hostname management, and platform-specific features behind a unified API usable by the rest of the firmware. Ensures reliable network connectivity with automatic failover and proper DHCP hostname negotiation.
+- **Description**: Unified network connectivity layer (v1.3.5+) providing WiFi with non-blocking reconnection (ADR-047), NTP time synchronization with timezone support, mDNS/LLMNR hostname resolution, SimpleTelnet 1.0.0 debug server, and optional Ethernet failover (ESP32 + W5500). Updated for Arduino Core 3.1.2 (ESP8266) with lwIP2 Low Memory variant (TCP_MSS=536). WiFiClient sync mode enabled to reduce TCP buffer copy overhead.
+- **Location**: `/src/OTGW-firmware/` (primary files: `networkStuff.ino`, `networkStuff.h`, `Ethernet.ino`, `platform.h`, `platform_esp8266.h`, `platform_esp32.h`); `src/libraries/SimpleTelnet/src/SimpleTelnet.h`
+- **Language**: Arduino C/C++ (ESP8266/ESP32), templated C++ (SimpleTelnet library)
+- **Purpose**: Abstracts WiFi/Ethernet connectivity, NTP time sync, hostname management, platform-specific features, and debug telnet interface behind a unified API. Ensures reliable network connectivity with automatic failover, proper DHCP hostname negotiation, and responsive debug terminal.
 
 ## Code Elements
 
@@ -216,13 +216,25 @@
 - **Description**: 
   Derives a unique locally-administered MAC address from ESP32 eFuse MAC. Extracts 6 bytes from `ESP.getEfuseMac()`, sets bit 1 of first octet to mark as locally-administered (0x02), ensuring Ethernet MAC differs from WiFi MAC while remaining unique per device.
 
-### Telnet Debug Server
+### Telnet Debug Server (SimpleTelnet 1.0.0)
 
 #### `void startTelnet(void)`
-- **Location**: `networkStuff.ino:263-271`
+- **Location**: `networkStuff.ino:405-414`
 - **Parameters**: None
 - **Return Type**: `void`
-- **Description**: Starts TelnetStream server on port 23 for remote debug output. Logs local IP to debug output so users can `telnet <ip>` to see real-time firmware logs.
+- **Description**: Initializes SimpleTelnet 1.0.0 debug server on port 23 (single-client instance `debugTelnet`). Registers `sendTelnetBanner()` as onConnect callback and `onTelnetInput()` as onInputReceived callback. Uses char-by-char input mode (no line buffering) for responsive debug menu. Replaces ESPTelnet/TelnetStream with callback-based architecture and no heap fragmentation (callbacks receive const char*, never String).
+
+#### `void sendTelnetBanner(const char* ip)` (SimpleTelnet onConnect callback)
+- **Location**: `networkStuff.ino:369-393`
+- **Parameters**: `ip` (const char*) - Client IP address (passed by SimpleTelnet)
+- **Return Type**: `void`
+- **Description**: Sends welcome banner with firmware version, IP, WiFi SSID, OTGW online status, MQTT connection state, free heap bytes, and debug flag status. Lists debug flag toggle keys (1-6 for OT messages, REST API, MQTT, MQTT gating, sensors, NTP; 'h' for full menu). Sent once per client connection.
+
+#### `void onTelnetInput(const char* s)` (SimpleTelnet onInputReceived callback)
+- **Location**: `networkStuff.ino:399-402`
+- **Parameters**: `s` (const char*) - Single character input (char-by-char mode)
+- **Return Type**: `void`
+- **Description**: Routes telnet input to `handleDebugChar()` in handleDebug.ino. SimpleTelnet passes one character at a time in char-by-char mode; onTelnetInput extracts the character and forwards to the debug handler.
 
 ### Platform Abstraction (Unified API)
 
@@ -332,8 +344,9 @@ All inline functions defined in `platform_esp8266.h` and `platform_esp32.h`, pro
 - **`LittleFS.h`**: File system for configuration, HTML assets
 - **`WebSocketsServer.h`**: WebSocket server for live OT log streaming (reduced to 256-byte buffer per client)
 - **`user_interface.h`** (from Arduino core): `wifi_station_dhcpc_stop/start`, `system_get_rst_info`
+- **SimpleTelnet** (v1.0.0, custom library in src/libraries/): Multi-client telnet server with streaming and CLI modes, per-client line buffering
 - **AZ Timelib** (external): `timezoneManager`, `ZonedDateTime` for timezone-aware time conversion
-- **Arduino core `time()`**: POSIX `time()` function (backed by SNTP via `configTime()`)
+- **Arduino Core ESP8266** (v3.1.2): lwIP2 Low Memory variant (TCP_MSS=536 via platformio.ini build_flags); SNTP client via `configTime()`
 
 #### ESP32 (Ethernet.ino, platform_esp32.h)
 - **`WiFi.h`**: WiFi management (similar to ESP8266 but different API)
@@ -349,20 +362,23 @@ All inline functions defined in `platform_esp8266.h` and `platform_esp32.h`, pro
 
 ## Key Behaviors & Patterns
 
-### WiFi Auto-Reconnect Architecture (ADR-047 Fallback)
+### WiFi Auto-Reconnect Architecture (ADR-047 Non-Blocking Reconnection)
 
-The firmware implements two-tier WiFi recovery:
+The firmware implements two-tier WiFi recovery (v1.3.5+ update: SDK DHCP calls removed while connected to fix issue #525 router unreachability after reboot):
 
 1. **SDK Auto-Reconnect** (fast, transparent):
    - ESP8266/32 firmware automatically retries connection on SSID if disconnected
    - Typical recovery time: < 1 second
    - No application visibility — transparent radio-level reconnect
+   - Note: SDK DHCP renew/check calls removed (was causing timeouts and unreachability after router reboot per issue #525)
 
 2. **loopWifi() State Machine** (fallback for extended outages):
    - Detects disconnections that exceed SDK auto-reconnect timeout (typically 30 seconds)
    - Non-blocking state machine with 30-second retry windows (max 10 attempts)
+   - Performs hostname re-apply and DHCP re-announce on reconnection to ensure router sees updated name
    - Restarts services (Telnet, MQTT, WebSocket) on successful reconnection
-   - Triggers reboot if > 10 consecutive failures (indicates unrecoverable hardware issue)
+   - Triggers reboot if >= 10 consecutive failures (indicates unrecoverable hardware issue)
+   - Beta (_VERSION_PRERELEASE): After 2 failures (60s), enters AP fallback mode with 5-minute WiFi retry interval (allows OTA recovery without physical access)
 
 **Why two-tier?** SDK handles momentary blips (channel hops, interference). Application layer catches prolonged outages or misconfiguration.
 
@@ -392,6 +408,8 @@ The `Ethernet.ino` module provides W5500 hardware detection and DHCP, but the ac
 ### WebSocket Configuration (Buffer Optimization)
 
 Default WebSocket per-client buffer: 512 bytes. This project reduces it to 256 bytes via `#define WEBSOCKETS_MAX_DATA_SIZE 256` (defined before `#include <WebSocketsServer.h>`). Saves ~256 bytes per client. For 3 clients: 768 bytes of RAM freed — significant on ESP8266's 40KB heap.
+
+**WiFiClient Sync Mode** (v1.3.5+): WiFiClient sync mode enabled to reduce TCP buffer copy overhead. This trades a small amount of latency for lower RAM usage (approximately 1KB TCP buffer copy saved per client).
 
 **Security note**: WebSocket stream intended for LOCAL NETWORK ONLY. No authentication on WebSocket endpoint. Do NOT expose to internet without reverse proxy + HTTPS.
 
@@ -541,8 +559,10 @@ graph TB
 
 - Static buffers used strategically: `baseMacChr[13]`, `uniqueId[32]`, `_hn[64]` in platform functions
 - WebSocket buffer reduced from 512 to 256 bytes per client (via `WEBSOCKETS_MAX_DATA_SIZE`)
+- SimpleTelnet 1.0.0 replaces ESPTelnet/TelnetStream (no String objects in callbacks, const char* only to avoid heap fragmentation)
 - WiFiManager debug output disabled via `#define WM_NODEBUG` (before the WiFiManager include in `networkStuff.h`): on ESP8266 Core 3.x, the `handleWifiSave()` debug block builds `String` objects from raw string literals stored in flash at potentially misaligned addresses; `strlen()` then generates an unaligned word-load resulting in Exception 3 (LoadStoreAlignmentCause). `WM_NODEBUG` undefines `WM_DEBUG_LEVEL` so those `#ifdef WM_DEBUG_LEVEL` blocks are excluded at compile time.
 - HTTP server streams large files (e.g., `index.html` ~11KB) rather than loading into RAM
+- WiFiClient sync mode enabled to reduce TCP buffer copy overhead (~1KB per connection saved)
 
 ### Platform Differences
 
@@ -579,10 +599,21 @@ graph TB
 - Re-registers mDNS on transition to avoid stale entries
 - Derived MAC address is locally-administered (0x02 bit set) to distinguish from WiFi MAC
 
+## Notes on v1.3.5+ Changes
+
+- **Arduino Core 3.1.2 (ESP8266)**: Upgraded from 2.7.4; lwIP2 Low Memory variant enables TCP_MSS=536 via platformio.ini build_flags
+- **SimpleTelnet 1.0.0**: Custom library replacing ESPTelnet/TelnetStream; per-client line buffering; printf/printf_P PROGMEM helpers; separate debug and CLI instances if needed
+- **Non-blocking WiFi reconnect (ADR-047)**: Fully implemented; SDK DHCP calls removed while connected (fixes issue #525 unreachability after router reboot)
+- **WiFiClient sync mode**: Enabled to save ~1KB TCP buffer copy per connection
+- **AP Fallback (beta, _VERSION_PRERELEASE)**: After 2 reconnect failures (60s), enters SoftAP mode with 5-minute WiFi retry interval for OTA recovery
+- **NTP Telemetry**: Optional debug flag (key '6') for periodic NTP sync diagnostics (every 60s unsynced, every 300s synced)
+
 ## References & ADRs
 
-- **ADR-047**: WiFi auto-reconnect fallback (loopWifi state machine for extended outages)
+- **ADR-047**: WiFi non-blocking auto-reconnect (loopWifi state machine for extended outages)
 - **ADR-051**: Settings & state architecture (ntp.*, eth.* settings structures)
+- **Issue #525**: SDK DHCP calls removed while connected (was causing timeouts and unreachability after router reboot)
 - **OTGW-firmware.h**: Settings definitions and state structures
 - **safeTimers.h**: Timer macro definitions
+- **SimpleTelnet.h**: Multi-client telnet library (1.0.0)
 - **Timezone/time includes**: AZ Timelib for timezone support

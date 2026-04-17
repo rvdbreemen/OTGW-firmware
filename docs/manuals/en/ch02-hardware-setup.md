@@ -15,12 +15,14 @@ Both revisions use the same firmware binary. The NodeMCU and Wemos D1 mini modul
 
 Characteristics:
 
-- ESP8266 at 80 or 160 MHz, approximately 80 KB usable RAM
+- ESP8266 at 160 MHz (configured in `platformio.ini`), approximately 80 KB usable RAM
 - PIC16F88 or PIC16F1847 co-processor for the OpenTherm bus
-- 4 MB SPI flash (2 MB available for LittleFS)
+- 4 MB SPI flash, `eagle.flash.4m2m.ld` linker layout: 1 MB firmware, 2 MB LittleFS, 1 MB reserved for OTA
 - Micro-USB connector for power and flashing
 - I2C pins for optional OLED display and external watchdog
 - 1-Wire GPIO for Dallas DS18B20 temperature sensors
+
+The PlatformIO environment is `esp8266` (board `d1_mini`, platform `espressif8266@4.2.1`, Arduino Core 3.1.2). The same binary runs on both NodeMCU and D1 mini variants.
 
 #### ESP32-S3 OTGW32 (NodoShop)
 
@@ -40,6 +42,10 @@ Characteristics:
 - USB-C connector
 - Two buttons: boot button (GPIO 0) and config button (GPIO 9)
 - Three LEDs: OT red (GPIO 2), status (GPIO 8), and OT green (GPIO 48)
+
+#### ESP32 (generic, experimental)
+
+Standard (non-S3) ESP32 modules are selected by defining `BOARD_NODOSHOP_ESP32` and compiling with the ESP32 toolchain, but the pin map in `boards.h` targets the OTGW32 (ESP32-S3) board. On a plain ESP32, the OTDirect GPIO pins and the W5500 SPI assignments may not match the module breakout. Treat this as a developer target.
 
 #### Other Boards
 
@@ -175,9 +181,12 @@ Up to four Xiaomi LYWSD03MMC Bluetooth LE sensors are supported on the ESP32-S3.
 
 The `flash_esp.py` script handles everything automatically: it can download the latest release from GitHub, auto-detect your board and serial port by USB VID/PID, and flash the firmware. For ESP32-S3, the script uses a merged binary that contains the bootloader, partition table, firmware, and filesystem in a single image.
 
+Under the hood the script calls `python -m esptool` (esptool.py v5 or newer) using the v5 subcommand names: `erase-flash` and `write-flash` with hyphens. The underscored v4 forms (`erase_flash`, `write_flash`) are no longer accepted by esptool v5. The script installs esptool via `pip` if it is missing, so you normally do not need to manage this yourself.
+
 **Prerequisites:**
 
 - Python 3.6 or higher
+- esptool v5 (installed automatically by `flash_esp.py` on first run)
 - A USB cable connected between your computer and the ESP module (micro-USB for ESP8266, USB-C for ESP32-S3/OTGW32)
 - The correct USB-to-UART driver installed for your board:
   - ESP8266: CP210x driver (NodeMCU) or CH340 driver (Wemos D1 mini clones)
@@ -229,7 +238,7 @@ python3 flash_esp.py --board esp8266 --erase --download
 
 #### Flashing with PlatformIO (Build from Source)
 
-PlatformIO is the primary build system. The repository contains a `platformio.ini` with two environments: `esp8266` and `esp32`.
+PlatformIO is the primary build system. The repository contains a `platformio.ini` with two environments: `esp8266` (Wemos D1 mini, ESP8266) and `esp32` (OTGW32, ESP32-S3).
 
 ```bash
 # Install PlatformIO (as VS Code extension or via pip)
@@ -252,13 +261,22 @@ The `upload` target flashes the firmware binary. The `uploadfs` target flashes t
 
 Both targets require the device to be connected via USB.
 
-Alternatively, use the `build.py` helper script:
+Alternatively, use the `build.py` helper script. It wraps PlatformIO by default and can optionally use arduino-cli as a backend; invoke esptool v5 under the hood for any flashing it performs:
 
 ```bash
-python build.py              # Build firmware + filesystem for both platforms
-python build.py --firmware   # Firmware only
-python build.py --clean      # Clean build
+python build.py                      # Full build, both platforms, PlatformIO backend
+python build.py --target esp8266     # ESP8266 only
+python build.py --target esp32       # ESP32-S3 / OTGW32 only
+python build.py --firmware           # Firmware only (skip filesystem)
+python build.py --filesystem         # Filesystem only
+python build.py --merged             # Also produce a merged binary (ESP32)
+python build.py --merged --compress  # Merged and gzip-compressed
+python build.py --clean              # Clean build artifacts
+python build.py --distclean          # Also drop cached cores and libraries
+python build.py --arduino-cli        # Use the legacy arduino-cli backend
 ```
+
+Run `python build.py --help` for the full, current list of flags.
 
 #### Manual Flashing with Existing Binaries
 

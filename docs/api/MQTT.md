@@ -420,6 +420,26 @@ Settings echo topics are retained. More settings echo topics exist; the full lis
 | `sat/summer_active` | `"false"` | no | Summer simmer mode currently suppressing heating |
 | `sat/summer_hours_above` | `"4.5"` | no | Hours outdoor temp has been above threshold |
 
+#### SAT Switch State Topics (TASK-284)
+
+State topics for the 13 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
+
+| Topic | Description |
+| ----- | ----------- |
+| `sat/solar_gain_enable` | Solar gain compensation enable state |
+| `sat/summer_simmer_enable` | Summer simmer enable state |
+| `sat/comfort_adjust_enable` | Humidity-based comfort adjust enable state |
+| `sat/multi_area_enable` | Multi-area averaging enable state |
+| `sat/auto_tune_enable` | Auto-tune analysis enable state |
+| `sat/simulation_enable` | Simulation mode enable state |
+| `sat/window_detection_enable` | Window detection enable state |
+| `sat/force_pwm_enable` | Force-PWM override enable state |
+| `sat/push_setpoint_enable` | Push-setpoint enable state |
+| `sat/ovp_enabled` | OPV (overshoot-protection value) enabled state |
+| `sat/preset_sync_enable` | Preset-sync enable state |
+| `sat/dhw_enabled` | DHW heating enable state |
+| `sat/pwm_auto_switch_enable` | Auto-switch between PWM and continuous mode |
+
 #### Climate Entity Attributes
 
 | Topic | Value | Retained | Description |
@@ -699,7 +719,82 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | `sat/flush` | (any) | Flush short-lived data (PID integral + cycle statistics window) |
 | `sat/flush_threshold_h` | `"4"` | Configure auto-flush threshold in hours |
 
-**Settings Commands**  - any SAT setting can be updated by publishing to its topic suffix. For example: `sat/heating_curve`, `sat/deadband`, `sat/boiler_capacity`, `sat/heating_system`, `sat/manufacturer`, `sat/simulation`, etc. The full list of 40+ settings commands is in the [SAT MQTT topics reference](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
+**Feature Switches (TASK-284, bound to HA switch entities):**
+
+Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 13 auto-discovered SAT switches.
+
+| Topic Suffix | Bound SAT setting | Description |
+| ------------ | ----------------- | ----------- |
+| `sat/solar_gain` | `SATsolargain` | Enable solar gain compensation |
+| `sat/summer_simmer` | `SATsummersimmer` | Enable summer simmer suppression |
+| `sat/comfort_adjust` | `SATcomfortadjust` | Enable humidity-based comfort adjust |
+| `sat/multi_area` | `SATmultiarea` | Enable multi-area temperature averaging |
+| `sat/auto_tune` | `SATautotune` | Enable auto-tune analysis |
+| `sat/simulation` | `SATsimulation` | Enable simulation mode |
+| `sat/window_detection` | `SATwindowdetect` | Enable automatic window detection |
+| `sat/force_pwm` | `SATforcepwm` | Force PWM mode override |
+| `sat/push_setpoint` | `SATpushsetpoint` | Enable pushing setpoint changes to boiler |
+| `sat/ovp_enabled` | `SATovpenabled` | Enable OPV (overshoot-protection value) |
+| `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
+| `sat/dhw_enabled` | `SATdhwenabled` | Enable DHW heating |
+| `sat/pwm_auto_switch` | `SATpwmautoswitch` | Auto-switch between PWM and continuous |
+
+**Heating System Select (TASK-284):**
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `sat/heating_system` | `"0"` / `"1"` / `"2"` / `"3"` | Heating system type (0=auto, 1=radiators, 2=heat pump, 3=underfloor). Bound to `SATsystem`. |
+
+**Other Settings Commands (tuning and thresholds):**
+
+These topics update the matching SAT setting directly. Payloads are numeric strings unless noted.
+
+| Topic Suffix | Bound SAT setting | Notes |
+| ------------ | ----------------- | ----- |
+| `sat/heating_curve` | `SATcoefficient` | Heating curve coefficient |
+| `sat/deadband` | `SATdeadband` | PID deadband (°C) |
+| `sat/interval` | `SATinterval` | Control loop interval (seconds) |
+| `sat/overshoot_margin` | `SATovershootmargin` | Overshoot margin (°C) |
+| `sat/manufacturer` | `SATmanufacturer` | Boiler manufacturer name |
+| `sat/max_modulation` | `SATmaxmodulation` | Max relative modulation % |
+| `sat/dhw_setpoint` | `SATdhwsetpoint` | DHW setpoint (°C) |
+| `sat/ovp_value` | `SATovpvalue` | OPV calibrated value (°C) |
+| `sat/flame_off_offset` | `SATflameoffset` | Setpoint offset when flame is off |
+| `sat/flow_offset` | `SATflowoffset` | Continuous mode max setpoint drop (°C) |
+| `sat/summer_threshold` | `SATsummerthreshold` | Summer simmer outdoor threshold (°C) |
+| `sat/summer_min_hours` | `SATsummerminhours` | Hours above threshold to activate summer mode |
+| `sat/thermal_comfort` | `SATthermalcomfort` | Thermal comfort tuning |
+| `sat/humidity_timeout_s` | `SAThumiditytimeout` | Humidity reading timeout (s) |
+| `sat/comfort_humidity` | `SATcomforthumidity` | Reference humidity for comfort (%) |
+| `sat/comfort_max_offset` | `SATcomfortmaxoffset` | Max comfort offset (°C) |
+| `sat/ble_enable` | `SATbleenable` | Enable BLE sensor (ESP32 only) |
+| `sat/ble_mac` | `SATblemac` | BLE sensor MAC address |
+| `sat/ble_interval` | `SATbleinterval` | BLE poll interval (s) |
+| `sat/preset_sync_topic` | `SATpresetsynctopic` | Preset-sync MQTT topic to subscribe to |
+| `sat/auto_tune_rate` | `SATautotunerate` | Auto-tune learning rate |
+| `sat/multi_area_count` | `SATmultiareacount` | Number of multi-area inputs |
+| `sat/mod_sup_delay` | `SATmodsupdelay` | Modulation suppression delay |
+| `sat/mod_sup_offset` | `SATmodsupoffset` | Modulation suppression offset |
+| `sat/boiler_capacity` | `SATboilercapacity` | Rated boiler capacity (kW) |
+| `sat/target_temp_step` | `SATtempstep` | Target temperature step (°C) |
+| `sat/min_pressure` | `SATminpressure` | Min pressure alarm threshold (bar) |
+| `sat/max_pressure` | `SATmaxpressure` | Max pressure alarm threshold (bar) |
+| `sat/max_pressure_drop` | `SATmaxpressdrop` | Max acceptable pressure drop rate |
+| `sat/preset_comfort` | `SATpresetcomfort` | Comfort preset temperature |
+| `sat/preset_eco` | `SATpreseteco` | Eco preset temperature |
+| `sat/preset_away` | `SATpresetaway` | Away preset temperature |
+| `sat/preset_sleep` | `SATpresetsleep` | Sleep preset temperature |
+| `sat/preset_activity` | `SATpresetactivity` | Activity preset temperature |
+| `sat/preset_home` | `SATpresethome` | Home preset temperature |
+| `sat/sensor_max_age` | `SATsensormaxage` | Max age for external sensor readings (s) |
+| `sat/error_monitoring` | `SATerrormon` | Enable PID error ring-buffer monitoring |
+| `sat/auto_gains_value` | `SATautogains` | Auto-gains multiplier |
+| `sat/heating_mode` | `SATheatingmode` | Heating mode: `"eco"`, `"comfort"`, or numeric |
+| `sat/cycles_per_hour` | `SATcyclesperhour` | Target PWM cycles per hour |
+| `sat/valve_offset` | `SATvalveoffset` | Valve offset compensation |
+| `sat/solar_freeze_integral` | `SATsolarfreezeint` | Freeze PID integral during solar gain |
+
+The full reference with payload ranges and defaults is in the [SAT MQTT topics document](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
 
 **Example**  - Set SAT target to 21.5°C:
 ```bash
@@ -751,6 +846,12 @@ Commands can also be sent using the two-letter OTGW command codes directly as to
 
 The firmware supports Home Assistant MQTT auto-discovery, publishing discovery configuration messages to the `{haprefix}/` topic tree (default: `homeassistant/`).
 
+### Architecture: Streaming Discovery
+
+Discovery configs are no longer built from a filesystem template (`data/mqttha.cfg`, now archived under `docs/archive/`). The source of truth is the streaming compose functions in `src/OTGW-firmware/mqtt_configuratie.cpp`, which build each config directly into MQTT publish frames via a two-pass (MEASURE then WRITE) `MqttJsonWriter`. This eliminates the historical `sLine[1200]` staging buffer and avoids file I/O during discovery.
+
+Each discovery publish uses `client.beginPublish()` with `retain = true`, so HA receives a full retained config per entity.
+
 ### Discovery Configuration
 
 Discovery topics follow the pattern:
@@ -762,9 +863,25 @@ Discovery topics follow the pattern:
 Where:
 
 - `{haprefix}` = `settings.mqtt.sHaprefix` (default: `homeassistant`)
-- `{component}` = HA component type (sensor, binary_sensor, switch, climate, etc.)
+- `{component}` = HA component type (`sensor`, `binary_sensor`, `switch`, `select`, `climate`, `number`)
 - `{node_id}` = `settings.mqtt.sUniqueid` (default: `otgw-{MAC}`)
 - `{object_id}` = unique identifier for the entity
+
+### Entity Inventory
+
+The firmware emits the following entity categories (verified against `mqtt_configuratie.cpp` on `feature-dev-2.0.0-otgw32-esp32-sat-support`):
+
+| Component | Count | Source | Notes |
+|-----------|-------|--------|-------|
+| `sensor` | 289 | PROGMEM table `mqttHaSensorCfg[]` (indexed via `mqttHaSensorIndex[256]`) | Covers all OT numeric fields, status decoding, RBP, VH, solar, SAT sensor fan-out |
+| `binary_sensor` | 53 | PROGMEM table `mqttHaBinSensorCfg[]` (indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries |
+| `climate` | 2 | `streamClimateDiscovery(idx=0/1)` | 0 = Thermostat, 1 = DHW Control |
+| `number` | 1 | `streamNumberDiscovery()` | `Toutside_override` slider |
+| `switch` (SAT, TASK-284) | 13 | `streamSatSwitchDiscovery(idx=0..12)` | See list below |
+| `select` (SAT, TASK-284) | 1 | `streamSatSelectDiscovery(idx=0)` | `sat_heating_system` (options `"0"`..`"3"`) |
+| `sensor` (Dallas) | runtime | `streamDallasSensorDiscovery()` via `configSensors()` | Published per detected 1-Wire address |
+
+The SAT switch and select entries piggyback on OT pseudo-ID 0 in the discovery bitmap (they are streamed alongside the climate entities and marked done together with ID 0). The number entity is marked done with OT ID 27.
 
 ### Discovery Modes
 
@@ -868,6 +985,32 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 |-------------|-----------|------|-------------|
 | `number` | `sat_dhw_setpoint` | °C | DHW setpoint slider (30-60 °C, 0.5 step) |
 
+**Switch Entities (TASK-284, 13 switches):**
+
+Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and takes commands on `%mqtt_sub_topic%/sat/<command>`. Payloads are literal `"true"` / `"false"` (`pl_on` / `pl_off`).
+
+| Entity ID | Command topic suffix | State topic suffix | Icon |
+|-----------|----------------------|--------------------|------|
+| `sat_solar_gain_enable` | `sat/solar_gain` | `sat/solar_gain_enable` | `mdi:white-balance-sunny` |
+| `sat_summer_simmer_enable` | `sat/summer_simmer` | `sat/summer_simmer_enable` | `mdi:weather-sunny-alert` |
+| `sat_comfort_adjust_enable` | `sat/comfort_adjust` | `sat/comfort_adjust_enable` | `mdi:water-thermometer` |
+| `sat_multi_area_enable` | `sat/multi_area` | `sat/multi_area_enable` | `mdi:home-group` |
+| `sat_auto_tune_enable` | `sat/auto_tune` | `sat/auto_tune_enable` | `mdi:auto-fix` |
+| `sat_simulation_enable` | `sat/simulation` | `sat/simulation_enable` | `mdi:flask` |
+| `sat_window_detection_enable` | `sat/window_detection` | `sat/window_detection_enable` | `mdi:window-open-variant` |
+| `sat_force_pwm_enable` | `sat/force_pwm` | `sat/force_pwm_enable` | `mdi:pulse` |
+| `sat_push_setpoint_enable` | `sat/push_setpoint` | `sat/push_setpoint_enable` | `mdi:upload` |
+| `sat_ovp_enabled` | `sat/ovp_enabled` | `sat/ovp_enabled` | `mdi:shield-check` |
+| `sat_preset_sync_enable` | `sat/preset_sync` | `sat/preset_sync_enable` | `mdi:sync` |
+| `sat_dhw_enabled` | `sat/dhw_enabled` | `sat/dhw_enabled` | `mdi:water-boiler` |
+| `sat_pwm_auto_switch_enable` | `sat/pwm_auto_switch` | `sat/pwm_auto_switch_enable` | `mdi:swap-horizontal` |
+
+**Select Entity (TASK-284):**
+
+| Entity ID | Command topic suffix | State topic suffix | Options |
+|-----------|----------------------|--------------------|---------|
+| `sat_heating_system` | `sat/heating_system` | `sat/heating_system` | `"0"`, `"1"`, `"2"`, `"3"` |
+
 ### Discovery Lifecycle
 
 - On firmware boot (`startMQTT()`): all discovery IDs are marked pending for drip publishing
@@ -877,26 +1020,28 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 - Discovery configs are published with `retain = true`
 - The drip publisher runs at 3-second intervals (or 30-second intervals when free heap is below 8KB)
 
-### Discovery Templates
+### Discovery Composition
 
-Discovery templates are stored in PROGMEM (compiled into firmware flash) via `mqttha_progmem.h`, which is auto-generated from the `mqttha.cfg` source file at build time. Templates are no longer read from LittleFS at runtime; this eliminates file I/O during discovery and avoids the previous `sLine[1200]` staging buffer.
+Discovery configs are composed in flash by streaming functions in `mqtt_configuratie.cpp`:
 
-The PROGMEM table is indexed by OT message ID (0-255), allowing O(1) lookup. Each entry contains pointers to topic and message template strings in flash.
+- `streamSensorDiscovery()`, `streamBinarySensorDiscovery()` iterate PROGMEM config arrays auto-generated by `tools/generate_mqttha_data.py`.
+- `streamClimateDiscovery(idx)`, `streamNumberDiscovery()`, `streamSatSwitchDiscovery(idx)`, `streamSatSelectDiscovery(idx)` are hardcoded per index.
+- `streamDallasSensorDiscovery(addr)` handles the runtime-addressed Dallas sensors.
 
-Template placeholders:
+Each function uses a two-pass `MqttJsonWriter` (first pass measures bytes, second writes via `PubSubClient::beginPublish()` + chunked payload writes) so no full-message RAM buffer is needed.
 
-| Placeholder | Replaced With |
-| ----------- | ------------- |
-| `%node_id%` | MQTT unique ID |
-| `%sensor_id%` | Sensor-specific ID (e.g., Dallas address) |
-| `%hostname%` | Device hostname |
-| `%version%` | Firmware version |
-| `%mqtt_pub_topic%` | MQTT publish namespace |
-| `%mqtt_sub_topic%` | MQTT subscribe namespace |
-| `%homeassistant%` | HA discovery prefix |
-| `%source_suffix%` | Source suffix (_thermostat, _boiler, _gateway) |
-| `%source_name%` | Source display name (Thermostat, Boiler, Gateway) |
-| `%source_topic_segment%` | Source topic segment (thermostat, boiler, gateway) |
+Runtime values interpolated into configs (instead of template placeholders) come from a `HaDiscoveryContext`:
+
+| Context field | Used for |
+| ------------- | -------- |
+| `nodeId` | `{MQTT unique id}` (default `otgw-{MAC}`) |
+| `hostname` | Entity `name` prefix |
+| `haPrefix` | Discovery topic prefix |
+| `mqttPubTopic` | Publish/state topic base |
+| `mqttSubTopic` | Subscribe/command topic base |
+| `version` | `device.sw_version` and `origin.sw` |
+
+Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is handled at stream time by `expandAndStreamSensorSources()`, which emits three variants (`_thermostat`, `_boiler`, `_gateway`) for sensors marked with `MQTT_HA_FLAG_ANY_SOURCE`.
 
 ---
 

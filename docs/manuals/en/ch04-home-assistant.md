@@ -2,7 +2,7 @@
 
 ### Overview
 
-OTGW-firmware is designed for tight Home Assistant integration. Once you have an MQTT broker running and the firmware connected to it, Home Assistant automatically discovers all OpenTherm sensors, the boiler climate entity, and binary status sensors, with no YAML required. This chapter covers how that works, what gets discovered, and how to send commands from Home Assistant to the gateway.
+OTGW-firmware is designed for tight Home Assistant integration. Once you have an MQTT broker running and the firmware connected to it, Home Assistant automatically discovers all OpenTherm sensors, the boiler climate entity, binary status sensors, and (when SAT is enabled) a set of SAT switches, a heating-system select, and a number entity, with no YAML required. This chapter covers how that works, what gets discovered, and how to send commands from Home Assistant to the gateway.
 
 ---
 
@@ -72,6 +72,10 @@ Open the OTGW-firmware web UI and go to the Settings page. The MQTT section has 
 | Top Topic | `OTGW` | Root namespace for all published topics |
 | Unique ID | `otgw-{MAC}` | Node identifier, included in every topic path |
 | HA Discovery Prefix | `homeassistant` | Must match the discovery prefix in HA MQTT integration |
+| Device Manufacturer | `NodoShop` | Shown in the HA device info block. Editable. |
+| Device Model | `OTGW` | Shown in the HA device info block. Editable. |
+
+The manufacturer and model are now configurable so the same firmware can be labelled correctly when it runs on different hardware variants (classic NodoShop OTGW, ESP32 OT-Shield, etc.). These values appear in Home Assistant under Settings > Devices and Services > MQTT > OTGW. As a small nod to the origin of the project, a separate `otgw-pic/designer` topic is always published with the value `Schelte Bron`, to credit the original PIC firmware author.
 
 After saving, the firmware connects to the broker within a few seconds. The MQTT status indicator on the web UI main page turns green when the connection is established.
 
@@ -139,16 +143,23 @@ When the interval is set to, say, 60 seconds, a stable boiler temperature will b
 
 The interval gate applies to OpenTherm data messages only. SAT topics, connection status, version info, and other non-OT topics are always published when they change, regardless of the interval setting.
 
-#### Debugging the gate
+#### Debugging MQTT
 
-If you connect to the firmware telnet debug port (port 23) and press `g`, the MQTT gate debug flag toggles. With it enabled, the firmware logs every gate decision to the debug console:
+Telnet into the firmware on port 23. Two separate debug toggles cover MQTT behaviour:
+
+| Key | Flag | What it logs |
+|---|---|---|
+| `3` | `bMQTT` | MQTT module trace: connect, subscribe, publish, discovery progress, errors |
+| `g` | `bMQTTGate` | Per-message gate decisions from the publish interval filter |
+
+Enable `g` to see why a given message was published or suppressed by the interval filter:
 
 ```
 MQTT gate id=25 src=S slot=25 prev=0x0000 curr=0x0510 first=true changed=true interval=false last=0 now=42 => publish [tracked update]
 MQTT gate id=25 src=S slot=25 prev=0x0510 curr=0x0510 first=false changed=false interval=false last=42 now=71 => skip [suppressed by interval]
 ```
 
-This is useful when diagnosing why a sensor is or is not appearing in Home Assistant.
+Enable `3` for the higher-level MQTT trace when diagnosing connection, subscription, or discovery issues. The two flags are independent: the gate log is high-volume, so you generally only enable it briefly while diagnosing a specific sensor.
 
 ---
 
@@ -164,37 +175,48 @@ Home Assistant listens on `homeassistant/#` for discovery messages. The firmware
 homeassistant/{component}/{node_id}/{entity_id}/config
 ```
 
-#### Async drip publisher
+#### Streaming discovery architecture
 
-Starting with v2.0.0, discovery uses an async "drip" publisher. Instead of sending all 345 discovery messages in a single burst at startup, the firmware publishes one entity every 3 seconds in the background. This means a full discovery cycle takes approximately 17 minutes, but the approach is far gentler on the ESP8266's limited heap and on the MQTT broker.
+Starting with v2.0.0 the firmware uses a streaming discovery pipeline (implemented in `mqtt_configuratie.cpp`). Every discovery payload is composed on the fly and written to the MQTT client in 128-byte chunks, similar to how ESPHome builds its discovery messages. Nothing is buffered as a full JSON string in RAM. This keeps heap pressure low (around 200 bytes of working memory per entity) and avoids the heap fragmentation problems that the older approach suffered from on the ESP8266.
 
-The drip publisher includes two protective mechanisms:
+The streaming functions (`streamSensorDiscovery`, `streamBinarySensorDiscovery`, `streamClimateDiscovery`, `streamNumberDiscovery`, `streamDallasSensorDiscovery`, `streamSatSwitchDiscovery`, `streamSatSelectDiscovery`) replace the older PROGMEM-template approach. Streaming is always on; there is no flag to turn it off.
 
-- **Heap guard.** If free heap drops below 8 KB, the discovery publish is skipped until memory recovers. This prevents out-of-memory crashes during periods of high network activity.
-- **Adaptive interval.** Under heap pressure the interval automatically widens from 3 seconds to 30 seconds. When heap recovers, the interval returns to 3 seconds. This ensures the system stays stable while still making progress on discovery.
+The legacy `mqttha.cfg` file that earlier versions stored on LittleFS is no longer used at runtime. It has been archived to `docs/archive/mqttha.cfg` as a reference for the original template layout only.
 
-During the initial 17 minutes, entities appear gradually in Home Assistant. Sensors that have not yet been discovered will show up as they are published. Once all entities are discovered, the state is remembered and no re-discovery is needed unless you explicitly trigger one.
+#### Bitmap-driven drip publisher
 
-#### Discovery templates in PROGMEM
+Discovery is incremental. A 256-bit "done" bitmap tracks which OpenTherm message IDs have already had their discovery entities published. Two entry points drive the pipeline:
 
-Discovery templates are compiled into flash memory (PROGMEM) rather than loaded from the LittleFS filesystem at runtime. This is transparent to the user, but it eliminates filesystem I/O during discovery and slightly reduces RAM usage. The `mqttha.cfg` file is no longer read at runtime; it serves only as the source for the build-time code generator.
+- `doAutoConfigure()` clears the bitmap and streams all entities in one pass. Used on boot, on a manual force, and whenever Home Assistant itself restarts.
+- `doAutoConfigureMsgid(OTid)` publishes only the discovery entries that belong to one OpenTherm message ID, and only if the bitmap shows that ID has not yet been done. It is called opportunistically as OT traffic flows by, so the discovery set for a given boiler is built up naturally as messages are observed.
+
+Two pseudo-IDs are used to hang non-OT entities off the bitmap:
+
+- ID `0` carries the two climate entities (thermostat and DHW control), the 13 SAT switches, and the SAT select.
+- ID `27` carries the "outside temperature override" number entity.
+
+Dallas sensors have their own path (`streamDallasSensorDiscovery`) because their discovery depends on the actual 1-Wire address read at runtime, and they are published via `configSensors()` once those addresses are known.
+
+#### Heap safety
+
+Every `stream*Discovery` function checks free heap (`STREAM_HEAP_MIN = 4000` bytes) before composing a payload and returns `false` if heap is too low. The drip loop then re-tries later when memory has recovered. This keeps discovery alive through transient heap pressure without ever crashing the device.
 
 #### Re-discovery triggers
 
 The firmware re-publishes all discovery configurations in two situations:
 
-1. **Firmware boot or MQTT settings change.** All discovery IDs are queued for drip publishing.
-2. **Home Assistant restart.** The firmware monitors `homeassistant/status`. When HA comes back online, all IDs are re-queued.
+1. **Firmware boot or MQTT settings change.** The bitmap is cleared and `doAutoConfigure()` streams every entity.
+2. **Home Assistant restart.** The firmware monitors `homeassistant/status`. When HA comes back online, `doAutoConfigure()` is called again.
 
-On a simple MQTT reconnect (e.g. a brief network interruption), discovery is *not* re-run. The broker retains the discovery messages, so re-publishing them on every reconnect would be unnecessary.
+On a simple MQTT reconnect (for example a brief network interruption) discovery is *not* re-run. The broker retains the discovery messages, so re-publishing on every reconnect would be unnecessary.
 
-#### Triggering a full rediscovery manually
+#### Forcing a full rediscovery
+
+From the telnet debug console, press `F` (uppercase). This clears the done bitmap and re-sends discovery for every entity. The same effect is available via the REST API:
 
 ```bash
 curl -X POST http://otgw.local/api/v2/otgw/discovery
 ```
-
-This queues all discovery IDs for drip publishing. The entities will appear over the following ~17 minutes.
 
 ---
 
@@ -216,6 +238,8 @@ This queues all discovery IDs for drip publishing. The entities will appear over
 | Outside temperature | `outsidetemperature` | °C |
 | CH water pressure | `chwaterpressure` | bar |
 
+The exact set depends on which OpenTherm message IDs your thermostat and boiler exchange. Any defined message ID may generate one or more entities.
+
 #### Binary Sensors
 
 | Entity | Description |
@@ -227,13 +251,52 @@ This queues all discovery IDs for drip publishing. The entities will appear over
 | CH enable | Thermostat requesting central heating |
 | DHW enable | Thermostat requesting hot water |
 
-#### Climate Entity
+#### Climate Entities
 
-The firmware publishes a climate entity showing the current room temperature, the active setpoint, and allows setting a new target temperature from the HA dashboard. If SAT is enabled, a dedicated SAT climate entity (`sat_climate`) appears with full mode and preset support.
+Two climate entities are published:
+
+- Thermostat climate: shows the current room temperature, the active setpoint, and allows setting a new target temperature from the HA dashboard.
+- DHW climate: exposes domestic hot water control as a climate entity.
+
+If SAT is enabled, the thermostat climate is the SAT-driven one and supports mode and preset selection.
+
+#### Number Entity
+
+A number entity is published for the outside-temperature override, letting HA push a value as if it came from a wired outdoor sensor.
+
+#### SAT Switches and Select (new in 2.0.0)
+
+When SAT is enabled, the streaming pipeline publishes 13 boolean switches and 1 select, giving Home Assistant direct control over the SAT feature flags. All entity names are prefixed with the hostname.
+
+Switches:
+
+| Suffix | Purpose |
+|---|---|
+| `SAT_Solar_Gain` | Enable solar gain compensation |
+| `SAT_Summer_Simmer` | Enable summer simmer index auto-disable |
+| `SAT_Comfort_Adjust` | Enable comfort adjust |
+| `SAT_Multi_Area` | Enable multi-area weighted room temperature |
+| `SAT_Auto_Tune` | Enable automatic PID gain tuning |
+| `SAT_Simulation` | Run SAT in simulation mode (no real boiler control) |
+| `SAT_Window_Detection` | Enable window-open detection |
+| `SAT_Force_PWM` | Force PWM mode regardless of boiler modulation |
+| `SAT_Push_Setpoint` | Push control setpoint to boiler via TC= |
+| `SAT_OVP_Enabled` | Enable overshoot prevention calibration |
+| `SAT_Preset_Sync` | Sync climate preset to secondary entities |
+| `SAT_DHW_Enabled` | Enable DHW control interaction with SAT |
+| `SAT_PWM_Auto_Switch` | Auto-switch between continuous and PWM mode |
+
+Select:
+
+| Suffix | Options | Purpose |
+|---|---|---|
+| `SAT_Heating_System` | `0`, `1`, `2`, `3` | Heating system type (radiator, underfloor, low-temp, heat pump) |
+
+Each switch uses `true`/`false` payloads and is retained; the select publishes and accepts the numeric strings above.
 
 #### SAT Sensor Entities
 
-When SAT is enabled, the firmware auto-discovers additional diagnostic entities. These are published under the `sat/` topic prefix.
+When SAT is enabled, the firmware also auto-discovers diagnostic sensor entities. These are published under the `sat/` topic prefix.
 
 **Core SAT topics (always published when SAT is active):**
 

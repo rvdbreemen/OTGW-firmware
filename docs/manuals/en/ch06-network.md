@@ -14,10 +14,10 @@ When no credentials are stored, the device starts a WiFi access point named afte
 
 The firmware uses a two-tier reconnection strategy:
 
-1. The ESP SDK's built-in auto-reconnect handles short blips (typically under 30 seconds).
-2. If the connection stays down longer, the application-level `loopWifi()` state machine retries non-blocking with a 30-second window per attempt. In production builds it retries up to 10 times before rebooting. In beta builds it enters AP fallback mode after 2 failed retries (see section 6.1.3).
+1. The ESP SDK's built-in auto-reconnect (`WiFi.setAutoReconnect(true)`) handles short blips (typically under 30 seconds) transparently at the radio level.
+2. For longer outages, the application-level `loopWifi()` state machine takes over. The state machine is fully non-blocking: each call returns in well under a millisecond, so the watchdog, OpenTherm message processing, MQTT keepalives, and the web UI all keep running during reconnection. It retries with a 30-second window per attempt (enough for a full scan, association, and DHCP exchange) and gives up after 10 attempts, rebooting the device. In beta builds it enters AP fallback mode after 2 failed retries instead (see section 6.1.3).
 
-After reconnecting, the firmware re-applies the configured hostname, forces a DHCP re-announce so the router learns the correct hostname, and restarts Telnet, MQTT, and WebSocket services automatically.
+After a successful reconnect, the firmware re-applies the configured hostname, forces a DHCP re-announce so the router learns the correct hostname, and restarts Telnet, MQTT, and WebSocket services automatically. Per the fix for issue #525, the SDK DHCP client is only restarted while the station is disconnected. Touching `wifi_station_dhcpc_start()` on an associated station resets the IP to `0.0.0.0` and prevents recovery after a router reboot.
 
 #### 6.1.3 AP Fallback Mode
 
@@ -124,7 +124,7 @@ Set the hostname in Settings. The new hostname propagates to the DHCP request, m
 
 #### 6.5.2 Timezone Handling (AceTime)
 
-The firmware uses the AceTime library for timezone handling. You configure the timezone using standard IANA timezone names (for example `Europe/Amsterdam`, `America/New_York`, `Asia/Tokyo`). These names are resolved using AceTime's built-in timezone database, which covers DST rules and historical changes automatically.
+The firmware uses the AceTime library (4.x) for timezone handling. You configure the timezone using standard IANA timezone names (for example `Europe/Amsterdam`, `America/New_York`, `Asia/Tokyo`). These names are resolved using AceTime's built-in timezone database, which covers DST rules and historical changes automatically.
 
 Unlike a raw POSIX timezone string, you do not need to specify DST transition rules manually. Just enter the IANA name and AceTime handles the rest.
 
@@ -181,9 +181,11 @@ On ESP32, the OTA update page accepts a merged binary (firmware + filesystem com
 
 ---
 
-### 6.7 ESP8266: lwIP Low Memory Variant
+### 6.7 ESP8266: lwIP Low Memory Variant and Arduino Core 3.1.2
 
-On ESP8266, the firmware is built with the lwIP v2 Low Memory variant (TCP MSS=536). This reduces per-connection memory usage compared to the Higher Bandwidth variant, which is important given the ESP8266's limited ~40KB of usable RAM. The lwIP variant is set at build time and requires no user configuration.
+Since v2.0.0-beta, the ESP8266 build has moved from Arduino core 2.7.4 to 3.1.2 and is compiled with the lwIP v2 Low Memory variant (`ip=lm2f`, TCP MSS=536). Compared to the Higher Bandwidth variant this roughly halves the TCP receive/send buffers per socket, which matters on the ESP8266's ~40KB of usable RAM. The lwIP variant is a compile-time choice and requires no user configuration.
+
+On the MQTT publish path the firmware also enables WiFiClient sync mode (`setSync(true)`). This skips the temporary ~1KB `TCP_SND_BUF` copy inside the Arduino WiFiClient: writes flow straight into lwIP instead of being staged in an intermediate buffer. Combined with `setNoDelay(true)`, the data-plane RAM per MQTT connection drops from about 4.8KB to 3.7KB. This applies to the MQTT publish path only; the web server, WebSocket, and telnet sockets continue to use the default (buffered) WiFiClient behaviour.
 
 ---
 

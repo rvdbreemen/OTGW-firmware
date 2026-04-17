@@ -12,6 +12,8 @@ Met SAT: de ketel draait continu op een lage aanvoertemperatuur die net genoeg w
 
 SAT draait volledig op het ESP-apparaat. Er is geen Home Assistant, geen cloud en geen internetverbinding vereist voor de basiswerking.
 
+SAT is geinspireerd op (en geport van) de uitstekende Home Assistant SAT custom component van Alex Wijnholds (Alexwijn), met ontwerpfeedback en validatie van George Dellas (sergeantd). De firmware draait de controller rechtstreeks op de OTGW, zodat de verwarmingslus blijft werken ook als Home Assistant, MQTT of WiFi tijdelijk niet beschikbaar zijn.
+
 ---
 
 ### 5.1 Vereisten en compatibiliteit
@@ -56,6 +58,10 @@ SAT heeft een ruimtetemperatuurmeting nodig. Mogelijke bronnen (in prioriteitsvo
 Onderwerp: OTGW/set/otgw-AABBCCDDEEFF/sat/enabled
 Waarde:    true
 ```
+
+Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `pwm_auto_switch`, `push_setpoint`, `ovp_enabled`, `ovp_value`, `ovp_start`, `ovp_stop`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+
+Voor booleaanse topics werken `ON` / `OFF` / `true` / `false` / `1` / `0`. Numerieke topics accepteren de gebruikelijke decimale notatie.
 
 #### Via REST API
 
@@ -410,7 +416,7 @@ Wanneer `satzonecount` 1 is (standaard), werkt SAT in single-zone modus en heeft
 
 ### 5.15 BLE-temperatuursensor (alleen ESP32)
 
-Op ESP32-builds kan SAT BLE-temperatuursensoren scannen en als ruimtetemperatuurinvoer gebruiken. Ondersteunde sensorformaten:
+Op ESP32-builds (OTGW32 / Thermo-Nova) kan SAT BLE-temperatuursensoren scannen en als ruimtetemperatuurinvoer gebruiken. Ondersteunde sensorformaten:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC met custom firmware): service data UUID 0x181A. Rapporteert temperatuur, luchtvochtigheid en batterijniveau.
 - **BTHome v2**: service data UUID 0xFCD2. Standaard BTHome-protocol voor temperatuur- en luchtvochtigheidssensoren.
@@ -485,18 +491,26 @@ Gepubliceerd via MQTT als `sat/power` (W) en `sat/energy_total` (kWh).
 
 #### Klimaatentiteit
 
-Wanneer SAT is ingeschakeld en MQTT met auto-discovery is geconfigureerd, maakt Home Assistant automatisch een klimaatentiteit aan:
+Wanneer SAT is ingeschakeld en MQTT met auto-discovery is geconfigureerd, publiceert de firmware een klimaatentiteit voor de thermostaat:
 
 | Entiteit | Beschrijving |
 |---|---|
-| `climate.otgw_sat` | Volledige klimaatentiteit met doeltemperatuur en modus |
+| `climate.<hostname>_thermostat` | Thermostaat-klimaatentiteit, modi `off` / `heat`, bereik 12 C tot 28 C, stap 0,5 C, precisie 0,1 C |
+| `climate.<hostname>_dhw_control` | Optionele warmwater-klimaatentiteit, modi `off` / `auto`, bereik 40 C tot 60 C |
 
-Via deze entiteit kunt u:
-- De doeltemperatuur instellen (slider of numeriek invoerveld)
-- De bedrijfsmodus selecteren (`off`, `continuous`, `pwm`)
-- Een voorinstelling kiezen (comfort, eco, weg, slaap, thuis, activiteit) indien geconfigureerd
-- De huidige ruimtetemperatuur aflezen
-- De actuele SAT-modus aflezen (`off`, `continuous`, `pwm`)
+De HA-zichtbare modi zijn `off` en `heat`. De mode-status volgt de `thermostat_connected`-status van de PIC, dus als u in HA naar `off` schakelt, laat SAT de setpoint-override los. Het instellen van de doeltemperatuur via HA stuurt een `TT=` commando, dat SAT persisteert naar ESP-flash. Presets (comfort, eco, away, sleep, home, activity) worden doorgestuurd via `sat/preset` als ze zijn geconfigureerd.
+
+#### SAT-instellingen als HA-entiteiten (Task-81 / Task-284)
+
+Sinds 2.0.0 worden alle bestuurbare SAT-parameters als aparte HA-entiteiten gepubliceerd, zodat de volledige SAT-feature set vanaf een dashboard bestuurbaar is zonder rechtstreeks MQTT-berichten te sturen.
+
+| HA-component | Aantal | Voorbeelden |
+|---|---|---|
+| `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, comfort-vochtigheid, zomerdrempel, auto-tune rate, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
+| `switch` | 13 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `push_setpoint`, `ovp_enabled`, `preset_sync`, `dhw_enabled`, `pwm_auto_switch` |
+| `select` | 1 | `sat_heating_system` met opties `0` (auto), `1` (radiatoren), `2` (warmtepomp), `3` (vloerverwarming) |
+
+Elke entiteit schrijft naar het bijbehorende `%mqtt_sub_topic%/sat/<parameter>` commandotopic en leest uit het bijbehorende state-topic. Alle wijzigingen lopen via `updateSetting()` en worden dus naar flash gepersisteerd en binnen veilige grenzen geklemd.
 
 #### SAT-sensorentiteiten
 
@@ -593,3 +607,21 @@ De externe temperatuurwaarden vervallen automatisch na respectievelijk 5 minuten
 | Drukalarm blijft triggeren | Drukbereik te smal of ketelvulprobleem | Pas `satminpressure`/`satmaxpressure` aan. Controleer de drukmanometer van de ketel. |
 | Solar gain activeert nooit | Stijgsnelheidsdrempel te hoog of zonne-elevatie ontbreekt | Verlaag `satsolarminrise`. Schakel weather API in voor zonne-elevatie. |
 | Zomermodus activeert niet | Drempel te hoog of uren te lang | Verlaag `satsummerthreshold` of `satsummerminhours`. |
+
+---
+
+### 5.23 Debuggen en kalibratie
+
+**Telnet debug-trace.** SAT heeft zijn eigen conditionele debugkanaal. Verbind met de OTGW via TCP-poort 23 en druk op `5` om SAT control-, cycle- en HCR-tracing om te schakelen. In 2.0.0 staat deze standaard aan. Alle togglekeys worden getoond in de telnet-welkomstbanner.
+
+**OPV-kalibratie (Overshoot Protection Value).** SAT kan het minimale stabiele ketelsetpoint meten (het punt waarop de vlam blijft branden zonder kort-cycleren) en dit als ondergrens toepassen. Start een kalibratieronde met:
+
+```bash
+mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/ovp_start" -m ""
+```
+
+De kalibratie verzamelt minimaal 40 monsters voordat een resultaat wordt geaccepteerd. Stop vroegtijdig (en verwerp) met `sat/ovp_stop`. De gemeten waarde wordt opgeslagen in `SATovpvalue` en wordt alleen toegepast wanneer `SATovpenabled` aanstaat.
+
+**Kortlevende toestand wissen.** `sat/flush` wist tijdelijke runtime-state (cyclusvenster, HCR-monsters, recente drukhistorie) zonder de permanente instellingen te verwijderen. Handig na grote wijzigingen aan het verwarmingssysteem of de sensoren.
+
+**Gepersisteerde bestanden op LittleFS.** SAT slaat langlopende state op onder `/sat/`: `sat_hcr.json` (heating curve recommendation monsters), plus cyclus- en vensterrecords. Deze overleven herstarts.

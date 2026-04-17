@@ -27,13 +27,15 @@ All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files. Arduino
 | `webSocketStuff.ino` | WebSocket server on port 81, OT log streaming, heap backpressure gate |
 | `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS status helpers |
 | `OTDirect.ino` | ESP32-only: direct GPIO OpenTherm bus via ISR, OTDirect operating modes, frame bridge |
-| `SAT.ino` | Smart Autotune Thermostat: master enable/disable, SAT settings bridge |
-| `SATcontrol.ino` | SAT control loop, heating curve, boiler state machine, setpoint injection |
+| `SATcontrol.ino` | SAT control loop, heating curve, boiler state machine, setpoint injection, master enable/disable |
 | `SATpid.ino` | PID v3 implementation: proportional, integral, derivative with deadband |
 | `SATcycles.ino` | Cycle classification, overshoot detection, anti-cycling |
+| `SATpressure.ino` | SAT boiler pressure monitoring, low-pressure warning, trend detection |
 | `SATweather.ino` | Open-Meteo weather fetch, outdoor temperature for SAT heating curve |
 | `SATble.ino` | ESP32 BLE room temperature sensor integration (BTHome protocol) |
-| `sensorStuff.ino` | Dallas DS18B20 temperature sensors, S0 pulse counter, OLED display |
+| `mqtt_configuratie.cpp` | Generated PROGMEM tables for MQTT Home Assistant auto-discovery (sensors, binary sensors, climate, number entities) |
+| `sensors_ext.ino`, `s0PulseCount.ino`, `OLED.ino` | Dallas DS18B20 temperature sensors, S0 pulse counter, OLED display |
+| `Ethernet.ino` | W5500 SPI Ethernet runtime probe and failover (ESP32 only) |
 | `boards.h` | Board-specific pin maps and feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`) |
 | `safeTimers.h` | Timer macros: `DECLARE_TIMER_SEC()`, `DUE()`, `RESTART_TIMER()` |
 | `platform.h`, `platform_esp8266.h`, `platform_esp32.h` | Platform abstraction layer |
@@ -68,21 +70,33 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 
 #### build.py (release builds)
 
-The primary build script for producing release artifacts. It invokes PlatformIO internally, handles version embedding, filesystem packaging, and artifact collection.
+The primary build script for producing release artifacts. It invokes PlatformIO (or arduino-cli) internally, handles version embedding, filesystem packaging, and artifact collection.
 
 ```bash
-python build.py                      # Full build for ESP8266 + ESP32 (PlatformIO, incremental)
-python build.py --target esp8266     # Build for ESP8266 only
-python build.py --target esp32       # Build for ESP32 only
-python build.py --firmware           # Build firmware only (skip filesystem)
-python build.py --filesystem         # Build filesystem only
-python build.py --clean              # Clean build artifacts before building
-python build.py --distclean          # Clean build + cached dependencies
-python build.py --arduino-cli        # Use legacy arduino-cli backend instead of PlatformIO
-python build.py --help               # Show help
+python build.py                                   # Full build for ESP8266 + ESP32 (PlatformIO, incremental)
+python build.py --target esp8266                  # Build for ESP8266 only
+python build.py --target esp32                    # Build for ESP32 only
+python build.py --target all                      # Build for both (default)
+python build.py --backend platformio              # Explicit PlatformIO backend (default)
+python build.py --backend arduino-cli             # Legacy arduino-cli backend (ESP8266 only)
+python build.py --pio                             # Shorthand for --backend platformio
+python build.py --arduino-cli                     # Shorthand for --backend arduino-cli
+python build.py --firmware                        # Build firmware only (skip filesystem)
+python build.py --filesystem                      # Build filesystem only
+python build.py --clean                           # Remove build artifacts, keep libdeps cache
+python build.py --distclean                       # Remove build artifacts + cores + library cache
+python build.py --merged                          # Produce a single merged firmware+filesystem binary
+python build.py --merged --compress               # Merged binary, gzip-compressed
+python build.py --no-install-cli                  # Skip arduino-cli install check (arduino-cli backend)
+python build.py --no-color                        # Disable coloured output
+python build.py --help                            # Show help
 ```
 
-By default `build.py` uses PlatformIO as backend and builds both ESP8266 and ESP32 targets. The `--arduino-cli` flag selects the legacy arduino-cli backend (ESP8266 only). The script reads the Git tag to embed the version string and places output in the `build/` directory.
+By default `build.py` uses the PlatformIO backend and builds both ESP8266 and ESP32 targets. The `--arduino-cli` flag selects the legacy arduino-cli backend, which supports only ESP8266. The script reads the Git tag to embed the version string and places output in the `build/` directory.
+
+**Python version**: PlatformIO requires Python 3.10 through 3.13. Python 3.14 is rejected by PlatformIO's own guard. `build.py` will prefer the PlatformIO-bundled Python in `~/.platformio/penv/` (typically 3.11.x) when available, so a system-wide Python 3.14 installation does not prevent building as long as PlatformIO's virtualenv is present.
+
+**esptool**: `build.py` uses esptool v5 for merged-binary creation (`--merged`). It is installed automatically on first use via `pip install esptool` if not already present.
 
 #### PlatformIO
 
@@ -91,7 +105,7 @@ PlatformIO is the preferred build system and is used for both ESP8266 and ESP32.
 | Environment | Target | Board | Core | CPU |
 |-------------|--------|-------|------|-----|
 | `esp8266` | Wemos D1 mini / NodeMCU (NodoShop OTGW) | `d1_mini` | Arduino Core 3.1.2 (espressif8266) | 160 MHz |
-| `esp32` | NodoShop OTGW32 | `esp32dev` | pioarduino espressif32 fork | 240 MHz |
+| `esp32` | NodoShop OTGW32 (ESP32-S3) | `esp32-s3-devkitc-1` | pioarduino espressif32 fork | 240 MHz |
 
 The ESP8266 LittleFS partition size is 2 072 576 bytes (approximately 2 MB). This is configured in `platformio.ini` via the board options.
 
@@ -126,10 +140,12 @@ Arduino IDE is supported for ESP8266 only. Install the ESP8266 Arduino core, the
 Run the code quality checker after making changes to catch common ESP8266-specific mistakes:
 
 ```bash
-python evaluate.py           # Full evaluation (all files)
-python evaluate.py --quick   # Quick check (essentials only)
-python evaluate.py --report  # Generate detailed report
-python evaluate.py --fix     # Auto-fix issues where possible
+python evaluate.py                  # Full evaluation (all files)
+python evaluate.py --quick          # Essential checks only
+python evaluate.py --report         # Generate detailed JSON report
+python evaluate.py --output FILE    # Custom report output path (default: evaluation-report.json)
+python evaluate.py --verbose        # Show all checks, not just failures
+python evaluate.py --no-color       # Disable coloured output
 ```
 
 The checker performs comprehensive evaluation including:
@@ -147,19 +163,19 @@ Key patterns it flags:
 - `strcpy`/`sprintf` without bounds (should use `strlcpy`/`snprintf_P`)
 - `strncmp_P`/`strstr_P` on binary data (use `memcmp_P`)
 
-#### tools/generate_mqttha_progmem.py
+#### tools/generate_mqttha_data.py (legacy regenerator)
 
-Generates compiled PROGMEM data for MQTT Home Assistant auto-discovery from the template configuration file `mqttha.cfg`:
+The MQTT Home Assistant auto-discovery metadata lives in compiled form as `src/OTGW-firmware/mqtt_configuratie.cpp`. That file is the **source of truth** and is checked into the repository. It contains structured PROGMEM arrays for sensors, binary sensors, climate, and number entities, keyed by OT message ID.
+
+The text template `mqttha.cfg` that originally generated this file has been archived to `docs/archive/mqttha.cfg` and is no longer part of the build. If you need to regenerate `mqtt_configuratie.cpp` from an updated template, restore `mqttha.cfg` to `src/OTGW-firmware/data/mqttha.cfg` and run:
 
 ```bash
-python tools/generate_mqttha_progmem.py
+python tools/generate_mqttha_data.py
 ```
 
-This reads `src/OTGW-firmware/data/mqttha.cfg` and produces two files in the sketch directory:
-- `mqttha_progmem.h`: struct definition and extern declarations (included by `.ino` files)
-- `mqttha_progmem.cpp`: actual PROGMEM data definitions (compiled as a separate translation unit)
+For normal development, edit `mqtt_configuratie.cpp` directly and keep it consistent with the streaming discovery consumer in `MQTTstuff.ino`. The legacy generators `tools/generate_mqttha_progmem.py` and `tools/generate_mqttha_readable.py` are retained for reference but are superseded by `generate_mqttha_data.py`.
 
-The generated code uses two flat PROGMEM string pools (topics and messages concatenated) with a struct index. Placing the data in a separate `.cpp` translation unit avoids the Xtensa single-TU section/relocation explosion that occurs when large PROGMEM data is placed in the main sketch. Run this tool whenever `mqttha.cfg` is modified.
+The generated file is deliberately placed in its own `.cpp` translation unit to avoid the Xtensa single-TU section/relocation explosion that occurs when large PROGMEM data is placed in the main sketch.
 
 ---
 
@@ -446,7 +462,9 @@ For commands that do not map to a PIC command (e.g., SAT-specific topics), add a
 
 #### Home Assistant Auto-Discovery
 
-HA discovery payloads are generated from `mqttha.cfg` (stored in LittleFS). This is a template file processed by `doAutoConfigure()` / `doAutoConfigureMsgid()`. If your new topic needs a HA entity, add an entry to `mqttha.cfg` following the existing template format. The file is too large to document fully here. Examine existing entries for the pattern.
+HA discovery payloads are built at runtime from compile-time PROGMEM tables in `mqtt_configuratie.cpp`. The streaming discovery emitter in `MQTTstuff.ino` (`doAutoConfigure()` / `doAutoConfigureMsgid()`) walks those tables and streams each discovery message directly to the broker without buffering a full payload in RAM. `mqtt_configuratie.cpp` is the source of truth; the older `mqttha.cfg` template has been archived to `docs/archive/`.
+
+To add a new discoverable entity, append a new entry to the appropriate PROGMEM array (sensors, binary sensors, climate, number) in `mqtt_configuratie.cpp`, using the existing entries as templates. Fields that vary per entity (device class, unit, state class, icon, entity category) are encoded as enum values to keep flash usage bounded. Rebuild firmware and re-run discovery (press `F` on the telnet debug console) to publish the new entity.
 
 ---
 
@@ -660,14 +678,15 @@ All commands to the OTGW PIC must go through `addCommandToQueue()`. Direct UART 
 
 ```cpp
 // Signature:
-void addCommandToQueue(const char* cmd, int len,
-                       const bool urgent = false,
-                       const int16_t responseTimeout = 1000);
+void addCommandToQueue(const char* buf, int len,
+                       const bool forceQueue = false,
+                       const int16_t delay = 1000);   // inter-command send delay, milliseconds
 
 // Examples:
 addCommandToQueue(PSTR("TT=21.50"), 8);            // temporary temperature setpoint
-addCommandToQueue(PSTR("CS=55.00"), 8, true);      // urgent: control setpoint, high priority
+addCommandToQueue(PSTR("CS=55.00"), 8, true);      // force-queue: bypass deduplication
 addCommandToQueue(PSTR("GW=1"), 4);                // gateway mode on
+addCommandToQueue(PSTR("PR=A"), 4, false, 500);    // custom 500 ms send delay
 ```
 
 The queue is processed in the OTGW-Core background task. Responses from the PIC are matched against outstanding commands and published to MQTT. On OTGW32 (OTDirect), the queue is handled internally by `loopOTDirect()`.
@@ -734,18 +753,24 @@ Not required for: pure bug fixes, minor features within existing patterns.
 
 | ADR | Topic | Impact |
 |-----|-------|--------|
+| ADR-003 | HTTP/WS only, no HTTPS/WSS | Plain HTTP and WebSocket only; trusted LAN security model |
 | ADR-004 | Static buffer allocation | No `String` in hot paths; all buffers `char[]` |
 | ADR-009 | PROGMEM string literals | All literals in flash via `F()` / `PSTR()` |
-| ADR-014 | Dual build system | `build.py` for Arduino CLI, PlatformIO for ESP32 |
+| ADR-014 | Dual build system | `build.py` wraps PlatformIO (default) and arduino-cli (ESP8266-only) |
 | ADR-016 | OpenTherm command queue | Always use `addCommandToQueue()` |
 | ADR-019 | REST API versioning | `/api/v2/` is current; v0/v1 return 410 Gone |
 | ADR-028 | File streaming | Files >2 KB must use `streamFile()`, never load |
 | ADR-040 | MQTT source-specific topics | Source separation topic structure |
 | ADR-042 | Streaming JSON | No ArduinoJson; manual `snprintf_P` construction |
+| ADR-049 | String prohibition on protocol paths | No `String` class on MQTT/REST/WebSocket hot paths |
 | ADR-050 | Centralized API dispatch | Single `kV2Routes[]` table; no per-route router changes |
 | ADR-051 | Dual encapsulating structs | `OTGWSettings` / `OTGWState` architecture |
 | ADR-053 | Large feature buffer allocation | Static allocation for large per-feature buffers |
 | ADR-061 | ESP8266/ESP32 platform abstraction | Use `platform.h` abstractions, not direct SDK calls |
+| ADR-063 | OTGW32 hardware support | ESP32-S3 NodoShop OTGW32 board with direct GPIO OT bus |
+| ADR-064 | OTDirect operating-mode architecture | Gateway / Monitor / Thermostat / Off modes on ESP32 |
+| ADR-069 | SAT PID v3 implementation | Current PID control law for Smart Autotune Thermostat |
+| ADR-072 | SAT platform compatibility layer | SAT builds on both ESP8266 and ESP32 via shared abstractions |
 
 #### Creating a New ADR
 
@@ -773,8 +798,8 @@ To reverse an Accepted ADR: create a new ADR that supersedes it and mark the old
 5. Write an implementation plan in the task before writing code.
 6. Implement the change. Mark acceptance criteria done as you go.
 7. Run `python evaluate.py` and fix all reported issues.
-8. Build for both targets and confirm no compile errors: `pio run`.
-9. Test on real hardware if possible; use the simulation mode in `state.debug.bOTGWSimulation` if hardware is unavailable.
+8. Build for both targets and confirm no compile errors: `python build.py` (or `pio run` directly).
+9. Test on real hardware if possible. When hardware is unavailable, use the OTGW serial-simulation replay (`s` / `S` on the telnet debug console, backed by `state.debug.bOTGWSimulation`) or the Dallas sensor simulation (`d`).
 10. Write a final summary in the backlog task.
 11. Open a pull request against the `dev` branch, not `main`.
 12. Include the backlog task ID in the PR description.

@@ -76,7 +76,7 @@
   - **Side-effect coordination**: Sets `pendingSideEffects` bitmask (SIDE_EFFECT_MQTT, SIDE_EFFECT_NTP, SIDE_EFFECT_MDNS) instead of immediate service restart
   - **Deferred write**: Sets `settingsDirty=true` and restarts `timerFlushSettings` to batch multiple updates
   - Covers all sub-sections:
-    - Device: hostname, HTTP password, LED blink, dark theme, nightly restart (enable + hour)
+    - Device: hostname, HTTP password, LED blink, dark theme, nightly restart (enable + hour), manufacturer, model
     - MQTT: 13 fields (enable, broker, port, user, passwd, topic, HA prefix, unique ID, OT msg, interval, separate sources, HA reboot detect)
     - NTP: timezone, hostname, send-time, enable
     - GPIO Sensors: enabled, legacy format, pin (D7/SDIO3), interval
@@ -242,7 +242,7 @@ Hungarian prefixes: **b** = bool, **s** = char[], **i** = int/uint, **f** = floa
 
 ```cpp
 struct OTGWSettings {
-  // Device-level fields
+  // Device-level fields (universal device identity)
   char sHostname[41];           // Device hostname (default "OTGW")
   char sHTTPpasswd[41];         // HTTP Basic Auth password
   bool bLEDblink;               // LED blink enable
@@ -252,6 +252,7 @@ struct OTGWSettings {
   uint8_t iRestartHour;         // Hour (0-23) for nightly restart (default 4)
   
   // Named sub-sections
+  DeviceSection device;         // 2 fields: manufacturer, model identity
   MQTTSettingsSection mqtt;     // 13 fields: broker, auth, topics, HA discovery
   NTPSection ntp;               // 4 fields: enable, timezone, hostname, sendtime
   SensorsSection sensors;       // 4 fields: Dallas DS18B20 (enabled, pin, interval, format)
@@ -267,6 +268,15 @@ struct OTGWSettings {
 ```
 
 ### Sub-Section Details
+
+#### DeviceSection (device) — Device Identity Metadata
+```cpp
+struct DeviceSection {
+  char sManufacturer[32] = "NodoShop";   // Device manufacturer (e.g. "NodoShop", "Seegel")
+  char sModel[32]        = "OTGW";       // Device model (e.g. "OTGW", "OTGW32", "OT-Thing")
+};
+```
+**Purpose**: Store device identity metadata for REST API and HA discovery. Updated via REST settings API (`updateSetting("DeviceManufacturer", ...)` and `updateSetting("DeviceModel", ...)`). Allows custom device identification independent of firmware version. Used by Home Assistant discovery to label device in UI.
 
 #### MQTTSettingsSection (mqtt)
 ```cpp
@@ -538,25 +548,28 @@ Direct call (e.g., OTA window)
 ```
 /src/OTGW-firmware/
   ├─ OTGW-firmware.h
-  │  ├─ struct OTGWSettings (line 940)
-  │  ├─ All sub-section struct definitions (lines 731-936)
-  │  ├─ Global instance: OTGWSettings settings (line 966)
+  │  ├─ struct DeviceSection (line 969) — device identity metadata
+  │  ├─ struct OTGWSettings (line 974) — root settings container
+  │  ├─ All sub-section struct definitions (lines 758-936)
+  │  ├─ Global instance: OTGWSettings settings (line 1003)
   │  └─ Prototypes: readSettings(), writeSettings(), updateSetting()
   └─ settingStuff.ino
-     ├─ Deferred-write support (lines 14-81)
-     │  ├─ settingsDirty, pendingSideEffects global flags
-     │  ├─ flushSettings(), settingsMarkClean()
-     │  └─ SIDE_EFFECT_* bitmask constants
-     ├─ GPIO conflict detection (lines 84-106)
+     ├─ Deferred-write support (lines 14-82)
+     │  ├─ settingsDirty, pendingSideEffects global flags (lines 21-22)
+     │  ├─ flushSettings(), settingsMarkClean() (lines 53-82)
+     │  └─ SIDE_EFFECT_* bitmask constants (lines 18-20)
+     ├─ Password placeholder detection (lines 24-47)
+     │  └─ isHttpPasswordPlaceholder()
+     ├─ GPIO conflict detection (lines 88-107)
      │  └─ checkGPIOConflict()
-     ├─ JSON parser & serializers (lines 108-213)
-     │  ├─ parseJsonKVLine()
-     │  ├─ writeJsonStringKV(), writeJsonBoolKV(), etc.
-     ├─ Core functions (lines 216-917)
-     │  ├─ writeSettings() (line 216)
-     │  ├─ readSettings() (line 412)
-     │  ├─ updateSetting() [massive dispatcher] (line 548)
-     │  └─ isHttpPasswordPlaceholder() (line 23)
+     ├─ JSON parser & serializers (lines 110-214)
+     │  ├─ parseJsonKVLine() (line 110)
+     │  ├─ writeJsonStringKV(), writeJsonBoolKV(), writeJsonIntKV(), writeJsonFloatKV() (lines 179-214)
+     ├─ Core functions (lines 217-930)
+     │  ├─ writeSettings() (line 217) — serializes entire struct to LittleFS JSON
+     │  ├─ readSettings() (line 416) — loads settings from LittleFS, applies defaults
+     │  ├─ updateSetting() [dispatcher] (line 553) — validates and updates any field
+     │  └─ isHttpPasswordPlaceholder() (line 24)
 
 /
   └─ /settings.ini [LittleFS JSON, read on boot, written on flush]
@@ -584,6 +597,12 @@ Direct call (e.g., OTA window)
 - **Largest setting**: SAT section with ~80+ fields; updates trigger SIDE_EFFECT_MQTT but also local state changes
 - **Missing feature**: MQTT TLS (bSecure flag exists but not implemented; HTTP/MQTT only per project design)
 - **ADR-051**: Two-level named sub-sections provide better organization than flat 100+ field struct (see docs/adr/adr-051-settings-architecture.md)
+- **Recent changes (v1.4.0+)**:
+  - **DeviceSection** (commit be3e8764): New `settings.device.sManufacturer` and `settings.device.sModel` for device identity metadata (Home Assistant discovery)
+  - **Nightly restart** (v1.3.5+): `settings.bNightlyRestart` and `settings.iRestartHour` allow scheduled daily restart for heap recovery
+  - **State rename** (commit f3354dd6): Runtime state member renamed from `state.otgw` to `state.otBus` to reflect OpenTherm bus state (persistent settings unaffected)
+  - **MQTT separate sources** (ADR-040): `settings.mqtt.bSeparateSources` enables source-specific MQTT topics, reducing MQTT churn for discovery
+  - **WiFi reset button** (board-specific): May be configured via GPIO settings (see OutputsSection for GPIO relay outputs)
 
 ---
 

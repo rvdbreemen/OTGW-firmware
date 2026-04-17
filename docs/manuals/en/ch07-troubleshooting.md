@@ -73,6 +73,12 @@ Common MQTT return codes:
 | Device reboots to old firmware | Binary failed MD5 check | Confirm you are uploading the correct `.bin` for your board |
 | "Not enough space" error | Filesystem too full | Free space via the File System Explorer at `/fsexplorer` |
 
+> **WARNING: Do NOT flash PIC firmware over WiFi.**
+>
+> The ESP firmware can be updated safely over WiFi (OTA), but the PIC microcontroller on the OTGW board is a separate chip with its own flashing path. Using OTmonitor over the TCP serial socket to upload PIC firmware (for example, upgrading to PIC v6.6) is **known to brick the PIC**: a WiFi hiccup mid-transfer leaves the PIC in a half-programmed state with no recovery path short of in-circuit reprogramming.
+>
+> Always flash PIC firmware over a **wired USB serial connection** using OTmonitor or the dedicated PIC programming tool. This is a hardware-level constraint, not a firmware bug, and it is not something the OTGW-firmware can work around.
+
 ---
 
 ### 7.6 Web UI Not Loading
@@ -144,7 +150,7 @@ LED blinking can be disabled entirely in Settings (`LED blink`).
 
 ### 7.10 Telnet Debug Output
 
-The firmware streams a real-time debug log over Telnet on port 23.
+The firmware streams a real-time debug log over Telnet on port 23. In addition to passive logging, the Telnet console accepts single-keypress commands for live diagnostics.
 
 #### Connecting
 
@@ -154,6 +160,47 @@ telnet otgw.local 23
 
 Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw.local`, port 23.
 
+#### Debug Menu Keys (v2.0.0)
+
+Press `h` at any time to print the help menu with the current device status and toggle states. The set of keys changed compared to v1.3.5; if you are used to the old layout, consult the table below.
+
+**Debug log toggles** (each key flips a category on or off):
+
+| Key | Category |
+|---|---|
+| 1 | OT message parsing |
+| 2 | API handling (REST) |
+| 3 | MQTT module |
+| 4 | Sensor modules |
+| 5 | SAT control loop, cycles and HCR (enabled by default) |
+| 6 | OTDirect frame handling and PI loop (enabled by default, ESP32 only) |
+| g | MQTT interval gating (shows why a message was or was not published) |
+| n | NTP time sync details |
+| d | Dallas sensor simulation helper |
+
+**Commands:**
+
+| Key | Action |
+|---|---|
+| h | Show help menu with current status and toggle states |
+| q | Force re-read of `settings.json` from flash |
+| F | Force full Home Assistant discovery for ALL message IDs (clears the internal discovery bitmap and re-publishes everything) |
+| r | Reconnect WiFi, Telnet, OTGW serial stream and MQTT |
+| p | Reset the PIC manually |
+| a | Send `PR=A` to the PIC to report firmware version, type and device ID |
+| s / S | Toggle OTGW serial simulation replay (for development without a PIC) |
+| b | Blink LED 1 five times |
+| i | Initialize relay outputs |
+| u | Drive the configured GPIO output ON |
+| o | Drive the configured GPIO output OFF |
+| j | Read the current GPIO output state |
+| l | Toggle generic MyDEBUG flag |
+| f | Show the MyDEBUG flag state |
+
+The `F` key is useful after a Home Assistant MQTT wipe or topic-prefix change: it forces a complete re-publish of all discovery entries rather than waiting for the next natural trigger.
+
+The `r` key is the fastest way to recover from a transient network hiccup without power-cycling the device.
+
 #### Reading Common Error Patterns
 
 | Pattern in log | Meaning |
@@ -161,11 +208,15 @@ Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw.local`, por
 | `WiFi disconnected` / `WiFi reconnected` in short loops | Intermittent signal or IP conflict |
 | `MQTT connect failed, rc=-2` | Broker not reachable; check IP and port |
 | `MQTT connect failed, rc=4` | Wrong username or password |
+| `MQTT: heap before connect = XXXX` | Heap diagnostic logged just before each MQTT (re)connect; useful to correlate heap pressure with connect failures |
+| `MQTT: heap after birth = XXXX` | Heap snapshot right after the birth/online publish |
+| `MQTT: heap after discovery republish = XXXX` | Heap snapshot after a discovery republish batch |
+| `Hour changed: X -> Y, heap=ZZZZ` | Hourly heartbeat from `hourChanged()`; a steadily falling heap here indicates a slow leak |
 | `OTGW offline` without `OTGW online` ever appearing | PIC not responding on serial |
-| `Serial overrun` | Main loop blocked too long |
-| `Exception (2)` | Illegal memory access; note the stack trace and report as a bug |
-| `Exception (3)` | Load/store alignment error; PROGMEM pointer mismatch |
-| `NTP: bogus initial time ignored` | Normal on first boot; SDK quirk guard working correctly |
+| `Serial overrun` | Main loop blocked too long, or UART buffer overflowed |
+| `Exception (2)` | Illegal memory access; in v2.0.0 this class of crash in `strncmp_P`/`strstr_P` on binary data was fixed. If you still see it on 2.0.0, capture the crash log and file a bug. |
+| `Exception (3)` | Load/store alignment error; almost always a PROGMEM pointer fed to a function that expects RAM. The well-known case from Arduino Core 3.1.2+ was fixed in 2.0.0. |
+| `NTP: bogus initial time ignored` | Normal on first boot; the SDK sometimes returns `2106-02-07` before the first real sync. Guard is working correctly. |
 | `Heap: XXXXX (HEALTHY)` | Normal heap status logged every 60 seconds |
 | `Heap: XXXXX (LOW)` | Heap is getting low; message frequency is being reduced |
 | `HEAP-CRITICAL: Blocking WebSocket` | Heap critically low; WebSocket messages are being dropped |
@@ -174,6 +225,21 @@ Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw.local`, por
 | `[drip] publishing discovery for OT ID ...` | MQTT discovery publishing one entity at a time (normal) |
 | `[drip] slowed to 30s (heap pressure)` | Discovery interval increased due to low heap |
 | `Nightly restart triggered` | Scheduled restart executing at the configured hour |
+
+---
+
+### 7.10a Issues Fixed in v2.0.0 (What You May Still See in the Wild)
+
+If you are coming from an older firmware or reading older forum threads, the problems below were common on v1.3.5 and earlier. They are fixed in v2.0.0. If any of these still occur on a confirmed v2.0.0 build, please file a GitHub issue with the crash log.
+
+| Old symptom | Root cause (pre-2.0.0) | Status in 2.0.0 |
+|---|---|---|
+| Random `Exception (3)` reboots, often during MQTT activity | PROGMEM pointer passed to a function that does word-aligned reads (Arduino Core 3.1.2+ tightened this). A flash read at `0x402xxxxx` with word alignment triggers the exception. | Fixed. PROGMEM-safe helpers (`pgm_strncmp_PP`, `pgm_read_char`) used throughout; `writeMqttProgmemChunk()` used for PROGMEM to MQTT. |
+| `Exception (2)` while parsing OT frames | `strncmp_P` / `strstr_P` used on binary data. These helpers assume C-strings and walk past embedded NULs. | Fixed. Binary compares now use `memcmp_P`. |
+| Flood of MQTT messages and broker hammering right after a reconnect | Full MQTT discovery burst re-sent in one go on every reconnect, exhausting heap and overwhelming the broker. | Fixed. Discovery is now async and drip-published (see 7.3). On reconnect the bitmap is preserved; use `F` in the Telnet console to force a full re-publish if needed. |
+| Clock jumps to `2106-02-07` shortly after boot | SDK sometimes hands back a bogus `time_t` before the first successful NTP exchange. | Fixed. NTP code now ignores the pre-epoch/post-2106 values until a real sync succeeds. Enable key `n` in the Telnet console to watch the handshake. |
+| Device unreachable after the router reboots, until the OTGW is power-cycled | DHCP lease renewal raced with the WiFi reconnect logic, leaving the interface without an IP. | Fixed. DHCP renewal and WiFi recovery are coordinated (ADR-047 two-layer recovery logic). |
+| OTGW online/offline flapping, serial overruns during MQTT bursts | `publishToSourceTopic()` allocated ~1.6 KB of local buffers on the 4 KB CONT stack. | Fixed. Large buffers converted to static or pre-allocated scratch memory. See section 7.8. |
 
 ---
 

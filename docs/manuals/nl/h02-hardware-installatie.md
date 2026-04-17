@@ -15,12 +15,14 @@ Beide revisies gebruiken dezelfde firmwarebinary. De NodeMCU en Wemos D1 mini zi
 
 Kenmerken:
 
-- ESP8266 op 80 of 160 MHz, circa 80 KB bruikbaar RAM
+- ESP8266 op 160 MHz (vastgelegd in `platformio.ini`), circa 80 KB bruikbaar RAM
 - PIC16F88 of PIC16F1847 co-processor voor de OpenTherm bus
-- 4 MB SPI-flash (2 MB beschikbaar voor LittleFS)
+- 4 MB SPI-flash, linkerscript `eagle.flash.4m2m.ld`: 1 MB firmware, 2 MB LittleFS, 1 MB gereserveerd voor OTA
 - Micro-USB aansluiting voor voeding en flashen
 - I2C-pinnen voor optionele OLED en externe watchdog
 - 1-Wire GPIO voor Dallas DS18B20 temperatuursensoren
+
+De PlatformIO-omgeving heet `esp8266` (board `d1_mini`, platform `espressif8266@4.2.1`, Arduino Core 3.1.2). Dezelfde binary draait op zowel de NodeMCU- als de D1 mini-variant.
 
 #### NodoShop OTGW32 met ESP32-S3
 
@@ -40,6 +42,10 @@ Kenmerken:
 - USB-C aansluiting
 - Twee knoppen: boot button (GPIO 0) en config button (GPIO 9)
 - Drie LEDs: OT rood (GPIO 2), status (GPIO 8) en OT groen (GPIO 48)
+
+#### Generieke ESP32 (experimenteel)
+
+Standaard ESP32-modules (geen S3) worden geselecteerd door `BOARD_NODOSHOP_ESP32` te definieren en met de ESP32-toolchain te compileren, maar de pintoewijzingen in `boards.h` zijn afgestemd op het OTGW32-board met ESP32-S3. Op een gewone ESP32 sluiten de OTDirect-GPIO's en de W5500 SPI-pinnen niet noodzakelijk aan op de module. Beschouw dit als een ontwikkelaarsdoel.
 
 #### Andere boards
 
@@ -198,9 +204,12 @@ Op de OTGW32 kunnen tot vier Xiaomi LYWSD03MMC Bluetooth LE sensoren worden uitg
 
 Het `flash_esp.py`-script verwerkt alle stappen automatisch: het kan de nieuwste release van GitHub downloaden, uw board en seriele poort automatisch detecteren via USB VID/PID, en de firmware flashen. Voor ESP32-S3 gebruikt het script een merged binary die de bootloader, partitietabel, firmware en filesystem in een enkel image combineert.
 
+Onder de motorkap roept het script `python -m esptool` aan (esptool.py v5 of nieuwer) met de v5-subcommando's: `erase-flash` en `write-flash` met koppeltekens. De oude v4-vormen met underscore (`erase_flash`, `write_flash`) worden door esptool v5 niet meer geaccepteerd. Het script installeert esptool zo nodig zelf via `pip`, dus u hoeft dit normaal gesproken niet handmatig te doen.
+
 **Vereisten:**
 
 - Python 3.6 of hoger
+- esptool v5 (wordt automatisch geinstalleerd door `flash_esp.py` bij eerste gebruik)
 - USB-kabel (micro-USB voor ESP8266, USB-C voor ESP32-S3/OTGW32)
 - De juiste USB-to-UART driver:
   - ESP8266: CP210x driver (NodeMCU) of CH340 driver (Wemos D1 mini klonen)
@@ -252,7 +261,7 @@ python3 flash_esp.py --board esp8266 --erase --download
 
 #### Bouwen vanuit broncode met PlatformIO
 
-PlatformIO is het primaire buildsysteem. De repository bevat een `platformio.ini` met twee omgevingen: `esp8266` en `esp32`.
+PlatformIO is het primaire buildsysteem. De repository bevat een `platformio.ini` met twee omgevingen: `esp8266` (Wemos D1 mini, ESP8266) en `esp32` (OTGW32, ESP32-S3).
 
 ```bash
 # Installeer PlatformIO (als extensie in VS Code of via pip)
@@ -275,13 +284,22 @@ De `upload`-target flasht de firmwarebinary. De `uploadfs`-target flasht het Lit
 
 Beide targets vereisen een USB-verbinding.
 
-Als alternatief kunt u het `build.py`-hulpscript gebruiken:
+Als alternatief kunt u het `build.py`-hulpscript gebruiken. Dit wrapt standaard PlatformIO en kan optioneel arduino-cli als backend inzetten; voor het flashen zelf wordt esptool v5 aangeroepen:
 
 ```bash
-python build.py              # Firmware + filesystem voor beide platformen
-python build.py --firmware   # Alleen firmware
-python build.py --clean      # Schone build
+python build.py                      # Volledige build, beide platformen, PlatformIO backend
+python build.py --target esp8266     # Alleen ESP8266
+python build.py --target esp32       # Alleen ESP32-S3 / OTGW32
+python build.py --firmware           # Alleen firmware (zonder filesystem)
+python build.py --filesystem         # Alleen filesystem
+python build.py --merged             # Maak ook een merged binary (ESP32)
+python build.py --merged --compress  # Merged binary gzip-gecomprimeerd
+python build.py --clean              # Build-artefacten opruimen
+python build.py --distclean          # Inclusief gecachte cores en libraries
+python build.py --arduino-cli        # Gebruik de legacy arduino-cli backend
 ```
+
+Gebruik `python build.py --help` voor de actuele, complete lijst met vlaggen.
 
 #### Handmatig flashen met bestaande binaries
 

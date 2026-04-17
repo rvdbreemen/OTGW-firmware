@@ -22,7 +22,7 @@
 
 ### Core Data Structures
 
-#### `OTdataStruct` (OTGW-Core.h, line 25-172)
+#### `OTdataStruct` (OTGW-Core.h, line 26-173)
 - **Purpose**: Central repository for all OpenTherm state from the boiler/thermostat
 - **Members**: 
   - Status flags (master/slave) and configuration
@@ -30,9 +30,10 @@
   - Modulation and pressure: RelModLevel, CHPressure
   - Flow rates: DHWFlowRate
   - Counters: BurnerOperationHours, CHPumpStarts, etc.
-  - Extended features: Solar storage, ventilation/heat recovery, RF sensors, vendor-specific
+  - Extended features: Solar storage, ventilation/heat recovery, RF sensors, vendor-specific, brand identification
   - Error tracking: error01-04, errorBufferOverflow
-- **Scope**: Global singleton `OTdataStruct OTcurrentSystemState` (OTGW-Core.h:174)
+- **Scope**: Global singleton `OTdataStruct OTcurrentSystemState` (OTGW-Core.h:175)
+- **Note**: Flame status is in SlaveStatus bit 3 (NOT MasterStatus); MasterStatus bit 3 is OTC (Outside Temperature Compensation) enabled (bug fix: commit d85e668c)
 
 #### `OpenthermData_t` (OTGW-Core.h, embedded)
 - **Purpose**: Typed wrapper for 16-bit OpenTherm data values
@@ -44,10 +45,11 @@
   - `s16()`: Read as signed 16-bit (OTGW-Core.ino:1037)
   - `s16(int16_t value)`: Write as signed 16-bit (OTGW-Core.ino:1042)
 
-#### `OTLibMessageID` (OTGW-Core.h:204-240+)
+#### `OTLibMessageID` (OTGW-Core.h:209-326)
 - **Purpose**: Enum mapping OpenTherm message IDs (0-255) to semantic names
-- **Range**: OT_Statusflags, OT_TSet, OT_TrSet, OT_Tr, OT_Tboiler, OT_Tdhw, etc.
-- **Extended**: Solar storage (OT_Tsolarstorage, OT_SolarStorageStatus), ventilation/heat recovery (OT_StatusVH), RF sensors, etc.
+- **Range**: OT_Statusflags (0), OT_TSet (1), OT_TrSet (16), OT_Tr (24), OT_Tboiler (25), OT_Tdhw (26), etc. (up to OT_RemehaDetectionConnectedSCU: 133)
+- **Extended**: Solar storage (OT_Tsolarstorage, OT_SolarStorageStatus), ventilation/heat recovery (OT_StatusVH, OT_ControlSetpointVH), RF sensors (OT_RFstrengthbatterylevel), brand identification (OT_Brand, OT_BrandVersion, OT_BrandSerialNumber)
+- **Reserved ranges** (v4.x): IDs 40-47, 64-69 (gaps in OpenTherm v4.2 spec; v3.x treats as undefined)
 
 #### `OTLibMessageType` (OTGW-Core.h:191-202)
 - **Purpose**: OpenTherm frame type classification
@@ -135,17 +137,17 @@
 
 #### Command Queue
 
-##### `void addCommandToQueue(const char* buf, int len, bool forceQueue, int16_t delay)` (OTGW-Core.ino:2652)
-- **Purpose**: Queue command for delivery to PIC (e.g., "CS=1", "GW=1", "TT=20.0")
+##### `void addCommandToQueue(const char* buf, int len, bool forceQueue, int16_t delay)` (OTGW-Core.ino:2687)
+- **Purpose**: Queue command for delivery to PIC (e.g., "CS=1", "GW=1", "TT=20.0"; renamed from `addOTWGcmdtoqueue` in v1.3.5)
 - **Parameters**:
   - `buf`: Command string (null-terminated)
   - `len`: Command length
-  - `forceQueue`: If true, queue even if already queued
-  - `delay`: Retry delay in ms (default 1000)
-- **Queue Size**: `int cmdQueueSize` tracks fill-pointer (OTGW-Core.ino:391)
-- **Retry Logic**: Failed commands re-queued with exponential backoff
-- **Related**: handleCommandQueue(), removeFromCmdQueue()
-- **Location**: OTGW-Core.ino:2652-2762
+  - `forceQueue`: If true, queue even if already queued; used by PR/CR queries to bypass deduplication
+  - `delay`: Retry delay in ms (default 1000ms: OTGW_DELAY_SEND_MS)
+- **Queue Size**: `int cmdQueueSize` (OTGW-Core.ino:404) tracks fill-pointer (0..CMDQUEUE_MAX-1, default 20 entries)
+- **Retry Logic**: Failed commands re-queued with exponential backoff (timeout tracking via `due` field in OT_cmd_t)
+- **Related**: handleCommandQueue(), checkCommandResponse(), OT_cmd_t struct (OTGW-Core.h:510-515)
+- **Location**: OTGW-Core.ino:2687-2762
 
 ##### `void handleCommandQueue()` (OTGW-Core.ino:2763)
 - **Purpose**: Drain command queue, retry failed commands (called every 1 second from doTaskEvery1s)
@@ -356,7 +358,8 @@ These functions decode OpenTherm data and emit to MQTT/WebSocket:
   - '<' = response received
   - '!' = error/warning
   - '*' = system event
-- **Uses**: ot_log_buffer for safe reentrant logging
+- **Uses**: ot_log_buffer (512 bytes, OTGW-Core.ino:99) for safe reentrant logging
+- **Macros**: ClrLog(), AddLogf(), AddLogf_P(), AddLog(), AddLogln() for safe buffer management
 - **Location**: OTGW-Core.ino:119-134
 
 ##### `static void sendEventToWebSocket_P(char prefix, PGM_P msg_P)` (OTGW-Core.ino:136)
@@ -364,42 +367,68 @@ These functions decode OpenTherm data and emit to MQTT/WebSocket:
 - **Location**: OTGW-Core.ino:136-148
 
 ##### `static void reportOTGWEvent(const char *eventMsg, char prefix, bool suppressDuringStartup)` (OTGW-Core.ino:171)
-- **Purpose**: Fan-out event to MQTT and WebSocket (if connected)
+- **Purpose**: Fan-out event to MQTT (via sendMQTTData) and WebSocket (via sendEventToWebSocket)
 - **Suppression**: Can suppress during 15s startup quiet period
 - **Location**: OTGW-Core.ino:171-183
 
 #### Startup Quiet Period
 
 ##### `static void scheduleOTGWStartupQuietPeriod()` (OTGW-Core.ino:150)
-- **Purpose**: Start 15-second window where event logging is suppressed
-- **Called From**: resetOTGW() after PIC reset
+- **Purpose**: Start 15-second window where event logging is suppressed after PIC reset to allow stabilization
+- **Called From**: resetOTGW() after GPIO reset pulse
 - **Location**: OTGW-Core.ino:150-154
 
 ##### `static bool isOTGWStartupQuietPeriodActive()` (OTGW-Core.ino:156)
 - **Purpose**: Check if startup quiet period (15s after PIC reset) is still active
+- **Used By**: reportOTGWEvent() to gate event publishing during PIC bootup
 - **Location**: OTGW-Core.ino:156-164
+
+#### Connected State Publishers (v1.3.5+)
+
+##### `void publishBoilerConnectedState()` (defined in MQTTstuff.ino, called from OTGW-Core.ino:3768)
+- **Purpose**: Publish MQTT message when boiler connection state changes (seen for 30s vs timeout)
+- **Topic**: otgw/boiler_connected (true/false)
+- **Called From**: processOT() main loop, after checking message timeout
+- **Related**: state.otBus.bBoilerState, epochBoilerlastseen, bOTGWboilerpreviousstate
+
+##### `void publishThermostatConnectedState()` (defined in MQTTstuff.ino, called from OTGW-Core.ino:3775)
+- **Purpose**: Publish MQTT message when thermostat connection state changes
+- **Topic**: otgw/thermostat_connected (true/false)
+- **Called From**: processOT() main loop, after checking message timeout
+- **Related**: state.otBus.bThermostatState, epochThermostatlastseen, bOTGWthermostatpreviousstate
+
+##### `void publishOTGWConnectedState()` (defined in MQTTstuff.ino, called from OTGW-Core.ino:3782)
+- **Purpose**: Publish MQTT message when overall OpenTherm bus state changes (boiler OR thermostat online)
+- **Topic**: otgw/otgw_online (true/false)
+- **Called From**: processOT() main loop after boiler/thermostat state changes
+- **Related**: state.otBus.bOnline (computed from boilerState OR thermostatState)
 
 ### OpenTherm Status Helpers
 
-##### `bool isCentralHeatingEnabled()` (OTGW-Core.ino:1092)
+##### `bool isCentralHeatingEnabled()` (OTGW-Core.ino:1108)
 - **Purpose**: Extract CH enabled bit from master status flags
 - **Returns**: true if bit 0 of master Statusflags is set
-- **Location**: OTGW-Core.ino:1092-1095
+- **Location**: OTGW-Core.ino:1108-1111
 
-##### `bool isDomesticHotWaterEnabled()` (OTGW-Core.ino:1096)
+##### `bool isDomesticHotWaterEnabled()` (OTGW-Core.ino:1112)
 - **Purpose**: Extract DHW enabled bit from master status
 - **Returns**: true if bit 1 of master Statusflags is set
-- **Location**: OTGW-Core.ino:1096-1099
+- **Location**: OTGW-Core.ino:1112-1115
 
-##### `bool isCoolingEnabled()` (OTGW-Core.ino:1100)
+##### `bool isCoolingEnabled()` (OTGW-Core.ino:1116)
 - **Purpose**: Extract cooling enabled bit from master status
 - **Returns**: true if bit 2 of master Statusflags is set
-- **Location**: OTGW-Core.ino:1100-1103
+- **Location**: OTGW-Core.ino:1116-1119
 
-##### `bool isOutsideTemperatureCompensationActive()` (OTGW-Core.ino:1104)
-- **Purpose**: Extract OTC bit from slave status
-- **Returns**: true if outside temp compensation is active
-- **Location**: OTGW-Core.ino:1104-1107
+##### `bool isOutsideTemperatureCompensationActive()` (OTGW-Core.ino:1120)
+- **Purpose**: Extract OTC bit from master status (MasterStatus bit 3; commit d85e668c fixed flame detection bug)
+- **Returns**: true if outside temp compensation is active (NOT flame status)
+- **Location**: OTGW-Core.ino:1120-1123
+
+##### `bool isFlameStatus()` (OTGW-Core.ino:1151)
+- **Purpose**: Extract flame on/off status from slave status flags (bug fix: v1.3.5 corrected source from MasterStatus)
+- **Returns**: true if bit 3 of slave Statusflags is set
+- **Location**: OTGW-Core.ino:1151-1153
 
 ### OT Spec Profile Helpers
 
@@ -470,6 +499,14 @@ Instead of querying all PIC settings at once (risks overwhelming serial), settin
 ### Startup Quiet Period
 
 After PIC reset, event logging is suppressed for 15 seconds to allow PIC to stabilize and collect initial messages. Prevents burst of "command response" noise in WebSocket logs.
+
+### Connection State Tracking (v1.3.5+)
+
+Three independent state publishers track OpenTherm bus connectivity: boiler (30s inactivity timeout), thermostat (30s), and combined bus (OR logic). Published separately to MQTT topics otgw/boiler_connected, otgw/thermostat_connected, otgw/otgw_online to enable Home Assistant automations when devices disconnect.
+
+### Flame Detection Bug Fix (v1.3.5, commit d85e668c)
+
+MasterStatus bit 3 is Outside Temperature Compensation enabled, NOT flame status. Flame status is correctly in SlaveStatus bit 3. Helper function `isFlameStatus()` now reads from SlaveStatus. All flame-dependent logic (e.g., burner active, safety interlocks) must read SlaveStatus, not MasterStatus.
 
 ### PS=1 Summary Mode
 
@@ -587,5 +624,9 @@ flowchart TB
 - **No ArduinoJson**: JSON is built manually via `snprintf_P()` for efficiency on ESP8266
 - **Serial Reserved**: After OTGW reset, Serial port is exclusively for PIC; all debug goes to Telnet (port 23)
 - **No HTTPS/WSS**: HTTP/WS only; target environment is trusted LAN
-- **Cooperative Scheduling**: `feedWatchDog()` is cooperative; loops must yield regularly
+- **Cooperative Scheduling**: `feedWatchDog()` is cooperative (commented out `yield()` in v1.3.5); loops must yield regularly
 - **Throttle Driven by MQTT**: Publish rate is throttle-driven, not event-driven, to reduce upstream load on MQTT brokers
+- **OpenTherm v3.x vs v4.x**: Reserved ID ranges differ; code auto-detects via PIC banner and applies version-specific filtering (e.g., IDs 40-47, 64-69 reserved in v4.x)
+- **MaxTSet/TdhwSet in v4.x Mode**: Fixed in v1.3.5 (commit 818d1181) to correctly suppress/publish based on OT spec version; HA previously showed 0°C in v4.x mode
+- **Command Queue Renamed**: `addOTWGcmdtoqueue()` renamed to `addCommandToQueue()` in v1.3.5 for clarity
+- **Flame Detection**: CRITICAL: flame status is SlaveStatus bit 3, NOT MasterStatus bit 3 (which is OTC enabled); bug fixed in commit d85e668c

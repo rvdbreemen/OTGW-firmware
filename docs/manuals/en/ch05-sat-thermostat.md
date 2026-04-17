@@ -6,6 +6,8 @@ SAT (Smart Autotune Thermostat) transforms the OpenTherm Gateway from a transpar
 
 The result is weather-compensated heating that keeps room temperatures stable within a fraction of a degree, reduces gas consumption, and dramatically cuts the number of boiler ignition cycles. SAT is entirely self-contained: it runs on the ESP microcontroller with no dependency on Home Assistant, cloud services, or internet access.
 
+SAT was inspired by (and ported from) the excellent Home Assistant SAT custom component by Alex Wijnholds (Alexwijn), with design feedback and validation from George Dellas (sergeantd). The firmware embeds the controller directly in the OTGW so the heating loop keeps running even when Home Assistant, MQTT, or WiFi are unavailable.
+
 ---
 
 ### 5.1 What SAT Does
@@ -50,6 +52,10 @@ With SAT, every control loop cycle (default 30 seconds):
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "true"
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0"
 ```
+
+Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `pwm_auto_switch`, `push_setpoint`, `ovp_enabled`, `ovp_value`, `ovp_start`, `ovp_stop`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+
+Sending `ON` / `OFF` / `true` / `false` / `1` / `0` works for boolean topics. Numeric topics accept the usual decimal representation.
 
 #### Via REST API
 
@@ -377,7 +383,7 @@ When `satzonecount` is 1 (default), SAT operates in single-zone mode and this fe
 
 ### 5.16 BLE Temperature Sensor (ESP32 Only)
 
-On ESP32 builds, SAT can scan for BLE temperature sensors and use them as room temperature input. Supported sensor formats:
+On ESP32 builds (OTGW32 / Thermo-Nova), SAT can scan for BLE temperature sensors and use them as room temperature input. Supported sensor formats:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC with custom firmware): service data UUID 0x181A. Reports temperature, humidity, and battery level.
 - **BTHome v2**: service data UUID 0xFCD2. Standard BTHome protocol for temperature and humidity sensors.
@@ -452,7 +458,19 @@ Published to MQTT as `sat/power` (W) and `sat/energy_total` (kWh).
 
 When MQTT is enabled, SAT entities are automatically discovered by Home Assistant.
 
-**Climate entity**: The `sat_climate` entity shows current room temperature, target temperature, and mode. Available modes are `off`, `heat` (continuous), and `pwm`. Setting the target temperature persists the value to ESP flash storage. Presets (comfort, eco, away, sleep, home, activity) are available if configured.
+**Climate entity**: The firmware publishes a thermostat climate entity via HA auto-discovery (`climate.<hostname>_thermostat`). It shows current room temperature, target temperature, and mode. HA-visible modes are `off` and `heat`; the `off` / `heat` mapping is driven by the `thermostat_connected` state of the PIC, so switching heat off in HA releases SAT control. Target temperature bounds follow the HA discovery config: min 12 C, max 28 C, step 0.5 C, precision 0.1 C. Setting the target in HA sends a `TT=` command, which SAT persists to ESP flash. Presets (comfort, eco, away, sleep, home, activity) are pushed through `sat/preset` when configured.
+
+A second climate entity (`climate.<hostname>_dhw_control`) exposes DHW setpoint control when the boiler supports it, with modes `off` / `auto` and range 40-60 C.
+
+**SAT settings entities (Task-81 / Task-284)**: Since 2.0.0, all controllable SAT parameters are exposed as HA entities so the full SAT feature set can be driven from a dashboard without sending raw MQTT messages.
+
+| HA component | Count | Examples |
+|---|---|---|
+| `number` | ~25 | heating curve coefficient, deadband, overshoot margin, control interval, max modulation, flame-off offset, flow offset, modulation-suppression delay/offset, boiler capacity, comfort humidity, summer threshold, auto-tune rate, preset temperatures (comfort/eco/away/sleep/activity/home), min/max pressure, max pressure drop, target temp step |
+| `switch` | 13 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `push_setpoint`, `ovp_enabled`, `preset_sync`, `dhw_enabled`, `pwm_auto_switch` |
+| `select` | 1 | `sat_heating_system` with options `0` (auto), `1` (radiators), `2` (heat pump), `3` (underfloor) |
+
+Each entity writes to its matching `%mqtt_sub_topic%/sat/<parameter>` command topic and reads from the corresponding state topic. All changes go through `updateSetting()` so they are persisted to flash and clamped to safe bounds.
 
 **Key sensor entities**:
 
@@ -543,3 +561,21 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 | Pressure alarm keeps triggering | Pressure band too narrow or boiler filling issue | Adjust `satminpressure`/`satmaxpressure`. Check boiler pressure gauge. |
 | Solar gain never activates | Rise rate threshold too high or sun elevation data missing | Lower `satsolarminrise`. Enable weather API for sun elevation. |
 | Summer mode does not activate | Threshold too high or hours too long | Lower `satsummerthreshold` or `satsummerminhours`. |
+
+---
+
+### 5.24 Debugging and Calibration
+
+**Telnet debug trace.** SAT has its own conditional debug channel. Connect to the OTGW on TCP port 23 and press `5` to toggle SAT control, cycle, and HCR tracing. It is enabled by default in 2.0.0. The complete set of toggles is shown in the telnet welcome banner.
+
+**OPV (Overshoot Protection Value) calibration.** SAT can measure the minimum stable boiler setpoint (the point at which the flame stays lit without short-cycling) and use it as a lower clamp. Trigger a calibration run with:
+
+```bash
+mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/ovp_start" -m ""
+```
+
+The calibration collects at least 40 samples before accepting a result. Stop it early (and discard) with `sat/ovp_stop`. The measured value is stored in `SATovpvalue` and is only applied when `SATovpenabled` is true.
+
+**Flushing short-lived state.** `sat/flush` clears transient runtime state (cycle window, HCR samples, recent pressure history) without erasing persistent settings. Useful after large changes to the heating system or sensors.
+
+**Persisted files on LittleFS.** SAT stores long-running state under `/sat/`: `sat_hcr.json` (heating curve recommendation samples), plus cycle/window records. These survive reboots.

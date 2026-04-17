@@ -77,7 +77,8 @@ v2.0.0 is een grote platformrelease. Het levert volledige ondersteuning voor het
 
 **MQTT en Home Assistant**
 - 250+ auto-discovery entiteiten: climate entity, SAT-sensoren, BLE-sensoren, drukbewaking, OLED-status
-- PROGMEM MQTT discovery: discovery payloads worden gecompileerd in flash en asynchroon gepubliceerd via een bitmap-gestuurd drip-mechanisme. Dit vervangt de eerdere LittleFS-benadering en elimineert grote RAM-buffers.
+- Streaming MQTT discovery: discovery payloads worden gecompileerd in flash (PROGMEM) en asynchroon gepubliceerd via een bitmap-gestuurd drip-mechanisme dat elke entiteit rechtstreeks naar de broker streamt. Dit vervangt de eerdere LittleFS- en RAM-gebaseerde aanpak en elimineert grote staging-buffers.
+- SAT switches en select entities zijn toegevoegd aan de HA discovery via dezelfde streaming-pipeline (TASK-284), samen met runtime-gedetecteerde Dallas-sensoren en de climate/number entiteiten.
 
 **Netwerk en stabiliteit**
 - AP-fallbackmodus: als Wi-Fi drie keer achter elkaar mislukt, opent het apparaat een accesspoint
@@ -88,7 +89,8 @@ v2.0.0 is een grote platformrelease. Het levert volledige ondersteuning voor het
 **Build en tooling**
 - Gecentraliseerde PlatformIO-build voor zowel ESP8266 als ESP32
 - Platformabstractie via `boards.h` met feature flags per printvariant
-- SimpleTelnet: uniforme multi-client telnet-bibliotheek ter vervanging van TelnetStream en ESPTelnet
+- SimpleTelnet: uniforme multi-client telnet-bibliotheek ter vervanging van TelnetStream en ESPTelnet uit v1.x
+- Toolchain-update: ESP8266-builds gebruiken nu Arduino core 3.1.2 (was 2.7.4 in v1.3.5), en tijdafhandeling is overgezet op AceTime 4.x. Dit levert een actuele lwIP, een vernieuwde Wi-Fi-stack en een kleinere, snellere tijd-bibliotheek op.
 - Verbeterd `build.py`-script en `flash_esp.py` met ESP32-ondersteuning
 
 ---

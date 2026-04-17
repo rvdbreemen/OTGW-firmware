@@ -20,7 +20,7 @@ Als u Home Assistant OS of Home Assistant Supervised gebruikt, kunt u Mosquitto 
 
 1. Ga in Home Assistant naar **Instellingen > Add-ons > Add-on Store**.
 2. Zoek naar **Mosquitto broker** en klik op **Installeren**.
-3. Start de add-on. Ga naar de tabblad **Configuratie** en voeg een gebruiker toe:
+3. Start de add-on. Ga naar de tab **Configuratie** en voeg een gebruiker toe:
 
 ```yaml
 logins:
@@ -55,8 +55,12 @@ Als u al een zelfstandige Mosquitto-installatie, EMQX, HiveMQ of een andere brok
 | UniqueID | Uniek apparaat-ID in topics | `otgw-{MAC}` |
 | HA Discovery | Aanvinken voor auto-discovery | aangevinkt |
 | HA Prefix | Auto-discovery topic-prefix | `homeassistant` |
+| Device Manufacturer | Fabrikant in HA device block | `NodoShop` |
+| Device Model | Modelnaam in HA device block | `OTGW` |
 
 4. Klik op **Opslaan**.
+
+De velden Device Manufacturer en Device Model zijn nieuw in 2.0.0 en instelbaar, zodat dezelfde firmware op verschillende hardware (klassieke NodoShop OTGW, ESP32 OT-Shield, etc.) correct gelabeld wordt in Home Assistant (**Instellingen > Apparaten en services > MQTT > OTGW**). Als verwijzing naar de oorsprong van het project wordt het topic `otgw-pic/designer` altijd gepubliceerd met de waarde `Schelte Bron`, ter credit aan de auteur van de originele PIC-firmware.
 
 De firmware verbindt onmiddellijk met de broker en publiceert het geboorte-bericht (`online`). Daarna beginnen de auto-discovery payloads te verschijnen.
 
@@ -79,16 +83,23 @@ Met een interval van 60 seconden wordt een stabiele keteltemperatuur maximaal ee
 
 Het interval geldt alleen voor OpenTherm-databerichten. SAT-topics, verbindingsstatus, versie-informatie en andere niet-OT-topics worden altijd gepubliceerd zodra ze wijzigen.
 
-#### Debuggen van het publicatiefilter
+#### MQTT debuggen
 
-Als u verbinding maakt via telnet (poort 23) en de toets `g` indrukt, wordt de MQTT-poort-debug ingeschakeld. De firmware logt dan elke beslissing:
+Maak via telnet verbinding op poort 23. Er zijn twee afzonderlijke debug-schakelaars voor MQTT:
+
+| Toets | Vlag | Wat het logt |
+|---|---|---|
+| `3` | `bMQTT` | MQTT module-trace: verbinden, subscriben, publiceren, discovery, fouten |
+| `g` | `bMQTTGate` | Per-bericht-beslissingen van het publicatiefilter |
+
+Schakel `g` in om te zien waarom een bericht wel of niet door het publicatiefilter komt:
 
 ```
 MQTT gate id=25 src=S slot=25 prev=0x0000 curr=0x0510 first=true changed=true interval=false last=0 now=42 => publish [tracked update]
 MQTT gate id=25 src=S slot=25 prev=0x0510 curr=0x0510 first=false changed=false interval=false last=42 now=71 => skip [suppressed by interval]
 ```
 
-Dit is handig bij het vaststellen waarom een sensor wel of niet verschijnt in Home Assistant.
+Schakel `3` in voor een hoger-niveau MQTT-trace bij het onderzoeken van verbindings-, subscriptie- of discovery-problemen. De twee vlaggen zijn onafhankelijk: de gate-log is volume-intensief, dus in de praktijk schakelt u die alleen kortstondig in tijdens het diagnosticeren van een specifieke sensor.
 
 ---
 
@@ -153,10 +164,10 @@ Home Assistant gebruikt het `online`/`offline`-bericht om de beschikbaarheidssta
 OTGW-firmware implementeert de MQTT-auto-discovery van Home Assistant. De firmware publiceert discovery-payloads naar het geconfigureerde prefix (standaard `homeassistant/`).
 
 Een discovery-payload is een JSON-bericht dat Home Assistant vertelt:
-- Welk type entiteit het is (sensor, binaire sensor, klimaatentiteit)
+- Welk type entiteit het is (sensor, binary sensor, climate, switch, select, number)
 - Wat de naam en het unieke ID zijn
 - Op welk MQTT-topic de waarden worden gepubliceerd
-- Op welk topic opdrachten kunnen worden gestuurd (voor klimaatentiteiten)
+- Op welk topic opdrachten kunnen worden gestuurd (voor climate, switch, select, number)
 - Welke meeteenheid van toepassing is
 
 Voorbeeld van een discovery-payload voor de aanvoertemperatuur:
@@ -171,33 +182,52 @@ Voorbeeld van een discovery-payload voor de aanvoertemperatuur:
   "availability_topic": "OTGW/value/otgw-AABBCCDDEEFF",
   "payload_available": "online",
   "payload_not_available": "offline",
-  "device": { "identifiers": ["otgw-AABBCCDDEEFF"], "name": "OTGW", "model": "...", ... }
+  "device": { "identifiers": ["otgw-AABBCCDDEEFF"], "name": "OTGW", "manufacturer": "NodoShop", "model": "OTGW" }
 }
 ```
 
-#### Async drip publisher
+#### Streaming discovery architectuur
 
-Vanaf v2.0.0 gebruikt de firmware een asynchrone "drip" publisher voor discovery. In plaats van alle 345 discovery-berichten in een keer te versturen bij het opstarten, publiceert de firmware elke 3 seconden een entiteit op de achtergrond. Een volledige discovery-cyclus duurt daardoor ongeveer 17 minuten, maar deze aanpak is veel vriendelijker voor het beperkte geheugen van de ESP8266 en voor de MQTT-broker.
+Vanaf v2.0.0 gebruikt de firmware een streaming discovery pipeline (geïmplementeerd in `mqtt_configuratie.cpp`). Elke discovery-payload wordt on the fly opgebouwd en in blokken van 128 bytes naar de MQTT-client geschreven, vergelijkbaar met hoe ESPHome zijn discovery-berichten opbouwt. Er wordt nooit een volledige JSON-string in RAM gebufferd. Dit houdt de geheugendruk laag (ongeveer 200 bytes werkgeheugen per entiteit) en voorkomt de heap-fragmentatieproblemen die de oudere aanpak op de ESP8266 opleverde.
 
-De drip publisher bevat twee beschermingsmechanismen:
+De streaming-functies (`streamSensorDiscovery`, `streamBinarySensorDiscovery`, `streamClimateDiscovery`, `streamNumberDiscovery`, `streamDallasSensorDiscovery`, `streamSatSwitchDiscovery`, `streamSatSelectDiscovery`) vervangen de eerdere PROGMEM-template aanpak. Streaming staat altijd aan; er is geen schakelaar om het uit te zetten.
 
-- **Heap guard.** Als het vrije geheugen onder 8 KB zakt, wordt de discovery-publicatie overgeslagen totdat er weer voldoende geheugen beschikbaar is. Dit voorkomt crashes door geheugentekort tijdens periodes van hoge netwerkactiviteit.
-- **Adaptief interval.** Bij geheugendruk wordt het interval automatisch verbreed van 3 seconden naar 30 seconden. Zodra het geheugen herstelt, keert het interval terug naar 3 seconden. Zo blijft het systeem stabiel terwijl de discovery toch vordert.
+Het oude bestand `mqttha.cfg` dat eerdere versies op LittleFS opsloegen, wordt niet meer tijdens runtime gebruikt. Het is gearchiveerd in `docs/archive/mqttha.cfg` en dient enkel nog als referentie voor de oorspronkelijke template-indeling.
 
-Tijdens de eerste 17 minuten verschijnen entiteiten geleidelijk in Home Assistant. Sensoren die nog niet ontdekt zijn, worden zichtbaar zodra ze gepubliceerd worden. Wanneer alle entiteiten ontdekt zijn, wordt de status onthouden en is er geen nieuwe discovery nodig, tenzij u er handmatig een afdwingt.
+#### Bitmap-gestuurde drip publisher
 
-#### Discovery-templates in PROGMEM
+Discovery is incrementeel. Een 256-bits "done" bitmap houdt bij welke OpenTherm message-ID's al een discovery-publicatie hebben gekregen. Twee entry points sturen de pipeline aan:
 
-Discovery-templates worden bij het compileren in het flashgeheugen (PROGMEM) opgeslagen in plaats van bij runtime uit het LittleFS-bestandssysteem geladen. Dit is transparant voor de gebruiker, maar elimineert bestandssysteem-I/O tijdens discovery en vermindert het RAM-gebruik enigszins. Het bestand `mqttha.cfg` wordt niet meer tijdens runtime gelezen; het dient alleen als bron voor de build-time codegenerator.
+- `doAutoConfigure()` wist de bitmap en streamt alle entiteiten in één ronde. Wordt gebruikt bij opstarten, bij handmatig forceren, en wanneer Home Assistant zelf herstart.
+- `doAutoConfigureMsgid(OTid)` publiceert alleen de discovery-items die bij één OpenTherm message-ID horen, en alleen als de bitmap aangeeft dat deze ID nog niet gedaan is. Deze wordt opportunistisch aangeroepen terwijl OT-verkeer langskomt, zodat de discovery-set voor een bepaalde ketel natuurlijk wordt opgebouwd terwijl berichten gezien worden.
+
+Twee pseudo-ID's worden gebruikt om niet-OT-entiteiten aan de bitmap op te hangen:
+
+- ID `0` bevat de twee climate-entiteiten (thermostaat en DHW-control), de 13 SAT-switches en de SAT-select.
+- ID `27` bevat de number-entiteit voor buitentemperatuur-override.
+
+Dallas-sensoren hebben een eigen pad (`streamDallasSensorDiscovery`) omdat hun discovery afhankelijk is van het 1-Wire-adres dat pas tijdens runtime bekend wordt; ze worden via `configSensors()` gepubliceerd zodra die adressen beschikbaar zijn.
+
+#### Heap-bescherming
+
+Elke `stream*Discovery`-functie controleert de vrije heap (`STREAM_HEAP_MIN = 4000` bytes) voordat een payload opgebouwd wordt en geeft `false` terug als het geheugen te laag is. De drip-loop probeert het dan later opnieuw, wanneer het geheugen hersteld is. Zo blijft discovery doorlopen bij tijdelijke heap-druk zonder dat het apparaat crasht.
 
 #### Wanneer wordt discovery opnieuw uitgevoerd?
 
 De firmware publiceert alle discovery-configuraties opnieuw in twee situaties:
 
-1. **Firmware-opstart of wijziging van MQTT-instellingen.** Alle discovery-ID's worden in de wachtrij geplaatst voor drip publishing.
-2. **Home Assistant herstart.** De firmware bewaakt `homeassistant/status`. Wanneer HA weer online komt, worden alle ID's opnieuw in de wachtrij geplaatst.
+1. **Firmware-opstart of wijziging van MQTT-instellingen.** De bitmap wordt gewist en `doAutoConfigure()` streamt elke entiteit.
+2. **Home Assistant herstart.** De firmware bewaakt `homeassistant/status`. Wanneer HA weer online komt, wordt `doAutoConfigure()` opnieuw aangeroepen.
 
-Bij een eenvoudige MQTT-herverbinding (bijvoorbeeld een korte netwerkonderbreking) wordt discovery *niet* opnieuw uitgevoerd. De broker bewaart de discovery-berichten (retained), dus het opnieuw publiceren bij elke herverbinding zou onnodig zijn.
+Bij een eenvoudige MQTT-herverbinding (bijvoorbeeld een korte netwerkonderbreking) wordt discovery *niet* opnieuw uitgevoerd. De broker bewaart de discovery-berichten (retained), dus opnieuw publiceren bij elke herverbinding zou onnodig zijn.
+
+#### Volledige discovery handmatig afdwingen
+
+Druk in de telnet-debugconsole op `F` (hoofdletter). Dit wist de done-bitmap en verstuurt discovery voor elke entiteit opnieuw. Hetzelfde is te bereiken via de REST API:
+
+```bash
+curl -X POST http://otgw.local/api/v2/otgw/discovery
+```
 
 ---
 
@@ -218,7 +248,7 @@ Bij een eenvoudige MQTT-herverbinding (bijvoorbeeld een korte netwerkonderbrekin
 | Ruimtetemperatuursetpoint | `roomsetpoint` | °C | Gewenste ruimtetemperatuur |
 | OEM diagnostiekcode | `oemdiagnosticcode` | - | Ketelspecifieke diagnosecode |
 
-De exacte set sensoren is afhankelijk van welke OpenTherm bericht-ID's uw ketel en thermostaat uitwisselen. Alle 80+ gedefinieerde bericht-ID's kunnen een entiteit genereren.
+De exacte set sensoren is afhankelijk van welke OpenTherm bericht-ID's uw ketel en thermostaat uitwisselen. Elke gedefinieerde bericht-ID kan een of meer entiteiten genereren.
 
 #### Binaire sensoren (selectie)
 
@@ -235,19 +265,52 @@ De exacte set sensoren is afhankelijk van welke OpenTherm bericht-ID's uw ketel 
 | Ketel verbonden | `otgw-pic/boiler_connected` | Ketelcommunicatie OK |
 | Thermostaat verbonden | `otgw-pic/thermostat_connected` | Thermostaatcommunicatie OK |
 
-#### Klimaatentiteit
+#### Climate-entiteiten
 
-Als SAT is ingeschakeld, maakt de firmware een SAT-klimaatentiteit aan in Home Assistant. Via deze entiteit kunt u:
+Er worden twee climate-entiteiten gepubliceerd:
 
-- De doeltemperatuur instellen (5-30 °C, in stappen van 0,5 °C)
-- De bedrijfsmodus selecteren (`off`, `heat` / continuous, `pwm`)
-- Een voorinstelling kiezen (comfort, eco, weg, slaap) indien geconfigureerd
-- De huidige ruimtetemperatuur aflezen
-- De actuele SAT-modus aflezen
+- Thermostaat-climate: toont de huidige ruimtetemperatuur en het actieve setpoint en laat u vanuit het HA-dashboard een nieuwe doeltemperatuur instellen.
+- DHW-climate: exposeert de warmwaterregeling als climate-entiteit.
+
+Als SAT is ingeschakeld, is de thermostaat-climate de SAT-gestuurde variant, met ondersteuning voor modus- en preset-keuze.
+
+#### Number-entiteit
+
+Voor het overschrijven van de buitentemperatuur wordt een number-entiteit gepubliceerd; hiermee kan Home Assistant een waarde pushen alsof die van een bekabelde buitensensor komt.
+
+#### SAT-switches en -select (nieuw in 2.0.0)
+
+Wanneer SAT is ingeschakeld, publiceert de streaming-pipeline 13 boolean switches en 1 select, waarmee Home Assistant direct de SAT-feature-vlaggen kan aansturen. Alle entiteitsnamen worden voorafgegaan door de hostname.
+
+Switches:
+
+| Suffix | Doel |
+|---|---|
+| `SAT_Solar_Gain` | Zon-gain compensatie inschakelen |
+| `SAT_Summer_Simmer` | Summer simmer auto-disable inschakelen |
+| `SAT_Comfort_Adjust` | Comfort adjust inschakelen |
+| `SAT_Multi_Area` | Multi-area gewogen ruimtetemperatuur inschakelen |
+| `SAT_Auto_Tune` | Automatische PID-gain tuning inschakelen |
+| `SAT_Simulation` | SAT draaien in simulatiemodus (geen echte ketelregeling) |
+| `SAT_Window_Detection` | Openraamdetectie inschakelen |
+| `SAT_Force_PWM` | PWM-modus afdwingen, ongeacht ketelmodulatie |
+| `SAT_Push_Setpoint` | Control-setpoint via TC= naar de ketel pushen |
+| `SAT_OVP_Enabled` | Overshoot prevention-kalibratie inschakelen |
+| `SAT_Preset_Sync` | Climate-preset synchroniseren naar secondaire entiteiten |
+| `SAT_DHW_Enabled` | DHW-regeling binnen SAT inschakelen |
+| `SAT_PWM_Auto_Switch` | Automatisch wisselen tussen continuous- en PWM-modus |
+
+Select:
+
+| Suffix | Opties | Doel |
+|---|---|---|
+| `SAT_Heating_System` | `0`, `1`, `2`, `3` | Type verwarmingssysteem (radiator, vloerverwarming, laagtemperatuur, warmtepomp) |
+
+Elke switch gebruikt `true`/`false` als payload en is retained; de select publiceert en accepteert bovenstaande numerieke strings.
 
 #### SAT-sensorentiteiten
 
-Wanneer SAT is ingeschakeld, worden ook diagnostische entiteiten automatisch aangemeld bij Home Assistant. Deze worden gepubliceerd onder het topic-prefix `sat/`.
+Wanneer SAT is ingeschakeld, worden ook diagnostische sensor-entiteiten automatisch aangemeld bij Home Assistant. Deze worden gepubliceerd onder het topic-prefix `sat/`.
 
 **Kern SAT-topics (altijd gepubliceerd als SAT actief is):**
 

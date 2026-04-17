@@ -170,10 +170,10 @@ The Settings tab contains all device configuration, organized into sections. Aft
 | Setting | Description |
 |---|---|
 | Hostname | mDNS and DHCP hostname for the device (default: `otgw`) |
-| Connected SSID | Displays the currently connected Wi-Fi network (read-only) |
-| Reset WiFi | Clears saved credentials and reopens the captive portal on next boot |
+| Wi-Fi Network (SSID) | Read-only display of the currently connected Wi-Fi network |
+| Reset WiFi | Button next to the SSID field. Clears the stored Wi-Fi credentials and reboots the device in Access Point (AP) mode |
 
-To change the Wi-Fi network, click **Reset WiFi**, then reconnect to the `otgw-XXXXXX` AP and enter the new credentials.
+To move the gateway to a different Wi-Fi network, click **Reset WiFi** and confirm the prompt. The device reboots, starts an AP named `OTGW-XXXXXX` (where `XXXXXX` is derived from the chip ID), and reopens the captive portal so you can select and authenticate against the new network. The Reset WiFi action is also available under **FSexplorer > System Actions** as the *Reset Wireless* button.
 
 #### MQTT
 
@@ -267,7 +267,9 @@ A **Test** button sends a test webhook immediately so you can verify your endpoi
 
 ### Real-Time OpenTherm Log
 
-The OpenTherm log on the Home tab is powered by a WebSocket connection to the device (port 80, path `/ws`). The firmware streams every decoded OpenTherm frame as it arrives. The browser maintains a circular buffer of recent messages and persists it to `localStorage`.
+The OpenTherm log on the Home tab is powered by a plain WebSocket connection to the device (`ws://<device>/ws` on port 80). The firmware streams every decoded OpenTherm frame as it arrives. The browser maintains a circular buffer of recent messages and persists it to `localStorage`.
+
+> **HTTP/WS only**: The firmware does not support HTTPS or WSS. This is a deliberate design decision for a trusted-LAN device with limited ESP8266 resources. The REST API can be exposed through an HTTPS reverse proxy, but the live OpenTherm log assumes a direct plain WebSocket to the device and will not work through an HTTPS proxy that does not also bridge `ws://` to `wss://`. For remote access, use a VPN.
 
 **Heap backpressure**: On the ESP8266, available RAM is limited. The firmware monitors free heap and automatically reduces WebSocket streaming frequency when memory is low:
 
@@ -300,16 +302,19 @@ The **Update** section (accessible from the Advanced tab or the update icon in t
 
 ### File Manager (FSexplorer)
 
-The **FSexplorer** is accessible from the Advanced tab. It provides a browser-based view of the LittleFS filesystem on the device, with the ability to:
+The **FSexplorer** is accessible from the Advanced tab dropdown under **File system contents**, or directly at `http://otgw.local/FSexplorer.html`. It provides a browser-based view of the LittleFS filesystem on the device.
 
-- Browse all files stored in LittleFS.
-- Upload new files (drag and drop or file select).
-- Download existing files.
-- Delete or rename files.
+Features:
 
-This is useful for manually backing up or restoring `settings.ini`, `dallas_labels.ini`, the SAT PID state file, or custom web assets. The file listing is sorted and filtered in the browser; hidden files (those with a `.` prefix) are not displayed.
+- Browse files and subdirectories. Directories are listed first and alphabetically sorted (case-insensitive). A `.. (Parent)` link appears in subdirectories for navigation.
+- Upload new files via the **Upload File** form. A progress bar shows upload status, and the file size is checked against available free space before upload is allowed.
+- Download any file by clicking **Download** on its row.
+- Delete files with the **Delete** link. Protected system files (`FSexplorer.html`, `FSexplorer.css`, `FSexplorer.png`, `index.html`, `index.js`, `index.css`, `settings.png`) cannot be deleted from the UI.
+- View storage usage at the bottom of the listing (used and total bytes of the LittleFS partition).
 
-> **File size limits**: Files larger than 10 KB should be streamed rather than loaded into RAM. The firmware always streams files rather than buffering them, so there is no hard upload size limit beyond the available LittleFS partition space.
+A **System Actions** panel below the file list provides quick buttons for **Update Firmware** (desktop browsers only), **ReBoot**, **Reset Wireless** (same action as Reset WiFi on the Settings page), and **Exit FSexplorer** (returns to the main page).
+
+This is useful for manually backing up or restoring `settings.ini`, `dallas_labels.ini`, the SAT PID state file, or custom web assets. The firmware streams files rather than buffering them into RAM, so there is no hard upload size limit beyond the available LittleFS partition space. The main `index.html` (~11 KB) and other assets are always served via `streamFile()` to avoid loading them into the limited ESP8266 heap.
 
 ### Light and Dark Theme
 

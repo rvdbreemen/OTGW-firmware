@@ -102,6 +102,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **platform.h** | The unified platform abstraction header (ADR-061). Provides `#define` guards and typedefs that isolate ESP8266-specific and ESP32-specific code behind a single interface. |
 | **PlatformIO** | Cross-platform embedded development toolchain and IDE plugin. Used for building the ESP32 target and optionally ESP8266. Config: `platformio.ini`. |
 | **SAT** | Smart Autotune Thermostat. The embedded heating controller in the firmware that replaces the room thermostat's role. Combines a weather-compensated heating curve with a PID v3 control loop and automatic gain tuning. |
+| **SimpleTelnet** | Bundled multi-client Telnet library (1.0.0) that provides both streaming and line-input (CLI) modes. Replaces the earlier TelnetStream and ESPTelnet libraries. Used for the debug console on port 23 and for the PIC-serial TCP bridge on port 25238. Located in `src/libraries/SimpleTelnet/`. |
 | **SLINE_SIZE** | 1200-byte MQTT autoconfig line buffer. Used exclusively in `MQTTstuff.ino` for `mqttha.cfg` processing. Larger than `CMSG_SIZE` to accommodate HA discovery JSON lines up to ~900 bytes. |
 | **SNTP** | Simple Network Time Protocol. UDP-based time synchronization, subset of NTP used for embedded devices. Port 123. |
 | **SSD1306** | OLED display controller used on OTGW32 hardware. Driven by the `SSD1306Ascii` library. Displays device status at boot. |
@@ -225,14 +226,24 @@ All inbound services are unencrypted (HTTP, not HTTPS; WS, not WSS). The device 
 
 #### Libraries Used
 
-- PubSubClient (MQTT): [https://github.com/knolleary/pubsubclient](https://github.com/knolleary/pubsubclient)
-- WiFiManager: [https://github.com/tzapu/WiFiManager](https://github.com/tzapu/WiFiManager)
-- AceTime: [https://github.com/bxparks/AceTime](https://github.com/bxparks/AceTime)
-- TelnetStream: [https://github.com/jandrassy/TelnetStream](https://github.com/jandrassy/TelnetStream)
-- WebSockets (Links2004): [https://github.com/Links2004/arduinoWebSockets](https://github.com/Links2004/arduinoWebSockets)
-- DallasTemperature: [https://github.com/milesburton/Arduino-Temperature-Control-Library](https://github.com/milesburton/Arduino-Temperature-Control-Library)
-- EthernetESP32: [https://github.com/JAndrassy/EthernetESP32](https://github.com/JAndrassy/EthernetESP32)
-- OTGWSerial (Schelte Bron): included in `libraries/OTGWSerial/`
+Pinned versions are defined in `platformio.ini`. Bundled libraries live in `src/libraries/`.
+
+| Library | Pinned version | Purpose | Source |
+|---------|----------------|---------|--------|
+| WiFiManager | 2.0.17 | Captive portal for initial WiFi configuration | [tzapu/WiFiManager](https://github.com/tzapu/WiFiManager) |
+| PubSubClient | 2.8.0 | MQTT 3.1.1 client | [knolleary/pubsubclient](https://github.com/knolleary/pubsubclient) |
+| SimpleTelnet | 1.0.0 (bundled) | Multi-client telnet for debug and CLI; replaces TelnetStream and ESPTelnet | [RvdB/SimpleTelnet](https://github.com/rvdbreemen/SimpleTelnet) |
+| WebSockets (Links2004) | 2.3.6 | WebSocket server for live OT log stream | [Links2004/arduinoWebSockets](https://github.com/Links2004/arduinoWebSockets) |
+| AceTime | 2.0.1 (pinned via GitHub tag) | NTP and timezone-aware timestamps | [bxparks/AceTime](https://github.com/bxparks/AceTime) |
+| AceCommon | 1.6.2 | AceTime support library | [bxparks/AceCommon](https://github.com/bxparks/AceCommon) |
+| AceSorting | 1.0.0 | AceTime support library | [bxparks/AceSorting](https://github.com/bxparks/AceSorting) |
+| NetApiHelpers | 1.0.2 | Patched at build time for Arduino Core 3.x compatibility | registry |
+| OneWire | 2.3.8 | 1-Wire bus transport for DS18B20 | registry |
+| DallasTemperature | 4.0.6 | DS18B20 temperature sensor driver | [milesburton/Arduino-Temperature-Control-Library](https://github.com/milesburton/Arduino-Temperature-Control-Library) |
+| EthernetESP32 | 1.0.2 (ESP32 only) | W5500 SPI Ethernet driver for OTGW32 | [JAndrassy/EthernetESP32](https://github.com/JAndrassy/EthernetESP32) |
+| OpenTherm Library | 1.1.5 (bundled, ESP32 only) | OTDirect GPIO OpenTherm transport | [ihormelnyk/opentherm_library](https://github.com/ihormelnyk/opentherm_library) |
+| OTGWSerial (Schelte Bron) | bundled (ESP8266 only) | PIC co-processor UART protocol | included in `src/libraries/OTGWSerial/` |
+| SSD1306Ascii | as installed (ESP32 only) | OLED display driver (ADR-067) | registry |
 
 ---
 

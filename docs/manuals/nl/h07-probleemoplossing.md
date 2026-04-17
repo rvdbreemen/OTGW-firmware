@@ -181,6 +181,12 @@ Als de firmware niet meer reageert na een mislukte update:
 2. Flash de firmware opnieuw via `build.py` of PlatformIO.
 3. De ESP8266/ESP32 bootloader is robuust: een mislukte OTA-update overschrijft de actieve firmware niet totdat de upload volledig is geverifieerd.
 
+> **WAARSCHUWING: Flash PIC-firmware NOOIT via WiFi.**
+>
+> De ESP-firmware kan veilig via WiFi worden geüpdatet (OTA), maar de PIC-microcontroller op de OTGW-print is een afzonderlijke chip met een eigen flash-pad. Het gebruik van OTmonitor via de TCP-seriele socket om PIC-firmware te uploaden (bijvoorbeeld een upgrade naar PIC v6.6) **staat bekend om het brick'en van de PIC**: een WiFi-hapering halverwege de overdracht laat de PIC in een half-geprogrammeerde toestand achter, waaruit alleen in-circuit herprogrammering nog redding biedt.
+>
+> Flash PIC-firmware altijd via een **bedrade USB-seriele verbinding** met OTmonitor of het daarvoor bedoelde PIC-programmeergereedschap. Dit is een hardware-beperking, geen firmware-bug, en de OTGW-firmware kan dit niet omzeilen.
+
 ---
 
 ### 7.6 Web UI laadt niet
@@ -298,7 +304,7 @@ LED-knipperen kan volledig worden uitgeschakeld in Settings (`LED blink`).
 
 ### 7.10 Telnet-debuglog: verbinden en lezen
 
-De Telnet-debuglog op poort 23 is het krachtigste diagnosehulpmiddel dat de firmware biedt. Alle interne events worden hier in real-time gerapporteerd.
+De Telnet-debuglog op poort 23 is het krachtigste diagnosehulpmiddel dat de firmware biedt. Alle interne events worden hier in real-time gerapporteerd. Naast passieve logging accepteert de Telnet-console ook enkele-toets commando's voor live diagnostiek.
 
 #### Verbinden
 
@@ -320,16 +326,64 @@ Telnet is in Windows standaard uitgeschakeld. Activeer het via **Programma's en 
 
 **Alternatief:** Gebruik PuTTY met verbindingstype "Raw" op poort 23.
 
+#### Debugmenu-toetsen (v2.0.0)
+
+Druk op elk moment op `h` om het helpmenu te tonen met de huidige apparaatstatus en de stand van de toggles. De toetsenset is gewijzigd ten opzichte van v1.3.5; als u de oude indeling gewend bent, raadpleeg dan onderstaande tabellen.
+
+**Debuglog-toggles** (elke toets schakelt een categorie aan of uit):
+
+| Toets | Categorie |
+|---|---|
+| 1 | OT-berichten parsen |
+| 2 | API-afhandeling (REST) |
+| 3 | MQTT-module |
+| 4 | Sensormodules |
+| 5 | SAT-regellus, cycles en HCR (standaard aan) |
+| 6 | OTDirect frame handling en PI-lus (standaard aan, alleen ESP32) |
+| g | MQTT interval gating (laat zien waarom een bericht wel of niet is gepubliceerd) |
+| n | NTP-tijdsynchronisatiedetails |
+| d | Dallas-sensor simulatiehelper |
+
+**Commando's:**
+
+| Toets | Actie |
+|---|---|
+| h | Toon helpmenu met huidige status en togglestanden |
+| q | Forceer herinlezen van `settings.json` vanuit flash |
+| F | Forceer volledige Home Assistant-discovery voor ALLE message IDs (wist de interne discovery-bitmap en publiceert alles opnieuw) |
+| r | Herverbind WiFi, Telnet, OTGW seriele stream en MQTT |
+| p | Reset de PIC handmatig |
+| a | Verstuur `PR=A` naar de PIC om firmwareversie, type en device ID op te vragen |
+| s / S | Toggle OTGW seriele simulatie-replay (voor ontwikkelen zonder PIC) |
+| b | Knipper LED 1 vijf keer |
+| i | Initialiseer relay-uitgangen |
+| u | Zet de geconfigureerde GPIO-uitgang AAN |
+| o | Zet de geconfigureerde GPIO-uitgang UIT |
+| j | Lees de huidige GPIO-uitgangstatus |
+| l | Toggle de generieke MyDEBUG-vlag |
+| f | Toon de MyDEBUG-vlagstand |
+
+De `F`-toets is handig na een Home Assistant MQTT-wissing of na een wijziging van het topic-prefix: het forceert een volledige herpublicatie van alle discovery-items in plaats van te wachten op de volgende natuurlijke trigger.
+
+De `r`-toets is de snelste manier om te herstellen van een tijdelijke netwerkhapering zonder het apparaat uit te schakelen.
+
 #### Nuttige logpatronen herkennen
 
 | Logpatroon | Betekenis |
 |-----------|-----------|
 | `WiFi connected, IP: 192.168.x.x` | WiFi-verbinding geslaagd |
 | `MQTT: Connected` | MQTT-verbinding actief |
+| `MQTT: heap before connect = XXXX` | Heap-diagnose vlak voor elke MQTT-(her)verbinding; nuttig om heapdruk te correleren met mislukte verbindingen |
+| `MQTT: heap after birth = XXXX` | Heap-snapshot direct na de birth/online-publicatie |
+| `MQTT: heap after discovery republish = XXXX` | Heap-snapshot na een discovery-herpublicatie |
+| `Hour changed: X -> Y, heap=ZZZZ` | Uur-hartslag vanuit `hourChanged()`; een gestaag dalende heap hier wijst op een trage lek |
 | `NTP synced: 2026-04-11 ...` | NTP-synchronisatie gelukt |
 | `T:XXXX YYYY` | OpenTherm-frame ontvangen van thermostaat (T = Thermostat) |
 | `B:XXXX YYYY` | OpenTherm-frame ontvangen van boiler (B = Boiler) |
 | `SERIAL OVERRUN` | UART-buffer overgelopen |
+| `Exception (2)` | Illegale geheugentoegang. In v2.0.0 is de klasse crashes in `strncmp_P`/`strstr_P` op binaire data opgelost. Ziet u dit nog op 2.0.0, leg dan de crashlog vast en meld het als bug. |
+| `Exception (3)` | Load/store alignment-fout; vrijwel altijd een PROGMEM-pointer doorgegeven aan een functie die RAM verwacht. De bekende Arduino Core 3.1.2+-variant is in 2.0.0 opgelost. |
+| `NTP: bogus initial time ignored` | Normaal bij de eerste opstart; de SDK geeft soms `2106-02-07` terug voor de eerste echte sync. De guard werkt correct. |
 | `Heap: XXXXX (HEALTHY)` | Normaal heap-niveau, elke 60 seconden gelogd |
 | `Heap: XXXXX (LOW)` | Heap wordt laag; berichtfrequentie vermindert |
 | `HEAP-CRITICAL: Blocking WebSocket` | Heap kritiek laag; WebSocket-berichten worden gedropt |
@@ -348,6 +402,21 @@ Wilt u een langere sessie vastleggen:
 ```bash
 nc <ip-adres> 23 | tee otgw-debug.log
 ```
+
+---
+
+### 7.10a In v2.0.0 opgeloste problemen (wat u nog in oudere builds kunt tegenkomen)
+
+Komt u van een oudere firmware of leest u oudere forumdraadjes, dan komen onderstaande problemen regelmatig voor op v1.3.5 en eerder. Ze zijn opgelost in v2.0.0. Mocht u een van deze symptomen alsnog op een bevestigde v2.0.0-build tegenkomen, meld dit dan als GitHub-issue met de bijbehorende crashlog.
+
+| Oud symptoom | Oorzaak (vóór 2.0.0) | Status in 2.0.0 |
+|---|---|---|
+| Willekeurige `Exception (3)`-reboots, vaak tijdens MQTT-activiteit | PROGMEM-pointer doorgegeven aan een functie die word-aligned leest (Arduino Core 3.1.2+ is strenger). Een flash-lezing op `0x402xxxxx` met word-alignment veroorzaakt de exception. | Opgelost. PROGMEM-veilige helpers (`pgm_strncmp_PP`, `pgm_read_char`) worden overal gebruikt; `writeMqttProgmemChunk()` voor PROGMEM naar MQTT. |
+| `Exception (2)` tijdens het parsen van OT-frames | `strncmp_P` / `strstr_P` gebruikt op binaire data. Deze helpers nemen C-strings aan en lopen door over ingesloten NUL-bytes heen. | Opgelost. Binaire vergelijkingen gebruiken nu `memcmp_P`. |
+| Vloedgolf van MQTT-berichten en hameren op de broker direct na een reconnect | Volledige MQTT-discovery-burst werd in één keer opnieuw verstuurd bij iedere reconnect, waardoor de heap uitgeput raakte en de broker overbelast werd. | Opgelost. Discovery is nu async en drip-published (zie 7.3). Bij een reconnect blijft de bitmap bewaard; gebruik `F` in de Telnet-console om zo nodig een volledige herpublicatie af te dwingen. |
+| Klok springt vlak na opstart naar `2106-02-07` | De SDK geeft soms een onzinnige `time_t` terug vóór de eerste geslaagde NTP-uitwisseling. | Opgelost. De NTP-code negeert nu pre-epoch/post-2106-waarden tot een echte sync slaagt. Schakel toets `n` in de Telnet-console in om de handshake te volgen. |
+| Apparaat onbereikbaar na een routerherstart totdat de OTGW wordt uit- en weer ingeschakeld | DHCP-lease-vernieuwing liep in een race met de WiFi-reconnectlogica, waardoor de interface zonder IP achterbleef. | Opgelost. DHCP-vernieuwing en WiFi-herstel zijn gecoördineerd (ADR-047 tweelaagse herstellogica). |
+| OTGW online/offline-flikkeringen, seriele overruns tijdens MQTT-bursts | `publishToSourceTopic()` reserveerde ~1,6 KB aan lokale buffers op de 4 KB CONT-stack. | Opgelost. Grote buffers omgezet naar statisch of pre-allocated scratch-geheugen. Zie paragraaf 7.8. |
 
 ---
 

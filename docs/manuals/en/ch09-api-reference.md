@@ -2,21 +2,43 @@
 
 This chapter documents all programmatic interfaces exposed by the OTGW-firmware: the REST API, the WebSocket stream, the MQTT integration, and the Telnet debug console. These are the interfaces used by Home Assistant, Node-RED flows, automation scripts, and custom integrations.
 
+This chapter is a user-facing narrative. For the exhaustive machine-readable specification (request/response schemas, status codes, examples), consult the OpenAPI 3.1 document in the repository:
+
+- `docs/api/openapi.yaml` : complete REST API specification, authoritative source
+- `docs/api/MQTT.md` : full MQTT topic reference and payload examples
+- `docs/api/WEBSOCKET_FLOW.md` : WebSocket connection lifecycle and message framing
+
+When this chapter and the OpenAPI document disagree, the OpenAPI document wins. Raise an issue so the chapter can be corrected.
+
 ---
 
 ### REST API Overview
 
 #### Base URL and Versioning
 
-The current REST API version is v2. All v2 endpoints are under:
+Three API version prefixes are reserved. Only one is active:
+
+| Version | Path | Status |
+|---------|------|--------|
+| v0 | `/api/v0/` | Legacy, removed. Returns HTTP 410 Gone. |
+| v1 | `/api/v1/` | Standard (removed in 2.x). Returns HTTP 410 Gone. |
+| v2 | `/api/v2/` | Current preferred. All new integrations must use this prefix. |
+
+New code must always use `/api/v2/`:
 
 ```
 http://{device-ip}/api/v2/
 ```
 
-Older versions return HTTP 410 Gone. Never use `/api/v0/` or `/api/v1/` in new code.
-
 The device hostname defaults to `otgw.local` (mDNS / LLMNR). Alternatively, use the IP address assigned by your DHCP server.
+
+#### Route Dispatch (ADR-050)
+
+Internally, `/api/v2/` requests are dispatched by a static route table `kV2Routes[]` defined in `src/OTGW-firmware/restAPI.ino`. Each top-level resource segment maps to a single handler function:
+
+`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (OTGW32 only), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`.
+
+Adding a new endpoint is a two-line change: register a handler and add one entry to `kV2Routes[]`. This is why the API is stable across builds: the dispatch surface is small, explicit, and reviewed.
 
 #### Transport
 
@@ -36,7 +58,7 @@ CSRF same-origin validation is enforced for authenticated browser requests: the 
 
 #### Error Response Format
 
-All errors use a consistent JSON envelope:
+All errors are produced by the helper `sendApiError(httpCode, F("message"))` and use a consistent JSON envelope:
 
 ```json
 {
@@ -65,6 +87,8 @@ HTTP status codes follow RFC 7231. Common error codes:
 ---
 
 ### REST API Endpoints
+
+The sections below describe the most commonly used endpoints with usage notes and examples. This is not an exhaustive list. For the complete set of endpoints, including every field, enum value, and error shape, see `docs/api/openapi.yaml`. You can render that file as interactive documentation with Swagger UI, Redoc, or any OpenAPI-compatible tool.
 
 #### Health
 
@@ -338,7 +362,11 @@ Alias: `POST /api/v2/otgw/autoconfigure`
 
 ##### GET /api/v2/sensors
 
-Returns all Dallas DS18B20 sensor data and S0 pulse counter status. No authentication required. Alias: `GET /api/v2/sensors/status`.
+Returns all Dallas DS18B20 sensor data and S0 pulse counter status. No authentication required.
+
+##### GET /api/v2/sensors/status
+
+Alias of `GET /api/v2/sensors`. Added in 2.x so external monitoring tools can poll a predictable `/status` path per the convention used by `/health` and `/sat/status`. Both paths return the identical payload:
 
 **Response:**
 
@@ -663,6 +691,8 @@ Returns the filesystem content hash compared to the firmware hash. Used to detec
 
 The firmware runs a WebSocket server that streams live OpenTherm log frames to connected browsers. This is the data source for the live OT log viewer and the real-time temperature graphs in the web UI.
 
+For the full connection lifecycle, broadcast gating rules, and heap-backpressure state machine, see `docs/api/WEBSOCKET_FLOW.md`.
+
 #### Connection
 
 ```
@@ -756,6 +786,8 @@ When free heap falls below the warning threshold, the server stops sending WebSo
 ### MQTT API
 
 The MQTT interface is the primary integration method for Home Assistant and other home automation platforms.
+
+For the complete topic inventory (every published value, every accepted command, retained/non-retained flags, and payload examples), see `docs/api/MQTT.md`. The tables in this chapter are a quick reference covering the most commonly used topics. Incoming command topics are dispatched by `handleMQTTcallback()` in `MQTTstuff.ino`, which parses the trailing topic segment and routes it to the corresponding handler.
 
 #### Broker Configuration
 
@@ -961,11 +993,11 @@ When `mqttotmessage` is enabled:
 
 #### Subscribed Topics (Commands)
 
-The firmware subscribes to `{TopTopic}/set/{UniqueId}/#`.
+The firmware subscribes to `{TopTopic}/set/{UniqueId}/#`. The trailing segment after `set/{UniqueId}/` selects the command; `handleMQTTcallback()` routes each match to the matching OTGW PIC command or internal handler.
 
-##### Direct Control Commands
+##### Direct Control Commands (Quick Reference)
 
-Publish a plain text payload to these topics:
+Publish a plain text payload to these topics. This table is a quick reference for the most commonly used command topics; the authoritative list lives in `docs/api/MQTT.md`.
 
 | Topic suffix | Payload | OTGW command | Description |
 |-------------|---------|-------------|-------------|
@@ -1073,7 +1105,7 @@ The stream is plain ASCII, one line per event. Output lines include:
 - Heap statistics: free heap, heap health level.
 - Network events: WiFi connect/disconnect, IP address.
 - Error messages and warnings.
-- REST API access log (when `bRestAPI` debug flag is enabled): method, URI, status code, timing.
+- REST API access log (when `bRestAPI` debug flag is enabled): method, URI, HTTP status code, matched route segment, and total handler wall-clock time in milliseconds.
 
 Example output:
 
@@ -1084,7 +1116,10 @@ Example output:
 [SAT]  Control loop: Tr=20.5 Tboiler=62.3 setpoint=43.1 error=0.50
 [HEAP] Free: 19234 bytes (healthy)
 REST GET /api/v2/health => 200 v2/health 12ms
+REST POST /api/v2/otgw/commands => 202 v2/otgw 4ms
 ```
+
+The trailing number is the time spent in the handler, measured from URI parse to response flush. Use it to spot slow endpoints or flash/LittleFS stalls without needing an external profiler.
 
 The verbosity of each category is controlled by boolean flags in `state.debug`:
 
