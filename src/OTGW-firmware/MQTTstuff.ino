@@ -1005,10 +1005,7 @@ void setMQTTConfigDone(const uint8_t MSGid)
   uint8_t group = MSGid & 0b11100000;
   group = group>>5;
   uint8_t index = MSGid & 0b00011111;
-  MQTTDebugTf(PSTR("Setting bit %d from group %d for MSGid %d\r\n"), index, group, MSGid);
-  MQTTDebugTf(PSTR("Value before setting bit %d\r\n"), MQTTautoConfigMap[group]);
   bitSet(MQTTautoConfigMap[group], index);
-  MQTTDebugTf(PSTR("Value after setting bit  %d\r\n"), MQTTautoConfigMap[group]);
 }
 //===========================================================================================
 void clearMQTTConfigDone()
