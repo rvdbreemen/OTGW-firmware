@@ -337,6 +337,10 @@ bool streamClimateDiscovery(PubSubClient &client,
 bool streamNumberDiscovery(PubSubClient &client,
                            HaDiscoveryContext &ctx);
 
+bool streamDallasSensorDiscovery(PubSubClient &client,
+                                 const char *sensorAddress,
+                                 HaDiscoveryContext &ctx);
+
 bool expandAndStreamSensorSources(PubSubClient &client,
                                   const MqttHaSensorCfg &cfg,
                                   HaDiscoveryContext &ctx);

@@ -2129,6 +2129,134 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
 }
 
 // ---------------------------------------------------------------------------
+// Public API: streamDallasSensorDiscovery
+// Dallas temperature sensors have dynamic addresses known only at runtime.
+// This function builds a sensor discovery payload using the address as label.
+// ---------------------------------------------------------------------------
+bool streamDallasSensorDiscovery(PubSubClient &client,
+                                 const char *sensorAddress,
+                                 HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (!sensorAddress || sensorAddress[0] == '\0') return false;
+
+  // Build topic: <haPrefix>/sensor/<nodeId>/<sensorAddress>/config
+  char topic[STREAM_TOPIC_MAX];
+  int n = snprintf_P(topic, sizeof(topic), PSTR("%s/sensor/%s/%s/config"),
+                     ctx.haPrefix, ctx.nodeId, sensorAddress);
+  if (n <= 0 || static_cast<size_t>(n) >= sizeof(topic)) return false;
+
+  // Build a temporary config struct with the runtime address
+  static const char dallasFriendlyName[] PROGMEM = "Temperature";
+  MqttHaSensorCfg cfg;
+  cfg.id = 246;  // OTGWdallasdataid
+  cfg.flags = 0;
+  cfg.label = nullptr;  // not used directly -- we override stat_t below
+  cfg.friendlyName = dallasFriendlyName;
+  cfg.deviceClass = HaDeviceClass::temperature;
+  cfg.unit = HaUnit::degC;
+  cfg.stateClass = HaStateClass::measurement;
+  cfg.icon = HaIcon::thermometer;
+  cfg.entityCat = HaEntityCat::none;
+  cfg.enabledByDefault = true;
+
+  // We need a custom compose since the label is a runtime RAM string, not PROGMEM.
+  // Use the standard composer but with a patched context that has the address as sensorId.
+  // Actually, we compose inline here for clarity.
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    // "avty_t"
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // device block
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "uniq_id":"<nodeId>-<sensorAddress>"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kUniqId)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeRam(ctx.nodeId)) return false;
+    if (!w.writeChar('-')) return false;
+    if (!w.writeRam(sensorAddress)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "name":"<hostname>_Temperature_<sensorAddress>"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kName)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeRam(ctx.hostname)) return false;
+    if (!w.writeProgmem(PSTR("_Temperature_"))) return false;
+    if (!w.writeRam(sensorAddress)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "stat_t":"<mqttPubTopic>/<sensorAddress>"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kStatT)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (!w.writeChar('/')) return false;
+    if (!w.writeRam(sensorAddress)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "device_class":"temperature"
+    if (!writeJsonKV_P(w, kDevCls, haDeviceClassStr(HaDeviceClass::temperature))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "unit_of_measurement":"°C"
+    if (!writeJsonKV_P(w, kUom, haUnitStr(HaUnit::degC))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "state_class":"measurement"
+    if (!writeJsonKV_P(w, kStatCls, haStateClassStr(HaStateClass::measurement))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "icon":"mdi:thermometer"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kIcon)) return false;
+    if (!w.writeProgmem(PSTR("\":\"mdi:"))) return false;
+    if (!w.writeProgmem(haIconStr(HaIcon::thermometer))) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "value_template":"{{ value }}"
+    if (!writeJsonKV_P(w, kValTpl, kValTplVal)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // origin block
+    if (!writeOriginBlock(w, ctx)) return false;
+
+    return writeJsonClose(w);
+  };
+
+  // Measure pass
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  // Write pass
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.endPublish();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+
+  feedWatchDog();
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // expandAndStreamSensorSources()
 // Expands a source-template sensor into 3 per-source variants
 // (thermostat/boiler/gateway) and streams each via streamSensorDiscovery().

@@ -1312,25 +1312,35 @@ bool doAutoConfigureMsgid(byte OTid, const char *cfgSensorId, const char *baseMq
   return result;
 }
 
-void sensorAutoConfigure(byte dataid, bool finishflag , const char *cfgSensorId = nullptr) {
- // Special version of Autoconfigure for sensors
- // dataid is a foney id, not used by OT 
- // check wheter MQTT topic needs to be configured
- // cfgNodeId can be set to alternate NodeId to allow for multiple temperature sensors, should normally be NodeId
- // When finishflag is true, check on dataid is already done and complete the config.  On false do the config and leave completion to caller
- if(getMQTTConfigDone(dataid)==false or !finishflag) {
-   MQTTDebugTf(PSTR("Need to set MQTT config for sensor id(%d)\r\n"),dataid);
-   bool success = doAutoConfigureMsgid(dataid,cfgSensorId);
-   if(success) {
-     MQTTDebugTf(PSTR("Successfully sent MQTT config for sensor id(%d)\r\n"),dataid);
-     if (finishflag) setMQTTConfigDone(dataid);
-     } else {
-       MQTTDebugTf(PSTR("Not able to complete MQTT configuration for sensor id(%d)\r\n"),dataid);
-     }
-   } else {
-   // MQTTDebugTf(PSTR("No need to set MQTT config for sensor id(%d)\r\n"),dataid);
-   }
- }
+void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId = nullptr) {
+  // Dallas temperature sensor discovery via streaming API.
+  // cfgSensorId is the Dallas device address string (e.g. "28FF1234567890").
+  if (getMQTTConfigDone(dataid) && finishflag) return;
+
+  if (!cfgSensorId || cfgSensorId[0] == '\0') return;
+
+  MQTTDebugTf(PSTR("Dallas discovery for sensor [%s]\r\n"), cfgSensorId);
+
+  HaDiscoveryContext ctx;
+  ctx.nodeId = NodeId;
+  ctx.hostname = CSTR(settings.sHostname);
+  ctx.version = _VERSION;
+  ctx.mqttPubTopic = MQTTPubNamespace;
+  ctx.mqttSubTopic = MQTTSubNamespace;
+  ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
+  ctx.isFirstEntity = false;
+  ctx.sourceSuffix = "";
+  ctx.sourceName = "";
+  ctx.sourceTopicSegment = "";
+
+  bool success = streamDallasSensorDiscovery(MQTTclient, cfgSensorId, ctx);
+  if (success) {
+    MQTTDebugTf(PSTR("Dallas discovery sent for [%s]\r\n"), cfgSensorId);
+    if (finishflag) setMQTTConfigDone(dataid);
+  } else {
+    MQTTDebugTf(PSTR("Dallas discovery failed for [%s]\r\n"), cfgSensorId);
+  }
+}
 
 
 
