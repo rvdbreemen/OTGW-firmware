@@ -468,7 +468,10 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       if (topicToken[0] != '\0') {
         // --- SAT MQTT commands: set/<nodeId>/sat/<sub-command> ---
         if (strcasecmp_P(topicToken, PSTR("sat")) == 0) {
-          char satSubCmd[20];
+          // Must hold the longest sub-command name + NUL. Current longest is
+          // "solar_freeze_integral" at 21 chars (TASK-292). 24 gives headroom
+          // for future SAT MQTT command names without another resize.
+          char satSubCmd[24];
           if (readMQTTTopicToken(topicCursor, satSubCmd, sizeof(satSubCmd))) {
             MQTTDebugTf(PSTR("MQTT SAT cmd: %s [%s]\r\n"), satSubCmd, msgPayload);
             if (strcasecmp_P(satSubCmd, PSTR("target")) == 0) {
