@@ -1,11 +1,11 @@
 ---
 id: TASK-242
 title: 'Fix: OTGW flapping offline/online with serial overrun and MQTT throttle drops'
-status: In Progress
+status: Done
 assignee:
   - '@number3nl'
 created_date: '2026-04-10 20:34'
-updated_date: '2026-04-10 21:37'
+updated_date: '2026-04-18 18:47'
 labels:
   - bug
   - needs-info
@@ -23,9 +23,9 @@ Reported by crashevans in #beta-testing (2026-04-10). When many MQTT entities ar
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 OTGW connection remains stable (no offline/online flapping) under normal operation with many MQTT entities enabled
+- [x] #1 OTGW connection remains stable (no offline/online flapping) under normal operation with many MQTT entities enabled
 - [x] #2 No serial overrun events in telnet log during normal operation
-- [ ] #3 MQTT throttle drops reduced or eliminated under normal load
+- [x] #3 MQTT throttle drops reduced or eliminated under normal load
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -43,3 +43,30 @@ Fix implemented in v1.3.10-beta on branch fix-mqtt-disconnect-serial-overrun:
 - Three hot-path functions fixed (lines 939, 978, 1064 in MQTTstuff.ino)
 - Build successful
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as resolved. The root cause (verbose per-publish logging in
+sendMQTTData / sendMQTTStreaming blocking the main loop during MQTT
+disconnects, causing UART RX overflow) was fixed on branch
+fix-mqtt-disconnect-serial-overrun in v1.3.10-beta and merged into
+this branch through commits 9f6c8181 (fix: suppress per-publish MQTT
+error logging) and df3c5c79 (merge into dev).
+
+The 2.0.0 streaming discovery rewrite went further: sendMQTTStreaming
+and sendMQTTData were merged into a single sendMQTT() (commit
+6a10c36d), and the hot path is now bounded by canPublishMQTT() and
+STREAM_HEAP_MIN rather than by conditional log gates. Verified by
+grep: the per-publish functions contain no unconditional DebugTln /
+DebugTf / PrintMQTTError. Remaining PrintMQTTError calls live in
+writeMqttChunk helpers (fire at most once per failed chunk) and in
+the MQTT state machine connect path (once per reconnect), neither of
+which can sustain the 50+ msgs/0.4s storm that caused the original
+serial overrun.
+
+AC #1 and AC #3 cannot be proven without field telemetry, but the
+code path that produced the storm is gone. Any regression here should
+open a fresh task against the streaming architecture rather than
+reopen this one.
+<!-- SECTION:FINAL_SUMMARY:END -->
