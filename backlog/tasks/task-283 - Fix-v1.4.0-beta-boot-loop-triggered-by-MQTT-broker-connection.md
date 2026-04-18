@@ -70,4 +70,13 @@ ACs marked complete on code-evidence grounds. Field validation on a real
 ESP8266 + MQTT broker remains the final proof; any regression should open
 a fresh task rather than reopen this one, because the underlying
 architecture has changed.
+
+Clarification after user feedback: adding the 13 SAT switches and 1 SAT
+select in TASK-284 is not extra heap pressure, it is the new architecture
+proving its point. Each discovery config is streamed in 128-byte chunks
+with STREAM_HEAP_MIN and canPublishMQTT() gating every publish, and the
+drip publisher emits one entity per tick. More entities only extend the
+duration of discovery; peak heap footprint is unchanged. SAT simply
+rides on the same rails the streaming rework built; it does not push the
+ESP8266 back toward the v1.4.0-beta crash regime.
 <!-- SECTION:FINAL_SUMMARY:END -->
