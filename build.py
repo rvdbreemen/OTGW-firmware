@@ -496,6 +496,21 @@ def build_firmware(project_dir, config_file, target):
     temp_build_dir = config.TEMP_DIR / f"build-{target}"
     temp_build_dir.mkdir(parents=True, exist_ok=True)
 
+    # When --reproducible is active, add -ffile-prefix-map so absolute source
+    # paths do not bleed into the debug sections of the produced objects
+    # (TASK-289). Applied to C, C++, and assembly. Non-reproducible builds
+    # keep the existing flags untouched to preserve absolute paths for local
+    # debugging convenience.
+    reproducible = os.environ.get("OTGW_BUILD_REPRODUCIBLE") == "1"
+    cpp_flags = tcfg["build_flags"]
+    c_flags = ""
+    s_flags = ""
+    if reproducible:
+        prefix_map = f"-ffile-prefix-map={project_dir}=."
+        cpp_flags = f"{cpp_flags} {prefix_map}".strip()
+        c_flags = prefix_map
+        s_flags = prefix_map
+
     cmd = [
         "arduino-cli",
         "compile",
@@ -503,8 +518,13 @@ def build_firmware(project_dir, config_file, target):
         "--warnings", "default",
         "--verbose",
         "--libraries", str(project_dir / "src" / "libraries"),
-        "--build-property", f"compiler.cpp.extra_flags=\"{tcfg['build_flags']}\"",
+        "--build-property", f"compiler.cpp.extra_flags=\"{cpp_flags}\"",
     ]
+    if reproducible:
+        cmd.extend([
+            "--build-property", f"compiler.c.extra_flags=\"{c_flags}\"",
+            "--build-property", f"compiler.S.extra_flags=\"{s_flags}\"",
+        ])
 
     # Override the upload.maximum_size default when the target pins an app size.
     # PartitionScheme=custom in the ESP32 boards.txt ships a 16 MB default, which
@@ -1251,6 +1271,11 @@ def setup_reproducible_env(project_dir, use_ccache=False):
         pinned["CCACHE_DIR"] = str(ccache_dir)
         pinned["CCACHE_COMPILERCHECK"] = "content"
         pinned["CCACHE_LOGFILE"] = str(ccache_dir / "ccache.log")
+
+    # Signal downstream (e.g. build_firmware) that reproducibility is on so
+    # compiler flags like -ffile-prefix-map can be appended selectively.
+    # Scoped to the current process only.
+    pinned["OTGW_BUILD_REPRODUCIBLE"] = "1"
 
     for k, v in pinned.items():
         os.environ[k] = v
