@@ -4,76 +4,36 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-## What's New in v1.4.0
+## What's New in v1.4.0-beta
 
-Version 1.4.0 is a major feature release. It adds SAT (Smart Autotune Thermostat), an embedded heating controller that turns the OTGW into a standalone smart thermostat. It also introduces ESP32 support through a unified platform abstraction layer. Full release notes: [RELEASE_NOTES_1.4.0.md](RELEASE_NOTES_1.4.0.md)
+Version 1.4.0 is a minor-version release focused on a modern toolchain, a rewritten MQTT Home Assistant discovery pipeline, and memory/stability work on the ESP8266. Full release notes: [RELEASE_NOTES_1.4.0.md](RELEASE_NOTES_1.4.0.md)
 
 ### Highlights
 
-- **SAT (Smart Autotune Thermostat):** Embedded heating controller running entirely on the ESP. Weather-compensated heating curve + PID v3 controller with automatic gain tuning. Supports continuous modulation and PWM flame cycling, radiator and underfloor heating. Six independent safety layers. Web UI dashboard, REST API, MQTT, and Home Assistant auto-discovery. No HA or external controller required.
-- **ESP32 support (experimental):** The firmware now compiles for both ESP8266 and ESP32 from one source tree. 30+ platform shim functions abstract away SDK differences at compile time.
-- **PlatformIO build system:** New `platformio.ini` with `esp8266` and `esp32` environments. Build with `pio run -e esp8266` or `pio run -e esp32`.
-- **Board-level GPIO definitions:** Auto-detected pin mappings per platform via `boards.h`.
-- **OpenTherm enum modernization:** Binary literals updated to C++14 standard format for better compiler compatibility.
-- **No breaking changes** vs v1.3.4. The ESP8266 build is functionally identical.
-
-## SAT - Smart Autotune Thermostat
-
-SAT is an embedded heating controller that runs entirely on the ESP and turns the OTGW into a standalone smart thermostat. It sits between the OpenTherm bus and the boiler, computing and sending the optimal flow temperature setpoint without needing an external controller or Home Assistant.
-
-### What SAT does
-
-SAT combines a **weather-compensated heating curve** with a **PID v3 controller** that adjusts the flow temperature setpoint based on measured room temperature error. It learns your boiler's behavior over time through automatic gain tuning and a thermal model.
-
-Key capabilities:
-
-- **Weather-compensated heating curve**: calculates the base flow temperature from the outdoor temperature using a configurable coefficient.
-- **PID v3 control**: proportional + integral + derivative correction on top of the heating curve to hold the target room temperature.
-- **Auto-tune**: automatically adjusts PID gains based on cycle analysis, so you don't have to tune them manually.
-- **Two control modes**: continuous modulation (modulates boiler flame directly) and PWM cycling (on/off flame with configurable duty cycle).
-- **Six independent safety layers**: flame health, CH sync, setpoint mismatch, pressure monitoring, cycle classification, and overshoot detection.
-- **Heating curve recommendation**: analyzes error statistics and suggests whether to increase or decrease the curve coefficient.
-- **OPV calibration**: finds your boiler's Overpressure Valve (pressure relief valve) opening temperature so SAT stays below it.
-- **Presets**: six named presets (comfort, eco, away, sleep, activity, home) with configurable target temperatures.
-- **Multi-area room temperature**: averages temperature readings from up to four zones for more accurate control.
-- **Solar gain compensation**: detects solar gain from indoor temperature rise rate and sun elevation, and reduces the setpoint to avoid overheating.
-- **Summer simmer mode**: suppresses heating when outdoor temperature stays above a threshold for a configurable number of hours.
-- **Pressure monitoring**: tracks system pressure and raises an alarm when it drops below the minimum or falls too fast.
-- **BLE temperature sensor** (ESP32 only): receives room temperature and humidity from a Bluetooth LE sensor (e.g., Xiaomi/PVVX).
-
-### Hardware support
-
-| Platform | SAT | BLE sensor |
-| -------- | --- | ---------- |
-| ESP8266 (NodeMCU, Wemos D1 mini) | Full support | Not available |
-| ESP32 | Full support | Available |
-
-### Quick start
-
-1. Open the OTGW Web UI and go to **SAT** in the navigation.
-2. Enable SAT and set your target room temperature.
-3. Configure your heating system type (radiators / underfloor / heat pump).
-4. Set your boiler capacity (kW) for accurate power estimation.
-5. Let the auto-tune run for a few days to optimize PID gains.
-
-For detailed setup, including heating curve tuning, OPV calibration, and Home Assistant automation examples, see the [SAT integration guide](backlog/docs/doc-3%20-%20sat-integration-guide.md).
-
-### Integration
-
-SAT integrates with Home Assistant via MQTT auto-discovery. When SAT is enabled and MQTT is configured:
-
-- A `climate` entity appears in HA with target temperature control and heat/off mode.
-- 40+ sensor and binary_sensor entities appear for all SAT state, diagnostics, and settings.
-- Commands can be sent via MQTT topics or the REST API.
-
-| Interface | Reference |
-| --------- | --------- |
-| MQTT topics (published and subscribed) | [MQTT topic reference](docs/api/MQTT.md) / [Full SAT topic inventory](backlog/docs/doc-1%20-%20sat-mqtt-topics.md) |
-| REST API | [OpenAPI spec](docs/api/openapi.yaml) — all `/api/v2/sat/*` endpoints |
-| OPV calibration guide | [OPV calibration](backlog/docs/doc-2%20-%20sat-opv-calibration.md) |
-| Preset configuration | [Preset configuration](backlog/docs/doc-4%20-%20sat-preset-configuration.md) |
+- **ESP8266 Arduino core 3.1.2:** Upgraded from 2.7.4. Toolchain and SDK refreshed; LittleFS image format, filesystem null-checks, and reboot-loop edge cases adjusted to match the new core.
+- **Library refresh:** AceTime 2.0.1 → 4.1.0, TelnetStream 1.3.0, migration from ESPTelnet/TelnetStream to the new **SimpleTelnet** library with debug input restructured as a callback.
+- **Async bitmap-driven MQTT HA discovery (#547):** The synchronous inline "just-in-time" discovery path is replaced by an async drip publisher. OT message processing no longer blocks on discovery publishes; the broker no longer sees a burst of 60+ discovery messages on restart. Discovery is spread at ~3s per message (30s under heap pressure) and is resumed gradually on boot and HA online events.
+- **Streaming discovery API:** The legacy `MqttHaSpecialCfg` template path and large PROGMEM template blobs are gone. Climate, number, and sensor discovery are all built by the streaming API, with runtime discovery for Dallas sensors (addresses known at runtime) and comprehensive icon heuristics in one place.
+- **Configurable device manufacturer/model:** `settings.device.sManufacturer` / `sModel` (defaults `NodoShop` / `OTGW`) drive the HA device registry block. `otgw-pic/designer = "Schelte Bron"` is now published separately to credit the original OTGW hardware and PIC firmware designer.
+- **Scheduled nightly restart (opt-in):** Optional once-per-day reboot at a configurable hour for long-term heap recovery. Disabled by default; respects NTP sync, timezone, and a 1-hour minimum uptime to avoid restart loops. Exposed in the Web UI, REST API, and settings.
+- **REST API additions:** `GET /api/v2/sensors/status` for current Dallas sensor readings. Debug access log now one-line with HTTP status code and handler timing.
+- **MQTT debug key split:** The single MQTT debug flag is split into key 3 (communication) and key 5 (gating), and the very noisy "skip" lines are suppressed.
+- **NTP telemetry (debug key 6):** Optional NTP sync diagnostics in the telnet debug menu, on by default.
+- **Memory and stability:**
+  - `sLine[1200]` and `topicBuf[200]` staging buffers eliminated (TASK-276/277).
+  - `WiFiClient::setSync(true)` + `setNoDelay(true)` save ~1KB of per-connection TCP buffer copy.
+  - `O(n²)` strlen scanning eliminated in the `AddLog` macros.
+  - PROGMEM pool linkage validation guard; fix for a PROGMEM-as-RAM crash in autodiscovery (Exception 3).
+  - Heap-guard + `bConnected` check to prevent a reboot loop seen on the first beta builds.
+  - Serial-overrun suppression on MQTT publish errors.
+- **SAT (preview, not active in default builds):** Smart Autotune Thermostat source modules (PID, cycles, pressure, weather) are now in the tree behind `#if defined(ENABLE_SAT)`. They are not compiled in default firmware builds and are shipped as a developer preview for the next release cycle.
+- **No breaking changes vs v1.3.5** for ESP8266 users on the default build. MQTT topics, REST API, and settings format are preserved.
 
 ---
+
+## What was new in v1.3.5
+
+Version 1.3.5 fixed a WiFi reconnection regression introduced in v1.3.0 (state machine timeout raised from 5s to 30s) and added MQTT uptime / firmware version publishing on connect. Full release notes: [RELEASE_NOTES_1.3.5.md](docs/releases/RELEASE_NOTES_1.3.5.md)
 
 ## What was new in v1.3.4
 
@@ -408,7 +368,8 @@ Release notes for all versions are in [docs/releases/](docs/releases/). Prebuilt
 
 | Version | Highlights |
 | --- | --- |
-| **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/RELEASE_NOTES_1.3.4.md) [1.3.5](RELEASE_NOTES_1.3.5.md) |
+| **1.4.0-beta** | ESP8266 Arduino core 3.1.2, AceTime 4.1.0, SimpleTelnet migration, async bitmap-driven MQTT HA discovery, streaming discovery API, configurable HA device manufacturer/model, opt-in nightly restart, `/api/v2/sensors/status`, MQTT debug key split (3/5), NTP telemetry (key 6), memory reductions on ESP8266. SAT source added as preview (gated off). [Notes](RELEASE_NOTES_1.4.0.md) |
+| **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/RELEASE_NOTES_1.3.4.md) [1.3.5](docs/releases/RELEASE_NOTES_1.3.5.md) |
 | **1.2.0** | Complete HA discovery expansion (309 configs, 80+ message IDs), OpenTherm v4.2 alignment, webhook support, source-separated MQTT topics, v0/v1 API removed. [Notes](docs/releases/RELEASE_NOTES_1.2.0.md) |
 | **1.1.0** | Dallas sensor custom labels and graphs, RESTful API v2 (13 new endpoints), WebUI data persistence, browser debug console, PS mode detection, 20 bug fixes. [Notes](docs/releases/RELEASE_NOTES_1.1.0.md) |
 | **1.0.0** | Milestone release: real-time graphs, modern Web UI with dark mode, WebSocket live log, MQTT auto-discovery, interactive flashing tool, PROGMEM memory safety. [Notes](docs/releases/RELEASE_NOTES_1.0.0.md) |
