@@ -26,8 +26,9 @@ Version 1.4.0 is a minor-version release focused on a modern toolchain, a rewrit
   - PROGMEM pool linkage validation guard; fix for a PROGMEM-as-RAM crash in autodiscovery (Exception 3).
   - Heap-guard + `bConnected` check to prevent a reboot loop seen on the first beta builds.
   - Serial-overrun suppression on MQTT publish errors.
-- **SAT (preview, not active in default builds):** Smart Autotune Thermostat source modules (PID, cycles, pressure, weather) are now in the tree behind `#if defined(ENABLE_SAT)`. They are not compiled in default firmware builds and are shipped as a developer preview for the next release cycle.
-- **No breaking changes vs v1.3.5** for ESP8266 users on the default build. MQTT topics, REST API, and settings format are preserved.
+- **No breaking changes vs v1.3.5** for ESP8266 users. MQTT topics, REST API, and settings format are preserved.
+
+> **Note on SAT, ESP32 and PlatformIO:** those tracks have moved to a separate **`2.0.0`** branch and are **not** part of v1.4.0. The v1.4.0 line stays focused on ESP8266 + Arduino IDE builds.
 
 ---
 
@@ -368,7 +369,7 @@ Release notes for all versions are in [docs/releases/](docs/releases/). Prebuilt
 
 | Version | Highlights |
 | --- | --- |
-| **1.4.0-beta** | ESP8266 Arduino core 3.1.2, AceTime 4.1.0, SimpleTelnet migration, async bitmap-driven MQTT HA discovery, streaming discovery API, configurable HA device manufacturer/model, opt-in nightly restart, `/api/v2/sensors/status`, MQTT debug key split (3/5), NTP telemetry (key 6), memory reductions on ESP8266. SAT source added as preview (gated off). [Notes](RELEASE_NOTES_1.4.0.md) |
+| **1.4.0-beta** | ESP8266 Arduino core 3.1.2, AceTime 4.1.0, SimpleTelnet migration, async bitmap-driven MQTT HA discovery, streaming discovery API, configurable HA device manufacturer/model, opt-in nightly restart, `/api/v2/sensors/status`, MQTT debug key split (3/5), NTP telemetry (key 6), memory reductions on ESP8266. (SAT, ESP32 and PlatformIO moved to the `2.0.0` branch.) [Notes](RELEASE_NOTES_1.4.0.md) |
 | **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/RELEASE_NOTES_1.3.4.md) [1.3.5](docs/releases/RELEASE_NOTES_1.3.5.md) |
 | **1.2.0** | Complete HA discovery expansion (309 configs, 80+ message IDs), OpenTherm v4.2 alignment, webhook support, source-separated MQTT topics, v0/v1 API removed. [Notes](docs/releases/RELEASE_NOTES_1.2.0.md) |
 | **1.1.0** | Dallas sensor custom labels and graphs, RESTful API v2 (13 new endpoints), WebUI data persistence, browser debug console, PS mode detection, 20 bug fixes. [Notes](docs/releases/RELEASE_NOTES_1.1.0.md) |

@@ -51,9 +51,10 @@ This build is published as **v1.4.0-beta** because the discovery rewrite and cor
 - Noisy `skip` lines on MQTT gating are suppressed; per-publish MQTT error logging is suppressed to prevent serial overrun.
 - Per-second work in `_debugBOL()` is cached to reduce debug output overhead; `AddLog` no longer does `O(n²)` strlen scans.
 
-### Developer previews
-- **SAT (Smart Autotune Thermostat) source modules** (`SATcontrol.ino`, `SATcycles.ino`, `SATpid.ino`, `SATpressure.ino`, `SATweather.ino`) are now in the repository behind `#if defined(ENABLE_SAT)`. `ENABLE_SAT` is **not** defined in default builds, so SAT is not compiled into the shipped binary. This is an early port intended for the v1.5 cycle.
+### Tooling
 - New `/flash` skill for automated build + flash during development.
+
+> **Scope note.** SAT (Smart Autotune Thermostat), ESP32 support, and the PlatformIO build system have been moved to a separate **`2.0.0`** branch and are **not** part of v1.4.0. The v1.4.0 line stays focused on ESP8266 on the Arduino IDE toolchain; earlier documentation that announced those features under v1.4.0 was premature.
 
 ## Bug fixes
 
@@ -97,8 +98,7 @@ No breaking changes for ESP8266 default builds vs v1.3.5:
 
 ## Known limitations
 
-- **SAT** is source-only in this release (`ENABLE_SAT` not defined). It does **not** run in the shipped binary.
-- **ESP32 / PlatformIO** are not supported in this release. Any previous mention of those in documentation was aspirational; the shipped firmware is ESP8266-only.
+- **SAT, ESP32 support, and PlatformIO** are **not** part of this release. They have been moved to the separate **`2.0.0`** branch and will be tracked there until they are ready to ship. v1.4.0 targets ESP8266 on the Arduino IDE toolchain only.
 
 ## Thanks
 

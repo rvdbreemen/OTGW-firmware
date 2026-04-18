@@ -29,9 +29,8 @@ v1.4.0-beta is a minor-version release focused on a modern toolchain, a rewritte
 - Serial overrun on MQTT disconnect eliminated by dropping per-publish error logs.
 - Dallas sensor ID 246 removed from the static PROGMEM discovery array.
 
-## Developer previews (not active in default builds)
+## Tooling
 
-- **SAT (Smart Autotune Thermostat)** source modules (PID, cycles, pressure, weather) are now in the tree behind `#if defined(ENABLE_SAT)`. `ENABLE_SAT` is **not** set in the default build, so SAT is shipped as source only. Target for the next release cycle.
 - New `/flash` skill for automated build + flash during development.
 
 ## Upgrade notes
@@ -41,10 +40,9 @@ v1.4.0-beta is a minor-version release focused on a modern toolchain, a rewritte
 - **No breaking changes vs v1.3.5**: MQTT topics, REST API, and settings JSON are preserved. New settings (`nightlyrestart`, `nightlyrestarthour`, `device.manufacturer`, `device.model`) all have defaults.
 - **This is a beta.** We want a couple of weeks of field testing before promoting the tag to a stable `v1.4.0`. Please report issues on GitHub or on Discord.
 
-## Known limitations
+## Scope
 
-- SAT is not compiled into the shipped binary (`ENABLE_SAT` off).
-- ESP32 and PlatformIO builds are **not** supported in this release. Any earlier documentation suggesting otherwise was aspirational; this firmware is ESP8266-only.
+- **SAT, ESP32 support, and PlatformIO** have moved to the separate **`2.0.0`** branch and are **not** part of v1.4.0. This release stays focused on ESP8266 on the Arduino IDE toolchain.
 
 ## Thanks
 
