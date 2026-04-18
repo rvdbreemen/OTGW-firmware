@@ -87,6 +87,9 @@ TARGETS = {
         "fs_block": 4096,
         "fs_page": 256,
         "fs_size": 1048576,       # 0x100000 = 1 MB — matches partitions_otgw_esp32.csv
+        "app_size": 3014656,      # 0x2E0000 — matches factory app slot in partitions_otgw_esp32.csv.
+                                  #  Overrides PartitionScheme=custom default of 16 MB so the
+                                  #  size check reflects reality (TASK-288).
         "bootloader_offset": "0x0",  # ESP32-S3 bootloader is at 0x0 (not 0x1000)
     },
 }
@@ -501,10 +504,19 @@ def build_firmware(project_dir, config_file, target):
         "--verbose",
         "--libraries", str(project_dir / "src" / "libraries"),
         "--build-property", f"compiler.cpp.extra_flags=\"{tcfg['build_flags']}\"",
+    ]
+
+    # Override the upload.maximum_size default when the target pins an app size.
+    # PartitionScheme=custom in the ESP32 boards.txt ships a 16 MB default, which
+    # masks overflow on the OTGW32 4 MB layout. See TASK-288.
+    if "app_size" in tcfg:
+        cmd.extend(["--build-property", f"upload.maximum_size={tcfg['app_size']}"])
+
+    cmd.extend([
         "--build-path", str(temp_build_dir),
         "--config-file", str(config_file),
-        str(config.FIRMWARE_ROOT)
-    ]
+        str(config.FIRMWARE_ROOT),
+    ])
 
     run_command(cmd, cwd=project_dir, show_output=True)
     print_success(f"Firmware build complete [{tcfg['name']}]")
