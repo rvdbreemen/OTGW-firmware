@@ -3720,7 +3720,12 @@ static void decodeAndPublishOTValue()
   - error format
   - ...
 */
-void processOT(const char *buf, int len){
+void processOT(const char *buf, int len, bool suppressOutput){
+  // suppressOutput (TASK-293): when true, skip per-frame output paths and the
+  // auto-leave-PS-mode heuristic. State updates, decoded value publishing,
+  // and OT state flag writes still run so MQTT/SAT/WebUI values stay fresh.
+  // Set by bridgeFrameToParser() on ESP32 OT-direct when PS=1 is active; the
+  // PIC does the equivalent internally on ESP8266.
   static time_t epochBoilerlastseen = 0;
   static time_t epochThermostatlastseen = 0;
   static bool bOTGWboilerpreviousstate = false;
@@ -3729,8 +3734,11 @@ void processOT(const char *buf, int len){
   time_t now = time(nullptr);
 
   if (isvalidotmsg(buf, len)) {
-    // Raw OT frames indicate normal streaming mode (PS=0).
-    if (state.otBus.bPSmode) {
+    // Raw OT frames normally indicate PS=0 (streaming resumed). Skip this
+    // auto-leave path when the caller explicitly suppresses output: in
+    // OT-direct PS=1 we synthesise raw frames ourselves, so seeing them
+    // does not mean the PIC/firmware left PS mode.
+    if (state.otBus.bPSmode && !suppressOutput) {
       leavePSMode(PSTR("PS mode auto-detected as OFF (raw OT stream resumed)"),
                   PSTR("PS=0 [auto-detected, raw mode resumed]"));
     }
@@ -3739,7 +3747,7 @@ void processOT(const char *buf, int len){
     lastOTmsgMs = millis();
 
     //OT protocol messages are 9 chars long
-    if (settings.mqtt.bOTmessage) sendMQTTData(F("otmessage"), buf);
+    if (!suppressOutput && settings.mqtt.bOTmessage) sendMQTTData(F("otmessage"), buf);
 
     // counter of number of OT messages processed
     static int32_t cntOTmessagesprocessed = 0;

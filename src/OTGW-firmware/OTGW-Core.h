@@ -496,6 +496,12 @@ void confirmMQTTPublishSlot();             // confirm pending throttle slot upda
 void confirmMQTTPublishBitSlot();          // confirm pending status-bit slot update after successful MQTT publish
 void confirmMQTTPublishByteSlot();         // confirm pending status-byte slot update after successful MQTT publish
 
+// processOT — parse one OT frame and update state. suppressOutput=true skips
+// per-frame MQTT publish and the auto-leave-PS heuristic while still running
+// state updates, decoded value publishing, and connected-state flag writes.
+// Used by OT-direct bridgeFrameToParser() during PS=1 (TASK-293).
+void processOT(const char *buf, int len, bool suppressOutput = false);
+
 // RAII guard for the MQTT publish gate. Saves/restores mqttPublishAllowed on scope exit
 // so nested or interrupted gate operations can never leave the gate stuck false.
 // Usage:  { OTPublishGate gate(shouldPublishMQTTForID(...)); decodeAndPublishOTValue(); }

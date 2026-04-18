@@ -447,10 +447,14 @@ static void handleSlaveRequest(unsigned long request, OpenThermResponseStatus st
 // bridgeFrameToParser — format a 32-bit OT frame and feed to processOT()
 // ---------------------------------------------------------------------------
 static void bridgeFrameToParser(char prefix, unsigned long frame) {
-  if (otHideReports) return;  // PS=1 mode: suppress individual frame output
+  // TASK-293: always feed the frame into processOT() so state, decoded
+  // values, and connected-state flags stay fresh. In PS=1 mode, pass
+  // suppressOutput=true so the per-frame raw "otmessage" publish and the
+  // auto-leave-PS heuristic are skipped. Previously we early-returned here,
+  // which froze the whole ESP32 OT-direct pipeline while PS=1 was active.
   char buf[10];
   snprintf_P(buf, sizeof(buf), PSTR("%c%08lX"), prefix, frame);
-  processOT(buf, 9);
+  processOT(buf, 9, otHideReports);
 }
 
 // ---------------------------------------------------------------------------
