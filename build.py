@@ -1110,6 +1110,121 @@ def clean_build(project_dir, distclean=False):
     print_success("Clean complete")
 
 
+def verify_image_header(project_dir, target):
+    """Run `esptool image-info` on each produced .bin under build/ and confirm
+    that flash_mode, flash_freq and flash_size match TARGETS[target]. Returns
+    True when every image matches, False on the first mismatch or when esptool
+    is missing. Deliberately tolerant of missing image-info output: a binary
+    without a recognised header is skipped with a warning (not a failure).
+
+    Covers AC #1 of TASK-290.
+    """
+    tcfg = TARGETS[target]
+    build_dir = project_dir / "build"
+    if not build_dir.exists():
+        print_warning("Build directory not found, nothing to verify")
+        return False
+
+    # Only the main flash images carry a full image header; bootloader images
+    # do too, but partition / filesystem binaries do not. Stick to *.bin at the
+    # top level of build/ for now; skip anything under subdirs.
+    images = sorted(build_dir.glob("*.bin"))
+    if not images:
+        print_warning("No .bin artifacts found under build/")
+        return False
+
+    print_step(f"Verifying image headers [{tcfg['name']}]")
+
+    import re
+    patt_mode = re.compile(r"Flash mode:\s*(\S+)", re.IGNORECASE)
+    patt_freq = re.compile(r"Flash freq:\s*(\S+)", re.IGNORECASE)
+    patt_size = re.compile(r"Flash size:\s*(\S+)", re.IGNORECASE)
+
+    expected = {
+        "mode": str(tcfg.get("flash_mode", "")).lower(),
+        "freq": str(tcfg.get("flash_freq", "")).lower(),
+        "size": str(tcfg.get("flash_size", "")).lower(),
+    }
+    all_ok = True
+    for img in images:
+        try:
+            out = subprocess.run(
+                [sys.executable, "-m", "esptool", "--chip", tcfg["chip"],
+                 "image-info", str(img)],
+                check=False, capture_output=True, text=True,
+            )
+        except FileNotFoundError:
+            print_error("esptool not available; install via `pip install esptool`")
+            return False
+        text = out.stdout + out.stderr
+        if "Image Header" not in text:
+            print_info(f"{img.name}: no image header, skipped")
+            continue
+
+        got = {}
+        for key, pat in (("mode", patt_mode), ("freq", patt_freq), ("size", patt_size)):
+            m = pat.search(text)
+            got[key] = m.group(1).lower() if m else ""
+
+        mismatches = [k for k in ("mode", "freq", "size")
+                      if expected[k] and got[k] != expected[k]]
+        if mismatches:
+            print_error(
+                f"{img.name}: image header mismatch on {mismatches}. "
+                f"Expected {expected}, got {got}"
+            )
+            all_ok = False
+        else:
+            print_success(f"{img.name}: header OK ({got})")
+    return all_ok
+
+
+def verify_flash_on_device(project_dir, target, port):
+    """Run `esptool verify-flash` against a connected device for the produced
+    bootloader + partitions + app + filesystem binaries. Returns True on pass.
+
+    Covers AC #2 of TASK-290. Only meaningful for ESP32/ESP32-S3 targets where
+    multiple artifacts land at documented offsets; ESP8266 has a single merged
+    image and is out of scope.
+    """
+    tcfg = TARGETS[target]
+    if "bootloader_offset" not in tcfg:
+        print_warning(f"{tcfg['name']}: verify-flash expects a multi-artifact layout; skipped")
+        return False
+
+    build_dir = project_dir / "build"
+    candidates = {
+        tcfg["bootloader_offset"]: next(iter(build_dir.glob("**/bootloader.bin")), None),
+        "0x8000": next(iter(list(build_dir.glob("**/partitions.bin")) + list(build_dir.glob("**/*.partitions.bin"))), None),
+        tcfg["firmware_offset"]: next(iter(build_dir.glob("*.bin")), None),
+        tcfg["fs_offset"]: next(iter(build_dir.glob("*littlefs*.bin")), None),
+    }
+    missing = [o for o, p in candidates.items() if p is None]
+    if missing:
+        print_error(f"verify-flash: missing artifacts for offsets {missing}")
+        return False
+
+    cmd = [
+        sys.executable, "-m", "esptool",
+        "--chip", tcfg["chip"],
+        "--port", port,
+        "verify-flash",
+        "--flash-mode", tcfg["flash_mode"],
+        "--flash-freq", tcfg["flash_freq"],
+        "--flash-size", tcfg["flash_size"],
+    ]
+    for off, path in candidates.items():
+        cmd.extend([off, str(path)])
+
+    print_step(f"Verifying on-device flash [{tcfg['name']}] via {port}")
+    result = subprocess.run(cmd, check=False)
+    if result.returncode != 0:
+        print_error("verify-flash reported a mismatch; see esptool output above")
+        return False
+    print_success("verify-flash: on-device image matches build output")
+    return True
+
+
 def setup_reproducible_env(project_dir, use_ccache=False):
     """Configure environment variables for reproducible builds and optional ccache.
 
@@ -1285,6 +1400,16 @@ Examples:
         action="store_true",
         help="Pin LC_ALL, TZ, PYTHONHASHSEED, SOURCE_DATE_EPOCH for reproducible builds"
     )
+    parser.add_argument(
+        "--verify-image",
+        action="store_true",
+        help="After build, run esptool image-info on each .bin and confirm flash_mode/freq/size match the target config"
+    )
+    parser.add_argument(
+        "--verify-flash",
+        metavar="PORT",
+        help="After build, run esptool verify-flash against the given serial port"
+    )
 
     args = parser.parse_args()
     
@@ -1435,6 +1560,20 @@ Examples:
     # Optional sha256 manifest before listing
     if args.manifest:
         write_build_manifest(project_dir, semver)
+
+    # Optional image-header / on-device flash verification (TASK-290).
+    if args.verify_image:
+        for target in target_names:
+            if not verify_image_header(project_dir, target):
+                print_error(f"Image verification failed for {TARGETS[target]['name']}")
+                sys.exit(3)
+
+    if args.verify_flash:
+        # verify-flash only makes sense for one target at a time; pick the
+        # first target the user asked for.
+        if not verify_flash_on_device(project_dir, target_names[0], args.verify_flash):
+            print_error("On-device verify-flash failed")
+            sys.exit(3)
 
     # List build artifacts
     list_build_artifacts(project_dir)
