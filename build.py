@@ -1186,6 +1186,15 @@ def verify_image_header(project_dir, target):
             m = pat.search(text)
             got[key] = m.group(1).lower() if m else ""
 
+        # ESP32-S3 by design: the core boards.txt sets
+        # esp32s3.menu.FlashMode.qio.build.flash_mode=dio so the app image
+        # header is always DIO even when the user selected QIO; the QIO
+        # switch happens at bootloader time. Do not flag that as a drift.
+        if (tcfg.get("chip") == "esp32s3"
+                and expected["mode"] == "qio"
+                and got.get("mode") == "dio"):
+            got["mode"] = "qio"  # normalise for the comparison below
+
         mismatches = [k for k in ("mode", "freq", "size")
                       if expected[k] and got[k] != expected[k]]
         if mismatches:
