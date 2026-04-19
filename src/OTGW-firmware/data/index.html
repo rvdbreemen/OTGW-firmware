@@ -115,7 +115,7 @@
         <div id="otd-ovr-section" style="display:none; margin-bottom:8px;">
           <div id="otd-ovr-list"></div>
           <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px; align-items:center;">
-            <select id="otd-ovr-action">
+            <select id="otd-ovr-action" aria-label="Override action">
               <option value="sr">SR (Stored Response)</option>
               <option value="cr">CR (Clear Response)</option>
               <option value="rm">RM (Response Modify)</option>
@@ -123,8 +123,8 @@
               <option value="ui">UI (Mark Unknown ID)</option>
               <option value="ki">KI (Mark Known ID)</option>
             </select>
-            <input type="number" id="otd-ovr-msgid" min="0" max="127" placeholder="MsgID" style="width:70px;" />
-            <input type="text" id="otd-ovr-value" placeholder="Hex value" style="width:80px;" />
+            <input type="number" id="otd-ovr-msgid" min="0" max="127" placeholder="MsgID" aria-label="OpenTherm message ID" style="width:70px;" />
+            <input type="text" id="otd-ovr-value" placeholder="Hex value" aria-label="Override value (hex)" style="width:80px;" />
             <button type="button" onclick="sendOTDOverride()">Apply</button>
           </div>
         </div>
@@ -441,7 +441,7 @@
           </div>
           <div class="sat-controls-row" style="margin-top:8px">
             <button class="sat-btn" id="sat-btn-detect-location" onclick="SAT.detectLocation()">Detect Location</button>
-            <span id="sat-weather-coords" style="font-size:0.85em;color:#888"></span>
+            <span id="sat-weather-coords" class="sat-weather-coords"></span>
           </div>
         </div>
 

@@ -351,7 +351,12 @@
 
   .net-status-text {
     font-size: 11px;
-    opacity: 0.7;
+    color: #c0c0c0; /* WCAG AA on dark header bg; replaced opacity:0.7 which dropped to ~4.0:1 */
+  }
+
+  .sat-weather-coords {
+    font-size: 0.85em;
+    color: #999; /* WCAG AA secondary text on dark theme */
   }
 
   .net-status.net-wifi .net-icon { color: #66bb6a; }

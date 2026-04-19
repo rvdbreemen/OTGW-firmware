@@ -3362,11 +3362,9 @@ void satControlLoop()
     satLoadPidState();
   }
 
-  // --- Simulation update (Task #37): model thermal behavior before PID ---
-  satUpdateSimulation();
-  // --- Thermal drop learning (Task #21): learn building thermal decay rate ---
-  satUpdateThermalLearning();
   // --- Fallback detection (Task #19): auto-enable SAT when external control lost ---
+  // Runs BEFORE the bEnabled gate because it is the entry path that flips
+  // bEnabled from false to true when the boiler controller loses MQTT.
   if (!settings.sat.bEnabled && !state.sat.bFallbackActive) {
     // Only fall back if MQTT is enabled AND was previously connected but has now been
     // lost for >5 minutes. iLastConnectedMs == 0 means never connected (fresh boot or
@@ -3392,12 +3390,20 @@ void satControlLoop()
     return;
   }
 
+  // Early bail when SAT is disabled or a flash update is in progress.
+  // Simulation and thermal-learning are SAT-internal (their consumers all
+  // live in SAT code paths) and only run past this gate. PERF-L2 2026-04-18.
   if (!settings.sat.bEnabled || isFlashing()) {
     if (state.sat.bActive) {
       satDisable();
     }
     return;
   }
+
+  // --- Simulation update (Task #37): model thermal behavior before PID ---
+  satUpdateSimulation();
+  // --- Thermal drop learning (Task #21): learn building thermal decay rate ---
+  satUpdateThermalLearning();
 
   // If safety tripped, stay disabled until explicitly re-enabled
   if (state.sat.bSafetyTripped) return;

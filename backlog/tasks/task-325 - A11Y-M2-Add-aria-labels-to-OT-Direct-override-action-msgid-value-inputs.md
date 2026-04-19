@@ -1,9 +1,11 @@
 ---
 id: TASK-325
 title: '[A11Y-M2] Add aria-labels to OT-Direct override action/msgid/value inputs'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-18 19:27'
+updated_date: '2026-04-19 06:21'
 labels:
   - accessibility
   - review-2026-04-18
@@ -19,7 +21,13 @@ index.html:118,:126,:127 use placeholder-only labeling. WCAG 1.3.1 and 3.3.2 fai
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 action <select>, msgid <input>, value <input> each have a descriptive aria-label
+- [x] #1 action <select>, msgid <input>, value <input> each have a descriptive aria-label
 - [ ] #2 Or visible <label for=> equivalent added
-- [ ] #3 Placeholder attributes remain as hints but no longer carry the label
+- [x] #3 Placeholder attributes remain as hints but no longer carry the label
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+index.html:118-127: added aria-label='Override action' to otd-ovr-action select, aria-label='OpenTherm message ID' to otd-ovr-msgid input, aria-label='Override value (hex)' to otd-ovr-value input. Placeholders retained as hints. AC2 (visible <label for=> alternative) not chosen because the horizontal compact layout doesn't have room for visible labels without restructuring.
+<!-- SECTION:FINAL_SUMMARY:END -->

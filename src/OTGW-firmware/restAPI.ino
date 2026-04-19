@@ -42,9 +42,12 @@ static const char* httpMethodToStr(HTTPMethod m) {
 // H3: Send dynamic CORS Allow-Origin header echoing the request Origin,
 // instead of a wildcard. Only sends the header when Origin is present.
 static void sendCorsOriginHeader() {
-  String origin = httpServer.header("Origin");
-  if (origin.length() > 0) {
-    httpServer.sendHeader(F("Access-Control-Allow-Origin"), origin);
+  // httpServer.header() returns const String& (no allocation); strlcpy into a
+  // static buffer keeps this allocation-free on the request hot path.
+  static char originBuf[128];
+  strlcpy(originBuf, httpServer.header(F("Origin")).c_str(), sizeof(originBuf));
+  if (originBuf[0] != '\0') {
+    httpServer.sendHeader(F("Access-Control-Allow-Origin"), originBuf);
   }
 }
 
