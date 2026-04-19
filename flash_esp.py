@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import glob
+import hashlib
 import json
 import os
 import platform
@@ -368,10 +369,58 @@ def get_latest_release_info():
         return None
 
 
+def _load_sha256sums(assets, download_dir):
+    """Look for a SHA256SUMS asset in the release and return a {filename: hexdigest}
+    mapping. Returns {} when the release has no SHA256SUMS (older releases). A
+    warning is printed in that case so users know verification was skipped."""
+    sums_asset = None
+    for asset in assets:
+        name = asset['name']
+        if name.upper() in ("SHA256SUMS", "SHA256SUMS.TXT", "CHECKSUMS.SHA256"):
+            sums_asset = asset
+            break
+    if not sums_asset:
+        print_warning("No SHA256SUMS asset in release; cannot verify downloads.")
+        return {}
+    sums_path = download_dir / sums_asset['name']
+    try:
+        urllib.request.urlretrieve(sums_asset['browser_download_url'], sums_path)
+    except Exception as e:
+        print_warning(f"Failed to download {sums_asset['name']}: {e}")
+        return {}
+    mapping = {}
+    for line in sums_path.read_text(encoding='utf-8', errors='replace').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        # Format: "<hexdigest>  <filename>" (two spaces) or "<hexdigest> <filename>"
+        parts = line.split(None, 1)
+        if len(parts) != 2:
+            continue
+        digest, fname = parts[0].lower(), parts[1].lstrip('*').strip()
+        if len(digest) == 64 and all(c in '0123456789abcdef' for c in digest):
+            mapping[fname] = digest
+    print_info(f"Loaded {len(mapping)} SHA256 entries from {sums_asset['name']}")
+    return mapping
+
+
+def _sha256_of_file(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(65536), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def download_release_assets(release_info, download_dir, board):
     """Download firmware and filesystem files for the given board from a GitHub release."""
     assets = release_info.get('assets', [])
     downloaded = {}
+
+    # Pull SHA256SUMS first so every subsequent download can be verified before
+    # any bytes are written to flash. If the release does not publish a sums
+    # file we fall back to unverified downloads with a loud warning.
+    sums = _load_sha256sums(assets, download_dir)
 
     # For merged binary (preferred for ESP32), firmware .ino.bin, and littlefs.bin
     # Assets are expected to contain the board name (esp8266 / esp32) in the filename.
@@ -401,6 +450,25 @@ def download_release_assets(release_info, download_dir, board):
             print_info(f"Downloading {label}: {asset['name']}...")
             urllib.request.urlretrieve(asset['browser_download_url'], path)
             print_success(f"Downloaded {asset['name']} ({asset['size']} bytes)")
+            # Verify SHA256 when available. A mismatch MUST abort before the
+            # bytes have any chance of reaching esptool write-flash.
+            expected = sums.get(asset['name'])
+            if expected:
+                actual = _sha256_of_file(path)
+                if actual != expected:
+                    print_error(f"SHA256 mismatch for {asset['name']}")
+                    print_error(f"  expected: {expected}")
+                    print_error(f"  actual:   {actual}")
+                    try:
+                        path.unlink()
+                    except Exception:
+                        pass
+                    return  # do NOT add to downloaded; caller will see it missing
+                print_success(f"SHA256 OK for {asset['name']}")
+            elif sums:
+                # We have a SHA256SUMS file but no entry for this asset: treat
+                # as suspect because the release packager meant to cover it.
+                print_warning(f"No SHA256 entry for {asset['name']}; proceeding without verification")
             downloaded[key] = path
         except Exception as e:
             print_error(f"Failed to download {label}: {e}")

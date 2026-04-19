@@ -350,27 +350,47 @@ def install_arduino_cli(system):
     temp_dir.mkdir(exist_ok=True)
     
     try:
-        # Download arduino-cli
+        # Download arduino-cli.
+        # Use the system default SSL context: verifies certificates and hostnames.
+        # Previously this code set CERT_NONE and check_hostname=False "to avoid
+        # macOS cert errors", which opened the door to MITM of arduino-cli itself.
+        # If a macOS user hits cert errors now, the fix is to run
+        #   /Applications/Python\ 3.x/Install\ Certificates.command
+        # once on their machine, not to disable verification globally.
         print_info(f"Downloading from {url}...")
         download_path = temp_dir / filename
-        
-        # Use unverified SSL context to avoid certificate errors on macOS
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        
+
         with urllib.request.urlopen(url, context=ctx) as response, open(download_path, 'wb') as out_file:
             shutil.copyfileobj(response, out_file)
-            
+
         print_success("Download complete")
-        
-        # Extract
+
+        # Extract. Use filter='data' on tar to block path traversal ('../') and
+        # device/special files (Python 3.12+). For zip, validate each member's
+        # resolved path stays inside temp_dir before extraction.
         print_info("Extracting...")
         if filename.endswith(".tar.gz"):
             with tarfile.open(download_path, "r:gz") as tar:
-                tar.extractall(temp_dir)
+                try:
+                    tar.extractall(temp_dir, filter='data')  # type: ignore[arg-type]
+                except TypeError:
+                    # Python < 3.12 does not accept filter= kwarg. Validate manually.
+                    temp_resolved = temp_dir.resolve()
+                    for member in tar.getmembers():
+                        dest = (temp_dir / member.name).resolve()
+                        if not str(dest).startswith(str(temp_resolved)):
+                            print_error(f"tar member escapes temp dir: {member.name}")
+                            sys.exit(1)
+                    tar.extractall(temp_dir)
         elif filename.endswith(".zip"):
             with zipfile.ZipFile(download_path, "r") as zip_ref:
+                temp_resolved = temp_dir.resolve()
+                for member in zip_ref.namelist():
+                    dest = (temp_dir / member).resolve()
+                    if not str(dest).startswith(str(temp_resolved)):
+                        print_error(f"zip member escapes temp dir: {member}")
+                        sys.exit(1)
                 zip_ref.extractall(temp_dir)
         
         # Find the extracted executable

@@ -223,16 +223,22 @@ void startWebserver(){
   // all other api calls are catched in FSexplorer onNotFounD!
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
-  // Enable collection of If-None-Match so index.html ETag conditional requests work.
+  // Enable collection of headers the API layer needs:
+  //   - If-None-Match: ETag conditional requests (index.html cache)
+  //   - Origin / Referer: CSRF same-origin check in restAPI.ino (ADR-054).
+  //     Without these, httpServer.header("Origin") always returns empty and
+  //     isSameOriginRequest() treats every browser request as "non-browser",
+  //     silently disabling CSRF protection.
   // ESP8266 Core 3.x has BOTH overloads; the variadic template wins over the
   // array+count form when the count is int (int→size_t conversion ranking).
-  // Passing a single string literal bypasses the ambiguity on ESP8266.
   // ESP32 WebServer only has the array+count overload, no variadic template.
 #ifdef ESP8266
-  httpServer.collectHeaders("If-None-Match");
+  // ESP8266WebServer stores these pointers by value (no PROGMEM copy-out),
+  // so plain RAM string literals are correct here — not F()/PSTR().
+  httpServer.collectHeaders("If-None-Match", "Origin", "Referer");
 #else
-  static const char* collectHeaderKeys[] = {"If-None-Match"};
-  httpServer.collectHeaders(collectHeaderKeys, 1);
+  static const char* collectHeaderKeys[] = {"If-None-Match", "Origin", "Referer"};
+  httpServer.collectHeaders(collectHeaderKeys, 3);
 #endif
 
   httpServer.begin();

@@ -144,9 +144,40 @@ void weatherFetch()
   yield();
 
   if (httpCode == 200) {
-    // OK to use String here — one-off fetch, not a hot path (ADR-004 exception)
-    String payload = http.getString();
-    const char* json = payload.c_str();
+    // Replace String payload = http.getString() (ADR-004 hot-path repeat
+    // allocation every 15 min, 2-4 KB doubling growth) with a bounded heap
+    // buffer. Fixed 4 KB is plenty for current + 24h forecast; if heap is
+    // low we skip the fetch entirely rather than risk a failed malloc mid-loop.
+    constexpr size_t WEATHER_BUF_SIZE = 4096;
+    if (ESP.getFreeHeap() < (WEATHER_BUF_SIZE + 4096)) {
+      DebugTln(F("Weather: free heap too low for fetch, skipping"));
+      state.sat.weather.iFetchErrors++;
+      http.end();
+      return;
+    }
+    char* json = (char*) malloc(WEATHER_BUF_SIZE);
+    if (!json) {
+      DebugTln(F("Weather: malloc failed, skipping"));
+      state.sat.weather.iFetchErrors++;
+      http.end();
+      return;
+    }
+    WiFiClient* stream = http.getStreamPtr();
+    size_t total = 0;
+    while (stream && stream->connected() && total < WEATHER_BUF_SIZE - 1) {
+      int avail = stream->available();
+      if (avail <= 0) {
+        if (http.connected()) { yield(); delay(1); continue; }
+        break;
+      }
+      int toRead = (int)(WEATHER_BUF_SIZE - 1 - total);
+      if (toRead > avail) toRead = avail;
+      int got = stream->readBytes(json + total, toRead);
+      if (got <= 0) break;
+      total += (size_t)got;
+      yield();
+    }
+    json[total] = '\0';
 
     // Parse current weather from "current" section
     float temp = 0.0f, hum = 0.0f, wind = 0.0f;
@@ -171,11 +202,14 @@ void weatherFetch()
     state.sat.weather.bValid = true;
     state.sat.weather.iLastUpdateMs = millis();
 
-    DebugTf(PSTR("Weather: %.1fC, %d%% humidity, %.1f km/h wind, %d forecast hours\r\n"),
+    DebugTf(PSTR("Weather: %.1fC, %d%% humidity, %.1f km/h wind, %d forecast hours (read %u bytes)\r\n"),
       state.sat.weather.fTemperature,
       (int)state.sat.weather.fHumidity,
       state.sat.weather.fWindSpeed,
-      _weather_forecastCount);
+      _weather_forecastCount,
+      (unsigned)total);
+
+    free(json);
   } else {
     DebugTf(PSTR("Weather: HTTP %d\r\n"), httpCode);
     state.sat.weather.iFetchErrors++;
