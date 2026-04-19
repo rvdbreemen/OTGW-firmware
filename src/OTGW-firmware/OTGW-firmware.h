@@ -30,6 +30,8 @@ extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 // enums are tightly coupled; see SATtypes.h preamble for the rationale.
 #include "SATtypes.h"
 #include "boards.h"             // Board-specific pin maps and feature flags (HAS_PIC, HAS_DIRECT_OT)
+// OTDirecttypes.h must follow boards.h because its contents are gated on HAS_DIRECT_OT (ADR-079).
+#include "OTDirecttypes.h"
 #if HAS_PIC
 #include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
 #endif
@@ -58,10 +60,7 @@ String checkforupdatepic(String filename);
 #if HAS_DIRECT_OT
 enum class OpenThermResponseStatus : byte;
 
-enum OTDirectRequestOrigin : uint8_t {
-  OT_DIRECT_ORIGIN_GATEWAY = 0,
-  OT_DIRECT_ORIGIN_THERMOSTAT
-};
+// OTDirectRequestOrigin moved to OTDirecttypes.h (ADR-079/TASK-326)
 
 // OT-direct forward declarations (defined in OTDirect.ino)
 void initOTDirect();
@@ -269,31 +268,7 @@ struct PICSection {            // state.pic — PIC microcontroller identity/sta
   char sType[32]      = "no pic found";  // was sPICtype
 };
 
-#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-// OT-direct operating modes (gateway perspective)
-enum OTDirectMode : uint8_t {
-  OTD_MODE_GATEWAY  = 1,   // Full gateway: scheduler + thermostat forwarding + overrides (default)
-  OTD_MODE_MONITOR  = 2,   // Transparent: forward all frames unmodified, log everything
-  OTD_MODE_BYPASS   = 0,   // Thermostat direct to boiler via relay, OT-direct inactive
-  OTD_MODE_MASTER   = 3,   // Sole OT master: scheduler only, no thermostat expected
-  OTD_MODE_LOOPBACK = 4,   // Internal test: simulated boiler responses, no hardware needed
-};
-
-struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime status
-  uint8_t  iScheduleTotal    = 0;   // total schedule entries
-  uint8_t  iScheduleActive   = 0;   // entries not disabled by boiler
-  uint8_t  iScheduleDisabled = 0;   // entries disabled (UNKNOWN_DATA_ID)
-  uint8_t  iOverrideCount    = 0;   // number of active write overrides
-  bool     bBypassActive     = false; // true = thermostat direct to boiler (relay)
-  bool     bStepUpEnabled    = false; // 24V step-up converter on
-  bool     bMonitorMode      = false; // true = transparent pass-through, no overrides applied
-  OTDirectMode eMode         = OTD_MODE_GATEWAY; // current operating mode
-  bool     bMasterMode       = false;    // true = standalone master, no thermostat
-  bool     bThermostatConnected = false; // thermostat recently seen (within timeout)
-  bool     bSetbackActive    = false;    // thermostat disconnected → setback override engaged
-  uint32_t iLastThermostatMs = 0;        // millis() of last thermostat frame received
-};
-#endif
+// OTDirectMode + OTDirectSection moved to OTDirecttypes.h (ADR-079/TASK-326)
 
 struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (semantic name: OT bus traffic, not the gateway as a whole)
   bool bOnline           = false;  // was bOTGWonline — serial link alive
@@ -573,31 +548,7 @@ struct PICBootSection {            // PIC boot-time command injection
 // with permission from the SAT authors.
 // SATSection moved to settings_sat.h (ADR-079/TASK-326)
 
-#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-struct OTDirectSettingsSection {
-  uint8_t  iMode              = 1;     // OTD_MODE_GATEWAY default, persisted across reboot
-  bool     bAutoDetect        = true;  // Auto-detect thermostat presence at boot
-  float    fSetbackTemp       = 16.0f; // Setback temp on thermostat disconnect (°C)
-  uint8_t  iSetbackTimeout    = 30;    // Seconds before thermostat considered disconnected
-  bool     bEnableSlave       = true;  // Enable slave interface in master mode
-  bool     bSummerMode        = false; // SM= summer mode (bit5 of master status)
-  bool     bFailSafe          = true;  // FS= fail-safe setback on thermostat disconnect
-  uint16_t iMsgInterval       = 100;   // MI= minimum inter-message gap (ms, 100-1275)
-  bool     bHasBypassRelay    = false; // Runtime: bypass relay present on this board
-  // --- TASK-183: PI room compensation + weather-compensated heating curve ---
-  uint8_t  iCHMode            = 1;     // 0=off, 1=fixed flow, 2=heating curve (AUTO)
-  float    fFlowTemp          = 45.0f; // Fixed flow temp for CH mode=fixed (°C)
-  float    fFlowMax           = 75.0f; // Maximum flow temperature (°C)
-  float    fRoomSetpoint      = 20.0f; // Default room setpoint for heating curve (°C)
-  float    fGradient          = 1.5f;  // Heating curve gradient
-  float    fExponent          = 1.0f;  // Heating curve exponent (1.0 = linear)
-  float    fOffset            = 0.0f;  // Heating curve offset (°C)
-  bool     bRoomCompEnabled   = false; // PI room compensation enabled
-  float    fKp                = 5.0f;  // Proportional gain (K/K)
-  float    fKi                = 0.5f;  // Integral gain (1/h)
-  float    fKboost            = 2.0f;  // Boost gain (K/K), applied when error > 1°C
-};
-#endif
+// OTDirectSettingsSection moved to OTDirecttypes.h (ADR-079/TASK-326)
 
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
 struct EthernetSection {
