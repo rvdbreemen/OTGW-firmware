@@ -21,6 +21,8 @@ otmonitor-6.6/**
 otmonitor-6.6
 evaluation-report.json
 .tmp/
+*.tmp
+*.bak
 .claude/settings.local.json
 .claude/.vscode/mcp.json
 .mcp.json

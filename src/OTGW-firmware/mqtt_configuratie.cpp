@@ -1,13 +1,15 @@
-// AUTO-GENERATED from mqttha.cfg by tools/generate_mqttha_data.py
-// DO NOT EDIT -- regenerate with: python tools/generate_mqttha_data.py
-// Generated: 2026-04-17T17:40:17Z
+// Hand-written streaming HA discovery data + compose functions.
+// See ADR-077 (streaming MQTT HA discovery architecture) for the rationale.
+// The former auto-generator under tools/generate_mqttha_*.py is gone; edit this
+// file directly. Former header banner removed so contributors do not chase a
+// tool that no longer exists.
 //
-// Sensors        : 289 entries (118 unique OT IDs)
-// Binary sensors : 53 entries (10 unique OT IDs)
-// Climate        : 2 entries
-// Number         : 1 entries
-//
-// Total PROGMEM strings: 250 labels + 259 friendly names
+// Contents:
+//   Sensors        : 289 entries (118 unique OT IDs)
+//   Binary sensors : 53 entries (10 unique OT IDs)
+//   Climate        : 2 entries
+//   Number         : 1 entries
+//   Total PROGMEM strings: 250 labels + 259 friendly names
 
 #include "MQTTstuff.h"
 

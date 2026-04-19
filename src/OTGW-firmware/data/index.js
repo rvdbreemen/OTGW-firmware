@@ -379,7 +379,9 @@ function updateNetworkIndicator(mode, apFallback, quality) {
   var isAP  = (mode === 'AP');
   var cssClass = isEth ? 'net-ethernet' : (isAP ? 'net-ap' : 'net-wifi');
   container.className = 'headercolumn net-status ' + cssClass;
-  container.title = isAP ? 'AP Fallback mode (no WiFi)' : ('Network: ' + mode);
+  var netLabel = isAP ? 'AP Fallback mode (no WiFi)' : ('Network: ' + mode);
+  container.title = netLabel;
+  container.setAttribute('aria-label', 'Network status: ' + (isAP ? 'AP Fallback' : mode));
   wifiIcon.classList.toggle('hidden', isEth);
   ethIcon.classList.toggle('hidden', !isEth);
   if (textEl) textEl.textContent = isAP ? 'AP MODE' : mode;

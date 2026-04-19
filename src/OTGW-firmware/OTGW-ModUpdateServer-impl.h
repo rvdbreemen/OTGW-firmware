@@ -39,9 +39,17 @@ extern void settingsMarkClean();      // Clear dirty flag without writing or res
 
 #ifndef Debug
   //#warning Debug() was not defined!
-	#define Debug(...)		({ Serial.print(__VA_ARGS__); })
-	#define Debugln(...)	({ Serial.println(__VA_ARGS__); })
-  #define Debugf(...)		({ Serial.printf_P(__VA_ARGS__); })
+  #if defined(ESP8266)
+    // ESP8266 shares UART0 between Serial and the PIC link; route via OTGWSerial
+    // so raw writes cannot corrupt PIC framing (see security review 2026-04-18).
+    #define Debug(...)		({ OTGWSerial.print(__VA_ARGS__); })
+    #define Debugln(...)	({ OTGWSerial.println(__VA_ARGS__); })
+    #define Debugf(...)		({ OTGWSerial.printf_P(__VA_ARGS__); })
+  #else
+    #define Debug(...)		({ Serial.print(__VA_ARGS__); })
+    #define Debugln(...)	({ Serial.println(__VA_ARGS__); })
+    #define Debugf(...)		({ Serial.printf_P(__VA_ARGS__); })
+  #endif
 //#else
 //  #warning Seems Debug() is already defined!
 #endif
@@ -161,7 +169,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_beginFilesystemUpload(HTTPUpl
   if (uploadTotal > 0 && uploadTotal > fsSize) {
     _updaterError = F("filesystem image too large");
   } else if (!Update.begin(fsSize, U_FS)) { // always use full partition size to erase stale upper-block data
+#if defined(ESP8266)
+    if (_serial_output) Update.printError(OTGWSerial);
+#else
     if (_serial_output) Update.printError(Serial);
+#endif
     _setUpdaterError();
   }
 }
@@ -340,7 +352,11 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setSuccessPage(const char *suc
 template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_setUpdaterError()
 {
+#if defined(ESP8266)
+  if (_serial_output) Update.printError(OTGWSerial);
+#else
   if (_serial_output) Update.printError(Serial);
+#endif
   StreamString str;
   Update.printError(str);
   _updaterError = str.c_str();
