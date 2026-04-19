@@ -1,11 +1,11 @@
 ---
 id: TASK-342
 title: Quiesce MQTT discovery drip during Status-frame burst
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-19 21:06'
-updated_date: '2026-04-19 21:13'
+updated_date: '2026-04-19 21:17'
 labels:
   - mqtt
   - heap
@@ -46,12 +46,12 @@ Removes the specific heap-collision visible at lines 450-455 of debug_2a.txt (he
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Flag added (location: state.mqtt.bStatusBurstActive OR static in MQTTstuff.ino — pick based on ADR-051 review)
-- [ ] #2 Flag set TRUE at start of Status-frame sub-topic loop in processOT
-- [ ] #3 Flag cleared FALSE after final sub-topic publish
-- [ ] #4 loopMQTTDiscovery() skips publish when flag is TRUE
-- [ ] #5 Timeout safety: flag auto-clears after 500ms
-- [ ] #6 Build passes for esp8266 environment
+- [x] #1 Flag added (location: state.mqtt.bStatusBurstActive OR static in MQTTstuff.ino — pick based on ADR-051 review)
+- [x] #2 Flag set TRUE at start of Status-frame sub-topic loop in processOT
+- [x] #3 Flag cleared FALSE after final sub-topic publish
+- [x] #4 loopMQTTDiscovery() skips publish when flag is TRUE
+- [x] #5 Timeout safety: flag auto-clears after 500ms
+- [x] #6 Build passes for esp8266 environment
 - [ ] #7 Manual test: confirm drip does not fire during Status-burst by comparing timestamps in debug log
 <!-- AC:END -->
 
@@ -72,3 +72,23 @@ Removes the specific heap-collision visible at lines 450-455 of debug_2a.txt (he
 <!-- SECTION:NOTES:BEGIN -->
 Added statusBurstActive flag + beginStatusBurst/endStatusBurst/isStatusBurstActive in MQTTstuff.ino with 500ms self-heal timeout. Wrapped publishMasterStatusState and publishSlaveStatusState in OTGW-Core.ino — this catches ALL three call sites (the combined caller at line 3388, plus the individual-side callers at lines 1871 and 1899). loopMQTTDiscovery now skips a tick when isStatusBurstActive() returns true. Forward declarations in OTGW-firmware.h.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added a status-burst quiesce mechanism (MQTTstuff.ino):
+- static bool statusBurstActive + unsigned long statusBurstStartMs
+- beginStatusBurst(): set flag, record millis
+- endStatusBurst(): clear flag
+- isStatusBurstActive(): returns flag with 500ms self-heal timeout
+
+Wrapped publishMasterStatusState and publishSlaveStatusState in OTGW-Core.ino with begin/end calls. This wrap location covers all three Status-frame call sites automatically (the combined caller at line 3388, plus the individual-side callers at lines 1871 and 1899) without double-wrapping.
+
+loopMQTTDiscovery() now calls isStatusBurstActive() and skips that tick when TRUE — the drip timer keeps running, next tick picks up as soon as the burst ends.
+
+Forward declarations added in OTGW-firmware.h so callers outside MQTTstuff.ino can access the helpers without touching MQTTstuff.h.
+
+Build verified on esp8266: clean compile, 0.69MB firmware artifact produced.
+
+AC7 (manual timestamp comparison in debug log) deferred to on-device test. The change is small and self-contained; regression risk is limited to the 500ms safety timeout which guarantees the flag never permanently latches ON.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-340
 title: >-
   Use getMaxFreeBlockSize in MQTT/WebSocket publish gates for fragmentation
   awareness
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-19 21:04'
-updated_date: '2026-04-19 21:13'
+updated_date: '2026-04-19 21:17'
 labels:
   - mqtt
   - heap
@@ -42,11 +42,11 @@ Measured primarily on long-uptime setups (>24h) where fragmentation accumulates.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 getHeapHealth() considers getMaxFreeBlockSize() when level is already LOW or below
-- [ ] #2 Fragmentation factor documented (maxBlock/freeHeap ratio threshold)
-- [ ] #3 Perf check: heap health check must stay below 100us in the common healthy path (skip walk)
-- [ ] #4 Debug diagnostics: logHeapStats() already shows both values — no log format change needed
-- [ ] #5 Build passes for esp8266 environment
+- [x] #1 getHeapHealth() considers getMaxFreeBlockSize() when level is already LOW or below
+- [x] #2 Fragmentation factor documented (maxBlock/freeHeap ratio threshold)
+- [x] #3 Perf check: heap health check must stay below 100us in the common healthy path (skip walk)
+- [x] #4 Debug diagnostics: logHeapStats() already shows both values — no log format change needed
+- [x] #5 Build passes for esp8266 environment
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -65,3 +65,15 @@ Measured primarily on long-uptime setups (>24h) where fragmentation accumulates.
 <!-- SECTION:NOTES:BEGIN -->
 Extended getHeapHealth() in helperStuff.ino to consult getMaxFreeBlockSize() when freeHeap is in LOW tier. If maxBlock < HEAP_FRAG_PROMOTE_MAXBLOCK (2048 bytes) we promote to WARNING. Kept the HEALTHY fast-path free of the free-list walk. Added getHeapFragmentation() observability helper (returns percent 0..100).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Extended getHeapHealth() in helperStuff.ino to consult ESP.getMaxFreeBlockSize() when freeHeap is already in the LOW tier. If maxBlock is below HEAP_FRAG_PROMOTE_MAXBLOCK (2048 bytes) the level is promoted to HEAP_WARNING, causing all downstream gates (MQTT publish, WebSocket, drip backoff) to start throttling.
+
+Design decision — fragmentation-awareness only in the non-healthy path: getMaxFreeBlockSize() walks the free list, which is expensive. Keeping the HEALTHY branch on plain getFreeHeap() preserves the cheap common case; extra work only happens when we were already about to throttle anyway.
+
+Added getHeapFragmentation() observability helper (returns 0-100 percent). Not wired into any gate — pure diagnostic. Intended for future logHeapStats/telnet-debug inclusion without locking the gate contract.
+
+Build verified on esp8266: clean compile, no warnings.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-338
 title: Slow MQTT discovery drip interval from 1s to 2s
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-19 21:03'
-updated_date: '2026-04-19 21:12'
+updated_date: '2026-04-19 21:17'
 labels:
   - mqtt
   - heap
@@ -36,10 +36,10 @@ Combined with widening the pressure backoff (sibling task): expected 60-70% redu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 DISCOVERY_INTERVAL_NORMAL set to 2 in MQTTstuff.ino
-- [ ] #2 Comment updated to reflect 2s cadence rationale
-- [ ] #3 No change to DISCOVERY_INTERVAL_SLOW (10s remains correct pressure fallback)
-- [ ] #4 Build passes for esp8266 environment
+- [x] #1 DISCOVERY_INTERVAL_NORMAL set to 2 in MQTTstuff.ino
+- [x] #2 Comment updated to reflect 2s cadence rationale
+- [x] #3 No change to DISCOVERY_INTERVAL_SLOW (10s remains correct pressure fallback)
+- [x] #4 Build passes for esp8266 environment
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -56,3 +56,15 @@ Combined with widening the pressure backoff (sibling task): expected 60-70% redu
 <!-- SECTION:NOTES:BEGIN -->
 Changed DISCOVERY_INTERVAL_NORMAL from 1 to 2 (MQTTstuff.ino). Updated block comment to reflect that 2s cadence gives heap time to recover between publishes. Build pending.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Changed DISCOVERY_INTERVAL_NORMAL from 1s to 2s in MQTTstuff.ino. Updated the block comment to explain the new rationale: 2s gives heap time to recover between discovery-drip allocation bursts, and prevents collision with Status-frame sub-topic fanout (which can fan out 8-9 publishes in ~20ms).
+
+DISCOVERY_INTERVAL_SLOW (10s) unchanged — correct as pressure fallback.
+
+Build verified on esp8266 (Python 3.12 build.py path): clean compile, 0.69MB firmware artifact produced.
+
+Impact: HA discovery completion time doubles from ~1.5min to ~3min at boot. Acceptable because discovery is one-shot per session. In exchange, the per-second burst rate halves — which combined with TASK-339 keeps the system out of the LOW heap band under normal load.
+<!-- SECTION:FINAL_SUMMARY:END -->
