@@ -1885,6 +1885,8 @@ function toggleOTDOverrides() {
   var visible = sec.style.display !== 'none';
   sec.style.display = visible ? 'none' : 'block';
   if (arrow) arrow.innerHTML = visible ? '&#9660;' : '&#9650;';
+  var toggleEl = document.querySelector('[aria-controls="otd-ovr-section"]');
+  if (toggleEl) toggleEl.setAttribute('aria-expanded', visible ? 'false' : 'true');
   if (!visible) refreshOTDOverrides();
 }
 
@@ -3492,6 +3494,8 @@ function toggleSATSettingsGroup(headerId) {
   body.style.display = collapsed ? '' : 'none';
   var arrow = header.querySelector('.sat-settings-arrow');
   if (arrow) arrow.innerHTML = collapsed ? '&#9660;' : '&#9654;';
+  var toggleBtn = header.querySelector('.sat-settings-group-toggle');
+  if (toggleBtn) toggleBtn.setAttribute('aria-expanded', collapsed ? 'true' : 'false');
 }
 
 function refreshSATSettings() {
@@ -3528,20 +3532,30 @@ function buildSATSettingsGroups(page, data) {
     var grpDiv = document.createElement('div');
     grpDiv.className = 'sat-settings-group';
 
-    // Collapsible header
+    // Collapsible header: layout row containing a toggle button and a save button as siblings
     var header = document.createElement('div');
     header.className = 'sat-settings-group-header';
     header.id = group.id + '-header';
+
+    var bodyId = group.id + '-body';
+
+    // Toggle button (keyboard accessible, syncs aria-expanded)
+    var toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'sat-settings-group-toggle';
+    toggleBtn.setAttribute('aria-expanded', 'true');
+    toggleBtn.setAttribute('aria-controls', bodyId);
     var arrow = document.createElement('span');
     arrow.className = 'sat-settings-arrow';
     arrow.innerHTML = '&#9660;';
-    header.appendChild(arrow);
-    header.appendChild(document.createTextNode(' ' + group.title));
+    toggleBtn.appendChild(arrow);
+    toggleBtn.appendChild(document.createTextNode(' ' + group.title));
     (function(hid) {
-      header.addEventListener('click', function() { toggleSATSettingsGroup(hid); }, false);
+      toggleBtn.addEventListener('click', function() { toggleSATSettingsGroup(hid); }, false);
     })(group.id + '-header');
+    header.appendChild(toggleBtn);
 
-    // Save group button
+    // Save group button (sibling of toggle, not nested)
     var saveBtn = document.createElement('button');
     saveBtn.type = 'button';
     saveBtn.className = 'sat-settings-save-btn';

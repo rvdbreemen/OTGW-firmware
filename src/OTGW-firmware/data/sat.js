@@ -550,6 +550,8 @@ var SAT = (function() {
     var arrow = el('sat-curve-arrow');
     if (section) section.style.display = _curveVisible ? '' : 'none';
     if (arrow) arrow.innerHTML = _curveVisible ? '&#9660;' : '&#9654;';
+    var toggleEl = document.querySelector('[aria-controls="sat-curve-section"]');
+    if (toggleEl) toggleEl.setAttribute('aria-expanded', _curveVisible ? 'true' : 'false');
     if (_curveVisible && _curveChartInstance) _curveChartInstance.resize();
   }
 
@@ -799,8 +801,11 @@ var SAT = (function() {
   function toggleRawData() {
     var raw = el('sat-raw-json');
     var arrow = el('sat-raw-arrow');
-    if (raw) { raw.style.display = raw.style.display === 'none' ? 'block' : 'none'; }
-    if (arrow) { arrow.innerHTML = raw.style.display === 'none' ? '&#9654;' : '&#9660;'; }
+    var isHidden = raw ? raw.style.display === 'none' : true;
+    if (raw) { raw.style.display = isHidden ? 'block' : 'none'; }
+    if (arrow) { arrow.textContent = isHidden ? '\u25BC' : '\u25B6'; }
+    var toggleEl = document.querySelector('[aria-controls="sat-raw-json"]');
+    if (toggleEl) toggleEl.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
   }
 
   // --- DHW controls ---

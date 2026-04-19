@@ -107,7 +107,7 @@
             <div class="devinfocolumn1">Schedule</div>
             <div class="devinfocolumn2"><span id="otd-st-sched">--</span></div>
           </div>
-          <div class="devinforow" style="cursor:pointer;" onclick="toggleOTDOverrides()" title="Click to expand/collapse active bus overrides">
+          <div class="devinforow" style="cursor:pointer;" role="button" tabindex="0" aria-expanded="false" aria-controls="otd-ovr-section" onclick="toggleOTDOverrides()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleOTDOverrides();}" title="Click to expand/collapse active bus overrides">
             <div class="devinfocolumn1">Active Overrides</div>
             <div class="devinfocolumn2"><span id="otd-st-ovr">--</span>&nbsp;<span id="otd-ovr-arrow">&#9660;</span></div>
           </div>
@@ -453,7 +453,7 @@
 
         <!-- Heating Curve (Stooklijn) -->
         <div class="sat-section" data-view="expert diag">
-          <h3 class="sat-curve-toggle" onclick="SAT.toggleCurve()">Heating Curve (Stooklijn) <span id="sat-curve-arrow">&#9660;</span></h3>
+          <h3 class="sat-curve-toggle"><button type="button" class="heading-toggle-btn" aria-expanded="true" aria-controls="sat-curve-section" onclick="SAT.toggleCurve()">Heating Curve (Stooklijn) <span id="sat-curve-arrow">&#9660;</span></button></h3>
           <div id="sat-curve-section">
             <div id="sat-curve-chart" style="width:100%;height:320px;"></div>
             <div class="sat-curve-info">
@@ -563,7 +563,7 @@
 
         <!-- Diagnostics: Raw JSON Data -->
         <div class="sat-section" data-view="diag">
-          <h3 class="sat-collapsible" onclick="SAT.toggleRawData()">Raw Data <span id="sat-raw-arrow">&#9654;</span></h3>
+          <h3 class="sat-collapsible"><button type="button" class="heading-toggle-btn" aria-expanded="false" aria-controls="sat-raw-json" onclick="SAT.toggleRawData()">Raw Data <span id="sat-raw-arrow">&#9654;</span></button></h3>
           <pre id="sat-raw-json" class="sat-raw-data" style="display:none"></pre>
         </div>
       </div>
