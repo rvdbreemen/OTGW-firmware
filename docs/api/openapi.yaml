@@ -1119,7 +1119,7 @@ paths:
         drip-publishing of MQTT autodiscovery configs for Home Assistant integration.
 
         Discovery configs are composed by hand-written streaming functions in
-        `mqtt_configuratie.cpp` (see ADR-077). The legacy runtime template file
+        `MQTTHaDiscovery.cpp` (see ADR-077). The legacy runtime template file
         `data/mqttha.cfg` is archived under `docs/archive/` as historical
         reference only. The drip publisher issues one config every 3 seconds
         (slowed to every 30 seconds under heap pressure) to avoid MQTT burst

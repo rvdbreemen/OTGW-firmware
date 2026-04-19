@@ -1,7 +1,7 @@
 # MQTT HA Discovery Regression Check
 
 Baseline for verifying the streaming Home Assistant MQTT auto-discovery pipeline
-(ADR-077) after any change that touches `MQTTstuff.ino`, `mqtt_configuratie.cpp`,
+(ADR-077) after any change that touches `MQTTstuff.ino`, `MQTTHaDiscovery.cpp`,
 or the OpenTherm message dispatch. Without this check, silent breakage of HA
 integration is the most expensive failure mode in the project: users only notice
 when entities stop updating in Home Assistant, and the regression may be weeks old
@@ -119,4 +119,4 @@ Before landing any change that touches the MQTT discovery path:
 - Task TASK-275 "HA discovery heap stability" (closed as superseded)
 - Task TASK-283 "HA discovery bootloop" (closed as resolved by streaming rework)
 - `MQTTstuff.ino` `loopMQTTDiscovery`, `doAutoConfigureMsgid`
-- `mqtt_configuratie.cpp` streaming compose functions
+- `MQTTHaDiscovery.cpp` streaming compose functions

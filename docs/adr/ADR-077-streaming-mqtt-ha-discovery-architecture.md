@@ -26,7 +26,7 @@ Alternatives considered before adopting streaming compose:
 
 ## Decision
 
-Home Assistant MQTT discovery is emitted by streaming compose functions living in `src/OTGW-firmware/mqtt_configuratie.cpp`. `data/mqttha.cfg` is archived to `docs/archive/mqttha.cfg` as a historical reference and is not part of the LittleFS image. The Python generators (`tools/generate_mqttha_*.py`) are considered outdated relative to this refactor and are not invoked by the build.
+Home Assistant MQTT discovery is emitted by streaming compose functions living in `src/OTGW-firmware/MQTTHaDiscovery.cpp`. `data/mqttha.cfg` is archived to `docs/archive/mqttha.cfg` as a historical reference and is not part of the LittleFS image. The Python generators (`tools/generate_mqttha_*.py`) are considered outdated relative to this refactor and are not invoked by the build.
 
 Architecture:
 
@@ -52,7 +52,7 @@ Benefits:
 
 Trade-offs:
 
-- Adding a new entity means touching C++ code (`mqtt_configuratie.cpp` + declarations in `MQTTstuff.h`), whereas previously a config-file append was enough. Given the real frequency (new entities correspond to new firmware features) this is acceptable.
+- Adding a new entity means touching C++ code (`MQTTHaDiscovery.cpp` + declarations in `MQTTstuff.h`), whereas previously a config-file append was enough. Given the real frequency (new entities correspond to new firmware features) this is acceptable.
 - The Python generators under `tools/generate_mqttha_*.py` are now dead code relative to the shipped firmware. They are kept as reference for the archived format but should either be removed or explicitly marked deprecated in a follow-up.
 - The 2.0.0 refactor initially dropped 13 switch and 1 select entities from TASK-81 because the streaming pipeline had no corresponding stream functions; this was caught and restored in TASK-284. Future entity-type additions (e.g. `button`, `cover`) will require matching streaming functions and caller wiring.
 - Pseudo-ID 0 is now overloaded (climate + SAT switch + select). If the drip load under pseudo-ID 0 ever becomes problematic (e.g. 50+ switches), a split into a dedicated pseudo-ID will be required.
@@ -67,5 +67,5 @@ Risks:
 - Prior ADRs: ADR-004 (no String class in hot paths), ADR-040 (MQTT source-specific topics), ADR-051 (OTGWSettings/OTGWState architecture), ADR-073 (SAT MQTT topic structure).
 - Implementation commits on `feature-dev-2.0.0-otgw32-esp32-sat-support`: `2b12834c` (legacy replacement with compact streaming API), `ff159819` (async bitmap-driven drip publisher), `a91220af` (PROGMEM-as-RAM crash fix), `413d8b00` (PROGMEM pool linkage validation guard), `7f663524` / `267fa013` (elimination of `sLine[1200]` and `topicBuf[200]`), `1df3eca5` (discovery burst fix + PROGMEM index), `5384be2a` (TASK-284: restore SAT switch/select streams), `4db9543f` (archive `mqttha.cfg` as reference-only).
 - Backlog tasks: TASK-81 (HA number/switch/select entities), TASK-276 / TASK-277 (staging buffer elimination), TASK-278 / TASK-279 / TASK-280 (Exception (2)/(3) crash fixes), TASK-281 (mqttha_progmem readable refactor), TASK-282 (compact array streaming constructors), TASK-283 (boot loop on MQTT connection), TASK-284 (restore SAT switches/select).
-- Source files: `src/OTGW-firmware/mqtt_configuratie.cpp` (2700+ lines), `src/OTGW-firmware/MQTTstuff.h` (public API), `src/OTGW-firmware/MQTTstuff.ino` (state machine, drip loop, callers), `docs/archive/mqttha.cfg` (historical reference).
+- Source files: `src/OTGW-firmware/MQTTHaDiscovery.cpp` (2700+ lines), `src/OTGW-firmware/MQTTstuff.h` (public API), `src/OTGW-firmware/MQTTstuff.ino` (state machine, drip loop, callers), `docs/archive/mqttha.cfg` (historical reference).
 - Outdated tooling: `tools/generate_mqttha_data.py`, `tools/generate_mqttha_progmem.py`, `tools/generate_mqttha_readable.py`.

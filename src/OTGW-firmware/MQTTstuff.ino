@@ -84,7 +84,7 @@ struct MQTTAutoConfigSessionLock {
   MQTTAutoConfigSessionLock& operator=(const MQTTAutoConfigSessionLock&) = delete;
 };
 
-// pgm_strncmp_PP() and pgm_read_char() are in MQTTstuff.h (inline, shared with mqtt_configuratie.cpp)
+// pgm_strncmp_PP() and pgm_read_char() are in MQTTstuff.h (inline, shared with MQTTHaDiscovery.cpp)
 
 static            PubSubClient MQTTclient(wifiClient);
 
@@ -163,7 +163,7 @@ bool writeMqttByteExt(uint8_t b) {
 
 // ---------------------------------------------------------------------------
 // The streaming JSON helpers, compose functions, topic builders, and the
-// public streamXxxDiscovery() API live in mqtt_configuratie.cpp to avoid
+// public streamXxxDiscovery() API live in MQTTHaDiscovery.cpp to avoid
 // Arduino's auto-prototype generator mangling custom-type parameters.
 // ---------------------------------------------------------------------------
 

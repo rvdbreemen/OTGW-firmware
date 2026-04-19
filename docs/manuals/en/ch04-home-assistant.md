@@ -177,7 +177,7 @@ homeassistant/{component}/{node_id}/{entity_id}/config
 
 #### Streaming discovery architecture
 
-Starting with v2.0.0 the firmware uses a streaming discovery pipeline (implemented in `mqtt_configuratie.cpp`). Every discovery payload is composed on the fly and written to the MQTT client in 128-byte chunks, similar to how ESPHome builds its discovery messages. Nothing is buffered as a full JSON string in RAM. This keeps heap pressure low (around 200 bytes of working memory per entity) and avoids the heap fragmentation problems that the older approach suffered from on the ESP8266.
+Starting with v2.0.0 the firmware uses a streaming discovery pipeline (implemented in `MQTTHaDiscovery.cpp`). Every discovery payload is composed on the fly and written to the MQTT client in 128-byte chunks, similar to how ESPHome builds its discovery messages. Nothing is buffered as a full JSON string in RAM. This keeps heap pressure low (around 200 bytes of working memory per entity) and avoids the heap fragmentation problems that the older approach suffered from on the ESP8266.
 
 The streaming functions (`streamSensorDiscovery`, `streamBinarySensorDiscovery`, `streamClimateDiscovery`, `streamNumberDiscovery`, `streamDallasSensorDiscovery`, `streamSatSwitchDiscovery`, `streamSatSelectDiscovery`) replace the older PROGMEM-template approach. Streaming is always on; there is no flag to turn it off.
 

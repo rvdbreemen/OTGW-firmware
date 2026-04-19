@@ -4,7 +4,7 @@
 
 - **Name**: MQTT Client and Home Assistant Auto-Discovery Module
 - **Description**: Complete MQTT client implementation for the OTGW-firmware ESP8266/ESP32 gateway. Provides MQTT publish/subscribe functionality, streaming Home Assistant auto-discovery configuration, command handling, and OpenTherm message-to-MQTT mapping. Discovery architecture shifted from file-based PROGMEM table generation to data-driven streaming functions with two-pass JSON writing.
-- **Location**: `/src/OTGW-firmware/MQTTstuff.ino`, `/src/OTGW-firmware/MQTTstuff.h`, `/src/OTGW-firmware/mqtt_configuratie.cpp`
+- **Location**: `/src/OTGW-firmware/MQTTstuff.ino`, `/src/OTGW-firmware/MQTTstuff.h`, `/src/OTGW-firmware/MQTTHaDiscovery.cpp`
 - **Language**: Arduino C/C++ (with PubSubClient library integration)
 - **Purpose**: Enables MQTT-based integration with home automation systems (Home Assistant), publishes OpenTherm data to configurable topics, handles MQTT commands for controlling the OTGW gateway, and manages streaming auto-discovery of sensors, binary sensors, climate entities, and SAT controls in Home Assistant.
 
@@ -35,7 +35,7 @@
     - `HaEntityCat entityCat`: HA entity category enum (diagnostic, config)
     - `bool enabledByDefault`: Whether entity is enabled in HA by default
   - Location: MQTTstuff.h:177-188
-  - Source: hand-written table in `mqtt_configuratie.cpp` (see ADR-077; `docs/archive/mqttha.cfg` is historical reference only)
+  - Source: hand-written table in `MQTTHaDiscovery.cpp` (see ADR-077; `docs/archive/mqttha.cfg` is historical reference only)
   - Array: `mqttHaSensors[289]` (118 unique OT IDs)
 
 - `struct MqttHaBinSensorCfg` (MQTTstuff.h)
@@ -301,37 +301,37 @@ This approach allows discovery functions to compose JSON once and reuse the same
     7. End publish: `client.endPublish()`
   - Location: MQTTstuff.h:280-323
 
-- `bool writeMqttChunkExt(const char *data, size_t len)` (mqtt_configuratie.cpp)
+- `bool writeMqttChunkExt(const char *data, size_t len)` (MQTTHaDiscovery.cpp)
   - Description: Write RAM data chunk to MQTT during WRITE pass
-  - Location: mqtt_configuratie.cpp
+  - Location: MQTTHaDiscovery.cpp
   - Called by MqttJsonWriter.writeRam and writeRamN in WRITE mode
   - Chunking handled by underlying MQTT layer
 
-- `bool writeMqttProgmemChunkExt(PGM_P data, size_t len)` (mqtt_configuratie.cpp)
+- `bool writeMqttProgmemChunkExt(PGM_P data, size_t len)` (MQTTHaDiscovery.cpp)
   - Description: Write PROGMEM data chunk to MQTT during WRITE pass
-  - Location: mqtt_configuratie.cpp
+  - Location: MQTTHaDiscovery.cpp
   - Uses pgm_read_byte for safe byte-by-byte PROGMEM access (no word-aligned reads)
 
-- `bool writeMqttByteExt(uint8_t b)` (mqtt_configuratie.cpp)
+- `bool writeMqttByteExt(uint8_t b)` (MQTTHaDiscovery.cpp)
   - Description: Write single byte to MQTT
-  - Location: mqtt_configuratie.cpp
+  - Location: MQTTHaDiscovery.cpp
   - Called by MqttJsonWriter.writeChar in WRITE mode
 
 ### Buffer Management & Chunked Writing
 
 The module avoids large heap allocations by streaming discovery payloads in small chunks. All writes go through two-mode MqttJsonWriter, which delegates to external chunk helpers in WRITE mode.
 
-- `bool writeMqttChunkExt(const char *data, size_t len)` (mqtt_configuratie.cpp)
+- `bool writeMqttChunkExt(const char *data, size_t len)` (MQTTHaDiscovery.cpp)
   - Description: Write RAM data to MQTT in chunks
   - Called by MqttJsonWriter.writeRam during WRITE pass
   - Handles chunking to PubSubClient.write()
 
-- `bool writeMqttProgmemChunkExt(PGM_P data, size_t len)` (mqtt_configuratie.cpp)
+- `bool writeMqttProgmemChunkExt(PGM_P data, size_t len)` (MQTTHaDiscovery.cpp)
   - Description: Write PROGMEM data to MQTT in chunks
   - Called by MqttJsonWriter.writeProgmem during WRITE pass
   - Uses pgm_read_byte for safe byte access (no unaligned 32-bit reads from flash)
 
-- `bool writeMqttByteExt(uint8_t b)` (mqtt_configuratie.cpp)
+- `bool writeMqttByteExt(uint8_t b)` (MQTTHaDiscovery.cpp)
   - Description: Write single byte to MQTT
   - Called by MqttJsonWriter.writeChar during WRITE pass
 
@@ -343,7 +343,7 @@ The module avoids large heap allocations by streaming discovery payloads in smal
 
 ### Home Assistant Auto-Discovery (Streaming Architecture)
 
-Discovery configs are generated on-the-fly by streaming functions in `mqtt_configuratie.cpp`. The previous file-based PROGMEM generation (mqttha.cfg parsed by tools/generate_mqttha_progmem.py into pools) has been replaced by data-driven tables (`mqttHaSensors[289]`, `mqttHaBinSensors[53]`) with corresponding streaming functions. Discovery includes hardcoded stream functions for climate (Thermostat + DHW Control pseudo-ID 0), number (Toutside Override pseudo-ID 27), SAT switches (13 boolean controls via switchIdx 0-12), SAT select (sat_heating_system pseudo-ID), and Dallas sensors (runtime address-based).
+Discovery configs are generated on-the-fly by streaming functions in `MQTTHaDiscovery.cpp`. The previous file-based PROGMEM generation (mqttha.cfg parsed by tools/generate_mqttha_progmem.py into pools) has been replaced by data-driven tables (`mqttHaSensors[289]`, `mqttHaBinSensors[53]`) with corresponding streaming functions. Discovery includes hardcoded stream functions for climate (Thermostat + DHW Control pseudo-ID 0), number (Toutside Override pseudo-ID 27), SAT switches (13 boolean controls via switchIdx 0-12), SAT select (sat_heating_system pseudo-ID), and Dallas sensors (runtime address-based).
 
 Three discovery paths exist:
 
@@ -355,7 +355,7 @@ Three discovery paths exist:
 
 - `bool streamSensorDiscovery(PubSubClient &client, const MqttHaSensorCfg &cfg, HaDiscoveryContext &ctx)`
   - Description: Stream a single sensor discovery config to MQTT
-  - Location: mqtt_configuratie.cpp:1979+
+  - Location: MQTTHaDiscovery.cpp:1979+
   - Parameters:
     - `PubSubClient &client`: MQTT client instance
     - `const MqttHaSensorCfg &cfg`: Sensor config from mqttHaSensors[] table
@@ -371,24 +371,24 @@ Three discovery paths exist:
 
 - `bool streamBinarySensorDiscovery(PubSubClient &client, const MqttHaBinSensorCfg &cfg, HaDiscoveryContext &ctx)`
   - Description: Stream a single binary sensor discovery config
-  - Location: mqtt_configuratie.cpp:similar pattern
+  - Location: MQTTHaDiscovery.cpp:similar pattern
   - Similar to streamSensorDiscovery but omits unit and state_class
 
 - `bool streamClimateDiscovery(PubSubClient &client, uint8_t climateIdx, HaDiscoveryContext &ctx)`
   - Description: Stream climate entity discovery (Thermostat or DHW Control)
-  - Location: mqtt_configuratie.cpp:2240+
+  - Location: MQTTHaDiscovery.cpp:2240+
   - Parameters:
     - `uint8_t climateIdx`: 0 = Thermostat, 1 = DHW Control
   - Generates hardcoded JSON with modes, temp setpoint, current temp, etc.
 
 - `bool streamNumberDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)`
   - Description: Stream number entity discovery (Toutside Override)
-  - Location: mqtt_configuratie.cpp:2417+
+  - Location: MQTTHaDiscovery.cpp:2417+
   - Single hardcoded number entity for external temperature override
 
 - `bool streamSatSwitchDiscovery(PubSubClient &client, uint8_t switchIdx, HaDiscoveryContext &ctx)`
   - Description: Stream SAT boolean switch discovery (13 switches)
-  - Location: mqtt_configuratie.cpp:2596+
+  - Location: MQTTHaDiscovery.cpp:2596+
   - Parameters:
     - `uint8_t switchIdx`: 0-12 for each SAT boolean control
   - Uses helper streamSatBoolSwitch() with parameterised PROGMEM strings (uniqSuffix, nameSuffix, cmdSub, statSub, icon)
@@ -396,19 +396,19 @@ Three discovery paths exist:
 
 - `bool streamSatSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryContext &ctx)`
   - Description: Stream SAT select entity discovery
-  - Location: mqtt_configuratie.cpp
+  - Location: MQTTHaDiscovery.cpp
   - Currently: selectIdx = 0 for sat_heating_system dropdown
 
 - `bool streamDallasSensorDiscovery(PubSubClient &client, const char *sensorAddress, HaDiscoveryContext &ctx)`
   - Description: Stream Dallas temperature sensor discovery
-  - Location: mqtt_configuratie.cpp:similar pattern
+  - Location: MQTTHaDiscovery.cpp:similar pattern
   - Parameters:
     - `const char *sensorAddress`: Runtime sensor address string
   - Generated on first sensor discovery call; topic includes address in uniq_id
 
 - `bool expandAndStreamSensorSources(PubSubClient &client, const MqttHaSensorCfg &cfg, HaDiscoveryContext &ctx)`
   - Description: Expand sensor config into 3 per-source variants (thermostat/boiler/gateway)
-  - Location: mqtt_configuratie.cpp:2180+
+  - Location: MQTTHaDiscovery.cpp:2180+
   - Iterates 3 sources, sets source tokens in ctx, calls streamSensorDiscovery for each
 
 - `void doAutoConfigure()`
@@ -708,7 +708,7 @@ PubSubClient's `beginPublish()` → `write()` → `endPublish()` API allows effi
 
 ### Home Assistant Auto-Discovery (Streaming Architecture)
 
-Discovery configs are generated on-the-fly by streaming functions in `mqtt_configuratie.cpp` that use the two-pass MqttJsonWriter. Configs are driven by:
+Discovery configs are generated on-the-fly by streaming functions in `MQTTHaDiscovery.cpp` that use the two-pass MqttJsonWriter. Configs are driven by:
 
 - `mqttHaSensors[289]` and `mqttHaSensorIndex[256]`: Sensor discovery table (118 unique OT IDs)
 - `mqttHaBinSensors[53]` and `mqttHaBinSensorIndex[256]`: Binary sensor discovery table (10 unique OT IDs)
@@ -965,8 +965,8 @@ id;label;friendlyName;deviceClass;unit;stateClass;icon;entityCat;enabledByDefaul
 ```
 
 At build time, `tools/generate_mqttha_data.py` compiles this into:
-- `mqtt_configuratie.cpp`: PROGMEM label/name strings, sensor/binary sensor config arrays, index lookup tables, streaming function definitions
-- `mqtt_configuratie.h` (generated): Array declarations and lookup functions
+- `MQTTHaDiscovery.cpp`: PROGMEM label/name strings, sensor/binary sensor config arrays, index lookup tables, streaming function definitions
+- `MQTTHaDiscovery.h` (generated): Array declarations and lookup functions
 
 The firmware calls streaming functions with config structs from the arrays. Hardcoded streaming functions for climate, number, SAT controls, and Dallas sensors complement the data-driven sensor/binary sensor tables.
 
@@ -1120,7 +1120,7 @@ classDiagram
 
 - **MQTTstuff.ino**: 1,494 lines (MQTT state machine, publishing, command dispatch)
 - **MQTTstuff.h**: 361 lines (header with enums, structs, streaming function declarations)
-- **mqtt_configuratie.cpp**: 2,737 lines (auto-generated from mqttha.cfg: data tables, streaming discovery functions)
+- **MQTTHaDiscovery.cpp**: 2,737 lines (auto-generated from mqttha.cfg: data tables, streaming discovery functions)
 - **Key Functions**: 50+ public/static functions
 - **Global Variables**: 25+ module-level globals
 - **PROGMEM Data**: Sensor/binary sensor label and name strings, discovery context strings

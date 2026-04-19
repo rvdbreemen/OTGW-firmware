@@ -5,7 +5,7 @@
 // Copyright (c) 2021-2026 Robert van den Breemen
 //
 // Hand-written header: enums and structs are stable across cfg changes.
-// Companion files: MQTTstuff.ino (MQTT engine) and mqtt_configuratie.cpp
+// Companion files: MQTTstuff.ino (MQTT engine) and MQTTHaDiscovery.cpp
 // (PROGMEM data arrays + streaming discovery constructors).
 
 #pragma once
@@ -199,7 +199,7 @@ struct MqttHaBinSensorCfg {
 };
 
 // ---------------------------------------------------------------------------
-// PROGMEM arrays -- defined in mqtt_configuratie.cpp (generated from mqttha.cfg)
+// PROGMEM arrays -- defined in MQTTHaDiscovery.cpp (generated from mqttha.cfg)
 // Climate and Number discovery are handled by streaming functions directly.
 // ---------------------------------------------------------------------------
 extern const MqttHaSensorCfg    PROGMEM mqttHaSensors[];
@@ -323,7 +323,7 @@ struct MqttJsonWriter {
 };
 
 // ---------------------------------------------------------------------------
-// Streaming discovery functions (defined in mqtt_configuratie.cpp)
+// Streaming discovery functions (defined in MQTTHaDiscovery.cpp)
 // ---------------------------------------------------------------------------
 bool streamSensorDiscovery(PubSubClient &client,
                            const MqttHaSensorCfg &cfg,

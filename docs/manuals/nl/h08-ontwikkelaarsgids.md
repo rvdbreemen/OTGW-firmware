@@ -31,7 +31,7 @@ De broncode bevindt zich in `src/OTGW-firmware/`. Elk `.ino`-bestand vormt een l
 | `SATpressure.ino` | SAT boilerdrukbewaking, lage-drukwaarschuwing, trenddetectie |
 | `SATweather.ino` | Open-Meteo weersophaling, buitentemperatuur voor SAT-verwarmingscurve |
 | `SATble.ino` | ESP32 BLE-kamertemperatuursensor (BTHome-protocol) |
-| `mqtt_configuratie.cpp` | Gegenereerde PROGMEM-tabellen voor MQTT Home Assistant auto-discovery (sensors, binary sensors, climate, number) |
+| `MQTTHaDiscovery.cpp` | Gegenereerde PROGMEM-tabellen voor MQTT Home Assistant auto-discovery (sensors, binary sensors, climate, number) |
 | `sensors_ext.ino`, `s0PulseCount.ino`, `OLED.ino` | Dallas DS18B20 temperatuursensoren, S0-pulsteller, OLED-display |
 | `Ethernet.ino` | W5500 SPI-Ethernet runtime-probe en failover (alleen ESP32) |
 | `boards.h` | Boardspecifieke pin maps en feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`) |
@@ -56,7 +56,7 @@ De browser-SPA bevindt zich in `src/OTGW-firmware/data/`. Deze bestanden worden 
 | `build.py` | Primair bouwscript: roept PlatformIO (of arduino-cli) intern aan, verpakt firmware- en LittleFS-artefacten |
 | `platformio.ini` | PlatformIO-project: `esp8266` en `esp32` omgevingen |
 | `evaluate.py` | Statische codekwaliteitscontrole: PROGMEM-gebruik, onveilige patronen, String-klasse audit |
-| `tools/generate_mqttha_data.py` | Legacy-regenerator voor `mqtt_configuratie.cpp` uit een gearchiveerd `mqttha.cfg`-template |
+| `tools/generate_mqttha_data.py` | Legacy-regenerator voor `MQTTHaDiscovery.cpp` uit een gearchiveerd `mqttha.cfg`-template |
 | `scripts/` | PlatformIO pre-build scripts: versie-injectie, bibliotheekpatching |
 | `libraries/` | Vendored Arduino-bibliotheken gebruikt door beide bouwsystemen |
 | `docs/` | C4-architectuurdocs, ADRs, API-referenties, functiedocumentatie |
@@ -164,15 +164,15 @@ Belangrijkste patronen die worden gemarkeerd:
 
 #### tools/generate_mqttha_data.py (legacy-regenerator)
 
-De MQTT Home Assistant auto-discovery-metadata bevindt zich in gecompileerde vorm als `src/OTGW-firmware/mqtt_configuratie.cpp`. Dat bestand is de **source of truth** en is in de repository opgenomen. Het bevat gestructureerde PROGMEM-arrays voor sensors, binary sensors, climate en number entities, geindexeerd op OT-message-ID.
+De MQTT Home Assistant auto-discovery-metadata bevindt zich in gecompileerde vorm als `src/OTGW-firmware/MQTTHaDiscovery.cpp`. Dat bestand is de **source of truth** en is in de repository opgenomen. Het bevat gestructureerde PROGMEM-arrays voor sensors, binary sensors, climate en number entities, geindexeerd op OT-message-ID.
 
-Het teksttemplate `mqttha.cfg` dat dit bestand oorspronkelijk genereerde is gearchiveerd naar `docs/archive/mqttha.cfg` en maakt geen deel meer uit van de build. Mocht je `mqtt_configuratie.cpp` uit een bijgewerkt template willen regenereren, herstel dan `mqttha.cfg` naar `src/OTGW-firmware/data/mqttha.cfg` en voer uit:
+Het teksttemplate `mqttha.cfg` dat dit bestand oorspronkelijk genereerde is gearchiveerd naar `docs/archive/mqttha.cfg` en maakt geen deel meer uit van de build. Mocht je `MQTTHaDiscovery.cpp` uit een bijgewerkt template willen regenereren, herstel dan `mqttha.cfg` naar `src/OTGW-firmware/data/mqttha.cfg` en voer uit:
 
 ```bash
 python tools/generate_mqttha_data.py
 ```
 
-Voor normaal ontwikkelwerk pas je `mqtt_configuratie.cpp` rechtstreeks aan en houd je het consistent met de streaming-discovery-consumer in `MQTTstuff.ino`. De legacy-generators `tools/generate_mqttha_progmem.py` en `tools/generate_mqttha_readable.py` zijn behouden als referentie maar worden vervangen door `generate_mqttha_data.py`.
+Voor normaal ontwikkelwerk pas je `MQTTHaDiscovery.cpp` rechtstreeks aan en houd je het consistent met de streaming-discovery-consumer in `MQTTstuff.ino`. De legacy-generators `tools/generate_mqttha_progmem.py` en `tools/generate_mqttha_readable.py` zijn behouden als referentie maar worden vervangen door `generate_mqttha_data.py`.
 
 Het gegenereerde bestand is bewust in een eigen `.cpp` translation unit geplaatst om de Xtensa single-TU section/relocation-explosie te voorkomen die optreedt wanneer grote PROGMEM-data in de hoofd-sketch wordt geplaatst.
 
@@ -470,9 +470,9 @@ Voor commando's die niet naar een PIC-commando mappen (bijv. SAT-specifieke topi
 
 #### Home Assistant auto-discovery
 
-HA discovery-payloads worden tijdens runtime opgebouwd uit compile-time PROGMEM-tabellen in `mqtt_configuratie.cpp`. De streaming-discovery-emitter in `MQTTstuff.ino` (`doAutoConfigure()` / `doAutoConfigureMsgid()`) doorloopt die tabellen en streamt elk discovery-bericht rechtstreeks naar de broker zonder een volledige payload in RAM te bufferen. `mqtt_configuratie.cpp` is de source of truth; het oudere `mqttha.cfg`-template is gearchiveerd naar `docs/archive/`.
+HA discovery-payloads worden tijdens runtime opgebouwd uit compile-time PROGMEM-tabellen in `MQTTHaDiscovery.cpp`. De streaming-discovery-emitter in `MQTTstuff.ino` (`doAutoConfigure()` / `doAutoConfigureMsgid()`) doorloopt die tabellen en streamt elk discovery-bericht rechtstreeks naar de broker zonder een volledige payload in RAM te bufferen. `MQTTHaDiscovery.cpp` is de source of truth; het oudere `mqttha.cfg`-template is gearchiveerd naar `docs/archive/`.
 
-Om een nieuwe discoverable entity toe te voegen, plaats een extra vermelding in de passende PROGMEM-array (sensors, binary sensors, climate, number) in `mqtt_configuratie.cpp`, met bestaande vermeldingen als voorbeeld. Velden die per entity varieren (device class, unit, state class, icon, entity category) zijn als enum-waarden gecodeerd om flash-gebruik te beperken. Bouw de firmware opnieuw en forceer discovery (toets `F` op de telnet-debugconsole) om de nieuwe entity te publiceren.
+Om een nieuwe discoverable entity toe te voegen, plaats een extra vermelding in de passende PROGMEM-array (sensors, binary sensors, climate, number) in `MQTTHaDiscovery.cpp`, met bestaande vermeldingen als voorbeeld. Velden die per entity varieren (device class, unit, state class, icon, entity category) zijn als enum-waarden gecodeerd om flash-gebruik te beperken. Bouw de firmware opnieuw en forceer discovery (toets `F` op de telnet-debugconsole) om de nieuwe entity te publiceren.
 
 ---
 

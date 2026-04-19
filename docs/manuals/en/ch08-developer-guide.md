@@ -33,7 +33,7 @@ All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files. Arduino
 | `SATpressure.ino` | SAT boiler pressure monitoring, low-pressure warning, trend detection |
 | `SATweather.ino` | Open-Meteo weather fetch, outdoor temperature for SAT heating curve |
 | `SATble.ino` | ESP32 BLE room temperature sensor integration (BTHome protocol) |
-| `mqtt_configuratie.cpp` | Generated PROGMEM tables for MQTT Home Assistant auto-discovery (sensors, binary sensors, climate, number entities) |
+| `MQTTHaDiscovery.cpp` | Generated PROGMEM tables for MQTT Home Assistant auto-discovery (sensors, binary sensors, climate, number entities) |
 | `sensors_ext.ino`, `s0PulseCount.ino`, `OLED.ino` | Dallas DS18B20 temperature sensors, S0 pulse counter, OLED display |
 | `Ethernet.ino` | W5500 SPI Ethernet runtime probe and failover (ESP32 only) |
 | `boards.h` | Board-specific pin maps and feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`) |
@@ -165,15 +165,15 @@ Key patterns it flags:
 
 #### tools/generate_mqttha_data.py (legacy regenerator)
 
-The MQTT Home Assistant auto-discovery metadata lives in compiled form as `src/OTGW-firmware/mqtt_configuratie.cpp`. That file is the **source of truth** and is checked into the repository. It contains structured PROGMEM arrays for sensors, binary sensors, climate, and number entities, keyed by OT message ID.
+The MQTT Home Assistant auto-discovery metadata lives in compiled form as `src/OTGW-firmware/MQTTHaDiscovery.cpp`. That file is the **source of truth** and is checked into the repository. It contains structured PROGMEM arrays for sensors, binary sensors, climate, and number entities, keyed by OT message ID.
 
-The text template `mqttha.cfg` that originally generated this file has been archived to `docs/archive/mqttha.cfg` and is no longer part of the build. If you need to regenerate `mqtt_configuratie.cpp` from an updated template, restore `mqttha.cfg` to `src/OTGW-firmware/data/mqttha.cfg` and run:
+The text template `mqttha.cfg` that originally generated this file has been archived to `docs/archive/mqttha.cfg` and is no longer part of the build. If you need to regenerate `MQTTHaDiscovery.cpp` from an updated template, restore `mqttha.cfg` to `src/OTGW-firmware/data/mqttha.cfg` and run:
 
 ```bash
 python tools/generate_mqttha_data.py
 ```
 
-For normal development, edit `mqtt_configuratie.cpp` directly and keep it consistent with the streaming discovery consumer in `MQTTstuff.ino`. The legacy generators `tools/generate_mqttha_progmem.py` and `tools/generate_mqttha_readable.py` are retained for reference but are superseded by `generate_mqttha_data.py`.
+For normal development, edit `MQTTHaDiscovery.cpp` directly and keep it consistent with the streaming discovery consumer in `MQTTstuff.ino`. The legacy generators `tools/generate_mqttha_progmem.py` and `tools/generate_mqttha_readable.py` are retained for reference but are superseded by `generate_mqttha_data.py`.
 
 The generated file is deliberately placed in its own `.cpp` translation unit to avoid the Xtensa single-TU section/relocation explosion that occurs when large PROGMEM data is placed in the main sketch.
 
@@ -462,9 +462,9 @@ For commands that do not map to a PIC command (e.g., SAT-specific topics), add a
 
 #### Home Assistant Auto-Discovery
 
-HA discovery payloads are built at runtime from compile-time PROGMEM tables in `mqtt_configuratie.cpp`. The streaming discovery emitter in `MQTTstuff.ino` (`doAutoConfigure()` / `doAutoConfigureMsgid()`) walks those tables and streams each discovery message directly to the broker without buffering a full payload in RAM. `mqtt_configuratie.cpp` is the source of truth; the older `mqttha.cfg` template has been archived to `docs/archive/`.
+HA discovery payloads are built at runtime from compile-time PROGMEM tables in `MQTTHaDiscovery.cpp`. The streaming discovery emitter in `MQTTstuff.ino` (`doAutoConfigure()` / `doAutoConfigureMsgid()`) walks those tables and streams each discovery message directly to the broker without buffering a full payload in RAM. `MQTTHaDiscovery.cpp` is the source of truth; the older `mqttha.cfg` template has been archived to `docs/archive/`.
 
-To add a new discoverable entity, append a new entry to the appropriate PROGMEM array (sensors, binary sensors, climate, number) in `mqtt_configuratie.cpp`, using the existing entries as templates. Fields that vary per entity (device class, unit, state class, icon, entity category) are encoded as enum values to keep flash usage bounded. Rebuild firmware and re-run discovery (press `F` on the telnet debug console) to publish the new entity.
+To add a new discoverable entity, append a new entry to the appropriate PROGMEM array (sensors, binary sensors, climate, number) in `MQTTHaDiscovery.cpp`, using the existing entries as templates. Fields that vary per entity (device class, unit, state class, icon, entity category) are encoded as enum values to keep flash usage bounded. Rebuild firmware and re-run discovery (press `F` on the telnet debug console) to publish the new entity.
 
 ---
 

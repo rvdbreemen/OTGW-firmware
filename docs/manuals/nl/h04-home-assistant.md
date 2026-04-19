@@ -188,7 +188,7 @@ Voorbeeld van een discovery-payload voor de aanvoertemperatuur:
 
 #### Streaming discovery architectuur
 
-Vanaf v2.0.0 gebruikt de firmware een streaming discovery pipeline (geïmplementeerd in `mqtt_configuratie.cpp`). Elke discovery-payload wordt on the fly opgebouwd en in blokken van 128 bytes naar de MQTT-client geschreven, vergelijkbaar met hoe ESPHome zijn discovery-berichten opbouwt. Er wordt nooit een volledige JSON-string in RAM gebufferd. Dit houdt de geheugendruk laag (ongeveer 200 bytes werkgeheugen per entiteit) en voorkomt de heap-fragmentatieproblemen die de oudere aanpak op de ESP8266 opleverde.
+Vanaf v2.0.0 gebruikt de firmware een streaming discovery pipeline (geïmplementeerd in `MQTTHaDiscovery.cpp`). Elke discovery-payload wordt on the fly opgebouwd en in blokken van 128 bytes naar de MQTT-client geschreven, vergelijkbaar met hoe ESPHome zijn discovery-berichten opbouwt. Er wordt nooit een volledige JSON-string in RAM gebufferd. Dit houdt de geheugendruk laag (ongeveer 200 bytes werkgeheugen per entiteit) en voorkomt de heap-fragmentatieproblemen die de oudere aanpak op de ESP8266 opleverde.
 
 De streaming-functies (`streamSensorDiscovery`, `streamBinarySensorDiscovery`, `streamClimateDiscovery`, `streamNumberDiscovery`, `streamDallasSensorDiscovery`, `streamSatSwitchDiscovery`, `streamSatSelectDiscovery`) vervangen de eerdere PROGMEM-template aanpak. Streaming staat altijd aan; er is geen schakelaar om het uit te zetten.
 

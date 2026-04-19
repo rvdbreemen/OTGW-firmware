@@ -848,7 +848,7 @@ The firmware supports Home Assistant MQTT auto-discovery, publishing discovery c
 
 ### Architecture: Streaming Discovery
 
-Discovery configs are no longer built from a filesystem template (`data/mqttha.cfg`, now archived under `docs/archive/`). The source of truth is the streaming compose functions in `src/OTGW-firmware/mqtt_configuratie.cpp`, which build each config directly into MQTT publish frames via a two-pass (MEASURE then WRITE) `MqttJsonWriter`. This eliminates the historical `sLine[1200]` staging buffer and avoids file I/O during discovery.
+Discovery configs are no longer built from a filesystem template (`data/mqttha.cfg`, now archived under `docs/archive/`). The source of truth is the streaming compose functions in `src/OTGW-firmware/MQTTHaDiscovery.cpp`, which build each config directly into MQTT publish frames via a two-pass (MEASURE then WRITE) `MqttJsonWriter`. This eliminates the historical `sLine[1200]` staging buffer and avoids file I/O during discovery.
 
 Each discovery publish uses `client.beginPublish()` with `retain = true`, so HA receives a full retained config per entity.
 
@@ -869,7 +869,7 @@ Where:
 
 ### Entity Inventory
 
-The firmware emits the following entity categories (verified against `mqtt_configuratie.cpp` on `feature-dev-2.0.0-otgw32-esp32-sat-support`):
+The firmware emits the following entity categories (verified against `MQTTHaDiscovery.cpp` on `feature-dev-2.0.0-otgw32-esp32-sat-support`):
 
 | Component | Count | Source | Notes |
 |-----------|-------|--------|-------|
@@ -1022,9 +1022,9 @@ Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and take
 
 ### Discovery Composition
 
-Discovery configs are composed in flash by streaming functions in `mqtt_configuratie.cpp`:
+Discovery configs are composed in flash by streaming functions in `MQTTHaDiscovery.cpp`:
 
-- `streamSensorDiscovery()`, `streamBinarySensorDiscovery()` iterate hand-maintained PROGMEM config arrays (`mqttHaSensors[]`, `mqttHaBinSensors[]`) in `mqtt_configuratie.cpp`.
+- `streamSensorDiscovery()`, `streamBinarySensorDiscovery()` iterate hand-maintained PROGMEM config arrays (`mqttHaSensors[]`, `mqttHaBinSensors[]`) in `MQTTHaDiscovery.cpp`.
 - `streamClimateDiscovery(idx)`, `streamNumberDiscovery()`, `streamSatSwitchDiscovery(idx)`, `streamSatSelectDiscovery(idx)` are hardcoded per index.
 - `streamDallasSensorDiscovery(addr)` handles the runtime-addressed Dallas sensors.
 
