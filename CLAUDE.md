@@ -37,6 +37,8 @@ Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. "Builds
 - **KISS**: Simplest solution that works. Share design choices so user decides on complexity.
 - **YAGNI**: No features for hypothetical future requirements.
 - **Minimal change surface**: Small, focused changes. Each change needs a concrete justification.
+- **Comments about the present only**: Avoid defensive comments about hypothetical future scenarios ("if mode X is ever added, revisit this"). They confuse future readers by implying a plan that doesn't exist. Write only about what is true now. If the future concern is real, it belongs in a backlog task, not a code comment.
+- **Fix the doc, not the identifier**: When an existing identifier's name is semantically correct but its documentation is wrong (stale docstring, mismatched comment, outdated reference), prefer fixing the documentation over renaming. A rename touching N call sites is rarely a net win when the name itself isn't the bug.
 
 ---
 
