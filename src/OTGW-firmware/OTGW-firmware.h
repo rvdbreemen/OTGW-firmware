@@ -119,7 +119,11 @@ inline const char* CSTR(char* x) { return x ? x : ""; }
 #include "Networktypes.h"
 #include "PICtypes.h"
 #include "OTBustypes.h"
-#include "MQTTtypes.h"
+// MQTTtypes.h merged into MQTTstuff.h (ADR-081). Include MQTTstuff.h here so
+// the state/settings structs are visible before OTGWState / OTGWSettings
+// reference them. Later .ino files that include MQTTstuff.h get a no-op via
+// #pragma once.
+#include "MQTTstuff.h"
 #include "Flashtypes.h"
 // debugStuff.h (formerly Debugtypes.h slot): ADR-081 merged DebugSection
 // into debugStuff.h, so we include the whole stuff.h here -- early enough

@@ -13,6 +13,51 @@
 #include <stdint.h>
 #include <PubSubClient.h>
 
+// MQTTstuff.h is included by both the main Arduino translation unit (via
+// OTGW-firmware.h, which defines HOME_ASSISTANT_DISCOVERY_PREFIX) and by the
+// standalone MQTTHaDiscovery.cpp (which does NOT include OTGW-firmware.h).
+// Guard the constant so the second TU still compiles. Kept as a #define to
+// preserve the original macro semantics; the guard makes the definition
+// idempotent if OTGW-firmware.h has already provided it.
+#ifndef HOME_ASSISTANT_DISCOVERY_PREFIX
+#define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"
+#endif
+
+// ============================================================================
+// State + Settings sections (ADR-081 -- merged from former MQTTtypes.h)
+// ============================================================================
+//
+// MQTTRuntimeSection and MQTTSettingsSection live here (inside MQTTstuff.h)
+// because MQTT is a component that owns both machinery and state/settings
+// structs, and per ADR-081 types merge into <Component>stuff.h when a
+// stuff.h sibling exists. Accessed as state.mqtt.<field> and
+// settings.mqtt.<field>.
+
+struct MQTTRuntimeSection {    // state.mqtt -- MQTT broker connection state
+  bool bConnected        = false;  // was statusMQTTconnection
+  uint32_t iLastConnectedMs = 0;   // millis() when MQTT was last connected (for fallback detection)
+};
+
+struct MQTTSettingsSection {
+  bool    bEnable          = true;
+  bool    bSecure          = false;
+  char    sBroker[65]      = "homeassistant.local";
+  int16_t iBrokerPort      = 1883;
+  char    sUser[41]        = "";
+  char    sPasswd[41]      = "";
+  char    sHaprefix[41]    = HOME_ASSISTANT_DISCOVERY_PREFIX;
+  bool    bHaRebootDetect  = true;
+  char    sTopTopic[41]    = "OTGW";
+  // Format budget: "otgw-" (5) + up to 32-char device id + optional suffix.
+  // The streaming HA discovery composer may prepend/append short fragments,
+  // so keep headroom. Minimum 20 bytes is a hard lower bound.
+  char    sUniqueid[41]    = "";  // Initialized in readSettings
+  static_assert(sizeof(sUniqueid) >= 20, "sUniqueid must fit 'otgw-' + chipId");
+  bool    bOTmessage       = false;
+  uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
+  bool    bSeparateSources = false; // ADR-040: publish source-specific topics
+};
+
 // ---------------------------------------------------------------------------
 // PROGMEM-safe helpers -- shared between MQTTstuff.ino and the data layer.
 //
