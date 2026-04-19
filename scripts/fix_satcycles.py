@@ -1,9 +1,25 @@
 #!/usr/bin/env python3
-"""Apply all Task #237 changes to SATcycles.ino"""
+"""Apply all Task #237 changes to SATcycles.ino.
+
+One-shot migration: the generated code (satSaveCycleWindow, satLoadCycleWindow,
+satFlushCycleWindow) is now part of the tree. Running this script a second time
+used to silently append the cycle functions a second time (Change 4 has no
+"already applied" guard), causing redefinition errors. TASK-309 (TEST-M2) adds
+the idempotency guard below.
+"""
+
+import sys
 
 path = 'src/OTGW-firmware/SATcycles.ino'
 with open(path, 'r', encoding='utf-8') as f:
     content = f.read()
+
+# Idempotency guard (TASK-309): bail out if the appended functions already exist.
+if 'void satSaveCycleWindow()' in content or 'void satFlushCycleWindow()' in content:
+    print('[fix_satcycles] already applied: satSaveCycleWindow/satFlushCycleWindow '
+          'present in target file. Re-running would duplicate those definitions and '
+          'break the build. Exiting cleanly.')
+    sys.exit(0)
 
 original_len = len(content)
 print(f"Original length: {original_len}")

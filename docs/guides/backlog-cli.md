@@ -47,6 +47,38 @@ A task is Done only when ALL of:
 
 ---
 
+## Test Plan Section (firmware changes)
+
+Any task that changes firmware behaviour a human could only verify on real
+hardware MUST include a `## Test Plan` section in the notes. Without it,
+regressions surface weeks later as user reports on Discord or Tweakers rather
+than as a failing AC.
+
+Required for: OpenTherm pipeline changes, MQTT topic changes, OTA path
+modifications, SAT control loop changes, BLE/SAT pairing, WiFi/Ethernet stack,
+anything that flips a feature flag observed by Home Assistant.
+
+Append to any task with:
+
+```bash
+backlog task edit <id> --append-notes $'## Test Plan\n- Precondition: ...\n- Step 1: ...\n- Expected MQTT topic/value: ...\n- How to roll back: ...'
+```
+
+**Template** (keep it to 3-5 bullets):
+
+```
+## Test Plan
+- Precondition: device state, settings, connected peripherals
+- Steps: numbered actions that exercise the change
+- Expected observable: MQTT topic/value, REST response, OLED text, log line
+- Negative case: what SHOULDN'T happen (avoid silent regressions)
+- Roll-back: how to revert if the change misbehaves in the field
+```
+
+Historic tasks (closed without Test Plan) should be retrofitted when reopened.
+
+---
+
 ## Task Creation
 
 | Action | Command |

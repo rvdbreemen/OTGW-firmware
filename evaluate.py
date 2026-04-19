@@ -37,6 +37,61 @@ if sys.stderr.encoding and sys.stderr.encoding.lower().replace('-', '') != 'utf8
 
 import config
 
+# ===== Module-level pure helpers (testable; used by WorkspaceEvaluator) =====
+
+# Hot-path files per ADR-004: no String class allowed.
+# Matched as filename-prefix tuples (e.g. 'SAT' matches SATble.ino, SATcontrol.ino, ...).
+HOT_PATH_PREFIXES: Tuple[str, ...] = (
+    'SAT', 'MQTTstuff', 'restAPI', 'OTGW-Core', 'OTDirect',
+)
+
+# String-class regex: declarations of the form "String name;", "String name = ...",
+# "String name(arg)". Reference forms like "String&" and "const String&" are skipped
+# because they do not allocate.
+_STRING_DECL_RE = re.compile(r'\bString\s+\w+\s*[;=(]')
+
+# Binary-safe compare: strncmp_P / strstr_P on binary buffers causes Exception(2) on
+# ESP8266. Reported as INFO so each call site can be hand-verified to operate on
+# null-terminated text. See MEMORY.md "Exception (2) foot-gun" note.
+_BINARY_COMPARE_RE = re.compile(r'\b(?:strncmp_P|strstr_P)\s*\(')
+
+
+def is_hot_path_file(filename: str) -> bool:
+    """Return True when the file is a known ADR-004 hot-path source file."""
+    return any(filename.startswith(p) for p in HOT_PATH_PREFIXES)
+
+
+def _strip_line_comments(line: str) -> str:
+    """Return the portion of the line before a // line-comment (if any)."""
+    return line.split('//', 1)[0]
+
+
+def scan_string_usages_detailed(content: str, filename: str) -> List[str]:
+    """Return "filename:lineno" entries for String-class declarations in content."""
+    hits: List[str] = []
+    for i, line in enumerate(content.split('\n'), 1):
+        before_comment = _strip_line_comments(line)
+        stripped = before_comment.lstrip()
+        if stripped.startswith('/*') or stripped.startswith('*'):
+            continue
+        if _STRING_DECL_RE.search(before_comment):
+            hits.append(f"{filename}:{i}")
+    return hits
+
+
+def scan_binary_compare_calls(content: str, filename: str) -> List[str]:
+    """Return "filename:lineno" entries for strncmp_P / strstr_P call sites."""
+    hits: List[str] = []
+    for i, line in enumerate(content.split('\n'), 1):
+        before_comment = _strip_line_comments(line)
+        stripped = before_comment.lstrip()
+        if stripped.startswith('/*') or stripped.startswith('*') or stripped.startswith('#define'):
+            continue
+        if _BINARY_COMPARE_RE.search(before_comment):
+            hits.append(f"{filename}:{i}")
+    return hits
+
+
 class Colors:
     """ANSI color codes"""
     HEADER = '\033[95m'
@@ -160,36 +215,36 @@ class WorkspaceEvaluator:
         """Check coding standards and best practices"""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Coding Standards ==={Colors.ENDC}")
         
-        issues = {
-            'serial_debug': 0,
-            'string_usage': 0,
-            'global_vars': 0,
-            'magic_numbers': 0
-        }
-        
+        serial_debug_count = 0
+        string_hot_hits: List[str] = []
+        string_other_hits: List[str] = []
+
         src_dir = config.FIRMWARE_ROOT
         ino_cpp_files = list(src_dir.glob("*.ino")) + list(src_dir.glob("*.cpp"))
-        
+
         for file in ino_cpp_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
-                lines = content.split('\n')
-                
-                for i, line in enumerate(lines, 1):
-                    # Check for Serial.print usage (should use Debug macros)
-                    if 'Serial.print' in line and 'SetupDebug' not in line and '//' not in line.split('Serial.print')[0]:
-                        issues['serial_debug'] += 1
-                        if self.verbose:
-                            print(f"  {file.name}:{i}: Serial.print usage")
-                    
-                    # Check for String class usage in critical paths
-                    if re.search(r'\bString\s+\w+\s*=', line) and '//' not in line.split('String')[0]:
-                        issues['string_usage'] += 1
 
-        if issues['serial_debug'] > 0:
+            # Serial.print detection (unchanged logic)
+            for i, line in enumerate(content.split('\n'), 1):
+                if 'Serial.print' in line and 'SetupDebug' not in line and '//' not in line.split('Serial.print')[0]:
+                    serial_debug_count += 1
+                    if self.verbose:
+                        print(f"  {file.name}:{i}: Serial.print usage")
+
+            # String class detection (widened regex: catches decl, init, direct-init;
+            # skips reference forms which do not allocate). Split by ADR-004 hot path.
+            hits = scan_string_usages_detailed(content, file.name)
+            if is_hot_path_file(file.name):
+                string_hot_hits.extend(hits)
+            else:
+                string_other_hits.extend(hits)
+
+        if serial_debug_count > 0:
             self.add_result(EvaluationResult(
                 "Coding", "Serial Debug Output", "WARN",
-                f"Found {issues['serial_debug']} Serial.print() usage (should use Debug macros)"
+                f"Found {serial_debug_count} Serial.print() usage (should use Debug macros)"
             ))
         else:
             self.add_result(EvaluationResult(
@@ -197,15 +252,29 @@ class WorkspaceEvaluator:
                 "No improper Serial.print() usage found"
             ))
 
-        if issues['string_usage'] > 5:
+        # ADR-004 hot-path String usage: reported as WARN with concrete call sites
+        # until the existing debt is burned down. Follow-up task will flip to FAIL.
+        if string_hot_hits:
+            self.add_result(EvaluationResult(
+                "Coding", "String Class in Hot Path (ADR-004)", "WARN",
+                f"Found {len(string_hot_hits)} String usages in hot-path files (SAT*, MQTTstuff, restAPI, OTGW-Core, OTDirect)",
+                "; ".join(string_hot_hits[:10])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Coding", "String Class in Hot Path (ADR-004)", "PASS",
+                "No String usages in hot-path files"
+            ))
+
+        if len(string_other_hits) > 5:
             self.add_result(EvaluationResult(
                 "Coding", "String Class Usage", "WARN",
-                f"Found {issues['string_usage']} String class usages (may cause heap fragmentation)"
+                f"Found {len(string_other_hits)} String class usages in non-hot-path files"
             ))
         else:
             self.add_result(EvaluationResult(
                 "Coding", "String Class Usage", "PASS",
-                f"Limited String usage ({issues['string_usage']} instances)"
+                f"Limited String usage ({len(string_other_hits)} non-hot-path instances)"
             ))
 
     def check_memory_usage(self):
@@ -767,8 +836,39 @@ class WorkspaceEvaluator:
                 "version.h not found"
             ))
 
+    # ===== BINARY-SAFE COMPARE CHECK =====
+
+    def check_binary_safe_compare(self):
+        """INFO: flag every strncmp_P / strstr_P call site. These MUST operate on
+        null-terminated text only; running them against binary buffers triggers
+        Exception(2) on ESP8266. Use memcmp_P for binary data. See MEMORY.md."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Binary-safe Compare Audit ==={Colors.ENDC}")
+
+        src_dir = config.FIRMWARE_ROOT
+        code_files = (list(src_dir.glob("*.ino")) +
+                      list(src_dir.glob("*.cpp")) +
+                      list(src_dir.glob("*.h")))
+
+        hits: List[str] = []
+        for file in code_files:
+            with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            hits.extend(scan_binary_compare_calls(content, file.name))
+
+        if hits:
+            self.add_result(EvaluationResult(
+                "Coding", "Binary-safe compare audit", "INFO",
+                f"Found {len(hits)} strncmp_P/strstr_P call sites; verify each operates on null-terminated text (use memcmp_P for binary)",
+                "; ".join(hits[:10])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Coding", "Binary-safe compare audit", "PASS",
+                "No strncmp_P / strstr_P call sites found"
+            ))
+
     # ===== MAIN EVALUATION =====
-    
+
     def evaluate_all(self, quick: bool = False):
         """Run all evaluations"""
         print(f"\n{Colors.BOLD}{Colors.HEADER}{'='*60}{Colors.ENDC}")
@@ -783,6 +883,7 @@ class WorkspaceEvaluator:
         self.check_version_info()
         self.check_progmem_compliance()
         self.check_no_arduinojson()
+        self.check_binary_safe_compare()
 
         if not quick:
             # Detailed checks

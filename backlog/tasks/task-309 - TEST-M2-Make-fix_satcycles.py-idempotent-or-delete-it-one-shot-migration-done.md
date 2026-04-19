@@ -3,9 +3,11 @@ id: TASK-309
 title: >-
   [TEST-M2] Make fix_satcycles.py idempotent or delete it (one-shot migration
   done)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-18 19:21'
+updated_date: '2026-04-19 07:05'
 labels:
   - testing
   - review-2026-04-18
@@ -21,7 +23,13 @@ scripts/fix_satcycles.py change #4 has no already-applied guard; second run dupl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Either add early-exit guard at the top (assert satFlushCycleWindow not in content)
+- [x] #1 Either add early-exit guard at the top (assert satFlushCycleWindow not in content)
 - [ ] #2 Or delete the script and document one-shot migration in backlog
-- [ ] #3 No CI job or dev workflow depends on the script silently
+- [x] #3 No CI job or dev workflow depends on the script silently
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+scripts/fix_satcycles.py: added idempotency guard at module top that checks for 'void satSaveCycleWindow()' or 'void satFlushCycleWindow()' in the target file. If either exists, the script exits cleanly with a clear message instead of appending the functions a second time (which previously caused redefinition errors). Verified by running the script against the post-migration tree: produces 'already applied' message and exits 0. Script kept rather than deleted to preserve the migration audit trail.
+<!-- SECTION:FINAL_SUMMARY:END -->

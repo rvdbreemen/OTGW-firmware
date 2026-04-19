@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-18 13:19'
-updated_date: '2026-04-18 14:29'
+updated_date: '2026-04-19 07:03'
 labels:
   - otdirect
   - esp32
@@ -35,6 +35,22 @@ OTDirect.ino bridgeFrameToParser() (line 449-454) returns early when otHideRepor
 <!-- SECTION:PLAN:BEGIN -->
 1. Add optional bool suppressOutput=false parameter to processOT() (OTGW-Core.ino). Backward-compatible default means every existing caller keeps current behaviour. 2. Inside processOT(): wrap auto-leave-PS-mode block (line 3733-3736) in if(!suppressOutput) so bridge-fed frames do not kick us out of PS mode. 3. Wrap per-frame sendMQTTData(F('otmessage'), buf) (line 3742) in if(!suppressOutput). 4. All state updates (lastOTmsgMs, OTdata.rsptype, epochBoiler/Thermostat, state.otBus.bBoilerState/bThermostatState/bOnline, publishBoilerConnectedState/publishThermostatConnectedState/publishOTGWConnectedState, setMsgLastUpdated, OTcurrentSystemState decode) run unconditionally. 5. bridgeFrameToParser (OTDirect.ino:449-454): remove the early return; always call processOT(buf, 9, otHideReports) so state stays fresh while output is suppressed during PS=1. 6. ESP32 build green. 7. ESP8266 build green (default parameter keeps behaviour). Out of scope: ClrLog/AddLog gating — that is the WebSocket OT monitor stream and can be a follow-up once the core pipeline no longer freezes.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Test Plan (retrofit 2026-04-19 per TASK-310)
+
+Run against a real OTGW connected to a live boiler, or OTmonitor in simulation.
+
+- Precondition: firmware flashed from this branch; HA/MQTT broker connected; OT bus active.
+- PS=0 (baseline): send `PS=0` via telnet; verify `OTGW/value/otmessage` publishes on every message; `master_status`/`slave_status` topics update.
+- PS=1 suppression: send `PS=1`; verify `otmessage` topic STOPS updating; verify decoded value topics (`boiler_water_temp`, `master_status`, etc) CONTINUE to update.
+- PS=1 + SAT active: enable SAT; confirm `state.sat.fBoilerTemp` still tracks live Tboiler; PID output continues to adjust setpoint.
+- Auto-leave-PS: observe after documented 10s stall window; verify PS drops back to 0 automatically.
+- Negative case: `otmessage` topic should NOT publish stale last-known-good values while PS=1 is active.
+- Roll-back: set PS=0 via MQTT `set/<nodeId>/otd/ps` with payload "0", or reset via web UI.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
