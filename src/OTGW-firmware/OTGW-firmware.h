@@ -102,10 +102,16 @@ enum HeapHealthLevel {
   HEAP_CRITICAL
 };
 HeapHealthLevel getHeapHealth();
+uint8_t getHeapFragmentation();
 bool canSendWebSocket();
 bool canPublishMQTT();
 void logHeapStats();
 void emergencyHeapRecovery();
+// Status-frame burst quiesce (TASK-342): suppress MQTT discovery drip during
+// Status sub-topic fanout so allocation peaks do not stack.
+void beginStatusBurst();
+void endStatusBurst();
+bool isStatusBurstActive();
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);

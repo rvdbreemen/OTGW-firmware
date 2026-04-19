@@ -76,6 +76,37 @@ struct MQTTAutoConfigSessionLock {
 
 // pgm_strncmp_PP() and pgm_read_char() are in MQTTstuff.h (inline, shared with mqtt_configuratie.cpp)
 
+// Status-burst quiesce flag (TASK-342).
+// A Status-frame fanout publishes status_master plus 7 bits, and/or status_slave
+// plus 8 bits in rapid succession (~20ms). If loopMQTTDiscovery fires a drip
+// in the middle of that burst, the two allocations overlap and push the heap
+// into the throttle band unnecessarily. Calling beginStatusBurst() before the
+// fanout and endStatusBurst() after causes the drip to skip that tick.
+// Timeout safety: if endStatusBurst is never reached (e.g. exception path),
+// isStatusBurstActive() auto-clears after STATUS_BURST_TIMEOUT_MS.
+static bool statusBurstActive = false;
+static unsigned long statusBurstStartMs = 0;
+constexpr unsigned long STATUS_BURST_TIMEOUT_MS = 500;
+
+void beginStatusBurst() {
+  statusBurstActive = true;
+  statusBurstStartMs = millis();
+}
+
+void endStatusBurst() {
+  statusBurstActive = false;
+}
+
+bool isStatusBurstActive() {
+  if (!statusBurstActive) return false;
+  // Self-heal against a missed endStatusBurst() call.
+  if ((unsigned long)(millis() - statusBurstStartMs) > STATUS_BURST_TIMEOUT_MS) {
+    statusBurstActive = false;
+    return false;
+  }
+  return true;
+}
+
 static            PubSubClient MQTTclient(wifiClient);
 
 int8_t            reconnectAttempts = 0;
@@ -965,19 +996,25 @@ void markAllMQTTConfigPending()
 // and sets its "done" bit.  Publishes exactly ONE ID per timer tick to
 // spread broker load over time.
 //
-// Adaptive interval: 3s when heap is healthy, 30s under heap pressure.
-// This avoids adding lwIP pbuf allocations when the system is already
-// memory-constrained, while still making progress on discovery.
+// Adaptive interval: 2s when heap is healthy, 10s under heap pressure.
+// The 2s cadence gives heap time to recover between discovery bursts so that
+// a Status-frame fanout (9 sub-topic publishes in ~20ms) does not overlap
+// with the next drip alloc. Pressure trigger is HEAP_LOW (not WARNING): the
+// drip MUST back off before the publish gate starts dropping, otherwise we
+// only mitigate drops at the gate instead of preventing them at the source.
 //===========================================================================================
-constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 1;   // seconds (streaming is lightweight)
+constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 2;   // seconds (heap recovery between bursts)
 constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 10;  // seconds (heap pressure backoff)
 
 void loopMQTTDiscovery()
 {
   DECLARE_TIMER_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
 
-  // Adaptive interval: only change on state transition (guard prevents resetting _due every loop)
-  bool heapPressure = (getHeapHealth() >= HEAP_WARNING);
+  // Adaptive interval: back off BEFORE the publish gate engages.
+  // canPublishMQTT() starts dropping at HEAP_LOW (<6KB); if we only trigger
+  // slow-mode at HEAP_WARNING (<4KB) we are too late — drops have already
+  // started. Trigger at HEAP_LOW so the drip quiets down first.
+  bool heapPressure = (getHeapHealth() >= HEAP_LOW);
   if (heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_SLOW * 1000UL) {
     CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_SLOW, SKIP_MISSED_TICKS);
     MQTTDebugTf(PSTR("[drip] slowed to %ds (heap pressure)\r\n"), DISCOVERY_INTERVAL_SLOW);
@@ -991,6 +1028,9 @@ void loopMQTTDiscovery()
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
   if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return;
+  // Do not stack a discovery publish on top of a Status-frame sub-topic fanout.
+  // Timer keeps running; next tick picks up as soon as the burst ends.
+  if (isStatusBurstActive()) return;
 
   // Scan pending bitmap for the next set bit
   for (uint8_t group = 0; group < 8; group++) {

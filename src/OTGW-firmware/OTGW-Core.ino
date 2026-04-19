@@ -1562,6 +1562,8 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   }
   OTcurrentSystemState.MasterStatus = valueHB;
   mqttForceNextMasterStatusPublish = false;
+  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342).
+  beginStatusBurst();
   {
     OTPublishGate gate(publishCombined);
     sendMQTTData("status_master", statusText);
@@ -1573,6 +1575,7 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   publishStatusBitMQTT(4, "ch2_enable",       (valueHB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueHB);
   publishStatusBitMQTT(5, "summerwintertime", (valueHB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueHB);
   publishStatusBitMQTT(6, "dhw_blocking",     (valueHB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueHB);
+  endStatusBurst();
 }
 
 static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
@@ -1598,6 +1601,8 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   }
   OTcurrentSystemState.SlaveStatus = valueLB;
   mqttForceNextSlaveStatusPublish = false;
+  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342).
+  beginStatusBurst();
   {
     OTPublishGate gate(publishCombined);
     sendMQTTData("status_slave", statusText);
@@ -1610,6 +1615,7 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   publishStatusBitMQTT(13, "centralheating2",      (valueLB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueLB);
   publishStatusBitMQTT(14, "diagnostic_indicator", (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB);
   publishStatusBitMQTT(15, "electric_production",  (valueLB & 0x80), (previousStatus & 0x80), forcePublish, previousStatus, valueLB);
+  endStatusBurst();
 }
 
 static uint16_t publishCombinedStatusState(uint8_t valueHB, uint8_t valueLB)
@@ -1618,6 +1624,8 @@ static uint16_t publishCombinedStatusState(uint8_t valueHB, uint8_t valueLB)
   char slaveStatus[9] {0};
   buildStatusMasterText(valueHB, masterStatus, sizeof(masterStatus));
   buildStatusSlaveText(valueLB, slaveStatus, sizeof(slaveStatus));
+  // Status-burst quiesce is inside publishMasterStatusState/publishSlaveStatusState
+  // so the individual-side callers (lines 1871 and 1899 of this file) also benefit.
   publishMasterStatusState(valueHB, masterStatus);
   publishSlaveStatusState(valueLB, slaveStatus);
   return (OTcurrentSystemState.MasterStatus << 8) | OTcurrentSystemState.SlaveStatus;
