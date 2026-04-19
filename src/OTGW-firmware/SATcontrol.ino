@@ -1442,6 +1442,26 @@ void satFlushShortLivedData()
   SATDebugTln(F("SAT: short-lived data flushed (PID integral + cycle window)"));
 }
 
+//=====================================================================
+//=== Handle SAT heating_mode payload ===
+//=====================================================================
+// Map "eco"/"comfort" string aliases to the numeric SATheatingmode setting
+// (1=eco, 0=comfort); passthrough any other payload so REST/MQTT callers can
+// still send a bare number. Kept here alongside the other satHandle* helpers
+// so MQTT/REST transport layers stay free of SAT-specific string tokens
+// (ARCH-L3 2026-04-18 review).
+void satHandleHeatingMode(const char* value)
+{
+  if (!value || !*value) return;
+  if (strcasecmp_P(value, PSTR("eco")) == 0) {
+    updateSetting("SATheatingmode", "1");
+  } else if (strcasecmp_P(value, PSTR("comfort")) == 0) {
+    updateSetting("SATheatingmode", "0");
+  } else {
+    updateSetting("SATheatingmode", value);
+  }
+}
+
 void satHandleControlMode(const char* value)
 {
   if (!value || !*value) return;

@@ -189,6 +189,7 @@ bool satHandleTargetTemp(const char* value);
 bool satHandleZoneRoomTemp(uint8_t zone, const char* value);
 bool satHandleZoneSetpoint(uint8_t zone, const char* value);
 void satHandleEnabled(const char* value);
+void satHandleHeatingMode(const char* value);
 void satDisable();
 void satHandleControlMode(const char* value);
 void satCycleOnFlameChange(bool flameOn);
@@ -288,7 +289,7 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
 };
 #endif
 
-struct OTBusState {          // state.otgw — OpenTherm protocol & bus state
+struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (semantic name: OT bus traffic, not the gateway as a whole)
   bool bOnline           = false;  // was bOTGWonline — serial link alive
   bool bPSmode           = false;  // was bPSmode — Print Summary mode (PS=1)
   bool bGatewayMode      = false;  // was bOTGWgatewaystate — true=gateway, false=monitor

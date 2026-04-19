@@ -3,9 +3,11 @@ id: TASK-307
 title: >-
   [ARCH-M3] Replace 76-branch SAT MQTT strcasecmp chain with dispatch table
   (plus ADR)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-18 19:21'
+updated_date: '2026-04-19 07:23'
 labels:
   - architecture
   - review-2026-04-18

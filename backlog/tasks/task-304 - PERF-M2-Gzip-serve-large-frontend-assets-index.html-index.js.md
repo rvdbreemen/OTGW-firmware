@@ -1,11 +1,11 @@
 ---
 id: TASK-304
 title: '[PERF-M2] Gzip serve large frontend assets (index.html, index.js)'
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-18 19:20'
-updated_date: '2026-04-19 07:17'
+updated_date: '2026-04-19 07:23'
 labels:
   - performance
   - review-2026-04-18

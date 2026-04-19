@@ -1,9 +1,11 @@
 ---
 id: TASK-319
 title: '[ARCH-L2] Consider splitting OTGW-firmware.h into per-component state headers'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-18 19:24'
+updated_date: '2026-04-19 07:23'
 labels:
   - architecture
   - review-2026-04-18

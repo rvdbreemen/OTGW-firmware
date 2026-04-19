@@ -604,13 +604,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             } else if (strcasecmp_P(satSubCmd, PSTR("auto_gains_value")) == 0) {
               updateSetting("SATautogains", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("heating_mode")) == 0) {
-              if (strcasecmp_P(msgPayload, PSTR("eco")) == 0) {
-                updateSetting("SATheatingmode", "1");
-              } else if (strcasecmp_P(msgPayload, PSTR("comfort")) == 0) {
-                updateSetting("SATheatingmode", "0");
-              } else {
-                updateSetting("SATheatingmode", msgPayload);
-              }
+              satHandleHeatingMode(msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("cycles_per_hour")) == 0) {
               updateSetting("SATcyclesperhour", msgPayload);
             } else if (strcasecmp_P(satSubCmd, PSTR("valve_offset")) == 0) {

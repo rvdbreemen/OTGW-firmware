@@ -926,13 +926,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       satHandlePreset(val);
       handled = true;
     } else if (strcasecmp_P(settingName, PSTR("heating_mode")) == 0) {
-      if (strcasecmp_P(val, PSTR("eco")) == 0) {
-        updateSetting("SATheatingmode", "1");
-      } else if (strcasecmp_P(val, PSTR("comfort")) == 0) {
-        updateSetting("SATheatingmode", "0");
-      } else {
-        updateSetting("SATheatingmode", val);
-      }
+      satHandleHeatingMode(val);
       handled = true;
     // Direct updateSetting() calls
     } else if (strcasecmp_P(settingName, PSTR("overshoot_margin")) == 0) {
