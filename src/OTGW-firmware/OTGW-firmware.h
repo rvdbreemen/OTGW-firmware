@@ -111,6 +111,26 @@ inline const char* CSTR(char* x) { return x ? x : ""; }
 #define EVALBOOLEAN(x) (strcasecmp(x,"true")==0||strcasecmp(x,"on")==0||strcasecmp(x,"1")==0)
 #define ETX ((uint8_t)0x04)
 
+// Per-component type headers (ADR-079 / TASK-326 AC3). Included after the
+// #define block above because MQTTtypes.h references HOME_ASSISTANT_DISCOVERY_PREFIX
+// and NTPtypes.h references NTP_DEFAULT_TIMEZONE / NTP_HOST_DEFAULT.
+#include "Devicetypes.h"
+#include "Hardwaretypes.h"
+#include "Networktypes.h"
+#include "PICtypes.h"
+#include "OTBustypes.h"
+#include "MQTTtypes.h"
+#include "Flashtypes.h"
+#include "Debugtypes.h"
+#include "Uptimetypes.h"
+#include "NTPtypes.h"
+#include "Sensorstypes.h"
+#include "S0types.h"
+#include "Outputstypes.h"
+#include "Webhooktypes.h"
+#include "UItypes.h"
+
+
 // Forward declarations for heap monitoring (defined in helperStuff.ino)
 enum HeapHealthLevel {
   HEAP_HEALTHY,
@@ -214,130 +234,10 @@ void satLoadCycleWindow();
 void satFlushCycleWindow();
 void satFlushShortLivedData();
 
-//===================[ Hardware Mode — detected at boot ]===================
-enum OTGWHardwareMode : uint8_t {
-  HW_MODE_UNKNOWN   = 0,   // Not yet detected
-  HW_MODE_PIC       = 1,   // PIC16F co-processor on UART (traditional OTGW)
-  HW_MODE_OT_DIRECT = 2,   // Direct GPIO OpenTherm via opentherm_library (OTGW32)
-  HW_MODE_DEGRADED  = 3,   // Hardware detected but non-functional (OT bus dead, PIC missing)
-};
-
-//===================[ Network Transport — WiFi vs Ethernet ]===================
-enum OTGWNetworkMode : uint8_t {
-  NET_WIFI        = 0,   // Using WiFi (default)
-  NET_ETHERNET    = 1,   // Using wired Ethernet (W5500)
-#if defined(_VERSION_PRERELEASE)
-  NET_AP_FALLBACK = 2,   // BETA ONLY — SoftAP when WiFi unavailable
-#endif
-};
-
-struct HardwareSection {       // state.hw — detected hardware capabilities
-  OTGWHardwareMode eMode       = HW_MODE_UNKNOWN;
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
-  bool bOLEDPresent            = false;
-#endif
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  bool bEthernetPresent        = false;
-#endif
-};
-
-// NetworkSection is always present; Ethernet fields only on capable hardware.
-struct NetworkSection {        // state.net — active network transport state
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  OTGWNetworkMode eMode        = NET_WIFI;
-  bool bEthernetLink           = false;   // physical link up on W5500
-#endif
-#if defined(_VERSION_PRERELEASE)
-  // *** BETA ONLY — AP fallback flag ***
-  // Guarded by _VERSION_PRERELEASE. If this define is absent (production release),
-  // this field does not exist and AP fallback cannot activate under any circumstance.
-  bool bAPFallback             = false;   // true while SoftAP fallback is active
-  char sAPSSID[32]             = "";      // SSID of the active fallback AP
-#endif
-};
+// HardwareSection + NetworkSection + enums moved to Hardwaretypes.h / Networktypes.h (ADR-079/TASK-326 AC3)
 
 
-//===================[ Runtime State — transient, never persisted (ADR-051) ]===================
-// Sub-section structs for OTGWState — groups runtime state by system component.
-// Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float
-
-struct PICSection {            // state.pic — PIC microcontroller identity/status
-  bool bAvailable     = false;           // was bPICavailable
-  char sFwversion[32] = "no pic found";  // was sPICfwversion
-  char sDeviceid[32]  = "no pic found";  // was sPICdeviceid
-  char sType[32]      = "no pic found";  // was sPICtype
-};
-
-// OTDirectMode + OTDirectSection moved to OTDirecttypes.h (ADR-079/TASK-326)
-
-struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (semantic name: OT bus traffic, not the gateway as a whole)
-  bool bOnline           = false;  // was bOTGWonline — serial link alive
-  bool bPSmode           = false;  // was bPSmode — Print Summary mode (PS=1)
-  bool bGatewayMode      = false;  // was bOTGWgatewaystate — true=gateway, false=monitor
-  bool bGatewayModeKnown = false;  // was bOTGWgatewaystateKnown
-  bool bBoilerState      = false;  // was bOTGWboilerstate — CH/boiler active
-  bool bThermostatState  = false;  // was bOTGWthermostatstate
-};
-
-struct MQTTRuntimeSection {    // state.mqtt -- MQTT broker connection state
-  bool bConnected        = false;  // was statusMQTTconnection
-  uint32_t iLastConnectedMs = 0;   // millis() when MQTT was last connected (for fallback detection)
-};
-
-struct FlashSection {          // state.flash — Firmware upgrade operations
-  bool bESPactive        = false;  // was isESPFlashing
-  bool bPICactive        = false;  // was isPICFlashing
-  char sError[129]       = "";     // was errorupgrade
-  char sPICfile[65]      = "";     // was currentPICFlashFile
-  int  iPICprogress      = 0;      // was currentPICFlashProgress — percent 0-100
-};
-
-struct DebugSection {          // state.debug — Runtime diagnostic output flags
-  bool     bOTmsg                 = true;   // was bDebugOTmsg — OpenTherm message trace
-  bool     bRestAPI               = false;  // was bDebugRestAPI — REST API request trace
-  bool     bMQTT                  = false;  // was bDebugMQTT — MQTT publish/receive trace
-  bool     bMQTTGate              = false;  // MQTT gate decisions: interval/change-based publish logic
-  bool     bSensors               = false;  // was bDebugSensors — Dallas sensor scan trace
-  bool     bNTP                   = true;   // NTP time sync telemetry (on by default for diagnostics)
-  bool     bSensorSim             = false;  // was bDebugSensorSimulation
-  bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
-  bool     bSAT                   = true;   // SAT control loop + cycle + HCR trace (default on)
-  bool     bOTDirect              = true;   // OTDirect frame handling + PI loop trace (default on)
-  uint32_t iOTGWSimulationIntervalMs = 750;
-  uint32_t iOTGWSimulationNextDueMs  = 0;
-};
-
-struct UptimeSection {         // state.uptime — System longevity counters
-  uint32_t iSeconds      = 0;  // was upTimeSeconds
-  uint32_t iRebootCount  = 0;  // was rebootCount
-};
-
-struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
-  // Source: Schelte Bron's OTGW firmware documentation (https://otgw.tclcode.com/firmware.html)
-  // PR=A (About/version) is handled by getpicfwversion(); PR=M (mode) by queryOTGWgatewaymode().
-  // All other PR= reports are polled on-demand by queryNextPICsetting(), one per 3s tick.
-
-  // --- Active settings (most useful for HA integration) ---
-  char sSetpointOverride[16]  = "";  // PR=O: setpoint override ("T20.5" TT active, "C20.5" TC active, "N" none)
-  char sSetback[16]           = "";  // PR=S: setback temperature (SB command value, e.g. "15.0")
-  char sDhwOverride[8]        = "";  // PR=W: DHW/hot-water override ("0"=off, "1"=on, "A"=auto)
-
-  // --- Hardware configuration ---
-  char sGpio[8]               = "";  // PR=G: GPIO A+B function codes (two digits, e.g. "05")
-  char sGpioStates[8]         = "";  // PR=I: GPIO A+B current input states (two digits, e.g. "00")
-  char sLed[8]                = "";  // PR=L: LED A–F function chars (six chars, e.g. "RFFTTT")
-  char sTweaks[8]             = "";  // PR=T: tweaks (two chars: ignore_transitions + ovrd_high_byte)
-  char sTempSensor[4]         = "";  // PR=D: external temp sensor function ("O"=outside, "R"=return; v5+ only)
-  char sSmartPower[16]        = "";  // PR=P: smart power mode ("L"/"Low power", "M"/"Medium power", "H"/"High power", "N"/"Normal power")
-  char sThermostatDetect[8]   = "";  // PR=R: thermostat detection setting
-
-  // --- Diagnostics ---
-  char sBuilddate[24]         = "";  // PR=B: firmware build date/time (e.g. "17:52 12-03-2023")
-  char sClockMHz[8]           = "";  // PR=C: PIC clock speed in MHz (e.g. "4", "4 MHz")
-  char sResetCause[4]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on)
-  char sStandaloneInterval[8] = "";  // PR=N: message interval in standalone mode (seconds)
-  char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)
-};
+// PIC / OTBus / MQTT runtime / Flash / Debug / Uptime / PicSettings state structs moved per ADR-079/TASK-326 AC3
 
 // --- SAT enums + SATWindowRecord + SATZoneState + SATRuntimeSection moved to state_sat.h (ADR-079/TASK-326)
 
@@ -471,77 +371,21 @@ inline bool isGatewayFirmware() { return false; }
 // Sub-section structs for OTGWSettings — groups configuration by feature area.
 // Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float
 
-struct MQTTSettingsSection {
-  bool    bEnable          = true;
-  bool    bSecure          = false;
-  char    sBroker[65]      = "homeassistant.local";
-  int16_t iBrokerPort      = 1883;
-  char    sUser[41]        = "";
-  char    sPasswd[41]      = "";
-  char    sHaprefix[41]    = HOME_ASSISTANT_DISCOVERY_PREFIX;
-  bool    bHaRebootDetect  = true;
-  char    sTopTopic[41]    = "OTGW";
-  // Format budget: "otgw-" (5) + up to 32-char device id + optional suffix.
-  // The streaming HA discovery composer may prepend/append short fragments,
-  // so keep headroom. Minimum 20 bytes is a hard lower bound.
-  char    sUniqueid[41]    = "";  // Initialized in readSettings
-  static_assert(sizeof(sUniqueid) >= 20, "sUniqueid must fit 'otgw-' + chipId");
-  bool    bOTmessage       = false;
-  uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
-  bool    bSeparateSources = false; // ADR-040: publish source-specific topics
-};
+// MQTTSettingsSection moved to MQTTtypes.h (ADR-079/TASK-326 AC3)
 
-struct NTPSection {
-  bool bEnable        = true;
-  char sTimezone[65]  = NTP_DEFAULT_TIMEZONE;
-  char sHostname[65]  = NTP_HOST_DEFAULT;
-  bool bSendtime      = false;
-};
+// NTPSection moved to NTPtypes.h (ADR-079/TASK-326 AC3)
 
-struct SensorsSection {             // Dallas DS18B20 external sensors
-  bool    bEnabled       = false;
-  bool    bLegacyFormat  = false;   // Default to false (new standard format)
-  int8_t  iPin           = 10;     // GPIO 13 = D7, GPIO 10 = SDIO 3
-  int16_t iInterval      = 20;     // Interval time to read out temp and send to MQ
-};
+// SensorsSection moved to Sensorstypes.h (ADR-079/TASK-326 AC3)
 
-struct S0Section {
-  bool     bEnabled      = false;
-  uint8_t  iPin          = 12;     // GPIO 12 = D6, preferred
-  uint16_t iDebounceTime = 80;     // Depending on S0 switch
-  uint16_t iPulsekw      = 1000;   // Most S0 counters have 1000 pulses per kW
-  uint16_t iInterval     = 60;     // Suggested measurement reporting interval
-};
+// S0Section moved to S0types.h (ADR-079/TASK-326 AC3)
 
-struct OutputsSection {             // GPIO relay outputs
-  bool   bEnabled    = false;
-  int8_t iPin        = 16;
-  int8_t iTriggerBit = 0;
-};
+// OutputsSection moved to Outputstypes.h (ADR-079/TASK-326 AC3)
 
-struct WebhookSection {
-  bool   bEnabled         = false;
-  char   sURLon[101]      = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
-  char   sURLoff[101]     = "http://homeassistant.local:8123/api/webhook/otgw_boiler";
-  int8_t iTriggerBit      = 1;     // Default: bit 1 = CH mode (slave: CH active)
-  char   sPayload[201]    = "";    // Body template for HTTP POST; empty = HTTP GET
-  char   sContentType[32] = "application/json";
-};
+// WebhookSection moved to Webhooktypes.h (ADR-079/TASK-326 AC3)
 
-struct UISection {
-  bool bAutoScroll      = true;
-  bool bShowTimestamp   = true;
-  bool bCaptureMode     = false;
-  bool bAutoScreenshot  = false;
-  bool bAutoDownloadLog = false;
-  bool bAutoExport      = false;
-  int  iGraphTimeWindow = 60;      // Default to 1 Hour (60 minutes)
-};
+// UISection moved to UItypes.h (ADR-079/TASK-326 AC3)
 
-struct PICBootSection {            // PIC boot-time command injection
-  bool bEnable        = false;
-  char sCommands[129] = "";
-};
+// PICBootSection moved to PICtypes.h (ADR-079/TASK-326 AC3)
 
 //--- SAT (Smart Autotune Thermostat) settings ---
 // Ported from SAT releases/thermo-nova (https://github.com/Alexwijn/SAT)
@@ -550,23 +394,10 @@ struct PICBootSection {            // PIC boot-time command injection
 
 // OTDirectSettingsSection moved to OTDirecttypes.h (ADR-079/TASK-326)
 
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-struct EthernetSection {
-  bool bStaticIP       = false;             // false=DHCP (default), true=use static IP
-  char sIPaddress[16]  = "0.0.0.0";        // Static IP address
-  char sGateway[16]    = "0.0.0.0";        // Gateway
-  char sSubnet[16]     = "255.255.255.0";  // Subnet mask
-  char sDNS[16]        = "0.0.0.0";        // DNS server (0.0.0.0 = use gateway)
-};
-#endif
+// EthernetSection moved to Networktypes.h (ADR-079/TASK-326 AC3)
 
 
-// Hardware identity for HA device registry discovery.
-// Defaults set per platform; user can override via settings.ini or web UI.
-struct DeviceSection {
-  char sManufacturer[32] = "NodoShop";
-  char sModel[32]        = "OTGW";
-};
+// DeviceSection moved to Devicetypes.h (ADR-079/TASK-326 AC3)
 
 struct OTGWSettings {
   // Device-level fields (universal device identity)
