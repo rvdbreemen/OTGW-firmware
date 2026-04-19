@@ -41,9 +41,17 @@ The rule keeps ADR-079's goals (types are discoverable in a known location per c
 | SAT | No | `SATtypes.h` | unchanged |
 | OTDirect | No | `OTDirecttypes.h` | unchanged |
 | Hardware, PIC, OTBus, Flash, Uptime, Device, UI, Webhook, Outputs, S0, Sensors, NTP | No | `<Component>types.h` | unchanged |
-| **MQTT** | Yes | **Inside `MQTTstuff.h`** | `MQTTtypes.h` merged into `MQTTstuff.h`, file deleted |
-| **Network** | Yes | **Inside `networkStuff.h`** | `Networktypes.h` merged into `networkStuff.h`, file deleted |
-| **Debug** | Yes | **Inside `debugStuff.h`** | `Debugtypes.h` merged into `debugStuff.h`, file deleted |
+| **MQTT** | Yes | **Inside `MQTTstuff.h`** | `MQTTtypes.h` merged into `MQTTstuff.h`, file deleted (TASK-333) |
+| **Debug** | Yes | **Inside `debugStuff.h`** | `Debugtypes.h` merged into `debugStuff.h`, file deleted (TASK-336) |
+| **Network** | Yes | **Stays in `Networktypes.h`** (exception) | No change — see "Heavy-transitive exception" below |
+
+### Heavy-transitive exception
+
+ADR-081 was attempted for **Network** (TASK-334) and reverted after a build failure. Merging `NetworkSection` / `OTGWNetworkMode` / `EthernetSection` into `networkStuff.h` and then forward-positioning `#include "networkStuff.h"` in `OTGW-firmware.h` (so the types are visible before `OTGWState` references them) pulls `networkStuff.h`'s heavy transitive includes into the early position too — in particular `OTGW-ModUpdateServer.h` (via `OTGW-ModUpdateServer-esp32.h`) which references `OTGWState`, the global `state`, and the `DebugTln` / `DebugTf` macros. Those references only resolve later in `OTGW-firmware.h`'s include chain; forward-positioning creates a real compile-time ordering problem that is not worth the file-count saving.
+
+**Rule**: components whose `<Component>stuff.h` transitively pulls in headers that depend on `OTGWState`, `OTGWSettings`, or project-wide macros defined late in `OTGW-firmware.h` are **excepted** from ADR-081. They keep their separate `<Component>types.h` for the types that need to be visible early. Currently this rule applies only to `Network`.
+
+A future refactor could dissolve this exception by splitting `OTGW-ModUpdateServer.h` itself so its hot-path definitions don't leak `state` references upward through `networkStuff.h`. That is a larger refactor (affects `OTGW-ModUpdateServer.h` + `-esp32.h` + `-impl.h`) and is out of scope for ADR-081.
 
 ### Section ordering within `stuff.h`
 
