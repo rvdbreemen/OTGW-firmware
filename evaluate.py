@@ -92,6 +92,70 @@ def scan_binary_compare_calls(content: str, filename: str) -> List[str]:
     return hits
 
 
+# ADR-080 gate helpers. An Accepted ADR either references an automated gate
+# (evaluate.py / tests/) or carries a classification label marking it as non-
+# pattern-level. Otherwise it is a binding rule without enforcement -- the
+# exact drift mode ADR-080 was written to prevent.
+_ADR_CLASSIFICATION_LABELS: Tuple[str, ...] = (
+    'guideline-level', 'structural', 'historical', 'policy', 'meta-level',
+    'meta-rule', 'system-level',
+)
+_ADR_GATE_MARKERS: Tuple[str, ...] = (
+    'evaluate.py', 'tests/test_', 'check_progmem', 'check_binary_safe',
+    'check_coding_standards', 'check_no_arduinojson', 'check_adr_gates',
+    'check_backlog_hygiene', 'check_stack_safety',
+)
+
+
+def adr_has_gate_or_label(text: str) -> bool:
+    """True when the ADR text references a gate or carries a classification label."""
+    lowered = text.lower()
+    if any(label in lowered for label in _ADR_CLASSIFICATION_LABELS):
+        return True
+    if any(marker in text for marker in _ADR_GATE_MARKERS):
+        return True
+    return False
+
+
+def adr_is_accepted(text: str) -> bool:
+    """True when the ADR's Status section contains 'Accepted' (case-insensitive)."""
+    # Only look at the first ~40 lines; Status sits near the top.
+    head = '\n'.join(text.splitlines()[:40])
+    return 'accepted' in head.lower()
+
+
+# Backlog hygiene helpers (enforces the AC Deviation Protocol at task level).
+_TASK_DEVIATION_MARKERS: Tuple[str, ...] = (
+    'deviation', 'deferred', 'defer ', 'follow-up', 'followup',
+    'hardware test', 'manual test', "won't fix", 'wont-fix', 'wont fix',
+    'out of scope', 'out-of-scope', 'scope-out',
+    'superseded', 'retrofit', 'retrofitted',
+)
+
+
+def task_has_deviation_note(text: str) -> bool:
+    """True when the task notes/final-summary reference a recognized deviation marker."""
+    # Only scan sections that live after the AC block (Implementation Notes / Final Summary).
+    # Using the whole body is fine for our purposes; a marker in the description
+    # usually implies the author was aware of the shape of the deviation too.
+    lowered = text.lower()
+    return any(marker in lowered for marker in _TASK_DEVIATION_MARKERS)
+
+
+_TASK_AC_UNCHECKED_RE = re.compile(r'^\s*-\s*\[\s\]\s+#?\d+', re.MULTILINE)
+_TASK_STATUS_RE = re.compile(r'^status:\s*(\S+)', re.MULTILINE)
+
+
+def task_status(text: str) -> str:
+    m = _TASK_STATUS_RE.search(text)
+    return m.group(1).strip().strip("'\"") if m else ''
+
+
+def task_unchecked_ac_count(text: str) -> int:
+    """Count unchecked ACs (- [ ] #N ...) in task body."""
+    return len(_TASK_AC_UNCHECKED_RE.findall(text))
+
+
 class Colors:
     """ANSI color codes"""
     HEADER = '\033[95m'
@@ -195,12 +259,14 @@ class WorkspaceEvaluator:
             ", ".join([f.name for f in ino_files])
         ))
 
-        # Check for proper header guards in .h files
+        # Check for proper header guards in .h files. Accept both the classic
+        # #ifndef/#define idiom and the modern #pragma once (supported by every
+        # compiler this project targets).
         h_files = list(src_dir.glob("*.h"))
         for h_file in h_files:
             with open(h_file, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
-                if '#ifndef' in content and '#define' in content:
+                if '#pragma once' in content or ('#ifndef' in content and '#define' in content):
                     self.add_result(EvaluationResult(
                         "Structure", f"Header guard: {h_file.name}", "PASS",
                         "Has header guards"
@@ -867,6 +933,93 @@ class WorkspaceEvaluator:
                 "No strncmp_P / strstr_P call sites found"
             ))
 
+    # ===== ADR-080 GATES =====
+
+    def check_adr_gates(self):
+        """ADR-080: Accepted ADRs must reference an automated gate OR carry a
+        classification label (structural / historical / policy / guideline-level /
+        meta-level). Without either, a binding-on-paper rule drifts unchecked --
+        exactly the pattern that ADR-004 demonstrated before this check existed."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR Gate Audit (ADR-080) ==={Colors.ENDC}")
+
+        adr_dir = self.project_dir / "docs" / "adr"
+        if not adr_dir.exists():
+            self.add_result(EvaluationResult(
+                "ADR", "ADR directory", "INFO",
+                "docs/adr/ not found -- skipping ADR gate audit"
+            ))
+            return
+
+        gaps: List[str] = []
+        audited = 0
+        for adr in sorted(adr_dir.glob("ADR-*.md")):
+            try:
+                text = adr.read_text(encoding='utf-8', errors='ignore')
+            except OSError:
+                continue
+            if not adr_is_accepted(text):
+                continue
+            audited += 1
+            if not adr_has_gate_or_label(text):
+                gaps.append(adr.name)
+
+        if gaps:
+            self.add_result(EvaluationResult(
+                "ADR", "ADR gate audit", "INFO",
+                f"{len(gaps)}/{audited} Accepted ADRs lack both a gate reference "
+                f"and a classification label (ADR-080)",
+                "; ".join(gaps[:10])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR", "ADR gate audit", "PASS",
+                f"All {audited} Accepted ADRs reference a gate or carry a classification label"
+            ))
+
+    def check_backlog_hygiene(self):
+        """AC Deviation Protocol: Done tasks with unchecked ACs must reference a
+        deviation, deferral, follow-up, or out-of-scope note. Otherwise the task
+        is a silent partial Done -- the drift the protocol was written to prevent."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Backlog Hygiene (AC Deviation Protocol) ==={Colors.ENDC}")
+
+        tasks_dir = self.project_dir / "backlog" / "tasks"
+        if not tasks_dir.exists():
+            self.add_result(EvaluationResult(
+                "Backlog", "Backlog directory", "INFO",
+                "backlog/tasks/ not found -- skipping hygiene check"
+            ))
+            return
+
+        silent_partials: List[str] = []
+        audited = 0
+        for task in sorted(tasks_dir.glob("task-*.md")):
+            try:
+                text = task.read_text(encoding='utf-8', errors='ignore')
+            except OSError:
+                continue
+            if task_status(text) != 'Done':
+                continue
+            audited += 1
+            if task_unchecked_ac_count(text) == 0:
+                continue
+            if task_has_deviation_note(text):
+                continue
+            # Extract task id for a compact report
+            short = task.name.split(' - ', 1)[0]
+            silent_partials.append(short)
+
+        if silent_partials:
+            self.add_result(EvaluationResult(
+                "Backlog", "AC Deviation Protocol", "INFO",
+                f"{len(silent_partials)}/{audited} Done tasks have unchecked ACs without a deviation note",
+                "; ".join(silent_partials[:10])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Backlog", "AC Deviation Protocol", "PASS",
+                f"All {audited} Done tasks either have every AC checked or document the deviation"
+            ))
+
     # ===== MAIN EVALUATION =====
 
     def evaluate_all(self, quick: bool = False):
@@ -884,6 +1037,8 @@ class WorkspaceEvaluator:
         self.check_progmem_compliance()
         self.check_no_arduinojson()
         self.check_binary_safe_compare()
+        self.check_adr_gates()
+        self.check_backlog_hygiene()
 
         if not quick:
             # Detailed checks

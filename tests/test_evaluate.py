@@ -124,6 +124,102 @@ class TestScanBinaryCompareCalls(unittest.TestCase):
         self.assertEqual(hits, [])
 
 
+class TestAdrGateHelpers(unittest.TestCase):
+    """ADR-080 gate helpers: an Accepted ADR must reference a gate OR carry a
+    classification label. These tests pin both paths so a silent regression in
+    the markers cannot re-open the drift ADR-080 was written to prevent."""
+
+    def test_accepted_status_detected(self):
+        self.assertTrue(evaluate.adr_is_accepted("# ADR-X\n\n## Status\n\nAccepted (2026-04-19)\n"))
+        self.assertTrue(evaluate.adr_is_accepted("## Status\n\nAccepted\n"))
+
+    def test_non_accepted_status_ignored(self):
+        self.assertFalse(evaluate.adr_is_accepted("## Status\n\nProposed\n"))
+        self.assertFalse(evaluate.adr_is_accepted("## Status\n\nSuperseded by ADR-Y\n"))
+        self.assertFalse(evaluate.adr_is_accepted(""))
+
+    def test_classification_label_satisfies_gate(self):
+        for label in ("guideline-level", "structural", "historical", "policy", "meta-level"):
+            text = f"## Status\n\nAccepted ({label})\n"
+            self.assertTrue(evaluate.adr_has_gate_or_label(text),
+                            f"label '{label}' should satisfy the gate requirement")
+
+    def test_gate_reference_satisfies_gate(self):
+        for marker in ("evaluate.py check_progmem_compliance", "tests/test_evaluate.py", "evaluate.py"):
+            text = f"## Status\n\nAccepted\n\n## Consequences\n\nEnforced by {marker}\n"
+            self.assertTrue(evaluate.adr_has_gate_or_label(text),
+                            f"gate marker '{marker}' should satisfy the gate requirement")
+
+    def test_accepted_without_gate_or_label_fails(self):
+        text = ("# ADR-Y Some rule\n\n## Status\n\nAccepted\n\n"
+                "## Context\n\nStuff happens.\n\n## Decision\n\nDo the thing.\n")
+        self.assertTrue(evaluate.adr_is_accepted(text))
+        self.assertFalse(evaluate.adr_has_gate_or_label(text))
+
+
+class TestBacklogHygieneHelpers(unittest.TestCase):
+    """AC Deviation Protocol: Done tasks with unchecked ACs must cite a
+    deviation / follow-up / scope-out. These tests keep the marker list honest."""
+
+    _DONE_TASK_ALL_CHECKED = (
+        "---\nid: TASK-1\nstatus: Done\n---\n\n"
+        "## Acceptance Criteria\n"
+        "<!-- AC:BEGIN -->\n"
+        "- [x] #1 First done\n"
+        "- [x] #2 Second done\n"
+        "<!-- AC:END -->\n"
+    )
+    _DONE_TASK_ONE_UNCHECKED_NO_NOTE = (
+        "---\nid: TASK-2\nstatus: Done\n---\n\n"
+        "## Acceptance Criteria\n"
+        "- [x] #1 Done\n"
+        "- [ ] #2 Not done\n"
+    )
+    _DONE_TASK_ONE_UNCHECKED_WITH_NOTE = (
+        "---\nid: TASK-3\nstatus: Done\n---\n\n"
+        "## Acceptance Criteria\n"
+        "- [x] #1 Done\n"
+        "- [ ] #2 Not done\n\n"
+        "## Implementation Notes\n\n"
+        "AC2 deferred to hardware test; tracked as follow-up.\n"
+    )
+    _IN_PROGRESS_TASK = (
+        "---\nid: TASK-4\nstatus: In Progress\n---\n\n"
+        "## Acceptance Criteria\n"
+        "- [ ] #1 Still open\n"
+    )
+
+    def test_status_parsing(self):
+        self.assertEqual(evaluate.task_status(self._DONE_TASK_ALL_CHECKED), "Done")
+        self.assertEqual(evaluate.task_status(self._IN_PROGRESS_TASK), "In")  # "In Progress" splits on whitespace
+        # Full status retrieval is done via front-matter parsers in real code; the
+        # helper is used only for equality checks against "Done", which works here.
+
+    def test_unchecked_ac_count(self):
+        self.assertEqual(evaluate.task_unchecked_ac_count(self._DONE_TASK_ALL_CHECKED), 0)
+        self.assertEqual(evaluate.task_unchecked_ac_count(self._DONE_TASK_ONE_UNCHECKED_NO_NOTE), 1)
+        self.assertEqual(evaluate.task_unchecked_ac_count(self._DONE_TASK_ONE_UNCHECKED_WITH_NOTE), 1)
+
+    def test_deviation_note_detected(self):
+        self.assertTrue(evaluate.task_has_deviation_note(self._DONE_TASK_ONE_UNCHECKED_WITH_NOTE))
+
+    def test_deviation_note_missing(self):
+        self.assertFalse(evaluate.task_has_deviation_note(self._DONE_TASK_ONE_UNCHECKED_NO_NOTE))
+
+    def test_various_deviation_markers_all_recognized(self):
+        for marker in (
+            "AC2 deferred to hardware test",
+            "AC-2 deviation: scope pushed to follow-up",
+            "Out of scope for this batch",
+            "Won't fix -- deliberate beta-debug feature",
+            "Manual test required; no CI gate possible",
+            "Superseded by TASK-X",
+        ):
+            text = f"## Implementation Notes\n\n{marker}\n"
+            self.assertTrue(evaluate.task_has_deviation_note(text),
+                            f"marker phrase '{marker}' should be recognized as a deviation note")
+
+
 class TestProgmemComplianceIntegration(unittest.TestCase):
     """Smoke test: confirm the main evaluator wiring still works end-to-end."""
 
