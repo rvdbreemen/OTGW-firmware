@@ -383,6 +383,155 @@ void startMQTT()
 
 bool bHAcycle = false;
 
+// ===========================================================================
+// SAT MQTT sub-command dispatch table (ADR-078)
+// ===========================================================================
+// Replaces the 76-branch chained strcasecmp_P that used to live inline inside
+// handleMQTTcallback. Each entry is either a handler delegate (for commands
+// whose payload needs typed parsing) or a setting-key passthrough (for
+// commands that just forward the payload to updateSetting). Sub-token commands
+// (sat/area/<idx>, sat/zone/<idx>/<cmd>) stay outside the table as special
+// cases because they consume additional topic segments. See ADR-078 for the
+// rationale + the kV2Routes[] precedent this mirrors.
+
+// --- Adapters: wrap bool-returning and no-arg handlers into the uniform
+// void(const char*) signature expected by the dispatch table. ---
+static void _satTargetTempCmd(const char* v)     { satHandleTargetTemp(v); }
+static void _satExtTempCmd(const char* v)        { satHandleExternalTemp(v); }
+static void _satExtOutdoorCmd(const char* v)     { satHandleExternalOutdoor(v); }
+static void _satHumidityCmd(const char* v)       { satHandleHumidity(v); }
+static void _satSunElevationCmd(const char* v)   { satHandleSunElevation(v); }
+
+static void _satOvpStartCmd(const char* v)       { (void)v; satOvpStartCalibration(); }
+static void _satOvpStopCmd(const char* v)        { (void)v; satOvpStopCalibration(); }
+static void _satResetIntegralCmd(const char* v)  { (void)v; satResetIntegral(); }
+static void _satFlushCmd(const char* v) {
+  (void)v;
+  satFlushShortLivedData();
+  MQTTDebugln(F("SAT: flushed short-lived data via MQTT"));
+}
+
+static void _satWindowCmd(const char* v) {
+  bool isOpen = (strcasecmp_P(v, PSTR("open")) == 0 ||
+                 strcasecmp_P(v, PSTR("1"))    == 0 ||
+                 strcasecmp_P(v, PSTR("ON"))   == 0);
+  satHandleWindow(isOpen);
+}
+
+static void _satValvesOpenCmd(const char* v) {
+  state.sat.bValvesOpen = (strcasecmp_P(v, PSTR("true")) == 0 ||
+                           strcmp_P   (v, PSTR("1"))    == 0 ||
+                           strcasecmp_P(v, PSTR("open")) == 0);
+  DebugTf(PSTR("SAT: valves_open = %s\r\n"), state.sat.bValvesOpen ? "true" : "false");
+}
+
+typedef void (*SatMqttHandler)(const char*);
+
+struct SatMqttCmdEntry {
+  const char*    cmd;         // command token (lower-case). Compared with strcasecmp.
+  const char*    settingKey;  // NULL when handler is used
+  SatMqttHandler handler;     // NULL when settingKey is used
+};
+
+// Dispatch table. Terminated by a { nullptr, nullptr, nullptr } sentinel,
+// same convention as kV2Routes[] in restAPI.ino.
+static const SatMqttCmdEntry kSatMqttCmds[] = {
+  // --- Typed handlers (payload parsing lives in the handler) ---
+  { "target",                 nullptr,                _satTargetTempCmd },
+  { "indoor_temp",            nullptr,                _satExtTempCmd },
+  { "outdoor_temp",           nullptr,                _satExtOutdoorCmd },
+  { "enabled",                nullptr,                satHandleEnabled },
+  { "control_mode",           nullptr,                satHandleControlMode },
+  { "preset",                 nullptr,                satHandlePreset },
+  { "humidity",               nullptr,                _satHumidityCmd },
+  { "heating_mode",           nullptr,                satHandleHeatingMode },
+  { "sun_elevation",          nullptr,                _satSunElevationCmd },
+  { "window",                 nullptr,                _satWindowCmd },
+  { "valves_open",            nullptr,                _satValvesOpenCmd },
+  { "ovp_start",              nullptr,                _satOvpStartCmd },
+  { "ovp_stop",               nullptr,                _satOvpStopCmd },
+  { "reset_integral",         nullptr,                _satResetIntegralCmd },
+  { "flush",                  nullptr,                _satFlushCmd },
+
+  // --- Direct setting-key passthrough ---
+  { "overshoot_margin",       "SATovershootmargin",   nullptr },
+  { "heating_system",         "SATsystem",            nullptr },
+  { "manufacturer",           "SATmanufacturer",      nullptr },
+  { "max_modulation",         "SATmaxmodulation",     nullptr },
+  { "dhw_setpoint",           "SATdhwsetpoint",       nullptr },
+  { "dhw_enabled",            "SATdhwenabled",        nullptr },
+  { "interval",               "SATinterval",          nullptr },
+  { "ovp_value",              "SATovpvalue",          nullptr },
+  { "ovp_enabled",            "SATovpenabled",        nullptr },
+  { "push_setpoint",          "SATpushsetpoint",      nullptr },
+  { "flame_off_offset",       "SATflameoffset",       nullptr },
+  { "force_pwm",              "SATforcepwm",          nullptr },
+  { "flow_offset",            "SATflowoffset",        nullptr },
+  { "summer_simmer",          "SATsummersimmer",      nullptr },
+  { "summer_threshold",       "SATsummerthreshold",   nullptr },
+  { "summer_min_hours",       "SATsummerminhours",    nullptr },
+  { "thermal_comfort",        "SATthermalcomfort",    nullptr },
+  { "humidity_timeout_s",     "SAThumiditytimeout",   nullptr },
+  { "comfort_adjust",         "SATcomfortadjust",     nullptr },
+  { "comfort_humidity",       "SATcomforthumidity",   nullptr },
+  { "comfort_max_offset",     "SATcomfortmaxoffset",  nullptr },
+  { "simulation",             "SATsimulation",        nullptr },
+  { "ble_enable",             "SATbleenable",         nullptr },
+  { "ble_mac",                "SATblemac",            nullptr },
+  { "ble_interval",           "SATbleinterval",       nullptr },
+  { "preset_sync",            "SATpresetsync",        nullptr },
+  { "preset_sync_topic",      "SATpresetsynctopic",   nullptr },
+  { "multi_area",             "SATmultiarea",         nullptr },
+  { "multi_area_count",       "SATmultiareacount",    nullptr },
+  { "auto_tune",              "SATautotune",          nullptr },
+  { "auto_tune_rate",         "SATautotunerate",      nullptr },
+  { "heating_curve",          "SATcoefficient",       nullptr },
+  { "deadband",               "SATdeadband",          nullptr },
+  { "mod_sup_delay",          "SATmodsupdelay",       nullptr },
+  { "mod_sup_offset",         "SATmodsupoffset",      nullptr },
+  { "boiler_capacity",        "SATboilercapacity",    nullptr },
+  { "target_temp_step",       "SATtempstep",          nullptr },
+  { "min_pressure",           "SATminpressure",       nullptr },
+  { "max_pressure",           "SATmaxpressure",       nullptr },
+  { "max_pressure_drop",      "SATmaxpressdrop",      nullptr },
+  { "preset_comfort",         "SATpresetcomfort",     nullptr },
+  { "preset_eco",             "SATpreseteco",         nullptr },
+  { "preset_away",            "SATpresetaway",        nullptr },
+  { "preset_sleep",           "SATpresetsleep",       nullptr },
+  { "preset_activity",        "SATpresetactivity",    nullptr },
+  { "preset_home",            "SATpresethome",        nullptr },
+  { "solar_gain",             "SATsolargain",         nullptr },
+  { "window_detection",       "SATwindowdetect",      nullptr },
+  { "pwm_auto_switch",        "SATpwmautoswitch",     nullptr },
+  { "sensor_max_age",         "SATsensormaxage",      nullptr },
+  { "error_monitoring",       "SATerrormon",          nullptr },
+  { "auto_gains_value",       "SATautogains",         nullptr },
+  { "cycles_per_hour",        "SATcyclesperhour",     nullptr },
+  { "valve_offset",           "SATvalveoffset",       nullptr },
+  { "solar_freeze_integral",  "SATsolarfreezeint",    nullptr },
+  { "zone_count",             "SATzonecount",         nullptr },
+  { "zone_timeout_s",         "SATzonetimeout",       nullptr },
+  { "solar_min_elevation",    "SATsolarminelev",      nullptr },
+  { "flush_threshold_h",      "SATflushtreshold",     nullptr },
+
+  { nullptr, nullptr, nullptr } // sentinel
+};
+
+// Returns true when the sub-command was found in the table and dispatched.
+static bool dispatchSatMqttCmd(const char* cmd, const char* payload) {
+  for (const SatMqttCmdEntry* e = kSatMqttCmds; e->cmd != nullptr; e++) {
+    if (strcasecmp(cmd, e->cmd) == 0) {
+      if (e->handler) {
+        e->handler(payload);
+      } else if (e->settingKey) {
+        updateSetting(e->settingKey, payload);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 // handles MQTT subscribe incoming stuff
 void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
@@ -474,149 +623,10 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
           char satSubCmd[24];
           if (readMQTTTopicToken(topicCursor, satSubCmd, sizeof(satSubCmd))) {
             MQTTDebugTf(PSTR("MQTT SAT cmd: %s [%s]\r\n"), satSubCmd, msgPayload);
-            if (strcasecmp_P(satSubCmd, PSTR("target")) == 0) {
-              satHandleTargetTemp(msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("indoor_temp")) == 0) {
-              satHandleExternalTemp(msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("outdoor_temp")) == 0) {
-              satHandleExternalOutdoor(msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("enabled")) == 0) {
-              satHandleEnabled(msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("control_mode")) == 0) {
-              satHandleControlMode(msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("overshoot_margin")) == 0) {
-              updateSetting("SATovershootmargin", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("heating_system")) == 0) {
-              updateSetting("SATsystem", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("manufacturer")) == 0) {
-              updateSetting("SATmanufacturer", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("max_modulation")) == 0) {
-              updateSetting("SATmaxmodulation", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("dhw_setpoint")) == 0) {
-              updateSetting("SATdhwsetpoint", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("dhw_enabled")) == 0) {
-              updateSetting("SATdhwenabled", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("interval")) == 0) {
-              updateSetting("SATinterval", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("preset")) == 0) {
-              satHandlePreset(msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("ovp_start")) == 0) {
-              satOvpStartCalibration();
-            } else if (strcasecmp_P(satSubCmd, PSTR("ovp_stop")) == 0) {
-              satOvpStopCalibration();
-            } else if (strcasecmp_P(satSubCmd, PSTR("ovp_value")) == 0) {
-              updateSetting("SATovpvalue", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("ovp_enabled")) == 0) {
-              updateSetting("SATovpenabled", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("push_setpoint")) == 0) {
-              updateSetting("SATpushsetpoint", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("flame_off_offset")) == 0) {
-              updateSetting("SATflameoffset", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("reset_integral")) == 0) {
-              satResetIntegral();
-            } else if (strcasecmp_P(satSubCmd, PSTR("window")) == 0) {
-              bool isOpen = (strcasecmp_P(msgPayload, PSTR("open")) == 0 ||
-                            strcasecmp_P(msgPayload, PSTR("1")) == 0 ||
-                            strcasecmp_P(msgPayload, PSTR("ON")) == 0);
-              satHandleWindow(isOpen);
-            } else if (strcasecmp_P(satSubCmd, PSTR("force_pwm")) == 0) {
-              updateSetting("SATforcepwm", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("flow_offset")) == 0) {
-              updateSetting("SATflowoffset", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("summer_simmer")) == 0) {
-              updateSetting("SATsummersimmer", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("summer_threshold")) == 0) {
-              updateSetting("SATsummerthreshold", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("summer_min_hours")) == 0) {
-              updateSetting("SATsummerminhours", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("humidity")) == 0) {
-              satHandleHumidity(msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("thermal_comfort")) == 0) {
-              updateSetting("SATthermalcomfort", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("humidity_timeout_s")) == 0) {
-              updateSetting("SAThumiditytimeout", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("comfort_adjust")) == 0) {
-              updateSetting("SATcomfortadjust", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("comfort_humidity")) == 0) {
-              updateSetting("SATcomforthumidity", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("comfort_max_offset")) == 0) {
-              updateSetting("SATcomfortmaxoffset", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("simulation")) == 0) {
-              updateSetting("SATsimulation", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("ble_enable")) == 0) {
-              updateSetting("SATbleenable", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("ble_mac")) == 0) {
-              updateSetting("SATblemac", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("ble_interval")) == 0) {
-              updateSetting("SATbleinterval", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("preset_sync")) == 0) {
-              updateSetting("SATpresetsync", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("preset_sync_topic")) == 0) {
-              updateSetting("SATpresetsynctopic", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("multi_area")) == 0) {
-              updateSetting("SATmultiarea", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("auto_tune")) == 0) {
-              updateSetting("SATautotune", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("auto_tune_rate")) == 0) {
-              updateSetting("SATautotunerate", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("multi_area_count")) == 0) {
-              updateSetting("SATmultiareacount", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("heating_curve")) == 0) {
-              updateSetting("SATcoefficient", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("deadband")) == 0) {
-              updateSetting("SATdeadband", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("mod_sup_delay")) == 0) {
-              updateSetting("SATmodsupdelay", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("mod_sup_offset")) == 0) {
-              updateSetting("SATmodsupoffset", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("boiler_capacity")) == 0) {
-              updateSetting("SATboilercapacity", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("target_temp_step")) == 0) {
-              updateSetting("SATtempstep", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("min_pressure")) == 0) {
-              updateSetting("SATminpressure", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("max_pressure")) == 0) {
-              updateSetting("SATmaxpressure", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("max_pressure_drop")) == 0) {
-              updateSetting("SATmaxpressdrop", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("preset_comfort")) == 0) {
-              updateSetting("SATpresetcomfort", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("preset_eco")) == 0) {
-              updateSetting("SATpreseteco", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("preset_away")) == 0) {
-              updateSetting("SATpresetaway", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("preset_sleep")) == 0) {
-              updateSetting("SATpresetsleep", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("preset_activity")) == 0) {
-              updateSetting("SATpresetactivity", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("preset_home")) == 0) {
-              updateSetting("SATpresethome", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("solar_gain")) == 0) {
-              updateSetting("SATsolargain", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("window_detection")) == 0) {
-              updateSetting("SATwindowdetect", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("pwm_auto_switch")) == 0) {
-              updateSetting("SATpwmautoswitch", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("sensor_max_age")) == 0) {
-              updateSetting("SATsensormaxage", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("error_monitoring")) == 0) {
-              updateSetting("SATerrormon", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("auto_gains_value")) == 0) {
-              updateSetting("SATautogains", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("heating_mode")) == 0) {
-              satHandleHeatingMode(msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("cycles_per_hour")) == 0) {
-              updateSetting("SATcyclesperhour", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("valve_offset")) == 0) {
-              updateSetting("SATvalveoffset", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("solar_freeze_integral")) == 0) {
-              updateSetting("SATsolarfreezeint", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("valves_open")) == 0) {
-              state.sat.bValvesOpen = (strcasecmp_P(msgPayload, PSTR("true")) == 0 ||
-                                      strcmp_P(msgPayload, PSTR("1")) == 0 ||
-                                      strcasecmp_P(msgPayload, PSTR("open")) == 0);
-              DebugTf(PSTR("SAT: valves_open = %s\r\n"), state.sat.bValvesOpen ? "true" : "false");
-            } else if (strcasecmp_P(satSubCmd, PSTR("area")) == 0) {
+            // ADR-078 dispatch. Sub-token commands (area, zone) cannot fit the
+            // uniform (cmd, payload) table because they consume additional
+            // topic segments, so they stay as special cases before the table scan.
+            if (strcasecmp_P(satSubCmd, PSTR("area")) == 0) {
               char areaIdx[4];
               if (readMQTTTopicToken(topicCursor, areaIdx, sizeof(areaIdx))) {
                 int idx = atoi(areaIdx);
@@ -641,20 +651,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
                   }
                 }
               }
-            } else if (strcasecmp_P(satSubCmd, PSTR("zone_count")) == 0) {
-              updateSetting("SATzonecount", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("zone_timeout_s")) == 0) {
-              updateSetting("SATzonetimeout", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("sun_elevation")) == 0) {
-              satHandleSunElevation(msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("solar_min_elevation")) == 0) {
-              updateSetting("SATsolarminelev", msgPayload);
-            } else if (strcasecmp_P(satSubCmd, PSTR("flush")) == 0) {
-              satFlushShortLivedData();
-              MQTTDebugln(F("SAT: flushed short-lived data via MQTT"));
-            } else if (strcasecmp_P(satSubCmd, PSTR("flush_threshold_h")) == 0) {
-              updateSetting("SATflushtreshold", msgPayload);
-            } else {
+            } else if (!dispatchSatMqttCmd(satSubCmd, msgPayload)) {
               MQTTDebugTf(PSTR("SAT: unknown sub-command [%s]\r\n"), satSubCmd);
             }
           } else {
