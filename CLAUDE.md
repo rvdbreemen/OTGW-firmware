@@ -114,14 +114,26 @@ Trusted LAN only. REST API works behind HTTPS reverse proxy, but WebSocket assum
 
 ADRs in `docs/adr/`. Read before changes to: architecture, NFRs, API contracts, new dependencies.
 
-- **ADR-004**: No `String` in hot paths
-- **ADR-051**: Settings/State architecture
-- Accepted ADRs are binding. To reverse: new ADR that supersedes old one.
+**Binding ADRs** (pattern-level, enforced by `evaluate.py` or tests — see ADR-080):
+- **ADR-004**: No `String` in hot paths (SAT*, MQTTstuff, restAPI, OTGW-Core, OTDirect)
+
+**Structural / architectural ADRs** (reviewed at PR, no automated gate — see ADR-080):
+- **ADR-044**: Single-point-of-instantiation for globals
+- **ADR-051**: Settings/State architecture (dual encapsulating structs, Hungarian prefix, two-level sections)
+- **ADR-054**: CSRF same-origin check (collectHeaders must register Origin/Referer)
+- **ADR-077**: Streaming MQTT HA discovery architecture
+- **ADR-078**: MQTT sub-command dispatch tables (replaces chained `strcasecmp_P` blocks)
+- **ADR-079**: Per-component type headers (`<Component>types.h` pattern, amendment to ADR-051)
+- **ADR-080**: Binding ADR rules must have a CI gate (meta-rule)
+
+Accepted ADRs are binding. To reverse: new ADR that supersedes old one.
 
 Format: Status / Context / Decision / Consequences / Related
 
 Create an ADR when: architecture changes, new/replaced dependency, API contract change, build tooling change.
 Do NOT create for: refactors, bug fixes, minor features within existing patterns.
+
+Per **ADR-080**, a new pattern-level ADR MUST either reference its CI gate (in `evaluate.py` or `tests/`) or be explicitly labeled guideline-level in its Status line. No more "binding on paper, unchecked in practice".
 
 ---
 
