@@ -49,6 +49,8 @@ A task is Done only when ALL of:
 
 ## Test Plan Section (firmware changes)
 
+For the full pre-merge checklist (build, lint, test, hardware/browser smoke tests), see `docs/guides/pr-checklist.md`. The Test Plan below is the task-level counterpart: the per-task steps that feed into the checklist.
+
 Any task that changes firmware behaviour a human could only verify on real
 hardware MUST include a `## Test Plan` section in the notes. Without it,
 regressions surface weeks later as user reports on Discord or Tweakers rather
