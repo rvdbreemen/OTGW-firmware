@@ -190,31 +190,47 @@ void startWebserver(){
     f.close();
   });
   
+  // TASK-304: prefer the .gz sibling (pre-gzipped at build time) with
+  // Content-Encoding: gzip when present. All target browsers (Chrome/FF/
+  // Safari latest +2) accept gzip unconditionally; no Accept-Encoding
+  // negotiation needed.
   httpServer.on("/index.js", []() {
-    // ?v=<hash> versioned requests get long-term cache; bare /index.js gets no-cache.
     const char* fsHash = getFilesystemHash();
-    // httpServer.arg() returns String by value — compare directly to avoid dangling c_str()
     if (httpServer.hasArg("v") && fsHash[0] != '\0' && strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
       httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
-    File f = LittleFS.open("/index.js", "r");
-    httpServer.streamFile(f, F("application/javascript"));
-    f.close();
+    if (LittleFS.exists("/index.js.gz")) {
+      httpServer.sendHeader(F("Content-Encoding"), F("gzip"));
+      File f = LittleFS.open("/index.js.gz", "r");
+      httpServer.streamFile(f, F("application/javascript"));
+      f.close();
+    } else {
+      File f = LittleFS.open("/index.js", "r");
+      httpServer.streamFile(f, F("application/javascript"));
+      f.close();
+    }
   });
 
   httpServer.on("/graph.js", []() {
-    // Same versioned-URL caching strategy as index.js (see above).
+    // Same versioned-URL caching + gzip-preference strategy as /index.js (see above).
     const char* fsHash = getFilesystemHash();
     if (httpServer.hasArg("v") && fsHash[0] != '\0' && strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
       httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
-    File f = LittleFS.open("/graph.js", "r");
-    httpServer.streamFile(f, F("application/javascript"));
-    f.close();
+    if (LittleFS.exists("/graph.js.gz")) {
+      httpServer.sendHeader(F("Content-Encoding"), F("gzip"));
+      File f = LittleFS.open("/graph.js.gz", "r");
+      httpServer.streamFile(f, F("application/javascript"));
+      f.close();
+    } else {
+      File f = LittleFS.open("/graph.js", "r");
+      httpServer.streamFile(f, F("application/javascript"));
+      f.close();
+    }
   });
 #if HAS_PIC
   //otgw pic functions

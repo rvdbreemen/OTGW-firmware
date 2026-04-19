@@ -562,10 +562,45 @@ def build_firmware(project_dir, config_file, target):
     print_success(f"Firmware build complete [{tcfg['name']}]")
 
 
+def prepare_gzip_assets(data_dir):
+    """Pre-gzip large static assets (*.js) in data_dir so FSexplorer.ino can
+    serve the .gz sibling with Content-Encoding: gzip. ~70% size reduction on
+    typical text assets, shrinking page-load cost and LittleFS footprint.
+
+    Only *.js files > 2 KB are gzipped. index.html is served through
+    sendIndex() with runtime template expansion (%name% placeholders), so
+    pre-gzipping would break that substitution -- left untouched on purpose.
+
+    Idempotent: regenerates the .gz only when the source is newer than the
+    existing .gz (mtime comparison). Safe to run on every build.
+    """
+    if not data_dir.exists():
+        return
+    print_step("Preparing gzip assets")
+    gz_count = 0
+    for src in data_dir.glob("*.js"):
+        if src.stat().st_size < 2048:
+            continue
+        dst = src.with_suffix(src.suffix + ".gz")
+        if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime:
+            continue
+        with open(src, "rb") as rf, gzip.open(dst, "wb", compresslevel=9) as wf:
+            shutil.copyfileobj(rf, wf)
+        reduction = (1.0 - dst.stat().st_size / src.stat().st_size) * 100.0
+        print_info(f"Gzipped {src.name} -> {dst.name} ({src.stat().st_size} -> {dst.stat().st_size} B, {reduction:.0f}% smaller)")
+        gz_count += 1
+    if gz_count == 0:
+        print_info("No gzip assets needed updating")
+    else:
+        print_success(f"Prepared {gz_count} gzip asset(s)")
+
+
 def build_filesystem(project_dir, config_file, target):
     """Build filesystem using mklittlefs for the given target"""
     tcfg = TARGETS[target]
     print_step(f"Building filesystem [{tcfg['name']}]")
+    # Ensure large static assets have up-to-date .gz siblings before mklittlefs packs them.
+    prepare_gzip_assets(config.DATA_DIR)
 
     # Find mklittlefs under the target's tool path
     # e.g. arduino/packages/esp8266/tools/mklittlefs/*/mklittlefs(.exe)
@@ -1061,6 +1096,8 @@ def build_filesystem_pio(project_dir, target):
     tcfg = TARGETS[target]
     env_name = PIO_ENV_MAP[target]
     print_step(f"Building filesystem [{tcfg['name']}] (PlatformIO)")
+    # Ensure large static assets have up-to-date .gz siblings before PIO packs them.
+    prepare_gzip_assets(config.DATA_DIR)
     run_command(["pio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir)
     print_success(f"Filesystem build complete [{tcfg['name']}]")
 
