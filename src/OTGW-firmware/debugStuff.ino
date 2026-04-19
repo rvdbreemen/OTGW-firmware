@@ -1,64 +1,36 @@
-/* 
-***************************************************************************  
-**  Program  : Debug.h
+/*
+***************************************************************************
+**  Program  : debugStuff.ino
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
-**  Met dank aan Willem Aandewiel en Erik
 **
-**  TERMS OF USE: MIT License. See bottom of file.                                                            
-***************************************************************************      
-** Modified: as OTGW actually uses the Serial interface, so no more debug to serial please.
+**  Debug-output machinery IMPLEMENTATION (ADR-079 split).
+**  Companion header: debugStuff.h (macros + function declarations).
+**  Data companion  : Debugtypes.h (state.debug trace toggles).
+**
+**  Two helpers live here so that only one translation unit instantiates
+**  the function bodies (matches the project-wide stuff.h/.ino pattern
+**  and removes the prior multi-definition fragility of Debug.h):
+**
+**    - _debugPrintf_P(fmt, ...)
+**        PROGMEM-format-string helper. vsnprintf_P into a 256-byte stack
+**        buffer, then debugTelnet.print(buf). Strings longer than 255
+**        chars are silently truncated -- acceptable for debug output.
+**
+**    - _debugBOL(fn, line)
+**        Beginning-of-line prefix: "HH:MM:SS.uuuuuu (heap|block) fn(line): ".
+**        Caches the timezone object, timestamp, and heap stats for a full
+**        second so high-volume flags (bMQTTGate) do not burn CPU on
+**        ZonedDateTime conversions or free-list walks on every debug line.
+**
+**  TERMS OF USE: MIT License. See OTGW-firmware.h for the full notice.
+***************************************************************************
 */
-
- #ifndef DEBUG_H
- #define DEBUG_H
-
- #include "platform.h"
-
-/*---- start macro's ------------------------------------------------------------------*/
-
-
-#define Debug(...)      ({ debugTelnet.print(__VA_ARGS__);    })
-#define Debugln(...)    ({ debugTelnet.println(__VA_ARGS__);  })
-#define Debugf(...)     ({ _debugPrintf_P(__VA_ARGS__);       })
-
-#define DebugFlush()    ({ debugTelnet.flush(); })
-
-
-#define DebugT(...)     ({ _debugBOL(__FUNCTION__, __LINE__);  \
-                           Debug(__VA_ARGS__);                 \
-                        })
-#define DebugTln(...)   ({ _debugBOL(__FUNCTION__, __LINE__);  \
-                           Debugln(__VA_ARGS__);        \
-                        })
-#define DebugTf(...)    ({ _debugBOL(__FUNCTION__, __LINE__);  \
-                           Debugf(__VA_ARGS__);                \
-                        })
-
-/*---- einde macro's ------------------------------------------------------------------*/
-
-// Module-specific conditional debug macros (ADR-051: uses state.debug.* flags)
-// Each .ino file defines its own set with a per-module flag and prefix.
-// Pattern (intentionally duplicated per-file — Arduino single-TU, no conflict):
-//
-//   #define XxxDebugTln(...) ({ if (state.debug.bXxx) DebugTln(__VA_ARGS__); })
-//   #define XxxDebugTf(...)  ({ if (state.debug.bXxx) DebugTf(__VA_ARGS__);  })
-//   ... (Tln, ln, Tf, f, T, plain)
-//
-// Modules: OTDebug* (bOTmsg), MQTTDebug* (bMQTT), RESTDebug* (bRestAPI),
-//          SensorDebug* (bSensors) — see each .ino file header.
-
-// needs extern SimpleTelnet<1> debugTelnet;   // declared in OTGW-firmware.h, defined in networkStuff.ino
-
-//#include <sys/time.h>
-// #include <time.h>
-// extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
-
 
 // SimpleTelnet inherits from Stream/Print but printf_P() is used here as a
 // standalone helper for PROGMEM format strings via vsnprintf_P into a
 // 256-byte stack buffer, then sent via debugTelnet.print().
-// Debug strings that exceed 255 chars are silently truncated — acceptable.
+// Debug strings that exceed 255 chars are silently truncated -- acceptable.
 void _debugPrintf_P(PGM_P fmt, ...) {
     char buf[256];
     va_list args;
@@ -112,7 +84,7 @@ void _debugBOL(const char *fn, int line)
 
    // Refresh time decomposition and heap stats at most once per second.
    // ZonedDateTime::forUnixSeconds64() computes DST rules and UTC offset;
-   // platformMaxFreeBlock() walks the entire free list — both are too
+   // platformMaxFreeBlock() walks the entire free list -- both are too
    // expensive to run on every debug line under high-volume flags.
    if (now_sec != lastCachedSec) {
      ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, cachedTz);
@@ -137,4 +109,3 @@ void _debugBOL(const char *fn, int line)
 
    debugTelnet.print(_bol);
 }
-#endif

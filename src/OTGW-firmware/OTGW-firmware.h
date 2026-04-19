@@ -121,7 +121,12 @@ inline const char* CSTR(char* x) { return x ? x : ""; }
 #include "OTBustypes.h"
 #include "MQTTtypes.h"
 #include "Flashtypes.h"
-#include "Debugtypes.h"
+// debugStuff.h (formerly Debugtypes.h slot): ADR-081 merged DebugSection
+// into debugStuff.h, so we include the whole stuff.h here -- early enough
+// that DebugSection is defined before OTGWState references it (line ~255).
+// The later #include "debugStuff.h" near the bottom becomes a no-op via
+// #pragma once.
+#include "debugStuff.h"
 #include "Uptimetypes.h"
 #include "NTPtypes.h"
 #include "Sensorstypes.h"
@@ -491,7 +496,7 @@ time_t    OTGWs0lasttime = 0;                     // Last time S0 counters have 
 byte      OTGWs0dataid = 245;                     // foney dataid for counter autoconfigure
 
 //Now load Debug & network library
-#include "Debug.h"
+#include "debugStuff.h"
 #include "networkStuff.h"
 #include "helperStuff.h"
 

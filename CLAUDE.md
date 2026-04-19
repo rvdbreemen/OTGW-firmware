@@ -129,6 +129,7 @@ ADRs in `docs/adr/`. Read before changes to: architecture, NFRs, API contracts, 
 - **ADR-078**: MQTT sub-command dispatch tables (replaces chained `strcasecmp_P` blocks)
 - **ADR-079**: Per-component type headers (`<Component>types.h` pattern, amendment to ADR-051)
 - **ADR-080**: Binding ADR rules must have a CI gate (meta-rule)
+- **ADR-081**: Types merge into `<Component>stuff.h` when both exist (amendment to ADR-079)
 
 Accepted ADRs are binding. To reverse: new ADR that supersedes old one.
 
