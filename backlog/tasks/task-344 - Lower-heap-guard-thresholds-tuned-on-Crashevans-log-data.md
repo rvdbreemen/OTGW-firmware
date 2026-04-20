@@ -1,11 +1,11 @@
 ---
 id: TASK-344
 title: Lower heap guard thresholds tuned on Crashevans log data
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 07:20'
-updated_date: '2026-04-20 07:20'
+updated_date: '2026-04-20 07:28'
 labels:
   - mqtt
   - heap
@@ -43,13 +43,13 @@ With 2s drip cadence + HEAP_LOW adaptive trigger + Status-burst quiesce shipping
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 HEAP_CRITICAL_THRESHOLD set to 1536 in helperStuff.ino
-- [ ] #2 HEAP_WARNING_THRESHOLD set to 3072 in helperStuff.ino
-- [ ] #3 HEAP_LOW_THRESHOLD set to 5120 in helperStuff.ino
-- [ ] #4 HEAP_FRAG_PROMOTE_MAXBLOCK set to 1536 in helperStuff.ino
-- [ ] #5 MQTT_DISCOVERY_HEAP_MIN set to 3000 in MQTTstuff.ino
-- [ ] #6 Comment block in MQTTstuff.ino updated to reference new WARNING value (was Keep in sync with HEAP_WARNING)
-- [ ] #7 Full build (firmware + littlefs) passes on esp8266
+- [x] #1 HEAP_CRITICAL_THRESHOLD set to 1536 in helperStuff.ino
+- [x] #2 HEAP_WARNING_THRESHOLD set to 3072 in helperStuff.ino
+- [x] #3 HEAP_LOW_THRESHOLD set to 5120 in helperStuff.ino
+- [x] #4 HEAP_FRAG_PROMOTE_MAXBLOCK set to 1536 in helperStuff.ino
+- [x] #5 MQTT_DISCOVERY_HEAP_MIN set to 3000 in MQTTstuff.ino
+- [x] #6 Comment block in MQTTstuff.ino updated to reference new WARNING value (was Keep in sync with HEAP_WARNING)
+- [x] #7 Full build (firmware + littlefs) passes on esp8266
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -62,3 +62,25 @@ With 2s drip cadence + HEAP_LOW adaptive trigger + Status-burst quiesce shipping
 5. Push to origin/1.4.1
 6. Run full build (firmware + filesystem)
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Lowered all 5 heap-pressure thresholds on branch 1.4.1 tuned to Crashevans tester log data:
+
+- HEAP_CRITICAL_THRESHOLD   2048 -> 1536  (helperStuff.ino:687)
+- HEAP_WARNING_THRESHOLD    4096 -> 3072  (helperStuff.ino:688)
+- HEAP_LOW_THRESHOLD        6144 -> 5120  (helperStuff.ino:689) — tuned value
+- HEAP_FRAG_PROMOTE_MAXBLOCK 2048 -> 1536  (helperStuff.ino:724)
+- MQTT_DISCOVERY_HEAP_MIN   4000 -> 3000  (MQTTstuff.ino:49)
+
+Updated the sync comment in MQTTstuff.ino to reference the new HEAP_WARNING value (3072) instead of the stale historical 12000-bytes-for-1200-byte-pbuf rationale.
+
+Build verified: full firmware + filesystem build on esp8266 via build.py (Python 3.12). Both artifacts produced clean:
+- OTGW-firmware-1.4.1-beta+7f5fdaa.ino.bin (0.69 MB)
+- OTGW-firmware.1.4.1-beta+7f5fdaa.littlefs.bin (1.98 MB)
+
+No compile errors, no warnings, no stack size regression. Commit 7f5fdaad on origin/1.4.1.
+
+Expected effect on tester setups: combined with the 4 burst-reduction fixes already shipping (TASK-338/339/340/342), throttle events should go from ~15 per 3 minutes observed in debug_2a.txt down to near-zero in routine operation. Only abnormal pressure (long uptime fragmentation, extra WS clients) would now trigger the LOW throttle band.
+<!-- SECTION:FINAL_SUMMARY:END -->
