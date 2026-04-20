@@ -1,0 +1,36 @@
+---
+id: TASK-351
+title: Daily automatic discovery verification
+status: To Do
+assignee: []
+created_date: '2026-04-20 19:33'
+labels:
+  - mqtt
+  - discovery
+  - 1.4.1
+dependencies: []
+priority: low
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Wire startDiscoveryVerification into the daily branch of the unified time-boundary dispatcher established in TASK-350. ONE line added inside if(dayFlag) block in doTaskMinuteChanged. Gated by new settings.mqtt.bDiscoveryAutoVerify (default true). Final layer of defense against broker-side retained loss. Ship AFTER TASK-349 has been in field 7+ days AND TASK-350 has landed. See plan file expressive-growing-yao.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Exactly ONE line added: if(settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification()
+- [ ] #2 Preconditions enforced inside startDiscoveryVerification, not duplicated at dispatcher
+- [ ] #3 NO new helper function - inline in dispatcher per ADR-064
+- [ ] #4 NO dayChanged or local static - dayFlag from dispatcher
+- [ ] #5 MQTTdiscoveryAutoVerify settings key serialized/parsed in settingStuff.ino
+- [ ] #6 UI toggle in data/index.js with translateFields label
+- [ ] #7 UI tooltip explains shared-broker warning
+- [ ] #8 REST GET /api/v2/discovery exposes auto_verify boolean
+- [ ] #9 REST PUT /api/v2/settings accepts MQTTdiscoveryAutoVerify via existing updateSetting dispatch
+- [ ] #10 Build passes and evaluate.py 100%
+- [ ] #11 Manual test: clock near midnight, [verify] started at day rollover
+- [ ] #12 Manual test: bDiscoveryAutoVerify=false, no verify triggered on day rollover
+- [ ] #13 DST fall-back 3:00 to 2:00 does NOT trigger spurious verify
+<!-- AC:END -->
