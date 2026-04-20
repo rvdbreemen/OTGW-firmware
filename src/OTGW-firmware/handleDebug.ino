@@ -74,6 +74,13 @@ void handleDebugChar(char c){
                 DebugTf(PSTR("Enable MQTT: %s\r\n"), CBOOLEAN(settings.mqtt.bEnable));
                 doAutoConfigure();
                 break;
+            case 'V':
+                // ADR-062 / TASK-349: trigger on-demand retained-discovery verification
+                DebugTln(F("Trigger MQTT discovery verification"));
+                if (!startDiscoveryVerification()) {
+                    DebugTln(F("[verify] refused (MQTT? pending drip? heap? flashing? already active?)"));
+                }
+                break;
             case 'r':
                 if (WiFi.status() != WL_CONNECTED)
                 {

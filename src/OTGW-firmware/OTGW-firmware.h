@@ -127,6 +127,13 @@ void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const 
 void publishToSourceTopic(const char*, const char*, byte);
 void loopMQTTDiscovery();
 void sendMQTTheapdiag();
+// MQTT discovery verification (ADR-062, TASK-349): see MQTTstuff.ino
+bool     startDiscoveryVerification();
+void     endDiscoveryVerification();
+bool     isDiscoveryVerificationActive();
+void     tickDiscoveryVerification();
+uint16_t countPendingDiscoveryIds();
+void     incPublishedTopicCount();    // called by streaming helpers in mqtt_configuratie.cpp (ADR-044 shim)
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 #if defined(ENABLE_SAT)
 // Alias used by SAT subsystem (name harmonised with OTGW32 branch)
@@ -248,6 +255,17 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
 struct UptimeSection {         // state.uptime — System longevity counters
   uint32_t iSeconds      = 0;  // was upTimeSeconds
   uint32_t iRebootCount  = 0;  // was rebootCount
+};
+
+struct DiscoverySection {                    // state.discovery — MQTT auto-discovery verify telemetry (ADR-062)
+  uint32_t iLastVerifyEpoch         = 0;     // unix-epoch of last endVerify (0 = never)
+  uint32_t iVerifyRunCount          = 0;     // lifetime verify-start counter
+  uint32_t iRepublishTriggeredCount = 0;     // lifetime count where missing>0 → markAllMQTTConfigPending
+  uint32_t iPublishedTopicCount     = 0;     // running counter incremented by stream helpers after endPublish
+  uint16_t iLastMissingCount        = 0;     // last run: expected - received
+  uint16_t iLastOrphanCount         = 0;     // last run: foreign-nodeId retained configs observed
+  bool     bVerificationActive      = false; // active verify window indicator (observable via REST)
+  // 3 bytes padding
 };
 
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
@@ -512,6 +530,7 @@ struct OTGWState {
   DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
   UptimeSection      uptime;      // state.uptime.iSeconds, state.uptime.iRebootCount
   HeapDiagSection    heapdiag;    // state.heapdiag.iMqttDropsTotal, ...
+  DiscoverySection   discovery;   // state.discovery.iPublishedTopicCount, ... (ADR-062)
   PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
 #if defined(ENABLE_SAT)
   SATRuntimeSection  sat;         // state.sat — SAT thermostat controller
@@ -550,6 +569,7 @@ struct MQTTSettingsSection {
   bool    bOTmessage       = false;
   uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
+  bool    bDiscoveryAutoVerify = true;  // ADR-062: daily auto-heal of retained discovery configs (TASK-351 wires the trigger; TASK-349 ships the field only)
 };
 
 struct NTPSection {

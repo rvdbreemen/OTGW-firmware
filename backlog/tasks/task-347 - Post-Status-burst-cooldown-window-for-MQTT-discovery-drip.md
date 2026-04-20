@@ -1,11 +1,11 @@
 ---
 id: TASK-347
 title: Post-Status-burst cooldown window for MQTT discovery drip
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 09:34'
-updated_date: '2026-04-20 09:34'
+updated_date: '2026-04-20 09:41'
 labels:
   - mqtt
   - heap
@@ -37,15 +37,15 @@ One #define in MQTTstuff.ino to lower the cooldown if boot-discovery proves too 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 STATUS_BURST_COOLDOWN_MS constant defined (value=10000)
-- [ ] #2 burstCooldownUntilMs static added to MQTTstuff.ino
-- [ ] #3 statusBurstPublishCount tracks real sends during a burst
-- [ ] #4 publishStatusBitMQTT increments the counter on actual MQTT publish
-- [ ] #5 endStatusBurst arms cooldown only when publishCount > 0
-- [ ] #6 isDripDeferred() helper added to header
-- [ ] #7 loopMQTTDiscovery uses isDripDeferred()
-- [ ] #8 iDripQuiescedCount increments for both active-burst skip and cooldown skip
-- [ ] #9 Build passes esp8266
+- [x] #1 STATUS_BURST_COOLDOWN_MS constant defined (value=10000)
+- [x] #2 burstCooldownUntilMs static added to MQTTstuff.ino
+- [x] #3 statusBurstPublishCount tracks real sends during a burst
+- [x] #4 publishStatusBitMQTT increments the counter on actual MQTT publish
+- [x] #5 endStatusBurst arms cooldown only when publishCount > 0
+- [x] #6 isDripDeferred() helper added to header
+- [x] #7 loopMQTTDiscovery uses isDripDeferred()
+- [x] #8 iDripQuiescedCount increments for both active-burst skip and cooldown skip
+- [x] #9 Build passes esp8266
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -62,3 +62,29 @@ One #define in MQTTstuff.ino to lower the cooldown if boot-discovery proves too 
 <!-- SECTION:NOTES:BEGIN -->
 User confirmed: 1=10s cooldown, 2=empty-burst guard enabled, 3=split counter. Plan adjusted: rename iDripQuiescedCount -> iDripActiveBurstSkipCount (struct + JSON + REST + UI) and add iDripCooldownSkipCount. Two MQTT JSON fields: drip_burst_skip, drip_cooldown_skip. Two REST fields: hd_drip_burst_skip, hd_drip_cooldown_skip. Safe rename since TASK-346 just landed today and there are no external consumers yet.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added post-Status-burst cooldown window for MQTT discovery drip on branch 1.4.1.
+
+**Cooldown mechanism**
+- STATUS_BURST_COOLDOWN_MS = 10000 (user-chosen)
+- Armed at endStatusBurst() ONLY if statusBurstPublishCount > 0 (empty-burst guard)
+- statusBurstPublishCount incremented by incrementStatusBurstPublishCount() called from publishStatusBitMQTT (when allowPublish) and publishMasterStatusState/publishSlaveStatusState (when publishCombined)
+
+**New helper**
+isDripDeferred() = isStatusBurstActive() || (millis() < burstCooldownUntilMs)
+
+**Telemetry split (per user request)**
+- iDripQuiescedCount renamed to iDripActiveBurstSkipCount
+- New iDripCooldownSkipCount for cooldown-window skips
+- MQTT JSON: drip_burst_skip + drip_cooldown_skip (was drip_quiesced)
+- REST: hd_drip_burst_skip + hd_drip_cooldown_skip
+- UI labels: "Discovery Drip Skipped (active burst)" + "Discovery Drip Skipped (cooldown)"
+
+**Known trade-off documented in code**
+Status-frames arrive ~3s apart in normal boiler traffic. 10s cooldown will overlap consecutive bursts under heavy traffic, effectively stalling discovery. Visible in telemetry as iDripCooldownSkipCount growing without iDripSlowModeCount. Tunable via STATUS_BURST_COOLDOWN_MS (2500ms = fits between bursts, 5000ms = partial overlap).
+
+Build verified, commit pushed to origin/1.4.1.
+<!-- SECTION:FINAL_SUMMARY:END -->
