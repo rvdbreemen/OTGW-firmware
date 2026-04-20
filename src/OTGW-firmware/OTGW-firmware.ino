@@ -310,9 +310,13 @@ void doTaskMinuteChanged(){
     sendMQTTheapdiag();            // TASK-346: moved from doTaskEvery60s
   }
 
-  // Daily consumers. TASK-351 will wire discovery-verify into this block.
+  // Daily consumers (TASK-351).
   if (dayFlag) {
-    // (no daily consumers yet; reserved for TASK-351)
+    // Daily MQTT discovery verification. Opt-in via settings.mqtt.bDiscoveryAutoVerify
+    // (default true). Preconditions (NTP sync, uptime>3600, heap>=6000, no pending
+    // drip, MQTT connected) are enforced inside startDiscoveryVerification(), so
+    // this call is unconditional here and startup-safe.
+    if (settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification();
   }
 
   // Yearly consumers: none currently beyond sendtimecommand's SR=22 which is

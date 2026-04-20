@@ -4848,6 +4848,7 @@ var translateFields = [
   , ["disc_republish_triggered", "Discovery Republish Triggered (count)"]
   , ["disc_last_missing", "Discovery Last Missing Count"]
   , ["disc_last_orphan", "Discovery Last Orphan Count"]
+  , ["MQTTdiscoveryAutoVerify", "MQTT Discovery Daily Auto-Verify"]
   , ["chipid", "Unique Chip ID"]
   , ["coreversion", "Arduino Core Version"]
   , ["sdkversion", "Espressif SDK Version"]
