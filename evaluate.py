@@ -156,6 +156,68 @@ class WorkspaceEvaluator:
                         "Missing or incomplete header guards"
                     ))
 
+    def check_time_boundary_single_caller(self):
+        """ADR-064 binding rule: each consume-on-read time-boundary helper
+        (minuteChanged / hourChanged / dayChanged / yearChanged) must have
+        exactly ONE call site firmware-wide. A second caller silently steals
+        the event.
+
+        Enforcement per ADR-080 meta-rule. Fails on >1 call site.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-064 Time-Boundary Single-Caller ==={Colors.ENDC}")
+
+        helpers = ["minuteChanged", "hourChanged", "dayChanged", "yearChanged"]
+        src_dir = config.FIRMWARE_ROOT
+        # Scan all C/C++ source files under firmware root (not library subtree).
+        source_files: List[Path] = []
+        for pattern in ("*.ino", "*.cpp", "*.h"):
+            source_files.extend(src_dir.glob(pattern))
+
+        for helper in helpers:
+            # Pattern: helper name followed by '(' — catches calls and declarations.
+            # We subtract definitions (helperStuff.ino: 'bool <name>(){') from call count.
+            call_pattern = re.compile(rf"\b{helper}\s*\(")
+            definition_pattern = re.compile(rf"^\s*bool\s+{helper}\s*\(")
+
+            call_sites: List[Tuple[str, int, str]] = []
+            definition_sites: List[Tuple[str, int]] = []
+
+            for src in source_files:
+                try:
+                    with open(src, 'r', encoding='utf-8', errors='ignore') as f:
+                        for lineno, line in enumerate(f, 1):
+                            stripped = line.lstrip()
+                            # Skip pure comment lines so comments mentioning
+                            # xChanged() aren't counted as calls.
+                            if stripped.startswith(("//", "*", "/*")):
+                                continue
+                            if definition_pattern.match(line):
+                                definition_sites.append((src.name, lineno))
+                                continue
+                            if call_pattern.search(line):
+                                call_sites.append((src.name, lineno, line.rstrip()))
+                except (OSError, UnicodeDecodeError):
+                    continue
+
+            if len(call_sites) == 1:
+                loc = f"{call_sites[0][0]}:{call_sites[0][1]}"
+                self.add_result(EvaluationResult(
+                    "ADR-064", f"{helper}() single caller", "PASS",
+                    f"Exactly 1 call site at {loc}"
+                ))
+            elif len(call_sites) == 0:
+                self.add_result(EvaluationResult(
+                    "ADR-064", f"{helper}() single caller", "WARN",
+                    "No call sites found (dead code or helper removed)"
+                ))
+            else:
+                detail = "; ".join(f"{n}:{ln}" for n, ln, _ in call_sites)
+                self.add_result(EvaluationResult(
+                    "ADR-064", f"{helper}() single caller", "FAIL",
+                    f"Found {len(call_sites)} call sites — ADR-064 requires exactly 1",
+                    detail
+                ))
+
     def check_coding_standards(self):
         """Check coding standards and best practices"""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Coding Standards ==={Colors.ENDC}")
@@ -578,6 +640,7 @@ class WorkspaceEvaluator:
         self.check_code_structure()
         self.check_build_system()
         self.check_version_info()
+        self.check_time_boundary_single_caller()   # ADR-064 CI gate (ADR-080 meta-rule)
         
         if not quick:
             # Detailed checks

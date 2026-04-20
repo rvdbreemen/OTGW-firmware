@@ -258,38 +258,66 @@ void doTaskEvery60s(){
   // Log heap statistics every minute for monitoring
   logHeapStats();
 
-  // Hourly-tick dispatcher. hourChanged() is a consume-on-read helper with
-  // a single shared static, so we call it ONCE and dispatch to every feature
-  // that wants the hour boundary. Current consumers: nightly restart + heap
-  // diagnostics publish (TASK-346). Adding a third consumer goes here too.
-  if (hourChanged()) {
-    // Scheduled nightly restart for heap recovery (opt-in via settings).
-    // Fires on the first 60s-tick after the hour flips. uptime>3600 guards
-    // against restart loops, including the restart we just triggered.
-    if (settings.bNightlyRestart && settings.ntp.bEnable && state.uptime.iSeconds > 3600) {
-      int64_t now_sec = time(nullptr);
-      if (now_sec > 946684800) {  // sanity: after 2000-01-01 (NTP synced)
-        TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
-        ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, myTz);
-        if (myTime.hour() == settings.iRestartHour) {
-          DebugTf(PSTR("Nightly restart triggered at %02d:00 (uptime=%lu s)\r\n"),
-                  settings.iRestartHour, (unsigned long)state.uptime.iSeconds);
-          delay(200);  // brief delay for any pending I/O to flush
-          ESP.restart();
-        }
-      }
-    }
+  // Hourly/daily dispatch moved to doTaskMinuteChanged (ADR-064 / TASK-350):
+  // wall-clock aligned instead of boot-relative 60s drift. See that function
+  // for the single call site of hourChanged/dayChanged/yearChanged.
+}
 
-    // Hourly heap diagnostics publish (TASK-346).
-    sendMQTTheapdiag();
-  }
+// Extracted from the old hourly block so the new dispatcher reads cleanly
+// (ADR-064). Preserves existing guards: bNightlyRestart + ntp.bEnable +
+// uptime>3600 + NTP-synced sanity.
+static void runNightlyRestartCheck() {
+  if (!settings.bNightlyRestart) return;
+  if (!settings.ntp.bEnable) return;
+  if (state.uptime.iSeconds <= 3600) return;
+  const int64_t now_sec = time(nullptr);
+  if (now_sec <= 946684800) return;     // sanity: after 2000-01-01 (NTP synced)
+  TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, myTz);
+  if (myTime.hour() != settings.iRestartHour) return;
+  DebugTf(PSTR("Nightly restart triggered at %02d:00 (uptime=%lu s)\r\n"),
+          settings.iRestartHour, (unsigned long)state.uptime.iSeconds);
+  delay(200);                           // brief delay for any pending I/O to flush
+  ESP.restart();
 }
 
 //===[ Do task exactly on the minute ]===
+// Single dispatcher for all sub-minute consume-on-read time-boundary helpers
+// per ADR-064. The four helpers (minuteChanged + hourChanged/dayChanged/
+// yearChanged) each have EXACTLY ONE call site in the firmware:
+//   - minuteChanged() : main loop gate (OTGW-firmware.ino:366)
+//   - hourChanged()   : this function
+//   - dayChanged()    : this function
+//   - yearChanged()   : this function
+// Downstream consumers read the local flag, never re-call the helper.
+// evaluate.py::check_time_boundary_single_caller enforces this rule.
 void doTaskMinuteChanged(){
-  //== do tasks ==
-  // WiFi reconnect is now handled by loopWifi() state machine in doBackgroundTasks()
-  sendtimecommand();
+  // ADR-064: single caller
+  const bool hourFlag = hourChanged();
+  // ADR-064: single caller
+  const bool dayFlag  = dayChanged();
+  // ADR-064: single caller
+  const bool yearFlag = yearChanged();
+
+  // Per-minute work (unconditional).
+  // WiFi reconnect is handled by loopWifi() state machine in doBackgroundTasks().
+  sendtimecommand(dayFlag, yearFlag);
+
+  // Hourly consumers. New hourly tasks extend THIS block, never add a second
+  // hourChanged() call elsewhere.
+  if (hourFlag) {
+    runNightlyRestartCheck();     // TASK-345: moved from doTaskEvery60s
+    sendMQTTheapdiag();            // TASK-346: moved from doTaskEvery60s
+  }
+
+  // Daily consumers. TASK-351 will wire discovery-verify into this block.
+  if (dayFlag) {
+    // (no daily consumers yet; reserved for TASK-351)
+  }
+
+  // Yearly consumers: none currently beyond sendtimecommand's SR=22 which is
+  // driven by yearFlag above.
+  (void)yearFlag;  // silence unused-warning until a yearly consumer lands
 }
 
 //===[ Do task every 5min ]===
@@ -372,6 +400,7 @@ void loop()
       if (DUE(timer60s))                doTaskEvery60s();
       if (DUE(timer3s))                 doTaskEvery3s();
       if (DUE(timer1s))                 doTaskEvery1s();
+      // ADR-064: single caller
       if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
       loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, 3s interval)
       evalOutputs();                    // when the bits change, the output gpio bit will follow
