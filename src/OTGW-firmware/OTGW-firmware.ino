@@ -258,30 +258,30 @@ void doTaskEvery60s(){
   // Log heap statistics every minute for monitoring
   logHeapStats();
 
-  // Scheduled nightly restart for heap recovery (opt-in via settings).
-  // Gated by hourChanged() so the restart check fires on the first 60s-tick
-  // after the hour flips, not on every minute==0 sample. Subsequent 60s-ticks
-  // within the same hour short-circuit on hourChanged() returning false.
-  //
-  // Note: hourChanged() is a consume-on-read helper with a single shared
-  // static. This block is currently its sole caller in 1.4.x. Adding a
-  // second caller would create a race: first call wins the event.
-  //
-  // Only restarts if uptime > 1 hour (prevents restart loops after a recent
-  // reboot, including the restart we just triggered).
-  if (settings.bNightlyRestart && settings.ntp.bEnable
-      && state.uptime.iSeconds > 3600 && hourChanged()) {
-    int64_t now_sec = time(nullptr);
-    if (now_sec > 946684800) {  // sanity: after 2000-01-01 (NTP synced)
-      TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
-      ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, myTz);
-      if (myTime.hour() == settings.iRestartHour) {
-        DebugTf(PSTR("Nightly restart triggered at %02d:00 (uptime=%lu s)\r\n"),
-                settings.iRestartHour, (unsigned long)state.uptime.iSeconds);
-        delay(200);  // brief delay for any pending I/O to flush
-        ESP.restart();
+  // Hourly-tick dispatcher. hourChanged() is a consume-on-read helper with
+  // a single shared static, so we call it ONCE and dispatch to every feature
+  // that wants the hour boundary. Current consumers: nightly restart + heap
+  // diagnostics publish (TASK-346). Adding a third consumer goes here too.
+  if (hourChanged()) {
+    // Scheduled nightly restart for heap recovery (opt-in via settings).
+    // Fires on the first 60s-tick after the hour flips. uptime>3600 guards
+    // against restart loops, including the restart we just triggered.
+    if (settings.bNightlyRestart && settings.ntp.bEnable && state.uptime.iSeconds > 3600) {
+      int64_t now_sec = time(nullptr);
+      if (now_sec > 946684800) {  // sanity: after 2000-01-01 (NTP synced)
+        TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+        ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, myTz);
+        if (myTime.hour() == settings.iRestartHour) {
+          DebugTf(PSTR("Nightly restart triggered at %02d:00 (uptime=%lu s)\r\n"),
+                  settings.iRestartHour, (unsigned long)state.uptime.iSeconds);
+          delay(200);  // brief delay for any pending I/O to flush
+          ESP.restart();
+        }
       }
     }
+
+    // Hourly heap diagnostics publish (TASK-346).
+    sendMQTTheapdiag();
   }
 }
 

@@ -818,7 +818,18 @@ void sendDeviceInfoV2()
     sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
   }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
-  
+
+  // Heap diagnostics (TASK-346) — cumulative counters since last reboot.
+  // hd_* prefix keeps them grouped when the UI renders devinfo alphabetically.
+  sendJsonMapEntry(F("hd_fragmentation_pct"), getHeapFragmentation());
+  sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
+  sendJsonMapEntry(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
+  sendJsonMapEntry(F("hd_enter_low"),        state.heapdiag.iEnteredLowCount);
+  sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
+  sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
+  sendJsonMapEntry(F("hd_drip_quiesced"),    state.heapdiag.iDripQuiescedCount);
+  sendJsonMapEntry(F("hd_drip_slowmode"),    state.heapdiag.iDripSlowModeCount);
+
   sendEndJsonMap(F("device"));
 
 } // sendDeviceInfoV2()

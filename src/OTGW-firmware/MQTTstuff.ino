@@ -822,6 +822,36 @@ void sendMQTTversioninfo(){
 }
 
 /*
+Publish cumulative heap-pressure and drop diagnostics as a single retained JSON
+blob to otgw-firmware/stats/heap. Called from the hourly tick (doTaskEvery60s
+gated by hourChanged) — NOT piggybacked on the 5-minute loop to keep traffic low.
+
+Counters reset on reboot; correlate with otgw-firmware/reboot_count and /uptime
+to reason about lifetime vs. session rates.
+*/
+void sendMQTTheapdiag(){
+  if (!settings.mqtt.bEnable) return;
+  if (!state.mqtt.bConnected) return;
+  state.heapdiag.iLastPublishedEpoch = (uint32_t)time(nullptr);
+  char json[256];
+  snprintf_P(json, sizeof(json),
+    PSTR("{\"ws_drops\":%lu,\"mqtt_drops\":%lu,\"enter_low\":%lu,\"enter_warning\":%lu,"
+         "\"enter_critical\":%lu,\"drip_quiesced\":%lu,\"drip_slowmode\":%lu,"
+         "\"free_heap\":%lu,\"max_block\":%lu,\"frag_pct\":%u}"),
+    (unsigned long)state.heapdiag.iWsDropsTotal,
+    (unsigned long)state.heapdiag.iMqttDropsTotal,
+    (unsigned long)state.heapdiag.iEnteredLowCount,
+    (unsigned long)state.heapdiag.iEnteredWarningCount,
+    (unsigned long)state.heapdiag.iEnteredCriticalCount,
+    (unsigned long)state.heapdiag.iDripQuiescedCount,
+    (unsigned long)state.heapdiag.iDripSlowModeCount,
+    (unsigned long)ESP.getFreeHeap(),
+    (unsigned long)ESP.getMaxFreeBlockSize(),
+    getHeapFragmentation());
+  sendMQTTData(F("otgw-firmware/stats/heap"), json, true);   // retained
+}
+
+/*
 Publish state information of PIC firmware version information to MQTT broker.
 */
 void sendMQTTstateinformation(){
@@ -1018,6 +1048,7 @@ void loopMQTTDiscovery()
   bool heapPressure = (getHeapHealth() >= HEAP_LOW);
   if (heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_SLOW * 1000UL) {
     CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_SLOW, SKIP_MISSED_TICKS);
+    state.heapdiag.iDripSlowModeCount++;
     MQTTDebugTf(PSTR("[drip] slowed to %ds (heap pressure)\r\n"), DISCOVERY_INTERVAL_SLOW);
   } else if (!heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_NORMAL * 1000UL) {
     CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
@@ -1031,7 +1062,10 @@ void loopMQTTDiscovery()
   if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return;
   // Do not stack a discovery publish on top of a Status-frame sub-topic fanout.
   // Timer keeps running; next tick picks up as soon as the burst ends.
-  if (isStatusBurstActive()) return;
+  if (isStatusBurstActive()) {
+    state.heapdiag.iDripQuiescedCount++;
+    return;
+  }
 
   // Scan pending bitmap for the next set bit
   for (uint8_t group = 0; group < 8; group++) {

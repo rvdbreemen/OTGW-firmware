@@ -122,6 +122,7 @@ void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
 void publishToSourceTopic(const char*, const char*, byte);
 void loopMQTTDiscovery();
+void sendMQTTheapdiag();
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 #if defined(ENABLE_SAT)
 // Alias used by SAT subsystem (name harmonised with OTGW32 branch)
@@ -243,6 +244,17 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
 struct UptimeSection {         // state.uptime — System longevity counters
   uint32_t iSeconds      = 0;  // was upTimeSeconds
   uint32_t iRebootCount  = 0;  // was rebootCount
+};
+
+struct HeapDiagSection {               // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
+  uint32_t iWsDropsTotal          = 0; // lifetime WebSocket messages dropped due to heap pressure
+  uint32_t iMqttDropsTotal        = 0; // lifetime MQTT messages dropped due to heap pressure
+  uint32_t iEnteredLowCount       = 0; // transitions into HEAP_LOW tier (from HEALTHY)
+  uint32_t iEnteredWarningCount   = 0; // transitions into HEAP_WARNING tier
+  uint32_t iEnteredCriticalCount  = 0; // transitions into HEAP_CRITICAL tier
+  uint32_t iDripQuiescedCount     = 0; // drip ticks skipped due to active Status-burst (TASK-342)
+  uint32_t iDripSlowModeCount     = 0; // transitions to 10s slow-mode due to heap pressure
+  uint32_t iLastPublishedEpoch    = 0; // unix-epoch of last sendMQTTheapdiag publish
 };
 
 struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
@@ -494,6 +506,7 @@ struct OTGWState {
   FlashSection       flash;       // state.flash.bESPactive, state.flash.iPICprogress
   DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
   UptimeSection      uptime;      // state.uptime.iSeconds, state.uptime.iRebootCount
+  HeapDiagSection    heapdiag;    // state.heapdiag.iMqttDropsTotal, ...
   PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
 #if defined(ENABLE_SAT)
   SATRuntimeSection  sat;         // state.sat — SAT thermostat controller

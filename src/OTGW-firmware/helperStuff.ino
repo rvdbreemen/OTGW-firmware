@@ -731,22 +731,37 @@ static uint32_t mqttDropCount = 0;
 //===========================================================================================
 #define HEAP_FRAG_PROMOTE_MAXBLOCK  1536   // maxBlock below this while freeHeap in LOW → promote to WARNING (matched to CRITICAL)
 HeapHealthLevel getHeapHealth() {
+  static HeapHealthLevel lastLevel = HEAP_HEALTHY;
   uint32_t freeHeap = ESP.getFreeHeap();
 
+  HeapHealthLevel level;
   if (freeHeap < HEAP_CRITICAL_THRESHOLD) {
-    return HEAP_CRITICAL;
+    level = HEAP_CRITICAL;
   } else if (freeHeap < HEAP_WARNING_THRESHOLD) {
-    return HEAP_WARNING;
+    level = HEAP_WARNING;
   } else if (freeHeap < HEAP_LOW_THRESHOLD) {
     // Fragmentation check: if contiguous block is already small, promote
     // one tier so callers back off before the next alloc fails.
     uint32_t maxBlock = ESP.getMaxFreeBlockSize();
     if (maxBlock < HEAP_FRAG_PROMOTE_MAXBLOCK) {
-      return HEAP_WARNING;
+      level = HEAP_WARNING;
+    } else {
+      level = HEAP_LOW;
     }
-    return HEAP_LOW;
+  } else {
+    level = HEAP_HEALTHY;
   }
-  return HEAP_HEALTHY;
+
+  // Track tier-entry transitions for cumulative diagnostics (TASK-346).
+  // Only count when moving INTO a stricter tier than the previous call;
+  // recovery back to HEALTHY is not counted (focus is on pressure events).
+  if (level != lastLevel && level > lastLevel) {
+    if (level == HEAP_LOW)      state.heapdiag.iEnteredLowCount++;
+    if (level == HEAP_WARNING)  state.heapdiag.iEnteredWarningCount++;
+    if (level == HEAP_CRITICAL) state.heapdiag.iEnteredCriticalCount++;
+  }
+  lastLevel = level;
+  return level;
 }
 
 //===========================================================================================
@@ -771,9 +786,10 @@ bool canSendWebSocket() {
   // Critical: block WebSocket messages completely
   if (heapLevel == HEAP_CRITICAL) {
     webSocketDropCount++;
+    state.heapdiag.iWsDropsTotal++;
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
-      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"),
               webSocketDropCount, ESP.getFreeHeap());
       lastWebSocketWarningMs = now;
     }
@@ -785,6 +801,7 @@ bool canSendWebSocket() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_CRITICAL) {
       webSocketDropCount++;
+      state.heapdiag.iWsDropsTotal++;
       return false;
     }
   }
@@ -794,6 +811,7 @@ bool canSendWebSocket() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_WARNING) {
       webSocketDropCount++;
+      state.heapdiag.iWsDropsTotal++;
       return false;
     }
   }
@@ -822,9 +840,10 @@ bool canPublishMQTT() {
   // Critical: block MQTT messages completely
   if (heapLevel == HEAP_CRITICAL) {
     mqttDropCount++;
+    state.heapdiag.iMqttDropsTotal++;
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
-      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"),
               mqttDropCount, ESP.getFreeHeap());
       lastMQTTWarningMs = now;
     }
@@ -836,6 +855,7 @@ bool canPublishMQTT() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_CRITICAL) {
       mqttDropCount++;
+      state.heapdiag.iMqttDropsTotal++;
       return false;
     }
   }
@@ -845,6 +865,7 @@ bool canPublishMQTT() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_WARNING) {
       mqttDropCount++;
+      state.heapdiag.iMqttDropsTotal++;
       return false;
     }
   }

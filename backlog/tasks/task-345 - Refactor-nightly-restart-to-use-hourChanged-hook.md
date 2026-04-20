@@ -1,11 +1,11 @@
 ---
 id: TASK-345
 title: Refactor nightly restart to use hourChanged hook
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 07:43'
-updated_date: '2026-04-20 07:43'
+updated_date: '2026-04-20 07:49'
 labels:
   - 1.4.1
   - cleanup
@@ -48,12 +48,12 @@ Reboot-robust dayChanged() via LittleFS file. Documented in earlier discussion a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Inline minute==0 check removed from OTGW-firmware.ino
-- [ ] #2 hourChanged() used as gate on the nightly restart block
-- [ ] #3 hourChanged() no longer dead code (has at least one caller)
-- [ ] #4 Comment above the block updated to explain the hourChanged-gated design
-- [ ] #5 Existing guards preserved: bNightlyRestart, ntp.bEnable, uptime > 3600, time > 2000
-- [ ] #6 Build passes for esp8266
+- [x] #1 Inline minute==0 check removed from OTGW-firmware.ino
+- [x] #2 hourChanged() used as gate on the nightly restart block
+- [x] #3 hourChanged() no longer dead code (has at least one caller)
+- [x] #4 Comment above the block updated to explain the hourChanged-gated design
+- [x] #5 Existing guards preserved: bNightlyRestart, ntp.bEnable, uptime > 3600, time > 2000
+- [x] #6 Build passes for esp8266
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -65,3 +65,19 @@ Reboot-robust dayChanged() via LittleFS file. Documented in earlier discussion a
 4. Commit + push to origin/1.4.1
 5. Final summary with before/after
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Refactored the nightly restart block in OTGW-firmware.ino (doTaskEvery60s) to use hourChanged() as gate:
+
+- Removed: minute==0 wall-clock window check
+- Added: hourChanged() in the outer condition, leveraging short-circuit evaluation so AceTime conversion only happens once per hour boundary
+- Preserved: all existing guards (bNightlyRestart, ntp.bEnable, uptime>3600, time()>2000-01-01)
+
+Side effect: hourChanged() is no longer dead code. The refactored block is its sole caller in 1.4.x. Inline comment warns that adding a second caller would create an event-consumption race.
+
+Build verified: incremental esp8266 firmware compile clean. Binary 723,680 bytes (~0.1% larger than pre-refactor due to extra comment block and one additional AceTime path at hour boundary, negligible).
+
+Commit 22daada8 on origin/1.4.1.
+<!-- SECTION:FINAL_SUMMARY:END -->
