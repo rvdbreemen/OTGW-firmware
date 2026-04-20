@@ -259,14 +259,23 @@ void doTaskEvery60s(){
   logHeapStats();
 
   // Scheduled nightly restart for heap recovery (opt-in via settings).
-  // Checks once per minute if the current local hour matches the configured restart hour.
-  // Only restarts if uptime > 1 hour (prevents restart loops after a recent reboot).
-  if (settings.bNightlyRestart && settings.ntp.bEnable && state.uptime.iSeconds > 3600) {
+  // Gated by hourChanged() so the restart check fires on the first 60s-tick
+  // after the hour flips, not on every minute==0 sample. Subsequent 60s-ticks
+  // within the same hour short-circuit on hourChanged() returning false.
+  //
+  // Note: hourChanged() is a consume-on-read helper with a single shared
+  // static. This block is currently its sole caller in 1.4.x. Adding a
+  // second caller would create a race: first call wins the event.
+  //
+  // Only restarts if uptime > 1 hour (prevents restart loops after a recent
+  // reboot, including the restart we just triggered).
+  if (settings.bNightlyRestart && settings.ntp.bEnable
+      && state.uptime.iSeconds > 3600 && hourChanged()) {
     int64_t now_sec = time(nullptr);
     if (now_sec > 946684800) {  // sanity: after 2000-01-01 (NTP synced)
       TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
       ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, myTz);
-      if (myTime.hour() == settings.iRestartHour && myTime.minute() == 0) {
+      if (myTime.hour() == settings.iRestartHour) {
         DebugTf(PSTR("Nightly restart triggered at %02d:00 (uptime=%lu s)\r\n"),
                 settings.iRestartHour, (unsigned long)state.uptime.iSeconds);
         delay(200);  // brief delay for any pending I/O to flush
