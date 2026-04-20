@@ -679,14 +679,22 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 //===========================================================================================
 
 // Heap thresholds for different severity levels
-// Rationale: ESP8266 typically has ~40KB RAM after core libraries
-// - CRITICAL (3KB): Minimum to prevent crash, emergency only
-// - WARNING (5KB): Below this, aggressive throttling needed
-// - LOW (8KB): Below this, start reducing message frequency
-// - HEALTHY (>8KB): Sufficient for normal operation with WebSocket server (~4KB baseline)
-#define HEAP_CRITICAL_THRESHOLD   2048   // Critical: Stop all non-essential operations
-#define HEAP_WARNING_THRESHOLD    4096   // Warning: Start throttling messages
-#define HEAP_LOW_THRESHOLD        6144   // Low: Begin reducing message frequency
+// Rationale: ESP8266 typically has ~40KB RAM after core libraries.
+// Tuned on tester log data (Crashevans, v1.4.0-beta+0d6942a, debug_2a.txt)
+// combined with the burst-reduction fixes from TASK-338/339/340/342. Each
+// tier is sized to cover a specific allocation risk:
+// - CRITICAL (1.5KB): leaves just one lwIP pbuf (~1.5KB) worth of headroom.
+//                     Eronder = near-certain crash zone.
+// - WARNING  (3KB):   2x pbuf + streaming chunk. Also the floor for
+//                     accepting new WebSocket clients (see webSocketStuff.ino).
+// - LOW      (5KB):   sits below the expected in-burst dip floor after the
+//                     1.4.1 burst-reduction fixes. Throttling fires only on
+//                     abnormal pressure (longer uptime, fragmentation,
+//                     extra WS clients), not on routine bursts.
+// - HEALTHY (>=5KB):  sufficient for steady-state operation.
+#define HEAP_CRITICAL_THRESHOLD   1536   // Critical: Stop all non-essential operations
+#define HEAP_WARNING_THRESHOLD    3072   // Warning: Start throttling messages
+#define HEAP_LOW_THRESHOLD        5120   // Low: Begin reducing message frequency
 
 // Throttling state
 static uint32_t lastWebSocketSendMs = 0;
@@ -721,7 +729,7 @@ static uint32_t mqttDropCount = 0;
 // Perf note: getMaxFreeBlockSize() walks the full free list. We only call it
 // outside the HEALTHY path, so the common case stays cheap.
 //===========================================================================================
-#define HEAP_FRAG_PROMOTE_MAXBLOCK  2048   // maxBlock below this while freeHeap in LOW → promote to WARNING
+#define HEAP_FRAG_PROMOTE_MAXBLOCK  1536   // maxBlock below this while freeHeap in LOW → promote to WARNING (matched to CRITICAL)
 HeapHealthLevel getHeapHealth() {
   uint32_t freeHeap = ESP.getFreeHeap();
 

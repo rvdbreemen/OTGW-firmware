@@ -43,10 +43,11 @@ constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
 constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 // Minimum free heap required before attempting a discovery publish.
-// A single discovery message needs ~1200 bytes of lwIP pbuf (ESP8266 core 3.x / lwIP 2.x).
-// 12000 bytes provides ~10x margin to absorb concurrent TCP stack overhead.
-// Keep in sync with the HEAP_WARNING tier in canPublishMQTT().
-constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 4000;  // Streaming needs ~200 bytes, not 1200+
+// Streaming HA discovery (ADR-077) only needs ~200 bytes per chunk, so the
+// historical 1200-byte floor is obsolete. Value aligned with HEAP_WARNING_THRESHOLD
+// (3072) in canPublishMQTT(): if heap is already at WARNING the drip skips
+// rather than competing with publish-gate throttling.
+constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 3000;  // Streaming needs ~200 bytes; aligned with WARNING tier
 
 // MQTT autoconfig buffer design:
 // feedWatchDog() is used (not doBackgroundTasks()) during autoconfig iterations
