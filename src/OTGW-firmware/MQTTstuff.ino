@@ -1135,12 +1135,17 @@ void loopMQTTDiscovery()
       bool success = doAutoConfigureMsgid(msgId);
       if (success) {
         setMQTTConfigDone(msgId);
+        bitClear(MQTTautoCfgPendingMap[group], bit);
+        MQTTDebugTf(PSTR("[drip] OT ID %d published OK\r\n"), msgId);
+      } else {
+        // Leave pending bit set — next drip tick retries automatically.
+        // Rate-limited by the drip timer itself (2s normal, 10s slow-mode under
+        // heap pressure), so no busy-loop risk. Fixes the limbo where a failed
+        // publish used to drop the msgid until an external markAllMQTTConfigPending
+        // call arrived (TASK-348).
+        MQTTDebugTf(PSTR("[drip] OT ID %d publish failed, retaining pending\r\n"), msgId);
       }
-      // Clear pending regardless — if it failed (heap, broker down), the bit
-      // stays cleared to avoid busy-looping.  The JIT path or next
-      // markAllMQTTConfigPending() will re-queue it if still needed.
-      bitClear(MQTTautoCfgPendingMap[group], bit);
-      return;  // one per tick
+      return;  // one attempt per tick regardless of success
     }
   }
 }
