@@ -77,25 +77,51 @@ struct MQTTAutoConfigSessionLock {
 
 // pgm_strncmp_PP() and pgm_read_char() are in MQTTstuff.h (inline, shared with mqtt_configuratie.cpp)
 
-// Status-burst quiesce flag (TASK-342).
+// Status-burst quiesce (TASK-342) + post-burst cooldown (TASK-347).
 // A Status-frame fanout publishes status_master plus 7 bits, and/or status_slave
-// plus 8 bits in rapid succession (~20ms). If loopMQTTDiscovery fires a drip
-// in the middle of that burst, the two allocations overlap and push the heap
-// into the throttle band unnecessarily. Calling beginStatusBurst() before the
-// fanout and endStatusBurst() after causes the drip to skip that tick.
-// Timeout safety: if endStatusBurst is never reached (e.g. exception path),
+// plus 8 bits in rapid succession (~20ms). If loopMQTTDiscovery fires a drip in
+// the middle of that burst, the two allocations overlap and push the heap into
+// the throttle band unnecessarily. beginStatusBurst() opens the window,
+// endStatusBurst() closes it; during the window the drip skips.
+//
+// After endStatusBurst(), a cooldown of STATUS_BURST_COOLDOWN_MS is armed so
+// lwIP pbufs from the just-finished publishes can drain before the next heap
+// allocation. The cooldown is armed ONLY if the burst had at least one real
+// MQTT publish (statusBurstPublishCount > 0). Empty bursts (every single bit
+// was gated out by shouldPublishStatusBit) cost no TCP bandwidth, so no
+// cooldown is needed — this prevents pointless drip pauses in idle state.
+//
+// CAUTION: at 10 seconds, the cooldown can overlap consecutive Status-frames
+// (Crashevans log shows ~3s cadence). That means under heavy Status traffic
+// the drip can stall. Tunable via STATUS_BURST_COOLDOWN_MS. If you see
+// iDripCooldownSkipCount grow without discovery progressing, lower the value
+// (candidates: 2500ms = fits between bursts, 5000ms = partial overlap).
+//
+// Timeout safety: if endStatusBurst() is never reached (exception path),
 // isStatusBurstActive() auto-clears after STATUS_BURST_TIMEOUT_MS.
-static bool statusBurstActive = false;
-static unsigned long statusBurstStartMs = 0;
-constexpr unsigned long STATUS_BURST_TIMEOUT_MS = 500;
+static bool            statusBurstActive     = false;
+static unsigned long   statusBurstStartMs    = 0;
+static uint16_t        statusBurstPublishCount = 0;
+static unsigned long   burstCooldownUntilMs  = 0;
+constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
+constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 10000;
 
 void beginStatusBurst() {
   statusBurstActive = true;
   statusBurstStartMs = millis();
+  statusBurstPublishCount = 0;
 }
 
 void endStatusBurst() {
   statusBurstActive = false;
+  if (statusBurstPublishCount > 0) {
+    burstCooldownUntilMs = millis() + STATUS_BURST_COOLDOWN_MS;
+  }
+  // else: empty burst, no cooldown armed
+}
+
+void incrementStatusBurstPublishCount() {
+  if (statusBurstActive) statusBurstPublishCount++;
 }
 
 bool isStatusBurstActive() {
@@ -106,6 +132,16 @@ bool isStatusBurstActive() {
     return false;
   }
   return true;
+}
+
+bool isDripDeferred() {
+  if (isStatusBurstActive()) return true;
+  // Post-burst cooldown window still open?
+  // Use signed diff for millis() rollover safety.
+  if (burstCooldownUntilMs != 0 && (long)(millis() - burstCooldownUntilMs) < 0) {
+    return true;
+  }
+  return false;
 }
 
 static            PubSubClient MQTTclient(wifiClient);
@@ -836,14 +872,15 @@ void sendMQTTheapdiag(){
   char json[256];
   snprintf_P(json, sizeof(json),
     PSTR("{\"ws_drops\":%lu,\"mqtt_drops\":%lu,\"enter_low\":%lu,\"enter_warning\":%lu,"
-         "\"enter_critical\":%lu,\"drip_quiesced\":%lu,\"drip_slowmode\":%lu,"
-         "\"free_heap\":%lu,\"max_block\":%lu,\"frag_pct\":%u}"),
+         "\"enter_critical\":%lu,\"drip_burst_skip\":%lu,\"drip_cooldown_skip\":%lu,"
+         "\"drip_slowmode\":%lu,\"free_heap\":%lu,\"max_block\":%lu,\"frag_pct\":%u}"),
     (unsigned long)state.heapdiag.iWsDropsTotal,
     (unsigned long)state.heapdiag.iMqttDropsTotal,
     (unsigned long)state.heapdiag.iEnteredLowCount,
     (unsigned long)state.heapdiag.iEnteredWarningCount,
     (unsigned long)state.heapdiag.iEnteredCriticalCount,
-    (unsigned long)state.heapdiag.iDripQuiescedCount,
+    (unsigned long)state.heapdiag.iDripActiveBurstSkipCount,
+    (unsigned long)state.heapdiag.iDripCooldownSkipCount,
     (unsigned long)state.heapdiag.iDripSlowModeCount,
     (unsigned long)ESP.getFreeHeap(),
     (unsigned long)ESP.getMaxFreeBlockSize(),
@@ -1060,10 +1097,15 @@ void loopMQTTDiscovery()
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
   if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return;
-  // Do not stack a discovery publish on top of a Status-frame sub-topic fanout.
-  // Timer keeps running; next tick picks up as soon as the burst ends.
+  // Defer drip during Status-frame fanout AND for STATUS_BURST_COOLDOWN_MS afterwards.
+  // Timer keeps running; next tick picks up as soon as the deferred window clears.
+  // Track which of the two reasons triggered the skip for diagnostics.
   if (isStatusBurstActive()) {
-    state.heapdiag.iDripQuiescedCount++;
+    state.heapdiag.iDripActiveBurstSkipCount++;
+    return;
+  }
+  if (isDripDeferred()) {
+    state.heapdiag.iDripCooldownSkipCount++;
     return;
   }
 

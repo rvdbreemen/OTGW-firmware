@@ -109,9 +109,13 @@ void logHeapStats();
 void emergencyHeapRecovery();
 // Status-frame burst quiesce (TASK-342): suppress MQTT discovery drip during
 // Status sub-topic fanout so allocation peaks do not stack.
+// Post-burst cooldown (TASK-347): hold drip for STATUS_BURST_COOLDOWN_MS after
+// an endStatusBurst() that had real MQTT traffic, to let lwIP pbufs drain.
 void beginStatusBurst();
 void endStatusBurst();
 bool isStatusBurstActive();
+bool isDripDeferred();                  // true when drip must skip (active burst OR in cooldown)
+void incrementStatusBurstPublishCount(); // called by status publishers on each real MQTT send
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
@@ -246,15 +250,16 @@ struct UptimeSection {         // state.uptime — System longevity counters
   uint32_t iRebootCount  = 0;  // was rebootCount
 };
 
-struct HeapDiagSection {               // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
-  uint32_t iWsDropsTotal          = 0; // lifetime WebSocket messages dropped due to heap pressure
-  uint32_t iMqttDropsTotal        = 0; // lifetime MQTT messages dropped due to heap pressure
-  uint32_t iEnteredLowCount       = 0; // transitions into HEAP_LOW tier (from HEALTHY)
-  uint32_t iEnteredWarningCount   = 0; // transitions into HEAP_WARNING tier
-  uint32_t iEnteredCriticalCount  = 0; // transitions into HEAP_CRITICAL tier
-  uint32_t iDripQuiescedCount     = 0; // drip ticks skipped due to active Status-burst (TASK-342)
-  uint32_t iDripSlowModeCount     = 0; // transitions to 10s slow-mode due to heap pressure
-  uint32_t iLastPublishedEpoch    = 0; // unix-epoch of last sendMQTTheapdiag publish
+struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
+  uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
+  uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
+  uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
+  uint32_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier
+  uint32_t iEnteredCriticalCount    = 0; // transitions into HEAP_CRITICAL tier
+  uint32_t iDripActiveBurstSkipCount = 0; // drip ticks skipped DURING active Status-burst (TASK-342)
+  uint32_t iDripCooldownSkipCount   = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
+  uint32_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure
+  uint32_t iLastPublishedEpoch      = 0; // unix-epoch of last sendMQTTheapdiag publish
 };
 
 struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands

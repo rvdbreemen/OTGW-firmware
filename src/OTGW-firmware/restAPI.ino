@@ -827,8 +827,9 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("hd_enter_low"),        state.heapdiag.iEnteredLowCount);
   sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
   sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
-  sendJsonMapEntry(F("hd_drip_quiesced"),    state.heapdiag.iDripQuiescedCount);
-  sendJsonMapEntry(F("hd_drip_slowmode"),    state.heapdiag.iDripSlowModeCount);
+  sendJsonMapEntry(F("hd_drip_burst_skip"),    state.heapdiag.iDripActiveBurstSkipCount);
+  sendJsonMapEntry(F("hd_drip_cooldown_skip"), state.heapdiag.iDripCooldownSkipCount);
+  sendJsonMapEntry(F("hd_drip_slowmode"),      state.heapdiag.iDripSlowModeCount);
 
   sendEndJsonMap(F("device"));
 

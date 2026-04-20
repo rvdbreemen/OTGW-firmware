@@ -1493,6 +1493,7 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
   const bool allowPublish = shouldPublishStatusBit(bitSlot, newVal, prevVal, forcePublish);
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
+  if (allowPublish) incrementStatusBurstPublishCount();  // TASK-347: arm cooldown only for real sends
   publishMQTTOnOff(topic, newVal);
 }
 
@@ -1562,10 +1563,12 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   }
   OTcurrentSystemState.MasterStatus = valueHB;
   mqttForceNextMasterStatusPublish = false;
-  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342).
+  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342)
+  // and arm post-burst cooldown on real sends (TASK-347).
   beginStatusBurst();
   {
     OTPublishGate gate(publishCombined);
+    if (publishCombined) incrementStatusBurstPublishCount();
     sendMQTTData("status_master", statusText);
   }
   publishStatusBitMQTT(0, "ch_enable",        (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
@@ -1601,10 +1604,12 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   }
   OTcurrentSystemState.SlaveStatus = valueLB;
   mqttForceNextSlaveStatusPublish = false;
-  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342).
+  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342)
+  // and arm post-burst cooldown on real sends (TASK-347).
   beginStatusBurst();
   {
     OTPublishGate gate(publishCombined);
+    if (publishCombined) incrementStatusBurstPublishCount();
     sendMQTTData("status_slave", statusText);
   }
   publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
