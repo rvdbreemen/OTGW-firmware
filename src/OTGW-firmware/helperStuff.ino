@@ -652,7 +652,7 @@ static uint32_t mqttDropCount = 0;
 // Check current heap health level
 //
 // Primary signal is ESP.getFreeHeap(). When freeHeap is already in LOW tier,
-// we additionally consult ESP.getMaxFreeBlockSize() so that fragmentation
+// we additionally consult platformMaxFreeBlock() so that fragmentation
 // promotes the level by one tier. Rationale: umm_malloc has no compaction,
 // so a 1.2KB discovery payload can fail when maxBlock<1.2KB even though
 // total free looks ok. Promoting early lets the publish gate start throttling
@@ -675,7 +675,7 @@ HeapHealthLevel getHeapHealth() {
   } else if (freeHeap < HEAP_LOW_THRESHOLD) {
     // Fragmentation check: if contiguous block is already small, promote
     // one tier so callers back off before the next alloc fails.
-    uint32_t maxBlock = ESP.getMaxFreeBlockSize();
+    uint32_t maxBlock = platformMaxFreeBlock();
     if (maxBlock < HEAP_FRAG_PROMOTE_MAXBLOCK) {
       level = HEAP_WARNING;
     } else {
@@ -704,7 +704,7 @@ HeapHealthLevel getHeapHealth() {
 uint8_t getHeapFragmentation() {
   uint32_t freeHeap = ESP.getFreeHeap();
   if (freeHeap == 0) return 100;
-  uint32_t maxBlock = ESP.getMaxFreeBlockSize();
+  uint32_t maxBlock = platformMaxFreeBlock();
   if (maxBlock >= freeHeap) return 0;
   return (uint8_t)(100UL - (100UL * maxBlock / freeHeap));
 }

@@ -26,7 +26,7 @@
 // strings compile unchanged and users understand "not available on this
 // platform" when the value shows as 0 in the trace.
 #ifdef ARDUINO_ARCH_ESP8266
-  #define MQTT_MAX_FREE_BLOCK() ESP.getMaxFreeBlockSize()
+  #define MQTT_MAX_FREE_BLOCK() platformMaxFreeBlock()
 #else
   #define MQTT_MAX_FREE_BLOCK() ((uint32_t)0)
 #endif
@@ -237,7 +237,7 @@ bool startDiscoveryVerification() {
   // Max-block precheck: umm_malloc realloc of PubSubClient's buffer needs a
   // contiguous 1024-byte block. Avoid the realloc entirely when the heap is
   // fragmented (Perf review: setBufferSize grow/shrink fragments over long uptime).
-  if (ESP.getMaxFreeBlockSize() < (VERIFICATION_BUFFER_BYTES + 256U)) return false;
+  if (platformMaxFreeBlock() < (VERIFICATION_BUFFER_BYTES + 256U)) return false;
 
   const int wrote = snprintf_P(verifyWildcard, sizeof(verifyWildcard),
                                PSTR("%s/+/%s/#"), CSTR(settings.mqtt.sHaprefix), NodeId);
@@ -1367,44 +1367,8 @@ void sendMQTTheapdiag(){
     (unsigned long)state.heapdiag.iDripCooldownSkipCount,
     (unsigned long)state.heapdiag.iDripSlowModeCount,
     (unsigned long)platformFreeHeap(),
-    (unsigned long)ESP.getMaxFreeBlockSize(),
+    (unsigned long)platformMaxFreeBlock(),
     getHeapFragmentation());
-  sendMQTTData(F("otgw-firmware/stats/heap"), json, true);   // retained
-}
-
-/*
-Publish cumulative heap-pressure and drop diagnostics as a single retained JSON
-blob to otgw-firmware/stats/heap. Called from the hourly tick (doTaskEvery60s
-gated by hourChanged) — NOT piggybacked on the 5-minute loop to keep traffic low.
-
-Counters reset on reboot; correlate with otgw-firmware/reboot_count and /uptime
-to reason about lifetime vs. session rates.
-*/
-void sendMQTTheapdiag(){
-  if (!settings.mqtt.bEnable) return;
-  if (!state.mqtt.bConnected) return;
-  state.heapdiag.iLastPublishedEpoch = (uint32_t)time(nullptr);
-  char json[256];
-  snprintf_P(json, sizeof(json),
-    PSTR("{\"ws_drops\":%lu,\"mqtt_drops\":%lu,\"enter_low\":%lu,\"enter_warning\":%lu,"
-         "\"enter_critical\":%lu,\"drip_quiesced\":%lu,\"drip_slowmode\":%lu,"
-         "\"free_heap\":%lu,\"max_block\":%lu,\"frag_pct\":%u}"),
-    (unsigned long)state.heapdiag.iWsDropsTotal,
-    (unsigned long)state.heapdiag.iMqttDropsTotal,
-    (unsigned long)state.heapdiag.iEnteredLowCount,
-    (unsigned long)state.heapdiag.iEnteredWarningCount,
-    (unsigned long)state.heapdiag.iEnteredCriticalCount,
-    (unsigned long)state.heapdiag.iDripQuiescedCount,
-    (unsigned long)state.heapdiag.iDripSlowModeCount,
-    (unsigned long)ESP.getFreeHeap(),
-    (unsigned long)ESP.getMaxFreeBlockSize(),
-    getHeapFragmentation(),
-    (unsigned long)state.discovery.iVerifyRunCount,
-    (unsigned long)state.discovery.iRepublishTriggeredCount,
-    (unsigned)state.discovery.iLastMissingCount,
-    (unsigned)state.discovery.iLastOrphanCount,
-    (unsigned long)state.discovery.iPublishedTopicCount,
-    (unsigned long)state.discovery.iLastVerifyEpoch);
   sendMQTTData(F("otgw-firmware/stats/heap"), json, true);   // retained
 }
 

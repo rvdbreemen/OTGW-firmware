@@ -1048,6 +1048,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   else {
     sendApiNotFound(originalURI);
   }
+}
 
 //===[ /api/v2/discovery — MQTT auto-discovery verification/republish (ADR-062 / TASK-349) ]===
 static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {

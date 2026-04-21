@@ -269,6 +269,28 @@ void satFlushShortLivedData();
 
 // --- SAT enums + SATWindowRecord + SATZoneState + SATRuntimeSection moved to state_sat.h (ADR-079/TASK-326)
 
+struct DiscoverySection {                    // state.discovery — MQTT auto-discovery verify telemetry (ADR-062)
+  uint32_t iLastVerifyEpoch         = 0;     // unix-epoch of last endVerify (0 = never)
+  uint32_t iVerifyRunCount          = 0;     // lifetime verify-start counter
+  uint32_t iRepublishTriggeredCount = 0;     // lifetime count where missing>0 triggered markAllMQTTConfigPending
+  uint32_t iPublishedTopicCount     = 0;     // running counter incremented by stream helpers after endPublish
+  uint16_t iLastMissingCount        = 0;     // last run: expected - received
+  uint16_t iLastOrphanCount         = 0;     // last run: foreign-nodeId retained configs observed
+  bool     bVerificationActive      = false; // active verify window indicator (observable via REST)
+};
+
+struct HeapDiagSection {                   // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
+  uint32_t iWsDropsTotal             = 0; // lifetime WebSocket messages dropped due to heap pressure
+  uint32_t iMqttDropsTotal           = 0; // lifetime MQTT messages dropped due to heap pressure
+  uint32_t iEnteredLowCount          = 0; // transitions into HEAP_LOW tier (from HEALTHY)
+  uint32_t iEnteredWarningCount      = 0; // transitions into HEAP_WARNING tier
+  uint32_t iEnteredCriticalCount     = 0; // transitions into HEAP_CRITICAL tier
+  uint32_t iDripActiveBurstSkipCount = 0; // drip ticks skipped DURING active Status-burst (TASK-342)
+  uint32_t iDripCooldownSkipCount    = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
+  uint32_t iDripSlowModeCount        = 0; // transitions to 10s slow-mode due to heap pressure
+  uint32_t iLastPublishedEpoch       = 0; // unix-epoch of last sendMQTTheapdiag publish
+};
+
 struct OTGWState {
   HardwareSection    hw;          // state.hw.eMode, state.hw.bOLEDPresent
   NetworkSection     net;         // state.net (always present; fields vary by platform/build)
