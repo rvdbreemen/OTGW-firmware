@@ -109,6 +109,7 @@ static bool            statusBurstActive     = false;
 static unsigned long   statusBurstStartMs    = 0;
 static uint16_t        statusBurstPublishCount = 0;
 static unsigned long   burstCooldownUntilMs  = 0;
+static uint32_t        sDripDueAtMs          = 0;   // updated by loopMQTTDiscovery(); read by dripDueWithinMs()
 constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
 constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 2000;   // TASK-353: 10000->2000; stays under the ~3s Status cadence so the drip gets a window per cycle
 
@@ -138,6 +139,14 @@ bool isStatusBurstActive() {
     return false;
   }
   return true;
+}
+
+// Returns true when the next drip tick will fire within windowMs milliseconds,
+// or is already overdue. Callers (e.g. queryNextPICsetting) use this to avoid
+// issuing MQTT publishes that would land on top of a drip allocation.
+bool dripDueWithinMs(uint32_t windowMs) {
+  long timeLeft = (long)(sDripDueAtMs - millis());
+  return timeLeft <= (long)windowMs;
 }
 
 static bool isDripDeferred() {
@@ -1209,6 +1218,7 @@ void loopMQTTDiscovery()
 {
   DECLARE_TIMER_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
   static uint32_t modeEnteredMs = 0;  // millis() when current mode was entered; 0 = boot
+  sDripDueAtMs = timerDiscoveryDrip_due;  // expose due-time for dripDueWithinMs()
 
   // Adaptive interval: back off BEFORE the publish gate engages.
   // canPublishMQTT() starts dropping at HEAP_LOW (<6KB); if we only trigger

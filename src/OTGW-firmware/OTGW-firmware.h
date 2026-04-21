@@ -114,6 +114,7 @@ void emergencyHeapRecovery();
 void beginStatusBurst();
 void endStatusBurst();
 bool isStatusBurstActive();
+bool dripDueWithinMs(uint32_t windowMs);  // true if drip fires within windowMs ms or is overdue
 // isDripDeferred() is internal to MQTTstuff.ino (TASK-362) — single caller in loopMQTTDiscovery.
 void incrementStatusBurstPublishCount(); // called by status publishers on each real MQTT send
 bool updateLittleFSStatus(const char *probePath = nullptr);

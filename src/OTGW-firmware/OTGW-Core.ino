@@ -606,6 +606,11 @@ void triggerPICsettingsReadout() {
 void queryNextPICsetting() {
   if (!isPICEnabled() || !isGatewayFirmware()) return;
   if (state.flash.bESPactive || state.flash.bPICactive) return;
+  // Defer PR= queries during Status-burst fanouts and when a drip tick is imminent.
+  // Each PR= response triggers 2 MQTT publishes; landing these inside a burst or
+  // drip window amplifies heap pressure. Deferred queries retry on the next 3s tick.
+  if (isStatusBurstActive()) return;
+  if (dripDueWithinMs(500)) return;
 
   const uint8_t idx = picSettingsQueryIdx;
   picSettingsQueryIdx++;
