@@ -1,11 +1,11 @@
 ---
 id: TASK-355
 title: 'chore(adr): revert ADR-062/064 to Proposed and resolve ghost ADR citations'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-21 07:32'
-updated_date: '2026-04-21 16:54'
+updated_date: '2026-04-21 21:04'
 labels:
   - adr
   - docs
@@ -26,7 +26,7 @@ Phase 1B CRITICAL+HIGH: ADR-062 and ADR-064 carry Status Accepted on disk withou
 - [x] #2 ADR-064 Status field reverted to Proposed
 - [x] #3 ADR-077/078/080 references replaced with existing ADRs or removed
 - [x] #4 Local plan-file path removed from both ADRs
-- [ ] #5 ADRs flipped to Accepted only after explicit user approval
+- [x] #5 ADRs flipped to Accepted only after explicit user approval
 - [x] #6 ADR-062 Consequences/Limits section gets bullet: heap-abort outcome indistinguishable from clean pass in iLastMissingCount; check [verify] heap-abort debug log
 - [x] #7 ADR-062 Consequences section gets bullet: at boot, dayChanged lastX=-1 sentinel fires true on first post-NTP-sync minute; auto-verify runs within one minute of NTP sync
 - [x] #8 ADR-064 Benefits/Costs section gets bullet: hourFlag/dayFlag/yearFlag all fire true on first post-NTP-sync tick; downstream consumers must defend (runNightlyRestart does via uptime>3600, sendMQTTheapdiag publishes near-zero snapshot)
