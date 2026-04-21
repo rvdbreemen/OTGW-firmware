@@ -6,81 +6,23 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## What's New in v1.4.1
 
-Version 1.4.1 focuses on ESP8266 heap robustness during Home Assistant MQTT auto-discovery and adds an automatic retained-discovery self-heal mechanism. Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md).
+**v1.4.1 is the first public release in the 1.4.x series.** A 1.4.0 milestone was tracked internally but was never published as a standalone release: development continued until the full body of work was stable enough to ship in one go. If you are upgrading from v1.3.5, v1.4.1 contains everything. There is no v1.4.0 to install or skip.
 
-- Slower, heap-aware discovery drip (2 s normal, 10 s under heap pressure) with post-Status-burst cooldown.
-- Retained-discovery verification: node-scoped wildcard subscribe, counts retained configs, re-announces on mismatch. Exposed via REST (`/api/v2/discovery`), telnet (V key) and MQTT telemetry. Opt-in daily auto-heal via `MQTTdiscoveryAutoVerify` (default on).
-- Hourly retained MQTT heap diagnostic at `<topTopic>/otgw-firmware/stats/heap`.
-- Unified time-boundary dispatcher: hour/day/year triggers are now wall-clock aligned. See [ADR-064](docs/adr/ADR-064-time-boundary-single-caller-contract.md).
+Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md).
 
-## What's New in v1.4.0
+Key highlights:
 
-Version 1.4.0 is a major feature release. It adds SAT (Smart Autotune Thermostat), an embedded heating controller that turns the OTGW into a standalone smart thermostat. It also introduces ESP32 support through a unified platform abstraction layer. Full release notes: [RELEASE_NOTES_1.4.0.md](RELEASE_NOTES_1.4.0.md)
-
-### Highlights
-
-- **SAT (Smart Autotune Thermostat):** Embedded heating controller running entirely on the ESP. Weather-compensated heating curve + PID v3 controller with automatic gain tuning. Supports continuous modulation and PWM flame cycling, radiator and underfloor heating. Six independent safety layers. Web UI dashboard, REST API, MQTT, and Home Assistant auto-discovery. No HA or external controller required.
-- **ESP32 support (experimental):** The firmware now compiles for both ESP8266 and ESP32 from one source tree. 30+ platform shim functions abstract away SDK differences at compile time.
-- **PlatformIO build system:** New `platformio.ini` with `esp8266` and `esp32` environments. Build with `pio run -e esp8266` or `pio run -e esp32`.
-- **Board-level GPIO definitions:** Auto-detected pin mappings per platform via `boards.h`.
-- **OpenTherm enum modernization:** Binary literals updated to C++14 standard format for better compiler compatibility.
-- **No breaking changes** vs v1.3.4. The ESP8266 build is functionally identical.
-
-## SAT - Smart Autotune Thermostat
-
-SAT is an embedded heating controller that runs entirely on the ESP and turns the OTGW into a standalone smart thermostat. It sits between the OpenTherm bus and the boiler, computing and sending the optimal flow temperature setpoint without needing an external controller or Home Assistant.
-
-### What SAT does
-
-SAT combines a **weather-compensated heating curve** with a **PID v3 controller** that adjusts the flow temperature setpoint based on measured room temperature error. It learns your boiler's behavior over time through automatic gain tuning and a thermal model.
-
-Key capabilities:
-
-- **Weather-compensated heating curve**: calculates the base flow temperature from the outdoor temperature using a configurable coefficient.
-- **PID v3 control**: proportional + integral + derivative correction on top of the heating curve to hold the target room temperature.
-- **Auto-tune**: automatically adjusts PID gains based on cycle analysis, so you don't have to tune them manually.
-- **Two control modes**: continuous modulation (modulates boiler flame directly) and PWM cycling (on/off flame with configurable duty cycle).
-- **Six independent safety layers**: flame health, CH sync, setpoint mismatch, pressure monitoring, cycle classification, and overshoot detection.
-- **Heating curve recommendation**: analyzes error statistics and suggests whether to increase or decrease the curve coefficient.
-- **OPV calibration**: finds your boiler's Overpressure Valve (pressure relief valve) opening temperature so SAT stays below it.
-- **Presets**: six named presets (comfort, eco, away, sleep, activity, home) with configurable target temperatures.
-- **Multi-area room temperature**: averages temperature readings from up to four zones for more accurate control.
-- **Solar gain compensation**: detects solar gain from indoor temperature rise rate and sun elevation, and reduces the setpoint to avoid overheating.
-- **Summer simmer mode**: suppresses heating when outdoor temperature stays above a threshold for a configurable number of hours.
-- **Pressure monitoring**: tracks system pressure and raises an alarm when it drops below the minimum or falls too fast.
-- **BLE temperature sensor** (ESP32 only): receives room temperature and humidity from a Bluetooth LE sensor (e.g., Xiaomi/PVVX).
-
-### Hardware support
-
-| Platform | SAT | BLE sensor |
-| -------- | --- | ---------- |
-| ESP8266 (NodeMCU, Wemos D1 mini) | Full support | Not available |
-| ESP32 | Full support | Available |
-
-### Quick start
-
-1. Open the OTGW Web UI and go to **SAT** in the navigation.
-2. Enable SAT and set your target room temperature.
-3. Configure your heating system type (radiators / underfloor / heat pump).
-4. Set your boiler capacity (kW) for accurate power estimation.
-5. Let the auto-tune run for a few days to optimize PID gains.
-
-For detailed setup, including heating curve tuning, OPV calibration, and Home Assistant automation examples, see the [SAT integration guide](backlog/docs/doc-3%20-%20sat-integration-guide.md).
-
-### Integration
-
-SAT integrates with Home Assistant via MQTT auto-discovery. When SAT is enabled and MQTT is configured:
-
-- A `climate` entity appears in HA with target temperature control and heat/off mode.
-- 40+ sensor and binary_sensor entities appear for all SAT state, diagnostics, and settings.
-- Commands can be sent via MQTT topics or the REST API.
-
-| Interface | Reference |
-| --------- | --------- |
-| MQTT topics (published and subscribed) | [MQTT topic reference](docs/api/MQTT.md) / [Full SAT topic inventory](backlog/docs/doc-1%20-%20sat-mqtt-topics.md) |
-| REST API | [OpenAPI spec](docs/api/openapi.yaml) — all `/api/v2/sat/*` endpoints |
-| OPV calibration guide | [OPV calibration](backlog/docs/doc-2%20-%20sat-opv-calibration.md) |
-| Preset configuration | [Preset configuration](backlog/docs/doc-4%20-%20sat-preset-configuration.md) |
+- **SimpleTelnet migration**: formatted welcome banner on debug connect, structured key dispatch, clean session teardown.
+- **ESP8266 Arduino Core 3.1.2**: updated lwIP, improved WiFi driver, systematic PROGMEM pointer safety audit.
+- **MQTT HA discovery rewrite**: 309 auto-discovery configs via a streaming, bitmap-driven drip API. No static staging buffer. Runtime Dallas sensor discovery. Comprehensive icon heuristics.
+- **WiFi reconnect hardening**: fixes a regression that prevented IP re-acquisition after a router reboot (no ESP reboot required).
+- **Heap-aware discovery drip**: 2 s normal / 10 s slow-mode with fragmentation-aware gates, Status-burst cooldown, and hold-per-interval hysteresis. Eliminates mid-discovery watchdog resets on loaded gateways.
+- **Retained-discovery self-heal**: node-scoped wildcard verify window counts what the broker actually has, re-announces missing configs. Daily auto-heal + on-demand via REST (`/api/v2/discovery`), telnet `V` key. See [ADR-062](docs/adr/ADR-062-retained-discovery-verification.md).
+- **Hourly heap diagnostic MQTT topic**: `<topTopic>/otgw-firmware/stats/heap` (retained, 17-field JSON covering free heap, fragmentation, tier counters, discovery state).
+- **Unified time-boundary dispatcher**: hour/day/year triggers wall-clock aligned via single caller contract. See [ADR-064](docs/adr/ADR-064-time-boundary-single-caller-contract.md).
+- **OpenTherm v4.2 alignment**: fixes for MaxTSet/TdhwSet (0°C in HA), reserved ID range 58-69, WRITE_ACK handling.
+- **Configurable device manufacturer/model** in MQTT device announcement (credit: Schelte Bron).
+- **Nightly restart** with configurable hour, wired to the unified hourChanged dispatcher.
 
 ---
 
