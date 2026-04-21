@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.4.0-beta
+**  Version  : v1.4.1-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -164,6 +164,7 @@ static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPM
 static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTGWvalue(int msgid);
 void sendOTGWlabel(const char *msglabel);
@@ -467,6 +468,103 @@ static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
   }
 }
 
+// TASK-361: stringify VerifyOutcome for telemetry (REST + devinfo).
+// Returns a PROGMEM short label matching the enum values in OTGW-firmware.h.
+static const __FlashStringHelper* verifyOutcomeLabel(VerifyOutcome o) {
+  switch (o) {
+    case VerifyOutcome::CLEAN:              return F("clean");
+    case VerifyOutcome::MISSING:            return F("missing");
+    case VerifyOutcome::ABORTED_HEAP:       return F("aborted_heap");
+    case VerifyOutcome::ABORTED_DISCONNECT: return F("aborted_disconnect");
+    case VerifyOutcome::UNKNOWN:
+    default:                                return F("unknown");
+  }
+}
+
+//===[ /api/v2/discovery — MQTT auto-discovery verification/republish (ADR-062 / TASK-349) ]===
+static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  // GET /api/v2/discovery — status dump
+  if (wc == 4 || (wc == 5 && words[4][0] == '\0')) {
+    if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+    char msg[384];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"verification\":{\"active\":%s,\"last_epoch\":%lu,\"last_missing\":%u,\"last_orphan\":%u,\"last_outcome\":\"%S\"},"
+           "\"counters\":{\"published_topics\":%lu,\"pending_ids\":%u,\"verify_runs\":%lu,\"republish_triggered\":%lu},"
+           "\"settings\":{\"auto_verify\":%s}}"),
+      isDiscoveryVerificationActive() ? "true" : "false",
+      (unsigned long)state.discovery.iLastVerifyEpoch,
+      (unsigned)state.discovery.iLastMissingCount,
+      (unsigned)state.discovery.iLastOrphanCount,
+      (PGM_P)verifyOutcomeLabel(state.discovery.eLastOutcome),
+      (unsigned long)state.discovery.iPublishedTopicCount,
+      (unsigned)countPendingDiscoveryIds(),
+      (unsigned long)state.discovery.iVerifyRunCount,
+      (unsigned long)state.discovery.iRepublishTriggeredCount,
+      settings.mqtt.bDiscoveryAutoVerify ? "true" : "false");
+    sendCorsOriginHeader();
+    httpServer.send(200, F("application/json"), msg);
+    return;
+  }
+
+  // POST /api/v2/discovery/verify — start verification window
+  if (wc > 4 && strcmp_P(words[4], PSTR("verify")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+    if (ESP.getFreeHeap() < VERIFICATION_MIN_HEAP_START) { sendApiError(503, F("Heap too low for verify")); return; }
+    if (isDiscoveryVerificationActive()) { sendApiError(409, F("Verification already active")); return; }
+    if (countPendingDiscoveryIds() > 0) { sendApiError(409, F("Discovery drip in progress")); return; }
+    if (!startDiscoveryVerification()) { sendApiError(503, F("Verification start refused (see telnet log)")); return; }
+    char msg[128];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"status\":\"verification_started\",\"expected\":%lu,\"window_ms\":15000}"),
+      (unsigned long)state.discovery.iPublishedTopicCount);
+    sendCorsOriginHeader();
+    httpServer.send(202, F("application/json"), msg);
+    return;
+  }
+
+  // POST /api/v2/discovery/republish — force full re-announce
+  if (wc > 4 && strcmp_P(words[4], PSTR("republish")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+
+    // TASK-356 (CWE-770): 60 s cooldown between successful republish invocations.
+    // Rationale: rapid-fire POSTs keep countPendingDiscoveryIds > 0 permanently,
+    // which blocks startDiscoveryVerification() (precondition at MQTTstuff.ino).
+    // A post-auth LAN actor could otherwise DoS the verify endpoint. 60 s gives
+    // the drip publisher time to drain pending IDs so verify becomes reachable
+    // again. Timer is a function-local static so no new globals leak out.
+    static unsigned long lastRepublishMs = 0;
+    constexpr unsigned long REPUBLISH_COOLDOWN_MS = 60000UL;
+    if (lastRepublishMs != 0) {
+      const unsigned long elapsed = millis() - lastRepublishMs;
+      if (elapsed < REPUBLISH_COOLDOWN_MS) {
+        const unsigned long remaining = (REPUBLISH_COOLDOWN_MS - elapsed + 999UL) / 1000UL;
+        restResponseStatus = 429;
+        char jsonBuff[160];
+        snprintf_P(jsonBuff, sizeof(jsonBuff),
+          PSTR("{\"error\":{\"status\":429,\"message\":\"Republish cooldown active, retry in %lus\"}}"),
+          remaining);
+        sendCorsOriginHeader();
+        httpServer.send(429, F("application/json"), jsonBuff);
+        return;
+      }
+    }
+
+    markAllMQTTConfigPending();
+    char msg[96];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"status\":\"marked_pending\",\"count\":%u}"),
+      (unsigned)countPendingDiscoveryIds());
+    lastRepublishMs = millis();  // stamp only after work commits
+    sendCorsOriginHeader();
+    httpServer.send(200, F("application/json"), msg);
+    return;
+  }
+
+  sendApiNotFound(originalURI);
+}
+
 //=== Route dispatch table (ADR-050) ===
 // Adding a new v2 resource: (1) write handler function above, (2) add entry below.
 typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
@@ -487,6 +585,7 @@ static const char kRouteFilesystem[] PROGMEM = "filesystem";
 static const char kRouteSimulate[]   PROGMEM = "simulate";
 static const char kRouteOtgw[]       PROGMEM = "otgw";
 static const char kRouteWebhook[]    PROGMEM = "webhook";
+static const char kRouteDiscovery[]  PROGMEM = "discovery";
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -500,6 +599,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteSimulate,   handleSimulate },
   { kRouteOtgw,       handleOtgw },
   { kRouteWebhook,    handleWebhook },
+  { kRouteDiscovery,  handleDiscovery },
   { nullptr,          nullptr }  // sentinel
 };
 
@@ -818,7 +918,28 @@ void sendDeviceInfoV2()
     sendJsonMapEntry(F("otgwconnected"), state.otgw.bOnline);
   }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
-  
+
+  // Heap diagnostics (TASK-346) — cumulative counters since last reboot.
+  // hd_* prefix keeps them grouped when the UI renders devinfo alphabetically.
+  sendJsonMapEntry(F("hd_fragmentation_pct"), getHeapFragmentation());
+  sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
+  sendJsonMapEntry(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
+  sendJsonMapEntry(F("hd_enter_low"),        state.heapdiag.iEnteredLowCount);
+  sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
+  sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
+  sendJsonMapEntry(F("hd_drip_burst_skip"),    state.heapdiag.iDripActiveBurstSkipCount);
+  sendJsonMapEntry(F("hd_drip_cooldown_skip"), state.heapdiag.iDripCooldownSkipCount);
+  sendJsonMapEntry(F("hd_drip_slowmode"),      state.heapdiag.iDripSlowModeCount);
+
+  // Discovery verification telemetry (ADR-062 / TASK-349 / TASK-361)
+  sendJsonMapEntry(F("disc_published_topics"),     state.discovery.iPublishedTopicCount);
+  sendJsonMapEntry(F("disc_pending_ids"),          (uint32_t)countPendingDiscoveryIds());
+  sendJsonMapEntry(F("disc_verify_runs"),          state.discovery.iVerifyRunCount);
+  sendJsonMapEntry(F("disc_republish_triggered"),  state.discovery.iRepublishTriggeredCount);
+  sendJsonMapEntry(F("disc_last_missing"),         (uint32_t)state.discovery.iLastMissingCount);
+  sendJsonMapEntry(F("disc_last_orphan"),          (uint32_t)state.discovery.iLastOrphanCount);
+  sendJsonMapEntry(F("disc_last_outcome"),         verifyOutcomeLabel(state.discovery.eLastOutcome));
+
   sendEndJsonMap(F("device"));
 
 } // sendDeviceInfoV2()

@@ -4,6 +4,15 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
+## What's New in v1.4.1
+
+Version 1.4.1 focuses on ESP8266 heap robustness during Home Assistant MQTT auto-discovery and adds an automatic retained-discovery self-heal mechanism. Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md).
+
+- Slower, heap-aware discovery drip (2 s normal, 10 s under heap pressure) with post-Status-burst cooldown.
+- Retained-discovery verification: node-scoped wildcard subscribe, counts retained configs, re-announces on mismatch. Exposed via REST (`/api/v2/discovery`), telnet (V key) and MQTT telemetry. Opt-in daily auto-heal via `MQTTdiscoveryAutoVerify` (default on).
+- Hourly retained MQTT heap diagnostic at `<topTopic>/otgw-firmware/stats/heap`.
+- Unified time-boundary dispatcher: hour/day/year triggers are now wall-clock aligned. See [ADR-064](docs/adr/ADR-064-time-boundary-single-caller-contract.md).
+
 ## What's New in v1.4.0
 
 Version 1.4.0 is a major feature release. It adds SAT (Smart Autotune Thermostat), an embedded heating controller that turns the OTGW into a standalone smart thermostat. It also introduces ESP32 support through a unified platform abstraction layer. Full release notes: [RELEASE_NOTES_1.4.0.md](RELEASE_NOTES_1.4.0.md)

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.4.0-beta
+**  Version  : v1.4.1-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -15,6 +15,7 @@
 #include <pgmspace.h>
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
 #include "MQTTstuff.h"              // Structured discovery data layer (enums, structs, streaming API)
+#include "mqtt_discovery_verify.h"  // Discovery-verify state machine (TASK-363: separate TU)
 
 // MQTT Streaming Mode - ALWAYS ENABLED
 // Large auto-discovery messages are sent in 128-byte chunks instead of
@@ -43,10 +44,12 @@ constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
 constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 // Minimum free heap required before attempting a discovery publish.
-// A single discovery message needs ~1200 bytes of lwIP pbuf (ESP8266 core 3.x / lwIP 2.x).
-// 12000 bytes provides ~10x margin to absorb concurrent TCP stack overhead.
-// Keep in sync with the HEAP_WARNING tier in canPublishMQTT().
-constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 4000;  // Streaming needs ~200 bytes, not 1200+
+// Streaming HA discovery (ADR-042: streaming JSON, no ArduinoJson) only needs
+// ~200 bytes per chunk, so the historical 1200-byte floor is obsolete. Value
+// aligned with HEAP_WARNING_THRESHOLD (3072) in canPublishMQTT(): if heap is
+// already at WARNING the drip skips rather than competing with publish-gate
+// throttling.
+constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 3000;  // Streaming needs ~200 bytes; aligned with WARNING tier
 
 // MQTT autoconfig buffer design:
 // feedWatchDog() is used (not doBackgroundTasks()) during autoconfig iterations
@@ -76,6 +79,89 @@ struct MQTTAutoConfigSessionLock {
 
 // pgm_strncmp_PP() and pgm_read_char() are in MQTTstuff.h (inline, shared with mqtt_configuratie.cpp)
 
+// Status-burst quiesce (TASK-342) + post-burst cooldown (TASK-347).
+// A Status-frame fanout publishes status_master plus 7 bits, and/or status_slave
+// plus 8 bits in rapid succession (~20ms). If loopMQTTDiscovery fires a drip in
+// the middle of that burst, the two allocations overlap and push the heap into
+// the throttle band unnecessarily. beginStatusBurst() opens the window,
+// endStatusBurst() closes it; during the window the drip skips.
+//
+// After endStatusBurst(), a cooldown of STATUS_BURST_COOLDOWN_MS is armed so
+// lwIP pbufs from the just-finished publishes can drain before the next heap
+// allocation. The cooldown is armed ONLY if the burst had at least one real
+// MQTT publish (statusBurstPublishCount > 0). Empty bursts (every single bit
+// was gated out by shouldPublishStatusBit) cost no TCP bandwidth, so no
+// cooldown is needed — this prevents pointless drip pauses in idle state.
+//
+// TUNING (TASK-353): the Crashevans log shows Status-frames arriving at ~3s
+// cadence. A 10s cooldown overlapped consecutive bursts and stalled the drip
+// under heavy Status traffic (iDripCooldownSkipCount grew without discovery
+// progressing). 2000ms is the chosen default: it fits comfortably between
+// Status-frames (~3s cadence leaves ~1s of drip window per cycle) while still
+// giving lwIP pbufs from the just-finished burst time to drain before the next
+// heap allocation. If you see iDripCooldownSkipCount climb again without
+// discovery progressing, consider lowering further; raising above ~2500ms
+// re-introduces the overlap stall.
+//
+// Timeout safety: if endStatusBurst() is never reached (exception path),
+// isStatusBurstActive() auto-clears after STATUS_BURST_TIMEOUT_MS.
+static bool            statusBurstActive     = false;
+static unsigned long   statusBurstStartMs    = 0;
+static uint16_t        statusBurstPublishCount = 0;
+static unsigned long   burstCooldownUntilMs  = 0;
+static uint32_t        sDripDueAtMs          = 0;   // updated by loopMQTTDiscovery(); read by dripDueWithinMs()
+constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
+constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 2000;   // TASK-353: 10000->2000; stays under the ~3s Status cadence so the drip gets a window per cycle
+
+void beginStatusBurst() {
+  statusBurstActive = true;
+  statusBurstStartMs = millis();
+  statusBurstPublishCount = 0;
+}
+
+void endStatusBurst() {
+  statusBurstActive = false;
+  if (statusBurstPublishCount > 0) {
+    burstCooldownUntilMs = millis() + STATUS_BURST_COOLDOWN_MS;
+  }
+  // else: empty burst, no cooldown armed
+}
+
+void incrementStatusBurstPublishCount() {
+  if (statusBurstActive) statusBurstPublishCount++;
+}
+
+bool isStatusBurstActive() {
+  if (!statusBurstActive) return false;
+  // Self-heal against a missed endStatusBurst() call.
+  if ((unsigned long)(millis() - statusBurstStartMs) > STATUS_BURST_TIMEOUT_MS) {
+    statusBurstActive = false;
+    return false;
+  }
+  return true;
+}
+
+// Returns true when the next drip tick will fire within windowMs milliseconds,
+// or is already overdue. Callers (e.g. queryNextPICsetting) use this to avoid
+// issuing MQTT publishes that would land on top of a drip allocation.
+bool dripDueWithinMs(uint32_t windowMs) {
+  long timeLeft = (long)(sDripDueAtMs - millis());
+  return timeLeft <= (long)windowMs;
+}
+
+static bool isDripDeferred() {
+  if (isStatusBurstActive()) return true;
+  // Post-burst cooldown window still open?
+  // Use signed diff for millis() rollover safety.
+  if (burstCooldownUntilMs != 0 && (long)(millis() - burstCooldownUntilMs) < 0) {
+    return true;
+  }
+  return false;
+}
+
+// MQTT auto-discovery verification implementation lives below the MQTTclient +
+// NodeId static declarations (search for "MQTT auto-discovery verification (ADR-062").
+
 static            PubSubClient MQTTclient(wifiClient);
 
 int8_t            reconnectAttempts = 0;
@@ -88,6 +174,93 @@ static char       MQTTclientId[MQTT_ID_MAX_LEN];
 static char       MQTTPubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       MQTTSubNamespace[MQTT_NAMESPACE_MAX_LEN];
 static char       NodeId[MQTT_ID_MAX_LEN];
+
+// =====================================================================
+// MQTT auto-discovery verification (ADR-062, TASK-349)
+// State machine extracted to mqtt_discovery_verify.cpp under TASK-363.
+// MQTTstuff.ino keeps only the small accessor surface that the extracted
+// TU calls back into (state/settings access, MQTT client ops, logging).
+// Public API: startDiscoveryVerification(), isDiscoveryVerificationActive(),
+// tickDiscoveryVerification(), handleDiscoveryVerifyMessage()
+//   - all declared in mqtt_discovery_verify.h.
+// =====================================================================
+
+// Pin the numeric mapping between VerifyOutcome (OTGW-firmware.h) and the
+// uint8_t codes used across the extracted TU boundary. If the enum ever
+// gets reordered this will fail to compile.
+static_assert((uint8_t)VerifyOutcome::UNKNOWN            == 0, "VerifyOutcome UNKNOWN must be 0");
+static_assert((uint8_t)VerifyOutcome::CLEAN              == 1, "VerifyOutcome CLEAN must be 1");
+static_assert((uint8_t)VerifyOutcome::MISSING            == 2, "VerifyOutcome MISSING must be 2");
+static_assert((uint8_t)VerifyOutcome::ABORTED_HEAP       == 3, "VerifyOutcome ABORTED_HEAP must be 3");
+static_assert((uint8_t)VerifyOutcome::ABORTED_DISCONNECT == 4, "VerifyOutcome ABORTED_DISCONNECT must be 4");
+
+// Counter increment shim for mqtt_configuratie.cpp (ADR-044: that TU does not
+// include OTGW-firmware.h / the state global). Must be called from each
+// stream*Discovery() helper after a successful endPublish().
+void incPublishedTopicCount() {
+  state.discovery.iPublishedTopicCount++;
+}
+
+// Returns number of msgids currently pending discovery publication.
+uint16_t countPendingDiscoveryIds() {
+  uint16_t n = 0;
+  for (uint8_t g = 0; g < 8; g++) {
+    uint32_t m = MQTTautoCfgPendingMap[g];
+    while (m) { n += (m & 1u); m >>= 1; }
+  }
+  return n;
+}
+
+// ---------------------------------------------------------------------
+// Discovery-verify TU accessors (TASK-363). Implemented here because
+// mqtt_discovery_verify.cpp is a separate translation unit and cannot
+// include OTGW-firmware.h (the header defines sketch-level globals that
+// would cause ODR violations when pulled into a second TU). All access
+// to state/settings/MQTTclient/NodeId/etc. from the extracted file goes
+// through these narrow bridges.
+// ---------------------------------------------------------------------
+bool        verifyAccessorMqttConnected()            { return state.mqtt.bConnected; }
+bool        verifyAccessorPicFlashing()              { return isFlashing(); }
+bool        verifyAccessorNtpTimeSet()               { return isNTPtimeSet(); }
+uint32_t    verifyAccessorUptimeSeconds()            { return state.uptime.iSeconds; }
+uint32_t    verifyAccessorPublishedTopicCount()      { return state.discovery.iPublishedTopicCount; }
+uint16_t    verifyAccessorCountPendingDiscoveryIds() { return countPendingDiscoveryIds(); }
+const char* verifyAccessorHaPrefix()                 { return CSTR(settings.mqtt.sHaprefix); }
+const char* verifyAccessorNodeId()                   { return NodeId; }
+
+void        verifyAccessorSetOutcome(uint8_t outcome) {
+  state.discovery.eLastOutcome = (VerifyOutcome)outcome;
+}
+uint8_t     verifyAccessorGetOutcome() {
+  return (uint8_t)state.discovery.eLastOutcome;
+}
+void        verifyAccessorIncVerifyRunCount()         { state.discovery.iVerifyRunCount++; }
+void        verifyAccessorIncRepublishTriggeredCount(){ state.discovery.iRepublishTriggeredCount++; }
+void        verifyAccessorSetLastVerifyEpoch(uint32_t epoch)   { state.discovery.iLastVerifyEpoch = epoch; }
+void        verifyAccessorSetLastMissingCount(uint16_t missing){ state.discovery.iLastMissingCount = missing; }
+void        verifyAccessorSetLastOrphanCount(uint16_t orphan)  { state.discovery.iLastOrphanCount = orphan; }
+void        verifyAccessorMarkAllMQTTConfigPending()           { markAllMQTTConfigPending(); }
+
+bool        verifyAccessorSetMqttBufferSize(uint16_t sizeBytes) {
+  return MQTTclient.setBufferSize(sizeBytes);
+}
+bool        verifyAccessorRestoreMqttBufferSize() {
+  return MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
+}
+bool        verifyAccessorMqttSubscribe(const char *topic) {
+  return MQTTclient.subscribe(topic, 0);
+}
+bool        verifyAccessorMqttUnsubscribe(const char *topic) {
+  return MQTTclient.unsubscribe(topic);
+}
+
+// Logging bridge: accept a pre-formatted RAM string and dispatch through
+// the usual DebugTln helper so the telnet BOL prefix is preserved.
+// The verify TU pre-formats with snprintf_P because it cannot include
+// Debug.h (ODR violation on function bodies defined there).
+void verifyAccessorLogLine(const char* ramMessage) {
+  if (ramMessage != nullptr) DebugTln(ramMessage);
+}
 
 static bool writeMqttChunk(const char *data, size_t len)
 {
@@ -378,7 +551,14 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       Debug((char)payload[i]);
     }
     Debug(F("] (")); Debug(length); Debug(F(")")); Debugln(); DebugFlush();
-  }  
+  }
+
+  // Verify-window retained-config filter (ADR-062, TASK-349, TASK-357).
+  // TASK-363: extracted to mqtt_discovery_verify.cpp. If the verify window is
+  // active and the topic matches our <haprefix>/ prefix, the extracted filter
+  // consumes the message and returns true; we must not fall through to the
+  // OT command dispatcher in that case.
+  if (handleDiscoveryVerifyMessage(topic, length)) return;
 
   //detect home assistant going down...
   char msgPayload[128];
@@ -502,6 +682,10 @@ void handleMQTT()
   DECLARE_TIMER_SEC(timerMQTTdebugisconnected, 60);
   
   if (MQTTclient.connected()) MQTTclient.loop();  //always do a MQTTclient.loop() first
+
+  // Poll the discovery-verify window closer (ADR-062). Handles timeout,
+  // MQTT-disconnect fast-close, and heap-abort.
+  tickDiscoveryVerification();
 
   switch(stateMQTT) 
   {
@@ -790,6 +974,52 @@ void sendMQTTversioninfo(){
 }
 
 /*
+Publish cumulative heap-pressure and drop diagnostics as a single retained JSON
+blob to otgw-firmware/stats/heap. Called from doTaskMinuteChanged() under
+if (hourFlag) per ADR-064 (wall-clock aligned hourly dispatch). NOT piggybacked
+on the 5-minute loop to keep traffic low.
+
+Counters reset on reboot; correlate with otgw-firmware/reboot_count and /uptime
+to reason about lifetime vs. session rates.
+*/
+void sendMQTTheapdiag(){
+  if (!settings.mqtt.bEnable) return;
+  if (!state.mqtt.bConnected) return;
+  // TASK-352: raised 384->512 after Phase-2b perf review measured a 465-byte
+  // worst-case serialisation. Breakdown: 17 key+quote+colon+comma tokens (~215B
+  // of JSON scaffolding) + 10 uint32 values at 10 digits each (~100B) + 3 uint16
+  // values at 5 digits each (~15B) + 1 uint8 frag_pct at 3 digits + braces/NUL.
+  // 384 truncated under realistic load; 512 gives ~47B headroom without wasting
+  // RAM. Keep in sync if additional disc_/heap_ counters are added.
+  char json[512];
+  snprintf_P(json, sizeof(json),
+    PSTR("{\"ws_drops\":%lu,\"mqtt_drops\":%lu,\"enter_low\":%lu,\"enter_warning\":%lu,"
+         "\"enter_critical\":%lu,\"drip_burst_skip\":%lu,\"drip_cooldown_skip\":%lu,"
+         "\"drip_slowmode\":%lu,\"free_heap\":%lu,\"max_block\":%lu,\"frag_pct\":%u,"
+         "\"disc_verify_runs\":%lu,\"disc_republish_triggered\":%lu,"
+         "\"disc_last_missing\":%u,\"disc_last_orphan\":%u,"
+         "\"disc_published_topics\":%lu,\"disc_last_verify_epoch\":%lu}"),
+    (unsigned long)state.heapdiag.iWsDropsTotal,
+    (unsigned long)state.heapdiag.iMqttDropsTotal,
+    (unsigned long)state.heapdiag.iEnteredLowCount,
+    (unsigned long)state.heapdiag.iEnteredWarningCount,
+    (unsigned long)state.heapdiag.iEnteredCriticalCount,
+    (unsigned long)state.heapdiag.iDripActiveBurstSkipCount,
+    (unsigned long)state.heapdiag.iDripCooldownSkipCount,
+    (unsigned long)state.heapdiag.iDripSlowModeCount,
+    (unsigned long)ESP.getFreeHeap(),
+    (unsigned long)ESP.getMaxFreeBlockSize(),
+    getHeapFragmentation(),
+    (unsigned long)state.discovery.iVerifyRunCount,
+    (unsigned long)state.discovery.iRepublishTriggeredCount,
+    (unsigned)state.discovery.iLastMissingCount,
+    (unsigned)state.discovery.iLastOrphanCount,
+    (unsigned long)state.discovery.iPublishedTopicCount,
+    (unsigned long)state.discovery.iLastVerifyEpoch);
+  sendMQTTData(F("otgw-firmware/stats/heap"), json, true);   // retained
+}
+
+/*
 Publish state information of PIC firmware version information to MQTT broker.
 */
 void sendMQTTstateinformation(){
@@ -924,6 +1154,9 @@ void setMQTTConfigDone(const uint8_t MSGid)
 void clearMQTTConfigDone()
 {
   memset(MQTTautoConfigMap, 0, sizeof(MQTTautoConfigMap));
+  // Reset published-topic counter so it stays in sync with the bitmap (ADR-062).
+  // Stream helpers re-increment on each successful endPublish.
+  state.discovery.iPublishedTopicCount = 0;
 }
 //===========================================================================================
 // Pending-bitmap helpers for async drip-discovery (ADR-pending).
@@ -965,24 +1198,45 @@ void markAllMQTTConfigPending()
 // and sets its "done" bit.  Publishes exactly ONE ID per timer tick to
 // spread broker load over time.
 //
-// Adaptive interval: 3s when heap is healthy, 30s under heap pressure.
-// This avoids adding lwIP pbuf allocations when the system is already
-// memory-constrained, while still making progress on discovery.
+// Adaptive interval: 2s when heap is healthy, 10s under heap pressure.
+// The 2s cadence gives heap time to recover between discovery bursts so that
+// a Status-frame fanout (9 sub-topic publishes in ~20ms) does not overlap
+// with the next drip alloc. Pressure trigger is HEAP_LOW (not WARNING): the
+// drip MUST back off before the publish gate starts dropping, otherwise we
+// only mitigate drops at the gate instead of preventing them at the source.
+//
+// Mode hysteresis: once a mode is entered, it holds for at least one full
+// timerDiscoveryDrip_interval before a switch is allowed in either direction.
+// Normal (2s) -> Slow: requires >=2s in normal; Slow (10s) -> Normal: requires
+// >=10s in slow. This prevents rapid oscillation when freeHeap hovers near
+// HEAP_LOW_THRESHOLD (TASK-370).
 //===========================================================================================
-constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 1;   // seconds (streaming is lightweight)
+constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 2;   // seconds (heap recovery between bursts)
 constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 10;  // seconds (heap pressure backoff)
 
 void loopMQTTDiscovery()
 {
   DECLARE_TIMER_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
+  static uint32_t modeEnteredMs = 0;  // millis() when current mode was entered; 0 = boot
+  sDripDueAtMs = timerDiscoveryDrip_due;  // expose due-time for dripDueWithinMs()
 
-  // Adaptive interval: only change on state transition (guard prevents resetting _due every loop)
-  bool heapPressure = (getHeapHealth() >= HEAP_WARNING);
-  if (heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_SLOW * 1000UL) {
+  // Adaptive interval: back off BEFORE the publish gate engages.
+  // canPublishMQTT() starts dropping at HEAP_LOW (<6KB); if we only trigger
+  // slow-mode at HEAP_WARNING (<4KB) we are too late — drops have already
+  // started. Trigger at HEAP_LOW so the drip quiets down first.
+  bool heapPressure = (getHeapHealth() >= HEAP_LOW);
+  // Hold current mode for at least one full interval before switching.
+  // modeEnteredMs == 0 on first call: first switch is always allowed immediately.
+  bool canSwitch = (modeEnteredMs == 0) ||
+                   ((millis() - modeEnteredMs) >= timerDiscoveryDrip_interval);
+  if (heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_SLOW * 1000UL && canSwitch) {
     CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_SLOW, SKIP_MISSED_TICKS);
+    state.heapdiag.iDripSlowModeCount++;
+    modeEnteredMs = millis();
     MQTTDebugTf(PSTR("[drip] slowed to %ds (heap pressure)\r\n"), DISCOVERY_INTERVAL_SLOW);
-  } else if (!heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_NORMAL * 1000UL) {
+  } else if (!heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_NORMAL * 1000UL && canSwitch) {
     CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
+    modeEnteredMs = millis();
     MQTTDebugTf(PSTR("[drip] restored to %ds (heap healthy)\r\n"), DISCOVERY_INTERVAL_NORMAL);
   }
 
@@ -991,6 +1245,17 @@ void loopMQTTDiscovery()
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
   if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return;
+  // Defer drip during Status-frame fanout AND for STATUS_BURST_COOLDOWN_MS afterwards.
+  // Timer keeps running; next tick picks up as soon as the deferred window clears.
+  // Track which of the two reasons triggered the skip for diagnostics.
+  if (isStatusBurstActive()) {
+    state.heapdiag.iDripActiveBurstSkipCount++;
+    return;
+  }
+  if (isDripDeferred()) {
+    state.heapdiag.iDripCooldownSkipCount++;
+    return;
+  }
 
   // Scan pending bitmap for the next set bit
   for (uint8_t group = 0; group < 8; group++) {
@@ -1018,12 +1283,17 @@ void loopMQTTDiscovery()
       bool success = doAutoConfigureMsgid(msgId);
       if (success) {
         setMQTTConfigDone(msgId);
+        bitClear(MQTTautoCfgPendingMap[group], bit);
+        MQTTDebugTf(PSTR("[drip] OT ID %d published OK\r\n"), msgId);
+      } else {
+        // Leave pending bit set — next drip tick retries automatically.
+        // Rate-limited by the drip timer itself (2s normal, 10s slow-mode under
+        // heap pressure), so no busy-loop risk. Fixes the limbo where a failed
+        // publish used to drop the msgid until an external markAllMQTTConfigPending
+        // call arrived (TASK-348).
+        MQTTDebugTf(PSTR("[drip] OT ID %d publish failed, retaining pending\r\n"), msgId);
       }
-      // Clear pending regardless — if it failed (heap, broker down), the bit
-      // stays cleared to avoid busy-looping.  The JIT path or next
-      // markAllMQTTConfigPending() will re-queue it if still needed.
-      bitClear(MQTTautoCfgPendingMap[group], bit);
-      return;  // one per tick
+      return;  // one attempt per tick regardless of success
     }
   }
 }

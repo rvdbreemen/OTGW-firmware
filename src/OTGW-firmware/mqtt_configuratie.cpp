@@ -1676,6 +1676,7 @@ inline size_t strlcpy_P(char *dst, PGM_P src, size_t size) {
 // External functions from the .ino translation unit.
 extern bool canPublishMQTT();
 extern void feedWatchDog();
+extern void incPublishedTopicCount();   // ADR-062 / TASK-349: called after every successful retained discovery publish
 
 // ---------------------------------------------------------------------------
 // JSON streaming helpers
@@ -2009,6 +2010,7 @@ bool streamSensorDiscovery(PubSubClient &client,
 
   if (!client.endPublish()) return false;
 
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -2042,6 +2044,7 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
 
   if (!client.endPublish()) return false;
 
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -2170,6 +2173,7 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
 
   if (!client.endPublish()) return false;
 
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -2407,6 +2411,7 @@ bool streamClimateDiscovery(PubSubClient &client,
   }
 
   if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -2488,6 +2493,7 @@ bool streamNumberDiscovery(PubSubClient &client,
   }
 
   if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }

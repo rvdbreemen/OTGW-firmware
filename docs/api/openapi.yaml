@@ -64,6 +64,8 @@ tags:
     description: OTGW simulation mode control
   - name: Webhook
     description: Webhook testing
+  - name: Discovery
+    description: Retained MQTT auto-discovery verification and republish (ADR-062)
 
 paths:
   /v2/health:
@@ -999,6 +1001,228 @@ paths:
           description: Discovery accepted for processing
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/discovery:
+    get:
+      tags:
+        - Discovery
+      summary: Get discovery verification status, counters and settings
+      description: |
+        Returns the current state of the retained-discovery verification mechanism
+        introduced in 1.4.1 (ADR-062). This is an observational endpoint: it does
+        not start a verify run or publish anything. Use it to inspect whether a
+        verify window is currently active, when the last run completed, how many
+        retained configs were missing or orphaned on the last run, and whether
+        automatic daily verification is enabled.
+
+        This endpoint is distinct from `/v2/otgw/discovery`, which publishes all
+        Home Assistant discovery topics unconditionally.
+      operationId: getDiscoveryStatus
+      responses:
+        '200':
+          description: Discovery state retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - verification
+                  - counters
+                  - settings
+                properties:
+                  verification:
+                    type: object
+                    properties:
+                      active:
+                        type: boolean
+                        description: True while the 15-second verify window is open.
+                      last_epoch:
+                        type: integer
+                        format: uint32
+                        description: Unix-epoch timestamp of the last completed verify run (0 = never run since boot).
+                      last_missing:
+                        type: integer
+                        format: uint16
+                        description: Retained discovery topics expected but not observed on the last verify run.
+                      last_orphan:
+                        type: integer
+                        format: uint16
+                        description: Retained discovery topics observed under `<haprefix>/+/<other-nodeId>/#` that do not belong to this node. Informational only; orphans are never deleted by OTGW (see ADR-062).
+                  counters:
+                    type: object
+                    properties:
+                      published_topics:
+                        type: integer
+                        format: uint32
+                        description: Running count of discovery topics successfully published by the streaming helpers since boot (or since the last `clearMQTTConfigDone`).
+                      pending_ids:
+                        type: integer
+                        format: uint16
+                        description: Number of discovery IDs currently marked pending in the drip pipeline.
+                      verify_runs:
+                        type: integer
+                        format: uint32
+                        description: Lifetime count of verify windows started since boot.
+                      republish_triggered:
+                        type: integer
+                        format: uint32
+                        description: Lifetime count of verify runs that ended with `last_missing > 0` and triggered `markAllMQTTConfigPending()`.
+                  settings:
+                    type: object
+                    properties:
+                      auto_verify:
+                        type: boolean
+                        description: Reflects `settings.mqtt.bDiscoveryAutoVerify`. When true, a verify run is triggered automatically once per day at the day-flip boundary.
+              example:
+                verification:
+                  active: false
+                  last_epoch: 1745236800
+                  last_missing: 0
+                  last_orphan: 0
+                counters:
+                  published_topics: 82
+                  pending_ids: 0
+                  verify_runs: 4
+                  republish_triggered: 0
+                settings:
+                  auto_verify: true
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/discovery/verify:
+    post:
+      tags:
+        - Discovery
+      summary: Start a retained-discovery verification window
+      description: |
+        Opens a 15-second subscription window on `<haprefix>/+/<nodeId>/#` and
+        counts retained discovery configs seen against
+        `state.discovery.iPublishedTopicCount`. On completion the firmware
+        re-announces any missing configs via the drip. See ADR-062 for the full
+        mechanism.
+
+        The handler refuses to start the window under several conditions (see
+        error responses); in that case the caller should not retry immediately.
+      operationId: startDiscoveryVerify
+      security:
+        - basicAuth: []
+      responses:
+        '202':
+          description: Verification window started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [verification_started]
+                  expected:
+                    type: integer
+                    format: uint32
+                    description: Number of retained configs the firmware expects to see during the window.
+                  window_ms:
+                    type: integer
+                    description: Window duration in milliseconds (currently 15000).
+              example:
+                status: "verification_started"
+                expected: 82
+                window_ms: 15000
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '409':
+          description: Verification cannot start because discovery is busy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                alreadyActive:
+                  summary: Verify already running
+                  value:
+                    error:
+                      status: 409
+                      message: "Verification already active"
+                dripInProgress:
+                  summary: Discovery drip still publishing
+                  value:
+                    error:
+                      status: 409
+                      message: "Discovery drip in progress"
+        '503':
+          description: Verification cannot start because a precondition failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                mqttDown:
+                  summary: MQTT not connected
+                  value:
+                    error:
+                      status: 503
+                      message: "MQTT not connected"
+                lowHeap:
+                  summary: Free heap below start threshold
+                  value:
+                    error:
+                      status: 503
+                      message: "Heap too low for verify"
+                startRefused:
+                  summary: Verification layer refused the start (see telnet log)
+                  value:
+                    error:
+                      status: 503
+                      message: "Verification start refused (see telnet log)"
+
+  /v2/discovery/republish:
+    post:
+      tags:
+        - Discovery
+      summary: Mark all discovery IDs pending for immediate re-announce
+      description: |
+        Calls `markAllMQTTConfigPending()` directly, without running a verify
+        pass first. All discovery IDs are flagged pending and the drip will
+        re-publish them at its configured cadence.
+
+        Use this when you already know the broker's retained state is bad (for
+        example after a broker reinstall without persistence) and want to skip
+        the verify window. For normal troubleshooting, prefer
+        `POST /v2/discovery/verify`, which only triggers a republish when
+        retained configs are actually missing.
+      operationId: republishDiscovery
+      security:
+        - basicAuth: []
+      responses:
+        '200':
+          description: All discovery IDs marked pending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [marked_pending]
+                  count:
+                    type: integer
+                    format: uint16
+                    description: Number of discovery IDs now pending in the drip pipeline.
+              example:
+                status: "marked_pending"
+                count: 82
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '503':
+          description: MQTT is not connected; nothing was marked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error:
+                  status: 503
+                  message: "MQTT not connected"
 
   /v2/webhook/test:
     post:

@@ -394,6 +394,16 @@ Triggers a full MQTT autodiscovery cycle, sending all HA discovery configs from 
 {"status": "accepted"}
 ```
 
+#### Discovery verification and republish (v1.4.1+)
+
+Version 1.4.1 adds three endpoints under `/api/v2/discovery/` that complement the existing unconditional publish at `/api/v2/otgw/discovery`. They cover broker-side retained-state loss, which is invisible to the legacy MQTT reconnect and HA-restart recovery paths. See [ADR-062](../adr/ADR-062-retained-discovery-verification.md) for the mechanism rationale.
+
+- `GET /api/v2/discovery` — returns `verification.*` (active flag, last epoch, last missing and orphan counts), `counters.*` (published topics, pending IDs, verify runs, republishes triggered) and `settings.auto_verify`. Read-only; does not publish anything.
+- `POST /api/v2/discovery/verify` — subscribes to `<haprefix>/+/<nodeId>/#` for 15 seconds, counts retained configs that arrive, and calls `markAllMQTTConfigPending()` only when `received < expected`. Returns `202 Accepted` with `{status, expected, window_ms}` on success, `409` when a verify or drip is already in progress, and `503` when MQTT is down, heap is low, or the verification layer refuses to start.
+- `POST /api/v2/discovery/republish` — unconditionally marks every discovery ID pending in the drip pipeline. Use this only when you already know the broker's retained state is bad, for example after a broker reinstall without persistence. Returns `200 OK` with `{status, count}` or `503` when MQTT is down.
+
+For normal troubleshooting prefer the verify endpoint: it only re-announces when something is actually missing and avoids a full flood of ~80 retained messages.
+
 ---
 
 ### Sensors

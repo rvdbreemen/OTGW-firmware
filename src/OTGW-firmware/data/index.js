@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.4.0-beta
+**  Version  : v1.4.1-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4833,6 +4833,22 @@ var translateFields = [
   , ["macaddress", "MAC Address"]
   , ["freeheap", "Free Heap Memory (bytes)"]
   , ["maxfreeblock", "Max. Free Block (bytes)"]
+  , ["hd_fragmentation_pct", "Heap Fragmentation (%)"]
+  , ["hd_ws_drops", "WebSocket Drops (since boot)"]
+  , ["hd_mqtt_drops", "MQTT Drops (since boot)"]
+  , ["hd_enter_low", "Heap Entered LOW (count)"]
+  , ["hd_enter_warning", "Heap Entered WARNING (count)"]
+  , ["hd_enter_critical", "Heap Entered CRITICAL (count)"]
+  , ["hd_drip_burst_skip", "Discovery Drip Skipped (active burst)"]
+  , ["hd_drip_cooldown_skip", "Discovery Drip Skipped (cooldown)"]
+  , ["hd_drip_slowmode", "Discovery Drip Slow-mode (count)"]
+  , ["disc_published_topics", "Discovery Topics Published"]
+  , ["disc_pending_ids", "Discovery IDs Pending"]
+  , ["disc_verify_runs", "Discovery Verify Runs"]
+  , ["disc_republish_triggered", "Discovery Republish Triggered (count)"]
+  , ["disc_last_missing", "Discovery Last Missing Count"]
+  , ["disc_last_orphan", "Discovery Last Orphan Count"]
+  , ["MQTTdiscoveryAutoVerify", "MQTT Discovery Daily Auto-Verify"]
   , ["chipid", "Unique Chip ID"]
   , ["coreversion", "Arduino Core Version"]
   , ["sdkversion", "Espressif SDK Version"]

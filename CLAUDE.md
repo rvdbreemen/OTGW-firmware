@@ -437,6 +437,19 @@ A task is **Done** only when **ALL** of the following are complete:
 
 ⚠️ **NEVER mark a task as Done without completing ALL items above**
 
+### ✅ Autonomous completion
+
+When you (or any agent you spawn) have satisfied ALL 8 items above — every AC checked, every DoD item checked, Final Summary added, build/tests pass, code self-reviewed, no regressions — **set the status to Done immediately**. Do not leave the task at "In Progress" waiting for the user to review and flip it.
+
+Rationale: if the AC list is well-designed, "all ACs checked" already means "the task is objectively done". Treating the user's review as a gating step doubles the turnaround on completed work. The user audits after the fact via Final Summary and git log, not by polling task status.
+
+**Exceptions** (leave at "In Progress" only if any of these applies):
+- An AC genuinely cannot be self-verified (hardware-specific tester feedback, explicit user sign-off as a policy step, third-party integration approval). Document which AC is blocking in the Final Summary.
+- A DoD item is unmet (build failed, regression detected, test missing that the AC requires).
+- The task is one of a coordinated set where status transitions must wait for a sibling (rare; note in Final Summary).
+
+If you're unsure whether an AC is self-verifiable, prefer to **attempt** the verification rather than preemptively deferring to the user. Trust the AC list; if an AC was truly unverifiable, it shouldn't have been an AC in the first place.
+
 ---
 
 ## 8. Finding Tasks and Content with Search
