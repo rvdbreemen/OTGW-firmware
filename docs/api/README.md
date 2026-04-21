@@ -52,7 +52,8 @@ Optional HTTP Basic Auth. When a password is configured in device settings, muta
 
 - Settings: `GET/POST/PUT /api/v2/settings`
 - OTGW commands: `POST /api/v2/otgw/commands`, `POST /api/v2/otgw/command/{cmd}`
-- MQTT discovery: `POST /api/v2/otgw/discovery`, `POST /api/v2/otgw/autoconfigure`
+- MQTT discovery (legacy trigger): `POST /api/v2/otgw/discovery`, `POST /api/v2/otgw/autoconfigure`
+- Discovery verification and republish: `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`
 - Simulation: `POST /api/v2/simulate/start`, `POST /api/v2/simulate/stop`
 - Webhook test: `POST /api/v2/webhook/test`
 - File management, reboot, reset, and OTA update endpoints
@@ -174,10 +175,50 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "otdschedtotal": 12,
     "otdschedactive": 11,
     "otdscheddisabled": 1,
-    "otdoverrides": 0
+    "otdoverrides": 0,
+    "hd_fragmentation_pct": 12,
+    "hd_ws_drops": 0,
+    "hd_mqtt_drops": 0,
+    "hd_enter_low": 1,
+    "hd_enter_warning": 0,
+    "hd_enter_critical": 0,
+    "hd_drip_burst_skip": 0,
+    "hd_drip_cooldown_skip": 0,
+    "hd_drip_slowmode": 0,
+    "disc_published_topics": 142,
+    "disc_pending_ids": 0,
+    "disc_verify_runs": 3,
+    "disc_republish_triggered": 0,
+    "disc_last_missing": 0,
+    "disc_last_orphan": 0
   }
 }
 ```
+
+**Heap diagnostics fields** (`hd_*`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `hd_fragmentation_pct` | integer | Heap fragmentation percentage |
+| `hd_ws_drops` | integer | WebSocket messages dropped due to heap pressure (cumulative) |
+| `hd_mqtt_drops` | integer | MQTT messages dropped due to heap pressure (cumulative) |
+| `hd_enter_low` | integer | Transitions into HEAP_LOW tier (cumulative) |
+| `hd_enter_warning` | integer | Transitions into HEAP_WARNING tier (cumulative) |
+| `hd_enter_critical` | integer | Transitions into HEAP_CRITICAL tier (cumulative) |
+| `hd_drip_burst_skip` | integer | Discovery drip ticks skipped during status burst (cumulative) |
+| `hd_drip_cooldown_skip` | integer | Discovery drip ticks skipped in post-burst cooldown (cumulative) |
+| `hd_drip_slowmode` | integer | Transitions to slow-mode drip due to heap pressure (cumulative) |
+
+**Discovery counters** (`disc_*`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `disc_published_topics` | integer | HA discovery topics published since last reboot |
+| `disc_pending_ids` | integer | Number of message IDs pending discovery publish |
+| `disc_verify_runs` | integer | Lifetime discovery verify run counter |
+| `disc_republish_triggered` | integer | Lifetime count of verify runs that triggered re-publish |
+| `disc_last_missing` | integer | Last verify run: expected minus received |
+| `disc_last_orphan` | integer | Last verify run: foreign nodeId retained configs observed |
 
 The `otcommandinterface` field is `true` when either a PIC or OT-direct hardware interface is present and active.
 
@@ -469,6 +510,78 @@ Produced entity categories:
 ```json
 {"status": "accepted"}
 ```
+
+---
+
+### Discovery Verification
+
+#### `GET /api/v2/discovery`
+
+Returns the current discovery verification status and counters.
+
+**Authentication**: Not required
+
+**Response** `200 OK`:
+```json
+{
+  "verification": {
+    "active": false,
+    "last_epoch": 1713700000,
+    "last_missing": 0,
+    "last_orphan": 0
+  },
+  "counters": {
+    "published_topics": 142,
+    "pending_ids": 0,
+    "verify_runs": 3,
+    "republish_triggered": 0
+  },
+  "settings": {
+    "auto_verify": true
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `verification.active` | boolean | Whether a verification window is currently running |
+| `verification.last_epoch` | integer | Unix timestamp of the last completed verification run (0 if never run) |
+| `verification.last_missing` | integer | Last verify run: expected topics not confirmed received |
+| `verification.last_orphan` | integer | Last verify run: foreign nodeId retained configs observed |
+| `counters.published_topics` | integer | HA discovery topics published since last reboot |
+| `counters.pending_ids` | integer | Message IDs currently pending discovery publish |
+| `counters.verify_runs` | integer | Lifetime count of completed verify runs |
+| `counters.republish_triggered` | integer | Lifetime count of verify runs that triggered a full re-publish |
+| `settings.auto_verify` | boolean | Whether automatic daily verification is enabled |
+
+#### `POST /api/v2/discovery/verify`
+
+Starts a discovery verification window (15 seconds). During the window, the firmware listens for MQTT retain confirmations from the broker and compares them against expected discovery topics.
+
+**Authentication**: Not required
+
+**Response** `200 OK` (verification started):
+```json
+{"status": "started"}
+```
+
+**Response** `503 Service Unavailable` (refused): Returned when verification cannot start because one of the following conditions is true: a verification window is already active, MQTT is disconnected, free heap is too low, or a discovery drip is pending.
+
+#### `POST /api/v2/discovery/republish`
+
+Forces a full re-announcement of all HA discovery configs. Marks all known message IDs as pending; the drip publisher then works through them at the normal pace.
+
+**Authentication**: Not required
+
+**Response** `200 OK`:
+```json
+{"status": "marked_pending", "count": 142}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Always `"marked_pending"` on success |
+| `count` | integer | Number of discovery configs marked for re-publish |
 
 ---
 

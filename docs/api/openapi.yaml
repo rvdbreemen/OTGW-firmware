@@ -73,6 +73,11 @@ tags:
 
       SAT endpoints are available on all builds but will return an error if SAT is not
       compiled in or not enabled.
+  - name: Discovery Verification
+    description: |
+      Discovery verification endpoints allow querying the HA MQTT discovery status and
+      triggering on-demand verification or full re-announcement. These endpoints expose
+      the counters and state managed by the discovery drip publisher (ADR-077).
   - name: OT Direct (OTGW32)
     description: |
       OT Direct endpoints are only available on OTGW32 hardware (`HAS_DIRECT_OT=1`).
@@ -497,6 +502,53 @@ paths:
                       otdoverrides:
                         type: integer
                         description: Number of active write-override slots
+                      # Heap diagnostics fields (hd_*) - added in 1.4.1
+                      hd_fragmentation_pct:
+                        type: integer
+                        description: Heap fragmentation percentage
+                      hd_ws_drops:
+                        type: integer
+                        description: WebSocket messages dropped due to heap pressure (cumulative)
+                      hd_mqtt_drops:
+                        type: integer
+                        description: MQTT messages dropped due to heap pressure (cumulative)
+                      hd_enter_low:
+                        type: integer
+                        description: Transitions into HEAP_LOW tier (cumulative)
+                      hd_enter_warning:
+                        type: integer
+                        description: Transitions into HEAP_WARNING tier (cumulative)
+                      hd_enter_critical:
+                        type: integer
+                        description: Transitions into HEAP_CRITICAL tier (cumulative)
+                      hd_drip_burst_skip:
+                        type: integer
+                        description: Discovery drip ticks skipped during status burst (cumulative)
+                      hd_drip_cooldown_skip:
+                        type: integer
+                        description: Discovery drip ticks skipped in post-burst cooldown (cumulative)
+                      hd_drip_slowmode:
+                        type: integer
+                        description: Transitions to slow-mode drip due to heap pressure (cumulative)
+                      # Discovery counters (disc_*) - added in 1.4.1
+                      disc_published_topics:
+                        type: integer
+                        description: HA discovery topics published since last reboot
+                      disc_pending_ids:
+                        type: integer
+                        description: Number of message IDs pending discovery publish
+                      disc_verify_runs:
+                        type: integer
+                        description: Lifetime discovery verify run counter
+                      disc_republish_triggered:
+                        type: integer
+                        description: Lifetime count of verify runs that triggered re-publish
+                      disc_last_missing:
+                        type: integer
+                        description: Last verify run: expected minus received
+                      disc_last_orphan:
+                        type: integer
+                        description: Last verify run: foreign nodeId retained configs observed
               examples:
                 example:
                   value:
@@ -1830,6 +1882,143 @@ paths:
       responses:
         '202':
           description: Discovery accepted for processing
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  # Discovery verification endpoints (1.4.1+)
+
+  /v2/discovery:
+    get:
+      tags:
+        - Discovery Verification
+      summary: Get discovery verification status and counters
+      description: |
+        Returns the current state of the MQTT HA discovery subsystem including the
+        active verification window state, lifetime counters, and auto-verify setting.
+      operationId: getDiscoveryStatus
+      responses:
+        '200':
+          description: Discovery status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  verification:
+                    type: object
+                    properties:
+                      active:
+                        type: boolean
+                        description: Whether a verification window is currently running
+                      last_epoch:
+                        type: integer
+                        description: Unix timestamp of the last completed verification run (0 if never run)
+                      last_missing:
+                        type: integer
+                        description: Last verify run: expected topics not confirmed received
+                      last_orphan:
+                        type: integer
+                        description: Last verify run: foreign nodeId retained configs observed
+                  counters:
+                    type: object
+                    properties:
+                      published_topics:
+                        type: integer
+                        description: HA discovery topics published since last reboot
+                      pending_ids:
+                        type: integer
+                        description: Message IDs currently pending discovery publish
+                      verify_runs:
+                        type: integer
+                        description: Lifetime count of completed verify runs
+                      republish_triggered:
+                        type: integer
+                        description: Lifetime count of verify runs that triggered a full re-publish
+                  settings:
+                    type: object
+                    properties:
+                      auto_verify:
+                        type: boolean
+                        description: Whether automatic daily verification is enabled
+              example:
+                verification:
+                  active: false
+                  last_epoch: 1713700000
+                  last_missing: 0
+                  last_orphan: 0
+                counters:
+                  published_topics: 142
+                  pending_ids: 0
+                  verify_runs: 3
+                  republish_triggered: 0
+                settings:
+                  auto_verify: true
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/discovery/verify:
+    post:
+      tags:
+        - Discovery Verification
+      summary: Start a discovery verification window
+      description: |
+        Starts a 15-second discovery verification window. During the window the
+        firmware listens for MQTT retain confirmations from the broker and compares
+        them against expected discovery topics.
+
+        Returns `503` if verification cannot start because one of the following
+        conditions holds: a window is already active, MQTT is disconnected, free
+        heap is too low, or a discovery drip is pending.
+      operationId: startDiscoveryVerify
+      responses:
+        '200':
+          description: Verification window started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [started]
+              example:
+                status: "started"
+        '503':
+          description: Verification refused (already active, MQTT disconnected, heap too low, or drip pending)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/discovery/republish:
+    post:
+      tags:
+        - Discovery Verification
+      summary: Force full re-announcement of all HA discovery configs
+      description: |
+        Marks all known message IDs as pending for the drip publisher, triggering a
+        full re-announcement of all HA discovery configurations at the normal drip
+        pace (one every 3 seconds, slowed to 30 seconds under heap pressure).
+      operationId: triggerDiscoveryRepublish
+      responses:
+        '200':
+          description: All discovery configs marked pending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [marked_pending]
+                  count:
+                    type: integer
+                    description: Number of discovery configs marked for re-publish
+              example:
+                status: "marked_pending"
+                count: 142
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 

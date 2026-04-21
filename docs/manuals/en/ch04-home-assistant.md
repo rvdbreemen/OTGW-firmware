@@ -74,6 +74,7 @@ Open the OTGW-firmware web UI and go to the Settings page. The MQTT section has 
 | HA Discovery Prefix | `homeassistant` | Must match the discovery prefix in HA MQTT integration |
 | Device Manufacturer | `NodoShop` | Shown in the HA device info block. Editable. |
 | Device Model | `OTGW` | Shown in the HA device info block. Editable. |
+| HA Discovery Auto-Verify | `true` | When enabled, the firmware checks once per day whether all expected HA discovery configs are still retained in the broker and re-publishes any that are missing. This automatic self-heal prevents entities going unavailable after broker restarts. |
 
 The manufacturer and model are now configurable so the same firmware can be labelled correctly when it runs on different hardware variants (classic NodoShop OTGW, ESP32 OT-Shield, etc.). These values appear in Home Assistant under Settings > Devices and Services > MQTT > OTGW. As a small nod to the origin of the project, a separate `otgw-pic/designer` topic is always published with the value `Schelte Bron`, to credit the original PIC firmware author.
 
@@ -123,6 +124,38 @@ The firmware publishes a birth/last-will message at the root of the publish name
 OTGW/value/otgw-AABBCCDDEEFF   →  "online"  (retained, published on connect)
 OTGW/value/otgw-AABBCCDDEEFF   →  "offline" (retained, last will on disconnect)
 ```
+
+#### Diagnostic topics
+
+The firmware publishes a heap and discovery statistics snapshot once per hour to:
+
+```
+{TopTopic}/otgw-firmware/stats/heap
+```
+
+The payload is a retained JSON object with 17 fields:
+
+| Field | Description |
+|---|---|
+| `free_heap` | Current free heap in bytes |
+| `max_block` | Largest allocatable contiguous block in bytes |
+| `frag_pct` | Heap fragmentation percentage |
+| `ws_drops` | WebSocket messages dropped due to heap pressure |
+| `mqtt_drops` | MQTT publishes dropped due to heap pressure |
+| `enter_low` | Number of times heap entered LOW state |
+| `enter_warning` | Number of times heap entered WARNING state |
+| `enter_critical` | Number of times heap entered CRITICAL state |
+| `drip_burst_skip` | Discovery drip cycles skipped during post-Status-burst cooldown |
+| `drip_cooldown_skip` | Discovery drip cycles skipped during heap-pressure cooldown |
+| `drip_slowmode` | Number of discovery drip cycles run in slow mode (10 s interval) |
+| `disc_verify_runs` | Number of daily discovery verification runs completed |
+| `disc_republish_triggered` | Number of times a verification found missing configs and triggered re-publish |
+| `disc_last_missing` | Count of missing discovery configs found in the most recent verification |
+| `disc_last_orphan` | Count of orphan (unexpected) retained discovery topics found in the most recent verification |
+| `disc_published_topics` | Total number of discovery topics currently tracked |
+| `disc_last_verify_epoch` | Unix timestamp of the most recent verification run |
+
+This topic is useful for monitoring long-running installations: low `free_heap`, rising `frag_pct`, or repeated `enter_critical` counts are early indicators that a nightly restart is advisable.
 
 ---
 
@@ -203,10 +236,11 @@ Every `stream*Discovery` function checks free heap (`STREAM_HEAP_MIN = 4000` byt
 
 #### Re-discovery triggers
 
-The firmware re-publishes all discovery configurations in two situations:
+The firmware re-publishes all discovery configurations in three situations:
 
 1. **Firmware boot or MQTT settings change.** The bitmap is cleared and `doAutoConfigure()` streams every entity.
 2. **Home Assistant restart.** The firmware monitors `homeassistant/status`. When HA comes back online, `doAutoConfigure()` is called again.
+3. **Daily auto-verification (when `MQTTdiscoveryAutoVerify` is enabled).** Once per day the firmware checks whether all expected discovery configs are still retained in the broker. If any are missing, it re-publishes them. This self-heal prevents HA entities going unavailable after a broker restart that cleared retained messages.
 
 On a simple MQTT reconnect (for example a brief network interruption) discovery is *not* re-run. The broker retains the discovery messages, so re-publishing on every reconnect would be unnecessary.
 

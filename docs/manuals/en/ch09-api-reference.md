@@ -237,6 +237,26 @@ On OTGW32 hardware: the `otdirectavailable` field is `true`, and additional `otd
 
 The `otcommandinterface` field is `true` when either a PIC or OT-direct hardware interface is present and active.
 
+The response also includes heap diagnostics (`hd_*`) and discovery counter (`disc_*`) fields added in firmware 1.4.1:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `hd_fragmentation_pct` | integer | Heap fragmentation percentage |
+| `hd_ws_drops` | integer | WebSocket messages dropped due to heap pressure (cumulative) |
+| `hd_mqtt_drops` | integer | MQTT messages dropped due to heap pressure (cumulative) |
+| `hd_enter_low` | integer | Transitions into HEAP_LOW tier (cumulative) |
+| `hd_enter_warning` | integer | Transitions into HEAP_WARNING tier (cumulative) |
+| `hd_enter_critical` | integer | Transitions into HEAP_CRITICAL tier (cumulative) |
+| `hd_drip_burst_skip` | integer | Discovery drip ticks skipped during status burst (cumulative) |
+| `hd_drip_cooldown_skip` | integer | Discovery drip ticks skipped in post-burst cooldown (cumulative) |
+| `hd_drip_slowmode` | integer | Transitions to slow-mode drip due to heap pressure (cumulative) |
+| `disc_published_topics` | integer | HA discovery topics published since last reboot |
+| `disc_pending_ids` | integer | Message IDs pending discovery publish |
+| `disc_verify_runs` | integer | Lifetime discovery verify run counter |
+| `disc_republish_triggered` | integer | Lifetime count of verify runs that triggered re-publish |
+| `disc_last_missing` | integer | Last verify run: expected minus received |
+| `disc_last_orphan` | integer | Last verify run: foreign nodeId retained configs observed |
+
 ##### GET /api/v2/device/time
 
 Returns current device time.
@@ -355,6 +375,78 @@ Force a full Home Assistant MQTT auto-discovery republish. Authentication requir
 Discovery uses an async bitmap-driven drip publisher: all message IDs are marked pending, then published one at a time from the main loop at a controlled pace (see "MQTT Discovery Drip Publisher" below). This avoids a burst of 200+ messages that could exhaust heap or overwhelm the broker.
 
 Alias: `POST /api/v2/otgw/autoconfigure`
+
+---
+
+#### Discovery Verification
+
+Added in firmware 1.4.1.
+
+##### GET /api/v2/discovery
+
+Returns the current HA discovery subsystem state including verification status, counters, and auto-verify setting. No authentication required.
+
+**Response:**
+
+```json
+{
+  "verification": {
+    "active": false,
+    "last_epoch": 1713700000,
+    "last_missing": 0,
+    "last_orphan": 0
+  },
+  "counters": {
+    "published_topics": 142,
+    "pending_ids": 0,
+    "verify_runs": 3,
+    "republish_triggered": 0
+  },
+  "settings": {
+    "auto_verify": true
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `verification.active` | Whether a verification window is currently running |
+| `verification.last_epoch` | Unix timestamp of the last completed verify run (0 if never run) |
+| `verification.last_missing` | Last verify run: expected topics not confirmed received |
+| `verification.last_orphan` | Last verify run: foreign nodeId retained configs observed |
+| `counters.published_topics` | HA discovery topics published since last reboot |
+| `counters.pending_ids` | Message IDs currently pending discovery publish |
+| `counters.verify_runs` | Lifetime count of completed verify runs |
+| `counters.republish_triggered` | Lifetime count of verify runs that triggered a full re-publish |
+| `settings.auto_verify` | Whether automatic daily verification is enabled |
+
+##### POST /api/v2/discovery/verify
+
+Starts a 15-second discovery verification window. The firmware listens for MQTT retain confirmations from the broker and compares them against expected discovery topics.
+
+**Request:** No body required. No authentication required.
+
+**Response (HTTP 200):**
+
+```json
+{"status": "started"}
+```
+
+**Response (HTTP 503):** Returned when verification is refused because a window is already active, MQTT is disconnected, free heap is too low, or a discovery drip is pending.
+
+##### POST /api/v2/discovery/republish
+
+Forces a full re-announcement of all HA discovery configs. All known message IDs are marked pending; the drip publisher then works through them at normal pace.
+
+**Request:** No body required. No authentication required.
+
+**Response (HTTP 200):**
+
+```json
+{"status": "marked_pending", "count": 142}
+```
+
+The `count` field indicates how many discovery configs were queued for re-publish.
 
 ---
 

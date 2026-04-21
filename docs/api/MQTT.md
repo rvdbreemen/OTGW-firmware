@@ -58,6 +58,62 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 | `otgw-firmware/network_mode` | `"wifi"` / `"ethernet"` / `"ap"` | Active network mode |
 | `otgw-firmware/error` | `"LittleFS mount failed..."` | Error messages (not retained, only when applicable) |
 
+### Heap and System Diagnostics
+
+Published hourly (on the first 60-second tick after the hour changes). Retained.
+
+| Topic | Retained | Description |
+| ----- | -------- | ----------- |
+| `otgw-firmware/stats/heap` | yes | JSON object with heap health, MQTT/WebSocket drop counters, and HA discovery statistics |
+
+The payload is a retained JSON object:
+
+```json
+{
+  "ws_drops": 0,
+  "mqtt_drops": 0,
+  "enter_low": 0,
+  "enter_warning": 0,
+  "enter_critical": 0,
+  "drip_burst_skip": 0,
+  "drip_cooldown_skip": 0,
+  "drip_slowmode": 0,
+  "free_heap": 34512,
+  "max_block": 28000,
+  "frag_pct": 5,
+  "disc_verify_runs": 2,
+  "disc_republish_triggered": 0,
+  "disc_last_missing": 0,
+  "disc_last_orphan": 0,
+  "disc_published_topics": 142,
+  "disc_last_verify_epoch": 1713700000
+}
+```
+
+| Field | Description |
+| ----- | ----------- |
+| `ws_drops` | WebSocket messages dropped due to low heap since last reboot |
+| `mqtt_drops` | MQTT publishes suppressed by heap backpressure since last reboot |
+| `enter_low` | Number of times heap entered the low-heap threshold zone since last reboot |
+| `enter_warning` | Number of times heap entered the warning threshold zone since last reboot |
+| `enter_critical` | Number of times heap entered the critical threshold zone since last reboot |
+| `drip_burst_skip` | Discovery drip-publish cycles skipped due to burst limiting since last reboot |
+| `drip_cooldown_skip` | Discovery drip-publish cycles skipped due to cooldown since last reboot |
+| `drip_slowmode` | Number of times the drip publisher switched to slow mode (30 s interval) due to heap pressure since last reboot |
+| `free_heap` | Free heap in bytes at publish time |
+| `max_block` | Largest contiguous free heap block in bytes at publish time |
+| `frag_pct` | Heap fragmentation percentage at publish time: `(1 - max_block / free_heap) * 100` |
+| `disc_verify_runs` | Number of HA discovery verification runs completed since last reboot |
+| `disc_republish_triggered` | Number of times a verification run triggered a re-publish of missing or orphaned topics since last reboot |
+| `disc_last_missing` | Number of missing topics found in the most recent verification run |
+| `disc_last_orphan` | Number of orphaned (stale) topics found in the most recent verification run |
+| `disc_published_topics` | Total number of discovery topics published in the most recent verification run |
+| `disc_last_verify_epoch` | Unix timestamp of the most recent verification run (0 = never verified) |
+
+All counters reset on reboot.
+
+---
+
 ### PIC Gateway Information
 
 Published at startup, on MQTT (re)connect, and every 5 minutes.

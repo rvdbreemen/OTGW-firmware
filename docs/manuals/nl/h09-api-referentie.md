@@ -230,6 +230,75 @@ Discovery gebruikt een asynchrone bitmap-gestuurde drip publisher: alle bericht-
 
 ---
 
+#### Discovery-verificatie
+
+Toegevoegd in firmware 1.4.1.
+
+##### GET /api/v2/discovery
+
+De huidige status van het HA discovery-subsysteem opvragen, inclusief verificatiestatus, tellers en de auto-verify-instelling. Geen authenticatie vereist.
+
+**Antwoord:**
+```json
+{
+  "verification": {
+    "active": false,
+    "last_epoch": 1713700000,
+    "last_missing": 0,
+    "last_orphan": 0
+  },
+  "counters": {
+    "published_topics": 142,
+    "pending_ids": 0,
+    "verify_runs": 3,
+    "republish_triggered": 0
+  },
+  "settings": {
+    "auto_verify": true
+  }
+}
+```
+
+| Veld | Beschrijving |
+|------|-------------|
+| `verification.active` | Of er momenteel een verificatievenster actief is |
+| `verification.last_epoch` | Unix-tijdstempel van de laatste voltooide verify-run (0 indien nooit uitgevoerd) |
+| `verification.last_missing` | Laatste verify-run: verwachte topics die niet bevestigd zijn ontvangen |
+| `verification.last_orphan` | Laatste verify-run: retained configs van vreemde nodeId waargenomen |
+| `counters.published_topics` | HA discovery-topics gepubliceerd sinds laatste herstart |
+| `counters.pending_ids` | Bericht-ID's in afwachting van discovery-publicatie |
+| `counters.verify_runs` | Levenslange teller voor voltooide verify-runs |
+| `counters.republish_triggered` | Levenslange teller voor verify-runs die een volledige herpublicatie activeerden |
+| `settings.auto_verify` | Of automatische dagelijkse verificatie is ingeschakeld |
+
+##### POST /api/v2/discovery/verify
+
+Start een verificatievenster van 15 seconden. De firmware luistert naar MQTT retain-bevestigingen van de broker en vergelijkt deze met de verwachte discovery-topics.
+
+**Verzoek:** geen parameters, geen authenticatie vereist.
+
+**Antwoord (HTTP 200):**
+```json
+{"status": "started"}
+```
+
+**Antwoord (HTTP 503):** Geretourneerd wanneer verificatie wordt geweigerd omdat er al een venster actief is, MQTT niet verbonden is, het vrije heap-geheugen te laag is of een discovery drip lopende is.
+
+##### POST /api/v2/discovery/republish
+
+Forceert een volledige herpublicatie van alle HA discovery-configuraties. Alle bekende bericht-ID's worden als "pending" gemarkeerd; de drip publisher werkt deze vervolgens op normaal tempo af.
+
+**Verzoek:** geen parameters, geen authenticatie vereist.
+
+**Antwoord (HTTP 200):**
+```json
+{"status": "marked_pending", "count": 142}
+```
+
+Het veld `count` geeft aan hoeveel discovery-configuraties in de wachtrij zijn geplaatst voor herpublicatie.
+
+---
+
 #### GET /api/v2/otgw/otmonitor
 
 Alle huidige OpenTherm-waarden opvragen in gestructureerd key-value formaat. Elk veld bevat waarde, eenheid en laatste update-tijdstempel. Compatibel met Telegraf en OTmonitor.
@@ -344,6 +413,26 @@ Apparaatinformatie opvragen (firmware, hardware, netwerk). Geen authenticatie ve
 Op OTGW32-hardware: het veld `otdirectavailable` is `true` en aanvullende `otd*`-velden zijn aanwezig (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`).
 
 Het veld `otcommandinterface` is `true` wanneer een PIC- of OT-direct-interface aanwezig en actief is.
+
+Het antwoord bevat ook heap-diagnostiekvelden (`hd_*`) en discovery-tellers (`disc_*`), toegevoegd in firmware 1.4.1:
+
+| Veld | Type | Beschrijving |
+|------|------|-------------|
+| `hd_fragmentation_pct` | integer | Heap-fragmentatiepercentage |
+| `hd_ws_drops` | integer | WebSocket-berichten verwijderd vanwege heap-druk (cumulatief) |
+| `hd_mqtt_drops` | integer | MQTT-berichten verwijderd vanwege heap-druk (cumulatief) |
+| `hd_enter_low` | integer | Overgangen naar HEAP_LOW-niveau (cumulatief) |
+| `hd_enter_warning` | integer | Overgangen naar HEAP_WARNING-niveau (cumulatief) |
+| `hd_enter_critical` | integer | Overgangen naar HEAP_CRITICAL-niveau (cumulatief) |
+| `hd_drip_burst_skip` | integer | Discovery drip-ticks overgeslagen tijdens status burst (cumulatief) |
+| `hd_drip_cooldown_skip` | integer | Discovery drip-ticks overgeslagen in post-burst cooldown (cumulatief) |
+| `hd_drip_slowmode` | integer | Overgangen naar slow-mode drip vanwege heap-druk (cumulatief) |
+| `disc_published_topics` | integer | HA discovery-topics gepubliceerd sinds laatste herstart |
+| `disc_pending_ids` | integer | Bericht-ID's in afwachting van discovery-publicatie |
+| `disc_verify_runs` | integer | Levenslange teller voor discovery verify-runs |
+| `disc_republish_triggered` | integer | Levenslange teller voor verify-runs die een volledige herpublicatie activeerden |
+| `disc_last_missing` | integer | Laatste verify-run: verwacht minus ontvangen |
+| `disc_last_orphan` | integer | Laatste verify-run: retained configs van vreemde nodeId waargenomen |
 
 ---
 

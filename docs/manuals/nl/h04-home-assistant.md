@@ -57,6 +57,7 @@ Als u al een zelfstandige Mosquitto-installatie, EMQX, HiveMQ of een andere brok
 | HA Prefix | Auto-discovery topic-prefix | `homeassistant` |
 | Device Manufacturer | Fabrikant in HA device block | `NodoShop` |
 | Device Model | Modelnaam in HA device block | `OTGW` |
+| HA Discovery Auto-Verify | Automatische dagelijkse verificatie of alle verwachte HA discovery-configuraties nog in de broker aanwezig zijn; publiceert ontbrekende configs opnieuw. Voorkomt dat entiteiten offline gaan na een broker-herstart. | aangevinkt |
 
 4. Klik op **Opslaan**.
 
@@ -155,6 +156,38 @@ OTGW/set/otgw-AABBCCDDEEFF/otgwcmnd       → "TT=21.00"
 
 Home Assistant gebruikt het `online`/`offline`-bericht om de beschikbaarheidsstatus van het apparaat bij te houden.
 
+#### Diagnostische topics
+
+De firmware publiceert eenmaal per uur een heap- en discovery-statistiekenoverzicht naar:
+
+```
+{TopTopic}/otgw-firmware/stats/heap
+```
+
+De payload is een retained JSON-object met 17 velden:
+
+| Veld | Omschrijving |
+|---|---|
+| `free_heap` | Vrij heap-geheugen in bytes |
+| `max_block` | Grootste aaneengesloten alloceerbaar blok in bytes |
+| `frag_pct` | Heap-fragmentatiepercentage |
+| `ws_drops` | WebSocket-berichten laten vallen vanwege heap-druk |
+| `mqtt_drops` | MQTT-publicaties laten vallen vanwege heap-druk |
+| `enter_low` | Aantal keren dat de heap in LOW-toestand terechtkwam |
+| `enter_warning` | Aantal keren dat de heap in WARNING-toestand terechtkwam |
+| `enter_critical` | Aantal keren dat de heap in CRITICAL-toestand terechtkwam |
+| `drip_burst_skip` | Discovery drip-cycli overgeslagen tijdens post-Status-burst-cooldown |
+| `drip_cooldown_skip` | Discovery drip-cycli overgeslagen tijdens heap-druk-cooldown |
+| `drip_slowmode` | Aantal discovery drip-cycli uitgevoerd in slow mode (interval 10 s) |
+| `disc_verify_runs` | Aantal voltooide dagelijkse discovery-verificatieruns |
+| `disc_republish_triggered` | Aantal keren dat een verificatie ontbrekende configs vond en heruitgave triggerde |
+| `disc_last_missing` | Aantal ontbrekende discovery-configs bij de meest recente verificatie |
+| `disc_last_orphan` | Aantal onverwachte retained discovery-topics bij de meest recente verificatie |
+| `disc_published_topics` | Totaal aantal bijgehouden discovery-topics |
+| `disc_last_verify_epoch` | Unix-tijdstempel van de meest recente verificatierun |
+
+Dit topic is nuttig voor het bewaken van langlopende installaties: een lage `free_heap`, stijgende `frag_pct` of herhaalde `enter_critical`-tellers zijn vroege signalen dat een nachtelijke herstart aan te raden is.
+
 ---
 
 ### Home Assistant auto-discovery
@@ -214,10 +247,11 @@ Elke `stream*Discovery`-functie controleert de vrije heap (`STREAM_HEAP_MIN = 40
 
 #### Wanneer wordt discovery opnieuw uitgevoerd?
 
-De firmware publiceert alle discovery-configuraties opnieuw in twee situaties:
+De firmware publiceert alle discovery-configuraties opnieuw in drie situaties:
 
 1. **Firmware-opstart of wijziging van MQTT-instellingen.** De bitmap wordt gewist en `doAutoConfigure()` streamt elke entiteit.
 2. **Home Assistant herstart.** De firmware bewaakt `homeassistant/status`. Wanneer HA weer online komt, wordt `doAutoConfigure()` opnieuw aangeroepen.
+3. **Dagelijkse automatische verificatie (wanneer `MQTTdiscoveryAutoVerify` is ingeschakeld).** Eenmaal per dag controleert de firmware of alle verwachte discovery-configuraties nog retained aanwezig zijn in de broker. Ontbrekende configs worden automatisch opnieuw gepubliceerd. Dit zelfherstellend mechanisme voorkomt dat HA-entiteiten onbeschikbaar worden na een broker-herstart waarbij retained berichten verloren zijn gegaan.
 
 Bij een eenvoudige MQTT-herverbinding (bijvoorbeeld een korte netwerkonderbreking) wordt discovery *niet* opnieuw uitgevoerd. De broker bewaart de discovery-berichten (retained), dus opnieuw publiceren bij elke herverbinding zou onnodig zijn.
 
