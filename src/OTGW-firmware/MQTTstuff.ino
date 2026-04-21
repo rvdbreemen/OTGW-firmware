@@ -1195,6 +1195,12 @@ void markAllMQTTConfigPending()
 // with the next drip alloc. Pressure trigger is HEAP_LOW (not WARNING): the
 // drip MUST back off before the publish gate starts dropping, otherwise we
 // only mitigate drops at the gate instead of preventing them at the source.
+//
+// Mode hysteresis: once a mode is entered, it holds for at least one full
+// timerDiscoveryDrip_interval before a switch is allowed in either direction.
+// Normal (2s) -> Slow: requires >=2s in normal; Slow (10s) -> Normal: requires
+// >=10s in slow. This prevents rapid oscillation when freeHeap hovers near
+// HEAP_LOW_THRESHOLD (TASK-370).
 //===========================================================================================
 constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 2;   // seconds (heap recovery between bursts)
 constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 10;  // seconds (heap pressure backoff)
@@ -1202,18 +1208,25 @@ constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 10;  // seconds (heap pressure bac
 void loopMQTTDiscovery()
 {
   DECLARE_TIMER_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
+  static uint32_t modeEnteredMs = 0;  // millis() when current mode was entered; 0 = boot
 
   // Adaptive interval: back off BEFORE the publish gate engages.
   // canPublishMQTT() starts dropping at HEAP_LOW (<6KB); if we only trigger
   // slow-mode at HEAP_WARNING (<4KB) we are too late — drops have already
   // started. Trigger at HEAP_LOW so the drip quiets down first.
   bool heapPressure = (getHeapHealth() >= HEAP_LOW);
-  if (heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_SLOW * 1000UL) {
+  // Hold current mode for at least one full interval before switching.
+  // modeEnteredMs == 0 on first call: first switch is always allowed immediately.
+  bool canSwitch = (modeEnteredMs == 0) ||
+                   ((millis() - modeEnteredMs) >= timerDiscoveryDrip_interval);
+  if (heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_SLOW * 1000UL && canSwitch) {
     CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_SLOW, SKIP_MISSED_TICKS);
     state.heapdiag.iDripSlowModeCount++;
+    modeEnteredMs = millis();
     MQTTDebugTf(PSTR("[drip] slowed to %ds (heap pressure)\r\n"), DISCOVERY_INTERVAL_SLOW);
-  } else if (!heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_NORMAL * 1000UL) {
+  } else if (!heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_NORMAL * 1000UL && canSwitch) {
     CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
+    modeEnteredMs = millis();
     MQTTDebugTf(PSTR("[drip] restored to %ds (heap healthy)\r\n"), DISCOVERY_INTERVAL_NORMAL);
   }
 
