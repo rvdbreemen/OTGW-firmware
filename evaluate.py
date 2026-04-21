@@ -180,7 +180,6 @@ class WorkspaceEvaluator:
             definition_pattern = re.compile(rf"^\s*bool\s+{helper}\s*\(")
 
             call_sites: List[Tuple[str, int, str]] = []
-            definition_sites: List[Tuple[str, int]] = []
 
             for src in source_files:
                 try:
@@ -191,8 +190,9 @@ class WorkspaceEvaluator:
                             # xChanged() aren't counted as calls.
                             if stripped.startswith(("//", "*", "/*")):
                                 continue
+                            # Skip the definition line itself so 'bool hourChanged(){'
+                            # isn't counted as a call.
                             if definition_pattern.match(line):
-                                definition_sites.append((src.name, lineno))
                                 continue
                             if call_pattern.search(line):
                                 call_sites.append((src.name, lineno, line.rstrip()))
@@ -217,6 +217,629 @@ class WorkspaceEvaluator:
                     f"Found {len(call_sites)} call sites — ADR-064 requires exactly 1",
                     detail
                 ))
+
+    # ---- Helpers for body extraction (shared by ADR-062 / TASK-354 gates) ----
+
+    @staticmethod
+    def _extract_function_body(source: str, signature_start: int) -> Tuple[str, int]:
+        """Starting at ``signature_start`` (index of the signature's first char),
+        walk forward to the first '{' and return (body, end_index) where body
+        is the text enclosed in the outermost matching braces and end_index is
+        the position just after the closing '}'. Returns ('', -1) if the body
+        can't be delimited. Handles single-line // and /* */ comments and
+        simple "..." / '...' string literals so that braces inside them are
+        not counted.
+        """
+        i = source.find('{', signature_start)
+        if i == -1:
+            return '', -1
+        depth = 0
+        n = len(source)
+        body_start = i
+        while i < n:
+            c = source[i]
+            # // line comment
+            if c == '/' and i + 1 < n and source[i + 1] == '/':
+                nl = source.find('\n', i)
+                if nl == -1:
+                    return '', -1
+                i = nl + 1
+                continue
+            # /* block comment */
+            if c == '/' and i + 1 < n and source[i + 1] == '*':
+                end = source.find('*/', i + 2)
+                if end == -1:
+                    return '', -1
+                i = end + 2
+                continue
+            # string literal "..."
+            if c == '"':
+                i += 1
+                while i < n and source[i] != '"':
+                    if source[i] == '\\' and i + 1 < n:
+                        i += 2
+                        continue
+                    i += 1
+                i += 1
+                continue
+            # char literal '...'
+            if c == "'":
+                i += 1
+                while i < n and source[i] != "'":
+                    if source[i] == '\\' and i + 1 < n:
+                        i += 2
+                        continue
+                    i += 1
+                i += 1
+                continue
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return source[body_start:i + 1], i + 1
+            i += 1
+        return '', -1
+
+    # ===== ADR-062 DISCOVERY COUNTER GATES (TASK-349/364) =====
+
+    def check_discovery_counter_instrumented(self):
+        """ADR-062 binding rule: every ``bool stream*Discovery(`` helper in
+        ``mqtt_configuratie.cpp`` must contain at least one ``incPublishedTopicCount()``
+        call. Without this, a newly-added helper would silently under-count its
+        retained-discovery publishes, causing the daily verify pass to see a
+        false-missing state and republish the entire discovery set.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-062 Discovery Counter Instrumented ==={Colors.ENDC}")
+
+        cpp = config.FIRMWARE_ROOT / "mqtt_configuratie.cpp"
+        if not cpp.exists():
+            self.add_result(EvaluationResult(
+                "ADR-062", "Discovery counter instrumented", "WARN",
+                "mqtt_configuratie.cpp not found — cannot verify"
+            ))
+            return
+
+        try:
+            source = cpp.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "ADR-062", "Discovery counter instrumented", "FAIL",
+                f"Could not read mqtt_configuratie.cpp: {e}"
+            ))
+            return
+
+        # Find every "bool streamXxxDiscovery(" signature. Anchor to start of
+        # line so forward declarations in .h headers (none today, but safe)
+        # aren't mis-matched.
+        sig_re = re.compile(r"^bool\s+(stream\w*Discovery)\s*\(", re.MULTILINE)
+        matches = list(sig_re.finditer(source))
+
+        if not matches:
+            self.add_result(EvaluationResult(
+                "ADR-062", "Discovery counter instrumented", "WARN",
+                "No bool stream*Discovery( helpers found — file restructured?"
+            ))
+            return
+
+        missing: List[str] = []
+        covered: List[str] = []
+        for m in matches:
+            name = m.group(1)
+            body, _ = self._extract_function_body(source, m.start())
+            if not body:
+                missing.append(f"{name} (body not parseable)")
+                continue
+            # Count inc calls inside body (tolerate comment stripping being
+            # approximate — _extract_function_body already skipped comments
+            # inside the body walk for brace matching, but the body text
+            # itself may still contain // comments; a simple string search
+            # is adequate for "at least one call").
+            if re.search(r"\bincPublishedTopicCount\s*\(", body):
+                covered.append(name)
+            else:
+                missing.append(name)
+
+        detail = (
+            f"covered={len(covered)}: " + ", ".join(covered) +
+            (f"; missing: {', '.join(missing)}" if missing else "")
+        )
+        if missing:
+            self.add_result(EvaluationResult(
+                "ADR-062", "Discovery counter instrumented", "FAIL",
+                f"{len(missing)} of {len(matches)} stream*Discovery helpers miss incPublishedTopicCount()",
+                detail
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-062", "Discovery counter instrumented", "PASS",
+                f"All {len(matches)} stream*Discovery helpers call incPublishedTopicCount()",
+                detail
+            ))
+
+    def check_publishedtopic_counter_reset(self):
+        """ADR-062 binding rule: ``iPublishedTopicCount`` must be reset to 0 at
+        least once in the firmware, typically inside ``clearMQTTConfigDone``
+        (or equivalent reset path). Without this, the counter would drift and
+        make the verify-vs-publish comparison meaningless after a discovery
+        bitmap clear.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-062 PublishedTopic Counter Reset ==={Colors.ENDC}")
+
+        src_dir = config.FIRMWARE_ROOT
+        source_files: List[Path] = []
+        for pattern in ("*.ino", "*.cpp", "*.h"):
+            source_files.extend(src_dir.glob(pattern))
+
+        reset_re = re.compile(r"iPublishedTopicCount\s*=\s*0")
+        hits: List[Tuple[str, int, str]] = []
+        for src in source_files:
+            try:
+                with open(src, 'r', encoding='utf-8', errors='ignore') as f:
+                    for lineno, line in enumerate(f, 1):
+                        stripped = line.lstrip()
+                        # Skip declarations of the form "uint32_t iPublishedTopicCount = 0;"
+                        # inside the struct definition — those are default
+                        # initialisers, not reset paths. Heuristic: skip lines
+                        # that contain a type keyword before the identifier.
+                        if re.search(r"\b(uint\d+_t|int|unsigned|long|size_t)\b[^;]*iPublishedTopicCount\s*=\s*0", line):
+                            continue
+                        if reset_re.search(stripped):
+                            hits.append((src.name, lineno, stripped.rstrip()))
+            except (OSError, UnicodeDecodeError):
+                continue
+
+        if not hits:
+            self.add_result(EvaluationResult(
+                "ADR-062", "PublishedTopic counter reset", "FAIL",
+                "No reset path found — iPublishedTopicCount will drift after clearMQTTConfigDone()"
+            ))
+            return
+
+        # Prefer a reset inside a clearMQTTConfigDone / markAllMQTTConfigPending
+        # style function; flag WARN if the only reset lives somewhere unexpected.
+        blessed: List[str] = []
+        for name, lineno, _ in hits:
+            if name.endswith((".ino", ".cpp")):
+                try:
+                    src_path = src_dir / name
+                    text = src_path.read_text(encoding='utf-8', errors='ignore')
+                    # Look backwards 40 lines for a function header.
+                    lines = text.split('\n')
+                    window = "\n".join(lines[max(0, lineno - 40):lineno])
+                    if re.search(r"\b(clearMQTTConfigDone|markAllMQTTConfigPending|resetDiscovery\w*)\s*\(", window):
+                        blessed.append(f"{name}:{lineno}")
+                except OSError:
+                    pass
+
+        detail = "; ".join(f"{n}:{ln}" for n, ln, _ in hits)
+        if blessed:
+            self.add_result(EvaluationResult(
+                "ADR-062", "PublishedTopic counter reset", "PASS",
+                f"Reset found in blessed function(s): {', '.join(blessed)}",
+                detail
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-062", "PublishedTopic counter reset", "WARN",
+                f"Reset present ({len(hits)} site(s)) but not inside clearMQTTConfigDone / markAllMQTTConfigPending",
+                detail
+            ))
+
+    # ===== JSON BUFFER ARITHMETIC (TASK-368) =====
+
+    def check_json_buffer_arithmetic(self):
+        """Compute worst-case output length of ``snprintf_P(buf, sizeof(buf), PSTR(fmt), ...)``
+        calls inside ``sendMQTTheapdiag`` and fail if it exceeds the buffer.
+
+        Scope note: first iteration is narrowly scoped to the
+        ``sendMQTTheapdiag`` function in ``MQTTstuff.ino`` because it was the
+        Phase 2B perf review's concrete concern (TASK-352 raised 384->512 after
+        measuring a 465-byte worst case). Expand scoping in a follow-up task
+        once the parser handles non-numeric conversions robustly.
+
+        Conversion budgeting:
+          %lu -> 10 (uint32 max = 4294967295, 10 digits)
+          %ld -> 11 (signed int32, sign + 10 digits)
+          %u  -> 10 (treated as uint32 worst-case — safer than uint16=5)
+          %d  -> 11 (signed, sign + 10 digits)
+          %s  -> 0 with a warning (not inferrable without type info)
+          %%  -> 1 literal percent
+          literal bytes in the format string -> counted as-is
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== JSON Buffer Arithmetic (sendMQTTheapdiag) ==={Colors.ENDC}")
+
+        mqtt_ino = config.FIRMWARE_ROOT / "MQTTstuff.ino"
+        if not mqtt_ino.exists():
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "WARN",
+                "MQTTstuff.ino not found — cannot verify"
+            ))
+            return
+
+        try:
+            source = mqtt_ino.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "FAIL",
+                f"Could not read MQTTstuff.ino: {e}"
+            ))
+            return
+
+        sig_re = re.compile(r"^void\s+sendMQTTheapdiag\s*\(", re.MULTILINE)
+        m = sig_re.search(source)
+        if not m:
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "WARN",
+                "sendMQTTheapdiag() not found"
+            ))
+            return
+
+        body, _ = self._extract_function_body(source, m.start())
+        if not body:
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "FAIL",
+                "Could not parse sendMQTTheapdiag() body"
+            ))
+            return
+
+        # Extract buffer size: "char json[512];" or similar.
+        buf_decl = re.search(r"\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]", body)
+        if not buf_decl:
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "WARN",
+                "No 'char X[N]' buffer declaration found in body"
+            ))
+            return
+        buf_name = buf_decl.group(1)
+        buf_size = int(buf_decl.group(2))
+
+        # Pull the first snprintf_P(buf_name, sizeof(buf_name), PSTR("..."...), ...).
+        # Capture the quoted format string; handle the PSTR("a" "b" "c") adjacent-
+        # string concatenation idiom by grabbing everything between PSTR( and the
+        # matching ) and then extracting every "..." inside.
+        snp_re = re.compile(
+            rf"snprintf_P\s*\(\s*{re.escape(buf_name)}\s*,\s*sizeof\(\s*{re.escape(buf_name)}\s*\)\s*,\s*PSTR\s*\(",
+            re.DOTALL
+        )
+        sm = snp_re.search(body)
+        if not sm:
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "WARN",
+                f"No snprintf_P({buf_name}, sizeof({buf_name}), PSTR(...), ...) pattern found"
+            ))
+            return
+
+        # Walk from end of PSTR( marker, balance parens to find matching ')'.
+        i = sm.end()
+        depth = 1
+        n = len(body)
+        pstr_start = i
+        pstr_end = -1
+        while i < n and depth > 0:
+            c = body[i]
+            if c == '"':
+                # skip string literal
+                i += 1
+                while i < n and body[i] != '"':
+                    if body[i] == '\\' and i + 1 < n:
+                        i += 2
+                        continue
+                    i += 1
+                i += 1
+                continue
+            if c == '(':
+                depth += 1
+            elif c == ')':
+                depth -= 1
+                if depth == 0:
+                    pstr_end = i
+                    break
+            i += 1
+
+        if pstr_end == -1:
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "FAIL",
+                "Could not balance parens around PSTR(...)"
+            ))
+            return
+
+        pstr_segment = body[pstr_start:pstr_end]
+        # Extract every "..." chunk and concatenate.
+        chunk_re = re.compile(r'"((?:[^"\\]|\\.)*)"')
+        fmt_chars = ''.join(
+            # Turn common escape sequences back into a single char for counting;
+            # this is worst-case byte count of runtime output.
+            chunk.encode('latin-1', 'backslashreplace').decode('unicode_escape')
+            for chunk in chunk_re.findall(pstr_segment)
+        )
+
+        # Walk format string, budgeting each conversion.
+        worst = 0
+        unknown: List[str] = []
+        i = 0
+        while i < len(fmt_chars):
+            c = fmt_chars[i]
+            if c != '%':
+                worst += 1
+                i += 1
+                continue
+            # Consume optional flags/width/precision/length modifier.
+            j = i + 1
+            # flags
+            while j < len(fmt_chars) and fmt_chars[j] in "-+ #0":
+                j += 1
+            # width (digits)
+            while j < len(fmt_chars) and fmt_chars[j].isdigit():
+                j += 1
+            # precision
+            if j < len(fmt_chars) and fmt_chars[j] == '.':
+                j += 1
+                while j < len(fmt_chars) and fmt_chars[j].isdigit():
+                    j += 1
+            # length modifiers (l, ll, h, hh, z, j, t, L)
+            length = ''
+            while j < len(fmt_chars) and fmt_chars[j] in "lhzjtL":
+                length += fmt_chars[j]
+                j += 1
+            if j >= len(fmt_chars):
+                # dangling %
+                worst += 1
+                i = j
+                continue
+            conv = fmt_chars[j]
+            if conv == '%':
+                worst += 1
+            elif conv in ('u', 'd', 'i'):
+                # worst-case 32-bit signed or unsigned: 10 or 11 chars.
+                worst += 11 if conv in ('d', 'i') else 10
+            elif conv in ('x', 'X', 'o'):
+                worst += 8  # 32-bit hex/octal upper bound
+            elif conv == 'c':
+                worst += 1
+            elif conv == 's':
+                unknown.append("%s (skipped, length unknown)")
+            elif conv in ('f', 'F', 'e', 'E', 'g', 'G'):
+                worst += 24  # conservative double
+            else:
+                unknown.append(f"%{conv} (unknown conv)")
+            i = j + 1
+
+        # Plus NUL terminator.
+        required = worst + 1
+        headroom = buf_size - required
+        detail_parts = [f"buf={buf_size}", f"worst={worst}", f"required(+NUL)={required}", f"headroom={headroom}"]
+        if unknown:
+            detail_parts.append("skipped: " + ", ".join(unknown))
+        detail = ", ".join(detail_parts)
+
+        if required > buf_size:
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "FAIL",
+                f"Buffer too small: needs {required} bytes, have {buf_size}",
+                detail
+            ))
+        elif headroom < 16:
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "WARN",
+                f"Buffer has only {headroom} bytes of headroom (< 16 recommended)",
+                detail
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Buffer", "sendMQTTheapdiag arithmetic", "PASS",
+                f"Buffer adequate: {headroom} bytes headroom",
+                detail
+            ))
+
+    # ===== STATUS BURST TUNING (TASK-353/368) =====
+
+    def check_status_burst_cooldown_bound(self):
+        """Guard against regressing ``STATUS_BURST_COOLDOWN_MS`` back to a
+        large value. TASK-353 tuned it from 10000 -> 2000 to fit Crashevans'
+        status cadence; any value >= 3000 should carry a ``// verified tuning``
+        marker on one of the preceding 5 lines to prove it was re-validated.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== STATUS_BURST_COOLDOWN_MS Tuning Bound ==={Colors.ENDC}")
+
+        mqtt_ino = config.FIRMWARE_ROOT / "MQTTstuff.ino"
+        if not mqtt_ino.exists():
+            self.add_result(EvaluationResult(
+                "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "WARN",
+                "MQTTstuff.ino not found"
+            ))
+            return
+
+        try:
+            lines = mqtt_ino.read_text(encoding='utf-8', errors='ignore').split('\n')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "FAIL",
+                f"Could not read MQTTstuff.ino: {e}"
+            ))
+            return
+
+        decl_re = re.compile(r"\bSTATUS_BURST_COOLDOWN_MS\s*=\s*(\d+)")
+        found = False
+        for idx, line in enumerate(lines):
+            # Skip comments that just mention the constant in prose.
+            if line.lstrip().startswith("//"):
+                continue
+            m = decl_re.search(line)
+            if not m:
+                continue
+            found = True
+            value = int(m.group(1))
+            lineno = idx + 1
+            if value < 3000:
+                self.add_result(EvaluationResult(
+                    "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "PASS",
+                    f"STATUS_BURST_COOLDOWN_MS = {value} ms (< 3000)",
+                    f"MQTTstuff.ino:{lineno}"
+                ))
+            else:
+                window = "\n".join(lines[max(0, idx - 5):idx])
+                if "verified tuning" in window:
+                    self.add_result(EvaluationResult(
+                        "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "PASS",
+                        f"STATUS_BURST_COOLDOWN_MS = {value} ms carries 'verified tuning' marker",
+                        f"MQTTstuff.ino:{lineno}"
+                    ))
+                else:
+                    self.add_result(EvaluationResult(
+                        "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "FAIL",
+                        f"STATUS_BURST_COOLDOWN_MS = {value} ms (>= 3000) without '// verified tuning' marker",
+                        f"MQTTstuff.ino:{lineno}"
+                    ))
+            break
+        if not found:
+            self.add_result(EvaluationResult(
+                "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "WARN",
+                "STATUS_BURST_COOLDOWN_MS declaration not found"
+            ))
+
+    def check_status_publishers_wrap_burst(self):
+        """TASK-347/354: every status-publisher function whose name matches
+        ``publish(Master|Slave)Status.*State`` in ``OTGW-Core.ino`` must wrap
+        its sub-topic fanout with ``beginStatusBurst(`` and ``endStatusBurst(``
+        so the drip loop and heap-health gate can quiesce during the burst.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Status Publishers Wrap Burst ==={Colors.ENDC}")
+
+        core_ino = config.FIRMWARE_ROOT / "OTGW-Core.ino"
+        if not core_ino.exists():
+            self.add_result(EvaluationResult(
+                "ADR-062", "Status publishers wrap burst", "WARN",
+                "OTGW-Core.ino not found"
+            ))
+            return
+
+        try:
+            source = core_ino.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "ADR-062", "Status publishers wrap burst", "FAIL",
+                f"Could not read OTGW-Core.ino: {e}"
+            ))
+            return
+
+        # Signatures like "static void publishMasterStatusState(..."
+        sig_re = re.compile(
+            r"^\s*(?:static\s+)?void\s+(publish(?:Master|Slave)Status\w*State)\s*\(",
+            re.MULTILINE
+        )
+        matches = list(sig_re.finditer(source))
+        if not matches:
+            self.add_result(EvaluationResult(
+                "ADR-062", "Status publishers wrap burst", "WARN",
+                "No publish(Master|Slave)Status*State functions found"
+            ))
+            return
+
+        missing: List[str] = []
+        covered: List[str] = []
+        for m in matches:
+            name = m.group(1)
+            body, _ = self._extract_function_body(source, m.start())
+            if not body:
+                missing.append(f"{name} (body not parseable)")
+                continue
+            has_begin = bool(re.search(r"\bbeginStatusBurst\s*\(", body))
+            has_end = bool(re.search(r"\bendStatusBurst\s*\(", body))
+            if has_begin and has_end:
+                covered.append(name)
+            else:
+                parts = []
+                if not has_begin: parts.append("no beginStatusBurst(")
+                if not has_end:   parts.append("no endStatusBurst(")
+                missing.append(f"{name} [{', '.join(parts)}]")
+
+        detail = f"covered={len(covered)}: " + ", ".join(covered)
+        if missing:
+            detail += f"; missing: {', '.join(missing)}"
+            self.add_result(EvaluationResult(
+                "ADR-062", "Status publishers wrap burst", "FAIL",
+                f"{len(missing)} of {len(matches)} status publishers miss burst wrap",
+                detail
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-062", "Status publishers wrap burst", "PASS",
+                f"All {len(matches)} status publishers wrap begin/endStatusBurst()",
+                detail
+            ))
+
+    # ===== ADR REFERENCE RESOLUTION (TASK-368) =====
+
+    def check_adr_references_resolve(self):
+        """Every ``ADR-NNN`` citation in ``docs/adr/*.md`` and firmware source
+        must resolve to ``docs/adr/ADR-NNN-*.md``. Catches Phase 1B ghost-ADR
+        class of finding (e.g. ADR-077/078/080 before TASK-355).
+
+        Forward-citation escape hatch: if the ADR number appears on a line
+        (or within a 40-char window around the match) that contains one of
+        the markers ``future``, ``proposed``, or ``TBD`` (case-insensitive),
+        the reference is treated as a known forward citation and not failed.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR References Resolve ==={Colors.ENDC}")
+
+        # Inventory of existing ADR numbers.
+        adr_dir = self.project_dir / "docs" / "adr"
+        if not adr_dir.exists():
+            self.add_result(EvaluationResult(
+                "ADR", "References resolve", "WARN",
+                "docs/adr/ not found"
+            ))
+            return
+
+        existing_nums: set = set()
+        file_name_re = re.compile(r"^ADR-(\d{3})-.*\.md$")
+        for path in adr_dir.glob("ADR-*.md"):
+            m = file_name_re.match(path.name)
+            if m:
+                existing_nums.add(m.group(1))
+
+        # Scan targets: ADR docs + firmware source.
+        scan_targets: List[Path] = list(adr_dir.glob("*.md"))
+        fw = config.FIRMWARE_ROOT
+        for pattern in ("*.ino", "*.cpp", "*.h"):
+            scan_targets.extend(fw.glob(pattern))
+
+        ref_re = re.compile(r"ADR-(\d{3})")
+        forward_markers = re.compile(r"\b(future|proposed|TBD)\b", re.IGNORECASE)
+
+        unresolved: List[Tuple[str, int, str]] = []
+        total_refs = 0
+        for target in scan_targets:
+            try:
+                with open(target, 'r', encoding='utf-8', errors='ignore') as f:
+                    for lineno, line in enumerate(f, 1):
+                        for m in ref_re.finditer(line):
+                            total_refs += 1
+                            num = m.group(1)
+                            if num in existing_nums:
+                                continue
+                            # Forward-citation escape.
+                            if forward_markers.search(line):
+                                continue
+                            rel = target.relative_to(self.project_dir) if target.is_absolute() else target
+                            unresolved.append((str(rel), lineno, f"ADR-{num}"))
+            except (OSError, UnicodeDecodeError):
+                continue
+
+        if not unresolved:
+            self.add_result(EvaluationResult(
+                "ADR", "References resolve", "PASS",
+                f"All {total_refs} ADR-NNN references resolve to existing ADR files"
+            ))
+        else:
+            # Show up to first 5 offenders in the message.
+            sample = "; ".join(f"{n}:{ln}->{ref}" for n, ln, ref in unresolved[:5])
+            self.add_result(EvaluationResult(
+                "ADR", "References resolve", "FAIL",
+                f"{len(unresolved)} unresolved ADR reference(s) out of {total_refs}",
+                sample
+            ))
 
     def check_coding_standards(self):
         """Check coding standards and best practices"""
@@ -640,8 +1263,14 @@ class WorkspaceEvaluator:
         self.check_code_structure()
         self.check_build_system()
         self.check_version_info()
-        self.check_time_boundary_single_caller()   # ADR-064 CI gate (ADR-080 meta-rule)
-        
+        self.check_time_boundary_single_caller()      # ADR-064 CI gate (TASK-350)
+        self.check_discovery_counter_instrumented()   # ADR-062 CI gate (TASK-364)
+        self.check_publishedtopic_counter_reset()     # ADR-062 CI gate (TASK-364)
+        self.check_json_buffer_arithmetic()           # TASK-352/368
+        self.check_status_burst_cooldown_bound()      # TASK-353/368
+        self.check_status_publishers_wrap_burst()     # TASK-347/354/368
+        self.check_adr_references_resolve()           # TASK-355/368
+
         if not quick:
             # Detailed checks
             self.check_coding_standards()

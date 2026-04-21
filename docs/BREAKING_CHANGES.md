@@ -4,6 +4,22 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## 🛑 v1.4.1
+
+There are **no breaking changes** in `v1.4.1`. Heap-pressure reduction, retained MQTT discovery verification, the hourly heap-diagnostic topic, and the time-boundary dispatcher refactor are all additive with safe defaults. All MQTT topics published before v1.4.1 remain identical; the new `<topTopic>/otgw-firmware/stats/heap` retained topic is additive. The three new REST endpoints (`GET /api/v2/discovery`, `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`) do not replace or alter any existing endpoint.
+
+The new setting `MQTTdiscoveryAutoVerify` defaults to `true`. On shared brokers or brokers with tight wildcard ACLs, set it to `false` to disable the daily verification pass (on-demand verify via REST or telnet remains available either way).
+
+See [RELEASE_NOTES_1.4.1.md](../RELEASE_NOTES_1.4.1.md) for details.
+
+---
+
+## 🛑 v1.4.0
+
+There are **no breaking changes** in `v1.4.0`. This release is additive: it introduces SAT (Smart Autotune Thermostat) as an optional embedded heating controller and adds experimental ESP32 support through a unified platform abstraction layer. The ESP8266 build is functionally identical to `v1.3.5`. All MQTT topics, REST API endpoints, settings format, and ser2net behaviour remain identical to `v1.3.5`; SAT and ESP32-only features are opt-in.
+
+---
+
 ## 🛑 v1.3.5
 
 There are **no breaking changes** in `v1.3.5`. This release fixes the WiFi reconnection regression from v1.3.0 and adds MQTT uptime/version publishing. All MQTT topics, REST API endpoints, settings format, and ser2net behavior remain identical to `v1.3.4`.

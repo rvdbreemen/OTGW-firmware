@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Proposed
 
 ## Context
 
@@ -101,15 +101,17 @@ Auto-deleting would be dangerous: if the firmware incorrectly computes its own n
 - Cannot detect orphan deletion risks (intentional): foreign-nodeId configs NOT cleaned automatically.
 - Cannot distinguish "retained missing" from "broker dropped during window" (e.g., transient broker issue). Both result in a re-announce; worst case is duplicated traffic.
 - On large shared brokers with >200 foreign HA integrations under `homeassistant/`, the narrow `<haprefix>/+/<nodeId>/#` wildcard prevents callback flooding. Without the node-scope restriction, verify would be unviable on such brokers.
+- A heap-abort during the verify window is indistinguishable in telemetry from a clean pass (`iLastMissingCount = 0`). If `iLastVerifyEpoch` advances but `iRepublishTriggeredCount` never does, check the debug log for `[verify] heap-abort` to distinguish. Follow-up: TASK-361 introduces an explicit outcome enum.
+- At boot, the `dayChanged()` helper's `lastX = -1` sentinel fires true on the first post-NTP-sync minute. With `MQTTdiscoveryAutoVerify = true`, a verify pass runs within one minute of reaching NTP sync, not at the wall-clock day boundary. Intentional: covers the case where HA was restarted while OTGW was offline.
 
 ### Binding rule enforced by this ADR
 
-- `streamSensorDiscovery`, `streamBinarySensorDiscovery`, `streamClimateDiscovery`, `streamNumberDiscovery` in `mqtt_configuratie.cpp` MUST call `incPublishedTopicCount()` after a successful `endPublish`. Missing calls cause `iPublishedTopicCount` to undercount, resulting in persistent false-positive republish triggers.
+- Every `stream*Discovery` helper in `mqtt_configuratie.cpp` (currently `streamSensorDiscovery`, `streamBinarySensorDiscovery`, `streamClimateDiscovery`, `streamNumberDiscovery`, `streamDallasSensorDiscovery`) MUST call `incPublishedTopicCount()` after a successful `endPublish`. Missing calls cause `iPublishedTopicCount` to undercount, resulting in persistent false-positive republish triggers.
 - `clearMQTTConfigDone()` in `MQTTstuff.ino` MUST reset `state.discovery.iPublishedTopicCount = 0` so the counter stays consistent with the `MQTTautoConfigMap` bitmap.
 
-Per ADR-080 meta-rule, these binding rules need a CI-gate entry in `evaluate.py`:
+These binding rules need CI-gate entries in `evaluate.py`:
 
-- `check_discovery_counter_instrumented`: greps `mqtt_configuratie.cpp` for each stream helper ensuring each has a matching `incPublishedTopicCount()` call within the function body after the final `endPublish()`.
+- `check_discovery_counter_instrumented`: greps `mqtt_configuratie.cpp` for every `stream*Discovery` helper and ensures each has a matching `incPublishedTopicCount()` call within the function body after the final `endPublish()`.
 - `check_publishedtopic_counter_reset`: greps `clearMQTTConfigDone` body for `state.discovery.iPublishedTopicCount = 0` (or equivalent assignment).
 
 These gates land in TASK-349.
@@ -119,12 +121,9 @@ These gates land in TASK-349.
 - ADR-004 — no String in hot paths (all new code uses `char[]` + `snprintf_P`)
 - ADR-040 — source-specific topics explain why wildcard must be `/#`, not `/+/config`
 - ADR-044 — global state access from secondary TUs; explains why `incPublishedTopicCount` is a shim rather than direct state access
+- ADR-050 — centralized API route dispatch; REST `discovery` route added to `kV2Routes`
 - ADR-051 — state/settings split with Hungarian prefixes; new `DiscoverySection` follows this
-- ADR-077 — streaming MQTT HA discovery; counter hooks into the streaming path
-- ADR-078 — MQTT sub-command dispatch tables; REST `discovery` route added to `kV2Routes`
-- ADR-080 — binding ADR rules must have CI gate; two gates added per rules above
 - TASK-348 — pending-bit limbo fix (prerequisite; otherwise verify-triggered republish itself leaks msgids)
 - TASK-349 — this ADR's implementation
 - TASK-351 — time-boundary dispatcher unification (prerequisite for TASK-350 auto-verify trigger)
 - TASK-350 — daily automatic verify triggered from unified dispatcher
-- Plan file: `C:\Users\rvdbr\.claude\plans\expressive-growing-yao.md`

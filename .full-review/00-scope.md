@@ -2,64 +2,73 @@
 
 ## Target
 
-All changes since the v1.3.2 release to current HEAD on the `dev` branch. This covers the v1.3.3 release and ongoing v1.3.4-beta development. 28 source files changed with 309 insertions and 125 deletions.
+Full branch review of `1.4.1` vs `dev` (base branch). This branch is the "heap-pressure reduction + MQTT discovery verification + time-boundary dispatcher" release candidate for OTGW-firmware 1.4.1.
 
-## Key Commits
+- Commits in range: 14 (0cc5dd10 → deaddd85)
+- Source files changed: ~20 C/C++/INO files, plus frontend JS/CSS and build helpers
+- Documentation: ADR-062 (retained discovery verification), ADR-064 (time-boundary single-caller contract)
+- Backlog: TASK-338 through TASK-351
 
-- `afd77dc` fix: defer MQTT throttle slot update until publish succeeds
-- `c3c1184` fix: add tooltips to Debug Info page, rename OTGW Connected to OpenTherm Active, support thermostat-only setups
-- `5f5ee4f` feat: Bump version to v1.3.4-beta for development
-- `541cb1b` release: v1.3.3
-- `008bc6f` Fix gateway mode detection and misleading HA Integration label (#528)
-- `ae4487a` fix: hide unsupported OT values from dashboard
-- `fad2ce7` Disable all PIC-related functions when no PIC is detected at boot (#522)
-- `10f8a59` docs: add ADR-060 PIC Availability Guard Pattern
+## Themes
 
-## Files (Source Code)
+1. **Heap pressure reduction** during Home Assistant MQTT discovery drip
+   - Slower drip interval, wider HEAP_LOW backoff, fragmentation-aware publish gates, Status-burst cooldown
+   - Lower heap guard thresholds tuned on tester log data
+2. **Cumulative heap diagnostics** with hourly MQTT publishing (drop/tier counters)
+3. **MQTT discovery verification & republish** (on-demand + daily automatic)
+4. **Time-boundary dispatcher refactor** (unify hourChanged / dayChanged / yearChanged under single-caller contract)
+5. **Nightly restart refactor** to use hourChanged hook
+6. **Version bump** 1.4.0 → 1.4.1-beta, build artefact hygiene (remove .gz from git)
 
-### Core Firmware (.ino/.h)
-- src/OTGW-firmware/OTGW-firmware.ino
-- src/OTGW-firmware/OTGW-firmware.h
-- src/OTGW-firmware/OTGW-Core.ino
-- src/OTGW-firmware/OTGW-Core.h
-- src/OTGW-firmware/MQTTstuff.ino
-- src/OTGW-firmware/networkStuff.ino
-- src/OTGW-firmware/networkStuff.h
-- src/OTGW-firmware/restAPI.ino
-- src/OTGW-firmware/settingStuff.ino
-- src/OTGW-firmware/jsonStuff.ino
-- src/OTGW-firmware/helperStuff.ino
-- src/OTGW-firmware/FSexplorer.ino
-- src/OTGW-firmware/sensors_ext.ino
-- src/OTGW-firmware/outputs_ext.ino
-- src/OTGW-firmware/s0PulseCount.ino
-- src/OTGW-firmware/webSocketStuff.ino
-- src/OTGW-firmware/webhook.ino
-- src/OTGW-firmware/version.h
+## Files (source / docs / build)
 
-### Frontend (Web UI)
-- src/OTGW-firmware/data/index.html
-- src/OTGW-firmware/data/index.js
-- src/OTGW-firmware/data/index.css
-- src/OTGW-firmware/data/index_dark.css
-- src/OTGW-firmware/data/graph.js
-- src/OTGW-firmware/data/FSexplorer.html
-- src/OTGW-firmware/data/FSexplorer.css
-- src/OTGW-firmware/data/FSexplorer_dark.css
-- src/OTGW-firmware/data/mqttha.cfg
-- src/OTGW-firmware/data/version.hash
+### Source code (C/C++/INO)
+- `src/OTGW-firmware/MQTTstuff.ino` — major changes (discovery drip, verification, cooldown)
+- `src/OTGW-firmware/OTGW-firmware.ino` — time dispatcher refactor, nightly restart hook
+- `src/OTGW-firmware/OTGW-firmware.h` — pending flags, cooldown state, discovery verification state
+- `src/OTGW-firmware/OTGW-Core.ino` + `.h` — Status-burst cooldown hooks, version bump
+- `src/OTGW-firmware/helperStuff.ino` — heap guard thresholds, drop counters
+- `src/OTGW-firmware/restAPI.ino` — on-demand discovery verification endpoints
+- `src/OTGW-firmware/handleDebug.ino` — debug hooks for discovery verification
+- `src/OTGW-firmware/settingStuff.ino` — settings for discovery verification cadence
+- `src/OTGW-firmware/mqtt_configuratie.cpp` — discovery verification hooks
+- `src/OTGW-firmware/networkStuff.{h,ino}` — time-dispatcher callers
+- Smaller edits: `FSexplorer.ino`, `jsonStuff.ino`, `outputs_ext.ino`, `s0PulseCount.ino`, `sensors_ext.ino`, `webSocketStuff.ino`, `webhook.ino` (mostly version bumps)
 
-### Documentation
-- docs/adr/ADR-060-pic-availability-guard-pattern.md
-- RELEASE_NOTES_1.3.3.md
-- README.md
+### Frontend
+- `src/OTGW-firmware/data/index.js` — heap diagnostics UI, discovery verification UI
+- `src/OTGW-firmware/data/index.css` / `index_dark.css` — minor
+- `src/OTGW-firmware/data/FSexplorer.{css,html}`, `FSexplorer_dark.css`, `graph.js` — version-only
+
+### Config / build
+- `evaluate.py` — extended with new checks
+- `src/OTGW-firmware/data/mqttha.cfg` — version bump
+- `src/OTGW-firmware/data/version.hash`, `version.h` — version tracking
+- Removed generated `.gz` artefacts from git (404f7a48)
+
+### Docs
+- `docs/adr/ADR-062-retained-discovery-verification.md` (Proposed)
+- `docs/adr/ADR-064-time-boundary-single-caller-contract.md` (Proposed)
+
+### Backlog
+- 14 task files covering the changes (TASK-338 through TASK-351)
 
 ## Flags
 
-- Security Focus: no
-- Performance Critical: no
+- Security Focus: no (embedded LAN-only firmware; see ADR "HTTP/WS only")
+- Performance Critical: yes (ESP8266, ~40KB RAM, heap pressure is the main theme)
 - Strict Mode: no
-- Framework: Arduino/ESP8266
+- Framework: Arduino / ESP8266 (auto-detected)
+
+## Platform constraints reviewers must remember
+
+- ESP8266 with ~40KB usable RAM and a **4KB cooperative CONT stack**
+- `doBackgroundTasks()` IS re-entrant (MQTTstuff.ino:1055 reads files while auto-configuring)
+- `feedWatchDog()` at OTGW-Core.ino:403 has `yield()` commented out — no re-entrancy from watchdog
+- PROGMEM pointers must match helpers: never pass PROGMEM to `printf %s`, `MQTTclient.write()`, `writeMqttChunk()`
+- No HTTPS / WSS — plain HTTP/WS only (ADR)
+- No `String` class in hot paths (ADR-004)
+- Static buffers `mqttAutoCfgScratch` / `ot_log_buffer` have specific ownership rules
 
 ## Review Phases
 

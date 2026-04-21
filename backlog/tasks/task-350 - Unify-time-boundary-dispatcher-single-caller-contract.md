@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 19:32'
-updated_date: '2026-04-20 21:00'
+updated_date: '2026-04-21 17:03'
 labels:
   - refactor
   - time-boundary
@@ -17,7 +17,7 @@ priority: medium
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Behavior-preserving refactor to consolidate hourChanged, dayChanged, yearChanged into a single dispatcher inside doTaskMinuteChanged. Closes the latent consume-on-read bug where adding a second consumer silently steals the event. Moves nightly restart and hourly heapdiag from doTaskEvery60s (boot-relative, drifts) to doTaskMinuteChanged (wall-clock aligned). sendtimecommand signature changes to take dayFlag and yearFlag as parameters. Every helper has EXACTLY ONE call site after refactor, enforced by new evaluate.py gate per ADR-080/ADR-064. See plan file expressive-growing-yao.
+Behavior-preserving refactor to consolidate hourChanged, dayChanged, yearChanged into a single dispatcher inside doTaskMinuteChanged. Closes the latent consume-on-read bug where adding a second consumer silently steals the event. Moves nightly restart and hourly heapdiag from doTaskEvery60s (boot-relative, drifts) to doTaskMinuteChanged (wall-clock aligned). sendtimecommand signature changes to take dayFlag and yearFlag as parameters. Every helper has EXACTLY ONE call site after refactor, enforced by new evaluate.py gate per ADR-080/ADR-064.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

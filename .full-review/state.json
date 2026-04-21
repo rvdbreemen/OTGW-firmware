@@ -1,16 +1,62 @@
 {
-  "target": "Changes since v1.3.2 release (28 source files, 309 insertions, 125 deletions)",
-  "status": "in_progress",
+  "target": "Branch 1.4.1 vs dev (14 commits, ~20 source files) — heap-pressure reduction, MQTT discovery verification, time-boundary dispatcher refactor",
+  "status": "complete",
   "flags": {
     "security_focus": false,
-    "performance_critical": false,
+    "performance_critical": true,
     "strict_mode": false,
-    "framework": "Arduino/ESP8266"
+    "framework": "Arduino/ESP8266",
+    "skip_phase_4": true
   },
-  "current_step": 0,
-  "current_phase": 0,
-  "completed_steps": [],
-  "files_created": [],
-  "started_at": "2026-04-01T00:00:00Z",
-  "last_updated": "2026-04-01T00:00:00Z"
+  "current_step": "done",
+  "current_phase": 5,
+  "completed_steps": [0, "1A", "1B", "2A", "2B", "checkpoint-1", "backlog-created", "3A", "3B", 5],
+  "phase_4_skipped_by_user": true,
+  "files_created": [
+    "00-scope.md",
+    "phase1a-code-quality.md",
+    "phase1b-architecture.md",
+    "01-quality-architecture.md",
+    "phase2a-security.md",
+    "phase2b-performance.md",
+    "02-security-performance.md",
+    "phase3a-testing.md",
+    "phase3b-documentation.md",
+    "03-testing-documentation.md",
+    "05-final-report.md"
+  ],
+  "backlog_tasks_created": [
+    "TASK-352 [HIGH] fix(heapdiag) JSON buffer 384->512",
+    "TASK-353 [HIGH] fix(mqtt) STATUS_BURST_COOLDOWN_MS 10000->2000",
+    "TASK-354 [HIGH] fix(otgw) VH status publishers burst-quiesce",
+    "TASK-355 [HIGH] chore(adr) revert to Proposed + ghost citations + plan-file leak + Consequences",
+    "TASK-356 [MED] fix(mqtt) /republish cooldown CWE-770",
+    "TASK-357 [MED] fix(mqtt) verify callback fall-through CWE-20",
+    "TASK-358 [MED] fix(mqtt) dedupe heap threshold 6000",
+    "TASK-359 [MED] fix(mqtt) NTP+uptime preconditions",
+    "TASK-360 [MED] docs(mqtt) stale comments + constant rationales",
+    "TASK-361 [MED] feat(mqtt) verify outcome enum",
+    "TASK-362 [LOW] chore(cleanup) dead code + write-only fields",
+    "TASK-363 [LOW] refactor(mqtt) extract discovery-verify TU",
+    "TASK-364 [LOW] chore(adr) ADR-062 CI gates",
+    "TASK-365 [MED] docs(release) RELEASE_NOTES_1.4.1 + BREAKING_CHANGES + README",
+    "TASK-366 [MED] docs(api) openapi.yaml + MQTT.md updates",
+    "TASK-367 [LOW] chore(backlog) erratum on TASK-342/346/349/351 + plan-file cleanup",
+    "TASK-368 [LOW] chore(ci) wire evaluate.py + 4 regex gates",
+    "TASK-369 [LOW] chore(tests) Dallas test host-compilable or delete"
+  ],
+  "findings_total": 88,
+  "findings_severity": {
+    "critical": 2,
+    "high": 20,
+    "medium": 28,
+    "low": 27,
+    "dead_code": 14,
+    "informational": 2
+  },
+  "merge_blockers": ["TASK-352", "TASK-353", "TASK-354", "TASK-355", "TASK-359"],
+  "external_reviews_preserved": [".external-reviews/HANDOFF-claude-review-c-codebase-303Qj.md"],
+  "started_at": "2026-04-21T08:50:00Z",
+  "last_updated": "2026-04-21T09:50:00Z",
+  "completed_at": "2026-04-21T09:50:00Z"
 }

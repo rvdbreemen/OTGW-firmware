@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Proposed
 
 ## Context
 
@@ -36,7 +36,7 @@ The discovery-verification plan (see `docs/adr/ADR-062`) adds a new daily consum
 1. Re-calls `dayChanged()` — which steals `SR=21` from `sendtimecommand`, breaking the PIC date-sync.
 2. Maintains a parallel local-static `lastVerifyDay` — which duplicates the bookkeeping, obscures intent, and becomes a pattern that proliferates across every future daily feature.
 
-Both paths create a maintenance tax. The rule below formalises a third way and enforces it via CI gate per ADR-080.
+Both paths create a maintenance tax. The rule below formalises a third way and enforces it via a CI gate in `evaluate.py`.
 
 ## Decision
 
@@ -77,7 +77,7 @@ void doTaskMinuteChanged() {
 
 > For each of the four helpers `minuteChanged()`, `hourChanged()`, `dayChanged()`, `yearChanged()`, the codebase contains **exactly one** call site. Downstream consumers capture the returned bool once per tick into a local flag and read that flag.
 
-### Enforcement (per ADR-080 meta-rule)
+### Enforcement
 
 A new `evaluate.py` check `check_time_boundary_single_caller` scans all `src/OTGW-firmware/**/*.{ino,cpp,h}` files and counts occurrences of each helper name as a call (`hourChanged()`, `dayChanged()`, etc., excluding the definition itself in `helperStuff.ino`). If any helper has more than one call site, the check fails, blocking merge.
 
@@ -115,6 +115,7 @@ The check implementation should be resilient to:
 
 - The refactor (TASK-350 in the current plan) is a multi-file change: `OTGW-firmware.ino` (move blocks), `networkStuff.ino` (change signature), `evaluate.py` (add check). Landed as one atomic commit.
 - `sendtimecommand` gains two new parameters. Only one caller (`doTaskMinuteChanged`) so migration is contained.
+- All three flags (`hourFlag`/`dayFlag`/`yearFlag`) fire `true` on the first post-NTP-sync dispatcher tick because the helpers' `lastX = -1` sentinels mismatch any real wall-clock value. Downstream consumers must defend against boot-time first-minute fires: `runNightlyRestartCheck` already does via `uptime > 3600`, and `sendMQTTheapdiag` publishes an acceptable near-zero snapshot (overwritten on the next real hour). New consumers added to `if (hourFlag) { ... }` must consider this.
 
 ### Alternatives considered and rejected
 
@@ -124,11 +125,9 @@ The check implementation should be resilient to:
 
 ## Related
 
-- ADR-080 — binding ADR rules must have CI gate (this ADR's rule lands with an `evaluate.py` gate per that meta-rule)
 - ADR-062 — retained discovery verification (introduces the new daily consumer that motivates this rule)
 - TASK-345 — already established single-caller dispatch for `hourChanged()` in `doTaskEvery60s`; this refactor moves that same pattern into `doTaskMinuteChanged` for wall-clock alignment
 - TASK-350 — implements this ADR
 - TASK-351 — adds the new daily consumer inside the unified dispatcher
 - `helperStuff.ino:467-515` — the four helper definitions (unchanged by this ADR)
 - `networkStuff.ino:494-504` — current `sendtimecommand` (signature changes in TASK-350)
-- Plan file: `C:\Users\rvdbr\.claude\plans\expressive-growing-yao.md`

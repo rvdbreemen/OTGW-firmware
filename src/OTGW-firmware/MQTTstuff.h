@@ -239,6 +239,15 @@ inline uint16_t readBinSensorIndex(uint8_t otId) {
 constexpr uint16_t MQTT_HA_INDEX_NONE = 0xFFFF;
 
 // ---------------------------------------------------------------------------
+// Cross-TU tuning constant -- exposed here so restAPI.ino and other callers
+// can enforce the same heap floor as startDiscoveryVerification() without
+// duplicating a magic number. Full ADR-062 tuning rationale lives in
+// MQTTstuff.ino alongside the other VERIFICATION_* constants (kept local
+// because only this one has external callers).
+// ---------------------------------------------------------------------------
+constexpr uint32_t VERIFICATION_MIN_HEAP_START = 6000;
+
+// ---------------------------------------------------------------------------
 // Discovery context -- runtime state passed to streaming functions
 // ---------------------------------------------------------------------------
 struct HaDiscoveryContext {

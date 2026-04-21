@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 07:53'
-updated_date: '2026-04-20 08:02'
+updated_date: '2026-04-21 17:02'
 labels:
   - mqtt
   - heap
@@ -78,4 +78,10 @@ Added cumulative heap-pressure diagnostics on branch 1.4.1.
 **REST/UI**: /api/v2/devinfo exposes 8 new hd_* fields. translateFields in index.js labels them for the Device Information tab (e.g. "Heap Fragmentation (%)", "MQTT Drops (since boot)"). No new UI card needed; existing refreshDeviceInfo renderer picks them up.
 
 **Build verified**: esp8266 firmware 724,592 bytes (+912 from pre-TASK-346 baseline), littlefs 1.98MB. Commit 9bd51f0b on origin/1.4.1.
+
+---
+
+**Erratum (2026-04-21, per TASK-367)**
+
+The claim above that the hourly publish runs via "hourChanged() hook in doTaskEvery60s" is no longer accurate after TASK-350. Per ADR-064 (unified time-boundary dispatcher), the sendMQTTheapdiag call site was moved out of doTaskEvery60s and into the if(hourFlag) block inside doTaskMinuteChanged. The dispatch is still once-per-hour and still shares its hour boundary with the nightly restart check, but the containing function and trigger path have changed. Behaviour is preserved; only the call-site location moved.
 <!-- SECTION:FINAL_SUMMARY:END -->

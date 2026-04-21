@@ -729,7 +729,7 @@ static uint32_t mqttDropCount = 0;
 // Perf note: getMaxFreeBlockSize() walks the full free list. We only call it
 // outside the HEALTHY path, so the common case stays cheap.
 //===========================================================================================
-#define HEAP_FRAG_PROMOTE_MAXBLOCK  1536   // maxBlock below this while freeHeap in LOW → promote to WARNING (matched to CRITICAL)
+constexpr uint32_t HEAP_FRAG_PROMOTE_MAXBLOCK = 1536;   // maxBlock below this while freeHeap in LOW -> promote to WARNING (matched to CRITICAL)
 HeapHealthLevel getHeapHealth() {
   static HeapHealthLevel lastLevel = HEAP_HEALTHY;
   uint32_t freeHeap = ESP.getFreeHeap();

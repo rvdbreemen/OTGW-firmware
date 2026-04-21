@@ -292,11 +292,11 @@ static void runNightlyRestartCheck() {
 // Downstream consumers read the local flag, never re-call the helper.
 // evaluate.py::check_time_boundary_single_caller enforces this rule.
 void doTaskMinuteChanged(){
-  // ADR-064: single caller
+  // ADR-064: these three helpers are called here and only here. Downstream
+  // consumers read the local flags below, never re-call the helper.
+  // Enforced by evaluate.py::check_time_boundary_single_caller.
   const bool hourFlag = hourChanged();
-  // ADR-064: single caller
   const bool dayFlag  = dayChanged();
-  // ADR-064: single caller
   const bool yearFlag = yearChanged();
 
   // Per-minute work (unconditional).
@@ -319,9 +319,9 @@ void doTaskMinuteChanged(){
     if (settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification();
   }
 
-  // Yearly consumers: none currently beyond sendtimecommand's SR=22 which is
-  // driven by yearFlag above.
-  (void)yearFlag;  // silence unused-warning until a yearly consumer lands
+  // Yearly consumers: SR=22 via sendtimecommand(dayFlag, yearFlag) above is the
+  // only current consumer. New yearly work extends THIS block (and keeps the
+  // single-caller rule for yearChanged()).
 }
 
 //===[ Do task every 5min ]===
@@ -404,9 +404,8 @@ void loop()
       if (DUE(timer60s))                doTaskEvery60s();
       if (DUE(timer3s))                 doTaskEvery3s();
       if (DUE(timer1s))                 doTaskEvery1s();
-      // ADR-064: single caller
-      if (minuteChanged())              doTaskMinuteChanged(); //exactly on the minute
-      loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, 3s interval)
+      if (minuteChanged())              doTaskMinuteChanged(); //ADR-064: sole minuteChanged() caller; hour/day/year dispatch lives inside
+      loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, 2s normal / 10s slow)
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook
       handlePendingUpgrade();           // Check if we need to start an upgrade

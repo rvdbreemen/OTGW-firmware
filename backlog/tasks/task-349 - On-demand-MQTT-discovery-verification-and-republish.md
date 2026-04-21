@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 19:32'
-updated_date: '2026-04-20 20:48'
+updated_date: '2026-04-21 17:03'
 labels:
   - mqtt
   - discovery
@@ -18,7 +18,7 @@ priority: medium
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Add a verification pass that subscribes to the node-scoped discovery wildcard haprefix/+/nodeId/#, counts retained configs delivered by the broker, compares to the expected count, and re-announces via markAllMQTTConfigPending when counts do not match. RAM-tuned: PubSubClient RX buffer raised 384 to 1024 during 15s window (peak +640B). Exposed via REST GET/POST /api/v2/discovery, telnet V key, and hourly heapdiag. See plan file expressive-growing-yao and ADR-062.
+Add a verification pass that subscribes to the node-scoped discovery wildcard haprefix/+/nodeId/#, counts retained configs delivered by the broker, compares to the expected count, and re-announces via markAllMQTTConfigPending when counts do not match. RAM-tuned: PubSubClient RX buffer raised 384 to 1024 during 15s window (peak +640B). Exposed via REST GET/POST /api/v2/discovery, telnet V key, and hourly heapdiag. See ADR-062.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -58,4 +58,10 @@ Add a verification pass that subscribes to the node-scoped discovery wildcard ha
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Implemented on-demand MQTT discovery verification on branch 1.4.1. DiscoverySection struct (24B) added per ADR-051. Forward declarations published. Verify state machine in MQTTstuff.ino (after NodeId/MQTTclient decls) with startDiscoveryVerification / endDiscoveryVerification / tickDiscoveryVerification / isDiscoveryVerificationActive / countPendingDiscoveryIds / incPublishedTopicCount. Callback filter at top of handleMQTTcallback routes retained configs under haprefix/nodeId to counters. Tick poll in handleMQTT. clearMQTTConfigDone resets iPublishedTopicCount. 5 stream helpers in mqtt_configuratie.cpp instrumented with incPublishedTopicCount() after successful endPublish. REST handleDiscovery registered (GET/POST verify/POST republish). Telnet V key. sendMQTTheapdiag JSON extended with 6 disc_* fields. translateFields labels in index.js. Review fixes applied: verifyWildcard 80->128 with truncation check (arch HIGH), getMaxFreeBlockSize precheck (perf MED), defensive setBufferSize(384) on MQTT disconnect fast-close (arch/sec MED), cached verifyPrefixLen/verifyNodeLen (perf LOW), VERIFICATION_MAX_NODE_SEGMENT_LEN=64 cap on broker-supplied topic segments (sec MED). Build passes: 728,400 byte firmware + 2,072,576 byte littlefs. AC19/20 (evaluate.py gates) deferred to TASK-350 where the check_time_boundary_single_caller sibling gate lands. AC23-26 deferred to field validation (flash + tester log with MQTT-debug on to see iDripCooldownSkipCount telemetry).
+
+---
+
+**Erratum (2026-04-21, per TASK-367)**
+
+The review summary for this task (and the Description AC #9) states that startDiscoveryVerification enforces all preconditions including "NTP sync, uptime>3600, heap>=6000, no pending drip, MQTT connected". In the code originally shipped for TASK-349, the NTP-sync and uptime>3600 guards were NOT enforced; only heap, no-pending-drip, and MQTT-connected checks were in place. The gap was closed by TASK-359, which added the missing NTP and uptime preconditions to startDiscoveryVerification. Post-TASK-359 (now Done), the full precondition list claimed above is accurate.
 <!-- SECTION:FINAL_SUMMARY:END -->

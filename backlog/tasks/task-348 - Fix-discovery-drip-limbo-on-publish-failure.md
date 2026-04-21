@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 19:23'
-updated_date: '2026-04-20 19:28'
+updated_date: '2026-04-21 17:03'
 labels:
   - mqtt
   - discovery
@@ -21,7 +21,7 @@ The drip loop in loopMQTTDiscovery() currently clears the pending bit for an OT 
 
 Fix: clear the pending bit ONLY on success. On failure, leave it set so the next drip tick retries. Rate-limited by the drip timer itself (2s normal, 10s slow-mode when under heap pressure), so no busy-loop risk. Tester log debug_4f.txt showed 241 MQTT drops in 6 minutes on 1.4.0-beta baseline — a subset of those were first-publish-after-discovery and left msgids in this limbo state.
 
-Part of the discovery verification + auto-heal plan (see plan: expressive-growing-yao). Ships first as lowest-risk cleanup.
+Part of the discovery verification + auto-heal plan. Ships first as lowest-risk cleanup.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

@@ -114,7 +114,7 @@ void emergencyHeapRecovery();
 void beginStatusBurst();
 void endStatusBurst();
 bool isStatusBurstActive();
-bool isDripDeferred();                  // true when drip must skip (active burst OR in cooldown)
+// isDripDeferred() is internal to MQTTstuff.ino (TASK-362) — single caller in loopMQTTDiscovery.
 void incrementStatusBurstPublishCount(); // called by status publishers on each real MQTT send
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
@@ -127,11 +127,14 @@ void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const 
 void publishToSourceTopic(const char*, const char*, byte);
 void loopMQTTDiscovery();
 void sendMQTTheapdiag();
-// MQTT discovery verification (ADR-062, TASK-349): see MQTTstuff.ino
+// MQTT discovery verification (ADR-062, TASK-349): state machine lives in
+// mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.
+// startDiscoveryVerification() / isDiscoveryVerificationActive() are
+// re-declared here so that callers already transitively including OTGW-firmware.h
+// keep compiling; prefer including mqtt_discovery_verify.h directly for new
+// callers. endDiscoveryVerification() remains file-static inside the .cpp.
 bool     startDiscoveryVerification();
-void     endDiscoveryVerification();
 bool     isDiscoveryVerificationActive();
-void     tickDiscoveryVerification();
 uint16_t countPendingDiscoveryIds();
 void     incPublishedTopicCount();    // called by streaming helpers in mqtt_configuratie.cpp (ADR-044 shim)
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
@@ -257,6 +260,19 @@ struct UptimeSection {         // state.uptime — System longevity counters
   uint32_t iRebootCount  = 0;  // was rebootCount
 };
 
+// Verify-pass outcome classification (TASK-361). Replaces the earlier hack of
+// writing verifyReceivedCount=expected on heap-abort to suppress the false-
+// missing republish, which also lied to telemetry. With this enum the heap-
+// abort and disconnect paths can honestly report what happened while still
+// suppressing republish only when the outcome is ABORTED_* (not when CLEAN).
+enum class VerifyOutcome : uint8_t {
+  UNKNOWN = 0,            // no verify completed yet
+  CLEAN,                  // verify closed with receivedCount >= expected, no missing
+  MISSING,                // verify closed with missingCount > 0, republish triggered
+  ABORTED_HEAP,           // heap dropped below VERIFICATION_MIN_HEAP_ABORT during window
+  ABORTED_DISCONNECT      // MQTT disconnected during window
+};
+
 struct DiscoverySection {                    // state.discovery — MQTT auto-discovery verify telemetry (ADR-062)
   uint32_t iLastVerifyEpoch         = 0;     // unix-epoch of last endVerify (0 = never)
   uint32_t iVerifyRunCount          = 0;     // lifetime verify-start counter
@@ -264,10 +280,18 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
   uint32_t iPublishedTopicCount     = 0;     // running counter incremented by stream helpers after endPublish
   uint16_t iLastMissingCount        = 0;     // last run: expected - received
   uint16_t iLastOrphanCount         = 0;     // last run: foreign-nodeId retained configs observed
-  bool     bVerificationActive      = false; // active verify window indicator (observable via REST)
-  // 3 bytes padding
+  VerifyOutcome eLastOutcome        = VerifyOutcome::UNKNOWN;  // TASK-361: honest outcome label for last verify pass
+  // Active-window indicator is exposed via isDiscoveryVerificationActive()
+  // reading the MQTTstuff.ino static-local verifyActive flag — single source
+  // of truth. Do not add a mirror bool here (was removed in TASK-362).
 };
 
+// NOTE: this struct is NOT authoritative for the retained stats/heap MQTT blob.
+// sendMQTTheapdiag() emits 17 JSON keys: 8 from this struct plus 3 live values
+// (ESP.getFreeHeap / getMaxFreeBlockSize / getHeapFragmentation) and 6 more
+// from state.discovery (verify_runs/republish_triggered/last_missing/last_orphan/
+// published_topics/last_verify_epoch). Do not assume adding a field here extends
+// the wire format automatically — update the snprintf_P in sendMQTTheapdiag too.
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
   uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
@@ -277,7 +301,6 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iDripActiveBurstSkipCount = 0; // drip ticks skipped DURING active Status-burst (TASK-342)
   uint32_t iDripCooldownSkipCount   = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
   uint32_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure
-  uint32_t iLastPublishedEpoch      = 0; // unix-epoch of last sendMQTTheapdiag publish
 };
 
 struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands

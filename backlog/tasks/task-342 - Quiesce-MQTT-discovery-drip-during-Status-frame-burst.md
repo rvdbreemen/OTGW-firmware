@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-19 21:06'
-updated_date: '2026-04-19 21:17'
+updated_date: '2026-04-21 17:02'
 labels:
   - mqtt
   - heap
@@ -91,4 +91,12 @@ Forward declarations added in OTGW-firmware.h so callers outside MQTTstuff.ino c
 Build verified on esp8266: clean compile, 0.69MB firmware artifact produced.
 
 AC7 (manual timestamp comparison in debug log) deferred to on-device test. The change is small and self-contained; regression risk is limited to the 500ms safety timeout which guarantees the flag never permanently latches ON.
+
+---
+
+**Erratum (2026-04-21, per TASK-367)**
+
+The claim above that the wrap "covers all three Status-frame call sites automatically" is incomplete. The original TASK-342 implementation wrapped only the CH (central heating) Master/Slave status publishers. The ventilation (VH) Status-frame publishers — publishMasterStatusVHState, publishSlaveStatusVHState, and publishStatusVHBitMQTT (OTGW-Core.ino around lines 1500/1667/1706) — were NOT wrapped by beginStatusBurst/endStatusBurst on 1.4.1 as originally shipped. The gap was identified in the 1.4.1 code review (Phase 1A HIGH #1 and Phase 2B HIGH-2) and is being closed by TASK-354.
+
+With TASK-354 complete, the wrapping becomes symmetric across CH and VH publishers. At time of writing TASK-354 is In Progress pending VH-hardware field test; once that task lands and is verified, the "all Status-frame call sites wrapped" claim above will hold.
 <!-- SECTION:FINAL_SUMMARY:END -->

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 19:33'
-updated_date: '2026-04-20 21:07'
+updated_date: '2026-04-21 17:03'
 labels:
   - mqtt
   - discovery
@@ -17,7 +17,7 @@ priority: low
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Wire startDiscoveryVerification into the daily branch of the unified time-boundary dispatcher established in TASK-350. ONE line added inside if(dayFlag) block in doTaskMinuteChanged. Gated by new settings.mqtt.bDiscoveryAutoVerify (default true). Final layer of defense against broker-side retained loss. Ship AFTER TASK-349 has been in field 7+ days AND TASK-350 has landed. See plan file expressive-growing-yao.
+Wire startDiscoveryVerification into the daily branch of the unified time-boundary dispatcher established in TASK-350. ONE line added inside if(dayFlag) block in doTaskMinuteChanged. Gated by new settings.mqtt.bDiscoveryAutoVerify (default true). Final layer of defense against broker-side retained loss. Ship AFTER TASK-349 has been in field 7+ days AND TASK-350 has landed.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -47,4 +47,10 @@ Wire startDiscoveryVerification into the daily branch of the unified time-bounda
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Wired daily auto-verify as the last layer of the discovery auto-heal plan. ONE line added in doTaskMinuteChanged if(dayFlag) block per ADR-064 (no new helper, no dayChanged race): 'if (settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification();'. Preconditions (NTP sync, uptime>3600, heap>=6000, no pending drip, MQTT connected) are already enforced inside startDiscoveryVerification(). Settings wire-up: MQTTdiscoveryAutoVerify JSON serialize/dump/updateSetting in settingStuff.ino. data/index.js translateFields label 'MQTT Discovery Daily Auto-Verify'. Build verified clean (firmware + filesystem). evaluate.py 27/27 PASS including ADR-064 single-caller gate. AC7-9 deferred to field validation (REST exposure of auto_verify boolean, UI tooltip, DST edge case verification). AC11-13 are field/time-based and can only be validated after tester flash + day rollover in real time.
+
+---
+
+**Erratum (2026-04-21, per TASK-367)**
+
+The summary above states that "Preconditions (NTP sync, uptime>3600, heap>=6000, no pending drip, MQTT connected) are already enforced inside startDiscoveryVerification()". At the time TASK-351 shipped, NTP-sync and uptime>3600 were NOT yet enforced inside startDiscoveryVerification; only heap, no-pending-drip, and MQTT-connected checks existed. TASK-359 closed that gap by adding the missing NTP and uptime guards. Post-TASK-359 (now Done), the precondition list quoted above holds for the daily auto-verify path as well.
 <!-- SECTION:FINAL_SUMMARY:END -->

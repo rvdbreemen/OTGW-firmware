@@ -15,6 +15,7 @@
 #include <pgmspace.h>
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
 #include "MQTTstuff.h"              // Structured discovery data layer (enums, structs, streaming API)
+#include "mqtt_discovery_verify.h"  // Discovery-verify state machine (TASK-363: separate TU)
 
 // MQTT Streaming Mode - ALWAYS ENABLED
 // Large auto-discovery messages are sent in 128-byte chunks instead of
@@ -43,10 +44,11 @@ constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
 constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 // Minimum free heap required before attempting a discovery publish.
-// Streaming HA discovery (ADR-077) only needs ~200 bytes per chunk, so the
-// historical 1200-byte floor is obsolete. Value aligned with HEAP_WARNING_THRESHOLD
-// (3072) in canPublishMQTT(): if heap is already at WARNING the drip skips
-// rather than competing with publish-gate throttling.
+// Streaming HA discovery (ADR-042: streaming JSON, no ArduinoJson) only needs
+// ~200 bytes per chunk, so the historical 1200-byte floor is obsolete. Value
+// aligned with HEAP_WARNING_THRESHOLD (3072) in canPublishMQTT(): if heap is
+// already at WARNING the drip skips rather than competing with publish-gate
+// throttling.
 constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 3000;  // Streaming needs ~200 bytes; aligned with WARNING tier
 
 // MQTT autoconfig buffer design:
@@ -91,11 +93,15 @@ struct MQTTAutoConfigSessionLock {
 // was gated out by shouldPublishStatusBit) cost no TCP bandwidth, so no
 // cooldown is needed — this prevents pointless drip pauses in idle state.
 //
-// CAUTION: at 10 seconds, the cooldown can overlap consecutive Status-frames
-// (Crashevans log shows ~3s cadence). That means under heavy Status traffic
-// the drip can stall. Tunable via STATUS_BURST_COOLDOWN_MS. If you see
-// iDripCooldownSkipCount grow without discovery progressing, lower the value
-// (candidates: 2500ms = fits between bursts, 5000ms = partial overlap).
+// TUNING (TASK-353): the Crashevans log shows Status-frames arriving at ~3s
+// cadence. A 10s cooldown overlapped consecutive bursts and stalled the drip
+// under heavy Status traffic (iDripCooldownSkipCount grew without discovery
+// progressing). 2000ms is the chosen default: it fits comfortably between
+// Status-frames (~3s cadence leaves ~1s of drip window per cycle) while still
+// giving lwIP pbufs from the just-finished burst time to drain before the next
+// heap allocation. If you see iDripCooldownSkipCount climb again without
+// discovery progressing, consider lowering further; raising above ~2500ms
+// re-introduces the overlap stall.
 //
 // Timeout safety: if endStatusBurst() is never reached (exception path),
 // isStatusBurstActive() auto-clears after STATUS_BURST_TIMEOUT_MS.
@@ -104,7 +110,7 @@ static unsigned long   statusBurstStartMs    = 0;
 static uint16_t        statusBurstPublishCount = 0;
 static unsigned long   burstCooldownUntilMs  = 0;
 constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
-constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 10000;
+constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 2000;   // TASK-353: 10000->2000; stays under the ~3s Status cadence so the drip gets a window per cycle
 
 void beginStatusBurst() {
   statusBurstActive = true;
@@ -134,7 +140,7 @@ bool isStatusBurstActive() {
   return true;
 }
 
-bool isDripDeferred() {
+static bool isDripDeferred() {
   if (isStatusBurstActive()) return true;
   // Post-burst cooldown window still open?
   // Use signed diff for millis() rollover safety.
@@ -162,34 +168,22 @@ static char       NodeId[MQTT_ID_MAX_LEN];
 
 // =====================================================================
 // MQTT auto-discovery verification (ADR-062, TASK-349)
-// Subscribe briefly to <haprefix>/+/<nodeId>/# and count retained configs
-// delivered by the broker. If received < expected, trigger a full re-announce.
-//
-// RAM-tuned: PubSubClient RX buffer raised 384->1024 only during the 15s
-// window, then restored. Peak transient delta: +640 bytes.
-// Placed below MQTTclient+NodeId static declarations (both referenced here).
+// State machine extracted to mqtt_discovery_verify.cpp under TASK-363.
+// MQTTstuff.ino keeps only the small accessor surface that the extracted
+// TU calls back into (state/settings access, MQTT client ops, logging).
+// Public API: startDiscoveryVerification(), isDiscoveryVerificationActive(),
+// tickDiscoveryVerification(), handleDiscoveryVerifyMessage()
+//   - all declared in mqtt_discovery_verify.h.
 // =====================================================================
-static bool            verifyActive          = false;
-static unsigned long   verifyStartMs         = 0;
-static uint16_t        verifyReceivedCount   = 0;
-static uint16_t        verifyOrphanCount     = 0;
-static bool            verifyBufferResized   = false;
-// sHaprefix[41] + "/+/" + sUniqueid[41] + "/#" + NUL = 88 bytes worst case.
-// Sized to 128 gives comfortable headroom for any future field-size bump.
-static char            verifyWildcard[128]   = "";
-// Cached once in startDiscoveryVerification() so the MQTT callback filter does
-// not recompute strlen() on every incoming retained-config message during the
-// 15s verify window (HIGH/Perf review finding).
-static size_t          verifyPrefixLen       = 0;
-static size_t          verifyNodeLen         = 0;
 
-constexpr unsigned long VERIFICATION_WINDOW_MS      = 15000;
-constexpr uint16_t      VERIFICATION_BUFFER_BYTES   = 1024;
-constexpr uint32_t      VERIFICATION_MIN_HEAP_START = 6000;
-constexpr uint32_t      VERIFICATION_MIN_HEAP_ABORT = 4500;
-// Max single-segment length the node-id parse accepts. Caps DoS-window CPU
-// from malicious broker flooding with long-segment topics (MEDIUM/Sec finding).
-constexpr size_t        VERIFICATION_MAX_NODE_SEGMENT_LEN = 64;
+// Pin the numeric mapping between VerifyOutcome (OTGW-firmware.h) and the
+// uint8_t codes used across the extracted TU boundary. If the enum ever
+// gets reordered this will fail to compile.
+static_assert((uint8_t)VerifyOutcome::UNKNOWN            == 0, "VerifyOutcome UNKNOWN must be 0");
+static_assert((uint8_t)VerifyOutcome::CLEAN              == 1, "VerifyOutcome CLEAN must be 1");
+static_assert((uint8_t)VerifyOutcome::MISSING            == 2, "VerifyOutcome MISSING must be 2");
+static_assert((uint8_t)VerifyOutcome::ABORTED_HEAP       == 3, "VerifyOutcome ABORTED_HEAP must be 3");
+static_assert((uint8_t)VerifyOutcome::ABORTED_DISCONNECT == 4, "VerifyOutcome ABORTED_DISCONNECT must be 4");
 
 // Counter increment shim for mqtt_configuratie.cpp (ADR-044: that TU does not
 // include OTGW-firmware.h / the state global). Must be called from each
@@ -208,127 +202,56 @@ uint16_t countPendingDiscoveryIds() {
   return n;
 }
 
-// Begin a verify pass. Returns false if any precondition fails.
-bool startDiscoveryVerification() {
-  if (verifyActive) return false;
-  if (!state.mqtt.bConnected) return false;
-  if (isFlashing()) return false;
-  if (countPendingDiscoveryIds() > 0) return false;                 // drip-race guard
-  if (ESP.getFreeHeap() < VERIFICATION_MIN_HEAP_START) return false;
-  // Max-block precheck: umm_malloc realloc of PubSubClient's buffer needs a
-  // contiguous 1024-byte block. Avoid the realloc entirely when the heap is
-  // fragmented (Perf review: setBufferSize grow/shrink fragments over long uptime).
-  if (ESP.getMaxFreeBlockSize() < (VERIFICATION_BUFFER_BYTES + 256U)) return false;
+// ---------------------------------------------------------------------
+// Discovery-verify TU accessors (TASK-363). Implemented here because
+// mqtt_discovery_verify.cpp is a separate translation unit and cannot
+// include OTGW-firmware.h (the header defines sketch-level globals that
+// would cause ODR violations when pulled into a second TU). All access
+// to state/settings/MQTTclient/NodeId/etc. from the extracted file goes
+// through these narrow bridges.
+// ---------------------------------------------------------------------
+bool        verifyAccessorMqttConnected()            { return state.mqtt.bConnected; }
+bool        verifyAccessorPicFlashing()              { return isFlashing(); }
+bool        verifyAccessorNtpTimeSet()               { return isNTPtimeSet(); }
+uint32_t    verifyAccessorUptimeSeconds()            { return state.uptime.iSeconds; }
+uint32_t    verifyAccessorPublishedTopicCount()      { return state.discovery.iPublishedTopicCount; }
+uint16_t    verifyAccessorCountPendingDiscoveryIds() { return countPendingDiscoveryIds(); }
+const char* verifyAccessorHaPrefix()                 { return CSTR(settings.mqtt.sHaprefix); }
+const char* verifyAccessorNodeId()                   { return NodeId; }
 
-  const int wrote = snprintf_P(verifyWildcard, sizeof(verifyWildcard),
-                               PSTR("%s/+/%s/#"), CSTR(settings.mqtt.sHaprefix), NodeId);
-  if (wrote <= 0 || (size_t)wrote >= sizeof(verifyWildcard)) {
-    // Arch review (HIGH): refuse to start on wildcard truncation, which would
-    // subscribe to a malformed topic and yield zero matches → false-positive
-    // full republish every run.
-    DebugTf(PSTR("[verify] wildcard truncated (%d/%u), refusing start\r\n"),
-            wrote, (unsigned)sizeof(verifyWildcard));
-    return false;
-  }
+void        verifyAccessorSetOutcome(uint8_t outcome) {
+  state.discovery.eLastOutcome = (VerifyOutcome)outcome;
+}
+uint8_t     verifyAccessorGetOutcome() {
+  return (uint8_t)state.discovery.eLastOutcome;
+}
+void        verifyAccessorIncVerifyRunCount()         { state.discovery.iVerifyRunCount++; }
+void        verifyAccessorIncRepublishTriggeredCount(){ state.discovery.iRepublishTriggeredCount++; }
+void        verifyAccessorSetLastVerifyEpoch(uint32_t epoch)   { state.discovery.iLastVerifyEpoch = epoch; }
+void        verifyAccessorSetLastMissingCount(uint16_t missing){ state.discovery.iLastMissingCount = missing; }
+void        verifyAccessorSetLastOrphanCount(uint16_t orphan)  { state.discovery.iLastOrphanCount = orphan; }
+void        verifyAccessorMarkAllMQTTConfigPending()           { markAllMQTTConfigPending(); }
 
-  // Cache segment lengths for callback fast-path.
-  verifyPrefixLen = strlen(CSTR(settings.mqtt.sHaprefix));
-  verifyNodeLen   = strlen(NodeId);
-
-  // Raise RX buffer BEFORE subscribe so oversize configs fit.
-  if (!MQTTclient.setBufferSize(VERIFICATION_BUFFER_BYTES)) {
-    DebugTln(F("[verify] setBufferSize failed"));
-    return false;
-  }
-  verifyBufferResized = true;
-
-  if (!MQTTclient.subscribe(verifyWildcard, 0)) {
-    DebugTln(F("[verify] subscribe failed"));
-    MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
-    verifyBufferResized = false;
-    return false;
-  }
-
-  verifyReceivedCount = 0;
-  verifyOrphanCount   = 0;
-  verifyStartMs       = millis();
-  verifyActive        = true;
-  state.discovery.bVerificationActive = true;
-  state.discovery.iVerifyRunCount++;
-  DebugTf(PSTR("[verify] started: wildcard=%s expected=%lu\r\n"),
-          verifyWildcard, (unsigned long)state.discovery.iPublishedTopicCount);
-  return true;
+bool        verifyAccessorSetMqttBufferSize(uint16_t sizeBytes) {
+  return MQTTclient.setBufferSize(sizeBytes);
+}
+bool        verifyAccessorRestoreMqttBufferSize() {
+  return MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
+}
+bool        verifyAccessorMqttSubscribe(const char *topic) {
+  return MQTTclient.subscribe(topic, 0);
+}
+bool        verifyAccessorMqttUnsubscribe(const char *topic) {
+  return MQTTclient.unsubscribe(topic);
 }
 
-// End the verify window, reconcile, trigger republish if missing.
-void endDiscoveryVerification() {
-  if (!verifyActive) return;
-  verifyActive = false;
-  state.discovery.bVerificationActive = false;
-  state.discovery.iLastVerifyEpoch    = (uint32_t)time(nullptr);
-
-  const uint16_t expected = (uint16_t)state.discovery.iPublishedTopicCount;
-  const uint16_t missing  = (verifyReceivedCount >= expected) ? 0
-                                                              : (uint16_t)(expected - verifyReceivedCount);
-  state.discovery.iLastMissingCount = missing;
-  state.discovery.iLastOrphanCount  = verifyOrphanCount;
-
-  if (state.mqtt.bConnected) {
-    MQTTclient.unsubscribe(verifyWildcard);
-  }
-  if (verifyBufferResized) {
-    MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
-    verifyBufferResized = false;
-  }
-
-  DebugTf(PSTR("[verify] done: expected=%u received=%u orphans=%u missing=%u\r\n"),
-          expected, verifyReceivedCount, verifyOrphanCount, missing);
-
-  if (missing > 0) {
-    DebugTln(F("[verify] missing configs detected, triggering markAllMQTTConfigPending"));
-    state.discovery.iRepublishTriggeredCount++;
-    markAllMQTTConfigPending();
-  }
+// Logging bridge: accept a pre-formatted RAM string and dispatch through
+// the usual DebugTln helper so the telnet BOL prefix is preserved.
+// The verify TU pre-formats with snprintf_P because it cannot include
+// Debug.h (ODR violation on function bodies defined there).
+void verifyAccessorLogLine(const char* ramMessage) {
+  if (ramMessage != nullptr) DebugTln(ramMessage);
 }
-
-// Polled from handleMQTT() to close the window on timeout / disconnect / heap-abort.
-void tickDiscoveryVerification() {
-  if (!verifyActive) return;
-  if (!state.mqtt.bConnected) {
-    // Fast-path close. Restore the buffer defensively even on a dead client:
-    // setBufferSize is a local realloc, safe when not connected. Prevents the
-    // 1024B allocation from leaking across a reconnect path that does not
-    // re-size (Arch/Sec review finding).
-    if (verifyBufferResized) {
-      MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
-      verifyBufferResized = false;
-    }
-    verifyActive = false;
-    state.discovery.bVerificationActive = false;
-    return;
-  }
-  const unsigned long now = millis();
-  const uint16_t expected = (uint16_t)state.discovery.iPublishedTopicCount;
-
-  // Heap-abort gate: avoid fighting for RAM mid-window.
-  if (ESP.getFreeHeap() < VERIFICATION_MIN_HEAP_ABORT) {
-    verifyReceivedCount = expected;   // suppress false-missing republish
-    DebugTln(F("[verify] heap-abort: closing window early"));
-    endDiscoveryVerification();
-    return;
-  }
-  // Early-close when everything arrived (with tiny settling delay).
-  if (verifyReceivedCount >= expected && (unsigned long)(now - verifyStartMs) > 500UL) {
-    endDiscoveryVerification();
-    return;
-  }
-  // Timeout.
-  if ((unsigned long)(now - verifyStartMs) >= VERIFICATION_WINDOW_MS) {
-    endDiscoveryVerification();
-  }
-}
-
-bool isDiscoveryVerificationActive() { return verifyActive; }
 
 static bool writeMqttChunk(const char *data, size_t len)
 {
@@ -621,39 +544,12 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     Debug(F("] (")); Debug(length); Debug(F(")")); Debugln(); DebugFlush();
   }
 
-  // Verify-window retained-config filter (ADR-062, TASK-349).
-  // Route retained discovery configs from our subscribe-wildcard to the verify
-  // counters without falling through to the command-topic dispatcher below.
-  // Uses cached verifyPrefixLen/verifyNodeLen populated in startDiscoveryVerification
-  // to avoid strlen() per message (Perf/Sec review).
-  if (verifyActive && verifyPrefixLen > 0) {
-    const char *prefix = CSTR(settings.mqtt.sHaprefix);
-    if (strncmp(topic, prefix, verifyPrefixLen) == 0 && topic[verifyPrefixLen] == '/') {
-      // Topic format: <haprefix>/<component>/<nodeId>/.../config
-      const char *rest   = topic + verifyPrefixLen + 1;
-      const char *slash1 = strchr(rest, '/');
-      if (slash1) {
-        const char *nodeStart = slash1 + 1;
-        const char *slash2    = strchr(nodeStart, '/');
-        if (slash2) {
-          const size_t nodeLen = (size_t)(slash2 - nodeStart);
-          // DoS-cap: refuse overly long node segments from malicious/misconfigured
-          // brokers (Sec review). Anything beyond our own nodeid length window is
-          // noise we don't need to strncmp.
-          if (nodeLen > VERIFICATION_MAX_NODE_SEGMENT_LEN) {
-            verifyOrphanCount++;
-            return;
-          }
-          if (nodeLen == verifyNodeLen && strncmp(nodeStart, NodeId, nodeLen) == 0) {
-            verifyReceivedCount++;
-          } else {
-            verifyOrphanCount++;
-          }
-          return;  // handled by verify — do not forward to command dispatcher
-        }
-      }
-    }
-  }
+  // Verify-window retained-config filter (ADR-062, TASK-349, TASK-357).
+  // TASK-363: extracted to mqtt_discovery_verify.cpp. If the verify window is
+  // active and the topic matches our <haprefix>/ prefix, the extracted filter
+  // consumes the message and returns true; we must not fall through to the
+  // OT command dispatcher in that case.
+  if (handleDiscoveryVerifyMessage(topic, length)) return;
 
   //detect home assistant going down...
   char msgPayload[128];
@@ -1070,8 +966,9 @@ void sendMQTTversioninfo(){
 
 /*
 Publish cumulative heap-pressure and drop diagnostics as a single retained JSON
-blob to otgw-firmware/stats/heap. Called from the hourly tick (doTaskEvery60s
-gated by hourChanged) — NOT piggybacked on the 5-minute loop to keep traffic low.
+blob to otgw-firmware/stats/heap. Called from doTaskMinuteChanged() under
+if (hourFlag) per ADR-064 (wall-clock aligned hourly dispatch). NOT piggybacked
+on the 5-minute loop to keep traffic low.
 
 Counters reset on reboot; correlate with otgw-firmware/reboot_count and /uptime
 to reason about lifetime vs. session rates.
@@ -1079,8 +976,13 @@ to reason about lifetime vs. session rates.
 void sendMQTTheapdiag(){
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
-  state.heapdiag.iLastPublishedEpoch = (uint32_t)time(nullptr);
-  char json[384];   // TASK-349: raised 256->384 to fit disc_* fields
+  // TASK-352: raised 384->512 after Phase-2b perf review measured a 465-byte
+  // worst-case serialisation. Breakdown: 17 key+quote+colon+comma tokens (~215B
+  // of JSON scaffolding) + 10 uint32 values at 10 digits each (~100B) + 3 uint16
+  // values at 5 digits each (~15B) + 1 uint8 frag_pct at 3 digits + braces/NUL.
+  // 384 truncated under realistic load; 512 gives ~47B headroom without wasting
+  // RAM. Keep in sync if additional disc_/heap_ counters are added.
+  char json[512];
   snprintf_P(json, sizeof(json),
     PSTR("{\"ws_drops\":%lu,\"mqtt_drops\":%lu,\"enter_low\":%lu,\"enter_warning\":%lu,"
          "\"enter_critical\":%lu,\"drip_burst_skip\":%lu,\"drip_cooldown_skip\":%lu,"

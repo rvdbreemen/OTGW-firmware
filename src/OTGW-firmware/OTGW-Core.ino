@@ -1503,6 +1503,7 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
   const bool allowPublish = shouldPublishStatusVHBit(bitSlot, newVal, prevVal, forcePublish);
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
+  if (allowPublish) incrementStatusBurstPublishCount();  // TASK-354: arm cooldown only for real sends
   publishMQTTOnOff(topic, newVal);
 }
 
@@ -1687,14 +1688,19 @@ static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
   }
   OTcurrentSystemState.MasterStatusVH = valueHB;
   mqttForceNextMasterStatusVHPublish = false;
+  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342/354)
+  // and arm post-burst cooldown on real sends (TASK-347/354).
+  beginStatusBurst();
   {
     OTPublishGate gate(publishCombined);
+    if (publishCombined) incrementStatusBurstPublishCount();
     sendMQTTData(F("status_vh_master"), statusText);
   }
   publishStatusVHBitMQTT(0, "vh_ventilation_enabled",    (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
   publishStatusVHBitMQTT(1, "vh_bypass_position",        (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
   publishStatusVHBitMQTT(2, "vh_bypass_mode",            (valueHB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueHB);
   publishStatusVHBitMQTT(3, "vh_free_ventilation_mode", (valueHB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueHB);
+  endStatusBurst();
 }
 
 static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
@@ -1720,8 +1726,12 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
   }
   OTcurrentSystemState.SlaveStatusVH = valueLB;
   mqttForceNextSlaveStatusVHPublish = false;
+  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342/354)
+  // and arm post-burst cooldown on real sends (TASK-347/354).
+  beginStatusBurst();
   {
     OTPublishGate gate(publishCombined);
+    if (publishCombined) incrementStatusBurstPublishCount();
     sendMQTTData(F("status_vh_slave"), statusText);
   }
   publishStatusVHBitMQTT(0, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
@@ -1730,6 +1740,7 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
   publishStatusVHBitMQTT(3, "vh_bypass_automatic_status", (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB);
   publishStatusVHBitMQTT(4, "vh_free_ventliation_status", (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB);
   publishStatusVHBitMQTT(6, "vh_diagnostic_indicator",    (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB);
+  endStatusBurst();
 }
 
 static uint16_t publishCombinedStatusVHState(uint8_t valueHB, uint8_t valueLB)
