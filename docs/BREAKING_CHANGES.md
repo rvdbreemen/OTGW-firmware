@@ -6,17 +6,29 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ## 🛑 v1.4.1
 
-There are **no breaking changes** in `v1.4.1`. Heap-pressure reduction, retained MQTT discovery verification, the hourly heap-diagnostic topic, and the time-boundary dispatcher refactor are all additive with safe defaults. All MQTT topics published before v1.4.1 remain identical; the new `<topTopic>/otgw-firmware/stats/heap` retained topic is additive. The three new REST endpoints (`GET /api/v2/discovery`, `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`) do not replace or alter any existing endpoint.
+v1.4.1 is the first public release in the 1.4.x series (v1.4.0 was an internal development milestone that was never published).
 
-The new setting `MQTTdiscoveryAutoVerify` defaults to `true`. On shared brokers or brokers with tight wildcard ACLs, set it to `false` to disable the daily verification pass (on-demand verify via REST or telnet remains available either way).
+### Breaking: LittleFS partition size changed from 1 MB to 2 MB
 
-See [RELEASE_NOTES_1.4.1.md](../RELEASE_NOTES_1.4.1.md) for details.
+The upgrade to Arduino Core 3.1.2 changes the LittleFS partition size from 1 MB to 2 MB. **You must flash both the firmware binary and the filesystem binary in the same session.** If you flash only the firmware and skip the filesystem flash, the OTGW will be unable to read or write `settings.ini` — your settings will appear to save but will not persist across reboots. Recovering from this state requires flashing the filesystem image.
 
----
+**Correct upgrade procedure:**
+1. Download both `OTGW-firmware-*.ino.bin` and `OTGW-firmware-*.littlefs.bin` from the release.
+2. Flash the firmware binary first via the Web UI update page.
+3. Flash the filesystem binary immediately after via the same update page.
+4. Hard-refresh the browser (Ctrl+F5) after flashing.
 
-## 🛑 v1.4.0
+Skipping step 3 is the most common upgrade mistake for this release. The firmware will boot and appear to work, but any setting change will silently fail to persist.
 
-There are **no breaking changes** in `v1.4.0`. This release is additive: it introduces SAT (Smart Autotune Thermostat) as an optional embedded heating controller and adds experimental ESP32 support through a unified platform abstraction layer. The ESP8266 build is functionally identical to `v1.3.5`. All MQTT topics, REST API endpoints, settings format, and ser2net behaviour remain identical to `v1.3.5`; SAT and ESP32-only features are opt-in.
+### No other breaking changes
+
+All MQTT topics, REST API endpoints, and settings format remain identical to `v1.3.5`. New additions are purely additive:
+
+- `<topTopic>/otgw-firmware/stats/heap` is a new retained topic (additive).
+- Three new REST endpoints (`GET /api/v2/discovery`, `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`) do not replace or alter any existing endpoint.
+- `MQTTdiscoveryAutoVerify` is a new setting (default `true`). On shared brokers or brokers with tight wildcard ACLs, set it to `false`.
+
+See [RELEASE_NOTES_1.4.1.md](../RELEASE_NOTES_1.4.1.md) for the complete changelog covering all changes since `v1.3.5`.
 
 ---
 

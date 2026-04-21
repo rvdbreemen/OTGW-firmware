@@ -120,14 +120,28 @@ ADR-064 consolidates the firmware's four time-boundary helpers under a single ca
 
 ## Upgrade notes
 
-- Flash both firmware and filesystem. Frontend changes require the filesystem image.
-- Hard-refresh the browser after flashing (Ctrl+F5).
+### LittleFS partition size changed — filesystem flash is mandatory
+
+The Arduino Core 3.1.2 upgrade changed the LittleFS partition size from 1 MB to 2 MB. **You must flash both the firmware binary and the filesystem binary in the same upgrade session.**
+
+If you flash only the firmware and skip the filesystem image, the OTGW will boot and appear to work, but `settings.ini` will be unreadable at the new partition offset. Settings will silently fail to persist across reboots. Recovering requires flashing the filesystem image.
+
+Correct procedure:
+1. Download both `OTGW-firmware-*.ino.bin` and `OTGW-firmware-*.littlefs.bin` from the release.
+2. Flash the firmware binary via the Web UI update page.
+3. Flash the filesystem binary immediately after via the same update page.
+4. Hard-refresh the browser (Ctrl+F5).
+
+### Other upgrade notes
+
 - No settings migration required. The new `MQTTdiscoveryAutoVerify` setting defaults to `true`.
-- If you run on a shared MQTT broker and prefer not to subscribe to a node-scoped wildcard once per day, set `MQTTdiscoveryAutoVerify` to `false`.
+- If you run on a shared MQTT broker with tight wildcard ACLs, set `MQTTdiscoveryAutoVerify` to `false`. On-demand verify via REST or telnet remains available either way.
 
 ## Breaking changes
 
-No breaking changes vs v1.3.5. See [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md) for the cumulative log.
+**LittleFS partition size changed from 1 MB to 2 MB**: upgrading without flashing the filesystem image will cause settings to silently fail to persist. Flash both binaries. See Upgrade notes above and [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md) for the cumulative log.
+
+All MQTT topics, REST API endpoints, and settings format are otherwise identical to `v1.3.5`.
 
 ## Architecture Decision Records
 
