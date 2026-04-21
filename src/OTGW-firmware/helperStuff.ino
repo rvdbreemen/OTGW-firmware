@@ -611,14 +611,22 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 //===========================================================================================
 
 // Heap thresholds for different severity levels
-// Rationale: ESP8266 typically has ~40KB RAM after core libraries
-// - CRITICAL (3KB): Minimum to prevent crash, emergency only
-// - WARNING (5KB): Below this, aggressive throttling needed
-// - LOW (8KB): Below this, start reducing message frequency
-// - HEALTHY (>8KB): Sufficient for normal operation with WebSocket server (~4KB baseline)
-#define HEAP_CRITICAL_THRESHOLD   2048   // Critical: Stop all non-essential operations
-#define HEAP_WARNING_THRESHOLD    4096   // Warning: Start throttling messages
-#define HEAP_LOW_THRESHOLD        6144   // Low: Begin reducing message frequency
+// Rationale: ESP8266 typically has ~40KB RAM after core libraries.
+// Tuned on tester log data (CrashEvans, v1.4.x beta, debug_2a.txt)
+// combined with the burst-reduction fixes. Each tier is sized to cover
+// a specific allocation risk:
+// - CRITICAL (1.5KB): leaves just one lwIP pbuf (~1.5KB) worth of headroom.
+//                     Below this = near-certain crash zone.
+// - WARNING  (3KB):   2x pbuf + streaming chunk. Also the floor for
+//                     accepting new WebSocket clients (see webSocketStuff.ino).
+// - LOW      (5KB):   sits below the expected in-burst dip floor after the
+//                     burst-reduction fixes. Throttling fires only on
+//                     abnormal pressure (longer uptime, fragmentation,
+//                     extra WS clients), not on routine bursts.
+// - HEALTHY (>=5KB):  sufficient for steady-state operation.
+#define HEAP_CRITICAL_THRESHOLD   1536   // Critical: Stop all non-essential operations
+#define HEAP_WARNING_THRESHOLD    3072   // Warning: Start throttling messages
+#define HEAP_LOW_THRESHOLD        5120   // Low: Begin reducing message frequency
 
 // Throttling state
 static uint32_t lastWebSocketSendMs = 0;
@@ -642,18 +650,63 @@ static uint32_t mqttDropCount = 0;
 
 //===========================================================================================
 // Check current heap health level
+//
+// Primary signal is ESP.getFreeHeap(). When freeHeap is already in LOW tier,
+// we additionally consult ESP.getMaxFreeBlockSize() so that fragmentation
+// promotes the level by one tier. Rationale: umm_malloc has no compaction,
+// so a 1.2KB discovery payload can fail when maxBlock<1.2KB even though
+// total free looks ok. Promoting early lets the publish gate start throttling
+// BEFORE the next allocation silently fails.
+//
+// Perf note: getMaxFreeBlockSize() walks the full free list. We only call it
+// outside the HEALTHY path, so the common case stays cheap.
 //===========================================================================================
+#define HEAP_FRAG_PROMOTE_MAXBLOCK  1536   // maxBlock below this while freeHeap in LOW → promote to WARNING (matched to CRITICAL)
 HeapHealthLevel getHeapHealth() {
+  static HeapHealthLevel lastLevel = HEAP_HEALTHY;
   uint32_t freeHeap = platformFreeHeap();
-  
+
+
+  HeapHealthLevel level;
   if (freeHeap < HEAP_CRITICAL_THRESHOLD) {
-    return HEAP_CRITICAL;
+    level = HEAP_CRITICAL;
   } else if (freeHeap < HEAP_WARNING_THRESHOLD) {
-    return HEAP_WARNING;
+    level = HEAP_WARNING;
   } else if (freeHeap < HEAP_LOW_THRESHOLD) {
-    return HEAP_LOW;
+    // Fragmentation check: if contiguous block is already small, promote
+    // one tier so callers back off before the next alloc fails.
+    uint32_t maxBlock = ESP.getMaxFreeBlockSize();
+    if (maxBlock < HEAP_FRAG_PROMOTE_MAXBLOCK) {
+      level = HEAP_WARNING;
+    } else {
+      level = HEAP_LOW;
+    }
+  } else {
+    level = HEAP_HEALTHY;
   }
-  return HEAP_HEALTHY;
+
+  // Track tier-entry transitions for cumulative diagnostics (TASK-346).
+  // Only count when moving INTO a stricter tier than the previous call;
+  // recovery back to HEALTHY is not counted (focus is on pressure events).
+  if (level != lastLevel && level > lastLevel) {
+    if (level == HEAP_LOW)      state.heapdiag.iEnteredLowCount++;
+    if (level == HEAP_WARNING)  state.heapdiag.iEnteredWarningCount++;
+    if (level == HEAP_CRITICAL) state.heapdiag.iEnteredCriticalCount++;
+  }
+  lastLevel = level;
+  return level;
+}
+
+//===========================================================================================
+// Return heap fragmentation as a percentage (0 = no fragmentation, 100 = max)
+// Defined as: 100 * (1 - maxBlock / freeHeap). Observability only — not a gate.
+//===========================================================================================
+uint8_t getHeapFragmentation() {
+  uint32_t freeHeap = ESP.getFreeHeap();
+  if (freeHeap == 0) return 100;
+  uint32_t maxBlock = ESP.getMaxFreeBlockSize();
+  if (maxBlock >= freeHeap) return 0;
+  return (uint8_t)(100UL - (100UL * maxBlock / freeHeap));
 }
 
 //===========================================================================================
@@ -666,6 +719,7 @@ bool canSendWebSocket() {
   // Critical: block WebSocket messages completely
   if (heapLevel == HEAP_CRITICAL) {
     webSocketDropCount++;
+    state.heapdiag.iWsDropsTotal++;
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
       DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
@@ -680,6 +734,7 @@ bool canSendWebSocket() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_CRITICAL) {
       webSocketDropCount++;
+      state.heapdiag.iWsDropsTotal++;
       return false;
     }
   }
@@ -689,6 +744,7 @@ bool canSendWebSocket() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_WARNING) {
       webSocketDropCount++;
+      state.heapdiag.iWsDropsTotal++;
       return false;
     }
   }
@@ -717,6 +773,7 @@ bool canPublishMQTT() {
   // Critical: block MQTT messages completely
   if (heapLevel == HEAP_CRITICAL) {
     mqttDropCount++;
+    state.heapdiag.iMqttDropsTotal++;
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
       DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
@@ -731,6 +788,7 @@ bool canPublishMQTT() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_CRITICAL) {
       mqttDropCount++;
+      state.heapdiag.iMqttDropsTotal++;
       return false;
     }
   }
@@ -740,6 +798,7 @@ bool canPublishMQTT() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_WARNING) {
       mqttDropCount++;
+      state.heapdiag.iMqttDropsTotal++;
       return false;
     }
   }

@@ -148,10 +148,21 @@ enum HeapHealthLevel {
   HEAP_CRITICAL
 };
 HeapHealthLevel getHeapHealth();
+uint8_t getHeapFragmentation();
 bool canSendWebSocket();
 bool canPublishMQTT();
 void logHeapStats();
 void emergencyHeapRecovery();
+// Status-frame burst quiesce (TASK-342): suppress MQTT discovery drip during
+// Status sub-topic fanout so allocation peaks do not stack.
+// Post-burst cooldown (TASK-347): hold drip for STATUS_BURST_COOLDOWN_MS after
+// an endStatusBurst() that had real MQTT traffic, to let lwIP pbufs drain.
+void beginStatusBurst();
+void endStatusBurst();
+bool isStatusBurstActive();
+bool dripDueWithinMs(uint32_t windowMs);  // true if drip fires within windowMs ms or is overdue
+// isDripDeferred() is internal to MQTTstuff.ino -- single caller in loopMQTTDiscovery.
+void incrementStatusBurstPublishCount(); // called by status publishers on each real MQTT send
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
@@ -166,6 +177,14 @@ void setMQTTConfigPending(const uint8_t MSGid);
 void markAllMQTTConfigPending();
 const char *messageIDToString(OTLibMessageID message_id);
 void addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
+void sendMQTTheapdiag();
+// MQTT discovery verification (ADR-062, TASK-349): see MQTTstuff.ino
+bool     startDiscoveryVerification();
+void     endDiscoveryVerification();
+bool     isDiscoveryVerificationActive();
+void     tickDiscoveryVerification();
+uint16_t countPendingDiscoveryIds();
+void     incPublishedTopicCount();    // called by streaming helpers in mqtt_configuratie.cpp (ADR-044 shim)
 void sendLogToWebSocket(const char* logMessage);
 
 // Forward declarations for functions defined in later .ino files
@@ -262,6 +281,8 @@ struct OTGWState {
   FlashSection       flash;       // state.flash.bESPactive, state.flash.iPICprogress
   DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
   UptimeSection      uptime;      // state.uptime.iSeconds, state.uptime.iRebootCount
+  HeapDiagSection    heapdiag;    // state.heapdiag.iMqttDropsTotal, ...
+  DiscoverySection   discovery;   // state.discovery.iPublishedTopicCount, ... (ADR-062)
   PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
   SATRuntimeSection  sat;         // state.sat — SAT thermostat controller
   StatusMessage      statusMessage = StatusMessage::None;

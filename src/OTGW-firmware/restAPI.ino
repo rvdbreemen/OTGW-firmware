@@ -168,6 +168,7 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTValue(int msgid);
 void sendOTLabel(const char *msglabel);
@@ -1047,6 +1048,63 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   else {
     sendApiNotFound(originalURI);
   }
+
+//===[ /api/v2/discovery — MQTT auto-discovery verification/republish (ADR-062 / TASK-349) ]===
+static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  // GET /api/v2/discovery — status dump
+  if (wc == 4 || (wc == 5 && words[4][0] == '\0')) {
+    if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+    char msg[320];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"verification\":{\"active\":%s,\"last_epoch\":%lu,\"last_missing\":%u,\"last_orphan\":%u},"
+           "\"counters\":{\"published_topics\":%lu,\"pending_ids\":%u,\"verify_runs\":%lu,\"republish_triggered\":%lu},"
+           "\"settings\":{\"auto_verify\":%s}}"),
+      isDiscoveryVerificationActive() ? "true" : "false",
+      (unsigned long)state.discovery.iLastVerifyEpoch,
+      (unsigned)state.discovery.iLastMissingCount,
+      (unsigned)state.discovery.iLastOrphanCount,
+      (unsigned long)state.discovery.iPublishedTopicCount,
+      (unsigned)countPendingDiscoveryIds(),
+      (unsigned long)state.discovery.iVerifyRunCount,
+      (unsigned long)state.discovery.iRepublishTriggeredCount,
+      settings.mqtt.bDiscoveryAutoVerify ? "true" : "false");
+    sendCorsOriginHeader();
+    httpServer.send(200, F("application/json"), msg);
+    return;
+  }
+
+  // POST /api/v2/discovery/verify — start verification window
+  if (wc > 4 && strcmp_P(words[4], PSTR("verify")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+    if (ESP.getFreeHeap() < 6000) { sendApiError(503, F("Heap too low for verify")); return; }
+    if (isDiscoveryVerificationActive()) { sendApiError(409, F("Verification already active")); return; }
+    if (countPendingDiscoveryIds() > 0) { sendApiError(409, F("Discovery drip in progress")); return; }
+    if (!startDiscoveryVerification()) { sendApiError(503, F("Verification start refused (see telnet log)")); return; }
+    char msg[128];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"status\":\"verification_started\",\"expected\":%lu,\"window_ms\":15000}"),
+      (unsigned long)state.discovery.iPublishedTopicCount);
+    sendCorsOriginHeader();
+    httpServer.send(202, F("application/json"), msg);
+    return;
+  }
+
+  // POST /api/v2/discovery/republish — force full re-announce
+  if (wc > 4 && strcmp_P(words[4], PSTR("republish")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+    markAllMQTTConfigPending();
+    char msg[96];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"status\":\"marked_pending\",\"count\":%u}"),
+      (unsigned)countPendingDiscoveryIds());
+    sendCorsOriginHeader();
+    httpServer.send(200, F("application/json"), msg);
+    return;
+  }
+
+  sendApiNotFound(originalURI);
 }
 
 //=== Route dispatch table (ADR-050) ===
@@ -1073,6 +1131,7 @@ static const char kRouteWebhook[]    PROGMEM = "webhook";
 static const char kRouteOtdirect[]   PROGMEM = "otdirect";
 #endif
 static const char kRouteSat[]        PROGMEM = "sat";
+static const char kRouteDiscovery[]  PROGMEM = "discovery";
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -1090,6 +1149,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteOtgw,       handleOtgw },
   { kRouteWebhook,    handleWebhook },
   { kRouteSat,        handleSAT },
+  { kRouteDiscovery,  handleDiscovery },
   { nullptr,          nullptr }  // sentinel
 };
 
@@ -1478,6 +1538,26 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("ethernetpresent"), state.hw.bEthernetPresent);
   sendJsonMapEntry(F("ethernetlink"), state.net.bEthernetLink);
 #endif
+
+  // Heap diagnostics — cumulative counters since last reboot.
+  // hd_* prefix keeps them grouped when the UI renders devinfo alphabetically.
+  sendJsonMapEntry(F("hd_fragmentation_pct"), getHeapFragmentation());
+  sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
+  sendJsonMapEntry(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
+  sendJsonMapEntry(F("hd_enter_low"),        state.heapdiag.iEnteredLowCount);
+  sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
+  sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
+  sendJsonMapEntry(F("hd_drip_burst_skip"),    state.heapdiag.iDripActiveBurstSkipCount);
+  sendJsonMapEntry(F("hd_drip_cooldown_skip"), state.heapdiag.iDripCooldownSkipCount);
+  sendJsonMapEntry(F("hd_drip_slowmode"),      state.heapdiag.iDripSlowModeCount);
+
+  // Discovery verification telemetry (ADR-062 / TASK-349)
+  sendJsonMapEntry(F("disc_published_topics"),     state.discovery.iPublishedTopicCount);
+  sendJsonMapEntry(F("disc_pending_ids"),          (uint32_t)countPendingDiscoveryIds());
+  sendJsonMapEntry(F("disc_verify_runs"),          state.discovery.iVerifyRunCount);
+  sendJsonMapEntry(F("disc_republish_triggered"),  state.discovery.iRepublishTriggeredCount);
+  sendJsonMapEntry(F("disc_last_missing"),         (uint32_t)state.discovery.iLastMissingCount);
+  sendJsonMapEntry(F("disc_last_orphan"),          (uint32_t)state.discovery.iLastOrphanCount);
 
   sendEndJsonMap(F("device"));
 

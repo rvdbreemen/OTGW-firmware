@@ -598,6 +598,11 @@ void triggerPICsettingsReadout() {
 void queryNextPICsetting() {
   if (!isPICEnabled() || !isGatewayFirmware()) return;
   if (state.flash.bESPactive || state.flash.bPICactive) return;
+  // Defer PR= queries during Status-burst fanouts and when a drip tick is imminent.
+  // Each PR= response triggers 2 MQTT publishes; landing these inside a burst or
+  // drip window amplifies heap pressure. Deferred queries retry on the next 3s tick.
+  if (isStatusBurstActive()) return;
+  if (dripDueWithinMs(500)) return;
 
   const uint8_t idx = picSettingsQueryIdx;
   picSettingsQueryIdx++;
@@ -1531,6 +1536,7 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
   const bool allowPublish = shouldPublishStatusBit(bitSlot, newVal, prevVal, forcePublish);
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
+  if (allowPublish) incrementStatusBurstPublishCount();  // TASK-347: arm cooldown only for real sends
   publishMQTTOnOff(topic, newVal);
 }
 
@@ -1600,8 +1606,12 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   }
   OTcurrentSystemState.MasterStatus = valueHB;
   mqttForceNextMasterStatusPublish = false;
+  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342)
+  // and arm post-burst cooldown on real sends (TASK-347).
+  beginStatusBurst();
   {
     OTPublishGate gate(publishCombined);
+    if (publishCombined) incrementStatusBurstPublishCount();
     sendMQTTData("status_master", statusText);
   }
   publishStatusBitMQTT(0, "ch_enable",        (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
@@ -1611,6 +1621,7 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   publishStatusBitMQTT(4, "ch2_enable",       (valueHB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueHB);
   publishStatusBitMQTT(5, "summerwintertime", (valueHB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueHB);
   publishStatusBitMQTT(6, "dhw_blocking",     (valueHB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueHB);
+  endStatusBurst();
 }
 
 static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
@@ -1636,8 +1647,12 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   }
   OTcurrentSystemState.SlaveStatus = valueLB;
   mqttForceNextSlaveStatusPublish = false;
+  // Suppress MQTT discovery drip during this sub-topic fanout (TASK-342)
+  // and arm post-burst cooldown on real sends (TASK-347).
+  beginStatusBurst();
   {
     OTPublishGate gate(publishCombined);
+    if (publishCombined) incrementStatusBurstPublishCount();
     sendMQTTData("status_slave", statusText);
   }
   publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
@@ -1648,6 +1663,7 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   publishStatusBitMQTT(13, "centralheating2",      (valueLB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueLB);
   publishStatusBitMQTT(14, "diagnostic_indicator", (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB);
   publishStatusBitMQTT(15, "electric_production",  (valueLB & 0x80), (previousStatus & 0x80), forcePublish, previousStatus, valueLB);
+  endStatusBurst();
 }
 
 static uint16_t publishCombinedStatusState(uint8_t valueHB, uint8_t valueLB)
@@ -1656,6 +1672,8 @@ static uint16_t publishCombinedStatusState(uint8_t valueHB, uint8_t valueLB)
   char slaveStatus[9] {0};
   buildStatusMasterText(valueHB, masterStatus, sizeof(masterStatus));
   buildStatusSlaveText(valueLB, slaveStatus, sizeof(slaveStatus));
+  // Status-burst quiesce is inside publishMasterStatusState/publishSlaveStatusState
+  // so the individual-side callers (lines 1871 and 1899 of this file) also benefit.
   publishMasterStatusState(valueHB, masterStatus);
   publishSlaveStatusState(valueLB, slaveStatus);
   return (OTcurrentSystemState.MasterStatus << 8) | OTcurrentSystemState.SlaveStatus;

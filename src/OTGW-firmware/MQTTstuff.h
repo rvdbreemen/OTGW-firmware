@@ -56,6 +56,7 @@ struct MQTTSettingsSection {
   bool    bOTmessage       = false;
   uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
+  bool    bDiscoveryAutoVerify = true;  // ADR-062: daily auto-heal of retained discovery configs
 };
 
 // ---------------------------------------------------------------------------
