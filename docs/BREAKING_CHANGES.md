@@ -4,6 +4,42 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## 🛑 v1.4.2
+
+### Breaking: heap diagnostic MQTT topic split from one JSON blob into 17 individual retained topics
+
+In v1.4.1 the hourly heap diagnostic was published as a single retained JSON blob on:
+
+```
+<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap
+```
+
+That topic is **removed** in v1.4.2. The same 17 metrics are now published as individual retained topics under:
+
+```
+<topTopic>/value/<uniqueid>/otgw-firmware/stats/<metric>
+```
+
+Each topic carries a plain ASCII decimal number. Metrics: `ws_drops`, `mqtt_drops`, `enter_low`, `enter_warning`, `enter_critical`, `drip_burst_skip`, `drip_cooldown_skip`, `drip_slowmode`, `free_heap`, `max_block`, `frag_pct`, `disc_verify_runs`, `disc_republish_triggered`, `disc_last_missing`, `disc_last_orphan`, `disc_published_topics`, `disc_last_verify_epoch`.
+
+**Action required when upgrading from v1.4.1:**
+
+- If your Home Assistant or Grafana setup subscribed to `<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap` and used a `value_template` / JSON path to extract a field, replace that with a direct subscription to the corresponding `<topTopic>/value/<uniqueid>/otgw-firmware/stats/<metric>` topic. No JSON parsing needed.
+- The old `.../stats/heap` topic is no longer published. If it still sits on your broker as a retained message, clear it manually or wait for broker expiry: the firmware will not overwrite it.
+- Subscribe to `<topTopic>/value/<uniqueid>/otgw-firmware/stats/+` to receive all 17 metrics in one wildcard subscription.
+
+### Additive: retained hostname-to-uniqueid mapping topic
+
+A new retained topic exposes the human-readable hostname for each device:
+
+```
+<topTopic>/value/<uniqueid>/otgw-firmware/hostname
+```
+
+Published on MQTT (re)connect. This lets broker-explorers, multi-device dashboards, and troubleshooting scripts map a cryptic `<uniqueid>` (e.g. `otgw-a1b2c3`) back to the user-visible hostname (e.g. `zolder-otgw`). Additive only: no existing topic changes behavior.
+
+---
+
 ## 🛑 v1.4.1
 
 v1.4.1 is the first public release in the 1.4.x series (v1.4.0 was an internal development milestone that was never published).
