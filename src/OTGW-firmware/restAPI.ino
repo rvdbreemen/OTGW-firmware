@@ -867,49 +867,35 @@ void sendDeviceInfoV2()
 {
   sendStartJsonMap(F("device"));
 
+  // --- Firmware & build identity ---
   sendJsonMapEntry(F("author"), F("Robert van den Breemen"));
   sendJsonMapEntry(F("fwversion"), _SEMVER_FULL);
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
+  sendJsonMapEntry(F("compiled"), cMsg);
   sendJsonMapEntry(F("picavailable"), state.pic.bAvailable);
   if (isPICEnabled()) {
     sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
     sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
     sendJsonMapEntry(F("picfwtype"), state.pic.sType);
   }
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
-  sendJsonMapEntry(F("compiled"), cMsg);
+
+  // --- Network identity ---
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
   sendJsonMapEntry(F("ipaddress"), CSTR(WiFi.localIP().toString()));
   sendJsonMapEntry(F("macaddress"), CSTR(WiFi.macAddress()));
-  sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
-  sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
-  sendJsonMapEntry(F("chipid"), CSTR(String( ESP.getChipId(), HEX )));
-  sendJsonMapEntry(F("coreversion"), CSTR(ESP.getCoreVersion()) );
-  sendJsonMapEntry(F("sdkversion"),  ESP.getSdkVersion());
-  sendJsonMapEntry(F("cpufreq"), ESP.getCpuFreqMHz());
-  sendJsonMapEntry(F("sketchsize"), ESP.getSketchSize() );
-  sendJsonMapEntry(F("freesketchspace"),  ESP.getFreeSketchSpace() );
-
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), ESP.getFlashChipId());
-  sendJsonMapEntry(F("flashchipid"), cMsg);
-  sendJsonMapEntry(F("flashchipsize"), (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
-  sendJsonMapEntry(F("flashchiprealsize"), (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
-
-  LittleFS.info(LittleFSinfo);
-  sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
-
-  sendJsonMapEntry(F("flashchipspeed"), floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
-
-  FlashMode_t ideMode = ESP.getFlashChipMode();
-  sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode]);
   sendJsonMapEntry(F("ssid"), CSTR(WiFi.SSID()));
   sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
   sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
   sendJsonMapEntry(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
+
+  // --- Time, NTP & uptime ---
   sendJsonMapEntry(F("ntpenable"), settings.ntp.bEnable);
   sendJsonMapEntry(F("ntptimezone"), CSTR(settings.ntp.sTimezone));
   sendJsonMapEntry(F("uptime"), upTime());
   sendJsonMapEntry(F("lastreset"), lastReset);
   sendJsonMapEntry(F("bootcount"), state.uptime.iRebootCount);
+
+  // --- Connection status (MQTT, OTGW, thermostat, boiler) ---
   sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
   if (isPICEnabled()) {
     sendJsonMapEntry(F("thermostatconnected"), state.otgw.bThermostatState);
@@ -919,19 +905,40 @@ void sendDeviceInfoV2()
   }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
 
-  // Heap diagnostics (TASK-346) — cumulative counters since last reboot.
-  // hd_* prefix keeps them grouped when the UI renders devinfo alphabetically.
+  // --- Chip & CPU ---
+  sendJsonMapEntry(F("chipid"), CSTR(String( ESP.getChipId(), HEX )));
+  sendJsonMapEntry(F("coreversion"), CSTR(ESP.getCoreVersion()) );
+  sendJsonMapEntry(F("sdkversion"),  ESP.getSdkVersion());
+  sendJsonMapEntry(F("cpufreq"), ESP.getCpuFreqMHz());
+
+  // --- RAM / heap (free heap, largest block, fragmentation, tier transitions) ---
+  sendJsonMapEntry(F("freeheap"), ESP.getFreeHeap());
+  sendJsonMapEntry(F("maxfreeblock"), ESP.getMaxFreeBlockSize());
   sendJsonMapEntry(F("hd_fragmentation_pct"), getHeapFragmentation());
-  sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
-  sendJsonMapEntry(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
   sendJsonMapEntry(F("hd_enter_low"),        state.heapdiag.iEnteredLowCount);
   sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
   sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
-  sendJsonMapEntry(F("hd_drip_burst_skip"),    state.heapdiag.iDripActiveBurstSkipCount);
-  sendJsonMapEntry(F("hd_drip_cooldown_skip"), state.heapdiag.iDripCooldownSkipCount);
-  sendJsonMapEntry(F("hd_drip_slowmode"),      state.heapdiag.iDripSlowModeCount);
 
-  // Discovery verification telemetry (ADR-062 / TASK-349 / TASK-361)
+  // --- Reliability drops (heap-pressure side effects) ---
+  sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
+  sendJsonMapEntry(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
+
+  // --- Flash, sketch & filesystem storage ---
+  sendJsonMapEntry(F("sketchsize"), ESP.getSketchSize() );
+  sendJsonMapEntry(F("freesketchspace"),  ESP.getFreeSketchSpace() );
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), ESP.getFlashChipId());
+  sendJsonMapEntry(F("flashchipid"), cMsg);
+  sendJsonMapEntry(F("flashchipsize"), (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
+  sendJsonMapEntry(F("flashchiprealsize"), (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
+  sendJsonMapEntry(F("flashchipspeed"), floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
+  {
+    FlashMode_t ideMode = ESP.getFlashChipMode();
+    sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode]);
+  }
+  LittleFS.info(LittleFSinfo);
+  sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+
+  // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
   sendJsonMapEntry(F("disc_published_topics"),     state.discovery.iPublishedTopicCount);
   sendJsonMapEntry(F("disc_pending_ids"),          (uint32_t)countPendingDiscoveryIds());
   sendJsonMapEntry(F("disc_verify_runs"),          state.discovery.iVerifyRunCount);
@@ -939,6 +946,9 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("disc_last_missing"),         (uint32_t)state.discovery.iLastMissingCount);
   sendJsonMapEntry(F("disc_last_orphan"),          (uint32_t)state.discovery.iLastOrphanCount);
   sendJsonMapEntry(F("disc_last_outcome"),         verifyOutcomeLabel(state.discovery.eLastOutcome));
+  sendJsonMapEntry(F("hd_drip_burst_skip"),        state.heapdiag.iDripActiveBurstSkipCount);
+  sendJsonMapEntry(F("hd_drip_cooldown_skip"),     state.heapdiag.iDripCooldownSkipCount);
+  sendJsonMapEntry(F("hd_drip_slowmode"),          state.heapdiag.iDripSlowModeCount);
 
   sendEndJsonMap(F("device"));
 
