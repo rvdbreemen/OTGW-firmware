@@ -863,7 +863,17 @@ void sendOTmonitorV2()
 //=======================================================================
 // Sends device info as JSON map (v2 format)
 // Returns: {"device":{"author":"...","fwversion":"...",...}}
-void sendDeviceInfoV2() 
+//
+// Field ordering contract:
+// The Debug Info page (data/index.js refreshDeviceInfo) renders rows in
+// JSON insertion order via `for (key in device)`. The emit order below
+// therefore IS the on-screen order. Fields are grouped semantically
+// (firmware, network, time, connections, chip, RAM, flash, drops,
+// discovery). When adding a new field, place it inside the matching
+// group rather than appending at the end, so related metrics stay
+// adjacent on the page. JSON object order is not an API guarantee for
+// REST consumers - they should parse by key.
+void sendDeviceInfoV2()
 {
   sendStartJsonMap(F("device"));
 
