@@ -1197,6 +1197,8 @@ void markAllMQTTConfigPending()
   setMQTTConfigPending(27);  // number Toutside override
   // Also mark the Dallas sensor pseudo-ID
   setMQTTConfigPending(OTGWdallasdataid);
+  // Heap/discovery statistics discovery (TASK-346): 17 retained otgw-firmware/stats/* topics
+  setMQTTConfigPending(OTGWheapstatsid);
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }

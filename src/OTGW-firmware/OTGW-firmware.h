@@ -823,6 +823,11 @@ float     OTGWs0powerkw = 0.0f ;                  // Calculated kW actual consum
 time_t    OTGWs0lasttime = 0;                     // Last time S0 counters have been read
 byte      OTGWs0dataid = 245;                     // foney dataid for counter autoconfigure
 
+// Heap & discovery statistics (TASK-346): faux dataid used to anchor HA discovery
+// configs for the 17 retained otgw-firmware/stats/* topics. Not an OT message ID;
+// MQTTautoCfgPendingMap tracks this entry like any other in markAllMQTTConfigPending().
+byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats autoconfigure
+
 //Now load Debug & network library
 #include "Debug.h"
 #include "networkStuff.h"
