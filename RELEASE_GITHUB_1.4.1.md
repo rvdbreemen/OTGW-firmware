@@ -1,6 +1,6 @@
 v1.4.1 is the first public release in the 1.4.x series. A 1.4.0 milestone was tracked internally but was never published as a standalone release — v1.4.1 ships the complete body of work in one go. Upgrading from v1.3.5? You get everything below. There is no v1.4.0 to install or skip.
 
-> **CRITICAL: Flash filesystem FIRST, then firmware.** The Arduino Core 3.1.2 upgrade changed the LittleFS partition from 1 MB to 2 MB. Flashing firmware first (or skipping the filesystem) causes settings loss. On any device running firmware before v1.4.x it also triggers a 5-10 minute unresponsive first boot while the partition reformats, after which all settings reset to factory defaults. Always flash the filesystem binary before the firmware binary.
+> **CRITICAL: Flash filesystem FIRST, then firmware.** The Arduino Core 3.1.2 upgrade changed the LittleFS partition from 1 MB to 2 MB. Flashing in the correct order (filesystem first, firmware second) preserves your settings. If you mistakenly flash the firmware first, the new firmware boots against the old 1 MB layout and spends 5-10 minutes reformatting the 2 MB partition on first boot — the device is unresponsive during that time and all settings are lost. Always flash the filesystem binary before the firmware binary.
 
 Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md)
 
@@ -31,9 +31,8 @@ Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md)
 2. Flash the **filesystem binary first** via the Web UI update page.
 3. Flash the **firmware binary second**, immediately after.
 4. Hard-refresh the browser (Ctrl+F5).
-5. If upgrading from any version before v1.4.x: wait up to 10 minutes for the first boot to complete, then re-enter all settings.
 
-No settings migration required. The new `MQTTdiscoveryAutoVerify` setting defaults to `true`. If you run on a shared MQTT broker with tight wildcard ACLs, set it to `false`.
+Flashing in this order preserves your settings. No settings migration required. The new `MQTTdiscoveryAutoVerify` setting defaults to `true`. If you run on a shared MQTT broker with tight wildcard ACLs, set it to `false`.
 
 ## Thank you
 
