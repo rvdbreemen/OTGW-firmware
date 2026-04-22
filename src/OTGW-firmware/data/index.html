@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">  
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- color-scheme meta: tells the browser BEFORE any CSS parses that we
+         support both light and dark. Prevents flash-of-wrong-theme on
+         native chrome (scrollbars, form widgets) during first render.
+         The actual active scheme is still driven by the html color-scheme
+         declaration in the loaded stylesheet below. -->
+    <meta name="color-scheme" content="light dark">
     <script>
       (function() {
         var css = "./index.css";

@@ -18,7 +18,12 @@
     line-height: 1.6;
     color: black;
     background: #e6ffff;
+    color-scheme: light;  /* match the meta tag; native widgets render in light variant across Chrome/Edge/Safari/Firefox */
   }
+
+  /* Standard ::placeholder has shipped in every major engine since 2017
+     (Blink, Gecko, WebKit). Older prefixed variants are not needed. */
+  ::placeholder { color: #999; opacity: 1; }
   
   body {
     max-width: 100%;
