@@ -962,6 +962,7 @@ Publish usefull firmware version information to MQTT broker.
 void sendMQTTversioninfo(){
   char rebootCountBuf[12];
   snprintf_P(rebootCountBuf, sizeof(rebootCountBuf), PSTR("%lu"), static_cast<unsigned long>(state.uptime.iRebootCount));
+  sendMQTTData(F("otgw-firmware/hostname"), CSTR(settings.sHostname), true);  // retained: human-readable mapping of <uniqueid> to device name
   sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
   sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
@@ -975,49 +976,55 @@ void sendMQTTversioninfo(){
 }
 
 /*
-Publish cumulative heap-pressure and drop diagnostics as a single retained JSON
-blob to otgw-firmware/stats/heap. Called from doTaskMinuteChanged() under
-if (hourFlag) per ADR-064 (wall-clock aligned hourly dispatch). NOT piggybacked
-on the 5-minute loop to keep traffic low.
+Publish cumulative heap-pressure and drop diagnostics as individual retained
+topics under <topTopic>/value/<uniqueid>/otgw-firmware/stats/*. Each metric
+lives on its own topic (not bundled in a JSON blob) so consumers can subscribe
+to a single counter, expose it as a Home Assistant entity without JSON path
+templating, or graph it in Grafana without parsing. sendMQTTData() prepends
+MQTTPubNamespace, so uniqueid already scopes the topics per device - multiple
+OTGWs on one broker never collide.
 
-Counters reset on reboot; correlate with otgw-firmware/reboot_count and /uptime
-to reason about lifetime vs. session rates.
+Called from doTaskMinuteChanged() under if (hourFlag) per ADR-064 (wall-clock
+aligned hourly dispatch). NOT piggybacked on the 5-minute loop to keep traffic
+low. Counters reset on reboot; correlate with otgw-firmware/reboot_count and
+/uptime to reason about lifetime vs. session rates. To map <uniqueid> back to
+a human-readable device name, subscribe to
+<topTopic>/value/<uniqueid>/otgw-firmware/hostname (retained).
 */
+static void publishStatU32(const __FlashStringHelper *topic, unsigned long value) {
+  char buf[12];  // max uint32 decimal = 10 digits + sign + NUL
+  snprintf_P(buf, sizeof(buf), PSTR("%lu"), value);
+  sendMQTTData(topic, buf, true);  // retained
+}
+
 void sendMQTTheapdiag(){
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
-  // TASK-352: raised 384->512 after Phase-2b perf review measured a 465-byte
-  // worst-case serialisation. Breakdown: 17 key+quote+colon+comma tokens (~215B
-  // of JSON scaffolding) + 10 uint32 values at 10 digits each (~100B) + 3 uint16
-  // values at 5 digits each (~15B) + 1 uint8 frag_pct at 3 digits + braces/NUL.
-  // 384 truncated under realistic load; 512 gives ~47B headroom without wasting
-  // RAM. Keep in sync if additional disc_/heap_ counters are added.
-  char json[512];
-  snprintf_P(json, sizeof(json),
-    PSTR("{\"ws_drops\":%lu,\"mqtt_drops\":%lu,\"enter_low\":%lu,\"enter_warning\":%lu,"
-         "\"enter_critical\":%lu,\"drip_burst_skip\":%lu,\"drip_cooldown_skip\":%lu,"
-         "\"drip_slowmode\":%lu,\"free_heap\":%lu,\"max_block\":%lu,\"frag_pct\":%u,"
-         "\"disc_verify_runs\":%lu,\"disc_republish_triggered\":%lu,"
-         "\"disc_last_missing\":%u,\"disc_last_orphan\":%u,"
-         "\"disc_published_topics\":%lu,\"disc_last_verify_epoch\":%lu}"),
-    (unsigned long)state.heapdiag.iWsDropsTotal,
-    (unsigned long)state.heapdiag.iMqttDropsTotal,
-    (unsigned long)state.heapdiag.iEnteredLowCount,
-    (unsigned long)state.heapdiag.iEnteredWarningCount,
-    (unsigned long)state.heapdiag.iEnteredCriticalCount,
-    (unsigned long)state.heapdiag.iDripActiveBurstSkipCount,
-    (unsigned long)state.heapdiag.iDripCooldownSkipCount,
-    (unsigned long)state.heapdiag.iDripSlowModeCount,
-    (unsigned long)ESP.getFreeHeap(),
-    (unsigned long)ESP.getMaxFreeBlockSize(),
-    getHeapFragmentation(),
-    (unsigned long)state.discovery.iVerifyRunCount,
-    (unsigned long)state.discovery.iRepublishTriggeredCount,
-    (unsigned)state.discovery.iLastMissingCount,
-    (unsigned)state.discovery.iLastOrphanCount,
-    (unsigned long)state.discovery.iPublishedTopicCount,
-    (unsigned long)state.discovery.iLastVerifyEpoch);
-  sendMQTTData(F("otgw-firmware/stats/heap"), json, true);   // retained
+
+  // Heap pressure tier transitions and drop counters
+  publishStatU32(F("otgw-firmware/stats/ws_drops"),              (unsigned long)state.heapdiag.iWsDropsTotal);
+  publishStatU32(F("otgw-firmware/stats/mqtt_drops"),            (unsigned long)state.heapdiag.iMqttDropsTotal);
+  publishStatU32(F("otgw-firmware/stats/enter_low"),             (unsigned long)state.heapdiag.iEnteredLowCount);
+  publishStatU32(F("otgw-firmware/stats/enter_warning"),         (unsigned long)state.heapdiag.iEnteredWarningCount);
+  publishStatU32(F("otgw-firmware/stats/enter_critical"),        (unsigned long)state.heapdiag.iEnteredCriticalCount);
+
+  // Discovery drip throttle counters
+  publishStatU32(F("otgw-firmware/stats/drip_burst_skip"),       (unsigned long)state.heapdiag.iDripActiveBurstSkipCount);
+  publishStatU32(F("otgw-firmware/stats/drip_cooldown_skip"),    (unsigned long)state.heapdiag.iDripCooldownSkipCount);
+  publishStatU32(F("otgw-firmware/stats/drip_slowmode"),         (unsigned long)state.heapdiag.iDripSlowModeCount);
+
+  // Live heap snapshot at publish time
+  publishStatU32(F("otgw-firmware/stats/free_heap"),             (unsigned long)ESP.getFreeHeap());
+  publishStatU32(F("otgw-firmware/stats/max_block"),             (unsigned long)ESP.getMaxFreeBlockSize());
+  publishStatU32(F("otgw-firmware/stats/frag_pct"),              (unsigned long)getHeapFragmentation());
+
+  // Discovery verification telemetry (ADR-062)
+  publishStatU32(F("otgw-firmware/stats/disc_verify_runs"),         (unsigned long)state.discovery.iVerifyRunCount);
+  publishStatU32(F("otgw-firmware/stats/disc_republish_triggered"), (unsigned long)state.discovery.iRepublishTriggeredCount);
+  publishStatU32(F("otgw-firmware/stats/disc_last_missing"),        (unsigned long)state.discovery.iLastMissingCount);
+  publishStatU32(F("otgw-firmware/stats/disc_last_orphan"),         (unsigned long)state.discovery.iLastOrphanCount);
+  publishStatU32(F("otgw-firmware/stats/disc_published_topics"),    (unsigned long)state.discovery.iPublishedTopicCount);
+  publishStatU32(F("otgw-firmware/stats/disc_last_verify_epoch"),   (unsigned long)state.discovery.iLastVerifyEpoch);
 }
 
 /*

@@ -452,16 +452,18 @@ Template placeholders:
 
 ## Heap diagnostic telemetry
 
-Since 1.4.1 the firmware publishes a single retained JSON blob summarising the main heap-pressure and discovery counters. It is intended for dashboards, Home Assistant template sensors and long-term diagnostics without having to scrape the telnet log.
+The firmware publishes heap-pressure and discovery counters as 17 individual retained topics under `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/*`. Each metric lives on its own topic (no JSON bundling) so consumers can subscribe to a single counter, expose it as a Home Assistant sensor without JSON path templating, or graph it directly in Grafana.
 
-**Topic**: `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/heap` (retained)
+**Topic prefix**: `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/<metric>` (all retained)
 
 **Cadence**: once per hour, on the wall-clock hour boundary. Publishing is dispatched by the unified time handler introduced in ADR-064, which also drives the daily discovery-verify trigger. No publish happens while MQTT is disconnected.
 
-**Payload**: a single JSON object with 17 fields. Most fields are *session counters* that reset to zero on reboot; a few are *live samples* measured at publish time; three are *last-known* values captured at the end of the previous discovery verify run.
+**Device identity**: to map `{UniqueId}` (e.g. `otgw-a1b2c3`) back to a human-readable device name, subscribe to `{TopTopic}/value/{UniqueId}/otgw-firmware/hostname` (retained, published on every MQTT (re)connect).
 
-| Field | Type | Kind | Meaning |
-| ----- | ---- | ---- | ------- |
+**Metrics**: most topics carry *session counters* that reset to zero on reboot; a few are *live samples* measured at publish time; three are *last-known* values captured at the end of the previous discovery verify run. Payloads are plain ASCII decimal numbers.
+
+| Metric topic suffix | Type | Kind | Meaning |
+| ------------------- | ---- | ---- | ------- |
 | `ws_drops` | uint32 | session counter | WebSocket messages dropped due to heap pressure since boot. |
 | `mqtt_drops` | uint32 | session counter | MQTT messages dropped due to heap pressure since boot. |
 | `enter_low` | uint32 | session counter | Transitions into the `HEAP_LOW` tier (from `HEALTHY`). |
@@ -482,11 +484,11 @@ Since 1.4.1 the firmware publishes a single retained JSON blob summarising the m
 
 **Counter reset semantics**
 
-- All `session counter` fields reset to zero on reboot and increase monotonically while the firmware runs. They are *cumulative* within a session.
-- `live sample` fields reflect the state at the moment of publish; do not use them to infer trends without sampling.
-- `last known` fields hold the result of the *previous* verify run. During an active verify window they are not updated until `endVerify` runs.
+- All `session counter` topics reset to zero on reboot and increase monotonically while the firmware runs. They are *cumulative* within a session.
+- `live sample` topics reflect the state at the moment of publish; do not use them to infer trends without sampling.
+- `last known` topics hold the result of the *previous* verify run. During an active verify window they are not updated until `endVerify` runs.
 
-A matching REST surface is available at `GET /api/v2/discovery` for the discovery-specific subset of these fields (see `docs/api/README.md`).
+Subscribing to `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/+` gives you all 17 counters as individual messages. A matching REST surface is available at `GET /api/v2/discovery` for the discovery-specific subset of these fields (see `docs/api/README.md`).
 
 ---
 

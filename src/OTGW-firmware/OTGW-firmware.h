@@ -287,12 +287,14 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
   // of truth. Do not add a mirror bool here (was removed in TASK-362).
 };
 
-// NOTE: this struct is NOT authoritative for the retained stats/heap MQTT blob.
-// sendMQTTheapdiag() emits 17 JSON keys: 8 from this struct plus 3 live values
-// (ESP.getFreeHeap / getMaxFreeBlockSize / getHeapFragmentation) and 6 more
-// from state.discovery (verify_runs/republish_triggered/last_missing/last_orphan/
-// published_topics/last_verify_epoch). Do not assume adding a field here extends
-// the wire format automatically — update the snprintf_P in sendMQTTheapdiag too.
+// NOTE: this struct is NOT authoritative for the retained otgw-firmware/stats/*
+// MQTT topics. sendMQTTheapdiag() publishes 17 individual retained topics: 8
+// sourced from this struct, 3 live values (ESP.getFreeHeap / getMaxFreeBlockSize
+// / getHeapFragmentation), and 6 from state.discovery (verify_runs /
+// republish_triggered / last_missing / last_orphan / published_topics /
+// last_verify_epoch). Adding a field here does NOT automatically surface on MQTT
+// — add a corresponding publishStatU32(F("otgw-firmware/stats/...")) call in
+// sendMQTTheapdiag().
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
   uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
