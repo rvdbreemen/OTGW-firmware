@@ -580,7 +580,7 @@
     background: #2c2c2e;
   }
 
-  .input-changed { background: #3a3a3c; }
+  .input-changed { background: #5a4a1a; color: #ffe0b2; }
   .input-normal { background: #2c2c2e; color: #e0e0e0; }
   .input-readonly { background: #1c1c1e; color: #888; }
 
