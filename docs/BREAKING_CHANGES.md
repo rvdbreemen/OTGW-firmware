@@ -31,7 +31,7 @@ If you skip the filesystem flash, the OTGW can still read existing settings but 
 
 All MQTT topics, REST API endpoints, and settings format remain identical to `v1.3.5`. New additions are purely additive:
 
-- `<topTopic>/otgw-firmware/stats/heap` is a new retained topic (additive).
+- `<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap` is a new retained topic (additive). The `<uniqueid>` segment is automatically inserted by the publish namespace so multiple OTGWs on one broker cannot overwrite each other.
 - Three new REST endpoints (`GET /api/v2/discovery`, `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`) do not replace or alter any existing endpoint.
 - `MQTTdiscoveryAutoVerify` is a new setting (default `true`). On shared brokers or brokers with tight wildcard ACLs, set it to `false`.
 

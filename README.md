@@ -20,7 +20,7 @@ Key highlights:
 - **WiFi reconnect hardening**: fixes a regression that prevented IP re-acquisition after a router reboot (no ESP reboot required).
 - **Heap-aware discovery drip**: 2 s normal / 10 s slow-mode with fragmentation-aware gates, Status-burst cooldown, and hold-per-interval hysteresis. Eliminates mid-discovery watchdog resets on loaded gateways.
 - **Retained-discovery self-heal**: node-scoped wildcard verify window counts what the broker actually has, re-announces missing configs. Daily auto-heal + on-demand via REST (`/api/v2/discovery`), telnet `V` key. See [ADR-062](docs/adr/ADR-062-retained-discovery-verification.md).
-- **Hourly heap diagnostic MQTT topic**: `<topTopic>/otgw-firmware/stats/heap` (retained, 17-field JSON covering free heap, fragmentation, tier counters, discovery state).
+- **Hourly heap diagnostic MQTT topic**: `<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap` (retained, 17-field JSON covering free heap, fragmentation, tier counters, discovery state). Uniqueid scoping keeps multiple OTGWs on the same broker from overwriting each other.
 - **Unified time-boundary dispatcher**: hour/day/year triggers wall-clock aligned via single caller contract. See [ADR-064](docs/adr/ADR-064-time-boundary-single-caller-contract.md).
 - **OpenTherm v4.2 alignment**: fixes for MaxTSet/TdhwSet (0°C in HA), reserved ID range 58-69, WRITE_ACK handling.
 - **Configurable device manufacturer/model** in MQTT device announcement (credit: Schelte Bron).

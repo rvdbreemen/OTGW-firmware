@@ -119,7 +119,7 @@ ADR-062 introduces a self-heal mechanism for the retained HA discovery state on 
 
 ### Hourly heap diagnostic MQTT topic
 
-A retained topic `<topTopic>/otgw-firmware/stats/heap` is published once per hour. The 17-field JSON payload covers current/min/max/average free heap, largest contiguous block, cumulative tier-transition counters, dropped-publish counters, and discovery state. Because the topic is retained, any fresh subscriber can read the most recent snapshot without waiting for the next hour boundary.
+A retained topic `<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap` is published once per hour. The 17-field JSON payload covers current/min/max/average free heap, largest contiguous block, cumulative tier-transition counters, dropped-publish counters, and discovery state. Because the topic is retained, any fresh subscriber can read the most recent snapshot without waiting for the next hour boundary. The `<uniqueid>` segment in the path ensures multiple OTGWs on the same broker never overwrite each other's stats.
 
 ### Unified time-boundary dispatcher
 
