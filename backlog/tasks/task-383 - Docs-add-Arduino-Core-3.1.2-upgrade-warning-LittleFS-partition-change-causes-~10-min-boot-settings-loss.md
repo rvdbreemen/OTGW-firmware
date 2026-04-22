@@ -3,11 +3,11 @@ id: TASK-383
 title: >-
   Docs: add Arduino Core 3.1.2 upgrade warning (LittleFS partition change causes
   ~10 min boot + settings loss)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-22 06:35'
-updated_date: '2026-04-22 06:38'
+updated_date: '2026-04-22 06:47'
 labels:
   - docs
   - migration
@@ -53,7 +53,13 @@ Maintainer confirmed: "I think it's caused by upgrading Arduino Core 3.1.2 to be
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 BREAKING_CHANGES.md has a v1.4.1 section explicitly warning about LittleFS partition change
-- [ ] #2 Upgrade notes state: 'Flash both firmware.bin AND littlefs.bin when upgrading from 1.3.x or any build based on Arduino Core 2.7.4'
-- [ ] #3 The warning explains the ~10 min boot and settings loss consequence if only firmware is flashed
+- [x] #1 BREAKING_CHANGES.md has a v1.4.1 section explicitly warning about LittleFS partition change
+- [x] #2 Upgrade notes state: 'Flash both firmware.bin AND littlefs.bin when upgrading from 1.3.x or any build based on Arduino Core 2.7.4'
+- [x] #3 The warning explains the ~10 min boot and settings loss consequence if only firmware is flashed
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Updated `docs/BREAKING_CHANGES.md` v1.4.1 section. The existing text only warned about settings not persisting; it did not mention the ~10 minute boot time or complete settings loss specific to 1.3.x upgrades. Expanded the section with two subsections: upgrading from v1.3.x (Core 2.7.4) describing the reformat hang and full settings wipe, and upgrading from v1.4.x describing the silent persist failure. Step 5 added to the upgrade procedure. Committed together with TASK-382 on branch fix-issue-mqtt-discovery-device-name."
+<!-- SECTION:FINAL_SUMMARY:END -->

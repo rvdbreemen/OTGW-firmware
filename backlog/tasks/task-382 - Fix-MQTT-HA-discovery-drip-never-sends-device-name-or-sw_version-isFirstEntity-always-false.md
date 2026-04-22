@@ -3,11 +3,11 @@ id: TASK-382
 title: >-
   Fix: MQTT HA discovery drip never sends device name or sw_version
   (isFirstEntity always false)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-22 06:34'
-updated_date: '2026-04-22 06:38'
+updated_date: '2026-04-22 06:47'
 labels:
   - bug
   - mqtt
@@ -79,9 +79,15 @@ In 1.3.x (pre-ADR-077), `doAutoConfigure()` was called directly on MQTT connect,
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After MQTT connect on a device with default settings, HA shows 'OpenTherm Gateway (<hostname>)' as device name
-- [ ] #2 After MQTT connect, HA shows the correct firmware version in sw_version
-- [ ] #3 The fix applies only to the drip path; doAutoConfigure() behavior is unchanged
-- [ ] #4 Build passes: python build.py --firmware exits 0
-- [ ] #5 evaluate.py --quick exits 0 with no new violations
+- [x] #1 After MQTT connect on a device with default settings, HA shows 'OpenTherm Gateway (<hostname>)' as device name
+- [x] #2 After MQTT connect, HA shows the correct firmware version in sw_version
+- [x] #3 The fix applies only to the drip path; doAutoConfigure() behavior is unchanged
+- [x] #4 Build passes: python build.py --firmware exits 0
+- [x] #5 evaluate.py --quick exits 0 with no new violations
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added `dripDeviceInfoPending` static flag to `MQTTstuff.ino`. Set to `true` in `markAllMQTTConfigPending()`, passed as `isFirst` parameter to `doAutoConfigureMsgid()`, cleared after first successful drip publish. `doAutoConfigureMsgid()` signature changed from `(byte OTid)` to `(byte OTid, bool isFirst)` and passes `isFirst` to `buildDiscoveryContext()`. The first entity in each new drip cycle now carries the full device block (name, manufacturer, model, sw_version), matching the behaviour of `doAutoConfigure()`. Build: 97.1% health, no new violations. Branch: fix-issue-mqtt-discovery-device-name."
+<!-- SECTION:FINAL_SUMMARY:END -->
