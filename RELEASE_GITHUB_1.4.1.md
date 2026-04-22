@@ -1,5 +1,7 @@
 v1.4.1 is the first public release in the 1.4.x series. A 1.4.0 milestone was tracked internally but was never published as a standalone release — v1.4.1 ships the complete body of work in one go. Upgrading from v1.3.5? You get everything below. There is no v1.4.0 to install or skip.
 
+> **CRITICAL: Flash filesystem FIRST, then firmware.** The Arduino Core 3.1.2 upgrade changed the LittleFS partition from 1 MB to 2 MB. Flashing in the correct order (filesystem first, firmware second) preserves your settings. If you mistakenly flash the firmware first, the new firmware boots against the old 1 MB layout and spends 5-10 minutes reformatting the 2 MB partition on first boot — the device is unresponsive during that time and all settings are lost. Always flash the filesystem binary before the firmware binary.
+
 Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md)
 
 ## Bug fixes
@@ -25,12 +27,12 @@ Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md)
 
 ## Upgrade notes
 
-> **Warning: flash both binaries.** The Arduino Core 3.1.2 upgrade changed the LittleFS partition from 1 MB to 2 MB. If you flash only the firmware and skip the filesystem image, your OTGW will boot normally but settings will silently fail to persist across reboots. Flash firmware first, then filesystem, in the same session.
+1. Download both `OTGW-firmware-*.ino.bin` and `OTGW-firmware-*.littlefs.bin` from this release.
+2. Flash the **filesystem binary first** via the Web UI update page.
+3. Flash the **firmware binary second**, immediately after.
+4. Hard-refresh the browser (Ctrl+F5).
 
-- Download both `OTGW-firmware-*.ino.bin` and `OTGW-firmware-*.littlefs.bin` from this release.
-- Flash firmware via the Web UI update page, then flash the filesystem image immediately after.
-- Hard-refresh the browser (Ctrl+F5) after flashing.
-- No settings migration required. The new `MQTTdiscoveryAutoVerify` setting defaults to `true`. If you run on a shared MQTT broker with tight wildcard ACLs, set it to `false`.
+Flashing in this order preserves your settings. No settings migration required. The new `MQTTdiscoveryAutoVerify` setting defaults to `true`. If you run on a shared MQTT broker with tight wildcard ACLs, set it to `false`.
 
 ## Thank you
 

@@ -8,7 +8,7 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 **v1.4.1 is the first public release in the 1.4.x series.** A 1.4.0 milestone was tracked internally but was never published as a standalone release: development continued until the full body of work was stable enough to ship in one go. If you are upgrading from v1.3.5, v1.4.1 contains everything. There is no v1.4.0 to install or skip.
 
-> **Upgrade warning: flash both firmware and filesystem.** The Arduino Core 3.1.2 upgrade changed the LittleFS partition from 1 MB to 2 MB. If you flash only the firmware binary and skip the filesystem image, your OTGW will boot but settings will silently fail to persist across reboots. Download both `*.ino.bin` and `*.littlefs.bin` from the release and flash them in the same session.
+> **CRITICAL upgrade warning: flash filesystem FIRST, then firmware.** The Arduino Core 3.1.2 upgrade changed the LittleFS partition from 1 MB to 2 MB. All versions before v1.4.x shipped with Arduino Core 2.7.4 and a 1 MB filesystem. Flashing in the correct order (filesystem binary first, firmware binary second) preserves your settings. If you mistakenly flash the firmware first, the new firmware boots against the old 1 MB layout and spends 5-10 minutes reformatting the 2 MB partition on first boot — the device is unresponsive during that time and all your settings are lost. Always download both `*.ino.bin` and `*.littlefs.bin` and flash the filesystem binary first.
 
 Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md).
 

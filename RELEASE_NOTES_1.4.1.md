@@ -14,6 +14,27 @@ There are no breaking changes vs v1.3.5. All new behaviour is additive, with con
 
 ---
 
+## WARNING: Flash filesystem FIRST, then firmware when upgrading to v1.4.x
+
+**If you are upgrading to v1.4.1 from any earlier version, read this before you flash anything.**
+
+The Arduino Core 3.1.2 upgrade changed the LittleFS partition size from 1 MB to 2 MB. All versions before v1.4.x shipped with Arduino Core 2.7.4 and a 1 MB filesystem. This changes the correct upgrade procedure.
+
+**Correct order: filesystem binary first, firmware binary second. Your settings are preserved.**
+
+1. Download both `OTGW-firmware-1.4.1.ino.bin` and `OTGW-firmware-1.4.1.littlefs.bin` from this release.
+2. Flash the **filesystem binary first** via the Web UI update page.
+3. Flash the **firmware binary second**, immediately after.
+4. Hard-refresh the browser (Ctrl+F5).
+
+**What happens if you flash the firmware first (the wrong order)?**
+
+If you mistakenly flash the firmware binary before the filesystem, the new firmware boots against the old 1 MB filesystem layout at the wrong partition offset. It then spends approximately 5 to 10 minutes reformatting the new 2 MB partition on first boot. During this time the device is completely unresponsive: the web UI is unreachable and MQTT stays offline. After the reformat, all your settings are gone and you will need to re-enter your MQTT broker, credentials, hostname, and every other setting once more.
+
+**Flashing the filesystem binary first avoids this entirely. Your settings are preserved and no reformat is triggered.**
+
+---
+
 ## New features and improvements since v1.3.5
 
 ### SimpleTelnet: cleaner debug console
@@ -122,15 +143,17 @@ ADR-064 consolidates the firmware's four time-boundary helpers under a single ca
 
 ### LittleFS partition size changed — filesystem flash is mandatory
 
-The Arduino Core 3.1.2 upgrade changed the LittleFS partition size from 1 MB to 2 MB. **You must flash both the firmware binary and the filesystem binary in the same upgrade session.**
+The Arduino Core 3.1.2 upgrade changed the LittleFS partition size from 1 MB to 2 MB. **You must flash both binaries in the same session, filesystem first.**
 
-If you flash only the firmware and skip the filesystem image, the OTGW will boot and appear to work, but `settings.ini` will be unreadable at the new partition offset. Settings will silently fail to persist across reboots. Recovering requires flashing the filesystem image.
+See the WARNING section at the top of these release notes for the full details on what happens if you skip or reverse the order.
 
 Correct procedure:
 1. Download both `OTGW-firmware-*.ino.bin` and `OTGW-firmware-*.littlefs.bin` from the release.
-2. Flash the firmware binary via the Web UI update page.
-3. Flash the filesystem binary immediately after via the same update page.
+2. Flash the **filesystem binary first** via the Web UI update page.
+3. Flash the **firmware binary second**, immediately after via the same update page.
 4. Hard-refresh the browser (Ctrl+F5).
+
+Flashing in this order preserves your settings. Flashing the firmware first triggers a reformat on boot and all settings are lost.
 
 ### Other upgrade notes
 
@@ -139,7 +162,7 @@ Correct procedure:
 
 ## Breaking changes
 
-**LittleFS partition size changed from 1 MB to 2 MB**: upgrading without flashing the filesystem image will cause settings to silently fail to persist. Flash both binaries. See Upgrade notes above and [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md) for the cumulative log.
+**LittleFS partition size changed from 1 MB to 2 MB**: flash the filesystem binary first, firmware second to preserve your settings. Flashing firmware first triggers a 5-10 minute unresponsive boot while the partition reformats, and all settings are lost. See the WARNING section above and [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md) for the cumulative log.
 
 All MQTT topics, REST API endpoints, and settings format are otherwise identical to `v1.3.5`.
 
