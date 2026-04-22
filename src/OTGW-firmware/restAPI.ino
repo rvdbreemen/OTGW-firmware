@@ -919,10 +919,6 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
   sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
 
-  // --- Reliability drops (heap-pressure side effects) ---
-  sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
-  sendJsonMapEntry(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
-
   // --- Flash, sketch & filesystem storage ---
   sendJsonMapEntry(F("sketchsize"), ESP.getSketchSize() );
   sendJsonMapEntry(F("freesketchspace"),  ESP.getFreeSketchSpace() );
@@ -937,6 +933,10 @@ void sendDeviceInfoV2()
   }
   LittleFS.info(LittleFSinfo);
   sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+
+  // --- Reliability drops (heap-pressure side effects) ---
+  sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
+  sendJsonMapEntry(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
 
   // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
   sendJsonMapEntry(F("disc_published_topics"),     state.discovery.iPublishedTopicCount);
