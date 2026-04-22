@@ -77,6 +77,7 @@ enum class HaUnit : uint8_t {
     mS,                 // "mS" (milliseconds, S0 pulse time)
     h,                  // "h" (hours)
     kW_percent,         // "kW/%" (MaxCapacity composite)
+    bytes,              // "B" (bytes, used by heap-diag sensors)
     _count
 };
 
