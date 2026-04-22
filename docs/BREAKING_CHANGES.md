@@ -10,15 +10,22 @@ v1.4.1 is the first public release in the 1.4.x series (v1.4.0 was an internal d
 
 ### Breaking: LittleFS partition size changed from 1 MB to 2 MB
 
-The upgrade to Arduino Core 3.1.2 changes the LittleFS partition size from 1 MB to 2 MB. **You must flash both the firmware binary and the filesystem binary in the same session.** If you flash only the firmware and skip the filesystem flash, the OTGW will be unable to read or write `settings.ini` — your settings will appear to save but will not persist across reboots. Recovering from this state requires flashing the filesystem image.
+The upgrade to Arduino Core 3.1.2 changes the LittleFS partition size from 1 MB to 2 MB. **You must flash both the firmware binary and the filesystem binary in the same session.**
 
-**Correct upgrade procedure:**
+**Upgrading from v1.3.x (Arduino Core 2.7.4):**
+
+If you flash only the firmware binary without flashing the filesystem binary, the OTGW will detect a stale 1 MB filesystem at the wrong partition offset. It will spend approximately 5 to 10 minutes reformatting the new 2 MB partition on first boot. During this time the device is unresponsive: the web UI is unreachable and MQTT stays offline. After the reformat completes, all settings are gone — MQTT broker, credentials, hostname, and every other setting resets to factory defaults. You must re-enter all settings manually after the first boot.
+
+**Upgrading from v1.4.x (already on Arduino Core 3.1.2):**
+
+If you skip the filesystem flash, the OTGW can still read existing settings but any setting change will silently fail to persist across reboots. Recovering from this state requires flashing the filesystem image.
+
+**Correct upgrade procedure (applies to all upgrades):**
 1. Download both `OTGW-firmware-*.ino.bin` and `OTGW-firmware-*.littlefs.bin` from the release.
 2. Flash the firmware binary first via the Web UI update page.
 3. Flash the filesystem binary immediately after via the same update page.
 4. Hard-refresh the browser (Ctrl+F5) after flashing.
-
-Skipping step 3 is the most common upgrade mistake for this release. The firmware will boot and appear to work, but any setting change will silently fail to persist.
+5. If upgrading from v1.3.x: wait up to 10 minutes for the first boot to complete, then re-enter your settings.
 
 ### No other breaking changes
 
