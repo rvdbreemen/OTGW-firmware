@@ -110,6 +110,7 @@ static unsigned long   statusBurstStartMs    = 0;
 static uint16_t        statusBurstPublishCount = 0;
 static unsigned long   burstCooldownUntilMs  = 0;
 static uint32_t        sDripDueAtMs          = 0;   // updated by loopMQTTDiscovery(); read by dripDueWithinMs()
+static bool            dripDeviceInfoPending = false; // true after markAllMQTTConfigPending(); first drip entity carries full device block
 constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
 constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 2000;   // TASK-353: 10000->2000; stays under the ~3s Status cadence so the drip gets a window per cycle
 
@@ -1189,6 +1190,7 @@ void markAllMQTTConfigPending()
   setMQTTConfigPending(27);  // number Toutside override
   // Also mark the Dallas sensor pseudo-ID
   setMQTTConfigPending(OTGWdallasdataid);
+  dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }
 //===========================================================================================
@@ -1280,8 +1282,9 @@ void loopMQTTDiscovery()
       }
 
       MQTTDebugTf(PSTR("[drip] publishing discovery for OT ID %d\r\n"), msgId);
-      bool success = doAutoConfigureMsgid(msgId);
+      bool success = doAutoConfigureMsgid(msgId, dripDeviceInfoPending);
       if (success) {
+        dripDeviceInfoPending = false;
         setMQTTConfigDone(msgId);
         bitClear(MQTTautoCfgPendingMap[group], bit);
         MQTTDebugTf(PSTR("[drip] OT ID %d published OK\r\n"), msgId);
@@ -1387,7 +1390,7 @@ void doAutoConfigure(){
   }
 }
 //===========================================================================================
-bool doAutoConfigureMsgid(byte OTid)
+bool doAutoConfigureMsgid(byte OTid, bool isFirst)
 {
   // Dallas sensors have their own discovery path
   if (OTid == OTGWdallasdataid) {
@@ -1403,7 +1406,7 @@ bool doAutoConfigureMsgid(byte OTid)
   if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return false;
 
   bool result = false;
-  HaDiscoveryContext ctx = buildDiscoveryContext();
+  HaDiscoveryContext ctx = buildDiscoveryContext(isFirst);
 
   // Sensors
   uint16_t sIdx = readSensorIndex(OTid);
