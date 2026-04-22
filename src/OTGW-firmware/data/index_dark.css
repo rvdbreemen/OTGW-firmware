@@ -18,7 +18,15 @@
     line-height: 1.6;
     color: #e0e0e0;
     background: #1a1a1a;
+    color-scheme: dark;           /* tell the browser to render native widgets (number spinners, autofill, scrollbars, focus rings) in dark variant */
+    scrollbar-color: #555 #2c2c2e;/* Firefox: explicit thumb/track colors (Chrome picks up color-scheme automatically) */
   }
+
+  /* Placeholder text: keep legible on both the browser-default white inputs
+     and the .input-normal dark inputs. #888 reads as subtle hint on both. */
+  ::placeholder { color: #888; opacity: 1; }
+  ::-webkit-input-placeholder { color: #888; }
+  :-ms-input-placeholder { color: #888; }
   
   body {
     max-width: 100%;
