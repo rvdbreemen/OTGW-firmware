@@ -50,6 +50,7 @@ ESP8266/ESP32 firmware for the NodoShop OpenTherm Gateway. Web UI, MQTT, REST AP
 - **Language**: Arduino C/C++ (.ino files), single translation unit
 - **Serial**: Reserved exclusively for PIC — never write to `Serial` after init
 - **Debug**: `DebugTln()`, `DebugTf()` → Telnet port 23, never `Serial.print()`
+- **Branches**: `dev` is the 1.4.x maintenance line; `feature-dev-2.0.0-otgw32-esp32-sat-support` is the 2.0.0 development branch (ESP32/OTGW32 + SAT). Default to the branch you are on; port fixes deliberately, not reflexively.
 
 ---
 
