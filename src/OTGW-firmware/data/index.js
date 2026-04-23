@@ -813,6 +813,16 @@ window.otgwDebug = {
   }
 };
 
+// Wire otgwDebug.verbose accessor to the DEBUG_WS flag so the advertised help
+// command actually works. Reads return the current flag; writes coerce to bool
+// and log the transition once for confirmation.
+Object.defineProperty(window.otgwDebug, 'verbose', {
+  get: () => DEBUG_WS,
+  set: (v) => { DEBUG_WS = !!v; console.log('[WebSocket] verbose logging =', DEBUG_WS); },
+  enumerable: true,
+  configurable: true,
+});
+
 // Show welcome message on load
 console.log('%c🔧 OTGW Debug Helper Loaded', 'color: #00ff00; font-weight: bold; font-size: 14px;');
 console.log('%cType otgwDebug.help() for available commands', 'color: #ffaa00;');
@@ -894,6 +904,12 @@ const WEBSOCKET_PORT = 81;
 let wsReconnectTimer = null;
 let wsWatchdogTimer = null;
 const WS_WATCHDOG_TIMEOUT = 45000; // 45 seconds timeout (allows for 30s keepalive + 15s margin)
+// Per-message WebSocket console logs are gated behind this flag. It is
+// file-scoped; toggle from the browser console via `otgwDebug.verbose = true`
+// (wired via an accessor near the otgwDebug helper). Keeps the default console
+// clean so warnings/errors are not drowned out by a torrent of MESSAGE/KEEPALIVE/
+// Watchdog/Trim lines at steady state.
+let DEBUG_WS = false;
 
 // WebSocket connection tracking for detailed logging
 let wsConnectionAttempts = 0; // Count of connection attempts since page load
@@ -1307,10 +1323,10 @@ window.otgwPersistence = {
 
 //============================================================================
 function resetWSWatchdog() {
-  console.log('[WebSocket] Watchdog reset (' + (WS_WATCHDOG_TIMEOUT/1000) + 's)');
+  // Reset+cleared logs removed -- they fired on every inbound message and drowned
+  // out real signals. Only the WATCHDOG TIMEOUT path below still logs (console.warn).
   if (wsWatchdogTimer) {
     clearTimeout(wsWatchdogTimer);
-    console.log('[WebSocket] Watchdog timer cleared');
   }
   wsWatchdogTimer = setTimeout(function() {
       console.warn('[WebSocket] WATCHDOG TIMEOUT - no data received');
@@ -1581,10 +1597,11 @@ function initOTLogWebSocket(force) {
     };
     
     otLogWS.onmessage = function(event) {
-      console.log('[WebSocket] MESSAGE bytes=' + (event.data ? event.data.length : 0));
+      // Per-message trace gated behind DEBUG_WS (set true in console to enable).
+      // MESSAGE bytes= removed as redundant with MESSAGE data:.
       resetWSWatchdog();
 
-      if (typeof event.data === 'string') {
+      if (DEBUG_WS && typeof event.data === 'string') {
         if (event.data.length > 200) {
           console.log('[WebSocket] MESSAGE data (truncated): ' + event.data.substring(0, 200) + '...');
         } else {
@@ -1594,7 +1611,7 @@ function initOTLogWebSocket(force) {
 
       // Handle keepalive messages (don't log or add to buffer)
       if (typeof event.data === 'string' && event.data.includes('"type":"keepalive"')) {
-        console.log('[WebSocket] KEEPALIVE');
+        if (DEBUG_WS) console.log('[WebSocket] KEEPALIVE');
         return;
       }
 
@@ -1973,7 +1990,7 @@ function addLogLine(logLine) {
   if (maxLogLines !== null && otLogBuffer.length > maxLogLines) {
     const toRemove = otLogBuffer.length - maxLogLines;
     otLogBuffer.splice(0, toRemove);
-    console.log(`Trimmed ${toRemove} old log entries (limit: ${maxLogLines.toLocaleString()})`);
+    if (DEBUG_WS) console.log(`Trimmed ${toRemove} old log entries (limit: ${maxLogLines.toLocaleString()})`);
   }
   
   // Trigger debounced save (progressive storage)
