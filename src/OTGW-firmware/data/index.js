@@ -846,7 +846,8 @@ let storageQuotaMB = 10; // Default, will be detected
 let autoScroll = true;
 let frozenLogStartIndex = null; // Freeze visible slice when auto-scroll is disabled
 let lastRenderedStartIndex = 0;
-let lastRenderedLogHtml = null;
+let lastRenderedLogText = null;
+let scrollToBottomScheduled = false;
 let showTimestamps = true;
 let searchTerm = '';
 let updatePending = false;
@@ -1026,7 +1027,9 @@ function calculateOptimalMaxLines() {
   
   // Use the smaller of the two
   const calculated = Math.min(availableMemoryLines, availableStorageLines);
-  const reasonable = Math.max(5000, Math.min(calculated, 200000)); // 5k to 200k range
+  // Cap normal-mode buffer at 10k lines for 1.4.2: higher values stall the render hotpath
+  // on restore and drag the WS watchdog down with them. Capture mode still scales with memory.
+  const reasonable = Math.max(5000, Math.min(calculated, 10000)); // 5k to 10k range
   
   console.log(`Normal mode: max ${reasonable.toLocaleString()} lines (mem: ${availableMemoryLines.toLocaleString()}, storage: ${availableStorageLines.toLocaleString()})`);
   return reasonable;
@@ -2143,23 +2146,28 @@ function renderLogDisplay() {
   const linesToShow = otLogFilteredBuffer.slice(startIndex, startIndex + displayCount);
   lastRenderedStartIndex = startIndex;
 
-  // Build HTML
-  let html = '';
-  linesToShow.forEach(entry => {
-    const text = formatLogLine(entry.data);
-    const line = showTimestamps ? `${entry.time} ${text}` : text;
-    html += escapeHtml(line) + '\n';
-  });
+  // Build plain text: container CSS is white-space: pre, so '\n' becomes a line break.
+  // textContent skips the HTML parser and per-line escaping entirely.
+  const text = linesToShow.map(entry => {
+    const body = formatLogLine(entry.data);
+    return showTimestamps ? `${entry.time} ${body}` : body;
+  }).join('\n');
 
-  // Avoid resetting scroll position when rendered content did not change.
-  if (html !== lastRenderedLogHtml) {
-    container.innerHTML = html;
-    lastRenderedLogHtml = html;
+  if (text !== lastRenderedLogText) {
+    container.textContent = text;
+    lastRenderedLogText = text;
   }
 
-  // Auto-scroll to bottom if enabled
-  if (autoScroll) {
-    container.scrollTop = container.scrollHeight;
+  // Defer scroll-to-bottom to the next frame so scrollHeight is read after paint,
+  // not synchronously in the same frame as the textContent write (avoids forced reflow).
+  if (autoScroll && !scrollToBottomScheduled) {
+    scrollToBottomScheduled = true;
+    requestAnimationFrame(() => {
+      scrollToBottomScheduled = false;
+      if (autoScroll) {
+        container.scrollTop = container.scrollHeight;
+      }
+    });
   }
 }
 
