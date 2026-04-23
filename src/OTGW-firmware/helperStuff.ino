@@ -463,9 +463,21 @@ static void prepareForReboot() {
   doWebSocketClose();     // close all WebSocket clients (wrapper, see webSocketStuff.ino)
   debugTelnet.stop();     // port 23 debug telnet
   OTGWstream.stop();      // port 25238 OTGW stream
-  WiFi.disconnect();      // trigger WIFI_EVENT_STAMODE_DISCONNECTED so the SDK
-                          // does a fresh association on the next boot instead
-                          // of reusing stale state from before the restart
+
+  // IMPORTANT: do NOT call WiFi.disconnect() here. On ESP8266 Arduino with
+  // WiFi.persistent(true) (which networkStuff.ino startWiFi() sets, and is
+  // the default), WiFi.disconnect() writes an EMPTY station_config to flash
+  // NVRAM — wiping the stored SSID and password. The device then boots into
+  // the captive portal with no credentials. Reference:
+  // ESP8266WiFiSTA.cpp::disconnect() writes wifi_station_set_config(&conf)
+  // with conf.ssid = 0 / conf.password = 0 when _persistent is true.
+  // This was observed 2026-04-23 — reboot caused WiFi creds to be lost.
+  //
+  // We don't actually need WiFi.disconnect() here: ESP.reset() (our final
+  // call below) is a bootrom jump that wipes all SDK state anyway, forcing
+  // a fresh association on the next boot. Keeping WiFi up through this
+  // cleanup phase is in fact necessary so the TCP FINs from the close/stop
+  // calls above can reach their peers before the reset fires.
 }
 
 void doRestart(const char* str) {
