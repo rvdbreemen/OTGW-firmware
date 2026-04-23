@@ -4,7 +4,7 @@ title: 'Fix: v1.3.5 bootloop on fresh flash to Wemos D1'
 status: To Do
 assignee: []
 created_date: '2026-04-22 20:53'
-updated_date: '2026-04-22 20:53'
+updated_date: '2026-04-23 16:59'
 labels:
   - bug
   - needs-info
@@ -32,4 +32,6 @@ GitHub #554 (ArnoudPJ, 2026-04-22): A fresh Wemos D1 mini could not be flashed w
 
 <!-- SECTION:NOTES:BEGIN -->
 Waiting for: (1) reporter answer on whether 1.4.1 direct-flash also bootloops; (2) serial output during bootloop. Maintainer already asked the question in the issue thread on 2026-04-22T16:15Z.
+
+2026-04-23: ArnoudPJ replied with full diagnostic info on GitHub #554. Environment: Wemos D1 mini classic (ESP8266, 4MB Boya flash chip, manufacturer 0x68), Nodo-shop OTGW PCB v2.12 purchased 15 April. Flashed with esptool.py v3.3.3 using '--baud 9600 --no-stub --flash_mode qio'. Serial output confirms bootloop: 'rst cause:2, boot mode:(3,7)' repeating, never progresses past bootloader. User reports logging 'craps out when trying to connect to wifi'. Did not test 1.4.1 direct-flash yet. Strong suspicion: --flash_mode qio mismatch with Boya chip (0x68 vendor) which is notoriously unreliable in QIO; our firmware binaries are built with dio mode. Also --no-stub and --baud 9600 suggest poor serial reliability. Recommendation: respond to #554 suggesting --flash_mode dio + drop --no-stub + try --baud 115200. This is a flash-procedure issue rather than a firmware bug. Ready to formulate an info/advice reply on GitHub.
 <!-- SECTION:NOTES:END -->
