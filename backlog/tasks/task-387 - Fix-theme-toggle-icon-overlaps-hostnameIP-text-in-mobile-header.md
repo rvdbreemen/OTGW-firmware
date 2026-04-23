@@ -1,10 +1,10 @@
 ---
 id: TASK-387
 title: 'Fix: theme toggle icon overlaps hostname+IP text in mobile header'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-04-23 07:43'
-updated_date: '2026-04-23 07:43'
+updated_date: '2026-04-23 07:48'
 labels:
   - bug
   - ui
@@ -29,3 +29,9 @@ Discord #beta-testing (sergeantd, 2026-04-23 07:11Z, screenshot attached): on mo
 - [ ] #3 Desktop layout (>600px) unchanged
 - [ ] #4 Tested on Android Chrome and iOS Safari
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-23: Fix landed on dev (commit c0eb1682). Added .headerrow { padding-right: 32px; } inside the @media (max-width: 600px) block in both index.css and index_dark.css. Reserves horizontal space for the absolute-positioned theme toggle so flex content (hostname+IP .headercolumn) no longer flows under it. Desktop unchanged. Awaiting field validation by sergeantd on mobile.
+<!-- SECTION:NOTES:END -->
