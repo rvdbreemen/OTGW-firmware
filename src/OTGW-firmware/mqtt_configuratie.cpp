@@ -1893,12 +1893,16 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "stat_t":"<mqttPubTopic>/<label>[/<sourceTopicSegment>]"
+  // "stat_t":"<mqttPubTopic>/[otgw-pic/]<label>[/<sourceTopicSegment>]"
+  // otgw-pic/ prefix applied when MQTT_HA_FLAG_IS_PIC_ENTRY is set -- see ADR-065.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kStatT)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.mqttPubTopic)) return false;
   if (!w.writeChar('/')) return false;
+  if (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY) {
+    if (!w.writeProgmem(kPicSubtreePrefix)) return false;
+  }
   if (!w.writeRam(label)) return false;
   if (hasSrc && ctx.sourceTopicSegment && ctx.sourceTopicSegment[0]) {
     if (!w.writeChar('/')) return false;
@@ -1982,12 +1986,16 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "stat_t":"<mqttPubTopic>/<label>"
+  // "stat_t":"<mqttPubTopic>/[otgw-pic/]<label>"
+  // otgw-pic/ prefix applied when MQTT_HA_FLAG_IS_PIC_ENTRY is set -- see ADR-065.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kStatT)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.mqttPubTopic)) return false;
   if (!w.writeChar('/')) return false;
+  if (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY) {
+    if (!w.writeProgmem(kPicSubtreePrefix)) return false;
+  }
   if (!w.writeRam(label)) return false;
   if (!w.writeChar('"')) return false;
 
@@ -2401,7 +2409,10 @@ bool streamClimateDiscovery(PubSubClient &client,
     if (!w.writeProgmem(PSTR("\"mode_stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("/otgw-pic/thermostat_connected\""))) return false;
+      // Uses kPicSubtreePrefix for consistency with composeBinSensorPayload (ADR-065).
+      if (!w.writeChar('/')) return false;
+      if (!w.writeProgmem(kPicSubtreePrefix)) return false;
+      if (!w.writeProgmem(PSTR("thermostat_connected\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!writeJsonKV_P(w, PSTR("mode_stat_tpl"), PSTR("{% if value == 'ON' %}heat{% else %}off{% endif %}"))) return false;
     } else {

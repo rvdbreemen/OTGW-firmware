@@ -51,6 +51,14 @@ constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 // throttling.
 constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 3000;  // Streaming needs ~200 bytes; aligned with WARNING tier
 
+// PIC subtree prefix -- single source of truth for the otgw-pic/ MQTT subtree.
+// Declared extern in MQTTstuff.h. See ADR-065 / TASK-389 for the public-API
+// contract. Consumed by composeBinSensorPayload/composeSensorPayload/climate
+// payload in mqtt_configuratie.cpp to emit stat_t that matches the runtime
+// publish topic. Publish-side call-sites still use F("otgw-pic/...") literals
+// until TASK-390 migrates them to sendMQTTDataPic().
+const char kPicSubtreePrefix[] PROGMEM = "otgw-pic/";
+
 // MQTT autoconfig buffer design:
 // feedWatchDog() is used (not doBackgroundTasks()) during autoconfig iterations
 // to prevent cMsg from being overwritten by HTTP/MQTT callbacks.

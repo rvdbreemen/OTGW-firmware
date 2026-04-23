@@ -173,6 +173,15 @@ constexpr uint8_t MQTT_HA_FLAG_ANY_SOURCE           = 0x07;
 #endif
 
 // ---------------------------------------------------------------------------
+// PIC subtree prefix -- stable public topic API (see ADR-065 / TASK-389).
+// Entries flagged MQTT_HA_FLAG_IS_PIC_ENTRY publish and are discovered under
+// <mqttPubTopic>/otgw-pic/<label>. Single source of truth for the subtree
+// name so future renames or migrations touch exactly one location.
+// Defined in MQTTstuff.ino.
+// ---------------------------------------------------------------------------
+extern const char kPicSubtreePrefix[] PROGMEM;
+
+// ---------------------------------------------------------------------------
 // Sensor discovery config -- one per mqttha.cfg sensor entry
 // ---------------------------------------------------------------------------
 struct MqttHaSensorCfg {
