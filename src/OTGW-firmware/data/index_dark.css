@@ -9,16 +9,42 @@
 ***************************************************************************      
 */
 * {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: var(--font-sans);
   }
   
   html {
     -webkit-font-smoothing: antialiased;
-    font-family: 'Dosis', sans-serif;
+    font-family: var(--font-sans); /* was 'Dosis' — never actually loaded */
     line-height: 1.6;
     color: #e0e0e0;
     background: #1a1a1a;
+    /* color-scheme tells modern browsers to render native widgets (number
+       spinners, autofill UI, focus rings, dropdowns) in their dark variant.
+       Supported: Chrome 81+, Firefox 96+, Safari 13+, Edge 81+. Covered by
+       the <meta name="color-scheme"> tag during initial render, and by this
+       rule once CSS parses. */
+    color-scheme: dark;
+    /* scrollbar-color: honored by Firefox 64+, Chrome 121+ (Jan 2024), and
+       Safari 18+ (Sep 2024). Older Blink/WebKit needs the ::-webkit-scrollbar
+       fallbacks further down. */
+    scrollbar-color: #555 #2c2c2e;
   }
+
+  /* Standard ::placeholder has shipped in Chrome 57+ (2017), Firefox 51+
+     (2017), Safari 10.1+ (2017), Edge 79+ (2020). All older vendor-prefixed
+     variants are obsolete and omitted intentionally. opacity:1 overrides
+     the Firefox default of 0.54 that dims placeholders by default. */
+  ::placeholder { color: #888; opacity: 1; }
+
+  /* ::-webkit-scrollbar fallbacks for Blink < 121 and WebKit < 18 which do
+     not honor scrollbar-color. Safe to keep even once those versions
+     disappear: modern engines that honor scrollbar-color simply ignore
+     these. Does not affect Firefox. */
+  ::-webkit-scrollbar              { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track        { background: #2c2c2e; }
+  ::-webkit-scrollbar-thumb        { background: #555; border-radius: 6px; border: 2px solid #2c2c2e; }
+  ::-webkit-scrollbar-thumb:hover  { background: #6a6a6c; }
+  ::-webkit-scrollbar-corner       { background: #2c2c2e; }
   
   body {
     max-width: 100%;
@@ -187,6 +213,12 @@
       top: 8px;
       right: 0;
       margin: 0;
+    }
+    /* Mirrors index.css: reserve 32px for the absolute-positioned toggle so
+       the rightmost .headercolumn (hostname + IP) does not flow under it on
+       narrow viewports. */
+    .headerrow {
+      padding-right: 32px;
     }
   }
 
@@ -550,7 +582,7 @@
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: Consolas, "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -620,7 +652,7 @@
     background: #2c2c2e;
   }
 
-  .input-changed { background: #3a3a3c; }
+  .input-changed { background: #5a4a1a; color: #ffe0b2; }
   .input-normal { background: #2c2c2e; color: #e0e0e0; }
   .input-readonly { background: #1c1c1e; color: #888; }
 
@@ -886,7 +918,7 @@
 
 /* Log Content */
 .ot-log-content {
-  font-family: 'Courier New', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: #d4d4d4;
   padding: 15px;

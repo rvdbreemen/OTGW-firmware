@@ -1011,6 +1011,28 @@ Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and take
 |-----------|----------------------|--------------------|---------|
 | `sat_heating_system` | `sat/heating_system` | `sat/heating_system` | `"0"`, `"1"`, `"2"`, `"3"` |
 
+### Retained discovery verification (v1.4.1+)
+
+Since 1.4.1 the firmware can actively verify that its retained Home Assistant discovery configs are still present on the broker. This closes the gap where the broker loses retained state while Home Assistant stays connected, such as a `mosquitto` restart without `persistence true`, a volatile-filesystem crash or a manual `mosquitto_pub -r -n` deletion. None of those events fire the `homeassistant/status` offline → online transition, so the legacy reconnect-driven republish paths cannot recover from them. See [ADR-062](../adr/ADR-062-retained-discovery-verification.md) for the mechanism and the memory trade-offs.
+
+**Mechanism**. The firmware subscribes to the node-scoped wildcard `<haprefix>/+/<nodeId>/#` for a 15-second window, counts retained discovery messages that arrive, and compares the total against `state.discovery.iPublishedTopicCount`. If fewer than expected arrive, it calls `markAllMQTTConfigPending()` and the drip re-announces every config. Foreign-nodeId retained configs that happen to pass through the wildcard are counted separately as "orphans" for diagnostics.
+
+**Triggers**. A verify run can start in three ways:
+
+1. **Automatic daily** — when `settings.mqtt.bDiscoveryAutoVerify` is true (default), the ADR-064 time dispatcher triggers a verify at the day-flip boundary. Disable this if your broker is noisy on wildcard subscriptions or if multiple OTGW nodes share a prefix and you want to spread the load manually.
+2. **REST** — `POST /api/v2/discovery/verify`. See `docs/api/README.md` and `openapi.yaml` for the full contract, including the `409` / `503` error cases.
+3. **Telnet debug key** — pressing `V` on the debug console starts an immediate verify window, provided the same preconditions are met (MQTT connected, free heap above the start threshold, no verify or drip already active).
+
+**Why OTGW does not delete orphans**. The `nodeId` in the subscribe wildcard is user-configurable. Two OTGW devices, or an OTGW plus a test-bench instance, can legitimately share the same `<haprefix>`. Deleting everything under another node's path would silently wipe a neighbour's entities. OTGW therefore only *counts* orphans and publishes the number in `disc_last_orphan`; cleanup is always a manual broker operation.
+
+**Disabling**. Set `settings.mqtt.bDiscoveryAutoVerify = false` via the Web UI (Settings → MQTT) or the REST settings API if the daily verify is undesirable in your environment. On-demand verify via the REST endpoint or the telnet `V` key remains available regardless of this setting.
+
+**Diagnostic interpretation**.
+
+- `disc_last_missing > 0` immediately after a run means a republish was just triggered. Wait for the drip to finish (observable via `pending_ids` on `GET /api/v2/discovery`), then start a second verify. If `last_missing` is still non-zero after two or three passes, investigate the broker: retained-message settings, persistence configuration, backup/restore gaps.
+- `disc_last_orphan > 0` is purely informational. On a shared broker it is expected and does not require action.
+- If `verify_runs` increases but `disc_last_verify_epoch` does not, the verify is aborting early because the heap dropped below the abort threshold during the window. This is harmless but indicates the device is under memory pressure from another subsystem.
+
 ### Discovery Lifecycle
 
 - On firmware boot (`startMQTT()`): all discovery IDs are marked pending for drip publishing
@@ -1042,6 +1064,48 @@ Runtime values interpolated into configs (instead of template placeholders) come
 | `version` | `device.sw_version` and `origin.sw` |
 
 Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is handled at stream time by `expandAndStreamSensorSources()`, which emits three variants (`_thermostat`, `_boiler`, `_gateway`) for sensors marked with `MQTT_HA_FLAG_ANY_SOURCE`.
+
+---
+
+## Heap diagnostic telemetry
+
+The firmware publishes heap-pressure and discovery counters as 17 individual retained topics under `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/*`. Each metric lives on its own topic (no JSON bundling) so consumers can subscribe to a single counter, expose it as a Home Assistant sensor without JSON path templating, or graph it directly in Grafana.
+
+**Topic prefix**: `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/<metric>` (all retained)
+
+**Cadence**: once per hour, on the wall-clock hour boundary. Publishing is dispatched by the unified time handler introduced in ADR-064, which also drives the daily discovery-verify trigger. No publish happens while MQTT is disconnected.
+
+**Device identity**: to map `{UniqueId}` (e.g. `otgw-a1b2c3`) back to a human-readable device name, subscribe to `{TopTopic}/value/{UniqueId}/otgw-firmware/hostname` (retained, published on every MQTT (re)connect).
+
+**Metrics**: most topics carry *session counters* that reset to zero on reboot; a few are *live samples* measured at publish time; three are *last-known* values captured at the end of the previous discovery verify run. Payloads are plain ASCII decimal numbers.
+
+| Metric topic suffix | Type | Kind | Meaning |
+| ------------------- | ---- | ---- | ------- |
+| `ws_drops` | uint32 | session counter | WebSocket messages dropped due to heap pressure since boot. |
+| `mqtt_drops` | uint32 | session counter | MQTT messages dropped due to heap pressure since boot. |
+| `enter_low` | uint32 | session counter | Transitions into the `HEAP_LOW` tier (from `HEALTHY`). |
+| `enter_warning` | uint32 | session counter | Transitions into the `HEAP_WARNING` tier. |
+| `enter_critical` | uint32 | session counter | Transitions into the `HEAP_CRITICAL` tier. |
+| `drip_burst_skip` | uint32 | session counter | Discovery drip ticks skipped while a Status-frame burst was active (TASK-342). |
+| `drip_cooldown_skip` | uint32 | session counter | Discovery drip ticks skipped in the post-burst cooldown window (TASK-347). |
+| `drip_slowmode` | uint32 | session counter | Transitions into the 10-second slow-mode cadence caused by heap pressure. |
+| `free_heap` | uint32 | live sample | `ESP.getFreeHeap()` at publish time, in bytes. |
+| `max_block` | uint32 | live sample | `ESP.getMaxFreeBlockSize()` at publish time, in bytes. |
+| `frag_pct` | uint8 | live sample | Heap fragmentation percentage at publish time (0 – 100). |
+| `disc_verify_runs` | uint32 | session counter | Lifetime count of retained-discovery verify windows started since boot. |
+| `disc_republish_triggered` | uint32 | session counter | Lifetime count of verify runs that ended with missing configs and triggered a republish. |
+| `disc_last_missing` | uint16 | last known | Retained configs missing at the end of the previous verify run. |
+| `disc_last_orphan` | uint16 | last known | Foreign-nodeId retained configs observed during the previous verify run (informational). |
+| `disc_published_topics` | uint32 | live-ish | Running count of discovery topics successfully published since boot. Incremented inside the streaming helpers after a successful `endPublish`. |
+| `disc_last_verify_epoch` | uint32 | last known | Unix-epoch timestamp of the last completed verify run (0 = none since boot). |
+
+**Counter reset semantics**
+
+- All `session counter` topics reset to zero on reboot and increase monotonically while the firmware runs. They are *cumulative* within a session.
+- `live sample` topics reflect the state at the moment of publish; do not use them to infer trends without sampling.
+- `last known` topics hold the result of the *previous* verify run. During an active verify window they are not updated until `endVerify` runs.
+
+Subscribing to `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/+` gives you all 17 counters as individual messages. A matching REST surface is available at `GET /api/v2/discovery` for the discovery-specific subset of these fields (see `docs/api/README.md`).
 
 ---
 

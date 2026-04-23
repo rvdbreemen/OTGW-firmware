@@ -1,0 +1,36 @@
+name: evaluate.py CI gates
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - dev
+      - "1.4.*"
+      - "release/**"
+
+jobs:
+  evaluate:
+    name: Run evaluate.py --quick
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run evaluate.py --quick
+        run: |
+          mkdir -p .tmp
+          python evaluate.py --quick --no-color --report --output .tmp/evaluation-report.json
+
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluate-py-report-${{ github.run_id }}
+          path: .tmp/evaluation-report.json
+          if-no-files-found: warn

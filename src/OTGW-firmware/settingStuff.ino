@@ -244,6 +244,7 @@ void writeSettings(bool show)
   writeJsonIntKV(file, F("MQTTinterval"), settings.mqtt.iInterval, true);
   writeJsonBoolKV(file, F("MQTTseparatesources"), settings.mqtt.bSeparateSources, true);
   writeJsonBoolKV(file, F("MQTTharebootdetection"), settings.mqtt.bHaRebootDetect, true);
+  writeJsonBoolKV(file, F("MQTTdiscoveryAutoVerify"), settings.mqtt.bDiscoveryAutoVerify, true);
   writeJsonBoolKV(file, F("NTPenable"), settings.ntp.bEnable, true);
   writeJsonStringKV(file, F("NTPtimezone"), settings.ntp.sTimezone, true);
   writeJsonStringKV(file, F("NTPhostname"), settings.ntp.sHostname, true);
@@ -508,6 +509,7 @@ void readSettings(bool show)
     Debugf(PSTR("MQTT interval         : %d\r\n"), settings.mqtt.iInterval);
     Debugf(PSTR("HA prefix             : %s\r\n"), CSTR(settings.mqtt.sHaprefix));
     Debugf(PSTR("HA reboot detection   : %s\r\n"), CBOOLEAN(settings.mqtt.bHaRebootDetect));
+    Debugf(PSTR("Discovery auto-verify : %s\r\n"), CBOOLEAN(settings.mqtt.bDiscoveryAutoVerify));
     Debugf(PSTR("NTP enabled           : %s\r\n"), CBOOLEAN(settings.ntp.bEnable));
     Debugf(PSTR("NPT timezone          : %s\r\n"), CSTR(settings.ntp.sTimezone));
     Debugf(PSTR("NPT hostname          : %s\r\n"), CSTR(settings.ntp.sHostname));
@@ -634,6 +636,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settings.mqtt.sHaprefix)==0)    strlcpy(settings.mqtt.sHaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settings.mqtt.sHaprefix));
   }
   else if (strcasecmp_P(field, PSTR("MQTTharebootdetection"))==0)      settings.mqtt.bHaRebootDetect = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("MQTTdiscoveryAutoVerify"))==0)    settings.mqtt.bDiscoveryAutoVerify = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("MQTTuniqueid")) == 0)  {
     strlcpy(settings.mqtt.sUniqueid, newValue, sizeof(settings.mqtt.sUniqueid));
     if (strlen(settings.mqtt.sUniqueid) == 0)   strlcpy(settings.mqtt.sUniqueid, getUniqueId(), sizeof(settings.mqtt.sUniqueid));

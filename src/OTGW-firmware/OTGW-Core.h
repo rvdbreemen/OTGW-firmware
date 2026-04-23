@@ -1,6 +1,6 @@
 /*
 ***************************************************************************  
-**  Program  : Header file: OTGW-Core.h 
+**  Program  : Header file: OTGW-Core.h
 **  Version  : v2.0.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen

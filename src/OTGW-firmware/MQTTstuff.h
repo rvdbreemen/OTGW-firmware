@@ -47,6 +47,7 @@ struct MQTTSettingsSection {
   char    sPasswd[41]      = "";
   char    sHaprefix[41]    = HOME_ASSISTANT_DISCOVERY_PREFIX;
   bool    bHaRebootDetect  = true;
+  bool    bDiscoveryAutoVerify = true;  // ADR-062/TASK-349/351: daily automatic retained-discovery verification
   char    sTopTopic[41]    = "OTGW";
   // Format budget: "otgw-" (5) + up to 32-char device id + optional suffix.
   // The streaming HA discovery composer may prepend/append short fragments,
@@ -81,6 +82,21 @@ inline int pgm_strncmp_PP(PGM_P s1, const char *s2, size_t n)
 inline char pgm_read_char(PGM_P p)
 {
     return static_cast<char>(pgm_read_byte(p));
+}
+#endif
+
+// strlcpy_P is not declared in ESP8266 Arduino Core 3.1.2. Provide a shared
+// fallback for every TU that #includes MQTTstuff.h so sendMQTTDataPic and
+// similar helpers compile on ESP8266 and ESP32 alike.
+#ifndef strlcpy_P
+inline size_t strlcpy_P(char *dst, PGM_P src, size_t size) {
+  size_t srcLen = strlen_P(src);
+  if (size > 0) {
+    size_t n = (srcLen < size - 1) ? srcLen : (size - 1);
+    memcpy_P(dst, src, n);
+    dst[n] = '\0';
+  }
+  return srcLen;
 }
 #endif
 
@@ -122,6 +138,7 @@ enum class HaUnit : uint8_t {
     mS,                 // "mS" (milliseconds, S0 pulse time)
     h,                  // "h" (hours)
     kW_percent,         // "kW/%" (MaxCapacity composite)
+    bytes,              // "B" (bytes, used by heap-diag sensors)
     _count
 };
 
@@ -217,6 +234,15 @@ constexpr uint8_t MQTT_HA_FLAG_ANY_SOURCE           = 0x07;
 #endif
 
 // ---------------------------------------------------------------------------
+// PIC subtree prefix -- stable public topic API (see ADR-065 / TASK-389).
+// Entries flagged MQTT_HA_FLAG_IS_PIC_ENTRY publish and are discovered under
+// <mqttPubTopic>/otgw-pic/<label>. Single source of truth for the subtree
+// name so future renames or migrations touch exactly one location.
+// Defined in MQTTstuff.ino.
+// ---------------------------------------------------------------------------
+extern const char kPicSubtreePrefix[] PROGMEM;
+
+// ---------------------------------------------------------------------------
 // Sensor discovery config -- one per mqttha.cfg sensor entry
 // ---------------------------------------------------------------------------
 struct MqttHaSensorCfg {
@@ -282,6 +308,15 @@ inline uint16_t readBinSensorIndex(uint8_t otId) {
 }
 
 constexpr uint16_t MQTT_HA_INDEX_NONE = 0xFFFF;
+
+// ---------------------------------------------------------------------------
+// Cross-TU tuning constant -- exposed here so restAPI.ino and other callers
+// can enforce the same heap floor as startDiscoveryVerification() without
+// duplicating a magic number. Full ADR-062 tuning rationale lives in
+// MQTTstuff.ino alongside the other VERIFICATION_* constants (kept local
+// because only this one has external callers).
+// ---------------------------------------------------------------------------
+constexpr uint32_t VERIFICATION_MIN_HEAP_START = 6000;
 
 // ---------------------------------------------------------------------------
 // Discovery context -- runtime state passed to streaming functions

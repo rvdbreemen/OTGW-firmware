@@ -584,7 +584,10 @@ bool isNTPtimeSet()
   return NtpStatus == TIME_SYNC;
 }
 
-void sendtimecommand(){
+// ADR-064 (TASK-350): signature takes pre-computed flags from the single
+// dispatcher in doTaskMinuteChanged. Internal dayChanged/yearChanged calls
+// are removed so each helper has exactly ONE call site firmware-wide.
+void sendtimecommand(bool dayFlag, bool yearFlag){
   if (state.otBus.bPSmode) return;                  // when in Print Summary mode (PS=1), no timesync commands (improving legacy/Domoticz compatibility)
   if (!settings.ntp.bEnable) return;        // if NTP is disabled, then return
   if (!settings.ntp.bSendtime) return;      // if NTP send time is disabled, then return
@@ -605,13 +608,13 @@ void sendtimecommand(){
   snprintf_P(msg, sizeof(msg), PSTR("SC=%d:%02d/%d"), myTime.hour(), myTime.minute(), day_of_week);
   addCommandToQueue(msg, strlen(msg), false, 0);
 
-  if (dayChanged()){
+  if (dayFlag){
     //Send msg id 21: month, day
     snprintf_P(msg, sizeof(msg), PSTR("SR=21:%d,%d"), myTime.month(), myTime.day());
     addCommandToQueue(msg, strlen(msg), true, 0);
   }
 
-  if (yearChanged()){
+  if (yearFlag){
     //Send msg id 22: HB of Year, LB of Year
     snprintf_P(msg, sizeof(msg), PSTR("SR=22:%d,%d"), (myTime.year() >> 8) & 0xFF, myTime.year() & 0xFF);
     addCommandToQueue(msg, strlen(msg), true, 0);

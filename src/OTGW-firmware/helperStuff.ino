@@ -375,12 +375,52 @@ bool updateRebootLog(String text)
 }
 
 
+// Explicit service cleanup required before ESP.restart() on Arduino Core 3.1.0+.
+// PR esp8266/Arduino#8598 removed the implicit WiFiClient/WiFiUDP::stopAll() that
+// used to run as part of the Update path. Without manual cleanup, TCP sockets
+// linger in lwIP and the WiFi SDK state persists through the soft reset. The
+// next boot ends up in a half-state: WiFi is still associated (leftover from
+// before the restart) but telnet/HTTP/MQTT fail to bind their ports.
+// Reported 2026-04-22 by andrebrait (Discord #beta-testing): force WiFi
+// disconnect via AP -> services initialise -> alive. Root cause: Arduino
+// Core 3.1.0 breaking change, not an OTGW-firmware regression.
+static void prepareForReboot() {
+  // Focus on TCP-based services — those are the ones whose lingering lwIP
+  // state in Core 3.1.0+ blocks clean reboot. mDNS and LLMNR are UDP
+  // responders whose stale state is harmless across a reset, so we do not
+  // touch them (also avoids API compatibility issues across Core versions
+  // where ESP8266mDNS::end() and LLMNRResponder::end() are not uniformly
+  // exposed).
+  doMqttDisconnect();     // clean disconnect to broker (file-static wrapper, see MQTTstuff.ino)
+  doWebSocketClose();     // close all WebSocket clients (wrapper, see webSocketStuff.ino)
+  debugTelnet.stop();     // port 23 debug telnet
+  OTGWstream.stop();      // port 25238 OTGW stream
+
+  // IMPORTANT: do NOT call WiFi.disconnect() here. On ESP8266 Arduino with
+  // WiFi.persistent(true) (which networkStuff.ino startWiFi() sets, and is
+  // the default), WiFi.disconnect() writes an EMPTY station_config to flash
+  // NVRAM — wiping the stored SSID and password. The device then boots into
+  // the captive portal with no credentials. Reference:
+  // ESP8266WiFiSTA.cpp::disconnect() writes wifi_station_set_config(&conf)
+  // with conf.ssid = 0 / conf.password = 0 when _persistent is true.
+  // This was observed 2026-04-23 — reboot caused WiFi creds to be lost.
+  //
+  // We don't actually need WiFi.disconnect() here: ESP.reset() (our final
+  // call below) is a bootrom jump that wipes all SDK state anyway, forcing
+  // a fresh association on the next boot. Keeping WiFi up through this
+  // cleanup phase is in fact necessary so the TCP FINs from the close/stop
+  // calls above can reach their peers before the reset fires.
+}
+
 void doRestart(const char* str) {
   DebugTln(str);
-  flushSettings();  // Persist any pending settings before reboot
-  delay(2000);  // Enough time for messages to be sent.
+  flushSettings();        // persist any pending settings before reboot
+  prepareForReboot();     // graceful shutdown: MQTT LWT, WS close frames, TCP FINs
+  delay(2000);            // let TCP FINs + WiFi disassoc propagate (~1-2s RTT budget)
+  // platformRestart() on ESP8266 calls ESP.reset() (bootrom jump) to sidestep the
+  // Core 3.1.0 WiFi-SDK-state regression; on ESP32 it calls ESP.restart().
+  // Both never return, so no safety-tail delay after this line.
   platformRestart();
-  delay(5000);  // Enough time to ensure we don't return.
 }
 
 String upTime() 
@@ -611,14 +651,22 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 //===========================================================================================
 
 // Heap thresholds for different severity levels
-// Rationale: ESP8266 typically has ~40KB RAM after core libraries
-// - CRITICAL (3KB): Minimum to prevent crash, emergency only
-// - WARNING (5KB): Below this, aggressive throttling needed
-// - LOW (8KB): Below this, start reducing message frequency
-// - HEALTHY (>8KB): Sufficient for normal operation with WebSocket server (~4KB baseline)
-#define HEAP_CRITICAL_THRESHOLD   2048   // Critical: Stop all non-essential operations
-#define HEAP_WARNING_THRESHOLD    4096   // Warning: Start throttling messages
-#define HEAP_LOW_THRESHOLD        6144   // Low: Begin reducing message frequency
+// Rationale: ESP8266 typically has ~40KB RAM after core libraries.
+// Tuned on tester log data (Crashevans, v1.4.0-beta+0d6942a, debug_2a.txt)
+// combined with the burst-reduction fixes from TASK-338/339/340/342. Each
+// tier is sized to cover a specific allocation risk:
+// - CRITICAL (1.5KB): leaves just one lwIP pbuf (~1.5KB) worth of headroom.
+//                     Eronder = near-certain crash zone.
+// - WARNING  (3KB):   2x pbuf + streaming chunk. Also the floor for
+//                     accepting new WebSocket clients (see webSocketStuff.ino).
+// - LOW      (5KB):   sits below the expected in-burst dip floor after the
+//                     1.4.1 burst-reduction fixes. Throttling fires only on
+//                     abnormal pressure (longer uptime, fragmentation,
+//                     extra WS clients), not on routine bursts.
+// - HEALTHY (>=5KB):  sufficient for steady-state operation.
+#define HEAP_CRITICAL_THRESHOLD   1536   // Critical: Stop all non-essential operations
+#define HEAP_WARNING_THRESHOLD    3072   // Warning: Start throttling messages
+#define HEAP_LOW_THRESHOLD        5120   // Low: Begin reducing message frequency
 
 // Throttling state
 static uint32_t lastWebSocketSendMs = 0;
@@ -642,18 +690,62 @@ static uint32_t mqttDropCount = 0;
 
 //===========================================================================================
 // Check current heap health level
+//
+// Primary signal is ESP.getFreeHeap(). When freeHeap is already in LOW tier,
+// we additionally consult ESP.getMaxFreeBlockSize() so that fragmentation
+// promotes the level by one tier. Rationale: umm_malloc has no compaction,
+// so a 1.2KB discovery payload can fail when maxBlock<1.2KB even though
+// total free looks ok. Promoting early lets the publish gate start throttling
+// BEFORE the next allocation silently fails.
+//
+// Perf note: getMaxFreeBlockSize() walks the full free list. We only call it
+// outside the HEALTHY path, so the common case stays cheap.
 //===========================================================================================
+constexpr uint32_t HEAP_FRAG_PROMOTE_MAXBLOCK = 1536;   // maxBlock below this while freeHeap in LOW -> promote to WARNING (matched to CRITICAL)
 HeapHealthLevel getHeapHealth() {
+  static HeapHealthLevel lastLevel = HEAP_HEALTHY;
   uint32_t freeHeap = platformFreeHeap();
-  
+
+  HeapHealthLevel level;
   if (freeHeap < HEAP_CRITICAL_THRESHOLD) {
-    return HEAP_CRITICAL;
+    level = HEAP_CRITICAL;
   } else if (freeHeap < HEAP_WARNING_THRESHOLD) {
-    return HEAP_WARNING;
+    level = HEAP_WARNING;
   } else if (freeHeap < HEAP_LOW_THRESHOLD) {
-    return HEAP_LOW;
+    // Fragmentation check: if contiguous block is already small, promote
+    // one tier so callers back off before the next alloc fails.
+    uint32_t maxBlock = platformMaxFreeBlock();
+    if (maxBlock < HEAP_FRAG_PROMOTE_MAXBLOCK) {
+      level = HEAP_WARNING;
+    } else {
+      level = HEAP_LOW;
+    }
+  } else {
+    level = HEAP_HEALTHY;
   }
-  return HEAP_HEALTHY;
+
+  // Track tier-entry transitions for cumulative diagnostics (TASK-346).
+  // Only count when moving INTO a stricter tier than the previous call;
+  // recovery back to HEALTHY is not counted (focus is on pressure events).
+  if (level != lastLevel && level > lastLevel) {
+    if (level == HEAP_LOW)      state.heapdiag.iEnteredLowCount++;
+    if (level == HEAP_WARNING)  state.heapdiag.iEnteredWarningCount++;
+    if (level == HEAP_CRITICAL) state.heapdiag.iEnteredCriticalCount++;
+  }
+  lastLevel = level;
+  return level;
+}
+
+//===========================================================================================
+// Return heap fragmentation as a percentage (0 = no fragmentation, 100 = max)
+// Defined as: 100 * (1 - maxBlock / freeHeap). Observability only — not a gate.
+//===========================================================================================
+uint8_t getHeapFragmentation() {
+  uint32_t freeHeap = ESP.getFreeHeap();
+  if (freeHeap == 0) return 100;
+  uint32_t maxBlock = platformMaxFreeBlock();
+  if (maxBlock >= freeHeap) return 0;
+  return (uint8_t)(100UL - (100UL * maxBlock / freeHeap));
 }
 
 //===========================================================================================
@@ -666,9 +758,10 @@ bool canSendWebSocket() {
   // Critical: block WebSocket messages completely
   if (heapLevel == HEAP_CRITICAL) {
     webSocketDropCount++;
+    state.heapdiag.iWsDropsTotal++;
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
-      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"), 
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"),
               webSocketDropCount, platformFreeHeap());
       lastWebSocketWarningMs = now;
     }
@@ -680,6 +773,7 @@ bool canSendWebSocket() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_CRITICAL) {
       webSocketDropCount++;
+      state.heapdiag.iWsDropsTotal++;
       return false;
     }
   }
@@ -689,6 +783,7 @@ bool canSendWebSocket() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_WARNING) {
       webSocketDropCount++;
+      state.heapdiag.iWsDropsTotal++;
       return false;
     }
   }
@@ -717,9 +812,10 @@ bool canPublishMQTT() {
   // Critical: block MQTT messages completely
   if (heapLevel == HEAP_CRITICAL) {
     mqttDropCount++;
+    state.heapdiag.iMqttDropsTotal++;
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
-      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"), 
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"),
               mqttDropCount, platformFreeHeap());
       lastMQTTWarningMs = now;
     }
@@ -731,6 +827,7 @@ bool canPublishMQTT() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_CRITICAL) {
       mqttDropCount++;
+      state.heapdiag.iMqttDropsTotal++;
       return false;
     }
   }
@@ -740,6 +837,7 @@ bool canPublishMQTT() {
     // Use unsigned arithmetic to handle millis() rollover correctly
     if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_WARNING) {
       mqttDropCount++;
+      state.heapdiag.iMqttDropsTotal++;
       return false;
     }
   }

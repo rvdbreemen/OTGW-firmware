@@ -1,15 +1,30 @@
+// =======================================================================
+// SINGLE SOURCE OF TRUTH for Home Assistant MQTT auto-discovery configs.
+// =======================================================================
+//
 // Hand-written streaming HA discovery data + compose functions.
 // See ADR-077 (streaming MQTT HA discovery architecture) for the rationale.
-// The former auto-generator under tools/generate_mqttha_*.py is gone; edit this
-// file directly. Former header banner removed so contributors do not chase a
-// tool that no longer exists.
+// Edit this file directly to add, remove, or modify discovery entries.
 //
-// Contents:
-//   Sensors        : 289 entries (118 unique OT IDs)
+// Historical note (2026-04-22):
+//   This file was originally auto-generated from src/OTGW-firmware/data/mqttha.cfg
+//   by tools/generate_mqttha_data.py. From 2026-04-20 onwards the file
+//   diverged from the cfg (see commit bc9bd6a2 "on-demand discovery
+//   verification and republish", which added hand-written entries the
+//   generator cannot produce). The cfg has been retired as a build input
+//   and archived at docs/archive/mqttha.cfg for historical reference only.
+//   Do NOT run tools/generate_mqttha_data.py against this file -- it would
+//   overwrite all post-2026-04-20 hand-edits. The former auto-generator
+//   under tools/generate_mqttha_*.py is no longer part of the build.
+//
+// Last generator run: 2026-04-17T17:40:17Z (snapshot of the cfg-based
+//                                            baseline before retirement)
+//
+// Current contents (hand-maintained):
+//   Sensors        : 306 entries (119 unique OT IDs + stats pseudo-ID 247)
 //   Binary sensors : 53 entries (10 unique OT IDs)
 //   Climate        : 2 entries
 //   Number         : 1 entries
-//   Total PROGMEM strings: 250 labels + 259 friendly names
 
 #include "MQTTstuff.h"
 
@@ -211,6 +226,25 @@ const char ha_lbl_s0pulsecount[] PROGMEM = "s0pulsecount";
 const char ha_lbl_s0pulsecounttot[] PROGMEM = "s0pulsecounttot";
 const char ha_lbl_s0pulsetime[] PROGMEM = "s0pulsetime";
 const char ha_lbl_sensor_id[] PROGMEM = "%sensor_id%";
+// Heap & discovery statistics labels (TASK-346, faux dataid 247)
+// Each label is the topic suffix after <topTopic>/value/<uniqueid>/
+const char ha_lbl_stats_ws_drops[] PROGMEM                = "otgw-firmware/stats/ws_drops";
+const char ha_lbl_stats_mqtt_drops[] PROGMEM              = "otgw-firmware/stats/mqtt_drops";
+const char ha_lbl_stats_enter_low[] PROGMEM               = "otgw-firmware/stats/enter_low";
+const char ha_lbl_stats_enter_warning[] PROGMEM           = "otgw-firmware/stats/enter_warning";
+const char ha_lbl_stats_enter_critical[] PROGMEM          = "otgw-firmware/stats/enter_critical";
+const char ha_lbl_stats_drip_burst_skip[] PROGMEM         = "otgw-firmware/stats/drip_burst_skip";
+const char ha_lbl_stats_drip_cooldown_skip[] PROGMEM      = "otgw-firmware/stats/drip_cooldown_skip";
+const char ha_lbl_stats_drip_slowmode[] PROGMEM           = "otgw-firmware/stats/drip_slowmode";
+const char ha_lbl_stats_free_heap[] PROGMEM               = "otgw-firmware/stats/free_heap";
+const char ha_lbl_stats_max_block[] PROGMEM               = "otgw-firmware/stats/max_block";
+const char ha_lbl_stats_frag_pct[] PROGMEM                = "otgw-firmware/stats/frag_pct";
+const char ha_lbl_stats_disc_verify_runs[] PROGMEM        = "otgw-firmware/stats/disc_verify_runs";
+const char ha_lbl_stats_disc_republish_triggered[] PROGMEM = "otgw-firmware/stats/disc_republish_triggered";
+const char ha_lbl_stats_disc_last_missing[] PROGMEM       = "otgw-firmware/stats/disc_last_missing";
+const char ha_lbl_stats_disc_last_orphan[] PROGMEM        = "otgw-firmware/stats/disc_last_orphan";
+const char ha_lbl_stats_disc_published_topics[] PROGMEM   = "otgw-firmware/stats/disc_published_topics";
+const char ha_lbl_stats_disc_last_verify_epoch[] PROGMEM  = "otgw-firmware/stats/disc_last_verify_epoch";
 const char ha_lbl_centralheating[] PROGMEM = "centralheating";
 const char ha_lbl_centralheating2[] PROGMEM = "centralheating2";
 const char ha_lbl_ch2_enable[] PROGMEM = "ch2_enable";
@@ -472,6 +506,24 @@ const char ha_name_s0_pulse_count[] PROGMEM = "S0_Pulse_Count";
 const char ha_name_s0_pulse_count_total[] PROGMEM = "S0_Pulse_Count_Total";
 const char ha_name_s0_pulse_time[] PROGMEM = "S0_Pulse_Time";
 const char ha_name_sensor_id[] PROGMEM = "%sensor_id%";
+// Heap & discovery statistics friendly names (TASK-346, faux dataid 247)
+const char ha_name_stats_ws_drops[] PROGMEM                = "Stats_WS_Drops";
+const char ha_name_stats_mqtt_drops[] PROGMEM              = "Stats_MQTT_Drops";
+const char ha_name_stats_enter_low[] PROGMEM               = "Stats_Enter_Low";
+const char ha_name_stats_enter_warning[] PROGMEM           = "Stats_Enter_Warning";
+const char ha_name_stats_enter_critical[] PROGMEM          = "Stats_Enter_Critical";
+const char ha_name_stats_drip_burst_skip[] PROGMEM         = "Stats_Drip_Burst_Skip";
+const char ha_name_stats_drip_cooldown_skip[] PROGMEM      = "Stats_Drip_Cooldown_Skip";
+const char ha_name_stats_drip_slowmode[] PROGMEM           = "Stats_Drip_Slowmode";
+const char ha_name_stats_free_heap[] PROGMEM               = "Stats_Free_Heap";
+const char ha_name_stats_max_block[] PROGMEM               = "Stats_Max_Block";
+const char ha_name_stats_frag_pct[] PROGMEM                = "Stats_Fragmentation";
+const char ha_name_stats_disc_verify_runs[] PROGMEM        = "Stats_Discovery_Verify_Runs";
+const char ha_name_stats_disc_republish_triggered[] PROGMEM = "Stats_Discovery_Republish_Triggered";
+const char ha_name_stats_disc_last_missing[] PROGMEM       = "Stats_Discovery_Last_Missing";
+const char ha_name_stats_disc_last_orphan[] PROGMEM        = "Stats_Discovery_Last_Orphan";
+const char ha_name_stats_disc_published_topics[] PROGMEM   = "Stats_Discovery_Published_Topics";
+const char ha_name_stats_disc_last_verify_epoch[] PROGMEM  = "Stats_Discovery_Last_Verify_Epoch";
 const char ha_name_central_heating[] PROGMEM = "Central_Heating";
 const char ha_name_central_heating_2[] PROGMEM = "Central_Heating_2";
 const char ha_name_central_heating_2_enable[] PROGMEM = "central_heating_2_enable";
@@ -527,7 +579,7 @@ const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storag
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
 
 // ========== Sensor array (289 entries, sorted by id) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 289;
+const uint16_t MQTT_HA_SENSOR_COUNT = 306;
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -938,6 +990,27 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {245, 0x00, ha_lbl_s0pulsetime, ha_name_s0_pulse_time, HaDeviceClass::none, HaUnit::mS, HaStateClass::none, HaIcon::clock_outline, HaEntityCat::none, true},
     // --- OT ID 246 ---
     {246, 0x00, ha_lbl_sensor_id, ha_name_sensor_id, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
+    // --- Pseudo-ID 247: heap & discovery statistics (TASK-346) ---
+    // 17 retained otgw-firmware/stats/* topics published hourly by sendMQTTheapdiag().
+    // entity_category=diagnostic keeps them out of the HA primary sensor view.
+    // Counters use total_increasing; live samples and last-known values use measurement.
+    {247, 0x00, ha_lbl_stats_ws_drops,                ha_name_stats_ws_drops,                HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_mqtt_drops,              ha_name_stats_mqtt_drops,              HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_enter_low,               ha_name_stats_enter_low,               HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_enter_warning,           ha_name_stats_enter_warning,           HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_enter_critical,          ha_name_stats_enter_critical,          HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_drip_burst_skip,         ha_name_stats_drip_burst_skip,         HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_drip_cooldown_skip,      ha_name_stats_drip_cooldown_skip,      HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_drip_slowmode,           ha_name_stats_drip_slowmode,           HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_free_heap,               ha_name_stats_free_heap,               HaDeviceClass::none, HaUnit::bytes,   HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_max_block,               ha_name_stats_max_block,               HaDeviceClass::none, HaUnit::bytes,   HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_frag_pct,                ha_name_stats_frag_pct,                HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_disc_verify_runs,        ha_name_stats_disc_verify_runs,        HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_disc_republish_triggered, ha_name_stats_disc_republish_triggered, HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_disc_last_missing,       ha_name_stats_disc_last_missing,       HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_disc_last_orphan,        ha_name_stats_disc_last_orphan,        HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_disc_published_topics,   ha_name_stats_disc_published_topics,   HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_disc_last_verify_epoch,  ha_name_stats_disc_last_verify_epoch,  HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
 };
 
 // ========== Binary sensor array (53 entries, sorted by id) ==========
@@ -1563,6 +1636,7 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::ppm: { static const char s[] PROGMEM = "ppm"; return s; }
         case HaUnit::mS: { static const char s[] PROGMEM = "mS"; return s; }
         case HaUnit::h: { static const char s[] PROGMEM = "h"; return s; }
+        case HaUnit::bytes: { static const char s[] PROGMEM = "B"; return s; }
         default: return nullptr;
     }
 }
@@ -1661,23 +1735,13 @@ PGM_P haEntityCatStr(HaEntityCat ec) {
 
 #include <Arduino.h>
 
-// strlcpy_P may not be available on all Arduino cores.
-// Re-declare it here if needed (same as OTGW-firmware.h).
-#ifndef strlcpy_P
-inline size_t strlcpy_P(char *dst, PGM_P src, size_t size) {
-  size_t srcLen = strlen_P(src);
-  if (size > 0) {
-    size_t n = (srcLen < size - 1) ? srcLen : (size - 1);
-    memcpy_P(dst, src, n);
-    dst[n] = '\0';
-  }
-  return srcLen;
-}
-#endif
+// strlcpy_P fallback for ESP8266 Arduino Core 3.1.2 lives centrally in MQTTstuff.h,
+// which this TU already includes (line 29). No local redefinition needed.
 
 // External functions from the .ino translation unit.
 extern bool canPublishMQTT();
 extern void feedWatchDog();
+extern void incPublishedTopicCount();   // ADR-062 / TASK-349: called after every successful retained discovery publish
 
 // ---------------------------------------------------------------------------
 // JSON streaming helpers
@@ -1820,12 +1884,16 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "stat_t":"<mqttPubTopic>/<label>[/<sourceTopicSegment>]"
+  // "stat_t":"<mqttPubTopic>/[otgw-pic/]<label>[/<sourceTopicSegment>]"
+  // otgw-pic/ prefix applied when MQTT_HA_FLAG_IS_PIC_ENTRY is set -- see ADR-065.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kStatT)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.mqttPubTopic)) return false;
   if (!w.writeChar('/')) return false;
+  if (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY) {
+    if (!w.writeProgmem(kPicSubtreePrefix)) return false;
+  }
   if (!w.writeRam(label)) return false;
   if (hasSrc && ctx.sourceTopicSegment && ctx.sourceTopicSegment[0]) {
     if (!w.writeChar('/')) return false;
@@ -1909,12 +1977,16 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "stat_t":"<mqttPubTopic>/<label>"
+  // "stat_t":"<mqttPubTopic>/[otgw-pic/]<label>"
+  // otgw-pic/ prefix applied when MQTT_HA_FLAG_IS_PIC_ENTRY is set -- see ADR-065.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kStatT)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.mqttPubTopic)) return false;
   if (!w.writeChar('/')) return false;
+  if (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY) {
+    if (!w.writeProgmem(kPicSubtreePrefix)) return false;
+  }
   if (!w.writeRam(label)) return false;
   if (!w.writeChar('"')) return false;
 
@@ -2011,6 +2083,7 @@ bool streamSensorDiscovery(PubSubClient &client,
 
   if (!client.endPublish()) return false;
 
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -2044,6 +2117,7 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
 
   if (!client.endPublish()) return false;
 
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -2172,6 +2246,7 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
 
   if (!client.endPublish()) return false;
 
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -2325,7 +2400,10 @@ bool streamClimateDiscovery(PubSubClient &client,
     if (!w.writeProgmem(PSTR("\"mode_stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("/otgw-pic/thermostat_connected\""))) return false;
+      // Uses kPicSubtreePrefix for consistency with composeBinSensorPayload (ADR-065).
+      if (!w.writeChar('/')) return false;
+      if (!w.writeProgmem(kPicSubtreePrefix)) return false;
+      if (!w.writeProgmem(PSTR("thermostat_connected\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!writeJsonKV_P(w, PSTR("mode_stat_tpl"), PSTR("{% if value == 'ON' %}heat{% else %}off{% endif %}"))) return false;
     } else {
@@ -2409,6 +2487,7 @@ bool streamClimateDiscovery(PubSubClient &client,
   }
 
   if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -2490,6 +2569,7 @@ bool streamNumberDiscovery(PubSubClient &client,
   }
 
   if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }

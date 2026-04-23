@@ -9,16 +9,21 @@
 ***************************************************************************      
 */
 * {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: var(--font-sans);
   }
   
   html {
     -webkit-font-smoothing: antialiased;
-    font-family: 'Dosis', sans-serif;
+    font-family: var(--font-sans); /* was 'Dosis' — never actually loaded */
     line-height: 1.6;
     color: black;
     background: #e6ffff;
+    color-scheme: light;  /* match the meta tag; native widgets render in light variant across Chrome/Edge/Safari/Firefox */
   }
+
+  /* Standard ::placeholder has shipped in every major engine since 2017
+     (Blink, Gecko, WebKit). Older prefixed variants are not needed. */
+  ::placeholder { color: #999; opacity: 1; }
   
   body {
     max-width: 100%;
@@ -56,6 +61,14 @@
      padding-top: 3px;
      padding-bottom: 2px;
      font-size: 12pt;
+     /* Explicit colors override browser native rendering. Without these,
+        mobile browsers (iOS Safari and some Android Chromium) can leak
+        OS dark-mode UA styles onto the input despite our color-scheme: light
+        declaration, producing dark-on-dark text. Classes .input-normal /
+        .input-changed / .input-readonly still override via higher
+        specificity. */
+     background-color: white;
+     color: black;
   }
   
   #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage, #displaySATPage {
@@ -187,6 +200,13 @@
       top: 8px;
       right: 0;
       margin: 0;
+    }
+    /* Reserve horizontal space for the absolute-positioned toggle so the
+       rightmost flex-ended .headercolumn (hostname + IP) does not flow
+       underneath the icon. Without this, on narrow viewports the toggle
+       visually overlaps the closing paren of "OTGW (IP)". */
+    .headerrow {
+      padding-right: 32px;
     }
   }
 
@@ -550,7 +570,7 @@
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: Consolas, "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -620,8 +640,11 @@
     background: lightblue;
   }
 
-  .input-changed { background: lightgray; }
-  .input-normal { background: white; }
+  /* Explicit color matches the dark theme's symmetry and prevents OS-level
+     UA text color leaking in when color-scheme: light is honored loosely
+     (mobile Safari, some Android Chromium). */
+  .input-changed { background: lightgray; color: black; }
+  .input-normal { background: white; color: black; }
   .input-readonly { background: #f0f0f0; color: #666; }
 
   .btn-wifi-reset {
@@ -882,7 +905,7 @@
 
 /* Log Content */
 .ot-log-content {
-  font-family: 'Courier New', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: #d4d4d4;
   padding: 15px;

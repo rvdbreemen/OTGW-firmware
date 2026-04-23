@@ -33,7 +33,7 @@ extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 // OTDirecttypes.h must follow boards.h because its contents are gated on HAS_DIRECT_OT (ADR-079).
 #include "OTDirecttypes.h"
 #if HAS_PIC
-#include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
+#include <OTGWSerial.h>         // Schelte Bron's Serial class - it upgrades and more
 #endif
 #include "OTGW-Core.h"          // Core code for this firmware
 #include <OneWire.h>            // required for Dallas sensor library
@@ -148,10 +148,21 @@ enum HeapHealthLevel {
   HEAP_CRITICAL
 };
 HeapHealthLevel getHeapHealth();
+uint8_t getHeapFragmentation();
 bool canSendWebSocket();
 bool canPublishMQTT();
 void logHeapStats();
 void emergencyHeapRecovery();
+// Status-frame burst quiesce (TASK-342): suppress MQTT discovery drip during
+// Status sub-topic fanout so allocation peaks do not stack.
+// Post-burst cooldown (TASK-347): hold drip for STATUS_BURST_COOLDOWN_MS after
+// an endStatusBurst() that had real MQTT traffic, to let lwIP pbufs drain.
+void beginStatusBurst();
+void endStatusBurst();
+bool isStatusBurstActive();
+bool dripDueWithinMs(uint32_t windowMs);  // true if drip fires within windowMs ms or is overdue
+// isDripDeferred() is internal to MQTTstuff.ino (TASK-362) — single caller in loopMQTTDiscovery.
+void incrementStatusBurstPublishCount(); // called by status publishers on each real MQTT send
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
@@ -160,12 +171,30 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
 void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
+// PIC subtree helper -- prepends kPicSubtreePrefix so the otgw-pic/ subtree
+// name has a single source of truth (ADR-065). Used by TASK-390 migrations.
+void sendMQTTDataPic(const __FlashStringHelper* label, const char* value);
+void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper* value);
 void publishToSourceTopic(const char*, const char*, byte);
 void loopMQTTDiscovery();
 void setMQTTConfigPending(const uint8_t MSGid);
 void markAllMQTTConfigPending();
 const char *messageIDToString(OTLibMessageID message_id);
 void addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
+void sendMQTTheapdiag();
+void doMqttDisconnect();                 // graceful disconnect for reboot path (MQTTclient is file-static)
+void doWebSocketClose();                 // close all WS clients before reboot (webSocket not extern'd in any header)
+void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
+// MQTT discovery verification (ADR-062, TASK-349): state machine lives in
+// mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.
+// startDiscoveryVerification() / isDiscoveryVerificationActive() are
+// re-declared here so that callers already transitively including OTGW-firmware.h
+// keep compiling; prefer including mqtt_discovery_verify.h directly for new
+// callers. endDiscoveryVerification() remains file-static inside the .cpp.
+bool     startDiscoveryVerification();
+bool     isDiscoveryVerificationActive();
+uint16_t countPendingDiscoveryIds();
+void     incPublishedTopicCount();    // called by streaming helpers in MQTTHaDiscovery.cpp (ADR-044 shim)
 void sendLogToWebSocket(const char* logMessage);
 
 // Forward declarations for functions defined in later .ino files
@@ -250,6 +279,52 @@ void satFlushShortLivedData();
 
 // --- SAT enums + SATWindowRecord + SATZoneState + SATRuntimeSection moved to state_sat.h (ADR-079/TASK-326)
 
+// Verify-pass outcome classification (TASK-361). Replaces the earlier hack of
+// writing verifyReceivedCount=expected on heap-abort to suppress the false-
+// missing republish, which also lied to telemetry. With this enum the heap-
+// abort and disconnect paths can honestly report what happened while still
+// suppressing republish only when the outcome is ABORTED_* (not when CLEAN).
+enum class VerifyOutcome : uint8_t {
+  UNKNOWN = 0,            // no verify completed yet
+  CLEAN,                  // verify closed with receivedCount >= expected, no missing
+  MISSING,                // verify closed with missingCount > 0, republish triggered
+  ABORTED_HEAP,           // heap dropped below VERIFICATION_MIN_HEAP_ABORT during window
+  ABORTED_DISCONNECT      // MQTT disconnected during window
+};
+
+struct DiscoverySection {                    // state.discovery — MQTT auto-discovery verify telemetry (ADR-062)
+  uint32_t iLastVerifyEpoch         = 0;     // unix-epoch of last endVerify (0 = never)
+  uint32_t iVerifyRunCount          = 0;     // lifetime verify-start counter
+  uint32_t iRepublishTriggeredCount = 0;     // lifetime count where missing>0 → markAllMQTTConfigPending
+  uint32_t iPublishedTopicCount     = 0;     // running counter incremented by stream helpers after endPublish
+  uint16_t iLastMissingCount        = 0;     // last run: expected - received
+  uint16_t iLastOrphanCount         = 0;     // last run: foreign-nodeId retained configs observed
+  VerifyOutcome eLastOutcome        = VerifyOutcome::UNKNOWN;  // TASK-361: honest outcome label for last verify pass
+  // Active-window indicator is exposed via isDiscoveryVerificationActive()
+  // reading the MQTTstuff.ino static-local verifyActive flag — single source
+  // of truth. Do not add a mirror bool here (was removed in TASK-362).
+};
+
+// NOTE: this struct is NOT authoritative for the retained otgw-firmware/stats/*
+// MQTT topics. sendMQTTheapdiag() publishes 17 individual retained topics: 8
+// sourced from this struct, 3 live values (ESP.getFreeHeap / getMaxFreeBlockSize
+// / getHeapFragmentation), and 6 from state.discovery (verify_runs /
+// republish_triggered / last_missing / last_orphan / published_topics /
+// last_verify_epoch). Adding a field here does NOT automatically surface on MQTT
+// — add a corresponding publishStatU32(F("otgw-firmware/stats/...")) call in
+// sendMQTTheapdiag().
+struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
+  uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
+  uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
+  uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
+  uint32_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier
+  uint32_t iEnteredCriticalCount    = 0; // transitions into HEAP_CRITICAL tier
+  uint32_t iDripActiveBurstSkipCount = 0; // drip ticks skipped DURING active Status-burst (TASK-342)
+  uint32_t iDripCooldownSkipCount   = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
+  uint32_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure
+};
+
+
 struct OTGWState {
   HardwareSection    hw;          // state.hw.eMode, state.hw.bOLEDPresent
   NetworkSection     net;         // state.net (always present; fields vary by platform/build)
@@ -262,6 +337,8 @@ struct OTGWState {
   FlashSection       flash;       // state.flash.bESPactive, state.flash.iPICprogress
   DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
   UptimeSection      uptime;      // state.uptime.iSeconds, state.uptime.iRebootCount
+  HeapDiagSection    heapdiag;    // state.heapdiag.iMqttDropsTotal, ...
+  DiscoverySection   discovery;   // state.discovery.iPublishedTopicCount, ... (ADR-062)
   PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
   SATRuntimeSection  sat;         // state.sat — SAT thermostat controller
   StatusMessage      statusMessage = StatusMessage::None;
@@ -380,7 +457,11 @@ inline bool isGatewayFirmware() { return false; }
 // Sub-section structs for OTGWSettings — groups configuration by feature area.
 // Hungarian prefixes: b=bool, s=string/char[], i=int/uint, f=float
 
-// MQTTSettingsSection moved to MQTTtypes.h (ADR-079/TASK-326 AC3)
+// MQTTSettingsSection moved to MQTTstuff.h (ADR-079/TASK-326 AC3; merged per ADR-081)
+// NOTE: settings.mqtt.bDiscoveryAutoVerify (ADR-062/TASK-349/351) is referenced by
+// restAPI.ino, settingStuff.ino, and OTGW-firmware.ino. The field must be added to
+// MQTTSettingsSection in MQTTstuff.h for the tree to compile — this is a cross-file
+// concern owned by the MQTT implementer, not resolvable from this header.
 
 // NTPSection moved to NTPtypes.h (ADR-079/TASK-326 AC3)
 
@@ -498,6 +579,11 @@ uint32_t  OTGWs0pulseCountTot = 0;                // Number of S0 pulses since s
 float     OTGWs0powerkw = 0.0f ;                  // Calculated kW actual consumption
 time_t    OTGWs0lasttime = 0;                     // Last time S0 counters have been read
 byte      OTGWs0dataid = 245;                     // foney dataid for counter autoconfigure
+
+// Heap & discovery statistics (TASK-346): faux dataid used to anchor HA discovery
+// configs for the 17 retained otgw-firmware/stats/* topics. Not an OT message ID;
+// MQTTautoCfgPendingMap tracks this entry like any other in markAllMQTTConfigPending().
+byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats autoconfigure
 
 //Now load Debug & network library
 #include "debugStuff.h"

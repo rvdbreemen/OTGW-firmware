@@ -2,7 +2,7 @@
 ***************************************************************************  
 **  Program  : FSexplorer.html
 **  Version  : v2.0.0-beta
-***************************************************************************  
+***************************************************************************
 */
 :root {
     --primary-color: #0088cc; /* A slightly darker blue than #00bffe for better text contrast */
@@ -15,7 +15,7 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: var(--font-sans);
     background-color: var(--bg-color);
     color: var(--text-color);
     display: flex;

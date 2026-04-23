@@ -2,7 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">  
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- color-scheme meta: tells the browser BEFORE any CSS parses that we
+         support both light and dark. Prevents flash-of-wrong-theme on
+         native chrome (scrollbars, form widgets) during first render.
+         The actual active scheme is still driven by the html color-scheme
+         declaration in the loaded stylesheet below. -->
+    <meta name="color-scheme" content="light dark">
+    <!-- Design-system tokens (fonts + CSS variables). Must load BEFORE the theme
+         stylesheet injection below so var(--font-sans)/var(--font-mono) are
+         resolvable when index.css or index_dark.css cascades. -->
+    <link rel="stylesheet" type="text/css" href="ds-tokens.css">
     <script>
       (function() {
         var css = "./index.css";
@@ -25,7 +35,6 @@
     <title>OTGW firmware</title>
   </head>
   <body>
-    <font face="Arial">
     <div class="headerrow">
         <div class="headercolumnbig" id="sysName">OTGW firmware</div>
         <span class="headercolumn net-status" id="netStatus" title="Network: WiFi" aria-label="Network status: WiFi">
@@ -48,7 +57,6 @@
         <div class="headercolumn" id='theTime'>[00:00:00]</div>
         <span class="headercolumn theme-toggle-btn" id="headerThemeToggle" role="button" tabindex="0" title="Toggle theme" aria-label="Toggle theme"></span>
     </div>
-    </font>
     <template id="pageNavTemplate">
       <div class="nav-container">
         <div class='nav-left'>

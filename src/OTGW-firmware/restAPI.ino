@@ -168,6 +168,7 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTValue(int msgid);
 void sendOTLabel(const char *msglabel);
@@ -1049,6 +1050,103 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   }
 }
 
+// TASK-361: stringify VerifyOutcome for telemetry (REST + devinfo).
+// Returns a PROGMEM short label matching the enum values in OTGW-firmware.h.
+static const __FlashStringHelper* verifyOutcomeLabel(VerifyOutcome o) {
+  switch (o) {
+    case VerifyOutcome::CLEAN:              return F("clean");
+    case VerifyOutcome::MISSING:            return F("missing");
+    case VerifyOutcome::ABORTED_HEAP:       return F("aborted_heap");
+    case VerifyOutcome::ABORTED_DISCONNECT: return F("aborted_disconnect");
+    case VerifyOutcome::UNKNOWN:
+    default:                                return F("unknown");
+  }
+}
+
+//===[ /api/v2/discovery — MQTT auto-discovery verification/republish (ADR-062 / TASK-349) ]===
+static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  // GET /api/v2/discovery — status dump
+  if (wc == 4 || (wc == 5 && words[4][0] == '\0')) {
+    if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+    char msg[384];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"verification\":{\"active\":%s,\"last_epoch\":%lu,\"last_missing\":%u,\"last_orphan\":%u,\"last_outcome\":\"%S\"},"
+           "\"counters\":{\"published_topics\":%lu,\"pending_ids\":%u,\"verify_runs\":%lu,\"republish_triggered\":%lu},"
+           "\"settings\":{\"auto_verify\":%s}}"),
+      isDiscoveryVerificationActive() ? "true" : "false",
+      (unsigned long)state.discovery.iLastVerifyEpoch,
+      (unsigned)state.discovery.iLastMissingCount,
+      (unsigned)state.discovery.iLastOrphanCount,
+      (PGM_P)verifyOutcomeLabel(state.discovery.eLastOutcome),
+      (unsigned long)state.discovery.iPublishedTopicCount,
+      (unsigned)countPendingDiscoveryIds(),
+      (unsigned long)state.discovery.iVerifyRunCount,
+      (unsigned long)state.discovery.iRepublishTriggeredCount,
+      settings.mqtt.bDiscoveryAutoVerify ? "true" : "false");
+    sendCorsOriginHeader();
+    httpServer.send(200, F("application/json"), msg);
+    return;
+  }
+
+  // POST /api/v2/discovery/verify — start verification window
+  if (wc > 4 && strcmp_P(words[4], PSTR("verify")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+    if (platformFreeHeap() < VERIFICATION_MIN_HEAP_START) { sendApiError(503, F("Heap too low for verify")); return; }
+    if (isDiscoveryVerificationActive()) { sendApiError(409, F("Verification already active")); return; }
+    if (countPendingDiscoveryIds() > 0) { sendApiError(409, F("Discovery drip in progress")); return; }
+    if (!startDiscoveryVerification()) { sendApiError(503, F("Verification start refused (see telnet log)")); return; }
+    char msg[128];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"status\":\"verification_started\",\"expected\":%lu,\"window_ms\":15000}"),
+      (unsigned long)state.discovery.iPublishedTopicCount);
+    sendCorsOriginHeader();
+    httpServer.send(202, F("application/json"), msg);
+    return;
+  }
+
+  // POST /api/v2/discovery/republish — force full re-announce
+  if (wc > 4 && strcmp_P(words[4], PSTR("republish")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+
+    // TASK-356 (CWE-770): 60 s cooldown between successful republish invocations.
+    // Rationale: rapid-fire POSTs keep countPendingDiscoveryIds > 0 permanently,
+    // which blocks startDiscoveryVerification() (precondition at MQTTstuff.ino).
+    // A post-auth LAN actor could otherwise DoS the verify endpoint. 60 s gives
+    // the drip publisher time to drain pending IDs so verify becomes reachable
+    // again. Timer is a function-local static so no new globals leak out.
+    static unsigned long lastRepublishMs = 0;
+    constexpr unsigned long REPUBLISH_COOLDOWN_MS = 60000UL;
+    if (lastRepublishMs != 0) {
+      const unsigned long elapsed = millis() - lastRepublishMs;
+      if (elapsed < REPUBLISH_COOLDOWN_MS) {
+        const unsigned long remaining = (REPUBLISH_COOLDOWN_MS - elapsed + 999UL) / 1000UL;
+        restResponseStatus = 429;
+        char jsonBuff[160];
+        snprintf_P(jsonBuff, sizeof(jsonBuff),
+          PSTR("{\"error\":{\"status\":429,\"message\":\"Republish cooldown active, retry in %lus\"}}"),
+          remaining);
+        sendCorsOriginHeader();
+        httpServer.send(429, F("application/json"), jsonBuff);
+        return;
+      }
+    }
+
+    markAllMQTTConfigPending();
+    char msg[96];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"status\":\"marked_pending\",\"count\":%u}"),
+      (unsigned)countPendingDiscoveryIds());
+    lastRepublishMs = millis();  // stamp only after work commits
+    sendCorsOriginHeader();
+    httpServer.send(200, F("application/json"), msg);
+    return;
+  }
+
+  sendApiNotFound(originalURI);
+}
+
 //=== Route dispatch table (ADR-050) ===
 // Adding a new v2 resource: (1) write handler function above, (2) add entry below.
 typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
@@ -1073,6 +1171,7 @@ static const char kRouteWebhook[]    PROGMEM = "webhook";
 static const char kRouteOtdirect[]   PROGMEM = "otdirect";
 #endif
 static const char kRouteSat[]        PROGMEM = "sat";
+static const char kRouteDiscovery[]  PROGMEM = "discovery";
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -1090,6 +1189,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteOtgw,       handleOtgw },
   { kRouteWebhook,    handleWebhook },
   { kRouteSat,        handleSAT },
+  { kRouteDiscovery,  handleDiscovery },
   { nullptr,          nullptr }  // sentinel
 };
 
@@ -1361,12 +1461,25 @@ void sendOTmonitorV2()
 //=======================================================================
 // Sends device info as JSON map (v2 format)
 // Returns: {"device":{"author":"...","fwversion":"...",...}}
-void sendDeviceInfoV2() 
+//
+// Field ordering contract:
+// The Debug Info page (data/index.js refreshDeviceInfo) renders rows in
+// JSON insertion order via `for (key in device)`. The emit order below
+// therefore IS the on-screen order. Fields are grouped semantically
+// (firmware, platform, network, time, connections, chip, RAM, flash,
+// drops, discovery). When adding a new field, place it inside the
+// matching group rather than appending at the end, so related metrics
+// stay adjacent on the page. JSON object order is not an API guarantee
+// for REST consumers - they should parse by key.
+void sendDeviceInfoV2()
 {
   sendStartJsonMap(F("device"));
 
+  // --- Firmware & build identity ---
   sendJsonMapEntry(F("author"), F("Robert van den Breemen"));
   sendJsonMapEntry(F("fwversion"), _SEMVER_FULL);
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
+  sendJsonMapEntry(F("compiled"), cMsg);
   sendJsonMapEntry(F("picavailable"), state.pic.bAvailable);
   if (isPICEnabled()) {
     sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
@@ -1396,34 +1509,24 @@ void sendDeviceInfoV2()
     sendJsonMapEntry(F("otdoverrides"), state.otd.iOverrideCount);
   }
 #endif
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
-  sendJsonMapEntry(F("compiled"), cMsg);
+
+  // --- Platform & hardware identity ---
+  sendJsonMapEntry(F("platform"), F(PLATFORM_NAME));
+  sendJsonMapEntry(F("board"), boardName());
+  sendJsonMapEntry(F("hardwaremode"), hardwareModeName());
+  sendJsonMapEntry(F("networkmode"), networkModeName());
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
+  sendJsonMapEntry(F("oledpresent"), state.hw.bOLEDPresent);
+#endif
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  sendJsonMapEntry(F("ethernetpresent"), state.hw.bEthernetPresent);
+  sendJsonMapEntry(F("ethernetlink"), state.net.bEthernetLink);
+#endif
+
+  // --- Network identity ---
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
   sendJsonMapEntry(F("ipaddress"), CSTR(getActiveIP()));
   sendJsonMapEntry(F("macaddress"), CSTR(getActiveMAC()));
-  sendJsonMapEntry(F("platform"), F(PLATFORM_NAME));
-  sendJsonMapEntry(F("freeheap"), platformFreeHeap());
-  sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%06X"), (unsigned int)platformChipId());
-  sendJsonMapEntry(F("chipid"), cMsg);
-  sendJsonMapEntry(F("coreversion"), platformCoreVersion());
-  sendJsonMapEntry(F("sdkversion"),  platformSdkVersion());
-  sendJsonMapEntry(F("cpufreq"), platformCpuFreqMHz());
-  sendJsonMapEntry(F("sketchsize"), platformSketchSize() );
-  sendJsonMapEntry(F("freesketchspace"),  platformFreeSketchSpace() );
-
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), (unsigned int)platformFlashChipId());
-  sendJsonMapEntry(F("flashchipid"), cMsg);
-  sendJsonMapEntry(F("flashchipsize"), (platformFlashChipSize() / 1024.0f / 1024.0f));
-  sendJsonMapEntry(F("flashchiprealsize"), (platformFlashChipRealSize() / 1024.0f / 1024.0f));
-
-  platformFSInfo(LittleFSinfo);
-  sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
-
-  sendJsonMapEntry(F("flashchipspeed"), floorf((platformFlashChipSpeed() / 1000.0f / 1000.0f)));
-
-  uint8_t ideMode = platformFlashChipMode();
-  sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode < 4 ? ideMode : 4]);
 #if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
     sendJsonMapEntry(F("ssid"), CSTR(state.net.sAPSSID));
@@ -1447,16 +1550,20 @@ void sendDeviceInfoV2()
     sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
     sendJsonMapEntry(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
   }
+
+  // --- Time, NTP & uptime ---
   sendJsonMapEntry(F("ntpenable"), settings.ntp.bEnable);
   sendJsonMapEntry(F("ntptimezone"), CSTR(settings.ntp.sTimezone));
   sendJsonMapEntry(F("uptime"), upTime());
   sendJsonMapEntry(F("lastreset"), lastReset);
   sendJsonMapEntry(F("bootcount"), state.uptime.iRebootCount);
+
+  // --- Connection status (MQTT, OTGW, thermostat, boiler) ---
   sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
-  // "otcommandinterface" names which OT interface is active — always one or the other, never both.
-  if (isPICEnabled())        sendJsonMapEntry(F("otcommandinterface"), F("PIC"));
+  // "otcommandinterface" names which OT interface is active, always one or the other, never both.
+  if (isPICEnabled())           sendJsonMapEntry(F("otcommandinterface"), F("PIC"));
   else if (isOTDirectEnabled()) sendJsonMapEntry(F("otcommandinterface"), F("OT-Direct"));
-  else                       sendJsonMapEntry(F("otcommandinterface"), F("None"));
+  else                          sendJsonMapEntry(F("otcommandinterface"), F("None"));
   if (hasOTCommandInterface()) {
     sendJsonMapEntry(F("thermostatconnected"), state.otBus.bThermostatState);
     sendJsonMapEntry(F("boilerconnected"), state.otBus.bBoilerState);
@@ -1467,17 +1574,51 @@ void sendDeviceInfoV2()
   }
   sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
 
-  // Hardware platform details
-  sendJsonMapEntry(F("board"), boardName());
-  sendJsonMapEntry(F("hardwaremode"), hardwareModeName());
-  sendJsonMapEntry(F("networkmode"), networkModeName());
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
-  sendJsonMapEntry(F("oledpresent"), state.hw.bOLEDPresent);
-#endif
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  sendJsonMapEntry(F("ethernetpresent"), state.hw.bEthernetPresent);
-  sendJsonMapEntry(F("ethernetlink"), state.net.bEthernetLink);
-#endif
+  // --- Chip & CPU ---
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%06X"), (unsigned int)platformChipId());
+  sendJsonMapEntry(F("chipid"), cMsg);
+  sendJsonMapEntry(F("coreversion"), platformCoreVersion());
+  sendJsonMapEntry(F("sdkversion"),  platformSdkVersion());
+  sendJsonMapEntry(F("cpufreq"), platformCpuFreqMHz());
+
+  // --- RAM / heap (free heap, largest block, fragmentation, tier transitions) ---
+  sendJsonMapEntry(F("freeheap"), platformFreeHeap());
+  sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
+  sendJsonMapEntry(F("hd_fragmentation_pct"), getHeapFragmentation());
+  sendJsonMapEntry(F("hd_enter_low"),        state.heapdiag.iEnteredLowCount);
+  sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
+  sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
+
+  // --- Flash, sketch & filesystem storage ---
+  sendJsonMapEntry(F("sketchsize"), platformSketchSize());
+  sendJsonMapEntry(F("freesketchspace"),  platformFreeSketchSpace());
+  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), (unsigned int)platformFlashChipId());
+  sendJsonMapEntry(F("flashchipid"), cMsg);
+  sendJsonMapEntry(F("flashchipsize"), (platformFlashChipSize() / 1024.0f / 1024.0f));
+  sendJsonMapEntry(F("flashchiprealsize"), (platformFlashChipRealSize() / 1024.0f / 1024.0f));
+  sendJsonMapEntry(F("flashchipspeed"), floorf((platformFlashChipSpeed() / 1000.0f / 1000.0f)));
+  {
+    uint8_t ideMode = platformFlashChipMode();
+    sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode < 4 ? ideMode : 4]);
+  }
+  platformFSInfo(LittleFSinfo);
+  sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+
+  // --- Reliability drops (heap-pressure side effects) ---
+  sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
+  sendJsonMapEntry(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
+
+  // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
+  sendJsonMapEntry(F("disc_published_topics"),     state.discovery.iPublishedTopicCount);
+  sendJsonMapEntry(F("disc_pending_ids"),          (uint32_t)countPendingDiscoveryIds());
+  sendJsonMapEntry(F("disc_verify_runs"),          state.discovery.iVerifyRunCount);
+  sendJsonMapEntry(F("disc_republish_triggered"),  state.discovery.iRepublishTriggeredCount);
+  sendJsonMapEntry(F("disc_last_missing"),         (uint32_t)state.discovery.iLastMissingCount);
+  sendJsonMapEntry(F("disc_last_orphan"),          (uint32_t)state.discovery.iLastOrphanCount);
+  sendJsonMapEntry(F("disc_last_outcome"),         verifyOutcomeLabel(state.discovery.eLastOutcome));
+  sendJsonMapEntry(F("hd_drip_burst_skip"),        state.heapdiag.iDripActiveBurstSkipCount);
+  sendJsonMapEntry(F("hd_drip_cooldown_skip"),     state.heapdiag.iDripCooldownSkipCount);
+  sendJsonMapEntry(F("hd_drip_slowmode"),          state.heapdiag.iDripSlowModeCount);
 
   sendEndJsonMap(F("device"));
 

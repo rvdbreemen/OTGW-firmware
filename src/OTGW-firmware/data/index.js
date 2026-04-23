@@ -862,6 +862,16 @@ window.otgwDebug = {
   }
 };
 
+// Wire otgwDebug.verbose accessor to the DEBUG_WS flag so the advertised help
+// command actually works. Reads return the current flag; writes coerce to bool
+// and log the transition once for confirmation.
+Object.defineProperty(window.otgwDebug, 'verbose', {
+  get: () => DEBUG_WS,
+  set: (v) => { DEBUG_WS = !!v; console.log('[WebSocket] verbose logging =', DEBUG_WS); },
+  enumerable: true,
+  configurable: true,
+});
+
 // Show welcome message on load
 console.log('%c🔧 OTGW Debug Helper Loaded', 'color: #00ff00; font-weight: bold; font-size: 14px;');
 console.log('%cType otgwDebug.help() for available commands', 'color: #ffaa00;');
@@ -885,7 +895,8 @@ let storageQuotaMB = 10; // Default, will be detected
 let autoScroll = true;
 let frozenLogStartIndex = null; // Freeze visible slice when auto-scroll is disabled
 let lastRenderedStartIndex = 0;
-let lastRenderedLogHtml = null;
+let lastRenderedLogText = null;
+let scrollToBottomScheduled = false;
 let showTimestamps = true;
 let searchTerm = '';
 let updatePending = false;
@@ -943,6 +954,12 @@ const WEBSOCKET_PORT = 81;
 let wsReconnectTimer = null;
 let wsWatchdogTimer = null;
 const WS_WATCHDOG_TIMEOUT = 45000; // 45 seconds timeout (allows for 30s keepalive + 15s margin)
+// Per-message WebSocket console logs are gated behind this flag. It is
+// file-scoped; toggle from the browser console via `otgwDebug.verbose = true`
+// (wired via an accessor near the otgwDebug helper). Keeps the default console
+// clean so warnings/errors are not drowned out by a torrent of MESSAGE/KEEPALIVE/
+// Watchdog/Trim lines at steady state.
+let DEBUG_WS = false;
 
 // WebSocket connection tracking for detailed logging
 let wsConnectionAttempts = 0; // Count of connection attempts since page load
@@ -1059,7 +1076,9 @@ function calculateOptimalMaxLines() {
   
   // Use the smaller of the two
   const calculated = Math.min(availableMemoryLines, availableStorageLines);
-  const reasonable = Math.max(5000, Math.min(calculated, 200000)); // 5k to 200k range
+  // Cap normal-mode buffer at 10k lines for 1.4.2: higher values stall the render hotpath
+  // on restore and drag the WS watchdog down with them. Capture mode still scales with memory.
+  const reasonable = Math.max(5000, Math.min(calculated, 10000)); // 5k to 10k range
   
   console.log(`Normal mode: max ${reasonable.toLocaleString()} lines (mem: ${availableMemoryLines.toLocaleString()}, storage: ${availableStorageLines.toLocaleString()})`);
   return reasonable;
@@ -1356,10 +1375,10 @@ window.otgwPersistence = {
 
 //============================================================================
 function resetWSWatchdog() {
-  console.log('[WebSocket] Watchdog reset (' + (WS_WATCHDOG_TIMEOUT/1000) + 's)');
+  // Reset+cleared logs removed -- they fired on every inbound message and drowned
+  // out real signals. Only the WATCHDOG TIMEOUT path below still logs (console.warn).
   if (wsWatchdogTimer) {
     clearTimeout(wsWatchdogTimer);
-    console.log('[WebSocket] Watchdog timer cleared');
   }
   wsWatchdogTimer = setTimeout(function() {
       console.warn('[WebSocket] WATCHDOG TIMEOUT - no data received');
@@ -1630,10 +1649,11 @@ function initOTLogWebSocket(force) {
     };
     
     otLogWS.onmessage = function(event) {
-      console.log('[WebSocket] MESSAGE bytes=' + (event.data ? event.data.length : 0));
+      // Per-message trace gated behind DEBUG_WS (set true in console to enable).
+      // MESSAGE bytes= removed as redundant with MESSAGE data:.
       resetWSWatchdog();
 
-      if (typeof event.data === 'string') {
+      if (DEBUG_WS && typeof event.data === 'string') {
         if (event.data.length > 200) {
           console.log('[WebSocket] MESSAGE data (truncated): ' + event.data.substring(0, 200) + '...');
         } else {
@@ -1643,7 +1663,7 @@ function initOTLogWebSocket(force) {
 
       // Handle keepalive messages (don't log or add to buffer)
       if (typeof event.data === 'string' && event.data.includes('"type":"keepalive"')) {
-        console.log('[WebSocket] KEEPALIVE');
+        if (DEBUG_WS) console.log('[WebSocket] KEEPALIVE');
         return;
       }
 
@@ -2194,7 +2214,7 @@ function addLogLine(logLine) {
   if (maxLogLines !== null && otLogBuffer.length > maxLogLines) {
     const toRemove = otLogBuffer.length - maxLogLines;
     otLogBuffer.splice(0, toRemove);
-    console.log(`Trimmed ${toRemove} old log entries (limit: ${maxLogLines.toLocaleString()})`);
+    if (DEBUG_WS) console.log(`Trimmed ${toRemove} old log entries (limit: ${maxLogLines.toLocaleString()})`);
   }
   
   // Trigger debounced save (progressive storage)
@@ -2347,23 +2367,28 @@ function renderLogDisplay() {
   const linesToShow = otLogFilteredBuffer.slice(startIndex, startIndex + displayCount);
   lastRenderedStartIndex = startIndex;
 
-  // Build HTML
-  let html = '';
-  linesToShow.forEach(entry => {
-    const text = formatLogLine(entry.data);
-    const line = showTimestamps ? `${entry.time} ${text}` : text;
-    html += escapeHtml(line) + '\n';
-  });
+  // Build plain text: container CSS is white-space: pre, so '\n' becomes a line break.
+  // textContent skips the HTML parser and per-line escaping entirely.
+  const text = linesToShow.map(entry => {
+    const body = formatLogLine(entry.data);
+    return showTimestamps ? `${entry.time} ${body}` : body;
+  }).join('\n');
 
-  // Avoid resetting scroll position when rendered content did not change.
-  if (html !== lastRenderedLogHtml) {
-    container.innerHTML = html;
-    lastRenderedLogHtml = html;
+  if (text !== lastRenderedLogText) {
+    container.textContent = text;
+    lastRenderedLogText = text;
   }
 
-  // Auto-scroll to bottom if enabled
-  if (autoScroll) {
-    container.scrollTop = container.scrollHeight;
+  // Defer scroll-to-bottom to the next frame so scrollHeight is read after paint,
+  // not synchronously in the same frame as the textContent write (avoids forced reflow).
+  if (autoScroll && !scrollToBottomScheduled) {
+    scrollToBottomScheduled = true;
+    requestAnimationFrame(() => {
+      scrollToBottomScheduled = false;
+      if (autoScroll) {
+        container.scrollTop = container.scrollHeight;
+      }
+    });
   }
 }
 
@@ -5537,6 +5562,23 @@ var translateFields = [
   , ["macaddress", "MAC Address"]
   , ["freeheap", "Free Heap Memory (bytes)"]
   , ["maxfreeblock", "Max. Free Block (bytes)"]
+  , ["hd_fragmentation_pct", "Heap Fragmentation (%)"]
+  , ["hd_ws_drops", "WebSocket Drops (since boot)"]
+  , ["hd_mqtt_drops", "MQTT Drops (since boot)"]
+  , ["hd_enter_low", "Heap Entered LOW (count)"]
+  , ["hd_enter_warning", "Heap Entered WARNING (count)"]
+  , ["hd_enter_critical", "Heap Entered CRITICAL (count)"]
+  , ["hd_drip_burst_skip", "Discovery Drip Skipped (active burst)"]
+  , ["hd_drip_cooldown_skip", "Discovery Drip Skipped (cooldown)"]
+  , ["hd_drip_slowmode", "Discovery Drip Slow-mode (count)"]
+  , ["disc_published_topics", "Discovery Topics Published"]
+  , ["disc_pending_ids", "Discovery IDs Pending"]
+  , ["disc_verify_runs", "Discovery Verify Runs"]
+  , ["disc_republish_triggered", "Discovery Republish Triggered (count)"]
+  , ["disc_last_missing", "Discovery Last Missing Count"]
+  , ["disc_last_orphan", "Discovery Last Orphan Count"]
+  , ["disc_last_outcome", "Discovery Last Verify Outcome"]
+  , ["MQTTdiscoveryAutoVerify", "MQTT Discovery Daily Auto-Verify"]
   , ["chipid", "Unique Chip ID"]
   , ["coreversion", "Arduino Core Version"]
   , ["sdkversion", "Espressif SDK Version"]

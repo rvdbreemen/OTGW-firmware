@@ -4,6 +4,77 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## 🛑 v1.4.2
+
+### Breaking: heap diagnostic MQTT topic split from one JSON blob into 17 individual retained topics
+
+In v1.4.1 the hourly heap diagnostic was published as a single retained JSON blob on:
+
+```
+<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap
+```
+
+That topic is **removed** in v1.4.2. The same 17 metrics are now published as individual retained topics under:
+
+```
+<topTopic>/value/<uniqueid>/otgw-firmware/stats/<metric>
+```
+
+Each topic carries a plain ASCII decimal number. Metrics: `ws_drops`, `mqtt_drops`, `enter_low`, `enter_warning`, `enter_critical`, `drip_burst_skip`, `drip_cooldown_skip`, `drip_slowmode`, `free_heap`, `max_block`, `frag_pct`, `disc_verify_runs`, `disc_republish_triggered`, `disc_last_missing`, `disc_last_orphan`, `disc_published_topics`, `disc_last_verify_epoch`.
+
+**Action required when upgrading from v1.4.1:**
+
+- If your Home Assistant or Grafana setup subscribed to `<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap` and used a `value_template` / JSON path to extract a field, replace that with a direct subscription to the corresponding `<topTopic>/value/<uniqueid>/otgw-firmware/stats/<metric>` topic. No JSON parsing needed.
+- The old `.../stats/heap` topic is no longer published. If it still sits on your broker as a retained message, clear it manually or wait for broker expiry: the firmware will not overwrite it.
+- Subscribe to `<topTopic>/value/<uniqueid>/otgw-firmware/stats/+` to receive all 17 metrics in one wildcard subscription.
+
+### Additive: retained hostname-to-uniqueid mapping topic
+
+A new retained topic exposes the human-readable hostname for each device:
+
+```
+<topTopic>/value/<uniqueid>/otgw-firmware/hostname
+```
+
+Published on MQTT (re)connect. This lets broker-explorers, multi-device dashboards, and troubleshooting scripts map a cryptic `<uniqueid>` (e.g. `otgw-a1b2c3`) back to the user-visible hostname (e.g. `zolder-otgw`). Additive only: no existing topic changes behavior.
+
+---
+
+## 🛑 v1.4.1
+
+v1.4.1 is the first public release in the 1.4.x series (v1.4.0 was an internal development milestone that was never published).
+
+### Breaking: LittleFS partition size changed from 1 MB to 2 MB
+
+The upgrade to Arduino Core 3.1.2 changes the LittleFS partition size from 1 MB to 2 MB. **You must flash both the firmware binary and the filesystem binary in the same session.**
+
+**Upgrading from v1.3.x (Arduino Core 2.7.4):**
+
+If you flash only the firmware binary without flashing the filesystem binary, the OTGW will detect a stale 1 MB filesystem at the wrong partition offset. It will spend approximately 5 to 10 minutes reformatting the new 2 MB partition on first boot. During this time the device is unresponsive: the web UI is unreachable and MQTT stays offline. After the reformat completes, all settings are gone — MQTT broker, credentials, hostname, and every other setting resets to factory defaults. You must re-enter all settings manually after the first boot.
+
+**Upgrading from v1.4.x (already on Arduino Core 3.1.2):**
+
+If you skip the filesystem flash, the OTGW can still read existing settings but any setting change will silently fail to persist across reboots. Recovering from this state requires flashing the filesystem image.
+
+**Correct upgrade procedure (applies to all upgrades):**
+1. Download both `OTGW-firmware-*.ino.bin` and `OTGW-firmware-*.littlefs.bin` from the release.
+2. Flash the firmware binary first via the Web UI update page.
+3. Flash the filesystem binary immediately after via the same update page.
+4. Hard-refresh the browser (Ctrl+F5) after flashing.
+5. If upgrading from v1.3.x: wait up to 10 minutes for the first boot to complete, then re-enter your settings.
+
+### No other breaking changes
+
+All MQTT topics, REST API endpoints, and settings format remain identical to `v1.3.5`. New additions are purely additive:
+
+- `<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap` is a new retained topic (additive). The `<uniqueid>` segment is automatically inserted by the publish namespace so multiple OTGWs on one broker cannot overwrite each other.
+- Three new REST endpoints (`GET /api/v2/discovery`, `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`) do not replace or alter any existing endpoint.
+- `MQTTdiscoveryAutoVerify` is a new setting (default `true`). On shared brokers or brokers with tight wildcard ACLs, set it to `false`.
+
+See [RELEASE_NOTES_1.4.1.md](../RELEASE_NOTES_1.4.1.md) for the complete changelog covering all changes since `v1.3.5`.
+
+---
+
 ## 🛑 v1.3.5
 
 There are **no breaking changes** in `v1.3.5`. This release fixes the WiFi reconnection regression from v1.3.0 and adds MQTT uptime/version publishing. All MQTT topics, REST API endpoints, settings format, and ser2net behavior remain identical to `v1.3.4`.

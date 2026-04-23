@@ -136,9 +136,15 @@ inline uint32_t platformFreeSketchSpace() {
   return ESP.getFreeSketchSpace();
 }
 
-// Restart
+// Restart: ESP.reset() is a bootrom jump (0x40000080), equivalent to the
+// physical reset pin. It wipes ALL SDK and lwIP state, sidestepping the
+// Core 3.1.0 regression where ESP.restart() could leave WiFi SDK state in a
+// half-associated condition across the soft-reset ("WiFi connected but
+// services dead" symptom). Graceful peer cleanup (MQTT LWT, WS close frames,
+// TCP FINs) is handled by the caller via prepareForReboot() beforehand.
+// ESP.reset() never returns, so no safety-tail delay is required.
 inline void platformRestart() {
-  ESP.restart();
+  ESP.reset();
 }
 
 // Hardware random

@@ -137,6 +137,19 @@ Proceed directly after Phase 4 approval. No additional confirmation needed.
    - Commit: `feat: Bump version to v<next>-beta for development`
    - Push `dev`
 
+## Phase 7: Post-publication corrections (when release notes need updating after publish)
+
+Sometimes a user asks to correct text in an already-published release. Editing `RELEASE_GITHUB_<version>.md` in the repo does **not** update the GitHub release page automatically: the release body is a copy taken at `gh release create` time and lives on GitHub, not in the repo.
+
+Whenever you update release notes, README, or the GitHub release body after publication, do all three in the same round:
+
+1. **Edit the files in the repo** (`RELEASE_NOTES_<version>.md`, `README.md`, `RELEASE_GITHUB_<version>.md`) on `main`.
+2. **Commit and push** to `main`.
+3. **Update the live GitHub release body** with: `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md`
+4. **Merge `main` back into `dev`** so both branches reflect the correction: `git checkout dev && git merge main && git push origin dev`
+
+Skipping step 3 leaves the repo and the GitHub release page out of sync. Skipping step 4 means the next beta cycle starts from stale release docs.
+
 ## Important rules
 
 - **Never use em dashes** in any generated text (release notes, Discord messages, commit messages, README, conversation). Use colons, periods, commas, or parentheses.
@@ -149,3 +162,4 @@ Proceed directly after Phase 4 approval. No additional confirmation needed.
 - **Read `docs/process/RELEASE_PROCESS.md`** at the start of every release for the latest process updates
 - **All release notes and GitHub release messages MUST be in English**: international audience
 - **No emojis** in release notes unless the existing format uses them (README uses them in headings)
+- **GitHub release body is decoupled from the repo file**: editing `RELEASE_GITHUB_<version>.md` does NOT update the published release page. After any edit, run `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md` to push the change to GitHub, then merge main back into dev so both branches carry the correction.

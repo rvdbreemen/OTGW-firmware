@@ -1,0 +1,41 @@
+/*
+ * ds-tokens.css  —  OTGW-firmware design-system fonts
+ *
+ * Self-hosted WOFF2 served from LittleFS. No CDN. No cloud.
+ * Loaded BEFORE index.css / index_dark.css so the font-family swaps
+ * below (which use var(--font-sans) / var(--font-mono)) can resolve.
+ *
+ * Total on disk:
+ *   inter-400.woff2           ~23 KB
+ *   inter-700.woff2           ~24 KB
+ *   jetbrains-mono-400.woff2  ~21 KB
+ *   ---------------------------------
+ *   Total                     ~68 KB
+ */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('fonts/inter-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('fonts/inter-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('fonts/jetbrains-mono-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+
+:root {
+  --font-sans: 'Inter', Arial, Helvetica, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, "Courier New", monospace;
+}
+
+/* Tabular numerals globally — temperature / modulation columns stop wobbling */
+html, body, input, button, select, textarea {
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  font-variant-numeric: tabular-nums;
+}
