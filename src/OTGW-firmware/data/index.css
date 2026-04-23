@@ -61,6 +61,14 @@
      padding-top: 3px;
      padding-bottom: 2px;
      font-size: 12pt;
+     /* Explicit colors override browser native rendering. Without these,
+        mobile browsers (iOS Safari and some Android Chromium) can leak
+        OS dark-mode UA styles onto the input despite our color-scheme: light
+        declaration, producing dark-on-dark text. Classes .input-normal /
+        .input-changed / .input-readonly still override via higher
+        specificity. */
+     background-color: white;
+     color: black;
   }
   
   #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage {
@@ -192,6 +200,13 @@
       top: 8px;
       right: 0;
       margin: 0;
+    }
+    /* Reserve horizontal space for the absolute-positioned toggle so the
+       rightmost flex-ended .headercolumn (hostname + IP) does not flow
+       underneath the icon. Without this, on narrow viewports the toggle
+       visually overlaps the closing paren of "OTGW (IP)". */
+    .headerrow {
+      padding-right: 32px;
     }
   }
 
@@ -584,8 +599,11 @@
     background: lightblue;
   }
 
-  .input-changed { background: lightgray; }
-  .input-normal { background: white; }
+  /* Explicit color matches the dark theme's symmetry and prevents OS-level
+     UA text color leaking in when color-scheme: light is honored loosely
+     (mobile Safari, some Android Chromium). */
+  .input-changed { background: lightgray; color: black; }
+  .input-normal { background: white; color: black; }
   .input-readonly { background: #f0f0f0; color: #666; }
 
   .btn-wifi-reset {
