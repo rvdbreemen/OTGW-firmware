@@ -443,12 +443,39 @@ bool updateRebootLog(String text)
 }
 
 
+// Explicit service cleanup required before ESP.restart() on Arduino Core 3.1.0+.
+// PR esp8266/Arduino#8598 removed the implicit WiFiClient/WiFiUDP::stopAll() that
+// used to run as part of the Update path. Without manual cleanup, TCP sockets
+// linger in lwIP and the WiFi SDK state persists through the soft reset. The
+// next boot ends up in a half-state: WiFi is still associated (leftover from
+// before the restart) but telnet/HTTP/MQTT fail to bind their ports.
+// Reported 2026-04-22 by andrebrait (Discord #beta-testing): force WiFi
+// disconnect via AP -> services initialise -> alive. Root cause: Arduino
+// Core 3.1.0 breaking change, not an OTGW-firmware regression.
+static void prepareForReboot() {
+  // Focus on TCP-based services — those are the ones whose lingering lwIP
+  // state in Core 3.1.0+ blocks clean reboot. mDNS and LLMNR are UDP
+  // responders whose stale state is harmless across a reset, so we do not
+  // touch them (also avoids API compatibility issues across Core versions
+  // where ESP8266mDNS::end() and LLMNRResponder::end() are not uniformly
+  // exposed).
+  doMqttDisconnect();     // clean disconnect to broker (file-static wrapper, see MQTTstuff.ino)
+  webSocket.close();      // close all WebSocket clients and listener socket
+  debugTelnet.stop();     // port 23 debug telnet
+  OTGWstream.stop();      // port 25238 OTGW stream
+  WiFi.disconnect();      // trigger WIFI_EVENT_STAMODE_DISCONNECTED so the SDK
+                          // does a fresh association on the next boot instead
+                          // of reusing stale state from before the restart
+}
+
 void doRestart(const char* str) {
   DebugTln(str);
-  flushSettings();  // Persist any pending settings before reboot
-  delay(2000);  // Enough time for messages to be sent.
+  flushSettings();        // persist any pending settings before reboot
+  prepareForReboot();     // drain sockets + disconnect WiFi so lwIP state is clean
+  delay(2000);            // let TCP FINs + WiFi disassoc propagate
   ESP.restart();
-  delay(5000);  // Enough time to ensure we don't return.
+  delay(5000);            // safety tail: keep the stack alive until the soft-reset
+                          // actually fires (ESP.restart is non-blocking on ESP8266)
 }
 
 String upTime() 

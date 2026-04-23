@@ -97,18 +97,15 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
-        // Reboot for BOTH firmware and filesystem
-        if (_serial_output) {
-          DebugTln(F("[OTA] Rebooting..."));
-        }
-        delay(1000);
-        ESP.restart();
-        // ESP.restart() is non-blocking on ESP8266: the SDK arms a soft-reset
-        // that fires a few cycles later. Without this tail delay the handler
-        // returns immediately, control goes back to the WebServer loop, and
-        // the pending reset can be lost in scheduling. Keep the stack alive
-        // until the reset has actually fired. Do not remove.
-        delay(5000);
+        // Reboot for BOTH firmware and filesystem.
+        // Use doRestart() (helperStuff.ino) so every reboot path goes through
+        // the same service-cleanup sequence. This is critical on Arduino Core
+        // 3.1.0+ which removed the implicit WiFiClient/WiFiUDP::stopAll() from
+        // the Update path (PR esp8266/Arduino#8598). Without explicit cleanup,
+        // lwIP TCP state lingers through the soft-reset and services fail to
+        // come back on the next boot (WiFi associated but telnet/HTTP/MQTT
+        // non-responsive until a manual power-cycle or forced WiFi reassoc).
+        doRestart("[OTA] Rebooting...");
       }
     },[&](){
       // handler for the file upload, get's the sketch bytes, and writes

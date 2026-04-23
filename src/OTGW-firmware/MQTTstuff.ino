@@ -519,6 +519,16 @@ static int findMQTTSetCommandIndex(const char *topicToken)
 }
 
 //===========================================================================================
+// Clean MQTT disconnect for reboot path. MQTTclient is file-static so we expose
+// a wrapper; called from prepareForReboot() in helperStuff.ino before ESP.restart().
+// Arduino Core 3.1.0 removed implicit WiFiClient::stopAll() from the Update path,
+// so without this the TCP socket lingers in lwIP and the next boot comes up in a
+// weird half-state (WiFi associated but services non-responsive).
+void doMqttDisconnect() {
+  if (MQTTclient.connected()) MQTTclient.disconnect();
+}
+
+//===========================================================================================
 void startMQTT()
 {
   if (!settings.mqtt.bEnable) return;
