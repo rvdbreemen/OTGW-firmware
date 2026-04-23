@@ -1,29 +1,48 @@
-# Daily Issue Report — 2026-04-22
+# Daily Issue Report — 2026-04-23
 
-**Generated**: 2026-04-22  
-**Period checked**: Last 24 hours (since 2026-04-21T10:00:00Z)
+**Generated**: 2026-04-23  
+**Period checked**: Since 2026-04-22T20:51:44Z (last check timestamp)
 
 ## Sources Checked
 
 | Source | Status | Result |
 |--------|--------|--------|
-| GitHub Issues | ✅ Scanned | 0 new/updated issues |
+| GitHub Issues | ✅ Scanned | 1 issue updated since last check (already tracked) |
 | Tweakers forum | ❌ Unreachable | Host blocked by network policy |
 | Discord | ❌ Unavailable | Discord MCP not configured in this session |
 
 ## Findings
 
-No new issues in the last 24 hours.
+### GitHub — Issue #554 (already tracked as TASK-384)
 
-GitHub returned 0 open issues updated since `2026-04-21T10:00:00Z` for repository `rvdbreemen/OTGW-firmware`.
+- **Source**: [GitHub #554](https://github.com/rvdbreemen/OTGW-firmware/issues/554)
+- **Reporter**: ArnoudPJ
+- **Created**: 2026-04-22T14:39Z (before last check, already in backlog)
+- **Updated**: 2026-04-22T20:57Z (after last check)
+- **Classification**: Bug report (needs-info)
+- **Summary**: User reported that v1.3.5 cannot be flashed directly to the Nodo-shop OTGW (WeMos D1 board) — it boots into a loop. Workaround found: flash v1.2 first, connect to WiFi, then OTA-update to the latest version. User shared this as a tip for others.
+- **New activity since last check**: Maintainer (rvdbreemen) added a detailed troubleshooting questionnaire at 20:55Z asking for: exact WeMos variant, OTGW PCB revision, flash tool and offsets used, whether both `.ino.bin` and `.littlefs.bin` were flashed, and serial output at 74880 baud during the bootloop.
+- **Backlog task**: TASK-384 — `Fix: v1.3.5 bootloop on fresh flash to Wemos D1` (status: To Do, label: needs-info). Awaiting reporter response.
 
-Tweakers forum RSS (`https://gathering.tweakers.net/rss/list_messages/1653967`) could not be fetched — the host is not in the network allowlist for this environment.
+**No new user-reported issues since the last check.** The only update to #554 is from the maintainer; the reporter has not yet replied.
 
-Discord channels (`#beta-testing`, `#devs-esp-firmware`, `#english-support`, `#nederlandse-ondersteuning`) were not scanned — no Discord MCP tools are available in this session.
+### Tweakers forum
+
+Not scanned — `https://gathering.tweakers.net/rss/list_messages/1653967` is not reachable from this environment (host not in network allowlist).
+
+### Discord
+
+Not scanned — Discord MCP tools (`mcp__discord__*`) are not available in this session.
+
+## Backlog Status (needs-info)
+
+| Task | Title | Source | Waiting for |
+|------|-------|--------|-------------|
+| TASK-384 | Fix: v1.3.5 bootloop on fresh flash to Wemos D1 | GitHub #554 | Serial logs + hardware details from ArnoudPJ |
 
 ## Action Items
 
-None — no actionable issues found from available sources.
+- **TASK-384**: Monitor GitHub #554 for reporter follow-up. No code changes until hardware details and serial output are provided.
 
 ---
 
