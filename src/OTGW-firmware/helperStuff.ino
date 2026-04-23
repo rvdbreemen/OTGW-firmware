@@ -460,7 +460,7 @@ static void prepareForReboot() {
   // where ESP8266mDNS::end() and LLMNRResponder::end() are not uniformly
   // exposed).
   doMqttDisconnect();     // clean disconnect to broker (file-static wrapper, see MQTTstuff.ino)
-  webSocket.close();      // close all WebSocket clients and listener socket
+  doWebSocketClose();     // close all WebSocket clients (wrapper, see webSocketStuff.ino)
   debugTelnet.stop();     // port 23 debug telnet
   OTGWstream.stop();      // port 25238 OTGW stream
   WiFi.disconnect();      // trigger WIFI_EVENT_STAMODE_DISCONNECTED so the SDK

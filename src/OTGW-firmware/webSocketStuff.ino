@@ -34,6 +34,14 @@
 // WebSocket server on port 81 (no built-in authentication; local network use only)
 WebSocketsServer webSocket = WebSocketsServer(81);
 
+// Close wrapper for prepareForReboot() in helperStuff.ino. The webSocket global
+// is defined here (not extern'd in a header) because it needs WebSocketsServer.h
+// visibility; wrapping the call keeps helperStuff.ino free of that include chain.
+// Same pattern as doMqttDisconnect() in MQTTstuff.ino.
+void doWebSocketClose() {
+  webSocket.close();
+}
+
 // Track number of connected WebSocket clients
 static uint8_t wsClientCount = 0;
 
