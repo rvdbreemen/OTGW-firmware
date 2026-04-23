@@ -89,6 +89,8 @@ Trusted LAN only. REST API works behind HTTPS reverse proxy, but WebSocket assum
 - `doBackgroundTasks()` can re-enter — shared buffers across yield must be static/local
 - Typed control flow: `enum class` or numeric IDs, never string tokens as discriminators
 - Frontend JS: Chrome/Firefox/Safari (latest + 2). Check element existence, try-catch JSON.parse, response.ok, .catch() on all async
+- Webui assets live in `src/OTGW-firmware/data/` (`index.html`, `index.js`, `index.css`, `graph.js`) and ship as a LittleFS image; use `python build.py` (not `--firmware`) to rebuild them
+- Log container contract: `.ot-log-content` has `white-space: pre` (index.css); `\n` is the line separator. Prefer `textContent` over `innerHTML` for plain text (skips HTML parser and per-line escape)
 
 ### Naming conventions
 
