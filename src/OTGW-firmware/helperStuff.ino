@@ -471,11 +471,17 @@ static void prepareForReboot() {
 void doRestart(const char* str) {
   DebugTln(str);
   flushSettings();        // persist any pending settings before reboot
-  prepareForReboot();     // drain sockets + disconnect WiFi so lwIP state is clean
-  delay(2000);            // let TCP FINs + WiFi disassoc propagate
-  ESP.restart();
-  delay(5000);            // safety tail: keep the stack alive until the soft-reset
-                          // actually fires (ESP.restart is non-blocking on ESP8266)
+  prepareForReboot();     // graceful shutdown: MQTT LWT, WS close frames, TCP FINs
+  delay(2000);            // let TCP FINs + WiFi disassoc propagate (~1-2s RTT budget)
+  // ESP.reset() is a bootrom jump (address 0x40000080), equivalent to pressing
+  // the physical reset pin. It wipes ALL SDK and lwIP state, sidestepping the
+  // Core 3.1.0 regression where ESP.restart() could leave WiFi SDK state in a
+  // half-associated condition across the soft-reset. This matches the working
+  // manual recovery (physical reset button) that field testers discovered.
+  // Combined with the prepareForReboot() graceful cleanup above, we get both
+  // clean peer disconnects AND a guaranteed fresh boot.
+  // Never returns, so no safety-tail delay is required after this line.
+  ESP.reset();
 }
 
 String upTime() 
