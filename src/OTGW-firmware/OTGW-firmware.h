@@ -40,7 +40,7 @@ inline size_t strlcpy_P(char *dst, PGM_P src, size_t size) {
 extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 #include "Wire.h"
 #include "safeTimers.h"
-#include <OTGWSerial.h>         // Bron Schelte's Serial class - it upgrades and more
+#include <OTGWSerial.h>         // Schelte Bron's Serial class - it upgrades and more
 #include "OTGW-Core.h"          // Core code for this firmware 
 #include <OneWire.h>            // required for Dallas sensor library
 #include <DallasTemperature.h>  // Miles Burton's - Arduino Dallas library
