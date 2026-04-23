@@ -52,11 +52,14 @@ constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 3000;  // Streaming needs ~200 bytes; aligned with WARNING tier
 
 // PIC subtree prefix -- single source of truth for the otgw-pic/ MQTT subtree.
-// Declared extern in MQTTstuff.h. See ADR-065 / TASK-389 for the public-API
-// contract. Consumed by composeBinSensorPayload/composeSensorPayload/climate
-// payload in mqtt_configuratie.cpp to emit stat_t that matches the runtime
-// publish topic. Publish-side call-sites still use F("otgw-pic/...") literals
-// until TASK-390 migrates them to sendMQTTDataPic().
+// Declared extern in MQTTstuff.h. See ADR-065 for the public-API contract.
+// Consumed on the discovery side by composeBinSensorPayload/composeSensorPayload/
+// climate payload in mqtt_configuratie.cpp, and on the publish side by the
+// sendMQTTDataPic() helper below. TASK-390 migrated 9 direct publish call-sites
+// in this file and 4 in OTGW-Core.ino to the helper. The indirect dispatcher
+// path at OTGW-Core.ino:707-794 (picSettings switch-case + picSettings publish
+// block, 30 literals total) still uses F("otgw-pic/settings/...") directly;
+// migrating that set requires a dispatcher refactor and is tracked separately.
 const char kPicSubtreePrefix[] PROGMEM = "otgw-pic/";
 
 // MQTT autoconfig buffer design:
@@ -965,6 +968,33 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   feedWatchDog();
 }
 
+//===========================================================================================
+// sendMQTTDataPic -- publish to the otgw-pic/ subtree using kPicSubtreePrefix.
+// Single source of truth for the subtree name (ADR-065). Callers pass the
+// label without the otgw-pic/ prefix; the helper composes the full topic on
+// a local 128-byte stack buffer (longest in-scope topic is
+// "otgw-pic/thermostat_connected" = 29 chars + NUL, 64 bytes margin).
+// PROGMEM-correct per ADR-004: no String class. Uses strlcpy_P + strncat_P;
+// strlcat_P is not declared in ESP8266 Arduino Core 3.1.2, so the canonical
+// project pattern is strncat_P with (dstSize - strlen(dst) - 1) bound
+// (mirrors OTGW-Core.ino:475).
+//===========================================================================================
+void sendMQTTDataPic(const __FlashStringHelper* label, const char* value) {
+  char topic[128];
+  strlcpy_P(topic, reinterpret_cast<PGM_P>(kPicSubtreePrefix), sizeof(topic));
+  strncat_P(topic, reinterpret_cast<PGM_P>(label), sizeof(topic) - strlen(topic) - 1);
+  sendMQTTData(topic, value);
+}
+
+// F-value overload: preserves PROGMEM semantics for flash-literal values
+// (e.g. sendMQTTDataPic(F("designer"), F("Schelte Bron"))). Copies value to
+// a stack buffer then delegates to the char*-value overload.
+void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper* value) {
+  char valueBuf[64];
+  strlcpy_P(valueBuf, reinterpret_cast<PGM_P>(value), sizeof(valueBuf));
+  sendMQTTDataPic(label, static_cast<const char*>(valueBuf));
+}
+
 //===================[ Send useful information to MQTT ]======================
 
 void sendMQTTuptime(){
@@ -985,12 +1015,12 @@ void sendMQTTversioninfo(){
   sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
   if (isPICEnabled()) {
-    sendMQTTData("otgw-pic/version", state.pic.sFwversion);
-    sendMQTTData("otgw-pic/deviceid", state.pic.sDeviceid);
-    sendMQTTData("otgw-pic/firmwaretype", state.pic.sType);
-    sendMQTTData(F("otgw-pic/designer"), F("Schelte Bron"));
+    sendMQTTDataPic(F("version"), state.pic.sFwversion);
+    sendMQTTDataPic(F("deviceid"), state.pic.sDeviceid);
+    sendMQTTDataPic(F("firmwaretype"), state.pic.sType);
+    sendMQTTDataPic(F("designer"), F("Schelte Bron"));
   }
-  sendMQTTData("otgw-pic/picavailable", CCONOFF(state.pic.bAvailable));
+  sendMQTTDataPic(F("picavailable"), CCONOFF(state.pic.bAvailable));
 }
 
 /*
@@ -1050,12 +1080,12 @@ Publish state information of PIC firmware version information to MQTT broker.
 */
 void sendMQTTstateinformation(){
   if (!isPICEnabled()) return;
-  sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
-  sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+  sendMQTTDataPic(F("boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+  sendMQTTDataPic(F("thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
   if (state.otgw.bGatewayModeKnown) {
-    sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
+    sendMQTTDataPic(F("gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
   }
-  sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
+  sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
   sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
 }
 

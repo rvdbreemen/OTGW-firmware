@@ -125,6 +125,10 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
 void sendMQTTData(const char*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
+// PIC subtree helper -- prepends kPicSubtreePrefix so the otgw-pic/ subtree
+// name has a single source of truth (ADR-065). Used by TASK-390 migrations.
+void sendMQTTDataPic(const __FlashStringHelper* label, const char* value);
+void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper* value);
 void publishToSourceTopic(const char*, const char*, byte);
 void loopMQTTDiscovery();
 void sendMQTTheapdiag();

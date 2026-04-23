@@ -688,7 +688,7 @@ static void handlePRresponse(const char* buf, size_t len) {
     state.otgw.bGatewayMode = isGateway;
     state.otgw.bGatewayModeKnown = true;
     if (isGateway != prevGatewayMode || !prevGatewayKnown) {
-      sendMQTTData(F("otgw-pic/gateway_mode"), CCONOFF(isGateway));
+      sendMQTTDataPic(F("gateway_mode"), CCONOFF(isGateway));
       prevGatewayMode = isGateway;
       prevGatewayKnown = true;
       OTGWDebugTf(PSTR("handlePRresponse: gateway mode = %s\r\n"), CCONOFF(isGateway));
@@ -3740,22 +3740,22 @@ void processOT(const char *buf, int len){
     //If the Boiler messages have not been seen for 30 seconds, then set the state to false. 
     state.otgw.bBoilerState = (now < (epochBoilerlastseen+30));
     if ((state.otgw.bBoilerState != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
-      if (isPICEnabled()) sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+      if (isPICEnabled()) sendMQTTDataPic(F("boiler_connected"), CCONOFF(state.otgw.bBoilerState));
       bOTGWboilerpreviousstate = state.otgw.bBoilerState;
     }
 
     //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
     state.otgw.bThermostatState = (now < (epochThermostatlastseen+30));
     if ((state.otgw.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){
-      if (isPICEnabled()) sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+      if (isPICEnabled()) sendMQTTDataPic(F("thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
       bOTGWthermostatpreviousstate = state.otgw.bThermostatState;
     }
-    
+
     //OpenTherm is active when at least one side (boiler or thermostat) is communicating on the bus.
     state.otgw.bOnline = state.otgw.bBoilerState || state.otgw.bThermostatState;
     if ((state.otgw.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
       if (isPICEnabled()) {
-        sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otgw.bOnline));
+        sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
         sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
       }
       // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
