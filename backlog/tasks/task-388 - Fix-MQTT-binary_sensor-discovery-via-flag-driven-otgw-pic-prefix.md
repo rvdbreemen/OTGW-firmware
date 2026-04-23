@@ -5,23 +5,16 @@ status: Done
 assignee:
   - '@rvdbreemen'
 created_date: '2026-04-23 16:59'
-updated_date: '2026-04-23 18:40'
+updated_date: '2026-04-23 19:33'
 labels:
   - bug
   - mqtt
   - ha-discovery
 dependencies: []
 references:
-  - 'src/OTGW-firmware/MQTTstuff.h:171'
-  - 'src/OTGW-firmware/mqtt_configuratie.cpp:1035-1036'
-  - 'src/OTGW-firmware/mqtt_configuratie.cpp:1896-1900'
-  - 'src/OTGW-firmware/mqtt_configuratie.cpp:1985-1992'
-  - 'src/OTGW-firmware/mqtt_configuratie.cpp:2404'
-  - 'src/OTGW-firmware/MQTTstuff.ino:1045-1046'
-  - 'src/OTGW-firmware/OTGW-Core.ino:3743'
-  - 'src/OTGW-firmware/OTGW-Core.ino:3750'
-  - 'src/OTGW-firmware/MQTTstuff.ino:1365'
-  - 'src/OTGW-firmware/MQTTstuff.ino:1385'
+  - 'Discord #nederlandse-ondersteuning'
+  - user stefan_24213
+  - '2026-04-23 17:13Z'
 priority: high
 ---
 
@@ -104,6 +97,8 @@ ACs 1-6 and 10 are self-verified complete.
 ACs 7-9 (mosquitto_sub output, HA entity state, climate regression) require OTA flash + HA broker + HA UI verification -- user action needed.
 
 2026-04-23: AC 7, 8, 9 verified by developer. Publish-side MQTT browser shows otgw-pic/ subtree intact with boiler_connected, thermostat_connected, otgw_connected all present. HA UI confirms entities leave 'unavailable' state; climate entity regression clean.
+
+2026-04-23 17:13Z: stefan_24213 independently reported the same bug in Discord #nederlandse-ondersteuning -- replying to the_royal_fortune's original report. Quote: "Ik heb hier hetzelfde, hier zijn beide entiteiten Onbekend. Bij de vorige versie 1.35 gaven deze entiteiten Aan aan." Confirms the bug existed against v1.3.5 baseline and affected multiple users; fix already shipped in commit ae18971e (2026-04-23 earlier). No action needed -- recording the second independent report for audit trail.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
