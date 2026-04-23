@@ -211,7 +211,13 @@
                          deleteCell.setAttribute('nowrap', '');
 
                          const protectedFiles = ['FSexplorer.html', 'FSexplorer.css', 'FSexplorer.png',
-                                                 'index.html', 'index.js', 'index.css', 'settings.png'];
+                                                 'FSexplorer_dark.css',
+                                                 'index.html', 'index.js', 'index.css',
+                                                 'index_common.css', 'index_dark.css',
+                                                 'ds-tokens.css', 'graph.js',
+                                                 'favicon.ico', 'settings.png',
+                                                 'inter-400.woff2', 'inter-700.woff2',
+                                                 'jetbrains-mono-400.woff2'];
                          if (!protectedFiles.includes(files[i].name)) {
                            const deleteLink = document.createElement('a');
                            deleteLink.href = '#';

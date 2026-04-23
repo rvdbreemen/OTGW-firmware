@@ -1332,7 +1332,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 244
     284, // id 245, 4 entries
     288, // id 246, 1 entry
-    0xFFFF, // id 247
+    289, // id 247, 17 entries
     0xFFFF, // id 248
     0xFFFF, // id 249
     0xFFFF, // id 250
@@ -1836,6 +1836,19 @@ static bool writeOriginBlock(MqttJsonWriter &w, const HaDiscoveryContext &ctx) {
   return w.writeChar('}');
 }
 
+// Make a label safe for use as an HA discovery object_id / uniq_id component.
+// HA requires [a-zA-Z0-9_-] only; any other byte (e.g. '/') is replaced with '_'.
+// The MQTT stat_t value is built from the original label and is NOT affected.
+static void sanitizeHaObjectId(char *s) {
+  if (!s) return;
+  for (; *s; ++s) {
+    char c = *s;
+    bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '_' || c == '-';
+    if (!ok) *s = '_';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Sensor payload composer
 // ---------------------------------------------------------------------------
@@ -1844,8 +1857,11 @@ static bool composeSensorPayload(MqttJsonWriter &w,
                                  const HaDiscoveryContext &ctx)
 {
   char label[48];
+  char idLabel[48];
   char friendlyName[80];
   strlcpy_P(label, cfg.label, sizeof(label));
+  strlcpy(idLabel, label, sizeof(idLabel));
+  sanitizeHaObjectId(idLabel);
   strlcpy_P(friendlyName, cfg.friendlyName, sizeof(friendlyName));
 
   bool hasSrc = (ctx.sourceSuffix && ctx.sourceSuffix[0] != '\0');
@@ -1860,12 +1876,13 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   if (!writeJsonComma(w)) return false;
 
   // "uniq_id":"<nodeId>-<label>[<sourceSuffix>]"
+  // Uses idLabel (sanitized) so HA-forbidden characters like '/' become '_'.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kUniqId)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
   if (!w.writeChar('-')) return false;
-  if (!w.writeRam(label)) return false;
+  if (!w.writeRam(idLabel)) return false;
   if (hasSrc) { if (!w.writeRam(ctx.sourceSuffix)) return false; }
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
@@ -2021,6 +2038,7 @@ static bool buildSensorDiscoveryTopic(char *dest, size_t destSize,
 {
   char labelBuf[48];
   strlcpy_P(labelBuf, label, sizeof(labelBuf));
+  sanitizeHaObjectId(labelBuf);
   int n;
   if (sourceTopicSegment && sourceTopicSegment[0]) {
     n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s/%s/config"),

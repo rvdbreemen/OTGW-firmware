@@ -547,6 +547,136 @@ class WorkspaceEvaluator:
                 detail
             ))
 
+    # ===== HA DISCOVERY INDEX CONSISTENCY (TASK-392) =====
+
+    def check_ha_sensor_index_consistency(self):
+        """Verify that mqttHaSensorIndex[] points to the correct first-entry row
+        for every OT ID that has entries in mqttHaSensors[], and 0xFFFF for IDs
+        with no entries. A mismatch means discovery for that ID will either
+        never publish (index=0xFFFF for an ID that has entries) or will publish
+        the wrong rows (index points to a different ID's rows).
+
+        TASK-392: catches the ID-247 class of bug where a pseudo-ID is added to
+        mqttHaSensors[] but the sibling index table is not updated.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== HA Sensor Index Consistency ==={Colors.ENDC}")
+
+        cpp = config.FIRMWARE_ROOT / "mqtt_configuratie.cpp"
+        if not cpp.exists():
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Sensor index consistency", "WARN",
+                "mqtt_configuratie.cpp not found — cannot verify"
+            ))
+            return
+
+        try:
+            source = cpp.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Sensor index consistency", "FAIL",
+                f"Could not read mqtt_configuratie.cpp: {e}"
+            ))
+            return
+
+        # --- Parse mqttHaSensors[] body ---
+        sensors_block_re = re.compile(
+            r"const\s+MqttHaSensorCfg\s+PROGMEM\s+mqttHaSensors\s*\[\s*\]\s*=\s*\{(.*?)\n\}\s*;",
+            re.DOTALL,
+        )
+        m = sensors_block_re.search(source)
+        if not m:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Sensor index consistency", "FAIL",
+                "Could not locate mqttHaSensors[] array — file restructured?"
+            ))
+            return
+
+        sensors_body = m.group(1)
+        row_re = re.compile(r"\{\s*(\d+)\s*,")
+        ids_in_order: List[int] = []
+        for line in sensors_body.split('\n'):
+            code = line.split('//', 1)[0]  # strip // comments to avoid matching digits in prose
+            for rm in row_re.finditer(code):
+                ids_in_order.append(int(rm.group(1)))
+
+        if not ids_in_order:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Sensor index consistency", "WARN",
+                "mqttHaSensors[] body parsed but no {id,...} rows matched"
+            ))
+            return
+
+        # Build id -> (first_row_index, count)
+        first_index: dict = {}
+        count_per_id: dict = {}
+        for row_idx, id_val in enumerate(ids_in_order):
+            if id_val not in first_index:
+                first_index[id_val] = row_idx
+            count_per_id[id_val] = count_per_id.get(id_val, 0) + 1
+
+        # --- Parse mqttHaSensorIndex[256] body ---
+        index_block_re = re.compile(
+            r"const\s+uint16_t\s+PROGMEM\s+mqttHaSensorIndex\s*\[\s*256\s*\]\s*=\s*\{(.*?)\n\}\s*;",
+            re.DOTALL,
+        )
+        m2 = index_block_re.search(source)
+        if not m2:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Sensor index consistency", "FAIL",
+                "Could not locate mqttHaSensorIndex[256] array — file restructured?"
+            ))
+            return
+
+        index_body = m2.group(1)
+        # Comments are already stripped per line; match just the leading value.
+        # Last array entry in C may omit the trailing comma.
+        val_re = re.compile(r"^\s*(?:(0x[0-9A-Fa-f]+)|(\d+))\b")
+        index_vals: List[int] = []
+        for line in index_body.split('\n'):
+            code = line.split('//', 1)[0]
+            vm = val_re.match(code)
+            if not vm:
+                continue
+            if vm.group(1):
+                index_vals.append(int(vm.group(1), 16))
+            else:
+                index_vals.append(int(vm.group(2)))
+
+        if len(index_vals) != 256:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Sensor index consistency", "FAIL",
+                f"mqttHaSensorIndex[256] parsed {len(index_vals)} values; expected 256"
+            ))
+            return
+
+        # --- Validate consistency ---
+        MQTT_HA_INDEX_NONE = 0xFFFF
+        mismatches: List[str] = []
+        for otid in range(256):
+            idx_val = index_vals[otid]
+            expected = first_index.get(otid, MQTT_HA_INDEX_NONE)
+            if idx_val != expected:
+                cnt = count_per_id.get(otid, 0)
+                mismatches.append(
+                    f"id {otid}: index={hex(idx_val) if idx_val == MQTT_HA_INDEX_NONE else idx_val} "
+                    f"expected={hex(expected) if expected == MQTT_HA_INDEX_NONE else expected} "
+                    f"(rows in mqttHaSensors[]={cnt})"
+                )
+
+        total_ids_with_entries = len(first_index)
+        total_entries = sum(count_per_id.values())
+        if mismatches:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Sensor index consistency", "FAIL",
+                f"{len(mismatches)} mismatch(es) across {total_ids_with_entries} IDs with entries",
+                "; ".join(mismatches[:10]) + (" ..." if len(mismatches) > 10 else "")
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Sensor index consistency", "PASS",
+                f"All {total_ids_with_entries} IDs indexed correctly ({total_entries} sensor entries total)"
+            ))
+
     # ===== JSON BUFFER ARITHMETIC (TASK-368) =====
 
     def check_json_buffer_arithmetic(self):
@@ -1727,6 +1857,7 @@ class WorkspaceEvaluator:
         self.check_time_boundary_single_caller()      # ADR-064 CI gate (TASK-350)
         self.check_discovery_counter_instrumented()   # ADR-062 CI gate (TASK-364)
         self.check_publishedtopic_counter_reset()     # ADR-062 CI gate (TASK-364)
+        self.check_ha_sensor_index_consistency()      # HA discovery gate (TASK-392)
         self.check_json_buffer_arithmetic()           # TASK-352/368
         self.check_status_burst_cooldown_bound()      # TASK-353/368
         self.check_status_publishers_wrap_burst()     # TASK-347/354/368

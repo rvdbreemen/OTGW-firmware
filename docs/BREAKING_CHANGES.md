@@ -58,10 +58,12 @@ If you skip the filesystem flash, the OTGW can still read existing settings but 
 
 **Correct upgrade procedure (applies to all upgrades):**
 1. Download both `OTGW-firmware-*.ino.bin` and `OTGW-firmware-*.littlefs.bin` from the release.
-2. Flash the firmware binary first via the Web UI update page.
-3. Flash the filesystem binary immediately after via the same update page.
+2. Flash the **filesystem binary first** via the Web UI update page. Doing this before the firmware flash preserves your existing settings and avoids the first-boot reformat.
+3. Flash the **firmware binary second**, immediately after, via the same update page.
 4. Hard-refresh the browser (Ctrl+F5) after flashing.
-5. If upgrading from v1.3.x: wait up to 10 minutes for the first boot to complete, then re-enter your settings.
+
+**Recovery: if you already flashed in the wrong order (firmware before filesystem):**
+The device spends approximately 5 to 10 minutes reformatting the 2 MB partition on first boot. It is unresponsive during that time — the web UI is unreachable and MQTT stays offline. After the reformat, settings reset to factory defaults. Flash the filesystem binary once the device becomes responsive again, hard-refresh the browser, and re-enter your settings manually via the Web UI.
 
 ### No other breaking changes
 
