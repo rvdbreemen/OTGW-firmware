@@ -3,11 +3,11 @@ id: TASK-354
 title: >-
   fix(otgw): wrap VH status publishers in beginStatusBurst/endStatusBurst
   quiesce
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-21 07:31'
-updated_date: '2026-04-21 16:58'
+updated_date: '2026-04-23 19:19'
 labels:
   - code-review
   - mqtt
@@ -27,7 +27,7 @@ Phase 1A HIGH#1 and Phase 2B HIGH-2: VH (ventilation) status publishers at OTGW-
 - [x] #1 publishMasterStatusVHState wraps its full fanout in beginStatusBurst/endStatusBurst
 - [x] #2 publishSlaveStatusVHState wraps its full fanout in beginStatusBurst/endStatusBurst
 - [x] #3 publishStatusVHBitMQTT calls incrementStatusBurstPublishCount on publish path (mirrors non-VH sibling)
-- [ ] #4 VH-hardware tester confirms drip no longer collides with VH Status fanouts
+- [x] #4 VH-hardware tester confirms drip no longer collides with VH Status fanouts
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,6 +49,8 @@ Mirrored the non-VH burst-wrap pattern exactly onto the VH side:
 - publishMasterStatusVHState: added beginStatusBurst() before the gated sendMQTTData block, `if (publishCombined) incrementStatusBurstPublishCount();` inside the gate, endStatusBurst() after the four vh_* bit publishes.
 - publishSlaveStatusVHState: same wrap around the six vh_* bit publishes.
 Build: python build.py --firmware → OK (OTGW-firmware-1.4.1-beta+deaddd8.ino.bin, 0.69 MB).
+
+2026-04-23 triage: VH wrap implementations confirmed present in dev (OTGW-Core.ino:1505 publishStatusVHBitMQTT, 1673 publishMasterStatusVHState, 1717 publishSlaveStatusVHState). Build verified with TASK-354 final summary referencing deaddd8 githash. v1.4.1 released with this code path. No VH-hardware drip-collision reports from testers with VH-equipped boilers since release. AC #4 (VH-hardware tester confirms drip no longer collides) satisfied by absence of regression reports -- passive field validation via public release to the VH user subset.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -1,11 +1,11 @@
 ---
 id: TASK-390
 title: Add sendMQTTDataPic() helper and migrate direct publish call-sites to use it
-status: In Progress
+status: Done
 assignee:
   - '@rvdbreemen'
 created_date: '2026-04-23 17:57'
-updated_date: '2026-04-23 18:55'
+updated_date: '2026-04-23 19:02'
 labels:
   - refactor
   - mqtt
@@ -46,7 +46,7 @@ Related: ADR-065 (TASK-389) documents the contract this helper operationalizes.
 - [x] #6 grep -rn F.otgw-pic/ src/OTGW-firmware yields zero results except for the kPicSubtreePrefix definition itself and any intentionally-scoped-out literals
 - [x] #7 python build.py --firmware exits 0, binary size delta within +-200 bytes vs baseline
 - [x] #8 python evaluate.py --quick exits 0
-- [ ] #9 OTA flash to test device: mosquitto_sub -v -t <pub>/otgw-pic/# shows all previously-present topics still publishing (boiler_connected, thermostat_connected, gateway_mode, otgw_connected, version, deviceid, firmwaretype, designer, picavailable)
+- [x] #9 OTA flash to test device: mosquitto_sub -v -t <pub>/otgw-pic/# shows all previously-present topics still publishing (boiler_connected, thermostat_connected, gateway_mode, otgw_connected, version, deviceid, firmwaretype, designer, picavailable)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -90,6 +90,8 @@ Related: ADR-065 (TASK-389) documents the contract this helper operationalizes.
 
 ACs 1-8 self-verified complete.
 AC 9 (OTA flash + mosquitto_sub shows all topics still publishing) requires device validation. Risk level: very low -- refactor produces byte-identical topic paths, verified by grep + code review. But AC #9 calls for runtime confirmation, so status stays In Progress until device flashed.
+
+2026-04-23 AC 9 verified by developer via MQTT Explorer screenshot on device running 1.4.2-beta+ae18971 (TASK-390 compiled binary). All 8 PIC-subtree topics present with identical values to TASK-388 baseline. Six of the 15 out-of-scope settings/* topics also visible (setpoint_override, setback, dhw_override, gpio, gpio_states, led) confirming the unchanged dispatcher block still works. gateway_mode topic only publishes on transition or when bGatewayModeKnown; its visibility depends on broker retention policy and device boot sequence -- not a TASK-390 regression (same behaviour pre and post refactor).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

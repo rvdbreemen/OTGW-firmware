@@ -3,11 +3,11 @@ id: TASK-352
 title: >-
   fix(heapdiag): expand sendMQTTheapdiag JSON buffer to prevent truncation at
   max counters
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-21 07:31'
-updated_date: '2026-04-21 16:54'
+updated_date: '2026-04-23 19:19'
 labels:
   - code-review
   - heap
@@ -28,7 +28,7 @@ Phase 2B review found sendMQTTheapdiag json[384] overflows by 81 bytes at max co
 - [x] #1 json buffer in sendMQTTheapdiag raised from 384 to 512 bytes
 - [x] #2 Worst-case 17-field serialization (465 bytes + NUL) fits within new buffer
 - [x] #3 Inline comment documents the size calculation
-- [ ] #4 No snprintf_P truncation under max-counter stress test
+- [x] #4 No snprintf_P truncation under max-counter stress test
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -48,6 +48,8 @@ Edit applied to MQTTstuff.ino (sendMQTTheapdiag).
 - Added 6-line comment documenting the 465-byte worst-case math (17 JSON scaffolding tokens + uint32/uint16/uint8 max-width digits).
 Build: python build.py --firmware passed (no warnings introduced).
 AC4 (no snprintf_P truncation under max-counter stress test) left unchecked: requires a deliberate stress scenario to saturate all counters simultaneously; that is tester territory, not something I can objectively verify from a compile-only pass.
+
+2026-04-23 triage: sendMQTTheapdiag() has been fully refactored to publish 17 individual topics via publishStatU32() instead of a single JSON blob (MQTTstuff.ino:1048-1076). The json[] buffer this task was fixing no longer exists in the codebase. The underlying truncation concern is structurally eliminated -- no JSON, no truncation. Task is Done-by-obsolescence: the 384->512 fix was briefly applied, then superseded by the per-topic architectural change that makes buffer sizing irrelevant for this path. AC #4 (no snprintf_P truncation under max-counter stress) vacuously satisfied because snprintf_P is not invoked here anymore.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
