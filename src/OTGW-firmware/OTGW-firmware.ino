@@ -115,7 +115,34 @@ bool shouldForceWifiConfigPortal() {
 bool wifiPortalResetWindowExpired() {
   return wifiPortalResetWindowOpen && ((int32_t)(millis() - wifiPortalResetWindowDeadline) >= 0);
 }
-  
+
+// ---------------------------------------------------------------------------
+// TASK-397: always-on BGTRACE instrumentation to diagnose random
+// doBackgroundTasks() stalls introduced somewhere between v1.3.5 and dev.
+// When BGTASKS_TRACE is 1, every handler in the chain emits a one-line
+// telnet log with name, duration (microseconds), free heap, and max free
+// block. Volume is HIGH (hundreds of lines/sec at idle); disable by setting
+// BGTASKS_TRACE to 0 after the culprit has been identified.
+//
+// Stall-detection pattern: the LAST BGTRACE line in the log identifies the
+// previous handler that returned normally. The handler whose name appears
+// NEXT in the code but has NO corresponding BGTRACE line is the one hung.
+// ---------------------------------------------------------------------------
+#define BGTASKS_TRACE 1
+
+#if BGTASKS_TRACE
+  #define BGTRACE(name) do { \
+      uint32_t _now = micros(); \
+      DebugTf(PSTR("[bg] %s %luus heap=%u max=%u\r\n"), \
+              name, (unsigned long)(_now - _bgPrev), \
+              (unsigned)ESP.getFreeHeap(), \
+              (unsigned)ESP.getMaxFreeBlockSize()); \
+      _bgPrev = _now; \
+    } while(0)
+#else
+  #define BGTRACE(name) ((void)0)
+#endif
+
 //=====================================================================
 void setup() {
 
@@ -381,15 +408,16 @@ void doBackgroundTasks()
       handlePicFlashBackgroundTasks();
     } else {
       //while connected handle everything that uses network stuff
-      debugTelnet.loop();         // Process new connections, fire onConnect banner
-      OTGWstream.loop();          // Keep OTGWstream clients alive (SimpleTelnet requires loop())
-      handleDebug();
-      handleMQTT();                 // MQTT transmissions
-      handleOTGW();                 // OTGW handling
-      handleWebSocket();            // WebSocket handling for OT log streaming
-      httpServer.handleClient();
-      MDNS.update();
-      loopNTP();
+      uint32_t _bgPrev = micros();
+      debugTelnet.loop();          BGTRACE("debugTelnet");
+      OTGWstream.loop();           BGTRACE("OTGWstream");
+      handleDebug();               BGTRACE("handleDebug");
+      handleMQTT();                BGTRACE("handleMQTT");
+      handleOTGW();                BGTRACE("handleOTGW");
+      handleWebSocket();           BGTRACE("handleWebSocket");
+      httpServer.handleClient();   BGTRACE("httpServer");
+      MDNS.update();               BGTRACE("mdns");
+      loopNTP();                   BGTRACE("ntp");
     }
   } //otherwise, just wait until reconnected gracefully
   delay(1);
@@ -413,11 +441,14 @@ void loop()
       if (DUE(timer3s))                 doTaskEvery3s();
       if (DUE(timer1s))                 doTaskEvery1s();
       if (minuteChanged())              doTaskMinuteChanged(); //ADR-064: sole minuteChanged() caller; hour/day/year dispatch lives inside
-      loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, 2s normal / 10s slow)
-      evalOutputs();                    // when the bits change, the output gpio bit will follow
-      evalWebhook();                    // when the trigger bit changes, fire the webhook
-      handlePendingUpgrade();           // Check if we need to start an upgrade
-    } 
+      {
+        uint32_t _bgPrev = micros();
+        loopMQTTDiscovery();       BGTRACE("loopMQTTDiscovery");
+        evalOutputs();             BGTRACE("evalOutputs");
+        evalWebhook();             BGTRACE("evalWebhook");
+        handlePendingUpgrade();    BGTRACE("handlePendingUpgrade");
+      }
+    }
 
   doBackgroundTasks();              // run background tasks
 
