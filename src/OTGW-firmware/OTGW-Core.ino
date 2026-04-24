@@ -278,12 +278,16 @@ static uint16_t mqttlastsentRObyte[1]   = {0};  // msgId 100 Remote Override LB 
 // TASK-402: global rate-gate — enforce MQTT_GATED_PUBLISH_SPACING_MS between
 // any two gated publishes for first-seen, heartbeat, and force paths.
 // Change-detect publishes bypass the gate (priority: bit-flip goes out
-// immediately) but still update mqttLastGatedPublishMs, so a subsequent
-// non-change publish honours spacing relative to the change-detect burst.
+// immediately) and do NOT update the timer, so a subsequent non-change publish
+// honours spacing relative to the previous non-change publish only.
 // Boot sentinel mqttLastGatedPublishMs==0 means "nothing published yet, first
-// pass is free" — earliest bit at boot goes through without waiting 1s.
+// pass is free" — earliest bit at boot goes through without waiting.
+// TASK-402 v2: spacing tightened from 1000ms to 250ms per user request.
+// With 44 gated slots across msgId 0/70/5/6/100, boot-time full fanout
+// completes in ~11s; the 60s heartbeat storm spreads over ~4s (16 bits at
+// 250ms each). Still one publish per tick, so handleMQTT peaks stay low.
 static uint32_t mqttLastGatedPublishMs = 0;
-static constexpr uint32_t MQTT_GATED_PUBLISH_SPACING_MS = 1000;
+static constexpr uint32_t MQTT_GATED_PUBLISH_SPACING_MS = 250;
 
 // Pending MQTT throttle slot update — applied only after successful publish.
 // Prevents the throttle from "burning" a slot when sendMQTTData fails silently.
@@ -3833,7 +3837,7 @@ static void decodeAndPublishOTValue()
 // (~10/sec at idle). Each probe logs: phase name, duration since last probe,
 // current heap, current max block, delta heap vs baseline at frame entry.
 // ---------------------------------------------------------------------------
-#define OTPROCESS_TRACE 1
+#define OTPROCESS_TRACE 0
 
 #if OTPROCESS_TRACE
   #define OTTRACE(name) do { \

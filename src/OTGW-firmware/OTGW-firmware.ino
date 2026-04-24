@@ -128,7 +128,7 @@ bool wifiPortalResetWindowExpired() {
 // previous handler that returned normally. The handler whose name appears
 // NEXT in the code but has NO corresponding BGTRACE line is the one hung.
 // ---------------------------------------------------------------------------
-#define BGTASKS_TRACE 1
+#define BGTASKS_TRACE 0
 
 #if BGTASKS_TRACE
   #define BGTRACE(name) do { \
