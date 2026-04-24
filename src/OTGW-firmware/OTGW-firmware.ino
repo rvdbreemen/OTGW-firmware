@@ -172,7 +172,12 @@ void setup() {
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
-  
+
+  // One-line boot signature for field diagnostics (TASK-395, port from 2.0.0
+  // TASK-394 Phase 2). Captured AFTER full init so heap/fragmentation reflect
+  // steady-state setup.
+  logBootSignature("boot:");
+
   SetupDebugln(F("Setup finished!\r\n"));
 
   // After resetting the OTGW PIC never send anything to Serial for debug

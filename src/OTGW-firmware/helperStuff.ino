@@ -480,6 +480,31 @@ static void prepareForReboot() {
   // calls above can reach their peers before the reset fires.
 }
 
+// One-line boot/runtime signature with platform, hardware, heap, and reset
+// info. Dev (1.4.x) is ESP8266-only and has no platform abstraction layer, so
+// this calls the ESP APIs directly (ESP.getHeapFragmentation() is native on
+// ESP8266). Pass a short phase label (e.g. "boot:", "[OTA] pre-begin") so the
+// lifecycle is greppable across the telnet log. Ported from 2.0.0 TASK-394
+// Phase 2; output format kept identical so logs are cross-branch comparable.
+void logBootSignature(const char *phase) {
+  DebugTf(PSTR("%s core=%s sdk=%s cpu=%u flashId=0x%08X flashReal=%u flashMap=%u flashSpeed=%u sketch=%u freeSketch=%u md5=%s heap=%u maxBlk=%u frag=%u reset=[%s]\r\n"),
+          phase ? phase : "boot:",
+          ESP.getCoreVersion().c_str(),
+          ESP.getSdkVersion(),
+          (unsigned)ESP.getCpuFreqMHz(),
+          (unsigned)ESP.getFlashChipId(),
+          (unsigned)ESP.getFlashChipRealSize(),
+          (unsigned)ESP.getFlashChipSize(),
+          (unsigned)ESP.getFlashChipSpeed(),
+          (unsigned)ESP.getSketchSize(),
+          (unsigned)ESP.getFreeSketchSpace(),
+          ESP.getSketchMD5().c_str(),
+          (unsigned)ESP.getFreeHeap(),
+          (unsigned)ESP.getMaxFreeBlockSize(),
+          (unsigned)ESP.getHeapFragmentation(),
+          ESP.getResetReason().c_str());
+}
+
 void doRestart(const char* str) {
   DebugTln(str);
   flushSettings();        // persist any pending settings before reboot

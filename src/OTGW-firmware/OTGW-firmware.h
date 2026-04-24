@@ -135,6 +135,7 @@ void sendMQTTheapdiag();
 void doMqttDisconnect();                 // graceful disconnect for reboot path (MQTTclient is file-static)
 void doWebSocketClose();                 // close all WS clients before reboot (webSocket not extern'd in any header)
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
+void logBootSignature(const char *phase); // one-line boot/runtime signature for field diagnostics (TASK-395)
 // MQTT discovery verification (ADR-062, TASK-349): state machine lives in
 // mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.
 // startDiscoveryVerification() / isDiscoveryVerificationActive() are
