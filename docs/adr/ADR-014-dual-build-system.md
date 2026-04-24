@@ -1,8 +1,8 @@
 # ADR-014: Dual Build System (Makefile + Python Script)
 
-**Status:** Accepted  
+**Status:** Superseded by ADR-083
 **Date:** 2020-01-01 (build.py added)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-04-24 (Superseded by ADR-083: PlatformIO as primary build system)
 
 ## Context
 
