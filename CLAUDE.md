@@ -6,11 +6,13 @@
 
 **Every piece of work must have a backlog task before any code is written. No exceptions.**
 
+**Preferred interface: MCP server (`mcp__backlog__*`) over the CLI.** MCP calls take structured parameters (typed arrays, multi-line strings) — no shell-escape pain. Use the CLI only when an operation is not exposed via MCP or the MCP server is unreachable. Coverage includes task create/edit/view/list/search/archive/complete, documents, milestones, Definition of Done defaults, and the workflow/execution guides. The CLI reference below remains the authoritative semantics description — same underlying engine.
+
 ```bash
-# Before writing any code:
-backlog search "<topic>" --plain           # 1. Find existing task
-backlog task create "Title" -d "..." --ac "..."  # 2. Create if none exists
-backlog task edit <id> -s "In Progress" -a @claude  # 3. Start it
+# Before writing any code (CLI shown for reference; MCP equivalents preferred):
+backlog search "<topic>" --plain           # 1. Find existing task       (mcp__backlog__task_search)
+backlog task create "Title" -d "..." --ac "..."  # 2. Create if none     (mcp__backlog__task_create)
+backlog task edit <id> -s "In Progress" -a @claude  # 3. Start it        (mcp__backlog__task_edit)
 backlog task edit <id> --plan "..."        # 4. Write plan, share with user, WAIT for approval
 
 # During implementation:
