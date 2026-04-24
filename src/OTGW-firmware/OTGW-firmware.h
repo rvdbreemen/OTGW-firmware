@@ -585,6 +585,21 @@ byte      OTGWs0dataid = 245;                     // foney dataid for counter au
 // MQTTautoCfgPendingMap tracks this entry like any other in markAllMQTTConfigPending().
 byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats autoconfigure
 
+// Forward declarations for helperStuff.ino functions called from template
+// instantiations in OTGW-ModUpdateServer-impl.h (pulled in via networkStuff.h).
+// Without these, GCC 4.8.2 (Arduino Core 2.7.4 toolchain) reports
+// "'foo' was not declared in this scope" at template-instantiation time because
+// the template uses these names before their actual definitions are parsed.
+// GCC 10.3 (Core 3.1.2 toolchain) resolved this via ADL/2-phase lookup; 4.8.2
+// does not. Keep these in sync with helperStuff.ino definitions.
+void logBootSignature(const char *phase);          // one-line boot/runtime signature for field diagnostics
+void requestDeferredReboot(const char *reason);    // mark reboot pending; actual reset fires from loop() on next tick
+void performDeferredReboot();                      // called by loop() when g_rebootPending && !isFlashing()
+bool isRebootPending();                            // true when a deferred reboot is queued
+void rebootHeapWatermarkTick();                    // update min-free-heap watermark; called from loop()
+uint32_t getMinFreeHeap();                         // read current heap watermark (wraps platformMinFreeHeap)
+void maybeWarnFlashMismatch();                     // one-shot flash-config sanity check at boot
+
 //Now load Debug & network library
 #include "debugStuff.h"
 #include "networkStuff.h"
