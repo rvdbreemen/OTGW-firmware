@@ -178,6 +178,10 @@ void setup() {
   // steady-state setup.
   logBootSignature("boot:");
 
+  // TASK-396: warn once if flash hardware doesn't match the 4M2M DIO build.
+  // Silent on matching boards; emits one or more [flash] WARN lines otherwise.
+  maybeWarnFlashMismatch();
+
   SetupDebugln(F("Setup finished!\r\n"));
 
   // After resetting the OTGW PIC never send anything to Serial for debug
@@ -416,6 +420,16 @@ void loop()
     } 
 
   doBackgroundTasks();              // run background tasks
+
+  // TASK-396: heap watermark tick + deferred-reboot gate. The watermark runs
+  // every loop so slow leaks are visible in the minHeap field of the boot
+  // signature on the next reboot. The deferred-reboot check re-uses the
+  // existing isFlashing() guard so we never reset mid-OTA. When a callback
+  // (e.g. OTA success handler) or timer (nightly restart) has set the pending
+  // flag, the actual reset fires here — OUTSIDE the callback context so any
+  // pending HTTP response bytes have already left the socket.
+  rebootHeapWatermarkTick();
+  if (isRebootPending() && !isFlashing()) performDeferredReboot();
 }
 
 
