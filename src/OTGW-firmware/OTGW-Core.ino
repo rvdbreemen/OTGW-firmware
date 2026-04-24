@@ -241,6 +241,16 @@ OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 static constexpr uint8_t MQTT_TRACKED_RESPONSE_ID_COUNT = 128; // linear msgid slots for IDs 0-127
 static constexpr uint16_t MQTT_TRACKED_SLOT_COUNT = MQTT_TRACKED_RESPONSE_ID_COUNT * 2; // response + request view
 
+// TASK-400: Status-bit specific heartbeat interval. Hardcoded to 60 seconds
+// so the msgId 0 status_master / status_slave fan-out (and the msgId 70
+// Status VH equivalent) publishes at least once a minute as a state-snapshot
+// for HA reconnect recovery, INDEPENDENT of settings.mqtt.iInterval (which
+// governs all OTHER topic throttles). The 60s cadence is a compromise: long
+// enough to eliminate per-frame publish spam under steady-state boiler
+// conditions (drops 160 publishes/sec → ~0.27/sec), short enough that HA
+// regains full state within one minute after any MQTT broker reconnect.
+static constexpr uint16_t STATUS_HEARTBEAT_INTERVAL_SEC = 60;
+
 // Global state arrays — defined here (one definition rule), declared extern in OTGW-Core.h. (ADR-044)
 uint32_t mqttlastsent[MQTT_TRACKED_SLOT_COUNT] = {0}; // packed throttle for msgids 0-127: bits31-16=last published u16, bits15-0=seconds-since-boot
 uint16_t mqttlastsentstatusbit[16] = {0}; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
@@ -1425,7 +1435,18 @@ bool shouldPublishMQTTForPSField(byte id) {
   return false;
 }
 
-// shouldPublishStatusBit - per-bit publish decision for OT_Statusflags
+// shouldPublishStatusBit - per-bit publish decision for OT_Statusflags.
+// TASK-400: pure change-detection with a fixed 60-second heartbeat.
+//   - forcePublish (boot reset-flag): publish once to establish state
+//   - firstSeen (per-bit sentinel): publish the very first value per bit
+//   - valueChanged: publish only when the bit actually flipped
+//   - 60-second heartbeat (STATUS_HEARTBEAT_INTERVAL_SEC): republish if no
+//     change for ≥60s, so HA has recent state after MQTT broker reconnect
+// Behaviour change vs pre-TASK-400: previously settings.mqtt.iInterval
+// governed the heartbeat AND iInterval==0 forced publish on every frame
+// (causing 160 MQTT publishes/sec on Status frames). Status bits now use
+// a dedicated 60s constant, independent of iInterval — other topic throttles
+// continue to honour iInterval.
 static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlot, bool newVal, bool prevVal, bool forcePublish) {
   mqttPendingBitSlot.pending = false; // discard unconfirmed pending from prior call
   const uint16_t lastTime = trackedSlots[bitSlot];
@@ -1435,12 +1456,9 @@ static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlo
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
     return true;
   }
-  if (settings.mqtt.iInterval == 0) {
-    mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
-    return true;   // interval=0: always publish every OT message
-  }
-  bool valueChanged    = (newVal != prevVal);
-  bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
+  const bool valueChanged    = (newVal != prevVal);
+  const bool intervalElapsed = !firstSeen
+                             && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
   if (firstSeen || valueChanged || intervalElapsed) {
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
     return true;
@@ -1457,6 +1475,9 @@ static bool shouldPublishStatusVHBit(uint8_t bitSlot, bool newVal, bool prevVal,
   return shouldPublishTrackedStatusBit(mqttlastsentstatusvhbit, bitSlot, newVal, prevVal, forcePublish);
 }
 
+// TASK-400: same rules as shouldPublishTrackedStatusBit — the status_master
+// and status_slave combined-byte topics (and Status VH equivalents) also use
+// the hardcoded 60-second heartbeat, independent of settings.mqtt.iInterval.
 static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteSlot, uint8_t newVal, uint8_t prevVal, bool forcePublish)
 {
   mqttPendingByteSlot.pending = false; // discard unconfirmed pending from prior call
@@ -1467,12 +1488,9 @@ static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteS
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
     return true;
   }
-  if (settings.mqtt.iInterval == 0) {
-    mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
-    return true;   // interval=0: always publish every OT message
-  }
   const bool valueChanged = (newVal != prevVal);
-  const bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
+  const bool intervalElapsed = !firstSeen
+                             && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
   if (firstSeen || valueChanged || intervalElapsed) {
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
     return true;
