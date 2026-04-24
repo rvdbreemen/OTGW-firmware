@@ -136,6 +136,13 @@ void doMqttDisconnect();                 // graceful disconnect for reboot path 
 void doWebSocketClose();                 // close all WS clients before reboot (webSocket not extern'd in any header)
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
 void logBootSignature(const char *phase); // one-line boot/runtime signature for field diagnostics (TASK-395)
+// Reboot-process instrumentation helpers (TASK-396)
+void requestDeferredReboot(const char *reason); // mark reboot pending; actual reset fires from loop() on next tick
+void performDeferredReboot();                   // called by loop() when g_rebootPending && !isFlashing()
+bool isRebootPending();                         // true when a deferred reboot is queued
+void rebootHeapWatermarkTick();                 // update g_minFreeHeap; called from loop()
+uint32_t getMinFreeHeap();                      // read current heap watermark
+void maybeWarnFlashMismatch();                  // one-shot flash-config sanity check at boot
 // MQTT discovery verification (ADR-062, TASK-349): state machine lives in
 // mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.
 // startDiscoveryVerification() / isDiscoveryVerificationActive() are
