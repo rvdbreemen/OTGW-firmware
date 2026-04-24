@@ -263,6 +263,18 @@ static bool mqttForceNextSlaveStatusPublish  = true;
 static bool mqttForceNextMasterStatusVHPublish = true;
 static bool mqttForceNextSlaveStatusVHPublish  = true;
 
+// TASK-401: per-bit / per-byte publish timers for non-Status fan-out sites
+// that fire frequently enough to matter for heap pressure. Same first-seen +
+// change + STATUS_HEARTBEAT_INTERVAL_SEC heartbeat gating as msgId 0 Status.
+// Reset to TRACKED_TIME_UNSEEN in resetMqttTrackedState() so the first frame
+// after boot publishes all bits/bytes once.
+static uint16_t mqttlastsentASFbit[8]   = {0};  // msgId 5 ASF bits 0-5 (slots 6-7 reserved)
+static uint16_t mqttlastsentASFbyte[1]  = {0};  // msgId 5 ASF_flags byte-topic
+static uint16_t mqttlastsentRBPbit[4]   = {0};  // msgId 6 RBP: 0=dhw_sp, 1=max_ch_sp, 2=rw_dhw_sp, 3=rw_max_ch_sp
+static uint16_t mqttlastsentRBPbyte[2]  = {0};  // msgId 6 RBP: 0=transfer_enable, 1=read_write
+static uint16_t mqttlastsentRObit[2]    = {0};  // msgId 100 Remote Override: 0=manual, 1=program
+static uint16_t mqttlastsentRObyte[1]   = {0};  // msgId 100 Remote Override LB flag8
+
 // Pending MQTT throttle slot update — applied only after successful publish.
 // Prevents the throttle from "burning" a slot when sendMQTTData fails silently.
 struct MQTTPendingSlotUpdate {
@@ -397,6 +409,15 @@ static void resetMqttTrackedState()
   mqttlastsentstatusbyte[1] = TRACKED_TIME_UNSEEN;
   mqttlastsentstatusvhbyte[0] = TRACKED_TIME_UNSEEN;
   mqttlastsentstatusvhbyte[1] = TRACKED_TIME_UNSEEN;
+  // TASK-401: non-Status fan-out trackers (ASF / RBP / Remote Override)
+  for (uint8_t i = 0; i < 8; i++) mqttlastsentASFbit[i] = TRACKED_TIME_UNSEEN;
+  mqttlastsentASFbyte[0] = TRACKED_TIME_UNSEEN;
+  for (uint8_t i = 0; i < 4; i++) mqttlastsentRBPbit[i]  = TRACKED_TIME_UNSEEN;
+  mqttlastsentRBPbyte[0] = TRACKED_TIME_UNSEEN;
+  mqttlastsentRBPbyte[1] = TRACKED_TIME_UNSEEN;
+  mqttlastsentRObit[0]  = TRACKED_TIME_UNSEEN;
+  mqttlastsentRObit[1]  = TRACKED_TIME_UNSEEN;
+  mqttlastsentRObyte[0] = TRACKED_TIME_UNSEEN;
 }
 
 struct TrackingStateInitializer {
@@ -1530,6 +1551,40 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
   publishMQTTOnOff(topic, newVal);
 }
 
+// TASK-401: generic gate-wrapped publish helpers for non-Status fan-out
+// (msgId 5 ASF, msgId 6 RBP, msgId 100 Remote Override). Reuse the Status
+// gate (shouldPublishTrackedStatusBit/Byte) so heartbeat semantics match
+// msgId 0. No status-burst cooldown here — that mechanism is scoped to the
+// high-frequency msgId 0 flow and these sites publish an order of magnitude
+// less often.
+static void publishGatedBitMQTT(uint16_t *trackedSlots, uint8_t bitSlot,
+                                const __FlashStringHelper *topic,
+                                bool newVal, bool prevVal)
+{
+  const bool allowPublish = shouldPublishTrackedStatusBit(trackedSlots, bitSlot, newVal, prevVal, /*forcePublish=*/false);
+  OTPublishGate gate(allowPublish);
+  publishMQTTOnOff(topic, newVal);
+}
+
+static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
+                                 const __FlashStringHelper *topic, const char *payload,
+                                 uint8_t newVal, uint8_t prevVal)
+{
+  const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
+  OTPublishGate gate(allowPublish);
+  sendMQTTData(topic, payload);
+}
+
+// Overload for dynamically-built char* topics (e.g. "<msgid>_flag8").
+static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
+                                 const char *topic, const char *payload,
+                                 uint8_t newVal, uint8_t prevVal)
+{
+  const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
+  OTPublishGate gate(allowPublish);
+  sendMQTTData(topic, payload);
+}
+
 static void copyBinaryByteString(uint8_t value, char *dest, size_t destSize)
 {
   if (!dest || destSize == 0) return;
@@ -1777,19 +1832,29 @@ static uint16_t publishCombinedStatusVHState(uint8_t valueHB, uint8_t valueLB)
   return (OTcurrentSystemState.MasterStatusVH << 8) | OTcurrentSystemState.SlaveStatusVH;
 }
 
-static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWriteFlags)
+// TASK-401: gated RBP publish. `prevTransfer` and `prevReadWrite` come from the
+// previously stored OTcurrentSystemState.RBPflags (HB<<8 | LB) so the gate can
+// compute per-bit change vs last frame. First-seen + change-only + 60s heartbeat.
+static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWriteFlags,
+                                     uint8_t prevTransfer, uint8_t prevReadWrite)
 {
   char transferEnableText[9] {0};
   char readWriteText[9] {0};
   copyBinaryByteString(transferEnableFlags, transferEnableText, sizeof(transferEnableText));
   copyBinaryByteString(readWriteFlags, readWriteText, sizeof(readWriteText));
 
-  sendMQTTData(F("RBP_flags_transfer_enable"), transferEnableText);
-  sendMQTTData(F("RBP_flags_read_write"), readWriteText);
-  sendMQTTData(F("rbp_dhw_setpoint"),        ((transferEnableFlags & 0x01) ? "ON" : "OFF"));
-  sendMQTTData(F("rbp_max_ch_setpoint"),     ((transferEnableFlags & 0x02) ? "ON" : "OFF"));
-  sendMQTTData(F("rbp_rw_dhw_setpoint"),     ((readWriteFlags & 0x01) ? "ON" : "OFF"));
-  sendMQTTData(F("rbp_rw_max_ch_setpoint"),  ((readWriteFlags & 0x02) ? "ON" : "OFF"));
+  publishGatedByteMQTT(mqttlastsentRBPbyte, 0, F("RBP_flags_transfer_enable"), transferEnableText,
+                       transferEnableFlags, prevTransfer);
+  publishGatedByteMQTT(mqttlastsentRBPbyte, 1, F("RBP_flags_read_write"), readWriteText,
+                       readWriteFlags, prevReadWrite);
+  publishGatedBitMQTT(mqttlastsentRBPbit, 0, F("rbp_dhw_setpoint"),
+                      (transferEnableFlags & 0x01), (prevTransfer & 0x01));
+  publishGatedBitMQTT(mqttlastsentRBPbit, 1, F("rbp_max_ch_setpoint"),
+                      (transferEnableFlags & 0x02), (prevTransfer & 0x02));
+  publishGatedBitMQTT(mqttlastsentRBPbit, 2, F("rbp_rw_dhw_setpoint"),
+                      (readWriteFlags & 0x01), (prevReadWrite & 0x01));
+  publishGatedBitMQTT(mqttlastsentRBPbit, 3, F("rbp_rw_max_ch_setpoint"),
+                      (readWriteFlags & 0x02), (prevReadWrite & 0x02));
 
   return ((uint16_t)transferEnableFlags << 8) | readWriteFlags;
 }
@@ -2057,13 +2122,16 @@ void print_statusVH(uint16_t& value)
 void print_ASFflags(uint16_t& value)
 {
   AddLogf("%s = ASF flags[%s] OEM faultcode [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  
+
   if (is_value_valid(OTdata, OTlookupitem)){
-    //Build string for MQTT
+    // TASK-401: gate ASF_flags byte-topic + 6 bit-topics on first-seen + change + 60s heartbeat.
+    // Previous byte value lives in `value` (uint16_t& ref to OTcurrentSystemState.ASFflags).
+    const uint8_t prevHB = (uint8_t)((value >> 8) & 0xFF);
+    const uint8_t newHB  = OTdata.valueHB;
+    //Application Specific Fault (byte, gated)
+    publishGatedByteMQTT(mqttlastsentASFbyte, 0, F("ASF_flags"), byte_to_binary(newHB), newHB, prevHB);
+    //OEM fault code — numeric value, not a bit; left raw (low publish cost vs HA wants fresh code)
     char _msg[15] {0};
-    //Application Specific Fault
-    sendMQTTData(F("ASF_flags"), byte_to_binary(OTdata.valueHB));
-    //OEM fault code
     utoa(OTdata.valueLB, _msg, 10);
     sendMQTTData(F("OEMFaultCode"), _msg);
 
@@ -2076,12 +2144,12 @@ void print_ASFflags(uint16_t& value)
     //5: Water over-temp[ no OvT fault, over-temperat. Fault]
     //6: reserved
     //7: reserved
-    publishMQTTOnOff(F("service_request"),       ((OTdata.valueHB) & 0x01));
-    publishMQTTOnOff(F("lockout_reset"),         ((OTdata.valueHB) & 0x02));
-    publishMQTTOnOff(F("low_water_pressure"),    ((OTdata.valueHB) & 0x04));
-    publishMQTTOnOff(F("gas_flame_fault"),       ((OTdata.valueHB) & 0x08));
-    publishMQTTOnOff(F("air_pressure_fault"),    ((OTdata.valueHB) & 0x10));
-    publishMQTTOnOff(F("water_over_temperature"), ((OTdata.valueHB) & 0x20));
+    publishGatedBitMQTT(mqttlastsentASFbit, 0, F("service_request"),        (newHB & 0x01), (prevHB & 0x01));
+    publishGatedBitMQTT(mqttlastsentASFbit, 1, F("lockout_reset"),          (newHB & 0x02), (prevHB & 0x02));
+    publishGatedBitMQTT(mqttlastsentASFbit, 2, F("low_water_pressure"),     (newHB & 0x04), (prevHB & 0x04));
+    publishGatedBitMQTT(mqttlastsentASFbit, 3, F("gas_flame_fault"),        (newHB & 0x08), (prevHB & 0x08));
+    publishGatedBitMQTT(mqttlastsentASFbit, 4, F("air_pressure_fault"),     (newHB & 0x10), (prevHB & 0x10));
+    publishGatedBitMQTT(mqttlastsentASFbit, 5, F("water_over_temperature"), (newHB & 0x20), (prevHB & 0x20));
     value = OTdata.u16();
   }
 }
@@ -2090,7 +2158,10 @@ void print_RBPflags(uint16_t& value)
 {
   AddLogf("%s = M[%s] OEM fault code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
-    value = publishRBPFlagsState(OTdata.valueHB, OTdata.valueLB);
+    // TASK-401: extract previous HB/LB so publishRBPFlagsState can gate per-bit vs last frame.
+    const uint8_t prevTransfer  = (uint8_t)((value >> 8) & 0xFF);
+    const uint8_t prevReadWrite = (uint8_t)(value & 0xFF);
+    value = publishRBPFlagsState(OTdata.valueHB, OTdata.valueLB, prevTransfer, prevReadWrite);
   }
 }
 
@@ -2200,15 +2271,21 @@ void print_remoteoverridefunction(uint16_t& value)
   AddLogf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
 
   if (is_value_valid(OTdata, OTlookupitem)){
+    // TASK-401: gate <msgid>_flag8 byte + 2 bit-topics. Remote Override msgId 100
+    // stores full u16 in `value`; LB holds the flag byte (HB is reserved).
+    const uint8_t prevLB = (uint8_t)(value & 0xFF);
+    const uint8_t newLB  = OTdata.valueLB;
     //Build string for MQTT
     otTopic[0] = '\0';
     //flag8 value
     strlcpy(otTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_flag8", sizeof(otTopic));
-    sendMQTTData(otTopic, byte_to_binary(OTdata.valueLB));
+    publishGatedByteMQTT(mqttlastsentRObyte, 0, otTopic, byte_to_binary(newLB), newLB, prevLB);
     //report remote override flags to MQTT
-    sendMQTTData(F("remote_override_manual_change_priority"),             (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  
-    sendMQTTData(F("remote_override_program_change_priority"),            (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  
+    publishGatedBitMQTT(mqttlastsentRObit, 0, F("remote_override_manual_change_priority"),
+                        (newLB & 0x01), (prevLB & 0x01));
+    publishGatedBitMQTT(mqttlastsentRObit, 1, F("remote_override_program_change_priority"),
+                        (newLB & 0x02), (prevLB & 0x02));
     value = OTdata.u16();
   }
 }
@@ -3431,9 +3508,14 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
         case 0:
           OTcurrentSystemState.Statusflags = publishCombinedStatusState(upperByte, lowerByte);
           break;
-        case 6:
-          OTcurrentSystemState.RBPflags = publishRBPFlagsState(upperByte, lowerByte);
+        case 6: {
+          // TASK-401: feed previous HB/LB into publishRBPFlagsState so per-bit gate works via PS summary path too.
+          const uint16_t prevCombined = OTcurrentSystemState.RBPflags;
+          const uint8_t  prevTransfer  = (uint8_t)((prevCombined >> 8) & 0xFF);
+          const uint8_t  prevReadWrite = (uint8_t)(prevCombined & 0xFF);
+          OTcurrentSystemState.RBPflags = publishRBPFlagsState(upperByte, lowerByte, prevTransfer, prevReadWrite);
           break;
+        }
         case 70:
           OTcurrentSystemState.StatusVH = publishCombinedStatusVHState(upperByte, lowerByte);
           break;
