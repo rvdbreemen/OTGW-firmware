@@ -728,6 +728,12 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     Debug(F("] (")); Debug(length); Debug(F(")")); Debugln(); DebugFlush();
   }
 
+  // TASK-410 / ADR-084: catch retained payloads on the six deprecated OT-bus
+  // topics before they reach the normal set/* dispatcher. The helper clears
+  // the retained entry on the broker and unsubscribes for that specific topic.
+  // Payload content is ignored: the mere arrival of the message is the trigger.
+  if (mqttV2MigrationHandleIfDeprecated(topic)) return;
+
   // Verify-window retained-config filter (ADR-062, TASK-349, TASK-357).
   // TASK-363: extracted to mqtt_discovery_verify.cpp. If the verify window is
   // active and the topic matches our <haprefix>/ prefix, the extracted filter
@@ -928,6 +934,11 @@ void handleMQTT()
   // MQTT-disconnect fast-close, and heap-abort.
   tickDiscoveryVerification();
 
+  // TASK-410 / ADR-084: close the V2 retained-cleanup subscribe window a few
+  // seconds after MQTT (re)connect, so the six deprecated topics no longer
+  // deliver traffic once the initial retained sweep is done.
+  mqttV2MigrationTick();
+
   switch(stateMQTT) 
   {
     case MQTT_STATE_INIT:  
@@ -1009,6 +1020,11 @@ void handleMQTT()
           PrintMQTTError();
         }
         MQTTclient.subscribe("homeassistant/status");
+        // TASK-410 / ADR-084: briefly subscribe to the six deprecated OT-bus
+        // topics so the broker delivers any lingering retained payloads from
+        // pre-2.0.0 firmware. The callback clears them; mqttV2MigrationTick()
+        // closes the window a few seconds later. No-op on clean brokers.
+        mqttV2MigrationOnConnect();
         DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
         sendMQTTversioninfo();
         publishAllPICsettings();
@@ -1214,6 +1230,108 @@ void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper
   sendMQTTDataPic(label, static_cast<const char*>(valueBuf));
 }
 
+// ---------------------------------------------------------------------------
+// TEMPORARY MIGRATION CODE -- added in firmware 2.0.0 (2026-04-24) for TASK-410.
+//
+// Why this exists:
+//   Up to and including 1.4.x the OT-bus presence values were published under
+//   hardware-specific subtrees (`otgw-pic/*` and `otgw-otdirect/*`). In 2.0.0
+//   they moved to the generic `OTGW/value/<uniqueId>/<label>` namespace
+//   (see ADR-084, amends ADR-065). Brokers that previously served those
+//   topics still hold retained payloads on the old topics, which would
+//   otherwise confuse custom consumers and leave ghost state visible forever.
+//
+//   This block subscribes briefly after each MQTT reconnect, wipes any
+//   retained payload it encounters on the deprecated topics, and unsubscribes
+//   after a short timeout. Idempotent: no-op on brokers that never saw the
+//   pre-2.0.0 firmware.
+//
+// When can this be removed:
+//   Safe to delete once 2.0.0 (or a newer version containing this block) has
+//   been in the field long enough that all brokers serving OTGW data have
+//   seen at least one reconnect of the 2.0.0+ firmware. Practical target:
+//   remove in 2.3.0 at the earliest, or as part of the 3.0.0 cleanup --
+//   whichever comes first. Backlog follow-up: TASK-409
+//   (remove 2.0.0 retained-cleanup migration helper).
+//
+//   Do not remove this block unless ADR-084 is superseded by a new ADR that
+//   explicitly declares the migration complete.
+// ---------------------------------------------------------------------------
+static const char kV2Dep0[] PROGMEM = "otgw-pic/boiler_connected";
+static const char kV2Dep1[] PROGMEM = "otgw-pic/thermostat_connected";
+static const char kV2Dep2[] PROGMEM = "otgw-pic/otgw_connected";
+static const char kV2Dep3[] PROGMEM = "otgw-otdirect/boiler_connected";
+static const char kV2Dep4[] PROGMEM = "otgw-otdirect/thermostat_connected";
+static const char kV2Dep5[] PROGMEM = "otgw-otdirect/ot_online";
+
+static const char * const kV2DeprecatedTopics[] PROGMEM = {
+  kV2Dep0, kV2Dep1, kV2Dep2, kV2Dep3, kV2Dep4, kV2Dep5
+};
+static constexpr size_t kV2DeprecatedCount =
+  sizeof(kV2DeprecatedTopics) / sizeof(kV2DeprecatedTopics[0]);
+
+static bool     v2MigrationSubscribed = false;
+static uint32_t v2MigrationSubscribeMs = 0;   // millis() at subscribe time
+static constexpr uint32_t V2_MIGRATION_WINDOW_MS = 5000;
+
+// Compose "<MQTTPubNamespace>/<leaf>" into outBuf, mirroring what sendMQTTData
+// does internally. Leaf is a PROGMEM pointer (read via strlcpy_P / strlcat).
+static void v2MigrationBuildFullTopic(char *outBuf, size_t outSize, PGM_P leafProgmem) {
+  snprintf_P(outBuf, outSize, PSTR("%s/"), MQTTPubNamespace);
+  size_t used = strlen(outBuf);
+  if (used < outSize) {
+    strlcpy_P(outBuf + used, leafProgmem, outSize - used);
+  }
+}
+
+static void mqttV2MigrationOnConnect() {
+  char fullTopic[MQTT_TOPIC_MAX_LEN];
+  for (size_t i = 0; i < kV2DeprecatedCount; ++i) {
+    PGM_P leaf = reinterpret_cast<PGM_P>(pgm_read_ptr(&kV2DeprecatedTopics[i]));
+    v2MigrationBuildFullTopic(fullTopic, sizeof(fullTopic), leaf);
+    MQTTclient.subscribe(fullTopic);
+  }
+  v2MigrationSubscribed = true;
+  v2MigrationSubscribeMs = millis();
+  DebugTln(F("V2 migration: subscribed to deprecated topics for retained cleanup"));
+}
+
+static bool mqttV2MigrationHandleIfDeprecated(const char* topic) {
+  if (!v2MigrationSubscribed) return false;
+  char fullTopic[MQTT_TOPIC_MAX_LEN];
+  for (size_t i = 0; i < kV2DeprecatedCount; ++i) {
+    PGM_P leaf = reinterpret_cast<PGM_P>(pgm_read_ptr(&kV2DeprecatedTopics[i]));
+    v2MigrationBuildFullTopic(fullTopic, sizeof(fullTopic), leaf);
+    if (strcmp(topic, fullTopic) == 0) {
+      // Publish zero-length retained payload => broker deletes the retained
+      // entry for this topic (MQTT 3.1.1 section 3.3.1.3).
+      MQTTclient.publish(fullTopic, (const uint8_t*)nullptr, 0, /*retain=*/true);
+      MQTTclient.unsubscribe(fullTopic);
+      DebugTf(PSTR("V2 migration: cleared retained on %s\r\n"), fullTopic);
+      return true;
+    }
+  }
+  return false;
+}
+
+static void mqttV2MigrationTick() {
+  if (!v2MigrationSubscribed) return;
+  // Rollover-safe elapsed check: unsigned subtraction wraps correctly so the
+  // window closes ~5s after subscribe even across the 49.7-day millis() wrap.
+  if ((uint32_t)(millis() - v2MigrationSubscribeMs) < V2_MIGRATION_WINDOW_MS) return;
+  char fullTopic[MQTT_TOPIC_MAX_LEN];
+  for (size_t i = 0; i < kV2DeprecatedCount; ++i) {
+    PGM_P leaf = reinterpret_cast<PGM_P>(pgm_read_ptr(&kV2DeprecatedTopics[i]));
+    v2MigrationBuildFullTopic(fullTopic, sizeof(fullTopic), leaf);
+    MQTTclient.unsubscribe(fullTopic);
+  }
+  v2MigrationSubscribed = false;
+  DebugTln(F("V2 migration: cleanup window closed, unsubscribed from deprecated topics"));
+}
+// ---------------------------------------------------------------------------
+// END TEMPORARY MIGRATION CODE (TASK-410 / ADR-084)
+// ---------------------------------------------------------------------------
+
 //===================[ Send useful information to MQTT ]======================
 
 void sendMQTTuptime(){
@@ -1251,7 +1369,7 @@ templating, or graph it in Grafana without parsing. sendMQTTData() prepends
 MQTTPubNamespace, so uniqueid already scopes the topics per device - multiple
 OTGWs on one broker never collide.
 
-Called from doTaskMinuteChanged() under if (hourFlag) per ADR-064 (wall-clock
+Called from doTaskMinuteChanged() under if (hourFlag) per ADR-086 (wall-clock
 aligned hourly dispatch). NOT piggybacked on the 5-minute loop to keep traffic
 low. Counters reset on reboot; correlate with otgw-firmware/reboot_count and
 /uptime to reason about lifetime vs. session rates. To map <uniqueid> back to
@@ -1294,43 +1412,25 @@ void sendMQTTheapdiag(){
   publishStatU32(F("otgw-firmware/stats/disc_last_verify_epoch"),   (unsigned long)state.discovery.iLastVerifyEpoch);
 }
 
+// ADR-084: OT-bus presence values (boiler_connected, thermostat_connected,
+// otgw_connected) are published only under the generic
+// OTGW/value/<uniqueId>/<label> namespace. Hardware-specific duplicates that
+// used to live under otgw-pic/* and otgw-otdirect/* have been removed in
+// 2.0.0. See also the V2 migration helpers below for retained cleanup of
+// pre-2.0.0 payloads on the deprecated topics.
 static void publishBoilerConnectedState()
 {
   sendMQTTData(F("boiler_connected"), CCONOFF(state.otBus.bBoilerState));
-  if (isPICEnabled()) {
-    sendMQTTData(F("otgw-pic/boiler_connected"), CCONOFF(state.otBus.bBoilerState));
-  }
-#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  if (isOTDirectEnabled()) {
-    sendMQTTData(F("otgw-otdirect/boiler_connected"), CCONOFF(state.otBus.bBoilerState));
-  }
-#endif
 }
 
 static void publishThermostatConnectedState()
 {
   sendMQTTData(F("thermostat_connected"), CCONOFF(state.otBus.bThermostatState));
-  if (isPICEnabled()) {
-    sendMQTTData(F("otgw-pic/thermostat_connected"), CCONOFF(state.otBus.bThermostatState));
-  }
-#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  if (isOTDirectEnabled()) {
-    sendMQTTData(F("otgw-otdirect/thermostat_connected"), CCONOFF(state.otBus.bThermostatState));
-  }
-#endif
 }
 
 static void publishOTGWConnectedState()
 {
   sendMQTTData(F("otgw_connected"), CCONOFF(state.otBus.bOnline));
-  if (isPICEnabled()) {
-    sendMQTTData(F("otgw-pic/otgw_connected"), CCONOFF(state.otBus.bOnline));
-  }
-#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  if (isOTDirectEnabled()) {
-    sendMQTTData(F("otgw-otdirect/ot_online"), CCONOFF(state.otBus.bOnline));
-  }
-#endif
   sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otBus.bOnline));
 }
 

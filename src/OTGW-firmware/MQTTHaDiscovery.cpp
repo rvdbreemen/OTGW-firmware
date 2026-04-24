@@ -1035,8 +1035,12 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     {  0, 0x00, ha_lbl_flame, ha_name_flame, HaIcon::fire, HaEntityCat::none, true},
     {  0, 0x00, ha_lbl_otc_active, ha_name_otc_enable, HaIcon::information, HaEntityCat::none, true},
     {  0, 0x00, ha_lbl_summerwintertime, ha_name_summerwintertime, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
-    {  0, 0x08, ha_lbl_boiler_connected, ha_name_boiler_connected, HaIcon::lan_connect, HaEntityCat::none, true},
-    {  0, 0x08, ha_lbl_thermostat_connected, ha_name_thermostat_connected, HaIcon::lan_connect, HaEntityCat::none, true},
+    // ADR-084: OT-bus presence entries are generic (no otgw-pic/ prefix) since
+    // 2.0.0 -- stat_t now points at OTGW/value/<uid>/{boiler,thermostat}_connected
+    // and HA-discovery no longer requires isPICEnabled() to pass. Do not restore
+    // MQTT_HA_FLAG_IS_PIC_ENTRY (0x08) on these rows.
+    {  0, 0x00, ha_lbl_boiler_connected, ha_name_boiler_connected, HaIcon::lan_connect, HaEntityCat::none, true},
+    {  0, 0x00, ha_lbl_thermostat_connected, ha_name_thermostat_connected, HaIcon::lan_connect, HaEntityCat::none, true},
     // --- OT ID 2 ---
     {  2, 0x00, ha_lbl_master_configuration_smart_power, ha_name_master_configuration_smart_power, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
     // --- OT ID 3 ---

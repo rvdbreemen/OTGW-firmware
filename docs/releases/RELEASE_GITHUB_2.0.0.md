@@ -51,6 +51,36 @@ W5500 SPI Ethernet on OTGW32. DHCP automatic, MAC derived from the ESP32 eFuse. 
 - **NTP bogus time guard**: rejects the 0xFFFFFFFF sentinel the ESP8266 SDK emits before the first sync.
 - **Beta: AP fallback mode** when saved credentials are unavailable (pre-release builds only).
 
+## Breaking changes
+
+### OT-bus state moved to generic MQTT topics
+
+Three OT-bus presence values previously published under hardware-specific subtrees (`otgw-pic/*` on PIC-based gateways, `otgw-otdirect/*` on OTGW32) are now published under the generic value namespace, regardless of hardware variant. The former `otgw-otdirect/ot_online` topic has been retired; the same concept now lives under `otgw_connected`.
+
+**Removed topics:**
+
+- `OTGW/value/<uniqueId>/otgw-pic/boiler_connected`
+- `OTGW/value/<uniqueId>/otgw-pic/thermostat_connected`
+- `OTGW/value/<uniqueId>/otgw-pic/otgw_connected`
+- `OTGW/value/<uniqueId>/otgw-otdirect/boiler_connected`
+- `OTGW/value/<uniqueId>/otgw-otdirect/thermostat_connected`
+- `OTGW/value/<uniqueId>/otgw-otdirect/ot_online`
+
+**New canonical topics:**
+
+- `OTGW/value/<uniqueId>/boiler_connected`
+- `OTGW/value/<uniqueId>/thermostat_connected`
+- `OTGW/value/<uniqueId>/otgw_connected`
+
+Payload semantics are unchanged: `"ON"` / `"OFF"`, retained.
+
+**What you need to do:**
+
+- **Home Assistant users**: nothing. Entity `unique_id`s are stable, discovery auto-republishes on reconnect, and history is preserved. On OTGW32 builds without a PIC, `Boiler connected` and `Thermostat connected` entities now appear for the first time (they were previously gated behind the PIC flag).
+- **Custom MQTT consumers** (Node-RED, openHAB, scripts) subscribed to the old topics: update your topic patterns to the new canonical paths. The firmware auto-cleans retained payloads on the deprecated topics at first reconnect, so no manual broker cleanup is required in the typical case. If you want to clean up manually, see the `mosquitto_pub` one-liner in the [MQTT migration guide](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/api/MQTT.md#migration-from-14x--pre-release-200-ot-bus-state-topics).
+
+Rationale: these values describe what the OTGW-firmware observes on the OpenTherm bus, not properties of the PIC coprocessor or the OT-direct driver. Grouping them under the hardware-specific subtrees made them disappear from Home Assistant on OTGW32 builds without a PIC, and forced custom consumers to switch topic prefixes when the underlying hardware changed. See ADR-084 (amends ADR-065) and the [MQTT migration guide](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/api/MQTT.md#migration-from-14x--pre-release-200-ot-bus-state-topics) for the full story.
+
 ## Bug fixes
 
 - **OTGW Answer Thermostat messages** now published to the correct boiler MQTT source topic.
@@ -66,7 +96,7 @@ W5500 SPI Ethernet on OTGW32. DHCP automatic, MAC derived from the ESP32 eFuse. 
 
 ## Upgrade notes
 
-- **No breaking changes vs v1.3.5.** All existing MQTT topics, REST endpoints, and `settings.ini` format are unchanged.
+- **Breaking changes vs v1.3.5:** see the [Breaking changes](#breaking-changes) section above. Only three MQTT topic paths changed (OT-bus presence values); REST endpoints and `settings.ini` format are unchanged. Home Assistant users are unaffected; custom MQTT consumers should update their topic patterns.
 - **Flash both firmware and filesystem** (OLED support and SAT WebUI require the updated filesystem).
 - **Hard-refresh the browser** after flashing (Ctrl+F5).
 - **SAT is disabled by default.** Enable via `set/{nodeId}/sat/enabled = 1` over MQTT, or via the Settings page.

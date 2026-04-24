@@ -2,6 +2,8 @@
 
 This document describes all MQTT topics published and subscribed to by the OTGW-firmware.
 
+> **Breaking change in 2.0.0 (MQTT consumers please read):** three OT-bus presence values (`boiler_connected`, `thermostat_connected`, `otgw_connected`) have moved out of the hardware-specific `otgw-pic/` and `otgw-otdirect/` subtrees into the generic `OTGW/value/<uniqueId>/` namespace. The `otgw-otdirect/ot_online` topic has been retired; the same concept now lives under `otgw_connected`. The firmware self-heals retained payloads on the deprecated topics at first MQTT reconnect. Home Assistant users do not need to do anything; custom consumers should update their topic patterns. See [OT-bus state (generic, since 2.0.0)](#ot-bus-state-generic-since-200) and [Migration from 1.4.x / pre-release 2.0.0 (OT-bus state topics)](#migration-from-14x--pre-release-200-ot-bus-state-topics). Background: ADR-084.
+
 ## Overview
 
 The OTGW-firmware uses MQTT as its primary integration method with Home Assistant and other home automation systems. It publishes OpenTherm data, device status, and sensor readings, and subscribes to command topics for controlling the OpenTherm Gateway.
@@ -58,9 +60,23 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 | `otgw-firmware/network_mode` | `"wifi"` / `"ethernet"` / `"ap"` | Active network mode |
 | `otgw-firmware/error` | `"LittleFS mount failed..."` | Error messages (not retained, only when applicable) |
 
+### OT-bus state (generic, since 2.0.0)
+
+Published at startup, on MQTT (re)connect, and whenever the values change. These three topics describe what the OTGW-firmware observes on the OpenTherm bus, independent of whether the hardware uses the PIC coprocessor or the native OTDirect driver. Before 2.0.0 these values lived under `otgw-pic/` or `otgw-otdirect/`; see the [migration section](#migration-from-14x--pre-release-200-ot-bus-state-topics) for details.
+
+| Topic | Value | Description |
+| ----- | ----- | ----------- |
+| `boiler_connected` | `"ON"` / `"OFF"` | A boiler is visible on the OpenTherm bus (frames received from the slave side). |
+| `thermostat_connected` | `"ON"` / `"OFF"` | A thermostat is visible on the OpenTherm bus (frames received from the master side). |
+| `otgw_connected` | `"ON"` / `"OFF"` | The OpenTherm bus is active (the firmware is exchanging frames). This topic replaces the former `otgw-otdirect/ot_online` and mirrors the former `otgw-pic/otgw_connected`. |
+
+Payloads are retained. Published as `OTGW/value/<uniqueId>/<topic>` using the configured `TopTopic` and `UniqueId` (see [Namespace Convention](#namespace-convention)).
+
 ### PIC Gateway Information
 
 Published at startup, on MQTT (re)connect, and every 5 minutes.
+
+Note: the OT-bus presence values (`boiler_connected`, `thermostat_connected`, `otgw_connected`) were previously listed here. Since 2.0.0 they are published under the generic namespace; see [OT-bus state (generic, since 2.0.0)](#ot-bus-state-generic-since-200) and the [migration section](#migration-from-14x--pre-release-200-ot-bus-state-topics).
 
 | Topic | Value | Description |
 | ----- | ----- | ----------- |
@@ -68,10 +84,7 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 | `otgw-pic/deviceid` | `"gateway"` | PIC device ID |
 | `otgw-pic/firmwaretype` | `"gateway"` | PIC firmware type (gateway/interface/diagnose) |
 | `otgw-pic/picavailable` | `"ON"` / `"OFF"` | Whether PIC is detected |
-| `otgw-pic/boiler_connected` | `"ON"` / `"OFF"` | Boiler communication status |
-| `otgw-pic/thermostat_connected` | `"ON"` / `"OFF"` | Thermostat communication status |
 | `otgw-pic/gateway_mode` | `"ON"` / `"OFF"` | Gateway mode (ON) vs monitor mode (OFF) |
-| `otgw-pic/otgw_connected` | `"ON"` / `"OFF"` | OTGW serial connection status |
 
 ### PIC Settings
 
@@ -99,6 +112,8 @@ Published at startup, on MQTT (re)connect, every 5 minutes, and when settings ar
 
 Published at startup, on MQTT (re)connect, and every 5 minutes. Only present in OTGW32 builds (`HAS_DIRECT_OT=1`). On standard ESP8266+PIC hardware, only `otgw-otdirect/available` is published with value `"OFF"`.
 
+Note: the OT-bus presence values (`boiler_connected`, `thermostat_connected`) and the former `ot_online` topic were previously listed here. Since 2.0.0 these values are published under the generic namespace; `ot_online` has been retired in favour of `otgw_connected`. See [OT-bus state (generic, since 2.0.0)](#ot-bus-state-generic-since-200) and the [migration section](#migration-from-14x--pre-release-200-ot-bus-state-topics).
+
 | Topic | Value | Description |
 | ----- | ----- | ----------- |
 | `otgw-otdirect/available` | `"ON"` / `"OFF"` | Whether OT-direct hardware is present and enabled |
@@ -107,13 +122,10 @@ Published at startup, on MQTT (re)connect, and every 5 minutes. Only present in 
 | `otgw-otdirect/monitor_mode` | `"ON"` / `"OFF"` | Whether transparent pass-through mode is active |
 | `otgw-otdirect/master_mode` | `"ON"` / `"OFF"` | Whether OTGW32 is acting as sole OT master |
 | `otgw-otdirect/stepup` | `"ON"` / `"OFF"` | Whether the 24V step-up converter is active |
-| `otgw-otdirect/thermostat_connected` | `"ON"` / `"OFF"` | Whether a thermostat frame has been received within the setback timeout |
 | `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Whether setback override is active (thermostat disconnected) |
 | `otgw-otdirect/schedule_active` | `"11"` | Number of OT polling schedule entries currently active |
 | `otgw-otdirect/schedule_disabled` | `"1"` | Number of schedule entries disabled because boiler returned UNKNOWN_DATA_ID |
 | `otgw-otdirect/overrides_active` | `"2"` | Number of active write-override slots |
-| `otgw-otdirect/boiler_connected` | `"ON"` / `"OFF"` | Whether the boiler OT bus side is active |
-| `otgw-otdirect/ot_online` | `"ON"` / `"OFF"` | Whether the OT serial bus is alive (frames recently received) |
 
 These topics are only published when `isOTDirectEnabled()` returns true. Topics prefixed `otgw-otdirect/` are skipped during MQTT discovery replay when OT-direct is not enabled.
 
@@ -1019,7 +1031,7 @@ Since 1.4.1 the firmware can actively verify that its retained Home Assistant di
 
 **Triggers**. A verify run can start in three ways:
 
-1. **Automatic daily** — when `settings.mqtt.bDiscoveryAutoVerify` is true (default), the ADR-064 time dispatcher triggers a verify at the day-flip boundary. Disable this if your broker is noisy on wildcard subscriptions or if multiple OTGW nodes share a prefix and you want to spread the load manually.
+1. **Automatic daily** — when `settings.mqtt.bDiscoveryAutoVerify` is true (default), the ADR-086 time dispatcher triggers a verify at the day-flip boundary. Disable this if your broker is noisy on wildcard subscriptions or if multiple OTGW nodes share a prefix and you want to spread the load manually.
 2. **REST** — `POST /api/v2/discovery/verify`. See `docs/api/README.md` and `openapi.yaml` for the full contract, including the `409` / `503` error cases.
 3. **Telnet debug key** — pressing `V` on the debug console starts an immediate verify window, provided the same preconditions are met (MQTT connected, free heap above the start threshold, no verify or drip already active).
 
@@ -1073,7 +1085,7 @@ The firmware publishes heap-pressure and discovery counters as 17 individual ret
 
 **Topic prefix**: `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/<metric>` (all retained)
 
-**Cadence**: once per hour, on the wall-clock hour boundary. Publishing is dispatched by the unified time handler introduced in ADR-064, which also drives the daily discovery-verify trigger. No publish happens while MQTT is disconnected.
+**Cadence**: once per hour, on the wall-clock hour boundary. Publishing is dispatched by the unified time handler introduced in ADR-086, which also drives the daily discovery-verify trigger. No publish happens while MQTT is disconnected.
 
 **Device identity**: to map `{UniqueId}` (e.g. `otgw-a1b2c3`) back to a human-readable device name, subscribe to `{TopTopic}/value/{UniqueId}/otgw-firmware/hostname` (retained, published on every MQTT (re)connect).
 
@@ -1229,6 +1241,71 @@ mqtt:
       payload_on: "ON"
       payload_off: "OFF"
 ```
+
+---
+
+## Migration from 1.4.x / pre-release 2.0.0 (OT-bus state topics)
+
+Starting with 2.0.0, three OT-bus presence values have been promoted from hardware-specific subtrees to the generic value namespace. They describe what the OTGW-firmware observes on the OpenTherm bus, not properties of the PIC coprocessor or the OT-direct driver, so they no longer belong under a hardware-specific prefix. Background and rationale: ADR-084 (amends ADR-065).
+
+### Before / after topic map
+
+| Old topic (1.4.x / pre-release 2.0.0)                               | New topic (2.0.0 and later)                         |
+|---------------------------------------------------------------------|-----------------------------------------------------|
+| `OTGW/value/<uniqueId>/otgw-pic/boiler_connected`                   | `OTGW/value/<uniqueId>/boiler_connected`            |
+| `OTGW/value/<uniqueId>/otgw-pic/thermostat_connected`               | `OTGW/value/<uniqueId>/thermostat_connected`        |
+| `OTGW/value/<uniqueId>/otgw-pic/otgw_connected`                     | `OTGW/value/<uniqueId>/otgw_connected`              |
+| `OTGW/value/<uniqueId>/otgw-otdirect/boiler_connected`              | `OTGW/value/<uniqueId>/boiler_connected`            |
+| `OTGW/value/<uniqueId>/otgw-otdirect/thermostat_connected`          | `OTGW/value/<uniqueId>/thermostat_connected`        |
+| `OTGW/value/<uniqueId>/otgw-otdirect/ot_online` (renamed)           | `OTGW/value/<uniqueId>/otgw_connected`              |
+
+Six old topic paths, three new canonical topics. Payload semantics are unchanged: `"ON"` / `"OFF"`, retained.
+
+### Automatic cleanup (no action required)
+
+The 2.0.0 firmware self-heals. On every MQTT reconnect it briefly subscribes to the six deprecated topics above and clears any retained payload it finds by republishing an empty retained message. After the first successful reconnect following the upgrade, your broker no longer serves stale retained values on the old topics. This is idempotent: on brokers that never saw the pre-2.0.0 firmware, the cleanup is a silent no-op.
+
+### Manual cleanup (advanced users)
+
+If you prefer to clean up manually (for example, you do not boot the device after the upgrade, or you manage broker state with external tooling), publish an empty retained message on each deprecated topic:
+
+```bash
+# Replace <broker> and <uniqueId>.
+# The default uniqueId is otgw-<MAC>, where <MAC> is the last three octets
+# of the device MAC address, uppercased.
+BROKER=192.168.1.10
+UID=otgw-AABBCC
+
+for leaf in \
+    otgw-pic/boiler_connected \
+    otgw-pic/thermostat_connected \
+    otgw-pic/otgw_connected \
+    otgw-otdirect/boiler_connected \
+    otgw-otdirect/thermostat_connected \
+    otgw-otdirect/ot_online ; do
+  mosquitto_pub -h "$BROKER" -t "OTGW/value/$UID/$leaf" -r -n
+done
+```
+
+Flags explained:
+
+- `-r`: set the retain flag on the publish.
+- `-n`: send a null (zero-length) payload. Combined with `-r`, this instructs the broker to delete the retained entry for that topic (MQTT 3.1.1, section 3.3.1.3).
+
+### Listing which retained topics still exist on your broker
+
+Before or after the cleanup, inspect retained state with:
+
+```bash
+mosquitto_sub -h "$BROKER" -t 'OTGW/value/+/otgw-pic/#'      -v --retained-only -W 2
+mosquitto_sub -h "$BROKER" -t 'OTGW/value/+/otgw-otdirect/#' -v --retained-only -W 2
+```
+
+`-W 2` exits after 2 seconds of silence, which is enough for any retained delivery on a local broker.
+
+### Home Assistant consumers
+
+Home Assistant discovery is republished automatically by the firmware on reconnect. The `Boiler connected` and `Thermostat connected` binary_sensor entities keep their `unique_id`, so entity history and automations are preserved across the upgrade. After the first reconnect, their `state_topic` shows the new generic path. On OTGW32 builds without a PIC, these two entities now appear for the first time (they were previously gated behind the PIC flag).
 
 ---
 
