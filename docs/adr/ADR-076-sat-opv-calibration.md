@@ -88,7 +88,7 @@ A new calibration procedure can be started at any time via REST/MQTT. The previo
 
 ## Related
 
-- ADR-062: SAT Smart Autotune Thermostat Integration (overall context)
+- ADR-085: SAT Smart Autotune Thermostat Integration (overall context)
 - ADR-016: OpenTherm Command Queue (all boiler commands via queue)
 - ADR-051: Dual Encapsulating Structs (settings persistence)
 - `SATcontrol.ino`: `satOvpCalibrate()`, `satOvpStartCalibration()`, `satOvpStopCalibration()`

@@ -174,7 +174,7 @@ the coarse setpoint and the PID trims it within the clamped range.
 
 ## Related
 
-- ADR-062: SAT Integration (overall architecture, module split)
+- ADR-085: SAT Integration (overall architecture, module split)
 - ADR-069: SAT PID v3 Implementation (PID adds correction on top of heating curve output)
 - ADR-070: SAT Memory Allocation Strategy (all curve-related constants are static or PROGMEM)
 - `SATcontrol.ino`: `satCalcHeatingCurve()` (line ~343), `satGetBaseOffset()`, `satGetMaxSetpoint()`

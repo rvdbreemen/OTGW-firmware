@@ -83,7 +83,7 @@ the control algorithm.
    cooperative-stack call chain, and add flash overhead without any concrete benefit.
 
 4. **Use `OTcurrentSystemState` directly on ESP8266, separate OT-Direct state struct on
-   OTGW32** — Rejected: the frame bridge (ADR-063, ADR-065) explicitly converts OTGW32
+   OTGW32** — Rejected: the frame bridge (ADR-063, ADR-087) explicitly converts OTGW32
    frames to the same text format as the PIC, so `processOT()` populates
    `OTcurrentSystemState` identically. Separate structs would duplicate the population logic.
 
@@ -92,7 +92,7 @@ the control algorithm.
 **SAT source files contain no platform preprocessor guards.** The compatibility layer is
 implemented entirely via:
 
-1. **Frame bridge pattern** (ADR-065): OTGW32 GPIO frames are formatted as 9-character text
+1. **Frame bridge pattern** (ADR-087): OTGW32 GPIO frames are formatted as 9-character text
    strings and passed to `processOT()`, which populates `OTcurrentSystemState`. SAT reads
    this struct directly.
 
@@ -126,7 +126,7 @@ SAT code must NOT assume:
 - SAT source files are clean: no `#if` forests, easy to read and audit
 - Adding a third platform (e.g., ESP32 + PIC, if it ever exists) requires no SAT changes,
   only frame bridge and command queue adaptation
-- Frame bridge pattern (ADR-063, ADR-065) is the single point of OT abstraction; tested
+- Frame bridge pattern (ADR-063, ADR-087) is the single point of OT abstraction; tested
   independently of SAT
 - BLE temperature input integrates via the same external temperature path as MQTT/REST,
   so the PID and heating curve logic is identical regardless of sensor source
@@ -151,8 +151,8 @@ SAT code must NOT assume:
 
 - ADR-063: OTGW32 Hardware Support — dual build targets, `HAS_PIC` / `HAS_DIRECT_OT` flags
 - ADR-064: OT-Direct Operating Mode Architecture
-- ADR-065: Frame Bridge Pattern — converts GPIO frames to PIC text format
-- ADR-062: SAT Integration — overall SAT architecture
+- ADR-087: Frame Bridge Pattern — converts GPIO frames to PIC text format
+- ADR-085: SAT Integration — overall SAT architecture
 - ADR-070: SAT Memory Allocation — static state, no platform-conditional buffers
 - `OTDirect.ino`: frame bridge implementation (`processOT()` call with text format)
 - `OTGW-Core.ino`: `addOTWGcmdtoqueue()`, `processOT()`

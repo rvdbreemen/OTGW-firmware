@@ -29,7 +29,7 @@ Phase 1A dead-code analysis identified 14 items introduced or left behind by thi
 - [x] #3 endDiscoveryVerification and tickDiscoveryVerification demoted to static inside MQTTstuff.ino
 - [x] #4 isDripDeferred demoted to static (single in-TU caller)
 - [x] #5 (void)yearFlag cast removed at OTGW-firmware.ino:324
-- [x] #6 Per-line // ADR-064: single caller comments collapsed into block header
+- [x] #6 Per-line // ADR-086: single caller comments collapsed into block header
 - [x] #7 HEAP_FRAG_PROMOTE_MAXBLOCK changed from #define to constexpr
 - [x] #8 DiscoverySection 3 bytes padding comment removed (not load-bearing per ADR-051)
 <!-- AC:END -->
@@ -42,7 +42,7 @@ Phase 1A dead-code analysis identified 14 items introduced or left behind by thi
 3. Demote endDiscoveryVerification + tickDiscoveryVerification to static in MQTTstuff.ino; remove forward decls from OTGW-firmware.h.
 4. Demote isDripDeferred to static; remove header decl.
 5. Remove (void)yearFlag dead cast at OTGW-firmware.ino:324.
-6. Collapse per-line // ADR-064: single caller comments at lines 295/297/299/407 into block-header reference.
+6. Collapse per-line // ADR-086: single caller comments at lines 295/297/299/407 into block-header reference.
 7. SKIP - HEAP_FRAG_PROMOTE_MAXBLOCK is in helperStuff.ino (out of scope); document in final summary.
 8. Remove "3 bytes padding" comment from DiscoverySection in OTGW-firmware.h (trailing bVerificationActive removal also drops the padding line).
 Run full build at the end.
@@ -57,7 +57,7 @@ Seven of eight ACs satisfied in this pass.
 - endDiscoveryVerification + tickDiscoveryVerification: demoted to static in MQTTstuff.ino. Forward decls removed from OTGW-firmware.h (kept start/isActive since they have external callers in OTGW-firmware.ino / restAPI.ino / handleDebug.ino).
 - isDripDeferred: demoted to static; header decl removed.
 - (void)yearFlag dead cast at OTGW-firmware.ino:324: removed; replaced silencer comment with a one-line clarifier about SR=22 via sendtimecommand being the sole current yearly consumer.
-- Four // ADR-064: single caller repeats collapsed into one block header above the three helper calls; line 407 repeat folded into the trailing comment on the same line.
+- Four // ADR-086: single caller repeats collapsed into one block header above the three helper calls; line 407 repeat folded into the trailing comment on the same line.
 - DiscoverySection padding comment removed (trailing bool removed so alignment note no longer meaningful; ADR-051 says struct is not flash-serialised anyway).
 
 AC #7 (HEAP_FRAG_PROMOTE_MAXBLOCK #define -> constexpr) not done: helperStuff.ino is outside this agent's file ownership. Recommend a follow-up with the appropriate agent or include in a later hygiene pass. No functional impact.
@@ -78,7 +78,7 @@ Changes:
 - Demoted endDiscoveryVerification() and tickDiscoveryVerification() to static in MQTTstuff.ino; removed their forward decls from OTGW-firmware.h. startDiscoveryVerification() and isDiscoveryVerificationActive() stay visible — they have external callers in OTGW-firmware.ino, restAPI.ino, and handleDebug.ino.
 - Demoted isDripDeferred() to static; removed header decl (single caller in loopMQTTDiscovery, same TU).
 - Removed (void)yearFlag dead cast at OTGW-firmware.ino:324. yearFlag is already consumed by sendtimecommand(dayFlag, yearFlag) two lines earlier, so the cast was a no-op silencer. Replaced with a one-line clarifier about SR=22 being the current sole yearly consumer.
-- Collapsed four repeated // ADR-064: single caller trailing comments in OTGW-firmware.ino (lines 295/297/299/407) into a single block header above the hourChanged/dayChanged/yearChanged triad plus a compact inline comment on the minuteChanged() dispatcher call. The CI rule in evaluate.py::check_time_boundary_single_caller is the real enforcement.
+- Collapsed four repeated // ADR-086: single caller trailing comments in OTGW-firmware.ino (lines 295/297/299/407) into a single block header above the hourChanged/dayChanged/yearChanged triad plus a compact inline comment on the minuteChanged() dispatcher call. The CI rule in evaluate.py::check_time_boundary_single_caller is the real enforcement.
 - Removed the "3 bytes padding" comment from DiscoverySection (happened as part of AC #1 since the bool was the last field).
 
 Not in scope (see below):

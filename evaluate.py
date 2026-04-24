@@ -278,14 +278,14 @@ class WorkspaceEvaluator:
                     ))
 
     def check_time_boundary_single_caller(self):
-        """ADR-064 binding rule: each consume-on-read time-boundary helper
-        (minuteChanged / hourChanged / dayChanged / yearChanged) must have
-        exactly ONE call site firmware-wide. A second caller silently steals
-        the event.
+        """ADR-086 binding rule (originally ADR-064): each consume-on-read
+        time-boundary helper (minuteChanged / hourChanged / dayChanged /
+        yearChanged) must have exactly ONE call site firmware-wide. A second
+        caller silently steals the event.
 
         Enforcement per ADR-080 meta-rule. Fails on >1 call site.
         """
-        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-064 Time-Boundary Single-Caller ==={Colors.ENDC}")
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-086 Time-Boundary Single-Caller ==={Colors.ENDC}")
 
         helpers = ["minuteChanged", "hourChanged", "dayChanged", "yearChanged"]
         src_dir = config.FIRMWARE_ROOT
@@ -323,19 +323,19 @@ class WorkspaceEvaluator:
             if len(call_sites) == 1:
                 loc = f"{call_sites[0][0]}:{call_sites[0][1]}"
                 self.add_result(EvaluationResult(
-                    "ADR-064", f"{helper}() single caller", "PASS",
+                    "ADR-086", f"{helper}() single caller", "PASS",
                     f"Exactly 1 call site at {loc}"
                 ))
             elif len(call_sites) == 0:
                 self.add_result(EvaluationResult(
-                    "ADR-064", f"{helper}() single caller", "WARN",
+                    "ADR-086", f"{helper}() single caller", "WARN",
                     "No call sites found (dead code or helper removed)"
                 ))
             else:
                 detail = "; ".join(f"{n}:{ln}" for n, ln, _ in call_sites)
                 self.add_result(EvaluationResult(
-                    "ADR-064", f"{helper}() single caller", "FAIL",
-                    f"Found {len(call_sites)} call sites — ADR-064 requires exactly 1",
+                    "ADR-086", f"{helper}() single caller", "FAIL",
+                    f"Found {len(call_sites)} call sites — ADR-086 requires exactly 1",
                     detail
                 ))
 
@@ -1859,7 +1859,7 @@ class WorkspaceEvaluator:
         self.check_binary_safe_compare()
         self.check_adr_gates()
         self.check_backlog_hygiene()
-        self.check_time_boundary_single_caller()      # ADR-064 CI gate (TASK-350)
+        self.check_time_boundary_single_caller()      # ADR-086 CI gate (originally ADR-064, TASK-350)
         self.check_discovery_counter_instrumented()   # ADR-062 CI gate (TASK-364)
         self.check_publishedtopic_counter_reset()     # ADR-062 CI gate (TASK-364)
         self.check_ha_sensor_index_consistency()      # HA discovery gate (TASK-392)

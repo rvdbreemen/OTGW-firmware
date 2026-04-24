@@ -51,7 +51,7 @@ Backlog hygiene pass for 1.4.1: appended erratum blocks to four Final Summaries 
 
 Errata appended:
 - TASK-342: clarified that only CH Master/Slave status publishers were wrapped by beginStatusBurst/endStatusBurst; VH publishers (publishMasterStatusVHState / publishSlaveStatusVHState / publishStatusVHBitMQTT) were missed and are being closed by TASK-354.
-- TASK-346: corrected call-site attribution; sendMQTTheapdiag now runs under if(hourFlag) inside doTaskMinuteChanged per ADR-064 (unified dispatcher), not inside doTaskEvery60s as originally written.
+- TASK-346: corrected call-site attribution; sendMQTTheapdiag now runs under if(hourFlag) inside doTaskMinuteChanged per ADR-086 (originally ADR-064, unified dispatcher), not inside doTaskEvery60s as originally written.
 - TASK-349: noted that NTP-sync and uptime>3600 preconditions were NOT enforced in startDiscoveryVerification as originally shipped; closed by TASK-359 (now Done).
 - TASK-351: same NTP/uptime precondition erratum as TASK-349; cross-referenced TASK-359.
 

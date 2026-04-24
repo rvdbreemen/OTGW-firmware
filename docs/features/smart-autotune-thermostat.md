@@ -707,7 +707,7 @@ Remember to enable `satexternaltemp` in settings for indoor readings, and to pus
 
 - **SAT upstream**: [github.com/Alexwijn/SAT](https://github.com/Alexwijn/SAT) — Original Home Assistant integration
 - **OpenTherm Protocol Specification v4.2**: `docs/opentherm specification/` in this repository
-- **ADR-062**: `docs/adr/ADR-062-sat-smart-autotune-thermostat-integration.md` — Architecture decision record
+- **ADR-085**: `docs/adr/ADR-085-sat-smart-autotune-thermostat-integration.md` — Architecture decision record
 - **REST API docs**: `docs/api/README.md` — Full endpoint reference
 - **MQTT docs**: `docs/api/MQTT.md` — Topic reference
 - **OTGW firmware**: [otgw.tclcode.com](https://otgw.tclcode.com/firmware.html) — PIC gateway documentation

@@ -32,5 +32,5 @@ Write an ADR for the SAT control architecture in the firmware: choice of embedde
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-ADR-062 (docs/adr/ADR-062-sat-smart-autotune-thermostat-integration.md) already fully documents the SAT control architecture: embedded C port rationale, alternatives considered (keep-in-HA, full-port, selective port), source file structure, control architecture (heating curve + PID + dual modes + cycle tracker), safety system, settings/state layout, and API surface. No new ADR created to avoid duplication. Task complete by reference to ADR-062.
+ADR-085 (docs/adr/ADR-085-sat-smart-autotune-thermostat-integration.md; originally authored as ADR-062, renumbered on 2026-04-24 via TASK-412) already fully documents the SAT control architecture: embedded C port rationale, alternatives considered (keep-in-HA, full-port, selective port), source file structure, control architecture (heating curve + PID + dual modes + cycle tracker), safety system, settings/state layout, and API surface. No new ADR created to avoid duplication. Task complete by reference to ADR-085.
 <!-- SECTION:FINAL_SUMMARY:END -->

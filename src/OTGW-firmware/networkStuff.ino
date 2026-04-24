@@ -584,7 +584,7 @@ bool isNTPtimeSet()
   return NtpStatus == TIME_SYNC;
 }
 
-// ADR-064 (TASK-350): signature takes pre-computed flags from the single
+// ADR-086 (TASK-350): signature takes pre-computed flags from the single
 // dispatcher in doTaskMinuteChanged. Internal dayChanged/yearChanged calls
 // are removed so each helper has exactly ONE call site firmware-wide.
 void sendtimecommand(bool dayFlag, bool yearFlag){

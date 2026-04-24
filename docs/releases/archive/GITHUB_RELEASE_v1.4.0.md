@@ -14,7 +14,7 @@ An embedded heating controller that runs entirely on the ESP, independent of Hom
 - **Full observability**: Web UI dashboard tab, REST API (`/api/v2/sat/*`), MQTT publish/subscribe, and Home Assistant auto-discovery (climate entity + 7 sensors)
 - **External sensors optional**: works with OT bus data alone; MQTT/REST indoor and outdoor temperature inputs enhance accuracy when available
 
-Documentation: [Feature guide](docs/features/smart-autotune-thermostat.md) | [ADR-062](docs/adr/ADR-062-sat-smart-autotune-thermostat-integration.md)
+Documentation: [Feature guide](docs/features/smart-autotune-thermostat.md) | [ADR-085](docs/adr/ADR-085-sat-smart-autotune-thermostat-integration.md)
 
 ### ESP32 and platform improvements
 

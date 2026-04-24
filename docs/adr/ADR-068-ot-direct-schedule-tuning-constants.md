@@ -88,6 +88,6 @@ The 3-strike threshold, 800 ms status interval, queue size of 8, and table sizes
 ## Related
 
 - **ADR-064**: OT-Direct operating mode architecture — establishes the scheduler and command queue concepts
-- **ADR-065**: Frame bridge pattern — the bridge is called from the scheduler for every queued frame
+- **ADR-087**: Frame bridge pattern — the bridge is called from the scheduler for every queued frame
 - **ADR-066**: Thermostat auto-detection — the 800 ms status interval is also the heartbeat for thermostat connectivity detection
 - **Code**: `OTDirect.ino` — `OT_STATUS_INTERVAL_MS`, `OT_CMD_QUEUE_SIZE`, `OT_RESPONSE_OVERRIDE_MAX`, `OT_RESPONSE_MODIFY_MAX`, `OT_UNKNOWN_ID_MAX`, `otUnknownCounters[]`, `incUnknownCount()`, `scheduleMasterRequest()`

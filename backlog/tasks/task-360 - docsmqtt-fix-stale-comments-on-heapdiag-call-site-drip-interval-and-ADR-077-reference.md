@@ -19,12 +19,12 @@ priority: medium
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Phase 1A HIGH#4 plus LOW items: sendMQTTheapdiag header comment still claims doTaskEvery60s call path but actually runs via doTaskMinuteChanged under hourFlag (ADR-064). Drip loop comment at OTGW-firmware.ino:409 says 3s interval but is 2s/10s. MQTTstuff.ino:46 references non-existent ADR-077. (void)yearFlag cast at OTGW-firmware.ino:324 is a no-op since yearFlag is already consumed.
+Phase 1A HIGH#4 plus LOW items: sendMQTTheapdiag header comment still claims doTaskEvery60s call path but actually runs via doTaskMinuteChanged under hourFlag (ADR-086). Drip loop comment at OTGW-firmware.ino:409 says 3s interval but is 2s/10s. MQTTstuff.ino:46 references non-existent ADR-077. (void)yearFlag cast at OTGW-firmware.ino:324 is a no-op since yearFlag is already consumed.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 sendMQTTheapdiag header comment corrected to reflect doTaskMinuteChanged + hourFlag (ADR-064)
+- [x] #1 sendMQTTheapdiag header comment corrected to reflect doTaskMinuteChanged + hourFlag (ADR-086)
 - [x] #2 loopMQTTDiscovery comment in main loop reflects 2s normal / 10s slow intervals
 - [x] #3 ADR-077 reference replaced with an existing ADR (e.g. ADR-044) or removed
 - [x] #4 (void)yearFlag dead cast at OTGW-firmware.ino:324 removed; comment clarified
@@ -36,7 +36,7 @@ Phase 1A HIGH#4 plus LOW items: sendMQTTheapdiag header comment still claims doT
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. MQTTstuff.ino sendMQTTheapdiag header comment: update call-path description to doTaskMinuteChanged+hourFlag (ADR-064).
+1. MQTTstuff.ino sendMQTTheapdiag header comment: update call-path description to doTaskMinuteChanged+hourFlag (ADR-086).
 2. OTGW-firmware.ino loopMQTTDiscovery call site comment: change "3s interval" -> "2s normal / 10s slow".
 3. MQTTstuff.ino:46 ADR-077 reference: does not exist; replace with ADR-042 (streaming JSON) since that is what the stated ~200B/chunk context actually describes.
 4. MQTTstuff.ino VERIFICATION_* constants: add per-line rationale trailer (already partially present; refine tuning rationale).
@@ -49,7 +49,7 @@ Skip AC #4 here (dead-cast removal is TASK-362 #5).
 
 <!-- SECTION:NOTES:BEGIN -->
 All seven ACs satisfied.
-- sendMQTTheapdiag header now reads doTaskMinuteChanged + hourFlag (ADR-064).
+- sendMQTTheapdiag header now reads doTaskMinuteChanged + hourFlag (ADR-086).
 - loopMQTTDiscovery call-site comment: "2s normal / 10s slow".
 - ADR-077 replaced with ADR-042 (streaming JSON, which is the genuinely relevant decision).
 - VERIFICATION_* constants now have per-line rationale aligned with ADR-062 tuning table.
@@ -65,7 +65,7 @@ Build: python build.py --firmware passed (1.4.1-beta+deaddd8).
 Cleaned up stale comments and added missing inline rationale across three files.
 
 Changes:
-- MQTTstuff.ino sendMQTTheapdiag header: corrected call-path to doTaskMinuteChanged under hourFlag (ADR-064). The old "doTaskEvery60s gated by hourChanged" wording was pre-ADR-064.
+- MQTTstuff.ino sendMQTTheapdiag header: corrected call-path to doTaskMinuteChanged under hourFlag (ADR-086). The old "doTaskEvery60s gated by hourChanged" wording was pre-ADR-086.
 - OTGW-firmware.ino loopMQTTDiscovery trailing comment: "3s interval" -> "2s normal / 10s slow" matching DISCOVERY_INTERVAL_NORMAL / DISCOVERY_INTERVAL_SLOW in MQTTstuff.ino.
 - MQTTstuff.ino MQTT_DISCOVERY_HEAP_MIN comment: replaced ghost ADR-077 citation with ADR-042 (streaming JSON, no ArduinoJson) — that is the genuinely relevant streaming-discovery decision.
 - MQTTstuff.ino VERIFICATION_* constants (window, buffer, heap start/abort): added per-line rationale trailer tied to the ADR-062 tuning table and to HEAP_LOW=5120 / HEAP_WARNING=3072.

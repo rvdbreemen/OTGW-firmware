@@ -139,6 +139,6 @@ would make the variables effectively global.
 - ADR-053: Large Feature Buffer Static Allocation (supersedes ADR-004; all-static rule)
 - ADR-049: String Prohibition in Protocol Paths (hot-path String ban, weather exception)
 - ADR-051: Dual Encapsulating Structs (settings/state architecture, `state.sat.*`)
-- ADR-062: SAT Integration (overall SAT architecture, source file split)
+- ADR-085: SAT Integration (overall SAT architecture, source file split)
 - `SATcontrol.ino`, `SATpid.ino`, `SATcycles.ino`, `SATweather.ino`: implementation
 - `OTGW-firmware.h`: `OTGWState.sat` struct definition

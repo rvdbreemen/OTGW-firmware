@@ -71,7 +71,7 @@ Identified 7 undocumented architectural decisions in OTDirect.ino not covered by
 Written ADR-068: docs/adr/ADR-068-ot-direct-schedule-tuning-constants.md
 - Documents rationale for constants 1-5 (most architecturally significant)
 - All constants accepted as-is — no code changes needed
-- Loopback PROGMEM table (item 6) is covered implicitly by ADR-065 (frame bridge, no separate ADR needed)
+- Loopback PROGMEM table (item 6) is covered implicitly by ADR-087 (frame bridge, no separate ADR needed)
 - Peek-before-dequeue (item 7) is an implementation detail noted in ADR-068 code reference
 
 No audit-fix tasks created: all are documentation gaps, not code defects.

@@ -42,7 +42,7 @@ Review all existing ADRs in backlog/decisions/ for relevance to the SAT implemen
 
 <!-- SECTION:NOTES:BEGIN -->
 Reviewed all 68 existing ADRs (ADR-001 through ADR-068). SAT-relevant ADRs:
-- ADR-062: Main SAT integration architecture (already exists, comprehensive)
+- ADR-085: Main SAT integration architecture (already exists, comprehensive)
 - ADR-061: Platform abstraction (relevant for ESP8266/ESP32 SAT code)
 - ADR-063: OTGW32 hardware support
 - ADR-004/ADR-053: Static buffer allocation (applies to SAT)
@@ -52,7 +52,7 @@ Reviewed all 68 existing ADRs (ADR-001 through ADR-068). SAT-relevant ADRs:
 - ADR-051: Dual structs (settings.sat, state.sat)
 
 Missing ADRs identified:
-- PID v3 implementation details (no ADR, just brief mention in ADR-062)
+- PID v3 implementation details (no ADR, just brief mention in ADR-085)
 - OPV calibration algorithm
 - Heating curve formula rationale
 - SAT memory allocation specifics
@@ -68,8 +68,8 @@ No existing ADRs conflict with SAT. No outdated ADRs identified due to SAT.
 Reviewed all 68 existing ADRs for SAT relevance.
 
 Findings:
-- ADR-062 covers overall SAT integration architecture
-- ADR-061, 063, 064, 065 cover OTGW32/platform topics
+- ADR-085 covers overall SAT integration architecture
+- ADR-061, 063, 064, 087 (renumbered from 065) cover OTGW32/platform topics
 - ADR-004/049/053 cover memory/buffer strategy
 - ADR-006 covers MQTT patterns
 - ADR-016, 041, 051 cover command queue, HA discovery, dual structs

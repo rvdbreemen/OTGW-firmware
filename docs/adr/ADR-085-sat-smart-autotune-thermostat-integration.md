@@ -1,6 +1,7 @@
-# ADR-062: SAT (Smart Autotune Thermostat) Integration
+# ADR-085: SAT (Smart Autotune Thermostat) Integration
 
 **Status:** Accepted
+Renumbered from ADR-062 on 2026-04-24 to resolve duplicate numbering (TASK-412). Content unchanged.
 **Date:** 2026-04-02
 
 ## Context

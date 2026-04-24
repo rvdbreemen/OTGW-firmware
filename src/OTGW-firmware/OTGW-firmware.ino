@@ -423,13 +423,13 @@ void doTaskEvery60s(){
   // Log heap statistics every minute for monitoring
   logHeapStats();
 
-  // Hourly/daily dispatch moved to doTaskMinuteChanged (ADR-064 / TASK-350):
+  // Hourly/daily dispatch moved to doTaskMinuteChanged (ADR-086 / TASK-350):
   // wall-clock aligned instead of boot-relative 60s drift. See that function
   // for the single call site of hourChanged/dayChanged/yearChanged.
 }
 
 // Extracted from the old hourly block so the new dispatcher reads cleanly
-// (ADR-064). Preserves existing guards: bNightlyRestart + ntp.bEnable +
+// (ADR-086). Preserves existing guards: bNightlyRestart + ntp.bEnable +
 // uptime>3600 + NTP-synced sanity.
 static void runNightlyRestartCheck() {
   if (!settings.bNightlyRestart) return;
@@ -447,7 +447,7 @@ static void runNightlyRestartCheck() {
 
 //===[ Do task exactly on the minute ]===
 // Single dispatcher for all sub-minute consume-on-read time-boundary helpers
-// per ADR-064. The four helpers (minuteChanged + hourChanged/dayChanged/
+// per ADR-086. The four helpers (minuteChanged + hourChanged/dayChanged/
 // yearChanged) each have EXACTLY ONE call site in the firmware:
 //   - minuteChanged() : main loop gate (OTGW-firmware.ino:366)
 //   - hourChanged()   : this function
@@ -456,7 +456,7 @@ static void runNightlyRestartCheck() {
 // Downstream consumers read the local flag, never re-call the helper.
 // evaluate.py::check_time_boundary_single_caller enforces this rule.
 void doTaskMinuteChanged(){
-  // ADR-064: these three helpers are called here and only here. Downstream
+  // ADR-086: these three helpers are called here and only here. Downstream
   // consumers read the local flags below, never re-call the helper.
   // Enforced by evaluate.py::check_time_boundary_single_caller.
   const bool hourFlag = hourChanged();
@@ -594,7 +594,7 @@ void loop()
           setLed(LED2, _led2Fast ? ON : OFF);
         }
       }
-      if (minuteChanged())              doTaskMinuteChanged(); //ADR-064: sole minuteChanged() caller; hour/day/year dispatch lives inside
+      if (minuteChanged())              doTaskMinuteChanged(); //ADR-086: sole minuteChanged() caller; hour/day/year dispatch lives inside
       loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, 2s normal / 10s slow)
       evalOutputs();                    // when the bits change, the output gpio bit will follow
       evalWebhook();                    // when the trigger bit changes, fire the webhook

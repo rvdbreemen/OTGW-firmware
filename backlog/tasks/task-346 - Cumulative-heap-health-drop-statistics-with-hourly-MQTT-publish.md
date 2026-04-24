@@ -83,5 +83,5 @@ Added cumulative heap-pressure diagnostics on branch 1.4.1.
 
 **Erratum (2026-04-21, per TASK-367)**
 
-The claim above that the hourly publish runs via "hourChanged() hook in doTaskEvery60s" is no longer accurate after TASK-350. Per ADR-064 (unified time-boundary dispatcher), the sendMQTTheapdiag call site was moved out of doTaskEvery60s and into the if(hourFlag) block inside doTaskMinuteChanged. The dispatch is still once-per-hour and still shares its hour boundary with the nightly restart check, but the containing function and trigger path have changed. Behaviour is preserved; only the call-site location moved.
+The claim above that the hourly publish runs via "hourChanged() hook in doTaskEvery60s" is no longer accurate after TASK-350. Per ADR-086 (unified time-boundary dispatcher), the sendMQTTheapdiag call site was moved out of doTaskEvery60s and into the if(hourFlag) block inside doTaskMinuteChanged. The dispatch is still once-per-hour and still shares its hour boundary with the nightly restart check, but the containing function and trigger path have changed. Behaviour is preserved; only the call-site location moved.
 <!-- SECTION:FINAL_SUMMARY:END -->

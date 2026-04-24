@@ -1,8 +1,10 @@
-# ADR-064 — Time-boundary consume-on-read helpers MUST have exactly one call site
+# ADR-086 — Time-boundary consume-on-read helpers MUST have exactly one call site
 
 ## Status
 
 Accepted
+
+Renumbered from ADR-064 on 2026-04-24 to resolve duplicate numbering (TASK-412). Content unchanged.
 
 ## Context
 
@@ -47,7 +49,7 @@ After the TASK-350 refactor, the canonical structure is:
 ```cpp
 // OTGW-firmware.ino — doTaskMinuteChanged (single dispatcher for all sub-minute boundaries)
 void doTaskMinuteChanged() {
-  // ADR-064: single caller for each of hour/day/year; captured into flags for downstream gates.
+  // ADR-086: single caller for each of hour/day/year; captured into flags for downstream gates.
   const bool hourFlag = hourChanged();
   const bool dayFlag  = dayChanged();
   const bool yearFlag = yearChanged();
@@ -84,14 +86,14 @@ A new `evaluate.py` check `check_time_boundary_single_caller` scans all `src/OTG
 The permitted call site is pinned by a comment anchor at the canonical location:
 
 ```cpp
-  // ADR-064: single caller
+  // ADR-086: single caller
   const bool hourFlag = hourChanged();
 ```
 
 The check implementation should be resilient to:
 - Comments containing the helper name (skip lines starting with `//` or `*`)
 - Function definitions (skip the lines in `helperStuff.ino` where the helper is declared)
-- The `// ADR-064` anchor line itself (do count it, so the anchor and the call form one permitted pair)
+- The `// ADR-086` anchor line itself (do count it, so the anchor and the call form one permitted pair)
 
 ### Guidance for future features
 

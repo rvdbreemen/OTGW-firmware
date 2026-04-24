@@ -43,7 +43,7 @@ The 5-second window is a blocking wait during the setup phase. This is acceptabl
 In Master mode, the firmware runs a full OpenTherm polling scheduler that:
 - Sends MsgID 0 (status) every ~1 second as required by the protocol
 - Cycles through configured data IDs (setpoint, DHW, modulation, temperatures, etc.)
-- Processes boiler responses via `bridgeFrameToParser()` (ADR-065) so MQTT, REST, and WebSocket all work normally
+- Processes boiler responses via `bridgeFrameToParser()` (ADR-087) so MQTT, REST, and WebSocket all work normally
 
 ### Boiler response cache: `otBoilerCache[128]`
 
@@ -84,6 +84,6 @@ Both `bAutoDetect` and `bEnableSlave` are persisted in the `OTDirectSettingsSect
 ## Related
 
 - **ADR-064**: OT-Direct operating mode architecture -- defines `OTDirectMode` enum and `setOTDirectMode()` used for the auto-switch
-- **ADR-065**: Frame bridge pattern -- master mode scheduler feeds boiler responses through the bridge
+- **ADR-087**: Frame bridge pattern -- master mode scheduler feeds boiler responses through the bridge
 - **ADR-063**: OTGW32 hardware support -- establishes the OT-direct build target
 - **Code**: `OTDirect.ino` (`initOTDirect` auto-detect logic, `handleMasterModeSlaveFrame`, `otBoilerCache`), `OTGW-firmware.h` (`bAutoDetect`, `bEnableSlave` settings)

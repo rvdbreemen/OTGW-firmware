@@ -1,6 +1,6 @@
 ---
 id: TASK-171
-title: 'OTGW32-Audit-9B: Review ADR-064 and ADR-065 — operating modes and frame bridge'
+title: 'OTGW32-Audit-9B: Review ADR-064 and ADR-087 — operating modes and frame bridge'
 status: Done
 assignee:
   - '@claude'
@@ -14,21 +14,21 @@ milestone: m-1
 dependencies: []
 references:
   - docs/adr/ADR-064-ot-direct-operating-mode-architecture.md
-  - docs/adr/ADR-065-frame-bridge-pattern.md
+  - docs/adr/ADR-087-frame-bridge-pattern.md
 priority: medium
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Review ADR-064 (OT Direct operating mode architecture) and ADR-065 (frame bridge pattern) against the current implementation. Verify all five modes (gateway/monitor/bypass/master/loopback) are documented, the frame bridge T/B/R/A format is correct, and the synthesizeResponse() flow matches the documented pattern.
+Review ADR-064 (OT Direct operating mode architecture) and ADR-087 (frame bridge pattern) against the current implementation. Verify all five modes (gateway/monitor/bypass/master/loopback) are documented, the frame bridge T/B/R/A format is correct, and the synthesizeResponse() flow matches the documented pattern.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 ADR-064 documents all 5 operating modes with accurate descriptions
-- [x] #2 ADR-065 frame format (T/B/R/A prefix + 8-digit hex) matches implementation
-- [x] #3 synthesizeResponse() output flow matches ADR-065 description
+- [x] #2 ADR-087 frame format (T/B/R/A prefix + 8-digit hex) matches implementation
+- [x] #3 synthesizeResponse() output flow matches ADR-087 description
 - [x] #4 Both ADRs are updated if implementation details have changed
 - [x] #5 Any gap between ADR and code results in an audit-fix task
 <!-- AC:END -->
@@ -48,7 +48,7 @@ Persistence: ADR says "stored in OTDirectSettingsSection and restored at boot". 
 
 Hardware transitions: relay, step-up — implemented for each mode case.
 
-ADR-065 vs OTDirect.ino review:
+ADR-087 vs OTDirect.ino review:
 
 bridgeFrameToParser(char prefix, unsigned long frame): matches ADR exactly. Uses PSTR("%c%08lX") format.
 
@@ -58,7 +58,7 @@ synthesizeResponse(): implemented as two overloads (c0+c1+value, or cmd+value). 
 
 Call sites: ISR callbacks → loopOTDirect() → bridgeFrameToParser(). Matches ADR description.
 
-Loopback mode: not mentioned in ADR-065 but uses same bridgeFrameToParser() path — consistent.
+Loopback mode: not mentioned in ADR-087 but uses same bridgeFrameToParser() path — consistent.
 
 Discrepancy found: ADR-064 enum values are wrong (GATEWAY=0 in ADR vs GATEWAY=1 in code). ADR needs updating.
 <!-- SECTION:NOTES:END -->
@@ -66,7 +66,7 @@ Discrepancy found: ADR-064 enum values are wrong (GATEWAY=0 in ADR vs GATEWAY=1 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-ADR-064 and ADR-065 review against OTDirect.ino:
+ADR-064 and ADR-087 review against OTDirect.ino:
 
 ADR-064 discrepancies found and fixed:
 - Enum prefix was OT_MODE_* in ADR but OTD_MODE_* in code — corrected
@@ -74,7 +74,7 @@ ADR-064 discrepancies found and fixed:
 - Convenience flags were documented as boolean variables; code uses macros (#define IS_*_MODE()) — ADR updated to show actual macros
 - setOTDirectMode() also calls resetTransientState() on every mode change (not in ADR) — noted as implementation detail
 
-ADR-065: all aspects match implementation exactly.
+ADR-087: all aspects match implementation exactly.
 - bridgeFrameToParser() signature, format string, call sites all correct
 - synthesizeResponse() two overloads match ADR description
 - Origin chars T/B/R/A used correctly in code

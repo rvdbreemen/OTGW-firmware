@@ -61,13 +61,13 @@ Stripped all em dashes from my additions per user feedback; pre-existing em dash
 Release-facing documentation for v1.4.1 is in place.
 
 Changes:
-- New: RELEASE_NOTES_1.4.1.md at repo root (137 lines). Mirrors the v1.3.4 template: Overview, What's new (heap pressure reduction, retained discovery verification + republish, hourly heap-diag MQTT topic, unified time-boundary dispatcher), Behavioural notes for users, Known limits and trade-offs, Upgrade notes, Breaking changes cross-reference, and Links (ADR-062, ADR-064, TASK-338..351).
+- New: RELEASE_NOTES_1.4.1.md at repo root (137 lines). Mirrors the v1.3.4 template: Overview, What's new (heap pressure reduction, retained discovery verification + republish, hourly heap-diag MQTT topic, unified time-boundary dispatcher), Behavioural notes for users, Known limits and trade-offs, Upgrade notes, Breaking changes cross-reference, and Links (ADR-062, ADR-086 [originally ADR-064], TASK-338..351).
 - Updated: docs/BREAKING_CHANGES.md. Added no-breaking blocks for v1.4.0 (SAT + ESP32 additive) and v1.4.1 (heap + discovery-verify additive, MQTTdiscoveryAutoVerify default note). Old blocks untouched.
 - Updated: README.md. Added "What's New in v1.4.1" section immediately before the v1.4.0 block with 4 summary bullets and a link to the full release notes.
 
 Verification:
 - All 12 TASK-NNN links resolve to real files in backlog/tasks/.
-- Both ADR links (ADR-062, ADR-064) resolve to real files in docs/adr/.
+- Both ADR links (ADR-062, ADR-086 [originally ADR-064]) resolve to real files in docs/adr/.
 - No em dashes in any of my additions (per user global preference).
 - English throughout (per release-notes policy).
 

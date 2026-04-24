@@ -123,7 +123,7 @@ A retained topic `<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap` is publi
 
 ### Unified time-boundary dispatcher
 
-ADR-064 consolidates the firmware's four time-boundary helpers under a single caller contract. Exactly one dispatcher site in `OTGW-firmware.ino` calls `minuteChanged()` and fans out the hour/day/year transitions. All minute-aligned periodic work (nightly restart, daily discovery verify, hourly heap diagnostic publish) consumes boundary flags from the dispatcher instead of polling `minute()`/`hour()` directly.
+ADR-086 (originally ADR-064) consolidates the firmware's four time-boundary helpers under a single caller contract. Exactly one dispatcher site in `OTGW-firmware.ino` calls `minuteChanged()` and fans out the hour/day/year transitions. All minute-aligned periodic work (nightly restart, daily discovery verify, hourly heap diagnostic publish) consumes boundary flags from the dispatcher instead of polling `minute()`/`hour()` directly.
 
 ---
 
@@ -169,7 +169,7 @@ All MQTT topics, REST API endpoints, and settings format are otherwise identical
 ## Architecture Decision Records
 
 - [ADR-062: Retained discovery verification](docs/adr/ADR-062-retained-discovery-verification.md) (Accepted)
-- [ADR-064: Time-boundary single-caller contract](docs/adr/ADR-064-time-boundary-single-caller-contract.md) (Accepted)
+- [ADR-086: Time-boundary single-caller contract](docs/adr/ADR-086-time-boundary-single-caller-contract.md) (Accepted; renumbered from ADR-064 on 2026-04-24 via TASK-412)
 
 ## Thank you
 

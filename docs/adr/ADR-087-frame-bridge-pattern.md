@@ -1,6 +1,7 @@
-# ADR-065: Frame Bridge Pattern — Raw OT Frames to PIC-Format Text
+# ADR-087: Frame Bridge Pattern — Raw OT Frames to PIC-Format Text
 
 **Status:** Accepted
+Renumbered from ADR-065 on 2026-04-24 to resolve duplicate numbering (TASK-412). Content unchanged.
 **Date:** 2026-04-04
 
 ## Context

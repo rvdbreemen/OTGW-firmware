@@ -78,7 +78,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **ESP8266** | The Espressif Wi-Fi microcontroller used in the NodoShop OTGW board. Runs at 80 or 160 MHz, approximately 40 KB usable heap. |
 | **ESP32** | The more powerful Espressif microcontroller used in the NodoShop OTGW32 board. Runs at 240 MHz, significantly more RAM and flash, supports BLE, Ethernet, and OTDirect. |
 | **f8.8** | OpenTherm fixed-point data format: an 8-bit signed integer plus an 8-bit fractional part (1/256 per LSB). Used for all temperature values in the protocol. |
-| **Frame Bridge** | The abstraction layer (ADR-065) that provides a uniform OpenTherm frame interface regardless of whether the underlying transport is PIC UART (ESP8266) or OTDirect GPIO (ESP32). |
+| **Frame Bridge** | The abstraction layer (ADR-087) that provides a uniform OpenTherm frame interface regardless of whether the underlying transport is PIC UART (ESP8266) or OTDirect GPIO (ESP32). |
 | **HA** | Home Assistant. The primary target home automation platform for this firmware. |
 | **HEAP_CRITICAL** | Heap level below ~3 KB. Emergency mode: MQTT and WebSocket sends are blocked. |
 | **HEAP_HEALTHY** | Heap level above ~8 KB. Normal operation. |

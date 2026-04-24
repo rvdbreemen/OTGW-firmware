@@ -19,7 +19,7 @@ priority: low
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Phase 1B HIGH: ADR-062 binding rule promised check_discovery_counter_instrumented and check_publishedtopic_counter_reset in evaluate.py, but only check_time_boundary_single_caller (ADR-064's gate) was implemented. Without the gates, a future stream*Discovery helper missing incPublishedTopicCount will cause silent false-missing republish of all topics every day.
+Phase 1B HIGH: ADR-062 binding rule promised check_discovery_counter_instrumented and check_publishedtopic_counter_reset in evaluate.py, but only check_time_boundary_single_caller (ADR-086's gate, originally ADR-064) was implemented. Without the gates, a future stream*Discovery helper missing incPublishedTopicCount will cause silent false-missing republish of all topics every day.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

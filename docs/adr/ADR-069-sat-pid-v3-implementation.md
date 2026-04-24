@@ -134,12 +134,12 @@ Public state copies in `state.sat.fPidP/I/D/Output/Kp/Ki/Kd/fRawDerivative/fErro
 
 ### Risks
 
-- The `SAT_PID_AGGRESSION_V3 = 8400` constant was empirically chosen in the SAT Python project and may not be optimal for all boiler types. The manufacturer quirk system (ADR-062) can partially compensate, but the constant itself is not configurable
+- The `SAT_PID_AGGRESSION_V3 = 8400` constant was empirically chosen in the SAT Python project and may not be optimal for all boiler types. The manufacturer quirk system (ADR-085) can partially compensate, but the constant itself is not configurable
 - Solar gain detection relies on external state (`bSolarGainActive`) that must be set by the control loop. If this flag is stale or incorrect, the integral freeze mechanism misfires
 
 ## Related
 
-- ADR-062: SAT Smart Autotune Thermostat Integration (overall SAT architecture)
+- ADR-085: SAT Smart Autotune Thermostat Integration (overall SAT architecture)
 - ADR-069 (this ADR): PID implementation
 - `SATpid.ino`: Implementation
 - `OTGW-firmware.h`: `state.sat` fields for PID telemetry

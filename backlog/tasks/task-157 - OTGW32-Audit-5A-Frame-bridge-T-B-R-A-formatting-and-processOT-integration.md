@@ -14,7 +14,7 @@ milestone: m-1
 dependencies: []
 references:
   - src/OTGW-firmware/OTDirect.ino
-  - docs/adr/ADR-065-frame-bridge-pattern.md
+  - docs/adr/ADR-087-frame-bridge-pattern.md
 priority: high
 ---
 

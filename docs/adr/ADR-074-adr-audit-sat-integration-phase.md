@@ -5,7 +5,7 @@
 
 ## Context
 
-The SAT integration (ADR-062 through ADR-073) introduced significant new subsystems:
+The SAT integration (ADR-085 plus ADR-063, ADR-064, ADR-087, ADR-066 through ADR-073; originally written as ADR-062 through ADR-073, renumbered on 2026-04-24 per TASK-412) introduced significant new subsystems:
 weather compensation, PID control, BLE sensors, OPV calibration, cycle tracking, and a
 large new MQTT topic surface. Before closing the SAT audit phase, all existing ADRs were
 reviewed for conflicts, outdated decisions, or superseded guidance.
@@ -93,12 +93,13 @@ to these structs.
 SAT follows this rule. One documented String exception in `SATweather.ino` (HTTP
 payload) is consistent with the one-off allowance. ADR-070 documents this exception.
 
-### ADR-062 through ADR-069: SAT-specific ADRs — all accepted, no conflicts
+### SAT-phase ADRs (ADR-063..069 + ADR-085 + ADR-087) — all accepted, no conflicts
 
-All ADRs written for the SAT integration phase (062 SAT overview, 063 OTGW32 hardware,
-064 OT-direct mode, 065 frame bridge, 066 thermostat auto-detection, 067 OLED library,
-068 OT-direct schedule tuning, 069 PID v3) are consistent with each other and with
-ADR-070 through ADR-073 written in this audit phase.
+All ADRs written for the SAT integration phase (ADR-085 SAT overview [renumbered from 062],
+063 OTGW32 hardware, 064 OT-direct mode, ADR-087 frame bridge [renumbered from 065],
+066 thermostat auto-detection, 067 OLED library, 068 OT-direct schedule tuning,
+069 PID v3) are consistent with each other and with ADR-070 through ADR-073 written in
+this audit phase.
 
 ## Decision
 
@@ -107,7 +108,7 @@ No existing ADRs require status changes beyond those already applied. The audit 
 1. ADR-004, ADR-018, ADR-001 are correctly marked as superseded.
 2. ADR-006, ADR-016, ADR-038, ADR-041, ADR-049, ADR-051 are current and consistent
    with SAT integration.
-3. ADR-062 through ADR-073 are the authoritative records for all SAT-related decisions.
+3. ADR-063, ADR-064, ADR-066 through ADR-073, plus ADR-085 (renumbered from 062) and ADR-087 (renumbered from 065), are the authoritative records for all SAT-related decisions.
 4. The ADR-061 filename collision was resolved: the WiFi reconnect timeout ADR is now
    ADR-075. ADR-047 updated to reference ADR-075.
 
@@ -115,7 +116,7 @@ No existing ADRs require status changes beyond those already applied. The audit 
 
 ### Benefits
 
-- SAT integration is fully documented in ADRs 062-073 with no gaps
+- SAT integration is fully documented across ADRs 063-073 plus ADR-085 and ADR-087 (originally authored as ADR-062 and ADR-065; renumbered via TASK-412) with no gaps
 - No existing ADRs are in conflict with SAT code
 - The one outdated-status issue (ADR-018, ADR-004, ADR-001) was already resolved before
   this audit
@@ -135,7 +136,7 @@ No existing ADRs require status changes beyond those already applied. The audit 
 - ADR-053: Large Feature Buffer Static Allocation
 - ADR-042: Streaming JSON — No ArduinoJson
 - ADR-061: Unified ESP8266/ESP32 Platform Abstraction
-- ADR-062 through ADR-073: SAT integration ADRs
+- ADR-063, ADR-064, ADR-066 through ADR-073, ADR-085 (renumbered from 062), ADR-087 (renumbered from 065): SAT integration ADRs
 - ADR-075: WiFi Reconnect Timeout Tuning (renumbered from ADR-061)
 - ADR-070: SAT Memory Allocation (this audit phase)
 - ADR-071: SAT Heating Curve (this audit phase)

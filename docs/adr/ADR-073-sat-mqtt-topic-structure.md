@@ -204,7 +204,7 @@ cycle.
 - ADR-006: MQTT Integration Pattern (existing topic convention)
 - ADR-040: MQTT Source-Specific Topics (per-source topic approach)
 - ADR-041: JIT HA Discovery (auto-discovery via `mqttha.cfg`)
-- ADR-062: SAT Integration (overall SAT architecture and MQTT overview)
+- ADR-085: SAT Integration (overall SAT architecture and MQTT overview)
 - `SATcontrol.ino`: `satPublishMQTT()` (~line 1265)
 - `SATweather.ino`: `weatherPublishMQTT()`
 - `SATble.ino`: `blePublishMQTT()`

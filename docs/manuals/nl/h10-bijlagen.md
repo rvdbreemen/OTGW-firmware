@@ -87,7 +87,7 @@ Volledige specificatie: `docs/opentherm specification/OpenTherm-Protocol-Specifi
 | **DHW** | Domestic Hot Water — warmwatervoorziening (sanitair warm water). |
 | **ESP8266** | Espressif microcontroller met ingebouwde WiFi, gebruikt op het Nodoshop OTGW-bord (~40 KB bruikbaar DRAM). |
 | **ESP32** | Espressif microcontroller met WiFi, Bluetooth en meer RAM, gebruikt op het OTGW32-bord. |
-| **Frame Bridge** | Abstractielaag (ADR-065) die een uniforme OpenTherm frame-interface biedt, ongeacht of het onderliggende transport PIC UART (ESP8266) of OTDirect GPIO (ESP32) is. |
+| **Frame Bridge** | Abstractielaag (ADR-087) die een uniforme OpenTherm frame-interface biedt, ongeacht of het onderliggende transport PIC UART (ESP8266) of OTDirect GPIO (ESP32) is. |
 | **F8.8** | OpenTherm-getal met vaste komma: 16 bits, waarvan 8 bit geheel en 8 bit breuk (resolutie 1/256 ≈ 0,004). |
 | **HA** | Home Assistant — open source domotica-platform, primaire integratiedoelstelling. |
 | **LLMNR** | Link-Local Multicast Name Resolution — naamresolutie op Windows-netwerken, poort 5355 UDP. |

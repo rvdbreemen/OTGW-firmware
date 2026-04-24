@@ -1,6 +1,6 @@
 ---
 id: TASK-355
-title: 'chore(adr): revert ADR-062/064 to Proposed and resolve ghost ADR citations'
+title: 'chore(adr): revert ADR-062/086 (originally ADR-064) to Proposed and resolve ghost ADR citations'
 status: Done
 assignee:
   - '@claude'
@@ -17,19 +17,19 @@ priority: high
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Phase 1B CRITICAL+HIGH: ADR-062 and ADR-064 carry Status Accepted on disk without explicit user approval (violates ADR lifecycle per CLAUDE.md). Both ADRs cite ADR-077/078/080 which do not exist; highest pre-existing ADR is ADR-061. Also: local Windows plan-file path leaks into repo.
+Phase 1B CRITICAL+HIGH: ADR-062 and ADR-086 (originally ADR-064, renumbered via TASK-412) carry Status Accepted on disk without explicit user approval (violates ADR lifecycle per CLAUDE.md). Both ADRs cite ADR-077/078/080 which do not exist; highest pre-existing ADR is ADR-061. Also: local Windows plan-file path leaks into repo.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 ADR-062 Status field reverted to Proposed
-- [x] #2 ADR-064 Status field reverted to Proposed
+- [x] #2 ADR-086 (originally ADR-064) Status field reverted to Proposed
 - [x] #3 ADR-077/078/080 references replaced with existing ADRs or removed
 - [x] #4 Local plan-file path removed from both ADRs
 - [x] #5 ADRs flipped to Accepted only after explicit user approval
 - [x] #6 ADR-062 Consequences/Limits section gets bullet: heap-abort outcome indistinguishable from clean pass in iLastMissingCount; check [verify] heap-abort debug log
 - [x] #7 ADR-062 Consequences section gets bullet: at boot, dayChanged lastX=-1 sentinel fires true on first post-NTP-sync minute; auto-verify runs within one minute of NTP sync
-- [x] #8 ADR-064 Benefits/Costs section gets bullet: hourFlag/dayFlag/yearFlag all fire true on first post-NTP-sync tick; downstream consumers must defend (runNightlyRestart does via uptime>3600, sendMQTTheapdiag publishes near-zero snapshot)
+- [x] #8 ADR-086 (originally ADR-064) Benefits/Costs section gets bullet: hourFlag/dayFlag/yearFlag all fire true on first post-NTP-sync tick; downstream consumers must defend (runNightlyRestart does via uptime>3600, sendMQTTheapdiag publishes near-zero snapshot)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -43,7 +43,7 @@ Phase 1B CRITICAL+HIGH: ADR-062 and ADR-064 carry Status Accepted on disk withou
 6. Strip C:\\Users\\rvdbr\\... plan-file paths from both ADRs
 7. Widen binding rule to 'every stream*Discovery helper in mqtt_configuratie.cpp' (or explicitly list 5 incl. streamDallasSensorDiscovery)
 8. Add 2 Consequences bullets to ADR-062 (heap-abort indistinguishable; dayChanged boot-time first fire)
-9. Add 1 bullet to ADR-064 (hourFlag/dayFlag/yearFlag boot-time first fire)
+9. Add 1 bullet to ADR-086 (originally ADR-064) (hourFlag/dayFlag/yearFlag boot-time first fire)
 10. Verify no remaining Windows path leaks in these two files
 <!-- SECTION:PLAN:END -->
 
@@ -62,10 +62,10 @@ ADR-062 Limits: added two bullets (heap-abort telemetry indistinguishability; da
 
 ADR-062 Windows plan-file path stripped.
 
-ADR-064: Status reverted to Proposed.
-ADR-064 ghost citations: ADR-080 references removed from Context narrative, Enforcement heading, and Related section. Replaced with direct 'CI gate in evaluate.py' language (no meta-rule invoked).
-ADR-064 Costs: added one bullet (hourFlag/dayFlag/yearFlag boot-time first-fire + defences already present in runNightlyRestartCheck and sendMQTTheapdiag).
-ADR-064 Windows plan-file path stripped.
+ADR-086 (originally ADR-064): Status reverted to Proposed.
+ADR-086 ghost citations: ADR-080 references removed from Context narrative, Enforcement heading, and Related section. Replaced with direct 'CI gate in evaluate.py' language (no meta-rule invoked).
+ADR-086 Costs: added one bullet (hourFlag/dayFlag/yearFlag boot-time first-fire + defences already present in runNightlyRestartCheck and sendMQTTheapdiag).
+ADR-086 Windows plan-file path stripped.
 
 Final verification: grep for ADR-07x/08x, C:\, rvdbr, plans\ - no matches in either ADR.
 
@@ -75,7 +75,7 @@ AC 5 (user approval) intentionally left unchecked: self-approval violates CLAUDE
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Reverted ADR-062 and ADR-064 from Accepted to Proposed (process-integrity fix: self-approval without user review violates CLAUDE.md ADR governance).
+Reverted ADR-062 and ADR-086 (originally ADR-064) from Accepted to Proposed (process-integrity fix: self-approval without user review violates CLAUDE.md ADR governance).
 
 ## Ghost-ADR citations resolved
 
@@ -91,7 +91,7 @@ Reverted ADR-062 and ADR-064 from Accepted to Proposed (process-integrity fix: s
 
 - ADR-062 Limits: heap-abort during verify window is indistinguishable from clean pass in iLastMissingCount; disambiguate via '[verify] heap-abort' debug log; TASK-361 follow-up will introduce explicit outcome enum.
 - ADR-062 Limits: dayChanged()'s lastX=-1 sentinel fires true on first post-NTP-sync minute, so when MQTTdiscoveryAutoVerify=true a verify runs within one minute of NTP sync (not at wall-clock day boundary); intentional behaviour for HA-restarted-while-OTGW-offline case.
-- ADR-064 Costs: all three flags (hourFlag/dayFlag/yearFlag) fire true on first post-NTP-sync dispatcher tick due to lastX=-1 sentinels; runNightlyRestartCheck defends via uptime>3600, sendMQTTheapdiag tolerates a near-zero first snapshot; new if(hourFlag) consumers must consider this.
+- ADR-086 Costs: all three flags (hourFlag/dayFlag/yearFlag) fire true on first post-NTP-sync dispatcher tick due to lastX=-1 sentinels; runNightlyRestartCheck defends via uptime>3600, sendMQTTheapdiag tolerates a near-zero first snapshot; new if(hourFlag) consumers must consider this.
 
 ## Cleanup
 
@@ -107,7 +107,7 @@ Task status kept 'In Progress', NOT 'Done'. This is the legitimate user-gated ex
 
 Files touched (only these two, per strict ownership):
 - docs/adr/ADR-062-retained-discovery-verification.md
-- docs/adr/ADR-064-time-boundary-single-caller-contract.md
+- docs/adr/ADR-086-time-boundary-single-caller-contract.md
 
 No code files touched. No commits. No merge.
 <!-- SECTION:FINAL_SUMMARY:END -->

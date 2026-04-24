@@ -38,7 +38,7 @@ Created docs/adr/ADR-073-sat-platform-compatibility.md documenting:
 - Strategy: compile-time #if defined(ESP32) guards for BLE only
 - Core algorithms (heating curve, PID, cycles, OPV calibration) have zero platform-specific code
 - SATble.ino: entirely wrapped in #if defined(ESP32)
-- OTcurrentSystemState is platform-agnostic thanks to frame bridge pattern (ADR-065)
+- OTcurrentSystemState is platform-agnostic thanks to frame bridge pattern (ADR-087)
 - SATStateSection has conditional BLE fields
 - weatherFetch uses WiFiClient/HTTPClient abstracted by platform.h (ADR-061)
 - climAttrBuf[512] static on both platforms; constrains ESP8266 stack, harmless on ESP32

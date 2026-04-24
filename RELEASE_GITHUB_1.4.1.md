@@ -20,7 +20,7 @@ Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md)
 - **Heap-aware discovery drip**: 2 s normal / 10 s slow-mode; fragmentation-aware publish gates; Status-burst cooldown (2 s); hold-per-interval hysteresis to prevent mode oscillation. Eliminates mid-discovery watchdog resets on loaded gateways
 - **Retained-discovery self-heal** (ADR-062): daily wildcard subscribe verifies broker state, re-announces missing configs. On-demand via REST (`/api/v2/discovery`), telnet `V` key
 - **Hourly heap diagnostic MQTT topic**: `<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap` (retained, 17-field JSON: heap levels, fragmentation, tier counters, discovery state). Uniqueid scoping prevents collisions between multiple OTGWs on the same broker.
-- **Unified time-boundary dispatcher** (ADR-064): hour/day/year triggers wall-clock aligned through a single call site
+- **Unified time-boundary dispatcher** (ADR-086, originally ADR-064): hour/day/year triggers wall-clock aligned through a single call site
 - **Configurable device manufacturer/model** in MQTT device announcement (credit: Schelte Bron)
 - **Nightly restart** with configurable hour, wired to the `hourChanged` dispatcher
 - **REST API additions**: `GET /api/v2/sensors/status`, `GET /api/v2/discovery`, `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`

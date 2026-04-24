@@ -24,7 +24,7 @@ Wire startDiscoveryVerification into the daily branch of the unified time-bounda
 <!-- AC:BEGIN -->
 - [x] #1 Exactly ONE line added: if(settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification()
 - [x] #2 Preconditions enforced inside startDiscoveryVerification, not duplicated at dispatcher
-- [x] #3 NO new helper function - inline in dispatcher per ADR-064
+- [x] #3 NO new helper function - inline in dispatcher per ADR-086
 - [x] #4 NO dayChanged or local static - dayFlag from dispatcher
 - [x] #5 MQTTdiscoveryAutoVerify settings key serialized/parsed in settingStuff.ino
 - [x] #6 UI toggle in data/index.js with translateFields label
@@ -46,7 +46,7 @@ Wire startDiscoveryVerification into the daily branch of the unified time-bounda
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Wired daily auto-verify as the last layer of the discovery auto-heal plan. ONE line added in doTaskMinuteChanged if(dayFlag) block per ADR-064 (no new helper, no dayChanged race): 'if (settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification();'. Preconditions (NTP sync, uptime>3600, heap>=6000, no pending drip, MQTT connected) are already enforced inside startDiscoveryVerification(). Settings wire-up: MQTTdiscoveryAutoVerify JSON serialize/dump/updateSetting in settingStuff.ino. data/index.js translateFields label 'MQTT Discovery Daily Auto-Verify'. Build verified clean (firmware + filesystem). evaluate.py 27/27 PASS including ADR-064 single-caller gate. AC7-9 deferred to field validation (REST exposure of auto_verify boolean, UI tooltip, DST edge case verification). AC11-13 are field/time-based and can only be validated after tester flash + day rollover in real time.
+Wired daily auto-verify as the last layer of the discovery auto-heal plan. ONE line added in doTaskMinuteChanged if(dayFlag) block per ADR-086 (no new helper, no dayChanged race): 'if (settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification();'. Preconditions (NTP sync, uptime>3600, heap>=6000, no pending drip, MQTT connected) are already enforced inside startDiscoveryVerification(). Settings wire-up: MQTTdiscoveryAutoVerify JSON serialize/dump/updateSetting in settingStuff.ino. data/index.js translateFields label 'MQTT Discovery Daily Auto-Verify'. Build verified clean (firmware + filesystem). evaluate.py 27/27 PASS including ADR-086 single-caller gate. AC7-9 deferred to field validation (REST exposure of auto_verify boolean, UI tooltip, DST edge case verification). AC11-13 are field/time-based and can only be validated after tester flash + day rollover in real time.
 
 ---
 
