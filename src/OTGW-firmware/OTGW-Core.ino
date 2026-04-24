@@ -243,6 +243,16 @@ OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
 static constexpr uint8_t MQTT_TRACKED_RESPONSE_ID_COUNT = 128; // linear msgid slots for IDs 0-127
 static constexpr uint16_t MQTT_TRACKED_SLOT_COUNT = MQTT_TRACKED_RESPONSE_ID_COUNT * 2; // response + request view
 
+// TASK-400: Status-bit specific heartbeat interval. Hardcoded to 60 seconds
+// so the msgId 0 status_master / status_slave fan-out (and the msgId 70
+// Status VH equivalent) publishes at least once a minute as a state-snapshot
+// for HA reconnect recovery, INDEPENDENT of settings.mqtt.iInterval (which
+// governs all OTHER topic throttles). The 60s cadence is a compromise: long
+// enough to eliminate per-frame publish spam under steady-state boiler
+// conditions (drops 160 publishes/sec → ~0.27/sec), short enough that HA
+// regains full state within one minute after any MQTT broker reconnect.
+static constexpr uint16_t STATUS_HEARTBEAT_INTERVAL_SEC = 60;
+
 // Global state arrays — defined here (one definition rule), declared extern in OTGW-Core.h. (ADR-044)
 uint32_t mqttlastsent[MQTT_TRACKED_SLOT_COUNT] = {0}; // packed throttle for msgids 0-127: bits31-16=last published u16, bits15-0=seconds-since-boot
 uint16_t mqttlastsentstatusbit[16] = {0}; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
@@ -254,6 +264,32 @@ static bool mqttForceNextMasterStatusPublish = true;
 static bool mqttForceNextSlaveStatusPublish  = true;
 static bool mqttForceNextMasterStatusVHPublish = true;
 static bool mqttForceNextSlaveStatusVHPublish  = true;
+
+// TASK-401: per-bit / per-byte publish timers for non-Status fan-out sites
+// that fire frequently enough to matter for heap pressure. Same first-seen +
+// change + STATUS_HEARTBEAT_INTERVAL_SEC heartbeat gating as msgId 0 Status.
+// Reset to TRACKED_TIME_UNSEEN in resetMqttTrackedState() so the first frame
+// after boot publishes all bits/bytes once.
+static uint16_t mqttlastsentASFbit[8]   = {0};  // msgId 5 ASF bits 0-5 (slots 6-7 reserved)
+static uint16_t mqttlastsentASFbyte[1]  = {0};  // msgId 5 ASF_flags byte-topic
+static uint16_t mqttlastsentRBPbit[4]   = {0};  // msgId 6 RBP: 0=dhw_sp, 1=max_ch_sp, 2=rw_dhw_sp, 3=rw_max_ch_sp
+static uint16_t mqttlastsentRBPbyte[2]  = {0};  // msgId 6 RBP: 0=transfer_enable, 1=read_write
+static uint16_t mqttlastsentRObit[2]    = {0};  // msgId 100 Remote Override: 0=manual, 1=program
+static uint16_t mqttlastsentRObyte[1]   = {0};  // msgId 100 Remote Override LB flag8
+
+// TASK-402: global rate-gate — enforce MQTT_GATED_PUBLISH_SPACING_MS between
+// any two gated publishes for first-seen, heartbeat, and force paths.
+// Change-detect publishes bypass the gate (priority: bit-flip goes out
+// immediately) and do NOT update the timer, so a subsequent non-change publish
+// honours spacing relative to the previous non-change publish only.
+// Boot sentinel mqttLastGatedPublishMs==0 means "nothing published yet, first
+// pass is free" — earliest bit at boot goes through without waiting.
+// TASK-402 v2: spacing tightened from 1000ms to 250ms per user request.
+// With 44 gated slots across msgId 0/70/5/6/100, boot-time full fanout
+// completes in ~11s; the 60s heartbeat storm spreads over ~4s (16 bits at
+// 250ms each). Still one publish per tick, so handleMQTT peaks stay low.
+static uint32_t mqttLastGatedPublishMs = 0;
+static constexpr uint32_t MQTT_GATED_PUBLISH_SPACING_MS = 250;
 
 // Pending MQTT throttle slot update — applied only after successful publish.
 // Prevents the throttle from "burning" a slot when sendMQTTData fails silently.
@@ -389,6 +425,18 @@ static void resetMqttTrackedState()
   mqttlastsentstatusbyte[1] = TRACKED_TIME_UNSEEN;
   mqttlastsentstatusvhbyte[0] = TRACKED_TIME_UNSEEN;
   mqttlastsentstatusvhbyte[1] = TRACKED_TIME_UNSEEN;
+  // TASK-401: non-Status fan-out trackers (ASF / RBP / Remote Override)
+  for (uint8_t i = 0; i < 8; i++) mqttlastsentASFbit[i] = TRACKED_TIME_UNSEEN;
+  mqttlastsentASFbyte[0] = TRACKED_TIME_UNSEEN;
+  for (uint8_t i = 0; i < 4; i++) mqttlastsentRBPbit[i]  = TRACKED_TIME_UNSEEN;
+  mqttlastsentRBPbyte[0] = TRACKED_TIME_UNSEEN;
+  mqttlastsentRBPbyte[1] = TRACKED_TIME_UNSEEN;
+  mqttlastsentRObit[0]  = TRACKED_TIME_UNSEEN;
+  mqttlastsentRObit[1]  = TRACKED_TIME_UNSEEN;
+  mqttlastsentRObyte[0] = TRACKED_TIME_UNSEEN;
+  // TASK-402: reset rate-gate sentinel so post-reset the first non-change
+  // publish goes through immediately instead of waiting 1s.
+  mqttLastGatedPublishMs = 0;
 }
 
 struct TrackingStateInitializer {
@@ -1463,24 +1511,46 @@ bool shouldPublishMQTTForPSField(byte id) {
   return false;
 }
 
-// shouldPublishStatusBit - per-bit publish decision for OT_Statusflags
+// shouldPublishStatusBit - per-bit publish decision for OT_Statusflags.
+// TASK-400: pure change-detection with a fixed 60-second heartbeat.
+//   - forcePublish (boot reset-flag): publish once to establish state
+//   - firstSeen (per-bit sentinel): publish the very first value per bit
+//   - valueChanged: publish only when the bit actually flipped
+//   - 60-second heartbeat (STATUS_HEARTBEAT_INTERVAL_SEC): republish if no
+//     change for ≥60s, so HA has recent state after MQTT broker reconnect
+// Behaviour change vs pre-TASK-400: previously settings.mqtt.iInterval
+// governed the heartbeat AND iInterval==0 forced publish on every frame
+// (causing 160 MQTT publishes/sec on Status frames). Status bits now use
+// a dedicated 60s constant, independent of iInterval — other topic throttles
+// continue to honour iInterval.
 static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlot, bool newVal, bool prevVal, bool forcePublish) {
   mqttPendingBitSlot.pending = false; // discard unconfirmed pending from prior call
   const uint16_t lastTime = trackedSlots[bitSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
-  if (forcePublish) {
+  // TASK-402: change-detect has absolute priority — bit-flips publish
+  // immediately, bypassing the 1s rate-gate. Excludes firstSeen (handled
+  // below as a first-seen publish, not a "flip"). Change-detect publishes
+  // do NOT update mqttLastGatedPublishMs, so a concurrent heartbeat/first-seen
+  // publish schedules against the previous non-change publish, not the flip.
+  const bool valueChanged = !firstSeen && (newVal != prevVal);
+  if (valueChanged) {
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
     return true;
   }
-  if (settings.mqtt.iInterval == 0) {
+  const bool intervalElapsed = !firstSeen
+                             && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
+  if (firstSeen || forcePublish || intervalElapsed) {
+    // TASK-402: rate-gate — ≥MQTT_GATED_PUBLISH_SPACING_MS since last non-change
+    // publish. Deferred calls return false; the firstSeen/intervalElapsed flags
+    // stay true until our lastTime gets updated, so the bit retries on the next
+    // OT frame automatically.
+    const uint32_t nowMs = millis();
+    if (mqttLastGatedPublishMs != 0 && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
+      return false;
+    }
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
-    return true;   // interval=0: always publish every OT message
-  }
-  bool valueChanged    = (newVal != prevVal);
-  bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
-  if (firstSeen || valueChanged || intervalElapsed) {
-    mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
+    mqttLastGatedPublishMs = nowMs;
     return true;
   }
   return false;
@@ -1495,24 +1565,31 @@ static bool shouldPublishStatusVHBit(uint8_t bitSlot, bool newVal, bool prevVal,
   return shouldPublishTrackedStatusBit(mqttlastsentstatusvhbit, bitSlot, newVal, prevVal, forcePublish);
 }
 
+// TASK-400: same rules as shouldPublishTrackedStatusBit — the status_master
+// and status_slave combined-byte topics (and Status VH equivalents) also use
+// the hardcoded 60-second heartbeat, independent of settings.mqtt.iInterval.
 static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteSlot, uint8_t newVal, uint8_t prevVal, bool forcePublish)
 {
   mqttPendingByteSlot.pending = false; // discard unconfirmed pending from prior call
   const uint16_t lastTime = trackedSlots[byteSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
-  if (forcePublish) {
+  // TASK-402: change-detect priority — byte changed -> immediate publish,
+  // no spacing check, no spacing-timer update. Same rationale as bit path.
+  const bool valueChanged = !firstSeen && (newVal != prevVal);
+  if (valueChanged) {
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
     return true;
   }
-  if (settings.mqtt.iInterval == 0) {
+  const bool intervalElapsed = !firstSeen
+                             && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
+  if (firstSeen || forcePublish || intervalElapsed) {
+    const uint32_t nowMs = millis();
+    if (mqttLastGatedPublishMs != 0 && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
+      return false;
+    }
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
-    return true;   // interval=0: always publish every OT message
-  }
-  const bool valueChanged = (newVal != prevVal);
-  const bool intervalElapsed = !firstSeen && (elapsedTrackedSeconds(now, lastTime) >= settings.mqtt.iInterval);
-  if (firstSeen || valueChanged || intervalElapsed) {
-    mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
+    mqttLastGatedPublishMs = nowMs;
     return true;
   }
   return false;
@@ -1548,6 +1625,40 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-354: arm cooldown only for real sends
   publishMQTTOnOff(topic, newVal);
+}
+
+// TASK-401: generic gate-wrapped publish helpers for non-Status fan-out
+// (msgId 5 ASF, msgId 6 RBP, msgId 100 Remote Override). Reuse the Status
+// gate (shouldPublishTrackedStatusBit/Byte) so heartbeat semantics match
+// msgId 0. No status-burst cooldown here — that mechanism is scoped to the
+// high-frequency msgId 0 flow and these sites publish an order of magnitude
+// less often.
+static void publishGatedBitMQTT(uint16_t *trackedSlots, uint8_t bitSlot,
+                                const __FlashStringHelper *topic,
+                                bool newVal, bool prevVal)
+{
+  const bool allowPublish = shouldPublishTrackedStatusBit(trackedSlots, bitSlot, newVal, prevVal, /*forcePublish=*/false);
+  OTPublishGate gate(allowPublish);
+  publishMQTTOnOff(topic, newVal);
+}
+
+static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
+                                 const __FlashStringHelper *topic, const char *payload,
+                                 uint8_t newVal, uint8_t prevVal)
+{
+  const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
+  OTPublishGate gate(allowPublish);
+  sendMQTTData(topic, payload);
+}
+
+// Overload for dynamically-built char* topics (e.g. "<msgid>_flag8").
+static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
+                                 const char *topic, const char *payload,
+                                 uint8_t newVal, uint8_t prevVal)
+{
+  const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
+  OTPublishGate gate(allowPublish);
+  sendMQTTData(topic, payload);
 }
 
 static void copyBinaryByteString(uint8_t value, char *dest, size_t destSize)
@@ -1797,19 +1908,29 @@ static uint16_t publishCombinedStatusVHState(uint8_t valueHB, uint8_t valueLB)
   return (OTcurrentSystemState.MasterStatusVH << 8) | OTcurrentSystemState.SlaveStatusVH;
 }
 
-static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWriteFlags)
+// TASK-401: gated RBP publish. `prevTransfer` and `prevReadWrite` come from the
+// previously stored OTcurrentSystemState.RBPflags (HB<<8 | LB) so the gate can
+// compute per-bit change vs last frame. First-seen + change-only + 60s heartbeat.
+static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWriteFlags,
+                                     uint8_t prevTransfer, uint8_t prevReadWrite)
 {
   char transferEnableText[9] {0};
   char readWriteText[9] {0};
   copyBinaryByteString(transferEnableFlags, transferEnableText, sizeof(transferEnableText));
   copyBinaryByteString(readWriteFlags, readWriteText, sizeof(readWriteText));
 
-  sendMQTTData(F("RBP_flags_transfer_enable"), transferEnableText);
-  sendMQTTData(F("RBP_flags_read_write"), readWriteText);
-  sendMQTTData(F("rbp_dhw_setpoint"),        ((transferEnableFlags & 0x01) ? "ON" : "OFF"));
-  sendMQTTData(F("rbp_max_ch_setpoint"),     ((transferEnableFlags & 0x02) ? "ON" : "OFF"));
-  sendMQTTData(F("rbp_rw_dhw_setpoint"),     ((readWriteFlags & 0x01) ? "ON" : "OFF"));
-  sendMQTTData(F("rbp_rw_max_ch_setpoint"),  ((readWriteFlags & 0x02) ? "ON" : "OFF"));
+  publishGatedByteMQTT(mqttlastsentRBPbyte, 0, F("RBP_flags_transfer_enable"), transferEnableText,
+                       transferEnableFlags, prevTransfer);
+  publishGatedByteMQTT(mqttlastsentRBPbyte, 1, F("RBP_flags_read_write"), readWriteText,
+                       readWriteFlags, prevReadWrite);
+  publishGatedBitMQTT(mqttlastsentRBPbit, 0, F("rbp_dhw_setpoint"),
+                      (transferEnableFlags & 0x01), (prevTransfer & 0x01));
+  publishGatedBitMQTT(mqttlastsentRBPbit, 1, F("rbp_max_ch_setpoint"),
+                      (transferEnableFlags & 0x02), (prevTransfer & 0x02));
+  publishGatedBitMQTT(mqttlastsentRBPbit, 2, F("rbp_rw_dhw_setpoint"),
+                      (readWriteFlags & 0x01), (prevReadWrite & 0x01));
+  publishGatedBitMQTT(mqttlastsentRBPbit, 3, F("rbp_rw_max_ch_setpoint"),
+                      (readWriteFlags & 0x02), (prevReadWrite & 0x02));
 
   return ((uint16_t)transferEnableFlags << 8) | readWriteFlags;
 }
@@ -2077,13 +2198,16 @@ void print_statusVH(uint16_t& value)
 void print_ASFflags(uint16_t& value)
 {
   AddLogf("%s = ASF flags[%s] OEM faultcode [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
-  
+
   if (is_value_valid(OTdata, OTlookupitem)){
-    //Build string for MQTT
+    // TASK-401: gate ASF_flags byte-topic + 6 bit-topics on first-seen + change + 60s heartbeat.
+    // Previous byte value lives in `value` (uint16_t& ref to OTcurrentSystemState.ASFflags).
+    const uint8_t prevHB = (uint8_t)((value >> 8) & 0xFF);
+    const uint8_t newHB  = OTdata.valueHB;
+    //Application Specific Fault (byte, gated)
+    publishGatedByteMQTT(mqttlastsentASFbyte, 0, F("ASF_flags"), byte_to_binary(newHB), newHB, prevHB);
+    //OEM fault code — numeric value, not a bit; left raw (low publish cost vs HA wants fresh code)
     char _msg[15] {0};
-    //Application Specific Fault
-    sendMQTTData(F("ASF_flags"), byte_to_binary(OTdata.valueHB));
-    //OEM fault code
     utoa(OTdata.valueLB, _msg, 10);
     sendMQTTData(F("OEMFaultCode"), _msg);
 
@@ -2096,12 +2220,12 @@ void print_ASFflags(uint16_t& value)
     //5: Water over-temp[ no OvT fault, over-temperat. Fault]
     //6: reserved
     //7: reserved
-    publishMQTTOnOff(F("service_request"),       ((OTdata.valueHB) & 0x01));
-    publishMQTTOnOff(F("lockout_reset"),         ((OTdata.valueHB) & 0x02));
-    publishMQTTOnOff(F("low_water_pressure"),    ((OTdata.valueHB) & 0x04));
-    publishMQTTOnOff(F("gas_flame_fault"),       ((OTdata.valueHB) & 0x08));
-    publishMQTTOnOff(F("air_pressure_fault"),    ((OTdata.valueHB) & 0x10));
-    publishMQTTOnOff(F("water_over_temperature"), ((OTdata.valueHB) & 0x20));
+    publishGatedBitMQTT(mqttlastsentASFbit, 0, F("service_request"),        (newHB & 0x01), (prevHB & 0x01));
+    publishGatedBitMQTT(mqttlastsentASFbit, 1, F("lockout_reset"),          (newHB & 0x02), (prevHB & 0x02));
+    publishGatedBitMQTT(mqttlastsentASFbit, 2, F("low_water_pressure"),     (newHB & 0x04), (prevHB & 0x04));
+    publishGatedBitMQTT(mqttlastsentASFbit, 3, F("gas_flame_fault"),        (newHB & 0x08), (prevHB & 0x08));
+    publishGatedBitMQTT(mqttlastsentASFbit, 4, F("air_pressure_fault"),     (newHB & 0x10), (prevHB & 0x10));
+    publishGatedBitMQTT(mqttlastsentASFbit, 5, F("water_over_temperature"), (newHB & 0x20), (prevHB & 0x20));
     value = OTdata.u16();
   }
 }
@@ -2110,7 +2234,10 @@ void print_RBPflags(uint16_t& value)
 {
   AddLogf("%s = M[%s] OEM fault code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
-    value = publishRBPFlagsState(OTdata.valueHB, OTdata.valueLB);
+    // TASK-401: extract previous HB/LB so publishRBPFlagsState can gate per-bit vs last frame.
+    const uint8_t prevTransfer  = (uint8_t)((value >> 8) & 0xFF);
+    const uint8_t prevReadWrite = (uint8_t)(value & 0xFF);
+    value = publishRBPFlagsState(OTdata.valueHB, OTdata.valueLB, prevTransfer, prevReadWrite);
   }
 }
 
@@ -2224,15 +2351,21 @@ void print_remoteoverridefunction(uint16_t& value)
   AddLogf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
 
   if (is_value_valid(OTdata, OTlookupitem)){
+    // TASK-401: gate <msgid>_flag8 byte + 2 bit-topics. Remote Override msgId 100
+    // stores full u16 in `value`; LB holds the flag byte (HB is reserved).
+    const uint8_t prevLB = (uint8_t)(value & 0xFF);
+    const uint8_t newLB  = OTdata.valueLB;
     //Build string for MQTT
     otTopic[0] = '\0';
     //flag8 value
     strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
     strlcat(otTopic, "_flag8", sizeof(otTopic));
-    sendMQTTData(otTopic, byte_to_binary(OTdata.valueLB));
+    publishGatedByteMQTT(mqttlastsentRObyte, 0, otTopic, byte_to_binary(newLB), newLB, prevLB);
     //report remote override flags to MQTT
-    sendMQTTData(F("remote_override_manual_change_priority"),             (((OTdata.valueLB) & 0x01) ? "ON" : "OFF"));  
-    sendMQTTData(F("remote_override_program_change_priority"),            (((OTdata.valueLB) & 0x02) ? "ON" : "OFF"));  
+    publishGatedBitMQTT(mqttlastsentRObit, 0, F("remote_override_manual_change_priority"),
+                        (newLB & 0x01), (prevLB & 0x01));
+    publishGatedBitMQTT(mqttlastsentRObit, 1, F("remote_override_program_change_priority"),
+                        (newLB & 0x02), (prevLB & 0x02));
     value = OTdata.u16();
   }
 }
@@ -3464,9 +3597,14 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
         case 0:
           OTcurrentSystemState.Statusflags = publishCombinedStatusState(upperByte, lowerByte);
           break;
-        case 6:
-          OTcurrentSystemState.RBPflags = publishRBPFlagsState(upperByte, lowerByte);
+        case 6: {
+          // TASK-401: feed previous HB/LB into publishRBPFlagsState so per-bit gate works via PS summary path too.
+          const uint16_t prevCombined = OTcurrentSystemState.RBPflags;
+          const uint8_t  prevTransfer  = (uint8_t)((prevCombined >> 8) & 0xFF);
+          const uint8_t  prevReadWrite = (uint8_t)(prevCombined & 0xFF);
+          OTcurrentSystemState.RBPflags = publishRBPFlagsState(upperByte, lowerByte, prevTransfer, prevReadWrite);
           break;
+        }
         case 70:
           OTcurrentSystemState.StatusVH = publishCombinedStatusVHState(upperByte, lowerByte);
           break;
@@ -3742,6 +3880,32 @@ static void decodeAndPublishOTValue()
           OTdata.s16());
 }
 
+// ---------------------------------------------------------------------------
+// TASK-397: sub-trace inside processOT() to isolate heap/time cost of the
+// three main sub-phases: decodeAndPublishOTValue, sendLogToWebSocket, and
+// everything else. Toggle with #define OTPROCESS_TRACE; set to 0 to compile
+// out entirely. Output is per-OT-frame so volume mirrors OT message rate
+// (~10/sec at idle). Each probe logs: phase name, duration since last probe,
+// current heap, current max block, delta heap vs baseline at frame entry.
+// ---------------------------------------------------------------------------
+#define OTPROCESS_TRACE 0
+
+#if OTPROCESS_TRACE
+  #define OTTRACE(name) do { \
+      uint32_t _now = micros(); \
+      uint32_t _h = ESP.getFreeHeap(); \
+      DebugTf(PSTR("[ot] %s %luus heap=%u max=%u dHeap=%d (src=%c id=%u)\r\n"), \
+              name, (unsigned long)(_now - _otPrev), \
+              (unsigned)_h, \
+              (unsigned)ESP.getMaxFreeBlockSize(), \
+              (int)_h - (int)_otBaselineHeap, \
+              buf[0], (unsigned)OTdata.id); \
+      _otPrev = _now; \
+    } while(0)
+#else
+  #define OTTRACE(name) ((void)0)
+#endif
+
 /*
   Process OTGW messages coming from the PIC.
   It knows about:
@@ -3928,7 +4092,13 @@ void processOT(const char *buf, int len, bool suppressOutput){
       else AddLog(" ");  //placeholder for alignment
       
       AddLog(" ");  // Space before payload for readability
-      
+
+      // TASK-397 sub-trace: measure heap/time per phase so we can isolate
+      // whether decode+publish or WebSocket send is the heap consumer.
+      uint32_t _otBaselineHeap = ESP.getFreeHeap();
+      uint32_t _otPrev = micros();
+      OTTRACE("pre-decode");
+
       //next step interpret the OT protocol
       // OTPublishGate RAII: gate closes for this OT slot's throttle decision and
       // is guaranteed to reopen (restore true) when the scope exits, even on early
@@ -3937,13 +4107,16 @@ void processOT(const char *buf, int len, bool suppressOutput){
         OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
         decodeAndPublishOTValue();
       }
+      OTTRACE("post-decode");
 
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTDebugT(skipOTLogTimestamp(ot_log_buffer));
+      OTTRACE("post-debug");
 
       // Send log buffer directly to WebSocket (no JSON, no queue)
       sendLogToWebSocket(ot_log_buffer);
+      OTTRACE("post-ws");
 
       // Throttle TCP flush to once per second instead of per-message (~10/sec).
       // debugTelnet (SimpleTelnet) buffers output; flushing just forces a TCP push.

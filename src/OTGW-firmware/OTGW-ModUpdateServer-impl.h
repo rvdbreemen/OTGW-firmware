@@ -106,14 +106,19 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
         // Reboot for BOTH firmware and filesystem.
-        // Use doRestart() (helperStuff.ino) so every reboot path goes through
-        // the same service-cleanup sequence. This is critical on Arduino Core
-        // 3.1.0+ which removed the implicit WiFiClient/WiFiUDP::stopAll() from
-        // the Update path (PR esp8266/Arduino#8598). Without explicit cleanup,
-        // lwIP TCP state lingers through the soft-reset and services fail to
-        // come back on the next boot (WiFi associated but telnet/HTTP/MQTT
-        // non-responsive until a manual power-cycle or forced WiFi reassoc).
-        doRestart("[OTA] Rebooting...");
+        // TASK-396 Phase 3: switched from immediate doRestart() to the deferred
+        // mechanism. The rationale: doRestart() calls prepareForReboot() which
+        // stops telnet and closes MQTT/WS/OTGWstream — all while we're still
+        // inside the HTTP handler callback. On fast networks the HTTP 200
+        // response body is typically flushed by the client().stop() above, but
+        // on slow/congested links we used to see browser hangs where the
+        // success HTML never fully arrived. Deferring the reboot to the next
+        // loop() tick gives lwIP 10-100ms to finish draining the response
+        // socket. The existing service-cleanup sequence (critical on Arduino
+        // Core 3.1.0+ per PR esp8266/Arduino#8598) still fires, just from
+        // performDeferredReboot() in loop() rather than here.
+        logBootSignature("[OTA] pre-reboot");    // TASK-396 Phase 4: fourth/final OTA probe
+        requestDeferredReboot("[OTA] Rebooting...");
       }
     },[&](){
       // handler for the file upload, get's the sketch bytes, and writes
@@ -160,6 +165,7 @@ template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_beginFilesystemUpload(HTTPUpload& upload, size_t uploadTotal)
 {
   _uploadTarget = "filesystem";
+  logBootSignature("[OTA] pre-begin");    // TASK-396 Phase 4: first of four OTA lifecycle probes
   size_t fsSize = ((size_t) &_FS_end - (size_t) &_FS_start);
   if (_serial_output) {
     DebugTf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
@@ -185,6 +191,7 @@ template <typename ServerType>
 void ESP8266HTTPUpdateServerTemplate<ServerType>::_beginFirmwareUpload(HTTPUpload& upload, size_t uploadTotal)
 {
   _uploadTarget = "firmware";
+  logBootSignature("[OTA] pre-begin");    // TASK-396 Phase 4: first of four OTA lifecycle probes
   uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
   if (_serial_output) {
     DebugTf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
@@ -294,6 +301,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_handleUploadEnd(HTTPUpload& u
   bool updateOk = Update.end(true);
   if(updateOk){
     if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
+    logBootSignature("[OTA] post-end");   // TASK-396 Phase 4: second probe, after Update.end(true) commits the image
 
     if (_uploadTarget == "filesystem") {
       LittleFSmounted = LittleFS.begin();
@@ -302,6 +310,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_handleUploadEnd(HTTPUpload& u
         if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
         writeSettings(false);
         settingsMarkClean();
+        logBootSignature("[OTA] post-remount");   // TASK-396 Phase 4: third probe, FS-OTA only
       } else {
         LittleFSmounted = false;
         if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));

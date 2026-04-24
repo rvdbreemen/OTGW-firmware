@@ -245,17 +245,15 @@ void startWebserver(){
   //     Without these, httpServer.header("Origin") always returns empty and
   //     isSameOriginRequest() treats every browser request as "non-browser",
   //     silently disabling CSRF protection.
-  // ESP8266 Core 3.x has BOTH overloads; the variadic template wins over the
-  // array+count form when the count is int (int→size_t conversion ranking).
-  // ESP32 WebServer only has the array+count overload, no variadic template.
-#ifdef ESP8266
+  // Use the array+count form: portable across ESP8266 Core 2.7.4 (LTS), Core 3.x,
+  // and ESP32 WebServer. The variadic template overload exists only on ESP8266
+  // Core 3.x — keeping the array form is the lowest common denominator.
   // ESP8266WebServer stores these pointers by value (no PROGMEM copy-out),
   // so plain RAM string literals are correct here — not F()/PSTR().
-  httpServer.collectHeaders("If-None-Match", "Origin", "Referer");
-#else
-  static const char* collectHeaderKeys[] = {"If-None-Match", "Origin", "Referer"};
-  httpServer.collectHeaders(collectHeaderKeys, 3);
-#endif
+  {
+    static const char* collectHeaderKeys[] = {"If-None-Match", "Origin", "Referer"};
+    httpServer.collectHeaders(collectHeaderKeys, 3);
+  }
 
   httpServer.begin();
   // Set up first message as the IP address

@@ -375,6 +375,99 @@ bool updateRebootLog(String text)
 }
 
 
+// ---------------------------------------------------------------------------
+// Reboot-process instrumentation helpers (TASK-396).
+// ---------------------------------------------------------------------------
+// Three concerns, one block:
+//   1. Heap watermark — smallest freeHeap seen since boot, for slow-leak detection.
+//   2. Deferred-reboot mechanism — move the actual reboot out of HTTP callback
+//      context so the response can flush before service cleanup begins.
+//   3. Flash-config sanity check — warn if hardware does not match the 4M2M DIO
+//      build assumption (PUYA chips, NodeMCU/Wemos variants, flash-mode mismatch).
+//
+// All log output uses the "[reboot]" or "[flash]" prefix so the lifecycle is
+// greppable across the telnet log. After debugTelnet.stop() runs inside
+// prepareForReboot(), subsequent Debug* calls silently drop — we flush before
+// that point so the last-seen state is always visible to an external logger.
+
+// Heap watermark. Updated from loop() via rebootHeapWatermarkTick().
+static uint32_t g_minFreeHeap = 0xFFFFFFFFUL;
+
+// Deferred reboot pending-flag. Set by requestDeferredReboot() (typically
+// from an HTTP or timer callback), observed by the main loop which fires
+// performDeferredReboot() on the next tick when !isFlashing().
+static volatile bool g_rebootPending = false;
+static const char  *g_rebootReason   = "deferred reboot";
+static uint32_t     g_rebootRequestMs = 0;
+
+void rebootHeapWatermarkTick() {
+  uint32_t h = ESP.getFreeHeap();
+  if (h < g_minFreeHeap) g_minFreeHeap = h;
+}
+
+uint32_t getMinFreeHeap() {
+  return (g_minFreeHeap == 0xFFFFFFFFUL) ? ESP.getFreeHeap() : g_minFreeHeap;
+}
+
+bool isRebootPending() {
+  return g_rebootPending;
+}
+
+void requestDeferredReboot(const char *reason) {
+  if (g_rebootPending) {
+    DebugTf(PSTR("[reboot] request IGNORED (already pending): was=\"%s\" new=\"%s\"\r\n"),
+            g_rebootReason ? g_rebootReason : "?",
+            reason ? reason : "?");
+    return;
+  }
+  g_rebootReason = reason ? reason : "deferred reboot";
+  g_rebootRequestMs = millis();
+  DebugTf(PSTR("[reboot] deferred request: \"%s\" heap=%u minHeap=%u maxBlk=%u frag=%u flashing=%d\r\n"),
+          g_rebootReason,
+          (unsigned)ESP.getFreeHeap(),
+          (unsigned)getMinFreeHeap(),
+          (unsigned)ESP.getMaxFreeBlockSize(),
+          (unsigned)ESP.getHeapFragmentation(),
+          (int)state.flash.bESPactive);
+  g_rebootPending = true;
+}
+
+void performDeferredReboot() {
+  uint32_t deferredMs = millis() - g_rebootRequestMs;
+  DebugTf(PSTR("[reboot] performing deferred reboot after %lums defer: \"%s\"\r\n"),
+          (unsigned long)deferredMs, g_rebootReason);
+  logBootSignature("[reboot] pre-doRestart");
+  DebugFlush();
+  doRestart(g_rebootReason);
+  // doRestart() never returns. Guard against compiler "unreachable" on hosts
+  // without [[noreturn]] inference through the call boundary.
+  while (true) { delay(1000); }
+}
+
+// Warn at boot if the flash chip's real-size or mode doesn't match the 4M2M
+// DIO build assumption. Fires at most three WARN lines; silent on matching
+// hardware. Strictly informational — the firmware continues to run regardless.
+// Catches: wrong partition config (4M1M image on 4M2M board or vice versa),
+// PUYA chip with misdetected size, non-DIO flash mode (QIO/QOUT can change
+// behaviour around OTA writes on some boards).
+void maybeWarnFlashMismatch() {
+  const uint32_t real   = ESP.getFlashChipRealSize();
+  const uint32_t mapped = ESP.getFlashChipSize();
+  const uint8_t  mode   = ESP.getFlashChipMode();  // FM_QIO=0 FM_QOUT=1 FM_DIO=2 FM_DOUT=3 FM_UNKNOWN=255
+  if (real != mapped) {
+    DebugTf(PSTR("[flash] WARN: real size %u != mapped size %u — wrong board config (expected 4M2M)\r\n"),
+            (unsigned)real, (unsigned)mapped);
+  }
+  if (real < 4UL * 1024UL * 1024UL) {
+    DebugTf(PSTR("[flash] WARN: real size %u < 4 MB — this build requires 4M2M (4 MB flash, 2 MB FS)\r\n"),
+            (unsigned)real);
+  }
+  if (mode != 2 /* FM_DIO */ && mode != 0 /* FM_QIO */) {
+    DebugTf(PSTR("[flash] WARN: flash mode %u (expected DIO=2 or QIO=0) — OTA writes may misbehave\r\n"),
+            (unsigned)mode);
+  }
+}
+
 // Explicit service cleanup required before ESP.restart() on Arduino Core 3.1.0+.
 // PR esp8266/Arduino#8598 removed the implicit WiFiClient/WiFiUDP::stopAll() that
 // used to run as part of the Update path. Without manual cleanup, TCP sockets
@@ -391,9 +484,27 @@ static void prepareForReboot() {
   // touch them (also avoids API compatibility issues across Core versions
   // where ESP8266mDNS::end() and LLMNRResponder::end() are not uniformly
   // exposed).
+  const uint32_t tStart = millis();
+  DebugTf(PSTR("[reboot] prepareForReboot begin, heap=%u maxBlk=%u\r\n"),
+          (unsigned)ESP.getFreeHeap(),
+          (unsigned)ESP.getMaxFreeBlockSize());
+
+  uint32_t t = millis();
   doMqttDisconnect();     // clean disconnect to broker (file-static wrapper, see MQTTstuff.ino)
+  DebugTf(PSTR("[reboot]   mqtt disconnect: %lums\r\n"), (unsigned long)(millis() - t));
+
+  t = millis();
   doWebSocketClose();     // close all WebSocket clients (wrapper, see webSocketStuff.ino)
-  debugTelnet.stop();     // port 23 debug telnet
+  DebugTf(PSTR("[reboot]   ws close: %lums\r\n"), (unsigned long)(millis() - t));
+
+  // Final log line BEFORE debugTelnet.stop() kills our logging sink. Anything
+  // after this is best-effort — still emitted but will not reach telnet.
+  DebugTf(PSTR("[reboot]   stopping telnet+otgwstream, total=%lums heap=%u\r\n"),
+          (unsigned long)(millis() - tStart),
+          (unsigned)ESP.getFreeHeap());
+  DebugFlush();
+
+  // debugTelnet.stop();     // port 23 debug telnet
   OTGWstream.stop();      // port 25238 OTGW stream
 
   // IMPORTANT: do NOT call WiFi.disconnect() here. On ESP8266 Arduino with
@@ -417,6 +528,10 @@ static void prepareForReboot() {
 // and ESP32. Pass a short phase label (e.g. "boot:", "[OTA] pre-begin") so
 // the lifecycle is greppable across the telnet log. Heap fragmentation is
 // computed from free/maxBlk so no ESP8266-only API is required.
+// NOTE: dev's 1.5.x version added minHeap + exccause diagnostic fields via
+// direct ESP APIs. Those require platform-layer extensions (platformMinHeap,
+// platformExccause) before they can be added here while staying dual-target —
+// deferred to a follow-up task.
 void logBootSignature(const char *phase) {
   char resetReason[48];
   platformResetReason(resetReason, sizeof(resetReason));
@@ -443,14 +558,39 @@ void logBootSignature(const char *phase) {
           resetReason);
 }
 
+// Central reboot wrapper. Every intentional reboot path in the firmware should
+// go through this — direct ESP.restart()/ESP.reset() calls in application code
+// are a bug (one documented exception: networkStuff.ino WiFi-portal timeout,
+// where services are not yet up and cleanup would be a no-op).
+// TASK-396: richly instrumented so every reboot leaves a breadcrumb trail in
+// the telnet log. Each phase logs its duration and a heap snapshot, except the
+// final "platformRestart() now" line which is emitted AFTER telnet is torn
+// down and therefore only reaches a serial logger.
 void doRestart(const char* str) {
-  DebugTln(str);
+  const uint32_t tStart = millis();
+  DebugTf(PSTR("[reboot] doRestart(\"%s\") begin, heap=%u minHeap=%u maxBlk=%u frag=%u\r\n"),
+          str ? str : "(null)",
+          (unsigned)ESP.getFreeHeap(),
+          (unsigned)getMinFreeHeap(),
+          (unsigned)ESP.getMaxFreeBlockSize(),
+          (unsigned)ESP.getHeapFragmentation());
+
+  uint32_t t = millis();
   flushSettings();        // persist any pending settings before reboot
+  DebugTf(PSTR("[reboot]   flushSettings: %lums\r\n"), (unsigned long)(millis() - t));
+
   prepareForReboot();     // graceful shutdown: MQTT LWT, WS close frames, TCP FINs
+  // NOTE: prepareForReboot() called debugTelnet.stop() near its end, so every
+  // Debug* call from here on is silently dropped to telnet. Serial debug (if
+  // enabled in the build) still captures them. DebugFlush() is defensive.
+
   delay(2000);            // let TCP FINs + WiFi disassoc propagate (~1-2s RTT budget)
   // platformRestart() on ESP8266 calls ESP.reset() (bootrom jump) to sidestep the
   // Core 3.1.0 WiFi-SDK-state regression; on ESP32 it calls ESP.restart().
   // Both never return, so no safety-tail delay after this line.
+  DebugTf(PSTR("[reboot]   calling platformRestart() after %lums total (this line may not reach telnet)\r\n"),
+          (unsigned long)(millis() - tStart));
+  DebugFlush();
   platformRestart();
 }
 

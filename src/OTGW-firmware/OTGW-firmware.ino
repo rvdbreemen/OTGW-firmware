@@ -118,7 +118,34 @@ bool shouldForceWifiConfigPortal() {
 bool wifiPortalResetWindowExpired() {
   return wifiPortalResetWindowOpen && ((int32_t)(millis() - wifiPortalResetWindowDeadline) >= 0);
 }
-  
+
+// ---------------------------------------------------------------------------
+// TASK-397: always-on BGTRACE instrumentation to diagnose random
+// doBackgroundTasks() stalls introduced somewhere between v1.3.5 and dev.
+// When BGTASKS_TRACE is 1, every handler in the chain emits a one-line
+// telnet log with name, duration (microseconds), free heap, and max free
+// block. Volume is HIGH (hundreds of lines/sec at idle); disable by setting
+// BGTASKS_TRACE to 0 after the culprit has been identified.
+//
+// Stall-detection pattern: the LAST BGTRACE line in the log identifies the
+// previous handler that returned normally. The handler whose name appears
+// NEXT in the code but has NO corresponding BGTRACE line is the one hung.
+// ---------------------------------------------------------------------------
+#define BGTASKS_TRACE 0
+
+#if BGTASKS_TRACE
+  #define BGTRACE(name) do { \
+      uint32_t _now = micros(); \
+      DebugTf(PSTR("[bg] %s %luus heap=%u max=%u\r\n"), \
+              name, (unsigned long)(_now - _bgPrev), \
+              (unsigned)ESP.getFreeHeap(), \
+              (unsigned)ESP.getMaxFreeBlockSize()); \
+      _bgPrev = _now; \
+    } while(0)
+#else
+  #define BGTRACE(name) ((void)0)
+#endif
+
 //=====================================================================
 void setup() {
 
@@ -194,6 +221,14 @@ void setup() {
   // One-line boot signature for field diagnostics (TASK-394 Phase 2).
   // Captured AFTER full init so heap/fragmentation reflect steady-state setup.
   logBootSignature("boot:");
+
+#ifdef ESP8266
+  // TASK-396: warn once if flash hardware doesn't match the 4M2M DIO build.
+  // Silent on matching boards; emits one or more [flash] WARN lines otherwise.
+  // ESP8266-only: uses ESP.getFlashChipMode() which is not available on ESP32.
+  maybeWarnFlashMismatch();
+#endif
+
 
   SetupDebugln(F("Setup finished!\r\n"));
 
@@ -599,9 +634,19 @@ void loop()
 #if HAS_PIC
       handlePendingUpgrade();           // Check if we need to start an upgrade
 #endif
-    } 
+    }
 
   doBackgroundTasks();              // run background tasks
+
+  // TASK-396: heap watermark tick + deferred-reboot gate. The watermark runs
+  // every loop so slow leaks are visible in the minHeap field of the boot
+  // signature on the next reboot. The deferred-reboot check re-uses the
+  // existing isFlashing() guard so we never reset mid-OTA. When a callback
+  // (e.g. OTA success handler) or timer (nightly restart) has set the pending
+  // flag, the actual reset fires here — OUTSIDE the callback context so any
+  // pending HTTP response bytes have already left the socket.
+  rebootHeapWatermarkTick();
+  if (isRebootPending() && !isFlashing()) performDeferredReboot();
 }
 
 
