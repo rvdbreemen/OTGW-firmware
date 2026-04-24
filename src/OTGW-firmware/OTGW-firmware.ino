@@ -282,8 +282,7 @@ static void runNightlyRestartCheck() {
   if (myTime.hour() != settings.iRestartHour) return;
   DebugTf(PSTR("Nightly restart triggered at %02d:00 (uptime=%lu s)\r\n"),
           settings.iRestartHour, (unsigned long)state.uptime.iSeconds);
-  delay(200);                           // brief delay for any pending I/O to flush
-  ESP.restart();
+  doRestart("[nightly] scheduled restart");
 }
 
 //===[ Do task exactly on the minute ]===
