@@ -561,11 +561,16 @@ class WorkspaceEvaluator:
         """
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== HA Sensor Index Consistency ==={Colors.ENDC}")
 
+        # The arrays live in mqtt_configuratie.cpp on dev (1.4.x line) and in
+        # MQTTHaDiscovery.cpp on feature-dev-2.0.0 (renamed per ADR-077). Try
+        # both so the gate runs on either branch without divergence.
         cpp = config.FIRMWARE_ROOT / "mqtt_configuratie.cpp"
+        if not cpp.exists():
+            cpp = config.FIRMWARE_ROOT / "MQTTHaDiscovery.cpp"
         if not cpp.exists():
             self.add_result(EvaluationResult(
                 "HA-DISC", "Sensor index consistency", "WARN",
-                "mqtt_configuratie.cpp not found — cannot verify"
+                "Neither mqtt_configuratie.cpp nor MQTTHaDiscovery.cpp found — cannot verify"
             ))
             return
 
@@ -574,7 +579,7 @@ class WorkspaceEvaluator:
         except OSError as e:
             self.add_result(EvaluationResult(
                 "HA-DISC", "Sensor index consistency", "FAIL",
-                f"Could not read mqtt_configuratie.cpp: {e}"
+                f"Could not read {cpp.name}: {e}"
             ))
             return
 
