@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.4.2-beta
+**  Version  : v1.5.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -572,7 +572,7 @@ static void prepareForReboot() {
           (unsigned)ESP.getFreeHeap());
   DebugFlush();
 
-  debugTelnet.stop();     // port 23 debug telnet
+  // debugTelnet.stop();     // port 23 debug telnet
   OTGWstream.stop();      // port 25238 OTGW stream
 
   // IMPORTANT: do NOT call WiFi.disconnect() here. On ESP8266 Arduino with

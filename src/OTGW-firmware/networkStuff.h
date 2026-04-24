@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v1.4.2-beta
+**  Version  : v1.5.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
