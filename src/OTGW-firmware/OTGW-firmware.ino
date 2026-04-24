@@ -119,33 +119,6 @@ bool wifiPortalResetWindowExpired() {
   return wifiPortalResetWindowOpen && ((int32_t)(millis() - wifiPortalResetWindowDeadline) >= 0);
 }
 
-// ---------------------------------------------------------------------------
-// TASK-397: always-on BGTRACE instrumentation to diagnose random
-// doBackgroundTasks() stalls introduced somewhere between v1.3.5 and dev.
-// When BGTASKS_TRACE is 1, every handler in the chain emits a one-line
-// telnet log with name, duration (microseconds), free heap, and max free
-// block. Volume is HIGH (hundreds of lines/sec at idle); disable by setting
-// BGTASKS_TRACE to 0 after the culprit has been identified.
-//
-// Stall-detection pattern: the LAST BGTRACE line in the log identifies the
-// previous handler that returned normally. The handler whose name appears
-// NEXT in the code but has NO corresponding BGTRACE line is the one hung.
-// ---------------------------------------------------------------------------
-#define BGTASKS_TRACE 0
-
-#if BGTASKS_TRACE
-  #define BGTRACE(name) do { \
-      uint32_t _now = micros(); \
-      DebugTf(PSTR("[bg] %s %luus heap=%u max=%u\r\n"), \
-              name, (unsigned long)(_now - _bgPrev), \
-              (unsigned)ESP.getFreeHeap(), \
-              (unsigned)ESP.getMaxFreeBlockSize()); \
-      _bgPrev = _now; \
-    } while(0)
-#else
-  #define BGTRACE(name) ((void)0)
-#endif
-
 //=====================================================================
 void setup() {
 
