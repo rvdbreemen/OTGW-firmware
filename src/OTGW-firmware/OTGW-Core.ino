@@ -275,6 +275,16 @@ static uint16_t mqttlastsentRBPbyte[2]  = {0};  // msgId 6 RBP: 0=transfer_enabl
 static uint16_t mqttlastsentRObit[2]    = {0};  // msgId 100 Remote Override: 0=manual, 1=program
 static uint16_t mqttlastsentRObyte[1]   = {0};  // msgId 100 Remote Override LB flag8
 
+// TASK-402: global rate-gate — enforce MQTT_GATED_PUBLISH_SPACING_MS between
+// any two gated publishes for first-seen, heartbeat, and force paths.
+// Change-detect publishes bypass the gate (priority: bit-flip goes out
+// immediately) but still update mqttLastGatedPublishMs, so a subsequent
+// non-change publish honours spacing relative to the change-detect burst.
+// Boot sentinel mqttLastGatedPublishMs==0 means "nothing published yet, first
+// pass is free" — earliest bit at boot goes through without waiting 1s.
+static uint32_t mqttLastGatedPublishMs = 0;
+static constexpr uint32_t MQTT_GATED_PUBLISH_SPACING_MS = 1000;
+
 // Pending MQTT throttle slot update — applied only after successful publish.
 // Prevents the throttle from "burning" a slot when sendMQTTData fails silently.
 struct MQTTPendingSlotUpdate {
@@ -418,6 +428,9 @@ static void resetMqttTrackedState()
   mqttlastsentRObit[0]  = TRACKED_TIME_UNSEEN;
   mqttlastsentRObit[1]  = TRACKED_TIME_UNSEEN;
   mqttlastsentRObyte[0] = TRACKED_TIME_UNSEEN;
+  // TASK-402: reset rate-gate sentinel so post-reset the first non-change
+  // publish goes through immediately instead of waiting 1s.
+  mqttLastGatedPublishMs = 0;
 }
 
 struct TrackingStateInitializer {
@@ -1473,15 +1486,29 @@ static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlo
   const uint16_t lastTime = trackedSlots[bitSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
-  if (forcePublish) {
+  // TASK-402: change-detect has absolute priority — bit-flips publish
+  // immediately, bypassing the 1s rate-gate. Excludes firstSeen (handled
+  // below as a first-seen publish, not a "flip"). Change-detect publishes
+  // do NOT update mqttLastGatedPublishMs, so a concurrent heartbeat/first-seen
+  // publish schedules against the previous non-change publish, not the flip.
+  const bool valueChanged = !firstSeen && (newVal != prevVal);
+  if (valueChanged) {
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
     return true;
   }
-  const bool valueChanged    = (newVal != prevVal);
   const bool intervalElapsed = !firstSeen
                              && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
-  if (firstSeen || valueChanged || intervalElapsed) {
+  if (firstSeen || forcePublish || intervalElapsed) {
+    // TASK-402: rate-gate — ≥MQTT_GATED_PUBLISH_SPACING_MS since last non-change
+    // publish. Deferred calls return false; the firstSeen/intervalElapsed flags
+    // stay true until our lastTime gets updated, so the bit retries on the next
+    // OT frame automatically.
+    const uint32_t nowMs = millis();
+    if (mqttLastGatedPublishMs != 0 && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
+      return false;
+    }
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
+    mqttLastGatedPublishMs = nowMs;
     return true;
   }
   return false;
@@ -1505,15 +1532,22 @@ static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteS
   const uint16_t lastTime = trackedSlots[byteSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
-  if (forcePublish) {
+  // TASK-402: change-detect priority — byte changed -> immediate publish,
+  // no spacing check, no spacing-timer update. Same rationale as bit path.
+  const bool valueChanged = !firstSeen && (newVal != prevVal);
+  if (valueChanged) {
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
     return true;
   }
-  const bool valueChanged = (newVal != prevVal);
   const bool intervalElapsed = !firstSeen
                              && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
-  if (firstSeen || valueChanged || intervalElapsed) {
+  if (firstSeen || forcePublish || intervalElapsed) {
+    const uint32_t nowMs = millis();
+    if (mqttLastGatedPublishMs != 0 && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
+      return false;
+    }
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
+    mqttLastGatedPublishMs = nowMs;
     return true;
   }
   return false;
