@@ -94,11 +94,18 @@ public:
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
-        // Use doRestart() (helperStuff.ino) so ESP32 OTA goes through the same
-        // service-cleanup sequence as ESP8266 (MQTT LWT, WS close, TCP FINs)
-        // before the platform restart fires. Mirrors the ESP8266 path at
-        // OTGW-ModUpdateServer-impl.h.
-        doRestart("[OTA] Rebooting...");
+        // Defer the reboot to the next loop() tick instead of calling doRestart()
+        // directly from inside the HTTP callback. Rationale (mirrors ESP8266 at
+        // OTGW-ModUpdateServer-impl.h): doRestart() calls prepareForReboot()
+        // which tears down MQTT/WS/OTGWstream while we are still inside the
+        // request handler. On slow/congested links the HTTP 200 success body
+        // may not have fully drained. requestDeferredReboot() sets a flag that
+        // loop() observes via isRebootPending() && !isFlashing() and then fires
+        // performDeferredReboot() from the main loop — giving lwIP 10-100ms to
+        // finish the response before cleanup begins. The service-cleanup path
+        // is identical to the direct-call variant, just invoked from loop().
+        logBootSignature("[OTA] pre-reboot");    // fourth/final OTA probe, parity with ESP8266
+        requestDeferredReboot("[OTA] Rebooting...");
       }
     }, [&]() {
       // Upload handler
@@ -163,6 +170,7 @@ private:
               upload.filename.c_str(), _server->arg("size").c_str());
     }
 
+    logBootSignature("[OTA] pre-begin");    // first of four OTA lifecycle probes, parity with ESP8266
     ::state.flash.bESPactive = true;
 
     size_t uploadTotal = _parseUploadTotalSize();
@@ -267,10 +275,12 @@ private:
     bool updateOk = Update.end(true);
     if (updateOk) {
       if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
+      logBootSignature("[OTA] post-end");    // second probe: after Update.end(true) commits the image
       if (_uploadTarget == UploadTarget::Filesystem) {
         LittleFSmounted = LittleFS.begin();
         if (LittleFSmounted) {
           updateLittleFSStatus(F("/.ota_post"));
+          logBootSignature("[OTA] post-remount");    // third probe (FS-OTA only): after LittleFS.begin() remount
           if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
           writeSettings(false);
           settingsMarkClean();
