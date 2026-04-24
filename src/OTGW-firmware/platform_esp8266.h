@@ -107,6 +107,37 @@ inline uint32_t platformMaxFreeBlock() {
   return ESP.getMaxFreeBlockSize();
 }
 
+// Heap fragmentation as percentage (0 = none, 100 = worst). ESP8266 exposes
+// this natively via ESP.getHeapFragmentation(); ESP32 computes it.
+inline uint8_t platformHeapFragmentation() {
+  return ESP.getHeapFragmentation();
+}
+
+// Minimum observed free heap since boot. ESP8266 has no native API for this,
+// so we maintain our own watermark that the firmware updates each loop via
+// platformUpdateMinFreeHeap(). Returns current free heap if no sample has
+// been taken yet (sentinel 0xFFFFFFFF).
+extern uint32_t g_platformMinFreeHeapWatermark;  // defined in helperStuff.ino
+
+inline uint32_t platformMinFreeHeap() {
+  return (g_platformMinFreeHeapWatermark == 0xFFFFFFFFUL)
+           ? ESP.getFreeHeap()
+           : g_platformMinFreeHeapWatermark;
+}
+
+inline void platformUpdateMinFreeHeap() {
+  const uint32_t cur = ESP.getFreeHeap();
+  if (cur < g_platformMinFreeHeapWatermark) g_platformMinFreeHeapWatermark = cur;
+}
+
+// Exception cause from the last reset. Returns 0 on normal/clean reboot;
+// non-zero (typically 1..29) on crash, WDT, or unaligned access. Wraps the
+// raw exccause field from ESP.getResetInfoPtr() which is ESP8266-specific.
+inline uint32_t platformExccause() {
+  rst_info *rst = ESP.getResetInfoPtr();
+  return (rst != nullptr) ? (uint32_t)rst->exccause : 0U;
+}
+
 // Flash information
 inline uint32_t platformFlashChipRealSize() {
   return ESP.getFlashChipRealSize();

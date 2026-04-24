@@ -390,8 +390,14 @@ bool updateRebootLog(String text)
 // prepareForReboot(), subsequent Debug* calls silently drop — we flush before
 // that point so the last-seen state is always visible to an external logger.
 
-// Heap watermark. Updated from loop() via rebootHeapWatermarkTick().
-static uint32_t g_minFreeHeap = 0xFFFFFFFFUL;
+// Heap watermark storage. ESP8266 has no native min-free-heap API so we
+// maintain our own watermark; the global is declared extern in
+// platform_esp8266.h and used by platformMinFreeHeap()/platformUpdateMinFreeHeap().
+// ESP32 has ESP.getMinFreeHeap() natively, so the watermark isn't needed
+// there — hence the guard.
+#ifdef ESP8266
+uint32_t g_platformMinFreeHeapWatermark = 0xFFFFFFFFUL;
+#endif
 
 // Deferred reboot pending-flag. Set by requestDeferredReboot() (typically
 // from an HTTP or timer callback), observed by the main loop which fires
@@ -400,13 +406,20 @@ static volatile bool g_rebootPending = false;
 static const char  *g_rebootReason   = "deferred reboot";
 static uint32_t     g_rebootRequestMs = 0;
 
+// Sample current free heap to update the min-free watermark. Thin wrapper
+// over platformUpdateMinFreeHeap() so call-sites keep a semantically named
+// entry point (call is in the hot loop path next to the deferred-reboot
+// gate; the reader sees "watermark tick" rather than a generic platform call).
 void rebootHeapWatermarkTick() {
-  uint32_t h = ESP.getFreeHeap();
-  if (h < g_minFreeHeap) g_minFreeHeap = h;
+  platformUpdateMinFreeHeap();
 }
 
+// Legacy name kept for back-compat with code that was written against the
+// ESP8266-only dev implementation. Delegates to platformMinFreeHeap()
+// which gives a native minimum-free-heap reading on ESP32 and a user-space
+// watermark on ESP8266.
 uint32_t getMinFreeHeap() {
-  return (g_minFreeHeap == 0xFFFFFFFFUL) ? ESP.getFreeHeap() : g_minFreeHeap;
+  return platformMinFreeHeap();
 }
 
 bool isRebootPending() {
@@ -424,10 +437,10 @@ void requestDeferredReboot(const char *reason) {
   g_rebootRequestMs = millis();
   DebugTf(PSTR("[reboot] deferred request: \"%s\" heap=%u minHeap=%u maxBlk=%u frag=%u flashing=%d\r\n"),
           g_rebootReason,
-          (unsigned)ESP.getFreeHeap(),
-          (unsigned)getMinFreeHeap(),
-          (unsigned)ESP.getMaxFreeBlockSize(),
-          (unsigned)ESP.getHeapFragmentation(),
+          (unsigned)platformFreeHeap(),
+          (unsigned)platformMinFreeHeap(),
+          (unsigned)platformMaxFreeBlock(),
+          (unsigned)platformHeapFragmentation(),
           (int)state.flash.bESPactive);
   g_rebootPending = true;
 }
@@ -450,14 +463,13 @@ void performDeferredReboot() {
 // Catches: wrong partition config (4M1M image on 4M2M board or vice versa),
 // PUYA chip with misdetected size, non-DIO flash mode (QIO/QOUT can change
 // behaviour around OTA writes on some boards).
-// ESP8266-only: ESP.getFlashChipMode() and ESP.getFlashChipRealSize() are
-// part of the ESP8266 Arduino Core; ESP32's ESP namespace does not expose
-// them. A platform-abstracted equivalent belongs in platform.h as a follow-up.
-#ifdef ESP8266
+// Uses the platform abstraction so the same code compiles on ESP8266 and
+// ESP32. On ESP32 platformFlashChipMode() returns 4 (unknown) — the DIO
+// check is skipped in that case since the concept is ESP8266-specific.
 void maybeWarnFlashMismatch() {
-  const uint32_t real   = ESP.getFlashChipRealSize();
-  const uint32_t mapped = ESP.getFlashChipSize();
-  const uint8_t  mode   = ESP.getFlashChipMode();  // FM_QIO=0 FM_QOUT=1 FM_DIO=2 FM_DOUT=3 FM_UNKNOWN=255
+  const uint32_t real   = platformFlashChipRealSize();
+  const uint32_t mapped = platformFlashChipSize();
+  const uint8_t  mode   = platformFlashChipMode();  // FM_QIO=0 FM_QOUT=1 FM_DIO=2 FM_DOUT=3 FM_UNKNOWN=255; ESP32 stub returns 4
   if (real != mapped) {
     DebugTf(PSTR("[flash] WARN: real size %u != mapped size %u — wrong board config (expected 4M2M)\r\n"),
             (unsigned)real, (unsigned)mapped);
@@ -466,12 +478,13 @@ void maybeWarnFlashMismatch() {
     DebugTf(PSTR("[flash] WARN: real size %u < 4 MB — this build requires 4M2M (4 MB flash, 2 MB FS)\r\n"),
             (unsigned)real);
   }
-  if (mode != 2 /* FM_DIO */ && mode != 0 /* FM_QIO */) {
+  // Mode 4 (platform "unknown" on ESP32) skips the DIO/QIO check — that
+  // distinction only matters on ESP8266 boards.
+  if (mode != 4 && mode != 2 /* FM_DIO */ && mode != 0 /* FM_QIO */) {
     DebugTf(PSTR("[flash] WARN: flash mode %u (expected DIO=2 or QIO=0) — OTA writes may misbehave\r\n"),
             (unsigned)mode);
   }
 }
-#endif  // ESP8266
 
 // Explicit service cleanup required before ESP.restart() on Arduino Core 3.1.0+.
 // PR esp8266/Arduino#8598 removed the implicit WiFiClient/WiFiUDP::stopAll() that
@@ -491,8 +504,8 @@ static void prepareForReboot() {
   // exposed).
   const uint32_t tStart = millis();
   DebugTf(PSTR("[reboot] prepareForReboot begin, heap=%u maxBlk=%u\r\n"),
-          (unsigned)ESP.getFreeHeap(),
-          (unsigned)ESP.getMaxFreeBlockSize());
+          (unsigned)platformFreeHeap(),
+          (unsigned)platformMaxFreeBlock());
 
   uint32_t t = millis();
   doMqttDisconnect();     // clean disconnect to broker (file-static wrapper, see MQTTstuff.ino)
@@ -531,21 +544,16 @@ static void prepareForReboot() {
 // One-line boot/runtime signature with platform, hardware, heap, and reset
 // info. All fields are platform-abstracted so the same code works on ESP8266
 // and ESP32. Pass a short phase label (e.g. "boot:", "[OTA] pre-begin") so
-// the lifecycle is greppable across the telnet log. Heap fragmentation is
-// computed from free/maxBlk so no ESP8266-only API is required.
-// NOTE: dev's 1.5.x version added minHeap + exccause diagnostic fields via
-// direct ESP APIs. Those require platform-layer extensions (platformMinHeap,
-// platformExccause) before they can be added here while staying dual-target —
-// deferred to a follow-up task.
+// the lifecycle is greppable across the telnet log. minHeap = min free heap
+// observed since boot (ESP8266 maintains a user-space watermark; ESP32 uses
+// the native esp_get_minimum_free_heap_size). exccause = 0 on normal reboot,
+// non-zero on crash/WDT (ESP8266 raw exccause; ESP32 mapped reset-reason).
 void logBootSignature(const char *phase) {
   char resetReason[48];
   platformResetReason(resetReason, sizeof(resetReason));
   const uint32_t freeHeap = platformFreeHeap();
   const uint32_t maxBlk   = platformMaxFreeBlock();
-  const uint32_t frag     = (freeHeap > 0)
-                              ? (100U - ((maxBlk * 100U) / freeHeap))
-                              : 0U;
-  DebugTf(PSTR("%s core=%s sdk=%s cpu=%u flashId=0x%08X flashReal=%u flashMap=%u flashSpeed=%u sketch=%u freeSketch=%u md5=%s heap=%u maxBlk=%u frag=%u reset=[%s]\r\n"),
+  DebugTf(PSTR("%s core=%s sdk=%s cpu=%u flashId=0x%08X flashReal=%u flashMap=%u flashSpeed=%u sketch=%u freeSketch=%u md5=%s heap=%u maxBlk=%u frag=%u minHeap=%u exccause=%u reset=[%s]\r\n"),
           phase ? phase : "boot:",
           platformCoreVersion(),
           platformSdkVersion(),
@@ -559,7 +567,9 @@ void logBootSignature(const char *phase) {
           ESP.getSketchMD5().c_str(),
           (unsigned)freeHeap,
           (unsigned)maxBlk,
-          (unsigned)frag,
+          (unsigned)platformHeapFragmentation(),
+          (unsigned)platformMinFreeHeap(),
+          (unsigned)platformExccause(),
           resetReason);
 }
 
@@ -575,10 +585,10 @@ void doRestart(const char* str) {
   const uint32_t tStart = millis();
   DebugTf(PSTR("[reboot] doRestart(\"%s\") begin, heap=%u minHeap=%u maxBlk=%u frag=%u\r\n"),
           str ? str : "(null)",
-          (unsigned)ESP.getFreeHeap(),
-          (unsigned)getMinFreeHeap(),
-          (unsigned)ESP.getMaxFreeBlockSize(),
-          (unsigned)ESP.getHeapFragmentation());
+          (unsigned)platformFreeHeap(),
+          (unsigned)platformMinFreeHeap(),
+          (unsigned)platformMaxFreeBlock(),
+          (unsigned)platformHeapFragmentation());
 
   uint32_t t = millis();
   flushSettings();        // persist any pending settings before reboot

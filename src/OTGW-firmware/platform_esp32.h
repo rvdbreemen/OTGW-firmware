@@ -129,6 +129,43 @@ inline uint32_t platformMaxFreeBlock() {
   return ESP.getMaxAllocHeap();
 }
 
+// Heap fragmentation as percentage (0 = none, 100 = worst). ESP32 has no
+// native fragmentation API, so we compute it the same way ESP8266 core does:
+// 100 - (maxBlock * 100 / totalFree). 0 when heap is empty.
+inline uint8_t platformHeapFragmentation() {
+  const uint32_t freeHeap = ESP.getFreeHeap();
+  if (freeHeap == 0) return 0;
+  const uint32_t maxBlk = ESP.getMaxAllocHeap();
+  return (uint8_t)(100U - ((maxBlk * 100U) / freeHeap));
+}
+
+// Minimum observed free heap since boot. ESP32 tracks this natively in the
+// heap allocator via heap_caps_get_minimum_free_size — no user-space
+// watermark needed.
+inline uint32_t platformMinFreeHeap() {
+  return ESP.getMinFreeHeap();
+}
+
+// No-op on ESP32: the heap allocator tracks min-free internally.
+inline void platformUpdateMinFreeHeap() {
+  // intentionally empty
+}
+
+// Exception cause from the last reset. ESP32 does not expose a direct
+// numeric exccause via esp_reset_reason(); instead the reset_reason enum
+// conveys the class of fault. We map panic/watchdog to non-zero sentinel
+// values so the boot signature still flags abnormal reboots.
+inline uint32_t platformExccause() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_PANIC:    return 1U;  // software panic / exception
+    case ESP_RST_INT_WDT:  return 2U;  // interrupt watchdog
+    case ESP_RST_TASK_WDT: return 3U;  // task watchdog
+    case ESP_RST_WDT:      return 4U;  // other watchdog
+    case ESP_RST_BROWNOUT: return 5U;  // brownout
+    default:               return 0U;  // clean boot / power-on / external / SW
+  }
+}
+
 // Flash information
 inline uint32_t platformFlashChipRealSize() {
   return ESP.getFlashChipSize();   // ESP32 has no "real" vs "configured" distinction

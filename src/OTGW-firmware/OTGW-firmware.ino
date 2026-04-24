@@ -222,12 +222,11 @@ void setup() {
   // Captured AFTER full init so heap/fragmentation reflect steady-state setup.
   logBootSignature("boot:");
 
-#ifdef ESP8266
   // TASK-396: warn once if flash hardware doesn't match the 4M2M DIO build.
   // Silent on matching boards; emits one or more [flash] WARN lines otherwise.
-  // ESP8266-only: uses ESP.getFlashChipMode() which is not available on ESP32.
+  // Dual-target via platformFlashChipMode()/RealSize()/Size(); on ESP32 the
+  // DIO-mode sub-check is automatically skipped (mode=4 = platform unknown).
   maybeWarnFlashMismatch();
-#endif
 
 
   SetupDebugln(F("Setup finished!\r\n"));
