@@ -3897,7 +3897,7 @@ static void decodeAndPublishOTValue()
       DebugTf(PSTR("[ot] %s %luus heap=%u max=%u dHeap=%d (src=%c id=%u)\r\n"), \
               name, (unsigned long)(_now - _otPrev), \
               (unsigned)_h, \
-              (unsigned)ESP.getMaxFreeBlockSize(), \
+              (unsigned)platformMaxFreeBlock(), \
               (int)_h - (int)_otBaselineHeap, \
               buf[0], (unsigned)OTdata.id); \
       _otPrev = _now; \
