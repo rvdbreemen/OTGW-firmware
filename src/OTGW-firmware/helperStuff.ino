@@ -519,7 +519,7 @@ static void prepareForReboot() {
   // after this is best-effort — still emitted but will not reach telnet.
   DebugTf(PSTR("[reboot]   stopping telnet+otgwstream, total=%lums heap=%u\r\n"),
           (unsigned long)(millis() - tStart),
-          (unsigned)ESP.getFreeHeap());
+          (unsigned)platformFreeHeap());
   DebugFlush();
 
   // debugTelnet.stop();     // port 23 debug telnet
@@ -877,7 +877,7 @@ static uint32_t mqttDropCount = 0;
 //===========================================================================================
 // Check current heap health level
 //
-// Primary signal is ESP.getFreeHeap(). When freeHeap is already in LOW tier,
+// Primary signal is platformFreeHeap(). When freeHeap is already in LOW tier,
 // we additionally consult ESP.getMaxFreeBlockSize() so that fragmentation
 // promotes the level by one tier. Rationale: umm_malloc has no compaction,
 // so a 1.2KB discovery payload can fail when maxBlock<1.2KB even though
@@ -923,15 +923,13 @@ HeapHealthLevel getHeapHealth() {
 }
 
 //===========================================================================================
-// Return heap fragmentation as a percentage (0 = no fragmentation, 100 = max)
-// Defined as: 100 * (1 - maxBlock / freeHeap). Observability only — not a gate.
+// Return heap fragmentation as a percentage (0 = no fragmentation, 100 = max).
+// Delegates to platformHeapFragmentation() which on ESP8266 uses the native
+// ESP.getHeapFragmentation() and on ESP32 computes 100 - (maxBlk*100/freeHeap).
+// Observability only — not a gate.
 //===========================================================================================
 uint8_t getHeapFragmentation() {
-  uint32_t freeHeap = ESP.getFreeHeap();
-  if (freeHeap == 0) return 100;
-  uint32_t maxBlock = platformMaxFreeBlock();
-  if (maxBlock >= freeHeap) return 0;
-  return (uint8_t)(100UL - (100UL * maxBlock / freeHeap));
+  return platformHeapFragmentation();
 }
 
 //===========================================================================================

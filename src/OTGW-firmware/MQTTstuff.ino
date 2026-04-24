@@ -971,7 +971,7 @@ void handleMQTT()
     case MQTT_STATE_TRY_TO_CONNECT:
       MQTTDebugTln(F("MQTT State: MQTT try to connect"));
       MQTTDebugTf(PSTR("MQTT server is [%s], IP[%s]\r\n"), settings.mqtt.sBroker, MQTTbrokerIPchar);
-      DebugTf(PSTR("[HEAP] pre-connect: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
+      DebugTf(PSTR("[HEAP] pre-connect: free=%u max_block=%u\r\n"), platformFreeHeap(), MQTT_MAX_FREE_BLOCK());
 
       MQTTDebugT(F("Attempting MQTT connection .. "));
       reconnectAttempts++;
@@ -987,7 +987,7 @@ void handleMQTT()
         MQTTDebugf(PSTR("Username [%s] "), CSTR(settings.mqtt.sUser));
         if(!MQTTclient.connect(MQTTclientId, CSTR(settings.mqtt.sUser), CSTR(settings.mqtt.sPasswd), MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
       }
-      DebugTf(PSTR("[HEAP] post-connect: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
+      DebugTf(PSTR("[HEAP] post-connect: free=%u max_block=%u\r\n"), platformFreeHeap(), MQTT_MAX_FREE_BLOCK());
 
       //If connection was made succesful, move on to next state...
       if (MQTTclient.connected())
@@ -999,11 +999,11 @@ void handleMQTT()
         MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
         // birth message, sendMQTT retains  by default
         sendMQTT(MQTTPubNamespace, "online");
-        DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
+        DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), platformFreeHeap(), MQTT_MAX_FREE_BLOCK());
 
         // Force re-publish of all OT values so HA gets current state after reconnect.
         requestMQTTRepublishAll();
-        DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
+        DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), platformFreeHeap(), MQTT_MAX_FREE_BLOCK());
 
         //Subscribe to topics
         char topic[MQTT_TOPIC_MAX_LEN];
@@ -1019,10 +1019,10 @@ void handleMQTT()
           PrintMQTTError();
         }
         MQTTclient.subscribe("homeassistant/status");
-        DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
+        DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), MQTT_MAX_FREE_BLOCK());
         sendMQTTversioninfo();
         publishAllPICsettings();
-        DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), MQTT_MAX_FREE_BLOCK());
+        DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), platformFreeHeap(), MQTT_MAX_FREE_BLOCK());
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
@@ -1291,7 +1291,7 @@ void sendMQTTheapdiag(){
   publishStatU32(F("otgw-firmware/stats/drip_slowmode"),         (unsigned long)state.heapdiag.iDripSlowModeCount);
 
   // Live heap snapshot at publish time
-  publishStatU32(F("otgw-firmware/stats/free_heap"),             (unsigned long)ESP.getFreeHeap());
+  publishStatU32(F("otgw-firmware/stats/free_heap"),             (unsigned long)platformFreeHeap());
   publishStatU32(F("otgw-firmware/stats/max_block"),             (unsigned long)platformMaxFreeBlock());
   publishStatU32(F("otgw-firmware/stats/frag_pct"),              (unsigned long)getHeapFragmentation());
 
@@ -1570,7 +1570,7 @@ void loopMQTTDiscovery()
 
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
-  if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return;
+  if (platformFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return;
   // Defer drip during Status-frame fanout AND for STATUS_BURST_COOLDOWN_MS afterwards.
   // Timer keeps running; next tick picks up as soon as the deferred window clears.
   // Track which of the two reasons triggered the skip for diagnostics.
@@ -1734,7 +1734,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   if (!settings.mqtt.bEnable) return false;
   if (!MQTTclient.connected()) return false;
   if (!isValidIP(MQTTbrokerIP)) return false;
-  if (ESP.getFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return false;
+  if (platformFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return false;
 
   bool result = false;
   HaDiscoveryContext ctx = buildDiscoveryContext(isFirst);

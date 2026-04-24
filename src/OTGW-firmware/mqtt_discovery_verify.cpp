@@ -18,7 +18,7 @@
 
 #include "mqtt_discovery_verify.h"
 
-#include <Arduino.h>          // millis(), ESP.getFreeHeap()
+#include <Arduino.h>          // millis(), platformFreeHeap()
 #include "platform.h"         // platformMaxFreeBlock() (ESP8266 + ESP32)
 #include <pgmspace.h>
 #include <string.h>
@@ -103,7 +103,7 @@ bool startDiscoveryVerification() {
   if (!verifyAccessorNtpTimeSet()) return false;                              // TASK-359
   if (verifyAccessorUptimeSeconds() < 3600) return false;                     // TASK-359
   if (verifyAccessorCountPendingDiscoveryIds() > 0) return false;             // drip-race guard
-  if (ESP.getFreeHeap() < VERIFICATION_MIN_HEAP_START_LOCAL) return false;
+  if (platformFreeHeap() < VERIFICATION_MIN_HEAP_START_LOCAL) return false;
   // Max-block precheck: umm_malloc realloc of PubSubClient's buffer needs a
   // contiguous 1024-byte block. Avoid the realloc entirely when the heap is
   // fragmented (Perf review: setBufferSize grow/shrink fragments over long uptime).
@@ -245,7 +245,7 @@ void tickDiscoveryVerification() {
   // the real missing/orphan counts but skips republish (republish is gated on
   // MISSING). Earlier code forged verifyReceivedCount=expected to suppress
   // the republish, which also lied to telemetry -- hack removed.
-  if (ESP.getFreeHeap() < VERIFICATION_MIN_HEAP_ABORT) {
+  if (platformFreeHeap() < VERIFICATION_MIN_HEAP_ABORT) {
     verifyAccessorSetOutcome(OUTCOME_ABORTED_HEAP);
     verifyAccessorLogLine("[verify] heap-abort: closing window early");
     endDiscoveryVerification();

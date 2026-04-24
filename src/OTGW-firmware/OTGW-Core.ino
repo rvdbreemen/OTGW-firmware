@@ -3893,7 +3893,7 @@ static void decodeAndPublishOTValue()
 #if OTPROCESS_TRACE
   #define OTTRACE(name) do { \
       uint32_t _now = micros(); \
-      uint32_t _h = ESP.getFreeHeap(); \
+      uint32_t _h = platformFreeHeap(); \
       DebugTf(PSTR("[ot] %s %luus heap=%u max=%u dHeap=%d (src=%c id=%u)\r\n"), \
               name, (unsigned long)(_now - _otPrev), \
               (unsigned)_h, \
@@ -4095,7 +4095,7 @@ void processOT(const char *buf, int len, bool suppressOutput){
 
       // TASK-397 sub-trace: measure heap/time per phase so we can isolate
       // whether decode+publish or WebSocket send is the heap consumer.
-      uint32_t _otBaselineHeap = ESP.getFreeHeap();
+      uint32_t _otBaselineHeap = platformFreeHeap();
       uint32_t _otPrev = micros();
       OTTRACE("pre-decode");
 

@@ -149,7 +149,7 @@ void weatherFetch()
     // buffer. Fixed 4 KB is plenty for current + 24h forecast; if heap is
     // low we skip the fetch entirely rather than risk a failed malloc mid-loop.
     constexpr size_t WEATHER_BUF_SIZE = 4096;
-    if (ESP.getFreeHeap() < (WEATHER_BUF_SIZE + 4096)) {
+    if (platformFreeHeap() < (WEATHER_BUF_SIZE + 4096)) {
       DebugTln(F("Weather: free heap too low for fetch, skipping"));
       state.sat.weather.iFetchErrors++;
       http.end();

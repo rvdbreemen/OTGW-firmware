@@ -27,6 +27,7 @@
 //   Number         : 1 entries
 
 #include "MQTTstuff.h"
+#include "platform.h"          // platformFreeHeap() / platformMaxFreeBlock() (ESP8266 + ESP32)
 
 // ========== Named PROGMEM strings: Labels ==========
 const char ha_lbl_status_master[] PROGMEM = "status_master";
@@ -2076,7 +2077,7 @@ bool streamSensorDiscovery(PubSubClient &client,
 {
   if (!client.connected()) return false;
   if (!canPublishMQTT()) return false;
-  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
   bool hasSrc = (ctx.sourceSuffix && ctx.sourceSuffix[0] != '\0');
 
@@ -2115,7 +2116,7 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
 {
   if (!client.connected()) return false;
   if (!canPublishMQTT()) return false;
-  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
   char topic[STREAM_TOPIC_MAX];
   if (!buildBinSensorDiscoveryTopic(topic, sizeof(topic), ctx.haPrefix, ctx.nodeId,
@@ -2151,7 +2152,7 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
 {
   if (!client.connected()) return false;
   if (!canPublishMQTT()) return false;
-  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
   if (!sensorAddress || sensorAddress[0] == '\0') return false;
 
   // Build topic: <haPrefix>/sensor/<nodeId>/<sensorAddress>/config
@@ -2338,7 +2339,7 @@ bool streamClimateDiscovery(PubSubClient &client,
 {
   if (!client.connected()) return false;
   if (!canPublishMQTT()) return false;
-  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
   if (climateIdx > 1) return false;
 
   // Topic
@@ -2518,7 +2519,7 @@ bool streamNumberDiscovery(PubSubClient &client,
 {
   if (!client.connected()) return false;
   if (!canPublishMQTT()) return false;
-  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
   char topic[STREAM_TOPIC_MAX];
   snprintf_P(topic, sizeof(topic), PSTR("%s/number/%s/Toutside_override/config"),
@@ -2610,7 +2611,7 @@ static bool streamSatBoolSwitch(PubSubClient &client,
 {
   if (!client.connected()) return false;
   if (!canPublishMQTT()) return false;
-  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
   // Derive topic object-id from uniqSuffix: strip leading dash, swap '-' to '_'.
   // e.g. "-sat-solar-gain-enable" -> "sat_solar_gain_enable".
@@ -2776,7 +2777,7 @@ bool streamSatSelectDiscovery(PubSubClient &client,
   if (selectIdx != 0) return false;
   if (!client.connected()) return false;
   if (!canPublishMQTT()) return false;
-  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
   char topic[STREAM_TOPIC_MAX];
   snprintf_P(topic, sizeof(topic), PSTR("%s/select/%s/sat_heating_system/config"),
