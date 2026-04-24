@@ -212,7 +212,11 @@ void startWebserver(){
   httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
 
   // Enable collection of If-None-Match so index.html ETag conditional requests work.
-    httpServer.collectHeaders("If-None-Match");
+  // TASK-398: use array form (works on both Core 2.7.4 and 3.1.2; single-arg overload is 3.x-only).
+  {
+    static const char *otaHeaderKeys[] = {"If-None-Match"};
+    httpServer.collectHeaders(otaHeaderKeys, 1);
+  }
 
   httpServer.begin();
   // Set up first message as the IP address
