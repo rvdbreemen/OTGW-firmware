@@ -190,7 +190,11 @@ void setup() {
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
-  
+
+  // One-line boot signature for field diagnostics (TASK-394 Phase 2).
+  // Captured AFTER full init so heap/fragmentation reflect steady-state setup.
+  logBootSignature("boot:");
+
   SetupDebugln(F("Setup finished!\r\n"));
 
   // After resetting the OTGW PIC never send anything to Serial for debug
@@ -431,8 +435,7 @@ static void runNightlyRestartCheck() {
   if (myTime.hour() != settings.iRestartHour) return;
   DebugTf(PSTR("Nightly restart triggered at %02d:00 (uptime=%lu s)\r\n"),
           settings.iRestartHour, (unsigned long)state.uptime.iSeconds);
-  delay(200);                           // brief delay for any pending I/O to flush
-  ESP.restart();
+  doRestart("[nightly] scheduled restart");
 }
 
 //===[ Do task exactly on the minute ]===

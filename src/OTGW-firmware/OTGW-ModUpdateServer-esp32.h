@@ -94,11 +94,11 @@ public:
         _server->client().setNoDelay(true);
         _server->send_P(200, PSTR("text/html"), _serverSuccess);
         _server->client().stop();
-        if (_serial_output) {
-          DebugTln(F("[OTA] Rebooting..."));
-        }
-        delay(1000);
-        platformRestart();
+        // Use doRestart() (helperStuff.ino) so ESP32 OTA goes through the same
+        // service-cleanup sequence as ESP8266 (MQTT LWT, WS close, TCP FINs)
+        // before the platform restart fires. Mirrors the ESP8266 path at
+        // OTGW-ModUpdateServer-impl.h.
+        doRestart("[OTA] Rebooting...");
       }
     }, [&]() {
       // Upload handler
