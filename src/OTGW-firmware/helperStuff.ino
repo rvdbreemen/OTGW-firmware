@@ -450,6 +450,10 @@ void performDeferredReboot() {
 // Catches: wrong partition config (4M1M image on 4M2M board or vice versa),
 // PUYA chip with misdetected size, non-DIO flash mode (QIO/QOUT can change
 // behaviour around OTA writes on some boards).
+// ESP8266-only: ESP.getFlashChipMode() and ESP.getFlashChipRealSize() are
+// part of the ESP8266 Arduino Core; ESP32's ESP namespace does not expose
+// them. A platform-abstracted equivalent belongs in platform.h as a follow-up.
+#ifdef ESP8266
 void maybeWarnFlashMismatch() {
   const uint32_t real   = ESP.getFlashChipRealSize();
   const uint32_t mapped = ESP.getFlashChipSize();
@@ -467,6 +471,7 @@ void maybeWarnFlashMismatch() {
             (unsigned)mode);
   }
 }
+#endif  // ESP8266
 
 // Explicit service cleanup required before ESP.restart() on Arduino Core 3.1.0+.
 // PR esp8266/Arduino#8598 removed the implicit WiFiClient/WiFiUDP::stopAll() that
