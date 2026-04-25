@@ -1,5 +1,7 @@
 v2.0.0 is the biggest release in the project's history: a unified ESP8266/ESP32 codebase, an embedded smart heating controller (SAT), native OpenTherm bus mastering on ESP32, wired Ethernet, OLED display, and BLE temperature sensors.
 
+> **Heads up for custom MQTT consumers**: one small breaking change. Three OT-bus presence topics (`boiler_connected`, `thermostat_connected`, `otgw_connected`) moved out of the hardware-specific `otgw-pic/*` and `otgw-otdirect/*` subtrees into the generic value namespace. Home Assistant users are unaffected; the firmware self-cleans stale retained payloads on first reconnect. See [Breaking changes](#breaking-changes) below.
+
 [Full release notes](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/releases/RELEASE_NOTES_2.0.0.md) | [README](https://github.com/rvdbreemen/OTGW-firmware/blob/main/README.md) | [API docs](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/api/README.md) | [MQTT topics](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/api/MQTT.md)
 
 ## Highlights

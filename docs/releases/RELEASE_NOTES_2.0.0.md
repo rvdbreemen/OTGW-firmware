@@ -1,6 +1,6 @@
 # Release Notes — v2.0.0
 
-**Last updated:** 2026-04-11<br>
+**Last updated:** 2026-04-25<br>
 **Release branch:** `dev`<br>
 **Comparison target:** `main` (current stable `v1.3.5`)<br>
 
@@ -10,7 +10,7 @@
 
 v2.0.0 is the largest release in the project's history. It adds a full dual-platform build for both ESP8266 and ESP32 (OTGW32), introduces SAT: an embedded PID heating controller with weather compensation and Home Assistant auto-discovery, adds OTDirect for native OpenTherm bus mastering on ESP32 without a PIC, brings wired Ethernet support for ESP32, adds an OLED display, and extends the API surface with 30+ new SAT and OTDirect MQTT topics and REST endpoints.
 
-All existing MQTT topics, REST endpoints, and settings formats from v1.x are unchanged. The new features are purely additive. SAT is disabled by default.
+REST endpoints and `settings.ini` format are unchanged from v1.x; one small MQTT breaking change applies to three OT-bus presence topics (see Breaking Changes below). The new features are otherwise purely additive. SAT is disabled by default.
 
 ---
 
@@ -58,6 +58,42 @@ All existing MQTT topics, REST endpoints, and settings formats from v1.x are unc
 - Multi-area room support uses TASK-25 weighted temperature algorithm.
 - OTGW32 OTDirect: PI room compensation and flame ratio tracking added.
 - SAT cycle classifier uses per-hour PWM cycle limiter and p90 flow temperature.
+
+---
+
+## Breaking Changes
+
+### OT-bus state moved to generic MQTT topics (ADR-084)
+
+Three OT-bus presence values previously published under hardware-specific subtrees (`otgw-pic/*` on PIC-based gateways, `otgw-otdirect/*` on OTGW32) now live under the generic value namespace, regardless of hardware variant. The inconsistent `otgw-otdirect/ot_online` name is retired in favour of `otgw_connected`.
+
+**Removed topics:**
+
+- `OTGW/value/<uniqueId>/otgw-pic/boiler_connected`
+- `OTGW/value/<uniqueId>/otgw-pic/thermostat_connected`
+- `OTGW/value/<uniqueId>/otgw-pic/otgw_connected`
+- `OTGW/value/<uniqueId>/otgw-otdirect/boiler_connected`
+- `OTGW/value/<uniqueId>/otgw-otdirect/thermostat_connected`
+- `OTGW/value/<uniqueId>/otgw-otdirect/ot_online` (renamed)
+
+**New canonical topics:**
+
+- `OTGW/value/<uniqueId>/boiler_connected`
+- `OTGW/value/<uniqueId>/thermostat_connected`
+- `OTGW/value/<uniqueId>/otgw_connected`
+
+Payload semantics are unchanged: `"ON"` / `"OFF"`, retained.
+
+**Impact and migration:**
+
+- **Home Assistant users**: nothing to do. Entity `unique_id`s are stable, discovery republishes automatically on reconnect, history is preserved. On OTGW32 builds without a PIC, `Boiler connected` and `Thermostat connected` entities now appear for the first time (they were previously gated behind `MQTT_HA_FLAG_IS_PIC_ENTRY`).
+- **Custom MQTT consumers** (Node-RED, openHAB, scripts) subscribed to the old paths: update your topic patterns. The firmware self-heals retained payloads on the deprecated topics at the first MQTT reconnect after upgrade, so no manual broker cleanup is required in the typical case. For manual cleanup, see the migration guide in `docs/api/MQTT.md` (search anchor: "Migration from 1.4.x").
+
+**Why:** these values describe what the firmware observes on the OpenTherm bus, not properties of the PIC coprocessor or the OT-direct driver. Grouping them under hardware-specific subtrees made them disappear from Home Assistant on OTGW32 builds without a PIC, and forced custom consumers to switch topic prefixes when the underlying hardware changed. ADR-084 amends ADR-065 to narrow the `otgw-pic/` subtree to strictly PIC-coprocessor properties (version, deviceid, firmwaretype, designer, picavailable, settings/*).
+
+**Self-healing cleanup**: a temporary firmware block subscribes briefly on each MQTT reconnect to the six deprecated topics and clears any retained payload it finds, then unsubscribes. Idempotent and free on brokers that never saw pre-2.0.0 firmware. Will be removed in firmware 2.3.0 or later (see in-source TEMPORARY MIGRATION CODE comment).
+
+REST endpoints and the `settings.ini` format are unchanged from v1.x.
 
 ---
 

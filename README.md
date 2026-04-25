@@ -24,7 +24,7 @@ Version 2.0.0 is a major platform release. It ships full ESP32/OTGW32 support al
 - **Wi-Fi resilience**: AP fallback mode (beta) keeps the web UI reachable when the home network is unavailable. Wi-Fi signal quality indicator in the web UI header. Triple-reset credential recovery.
 - **PlatformIO build**: Unified `platformio.ini` with `esp8266` and `esp32` environments. Arduino IDE still works for ESP8266.
 
-No breaking changes to MQTT topics or REST API from v1.x. Settings files from v1.3.x load without modification.
+**One small MQTT breaking change**: three OT-bus presence topics (`boiler_connected`, `thermostat_connected`, `otgw_connected`) moved out of the hardware-specific `otgw-pic/*` and `otgw-otdirect/*` subtrees into the generic value namespace, regardless of hardware variant. Home Assistant users are unaffected (entity `unique_id`s are stable, discovery auto-republishes). The firmware self-heals retained payloads on the deprecated topics at first MQTT reconnect. Custom MQTT consumers should update their topic patterns: see the [migration guide](docs/api/MQTT.md#migration-from-14x--pre-release-200-ot-bus-state-topics) and [ADR-084](docs/adr/ADR-084-generic-ot-bus-state-topics.md). REST API and `settings.ini` format are unchanged from v1.x.
 
 ---
 
