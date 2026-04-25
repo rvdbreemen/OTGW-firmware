@@ -40,6 +40,8 @@ This toolkit adds two patterns to the basic ADR tradition:
 
 The first three install the plugin: marketplace registration, plugin install, plugin reload. The fourth is a one-time per-project setup: it appends a short "ADR Kit Rules" section to your project's `CLAUDE.md` (creating the file if needed) so future sessions know about the skill, the `adr-generator` subagent, and the path-specific instructions. The setup command is idempotent: re-running it skips the append if the section is already there.
 
+Optional fifth command: `/adr-kit:lint` reads every `ADR-*.md` in your `docs/adr/` directory and reports per-file, per-gate pass/fail with line-level citations for failures. Useful right after install to see how your existing ADRs measure up against the four gates, and useful before merging a PR that touches an ADR. Read-only.
+
 Claude Cowork shares the `.claude/` convention; the same plugin commands work once your workspace is connected to a repo.
 
 ### Other AI coding tools: copy the files
@@ -58,8 +60,10 @@ adr-kit/
 ├── skills/
 │   ├── adr/
 │   │   └── SKILL.md                # the comprehensive ADR guide
-│   └── setup/
-│       └── SKILL.md                # /adr-kit:setup: appends ADR rules to CLAUDE.md
+│   ├── setup/
+│   │   └── SKILL.md                # /adr-kit:setup: appends ADR rules to CLAUDE.md
+│   └── lint/
+│       └── SKILL.md                # /adr-kit:lint: validates ADRs against the four gates
 ├── agents/
 │   └── adr-generator.md            # subagent: create a new ADR
 ├── instructions/
@@ -76,6 +80,7 @@ Once installed in your project:
 1. **First time**: ask your agent to "analyze this codebase for undocumented architectural decisions". Use the workflow in `SKILL.md` (Initial Codebase Analysis section) to retroactively document the existing patterns at `Status: Accepted`.
 2. **For new work**: when about to make an architecturally significant change, the coding instructions (`adr.coding.md`) point at the agent. The agent (`agents/adr-generator.md`) writes the ADR. The verification gates from the skill validate it.
 3. **In code review**: the review instructions (`adr.review.md`) walk through six named checks. The reviewer cites a check by name when blocking a PR.
+4. **Audit existing ADRs**: `/adr-kit:lint` runs the four verification gates over every ADR in `docs/adr/` and reports per-file, per-gate pass/fail. Read-only; useful right after install and before merging ADR-touching PRs.
 
 ## ADR conventions
 
@@ -140,6 +145,15 @@ The original sources of the two patterns:
 - Verification gates: [trailofbits/skills](https://github.com/trailofbits/skills).
 
 `adr-kit` builds on that combination by adding a focused creator agent (`adr-generator`), path-specific instructions for coding and review work, and per-tool install paths for Claude Code, Claude Cowork, Cursor, GitHub Copilot, and OpenAI Codex CLI.
+
+## Project resources
+
+- [ROADMAP.md](ROADMAP.md): direction, v1.0.0 criteria, deliberate non-goals.
+- [MIGRATING-FROM-ADR-SKILL.md](MIGRATING-FROM-ADR-SKILL.md): switching from or co-installing alongside Jim van den Breemen's adr-skill.
+- [CHANGELOG.md](CHANGELOG.md): release history in Keep a Changelog format.
+- [CONTRIBUTING.md](CONTRIBUTING.md): dev loop, add-a-skill, version-bump, release procedure, code style.
+- [SECURITY.md](SECURITY.md): security disclosure policy.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): community standards (Contributor Covenant 2.1 by reference).
 
 ## License
 
