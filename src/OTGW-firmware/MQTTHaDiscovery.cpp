@@ -2423,10 +2423,11 @@ bool streamClimateDiscovery(PubSubClient &client,
     if (!w.writeProgmem(PSTR("\"mode_stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
     if (climateIdx == 0) {
-      // Uses kPicSubtreePrefix for consistency with composeBinSensorPayload (ADR-065).
-      if (!w.writeChar('/')) return false;
-      if (!w.writeProgmem(kPicSubtreePrefix)) return false;
-      if (!w.writeProgmem(PSTR("thermostat_connected\""))) return false;
+      // ADR-084: thermostat_connected lives under the generic value namespace
+      // since 2.0.0; the otgw-pic/ prefix was retired together with the matching
+      // bin-sensor flag flip in composeBinSensorPayload. Match that path here so
+      // the Thermostat climate mode tracks the live publish.
+      if (!w.writeProgmem(PSTR("/thermostat_connected\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!writeJsonKV_P(w, PSTR("mode_stat_tpl"), PSTR("{% if value == 'ON' %}heat{% else %}off{% endif %}"))) return false;
     } else {
