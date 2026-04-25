@@ -1,0 +1,57 @@
+name: Bug report
+description: Report something that does not work as documented in adr-kit.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill in the fields below so we can reproduce and fix it.
+  - type: input
+    id: tool
+    attributes:
+      label: AI coding tool and version
+      description: Which tool are you running adr-kit in? Include the version.
+      placeholder: "Claude Code 1.x, Cursor 0.x, GitHub Copilot, OpenAI Codex CLI 0.x, etc."
+    validations:
+      required: true
+  - type: input
+    id: adr_kit_version
+    attributes:
+      label: adr-kit version
+      description: Which adr-kit version did you install?
+      placeholder: "v0.6.0, or a specific tag like adr-kit--v0.6.0"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Minimal step-by-step to reproduce. Slash commands, file contents, expected vs actual behaviour.
+      placeholder: |
+        1. Install adr-kit with `/plugin install adr-kit@rvdbreemen-adr-kit`.
+        2. Run `/adr-kit:setup` in an empty directory.
+        3. Expected: error about no project root. Actual: ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What did you think would happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead? Include any error message, file output, or terminal log (sanitised, no secrets).
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context
+      description: Anything else helpful: project structure, relevant CLAUDE.md content, plugin install method.
+    validations:
+      required: false

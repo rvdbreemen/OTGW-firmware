@@ -89,6 +89,45 @@ The toolkit defaults to:
 
 You can change the convention if your project already has a different one (some teams use `adr-NNNN-` lowercase 4-digit, or `0001-` with no prefix). Edit the `## Project Conventions` section in the skill and the agent definition; the rest of the toolkit follows from there.
 
+## FAQ
+
+**Where are ADRs stored?**
+
+Under `docs/adr/` in your project, one file per decision, named `ADR-XXX-kebab-case-title.md`. The numbering is sequential and zero-padded to three digits. The skill assumes this layout but documents how to override it.
+
+**How do I customize the conventions?**
+
+Open `skills/adr/SKILL.md` (or the installed copy in your tool's skills directory) and edit the `## Project Conventions` section. The agent and the instructions read from that section, so a single edit propagates. Some teams prefer `adr-NNNN-` lowercase 4-digit; some prefer `0001-...` without a prefix; both work as long as you commit to one.
+
+**What if my project already has ADRs in a different format?**
+
+Two options. (1) Migrate the existing files to the adr-kit conventions in one pass; the most common change is the filename casing. (2) Override the conventions in `SKILL.md` to match what you have, so future ADRs use the same format. Migration is cleaner long-term; override is faster short-term.
+
+**Does the skill auto-create ADRs without me asking?**
+
+No. The main skill activates when you author or review ADRs, but it does not write files on its own. The `adr-generator` subagent writes a file only when you ask it to. The `setup` skill writes once to `CLAUDE.md` and only when you run `/adr-kit:setup`. All file mutations are user-triggered.
+
+**Is this an Anthropic product?**
+
+No. `adr-kit` is an independent open-source toolkit. It happens to install cleanest in Claude Code because Claude Code's plugin system is the most mature option for this kind of multi-file bundle, but the same files run in Cursor, Copilot, and Codex.
+
+## Comparison
+
+A plain ADR template gives you a markdown file with sections to fill in. `adr-kit` adds three things on top:
+
+| Concern | Plain ADR template | adr-kit |
+|---|---|---|
+| Format | yes (one file) | yes (one file plus a generator agent) |
+| Pre-flight discipline | absent | **anti-rationalization guards**: a 9-row excuse / counter-argument table that fires before you reach for "this is too obvious to document" |
+| Acceptance bar | "fill it in" | **four named verification gates** (Completeness, Evidence, Clarity, Consistency) that must pass before Status flips from Proposed to Accepted |
+| Code-review integration | absent | six named checks plus review-comment templates, ready to paste into a PR review |
+| Tool integration | none | drop-in skill, agent, and instructions for Claude Code, Claude Cowork, Cursor, GitHub Copilot, OpenAI Codex CLI |
+| Onboarding | "read this template" | one-time setup command that wires the rules into your project's `CLAUDE.md` |
+
+The patterns themselves (anti-rationalization, verification gates) are not novel; both predate this toolkit. What `adr-kit` contributes is the **packaging**: a plug-and-play installation in any major AI coding tool, with the patterns wired into the place they need to be (the agent's pre-flight, the reviewer's checklist, the project's standing instructions).
+
+If your team is happy with a plain template and the discipline lives in your culture, you do not need this toolkit. If you want the discipline to be enforceable by an AI agent reviewing a PR, this is what `adr-kit` does.
+
 ## Credits
 
 Based on [Michael Nygard's ADR format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions).

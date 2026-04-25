@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest a generic improvement to adr-kit. Project-specific examples should stay in your fork.
+title: "[feat]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. adr-kit aims to stay generic; project-specific changes are best kept in your own fork. The bar for upstream changes is "this is generic and improves the toolkit for any user".
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is the problem your suggestion addresses? Be concrete: what is annoying, missing, or unclear today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed solution
+      description: What do you want adr-kit to do? File-level proposals are welcome (new skill, manifest field, README section).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: At least one alternative, with the reason it is less attractive than the proposed solution. (This is the same discipline the verification gates require of an ADR.)
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and compatibility
+      description: Is this additive (no impact on existing users) or breaking (changes default behaviour)? If breaking, what is the migration path?
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have read CONTRIBUTING.md and the proposal aligns with the project scope (generic, not project-specific).
+          required: true
+        - label: I have searched existing issues and the change is not already requested or rejected.
+          required: true
