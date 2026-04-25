@@ -1,0 +1,69 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate plugin.json syntax
+        run: jq empty .claude-plugin/plugin.json
+
+      - name: Verify required files exist
+        run: |
+          required_files=(
+            ".claude-plugin/plugin.json"
+            "skills/adr/SKILL.md"
+            "skills/setup/SKILL.md"
+            "agents/adr-generator.md"
+            "instructions/adr.coding.md"
+            "instructions/adr.review.md"
+            "examples/ADR-template.md"
+            "README.md"
+            "INSTALL.md"
+            "LICENSE"
+            "CHANGELOG.md"
+          )
+          missing=0
+          for f in "${required_files[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "ERROR: required file missing: $f"
+              missing=1
+            fi
+          done
+          [ $missing -eq 0 ] || exit 1
+
+      - name: Verify plugin.json version matches CHANGELOG top entry
+        run: |
+          manifest_version=$(jq -r '.version' .claude-plugin/plugin.json)
+          changelog_version=$(grep -m1 -E '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | sed -E 's/^## \[([0-9]+\.[0-9]+\.[0-9]+)\].*/\1/')
+          echo "plugin.json version: $manifest_version"
+          echo "CHANGELOG top version: $changelog_version"
+          if [ "$manifest_version" != "$changelog_version" ]; then
+            echo "ERROR: plugin.json version ($manifest_version) does not match CHANGELOG top entry ($changelog_version)"
+            exit 1
+          fi
+
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: |
+            skills/**/*.md
+            agents/**/*.md
+            instructions/**/*.md
+            examples/**/*.md
+          config: |
+            {
+              "default": true,
+              "MD013": false,
+              "MD024": false,
+              "MD033": false,
+              "MD034": false,
+              "MD041": false
+            }

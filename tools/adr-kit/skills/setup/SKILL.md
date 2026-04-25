@@ -2,6 +2,7 @@
 name: setup
 description: One-time project setup for adr-kit. Appends an "ADR Kit Rules" section to the project's CLAUDE.md (creating the file if it does not exist) so future sessions know about the ADR skill, agent, and instructions. Idempotent: skips the append if the section is already present.
 disable-model-invocation: true
+allowed-tools: [Read, Write, Edit]
 ---
 
 # adr-kit setup
