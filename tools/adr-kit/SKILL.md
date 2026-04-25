@@ -76,7 +76,7 @@ ADRs fail not from lack of templates but from the agent (or human) talking thems
 | "I don't have time" | Pay 30 minutes now or pay hours when someone challenges the choice in code review six months from now and nobody can remember the rationale. |
 | "There are no real alternatives" | Almost never true. If you cannot name one, the alternative is "do nothing" or "the framework default": that is an alternative. Document it and the reason it lost. |
 
-This pattern is adapted from [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills).
+This pattern was originally introduced by [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) and was first combined with verification gates in a single ADR skill by [Jim van den Breemen's adr-skill](https://github.com/Jvdbreemen/adr-skill); `adr-kit` adapts that pairing.
 
 ---
 
@@ -205,7 +205,7 @@ The ADR fits the existing record without creating contradictions.
 - [ ] Terminology matches the project glossary and other ADRs
 - [ ] ADR number is the next sequential, no gap, no reuse
 
-This pattern is adapted from [trailofbits/skills](https://github.com/trailofbits/skills).
+This pattern was originally introduced by [trailofbits/skills](https://github.com/trailofbits/skills) and was first combined with anti-rationalization guards in a single ADR skill by [Jim van den Breemen's adr-skill](https://github.com/Jvdbreemen/adr-skill); `adr-kit` adapts that pairing.
 
 ---
 

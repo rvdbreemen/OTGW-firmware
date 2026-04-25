@@ -71,7 +71,16 @@ You can change the convention if your project already has a different one (some 
 
 ## Credits
 
-Based on [Michael Nygard's ADR format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions). The anti-rationalization pattern is inspired by [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills). The verification-gates pattern is inspired by [trailofbits/skills](https://github.com/trailofbits/skills).
+Based on [Michael Nygard's ADR format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions).
+
+The two distinguishing patterns of this toolkit, **anti-rationalization guards** and **verification gates**, were first combined into a single ADR skill by [Jim van den Breemen's adr-skill](https://github.com/Jvdbreemen/adr-skill). That combination is what turns a plain ADR template into a discipline tool: the guards catch the excuses *before* a decision goes undocumented, and the gates catch the gaps *before* a `Proposed` ADR flips to `Accepted`. Without that pairing, this toolkit would be a thicker template, not a workflow.
+
+The original sources of the two patterns:
+
+- Anti-rationalization guards: [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills).
+- Verification gates: [trailofbits/skills](https://github.com/trailofbits/skills).
+
+`adr-kit` builds on that combination by adding a focused creator agent (`adr-generator`), path-specific instructions for coding and review work, and per-tool install paths for Claude Code, Claude Cowork, Cursor, GitHub Copilot, and OpenAI Codex CLI.
 
 ## License
 
