@@ -76,14 +76,41 @@ adr-kit/
     └── ADR-template.md             # clean template to copy
 ```
 
+## Slash commands reference
+
+After `/plugin install adr-kit@rvdbreemen-adr-kit` + `/reload-plugins`, your Claude Code session has four slash commands. Two of the five names below (`/adr` and `/adr-kit:adr`) invoke the same skill; the other three are independent.
+
+| Command | Type | Auto-invocable | When to use |
+|---|---|---|---|
+| `/adr [title]` | knowledge / guide | yes | Author or review an ADR. Loads the comprehensive ADR guide (anti-rationalization guards, four verification gates, supersession workflow). Same skill as `/adr-kit:adr`. |
+| `/adr-kit:adr [title]` | knowledge / guide | yes | Identical to `/adr`. The prefix form is canonical; the root form is a shortcut Claude Code exposes when a skill allows model-invocation. Use whichever fits your typing. |
+| `/adr-kit:setup` | one-time write | no | Run once per project after install. Appends an "ADR Kit Rules" section to your project's `CLAUDE.md` so future sessions know about the skill, the agent, and the path-specific instructions. Idempotent: re-running reports "Already set up" rather than duplicating. |
+| `/adr-kit:lint [path]` | deliberate check | no | Validate existing ADRs against the four gates with file:line citations. Reads `docs/adr/.adr-kit.json` if present. Default target is `docs/adr/`; pass a directory or file as argument to scope. Read-only. Three result tiers: PASS, ADVISORY (informational), FAIL (action required). |
+| `/adr-kit:migrate [path]` | guided rewrite | no | Bring a legacy-shaped ADR into the canonical-seven-section template. Read-then-confirm: prints a per-file plan first, applies after explicit yes. Six named patterns (Status promotion, Alternatives lift, Related-to-Related-Decisions split, TODO placeholders for genuine content gaps). Default target is `docs/adr/`. |
+
+### Auto-invocable vs user-only
+
+- **Auto-invocable** (`/adr`, `/adr-kit:adr`): Claude can also load this skill in the background when context calls for it (e.g. you ask "should I document this decision?"). The skill body activates without you typing the slash command. Knowledge / reference skills sit here.
+- **User-only** (`/adr-kit:setup`, `/adr-kit:lint`, `/adr-kit:migrate`): only fires when you explicitly type the slash command. Set via `disable-model-invocation: true` in the skill frontmatter. Write actions and deliberate checks sit here so Claude does not surprise you by triggering them.
+
+This is a deliberate design pattern. Knowledge skills should be cheap to auto-trigger; write-and-check skills should be costly enough that you have to ask.
+
+### Companion CLI: `bin/adr-lint`
+
+`/adr-kit:lint` runs in your Claude Code session. For unattended use (CI / pre-commit / batch validation) the toolkit ships a deterministic Python CLI at `bin/adr-lint`. Same gate logic, exit-code-based, runs anywhere with Python 3.8+. See the [CI integration section](#ci-integration-binadr-lint-since-v0100) below for a copy-paste GitHub Actions snippet.
+
+The CLI defaults to the deterministic gates (Completeness, Consistency); the heuristic gates (Evidence, Clarity) are opt-in via `--gates` because they need judgement that a regex cannot reliably provide. That judgement is where the slash-command form remains canonical.
+
 ## Quickstart
 
 Once installed in your project:
 
-1. **First time**: ask your agent to "analyze this codebase for undocumented architectural decisions". Use the workflow in `SKILL.md` (Initial Codebase Analysis section) to retroactively document the existing patterns at `Status: Accepted`.
-2. **For new work**: when about to make an architecturally significant change, the coding instructions (`adr.coding.md`) point at the agent. The agent (`agents/adr-generator.md`) writes the ADR. The verification gates from the skill validate it.
-3. **In code review**: the review instructions (`adr.review.md`) walk through six named checks. The reviewer cites a check by name when blocking a PR.
-4. **Audit existing ADRs**: `/adr-kit:lint` runs the four verification gates over every ADR in `docs/adr/` and reports per-file, per-gate pass/fail. Read-only; useful right after install and before merging ADR-touching PRs.
+1. **First time setup**: run `/adr-kit:setup` to wire the rules into your project's `CLAUDE.md`.
+2. **First-time analysis**: ask your agent to "analyze this codebase for undocumented architectural decisions". Use the workflow in `SKILL.md` (Initial Codebase Analysis section) to retroactively document existing patterns at `Status: Accepted`.
+3. **For new work**: when about to make an architecturally significant change, the coding instructions (`adr.coding.md`) point at the agent. The agent (`agents/adr-generator.md`) writes the ADR. The verification gates from the skill validate it. You can also invoke `/adr <short title>` directly.
+4. **In code review**: the review instructions (`adr.review.md`) walk through six named checks. The reviewer cites a check by name when blocking a PR.
+5. **Audit existing ADRs**: `/adr-kit:lint` runs the four verification gates over every ADR in `docs/adr/` and reports per-file, per-gate pass/fail. Useful right after install and before merging ADR-touching PRs.
+6. **Bring legacy ADRs into shape**: `/adr-kit:migrate` rewrites legacy-shaped ADRs into the canonical-seven-section template, read-then-confirm. Pair with `/adr-kit:lint` afterwards to verify the result.
 
 ## ADR conventions
 
