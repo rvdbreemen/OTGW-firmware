@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-24 19:59'
-updated_date: '2026-04-24 20:12'
+updated_date: '2026-04-25 14:19'
 labels:
   - mqtt
   - ha-discovery
@@ -83,7 +83,14 @@ REFERENCE FILES (read-only):
 - [x] #9 python evaluate.py passes with no new PROGMEM or String-class violations.
 - [x] #10 MQTT_HA_FLAG_IS_PIC_ENTRY (0x08) is still referenced by other HA-discovery entries (grep MQTTHaDiscovery.cpp + MQTTstuff.ino) after this change.
 - [x] #11 Source header comment block is present at the top of the migration helpers, stating why the code exists and when it may be removed, referencing ADR-084 and TASK-409.
+- [ ] #12 On both board variants, HA-discovery config payload for the Thermostat climate entity (homeassistant/climate/<nodeId>/<nodeId>-thermostat/config) shows mode_stat_t ending in /thermostat_connected with no otgw-pic/ segment. Verified by subscribing to homeassistant/climate/+/+/config and inspecting the payload. DHW Control climate's mode_stat_t is /dhw_enable (already generic, no change needed).
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Post-merge follow-up (commit 0331c0a1, 2026-04-25): TASK-410's brief named MQTTHaDiscovery.cpp:1038-1039 as the only discovery-side change. ADR-065's original call-site inventory also listed the climate composer (now MQTTHaDiscovery.cpp:2426) which prepended kPicSubtreePrefix to thermostat_connected for the Thermostat climate's mode_stat_t. That call-site was missed in the initial implementation and surfaced when the user explicitly asked whether the climate and DHW entities had been adapted. Fixed by replacing the hardcoded otgw-pic/ prefix with PSTR("/thermostat_connected") to match composeBinSensorPayload's new flag-0x00 output. DHW Control was already generic (mode_stat_t = /dhw_enable). AC #12 added to capture the runtime verification expectation. Lesson for future ADR amendments: when an ADR's call-site inventory enumerates discovery-side touches across multiple composers, copy that enumeration verbatim into the implementation task brief.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
