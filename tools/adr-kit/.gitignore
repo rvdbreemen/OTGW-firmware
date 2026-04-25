@@ -1,0 +1,51 @@
+# Operating system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editor / IDE state
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.*.kate-swp
+*.sublime-project
+*.sublime-workspace
+
+# Claude Code local state (per-machine, never committed)
+.claude/cache/
+.claude/local/
+.claude/settings.local.json
+
+# Python helpers (if added later)
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+coverage/
+.tox/
+.venv/
+venv/
+
+# Node helpers (if added later)
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.npm/
+.pnp.*
+
+# Generic build / temp
+dist/
+build/
+out/
+*.tmp
+*.bak
+*.log
