@@ -11,10 +11,13 @@ A complete Architecture Decision Record (ADR) toolkit for AI coding agents. Drop
 
 - **Skill** (`SKILL.md`): the comprehensive ADR guide. When to write one, what to write, how to verify it, how to supersede it. Includes anti-rationalization guards (the excuses agents use to skip documentation) and four named verification gates (Completeness, Evidence, Clarity, Consistency).
 - **Agent** (`agents/adr-generator.md`): a focused subagent for *creating* a new ADR. Hand it a decision and it produces a fully populated `docs/adr/ADR-XXX-title.md` file.
+- **Lint skill** (`/adr-kit:lint`, since v0.7.0): checks existing ADRs against the four gates with file:line citations. Supports scoped policy via `.adr-kit.json` since v0.9.0.
+- **Lint CLI** (`bin/adr-lint`, since v0.10.0): deterministic Python CLI for CI / pre-commit / batch validation. Same gate logic as the skill, exit-code-based.
+- **Migrate skill** (`/adr-kit:migrate`, since v0.11.0): guided rewrite of legacy-shaped ADRs into the canonical-seven-section template. Read-then-confirm workflow. No fabrication; uses TODO placeholders for genuine content gaps.
 - **Instructions** (`instructions/`): two path-specific instruction files, one for coding work (`adr.coding.md`) and one for code review (`adr.review.md`). They tell the agent which ADR rules apply and when.
 - **Template** (`examples/ADR-template.md`): a clean ADR file you can copy.
 
-The three files work together: the skill is the reference, the agent does the writing, the instructions tell the agent what to do at the right moment.
+The pieces work together: the skill is the reference, the agent does the writing, the lint flags deviations, the migrate command brings legacy work into shape, the instructions tell the agent what to do at the right moment.
 
 ## Why ADRs
 

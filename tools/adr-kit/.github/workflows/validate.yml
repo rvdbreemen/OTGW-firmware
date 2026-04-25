@@ -42,6 +42,7 @@ jobs:
             "skills/adr/SKILL.md"
             "skills/setup/SKILL.md"
             "skills/lint/SKILL.md"
+            "skills/migrate/SKILL.md"
             "agents/adr-generator.md"
             "instructions/adr.coding.md"
             "instructions/adr.review.md"
