@@ -6,13 +6,26 @@ The package is portable: drop the same content into the location your tool expec
 
 ## Claude Code
 
+> **Recommended**: install adr-kit as a Claude Code plugin instead of copying files. From your Claude Code session:
+>
+> ```
+> /plugin marketplace add rvdbreemen/adr-kit
+> /plugin install adr-kit@rvdbreemen-adr-kit
+> /reload-plugins
+> /adr-kit:setup
+> ```
+>
+> The first three commands install the plugin (marketplace, install, reload). The fourth is a one-time per-project setup that appends an "ADR Kit Rules" section to your `CLAUDE.md` so future sessions know the skill is governing ADR work in this project. The setup command is idempotent: re-running it skips the append if the section is already present.
+>
+> The manual path below is the fallback if you prefer to vendor the files in your repo or work without the plugin marketplace.
+
 Claude Code looks for skills in `.claude/skills/`, agents in `.claude/agents/`, and respects project-specific instructions referenced from `CLAUDE.md`.
 
 ```bash
 # From your project root, with this repo cloned alongside as adr-kit/:
 mkdir -p .claude/skills/adr .claude/agents .claude/instructions
 
-cp adr-kit/SKILL.md                   .claude/skills/adr/SKILL.md
+cp adr-kit/skills/adr/SKILL.md                   .claude/skills/adr/SKILL.md
 cp adr-kit/agents/adr-generator.md    .claude/agents/adr-generator.md
 cp adr-kit/instructions/adr.coding.md .claude/instructions/adr.coding.md
 cp adr-kit/instructions/adr.review.md .claude/instructions/adr.review.md
@@ -50,7 +63,7 @@ Claude Cowork (Anthropic's collaborative coding workspace, web-based) does not y
 ```bash
 mkdir -p .claude/skills/adr .claude/agents .claude/instructions
 
-cp adr-kit/SKILL.md                   .claude/skills/adr/SKILL.md
+cp adr-kit/skills/adr/SKILL.md                   .claude/skills/adr/SKILL.md
 cp adr-kit/agents/adr-generator.md    .claude/agents/adr-generator.md
 cp adr-kit/instructions/adr.coding.md .claude/instructions/adr.coding.md
 cp adr-kit/instructions/adr.review.md .claude/instructions/adr.review.md
@@ -65,7 +78,7 @@ Cursor reads project rules from `.cursor/rules/` and supports skills in `.cursor
 ```bash
 mkdir -p .cursor/skills/adr .cursor/rules
 
-cp adr-kit/SKILL.md                   .cursor/skills/adr/SKILL.md
+cp adr-kit/skills/adr/SKILL.md                   .cursor/skills/adr/SKILL.md
 cp adr-kit/agents/adr-generator.md    .cursor/skills/adr/AGENT.md
 cp adr-kit/instructions/adr.coding.md .cursor/rules/adr-coding.mdc
 cp adr-kit/instructions/adr.review.md .cursor/rules/adr-review.mdc
@@ -88,7 +101,7 @@ Copilot reads from `.github/skills/`, `.github/agents/`, and `.github/instructio
 ```bash
 mkdir -p .github/skills/adr .github/agents .github/instructions
 
-cp adr-kit/SKILL.md                   .github/skills/adr/SKILL.md
+cp adr-kit/skills/adr/SKILL.md                   .github/skills/adr/SKILL.md
 cp adr-kit/agents/adr-generator.md    .github/agents/adr-generator.agent.md
 cp adr-kit/instructions/adr.coding.md .github/instructions/adr.coding-agent.instructions.md
 cp adr-kit/instructions/adr.review.md .github/instructions/adr.code-review.instructions.md
@@ -112,7 +125,7 @@ Project-local install:
 ```bash
 mkdir -p .codex/skills/adr .codex/agents .codex/instructions
 
-cp adr-kit/SKILL.md                   .codex/skills/adr/SKILL.md
+cp adr-kit/skills/adr/SKILL.md                   .codex/skills/adr/SKILL.md
 cp adr-kit/agents/adr-generator.md    .codex/agents/adr-generator.md
 cp adr-kit/instructions/adr.coding.md .codex/instructions/adr.coding.md
 cp adr-kit/instructions/adr.review.md .codex/instructions/adr.review.md
@@ -142,28 +155,28 @@ SRC="${1:-./adr-kit}"
 
 # Claude Code (and Claude Cowork, which shares the .claude/ convention)
 mkdir -p .claude/skills/adr .claude/agents .claude/instructions
-cp "$SRC/SKILL.md"                   .claude/skills/adr/SKILL.md
+cp "$SRC/skills/adr/SKILL.md"                   .claude/skills/adr/SKILL.md
 cp "$SRC/agents/adr-generator.md"    .claude/agents/adr-generator.md
 cp "$SRC/instructions/adr.coding.md" .claude/instructions/adr.coding.md
 cp "$SRC/instructions/adr.review.md" .claude/instructions/adr.review.md
 
 # GitHub Copilot
 mkdir -p .github/skills/adr .github/agents .github/instructions
-cp "$SRC/SKILL.md"                   .github/skills/adr/SKILL.md
+cp "$SRC/skills/adr/SKILL.md"                   .github/skills/adr/SKILL.md
 cp "$SRC/agents/adr-generator.md"    .github/agents/adr-generator.agent.md
 cp "$SRC/instructions/adr.coding.md" .github/instructions/adr.coding-agent.instructions.md
 cp "$SRC/instructions/adr.review.md" .github/instructions/adr.code-review.instructions.md
 
 # Cursor
 mkdir -p .cursor/skills/adr .cursor/rules
-cp "$SRC/SKILL.md"                   .cursor/skills/adr/SKILL.md
+cp "$SRC/skills/adr/SKILL.md"                   .cursor/skills/adr/SKILL.md
 cp "$SRC/agents/adr-generator.md"    .cursor/skills/adr/AGENT.md
 cp "$SRC/instructions/adr.coding.md" .cursor/rules/adr-coding.mdc
 cp "$SRC/instructions/adr.review.md" .cursor/rules/adr-review.mdc
 
 # OpenAI Codex CLI (project-local)
 mkdir -p .codex/skills/adr .codex/agents .codex/instructions
-cp "$SRC/SKILL.md"                   .codex/skills/adr/SKILL.md
+cp "$SRC/skills/adr/SKILL.md"                   .codex/skills/adr/SKILL.md
 cp "$SRC/agents/adr-generator.md"    .codex/agents/adr-generator.md
 cp "$SRC/instructions/adr.coding.md" .codex/instructions/adr.coding.md
 cp "$SRC/instructions/adr.review.md" .codex/instructions/adr.review.md

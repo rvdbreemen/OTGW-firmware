@@ -1,6 +1,11 @@
 # adr-kit
 
-A complete Architecture Decision Record (ADR) toolkit for AI coding agents. Drop into any project to give Claude Code, Cursor, GitHub Copilot, or any agent that supports the [Agent Skills](https://agentskills.io/) format a shared, enforceable ADR workflow.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/tag/rvdbreemen/adr-kit?label=release&sort=semver)](https://github.com/rvdbreemen/adr-kit/releases)
+
+A complete Architecture Decision Record (ADR) toolkit for AI coding agents. Drop into any project to give Claude Code, Claude Cowork, Cursor, GitHub Copilot, OpenAI Codex CLI, or any agent that supports the [Agent Skills](https://agentskills.io/) format a shared, enforceable ADR workflow.
+
+> **Pre-1.0**: the toolkit is functional and in use, but the API and conventions may change before v1.0.0. Pin to a specific tag if you need stability across upgrades. Latest release: see the badge above.
 
 ## What it does
 
@@ -24,13 +29,22 @@ This toolkit adds two patterns to the basic ADR tradition:
 
 ## Install
 
-See [INSTALL.md](INSTALL.md) for per-tool installation steps:
+### Claude Code (recommended): four slash commands
 
-- **Claude Code**: copy into `.claude/`
-- **Cursor**: copy into `.cursor/`
-- **GitHub Copilot**: copy into `.github/`
+```
+/plugin marketplace add rvdbreemen/adr-kit
+/plugin install adr-kit@rvdbreemen-adr-kit
+/reload-plugins
+/adr-kit:setup
+```
 
-The skill is portable: same content, three target locations. Pick what your team uses.
+The first three install the plugin: marketplace registration, plugin install, plugin reload. The fourth is a one-time per-project setup: it appends a short "ADR Kit Rules" section to your project's `CLAUDE.md` (creating the file if needed) so future sessions know about the skill, the `adr-generator` subagent, and the path-specific instructions. The setup command is idempotent: re-running it skips the append if the section is already there.
+
+Claude Cowork shares the `.claude/` convention; the same plugin commands work once your workspace is connected to a repo.
+
+### Other AI coding tools: copy the files
+
+For Cursor, GitHub Copilot, OpenAI Codex CLI, and any other agent that reads skills from its own directory layout, see [INSTALL.md](INSTALL.md). It documents the per-tool target paths and includes a one-shot install script that lays everything down in one command.
 
 ## File map
 
@@ -38,8 +52,14 @@ The skill is portable: same content, three target locations. Pick what your team
 adr-kit/
 ├── README.md                       # this file
 ├── LICENSE                         # MIT
-├── INSTALL.md                      # per-tool install
-├── SKILL.md                        # the comprehensive ADR guide
+├── INSTALL.md                      # per-tool install (manual route)
+├── .claude-plugin/
+│   └── plugin.json                 # Claude Code plugin manifest
+├── skills/
+│   ├── adr/
+│   │   └── SKILL.md                # the comprehensive ADR guide
+│   └── setup/
+│       └── SKILL.md                # /adr-kit:setup: appends ADR rules to CLAUDE.md
 ├── agents/
 │   └── adr-generator.md            # subagent: create a new ADR
 ├── instructions/
