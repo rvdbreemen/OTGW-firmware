@@ -2,6 +2,7 @@
 name: lint
 description: Lints existing Architecture Decision Records against the four verification gates (Completeness, Evidence, Clarity, Consistency). Run on a single ADR file or on the whole docs/adr/ tree. Reports pass/fail per gate per file with file:line citations for failures. Read-only.
 argument-hint: "[file or directory; defaults to docs/adr/]"
+disable-model-invocation: true
 allowed-tools: [Read, Glob, Grep]
 ---
 

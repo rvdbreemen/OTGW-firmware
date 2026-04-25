@@ -4,6 +4,22 @@ All notable changes to `adr-kit` are documented in this file. The format follows
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-04-25
+
+### Fixed
+
+- `skills/lint/SKILL.md`: added `disable-model-invocation: true` to the frontmatter so the lint skill follows the same user-only invocation discipline as `skills/setup/SKILL.md`. Before this fix, `/lint` (without plugin prefix) appeared in Claude Code's autocomplete at the root namespace, and the skill was auto-invocable by Claude. With the fix, only the canonical `/adr-kit:lint` form is registered, matching `/adr-kit:setup` and giving the plugin a uniform invocation pattern. Lint is a deliberate user action (a checking tool, not a background helper), so disabling auto-invocation is the right discipline.
+
+### Changed
+
+- `.claude-plugin/plugin.json` version bumped to 0.10.1.
+- `.claude-plugin/marketplace.json` plugin entry version bumped to 0.10.1.
+
+### Notes
+
+- No skill body change. The lint logic (severity model, gate evaluation, output format) is identical to v0.10.0.
+- No `bin/adr-lint` change. The deterministic CLI is independent of the skill's invocation discipline.
+
 ## [0.10.0] - 2026-04-25
 
 ### Added
@@ -189,7 +205,8 @@ All notable changes to `adr-kit` are documented in this file. The format follows
 
 The anti-rationalization guards pattern is adapted from [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills). The verification gates pattern is adapted from [trailofbits/skills](https://github.com/trailofbits/skills). Both patterns were first combined into a single ADR skill by [Jim van den Breemen's adr-skill](https://github.com/Jvdbreemen/adr-skill); `adr-kit` builds on that combination.
 
-[Unreleased]: https://github.com/rvdbreemen/adr-kit/compare/adr-kit--v0.10.0...HEAD
+[Unreleased]: https://github.com/rvdbreemen/adr-kit/compare/adr-kit--v0.10.1...HEAD
+[0.10.1]: https://github.com/rvdbreemen/adr-kit/compare/adr-kit--v0.10.0...adr-kit--v0.10.1
 [0.10.0]: https://github.com/rvdbreemen/adr-kit/compare/adr-kit--v0.9.0...adr-kit--v0.10.0
 [0.9.0]: https://github.com/rvdbreemen/adr-kit/compare/adr-kit--v0.8.0...adr-kit--v0.9.0
 [0.8.0]: https://github.com/rvdbreemen/adr-kit/compare/adr-kit--v0.7.2...adr-kit--v0.8.0
