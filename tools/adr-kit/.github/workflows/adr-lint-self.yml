@@ -1,0 +1,55 @@
+name: adr-lint self-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    name: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pytest and jsonschema
+        run: pip install pytest jsonschema
+
+      - name: Run pytest
+        run: pytest tests/ -v
+
+  smoke-test-examples:
+    name: adr-lint smoke test on examples/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run adr-lint on examples/ (default --gates completeness,consistency)
+        run: |
+          chmod +x bin/adr-lint
+          python bin/adr-lint examples/
+
+      - name: Run adr-lint with --format json (assert parseable)
+        run: python bin/adr-lint --format json examples/ | python -m json.tool > /dev/null
+
+      - name: Demonstrate exit code on a fixture FAIL (must be 1)
+        run: |
+          set +e
+          python bin/adr-lint tests/fixtures/missing-headings/
+          rc=$?
+          set -e
+          if [ "$rc" != "1" ]; then
+            echo "ERROR: expected exit 1 on FAIL fixture, got $rc"
+            exit 1
+          fi

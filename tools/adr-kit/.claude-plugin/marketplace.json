@@ -9,7 +9,7 @@
     {
       "name": "adr-kit",
       "source": "./",
-      "version": "0.9.0",
+      "version": "0.10.0",
       "description": "Drop-in ADR toolkit: skill, ADR-generator subagent, /adr-kit:setup, /adr-kit:lint, path-specific coding and review instructions.",
       "homepage": "https://github.com/rvdbreemen/adr-kit",
       "license": "MIT"

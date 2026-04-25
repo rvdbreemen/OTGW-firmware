@@ -1,0 +1,542 @@
+#!/usr/bin/env python3
+"""adr-lint: deterministic CLI for the four adr-kit verification gates.
+
+Pairs with the /adr-kit:lint Claude Code skill. Use this CLI in CI / pre-commit
+hooks where Claude is not in the loop. Default gates are completeness and
+consistency (the deterministic ones). The heuristic gates evidence and clarity
+are available behind --gates but are off by default because they need
+judgement that a regex cannot reliably provide.
+
+Severity model matches the v0.9.0 skill exactly:
+  ignore  >  per-ADR markers  >  config.severity
+  always_strict > always_advisory > advisory_before_strict_from
+
+Exit codes:
+  0  no FAIL (PASS / ADVISORY / SKIPPED counts may be non-zero)
+  1  at least one FAIL
+  2  config or input error (malformed JSON, unknown field, bad path)
+
+Usage:
+  adr-lint                            # lint docs/adr/, config from docs/adr/.adr-kit.json
+  adr-lint docs/decisions/            # lint a different directory
+  adr-lint docs/adr/ADR-042-foo.md    # lint a single file
+  adr-lint --strict-from ADR-100      # override config strict_from
+  adr-lint --gates completeness       # only completeness gate
+  adr-lint --format json              # machine-readable output
+  adr-lint --config /tmp/policy.json  # custom config path
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
+
+CANONICAL_REQUIRED_SECTIONS = [
+    "## Status",
+    "## Context",
+    "## Decision",
+    "## Alternatives Considered",
+    "## Consequences",
+    "## Related Decisions",
+    "## References",
+]
+
+LEGAL_SEVERITIES = {"always_strict", "always_advisory", "advisory_before_strict_from"}
+ALL_GATES = ["completeness", "evidence", "clarity", "consistency"]
+DEFAULT_GATES = ["completeness", "consistency"]
+
+MARKER_RE = re.compile(r"<!--\s*adr-kit-lint:\s*([^>]+?)\s*-->", re.IGNORECASE)
+ADR_FILENAME_RE = re.compile(r"(?i)^ADR-(\d{1,4})-")
+CANONICAL_FILENAME_RE = re.compile(r"^ADR-\d{3}-[a-z0-9-]+\.md$")
+HEADING_NUMBER_RE = re.compile(r"^#\s+(?i:ADR)-(\d{1,4})\b")
+
+
+class PolicyError(Exception):
+    """Raised when the configuration file is malformed."""
+
+
+def load_config(path: Optional[Path]) -> Dict:
+    """Read .adr-kit.json (if present) and return as a dict.
+
+    Returns an empty dict if path is None or does not exist (default behaviour
+    is "no config, everything strict"). Raises PolicyError on malformed JSON or
+    unrecognised severity values.
+    """
+    if path is None or not path.exists():
+        return {}
+    try:
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise PolicyError(f"{path}: invalid JSON ({e.msg} at line {e.lineno})")
+
+    sev = cfg.get("severity")
+    if sev is not None:
+        if not isinstance(sev, dict):
+            raise PolicyError(f"{path}: 'severity' must be an object")
+        for gate, value in sev.items():
+            if gate not in ALL_GATES:
+                raise PolicyError(
+                    f"{path}: unknown severity gate {gate!r}; legal: {ALL_GATES}"
+                )
+            if value not in LEGAL_SEVERITIES:
+                raise PolicyError(
+                    f"{path}: severity.{gate}={value!r} not legal; "
+                    f"must be one of {sorted(LEGAL_SEVERITIES)}"
+                )
+
+    sf = cfg.get("strict_from")
+    if sf is not None and not re.match(r"^ADR-\d{3}$", sf):
+        raise PolicyError(
+            f"{path}: strict_from={sf!r} does not match pattern ADR-NNN"
+        )
+
+    # Optional jsonschema validation: deeper structural check.
+    try:
+        import jsonschema
+        schema_path = (
+            Path(__file__).resolve().parent.parent
+            / "schemas"
+            / "adr-kit-config.schema.json"
+        )
+        if schema_path.exists():
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            jsonschema.validate(cfg, schema)
+    except ImportError:
+        pass  # jsonschema not installed; basic checks above suffice.
+    except Exception as e:
+        raise PolicyError(f"{path}: schema validation failed: {e}")
+
+    return cfg
+
+
+def severity_of(
+    gate: str, adr_num: int, cfg: Dict, strict_from_override: Optional[str]
+) -> str:
+    """Return 'FAIL' or 'ADVISORY' for a gate failure, given the policy."""
+    sf_id = strict_from_override or cfg.get("strict_from")
+    sf_num = (
+        int(re.match(r"ADR-(\d+)", sf_id).group(1)) if sf_id else None
+    )
+    sev = cfg.get("severity", {})
+    default = "advisory_before_strict_from" if sf_id and gate != "consistency" else "always_strict"
+    s = sev.get(gate, default)
+    if s == "always_strict":
+        return "FAIL"
+    if s == "always_advisory":
+        return "ADVISORY"
+    if s == "advisory_before_strict_from":
+        return "ADVISORY" if (sf_num is None or adr_num < sf_num) else "FAIL"
+    return "FAIL"
+
+
+def parse_marker(text: str) -> Tuple[bool, bool, Set[str], Optional[str]]:
+    """Scan an ADR file body for the first adr-kit-lint marker.
+
+    Returns: (file_skipped, file_advisory, gate_skip_set, raw_directive_or_None).
+    """
+    for line in text.splitlines():
+        m = MARKER_RE.search(line)
+        if not m:
+            continue
+        directive = m.group(1).strip().lower()
+        if directive == "skip":
+            return True, False, set(), directive
+        if directive == "advisory":
+            return False, True, set(), directive
+        if directive.startswith("skip "):
+            gates = {g.strip() for g in directive[5:].split(",")}
+            unknown = gates - set(ALL_GATES)
+            if unknown:
+                # Treat unknown gate names as no-op rather than fail; warn caller.
+                gates = gates - unknown
+            return False, False, gates, directive
+        # Unknown directive: report so the user notices.
+        return False, False, set(), f"unknown directive: {directive!r}"
+    return False, False, set(), None
+
+
+def discover_files(target: Path) -> List[Path]:
+    """Return ADR files under target. target may be a file or directory."""
+    if target.is_file():
+        return [target]
+    if not target.is_dir():
+        return []
+    seen = {}
+    for p in target.glob("*.md"):
+        if ADR_FILENAME_RE.match(p.name):
+            seen[p.name.lower()] = p
+    return sorted(seen.values(), key=lambda p: p.name.lower())
+
+
+def gate_completeness(text: str, required: List[str]) -> Optional[List[str]]:
+    """Return list of missing required headings, or None if all present."""
+    missing = []
+    for s in required:
+        if not re.search(r"^" + re.escape(s) + r"\b", text, re.MULTILINE):
+            missing.append(s)
+    return missing or None
+
+
+def gate_evidence(text: str) -> Optional[List[Tuple[int, str]]]:
+    """Heuristic: bare adjectives without nearby measurement / citation.
+
+    Returns hits (line, text) when 3+ are found. Threshold suppresses noise.
+    """
+    bare = re.compile(
+        r"\b(faster|slower|better|worse|improves|reduces|"
+        r"more reliable|more performant|much faster|much slower)\b",
+        re.IGNORECASE,
+    )
+    hits = []
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        if bare.search(ln):
+            window = "\n".join(lines[max(0, i - 2):i + 5])
+            if not re.search(
+                r"\d|http|RFC|spec|datasheet|measured|see\s+\w+:",
+                window, re.IGNORECASE,
+            ):
+                hits.append((i + 1, ln.strip()[:80]))
+    return hits if len(hits) >= 3 else None
+
+
+def gate_clarity(text: str) -> Optional[List[Tuple[int, str]]]:
+    """Heuristic: ALL-CAPS acronyms (3 to 5 letters) without inline expansion.
+
+    Conservative: only flag when 3+ distinct acronyms appear without an
+    obvious '(<expansion>)' nearby. Off by default; opt in with --gates.
+    """
+    acro_re = re.compile(r"\b[A-Z]{3,5}\b")
+    seen_with_expansion: Set[str] = set()
+    flagged: List[Tuple[int, str]] = []
+    for i, ln in enumerate(text.splitlines()):
+        for m in acro_re.finditer(ln):
+            acro = m.group(0)
+            # Look for '(...)' immediately after.
+            tail = ln[m.end():m.end() + 100]
+            if re.match(r"\s*\(", tail):
+                seen_with_expansion.add(acro)
+                continue
+            if acro in seen_with_expansion:
+                continue
+            flagged.append((i + 1, acro))
+    if len({a for _, a in flagged}) >= 3:
+        return flagged[:5]
+    return None
+
+
+def gate_consistency(
+    fp: Path, adr_num: int, text: str, duplicates: Dict[int, List[str]]
+) -> Optional[List[str]]:
+    """Filename pattern, heading match, duplicate numbers, etc."""
+    issues = []
+    first_heading = next(
+        (l.strip() for l in text.splitlines() if l.strip().startswith("# ")),
+        "",
+    )
+    m = HEADING_NUMBER_RE.match(first_heading)
+    if not m:
+        issues.append(f"first heading {first_heading!r} does not match # ADR-NNN")
+    elif int(m.group(1)) != adr_num:
+        issues.append(
+            f"heading number {m.group(1)} != filename {adr_num:03d}"
+        )
+    if not CANONICAL_FILENAME_RE.match(fp.name):
+        issues.append(f"filename {fp.name} does not match ADR-NNN-kebab.md")
+    if adr_num in duplicates:
+        issues.append(
+            f"duplicate ADR-{adr_num:03d}: {duplicates[adr_num]}"
+        )
+    return issues or None
+
+
+def lint_file(
+    fp: Path,
+    cfg: Dict,
+    strict_from_override: Optional[str],
+    enabled_gates: Set[str],
+    duplicates: Dict[int, List[str]],
+    required_sections: List[str],
+    ignore: Set[str],
+) -> Dict:
+    """Lint one file. Returns a dict ready for JSON serialisation."""
+    m = ADR_FILENAME_RE.match(fp.name)
+    adr_num = int(m.group(1)) if m else -1
+    adr_id = f"ADR-{adr_num:03d}"
+
+    if adr_id in ignore or fp.name in ignore:
+        return {"file": fp.name, "adr_num": adr_num, "bucket": "SKIPPED",
+                "skip_reason": "config.ignore", "findings": []}
+
+    text = fp.read_text(encoding="utf-8", errors="replace")
+    file_skipped, file_advisory, skip_gates, _ = parse_marker(text)
+    if file_skipped:
+        return {"file": fp.name, "adr_num": adr_num, "bucket": "SKIPPED",
+                "skip_reason": "marker", "findings": []}
+
+    findings = []
+
+    if "completeness" in enabled_gates and "completeness" not in skip_gates:
+        miss = gate_completeness(text, required_sections)
+        if miss:
+            level = "ADVISORY" if file_advisory else severity_of(
+                "completeness", adr_num, cfg, strict_from_override
+            )
+            findings.append({
+                "gate": "completeness", "level": level,
+                "details": [s.replace("## ", "") for s in miss],
+                "summary": f"missing sections: {[s.replace('## ', '') for s in miss]}",
+            })
+
+    if "evidence" in enabled_gates and "evidence" not in skip_gates:
+        hits = gate_evidence(text)
+        if hits:
+            level = "ADVISORY" if file_advisory else severity_of(
+                "evidence", adr_num, cfg, strict_from_override
+            )
+            findings.append({
+                "gate": "evidence", "level": level,
+                "details": [{"line": l, "text": t} for l, t in hits],
+                "summary": f"{len(hits)} bare-adjective hit(s) without nearby measurement",
+            })
+
+    if "clarity" in enabled_gates and "clarity" not in skip_gates:
+        hits = gate_clarity(text)
+        if hits:
+            level = "ADVISORY" if file_advisory else severity_of(
+                "clarity", adr_num, cfg, strict_from_override
+            )
+            findings.append({
+                "gate": "clarity", "level": level,
+                "details": [{"line": l, "acronym": a} for l, a in hits],
+                "summary": f"{len({a for _, a in hits})} acronym(s) without inline expansion",
+            })
+
+    if "consistency" in enabled_gates and "consistency" not in skip_gates:
+        issues = gate_consistency(fp, adr_num, text, duplicates)
+        if issues:
+            level = "ADVISORY" if file_advisory else severity_of(
+                "consistency", adr_num, cfg, strict_from_override
+            )
+            findings.append({
+                "gate": "consistency", "level": level,
+                "details": issues, "summary": "; ".join(issues),
+            })
+
+    levels = {f["level"] for f in findings}
+    bucket = "PASS" if not findings else ("FAIL" if "FAIL" in levels else "ADVISORY")
+
+    return {"file": fp.name, "adr_num": adr_num, "bucket": bucket, "findings": findings}
+
+
+def detect_duplicates(files: List[Path]) -> Dict[int, List[str]]:
+    grouped: Dict[int, List[str]] = {}
+    for fp in files:
+        m = ADR_FILENAME_RE.match(fp.name)
+        if m:
+            grouped.setdefault(int(m.group(1)), []).append(fp.name)
+    return {n: lst for n, lst in grouped.items() if len(lst) > 1}
+
+
+def render_human(result: Dict, verbose: bool) -> str:
+    out = []
+    s = result["summary"]
+    out.append(f"Linting {result['target']} ({s['total']} ADRs)")
+    if result["config_path"]:
+        cfg_str = "; ".join(
+            f"{k}={v}" for k, v in result["config_summary"].items()
+        )
+        out.append(f"Config: {result['config_path']} ({cfg_str})")
+    elif result["strict_from_override"]:
+        out.append(f"Config: command-line --strict-from {result['strict_from_override']}")
+    out.append("")
+    out.append(f"PASS strictly ({s['pass']}):")
+    for f in result["files"]:
+        if f["bucket"] == "PASS":
+            out.append(f"  {f['file']}")
+    out.append("")
+    out.append(f"ADVISORY only ({s['advisory']}):")
+    if verbose:
+        for f in result["files"]:
+            if f["bucket"] == "ADVISORY":
+                out.append(f"  {f['file']}")
+                for fnd in f["findings"]:
+                    out.append(f"    {fnd['gate']} ADVISORY: {fnd['summary']}")
+    else:
+        out.append(f"  ({s['advisory']} files; pass --verbose for detail)")
+    out.append("")
+    out.append(f"FAIL ({s['fail']}):")
+    for f in result["files"]:
+        if f["bucket"] == "FAIL":
+            out.append(f"  {f['file']}")
+            for fnd in f["findings"]:
+                if fnd["level"] == "FAIL":
+                    out.append(f"    {fnd['gate']} FAIL: {fnd['summary']}")
+    out.append("")
+    out.append(f"SKIPPED ({s['skipped']})")
+    if verbose and s["skipped"]:
+        for f in result["files"]:
+            if f["bucket"] == "SKIPPED":
+                out.append(f"  {f['file']} (reason: {f.get('skip_reason', '?')})")
+    out.append("")
+    out.append("Aggregate:")
+    if s["fail"] > 0:
+        # Find ADR with most FAIL gates.
+        worst = max(
+            (f for f in result["files"] if f["bucket"] == "FAIL"),
+            key=lambda f: sum(1 for fnd in f["findings"] if fnd["level"] == "FAIL"),
+        )
+        n_fail_gates = sum(
+            1 for fnd in worst["findings"] if fnd["level"] == "FAIL"
+        )
+        out.append(
+            f"  Next steps: focus on {worst['file']}, "
+            f"which fails {n_fail_gates} of 4 gates."
+        )
+    else:
+        out.append(
+            f"  All linted ADRs pass at the configured severity. "
+            f"{s['advisory']} ADVISORY findings remain, treated as informational."
+        )
+    return "\n".join(out)
+
+
+def render_json(result: Dict) -> str:
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+def parse_gates(arg: Optional[str]) -> Set[str]:
+    if not arg:
+        return set(DEFAULT_GATES)
+    parts = {p.strip() for p in arg.split(",") if p.strip()}
+    unknown = parts - set(ALL_GATES)
+    if unknown:
+        raise ValueError(
+            f"unknown gate(s) {sorted(unknown)}; legal: {ALL_GATES}"
+        )
+    return parts
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="adr-lint",
+        description="Deterministic CLI for the four adr-kit verification gates.",
+    )
+    parser.add_argument(
+        "path", nargs="?", default="docs/adr/",
+        help="File or directory to lint (default: docs/adr/)",
+    )
+    parser.add_argument(
+        "--strict-from", metavar="ADR-NNN", default=None,
+        help="First ADR id (inclusive) on which gates are strict; overrides config.",
+    )
+    parser.add_argument(
+        "--gates", default=None,
+        help=f"Comma-separated gates to run. Default: {','.join(DEFAULT_GATES)}. "
+             f"All: {','.join(ALL_GATES)}",
+    )
+    parser.add_argument(
+        "--format", choices=["human", "json"], default="human",
+        help="Output format (default: human)",
+    )
+    parser.add_argument(
+        "--config", metavar="PATH", default=None,
+        help="Override .adr-kit.json location (default: <path>/.adr-kit.json)",
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="Show ADVISORY and SKIPPED details too",
+    )
+    parser.add_argument(
+        "--version", action="version", version="adr-lint 0.10.0",
+    )
+    args = parser.parse_args(argv)
+
+    target = Path(args.path)
+    if not target.exists():
+        print(f"adr-lint: path not found: {target}", file=sys.stderr)
+        return 2
+
+    try:
+        gates = parse_gates(args.gates)
+    except ValueError as e:
+        print(f"adr-lint: {e}", file=sys.stderr)
+        return 2
+
+    config_path = (
+        Path(args.config) if args.config
+        else (target / ".adr-kit.json" if target.is_dir()
+              else target.parent / ".adr-kit.json")
+    )
+    try:
+        cfg = load_config(config_path if config_path.exists() else None)
+    except PolicyError as e:
+        print(f"adr-lint: {e}", file=sys.stderr)
+        return 2
+
+    ignore = set(cfg.get("ignore", []))
+    required_sections = cfg.get("template", {}).get(
+        "required_sections", CANONICAL_REQUIRED_SECTIONS
+    )
+
+    files = discover_files(target)
+    if not files:
+        if args.format == "json":
+            print(json.dumps({
+                "summary": {"total": 0, "pass": 0, "advisory": 0, "fail": 0, "skipped": 0},
+                "config_path": str(config_path) if config_path.exists() else None,
+                "files": [], "exit_code": 0,
+            }))
+        else:
+            print(f"No ADRs found at {target}.")
+        return 0
+
+    duplicates = detect_duplicates(files)
+
+    file_results = [
+        lint_file(
+            fp, cfg, args.strict_from, gates, duplicates,
+            required_sections, ignore,
+        ) for fp in files
+    ]
+
+    counts = {"pass": 0, "advisory": 0, "fail": 0, "skipped": 0, "total": len(file_results)}
+    for r in file_results:
+        b = r["bucket"]
+        counts[b.lower()] += 1
+
+    config_summary = {}
+    if cfg.get("strict_from") or args.strict_from:
+        config_summary["strict_from"] = args.strict_from or cfg["strict_from"]
+    if cfg.get("severity"):
+        for g, v in cfg["severity"].items():
+            config_summary[f"severity.{g}"] = v
+    if cfg.get("template", {}).get("required_sections"):
+        config_summary["template_override"] = "yes"
+
+    result = {
+        "target": str(target),
+        "config_path": str(config_path) if config_path.exists() else None,
+        "config_summary": config_summary,
+        "strict_from_override": args.strict_from,
+        "gates_enabled": sorted(gates),
+        "summary": counts,
+        "files": file_results,
+        "exit_code": 1 if counts["fail"] > 0 else 0,
+    }
+
+    if args.format == "json":
+        print(render_json(result))
+    else:
+        print(render_human(result, args.verbose))
+
+    return result["exit_code"]
+
+
+if __name__ == "__main__":
+    sys.exit(main())

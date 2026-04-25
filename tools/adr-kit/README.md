@@ -141,6 +141,83 @@ For one-off grandfathering without a project-wide config, drop one of these HTML
 
 `/adr-kit:lint` now reports three tiers: PASS, ADVISORY (a finding that does not block but is reported), and FAIL. The aggregate's "next step" line always points at a FAIL, never an ADVISORY: ADVISORY is informational, FAIL is what you act on.
 
+## CI integration: `bin/adr-lint` (since v0.10.0)
+
+The `/adr-kit:lint` skill is for human-in-the-loop review (judgement-based gates rely on Claude). For CI / pre-commit / batch validation, v0.10.0 ships a deterministic Python CLI at `bin/adr-lint`. It mirrors the deterministic gates of the skill (Completeness and Consistency by default; Evidence and Clarity available behind `--gates`), reads the same `.adr-kit.json` policy, and exits with a status code that makes blocking a PR trivial.
+
+### Quick start
+
+```bash
+# Lint your project's ADRs (default: docs/adr/, gates: completeness,consistency)
+python bin/adr-lint
+
+# Limit to one gate, JSON output for tooling
+python bin/adr-lint --gates completeness --format json
+
+# Override the strict_from boundary on the command line
+python bin/adr-lint --strict-from ADR-100
+
+# Lint a different directory or a single file
+python bin/adr-lint docs/decisions/
+python bin/adr-lint docs/adr/ADR-042-foo.md
+```
+
+Exit codes: `0` = no FAIL (PASS / ADVISORY counts may be non-zero), `1` = at least one FAIL, `2` = config or input error.
+
+### Drop-in GitHub Actions snippet
+
+Add this job to your `.github/workflows/<ci>.yml` to block PRs that introduce a FAIL:
+
+```yaml
+adr-lint:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with: { python-version: '3.11' }
+    - name: Fetch adr-lint
+      run: |
+        curl -fsSL -o /tmp/adr-lint \
+          https://raw.githubusercontent.com/rvdbreemen/adr-kit/main/bin/adr-lint
+        chmod +x /tmp/adr-lint
+    - name: Lint ADRs
+      run: python /tmp/adr-lint docs/adr/
+```
+
+The script is stdlib-only, so no `pip install` is needed in CI. `jsonschema` is auto-detected if installed and used for deeper config validation; absence is non-fatal.
+
+### Help text
+
+```
+$ adr-lint --help
+usage: adr-lint [-h] [--strict-from ADR-NNN] [--gates GATES]
+                [--format {human,json}] [--config PATH] [-v] [--version]
+                [path]
+
+Deterministic CLI for the four adr-kit verification gates.
+
+positional arguments:
+  path                  File or directory to lint (default: docs/adr/)
+
+options:
+  --strict-from ADR-NNN
+                        First ADR id (inclusive) on which gates are strict; overrides config.
+  --gates GATES         Comma-separated gates to run. Default:
+                        completeness,consistency. All:
+                        completeness,evidence,clarity,consistency
+  --format {human,json}
+                        Output format (default: human)
+  --config PATH         Override .adr-kit.json location.
+  -v, --verbose         Show ADVISORY and SKIPPED details too
+```
+
+### When to use which
+
+- `/adr-kit:lint` (skill, in Claude Code): nuanced review, all four gates, judgement on Evidence and Clarity.
+- `bin/adr-lint` (CLI, in CI): deterministic gates only by default, exit-code based, runs unattended. Use as a PR merge gate.
+
+The two are designed to agree on Completeness and Consistency. They can disagree on Evidence and Clarity by design: Claude's judgement is structurally better at those.
+
 ## FAQ
 
 **Where are ADRs stored?**

@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/rvdbreemen/adr-kit/schemas/adr-kit-config.schema.json",
+  "title": "adr-kit project policy (.adr-kit.json)",
+  "description": "Schema for the project-level policy file at docs/adr/.adr-kit.json (introduced in adr-kit v0.9.0). Field semantics are documented in the README Configuration section and the lint skill body. Top-level keys starting with '_' (e.g. '_comment', '_note') are silently allowed for embedding annotations and are not subject to validation.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "strict_from": {
+      "type": "string",
+      "description": "First ADR identifier (inclusive) on which all gates are enforced strictly. ADRs with a numerically lower number are linted in advisory mode for the gates that opt in via 'severity'. Format must match the canonical ADR-NNN pattern with three-digit zero-padded number.",
+      "pattern": "^ADR-\\d{3}$"
+    },
+    "ignore": {
+      "type": "array",
+      "description": "List of ADR identifiers (ADR-NNN) or full filenames to skip entirely. Skipped ADRs appear in the aggregate as SKIPPED but produce no per-gate output.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "severity": {
+      "type": "object",
+      "description": "Per-gate severity. Default for completeness, evidence, clarity is 'advisory_before_strict_from' when strict_from is set, 'always_strict' otherwise. Default for consistency is 'always_strict' regardless: filename / heading mismatches and duplicate numbers are real bugs at any age.",
+      "additionalProperties": false,
+      "properties": {
+        "completeness": {
+          "type": "string",
+          "enum": ["always_strict", "always_advisory", "advisory_before_strict_from"]
+        },
+        "evidence": {
+          "type": "string",
+          "enum": ["always_strict", "always_advisory", "advisory_before_strict_from"]
+        },
+        "clarity": {
+          "type": "string",
+          "enum": ["always_strict", "always_advisory", "advisory_before_strict_from"]
+        },
+        "consistency": {
+          "type": "string",
+          "enum": ["always_strict", "always_advisory", "advisory_before_strict_from"]
+        }
+      }
+    },
+    "template": {
+      "type": "object",
+      "description": "Override the canonical seven required sections with a project-specific list. Useful for projects whose template legitimately differs from the toolkit's default.",
+      "additionalProperties": true,
+      "properties": {
+        "required_sections": {
+          "type": "array",
+          "description": "Required top-level headings, in the order they must appear. Each entry is the exact heading text including the '## ' prefix.",
+          "items": {
+            "type": "string",
+            "pattern": "^##\\s+\\S"
+          },
+          "minItems": 1
+        }
+      }
+    }
+  }
+}

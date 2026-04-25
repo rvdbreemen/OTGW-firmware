@@ -1,0 +1,10 @@
+{
+  "_comment": "Test fixture: ADR-001 should be ADVISORY (predates strict_from); ADR-100 should be PASS strictly.",
+  "strict_from": "ADR-100",
+  "severity": {
+    "completeness": "advisory_before_strict_from",
+    "evidence": "advisory_before_strict_from",
+    "clarity": "advisory_before_strict_from",
+    "consistency": "always_strict"
+  }
+}
