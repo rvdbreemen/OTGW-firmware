@@ -189,6 +189,7 @@ In that mode:
 - **ADR-046:** PS=1 Summary Translation with Shared Publish Helpers
 - **ADR-047:** Non-Blocking WiFi Reconnect State Machine
 - **ADR-044:** Global State — extern Declaration in Header, Definition in .ino
+- **ADR-088:** MQTT Status Burst Windowing and Post-Burst Cooldown (timing layer atop this eligibility contract for the Status fanout case)
 
 ## References
 

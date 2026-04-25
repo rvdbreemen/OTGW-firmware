@@ -965,7 +965,7 @@ class WorkspaceEvaluator:
         core_ino = config.FIRMWARE_ROOT / "OTGW-Core.ino"
         if not core_ino.exists():
             self.add_result(EvaluationResult(
-                "ADR-062", "Status publishers wrap burst", "WARN",
+                "ADR-088", "Status publishers wrap burst", "WARN",
                 "OTGW-Core.ino not found"
             ))
             return
@@ -974,7 +974,7 @@ class WorkspaceEvaluator:
             source = core_ino.read_text(encoding='utf-8', errors='ignore')
         except OSError as e:
             self.add_result(EvaluationResult(
-                "ADR-062", "Status publishers wrap burst", "FAIL",
+                "ADR-088", "Status publishers wrap burst", "FAIL",
                 f"Could not read OTGW-Core.ino: {e}"
             ))
             return
@@ -987,7 +987,7 @@ class WorkspaceEvaluator:
         matches = list(sig_re.finditer(source))
         if not matches:
             self.add_result(EvaluationResult(
-                "ADR-062", "Status publishers wrap burst", "WARN",
+                "ADR-088", "Status publishers wrap burst", "WARN",
                 "No publish(Master|Slave)Status*State functions found"
             ))
             return
@@ -1014,15 +1014,80 @@ class WorkspaceEvaluator:
         if missing:
             detail += f"; missing: {', '.join(missing)}"
             self.add_result(EvaluationResult(
-                "ADR-062", "Status publishers wrap burst", "FAIL",
+                "ADR-088", "Status publishers wrap burst", "FAIL",
                 f"{len(missing)} of {len(matches)} status publishers miss burst wrap",
                 detail
             ))
         else:
             self.add_result(EvaluationResult(
-                "ADR-062", "Status publishers wrap burst", "PASS",
+                "ADR-088", "Status publishers wrap burst", "PASS",
                 f"All {len(matches)} status publishers wrap begin/endStatusBurst()",
                 detail
+            ))
+
+    # ===== ADR-088 SUB-RULE 3 GATE (TASK-426) =====
+
+    def check_drip_consults_deferred(self):
+        """TASK-426 / ADR-088 sub-rule 3: ``loopMQTTDiscovery()`` must consult
+        ``isDripDeferred()`` before issuing a discovery drip publish so that
+        Status-burst windowing can quiesce the drip during a fanout and during
+        the post-burst cooldown. Without this consult, sub-rules 1 and 2 lose
+        their effect because the drip would still fire on top of bursts.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Drip Consults isDripDeferred ==={Colors.ENDC}")
+
+        mqtt_ino = config.FIRMWARE_ROOT / "MQTTstuff.ino"
+        if not mqtt_ino.exists():
+            self.add_result(EvaluationResult(
+                "ADR-088", "Drip consults isDripDeferred", "WARN",
+                "MQTTstuff.ino not found"
+            ))
+            return
+
+        try:
+            source = mqtt_ino.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "ADR-088", "Drip consults isDripDeferred", "FAIL",
+                f"Could not read MQTTstuff.ino: {e}"
+            ))
+            return
+
+        # Match the definition only (signature followed by '{', possibly across
+        # lines). Loosely matching only the signature would also hit the forward
+        # declaration in MQTTstuff.h-style prologue ("void loopMQTTDiscovery();")
+        # and _extract_function_body would then walk past the ';' into an
+        # unrelated function body.
+        sig_re = re.compile(
+            r"^\s*(?:static\s+)?void\s+(loopMQTTDiscovery)\s*\(\s*\)\s*\{",
+            re.MULTILINE
+        )
+        m = sig_re.search(source)
+        if not m:
+            self.add_result(EvaluationResult(
+                "ADR-088", "Drip consults isDripDeferred", "WARN",
+                "loopMQTTDiscovery() definition not found in MQTTstuff.ino"
+            ))
+            return
+
+        body, _ = self._extract_function_body(source, m.start())
+        if not body:
+            self.add_result(EvaluationResult(
+                "ADR-088", "Drip consults isDripDeferred", "FAIL",
+                "loopMQTTDiscovery() body not parseable"
+            ))
+            return
+
+        if re.search(r"\bisDripDeferred\s*\(", body):
+            self.add_result(EvaluationResult(
+                "ADR-088", "Drip consults isDripDeferred", "PASS",
+                "loopMQTTDiscovery() references isDripDeferred()"
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-088", "Drip consults isDripDeferred", "FAIL",
+                "loopMQTTDiscovery() does not reference isDripDeferred()",
+                "Add an isDripDeferred() check before the drip publish; see ADR-088 sub-rule 3"
             ))
 
     # ===== ADR REFERENCE RESOLUTION (TASK-368) =====
@@ -1865,7 +1930,8 @@ class WorkspaceEvaluator:
         self.check_ha_sensor_index_consistency()      # HA discovery gate (TASK-392)
         self.check_json_buffer_arithmetic()           # TASK-352/368
         self.check_status_burst_cooldown_bound()      # TASK-353/368
-        self.check_status_publishers_wrap_burst()     # TASK-347/354/368
+        self.check_status_publishers_wrap_burst()     # TASK-347/354/368, ADR-088 sub-rule 1
+        self.check_drip_consults_deferred()           # TASK-426, ADR-088 sub-rule 3
         self.check_adr_references_resolve()           # TASK-355/368
 
         if not quick:

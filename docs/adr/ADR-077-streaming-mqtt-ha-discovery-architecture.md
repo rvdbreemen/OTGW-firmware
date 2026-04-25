@@ -64,7 +64,7 @@ Risks:
 
 ## Related
 
-- Prior ADRs: ADR-004 (no String class in hot paths), ADR-040 (MQTT source-specific topics), ADR-051 (OTGWSettings/OTGWState architecture), ADR-073 (SAT MQTT topic structure).
+- Prior ADRs: ADR-004 (no String class in hot paths), ADR-040 (MQTT source-specific topics), ADR-051 (OTGWSettings/OTGWState architecture), ADR-073 (SAT MQTT topic structure), ADR-088 (status-burst windowing producer side that lets this drip coexist with bursty Status traffic).
 - Implementation commits on `feature-dev-2.0.0-otgw32-esp32-sat-support`: `2b12834c` (legacy replacement with compact streaming API), `ff159819` (async bitmap-driven drip publisher), `a91220af` (PROGMEM-as-RAM crash fix), `413d8b00` (PROGMEM pool linkage validation guard), `7f663524` / `267fa013` (elimination of `sLine[1200]` and `topicBuf[200]`), `1df3eca5` (discovery burst fix + PROGMEM index), `5384be2a` (TASK-284: restore SAT switch/select streams), `4db9543f` (archive `mqttha.cfg` as reference-only).
 - Backlog tasks: TASK-81 (HA number/switch/select entities), TASK-276 / TASK-277 (staging buffer elimination), TASK-278 / TASK-279 / TASK-280 (Exception (2)/(3) crash fixes), TASK-281 (mqttha_progmem readable refactor), TASK-282 (compact array streaming constructors), TASK-283 (boot loop on MQTT connection), TASK-284 (restore SAT switches/select).
 - Source files: `src/OTGW-firmware/MQTTHaDiscovery.cpp` (2700+ lines), `src/OTGW-firmware/MQTTstuff.h` (public API), `src/OTGW-firmware/MQTTstuff.ino` (state machine, drip loop, callers), `docs/archive/mqttha.cfg` (historical reference).

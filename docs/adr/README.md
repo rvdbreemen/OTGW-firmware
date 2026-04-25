@@ -101,6 +101,11 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-057: Webhook Delivery, Retry, and Protected Test Endpoint Policy](ADR-057-webhook-delivery-retry-and-protected-test-endpoint-policy.md)** 🆕
   Defines edge-triggered outbound webhook delivery, bounded timeout and retry behavior, local-only URL policy, and the protected webhook test endpoint; builds on ADR-048's non-blocking state machine.
 
+#### MQTT
+
+- **[ADR-088: MQTT Status Burst Windowing and Post-Burst Cooldown](ADR-088-mqtt-status-burst-windowing-and-cooldown.md)** 🆕
+  Pattern-level contract that brackets Status-frame fanout with `beginStatusBurst()`/`endStatusBurst()` and defers the discovery drip during the burst plus a post-burst cooldown bounded below the Status cadence. Three sub-rules are CI-gated; the timeout self-heal is explicitly labelled guideline-level. (Sub-section seeded by TASK-426; broader MQTT re-categorisation tracked in TASK-427.)
+
 ### System Architecture
 
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
