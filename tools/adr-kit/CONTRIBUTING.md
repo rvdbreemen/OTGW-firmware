@@ -68,12 +68,52 @@ Release steps:
 
 CI is enforced by `.github/workflows/validate.yml` on every push and pull request:
 
-- `jq empty` on `plugin.json` (syntax check).
+- `jq empty` on `plugin.json` and `marketplace.json` (syntax check).
+- Schema validation (ajv-cli, draft-07): both manifests are validated against `schemas/plugin.json.schema.json` and `schemas/marketplace.json.schema.json` respectively. The schemas reject the field-type bugs that surfaced post-install in v0.7.1 and v0.7.2 (missing marketplace manifest; `repository` declared as object instead of string).
 - Presence check on the required-files set.
 - `plugin.json` version must match the top entry of `CHANGELOG.md`.
 - `markdownlint` on skills, agents, instructions, and examples.
 
 PRs that break CI will not be merged.
+
+## Pre-release smoke test
+
+Schema validation catches manifest field-type bugs but does not exercise the actual install path. Before tagging a new release, run this manual checklist in a fresh Claude Code session against your local clone. The whole sequence takes about 3 minutes.
+
+1. **Start Claude Code with the local clone as plugin source:**
+
+   ```bash
+   claude --plugin-dir /path/to/your/adr-kit
+   ```
+
+2. **List installed plugins.** Type `/plugin` in the Claude Code prompt. Confirm `adr-kit` appears in the Installed tab. Confirm there are no red error messages or `Validation errors:` lines next to the plugin entry. (This catches manifest schema mismatches that ajv missed and that would otherwise only surface for end users.)
+
+3. **List slash commands.** Type `/help`. Confirm the following commands are registered:
+   - `/adr-kit:adr`
+   - `/adr-kit:setup`
+   - `/adr-kit:lint`
+
+   Missing commands typically mean a skill file is in the wrong directory or has malformed frontmatter.
+
+4. **Run setup against a scratch project.** In a temporary directory (or any project that does not already have an `ADR Kit Rules` section in its `CLAUDE.md`), run:
+
+   ```
+   /adr-kit:setup
+   ```
+
+   Confirm the response is one of: `Setup complete. Appended ...`, `Setup complete. Created CLAUDE.md ...`, or `Already set up. ... at line N. No changes made.` Inspect `CLAUDE.md` to verify the section was appended literally and not duplicated. Re-run `/adr-kit:setup` and confirm it reports `Already set up.` (idempotency check).
+
+5. **Run lint against a sample ADR.** Create a directory with at least one `ADR-001-foo.md` file, then run:
+
+   ```
+   /adr-kit:lint
+   ```
+
+   Confirm the output reports per-gate PASS / FAIL for each ADR found. The exact result is not what matters; what matters is that the skill executed and produced gate-by-gate output.
+
+6. **If any of steps 2-5 fails, do not tag the release.** Investigate the failure first. Schema-only fixes (CI green, install red) are exactly the regressions this checklist exists to catch.
+
+When the checklist passes, proceed with the release steps in the next section.
 
 ## Reporting issues
 

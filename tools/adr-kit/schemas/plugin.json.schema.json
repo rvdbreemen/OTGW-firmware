@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/rvdbreemen/adr-kit/schemas/plugin.json.schema.json",
+  "title": "Claude Code plugin manifest (.claude-plugin/plugin.json)",
+  "description": "Hand-curated schema for the Claude Code per-plugin manifest. Documents the field types observed in the published Claude Code plugin manifest spec and rejects the historical bug patterns that broke install for adr-kit users. Bugs prevented: (1) v0.7.2 bug -- repository declared as object {type, url}, npm-style; the manifest schema requires a plain URL string. (2) v0.7.1 bug was a missing marketplace.json, covered by the sibling schema marketplace.json.schema.json plus the required-files CI step. (3) Defensive: author must be an object {name, ...}, not a plain string.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["name", "description", "version"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Plugin name. Kebab-case, lowercase, starts with a letter.",
+      "pattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
+      "minLength": 2,
+      "maxLength": 64
+    },
+    "description": {
+      "type": "string",
+      "description": "Short human-readable description shown in the plugin picker.",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version: MAJOR.MINOR.PATCH with optional pre-release suffix.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?(\\+[A-Za-z0-9.-]+)?$"
+    },
+    "author": {
+      "description": "Author info. Must be an object; plain strings are rejected (some manifests in the wild used a string, the official spec wants an object).",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "email": { "type": "string", "format": "email" },
+        "url": { "type": "string", "format": "uri" }
+      }
+    },
+    "homepage": {
+      "type": "string",
+      "description": "Plugin homepage URL.",
+      "format": "uri"
+    },
+    "repository": {
+      "type": "string",
+      "description": "Repository URL as a plain string. Historical bug fixed in v0.7.2: the field was declared as an object {type, url} (npm package.json style), which the Claude Code plugin manifest schema rejects with 'expected string, received object'. Use a plain URL string instead.",
+      "format": "uri"
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX license identifier or short license name.",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "keywords": {
+      "type": "array",
+      "description": "Search keywords for plugin marketplaces.",
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "maxItems": 30
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Other plugins this plugin depends on. Empty array for none.",
+      "items": { "type": "string" }
+    }
+  }
+}

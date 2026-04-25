@@ -15,12 +15,33 @@ jobs:
       - name: Validate plugin.json syntax
         run: jq empty .claude-plugin/plugin.json
 
+      - name: Validate marketplace.json syntax
+        run: jq empty .claude-plugin/marketplace.json
+
+      - name: Setup Node.js for ajv-cli
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ajv-cli
+        run: npm install -g ajv-cli ajv-formats
+
+      - name: Validate plugin.json against schema
+        run: ajv validate -s schemas/plugin.json.schema.json -d .claude-plugin/plugin.json --spec=draft7 -c ajv-formats
+
+      - name: Validate marketplace.json against schema
+        run: ajv validate -s schemas/marketplace.json.schema.json -d .claude-plugin/marketplace.json --spec=draft7 -c ajv-formats
+
       - name: Verify required files exist
         run: |
           required_files=(
             ".claude-plugin/plugin.json"
+            ".claude-plugin/marketplace.json"
+            "schemas/plugin.json.schema.json"
+            "schemas/marketplace.json.schema.json"
             "skills/adr/SKILL.md"
             "skills/setup/SKILL.md"
+            "skills/lint/SKILL.md"
             "agents/adr-generator.md"
             "instructions/adr.coding.md"
             "instructions/adr.review.md"

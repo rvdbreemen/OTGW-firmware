@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/rvdbreemen/adr-kit/schemas/marketplace.json.schema.json",
+  "title": "Claude Code plugin marketplace manifest (.claude-plugin/marketplace.json)",
+  "description": "Hand-curated schema for the Claude Code marketplace manifest. A marketplace manifest registers one or more plugins under a marketplace name so users can install them via /plugin install <plugin>@<marketplace>. Bug prevented: v0.7.1 bug was that the repo only had .claude-plugin/plugin.json (per-plugin manifest) but lacked .claude-plugin/marketplace.json (this file), which caused /plugin marketplace add <user>/<repo> to register the marketplace name correctly but /plugin install <plugin>@<marketplace> to fail with 'Unknown command' for the plugin's own slash commands. The required-files CI step covers presence; this schema covers structure.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["name", "description", "owner", "plugins"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Marketplace identifier. Used as the suffix in /plugin install <plugin>@<marketplace>. Kebab-case lowercase.",
+      "pattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
+      "minLength": 2,
+      "maxLength": 64
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the marketplace.",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "owner": {
+      "type": "object",
+      "description": "Marketplace owner metadata. Must be an object with at least name; optional url.",
+      "additionalProperties": true,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" }
+      }
+    },
+    "plugins": {
+      "type": "array",
+      "description": "List of plugins offered by this marketplace. Each entry must declare name, source, version, and description.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["name", "source", "version", "description"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Plugin name. Must match the name field in the plugin's own .claude-plugin/plugin.json.",
+            "pattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
+            "minLength": 2,
+            "maxLength": 64
+          },
+          "source": {
+            "type": "string",
+            "description": "Path or URL where the plugin is located. './' for plugins co-located with the marketplace manifest.",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "description": "Plugin version. Should match the version in the plugin's own manifest.",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?(\\+[A-Za-z0-9.-]+)?$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "homepage": { "type": "string", "format": "uri" },
+          "license": { "type": "string", "minLength": 1, "maxLength": 64 }
+        }
+      }
+    }
+  }
+}
