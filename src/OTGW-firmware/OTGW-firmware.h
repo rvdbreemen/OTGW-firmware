@@ -222,7 +222,7 @@ void startWebSocket();
 void handleWebSocket();
 void testWebhook(bool testOn);
 void evalWebhook();
-bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-054; defined in restAPI.ino)
+bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-056; defined in restAPI.ino)
 extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
 
 // SAT Weather forward declarations — defined in SATweather.ino

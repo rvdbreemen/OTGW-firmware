@@ -241,7 +241,7 @@ void startWebserver(){
 
   // Enable collection of headers the API layer needs:
   //   - If-None-Match: ETag conditional requests (index.html cache)
-  //   - Origin / Referer: CSRF same-origin check in restAPI.ino (ADR-054).
+  //   - Origin / Referer: CSRF same-origin check in restAPI.ino (ADR-056 §2).
   //     Without these, httpServer.header("Origin") always returns empty and
   //     isSameOriginRequest() treats every browser request as "non-browser",
   //     silently disabling CSRF protection.
