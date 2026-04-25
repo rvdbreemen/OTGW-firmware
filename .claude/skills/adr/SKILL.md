@@ -54,6 +54,26 @@ Create a new ADR when making a decision that:
 
 ---
 
+## Anti-Rationalization Guards
+
+ADRs fail not from lack of templates but from the agent (or human) talking themselves out of writing one. Below is a table of common excuses with their counter-arguments. When you hear yourself reaching for one of the left-column entries, stop and apply the right-column response.
+
+| Excuse | Counter-argument |
+|---|---|
+| "This decision is obvious" | Obvious to you, today, with the context fresh in your head. Not obvious to a maintainer in six months, an open-source contributor, or an AI agent reviewing the PR. Document the *why*. |
+| "I'll document it later" | You will not. The pattern goes in once and only comes out if a future bug forces it out. Cost of writing now: 15 to 30 minutes. Cost of re-deriving later: hours, sometimes a full incident. |
+| "The code speaks for itself" | Code shows *what* and *how*. ADRs document *why*. The why is never derivable from source: it lives in the constraints, the alternatives that were rejected, and the trade-offs accepted. |
+| "Everyone knows this pattern" | Everyone on the team *today*. Not the maintainer in three years. Not the contributor who shows up next week. Not the model running a future code review. |
+| "This is just the framework default" | Then say so explicitly. "Status: Accepted. We took the framework default for X because Y." Defaults embed assumptions; an ADR makes those assumptions inspectable. |
+| "It is too small to need an ADR" | Small *architecturally*? Then no ADR. Small *implementation* of a contract change? Still an ADR, because the contract is what future developers will trip over. |
+| "We can always change it later" | Every architectural choice constrains the next one. Document the chosen path now so a future change is a *deliberate* supersede, not an accidental drift. |
+| "I don't have time" | Pay 30 minutes now or pay hours when someone challenges the choice in code review six months from now and nobody can remember the rationale. |
+| "There are no real alternatives" | Almost never true. If you cannot name one, the alternative is "do nothing" or "the framework default": that is an alternative. Document it and the reason it lost. |
+
+This pattern is adapted from Jim's [adr-skill](https://github.com/Jvdbreemen/adr-skill), which drew on [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills). Wording calibrated for this project's tone, memory constraints, and history of long-lived ADRs (ADR-001 through ADR-087+).
+
+---
+
 ## Initial Codebase Analysis
 
 ### First-Time Use: Discovering Undocumented Decisions
@@ -172,6 +192,51 @@ Start with foundational decisions that:
 ✗ Don't skip negative consequences
 ✗ Don't write marketing copy - be honest about trade-offs
 ```
+
+---
+
+## Verification Gates
+
+An ADR moves from `Status: Proposed` to `Status: Accepted` only after all four gates pass. The gates are intentionally *named* so a reviewer can cite a single gate when blocking acceptance: "This ADR fails the Evidence gate, please add measurements." This formalises what "When in Doubt" later in this document captures implicitly, and it complements (not replaces) the Critical Analysis Guidelines.
+
+### Gate 1: Completeness
+
+The ADR has filled every load-bearing section.
+
+- [ ] Problem statement is unambiguous; a reader knows what the decision is *about*
+- [ ] Decision is stated as a single, declarative sentence (not a discussion)
+- [ ] At least 2 alternatives considered, each with a "why not chosen" line
+- [ ] Consequences are listed in *both* directions (positive and negative); a one-sided ADR fails this gate
+- [ ] Risks are named explicitly, each with at least one mitigation
+
+### Gate 2: Evidence
+
+Every claim that a reader could challenge is backed by something verifiable.
+
+- [ ] No bare adjectives where numbers are achievable: "saves 5-8 KB RAM" beats "saves memory"; "reduces ISR latency from 12 us to 4 us" beats "faster"
+- [ ] Constraint claims are anchored to a source: "ESP8266 has ~40 KB usable RAM" cites where (board datasheet, SDK doc, or measured)
+- [ ] Code references include `file:line` so the reviewer can verify
+- [ ] External claims (specs, RFCs, vendor docs) are linked, not paraphrased
+
+### Gate 3: Clarity
+
+A reader who has never seen this codebase can follow the argument.
+
+- [ ] Acronyms defined on first use: "PROGMEM (program memory; flash-resident strings)"
+- [ ] Technical concepts explained when load-bearing: "heap fragmentation: free RAM scattered into pieces too small to allocate from"
+- [ ] Code examples are concrete and runnable, not pseudo-code
+- [ ] The decision is explainable in one paragraph at the top, before the reader needs to read the alternatives
+
+### Gate 4: Consistency
+
+The ADR fits the existing record without creating contradictions.
+
+- [ ] No conflict with an Accepted ADR; if there is, this ADR is a supersede with explicit reference
+- [ ] Cross-references to related ADRs are present and accurate
+- [ ] Terminology matches the project glossary and other ADRs (always "PROGMEM", never "flash strings" mid-document)
+- [ ] ADR number is the next sequential, no gap, no reuse
+
+This pattern is adapted from Jim's [adr-skill](https://github.com/Jvdbreemen/adr-skill), which drew on [trailofbits/skills](https://github.com/trailofbits/skills). Gate names and checklists are calibrated for the OTGW-firmware ADR set: an ADR cannot transition to Accepted without all four gates passing, and a code-review block can cite a single gate by name.
 
 ---
 
