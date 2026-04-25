@@ -1,8 +1,8 @@
 # ADR-085: SAT (Smart Autotune Thermostat) Integration
 
-**Status:** Accepted
-Renumbered from ADR-062 on 2026-04-24 to resolve duplicate numbering (TASK-412). Content unchanged.
-**Date:** 2026-04-02
+## Status
+
+Accepted, 2026-04-02. Renumbered from ADR-062 on 2026-04-24 to resolve duplicate numbering (TASK-412). Content unchanged.
 
 ## Context
 
@@ -17,11 +17,6 @@ The SAT (Smart Autotune Thermostat) project (https://github.com/Alexwijn/SAT) im
 - The existing OTGW relay functionality must not be affected when SAT is disabled
 - External sensors (MQTT/REST) are optional; the system must work with OT bus data alone
 - Settings must persist across reboots; runtime state is RAM-only
-
-### Alternatives considered:
-1. **Keep SAT in HA only** — Rejected: single point of failure, high latency, no standalone operation
-2. **Port full SAT Python codebase** — Rejected: too complex, many HA dependencies, not suitable for embedded
-3. **Selective port of core algorithms** — Chosen: heating curve, PID v3, cycle tracker, PWM/continuous modes
 
 ## Decision
 
@@ -71,7 +66,13 @@ All safety mechanisms are RAM-only — no flash writes required:
   - Subscribe: `<mqtt-prefix>/set/<node-id>/sat/{target,indoor_temp,outdoor_temp,enabled,control_mode}`
   - Publish: `<mqtt-prefix>/value/<node-id>/sat/{mode,setpoint,heating_curve,pid_output,target,error,pid_p,pid_i,pid_d,boiler_status,cycle_class,pwm_duty,safety_tripped}`
 - **HA auto-discovery**: Climate entity + 7 sensor entities via `mqttha.cfg`
-- **Web UI**: Dedicated SAT dashboard tab (`sat.js`) — visualization only, polls status every 5s
+- **Web UI**: Dedicated SAT dashboard tab (`sat.js`): visualization only, polls status every 5s
+
+## Alternatives Considered
+
+1. **Keep SAT in HA only**: Rejected. Single point of failure, high latency, no standalone operation.
+2. **Port full SAT Python codebase**: Rejected. Too complex, many HA dependencies, not suitable for embedded.
+3. **Selective port of core algorithms**: Chosen. Heating curve, PID v3, cycle tracker, PWM/continuous modes.
 
 ## Consequences
 
@@ -93,7 +94,7 @@ All safety mechanisms are RAM-only — no flash writes required:
 - PWM mode may not suit all boilers — mitigated by auto-switch logic and manual mode override
 - Arduino `.ino` concatenation ordering means `SATcontrol.ino` compiles before `SATcycles.ino` — mitigated by accessor functions for cross-file data access
 
-## Related
+## Related Decisions
 
 - ADR-002: Modular .ino Architecture (file split pattern)
 - ADR-006: MQTT Integration Pattern (topic structure)
@@ -101,4 +102,7 @@ All safety mechanisms are RAM-only — no flash writes required:
 - ADR-019: REST API Versioning Strategy (v2 endpoints)
 - ADR-041: JIT HA Discovery (auto-discovery config)
 - ADR-051: Dual Encapsulating Structs (settings/state pattern)
-- SAT upstream: https://github.com/Alexwijn/SAT
+
+## References
+
+- SAT upstream project: <https://github.com/Alexwijn/SAT>

@@ -1,8 +1,8 @@
-# ADR-087: Frame Bridge Pattern — Raw OT Frames to PIC-Format Text
+# ADR-087: Frame Bridge Pattern: Raw OT Frames to PIC-Format Text
 
-**Status:** Accepted
-Renumbered from ADR-065 on 2026-04-24 to resolve duplicate numbering (TASK-412). Content unchanged.
-**Date:** 2026-04-04
+## Status
+
+Accepted, 2026-04-04. Renumbered from ADR-065 on 2026-04-24 to resolve duplicate numbering (TASK-412). Content unchanged.
 
 ## Context
 
@@ -17,12 +17,6 @@ This text format feeds into:
 - **Home Assistant auto-discovery** -- generates HA MQTT config based on seen message IDs
 
 The OT-direct driver on OTGW32 works with raw 32-bit OpenTherm frames from the `opentherm_library` (interrupt-driven Manchester decoding). These frames arrive as `unsigned long` values with no text formatting.
-
-### Alternatives considered
-
-1. **Duplicate the downstream pipeline for raw frames** -- Rejected: would require parallel implementations of the parser, MQTT publisher, WebSocket streamer, REST responses, and HA discovery. Massive code duplication and maintenance burden.
-2. **Refactor the entire pipeline to accept raw 32-bit frames** -- Rejected: invasive change touching every consumer. High risk of regressions in the stable PIC code path. Violates minimal-change-surface principle.
-3. **Bridge pattern: format raw frames as PIC-style text, feed into existing pipeline** -- Chosen: one small adapter function, zero changes to downstream code.
 
 ## Decision
 
@@ -55,6 +49,12 @@ For OT-direct command confirmations (e.g., setpoint changes via MQTT or REST), t
 
 In OT-direct mode, the OpenTherm library's interrupt callbacks deliver raw frames. The cooperative loop in `OTDirect.ino` checks for completed frame transactions and calls `bridgeFrameToParser()` with the appropriate origin character. From that point forward, the data flow is identical to the PIC path.
 
+## Alternatives Considered
+
+1. **Duplicate the downstream pipeline for raw frames**: Rejected. Would require parallel implementations of the parser, MQTT publisher, WebSocket streamer, REST responses, and HA discovery. Massive code duplication and maintenance burden.
+2. **Refactor the entire pipeline to accept raw 32-bit frames**: Rejected. Invasive change touching every consumer. High risk of regressions in the stable PIC code path. Violates minimal-change-surface principle.
+3. **Bridge pattern: format raw frames as PIC-style text, feed into existing pipeline**: Chosen. One small adapter function, zero changes to downstream code.
+
 ## Consequences
 
 ### Benefits:
@@ -73,8 +73,12 @@ In OT-direct mode, the OpenTherm library's interrupt callbacks deliver raw frame
 - If `processOT()` is ever refactored to accept raw frames natively, the bridge becomes unnecessary overhead (but removal is trivial)
 - Origin character mapping must stay consistent between PIC firmware and the bridge -- a mismatch would cause silent misclassification of frame direction
 
-## Related
+## Related Decisions
 
-- **ADR-063**: OTGW32 hardware support -- establishes the dual build and frame bridge concept
-- **ADR-038**: OpenTherm data flow pipeline -- documents the `processOT()` parser and downstream consumers
-- **Code**: `OTDirect.ino` (`bridgeFrameToParser`, `synthesizeResponse`), `OTGW-Core.ino` (`processOT`)
+- **ADR-063**: OTGW32 hardware support: establishes the dual build and frame bridge concept
+- **ADR-038**: OpenTherm data flow pipeline: documents the `processOT()` parser and downstream consumers
+
+## References
+
+- `OTDirect.ino`: `bridgeFrameToParser`, `synthesizeResponse`
+- `OTGW-Core.ino`: `processOT`

@@ -1,7 +1,15 @@
 # ADR-082: ESP8266 Arduino Core 2.7.4 LTS pin for the 2.0.0 line
 
-**Status:** Accepted
-**Date:** 2026-04-24
+<!-- adr-kit-lint: skip consistency -->
+<!-- The filename embeds the version triplet "2.7.4" with literal dots, which
+     is more readable than "2-7-4" or "274" for the only ADR that pins a
+     specific upstream Core version. The Consistency gate's strict
+     ADR-NNN-[a-z0-9-]+.md kebab-case pattern is opted out on this single
+     file via the v0.9.0 per-ADR marker; all other gates continue to apply. -->
+
+## Status
+
+Accepted, 2026-04-24.
 
 ## Context
 
@@ -161,26 +169,29 @@ hardware.
   ~77% flash and ~85% RAM on the current 2.0.0 codebase, within the
   operational envelope of the Wemos D1 mini with 4M2M partition layout.
 
-## Related
+## Related Decisions
 
-- ADR-001 (ESP8266 Platform Selection) — superseded by ADR-061;
+- ADR-001 (ESP8266 Platform Selection): superseded by ADR-061;
   originally pinned the platform with no specific Core version
   preference.
-- ADR-013 (Arduino Framework over ESP-IDF) — unaffected; this ADR
+- ADR-013 (Arduino Framework over ESP-IDF): unaffected; this ADR
   chooses a Core *version* within the Arduino framework, not the
   framework itself.
-- ADR-015 (NTP AceTime Time Management) — this ADR introduces an
+- ADR-015 (NTP AceTime Time Management): this ADR introduces an
   explicit AceTime version pin (v2.0.1) that ADR-015 did not specify.
-- ADR-061 (Unified ESP8266/ESP32 Platform Abstraction) — the abstraction
+- ADR-061 (Unified ESP8266/ESP32 Platform Abstraction): the abstraction
   layer that makes this single-target Core downgrade possible without
   affecting ESP32.
-- TASK-397 — diagnostic instrumentation that identified the Core 3.1.2
+- TASK-397: diagnostic instrumentation that identified the Core 3.1.2
   reboot regression.
-- TASK-398 — LTS branch fork that validated the rollback.
-- TASK-399 — SimpleTelnet printf-stack bump that accompanied this work.
-- `platformio.ini` commit `08585837` — applies this pin.
-- PR [esp8266/Arduino#8598](https://github.com/esp8266/Arduino/pull/8598) —
+- TASK-398: LTS branch fork that validated the rollback.
+- TASK-399: SimpleTelnet printf-stack bump that accompanied this work.
+
+## References
+
+- `platformio.ini` commit `08585837`: applies this pin.
+- PR [esp8266/Arduino#8598](https://github.com/esp8266/Arduino/pull/8598):
   upstream breaking change that motivates the rollback.
-- `docs/research/deep-research-report_arduino_core_3.1.2_reboot_issue_after_OTA.md`
-  — field diagnostic evidence for the Core 3.1.2 OTA-reboot regression
+- `docs/research/deep-research-report_arduino_core_3.1.2_reboot_issue_after_OTA.md`:
+  field diagnostic evidence for the Core 3.1.2 OTA-reboot regression
   (the report that prompted this rollback decision).

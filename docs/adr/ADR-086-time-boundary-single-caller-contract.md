@@ -104,6 +104,12 @@ The check implementation should be resilient to:
 | New sub-minute granularity (e.g., every 10s) | Use `DECLARE_TIMER_SEC` + `DUE()` — these are not consume-on-read and can have multiple consumers safely. |
 | Moving a consumer between functions | Ensure the dispatcher still captures the flag exactly once; do not reintroduce the helper elsewhere. |
 
+## Alternatives Considered
+
+- **Per-consumer local-static (each feature reimplements day-tracking).** Rejected: duplicates state, obscures intent, makes removal of a consumer error-prone.
+- **Multi-subscriber event bus with callback registration.** Rejected: overkill for four events on a microcontroller with no dynamic memory management pattern elsewhere.
+- **Convert the helpers to non-consuming (return flag without updating lastX; caller updates).** Rejected: breaks the existing call sites, requires every call to become two lines, error-prone transition.
+
 ## Consequences
 
 ### Benefits
@@ -119,17 +125,14 @@ The check implementation should be resilient to:
 - `sendtimecommand` gains two new parameters. Only one caller (`doTaskMinuteChanged`) so migration is contained.
 - All three flags (`hourFlag`/`dayFlag`/`yearFlag`) fire `true` on the first post-NTP-sync dispatcher tick because the helpers' `lastX = -1` sentinels mismatch any real wall-clock value. Downstream consumers must defend against boot-time first-minute fires: `runNightlyRestartCheck` already does via `uptime > 3600`, and `sendMQTTheapdiag` publishes an acceptable near-zero snapshot (overwritten on the next real hour). New consumers added to `if (hourFlag) { ... }` must consider this.
 
-### Alternatives considered and rejected
+## Related Decisions
 
-- **Per-consumer local-static (each feature reimplements day-tracking).** Rejected: duplicates state, obscures intent, makes removal of a consumer error-prone.
-- **Multi-subscriber event bus with callback registration.** Rejected: overkill for four events on a microcontroller with no dynamic memory management pattern elsewhere.
-- **Convert the helpers to non-consuming (return flag without updating lastX; caller updates).** Rejected: breaks the existing call sites, requires every call to become two lines, error-prone transition.
+- ADR-062: retained discovery verification (introduces the new daily consumer that motivates this rule)
+- TASK-345: already established single-caller dispatch for `hourChanged()` in `doTaskEvery60s`; this refactor moves that same pattern into `doTaskMinuteChanged` for wall-clock alignment
+- TASK-350: implements this ADR
+- TASK-351: adds the new daily consumer inside the unified dispatcher
 
-## Related
+## References
 
-- ADR-062 — retained discovery verification (introduces the new daily consumer that motivates this rule)
-- TASK-345 — already established single-caller dispatch for `hourChanged()` in `doTaskEvery60s`; this refactor moves that same pattern into `doTaskMinuteChanged` for wall-clock alignment
-- TASK-350 — implements this ADR
-- TASK-351 — adds the new daily consumer inside the unified dispatcher
-- `helperStuff.ino:467-515` — the four helper definitions (unchanged by this ADR)
-- `networkStuff.ino:494-504` — current `sendtimecommand` (signature changes in TASK-350)
+- `helperStuff.ino:467-515`: the four helper definitions (unchanged by this ADR)
+- `networkStuff.ino:494-504`: current `sendtimecommand` (signature changes in TASK-350)

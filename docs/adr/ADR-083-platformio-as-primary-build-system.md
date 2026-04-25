@@ -1,8 +1,8 @@
 # ADR-083: PlatformIO as primary build system for dual-target firmware
 
-**Status:** Accepted
-**Date:** 2026-04-24
-**Supersedes:** ADR-014 (Dual Build System — Makefile + Python Script)
+## Status
+
+Accepted, 2026-04-24. Supersedes ADR-014 (Dual Build System: Makefile + Python Script).
 
 ## Context
 
@@ -168,13 +168,16 @@ retire `build.py` on 2.0.0 once no automation depends on it.
 - **Release notes for 2.0.0-beta** should state the build-tool
   expectation so downstream maintainers know which command to use.
 
-## Related
+## Related Decisions
 
-- ADR-014 (Dual Build System) — superseded by this ADR.
-- ADR-061 (Unified ESP8266/ESP32 Platform Abstraction) — introduced
+- ADR-014 (Dual Build System): superseded by this ADR.
+- ADR-061 (Unified ESP8266/ESP32 Platform Abstraction): introduced
   the `platformio.ini` file and the dual-env configuration.
-- ADR-082 (ESP8266 Arduino Core 2.7.4 LTS pin) — the Core-version
+- ADR-082 (ESP8266 Arduino Core 2.7.4 LTS pin): the Core-version
   pinning lives in the PlatformIO `[env:esp8266]` block described here.
-- `platformio.ini` — the configuration file this ADR centres on.
-- `scripts/patch_pio_libs.py` — the pre-hook library patcher referenced
+
+## References
+
+- `platformio.ini`: the configuration file this ADR centres on.
+- `scripts/patch_pio_libs.py`: the pre-hook library patcher referenced
   in Context §2.
