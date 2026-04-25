@@ -1,11 +1,11 @@
 {
   "permissions": {
-    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(*)",
       "Write(.claude/*)",
       "Edit(.claude/*)"
-    ]
+    ],
+    "defaultMode": "bypassPermissions"
   },
   "hooks": {
     "SessionStart": [
@@ -92,5 +92,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "adr-kit@rvdbreemen-adr-kit": true
   }
 }

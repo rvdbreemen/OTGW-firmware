@@ -214,3 +214,14 @@ python evaluate.py --quick   # Fast check
 | `otmonitor-6.6/` | How a well-tested client drives the PIC |
 
 **If you cannot name the C4 component that owns the code you are about to change, stop and read c4-context.md first.**
+
+## ADR Kit Rules
+
+This project uses [adr-kit](https://github.com/rvdbreemen/adr-kit) for Architecture Decision Records. The skill, the `adr-generator` subagent, and the path-specific instructions are loaded via the plugin.
+
+- Use `/adr-kit:adr` (or invoke the `adr-generator` subagent) when authoring a new ADR.
+- During coding work, follow the rules in the plugin's `instructions/adr.coding.md`.
+- During code review, apply the six named ADR checks in the plugin's `instructions/adr.review.md`.
+- An ADR cannot flip from `Proposed` to `Accepted` until it passes all four verification gates: Completeness, Evidence, Clarity, Consistency.
+
+ADR files live at `docs/adr/ADR-XXX-title.md`. Status flow: `Proposed` to `Accepted`, then immutable. To reverse a decision, write a superseding ADR rather than editing the original.

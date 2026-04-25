@@ -1,11 +1,11 @@
 ---
 id: TASK-413
 title: Adopt anti-rationalization guards and verification gates from Jim's adr-skill
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-25 14:27'
-updated_date: '2026-04-25 14:28'
+updated_date: '2026-04-25 14:29'
 labels:
   - skill
   - adr
@@ -38,13 +38,33 @@ Source attribution: a link to Jim's adr-skill at the bottom of each new section,
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 .claude/skills/adr/SKILL.md contains a new top-level section 'Anti-Rationalization Guards' with at least 7 excuse/counter-argument pairs in a markdown table
-- [ ] #2 The Anti-Rationalization Guards section is positioned between 'When NOT to Create ADR For' (or its parent) and 'Initial Codebase Analysis'
-- [ ] #3 .claude/skills/adr/SKILL.md contains a new top-level section 'Verification Gates' with four named gates (Completeness, Evidence, Clarity, Consistency), each with at least 4 checklist items
-- [ ] #4 The Verification Gates section is positioned between 'ADR Principles' and 'ADR Template'
-- [ ] #5 Both new sections include a brief credit line linking to Jim's adr-skill (https://github.com/Jvdbreemen/adr-skill) and acknowledging the upstream inspirations (addyosmani/agent-skills, trailofbits/skills)
-- [ ] #6 All existing project-specific content is preserved verbatim: Initial Codebase Analysis, Human Decision Documentation, ADR examples from the codebase, CI/CD integration examples, project-specific categories
-- [ ] #7 Skill frontmatter (name, description, license) is unchanged
-- [ ] #8 No em dashes introduced anywhere in the new content
-- [ ] #9 Markdown structure (heading levels, table format, list style, code-fence conventions) is consistent with the rest of the file
+- [x] #1 .claude/skills/adr/SKILL.md contains a new top-level section 'Anti-Rationalization Guards' with at least 7 excuse/counter-argument pairs in a markdown table
+- [x] #2 The Anti-Rationalization Guards section is positioned between 'When NOT to Create ADR For' (or its parent) and 'Initial Codebase Analysis'
+- [x] #3 .claude/skills/adr/SKILL.md contains a new top-level section 'Verification Gates' with four named gates (Completeness, Evidence, Clarity, Consistency), each with at least 4 checklist items
+- [x] #4 The Verification Gates section is positioned between 'ADR Principles' and 'ADR Template'
+- [x] #5 Both new sections include a brief credit line linking to Jim's adr-skill (https://github.com/Jvdbreemen/adr-skill) and acknowledging the upstream inspirations (addyosmani/agent-skills, trailofbits/skills)
+- [x] #6 All existing project-specific content is preserved verbatim: Initial Codebase Analysis, Human Decision Documentation, ADR examples from the codebase, CI/CD integration examples, project-specific categories
+- [x] #7 Skill frontmatter (name, description, license) is unchanged
+- [x] #8 No em dashes introduced anywhere in the new content
+- [x] #9 Markdown structure (heading levels, table format, list style, code-fence conventions) is consistent with the rest of the file
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+.claude/skills/adr/SKILL.md updated with two new top-level sections, both additive, both attributed, file grew from 1015 to 1080 lines.
+
+Section 1: Anti-Rationalization Guards. Inserted between "Do NOT Create ADR For" and "Initial Codebase Analysis". Contains a 9-row excuse / counter-argument table calibrated for this project's tone: "obvious", "later", "code speaks for itself", "everyone knows", "framework default", "too small", "change later", "no time", "no real alternatives". Closing paragraph credits Jim's adr-skill with link to https://github.com/Jvdbreemen/adr-skill and acknowledges upstream addyosmani/agent-skills.
+
+Section 2: Verification Gates. Inserted between ADR Principles and ADR Template. Four named gates (Completeness, Evidence, Clarity, Consistency), each with 4-5 checklist items. Framing: an ADR cannot move from Status: Proposed to Status: Accepted without all four gates passing, and a code-review block can cite a single gate by name. Closing paragraph credits Jim's adr-skill with link and acknowledges upstream trailofbits/skills.
+
+Project-specific content preserved verbatim: skill frontmatter, Initial Codebase Analysis (with ADR-009 PROGMEM example), Human Decision Documentation pattern with Decision Maker: User: Name attribution, CI/CD integration with evaluate.py and .github/workflows/adr-check.yml template, 11-category classification, ADR Examples from OTGW-firmware (ADR-003, 004, 029), Quick Reference checklist, Common ADR Mistakes to Avoid, Critical Analysis Guidelines, When in Doubt questions, Skill Invocation, Resources.
+
+Verification:
+- grep "—" against the whole file: 0 matches. No em dashes introduced.
+- File length 1080 lines (was 1015), delta consistent with two additive sections.
+- Frontmatter unchanged (name, description, license).
+- Markdown structure consistent with rest of file (--- separators, ## top-level headings, table format).
+
+All 9 acceptance criteria met. Committed and pushed.
+<!-- SECTION:FINAL_SUMMARY:END -->
