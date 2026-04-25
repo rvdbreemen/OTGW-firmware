@@ -1,0 +1,18 @@
+{
+  "name": "rvdbreemen-adr-kit",
+  "description": "Marketplace hosting the adr-kit plugin: a drop-in Architecture Decision Record toolkit for AI coding agents.",
+  "owner": {
+    "name": "Robert van den Breemen",
+    "url": "https://github.com/rvdbreemen"
+  },
+  "plugins": [
+    {
+      "name": "adr-kit",
+      "source": "./",
+      "version": "0.7.1",
+      "description": "Drop-in ADR toolkit: skill, ADR-generator subagent, /adr-kit:setup, /adr-kit:lint, path-specific coding and review instructions.",
+      "homepage": "https://github.com/rvdbreemen/adr-kit",
+      "license": "MIT"
+    }
+  ]
+}
