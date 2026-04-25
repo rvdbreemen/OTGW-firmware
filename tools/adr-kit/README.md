@@ -94,6 +94,53 @@ The toolkit defaults to:
 
 You can change the convention if your project already has a different one (some teams use `adr-NNNN-` lowercase 4-digit, or `0001-` with no prefix). Edit the `## Project Conventions` section in the skill and the agent definition; the rest of the toolkit follows from there.
 
+## Configuration (since v0.9.0)
+
+Established projects often have a long history of ADRs that predate the four canonical gates. Linting them under strict rules produces noise rather than actionable feedback. Two opt-in mechanisms let a project apply the gates surgically: strict on new ADRs, advisory on legacy ones.
+
+### Project-level config: `docs/adr/.adr-kit.json`
+
+Drop this file at `docs/adr/.adr-kit.json` to set the project's lint policy. Skipped if absent (defaults: everything strict, exact match to v0.7.x output).
+
+```json
+{
+  "strict_from": "ADR-042",
+  "ignore": ["ADR-001", "ADR-007"],
+  "severity": {
+    "completeness": "advisory_before_strict_from",
+    "evidence": "advisory_before_strict_from",
+    "clarity": "always_advisory",
+    "consistency": "always_strict"
+  },
+  "template": {
+    "required_sections": ["## Status", "## Context", "## Decision", "## Consequences"]
+  }
+}
+```
+
+- `strict_from` is the first ADR id (inclusive) on which the gates are enforced strictly. ADRs with a lower number are linted in advisory mode.
+- `ignore` lists ADR ids (or filenames) to skip entirely.
+- `severity` overrides the per-gate behaviour. Legal values: `always_strict`, `always_advisory`, `advisory_before_strict_from`. Consistency stays strict by default because filename / heading mismatches and duplicate numbers are real bugs regardless of when the ADR was written.
+- `template.required_sections` overrides the canonical seven sections with your project's actual template.
+
+A fully annotated copy lives at [`examples/.adr-kit.sample.json`](examples/.adr-kit.sample.json).
+
+### Per-ADR markers
+
+For one-off grandfathering without a project-wide config, drop one of these HTML comments anywhere in an ADR file:
+
+```html
+<!-- adr-kit-lint: skip -->
+<!-- adr-kit-lint: skip completeness, evidence -->
+<!-- adr-kit-lint: advisory -->
+```
+
+`skip` (no args) skips the file entirely; `skip <gate>[, <gate>...]` skips specific gates; `advisory` runs all gates in advisory mode on this file. A worked example lives at [`examples/ADR-sample-003-grandfathered-legacy.md`](examples/ADR-sample-003-grandfathered-legacy.md).
+
+### Result tiers
+
+`/adr-kit:lint` now reports three tiers: PASS, ADVISORY (a finding that does not block but is reported), and FAIL. The aggregate's "next step" line always points at a FAIL, never an ADVISORY: ADVISORY is informational, FAIL is what you act on.
+
 ## FAQ
 
 **Where are ADRs stored?**

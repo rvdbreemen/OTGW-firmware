@@ -1,0 +1,16 @@
+{
+  "_comment_top": "OTGW-firmware lint policy (adr-kit v0.9.0+). ADRs 1 through 81 predate adoption of the four canonical adr-kit gates and use a legacy structure (Decision drivers, Pros and Cons, Risks and Mitigations subsections). They are linted in advisory mode for completeness/evidence/clarity. ADRs 82 onward are linted strictly, so any new ADR is held to the canonical-seven section list out of the box. Consistency stays always_strict regardless of strict_from: filename / heading mismatches and duplicate ADR numbers are real bugs at any age.",
+
+  "_comment_template_choice": "We deliberately do NOT override template.required_sections here. The recent ADRs (082+) currently lack a few canonical headings (Status as heading, Related Decisions, References); the FAIL output is the actionable next step. If at some point we adopt a project-specific template (for example: only ## Context / ## Decision / ## Consequences as load-bearing headings, with Status inline as a bold prefix), add a template.required_sections array here listing the project's actual required headings, and the FAILs will resolve.",
+
+  "strict_from": "ADR-082",
+
+  "ignore": [],
+
+  "severity": {
+    "completeness": "advisory_before_strict_from",
+    "evidence": "advisory_before_strict_from",
+    "clarity": "advisory_before_strict_from",
+    "consistency": "always_strict"
+  }
+}

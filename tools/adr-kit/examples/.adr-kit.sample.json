@@ -1,0 +1,30 @@
+{
+  "_comment_top": "Drop this file at docs/adr/.adr-kit.json (rename: remove the .sample suffix). It tells /adr-kit:lint how strict to be on which ADRs. Underscore-prefixed keys (_comment, _example, ...) are silently ignored by the lint skill so you can keep notes in the file. Remove or keep them; either way the file stays valid JSON.",
+
+  "_comment_strict_from": "First ADR id (inclusive) on which the four gates are enforced strictly. Lower-numbered ADRs are linted in advisory mode for the gates that opt in via 'severity'. Use this when adopting adr-kit on a project that already has historical ADRs you do not want to retro-fit. Example: 'ADR-082' means ADR-001 through ADR-081 lint advisory; ADR-082 onward lints strict.",
+  "strict_from": "ADR-042",
+
+  "_comment_ignore": "ADRs to skip entirely. Useful for archived or superseded entries whose status is final. Both 'ADR-XXX' identifiers and full filenames are accepted. Skipped ADRs appear in the aggregate as SKIPPED but produce no per-gate output.",
+  "ignore": [
+    "ADR-001",
+    "ADR-007"
+  ],
+
+  "_comment_severity": "Per-gate severity. Legal values: 'always_strict' (failures are FAIL), 'always_advisory' (failures are ADVISORY), 'advisory_before_strict_from' (default for completeness/evidence/clarity when strict_from is set: ADVISORY before strict_from, FAIL after). Consistency stays always_strict by default because filename / heading mismatches and duplicate numbers are real bugs regardless of when the ADR was written.",
+  "severity": {
+    "completeness": "advisory_before_strict_from",
+    "evidence": "advisory_before_strict_from",
+    "clarity": "always_advisory",
+    "consistency": "always_strict"
+  },
+
+  "_comment_template": "Override the canonical seven required sections with your project's actual template. Each entry is the exact heading text including the '## ' prefix; order matters. Omit this whole 'template' object to use the canonical seven. Set it when your historical template legitimately differs (for example, a leaner four-section template).",
+  "template": {
+    "required_sections": [
+      "## Status",
+      "## Context",
+      "## Decision",
+      "## Consequences"
+    ]
+  }
+}

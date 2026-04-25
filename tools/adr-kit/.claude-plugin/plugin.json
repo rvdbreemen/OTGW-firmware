@@ -1,7 +1,7 @@
 {
   "name": "adr-kit",
   "description": "Drop-in Architecture Decision Record toolkit for AI coding agents. Skill, ADR-generator subagent, lint command, setup command, and path-specific instructions for coding and code review.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "author": {
     "name": "Robert van den Breemen",
     "url": "https://github.com/rvdbreemen"

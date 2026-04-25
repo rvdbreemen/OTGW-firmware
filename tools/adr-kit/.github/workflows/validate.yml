@@ -46,6 +46,8 @@ jobs:
             "instructions/adr.coding.md"
             "instructions/adr.review.md"
             "examples/ADR-template.md"
+            "examples/.adr-kit.sample.json"
+            "examples/ADR-sample-003-grandfathered-legacy.md"
             "README.md"
             "INSTALL.md"
             "LICENSE"
