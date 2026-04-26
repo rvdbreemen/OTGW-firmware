@@ -320,6 +320,13 @@ var SAT = (function() {
 
     // Update DHW controls
     updateDHWControls(d);
+
+    // Patch 05: notify dependents (sat-slider.js) that the SAT panel
+    // has been (re-)rendered. Without this dispatch, after a poll
+    // rewrites parts of the DHW container the slider live-fill stops
+    // working until a full page reload. Cheap; the listener bind() is
+    // idempotent so re-dispatching is safe.
+    document.dispatchEvent(new Event('sat:rendered'));
   }
 
   // --- Chart ---
