@@ -4,27 +4,38 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-## What's New in v1.4.1
+> ⚠️ **Don't Panic, but: this is the development branch.**
+>
+> The README on `dev` describes work in progress (currently `1.5.0-beta`). Things may break. Things may compile-and-not-work. Things may work fine and then forget about it on a Tuesday. By using anything from this branch you accept the risk: lost settings, watchdog resets, partial filesystems, the works. Please use this branch only on a non-production device. Please do not flash it onto the gateway that runs your actual heating.
+>
+> For production gateways, install the latest stable release (currently `v1.4.1`) from the [GitHub releases page](https://github.com/rvdbreemen/OTGW-firmware/releases/latest). The `main` branch never carries this disclaimer; if you see this block, you are reading the `dev` branch's README.
 
-**v1.4.1 is the first public release in the 1.4.x series.** A 1.4.0 milestone was tracked internally but was never published as a standalone release: development continued until the full body of work was stable enough to ship in one go. If you are upgrading from v1.3.5, v1.4.1 contains everything. There is no v1.4.0 to install or skip.
+## What's coming in v1.5.0-beta (LTS line on Arduino Core 2.7.4)
 
-> **CRITICAL upgrade warning: flash filesystem FIRST, then firmware.** The Arduino Core 3.1.2 upgrade changed the LittleFS partition from 1 MB to 2 MB. All versions before v1.4.x shipped with Arduino Core 2.7.4 and a 1 MB filesystem. Flashing in the correct order (filesystem binary first, firmware binary second) preserves your settings. If you mistakenly flash the firmware first, the new firmware boots against the old 1 MB layout and spends 5-10 minutes reformatting the 2 MB partition on first boot — the device is unresponsive during that time and all your settings are lost. Always download both `*.ino.bin` and `*.littlefs.bin` and flash the filesystem binary first.
+The `1.5.x` line is the long-term-support track of OTGW-firmware on the ESP8266, built on **Arduino Core 2.7.4**. Field experience of `v1.4.x` on Arduino Core 3.1.2 surfaced post-OTA reboot reliability and PROGMEM alignment classes of issue that did not appear on Core 2.7.4. The `1.5.x` LTS line gives users who prefer the proven, conservative platform a place to land.
 
-Full release notes: [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md).
+The separate ESP32 / SAT `v2.0.0` exploration on `feature-dev-2.0.0-otgw32-esp32-sat-support` continues independently and is not affected by this LTS choice.
 
-Key highlights:
+> **Status: BETA, in active development on `dev`.** Not recommended for production deployments. A stable `v1.5.0` will follow once the line has soaked in the field. Users staying on `v1.4.1` need no action; `v1.4.1` continues to be the latest stable release.
 
-- **SimpleTelnet migration**: formatted welcome banner on debug connect, structured key dispatch, clean session teardown.
-- **ESP8266 Arduino Core 3.1.2**: updated lwIP, improved WiFi driver, systematic PROGMEM pointer safety audit.
-- **MQTT HA discovery rewrite**: 309 auto-discovery configs via a streaming, bitmap-driven drip API. No static staging buffer. Runtime Dallas sensor discovery. Comprehensive icon heuristics.
-- **WiFi reconnect hardening**: fixes a regression that prevented IP re-acquisition after a router reboot (no ESP reboot required).
-- **Heap-aware discovery drip**: 2 s normal / 10 s slow-mode with fragmentation-aware gates, Status-burst cooldown, and hold-per-interval hysteresis. Eliminates mid-discovery watchdog resets on loaded gateways.
-- **Retained-discovery self-heal**: node-scoped wildcard verify window counts what the broker actually has, re-announces missing configs. Daily auto-heal + on-demand via REST (`/api/v2/discovery`), telnet `V` key. See [ADR-062](docs/adr/ADR-062-retained-discovery-verification.md).
-- **Hourly heap diagnostic MQTT topic**: `<topTopic>/value/<uniqueid>/otgw-firmware/stats/heap` (retained, 17-field JSON covering free heap, fragmentation, tier counters, discovery state). Uniqueid scoping keeps multiple OTGWs on the same broker from overwriting each other.
-- **Unified time-boundary dispatcher**: hour/day/year triggers wall-clock aligned via single caller contract. See [ADR-064](docs/adr/ADR-064-time-boundary-single-caller-contract.md).
-- **OpenTherm v4.2 alignment**: fixes for MaxTSet/TdhwSet (0°C in HA), reserved ID range 58-69, WRITE_ACK handling.
-- **Configurable device manufacturer/model** in MQTT device announcement (credit: Schelte Bron).
-- **Nightly restart** with configurable hour, wired to the unified hourChanged dispatcher.
+Full release notes: [RELEASE_NOTES_1.5.0-beta.md](RELEASE_NOTES_1.5.0-beta.md).
+
+What's different from `v1.4.1`:
+
+- **Arduino Core 2.7.4 baseline**: 1 MB LittleFS partition, lwIP 2.1.x. PROGMEM byte-safe helpers introduced for Core 3.1.2 are kept as defensive code.
+- **Reboot reliability hardening**: deferred reboot with lifecycle heap snapshots, explicit service cleanup before `ESP.restart()`, `ESP.reset()` fallback path, `WiFi.disconnect()` removed from the reboot path (it wiped NVRAM credentials on Core 3.1.x).
+- **MQTT publish gating tightened**: msgId 0 / 5 / 6 / 100 fan-out gates with 60 s heartbeat, 1 s minimum spacing between gated publishes (250 ms in the latest beta), `BGTRACE`/`OTTRACE` off by default.
+- **HA auto-discovery for stats topics**: `otgw-firmware/stats/*` metrics now publish proper HA sensors instead of raw JSON, with `IS_PIC_ENTRY` flag honoured and pseudo-ID 247 stats repaired.
+- **WebUI design system**: self-hosted Inter and JetBrains Mono fonts, design tokens, cross-browser dark/light theme hardening, log render hotpath fix (10k entry cap on restore buffer).
+- **Boot and loop diagnostics**: `logBootSignature()` boot telemetry, optional `BGTRACE` per-phase timing in `doBackgroundTasks` and main loop, `processOT` sub-trace with per-phase heap and time deltas.
+
+## Latest stable release: v1.4.1
+
+`v1.4.1` is the latest published stable release on the Arduino Core 3.1.2 line. Highlights: SimpleTelnet migration, MQTT HA discovery streaming rewrite (309 configs across 80+ msgIds), WiFi reconnect hardening after router reboot, heap-aware discovery drip with fragmentation gates, retained-discovery self-heal ([ADR-062](docs/adr/ADR-062-retained-discovery-verification.md)), unified time-boundary dispatcher ([ADR-064](docs/adr/ADR-064-time-boundary-single-caller-contract.md)), OpenTherm v4.2 alignment fixes.
+
+> **Upgrade warning for v1.4.1**: the Arduino Core 3.1.2 upgrade changed the LittleFS partition from 1 MB to 2 MB. Flash the **filesystem binary first** (`*.littlefs.bin`), then the firmware binary, to preserve your settings. Reverse order triggers a 5-10 minute partition reformat on boot and all settings are lost. Full procedure in the [v1.4.1 release notes](docs/releases/RELEASE_NOTES_1.4.1.md).
+
+Full release notes: [docs/releases/RELEASE_NOTES_1.4.1.md](docs/releases/RELEASE_NOTES_1.4.1.md).
 
 ---
 
@@ -361,7 +372,9 @@ Release notes for all versions are in [docs/releases/](docs/releases/). Prebuilt
 
 | Version | Highlights |
 | --- | --- |
-| **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/RELEASE_NOTES_1.3.4.md) [1.3.5](RELEASE_NOTES_1.3.5.md) |
+| **1.5.x** | LTS line on Arduino Core 2.7.4 (in development): reboot reliability hardening, tighter MQTT publish gating, HA discovery for stats topics, WebUI design system, boot/loop diagnostics. [1.5.0-beta](RELEASE_NOTES_1.5.0-beta.md) |
+| **1.4.x** | Arduino Core 3.1.2 baseline, SimpleTelnet migration, MQTT HA discovery streaming rewrite (309 configs / 80+ msgIds), WiFi reconnect hardening, heap-aware discovery drip, retained-discovery self-heal, unified time-boundary dispatcher, OpenTherm v4.2 alignment. [1.4.1](docs/releases/RELEASE_NOTES_1.4.1.md) |
+| **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/RELEASE_NOTES_1.3.4.md) [1.3.5](docs/releases/RELEASE_NOTES_1.3.5.md) |
 | **1.2.0** | Complete HA discovery expansion (309 configs, 80+ message IDs), OpenTherm v4.2 alignment, webhook support, source-separated MQTT topics, v0/v1 API removed. [Notes](docs/releases/RELEASE_NOTES_1.2.0.md) |
 | **1.1.0** | Dallas sensor custom labels and graphs, RESTful API v2 (13 new endpoints), WebUI data persistence, browser debug console, PS mode detection, 20 bug fixes. [Notes](docs/releases/RELEASE_NOTES_1.1.0.md) |
 | **1.0.0** | Milestone release: real-time graphs, modern Web UI with dark mode, WebSocket live log, MQTT auto-discovery, interactive flashing tool, PROGMEM memory safety. [Notes](docs/releases/RELEASE_NOTES_1.0.0.md) |

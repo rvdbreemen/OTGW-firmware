@@ -168,7 +168,19 @@ There are **no breaking changes** in `<version>`. <one-line description of relea
 
 If there ARE breaking changes, list them with migration instructions. This file is the chronological record for users who skip multiple versions.
 
-### 4. README.md
+### 4. CHANGELOG.md update
+
+Update `CHANGELOG.md` at the repository root to land the release entry. The file follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) and the project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
+
+Conventions:
+
+- Move all bullets from the `## [Unreleased]` section into a new `## [<version>] - YYYY-MM-DD` section directly beneath it.
+- Categorise bullets per Keep a Changelog sections: **Added**, **Changed**, **Deprecated**, **Removed**, **Fixed**, **Security**. Omit empty sections entirely.
+- Each bullet is a single short line stating the user-visible effect. Do not duplicate the long-form release notes here; the changelog is a terse cross-version index, the release notes file is the detailed story.
+- Skip purely internal refactors that have no measurable user impact.
+- A fresh empty `## [Unreleased]` is re-added at the top in **Phase 9** when `dev` is bumped to the next development version. Do not add it now on `main`; that is a `dev`-only step.
+
+### 5. README.md
 
 Update the top of the file:
 
@@ -176,8 +188,9 @@ Update the top of the file:
 2. **Verify** the "Previous releases" link points to `docs/releases/`.
 3. **Update** the version history table in the collapsible section at the bottom if needed (add a new row or update the current minor series row with a link to the new release notes).
 4. Verify all version references are correct (no `-beta`, no stale version numbers).
+5. **Remove** the development-branch disclaimer block from `README.md`. The disclaimer (`> ⚠️ **Don't Panic, but: this is the development branch.**` and the two paragraphs that follow it) lives on `dev` only and must NOT be present on `main`. It is re-added on `dev` in **Phase 9** after the version bump. See the [Branch disclaimer contract](#branch-disclaimer-contract) section below for the exact block to remove and re-add.
 
-### 5. ADR updates (if applicable)
+### 6. ADR updates (if applicable)
 
 Check if any changes warrant a new ADR or update to an existing one:
 - New architectural patterns → new ADR
@@ -206,8 +219,13 @@ Run through every item below before creating the GitHub release.
 - [ ] `docs/BREAKING_CHANGES.md` has a section for this version
 - [ ] `README.md` "Current version" line is updated with the new version and links to the root release notes
 - [ ] `README.md` version history table includes the new version with correct link
+- [ ] `README.md` does NOT contain the dev-branch disclaimer block (the `Don't Panic, but: this is the development branch.` callout). On `main` this block must be absent; it is re-added on `dev` in Phase 9.
+- [ ] `CHANGELOG.md` has a `## [<version>] - YYYY-MM-DD` entry directly below `## [Unreleased]` containing all user-visible changes since the previous release.
+- [ ] `CHANGELOG.md` `## [Unreleased]` section is empty on `main` (a fresh empty section is re-added on `dev` in Phase 9).
 
 > **Check:** `grep -rn "beta\|Development Release\|new in this branch" README.md RELEASE_NOTES_*.md docs/releases/`
+> **Check:** `grep -n "Don't Panic" README.md` should return no matches on `main`.
+> **Check:** `head -25 CHANGELOG.md` should show `## [Unreleased]` with no bullets, then the new `## [<version>]` entry.
 
 ### No debug / placeholder artifacts
 
@@ -327,7 +345,7 @@ Both messages must include the contributor shoutout from the Thank You section a
 
 ## Phase 9: Sync dev branch with main
 
-After every release, `dev` must be updated so it descends from the release commit on `main`. This ensures future development builds on the released code.
+After every release, `dev` must be updated so it descends from the release commit on `main`. This ensures future development builds on the released code, and it is the moment to restore the `dev`-only conventions that were stripped for the release.
 
 ```bash
 # 1. Switch to dev
@@ -343,13 +361,50 @@ git merge main
 #      _VERSION_PATCH  → next number
 #      _VERSION_PRERELEASE beta  → uncommented
 
-# 4. Commit and push
-git add src/OTGW-firmware/version.h
+# 4. Re-add the dev-branch disclaimer to README.md
+#    The merge from main brought in main's no-disclaimer state. Restore the
+#    disclaimer block immediately after the project intro paragraph and before
+#    the "What's coming in v<next>-beta" section header.
+#    Update both version references inside the disclaimer:
+#      - "currently `<dev-version>-beta`"  → use the new dev version
+#      - "currently `v<latest-stable>`"    → still the just-released stable
+#    See the "Branch disclaimer contract" section below for the exact block.
+
+# 5. Add a fresh empty ## [Unreleased] section to the top of CHANGELOG.md
+#    Phase 5 created the ## [<just-released>] entry on main. On dev we add a
+#    new "## [Unreleased]" header above it so future commits have a place to
+#    log changes. The body should read:
+#      "_No unreleased changes yet. New work on `dev` lands here._"
+
+# 6. Commit and push
+git add src/OTGW-firmware/version.h README.md CHANGELOG.md
 git commit -m "feat: Bump version to v<next>-beta for development"
 git push origin dev
 ```
 
-After this, `dev` is ahead of `main` by exactly one commit (the version bump). All new feature branches should be created from `dev`.
+After this, `dev` is ahead of `main` by exactly one commit (the version bump and dev-only restoration). All new feature branches should be created from `dev`.
+
+### Branch disclaimer contract
+
+The README on `dev` carries a development-branch disclaimer; the README on `main` never does. This is enforced by the steps in Phase 5 (remove on main) and Phase 9 (re-add on dev). The contract is mechanical so it does not drift.
+
+**Exact disclaimer block** (paste between the intro paragraph and the `## What's coming in v<version>-beta` header on `dev`, and update the two version references each release cycle):
+
+```markdown
+> ⚠️ **Don't Panic, but: this is the development branch.**
+>
+> The README on `dev` describes work in progress (currently `<dev-version>-beta`). Things may break. Things may compile-and-not-work. Things may work fine and then forget about it on a Tuesday. By using anything from this branch you accept the risk: lost settings, watchdog resets, partial filesystems, the works. Please use this branch only on a non-production device. Please do not flash it onto the gateway that runs your actual heating.
+>
+> For production gateways, install the latest stable release (currently `v<latest-stable>`) from the [GitHub releases page](https://github.com/rvdbreemen/OTGW-firmware/releases/latest). The `main` branch never carries this disclaimer; if you see this block, you are reading the `dev` branch's README.
+```
+
+**Why the contract exists:**
+
+- Users who land on the `main` branch's README via GitHub's default branch view should see a clean project description without development warnings.
+- Users who land on `dev` (or pull `dev` deliberately) should see immediately that the README they are reading is provisional.
+- The two version references inside the disclaimer (`<dev-version>-beta` and `v<latest-stable>`) keep the message factually current. If they drift, the disclaimer becomes unreliable and someone will eventually flash a beta from `dev` thinking it is stable.
+
+**Hotfix exception:** if a hotfix is committed directly to `main` (post-release bug fix), the next merge of `main` into `dev` will again strip dev's disclaimer. Restore it as part of the same hotfix-sync commit on `dev`.
 
 ---
 
@@ -378,6 +433,7 @@ Version strings are generated by `scripts/autoinc-semver.py` (called by `build.p
 | `RELEASE_NOTES_<version>.md` | Full detailed release notes for the **current** release (root, linked from README) |
 | `RELEASE_GITHUB_<version>.md` | Concise release body for GitHub release UI (root, **current** release only) |
 | `docs/releases/` | Archive of all previous release notes and GitHub release files |
+| `CHANGELOG.md` | Keep a Changelog 1.1.0 cross-version index. Live document, present on both `dev` and `main`. `## [Unreleased]` empty on `main`, fresh on `dev` after each release. |
 | `docs/BREAKING_CHANGES.md` | Cumulative breaking changes log across all versions |
-| `README.md` | Project readme — feature highlights, MQTT/HA setup, links to release notes |
+| `README.md` | Project readme — feature highlights, MQTT/HA setup, links to release notes. The `dev` branch carries a development disclaimer block (see Phase 9 "Branch disclaimer contract"); `main` does not. |
 | `docs/adr/` | Architecture Decision Records — check for new/updated ADRs per release |
