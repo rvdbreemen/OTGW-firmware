@@ -202,7 +202,9 @@ void startWebserver(){
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
     if (LittleFS.exists("/index.js.gz")) {
-      httpServer.sendHeader(F("Content-Encoding"), F("gzip"));
+      // streamFile() auto-detects the .gz suffix and emits Content-Encoding: gzip
+      // itself; do NOT also send it manually or the browser receives it twice and
+      // decompression silently produces an empty body (TASK-433).
       File f = LittleFS.open("/index.js.gz", "r");
       httpServer.streamFile(f, F("application/javascript"));
       f.close();
@@ -222,7 +224,9 @@ void startWebserver(){
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
     if (LittleFS.exists("/graph.js.gz")) {
-      httpServer.sendHeader(F("Content-Encoding"), F("gzip"));
+      // streamFile() auto-detects the .gz suffix and emits Content-Encoding: gzip
+      // itself; manually adding it again sends it twice and breaks the browser's
+      // decompression flow (TASK-433).
       File f = LittleFS.open("/graph.js.gz", "r");
       httpServer.streamFile(f, F("application/javascript"));
       f.close();
