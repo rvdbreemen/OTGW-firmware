@@ -806,26 +806,65 @@ def rename_build_artifacts(project_dir, semver, target):
     return renamed
 
 
+def copy_flash_scripts(project_dir):
+    """Copy the standalone flash scripts (flash_otgw.bat / flash_otgw.sh) into
+    build/ so they ship alongside the .bin artifacts in release zips.
+
+    The scripts are self-contained: they download Espressif's standalone
+    esptool binary on first run, so end-users don't need Python.
+    """
+    build_dir = project_dir / "build"
+    if not build_dir.exists():
+        return
+
+    copied = []
+    for script_name in ("flash_otgw.bat", "flash_otgw.sh"):
+        src = project_dir / script_name
+        if not src.exists():
+            continue
+        dst = build_dir / script_name
+        try:
+            shutil.copy2(src, dst)
+            # Preserve executable bit for the .sh on POSIX hosts so a release
+            # zip carrying mode-bits keeps it directly runnable.
+            if script_name.endswith(".sh") and platform.system() != "Windows":
+                os.chmod(dst, 0o755)
+            copied.append(script_name)
+        except Exception as e:
+            print_warning(f"Could not copy {script_name} to build/: {e}")
+
+    if copied:
+        print_info(f"Copied flash scripts to build/: {', '.join(copied)}")
+
+
 def list_build_artifacts(project_dir):
     """List all build artifacts"""
     print_step("Build artifacts")
-    
+
     build_dir = project_dir / "build"
     if not build_dir.exists():
         print_warning("Build directory not found")
         return
-    
+
     artifacts = list(build_dir.glob("*.bin")) + list(build_dir.glob("*.elf"))
-    
+
     if not artifacts:
         print_warning("No build artifacts found")
         return
-    
+
     print(f"\n{Colors.BOLD}Build artifacts in {build_dir}:{Colors.ENDC}")
     for artifact in sorted(artifacts):
         size = artifact.stat().st_size
         size_mb = size / (1024 * 1024)
         print(f"  • {artifact.name} ({size_mb:.2f} MB)")
+
+    # Also list flash helper scripts when they have been staged into build/.
+    scripts = [s for s in ("flash_otgw.bat", "flash_otgw.sh") if (build_dir / s).exists()]
+    if scripts:
+        print(f"\n{Colors.BOLD}Flash helpers in {build_dir}:{Colors.ENDC}")
+        for s in scripts:
+            sp = build_dir / s
+            print(f"  • {s} ({sp.stat().st_size} bytes)")
     print()
 
 
@@ -1750,6 +1789,9 @@ Examples:
         if not verify_flash_on_device(project_dir, target_names[0], args.verify_flash):
             print_error("On-device verify-flash failed")
             sys.exit(3)
+
+    # Stage flash helper scripts so they ship with release artifacts.
+    copy_flash_scripts(project_dir)
 
     # List build artifacts
     list_build_artifacts(project_dir)

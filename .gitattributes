@@ -1,6 +1,14 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
+# Shell scripts MUST keep LF endings even when checked out on Windows;
+# CRLF in a bash script causes "\r: command not found" on Linux/macOS.
+*.sh text eol=lf
+
+# Windows batch files need CRLF or cmd.exe mis-parses labels and goto.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
 # CI-generated version assets — always keep our local copy during merges/rebases
 src/OTGW-firmware/version.h    merge=ours
 src/OTGW-firmware/version.hash merge=ours
