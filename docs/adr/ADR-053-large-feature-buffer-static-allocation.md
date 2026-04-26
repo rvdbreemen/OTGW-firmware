@@ -239,6 +239,7 @@ void doFeatureWork() {
 - ADR-009: PROGMEM Usage for String Literals (RAM savings)
 - ADR-006: MQTT Integration Pattern (uses static buffers and chunked streaming)
 - ADR-030: Heap Memory Monitoring and Emergency Recovery
+- ADR-090: Re-entrancy Guard Pattern for Shared Scratch Buffers (acquisition contract on top of file-static allocation when the buffer is shared across re-entrant call paths)
 
 ## References
 - MQTT auto-discovery implementation: `src/OTGW-firmware/MQTTstuff.ino` (`sLine` as config line buffer, `cMsg` as sTopic, `MQTTAutoConfigSessionLock`)

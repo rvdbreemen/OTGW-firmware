@@ -78,6 +78,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-089: Heap Tier Machine Contract](ADR-089-heap-tier-machine-contract.md)** 🆕
   Amends ADR-030: re-baselines tier thresholds to 1536/3072/5120 bytes (Crashevans field log evidence, TASK-344), adds fragmentation-aware promotion (`HEAP_FRAG_PROMOTE_MAXBLOCK` = 1536), adds tier-entry counters (`iEnteredLowCount`/`Warning`/`Critical`, TASK-346) with hourly retained MQTT publication. Three sub-rules CI-gated, two explicitly labelled guideline-level (consumer-side gate, diagnostic-surface visibility). Defense-in-depth peer with ADR-088.
 
+- **[ADR-090: Re-entrancy Guard Pattern for Shared Scratch Buffers](ADR-090-re-entrancy-guard-pattern-shared-scratch-buffers.md)** 🆕
+  Guideline-level ADR (per ADR-080: 2 instances in 1 file is below the recurrence bar for binding pattern-level enforcement; no CI gate). Documents the acquisition contract for file-scope or function-local-static mutable scratch state shared across re-entrant call paths in the cooperative ESP8266 model (`doBackgroundTasks()` re-entry from `doAutoConfigure()`'s file-reading loop). Two existing exemplars in `MQTTstuff.ino`: RAII `MQTTAutoConfigSessionLock` (preferred for new code) and the `publishToSourceTopic` function-local inUse flag.
+
 ### Integration and Communication
 
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
