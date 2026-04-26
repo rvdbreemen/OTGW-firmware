@@ -838,17 +838,21 @@ def copy_flash_scripts(project_dir):
 
 
 def create_distribution_zip(project_dir, semver, target):
-    """Create a per-target distribution zip with the merged-full bin and the
-    cross-platform flash helper scripts.
+    """Create a per-target distribution zip with the merged-full bin (default
+    flash) plus the firmware-only bin (--upgrade mode) and the cross-platform
+    flash helper scripts.
 
     Output: build/OTGW-firmware-<target>-<semver>-flash.zip containing
-        OTGW-firmware-<target>-<semver>-merged-full.bin
+        OTGW-firmware-<target>-<semver>-merged-full.bin   (default flash)
+        OTGW-firmware-<target>-<semver>-merged.bin        (esp32 --upgrade)
+        OTGW-firmware-<target>-<semver>.ino.bin           (esp8266 --upgrade)
         flash_otgw.bat
         flash_otgw.sh
         README.txt
 
-    End users unzip, run flash_otgw.bat (Windows) or ./flash_otgw.sh
-    (Linux/macOS) and the script picks up the merged-full bin automatically.
+    Default flash preserves WiFi credentials in NVS but overwrites the
+    filesystem (MQTT/OTGW config). --upgrade flashes only the firmware-only
+    bin, preserving both WiFi and filesystem.
     """
     tcfg = TARGETS[target]
     build_dir = project_dir / "build"
@@ -861,7 +865,6 @@ def create_distribution_zip(project_dir, semver, target):
     merged_full = build_dir / merged_pattern
 
     if not merged_full.exists():
-        # Be tolerant: try a glob fallback in case the version string differs
         candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-*-merged-full.bin"))
         if candidates:
             merged_full = candidates[-1]
@@ -871,6 +874,26 @@ def create_distribution_zip(project_dir, semver, target):
                 f"(expected {merged_pattern})"
             )
             return None
+
+    # Locate the firmware-only bin used by --upgrade mode. ESP32 has a
+    # dedicated -merged.bin (bootloader + partitions + app, no filesystem).
+    # ESP8266 has no separate bootloader, so the bare .ino.bin written at
+    # offset 0x0 already preserves the LittleFS partition (offset 0x200000).
+    upgrade_bin = None
+    if target == "esp32":
+        candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-{semver}-merged.bin"))
+        if not candidates:
+            candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-*-merged.bin"))
+            # Filter out merged-full matches in case the glob picks them up
+            candidates = [c for c in candidates if "merged-full" not in c.name]
+        if candidates:
+            upgrade_bin = candidates[-1]
+    else:
+        candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-{semver}.ino.bin"))
+        if not candidates:
+            candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-*.ino.bin"))
+        if candidates:
+            upgrade_bin = candidates[-1]
 
     # Locate flash helper scripts in project root.
     flash_bat = project_dir / "flash_otgw.bat"
@@ -889,31 +912,43 @@ def create_distribution_zip(project_dir, semver, target):
 
     print_step(f"Creating distribution zip [{tcfg['name']}]")
     print_info(f"Zip: {zip_name}")
-    print_info(f"  + {merged_full.name}")
+    print_info(f"  + {merged_full.name}  (default flash)")
+    if upgrade_bin:
+        print_info(f"  + {upgrade_bin.name}  (--upgrade mode)")
+    else:
+        print_warning(f"  ! no firmware-only bin available for --upgrade mode")
     print_info(f"  + flash_otgw.bat")
     print_info(f"  + flash_otgw.sh")
     print_info(f"  + README.txt")
 
-    readme_text = _build_distribution_readme(target, tcfg, merged_full.name, semver)
+    readme_text = _build_distribution_readme(
+        target, tcfg, merged_full.name,
+        upgrade_bin.name if upgrade_bin else None,
+        semver,
+    )
 
     try:
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-            # Merged full firmware: keep its name so the flash scripts find it
-            # via their *-merged-full.bin glob.
+            # Default-flash bin (auto-detected by the flash scripts).
             zf.write(merged_full, arcname=merged_full.name)
 
-            # Windows batch script: keep CRLF line endings.
+            # Firmware-only bin for --upgrade mode (auto-detected by scripts).
+            if upgrade_bin:
+                zf.write(upgrade_bin, arcname=upgrade_bin.name)
+
+            # Windows batch script: keep CRLF line endings (the source file
+            # already has CRLF via .gitattributes when checked out on Windows).
             with open(flash_bat, "rb") as f:
                 bat_bytes = f.read()
             zf.writestr("flash_otgw.bat", bat_bytes)
 
-            # Unix shell script: force LF endings (Windows checkout may have
-            # CRLF locally) and set the executable bit on the zip entry.
+            # Unix shell script: force LF endings and set the executable bit
+            # on the zip entry so unpacking on POSIX preserves +x.
             with open(flash_sh, "rb") as f:
                 sh_bytes = f.read().replace(b"\r\n", b"\n")
             sh_info = zipfile.ZipInfo("flash_otgw.sh")
             sh_info.compress_type = zipfile.ZIP_DEFLATED
-            sh_info.external_attr = (0o100755 << 16)  # -rwxr-xr-x in zip metadata
+            sh_info.external_attr = (0o100755 << 16)
             zf.writestr(sh_info, sh_bytes)
 
             zf.writestr("README.txt", readme_text)
@@ -927,24 +962,36 @@ def create_distribution_zip(project_dir, semver, target):
         return None
 
 
-def _build_distribution_readme(target, tcfg, merged_filename, semver):
+def _build_distribution_readme(target, tcfg, merged_full_name, upgrade_bin_name, semver):
     """Generate the README.txt that ships inside each distribution zip.
 
-    Kept as a separate helper so the text is easy to update without touching
-    zip-creation logic.
+    Documents the three flash modes (default / --upgrade / --erase) so end
+    users know what data is preserved or wiped before they pick a mode.
     """
+    upgrade_section = (
+        f"  {upgrade_bin_name}\n"
+        f"      Firmware-only image. Used by 'flash_otgw.* --upgrade'.\n"
+        f"      Writes ONLY the firmware app at offset 0x0; the LittleFS\n"
+        f"      partition is left intact, so MQTT/OTGW config and WiFi\n"
+        f"      credentials both survive.\n"
+        f"\n"
+    ) if upgrade_bin_name else ""
+
     return (
         f"OTGW-firmware {semver} - {tcfg['name']}\n"
         f"================================================================\n"
         f"\n"
-        f"This archive contains everything you need for an initial flash of\n"
-        f"the {tcfg['name']} board over USB. No Python required.\n"
+        f"This archive flashes the {tcfg['name']} board over USB.\n"
+        f"No Python required.\n"
         f"\n"
         f"Contents:\n"
-        f"  {merged_filename}\n"
+        f"  {merged_full_name}\n"
         f"      Factory image: bootloader + partitions + app + filesystem.\n"
-        f"      Flashed to offset 0x0; one write covers the whole device.\n"
+        f"      Used by 'flash_otgw.*' (no flags). Default behaviour DOES\n"
+        f"      NOT erase, so WiFi credentials in NVS survive; the\n"
+        f"      filesystem is replaced by this fresh image.\n"
         f"\n"
+        f"{upgrade_section}"
         f"  flash_otgw.bat\n"
         f"      Windows flash tool. Double-click or run from cmd.exe.\n"
         f"      Downloads Espressif's standalone esptool on first run.\n"
@@ -952,23 +999,43 @@ def _build_distribution_readme(target, tcfg, merged_filename, semver):
         f"  flash_otgw.sh\n"
         f"      Linux / macOS flash tool. Run with ./flash_otgw.sh in a\n"
         f"      terminal. Downloads esptool on first run via curl or wget.\n"
+        f"      On Linux it auto-escalates with sudo when the user is not\n"
+        f"      in the dialout group.\n"
+        f"\n"
+        f"Three flash modes:\n"
+        f"  (no flag)   default factory flash\n"
+        f"              Preserves: WiFi credentials (NVS).\n"
+        f"              Wipes:     LittleFS settings (MQTT/OTGW config).\n"
+        f"\n"
+        f"  --upgrade   firmware-only flash\n"
+        f"              Preserves: WiFi credentials AND LittleFS settings.\n"
+        f"              Wipes:     nothing else; only the firmware app is\n"
+        f"                         updated. Equivalent to an OTA upgrade.\n"
+        f"\n"
+        f"  --erase     full clean wipe\n"
+        f"              Preserves: nothing.\n"
+        f"              Wipes:     everything including WiFi credentials.\n"
+        f"                         Use this for a true factory reset.\n"
         f"\n"
         f"How to flash:\n"
         f"  1) Connect the {tcfg['name']} board via USB.\n"
         f"  2) Run the flash script for your operating system:\n"
         f"        Windows:        flash_otgw.bat\n"
         f"        Linux / macOS:  ./flash_otgw.sh\n"
+        f"     Add --upgrade or --erase if you want a non-default mode.\n"
         f"  3) Confirm the prompt (type YES). The script auto-detects the\n"
-        f"     serial port, erases the flash, and writes the firmware.\n"
-        f"  4) After flashing, the board boots into AP mode (SSID OTGW-AP).\n"
-        f"     Connect to it and configure WiFi, or browse to\n"
-        f"     http://otgw.local once the board has joined your network.\n"
+        f"     serial port (USB VID/PID for esp32, port menu for esp8266)\n"
+        f"     and writes the firmware.\n"
+        f"  4) After flashing, the board reboots automatically. With the\n"
+        f"     default mode the board reconnects to the previously\n"
+        f"     configured WiFi network (settings page may need to be\n"
+        f"     reconfigured because the filesystem was wiped). With\n"
+        f"     --erase, connect to AP \"OTGW-AP\" to configure WiFi.\n"
         f"\n"
-        f"OTA upgrades (existing installations):\n"
-        f"  Use the .ino.bin (firmware) and .littlefs.bin (filesystem) files\n"
-        f"  from the main release zip via the OTGW web UI's update page.\n"
-        f"  Those files are NOT bundled here; this zip is for first-time\n"
-        f"  installs and full re-flashes only.\n"
+        f"OTA upgrades (alternative path, no USB needed):\n"
+        f"  The main release zip on GitHub also ships separate\n"
+        f"  .ino.bin and .littlefs.bin files for OTA via the OTGW web UI.\n"
+        f"  Use those if your board is already on the network.\n"
         f"\n"
         f"Documentation: https://github.com/rvdbreemen/OTGW-firmware\n"
     )

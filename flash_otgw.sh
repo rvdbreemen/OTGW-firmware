@@ -5,21 +5,26 @@
 #  Distributed alongside merged binary releases. Downloads Espressif's
 #  standalone esptool binary on first run (no Python required).
 #
+#  Default behaviour (no flags): writes the merged-full image to flash WITHOUT
+#  erasing first. WiFi credentials in NVS survive; LittleFS settings are
+#  overwritten by the fresh filesystem image inside the merged-full bin.
+#
 #  Usage:
-#    ./flash_otgw.sh                     auto-detect bin and serial port
+#    ./flash_otgw.sh                     factory flash (preserves WiFi creds)
+#    ./flash_otgw.sh --upgrade           firmware-only (preserves WiFi + app
+#                                         settings; ESP32 only)
+#    ./flash_otgw.sh --erase             full clean wipe (loses everything)
 #    ./flash_otgw.sh --port /dev/ttyUSB0 use specific port
 #    ./flash_otgw.sh --bin <file>        use specific firmware file
 #    ./flash_otgw.sh --board esp8266     force board (otherwise from filename)
 #    ./flash_otgw.sh --board esp32       (Nodoshop OTGW32)
-#    ./flash_otgw.sh --baud 921600       override baud rate
-#    ./flash_otgw.sh --no-erase          skip erase_flash before write_flash
-#    ./flash_otgw.sh --yes               skip all confirmation prompts
+#    ./flash_otgw.sh --baud N            override baud rate
+#    ./flash_otgw.sh --yes               skip confirmation prompts
 #    ./flash_otgw.sh --help              show this help
 # =============================================================================
 
 set -e
 set -u
-# pipefail also works in bash 3.2
 set -o pipefail 2>/dev/null || true
 
 ESPTOOL_VERSION="v4.8.1"
@@ -39,10 +44,10 @@ else
     C_GREEN=""; C_RED=""; C_YELLOW=""; C_CYAN=""; C_BOLD=""; C_RESET=""
 fi
 
-ok()    { printf "%s[OK]%s    %s\n" "$C_GREEN" "$C_RESET" "$*"; }
-info()  { printf "%s[INFO]%s  %s\n" "$C_CYAN"  "$C_RESET" "$*"; }
+ok()    { printf "%s[OK]%s    %s\n" "$C_GREEN"  "$C_RESET" "$*"; }
+info()  { printf "%s[INFO]%s  %s\n" "$C_CYAN"   "$C_RESET" "$*"; }
 warn()  { printf "%s[WARN]%s  %s\n" "$C_YELLOW" "$C_RESET" "$*"; }
-err()   { printf "%s[ERROR]%s %s\n" "$C_RED"   "$C_RESET" "$*" >&2; }
+err()   { printf "%s[ERROR]%s %s\n" "$C_RED"    "$C_RESET" "$*" >&2; }
 step()  { printf "\n%s[STEP]%s  %s\n" "$C_BOLD$C_CYAN" "$C_RESET" "$*"; }
 
 # ---- Defaults --------------------------------------------------------------
@@ -50,7 +55,8 @@ ARG_PORT=""
 ARG_BIN=""
 ARG_BOARD=""
 ARG_BAUD=""
-ARG_NO_ERASE=0
+ARG_ERASE=0
+ARG_UPGRADE=0
 ARG_YES=0
 
 # ---- Help ------------------------------------------------------------------
@@ -61,18 +67,29 @@ flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware
 Usage:
   ./flash_otgw.sh [options]
 
-Options:
-  --port <dev>         Serial port (e.g. /dev/ttyUSB0, /dev/cu.usbserial-XXXX)
-  --bin <file>         Firmware path (auto-detect *-merged-full.bin if omitted)
-  --board esp8266      Force board type
+Mode:
+  (no flag)            Default factory flash. Preserves WiFi credentials,
+                       wipes filesystem (MQTT/OTGW config).
+  --upgrade            Firmware-only flash. Preserves WiFi AND filesystem.
+                       Picks *-merged.bin (esp32) or *.ino.bin (esp8266).
+  --erase              Full clean wipe. Erases everything including WiFi.
+
+Targeting:
+  --port <dev>         Serial port (e.g. /dev/ttyUSB0, /dev/cu.usbserial-XXXX).
+                       For esp32 the script falls back to USB VID/PID filter
+                       (303A:1001) when no --port is given.
+  --bin <file>         Firmware path. Overrides mode-based auto-detect.
+  --board esp8266      Force board type.
   --board esp32        (Nodoshop OTGW32 = ESP32-S3)
-  --baud <num>         Override baud rate (default: 460800 esp8266 / 921600 esp32)
-  --no-erase           Skip erase_flash before write_flash (preserves data, risky)
-  --yes, -y            Skip all confirmation prompts (for automation)
-  --help, -h           Show this help
+  --baud N             Override baud rate (default: 460800/921600).
+
+Other:
+  --yes, -y            Skip the confirmation prompt.
+  --help, -h           Show this help.
 
 The script downloads esptool ${ESPTOOL_VERSION} to ./tools/esptool/ on first run.
-No Python required.
+No Python required. On Linux it auto-escalates with sudo if the user is not
+in the dialout group and the serial device is not writable.
 EOF
 }
 
@@ -83,12 +100,51 @@ while [ $# -gt 0 ]; do
         --bin)      ARG_BIN="$2";   shift 2 ;;
         --board)    ARG_BOARD="$2"; shift 2 ;;
         --baud)     ARG_BAUD="$2";  shift 2 ;;
-        --no-erase) ARG_NO_ERASE=1; shift ;;
+        --erase)    ARG_ERASE=1;    shift ;;
+        --upgrade)  ARG_UPGRADE=1;  shift ;;
         --yes|-y)   ARG_YES=1;      shift ;;
         --help|-h)  show_help; exit 0 ;;
         *) err "Unknown argument: $1"; echo "Run './flash_otgw.sh --help' for usage."; exit 2 ;;
     esac
 done
+
+if [ "$ARG_ERASE" = "1" ] && [ "$ARG_UPGRADE" = "1" ]; then
+    err "--erase and --upgrade are mutually exclusive."
+    err "        --erase wipes everything including the filesystem."
+    err "        --upgrade preserves the filesystem."
+    exit 2
+fi
+
+# ---- Linux: auto-escalate to sudo if dialout permission is missing --------
+# Mirrors Nodo-shop's tested approach: if the typical serial device exists,
+# is not writable, and the user is not root and not in the dialout group,
+# re-exec under sudo. Avoids cryptic "Permission denied: /dev/ttyUSB0" errors.
+maybe_sudo_relaunch() {
+    [ "$(uname -s)" = "Linux" ] || return 0
+    [ "${EUID:-$(id -u)}" -ne 0 ] || return 0
+
+    local need_sudo=0
+    for d in /dev/ttyUSB0 /dev/ttyACM0 /dev/ttyUSB1 /dev/ttyACM1; do
+        [ -e "$d" ] || continue
+        if [ ! -w "$d" ]; then
+            need_sudo=1
+        fi
+    done
+
+    [ "$need_sudo" = "1" ] || return 0
+
+    if id -nG "$USER" 2>/dev/null | grep -qw "dialout"; then
+        # User is in dialout but device still not writable: a logout/login is
+        # likely required. Don't sudo-spam in that case.
+        warn "User $USER is in 'dialout' group but cannot write to the serial"
+        warn "        device. Try logging out and back in to refresh group membership."
+        return 0
+    fi
+
+    info "Serial device not writable and user not in 'dialout'. Re-running with sudo..."
+    exec sudo -E bash "$0" "$@"
+}
+maybe_sudo_relaunch "$@"
 
 echo
 echo "============================================================"
@@ -143,15 +199,9 @@ ensure_esptool() {
     mkdir -p "$TOOLS_DIR"
 
     if command -v curl >/dev/null 2>&1; then
-        if ! curl -fSL --retry 2 -o "$zip_path" "$url"; then
-            err "Download failed (curl)."
-            exit 1
-        fi
+        curl -fSL --retry 2 -o "$zip_path" "$url" || { err "Download failed (curl)."; exit 1; }
     elif command -v wget >/dev/null 2>&1; then
-        if ! wget -q -O "$zip_path" "$url"; then
-            err "Download failed (wget)."
-            exit 1
-        fi
+        wget -q -O "$zip_path" "$url" || { err "Download failed (wget)."; exit 1; }
     else
         err "Neither curl nor wget is available. Install one and re-run."
         exit 1
@@ -165,14 +215,8 @@ ensure_esptool() {
     info "Extracting esptool..."
     unzip -q -o "$zip_path" -d "$TOOLS_DIR"
 
-    # Find the extracted esptool binary (lives in a versioned subdir)
     local found
-    found="$(find "$TOOLS_DIR" -maxdepth 4 -type f -name esptool -perm -u+x 2>/dev/null | head -n 1)"
-    if [ -z "$found" ]; then
-        # Fallback: search by name only and chmod ourselves
-        found="$(find "$TOOLS_DIR" -maxdepth 4 -type f -name esptool 2>/dev/null | head -n 1)"
-    fi
-
+    found="$(find "$TOOLS_DIR" -maxdepth 4 -type f -name esptool 2>/dev/null | head -n 1)"
     if [ -z "$found" ]; then
         err "Extracted archive did not contain an esptool binary."
         exit 1
@@ -187,6 +231,17 @@ ensure_esptool() {
 ensure_esptool
 
 # ---- Step 3: locate firmware bin -------------------------------------------
+# Mode selection mirrors the .bat script:
+#   default            -> *-merged-full.bin   (full factory image; preserves WiFi)
+#   --upgrade  (esp32) -> *-merged.bin        (firmware-only; preserves WiFi + FS)
+#   --upgrade (esp8266)-> *.ino.bin           (firmware-only; preserves WiFi + FS)
+#   --erase            -> *-merged-full.bin   (full image + erase_all)
+find_first_match() {
+    local pattern="$1"
+    # shellcheck disable=SC2012  # ls -1 sort order is fine here
+    ls -1 $pattern 2>/dev/null | head -n 1
+}
+
 find_bin() {
     if [ -n "$ARG_BIN" ]; then
         if [ ! -f "$ARG_BIN" ]; then
@@ -197,22 +252,35 @@ find_bin() {
         return 0
     fi
 
-    local candidate
-    # Search order: same dir as script, then ./build/
-    for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
-        # shellcheck disable=SC2012  # ls -1 sorts alphabetically; we want first match
-        candidate="$(ls -1 "$dir"/OTGW-firmware-*-merged-full.bin 2>/dev/null | head -n 1)"
-        if [ -n "$candidate" ]; then
-            echo "$candidate"
-            return 0
+    local cand=""
+    if [ "$ARG_UPGRADE" = "1" ]; then
+        for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
+            cand="$(find_first_match "$dir/OTGW-firmware-esp32-*-merged.bin")"
+            [ -n "$cand" ] && break
+            cand="$(find_first_match "$dir/OTGW-firmware-esp8266-*.ino.bin")"
+            [ -n "$cand" ] && break
+        done
+        if [ -z "$cand" ]; then
+            err "--upgrade: no firmware-only bin found."
+            err "        Expected: OTGW-firmware-esp32-*-merged.bin"
+            err "              or: OTGW-firmware-esp8266-*.ino.bin"
+            err "        Use --bin to specify a path."
+            exit 1
         fi
-    done
-
-    err "No OTGW-firmware-*-merged-full.bin found."
-    err "        Expected in: $SCRIPT_DIR"
-    err "                 or: $SCRIPT_DIR/build"
-    err "        Use --bin to specify a path."
-    exit 1
+    else
+        for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
+            cand="$(find_first_match "$dir/OTGW-firmware-*-merged-full.bin")"
+            [ -n "$cand" ] && break
+        done
+        if [ -z "$cand" ]; then
+            err "No OTGW-firmware-*-merged-full.bin found."
+            err "        Expected in: $SCRIPT_DIR"
+            err "                 or: $SCRIPT_DIR/build"
+            err "        Use --bin to specify a path, or --upgrade for firmware-only."
+            exit 1
+        fi
+    fi
+    echo "$cand"
 }
 
 BIN_FILE="$(find_bin)"
@@ -252,19 +320,27 @@ ok "Board:    $BOARD_NAME"
 ok "Baud:     $ARG_BAUD"
 
 # ---- Step 5: locate serial port --------------------------------------------
-list_ports() {
-    case "$(uname -s)" in
-        Linux)
-            ls -1 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
-            ;;
-        Darwin)
-            # Prefer /dev/cu.* (callout) over /dev/tty.*
-            ls -1 /dev/cu.usbserial-* /dev/cu.usbmodem* /dev/cu.SLAB_USBtoUART /dev/cu.wchusbserial* 2>/dev/null
-            ;;
-    esac
-}
+# ESP32-S3 has a fixed USB VID/PID — let esptool find it. ESP8266 boards
+# vary too much in USB-serial chip choice for a clean filter; enumerate.
+PORT_ARGS=""
+if [ -n "$ARG_PORT" ]; then
+    PORT_ARGS="--port $ARG_PORT"
+    ok "Port:     $ARG_PORT"
+elif [ "$ARG_BOARD" = "esp32" ]; then
+    PORT_ARGS="--port-filter vid=0x303A --port-filter pid=0x1001"
+    ok "Port:     auto-detect via USB VID/PID 303A:1001"
+else
+    list_ports() {
+        case "$(uname -s)" in
+            Linux)
+                ls -1 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
+                ;;
+            Darwin)
+                ls -1 /dev/cu.usbserial-* /dev/cu.usbmodem* /dev/cu.SLAB_USBtoUART /dev/cu.wchusbserial* 2>/dev/null
+                ;;
+        esac
+    }
 
-if [ -z "$ARG_PORT" ]; then
     info "Detecting available serial ports..."
     PORTS=()
     while IFS= read -r p; do
@@ -297,21 +373,28 @@ if [ -z "$ARG_PORT" ]; then
         fi
         ARG_PORT="${PORTS[$((CHOICE-1))]}"
     fi
+    PORT_ARGS="--port $ARG_PORT"
+    ok "Port:     $ARG_PORT"
 fi
-ok "Port:     $ARG_PORT"
 
-# ---- Step 6: confirm before destructive flash ------------------------------
+# ---- Step 6: confirm before flash ------------------------------------------
 echo
 echo "------------------------------------------------------------"
 echo " Ready to flash:"
 echo "   Firmware: $BIN_NAME"
 echo "   Board:    $BOARD_NAME"
-echo "   Port:     $ARG_PORT  @ $ARG_BAUD baud"
-if [ "$ARG_NO_ERASE" = "1" ]; then
-    echo "   Flash:    write_flash only (NOT erasing first)"
+echo "   Baud:     $ARG_BAUD"
+if [ "$ARG_ERASE" = "1" ]; then
+    echo "   Mode:     --erase  (full clean wipe)"
+    echo "   Effect:   ALL data wiped: WiFi credentials, NVS, filesystem."
+elif [ "$ARG_UPGRADE" = "1" ]; then
+    echo "   Mode:     --upgrade  (firmware-only)"
+    echo "   Effect:   WiFi credentials and app settings preserved."
+    echo "             Only the firmware app is updated."
 else
-    echo "   Flash:    erase_flash + write_flash"
-    echo "             All settings, WiFi credentials and stored data WILL BE WIPED."
+    echo "   Mode:     default factory flash"
+    echo "   Effect:   WiFi credentials in NVS preserved."
+    echo "             Filesystem (MQTT/OTGW config) replaced by fresh image."
 fi
 echo "------------------------------------------------------------"
 echo
@@ -326,17 +409,27 @@ if [ "$ARG_YES" = "0" ]; then
 fi
 
 # ---- Step 7: run esptool ---------------------------------------------------
-if [ "$ARG_NO_ERASE" = "0" ]; then
-    step "Running esptool erase_flash..."
-    "$ESPTOOL_BIN" --chip "$ESPTOOL_CHIP" --port "$ARG_PORT" --baud "$ARG_BAUD" erase_flash
+# Tested baseline (Nodo-shop OT-Thing): -z compresses transfer; default-reset
+# + hard-reset gives consistent strap timing on USB-JTAG boards. -e adds
+# erase_all to write_flash for the --erase mode.
+WRITE_FLAGS="-z"
+if [ "$ARG_ERASE" = "1" ]; then
+    WRITE_FLAGS="-z -e"
 fi
 
-step "Running esptool write_flash 0x0 $BIN_NAME..."
-"$ESPTOOL_BIN" --chip "$ESPTOOL_CHIP" --port "$ARG_PORT" --baud "$ARG_BAUD" write_flash 0x0 "$BIN_FILE"
+step "Running esptool write_flash..."
+"$ESPTOOL_BIN" --chip "$ESPTOOL_CHIP" $PORT_ARGS --baud "$ARG_BAUD" \
+    --before default-reset --after hard-reset \
+    write_flash $WRITE_FLAGS 0x0 "$BIN_FILE"
 
 echo
 echo "============================================================"
 echo " Flash complete. Reset the OTGW or unplug/replug USB."
-echo " Then connect to WiFi AP \"OTGW-AP\" to configure credentials,"
-echo " or browse to http://otgw.local once on your network."
+if [ "$ARG_ERASE" = "1" ]; then
+    echo " After reset: connect to WiFi AP \"OTGW-AP\" to configure."
+else
+    echo " WiFi credentials preserved; the board should rejoin"
+    echo " your network automatically. Browse to http://otgw.local"
+    echo " if mDNS works on your network."
+fi
 echo "============================================================"
