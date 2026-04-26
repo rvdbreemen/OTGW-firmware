@@ -2,6 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2026-02-07  
+**Updated:** 2026-04-26 (Amended by ADR-089: Heap Tier Machine Contract; re-baselines thresholds on Crashevans field-log evidence (TASK-344), adds fragmentation-aware promotion via HEAP_FRAG_PROMOTE_MAXBLOCK, adds tier-entry counter instrumentation per TASK-346. Decision text below is preserved per the immutability rule.)  
 **Decision Maker:** Copilot Agent based on codebase analysis
 
 ## Context

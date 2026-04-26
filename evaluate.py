@@ -1090,6 +1090,196 @@ class WorkspaceEvaluator:
                 "Add an isDripDeferred() check before the drip publish; see ADR-088 sub-rule 3"
             ))
 
+    # ===== ADR-089 GATES (TASK-428) =====
+
+    def check_heap_tier_thresholds_ordered(self):
+        """ADR-089 sub-rule 1: HEAP_CRITICAL_THRESHOLD < HEAP_WARNING_THRESHOLD <
+        HEAP_LOW_THRESHOLD, with HEAP_CRITICAL_THRESHOLD >= 1024 (sanity floor:
+        ESP8266 WiFi stack baseline ~1-2 KB). Re-baselined under TASK-344.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Heap Tier Thresholds Ordered ==={Colors.ENDC}")
+
+        helper = config.FIRMWARE_ROOT / "helperStuff.ino"
+        if not helper.exists():
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier thresholds ordered", "WARN",
+                "helperStuff.ino not found"
+            ))
+            return
+
+        try:
+            source = helper.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier thresholds ordered", "FAIL",
+                f"Could not read helperStuff.ino: {e}"
+            ))
+            return
+
+        decl_re = re.compile(
+            r"#define\s+(HEAP_CRITICAL_THRESHOLD|HEAP_WARNING_THRESHOLD|HEAP_LOW_THRESHOLD)\s+(\d+)"
+        )
+        found = {m.group(1): int(m.group(2)) for m in decl_re.finditer(source)}
+        missing = [k for k in ("HEAP_CRITICAL_THRESHOLD", "HEAP_WARNING_THRESHOLD", "HEAP_LOW_THRESHOLD") if k not in found]
+        if missing:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier thresholds ordered", "FAIL",
+                f"Missing #define for: {', '.join(missing)}"
+            ))
+            return
+
+        crit = found["HEAP_CRITICAL_THRESHOLD"]
+        warn = found["HEAP_WARNING_THRESHOLD"]
+        low  = found["HEAP_LOW_THRESHOLD"]
+
+        if crit < 1024:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier thresholds ordered", "FAIL",
+                f"HEAP_CRITICAL_THRESHOLD = {crit} below sanity floor (1024); ESP8266 WiFi stack needs ~1-2 KB"
+            ))
+            return
+
+        if not (crit < warn < low):
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier thresholds ordered", "FAIL",
+                f"Tier ordering violated: CRITICAL={crit}, WARNING={warn}, LOW={low}"
+            ))
+            return
+
+        self.add_result(EvaluationResult(
+            "ADR-089", "Heap tier thresholds ordered", "PASS",
+            f"CRITICAL={crit} < WARNING={warn} < LOW={low}, all >= 1024"
+        ))
+
+    def check_heap_fragmentation_promotion(self):
+        """ADR-089 sub-rule 2: getHeapHealth() must reference HEAP_FRAG_PROMOTE_MAXBLOCK
+        and call platformMaxFreeBlock() so a fragmented heap promotes LOW to WARNING
+        before the next allocation fails silently (umm_malloc has no compaction).
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Heap Fragmentation Promotion ==={Colors.ENDC}")
+
+        helper = config.FIRMWARE_ROOT / "helperStuff.ino"
+        if not helper.exists():
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap fragmentation promotion", "WARN",
+                "helperStuff.ino not found"
+            ))
+            return
+
+        try:
+            source = helper.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap fragmentation promotion", "FAIL",
+                f"Could not read helperStuff.ino: {e}"
+            ))
+            return
+
+        if not re.search(r"\bHEAP_FRAG_PROMOTE_MAXBLOCK\b", source):
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap fragmentation promotion", "FAIL",
+                "HEAP_FRAG_PROMOTE_MAXBLOCK not defined in helperStuff.ino"
+            ))
+            return
+
+        sig_re = re.compile(
+            r"^\s*HeapHealthLevel\s+(getHeapHealth)\s*\(\s*\)\s*\{",
+            re.MULTILINE
+        )
+        m = sig_re.search(source)
+        if not m:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap fragmentation promotion", "WARN",
+                "getHeapHealth() definition not found in helperStuff.ino"
+            ))
+            return
+
+        body, _ = self._extract_function_body(source, m.start())
+        if not body:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap fragmentation promotion", "FAIL",
+                "getHeapHealth() body not parseable"
+            ))
+            return
+
+        has_constant = bool(re.search(r"\bHEAP_FRAG_PROMOTE_MAXBLOCK\b", body))
+        has_maxblock = bool(re.search(r"\bplatformMaxFreeBlock\s*\(", body))
+
+        if has_constant and has_maxblock:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap fragmentation promotion", "PASS",
+                "getHeapHealth() consults platformMaxFreeBlock() with HEAP_FRAG_PROMOTE_MAXBLOCK"
+            ))
+        else:
+            parts = []
+            if not has_constant: parts.append("missing HEAP_FRAG_PROMOTE_MAXBLOCK reference")
+            if not has_maxblock: parts.append("missing platformMaxFreeBlock() call")
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap fragmentation promotion", "FAIL",
+                f"getHeapHealth() incomplete: {', '.join(parts)}",
+                "See ADR-089 sub-rule 2: promote LOW to WARNING when maxBlock < HEAP_FRAG_PROMOTE_MAXBLOCK"
+            ))
+
+    def check_heap_tier_entry_counters(self):
+        """ADR-089 sub-rule 3: getHeapHealth() must increment iEnteredLowCount,
+        iEnteredWarningCount, and iEnteredCriticalCount on transitions into stricter
+        tiers (TASK-346). The counters publish hourly via sendMQTTheapdiag() to
+        retained otgw-firmware/stats/enter_* topics for field telemetry.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Heap Tier-Entry Counters ==={Colors.ENDC}")
+
+        helper = config.FIRMWARE_ROOT / "helperStuff.ino"
+        if not helper.exists():
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier-entry counters", "WARN",
+                "helperStuff.ino not found"
+            ))
+            return
+
+        try:
+            source = helper.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier-entry counters", "FAIL",
+                f"Could not read helperStuff.ino: {e}"
+            ))
+            return
+
+        sig_re = re.compile(
+            r"^\s*HeapHealthLevel\s+(getHeapHealth)\s*\(\s*\)\s*\{",
+            re.MULTILINE
+        )
+        m = sig_re.search(source)
+        if not m:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier-entry counters", "WARN",
+                "getHeapHealth() definition not found in helperStuff.ino"
+            ))
+            return
+
+        body, _ = self._extract_function_body(source, m.start())
+        if not body:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier-entry counters", "FAIL",
+                "getHeapHealth() body not parseable"
+            ))
+            return
+
+        expected = ("iEnteredLowCount", "iEnteredWarningCount", "iEnteredCriticalCount")
+        missing = [c for c in expected if not re.search(rf"\b{c}\s*\+\+", body)]
+
+        if not missing:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier-entry counters", "PASS",
+                "getHeapHealth() increments all three tier-entry counters"
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-089", "Heap tier-entry counters", "FAIL",
+                f"getHeapHealth() missing increments for: {', '.join(missing)}",
+                "See ADR-089 sub-rule 3: TASK-346 counters track tier transitions for field telemetry"
+            ))
+
     # ===== ADR REFERENCE RESOLUTION (TASK-368) =====
 
     def check_adr_references_resolve(self):
@@ -1932,6 +2122,9 @@ class WorkspaceEvaluator:
         self.check_status_burst_cooldown_bound()      # TASK-353/368
         self.check_status_publishers_wrap_burst()     # TASK-347/354/368, ADR-088 sub-rule 1
         self.check_drip_consults_deferred()           # TASK-426, ADR-088 sub-rule 3
+        self.check_heap_tier_thresholds_ordered()     # TASK-428, ADR-089 sub-rule 1
+        self.check_heap_fragmentation_promotion()     # TASK-428, ADR-089 sub-rule 2
+        self.check_heap_tier_entry_counters()         # TASK-428, ADR-089 sub-rule 3
         self.check_adr_references_resolve()           # TASK-355/368
 
         if not quick:

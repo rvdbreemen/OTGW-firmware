@@ -75,6 +75,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-044: Global State — extern Declaration in Header, Definition in .ino](ADR-044-global-state-header-definition-pattern.md)** 🆕
   `extern` declarations in headers + single definition in owning `.ino` to avoid ODR violations in any multi-TU build; applies to `msglastupdated[]`, `mqttlastsent[]`, `mqttPublishAllowed`, etc.
 
+- **[ADR-089: Heap Tier Machine Contract](ADR-089-heap-tier-machine-contract.md)** 🆕
+  Amends ADR-030: re-baselines tier thresholds to 1536/3072/5120 bytes (Crashevans field log evidence, TASK-344), adds fragmentation-aware promotion (`HEAP_FRAG_PROMOTE_MAXBLOCK` = 1536), adds tier-entry counters (`iEnteredLowCount`/`Warning`/`Critical`, TASK-346) with hourly retained MQTT publication. Three sub-rules CI-gated, two explicitly labelled guideline-level (consumer-side gate, diagnostic-surface visibility). Defense-in-depth peer with ADR-088.
+
 ### Integration and Communication
 
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
