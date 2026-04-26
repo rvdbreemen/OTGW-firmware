@@ -1,0 +1,40 @@
+<!--
+  FSexplorer.html — file browser + system actions template
+
+  components.css herstijlt .fs-main / .fs-action-card / .fs-btn
+  volledig. De huidige firmware-markup hoeft niet aangepast te worden.
+  Onderstaand is referentie zodat de class-namen kloppen.
+-->
+
+<!-- DS:FSEXPLORER:BEGIN -->
+<main data-screen-label="FSexplorer">
+
+  <!-- File listing -->
+  <section class="fs-main">
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align: left; font-weight: 700; padding: var(--space-3); color: var(--fg-3);">File</th>
+          <th style="text-align: right; font-weight: 700; padding: var(--space-3); color: var(--fg-3);">Size</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="fs-list">
+        <!-- rows ge-rendered door FSexplorer.js -->
+      </tbody>
+    </table>
+  </section>
+
+  <!-- System actions -->
+  <section class="fs-action-card">
+    <h3>System actions</h3>
+    <div class="button-row">
+      <button class="fs-btn"           id="fs-update">Update Firmware</button>
+      <button class="fs-btn secondary" id="fs-reboot">ReBoot</button>
+      <button class="fs-btn wifi"      id="fs-reset-wifi">Reset Wireless</button>
+      <button class="fs-btn danger"    id="fs-reset-config">Reset Config</button>
+    </div>
+  </section>
+
+</main>
+<!-- DS:FSEXPLORER:END -->

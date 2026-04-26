@@ -1,0 +1,54 @@
+<!--
+  index.html — head + page chrome template
+
+  Plak deze blokken in je bestaande data/index.html. Verwacht: één
+  bestaande <head> en één <body> met de huidige nav. Vervang alleen
+  het stuk binnen de gemarkeerde sentinels — de rest van de pagina
+  (script-tags, page-content) blijft ongewijzigd.
+-->
+
+<!-- ============================================================
+     <head> — vervang ALLE bestaande <link rel="stylesheet">
+     en <script src="…echarts…"> regels door dit blok.
+     ============================================================ -->
+
+<!-- DS:HEAD:BEGIN -->
+<link rel="stylesheet" href="ds-tokens.css">
+<link rel="stylesheet" href="components.css">
+
+<!-- ECharts via CDN — onveranderd t.o.v. v2.0.0 -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"
+        integrity="sha384-X1QKzM/o8b6Js2VZv7r6w+S0vQH6Wh4fqcnqiJ6oTvhnaHqfP2Vp7zT1HKgBl1Bo"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="echarts-theme.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+<script src="sat-slider.js" defer></script>
+<!-- DS:HEAD:END -->
+
+
+<!-- ============================================================
+     Theme toggle button — vervang de bestaande theme-toggle in
+     de <header class="headerrow"> door dit element.
+     De ID `theme-toggle` is verplicht (theme-toggle.js zoekt erop).
+     ============================================================ -->
+
+<!-- DS:THEME-TOGGLE:BEGIN -->
+<button class="theme-toggle-btn" id="theme-toggle"
+        aria-label="Toggle theme" aria-pressed="false">☾</button>
+<!-- DS:THEME-TOGGLE:END -->
+
+
+<!--
+  De rest van index.html (nav, .otmontable, .ot-log-section, etc.)
+  hoeft NIET aangepast — components.css gebruikt dezelfde class-namen
+  als de oorspronkelijke index.css.
+
+  De drie OUDE link-tags die VERVANGEN moeten worden:
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="index_dark.css">
+    <link rel="stylesheet" href="dosis.css">       <!-- als die er is -->
+
+  Mag je laten staan zolang components.css ER NA komt — de selectors
+  zijn identiek dus components.css schaduwt ze. Maar netter is om de
+  oude link-tags te verwijderen.
+-->

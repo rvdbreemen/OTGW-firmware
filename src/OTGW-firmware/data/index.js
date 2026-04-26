@@ -3060,6 +3060,11 @@ function updateThemeToggle() {
     btn.textContent = icon;
     btn.title       = title;
   });
+  // TASK-435 Patch A: mirror the theme to body.dark + html[data-theme] so
+  // the new design-system rules in components.css (which target body.dark)
+  // pick up the same theme as the legacy stylesheet swap. Idempotent.
+  document.body.classList.toggle('dark', isDark);
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
 }
 
 //============================================================================

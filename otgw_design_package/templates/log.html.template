@@ -1,0 +1,96 @@
+<!--
+  log.html — Log viewer / Stats / Graph tabs template
+
+  De huidige firmware rendert dit al als .ot-log-section. components.css
+  pakt het automatisch — geen markup-changes nodig. Onderstaande blok is
+  een referentie-implementatie zodat je ziet wat de DS verwacht.
+-->
+
+<!-- DS:LOG:BEGIN -->
+<section class="ot-log-section" data-screen-label="Log">
+
+  <header class="ot-log-header">
+    <h3>OpenTherm Monitor</h3>
+    <div class="ot-log-status">
+      <span class="ws-status" id="ws-status"
+            aria-label="WebSocket status"></span>
+      <span id="ws-label">Connecting…</span>
+      <span class="status-separator">|</span>
+      <span class="mode-status" id="mode-status"
+            aria-label="Operating mode"></span>
+      <span id="mode-label">—</span>
+      <span class="status-separator">|</span>
+      <span class="simulation-badge" id="sim-badge" hidden>Simulation</span>
+    </div>
+  </header>
+
+  <nav class="ot-log-tabs" role="tablist">
+    <button class="tab-link active" role="tab" aria-selected="true"  data-tab="log">Log</button>
+    <button class="tab-link"        role="tab" aria-selected="false" data-tab="stats">Statistics</button>
+    <button class="tab-link"        role="tab" aria-selected="false" data-tab="graph">Graph</button>
+  </nav>
+
+  <!-- LOG -->
+  <div class="tab-content active" id="tab-log" role="tabpanel">
+    <div class="ot-log-controls">
+      <button class="btn-log-control" id="log-clear">Clear</button>
+      <button class="btn-log-control active" id="log-autoscroll">Auto-scroll</button>
+      <button class="btn-log-control" id="log-pause">Pause</button>
+      <input type="text" class="log-search" id="log-search"
+             placeholder="Filter… (T04, B40, ID=…)">
+      <label class="log-control-label">
+        <input type="checkbox" id="log-show-id" checked> show ID
+      </label>
+    </div>
+    <div class="ot-log-container">
+      <pre class="ot-log-content" id="log-content"></pre>
+    </div>
+    <div class="ot-log-footer">
+      <span id="log-frames">0 frames</span>
+      <span id="log-bps">0 B/s</span>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="tab-content" id="tab-stats" role="tabpanel">
+    <div class="ot-stats-container">
+      <table class="ot-stats-table">
+        <thead>
+          <tr>
+            <th data-sort="id">ID</th>
+            <th data-sort="name">Name</th>
+            <th data-sort="count">Count</th>
+            <th data-sort="value">Last value</th>
+            <th data-sort="seen">Last seen</th>
+          </tr>
+        </thead>
+        <tbody id="stats-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- GRAPH -->
+  <div class="tab-content" id="tab-graph" role="tabpanel">
+    <div id="log-chart" class="ds-chart"></div>
+  </div>
+
+</section>
+<!-- DS:LOG:END -->
+
+<!--
+  ===== Tab-switching JS (klein, geen framework nodig) =====
+
+    document.querySelectorAll('.ot-log-tabs .tab-link').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const id = tab.dataset.tab;
+        document.querySelectorAll('.ot-log-tabs .tab-link').forEach(t => {
+          const on = t === tab;
+          t.classList.toggle('active', on);
+          t.setAttribute('aria-selected', on);
+        });
+        document.querySelectorAll('.tab-content').forEach(p => {
+          p.classList.toggle('active', p.id === 'tab-' + id);
+        });
+      });
+    });
+-->

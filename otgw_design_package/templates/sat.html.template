@@ -1,0 +1,109 @@
+<!--
+  sat.html — SAT panel template (volledig vervangen)
+
+  Doel: vervang de huidige SAT-pagina (de teal-tile versie uit het
+  2.0.0 screenshot) door deze structuur. components.css + sat-slider.js
+  doen de rest.
+
+  Routing: in de firmware is dit een fragment dat via `/sat` of een
+  partial wordt geladen. Houd je bestaande wrapper / route intact —
+  vervang alleen de inhoud van het SAT-paneel.
+-->
+
+<!-- DS:SAT:BEGIN -->
+<section class="sat-panel" data-screen-label="SAT">
+
+  <!-- LINKER KOLOM: header, tiles, controls -->
+  <div>
+    <div class="sat-header">
+      <div class="sat-header-title">SAT — Smart Autotune Thermostat</div>
+
+      <!-- Enable-toggle. checkbox-id moet matchen met sat.js' handler. -->
+      <label class="ds-switch" title="Enable SAT">
+        <input type="checkbox" id="sat-enabled">
+        <span class="slider"></span>
+      </label>
+
+      <!-- Pill — class wordt vanuit sat.js gezet:
+           is-ok / is-warn / is-error, of geen class voor 'Disabled'. -->
+      <span class="ds-pill" id="sat-state-pill">Disabled</span>
+    </div>
+
+    <div class="sat-tiles">
+      <div class="sat-tile">
+        <div class="sat-tile-label">Room</div>
+        <div><span class="sat-tile-value" id="sat-room">—</span><span class="sat-tile-unit">°C</span></div>
+      </div>
+      <div class="sat-tile">
+        <div class="sat-tile-label">Outside</div>
+        <div><span class="sat-tile-value" id="sat-outside">—</span><span class="sat-tile-unit">°C</span></div>
+      </div>
+      <div class="sat-tile">
+        <div class="sat-tile-label">Boiler setpoint</div>
+        <div><span class="sat-tile-value" id="sat-boiler">—</span><span class="sat-tile-unit">°C</span></div>
+      </div>
+
+      <!-- Target — accent. Class .is-target is genoeg, geen aparte styling nodig. -->
+      <div class="sat-tile is-target">
+        <div class="sat-tile-label">Target</div>
+        <div><span class="sat-tile-value" id="sat-target">—</span><span class="sat-tile-unit">°C</span></div>
+      </div>
+    </div>
+
+    <h3>Temperature History</h3>
+    <div id="sat-chart" class="ds-chart"></div>
+
+    <h3>Controls</h3>
+    <div class="sat-controls">
+      <button class="btn btn-secondary" id="sat-recalibrate">Recalibrate</button>
+      <button class="btn btn-secondary" id="sat-diagnostics" disabled>Diagnostics</button>
+    </div>
+  </div>
+
+  <!-- RECHTER KOLOM: DHW -->
+  <div>
+    <h3>DHW</h3>
+    <div class="sat-dhw">
+      <div class="sat-dhw-row">
+        <span class="sat-dhw-label">DHW Setpoint</span>
+        <!-- data-unit / data-decimals worden door sat-slider.js gelezen -->
+        <span class="sat-dhw-value" id="dhw-setpoint-readout"
+              data-unit="°C" data-decimals="1">55.0 °C</span>
+      </div>
+      <input type="range" class="ds-slider"
+             id="dhw-setpoint-slider"
+             min="40" max="65" step="0.5" value="55">
+    </div>
+  </div>
+</section>
+<!-- DS:SAT:END -->
+
+<!--
+  ===== sat.js — TWEE kleine wijzigingen =====
+
+  1) Op je render-pad, NA elke innerHTML-rewrite:
+       document.dispatchEvent(new Event('sat:rendered'));
+     sat-slider.js bindt op dat event opnieuw.
+
+  2) State-pill zetten op basis van SAT-status:
+       const pill = document.getElementById('sat-state-pill');
+       pill.classList.remove('is-ok','is-warn','is-error');
+       if      (state === 'enabled')  { pill.textContent = 'Enabled';     pill.classList.add('is-ok'); }
+       else if (state === 'learning') { pill.textContent = 'Learning';    pill.classList.add('is-warn'); }
+       else if (state === 'fault')    { pill.textContent = 'Fault';       pill.classList.add('is-error'); }
+       else                           { pill.textContent = 'Disabled'; }
+
+  ===== ECharts init met token-driven theme =====
+
+       const chart = echarts.init(document.getElementById('sat-chart'));
+       function paint() {
+         chart.setOption(Object.assign({}, otgwChartTheme(), {
+           xAxis: { type: 'time' },
+           yAxis: { type: 'value', name: '°C' },
+           series: [{ type: 'line', data: HISTORY, smooth: true }],
+         }), true);
+       }
+       paint();
+       document.addEventListener('theme:changed', paint);  // theme-toggle.js
+       window.addEventListener('resize', () => chart.resize());
+-->

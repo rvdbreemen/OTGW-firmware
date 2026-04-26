@@ -28,20 +28,25 @@
       })();
     </script>
     <link rel="stylesheet" type="text/css" href="./index_common.css">
-    <!-- SAT panel theme (Patch 02): loads AFTER theme stylesheet so it can
-         override the older .sat-* rules in index.css / index_dark.css until
-         those are removed in a follow-up cleanup. -->
+    <!-- SAT panel theme (TASK-434 Patch 02): legacy partial; shadowed by
+         components.css below. To be removed in TASK-435 Patch E. -->
     <link rel="stylesheet" type="text/css" href="./sat.css">
-    <!-- OTMonitor home-page card grid (Patch 03): mirrors the SAT panel's
-         neutral surfaces and uses --status-* tokens for boolean indicators. -->
+    <!-- OTMonitor home-page card grid (TASK-434 Patch 03): legacy partial;
+         shadowed by components.css below. To be removed in TASK-435 Patch E. -->
     <link rel="stylesheet" type="text/css" href="./otmonitor.css">
+    <!-- TASK-435 Patch A: design-system component library. Loads LAST so
+         it shadows the older index.css / index_dark.css / sat.css /
+         otmonitor.css rules during the migration window. -->
+    <link rel="stylesheet" type="text/css" href="./components.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- TASK-435 Patch A: token-driven chart theme helper. Reads the
+         live --status-* tokens from CSS so charts follow the rest of
+         the UI on theme toggle. Loaded BEFORE sat.js / graph.js. -->
+    <script src="./echarts-theme.js" defer></script>
     <script src="./index.js"></script>
     <script src="./graph.js"></script>
     <script src="./sat.js"></script>
-    <!-- Patch 05: live-fill hook for the DHW setpoint slider. Loads after
-         sat.js so the listener for the sat:rendered re-render event is
-         registered on the same window. -->
+    <!-- TASK-434 Patch 05: live-fill hook for the DHW setpoint slider. -->
     <script src="./sat-slider.js"></script>
     <title>OTGW firmware</title>
   </head>

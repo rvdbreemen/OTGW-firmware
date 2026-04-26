@@ -1,0 +1,646 @@
+/*
+ * OTGW-firmware Design System — components.css
+ *
+ * Volledige componentbibliotheek. Alles in dit bestand gebruikt
+ * uitsluitend de tokens uit ds-tokens.css. Geen rauwe hex.
+ *
+ * Vervangt de oude index.css + index_dark.css + FSexplorer.css zodra
+ * je het er klaar voor bent. Tot die tijd kun je het ervoor laden —
+ * de selectors zijn hetzelfde dus components.css schaduwt ze.
+ *
+ * Inhoud:
+ *   1.  Base / reset
+ *   2.  Header + theme toggle
+ *   3.  Nav bar + Advanced dropdown
+ *   4.  Footer + status pills
+ *   5.  Buttons (primary / secondary / nav / log-control / fs)
+ *   6.  Form inputs (text, number, select, range, switch)
+ *   7.  Cards / panels
+ *   8.  Badges / state pills
+ *   9.  OT monitor home grid
+ *  10.  Log viewer (terminal)
+ *  11.  Stats table + tabs
+ *  12.  Graph / chart container (ECharts via CDN)
+ *  13.  SAT panel (tiles, DHW slider, controls)
+ *  14.  Settings form rows
+ *  15.  FSexplorer table + action card
+ *  16.  Banners (crash, mismatch, simulation)
+ *  17.  Utilities + a11y
+ */
+
+/* =============================================================
+ * 1. BASE
+ * ============================================================= */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-base);
+  color: var(--fg-1);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: 1.5em;
+}
+a { color: var(--accent-primary); text-decoration: none; }
+a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-radius: var(--radius-md);
+}
+
+/* =============================================================
+ * 2. HEADER
+ * ============================================================= */
+.headerrow {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  padding: var(--space-4) 16px var(--space-2); position: relative;
+}
+.headercolumnbig {
+  font-size: var(--fs-display); font-weight: 700;
+  flex-grow: 1; white-space: nowrap; margin-right: var(--space-6);
+}
+.headercolumn {
+  font-size: var(--fs-sm); white-space: nowrap; margin-left: var(--space-6);
+  color: var(--fg-3);
+}
+.theme-toggle-btn {
+  cursor: pointer; opacity: .7; position: relative; top: 6px;
+  user-select: none;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-xl);
+  font-size: var(--fs-h3); line-height: 1;
+  background: transparent; border: 0; color: inherit;
+  transition: opacity var(--dur-med) var(--ease), background-color var(--dur-med) var(--ease);
+}
+.theme-toggle-btn:hover { opacity: 1; background: rgba(0,0,0,.05); }
+body.dark .theme-toggle-btn:hover, [data-theme="dark"] .theme-toggle-btn:hover {
+  background: rgba(255,255,255,.08);
+}
+
+/* =============================================================
+ * 3. NAV
+ * ============================================================= */
+.nav-container {
+  background: var(--brand-cyan);
+  padding: var(--space-2) 16px;
+  min-height: var(--nav-height);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6);
+}
+body.dark .nav-container, [data-theme="dark"] .nav-container { background: #383838; }
+
+.nav-left, .nav-right {
+  display: flex; align-items: center; gap: var(--space-6);
+  min-height: var(--nav-height);
+}
+.nav-left  { flex: 2 1 0; justify-content: flex-start; }
+.nav-right { flex: 9 1 0; justify-content: flex-end; position: relative; }
+
+.nav-item {
+  font: inherit;
+  font-size: var(--fs-body); height: var(--btn-height); width: 110px;
+  background: var(--brand-lightblue); color: var(--fg-3);
+  border: 0; border-radius: var(--radius-lg);
+  cursor: pointer;
+  box-shadow: var(--shadow-btn);
+  transition: color var(--dur-med) var(--ease);
+}
+.nav-item:hover { color: var(--fg-1); }
+.nav-item:active { transform: translate(2px, 2px); box-shadow: none; }
+
+.adv_dropdown {
+  position: absolute; top: 52px; right: 0; min-width: 200px;
+  background: var(--bg-surface-alt); color: var(--fg-2);
+  border: 1px solid var(--border-2); border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-dropdown);
+  padding: 5px 0; z-index: 200;
+}
+.adv_dropdown .list_item {
+  display: block; padding: var(--space-4) var(--space-6);
+  cursor: pointer; border-bottom: 1px solid var(--border-soft);
+}
+.adv_dropdown .list_item:last-child { border-bottom: 0; }
+.adv_dropdown .list_item:hover {
+  background: var(--brand-faint); color: var(--fg-1);
+}
+body.dark .adv_dropdown .list_item:hover,
+[data-theme="dark"] .adv_dropdown .list_item:hover {
+  background: var(--bg-surface-alt); color: var(--fg-1);
+}
+
+/* =============================================================
+ * 4. FOOTER + STATUS
+ * ============================================================= */
+.footer { background: var(--bg-app); }
+.bottom {
+  position: fixed; bottom: 0;
+  font-size: var(--fs-sm); color: var(--fg-5);
+}
+.bottom.right-0 { right: 0; padding-right: var(--space-4); }
+.bottom.left-0  { left: 0;  padding-left:  var(--space-4); }
+.heap-info { margin-right: var(--space-4); font-family: var(--font-mono); font-size: var(--fs-xxs); }
+
+/* =============================================================
+ * 5. BUTTONS
+ * ============================================================= */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--space-3);
+  font: inherit; font-size: var(--fs-xs); font-weight: 500;
+  padding: var(--space-2) var(--space-5);
+  background: var(--bg-muted); color: var(--fg-2);
+  border: 1px solid var(--border-1); border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--dur-med) var(--ease),
+              transform var(--dur-fast) var(--ease),
+              box-shadow var(--dur-med) var(--ease);
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-btn-hover); }
+.btn:active { transform: translateY(0); box-shadow: none; }
+.btn[disabled], .btn:disabled {
+  opacity: .5; cursor: not-allowed; transform: none; box-shadow: none;
+}
+
+.btn-primary {
+  background: var(--status-info); color: var(--fg-inverse); border-color: transparent;
+}
+.btn-primary:hover { background: var(--status-info-dark); }
+.btn-secondary {
+  background: var(--bg-surface-alt); color: var(--fg-2);
+}
+.btn-danger { background: var(--status-danger); color: #fff; border-color: transparent; }
+.btn-warn   { background: var(--status-warn);   color: #000; border-color: transparent; }
+.btn-ok     { background: var(--status-ok);     color: #fff; border-color: transparent; }
+
+/* Log-control variant — kleiner, plat */
+.btn-log-control {
+  padding: var(--space-2) var(--space-5);
+  background: var(--status-info); color: var(--fg-inverse);
+  border: 0; border-radius: var(--radius-md);
+  cursor: pointer; font-size: var(--fs-xs);
+  transition: all var(--dur-med) var(--ease);
+}
+.btn-log-control:hover { background: var(--status-info-dark); transform: translateY(-1px); box-shadow: var(--shadow-btn-hover); }
+.btn-log-control.active { background: var(--status-ok); }
+body.dark .btn-log-control,
+[data-theme="dark"] .btn-log-control { background: var(--bg-surface-alt); }
+body.dark .btn-log-control:hover,
+[data-theme="dark"] .btn-log-control:hover { background: var(--bg-muted); }
+
+/* =============================================================
+ * 6. FORM INPUTS
+ * ============================================================= */
+input[type="text"], input[type="password"], input[type="number"],
+input[type="email"], input[type="url"], input[type="search"],
+select, textarea, .log-search {
+  font: inherit; font-size: var(--fs-input);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-surface); color: var(--fg-2);
+  border: 1px solid var(--border-2); border-radius: var(--radius-md);
+}
+.log-search { font-size: var(--fs-xs); }
+
+/* Range slider met live fill via --slider-pct (sat-slider.js) */
+input[type="range"].ds-slider {
+  --slider-pct: 50%;
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--status-info) 0,
+    var(--status-info) var(--slider-pct),
+    var(--slider-track-empty) var(--slider-pct),
+    var(--slider-track-empty) 100%
+  );
+  outline: none;
+}
+input[type="range"].ds-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: var(--radius-dot);
+  background: var(--slider-thumb-bg);
+  border: 2px solid var(--status-info);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+input[type="range"].ds-slider::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: var(--radius-dot);
+  background: var(--slider-thumb-bg);
+  border: 2px solid var(--status-info);
+  cursor: pointer;
+}
+
+/* Switch (square indicator zoals .state-on/.state-off) */
+.state-on, .state-off {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid currentColor; border-radius: var(--radius-sm);
+  vertical-align: text-bottom; box-sizing: border-box;
+}
+.state-on { background-color: currentColor; }
+
+/* Toggle switch (voor SAT enable, etc.) */
+.ds-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+.ds-switch input { opacity: 0; width: 0; height: 0; }
+.ds-switch .slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: var(--bg-muted); border-radius: var(--radius-pill);
+  transition: background-color var(--dur-med) var(--ease);
+}
+.ds-switch .slider::before {
+  content: ""; position: absolute; height: 16px; width: 16px;
+  left: 3px; bottom: 3px;
+  background: var(--bg-surface); border-radius: var(--radius-dot);
+  transition: transform var(--dur-med) var(--ease);
+}
+.ds-switch input:checked + .slider { background: var(--status-ok); }
+.ds-switch input:checked + .slider::before { transform: translateX(18px); }
+
+/* =============================================================
+ * 7. CARDS / PANELS
+ * ============================================================= */
+.ds-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-card);
+}
+.ds-panel {
+  background: var(--bg-panel);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-panel);
+}
+
+/* =============================================================
+ * 8. BADGES / STATE PILLS
+ * ============================================================= */
+.simulation-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--sim-badge-bg); color: var(--sim-badge-text);
+  font-size: var(--fs-caption); font-weight: 700; line-height: 1;
+  letter-spacing: .08em; text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(10,132,255,.2), 0 0 10px rgba(10,132,255,.35);
+}
+
+.ds-pill {
+  display: inline-flex; align-items: center;
+  padding: 3px var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-caption); font-weight: 700; line-height: 1;
+  letter-spacing: .06em; text-transform: uppercase;
+  background: var(--bg-muted); color: var(--fg-3);
+}
+.ds-pill.is-ok    { background: var(--status-ok);    color: #fff; }
+.ds-pill.is-warn  { background: var(--status-warn);  color: #000; }
+.ds-pill.is-info  { background: var(--status-info);  color: #fff; }
+.ds-pill.is-error { background: var(--status-error); color: #fff; }
+
+/* Status dots — gebruikt in nav-status, log-status, OT monitor bool rows */
+.ws-status, .mode-status, .ds-dot {
+  display: inline-block; width: 12px; height: 12px;
+  border-radius: var(--radius-dot);
+  transition: background-color var(--dur-slow) var(--ease),
+              box-shadow var(--dur-slow) var(--ease);
+}
+.ws-connected    { background: var(--status-ok);    box-shadow: 0 0 8px var(--status-ok-glow); }
+.ws-disconnected { background: var(--status-error); }
+.mode-gateway    { background: var(--status-warn);  box-shadow: 0 0 8px var(--status-warn-glow); }
+.mode-monitor    { background: var(--status-info);  box-shadow: 0 0 8px var(--status-info-glow); }
+.mode-unknown    { background: var(--status-neutral); }
+.status-separator { opacity: .6; }
+
+/* =============================================================
+ * 9. OT MONITOR HOME GRID
+ * ============================================================= */
+.otmontable {
+  column-width: 320px; column-gap: 0;
+  width: 100%; padding: 16px;
+}
+.otmonrow {
+  background: var(--brand-lightblue);
+  display: flex; align-items: center;
+  padding: 3px 0;
+  border: 1px solid var(--bg-surface);
+  break-inside: avoid;
+  font-size: var(--fs-sm); color: var(--fg-1);
+}
+body.dark .otmonrow,
+[data-theme="dark"] .otmonrow {
+  background: var(--bg-surface); border-color: var(--bg-app); color: var(--fg-2);
+}
+.otmoncolumn1 {
+  flex: 1; padding-left: var(--space-4);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.otmoncolumn2 {
+  width: 60px; text-align: right; padding-right: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.otmoncolumn3 { width: 40px; margin-left: 5px; }
+
+/* =============================================================
+ * 10. LOG VIEWER
+ * ============================================================= */
+.ot-log-section {
+  margin: 16px; padding: var(--space-6);
+  background: var(--bg-panel); border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-panel);
+}
+.ot-log-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--border-1);
+}
+.ot-log-header h3 { margin: 0; font-size: var(--fs-h3); color: var(--fg-2); font-weight: 700; }
+.ot-log-status { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
+
+.ot-log-controls {
+  display: flex; flex-wrap: wrap; gap: var(--space-3);
+  margin-bottom: var(--space-4); align-items: center;
+}
+.log-search {
+  flex: 1; min-width: 200px;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--border-1); border-radius: var(--radius-md);
+}
+.log-control-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-xs); cursor: pointer; user-select: none;
+}
+
+.ot-log-container {
+  background: var(--log-bg); border-radius: var(--radius-md);
+  overflow: hidden; max-height: 340px;
+}
+.ot-log-content {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xxs); color: var(--log-fg);
+  padding: 14px;
+  overflow-y: auto; overflow-x: auto;
+  white-space: pre; line-height: 1.4;
+  max-height: 340px;
+}
+.ot-log-footer {
+  display: flex; justify-content: space-between;
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-muted);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  font-size: var(--fs-xxs); color: var(--fg-3);
+}
+
+/* =============================================================
+ * 11. TABS + STATS TABLE
+ * ============================================================= */
+.ot-log-tabs {
+  margin-bottom: var(--space-6); border-bottom: 1px solid var(--border-1);
+}
+.tab-link {
+  background: transparent; border: 0;
+  border-bottom: 3px solid transparent;
+  padding: var(--space-4) 16px;
+  font-size: var(--fs-sm); font-weight: 700; color: var(--fg-3);
+  cursor: pointer;
+  transition: background-color var(--dur-slow) var(--ease),
+              color var(--dur-slow) var(--ease),
+              border-color var(--dur-slow) var(--ease);
+}
+.tab-link:hover { background: var(--bg-muted); border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.tab-link.active { color: var(--status-info); border-bottom-color: var(--status-info); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.ot-stats-container {
+  max-height: 340px; overflow: auto;
+  background: var(--bg-surface); border: 1px solid var(--border-1);
+}
+.ot-stats-table { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
+.ot-stats-table th, .ot-stats-table td {
+  text-align: left; padding: 4px var(--space-4);
+  border-bottom: 1px solid var(--border-1);
+  white-space: nowrap;
+}
+.ot-stats-table th {
+  background: var(--bg-header-strip); color: var(--fg-2);
+  position: sticky; top: 0; z-index: 10; cursor: pointer;
+}
+.ot-stats-table tr:hover { background: var(--bg-panel); }
+
+/* =============================================================
+ * 12. CHART CONTAINER (ECharts via CDN)
+ *
+ * In code:
+ *   const chart = echarts.init(document.querySelector('#sat-chart'));
+ *   chart.setOption({ ...otgwChartTheme(), series: [...] });
+ *
+ * otgwChartTheme() leest de CSS-vars hieronder zodat het thema
+ * volgt zonder dat er een tweede color-bron is. Snippet ligt in
+ * de package onder data/echarts-theme.js.
+ * ============================================================= */
+.ds-chart, .graph-fake {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  height: 280px;
+}
+
+/* =============================================================
+ * 13. SAT PANEL
+ * ============================================================= */
+.sat-panel {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(280px, 360px);
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-app); color: var(--fg-2);
+}
+@media (max-width: 720px) { .sat-panel { grid-template-columns: 1fr; } }
+
+.sat-panel h2, .sat-panel h3 {
+  font: 700 var(--fs-sm) / var(--lh-tight) var(--font-sans);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  margin: 0 0 var(--space-5);
+  color: var(--fg-4);
+}
+
+.sat-header {
+  display: flex; align-items: center; gap: var(--space-5);
+  margin-bottom: 16px;
+}
+.sat-header-title {
+  font-size: var(--fs-h3); font-weight: 700; color: var(--fg-1);
+  flex: 1;
+}
+
+.sat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: 16px;
+}
+.sat-tile {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2xl);
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+.sat-tile-label {
+  font-size: var(--fs-xxs); color: var(--fg-4); letter-spacing: .02em;
+}
+.sat-tile-value {
+  font-family: var(--font-mono); font-size: var(--fs-display);
+  font-weight: 400; line-height: 1; color: var(--fg-1);
+  font-variant-numeric: tabular-nums;
+}
+.sat-tile-unit { font-size: var(--fs-xs); color: var(--fg-4); margin-left: 2px; }
+.sat-tile.is-target .sat-tile-value { color: var(--status-info); }
+.sat-tile.is-target { border-color: var(--status-info); }
+
+.sat-dhw {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1); border-radius: var(--radius-2xl);
+}
+.sat-dhw-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-5);
+}
+.sat-dhw-label { font-size: var(--fs-xs); color: var(--fg-3); }
+.sat-dhw-value {
+  font-family: var(--font-mono); font-size: var(--fs-h3); color: var(--fg-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.sat-controls {
+  display: flex; gap: var(--space-3); flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* =============================================================
+ * 14. SETTINGS FORM ROWS
+ * ============================================================= */
+.settingDiv {
+  text-align: right;
+  border: 4px solid var(--brand-lightblue);
+  background: var(--brand-lightblue);
+  padding: var(--space-2) var(--space-5);
+  margin: 0 16px 4px;
+  font-size: var(--fs-sm); color: var(--fg-1);
+}
+body.dark .settingDiv,
+[data-theme="dark"] .settingDiv {
+  border-color: var(--bg-surface); background: var(--bg-surface); color: var(--fg-2);
+}
+.settingDiv .settings-field-container {
+  width: 320px; float: left;
+  text-align: left; font-weight: 500; padding-top: 4px;
+}
+.settingDiv input[type="text"],
+.settingDiv input[type="password"],
+.settingDiv input[type="number"] {
+  padding: 4px var(--space-3); width: 240px;
+  font-size: 12pt;
+}
+.settingDiv::after { content: ""; display: table; clear: both; }
+
+/* =============================================================
+ * 15. FSEXPLORER
+ * ============================================================= */
+.fs-main {
+  width: 100%; max-width: 800px; margin: 16px auto;
+  background: var(--bg-surface);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4);
+  font-family: var(--font-system);
+  color: var(--fg-2);
+}
+.fs-main table { width: 100%; border-collapse: collapse; }
+.fs-main tr:nth-child(odd)  { background: var(--bg-surface); }
+.fs-main tr:nth-child(even) { background: var(--bg-row-zebra); }
+.fs-main td {
+  padding: var(--space-4) var(--space-3);
+  white-space: nowrap; border: 0; font-size: var(--fs-sm);
+}
+.fs-main a.delete-link { color: var(--status-danger); }
+.fs-main a.delete-link:hover { color: var(--status-critical); }
+
+.fs-action-card {
+  max-width: 800px; margin: 16px auto;
+  background: var(--bg-surface);
+  padding: 22px; border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+  color: var(--fg-2);
+}
+.fs-action-card h3 {
+  color: var(--accent-primary);
+  border-bottom: 2px solid var(--bg-row-zebra);
+  padding-bottom: 14px;
+  margin: 0 0 18px;
+}
+.button-row {
+  display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;
+}
+.fs-btn {
+  background: var(--accent-primary); color: #fff;
+  border: 0; padding: var(--space-4) var(--space-7);
+  font-size: var(--fs-sm); font-weight: 500;
+  border-radius: var(--radius-xl); cursor: pointer;
+  min-width: 140px; box-shadow: var(--shadow-panel);
+  transition: transform var(--dur-med) var(--ease),
+              box-shadow var(--dur-med) var(--ease),
+              opacity var(--dur-med) var(--ease);
+  font-family: var(--font-system);
+}
+.fs-btn:hover {
+  transform: translateY(-2px); box-shadow: var(--shadow-card); opacity: .95;
+}
+.fs-btn.secondary { background: #6c757d; }
+.fs-btn.wifi      { background: var(--status-warn); color: #000; }
+.fs-btn.danger    { background: var(--status-danger); }
+
+/* =============================================================
+ * 16. BANNERS
+ * ============================================================= */
+.fs-mismatch-banner {
+  padding: var(--space-4) 16px;
+  background: var(--status-critical); color: #fff;
+  font-weight: 700; text-align: center;
+}
+.crash-panel {
+  margin: 16px;
+  padding: var(--space-6);
+  background: var(--crash-bg);
+  border: 1px solid var(--crash-border);
+  border-left: 4px solid var(--crash-accent);
+  border-radius: var(--radius-md);
+  color: var(--crash-text);
+}
+
+/* =============================================================
+ * 17. UTILITIES + A11Y
+ * ============================================================= */
+.page { display: none; padding-bottom: var(--space-7); }
+.page.active { display: block; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important; animation: none !important;
+  }
+}

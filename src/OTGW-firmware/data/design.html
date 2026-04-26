@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OTGW Design System — component reference</title>
+  <link rel="stylesheet" href="ds-tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <style>
+    /* Page chrome — alléén voor deze referentiepagina, niet voor de
+       firmware. Gebruikt design tokens zodat het zelf ook compliant is. */
+    .design-shell { padding: var(--space-7); max-width: 1200px; margin: 0 auto; }
+    .design-toc {
+      position: sticky; top: 0; z-index: 5;
+      background: var(--bg-app);
+      padding: var(--space-3) 0; margin: 0 0 var(--space-7);
+      border-bottom: 1px solid var(--border-1);
+      display: flex; flex-wrap: wrap; gap: var(--space-3);
+      align-items: center; justify-content: space-between;
+    }
+    .design-toc nav { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+    .design-toc a { font-size: var(--fs-xs); color: var(--fg-3); }
+    .design-toc a:hover { color: var(--accent-primary); }
+
+    .design-section {
+      margin: 0 0 var(--space-8); padding: var(--space-6);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-1); border-radius: var(--radius-2xl);
+    }
+    .design-section > h2 {
+      font: 700 var(--fs-h2)/var(--lh-tight) var(--font-sans);
+      margin: 0 0 var(--space-3); color: var(--fg-1);
+    }
+    .design-section > p.lede {
+      margin: 0 0 var(--space-6); color: var(--fg-3); font-size: var(--fs-sm);
+    }
+    .design-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--space-4);
+    }
+    .design-swatch {
+      display: flex; flex-direction: column; gap: var(--space-2);
+      padding: var(--space-4);
+      border: 1px solid var(--border-1); border-radius: var(--radius-md);
+      background: var(--bg-surface);
+    }
+    .swatch-tile { height: 56px; border-radius: var(--radius-md); border: 1px solid var(--border-1); }
+    .swatch-meta {
+      display: flex; justify-content: space-between; gap: var(--space-3);
+      font-size: var(--fs-xxs); color: var(--fg-4); font-family: var(--font-mono);
+    }
+    .swatch-meta b { color: var(--fg-2); font-family: var(--font-sans); }
+
+    .type-row { display: flex; align-items: baseline; gap: var(--space-5); padding: var(--space-3) 0; border-bottom: 1px dashed var(--border-1); }
+    .type-row:last-child { border-bottom: 0; }
+    .type-row .label {
+      width: 110px; font-family: var(--font-mono); font-size: var(--fs-xxs); color: var(--fg-4);
+    }
+
+    .specbox {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: var(--space-3); margin-top: var(--space-3);
+    }
+    .specbox > div {
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-app); border-radius: var(--radius-md);
+      font-family: var(--font-mono); font-size: var(--fs-xxs); color: var(--fg-3);
+    }
+    .specbox b { color: var(--fg-1); font-family: var(--font-sans); display: block; font-size: var(--fs-xs); }
+
+    .demo {
+      padding: var(--space-6);
+      background: var(--bg-app);
+      border: 1px dashed var(--border-1);
+      border-radius: var(--radius-md);
+      margin-top: var(--space-3);
+    }
+    .demo + .demo { margin-top: var(--space-3); }
+    .demo .demo-label {
+      font-family: var(--font-mono); font-size: var(--fs-xxs); color: var(--fg-4);
+      margin-bottom: var(--space-3);
+    }
+
+    /* Side-by-side light + dark — nest twee thema's via [data-theme] */
+    .theme-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    @media (max-width: 720px) { .theme-pair { grid-template-columns: 1fr; } }
+    .theme-pair > div {
+      padding: var(--space-6); border-radius: var(--radius-md);
+      background: var(--bg-app);
+      color: var(--fg-2);
+      border: 1px solid var(--border-1);
+    }
+    .theme-pair > .light-pane { /* defaults already light */ }
+    .theme-pair > .dark-pane[data-theme="dark"] {
+      /* tokens auto-applied via [data-theme="dark"] */
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar (referentiepagina-eigen) -->
+<div class="design-shell">
+
+  <header class="headerrow">
+    <span class="headercolumnbig">OTGW Design System</span>
+    <span class="headercolumn">Component reference</span>
+    <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme" aria-pressed="false">☾</button>
+  </header>
+
+  <div class="design-toc">
+    <nav>
+      <a href="#tokens">Tokens</a>
+      <a href="#type">Type</a>
+      <a href="#buttons">Buttons</a>
+      <a href="#forms">Forms</a>
+      <a href="#status">Status</a>
+      <a href="#nav">Nav + dropdown</a>
+      <a href="#cards">Cards</a>
+      <a href="#otmonitor">OT monitor</a>
+      <a href="#sat">SAT</a>
+      <a href="#log">Log viewer</a>
+      <a href="#tabs">Tabs + stats</a>
+      <a href="#chart">Chart</a>
+      <a href="#fsexplorer">FSexplorer</a>
+      <a href="#banners">Banners</a>
+    </nav>
+    <span class="ds-pill is-info">v1.0</span>
+  </div>
+
+  <!-- ============== TOKENS ============== -->
+  <section id="tokens" class="design-section">
+    <h2>1. Color tokens</h2>
+    <p class="lede">Eén bron van waarheid in <code>ds-tokens.css</code>. Light + dark variant per token.</p>
+
+    <h3 style="margin: var(--space-4) 0 var(--space-3); font-size: var(--fs-h3);">Brand &amp; surface</h3>
+    <div class="design-grid">
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--brand-cyan);"></div>          <div class="swatch-meta"><b>--brand-cyan</b><span>#00bffe</span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--brand-lightblue);"></div>     <div class="swatch-meta"><b>--brand-lightblue</b><span>#add8e6</span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--brand-cyan-soft);"></div>     <div class="swatch-meta"><b>--brand-cyan-soft</b><span>#e6ffff</span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--bg-app); border-color: var(--border-1);"></div> <div class="swatch-meta"><b>--bg-app</b><span></span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--bg-surface);"></div>          <div class="swatch-meta"><b>--bg-surface</b><span></span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--bg-panel);"></div>            <div class="swatch-meta"><b>--bg-panel</b><span></span></div></div>
+    </div>
+
+    <h3 style="margin: var(--space-7) 0 var(--space-3); font-size: var(--fs-h3);">Status</h3>
+    <div class="design-grid">
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--status-ok);"></div>           <div class="swatch-meta"><b>--status-ok</b><span>OK</span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--status-info);"></div>         <div class="swatch-meta"><b>--status-info</b><span>info</span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--status-warn);"></div>         <div class="swatch-meta"><b>--status-warn</b><span>warn</span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--status-error);"></div>        <div class="swatch-meta"><b>--status-error</b><span>error</span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--status-critical);"></div>     <div class="swatch-meta"><b>--status-critical</b><span>critical</span></div></div>
+      <div class="design-swatch"><div class="swatch-tile" style="background: var(--status-danger);"></div>       <div class="swatch-meta"><b>--status-danger</b><span>destructive</span></div></div>
+    </div>
+
+    <h3 style="margin: var(--space-7) 0 var(--space-3); font-size: var(--fs-h3);">Spacing &amp; radii</h3>
+    <div class="specbox">
+      <div><b>--space-1</b>4 px</div>
+      <div><b>--space-3</b>8 px</div>
+      <div><b>--space-4</b>10 px</div>
+      <div><b>--space-5</b>12 px</div>
+      <div><b>--space-6</b>15 px</div>
+      <div><b>--space-7</b>20 px</div>
+      <div><b>--space-8</b>25 px</div>
+      <div><b>--radius-md</b>4 px</div>
+      <div><b>--radius-lg</b>5 px</div>
+      <div><b>--radius-xl</b>6 px</div>
+      <div><b>--radius-2xl</b>8 px</div>
+      <div><b>--radius-pill</b>999 px</div>
+    </div>
+  </section>
+
+  <!-- ============== TYPE ============== -->
+  <section id="type" class="design-section">
+    <h2>2. Typography</h2>
+    <p class="lede">Inter (UI) + JetBrains Mono (terminal). Tabular numerals globaal aan.</p>
+    <div class="type-row"><span class="label">--fs-display</span><span style="font-size: var(--fs-display); font-weight: 700;">OTGW firmware</span></div>
+    <div class="type-row"><span class="label">--fs-h2</span><span style="font-size: var(--fs-h2); font-weight: 700;">Smart Autotune Thermostat</span></div>
+    <div class="type-row"><span class="label">--fs-h3</span><span style="font-size: var(--fs-h3); font-weight: 700;">OpenTherm Monitor</span></div>
+    <div class="type-row"><span class="label">--fs-body</span><span style="font-size: var(--fs-body);">Boiler setpoint  61.5 °C  · Modulation level  42 %  · Pressure  1.6 bar</span></div>
+    <div class="type-row"><span class="label">--fs-sm</span><span style="font-size: var(--fs-sm);">Connected · Gateway · v1.4.1</span></div>
+    <div class="type-row"><span class="label">--fs-xs (mono)</span><span style="font-size: var(--fs-xs); font-family: var(--font-mono);">T04 14:02:35.118 0080190000 [ID=0]</span></div>
+    <div class="type-row"><span class="label">--fs-caption</span><span class="ds-tag" style="font-size: var(--fs-caption);">SIMULATION</span></div>
+  </section>
+
+  <!-- ============== BUTTONS ============== -->
+  <section id="buttons" class="design-section">
+    <h2>3. Buttons</h2>
+    <p class="lede"><code>.btn</code> — vier varianten + log-control + nav-item + fs-btn.</p>
+
+    <div class="theme-pair">
+      <div class="light-pane" data-theme="light">
+        <div class="demo">
+          <div class="demo-label">light</div>
+          <div style="display: flex; gap: var(--space-3); flex-wrap: wrap;">
+            <button class="btn btn-primary">Primary</button>
+            <button class="btn btn-secondary">Secondary</button>
+            <button class="btn btn-ok">OK</button>
+            <button class="btn btn-warn">Warn</button>
+            <button class="btn btn-danger">Danger</button>
+            <button class="btn" disabled>Disabled</button>
+          </div>
+          <div style="display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-4);">
+            <button class="btn-log-control">Pause</button>
+            <button class="btn-log-control active">Auto-scroll</button>
+            <button class="nav-item">Home</button>
+            <button class="fs-btn">Update Firmware</button>
+            <button class="fs-btn wifi">Reset Wireless</button>
+            <button class="fs-btn danger">Reset Config</button>
+          </div>
+        </div>
+      </div>
+      <div class="dark-pane" data-theme="dark">
+        <div class="demo">
+          <div class="demo-label">dark</div>
+          <div style="display: flex; gap: var(--space-3); flex-wrap: wrap;">
+            <button class="btn btn-primary">Primary</button>
+            <button class="btn btn-secondary">Secondary</button>
+            <button class="btn btn-ok">OK</button>
+            <button class="btn btn-warn">Warn</button>
+            <button class="btn btn-danger">Danger</button>
+            <button class="btn" disabled>Disabled</button>
+          </div>
+          <div style="display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-4);">
+            <button class="btn-log-control">Pause</button>
+            <button class="btn-log-control active">Auto-scroll</button>
+            <button class="nav-item">Home</button>
+            <button class="fs-btn">Update Firmware</button>
+            <button class="fs-btn wifi">Reset Wireless</button>
+            <button class="fs-btn danger">Reset Config</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== FORMS ============== -->
+  <section id="forms" class="design-section">
+    <h2>4. Form inputs</h2>
+    <div class="theme-pair">
+      <div class="light-pane" data-theme="light">
+        <div class="demo">
+          <div class="demo-label">light</div>
+          <input type="text" placeholder="otgw-a3f1" style="margin-bottom: var(--space-3);"><br>
+          <input type="number" value="55" min="40" max="65" step="0.5" style="margin-bottom: var(--space-3);"><br>
+          <select style="margin-bottom: var(--space-3);"><option>Gateway</option><option>Monitor</option></select><br>
+          <input type="range" class="ds-slider" min="40" max="65" step="0.5" value="55" id="demo-slider-1">
+          <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3);">
+            <span class="state-on" style="color: var(--status-ok);"></span> Flame
+            <span class="state-off" style="color: var(--fg-4); margin-left: var(--space-4);"></span> CH active
+            <label class="ds-switch" style="margin-left: var(--space-4);"><input type="checkbox" checked><span class="slider"></span></label>
+          </div>
+        </div>
+      </div>
+      <div class="dark-pane" data-theme="dark">
+        <div class="demo">
+          <div class="demo-label">dark</div>
+          <input type="text" placeholder="otgw-a3f1" style="margin-bottom: var(--space-3);"><br>
+          <input type="number" value="55" min="40" max="65" step="0.5" style="margin-bottom: var(--space-3);"><br>
+          <select style="margin-bottom: var(--space-3);"><option>Gateway</option><option>Monitor</option></select><br>
+          <input type="range" class="ds-slider" min="40" max="65" step="0.5" value="55" id="demo-slider-2">
+          <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3);">
+            <span class="state-on" style="color: var(--status-ok);"></span> Flame
+            <span class="state-off" style="color: var(--fg-4); margin-left: var(--space-4);"></span> CH active
+            <label class="ds-switch" style="margin-left: var(--space-4);"><input type="checkbox" checked><span class="slider"></span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== STATUS / BADGES ============== -->
+  <section id="status" class="design-section">
+    <h2>5. Status &amp; badges</h2>
+    <div class="theme-pair">
+      <div class="light-pane" data-theme="light">
+        <div class="demo">
+          <div class="demo-label">light</div>
+          <div style="display: flex; gap: var(--space-5); align-items: center; flex-wrap: wrap;">
+            <span class="ws-status ws-connected" title="WS connected"></span> Connected
+            <span class="ws-status ws-disconnected"></span> Disconnected
+            <span class="mode-status mode-gateway"></span> Gateway
+            <span class="mode-status mode-monitor"></span> Monitor
+            <span class="mode-status mode-unknown"></span> Unknown
+          </div>
+          <div style="display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap;">
+            <span class="ds-pill">Disabled</span>
+            <span class="ds-pill is-ok">Enabled</span>
+            <span class="ds-pill is-warn">Learning</span>
+            <span class="ds-pill is-info">Calibrating</span>
+            <span class="ds-pill is-error">Fault</span>
+            <span class="simulation-badge">Simulation</span>
+          </div>
+        </div>
+      </div>
+      <div class="dark-pane" data-theme="dark">
+        <div class="demo">
+          <div class="demo-label">dark</div>
+          <div style="display: flex; gap: var(--space-5); align-items: center; flex-wrap: wrap;">
+            <span class="ws-status ws-connected"></span> Connected
+            <span class="ws-status ws-disconnected"></span> Disconnected
+            <span class="mode-status mode-gateway"></span> Gateway
+            <span class="mode-status mode-monitor"></span> Monitor
+            <span class="mode-status mode-unknown"></span> Unknown
+          </div>
+          <div style="display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap;">
+            <span class="ds-pill">Disabled</span>
+            <span class="ds-pill is-ok">Enabled</span>
+            <span class="ds-pill is-warn">Learning</span>
+            <span class="ds-pill is-info">Calibrating</span>
+            <span class="ds-pill is-error">Fault</span>
+            <span class="simulation-badge">Simulation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== NAV ============== -->
+  <section id="nav" class="design-section">
+    <h2>6. Nav bar</h2>
+    <div class="theme-pair">
+      <div class="light-pane" data-theme="light">
+        <div class="demo">
+          <div class="demo-label">light</div>
+          <div class="nav-container">
+            <div class="nav-left"><span style="color: #fff; font-weight: 700;">otgw-a3f1</span></div>
+            <div class="nav-right">
+              <button class="nav-item">Home</button>
+              <button class="nav-item">Settings</button>
+              <button class="nav-item">Advanced ▾</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dark-pane" data-theme="dark">
+        <div class="demo">
+          <div class="demo-label">dark</div>
+          <div class="nav-container">
+            <div class="nav-left"><span style="color: #fff; font-weight: 700;">otgw-a3f1</span></div>
+            <div class="nav-right">
+              <button class="nav-item">Home</button>
+              <button class="nav-item">Settings</button>
+              <button class="nav-item">Advanced ▾</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== CARDS ============== -->
+  <section id="cards" class="design-section">
+    <h2>7. Cards &amp; panels</h2>
+    <div class="theme-pair">
+      <div class="light-pane" data-theme="light">
+        <div class="demo">
+          <div class="demo-label">.ds-card / .ds-panel — light</div>
+          <div class="ds-card">
+            <div style="font-weight: 700; margin-bottom: var(--space-2);">Boiler</div>
+            <div style="font-family: var(--font-mono); font-size: var(--fs-h2);">58.2 °C</div>
+          </div>
+        </div>
+      </div>
+      <div class="dark-pane" data-theme="dark">
+        <div class="demo">
+          <div class="demo-label">.ds-card — dark</div>
+          <div class="ds-card">
+            <div style="font-weight: 700; margin-bottom: var(--space-2);">Boiler</div>
+            <div style="font-family: var(--font-mono); font-size: var(--fs-h2);">58.2 °C</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== OT MONITOR ============== -->
+  <section id="otmonitor" class="design-section">
+    <h2>8. OT monitor (home)</h2>
+    <div class="theme-pair">
+      <div class="light-pane" data-theme="light">
+        <div class="demo">
+          <div class="demo-label">light</div>
+          <div class="otmontable">
+            <div class="otmonrow"><div class="otmoncolumn1">Boiler setpoint</div>      <div class="otmoncolumn2">61.5</div><div class="otmoncolumn3">°C</div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Boiler water temp.</div>   <div class="otmoncolumn2">58.2</div><div class="otmoncolumn3">°C</div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Return water temp.</div>   <div class="otmoncolumn2">49.8</div><div class="otmoncolumn3">°C</div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Modulation level</div>     <div class="otmoncolumn2">42</div>  <div class="otmoncolumn3">%</div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Flame</div><div class="otmoncolumn2"></div><div class="otmoncolumn3"><span class="state-on" style="color: var(--status-ok);"></span></div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">CH active</div><div class="otmoncolumn2"></div><div class="otmoncolumn3"><span class="state-on" style="color: var(--status-ok);"></span></div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Fault</div><div class="otmoncolumn2"></div><div class="otmoncolumn3"><span class="state-off" style="color: var(--fg-4);"></span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="dark-pane" data-theme="dark">
+        <div class="demo">
+          <div class="demo-label">dark</div>
+          <div class="otmontable">
+            <div class="otmonrow"><div class="otmoncolumn1">Boiler setpoint</div>      <div class="otmoncolumn2">61.5</div><div class="otmoncolumn3">°C</div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Boiler water temp.</div>   <div class="otmoncolumn2">58.2</div><div class="otmoncolumn3">°C</div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Return water temp.</div>   <div class="otmoncolumn2">49.8</div><div class="otmoncolumn3">°C</div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Modulation level</div>     <div class="otmoncolumn2">42</div>  <div class="otmoncolumn3">%</div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Flame</div><div class="otmoncolumn2"></div><div class="otmoncolumn3"><span class="state-on" style="color: var(--status-ok);"></span></div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">CH active</div><div class="otmoncolumn2"></div><div class="otmoncolumn3"><span class="state-on" style="color: var(--status-ok);"></span></div></div>
+            <div class="otmonrow"><div class="otmoncolumn1">Fault</div><div class="otmoncolumn2"></div><div class="otmoncolumn3"><span class="state-off" style="color: var(--fg-4);"></span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== SAT ============== -->
+  <section id="sat" class="design-section">
+    <h2>9. SAT panel (Smart Autotune Thermostat)</h2>
+    <p class="lede">De fix uit de oorspronkelijke bug-melding: neutrale tiles, accent alleen op Target, live DHW slider.</p>
+
+    <div class="theme-pair">
+      <div class="light-pane" data-theme="light">
+        <div class="demo">
+          <div class="demo-label">light</div>
+          <div class="sat-panel">
+            <div>
+              <div class="sat-header">
+                <div class="sat-header-title">SAT — Smart Autotune Thermostat</div>
+                <label class="ds-switch"><input type="checkbox" checked><span class="slider"></span></label>
+                <span class="ds-pill is-ok">Enabled</span>
+              </div>
+              <div class="sat-tiles">
+                <div class="sat-tile"><div class="sat-tile-label">Room</div><div><span class="sat-tile-value">19.4</span><span class="sat-tile-unit">°C</span></div></div>
+                <div class="sat-tile"><div class="sat-tile-label">Outside</div><div><span class="sat-tile-value">6.3</span><span class="sat-tile-unit">°C</span></div></div>
+                <div class="sat-tile"><div class="sat-tile-label">Boiler setpoint</div><div><span class="sat-tile-value">61.5</span><span class="sat-tile-unit">°C</span></div></div>
+                <div class="sat-tile is-target"><div class="sat-tile-label">Target</div><div><span class="sat-tile-value">20.0</span><span class="sat-tile-unit">°C</span></div></div>
+              </div>
+              <h3>Controls</h3>
+              <div class="sat-controls">
+                <button class="btn btn-secondary">Recalibrate</button>
+                <button class="btn btn-secondary" disabled>Diagnostics</button>
+              </div>
+            </div>
+            <div>
+              <h3>DHW</h3>
+              <div class="sat-dhw">
+                <div class="sat-dhw-row">
+                  <span class="sat-dhw-label">DHW Setpoint</span>
+                  <span class="sat-dhw-value" id="dhw-setpoint-readout-light" data-unit="°C" data-decimals="1">55.0 °C</span>
+                </div>
+                <input type="range" class="ds-slider" id="dhw-setpoint-slider-light" min="40" max="65" step="0.5" value="55">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dark-pane" data-theme="dark">
+        <div class="demo">
+          <div class="demo-label">dark</div>
+          <div class="sat-panel">
+            <div>
+              <div class="sat-header">
+                <div class="sat-header-title">SAT — Smart Autotune Thermostat</div>
+                <label class="ds-switch"><input type="checkbox" checked><span class="slider"></span></label>
+                <span class="ds-pill is-ok">Enabled</span>
+              </div>
+              <div class="sat-tiles">
+                <div class="sat-tile"><div class="sat-tile-label">Room</div><div><span class="sat-tile-value">19.4</span><span class="sat-tile-unit">°C</span></div></div>
+                <div class="sat-tile"><div class="sat-tile-label">Outside</div><div><span class="sat-tile-value">6.3</span><span class="sat-tile-unit">°C</span></div></div>
+                <div class="sat-tile"><div class="sat-tile-label">Boiler setpoint</div><div><span class="sat-tile-value">61.5</span><span class="sat-tile-unit">°C</span></div></div>
+                <div class="sat-tile is-target"><div class="sat-tile-label">Target</div><div><span class="sat-tile-value">20.0</span><span class="sat-tile-unit">°C</span></div></div>
+              </div>
+              <h3>Controls</h3>
+              <div class="sat-controls">
+                <button class="btn btn-secondary">Recalibrate</button>
+                <button class="btn btn-secondary" disabled>Diagnostics</button>
+              </div>
+            </div>
+            <div>
+              <h3>DHW</h3>
+              <div class="sat-dhw">
+                <div class="sat-dhw-row">
+                  <span class="sat-dhw-label">DHW Setpoint</span>
+                  <span class="sat-dhw-value" id="dhw-setpoint-readout-dark" data-unit="°C" data-decimals="1">55.0 °C</span>
+                </div>
+                <input type="range" class="ds-slider" id="dhw-setpoint-slider-dark" min="40" max="65" step="0.5" value="55">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== LOG VIEWER ============== -->
+  <section id="log" class="design-section">
+    <h2>10. Log viewer</h2>
+    <div class="ot-log-section" style="margin: 0;">
+      <div class="ot-log-header">
+        <h3>OpenTherm Monitor</h3>
+        <div class="ot-log-status">
+          <span class="ws-status ws-connected"></span> Connected
+          <span class="status-separator">|</span>
+          <span class="mode-status mode-gateway"></span> Gateway
+          <span class="status-separator">|</span>
+          <span class="simulation-badge">Simulation</span>
+        </div>
+      </div>
+      <div class="ot-log-controls">
+        <button class="btn-log-control">Clear</button>
+        <button class="btn-log-control active">Auto-scroll</button>
+        <button class="btn-log-control">Pause</button>
+        <input type="text" class="log-search" placeholder="Filter…">
+        <label class="log-control-label"><input type="checkbox" checked> show ID</label>
+      </div>
+      <div class="ot-log-container">
+<pre class="ot-log-content">T04 14:02:35.118 0080190000 [ID=0]  Status: CH=ON DHW=OFF Flame=ON
+B40 14:02:35.204 C001190201 [ID=1]  Control setpoint=25.02°C
+T04 14:02:35.318 00110D4000 [ID=17] Relative modulation=40.0%
+B40 14:02:35.404 C0112E8000 [ID=46] DHW setpoint=46.0°C
+T04 14:02:35.518 0019C2C000 [ID=25] Boiler water=50.75°C
+B40 14:02:35.604 C01A322000 [ID=26] DHW temperature=50.25°C</pre>
+      </div>
+      <div class="ot-log-footer"><span>1 248 frames</span><span>3.2 KB / s</span></div>
+    </div>
+  </section>
+
+  <!-- ============== TABS + STATS ============== -->
+  <section id="tabs" class="design-section">
+    <h2>11. Tabs + stats table</h2>
+    <div class="ot-log-tabs">
+      <button class="tab-link active">Log</button>
+      <button class="tab-link">Statistics</button>
+      <button class="tab-link">Graph</button>
+    </div>
+    <div class="ot-stats-container">
+      <table class="ot-stats-table">
+        <thead><tr><th>ID</th><th>Name</th><th>Count</th><th>Last value</th><th>Last seen</th></tr></thead>
+        <tbody>
+          <tr><td>0</td><td>Status</td><td>1 240</td><td>CH=ON DHW=OFF Flame=ON</td><td>14:02:35.118</td></tr>
+          <tr><td>1</td><td>Control setpoint</td><td>620</td><td>25.02 °C</td><td>14:02:35.204</td></tr>
+          <tr><td>17</td><td>Relative modulation</td><td>620</td><td>40.0 %</td><td>14:02:35.318</td></tr>
+          <tr><td>25</td><td>Boiler water</td><td>620</td><td>50.75 °C</td><td>14:02:35.518</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============== CHART ============== -->
+  <section id="chart" class="design-section">
+    <h2>12. Chart container</h2>
+    <p class="lede">ECharts laadt via CDN; <code>otgwChartTheme()</code> in <code>echarts-theme.js</code> leest de design tokens. Hieronder een placeholder — de echte chart leeft op <code>/sat</code>.</p>
+    <div class="ds-chart" style="display: flex; align-items: center; justify-content: center; color: var(--fg-4); font-family: var(--font-mono);">[ Temperature History — ECharts ]</div>
+  </section>
+
+  <!-- ============== FSEXPLORER ============== -->
+  <section id="fsexplorer" class="design-section">
+    <h2>13. FSexplorer</h2>
+    <div class="theme-pair">
+      <div class="light-pane" data-theme="light">
+        <div class="demo">
+          <div class="demo-label">light</div>
+          <div class="fs-main">
+            <table>
+              <tbody>
+                <tr><td>📁 fonts/</td><td>—</td><td>—</td></tr>
+                <tr><td>index.html</td><td>14.2 KB</td><td><a href="#" class="delete-link">delete</a></td></tr>
+                <tr><td>ds-tokens.css</td><td>8.4 KB</td><td><a href="#" class="delete-link">delete</a></td></tr>
+                <tr><td>components.css</td><td>23.2 KB</td><td><a href="#" class="delete-link">delete</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="fs-action-card">
+            <h3>System actions</h3>
+            <div class="button-row">
+              <button class="fs-btn">Update Firmware</button>
+              <button class="fs-btn secondary">ReBoot</button>
+              <button class="fs-btn wifi">Reset Wireless</button>
+              <button class="fs-btn danger">Reset Config</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dark-pane" data-theme="dark">
+        <div class="demo">
+          <div class="demo-label">dark</div>
+          <div class="fs-main">
+            <table>
+              <tbody>
+                <tr><td>📁 fonts/</td><td>—</td><td>—</td></tr>
+                <tr><td>index.html</td><td>14.2 KB</td><td><a href="#" class="delete-link">delete</a></td></tr>
+                <tr><td>ds-tokens.css</td><td>8.4 KB</td><td><a href="#" class="delete-link">delete</a></td></tr>
+                <tr><td>components.css</td><td>23.2 KB</td><td><a href="#" class="delete-link">delete</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="fs-action-card">
+            <h3>System actions</h3>
+            <div class="button-row">
+              <button class="fs-btn">Update Firmware</button>
+              <button class="fs-btn secondary">ReBoot</button>
+              <button class="fs-btn wifi">Reset Wireless</button>
+              <button class="fs-btn danger">Reset Config</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== BANNERS ============== -->
+  <section id="banners" class="design-section">
+    <h2>14. Banners</h2>
+    <div class="fs-mismatch-banner" style="margin-bottom: var(--space-4);">
+      Firmware / filesystem version mismatch — please reflash LittleFS
+    </div>
+    <div class="crash-panel">
+      <strong>CRITICAL.</strong> The previous boot logged a stack trace.
+      <a href="#" style="color: var(--crash-text); text-decoration: underline;">View crash log</a>.
+    </div>
+  </section>
+
+  <footer style="text-align: center; color: var(--fg-5); font-size: var(--fs-xs); padding: var(--space-7) 0;">
+    OTGW Design System · v1.0 · referentiepagina niet bedoeld voor productie-flash
+  </footer>
+</div>
+
+<script src="theme-toggle.js"></script>
+<script src="sat-slider.js"></script>
+</body>
+</html>

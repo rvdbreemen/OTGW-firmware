@@ -1,0 +1,53 @@
+<!--
+  settings.html — Settings form template
+
+  De huidige firmware rendert settings als een lijst .settingDiv rijen.
+  components.css herstijlt die rijen volledig — markup hoeft niet te
+  veranderen, behalve de twee onderstaande optionele toevoegingen.
+-->
+
+<!-- DS:SETTINGS-NOTE
+     De bestaande settings-renderer hoeft niet aangepast.
+     Alle .settingDiv / .settings-field-container / input rules in
+     components.css matchen de huidige class-namen.
+
+     Twee aanbevolen kleine verbeteringen:
+-->
+
+<!-- 1) Sectie-koppen — wrap groepen in een card voor visuele rust.
+        Voor "Network", "MQTT", "OpenTherm", etc.
+        Optioneel — als je settings.html groepen rendert, doe het zo: -->
+
+<!-- DS:SETTINGS-GROUP:BEGIN -->
+<section class="ds-card" style="margin: 16px;">
+  <h3 style="margin: 0 0 var(--space-5); font-size: var(--fs-h3);">Network</h3>
+
+  <div class="settingDiv">
+    <div class="settings-field-container">Hostname</div>
+    <input type="text" name="hostname" value="otgw-a3f1">
+  </div>
+
+  <div class="settingDiv">
+    <div class="settings-field-container">SSID</div>
+    <input type="text" name="ssid" value="">
+  </div>
+
+  <div class="settingDiv">
+    <div class="settings-field-container">WiFi password</div>
+    <input type="password" name="wifi-password" value="">
+  </div>
+</section>
+<!-- DS:SETTINGS-GROUP:END -->
+
+
+<!-- 2) Save bar — onderaan, duidelijk afgebakend.
+        Vervangt de losse Save-knop. -->
+
+<!-- DS:SETTINGS-SAVEBAR:BEGIN -->
+<div style="display: flex; justify-content: flex-end; gap: var(--space-3);
+            padding: var(--space-6) 16px; background: var(--bg-app);
+            border-top: 1px solid var(--border-1); position: sticky; bottom: 0;">
+  <button class="btn btn-secondary" type="button" id="settings-cancel">Cancel</button>
+  <button class="btn btn-primary"   type="submit"  id="settings-save">Save settings</button>
+</div>
+<!-- DS:SETTINGS-SAVEBAR:END -->
