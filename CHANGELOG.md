@@ -29,8 +29,8 @@ LTS line on Arduino Core 2.7.4. Carries forward the v1.4.x feature set on the pr
 
 ### Changed
 - Arduino Core baseline reverted to 2.7.4 from 3.1.2 for field-tested stability
-- LittleFS partition returns to 1 MB (the v1.4.x 2 MB layout is Core 3.1.2-specific)
-- lwIP returns to the 2.1.x branch shipped with Core 2.7.4
+- Partition layout retained at `eesz=4M2M` (4 MB flash, 2 MB LittleFS) from v1.4.x; `v1.4.1 → 1.5.x` upgrade does not require a filesystem partition reformat
+- lwIP returns to the version shipped with Core 2.7.4 (the 2.2.0 update was Core 3.1.2-specific)
 - MQTT msgId 0 Status fan-out gate decoupled from `iInterval` with independent 60 s heartbeat
 - MQTT msgId 5/6/100 bit-and-byte fan-out gating with 60 s heartbeat (Scope C-min)
 - MQTT publish gating tightened to 1 s minimum spacing between gated publishes (250 ms in latest beta)

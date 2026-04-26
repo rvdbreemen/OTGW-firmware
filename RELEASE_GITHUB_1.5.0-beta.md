@@ -9,10 +9,10 @@ Full release notes: [RELEASE_NOTES_1.5.0-beta.md](RELEASE_NOTES_1.5.0-beta.md)
 ## What's different from v1.4.1
 
 ### Arduino Core 2.7.4 baseline
-- LittleFS partition returns to 1 MB (the v1.4.x 2 MB layout is Core 3.1.2-specific)
-- lwIP returns to the 2.1.x branch
+- Partition layout retained at `eesz=4M2M` (4 MB flash, 2 MB LittleFS) from v1.4.x; **v1.4.1 → 1.5.x needs no filesystem partition reformat**
+- lwIP returns to the version shipped with Core 2.7.4 (the 2.2.0 update was Core 3.1.2-specific)
 - PROGMEM byte-safe helpers (`pgm_strncmp_PP`, `pgm_read_char`) stay in place; correct on both Cores
-- `mqttha.cfg` archive removed (streaming HA discovery from v1.4.x supersedes it)
+- `mqttha.cfg` archive removed from the filesystem image (streaming HA discovery from v1.4.x supersedes it)
 
 ### Reboot reliability hardening
 - **Deferred reboot with lifecycle heap snapshots** at 4 points around OTA-triggered reboot
@@ -53,9 +53,9 @@ Full release notes: [RELEASE_NOTES_1.5.0-beta.md](RELEASE_NOTES_1.5.0-beta.md)
 ### Library bumps
 - SimpleTelnet submodule to `25a0250` (printf stack 256)
 
-## Upgrade notes (preliminary)
+## Upgrade notes
 
-A complete tested upgrade procedure from `v1.4.1` will be published with `v1.5.0` stable. The 2 MB → 1 MB LittleFS partition change between v1.4.x and 1.5.x means filesystem flashing will be required; settings should be backed up via the Web UI's settings export before upgrading. **Users staying on `v1.4.1` need no action.** `v1.4.1` continues to be the latest stable release.
+`v1.4.1` and `1.5.x` share the same `eesz=4M2M` partition layout, so the upgrade does **not** require a filesystem partition reformat. A firmware-only OTA (`*.ino.bin` via the Web UI) keeps existing settings untouched. A full OTA (firmware + filesystem) brings the WebUI design system updates as well; export your settings beforehand if you flash the filesystem image, since the new image is a fresh content bundle. The exact recommended procedure will be confirmed with `v1.5.0` stable. **Users staying on `v1.4.1` need no action.** `v1.4.1` continues to be the latest stable release.
 
 ## How to test
 

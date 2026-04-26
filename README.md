@@ -22,7 +22,7 @@ Full release notes: [RELEASE_NOTES_1.5.0-beta.md](RELEASE_NOTES_1.5.0-beta.md).
 
 What's different from `v1.4.1`:
 
-- **Arduino Core 2.7.4 baseline**: 1 MB LittleFS partition, lwIP 2.1.x. PROGMEM byte-safe helpers introduced for Core 3.1.2 are kept as defensive code.
+- **Arduino Core 2.7.4 baseline**: partition layout retained at `eesz=4M2M` (4 MB flash, 2 MB LittleFS) from v1.4.x, so `v1.4.1 → 1.5.x` needs no filesystem partition reformat. lwIP returns to the version shipped with Core 2.7.4. PROGMEM byte-safe helpers introduced for Core 3.1.2 are kept as defensive code.
 - **Reboot reliability hardening**: deferred reboot with lifecycle heap snapshots, explicit service cleanup before `ESP.restart()`, `ESP.reset()` fallback path, `WiFi.disconnect()` removed from the reboot path (it wiped NVRAM credentials on Core 3.1.x).
 - **MQTT publish gating tightened**: msgId 0 / 5 / 6 / 100 fan-out gates with 60 s heartbeat, 1 s minimum spacing between gated publishes (250 ms in the latest beta), `BGTRACE`/`OTTRACE` off by default.
 - **HA auto-discovery for stats topics**: `otgw-firmware/stats/*` metrics now publish proper HA sensors instead of raw JSON, with `IS_PIC_ENTRY` flag honoured and pseudo-ID 247 stats repaired.

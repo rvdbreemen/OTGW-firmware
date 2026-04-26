@@ -19,10 +19,11 @@ The separate ESP32 / SAT `v2.0.0` exploration on `feature-dev-2.0.0-otgw32-esp32
 
 ### Arduino Core 2.7.4 baseline
 
-The build is aligned with Arduino Core 2.7.4. Practical consequences:
+The build is aligned with Arduino Core 2.7.4 while keeping the partition layout that `v1.4.x` introduced. Practical consequences:
 
-- **LittleFS partition is back to 1 MB.** The 2 MB layout in `v1.4.x` was a Core 3.1.2 feature. Settings still fit comfortably; the `mqttha.cfg` HA discovery template that consumed most of the v1.4.x filesystem space is no longer needed because HA discovery is fully streamed (since `v1.4.0`'s rewrite) and the static template was archived out of the build pipeline.
-- **lwIP returns to the 2.1.x branch** that shipped with Core 2.7.4.
+- **LittleFS partition layout retained at `eesz=4M2M`** (4 MB flash, 2 MB LittleFS). This is a deliberate decoupling: the Core version and the partition layout are independent in this project (the FQBN `eesz=` parameter governs the partition, not the Core). Keeping the layout means **upgrading from `v1.4.1` to `1.5.x` does not require a filesystem partition reformat**; the v1.4.x `WARNING: flash filesystem FIRST` mitigation does not apply here.
+- **`mqttha.cfg` archive removed from the filesystem image.** The static HA discovery template that consumed most of the v1.4.x filesystem footprint is no longer needed because HA discovery has been fully streamed since the `v1.4.0` rewrite.
+- **lwIP returns to the version shipped with Core 2.7.4** (the 2.2.0 update was a Core 3.1.2 feature).
 - **PROGMEM byte-safe helpers stay in place.** `pgm_strncmp_PP`, `pgm_read_char` and the `memcmp_P`-on-binary-data rules introduced for Core 3.1.2 are correct on both Core versions; the codebase keeps them defensively.
 
 ### Reboot reliability hardening
@@ -86,15 +87,17 @@ These remain compiled in but are off by default in stability builds; enable via 
 - **First-boot HA discovery cadence** is unchanged from `v1.4.1` (2 s normal / 10 s slow-mode). The discovery rewrite is reused as-is.
 - **`mqttha.cfg` is no longer in the filesystem image.** This is intentional and safe; the streaming discovery rewrite supersedes it. Users on a fresh flash see no difference.
 
-## Upgrade considerations (preliminary)
+## Upgrade considerations
 
-The upgrade path from `v1.4.1` to `1.5.x` deserves dedicated testing before a stable `v1.5.0` is published. Open questions being tracked:
+`v1.4.1` and `1.5.x` share the same `eesz=4M2M` flash and partition layout, so the upgrade does not require a filesystem partition reformat. The `WARNING: flash filesystem FIRST` rule from the `v1.4.x` notes does not apply here.
 
-- The `v1.4.1` 2 MB LittleFS partition does not match the `1.5.x` 1 MB layout. Going `v1.4.1 → 1.5.x` likely requires re-flashing the filesystem image, which means settings need to be backed up first via the Web UI's settings export.
-- The `WARNING: flash filesystem FIRST` rule from the `v1.4.x` notes does not strictly apply going downward; the device is moving to a smaller, simpler partition layout. The exact procedure will be confirmed before stable.
-- For users staying on `v1.4.1`, no action is required. `v1.4.1` continues to be the latest stable release.
+Standard upgrade procedure (subject to confirmation with `v1.5.0` stable):
 
-A complete upgrade procedure with tested steps will be published with `v1.5.0` stable.
+- A **firmware-only OTA** (`*.ino.bin` via the Web UI Update page) is the lightest path: existing settings stay untouched. The new firmware runs against the existing filesystem from `v1.4.1`, which means you miss the `1.5.x` filesystem-side updates (font self-hosting, `mqttha.cfg` archive removal) but everything functional still works.
+- A **full OTA** (firmware binary first, then the new filesystem image) brings the WebUI design system updates as well. Standard practice still applies: export your settings via the Web UI before flashing the filesystem image, since the new image is a fresh content bundle.
+- Testing of `v1.4.1 → 1.5.x` upgrades across real devices is ongoing. The exact recommended procedure will be confirmed with `v1.5.0` stable.
+
+For users staying on `v1.4.1`, no action is required. `v1.4.1` continues to be the latest stable release.
 
 ## Known limits and TBD items
 
