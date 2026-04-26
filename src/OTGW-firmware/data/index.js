@@ -4676,11 +4676,25 @@ function refreshOTmonitor() {
 
         //console.log("["+data[i].name+"]=>["+data[i].value+"]");
 
+        // Patch 03: bool rows get an is-bool class and a data-state attribute
+        // so otmonitor.css can render them as a colored dot via the CSS
+        // tokens. Names that look like a fault/alarm/safety flag also get
+        // is-fault, which flips the "on" color from --status-ok to
+        // --status-error.
+        var isBool = (entry.value === "On" || entry.value === "Off");
+        var lname = (entry.name || "").toLowerCase();
+        var isFault = isBool && (lname.indexOf("fault") !== -1 ||
+                                 lname.indexOf("alarm") !== -1 ||
+                                 lname.indexOf("safety") !== -1);
+
         if ((document.getElementById("otmon_" + entry.name)) == null) { // if element does not exists yet, then build page
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "otmonrow");
-          //rowDiv.setAttribute("id", "otmon_"+data[i].name);
-          // rowDiv.style.background = "lightblue";
+          if (isBool) {
+            rowDiv.classList.add("is-bool");
+            rowDiv.setAttribute("data-state", entry.value === "On" ? "on" : "off");
+          }
+          if (isFault) rowDiv.classList.add("is-fault");
           if (entry.epoch == 0) rowDiv.classList.add('no-data-row');
           var epoch = document.createElement("INPUT");
           epoch.setAttribute("type", "hidden");
@@ -4688,10 +4702,10 @@ function refreshOTmonitor() {
           epoch.name = entry.name;
           epoch.value = entry.epoch;
           rowDiv.appendChild(epoch);
-          //--- field Name ---
+          //--- field Name (Patch 03: was otmoncolumn1) ---
           var fldDiv = document.createElement("div");
-          fldDiv.setAttribute("class", "otmoncolumn1");
-          
+          fldDiv.setAttribute("class", "label otmoncolumn1");
+
           var displayName;
           if (isDallasAddress(entry)) {
             displayName = entry.name;
@@ -4699,7 +4713,7 @@ function refreshOTmonitor() {
             if (dallasLabelsCache[entry.name]) {
               displayName = dallasLabelsCache[entry.name];
             }
-            
+
             // Add click handler to allow editing label
             fldDiv.classList.add('editable-label');
             fldDiv.title = 'Click to edit label (Address: ' + entry.name + ')';
@@ -4721,21 +4735,20 @@ function refreshOTmonitor() {
             displayName = translateToHuman(entry.name);
             fldDiv.textContent = displayName;
           }
-          
+
           rowDiv.appendChild(fldDiv);
-          //--- Value ---
+          //--- Value (Patch 03: was otmoncolumn2; bool rendering via CSS) ---
           var valDiv = document.createElement("div");
-          valDiv.setAttribute("class", "otmoncolumn2");
+          valDiv.setAttribute("class", "value otmoncolumn2");
           valDiv.setAttribute("id", "otmon_" + entry.name);
           if (entry.epoch != 0) {
-            if (entry.value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
-            else if (entry.value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
+            if (isBool) valDiv.textContent = "";  // CSS dot via .otmonrow.is-bool .value
             else valDiv.textContent = entry.value;
           }
           rowDiv.appendChild(valDiv);
-          //--- Unit  ---
+          //--- Unit (Patch 03: was otmoncolumn3) ---
           var unitDiv = document.createElement("div");
-          unitDiv.setAttribute("class", "otmoncolumn3");
+          unitDiv.setAttribute("class", "unit otmoncolumn3");
           unitDiv.textContent = entry.unit;
           rowDiv.appendChild(unitDiv);
           otMonTable.appendChild(rowDiv);
@@ -4748,23 +4761,22 @@ function refreshOTmonitor() {
             } else {
               update.parentNode.classList.remove('no-data-row');
             }
+            // Patch 03: refresh data-state on existing bool rows so the
+            // otmonitor.css colored dot tracks live polls.
+            if (isBool) {
+              update.parentNode.classList.add("is-bool");
+              update.parentNode.setAttribute("data-state", entry.value === "On" ? "on" : "off");
+              if (isFault) update.parentNode.classList.add("is-fault");
+            }
           }
           var epoch = document.getElementById("otmon_epoch_" + entry.name);
-          // if ((Number(epoch.value)==0) && (Number(data[i].epoch)>0)) {
-          //   //console.log ("unhide based on epoch");
-          //   //setTimeout(function () { update.style.visibility = 'visible';}, 0);
-          //   needReload = true;
-          // } 
           epoch.value = entry.epoch;
           if (entry.epoch != 0) {
-            if (entry.value === "On") update.innerHTML = "<span class='state-on'></span>";
-            else if (entry.value === "Off") update.innerHTML = "<span class='state-off'></span>";
+            if (isBool) update.textContent = "";  // CSS handles the dot
             else update.textContent = entry.value;
           } else {
             update.textContent = '';
           }
-          //if (update.style.visibility == 'visible') update.textContent = data[i].value;
-
         }
       }
     })

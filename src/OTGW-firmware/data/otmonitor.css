@@ -1,0 +1,78 @@
+/*
+ * otmonitor.css  —  OpenTherm monitor home page card grid
+ *
+ * Linked from index.html AFTER index.css and index_dark.css. Mirrors
+ * the SAT panel's neutral-card vocabulary so the home page and SAT
+ * page look like one product. Cyan stays in the nav, nowhere else.
+ *
+ * The 2.0.0 build had `.otmonrow` cards using `#add8e6` (light blue)
+ * fills. That clashed with the SAT teal cards and made every page
+ * read as a different product. We standardize on:
+ *
+ *   surface:  light=#ffffff   dark=#2c2c2e
+ *   border:   light=#d0d0d0   dark=#3a3a3c
+ *   value:    monospace, tabular, neutral
+ *   labels:   sans, neutral
+ *   status:   var(--status-*) tokens — see Patch 01
+ */
+
+.otmontable {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.otmonrow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+body.dark .otmonrow {
+  background: #2c2c2e;
+  border-color: #3a3a3c;
+}
+
+.otmonrow .label {
+  color: #4a4a4a;
+}
+body.dark .otmonrow .label { color: #b0b0b0; }
+
+.otmonrow .value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: #1a1a1a;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+body.dark .otmonrow .value { color: #f0f0f0; }
+
+.otmonrow .unit {
+  font-size: 12px;
+  color: #707070;
+  min-width: 28px;
+  text-align: left;
+}
+body.dark .otmonrow .unit { color: #909090; }
+
+/* Boolean status indicators — flame / CH / DHW / fault.
+ * Token-driven so they swap with theme. */
+.otmonrow.is-bool .value {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  background: var(--status-neutral-bg);
+}
+.otmonrow.is-bool[data-state="on"]  .value { background: var(--status-ok); box-shadow: 0 0 6px var(--status-ok-glow); }
+.otmonrow.is-bool[data-state="off"] .value { background: var(--status-neutral-bg); }
+.otmonrow.is-bool.is-fault[data-state="on"] .value {
+  background: var(--status-error);
+  box-shadow: 0 0 6px var(--status-error-glow);
+}
