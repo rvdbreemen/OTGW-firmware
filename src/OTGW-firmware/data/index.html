@@ -98,7 +98,10 @@
       </div>
       
       <!-- OT-Direct Status & Override Panel (OTGW32 only) -->
-      <div id="otd-panel" class="otdirect-only hidden">
+      <!-- TASK-435 follow-up: page-section gives no horizontal padding so the
+           panel was hugging the browser edge; inline padding mirrors the
+           inset that .otmontable / settings rows get from their `margin`. -->
+      <div id="otd-panel" class="otdirect-only hidden" style="padding: 8px 16px;">
         <h3 class="sat-collapsible" style="margin:0 0 4px 0;">
           <button type="button" class="heading-toggle-btn" aria-expanded="true" aria-controls="otd-panel-body" onclick="toggleOTDPanel()">
             OT-Direct Status <span id="otd-panel-arrow">&#9660;</span>
@@ -390,19 +393,15 @@
           <button type="button" class="sat-btn sat-settings-nav-btn" onclick="satSettingsPage()" title="SAT Settings">Settings</button>
         </div>
 
-        <!-- Temperature tiles (Patch 02: was sat-cards / sat-card) -->
+        <!-- Temperature tiles. TASK-435 follow-up: DOM order matches the
+             grid layout in components.css (.sat-tiles is a 3-column grid;
+             .sat-tile.is-target spans all three columns, so it has to come
+             AFTER the three live temperatures to render on its own row
+             below them: Room / Outside / Boiler on row 1, Target on row 2. -->
         <div class="sat-tiles" data-view="simple expert diag">
           <div class="sat-tile">
             <div class="sat-tile-label">Room Temperature</div>
             <div class="sat-tile-value" id="sat-room-temp">--</div>
-          </div>
-          <div class="sat-tile is-target">
-            <div class="sat-tile-label">Target Temperature</div>
-            <div class="sat-card-controls">
-              <button class="sat-btn sat-btn-temp" onclick="SAT.adjustTarget(-0.5)">-</button>
-              <div class="sat-tile-value" id="sat-target-temp">--</div>
-              <button class="sat-btn sat-btn-temp" onclick="SAT.adjustTarget(0.5)">+</button>
-            </div>
           </div>
           <div class="sat-tile">
             <div class="sat-tile-label">Outside Temperature</div>
@@ -411,6 +410,14 @@
           <div class="sat-tile">
             <div class="sat-tile-label">Boiler Setpoint</div>
             <div class="sat-tile-value" id="sat-flow-temp">--</div>
+          </div>
+          <div class="sat-tile is-target">
+            <div class="sat-tile-label">Target Temperature</div>
+            <div class="sat-card-controls">
+              <button class="sat-btn sat-btn-temp" onclick="SAT.adjustTarget(-0.5)">-</button>
+              <div class="sat-tile-value" id="sat-target-temp">--</div>
+              <button class="sat-btn sat-btn-temp" onclick="SAT.adjustTarget(0.5)">+</button>
+            </div>
           </div>
         </div>
 

@@ -454,14 +454,18 @@ body.dark .otmonrow,
 /* =============================================================
  * 13. SAT PANEL
  * ============================================================= */
+/* TASK-435 follow-up: SAT panel laid out as a single vertical column
+ * so the header title gets its own row (full width), the toggle/select/
+ * settings live on their own row directly below, then the three live
+ * temperature tiles in a 3-up grid, and Target Temperature spans the
+ * full width on its own row underneath. DHW and the heating-curve
+ * column flow underneath the main block instead of sitting in a
+ * sidebar — single-column reads naturally on every viewport width. */
 .sat-panel {
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(280px, 360px);
-  gap: 16px;
+  display: block;
   padding: 16px;
   background: var(--bg-app); color: var(--fg-2);
 }
-@media (max-width: 720px) { .sat-panel { grid-template-columns: 1fr; } }
 
 .sat-panel h2, .sat-panel h3 {
   font: 700 var(--fs-sm) / var(--lh-tight) var(--font-sans);
@@ -471,19 +475,30 @@ body.dark .otmonrow,
 }
 
 .sat-header {
-  display: flex; align-items: center; gap: var(--space-5);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5);
   margin-bottom: 16px;
 }
 .sat-header-title {
+  /* Force the title onto its own row inside the wrapping flex header. */
+  flex: 0 0 100%;
   font-size: var(--fs-h3); font-weight: 700; color: var(--fg-1);
-  flex: 1;
+  margin: 0 0 var(--space-2);
 }
 
 .sat-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  /* Three live temperatures side by side (Room / Outside / Boiler).
+     Target tile sits on its own row spanning all three columns. */
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-3);
   margin-bottom: 16px;
+}
+.sat-tile.is-target {
+  grid-column: 1 / -1;
+}
+@media (max-width: 720px) {
+  /* Stack to single column on phones; .is-target keeps its own row. */
+  .sat-tiles { grid-template-columns: 1fr; }
 }
 .sat-tile {
   background: var(--bg-surface);
@@ -530,10 +545,13 @@ body.dark .otmonrow,
  * ============================================================= */
 .settingDiv {
   text-align: right;
-  border: 4px solid var(--brand-lightblue);
+  /* Subtle row separator instead of a fat 4px border around every row.
+     Keeps the visual rhythm tight: row height = font + ~8px breathing
+     room top/bottom, not font + 32px. */
+  border-bottom: 1px solid var(--border-1);
   background: var(--brand-lightblue);
-  padding: var(--space-2) var(--space-5);
-  margin: 0 16px 4px;
+  padding: 4px var(--space-5);
+  margin: 0 16px;
   font-size: var(--fs-sm); color: var(--fg-1);
 }
 body.dark .settingDiv,
@@ -542,7 +560,7 @@ body.dark .settingDiv,
 }
 .settingDiv .settings-field-container {
   width: 320px; float: left;
-  text-align: left; font-weight: 500; padding-top: 4px;
+  text-align: left; font-weight: 500; padding-top: 2px;
 }
 .settingDiv input[type="text"],
 .settingDiv input[type="password"],
