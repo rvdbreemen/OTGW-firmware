@@ -34,9 +34,10 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266LLMNR.h>
 
-extern "C" {
-  #include "user_interface.h"   // wifi_station_dhcpc_stop/start
-}
+// Note: user_interface.h was previously included for wifi_station_dhcpc_stop/start.
+// Those SDK calls were removed (TASK-432) because they take DHCP ownership away
+// from the SDK and break subsequent setAutoReconnect-driven DHCP behaviour.
+// See networkStuff.ino loopWifi() WIFI_DISCONNECTED for the rationale.
 
 #include <WiFiUdp.h>            // part of ESP8266 Core
 #include <LittleFS.h>

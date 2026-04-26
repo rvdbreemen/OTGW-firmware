@@ -170,9 +170,11 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   DebugT(F("IP gateway: " ));  Debugln(WiFi.gatewayIP());
   Debugln();
 
-  // Ensure the hostname is set for the next DHCP exchange (renewal or reconnect).
-  // loopWifi() WIFI_DISCONNECTED calls wifi_station_dhcpc_start() before WiFi.begin()
-  // in the correct (not-connected) state, so no SDK DHCP call is needed here.
+  // Ensure the hostname is set for the next DHCP exchange (renewal or
+  // reconnect). No SDK DHCP calls anywhere in this file: the SDK manages the
+  // DHCP client autonomously when user code never invokes
+  // wifi_station_dhcpc_start/stop. This is the v1.2.0 baseline pattern, see
+  // TASK-432 for why we restored it.
   WiFi.hostname(hostname);
 
   httpUpdater.setup(&httpServer);
@@ -214,13 +216,16 @@ void loopWifi() {
               wifiRetryCount + 1,
               CSTR(settings.sHostname));
       WiFi.hostname(CSTR(settings.sHostname));
-      // Explicitly (re-)enable DHCP before reconnecting.  WiFi.begin() with no
-      // arguments only calls wifi_station_connect() — it does NOT call
-      // wifi_station_dhcpc_start().  This call ensures a fresh DHCP DISCOVER
-      // is sent on every reconnection, which is required after a router reboot
-      // so the device does not try to renew a stale lease that the router no
-      // longer has.  See issue #525 and ADR-047.
-      wifi_station_dhcpc_start();
+      // No SDK DHCP calls anywhere in this file — letting the SDK manage the
+      // DHCP client state entirely is the v1.2.0 baseline that worked across
+      // router reboots and brief glitches. Once user code calls
+      // wifi_station_dhcpc_start() (in any state, connected or not), the SDK
+      // considers DHCP "user-managed" and stops auto-restarting it on
+      // subsequent associations driven by setAutoReconnect(true). That
+      // regression is what TASK-432 surfaced as "associates but no DHCP/IP
+      // after reboot". WiFi.begin() with stored credentials triggers
+      // wifi_station_connect(); SDK-managed DHCP fires the DISCOVER as part
+      // of the association sequence.
       WiFi.begin();  // uses stored credentials
       RESTART_TIMER(timerWifiRetry);
       wifiState = WIFI_CONNECTING;
@@ -242,15 +247,11 @@ void loopWifi() {
       break;
 
     case WIFI_RECONNECTED:
-      // The hostname was already set in WIFI_DISCONNECTED before WiFi.begin(),
-      // and wifi_station_dhcpc_start() was called there too — so the DHCP
-      // negotiation already used the correct hostname.
-      // Do NOT call wifi_station_dhcpc_stop/start here: the SDK requires
-      // dhcpc_start only when the station is NOT connected, and calling it
-      // while connected temporarily resets the IP to 0.0.0.0.  That causes
-      // WIFI_IDLE to mistake the in-progress DHCP renewal for a disconnect,
-      // which triggers a new WiFi.begin() cycle that never re-enables DHCP,
-      // leaving the device associated at the WiFi layer but with no IP address.
+      // No SDK DHCP calls here either: the SDK handled the DHCP negotiation
+      // as part of the association triggered by WiFi.begin() in
+      // WIFI_DISCONNECTED. Re-applying WiFi.hostname() is harmless and keeps
+      // the next DHCP exchange (renewal or reconnect) using the configured
+      // name. See TASK-432 for the rationale (v1.2.0 baseline approach).
       WiFi.hostname(CSTR(settings.sHostname));
       startTelnet();
       startOTGWstream();
@@ -357,11 +358,14 @@ void startNTP()
   // station hostname to "ESP-XXXXXX" on some ESP8266 SDK versions.
   WiFi.hostname(CSTR(settings.sHostname));
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
-  // Restore hostname in case configTime() reset it.  The correct hostname will
+  // Restore hostname in case configTime() reset it. The correct hostname will
   // be sent to the router on the next DHCP exchange (renewal or reconnect).
-  // Do NOT call wifi_station_dhcpc_stop/start here: calling dhcpc_start() while
-  // connected resets the IP to 0.0.0.0 — see issue #525 and analysis report in
-  // docs/reviews/2026-04-07_issue-525-sdk-dhcp-analysis/ANALYSIS_REPORT.md
+  // No SDK DHCP calls here either: the SDK manages the DHCP client autonomously
+  // as long as user code never invokes wifi_station_dhcpc_start/stop. See
+  // TASK-432 (and the historical analysis at
+  // docs/reviews/2026-04-07_issue-525-sdk-dhcp-analysis/ANALYSIS_REPORT.md) for
+  // why ANY manual DHCP call (even while not connected) takes ownership away
+  // from the SDK and breaks subsequent SDK auto-reconnect DHCP behaviour.
   WiFi.hostname(CSTR(settings.sHostname));
   NtpStatus = TIME_WAITFORSYNC;
 }
