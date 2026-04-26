@@ -86,6 +86,12 @@
       
       <!-- OT-Direct Status & Override Panel (OTGW32 only) -->
       <div id="otd-panel" class="otdirect-only hidden">
+        <h3 class="sat-collapsible" style="margin:0 0 4px 0;">
+          <button type="button" class="heading-toggle-btn" aria-expanded="true" aria-controls="otd-panel-body" onclick="toggleOTDPanel()">
+            OT-Direct Status <span id="otd-panel-arrow">&#9660;</span>
+          </button>
+        </h3>
+        <div id="otd-panel-body">
         <div style="display:table; width:fit-content; border-collapse:collapse; margin-bottom:4px;">
           <div class="devinforow">
             <div class="devinfocolumn1">Mode</div>
@@ -136,6 +142,7 @@
             <button type="button" onclick="sendOTDOverride()">Apply</button>
           </div>
         </div>
+        </div><!-- /otd-panel-body -->
       </div>
 
       <!-- OpenTherm Log Viewer Section -->

@@ -1832,6 +1832,10 @@ function applyOTDirectAvailability(available) {
     if (otDirectAvailable) el.classList.remove('hidden');
     else el.classList.add('hidden');
   });
+  // Restore collapsed/expanded state of the OT-Direct status panel from localStorage
+  // once the panel is visible. Safe to call when otDirectAvailable=false (no-ops if
+  // the elements aren't in the DOM tree).
+  if (otDirectAvailable) restoreOTDPanelCollapse();
   // Dynamic device info rows
   var otdDevInfoKeys = ['otdirectavailable', 'otdmode', 'otdbypass', 'otdmonitor', 'otdmaster', 'otdstepup', 'otdthermostat', 'otdsetback', 'otdschedtotal', 'otdschedactive', 'otdscheddisabled', 'otdoverrides'];
   otdDevInfoKeys.forEach(function(key) {
@@ -1904,10 +1908,37 @@ function toggleOTDOverrides() {
   if (!sec) return;
   var visible = sec.style.display !== 'none';
   sec.style.display = visible ? 'none' : 'block';
-  if (arrow) arrow.innerHTML = visible ? '&#9660;' : '&#9650;';
+  if (arrow) arrow.textContent = visible ? '▼' : '▲';
   var toggleEl = document.querySelector('[aria-controls="otd-ovr-section"]');
   if (toggleEl) toggleEl.setAttribute('aria-expanded', visible ? 'false' : 'true');
   if (!visible) refreshOTDOverrides();
+}
+
+// Collapse / expand the entire OT-Direct status panel (TASK-433 follow-up).
+// State persisted in localStorage so the user's preference survives reloads.
+function toggleOTDPanel() {
+  var body = document.getElementById('otd-panel-body');
+  var arrow = document.getElementById('otd-panel-arrow');
+  if (!body) return;
+  var visible = body.style.display !== 'none';
+  body.style.display = visible ? 'none' : '';
+  if (arrow) arrow.textContent = visible ? '▶' : '▼';
+  var toggleEl = document.querySelector('[aria-controls="otd-panel-body"]');
+  if (toggleEl) toggleEl.setAttribute('aria-expanded', visible ? 'false' : 'true');
+  try { localStorage.setItem('otd-panel-collapsed', visible ? '1' : '0'); } catch (_) {}
+}
+
+function restoreOTDPanelCollapse() {
+  try {
+    if (localStorage.getItem('otd-panel-collapsed') === '1') {
+      var body = document.getElementById('otd-panel-body');
+      var arrow = document.getElementById('otd-panel-arrow');
+      var toggleEl = document.querySelector('[aria-controls="otd-panel-body"]');
+      if (body) body.style.display = 'none';
+      if (arrow) arrow.textContent = '▶';
+      if (toggleEl) toggleEl.setAttribute('aria-expanded', 'false');
+    }
+  } catch (_) {}
 }
 
 function refreshOTDOverrides() {
