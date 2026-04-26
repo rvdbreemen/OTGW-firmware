@@ -10,23 +10,30 @@ Architecture Decision Records capture important architectural decisions along wi
 
 **By Topic:**
 
-- [Platform & Build System](#platform-and-build-system) (2 ADRs)
-- [Network & Security](#network-and-security) (5 ADRs)
-- [Memory Management](#memory-management) (6 ADRs)
-- [Integration & Communication](#integration-and-communication) (8 ADRs)
-- [System Architecture](#system-architecture) (10 ADRs)
-- [Hardware & Reliability](#hardware-and-reliability) (2 ADRs)
-- [Development & Build](#development-and-build) (3 ADRs)
+- [Platform & Build System](#platform-and-build-system) (4 ADRs)
+- [Network & Security](#network-and-security) (6 ADRs)
+- [Memory Management](#memory-management) (8 ADRs)
+- [Integration & Communication](#integration-and-communication) (9 ADRs, plus MQTT subsection of 8)
+- [System Architecture](#system-architecture) (11 ADRs)
+- [Hardware & Reliability](#hardware-and-reliability) (4 ADRs)
+- [Development & Build](#development-and-build) (6 ADRs)
 - [Core Services](#core-services) (6 ADRs)
-- [Features & Extensions](#features-and-extensions) (9 ADRs)
+- [Features & Extensions](#features-and-extensions) (10 ADRs)
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
+- [OTGW32 & Dual Platform](#otgw32-and-dual-platform) (5 ADRs)
+- [SAT Subsystem](#sat-subsystem) (6 ADRs)
+- [ADR Governance](#adr-governance) (1 ADR)
+
+Counts above are advisory rather than hand-maintained; the canonical set is the per-section listing below.
 
 **Foundational ADRs** (most referenced by other ADRs):
 
 - **ADR-001:** ESP8266 Platform Selection (establishes hardware constraints)
-- **ADR-004:** Static Buffer Allocation (referenced by 8 other ADRs)
+- **ADR-004:** Static Buffer Allocation (referenced by 8 other ADRs; later extended by ADR-053)
 - **ADR-007:** Timer-Based Task Scheduling (enables non-blocking architecture)
+- **ADR-051:** Dual Encapsulating Structs for Settings + State (later amended by ADR-079, ADR-081)
+- **ADR-080:** Binding ADR rules must have a CI gate (governance backbone for pattern-level ADRs)
 
 ## ADR Index
 
@@ -37,6 +44,12 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-002: Modular .ino File Architecture](ADR-002-modular-ino-architecture.md)**  
   How the codebase is organized into multiple `.ino` files by functional domain while maintaining Arduino compatibility.
+
+- **[ADR-082: ESP8266 Arduino Core 2.7.4 LTS pin (2.0.0 line)](ADR-082-esp8266-arduino-core-2.7.4-lts-pin.md)** 🆕  
+  Pin Arduino Core to 2.7.4 for the 2.0.0 ESP8266 line; later Cores broke field stability around reboot reliability and PROGMEM alignment.
+
+- **[ADR-083: PlatformIO as primary build system for dual-target firmware](ADR-083-platformio-as-primary-build-system.md)** 🆕  
+  Supersedes ADR-014. PlatformIO `platformio.ini` is the primary build path for both ESP8266 and ESP32 targets in the 2.0.0 line; arduino-cli remains as a legacy fallback in `build.py`.
 
 ### Network and Security
 
@@ -55,9 +68,12 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-056: Protected Admin Endpoint Security and Secret-Handling Contract](ADR-056-protected-admin-endpoint-security-and-secret-handling-contract.md)** 🆕  
   Defines the protected admin boundary, same-origin enforcement, password round-trip contract, OTA credential propagation, and local-network HTTP-only constraints.
 
+- **[ADR-075: WiFi Reconnect Timeout Tuning](ADR-075-wifi-reconnect-timeout-tuning.md)** 🆕  
+  Reconnect timeout restored to 30s after the v1.3.x regression (5s) caused repeated cancelled associations on ESP8266; aligns with the v1.2.0 baseline.
+
 ### Memory Management
 
-- **[ADR-004: Static Buffer Allocation Strategy](ADR-004-static-buffer-allocation.md)** *(Superseded by ADR-053)*  
+- **[ADR-004: Static Buffer Allocation Strategy](ADR-004-static-buffer-allocation.md)** *(Extended by ADR-053)*  
   How static buffer allocation prevents heap fragmentation and crashes on the memory-constrained ESP8266.
 
 - **[ADR-053: Large Feature Buffer Static Allocation](ADR-053-large-feature-buffer-static-allocation.md)** 🆕  
@@ -69,17 +85,17 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)**  
   Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
 
-- **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** 🆕
-  Proactive heap monitoring with 4-level health system and adaptive throttling to prevent crashes (CRITICAL <3KB, WARNING 3-5KB, LOW 5-8KB, HEALTHY >8KB).
+- **[ADR-030: Heap Memory Monitoring and Emergency Recovery](ADR-030-heap-memory-monitoring-emergency-recovery.md)** *(Amended by ADR-089)*  
+  Proactive heap monitoring with 4-level health system and adaptive throttling to prevent crashes.
 
-- **[ADR-044: Global State — extern Declaration in Header, Definition in .ino](ADR-044-global-state-header-definition-pattern.md)** 🆕
+- **[ADR-044: Global State — extern Declaration in Header, Definition in .ino](ADR-044-global-state-header-definition-pattern.md)** 🆕  
   `extern` declarations in headers + single definition in owning `.ino` to avoid ODR violations in any multi-TU build; applies to `msglastupdated[]`, `mqttlastsent[]`, `mqttPublishAllowed`, etc.
 
-- **[ADR-089: Heap Tier Machine Contract](ADR-089-heap-tier-machine-contract.md)** 🆕
-  Amends ADR-030: re-baselines tier thresholds to 1536/3072/5120 bytes (Crashevans field log evidence, TASK-344), adds fragmentation-aware promotion (`HEAP_FRAG_PROMOTE_MAXBLOCK` = 1536), adds tier-entry counters (`iEnteredLowCount`/`Warning`/`Critical`, TASK-346) with hourly retained MQTT publication. Three sub-rules CI-gated, two explicitly labelled guideline-level (consumer-side gate, diagnostic-surface visibility). Defense-in-depth peer with ADR-088.
+- **[ADR-089: Heap Tier Machine Contract](ADR-089-heap-tier-machine-contract.md)** 🆕  
+  Amends ADR-030: re-baselines tier thresholds to 1536/3072/5120 bytes (Crashevans field log evidence, TASK-344), adds fragmentation-aware promotion (`HEAP_FRAG_PROMOTE_MAXBLOCK` = 1536), adds tier-entry counters (`iEnteredLowCount`/`Warning`/`Critical`, TASK-346) with hourly retained MQTT publication. Three sub-rules CI-gated, two explicitly labelled guideline-level. Defense-in-depth peer with ADR-088.
 
-- **[ADR-090: Re-entrancy Guard Pattern for Shared Scratch Buffers](ADR-090-re-entrancy-guard-pattern-shared-scratch-buffers.md)** 🆕
-  Guideline-level ADR (per ADR-080: 2 instances in 1 file is below the recurrence bar for binding pattern-level enforcement; no CI gate). Documents the acquisition contract for file-scope or function-local-static mutable scratch state shared across re-entrant call paths in the cooperative ESP8266 model (`doBackgroundTasks()` re-entry from `doAutoConfigure()`'s file-reading loop). Two existing exemplars in `MQTTstuff.ino`: RAII `MQTTAutoConfigSessionLock` (preferred for new code) and the `publishToSourceTopic` function-local inUse flag.
+- **[ADR-090: Re-entrancy Guard Pattern for Shared Scratch Buffers](ADR-090-re-entrancy-guard-pattern-shared-scratch-buffers.md)** 🆕  
+  Guideline-level ADR (per ADR-080: 2 instances in 1 file is below the recurrence bar for binding pattern-level enforcement; no CI gate). Documents the acquisition contract for file-scope or function-local-static mutable scratch state shared across re-entrant call paths in the cooperative ESP8266 model. Two existing exemplars in `MQTTstuff.ino`: RAII `MQTTAutoConfigSessionLock` (preferred for new code) and the `publishToSourceTopic` function-local `inUse` flag.
 
 ### Integration and Communication
 
@@ -89,28 +105,52 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-006: MQTT Integration Pattern](ADR-006-mqtt-integration-pattern.md)**  
   MQTT client implementation with Home Assistant Auto-Discovery for zero-configuration integration.
 
-- **[ADR-052: MQTT Publish Eligibility and Reconnect Refresh Contract](ADR-052-mqtt-publish-eligibility-contract.md)** 🆕
-  Precise contract for first-seen, value-change, stale-refresh, and reconnect-reset behavior for normal MQTT topics plus combined and per-bit `msgid 0` status topics.
-
 - **[ADR-031: Two-Microcontroller Coordination Architecture](ADR-031-two-microcontroller-coordination-architecture.md)** 🆕  
   Master/Slave architecture with ESP8266 as network controller and PIC microcontroller for OpenTherm protocol (serial communication, GPIO reset control, firmware upgrade capability).
 
 - **[ADR-037: Gateway Mode Detection via PR=M Polling](ADR-037-gateway-mode-detection.md)** 🆕  
   Periodic polling (PR=M command, 30s interval with 60s cache) to detect gateway vs. monitor mode, with PS=1 impact on time sync suppression.
 
-- **[ADR-040: MQTT Source-Specific Topics for OpenTherm Values](ADR-040-mqtt-source-specific-topics.md)** 🆕
-  Additive source-specific MQTT and HA discovery topics using nested `<metric>/<source>` paths with opt-in enablement (`MQTTseparatesources`) and backward-compatible base topics.
-
-- **[ADR-055: Webhook Outbound HTTP Integration](ADR-055-webhook-outbound-http-integration.md)** *(Superseded by ADR-057)*
+- **[ADR-055: Webhook Outbound HTTP Integration](ADR-055-webhook-outbound-http-integration.md)** *(Superseded by ADR-057)*  
   Historical record of introducing local-network outbound webhook support before retry, protected test-endpoint, and delivery policy were consolidated in ADR-057.
 
-- **[ADR-057: Webhook Delivery, Retry, and Protected Test Endpoint Policy](ADR-057-webhook-delivery-retry-and-protected-test-endpoint-policy.md)** 🆕
+- **[ADR-057: Webhook Delivery, Retry, and Protected Test Endpoint Policy](ADR-057-webhook-delivery-retry-and-protected-test-endpoint-policy.md)** 🆕  
   Defines edge-triggered outbound webhook delivery, bounded timeout and retry behavior, local-only URL policy, and the protected webhook test endpoint; builds on ADR-048's non-blocking state machine.
+
+- **[ADR-058: Non-blocking PIC Command/Response for PR= Queries](ADR-058-nonblocking-pic-command-response.md)** 🆕  
+  Decouple PR= settings reads from the HTTP request handler so blocking PIC reads do not stall the webserver; queue the command, parse the response asynchronously.
+
+- **[ADR-059: Ser2net Queue Awareness and Serial Bus Coordination](ADR-059-ser2net-queue-awareness.md)** 🆕  
+  Detect ser2net traffic on port 25238 and pause the OTGW command queue for 2 seconds to avoid colliding writes; remove conflicting queue entries automatically.
+
+- **[ADR-066: Thermostat Auto-Detection and Master Mode](ADR-066-thermostat-auto-detection-master-mode.md)** 🆕  
+  Detect the absence of a thermostat at boot and switch to master/standalone MQTT mode so the gateway publishes useful data even without an upstream thermostat.
 
 #### MQTT
 
-- **[ADR-088: MQTT Status Burst Windowing and Post-Burst Cooldown](ADR-088-mqtt-status-burst-windowing-and-cooldown.md)** 🆕
-  Pattern-level contract that brackets Status-frame fanout with `beginStatusBurst()`/`endStatusBurst()` and defers the discovery drip during the burst plus a post-burst cooldown bounded below the Status cadence. Three sub-rules are CI-gated; the timeout self-heal is explicitly labelled guideline-level. (Sub-section seeded by TASK-426; broader MQTT re-categorisation tracked in TASK-427.)
+- **[ADR-040: MQTT Source-Specific Topics for OpenTherm Values](ADR-040-mqtt-source-specific-topics.md)** 🆕  
+  Additive source-specific MQTT and HA discovery topics using nested `<metric>/<source>` paths with opt-in enablement (`MQTTseparatesources`) and backward-compatible base topics.
+
+- **[ADR-052: MQTT Publish Eligibility and Reconnect Refresh Contract](ADR-052-mqtt-publish-eligibility-contract.md)** 🆕  
+  Precise contract for first-seen, value-change, stale-refresh, and reconnect-reset behavior for normal MQTT topics plus combined and per-bit `msgid 0` status topics.
+
+- **[ADR-062: Retained Discovery Verification via Wildcard Subscribe](ADR-062-retained-discovery-verification.md)** 🆕  
+  Daily wildcard subscribe verifies retained HA discovery state on the broker, re-announces missing configs through the drip publisher, and tears down cleanly. RAM-tuned subscribe buffer.
+
+- **[ADR-065: otgw-pic/ MQTT Subtree as Stable Public Topic API](ADR-065-otgw-pic-mqtt-subtree.md)** 🆕  
+  Stable public topic API for PIC-derived state under `otgw-pic/`; clients should subscribe to this prefix rather than transient `otgw/` paths. Later partially generalised by ADR-084.
+
+- **[ADR-077: Streaming MQTT HA Discovery Architecture](ADR-077-streaming-mqtt-ha-discovery-architecture.md)** 🆕  
+  Streaming, bitmap-driven drip publisher replaces the static `mqttha.cfg` template; 309 configs across 80+ msgIDs without the 1350-byte staging buffer.
+
+- **[ADR-078: MQTT Sub-command Dispatch Tables](ADR-078-mqtt-subcommand-dispatch-tables.md)** 🆕  
+  `<topic>/set/<command>` handlers route through small dispatch tables instead of long if-else chains; centralises command registration.
+
+- **[ADR-084: Generic OT-bus State MQTT Topics (amends ADR-065)](ADR-084-generic-ot-bus-state-topics.md)** 🆕  
+  Generalises `otgw-pic/` to platform-neutral OT-bus state topics so OT-Direct (PIC-less) builds emit the same shape; partially breaks 1.4.x and pre-2.0.0 MQTT API consumers.
+
+- **[ADR-088: MQTT Status Burst Windowing and Post-Burst Cooldown](ADR-088-mqtt-status-burst-windowing-and-cooldown.md)** 🆕  
+  Pattern-level contract that brackets Status-frame fanout with `beginStatusBurst()`/`endStatusBurst()` and defers the discovery drip during the burst plus a post-burst cooldown bounded below the Status cadence. Three sub-rules are CI-gated; the timeout self-heal is explicitly labelled guideline-level.
 
 ### System Architecture
 
@@ -129,42 +169,57 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-045: PS=1 Print Summary Parsing](ADR-045-ps1-print-summary-parsing.md)** *(Superseded by ADR-046)*  
   Historical record of the original PS=1 synthetic-frame design.
 
-- **[ADR-046: PS=1 Summary Translation with Shared Publish Helpers](ADR-046-ps1-summary-translation-shared-publish-helpers.md)** 🆕
+- **[ADR-046: PS=1 Summary Translation with Shared Publish Helpers](ADR-046-ps1-summary-translation-shared-publish-helpers.md)** 🆕  
   PS=1 uses a dedicated summary-translation path with strict parsing, centralized PS-mode helpers, and selective reuse of shared publish/state helpers.
 
-- **[ADR-047: Non-Blocking WiFi Reconnect State Machine](ADR-047-nonblocking-wifi-reconnect.md)** 🆕
+- **[ADR-047: Non-Blocking WiFi Reconnect State Machine](ADR-047-nonblocking-wifi-reconnect.md)** 🆕  
   Cooperative reconnect state machine that retries without blocking the main loop and reboots after repeated failure.
 
-- **[ADR-048: Non-Blocking Webhook State Machine with Retry](ADR-048-nonblocking-webhook-state-machine.md)** 🆕
+- **[ADR-048: Non-Blocking Webhook State Machine with Retry](ADR-048-nonblocking-webhook-state-machine.md)** 🆕  
   Webhook delivery runs as a non-blocking state machine with bounded retry behavior to avoid stalling loop processing.
 
-- **[ADR-050: Centralized API Route Dispatch Table](ADR-050-centralized-api-route-dispatch.md)** 🆕
+- **[ADR-050: Centralized API Route Dispatch Table](ADR-050-centralized-api-route-dispatch.md)** 🆕  
   `/api/v2` routing uses a dispatch table instead of a long conditional chain to keep endpoint registration centralized and maintainable.
 
-- **[ADR-051: Dual Encapsulating Structs (Settings + State)](ADR-051-dual-encapsulating-structs.md)** 🆕
+- **[ADR-051: Dual Encapsulating Structs (Settings + State)](ADR-051-dual-encapsulating-structs.md)** *(Amended by ADR-079, ADR-081)*  
   Persistent configuration and runtime state are grouped into dedicated top-level structs to replace sprawling flat globals.
+
+- **[ADR-086: Time-Boundary Helpers MUST Have Exactly One Call Site](ADR-086-time-boundary-single-caller-contract.md)** 🆕  
+  `minuteChanged()` / `hourChanged()` / `dayChanged()` / `yearChanged()` are consume-on-read; calling them from more than one site silently drops boundary events. Renumbered from earlier ADR-064 to resolve duplicate numbering.
 
 ### Hardware and Reliability
 
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  
   I2C hardware watchdog chip that automatically resets the ESP8266 if firmware hangs or crashes.
 
-- **[ADR-012: PIC Firmware Upgrade via Web UI](ADR-012-pic-firmware-upgrade-via-web.md)**
+- **[ADR-012: PIC Firmware Upgrade via Web UI](ADR-012-pic-firmware-upgrade-via-web.md)**  
   Safe PIC microcontroller firmware flashing through the Web UI with WebSocket progress streaming.
 
-- **[ADR-060: PIC Availability Guard Pattern](ADR-060-pic-availability-guard-pattern.md)** 🆕
+- **[ADR-060: PIC Availability Guard Pattern](ADR-060-pic-availability-guard-pattern.md)** 🆕  
   Central `isPICEnabled()` guard that disables all PIC-dependent code paths when no PIC is detected, with auto-recovery via banner detection. Enables single firmware binary for both PIC and non-PIC hardware variants.
+
+- **[ADR-061: Unified ESP8266/ESP32 Platform Abstraction](ADR-061-unified-esp8266-esp32-platform-abstraction.md)** 🆕  
+  Single source codebase compiles for both ESP8266 (PIC-based OTGW) and ESP32 (OTGW32, OT-Direct, SAT) via `platform.h` / `platform_esp{8266,32}.h` shims; SDK differences encapsulated behind a thin abstraction.
 
 ### Development and Build
 
 - **[ADR-013: Arduino Framework Over ESP-IDF](ADR-013-arduino-framework-over-esp-idf.md)**  
   Using Arduino framework for rapid development and rich ecosystem instead of low-level ESP-IDF.
 
-- **[ADR-049: String Class Prohibition in Protocol Paths](ADR-049-string-prohibition-protocol-paths.md)** 🆕
+- **[ADR-014: Dual Build System (Makefile + Python Script)](ADR-014-dual-build-system.md)** *(Superseded by ADR-083)*  
+  Makefile for CI/CD and build.py wrapper for cross-platform developer convenience. Replaced by PlatformIO as primary in the 2.0.0 line.
+
+- **[ADR-049: String Class Prohibition in Protocol Paths](ADR-049-string-prohibition-protocol-paths.md)** 🆕  
   Protocol hot paths use bounded char buffers instead of `String` to reduce heap fragmentation and peak RAM usage on ESP8266.
 
-- **[ADR-014: Dual Build System (Makefile + Python Script)](ADR-014-dual-build-system.md)**  
-  Makefile for CI/CD and build.py wrapper for cross-platform developer convenience.
+- **[ADR-074: ADR Audit — SAT Integration Phase](ADR-074-adr-audit-sat-integration-phase.md)** 🆕  
+  One-time audit captured during the SAT integration phase to bring the ADR corpus in line with the SAT codebase; documents which decisions needed dedicated ADRs vs which were already covered.
+
+- **[ADR-079: Per-component Type Headers (amendment to ADR-051)](ADR-079-per-component-state-settings-headers.md)** 🆕  
+  One `<Component>types.h` file per subsystem bundles state + settings + enums; supersedes ADR-051's single-file struct layout (struct + Hungarian-prefix conventions retained).
+
+- **[ADR-081: Types Merge into `<Component>stuff.h` When Both Headers Exist](ADR-081-types-merge-into-stuff-when-both-exist.md)** 🆕  
+  Amendment to ADR-079: when a `<Component>stuff.h` already exists, types fold into it instead of creating a separate `<Component>types.h`. Prevents file-count bloat for components that already have a stuff sibling.
 
 ### Core Services
 
@@ -180,19 +235,16 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-018: ArduinoJson for Data Interchange](ADR-018-arduinojson-data-interchange.md)** *(Superseded by ADR-042)*  
   ~~Standardized JSON handling for settings persistence, REST API, MQTT, and WebSocket communication.~~
 
-- **[ADR-042: Streaming JSON I/O — No ArduinoJson](ADR-042-streaming-json-no-arduinojson.md)** 🆕
+- **[ADR-042: Streaming JSON I/O — No ArduinoJson](ADR-042-streaming-json-no-arduinojson.md)** 🆕  
   Mandate streaming JSON helpers with global scratch buffers instead of ArduinoJson; eliminates ArduinoJson heap documents, avoids ArduinoJson-driven fragmentation, and fixes the settings-reset bug from buffer overflow.
 
-- **[ADR-043: Reset-Pattern WiFi Recovery Trigger](ADR-043-reset-pattern-wifi-recovery.md)** 🆕
+- **[ADR-043: Reset-Pattern WiFi Recovery Trigger](ADR-043-reset-pattern-wifi-recovery.md)** 🆕  
   Triple-reset within a 10-second window forces WiFiManager configuration portal and clears saved WiFi credentials for deterministic recovery on ESP8266.
 
 ### Features and Extensions
 
 - **[ADR-019: REST API Versioning Strategy](ADR-019-rest-api-versioning-strategy.md)**  
   URL path-based API versioning (v0/v1/v2) with indefinite backward compatibility.
-
-- **[ADR-035: RESTful API Compliance Strategy](ADR-035-restful-api-compliance-strategy.md)** 🆕  
-  Expand v2 API with RESTful-compliant endpoints: consistent JSON errors, proper status codes, resource naming, and CORS headers.
 
 - **[ADR-020: Dallas DS18B20 Temperature Sensor Integration](ADR-020-dallas-ds18b20-sensor-integration.md)**  
   OneWire-based multi-sensor temperature monitoring with MQTT integration and auto-discovery.
@@ -212,8 +264,14 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-033: Dallas Sensor Custom Labels and Graph Visualization](ADR-033-dallas-sensor-custom-labels-graph-visualization.md)** 🆕  
   Persistent custom sensor labels (16 chars max) with REST API endpoint, dynamic graph visualization with 16-color palette, and non-blocking inline editor.
 
+- **[ADR-035: RESTful API Compliance Strategy](ADR-035-restful-api-compliance-strategy.md)** 🆕  
+  Expand v2 API with RESTful-compliant endpoints: consistent JSON errors, proper status codes, resource naming, and CORS headers.
+
 - **[ADR-039: Real-Time OTGraph Charting Architecture](ADR-039-otgraph-real-time-charting.md)** 🆕  
   5-grid ECharts-based charting module with dynamic Dallas sensor registration, dual-theme palettes, LTTB sampling, and 24h data buffer for real-time OpenTherm monitoring.
+
+- **[ADR-041: Just-In-Time Home Assistant MQTT Discovery](ADR-041-jit-ha-discovery.md)** 🆕  
+  JIT discovery emits HA configs only after a real OpenTherm message is observed for the corresponding msgID; reduces broker noise and avoids advertising entities the boiler does not actually report.
 
 ### Browser and Client Compatibility
 
@@ -231,11 +289,53 @@ Architecture Decision Records capture important architectural decisions along wi
 
 ### OTA and Firmware Updates
 
-- **[ADR-028: File Streaming Over Loading for Memory Safety](ADR-028-file-streaming-over-loading.md)** 🆕  
-  Never load files >2KB into RAM; use streaming patterns to prevent memory exhaustion crashes.
-
 - **[ADR-029: Simple XHR-Based OTA Flash (KISS Principle)](ADR-029-simple-xhr-ota-flash.md)** 🆕  
   Simplified firmware flash mechanism using XHR with backend confirmation, eliminating WebSocket complexity and Safari bugs. Reduces code by 68.5% while improving reliability.
+
+- **[ADR-067: SSD1306Ascii Text-Only OLED Library](ADR-067-ssd1306ascii-oled-library.md)** 🆕  
+  Use the lighter SSD1306Ascii library for OLED rendering instead of the full Adafruit GFX stack; saves flash and avoids heap allocation. *(Lives here because OLED is bound to the OTA/diagnostics surface; OTGW32-only.)*
+
+### OTGW32 and Dual Platform
+
+- **[ADR-063: OTGW32 Hardware Support — Dual Build Targets with Runtime Feature Detection](ADR-063-otgw32-hardware-support.md)** 🆕  
+  Dual build targets (ESP8266 and ESP32) with runtime detection of hardware capabilities (W5500 Ethernet, OLED, BLE) so a single firmware binary boots correctly on both platforms.
+
+- **[ADR-064: OT-Direct Operating Mode Architecture](ADR-064-ot-direct-operating-mode-architecture.md)** 🆕  
+  ESP32 GPIO-direct OpenTherm bus communication using the Phunkafizer OT library; bypasses the PIC controller entirely for boards without an OTGW PIC.
+
+- **[ADR-068: OT-Direct Schedule Tuning Constants](ADR-068-ot-direct-schedule-tuning-constants.md)** 🆕  
+  Calibrated polling intervals and burst rules for OT-Direct mode, mirroring the PIC-driven cadence so consumer code (MQTT, WebSocket) sees the same shape regardless of underlying transport.
+
+- **[ADR-087: Frame Bridge Pattern: Raw OT Frames to PIC-Format Text](ADR-087-frame-bridge-pattern.md)** 🆕  
+  In OT-Direct mode, raw OT frames are bridged into the same text format the PIC emits, so downstream parsing logic in `processOT()` and beyond stays unchanged. Renumbered from earlier ADR-065 to resolve duplicate numbering.
+
+- **[ADR-072: SAT Platform Compatibility Layer — ESP8266 vs OTGW32](ADR-072-sat-platform-compatibility-layer.md)** 🆕  
+  ESP8266 vs OTGW32 differences are encapsulated in the SAT subsystem so the controller code stays platform-neutral; drives buffer sizing, peripheral availability, and timing parameters per platform.
+
+### SAT Subsystem
+
+- **[ADR-085: SAT (Smart Autotune Thermostat) Integration](ADR-085-sat-smart-autotune-thermostat-integration.md)** 🆕  
+  Top-level decision to fold SAT into the firmware as an optional, opt-in controller (renumbered from earlier ADR-062 to resolve duplicate numbering, content unchanged).
+
+- **[ADR-069: SAT PID v3 Controller Implementation](ADR-069-sat-pid-v3-implementation.md)** 🆕  
+  Centralised PID controller implementation for the Smart Autotune Thermostat with anti-windup and adaptive-gain support.
+
+- **[ADR-070: SAT Memory Allocation Strategy](ADR-070-sat-memory-allocation-strategy.md)** 🆕  
+  File-static buffers for SAT working state with ring-buffer sizing tuned per platform (smaller on ESP8266, expanded on ESP32) to fit the heap envelope on each target.
+
+- **[ADR-071: SAT Heating Curve Algorithm](ADR-071-sat-heating-curve-algorithm.md)** 🆕  
+  Adaptive heating-curve advisor (INCREASE/DECREASE/HOLD) driving setpoint adjustments based on outdoor and indoor data with stalled-ignition adaptation.
+
+- **[ADR-073: SAT MQTT Topic Structure](ADR-073-sat-mqtt-topic-structure.md)** 🆕  
+  Topic layout for SAT inputs (room sensor, humidity), outputs (computed setpoint, mode), and configuration; integrates with the broader OT-bus topic strategy in ADR-084.
+
+- **[ADR-076: SAT OPV (Optimal Valve Position) Calibration](ADR-076-sat-opv-calibration.md)** 🆕  
+  Calibration procedure that determines the optimal valve position by observing flow and temperature response; persisted to LittleFS for cross-boot retention.
+
+### ADR Governance
+
+- **[ADR-080: Binding ADR Rules Must Have a CI Gate](ADR-080-binding-adr-rules-must-have-a-ci-gate.md)** 🆕  
+  Pattern-level ADRs that claim to be binding must either ship with a CI verification gate or be explicitly labelled guideline-level. Sets the bar for what "binding" means in this corpus and the basis for the guideline-vs-binding distinction used by ADR-088, ADR-089, and ADR-090.
 
 ## ADR Template
 
@@ -277,11 +377,12 @@ Links to relevant documentation, code, or resources.
 
 The ESP8266's limited RAM (~40KB usable) drives many architectural decisions:
 
-- Static buffer allocation (ADR-004)
+- Static buffer allocation (ADR-004, ADR-053)
 - PROGMEM for strings (ADR-009)
 - No HTTPS/TLS (ADR-003)
 - Client connection limits
-- Heap monitoring and adaptive throttling
+- Heap monitoring and adaptive throttling (ADR-030, ADR-089)
+- Re-entrancy guards on shared scratch state (ADR-090)
 
 ### Local Network Only
 
@@ -304,19 +405,21 @@ The firmware is designed for trusted local network deployment:
 
 Primary integration target is Home Assistant:
 
-- MQTT Auto-Discovery (ADR-006)
+- MQTT Auto-Discovery (ADR-006, ADR-077)
 - Standard HA entity patterns
 - Climate control integration
 - Zero-configuration setup
+- Retained-discovery self-heal (ADR-062)
 
 ### Cooperative Multitasking
 
 Single-core ESP8266 requires careful task management:
 
 - Timer-based scheduling (ADR-007)
-- Non-blocking operations
+- Non-blocking operations (ADR-047, ADR-048, ADR-058)
 - Watchdog feeding
 - No delay() calls
+- Time-boundary single-caller contract (ADR-086)
 
 ### Arduino Ecosystem
 
@@ -326,6 +429,17 @@ Maintaining Arduino compatibility for community contributions:
 - Modular .ino files (ADR-002)
 - Arduino IDE support
 - Standard Arduino libraries where possible
+- PlatformIO as primary build for dual-target firmware (ADR-083)
+
+### Dual-Platform Reach
+
+The 2.0.0 line supports both ESP8266 and ESP32:
+
+- Unified platform abstraction (ADR-061)
+- OTGW32 hardware variant (ADR-063)
+- OT-Direct (PIC-less) mode on ESP32 (ADR-064, ADR-068, ADR-087)
+- Generic OT-bus state topics (ADR-084)
+- LTS Core 2.7.4 pin on the ESP8266 line for stability (ADR-082)
 
 ## Architectural Dependencies
 
@@ -334,17 +448,19 @@ Maintaining Arduino compatibility for community contributions:
 ```text
 ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
                      │
-                     ├──> ADR-004 (Static Buffers) ──> Referenced by 8 ADRs
-                     ├──> ADR-007 (Timers) ──────────> Referenced by 6 ADRs
+                     ├──> ADR-004 (Static Buffers) ──> Referenced by 8+ ADRs
+                     ├──> ADR-007 (Timers) ──────────> Referenced by 6+ ADRs
                      └──> ADR-013 (Arduino) ─────────> Foundation for all
 ```
 
-**Most Referenced ADRs:**
+**Most Referenced ADRs** *(advisory; counts are estimates from earlier audits and are not re-counted on every commit)*:
 
-- **ADR-004:** Static Buffer Allocation (8 references)
-- **ADR-001:** ESP8266 Platform (7 references)
-- **ADR-007:** Timer-Based Scheduling (6 references)
-- **ADR-008:** LittleFS Persistence (5 references)
+- **ADR-004:** Static Buffer Allocation (~8 references)
+- **ADR-001:** ESP8266 Platform (~7 references)
+- **ADR-007:** Timer-Based Scheduling (~6 references)
+- **ADR-008:** LittleFS Persistence (~5 references)
+- **ADR-051:** Dual Encapsulating Structs (referenced by ADR-079, ADR-081, etc.)
+- **ADR-080:** Binding ADR rules CI gate (referenced by ADR-088, ADR-089, ADR-090)
 
 **Decision Timeline** (earliest to latest):
 
@@ -352,15 +468,17 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 2. 2018: ADR-002 (Modular), ADR-003 (HTTP-only), ADR-007 (Timers)
 3. 2019: ADR-005 (WebSocket), ADR-012 (PIC upgrade), ADR-020 (Sensors)
 4. 2020: ADR-004 (Static buffers), ADR-008 (LittleFS migration)
-5. 2021: ADR-015 (NTP + AceTime - verified: commit 45b51f2)
+5. 2021: ADR-015 (NTP + AceTime)
 6. 2024: ADR-019 (API v2)
-7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
-8. 2026: ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
-9. 2026: ADR-040 (MQTT source topics), ADR-041 (JIT HA discovery), ADR-042 (No ArduinoJson), ADR-043 (Triple-reset WiFi)
-10. 2026: ADR-044 (Global state header definition), ADR-045 (PS=1 summary parsing)
-11. 2026: ADR-054 (Optional HTTP Basic Auth), ADR-055 (Webhook HTTP integration)
-12. 2026: ADR-056 (Protected admin security contract), ADR-057 (Webhook delivery + test endpoint policy)
-13. 2026: ADR-060 (PIC availability guard pattern)
+7. 2026 Q1: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings), ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
+8. 2026 Q1: ADR-040 (MQTT source topics), ADR-041 (JIT HA discovery), ADR-042 (No ArduinoJson), ADR-043 (Triple-reset WiFi), ADR-044 (Global state header definition), ADR-045 (PS=1 summary parsing)
+9. 2026 Q1: ADR-054 (Optional HTTP Basic Auth), ADR-055 (Webhook HTTP integration), ADR-056 (Protected admin contract), ADR-057 (Webhook delivery + test endpoint policy)
+10. 2026 Q1-Q2: ADR-058 (Non-blocking PIC PR=), ADR-059 (Ser2net queue awareness), ADR-060 (PIC availability guard pattern)
+11. 2026 Q2: ADR-061 (Platform abstraction), ADR-062 (Retained discovery verification), ADR-063 (OTGW32 hardware), ADR-064 (OT-Direct mode), ADR-065 (otgw-pic subtree), ADR-066 (Thermostat auto-detect), ADR-067 (SSD1306 OLED), ADR-068 (OT-Direct schedule tuning)
+12. 2026 Q2: ADR-069 to ADR-073 (SAT PID, memory, heating curve, platform compat, MQTT topics), ADR-074 (ADR audit SAT phase), ADR-075 (WiFi reconnect timeout tuning), ADR-076 (SAT OPV calibration)
+13. 2026 Q2: ADR-077 (Streaming HA discovery), ADR-078 (MQTT sub-command dispatch), ADR-079 (Per-component type headers), ADR-080 (Binding ADR rules CI gate), ADR-081 (Types merge into stuff)
+14. 2026 Q2: ADR-082 (Core 2.7.4 LTS pin), ADR-083 (PlatformIO primary), ADR-084 (Generic OT-bus topics), ADR-085 (SAT integration, renumbered), ADR-086 (Time-boundary single caller, renumbered), ADR-087 (Frame Bridge, renumbered)
+15. 2026 Q2: ADR-088 (MQTT status burst windowing), ADR-089 (Heap tier machine contract), ADR-090 (Re-entrancy guard pattern)
 
 ## When to Create an ADR
 
@@ -393,17 +511,19 @@ Don't create ADRs for:
 - **Before implementing:** Read the relevant ADRs to align with existing decisions.
 - **During planning:** Create or update an ADR when a change materially alters architecture, protocols, data flow, or external behavior.
 - **After implementation:** Update the ADR status as needed and link the ADR from the PR or review description.
+- **Binding vs. guideline:** Per ADR-080, pattern-level rules that claim to be binding must ship with a CI gate. ADRs without a CI gate are guideline-level and should be labelled as such.
 
 ## Implementation Notes
 
-**Memory Measurements:**
-The claimed memory savings in ADR-004 (3,130-3,730 bytes or 7.8-9.3% of RAM) are estimates based on:
+**Heap Tier Thresholds (per ADR-089, amends ADR-030):**
 
-- Static buffer conversions: ~1,500 bytes
-- PROGMEM strings: ~2,000 bytes (see ADR-009)
-- Optimized libraries: ~400-500 bytes
+- `HEAP_CRITICAL` — less than 1536 bytes (emergency mode)
+- `HEAP_WARNING` — 1536 to 3072 bytes (throttle aggressively)
+- `HEAP_LOW` — 3072 to 5120 bytes (reduce message rates)
+- `HEAP_HEALTHY` — greater than 5120 bytes
+- Fragmentation-aware promotion: `HEAP_FRAG_PROMOTE_MAXBLOCK` = 1536
 
-To verify these measurements:
+**Verifying memory measurements:**
 
 ```bash
 # Build and check binary size
@@ -413,14 +533,6 @@ size build/OTGW-firmware.elf
 # Monitor heap at runtime via telnet (port 23)
 > s  # Show status including free heap
 ```
-
-**Heap Levels (Standardized):**
-Throughout the codebase, use these constant names:
-
-- `HEAP_CRITICAL` - Less than 3KB (emergency mode)
-- `HEAP_WARNING` - 3-5KB (throttle aggressively)
-- `HEAP_LOW` - 5-8KB (reduce message rates)
-- Normal operation: Greater than 8KB
 
 **Version Numbering:**
 
@@ -441,36 +553,36 @@ When an architectural decision changes:
 
 ## ADR Skill
 
-**NEW:** This repository includes a GitHub Copilot skill for ADR management!
-
-- **Location:** `.github/skills/adr/SKILL.md`
-- **Purpose:** Automated ADR creation, compliance checking, and enforcement
-- **Usage Guide:** `.github/skills/adr/USAGE_GUIDE.md`
+ADR maintenance in this repository is driven by the **adr-kit** plugin (skill: `/adr-kit:adr`, subagent: `adr-generator`). The plugin lives in the Claude Code plugin cache (`~/.claude/plugins/cache/rvdbreemen-adr-kit/`) and is configured per project via `.adr-kit.json` in the repo root. There is no in-tree skill copy at `.github/skills/adr/`; that earlier GitHub Copilot skill location is deprecated and any links pointing there should be replaced with this section.
 
 The ADR skill helps you:
 
-- Create well-structured ADRs using best practices
-- Check code changes against existing ADRs
-- Document architectural decisions with proper alternatives
-- Maintain ADR compliance in PRs and CI/CD
+- Create well-structured ADRs using the canonical sections (Context, Decision, Alternatives, Consequences, Related)
+- Lint the ADR corpus for canonical structure (`bin/adr-lint` from the plugin)
+- Check code changes against existing ADRs before merging
+- Distinguish binding (CI-gated) ADRs from guideline-level ADRs per ADR-080
+- Maintain this README as the navigation hub when ADRs are added, superseded, or renumbered
 
-**To use the skill:**
+**To use the skill from Claude Code:**
 
 ```text
-Ask Copilot: "Use the ADR skill to create ADR-XXX for [decision]"
-Ask Copilot: "Check my changes against existing ADRs"
-Ask Copilot: "Does this require a new ADR?"
+/adr-kit:adr               # interactive ADR workflow (create / supersede / lint)
 ```
 
-See `.github/skills/adr/USAGE_GUIDE.md` for comprehensive usage instructions and CI/CD integration examples.
+Or invoke the subagent directly for a concrete creation task:
+
+```text
+Use the adr-generator agent to draft ADR-NNN for <decision>
+```
+
+See `.adr-kit.json` for project-specific configuration (lint scope, naming policy, ignore lists). The plugin's documentation at `~/.claude/plugins/cache/rvdbreemen-adr-kit/README.md` covers slash commands, workflow, and CLI usage.
 
 ## Resources
 
-- **ADR Skill (Copilot):** `.github/skills/adr/SKILL.md` 🆕
-- **ADR Skill Usage Guide:** `.github/skills/adr/USAGE_GUIDE.md` 🆕
+- **adr-kit plugin** (`/adr-kit:adr` skill, `adr-generator` subagent): the active ADR workflow tooling for this repo, configured via `.adr-kit.json`.
+- **adr-lint CLI**: `bin/adr-lint` from the plugin cache, run by the `/adr-kit:adr` lint flow.
 - **ADR Best Practices:** <https://adr.github.io/>
 - **Michael Nygard's ADR Template:** <https://github.com/joelparkerhenderson/architecture-decision-record>
-- **Copilot Instructions:** `.github/copilot-instructions.md` (references ADRs)
 - **Evaluation Framework:** `evaluate.py` (enforces decisions like PROGMEM usage)
 
 ## Maintenance
@@ -481,7 +593,8 @@ ADRs are living documentation:
 - Reference ADRs in code reviews
 - Update ADR status when decisions change
 - Link from code comments to relevant ADRs
-- Use ADRs to inform copilot instructions
+- Use ADRs to inform agent and copilot instructions
+- Keep this README in sync with the ADR corpus (TASK-427 closed the gap from ADR-058 through ADR-088 on 2026-04-26; future additions should land here at the time the ADR is accepted)
 
 ---
 
