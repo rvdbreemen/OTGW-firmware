@@ -89,7 +89,7 @@ Trusted LAN only. REST API works behind HTTPS reverse proxy, but WebSocket assum
 
 - PIC commands: always `addOTWGcmdtoqueue()`, never direct serial write
 - Timers: `DECLARE_TIMER_SEC()` / `DECLARE_TIMER_MS()` + `DUE()` (see `safeTimers.h`)
-- `doBackgroundTasks()` can re-enter — shared buffers across yield must be static/local
+- `doBackgroundTasks()` can re-enter (called from inside `doAutoConfigure()`'s file-reading loop). Shared scratch state must declare an acquisition contract: see ADR-090 for the pattern (RAII or inUse-flag, both with fail-safe on contention)
 - Typed control flow: `enum class` or numeric IDs, never string tokens as discriminators
 - Frontend JS: Chrome/Firefox/Safari (latest + 2). Check element existence, try-catch JSON.parse, response.ok, .catch() on all async
 - Webui assets live in `src/OTGW-firmware/data/` (`index.html`, `index.js`, `index.css`, `graph.js`) and ship as a LittleFS image; use `python build.py` (not `--firmware`) to rebuild them
@@ -125,16 +125,19 @@ ADRs in `docs/adr/`. Read before changes to: architecture, NFRs, API contracts, 
 
 **Binding ADRs** (pattern-level, enforced by `evaluate.py` or tests — see ADR-080):
 - **ADR-004**: No `String` in hot paths (SAT*, MQTTstuff, restAPI, OTGW-Core, OTDirect)
+- **ADR-088**: MQTT status-burst windowing + post-burst cooldown (gated by `check_status_publishers_wrap_burst`, `check_status_burst_cooldown_bound`, `check_drip_consults_deferred` in evaluate.py)
+- **ADR-089**: Heap tier-machine contract (amends ADR-030; gated by `check_heap_tier_thresholds_ordered`, `check_heap_fragmentation_promotion`, `check_heap_tier_entry_counters` in evaluate.py)
 
 **Structural / architectural ADRs** (reviewed at PR, no automated gate — see ADR-080):
 - **ADR-044**: Single-point-of-instantiation for globals
 - **ADR-051**: Settings/State architecture (dual encapsulating structs, Hungarian prefix, two-level sections)
-- **ADR-054**: CSRF same-origin check (collectHeaders must register Origin/Referer)
+- **ADR-056**: Protected admin endpoint security and secret-handling contract (HTTP Basic Auth + CSRF same-origin enforcement on admin routes; supersedes ADR-054)
 - **ADR-077**: Streaming MQTT HA discovery architecture
 - **ADR-078**: MQTT sub-command dispatch tables (replaces chained `strcasecmp_P` blocks)
 - **ADR-079**: Per-component type headers (`<Component>types.h` pattern, amendment to ADR-051)
 - **ADR-080**: Binding ADR rules must have a CI gate (meta-rule)
 - **ADR-081**: Types merge into `<Component>stuff.h` when both exist (amendment to ADR-079)
+- **ADR-090**: Re-entrancy guard pattern for shared scratch buffers (guideline-level per ADR-080: 2 instances in MQTTstuff.ino, RAII `MQTTAutoConfigSessionLock` preferred for new code)
 
 Accepted ADRs are binding. To reverse: new ADR that supersedes old one.
 
