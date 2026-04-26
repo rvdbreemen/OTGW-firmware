@@ -143,13 +143,7 @@ var OTGraph = {
             return;
         }
 
-        // Patch 04: prefer our registered otgw-light/otgw-dark themes when
-        // echarts-theme.js has loaded; otherwise fall back to ECharts'
-        // built-in 'light' / 'dark' which is what currentTheme has been
-        // historically.
-        this.chart = echarts.init(container, (typeof otgwChartTheme === 'function')
-            ? (this.currentTheme === 'dark' ? 'otgw-dark' : 'otgw-light')
-            : this.currentTheme);
+        this.chart = echarts.init(container, this.currentTheme);
         
         // Bind settings - store handler references for cleanup
         var timeSelect = document.getElementById('graphTimeWindow');
@@ -611,12 +605,7 @@ var OTGraph = {
             }
 
             try {
-                // Patch 04: same otgw-* theme indirection as the initial
-                // init() above; honours newTheme as the source of truth.
-                var resolvedTheme = (typeof otgwChartTheme === 'function')
-                    ? (newTheme === 'dark' ? 'otgw-dark' : 'otgw-light')
-                    : newTheme;
-                var newChart = echarts.init(container, resolvedTheme);
+                var newChart = echarts.init(container, newTheme);
                 this.chart = newChart;
                 this.updateOption();
                 this.resize();

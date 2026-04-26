@@ -35,13 +35,7 @@
     <!-- OTMonitor home-page card grid (Patch 03): mirrors the SAT panel's
          neutral surfaces and uses --status-* tokens for boolean indicators. -->
     <link rel="stylesheet" type="text/css" href="./otmonitor.css">
-    <!-- Patch 04: self-hosted ECharts custom build (line + scatter + grid +
-         tooltip + legend + axisPointer; no CDN). Pinned version in
-         data/echarts.VERSION; entry list in PATCH.md commit body. -->
-    <script src="./echarts.min.js"></script>
-    <!-- Shared chart theme helper. Must load BEFORE sat.js / graph.js so
-         otgwChartTheme() is in scope when their chart-init runs. -->
-    <script src="./echarts-theme.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="./index.js"></script>
     <script src="./graph.js"></script>
     <script src="./sat.js"></script>
