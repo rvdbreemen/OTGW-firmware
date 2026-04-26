@@ -1,0 +1,87 @@
+/*
+ * ds-tokens.css  —  OTGW-firmware design-system fonts AND status colors
+ *
+ * Self-hosted WOFF2 served from LittleFS. No CDN. No cloud.
+ * Loaded BEFORE index.css / index_dark.css so the font-family swaps
+ * below (which use var(--font-sans) / var(--font-mono)) and the
+ * --status-* tokens can resolve.
+ *
+ * Total on disk:
+ *   inter-400.woff2           ~23 KB
+ *   inter-700.woff2           ~24 KB
+ *   jetbrains-mono-400.woff2  ~21 KB
+ *   ---------------------------------
+ *   Total                     ~68 KB
+ */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('fonts/inter-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('fonts/inter-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('fonts/jetbrains-mono-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+
+:root {
+  --font-sans: 'Inter', Arial, Helvetica, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, "Courier New", monospace;
+
+  /* ---- Status color tokens (light theme defaults) -------------------
+   * Used by .ws-status, .sig-bar, .sat-health-*, .otmonrow status pills,
+   * flame / CH / DHW indicators. The same five semantic roles map across
+   * both themes via the body.dark override block at the bottom of this
+   * file — *one* place to tweak.
+   *
+   * Roles:
+   *   ok       — connected, green, healthy
+   *   warn     — degraded, idle, awaiting input
+   *   error    — disconnected, fault, problem
+   *   info     — neutral chrome, ethernet, primary action
+   *   neutral  — disabled, unknown, placeholder
+   * ----------------------------------------------------------------- */
+  --status-ok:      #2e7d32;
+  --status-ok-bg:   #c8e6c9;
+  --status-warn:    #ef6c00;
+  --status-warn-bg: #ffe0b2;
+  --status-error:   #c62828;
+  --status-error-bg:#ffcdd2;
+  --status-info:    #1976d2;
+  --status-info-bg: #bbdefb;
+  --status-neutral: #607d8b;
+  --status-neutral-bg:#eceff1;
+
+  /* Glow used by .ws-connected / health dots. Same hue at 60% alpha. */
+  --status-ok-glow:    rgba(46, 125, 50, 0.6);
+  --status-error-glow: rgba(198, 40, 40, 0.6);
+}
+
+body.dark {
+  /* Slightly brighter / more saturated so they pop on #1a1a1a body. */
+  --status-ok:      #66bb6a;
+  --status-ok-bg:   #1b5e20;
+  --status-warn:    #ffa726;
+  --status-warn-bg: #5a4a1a;
+  --status-error:   #ef5350;
+  --status-error-bg:#5a1818;
+  --status-info:    #42a5f5;
+  --status-info-bg: #0d47a1;
+  --status-neutral: #b0b0b0;
+  --status-neutral-bg:#3a3a3c;
+
+  --status-ok-glow:    rgba(102, 187, 106, 0.6);
+  --status-error-glow: rgba(239, 83, 80, 0.6);
+}
+
+/* Tabular numerals globally — temperature / modulation columns stop wobbling */
+html, body, input, button, select, textarea {
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  font-variant-numeric: tabular-nums;
+}

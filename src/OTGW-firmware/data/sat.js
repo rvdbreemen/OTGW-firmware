@@ -329,11 +329,23 @@ var SAT = (function() {
     document.dispatchEvent(new Event('sat:rendered'));
   }
 
+  // Patch 04: pick the otgw-light or otgw-dark ECharts theme registered
+  // by echarts-theme.js based on the current body class. Falls back to
+  // ECharts' built-in 'dark' / null if echarts-theme.js hasn't loaded
+  // (e.g. dev page that skips the chart bundle).
+  function _otgwTheme() {
+    var isDark = document.body.classList.contains('dark');
+    if (typeof otgwChartTheme === 'function') {
+      return isDark ? 'otgw-dark' : 'otgw-light';
+    }
+    return isDark ? 'dark' : null;
+  }
+
   // --- Chart ---
   function initChart() {
     var container = el('sat-chart');
     if (!container || typeof echarts === 'undefined') return;
-    _chartInstance = echarts.init(container);
+    _chartInstance = echarts.init(container, _otgwTheme());
     var option = {
       tooltip: { trigger: 'axis' },
       legend: { data: ['Setpoint', 'Flow', 'Room', 'Outside', 'PID'], bottom: 0 },
@@ -503,7 +515,7 @@ var SAT = (function() {
   function initCurveChart() {
     var container = el('sat-curve-chart');
     if (!container || typeof echarts === 'undefined') return;
-    _curveChartInstance = echarts.init(container);
+    _curveChartInstance = echarts.init(container, _otgwTheme());
     // Initial empty state — filled on first data fetch
     _curveChartInstance.setOption(buildCurveOption(1.5, 0, 20.0, null, null, 'light'));
   }
@@ -612,7 +624,12 @@ var SAT = (function() {
   }
 
   function setTheme(theme) {
-    var themeArg = (theme === 'dark') ? 'dark' : null;
+    // Patch 04: pick our registered otgw-* themes when available; the
+    // theme arg passed in is the body theme name ('dark' / 'light').
+    var hasOtgw = (typeof otgwChartTheme === 'function');
+    var themeArg = (theme === 'dark')
+        ? (hasOtgw ? 'otgw-dark'  : 'dark')
+        : (hasOtgw ? 'otgw-light' : null);
     if (_chartInstance) {
       var container = el('sat-chart');
       _chartInstance.dispose();
