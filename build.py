@@ -651,8 +651,13 @@ def build_filesystem(project_dir, config_file, target):
     """Build filesystem using mklittlefs for the given target"""
     tcfg = TARGETS[target]
     print_step(f"Building filesystem [{tcfg['name']}]")
-    # Ensure large static assets have up-to-date .gz siblings before mklittlefs packs them.
-    prepare_gzip_assets(config.DATA_DIR)
+    # TASK-433: gzip pre-compression disabled. Plain .js files are served via the
+    # FSexplorer handlers (which fall through to the non-.gz branch when no .gz
+    # sibling exists). Removing the .gz artefacts eliminates the duplicate
+    # Content-Encoding header bug class entirely (was: streamFile auto-detected
+    # .gz AND the handler manually added Content-Encoding: gzip → browser saw
+    # the header twice and produced an empty body). See FSexplorer.ino comments.
+    # prepare_gzip_assets(config.DATA_DIR)  # intentionally disabled
 
     # Find mklittlefs under the target's tool path
     # e.g. arduino/packages/esp8266/tools/mklittlefs/*/mklittlefs(.exe)
@@ -1161,8 +1166,8 @@ def build_filesystem_pio(project_dir, target):
     tcfg = TARGETS[target]
     env_name = PIO_ENV_MAP[target]
     print_step(f"Building filesystem [{tcfg['name']}] (PlatformIO)")
-    # Ensure large static assets have up-to-date .gz siblings before PIO packs them.
-    prepare_gzip_assets(config.DATA_DIR)
+    # TASK-433: gzip pre-compression disabled (see build_filesystem above for rationale).
+    # prepare_gzip_assets(config.DATA_DIR)  # intentionally disabled
     run_command(["pio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir)
     # TASK-337: same fail-fast pattern as build_firmware_pio. The buildfs target
     # can also be silently skipped on toolchain misconfiguration.
