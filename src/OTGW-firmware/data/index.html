@@ -28,15 +28,12 @@
       })();
     </script>
     <link rel="stylesheet" type="text/css" href="./index_common.css">
-    <!-- SAT panel theme (TASK-434 Patch 02): legacy partial; shadowed by
-         components.css below. To be removed in TASK-435 Patch E. -->
-    <link rel="stylesheet" type="text/css" href="./sat.css">
-    <!-- OTMonitor home-page card grid (TASK-434 Patch 03): legacy partial;
-         shadowed by components.css below. To be removed in TASK-435 Patch E. -->
-    <link rel="stylesheet" type="text/css" href="./otmonitor.css">
     <!-- TASK-435 Patch A: design-system component library. Loads LAST so
-         it shadows the older index.css / index_dark.css / sat.css /
-         otmonitor.css rules during the migration window. -->
+         it shadows the older index.css / index_dark.css rules during the
+         migration window (those still load via the dynamic theme script
+         above). The TASK-434 sat.css and otmonitor.css partials were
+         dropped in TASK-435 Patch E; their rules now live in
+         components.css under the same selectors. -->
     <link rel="stylesheet" type="text/css" href="./components.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <!-- TASK-435 Patch A: token-driven chart theme helper. Reads the
@@ -176,11 +173,14 @@
         </div>
         <div id="otLogModeNotice" class="ot-log-mode-notice hidden" role="status" aria-live="polite"></div>
         
-        <div class="ot-log-tabs">
-          <button type="button" class="tab-link active" onclick="openLogTab(event, 'Log')">Log</button>
-          <button type="button" class="tab-link" onclick="openLogTab(event, 'Statistics')">Statistics</button>
-          <button type="button" class="tab-link" onclick="openLogTab(event, 'Graph')">Graph</button>
-        </div>
+        <!-- TASK-435 Patch C: a11y additions per log.html.template
+             (role=tablist/tab, aria-selected, data-tab). The tab-switching
+             behaviour stays driven by openLogTab() in index.js. -->
+        <nav class="ot-log-tabs" role="tablist">
+          <button type="button" class="tab-link active" role="tab" aria-selected="true"  data-tab="log"   onclick="openLogTab(event, 'Log')">Log</button>
+          <button type="button" class="tab-link"        role="tab" aria-selected="false" data-tab="stats" onclick="openLogTab(event, 'Statistics')">Statistics</button>
+          <button type="button" class="tab-link"        role="tab" aria-selected="false" data-tab="graph" onclick="openLogTab(event, 'Graph')">Graph</button>
+        </nav>
 
         <div id="Log" class="tab-content active">
             <div class="ot-log-controls">
@@ -282,7 +282,7 @@
                        </label>
                    </div>
                </div>
-               <div id="otGraphCanvas"></div>
+               <div id="otGraphCanvas" class="ds-chart"></div>
             </div>
         </div>
       </div>
@@ -445,7 +445,7 @@
             <div class="sat-row">
               <span class="sat-label">DHW Setpoint</span>
               <span class="sat-value">
-                <input type="range" id="sat-dhw-slider" class="sat-dhw-slider" min="40" max="60" step="1" value="50"
+                <input type="range" id="sat-dhw-slider" class="sat-dhw-slider ds-slider" min="40" max="60" step="1" value="50"
                   style="vertical-align:middle;width:120px;" oninput="SAT.onDhwSliderInput(this.value)" onchange="SAT.onDhwSliderChange(this.value)" aria-label="DHW setpoint slider" />
                 <span id="sat-dhw-slider-value" style="min-width:3.5em;display:inline-block;text-align:right;">50&deg;C</span>
               </span>
@@ -481,14 +481,14 @@
         <!-- Chart -->
         <div class="sat-section" data-view="simple expert diag">
           <h3>Temperature History</h3>
-          <div id="sat-chart" style="width:100%;height:300px;"></div>
+          <div id="sat-chart" class="ds-chart" style="width:100%;height:300px;"></div>
         </div>
 
         <!-- Heating Curve (Stooklijn) -->
         <div class="sat-section" data-view="expert diag">
           <h3 class="sat-curve-toggle"><button type="button" class="heading-toggle-btn" aria-expanded="true" aria-controls="sat-curve-section" onclick="SAT.toggleCurve()">Heating Curve (Stooklijn) <span id="sat-curve-arrow">&#9660;</span></button></h3>
           <div id="sat-curve-section">
-            <div id="sat-curve-chart" style="width:100%;height:320px;"></div>
+            <div id="sat-curve-chart" class="ds-chart" style="width:100%;height:320px;"></div>
             <div class="sat-curve-info">
               <span id="sat-curve-label"></span>
             </div>
@@ -626,9 +626,14 @@
         <div id="satSettingsContent"></div>
       </div>
     </div>
+    <!-- TASK-435 Patch D: footer Save button gets the design-system .btn
+         .btn-primary classes alongside the legacy nav-item tabButton
+         classes so components.css picks it up; behaviour is unchanged
+         (existing 'btnSaveSettings hidden' classes still drive the
+         show/hide logic). -->
     <div class="footer">
       <div class="nav-left">
-        <button type="button" class='nav-item tabButton btnSaveSettings hidden'>Save</button>
+        <button type="button" class='nav-item tabButton btnSaveSettings btn btn-primary hidden'>Save</button>
       </div>
     </div>
     <!-- KEEP THIS --->
