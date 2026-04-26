@@ -78,7 +78,16 @@ TARGETS = {
         "fqbn": "esp32:esp32:esp32s3:PartitionScheme=custom",
         "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32",
         "chip": "esp32s3",       # Nodoshop OTGW32 uses ESP32-S3
-        "flash_mode": "qio",     # ESP32-S3 uses QIO (not DIO)
+        "flash_mode": "dio",     # Nodoshop OTGW32 PCB wires SPI flash in DIO pinning
+                                  # (the WP/HD pins are not routed to flash on this
+                                  # board). The native PIO build produces a DIO
+                                  # bootloader and a DIO app; forcing QIO here patches
+                                  # only the bootloader header, creating a mismatch
+                                  # that boots the chip into a non-functional state
+                                  # (header says QIO, internals are DIO -> first
+                                  # IROM read after SPI re-init fails). Matches the
+                                  # tested Nodo-shop OT-Thing release.yml which also
+                                  # uses --flash_mode dio.
         "flash_freq": "80m",
         "flash_size": "4MB",
         "firmware_offset": "0x10000",
