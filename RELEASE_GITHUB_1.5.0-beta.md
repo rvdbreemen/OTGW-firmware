@@ -1,5 +1,15 @@
 **v1.5.0-beta is a development release. It is not recommended for production deployments.** A stable `v1.5.0` will follow when the line has soaked in the field.
 
+## Update 2026-04-26: build refreshed with a DHCP fix
+
+This build (`1.5.0-beta+cd30617`) replaces the original `1.5.0-beta+d40c2f6` artefacts on this release. It carries one targeted fix:
+
+- **WiFi association without DHCP/IP after first reboot post-flash** (TASK-432). On the original build, some testers reported the device would associate with WiFi but not acquire an IP from DHCP after a reboot, requiring a forced re-association at the router side to recover. Root cause: `wifi_station_dhcpc_start()` in the WiFi reconnect path took DHCP ownership away from the SDK, so subsequent `setAutoReconnect()`-driven reassociations no longer auto-restarted DHCP. Fix: removed the call, returning to the v1.2.0 baseline pattern where the SDK manages DHCP autonomously.
+
+Same `eesz=4M2M` partition layout as the original build; a firmware-only OTA from the previous build keeps your settings. A full firmware + filesystem flash is also fine.
+
+---
+
 The `1.5.x` line is the long-term-support track of OTGW-firmware on the ESP8266. It carries the `v1.4.x` feature set forward on **Arduino Core 2.7.4** instead of Core 3.1.2. Core 2.7.4 is the last Core version that ran this firmware without the post-OTA reboot reliability and PROGMEM alignment classes of issue that surfaced under Core 3.1.2 in the field.
 
 The separate ESP32 / SAT `v2.0.0` exploration on `feature-dev-2.0.0-otgw32-esp32-sat-support` continues independently and is not affected by this LTS choice.

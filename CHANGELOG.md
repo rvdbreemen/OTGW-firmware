@@ -10,7 +10,8 @@ The separate ESP32 / SAT v2.0.0 exploration on `feature-dev-2.0.0-otgw32-esp32-s
 
 ## [Unreleased]
 
-_No unreleased changes yet. New work on `dev` since v1.5.0-beta lands here._
+### Fixed
+- WiFi association without DHCP/IP after first reboot post-flash on the initial `1.5.0-beta+d40c2f6` build (TASK-432). Removed `wifi_station_dhcpc_start()` from `loopWifi()` `WIFI_DISCONNECTED` so the SDK regains autonomous DHCP management. Returns to the v1.2.0 baseline pattern; resolves the "associates but no IP, requires forced router-side reconnect" symptom reported by andrebrait on 2026-04-26.
 
 ## [1.5.0-beta] - 2026-04-26
 
