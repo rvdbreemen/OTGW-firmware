@@ -253,15 +253,12 @@ inline void platformResetExceptionInfo(char *buf, size_t bufLen) {
   buf[0] = '\0';
 }
 
-// DHCP restart — use esp_netif API to restart only the DHCP client without
-// dropping the WiFi association (mirrors ESP8266's wifi_station_dhcpc_stop/start).
-inline void platformRestartDHCP() {
-  esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-  if (netif) {
-    esp_netif_dhcpc_stop(netif);
-    esp_netif_dhcpc_start(netif);
-  }
-}
+// platformRestartDHCP() removed in TASK-432 port. Although the ESP32
+// esp_netif_dhcpc_stop/start API differs from ESP8266's SDK calls, the
+// underlying ownership-takeover concern still applies: once user code
+// manages DHCP explicitly, autonomous SDK reassociation may not restart
+// it correctly. The ESP8266 fix removed the call sites in networkStuff.ino;
+// this header drops the function for symmetry across platforms.
 
 // Serial error checks (ESP32 HardwareSerial does not expose overrun/rx error)
 inline bool platformSerialHasOverrun(HardwareSerial &serial) {

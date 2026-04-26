@@ -232,11 +232,12 @@ inline void platformResetExceptionInfo(char *buf, size_t bufLen) {
   }
 }
 
-// DHCP restart
-inline void platformRestartDHCP() {
-  wifi_station_dhcpc_stop();
-  wifi_station_dhcpc_start();
-}
+// platformRestartDHCP() removed in TASK-432 port. Calling
+// wifi_station_dhcpc_stop/start while the station is connected takes DHCP
+// ownership away from the SDK and breaks setAutoReconnect-driven DHCP on
+// subsequent reassociations. See networkStuff.ino for the rationale.
+// system_get_rst_info() above still requires user_interface.h, so the
+// include stays.
 
 // Serial error checks (ESP8266 HardwareSerial has these; ESP32 does not)
 inline bool platformSerialHasOverrun(HardwareSerial &serial) {

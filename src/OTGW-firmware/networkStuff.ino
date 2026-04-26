@@ -18,7 +18,15 @@
 
 NtpStatus_t NtpStatus  = TIME_NOTSET;
 time_t      NtpLastSync = 0;
-static bool sDhcpHostnameFixed = false;  // tracks whether DHCP re-announce has been done
+// Note: sDhcpHostnameFixed and the platformRestartDHCP() call sites it guarded
+// were removed (TASK-432, ported from dev). Calling the SDK's DHCP client
+// stop/start while the station is connected takes DHCP ownership away from the
+// SDK, so subsequent setAutoReconnect()-driven reassociations no longer auto-
+// restart DHCP. The result was "associates but no IP after reboot" reported
+// against dev's 1.5.0-beta+d40c2f6. The same call shape existed here on 2.0.0
+// in three sites (startWiFi catch-all, WIFI_RECONNECTED, startNTP) and is now
+// removed across the board. Hostname propagation still happens via
+// platformSetHostname() before WiFi.begin(); the SDK manages DHCP autonomously.
 
 // Debug telnet instance (port 23). SimpleTelnet replaces ESPTelnet for debug output.
 // Port is fixed in the constructor; begin() needs no port argument.
@@ -189,16 +197,11 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   DebugT(F("IP gateway: " ));  Debugln(WiFi.gatewayIP());
   Debugln();
 
-  // Catch-all: if the hostname still doesn't match after all connection paths,
-  // force a DHCP re-announce. Mark it done so startNTP() doesn't do it again.
+  // Apply the configured hostname for the next DHCP exchange (renewal or
+  // reconnect). No SDK DHCP calls here: the SDK manages DHCP autonomously
+  // when user code never invokes wifi_station_dhcpc_start/stop. See TASK-432
+  // for why the catch-all DHCP re-announce was removed.
   platformSetHostname(hostname);
-  const char *_hn = platformGetHostname();
-  if (!sDhcpHostnameFixed && strcmp(_hn, hostname) != 0) {
-    DebugTf(PSTR("Catch-all: hostname mismatch after connect ('%s' vs '%s'), forcing DHCP re-announce.\r\n"),
-            _hn, hostname);
-    platformRestartDHCP();
-    sDhcpHostnameFixed = true;
-  }
 
   httpUpdater.setup(&httpServer);
   httpUpdater.setIndexPage(UpdateServerIndex);
@@ -313,15 +316,16 @@ void loopWifi() {
       break;
 
     case WIFI_RECONNECTED:
-      // Match the startup path: re-apply the configured hostname and force a
-      // DHCP re-announce so the renewed lease uses the expected name.
+      // Re-apply the configured hostname so the next DHCP exchange uses it.
+      // No SDK DHCP calls here: the SDK already handled DHCP as part of the
+      // association triggered by WiFi.begin() in WIFI_DISCONNECTED. See
+      // TASK-432 for why platformRestartDHCP() was removed (it took DHCP
+      // ownership away from the SDK and broke setAutoReconnect-driven DHCP
+      // on subsequent reassociations).
 #if defined(_VERSION_PRERELEASE)
       stopAPFallback();  // tear down AP if it was active
 #endif
       platformSetHostname(CSTR(settings.sHostname));
-      DebugTf(PSTR("WiFi: reconnected, re-announcing DHCP lease for hostname [%s]\r\n"),
-              CSTR(settings.sHostname));
-      platformRestartDHCP();
       startTelnet();
       // OTGWstream is auto-started by handleOTGW() in the main loop
       startMQTT();
@@ -461,21 +465,12 @@ void startNTP()
 #endif
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
 #if defined(ESP8266)
-  // Capture hostname immediately after configTime() to detect if the SDK
-  // reset it, *before* we restore it. This drives the DHCP re-announce
-  // decision below.
-  bool hostnameWasReset = (strcmp(platformGetHostname(), CSTR(settings.sHostname)) != 0);
+  // Restore hostname in case configTime() reset it. The corrected hostname
+  // will be sent on the next DHCP exchange (renewal or reconnect). No SDK
+  // DHCP calls here: any wifi_station_dhcpc_start while connected takes DHCP
+  // ownership away from the SDK and breaks setAutoReconnect-driven DHCP on
+  // subsequent reassociations. See TASK-432.
   platformSetHostname(CSTR(settings.sHostname));
-
-  // If configTime() did reset the hostname, the DHCP lease may have been
-  // re-announced with the wrong name.  Force a DHCP re-announce once so the
-  // router sees the correct hostname.  Only do this once to avoid dropping
-  // the STA lease on every 30-min NTP resync (which would break MQTT/Telnet/
-  // WebSocket connections).
-  if (!sDhcpHostnameFixed && hostnameWasReset && WiFi.isConnected()) {
-    platformRestartDHCP();
-    sDhcpHostnameFixed = true;
-  }
 #endif
   NtpStatus = TIME_WAITFORSYNC;
 }
