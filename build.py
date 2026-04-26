@@ -194,6 +194,51 @@ def run_command(cmd, cwd=None, env=None, check=True, capture_output=False, show_
         sys.exit(1)
 
 
+def verify_artifact_exists(path, step_name, glob_pattern=None):
+    """Verify a build step actually produced the expected artifact.
+
+    Some toolchain failure modes return exit code 0 without producing output
+    (notably pio's pre-flight Python version rejection). Trust the filesystem,
+    not the exit code: if the artifact is missing, the build did not succeed
+    regardless of what the subprocess claims. See TASK-337.
+
+    Args:
+        path: Path or string. If glob_pattern is None, treated as exact file
+              that must exist. Otherwise treated as a directory to glob in.
+        step_name: human-readable label used in the error message.
+        glob_pattern: optional glob pattern (e.g. "**/*.ino.bin") to find the
+              artifact under `path` when the exact filename is not known
+              ahead of time (arduino-cli compile output).
+    """
+    p = Path(path)
+    if glob_pattern is not None:
+        matches = list(p.glob(glob_pattern))
+        if not matches:
+            print_error(
+                f"{step_name}: subprocess returned success but no artifact "
+                f"matching '{glob_pattern}' was produced under {p}"
+            )
+            print_error(
+                "This usually means the build tool printed an error and exited 0 "
+                "(e.g. pio 'Python version must be between 3.10 and 3.13'). "
+                "Treating as build failure."
+            )
+            sys.exit(2)
+        return matches
+    if not p.exists():
+        print_error(
+            f"{step_name}: subprocess returned success but expected artifact "
+            f"{p} was not produced"
+        )
+        print_error(
+            "This usually means the build tool printed an error and exited 0 "
+            "(e.g. pio 'Python version must be between 3.10 and 3.13'). "
+            "Treating as build failure."
+        )
+        sys.exit(2)
+    return [p]
+
+
 def get_system_info():
     """Get system information"""
     system = platform.system()
@@ -559,6 +604,13 @@ def build_firmware(project_dir, config_file, target):
     ])
 
     run_command(cmd, cwd=project_dir, show_output=True)
+    # TASK-337: trust the filesystem, not the exit code. Some toolchain
+    # failure modes return success without producing artifacts.
+    verify_artifact_exists(
+        temp_build_dir,
+        f"arduino-cli compile [{tcfg['name']}]",
+        glob_pattern="**/*.ino.bin",
+    )
     print_success(f"Firmware build complete [{tcfg['name']}]")
 
 
@@ -635,6 +687,12 @@ def build_filesystem(project_dir, config_file, target):
     ]
 
     run_command(cmd, cwd=project_dir, show_output=True)
+    # TASK-337: explicit artifact verification. mklittlefs returning success
+    # without writing the output file would otherwise propagate as a fake build.
+    verify_artifact_exists(
+        output_file,
+        f"mklittlefs [{tcfg['name']}]",
+    )
     print_success(f"Filesystem build complete [{tcfg['name']}]")
 
 
@@ -1088,6 +1146,13 @@ def build_firmware_pio(project_dir, target):
     env_name = PIO_ENV_MAP[target]
     print_step(f"Building firmware [{tcfg['name']}] (PlatformIO)")
     run_command(["pio", "run", "-e", env_name], cwd=project_dir)
+    # TASK-337: pio's pre-flight Python version rejection prints "Python version
+    # must be between 3.10 and 3.13" but exits 0, leaving no firmware.bin behind.
+    # Verify the artifact exists rather than trusting the subprocess exit code.
+    verify_artifact_exists(
+        project_dir / ".pio" / "build" / env_name / "firmware.bin",
+        f"pio run [{tcfg['name']}]",
+    )
     print_success(f"Firmware build complete [{tcfg['name']}]")
 
 
@@ -1099,6 +1164,12 @@ def build_filesystem_pio(project_dir, target):
     # Ensure large static assets have up-to-date .gz siblings before PIO packs them.
     prepare_gzip_assets(config.DATA_DIR)
     run_command(["pio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir)
+    # TASK-337: same fail-fast pattern as build_firmware_pio. The buildfs target
+    # can also be silently skipped on toolchain misconfiguration.
+    verify_artifact_exists(
+        project_dir / ".pio" / "build" / env_name / "littlefs.bin",
+        f"pio run -t buildfs [{tcfg['name']}]",
+    )
     print_success(f"Filesystem build complete [{tcfg['name']}]")
 
 
@@ -1151,7 +1222,16 @@ def collect_pio_artifacts(project_dir, target):
     if collected:
         print_success(f"Collected {len(collected)} artifact(s)")
     else:
-        print_warning("No build artifacts found in PlatformIO output")
+        # TASK-337: a successful pio run that produced no artifacts is a
+        # build failure, not a warning. The verify_artifact_exists() calls
+        # in build_firmware_pio / build_filesystem_pio already catch this
+        # earlier; this is belt-and-suspenders for any future entry point
+        # that bypasses those.
+        print_error(
+            f"No build artifacts found in PlatformIO output for "
+            f"{tcfg['name']} (looked under {pio_build_dir})"
+        )
+        sys.exit(2)
 
     return collected
 
@@ -1673,6 +1753,12 @@ Examples:
     if not use_pio:
         cleanup_temp_directory(project_dir)
 
+    # TASK-337: reaching this line means every target produced its expected
+    # artifacts. Per-target failures (subprocess non-zero, missing artifact
+    # via verify_artifact_exists, or collect_pio_artifacts finding nothing)
+    # all call sys.exit() earlier in this loop. The success banner is therefore
+    # genuinely gated on full per-target success, not just on subprocess exit
+    # codes that some toolchains return as 0 even when nothing was built.
     print(f"\n{Colors.OKGREEN}{Colors.BOLD}")
     print("=" * 60)
     print("  Build completed successfully!")
