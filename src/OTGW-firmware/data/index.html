@@ -28,6 +28,10 @@
       })();
     </script>
     <link rel="stylesheet" type="text/css" href="./index_common.css">
+    <!-- SAT panel theme (Patch 02): loads AFTER theme stylesheet so it can
+         override the older .sat-* rules in index.css / index_dark.css until
+         those are removed in a follow-up cleanup. -->
+    <link rel="stylesheet" type="text/css" href="./sat.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="./index.js"></script>
     <script src="./graph.js"></script>
@@ -352,10 +356,12 @@
     </div>
     <div id="displaySATPage" class="page-section">
       <div class="page-nav-shell"></div>
-      <div class="sat-dashboard">
+      <!-- Patch 02: sat-dashboard kept for legacy selectors; sat-panel is the
+           wrapper class targeted by the new sat.css design system. -->
+      <div class="sat-dashboard sat-panel">
         <div class="sat-header">
-          <h2>SAT - Smart Autotune Thermostat</h2>
-          <span id="sat-status-badge" class="sat-badge sat-badge-disabled">Disabled</span>
+          <h2 class="sat-header-title">SAT - Smart Autotune Thermostat</h2>
+          <span id="sat-status-badge" class="sat-state-pill is-neutral">Disabled</span>
           <span id="sat-sim-badge" class="sat-badge sat-badge-sim" style="display:none">SIMULATION</span>
           <span class="sat-enable-toggle-wrap" title="Enable / Disable SAT">
             <label class="sat-toggle">
@@ -372,27 +378,27 @@
           <button type="button" class="sat-btn sat-settings-nav-btn" onclick="satSettingsPage()" title="SAT Settings">Settings</button>
         </div>
 
-        <!-- Temperature cards -->
-        <div class="sat-cards" data-view="simple expert diag">
-          <div class="sat-card">
-            <div class="sat-card-label">Room Temperature</div>
-            <div class="sat-card-value" id="sat-room-temp">--</div>
+        <!-- Temperature tiles (Patch 02: was sat-cards / sat-card) -->
+        <div class="sat-tiles" data-view="simple expert diag">
+          <div class="sat-tile">
+            <div class="sat-tile-label">Room Temperature</div>
+            <div class="sat-tile-value" id="sat-room-temp">--</div>
           </div>
-          <div class="sat-card sat-card-interactive">
-            <div class="sat-card-label">Target Temperature</div>
+          <div class="sat-tile is-target">
+            <div class="sat-tile-label">Target Temperature</div>
             <div class="sat-card-controls">
               <button class="sat-btn sat-btn-temp" onclick="SAT.adjustTarget(-0.5)">-</button>
-              <div class="sat-card-value" id="sat-target-temp">--</div>
+              <div class="sat-tile-value" id="sat-target-temp">--</div>
               <button class="sat-btn sat-btn-temp" onclick="SAT.adjustTarget(0.5)">+</button>
             </div>
           </div>
-          <div class="sat-card">
-            <div class="sat-card-label">Outside Temperature</div>
-            <div class="sat-card-value" id="sat-outside-temp">--</div>
+          <div class="sat-tile">
+            <div class="sat-tile-label">Outside Temperature</div>
+            <div class="sat-tile-value" id="sat-outside-temp">--</div>
           </div>
-          <div class="sat-card">
-            <div class="sat-card-label">Boiler Setpoint</div>
-            <div class="sat-card-value" id="sat-flow-temp">--</div>
+          <div class="sat-tile">
+            <div class="sat-tile-label">Boiler Setpoint</div>
+            <div class="sat-tile-value" id="sat-flow-temp">--</div>
           </div>
         </div>
 
