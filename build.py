@@ -1683,18 +1683,49 @@ def create_merged_binary(project_dir, semver, target, compress=False, include_fi
             cmd.extend(["0x8000", str(partitions)])
             print_info(f"Partitions: {partitions.name}")
 
-        # Find boot_app0.bin (arduino-cli packages or PlatformIO packages)
+        # Find boot_app0.bin. WITHOUT this entry at offset 0xe000 the otadata
+        # partition keeps whatever was there before the flash. On a board that
+        # already had OTA state, the bootloader can then boot a stale OTA slot
+        # instead of the freshly written app. Nodo-shop's tested OT-Thing
+        # release.yml relies on the same trick (see their workflow:
+        # `find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin`).
+        #
+        # PlatformIO installs packages in ~/.platformio (per-user, global) by
+        # default; the previous project-local search missed that path. Search
+        # order tries the most likely locations first.
         boot_app = None
-        for packages_dir in [project_dir / "arduino" / "packages" / "esp32",
-                             project_dir / ".platformio" / "packages"]:
-            if packages_dir.exists():
-                for ba in packages_dir.glob("**/boot_app0.bin"):
-                    boot_app = ba
-                    break
+        search_roots = [
+            Path.home() / ".platformio" / "packages" / "framework-arduinoespressif32",
+            Path.home() / ".platformio" / "packages",
+            project_dir / ".platformio" / "packages",
+            project_dir / "arduino" / "packages" / "esp32",
+            project_dir / "src" / "OTGW-firmware" / "build",  # arduino-cli legacy build dir
+        ]
+        for packages_dir in search_roots:
+            if not packages_dir.exists():
+                continue
+            for ba in packages_dir.glob("**/boot_app0.bin"):
+                boot_app = ba
+                break
             if boot_app:
                 break
+
         if boot_app:
             cmd.extend(["0xe000", str(boot_app)])
+            print_info(f"Boot app0:  {boot_app}")
+        else:
+            # Without boot_app0.bin the merged image is missing otadata, which
+            # makes a no-erase flash unreliable on boards with stale OTA state.
+            # Fail loudly instead of producing a silently-broken artifact.
+            print_error("boot_app0.bin not found in any known location.")
+            print_error("Searched:")
+            for p in search_roots:
+                print_error(f"  - {p}")
+            print_error("Without it, merged-full.bin will not boot reliably on")
+            print_error("ESP32 boards that have prior OTA state. Install PlatformIO")
+            print_error("or the Espressif Arduino core so framework-arduinoespressif32")
+            print_error("is available, then rebuild.")
+            return None
 
     # Firmware
     cmd.extend([tcfg["firmware_offset"], str(firmware_file)])
