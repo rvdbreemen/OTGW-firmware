@@ -837,6 +837,143 @@ def copy_flash_scripts(project_dir):
         print_info(f"Copied flash scripts to build/: {', '.join(copied)}")
 
 
+def create_distribution_zip(project_dir, semver, target):
+    """Create a per-target distribution zip with the merged-full bin and the
+    cross-platform flash helper scripts.
+
+    Output: build/OTGW-firmware-<target>-<semver>-flash.zip containing
+        OTGW-firmware-<target>-<semver>-merged-full.bin
+        flash_otgw.bat
+        flash_otgw.sh
+        README.txt
+
+    End users unzip, run flash_otgw.bat (Windows) or ./flash_otgw.sh
+    (Linux/macOS) and the script picks up the merged-full bin automatically.
+    """
+    tcfg = TARGETS[target]
+    build_dir = project_dir / "build"
+
+    # Locate merged-full bin produced earlier in this build run.
+    if semver and semver != "unknown":
+        merged_pattern = f"OTGW-firmware-{target}-{semver}-merged-full.bin"
+    else:
+        merged_pattern = f"OTGW-firmware-{target}-merged-full.bin"
+    merged_full = build_dir / merged_pattern
+
+    if not merged_full.exists():
+        # Be tolerant: try a glob fallback in case the version string differs
+        candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-*-merged-full.bin"))
+        if candidates:
+            merged_full = candidates[-1]
+        else:
+            print_warning(
+                f"Skipping distribution zip for {tcfg['name']}: no merged-full bin found "
+                f"(expected {merged_pattern})"
+            )
+            return None
+
+    # Locate flash helper scripts in project root.
+    flash_bat = project_dir / "flash_otgw.bat"
+    flash_sh  = project_dir / "flash_otgw.sh"
+    missing = [s.name for s in (flash_bat, flash_sh) if not s.exists()]
+    if missing:
+        print_warning(
+            f"Skipping distribution zip for {tcfg['name']}: missing flash script(s): "
+            f"{', '.join(missing)}"
+        )
+        return None
+
+    zip_name = f"OTGW-firmware-{target}-{semver}-flash.zip" if semver and semver != "unknown" \
+               else f"OTGW-firmware-{target}-flash.zip"
+    zip_path = build_dir / zip_name
+
+    print_step(f"Creating distribution zip [{tcfg['name']}]")
+    print_info(f"Zip: {zip_name}")
+    print_info(f"  + {merged_full.name}")
+    print_info(f"  + flash_otgw.bat")
+    print_info(f"  + flash_otgw.sh")
+    print_info(f"  + README.txt")
+
+    readme_text = _build_distribution_readme(target, tcfg, merged_full.name, semver)
+
+    try:
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+            # Merged full firmware: keep its name so the flash scripts find it
+            # via their *-merged-full.bin glob.
+            zf.write(merged_full, arcname=merged_full.name)
+
+            # Windows batch script: keep CRLF line endings.
+            with open(flash_bat, "rb") as f:
+                bat_bytes = f.read()
+            zf.writestr("flash_otgw.bat", bat_bytes)
+
+            # Unix shell script: force LF endings (Windows checkout may have
+            # CRLF locally) and set the executable bit on the zip entry.
+            with open(flash_sh, "rb") as f:
+                sh_bytes = f.read().replace(b"\r\n", b"\n")
+            sh_info = zipfile.ZipInfo("flash_otgw.sh")
+            sh_info.compress_type = zipfile.ZIP_DEFLATED
+            sh_info.external_attr = (0o100755 << 16)  # -rwxr-xr-x in zip metadata
+            zf.writestr(sh_info, sh_bytes)
+
+            zf.writestr("README.txt", readme_text)
+
+        size_kb = zip_path.stat().st_size / 1024
+        print_success(f"Created distribution zip: {zip_name} ({size_kb:.1f} KB)")
+        return zip_path
+
+    except Exception as e:
+        print_error(f"Failed to create distribution zip for {tcfg['name']}: {e}")
+        return None
+
+
+def _build_distribution_readme(target, tcfg, merged_filename, semver):
+    """Generate the README.txt that ships inside each distribution zip.
+
+    Kept as a separate helper so the text is easy to update without touching
+    zip-creation logic.
+    """
+    return (
+        f"OTGW-firmware {semver} - {tcfg['name']}\n"
+        f"================================================================\n"
+        f"\n"
+        f"This archive contains everything you need for an initial flash of\n"
+        f"the {tcfg['name']} board over USB. No Python required.\n"
+        f"\n"
+        f"Contents:\n"
+        f"  {merged_filename}\n"
+        f"      Factory image: bootloader + partitions + app + filesystem.\n"
+        f"      Flashed to offset 0x0; one write covers the whole device.\n"
+        f"\n"
+        f"  flash_otgw.bat\n"
+        f"      Windows flash tool. Double-click or run from cmd.exe.\n"
+        f"      Downloads Espressif's standalone esptool on first run.\n"
+        f"\n"
+        f"  flash_otgw.sh\n"
+        f"      Linux / macOS flash tool. Run with ./flash_otgw.sh in a\n"
+        f"      terminal. Downloads esptool on first run via curl or wget.\n"
+        f"\n"
+        f"How to flash:\n"
+        f"  1) Connect the {tcfg['name']} board via USB.\n"
+        f"  2) Run the flash script for your operating system:\n"
+        f"        Windows:        flash_otgw.bat\n"
+        f"        Linux / macOS:  ./flash_otgw.sh\n"
+        f"  3) Confirm the prompt (type YES). The script auto-detects the\n"
+        f"     serial port, erases the flash, and writes the firmware.\n"
+        f"  4) After flashing, the board boots into AP mode (SSID OTGW-AP).\n"
+        f"     Connect to it and configure WiFi, or browse to\n"
+        f"     http://otgw.local once the board has joined your network.\n"
+        f"\n"
+        f"OTA upgrades (existing installations):\n"
+        f"  Use the .ino.bin (firmware) and .littlefs.bin (filesystem) files\n"
+        f"  from the main release zip via the OTGW web UI's update page.\n"
+        f"  Those files are NOT bundled here; this zip is for first-time\n"
+        f"  installs and full re-flashes only.\n"
+        f"\n"
+        f"Documentation: https://github.com/rvdbreemen/OTGW-firmware\n"
+    )
+
+
 def list_build_artifacts(project_dir):
     """List all build artifacts"""
     print_step("Build artifacts")
@@ -865,6 +1002,14 @@ def list_build_artifacts(project_dir):
         for s in scripts:
             sp = build_dir / s
             print(f"  • {s} ({sp.stat().st_size} bytes)")
+
+    # Per-target distribution zips for end-user download.
+    zips = sorted(build_dir.glob("OTGW-firmware-*-flash.zip"))
+    if zips:
+        print(f"\n{Colors.BOLD}Distribution zips in {build_dir}:{Colors.ENDC}")
+        for z in zips:
+            size_kb = z.stat().st_size / 1024
+            print(f"  • {z.name} ({size_kb:.1f} KB)")
     print()
 
 
@@ -1523,8 +1668,9 @@ Examples:
   python build.py --target esp32               # ESP32 only
   python build.py --firmware                   # Build firmware only
   python build.py --filesystem                 # Build filesystem only
-  python build.py --merged                     # Build and create merged binary
-  python build.py --merged --compress          # Build and create compressed merged binary
+  python build.py                              # Default: full build, merged bins, distribution zip
+  python build.py --no-merged --no-zip         # Faster dev build: skip merged + zip steps
+  python build.py --compress                   # Also produce gzip-compressed merged-full.bin
   python build.py --clean                      # Clean build artifacts (keeps PlatformIO libdeps)
   python build.py --distclean                  # Full clean including cores/libraries cache
   python build.py --arduino-cli                # Use legacy arduino-cli backend
@@ -1574,15 +1720,43 @@ Examples:
         action="store_true",
         help="Remove build artifacts plus downloaded cores/libraries (slower)"
     )
+    # --merged is now default-on so every build produces the artifacts needed
+    # for both an initial USB flash (-merged-full.bin) and an OTA upgrade
+    # (the existing .ino.bin / .littlefs.bin). Use --no-merged for fast
+    # iterative dev builds where the merged step is unwanted.
     parser.add_argument(
         "--merged",
+        dest="merged",
         action="store_true",
-        help="Create a single merged binary containing firmware and filesystem (easier flashing)"
+        default=True,
+        help="Create merged binaries (factory + firmware-only) for each target [default]"
+    )
+    parser.add_argument(
+        "--no-merged",
+        dest="merged",
+        action="store_false",
+        help="Skip merged binary creation (faster dev builds; OTA artifacts still produced)"
     )
     parser.add_argument(
         "--compress",
         action="store_true",
         help="Compress the merged binary with gzip (requires --merged)"
+    )
+    # Distribution zip is also default-on. It packages the merged-full bin
+    # together with both flash scripts and a README.txt, ready for end-user
+    # download from a release page. --no-zip skips it for dev builds.
+    parser.add_argument(
+        "--zip",
+        dest="zip_dist",
+        action="store_true",
+        default=True,
+        help="Create per-target distribution zip with merged-full bin and flash scripts [default]"
+    )
+    parser.add_argument(
+        "--no-zip",
+        dest="zip_dist",
+        action="store_false",
+        help="Skip per-target distribution zip creation"
     )
     parser.add_argument(
         "--target",
@@ -1771,6 +1945,12 @@ Examples:
                     print_error(f"Failed to create full merged binary for {tcfg['name']}")
                     sys.exit(1)
                 print_info(f"Factory flash:   esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {full_merged.name}")
+
+        # Per-target distribution zip: bundle the merged-full bin together
+        # with the cross-platform flash scripts. Requires --merged to have
+        # produced a *-merged-full.bin earlier in this iteration.
+        if args.zip_dist and args.merged:
+            create_distribution_zip(project_dir, semver, target)
 
     # Optional sha256 manifest before listing
     if args.manifest:
