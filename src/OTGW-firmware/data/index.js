@@ -4742,16 +4742,25 @@ function refreshOTmonitor() {
           }
 
           rowDiv.appendChild(fldDiv);
-          //--- Value (Patch 03: was otmoncolumn2; bool rendering via CSS) ---
+          //--- Value cell ---
+          // TASK-435 Patch E follow-up: components.css styles the legacy
+          // <span class="state-on">/<span class="state-off"> markers via
+          // currentColor; the otmonitor.css that drove the data-state CSS
+          // dot was dropped in Patch E. Reverting the value rendering to
+          // the inline-span approach so booleans still display a solid /
+          // open square. The is-bool / data-state / is-fault classes set
+          // on the row are kept (they cost nothing and the is-fault
+          // heuristic is still useful for future styling).
           var valDiv = document.createElement("div");
           valDiv.setAttribute("class", "value otmoncolumn2");
           valDiv.setAttribute("id", "otmon_" + entry.name);
           if (entry.epoch != 0) {
-            if (isBool) valDiv.textContent = "";  // CSS dot via .otmonrow.is-bool .value
+            if (entry.value === "On") valDiv.innerHTML = "<span class='state-on'></span>";
+            else if (entry.value === "Off") valDiv.innerHTML = "<span class='state-off'></span>";
             else valDiv.textContent = entry.value;
           }
           rowDiv.appendChild(valDiv);
-          //--- Unit (Patch 03: was otmoncolumn3) ---
+          //--- Unit ---
           var unitDiv = document.createElement("div");
           unitDiv.setAttribute("class", "unit otmoncolumn3");
           unitDiv.textContent = entry.unit;
@@ -4766,8 +4775,9 @@ function refreshOTmonitor() {
             } else {
               update.parentNode.classList.remove('no-data-row');
             }
-            // Patch 03: refresh data-state on existing bool rows so the
-            // otmonitor.css colored dot tracks live polls.
+            // Refresh is-bool / data-state on existing rows so the metadata
+            // stays in sync. Visual rendering happens inside .value via
+            // the state-on / state-off span; see create path above.
             if (isBool) {
               update.parentNode.classList.add("is-bool");
               update.parentNode.setAttribute("data-state", entry.value === "On" ? "on" : "off");
@@ -4777,7 +4787,8 @@ function refreshOTmonitor() {
           var epoch = document.getElementById("otmon_epoch_" + entry.name);
           epoch.value = entry.epoch;
           if (entry.epoch != 0) {
-            if (isBool) update.textContent = "";  // CSS handles the dot
+            if (entry.value === "On") update.innerHTML = "<span class='state-on'></span>";
+            else if (entry.value === "Off") update.innerHTML = "<span class='state-off'></span>";
             else update.textContent = entry.value;
           } else {
             update.textContent = '';
