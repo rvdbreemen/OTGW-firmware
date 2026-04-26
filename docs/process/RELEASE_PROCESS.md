@@ -408,6 +408,100 @@ The README on `dev` carries a development-branch disclaimer; the README on `main
 
 ---
 
+## Prerelease variant (beta releases on dev)
+
+Prereleases ship a beta build to the GitHub releases page so users can test an upcoming line without the firmware appearing as "Latest". The flow is intentionally lightweight: no merge to main, no `_VERSION_PRERELEASE` removal, no dev disclaimer removal, no version bump in Phase 9 style.
+
+### When to use
+
+- Soaking a `-beta` line with field testers before promoting to stable.
+- Publishing a downloadable build artefact that goes with already-published beta release notes (e.g. CHANGELOG `[<version>-beta]` entry exists, just needs a tagged GitHub release).
+- Anything where you want a `-beta` tag and signed artefacts on GitHub but NOT the "Latest" badge.
+
+### Differences vs the stable Phase 0..9 flow
+
+- **No merge to main**: the prerelease is tagged on `dev` directly via `gh release create --target dev`.
+- **`_VERSION_PRERELEASE` stays uncommented**: the firmware version string keeps `-beta`.
+- **README dev disclaimer stays**: development is ongoing; the disclaimer is still accurate.
+- **CHANGELOG `[Unreleased]` is not renamed**: a `[<version>-beta]` entry was created in advance (or already exists). No migration step.
+- **GitHub release flags**: `--prerelease` sets the orange "Pre-release" badge. **Omit `--latest`** so the GitHub releases page still surfaces the most recent stable as Latest.
+
+### Phase P0: Prepare on dev
+
+- `git checkout dev`
+- `git status`: working tree clean, branch in sync with origin
+- If `version.h` or `data/version.hash` were modified by an earlier ad-hoc build, stage and commit them with `chore(build): bump build to <version>-beta+<sha>` before proceeding
+
+### Phase P1: Build and verify
+
+- `python build.py` produces firmware and filesystem images
+- Confirm the version string still contains the `-beta` suffix: `grep "_VERSION " src/OTGW-firmware/version.h`
+- Artefacts are named `OTGW-firmware-<version>-beta+<sha>.ino.bin` and `OTGW-firmware.<version>-beta+<sha>.littlefs.bin`
+
+### Phase P2: Verify documentation is current
+
+These must already exist on `dev` before creating the release, because the GitHub release body is captured at `gh release create` time:
+
+- `RELEASE_NOTES_<version>-beta.md` at the repo root
+- `RELEASE_GITHUB_<version>-beta.md` at the repo root
+- `CHANGELOG.md` has a `## [<version>-beta] - YYYY-MM-DD` entry
+- `README.md` describes the upcoming line and links to the release notes
+
+If any are missing or outdated, fix them on `dev` and push BEFORE Phase P3.
+
+### Phase P3: Create the draft prerelease
+
+Derive a short title (3 to 6 words) for the release.
+
+```bash
+gh release create v<version>-beta \
+  --target dev \
+  --prerelease \
+  --title "v<version>-beta - <Short Title>" \
+  --notes-file RELEASE_GITHUB_<version>-beta.md \
+  --draft
+```
+
+`--draft` is identical to the stable flow: artefacts are uploaded to a draft first, then the draft is published once verified.
+
+### Phase P4: Upload artefacts
+
+```bash
+gh release upload v<version>-beta build/*.ino.bin build/*.littlefs.bin --clobber
+gh release view v<version>-beta --json assets --jq '.assets[].name'
+```
+
+Confirm both `.ino.bin` and `.littlefs.bin` are listed.
+
+### Phase P5: Publish the prerelease
+
+```bash
+gh release edit v<version>-beta --draft=false
+```
+
+There is no `--latest` flag. The most recent stable release keeps the "Latest" badge; the prerelease appears in the releases list with an orange "Pre-release" tag.
+
+### Phase P6: Post-publication
+
+- Verify on github.com that the release shows as "Pre-release" (not "Latest")
+- Discord announcement is **optional** for prereleases. If you do announce, frame it as a tester invitation, not a production-ready release. The Phase 6 mandatory Discord checkpoint of the stable flow does not apply by default.
+- **No `dev` version bump.** `dev` continues with `<version>-beta` accumulating commits for the eventual stable cut.
+
+### Promotion to stable
+
+When the soak completes and the line is ready to ship stable, run the standard Phase 0..9 flow with the stable version (e.g. `/release 1.5.0`). The stable release will:
+
+- Drop `-beta` from `_VERSION_PRERELEASE`
+- Remove the dev disclaimer for the merge to main (per Phase 5.5 and the Branch disclaimer contract above)
+- Migrate any post-beta fixes from CHANGELOG `[Unreleased]` into a new `[<version>]` entry. The historical `[<version>-beta]` entry stays.
+- Tag on `main` with `--latest`
+
+### Post-publication corrections to a prerelease
+
+Same as Phase 7 of the stable flow, with one simplification: no `main` involvement since the prerelease was tagged on `dev`. Edit on `dev`, commit, push, then `gh release edit v<version>-beta --notes-file RELEASE_GITHUB_<version>-beta.md` to push the body change to GitHub.
+
+---
+
 ## Version numbering
 
 This project follows [Semantic Versioning](https://semver.org/):
