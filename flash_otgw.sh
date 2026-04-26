@@ -419,7 +419,7 @@ fi
 
 step "Running esptool write_flash..."
 "$ESPTOOL_BIN" --chip "$ESPTOOL_CHIP" $PORT_ARGS --baud "$ARG_BAUD" \
-    --before default-reset --after hard-reset \
+    --before default_reset --after hard_reset \
     write_flash $WRITE_FLAGS 0x0 "$BIN_FILE"
 
 echo

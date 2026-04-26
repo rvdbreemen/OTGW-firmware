@@ -302,7 +302,7 @@ if "%ARG_ERASE%"=="1" set "WRITE_FLAGS=-z -e"
 
 echo.
 echo [STEP] Running esptool write_flash...
-"%ESPTOOL_EXE%" --chip %ESPTOOL_CHIP% %ESPTOOL_PORT_ARGS% --baud %ARG_BAUD% --before default-reset --after hard-reset write_flash %WRITE_FLAGS% 0x0 "%BIN_FILE%"
+"%ESPTOOL_EXE%" --chip %ESPTOOL_CHIP% %ESPTOOL_PORT_ARGS% --baud %ARG_BAUD% --before default_reset --after hard_reset write_flash %WRITE_FLAGS% 0x0 "%BIN_FILE%"
 if errorlevel 1 (
     echo [ERROR] write_flash failed.
     exit /b 1
