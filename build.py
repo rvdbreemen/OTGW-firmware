@@ -91,14 +91,17 @@ TARGETS = {
         "flash_freq": "80m",
         "flash_size": "4MB",
         "firmware_offset": "0x10000",
-        "fs_offset": "0x2F0000",   # from partitions_otgw_esp32.csv (partition labeled "spiffs" for LittleFS.begin() compat)
+        "fs_offset": "0x1F0000",   # from partitions_otgw_esp32.csv ("spiffs" label = LittleFS for begin() compat)
         "fs_tool_path": "esp32/tools/mklittlefs",
         "fs_block": 4096,
         "fs_page": 256,
-        "fs_size": 1048576,       # 0x100000 = 1 MB — matches partitions_otgw_esp32.csv
-        "app_size": 3014656,      # 0x2E0000 — matches factory app slot in partitions_otgw_esp32.csv.
-                                  #  Overrides PartitionScheme=custom default of 16 MB so the
-                                  #  size check reflects reality (TASK-288).
+        "fs_size": 2097152,       # 0x200000 = 2 MB — matches partitions_otgw_esp32.csv
+        "app_size": 1966080,      # 0x1E0000 = 1.875 MB — matches factory app slot in
+                                  # partitions_otgw_esp32.csv. Overrides PartitionScheme=custom
+                                  # default of 16 MB so the size check reflects reality (TASK-288).
+                                  # Was 0x2E0000 (2.875 MB) before the 4M2M layout switch; the
+                                  # full ESP32-S3 firmware is ~1.81 MB so this leaves ~150 KB
+                                  # of headroom for future growth.
         "bootloader_offset": "0x0",  # ESP32-S3 bootloader is at 0x0 (not 0x1000)
     },
 }

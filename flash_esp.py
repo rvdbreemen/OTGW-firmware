@@ -50,7 +50,7 @@ BOARD_CONFIGS = {
         "chip": "esp32s3",
         "default_baud": 921600,
         "firmware_address": "0x10000",
-        "filesystem_address": "0x2F0000",  # from partitions_otgw_esp32.csv
+        "filesystem_address": "0x1F0000",  # from partitions_otgw_esp32.csv (4M2M layout)
         "bootloader_address": "0x0",       # ESP32-S3 bootloader is at 0x0, not 0x1000
         "partitions_address": "0x8000",
         # ESP32-S3 built-in USB-Serial/JTAG (same VID/PID as OT-Thing)
