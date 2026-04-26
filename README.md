@@ -14,8 +14,6 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 The `1.5.x` line is the long-term-support track of OTGW-firmware on the ESP8266, built on **Arduino Core 2.7.4**. Field experience of `v1.4.x` on Arduino Core 3.1.2 surfaced post-OTA reboot reliability and PROGMEM alignment classes of issue that did not appear on Core 2.7.4. The `1.5.x` LTS line gives users who prefer the proven, conservative platform a place to land.
 
-The separate ESP32 / SAT `v2.0.0` exploration on `feature-dev-2.0.0-otgw32-esp32-sat-support` continues independently and is not affected by this LTS choice.
-
 > **Status: BETA, in active development on `dev`.** Not recommended for production deployments. A stable `v1.5.0` will follow once the line has soaked in the field. Users staying on `v1.4.1` need no action; `v1.4.1` continues to be the latest stable release.
 
 Full release notes: [RELEASE_NOTES_1.5.0-beta.md](RELEASE_NOTES_1.5.0-beta.md).
