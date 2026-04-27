@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -256,7 +256,6 @@ static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 }
 
 static void sendSensorStatus() {
-  time_t now = time(nullptr);
   sendStartJsonMap(F("sensors"));
 
   // Dallas temperature sensors

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -39,11 +39,11 @@
 #define WM_NODEBUG
 #include <WiFiManager.h>        // version 2.0.4-beta
 
-// Optimize WebSocket memory usage: reduce per-client buffer from 512 to 256 bytes
-// This must be defined BEFORE including WebSocketsServer.h
-// Saves ~256 bytes per client (768 bytes with 3 clients)
-#define WEBSOCKETS_MAX_DATA_SIZE 256
-
+// WebSocket per-client buffer is 15 KiB (WebSockets library default).
+// The library defines WEBSOCKETS_MAX_DATA_SIZE unconditionally without an
+// #ifndef guard (WebSockets.h), so any pre-define here is overwritten on
+// include and only produces a "redefined" warning. To shrink the buffer
+// the library itself must be patched.
 #include <WebSocketsServer.h>   // WebSocket server for streaming OT log messages to WebUI
 
 /*

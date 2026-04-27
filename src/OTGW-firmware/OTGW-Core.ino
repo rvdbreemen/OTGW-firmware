@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3643,7 +3643,6 @@ void processPSSummary(const char *buf, int len) {
   const char *end = buf + len;
   int idx = 0;
   char fBuf[22];
-  char vBuf[12];
 
   while (p <= end && idx < tableSize) {
     const char *comma = (const char*)memchr(p, ',', end - p);
@@ -4095,8 +4094,11 @@ void processOT(const char *buf, int len, bool suppressOutput){
 
       // TASK-397 sub-trace: measure heap/time per phase so we can isolate
       // whether decode+publish or WebSocket send is the heap consumer.
+      // Locals are only consumed by the OTTRACE macro when OTPROCESS_TRACE=1.
+#if OTPROCESS_TRACE
       uint32_t _otBaselineHeap = platformFreeHeap();
       uint32_t _otPrev = micros();
+#endif
       OTTRACE("pre-decode");
 
       //next step interpret the OT protocol

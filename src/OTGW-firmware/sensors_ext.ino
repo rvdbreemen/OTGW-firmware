@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -229,7 +229,7 @@ if (settings.mqtt.bEnable) {
     sensors.requestTemperatures(); // Non-blocking: setWaitForConversion(false) in initSensors()
   }
   bool simUpdateDue = true;
-  if (state.debug.bSensorSim && simLastUpdateTime != 0 && (now - simLastUpdateTime) < SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
+  if (state.debug.bSensorSim && simLastUpdateTime != 0 && (now - simLastUpdateTime) < (time_t)SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
   {
     simUpdateDue = false;
   }

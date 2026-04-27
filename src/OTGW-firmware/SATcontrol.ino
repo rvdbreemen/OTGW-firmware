@@ -2923,7 +2923,6 @@ static void satUpdateSimulation()
   if (heating) {
     // Warmup: first 5 minutes, flow ramps from current toward setpoint at reduced rate
     if (!state.sat.bSimWarmupDone) {
-      uint32_t elapsed = now - (state.sat.iSimLastUpdateMs - (uint32_t)(dtSec * 1000.0f));
       // Check if we've been running for SAT_SIM_WARMUP_MS
       if (state.sat.fSimFlowTemp >= (targetSetpoint - 1.0f)) {
         state.sat.bSimWarmupDone = true;
