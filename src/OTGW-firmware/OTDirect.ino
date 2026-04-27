@@ -300,6 +300,17 @@ static OTFrameOverride otOverrides[] = {
 };
 static constexpr uint8_t OT_OVERRIDE_COUNT = sizeof(otOverrides) / sizeof(otOverrides[0]);
 
+// TASK-442: PIC parity for CS/C2 heartbeat-driven expiry.
+// gateway.asm CommandExpiry invalidates OverrideCH/OverrideCH2 when the
+// CS/C2 heartbeat flags have not been refreshed within ~60s. The
+// underlying intent is safety: a stale flow setpoint should not stay
+// active forever. Track last-command timestamp per command; the periodic
+// task in loopOTDirect() clears the override when stale.
+// 0 means "no active override" (skip expiry check).
+static uint32_t otCSLastCommandMs = 0;
+static uint32_t otC2LastCommandMs = 0;
+static constexpr uint32_t OT_CSC2_EXPIRY_MS = 60000;  // ~1 minute, matches PIC heartbeat window
+
 // Set an override value for a MsgID (activates repeater modification for that ID)
 static void setOverride(uint8_t msgId, uint16_t value) {
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
@@ -1704,6 +1715,18 @@ void loopOTDirect() {
     checkThermostatTimeout();
     // TASK-184: flame ratio — update every second, publish every 60s
     loopFlameRatio();
+    // TASK-442: expire CS/C2 overrides if not refreshed within heartbeat window.
+    uint32_t nowExp = millis();
+    if (otCSLastCommandMs != 0 && (uint32_t)(nowExp - otCSLastCommandMs) > OT_CSC2_EXPIRY_MS) {
+      OTDDebugTln(F("OTD: CS heartbeat expired, clearing MsgID 1 override"));
+      clearWriteOverride(1);
+      otCSLastCommandMs = 0;
+    }
+    if (otC2LastCommandMs != 0 && (uint32_t)(nowExp - otC2LastCommandMs) > OT_CSC2_EXPIRY_MS) {
+      OTDDebugTln(F("OTD: C2 heartbeat expired, clearing MsgID 8 override"));
+      clearWriteOverride(8);
+      otC2LastCommandMs = 0;
+    }
   }
 
   // Periodic state log — every 30s for diagnostics
@@ -2119,21 +2142,31 @@ void handleOTDirectCommand(const char* buf, int len) {
     float temp = atof(value);
     if (temp == 0.0f) {
       clearWriteOverride(1);
+      otCSLastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
       uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
       enqueueWriteCommand(1, f88, "CS");
+      otCSLastCommandMs = millis();  // TASK-442: refresh expiry timer
+      if (otCSLastCommandMs == 0) otCSLastCommandMs = 1;  // 0 sentinel reserved
     }
     dtostrf(temp, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
   }
-  // TC=xx.x — Constant temperature override (same MsgID 1). Value 0 clears.
+  // TC=xx.x — Constant room temperature override (MsgID 16 = TrSet, like TT=).
+  // TASK-443: was incorrectly mapped to MsgID 1 (TSet, flow/control setpoint),
+  // duplicating CS=. PIC gateway.asm distinguishes TC from CS: TC and TT are
+  // thermostat (room) setpoint overrides, CS is the flow/control setpoint.
+  // OpenTherm v4.2: MsgID 1 = TSet (control), MsgID 16 = TrSet (room).
+  // Minimal fix: route TC= to the same MsgID 16 path that TT= uses. The
+  // temporary-vs-constant distinction (PIC remote-override + auto-clear)
+  // is not modelled here; clients needing that should use PIC firmware.
   else if (cmd0 == 'T' && cmd1 == 'C') {
     float temp = atof(value);
     if (temp == 0.0f) {
-      clearWriteOverride(1);
+      clearWriteOverride(16);
     } else {
       uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
-      enqueueWriteCommand(1, f88, "TC");
+      enqueueWriteCommand(16, f88, "TC");
     }
     dtostrf(temp, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
@@ -2174,9 +2207,12 @@ void handleOTDirectCommand(const char* buf, int len) {
     float temp = atof(value);
     if (temp == 0.0f) {
       clearWriteOverride(8);
+      otC2LastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
       uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
       enqueueWriteCommand(8, f88, "C2");
+      otC2LastCommandMs = millis();  // TASK-442: refresh expiry timer
+      if (otC2LastCommandMs == 0) otC2LastCommandMs = 1;
     }
     dtostrf(temp, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
