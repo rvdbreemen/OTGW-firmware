@@ -1,3 +1,217 @@
+# OTGW-firmware: Codex Agent Instructions
+
+These instructions adapt the repository's Claude guidance for Codex agents. They are project-specific rules for this firmware repository and sit above the generic Backlog.md CLI reference below.
+
+---
+
+## Task Management
+
+Every meaningful code or documentation change should be backed by a Backlog task before implementation work starts. Use the Backlog.md CLI rules in the section below as the source of truth for reading, creating, updating, and completing tasks.
+
+Codex agents must not edit files in `backlog/tasks/` directly. Use `backlog task create`, `backlog task edit`, `backlog task <id> --plain`, and `backlog search ... --plain`. If a Backlog MCP tool is explicitly available in the current session, it may be used for the same operations, but the CLI semantics below remain authoritative.
+
+Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. A clean build is the minimum bar; the checklist covers hardware, browser, MQTT, and smoke-test expectations that compile checks do not cover.
+
+Known issue: `backlog task list` may return empty in this repository. Prefer `backlog search "<topic>" --plain` or `backlog task <id> --plain`. Read task files directly only as a read-only fallback, never to modify them.
+
+---
+
+## Design Principles
+
+- KISS: choose the simplest solution that works and explain tradeoffs when complexity is optional.
+- YAGNI: do not add behavior for hypothetical future needs.
+- Minimal change surface: keep changes small, focused, and justified by the task.
+- Comments describe the present system. Avoid defensive comments about hypothetical modes or future work; if the concern is real, create a Backlog task.
+- Fix the documentation before renaming identifiers when the identifier is still semantically correct and only the comment or docstring is stale.
+
+---
+
+## Project Overview
+
+This repository contains ESP8266 and ESP32 firmware for the NodoShop OpenTherm Gateway, including Web UI, MQTT, REST API, TCP serial bridge, Home Assistant integration, OTGW32 support, and SAT-related work.
+
+- Platform: ESP8266 (NodeMCU/Wemos D1 mini, tight RAM budget) and ESP32/OTGW32.
+- Language: Arduino C/C++ in `.ino` files, built as a single translation unit.
+- Serial: reserved for the PIC after initialization. Never write to `Serial` after OTGW init.
+- Debug: use `DebugTln()`, `DebugTf()`, and related debug helpers. They go to Telnet port 23; do not use `Serial.print()`.
+- Branches: `dev` is the 1.4.x maintenance line. `feature-dev-2.0.0-otgw32-esp32-sat-support` is the 2.0.0 ESP32/OTGW32/SAT development line. Default to the current branch and port fixes deliberately.
+
+---
+
+## Critical Coding Rules
+
+### PROGMEM strings
+
+Keep string literals in flash wherever practical:
+
+```cpp
+DebugTln(F("Message"));
+DebugTf(PSTR("Value: %d\r\n"), value);
+snprintf_P(buf, size, PSTR("fmt: %s"), str);
+```
+
+Use `strcmp_P()` and `strcasecmp_P()` with `PSTR()` for flash-resident string comparisons. Use `memcmp_P()` for binary data; do not use `strncmp_P()` or `strstr_P()` on binary payloads.
+
+### JSON
+
+Do not add ArduinoJson. This firmware builds JSON manually with `snprintf_P()` / `sendJsonMapEntry()` and parses with `parseJsonKVLine()`.
+
+### String usage
+
+Avoid Arduino `String` in hot paths, especially areas covered by ADR-004: SAT, MQTT, REST, OTGW-Core, and OTDirect. Prefer fixed buffers with `strlcpy()` and `snprintf_P()`. `String` is acceptable only in setup or one-off paths where the local pattern already allows it.
+
+### File serving
+
+Stream files instead of loading them into RAM. Files larger than roughly 2 KB should use `httpServer.streamFile()`. `index.html` is too large for `readString()` style handling.
+
+### HTTP and WebSocket
+
+Do not add HTTPS or WSS support in firmware. This project targets trusted LAN deployment; REST can sit behind an HTTPS reverse proxy, while WebSocket assumptions remain plain WS.
+
+### Architecture rules
+
+- PIC commands must go through `addOTWGcmdtoqueue()`. Do not write command bytes directly to the PIC serial path.
+- Timers should use `DECLARE_TIMER_SEC()` / `DECLARE_TIMER_MS()` plus `DUE()` from `safeTimers.h`.
+- `doBackgroundTasks()` can re-enter, including while `doAutoConfigure()` is reading files. Shared scratch state needs an explicit acquisition contract, such as the ADR-090 RAII or in-use flag pattern.
+- Prefer typed control flow with `enum class` or numeric IDs. Do not use string tokens as discriminators.
+- Frontend JavaScript must support current Chrome, Firefox, and Safari plus two versions. Check element existence, use `try/catch` around `JSON.parse`, verify `response.ok`, and attach `.catch()` to async flows.
+- Web UI assets live in `src/OTGW-firmware/data/` and ship as a LittleFS image. Use `python build.py`, not direct PlatformIO, when rebuilding firmware/filesystem artifacts.
+- The log container contract is `.ot-log-content { white-space: pre; }`; `\n` is the line separator. Prefer `textContent` over `innerHTML` for plain log text.
+
+### Naming conventions
+
+- Variables and functions: camelCase, for example `settingHostname` and `startWiFi`.
+- Constants: upper snake case, for example `CMSG_SIZE`.
+- Persistent setting globals use the `setting` prefix when following existing legacy patterns.
+
+---
+
+## Settings and State Architecture
+
+Follow ADR-051:
+
+- `OTGWSettings settings` is persistent and serialized to LittleFS.
+- `OTGWState state` is transient and must not be persisted.
+- Settings/state use two-level subsections and Hungarian prefixes: `b` for bool, `s` for char arrays, `i` for integer, and `f` for float.
+- Access should look like `settings.mqtt.sBroker` and `state.otgw.bOnline`.
+
+---
+
+## REST API
+
+- `/api/v2/` is the current API surface.
+- Dispatch lives in `kV2Routes[]` in `restAPI.ino`.
+- Use `sendApiError(httpCode, F("message"))` for REST errors.
+
+---
+
+## ADR Guidelines
+
+ADRs live in `docs/adr/`. Read relevant ADRs before architecture, NFR, API contract, dependency, build tooling, or shared pattern changes.
+
+Binding ADRs with automated gates:
+
+- ADR-004: no `String` in hot paths.
+- ADR-088: MQTT status-burst windowing and post-burst cooldown.
+- ADR-089: heap tier-machine contract.
+
+Structural and architectural ADRs reviewed during PR:
+
+- ADR-044: single point of instantiation for globals.
+- ADR-051: settings/state architecture.
+- ADR-056: protected admin endpoint security and secret-handling contract.
+- ADR-077: streaming MQTT Home Assistant discovery architecture.
+- ADR-078: MQTT sub-command dispatch tables.
+- ADR-079: per-component type headers.
+- ADR-080: binding ADR rules must have a CI gate.
+- ADR-081: merge types into `<Component>stuff.h` when both exist.
+- ADR-090: re-entrancy guard pattern for shared scratch buffers.
+
+Accepted ADRs are binding. To reverse a decision, create a superseding ADR instead of editing the accepted ADR.
+
+Create an ADR for architecture changes, new or replaced dependencies, API contract changes, and build tooling changes. Do not create ADRs for ordinary refactors, bug fixes, or small features that fit existing patterns.
+
+New pattern-level ADRs must either reference their CI gate in `evaluate.py` or `tests/`, or explicitly mark themselves guideline-level in the status line.
+
+This project also uses adr-kit. Use the repository's adr-kit workflow when authoring ADRs, follow its coding/review instructions during ADR-sensitive work, and keep ADRs in `docs/adr/ADR-XXX-title.md`. Status moves from `Proposed` to `Accepted`; accepted ADRs are immutable except through superseding ADRs.
+
+---
+
+## Build and Verification Commands
+
+Use `build.py` rather than calling PlatformIO directly:
+
+```bash
+python build.py
+python build.py --firmware
+python build.py --clean
+python evaluate.py
+python evaluate.py --quick
+```
+
+Run the smallest verification that proves the change, then broaden when the change touches shared behavior, build tooling, network services, or public APIs.
+
+---
+
+## Important Constraints
+
+- Never write to `Serial` after OTGW init; it is the PIC serial link.
+- Never flash PIC firmware over WiFi using OTmonitor; that can brick the PIC.
+- Never add HTTPS or WSS support.
+- Always use `addOTWGcmdtoqueue()` for OTGW/PIC commands.
+- Always validate buffer sizes before string operations.
+- Always call `feedWatchDog()` in long-running loops.
+
+---
+
+## Project Navigation
+
+Start with `docs/c4/c4-context.md` and `docs/c4/c4-component.md` when you do not already know the owning component.
+
+Read these before touching specific areas:
+
+| Scenario | Read before starting |
+|---|---|
+| MQTT publishing bug | `docs/c4/c4-component-integration-layer.md`, `docs/api/MQTT.md`, `docs/c4/c4-code-mqtt.md` |
+| OpenTherm message parsing | `docs/c4/c4-component-opentherm-core.md`, OpenTherm spec v4.2, `docs/c4/c4-code-otgw-core.md` |
+| Web UI bug | `docs/c4/c4-component-web-interface.md`, `docs/c4/c4-code-web-assets.md` |
+| New REST endpoint | `docs/c4/c4-component-integration-layer.md`, `docs/c4/c4-code-rest-api.md` |
+| New MQTT topic | `docs/api/MQTT.md`, `docs/c4/c4-code-mqtt.md`, relevant ADRs |
+| Settings/config change | `docs/c4/c4-component-configuration-state.md`, ADR-051, `docs/c4/c4-code-settings.md` |
+| Network/WiFi/OTA change | `docs/c4/c4-component-network.md`, `docs/c4/c4-code-network.md` |
+| SAT/BLE feature | `docs/c4/c4-component-smart-thermostat.md`, `other-projects/SAT-releases-thermo-nova/` |
+| ESP32 port/feature | `docs/c4/c4-container.md`, `other-projects/OT-Thing-OTGW32/`, relevant ADRs |
+| OpenTherm protocol/message IDs | `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md` |
+| MQTT/REST/WebSocket API change | `docs/api/MQTT.md`, `docs/api/WEBSOCKET_FLOW.md` |
+| Architecture change | `docs/c4/c4-context.md`, `docs/c4/c4-component.md`, relevant ADRs, and a new ADR if needed |
+| New dependency | Relevant ADRs, PROGMEM/RAM budget check, and a new ADR |
+
+C4 component files in `docs/c4/`:
+
+| File | Covers |
+|---|---|
+| `c4-component-opentherm-core.md` | OT protocol, OTGW-Core, OTDirect, PIC serial |
+| `c4-component-integration-layer.md` | MQTT, REST API, WebSocket, Home Assistant auto-config |
+| `c4-component-web-interface.md` | Web UI, FSexplorer, file serving |
+| `c4-component-network.md` | WiFi, Ethernet, OTA, mDNS, NTP |
+| `c4-component-smart-thermostat.md` | SAT, BLE, simulation mode |
+| `c4-component-sensors-hardware.md` | Dallas, S0 pulse counter, OLED |
+| `c4-component-configuration-state.md` | Settings persistence, `OTGWSettings`, `OTGWState` |
+
+Code-level C4 docs are also in `docs/c4/` and cover MQTT, network, OTDirect, OTGW-Core, REST API, SAT, sensors, settings, utilities, and web assets.
+
+Reference implementations in `other-projects/` are read-only references. Do not copy them verbatim:
+
+| Directory | When to read |
+|---|---|
+| `other-projects/OT-Thing-OTGW32/` | ESP32 port, OTDirect, Ethernet, BLE |
+| `other-projects/SAT-releases-thermo-nova/` | SAT subsystem and BLE protocol |
+| `other-projects/otgw-6.6/` | PIC command set and response timing |
+| `other-projects/otmonitor-6.6/` | How a mature client drives the PIC |
+
+If you cannot name the C4 component that owns the code you are about to change, stop and read `docs/c4/c4-context.md` first.
+
+---
 
 <!-- BACKLOG.MD GUIDELINES START -->
 # Instructions for the usage of Backlog.md CLI Tool
