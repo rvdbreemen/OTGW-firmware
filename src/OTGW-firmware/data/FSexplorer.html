@@ -1,7 +1,7 @@
 <!--
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -15,20 +15,22 @@
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
       <link rel="stylesheet" type="text/css" href="ds-tokens.css">
-
+      <!-- TASK-435 follow-up A: same theme model as index.html. Pre-paint
+           data-theme on <html> for the first frame; components.css carries
+           both light baseline and body.dark / [data-theme="dark"] overrides
+           so no stylesheet swap is needed. -->
       <script>
         (function() {
-          var css = "FSexplorer.css";
           try {
-            var storedTheme = localStorage.getItem('theme');
-            if (storedTheme === 'dark') {
-              css = "FSexplorer_dark.css";
-              document.documentElement.className = 'dark';
-            }
-          } catch (e) { console.error(e); }
-          document.write('<link rel="stylesheet" href="' + css + '" id="theme-style">');
+            var stored = localStorage.getItem('theme');
+            var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var isDark = (stored === 'dark') || (!stored && prefersDark);
+            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            if (isDark) document.body && document.body.classList.add('dark');
+          } catch (e) { /* ignore */ }
         })();
       </script>
+      <link rel="stylesheet" type="text/css" href="components.css">
       <title>FSexplorer ESP</title>
       <script>
          let currentPath = '/';
@@ -210,10 +212,9 @@
                          deleteCell.width = '10%';
                          deleteCell.setAttribute('nowrap', '');
 
-                         const protectedFiles = ['FSexplorer.html', 'FSexplorer.css', 'FSexplorer.png',
-                                                 'FSexplorer_dark.css',
-                                                 'index.html', 'index.js', 'index.css',
-                                                 'index_common.css', 'index_dark.css',
+                         const protectedFiles = ['FSexplorer.html', 'FSexplorer.png',
+                                                 'index.html', 'index.js',
+                                                 'index_common.css', 'components.css',
                                                  'ds-tokens.css', 'graph.js',
                                                  'favicon.ico', 'settings.png',
                                                  'inter-400.woff2', 'inter-700.woff2',

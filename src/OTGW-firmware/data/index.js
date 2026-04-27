@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3085,7 +3085,9 @@ function initMainPage() {
 
   function doThemeToggle() {
     var isDark = localStorage.getItem('theme') !== 'dark';  // toggle
-    document.getElementById('theme-style').href = isDark ? 'index_dark.css' : 'index.css';
+    // TASK-435 follow-up A: theme is now body.dark + html[data-theme] only.
+    // No legacy index.css / index_dark.css stylesheet swap; updateThemeToggle()
+    // below mirrors body.dark + data-theme onto the document.
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
     if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
       OTGraph.setTheme(isDark ? 'dark' : 'light');
@@ -5160,7 +5162,6 @@ function refreshSettings() {
                 inputEl.className = "input-changed";
               }
               if (fieldName == "darktheme") {
-                 document.getElementById('theme-style').href = this.checked ? "index_dark.css" : "index.css";
                  localStorage.setItem('theme', this.checked ? 'dark' : 'light');
                  updateThemeToggle();
               }
@@ -5421,7 +5422,6 @@ function saveSettings() {
       // Update theme immediately if darktheme setting changed
       if (field === "darktheme") {
         let isDark = fieldEl.checked;
-        document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
         updateThemeToggle();
       }
@@ -5923,7 +5923,6 @@ function applyTheme() {
         try { localTheme = localStorage.getItem('theme'); } catch(e) {}
         if (!localTheme) {
           let isDark = strToBool(data["darktheme"].value);
-          document.getElementById('theme-style').href = isDark ? "index_dark.css" : "index.css";
           try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch(e) {}
           if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
               OTGraph.setTheme(isDark ? 'dark' : 'light');

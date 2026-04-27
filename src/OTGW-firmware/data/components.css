@@ -733,3 +733,3397 @@ body.dark .settingDiv,
     transition: none !important; animation: none !important;
   }
 }
+
+
+/* ===========================================================================
+ * LEGACY MERGE — TASK-435 follow-up A
+ *
+ * Imported verbatim from the legacy stylesheets we are dropping in this same
+ * commit. Brute-copy: no dedup against the rules above, no token migration.
+ * Functional parity over elegance. A follow-up can iterate over each block,
+ * dedup the parts that components.css already covers, and rewrite hard-coded
+ * hex colours to --bg-* / --fg-* / --status-* tokens.
+ *
+ * Source files:
+ *   ./index.css            (light theme baseline + page-specific styling)
+ *   ./index_dark.css       (dark-mode body.dark / [data-theme="dark"] overrides)
+ *   ./FSexplorer.css       (file-system explorer light theme)
+ *   ./FSexplorer_dark.css  (file-system explorer dark theme)
+ *
+ * Order matters: light baselines first, then dark overrides.
+ * =========================================================================== */
+
+/* --- merged from data/index.css (legacy light theme) --------------------- */
+/*
+***************************************************************************  
+**  Program  : index.css
+**  Version  : v2.0.0-alpha
+**
+**  Copyright (c) 2021-2026 Robert van den Breemen
+**
+**  TERMS OF USE: MIT License. See bottom of file.                                                            
+***************************************************************************      
+*/
+* {
+    font-family: var(--font-sans);
+  }
+  
+  html {
+    -webkit-font-smoothing: antialiased;
+    font-family: var(--font-sans); /* was 'Dosis' — never actually loaded */
+    line-height: 1.6;
+    color: black;
+    background: #e6ffff;
+    color-scheme: light;  /* match the meta tag; native widgets render in light variant across Chrome/Edge/Safari/Firefox */
+  }
+
+  /* Standard ::placeholder has shipped in every major engine since 2017
+     (Blink, Gecko, WebKit). Older prefixed variants are not needed. */
+  ::placeholder { color: #999; opacity: 1; }
+  
+  body {
+    max-width: 100%;
+    padding-bottom: 1.5em;
+  }
+
+  table {
+    color: black;
+    border-collapse: collapse;
+    width: 90%;
+    background: lightblue;
+  }
+  
+  th {
+    white-space: nowrap;
+    border-right: 1px solid #ddd;
+    border-left: 1px solid #ddd;
+    vertical-align: bottom;
+  }
+  
+  td {
+    white-space: nowrap;
+    border-bottom: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+    border-left: 1px solid #ddd;
+    vertical-align: bottom;
+  }
+  
+  tfoot {
+    font-size: 12px;
+    color: darkblue;
+  }
+  
+  input {
+     padding-top: 3px;
+     padding-bottom: 2px;
+     font-size: 12pt;
+     /* Explicit colors override browser native rendering. Without these,
+        mobile browsers (iOS Safari and some Android Chromium) can leak
+        OS dark-mode UA styles onto the input despite our color-scheme: light
+        declaration, producing dark-on-dark text. Classes .input-normal /
+        .input-changed / .input-readonly still override via higher
+        specificity. */
+     background-color: white;
+     color: black;
+  }
+  
+  #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage, #displaySATPage {
+    max-width: 100%;
+  }
+
+  #displayPICflash div#firmwarename {
+    width: 80%;
+  }
+  
+  /*--------------------- N A V - B A R -----------------*/
+.nav-container,.footer {
+    background: #00bffe;
+    padding: 6px;
+    min-height: 50px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  
+  .footer {
+    background-color: #e6ffff;
+  }
+
+  .nav-container a:hover {
+    color: black;
+    background: skyblue; /* only for FSexplorer - Rest does not work */
+  }
+
+  .nav-left {
+    flex-basis: 10%;
+    display: flex;
+    flex-grow: 1;
+    gap: 15px;
+    flex: 2 1 0;
+    justify-content: left; /* horizonal alignment */
+    align-items: center; /* horizonal alignment */
+    min-height: 50px;
+  }
+
+
+  .nav-left .hidden {
+    display: none;
+  }
+
+  .nav-right {
+    flex-basis: 80%;
+    display: flex;
+    flex-grow: 9;
+    gap: 15px;
+    flex: 2 1 0;
+    justify-content: right; /* horizonal alignment */
+    align-items: center; /* horizonal alignment */
+    min-height: 50px;
+  }
+
+  .nav-right .adv_dropdown {
+    display: block;
+    position: absolute;
+    top: 121px;
+    right: 10px;
+    background-color: #f9f9f9;
+    min-width: 200px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 200;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    padding: 5px 0;
+  }
+
+  .nav-right .adv_dropdown.hidden {
+    display: none;
+  }
+
+  .nav-right .adv_dropdown span {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #333;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .nav-right .adv_dropdown span:last-child {
+    border-bottom: none;
+  }
+
+  .nav-right .adv_dropdown span:hover {
+    background-color: #e6f7ff;
+    color: #000;
+  } 
+  
+  .nav-item {
+    font-size: 16px;
+    height: 40px;
+    width: 110px;
+    background-color: lightblue;
+    border: none;
+    border-radius: 5px;
+    color: #505050;
+    cursor: pointer;
+    box-shadow: 2px 2px 2px 0px grey;
+  }
+  
+  .nav-item:hover {
+    color: black;
+  }
+
+  .nav-item:active {
+    transform: translate(2px, 2px);
+    box-shadow: none;
+  }
+
+  .theme-toggle-btn {
+    cursor: pointer;
+    opacity: 0.7;
+    position: relative;
+    top: 6px;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .theme-toggle-btn:hover {
+    opacity: 1;
+  }
+  @media screen and (max-width: 600px) {
+    .theme-toggle-btn {
+      position: absolute;
+      top: 8px;
+      right: 0;
+      margin: 0;
+    }
+    /* Reserve horizontal space for the absolute-positioned toggle so the
+       rightmost flex-ended .headercolumn (hostname + IP) does not flow
+       underneath the icon. Without this, on narrow viewports the toggle
+       visually overlaps the closing paren of "OTGW (IP)". */
+    .headerrow {
+      padding-right: 32px;
+    }
+  }
+
+  .nav-img {
+    height: 30px;
+    object-fit: cover;
+    cursor: pointer;
+  }
+
+  .nav-clock {
+    top: 1px;
+    color: black;
+    float: right;
+    font-size: small;
+    font-weight:bold;
+    text-align: right;
+    background: white; 
+    width: 200px; 
+    padding-right: 10px;
+    background: #e6ffff;
+  }
+
+  /*-------------------------*/
+  
+  .tabButton a:hover {
+    background-color: gray;
+  }
+  
+  
+  .header h1 span {
+    position: relative;
+    top: 1px;
+    left: 10px;
+  }
+  
+  .bottom { 
+    position: fixed;
+    font-size: small;
+    color: gray;
+    bottom:0;
+  } 
+  .right-0  {right: 0; padding-right: 10px; }
+  .left-0   {left:  0; padding-left:  10px; }
+  .ps-mode-watermark {
+    color: #9c5700 !important;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  
+  /* Version mismatch warning styling */
+  .version-warning {
+    background-color: #ff6b6b !important;
+    color: white !important;
+    font-weight: bold !important;
+    font-size: 14px !important;
+    padding: 10px 15px !important;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    z-index: 1000;
+  }
+              
+/* Graph Tab */
+.ot-graph-container {
+    width: 100%;
+    height: 600px;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+#otGraphCanvas {
+    width: 100%;
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.ot-graph-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 5px;
+}
+
+.ot-graph-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Specific button style for graph controls */
+.ot-graph-controls .nav-item {
+    height: 25px;
+    width: auto;
+    font-size: 13px;
+    margin: 0;
+    line-height: 1; /* Ensure text is vertically centered */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ot-graph-select {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: white;
+    color: black;
+}
+  
+  /* header */
+  .headerrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    padding-bottom: 5px;
+    position: relative;
+  }
+  
+  .headercolumnbig{
+    font-size: xx-large;
+    font-weight: bold;
+    flex-grow: 1;
+    white-space: nowrap;
+    margin-right: 15px;
+  }
+  
+  .headercolumn{
+    font-size: smaller;
+    white-space: nowrap;
+    margin-left: 15px;
+  }
+  
+  /* Clear floats after the columns - keeping for compatibility if any floats remain, but flex ignores this mostly */
+  .headerrow:after {
+    content: "";
+    display: table;
+    clear: both;
+  }
+
+  /* Network status icon in header */
+  .net-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: default;
+  }
+
+  .net-icon {
+    vertical-align: middle;
+    opacity: 0.85;
+    transition: opacity 0.3s ease;
+  }
+
+  .net-icon.hidden {
+    display: none;
+  }
+
+  .net-status-text {
+    font-size: 11px;
+    color: #555; /* WCAG AA on header bg; replaced opacity:0.7 which broke contrast */
+  }
+
+  .sat-weather-coords {
+    font-size: 0.85em;
+    color: #666; /* WCAG AA secondary text; replaces inline color:#888 */
+  }
+
+  .net-status.net-wifi .net-icon { color: #4caf50; }
+  .net-status.net-ethernet .net-icon { color: #2196f3; }
+  .net-status.net-ap .net-icon { color: #ff9800; }
+  .net-status.net-ap .net-status-text { color: #ff9800; font-weight: bold; }
+
+  /* Signal strength bars — inactive color (structure in index_common.css) */
+  .sig-bar { background: #ccc; }
+  /* Signal quality tiers — applied by JS setting data-quality on .net-signal-bars */
+  .net-signal-bars[data-quality="good"]   .sig-bar.active { background: var(--status-ok); }
+  .net-signal-bars[data-quality="medium"] .sig-bar.active { background: var(--status-warn); }
+  .net-signal-bars[data-quality="poor"]   .sig-bar.active { background: var(--status-error); }
+  .net-signal-bars[data-quality="none"]   .sig-bar.active { background: var(--status-neutral); }
+
+  /* PIC firmware page */
+.pictable {
+  display: table;
+  width: 100%;
+  max-width: 720px;
+  border-collapse: collapse;
+  margin: 10px 0 12px 0;
+  border: 1px solid #ddd;
+}
+.picrow {
+  display: table-row;
+  border-bottom: 1px solid #ddd;
+}
+.picrow:nth-child(even) {
+  background-color: #f9f9f9;
+}
+.piccolumn1, .piccolumn2, .piccolumn3 {
+  display: table-cell;
+  padding: 8px 15px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+.piccolumn4, .piccolumn5 {
+  display: table-cell;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  text-align: center;
+  width: 30px;
+}
+
+*[data-tooltip] {
+  position: relative;
+}
+
+*[data-tooltip]::after {
+  content: attr(data-tooltip);
+
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: auto;
+
+  pointer-events: none;
+  opacity: 0;
+  -webkit-transition: opacity .15s ease-in-out;
+  transition: opacity .15s ease-in-out;
+
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  background: #fefdcd;
+  padding: 5px 2px;
+  border: 1px solid #c0c0c0;
+  box-shadow: 2px 4px 5px rgba(0, 0, 0, 0.4);
+}
+
+*[data-tooltip]:hover::after {
+    opacity: 1;
+}
+
+/* OTmonitor */
+
+.otmontable {
+  column-width: 350px;
+  column-gap: 0;
+  width: 100%;
+}
+
+.otmonrow {
+  background: lightblue;
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  border: 1px solid white;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.otmonrow.no-data-row {
+  display: none;
+}
+.otmoncolumn1 {
+  flex: 1;
+  padding-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.otmoncolumn2 {
+  width: 60px;
+  text-align: right;
+}
+.otmoncolumn3 {
+  width: 40px;
+  margin-left: 5px;
+}
+
+.state-on, .state-off {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  vertical-align: text-bottom;
+  box-sizing: border-box;
+}
+
+.state-on {
+  background-color: currentColor;
+}
+
+.state-off {
+  background-color: transparent;
+}
+
+/* DevInfo - Table Layout */
+#deviceinfoPage {
+  display: table;
+  width: fit-content;
+  border-collapse: collapse;
+}
+
+.devinforow {
+  display: table-row;
+  background: lightblue;
+}
+
+.devinfocolumn1 {
+  display: table-cell;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 2px 5px;
+  border: 1px solid white;
+  width: 1%;
+}
+
+.devinfocolumn2 {
+  display: table-cell;
+  text-align: left;
+  padding: 2px 5px;
+  border: 1px solid white;
+}
+
+#deviceinfoCrashLog {
+  max-width: 960px;
+  margin: 0 0 14px 0;
+}
+
+.crashlog-panel {
+  background: #ffe7b3;
+  border: 1px solid #f0b74a;
+  border-left: 5px solid #d98200;
+  padding: 10px 12px;
+  color: #4a3200;
+}
+
+.crashlog-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.crashlog-intro {
+  margin-bottom: 8px;
+}
+
+.crashlog-label {
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+}
+
+.crashlog-pre {
+  margin: 0;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Responsive: Stack on small screens */
+@media (max-width: 768px) {
+  #deviceinfoPage {
+    display: block;
+    width: 100%;
+  }
+
+  .devinforow {
+    display: flex;
+    flex-direction: column;
+    padding: 5px;
+    border-bottom: 1px solid white;
+  }
+  
+  .devinfocolumn1 {
+    display: block;
+    width: auto;
+    font-weight: 600;
+    color: #004080;
+    border: none;
+    padding: 0;
+  }
+  
+  .devinfocolumn2 {
+    display: block;
+    padding-left: 10px;
+    font-size: 13px;
+    border: none;
+    padding: 0 0 0 10px;
+  }
+
+  #deviceinfoCrashLog {
+    max-width: 100%;
+  }
+}
+
+/* SettingsPage */
+#settingMessage {
+  display: none;
+  width: 860px;
+  margin-left: 10px;
+  color: white;
+  text-align: center;
+  padding: 8px;
+  border-radius: 4px;
+}
+#settingMessage.loading {
+  display: block;
+  background-color: #2196F3;
+}
+#settingMessage.error {
+  display: block;
+  background-color: coral;
+}
+
+  /* define tag selectors () -------------------------------------------------- */
+  
+  button { width: 100px; }
+  
+  .settingDiv {
+    text-align: right;
+    min-width: 850px;
+    border: thick solid lightblue;
+    background: lightblue;
+  }
+
+  /* Explicit color matches the dark theme's symmetry and prevents OS-level
+     UA text color leaking in when color-scheme: light is honored loosely
+     (mobile Safari, some Android Chromium). */
+  .input-changed { background: lightgray; color: black; }
+  .input-normal { background: white; color: black; }
+  .input-readonly { background: #f0f0f0; color: #666; }
+
+  .btn-wifi-reset {
+    margin-left: 8px;
+    padding: 4px 10px;
+    background: #e57373;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.2s;
+  }
+
+  .btn-wifi-reset:hover {
+    background: #c62828;
+  }
+
+  /*
+  ***************************************************************************
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the
+  * "Software"), to deal in the Software without restriction, including
+  * without limitation the rights to use, copy, modify, merge, publish,
+  * distribute, sublicense, and/or sell copies of the Software, and to permit
+  * persons to whom the Software is furnished to do so, subject to the
+  * following conditions:
+  *
+  * The above copyright notice and this permission notice shall be included
+  * in all copies or substantial portions of the Software.
+  *
+  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT
+  * OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+  * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  * 
+  ***************************************************************************
+  */
+/*
+***************************************************************************
+** OpenTherm Log Viewer Styles
+***************************************************************************
+*/
+
+/* Log Section Container */
+.ot-log-section {
+  margin: 20px 0;
+  padding: 15px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.ot-log-section.commands-only .ot-log-tabs,
+.ot-log-section.commands-only .ot-log-controls,
+.ot-log-section.commands-only .ot-log-container,
+.ot-log-section.commands-only .ot-log-footer,
+.ot-log-section.commands-only #Statistics,
+.ot-log-section.commands-only #Graph {
+  display: none;
+}
+
+.ot-log-section.commands-only #Log {
+  display: block;
+}
+
+/* Log Header */
+.ot-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #ddd;
+}
+
+.ot-log-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.ot-log-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* WebSocket Status Indicator */
+.ws-status {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.ws-connected {
+  background: var(--status-ok);
+  box-shadow: 0 0 8px var(--status-ok-glow);
+}
+
+.ws-disconnected {
+  background: var(--status-error);
+}
+
+.simulation-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #0a84ff;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.2), 0 0 10px rgba(10, 132, 255, 0.35);
+}
+
+.status-separator {
+  opacity: 0.6;
+}
+
+.mode-status {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.mode-gateway {
+  background: var(--status-warn);
+  box-shadow: 0 0 8px #ff9800;
+}
+
+.mode-monitor {
+  background: var(--status-info);
+  box-shadow: 0 0 8px #2196f3;
+}
+
+.mode-unknown {
+  background: var(--status-neutral);
+}
+
+/* Log Controls */
+.ot-log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.btn-log-control {
+  padding: 6px 12px;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.btn-log-control:hover {
+  background: #1976D2;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.btn-log-control:active {
+  transform: translateY(0);
+}
+
+.btn-active {
+  background: var(--status-ok);
+}
+
+.btn-active:hover {
+  background: #45a049;
+}
+
+.log-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.log-control-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.log-control-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.ot-cmd-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 16px;
+  padding: 10px 12px;
+  background: #eef6fb;
+  border: 1px solid #d3e6f5;
+  border-radius: 6px;
+}
+
+.ot-cmd-input {
+  flex: 1 1 260px;
+  min-width: 220px;
+  padding: 7px 12px;
+  border: 1px solid #b8d2e4;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.ot-cmd-status {
+  flex: 1 1 180px;
+  min-height: 18px;
+  font-size: 12px;
+  color: #4b6476;
+}
+
+/* Log Container */
+.ot-log-container {
+  background: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.ot-log-container.collapsed {
+  max-height: 200px;
+}
+
+.ot-log-container:not(.collapsed) {
+  max-height: 600px;
+}
+
+/* Log Content */
+.ot-log-content {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #d4d4d4;
+  padding: 15px;
+  overflow-y: auto;
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.4;
+  max-height: inherit;
+}
+
+@supports (scrollbar-width: thin) {
+  .ot-log-content {
+    scrollbar-width: thin;
+    scrollbar-color: #555 #1e1e1e;
+  }
+}
+
+/* Log Footer */
+.ot-log-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #e0e0e0;
+  border-radius: 0 0 4px 4px;
+  font-size: 12px;
+  color: #555;
+}
+
+.ot-log-footer span {
+  display: inline-block;
+}
+
+  /* Firmware Upgrade Progress */
+  #flashProgressSection {
+    margin-top: 12px;
+    margin-bottom: 8px;
+    padding: 0px;
+    border: none;
+    box-shadow: none;
+  }
+
+  .flashProgresBarWrapper {
+    /* remove flex display to allow container to size itself */
+    position: relative;
+    max-width: 480px; /* Limit width */
+    margin: 0; /* Align left */
+  }
+  
+  .flashProgressBarContainer {
+    width: 100%;
+    background-color: #e0e0e0;
+    height: 30px;
+    border-radius: 15px;
+    overflow: hidden;
+    position: relative; /* Context for absolute positioning of text */
+  }
+
+  #flashProgressBar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    background-color: #4CAF50; /* Green */
+    -webkit-transition: width 0.3s ease;
+    transition: width 0.3s ease;
+    will-change: width;
+    z-index: 1;
+  }
+  
+  #flashPercentageText {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #333; /* Dark text for visibility */
+    z-index: 2; /* Ensure on top of bar */
+  }
+
+
+/* Disable interaction during critical operations */
+body.disable-interaction {
+    pointer-events: none;
+    opacity: 0.6;
+    cursor: wait;
+}
+
+/* Tabs support */
+.ot-log-tabs {
+  margin-bottom: 15px;
+  border-bottom: 1px solid #ddd;
+}
+
+.tab-link {
+  background-color: inherit;
+  border: none;
+  border-bottom: 3px solid transparent;
+  outline: none;
+  cursor: pointer;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  transition: 0.3s;
+  color: #555;
+}
+
+.tab-link:hover {
+  background-color: #ddd;
+  border-radius: 4px 4px 0 0;
+}
+
+.tab-link.active {
+  color: #2196F3;
+  border-bottom: 3px solid #2196F3;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Statistics Table */
+.ot-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background-color: white;
+  table-layout: fixed;
+}
+
+.ot-stats-table th:nth-child(1) { width: 40px; }  /* Hex */
+.ot-stats-table th:nth-child(2) { width: 40px; }  /* Dec */
+.ot-stats-table th:nth-child(3) { width: 70px; }  /* Direction */
+.ot-stats-table th:nth-child(4) { width: 200px; } /* Description */
+.ot-stats-table th:nth-child(5) { width: 80px; }  /* Interval */
+.ot-stats-table th:nth-child(6) { width: auto; }  /* Value - takes remaining space */
+
+.ot-stats-table th, .ot-stats-table td {
+  text-align: left;
+  padding: 2px 8px;
+  border-bottom: 1px solid #ddd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ot-stats-table th {
+  background-color: #f2f2f2;
+  color: #333;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.ot-stats-table th:hover {
+  background-color: #e6e6e6;
+}
+
+.ot-stats-table tr:hover {
+  background-color: #f5f5f5;
+}
+
+.ot-stats-container {
+  overflow-x: auto;
+  max-height: 600px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+}
+
+/* Utility classes for common inline styles */
+.hidden { display: none !important; }
+.visible { display: block !important; }
+
+.page-section {
+  display: none;
+}
+
+.page-section.active {
+  display: block;
+}
+
+.firmware-info-div {
+  margin-bottom: 12px;
+  padding: 10px;
+  max-width: 720px;
+}
+
+.fs-mismatch-banner {
+  padding: 10px 16px;
+  background-color: #c62828;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+}
+.fs-mismatch-banner a {
+  color: #ffcdd2;
+  text-decoration: underline;
+}
+
+.pic-update-banner {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  max-width: 720px;
+}
+.pic-update-banner.checking {
+  color: #888;
+}
+.pic-update-banner.update-available {
+  background-color: #e65c00;
+  color: white;
+  font-weight: bold;
+}
+.pic-update-banner.up-to-date {
+  background-color: #2e7d32;
+  color: white;
+}
+.pic-version-outdated {
+  color: #e65c00;
+  font-weight: bold;
+}
+
+.firmware-row-bold {
+  font-weight: bold;
+}
+
+.firmware-icon {
+  width: 16px;
+  height: auto;
+}
+
+.firmware-progress {
+  display: block;
+}
+
+.otmonrow.hidden-row {
+  display: none !important;
+}
+
+.waiting-error {
+  color: red;
+}
+
+/* Dallas Sensor Label Edit Icon */
+.sensor-edit-icon {
+  font-size: 0.85em;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+.otmoncolumn1.editable-label {
+  cursor: pointer;
+}
+
+.sensor-label-inline-editor {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  max-width: 220px;
+  font: inherit;
+  line-height: normal;
+  padding: 0 6px;
+  margin: 0;
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: #212529;
+  background: #fff;
+  outline: 1px solid #007bff;
+  outline-offset: -1px;
+  border: none;
+}
+
+
+/* --- Gateway Settings panel (PR= polled values on PIC firmware page) --- */
+.pic-settings-section {
+  max-width: 720px;
+  margin: 18px 0 0 0;
+}
+.pic-settings-section-heading {
+  font-size: 1em;
+  font-weight: bold;
+  margin: 0 0 6px 0;
+  padding: 6px 10px;
+  background-color: #e8e8e8;
+  border: 1px solid #ddd;
+  border-radius: 3px 3px 0 0;
+}
+.pic-settings-group-cell {
+  display: table-cell;
+  padding: 5px 15px;
+  font-style: italic;
+  color: #666;
+  font-size: 0.9em;
+  border: none;
+  background: transparent;
+}
+.pic-val-live {
+  color: #388e3c;
+  font-weight: 500;
+}
+.pic-val-cached {
+  color: #e65100;
+}
+.pic-val-unknown {
+  color: #aaa;
+  font-style: italic;
+}
+.pic-settings-refresh {
+  margin-top: 8px;
+  font-size: 0.85em;
+  color: #666;
+}
+.pic-settings-refresh button {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+/* ==================== SAT Theme (Light) ==================== */
+#displaySATPage {
+  max-width: 100%;
+}
+.sat-card {
+  background: #e0f2f1;
+  border: 1px solid #b2dfdb;
+}
+.sat-card-label {
+  color: #555;
+}
+.sat-card-value {
+  color: #00695c;
+}
+.sat-section {
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 12px;
+}
+.sat-section h3 {
+  color: #00796b;
+}
+.sat-label {
+  color: #444;
+}
+.sat-value {
+  color: #222;
+}
+.sat-grid {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+.sat-row {
+  display: table-row;
+}
+.sat-row .sat-label,
+.sat-row .sat-value {
+  display: table-cell;
+  padding: 3px 8px 3px 0;
+  vertical-align: top;
+}
+.sat-row .sat-label {
+  white-space: nowrap;
+  font-weight: 500;
+  width: 1%;
+  padding-right: 16px;
+}
+.sat-badge-active {
+  background: #c8e6c9;
+  color: #2e7d32;
+}
+.sat-badge-idle {
+  background: #fff9c4;
+  color: #f57f17;
+}
+.sat-badge-disabled {
+  background: #e0e0e0;
+  color: #757575;
+}
+.sat-badge-error {
+  background: #ffcdd2;
+  color: #c62828;
+}
+.sat-badge-sim {
+  background: #e1bee7;
+  color: #6a1b9a;
+}
+
+/* SAT View Selector */
+#sat-view-selector {
+  margin-left: auto;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 0.9em;
+  color: #333;
+}
+
+/* SAT View Visibility */
+.sat-dashboard.sat-view-simple .sat-section[data-view]:not([data-view*="simple"]),
+.sat-dashboard.sat-view-simple .sat-cards[data-view]:not([data-view*="simple"]) { display: none; }
+.sat-dashboard.sat-view-expert .sat-section[data-view]:not([data-view*="expert"]),
+.sat-dashboard.sat-view-expert .sat-cards[data-view]:not([data-view*="expert"]) { display: none; }
+.sat-dashboard.sat-view-diag .sat-section[data-view]:not([data-view*="diag"]),
+.sat-dashboard.sat-view-diag .sat-cards[data-view]:not([data-view*="diag"]) { display: none; }
+
+/* SAT Simple View Enhancements */
+.sat-view-simple .sat-card-value { font-size: 2rem; }
+.sat-view-simple .sat-cards { justify-content: center; }
+
+/* SAT Simple Status Summary */
+.sat-simple-status {
+  text-align: center;
+  font-size: 1.3rem;
+  padding: 12px;
+  color: #666;
+  font-weight: 500;
+}
+.sat-view-simple .sat-simple-status.heating { color: #e67e22; }
+.sat-view-simple .sat-simple-status.error { color: #e74c3c; }
+
+/* SAT Diagnostics */
+.sat-health-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0; }
+.sat-health-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
+.sat-health-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; background: #999; }
+.sat-health-ok { background: var(--status-ok); }
+.sat-health-problem { background: var(--status-error); }
+.sat-raw-data { background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+.sat-collapsible { cursor: pointer; }
+.sat-collapsible:hover { opacity: 0.8; }
+
+
+/* SAT Settings Groups (light theme) */
+.sat-settings-group-header {
+  background: #e0f2f1;
+  color: #004d40;
+  border-bottom: 1px solid #b2dfdb;
+}
+.sat-settings-group-header:hover {
+  background: #b2dfdb;
+}
+.sat-settings-group-body {
+  background: #fafafa;
+  border: 1px solid #b2dfdb;
+  border-top: none;
+}
+
+
+/* --- merged from data/FSexplorer.css (legacy light theme) ---------------- */
+
+/*
+***************************************************************************  
+**  Program  : FSexplorer.html
+**  Version  : v2.0.0-alpha
+***************************************************************************
+*/
+:root {
+    --primary-color: #0088cc; /* A slightly darker blue than #00bffe for better text contrast */
+    --primary-hover: #0077b3;
+    --bg-color: #e6ffff;      /* Matching index.css background */
+    --card-bg: #ffffff;
+    --text-color: #333;
+    --border-radius: 8px;
+    --shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+h2 {
+    color: #2c3e50;
+    text-shadow: none;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Layout Containers */
+/* Constrain width of main content area to prevent 100% width on large screens */
+body > div, body > fieldset, body > .system-actions {
+    width: 100%;
+    max-width: 800px;
+}
+
+/* File List Styling */
+main {
+    width: 100%;
+    overflow-x: auto;
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+table {
+    width: 100% !important; /* Override inline 90% */
+    border-collapse: collapse;
+    margin: 0;
+}
+
+tr {
+    border-bottom: 1px solid #eee;
+}
+
+tr:last-child {
+    border-bottom: none;
+}
+
+tr:nth-child(even) { background: #f0fbff; } /* Very faint blue */
+tr:nth-child(odd) { background: #ffffff; }
+
+td {
+    padding: 12px 8px;
+    text-align: left;
+    white-space: nowrap;
+    border: none;
+    width: auto !important; /* Critical: Overrides inline width attributes to fix column sizes */
+}
+
+/* Override 5th column background from original CSS */
+td:nth-child(n+5) {
+    background: transparent;
+}
+
+/* Links */
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    -webkit-transition: color 0.2s;
+    transition: color 0.2s;
+}
+a:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
+a.delete-link {
+    color: #dc3545; /* Danger Red */
+}
+a.delete-link:hover {
+    color: #c82333;
+    text-decoration: underline;
+}
+
+/* Upload Section */
+fieldset.upload-box {
+    background-color: var(--card-bg);
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 25px;
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+legend {
+    font-weight: 600;
+    font-size: 1.1em;
+    padding: 0 10px;
+    color: var(--primary-color);
+}
+
+form[action="/upload"] {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* System Actions Section */
+.system-actions {
+    background-color: var(--card-bg);
+    padding: 25px;
+    border-radius: var(--border-radius);
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    box-sizing: border-box;
+    /* Ensure it behaves like the fieldset */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.system-actions h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: var(--primary-color);
+    border-bottom: 2px solid #e0f7fa; /* Light cyan border to match theme */
+    padding-bottom: 15px;
+    width: 100%;
+}
+
+/* Form Elements */
+input[type="file"] {
+    display: block;
+    width: 100%;
+    max-width: 500px;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: #f8f9fa;
+    border: 2px dashed #ced4da;
+    border-radius: var(--border-radius);
+    box-sizing: border-box;
+    cursor: pointer;
+    text-align: center;
+}
+input[type="file"]:hover {
+    border-color: var(--primary-color);
+    background: #e9ecef;
+}
+
+progress {
+    width: 100% !important;
+    max-width: 500px;
+    height: 20px;
+    margin-bottom: 20px;
+    accent-color: var(--primary-color);
+}
+
+fileSize {
+    display: block;
+    margin-top: 10px;
+    min-height: 1.2em;
+    text-align: center;
+    width: 100%;
+}
+fileSize p {
+    margin: 5px 0;
+}
+
+.button-row {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+/* Button Styling System-wide */
+input[type="submit"], input[type="button"], .button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    -webkit-transition: all 0.2s ease;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    height: auto;
+    width: auto;
+    min-width: 140px;
+    margin: 0;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+input[type="submit"]:hover, input[type="button"]:hover, .button:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+input[type="submit"]:active, input[type="button"]:active, .button:active {
+    transform: translateY(0);
+}
+
+input[type="submit"]:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Action Specific Colors */
+form[action='/ReBoot'] input { background-color: #6c757d; }
+form[action='/ReBoot'] input:hover { background-color: #5a6268; }
+
+form[action='/ResetWireless'] input { background-color: #ffc107; color: #000; }
+form[action='/ResetWireless'] input:hover { background-color: #e0a800; }
+
+form[action='/'] input { background-color: #dc3545; }
+form[action='/'] input:hover { background-color: #c82333; }
+
+/* Hide HR as we use cards now */
+hr {
+    display: none;
+}
+
+/* Footer links */
+#left {
+    margin-top: 40px;
+    text-align: center;
+    font-size: 0.85em;
+    color: #888;
+    width: 100%;
+}
+#left a {
+    color: #888;
+    text-decoration: none;
+    margin: 0 5px;
+}
+#left a:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+/* Note style if it appears */
+.note {
+	background-color: #ffccbc;
+    color: #d84315;
+	padding: 10px;
+	margin-top: 1em;
+	text-align: center;
+	border-radius: var(--border-radius);
+    max-width: 100%;
+}
+
+/* Highlighting styles from original JS */
+tr[style*="background-color"] {
+    background-color: #d4edda !important;
+}
+
+/* Hide firmware update button on touch devices (phones and tablets).
+   pointer:coarse = finger/stylus input; hover:none = no mouse hover capability.
+   This is more reliable than screen width, which can misfire on resized desktop windows. */
+@media (pointer: coarse) and (hover: none) {
+    .desktop-only {
+        display: none;
+    }
+}
+
+
+
+/* --- merged from data/index_dark.css (legacy dark overrides) ------------- */
+
+/*
+***************************************************************************  
+**  Program  : index_dark.css
+**  Version  : v2.0.0-alpha
+**
+**  Copyright (c) 2021-2026 Robert van den Breemen
+**
+**  TERMS OF USE: MIT License. See bottom of file.                                                            
+***************************************************************************      
+*/
+* {
+    font-family: var(--font-sans);
+  }
+  
+  html {
+    -webkit-font-smoothing: antialiased;
+    font-family: var(--font-sans); /* was 'Dosis' — never actually loaded */
+    line-height: 1.6;
+    color: #e0e0e0;
+    background: #1a1a1a;
+    /* color-scheme tells modern browsers to render native widgets (number
+       spinners, autofill UI, focus rings, dropdowns) in their dark variant.
+       Supported: Chrome 81+, Firefox 96+, Safari 13+, Edge 81+. Covered by
+       the <meta name="color-scheme"> tag during initial render, and by this
+       rule once CSS parses. */
+    color-scheme: dark;
+    /* scrollbar-color: honored by Firefox 64+, Chrome 121+ (Jan 2024), and
+       Safari 18+ (Sep 2024). Older Blink/WebKit needs the ::-webkit-scrollbar
+       fallbacks further down. */
+    scrollbar-color: #555 #2c2c2e;
+  }
+
+  /* Standard ::placeholder has shipped in Chrome 57+ (2017), Firefox 51+
+     (2017), Safari 10.1+ (2017), Edge 79+ (2020). All older vendor-prefixed
+     variants are obsolete and omitted intentionally. opacity:1 overrides
+     the Firefox default of 0.54 that dims placeholders by default. */
+  ::placeholder { color: #888; opacity: 1; }
+
+  /* ::-webkit-scrollbar fallbacks for Blink < 121 and WebKit < 18 which do
+     not honor scrollbar-color. Safe to keep even once those versions
+     disappear: modern engines that honor scrollbar-color simply ignore
+     these. Does not affect Firefox. */
+  ::-webkit-scrollbar              { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track        { background: #2c2c2e; }
+  ::-webkit-scrollbar-thumb        { background: #555; border-radius: 6px; border: 2px solid #2c2c2e; }
+  ::-webkit-scrollbar-thumb:hover  { background: #6a6a6c; }
+  ::-webkit-scrollbar-corner       { background: #2c2c2e; }
+  
+  body {
+    max-width: 100%;
+    padding-bottom: 1.5em;
+  }
+
+  table {
+    color: #e0e0e0;
+    border-collapse: collapse;
+    width: 90%;
+    background: #2c2c2e;
+  }
+  
+  th {
+    white-space: nowrap;
+    border-right: 1px solid #444;
+    border-left: 1px solid #444;
+    vertical-align: bottom;
+  }
+  
+  td {
+    white-space: nowrap;
+    border-bottom: 1px solid #444;
+    border-right: 1px solid #444;
+    border-left: 1px solid #444;
+    vertical-align: bottom;
+  }
+  
+  tfoot {
+    font-size: 12px;
+    color: #6ab0ff;
+  }
+  
+  input {
+     padding-top: 3px;
+     padding-bottom: 2px;
+     font-size: 12pt;
+  }
+  
+  #displayMainPage, #displayPICflash, #displayDeviceInfo, #displaySettingsPage, #displaySATPage {
+    max-width: 100%;
+  }
+
+  #displayPICflash div#firmwarename {
+    width: 80%;
+  }
+  
+  /*--------------------- N A V - B A R -----------------*/
+.nav-container,.footer {
+    background: #383838;
+    padding: 6px;
+    min-height: 50px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  
+  .footer {
+    background-color: #1a1a1a;
+  }
+
+  .nav-container a:hover {
+    color: #e0e0e0;
+    background: #3a3a3c; /* only for FSexplorer - Rest does not work */
+  }
+
+  .nav-left {
+    flex-basis: 10%;
+    display: flex;
+    flex-grow: 1;
+    gap: 15px;
+    flex: 2 1 0;
+    justify-content: left; /* horizonal alignment */
+    align-items: center; /* horizonal alignment */
+    min-height: 50px;
+  }
+
+
+  .nav-left .hidden {
+    display: none;
+  }
+
+  .nav-right {
+    flex-basis: 80%;
+    display: flex;
+    flex-grow: 9;
+    gap: 15px;
+    flex: 2 1 0;
+    justify-content: right; /* horizonal alignment */
+    align-items: center; /* horizonal alignment */
+    min-height: 50px;
+  }
+
+  .nav-right .adv_dropdown {
+    display: block;
+    position: absolute;
+    top: 121px;
+    right: 10px;
+    background-color: #2c2c2e;
+    min-width: 200px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+    z-index: 200;
+    border-radius: 8px;
+    border: 1px solid #444;
+    padding: 5px 0;
+  }
+
+  .nav-right .adv_dropdown.hidden {
+    display: none;
+  }
+
+  .nav-right .adv_dropdown span {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #e0e0e0;
+    cursor: pointer;
+    border-bottom: 1px solid #444;
+  }
+  
+  .nav-right .adv_dropdown span:last-child {
+    border-bottom: none;
+  }
+
+  .nav-right .adv_dropdown span:hover {
+    background-color: #3a3a3c;
+    color: #fff;
+  } 
+  
+  .nav-item {
+    font-size: 16px;
+    height: 40px;
+    width: 110px;
+    background-color: #4e4e4e;
+    border: none;
+    border-radius: 5px;
+    color: #c8c8c8;
+    cursor: pointer;
+    box-shadow: 2px 2px 2px 0px #000;
+  }
+  
+  .nav-item:hover {
+    color: #e0e0e0;
+  }
+
+  .nav-item:active {
+    transform: translate(2px, 2px);
+    box-shadow: none;
+  }
+
+  .theme-toggle-btn {
+    cursor: pointer;
+    opacity: 0.7;
+    position: relative;
+    top: 6px;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .theme-toggle-btn:hover {
+    opacity: 1;
+  }
+  @media screen and (max-width: 600px) {
+    .theme-toggle-btn {
+      position: absolute;
+      top: 8px;
+      right: 0;
+      margin: 0;
+    }
+    /* Mirrors index.css: reserve 32px for the absolute-positioned toggle so
+       the rightmost .headercolumn (hostname + IP) does not flow under it on
+       narrow viewports. */
+    .headerrow {
+      padding-right: 32px;
+    }
+  }
+
+  .nav-img {
+    height: 30px;
+    object-fit: cover;
+    cursor: pointer;
+    filter: invert(1);
+  }
+
+  .nav-clock {
+    top: 1px;
+    color: #e0e0e0;
+    float: right;
+    font-size: small;
+    font-weight:bold;
+    text-align: right;
+    background: #1a1a1a; 
+    width: 200px; 
+    padding-right: 10px;
+  }
+
+  /*-------------------------*/
+  
+  .tabButton a:hover {
+    background-color: #555;
+  }
+  
+  
+  .header h1 span {
+    position: relative;
+    top: 1px;
+    left: 10px;
+  }
+  
+  .bottom { 
+    position: fixed;
+    font-size: small;
+    color: #888;
+    bottom:0;
+  } 
+  .right-0  {right: 0; padding-right: 10px; }
+  .left-0   {left:  0; padding-left:  10px; }
+  .ps-mode-watermark {
+    color: #f0b35d !important;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  
+  /* Version mismatch warning styling */
+  .version-warning {
+    background-color: #ff6b6b !important;
+    color: white !important;
+    font-weight: bold !important;
+    font-size: 14px !important;
+    padding: 10px 15px !important;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    z-index: 1000;
+  }
+              
+/* Graph Tab */
+.ot-graph-container {
+    width: 100%;
+    height: 600px;
+    background-color: #2c2c2e;
+    border: 1px solid #444;
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+#otGraphCanvas {
+    width: 100%;
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.ot-graph-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 5px;
+}
+
+.ot-graph-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Specific button style for graph controls */
+.ot-graph-controls .nav-item {
+    height: 25px;
+    width: auto;
+    font-size: 13px;
+    margin: 0;
+    line-height: 1; /* Ensure text is vertically centered */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ot-graph-select {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background-color: #2c2c2e;
+    color: #e0e0e0;
+}
+  
+  /* header */
+  .headerrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    padding-bottom: 5px;
+    position: relative;
+  }
+  
+  .headercolumnbig{
+    font-size: xx-large;
+    font-weight: bold;
+    flex-grow: 1;
+    white-space: nowrap;
+    margin-right: 15px;
+  }
+  
+  .headercolumn{
+    font-size: smaller;
+    white-space: nowrap;
+    margin-left: 15px;
+  }
+  
+  /* Clear floats after the columns - keeping for compatibility if any floats remain, but flex ignores this mostly */
+  .headerrow:after {
+    content: "";
+    display: table;
+    clear: both;
+  }
+
+  /* Network status icon in header */
+  .net-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: default;
+  }
+
+  .net-icon {
+    vertical-align: middle;
+    opacity: 0.85;
+    transition: opacity 0.3s ease;
+  }
+
+  .net-icon.hidden {
+    display: none;
+  }
+
+  .net-status-text {
+    font-size: 11px;
+    color: #c0c0c0; /* WCAG AA on dark header bg; replaced opacity:0.7 which dropped to ~4.0:1 */
+  }
+
+  .sat-weather-coords {
+    font-size: 0.85em;
+    color: #999; /* WCAG AA secondary text on dark theme */
+  }
+
+  .net-status.net-wifi .net-icon { color: #66bb6a; }
+  .net-status.net-ethernet .net-icon { color: #42a5f5; }
+  .net-status.net-ap .net-icon { color: #ffb74d; }
+  .net-status.net-ap .net-status-text { color: #ffb74d; font-weight: bold; }
+
+  /* Signal strength bars — dark theme overrides */
+  .sig-bar { background: #444; }
+  .net-signal-bars[data-quality="good"]   .sig-bar.active { background: #66bb6a; }
+  .net-signal-bars[data-quality="medium"] .sig-bar.active { background: #ffb74d; }
+  .net-signal-bars[data-quality="poor"]   .sig-bar.active { background: #ef5350; }
+  .net-signal-bars[data-quality="none"]   .sig-bar.active { background: #757575; }
+
+  /* PIC firmware page */
+.pictable {
+  display: table;
+  width: 100%;
+  max-width: 720px;
+  border-collapse: collapse;
+  margin: 10px 0 12px 0;
+  border: 1px solid #444;
+}
+.picrow {
+  display: table-row;
+  border-bottom: 1px solid #444;
+}
+.picrow:nth-child(even) {
+  background-color: #3a3a3c;
+}
+.piccolumn1, .piccolumn2, .piccolumn3 {
+  display: table-cell;
+  padding: 8px 15px;
+  border: 1px solid #444;
+  text-align: left;
+}
+.piccolumn4, .piccolumn5 {
+  display: table-cell;
+  padding: 8px 10px;
+  border: 1px solid #444;
+  text-align: center;
+  width: 30px;
+}
+
+*[data-tooltip] {
+  position: relative;
+}
+
+*[data-tooltip]::after {
+  content: attr(data-tooltip);
+
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: auto;
+
+  pointer-events: none;
+  opacity: 0;
+  -webkit-transition: opacity .15s ease-in-out;
+  transition: opacity .15s ease-in-out;
+
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  background: #3a3a3c;
+  padding: 5px 2px;
+  border: 1px solid #555;
+  box-shadow: 2px 4px 5px rgba(0, 0, 0, 0.6);
+  color: #e0e0e0;
+}
+
+*[data-tooltip]:hover::after {
+    opacity: 1;
+}
+
+/* OTmonitor */
+
+.otmontable {
+  column-width: 350px;
+  column-gap: 0;
+  width: 100%;
+}
+
+.otmonrow {
+  background: #2c2c2e;
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  border: 1px solid #1a1a1a;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.otmonrow.no-data-row {
+  display: none;
+}
+.otmoncolumn1 {
+  flex: 1;
+  padding-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.otmoncolumn2 {
+  width: 60px;
+  text-align: right;
+}
+.otmoncolumn3 {
+  width: 40px;
+  margin-left: 5px;
+}
+
+.state-on, .state-off {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  vertical-align: text-bottom;
+  box-sizing: border-box;
+}
+
+.state-on {
+  background-color: currentColor;
+}
+
+.state-off {
+  background-color: transparent;
+}
+
+/* DevInfo - Table Layout */
+#deviceinfoPage {
+  display: table;
+  width: fit-content;
+  border-collapse: collapse;
+}
+
+.devinforow {
+  display: table-row;
+  background: #2c2c2e;
+}
+
+.devinfocolumn1 {
+  display: table-cell;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 2px 5px;
+  border: 1px solid #1a1a1a;
+  width: 1%;
+}
+
+.devinfocolumn2 {
+  display: table-cell;
+  text-align: left;
+  padding: 2px 5px;
+  border: 1px solid #1a1a1a;
+}
+
+#deviceinfoCrashLog {
+  max-width: 960px;
+  margin: 0 0 14px 0;
+}
+
+.crashlog-panel {
+  background: #463318;
+  border: 1px solid #7c5a20;
+  border-left: 5px solid #ffae42;
+  padding: 10px 12px;
+  color: #f7ddb2;
+}
+
+.crashlog-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.crashlog-intro {
+  margin-bottom: 8px;
+}
+
+.crashlog-label {
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+}
+
+.crashlog-pre {
+  margin: 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Responsive: Stack on small screens */
+@media (max-width: 768px) {
+  #deviceinfoPage {
+    display: block;
+    width: 100%;
+  }
+
+  .devinforow {
+    display: flex;
+    flex-direction: column;
+    padding: 5px;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  
+  .devinfocolumn1 {
+    display: block;
+    width: auto;
+    font-weight: 600;
+    color: #6ab0ff;
+    border: none;
+    padding: 0;
+  }
+  
+  .devinfocolumn2 {
+    display: block;
+    padding-left: 10px;
+    font-size: 13px;
+    border: none;
+    padding: 0 0 0 10px;
+  }
+
+  #deviceinfoCrashLog {
+    max-width: 100%;
+  }
+}
+
+/* SettingsPage */
+#settingMessage {
+  display: none;
+  width: 860px;
+  margin-left: 10px;
+  color: white;
+  text-align: center;
+  padding: 8px;
+  border-radius: 4px;
+}
+#settingMessage.loading {
+  display: block;
+  background-color: #1565C0;
+}
+#settingMessage.error {
+  display: block;
+  background-color: #d35400;
+}
+
+  /* define tag selectors () -------------------------------------------------- */
+  
+  button { width: 100px; }
+  
+  .settingDiv {
+    text-align: right;
+    min-width: 850px;
+    border: thick solid #2c2c2e;
+    background: #2c2c2e;
+  }
+
+  .input-changed { background: #5a4a1a; color: #ffe0b2; }
+  .input-normal { background: #2c2c2e; color: #e0e0e0; }
+  .input-readonly { background: #1c1c1e; color: #888; }
+
+  .btn-wifi-reset {
+    margin-left: 8px;
+    padding: 4px 10px;
+    background: #b71c1c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.2s;
+  }
+
+  .btn-wifi-reset:hover {
+    background: #e53935;
+  }
+
+  /*
+  ***************************************************************************
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+  * copy of this software and associated documentation files (the
+  * "Software"), to deal in the Software without restriction, including
+  * without limitation the rights to use, copy, modify, merge, publish,
+  * distribute, sublicense, and/or sell copies of the Software, and to permit
+  * persons to whom the Software is furnished to do so, subject to the
+  * following conditions:
+  *
+  * The above copyright notice and this permission notice shall be included
+  * in all copies or substantial portions of the Software.
+  *
+  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT
+  * OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+  * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  * 
+  ***************************************************************************
+  */
+/*
+***************************************************************************
+** OpenTherm Log Viewer Styles
+***************************************************************************
+*/
+
+/* Log Section Container */
+.ot-log-section {
+  margin: 20px 0;
+  padding: 15px;
+  background: #2c2c2e;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.ot-log-section.commands-only .ot-log-tabs,
+.ot-log-section.commands-only .ot-log-controls,
+.ot-log-section.commands-only .ot-log-container,
+.ot-log-section.commands-only .ot-log-footer,
+.ot-log-section.commands-only #Statistics,
+.ot-log-section.commands-only #Graph {
+  display: none;
+}
+
+.ot-log-section.commands-only #Log {
+  display: block;
+}
+
+/* Log Header */
+.ot-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #444;
+}
+
+.ot-log-header h3 {
+  margin: 0;
+  color: #e0e0e0;
+  font-size: 18px;
+}
+
+.ot-log-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* WebSocket Status Indicator */
+.ws-status {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.ws-connected {
+  background: var(--status-ok);
+  box-shadow: 0 0 8px var(--status-ok-glow);
+}
+
+.ws-disconnected {
+  background: var(--status-error);
+}
+
+.simulation-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #3b9dff;
+  color: #04111f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(59, 157, 255, 0.28), 0 0 12px rgba(59, 157, 255, 0.3);
+}
+
+.status-separator {
+  opacity: 0.6;
+}
+
+.mode-status {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.mode-gateway {
+  background: var(--status-warn);
+  box-shadow: 0 0 8px #ff9800;
+}
+
+.mode-monitor {
+  background: var(--status-info);
+  box-shadow: 0 0 8px #2196f3;
+}
+
+.mode-unknown {
+  background: var(--status-neutral);
+}
+
+/* Log Controls */
+.ot-log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.btn-log-control {
+  padding: 6px 12px;
+  background: #3a3a3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.btn-log-control:hover {
+  background: #4a4a4c;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.btn-log-control:active {
+  transform: translateY(0);
+}
+
+.btn-active {
+  background: var(--status-ok);
+}
+
+.btn-active:hover {
+  background: #45a049;
+}
+
+.log-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px 12px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 13px;
+  background-color: #2c2c2e;
+  color: #e0e0e0;
+}
+
+.log-control-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.log-control-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.ot-cmd-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 16px;
+  padding: 10px 12px;
+  background: #252629;
+  border: 1px solid #3a3a3c;
+  border-radius: 6px;
+}
+
+.ot-cmd-input {
+  flex: 1 1 260px;
+  min-width: 220px;
+  padding: 7px 12px;
+  border: 1px solid #4a4a4c;
+  border-radius: 4px;
+  font-size: 13px;
+  background-color: #1f2022;
+  color: #e0e0e0;
+}
+
+.ot-cmd-status {
+  flex: 1 1 180px;
+  min-height: 18px;
+  font-size: 12px;
+  color: #a0a8b0;
+}
+
+/* Log Container */
+.ot-log-container {
+  background: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.ot-log-container.collapsed {
+  max-height: 200px;
+}
+
+.ot-log-container:not(.collapsed) {
+  max-height: 600px;
+}
+
+/* Log Content */
+.ot-log-content {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #d4d4d4;
+  padding: 15px;
+  overflow-y: auto;
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.4;
+  max-height: inherit;
+}
+
+@supports (scrollbar-width: thin) {
+  .ot-log-content {
+    scrollbar-width: thin;
+    scrollbar-color: #555 #1e1e1e;
+  }
+}
+
+/* Log Footer */
+.ot-log-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #3a3a3c;
+  border-radius: 0 0 4px 4px;
+  font-size: 12px;
+  color: #b0b0b0;
+}
+
+.ot-log-footer span {
+  display: inline-block;
+}
+
+  /* Firmware Upgrade Progress */
+  #flashProgressSection {
+    margin-top: 12px;
+    margin-bottom: 8px;
+    padding: 0px;
+    border: none;
+    box-shadow: none;
+  }
+
+  .flashProgresBarWrapper {
+    /* remove flex display to allow container to size itself */
+    position: relative;
+    max-width: 480px; /* Limit width */
+    margin: 0; /* Align left */
+  }
+  
+  .flashProgressBarContainer {
+    width: 100%;
+    background-color: #3a3a3c;
+    height: 30px;
+    border-radius: 15px;
+    overflow: hidden;
+    position: relative; /* Context for absolute positioning of text */
+  }
+
+  #flashProgressBar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    background-color: #4CAF50; /* Green */
+    -webkit-transition: width 0.3s ease;
+    transition: width 0.3s ease;
+    will-change: width;
+    z-index: 1;
+  }
+  
+  #flashPercentageText {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #e0e0e0; /* Light text for visibility */
+    z-index: 2; /* Ensure on top of bar */
+  }
+
+
+/* Disable interaction during critical operations */
+body.disable-interaction {
+    pointer-events: none;
+    opacity: 0.6;
+    cursor: wait;
+}
+
+/* Tabs support */
+.ot-log-tabs {
+  margin-bottom: 15px;
+  border-bottom: 1px solid #444;
+}
+
+.tab-link {
+  background-color: inherit;
+  border: none;
+  border-bottom: 3px solid transparent;
+  outline: none;
+  cursor: pointer;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  transition: 0.3s;
+  color: #b0b0b0;
+}
+
+.tab-link:hover {
+  background-color: #3a3a3c;
+  border-radius: 4px 4px 0 0;
+}
+
+.tab-link.active {
+  color: #b0b0b0;
+  border-bottom: 3px solid #5a5a5c;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Statistics Table */
+.ot-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background-color: #2c2c2e;
+  table-layout: fixed;
+}
+
+.ot-stats-table th:nth-child(1) { width: 40px; }  /* Hex */
+.ot-stats-table th:nth-child(2) { width: 40px; }  /* Dec */
+.ot-stats-table th:nth-child(3) { width: 70px; }  /* Direction */
+.ot-stats-table th:nth-child(4) { width: 200px; } /* Description */
+.ot-stats-table th:nth-child(5) { width: 80px; }  /* Interval */
+.ot-stats-table th:nth-child(6) { width: auto; }  /* Value - takes remaining space */
+
+.ot-stats-table th, .ot-stats-table td {
+  text-align: left;
+  padding: 2px 8px;
+  border-bottom: 1px solid #444;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ot-stats-table th {
+  background-color: #3a3a3c;
+  color: #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.ot-stats-table th:hover {
+  background-color: #4a4a4c;
+}
+
+.ot-stats-table tr:hover {
+  background-color: #3a3a3c;
+}
+
+.ot-stats-container {
+  overflow-x: auto;
+  max-height: 600px;
+  overflow-y: auto;
+  background: #2c2c2e;
+  border: 1px solid #444;
+}
+
+/* Utility classes for common inline styles */
+.hidden { display: none !important; }
+.visible { display: block !important; }
+
+.page-section {
+  display: none;
+}
+
+.page-section.active {
+  display: block;
+}
+
+.firmware-info-div {
+  margin-bottom: 12px;
+  padding: 10px;
+  max-width: 720px;
+}
+
+.fs-mismatch-banner {
+  padding: 10px 16px;
+  background-color: #7f0000;
+  color: #ffcdd2;
+  font-weight: bold;
+  text-align: center;
+}
+.fs-mismatch-banner a {
+  color: #ef9a9a;
+  text-decoration: underline;
+}
+
+.pic-update-banner {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  max-width: 720px;
+}
+.pic-update-banner.checking {
+  color: #888;
+}
+.pic-update-banner.update-available {
+  background-color: #bf360c;
+  color: #ffe0b2;
+  font-weight: bold;
+}
+.pic-update-banner.up-to-date {
+  background-color: #1b5e20;
+  color: #c8e6c9;
+}
+.pic-version-outdated {
+  color: #ff8a65;
+  font-weight: bold;
+}
+
+.firmware-row-bold {
+  font-weight: bold;
+}
+
+.firmware-icon {
+  width: 16px;
+  height: auto;
+  filter: invert(1);
+}
+
+.firmware-progress {
+  display: block;
+}
+
+.otmonrow.hidden-row {
+  display: none !important;
+}
+
+.waiting-error {
+  color: red;
+}
+
+/* Dallas Sensor Label Edit Icon (Dark Theme) */
+.sensor-edit-icon {
+  font-size: 0.85em;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+.otmoncolumn1.editable-label {
+  cursor: pointer;
+}
+
+.sensor-label-inline-editor {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  max-width: 220px;
+  font: inherit;
+  line-height: normal;
+  padding: 0 6px;
+  margin: 0;
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: #e0e0e0;
+  background: #1e1e1e;
+  outline: 1px solid #4a90e2;
+  outline-offset: -1px;
+  border: none;
+}
+
+
+/* --- Gateway Settings panel (PR= polled values on PIC firmware page) --- */
+.pic-settings-section {
+  max-width: 720px;
+  margin: 18px 0 0 0;
+}
+.pic-settings-section-heading {
+  font-size: 1em;
+  font-weight: bold;
+  margin: 0 0 6px 0;
+  padding: 6px 10px;
+  background-color: #2c2c2e;
+  border: 1px solid #444;
+  border-radius: 3px 3px 0 0;
+}
+.pic-settings-group-cell {
+  display: table-cell;
+  padding: 5px 15px;
+  font-style: italic;
+  color: #999;
+  font-size: 0.9em;
+  border: none;
+  background: transparent;
+}
+.pic-val-live {
+  color: #66bb6a;
+  font-weight: 500;
+}
+.pic-val-cached {
+  color: #ffa726;
+}
+.pic-val-unknown {
+  color: #666;
+  font-style: italic;
+}
+.pic-settings-refresh {
+  margin-top: 8px;
+  font-size: 0.85em;
+  color: #aaa;
+}
+.pic-settings-refresh button {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+/* ==================== SAT Theme (Dark) ==================== */
+#displaySATPage {
+  max-width: 100%;
+}
+.sat-card {
+  background: #1e3a3a;
+  border: 1px solid #2e5050;
+}
+.sat-card-label {
+  color: #aaa;
+}
+.sat-card-value {
+  color: #80cbc4;
+}
+.sat-section {
+  border-bottom: 1px solid #444;
+  padding-bottom: 12px;
+}
+.sat-section h3 {
+  color: #80cbc4;
+}
+.sat-label {
+  color: #bbb;
+}
+.sat-value {
+  color: #eee;
+}
+.sat-grid {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+.sat-row {
+  display: table-row;
+}
+.sat-row .sat-label,
+.sat-row .sat-value {
+  display: table-cell;
+  padding: 3px 8px 3px 0;
+  vertical-align: top;
+}
+.sat-row .sat-label {
+  white-space: nowrap;
+  font-weight: 500;
+  width: 1%;
+  padding-right: 16px;
+}
+.sat-badge-active {
+  background: #1b5e20;
+  color: #a5d6a7;
+}
+.sat-badge-idle {
+  background: #4a3c00;
+  color: #fff176;
+}
+.sat-badge-disabled {
+  background: #424242;
+  color: #999;
+}
+.sat-badge-error {
+  background: #4a1010;
+  color: #ef9a9a;
+}
+.sat-badge-sim {
+  background: #4a148c;
+  color: #ce93d8;
+}
+/* SAT View Selector (Dark) */
+#sat-view-selector {
+  margin-left: auto;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #2c2c2e;
+  font-size: 0.9em;
+  color: #e0e0e0;
+}
+
+/* SAT View Visibility */
+.sat-dashboard.sat-view-simple .sat-section[data-view]:not([data-view*="simple"]),
+.sat-dashboard.sat-view-simple .sat-cards[data-view]:not([data-view*="simple"]) { display: none; }
+.sat-dashboard.sat-view-expert .sat-section[data-view]:not([data-view*="expert"]),
+.sat-dashboard.sat-view-expert .sat-cards[data-view]:not([data-view*="expert"]) { display: none; }
+.sat-dashboard.sat-view-diag .sat-section[data-view]:not([data-view*="diag"]),
+.sat-dashboard.sat-view-diag .sat-cards[data-view]:not([data-view*="diag"]) { display: none; }
+
+/* SAT Simple View Enhancements */
+.sat-view-simple .sat-card-value { font-size: 2rem; }
+.sat-view-simple .sat-cards { justify-content: center; }
+
+/* SAT Simple Status Summary */
+.sat-simple-status {
+  text-align: center;
+  font-size: 1.3rem;
+  padding: 12px;
+  color: #aaa;
+  font-weight: 500;
+}
+.sat-view-simple .sat-simple-status.heating { color: #e67e22; }
+.sat-view-simple .sat-simple-status.error { color: #ef5350; }
+
+/* SAT Diagnostics (Dark) */
+.sat-health-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0; }
+.sat-health-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
+.sat-health-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; background: #999; }
+.sat-health-ok { background: var(--status-ok); }
+.sat-health-problem { background: var(--status-error); }
+.sat-raw-data { background: #1a1a2e; padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; color: #e0e0e0; }
+.sat-collapsible { cursor: pointer; }
+.sat-collapsible:hover { opacity: 0.8; }
+
+/* SAT Interactive Controls (Dark) */
+.sat-btn { background: #3a3a3c; color: #e0e0e0; border-color: #555; }
+.sat-btn:hover { background: #4a4a4c; }
+.sat-btn:active { background: #555; }
+.sat-btn.active { background: #2e7d32; color: #fff; border-color: #388E3C; }
+.sat-btn-toggle.active { background: #c62828; border-color: #b71c1c; }
+.sat-feedback-ok { color: #66bb6a; }
+.sat-feedback-error { color: #ef5350; }
+.sat-toggle-label { color: #aaa; }
+.sat-toggle-slider { background: #555; }
+.sat-toggle-slider::before { background: #ddd; }
+.sat-toggle input:checked + .sat-toggle-slider { background: #30d158; }
+.sat-toggle input:focus-visible + .sat-toggle-slider { outline-color: #30d158; }
+
+/* SAT Settings Groups (dark theme) */
+.sat-settings-group-header {
+  background: #1e3a3a;
+  color: #80cbc4;
+  border-bottom: 1px solid #2e4a4a;
+}
+.sat-settings-group-header:hover {
+  background: #2a4a4a;
+}
+.sat-settings-group-body {
+  background: #1a1a2e;
+  border: 1px solid #2e4a4a;
+  border-top: none;
+}
+
+
+/* --- merged from data/FSexplorer_dark.css (legacy dark overrides) -------- */
+
+/*
+***************************************************************************  
+**  Program  : FSexplorer_dark.css
+**  Version  : v2.0.0-alpha
+***************************************************************************
+*/
+:root {
+    --primary-color: #4daafc; /* Lighter blue for dark mode */
+    --primary-hover: #6eb9fd;
+    --bg-color: #121212;      /* Very dark background */
+    --card-bg: #1e1e1e;       /* Dark card background */
+    --text-color: #e0e0e0;    /* Light text */
+    --text-muted: #a0a0a0;
+    --border-color: #333333;
+    --border-radius: 8px;
+    --shadow: 0 4px 6px rgba(0,0,0,0.5); /* Stronger shadow for dark mode */
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+h2 {
+    color: var(--text-color);
+    text-shadow: none;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Layout Containers */
+body > div, body > fieldset, body > .system-actions {
+    width: 100%;
+    max-width: 800px;
+}
+
+/* File List Styling */
+main {
+    width: 100%;
+    overflow-x: auto;
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+table {
+    width: 100% !important;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+tr {
+    border-bottom: 1px solid var(--border-color);
+}
+
+tr:last-child {
+    border-bottom: none;
+}
+
+/* Dark mode striped rows */
+tr:nth-child(even) { background: #252525; }
+tr:nth-child(odd) { background: #1e1e1e; }
+
+td {
+    padding: 12px 8px;
+    text-align: left;
+    white-space: nowrap;
+    border: none;
+    width: auto !important;
+    color: var(--text-color);
+}
+
+td:nth-child(n+5) {
+    background: transparent;
+}
+
+/* Links */
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    -webkit-transition: color 0.2s;
+    transition: color 0.2s;
+}
+a:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
+a.delete-link {
+    color: #ff5252; /* Bright Red for dark mode */
+}
+a.delete-link:hover {
+    color: #ff1744;
+    text-decoration: underline;
+}
+
+/* Upload Section */
+fieldset.upload-box {
+    background-color: var(--card-bg);
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 25px;
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+legend {
+    font-weight: 600;
+    font-size: 1.1em;
+    padding: 0 10px;
+    color: var(--primary-color);
+}
+
+form[action="/upload"] {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* System Actions Section */
+.system-actions {
+    background-color: var(--card-bg);
+    padding: 25px;
+    border-radius: var(--border-radius);
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.system-actions h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: var(--text-color);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 15px;
+    width: 100%;
+}
+
+/* Form Elements */
+input[type="file"] {
+    display: block;
+    width: 100%;
+    max-width: 500px;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: #2d2d2d;
+    color: var(--text-color);
+    border: 2px dashed #444; /* Darker dashed border */
+    border-radius: var(--border-radius);
+    box-sizing: border-box;
+    cursor: pointer;
+    text-align: center;
+}
+input[type="file"]:hover {
+    border-color: var(--primary-color);
+    background: #333;
+}
+
+progress {
+    width: 100% !important;
+    max-width: 500px;
+    height: 20px;
+    margin-bottom: 20px;
+    accent-color: var(--primary-color);
+    background-color: #333;
+}
+
+fileSize {
+    display: block;
+    margin-top: 10px;
+    min-height: 1.2em;
+    text-align: center;
+    width: 100%;
+    color: var(--text-color);
+}
+fileSize p {
+    margin: 5px 0;
+}
+
+.button-row {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+/* Button Styling System-wide */
+input[type="submit"], input[type="button"], .button {
+    background-color: var(--primary-color);
+    color: #121212; /* Dark text for high contrast on bright blue */
+    border: none;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    -webkit-transition: all 0.2s ease;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    height: auto;
+    width: auto;
+    min-width: 140px;
+    margin: 0;
+    -webkit-appearance: none; /* iOS fix */
+    appearance: none;
+}
+
+input[type="submit"]:hover, input[type="button"]:hover, .button:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    color: white;
+}
+
+input[type="submit"]:active, input[type="button"]:active, .button:active {
+    transform: translateY(0);
+}
+
+input[type="submit"]:disabled {
+    background-color: #444;
+    color: #888;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Action Specific Colors */
+form[action='/ReBoot'] input { background-color: #5a5a5a; }
+form[action='/ReBoot'] input:hover { background-color: #6a6a6a; }
+
+form[action='/ResetWireless'] input { background-color: #ffb300; color: #000; }
+form[action='/ResetWireless'] input:hover { background-color: #e09f00; }
+
+form[action='/'] input { background-color: #cf6679; color: #000; } /* Material Error Color */
+form[action='/'] input:hover { background-color: #b00020; color: white; }
+
+/* Hide HR */
+hr {
+    display: none;
+}
+
+/* Footer links */
+#left {
+    margin-top: 40px;
+    text-align: center;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    width: 100%;
+}
+#left a {
+    color: var(--text-muted);
+    text-decoration: none;
+    margin: 0 5px;
+}
+#left a:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+/* Note style */
+.note {
+	background-color: #3e2723; /* Dark brown/red for warning */
+    color: #ffccbc;
+	padding: 10px;
+	margin-top: 1em;
+	text-align: center;
+	border-radius: var(--border-radius);
+    max-width: 100%;
+    border: 1px solid #d84315;
+}
+
+/* Highlighting styles from original JS */
+/* In dark mode, light green #d4edda is too bright for text. We need a dark green. */
+tr[style*="background-color"] {
+    background-color: #1b5e20 !important; /* Material Green 900 */
+    color: #e8f5e9;
+}
+
+/* Hide firmware update button on touch devices (phones and tablets).
+   pointer:coarse = finger/stylus input; hover:none = no mouse hover capability.
+   This is more reliable than screen width, which can misfire on resized desktop windows. */
+@media (pointer: coarse) and (hover: none) {
+    .desktop-only {
+        display: none;
+    }
+}
+

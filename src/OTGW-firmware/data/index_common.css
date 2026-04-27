@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 ** Shared layout/responsive rules for OTGW web UI (light + dark themes)
-** Keep theme colors in index.css / index_dark.css.
+** Theme colors and the rest of the design system live in components.css.
 ***************************************************************************
 */
 
@@ -381,7 +381,7 @@
   color: #e53935;
 }
 
-/* Signal strength bars — structure (theme colors stay in index.css / index_dark.css) */
+/* Signal strength bars — structure (theme colors live in components.css) */
 .net-signal-bars {
   display: inline-flex;
   align-items: flex-end;

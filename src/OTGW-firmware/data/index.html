@@ -9,31 +9,31 @@
          The actual active scheme is still driven by the html color-scheme
          declaration in the loaded stylesheet below. -->
     <meta name="color-scheme" content="light dark">
-    <!-- Design-system tokens (fonts + CSS variables). Must load BEFORE the theme
-         stylesheet injection below so var(--font-sans)/var(--font-mono) are
-         resolvable when index.css or index_dark.css cascades. -->
+    <!-- Design-system tokens (fonts + CSS variables). Must load BEFORE
+         components.css so var(--font-sans)/var(--font-mono) and the rest
+         of the design tokens are resolvable when components.css cascades. -->
     <link rel="stylesheet" type="text/css" href="ds-tokens.css">
+    <!-- TASK-435 follow-up A: theme is driven by html[data-theme] +
+         body.dark only. No more dynamic stylesheet swap. The inline
+         script below pre-paints data-theme on <html> so components.css
+         token rules resolve correctly on the very first frame.
+         updateThemeToggle() in index.js mirrors body.dark when DOM is
+         parsed and on every theme change. -->
     <script>
       (function() {
-        var css = "./index.css";
         try {
-          var storedTheme = localStorage.getItem('theme');
-          if (storedTheme === 'dark') {
-            css = "index_dark.css";
-          } else if (!storedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            css = "index_dark.css";
-          }
-        } catch (e) { console.error(e); }
-        document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
+          var stored = localStorage.getItem('theme');
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var isDark = (stored === 'dark') || (!stored && prefersDark);
+          document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        } catch (e) { /* ignore */ }
       })();
     </script>
     <link rel="stylesheet" type="text/css" href="./index_common.css">
-    <!-- TASK-435 Patch A: design-system component library. Loads LAST so
-         it shadows the older index.css / index_dark.css rules during the
-         migration window (those still load via the dynamic theme script
-         above). The TASK-434 sat.css and otmonitor.css partials were
-         dropped in TASK-435 Patch E; their rules now live in
-         components.css under the same selectors. -->
+    <!-- Single source of truth for component styling: ds-tokens.css
+         (variables) + components.css (rules). The legacy index.css /
+         index_dark.css / sat.css / otmonitor.css partials have all
+         been folded in here. -->
     <link rel="stylesheet" type="text/css" href="./components.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <!-- TASK-435 Patch A: token-driven chart theme helper. Reads the

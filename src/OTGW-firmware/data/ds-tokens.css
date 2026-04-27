@@ -17,8 +17,6 @@
  *
  *   <link rel="stylesheet" href="ds-tokens.css">
  *   <link rel="stylesheet" href="components.css">
- *   <link rel="stylesheet" href="index.css">          <!-- legacy, optional -->
- *   <link rel="stylesheet" href="index_dark.css">     <!-- legacy, optional -->
  *
  * components.css gebruikt uitsluitend var(--*) tokens uit dit bestand.
  * Wil je een token aanpassen — doe dat alleen hier.

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -182,14 +182,7 @@ void startWebserver(){
   httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
   
   // Serve CSS and JS files with appropriate caching headers
-  httpServer.on("/index.css", []() {
-    // CSS can be cached for longer periods (1 day)
-    httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
-    File f = LittleFS.open("/index.css", "r");
-    httpServer.streamFile(f, F("text/css"));
-    f.close();
-  });
-  
+
   // TASK-304: prefer the .gz sibling (pre-gzipped at build time) with
   // Content-Encoding: gzip when present. All target browsers (Chrome/FF/
   // Safari latest +2) accept gzip unconditionally; no Accept-Encoding
