@@ -38,6 +38,12 @@ BLE/SAT subsystem, and any command not present in `OTDirect.ino`.
   it.
 - OTDirect does not implement every PIC command (e.g. LED, GPIO). Those are silently
   returned as NG.
+- TT/TC remote-override semantics in OTDirect are currently a single override on
+  MsgID 16 (TrSet) for both commands. The PIC distinguishes them via MsgID 100
+  (RemoteOverrideFunction) flag bits and an auto-clear state machine driven by
+  thermostat MsgID 16 echoes. Full PIC parity is tracked as TASK-466. Until then,
+  TT and TC are functionally equivalent in OTDirect, with the safety bug (TC
+  writing MsgID 1) closed by TASK-443.
 
 ## Ground-Truth Sources
 
@@ -210,7 +216,7 @@ backdoor command). This is currently not implemented; adding it is a future task
 The byte-pair encoding for SR=21 and SR=22 can be verified arithmetically:
 
 - `SR=21:4,27`: expected data = `(4 << 8) | 27 = 1051 = 0x041B`. Month=April, Day=27.
-- `SR=22:7,234`: expected data = `(7 << 256) | 234`... wait, `(7 << 8) | 234 = 1792 + 234 = 2026 = 0x07EA`. Year 2026.
+- `SR=22:7,234`: expected data = `(7 << 8) | 234 = 1792 + 234 = 2026 = 0x07EA`. Year 2026.
 
 These byte values match what otmonitor.tcl sends on the sync path (lines 1978/1986).
 
