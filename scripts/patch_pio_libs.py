@@ -88,16 +88,18 @@ patch_file(
     "#elif defined(ESP8266)  /* PlatformIO pkg MAJOR is always 3; API matches 2.x */",
     "NetApiHelpers ArduinoWiFiServer.h ESP8266 major guard",
 )
-# Sub-patch: remove SERVER_DONT_INHERIT_FROM_PRINT from the ESP8266 block.
-# In Core 3.x (espressif8266@4.2.1), WiFiServer no longer inherits from Print,
-# so ServerTemplate can inherit from Print directly. Defining
-# SERVER_DONT_INHERIT_FROM_PRINT breaks ServerTemplate (its `using Print::write`
-# and `override` declarations assume Print is a direct base).
+# Sub-patch 1b (repair): restore SERVER_DONT_INHERIT_FROM_PRINT if a previous
+# incorrect build script removed it. On Core 2.7.4 (espressif8266 package 3.x)
+# WiFiServer still inherits from Print. ServerTemplate<WiFiServer,WiFiClient>
+# must NOT also inherit Print (diamond → ambiguity warning at ServerTemplate.h:37).
+# The define instructs ServerTemplate to skip its own Print base.
+# Note: a fresh library download already has the define; the patch_file helper
+# will skip silently ("pattern not found") in that case.
 patch_file(
     arduino_wifi_server,
-    "/* PlatformIO pkg MAJOR is always 3; API matches 2.x */\n#define SERVER_DONT_INHERIT_FROM_PRINT",
-    "/* PlatformIO pkg MAJOR is always 3; Core 3.x WiFiServer no longer inherits Print */",
-    "NetApiHelpers ArduinoWiFiServer.h ESP8266 SERVER_DONT_INHERIT_FROM_PRINT removal",
+    "/* PlatformIO pkg MAJOR is always 3; Core 3.x WiFiServer no longer inherits Print */\n#define SERVER_CTOR_WITH_IP",
+    "/* PlatformIO pkg MAJOR is always 3; WiFiServer (Core 2.7.4) inherits Print, guard ServerTemplate */\n#define SERVER_DONT_INHERIT_FROM_PRINT\n#define SERVER_CTOR_WITH_IP",
+    "NetApiHelpers ArduinoWiFiServer.h restore SERVER_DONT_INHERIT_FROM_PRINT for Core 2.7.4",
 )
 
 # --- Patch 2: ESP8266 core Stream.h debug include (Windows case-insensitive FS) ---

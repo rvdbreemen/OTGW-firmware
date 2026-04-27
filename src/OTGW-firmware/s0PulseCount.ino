@@ -29,7 +29,7 @@
   // If interrupts come faster than debouncetime, assume it's a bounce and ignore
   if (interrupt_time - last_interrupt_time > (volatile uint16_t)settings.s0.iDebounceTime)
   {
-    pulseCount++;
+    pulseCount = pulseCount + 1;
     last_pulse_duration = interrupt_time - last_interrupt_time ;
   }
   last_interrupt_time = interrupt_time;
