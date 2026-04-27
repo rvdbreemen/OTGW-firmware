@@ -6,14 +6,14 @@
   Backs up data/ as a timestamped zip, then copies the design system files
   from this package's data/ folder into <RepoPath>\src\OTGW-firmware\data\.
 
-  Default mode is INTERACTIVE — you confirm each file replacement.
+  Default mode is INTERACTIVE  -  you confirm each file replacement.
   Pass -Force to skip prompts.
 
   This script does NOT:
     - Edit existing files (no find/replace, no markup rewrite)
     - Run builds or flashes
     - Touch git
-  Those are intentional Claude Code's job — see handoff.md.
+  Those are intentional Claude Code's job  -  see handoff.md.
 
 .PARAMETER RepoPath
   Root of your OTGW-firmware checkout (the folder that contains
@@ -23,7 +23,7 @@
   Skip per-file confirmation prompts. Backup is still created.
 
 .PARAMETER NoBackup
-  Skip the backup step (NOT recommended — only for re-runs).
+  Skip the backup step (NOT recommended  -  only for re-runs).
 
 .PARAMETER WhatIf
   Show what would happen without changing anything.
@@ -75,7 +75,7 @@ function Confirm-Step {
 # ---------------------------------------------------------------- banner
 
 Write-Host ""
-Write-Host "  OTGW Design System — apply.ps1" -ForegroundColor White
+Write-Host "  OTGW Design System  -  apply.ps1" -ForegroundColor White
 Write-Host "  ------------------------------" -ForegroundColor White
 Write-Host ""
 
@@ -117,7 +117,7 @@ Write-Host ""
 # ---------------------------------------------------------------- backup
 
 if (-not $NoBackup) {
-    Write-Step "Step 1 — backup data/"
+    Write-Step "Step 1  -  backup data/"
 
     $stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
     $backupDir = Join-Path $here 'backups'
@@ -137,12 +137,12 @@ if (-not $NoBackup) {
         }
     }
 } else {
-    Write-WarnMsg "Step 1 — backup SKIPPED (-NoBackup)"
+    Write-WarnMsg "Step 1  -  backup SKIPPED (-NoBackup)"
 }
 
 # ---------------------------------------------------------------- copy plan
 
-Write-Step "Step 2 — copy plan"
+Write-Step "Step 2  -  copy plan"
 
 # Files in the package that will land in the firmware data/ folder.
 # Path is relative to package data/ AND to firmware data/.
@@ -168,9 +168,10 @@ foreach ($rel in $plan) {
         exit 1
     }
     $exists = Test-Path $dst
+    if ($exists) { $fileStatus = 'OVERWRITE' } else { $fileStatus = 'NEW' }
     $rows += [pscustomobject]@{
         File   = $rel
-        Status = if ($exists) { 'OVERWRITE' } else { 'NEW' }
+        Status = $fileStatus
         Size   = (Get-Item $src).Length
     }
 }
@@ -186,7 +187,7 @@ if (-not $Force) {
 
 # ---------------------------------------------------------------- copy
 
-Write-Step "Step 3 — copy files"
+Write-Step "Step 3  -  copy files"
 
 $copied  = 0
 $skipped = 0
