@@ -156,6 +156,62 @@ def task_unchecked_ac_count(text: str) -> int:
     return len(_TASK_AC_UNCHECKED_RE.findall(text))
 
 
+# OTGWstream / OTDirect 25238 bridge regression helpers.
+# These are intentionally text-based: the failure mode here is wiring drift,
+# not semantic behavior that a compiler can see.
+def otdirect_25238_bridge_regressions(
+    handle_debug_text: str,
+    firmware_text: str,
+    otdirect_text: str,
+) -> Dict[str, bool]:
+    """Return the key ownership/fanout checks for the ESP32 25238 bridge.
+
+    The result stays small and explicit so unit tests can pin the intended split:
+    - `handleOTGWstream()` remains serviced from core/network code.
+    - `handleOTDirectBridgeStream()` owns the no-PIC inbound TCP bridge.
+    - `bridgeFrameToParser()` / `synthesizeResponse()` still fan out to TCP.
+    - short PIC-style rejection statuses also fan out before `processOT()`.
+    - synthesized PR= responses also fan out before `processOT()`.
+    """
+    direct_short_status_re = re.compile(r'processOT\("(?:NG|BV|OR|SE|NS|NF)",\s*2\)')
+    direct_pr_response_re = re.compile(r'processOT\s*\(\s*prBuf\s*,\s*strlen\s*\(\s*prBuf\s*\)\s*\)')
+
+    return {
+        "service_loop": (
+            "handleOTGWstream();" in firmware_text
+            and "OTGWstream.loop();" in handle_debug_text
+        ),
+        "inbound_bridge": (
+            "void handleOTDirectBridgeStream()" in otdirect_text
+            and "OTGWstream.available()" in otdirect_text
+            and "OTGWstream.read()" in otdirect_text
+            and "sendPICSerial(" in otdirect_text
+        ),
+        "outbound_fanout": (
+            "otDirectBridgeWriteLine(buf, 9);" in otdirect_text
+            and "otDirectBridgeWriteLine(buf, respLen);" in otdirect_text
+            and "OTGWstream.write(" in otdirect_text
+        ),
+        "short_error_fanout": (
+            "static void otDirectBridgeProcessStatus(const char* status)" in otdirect_text
+            and "otDirectBridgeWriteLine(status, 2);" in otdirect_text
+            and "processOT(status, 2);" in otdirect_text
+            and not direct_short_status_re.search(otdirect_text)
+        ),
+        "pr_response_fanout": (
+            "static void otDirectBridgeProcessPRResponse(const char* prLine)" in otdirect_text
+            and "otDirectBridgeWriteLine(prLine, prLen);" in otdirect_text
+            and "processOT(prLine, prLen);" in otdirect_text
+            and not direct_pr_response_re.search(otdirect_text)
+        ),
+        "ownership_split": (
+            "handleOTDirectBridgeStream();" in firmware_text
+            and "void handleOTDirectBridgeStream()" in otdirect_text
+            and "handlePICSerial()" not in otdirect_text
+        ),
+    }
+
+
 class Colors:
     """ANSI color codes"""
     HEADER = '\033[95m'
@@ -2008,6 +2064,59 @@ class WorkspaceEvaluator:
                 "No strncmp_P / strstr_P call sites found"
             ))
 
+    def check_otdirect_25238_bridge(self):
+        """Regression gate for the ESP32/OTDirect 25238 bridge wiring.
+
+        The bug class here is structural: the socket loop can exist, but if the
+        cooperative service call or the no-PIC bridge ownership moves, the code
+        still compiles while the bridge silently stops working. This check keeps
+        the ownership split explicit and anchored to the current code layout."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== OTDirect 25238 Bridge Audit ==={Colors.ENDC}")
+
+        handle_debug = config.FIRMWARE_ROOT / "handleDebug.ino"
+        firmware = config.FIRMWARE_ROOT / "OTGW-firmware.ino"
+        otdirect = config.FIRMWARE_ROOT / "OTDirect.ino"
+
+        try:
+            handle_debug_text = handle_debug.read_text(encoding='utf-8', errors='ignore')
+            firmware_text = firmware.read_text(encoding='utf-8', errors='ignore')
+            otdirect_text = otdirect.read_text(encoding='utf-8', errors='ignore')
+        except OSError as exc:
+            self.add_result(EvaluationResult(
+                "Coding", "OTDirect 25238 bridge audit", "WARN",
+                f"Could not read bridge source files: {exc}"
+            ))
+            return
+
+        checks = otdirect_25238_bridge_regressions(handle_debug_text, firmware_text, otdirect_text)
+        missing = [name for name, ok in checks.items() if not ok]
+
+        if missing:
+            details = []
+            if "service_loop" in missing:
+                details.append("OTGWstream must keep a cooperative service call from firmware/background code.")
+            if "inbound_bridge" in missing:
+                details.append("OTDirect.ino must own the no-PIC inbound TCP bridge and keep the OTGWstream read->sendPICSerial path.")
+            if "outbound_fanout" in missing:
+                details.append("OTDirect.ino must keep fanout from bridgeFrameToParser()/synthesizeResponse() back to OTGWstream.")
+            if "short_error_fanout" in missing:
+                details.append("OTDirect short PIC-style rejection statuses must fan out to OTGWstream before processOT().")
+            if "pr_response_fanout" in missing:
+                details.append("OTDirect synthesized PR= responses must fan out to OTGWstream before processOT().")
+            if "ownership_split" in missing:
+                details.append("The split must remain: core/network services the socket, OTDirect owns the no-PIC bridge behavior.")
+
+            self.add_result(EvaluationResult(
+                "Coding", "OTDirect 25238 bridge audit", "INFO",
+                f"{len(missing)}/6 bridge regressions detected",
+                " ".join(details)
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Coding", "OTDirect 25238 bridge audit", "PASS",
+                "OTGWstream service, OTDirect inbound bridge, outbound fanout, short status fanout, and PR response fanout are wired to the current ownership split"
+            ))
+
     # ===== ADR-080 GATES =====
 
     def check_adr_gates(self):
@@ -2112,6 +2221,7 @@ class WorkspaceEvaluator:
         self.check_progmem_compliance()
         self.check_no_arduinojson()
         self.check_binary_safe_compare()
+        self.check_otdirect_25238_bridge()
         self.check_adr_gates()
         self.check_backlog_hygiene()
         self.check_time_boundary_single_caller()      # ADR-086 CI gate (originally ADR-064, TASK-350)

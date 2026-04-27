@@ -26,6 +26,18 @@ sys.path.insert(0, str(REPO_ROOT))
 import evaluate  # noqa: E402
 
 
+OTDIRECT_STATUS_HELPER = (
+    "static void otDirectBridgeProcessStatus(const char* status) { "
+    "otDirectBridgeWriteLine(status, 2); processOT(status, 2); }\n"
+)
+OTDIRECT_PR_HELPER = (
+    "static void otDirectBridgeProcessPRResponse(const char* prLine) { "
+    "size_t prLen = strlen(prLine); "
+    "otDirectBridgeWriteLine(prLine, prLen); processOT(prLine, prLen); }\n"
+)
+OTDIRECT_BRIDGE_HELPERS = OTDIRECT_STATUS_HELPER + OTDIRECT_PR_HELPER
+
+
 class TestIsHotPathFile(unittest.TestCase):
     def test_sat_files_are_hot(self):
         self.assertTrue(evaluate.is_hot_path_file("SATble.ino"))
@@ -220,6 +232,157 @@ class TestBacklogHygieneHelpers(unittest.TestCase):
                             f"marker phrase '{marker}' should be recognized as a deviation note")
 
 
+class TestOTDirect25238BridgeRegression(unittest.TestCase):
+    """Pin the ESP32 25238 bridge split so a future refactor cannot silently
+    remove the cooperative socket service or move the no-PIC bridge out of
+    OTDirect again."""
+
+    def test_current_source_wiring_is_detected(self):
+        handle_debug = (REPO_ROOT / "src" / "OTGW-firmware" / "handleDebug.ino").read_text(encoding="utf-8", errors="ignore")
+        firmware = (REPO_ROOT / "src" / "OTGW-firmware" / "OTGW-firmware.ino").read_text(encoding="utf-8", errors="ignore")
+        otdirect = (REPO_ROOT / "src" / "OTGW-firmware" / "OTDirect.ino").read_text(encoding="utf-8", errors="ignore")
+
+        checks = evaluate.otdirect_25238_bridge_regressions(handle_debug, firmware, otdirect)
+        self.assertEqual(
+            checks,
+            {
+                "service_loop": True,
+                "inbound_bridge": True,
+                "outbound_fanout": True,
+                "short_error_fanout": True,
+                "pr_response_fanout": True,
+                "ownership_split": True,
+            },
+        )
+
+    def test_missing_service_loop_is_flagged(self):
+        handle_debug = "void handleDebug() {}\n"
+        firmware = "void doBackgroundTasks() { handleOTDirectBridgeStream(); }\n"
+        otdirect = OTDIRECT_BRIDGE_HELPERS + (
+            "void handleOTDirectBridgeStream() { OTGWstream.available(); OTGWstream.read(); sendPICSerial(\"x\", 1); }\n"
+            "static void bridgeFrameToParser(char prefix, unsigned long frame) { otDirectBridgeWriteLine(buf, 9); }\n"
+            "static void synthesizeResponse(char c0, char c1, const char* value) { otDirectBridgeWriteLine(buf, respLen); }\n"
+            "OTGWstream.write((const uint8_t*)\"x\", 1);\n"
+        )
+
+        checks = evaluate.otdirect_25238_bridge_regressions(handle_debug, firmware, otdirect)
+        self.assertFalse(checks["service_loop"])
+        self.assertTrue(checks["inbound_bridge"])
+        self.assertTrue(checks["outbound_fanout"])
+        self.assertTrue(checks["short_error_fanout"])
+        self.assertTrue(checks["pr_response_fanout"])
+        self.assertTrue(checks["ownership_split"])
+
+    def test_unserviced_helper_is_flagged(self):
+        handle_debug = "void handleOTGWstream() { OTGWstream.loop(); }\n"
+        firmware = "void doBackgroundTasks() { handleOTDirectBridgeStream(); }\n"
+        otdirect = OTDIRECT_BRIDGE_HELPERS + (
+            "void handleOTDirectBridgeStream() { OTGWstream.available(); OTGWstream.read(); sendPICSerial(\"x\", 1); }\n"
+            "static void bridgeFrameToParser(char prefix, unsigned long frame) { otDirectBridgeWriteLine(buf, 9); }\n"
+            "static void synthesizeResponse(char c0, char c1, const char* value) { otDirectBridgeWriteLine(buf, respLen); }\n"
+            "OTGWstream.write((const uint8_t*)\"x\", 1);\n"
+        )
+
+        checks = evaluate.otdirect_25238_bridge_regressions(handle_debug, firmware, otdirect)
+        self.assertFalse(checks["service_loop"])
+        self.assertTrue(checks["inbound_bridge"])
+        self.assertTrue(checks["outbound_fanout"])
+        self.assertTrue(checks["short_error_fanout"])
+        self.assertTrue(checks["pr_response_fanout"])
+        self.assertTrue(checks["ownership_split"])
+
+    def test_missing_inbound_bridge_is_flagged(self):
+        handle_debug = "void handleOTGWstream() { OTGWstream.loop(); }\n"
+        firmware = "void doBackgroundTasks() { handleOTGWstream(); handleOTDirectBridgeStream(); }\n"
+        otdirect = OTDIRECT_BRIDGE_HELPERS + (
+            "void handleOTDirectBridgeStream() {}\n"
+            "static void bridgeFrameToParser(char prefix, unsigned long frame) { otDirectBridgeWriteLine(buf, 9); }\n"
+            "static void synthesizeResponse(char c0, char c1, const char* value) { otDirectBridgeWriteLine(buf, respLen); }\n"
+            "OTGWstream.write((const uint8_t*)\"x\", 1);\n"
+        )
+
+        checks = evaluate.otdirect_25238_bridge_regressions(handle_debug, firmware, otdirect)
+        self.assertTrue(checks["service_loop"])
+        self.assertFalse(checks["inbound_bridge"])
+        self.assertTrue(checks["outbound_fanout"])
+        self.assertTrue(checks["short_error_fanout"])
+        self.assertTrue(checks["pr_response_fanout"])
+        self.assertTrue(checks["ownership_split"])
+
+    def test_missing_outbound_fanout_is_flagged(self):
+        handle_debug = "void handleOTGWstream() { OTGWstream.loop(); }\n"
+        firmware = "void doBackgroundTasks() { handleOTGWstream(); handleOTDirectBridgeStream(); }\n"
+        otdirect = OTDIRECT_BRIDGE_HELPERS + (
+            "void handleOTDirectBridgeStream() { OTGWstream.available(); OTGWstream.read(); sendPICSerial(\"x\", 1); }\n"
+            "static void bridgeFrameToParser(char prefix, unsigned long frame) { processOT(buf, 9, otHideReports); }\n"
+            "static void synthesizeResponse(char c0, char c1, const char* value) { processOT(buf, respLen); }\n"
+        )
+
+        checks = evaluate.otdirect_25238_bridge_regressions(handle_debug, firmware, otdirect)
+        self.assertTrue(checks["service_loop"])
+        self.assertTrue(checks["inbound_bridge"])
+        self.assertFalse(checks["outbound_fanout"])
+        self.assertTrue(checks["short_error_fanout"])
+        self.assertTrue(checks["pr_response_fanout"])
+        self.assertTrue(checks["ownership_split"])
+
+    def test_missing_short_error_fanout_is_flagged(self):
+        handle_debug = "void handleOTGWstream() { OTGWstream.loop(); }\n"
+        firmware = "void doBackgroundTasks() { handleOTGWstream(); handleOTDirectBridgeStream(); }\n"
+        otdirect = OTDIRECT_PR_HELPER + (
+            "void handleOTDirectBridgeStream() { OTGWstream.available(); OTGWstream.read(); sendPICSerial(\"x\", 1); }\n"
+            "static void bridgeFrameToParser(char prefix, unsigned long frame) { otDirectBridgeWriteLine(buf, 9); }\n"
+            "static void synthesizeResponse(char c0, char c1, const char* value) { otDirectBridgeWriteLine(buf, respLen); }\n"
+            "OTGWstream.write((const uint8_t*)\"x\", 1);\n"
+            "void handleOTDirectCommand(const char* buf, int len) { processOT(\"NG\", 2); }\n"
+        )
+
+        checks = evaluate.otdirect_25238_bridge_regressions(handle_debug, firmware, otdirect)
+        self.assertTrue(checks["service_loop"])
+        self.assertTrue(checks["inbound_bridge"])
+        self.assertTrue(checks["outbound_fanout"])
+        self.assertFalse(checks["short_error_fanout"])
+        self.assertTrue(checks["pr_response_fanout"])
+        self.assertTrue(checks["ownership_split"])
+
+    def test_missing_pr_response_fanout_is_flagged(self):
+        handle_debug = "void handleOTGWstream() { OTGWstream.loop(); }\n"
+        firmware = "void doBackgroundTasks() { handleOTGWstream(); handleOTDirectBridgeStream(); }\n"
+        otdirect = OTDIRECT_STATUS_HELPER + (
+            "void handleOTDirectBridgeStream() { OTGWstream.available(); OTGWstream.read(); sendPICSerial(\"x\", 1); }\n"
+            "static void bridgeFrameToParser(char prefix, unsigned long frame) { otDirectBridgeWriteLine(buf, 9); }\n"
+            "static void synthesizeResponse(char c0, char c1, const char* value) { otDirectBridgeWriteLine(buf, respLen); }\n"
+            "OTGWstream.write((const uint8_t*)\"x\", 1);\n"
+            "void handleOTDirectCommand(const char* buf, int len) { processOT(prBuf, strlen(prBuf)); }\n"
+        )
+
+        checks = evaluate.otdirect_25238_bridge_regressions(handle_debug, firmware, otdirect)
+        self.assertTrue(checks["service_loop"])
+        self.assertTrue(checks["inbound_bridge"])
+        self.assertTrue(checks["outbound_fanout"])
+        self.assertTrue(checks["short_error_fanout"])
+        self.assertFalse(checks["pr_response_fanout"])
+        self.assertTrue(checks["ownership_split"])
+
+    def test_missing_ownership_split_is_flagged(self):
+        handle_debug = "void handleOTGWstream() { OTGWstream.loop(); }\n"
+        firmware = "void doBackgroundTasks() { handleOTGWstream(); handleOTDirectBridgeStream(); }\n"
+        otdirect = OTDIRECT_BRIDGE_HELPERS + (
+            "void handleOTDirectBridgeStream() { OTGWstream.available(); OTGWstream.read(); sendPICSerial(\"x\", 1); handlePICSerial(); }\n"
+            "static void bridgeFrameToParser(char prefix, unsigned long frame) { otDirectBridgeWriteLine(buf, 9); }\n"
+            "static void synthesizeResponse(char c0, char c1, const char* value) { otDirectBridgeWriteLine(buf, respLen); }\n"
+            "OTGWstream.write((const uint8_t*)\"x\", 1);\n"
+        )
+
+        checks = evaluate.otdirect_25238_bridge_regressions(handle_debug, firmware, otdirect)
+        self.assertTrue(checks["service_loop"])
+        self.assertTrue(checks["inbound_bridge"])
+        self.assertTrue(checks["outbound_fanout"])
+        self.assertTrue(checks["short_error_fanout"])
+        self.assertTrue(checks["pr_response_fanout"])
+        self.assertFalse(checks["ownership_split"])
+
+
 class TestProgmemComplianceIntegration(unittest.TestCase):
     """Smoke test: confirm the main evaluator wiring still works end-to-end."""
 
@@ -233,6 +396,9 @@ class TestProgmemComplianceIntegration(unittest.TestCase):
         categories = {r.category for r in evaluator.results}
         self.assertIn("PROGMEM", categories)
         self.assertIn("Coding", categories)  # binary-safe compare audit
+        bridge_checks = [r for r in evaluator.results if r.name == "OTDirect 25238 bridge audit"]
+        self.assertEqual(len(bridge_checks), 1)
+        self.assertEqual(bridge_checks[0].status, "PASS")
 
 
 if __name__ == "__main__":

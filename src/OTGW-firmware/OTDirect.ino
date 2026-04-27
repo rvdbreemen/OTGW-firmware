@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -444,6 +444,91 @@ static void handleSlaveRequest(unsigned long request, OpenThermResponseStatus st
 }
 
 // ---------------------------------------------------------------------------
+// OTDirect bridge log helper — mirrors the PIC ser2net command log shape.
+// ---------------------------------------------------------------------------
+static void otDirectBridgeEvent(char prefix, const char* msg, size_t len) {
+  ClrLog();
+  AddLog(getOTLogTimestamp());
+  AddLogf_P(PSTR(" %c "), prefix);
+  if (msg && len > 0) {
+    AddLogf_P(PSTR("%.*s"), static_cast<int>(len), msg);
+  }
+  AddLogln();
+  Debug(ot_log_buffer);
+  sendLogToWebSocket(ot_log_buffer);
+  ClrLog();
+}
+
+// ---------------------------------------------------------------------------
+// otDirectBridgeWriteLine — fan OT-direct bridge output to TCP port 25238.
+// Mirrors dispatchOTGWInputLine(): write payload, then CRLF, no heap.
+// ---------------------------------------------------------------------------
+static void otDirectBridgeWriteLine(const char* line, size_t len) {
+  if (!line || len == 0) return;
+  OTGWstream.write(reinterpret_cast<const uint8_t*>(line), len);
+  OTGWstream.write('\r');
+  OTGWstream.write('\n');
+}
+
+static void otDirectBridgeProcessStatus(const char* status) {
+  if (!status) return;
+  otDirectBridgeWriteLine(status, 2);
+  processOT(status, 2);
+}
+
+// ---------------------------------------------------------------------------
+// handleOTDirectBridgeStream — line-buffered TCP bridge input for OTGW32
+// Recreates the command-line behavior of the PIC-backed 25238 bridge, but
+// routes complete lines to the OTDirect command path instead of OTGWSerial.
+// ---------------------------------------------------------------------------
+void handleOTDirectBridgeStream() {
+  if (!isOTDirectEnabled()) return;
+
+  static constexpr size_t kMaxBridgeWrite = 128;
+  static char sWrite[kMaxBridgeWrite];
+  static size_t bytes_write = 0;
+  static bool discardCurrentWriteLine = false;
+  static uint32_t droppedWriteLines = 0;
+
+  while (OTGWstream.available()) {
+    int inByte = OTGWstream.read();
+    if (inByte < 0) break;
+
+    char outByte = static_cast<char>(inByte);
+    if (outByte == '\r') {
+      if ((bytes_write == 0) && !discardCurrentWriteLine) continue;
+
+      sWrite[bytes_write] = '\0';
+      if (discardCurrentWriteLine) {
+        droppedWriteLines++;
+        OTDDebugTf(PSTR("OTDirect bridge line dropped after overflow. Dropped lines total: %lu\r\n"),
+                   static_cast<unsigned long>(droppedWriteLines));
+      } else {
+        OTDDebugTf(PSTR("OTDirect bridge: Sending [%s] (%d)\r\n"), sWrite, static_cast<int>(bytes_write));
+        if (bytes_write > 0) {
+          otDirectBridgeEvent('>', sWrite, bytes_write);
+          sendPICSerial(sWrite, static_cast<int>(bytes_write));
+        }
+      }
+
+      bytes_write = 0;
+      discardCurrentWriteLine = false;
+    } else if (outByte == '\n') {
+      continue;
+    } else if (bytes_write < (kMaxBridgeWrite - 1)) {
+      if (!discardCurrentWriteLine) {
+        sWrite[bytes_write++] = outByte;
+      }
+    } else {
+      OTDDebugTf(PSTR("OTDirect bridge buffer overflow! Discarding %d bytes. Total overflows: %lu\r\n"),
+                 static_cast<int>(bytes_write), static_cast<unsigned long>(droppedWriteLines + 1));
+      discardCurrentWriteLine = true;
+      bytes_write = 0;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // bridgeFrameToParser — format a 32-bit OT frame and feed to processOT()
 // ---------------------------------------------------------------------------
 static void bridgeFrameToParser(char prefix, unsigned long frame) {
@@ -454,6 +539,7 @@ static void bridgeFrameToParser(char prefix, unsigned long frame) {
   // which froze the whole ESP32 OT-direct pipeline while PS=1 was active.
   char buf[10];
   snprintf_P(buf, sizeof(buf), PSTR("%c%08lX"), prefix, frame);
+  otDirectBridgeWriteLine(buf, 9);
   processOT(buf, 9, otHideReports);
 }
 
@@ -1679,12 +1765,21 @@ static void enqueueWriteCommand(uint8_t msgId, uint16_t dataValue, const char* l
 static void synthesizeResponse(char c0, char c1, const char* value) {
   char buf[48];
   snprintf_P(buf, sizeof(buf), PSTR("%c%c: %s"), c0, c1, value);
-  processOT(buf, strlen(buf));
+  size_t respLen = strlen(buf);
+  otDirectBridgeWriteLine(buf, respLen);
+  processOT(buf, respLen);
 }
 
 // Convenience: synthesize from the original command buffer (first 2 chars)
 static void synthesizeResponse(const char* cmd, const char* value) {
   synthesizeResponse(cmd[0], cmd[1], value);
+}
+
+static void otDirectBridgeProcessPRResponse(const char* prLine) {
+  if (!prLine) return;
+  size_t prLen = strlen(prLine);
+  otDirectBridgeWriteLine(prLine, prLen);
+  processOT(prLine, prLen);
 }
 
 // checkBoolean — PIC-compatible strict 0/1 validation. Returns true if valid.
@@ -2207,7 +2302,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // CH=0/1 — CH enable (bit0 of master status)
   else if (cmd0 == 'C' && cmd1 == 'H') {
-    if (!checkBoolean(value)) { processOT("BV", 2); return; }
+    if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x01;
     } else {
@@ -2218,7 +2313,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // H2=0/1 — CH2 enable (bit4 of master status)
   else if (cmd0 == 'H' && cmd1 == '2') {
-    if (!checkBoolean(value)) { processOT("BV", 2); return; }
+    if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x10;
     } else {
@@ -2229,7 +2324,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // SM=0/1 — Summer mode (bit5 of master status)
   else if (cmd0 == 'S' && cmd1 == 'M') {
-    if (!checkBoolean(value)) { processOT("BV", 2); return; }
+    if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x20;
       otSummerMode = true;
@@ -2243,7 +2338,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // BW=0/1 — DHW blocking (bit6 of master status, not persisted)
   else if (cmd0 == 'B' && cmd1 == 'W') {
-    if (!checkBoolean(value)) { processOT("BV", 2); return; }
+    if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x40;
       otDHWBlocking = true;
@@ -2256,7 +2351,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // CE=0/1 — Cooling enable (bit2 of master status, not persisted)
   else if (cmd0 == 'C' && cmd1 == 'E') {
-    if (!checkBoolean(value)) { processOT("BV", 2); return; }
+    if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return; }
     if (value[0] == '1') {
       otMasterStatusFlags |= 0x04;
       otCoolingEnable = true;
@@ -2287,7 +2382,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   // MH=x — Remote override operating mode CH1 (lower nibble of byte4)
   else if (cmd0 == 'M' && cmd1 == 'H') {
     uint8_t val = atoi(value);
-    if (val > 15) { processOT("BV", 2); return; }
+    if (val > 15) { otDirectBridgeProcessStatus("BV"); return; }
     otOperModeCH1 = val;
     // Send MsgID 99 WRITE_DATA
     uint16_t data99 = ((uint16_t)otOperModeDHW) | ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
@@ -2301,7 +2396,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   // MW=x — Remote override operating mode DHW (lower nibble of byte3)
   else if (cmd0 == 'M' && cmd1 == 'W') {
     uint8_t val = atoi(value);
-    if (val > 15) { processOT("BV", 2); return; }
+    if (val > 15) { otDirectBridgeProcessStatus("BV"); return; }
     otOperModeDHW = val;
     uint16_t data99 = ((uint16_t)otOperModeDHW) | ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
     unsigned long frame99 = OpenTherm::buildRequest(
@@ -2314,7 +2409,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   // M2=x — Remote override operating mode CH2 (upper nibble of byte4)
   else if (cmd0 == 'M' && cmd1 == '2') {
     uint8_t val = atoi(value);
-    if (val > 15) { processOT("BV", 2); return; }
+    if (val > 15) { otDirectBridgeProcessStatus("BV"); return; }
     otOperModeCH2 = val;
     uint16_t data99 = ((uint16_t)otOperModeDHW) | ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
     unsigned long frame99 = OpenTherm::buildRequest(
@@ -2346,14 +2441,14 @@ void handleOTDirectCommand(const char* buf, int len) {
       // Runtime check: relay must also be enabled in settings for this board
       if (!settings.otd.bHasBypassRelay) {
         OTDDebugTln(F("OTD: GW=0 rejected (bypass relay not enabled in settings)"));
-        processOT("NG", 2);
+        otDirectBridgeProcessStatus("NG");
         return;
       }
       setOTDirectMode(OTD_MODE_BYPASS);
 #else
       // No bypass relay on this board — reject command
       OTDDebugTln(F("OTD: GW=0 not supported (no bypass relay on this board)"));
-      processOT("NG", 2);
+      otDirectBridgeProcessStatus("NG");
       return;
 #endif
     } else if (value[0] == '1') {
@@ -2395,7 +2490,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       case 'A':
         // Banner — tools pattern-match on "OpenTherm Gateway" to detect device
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: A=OpenTherm Gateway OTGW32"));
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'M':
         // Gateway mode: G=gateway, M=monitor, P=passthru (bypass), S=standalone, L=loopback
@@ -2406,7 +2501,7 @@ void handleOTDirectCommand(const char* buf, int len) {
           else if (IS_MASTER_MODE()) modeChar = 'S';
           else if (IS_LOOPBACK_MODE()) modeChar = 'L';
           snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: M=%c"), modeChar);
-          processOT(prBuf, strlen(prBuf));
+          otDirectBridgeProcessPRResponse(prBuf);
         }
         break;
       case 'O': {
@@ -2426,55 +2521,55 @@ void handleOTDirectCommand(const char* buf, int len) {
         } else {
           snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=N"));
         }
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       }
       case 'S':
         dtostrf(otSetbackTemp, 1, 2, rspBuf);
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: S=%s"), rspBuf);
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'W':
         // DHW override state
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: W=%c"),
           (otDHWOverride == 0xFF) ? 'A' : (otDHWOverride ? '1' : '0'));
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'G':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: G=%s"), otGpioFunctions);
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'I':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: I=00"));
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'L':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: L=%s"), otLedFunctions);
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'T':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: T=%d/%d"), otIgnoreTransitions, otOverrideHB);
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'D':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: D=%c"), otTempSensor);
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'P':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: P=M"));  // medium power (default)
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'R':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: R=I"));  // internal detection
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'B':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: B=%s"), __DATE__);
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'C':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: C=240"));  // ESP32-S3 @ 240MHz
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'Q': {
         // Map ESP32 reset reason to PIC-compatible codes:
@@ -2492,17 +2587,17 @@ void handleOTDirectCommand(const char* buf, int len) {
         }
 #endif
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: Q=%c"), rc);
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       }
       case 'N':
         // Message interval in centiseconds (10ms units), matching PIC PR=N format
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: N=%u"), (unsigned)(otMinIntervalMs / 10));
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'V':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: V=%d"), otVoltageRef);
-        processOT(prBuf, strlen(prBuf));
+        otDirectBridgeProcessPRResponse(prBuf);
         break;
       default:
         OTDDebugTf(PSTR("OTD: PR=%c unknown register\r\n"), reg);
@@ -2538,7 +2633,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   else if (cmd0 == 'A' && cmd1 == 'A') {
     uint8_t msgId = atoi(value);
     if (msgId == 0 || msgId > 127) {
-      processOT("BV", 2); return;
+      otDirectBridgeProcessStatus("BV"); return;
     }
     bool found = false;
     for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
@@ -2547,7 +2642,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         found = true; break;
       }
     }
-    if (!found) { processOT("NF", 2); return; }
+    if (!found) { otDirectBridgeProcessStatus("NF"); return; }
     clearUnknownCount(msgId);  // Reset 3-strike counter so it doesn't re-disable immediately
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
@@ -2556,7 +2651,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   else if (cmd0 == 'D' && cmd1 == 'A') {
     uint8_t msgId = atoi(value);
     if (msgId == 0 || msgId > 127) {
-      processOT("BV", 2); return;
+      otDirectBridgeProcessStatus("BV"); return;
     }
     bool found = false;
     for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
@@ -2565,7 +2660,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         found = true; break;
       }
     }
-    if (!found) { processOT("NF", 2); return; }
+    if (!found) { otDirectBridgeProcessStatus("NF"); return; }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
   }
@@ -2573,7 +2668,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   else if (cmd0 == 'P' && cmd1 == 'M') {
     uint8_t msgId = atoi(value);
     if (msgId > 127) {
-      processOT("BV", 2); return;
+      otDirectBridgeProcessStatus("BV"); return;
     }
     bool found = false;
     for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
@@ -2603,7 +2698,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned int msgId = 0;
     unsigned int dataVal = 0;
     if (sscanf(value, "%u:%x", &msgId, &dataVal) != 2 || msgId > 127) {
-      processOT("BV", 2); return;
+      otDirectBridgeProcessStatus("BV"); return;
     }
     // Find existing or free slot
     int8_t slot = -1;
@@ -2617,7 +2712,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         if (!otResponseOverrides[i].active) { slot = i; break; }
       }
     }
-    if (slot < 0) { processOT("NS", 2); return; }  // table full
+    if (slot < 0) { otDirectBridgeProcessStatus("NS"); return; }  // table full
     otResponseOverrides[slot].msgId = (uint8_t)msgId;
     otResponseOverrides[slot].value = (uint16_t)dataVal;
     otResponseOverrides[slot].active = true;
@@ -2626,7 +2721,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   // CR=MsgID — Clear response override
   else if (cmd0 == 'C' && cmd1 == 'R') {
     uint8_t msgId = atoi(value);
-    if (msgId > 127) { processOT("BV", 2); return; }
+    if (msgId > 127) { otDirectBridgeProcessStatus("BV"); return; }
     bool found = false;
     for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
       if (otResponseOverrides[i].active && otResponseOverrides[i].msgId == msgId) {
@@ -2634,7 +2729,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         found = true; break;
       }
     }
-    if (!found) { processOT("NF", 2); return; }
+    if (!found) { otDirectBridgeProcessStatus("NF"); return; }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
   }
@@ -2642,9 +2737,9 @@ void handleOTDirectCommand(const char* buf, int len) {
   // UI=MsgID — Mark as unknown (gateway responds UNKNOWN_DATAID to thermostat)
   else if (cmd0 == 'U' && cmd1 == 'I') {
     uint8_t msgId = atoi(value);
-    if (msgId > 127) { processOT("BV", 2); return; }
+    if (msgId > 127) { otDirectBridgeProcessStatus("BV"); return; }
     if (!isUnknownId(msgId)) {
-      if (otUnknownIdCount >= OT_UNKNOWN_ID_MAX) { processOT("NS", 2); return; }
+      if (otUnknownIdCount >= OT_UNKNOWN_ID_MAX) { otDirectBridgeProcessStatus("NS"); return; }
       otUnknownIds[otUnknownIdCount++] = msgId;
     }
     // Also disable from schedule so we stop polling it
@@ -2657,7 +2752,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   // KI=MsgID — Mark as known again (restore normal forwarding)
   else if (cmd0 == 'K' && cmd1 == 'I') {
     uint8_t msgId = atoi(value);
-    if (msgId > 127) { processOT("BV", 2); return; }
+    if (msgId > 127) { otDirectBridgeProcessStatus("BV"); return; }
     for (uint8_t i = 0; i < otUnknownIdCount; i++) {
       if (otUnknownIds[i] == msgId) {
         otUnknownIds[i] = otUnknownIds[--otUnknownIdCount];
@@ -2682,7 +2777,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     unsigned int msgId = 0;
     unsigned int dataVal = 0;
     if (sscanf(value, "%u:%x", &msgId, &dataVal) != 2 || msgId > 127) {
-      processOT("BV", 2); return;
+      otDirectBridgeProcessStatus("BV"); return;
     }
     setResponseModifier((uint8_t)msgId, (uint16_t)dataVal);
     synthesizeResponse(buf, value);
@@ -2690,7 +2785,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   // CM=MsgID — Clear response modifier
   else if (cmd0 == 'C' && cmd1 == 'M') {
     uint8_t msgId = atoi(value);
-    if (msgId > 127) { processOT("BV", 2); return; }
+    if (msgId > 127) { otDirectBridgeProcessStatus("BV"); return; }
     clearResponseModifier(msgId);
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
@@ -2705,14 +2800,14 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // IT=0/1 — Ignore transitions
   else if (cmd0 == 'I' && cmd1 == 'T') {
-    if (!checkBoolean(value)) { processOT("BV", 2); return; }
+    if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return; }
     otIgnoreTransitions = (value[0] == '1') ? 1 : 0;
     rspBuf[0] = '0' + otIgnoreTransitions; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
   // OH=0/1 — Override high byte
   else if (cmd0 == 'O' && cmd1 == 'H') {
-    if (!checkBoolean(value)) { processOT("BV", 2); return; }
+    if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return; }
     otOverrideHB = (value[0] == '1') ? 1 : 0;
     rspBuf[0] = '0' + otOverrideHB; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
@@ -2732,7 +2827,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       else if (c0 == 'W' && c1 == 'P' && c2 == 'H') targetMsgId = 122;
       else if (c0 == 'W' && c1 == 'B' && c2 == 'H') targetMsgId = 123;
     }
-    if (targetMsgId == 0) { processOT("BV", 2); return; }
+    if (targetMsgId == 0) { otDirectBridgeProcessStatus("BV"); return; }
     // Send WRITE_DATA with value 0 to reset the counter
     unsigned long frame = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
@@ -2743,7 +2838,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   // MI=nnn — Message interval (minimum gap between OT messages, 100-1275ms)
   else if (cmd0 == 'M' && cmd1 == 'I') {
     uint16_t val = atoi(value);
-    if (val < 100 || val > 1275) { processOT("OR", 2); return; }
+    if (val < 100 || val > 1275) { otDirectBridgeProcessStatus("OR"); return; }
     otMinIntervalMs = val;
     settings.otd.iMsgInterval = val;
     // PIC responds in centiseconds (10ms units): 100ms → "10", 1275ms → "127"
@@ -2752,7 +2847,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // FS=0/1 — Fail safety (controls setback on thermostat disconnect)
   else if (cmd0 == 'F' && cmd1 == 'S') {
-    if (!checkBoolean(value)) { processOT("BV", 2); return; }
+    if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return; }
     otFailSafeEnabled = (value[0] == '1');
     settings.otd.bFailSafe = otFailSafeEnabled;
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
@@ -2764,7 +2859,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     bool isWrite = false;
     // Parse "MsgID:Index" or "MsgID:Index=Value"
     char* colonPos = strchr(value, ':');
-    if (!colonPos) { processOT("SE", 2); return; }
+    if (!colonPos) { otDirectBridgeProcessStatus("SE"); return; }
     tpMsgId = atoi(value);
     char* afterColon = colonPos + 1;
     tpIndex = atoi(afterColon);
@@ -2777,10 +2872,10 @@ void handleOTDirectCommand(const char* buf, int len) {
     // Odd = TSP r/w, Even+2 = FHB read-only
     if (tpMsgId != 11 && tpMsgId != 13 &&
         tpMsgId != 89 && tpMsgId != 91 &&
-        tpMsgId != 106 && tpMsgId != 108) { processOT("BV", 2); return; }
-    if (tpIndex > 255 || tpValue > 255) { processOT("OR", 2); return; }
+        tpMsgId != 106 && tpMsgId != 108) { otDirectBridgeProcessStatus("BV"); return; }
+    if (tpIndex > 255 || tpValue > 255) { otDirectBridgeProcessStatus("OR"); return; }
     // FHB entries (13, 91, 108) are read-only
-    if (isWrite && (tpMsgId == 13 || tpMsgId == 91 || tpMsgId == 108)) { processOT("SE", 2); return; }
+    if (isWrite && (tpMsgId == 13 || tpMsgId == 91 || tpMsgId == 108)) { otDirectBridgeProcessStatus("SE"); return; }
     // Build and queue the frame
     uint16_t tpData = ((uint16_t)tpIndex << 8) | (isWrite ? (uint16_t)tpValue : 0);
     OpenThermMessageType tpType = isWrite ?
@@ -2840,7 +2935,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   // Unknown command
   else {
     OTDDebugTf(PSTR("OTD: unknown cmd %c%c= (rejected)\r\n"), cmd0, cmd1);
-    processOT("NG", 2);  // No Good — unknown command code
+    otDirectBridgeProcessStatus("NG");  // No Good — unknown command code
   }
 }
 

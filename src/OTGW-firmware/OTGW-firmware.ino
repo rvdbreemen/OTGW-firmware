@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -542,7 +542,7 @@ void doBackgroundTasks()
     emergencyHeapRecovery();
   }
 
-  if (WiFi.status() == WL_CONNECTED) {
+  if (isNetworkUp()) {
     if (state.flash.bESPactive) {
       handleEspFlashBackgroundTasks();
     } else if (state.flash.bPICactive) {
@@ -550,9 +550,11 @@ void doBackgroundTasks()
     } else {
       //while connected handle everything that uses network stuff
       handleDebug();
+      handleOTGWstream();          // OTGW serial bridge on TCP port 25238
       handleMQTT();                 // MQTT transmissions
       handlePICSerial();            // OTGW/PIC handling
 #if HAS_DIRECT_OT
+      handleOTDirectBridgeStream(); // OTGW32/TCP 25238 command bridge
       loopOTDirect();               // OT-direct GPIO poll (OTGW32 only)
 #endif
       handleWebSocket();            // WebSocket handling for OT log streaming

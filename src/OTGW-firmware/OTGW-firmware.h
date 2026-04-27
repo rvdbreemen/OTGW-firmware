@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -32,6 +32,7 @@ extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 #include "boards.h"             // Board-specific pin maps and feature flags (HAS_PIC, HAS_DIRECT_OT)
 // OTDirecttypes.h must follow boards.h because its contents are gated on HAS_DIRECT_OT (ADR-079).
 #include "OTDirecttypes.h"
+#include "OTGWLogMacros.h"
 #if HAS_PIC
 #include <OTGWSerial.h>         // Schelte Bron's Serial class - it upgrades and more
 #endif
@@ -65,8 +66,10 @@ enum class OpenThermResponseStatus : byte;
 // OT-direct forward declarations (defined in OTDirect.ino)
 void initOTDirect();
 void loopOTDirect();
+void handleOTDirectBridgeStream();
 void handleOTDirectCommand(const char* buf, int len);
 void sendOTDirectOverridesJSON();
+void sendPICSerial(const char* buf, int len);
 // TASK-183: PI room compensation
 float getFlowTemp();
 // TASK-184: flame ratio metrics
@@ -220,6 +223,8 @@ void escapeJsonStringTo(const char* src, char* dest, size_t destSize);
 void GetVersion(const char* hexfile, char* version, size_t destSize);
 void startWebSocket();
 void handleWebSocket();
+void handleDebug();
+void handleOTGWstream();
 void testWebhook(bool testOn);
 void evalWebhook();
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-056; defined in restAPI.ino)

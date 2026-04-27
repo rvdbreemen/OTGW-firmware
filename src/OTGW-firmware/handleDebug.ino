@@ -198,6 +198,17 @@ void handleDebugChar(char c){
         }
 }
 
-// Called from doBackgroundTasks() — no-op now that input is handled via
-// the SimpleTelnet onInputReceived callback registered in startTelnet().
-void handleDebug(){}
+// Called from doBackgroundTasks().
+// SimpleTelnet is cooperative: loop() accepts new TCP clients, checks
+// disconnects, and dispatches onInputReceived callbacks.
+void handleDebug(){
+    debugTelnet.loop();
+}
+
+// Called from doBackgroundTasks().
+// Port 25238 uses the same cooperative SimpleTelnet service model as
+// the debug telnet port: begin() binds the listener, loop() accepts new
+// clients and maintains existing ones.
+void handleOTGWstream(){
+    OTGWstream.loop();
+}
