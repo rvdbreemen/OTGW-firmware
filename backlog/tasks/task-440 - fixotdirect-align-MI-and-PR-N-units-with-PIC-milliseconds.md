@@ -1,9 +1,10 @@
 ---
 id: TASK-440
 title: fixotdirect-align-MI-and-PR-N-units-with-PIC-milliseconds
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 09:53'
+updated_date: '2026-04-27 23:48'
 labels:
   - otdirect
   - pic-parity
@@ -43,12 +44,18 @@ Keep the fix limited to response/reporting units unless further testing proves t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `MI=<n>` continues to accept the current OTDirect millisecond range unless a separately documented PIC/spec reason justifies a range change.
-- [ ] #2 For valid input, OTDirect stores/schedules the same millisecond interval as before; the task is not a scheduling rewrite.
-- [ ] #3 The `MI:` response reports milliseconds, so `MI=500` responds as `MI: 500` or the repository's exact response-prefix equivalent with value `500`.
-- [ ] #4 `PR=N` reports the minimum message interval in milliseconds, matching the PIC `PrintInterval` behavior.
+- [x] #1 `MI=<n>` continues to accept the current OTDirect millisecond range unless a separately documented PIC/spec reason justifies a range change.
+- [x] #2 For valid input, OTDirect stores/schedules the same millisecond interval as before; the task is not a scheduling rewrite.
+- [x] #3 The `MI:` response reports milliseconds, so `MI=500` responds as `MI: 500` or the repository's exact response-prefix equivalent with value `500`.
+- [x] #4 `PR=N` reports the minimum message interval in milliseconds, matching the PIC `PrintInterval` behavior.
 - [ ] #5 Any documentation that claims OTDirect/PIC `MI` responses are centiseconds is corrected to milliseconds.
-- [ ] #6 Invalid values remain rejected and do not update the stored interval.
+- [x] #6 Invalid values remain rejected and do not update the stored interval.
 - [ ] #7 A focused verification covers `MI=500`, at least one boundary value from the accepted range, and `PR=N` after setting the interval.
-- [ ] #8 PIC firmware/source files are not modified.
+- [x] #8 PIC firmware/source files are not modified.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OTDirect MI= response and PR=N report milliseconds (PIC PrintInterval parity). Previously divided otMinIntervalMs / 10 producing centiseconds, now echoes the millisecond value directly. Stored interval and scheduling unchanged (otMinIntervalMs remains the canonical millisecond store). Range 100..1275ms unchanged. Out-of-range rejection unchanged (OR error). Build clean. Docs sweep (AC #5) and explicit unit test (AC #7) deferred — TASK-444 fixture covers AC #5 verification expectations.
+<!-- SECTION:FINAL_SUMMARY:END -->

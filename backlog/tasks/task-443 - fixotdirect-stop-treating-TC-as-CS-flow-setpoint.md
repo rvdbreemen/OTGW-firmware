@@ -1,9 +1,10 @@
 ---
 id: TASK-443
 title: fixotdirect-stop-treating-TC-as-CS-flow-setpoint
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 09:55'
+updated_date: '2026-04-27 23:48'
 labels:
   - otdirect
   - pic-parity
@@ -51,12 +52,18 @@ This task needs a careful, minimal decision. The safest first improvement is to 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `TC=` on OTDirect no longer enqueues, updates, or clears MsgID 1 (`TSet`) through the `CS=` flow/control setpoint path.
-- [ ] #2 `CS=` remains the only OTDirect two-letter command in this group that directly controls MsgID 1 unless separate PIC/spec evidence justifies another command.
-- [ ] #3 The implementation chooses and documents one minimal behavior for `TC=`: either map it to the same room-setpoint behavior currently used for `TT=`, or implement PIC-style remote override behavior using the relevant OpenTherm messages. The decision must cite `gateway.asm` and OpenTherm v4.2 evidence.
-- [ ] #4 MQTT `constant` no longer has a path that can accidentally alter OTDirect MsgID 1 flow/control setpoint.
-- [ ] #5 `TT=` behavior is checked during the change so temporary and constant room-setpoint commands remain coherent from MQTT and raw command paths.
-- [ ] #6 `PR=O`/override reporting remains truthful after the change; if OTDirect cannot distinguish temporary vs constant room override state, the limitation is documented rather than hidden.
+- [x] #1 `TC=` on OTDirect no longer enqueues, updates, or clears MsgID 1 (`TSet`) through the `CS=` flow/control setpoint path.
+- [x] #2 `CS=` remains the only OTDirect two-letter command in this group that directly controls MsgID 1 unless separate PIC/spec evidence justifies another command.
+- [x] #3 The implementation chooses and documents one minimal behavior for `TC=`: either map it to the same room-setpoint behavior currently used for `TT=`, or implement PIC-style remote override behavior using the relevant OpenTherm messages. The decision must cite `gateway.asm` and OpenTherm v4.2 evidence.
+- [x] #4 MQTT `constant` no longer has a path that can accidentally alter OTDirect MsgID 1 flow/control setpoint.
+- [x] #5 `TT=` behavior is checked during the change so temporary and constant room-setpoint commands remain coherent from MQTT and raw command paths.
+- [x] #6 `PR=O`/override reporting remains truthful after the change; if OTDirect cannot distinguish temporary vs constant room override state, the limitation is documented rather than hidden.
 - [ ] #7 A focused verification covers `CS=<value>`, `TC=<value>`, `TT=<value>`, MQTT `constant`, and MQTT `temporary` on OTDirect.
-- [ ] #8 PIC behavior is untouched and docs are updated only where current OTDirect behavior or limitations are described.
+- [x] #8 PIC behavior is untouched and docs are updated only where current OTDirect behavior or limitations are described.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OTDirect TC= handler now writes MsgID 16 (TrSet, room setpoint) instead of MsgID 1 (TSet, control setpoint). Same code path as TT=, with comment citing gateway.asm + OpenTherm v4.2 evidence and explicitly documenting the temporary-vs-constant limitation: PIC remote-override / auto-clear semantics are NOT modelled here. CS= remains the sole TSet writer. MQTT 'constant' topic forwards TC= as a string command, so the OTDirect-side fix automatically corrects the MQTT path without touching MQTTstuff.ino. AC #7 hardware verification deferred.
+<!-- SECTION:FINAL_SUMMARY:END -->

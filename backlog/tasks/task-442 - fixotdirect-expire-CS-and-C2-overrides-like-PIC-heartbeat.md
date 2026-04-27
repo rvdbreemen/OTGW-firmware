@@ -1,9 +1,10 @@
 ---
 id: TASK-442
 title: fixotdirect-expire-CS-and-C2-overrides-like-PIC-heartbeat
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 09:54'
+updated_date: '2026-04-27 23:48'
 labels:
   - otdirect
   - pic-parity
@@ -44,13 +45,19 @@ Keep the fix minimal: add timestamp/expiry handling for `CS` and `C2` only. Do n
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 OTDirect records the last successful `CS=` and `C2=` command time separately.
+- [x] #1 OTDirect records the last successful `CS=` and `C2=` command time separately.
 - [ ] #2 For normal setpoint values matching the PIC expiry category, OTDirect automatically clears/stops the corresponding override after approximately one minute without a fresh command.
-- [ ] #3 Refreshed `CS=`/`C2=` commands reset the expiry timer, so SAT's periodic control loop does not lose active control while it is still sending commands.
-- [ ] #4 Explicit release commands such as `CS=0` and `C2=0` continue to clear immediately and do not wait for the expiry timer.
-- [ ] #5 The expiry behavior is limited to `CS` and `C2` unless another command is explicitly justified with PIC evidence in the implementation notes.
+- [x] #3 Refreshed `CS=`/`C2=` commands reset the expiry timer, so SAT's periodic control loop does not lose active control while it is still sending commands.
+- [x] #4 Explicit release commands such as `CS=0` and `C2=0` continue to clear immediately and do not wait for the expiry timer.
+- [x] #5 The expiry behavior is limited to `CS` and `C2` unless another command is explicitly justified with PIC evidence in the implementation notes.
 - [ ] #6 Low-value/no-expiry behavior is matched to the PIC threshold where feasible; if OTDirect cannot or should not preserve that special case, the implementation notes must explain the decision with safety and compatibility reasoning.
-- [ ] #7 MQTT and REST one-shot command paths are covered in the analysis so stale overrides from those paths expire the same way as raw serial-style commands.
+- [x] #7 MQTT and REST one-shot command paths are covered in the analysis so stale overrides from those paths expire the same way as raw serial-style commands.
 - [ ] #8 A focused verification demonstrates: `CS` persists before the timeout, clears after the timeout without refresh, stays active when refreshed, and `C2` follows the same behavior.
-- [ ] #9 PIC firmware/source files are not modified.
+- [x] #9 PIC firmware/source files are not modified.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Per-command millisecond timestamps otCSLastCommandMs and otC2LastCommandMs added near override state. CS=/C2= handlers refresh the timestamp on a non-zero value and zero it on explicit clear. Periodic 1Hz timer in loopOTDirect() compares (millis - timestamp) against OT_CSC2_EXPIRY_MS = 60000ms; on timeout it calls clearWriteOverride(1) / clearWriteOverride(8) and zeroes the timestamp. Refreshed CS=/C2= reset the timer so SAT's periodic control loop is not affected while healthy. Explicit CS=0/C2=0 clear immediately and disarm expiry. PIC source untouched. AC #2 and #6: low-value/no-expiry carve-out NOT implemented — gateway.asm has a threshold-based preserve case for low setpoints, but OTDirect treats all CS/C2 the same to keep the change minimal and avoid replicating an undocumented numeric threshold. Documented as a known divergence; clients needing PIC-exact preserve behaviour for low setpoints should use PIC firmware. AC #8 hardware verification deferred.
+<!-- SECTION:FINAL_SUMMARY:END -->

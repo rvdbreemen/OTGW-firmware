@@ -1,10 +1,10 @@
 ---
 id: TASK-437
 title: fixsat-use-SW-command-for-DHW-setpoint-instead-of-unsupported-TW
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 09:47'
-updated_date: '2026-04-27 09:51'
+updated_date: '2026-04-27 23:47'
 labels:
   - sat
   - otdirect
@@ -47,13 +47,13 @@ Keep this as a one-command fix unless testing reveals a second directly coupled 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SAT DHW transition code sends `SW=<setpoint>` instead of `TW=<setpoint>`.
-- [ ] #2 The debug/log message is updated so it reports the actual command sent.
-- [ ] #3 The command remains guarded by the existing DHW enabled/range/interface checks; no new control-loop behavior is introduced.
-- [ ] #4 The valid DHW range check remains at the existing SAT level unless a separately justified bounds change is required.
-- [ ] #5 OTDirect accepts the generated command and maps it to MsgID 56 (`TdhwSet`) with the expected f8.8 value.
-- [ ] #6 PIC command parity is preserved: the generated command is accepted by `gateway.asm` command table semantics.
-- [ ] #7 A focused verification documents the exact generated command for a DHW-active transition, either by test, loopback trace, or code-level assertion in the task notes.
+- [x] #1 SAT DHW transition code sends `SW=<setpoint>` instead of `TW=<setpoint>`.
+- [x] #2 The debug/log message is updated so it reports the actual command sent.
+- [x] #3 The command remains guarded by the existing DHW enabled/range/interface checks; no new control-loop behavior is introduced.
+- [x] #4 The valid DHW range check remains at the existing SAT level unless a separately justified bounds change is required.
+- [x] #5 OTDirect accepts the generated command and maps it to MsgID 56 (`TdhwSet`) with the expected f8.8 value.
+- [x] #6 PIC command parity is preserved: the generated command is accepted by `gateway.asm` command table semantics.
+- [x] #7 A focused verification documents the exact generated command for a DHW-active transition, either by test, loopback trace, or code-level assertion in the task notes.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -72,3 +72,9 @@ Implementation guardrails:
 - Do not add a `TW=` alias unless a real compatibility need is proven; adding aliases can hide SAT bugs and expands the command surface unnecessarily.
 - Verification should prove the SAT path emits `SW=` and that OTDirect handles it as MsgID 56.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SATcontrol.ino DHW transition path: snprintf format changed from "TW=%d" to "SW=%d", buffer renamed twCmd -> swCmd, and the SATDebugTf log now prints the actual sent command via the renamed buffer. PIC gateway.asm SerialCmd04 implements SW for MsgID 56 (TdhwSet); OTDirect's existing SW= handler already maps to MsgID 56 with f8.8 encoding. TW= had no PIC mapping and was rejected as NG. Existing DHW enabled / range / hasOTCommandInterface guards retained. Build clean.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,11 @@
 ---
 id: TASK-464
 title: 'chore(ui): delete dead index_common.css from data/ (audit finding 3)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-27 23:35'
+updated_date: '2026-04-27 23:42'
 labels: []
 dependencies: []
 priority: medium
@@ -18,8 +19,14 @@ index_common.css exists in src/OTGW-firmware/data/ but no HTML file links it (gr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Confirmed no HTML file references index_common.css
-- [ ] #2 Unique rules from index_common.css verified to be covered in components.css OR migrated
-- [ ] #3 index_common.css deleted from data/
-- [ ] #4 Build clean and LittleFS image rebuilt
+- [x] #1 Confirmed no HTML file references index_common.css
+- [x] #2 Unique rules from index_common.css verified to be covered in components.css OR migrated
+- [x] #3 index_common.css deleted from data/
+- [x] #4 Build clean and LittleFS image rebuilt
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+index_common.css deleted. Verified no HTML references via grep. Selectors covered by components.css. LittleFS image rebuilt clean.
+<!-- SECTION:FINAL_SUMMARY:END -->
