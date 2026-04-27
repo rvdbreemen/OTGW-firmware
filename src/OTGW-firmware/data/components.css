@@ -180,7 +180,7 @@ body.dark .adv_dropdown .list_item:hover,
   background: var(--bg-surface-alt); color: var(--fg-2);
 }
 .btn-danger { background: var(--status-danger); color: #fff; border-color: transparent; }
-.btn-warn   { background: var(--status-warn);   color: #000; border-color: transparent; }
+.btn-warn   { background: var(--status-warn);   color: var(--fg-1); border-color: transparent; }
 .btn-ok     { background: var(--status-ok);     color: #fff; border-color: transparent; }
 
 /* Log-control variant — kleiner, plat */
@@ -305,7 +305,7 @@ input[type="range"].ds-slider::-moz-range-thumb {
   background: var(--bg-muted); color: var(--fg-3);
 }
 .ds-pill.is-ok    { background: var(--status-ok);    color: #fff; }
-.ds-pill.is-warn  { background: var(--status-warn);  color: #000; }
+.ds-pill.is-warn  { background: var(--status-warn);  color: var(--fg-1); }
 .ds-pill.is-info  { background: var(--status-info);  color: #fff; }
 .ds-pill.is-error { background: var(--status-error); color: #fff; }
 
@@ -695,7 +695,7 @@ body.dark .settingDiv,
   transform: translateY(-2px); box-shadow: var(--shadow-card); opacity: .95;
 }
 .fs-btn.secondary { background: #6c757d; }
-.fs-btn.wifi      { background: var(--status-warn); color: #000; }
+.fs-btn.wifi      { background: var(--status-warn); color: var(--fg-1); }
 .fs-btn.danger    { background: var(--status-danger); }
 
 /* =============================================================
@@ -773,7 +773,7 @@ body.dark .settingDiv,
     font-family: var(--font-sans); /* was 'Dosis' — never actually loaded */
     line-height: 1.6;
     color: black;
-    background: #e6ffff;
+    background: var(--brand-cyan-soft);
     color-scheme: light;  /* match the meta tag; native widgets render in light variant across Chrome/Edge/Safari/Firefox */
   }
 
@@ -795,16 +795,16 @@ body.dark .settingDiv,
   
   th {
     white-space: nowrap;
-    border-right: 1px solid #ddd;
-    border-left: 1px solid #ddd;
+    border-right: 1px solid var(--border-1);
+    border-left: 1px solid var(--border-1);
     vertical-align: bottom;
   }
   
   td {
     white-space: nowrap;
-    border-bottom: 1px solid #ddd;
-    border-right: 1px solid #ddd;
-    border-left: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-1);
+    border-right: 1px solid var(--border-1);
+    border-left: 1px solid var(--border-1);
     vertical-align: bottom;
   }
   
@@ -837,7 +837,7 @@ body.dark .settingDiv,
   
   /*--------------------- N A V - B A R -----------------*/
 .nav-container,.footer {
-    background: #00bffe;
+    background: var(--brand-cyan);
     padding: 6px;
     min-height: 50px;
     display: flex;
@@ -846,7 +846,7 @@ body.dark .settingDiv,
   }
   
   .footer {
-    background-color: #e6ffff;
+    background-color: var(--brand-cyan-soft);
   }
 
   .nav-container a:hover {
@@ -886,12 +886,12 @@ body.dark .settingDiv,
     position: absolute;
     top: 121px;
     right: 10px;
-    background-color: #f9f9f9;
+    background-color: var(--bg-surface-alt);
     min-width: 200px;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
     z-index: 200;
     border-radius: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-2);
     padding: 5px 0;
   }
 
@@ -903,7 +903,7 @@ body.dark .settingDiv,
     display: block;
     padding: 10px 15px;
     text-decoration: none;
-    color: #333;
+    color: var(--fg-2);
     cursor: pointer;
     border-bottom: 1px solid #eee;
   }
@@ -914,7 +914,7 @@ body.dark .settingDiv,
 
   .nav-right .adv_dropdown span:hover {
     background-color: #e6f7ff;
-    color: #000;
+    color: var(--fg-1);
   } 
   
   .nav-item {
@@ -982,7 +982,7 @@ body.dark .settingDiv,
     background: white; 
     width: 200px; 
     padding-right: 10px;
-    background: #e6ffff;
+    background: var(--brand-cyan-soft);
   }
 
   /*-------------------------*/
@@ -1007,14 +1007,14 @@ body.dark .settingDiv,
   .right-0  {right: 0; padding-right: 10px; }
   .left-0   {left:  0; padding-left:  10px; }
   .ps-mode-watermark {
-    color: #9c5700 !important;
+    color: var(--status-warn-text) !important;
     font-weight: 700;
     letter-spacing: 0.2px;
   }
   
   /* Version mismatch warning styling */
   .version-warning {
-    background-color: #ff6b6b !important;
+    background-color: var(--status-error-bg) !important;
     color: white !important;
     font-weight: bold !important;
     font-size: 14px !important;
@@ -1029,7 +1029,7 @@ body.dark .settingDiv,
     width: 100%;
     height: 600px;
     background-color: white;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-2);
     padding: 10px;
     box-sizing: border-box;
     display: flex;
@@ -1072,7 +1072,7 @@ body.dark .settingDiv,
 .ot-graph-select {
     padding: 5px;
     border-radius: 4px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-2);
     background-color: white;
     color: black;
 }
@@ -1127,21 +1127,21 @@ body.dark .settingDiv,
 
   .net-status-text {
     font-size: 11px;
-    color: #555; /* WCAG AA on header bg; replaced opacity:0.7 which broke contrast */
+    color: var(--border-2); /* WCAG AA on header bg; replaced opacity:0.7 which broke contrast */
   }
 
   .sat-weather-coords {
     font-size: 0.85em;
-    color: #666; /* WCAG AA secondary text; replaces inline color:#888 */
+    color: var(--fg-4); /* WCAG AA secondary text; replaces inline color:var(--fg-5) */
   }
 
-  .net-status.net-wifi .net-icon { color: #4caf50; }
-  .net-status.net-ethernet .net-icon { color: #2196f3; }
-  .net-status.net-ap .net-icon { color: #ff9800; }
-  .net-status.net-ap .net-status-text { color: #ff9800; font-weight: bold; }
+  .net-status.net-wifi .net-icon { color: var(--status-ok); }
+  .net-status.net-ethernet .net-icon { color: var(--status-info); }
+  .net-status.net-ap .net-icon { color: var(--status-warn); }
+  .net-status.net-ap .net-status-text { color: var(--status-warn); font-weight: bold; }
 
   /* Signal strength bars — inactive color (structure in index_common.css) */
-  .sig-bar { background: #ccc; }
+  .sig-bar { background: var(--border-2); }
   /* Signal quality tiers — applied by JS setting data-quality on .net-signal-bars */
   .net-signal-bars[data-quality="good"]   .sig-bar.active { background: var(--status-ok); }
   .net-signal-bars[data-quality="medium"] .sig-bar.active { background: var(--status-warn); }
@@ -1155,25 +1155,25 @@ body.dark .settingDiv,
   max-width: 720px;
   border-collapse: collapse;
   margin: 10px 0 12px 0;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-1);
 }
 .picrow {
   display: table-row;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-1);
 }
 .picrow:nth-child(even) {
-  background-color: #f9f9f9;
+  background-color: var(--bg-surface-alt);
 }
 .piccolumn1, .piccolumn2, .piccolumn3 {
   display: table-cell;
   padding: 8px 15px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-1);
   text-align: left;
 }
 .piccolumn4, .piccolumn5 {
   display: table-cell;
   padding: 8px 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-1);
   text-align: center;
   width: 30px;
 }
@@ -1198,9 +1198,9 @@ body.dark .settingDiv,
   display: block;
   font-size: 12px;
   line-height: 16px;
-  background: #fefdcd;
+  background: var(--tooltip-bg);
   padding: 5px 2px;
-  border: 1px solid #c0c0c0;
+  border: 1px solid var(--tooltip-border);
   box-shadow: 2px 4px 5px rgba(0, 0, 0, 0.4);
 }
 
@@ -1297,11 +1297,11 @@ body.dark .settingDiv,
 }
 
 .crashlog-panel {
-  background: #ffe7b3;
-  border: 1px solid #f0b74a;
-  border-left: 5px solid #d98200;
+  background: var(--crash-bg);
+  border: 1px solid var(--crash-border);
+  border-left: 5px solid var(--crash-accent);
   padding: 10px 12px;
-  color: #4a3200;
+  color: var(--crash-text);
 }
 
 .crashlog-title {
@@ -1378,7 +1378,7 @@ body.dark .settingDiv,
 }
 #settingMessage.loading {
   display: block;
-  background-color: #2196F3;
+  background-color: var(--status-info);
 }
 #settingMessage.error {
   display: block;
@@ -1401,12 +1401,12 @@ body.dark .settingDiv,
      (mobile Safari, some Android Chromium). */
   .input-changed { background: lightgray; color: black; }
   .input-normal { background: white; color: black; }
-  .input-readonly { background: #f0f0f0; color: #666; }
+  .input-readonly { background: var(--slider-thumb-bg); color: var(--fg-4); }
 
   .btn-wifi-reset {
     margin-left: 8px;
     padding: 4px 10px;
-    background: #e57373;
+    background: var(--status-danger);
     color: white;
     border: none;
     border-radius: 4px;
@@ -1416,7 +1416,7 @@ body.dark .settingDiv,
   }
 
   .btn-wifi-reset:hover {
-    background: #c62828;
+    background: var(--status-critical);
   }
 
   /*
@@ -1453,7 +1453,7 @@ body.dark .settingDiv,
 .ot-log-section {
   margin: 20px 0;
   padding: 15px;
-  background: #f5f5f5;
+  background: var(--bg-panel);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -1478,12 +1478,12 @@ body.dark .settingDiv,
   align-items: center;
   margin-bottom: 10px;
   padding-bottom: 10px;
-  border-bottom: 2px solid #ddd;
+  border-bottom: 2px solid var(--border-1);
 }
 
 .ot-log-header h3 {
   margin: 0;
-  color: #333;
+  color: var(--fg-2);
   font-size: 18px;
 }
 
@@ -1518,7 +1518,7 @@ body.dark .settingDiv,
   min-height: 22px;
   padding: 2px 9px;
   border-radius: 999px;
-  background: #0a84ff;
+  background: var(--sim-badge-bg);
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
@@ -1542,12 +1542,12 @@ body.dark .settingDiv,
 
 .mode-gateway {
   background: var(--status-warn);
-  box-shadow: 0 0 8px #ff9800;
+  box-shadow: 0 0 8px var(--status-warn);
 }
 
 .mode-monitor {
   background: var(--status-info);
-  box-shadow: 0 0 8px #2196f3;
+  box-shadow: 0 0 8px var(--status-info);
 }
 
 .mode-unknown {
@@ -1565,7 +1565,7 @@ body.dark .settingDiv,
 
 .btn-log-control {
   padding: 6px 12px;
-  background: #2196F3;
+  background: var(--status-info);
   color: white;
   border: none;
   border-radius: 4px;
@@ -1596,7 +1596,7 @@ body.dark .settingDiv,
   flex: 1;
   min-width: 200px;
   padding: 6px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-1);
   border-radius: 4px;
   font-size: 13px;
 }
@@ -1645,7 +1645,7 @@ body.dark .settingDiv,
 
 /* Log Container */
 .ot-log-container {
-  background: #1e1e1e;
+  background: var(--log-bg);
   border-radius: 4px;
   overflow: hidden;
   transition: max-height 0.3s ease;
@@ -1663,7 +1663,7 @@ body.dark .settingDiv,
 .ot-log-content {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: #d4d4d4;
+  color: var(--log-fg);
   padding: 15px;
   overflow-y: auto;
   overflow-x: auto;
@@ -1675,7 +1675,7 @@ body.dark .settingDiv,
 @supports (scrollbar-width: thin) {
   .ot-log-content {
     scrollbar-width: thin;
-    scrollbar-color: #555 #1e1e1e;
+    scrollbar-color: var(--border-2) var(--log-bg);
   }
 }
 
@@ -1684,10 +1684,10 @@ body.dark .settingDiv,
   display: flex;
   justify-content: space-between;
   padding: 8px 12px;
-  background: #e0e0e0;
+  background: var(--bg-muted);
   border-radius: 0 0 4px 4px;
   font-size: 12px;
-  color: #555;
+  color: var(--border-2);
 }
 
 .ot-log-footer span {
@@ -1712,7 +1712,7 @@ body.dark .settingDiv,
   
   .flashProgressBarContainer {
     width: 100%;
-    background-color: #e0e0e0;
+    background-color: var(--bg-muted);
     height: 30px;
     border-radius: 15px;
     overflow: hidden;
@@ -1725,7 +1725,7 @@ body.dark .settingDiv,
     left: 0;
     height: 100%;
     width: 0%;
-    background-color: #4CAF50; /* Green */
+    background-color: var(--status-ok); /* Green */
     -webkit-transition: width 0.3s ease;
     transition: width 0.3s ease;
     will-change: width;
@@ -1742,7 +1742,7 @@ body.dark .settingDiv,
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    color: #333; /* Dark text for visibility */
+    color: var(--fg-2); /* Dark text for visibility */
     z-index: 2; /* Ensure on top of bar */
   }
 
@@ -1757,7 +1757,7 @@ body.disable-interaction {
 /* Tabs support */
 .ot-log-tabs {
   margin-bottom: 15px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-1);
 }
 
 .tab-link {
@@ -1770,17 +1770,17 @@ body.disable-interaction {
   font-size: 14px;
   font-weight: bold;
   transition: 0.3s;
-  color: #555;
+  color: var(--border-2);
 }
 
 .tab-link:hover {
-  background-color: #ddd;
+  background-color: var(--border-1);
   border-radius: 4px 4px 0 0;
 }
 
 .tab-link.active {
-  color: #2196F3;
-  border-bottom: 3px solid #2196F3;
+  color: var(--status-info);
+  border-bottom: 3px solid var(--status-info);
 }
 
 .tab-content {
@@ -1810,15 +1810,15 @@ body.disable-interaction {
 .ot-stats-table th, .ot-stats-table td {
   text-align: left;
   padding: 2px 8px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ot-stats-table th {
-  background-color: #f2f2f2;
-  color: #333;
+  background-color: var(--bg-header-strip);
+  color: var(--fg-2);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -1830,7 +1830,7 @@ body.disable-interaction {
 }
 
 .ot-stats-table tr:hover {
-  background-color: #f5f5f5;
+  background-color: var(--bg-panel);
 }
 
 .ot-stats-container {
@@ -1838,7 +1838,7 @@ body.disable-interaction {
   max-height: 600px;
   overflow-y: auto;
   background: white;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-1);
 }
 
 /* Utility classes for common inline styles */
@@ -1861,7 +1861,7 @@ body.disable-interaction {
 
 .fs-mismatch-banner {
   padding: 10px 16px;
-  background-color: #c62828;
+  background-color: var(--status-critical);
   color: white;
   font-weight: bold;
   text-align: center;
@@ -1878,19 +1878,19 @@ body.disable-interaction {
   max-width: 720px;
 }
 .pic-update-banner.checking {
-  color: #888;
+  color: var(--fg-5);
 }
 .pic-update-banner.update-available {
-  background-color: #e65c00;
+  background-color: var(--status-alert);
   color: white;
   font-weight: bold;
 }
 .pic-update-banner.up-to-date {
-  background-color: #2e7d32;
+  background-color: var(--status-ok-dark);
   color: white;
 }
 .pic-version-outdated {
-  color: #e65c00;
+  color: var(--status-alert);
   font-weight: bold;
 }
 
@@ -1957,14 +1957,14 @@ body.disable-interaction {
   margin: 0 0 6px 0;
   padding: 6px 10px;
   background-color: #e8e8e8;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-1);
   border-radius: 3px 3px 0 0;
 }
 .pic-settings-group-cell {
   display: table-cell;
   padding: 5px 15px;
   font-style: italic;
-  color: #666;
+  color: var(--fg-4);
   font-size: 0.9em;
   border: none;
   background: transparent;
@@ -1983,7 +1983,7 @@ body.disable-interaction {
 .pic-settings-refresh {
   margin-top: 8px;
   font-size: 0.85em;
-  color: #666;
+  color: var(--fg-4);
 }
 .pic-settings-refresh button {
   margin-right: 8px;
@@ -1999,20 +1999,20 @@ body.disable-interaction {
   border: 1px solid #b2dfdb;
 }
 .sat-card-label {
-  color: #555;
+  color: var(--border-2);
 }
 .sat-card-value {
   color: #00695c;
 }
 .sat-section {
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-1);
   padding-bottom: 12px;
 }
 .sat-section h3 {
   color: #00796b;
 }
 .sat-label {
-  color: #444;
+  color: var(--border-1);
 }
 .sat-value {
   color: #222;
@@ -2039,19 +2039,19 @@ body.disable-interaction {
 }
 .sat-badge-active {
   background: #c8e6c9;
-  color: #2e7d32;
+  color: var(--status-ok-dark);
 }
 .sat-badge-idle {
   background: #fff9c4;
   color: #f57f17;
 }
 .sat-badge-disabled {
-  background: #e0e0e0;
+  background: var(--bg-muted);
   color: #757575;
 }
 .sat-badge-error {
   background: #ffcdd2;
-  color: #c62828;
+  color: var(--status-critical);
 }
 .sat-badge-sim {
   background: #e1bee7;
@@ -2063,10 +2063,10 @@ body.disable-interaction {
   margin-left: auto;
   padding: 4px 8px;
   border-radius: 4px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-2);
   background: #fff;
   font-size: 0.9em;
-  color: #333;
+  color: var(--fg-2);
 }
 
 /* SAT View Visibility */
@@ -2086,7 +2086,7 @@ body.disable-interaction {
   text-align: center;
   font-size: 1.3rem;
   padding: 12px;
-  color: #666;
+  color: var(--fg-4);
   font-weight: 500;
 }
 .sat-view-simple .sat-simple-status.heating { color: #e67e22; }
@@ -2098,7 +2098,7 @@ body.disable-interaction {
 .sat-health-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; background: #999; }
 .sat-health-ok { background: var(--status-ok); }
 .sat-health-problem { background: var(--status-error); }
-.sat-raw-data { background: #f5f5f5; padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+.sat-raw-data { background: var(--bg-panel); padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
 .sat-collapsible { cursor: pointer; }
 .sat-collapsible:hover { opacity: 0.8; }
 
@@ -2128,11 +2128,11 @@ body.disable-interaction {
 ***************************************************************************
 */
 :root {
-    --primary-color: #0088cc; /* A slightly darker blue than #00bffe for better text contrast */
-    --primary-hover: #0077b3;
-    --bg-color: #e6ffff;      /* Matching index.css background */
+    --primary-color: var(--accent-primary); /* A slightly darker blue than var(--brand-cyan) for better text contrast */
+    --primary-hover: var(--accent-hover);
+    --bg-color: var(--brand-cyan-soft);      /* Matching index.css background */
     --card-bg: #ffffff;
-    --text-color: #333;
+    --text-color: var(--fg-2);
     --border-radius: 8px;
     --shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
@@ -2191,7 +2191,7 @@ tr:last-child {
     border-bottom: none;
 }
 
-tr:nth-child(even) { background: #f0fbff; } /* Very faint blue */
+tr:nth-child(even) { background: var(--bg-row-zebra); } /* Very faint blue */
 tr:nth-child(odd) { background: #ffffff; }
 
 td {
@@ -2220,7 +2220,7 @@ a:hover {
 }
 
 a.delete-link {
-    color: #dc3545; /* Danger Red */
+    color: var(--status-danger); /* Danger Red */
 }
 a.delete-link:hover {
     color: #c82333;
@@ -2357,7 +2357,7 @@ input[type="submit"]:active, input[type="button"]:active, .button:active {
 }
 
 input[type="submit"]:disabled {
-    background-color: #ccc;
+    background-color: var(--border-2);
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
@@ -2367,10 +2367,10 @@ input[type="submit"]:disabled {
 form[action='/ReBoot'] input { background-color: #6c757d; }
 form[action='/ReBoot'] input:hover { background-color: #5a6268; }
 
-form[action='/ResetWireless'] input { background-color: #ffc107; color: #000; }
+form[action='/ResetWireless'] input { background-color: #ffc107; color: var(--fg-1); }
 form[action='/ResetWireless'] input:hover { background-color: #e0a800; }
 
-form[action='/'] input { background-color: #dc3545; }
+form[action='/'] input { background-color: var(--status-danger); }
 form[action='/'] input:hover { background-color: #c82333; }
 
 /* Hide HR as we use cards now */
@@ -2383,11 +2383,11 @@ hr {
     margin-top: 40px;
     text-align: center;
     font-size: 0.85em;
-    color: #888;
+    color: var(--fg-5);
     width: 100%;
 }
 #left a {
-    color: #888;
+    color: var(--fg-5);
     text-decoration: none;
     margin: 0 5px;
 }
@@ -2443,8 +2443,8 @@ tr[style*="background-color"] {
     -webkit-font-smoothing: antialiased;
     font-family: var(--font-sans); /* was 'Dosis' — never actually loaded */
     line-height: 1.6;
-    color: #e0e0e0;
-    background: #1a1a1a;
+    color: var(--bg-muted);
+    background: var(--bg-app);
     /* color-scheme tells modern browsers to render native widgets (number
        spinners, autofill UI, focus rings, dropdowns) in their dark variant.
        Supported: Chrome 81+, Firefox 96+, Safari 13+, Edge 81+. Covered by
@@ -2454,24 +2454,24 @@ tr[style*="background-color"] {
     /* scrollbar-color: honored by Firefox 64+, Chrome 121+ (Jan 2024), and
        Safari 18+ (Sep 2024). Older Blink/WebKit needs the ::-webkit-scrollbar
        fallbacks further down. */
-    scrollbar-color: #555 #2c2c2e;
+    scrollbar-color: var(--border-2) var(--bg-surface);
   }
 
   /* Standard ::placeholder has shipped in Chrome 57+ (2017), Firefox 51+
      (2017), Safari 10.1+ (2017), Edge 79+ (2020). All older vendor-prefixed
      variants are obsolete and omitted intentionally. opacity:1 overrides
      the Firefox default of 0.54 that dims placeholders by default. */
-  ::placeholder { color: #888; opacity: 1; }
+  ::placeholder { color: var(--fg-5); opacity: 1; }
 
   /* ::-webkit-scrollbar fallbacks for Blink < 121 and WebKit < 18 which do
      not honor scrollbar-color. Safe to keep even once those versions
      disappear: modern engines that honor scrollbar-color simply ignore
      these. Does not affect Firefox. */
   ::-webkit-scrollbar              { width: 12px; height: 12px; }
-  ::-webkit-scrollbar-track        { background: #2c2c2e; }
-  ::-webkit-scrollbar-thumb        { background: #555; border-radius: 6px; border: 2px solid #2c2c2e; }
+  ::-webkit-scrollbar-track        { background: var(--bg-surface); }
+  ::-webkit-scrollbar-thumb        { background: var(--border-2); border-radius: 6px; border: 2px solid var(--bg-surface); }
   ::-webkit-scrollbar-thumb:hover  { background: #6a6a6c; }
-  ::-webkit-scrollbar-corner       { background: #2c2c2e; }
+  ::-webkit-scrollbar-corner       { background: var(--bg-surface); }
   
   body {
     max-width: 100%;
@@ -2479,30 +2479,30 @@ tr[style*="background-color"] {
   }
 
   table {
-    color: #e0e0e0;
+    color: var(--bg-muted);
     border-collapse: collapse;
     width: 90%;
-    background: #2c2c2e;
+    background: var(--bg-surface);
   }
   
   th {
     white-space: nowrap;
-    border-right: 1px solid #444;
-    border-left: 1px solid #444;
+    border-right: 1px solid var(--border-1);
+    border-left: 1px solid var(--border-1);
     vertical-align: bottom;
   }
   
   td {
     white-space: nowrap;
-    border-bottom: 1px solid #444;
-    border-right: 1px solid #444;
-    border-left: 1px solid #444;
+    border-bottom: 1px solid var(--border-1);
+    border-right: 1px solid var(--border-1);
+    border-left: 1px solid var(--border-1);
     vertical-align: bottom;
   }
   
   tfoot {
     font-size: 12px;
-    color: #6ab0ff;
+    color: var(--accent-hover);
   }
   
   input {
@@ -2530,12 +2530,12 @@ tr[style*="background-color"] {
   }
   
   .footer {
-    background-color: #1a1a1a;
+    background-color: var(--bg-app);
   }
 
   .nav-container a:hover {
-    color: #e0e0e0;
-    background: #3a3a3c; /* only for FSexplorer - Rest does not work */
+    color: var(--bg-muted);
+    background: var(--bg-surface-alt); /* only for FSexplorer - Rest does not work */
   }
 
   .nav-left {
@@ -2570,12 +2570,12 @@ tr[style*="background-color"] {
     position: absolute;
     top: 121px;
     right: 10px;
-    background-color: #2c2c2e;
+    background-color: var(--bg-surface);
     min-width: 200px;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
     z-index: 200;
     border-radius: 8px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-1);
     padding: 5px 0;
   }
 
@@ -2587,9 +2587,9 @@ tr[style*="background-color"] {
     display: block;
     padding: 10px 15px;
     text-decoration: none;
-    color: #e0e0e0;
+    color: var(--bg-muted);
     cursor: pointer;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--border-1);
   }
   
   .nav-right .adv_dropdown span:last-child {
@@ -2597,7 +2597,7 @@ tr[style*="background-color"] {
   }
 
   .nav-right .adv_dropdown span:hover {
-    background-color: #3a3a3c;
+    background-color: var(--bg-surface-alt);
     color: #fff;
   } 
   
@@ -2610,11 +2610,11 @@ tr[style*="background-color"] {
     border-radius: 5px;
     color: #c8c8c8;
     cursor: pointer;
-    box-shadow: 2px 2px 2px 0px #000;
+    box-shadow: 2px 2px 2px 0px var(--fg-1);
   }
   
   .nav-item:hover {
-    color: #e0e0e0;
+    color: var(--bg-muted);
   }
 
   .nav-item:active {
@@ -2658,12 +2658,12 @@ tr[style*="background-color"] {
 
   .nav-clock {
     top: 1px;
-    color: #e0e0e0;
+    color: var(--bg-muted);
     float: right;
     font-size: small;
     font-weight:bold;
     text-align: right;
-    background: #1a1a1a; 
+    background: var(--bg-app); 
     width: 200px; 
     padding-right: 10px;
   }
@@ -2671,7 +2671,7 @@ tr[style*="background-color"] {
   /*-------------------------*/
   
   .tabButton a:hover {
-    background-color: #555;
+    background-color: var(--border-2);
   }
   
   
@@ -2684,20 +2684,20 @@ tr[style*="background-color"] {
   .bottom { 
     position: fixed;
     font-size: small;
-    color: #888;
+    color: var(--fg-5);
     bottom:0;
   } 
   .right-0  {right: 0; padding-right: 10px; }
   .left-0   {left:  0; padding-left:  10px; }
   .ps-mode-watermark {
-    color: #f0b35d !important;
+    color: var(--status-warn-text) !important;
     font-weight: 700;
     letter-spacing: 0.2px;
   }
   
   /* Version mismatch warning styling */
   .version-warning {
-    background-color: #ff6b6b !important;
+    background-color: var(--status-error-bg) !important;
     color: white !important;
     font-weight: bold !important;
     font-size: 14px !important;
@@ -2711,8 +2711,8 @@ tr[style*="background-color"] {
 .ot-graph-container {
     width: 100%;
     height: 600px;
-    background-color: #2c2c2e;
-    border: 1px solid #444;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-1);
     padding: 10px;
     box-sizing: border-box;
     display: flex;
@@ -2755,9 +2755,9 @@ tr[style*="background-color"] {
 .ot-graph-select {
     padding: 5px;
     border-radius: 4px;
-    border: 1px solid #444;
-    background-color: #2c2c2e;
-    color: #e0e0e0;
+    border: 1px solid var(--border-1);
+    background-color: var(--bg-surface);
+    color: var(--bg-muted);
 }
   
   /* header */
@@ -2810,7 +2810,7 @@ tr[style*="background-color"] {
 
   .net-status-text {
     font-size: 11px;
-    color: #c0c0c0; /* WCAG AA on dark header bg; replaced opacity:0.7 which dropped to ~4.0:1 */
+    color: var(--tooltip-border); /* WCAG AA on dark header bg; replaced opacity:0.7 which dropped to ~4.0:1 */
   }
 
   .sat-weather-coords {
@@ -2818,16 +2818,16 @@ tr[style*="background-color"] {
     color: #999; /* WCAG AA secondary text on dark theme */
   }
 
-  .net-status.net-wifi .net-icon { color: #66bb6a; }
-  .net-status.net-ethernet .net-icon { color: #42a5f5; }
+  .net-status.net-wifi .net-icon { color: var(--status-ok); }
+  .net-status.net-ethernet .net-icon { color: var(--status-info); }
   .net-status.net-ap .net-icon { color: #ffb74d; }
   .net-status.net-ap .net-status-text { color: #ffb74d; font-weight: bold; }
 
   /* Signal strength bars — dark theme overrides */
-  .sig-bar { background: #444; }
-  .net-signal-bars[data-quality="good"]   .sig-bar.active { background: #66bb6a; }
+  .sig-bar { background: var(--border-1); }
+  .net-signal-bars[data-quality="good"]   .sig-bar.active { background: var(--status-ok); }
   .net-signal-bars[data-quality="medium"] .sig-bar.active { background: #ffb74d; }
-  .net-signal-bars[data-quality="poor"]   .sig-bar.active { background: #ef5350; }
+  .net-signal-bars[data-quality="poor"]   .sig-bar.active { background: var(--status-error); }
   .net-signal-bars[data-quality="none"]   .sig-bar.active { background: #757575; }
 
   /* PIC firmware page */
@@ -2837,25 +2837,25 @@ tr[style*="background-color"] {
   max-width: 720px;
   border-collapse: collapse;
   margin: 10px 0 12px 0;
-  border: 1px solid #444;
+  border: 1px solid var(--border-1);
 }
 .picrow {
   display: table-row;
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid var(--border-1);
 }
 .picrow:nth-child(even) {
-  background-color: #3a3a3c;
+  background-color: var(--bg-surface-alt);
 }
 .piccolumn1, .piccolumn2, .piccolumn3 {
   display: table-cell;
   padding: 8px 15px;
-  border: 1px solid #444;
+  border: 1px solid var(--border-1);
   text-align: left;
 }
 .piccolumn4, .piccolumn5 {
   display: table-cell;
   padding: 8px 10px;
-  border: 1px solid #444;
+  border: 1px solid var(--border-1);
   text-align: center;
   width: 30px;
 }
@@ -2880,11 +2880,11 @@ tr[style*="background-color"] {
   display: block;
   font-size: 12px;
   line-height: 16px;
-  background: #3a3a3c;
+  background: var(--bg-surface-alt);
   padding: 5px 2px;
-  border: 1px solid #555;
+  border: 1px solid var(--border-2);
   box-shadow: 2px 4px 5px rgba(0, 0, 0, 0.6);
-  color: #e0e0e0;
+  color: var(--bg-muted);
 }
 
 *[data-tooltip]:hover::after {
@@ -2900,11 +2900,11 @@ tr[style*="background-color"] {
 }
 
 .otmonrow {
-  background: #2c2c2e;
+  background: var(--bg-surface);
   display: flex;
   align-items: center;
   padding: 2px 0;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--bg-app);
   break-inside: avoid;
   page-break-inside: avoid;
 }
@@ -2955,7 +2955,7 @@ tr[style*="background-color"] {
 
 .devinforow {
   display: table-row;
-  background: #2c2c2e;
+  background: var(--bg-surface);
 }
 
 .devinfocolumn1 {
@@ -2963,7 +2963,7 @@ tr[style*="background-color"] {
   font-weight: 500;
   white-space: nowrap;
   padding: 2px 5px;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--bg-app);
   width: 1%;
 }
 
@@ -2971,7 +2971,7 @@ tr[style*="background-color"] {
   display: table-cell;
   text-align: left;
   padding: 2px 5px;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--bg-app);
 }
 
 #deviceinfoCrashLog {
@@ -2980,11 +2980,11 @@ tr[style*="background-color"] {
 }
 
 .crashlog-panel {
-  background: #463318;
-  border: 1px solid #7c5a20;
-  border-left: 5px solid #ffae42;
+  background: var(--crash-bg);
+  border: 1px solid var(--crash-border);
+  border-left: 5px solid var(--crash-accent);
   padding: 10px 12px;
-  color: #f7ddb2;
+  color: var(--crash-text);
 }
 
 .crashlog-title {
@@ -3024,14 +3024,14 @@ tr[style*="background-color"] {
     display: flex;
     flex-direction: column;
     padding: 5px;
-    border-bottom: 1px solid #1a1a1a;
+    border-bottom: 1px solid var(--bg-app);
   }
   
   .devinfocolumn1 {
     display: block;
     width: auto;
     font-weight: 600;
-    color: #6ab0ff;
+    color: var(--accent-hover);
     border: none;
     padding: 0;
   }
@@ -3075,13 +3075,13 @@ tr[style*="background-color"] {
   .settingDiv {
     text-align: right;
     min-width: 850px;
-    border: thick solid #2c2c2e;
-    background: #2c2c2e;
+    border: thick solid var(--bg-surface);
+    background: var(--bg-surface);
   }
 
   .input-changed { background: #5a4a1a; color: #ffe0b2; }
-  .input-normal { background: #2c2c2e; color: #e0e0e0; }
-  .input-readonly { background: #1c1c1e; color: #888; }
+  .input-normal { background: var(--bg-surface); color: var(--bg-muted); }
+  .input-readonly { background: #1c1c1e; color: var(--fg-5); }
 
   .btn-wifi-reset {
     margin-left: 8px;
@@ -3133,7 +3133,7 @@ tr[style*="background-color"] {
 .ot-log-section {
   margin: 20px 0;
   padding: 15px;
-  background: #2c2c2e;
+  background: var(--bg-surface);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
@@ -3158,12 +3158,12 @@ tr[style*="background-color"] {
   align-items: center;
   margin-bottom: 10px;
   padding-bottom: 10px;
-  border-bottom: 2px solid #444;
+  border-bottom: 2px solid var(--border-1);
 }
 
 .ot-log-header h3 {
   margin: 0;
-  color: #e0e0e0;
+  color: var(--bg-muted);
   font-size: 18px;
 }
 
@@ -3198,8 +3198,8 @@ tr[style*="background-color"] {
   min-height: 22px;
   padding: 2px 9px;
   border-radius: 999px;
-  background: #3b9dff;
-  color: #04111f;
+  background: var(--sim-badge-bg);
+  color: var(--sim-badge-text);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -3222,12 +3222,12 @@ tr[style*="background-color"] {
 
 .mode-gateway {
   background: var(--status-warn);
-  box-shadow: 0 0 8px #ff9800;
+  box-shadow: 0 0 8px var(--status-warn);
 }
 
 .mode-monitor {
   background: var(--status-info);
-  box-shadow: 0 0 8px #2196f3;
+  box-shadow: 0 0 8px var(--status-info);
 }
 
 .mode-unknown {
@@ -3245,7 +3245,7 @@ tr[style*="background-color"] {
 
 .btn-log-control {
   padding: 6px 12px;
-  background: #3a3a3c;
+  background: var(--bg-surface-alt);
   color: white;
   border: none;
   border-radius: 4px;
@@ -3276,11 +3276,11 @@ tr[style*="background-color"] {
   flex: 1;
   min-width: 200px;
   padding: 6px 12px;
-  border: 1px solid #444;
+  border: 1px solid var(--border-1);
   border-radius: 4px;
   font-size: 13px;
-  background-color: #2c2c2e;
-  color: #e0e0e0;
+  background-color: var(--bg-surface);
+  color: var(--bg-muted);
 }
 
 .log-control-label {
@@ -3305,7 +3305,7 @@ tr[style*="background-color"] {
   margin: 8px 0 16px;
   padding: 10px 12px;
   background: #252629;
-  border: 1px solid #3a3a3c;
+  border: 1px solid var(--bg-surface-alt);
   border-radius: 6px;
 }
 
@@ -3317,7 +3317,7 @@ tr[style*="background-color"] {
   border-radius: 4px;
   font-size: 13px;
   background-color: #1f2022;
-  color: #e0e0e0;
+  color: var(--bg-muted);
 }
 
 .ot-cmd-status {
@@ -3329,7 +3329,7 @@ tr[style*="background-color"] {
 
 /* Log Container */
 .ot-log-container {
-  background: #1e1e1e;
+  background: var(--log-bg);
   border-radius: 4px;
   overflow: hidden;
   transition: max-height 0.3s ease;
@@ -3347,7 +3347,7 @@ tr[style*="background-color"] {
 .ot-log-content {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: #d4d4d4;
+  color: var(--log-fg);
   padding: 15px;
   overflow-y: auto;
   overflow-x: auto;
@@ -3359,7 +3359,7 @@ tr[style*="background-color"] {
 @supports (scrollbar-width: thin) {
   .ot-log-content {
     scrollbar-width: thin;
-    scrollbar-color: #555 #1e1e1e;
+    scrollbar-color: var(--border-2) var(--log-bg);
   }
 }
 
@@ -3368,10 +3368,10 @@ tr[style*="background-color"] {
   display: flex;
   justify-content: space-between;
   padding: 8px 12px;
-  background: #3a3a3c;
+  background: var(--bg-surface-alt);
   border-radius: 0 0 4px 4px;
   font-size: 12px;
-  color: #b0b0b0;
+  color: var(--status-neutral);
 }
 
 .ot-log-footer span {
@@ -3396,7 +3396,7 @@ tr[style*="background-color"] {
   
   .flashProgressBarContainer {
     width: 100%;
-    background-color: #3a3a3c;
+    background-color: var(--bg-surface-alt);
     height: 30px;
     border-radius: 15px;
     overflow: hidden;
@@ -3409,7 +3409,7 @@ tr[style*="background-color"] {
     left: 0;
     height: 100%;
     width: 0%;
-    background-color: #4CAF50; /* Green */
+    background-color: var(--status-ok); /* Green */
     -webkit-transition: width 0.3s ease;
     transition: width 0.3s ease;
     will-change: width;
@@ -3426,7 +3426,7 @@ tr[style*="background-color"] {
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    color: #e0e0e0; /* Light text for visibility */
+    color: var(--bg-muted); /* Light text for visibility */
     z-index: 2; /* Ensure on top of bar */
   }
 
@@ -3441,7 +3441,7 @@ body.disable-interaction {
 /* Tabs support */
 .ot-log-tabs {
   margin-bottom: 15px;
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid var(--border-1);
 }
 
 .tab-link {
@@ -3454,16 +3454,16 @@ body.disable-interaction {
   font-size: 14px;
   font-weight: bold;
   transition: 0.3s;
-  color: #b0b0b0;
+  color: var(--status-neutral);
 }
 
 .tab-link:hover {
-  background-color: #3a3a3c;
+  background-color: var(--bg-surface-alt);
   border-radius: 4px 4px 0 0;
 }
 
 .tab-link.active {
-  color: #b0b0b0;
+  color: var(--status-neutral);
   border-bottom: 3px solid #5a5a5c;
 }
 
@@ -3480,7 +3480,7 @@ body.disable-interaction {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  background-color: #2c2c2e;
+  background-color: var(--bg-surface);
   table-layout: fixed;
 }
 
@@ -3494,15 +3494,15 @@ body.disable-interaction {
 .ot-stats-table th, .ot-stats-table td {
   text-align: left;
   padding: 2px 8px;
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid var(--border-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ot-stats-table th {
-  background-color: #3a3a3c;
-  color: #e0e0e0;
+  background-color: var(--bg-surface-alt);
+  color: var(--bg-muted);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -3514,15 +3514,15 @@ body.disable-interaction {
 }
 
 .ot-stats-table tr:hover {
-  background-color: #3a3a3c;
+  background-color: var(--bg-surface-alt);
 }
 
 .ot-stats-container {
   overflow-x: auto;
   max-height: 600px;
   overflow-y: auto;
-  background: #2c2c2e;
-  border: 1px solid #444;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
 }
 
 /* Utility classes for common inline styles */
@@ -3545,7 +3545,7 @@ body.disable-interaction {
 
 .fs-mismatch-banner {
   padding: 10px 16px;
-  background-color: #7f0000;
+  background-color: var(--status-critical);
   color: #ffcdd2;
   font-weight: bold;
   text-align: center;
@@ -3562,15 +3562,15 @@ body.disable-interaction {
   max-width: 720px;
 }
 .pic-update-banner.checking {
-  color: #888;
+  color: var(--fg-5);
 }
 .pic-update-banner.update-available {
-  background-color: #bf360c;
+  background-color: var(--status-alert);
   color: #ffe0b2;
   font-weight: bold;
 }
 .pic-update-banner.up-to-date {
-  background-color: #1b5e20;
+  background-color: var(--status-ok-dark);
   color: #c8e6c9;
 }
 .pic-version-outdated {
@@ -3623,9 +3623,9 @@ body.disable-interaction {
   margin: 0;
   border-radius: 3px;
   box-sizing: border-box;
-  color: #e0e0e0;
-  background: #1e1e1e;
-  outline: 1px solid #4a90e2;
+  color: var(--bg-muted);
+  background: var(--log-bg);
+  outline: 1px solid var(--accent-primary);
   outline-offset: -1px;
   border: none;
 }
@@ -3641,8 +3641,8 @@ body.disable-interaction {
   font-weight: bold;
   margin: 0 0 6px 0;
   padding: 6px 10px;
-  background-color: #2c2c2e;
-  border: 1px solid #444;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-1);
   border-radius: 3px 3px 0 0;
 }
 .pic-settings-group-cell {
@@ -3655,14 +3655,14 @@ body.disable-interaction {
   background: transparent;
 }
 .pic-val-live {
-  color: #66bb6a;
+  color: var(--status-ok);
   font-weight: 500;
 }
 .pic-val-cached {
-  color: #ffa726;
+  color: var(--status-warn);
 }
 .pic-val-unknown {
-  color: #666;
+  color: var(--fg-4);
   font-style: italic;
 }
 .pic-settings-refresh {
@@ -3690,7 +3690,7 @@ body.disable-interaction {
   color: #80cbc4;
 }
 .sat-section {
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid var(--border-1);
   padding-bottom: 12px;
 }
 .sat-section h3 {
@@ -3723,7 +3723,7 @@ body.disable-interaction {
   padding-right: 16px;
 }
 .sat-badge-active {
-  background: #1b5e20;
+  background: var(--status-ok-dark);
   color: #a5d6a7;
 }
 .sat-badge-idle {
@@ -3747,10 +3747,10 @@ body.disable-interaction {
   margin-left: auto;
   padding: 4px 8px;
   border-radius: 4px;
-  border: 1px solid #555;
-  background: #2c2c2e;
+  border: 1px solid var(--border-2);
+  background: var(--bg-surface);
   font-size: 0.9em;
-  color: #e0e0e0;
+  color: var(--bg-muted);
 }
 
 /* SAT View Visibility */
@@ -3774,7 +3774,7 @@ body.disable-interaction {
   font-weight: 500;
 }
 .sat-view-simple .sat-simple-status.heating { color: #e67e22; }
-.sat-view-simple .sat-simple-status.error { color: #ef5350; }
+.sat-view-simple .sat-simple-status.error { color: var(--status-error); }
 
 /* SAT Diagnostics (Dark) */
 .sat-health-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0; }
@@ -3782,21 +3782,21 @@ body.disable-interaction {
 .sat-health-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; background: #999; }
 .sat-health-ok { background: var(--status-ok); }
 .sat-health-problem { background: var(--status-error); }
-.sat-raw-data { background: #1a1a2e; padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; color: #e0e0e0; }
+.sat-raw-data { background: #1a1a2e; padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; color: var(--bg-muted); }
 .sat-collapsible { cursor: pointer; }
 .sat-collapsible:hover { opacity: 0.8; }
 
 /* SAT Interactive Controls (Dark) */
-.sat-btn { background: #3a3a3c; color: #e0e0e0; border-color: #555; }
+.sat-btn { background: var(--bg-surface-alt); color: var(--bg-muted); border-color: var(--border-2); }
 .sat-btn:hover { background: #4a4a4c; }
-.sat-btn:active { background: #555; }
-.sat-btn.active { background: #2e7d32; color: #fff; border-color: #388E3C; }
-.sat-btn-toggle.active { background: #c62828; border-color: #b71c1c; }
-.sat-feedback-ok { color: #66bb6a; }
-.sat-feedback-error { color: #ef5350; }
+.sat-btn:active { background: var(--border-2); }
+.sat-btn.active { background: var(--status-ok-dark); color: #fff; border-color: #388E3C; }
+.sat-btn-toggle.active { background: var(--status-critical); border-color: #b71c1c; }
+.sat-feedback-ok { color: var(--status-ok); }
+.sat-feedback-error { color: var(--status-error); }
 .sat-toggle-label { color: #aaa; }
-.sat-toggle-slider { background: #555; }
-.sat-toggle-slider::before { background: #ddd; }
+.sat-toggle-slider { background: var(--border-2); }
+.sat-toggle-slider::before { background: var(--border-1); }
 .sat-toggle input:checked + .sat-toggle-slider { background: #30d158; }
 .sat-toggle input:focus-visible + .sat-toggle-slider { outline-color: #30d158; }
 
@@ -3828,10 +3828,10 @@ body.disable-interaction {
     --primary-color: #4daafc; /* Lighter blue for dark mode */
     --primary-hover: #6eb9fd;
     --bg-color: #121212;      /* Very dark background */
-    --card-bg: #1e1e1e;       /* Dark card background */
-    --text-color: #e0e0e0;    /* Light text */
+    --card-bg: var(--log-bg);       /* Dark card background */
+    --text-color: var(--bg-muted);    /* Light text */
     --text-muted: #a0a0a0;
-    --border-color: #333333;
+    --border-color: var(--fg-2);
     --border-radius: 8px;
     --shadow: 0 4px 6px rgba(0,0,0,0.5); /* Stronger shadow for dark mode */
 }
@@ -3891,7 +3891,7 @@ tr:last-child {
 
 /* Dark mode striped rows */
 tr:nth-child(even) { background: #252525; }
-tr:nth-child(odd) { background: #1e1e1e; }
+tr:nth-child(odd) { background: var(--log-bg); }
 
 td {
     padding: 12px 8px;
@@ -3986,7 +3986,7 @@ input[type="file"] {
     margin-bottom: 20px;
     background: #2d2d2d;
     color: var(--text-color);
-    border: 2px dashed #444; /* Darker dashed border */
+    border: 2px dashed var(--border-1); /* Darker dashed border */
     border-radius: var(--border-radius);
     box-sizing: border-box;
     cursor: pointer;
@@ -3994,7 +3994,7 @@ input[type="file"] {
 }
 input[type="file"]:hover {
     border-color: var(--primary-color);
-    background: #333;
+    background: var(--fg-2);
 }
 
 progress {
@@ -4003,7 +4003,7 @@ progress {
     height: 20px;
     margin-bottom: 20px;
     accent-color: var(--primary-color);
-    background-color: #333;
+    background-color: var(--fg-2);
 }
 
 fileSize {
@@ -4059,8 +4059,8 @@ input[type="submit"]:active, input[type="button"]:active, .button:active {
 }
 
 input[type="submit"]:disabled {
-    background-color: #444;
-    color: #888;
+    background-color: var(--border-1);
+    color: var(--fg-5);
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
@@ -4070,10 +4070,10 @@ input[type="submit"]:disabled {
 form[action='/ReBoot'] input { background-color: #5a5a5a; }
 form[action='/ReBoot'] input:hover { background-color: #6a6a6a; }
 
-form[action='/ResetWireless'] input { background-color: #ffb300; color: #000; }
+form[action='/ResetWireless'] input { background-color: #ffb300; color: var(--fg-1); }
 form[action='/ResetWireless'] input:hover { background-color: #e09f00; }
 
-form[action='/'] input { background-color: #cf6679; color: #000; } /* Material Error Color */
+form[action='/'] input { background-color: #cf6679; color: var(--fg-1); } /* Material Error Color */
 form[action='/'] input:hover { background-color: #b00020; color: white; }
 
 /* Hide HR */
@@ -4114,7 +4114,7 @@ hr {
 /* Highlighting styles from original JS */
 /* In dark mode, light green #d4edda is too bright for text. We need a dark green. */
 tr[style*="background-color"] {
-    background-color: #1b5e20 !important; /* Material Green 900 */
+    background-color: var(--status-ok-dark) !important; /* Material Green 900 */
     color: #e8f5e9;
 }
 
