@@ -551,12 +551,12 @@ body.dark .otmonrow,
  * ============================================================= */
 .settingDiv {
   text-align: right;
-  /* Subtle row separator instead of a fat 4px border around every row.
-     Keeps the visual rhythm tight: row height = font + ~8px breathing
-     room top/bottom, not font + 32px. */
+  /* Row height = the natural font line-height. No vertical padding;
+     a single-pixel divider separates rows. Per spec: rows must be
+     "as tall as the font" only. */
   border-bottom: 1px solid var(--border-1);
   background: var(--brand-lightblue);
-  padding: 4px var(--space-5);
+  padding: 0 var(--space-5);
   margin: 0 16px;
   font-size: var(--fs-sm); color: var(--fg-1);
 }
@@ -566,7 +566,7 @@ body.dark .settingDiv,
 }
 .settingDiv .settings-field-container {
   width: 320px; float: left;
-  text-align: left; font-weight: 500; padding-top: 2px;
+  text-align: left; font-weight: 500;
 }
 .settingDiv input[type="text"],
 .settingDiv input[type="password"],

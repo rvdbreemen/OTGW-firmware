@@ -5124,14 +5124,19 @@ function refreshSettings() {
           if (tooltipText) {
             sInput.setAttribute("title", tooltipText);
           }
+          // TASK-435 follow-up: build the Reset WiFi button up front but
+          // DO NOT append it to inputDiv here — append happens AFTER sInput
+          // further down so the button renders to the RIGHT of the SSID
+          // input (was rendering to the left because the original code
+          // appended this button before sInput went in).
+          var resetWifiBtn = null;
           if (key === "ssid") {
-            var resetWifiBtn = document.createElement("button");
+            resetWifiBtn = document.createElement("button");
             resetWifiBtn.type = "button";
             resetWifiBtn.textContent = "Reset WiFi";
             resetWifiBtn.className = "btn-wifi-reset";
             resetWifiBtn.title = "Clear stored Wi-Fi credentials and reboot the device in Access Point mode";
             resetWifiBtn.addEventListener('click', resetWiFiSettingsUI);
-            inputDiv.appendChild(resetWifiBtn);
           }
           if (s.type !== "r") {
           sInput.addEventListener('change',
@@ -5175,6 +5180,10 @@ function refreshSettings() {
           );
           } // end if (s.type !== "r")
           inputDiv.appendChild(sInput);
+          // TASK-435 follow-up: Reset WiFi button rendered AFTER the SSID
+          // input so it appears to the right of the field instead of in
+          // front of it.
+          if (resetWifiBtn) inputDiv.appendChild(resetWifiBtn);
 
           rowDiv.appendChild(inputDiv);
           settings.appendChild(rowDiv);
