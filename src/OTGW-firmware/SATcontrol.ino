@@ -217,7 +217,9 @@ static bool satAlwaysMaxModulation()
   return (satGetEffectiveHeatingSystem() == SAT_HSYS_HEAT_PUMP);
 }
 
-// Returns the name string for the current heating system
+// Returns the name string for the current heating system.
+// Kept available for future diagnostic endpoint exposing heating-system type.
+__attribute__((unused))
 static const char* satGetHeatingSystemName()
 {
   switch (satGetEffectiveHeatingSystem()) {
@@ -239,7 +241,6 @@ static uint32_t _thermal_prevMs       = 0;
 static bool     _thermal_learning     = false;  // true when flame is off and measuring decay
 static float    _thermal_coeffEma     = 0.05f;  // Running EMA of thermal coefficient
 static uint32_t _thermal_lastSaveMs   = 0;
-static uint32_t _thermal_learningStartMs = 0;   // When learning first started (for 24h validity)
 static uint32_t _thermal_totalLearnMs = 0;       // Accumulated learning time
 
 // --- OPV Calibration Constants ---
@@ -563,7 +564,6 @@ void satGetBoilerStatusName(char* buf, size_t bufLen)
 // PWM state tracking for effective temperature and flame timing
 static float    _pwm_effectiveBoilerTemp    = 0.0f;
 static uint32_t _pwm_flameOnMs             = 0;
-static uint32_t _pwm_lastSampleMs          = 0;
 static bool     _pwm_waitingForFlame       = false;
 static uint32_t _pwm_waitForFlameStartMs   = 0;    // Timestamp when flame wait began (for 180s timeout)
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
@@ -3423,6 +3423,9 @@ void satControlLoop()
   satUpdateSimulation();
   // --- Thermal drop learning (Task #21): learn building thermal decay rate ---
   satUpdateThermalLearning();
+
+  // --- OPV calibration state machine (ADR-076): poll while non-IDLE ---
+  if (state.sat.eCalibPhase != SAT_CALIB_IDLE) satOvpCalibrate();
 
   // If safety tripped, stay disabled until explicitly re-enabled
   if (state.sat.bSafetyTripped) return;
