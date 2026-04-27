@@ -60,3 +60,4 @@ logs-issue/*
 
 # Standalone esptool downloaded by flash_otgw.bat / flash_otgw.sh on first run
 tools/esptool/
+.claude/scheduled_tasks.lock
