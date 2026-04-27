@@ -571,10 +571,32 @@ body.dark .settingDiv,
 .settingDiv input[type="text"],
 .settingDiv input[type="password"],
 .settingDiv input[type="number"] {
-  padding: 4px var(--space-3); width: 240px;
+  /* Desktop: high-density form. Tight 2 px input padding so the row
+     height tracks the font line-height. Mobile override below adds
+     comfortable tap-target padding. */
+  padding: 2px var(--space-3); width: 240px;
   font-size: 12pt;
 }
 .settingDiv::after { content: ""; display: table; clear: both; }
+
+/* Mobile / touch density:
+   Settings is the only screen where the desktop "tight" rhythm is too
+   small for touch. Bring rows back to a comfortable height (~44 px tap
+   target) and pad inputs/buttons so finger taps still land cleanly. */
+@media (hover: none) and (pointer: coarse), (max-width: 720px) {
+  .settingDiv {
+    padding: 6px var(--space-5);
+  }
+  .settingDiv input[type="text"],
+  .settingDiv input[type="password"],
+  .settingDiv input[type="number"] {
+    padding: 8px var(--space-3);
+    font-size: 14pt;
+  }
+  .settingDiv .settings-field-container {
+    padding-top: 6px;
+  }
+}
 
 /* =============================================================
  * 15. FSEXPLORER
