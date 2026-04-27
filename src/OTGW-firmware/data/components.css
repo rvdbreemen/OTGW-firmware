@@ -552,6 +552,40 @@ body.dark .settingDiv,
 }
 .settingDiv::after { content: ""; display: table; clear: both; }
 
+/* Settings groups (DS:SETTINGS-GROUP) — wrap related .settingDiv rows
+ * in a ds-card with a heading. The .settings-group-body neutralises the
+ * outer margin that .settingDiv sets so rows align to the card edges. */
+.settings-group {
+  margin: 16px;
+  padding: var(--space-5);
+}
+.settings-group-title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-h3);
+  color: var(--fg-1);
+}
+.settings-group-body .settingDiv {
+  margin: 0 0 var(--space-2);
+}
+.settings-group-body .settingDiv:last-child { margin-bottom: 0; }
+
+/* Settings save-bar (DS:SETTINGS-SAVEBAR) — sticky status footer.
+ * Hides itself when empty so it doesn't take space when there's no
+ * status to report. saveSettings()/sendPostSetting() drive the text. */
+#settingMessage {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  margin: var(--space-5) 16px 0;
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-1);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  font-size: var(--fs-sm); color: var(--fg-2);
+  box-shadow: var(--shadow-card);
+}
+#settingMessage:empty { display: none; }
+
 /* =============================================================
  * 15. FSEXPLORER
  * ============================================================= */

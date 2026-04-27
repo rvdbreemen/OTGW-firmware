@@ -4995,6 +4995,59 @@ function getOriginalPasswordPrefill(field) {
   return currentValue;
 }
 
+// Settings group taxonomy. Maps key prefixes to a UI group. First match
+// wins. Group display order follows the firmware's setting iteration order
+// (settingStuff.ino), since each group container is created lazily on the
+// first setting that lands in it.
+var SETTINGS_GROUPS = [
+  { id: 'system',   title: 'System',            prefixes: ['hostname', 'httppasswd', 'DeviceManufacturer', 'DeviceModel'] },
+  { id: 'mqtt',     title: 'MQTT',              prefixes: ['MQTT'] },
+  { id: 'ntp',      title: 'Time / NTP',        prefixes: ['NTP'] },
+  { id: 'behavior', title: 'Behavior',          prefixes: ['LEDblink', 'darktheme', 'nightlyrestart'] },
+  { id: 'ui',       title: 'User Interface',    prefixes: ['ui_'] },
+  { id: 'sensors',  title: 'GPIO Sensors',      prefixes: ['GPIOSENSORS'] },
+  { id: 's0',       title: 'S0 Pulse Counter',  prefixes: ['S0COUNTER'] },
+  { id: 'otgw',     title: 'OpenTherm Gateway', prefixes: ['OTGW'] },
+  { id: 'outputs',  title: 'GPIO Outputs',      prefixes: ['GPIOOUTPUTS'] },
+  { id: 'webhook',  title: 'Webhook',           prefixes: ['Webhook'] }
+];
+
+function getSettingsGroupId(key) {
+  for (var g = 0; g < SETTINGS_GROUPS.length; g++) {
+    var prefixes = SETTINGS_GROUPS[g].prefixes;
+    for (var p = 0; p < prefixes.length; p++) {
+      if (key.indexOf(prefixes[p]) === 0) return SETTINGS_GROUPS[g].id;
+    }
+  }
+  return 'other';
+}
+
+function getOrCreateSettingsGroup(parentEl, groupId) {
+  var existing = parentEl.querySelector('section.settings-group[data-group-id="' + groupId + '"] .settings-group-body');
+  if (existing) return existing;
+
+  var title = 'Other';
+  for (var i = 0; i < SETTINGS_GROUPS.length; i++) {
+    if (SETTINGS_GROUPS[i].id === groupId) { title = SETTINGS_GROUPS[i].title; break; }
+  }
+
+  var section = document.createElement('section');
+  section.className = 'ds-card settings-group';
+  section.setAttribute('data-group-id', groupId);
+
+  var heading = document.createElement('h3');
+  heading.className = 'settings-group-title';
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  var body = document.createElement('div');
+  body.className = 'settings-group-body';
+  section.appendChild(body);
+
+  parentEl.appendChild(section);
+  return body;
+}
+
 function refreshSettings() {
   console.log("refreshSettings() ..");
   data = {};
@@ -5177,7 +5230,8 @@ function refreshSettings() {
           if (resetWifiBtn) inputDiv.appendChild(resetWifiBtn);
 
           rowDiv.appendChild(inputDiv);
-          settings.appendChild(rowDiv);
+          var groupBody = getOrCreateSettingsGroup(settings, getSettingsGroupId(key));
+          groupBody.appendChild(rowDiv);
         }
         else {
           //----document.getElementById("setFld_"+key).style.background = "white";
@@ -5388,6 +5442,16 @@ function saveSettings() {
   var inputs = page.getElementsByTagName("input");
   var selects = page.getElementsByTagName("select");
   var allFields = Array.prototype.slice.call(inputs).concat(Array.prototype.slice.call(selects));
+  // Pre-count changes for the save-bar status indicator (DS:SETTINGS-SAVEBAR).
+  var changeCount = 0;
+  for (var ci = 0; ci < allFields.length; ci++) {
+    if (allFields[ci].className === "input-changed") changeCount++;
+  }
+  var savebarEl = document.getElementById("settingMessage");
+  if (savebarEl) {
+    if (changeCount === 0) savebarEl.textContent = "";
+    else savebarEl.textContent = "Saving " + changeCount + " change" + (changeCount === 1 ? "" : "s") + "...";
+  }
   for (var i = 0; i < allFields.length; i++) {
     var field = allFields[i].getAttribute("id");
     console.log("InputNr[" + i + "], InputId[" + field + "]");
@@ -5416,8 +5480,8 @@ function saveSettings() {
         updateThemeToggle();
       }
 
-      const msgEl = document.getElementById("settingMessage");
-      if (msgEl) msgEl.textContent = "Saving changes...";
+      // Note: the savebar already shows "Saving N change(s)..." set by the
+      // pre-count above; sendPostSetting() takes over with per-response status.
       sendPostSetting(field, value);
     }
   }
