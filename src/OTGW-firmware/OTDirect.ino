@@ -2435,31 +2435,32 @@ void handleOTDirectCommand(const char* buf, int len) {
   // =====================================================================
 
   else if (cmd0 == 'G' && cmd1 == 'W') {
-    if (value[0] == '0') {
-      // GW=0 — Bypass mode: thermostat direct to boiler via relay
-#if HAS_BYPASS_RELAY
-      // Runtime check: relay must also be enabled in settings for this board
-      if (!settings.otd.bHasBypassRelay) {
-        OTDDebugTln(F("OTD: GW=0 rejected (bypass relay not enabled in settings)"));
-        otDirectBridgeProcessStatus("NG");
-        return;
-      }
-      setOTDirectMode(OTD_MODE_BYPASS);
-#else
-      // No bypass relay on this board — reject command
-      OTDDebugTln(F("OTD: GW=0 not supported (no bypass relay on this board)"));
-      otDirectBridgeProcessStatus("NG");
-      return;
-#endif
+    // TASK-438: PIC parity. gateway.asm: GW=0 = monitor, GW=1 = gateway,
+    // GW=R = reset. Bypass moved to GW=P (OTDirect-only alias) so PIC
+    // tooling sending GW=0 cannot accidentally engage bypass relay.
+    if (value[0] == '0' || value[0] == 'M') {
+      // GW=0 / GW=M — Monitor mode: transparent pass-through.
+      setOTDirectMode(OTD_MODE_MONITOR);
     } else if (value[0] == '1') {
       // GW=1 — Gateway mode: full override processing
       setOTDirectMode(OTD_MODE_GATEWAY);
     } else if (value[0] == '2' || value[0] == 'S') {
       // GW=2 or GW=S — Master/Standalone mode: sole OT master, no thermostat
       setOTDirectMode(OTD_MODE_MASTER);
-    } else if (value[0] == 'M') {
-      // GW=M — Monitor mode: transparent pass-through, all frames unmodified
-      setOTDirectMode(OTD_MODE_MONITOR);
+    } else if (value[0] == 'P') {
+      // TASK-438: GW=P — Bypass mode (OTDirect extension; thermostat -> boiler via relay).
+#if HAS_BYPASS_RELAY
+      if (!settings.otd.bHasBypassRelay) {
+        OTDDebugTln(F("OTD: GW=P rejected (bypass relay not enabled in settings)"));
+        otDirectBridgeProcessStatus("NG");
+        return;
+      }
+      setOTDirectMode(OTD_MODE_BYPASS);
+#else
+      OTDDebugTln(F("OTD: GW=P not supported (no bypass relay on this board)"));
+      otDirectBridgeProcessStatus("NG");
+      return;
+#endif
     } else if (value[0] == 'L') {
       // GW=L — Loopback test mode: simulated boiler, no hardware needed
       setOTDirectMode(OTD_MODE_LOOPBACK);
@@ -2592,7 +2593,8 @@ void handleOTDirectCommand(const char* buf, int len) {
       }
       case 'N':
         // Message interval in centiseconds (10ms units), matching PIC PR=N format
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: N=%u"), (unsigned)(otMinIntervalMs / 10));
+        // TASK-440: report MI in milliseconds (PIC PrintInterval parity).
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: N=%u"), (unsigned)otMinIntervalMs);
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'V':
@@ -2841,8 +2843,9 @@ void handleOTDirectCommand(const char* buf, int len) {
     if (val < 100 || val > 1275) { otDirectBridgeProcessStatus("OR"); return; }
     otMinIntervalMs = val;
     settings.otd.iMsgInterval = val;
-    // PIC responds in centiseconds (10ms units): 100ms → "10", 1275ms → "127"
-    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), val / 10);
+    // TASK-440: PIC SetInterval/PrintInterval reports milliseconds, not
+    // centiseconds. Internally PIC stores 5ms ticks but echoes ms.
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), val);
     synthesizeResponse(buf, rspBuf);
   }
   // FS=0/1 — Fail safety (controls setback on thermostat disconnect)
