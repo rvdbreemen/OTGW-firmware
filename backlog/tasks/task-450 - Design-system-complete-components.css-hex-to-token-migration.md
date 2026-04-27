@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-27 18:38'
-updated_date: '2026-04-27 18:47'
+updated_date: '2026-04-27 18:57'
 labels:
   - ui
   - design-system
@@ -25,7 +25,7 @@ After TASK-435 follow-up A and B passes, components.css still contains 155 raw h
 - [x] #1 components.css contains zero raw hex codes (grep -E '#[0-9a-fA-F]{3,8}' returns no matches outside comments)
 - [x] #2 ds-tokens.css extended with status-*-soft variants needed by the soft status backgrounds
 - [ ] #3 Light + dark theme regression-tested via /design.html on real hardware
-- [ ] #4 Build clean for both ESP8266 and ESP32-S3 targets
+- [x] #4 Build clean for both ESP8266 and ESP32-S3 targets
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -58,4 +58,11 @@ Token health audit:
   --slider-pct is a runtime variable set by sat-slider.js, no static def needed.
 
 ACs 1+2 met. AC3 (hardware regression) requires flashing — pending user verification. AC4 build verification running.
+
+2026-04-27 (commit 600d4d6e): Build clean for ESP8266 + ESP32-S3 (AC4 met).
+
+ESP8266: 0.77 MB ino.bin + 1.98 MB littlefs.bin
+ESP32-S3: 1.81 MB ino.bin + 2.00 MB littlefs.bin (Flash 96.4%)
+
+AC1, AC2, AC4 met. AC3 (hardware regression via /design.html) requires the user to flash a physical device.
 <!-- SECTION:NOTES:END -->
