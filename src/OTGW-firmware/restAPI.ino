@@ -368,9 +368,10 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
     if (!httpServer.hasArg("mode")) { sendApiError(400, F("Missing 'mode' parameter")); return; }
     String modeStr = httpServer.arg("mode");
+    // TASK-438: GW=0 is now monitor (PIC parity); bypass moved to GW=P alias.
     if (modeStr == F("gateway"))       addCommandToQueue("GW=1", 4, true);
-    else if (modeStr == F("monitor"))  addCommandToQueue("GW=M", 4, true);
-    else if (modeStr == F("bypass"))   addCommandToQueue("GW=0", 4, true);
+    else if (modeStr == F("monitor"))  addCommandToQueue("GW=0", 4, true);
+    else if (modeStr == F("bypass"))   addCommandToQueue("GW=P", 4, true);
     else if (modeStr == F("master"))   addCommandToQueue("GW=S", 4, true);
     else if (modeStr == F("loopback")) addCommandToQueue("GW=L", 4, true);
     else { sendApiError(400, F("Invalid mode. Use: gateway, monitor, bypass, master, loopback")); return; }
