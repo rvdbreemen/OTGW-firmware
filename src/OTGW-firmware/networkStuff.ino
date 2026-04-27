@@ -588,7 +588,9 @@ void sendtimecommand(bool dayFlag, bool yearFlag){
   if (!settings.ntp.bEnable) return;        // if NTP is disabled, then return
   if (!settings.ntp.bSendtime) return;      // if NTP send time is disabled, then return
   if (NtpStatus != TIME_SYNC) return;   // only send time command when time is synced
-  if (!state.pic.bAvailable) return;           // only send when pic is available
+  // TASK-441: widen gate so OTDirect builds also receive time/date sync.
+  // OTDirect now parses PIC-style SR=21:m,d and SR=22:hi,lo decimal bytes.
+  if (!hasOTCommandInterface()) return;        // PIC OR OTDirect must be ready
   if (!isGatewayFirmware()) return; // only send timecommand when in gateway firmware, not in diagnostic or interface mode
 
   //send time command to OTGW

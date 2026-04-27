@@ -2695,12 +2695,44 @@ void handleOTDirectCommand(const char* buf, int len) {
   // Override commands (SR, CR)
   // =====================================================================
 
-  // SR=MsgID:HHHH — Set response override (gateway answers thermostat)
+  // SR=MsgID:lowByte  or  SR=MsgID:highByte,lowByte (PIC-compatible decimal byte syntax)
+  // Legacy SR=MsgID:HHHH hex16 form retained for backward compatibility but
+  // PIC-style comma syntax takes precedence.
+  // TASK-441: gateway.asm SetResponse parses decimal bytes (0..255). Time/date
+  // sync via networkStuff.ino sendtimecommand emits SR=21:month,day and
+  // SR=22:yearHi,yearLo using PIC syntax, so OTDirect must accept it.
   else if (cmd0 == 'S' && cmd1 == 'R') {
     unsigned int msgId = 0;
     unsigned int dataVal = 0;
-    if (sscanf(value, "%u:%x", &msgId, &dataVal) != 2 || msgId > 127) {
-      otDirectBridgeProcessStatus("BV"); return;
+    const char* colon = strchr(value, ':');
+    const char* comma = colon ? strchr(colon, ',') : NULL;
+    if (!colon) { otDirectBridgeProcessStatus("BV"); return; }
+    if (comma) {
+      // PIC byte-pair: SR=<msgId>:<highByte>,<lowByte> (decimal 0..255 each)
+      unsigned int hiByte = 0, loByte = 0;
+      if (sscanf(value, "%u:%u,%u", &msgId, &hiByte, &loByte) != 3 ||
+          msgId > 127 || hiByte > 255 || loByte > 255) {
+        otDirectBridgeProcessStatus("BV"); return;
+      }
+      dataVal = (hiByte << 8) | loByte;
+    } else {
+      // Single argument after colon. PIC SetResponse: decimal byte (0..255)
+      // for the low byte, high byte = 0. Try decimal byte first; if the value
+      // is > 255 OR the string contains hex digits a-f/A-F, fall back to the
+      // legacy hex16 form for backward compatibility with existing clients.
+      unsigned int oneVal = 0;
+      bool hasHexDigit = false;
+      for (const char* p = colon + 1; *p; ++p) {
+        if ((*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F')) { hasHexDigit = true; break; }
+      }
+      if (!hasHexDigit && sscanf(value, "%u:%u", &msgId, &oneVal) == 2 && oneVal <= 255) {
+        if (msgId > 127) { otDirectBridgeProcessStatus("BV"); return; }
+        dataVal = oneVal & 0xFF;  // high byte = 0
+      } else if (sscanf(value, "%u:%x", &msgId, &dataVal) == 2 && msgId <= 127) {
+        // legacy hex16 form
+      } else {
+        otDirectBridgeProcessStatus("BV"); return;
+      }
     }
     // Find existing or free slot
     int8_t slot = -1;
