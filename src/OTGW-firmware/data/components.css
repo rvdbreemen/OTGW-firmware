@@ -546,6 +546,49 @@ body.dark .otmonrow,
   margin-top: 16px;
 }
 
+/* SAT buttons (preset / mode / +- temperature / settings nav).
+ * Token-driven baseline so they render correctly in both light and
+ * dark, regardless of whether the legacy index.css / index_dark.css
+ * cascade actually resolves a `.sat-btn` rule. Previously the
+ * legacy stylesheets only carried dark-mode rules; in any state
+ * where the body.dark / data-theme="dark" tokens were active but
+ * index_dark.css was not the loaded `theme-style`, the SAT buttons
+ * fell back to browser defaults (light grey on near-black) and
+ * became unreadable. */
+.sat-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  font: inherit;
+  padding: var(--space-2) var(--space-5);
+  background: var(--bg-muted); color: var(--fg-1);
+  border: 1px solid var(--border-1); border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--dur-med) var(--ease);
+}
+.sat-btn:hover {
+  background: var(--bg-surface-alt); color: var(--fg-1);
+}
+.sat-btn[disabled], .sat-btn:disabled {
+  opacity: .5; cursor: not-allowed;
+}
+/* Active preset / mode highlight uses --status-ok (matches the
+ * legacy index_dark.css greens). */
+.sat-btn.active {
+  background: var(--status-ok); color: var(--fg-inverse);
+  border-color: var(--status-ok);
+}
+/* Simulation toggle: red while running. */
+.sat-btn-toggle.active {
+  background: var(--status-error); color: #fff;
+  border-color: var(--status-error);
+}
+/* Tiny circular +/- buttons inside the Target tile. */
+.sat-btn-temp {
+  width: 32px; height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: var(--fs-h3); line-height: 1;
+}
+
 /* =============================================================
  * 14. SETTINGS FORM ROWS
  * ============================================================= */
