@@ -3879,32 +3879,6 @@ static void decodeAndPublishOTValue()
           OTdata.s16());
 }
 
-// ---------------------------------------------------------------------------
-// TASK-397: sub-trace inside processOT() to isolate heap/time cost of the
-// three main sub-phases: decodeAndPublishOTValue, sendLogToWebSocket, and
-// everything else. Toggle with #define OTPROCESS_TRACE; set to 0 to compile
-// out entirely. Output is per-OT-frame so volume mirrors OT message rate
-// (~10/sec at idle). Each probe logs: phase name, duration since last probe,
-// current heap, current max block, delta heap vs baseline at frame entry.
-// ---------------------------------------------------------------------------
-#define OTPROCESS_TRACE 0
-
-#if OTPROCESS_TRACE
-  #define OTTRACE(name) do { \
-      uint32_t _now = micros(); \
-      uint32_t _h = platformFreeHeap(); \
-      DebugTf(PSTR("[ot] %s %luus heap=%u max=%u dHeap=%d (src=%c id=%u)\r\n"), \
-              name, (unsigned long)(_now - _otPrev), \
-              (unsigned)_h, \
-              (unsigned)platformMaxFreeBlock(), \
-              (int)_h - (int)_otBaselineHeap, \
-              buf[0], (unsigned)OTdata.id); \
-      _otPrev = _now; \
-    } while(0)
-#else
-  #define OTTRACE(name) ((void)0)
-#endif
-
 /*
   Process OTGW messages coming from the PIC.
   It knows about:
@@ -4092,15 +4066,6 @@ void processOT(const char *buf, int len, bool suppressOutput){
       
       AddLog(" ");  // Space before payload for readability
 
-      // TASK-397 sub-trace: measure heap/time per phase so we can isolate
-      // whether decode+publish or WebSocket send is the heap consumer.
-      // Locals are only consumed by the OTTRACE macro when OTPROCESS_TRACE=1.
-#if OTPROCESS_TRACE
-      uint32_t _otBaselineHeap = platformFreeHeap();
-      uint32_t _otPrev = micros();
-#endif
-      OTTRACE("pre-decode");
-
       //next step interpret the OT protocol
       // OTPublishGate RAII: gate closes for this OT slot's throttle decision and
       // is guaranteed to reopen (restore true) when the scope exits, even on early
@@ -4109,16 +4074,13 @@ void processOT(const char *buf, int len, bool suppressOutput){
         OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
         decodeAndPublishOTValue();
       }
-      OTTRACE("post-decode");
 
       if (OTdata.skipthis) AddLog(" <ignored> ");
       AddLogln();
       OTDebugT(skipOTLogTimestamp(ot_log_buffer));
-      OTTRACE("post-debug");
 
       // Send log buffer directly to WebSocket (no JSON, no queue)
       sendLogToWebSocket(ot_log_buffer);
-      OTTRACE("post-ws");
 
       // Throttle TCP flush to once per second instead of per-message (~10/sec).
       // debugTelnet (SimpleTelnet) buffers output; flushing just forces a TCP push.
