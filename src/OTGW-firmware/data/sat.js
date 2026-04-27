@@ -901,12 +901,8 @@ var SAT = (function() {
     var cur = parseInt(slider.value, 10);
     if (cur < _dhwSliderMin) slider.value = _dhwSliderMin;
     if (cur > _dhwSliderMax) slider.value = _dhwSliderMax;
-    updateDHWSliderLabel(slider.value);
-  }
-
-  function updateDHWSliderLabel(value) {
-    var lbl = el('sat-dhw-slider-value');
-    if (lbl) lbl.textContent = Math.round(value) + '\u00B0C';
+    // TASK-463: sat-slider.js owns readout + --slider-pct via input event.
+    try { slider.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
   }
 
   function updateDHWHwSwitch() {
@@ -915,10 +911,9 @@ var SAT = (function() {
     row.style.display = _dhwStorageTank ? '' : 'none';
   }
 
-  // Called live as slider moves (update label only)
+  // Called live as slider moves; sat-slider.js handles label + fill.
   function onDhwSliderInput(value) {
     _dhwSliderDirty = true;
-    updateDHWSliderLabel(value);
   }
 
   // Called on slider release (send command)
@@ -944,19 +939,10 @@ var SAT = (function() {
       if (sp < _dhwSliderMin) sp = _dhwSliderMin;
       if (sp > _dhwSliderMax) sp = _dhwSliderMax;
       slider.value = sp;
-      updateDHWSliderLabel(sp);
-      // TASK-435 follow-up: sat-slider.js (.ds-slider live-fill) syncs on
-      // 'input' events, but the assignment above is a programmatic value
-      // mutation that does NOT fire input. Without this manual setProperty
-      // the --slider-pct stays at the CSS default of 50% and the blue fill
-      // detaches from the thumb. Mirroring the same pct math here keeps
-      // them in lock-step on every poll.
-      var min = parseFloat(slider.min) || 0;
-      var max = parseFloat(slider.max) || 100;
-      if (max > min) {
-        var pct = ((sp - min) / (max - min)) * 100;
-        slider.style.setProperty('--slider-pct', pct.toFixed(2) + '%');
-      }
+      // TASK-463: sat-slider.js's input handler covers --slider-pct and
+      // the readout span. Programmatic value mutation does not fire 'input'
+      // automatically, so dispatch one synthetically.
+      try { slider.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
     }
 
     // Update HW switch display state from dhw_active (= SlaveStatus bit 0x04)
