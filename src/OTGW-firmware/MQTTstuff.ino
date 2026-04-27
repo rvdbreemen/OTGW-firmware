@@ -879,8 +879,14 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 #endif
           return;
         }
-        if (!isPICEnabled()) {
-          MQTTDebugln(F(" MQTT command ignored: no PIC detected"));
+        // TASK-439: gate generic OTGW command topics on hasOTCommandInterface()
+        // (true for PIC OR OTDirect) instead of isPICEnabled(). addCommandToQueue()
+        // already fans out to handleOTDirectCommand() on PIC-less builds, so OTGW32/
+        // OTDirect targets must accept setpoint/constant/hotwater/outside/ctrlsetpt/
+        // gatewaymode/raw command topics. PIC-only behaviour (firmware flashing,
+        // PIC availability, PIC settings) stays gated on isPICEnabled() elsewhere.
+        if (!hasOTCommandInterface()) {
+          MQTTDebugln(F(" MQTT command ignored: no OT command interface available"));
           return;
         }
         const int cmdIndex = findMQTTSetCommandIndex(topicToken);
