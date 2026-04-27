@@ -233,7 +233,7 @@ static const char* satGetHeatingSystemName()
 static uint8_t _sat_consecutiveSkips  = 0;
 static uint8_t _sat_picFailCount      = 0;
 static bool    _sat_bootCS0sent       = false;  // One-shot: ensure CS=0 is sent once PIC is available
-static bool    _sat_prevDhwActive     = false;  // Track DHW transition to send TW= on entry
+static bool    _sat_prevDhwActive     = false;  // Track DHW transition to send SW= on entry (TASK-437)
 
 // --- Thermal Drop Learning State (Task #21) ---
 static float    _thermal_prevRoom     = 0.0f;
@@ -3465,14 +3465,16 @@ void satControlLoop()
   state.sat.bDhwActive = (OTcurrentSystemState.SlaveStatus & 0x04) != 0; // Bit 2 = DHW active
   if (state.sat.bDhwActive) {
     // DHW has priority - don't adjust CH setpoint, boiler manages itself.
-    // On transition into DHW mode, send TW= to set the DHW setpoint (matches Python SAT behaviour).
+    // TASK-437: On transition into DHW mode, send SW= (DHW setpoint, MsgID 56).
+    // Was TW=, which is not a PIC command (gateway.asm) and is not implemented
+    // by OTDirect, so the command was rejected as NG on every DHW transition.
     if (!_sat_prevDhwActive && settings.sat.bDhwEnabled &&
         settings.sat.fDhwSetpoint >= 30.0f && settings.sat.fDhwSetpoint <= 70.0f &&
         hasOTCommandInterface()) {
-      char twCmd[16];
-      snprintf_P(twCmd, sizeof(twCmd), PSTR("TW=%d"), (int)settings.sat.fDhwSetpoint);
-      addCommandToQueue(twCmd, strlen(twCmd), false, 0);
-      SATDebugTf(PSTR("SAT: DHW active, sent %s\r\n"), twCmd);
+      char swCmd[16];
+      snprintf_P(swCmd, sizeof(swCmd), PSTR("SW=%d"), (int)settings.sat.fDhwSetpoint);
+      addCommandToQueue(swCmd, strlen(swCmd), false, 0);
+      SATDebugTf(PSTR("SAT: DHW active, sent %s\r\n"), swCmd);
     }
     _sat_prevDhwActive = true;
     return;
