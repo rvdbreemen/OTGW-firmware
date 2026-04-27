@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : boards.h
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -112,6 +112,7 @@
 #define HAS_PIC           0    // No PIC: OT protocol handled by OTDirect (ESP32-S3 native)
 #define HAS_DIRECT_OT     1    // Direct OT master/slave via OTDirect library
 #define HAS_ETH_CAPABLE   1    // Has W5500 Ethernet module
+#define HAS_OLED_CAPABLE  1    // Onboard 128x64 SSD1306 I2C OLED (runtime probe at 0x3C)
 
 // ---------------------------------------------------------------------------
 #else
