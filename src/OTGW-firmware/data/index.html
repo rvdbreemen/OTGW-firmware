@@ -9,16 +9,9 @@
          The actual active scheme is still driven by the html color-scheme
          declaration in the loaded stylesheet below. -->
     <meta name="color-scheme" content="light dark">
-    <!-- Design-system tokens (fonts + CSS variables). Must load BEFORE
-         components.css so var(--font-sans)/var(--font-mono) and the rest
-         of the design tokens are resolvable when components.css cascades. -->
-    <link rel="stylesheet" type="text/css" href="ds-tokens.css">
-    <!-- TASK-435 follow-up A: theme is driven by html[data-theme] +
-         body.dark only. No more dynamic stylesheet swap. The inline
-         script below pre-paints data-theme on <html> so components.css
-         token rules resolve correctly on the very first frame.
-         updateThemeToggle() in index.js mirrors body.dark when DOM is
-         parsed and on every theme change. -->
+    <link rel="stylesheet" href="ds-tokens.css">
+    <link rel="stylesheet" href="components.css">
+
     <script>
       (function() {
         try {
@@ -32,18 +25,10 @@
         } catch (e) { /* ignore */ }
       })();
     </script>
-    <link rel="stylesheet" type="text/css" href="./index_common.css">
-    <!-- Single source of truth for component styling: ds-tokens.css
-         (variables) + components.css (rules). The legacy index.css /
-         index_dark.css / sat.css / otmonitor.css partials have all
-         been folded in here. -->
-    <link rel="stylesheet" type="text/css" href="./components.css">
+
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"
             integrity="sha384-BQKzmHvQLMCAnL3UtDBA1Al5tFjsCz1wrMlIUA1wkzo14DYkRWjywW+p9pCj0cwd"
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <!-- TASK-435 Patch A: token-driven chart theme helper. Reads the
-         live --status-* tokens from CSS so charts follow the rest of
-         the UI on theme toggle. Loaded BEFORE sat.js / graph.js. -->
     <script src="./echarts-theme.js" defer></script>
     <script src="./theme-toggle.js" defer></script>
     <script src="./sat-slider.js" defer></script>
@@ -73,7 +58,7 @@
         <div class="headercolumn" id="devName">[hostname]</div>
         <div class="headercolumn" id="devVersion">[version]</div>
         <div class="headercolumn" id='theTime'>[00:00:00]</div>
-        <button class="headercolumn theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme" aria-pressed="false">☾</button>
+        <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme" aria-pressed="false">☾</button>
     </div>
     <template id="pageNavTemplate">
       <div class="nav-container">
@@ -384,9 +369,9 @@
           <span id="sat-status-badge" class="ds-pill">Disabled</span>
           <span id="sat-sim-badge" class="sat-badge sat-badge-sim" style="display:none">SIMULATION</span>
           <span class="sat-enable-toggle-wrap" title="Enable / Disable SAT">
-            <label class="sat-toggle">
+            <label class="ds-switch">
               <input type="checkbox" id="sat-toggle-enable" onchange="SAT.toggleEnable()">
-              <span class="sat-toggle-slider"></span>
+              <span class="slider"></span>
             </label>
             <span class="sat-toggle-label">SAT</span>
           </span>
