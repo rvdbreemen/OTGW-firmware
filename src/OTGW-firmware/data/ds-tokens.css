@@ -96,6 +96,31 @@
   --status-danger:     #dc3545;
   --status-neutral:    #9e9e9e;
 
+  /* Status soft variants — subtle backgrounds + borders for inline
+     messages, banners and pill-like accents. -text is the readable
+     foreground on -bg. */
+  --status-ok-soft-bg:      #d4edda;
+  --status-ok-soft-border:  #a5d6a7;
+  --status-ok-soft-text:    #388e3c;
+  --status-warn-soft-bg:    #ffe0b2;
+  --status-warn-soft-border:#ffb74d;
+  --status-warn-soft-text:  #e67e22;
+  --status-error-soft-bg:   #ffcdd2;
+  --status-error-soft-border:#ef9a9a;
+  --status-error-soft-text: #c82333;
+  --status-info-soft-bg:    #e6f7ff;
+  --status-info-soft-border:#b8d2e4;
+  --status-error-darker:    #b71c1c;
+
+  /* SAT-specific tile palette (teal accents on the SAT dashboard). */
+  --sat-tile-teal-bg:      #e0f2f1;
+  --sat-tile-teal-border:  #80cbc4;
+  --sat-tile-teal-accent:  #b2dfdb;
+
+  /* Disabled / muted foreground (form controls, secondary helpers). */
+  --fg-disabled:       #6c757d;
+  --fg-mute:           #aaaaaa;
+
   --sim-badge-bg:      #0a84ff;
   --sim-badge-text:    #ffffff;
 
@@ -180,6 +205,29 @@ html.dark {
   --status-critical:   #7f0000;
   --status-danger:     #e57373;
   --status-neutral:    #b0b0b0;
+
+  /* Status soft variants — dark mode mirrors keep contrast with --fg-1. */
+  --status-ok-soft-bg:      #1c3a1c;
+  --status-ok-soft-border:  #2e7d32;
+  --status-ok-soft-text:    #a5d6a7;
+  --status-warn-soft-bg:    #5a4a1a;
+  --status-warn-soft-border:#7a5a2a;
+  --status-warn-soft-text:  #ffb74d;
+  --status-error-soft-bg:   #4a1010;
+  --status-error-soft-border:#7a1a1a;
+  --status-error-soft-text: #ef9a9a;
+  --status-info-soft-bg:    #1a3050;
+  --status-info-soft-border:#3a5070;
+  --status-error-darker:    #7f0000;
+
+  /* SAT-specific tile palette (teal accents on the SAT dashboard). */
+  --sat-tile-teal-bg:      #1e3a3a;
+  --sat-tile-teal-border:  #2e4a4a;
+  --sat-tile-teal-accent:  #2a4a4a;
+
+  /* Disabled / muted foreground. */
+  --fg-disabled:       #888888;
+  --fg-mute:           #999999;
 
   --sim-badge-bg:      #3b9dff;
   --sim-badge-text:    #04111f;

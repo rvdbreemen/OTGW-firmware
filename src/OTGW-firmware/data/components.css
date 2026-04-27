@@ -90,7 +90,7 @@ body.dark .theme-toggle-btn:hover, [data-theme="dark"] .theme-toggle-btn:hover {
   min-height: var(--nav-height);
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6);
 }
-body.dark .nav-container, [data-theme="dark"] .nav-container { background: #383838; }
+body.dark .nav-container, [data-theme="dark"] .nav-container { background: var(--bg-surface-alt); }
 
 .nav-left, .nav-right {
   display: flex; align-items: center; gap: var(--space-6);
@@ -179,9 +179,9 @@ body.dark .adv_dropdown .list_item:hover,
 .btn-secondary {
   background: var(--bg-surface-alt); color: var(--fg-2);
 }
-.btn-danger { background: var(--status-danger); color: #fff; border-color: transparent; }
+.btn-danger { background: var(--status-danger); color: var(--fg-inverse); border-color: transparent; }
 .btn-warn   { background: var(--status-warn);   color: var(--fg-1); border-color: transparent; }
-.btn-ok     { background: var(--status-ok);     color: #fff; border-color: transparent; }
+.btn-ok     { background: var(--status-ok);     color: var(--fg-inverse); border-color: transparent; }
 
 /* Log-control variant — kleiner, plat */
 .btn-log-control {
@@ -304,10 +304,10 @@ input[type="range"].ds-slider::-moz-range-thumb {
   letter-spacing: .06em; text-transform: uppercase;
   background: var(--bg-muted); color: var(--fg-3);
 }
-.ds-pill.is-ok    { background: var(--status-ok);    color: #fff; }
+.ds-pill.is-ok    { background: var(--status-ok);    color: var(--fg-inverse); }
 .ds-pill.is-warn  { background: var(--status-warn);  color: var(--fg-1); }
-.ds-pill.is-info  { background: var(--status-info);  color: #fff; }
-.ds-pill.is-error { background: var(--status-error); color: #fff; }
+.ds-pill.is-info  { background: var(--status-info);  color: var(--fg-inverse); }
+.ds-pill.is-error { background: var(--status-error); color: var(--fg-inverse); }
 
 /* Status dots — gebruikt in nav-status, log-status, OT monitor bool rows */
 .ws-status, .mode-status, .ds-dot {
@@ -578,7 +578,7 @@ body.dark .otmonrow,
 }
 /* Simulation toggle: red while running. */
 .sat-btn-toggle.active {
-  background: var(--status-error); color: #fff;
+  background: var(--status-error); color: var(--fg-inverse);
   border-color: var(--status-error);
 }
 /* Tiny circular +/- buttons inside the Target tile. */
@@ -681,7 +681,7 @@ body.dark .settingDiv,
   display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;
 }
 .fs-btn {
-  background: var(--accent-primary); color: #fff;
+  background: var(--accent-primary); color: var(--fg-inverse);
   border: 0; padding: var(--space-4) var(--space-7);
   font-size: var(--fs-sm); font-weight: 500;
   border-radius: var(--radius-xl); cursor: pointer;
@@ -694,7 +694,7 @@ body.dark .settingDiv,
 .fs-btn:hover {
   transform: translateY(-2px); box-shadow: var(--shadow-card); opacity: .95;
 }
-.fs-btn.secondary { background: #6c757d; }
+.fs-btn.secondary { background: var(--fg-disabled); }
 .fs-btn.wifi      { background: var(--status-warn); color: var(--fg-1); }
 .fs-btn.danger    { background: var(--status-danger); }
 
@@ -703,7 +703,7 @@ body.dark .settingDiv,
  * ============================================================= */
 .fs-mismatch-banner {
   padding: var(--space-4) 16px;
-  background: var(--status-critical); color: #fff;
+  background: var(--status-critical); color: var(--fg-inverse);
   font-weight: 700; text-align: center;
 }
 .crash-panel {
@@ -779,7 +779,7 @@ body.dark .settingDiv,
 
   /* Standard ::placeholder has shipped in every major engine since 2017
      (Blink, Gecko, WebKit). Older prefixed variants are not needed. */
-  ::placeholder { color: #999; opacity: 1; }
+  ::placeholder { color: var(--fg-mute); opacity: 1; }
   
   body {
     max-width: 100%;
@@ -905,7 +905,7 @@ body.dark .settingDiv,
     text-decoration: none;
     color: var(--fg-2);
     cursor: pointer;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-soft);
   }
   
   .nav-right .adv_dropdown span:last-child {
@@ -913,7 +913,7 @@ body.dark .settingDiv,
   }
 
   .nav-right .adv_dropdown span:hover {
-    background-color: #e6f7ff;
+    background-color: var(--status-info-soft-bg);
     color: var(--fg-1);
   } 
   
@@ -924,7 +924,7 @@ body.dark .settingDiv,
     background-color: lightblue;
     border: none;
     border-radius: 5px;
-    color: #505050;
+    color: var(--fg-3);
     cursor: pointer;
     box-shadow: 2px 2px 2px 0px grey;
   }
@@ -1348,7 +1348,7 @@ body.dark .settingDiv,
     display: block;
     width: auto;
     font-weight: 600;
-    color: #004080;
+    color: var(--accent-primary);
     border: none;
     padding: 0;
   }
@@ -1519,7 +1519,7 @@ body.dark .settingDiv,
   padding: 2px 9px;
   border-radius: 999px;
   background: var(--sim-badge-bg);
-  color: #ffffff;
+  color: var(--fg-inverse);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1575,7 +1575,7 @@ body.dark .settingDiv,
 }
 
 .btn-log-control:hover {
-  background: #1976D2;
+  background: var(--status-info-dark);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
@@ -1589,7 +1589,7 @@ body.dark .settingDiv,
 }
 
 .btn-active:hover {
-  background: #45a049;
+  background: var(--status-ok-dark);
 }
 
 .log-search {
@@ -1622,8 +1622,8 @@ body.dark .settingDiv,
   gap: 10px;
   margin: 8px 0 16px;
   padding: 10px 12px;
-  background: #eef6fb;
-  border: 1px solid #d3e6f5;
+  background: var(--status-info-soft-bg);
+  border: 1px solid var(--status-info-soft-bg);
   border-radius: 6px;
 }
 
@@ -1631,7 +1631,7 @@ body.dark .settingDiv,
   flex: 1 1 260px;
   min-width: 220px;
   padding: 7px 12px;
-  border: 1px solid #b8d2e4;
+  border: 1px solid var(--status-info-soft-border);
   border-radius: 4px;
   font-size: 13px;
 }
@@ -1640,7 +1640,7 @@ body.dark .settingDiv,
   flex: 1 1 180px;
   min-height: 18px;
   font-size: 12px;
-  color: #4b6476;
+  color: var(--fg-4);
 }
 
 /* Log Container */
@@ -1826,7 +1826,7 @@ body.disable-interaction {
 }
 
 .ot-stats-table th:hover {
-  background-color: #e6e6e6;
+  background-color: var(--bg-muted);
 }
 
 .ot-stats-table tr:hover {
@@ -1867,7 +1867,7 @@ body.disable-interaction {
   text-align: center;
 }
 .fs-mismatch-banner a {
-  color: #ffcdd2;
+  color: var(--status-error-soft-bg);
   text-decoration: underline;
 }
 
@@ -1938,9 +1938,9 @@ body.disable-interaction {
   margin: 0;
   border-radius: 3px;
   box-sizing: border-box;
-  color: #212529;
-  background: #fff;
-  outline: 1px solid #007bff;
+  color: var(--bg-surface);
+  background: var(--bg-surface);
+  outline: 1px solid var(--accent-primary);
   outline-offset: -1px;
   border: none;
 }
@@ -1956,7 +1956,7 @@ body.disable-interaction {
   font-weight: bold;
   margin: 0 0 6px 0;
   padding: 6px 10px;
-  background-color: #e8e8e8;
+  background-color: var(--bg-muted);
   border: 1px solid var(--border-1);
   border-radius: 3px 3px 0 0;
 }
@@ -1970,14 +1970,14 @@ body.disable-interaction {
   background: transparent;
 }
 .pic-val-live {
-  color: #388e3c;
+  color: var(--status-ok-soft-text);
   font-weight: 500;
 }
 .pic-val-cached {
-  color: #e65100;
+  color: var(--status-alert);
 }
 .pic-val-unknown {
-  color: #aaa;
+  color: var(--fg-mute);
   font-style: italic;
 }
 .pic-settings-refresh {
@@ -1995,27 +1995,27 @@ body.disable-interaction {
   max-width: 100%;
 }
 .sat-card {
-  background: #e0f2f1;
-  border: 1px solid #b2dfdb;
+  background: var(--sat-tile-teal-bg);
+  border: 1px solid var(--sat-tile-teal-accent);
 }
 .sat-card-label {
   color: var(--border-2);
 }
 .sat-card-value {
-  color: #00695c;
+  color: var(--status-ok-dark);
 }
 .sat-section {
   border-bottom: 1px solid var(--border-1);
   padding-bottom: 12px;
 }
 .sat-section h3 {
-  color: #00796b;
+  color: var(--status-ok-dark);
 }
 .sat-label {
   color: var(--border-1);
 }
 .sat-value {
-  color: #222;
+  color: var(--fg-1);
 }
 .sat-grid {
   display: table;
@@ -2038,24 +2038,24 @@ body.disable-interaction {
   padding-right: 16px;
 }
 .sat-badge-active {
-  background: #c8e6c9;
+  background: var(--status-ok-soft-bg);
   color: var(--status-ok-dark);
 }
 .sat-badge-idle {
-  background: #fff9c4;
-  color: #f57f17;
+  background: var(--status-warn-soft-bg);
+  color: var(--status-warn);
 }
 .sat-badge-disabled {
   background: var(--bg-muted);
-  color: #757575;
+  color: var(--fg-disabled);
 }
 .sat-badge-error {
-  background: #ffcdd2;
+  background: var(--status-error-soft-bg);
   color: var(--status-critical);
 }
 .sat-badge-sim {
-  background: #e1bee7;
-  color: #6a1b9a;
+  background: var(--status-error-soft-bg);
+  color: var(--status-error-soft-border);
 }
 
 /* SAT View Selector */
@@ -2064,7 +2064,7 @@ body.disable-interaction {
   padding: 4px 8px;
   border-radius: 4px;
   border: 1px solid var(--border-2);
-  background: #fff;
+  background: var(--bg-surface);
   font-size: 0.9em;
   color: var(--fg-2);
 }
@@ -2089,13 +2089,13 @@ body.disable-interaction {
   color: var(--fg-4);
   font-weight: 500;
 }
-.sat-view-simple .sat-simple-status.heating { color: #e67e22; }
-.sat-view-simple .sat-simple-status.error { color: #e74c3c; }
+.sat-view-simple .sat-simple-status.heating { color: var(--status-warn-soft-text); }
+.sat-view-simple .sat-simple-status.error { color: var(--status-error); }
 
 /* SAT Diagnostics */
 .sat-health-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0; }
 .sat-health-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
-.sat-health-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; background: #999; }
+.sat-health-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; background: var(--fg-mute); }
 .sat-health-ok { background: var(--status-ok); }
 .sat-health-problem { background: var(--status-error); }
 .sat-raw-data { background: var(--bg-panel); padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
@@ -2105,16 +2105,16 @@ body.disable-interaction {
 
 /* SAT Settings Groups (light theme) */
 .sat-settings-group-header {
-  background: #e0f2f1;
-  color: #004d40;
-  border-bottom: 1px solid #b2dfdb;
+  background: var(--sat-tile-teal-bg);
+  color: var(--status-ok-dark);
+  border-bottom: 1px solid var(--sat-tile-teal-accent);
 }
 .sat-settings-group-header:hover {
-  background: #b2dfdb;
+  background: var(--sat-tile-teal-accent);
 }
 .sat-settings-group-body {
-  background: #fafafa;
-  border: 1px solid #b2dfdb;
+  background: var(--bg-surface-alt);
+  border: 1px solid var(--sat-tile-teal-accent);
   border-top: none;
 }
 
@@ -2131,7 +2131,7 @@ body.disable-interaction {
     --primary-color: var(--accent-primary); /* A slightly darker blue than var(--brand-cyan) for better text contrast */
     --primary-hover: var(--accent-hover);
     --bg-color: var(--brand-cyan-soft);      /* Matching index.css background */
-    --card-bg: #ffffff;
+    --card-bg: var(--bg-surface);
     --text-color: var(--fg-2);
     --border-radius: 8px;
     --shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -2150,7 +2150,7 @@ body {
 }
 
 h2 {
-    color: #2c3e50;
+    color: var(--bg-surface);
     text-shadow: none;
     margin-bottom: 20px;
     text-align: center;
@@ -2184,7 +2184,7 @@ table {
 }
 
 tr {
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-soft);
 }
 
 tr:last-child {
@@ -2192,7 +2192,7 @@ tr:last-child {
 }
 
 tr:nth-child(even) { background: var(--bg-row-zebra); } /* Very faint blue */
-tr:nth-child(odd) { background: #ffffff; }
+tr:nth-child(odd) { background: var(--bg-surface); }
 
 td {
     padding: 12px 8px;
@@ -2223,7 +2223,7 @@ a.delete-link {
     color: var(--status-danger); /* Danger Red */
 }
 a.delete-link:hover {
-    color: #c82333;
+    color: var(--status-error-soft-text);
     text-decoration: underline;
 }
 
@@ -2274,7 +2274,7 @@ form[action="/upload"] {
     margin-top: 0;
     margin-bottom: 20px;
     color: var(--primary-color);
-    border-bottom: 2px solid #e0f7fa; /* Light cyan border to match theme */
+    border-bottom: 2px solid var(--sat-tile-teal-bg); /* Light cyan border to match theme */
     padding-bottom: 15px;
     width: 100%;
 }
@@ -2286,8 +2286,8 @@ input[type="file"] {
     max-width: 500px;
     padding: 15px;
     margin-bottom: 20px;
-    background: #f8f9fa;
-    border: 2px dashed #ced4da;
+    background: var(--bg-panel);
+    border: 2px dashed var(--border-2);
     border-radius: var(--border-radius);
     box-sizing: border-box;
     cursor: pointer;
@@ -2295,7 +2295,7 @@ input[type="file"] {
 }
 input[type="file"]:hover {
     border-color: var(--primary-color);
-    background: #e9ecef;
+    background: var(--bg-muted);
 }
 
 progress {
@@ -2364,14 +2364,14 @@ input[type="submit"]:disabled {
 }
 
 /* Action Specific Colors */
-form[action='/ReBoot'] input { background-color: #6c757d; }
-form[action='/ReBoot'] input:hover { background-color: #5a6268; }
+form[action='/ReBoot'] input { background-color: var(--fg-disabled); }
+form[action='/ReBoot'] input:hover { background-color: var(--fg-disabled); }
 
-form[action='/ResetWireless'] input { background-color: #ffc107; color: var(--fg-1); }
-form[action='/ResetWireless'] input:hover { background-color: #e0a800; }
+form[action='/ResetWireless'] input { background-color: var(--status-warn); color: var(--fg-1); }
+form[action='/ResetWireless'] input:hover { background-color: var(--status-warn); }
 
 form[action='/'] input { background-color: var(--status-danger); }
-form[action='/'] input:hover { background-color: #c82333; }
+form[action='/'] input:hover { background-color: var(--status-error-soft-text); }
 
 /* Hide HR as we use cards now */
 hr {
@@ -2398,8 +2398,8 @@ hr {
 
 /* Note style if it appears */
 .note {
-	background-color: #ffccbc;
-    color: #d84315;
+	background-color: var(--status-warn-soft-bg);
+    color: var(--status-alert);
 	padding: 10px;
 	margin-top: 1em;
 	text-align: center;
@@ -2409,7 +2409,7 @@ hr {
 
 /* Highlighting styles from original JS */
 tr[style*="background-color"] {
-    background-color: #d4edda !important;
+    background-color: var(--status-ok-soft-bg) !important;
 }
 
 /* Hide firmware update button on touch devices (phones and tablets).
@@ -2470,7 +2470,7 @@ tr[style*="background-color"] {
   ::-webkit-scrollbar              { width: 12px; height: 12px; }
   ::-webkit-scrollbar-track        { background: var(--bg-surface); }
   ::-webkit-scrollbar-thumb        { background: var(--border-2); border-radius: 6px; border: 2px solid var(--bg-surface); }
-  ::-webkit-scrollbar-thumb:hover  { background: #6a6a6c; }
+  ::-webkit-scrollbar-thumb:hover  { background: var(--fg-4); }
   ::-webkit-scrollbar-corner       { background: var(--bg-surface); }
   
   body {
@@ -2521,7 +2521,7 @@ tr[style*="background-color"] {
   
   /*--------------------- N A V - B A R -----------------*/
 .nav-container,.footer {
-    background: #383838;
+    background: var(--bg-surface-alt);
     padding: 6px;
     min-height: 50px;
     display: flex;
@@ -2598,17 +2598,17 @@ tr[style*="background-color"] {
 
   .nav-right .adv_dropdown span:hover {
     background-color: var(--bg-surface-alt);
-    color: #fff;
+    color: var(--fg-inverse);
   } 
   
   .nav-item {
     font-size: 16px;
     height: 40px;
     width: 110px;
-    background-color: #4e4e4e;
+    background-color: var(--border-2);
     border: none;
     border-radius: 5px;
-    color: #c8c8c8;
+    color: var(--fg-3);
     cursor: pointer;
     box-shadow: 2px 2px 2px 0px var(--fg-1);
   }
@@ -2815,20 +2815,20 @@ tr[style*="background-color"] {
 
   .sat-weather-coords {
     font-size: 0.85em;
-    color: #999; /* WCAG AA secondary text on dark theme */
+    color: var(--fg-mute); /* WCAG AA secondary text on dark theme */
   }
 
   .net-status.net-wifi .net-icon { color: var(--status-ok); }
   .net-status.net-ethernet .net-icon { color: var(--status-info); }
-  .net-status.net-ap .net-icon { color: #ffb74d; }
-  .net-status.net-ap .net-status-text { color: #ffb74d; font-weight: bold; }
+  .net-status.net-ap .net-icon { color: var(--status-warn-soft-border); }
+  .net-status.net-ap .net-status-text { color: var(--status-warn-soft-border); font-weight: bold; }
 
   /* Signal strength bars — dark theme overrides */
   .sig-bar { background: var(--border-1); }
   .net-signal-bars[data-quality="good"]   .sig-bar.active { background: var(--status-ok); }
-  .net-signal-bars[data-quality="medium"] .sig-bar.active { background: #ffb74d; }
+  .net-signal-bars[data-quality="medium"] .sig-bar.active { background: var(--status-warn-soft-border); }
   .net-signal-bars[data-quality="poor"]   .sig-bar.active { background: var(--status-error); }
-  .net-signal-bars[data-quality="none"]   .sig-bar.active { background: #757575; }
+  .net-signal-bars[data-quality="none"]   .sig-bar.active { background: var(--fg-disabled); }
 
   /* PIC firmware page */
 .pictable {
@@ -3061,11 +3061,11 @@ tr[style*="background-color"] {
 }
 #settingMessage.loading {
   display: block;
-  background-color: #1565C0;
+  background-color: var(--status-info-dark);
 }
 #settingMessage.error {
   display: block;
-  background-color: #d35400;
+  background-color: var(--status-alert);
 }
 
   /* define tag selectors () -------------------------------------------------- */
@@ -3079,14 +3079,14 @@ tr[style*="background-color"] {
     background: var(--bg-surface);
   }
 
-  .input-changed { background: #5a4a1a; color: #ffe0b2; }
+  .input-changed { background: var(--status-warn-soft-bg); color: var(--status-warn-soft-bg); }
   .input-normal { background: var(--bg-surface); color: var(--bg-muted); }
-  .input-readonly { background: #1c1c1e; color: var(--fg-5); }
+  .input-readonly { background: var(--bg-surface); color: var(--fg-5); }
 
   .btn-wifi-reset {
     margin-left: 8px;
     padding: 4px 10px;
-    background: #b71c1c;
+    background: var(--status-error-darker);
     color: white;
     border: none;
     border-radius: 4px;
@@ -3096,7 +3096,7 @@ tr[style*="background-color"] {
   }
 
   .btn-wifi-reset:hover {
-    background: #e53935;
+    background: var(--status-error);
   }
 
   /*
@@ -3255,7 +3255,7 @@ tr[style*="background-color"] {
 }
 
 .btn-log-control:hover {
-  background: #4a4a4c;
+  background: var(--border-1);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
@@ -3269,7 +3269,7 @@ tr[style*="background-color"] {
 }
 
 .btn-active:hover {
-  background: #45a049;
+  background: var(--status-ok-dark);
 }
 
 .log-search {
@@ -3304,7 +3304,7 @@ tr[style*="background-color"] {
   gap: 10px;
   margin: 8px 0 16px;
   padding: 10px 12px;
-  background: #252629;
+  background: var(--bg-surface);
   border: 1px solid var(--bg-surface-alt);
   border-radius: 6px;
 }
@@ -3313,10 +3313,10 @@ tr[style*="background-color"] {
   flex: 1 1 260px;
   min-width: 220px;
   padding: 7px 12px;
-  border: 1px solid #4a4a4c;
+  border: 1px solid var(--border-1);
   border-radius: 4px;
   font-size: 13px;
-  background-color: #1f2022;
+  background-color: var(--bg-surface);
   color: var(--bg-muted);
 }
 
@@ -3324,7 +3324,7 @@ tr[style*="background-color"] {
   flex: 1 1 180px;
   min-height: 18px;
   font-size: 12px;
-  color: #a0a8b0;
+  color: var(--fg-4);
 }
 
 /* Log Container */
@@ -3464,7 +3464,7 @@ body.disable-interaction {
 
 .tab-link.active {
   color: var(--status-neutral);
-  border-bottom: 3px solid #5a5a5c;
+  border-bottom: 3px solid var(--border-2);
 }
 
 .tab-content {
@@ -3510,7 +3510,7 @@ body.disable-interaction {
 }
 
 .ot-stats-table th:hover {
-  background-color: #4a4a4c;
+  background-color: var(--border-1);
 }
 
 .ot-stats-table tr:hover {
@@ -3546,12 +3546,12 @@ body.disable-interaction {
 .fs-mismatch-banner {
   padding: 10px 16px;
   background-color: var(--status-critical);
-  color: #ffcdd2;
+  color: var(--status-error-soft-bg);
   font-weight: bold;
   text-align: center;
 }
 .fs-mismatch-banner a {
-  color: #ef9a9a;
+  color: var(--status-error-soft-border);
   text-decoration: underline;
 }
 
@@ -3566,15 +3566,15 @@ body.disable-interaction {
 }
 .pic-update-banner.update-available {
   background-color: var(--status-alert);
-  color: #ffe0b2;
+  color: var(--status-warn-soft-bg);
   font-weight: bold;
 }
 .pic-update-banner.up-to-date {
   background-color: var(--status-ok-dark);
-  color: #c8e6c9;
+  color: var(--status-ok-soft-bg);
 }
 .pic-version-outdated {
-  color: #ff8a65;
+  color: var(--status-warn);
   font-weight: bold;
 }
 
@@ -3649,7 +3649,7 @@ body.disable-interaction {
   display: table-cell;
   padding: 5px 15px;
   font-style: italic;
-  color: #999;
+  color: var(--fg-mute);
   font-size: 0.9em;
   border: none;
   background: transparent;
@@ -3668,7 +3668,7 @@ body.disable-interaction {
 .pic-settings-refresh {
   margin-top: 8px;
   font-size: 0.85em;
-  color: #aaa;
+  color: var(--fg-mute);
 }
 .pic-settings-refresh button {
   margin-right: 8px;
@@ -3680,27 +3680,27 @@ body.disable-interaction {
   max-width: 100%;
 }
 .sat-card {
-  background: #1e3a3a;
-  border: 1px solid #2e5050;
+  background: var(--sat-tile-teal-bg);
+  border: 1px solid var(--sat-tile-teal-accent);
 }
 .sat-card-label {
-  color: #aaa;
+  color: var(--fg-mute);
 }
 .sat-card-value {
-  color: #80cbc4;
+  color: var(--sat-tile-teal-border);
 }
 .sat-section {
   border-bottom: 1px solid var(--border-1);
   padding-bottom: 12px;
 }
 .sat-section h3 {
-  color: #80cbc4;
+  color: var(--sat-tile-teal-border);
 }
 .sat-label {
-  color: #bbb;
+  color: var(--fg-5);
 }
 .sat-value {
-  color: #eee;
+  color: var(--border-soft);
 }
 .sat-grid {
   display: table;
@@ -3724,23 +3724,23 @@ body.disable-interaction {
 }
 .sat-badge-active {
   background: var(--status-ok-dark);
-  color: #a5d6a7;
+  color: var(--status-ok-soft-border);
 }
 .sat-badge-idle {
-  background: #4a3c00;
-  color: #fff176;
+  background: var(--crash-text);
+  color: var(--status-warn-soft-border);
 }
 .sat-badge-disabled {
-  background: #424242;
-  color: #999;
+  background: var(--bg-surface-alt);
+  color: var(--fg-mute);
 }
 .sat-badge-error {
-  background: #4a1010;
-  color: #ef9a9a;
+  background: var(--status-error-soft-bg);
+  color: var(--status-error-soft-border);
 }
 .sat-badge-sim {
-  background: #4a148c;
-  color: #ce93d8;
+  background: var(--status-error-soft-bg);
+  color: var(--status-error-soft-border);
 }
 /* SAT View Selector (Dark) */
 #sat-view-selector {
@@ -3770,48 +3770,48 @@ body.disable-interaction {
   text-align: center;
   font-size: 1.3rem;
   padding: 12px;
-  color: #aaa;
+  color: var(--fg-mute);
   font-weight: 500;
 }
-.sat-view-simple .sat-simple-status.heating { color: #e67e22; }
+.sat-view-simple .sat-simple-status.heating { color: var(--status-warn-soft-text); }
 .sat-view-simple .sat-simple-status.error { color: var(--status-error); }
 
 /* SAT Diagnostics (Dark) */
 .sat-health-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0; }
 .sat-health-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
-.sat-health-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; background: #999; }
+.sat-health-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; background: var(--fg-mute); }
 .sat-health-ok { background: var(--status-ok); }
 .sat-health-problem { background: var(--status-error); }
-.sat-raw-data { background: #1a1a2e; padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; color: var(--bg-muted); }
+.sat-raw-data { background: var(--bg-app); padding: 12px; border-radius: 4px; font-size: 0.8em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; color: var(--bg-muted); }
 .sat-collapsible { cursor: pointer; }
 .sat-collapsible:hover { opacity: 0.8; }
 
 /* SAT Interactive Controls (Dark) */
 .sat-btn { background: var(--bg-surface-alt); color: var(--bg-muted); border-color: var(--border-2); }
-.sat-btn:hover { background: #4a4a4c; }
+.sat-btn:hover { background: var(--border-1); }
 .sat-btn:active { background: var(--border-2); }
-.sat-btn.active { background: var(--status-ok-dark); color: #fff; border-color: #388E3C; }
-.sat-btn-toggle.active { background: var(--status-critical); border-color: #b71c1c; }
+.sat-btn.active { background: var(--status-ok-dark); color: var(--fg-inverse); border-color: var(--status-ok-soft-text); }
+.sat-btn-toggle.active { background: var(--status-critical); border-color: var(--status-error-darker); }
 .sat-feedback-ok { color: var(--status-ok); }
 .sat-feedback-error { color: var(--status-error); }
-.sat-toggle-label { color: #aaa; }
+.sat-toggle-label { color: var(--fg-mute); }
 .sat-toggle-slider { background: var(--border-2); }
 .sat-toggle-slider::before { background: var(--border-1); }
-.sat-toggle input:checked + .sat-toggle-slider { background: #30d158; }
-.sat-toggle input:focus-visible + .sat-toggle-slider { outline-color: #30d158; }
+.sat-toggle input:checked + .sat-toggle-slider { background: var(--status-ok); }
+.sat-toggle input:focus-visible + .sat-toggle-slider { outline-color: var(--status-ok); }
 
 /* SAT Settings Groups (dark theme) */
 .sat-settings-group-header {
-  background: #1e3a3a;
-  color: #80cbc4;
-  border-bottom: 1px solid #2e4a4a;
+  background: var(--sat-tile-teal-bg);
+  color: var(--sat-tile-teal-border);
+  border-bottom: 1px solid var(--sat-tile-teal-border);
 }
 .sat-settings-group-header:hover {
-  background: #2a4a4a;
+  background: var(--sat-tile-teal-accent);
 }
 .sat-settings-group-body {
-  background: #1a1a2e;
-  border: 1px solid #2e4a4a;
+  background: var(--bg-app);
+  border: 1px solid var(--sat-tile-teal-border);
   border-top: none;
 }
 
@@ -3825,12 +3825,12 @@ body.disable-interaction {
 ***************************************************************************
 */
 :root {
-    --primary-color: #4daafc; /* Lighter blue for dark mode */
-    --primary-hover: #6eb9fd;
-    --bg-color: #121212;      /* Very dark background */
+    --primary-color: var(--status-info); /* Lighter blue for dark mode */
+    --primary-hover: var(--accent-hover);
+    --bg-color: var(--bg-app);      /* Very dark background */
     --card-bg: var(--log-bg);       /* Dark card background */
     --text-color: var(--bg-muted);    /* Light text */
-    --text-muted: #a0a0a0;
+    --text-muted: var(--fg-5);
     --border-color: var(--fg-2);
     --border-radius: 8px;
     --shadow: 0 4px 6px rgba(0,0,0,0.5); /* Stronger shadow for dark mode */
@@ -3890,7 +3890,7 @@ tr:last-child {
 }
 
 /* Dark mode striped rows */
-tr:nth-child(even) { background: #252525; }
+tr:nth-child(even) { background: var(--bg-surface); }
 tr:nth-child(odd) { background: var(--log-bg); }
 
 td {
@@ -3919,10 +3919,10 @@ a:hover {
 }
 
 a.delete-link {
-    color: #ff5252; /* Bright Red for dark mode */
+    color: var(--status-error); /* Bright Red for dark mode */
 }
 a.delete-link:hover {
-    color: #ff1744;
+    color: var(--status-error);
     text-decoration: underline;
 }
 
@@ -3984,7 +3984,7 @@ input[type="file"] {
     max-width: 500px;
     padding: 15px;
     margin-bottom: 20px;
-    background: #2d2d2d;
+    background: var(--bg-surface);
     color: var(--text-color);
     border: 2px dashed var(--border-1); /* Darker dashed border */
     border-radius: var(--border-radius);
@@ -4029,7 +4029,7 @@ fileSize p {
 /* Button Styling System-wide */
 input[type="submit"], input[type="button"], .button {
     background-color: var(--primary-color);
-    color: #121212; /* Dark text for high contrast on bright blue */
+    color: var(--bg-app); /* Dark text for high contrast on bright blue */
     border: none;
     padding: 10px 20px;
     font-size: 14px;
@@ -4067,14 +4067,14 @@ input[type="submit"]:disabled {
 }
 
 /* Action Specific Colors */
-form[action='/ReBoot'] input { background-color: #5a5a5a; }
-form[action='/ReBoot'] input:hover { background-color: #6a6a6a; }
+form[action='/ReBoot'] input { background-color: var(--border-2); }
+form[action='/ReBoot'] input:hover { background-color: var(--fg-4); }
 
-form[action='/ResetWireless'] input { background-color: #ffb300; color: var(--fg-1); }
-form[action='/ResetWireless'] input:hover { background-color: #e09f00; }
+form[action='/ResetWireless'] input { background-color: var(--status-warn); color: var(--fg-1); }
+form[action='/ResetWireless'] input:hover { background-color: var(--status-warn); }
 
-form[action='/'] input { background-color: #cf6679; color: var(--fg-1); } /* Material Error Color */
-form[action='/'] input:hover { background-color: #b00020; color: white; }
+form[action='/'] input { background-color: var(--status-error); color: var(--fg-1); } /* Material Error Color */
+form[action='/'] input:hover { background-color: var(--status-critical); color: white; }
 
 /* Hide HR */
 hr {
@@ -4101,21 +4101,21 @@ hr {
 
 /* Note style */
 .note {
-	background-color: #3e2723; /* Dark brown/red for warning */
-    color: #ffccbc;
+	background-color: var(--status-warn-soft-bg); /* Dark brown/red for warning */
+    color: var(--status-warn-soft-bg);
 	padding: 10px;
 	margin-top: 1em;
 	text-align: center;
 	border-radius: var(--border-radius);
     max-width: 100%;
-    border: 1px solid #d84315;
+    border: 1px solid var(--status-alert);
 }
 
 /* Highlighting styles from original JS */
-/* In dark mode, light green #d4edda is too bright for text. We need a dark green. */
+/* In dark mode, light green var(--status-ok-soft-bg) is too bright for text. We need a dark green. */
 tr[style*="background-color"] {
     background-color: var(--status-ok-dark) !important; /* Material Green 900 */
-    color: #e8f5e9;
+    color: var(--status-ok-soft-bg);
 }
 
 /* Hide firmware update button on touch devices (phones and tablets).
