@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta
+**  Version  : v2.0.0-alpha
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -376,8 +376,9 @@ static void sendTelnetBanner(const char* ip)
   debugTelnet.println(F("  OpenTherm Gateway -- OTGW-firmware"));
   _debugPrintf_P(PSTR("  Version : %s\r\n"), _VERSION);
   debugTelnet.println(F("============================================"));
-  _debugPrintf_P(PSTR("  IP      : %s\r\n"), WiFi.localIP().toString().c_str());
-  _debugPrintf_P(PSTR("  WiFi    : %s\r\n"), WiFi.SSID().c_str());
+  _debugPrintf_P(PSTR("  IP      : %s\r\n"), getActiveIP().c_str());
+  debugTelnet.print(F("  Network : "));
+  debugTelnet.println(networkModeName());
   _debugPrintf_P(PSTR("  OTGW    : %-10s  MQTT : %s\r\n"),
     state.otBus.bOnline    ? "online"     : "offline",
     state.mqtt.bConnected  ? "connected"  : "disconnected");
@@ -411,9 +412,9 @@ void startTelnet()
   debugTelnet.onConnect(sendTelnetBanner);
   debugTelnet.setLineMode(false);
   debugTelnet.onInputReceived(onTelnetInput);
-  debugTelnet.begin();             // port was fixed in the constructor (23)
+  debugTelnet.begin(false);        // port was fixed in the constructor (23)
   DebugT(F("\r\nTelnet debug server started on "));
-  DebugT(WiFi.localIP());
+  DebugT(getActiveIP());
   DebugTln(F(":23"));
 } // startTelnet()
 
