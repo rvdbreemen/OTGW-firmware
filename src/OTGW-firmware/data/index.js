@@ -3090,6 +3090,10 @@ function initMainPage() {
     // Keep 'theme' key in sync so applyTheme() and the pre-paint script can
     // read it regardless of which key was written first.
     try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch (_) {}
+    // TASK-462: re-register otgw-light/otgw-dark with the freshly-read CSS
+    // vars BEFORE charts re-init, so echarts.init(c, 'otgw-dark') resolves
+    // to the correct token-driven theme rather than ECharts default.
+    if (typeof window.registerOtgwThemes === 'function') window.registerOtgwThemes();
     if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
       OTGraph.setTheme(isDark ? 'dark' : 'light');
     }

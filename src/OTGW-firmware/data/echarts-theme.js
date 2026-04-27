@@ -55,5 +55,24 @@
     };
   }
 
+  // TASK-462: register otgw-light / otgw-dark theme NAMES so existing
+  // echarts.init(container, 'otgw-dark') call sites in sat.js / graph.js
+  // actually resolve the token-driven theme. otgwChartTheme() reads CSS
+  // vars at call time, so re-register on theme:changed picks up the
+  // new dark/light values before charts re-init.
+  function registerOtgwThemes() {
+    if (typeof echarts === 'undefined' || typeof echarts.registerTheme !== 'function') return;
+    var theme = otgwChartTheme();
+    echarts.registerTheme('otgw-light', theme);
+    echarts.registerTheme('otgw-dark', theme);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', registerOtgwThemes);
+  } else {
+    registerOtgwThemes();
+  }
+
   root.otgwChartTheme = otgwChartTheme;
+  root.registerOtgwThemes = registerOtgwThemes;
 })(window);
