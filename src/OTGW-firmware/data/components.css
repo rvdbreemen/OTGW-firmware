@@ -111,8 +111,16 @@ body.dark .nav-container, [data-theme="dark"] .nav-container { background: #3838
 .nav-item:hover { color: var(--fg-1); }
 .nav-item:active { transform: translate(2px, 2px); box-shadow: none; }
 
+/* Higher specificity than the legacy `.nav-right .adv_dropdown` rule in
+ * index.css (which hard-codes top:121px / right:10px and floats the menu
+ * to the page centre when the nav layout shifts). Anchored to .nav-right's
+ * own coordinate system: top:100% drops the menu just below the nav bar,
+ * right:0 lines its right edge up with the Advanced button. */
+.nav-right .adv_dropdown,
 .adv_dropdown {
-  position: absolute; top: 52px; right: 0; min-width: 200px;
+  position: absolute; top: 100%; right: 0;
+  margin-top: 4px;
+  min-width: 200px;
   background: var(--bg-surface-alt); color: var(--fg-2);
   border: 1px solid var(--border-2); border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-dropdown);
