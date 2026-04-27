@@ -3053,7 +3053,7 @@ function renderSharedPageNavShell() {
 
 //============================================================================
 function updateThemeToggle() {
-  var isDark = localStorage.getItem('theme') === 'dark';
+  var isDark = (localStorage.getItem('otgw-theme') || localStorage.getItem('theme')) === 'dark';
   var icon  = isDark ? '\u2600\uFE0E' : '\u263D\uFE0E';   // ☀︎ sun  or  ☽︎ moon (text presentation, not emoji)
   var title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
   document.querySelectorAll('.theme-toggle-btn').forEach(function(btn) {
@@ -3083,12 +3083,13 @@ function initMainPage() {
   renderSharedPageNavShell();
   updateThemeToggle();
 
-  function doThemeToggle() {
-    var isDark = localStorage.getItem('theme') !== 'dark';  // toggle
-    // TASK-435 follow-up A: theme is now body.dark + html[data-theme] only.
-    // No legacy index.css / index_dark.css stylesheet swap; updateThemeToggle()
-    // below mirrors body.dark + data-theme onto the document.
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  // theme-toggle.js is the canonical toggle; listen for its event to handle
+  // side-effects: chart re-theme, server persistence, settings checkbox sync.
+  document.addEventListener('theme:changed', function(e) {
+    var isDark = (e.detail && e.detail.mode === 'dark');
+    // Keep 'theme' key in sync so applyTheme() and the pre-paint script can
+    // read it regardless of which key was written first.
+    try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch (_) {}
     if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
       OTGraph.setTheme(isDark ? 'dark' : 'light');
     }
@@ -3102,17 +3103,6 @@ function initMainPage() {
       headers: { 'content-type': 'application/json; charset=UTF-8' },
       body: JSON.stringify({ name: 'darktheme', value: String(isDark) })
     }).catch(function(err) { console.warn('Theme save failed:', err.message); });
-    updateThemeToggle();
-  }
-
-  document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('theme-toggle-btn')) doThemeToggle();
-  });
-  document.addEventListener('keydown', function(e) {
-    if (e.target.classList.contains('theme-toggle-btn') && (e.key === 'Enter' || e.key === ' ')) {
-      e.preventDefault();
-      doThemeToggle();
-    }
   });
 
   Array.from(document.getElementsByClassName('FSexplorer')).forEach(
@@ -5920,10 +5910,13 @@ function applyTheme() {
       if (data && data["darktheme"]) {
         // Only apply server theme if the browser has no local preference yet
         var localTheme = null;
-        try { localTheme = localStorage.getItem('theme'); } catch(e) {}
+        try { localTheme = localStorage.getItem('otgw-theme') || localStorage.getItem('theme'); } catch(e) {}
         if (!localTheme) {
           let isDark = strToBool(data["darktheme"].value);
-          try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch(e) {}
+          try {
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            localStorage.setItem('otgw-theme', isDark ? 'dark' : 'light');
+          } catch(e) {}
           if (typeof OTGraph !== 'undefined' && OTGraph && typeof OTGraph.setTheme === 'function') {
               OTGraph.setTheme(isDark ? 'dark' : 'light');
           }

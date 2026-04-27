@@ -394,7 +394,7 @@
    <body>
       <h2>FSexplorer ESP</h2>
       <div>
-         <main></main>
+         <main class="fs-main"></main>
       </div>
       <br>
       
@@ -410,23 +410,23 @@
       <span></span>
       
       <hr>
-      <div class="system-actions">
+      <section class="fs-action-card">
            <h3>System Actions</h3>
            <div class="button-row">
                 <form action='/update' method='GET' class='desktop-only'>
-                  <input type='submit' class='button' name='SUBMIT' value='Update Firmware' ENABLED/>
+                  <input type='submit' class='button fs-btn' name='SUBMIT' value='Update Firmware' ENABLED/>
                 </form>
                 <form action='/ReBoot'>
-                  <input type='submit' class='button' name='SUBMIT' value='ReBoot'>
+                  <input type='submit' class='button fs-btn secondary' name='SUBMIT' value='ReBoot'>
                 </form>
                 <form action='/ResetWireless'>
-                  <input type='submit' class='button' name='SUBMIT' value='Reset Wireless'>
+                  <input type='submit' class='button fs-btn wifi' name='SUBMIT' value='Reset Wireless'>
                 </form>
                 <form action='/'>
-                  <input type='button' class='button' value='Exit FSexplorer' onclick="window.location.href='/'">
+                  <input type='button' class='button fs-btn secondary' value='Exit FSexplorer' onclick="window.location.href='/'">
                 </form>
            </div>
-      </div>
+      </section>
       <br>
       <div id="left">
          <a href="https://fipsok.de/Projekt/Esp8266-LittleFS-Tab" target="_blank">Admin © 2018 Jens Fleischer</a><br>

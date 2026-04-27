@@ -99,28 +99,28 @@ var SAT = (function() {
         console.warn('[SAT] fetch error:', err);
         setText('sat-status-badge', 'Error');
         var b = el('sat-status-badge');
-        if (b) b.className = 'sat-state-pill is-error';
+        if (b) b.className = 'ds-pill is-error';
       });
   }
 
   // --- Update the dashboard with fresh data ---
   function updateDashboard(d) {
     _debug('updateDashboard', 'room=' + d.room_temp, 'target=' + d.target_temp, 'setpoint=' + d.final_setpoint, 'mode=' + (MODE_LABELS[d.control_mode] || d.control_mode), 'flame=' + d.flame, 'active=' + d.active);
-    // Status badge (Patch 02: sat-badge classes -> sat-state-pill is-*)
+    // Status badge — ds-pill base class, is-ok / is-warn / is-error modifiers
     var badge = el('sat-status-badge');
     if (badge) {
       if (!d.enabled) {
         badge.textContent = 'Disabled';
-        badge.className = 'sat-state-pill is-neutral';
+        badge.className = 'ds-pill';
       } else if (d.safety_tripped) {
         badge.textContent = 'Safety Tripped';
-        badge.className = 'sat-state-pill is-error';
+        badge.className = 'ds-pill is-error';
       } else if (d.active) {
         badge.textContent = MODE_LABELS[d.control_mode] || 'Active';
-        badge.className = 'sat-state-pill is-ok';
+        badge.className = 'ds-pill is-ok';
       } else {
         badge.textContent = 'Idle';
-        badge.className = 'sat-state-pill is-warn';
+        badge.className = 'ds-pill is-warn';
       }
     }
 
