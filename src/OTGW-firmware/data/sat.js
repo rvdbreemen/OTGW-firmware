@@ -945,6 +945,18 @@ var SAT = (function() {
       if (sp > _dhwSliderMax) sp = _dhwSliderMax;
       slider.value = sp;
       updateDHWSliderLabel(sp);
+      // TASK-435 follow-up: sat-slider.js (.ds-slider live-fill) syncs on
+      // 'input' events, but the assignment above is a programmatic value
+      // mutation that does NOT fire input. Without this manual setProperty
+      // the --slider-pct stays at the CSS default of 50% and the blue fill
+      // detaches from the thumb. Mirroring the same pct math here keeps
+      // them in lock-step on every poll.
+      var min = parseFloat(slider.min) || 0;
+      var max = parseFloat(slider.max) || 100;
+      if (max > min) {
+        var pct = ((sp - min) / (max - min)) * 100;
+        slider.style.setProperty('--slider-pct', pct.toFixed(2) + '%');
+      }
     }
 
     // Update HW switch display state from dhw_active (= SlaveStatus bit 0x04)

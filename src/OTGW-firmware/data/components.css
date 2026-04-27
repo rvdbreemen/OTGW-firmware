@@ -495,17 +495,15 @@ body.dark .otmonrow,
 
 .sat-tiles {
   display: grid;
-  /* Three live temperatures side by side (Room / Outside / Boiler).
-     Target tile sits on its own row spanning all three columns. */
-  grid-template-columns: repeat(3, 1fr);
+  /* 2x2 grid per spec:
+       row 1: Outside | Boiler
+       row 2: Room    | Target */
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-3);
   margin-bottom: 16px;
 }
-.sat-tile.is-target {
-  grid-column: 1 / -1;
-}
 @media (max-width: 720px) {
-  /* Stack to single column on phones; .is-target keeps its own row. */
+  /* Stack to single column on phones. */
   .sat-tiles { grid-template-columns: 1fr; }
 }
 .sat-tile {

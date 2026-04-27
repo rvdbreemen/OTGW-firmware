@@ -393,16 +393,10 @@
           <button type="button" class="sat-btn sat-settings-nav-btn" onclick="satSettingsPage()" title="SAT Settings">Settings</button>
         </div>
 
-        <!-- Temperature tiles. TASK-435 follow-up: DOM order matches the
-             grid layout in components.css (.sat-tiles is a 3-column grid;
-             .sat-tile.is-target spans all three columns, so it has to come
-             AFTER the three live temperatures to render on its own row
-             below them: Room / Outside / Boiler on row 1, Target on row 2. -->
+        <!-- Temperature tiles. TASK-435 follow-up: 2x2 grid per spec:
+               row 1: Outside | Boiler
+               row 2: Room    | Target (.is-target keeps the blue accent) -->
         <div class="sat-tiles" data-view="simple expert diag">
-          <div class="sat-tile">
-            <div class="sat-tile-label">Room Temperature</div>
-            <div class="sat-tile-value" id="sat-room-temp">--</div>
-          </div>
           <div class="sat-tile">
             <div class="sat-tile-label">Outside Temperature</div>
             <div class="sat-tile-value" id="sat-outside-temp">--</div>
@@ -410,6 +404,10 @@
           <div class="sat-tile">
             <div class="sat-tile-label">Boiler Setpoint</div>
             <div class="sat-tile-value" id="sat-flow-temp">--</div>
+          </div>
+          <div class="sat-tile">
+            <div class="sat-tile-label">Room Temperature</div>
+            <div class="sat-tile-value" id="sat-room-temp">--</div>
           </div>
           <div class="sat-tile is-target">
             <div class="sat-tile-label">Target Temperature</div>
