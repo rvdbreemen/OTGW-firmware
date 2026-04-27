@@ -639,7 +639,7 @@ body.dark .settingDiv,
 .fs-btn:hover {
   transform: translateY(-2px); box-shadow: var(--shadow-card); opacity: .95;
 }
-.fs-btn.secondary { background: #6c757d; }
+.fs-btn.secondary { background: var(--bg-muted); color: var(--fg-1); }
 .fs-btn.wifi      { background: var(--status-warn); color: #000; }
 .fs-btn.danger    { background: var(--status-danger); }
 
