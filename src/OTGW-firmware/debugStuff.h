@@ -55,6 +55,7 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
   bool     bSAT                   = true;   // SAT control loop + cycle + HCR trace (default on)
   bool     bOTDirect              = true;   // OTDirect frame handling + PI loop trace (default on)
+  bool     bSATBLE                = false;  // SAT BLE scan/parse/match/update trace (ESP32-only, default off: log-spam on busy advert bursts)
   uint32_t iOTGWSimulationIntervalMs = 750;
   uint32_t iOTGWSimulationNextDueMs  = 0;
 };

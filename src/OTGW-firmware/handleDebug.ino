@@ -45,6 +45,9 @@ void handleDebugChar(char c){
                 Debugf(PSTR("4) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(state.debug.bSensors));
                 Debugf(PSTR("5) Toggle debuglog - SAT control loop + cycles + HCR: %s\r\n"), CBOOLEAN(state.debug.bSAT));
                 Debugf(PSTR("6) Toggle debuglog - OTDirect frame handling + PI loop: %s\r\n"), CBOOLEAN(state.debug.bOTDirect));
+#if defined(ESP32)
+                Debugf(PSTR("7) Toggle debuglog - SAT BLE sensor scan: %s\r\n"), CBOOLEAN(state.debug.bSATBLE));
+#endif
                 Debugf(PSTR("g) Toggle debuglog - MQTT interval gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
                 Debugf(PSTR("n) Toggle debuglog - NTP time sync: %s\r\n"), CBOOLEAN(state.debug.bNTP));
                 Debugf(PSTR("d) Toggle debug helper - Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));
@@ -139,6 +142,12 @@ void handleDebugChar(char c){
                 state.debug.bOTDirect = !state.debug.bOTDirect;
                 DebugTf(PSTR("\r\nDebug OTDirect: %s\r\n"), CBOOLEAN(state.debug.bOTDirect));
                 break;
+#if defined(ESP32)
+            case '7':
+                state.debug.bSATBLE = !state.debug.bSATBLE;
+                DebugTf(PSTR("\r\nDebug SAT BLE: %s\r\n"), CBOOLEAN(state.debug.bSATBLE));
+                break;
+#endif
             case 'g':
                 state.debug.bMQTTGate = !state.debug.bMQTTGate;
                 DebugTf(PSTR("\r\nDebug MQTT Gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));

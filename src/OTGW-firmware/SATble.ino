@@ -22,6 +22,13 @@
 #include <BLEUtils.h>
 #include <BLEScan.h>
 
+// --- Switchable debug-trace macros (telnet key '7' toggles state.debug.bSATBLE) ---
+// Init meldingen blijven ongewrapt zodat boot-time visibility behouden blijft.
+#define SATBLEDebugTln(s)        do { if (state.debug.bSATBLE) DebugTln(s); } while(0)
+#define SATBLEDebugTf(fmt, ...)  do { if (state.debug.bSATBLE) DebugTf(fmt, ##__VA_ARGS__); } while(0)
+#define SATBLEDebugln(s)         do { if (state.debug.bSATBLE) Debugln(s); } while(0)
+#define SATBLEDebugf(fmt, ...)   do { if (state.debug.bSATBLE) Debugf(fmt, ##__VA_ARGS__); } while(0)
+
 // --- BLE Sensor Constants ---
 #define SAT_BLE_MAX_SENSORS   4
 static const uint32_t BLE_SCAN_INTERVAL_MS  = 30000;   // 30s between scans (default)
@@ -176,6 +183,12 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     uint8_t batt = 0;
     bool parsed = false;
 
+    // Trace every incoming advertisement when SAT BLE debug toggle is on.
+    SATBLEDebugTf(PSTR("SAT BLE: ad from %s rssi=%d hasServiceData=%d\r\n"),
+                  advertisedDevice.getAddress().toString().c_str(),
+                  advertisedDevice.getRSSI(),
+                  advertisedDevice.haveServiceData() ? 1 : 0);
+
     // Try ATC/pvvx format: service data UUID 0x181A
     if (advertisedDevice.haveServiceData()) {
       BLEUUID svcUUID = advertisedDevice.getServiceDataUUID();
@@ -215,7 +228,10 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
       }
     }
 
-    if (!parsed) return;
+    if (!parsed) {
+      SATBLEDebugTf(PSTR("SAT BLE: ad rejected (unknown format)\r\n"));
+      return;
+    }
 
     // Get MAC address — copy to fixed char buffer, avoid named String object
     char macBuf[18];
@@ -224,11 +240,18 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     for (int i = 0; macBuf[i]; i++) macBuf[i] = toupper((unsigned char)macBuf[i]);
 
     // Check MAC filter
-    if (!bleMatchesConfiguredMAC(macBuf)) return;
+    if (!bleMatchesConfiguredMAC(macBuf)) {
+      SATBLEDebugTf(PSTR("SAT BLE: ad from %s rejected (filter='%s')\r\n"),
+                    macBuf, settings.sat.sBleMAC);
+      return;
+    }
 
     // Find or allocate slot
     int slot = bleFindOrAllocSlot(macBuf);
-    if (slot < 0) return;  // All slots full
+    if (slot < 0) {
+      SATBLEDebugTf(PSTR("SAT BLE: ad from %s rejected (no free slot)\r\n"), macBuf);
+      return;
+    }
 
     // Update sensor data
     strlcpy(_bleSensors[slot].sMacAddress, macBuf, sizeof(_bleSensors[slot].sMacAddress));
@@ -238,6 +261,10 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     _bleSensors[slot].iRssi        = (int8_t)advertisedDevice.getRSSI();
     _bleSensors[slot].bValid       = true;
     _bleSensors[slot].iLastSeenMs  = millis();
+
+    SATBLEDebugTf(PSTR("SAT BLE: sensor %s slot=%d temp=%.1f hum=%.1f batt=%u rssi=%d\r\n"),
+                  macBuf, slot, temp, hum, (unsigned)batt,
+                  (int)advertisedDevice.getRSSI());
   }
 };
 
@@ -281,6 +308,10 @@ void satBLELoop()
   if ((millis() - _bleLastScanMs) < interval) return;
   _bleLastScanMs = millis();
 
+  SATBLEDebugTf(PSTR("SAT BLE: scan starting (interval=%us, duration=%us)\r\n"),
+                (unsigned)(interval / 1000UL),
+                (unsigned)BLE_SCAN_DURATION_SEC);
+
   // Start non-blocking scan
   _pBLEScan->start(BLE_SCAN_DURATION_SEC, false);  // false = non-blocking
   _pBLEScan->clearResults();  // Free memory after scan
@@ -320,6 +351,9 @@ void satBLEUpdateState()
         state.sat.bBleTempValid = true;
         state.sat.iBleTempLastMs = _bleSensors[i].iLastSeenMs;
         found = true;
+        SATBLEDebugTf(PSTR("SAT BLE: best sensor slot=%d mac=%s temp=%.1f age=%ums\r\n"),
+                      i, _bleSensors[i].sMacAddress, _bleSensors[i].fTemperature,
+                      (unsigned)(now - _bleSensors[i].iLastSeenMs));
       }
     }
   }
@@ -329,6 +363,8 @@ void satBLEUpdateState()
   // If no valid sensor found, mark state as invalid
   if (!found) {
     state.sat.bBleTempValid = false;
+    SATBLEDebugTf(PSTR("SAT BLE: no valid sensor (count=%u, all stale or filter mismatch)\r\n"),
+                  (unsigned)sensorCount);
   }
 }
 
