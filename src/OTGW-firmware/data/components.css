@@ -530,9 +530,9 @@ body.dark .otmonrow,
  * ============================================================= */
 .settingDiv {
   text-align: right;
-  border: 4px solid var(--brand-lightblue);
+  border: 1px solid var(--brand-lightblue);
   background: var(--brand-lightblue);
-  padding: var(--space-2) var(--space-5);
+  padding: var(--space-1) var(--space-4);
   margin: 0 16px 4px;
   font-size: var(--fs-sm); color: var(--fg-1);
 }
@@ -547,7 +547,8 @@ body.dark .settingDiv,
 .settingDiv input[type="text"],
 .settingDiv input[type="password"],
 .settingDiv input[type="number"] {
-  padding: 4px var(--space-3); width: 240px;
+  padding: 4px var(--space-3);
+  width: auto; min-width: 240px; max-width: 100%;
   font-size: 12pt;
 }
 .settingDiv::after { content: ""; display: table; clear: both; }
@@ -664,8 +665,8 @@ body.dark .settingDiv,
 /* =============================================================
  * 17. UTILITIES + A11Y
  * ============================================================= */
-.page { display: none; padding-bottom: var(--space-7); }
-.page.active { display: block; }
+.page-section { display: none; padding-bottom: var(--space-7); }
+.page-section.active { display: block; }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0;
@@ -1084,4 +1085,12 @@ body.dark .sat-chart {
 .sat-controls .btn[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* OT command input - TASK-474 follow-up: rule was missing entirely.
+   Constrains height to match the Send button next to it. */
+.ot-cmd-input {
+  height: 32px;
+  padding: 4px var(--space-3);
+  box-sizing: border-box;
 }

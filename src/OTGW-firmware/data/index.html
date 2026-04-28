@@ -281,81 +281,22 @@
       </div>
     </div>
     <div id="displayPICflash" class="page-section">
-      <div class="nav-container">
-        <div class='nav-left'>
-          <button type="button" class='home nav-item tabButton'>Home</button>
-          <button type="button" class='tabSAT nav-item tabButton'>SAT</button>
-        </div>
-        <div class='nav-right'>
-          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
-          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
-          <div class="adv_dropdown hidden">
-            <span class="list_item tabPICflash pic-only">PIC firmware</span>
-            <span class="list_item tabWebhook">Webhook</span>
-            <span class="list_item tabDeviceInfo">Debug Information</span>
-            <span class="list_item FSexplorer">File system contents</span>
-          </div>
-        </div>
-      </div>
+      <div class="page-nav-shell"></div>
       <div id="displayPICpage"></div>
     </div>
     <div id="displayDeviceInfo" class="page-section">
-      <div class="nav-container">
-        <div class='nav-left'>
-          <button type="button" class='home nav-item tabButton'>Home</button>
-          <button type="button" class='tabSAT nav-item tabButton'>SAT</button>
-        </div>
-        <div class='nav-right'>
-          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
-          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
-          <div class="adv_dropdown hidden">
-            <span class="list_item tabPICflash pic-only">PIC firmware</span>
-            <span class="list_item tabWebhook">Webhook</span>
-            <span class="list_item tabDeviceInfo">Debug Information</span>
-            <span class="list_item FSexplorer">File system contents</span>
-          </div>
-        </div>
-      </div>
+      <div class="page-nav-shell"></div>
       <div id="deviceinfoCrashLog" class="crashlog-panel hidden"></div>
       <div id="deviceinfoPage"></div>
     </div>
     <div id="displaySettingsPage" class="page-section">
-      <div class="nav-container">
-        <div class='nav-left'>
-          <button type="button" class='home nav-item tabButton'>Home</button>
-          <button type="button" class='tabSAT nav-item tabButton'>SAT</button>
-        </div>
-        <div class='nav-right'>
-          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
-          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
-          <div class="adv_dropdown hidden">
-            <span class="list_item tabPICflash pic-only">PIC firmware</span>
-            <span class="list_item tabWebhook">Webhook</span>
-            <span class="list_item tabDeviceInfo">Debug Information</span>
-            <span class="list_item FSexplorer">File system contents</span>
-          </div>
-        </div>
-      </div>
+      <div class="page-nav-shell"></div>
       <div id="settingsPage"></div>
       <div id="settingMessage"></div>
+      <button type="button" class='nav-item tabButton btnSaveSettings btn btn-primary hidden'>Save</button>
     </div>
     <div id="displayWebhookPage" class="page-section">
-      <div class="nav-container">
-        <div class='nav-left'>
-          <button type="button" class='home nav-item tabButton'>Home</button>
-          <button type="button" class='tabSAT nav-item tabButton'>SAT</button>
-        </div>
-        <div class='nav-right'>
-          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
-          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
-          <div class="adv_dropdown hidden">
-            <span class="list_item tabPICflash pic-only">PIC firmware</span>
-            <span class="list_item tabWebhook">Webhook</span>
-            <span class="list_item tabDeviceInfo">Debug Information</span>
-            <span class="list_item FSexplorer">File system contents</span>
-          </div>
-        </div>
-      </div>
+      <div class="page-nav-shell"></div>
       <div id="webhookPage"></div>
       <div id="webhookMessage"></div>
     </div>
@@ -597,22 +538,7 @@
       </div>
     </div>
     <div id="displaySATSettingsPage" class="page-section">
-      <div class="nav-container">
-        <div class='nav-left'>
-          <button type="button" class='home nav-item tabButton'>Home</button>
-          <button type="button" class='tabSAT nav-item tabButton'>SAT Dashboard</button>
-        </div>
-        <div class='nav-right'>
-          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
-          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
-          <div class="adv_dropdown hidden">
-            <span class="list_item tabPICflash pic-only">PIC firmware</span>
-            <span class="list_item tabWebhook">Webhook</span>
-            <span class="list_item tabDeviceInfo">Debug Information</span>
-            <span class="list_item FSexplorer">File system contents</span>
-          </div>
-        </div>
-      </div>
+      <div class="page-nav-shell"></div>
       <div class="sat-dashboard">
         <div class="sat-header">
           <h2>SAT Settings</h2>
@@ -621,16 +547,10 @@
         <div id="satSettingsContent"></div>
       </div>
     </div>
-    <!-- TASK-435 Patch D: footer Save button gets the design-system .btn
-         .btn-primary classes alongside the legacy nav-item tabButton
-         classes so components.css picks it up; behaviour is unchanged
-         (existing 'btnSaveSettings hidden' classes still drive the
-         show/hide logic). -->
-    <div class="footer">
-      <div class="nav-left">
-        <button type="button" class='nav-item tabButton btnSaveSettings btn btn-primary hidden'>Save</button>
-      </div>
-    </div>
+    <!-- TASK-474: Save button moved into #displaySettingsPage so the
+         existing .page-section { display: none; } rule (TASK-467) hides
+         it on other pages. The btnSaveSettings class + hidden class still
+         drive show/hide logic via index.js getElementsByClassName. -->
     <!-- KEEP THIS --->
 
     <!-- Pin to bottom right corner -->
