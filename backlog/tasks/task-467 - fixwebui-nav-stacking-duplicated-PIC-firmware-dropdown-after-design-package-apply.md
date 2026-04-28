@@ -3,11 +3,11 @@ id: TASK-467
 title: >-
   fix(webui): nav stacking + duplicated PIC firmware dropdown after
   design-package apply
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-28 05:56'
-updated_date: '2026-04-28 05:57'
+updated_date: '2026-04-28 21:28'
 labels:
   - webui
   - design-system
@@ -48,12 +48,20 @@ See plan: `C:\Users\rvdbr\.claude\plans\the-design-package-still-elegant-globe.m
 <!-- AC:BEGIN -->
 - [x] #1 components.css selector matches `.page-section` (not `.page`); only the active page-section is visible in the rendered DOM
 - [x] #2 All page-sections in index.html use `<div class="page-nav-shell"></div>`; no `<div class="nav-container">` exists outside the `<template id="pageNavTemplate">`
-- [ ] #3 Browser smoke test passes: one nav row visible, Advanced dropdown shows exactly four distinct items (PIC firmware, Webhook, Debug Information, File system contents), tab navigation works without ghosted content from other sections
-- [ ] #4 /design.html still renders cleanly in light and dark mode after the changes; no new console errors or 404s
+- [x] #3 Browser smoke test passes: one nav row visible, Advanced dropdown shows exactly four distinct items (PIC firmware, Webhook, Debug Information, File system contents), tab navigation works without ghosted content from other sections
+- [x] #4 /design.html still renders cleanly in light and dark mode after the changes; no new console errors or 404s
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Edits applied: components.css:667-668 selector now matches .page-section. index.html: stripped 5 hardcoded nav-container blocks (displayPICflash, displayDeviceInfo, displaySettingsPage, displayWebhookPage, displaySATSettingsPage), each replaced with `<div class="page-nav-shell"></div>`. Verified: nav-container + adv_dropdown now exist only inside `<template id="pageNavTemplate">` (lines 64/72). All 7 page-sections have exactly one page-nav-shell slot (lines 85, 284, 288, 293, 298, 303, 540). Dropped page-specific 'SAT Dashboard' label per plan (single source of truth in shared template). Build running in background: id b7fyluwe2. Browser smoke test (AC3) and /design.html re-check (AC4) pending after firmware/LittleFS flash to test device.
+
+2026-04-28: User verified the browser behavior works well: nav stacking/dropdown issue is resolved and the design page check is acceptable.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed the WebUI navigation stacking and duplicated Advanced dropdown by aligning the CSS visibility selector with .page-section and replacing legacy per-page nav markup with the shared page-nav-shell pattern. User verified the browser behavior works well, so the remaining smoke-test ACs are closed.
+<!-- SECTION:FINAL_SUMMARY:END -->

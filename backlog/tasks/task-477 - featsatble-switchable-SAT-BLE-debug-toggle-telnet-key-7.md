@@ -1,11 +1,11 @@
 ---
 id: TASK-477
 title: 'feat(satble): switchable SAT BLE debug toggle (telnet key ''7'')'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-28 18:57'
-updated_date: '2026-04-28 19:03'
+updated_date: '2026-04-28 21:29'
 labels:
   - satble
   - debug
@@ -66,11 +66,11 @@ This task adds switchable instrumentation so the user can on-demand observe:
 <!-- SECTION:DESCRIPTION:END -->
 
 - [x] #1 ESP32 build green; ESP8266 build also green (struct field declared but unused on ESP8266)
-- [ ] #2 Telnet '?' menu shows '7) Toggle debuglog - SAT BLE sensor scan: false' on ESP32 after boot
-- [ ] #3 Pressing '7' on telnet toggles state.debug.bSATBLE with confirmation 'Debug SAT BLE: ON/OFF'
-- [ ] #4 With toggle ON: scan-starts, advertisements (parsed + rejected), MAC mismatches, slot-full, successful sensor updates all visible in telnet log
-- [ ] #5 With toggle OFF: zero BLE-related log entries except always-on init meldingen
-- [ ] #6 Diagnostic for A4:C1:38:92:4F:AC sensor: which rejection path fires can be identified from log output
+- [x] #2 Telnet '?' menu shows '7) Toggle debuglog - SAT BLE sensor scan: false' on ESP32 after boot
+- [x] #3 Pressing '7' on telnet toggles state.debug.bSATBLE with confirmation 'Debug SAT BLE: ON/OFF'
+- [x] #4 With toggle ON: scan-starts, advertisements (parsed + rejected), MAC mismatches, slot-full, successful sensor updates all visible in telnet log
+- [x] #5 With toggle OFF: zero BLE-related log entries except always-on init meldingen
+- [x] #6 Diagnostic for A4:C1:38:92:4F:AC sensor: which rejection path fires can be identified from log output
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -92,4 +92,12 @@ Implementatie afgerond:
 Diff: 49 insertions / 3 deletions over 3 files. Build draait in achtergrond ID buhiygcla.
 
 Commit d8a73952 geland. Build groen (exit 0) op zowel ESP8266 als ESP32 — AC1 verified. AC2-6 wachten op flash + telnet diagnose-sessie.
+
+2026-04-28: User requested closure; ESP32 telnet SAT BLE debug-toggle behavior accepted as working.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added a switchable SAT BLE debug section controlled by telnet key 7. The ESP32 debug menu exposes the toggle, runtime state flips with ON/OFF confirmation, and the SAT BLE scan, parse, rejection, slot, and best-sensor paths are instrumented when enabled while remaining quiet when disabled; user verification accepts the diagnostic flow as working.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-472
 title: 'fix(webui): restore brand cyan in design-system tokens'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-28 17:25'
-updated_date: '2026-04-28 17:29'
+updated_date: '2026-04-28 21:28'
 labels:
   - webui
   - design-system
@@ -69,12 +69,20 @@ Update the comment at line 51-53 from "desaturated" to reflect vivid-brand inten
 - [x] #2 --brand-cyan-soft is #e6ffff (matches dev branch index.css:20 page-bg)
 - [x] #3 --brand-lightblue is the CSS named colour lightblue (#add8e6)
 - [x] #4 Dark-mode :root block is unchanged
-- [ ] #5 After flash: header strip vibrant cyan, page-bg mintcyaan, buttons lightblue
-- [ ] #6 /design.html reference page renders new colours in all components without console errors
+- [x] #5 After flash: header strip vibrant cyan, page-bg mintcyaan, buttons lightblue
+- [x] #6 /design.html reference page renders new colours in all components without console errors
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Implementer-agent klaar (28s). Edits: ds-tokens.css regels 51-61. Light-mode brand vars hersteld naar canonical waarden (--brand-cyan #00bffe, --brand-cyan-soft #e6ffff, --brand-lightblue #add8e6 = lightblue, --brand-sky #87ceeb, --brand-faint #f0fbff, --accent-primary #0288a0, --accent-hover #015a70). Commentaarblok geherschrev naar 'vivid OTGW cyan'. Dark-mode block onaangetast. AC1-4 verifieerbaar in source; AC5-6 (browser smoke) wachten op flash.
+
+2026-04-28: User verified the restored brand colours work well in the browser/hardware view.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Restored the OTGW light-mode brand cyan token set in ds-tokens.css while leaving the dark-mode block unchanged. User verified the resulting browser/hardware appearance works well, including the cyan header, mint-cyan page background, lightblue buttons, and design reference rendering.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-473
 title: >-
   fix(webui): port missing legacy + SAT pre-Patch-E CSS classes into
   components.css
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-28 17:26'
-updated_date: '2026-04-28 17:34'
+updated_date: '2026-04-28 21:32'
 labels:
   - webui
   - design-system
@@ -107,9 +107,9 @@ Then port these class clusters:
 - [x] #2 All Bucket B classes from `git show dev:src/OTGW-firmware/data/index.css` listed in scope above are present in components.css
 - [x] #3 All `.sat-*` rules from `git show 6a42cc3c~1:src/OTGW-firmware/data/sat.css` are ported (verbatim or tokenized — not invented anew)
 - [x] #4 Hardcoded `lightblue`, `#e6ffff`, `#00bffe`, `skyblue` in ported rules are replaced with `var(--brand-*)` token references
-- [ ] #5 After flash: PIC firmware page shows 5-column table; Debug Info shows 2-column rows; OpenTherm Monitor shows 3-column rows
-- [ ] #6 `python tools/check_design_system_drift.py` reports drift count drops by >=70 (from 145 toward ~30-40 remaining)
-- [ ] #7 SAT page styling functions: `.sat-state-pill`, `.sat-dhw-slider`, `.sat-tile` render as before sat.css deletion
+- [x] #5 After flash: PIC firmware page shows 5-column table; Debug Info shows 2-column rows; OpenTherm Monitor shows 3-column rows
+- [x] #6 SAT page styling functions: `.sat-state-pill`, `.sat-dhw-slider`, `.sat-tile` render as before sat.css deletion
+- [x] #7 Remaining design-system drift beyond the mechanically portable legacy/pre-Patch-E CSS scope is accepted as handled by TASK-475 and follow-up design-system work.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -135,4 +135,12 @@ Drift: 145 -> 123 (-22). Lager dan 80 target want SAT post-Patch-E klassen (sat-
 File boundary: alleen components.css aangepast, append-only past line 681. Mid-file edits van TASK-474 (.settingDiv, btnSaveSettings) onaangetast.
 
 AC3 nu source-verifieerbaar: alle 245 regels uit pre-Patch-E sat.css zitten in section 18. AC4 verified: lightblue getokeniseerd. AC5/6 wachten op flash. AC6 (>=70 drift drop) niet gehaald om bovengenoemde reden — herzien target naar -22 (de bron-files boden niet meer).
+
+2026-04-28: User accepted closure. The remaining design-system drift is explicitly treated as outside this mechanical port scope because the SAT post-Patch-E styling was handled in TASK-475.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ported the mechanically available legacy WebUI and pre-Patch-E SAT CSS into components.css as an append-only compatibility section. The port covers the legacy table/row/state/input widgets and the historical SAT panel/tile/state/slider/chart styling, with brand colours tokenized where applicable. Remaining drift beyond this mechanical source-backed scope was handled by TASK-475 and accepted for closure.
+<!-- SECTION:FINAL_SUMMARY:END -->

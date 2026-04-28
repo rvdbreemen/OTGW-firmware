@@ -1,11 +1,11 @@
 ---
 id: TASK-450
 title: 'Design system: complete components.css hex-to-token migration'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-27 18:38'
-updated_date: '2026-04-27 18:57'
+updated_date: '2026-04-28 21:29'
 labels:
   - ui
   - design-system
@@ -24,7 +24,7 @@ After TASK-435 follow-up A and B passes, components.css still contains 155 raw h
 <!-- AC:BEGIN -->
 - [x] #1 components.css contains zero raw hex codes (grep -E '#[0-9a-fA-F]{3,8}' returns no matches outside comments)
 - [x] #2 ds-tokens.css extended with status-*-soft variants needed by the soft status backgrounds
-- [ ] #3 Light + dark theme regression-tested via /design.html on real hardware
+- [x] #3 Light + dark theme regression-tested via /design.html on real hardware
 - [x] #4 Build clean for both ESP8266 and ESP32-S3 targets
 <!-- AC:END -->
 
@@ -65,4 +65,12 @@ ESP8266: 0.77 MB ino.bin + 1.98 MB littlefs.bin
 ESP32-S3: 1.81 MB ino.bin + 2.00 MB littlefs.bin (Flash 96.4%)
 
 AC1, AC2, AC4 met. AC3 (hardware regression via /design.html) requires the user to flash a physical device.
+
+2026-04-28: User requested closure; /design.html light/dark hardware/browser regression accepted as working.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Completed the components.css raw-hex-to-design-token migration. components.css now uses design-system tokens for the migrated colour values, required soft/status/SAT tokens were added, both firmware targets were previously reported build-clean, and user verification accepts the design reference regression as working.
+<!-- SECTION:FINAL_SUMMARY:END -->

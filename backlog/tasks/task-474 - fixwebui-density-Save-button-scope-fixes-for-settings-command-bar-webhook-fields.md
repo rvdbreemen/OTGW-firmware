@@ -3,11 +3,11 @@ id: TASK-474
 title: >-
   fix(webui): density + Save-button scope fixes for settings, command bar,
   webhook fields
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-28 17:26'
-updated_date: '2026-04-28 18:27'
+updated_date: '2026-04-28 21:26'
 labels:
   - webui
   - design-system
@@ -104,3 +104,9 @@ Open items:
 
 Open issue 2 RESOLVED (false alarm): displaySATSettingsPage heeft eigen save-mechanisme. Bij investigation gevonden: SAT settings rendert per-group save buttons dynamisch via index.js:3618 met klasse 'sat-settings-save-btn', click-handler aan saveSATSettingsGroup(groupId) op line 3723. Geen relatie met btnSaveSettings. De TASK-474 agent's flag was gebaseerd op het feit dat getElementsByClassName('btnSaveSettings') in eerste instantie 1 button vond ipv 2, maar dit was correct — SAT settings heeft een ander save-mechanisme. AC4 nu volledig source-verifieerbaar.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Tightened WebUI settings density and save-button scoping. Reduced setting row padding/borders, made settings inputs responsive, added a 32px OT command input rule, and moved the global Save button into the Settings page so it is hidden outside that page. Verified from source that SAT settings uses its separate dynamic save buttons and that the legacy widget compatibility section remains untouched.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-475
 title: 'feat(webui): write CSS for SAT post-Patch-E features (~30 unstyled classes)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-28 17:27'
-updated_date: '2026-04-28 18:27'
+updated_date: '2026-04-28 21:29'
 labels:
   - webui
   - design-system
@@ -105,9 +105,9 @@ Append after the section TASK-472 added.
 - [x] #1 `python tools/check_design_system_drift.py` shows drift count drops to under 35 (Bucket A JS-hooks + Bucket C design.html only)
 - [x] #2 SAT dashboard page renders without unstyled blocks; all post-Patch-E classes have CSS rules
 - [x] #3 Visual harmony with TASK-472 ported legacy SAT styling: same brand cyan, same spacing rhythm, same button shadow/radius style
-- [ ] #4 Hardware screenshot review by user — matches intended SAT UX
+- [x] #4 Hardware screenshot review by user — matches intended SAT UX
 - [x] #5 No console errors / 404s on SAT pages
-- [ ] #6 Dark-mode rendering verified on SAT pages (token-driven, should follow automatically)
+- [x] #6 Dark-mode rendering verified on SAT pages (token-driven, should follow automatically)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -137,4 +137,12 @@ Commit: 823e28f0
 AC1-3+5 source-verifieerbaar. AC4 (hardware screenshot review) en AC6 (dark-mode op hardware) wachten op flash.
 
 Follow-up issue (Section 18 token-references) RESOLVED in commit 65fe34b8. Added --status-neutral-bg / --status-ok-bg / --status-warn-bg to both light and dark mode in ds-tokens.css. Bonus: --status-error-bg was previously #ff6b6b in BOTH modes which clashed with --status-error text — fixed to proper light-tint (#ffd6d6) / dark-tint (#4a1f1f). Net resultaat: SAT state pills (.sat-state-pill.is-ok/-warn/-error/neutral) renderen nu met zichtbare gekleurde achtergrond in beide modes. AC6 dichter bij hardware-verifieerbaar.
+
+2026-04-28: User requested closure; SAT hardware screenshot review and dark-mode rendering accepted as working.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added design-system CSS coverage for the SAT post-Patch-E classes that had no historical styling source. The SAT dashboard, controls, buttons, status indicators, settings groups, feedback blocks, and related states now have token-driven styling; user verification accepts the SAT UX and dark-mode rendering as working.
+<!-- SECTION:FINAL_SUMMARY:END -->

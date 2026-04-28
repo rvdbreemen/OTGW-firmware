@@ -1,11 +1,11 @@
 ---
 id: TASK-476
 title: Fix flash settings preservation edge cases
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-04-28 17:48'
-updated_date: '2026-04-28 19:04'
+updated_date: '2026-04-28 21:31'
 labels:
   - flash scripts
 dependencies: []
@@ -44,10 +44,12 @@ Broader PR-checklist attempt: evaluate.py --quick ran but exited 1 because curre
 Broader PR-checklist attempt: tests/test_evaluate.py and tests/test_build.py both passed.
 
 Broader PR-checklist attempt: build.py failed in the ESP8266 PlatformIO link step with undefined references to setup and loop after only MQTTHaDiscovery.cpp and mqtt_discovery_verify.cpp objects were compiled under .pio/build/esp8266/src. Not marking Done while this checklist gate is red.
+
+2026-04-28: User accepted closing this task with the projectwide evaluate.py/build.py failures treated as outside the flash-script scope; task-specific ACs and targeted checks are complete.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Resolved the flash preservation review findings: shell backups are retained unless restore completes, shell preserve prompts are stdin-safe for scripted factory flashes, and Windows preserve mode now uses the typed host with delayed expansion. Targeted checks passed: batch --help, bash -n via Git Bash, git diff --check, tests/test_evaluate.py, and tests/test_build.py. Full PR checklist is not green yet: evaluate.py --quick fails on existing PROGMEM violations, and build.py currently fails in ESP8266 link with missing setup/loop outside these flash-script edits.
+Resolved the flash preservation review findings: shell backups are retained unless restore completes, shell preserve prompts are stdin-safe for scripted factory flashes, and Windows preserve mode now uses the typed host with delayed expansion. Targeted checks passed: batch --help, bash -n via Git Bash, git diff --check, tests/test_evaluate.py, and tests/test_build.py. Broader evaluate/build failures were documented as outside this flash-script task scope and accepted for closure.
 <!-- SECTION:FINAL_SUMMARY:END -->

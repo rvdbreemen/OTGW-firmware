@@ -1,11 +1,11 @@
 ---
 id: TASK-479
 title: 'fix(mqtt): port ADR-066 master-topic + slave-echo gating from dev'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-28 20:54'
-updated_date: '2026-04-28 20:54'
+updated_date: '2026-04-28 21:01'
 labels:
   - mqtt
   - ADR-066
@@ -67,5 +67,11 @@ Already executed in commit `d71d8063`:
 - [x] #6 Build green on ESP8266 and ESP32
 - [x] #7 ADR-066 + audit doc verbatim from dev
 - [x] #8 MQTT.md and CHANGELOG.md updated
-- [ ] #9 Hardware verification: master topic stable, /boiler subtopic correctly gated
+- [x] #9 Hardware verification: master topic stable, /boiler subtopic correctly gated
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Port van ADR-066 naar feature-dev-2.0.0-otgw32-esp32-sat-support succesvol afgerond. Twee commits (d71d8063 + aadb1869) gepusht naar origin. Hardware-verificatie door gebruiker bevestigd: master topic stabiel, source-separation /boiler subtopic correct gegate. Same decision (ADR-066) nu live op beide branches: dev (1.5.0-beta.3) en feature-dev-2.0.0-otgw32-esp32-sat-support.
+<!-- SECTION:FINAL_SUMMARY:END -->
