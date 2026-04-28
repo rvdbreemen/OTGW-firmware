@@ -95,11 +95,14 @@
   --status-warn-glow:  rgba(255,152,0,.6);
   --status-alert:      #e65c00;
   --status-error:      #f44336;
-  --status-error-bg:   #ff6b6b;
+  --status-error-bg:   #ffd6d6;   /* light tint for pill bg (was #ff6b6b which clashed with --status-error text) */
   --status-error-glow: rgba(244,67,54,.6);
   --status-critical:   #c62828;
   --status-danger:     #dc3545;
   --status-neutral:    #9e9e9e;
+  --status-neutral-bg: #e0e0e0;
+  --status-ok-bg:      #c8e6c9;
+  --status-warn-bg:    #ffe0b2;
 
   --sim-badge-bg:      #0a84ff;
   --sim-badge-text:    #ffffff;
@@ -180,11 +183,14 @@ html.dark {
   --status-warn-glow:  rgba(255,167,38,.6);
   --status-alert:      #bf360c;
   --status-error:      #ef5350;
-  --status-error-bg:   #ff6b6b;
+  --status-error-bg:   #4a1f1f;   /* dark tint for pill bg in dark mode */
   --status-error-glow: rgba(239,83,80,.6);
   --status-critical:   #7f0000;
   --status-danger:     #e57373;
   --status-neutral:    #b0b0b0;
+  --status-neutral-bg: #424242;
+  --status-ok-bg:      #2e4a2f;
+  --status-warn-bg:    #4a3a20;
 
   --sim-badge-bg:      #3b9dff;
   --sim-badge-text:    #04111f;
