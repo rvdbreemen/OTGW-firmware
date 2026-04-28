@@ -48,17 +48,17 @@
  * ============================================================== */
 :root,
 [data-theme="light"] {
-  /* Brand / accent — desaturated. The live UI is much grayer than the
-     original cyan suggested; brand color survives only as the faintest
-     cool wash on the app background and as the nav-strip tint. */
-  --brand-cyan:        #cfe9ee;   /* Nav strip — pale washed cyan, almost gray */
-  --brand-cyan-soft:   #f1f7f8;   /* App background — barely-tinted off-white */
-  --brand-sky:         #b8c4c8;   /* hover accent — cool gray */
-  --brand-lightblue:   #d6d8da;   /* Buttons / data rows — neutral gray, not blue */
-  --brand-faint:       #eef2f3;   /* alt row tint — near white with cool hint */
+  /* Brand / accent — vivid OTGW cyan. Matches the canonical legacy values
+     from index.css (#00bffe nav strip, #e6ffff app wash). The brand
+     identity is meant to be unmistakable, not whispered. */
+  --brand-cyan:        #00bffe;   /* Nav strip — signature OTGW cyan */
+  --brand-cyan-soft:   #e6ffff;   /* App background — pale cyan wash */
+  --brand-lightblue:   #add8e6;   /* Buttons / data rows — CSS lightblue */
+  --brand-sky:         #87ceeb;   /* hover accent — CSS skyblue */
+  --brand-faint:       #f0fbff;   /* alt row tint — faintest cyan */
 
-  --accent-primary:    #4a7a8c;   /* Muted slate-cyan for links */
-  --accent-hover:      #355d6e;
+  --accent-primary:    #0288a0;   /* Slate-cyan, harmonises with vivid brand */
+  --accent-hover:      #015a70;
 
   /* Neutrals — foreground. Lifted lighter to match the washed-out look
      of the actual rendered page (header wordmark looks faded, not pure black). */
