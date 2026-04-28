@@ -678,3 +678,410 @@ body.dark .settingDiv,
     transition: none !important; animation: none !important;
   }
 }
+
+/* =============================================================
+ * 18. LEGACY WIDGET COMPATIBILITY (ported from dev:index.css + sat.css)
+ *
+ * Classes here are referenced by JS/HTML markup that pre-dates the
+ * design-system tokens. We port them verbatim then tokenize colours
+ * so dark-mode follows. Source commits:
+ *   - dev branch index.css (1.4.x maintenance line)
+ *   - 6a42cc3c~1:sat.css (deleted in Patch E of TASK-435)
+ * ============================================================= */
+
+/* --- Utility --- */
+.hidden { display: none !important; }
+
+/* --- PIC firmware table --- */
+.pictable {
+  display: table;
+  width: 100%;
+  max-width: 720px;
+  border-collapse: collapse;
+  margin: 10px 0 12px 0;
+  border: 1px solid #ddd;
+}
+.picrow {
+  display: table-row;
+  border-bottom: 1px solid #ddd;
+}
+.picrow:nth-child(even) {
+  background-color: #f9f9f9;
+}
+.piccolumn1, .piccolumn2, .piccolumn3 {
+  display: table-cell;
+  padding: 8px 15px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+.piccolumn4, .piccolumn5 {
+  display: table-cell;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  text-align: center;
+  width: 30px;
+}
+
+/* --- OTmonitor table --- */
+.otmontable {
+  column-width: 350px;
+  column-gap: 0;
+  width: 100%;
+}
+.otmonrow {
+  background: var(--brand-lightblue);
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  border: 1px solid white;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.otmonrow.no-data-row {
+  display: none;
+}
+.otmoncolumn1 {
+  flex: 1;
+  padding-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.otmoncolumn2 {
+  width: 60px;
+  text-align: right;
+}
+.otmoncolumn3 {
+  width: 40px;
+  margin-left: 5px;
+}
+
+/* --- State indicators (boolean lamps) --- */
+.state-on, .state-off {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  vertical-align: text-bottom;
+  box-sizing: border-box;
+}
+.state-on {
+  background-color: currentColor;
+}
+.state-off {
+  background-color: transparent;
+}
+
+/* --- Device info table --- */
+#deviceinfoPage {
+  display: table;
+  width: fit-content;
+  border-collapse: collapse;
+}
+.devinforow {
+  display: table-row;
+  background: var(--brand-lightblue);
+}
+.devinfocolumn1 {
+  display: table-cell;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 2px 5px;
+  border: 1px solid white;
+  width: 1%;
+}
+.devinfocolumn2 {
+  display: table-cell;
+  text-align: left;
+  padding: 2px 5px;
+  border: 1px solid white;
+}
+
+/* --- Crash log panel --- */
+.crashlog-panel {
+  background: #ffe7b3;
+  border: 1px solid #f0b74a;
+  border-left: 5px solid #d98200;
+  padding: 10px 12px;
+  color: #4a3200;
+}
+.crashlog-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.crashlog-intro {
+  margin-bottom: 8px;
+}
+.crashlog-label {
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+}
+.crashlog-pre {
+  margin: 0;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* --- Firmware page misc --- */
+.firmware-row-bold {
+  font-weight: bold;
+}
+
+/* --- Settings input states (light-mode equivalents of dark-mode rules) --- */
+.input-changed { background: lightgray; color: black; }
+.input-normal { background: white; color: black; }
+.input-readonly { background: #f0f0f0; color: #666; }
+
+/* --- Editable Dallas sensor label inline editor --- */
+.otmoncolumn1.editable-label {
+  cursor: pointer;
+}
+.sensor-label-inline-editor {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  max-width: 220px;
+  font: inherit;
+  line-height: normal;
+  padding: 0 6px;
+  margin: 0;
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: #212529;
+  background: #fff;
+  outline: 1px solid #007bff;
+  outline-offset: -1px;
+  border: none;
+}
+
+/* --- PS-mode watermark + version mismatch banner --- */
+.ps-mode-watermark {
+  color: #9c5700 !important;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.version-warning {
+  background-color: #ff6b6b !important;
+  color: white !important;
+  font-weight: bold !important;
+  font-size: 14px !important;
+  padding: 10px 15px !important;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 1000;
+}
+
+/* =============================================================
+ * SAT panel — ported verbatim from sat.css @ 6a42cc3c~1
+ * (deleted in Patch E of TASK-435; classes still referenced by sat.js)
+ * ============================================================= */
+
+/* Layout: 2-column on desktop, stacks under 720px */
+.sat-panel {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(280px, 360px);
+  gap: 16px;
+  padding: 16px;
+  background: #f5f5f5;
+  color: #1a1a1a;
+}
+body.dark .sat-panel {
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+@media (max-width: 720px) {
+  .sat-panel { grid-template-columns: 1fr; }
+}
+
+.sat-panel h2,
+.sat-panel h3 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+  color: #4a4a4a;
+}
+body.dark .sat-panel h2,
+body.dark .sat-panel h3 { color: #b0b0b0; }
+
+/* Temperature tile grid */
+.sat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.sat-tile {
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+body.dark .sat-tile {
+  background: #2c2c2e;
+  border-color: #3a3a3c;
+}
+.sat-tile-label {
+  font-size: 12px;
+  color: #707070;
+  letter-spacing: 0.02em;
+}
+body.dark .sat-tile-label { color: #909090; }
+.sat-tile-value {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1;
+  color: #1a1a1a;
+  font-variant-numeric: tabular-nums;
+}
+body.dark .sat-tile-value { color: #f0f0f0; }
+.sat-tile-unit {
+  font-size: 13px;
+  color: #707070;
+  margin-left: 2px;
+}
+body.dark .sat-tile-unit { color: #909090; }
+
+.sat-tile.is-target .sat-tile-value { color: var(--status-info); }
+.sat-tile.is-target { border-color: var(--status-info); }
+
+/* Header row — title + enable toggle + state pill */
+.sat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.sat-header-title {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+  flex: 1;
+}
+body.dark .sat-header-title { color: #f0f0f0; }
+
+.sat-state-pill {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral);
+}
+.sat-state-pill.is-ok      { background: var(--status-ok-bg);   color: var(--status-ok); }
+.sat-state-pill.is-warn    { background: var(--status-warn-bg); color: var(--status-warn); }
+.sat-state-pill.is-error   { background: var(--status-error-bg);color: var(--status-error); }
+
+/* DHW slider — live fill driven by --sat-slider-pct on the input */
+.sat-dhw {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+}
+body.dark .sat-dhw {
+  background: #2c2c2e;
+  border-color: #3a3a3c;
+}
+.sat-dhw-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sat-dhw-label { font-size: 13px; color: #4a4a4a; }
+body.dark .sat-dhw-label { color: #b0b0b0; }
+.sat-dhw-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: #1a1a1a;
+  font-variant-numeric: tabular-nums;
+}
+body.dark .sat-dhw-value { color: #f0f0f0; }
+
+.sat-dhw-slider {
+  --sat-slider-pct: 50%;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--status-info) 0,
+    var(--status-info) var(--sat-slider-pct),
+    #d0d0d0 var(--sat-slider-pct),
+    #d0d0d0 100%
+  );
+  outline: none;
+}
+body.dark .sat-dhw-slider {
+  background: linear-gradient(
+    to right,
+    var(--status-info) 0,
+    var(--status-info) var(--sat-slider-pct),
+    #3a3a3c var(--sat-slider-pct),
+    #3a3a3c 100%
+  );
+}
+.sat-dhw-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--status-info);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.sat-dhw-slider::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--status-info);
+  cursor: pointer;
+}
+body.dark .sat-dhw-slider::-webkit-slider-thumb { background: #f0f0f0; }
+body.dark .sat-dhw-slider::-moz-range-thumb     { background: #f0f0f0; }
+
+/* Temperature history chart — ECharts container */
+.sat-chart {
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  padding: 12px;
+  height: 280px;
+}
+body.dark .sat-chart {
+  background: #2c2c2e;
+  border-color: #3a3a3c;
+}
+
+/* Controls row — secondary buttons */
+.sat-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.sat-controls .btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
