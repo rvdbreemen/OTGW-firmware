@@ -722,53 +722,13 @@ body.dark .settingDiv,
   width: 30px;
 }
 
-/* --- OTmonitor table --- */
-.otmontable {
-  column-width: 350px;
-  column-gap: 0;
-  width: 100%;
-}
-.otmonrow {
-  background: var(--brand-lightblue);
-  display: flex;
-  align-items: center;
-  padding: 2px 0;
-  border: 1px solid white;
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
+/* --- OTmonitor: extras unique to port (others duplicate Section 9) --- */
 .otmonrow.no-data-row {
   display: none;
 }
-.otmoncolumn1 {
-  flex: 1;
-  padding-left: 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.otmoncolumn2 {
-  width: 60px;
-  text-align: right;
-}
-.otmoncolumn3 {
-  width: 40px;
-  margin-left: 5px;
-}
 
-/* --- State indicators (boolean lamps) --- */
-.state-on, .state-off {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid currentColor;
-  border-radius: 3px;
-  vertical-align: text-bottom;
-  box-sizing: border-box;
-}
-.state-on {
-  background-color: currentColor;
-}
+/* --- State indicators: only the standalone .state-off rule is unique;
+       .state-on, .state-off group + .state-on standalone live in Section 8 --- */
 .state-off {
   background-color: transparent;
 }
@@ -889,79 +849,11 @@ body.dark .settingDiv,
  * lives in Section 13 above and now uses single-column layout.
  * ============================================================= */
 
-.sat-panel h2,
-.sat-panel h3 {
-  font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  margin: 0 0 12px;
-  color: #4a4a4a;
-}
-body.dark .sat-panel h2,
-body.dark .sat-panel h3 { color: #b0b0b0; }
-
-/* Temperature tile grid */
-.sat-tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.sat-tile {
-  background: #ffffff;
-  border: 1px solid #d0d0d0;
-  border-radius: 8px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-body.dark .sat-tile {
-  background: #2c2c2e;
-  border-color: #3a3a3c;
-}
-.sat-tile-label {
-  font-size: 12px;
-  color: #707070;
-  letter-spacing: 0.02em;
-}
-body.dark .sat-tile-label { color: #909090; }
-.sat-tile-value {
-  font-family: var(--font-mono);
-  font-size: 28px;
-  font-weight: 400;
-  line-height: 1;
-  color: #1a1a1a;
-  font-variant-numeric: tabular-nums;
-}
-body.dark .sat-tile-value { color: #f0f0f0; }
-.sat-tile-unit {
-  font-size: 13px;
-  color: #707070;
-  margin-left: 2px;
-}
-body.dark .sat-tile-unit { color: #909090; }
-
-.sat-tile.is-target .sat-tile-value { color: var(--status-info); }
-.sat-tile.is-target { border-color: var(--status-info); }
-
-/* Header row — title + enable toggle + state pill */
-.sat-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.sat-header-title {
-  font-family: var(--font-sans);
-  font-size: 18px;
-  font-weight: 700;
-  color: #1a1a1a;
-  flex: 1;
-}
-body.dark .sat-header-title { color: #f0f0f0; }
+/* NOTE: .sat-panel h2/h3, .sat-tiles, .sat-tile + dark variants,
+   .sat-tile-label/value/unit, .sat-tile.is-target, .sat-header,
+   .sat-header-title — all duplicate Section 13 above. Removed during
+   port-collision cleanup. The Section 13 versions are token-driven
+   and follow dark mode automatically. */
 
 .sat-state-pill {
   font-size: 11px;
@@ -977,35 +869,11 @@ body.dark .sat-header-title { color: #f0f0f0; }
 .sat-state-pill.is-warn    { background: var(--status-warn-bg); color: var(--status-warn); }
 .sat-state-pill.is-error   { background: var(--status-error-bg);color: var(--status-error); }
 
-/* DHW slider — live fill driven by --sat-slider-pct on the input */
-.sat-dhw {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
-  background: #ffffff;
-  border: 1px solid #d0d0d0;
-  border-radius: 8px;
-}
-body.dark .sat-dhw {
-  background: #2c2c2e;
-  border-color: #3a3a3c;
-}
-.sat-dhw-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-.sat-dhw-label { font-size: 13px; color: #4a4a4a; }
-body.dark .sat-dhw-label { color: #b0b0b0; }
-.sat-dhw-value {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  color: #1a1a1a;
-  font-variant-numeric: tabular-nums;
-}
-body.dark .sat-dhw-value { color: #f0f0f0; }
+/* DHW slider — live fill driven by --sat-slider-pct on the input.
+   NOTE: .sat-dhw / .sat-dhw-row / .sat-dhw-label / .sat-dhw-value
+   are duplicates of Section 13 — removed. Only the slider rules
+   (which include -webkit-/-moz- pseudo-elements unique to port)
+   remain below. */
 
 .sat-dhw-slider {
   --sat-slider-pct: 50%;
@@ -1062,13 +930,8 @@ body.dark .sat-chart {
   border-color: #3a3a3c;
 }
 
-/* Controls row — secondary buttons */
-.sat-controls {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
+/* Controls row: .sat-controls duplicates Section 13. Only the disabled-button
+   modifier (unique to port) is kept here. */
 .sat-controls .btn[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
