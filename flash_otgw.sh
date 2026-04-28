@@ -5,15 +5,15 @@
 #  Distributed alongside merged binary releases. Downloads Espressif's
 #  standalone esptool binary on first run (no Python required).
 #
-#  Default behaviour (no flags): writes the firmware-only image to flash.
-#  Existing WiFi credentials/settings stay intact because the filesystem is
-#  left untouched. Use --factory when you want to flash the merged-full image.
+#  Default behaviour (no flags): auto-detects whether the target flash is
+#  blank, then asks which install path to use with a recommendation.
+#  Blank flash recommends the factory reset path; already-used flash
+#  recommends the upgrade path that keeps WiFi credentials.
 #
 #  Usage:
-#    ./flash_otgw.sh                     firmware-only (preserves WiFi + app
-#                                         settings)
-#    ./flash_otgw.sh --upgrade           same as default
-#    ./flash_otgw.sh --factory           full image flash (updates filesystem)
+#    ./flash_otgw.sh                     interactive chooser with recommendation
+#    ./flash_otgw.sh --upgrade           force firmware-only upgrade
+#    ./flash_otgw.sh --factory           force full image flash
 #    ./flash_otgw.sh --erase             full clean wipe (loses everything)
 #    ./flash_otgw.sh --port /dev/ttyUSB0 use specific port
 #    ./flash_otgw.sh --bin <file>        use specific firmware file
@@ -68,11 +68,11 @@ Usage:
   ./flash_otgw.sh [options]
 
   Mode:
-  (no flag)            Firmware-only flash. Preserves WiFi credentials and
-                       existing filesystem/settings.
-  --upgrade            Same as default.
-  --factory            Full image flash. Updates the filesystem image too.
-  --erase              Full clean wipe. Erases everything including WiFi.
+  (no flag)            Interactive chooser with auto-detected default.
+                       1 = factory reset, 2 = upgrade OTGW, 3 = firmware-only
+  --upgrade            Force firmware-only upgrade.
+  --factory            Force full image flash (keeps WiFi; resets settings).
+  --erase              Full clean wipe. Erases WiFi credentials and settings.
 
 Targeting:
   --port <dev>         Serial port (e.g. /dev/ttyUSB0, /dev/cu.usbserial-XXXX).
@@ -237,7 +237,7 @@ ensure_esptool
 
 # ---- Step 3: locate firmware bin -------------------------------------------
 # Mode selection mirrors the .bat script:
-#   default / --upgrade -> *-merged.bin       (firmware-only; preserves WiFi + FS)
+#   --upgrade           -> *-merged.bin       (firmware-only; preserves WiFi + FS)
 #   --factory           -> *-merged-full.bin  (full image; updates filesystem)
 #   --erase             -> *-merged-full.bin  (full image + erase_all)
 find_first_match() {
@@ -257,7 +257,7 @@ find_bin() {
     fi
 
     local cand=""
-    if [ "$ARG_FACTORY" = "1" ]; then
+    if [ "$ARG_FACTORY" = "1" ] || [ "$ARG_ERASE" = "1" ]; then
         for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
             cand="$(find_first_match "$dir/OTGW-firmware-*-merged-full.bin")"
             [ -n "$cand" ] && break
@@ -275,11 +275,14 @@ find_bin() {
             [ -n "$cand" ] && break
             cand="$(find_first_match "$dir/OTGW-firmware-esp8266-*.ino.bin")"
             [ -n "$cand" ] && break
+            cand="$(find_first_match "$dir/OTGW-firmware-*-merged-full.bin")"
+            [ -n "$cand" ] && break
         done
         if [ -z "$cand" ]; then
-            err "--upgrade: no firmware-only bin found."
+            err "No firmware-only or merged-full bin found."
             err "        Expected: OTGW-firmware-esp32-*-merged.bin"
             err "              or: OTGW-firmware-esp8266-*.ino.bin"
+            err "              or: OTGW-firmware-*-merged-full.bin"
             err "        Use --bin to specify a path."
             exit 1
         fi
@@ -287,13 +290,32 @@ find_bin() {
     echo "$cand"
 }
 
-BIN_FILE="$(find_bin)"
-BIN_NAME="$(basename "$BIN_FILE")"
-ok "Firmware: $BIN_NAME"
+is_flash_blank() {
+    local tmpdir probe_file probe_hex
+    tmpdir="$(mktemp -d 2>/dev/null || mktemp -d -t otgwflash)" || return 1
+    probe_file="$tmpdir/flashprobe.bin"
+
+    if ! "$ESPTOOL_BIN" --chip "$ESPTOOL_CHIP" $PORT_ARGS --baud "$ARG_BAUD" read-flash 0x0 0x1000 "$probe_file" >/dev/null 2>&1; then
+        rm -rf "$tmpdir"
+        return 1
+    fi
+
+    probe_hex="$(od -An -tx1 -N 4096 "$probe_file" 2>/dev/null | tr -d ' \r\n\t')"
+    rm -rf "$tmpdir"
+
+    case "$probe_hex" in
+        "" ) return 1 ;;
+        *[!fF]* ) return 1 ;;
+        * ) return 0 ;;
+    esac
+}
+
+PROVISIONAL_BIN_FILE="$(find_bin)"
+PROVISIONAL_BIN_NAME="$(basename "$PROVISIONAL_BIN_FILE")"
 
 # ---- Step 4: derive board from filename (or user override) -----------------
 if [ -z "$ARG_BOARD" ]; then
-    case "$BIN_NAME" in
+    case "$PROVISIONAL_BIN_NAME" in
         *-esp8266-*) ARG_BOARD="esp8266" ;;
         *-esp32-*)   ARG_BOARD="esp32" ;;
     esac
@@ -381,6 +403,51 @@ else
     ok "Port:     $ARG_PORT"
 fi
 
+if [ "$ARG_BIN" = "" ] && [ "$ARG_ERASE" = "0" ] && [ "$ARG_UPGRADE" = "0" ] && [ "$ARG_FACTORY" = "0" ]; then
+    if is_flash_blank; then
+        FLASH_DEFAULT_MODE="1"
+        FLASH_DEFAULT_DESC="Factory reset"
+    else
+        FLASH_DEFAULT_MODE="2"
+        FLASH_DEFAULT_DESC="Upgrade OTGW"
+    fi
+
+    if [ -t 0 ]; then
+        echo
+        echo "------------------------------------------------------------"
+        echo " Choose flash mode:"
+        echo "   [1] Factory reset"
+        echo "       Fresh install of firmware and filesystem."
+        echo "       Removes WiFi credentials and settings."
+        echo "   [2] Upgrade OTGW"
+        echo "       Refreshes firmware and filesystem."
+        echo "       Keeps WiFi credentials; settings are reset."
+        echo "   [3] Firmware-only upgrade"
+        echo "       Updates firmware only."
+        echo "       Keeps WiFi credentials and settings."
+        echo "------------------------------------------------------------"
+        printf "Select option [1-3] (default %s): " "$FLASH_DEFAULT_MODE"
+        read -r FLASH_CHOICE
+        [ -z "$FLASH_CHOICE" ] && FLASH_CHOICE="$FLASH_DEFAULT_MODE"
+        case "$FLASH_CHOICE" in
+            1) ARG_ERASE=1 ;;
+            2) ARG_FACTORY=1 ;;
+            3) ARG_UPGRADE=1 ;;
+            *) err "Invalid selection."; exit 1 ;;
+        esac
+    else
+        case "$FLASH_DEFAULT_MODE" in
+            1) ARG_ERASE=1 ;;
+            2) ARG_FACTORY=1 ;;
+        esac
+        info "Auto-selected mode: $FLASH_DEFAULT_DESC"
+    fi
+fi
+
+BIN_FILE="$(find_bin)"
+BIN_NAME="$(basename "$BIN_FILE")"
+ok "Firmware: $BIN_NAME"
+
 # ---- Step 6: confirm before flash ------------------------------------------
 echo
 echo "------------------------------------------------------------"
@@ -395,6 +462,9 @@ elif [ "$ARG_FACTORY" = "1" ]; then
     echo "   Mode:     --factory  (full image)"
     echo "   Effect:   Filesystem image is refreshed."
     echo "             Existing WiFi/settings may be replaced."
+elif [ "$ARG_UPGRADE" = "1" ]; then
+    echo "   Mode:     --upgrade  (firmware-only)"
+    echo "   Effect:   WiFi credentials and filesystem/settings preserved."
 else
     echo "   Mode:     firmware-only"
     echo "   Effect:   WiFi credentials and filesystem/settings preserved."

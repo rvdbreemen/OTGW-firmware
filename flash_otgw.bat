@@ -8,15 +8,13 @@ REM ----------------------------------------------------------------------------
 REM  Distributed alongside merged binary releases. Downloads Espressif's
 REM  standalone esptool binary on first run (no Python required).
 REM
-REM  Default behaviour (no flags): writes the firmware-only image to flash.
-REM  Existing WiFi credentials/settings stay intact because the filesystem is
-REM  left untouched. Use --factory when you want to flash the merged-full image.
+REM  Default behaviour (no flags): asks which install path to use and
+REM  recommends one based on a flash probe.
 REM
 REM  Usage:
-REM    flash_otgw.bat                     firmware-only (preserves WiFi + app
-REM                                        settings)
-REM    flash_otgw.bat --upgrade           same as default
-REM    flash_otgw.bat --factory           full image flash (updates filesystem)
+REM    flash_otgw.bat                     interactive chooser with recommendation
+REM    flash_otgw.bat --upgrade           force firmware-only upgrade
+REM    flash_otgw.bat --factory           force full image flash
 REM    flash_otgw.bat --erase             full clean wipe (loses everything)
 REM    flash_otgw.bat --port COMx         use specific port
 REM    flash_otgw.bat --bin <file>        use specific firmware file
@@ -123,99 +121,13 @@ if exist "%ESPTOOL_EXE%" (
 
 REM ---- Step 2: locate firmware bin ------------------------------------------
 REM   Mode selection:
-REM     default / --upgrade -> *-merged.bin       (firmware-only; preserves WiFi + FS)
+REM     --upgrade           -> *-merged.bin       (firmware-only; preserves WiFi + FS)
 REM     --factory           -> *-merged-full.bin  (full image; updates filesystem)
 REM     --erase             -> *-merged-full.bin  (full image + erase_all)
-if not "%ARG_BIN%"=="" (
-    if not exist "%ARG_BIN%" (
-        echo [ERROR] Specified --bin file does not exist: %ARG_BIN%
-        exit /b 1
-    )
-    set "BIN_FILE=%ARG_BIN%"
-    goto bin_done
-)
-
-set "BIN_FILE="
-if "%ARG_FACTORY%"=="1" (
-    REM Use the full merged image when the user explicitly asked for factory flash.
-    for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do (
-        if not defined BIN_FILE set "BIN_FILE=%%F"
-    )
-    if not defined BIN_FILE (
-        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-    )
-    if not defined BIN_FILE (
-        echo [ERROR] --factory: no merged-full bin found.
-        echo         Expected in: %SCRIPT_DIR%
-        echo                  or: %SCRIPT_DIR%build\
-        echo         Use --bin to specify a path.
-        exit /b 1
-    )
-) else if "%ARG_UPGRADE%"=="1" (
-    REM Try ESP32 firmware-only merged first (has bootloader + partitions + app)
-    for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp32-*-merged.bin") do (
-        if not defined BIN_FILE set "BIN_FILE=%%F"
-    )
-    REM Fall back to ESP8266 firmware-only (.ino.bin written at offset 0x0)
-    if not defined BIN_FILE (
-        for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp8266-*.ino.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-    )
-    REM Same searches in build/ (developer running from repo root)
-    if not defined BIN_FILE (
-        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp32-*-merged.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-    )
-    if not defined BIN_FILE (
-        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp8266-*.ino.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-    )
-    if not defined BIN_FILE (
-        echo [ERROR] --upgrade: no firmware-only bin found.
-        echo         Expected: OTGW-firmware-esp32-*-merged.bin
-        echo               or: OTGW-firmware-esp8266-*.ino.bin
-        echo         Use --bin to specify a path.
-        exit /b 1
-    )
-) else (
-    REM Default to firmware-only so WiFi/settings are preserved.
-    for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp32-*-merged.bin") do (
-        if not defined BIN_FILE set "BIN_FILE=%%F"
-    )
-    REM Fall back to ESP8266 firmware-only (.ino.bin written at offset 0x0)
-    if not defined BIN_FILE (
-        for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp8266-*.ino.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-    )
-    REM Same searches in build/ (developer running from repo root)
-    if not defined BIN_FILE (
-        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp32-*-merged.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-    )
-    if not defined BIN_FILE (
-        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp8266-*.ino.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-    )
-    if not defined BIN_FILE (
-        echo [ERROR] No firmware-only bin found.
-        echo         Expected: OTGW-firmware-esp32-*-merged.bin
-        echo               or: OTGW-firmware-esp8266-*.ino.bin
-        echo         Use --bin to specify a path.
-        exit /b 1
-    )
-)
+call :select_bin
 
 :bin_done
 for %%F in ("%BIN_FILE%") do set "BIN_NAME=%%~nxF"
-echo [OK] Firmware: %BIN_NAME%
 
 REM ---- Step 3: derive board from filename (or user override) ----------------
 if "%ARG_BOARD%"=="" (
@@ -301,6 +213,46 @@ if "%ARG_PORT%"=="" (
 )
 :port_done
 
+if "%ARG_BIN%"=="" if "%ARG_ERASE%"=="0" if "%ARG_UPGRADE%"=="0" if "%ARG_FACTORY%"=="0" (
+    call :probe_flash_blank
+    if "!FLASH_IS_BLANK!"=="1" (
+        set "FLASH_DEFAULT_MODE=1"
+    ) else (
+        set "FLASH_DEFAULT_MODE=2"
+    )
+
+    echo.
+    echo ------------------------------------------------------------
+    echo  Choose flash mode:
+    echo    [1] Factory reset
+    echo        Fresh install of firmware and filesystem.
+    echo        Removes WiFi credentials and settings.
+    echo    [2] Upgrade OTGW
+    echo        Refreshes firmware and filesystem.
+    echo        Keeps WiFi credentials; settings are reset.
+    echo    [3] Firmware-only upgrade
+    echo        Updates firmware only.
+    echo        Keeps WiFi credentials and settings.
+    echo ------------------------------------------------------------
+    set /p "FLASH_CHOICE=Select option [1-3] (default !FLASH_DEFAULT_MODE!): "
+    if "!FLASH_CHOICE!"=="" set "FLASH_CHOICE=!FLASH_DEFAULT_MODE!"
+    if "!FLASH_CHOICE!"=="1" (
+        set "ARG_ERASE=1"
+    ) else if "!FLASH_CHOICE!"=="2" (
+        set "ARG_FACTORY=1"
+    ) else if "!FLASH_CHOICE!"=="3" (
+        set "ARG_UPGRADE=1"
+    ) else (
+        echo [ERROR] Invalid selection.
+        exit /b 1
+    )
+
+    call :select_bin
+    for %%F in ("%BIN_FILE%") do set "BIN_NAME=%%~nxF"
+)
+
+echo [OK] Firmware: %BIN_NAME%
+
 REM ---- Step 5: confirm before flash -----------------------------------------
 echo.
 echo ------------------------------------------------------------
@@ -357,6 +309,94 @@ echo ============================================================
 exit /b 0
 
 
+:select_bin
+set "BIN_FILE="
+if "%ARG_BIN%"=="" (
+    if "%ARG_FACTORY%"=="1" (
+        REM Use the full merged image when the user explicitly asked for factory flash.
+        for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do (
+            if not defined BIN_FILE set "BIN_FILE=%%F"
+        )
+        if not defined BIN_FILE (
+            for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do (
+                if not defined BIN_FILE set "BIN_FILE=%%F"
+            )
+        )
+        if not defined BIN_FILE (
+            echo [ERROR] --factory: no merged-full bin found.
+            echo         Expected in: %SCRIPT_DIR%
+            echo                  or: %SCRIPT_DIR%build\
+            echo         Use --bin to specify a path.
+            exit /b 1
+        )
+    ) else if "%ARG_ERASE%"=="1" (
+        REM Erase-all uses the full merged image too.
+        for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do (
+            if not defined BIN_FILE set "BIN_FILE=%%F"
+        )
+        if not defined BIN_FILE (
+            for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do (
+                if not defined BIN_FILE set "BIN_FILE=%%F"
+            )
+        )
+        if not defined BIN_FILE (
+            echo [ERROR] --erase: no merged-full bin found.
+            echo         Expected in: %SCRIPT_DIR%
+            echo                  or: %SCRIPT_DIR%build\
+            echo         Use --bin to specify a path.
+            exit /b 1
+        )
+    ) else (
+        REM Default to firmware-only so WiFi/settings are preserved.
+        for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp32-*-merged.bin") do (
+            if not defined BIN_FILE set "BIN_FILE=%%F"
+        )
+        REM Fall back to ESP8266 firmware-only (.ino.bin written at offset 0x0)
+        if not defined BIN_FILE (
+            for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp8266-*.ino.bin") do (
+                if not defined BIN_FILE set "BIN_FILE=%%F"
+            )
+        )
+        REM Same searches in build/ (developer running from repo root)
+        if not defined BIN_FILE (
+            for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp32-*-merged.bin") do (
+                if not defined BIN_FILE set "BIN_FILE=%%F"
+            )
+        )
+        if not defined BIN_FILE (
+            for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp8266-*.ino.bin") do (
+                if not defined BIN_FILE set "BIN_FILE=%%F"
+            )
+        )
+        if not defined BIN_FILE (
+            echo [ERROR] No firmware-only bin found.
+            echo         Expected: OTGW-firmware-esp32-*-merged.bin
+            echo               or: OTGW-firmware-esp8266-*.ino.bin
+            echo         Use --bin to specify a path.
+            exit /b 1
+        )
+    )
+) else (
+    set "BIN_FILE=%ARG_BIN%"
+)
+exit /b 0
+
+
+:probe_flash_blank
+set "FLASH_IS_BLANK=0"
+set "PROBE_FILE=%TEMP%\otgw_flash_probe_%RANDOM%.bin"
+"%ESPTOOL_EXE%" --chip %ESPTOOL_CHIP% %ESPTOOL_PORT_ARGS% --baud %ARG_BAUD% read-flash 0x0 0x1000 "%PROBE_FILE%" >nul 2>&1
+if errorlevel 1 (
+    if exist "%PROBE_FILE%" del "%PROBE_FILE%" >nul 2>&1
+    exit /b 0
+)
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$b=[IO.File]::ReadAllBytes('%PROBE_FILE%'); if (($b | Where-Object { $_ -ne 255 } | Select-Object -First 1) -eq $null) { exit 0 } else { exit 1 }"
+if not errorlevel 1 set "FLASH_IS_BLANK=1"
+if exist "%PROBE_FILE%" del "%PROBE_FILE%" >nul 2>&1
+exit /b 0
+
+
 :show_help
 echo flash_otgw.bat - Self-contained ESP flash tool for OTGW-firmware
 echo.
@@ -364,11 +404,11 @@ echo Usage:
 echo   flash_otgw.bat [options]
 echo.
 echo Mode:
-echo   (no flag)            Firmware-only flash. Preserves WiFi credentials and
-echo                        existing filesystem/settings.
-echo   --upgrade            Same as default.
-echo   --factory            Full image flash. Updates the filesystem image too.
-echo   --erase              Full clean wipe. Erases everything including WiFi.
+echo   (no flag)            Interactive chooser with auto-detected default.
+echo                        1 = factory reset, 2 = upgrade OTGW, 3 = firmware-only
+echo   --upgrade            Force firmware-only upgrade.
+echo   --factory            Full image flash. Keeps WiFi, resets settings.
+echo   --erase              Full clean wipe. Erases WiFi credentials and settings.
 echo.
 echo Targeting:
 echo   --port COMx          Serial port (auto-detected for esp32 via USB VID/PID,
