@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.5.0-beta
+**  Version  : v1.5.0-beta.3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1188,7 +1188,7 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
   // every MsgID in OTmap[] per docs/api/MQTT-message-id-echo-audit.md.
   // OTlookupitem is set by processOT before each print_* call and is
   // therefore valid here.
-  if (rsptype == OT_MSGTYPE_WRITE_ACK && !OTlookupitem.bSlaveEchoesValue) return;
+  if (rsptype == OT_WRITE_ACK && !OTlookupitem.bSlaveEchoesValue) return;
   // Re-entrancy guard: sendMQTTData may yield via feedWatchDog, allowing
   // a second processOT call to overwrite the static buffer mid-publish.
   static bool inUse = false;
