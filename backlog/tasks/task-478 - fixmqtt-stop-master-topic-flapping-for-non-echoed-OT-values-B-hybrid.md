@@ -5,6 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-28 19:47'
+updated_date: '2026-04-28 20:05'
 labels:
   - mqtt
   - regression
@@ -54,14 +55,31 @@ Alle ~50 OT MsgIDs categoriseren als echo / non-echo door OT v4.2 spec te lezen.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/api/MQTT-message-id-echo-audit.md bestaat met een rij per MsgID 0..127 (subset die OT v4.2 reference-doc dekt) inclusief bSlaveEchoesValue waarde en spec-citaat
-- [ ] #2 OTlookup_t struct heeft bSlaveEchoesValue veld; alle MsgID array-entries gevuld op basis van Phase 0 audit
-- [ ] #3 is_value_valid_for_master_topic helper bestaat in OTGW-Core.ino met v1.3.5 semantics (alleen WRITE-DATA voor WRITE / RW)
-- [ ] #4 Master-topic publish call-site gebruikt is_value_valid_for_master_topic; source-publish call-site gebruikt is_value_valid (ongewijzigd)
-- [ ] #5 publishToSourceTopic skipt /boiler topic voor OT_MSGTYPE_WRITE_ACK wanneer bSlaveEchoesValue=false
-- [ ] #6 Build groen op zowel ESP8266 als ESP32
+- [x] #1 docs/api/MQTT-message-id-echo-audit.md bestaat met een rij per MsgID 0..127 (subset die OT v4.2 reference-doc dekt) inclusief bSlaveEchoesValue waarde en spec-citaat
+- [x] #2 OTlookup_t struct heeft bSlaveEchoesValue veld; alle MsgID array-entries gevuld op basis van Phase 0 audit
+- [x] #3 is_value_valid_for_master_topic helper bestaat in OTGW-Core.ino met v1.3.5 semantics (alleen WRITE-DATA voor WRITE / RW)
+- [x] #4 Master-topic publish call-site gebruikt is_value_valid_for_master_topic; source-publish call-site gebruikt is_value_valid (ongewijzigd)
+- [x] #5 publishToSourceTopic skipt /boiler topic voor OT_MSGTYPE_WRITE_ACK wanneer bSlaveEchoesValue=false
+- [x] #6 Build groen op zowel ESP8266 als ESP32
 - [ ] #7 Smoke test: MQTT topic OTGW/value/{id}/Tr toont alleen 20.06 (geen flap meer); /boiler subtopic voor Tr ontvangt geen 0.00 publicatie als bSeparateSources=true
 - [ ] #8 HA Room Temperature sensor blijft stabiel op gemeten waarde (geen flapping); entity-IDs ongewijzigd, geen migratie-impact
 - [ ] #9 MaxTSet (echo) blijft werken: master toont thermostat-/gateway-waarde, /boiler toont boiler-clamped waarde (regressie-vrij)
-- [ ] #10 docs/api/MQTT.md heeft een note die naar de echo-audit doc verwijst
+- [x] #10 docs/api/MQTT.md heeft een note die naar de echo-audit doc verwijst
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementatie afgerond op dev branch (commit 8f87bfaa). Build groen op ESP8266 + ESP32.
+
+Files changed:
+- docs/adr/ADR-066-mqtt-publish-gating-by-source-and-slave-echo.md (NEW, Proposed status; structural classification per ADR-080)
+- docs/api/MQTT-message-id-echo-audit.md (NEW, canonical per-MsgID classification met spec-citaten)
+- docs/api/MQTT.md (uitgebreid met publish-gating sectie)
+- CHANGELOG.md ([Unreleased] entry)
+- src/OTGW-firmware/OTGW-Core.h: OTlookup_t struct uitgebreid met bSlaveEchoesValue veld; alle 133 OTmap[] entries bijgewerkt via Python script (default true; 14/16/23/24/37/98 op false)
+- src/OTGW-firmware/OTGW-Core.ino: is_value_valid_for_master_topic helper toegevoegd; 8 call-sites in print_f88/s16/s8s8/u16/u8_alias/u8_single gewrapt met master-topic guard
+- src/OTGW-firmware/MQTTstuff.ino: publishToSourceTopic vroege return op WRITE_ACK + !bSlaveEchoesValue
+
+AC1-6+10 source-verifieerbaar. AC7-9 wachten op hardware flash + telnet/HA observatie.
+<!-- SECTION:NOTES:END -->
