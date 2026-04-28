@@ -456,12 +456,11 @@ body.dark .otmonrow,
  * ============================================================= */
 .sat-panel {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(280px, 360px);
+  grid-template-columns: 1fr;
   gap: 16px;
   padding: 16px;
   background: var(--bg-app); color: var(--fg-2);
 }
-@media (max-width: 720px) { .sat-panel { grid-template-columns: 1fr; } }
 
 .sat-panel h2, .sat-panel h3 {
   font: 700 var(--fs-sm) / var(--lh-tight) var(--font-sans);
@@ -881,26 +880,14 @@ body.dark .settingDiv,
 }
 
 /* =============================================================
- * SAT panel — ported verbatim from sat.css @ 6a42cc3c~1
- * (deleted in Patch E of TASK-435; classes still referenced by sat.js)
+ * SAT panel — heading + tile rules ported verbatim from sat.css
+ * @ 6a42cc3c~1 (deleted in Patch E of TASK-435; classes still
+ * referenced by sat.js).
+ *
+ * NOTE: the .sat-panel layout rule from pre-Patch-E sat.css was
+ * intentionally NOT ported here — the canonical .sat-panel rule
+ * lives in Section 13 above and now uses single-column layout.
  * ============================================================= */
-
-/* Layout: 2-column on desktop, stacks under 720px */
-.sat-panel {
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(280px, 360px);
-  gap: 16px;
-  padding: 16px;
-  background: #f5f5f5;
-  color: #1a1a1a;
-}
-body.dark .sat-panel {
-  background: #1a1a1a;
-  color: #e0e0e0;
-}
-@media (max-width: 720px) {
-  .sat-panel { grid-template-columns: 1fr; }
-}
 
 .sat-panel h2,
 .sat-panel h3 {
