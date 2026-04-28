@@ -5,21 +5,21 @@
 #  Distributed alongside merged binary releases. Downloads Espressif's
 #  standalone esptool binary on first run (no Python required).
 #
-#  Default behaviour (no flags): writes the merged-full image to flash WITHOUT
-#  erasing first. WiFi credentials in NVS survive; LittleFS settings are
-#  overwritten by the fresh filesystem image inside the merged-full bin.
+#  Default behaviour (no flags): writes the firmware-only image to flash.
+#  Existing WiFi credentials/settings stay intact because the filesystem is
+#  left untouched. Use --factory when you want to flash the merged-full image.
 #
 #  Usage:
-#    ./flash_otgw.sh                     factory flash (preserves WiFi creds)
-#    ./flash_otgw.sh --upgrade           firmware-only (preserves WiFi + app
-#                                         settings; ESP32 only)
+#    ./flash_otgw.sh                     firmware-only (preserves WiFi + app
+#                                         settings)
+#    ./flash_otgw.sh --upgrade           same as default
+#    ./flash_otgw.sh --factory           full image flash (updates filesystem)
 #    ./flash_otgw.sh --erase             full clean wipe (loses everything)
 #    ./flash_otgw.sh --port /dev/ttyUSB0 use specific port
 #    ./flash_otgw.sh --bin <file>        use specific firmware file
 #    ./flash_otgw.sh --board esp8266     force board (otherwise from filename)
 #    ./flash_otgw.sh --board esp32       (Nodoshop OTGW32)
 #    ./flash_otgw.sh --baud N            override baud rate
-#    ./flash_otgw.sh --yes               skip confirmation prompts
 #    ./flash_otgw.sh --help              show this help
 # =============================================================================
 
@@ -57,7 +57,7 @@ ARG_BOARD=""
 ARG_BAUD=""
 ARG_ERASE=0
 ARG_UPGRADE=0
-ARG_YES=0
+ARG_FACTORY=0
 
 # ---- Help ------------------------------------------------------------------
 show_help() {
@@ -67,11 +67,11 @@ flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware
 Usage:
   ./flash_otgw.sh [options]
 
-Mode:
-  (no flag)            Default factory flash. Preserves WiFi credentials,
-                       wipes filesystem (MQTT/OTGW config).
-  --upgrade            Firmware-only flash. Preserves WiFi AND filesystem.
-                       Picks *-merged.bin (esp32) or *.ino.bin (esp8266).
+  Mode:
+  (no flag)            Firmware-only flash. Preserves WiFi credentials and
+                       existing filesystem/settings.
+  --upgrade            Same as default.
+  --factory            Full image flash. Updates the filesystem image too.
   --erase              Full clean wipe. Erases everything including WiFi.
 
 Targeting:
@@ -84,7 +84,6 @@ Targeting:
   --baud N             Override baud rate (default: 460800/921600).
 
 Other:
-  --yes, -y            Skip the confirmation prompt.
   --help, -h           Show this help.
 
 The script downloads esptool ${ESPTOOL_VERSION} to ./tools/esptool/ on first run.
@@ -102,16 +101,22 @@ while [ $# -gt 0 ]; do
         --baud)     ARG_BAUD="$2";  shift 2 ;;
         --erase)    ARG_ERASE=1;    shift ;;
         --upgrade)  ARG_UPGRADE=1;  shift ;;
-        --yes|-y)   ARG_YES=1;      shift ;;
+        --factory)  ARG_FACTORY=1;  shift ;;
         --help|-h)  show_help; exit 0 ;;
         *) err "Unknown argument: $1"; echo "Run './flash_otgw.sh --help' for usage."; exit 2 ;;
     esac
 done
 
-if [ "$ARG_ERASE" = "1" ] && [ "$ARG_UPGRADE" = "1" ]; then
-    err "--erase and --upgrade are mutually exclusive."
+if [ "$ARG_ERASE" = "1" ] && { [ "$ARG_UPGRADE" = "1" ] || [ "$ARG_FACTORY" = "1" ]; }; then
+    err "--erase and --upgrade/--factory are mutually exclusive."
     err "        --erase wipes everything including the filesystem."
     err "        --upgrade preserves the filesystem."
+    exit 2
+fi
+
+if [ "$ARG_UPGRADE" = "1" ] && [ "$ARG_FACTORY" = "1" ]; then
+    err "--upgrade and --factory are mutually exclusive."
+    err "        Both already select different flash layouts."
     exit 2
 fi
 
@@ -232,10 +237,9 @@ ensure_esptool
 
 # ---- Step 3: locate firmware bin -------------------------------------------
 # Mode selection mirrors the .bat script:
-#   default            -> *-merged-full.bin   (full factory image; preserves WiFi)
-#   --upgrade  (esp32) -> *-merged.bin        (firmware-only; preserves WiFi + FS)
-#   --upgrade (esp8266)-> *.ino.bin           (firmware-only; preserves WiFi + FS)
-#   --erase            -> *-merged-full.bin   (full image + erase_all)
+#   default / --upgrade -> *-merged.bin       (firmware-only; preserves WiFi + FS)
+#   --factory           -> *-merged-full.bin  (full image; updates filesystem)
+#   --erase             -> *-merged-full.bin  (full image + erase_all)
 find_first_match() {
     local pattern="$1"
     # shellcheck disable=SC2012  # ls -1 sort order is fine here
@@ -253,7 +257,19 @@ find_bin() {
     fi
 
     local cand=""
-    if [ "$ARG_UPGRADE" = "1" ]; then
+    if [ "$ARG_FACTORY" = "1" ]; then
+        for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
+            cand="$(find_first_match "$dir/OTGW-firmware-*-merged-full.bin")"
+            [ -n "$cand" ] && break
+        done
+        if [ -z "$cand" ]; then
+            err "--factory: no merged-full bin found."
+            err "        Expected in: $SCRIPT_DIR"
+            err "                 or: $SCRIPT_DIR/build"
+            err "        Use --bin to specify a path."
+            exit 1
+        fi
+    else
         for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
             cand="$(find_first_match "$dir/OTGW-firmware-esp32-*-merged.bin")"
             [ -n "$cand" ] && break
@@ -265,18 +281,6 @@ find_bin() {
             err "        Expected: OTGW-firmware-esp32-*-merged.bin"
             err "              or: OTGW-firmware-esp8266-*.ino.bin"
             err "        Use --bin to specify a path."
-            exit 1
-        fi
-    else
-        for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
-            cand="$(find_first_match "$dir/OTGW-firmware-*-merged-full.bin")"
-            [ -n "$cand" ] && break
-        done
-        if [ -z "$cand" ]; then
-            err "No OTGW-firmware-*-merged-full.bin found."
-            err "        Expected in: $SCRIPT_DIR"
-            err "                 or: $SCRIPT_DIR/build"
-            err "        Use --bin to specify a path, or --upgrade for firmware-only."
             exit 1
         fi
     fi
@@ -387,26 +391,16 @@ echo "   Baud:     $ARG_BAUD"
 if [ "$ARG_ERASE" = "1" ]; then
     echo "   Mode:     --erase  (full clean wipe)"
     echo "   Effect:   ALL data wiped: WiFi credentials, NVS, filesystem."
-elif [ "$ARG_UPGRADE" = "1" ]; then
-    echo "   Mode:     --upgrade  (firmware-only)"
-    echo "   Effect:   WiFi credentials and app settings preserved."
-    echo "             Only the firmware app is updated."
+elif [ "$ARG_FACTORY" = "1" ]; then
+    echo "   Mode:     --factory  (full image)"
+    echo "   Effect:   Filesystem image is refreshed."
+    echo "             Existing WiFi/settings may be replaced."
 else
-    echo "   Mode:     default factory flash"
-    echo "   Effect:   WiFi credentials in NVS preserved."
-    echo "             Filesystem (MQTT/OTGW config) replaced by fresh image."
+    echo "   Mode:     firmware-only"
+    echo "   Effect:   WiFi credentials and filesystem/settings preserved."
 fi
 echo "------------------------------------------------------------"
 echo
-
-if [ "$ARG_YES" = "0" ]; then
-    printf "Type YES to continue: "
-    read -r CONFIRM
-    if [ "$CONFIRM" != "YES" ]; then
-        info "Aborted by user."
-        exit 0
-    fi
-fi
 
 # ---- Step 7: run esptool ---------------------------------------------------
 # Tested baseline (Nodo-shop OT-Thing): -z compresses transfer; default-reset
@@ -428,7 +422,7 @@ echo " Flash complete. Reset the OTGW or unplug/replug USB."
 if [ "$ARG_ERASE" = "1" ]; then
     echo " After reset: connect to WiFi AP \"OTGW-AP\" to configure."
 else
-    echo " WiFi credentials preserved; the board should rejoin"
+    echo " WiFi credentials and settings preserved; the board should rejoin"
     echo " your network automatically. Browse to http://otgw.local"
     echo " if mDNS works on your network."
 fi

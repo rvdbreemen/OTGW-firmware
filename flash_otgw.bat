@@ -8,21 +8,21 @@ REM ----------------------------------------------------------------------------
 REM  Distributed alongside merged binary releases. Downloads Espressif's
 REM  standalone esptool binary on first run (no Python required).
 REM
-REM  Default behaviour (no flags): writes the merged-full image to flash WITHOUT
-REM  erasing first. WiFi credentials in NVS survive; LittleFS settings are
-REM  overwritten by the fresh filesystem image inside the merged-full bin.
+REM  Default behaviour (no flags): writes the firmware-only image to flash.
+REM  Existing WiFi credentials/settings stay intact because the filesystem is
+REM  left untouched. Use --factory when you want to flash the merged-full image.
 REM
 REM  Usage:
-REM    flash_otgw.bat                     factory flash (preserves WiFi creds)
-REM    flash_otgw.bat --upgrade           firmware-only (preserves WiFi + app
-REM                                        settings; ESP32 only)
+REM    flash_otgw.bat                     firmware-only (preserves WiFi + app
+REM                                        settings)
+REM    flash_otgw.bat --upgrade           same as default
+REM    flash_otgw.bat --factory           full image flash (updates filesystem)
 REM    flash_otgw.bat --erase             full clean wipe (loses everything)
 REM    flash_otgw.bat --port COMx         use specific port
 REM    flash_otgw.bat --bin <file>        use specific firmware file
 REM    flash_otgw.bat --board esp8266     force board (otherwise from filename)
 REM    flash_otgw.bat --board esp32       (Nodoshop OTGW32)
 REM    flash_otgw.bat --baud N            override baud rate
-REM    flash_otgw.bat --yes               skip confirmation prompts
 REM    flash_otgw.bat --help              show this help
 REM ============================================================================
 
@@ -38,7 +38,7 @@ set "ARG_BOARD="
 set "ARG_BAUD="
 set "ARG_ERASE=0"
 set "ARG_UPGRADE=0"
-set "ARG_YES=0"
+set "ARG_FACTORY=0"
 
 REM ---- Parse arguments -------------------------------------------------------
 :parse_args
@@ -49,8 +49,7 @@ if /I "%~1"=="--board"    ( set "ARG_BOARD=%~2"& shift & shift & goto parse_args
 if /I "%~1"=="--baud"     ( set "ARG_BAUD=%~2" & shift & shift & goto parse_args )
 if /I "%~1"=="--erase"    ( set "ARG_ERASE=1"  & shift & goto parse_args )
 if /I "%~1"=="--upgrade"  ( set "ARG_UPGRADE=1"& shift & goto parse_args )
-if /I "%~1"=="--yes"      ( set "ARG_YES=1"    & shift & goto parse_args )
-if /I "%~1"=="-y"         ( set "ARG_YES=1"    & shift & goto parse_args )
+if /I "%~1"=="--factory"  ( set "ARG_FACTORY=1"& shift & goto parse_args )
 if /I "%~1"=="--help"     goto show_help
 if /I "%~1"=="-h"         goto show_help
 echo [ERROR] Unknown argument: %~1
@@ -62,6 +61,17 @@ if "%ARG_ERASE%"=="1" if "%ARG_UPGRADE%"=="1" (
     echo [ERROR] --erase and --upgrade are mutually exclusive.
     echo         --erase wipes everything including the filesystem.
     echo         --upgrade preserves the filesystem.
+    exit /b 2
+)
+if "%ARG_ERASE%"=="1" if "%ARG_FACTORY%"=="1" (
+    echo [ERROR] --erase and --factory are mutually exclusive.
+    echo         --erase wipes everything including the filesystem.
+    echo         --factory flashes the merged-full filesystem image.
+    exit /b 2
+)
+if "%ARG_UPGRADE%"=="1" if "%ARG_FACTORY%"=="1" (
+    echo [ERROR] --upgrade and --factory are mutually exclusive.
+    echo         Both already select different flash layouts.
     exit /b 2
 )
 
@@ -113,10 +123,9 @@ if exist "%ESPTOOL_EXE%" (
 
 REM ---- Step 2: locate firmware bin ------------------------------------------
 REM   Mode selection:
-REM     default            -> *-merged-full.bin   (full factory image; preserves WiFi)
-REM     --upgrade  (esp32) -> *-merged.bin        (firmware-only; preserves WiFi + FS)
-REM     --upgrade (esp8266)-> *.ino.bin           (firmware-only; preserves WiFi + FS)
-REM     --erase            -> *-merged-full.bin   (full image + erase_all)
+REM     default / --upgrade -> *-merged.bin       (firmware-only; preserves WiFi + FS)
+REM     --factory           -> *-merged-full.bin  (full image; updates filesystem)
+REM     --erase             -> *-merged-full.bin  (full image + erase_all)
 if not "%ARG_BIN%"=="" (
     if not exist "%ARG_BIN%" (
         echo [ERROR] Specified --bin file does not exist: %ARG_BIN%
@@ -127,7 +136,24 @@ if not "%ARG_BIN%"=="" (
 )
 
 set "BIN_FILE="
-if "%ARG_UPGRADE%"=="1" (
+if "%ARG_FACTORY%"=="1" (
+    REM Use the full merged image when the user explicitly asked for factory flash.
+    for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do (
+        if not defined BIN_FILE set "BIN_FILE=%%F"
+    )
+    if not defined BIN_FILE (
+        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do (
+            if not defined BIN_FILE set "BIN_FILE=%%F"
+        )
+    )
+    if not defined BIN_FILE (
+        echo [ERROR] --factory: no merged-full bin found.
+        echo         Expected in: %SCRIPT_DIR%
+        echo                  or: %SCRIPT_DIR%build\
+        echo         Use --bin to specify a path.
+        exit /b 1
+    )
+) else if "%ARG_UPGRADE%"=="1" (
     REM Try ESP32 firmware-only merged first (has bootloader + partitions + app)
     for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp32-*-merged.bin") do (
         if not defined BIN_FILE set "BIN_FILE=%%F"
@@ -157,19 +183,32 @@ if "%ARG_UPGRADE%"=="1" (
         exit /b 1
     )
 ) else (
-    for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do (
+    REM Default to firmware-only so WiFi/settings are preserved.
+    for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp32-*-merged.bin") do (
         if not defined BIN_FILE set "BIN_FILE=%%F"
     )
+    REM Fall back to ESP8266 firmware-only (.ino.bin written at offset 0x0)
     if not defined BIN_FILE (
-        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do (
+        for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp8266-*.ino.bin") do (
+            if not defined BIN_FILE set "BIN_FILE=%%F"
+        )
+    )
+    REM Same searches in build/ (developer running from repo root)
+    if not defined BIN_FILE (
+        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp32-*-merged.bin") do (
             if not defined BIN_FILE set "BIN_FILE=%%F"
         )
     )
     if not defined BIN_FILE (
-        echo [ERROR] No OTGW-firmware-*-merged-full.bin found.
-        echo         Expected in: %SCRIPT_DIR%
-        echo                  or: %SCRIPT_DIR%build\
-        echo         Use --bin to specify a path, or --upgrade for firmware-only.
+        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp8266-*.ino.bin") do (
+            if not defined BIN_FILE set "BIN_FILE=%%F"
+        )
+    )
+    if not defined BIN_FILE (
+        echo [ERROR] No firmware-only bin found.
+        echo         Expected: OTGW-firmware-esp32-*-merged.bin
+        echo               or: OTGW-firmware-esp8266-*.ino.bin
+        echo         Use --bin to specify a path.
         exit /b 1
     )
 )
@@ -272,25 +311,21 @@ echo    Baud:     %ARG_BAUD%
 if "%ARG_ERASE%"=="1" (
     echo    Mode:     --erase  ^(full clean wipe^)
     echo    Effect:   ALL data wiped: WiFi credentials, NVS, filesystem.
+    echo    Use:      only when you want a factory reset.
+) else if "%ARG_FACTORY%"=="1" (
+    echo    Mode:     --factory  ^(full image^)
+    echo    Effect:   Filesystem image is refreshed.
+    echo              Existing WiFi/settings may be replaced.
 ) else if "%ARG_UPGRADE%"=="1" (
     echo    Mode:     --upgrade  ^(firmware-only^)
-    echo    Effect:   WiFi credentials and app settings preserved.
+    echo    Effect:   WiFi credentials and filesystem/settings preserved.
     echo              Only the firmware app is updated.
 ) else (
-    echo    Mode:     default factory flash
-    echo    Effect:   WiFi credentials in NVS preserved.
-    echo              Filesystem ^(MQTT/OTGW config^) replaced by fresh image.
+    echo    Mode:     firmware-only
+    echo    Effect:   WiFi credentials and filesystem/settings preserved.
 )
 echo ------------------------------------------------------------
 echo.
-
-if "%ARG_YES%"=="0" (
-    set /p "CONFIRM=Type YES to continue: "
-    if /I not "!CONFIRM!"=="YES" (
-        echo [INFO] Aborted by user.
-        exit /b 0
-    )
-)
 
 REM ---- Step 6: run esptool --------------------------------------------------
 REM   Tested baseline (Nodo-shop OT-Thing): -z compresses transfer; default-reset
@@ -314,7 +349,7 @@ echo  Flash complete. Reset the OTGW or unplug/replug USB.
 if "%ARG_ERASE%"=="1" (
     echo  After reset: connect to WiFi AP "OTGW-AP" to configure.
 ) else (
-    echo  WiFi credentials preserved; the board should rejoin
+    echo  WiFi credentials and settings preserved; the board should rejoin
     echo  your network automatically. Browse to http://otgw.local
     echo  if mDNS works on your network.
 )
@@ -329,10 +364,10 @@ echo Usage:
 echo   flash_otgw.bat [options]
 echo.
 echo Mode:
-echo   (no flag)            Default factory flash. Preserves WiFi credentials,
-echo                        wipes filesystem (MQTT/OTGW config).
-echo   --upgrade            Firmware-only flash. Preserves WiFi AND filesystem.
-echo                        Picks *-merged.bin (esp32) or *.ino.bin (esp8266).
+echo   (no flag)            Firmware-only flash. Preserves WiFi credentials and
+echo                        existing filesystem/settings.
+echo   --upgrade            Same as default.
+echo   --factory            Full image flash. Updates the filesystem image too.
 echo   --erase              Full clean wipe. Erases everything including WiFi.
 echo.
 echo Targeting:
@@ -344,7 +379,6 @@ echo   --board esp32        (Nodoshop OTGW32 = ESP32-S3)
 echo   --baud N             Override baud rate (default: 460800/921600).
 echo.
 echo Other:
-echo   --yes, -y            Skip the confirmation prompt.
 echo   --help, -h           Show this help.
 echo.
 echo The script downloads esptool %ESPTOOL_VERSION% to .\tools\esptool\ on first run.
