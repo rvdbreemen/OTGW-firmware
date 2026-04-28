@@ -50,14 +50,118 @@ warn()  { printf "%s[WARN]%s  %s\n" "$C_YELLOW" "$C_RESET" "$*"; }
 err()   { printf "%s[ERROR]%s %s\n" "$C_RED"    "$C_RESET" "$*" >&2; }
 step()  { printf "\n%s[STEP]%s  %s\n" "$C_BOLD$C_CYAN" "$C_RESET" "$*"; }
 
+cleanup_backup_dir() {
+    if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
+        rm -rf "$BACKUP_DIR"
+    fi
+}
+
+download_http_file() {
+    local url="$1"
+    local dest="$2"
+    if ! command -v curl >/dev/null 2>&1; then
+        err "curl is required for live backup/restore."
+        exit 1
+    fi
+    curl -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -o "$dest" "$url"
+}
+
+upload_http_file() {
+    local url="$1"
+    local src="$2"
+    local filename="$3"
+    curl -fsS --connect-timeout 5 --retry 2 --retry-delay 1 \
+        -X POST \
+        -F "path=/" \
+        -F "upload=@${src};filename=${filename}" \
+        "$url" >/dev/null
+}
+
+wait_for_health() {
+    local url="$1"
+    local timeout_s="${2:-180}"
+    local start now resp
+    start="$(date +%s)"
+    while true; do
+        resp="$(curl -fsS --max-time 5 "$url?t=$(date +%s)" 2>/dev/null || true)"
+        if printf '%s' "$resp" | grep -q '"status"[[:space:]]*:[[:space:]]*"UP"'; then
+            return 0
+        fi
+        now="$(date +%s)"
+        if [ $((now - start)) -ge "$timeout_s" ]; then
+            return 1
+        fi
+        sleep 2
+    done
+}
+
+prompt_preserve_settings() {
+    local answer host_input
+    printf "Preserve current settings via backup/restore? [Y/n]: "
+    read -r answer
+    case "$answer" in
+        ""|y|Y|yes|YES)
+            ARG_PRESERVE_SETTINGS=1
+            printf "Enter OTGW hostname or IP [otgw.local]: "
+            read -r host_input
+            [ -n "$host_input" ] && ARG_HOST="$host_input" || ARG_HOST="otgw.local"
+            HOST_BASE="http://${ARG_HOST}"
+            ;;
+        *)
+            ARG_PRESERVE_SETTINGS=0
+            ;;
+    esac
+}
+
+backup_live_files() {
+    BACKUP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t otgwflash)" || {
+        err "Could not create backup directory."
+        exit 1
+    }
+    trap cleanup_backup_dir EXIT
+
+    step "Backing up settings.ini from ${HOST_BASE}"
+    download_http_file "${HOST_BASE}/settings.ini" "${BACKUP_DIR}/settings.ini"
+    ok "Saved settings backup: ${BACKUP_DIR}/settings.ini"
+
+    step "Backing up Dallas labels from ${HOST_BASE}"
+    download_http_file "${HOST_BASE}/api/v2/sensors/labels" "${BACKUP_DIR}/dallas_labels.ini"
+    ok "Saved Dallas labels backup: ${BACKUP_DIR}/dallas_labels.ini"
+}
+
+restore_live_files() {
+    step "Restoring settings.ini to ${HOST_BASE}"
+    upload_http_file "${HOST_BASE}/upload" "${BACKUP_DIR}/settings.ini" "settings.ini"
+    ok "Restored settings.ini"
+
+    if [ -f "${BACKUP_DIR}/dallas_labels.ini" ]; then
+        step "Restoring Dallas labels to ${HOST_BASE}"
+        upload_http_file "${HOST_BASE}/upload" "${BACKUP_DIR}/dallas_labels.ini" "dallas_labels.ini"
+        ok "Restored Dallas labels"
+    fi
+}
+
+trigger_reboot() {
+    step "Triggering reboot on ${HOST_BASE}"
+    if curl -fsS --connect-timeout 5 --retry 1 --retry-delay 1 "${HOST_BASE}/ReBoot" >/dev/null 2>&1; then
+        ok "Reboot request sent"
+    else
+        warn "Reboot request may have been interrupted; continuing to wait."
+    fi
+}
+
 # ---- Defaults --------------------------------------------------------------
 ARG_PORT=""
 ARG_BIN=""
 ARG_BOARD=""
 ARG_BAUD=""
+ARG_HOST=""
 ARG_ERASE=0
 ARG_UPGRADE=0
 ARG_FACTORY=0
+ARG_PRESERVE_SETTINGS=0
+BACKUP_DIR=""
+HOST_BASE=""
 
 # ---- Help ------------------------------------------------------------------
 show_help() {
@@ -71,7 +175,8 @@ Usage:
   (no flag)            Interactive chooser with auto-detected default.
                        1 = factory reset, 2 = upgrade OTGW, 3 = firmware-only
   --upgrade            Force firmware-only upgrade.
-  --factory            Force full image flash (keeps WiFi; resets settings).
+  --factory            Force full image flash. You will be asked whether to
+                       back up and restore settings from a live OTGW.
   --erase              Full clean wipe. Erases WiFi credentials and settings.
 
 Targeting:
@@ -444,6 +549,14 @@ if [ "$ARG_BIN" = "" ] && [ "$ARG_ERASE" = "0" ] && [ "$ARG_UPGRADE" = "0" ] && 
     fi
 fi
 
+if [ "$ARG_FACTORY" = "1" ] && [ "$ARG_ERASE" = "0" ]; then
+    prompt_preserve_settings
+    if [ "$ARG_PRESERVE_SETTINGS" = "1" ]; then
+        step "Backing up live settings before flash"
+        backup_live_files
+    fi
+fi
+
 BIN_FILE="$(find_bin)"
 BIN_NAME="$(basename "$BIN_FILE")"
 ok "Firmware: $BIN_NAME"
@@ -486,10 +599,35 @@ step "Running esptool write_flash..."
     --before default_reset --after hard_reset \
     write_flash $WRITE_FLAGS 0x0 "$BIN_FILE"
 
+RESTORE_DONE=0
+if [ "$ARG_PRESERVE_SETTINGS" = "1" ]; then
+    step "Waiting for flashed device to come back online"
+    if wait_for_health "${HOST_BASE}/api/v2/health" 240; then
+        ok "Device is healthy again"
+        restore_live_files
+        trigger_reboot
+        step "Waiting for restored settings to load"
+        if wait_for_health "${HOST_BASE}/api/v2/health" 240; then
+            ok "Device is healthy again after restore"
+            RESTORE_DONE=1
+        else
+            warn "Device did not report healthy after restore within timeout."
+        fi
+    else
+        warn "Device did not report healthy after flash within timeout."
+    fi
+fi
+
 echo
 echo "============================================================"
-echo " Flash complete. Reset the OTGW or unplug/replug USB."
-if [ "$ARG_ERASE" = "1" ]; then
+echo " Flash complete."
+if [ "$RESTORE_DONE" = "1" ]; then
+    echo " Settings and Dallas labels were backed up and restored from ${ARG_HOST}."
+    echo " Browse to http://${ARG_HOST} if the device is reachable on your network."
+elif [ "$ARG_PRESERVE_SETTINGS" = "1" ]; then
+    echo " Settings backup was taken from ${ARG_HOST}, but the restore flow did"
+    echo " not complete. Check the warnings above."
+elif [ "$ARG_ERASE" = "1" ]; then
     echo " After reset: connect to WiFi AP \"OTGW-AP\" to configure."
 else
     echo " WiFi credentials and settings preserved; the board should rejoin"

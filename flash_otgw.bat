@@ -34,9 +34,13 @@ set "ARG_PORT="
 set "ARG_BIN="
 set "ARG_BOARD="
 set "ARG_BAUD="
+set "ARG_HOST="
 set "ARG_ERASE=0"
 set "ARG_UPGRADE=0"
 set "ARG_FACTORY=0"
+set "ARG_PRESERVE_SETTINGS=0"
+set "BACKUP_DIR="
+set "HOST_BASE="
 
 REM ---- Parse arguments -------------------------------------------------------
 :parse_args
@@ -251,6 +255,12 @@ if "%ARG_BIN%"=="" if "%ARG_ERASE%"=="0" if "%ARG_UPGRADE%"=="0" if "%ARG_FACTOR
     for %%F in ("%BIN_FILE%") do set "BIN_NAME=%%~nxF"
 )
 
+if "%ARG_FACTORY%"=="1" if "%ARG_ERASE%"=="0" call :prompt_preserve_settings
+if "%ARG_PRESERVE_SETTINGS%"=="1" if "%ARG_ERASE%"=="0" (
+    call :backup_live_files
+    if errorlevel 1 exit /b 1
+)
+
 echo [OK] Firmware: %BIN_NAME%
 
 REM ---- Step 5: confirm before flash -----------------------------------------
@@ -297,8 +307,22 @@ if errorlevel 1 (
 
 echo.
 echo ============================================================
-echo  Flash complete. Reset the OTGW or unplug/replug USB.
-if "%ARG_ERASE%"=="1" (
+echo  Flash complete.
+if "%ARG_PRESERVE_SETTINGS%"=="1" (
+    call :wait_for_health "after flash" 240
+    if "!HEALTH_OK!"=="1" (
+        call :restore_live_files
+        call :trigger_reboot
+        call :wait_for_health "after restore" 240
+        if "!HEALTH_OK!"=="1" (
+            echo  Settings and Dallas labels were restored from !ARG_HOST!.
+        ) else (
+            echo  [WARN] Device did not report healthy after restore within timeout.
+        )
+    ) else (
+        echo  [WARN] Device did not report healthy after flash within timeout.
+    )
+) else if "%ARG_ERASE%"=="1" (
     echo  After reset: connect to WiFi AP "OTGW-AP" to configure.
 ) else (
     echo  WiFi credentials and settings preserved; the board should rejoin
@@ -306,6 +330,113 @@ if "%ARG_ERASE%"=="1" (
     echo  if mDNS works on your network.
 )
 echo ============================================================
+exit /b 0
+
+
+:prompt_preserve_settings
+set "PRESERVE_CHOICE="
+set /p "PRESERVE_CHOICE=Preserve current settings via backup/restore? [Y/n]: "
+if "%PRESERVE_CHOICE%"=="" set "PRESERVE_CHOICE=Y"
+if /I "%PRESERVE_CHOICE%"=="Y" (
+    set "ARG_PRESERVE_SETTINGS=1"
+    set "ARG_HOST="
+    set /p "ARG_HOST=Enter OTGW hostname or IP [otgw.local]: "
+    if "%ARG_HOST%"=="" set "ARG_HOST=otgw.local"
+    set "HOST_BASE=http://%ARG_HOST%"
+) else (
+    set "ARG_PRESERVE_SETTINGS=0"
+)
+exit /b 0
+
+
+:backup_live_files
+where curl.exe >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] curl.exe not found. Windows backup/restore requires curl.
+    exit /b 1
+)
+set "BACKUP_DIR=%TEMP%\otgw_flash_%RANDOM%"
+mkdir "%BACKUP_DIR%" >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Could not create backup directory.
+    exit /b 1
+)
+echo [STEP] Backing up settings.ini from %HOST_BASE%
+curl.exe -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -o "%BACKUP_DIR%\settings.ini" "%HOST_BASE%/settings.ini"
+if errorlevel 1 (
+    echo [ERROR] Could not download settings.ini from %HOST_BASE%.
+    exit /b 1
+)
+echo [OK] Saved settings backup: %BACKUP_DIR%\settings.ini
+echo [STEP] Backing up Dallas labels from %HOST_BASE%
+curl.exe -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -o "%BACKUP_DIR%\dallas_labels.ini" "%HOST_BASE%/api/v2/sensors/labels"
+if errorlevel 1 (
+    echo [ERROR] Could not download Dallas labels from %HOST_BASE%.
+    exit /b 1
+)
+echo [OK] Saved Dallas labels backup: %BACKUP_DIR%\dallas_labels.ini
+exit /b 0
+
+
+:restore_live_files
+where curl.exe >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] curl.exe not found. Windows backup/restore requires curl.
+    exit /b 1
+)
+echo [STEP] Restoring settings.ini to %HOST_BASE%
+curl.exe -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -X POST -F "path=/" -F "upload=@%BACKUP_DIR%\settings.ini;filename=settings.ini" "%HOST_BASE%/upload" >nul
+if errorlevel 1 (
+    echo [ERROR] Could not restore settings.ini.
+    exit /b 1
+)
+echo [OK] Restored settings.ini
+echo [STEP] Restoring Dallas labels to %HOST_BASE%
+curl.exe -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -X POST -F "path=/" -F "upload=@%BACKUP_DIR%\dallas_labels.ini;filename=dallas_labels.ini" "%HOST_BASE%/upload" >nul
+if errorlevel 1 (
+    echo [ERROR] Could not restore Dallas labels.
+    exit /b 1
+)
+echo [OK] Restored Dallas labels
+exit /b 0
+
+
+:trigger_reboot
+where curl.exe >nul 2>&1
+if errorlevel 1 exit /b 1
+echo [STEP] Triggering reboot on %HOST_BASE%
+curl.exe -fsS --connect-timeout 5 --retry 1 --retry-delay 1 "%HOST_BASE%/ReBoot" >nul 2>&1
+if errorlevel 1 (
+    echo [WARN] Reboot request may have been interrupted; continuing to wait.
+) else (
+    echo [OK] Reboot request sent
+)
+exit /b 0
+
+
+:wait_for_health
+set "HEALTH_OK=0"
+set "WAIT_LABEL=%~1"
+set "WAIT_TIMEOUT=%~2"
+if "%WAIT_TIMEOUT%"=="" set "WAIT_TIMEOUT=180"
+echo [STEP] Waiting for device %WAIT_LABEL%...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$deadline=(Get-Date).AddSeconds(%WAIT_TIMEOUT%);" ^
+    "$url='http://'+$env:ARG_HOST+'/api/v2/health?t='+[DateTime]::UtcNow.Ticks;" ^
+    "while((Get-Date) -lt $deadline) {" ^
+    "  try {" ^
+    "    $r=Invoke-WebRequest -UseBasicParsing -Uri $url -Headers @{Accept='application/json'} -TimeoutSec 5;" ^
+    "    if($r.Content -match '\"status\"\s*:\s*\"UP\"') { exit 0 }" ^
+    "  } catch {}" ^
+    "  Start-Sleep -Seconds 2" ^
+    "}" ^
+    "exit 1"
+if not errorlevel 1 set "HEALTH_OK=1"
+if "%HEALTH_OK%"=="1" (
+    echo [OK] Device reports healthy.
+) else (
+    echo [WARN] Device did not report healthy within timeout.
+)
 exit /b 0
 
 
@@ -407,7 +538,8 @@ echo Mode:
 echo   (no flag)            Interactive chooser with auto-detected default.
 echo                        1 = factory reset, 2 = upgrade OTGW, 3 = firmware-only
 echo   --upgrade            Force firmware-only upgrade.
-echo   --factory            Full image flash. Keeps WiFi, resets settings.
+echo   --factory            Full image flash. You will be asked whether to
+echo                        back up and restore settings from a live OTGW.
 echo   --erase              Full clean wipe. Erases WiFi credentials and settings.
 echo.
 echo Targeting:
