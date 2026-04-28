@@ -51,8 +51,12 @@ err()   { printf "%s[ERROR]%s %s\n" "$C_RED"    "$C_RESET" "$*" >&2; }
 step()  { printf "\n%s[STEP]%s  %s\n" "$C_BOLD$C_CYAN" "$C_RESET" "$*"; }
 
 cleanup_backup_dir() {
-    if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
-        rm -rf "$BACKUP_DIR"
+    if [ -n "${BACKUP_DIR:-}" ] && [ -d "$BACKUP_DIR" ]; then
+        if [ "${RESTORE_DONE:-0}" = "1" ]; then
+            rm -rf "$BACKUP_DIR"
+        else
+            warn "Settings backup retained for manual recovery: ${BACKUP_DIR}"
+        fi
     fi
 }
 
@@ -97,13 +101,25 @@ wait_for_health() {
 
 prompt_preserve_settings() {
     local answer host_input
+    if [ ! -t 0 ]; then
+        ARG_PRESERVE_SETTINGS=0
+        info "Non-interactive stdin; skipping settings backup/restore prompt."
+        return 0
+    fi
+
     printf "Preserve current settings via backup/restore? [Y/n]: "
-    read -r answer
+    if ! read -r answer; then
+        ARG_PRESERVE_SETTINGS=0
+        warn "Could not read preserve-settings choice; continuing without backup/restore."
+        return 0
+    fi
     case "$answer" in
         ""|y|Y|yes|YES)
             ARG_PRESERVE_SETTINGS=1
             printf "Enter OTGW hostname or IP [otgw.local]: "
-            read -r host_input
+            if ! read -r host_input; then
+                host_input=""
+            fi
             [ -n "$host_input" ] && ARG_HOST="$host_input" || ARG_HOST="otgw.local"
             HOST_BASE="http://${ARG_HOST}"
             ;;
@@ -162,6 +178,7 @@ ARG_FACTORY=0
 ARG_PRESERVE_SETTINGS=0
 BACKUP_DIR=""
 HOST_BASE=""
+RESTORE_DONE=0
 
 # ---- Help ------------------------------------------------------------------
 show_help() {
@@ -599,7 +616,6 @@ step "Running esptool write_flash..."
     --before default_reset --after hard_reset \
     write_flash $WRITE_FLAGS 0x0 "$BIN_FILE"
 
-RESTORE_DONE=0
 if [ "$ARG_PRESERVE_SETTINGS" = "1" ]; then
     step "Waiting for flashed device to come back online"
     if wait_for_health "${HOST_BASE}/api/v2/health" 240; then
@@ -627,6 +643,9 @@ if [ "$RESTORE_DONE" = "1" ]; then
 elif [ "$ARG_PRESERVE_SETTINGS" = "1" ]; then
     echo " Settings backup was taken from ${ARG_HOST}, but the restore flow did"
     echo " not complete. Check the warnings above."
+    if [ -n "${BACKUP_DIR:-}" ] && [ -d "$BACKUP_DIR" ]; then
+        echo " Backup files remain at: ${BACKUP_DIR}"
+    fi
 elif [ "$ARG_ERASE" = "1" ]; then
     echo " After reset: connect to WiFi AP \"OTGW-AP\" to configure."
 else

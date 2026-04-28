@@ -341,8 +341,8 @@ if /I "%PRESERVE_CHOICE%"=="Y" (
     set "ARG_PRESERVE_SETTINGS=1"
     set "ARG_HOST="
     set /p "ARG_HOST=Enter OTGW hostname or IP [otgw.local]: "
-    if "%ARG_HOST%"=="" set "ARG_HOST=otgw.local"
-    set "HOST_BASE=http://%ARG_HOST%"
+    if "!ARG_HOST!"=="" set "ARG_HOST=otgw.local"
+    set "HOST_BASE=http://!ARG_HOST!"
 ) else (
     set "ARG_PRESERVE_SETTINGS=0"
 )
