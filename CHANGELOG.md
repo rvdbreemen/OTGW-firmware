@@ -12,6 +12,12 @@ The separate ESP32 / SAT v2.0.0 exploration on `feature-dev-2.0.0-otgw32-esp32-s
 
 ### Fixed
 - WiFi association without DHCP/IP after first reboot post-flash on the initial `1.5.0-beta+d40c2f6` build (TASK-432). Removed `wifi_station_dhcpc_start()` from `loopWifi()` `WIFI_DISCONNECTED` so the SDK regains autonomous DHCP management. Returns to the v1.2.0 baseline pattern; resolves the "associates but no IP, requires forced router-side reconnect" symptom reported by andrebrait on 2026-04-26.
+- Master MQTT topic flapping between real value and `0` for `Tr` (room temperature), `TrSet` (room setpoint), `MaxRelModLevelSetting`, and analogous master-to-slave informational write messages. Regression introduced in v1.4.1 when `is_value_valid()` was widened to accept slave Write-Ack values for `OT_WRITE` and `OT_RW` messages. Per ADR-066, the base topic now uses v1.3.5 semantics again (Read-Ack and Write-Data only); the optional `/boiler` subtopic is gated by a per-MsgID `bSlaveEchoesValue` flag for messages whose slave Write-Ack data byte is per-spec undefined. Spec-audit covering all OT v4.2 MsgIDs lives in `docs/api/MQTT-message-id-echo-audit.md`. Tracked as TASK-478.
+
+### Added
+- ADR-066 documenting the source-aware MQTT publish gating decision
+- `docs/api/MQTT-message-id-echo-audit.md` spec-audit reference per OpenTherm v4.2
+- `bSlaveEchoesValue` field on `OTlookup_t` populated for every MsgID
 
 ## [1.5.0-beta] - 2026-04-26
 
