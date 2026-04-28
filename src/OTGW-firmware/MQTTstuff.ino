@@ -1544,6 +1544,14 @@ static bool copySourceTableEntry(const char* const table[], uint8_t sourceIndex,
 void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 {
   if (!settings.mqtt.bSeparateSources || !topic || !json) return;
+  // ADR-066: skip /boiler subtopic for MsgIDs where the slave's Write-Ack
+  // data byte is per-spec undefined. Without this gate, /boiler shows
+  // protocol-zero readings that are not measurements (e.g. Tr, TrSet,
+  // MaxRelModLevelSetting). The bSlaveEchoesValue flag is populated for
+  // every MsgID in OTmap[] per docs/api/MQTT-message-id-echo-audit.md.
+  // OTlookupitem is set by processOT before each print_* call and is
+  // therefore valid here.
+  if (rsptype == OT_WRITE_ACK && !OTlookupitem.bSlaveEchoesValue) return;
   // Re-entrancy guard: sendMQTTData may yield via feedWatchDog, allowing
   // a second processOT call to overwrite the static buffer mid-publish.
   static bool inUse = false;

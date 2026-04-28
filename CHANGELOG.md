@@ -8,6 +8,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - **WiFi association without DHCP/IP after reboot** (TASK-432, ported from `dev`). Removed three `platformRestartDHCP()` call sites in `networkStuff.ino` (startWiFi catch-all, WIFI_RECONNECTED, startNTP) and the function itself from `platform_esp8266.h` and `platform_esp32.h`. Calling `wifi_station_dhcpc_stop/start` while the station is connected takes DHCP ownership away from the SDK and breaks subsequent `setAutoReconnect()`-driven DHCP. Returns to v1.2.0 baseline pattern: SDK manages DHCP autonomously.
+- **MQTT publish gating per source topic** (TASK-478, ported from `dev`). Implements ADR-066: the base topic `{prefix}/value/{id}/{label}` publishes only thermostat-side intent (Read-Ack and Write-Data); slave Write-Ack values no longer flow to the base topic. The `/boiler` subtopic (when `bSeparateSources=true`) is gated by a per-MsgID `bSlaveEchoesValue` flag for the six OpenTherm v4.2 messages whose slave Write-Ack data byte is per-spec undefined (`Tr` 24, `TrSet` 16, `MaxRelModLevelSetting` 14, `TrSetCH2` 23, `TRoomCH2` 37, `RFstrengthbatterylevel` 98). Spec-audit covering all OT v4.2 MsgIDs lives in `docs/api/MQTT-message-id-echo-audit.md`.
+
+### Added
+
+- ADR-066 documenting the source-aware MQTT publish gating decision (ported verbatim from `dev`)
+- `docs/api/MQTT-message-id-echo-audit.md` spec-audit reference per OpenTherm v4.2 (ported from `dev`)
+- `bSlaveEchoesValue` field on `OTlookup_t` populated for every MsgID
 
 ## [2.0.0-beta] - 2026-04-11
 

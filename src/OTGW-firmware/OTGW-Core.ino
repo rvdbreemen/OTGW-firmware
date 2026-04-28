@@ -1258,9 +1258,29 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (isMsgIdReservedInActiveProfile(OT.id)) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
+  _valid = _valid || (OTlookup.msgcmd==OT_WRITE && (OT.type==OT_WRITE_DATA || OT.type==OT_WRITE_ACK));
+  _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA || OT.type==OT_WRITE_ACK));
+  _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);;
+  return _valid;
+}
+
+// ADR-066: Master-topic validity check. Mirrors is_value_valid but excludes
+// WRITE-ACK for OT_WRITE / OT_RW messages. The base topic carries the
+// thermostat-side intent (Read-Ack + Write-Data only); the slave's
+// protocol-undefined Write-Ack data byte is suppressed at the master topic.
+// Source-separated subtopics still use the broader is_value_valid; the
+// bSlaveEchoesValue flag in OTlookup_t gates /boiler publication for
+// non-echo MsgIDs.
+// See ADR-066 + docs/api/MQTT-message-id-echo-audit.md for the per-MsgID
+// classification rationale.
+bool is_value_valid_for_master_topic(OpenthermData_t OT, OTlookup_t OTlookup) {
+  if (OT.skipthis) return false;
+  if (isMsgIdReservedInActiveProfile(OT.id)) return false;
+  bool _valid = false;
+  _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
   _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
   _valid = _valid || (OTlookup.msgcmd==OT_RW && (OT.type==OT_READ_ACK || OT.type==OT_WRITE_DATA));
-  _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);;
+  _valid = _valid || (OT.id==OT_Statusflags) || (OT.id==OT_StatusVH) || (OT.id==OT_SolarStorageMaster);
   return _valid;
 }
 
@@ -1929,7 +1949,7 @@ void print_f88(float& value)
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
-    sendMQTTData(topic, _msg);
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
     value = _value;
   }
@@ -1948,7 +1968,7 @@ void print_s16(int16_t& value)
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
-    sendMQTTData(topic, _msg);
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
     value = _value;
   }
@@ -1967,7 +1987,7 @@ void print_s8s8(uint16_t& value)
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   const bool _valid = is_value_valid(OTdata, OTlookupitem);
   if (_valid){
-    sendMQTTData(otTopic, _msg);
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(otTopic, _msg);
     publishToSourceTopic(otTopic, _msg, OTdata.rsptype);
   }
   //Build string for MQTT
@@ -1976,7 +1996,7 @@ void print_s8s8(uint16_t& value)
   strlcat(otTopic, "_value_lb", sizeof(otTopic));
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   if (_valid){
-    sendMQTTData(otTopic, _msg);
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(otTopic, _msg);
     publishToSourceTopic(otTopic, _msg, OTdata.rsptype);
     value = OTdata.u16();
   }
@@ -1994,7 +2014,7 @@ void print_u16(uint16_t& value)
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
-    sendMQTTData(topic, _msg);
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
     value = _value;
   }
@@ -2503,13 +2523,13 @@ static void publish_u8_alias_topics(const char* baseTopic)
   utoa(OTdata.valueHB, _msg, 10);
   strlcpy(otTopic, baseTopic, sizeof(otTopic));
   appendProgmemSuffix(otTopic, sizeof(otTopic), PSTR("_hb_u8"));
-  sendMQTTData(otTopic, _msg);
+  if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(otTopic, _msg);
   publishToSourceTopic(otTopic, _msg, OTdata.rsptype);
 
   utoa(OTdata.valueLB, _msg, 10);
   strlcpy(otTopic, baseTopic, sizeof(otTopic));
   appendProgmemSuffix(otTopic, sizeof(otTopic), PSTR("_lb_u8"));
-  sendMQTTData(otTopic, _msg);
+  if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(otTopic, _msg);
   publishToSourceTopic(otTopic, _msg, OTdata.rsptype);
 }
 
@@ -2534,7 +2554,7 @@ static void print_u8_single(uint16_t& value, bool useHB)
     char _msg[10] {0};
     const char* baseTopic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
     utoa(activeByte, _msg, 10);
-    sendMQTTData(baseTopic, _msg);
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(baseTopic, _msg);
     publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
 
     // Backward compatibility for earlier generic u8u8 decoding.

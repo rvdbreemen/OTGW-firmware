@@ -536,6 +536,31 @@ When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is additionally
 
 This allows distinguishing whether a value was sent by the thermostat (T-request), boiler (B-response), or injected/modified by the gateway.
 
+#### Publish gating per topic class (2.0.0+, ADR-066)
+
+The base topic `{TopTopic}/value/{UniqueId}/{label}` publishes only the
+thermostat-side intent: Read-Ack for read-supported messages and Write-Data
+for write-supported messages. Slave Write-Ack values are NOT routed to the
+base topic. This avoids flapping between thermostat-written values and
+slave-acked protocol-zero values for non-echo MsgIDs.
+
+The `/boiler` subtopic is gated by a per-MsgID `bSlaveEchoesValue` flag in
+the OTlookup table. For MsgIDs where the OpenTherm v4.2 specification defines
+the slave's Write-Ack data field as undefined (typically `Tr` 24, `TrSet` 16,
+`MaxRelModLevelSetting` 14, `TrSetCH2` 23, `TRoomCH2` 37, `RFstrengthbatterylevel` 98),
+the `/boiler` subtopic is NOT updated for Write-Ack messages. The slave's
+acknowledgement carries no measurement; suppressing it avoids polluting
+the per-source observability surface with fake-zero readings.
+
+For MsgIDs where the slave does store and echo the value (most R/W
+parameters, Class 5 remote boiler parameters such as `MaxTSet` 57 and
+`TdhwSet` 56, Class 6 transparent slave parameters, R/W counters), the
+`/boiler` subtopic continues to publish the slave's stored value, including
+clamped or modified variants distinct from the master's request.
+
+See `docs/api/MQTT-message-id-echo-audit.md` for the full per-MsgID
+classification with spec-citation rationale.
+
 ---
 
 ## Subscribed Topics
