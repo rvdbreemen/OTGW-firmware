@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-28 17:26'
-updated_date: '2026-04-28 17:34'
+updated_date: '2026-04-28 18:27'
 labels:
   - webui
   - design-system
@@ -101,4 +101,6 @@ Open items:
 2. #displaySATSettingsPage heeft nu geen Save-knop meer (klassen-based JS handler vond beide pagina's, maar er was maar 1 button). Optie: parallelle button in displaySATSettingsPage toevoegen, OF SAT settings heeft eigen save-pad (zie #satSettingsMessage / #satSettingsContent). Verifieer per hardware test.
 
 .ot-cmd-input rule toegevoegd onderaan components.css (na de TASK-473 append-section): height: 32px; padding: 4px var(--space-3); box-sizing: border-box. AC3 nu source-verifieerbaar; visuele bevestiging wacht op flash.
+
+Open issue 2 RESOLVED (false alarm): displaySATSettingsPage heeft eigen save-mechanisme. Bij investigation gevonden: SAT settings rendert per-group save buttons dynamisch via index.js:3618 met klasse 'sat-settings-save-btn', click-handler aan saveSATSettingsGroup(groupId) op line 3723. Geen relatie met btnSaveSettings. De TASK-474 agent's flag was gebaseerd op het feit dat getElementsByClassName('btnSaveSettings') in eerste instantie 1 button vond ipv 2, maar dit was correct — SAT settings heeft een ander save-mechanisme. AC4 nu volledig source-verifieerbaar.
 <!-- SECTION:NOTES:END -->

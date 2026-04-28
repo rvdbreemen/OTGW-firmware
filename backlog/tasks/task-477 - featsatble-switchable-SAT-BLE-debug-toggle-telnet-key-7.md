@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-28 18:57'
-updated_date: '2026-04-28 19:02'
+updated_date: '2026-04-28 19:03'
 labels:
   - satble
   - debug
@@ -65,7 +65,7 @@ This task adds switchable instrumentation so the user can on-demand observe:
 - Memory: `feedback_debug_guards_platform.md` (platform isolation requirement)
 <!-- SECTION:DESCRIPTION:END -->
 
-- [ ] #1 ESP32 build green; ESP8266 build also green (struct field declared but unused on ESP8266)
+- [x] #1 ESP32 build green; ESP8266 build also green (struct field declared but unused on ESP8266)
 - [ ] #2 Telnet '?' menu shows '7) Toggle debuglog - SAT BLE sensor scan: false' on ESP32 after boot
 - [ ] #3 Pressing '7' on telnet toggles state.debug.bSATBLE with confirmation 'Debug SAT BLE: ON/OFF'
 - [ ] #4 With toggle ON: scan-starts, advertisements (parsed + rejected), MAC mismatches, slot-full, successful sensor updates all visible in telnet log
@@ -90,4 +90,6 @@ Implementatie afgerond:
 3. handleDebug.ino: menu line '7) Toggle debuglog - SAT BLE sensor scan' en case '7' toggle, beide ESP32-only via #if defined(ESP32)
 
 Diff: 49 insertions / 3 deletions over 3 files. Build draait in achtergrond ID buhiygcla.
+
+Commit d8a73952 geland. Build groen (exit 0) op zowel ESP8266 als ESP32 — AC1 verified. AC2-6 wachten op flash + telnet diagnose-sessie.
 <!-- SECTION:NOTES:END -->
