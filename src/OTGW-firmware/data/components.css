@@ -798,6 +798,12 @@ body.dark .settingDiv,
 .input-changed { background: lightgray; color: black; }
 .input-normal { background: white; color: black; }
 .input-readonly { background: #f0f0f0; color: #666; }
+/* Checkboxes and number spinners must not inherit forced background/color:
+   native rendering relies on the browser/OS stylesheet, not explicit overrides. */
+input[type="checkbox"].input-normal,
+input[type="checkbox"].input-changed { background: revert; color: revert; }
+input[type="number"].input-normal,
+input[type="number"].input-changed { background: var(--bg-surface); color: var(--fg-2); }
 
 /* --- Editable Dallas sensor label inline editor --- */
 .otmoncolumn1.editable-label {
