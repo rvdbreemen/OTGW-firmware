@@ -1,10 +1,11 @@
 ---
 id: TASK-475
 title: 'feat(webui): write CSS for SAT post-Patch-E features (~30 unstyled classes)'
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-28 17:27'
+updated_date: '2026-04-28 17:43'
 labels:
   - webui
   - design-system
@@ -108,3 +109,9 @@ Append after the section TASK-472 added.
 - [ ] #5 No console errors / 404s on SAT pages
 - [ ] #6 Dark-mode rendering verified on SAT pages (token-driven, should follow automatically)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Pre-conditions geland (commits 82f999ef, 9c38ba58, 32e7d907). TASK-471(cyan tokens) + TASK-473(legacy port) + TASK-474(density+scope) zijn allemaal gecommit. Token-baseline en SAT-pre-Patch-E styling zijn nu beschikbaar. Doorpakken met implementer-agent voor de ~30 SAT post-Patch-E klassen.
+<!-- SECTION:NOTES:END -->

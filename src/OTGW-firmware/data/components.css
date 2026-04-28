@@ -1094,3 +1094,489 @@ body.dark .sat-chart {
   padding: 4px var(--space-3);
   box-sizing: border-box;
 }
+
+/* =============================================================
+ * 19. SAT POST-PATCH-E (new styling, no historical source)
+ *
+ * Classes added to HTML/JS in 2.0.0 development after sat.css was
+ * deleted in TASK-435 Patch E. No legacy CSS source - these rules
+ * are first-pass design choices using design-system tokens. Expect
+ * iteration based on hardware visual review (TASK-475 AC4).
+ *
+ * Visual language harmonised with Section 18 sat-* rules:
+ *   - radius-2xl (8px) on cards/sections
+ *   - var(--brand-lightblue) buttons with shadow-btn (matches .nav-item)
+ *   - mono font for values, sans for labels
+ *   - --space-* tokens for rhythm
+ * ============================================================= */
+
+/* --- Layout containers --- */
+.sat-dashboard {
+  /* Top-level wrapper for the SAT page and SAT-Settings page. When
+     paired with .sat-panel (Section 18) the panel rule wins. Standalone
+     (e.g. SAT-Settings page) we provide our own padding + bg so the
+     content is not naked against the app background. */
+  padding: var(--space-5);
+  background: var(--bg-app);
+  color: var(--fg-1);
+}
+.sat-dashboard.sat-panel {
+  /* .sat-panel already sets its own padding/grid/background; defer. */
+  padding: 16px;
+  background: #f5f5f5;
+}
+body.dark .sat-dashboard.sat-panel,
+[data-theme="dark"] .sat-dashboard.sat-panel {
+  background: #1a1a1a;
+}
+
+.sat-section {
+  margin-bottom: var(--space-7);
+}
+.sat-section > h3 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 var(--space-5);
+  color: var(--fg-2);
+}
+
+.sat-collapsible {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sat-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.sat-card-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+/* --- Row primitives (sat-row + sat-label + sat-value) --- */
+.sat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-soft);
+  min-height: 28px;
+}
+.sat-row:last-child {
+  border-bottom: 0;
+}
+
+.sat-label {
+  font-weight: 500;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+
+.sat-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--fg-1);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Grid layouts --- */
+.sat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3) var(--space-7);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-3) var(--space-5);
+}
+
+.sat-health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-5);
+}
+
+.sat-status-summary {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-5) var(--space-7);
+}
+
+.sat-simple-status {
+  font-family: var(--font-mono);
+  font-size: var(--fs-h3);
+  color: var(--fg-1);
+  text-align: center;
+}
+
+/* --- Buttons (match the .nav-item / lightblue aesthetic) --- */
+.sat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--btn-sm-height);
+  padding: var(--space-2) var(--space-5);
+  background: var(--brand-lightblue);
+  color: var(--fg-1);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-sm);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  box-shadow: var(--shadow-btn);
+  transition: background var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.sat-btn:hover:not([disabled]) {
+  background: var(--brand-sky);
+  box-shadow: var(--shadow-btn-hover);
+}
+.sat-btn:active:not([disabled]) {
+  transform: translateY(1px);
+}
+.sat-btn[disabled],
+.sat-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.sat-btn-preset {
+  font-size: var(--fs-xs);
+  padding: var(--space-1) var(--space-3);
+}
+.sat-btn-preset.is-active,
+.sat-btn-preset[aria-pressed="true"] {
+  background: var(--accent-primary);
+  color: var(--fg-inverse);
+  border-color: var(--accent-primary);
+}
+
+.sat-btn-mode {
+  font-size: var(--fs-sm);
+}
+.sat-btn-mode.is-active,
+.sat-btn-mode[aria-pressed="true"] {
+  background: var(--accent-primary);
+  color: var(--fg-inverse);
+  border-color: var(--accent-primary);
+}
+
+.sat-btn-temp {
+  min-width: 32px;
+  font-size: var(--fs-h3);
+  font-family: var(--font-mono);
+  padding: var(--space-1) var(--space-3);
+}
+
+.sat-btn-toggle {
+  font-size: var(--fs-sm);
+}
+.sat-btn-toggle.is-active,
+.sat-btn-toggle[aria-pressed="true"] {
+  background: var(--status-warn);
+  color: var(--fg-inverse);
+  border-color: var(--status-warn);
+}
+
+/* --- Indicators / health --- */
+.sat-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-dot);
+  background: var(--status-ok);
+  box-shadow: 0 0 4px var(--status-ok-glow);
+  vertical-align: middle;
+}
+.sat-indicator-off {
+  background: var(--fg-5);
+  box-shadow: none;
+}
+
+.sat-health-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.sat-health-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-dot);
+  background: var(--fg-5);
+  flex-shrink: 0;
+}
+.sat-health-dot.is-ok    { background: var(--status-ok);    box-shadow: 0 0 4px var(--status-ok-glow); }
+.sat-health-dot.is-warn  { background: var(--status-warn);  box-shadow: 0 0 4px var(--status-warn-glow); }
+.sat-health-dot.is-error { background: var(--status-error); box-shadow: 0 0 4px var(--status-error-glow); }
+
+/* --- Settings group (collapsible accordion) --- */
+.sat-settings-group {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2xl);
+  margin-bottom: var(--space-5);
+  overflow: hidden;
+}
+.sat-settings-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-7);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: var(--fs-body);
+  color: var(--fg-1);
+  background: var(--bg-surface-alt);
+  user-select: none;
+}
+.sat-settings-group-header:hover {
+  background: var(--bg-header-strip);
+}
+.sat-settings-group-body {
+  padding: var(--space-5) var(--space-7);
+  border-top: 1px solid var(--border-soft);
+}
+.sat-settings-group.is-collapsed .sat-settings-group-body,
+.sat-settings-group[aria-expanded="false"] .sat-settings-group-body {
+  display: none;
+}
+.sat-settings-group-toggle {
+  font-family: var(--font-mono);
+  color: var(--fg-3);
+}
+.sat-settings-arrow {
+  display: inline-block;
+  transition: transform var(--dur-med) var(--ease);
+  color: var(--fg-3);
+}
+.sat-settings-group.is-collapsed .sat-settings-arrow,
+.sat-settings-group[aria-expanded="false"] .sat-settings-arrow {
+  transform: rotate(-90deg);
+}
+
+.sat-settings-nav-btn {
+  /* Inherits .sat-btn; small visual nudge to read as a nav action */
+  font-size: var(--fs-sm);
+}
+.sat-settings-save-btn {
+  /* Inherits .sat-btn; promote to primary action */
+  background: var(--accent-primary);
+  color: var(--fg-inverse);
+  border-color: var(--accent-primary);
+}
+.sat-settings-save-btn:hover:not([disabled]) {
+  background: var(--accent-hover);
+}
+
+/* --- Inputs and feedback --- */
+.sat-setting-input {
+  font: inherit;
+  font-size: var(--fs-input);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  color: var(--fg-1);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  min-height: 28px;
+  box-sizing: border-box;
+}
+.sat-setting-input:focus {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-color: var(--accent-primary);
+}
+.sat-setting-changed {
+  border-left: 3px solid var(--status-warn);
+  background: color-mix(in srgb, var(--status-warn) 8%, var(--bg-surface));
+}
+.sat-setting-unit {
+  display: inline-block;
+  margin-left: var(--space-2);
+  font-size: var(--fs-xs);
+  color: var(--fg-4);
+}
+
+.sat-feedback {
+  min-height: 1.4em;
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  border-radius: var(--radius-md);
+}
+.sat-feedback:empty {
+  display: none;
+}
+.sat-feedback.is-ok {
+  color: var(--status-ok-dark);
+  background: color-mix(in srgb, var(--status-ok) 12%, var(--bg-surface));
+}
+.sat-feedback.is-warn {
+  color: var(--status-warn-text);
+  background: color-mix(in srgb, var(--status-warn) 12%, var(--bg-surface));
+}
+.sat-feedback.is-error {
+  color: var(--status-error);
+  background: color-mix(in srgb, var(--status-error) 12%, var(--bg-surface));
+}
+
+/* --- Misc --- */
+.sat-toggle-label {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  margin-left: var(--space-2);
+}
+
+.sat-enable-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sat-curve-info {
+  margin-top: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-3);
+  text-align: center;
+}
+.sat-curve-toggle {
+  /* h3 wrapper around heading-toggle-btn; spacing handled by section h3 rule */
+}
+
+.sat-raw-data {
+  display: block;
+  margin: 0;
+  padding: var(--space-5);
+  background: var(--log-bg);
+  color: var(--log-fg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  white-space: pre;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.sat-badge {
+  display: inline-block;
+  padding: 2px var(--space-3);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted);
+  color: var(--fg-2);
+}
+.sat-badge-sim {
+  background: var(--sim-badge-bg);
+  color: var(--sim-badge-text);
+}
+
+.sat-weather-coords {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--fg-4);
+}
+
+/* --- View-mode visibility (data-view attribute drives display) ---
+ * sat.js toggles visibility via these classes on the dashboard root
+ * (.sat-view-simple / .sat-view-expert / .sat-view-diag). Sections
+ * declare which views they belong to in [data-view="..."]; we hide
+ * sections whose data-view does not include the active view. */
+.sat-view-simple [data-view]:not([data-view~="simple"]) { display: none; }
+.sat-view-expert [data-view]:not([data-view~="expert"]) { display: none; }
+.sat-view-diag   [data-view]:not([data-view~="diag"])   { display: none; }
+/* Bare ".sat-view-" appears as a transient/empty state in sat.js -
+   treat as "show nothing view-gated" rather than a real mode. */
+.sat-view- [data-view] { display: none; }
+
+/* --- Non-SAT classes flagged by drift detector --- */
+
+/* Unstyled-button wrapper around heading text (used inside <h3>);
+   inherits the heading typography so the button is visually invisible. */
+.heading-toggle-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.heading-toggle-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Generic error text marker */
+.error {
+  color: var(--status-danger);
+  font-weight: 500;
+}
+
+/* Firmware-update state markers (color cues only - badges already
+   carry their own background/border styling from elsewhere) */
+.loading           { color: var(--fg-4); font-style: italic; }
+.checking          { color: var(--status-info); }
+.up-to-date        { color: var(--status-ok-dark); font-weight: 500; }
+.update-available  { color: var(--status-warn-text); font-weight: 600; }
+
+/* Bare .no-data-row outside the .otmonrow context (Section 18 already
+   handles .otmonrow.no-data-row). Hide rows JS marks as empty. */
+.no-data-row {
+  color: var(--fg-5);
+  font-style: italic;
+}
+
+/* Boolean / fault state markers used by PIC settings rendering */
+.is-bool  { color: var(--accent-primary); }
+.is-fault { color: var(--status-error); font-weight: 600; }
+
+/* --- Dark-mode tweaks ---
+ * Most rules above already use tokens that flip in dark mode. The
+ * overrides below are for places where a token doesn't quite cover
+ * the contrast we want. */
+body.dark .sat-btn,
+[data-theme="dark"] .sat-btn {
+  /* In dark mode, --brand-lightblue is #4e4e4e (a neutral). Keep text
+     readable and shadow softer. */
+  color: var(--fg-1);
+  box-shadow: var(--shadow-btn);
+}
+body.dark .sat-grid,
+body.dark .sat-health-grid,
+body.dark .sat-status-summary,
+body.dark .sat-settings-group,
+[data-theme="dark"] .sat-grid,
+[data-theme="dark"] .sat-health-grid,
+[data-theme="dark"] .sat-status-summary,
+[data-theme="dark"] .sat-settings-group {
+  background: var(--bg-surface);
+  border-color: var(--border-1);
+}
+
