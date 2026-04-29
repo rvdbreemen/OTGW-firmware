@@ -8,20 +8,17 @@ REM ----------------------------------------------------------------------------
 REM  Distributed alongside merged binary releases. Downloads Espressif's
 REM  standalone esptool binary on first run (no Python required).
 REM
-REM  Default behaviour (no flags): asks which install path to use and
-REM  recommends one based on a flash probe.
+REM  Default behaviour: factory reset. The script erases flash and writes the
+REM  merged-full image containing firmware and filesystem.
 REM
 REM  Usage:
-REM    flash_otgw.bat                     interactive chooser with recommendation
-REM    flash_otgw.bat --upgrade           force firmware-only upgrade
-REM    flash_otgw.bat --factory           force full image flash
-REM    flash_otgw.bat --erase             full clean wipe (loses everything)
-REM    flash_otgw.bat --port COMx         use specific port
-REM    flash_otgw.bat --bin <file>        use specific firmware file
-REM    flash_otgw.bat --board esp8266     force board (otherwise from filename)
+REM    flash_otgw.bat
+REM    flash_otgw.bat --port COMx
+REM    flash_otgw.bat --bin <merged-full.bin>
+REM    flash_otgw.bat --board esp8266
 REM    flash_otgw.bat --board esp32       (Nodoshop OTGW32)
-REM    flash_otgw.bat --baud N            override baud rate
-REM    flash_otgw.bat --help              show this help
+REM    flash_otgw.bat --baud N
+REM    flash_otgw.bat --help
 REM ============================================================================
 
 set "ESPTOOL_VERSION=v4.8.1"
@@ -34,13 +31,6 @@ set "ARG_PORT="
 set "ARG_BIN="
 set "ARG_BOARD="
 set "ARG_BAUD="
-set "ARG_HOST="
-set "ARG_ERASE=0"
-set "ARG_UPGRADE=0"
-set "ARG_FACTORY=0"
-set "ARG_PRESERVE_SETTINGS=0"
-set "BACKUP_DIR="
-set "HOST_BASE="
 
 REM ---- Parse arguments -------------------------------------------------------
 :parse_args
@@ -49,9 +39,6 @@ if /I "%~1"=="--port"     ( set "ARG_PORT=%~2" & shift & shift & goto parse_args
 if /I "%~1"=="--bin"      ( set "ARG_BIN=%~2"  & shift & shift & goto parse_args )
 if /I "%~1"=="--board"    ( set "ARG_BOARD=%~2"& shift & shift & goto parse_args )
 if /I "%~1"=="--baud"     ( set "ARG_BAUD=%~2" & shift & shift & goto parse_args )
-if /I "%~1"=="--erase"    ( set "ARG_ERASE=1"  & shift & goto parse_args )
-if /I "%~1"=="--upgrade"  ( set "ARG_UPGRADE=1"& shift & goto parse_args )
-if /I "%~1"=="--factory"  ( set "ARG_FACTORY=1"& shift & goto parse_args )
 if /I "%~1"=="--help"     goto show_help
 if /I "%~1"=="-h"         goto show_help
 echo [ERROR] Unknown argument: %~1
@@ -59,28 +46,11 @@ echo Run "flash_otgw.bat --help" for usage.
 exit /b 2
 :args_done
 
-if "%ARG_ERASE%"=="1" if "%ARG_UPGRADE%"=="1" (
-    echo [ERROR] --erase and --upgrade are mutually exclusive.
-    echo         --erase wipes everything including the filesystem.
-    echo         --upgrade preserves the filesystem.
-    exit /b 2
-)
-if "%ARG_ERASE%"=="1" if "%ARG_FACTORY%"=="1" (
-    echo [ERROR] --erase and --factory are mutually exclusive.
-    echo         --erase wipes everything including the filesystem.
-    echo         --factory flashes the merged-full filesystem image.
-    exit /b 2
-)
-if "%ARG_UPGRADE%"=="1" if "%ARG_FACTORY%"=="1" (
-    echo [ERROR] --upgrade and --factory are mutually exclusive.
-    echo         Both already select different flash layouts.
-    exit /b 2
-)
-
 echo.
 echo ============================================================
 echo  OTGW Flash Tool (Windows)
 echo  esptool standalone version: %ESPTOOL_VERSION%
+echo  Mode: factory reset ^(erase flash, write firmware + filesystem^)
 echo ============================================================
 echo.
 
@@ -124,13 +94,7 @@ if exist "%ESPTOOL_EXE%" (
 )
 
 REM ---- Step 2: locate firmware bin ------------------------------------------
-REM   Mode selection:
-REM     --upgrade           -> *-merged.bin       (firmware-only; preserves WiFi + FS)
-REM     --factory           -> *-merged-full.bin  (full image; updates filesystem)
-REM     --erase             -> *-merged-full.bin  (full image + erase_all)
 call :select_bin
-
-:bin_done
 for %%F in ("%BIN_FILE%") do set "BIN_NAME=%%~nxF"
 
 REM ---- Step 3: derive board from filename (or user override) ----------------
@@ -217,89 +181,25 @@ if "%ARG_PORT%"=="" (
 )
 :port_done
 
-if "%ARG_BIN%"=="" if "%ARG_ERASE%"=="0" if "%ARG_UPGRADE%"=="0" if "%ARG_FACTORY%"=="0" (
-    call :probe_flash_blank
-    if "!FLASH_IS_BLANK!"=="1" (
-        set "FLASH_DEFAULT_MODE=1"
-    ) else (
-        set "FLASH_DEFAULT_MODE=2"
-    )
-
-    echo.
-    echo ------------------------------------------------------------
-    echo  Choose flash mode:
-    echo    [1] Factory reset
-    echo        Fresh install of firmware and filesystem.
-    echo        Removes WiFi credentials and settings.
-    echo    [2] Upgrade OTGW
-    echo        Refreshes firmware and filesystem.
-    echo        Keeps WiFi credentials; settings are reset.
-    echo    [3] Firmware-only upgrade
-    echo        Updates firmware only.
-    echo        Keeps WiFi credentials and settings.
-    echo ------------------------------------------------------------
-    set /p "FLASH_CHOICE=Select option [1-3] (default !FLASH_DEFAULT_MODE!): "
-    if "!FLASH_CHOICE!"=="" set "FLASH_CHOICE=!FLASH_DEFAULT_MODE!"
-    if "!FLASH_CHOICE!"=="1" (
-        set "ARG_ERASE=1"
-    ) else if "!FLASH_CHOICE!"=="2" (
-        set "ARG_FACTORY=1"
-    ) else if "!FLASH_CHOICE!"=="3" (
-        set "ARG_UPGRADE=1"
-    ) else (
-        echo [ERROR] Invalid selection.
-        exit /b 1
-    )
-
-    call :select_bin
-    for %%F in ("%BIN_FILE%") do set "BIN_NAME=%%~nxF"
-)
-
-if "%ARG_FACTORY%"=="1" if "%ARG_ERASE%"=="0" call :prompt_preserve_settings
-if "%ARG_PRESERVE_SETTINGS%"=="1" if "%ARG_ERASE%"=="0" (
-    call :backup_live_files
-    if errorlevel 1 exit /b 1
-)
-
 echo [OK] Firmware: %BIN_NAME%
 
-REM ---- Step 5: confirm before flash -----------------------------------------
+REM ---- Step 5: show selected flash action -----------------------------------
 echo.
 echo ------------------------------------------------------------
 echo  Ready to flash:
 echo    Firmware: %BIN_NAME%
 echo    Board:    %BOARD_NAME%
 echo    Baud:     %ARG_BAUD%
-if "%ARG_ERASE%"=="1" (
-    echo    Mode:     --erase  ^(full clean wipe^)
-    echo    Effect:   ALL data wiped: WiFi credentials, NVS, filesystem.
-    echo    Use:      only when you want a factory reset.
-) else if "%ARG_FACTORY%"=="1" (
-    echo    Mode:     --factory  ^(full image^)
-    echo    Effect:   Filesystem image is refreshed.
-    echo              Existing WiFi/settings may be replaced.
-) else if "%ARG_UPGRADE%"=="1" (
-    echo    Mode:     --upgrade  ^(firmware-only^)
-    echo    Effect:   WiFi credentials and filesystem/settings preserved.
-    echo              Only the firmware app is updated.
-) else (
-    echo    Mode:     firmware-only
-    echo    Effect:   WiFi credentials and filesystem/settings preserved.
-)
+echo    Mode:     factory reset
+echo    Effect:   Erases flash, then writes firmware and filesystem.
+echo              WiFi credentials and settings will be removed.
 echo ------------------------------------------------------------
 echo.
 
 REM ---- Step 6: run esptool --------------------------------------------------
-REM   Tested baseline (Nodo-shop OT-Thing): -z compresses transfer; default-reset
-REM   + hard-reset gives consistent strap timing on USB-JTAG boards. -e adds
-REM   erase_all to write_flash for the --erase mode (single-pass, faster than
-REM   a separate erase_flash).
-set "WRITE_FLAGS=-z"
-if "%ARG_ERASE%"=="1" set "WRITE_FLAGS=-z -e"
-
 echo.
 echo [STEP] Running esptool write_flash...
-"%ESPTOOL_EXE%" --chip %ESPTOOL_CHIP% %ESPTOOL_PORT_ARGS% --baud %ARG_BAUD% --before default_reset --after hard_reset write_flash %WRITE_FLAGS% 0x0 "%BIN_FILE%"
+"%ESPTOOL_EXE%" --chip %ESPTOOL_CHIP% %ESPTOOL_PORT_ARGS% --baud %ARG_BAUD% --before default_reset --after hard_reset write_flash -z -e 0x0 "%BIN_FILE%"
 if errorlevel 1 (
     echo [ERROR] write_flash failed.
     exit /b 1
@@ -308,223 +208,36 @@ if errorlevel 1 (
 echo.
 echo ============================================================
 echo  Flash complete.
-if "%ARG_PRESERVE_SETTINGS%"=="1" (
-    call :wait_for_health "after flash" 240
-    if "!HEALTH_OK!"=="1" (
-        call :restore_live_files
-        call :trigger_reboot
-        call :wait_for_health "after restore" 240
-        if "!HEALTH_OK!"=="1" (
-            echo  Settings and Dallas labels were restored from !ARG_HOST!.
-        ) else (
-            echo  [WARN] Device did not report healthy after restore within timeout.
-        )
-    ) else (
-        echo  [WARN] Device did not report healthy after flash within timeout.
-    )
-) else if "%ARG_ERASE%"=="1" (
-    echo  After reset: connect to WiFi AP "OTGW-AP" to configure.
-) else (
-    echo  WiFi credentials and settings preserved; the board should rejoin
-    echo  your network automatically. Browse to http://otgw.local
-    echo  if mDNS works on your network.
-)
+echo  After reset: connect to WiFi AP "OTGW-AP" to configure.
 echo ============================================================
-exit /b 0
-
-
-:prompt_preserve_settings
-set "PRESERVE_CHOICE="
-set /p "PRESERVE_CHOICE=Preserve current settings via backup/restore? [Y/n]: "
-if "%PRESERVE_CHOICE%"=="" set "PRESERVE_CHOICE=Y"
-if /I "%PRESERVE_CHOICE%"=="Y" (
-    set "ARG_PRESERVE_SETTINGS=1"
-    set "ARG_HOST="
-    set /p "ARG_HOST=Enter OTGW hostname or IP [otgw.local]: "
-    if "!ARG_HOST!"=="" set "ARG_HOST=otgw.local"
-    set "HOST_BASE=http://!ARG_HOST!"
-) else (
-    set "ARG_PRESERVE_SETTINGS=0"
-)
-exit /b 0
-
-
-:backup_live_files
-where curl.exe >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] curl.exe not found. Windows backup/restore requires curl.
-    exit /b 1
-)
-set "BACKUP_DIR=%TEMP%\otgw_flash_%RANDOM%"
-mkdir "%BACKUP_DIR%" >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Could not create backup directory.
-    exit /b 1
-)
-echo [STEP] Backing up settings.ini from %HOST_BASE%
-curl.exe -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -o "%BACKUP_DIR%\settings.ini" "%HOST_BASE%/settings.ini"
-if errorlevel 1 (
-    echo [ERROR] Could not download settings.ini from %HOST_BASE%.
-    exit /b 1
-)
-echo [OK] Saved settings backup: %BACKUP_DIR%\settings.ini
-echo [STEP] Backing up Dallas labels from %HOST_BASE%
-curl.exe -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -o "%BACKUP_DIR%\dallas_labels.ini" "%HOST_BASE%/api/v2/sensors/labels"
-if errorlevel 1 (
-    echo [ERROR] Could not download Dallas labels from %HOST_BASE%.
-    exit /b 1
-)
-echo [OK] Saved Dallas labels backup: %BACKUP_DIR%\dallas_labels.ini
-exit /b 0
-
-
-:restore_live_files
-where curl.exe >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] curl.exe not found. Windows backup/restore requires curl.
-    exit /b 1
-)
-echo [STEP] Restoring settings.ini to %HOST_BASE%
-curl.exe -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -X POST -F "path=/" -F "upload=@%BACKUP_DIR%\settings.ini;filename=settings.ini" "%HOST_BASE%/upload" >nul
-if errorlevel 1 (
-    echo [ERROR] Could not restore settings.ini.
-    exit /b 1
-)
-echo [OK] Restored settings.ini
-echo [STEP] Restoring Dallas labels to %HOST_BASE%
-curl.exe -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -X POST -F "path=/" -F "upload=@%BACKUP_DIR%\dallas_labels.ini;filename=dallas_labels.ini" "%HOST_BASE%/upload" >nul
-if errorlevel 1 (
-    echo [ERROR] Could not restore Dallas labels.
-    exit /b 1
-)
-echo [OK] Restored Dallas labels
-exit /b 0
-
-
-:trigger_reboot
-where curl.exe >nul 2>&1
-if errorlevel 1 exit /b 1
-echo [STEP] Triggering reboot on %HOST_BASE%
-curl.exe -fsS --connect-timeout 5 --retry 1 --retry-delay 1 "%HOST_BASE%/ReBoot" >nul 2>&1
-if errorlevel 1 (
-    echo [WARN] Reboot request may have been interrupted; continuing to wait.
-) else (
-    echo [OK] Reboot request sent
-)
-exit /b 0
-
-
-:wait_for_health
-set "HEALTH_OK=0"
-set "WAIT_LABEL=%~1"
-set "WAIT_TIMEOUT=%~2"
-if "%WAIT_TIMEOUT%"=="" set "WAIT_TIMEOUT=180"
-echo [STEP] Waiting for device %WAIT_LABEL%...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$deadline=(Get-Date).AddSeconds(%WAIT_TIMEOUT%);" ^
-    "$url='http://'+$env:ARG_HOST+'/api/v2/health?t='+[DateTime]::UtcNow.Ticks;" ^
-    "while((Get-Date) -lt $deadline) {" ^
-    "  try {" ^
-    "    $r=Invoke-WebRequest -UseBasicParsing -Uri $url -Headers @{Accept='application/json'} -TimeoutSec 5;" ^
-    "    if($r.Content -match '\"status\"\s*:\s*\"UP\"') { exit 0 }" ^
-    "  } catch {}" ^
-    "  Start-Sleep -Seconds 2" ^
-    "}" ^
-    "exit 1"
-if not errorlevel 1 set "HEALTH_OK=1"
-if "%HEALTH_OK%"=="1" (
-    echo [OK] Device reports healthy.
-) else (
-    echo [WARN] Device did not report healthy within timeout.
-)
 exit /b 0
 
 
 :select_bin
 set "BIN_FILE="
 if "%ARG_BIN%"=="" (
-    if "%ARG_FACTORY%"=="1" (
-        REM Use the full merged image when the user explicitly asked for factory flash.
-        for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do (
+    for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do (
+        if not defined BIN_FILE set "BIN_FILE=%%F"
+    )
+    if not defined BIN_FILE (
+        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do (
             if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-        if not defined BIN_FILE (
-            for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do (
-                if not defined BIN_FILE set "BIN_FILE=%%F"
-            )
-        )
-        if not defined BIN_FILE (
-            echo [ERROR] --factory: no merged-full bin found.
-            echo         Expected in: %SCRIPT_DIR%
-            echo                  or: %SCRIPT_DIR%build\
-            echo         Use --bin to specify a path.
-            exit /b 1
-        )
-    ) else if "%ARG_ERASE%"=="1" (
-        REM Erase-all uses the full merged image too.
-        for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-        if not defined BIN_FILE (
-            for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do (
-                if not defined BIN_FILE set "BIN_FILE=%%F"
-            )
-        )
-        if not defined BIN_FILE (
-            echo [ERROR] --erase: no merged-full bin found.
-            echo         Expected in: %SCRIPT_DIR%
-            echo                  or: %SCRIPT_DIR%build\
-            echo         Use --bin to specify a path.
-            exit /b 1
-        )
-    ) else (
-        REM Default to firmware-only so WiFi/settings are preserved.
-        for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp32-*-merged.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-        REM Fall back to ESP8266 firmware-only (.ino.bin written at offset 0x0)
-        if not defined BIN_FILE (
-            for %%F in ("%SCRIPT_DIR%OTGW-firmware-esp8266-*.ino.bin") do (
-                if not defined BIN_FILE set "BIN_FILE=%%F"
-            )
-        )
-        REM Same searches in build/ (developer running from repo root)
-        if not defined BIN_FILE (
-            for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp32-*-merged.bin") do (
-                if not defined BIN_FILE set "BIN_FILE=%%F"
-            )
-        )
-        if not defined BIN_FILE (
-            for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-esp8266-*.ino.bin") do (
-                if not defined BIN_FILE set "BIN_FILE=%%F"
-            )
-        )
-        if not defined BIN_FILE (
-            echo [ERROR] No firmware-only bin found.
-            echo         Expected: OTGW-firmware-esp32-*-merged.bin
-            echo               or: OTGW-firmware-esp8266-*.ino.bin
-            echo         Use --bin to specify a path.
-            exit /b 1
         )
     )
+    if not defined BIN_FILE (
+        echo [ERROR] No merged-full bin found.
+        echo         Expected in: %SCRIPT_DIR%
+        echo                  or: %SCRIPT_DIR%build\
+        echo         Use --bin to specify a path.
+        exit /b 1
+    )
 ) else (
+    if not exist "%ARG_BIN%" (
+        echo [ERROR] Specified --bin file does not exist: %ARG_BIN%
+        exit /b 1
+    )
     set "BIN_FILE=%ARG_BIN%"
 )
-exit /b 0
-
-
-:probe_flash_blank
-set "FLASH_IS_BLANK=0"
-set "PROBE_FILE=%TEMP%\otgw_flash_probe_%RANDOM%.bin"
-"%ESPTOOL_EXE%" --chip %ESPTOOL_CHIP% %ESPTOOL_PORT_ARGS% --baud %ARG_BAUD% read-flash 0x0 0x1000 "%PROBE_FILE%" >nul 2>&1
-if errorlevel 1 (
-    if exist "%PROBE_FILE%" del "%PROBE_FILE%" >nul 2>&1
-    exit /b 0
-)
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$b=[IO.File]::ReadAllBytes('%PROBE_FILE%'); if (($b | Where-Object { $_ -ne 255 } | Select-Object -First 1) -eq $null) { exit 0 } else { exit 1 }"
-if not errorlevel 1 set "FLASH_IS_BLANK=1"
-if exist "%PROBE_FILE%" del "%PROBE_FILE%" >nul 2>&1
 exit /b 0
 
 
@@ -534,18 +247,14 @@ echo.
 echo Usage:
 echo   flash_otgw.bat [options]
 echo.
-echo Mode:
-echo   (no flag)            Interactive chooser with auto-detected default.
-echo                        1 = factory reset, 2 = upgrade OTGW, 3 = firmware-only
-echo   --upgrade            Force firmware-only upgrade.
-echo   --factory            Full image flash. You will be asked whether to
-echo                        back up and restore settings from a live OTGW.
-echo   --erase              Full clean wipe. Erases WiFi credentials and settings.
+echo Default:
+echo   Factory reset: erase flash, then write firmware and filesystem from
+echo   the merged-full image. WiFi credentials and settings are removed.
 echo.
 echo Targeting:
 echo   --port COMx          Serial port (auto-detected for esp32 via USB VID/PID,
 echo                        port menu for esp8266).
-echo   --bin ^<file^>         Firmware path. Overrides mode-based auto-detect.
+echo   --bin ^<file^>         Firmware path. Use a merged-full image.
 echo   --board esp8266      Force board type.
 echo   --board esp32        (Nodoshop OTGW32 = ESP32-S3)
 echo   --baud N             Override baud rate (default: 460800/921600).

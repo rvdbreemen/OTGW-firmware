@@ -257,7 +257,7 @@ python3 flash_esp.py --board esp8266 --erase --download
 
 6. Na het flashen herstart het apparaat automatisch.
 
-**ESP32-S3 merged binary**: Het flashscript geeft de voorkeur aan merged binary images voor ESP32-S3. Een merged binary combineert bootloader, partitietabel, firmware en filesystem in een enkel bestand dat op adres 0x0 wordt geflasht. Twee varianten bestaan: `merged-full` (inclusief filesystem, voor fabrieksinstallaties) en `merged` (alleen firmware, behoudt bestaand filesystem). Het script kiest automatisch de beste beschikbare variant.
+**ESP32-S3 merged binary**: Het flashscript gebruikt de `merged-full` image voor ESP32-S3. Een merged-full binary combineert bootloader, partitietabel, firmware en filesystem in een enkel bestand dat op adres 0x0 wordt geflasht. De helpers wissen flash eerst, dus het resultaat is een factory reset met verse firmware en filesystem.
 
 #### Bouwen vanuit broncode met PlatformIO
 

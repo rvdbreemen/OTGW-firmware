@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-29 21:02'
-updated_date: '2026-04-29 21:11'
+updated_date: '2026-04-29 21:18'
 labels:
   - webui
   - ADR-066
@@ -104,4 +104,6 @@ Implementation complete — `OTGW-Core.ino` print_f88/s16/s8s8/u16 each cache `v
 Build verification (2026-04-29): ESP8266 SUCCESS 84.7%/77.3% RAM/Flash; ESP32-S3 SUCCESS 32.1%/96.8% RAM/Flash. evaluate.py PROGMEM gate baseline = 27 violations, post-fix = 15 — drop is from auto-generated `OTGW-firmware.ino.cpp` filtering quirk (false-positive scope, see TASK-482). My code-changes don't match any of the patterns evaluate.py looks for (DebugTln/DebugTf/snprintf/strcmp/strcasecmp), so no real PROGMEM regression introduced.
 
 AC #7 (hardware verification) remains pending — requires user/tester to confirm WebUI stats stable + log shows one decoded value per WRITE-pair on real hardware.
+
+Incremental rebuild confirmation (commit c694fbdf): ESP8266 SUCCESS in 1m6s, ESP32-S3 SUCCESS in 2m40s. RAM and Flash byte-counts identical to first build (69408/806924 ESP8266, 105076/1902255 ESP32-S3); the validForMaster cache and conditional state-write are memory-neutral after compiler optimization. Distribution zip published: OTGW-firmware-esp32-2.0.0-alpha+c694fbd-flash.zip. Status stays In Progress for hardware verification (AC #7); flip to Done once tester confirms WebUI stats stable + log shows one decoded value per WRITE-pair.
 <!-- SECTION:NOTES:END -->

@@ -850,21 +850,17 @@ def copy_flash_scripts(project_dir):
 
 
 def create_distribution_zip(project_dir, semver, target):
-    """Create a per-target distribution zip with the merged-full bin (default
-    flash) plus the firmware-only bin (--upgrade mode) and the cross-platform
-    flash helper scripts.
+    """Create a per-target distribution zip with the merged-full bin and the
+    cross-platform flash helper scripts.
 
     Output: build/OTGW-firmware-<target>-<semver>-flash.zip containing
-        OTGW-firmware-<target>-<semver>-merged-full.bin   (default flash)
-        OTGW-firmware-<target>-<semver>-merged.bin        (esp32 --upgrade)
-        OTGW-firmware-<target>-<semver>.ino.bin           (esp8266 --upgrade)
+        OTGW-firmware-<target>-<semver>-merged-full.bin
         flash_otgw.bat
         flash_otgw.sh
         README.txt
 
-    Default flash preserves WiFi credentials in NVS but overwrites the
-    filesystem (MQTT/OTGW config). --upgrade flashes only the firmware-only
-    bin, preserving both WiFi and filesystem.
+    The flash helpers perform one user-facing flow: erase flash, then write
+    firmware and filesystem from the merged-full image.
     """
     tcfg = TARGETS[target]
     build_dir = project_dir / "build"
@@ -887,26 +883,6 @@ def create_distribution_zip(project_dir, semver, target):
             )
             return None
 
-    # Locate the firmware-only bin used by --upgrade mode. ESP32 has a
-    # dedicated -merged.bin (bootloader + partitions + app, no filesystem).
-    # ESP8266 has no separate bootloader, so the bare .ino.bin written at
-    # offset 0x0 already preserves the LittleFS partition (offset 0x200000).
-    upgrade_bin = None
-    if target == "esp32":
-        candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-{semver}-merged.bin"))
-        if not candidates:
-            candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-*-merged.bin"))
-            # Filter out merged-full matches in case the glob picks them up
-            candidates = [c for c in candidates if "merged-full" not in c.name]
-        if candidates:
-            upgrade_bin = candidates[-1]
-    else:
-        candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-{semver}.ino.bin"))
-        if not candidates:
-            candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-*.ino.bin"))
-        if candidates:
-            upgrade_bin = candidates[-1]
-
     # Locate flash helper scripts in project root.
     flash_bat = project_dir / "flash_otgw.bat"
     flash_sh  = project_dir / "flash_otgw.sh"
@@ -924,28 +900,19 @@ def create_distribution_zip(project_dir, semver, target):
 
     print_step(f"Creating distribution zip [{tcfg['name']}]")
     print_info(f"Zip: {zip_name}")
-    print_info(f"  + {merged_full.name}  (default flash)")
-    if upgrade_bin:
-        print_info(f"  + {upgrade_bin.name}  (--upgrade mode)")
-    else:
-        print_warning(f"  ! no firmware-only bin available for --upgrade mode")
+    print_info(f"  + {merged_full.name}  (factory reset flash)")
     print_info(f"  + flash_otgw.bat")
     print_info(f"  + flash_otgw.sh")
     print_info(f"  + README.txt      (English)")
     print_info(f"  + README_NL.txt   (Nederlands)")
 
-    upgrade_name = upgrade_bin.name if upgrade_bin else None
-    readme_en = _build_readme_en(target, tcfg, merged_full.name, upgrade_name, semver)
-    readme_nl = _build_readme_nl(target, tcfg, merged_full.name, upgrade_name, semver)
+    readme_en = _build_readme_en(target, tcfg, merged_full.name, None, semver)
+    readme_nl = _build_readme_nl(target, tcfg, merged_full.name, None, semver)
 
     try:
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-            # Default-flash bin (auto-detected by the flash scripts).
+            # Factory-reset bin used by the flash scripts.
             zf.write(merged_full, arcname=merged_full.name)
-
-            # Firmware-only bin for --upgrade mode (auto-detected by scripts).
-            if upgrade_bin:
-                zf.write(upgrade_bin, arcname=upgrade_bin.name)
 
             # Windows batch script: keep CRLF line endings (the source file
             # already has CRLF via .gitattributes when checked out on Windows).
@@ -990,11 +957,11 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
       - About the OTGW (one paragraph for newcomers)
       - Quick Start (physical procedure + script run)
       - Archive contents (every file explained)
-      - Three flash modes (preserves/wipes table)
+      - Flash behavior (factory reset)
       - First-time setup (AP, captive portal, network join)
       - Routine use (Web UI, telnet, REST, MQTT, OTA)
       - Troubleshooting (common failure modes per OS)
-      - Recovery (--erase + manual download mode)
+      - Recovery (manual download mode)
       - FAQ (most-asked questions)
       - Where to get help
 
@@ -1015,16 +982,6 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         "     try a different USB cable (some are charge-only) or hold\n"
         "     the on-board reset/flash button briefly."
     )
-
-    upgrade_section = (
-        f"  {upgrade_bin_name}\n"
-        f"      Firmware-only image. Used by 'flash_otgw.* --upgrade'.\n"
-        f"      Writes ONLY the firmware app (and bootloader/partitions\n"
-        f"      on ESP32) starting at offset 0x0; the LittleFS partition\n"
-        f"      is left intact, so MQTT/OTGW config and WiFi credentials\n"
-        f"      both survive.\n"
-        f"\n"
-    ) if upgrade_bin_name else ""
 
     return (
         f"OTGW-firmware {semver} - {tcfg['name']}\n"
@@ -1054,26 +1011,26 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"  2) Run the flash script for your operating system:\n"
         f"        Windows:        double-click flash_otgw.bat\n"
         f"        Linux / macOS:  ./flash_otgw.sh   (in a terminal)\n"
-        f"     Optional flags:\n"
-        f"        --upgrade       keep all current settings, only\n"
-        f"                        update firmware\n"
-        f"        --erase         full factory reset, including WiFi\n"
-        f"                        credentials\n"
-        f"  3) Confirm the prompt (type YES). The script downloads\n"
-        f"     esptool (~8 MB) on first run and writes the firmware.\n"
+        f"     Optional targeting flags:\n"
+        f"        --port <port>   choose the serial port\n"
+        f"        --board <type>  choose esp8266 or esp32\n"
+        f"        --baud <rate>   override the default baud rate\n"
+        f"        --bin <file>    use a specific merged-full image\n"
+        f"  3) The script downloads esptool (~8 MB) on first run,\n"
+        f"     erases flash, and writes firmware plus filesystem.\n"
         f"     The on-board status LED should pulse during transfer.\n"
         f"  4) The board reboots automatically. Continue with First-time\n"
-        f"     setup below if this is a brand-new flash.\n"
+        f"     setup below; this flash flow removes existing WiFi and\n"
+        f"     application settings.\n"
         f"\n"
         f"Archive contents\n"
         f"----------------\n"
         f"  {merged_full_name}\n"
         f"      Factory image: bootloader + partitions + app + filesystem.\n"
-        f"      Used by 'flash_otgw.*' (no flags). Default behaviour DOES\n"
-        f"      NOT erase, so WiFi credentials in NVS survive; the\n"
-        f"      filesystem is replaced by this fresh image.\n"
+        f"      Used by 'flash_otgw.*'. The script erases flash first,\n"
+        f"      then writes this image from offset 0x0. WiFi credentials,\n"
+        f"      NVS, LittleFS settings, and application config are removed.\n"
         f"\n"
-        f"{upgrade_section}"
         f"  flash_otgw.bat\n"
         f"      Windows flash tool. Double-click or run from cmd.exe.\n"
         f"      Downloads Espressif's standalone esptool on first run.\n"
@@ -1087,42 +1044,18 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"  README.txt        This file (English).\n"
         f"  README_NL.txt     Dutch translation of this file.\n"
         f"\n"
-        f"Three flash modes\n"
-        f"-----------------\n"
-        f"  (no flag)   default factory flash\n"
-        f"              Preserves: WiFi credentials (in NVS).\n"
-        f"              Wipes:     LittleFS settings (MQTT broker, OTGW\n"
-        f"                         options, hostname overrides, etc).\n"
-        f"              Use this:  fresh installs and version upgrades\n"
-        f"                         when you do not want to redo WiFi\n"
-        f"                         setup.\n"
+        f"Flash behavior\n"
+        f"--------------\n"
+        f"  The flash scripts intentionally expose one path: factory reset.\n"
+        f"  They erase flash, write the merged-full image, and force first-\n"
+        f"  time setup on next boot. Firmware-only USB update modes are not\n"
+        f"  offered by these helpers. After the device is configured, use\n"
+        f"  the Web UI OTA update flow for routine upgrades.\n"
         f"\n"
-        f"  --upgrade   firmware-only flash\n"
-        f"              Preserves: WiFi credentials AND all app settings.\n"
-        f"              Wipes:     nothing else; only the firmware app\n"
-        f"                         is updated. Equivalent to an OTA\n"
-        f"                         upgrade but over USB.\n"
-        f"              Use this:  routine version bumps once you have\n"
-        f"                         everything configured the way you\n"
-        f"                         like.\n"
-        f"\n"
-        f"  --erase     full clean wipe\n"
-        f"              Preserves: nothing.\n"
-        f"              Wipes:     everything including WiFi credentials.\n"
-        f"              Use this:  true factory reset, before passing\n"
-        f"                         the device to someone else, or to\n"
-        f"                         recover from corrupt NVS.\n"
-        f"\n"
-        f"Why the difference matters: WiFi credentials live in the NVS\n"
-        f"partition (offset 0x9000-0xE000 on ESP32-S3, dedicated SDK\n"
-        f"sectors at the end of flash on ESP8266). NVS sits in a hole\n"
-        f"in the normal write list, so 'write_flash' without '-e' leaves\n"
-        f"it untouched.\n"
-        f"\n"
-        f"First-time setup (after a default or --erase flash)\n"
-        f"---------------------------------------------------\n"
+        f"First-time setup (after flashing)\n"
+        f"---------------------------------\n"
         f"  1) The board boots into Access Point mode if it has no\n"
-        f"     stored WiFi credentials (always true after --erase).\n"
+        f"     stored WiFi credentials (always true after this flash).\n"
         f"  2) From your phone or laptop, connect to the open WiFi\n"
         f"     network 'OTGW-XXXXXX', where XXXXXX is the last 6 hex\n"
         f"     chars of the board's MAC address. There is no password.\n"
@@ -1183,10 +1116,10 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      /dev/cu.usbmodem* without any driver install.\n"
         f"\n"
         f"  Flash succeeds but the board never connects to WiFi\n"
-        f"      The default mode preserves WiFi credentials. If those\n"
-        f"      credentials were wrong (e.g. you changed your home WiFi\n"
-        f"      password), the board cannot connect. Re-flash with\n"
-        f"      --erase, then redo first-time setup.\n"
+        f"      The flash script removes WiFi credentials. Connect to the\n"
+        f"      OTGW access point and redo first-time setup. If the access\n"
+        f"      point does not appear, re-run the script with the manual\n"
+        f"      BOOT procedure from the recovery section below.\n"
         f"\n"
         f"  Web UI shows old version after a flash\n"
         f"      Hard-reload your browser (Ctrl-F5 / Cmd-Shift-R). The\n"
@@ -1194,14 +1127,14 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      the on-device flash hits down.\n"
         f"\n"
         f"  After flash: board boots into AP mode every time\n"
-        f"      You ran with --erase, which wipes WiFi credentials.\n"
+        f"      This is expected after factory reset until WiFi is saved.\n"
         f"      Reconfigure once via the AP; on subsequent boots the\n"
         f"      board joins the saved network automatically.\n"
         f"\n"
         f"Recovery\n"
         f"--------\n"
         f"  If the board is bricked or stuck in a boot loop, the\n"
-        f"  simplest fix is to flash with --erase. This wipes all NVS,\n"
+        f"  simplest fix is to re-run the flash script. It wipes all NVS,\n"
         f"  OTA, app and filesystem partitions, writes a fresh factory\n"
         f"  image, and forces first-time setup on next boot.\n"
         f"\n"
@@ -1227,7 +1160,7 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"\n"
         f"  Q: I lost my WiFi credentials. How do I get back into the\n"
         f"     access point?\n"
-        f"  A: Re-flash with --erase. That clears NVS and forces the\n"
+        f"  A: Re-run the flash script. That clears NVS and forces the\n"
         f"     board back into AP mode on next boot.\n"
         f"\n"
         f"  Q: Which version is currently flashed?\n"
@@ -1239,7 +1172,7 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"  A: Yes, by flashing an older release zip. Note that older\n"
         f"     firmware may not understand newer settings stored in\n"
         f"     LittleFS; if you see odd behaviour after a downgrade,\n"
-        f"     re-flash with --erase to start from a clean filesystem.\n"
+        f"     re-run the flash script to start from a clean filesystem.\n"
         f"\n"
         f"Where to get help\n"
         f"-----------------\n"
@@ -1281,16 +1214,6 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         "     knop op het bord kort vast."
     )
 
-    upgrade_section = (
-        f"  {upgrade_bin_name}\n"
-        f"      Alleen-firmware image. Wordt gebruikt door\n"
-        f"      'flash_otgw.* --upgrade'. Schrijft ALLEEN de firmware-app\n"
-        f"      (plus bootloader/partities op ESP32) vanaf offset 0x0;\n"
-        f"      de LittleFS-partitie blijft ongemoeid, dus MQTT/OTGW-\n"
-        f"      config en WiFi-credentials blijven beide bewaard.\n"
-        f"\n"
-    ) if upgrade_bin_name else ""
-
     return (
         f"OTGW-firmware {semver} - {tcfg['name']}\n"
         f"================================================================\n"
@@ -1321,29 +1244,27 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"  2) Draai het flash-script voor jouw besturingssysteem:\n"
         f"        Windows:        dubbelklik op flash_otgw.bat\n"
         f"        Linux / macOS:  ./flash_otgw.sh   (in een terminal)\n"
-        f"     Optionele vlaggen:\n"
-        f"        --upgrade       behoudt al je instellingen, alleen\n"
-        f"                        firmware bijwerken\n"
-        f"        --erase         volledige factory reset, inclusief\n"
-        f"                        WiFi-credentials\n"
-        f"  3) Bevestig de prompt (typ YES). Het script downloadt\n"
-        f"     esptool (~8 MB) bij de eerste keer en flasht daarna\n"
-        f"     het bord. De status-LED op het bord knippert tijdens\n"
-        f"     het overzetten.\n"
+        f"     Optionele doel-vlaggen:\n"
+        f"        --port <poort>  kies de seriele poort\n"
+        f"        --board <type>  kies esp8266 of esp32\n"
+        f"        --baud <rate>   overschrijf de standaard baudrate\n"
+        f"        --bin <file>    gebruik een specifieke merged-full image\n"
+        f"  3) Het script downloadt esptool (~8 MB) bij de eerste keer,\n"
+        f"     wist flash en schrijft firmware plus bestandssysteem.\n"
+        f"     De status-LED op het bord knippert tijdens het overzetten.\n"
         f"  4) Het bord start automatisch opnieuw op. Ga verder met de\n"
-        f"     Eerste configuratie hieronder als dit een nieuwe flash\n"
-        f"     is.\n"
+        f"     Eerste configuratie hieronder; deze flash-flow verwijdert\n"
+        f"     bestaande WiFi- en applicatie-instellingen.\n"
         f"\n"
         f"Inhoud van het archief\n"
         f"----------------------\n"
         f"  {merged_full_name}\n"
         f"      Fabrieksimage: bootloader + partities + app +\n"
         f"      bestandssysteem. Wordt gebruikt door 'flash_otgw.*'\n"
-        f"      zonder vlaggen. De default-modus wist NIET vooraf, dus\n"
-        f"      WiFi-credentials in NVS overleven; het bestandssysteem\n"
-        f"      wordt vervangen door deze verse image.\n"
+        f"      Het script wist flash eerst en schrijft daarna deze image\n"
+        f"      vanaf offset 0x0. WiFi-credentials, NVS, LittleFS-\n"
+        f"      instellingen en applicatieconfig worden verwijderd.\n"
         f"\n"
-        f"{upgrade_section}"
         f"  flash_otgw.bat\n"
         f"      Windows flash-tool. Dubbelklik of draai vanuit cmd.exe.\n"
         f"      Downloadt Espressif's standalone esptool bij de\n"
@@ -1358,43 +1279,19 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"  README.txt        Engelse versie van dit bestand.\n"
         f"  README_NL.txt     Dit bestand (Nederlands).\n"
         f"\n"
-        f"Drie flash-modi\n"
-        f"---------------\n"
-        f"  (geen vlag)  standaard fabrieksflash\n"
-        f"               Bewaart:  WiFi-credentials (in NVS).\n"
-        f"               Wist:     LittleFS-instellingen (MQTT broker,\n"
-        f"                         OTGW-opties, hostname-overrides etc).\n"
-        f"               Gebruik:  nieuwe installaties en versie-\n"
-        f"                         upgrades waarbij je je WiFi-setup\n"
-        f"                         niet opnieuw wil doen.\n"
+        f"Flash-gedrag\n"
+        f"-------------\n"
+        f"  De flash-scripts bieden bewust een pad: factory reset. Ze\n"
+        f"  wissen flash, schrijven de merged-full image en forceren de\n"
+        f"  eerste configuratie bij de volgende start. Alleen-firmware\n"
+        f"  USB-update-modi worden niet aangeboden door deze helpers.\n"
+        f"  Gebruik na configuratie de Web UI OTA-updateflow voor\n"
+        f"  normale upgrades.\n"
         f"\n"
-        f"  --upgrade    alleen-firmware flash\n"
-        f"               Bewaart:  WiFi-credentials EN alle app-\n"
-        f"                         instellingen.\n"
-        f"               Wist:     verder niets; alleen de firmware-\n"
-        f"                         app wordt vervangen. Equivalent aan\n"
-        f"                         een OTA-upgrade, maar via USB.\n"
-        f"               Gebruik:  routine versie-updates als je alles\n"
-        f"                         al naar wens hebt geconfigureerd.\n"
-        f"\n"
-        f"  --erase      volledige clean wipe\n"
-        f"               Bewaart:  niets.\n"
-        f"               Wist:     alles, inclusief WiFi-credentials.\n"
-        f"               Gebruik:  echte factory reset, voordat je het\n"
-        f"                         apparaat aan iemand anders geeft, of\n"
-        f"                         om te herstellen van een corrupte\n"
-        f"                         NVS.\n"
-        f"\n"
-        f"Waarom dat verschil ertoe doet: WiFi-credentials staan in de\n"
-        f"NVS-partitie (offset 0x9000-0xE000 op ESP32-S3, op de ESP8266\n"
-        f"in dedicated SDK-sectoren aan het einde van de flash). NVS\n"
-        f"valt in een gat in de write-list van de merged-image, dus\n"
-        f"'write_flash' zonder '-e' raakt het niet aan.\n"
-        f"\n"
-        f"Eerste configuratie (na een default- of --erase-flash)\n"
-        f"------------------------------------------------------\n"
+        f"Eerste configuratie (na flashen)\n"
+        f"--------------------------------\n"
         f"  1) Het bord start in Access Point modus als er geen WiFi-\n"
-        f"     credentials zijn opgeslagen (altijd zo na --erase).\n"
+        f"     credentials zijn opgeslagen (altijd zo na deze flash).\n"
         f"  2) Verbind vanaf je telefoon of laptop met het open WiFi-\n"
         f"     netwerk 'OTGW-XXXXXX', waarbij XXXXXX de laatste 6 hex-\n"
         f"     karakters van het MAC-adres van het bord zijn. Geen\n"
@@ -1459,11 +1356,11 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      /dev/cu.usbmodem* zonder driver-installatie.\n"
         f"\n"
         f"  Flash lukt, maar het bord komt niet op WiFi\n"
-        f"      De default-modus bewaart WiFi-credentials. Als die\n"
-        f"      credentials niet meer kloppen (bijv. je hebt je\n"
-        f"      thuisnetwerk-wachtwoord veranderd), kan het bord niet\n"
-        f"      verbinden. Re-flash met --erase en doe de eerste\n"
-        f"      configuratie opnieuw.\n"
+        f"      Het flash-script verwijdert WiFi-credentials. Verbind\n"
+        f"      met het OTGW access point en doe de eerste configuratie\n"
+        f"      opnieuw. Verschijnt het access point niet, draai het\n"
+        f"      script opnieuw met de handmatige BOOT-procedure uit\n"
+        f"      de herstel-sectie hieronder.\n"
         f"\n"
         f"  Web UI toont oude versie na een flash\n"
         f"      Doe een hard reload van je browser (Ctrl-F5 / Cmd-\n"
@@ -1471,15 +1368,14 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      agressief om de flash-belasting laag te houden.\n"
         f"\n"
         f"  Na een flash: bord start telkens in AP-mode\n"
-        f"      Je hebt met --erase geflasht, wat WiFi-credentials\n"
-        f"      wist. Configureer eenmalig via de AP; bij volgende\n"
-        f"      starts sluit het bord vanzelf weer aan op het\n"
-        f"      opgeslagen netwerk.\n"
+        f"      Dit is verwacht na factory reset totdat WiFi is opgeslagen.\n"
+        f"      Configureer eenmalig via de AP; bij volgende starts sluit\n"
+        f"      het bord vanzelf weer aan op het opgeslagen netwerk.\n"
         f"\n"
         f"Herstel\n"
         f"-------\n"
         f"  Als het bord 'gebricked' is of in een boot-loop hangt, is\n"
-        f"  de simpelste oplossing flashen met --erase. Dat wist alle\n"
+        f"  de simpelste oplossing het flash-script opnieuw draaien. Dat wist alle\n"
         f"  NVS-, OTA-, app- en filesystem-partities, schrijft een\n"
         f"  verse fabrieksimage en forceert de eerste configuratie\n"
         f"  bij de volgende start.\n"
@@ -1508,7 +1404,7 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"\n"
         f"  V: Ik ben mijn WiFi-credentials kwijt. Hoe kom ik weer in\n"
         f"     het access point?\n"
-        f"  A: Re-flashen met --erase. Dat wist NVS en forceert het\n"
+        f"  A: Draai het flash-script opnieuw. Dat wist NVS en forceert het\n"
         f"     bord terug naar AP-mode bij de volgende start.\n"
         f"\n"
         f"  V: Welke versie staat er nu op?\n"
@@ -1520,7 +1416,7 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"  A: Ja, door een oudere release-zip te flashen. Let op:\n"
         f"     oudere firmware kent mogelijk niet alle nieuwe\n"
         f"     instellingen die in LittleFS staan. Zie je vreemd\n"
-        f"     gedrag na een downgrade, re-flash dan met --erase om\n"
+        f"     gedrag na een downgrade, draai het flash-script opnieuw om\n"
         f"     met een schoon bestandssysteem te beginnen.\n"
         f"\n"
         f"Hulp en documentatie\n"

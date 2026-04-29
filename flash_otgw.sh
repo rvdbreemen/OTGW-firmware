@@ -5,28 +5,24 @@
 #  Distributed alongside merged binary releases. Downloads Espressif's
 #  standalone esptool binary on first run (no Python required).
 #
-#  Default behaviour (no flags): auto-detects whether the target flash is
-#  blank, then asks which install path to use with a recommendation.
-#  Blank flash recommends the factory reset path; already-used flash
-#  recommends the upgrade path that keeps WiFi credentials.
+#  Default behaviour: factory reset. The script erases flash and writes the
+#  merged-full image containing firmware and filesystem.
 #
 #  Usage:
-#    ./flash_otgw.sh                     interactive chooser with recommendation
-#    ./flash_otgw.sh --upgrade           force firmware-only upgrade
-#    ./flash_otgw.sh --factory           force full image flash
-#    ./flash_otgw.sh --erase             full clean wipe (loses everything)
-#    ./flash_otgw.sh --port /dev/ttyUSB0 use specific port
-#    ./flash_otgw.sh --bin <file>        use specific firmware file
-#    ./flash_otgw.sh --board esp8266     force board (otherwise from filename)
+#    ./flash_otgw.sh
+#    ./flash_otgw.sh --port /dev/ttyUSB0
+#    ./flash_otgw.sh --bin <merged-full.bin>
+#    ./flash_otgw.sh --board esp8266
 #    ./flash_otgw.sh --board esp32       (Nodoshop OTGW32)
-#    ./flash_otgw.sh --baud N            override baud rate
-#    ./flash_otgw.sh --help              show this help
+#    ./flash_otgw.sh --baud N
+#    ./flash_otgw.sh --help
 # =============================================================================
 
 set -e
 set -u
 set -o pipefail 2>/dev/null || true
 
+ORIGINAL_ARGS=("$@")
 ESPTOOL_VERSION="v4.8.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS_DIR="${SCRIPT_DIR}/tools/esptool"
@@ -50,135 +46,11 @@ warn()  { printf "%s[WARN]%s  %s\n" "$C_YELLOW" "$C_RESET" "$*"; }
 err()   { printf "%s[ERROR]%s %s\n" "$C_RED"    "$C_RESET" "$*" >&2; }
 step()  { printf "\n%s[STEP]%s  %s\n" "$C_BOLD$C_CYAN" "$C_RESET" "$*"; }
 
-cleanup_backup_dir() {
-    if [ -n "${BACKUP_DIR:-}" ] && [ -d "$BACKUP_DIR" ]; then
-        if [ "${RESTORE_DONE:-0}" = "1" ]; then
-            rm -rf "$BACKUP_DIR"
-        else
-            warn "Settings backup retained for manual recovery: ${BACKUP_DIR}"
-        fi
-    fi
-}
-
-download_http_file() {
-    local url="$1"
-    local dest="$2"
-    if ! command -v curl >/dev/null 2>&1; then
-        err "curl is required for live backup/restore."
-        exit 1
-    fi
-    curl -fsS --connect-timeout 5 --retry 2 --retry-delay 1 -o "$dest" "$url"
-}
-
-upload_http_file() {
-    local url="$1"
-    local src="$2"
-    local filename="$3"
-    curl -fsS --connect-timeout 5 --retry 2 --retry-delay 1 \
-        -X POST \
-        -F "path=/" \
-        -F "upload=@${src};filename=${filename}" \
-        "$url" >/dev/null
-}
-
-wait_for_health() {
-    local url="$1"
-    local timeout_s="${2:-180}"
-    local start now resp
-    start="$(date +%s)"
-    while true; do
-        resp="$(curl -fsS --max-time 5 "$url?t=$(date +%s)" 2>/dev/null || true)"
-        if printf '%s' "$resp" | grep -q '"status"[[:space:]]*:[[:space:]]*"UP"'; then
-            return 0
-        fi
-        now="$(date +%s)"
-        if [ $((now - start)) -ge "$timeout_s" ]; then
-            return 1
-        fi
-        sleep 2
-    done
-}
-
-prompt_preserve_settings() {
-    local answer host_input
-    if [ ! -t 0 ]; then
-        ARG_PRESERVE_SETTINGS=0
-        info "Non-interactive stdin; skipping settings backup/restore prompt."
-        return 0
-    fi
-
-    printf "Preserve current settings via backup/restore? [Y/n]: "
-    if ! read -r answer; then
-        ARG_PRESERVE_SETTINGS=0
-        warn "Could not read preserve-settings choice; continuing without backup/restore."
-        return 0
-    fi
-    case "$answer" in
-        ""|y|Y|yes|YES)
-            ARG_PRESERVE_SETTINGS=1
-            printf "Enter OTGW hostname or IP [otgw.local]: "
-            if ! read -r host_input; then
-                host_input=""
-            fi
-            [ -n "$host_input" ] && ARG_HOST="$host_input" || ARG_HOST="otgw.local"
-            HOST_BASE="http://${ARG_HOST}"
-            ;;
-        *)
-            ARG_PRESERVE_SETTINGS=0
-            ;;
-    esac
-}
-
-backup_live_files() {
-    BACKUP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t otgwflash)" || {
-        err "Could not create backup directory."
-        exit 1
-    }
-    trap cleanup_backup_dir EXIT
-
-    step "Backing up settings.ini from ${HOST_BASE}"
-    download_http_file "${HOST_BASE}/settings.ini" "${BACKUP_DIR}/settings.ini"
-    ok "Saved settings backup: ${BACKUP_DIR}/settings.ini"
-
-    step "Backing up Dallas labels from ${HOST_BASE}"
-    download_http_file "${HOST_BASE}/api/v2/sensors/labels" "${BACKUP_DIR}/dallas_labels.ini"
-    ok "Saved Dallas labels backup: ${BACKUP_DIR}/dallas_labels.ini"
-}
-
-restore_live_files() {
-    step "Restoring settings.ini to ${HOST_BASE}"
-    upload_http_file "${HOST_BASE}/upload" "${BACKUP_DIR}/settings.ini" "settings.ini"
-    ok "Restored settings.ini"
-
-    if [ -f "${BACKUP_DIR}/dallas_labels.ini" ]; then
-        step "Restoring Dallas labels to ${HOST_BASE}"
-        upload_http_file "${HOST_BASE}/upload" "${BACKUP_DIR}/dallas_labels.ini" "dallas_labels.ini"
-        ok "Restored Dallas labels"
-    fi
-}
-
-trigger_reboot() {
-    step "Triggering reboot on ${HOST_BASE}"
-    if curl -fsS --connect-timeout 5 --retry 1 --retry-delay 1 "${HOST_BASE}/ReBoot" >/dev/null 2>&1; then
-        ok "Reboot request sent"
-    else
-        warn "Reboot request may have been interrupted; continuing to wait."
-    fi
-}
-
 # ---- Defaults --------------------------------------------------------------
 ARG_PORT=""
 ARG_BIN=""
 ARG_BOARD=""
 ARG_BAUD=""
-ARG_HOST=""
-ARG_ERASE=0
-ARG_UPGRADE=0
-ARG_FACTORY=0
-ARG_PRESERVE_SETTINGS=0
-BACKUP_DIR=""
-HOST_BASE=""
-RESTORE_DONE=0
 
 # ---- Help ------------------------------------------------------------------
 show_help() {
@@ -188,19 +60,15 @@ flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware
 Usage:
   ./flash_otgw.sh [options]
 
-  Mode:
-  (no flag)            Interactive chooser with auto-detected default.
-                       1 = factory reset, 2 = upgrade OTGW, 3 = firmware-only
-  --upgrade            Force firmware-only upgrade.
-  --factory            Force full image flash. You will be asked whether to
-                       back up and restore settings from a live OTGW.
-  --erase              Full clean wipe. Erases WiFi credentials and settings.
+Default:
+  Factory reset: erase flash, then write firmware and filesystem from the
+  merged-full image. WiFi credentials and settings are removed.
 
 Targeting:
   --port <dev>         Serial port (e.g. /dev/ttyUSB0, /dev/cu.usbserial-XXXX).
                        For esp32 the script falls back to USB VID/PID filter
                        (303A:1001) when no --port is given.
-  --bin <file>         Firmware path. Overrides mode-based auto-detect.
+  --bin <file>         Firmware path. Use a merged-full image.
   --board esp8266      Force board type.
   --board esp32        (Nodoshop OTGW32 = ESP32-S3)
   --baud N             Override baud rate (default: 460800/921600).
@@ -221,26 +89,10 @@ while [ $# -gt 0 ]; do
         --bin)      ARG_BIN="$2";   shift 2 ;;
         --board)    ARG_BOARD="$2"; shift 2 ;;
         --baud)     ARG_BAUD="$2";  shift 2 ;;
-        --erase)    ARG_ERASE=1;    shift ;;
-        --upgrade)  ARG_UPGRADE=1;  shift ;;
-        --factory)  ARG_FACTORY=1;  shift ;;
         --help|-h)  show_help; exit 0 ;;
         *) err "Unknown argument: $1"; echo "Run './flash_otgw.sh --help' for usage."; exit 2 ;;
     esac
 done
-
-if [ "$ARG_ERASE" = "1" ] && { [ "$ARG_UPGRADE" = "1" ] || [ "$ARG_FACTORY" = "1" ]; }; then
-    err "--erase and --upgrade/--factory are mutually exclusive."
-    err "        --erase wipes everything including the filesystem."
-    err "        --upgrade preserves the filesystem."
-    exit 2
-fi
-
-if [ "$ARG_UPGRADE" = "1" ] && [ "$ARG_FACTORY" = "1" ]; then
-    err "--upgrade and --factory are mutually exclusive."
-    err "        Both already select different flash layouts."
-    exit 2
-fi
 
 # ---- Linux: auto-escalate to sudo if dialout permission is missing --------
 # Mirrors Nodo-shop's tested approach: if the typical serial device exists,
@@ -269,14 +121,15 @@ maybe_sudo_relaunch() {
     fi
 
     info "Serial device not writable and user not in 'dialout'. Re-running with sudo..."
-    exec sudo -E bash "$0" "$@"
+    exec sudo -E bash "$0" "${ORIGINAL_ARGS[@]}"
 }
-maybe_sudo_relaunch "$@"
+maybe_sudo_relaunch
 
 echo
 echo "============================================================"
 echo " OTGW Flash Tool ($(uname -s))"
 echo " esptool standalone version: ${ESPTOOL_VERSION}"
+echo " Mode: factory reset (erase flash, write firmware + filesystem)"
 echo "============================================================"
 echo
 
@@ -358,10 +211,6 @@ ensure_esptool() {
 ensure_esptool
 
 # ---- Step 3: locate firmware bin -------------------------------------------
-# Mode selection mirrors the .bat script:
-#   --upgrade           -> *-merged.bin       (firmware-only; preserves WiFi + FS)
-#   --factory           -> *-merged-full.bin  (full image; updates filesystem)
-#   --erase             -> *-merged-full.bin  (full image + erase_all)
 find_first_match() {
     local pattern="$1"
     # shellcheck disable=SC2012  # ls -1 sort order is fine here
@@ -379,65 +228,26 @@ find_bin() {
     fi
 
     local cand=""
-    if [ "$ARG_FACTORY" = "1" ] || [ "$ARG_ERASE" = "1" ]; then
-        for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
-            cand="$(find_first_match "$dir/OTGW-firmware-*-merged-full.bin")"
-            [ -n "$cand" ] && break
-        done
-        if [ -z "$cand" ]; then
-            err "--factory: no merged-full bin found."
-            err "        Expected in: $SCRIPT_DIR"
-            err "                 or: $SCRIPT_DIR/build"
-            err "        Use --bin to specify a path."
-            exit 1
-        fi
-    else
-        for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
-            cand="$(find_first_match "$dir/OTGW-firmware-esp32-*-merged.bin")"
-            [ -n "$cand" ] && break
-            cand="$(find_first_match "$dir/OTGW-firmware-esp8266-*.ino.bin")"
-            [ -n "$cand" ] && break
-            cand="$(find_first_match "$dir/OTGW-firmware-*-merged-full.bin")"
-            [ -n "$cand" ] && break
-        done
-        if [ -z "$cand" ]; then
-            err "No firmware-only or merged-full bin found."
-            err "        Expected: OTGW-firmware-esp32-*-merged.bin"
-            err "              or: OTGW-firmware-esp8266-*.ino.bin"
-            err "              or: OTGW-firmware-*-merged-full.bin"
-            err "        Use --bin to specify a path."
-            exit 1
-        fi
+    for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
+        cand="$(find_first_match "$dir/OTGW-firmware-*-merged-full.bin")"
+        [ -n "$cand" ] && break
+    done
+    if [ -z "$cand" ]; then
+        err "No merged-full bin found."
+        err "        Expected in: $SCRIPT_DIR"
+        err "                 or: $SCRIPT_DIR/build"
+        err "        Use --bin to specify a path."
+        exit 1
     fi
     echo "$cand"
 }
 
-is_flash_blank() {
-    local tmpdir probe_file probe_hex
-    tmpdir="$(mktemp -d 2>/dev/null || mktemp -d -t otgwflash)" || return 1
-    probe_file="$tmpdir/flashprobe.bin"
-
-    if ! "$ESPTOOL_BIN" --chip "$ESPTOOL_CHIP" $PORT_ARGS --baud "$ARG_BAUD" read-flash 0x0 0x1000 "$probe_file" >/dev/null 2>&1; then
-        rm -rf "$tmpdir"
-        return 1
-    fi
-
-    probe_hex="$(od -An -tx1 -N 4096 "$probe_file" 2>/dev/null | tr -d ' \r\n\t')"
-    rm -rf "$tmpdir"
-
-    case "$probe_hex" in
-        "" ) return 1 ;;
-        *[!fF]* ) return 1 ;;
-        * ) return 0 ;;
-    esac
-}
-
-PROVISIONAL_BIN_FILE="$(find_bin)"
-PROVISIONAL_BIN_NAME="$(basename "$PROVISIONAL_BIN_FILE")"
+BIN_FILE="$(find_bin)"
+BIN_NAME="$(basename "$BIN_FILE")"
 
 # ---- Step 4: derive board from filename (or user override) -----------------
 if [ -z "$ARG_BOARD" ]; then
-    case "$PROVISIONAL_BIN_NAME" in
+    case "$BIN_NAME" in
         *-esp8266-*) ARG_BOARD="esp8266" ;;
         *-esp32-*)   ARG_BOARD="esp32" ;;
     esac
@@ -468,8 +278,8 @@ ok "Board:    $BOARD_NAME"
 ok "Baud:     $ARG_BAUD"
 
 # ---- Step 5: locate serial port --------------------------------------------
-# ESP32-S3 has a fixed USB VID/PID — let esptool find it. ESP8266 boards
-# vary too much in USB-serial chip choice for a clean filter; enumerate.
+# ESP32-S3 has a fixed USB VID/PID, so esptool can find it itself. ESP8266
+# boards vary too much in USB-serial chip choice for a clean filter; enumerate.
 PORT_ARGS=""
 if [ -n "$ARG_PORT" ]; then
     PORT_ARGS="--port $ARG_PORT"
@@ -525,132 +335,29 @@ else
     ok "Port:     $ARG_PORT"
 fi
 
-if [ "$ARG_BIN" = "" ] && [ "$ARG_ERASE" = "0" ] && [ "$ARG_UPGRADE" = "0" ] && [ "$ARG_FACTORY" = "0" ]; then
-    if is_flash_blank; then
-        FLASH_DEFAULT_MODE="1"
-        FLASH_DEFAULT_DESC="Factory reset"
-    else
-        FLASH_DEFAULT_MODE="2"
-        FLASH_DEFAULT_DESC="Upgrade OTGW"
-    fi
-
-    if [ -t 0 ]; then
-        echo
-        echo "------------------------------------------------------------"
-        echo " Choose flash mode:"
-        echo "   [1] Factory reset"
-        echo "       Fresh install of firmware and filesystem."
-        echo "       Removes WiFi credentials and settings."
-        echo "   [2] Upgrade OTGW"
-        echo "       Refreshes firmware and filesystem."
-        echo "       Keeps WiFi credentials; settings are reset."
-        echo "   [3] Firmware-only upgrade"
-        echo "       Updates firmware only."
-        echo "       Keeps WiFi credentials and settings."
-        echo "------------------------------------------------------------"
-        printf "Select option [1-3] (default %s): " "$FLASH_DEFAULT_MODE"
-        read -r FLASH_CHOICE
-        [ -z "$FLASH_CHOICE" ] && FLASH_CHOICE="$FLASH_DEFAULT_MODE"
-        case "$FLASH_CHOICE" in
-            1) ARG_ERASE=1 ;;
-            2) ARG_FACTORY=1 ;;
-            3) ARG_UPGRADE=1 ;;
-            *) err "Invalid selection."; exit 1 ;;
-        esac
-    else
-        case "$FLASH_DEFAULT_MODE" in
-            1) ARG_ERASE=1 ;;
-            2) ARG_FACTORY=1 ;;
-        esac
-        info "Auto-selected mode: $FLASH_DEFAULT_DESC"
-    fi
-fi
-
-if [ "$ARG_FACTORY" = "1" ] && [ "$ARG_ERASE" = "0" ]; then
-    prompt_preserve_settings
-    if [ "$ARG_PRESERVE_SETTINGS" = "1" ]; then
-        step "Backing up live settings before flash"
-        backup_live_files
-    fi
-fi
-
-BIN_FILE="$(find_bin)"
-BIN_NAME="$(basename "$BIN_FILE")"
 ok "Firmware: $BIN_NAME"
 
-# ---- Step 6: confirm before flash ------------------------------------------
+# ---- Step 6: show selected flash action ------------------------------------
 echo
 echo "------------------------------------------------------------"
 echo " Ready to flash:"
 echo "   Firmware: $BIN_NAME"
 echo "   Board:    $BOARD_NAME"
 echo "   Baud:     $ARG_BAUD"
-if [ "$ARG_ERASE" = "1" ]; then
-    echo "   Mode:     --erase  (full clean wipe)"
-    echo "   Effect:   ALL data wiped: WiFi credentials, NVS, filesystem."
-elif [ "$ARG_FACTORY" = "1" ]; then
-    echo "   Mode:     --factory  (full image)"
-    echo "   Effect:   Filesystem image is refreshed."
-    echo "             Existing WiFi/settings may be replaced."
-elif [ "$ARG_UPGRADE" = "1" ]; then
-    echo "   Mode:     --upgrade  (firmware-only)"
-    echo "   Effect:   WiFi credentials and filesystem/settings preserved."
-else
-    echo "   Mode:     firmware-only"
-    echo "   Effect:   WiFi credentials and filesystem/settings preserved."
-fi
+echo "   Mode:     factory reset"
+echo "   Effect:   Erases flash, then writes firmware and filesystem."
+echo "             WiFi credentials and settings will be removed."
 echo "------------------------------------------------------------"
 echo
 
 # ---- Step 7: run esptool ---------------------------------------------------
-# Tested baseline (Nodo-shop OT-Thing): -z compresses transfer; default-reset
-# + hard-reset gives consistent strap timing on USB-JTAG boards. -e adds
-# erase_all to write_flash for the --erase mode.
-WRITE_FLAGS="-z"
-if [ "$ARG_ERASE" = "1" ]; then
-    WRITE_FLAGS="-z -e"
-fi
-
 step "Running esptool write_flash..."
 "$ESPTOOL_BIN" --chip "$ESPTOOL_CHIP" $PORT_ARGS --baud "$ARG_BAUD" \
     --before default_reset --after hard_reset \
-    write_flash $WRITE_FLAGS 0x0 "$BIN_FILE"
-
-if [ "$ARG_PRESERVE_SETTINGS" = "1" ]; then
-    step "Waiting for flashed device to come back online"
-    if wait_for_health "${HOST_BASE}/api/v2/health" 240; then
-        ok "Device is healthy again"
-        restore_live_files
-        trigger_reboot
-        step "Waiting for restored settings to load"
-        if wait_for_health "${HOST_BASE}/api/v2/health" 240; then
-            ok "Device is healthy again after restore"
-            RESTORE_DONE=1
-        else
-            warn "Device did not report healthy after restore within timeout."
-        fi
-    else
-        warn "Device did not report healthy after flash within timeout."
-    fi
-fi
+    write_flash -z -e 0x0 "$BIN_FILE"
 
 echo
 echo "============================================================"
 echo " Flash complete."
-if [ "$RESTORE_DONE" = "1" ]; then
-    echo " Settings and Dallas labels were backed up and restored from ${ARG_HOST}."
-    echo " Browse to http://${ARG_HOST} if the device is reachable on your network."
-elif [ "$ARG_PRESERVE_SETTINGS" = "1" ]; then
-    echo " Settings backup was taken from ${ARG_HOST}, but the restore flow did"
-    echo " not complete. Check the warnings above."
-    if [ -n "${BACKUP_DIR:-}" ] && [ -d "$BACKUP_DIR" ]; then
-        echo " Backup files remain at: ${BACKUP_DIR}"
-    fi
-elif [ "$ARG_ERASE" = "1" ]; then
-    echo " After reset: connect to WiFi AP \"OTGW-AP\" to configure."
-else
-    echo " WiFi credentials and settings preserved; the board should rejoin"
-    echo " your network automatically. Browse to http://otgw.local"
-    echo " if mDNS works on your network."
-fi
+echo " After reset: connect to WiFi AP \"OTGW-AP\" to configure."
 echo "============================================================"

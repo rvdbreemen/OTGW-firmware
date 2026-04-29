@@ -234,7 +234,7 @@ python3 flash_esp.py --board esp8266 --erase --download
 
 6. After flashing completes, the device reboots automatically.
 
-**ESP32-S3 merged binary**: The flash tool prefers merged binary images for ESP32-S3. A merged binary combines the bootloader, partition table, firmware, and filesystem into a single file flashed at address 0x0. Two variants exist: `merged-full` (includes filesystem, for factory installs) and `merged` (firmware only, preserves existing filesystem). The script picks the best available variant automatically.
+**ESP32-S3 merged binary**: The flash tool uses the `merged-full` image for ESP32-S3. A merged-full binary combines the bootloader, partition table, firmware, and filesystem into a single file flashed at address 0x0. The helper scripts erase flash first, so the result is a factory reset with fresh firmware and filesystem.
 
 #### Flashing with PlatformIO (Build from Source)
 
