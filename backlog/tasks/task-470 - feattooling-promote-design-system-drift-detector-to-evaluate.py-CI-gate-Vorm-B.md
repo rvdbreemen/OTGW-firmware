@@ -3,9 +3,11 @@ id: TASK-470
 title: >-
   feat(tooling): promote design-system drift detector to evaluate.py CI gate
   (Vorm B)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@codex'
 created_date: '2026-04-28 17:08'
+updated_date: '2026-04-28 22:15'
 labels:
   - tooling
   - design-system
@@ -103,14 +105,12 @@ Body sections per ADR template:
 - AC4: ADR-091 is in `docs/adr/` with Status `Accepted`, references the evaluate.py gate per ADR-080, and lists TASK-469 as the baseline-green prerequisite.
 - AC5: One release cycle of WARNING severity, then promote to ERROR. Track via follow-up task or in this task's history.
 
-- [ ] #1 evaluate.py contains check_design_system_drift() with module-level pure helpers; no duplicated logic with tools/check_design_system_drift.py
-- [ ] #2 tests/ covers HTML class extraction, JS classList API, JS template-literal extraction, compound CSS selector handling, comment stripping, and drift set arithmetic
-- [ ] #3 python evaluate.py and python evaluate.py --quick both run the check successfully on a green baseline (drift count = 0) without errors
-- [ ] #4 ADR-091 (or next free number) accepted in docs/adr/, references the evaluate.py gate per ADR-080, lists TASK-469 as the baseline-green prerequisite
-- [ ] #5 Severity progression handled: WARNING for one release cycle, then promoted to ERROR (track via follow-up task or task history)
+- [x] #1 evaluate.py contains check_design_system_drift() with module-level pure helpers; no duplicated logic with tools/check_design_system_drift.py
+- [x] #2 tests/ covers HTML class extraction, JS classList API, JS template-literal extraction, compound CSS selector handling, comment stripping, and drift set arithmetic
+- [x] #3 python evaluate.py and python evaluate.py --quick both run the check successfully on a green baseline (drift count = 0) without errors
+- [x] #4 ADR-091 (or next free number) accepted in docs/adr/, references the evaluate.py gate per ADR-080, lists TASK-469 as the baseline-green prerequisite
+- [x] #5 Severity progression handled: WARNING for one release cycle, then promoted to ERROR (track via follow-up task or task history)
 <!-- AC:END -->
-
-
 
 ## Definition of Done (task-specific)
 
@@ -134,3 +134,31 @@ Body sections per ADR template:
 - `otgw_design_package/handoff.md` — Patch E removed legacy CSS without documenting required class porting; this task closes that loop
 - TASK-435 / TASK-458 / TASK-461 / TASK-467 / TASK-469 — design-package implementation chain
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Move design-system drift parsing helpers into evaluate.py and make the standalone tool import them. 2. Add check_design_system_drift to quick and full evaluation as a WARN gate with an allowlist for intentional non-style hooks. 3. Add focused tests for extraction, comments, selectors, drift arithmetic, allowlist behavior, and a synthetic regression. 4. Add ADR-091 and update CLAUDE.md plus design-package handoff docs. 5. Run tests, quick/full evaluation, and the standalone JSON diagnostic before closing ACs.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-28 Codex resumed TASK-470 on feature-dev-2.0.0-otgw32-esp32-sat-support; reviewing existing partial implementation before finishing.
+
+Tightened classList literal extraction to capture all quoted arguments in multi-arg calls; covered by tests because sat.js already uses a three-arg classList.remove.
+
+Verification: tests/test_evaluate.py passed (45 tests); tests/test_build.py passed (9 tests); build.py completed ESP8266 and ESP32-S3 firmware/filesystem/distribution builds successfully.
+
+Design drift verification: tools/check_design_system_drift.py --json reports drift_count=0, allowlisted_count=32, used_count=238; direct shared-helper timing was 44.076 ms.
+
+Deliberate regression check: temporarily added codex-temp-drift-check to index.html, standalone diagnostic reported drift_count=1 at index.html:84, then the temporary edit was reverted and the diagnostic returned to drift_count=0.
+
+evaluate.py --quick --no-color --verbose and evaluate.py --no-color both execute Design-System Class Drift as PASS. Overall exit remains 1 because of pre-existing PROGMEM violations in debugStuff.ino, FSexplorer.ino, jsonStuff.ino, and MQTTstuff.ino; those files are outside TASK-470.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Promoted the design-system class drift detector into evaluate.py as check_design_system_drift with shared module-level helper functions and a documented allowlist for intentional no-style classes. The standalone tools/check_design_system_drift.py now imports the same scanner and allowlist so manual diagnostics and the CI gate do not diverge. Added focused unittest coverage for HTML extraction, JS classList and template literals, comment stripping, CSS selector extraction, drift arithmetic, allowlist behavior, fixture drift, and multi-argument classList calls. Added ADR-091 as Accepted, documented the gate in CLAUDE.md and otgw_design_package/handoff.md, and created TASK-480 to promote WARN drift severity to FAIL after the grace release. Verification: tests/test_evaluate.py and tests/test_build.py pass; build.py succeeds for ESP8266 and ESP32-S3; standalone drift JSON reports drift_count=0; a temporary index.html regression produced the expected missing-class report and was reverted. evaluate.py quick/full both run the design drift check as PASS, while the overall evaluator still exits 1 because of pre-existing PROGMEM findings outside TASK-470.
+<!-- SECTION:FINAL_SUMMARY:END -->

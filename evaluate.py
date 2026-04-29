@@ -10,6 +10,7 @@ This script performs comprehensive evaluation of the workspace including:
 - Security analysis
 - Memory and resource analysis
 - Test coverage analysis
+- Design-system CSS class drift analysis
 
 Usage:
     python evaluate.py              # Full evaluation
@@ -27,7 +28,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Set, Optional
 
 # Ensure Unicode output works on Windows consoles (cp1252 etc.)
 if sys.stdout.encoding and sys.stdout.encoding.lower().replace('-', '') != 'utf8':
@@ -54,6 +55,169 @@ _STRING_DECL_RE = re.compile(r'\bString\s+\w+\s*[;=(]')
 # ESP8266. Reported as INFO so each call site can be hand-verified to operate on
 # null-terminated text. See MEMORY.md "Exception (2) foot-gun" note.
 _BINARY_COMPARE_RE = re.compile(r'\b(?:strncmp_P|strstr_P)\s*\(')
+
+# Design-system class drift helpers. These are intentionally regex-based: the
+# firmware Web UI has no Node/AST toolchain, and ADR-091 only needs to catch
+# literal class names emitted by HTML and JavaScript.
+_DS_CLASS_TOKEN = r"[A-Za-z_][A-Za-z0-9_-]*"
+_DS_CLASS_ATTR_RE = re.compile(r"""class\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
+_DS_CLASSLIST_API_RE = re.compile(
+    r"""classList\s*\.\s*(?:add|remove|toggle|replace|contains)\s*\(([^)]*)\)""",
+    re.IGNORECASE,
+)
+_DS_CLASSNAME_ASSIGN_RE = re.compile(r"""\.\s*className\s*=\s*["']([^"']+)["']""")
+_DS_QUOTED_STRING_RE = re.compile(r"""["']([^"']+)["']""")
+_DS_CSS_CLASS_RE = re.compile(rf"\.({_DS_CLASS_TOKEN})")
+_DS_CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+_DS_JS_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+_DS_JS_LINE_COMMENT_RE = re.compile(r"//[^\n]*")
+
+# Classes below are intentionally referenced without a CSS selector. Keep this
+# grouped by reason so future additions are reviewable instead of becoming a
+# silent dumping ground.
+DESIGN_SYSTEM_CLASS_ALLOWLIST_BY_REASON: Dict[str, Tuple[str, ...]] = {
+    "behavior/state hooks": (
+        "FSexplorer",
+        "adminSettings",
+        "basicSettings",
+        "btnSaveSettings",
+        "home",
+        "ot-command-capable",
+        "otdirect-only",
+        "page-nav-shell",
+        "pic-only",
+        "tabButton",
+        "tabDeviceInfo",
+        "tabPICflash",
+        "tabSAT",
+        "tabWebhook",
+    ),
+    "design.html reference-only demo helpers": (
+        "dark-pane",
+        "demo",
+        "demo-label",
+        "design-grid",
+        "design-section",
+        "design-shell",
+        "design-swatch",
+        "design-toc",
+        "ds-tag",
+        "label",
+        "lede",
+        "light-pane",
+        "specbox",
+        "swatch-meta",
+        "swatch-tile",
+        "theme-pair",
+        "type-row",
+    ),
+    "browser/native utility classes with deliberate no-op styling": (
+        "button",
+    ),
+}
+
+DESIGN_SYSTEM_CLASS_ALLOWLIST: Set[str] = {
+    cls
+    for classes in DESIGN_SYSTEM_CLASS_ALLOWLIST_BY_REASON.values()
+    for cls in classes
+}
+
+
+def strip_css_comments(text: str) -> str:
+    """Strip CSS block comments before selector scanning."""
+    return _DS_CSS_COMMENT_RE.sub("", text)
+
+
+def strip_js_comments(text: str) -> str:
+    """Strip JavaScript block and line comments before class extraction."""
+    no_block = _DS_JS_BLOCK_COMMENT_RE.sub("", text)
+    return _DS_JS_LINE_COMMENT_RE.sub("", no_block)
+
+
+def _looks_like_template_placeholder(token: str) -> bool:
+    """Return True for dynamic template fragments that are not literal classes."""
+    return token.startswith("$") or token.startswith("{") or token.endswith("}") or "{" in token
+
+
+def extract_classes_from_html(content: str) -> List[Tuple[str, int]]:
+    """Return (class_name, line_number) tuples from literal HTML class attributes."""
+    hits: List[Tuple[str, int]] = []
+    for i, line in enumerate(content.split("\n"), 1):
+        for m in _DS_CLASS_ATTR_RE.finditer(line):
+            for cls in m.group(1).split():
+                if cls:
+                    hits.append((cls, i))
+    return hits
+
+
+def extract_classes_from_js(content: str) -> List[Tuple[str, int]]:
+    """Return (class_name, line_number) tuples from literal JavaScript class refs."""
+    cleaned = strip_js_comments(content)
+    hits: List[Tuple[str, int]] = []
+    for i, line in enumerate(cleaned.split("\n"), 1):
+        # class="..." inside strings and template literals.
+        for m in _DS_CLASS_ATTR_RE.finditer(line):
+            for cls in m.group(1).split():
+                if cls and not _looks_like_template_placeholder(cls):
+                    hits.append((cls, i))
+        # classList.{add,remove,toggle,replace,contains}('x' [, ...])
+        for m in _DS_CLASSLIST_API_RE.finditer(line):
+            for arg in _DS_QUOTED_STRING_RE.findall(m.group(1)):
+                for cls in arg.split():
+                    if cls and not _looks_like_template_placeholder(cls):
+                        hits.append((cls, i))
+        # el.className = 'x y' literal assignments only.
+        for m in _DS_CLASSNAME_ASSIGN_RE.finditer(line):
+            for cls in m.group(1).split():
+                if cls and not _looks_like_template_placeholder(cls):
+                    hits.append((cls, i))
+    return hits
+
+
+def extract_class_definitions_from_css(content: str) -> Set[str]:
+    """Return class names defined as CSS selectors, including compound selectors."""
+    cleaned = strip_css_comments(content)
+    return set(_DS_CSS_CLASS_RE.findall(cleaned))
+
+
+def compute_drift(
+    used: Dict[str, List[str]],
+    defined: Set[str],
+    allowlist: Optional[Set[str]] = None,
+) -> Tuple[Dict[str, List[str]], Set[str], Dict[str, List[str]]]:
+    """Return (missing, dead, allowlisted_missing) for design-system classes."""
+    allowed = allowlist or set()
+    used_set = set(used.keys())
+    raw_missing = {cls: locs for cls, locs in used.items() if cls not in defined}
+    allowlisted_missing = {cls: locs for cls, locs in raw_missing.items() if cls in allowed}
+    missing = {cls: locs for cls, locs in raw_missing.items() if cls not in allowed}
+    dead = defined - used_set
+    return missing, dead, allowlisted_missing
+
+
+def scan_design_system_workspace(data_dir: Path) -> Tuple[Dict[str, List[str]], Set[str], Dict[str, int]]:
+    """Scan data/*.html, data/*.js, and data/*.css for class usage/definitions."""
+    used: Dict[str, List[str]] = defaultdict(list)
+    used_counts: Dict[str, int] = defaultdict(int)
+    defined: Set[str] = set()
+
+    for f in sorted(data_dir.glob("*.html")):
+        text = f.read_text(encoding="utf-8", errors="replace")
+        for cls, line in extract_classes_from_html(text):
+            used[cls].append(f"{f.name}:{line}")
+            used_counts[cls] += 1
+
+    for f in sorted(data_dir.glob("*.js")):
+        text = f.read_text(encoding="utf-8", errors="replace")
+        for cls, line in extract_classes_from_js(text):
+            used[cls].append(f"{f.name}:{line}")
+            used_counts[cls] += 1
+
+    for f in sorted(data_dir.glob("*.css")):
+        text = f.read_text(encoding="utf-8", errors="replace")
+        defined |= extract_class_definitions_from_css(text)
+
+    return used, defined, used_counts
 
 
 def is_hot_path_file(filename: str) -> bool:
@@ -1336,6 +1500,60 @@ class WorkspaceEvaluator:
                 "See ADR-089 sub-rule 3: TASK-346 counters track tier transitions for field telemetry"
             ))
 
+    # ===== DESIGN SYSTEM CHECKS =====
+
+    def check_design_system_drift(self):
+        """ADR-091 binding rule: literal classes emitted by HTML/JS must either
+        have a CSS selector in data/*.css or be listed in the documented
+        allowlist above. First release reports actionable drift as WARN; TASK-480
+        tracks promoting this to FAIL after the grace release.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Design-System Class Drift ==={Colors.ENDC}")
+
+        data_dir = config.DATA_DIR
+        if not data_dir.exists():
+            self.add_result(EvaluationResult(
+                "Design System", "Class drift", "WARN",
+                f"data directory not found: {data_dir}"
+            ))
+            return
+
+        try:
+            used, defined, used_counts = scan_design_system_workspace(data_dir)
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "Design System", "Class drift", "FAIL",
+                f"Could not scan Web UI assets: {e}"
+            ))
+            return
+
+        missing, _, allowlisted_missing = compute_drift(
+            used,
+            defined,
+            DESIGN_SYSTEM_CLASS_ALLOWLIST,
+        )
+
+        if missing:
+            details = []
+            for cls in sorted(missing.keys(), key=lambda c: (-used_counts[c], c)):
+                locs = missing[cls]
+                details.append(f"{cls} first {locs[0]} ({used_counts[cls]} refs)")
+            self.add_result(EvaluationResult(
+                "Design System",
+                "Class drift",
+                "WARN",
+                f"{len(missing)} referenced CSS class(es) have no selector",
+                "; ".join(details[:20])
+            ))
+            return
+
+        self.add_result(EvaluationResult(
+            "Design System",
+            "Class drift",
+            "PASS",
+            f"No actionable drift ({len(allowlisted_missing)} intentional no-style class(es) allowlisted)"
+        ))
+
     # ===== ADR REFERENCE RESOLUTION (TASK-368) =====
 
     def check_adr_references_resolve(self):
@@ -2235,6 +2453,7 @@ class WorkspaceEvaluator:
         self.check_heap_tier_thresholds_ordered()     # TASK-428, ADR-089 sub-rule 1
         self.check_heap_fragmentation_promotion()     # TASK-428, ADR-089 sub-rule 2
         self.check_heap_tier_entry_counters()         # TASK-428, ADR-089 sub-rule 3
+        self.check_design_system_drift()              # TASK-470, ADR-091 WARN grace gate
         self.check_adr_references_resolve()           # TASK-355/368
 
         if not quick:

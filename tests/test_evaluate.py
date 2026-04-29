@@ -12,6 +12,7 @@ which is exactly what TASK-297 (TEST-H3) was created to prevent.
 
 import io
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -232,6 +233,119 @@ class TestBacklogHygieneHelpers(unittest.TestCase):
                             f"marker phrase '{marker}' should be recognized as a deviation note")
 
 
+class TestDesignSystemDriftHelpers(unittest.TestCase):
+    def test_extract_classes_from_html_simple(self):
+        html = (
+            "<div class=\"alpha beta\"></div>\n"
+            "<span class='gamma'></span>\n"
+            "<p class=\"delta\"></p>\n"
+        )
+        self.assertEqual(
+            evaluate.extract_classes_from_html(html),
+            [("alpha", 1), ("beta", 1), ("gamma", 2), ("delta", 3)],
+        )
+
+    def test_extract_classes_from_js_classlist_api(self):
+        js = (
+            "el.classList.add('is-open');\n"
+            "el.classList.remove(\"is-closed\");\n"
+            "el.classList.toggle('active');\n"
+            "el.classList.replace('old-state', 'new-state');\n"
+            "el.classList.contains('ready');\n"
+            "el.classList.remove('stale-one', 'stale-two', 'stale-three');\n"
+        )
+        classes = [cls for cls, _ in evaluate.extract_classes_from_js(js)]
+        self.assertEqual(
+            classes,
+            [
+                "is-open",
+                "is-closed",
+                "active",
+                "old-state",
+                "new-state",
+                "ready",
+                "stale-one",
+                "stale-two",
+                "stale-three",
+            ],
+        )
+
+    def test_extract_classes_from_js_template_literal(self):
+        js = "const row = `<div class=\"row is-live\"><span>OK</span></div>`;\n"
+        self.assertEqual(
+            evaluate.extract_classes_from_js(js),
+            [("row", 1), ("is-live", 1)],
+        )
+
+    def test_extract_classes_from_js_skips_template_placeholders(self):
+        js = "const row = `<div class=\"row ${stateClass} fixed ${prefix}-dynamic\"></div>`;\n"
+        classes = [cls for cls, _ in evaluate.extract_classes_from_js(js)]
+        self.assertEqual(classes, ["row", "fixed"])
+
+    def test_extract_class_definitions_compound_selectors(self):
+        css = ".foo.bar, .foo .bar, .foo:hover, .baz::before { color: red; }\n"
+        self.assertEqual(
+            evaluate.extract_class_definitions_from_css(css),
+            {"foo", "bar", "baz"},
+        )
+
+    def test_extract_class_definitions_skips_comments(self):
+        css = "/* .ghost { color: red; } */\n.real { color: green; }\n"
+        self.assertNotIn("ghost", evaluate.extract_class_definitions_from_css(css))
+        self.assertIn("real", evaluate.extract_class_definitions_from_css(css))
+
+    def test_css_and_js_comment_stripping(self):
+        self.assertEqual(evaluate.strip_css_comments(".real{} /* .ghost{} */"), ".real{} ")
+        cleaned_js = evaluate.strip_js_comments(
+            "el.classList.add('real'); // el.classList.add('line-ghost')\n"
+            "/* el.classList.add('block-ghost') */\n"
+        )
+        self.assertIn("real", cleaned_js)
+        self.assertNotIn("line-ghost", cleaned_js)
+        self.assertNotIn("block-ghost", cleaned_js)
+
+    def test_compute_drift_set_arithmetic_and_allowlist(self):
+        used = {
+            "used-missing": ["index.html:1"],
+            "allowed-hook": ["index.html:2"],
+        }
+        defined = {"defined-unused"}
+        missing, dead, allowlisted = evaluate.compute_drift(
+            used,
+            defined,
+            {"allowed-hook"},
+        )
+        self.assertEqual(missing, {"used-missing": ["index.html:1"]})
+        self.assertEqual(dead, {"defined-unused"})
+        self.assertEqual(allowlisted, {"allowed-hook": ["index.html:2"]})
+
+    def test_drift_against_known_fixture(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            (data_dir / "index.html").write_text(
+                '<div class="present missing"></div>\n',
+                encoding="utf-8",
+            )
+            (data_dir / "app.js").write_text(
+                "el.classList.add('allowed-hook');\n",
+                encoding="utf-8",
+            )
+            (data_dir / "style.css").write_text(
+                ".present { display: block; }\n",
+                encoding="utf-8",
+            )
+
+            used, defined, _ = evaluate.scan_design_system_workspace(data_dir)
+            missing, _, allowlisted = evaluate.compute_drift(
+                used,
+                defined,
+                {"allowed-hook"},
+            )
+
+        self.assertEqual(missing, {"missing": ["index.html:1"]})
+        self.assertEqual(allowlisted, {"allowed-hook": ["app.js:1"]})
+
+
 class TestOTDirect25238BridgeRegression(unittest.TestCase):
     """Pin the ESP32 25238 bridge split so a future refactor cannot silently
     remove the cooperative socket service or move the no-PIC bridge out of
@@ -396,6 +510,7 @@ class TestProgmemComplianceIntegration(unittest.TestCase):
         categories = {r.category for r in evaluator.results}
         self.assertIn("PROGMEM", categories)
         self.assertIn("Coding", categories)  # binary-safe compare audit
+        self.assertIn("Design System", categories)
         bridge_checks = [r for r in evaluator.results if r.name == "OTDirect 25238 bridge audit"]
         self.assertEqual(len(bridge_checks), 1)
         self.assertEqual(bridge_checks[0].status, "PASS")
