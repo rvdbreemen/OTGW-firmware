@@ -48,11 +48,11 @@ Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. "Builds
 
 ESP8266/ESP32 firmware for the NodoShop OpenTherm Gateway. Web UI, MQTT, REST API, TCP serial bridge, Home Assistant integration.
 
-- **Platform**: ESP8266 (NodeMCU/Wemos D1 mini), ~40KB usable RAM; ESP32 (OTGW32)
+- **Platform**: ESP8266 (NodeMCU/Wemos D1 mini), ~40KB usable RAM; ESP32-S3 (OTGW32)
 - **Language**: Arduino C/C++ (.ino files), single translation unit
 - **Serial**: Reserved exclusively for PIC — never write to `Serial` after init
 - **Debug**: `DebugTln()`, `DebugTf()` → Telnet port 23, never `Serial.print()`
-- **Branches**: `dev` is the 1.4.x maintenance line; `feature-dev-2.0.0-otgw32-esp32-sat-support` is the 2.0.0 development branch (ESP32/OTGW32 + SAT). Default to the branch you are on; port fixes deliberately, not reflexively.
+- **Branches**: `dev` is the 1.5.x maintenance line; `feature-dev-2.0.0-otgw32-esp32-sat-support` is the 2.0.0 development branch (ESP32/OTGW32 + SAT). Default to the branch you are on; port fixes deliberately, not reflexively.
 
 ---
 
@@ -92,8 +92,8 @@ Trusted LAN only. REST API works behind HTTPS reverse proxy, but WebSocket assum
 - `doBackgroundTasks()` can re-enter (called from inside `doAutoConfigure()`'s file-reading loop). Shared scratch state must declare an acquisition contract: see ADR-090 for the pattern (RAII or inUse-flag, both with fail-safe on contention)
 - Typed control flow: `enum class` or numeric IDs, never string tokens as discriminators
 - Frontend JS: Chrome/Firefox/Safari (latest + 2). Check element existence, try-catch JSON.parse, response.ok, .catch() on all async
-- Webui assets live in `src/OTGW-firmware/data/` (`index.html`, `index.js`, `index.css`, `graph.js`) and ship as a LittleFS image; use `python build.py` (not `--firmware`) to rebuild them
-- Log container contract: `.ot-log-content` has `white-space: pre` (index.css); `\n` is the line separator. Prefer `textContent` over `innerHTML` for plain text (skips HTML parser and per-line escape)
+- Webui assets live in `src/OTGW-firmware/data/` (`index.html`, `index.js`, `components.css`, `ds-tokens.css`, `graph.js`, `sat.js`, `sat-slider.js`, `theme-toggle.js`, `echarts-theme.js`) and ship as a LittleFS image; use `python build.py` (not `--firmware`) to rebuild them
+- Log container contract: `.ot-log-content` has `white-space: pre` (components.css); `\n` is the line separator. Prefer `textContent` over `innerHTML` for plain text (skips HTML parser and per-line escape)
 
 ### Naming conventions
 
@@ -127,6 +127,7 @@ ADRs in `docs/adr/`. Read before changes to: architecture, NFRs, API contracts, 
 - **ADR-004**: No `String` in hot paths (SAT*, MQTTstuff, restAPI, OTGW-Core, OTDirect)
 - **ADR-088**: MQTT status-burst windowing + post-burst cooldown (gated by `check_status_publishers_wrap_burst`, `check_status_burst_cooldown_bound`, `check_drip_consults_deferred` in evaluate.py)
 - **ADR-089**: Heap tier-machine contract (amends ADR-030; gated by `check_heap_tier_thresholds_ordered`, `check_heap_fragmentation_promotion`, `check_heap_tier_entry_counters` in evaluate.py)
+- **ADR-091**: Design-system class drift gate (gated by `check_design_system_drift` in evaluate.py; WARN for one release, TASK-480 promotes to FAIL)
 
 **Structural / architectural ADRs** (reviewed at PR, no automated gate — see ADR-080):
 - **ADR-044**: Single-point-of-instantiation for globals
