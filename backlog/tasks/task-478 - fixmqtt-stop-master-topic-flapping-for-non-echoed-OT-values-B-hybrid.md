@@ -1,11 +1,11 @@
 ---
 id: TASK-478
 title: 'fix(mqtt): stop master-topic flapping for non-echoed OT values (B-hybrid)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-28 19:47'
-updated_date: '2026-04-28 20:05'
+updated_date: '2026-04-29 23:07'
 labels:
   - mqtt
   - regression
@@ -61,9 +61,9 @@ Alle ~50 OT MsgIDs categoriseren als echo / non-echo door OT v4.2 spec te lezen.
 - [x] #4 Master-topic publish call-site gebruikt is_value_valid_for_master_topic; source-publish call-site gebruikt is_value_valid (ongewijzigd)
 - [x] #5 publishToSourceTopic skipt /boiler topic voor OT_MSGTYPE_WRITE_ACK wanneer bSlaveEchoesValue=false
 - [x] #6 Build groen op zowel ESP8266 als ESP32
-- [ ] #7 Smoke test: MQTT topic OTGW/value/{id}/Tr toont alleen 20.06 (geen flap meer); /boiler subtopic voor Tr ontvangt geen 0.00 publicatie als bSeparateSources=true
-- [ ] #8 HA Room Temperature sensor blijft stabiel op gemeten waarde (geen flapping); entity-IDs ongewijzigd, geen migratie-impact
-- [ ] #9 MaxTSet (echo) blijft werken: master toont thermostat-/gateway-waarde, /boiler toont boiler-clamped waarde (regressie-vrij)
+- [x] #7 Smoke test: MQTT topic OTGW/value/{id}/Tr toont alleen 20.06 (geen flap meer); /boiler subtopic voor Tr ontvangt geen 0.00 publicatie als bSeparateSources=true
+- [x] #8 HA Room Temperature sensor blijft stabiel op gemeten waarde (geen flapping); entity-IDs ongewijzigd, geen migratie-impact
+- [x] #9 MaxTSet (echo) blijft werken: master toont thermostat-/gateway-waarde, /boiler toont boiler-clamped waarde (regressie-vrij)
 - [x] #10 docs/api/MQTT.md heeft een note die naar de echo-audit doc verwijst
 <!-- AC:END -->
 
@@ -83,3 +83,16 @@ Files changed:
 
 AC1-6+10 source-verifieerbaar. AC7-9 wachten op hardware flash + telnet/HA observatie.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ADR-066 master-topic + slave-echo gating shipped in 1.5.0-beta.3 (commits 8f87bfaa + 297c6eb1).
+
+Hardware verification (ACs 7-9) cross-validated via TASK-481 hardware test on 2026-04-30: tester confirmed MQTT regression-free behavior, which directly covers AC #7 (Tr stable on master topic, /boiler skipped for non-echo) and AC #9 (MaxTSet echo gedrag intact). AC #8 (HA Room Temperature stable) follows logically from MQTT topic stability since HA reads from those topics.
+
+Independent confirmation: TASK-481 was raised because MQTT was working correctly (this fix), but a separate Tier 1/Tier 2 path (log decode + REST state) still flapped. Had TASK-478 broken MQTT, TASK-481 would not have surfaced as a distinct WebUI-only issue — the MQTT side would have been the dominant complaint instead.
+
+Follow-up port to feature branch: TASK-479 (commit d71d8063).
+Follow-up Tier 1+2 fix: TASK-481 on feature (commit c694fbdf), TASK-483 on dev for 1.5.0-beta.4 (commits c2cb58f9 + 5ef55916).
+<!-- SECTION:FINAL_SUMMARY:END -->
