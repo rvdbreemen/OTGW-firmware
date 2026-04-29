@@ -48,6 +48,12 @@
  * ============================================================== */
 :root,
 [data-theme="light"] {
+  /* Tell the browser which color scheme is active so native form controls
+     (checkboxes, scrollbars, spinners) render in the correct light style.
+     Without this, browsers on a dark-mode OS render unchecked checkboxes
+     as black squares even on a visually light page. */
+  color-scheme: light;
+
   /* Brand / accent — vivid OTGW cyan. Matches the canonical legacy values
      from index.css (#00bffe nav strip, #e6ffff app wash). The brand
      identity is meant to be unmistakable, not whispered. */
@@ -144,6 +150,8 @@
 [data-theme="dark"],
 body.dark,
 html.dark {
+  color-scheme: dark;
+
   --brand-cyan:        #00bffe;
   --brand-cyan-soft:   #1a1a1a;
   --brand-sky:         #3a3a3c;

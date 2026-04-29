@@ -172,6 +172,13 @@ After flashing the test device:
    (intentional — it's a self-contained terminal).
 8. DevTools console — no 404s, no CSS warnings.
 
+## Drift gate for future package work
+
+TASK-470 / ADR-091 promote the design-system class drift detector into
+`evaluate.py`. Any future package output that emits a class from HTML or
+JavaScript must either define that class in `data/*.css` or add it to the
+documented allowlist in `evaluate.py` with a concrete no-style reason.
+
 ## Rollback
 
 The package's `apply.ps1` writes a timestamped zip in

@@ -3244,11 +3244,14 @@ function initMainPage() {
       startMainPage();
     });
 
-  // Start time updates if not in flash mode
+  // Start time updates and populate navbar (version, hostname) immediately,
+  // in parallel with the Dallas labels fetch below, so the header is not
+  // blank for the full 2-RTT chain (labels → device/info) on slow devices.
   if (!flashModeActive && !timeupdate) {
     refreshDevTime();
     startTimeUpdates();
   }
+  refreshDevInfo();
 
   // Check filesystem/firmware hash match once on page load
   checkFSMismatch();

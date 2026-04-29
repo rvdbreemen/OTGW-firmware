@@ -1413,6 +1413,242 @@ body.dark .sat-dashboard.sat-panel,
 .is-bool  { color: var(--accent-primary); }
 .is-fault { color: var(--status-error); font-weight: 600; }
 
+/* Header network indicator */
+.net-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  vertical-align: middle;
+}
+.net-icon {
+  flex: 0 0 auto;
+}
+.net-status-text {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg-3);
+}
+.net-signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+.sig-bar {
+  display: inline-block;
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--border-2);
+  opacity: 0.45;
+}
+.sig-bar-1 { height: 4px; }
+.sig-bar-2 { height: 7px; }
+.sig-bar-3 { height: 10px; }
+.sig-bar-4 { height: 13px; }
+.sig-bar.active {
+  background: var(--status-ok);
+  opacity: 1;
+}
+.net-signal-bars[data-quality="poor"] .sig-bar.active { background: var(--status-error); }
+.net-signal-bars[data-quality="medium"] .sig-bar.active { background: var(--status-warn); }
+.net-signal-bars[data-quality="good"] .sig-bar.active { background: var(--status-ok); }
+
+/* Log command/status refinements */
+.log-control-inline {
+  white-space: nowrap;
+}
+.ot-log-mode-notice {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-left: 3px solid var(--status-info);
+  background: color-mix(in srgb, var(--status-info) 10%, var(--bg-surface));
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+.commands-only .ot-log-tabs,
+.commands-only #Statistics,
+.commands-only #Graph {
+  display: none;
+}
+.ot-cmd-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.ot-cmd-status {
+  min-height: 1.4em;
+  font-size: var(--fs-xs);
+  color: var(--fg-4);
+}
+.ot-cmd-ok {
+  color: var(--status-ok-dark);
+  font-weight: 600;
+}
+.ot-cmd-error {
+  color: var(--status-error);
+  font-weight: 600;
+}
+
+/* OpenTherm graph controls */
+.ot-graph-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ot-graph-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+.ot-graph-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.ot-graph-time-window {
+  min-width: 140px;
+}
+.graph-error {
+  padding: var(--space-6);
+  border: 1px solid var(--status-error);
+  border-left: 4px solid var(--status-error);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--status-error) 10%, var(--bg-surface));
+  color: var(--fg-2);
+}
+
+/* OTDirect override list */
+.otd-ovr-row {
+  display: grid;
+  grid-template-columns: minmax(52px, auto) minmax(90px, auto) 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+.otd-ovr-row:last-child {
+  border-bottom: 0;
+}
+.otd-ovr-empty {
+  padding: var(--space-3);
+  color: var(--fg-4);
+  font-size: var(--fs-sm);
+  font-style: italic;
+}
+
+/* PIC firmware and PR= settings details */
+.firmware-icon {
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.firmware-progress {
+  margin: 12px 0;
+  max-width: 720px;
+}
+.pic-update-banner {
+  max-width: 720px;
+  margin: 10px 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--bg-muted);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+.pic-update-banner.checking { border-left: 3px solid var(--status-info); }
+.pic-update-banner.up-to-date { border-left: 3px solid var(--status-ok); }
+.pic-update-banner.update-available { border-left: 3px solid var(--status-warn); }
+.pic-version-outdated {
+  color: var(--status-warn-text);
+  font-weight: 700;
+}
+.pic-settings-section {
+  margin-top: 12px;
+}
+.pic-settings-section-heading {
+  margin: 10px 0 6px;
+  font-weight: 700;
+  color: var(--fg-1);
+}
+.pic-settings-group-cell {
+  color: var(--fg-3);
+  background: var(--bg-panel);
+}
+.pic-settings-refresh {
+  margin-top: var(--space-3);
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+}
+.pic-val-live {
+  color: var(--status-ok-dark);
+  font-weight: 600;
+}
+.pic-val-cached {
+  color: var(--status-warn-text);
+  font-weight: 600;
+}
+
+/* Settings rows */
+.settings-input-container {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+}
+.btn-wifi-reset {
+  font: inherit;
+  font-size: var(--fs-xs);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  background: var(--status-warn);
+  color: #000;
+  cursor: pointer;
+}
+.btn-wifi-reset:hover {
+  box-shadow: var(--shadow-btn-hover);
+}
+.waiting-error {
+  margin: var(--space-4) 16px;
+  color: var(--status-error);
+  font-weight: 600;
+}
+
+/* FSexplorer extras */
+.upload-box {
+  max-width: 800px;
+  margin: 16px auto;
+  padding: var(--space-5);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+.desktop-only {
+  display: block;
+}
+@media (max-width: 720px) {
+  .desktop-only { display: none; }
+}
+
+/* Flash/update interaction lock */
+.disable-interaction {
+  cursor: progress;
+}
+.disable-interaction a,
+.disable-interaction button,
+.disable-interaction input,
+.disable-interaction select,
+.disable-interaction textarea {
+  pointer-events: none;
+}
+
 /* --- Dark-mode tweaks ---
  * Most rules above already use tokens that flip in dark mode. The
  * overrides below are for places where a token doesn't quite cover
