@@ -1939,44 +1939,65 @@ static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWr
 void print_f88(float& value)
 {
   //function to print data
-  float _value = roundf(OTdata.f88()*100.0f) / 100.0f; // round float 2 digits, like this: x.xx 
+  float _value = roundf(OTdata.f88()*100.0f) / 100.0f; // round float 2 digits, like this: x.xx
   // AddLog("%s = %3.2f %s", OTlookupitem.label, _value , OTlookupitem.unit);
   char _msg[15] {0};
   dtostrf(_value, 3, 2, _msg);
-  
-  AddLogf("%s = %s %s", OTlookupitem.label, _msg , OTlookupitem.unit);
+
+  // ADR-066: gate log decode + state write on master-topic validity. The protocol
+  // event stays visible (timestamp/source/msgid/type/indicator are added in processOT);
+  // only the per-spec-undefined Write-Ack data byte is suppressed from log + REST state.
+  const bool validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem);
+  if (validForMaster) {
+    AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+  } else {
+    AddLogf("%s", OTlookupitem.label);
+  }
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
-    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(topic, _msg);
+    if (validForMaster) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
-    value = _value;
+    if (validForMaster) value = _value;
   }
 }
 
 
 void print_s16(int16_t& value)
-{    
-  int16_t _value = OTdata.s16(); 
+{
+  int16_t _value = OTdata.s16();
   // AddLogf("%s = %5d %s", OTlookupitem.label, _value, OTlookupitem.unit);
   //Build string for MQTT
   char _msg[15] {0};
   itoa(_value, _msg, 10);
-  AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+
+  // ADR-066: gate log decode + state write on master-topic validity (see print_f88).
+  const bool validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem);
+  if (validForMaster) {
+    AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+  } else {
+    AddLogf("%s", OTlookupitem.label);
+  }
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
-    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(topic, _msg);
+    if (validForMaster) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
-    value = _value;
+    if (validForMaster) value = _value;
   }
 }
 
 void print_s8s8(uint16_t& value)
-{  
-  AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
+{
+  // ADR-066: gate log decode + state write on master-topic validity (see print_f88).
+  const bool validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem);
+  if (validForMaster) {
+    AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
+  } else {
+    AddLogf("%s", OTlookupitem.label);
+  }
 
   //Build string for MQTT
   char _msg[15] {0};
@@ -1987,7 +2008,7 @@ void print_s8s8(uint16_t& value)
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   const bool _valid = is_value_valid(OTdata, OTlookupitem);
   if (_valid){
-    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(otTopic, _msg);
+    if (validForMaster) sendMQTTData(otTopic, _msg);
     publishToSourceTopic(otTopic, _msg, OTdata.rsptype);
   }
   //Build string for MQTT
@@ -1996,27 +2017,33 @@ void print_s8s8(uint16_t& value)
   strlcat(otTopic, "_value_lb", sizeof(otTopic));
   //AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   if (_valid){
-    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(otTopic, _msg);
+    if (validForMaster) sendMQTTData(otTopic, _msg);
     publishToSourceTopic(otTopic, _msg, OTdata.rsptype);
-    value = OTdata.u16();
+    if (validForMaster) value = OTdata.u16();
   }
 }
 
 void print_u16(uint16_t& value)
-{ 
-  uint16_t _value = OTdata.u16(); 
+{
+  uint16_t _value = OTdata.u16();
   //Build string for MQTT
   char _msg[15] {0};
   utoa(_value, _msg, 10);
-  
-  AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
-  
+
+  // ADR-066: gate log decode + state write on master-topic validity (see print_f88).
+  const bool validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem);
+  if (validForMaster) {
+    AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
+  } else {
+    AddLogf("%s", OTlookupitem.label);
+  }
+
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
     const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
-    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(topic, _msg);
+    if (validForMaster) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
-    value = _value;
+    if (validForMaster) value = _value;
   }
 }
 
