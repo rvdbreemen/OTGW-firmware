@@ -31,20 +31,12 @@ set "ARG_PORT="
 set "ARG_BIN="
 set "ARG_BOARD="
 set "ARG_BAUD="
+set "ARG_HELP=0"
 
 REM ---- Parse arguments -------------------------------------------------------
-:parse_args
-if "%~1"=="" goto args_done
-if /I "%~1"=="--port"     ( set "ARG_PORT=%~2" & shift & shift & goto parse_args )
-if /I "%~1"=="--bin"      ( set "ARG_BIN=%~2"  & shift & shift & goto parse_args )
-if /I "%~1"=="--board"    ( set "ARG_BOARD=%~2"& shift & shift & goto parse_args )
-if /I "%~1"=="--baud"     ( set "ARG_BAUD=%~2" & shift & shift & goto parse_args )
-if /I "%~1"=="--help"     goto show_help
-if /I "%~1"=="-h"         goto show_help
-echo [ERROR] Unknown argument: %~1
-echo Run "flash_otgw.bat --help" for usage.
-exit /b 2
-:args_done
+if not "%~1"=="" call :parse_args %*
+if errorlevel 1 exit /b %ERRORLEVEL%
+if "%ARG_HELP%"=="1" goto show_help
 
 echo.
 echo ============================================================
@@ -95,6 +87,7 @@ if exist "%ESPTOOL_EXE%" (
 
 REM ---- Step 2: locate firmware bin ------------------------------------------
 call :select_bin
+if errorlevel 1 exit /b %ERRORLEVEL%
 for %%F in ("%BIN_FILE%") do set "BIN_NAME=%%~nxF"
 
 REM ---- Step 3: derive board from filename (or user override) ----------------
@@ -211,6 +204,19 @@ echo  Flash complete.
 echo  After reset: connect to WiFi AP "OTGW-AP" to configure.
 echo ============================================================
 exit /b 0
+
+
+:parse_args
+if "%~1"=="" exit /b 0
+if /I "%~1"=="--port"     ( set "ARG_PORT=%~2" & shift & shift & goto parse_args )
+if /I "%~1"=="--bin"      ( set "ARG_BIN=%~2"  & shift & shift & goto parse_args )
+if /I "%~1"=="--board"    ( set "ARG_BOARD=%~2"& shift & shift & goto parse_args )
+if /I "%~1"=="--baud"     ( set "ARG_BAUD=%~2" & shift & shift & goto parse_args )
+if /I "%~1"=="--help"     ( set "ARG_HELP=1" & exit /b 0 )
+if /I "%~1"=="-h"         ( set "ARG_HELP=1" & exit /b 0 )
+echo [ERROR] Unknown argument: %~1
+echo Run "flash_otgw.bat --help" for usage.
+exit /b 2
 
 
 :select_bin

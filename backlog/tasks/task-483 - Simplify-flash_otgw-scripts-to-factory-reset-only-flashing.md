@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-04-29 22:10'
-updated_date: '2026-04-29 22:53'
+updated_date: '2026-04-29 23:21'
 labels:
   - flash scripts
 dependencies: []
@@ -46,10 +46,18 @@ Verification: cmd /c flash_otgw.bat --help passed; Git Bash bash -n flash_otgw.s
 Zip verification: rebuilt ESP8266 and ESP32 flash zips contain only merged-full bin, flash_otgw.bat, flash_otgw.sh, README.txt, and README_NL.txt. Extracted readmes had no matches for --upgrade, --erase, preserve, backup, restore, firmware-only, alleen-firmware, YES, Three flash, or Drie flash.
 
 Checklist caveat: evaluate.py --quick still exits 1 on the existing 15 PROGMEM violations, with ADR-062 mqtt_configuratie.cpp not found and sendMQTTheapdiag buffer arithmetic warnings. This is unchanged project debt outside TASK-483 scope.
+
+Post-closure bug report: running build\flash_otgw.bat with no arguments failed before flashing with "The system cannot find the batch label specified - args_done". Reopened TASK-483 to fix the Windows no-argument path and packaging output.
+
+Windows batch bug fix: removed the no-argument forward goto to :args_done and replaced it with a parser subroutine that is only called when arguments exist. Added an errorlevel check after call :select_bin so missing-bin failures stop immediately instead of continuing into board detection.
+
+Packaging hardening: build.py now writes flash_otgw.bat with CRLF line endings when copying to build/ and when embedding it in distribution zips, so cmd.exe behavior does not depend on Git checkout line endings.
+
+Verification after bug report: safe no-argument batch smoke tests from extracted ESP8266 and ESP32 zip batch files no longer hit the batch-label error; they reach the expected No merged-full bin found error when the test intentionally omits binaries. build/flash_otgw.bat --help passed, rg found no args_done references, bash -n flash_otgw.sh passed, git diff --check passed with only CRLF normalization warnings, tests/test_build.py passed, and a clean full build.py completed successfully for ESP8266 and ESP32-S3 after stopping stale PlatformIO child processes and running build.py --clean.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Simplified the cross-platform OTGW flash helpers to one user-facing path: factory reset. flash_otgw.bat and flash_otgw.sh now accept only targeting/help options, auto-select merged-full images by default, erase flash with write_flash -z -e, and no longer offer mode selection, --upgrade/--factory/--erase flags, YES confirmation, preserve-settings prompts, or HTTP backup/restore. Updated build.py distribution packaging so flash zips include only the merged-full image plus flash scripts/readmes, then refreshed generated README copy and hardware manual notes to match the new factory-reset-only behavior. Verification passed for script help/syntax, removed option rejection, zip contents/readme scan, tests/test_build.py, tests/test_evaluate.py, and full build.py for ESP8266 and ESP32-S3. evaluate.py --quick remains red on existing unrelated PROGMEM debt and two warnings, documented in implementation notes.
+Simplified the cross-platform OTGW flash helpers to one user-facing path: factory reset. flash_otgw.bat and flash_otgw.sh now accept only targeting/help options, auto-select merged-full images by default, erase flash with write_flash -z -e, and no longer offer mode selection, --upgrade/--factory/--erase flags, YES confirmation, preserve-settings prompts, or HTTP backup/restore. Fixed the reported Windows no-argument batch failure by removing the fragile args_done forward-goto parser, adding a parser subroutine and select_bin error handling, and hardening build.py to emit CRLF batch files in build/ and distribution zips. Verification passed for batch help, safe no-argument smoke tests from extracted zip batch files, removed option rejection, zip contents/readme scan, tests/test_build.py, and a clean full build.py for ESP8266 and ESP32-S3. evaluate.py --quick remains red on existing unrelated PROGMEM debt and two warnings, documented in implementation notes.
 <!-- SECTION:FINAL_SUMMARY:END -->

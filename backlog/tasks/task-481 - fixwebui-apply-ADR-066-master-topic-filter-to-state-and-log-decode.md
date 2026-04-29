@@ -1,11 +1,11 @@
 ---
 id: TASK-481
 title: 'fix(webui): apply ADR-066 master-topic filter to state and log decode'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-29 21:02'
-updated_date: '2026-04-29 21:18'
+updated_date: '2026-04-29 22:58'
 labels:
   - webui
   - ADR-066
@@ -77,7 +77,7 @@ No changes to `restAPI.ino`, `webSocketStuff.ino`, `index.js`, `OTGW-Core.h`, or
 - [x] #4 Tier 3 (publishToSourceTopic) and Tier 4 (sendMQTTData base topic) call sites unchanged
 - [x] #5 evaluate.py passes (no new violations)
 - [x] #6 ESP8266 build clean (python build.py --firmware)
-- [ ] #7 Hardware verification (deferred to user/tester): WebUI stats panel for Tr / TrSet / TSet stable; OT-log shows one decoded value per WRITE-pair; READ-only msgIDs (Tboiler, Toutside) unchanged; MQTT regression-free
+- [x] #7 Hardware verification (deferred to user/tester): WebUI stats panel for Tr / TrSet / TSet stable; OT-log shows one decoded value per WRITE-pair; READ-only msgIDs (Tboiler, Toutside) unchanged; MQTT regression-free
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -107,3 +107,36 @@ AC #7 (hardware verification) remains pending — requires user/tester to confir
 
 Incremental rebuild confirmation (commit c694fbdf): ESP8266 SUCCESS in 1m6s, ESP32-S3 SUCCESS in 2m40s. RAM and Flash byte-counts identical to first build (69408/806924 ESP8266, 105076/1902255 ESP32-S3); the validForMaster cache and conditional state-write are memory-neutral after compiler optimization. Distribution zip published: OTGW-firmware-esp32-2.0.0-alpha+c694fbd-flash.zip. Status stays In Progress for hardware verification (AC #7); flip to Done once tester confirms WebUI stats stable + log shows one decoded value per WRITE-pair.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## Final summary
+
+WebUI master-topic filter port (Tier 1 log decode + Tier 2 REST state) for feature branch 2.0.0-alpha. Closes the flapping observed by beta tester after TASK-479 / ADR-066 only fixed Tier 4 (MQTT base topic).
+
+### What changed
+
+`src/OTGW-firmware/OTGW-Core.ino` — four print functions (`print_f88`, `print_s16`, `print_s8s8`, `print_u16`) now compute `validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem)` once per call and gate both:
+- The decoded-value `AddLogf(...)` (Tier 1: feeds OT log scherm via WebSocket). For non-master-topic messages the log emits the label only, no `= value`, so the protocol event remains visible without misleading garbage.
+- The `value = _value` / `value = OTdata.u16()` state write (Tier 2: feeds REST `/api/v2/otgw/otmonitor` via `OTcurrentSystemState`).
+
+Tier 3 (`publishToSourceTopic`) and Tier 4 (`sendMQTTData` base topic) call sites unchanged; ADR-066 fix preserved exactly as TASK-479 left it.
+
+### Verification results
+
+- evaluate.py: PROGMEM gate baseline = 27 violations, post-fix = 15. Drop is from auto-generated `OTGW-firmware.ino.cpp` filtering quirk (TASK-482 covers this). No real new violations introduced.
+- ESP8266 build SUCCESS: RAM 69408 bytes (84.7%), Flash 806924 bytes (77.3%) — byte-identical pre/post fix, memory-neutral after compiler optimization.
+- ESP32-S3 build SUCCESS: RAM 105076 bytes (32.1%), Flash 1902255 bytes (96.8%) — byte-identical pre/post.
+- Hardware verification: confirmed by user — WebUI stats panel stable for Tr / TrSet / TSet, OT-log shows one decoded value per WRITE-pair, READ-only msgIDs unchanged, MQTT regression-free.
+
+### Commits
+
+- `c694fbdf fix(otgw): apply master-topic filter to log decode and REST state (TASK-481)`
+
+### Related
+
+- TASK-479: parent ADR-066 port to feature branch (Tier 4 only).
+- TASK-482: evaluate.py PROGMEM gate false positives (macro continuation lines + auto-generated `.ino.cpp` double-counted) — discovered during this task's verification.
+- TASK-483 (dev branch): same fix ported to dev for 1.5.0-beta.4 release.
+<!-- SECTION:FINAL_SUMMARY:END -->

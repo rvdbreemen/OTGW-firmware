@@ -836,7 +836,12 @@ def copy_flash_scripts(project_dir):
             continue
         dst = build_dir / script_name
         try:
-            shutil.copy2(src, dst)
+            if script_name.endswith(".bat"):
+                text = src.read_text(encoding="utf-8")
+                text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
+                dst.write_text(text, encoding="utf-8", newline="")
+            else:
+                shutil.copy2(src, dst)
             # Preserve executable bit for the .sh on POSIX hosts so a release
             # zip carrying mode-bits keeps it directly runnable.
             if script_name.endswith(".sh") and platform.system() != "Windows":
@@ -914,10 +919,10 @@ def create_distribution_zip(project_dir, semver, target):
             # Factory-reset bin used by the flash scripts.
             zf.write(merged_full, arcname=merged_full.name)
 
-            # Windows batch script: keep CRLF line endings (the source file
-            # already has CRLF via .gitattributes when checked out on Windows).
-            with open(flash_bat, "rb") as f:
-                bat_bytes = f.read()
+            # Windows batch script: force CRLF line endings for cmd.exe.
+            bat_text = flash_bat.read_text(encoding="utf-8")
+            bat_text = bat_text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
+            bat_bytes = bat_text.encode("utf-8")
             zf.writestr("flash_otgw.bat", bat_bytes)
 
             # Unix shell script: force LF endings and set the executable bit
