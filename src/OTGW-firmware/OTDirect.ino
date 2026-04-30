@@ -1953,8 +1953,14 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88) {
     return;
   }
 
-  // Compute |delta| in f8.8 units, ignoring sign.
-  int32_t signedDelta = (int32_t)f88 - (int32_t)otRemoteOverride.f88Value;
+  // Compute |delta| in f8.8 units. f8.8 is two's-complement signed, so we
+  // sign-extend through int16_t before widening to int32_t. Without the
+  // (int16_t) hop a uint16_t -> int32_t cast keeps the high bit unset
+  // (e.g. -5 °C raw 0xFB00 would read as +64256 instead of -1280) and the
+  // honour/release deltas would mis-fire for negative TrSet values.
+  int16_t curSigned = (int16_t)f88;
+  int16_t ovrSigned = (int16_t)otRemoteOverride.f88Value;
+  int32_t signedDelta = (int32_t)curSigned - (int32_t)ovrSigned;
   uint32_t delta = (signedDelta < 0) ? (uint32_t)(-signedDelta) : (uint32_t)signedDelta;
 
   if (delta < OT_OVERRIDE_HONOR_DELTA_F88) {

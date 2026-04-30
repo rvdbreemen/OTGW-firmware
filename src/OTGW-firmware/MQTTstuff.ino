@@ -1993,13 +1993,15 @@ void bleSensorPublishStateTopics(const char* macCompact, float temp, float hum, 
 
 // Build one HA discovery config payload and publish it retained to
 // <HaPrefix>/sensor/<uniqueId>_ble_<mac>_<kind>/config.
-// Manual JSON via snprintf_P (no ArduinoJson per ADR). Streaming chunked
-// publish (no full-message buffer). Returns true on successful endPublish.
+// Manual JSON via snprintf_P (no ArduinoJson per ADR). Returns true on
+// successful endPublish.
 //
-// Discovery-payload size is bounded: device block + entity fields fit
-// comfortably under 600 bytes for all four kinds. We size the local buffer
-// at 768 to keep one allocation per call and avoid the two-pass MEASURE
-// dance for what is a small, fixed-size payload.
+// Single-buffer publish via the streaming primitives. Payload size is
+// bounded at 768 bytes (the four discovery configs each fit comfortably
+// under 600), so one stack-local allocation suffices and we skip the
+// two-pass MEASURE-then-WRITE dance ADR-077 prescribes for unbounded
+// payloads. Heap pressure is still bounded by the canPublishMQTT() and
+// MQTT_DISCOVERY_HEAP_MIN gates per call, so behaviour is heap-safe.
 static bool bleSensorPublishOneDiscovery(const char* macCompact,
                                          const char* macWithColons,
                                          const char* kindKey,        // "temp" | "rh" | "bat" | "rssi"

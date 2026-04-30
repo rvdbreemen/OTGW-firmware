@@ -245,6 +245,15 @@ class SATBLEScanCallbacks : public NimBLEScanCallbacks {
       return;
     }
 
+    // TASK-488 follow-up: when a slot is recycled (was occupied by a
+    // different MAC that went stale), the previous tenant's
+    // bDiscoveryPublished flag is still set. Reset it so the new MAC
+    // gets a fresh HA-discovery config published. For an unchanged
+    // MAC the strcmp matches and the flag is preserved (no spam).
+    if (strcmp(_bleSensors[slot].sMacAddress, macBuf) != 0) {
+      _bleSensors[slot].bDiscoveryPublished = false;
+    }
+
     // Update sensor data
     strlcpy(_bleSensors[slot].sMacAddress, macBuf, sizeof(_bleSensors[slot].sMacAddress));
     _bleSensors[slot].fTemperature = temp;
