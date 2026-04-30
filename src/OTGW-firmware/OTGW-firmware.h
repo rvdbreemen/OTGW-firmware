@@ -245,6 +245,13 @@ float satBLEGetTemperature();
 float satBLEGetHumidity();
 void satBLEPublishMQTT();
 void satBLESendStatusJSON();
+
+// TASK-488: BLE HA-discovery + per-MAC state-topic helpers (defined in MQTTstuff.ino).
+// Caller (satBLEPublishMQTT) wires these in once per first-seen MAC (discovery)
+// and on every scan iteration (state). One-shot discovery via per-slot
+// bDiscoveryPublished flag (added to BLESensorData in TASK-487 finalisation).
+void bleSensorPublishStateTopics(const char* macCompact, float temp, float hum, uint8_t bat, int8_t rssi);
+void bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColons);
 #endif
 
 // SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino

@@ -1909,7 +1909,230 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
   }
 }
 
+#if defined(ESP32)
+//===========================================================================================
+// TASK-488 BLE HA-discovery helpers (ESP32 / OTGW32 only).
+//
+// Caller wiring (lives in SATble.ino, finalised by TASK-487):
+//   In satBLEPublishMQTT(), iterate _bleSensors[] valid slots:
+//     1. Build macCompact via bleMacToCompact(slot.sMacAddress, ...).
+//     2. If slot.bDiscoveryPublished is false:
+//          - Call bleSensorPublishHaDiscovery(macCompact, slot.sMacAddress)
+//          - Set slot.bDiscoveryPublished = true on success path
+//     3. Call bleSensorPublishStateTopics(macCompact, slot.fTemperature, ...)
+//   The bDiscoveryPublished flag must be added to BLESensorData by TASK-487.
+//
+// ADR-077 conformance: HA discovery configs are emitted via the existing
+// chunked streaming primitives (beginMqttPublish + writeMqttChunk +
+// endPublish) — same heap-safe two-pass shape ADR-077 requires. The
+// 256-bit OT-ID drip bitmap (MQTTautoCfgPendingMap) does not apply here:
+// BLE MACs are not OT IDs. Drip pacing is provided by the caller cadence
+// (one BLE scan per iBleInterval, typically 30s) plus the one-shot
+// bDiscoveryPublished flag — there is no synchronous burst of N×4 retained
+// configs per scan. canPublishMQTT() and MQTT_DISCOVERY_HEAP_MIN gate every
+// publish, so heap pressure transparently defers via the existing tier
+// machine without needing a separate queue.
+//===========================================================================================
 
+// Convert "AA:BB:CC:DD:EE:FF" into "aabbccddeeff" (lowercase, no colons).
+// Bounded write; on malformed input (not exactly 17 chars / wrong colon
+// positions) writes empty string. No String, no heap.
+static void bleMacToCompact(const char* macWithColons, char* out, size_t outSize)
+{
+  if (!out || outSize == 0) return;
+  out[0] = '\0';
+  if (!macWithColons) return;
+  // Expect exactly 17 chars: "AA:BB:CC:DD:EE:FF"
+  size_t inLen = strnlen(macWithColons, 18);
+  if (inLen != 17) return;
+  // Need 12 hex chars + NUL in output.
+  if (outSize < 13) return;
+  size_t o = 0;
+  for (size_t i = 0; i < 17; i++) {
+    char c = macWithColons[i];
+    if ((i % 3) == 2) {
+      if (c != ':') { out[0] = '\0'; return; }
+      continue;
+    }
+    if (!isxdigit(static_cast<unsigned char>(c))) { out[0] = '\0'; return; }
+    out[o++] = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+  }
+  out[o] = '\0';
+}
+
+// Publish 4 BLE state topics under <MQTTPubNamespace>/sat/ble/<mac>/{temp,rh,bat,rssi}.
+// Not retained (state). Skips silently if MQTT is not connected.
+void bleSensorPublishStateTopics(const char* macCompact, float temp, float hum, uint8_t bat, int8_t rssi)
+{
+  if (!macCompact || macCompact[0] == '\0') return;
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
+
+  char topic[64];
+  char value[16];
+
+  // Temperature (°C)
+  snprintf_P(topic, sizeof(topic), PSTR("sat/ble/%s/temp"), macCompact);
+  dtostrf(temp, 1, 2, value);
+  sendMQTTData(topic, value, false);
+
+  // Relative humidity (%)
+  snprintf_P(topic, sizeof(topic), PSTR("sat/ble/%s/rh"), macCompact);
+  dtostrf(hum, 1, 2, value);
+  sendMQTTData(topic, value, false);
+
+  // Battery (%)
+  snprintf_P(topic, sizeof(topic), PSTR("sat/ble/%s/bat"), macCompact);
+  snprintf_P(value, sizeof(value), PSTR("%u"), (unsigned)bat);
+  sendMQTTData(topic, value, false);
+
+  // RSSI (dBm)
+  snprintf_P(topic, sizeof(topic), PSTR("sat/ble/%s/rssi"), macCompact);
+  snprintf_P(value, sizeof(value), PSTR("%d"), (int)rssi);
+  sendMQTTData(topic, value, false);
+}
+
+// Build one HA discovery config payload and publish it retained to
+// <HaPrefix>/sensor/<uniqueId>_ble_<mac>_<kind>/config.
+// Manual JSON via snprintf_P (no ArduinoJson per ADR). Streaming chunked
+// publish (no full-message buffer). Returns true on successful endPublish.
+//
+// Discovery-payload size is bounded: device block + entity fields fit
+// comfortably under 600 bytes for all four kinds. We size the local buffer
+// at 768 to keep one allocation per call and avoid the two-pass MEASURE
+// dance for what is a small, fixed-size payload.
+static bool bleSensorPublishOneDiscovery(const char* macCompact,
+                                         const char* macWithColons,
+                                         const char* kindKey,        // "temp" | "rh" | "bat" | "rssi"
+                                         const __FlashStringHelper* friendlyName,
+                                         const __FlashStringHelper* deviceClass,
+                                         const __FlashStringHelper* unit,
+                                         const __FlashStringHelper* valueTemplate)
+{
+  if (!settings.mqtt.bEnable) return false;
+  if (!MQTTclient.connected()) return false;
+  if (!isValidIP(MQTTbrokerIP)) return false;
+  if (!canPublishMQTT()) return false;
+  if (platformFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return false;
+
+  const char* haPrefix  = CSTR(settings.mqtt.sHaprefix);
+  const char* uniqueId  = CSTR(settings.mqtt.sUniqueid);
+  const char* topTopic  = CSTR(settings.mqtt.sTopTopic);
+
+  char topic[MQTT_TOPIC_MAX_LEN];
+  snprintf_P(topic, sizeof(topic),
+             PSTR("%s/sensor/%s_ble_%s_%s/config"),
+             haPrefix, uniqueId, macCompact, kindKey);
+
+  char stateTopic[MQTT_TOPIC_MAX_LEN];
+  snprintf_P(stateTopic, sizeof(stateTopic),
+             PSTR("%s/value/%s/sat/ble/%s/%s"),
+             topTopic, uniqueId, macCompact, kindKey);
+
+  // Compose the JSON payload into a single bounded RAM buffer.
+  char payload[768];
+  int n = snprintf_P(payload, sizeof(payload),
+    PSTR("{"
+      "\"name\":\"BLE %s %s\","
+      "\"uniq_id\":\"%s_ble_%s_%s\","
+      "\"stat_t\":\"%s\","
+      "\"dev_cla\":\"%S\","
+      "\"unit_of_meas\":\"%S\","
+      "\"val_tpl\":\"%S\","
+      "\"dev\":{"
+        "\"ids\":[\"%s_ble_%s\"],"
+        "\"name\":\"BLE %s\","
+        "\"mdl\":\"BLE Sensor\","
+        "\"mf\":\"BLE\","
+        "\"via_device\":\"%s\""
+      "}"
+    "}"),
+    macWithColons, reinterpret_cast<PGM_P>(friendlyName),
+    uniqueId, macCompact, kindKey,
+    stateTopic,
+    reinterpret_cast<PGM_P>(deviceClass),
+    reinterpret_cast<PGM_P>(unit),
+    reinterpret_cast<PGM_P>(valueTemplate),
+    uniqueId, macCompact,
+    macWithColons,
+    uniqueId);
+
+  if (n <= 0 || (size_t)n >= sizeof(payload)) {
+    MQTTDebugTf(PSTR("[ble-disc] payload truncated for %s/%s\r\n"), macCompact, kindKey);
+    return false;
+  }
+
+  if (!beginMqttPublish(topic, (size_t)n, /*retain=*/true)) return false;
+  if (!writeMqttChunk(payload, (size_t)n)) {
+    MQTTclient.endPublish();
+    return false;
+  }
+  if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
+  feedWatchDog();
+  return true;
+}
+
+// Publish 4 retained HA-discovery configs (temperature, humidity, battery,
+// signal_strength) for one BLE sensor MAC. One-shot per MAC: the caller is
+// responsible for tracking bDiscoveryPublished to avoid re-publishing on
+// every BLE scan. This is intentional — the bitmap-drip in
+// loopMQTTDiscovery() is keyed by OT message ID and does not have a slot
+// for arbitrary MACs; per-scan caller cadence (iBleInterval, typically 30s)
+// already provides drip pacing.
+void bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColons)
+{
+  if (!macCompact || macCompact[0] == '\0') return;
+  if (!macWithColons || macWithColons[0] == '\0') return;
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
+
+  // Each kind: short-name, device_class, unit, value_template. All PROGMEM.
+  bool ok;
+  ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
+        "temp",
+        F("Temperature"),
+        F("temperature"),
+        F("°C"),
+        F("{{ value | float }}"));
+  if (!ok) {
+    MQTTDebugTf(PSTR("[ble-disc] temp publish failed for %s\r\n"), macCompact);
+    return;
+  }
+
+  ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
+        "rh",
+        F("Humidity"),
+        F("humidity"),
+        F("%"),
+        F("{{ value | float }}"));
+  if (!ok) {
+    MQTTDebugTf(PSTR("[ble-disc] rh publish failed for %s\r\n"), macCompact);
+    return;
+  }
+
+  ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
+        "bat",
+        F("Battery"),
+        F("battery"),
+        F("%"),
+        F("{{ value | int }}"));
+  if (!ok) {
+    MQTTDebugTf(PSTR("[ble-disc] bat publish failed for %s\r\n"), macCompact);
+    return;
+  }
+
+  ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
+        "rssi",
+        F("Signal Strength"),
+        F("signal_strength"),
+        F("dBm"),
+        F("{{ value | int }}"));
+  if (!ok) {
+    MQTTDebugTf(PSTR("[ble-disc] rssi publish failed for %s\r\n"), macCompact);
+    return;
+  }
+
+  MQTTDebugTf(PSTR("[ble-disc] published 4 HA configs for MAC %s\r\n"), macCompact);
+}
+#endif // defined(ESP32)
 
 
 /***************************************************************************

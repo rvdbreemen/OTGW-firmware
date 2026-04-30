@@ -8,8 +8,13 @@
 **  SAT concept and algorithm design by George Dellas
 **
 **  Scans for BLE advertisements from common temperature/humidity sensors
-**  (Xiaomi LYWSD03MMC with ATC/pvvx custom firmware, BTHome protocol).
+**  (Xiaomi LYWSD03MMC with ATC/pvvx custom firmware, BTHome v2 protocol).
 **  Provides room temperature input for SAT control loop.
+**
+**  TASK-487 / ADR-092: built on NimBLE-Arduino 2.x rather than the classic
+**  Bluedroid stack. Async-by-default scanning means loop() is never blocked;
+**  std::string service-data avoids the Arduino-String heap churn that the
+**  hot-path scan callback used to cause (ADR-004).
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  TERMS OF USE: MIT License. See bottom of OTGW-firmware.h
@@ -18,9 +23,7 @@
 
 #if defined(ESP32)
 
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEScan.h>
+#include <NimBLEDevice.h>
 
 // --- Switchable debug-trace macros (telnet key '7' toggles state.debug.bSATBLE) ---
 // Init meldingen blijven ongewrapt zodat boot-time visibility behouden blijft.
@@ -31,14 +34,19 @@
 
 // --- BLE Sensor Constants ---
 #define SAT_BLE_MAX_SENSORS   4
-static const uint32_t BLE_SCAN_INTERVAL_MS  = 30000;   // 30s between scans (default)
 static const uint32_t BLE_STALE_MS          = 300000;   // 5 min stale timeout
-static const uint32_t BLE_SCAN_DURATION_SEC = 3;        // 3 second scan window
+static const uint32_t BLE_SCAN_DURATION_SEC = 3;        // 3 second scan window per cycle
 
 // ATC/pvvx custom firmware service data UUID: 0x181A (Environmental Sensing)
-static const uint16_t ATC_SERVICE_UUID_16   = 0x181A;
+static const uint16_t ATC_SERVICE_UUID_16    = 0x181A;
 // BTHome v2 service data UUID: 0xFCD2
 static const uint16_t BTHOME_SERVICE_UUID_16 = 0xFCD2;
+
+// BTHome v2 device-info / flag byte
+//   bit6 = version 2 (must be 1)
+//   bit0 = encryption (1 = encrypted, we skip those)
+static const uint8_t BTHOME_V2_FLAG_VERSION_BIT = 0x40;
+static const uint8_t BTHOME_V2_FLAG_ENCRYPTED   = 0x01;
 
 // BTHome v2 object IDs
 static const uint8_t BTHOME_OBJ_TEMPERATURE_S16 = 0x02;  // sint16, factor 0.01
@@ -53,12 +61,13 @@ struct BLESensorData {
   int8_t   iRssi;
   bool     bValid;
   uint32_t iLastSeenMs;
+  bool     bDiscoveryPublished; // TASK-488: HA-discovery sent at least once for this MAC
 };
 
 static BLESensorData _bleSensors[SAT_BLE_MAX_SENSORS];
-static BLEScan* _pBLEScan  = nullptr;
-static uint32_t _bleLastScanMs = 0;
-static bool     _bleInitialized = false;
+static NimBLEScan*   _pBLEScan       = nullptr;
+static uint32_t      _bleLastScanMs  = 0;
+static bool          _bleInitialized = false;
 
 // --- Forward declarations ---
 static bool parseBLEAtcFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);
@@ -102,7 +111,12 @@ static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, f
 {
   if (len < 3) return false;
 
-  // First byte is device info / flags; skip it
+  // First byte is device info / flags. BTHome v2 requires bit6 = 1 (version 2),
+  // and we skip encrypted advertisements (bit0 = 1) since we have no key.
+  uint8_t flags = data[0];
+  if ((flags & BTHOME_V2_FLAG_VERSION_BIT) == 0) return false;
+  if ((flags & BTHOME_V2_FLAG_ENCRYPTED) != 0)   return false;
+
   size_t pos = 1;
   bool gotTemp = false;
   bool gotHum = false;
@@ -174,57 +188,35 @@ static int bleFindOrAllocSlot(const char* mac)
 }
 
 //=====================================================================
-// BLE scan callback: parses advertisements for known sensor formats
+// NimBLE 2.x scan callback: parses advertisements for known sensor formats
 //=====================================================================
-class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
-  void onResult(BLEAdvertisedDevice advertisedDevice) override
+class SATBLEScanCallbacks : public NimBLEScanCallbacks {
+  void onResult(const NimBLEAdvertisedDevice* dev) override
   {
     float temp = 0.0f, hum = 0.0f;
     uint8_t batt = 0;
     bool parsed = false;
 
-    // Trace every incoming advertisement when SAT BLE debug toggle is on.
-    SATBLEDebugTf(PSTR("SAT BLE: ad from %s rssi=%d hasServiceData=%d\r\n"),
-                  advertisedDevice.getAddress().toString().c_str(),
-                  advertisedDevice.getRSSI(),
-                  advertisedDevice.haveServiceData() ? 1 : 0);
+    SATBLEDebugTf(PSTR("SAT BLE: ad from %s rssi=%d\r\n"),
+                  dev->getAddress().toString().c_str(),
+                  dev->getRSSI());
 
-    // Try ATC/pvvx format: service data UUID 0x181A
-    if (advertisedDevice.haveServiceData()) {
-      BLEUUID svcUUID = advertisedDevice.getServiceDataUUID();
-      // Copy service data to a fixed buffer immediately to avoid String heap churn
-      // in this BLE scan callback (called on every advertisement).
-      uint8_t svcBytes[32];
-      size_t svcLen = 0;
-      {
-        String svcData = advertisedDevice.getServiceData();
-        svcLen = svcData.length();
-        if (svcLen > sizeof(svcBytes)) svcLen = sizeof(svcBytes);
-        memcpy(svcBytes, svcData.c_str(), svcLen);
-      } // String freed here
-      uint16_t uuid16 = 0;
-
-      // Extract 16-bit UUID
-      if (svcUUID.bitSize() == 16) {
-        uuid16 = svcUUID.getNative()->u16.value;
-      } else {
-        // Some BLE stacks return the full 128-bit form for 16-bit UUIDs
-        // Try matching by comparing the UUID string in a fixed char buffer
-        char uuidBuf[40];
-        strlcpy(uuidBuf, svcUUID.toString().c_str(), sizeof(uuidBuf));
-        // tolower in-place for case-insensitive compare
-        for (int i = 0; uuidBuf[i]; i++) uuidBuf[i] = tolower((unsigned char)uuidBuf[i]);
-        if (strstr(uuidBuf, "181a") != nullptr) {
-          uuid16 = ATC_SERVICE_UUID_16;
-        } else if (strstr(uuidBuf, "fcd2") != nullptr) {
-          uuid16 = BTHOME_SERVICE_UUID_16;
-        }
+    // Try ATC/pvvx (UUID 0x181A) first.
+    // NimBLE returns std::string by value; lifetime ends at end of this scope.
+    {
+      std::string atcData = dev->getServiceData(NimBLEUUID((uint16_t)ATC_SERVICE_UUID_16));
+      if (atcData.length() >= 13) {
+        parsed = parseBLEAtcFormat(reinterpret_cast<const uint8_t*>(atcData.data()),
+                                    atcData.length(), &temp, &hum, &batt);
       }
+    }
 
-      if (uuid16 == ATC_SERVICE_UUID_16 && svcLen >= 13) {
-        parsed = parseBLEAtcFormat(svcBytes, svcLen, &temp, &hum, &batt);
-      } else if (uuid16 == BTHOME_SERVICE_UUID_16 && svcLen >= 3) {
-        parsed = parseBLEBTHomeFormat(svcBytes, svcLen, &temp, &hum, &batt);
+    // Fall through to BTHome v2 (UUID 0xFCD2) if ATC didn't match.
+    if (!parsed) {
+      std::string bthomeData = dev->getServiceData(NimBLEUUID((uint16_t)BTHOME_SERVICE_UUID_16));
+      if (bthomeData.length() >= 3) {
+        parsed = parseBLEBTHomeFormat(reinterpret_cast<const uint8_t*>(bthomeData.data()),
+                                       bthomeData.length(), &temp, &hum, &batt);
       }
     }
 
@@ -233,9 +225,9 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
       return;
     }
 
-    // Get MAC address — copy to fixed char buffer, avoid named String object
+    // Get MAC address — copy to fixed char buffer for storage
     char macBuf[18];
-    strlcpy(macBuf, advertisedDevice.getAddress().toString().c_str(), sizeof(macBuf));
+    strlcpy(macBuf, dev->getAddress().toString().c_str(), sizeof(macBuf));
     // Convert to uppercase AA:BB:CC:DD:EE:FF format
     for (int i = 0; macBuf[i]; i++) macBuf[i] = toupper((unsigned char)macBuf[i]);
 
@@ -258,13 +250,13 @@ class SATBLEScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     _bleSensors[slot].fTemperature = temp;
     _bleSensors[slot].fHumidity    = hum;
     _bleSensors[slot].iBattery     = batt;
-    _bleSensors[slot].iRssi        = (int8_t)advertisedDevice.getRSSI();
+    _bleSensors[slot].iRssi        = (int8_t)dev->getRSSI();
     _bleSensors[slot].bValid       = true;
     _bleSensors[slot].iLastSeenMs  = millis();
 
     SATBLEDebugTf(PSTR("SAT BLE: sensor %s slot=%d temp=%.1f hum=%.1f batt=%u rssi=%d\r\n"),
                   macBuf, slot, temp, hum, (unsigned)batt,
-                  (int)advertisedDevice.getRSSI());
+                  (int)dev->getRSSI());
   }
 };
 
@@ -275,15 +267,17 @@ void satBLEInit()
 {
   if (!settings.sat.bBleEnable) return;
 
-  BLEDevice::init("");
-  _pBLEScan = BLEDevice::getScan();
-  _pBLEScan->setAdvertisedDeviceCallbacks(&_bleScanCallbacks, true);  // true = allow duplicates
-  _pBLEScan->setActiveScan(false);   // Passive scan to save power
-  _pBLEScan->setInterval(100);
-  _pBLEScan->setWindow(99);
+  NimBLEDevice::init("");
+  _pBLEScan = NimBLEDevice::getScan();
+  // wantDuplicates=true: callback fires for every advertisement, not just first
+  _pBLEScan->setScanCallbacks(&_bleScanCallbacks, true);
+  _pBLEScan->setActiveScan(false);  // Passive scan to save power
+  _pBLEScan->setMaxResults(0);      // Callback-only mode; library never builds a result list
+  _pBLEScan->setInterval(160);       // 100 ms BLE scan-interval
+  _pBLEScan->setWindow(80);          // 50 ms BLE scan-window (50% radio duty)
 
   _bleInitialized = true;
-  DebugTln(F("SAT BLE: initialized"));
+  DebugTln(F("SAT BLE: initialized (NimBLE 2.x)"));
 
   if (settings.sat.sBleMAC[0] != '\0') {
     DebugTf(PSTR("SAT BLE: bound to MAC %s\r\n"), settings.sat.sBleMAC);
@@ -308,15 +302,18 @@ void satBLELoop()
   if ((millis() - _bleLastScanMs) < interval) return;
   _bleLastScanMs = millis();
 
-  SATBLEDebugTf(PSTR("SAT BLE: scan starting (interval=%us, duration=%us)\r\n"),
+  SATBLEDebugTf(PSTR("SAT BLE: scan starting async (interval=%us, duration=%us)\r\n"),
                 (unsigned)(interval / 1000UL),
                 (unsigned)BLE_SCAN_DURATION_SEC);
 
-  // Start non-blocking scan
-  _pBLEScan->start(BLE_SCAN_DURATION_SEC, false);  // false = non-blocking
-  _pBLEScan->clearResults();  // Free memory after scan
+  // NimBLE 2.x async scan: 3-arg form returns immediately, callbacks fire on
+  // the BLE host task. loop() is never blocked. Args: (duration_seconds,
+  // is_continue=false, restart=true). 'restart=true' handles the case where a
+  // previous scan window is still draining when our timer fires.
+  _pBLEScan->start(BLE_SCAN_DURATION_SEC, false, true);
 
-  // Update state from best sensor
+  // Update state from best sensor (uses whatever slots are valid right now;
+  // fresh callbacks during the next 3 s will refresh slots in place).
   satBLEUpdateState();
 }
 
@@ -391,6 +388,34 @@ float satBLEGetHumidity()
 }
 
 //=====================================================================
+// Compact a MAC string "AA:BB:CC:DD:EE:FF" -> "aabbccddeeff" (lowercase,
+// no colons). Used to build per-sensor MQTT topic paths and HA object_ids.
+// Bounded; on malformed input writes empty string.
+//=====================================================================
+static void bleMacCompactLocal(const char* macWithColons, char* out, size_t outSize)
+{
+  if (out == nullptr || outSize < 13) {
+    if (out != nullptr && outSize > 0) out[0] = '\0';
+    return;
+  }
+  out[0] = '\0';
+  if (macWithColons == nullptr) return;
+  size_t len = strnlen(macWithColons, 18);
+  if (len != 17) return;
+  size_t outPos = 0;
+  for (size_t i = 0; i < 17; i++) {
+    char c = macWithColons[i];
+    if (i % 3 == 2) {
+      if (c != ':') return;
+      continue;
+    }
+    if (!isxdigit((unsigned char)c)) return;
+    out[outPos++] = (char)tolower((unsigned char)c);
+  }
+  out[outPos] = '\0';
+}
+
+//=====================================================================
 // Publish BLE sensor data to MQTT
 //=====================================================================
 void satBLEPublishMQTT()
@@ -400,6 +425,7 @@ void satBLEPublishMQTT()
 
   char valBuf[16];
 
+  // --- Legacy flat topics (best/configured slot) — backwards compat ---
   if (state.sat.bBleTempValid) {
     dtostrf(state.sat.fBleTemp, 1, 2, valBuf);
     sendMQTTData(F("sat/ble_temp"), valBuf, false);
@@ -417,6 +443,25 @@ void satBLEPublishMQTT()
   snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)state.sat.iBleSensorCount);
   sendMQTTData(F("sat/ble_sensor_count"), valBuf, false);
   sendMQTTData(F("sat/ble_temp_valid"), state.sat.bBleTempValid ? "true" : "false", false);
+
+  // --- TASK-488: per-MAC state topics + one-shot HA discovery ---
+  // For every valid slot: compact MAC, publish 4 state topics,
+  // and (once per MAC) emit the HA discovery configs.
+  for (int i = 0; i < SAT_BLE_MAX_SENSORS; i++) {
+    if (!_bleSensors[i].bValid) continue;
+    char macCompact[13];
+    bleMacCompactLocal(_bleSensors[i].sMacAddress, macCompact, sizeof(macCompact));
+    if (macCompact[0] == '\0') continue;  // skip malformed
+    if (!_bleSensors[i].bDiscoveryPublished) {
+      bleSensorPublishHaDiscovery(macCompact, _bleSensors[i].sMacAddress);
+      _bleSensors[i].bDiscoveryPublished = true;
+    }
+    bleSensorPublishStateTopics(macCompact,
+                                 _bleSensors[i].fTemperature,
+                                 _bleSensors[i].fHumidity,
+                                 _bleSensors[i].iBattery,
+                                 _bleSensors[i].iRssi);
+  }
 }
 
 //=====================================================================
