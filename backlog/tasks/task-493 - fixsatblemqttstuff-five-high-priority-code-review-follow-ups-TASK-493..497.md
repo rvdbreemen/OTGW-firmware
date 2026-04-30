@@ -3,10 +3,11 @@ id: TASK-493
 title: >-
   fix(satble,mqttstuff): five high-priority code-review follow-ups
   (TASK-493..497)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-30 16:55'
+updated_date: '2026-04-30 17:31'
 labels:
   - esp32
   - ble
@@ -82,11 +83,52 @@ small, interrelated, and verified by the same single ESP32 build cycle.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 1A-H1: `bleSensorPublishHaDiscovery` returns bool; caller in `satBLEPublishMQTT` only sets `bDiscoveryPublished = true` when the helper returns true
-- [ ] #2 1B-H1: `platformio.ini` is restored to its 171-line prose-rich layout matching `git show 59b1478d^:platformio.ini`, with the NimBLE-Arduino dependency added at the correct position in `[env:esp32]` lib_deps; original esptoolpy pin (`~1.30000.0`) preserved
-- [ ] #3 2A-H1: `setRemoteOverride` clamps `celsius` to `-40.0f..127.0f` before the f8.8 cast, mirroring `otdMqttSetRoomSetpoint`'s existing range guard
-- [ ] #4 2B-H1: every `return false` path inside `bleSensorPublishOneDiscovery` and the four-helper loop in `bleSensorPublishHaDiscovery` calls `feedWatchDog()` before returning when the failure follows a network attempt
-- [ ] #5 Cross-phase: a `portMUX_TYPE` is added in `SATble.ino`, the scan-callback slot-write region is wrapped in `portENTER_CRITICAL`/`portEXIT_CRITICAL`, and the slot-iteration regions in `satBLEPublishMQTT` + `satBLEUpdateState` are wrapped consistently
-- [ ] #6 ESP32 build SUCCESS, ESP8266 build unchanged
-- [ ] #7 evaluate.py: zero new violations
+- [x] #1 1A-H1: `bleSensorPublishHaDiscovery` returns bool; caller in `satBLEPublishMQTT` only sets `bDiscoveryPublished = true` when the helper returns true
+- [x] #2 1B-H1: `platformio.ini` is restored to its 171-line prose-rich layout matching `git show 59b1478d^:platformio.ini`, with the NimBLE-Arduino dependency added at the correct position in `[env:esp32]` lib_deps; original esptoolpy pin (`~1.30000.0`) preserved
+- [x] #3 2A-H1: `setRemoteOverride` clamps `celsius` to `-40.0f..127.0f` before the f8.8 cast, mirroring `otdMqttSetRoomSetpoint`'s existing range guard
+- [x] #4 2B-H1: every `return false` path inside `bleSensorPublishOneDiscovery` and the four-helper loop in `bleSensorPublishHaDiscovery` calls `feedWatchDog()` before returning when the failure follows a network attempt
+- [x] #5 Cross-phase: a `portMUX_TYPE` is added in `SATble.ino`, the scan-callback slot-write region is wrapped in `portENTER_CRITICAL`/`portEXIT_CRITICAL`, and the slot-iteration regions in `satBLEPublishMQTT` + `satBLEUpdateState` are wrapped consistently
+- [x] #6 ESP32 build SUCCESS, ESP8266 build unchanged
+- [x] #7 evaluate.py: zero new violations
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## TASK-493/494/495/496/497 — Five comprehensive-review follow-ups
+
+Bundled commit addressing all five fix-before-release findings from the
+comprehensive review (Phase 2 checkpoint) of session work
+`ace21a48..fa5ef3c5`. Pushed in commit `55fd0cf6`.
+
+### What changed
+
+- **TASK-493 (1A-H1)**: `bleSensorPublishHaDiscovery()` returns bool;
+  caller in `satBLEPublishMQTT()` now only marks
+  `bDiscoveryPublished=true` on a successful publish so transient
+  failures retry on the next iBleInterval cycle.
+- **TASK-494 (1B-H1)**: `platformio.ini` restored to the original
+  171-line prose-rich layout (`git show 59b1478d^:platformio.ini`)
+  with the NimBLE-Arduino dependency re-applied at the correct
+  position. Original esptoolpy pin (`~1.30000.0`) preserved; the
+  silent bump to `^2.41100.0` is reverted along with the comment loss.
+- **TASK-495 (2A-H1)**: `setRemoteOverride()` clamps `celsius` to
+  `-40..127` before the f8.8 cast, mirroring `otdMqttSetRoomSetpoint`.
+  Closes the float-narrowing-UB on REST/MQTT/telnet command paths.
+- **TASK-496 (2B-H1)**: `feedWatchDog()` called on every `return false`
+  after a network attempt in `bleSensorPublishOneDiscovery()`.
+- **TASK-497 (cross-phase)**: file-static `portMUX_TYPE _bleSensorsMux`
+  with snapshot pattern. Scan-callback wraps slot-update; loop-task
+  readers take a copy under the lock and process outside. Critical
+  sections stay short (one struct copy ~ 40 bytes).
+
+### Verification
+- ESP32 build SUCCESS (`pio run -e esp32 -j 1`, Flash 95.8%, RAM 31.7%).
+- ESP8266 build SUCCESS (BLE/OTDirect regions inside ESP32-only guards).
+- `python evaluate.py --quick` 95.5% health, zero new violations.
+- All 7 ACs satisfied.
+
+### Outstanding
+None for this task. Hardware verification of the fixes runs as part of
+the parent TASK-487 / TASK-488 hardware soak.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,75 +1,133 @@
 # Phase 1: Code Quality & Architecture Review
 
-## Code Quality Findings
+Consolidated summary of findings from `phase1a-code-quality.md`
+(`comprehensive-review:code-reviewer` agent) and `phase1b-architecture.md`
+(`comprehensive-review:architect-review` agent).
 
-### High Severity
+## Code Quality Findings (Phase 1A)
 
-1. **`strstr()` on PROGMEM pointers -- platform assumption** (MQTTstuff.ino:1711-1724, 1842-1844)
-   - `strstr(topicTemplate, "otgw-pic/")` where `topicTemplate` points into PROGMEM pool. Works on ESP8266 due to load-store exception handler for flash reads, and on ESP32 where PROGMEM is a no-op. But technically UB for libc. Neither `strstr` nor `strstr_P` is fully correct here (haystack is PROGMEM, not needle).
-   - **Action**: Document as explicit platform assumption. No correct libc function exists for PROGMEM-haystack + RAM-needle without copying.
+**Counts**: 0 Critical, 1 High, 5 Medium, 8 Low.
 
-2. **`%s` format with PROGMEM pointer in debug log** (MQTTstuff.ino:1832)
-   - `MQTTDebugTf(PSTR("Found PROGMEM entry for %d: [%s]\r\n"), OTid, topicTemplate)` -- same PROGMEM pointer issue. Works on ESP8266 but slow (exception per byte). Debug-only, acceptable.
+### High
 
-### Medium Severity
+- **1A-H1**: `bDiscoveryPublished = true` is flipped unconditionally
+  in `satBLEPublishMQTT()` after calling `bleSensorPublishHaDiscovery()`,
+  but the helper has eight gating early-returns
+  (`!settings.mqtt.bEnable`, `!MQTTclient.connected()`,
+  `!isValidIP(MQTTbrokerIP)`, `!canPublishMQTT()`, low-heap,
+  `endPublish` failure, …) and silently returns `void`. A transient
+  failure (e.g. first BLE scan landing before MQTT has connected)
+  permanently suppresses HA discovery for that sensor until the slot
+  is recycled with a different MAC (TASK-489) or the device reboots.
+  Fix: change the helper signature to return `bool`, gate the flag
+  flip on success.
 
-3. **Stray/temporary files committed** (src/OTGW-firmware/$f, src/OTGW-firmware/networkStuff.h.tmp)
-   - Editor/build artifacts. Neither referenced by any build or #include. Pollutes repo.
-   - **Action**: Remove files, add `*.tmp` to `.gitignore`.
+### Medium
 
-4. **Nightly restart has narrow 60s match window** (OTGW-firmware.ino:418-427)
-   - Checks `hour == iRestartHour && minute == 0`. If the 60s timer drifts or main loop is delayed, the restart could be missed for that day. The `uptime > 3600` guard prevents restart loops.
-   - **Action**: Acceptable with current guards. Document as latent fragility.
+- **1A-M1**: `setRemoteOverride()` writes state first, then enqueues
+  two frames via `otCmdEnqueue`. If the queue is full the override
+  state machine claims `mode=TEMPORARY` with no frame in flight, and
+  the auto-clear honour-state-machine waits forever.
+- **1A-M2**: `lastThermostatVal = 0xFFFF` sentinel collides with the
+  valid f8.8 value `-0.0039 °C` (raw `0xFFFF` interpreted as
+  `int16_t` is `-1`, and `/ 256.0` is roughly `-0.0039`). Harmless
+  today since the field is not read for control flow, but the
+  contract is fragile.
+- **1A-M3**: TT/TC handlers call `setRemoteOverride(temp)` and
+  `clearRemoteOverride()` but the threshold for "clear" is exact
+  zero (`temp == 0.0f`); any negative value would set a TEMPORARY
+  override of negative °C, which silently slips past the safety
+  intent.
+- **1A-M4**: `bleSensorPublishOneDiscovery()` does not check
+  `endPublish()` exit cleanly on the `writeMqttChunk` failure path;
+  retains a partial publish state.
+- **1A-M5**: BLE state-topic format (`/sat/ble/<mac>/temp`) and
+  discovery `stat_t` format (`/value/<uniq>/sat/ble/<mac>/temp`) are
+  duplicated in two places (state-publish helper + discovery JSON).
+  Silent drift would break HA dashboards in a hard-to-diagnose way.
 
-5. **Stale comment: says 12000 but value is 8000** (MQTTstuff.ino:46-50)
-   - Comment references old threshold `12000` but `MQTT_DISCOVERY_HEAP_MIN = 8000`.
-   - **Action**: Fix comment to match actual value.
+### Low
 
-6. **Duplicated source token detection block** (MQTTstuff.ino:1722-1724 and 1842-1844)
-   - Identical 3-line `strstr` block in both `doAutoConfigure()` and `doAutoConfigureMsgid()`.
-   - **Action**: Extract to a `detectSourceTokens()` helper.
+- 1A-L1..L8: cumulative naming, comment, and minor style nitpicks.
+  See full report.
 
-7. **Stale `sLine[1200]` global buffer** (OTGW-firmware.h:89, 1002)
-   - 1200 bytes of RAM. No longer used by MQTT autoconfig (switched to PROGMEM). Only remaining users appear to be in restAPI.ino for OT-direct JSON.
-   - **Action**: Audit usage; reduce size or make local if only used by REST handler.
+## Architecture Findings (Phase 1B)
 
-### Low Severity
+**Counts**: 0 Critical, 1 High, 4 Medium, 4 Low.
 
-8. **Inconsistent bitmap helper style** (MQTTstuff.ino:1487-1535) -- old uses `0b11100000`, new uses `0x07`. Cosmetic.
-9. **`getMQTTConfigPending()` defined but never called** (MQTTstuff.ino:1524-1529) -- dead code, wastes flash.
-10. **Direct access to timer macro internals** (MQTTstuff.ino:1574) -- `timerDiscoveryDrip_interval` couples to macro naming.
-11. **No string deduplication in PROGMEM generator** (generate_mqttha_progmem.py) -- msg pool is 140KB, could shrink 30-50% with interning.
+### High
 
-## Architecture Findings
+- **1B-H1**: `platformio.ini` was auto-reformatted in commit
+  `59b1478d`, erasing about 90 lines of build-rationale comments
+  (including the ADR-082 ESP8266 Core 2.7.4 LTS rollback explanation,
+  the ctags `-D` flag justifications, and the Windows/MinGW
+  esptoolpy pin rationale). The `tool-esptoolpy` pin was silently
+  bumped from `~1.30000.0` to `^2.41100.0` and the same pin was
+  added to the ESP8266 env (which originally did not pin
+  esptoolpy). No commit-message line, no ADR, no review trail.
+  Recommend reverting the reformat to the original prose-rich
+  shape on the same diff, OR documenting the dependency bump in
+  a follow-up ADR.
 
-### Critical Severity
+### Medium
 
-1. **`strstr()` on PROGMEM pointers -- ESP32 portability risk** (MQTTstuff.ino:1711-1724)
-   - Works on ESP8266 (exception handler) and ESP32 (PROGMEM=no-op), but if ESP32-C3/C6 (RISC-V) or future cores change PROGMEM behavior, these break silently.
-   - **Action**: Use `strstr_P()` where possible, or add compile-time guard/static_assert for non-ESP8266/ESP32 platforms. At minimum, document the assumption.
+- **1B-M1**: `bleSensorPublishOneDiscovery()` opts out of ADR-077's
+  chunked two-pass MEASURE-then-WRITE shape with a 768-byte stack
+  buffer. The comment in the body acknowledges this (TASK-490) but
+  ADR-077 itself was not amended to whitelist the bounded-payload
+  exception.
+- **1B-M2**: NimBLE 2.x scan callback runs on a separate FreeRTOS
+  task on ESP32; `_bleSensors[]` is written from the scan task and
+  read from the loop task in `satBLEPublishMQTT()` /
+  `satBLEUpdateState()` without a guard. ADR-090's "no volatile
+  required if cooperative" assumption is silently invalidated by
+  the parallel-task model. Real risk: torn read of `bDiscoveryPublished`
+  or `iLastSeenMs` (8-bit and 32-bit fields). For 4-slot data this
+  is unlikely-but-possible.
+- **1B-M3**: New exports `bleMacToCompact`,
+  `bleSensorPublishStateTopics`, `bleSensorPublishHaDiscovery`
+  break the established `satBLE*` naming convention used by
+  `satBLEInit`, `satBLELoop`, `satBLEUpdateState`,
+  `satBLEPublishMQTT`, `satBLESendStatusJSON`. Either rename the
+  new exports to `satBLE*` or document the naming distinction.
+- **1B-M4**: `00-scope.md` (this review's own scope manifest)
+  claims `tests/test_evaluate.py` was touched in the diff window;
+  `git diff ace21a48^..fa5ef3c5 -- tests/test_evaluate.py`
+  shows zero changes. Cosmetic but undermines the review's own
+  precision.
 
-### Medium Severity
+### Low
 
-2. **Unused Python struct format in generator** (generate_mqttha_progmem.py:28)
-   - `ENTRY_FMT = '<BxHI'` is defined but never used (generator outputs C source, not binary). Creates false sense of verification.
-   - **Action**: Remove dead code or add clarifying comment.
+- 1B-L1..L4: documentation and naming consistency nitpicks.
+  See full report.
 
-3. **Heap guard threshold inconsistency** (MQTTstuff.ino:50 vs helperStuff.ino:609)
-   - `MQTT_DISCOVERY_HEAP_MIN=8000` vs `HEAP_WARNING_THRESHOLD=5120`. Comment says "keep in sync" but values differ intentionally (8000 is more conservative). Misleading comment.
-   - **Action**: Clarify comment to document the intentional two-tier design.
+## ADR conformance verdict
 
-4. **Code generator not integrated in build pipeline** (tools/generate_mqttha_progmem.py)
-   - Generated files committed but `build.py` does not invoke the generator. If `mqttha.cfg` is edited without regenerating, firmware silently uses stale discovery data.
-   - **Action**: Add CI check or pre-build step to verify generated files match source.
+| ADR | Status | Note |
+|-----|--------|------|
+| ADR-004 (no String hot-path) | Pass | NimBLE port replaced Arduino `String` with `std::string`; new helpers use `char[]` exclusively. |
+| ADR-051 (settings/state) | Pass | `state.otd.eOverrideMode` / `iOverrideF88` follow Hungarian + two-level structure. |
+| ADR-077 (streaming HA discovery) | Concern | Single-buffer publish (1B-M1); spirit honoured but ADR not amended. |
+| ADR-079 (per-component types) | Pass | OTDirect types in `OTDirecttypes.h`. |
+| ADR-089 (heap tier machine) | Pass | `canPublishMQTT()` + `MQTT_DISCOVERY_HEAP_MIN` gates per call. |
+| ADR-090 (re-entrancy guards) | Concern | Cross-task BLE access (1B-M2) is not the cooperative-loop model the ADR assumes. |
+| ADR-092 (NimBLE adoption) | Pass | Status=Accepted, four verification gates discharged. |
 
-### Low Severity
+## Critical issues for Phase 2 context
 
-5. **Nightly restart settings not in named sub-section per ADR-051** (OTGW-firmware.h:975-976) -- acceptable for two fields.
-6. **Silent failure in drip discovery** (MQTTstuff.ino loopMQTTDiscovery) -- pending bit cleared on publish failure without counter/log. Recovered by next reconnect cycle.
-7. **`doAutoConfigure()` iterates all 345 entries without early exit** (MQTTstuff.ino) -- intentional force-republish for manual trigger. No regression.
+The two High items are not classical security/performance concerns but
+warrant flagging:
 
-## Critical Issues for Phase 2 Context
+1. **1A-H1** (bDiscoveryPublished sticky on failure) is functionally
+   silent — Phase 2 performance pass should cross-check the heap-tier
+   gates (ADR-089) for early-boot timing where MQTT is not yet
+   connected when the first BLE scan lands.
+2. **1B-H1** (platformio.ini reformat) is build-config drift; not
+   security/performance per se, but the silent esptoolpy bump from
+   `~1.30000.0` to `^2.41100.0` could surface as an upload-time
+   regression on Windows/MinGW environments where the original pin
+   was rationalised.
 
-- **PROGMEM pointer dereference pattern**: The `strstr()` / `%s` on flash pointers is the central platform concern. Security and performance review should evaluate whether this creates any exploitable behavior or measurable performance impact.
-- **Heap thresholds**: Two different subsystems use different heap thresholds. Performance review should verify the 8000-byte threshold is appropriate for the MQTT discovery publish path.
-- **Stale sLine buffer**: 1200 bytes of potentially reclaimable RAM on a 40KB platform.
+Phase 2 will additionally examine the cross-task BLE access (1B-M2)
+through the concurrency-issues lens — there it could rise to a
+performance/scalability concern.

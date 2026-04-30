@@ -1,80 +1,155 @@
 # Phase 2: Security & Performance Review
 
-## Security Findings
+Consolidated from `phase2a-security.md` (`comprehensive-review:security-auditor`)
+and `phase2b-performance.md` (`comprehensive-review:code-reviewer` in
+performance-engineer mode).
 
-### Medium Severity
+## Security Findings (Phase 2A)
 
-1. **`strstr()` on PROGMEM pointers -- undefined behavior** (CWE-758, MQTTstuff.ino:1711-1724, 1842-1844)
-   - Works on ESP8266 (exception handler) and ESP32 (PROGMEM=no-op). Not exploitable but correctness risk on future platforms/SDK updates.
-   - Also affects `renderTemplateToBuffer()`, `sendMQTTTemplateStreaming()`, and `writeMqttChunk()` which pass PROGMEM pointers where RAM expected.
-   - `writeMqttProgmemChunk()` (line 282) already exists as the correct pattern but is unused in the streaming path.
+**Counts**: 0 Critical, 1 High, 3 Medium, 2 Low.
 
-2. **Generator not in build pipeline** (CWE-1104 adapted, tools/generate_mqttha_progmem.py)
-   - No automated staleness check. Editing `mqttha.cfg` without regenerating silently uses stale discovery data. No hash verification between source and generated output.
+### High
 
-### Low Severity
+- **2A-H1**: `setRemoteOverride()` in
+  `src/OTGW-firmware/OTDirect.ino:1888-1889` performs
+  `(int16_t)(celsius * 256.0f)` with no range clamp on `celsius`.
+  For inputs outside roughly `-128..127 °C` this is C/C++
+  **undefined behaviour** (the float-to-signed-narrow cast). All
+  three command-entry paths reach this — REST `/api/v2/command`,
+  MQTT raw command, telnet — on the trusted LAN. The sibling
+  `otdMqttSetRoomSetpoint()` already has the right pattern
+  (`-40..127` clamp); TT/TC silently skips it. Fix: 3-line range
+  guard inside `setRemoteOverride()` mirroring the existing MQTT
+  helper. Closes 1A-M3 too.
 
-3. **Stray files committed** (CWE-540, networkStuff.h.tmp, $f) -- hygiene issue, no credentials exposed.
-4. **Nightly restart auth/timing** (CWE-400) -- properly auth-gated, input validated, narrow timing window. Within trusted-LAN threat model.
-5. **Template rendering trusts null terminator** (CWE-120) -- safe under normal conditions (generator adds \0). Corrupted build artifact could leak flash content to MQTT. Not remotely exploitable.
-6. **Dead `sLine[1200]` buffer** (CWE-561) -- 1200 bytes wasted RAM, not a security issue but reclaim opportunity.
-7. **`delay(200)` before restart, no settings flush** -- pending settings write could be lost. Nightly restart is deliberate, so impact minimal.
+### Medium
 
-### Positive Findings (Informational)
+- **2A-M1**: NimBLE 2.x scan callback runs on a separate FreeRTOS
+  task and writes `_bleSensors[]` while the loop task reads it
+  with no synchronisation. Same defect as 1B-M2 (architecture)
+  and 2B-M2 (performance), now from the radio-driven attack
+  angle: a hostile broadcaster in radio range can write to
+  the slot at any moment, including mid-read by SAT's control
+  loop. Real-world consequence is bounded (4 slots, 32-bit
+  fields), but the contract is wrong.
+- **2A-M2**: Default-allow MAC filter — when `settings.sat.sBleMAC`
+  is empty, ANY sensor in radio range that emits a parseable BTHome
+  v2 / ATC payload feeds SAT's input. A neighbour with a Xiaomi
+  sensor on the same encryption-free firmware can spoof room
+  temperature readings (15-25 °C is the parser's accept band, easy
+  to forge). Recommend either (a) defaulting to a single-MAC pin
+  with explicit "accept-all" override, or (b) requiring at minimum
+  a configured RSSI floor.
+- **2A-M3**: BTHome v2 parser at `SATble.ino:120-148` returns on
+  the first unknown object ID — robust-by-truncation. Spec-compliant
+  devices that emit a `0x00` packet-ID byte before temperature
+  would silently drop the temperature reading. Fix: known
+  variable-length ID lookup table or a least-restrictive skip-byte
+  policy.
 
-- MQTT drip rate limiting: well-designed, no DoS concern. One publish per tick, timer-gated, heap-guarded.
-- Bitmap bounds checking: correct, no out-of-bounds possible (uint8_t input, 8-element array).
-- REST API auth for new settings: properly secured, consistent with existing patterns.
-- Input validation: `nightlyrestarthour` correctly clamped 0-23, `nightlyrestart` uses EVALBOOLEAN.
+### Low
 
-## Performance Findings
+- **2A-L1**: MsgID 100 reserved-bits-zero handling looks correct
+  but should be documented in the parity fixture for audit trail.
+- **2A-L2**: `bleSensorPublishOneDiscovery`'s 768-byte truncation
+  path is currently safe; would become risky if ADR-077's cap is
+  ever lifted.
 
-### High Severity
+### Out-of-scope notes
 
-1. **`strstr()` on PROGMEM triggers exception handler -- ~60-120ms per entry** (MQTTstuff.ino:1711-1724, 1842-1844)
-   - Every unaligned byte access on ESP8266 PROGMEM costs ~20-40us (Xtensa LoadStoreErrorCause exception handler).
-   - 6 strstr calls per entry x ~500 avg chars = ~3000 byte accesses = ~60-120ms per entry.
-   - `doAutoConfigure()` (345 entries): **~20-40 seconds** in exception handler overhead.
-   - `doAutoConfigureMsgid()` (drip, 1 entry): ~60-120ms per invocation (tolerable at 3s intervals).
-   - Same issue in `renderTemplateToBuffer()`, `sendMQTTTemplateStreaming()`, `tryGetTemplateReplacement()`.
-   - **Fix**: Add precomputed `flags` field to `MqttHaCfgEntry` (isPIC, isOTDirect, hasSourceTokens). Generator precomputes. Eliminates all 6 strstr calls per entry. For template rendering: use `writeMqttProgmemChunk` pattern for PROGMEM literal spans.
+- HTTPS / WSS / TLS not assessed (project posture).
+- WiFi credential handling not assessed (not in this diff).
 
-### Medium Severity
+## Performance Findings (Phase 2B)
 
-2. **17-minute discovery window** (MQTTstuff.ino loopMQTTDiscovery)
-   - 345 entries at 3s each = ~17 minutes for full HA discovery. Under heap pressure (30s): ~2.8 hours.
-   - Old JIT approach discovered ~60 active IDs in ~2 minutes as OT traffic arrived.
-   - **Fix**: Reduce normal interval to 1s (6 minutes), or hybrid JIT+drip for active IDs.
+**Counts**: 0 Critical, 1 High, 3 Medium, 6 Low.
 
-3. **sLine[1200] now reclaimable** (OTGW-firmware.h:1002)
-   - 1200 bytes = 3% of 40KB RAM budget. Only remaining user: restAPI.ino OTDirect JSON.
-   - **Fix**: Remove or shrink; use local buffer in REST handler.
+### High
 
-4. **sendMQTTTemplateStreaming uses writeMqttChunk on PROGMEM** (MQTTstuff.ino:346)
-   - `MQTTclient.write()` receives PROGMEM pointer where RAM expected. Works via exception handler but slow.
-   - **Fix**: Use existing `writeMqttProgmemChunk()` (line 282) which correctly stages via RAM buffer.
+- **2B-H1**: `feedWatchDog()` is only called on the success path
+  inside `bleSensorPublishOneDiscovery()` and the four-publish loop
+  inside `bleSensorPublishHaDiscovery()`. A string of broker
+  failures across the 16-publish first-scan burst can traverse all
+  four nested helpers without a single watchdog kick while four
+  PubSubClient sockets each work through their default 15-second
+  timeout. ESP32 HW watchdog is generous enough that this has not
+  bitten yet, but the pattern needs `feedWatchDog()` before every
+  `return false` that follows a network attempt. Trivial one-liner
+  fix that also closes 1A-M4 (incomplete `endPublish` cleanup on
+  error path).
 
-### Low Severity
+### Medium
 
-5. **getHeapHealth() called every loop iteration** (MQTTstuff.ino:1573)
-   - `ESP.getFreeHeap()` ~1-2us per call, at 1000Hz = ~1-2ms/s. Unnecessary before timer fires.
-   - **Fix**: Move adaptive interval logic after `DUE()` check.
+- **2B-M1**: Worst-case 32 sequential MQTT publishes on the first
+  `satBLEPublishMQTT` after MQTT-connect (4 slots × (4 discovery
+  retained + 4 state)). Gated by `canPublishMQTT()` and
+  `MQTT_DISCOVERY_HEAP_MIN`, so backpressure works, but combined
+  with 2B-H1 the burst is unwatchdogged.
+- **2B-M2**: Cross-task `_bleSensors[]` access without lock.
+  Performance impact is genuinely sub-microsecond on the
+  ESP32-S3's coherent caches; the architectural concern (1B-M2)
+  and the security concern (2A-M1) are the real angles, not
+  performance. Recommend leaving the data race alone purely from
+  performance perspective.
+- **2B-M3**: OT command queue depth (12 entries) stays in budget
+  for the new TT/TC sequences (2 frames per `setRemoteOverride`,
+  1 for `clearRemoteOverride`) but is borderline if any other
+  caller stacks up commands in the same tick. Recommend documenting
+  the worst-case stack-up in the OTDirect ADR (currently ADR-064
+  / ADR-087).
 
-6. **Failed discovery silently dropped** (MQTTstuff.ino:1614)
-   - Pending bit cleared on publish failure. Entry missing from HA until next restart/reconnect.
-   - **Fix**: Keep bit set on failure with backoff, or add retry counter.
+### Low
 
-7. **mqttha.cfg possibly still in LittleFS image** -- ~170KB wasted flash if no longer read at runtime. Remove from `data/`.
+- 2B-L1..L6: minor allocation, comment, and documentation
+  observations. See full report.
 
-### Major Positive Improvements
+## Strengths observed
 
-- **processOT() latency: 50-200ms reduced to ~1us** -- bitmap set replaces LittleFS open/scan/close + MQTT publish inline.
-- **Heap fragmentation elimination** -- zero LittleFS I/O during normal operation. No more file handle/sector cache/read buffer alloc/free cycles.
-- **New RAM usage negligible** -- 47 bytes total (32 bytes bitmap + 2 bytes settings + 13 bytes timer).
-- **Flash usage roughly neutral** -- ~164KB PROGMEM replaces ~170KB LittleFS file. Index overhead <4KB.
+- NimBLE 2.x port eliminates per-advertisement Arduino-`String`
+  churn — the biggest pre-session heap-fragmentation source.
+- Async 3-arg `start()` reclaims roughly 10% of
+  `doBackgroundTasks()` wall-clock that the synchronous Bluedroid
+  scan was blocking.
+- OTDirect TT/TC state machine is `O(1)` per frame and
+  `OTRemoteOverrideState` is a single cache line (16 bytes
+  packed). No allocation pressure.
+- `evaluate.py` regex changes are linear; no ReDoS risk.
+- NimBLE-Arduino 2.5.0 has no known CVEs at audit time.
 
-## Critical Issues for Phase 3 Context
+## Cross-phase signal
 
-- **Testing gap**: The strstr-on-PROGMEM performance issue should be validated with timing measurements on real hardware. The 20-40s estimate for full discovery is based on exception handler cost modeling, not measurement.
-- **Documentation gap**: The PROGMEM pointer access pattern (relying on exception handler) is a deliberate engineering choice but undocumented. Future contributors may "fix" it by adding _P helpers that don't exist for this use case.
-- **Integration test need**: The 17-minute discovery window should be tested with HA to verify entities appear correctly during the drip phase.
+The cross-task `_bleSensors[]` access surfaced from THREE
+independent angles:
+
+| Phase | ID | Angle |
+|---|---|---|
+| 1B | 1B-M2 | architecture: ADR-090 cooperative-loop assumption violated |
+| 2A | 2A-M1 | security: radio-driven attacker writes during loop-task read |
+| 2B | 2B-M2 | performance: real impact sub-microsecond, leave it |
+
+When the same defect lights up in three orthogonal reviews, it is
+a real concern. The verdict combining all three: **add a critical
+section** around the slot writes in the scan callback, narrow the
+data race surface. Implementation cost is small (one
+`portMUX_TYPE` and a pair of `portENTER_CRITICAL` / `EXIT`).
+
+## Critical issues for Phase 3 context
+
+The findings that warrant test/docs follow-through in Phase 3:
+
+1. **2A-H1** (TT/TC unclamped celsius): needs a fixture row in
+   `tests/otdirect_pic_parity_fixture.md` for the boundary-value
+   case (e.g. `TT=200`, `TT=-200`).
+2. **2B-H1** (watchdog on failure path): needs a code path covered
+   by a soak test, but no automated harness exists in this project
+   for that — document in the test plan as owner-only.
+3. **2A-M2** (default-allow MAC filter): needs a doc line in the
+   SAT BLE settings page warning about radio-range trust
+   assumptions, OR a settings UI tweak to require an explicit
+   "accept any sensor" toggle.
+4. **2A-M3** (BTHome parser unknown-object truncation): needs a
+   fixture row with a packet-ID-prefixed payload to reproduce the
+   silent-drop case.
+5. **1B-H1** (platformio.ini reformat) and **1B-M4** (scope
+   manifest error): docs / build-config issues; should surface
+   in Phase 4's CI/DevOps review.
