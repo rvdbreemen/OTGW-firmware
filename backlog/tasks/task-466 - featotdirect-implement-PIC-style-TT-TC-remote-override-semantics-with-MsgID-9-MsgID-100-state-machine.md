@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-04-27 23:55'
+updated_date: '2026-04-30 02:12'
 labels:
   - otdirect
   - pic-parity
@@ -22,6 +23,7 @@ references:
   - docs/MANUAL.md
   - tests/otdirect_pic_parity_fixture.md
 priority: medium
+ordinal: 9000
 ---
 
 ## Description
@@ -225,16 +227,32 @@ Extend tests/otdirect_pic_parity_fixture.md (TASK-444) with:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 OTRemoteOverrideState struct + OT_OVERRIDE_NONE/TEMPORARY/CONSTANT enum added in OTDirect.ino (or OTDirecttypes.h) with file-static instance otRemoteOverride.
-- [ ] #2 TT= and TC= command handlers route through setRemoteOverride() helper that sets MsgID 16 (TrSet) + MsgID 100 (RemoteOverrideFunction flags 0x02 for TT, 0x01 for TC).
-- [ ] #3 TT=0 and TC=0 route through clearRemoteOverride() which clears MsgID 16 and MsgID 100 overrides and emits a clearing WRITE_DATA for MsgID 100 = 0.
-- [ ] #4 Inbound MsgID 16 from thermostat is observed (hook into existing OT processing path) and updates otRemoteOverride.lastThermostatVal + honoredCount.
-- [ ] #5 Auto-clear trigger: when mode == TEMPORARY and honoredCount >= 3 and the next thermostat MsgID 16 differs by > 0.5C from the override value, the override is cleared automatically with an OTDDebug log line.
-- [ ] #6 TC behaviour: persists indefinitely across thermostat MsgID 16 transitions; only TC=0 (or TT= replacing it) clears.
-- [ ] #7 PR=O reporting includes override mode (none / TT / TC) and value.
-- [ ] #8 TASK-444 fixture extended with TT/TC frame-shape rows: TT=20 -> 0x1400 + 0x0002, TC=15 -> 0x0F00 + 0x0001, clearing -> 0x0000 + 0x0000.
-- [ ] #9 TASK-442 CS/C2 expiry timestamps are not touched by the new clearRemoteOverride() and CS/C2 behaviour remains independent.
-- [ ] #10 PIC firmware sources are not modified.
-- [ ] #11 Build clean on ESP32 and ESP8266, 0 warnings 0 errors.
+- [x] #1 OTRemoteOverrideState struct + OT_OVERRIDE_NONE/TEMPORARY/CONSTANT enum added in OTDirect.ino (or OTDirecttypes.h) with file-static instance otRemoteOverride.
+- [x] #2 TT= and TC= command handlers route through setRemoteOverride() helper that sets MsgID 16 (TrSet) + MsgID 100 (RemoteOverrideFunction flags 0x02 for TT, 0x01 for TC).
+- [x] #3 TT=0 and TC=0 route through clearRemoteOverride() which clears MsgID 16 and MsgID 100 overrides and emits a clearing WRITE_DATA for MsgID 100 = 0.
+- [x] #4 Inbound MsgID 16 from thermostat is observed (hook into existing OT processing path) and updates otRemoteOverride.lastThermostatVal + honoredCount.
+- [x] #5 Auto-clear trigger: when mode == TEMPORARY and honoredCount >= 3 and the next thermostat MsgID 16 differs by > 0.5C from the override value, the override is cleared automatically with an OTDDebug log line.
+- [x] #6 TC behaviour: persists indefinitely across thermostat MsgID 16 transitions; only TC=0 (or TT= replacing it) clears.
+- [x] #7 PR=O reporting includes override mode (none / TT / TC) and value.
+- [x] #8 TASK-444 fixture extended with TT/TC frame-shape rows: TT=20 -> 0x1400 + 0x0002, TC=15 -> 0x0F00 + 0x0001, clearing -> 0x0000 + 0x0000.
+- [x] #9 TASK-442 CS/C2 expiry timestamps are not touched by the new clearRemoteOverride() and CS/C2 behaviour remains independent.
+- [x] #10 PIC firmware sources are not modified.
+- [x] #11 Build clean on ESP32 and ESP8266, 0 warnings 0 errors.
 - [ ] #12 Hardware verification scenario documented: drag thermostat program through a setpoint change while TT is active -> auto-clears within 3-5 thermostat cycles; same scenario with TC -> stays.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-30 00:50 main session takeover from agent: Agent completed Phases 1-5 in source. Fixture markdown column-count errors (rows 4-5 in Table 9, `\|...\|` escapes confused the validator) fixed by replacing with `abs(...)` notation. `python tests/check_otdirect_fixture.py` now passes clean.
+
+2026-04-30 00:51 evaluate.py --quick: 67 checks, 57 pass, 2 warn, 1 fail (pre-existing PROGMEM 14-violations baseline; TASK-482 just shaved one off from 15). Direct grep of OTDirect.ino for hot-path `String`, `DebugTln("..."`, `DebugTf("..."`, `snprintf(` (without `_P`) returns zero matches. My changes (and the agent's) add zero new violations.
+
+2026-04-30 00:51 builds in progress (python build.py --firmware in background). AC #11 will flip when both ESP32 + ESP8266 succeed.
+
+Open question 1 from agent (msgType==1 filter on MsgID 16 inbound observer): CONFIRMED CORRECT. Per OT v4.2 spec, MsgID 16 (TrSet) is master-write-only. Master = thermostat. So WRITE_DATA on MsgID 16 is the only valid direction. Filter stays as-is.
+
+Open question 2 from agent (MsgID 100 clear via direct otCmdEnqueue, not via enqueueWriteCommand): CONFIRMED CORRECT. The clear signal should be one-shot, NOT persistently rebroadcast every periodic cycle. enqueueWriteCommand would update the cache and keep emitting forever; otCmdEnqueue is single-shot. Design is right.
+
+2026-04-30 02:13 BUILDS GREEN: ESP32 SUCCESS (Flash 95.8%, RAM 31.7%, 19m25s), ESP8266 SUCCESS (Flash 77.3%, RAM 84.7%, 2m41s). AC #11 satisfied. Open: AC #12 hardware verification by owner.
+<!-- SECTION:NOTES:END -->

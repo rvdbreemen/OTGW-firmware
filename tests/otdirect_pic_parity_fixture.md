@@ -38,12 +38,12 @@ BLE/SAT subsystem, and any command not present in `OTDirect.ino`.
   it.
 - OTDirect does not implement every PIC command (e.g. LED, GPIO). Those are silently
   returned as NG.
-- TT/TC remote-override semantics in OTDirect are currently a single override on
-  MsgID 16 (TrSet) for both commands. The PIC distinguishes them via MsgID 100
-  (RemoteOverrideFunction) flag bits and an auto-clear state machine driven by
-  thermostat MsgID 16 echoes. Full PIC parity is tracked as TASK-466. Until then,
-  TT and TC are functionally equivalent in OTDirect, with the safety bug (TC
-  writing MsgID 1) closed by TASK-443.
+- TT/TC remote-override semantics: TASK-466 implemented PIC-style distinction.
+  TT writes MsgID 16 + MsgID 100=0x0002 (Program override priority). TC writes
+  MsgID 16 + MsgID 100=0x0001 (Manual override priority). TT auto-clears after
+  the thermostat has echoed our value for >=3 cycles and then drifts away by
+  >0.5 C; TC persists until TC=0 or a TT= replaces it. MsgID 9 (TrOverride)
+  is intentionally NOT synthesised — boiler-side TrSet (MsgID 16) is sufficient.
 
 ## Ground-Truth Sources
 
@@ -159,10 +159,33 @@ Citation: `gateway.asm` header comment lines 46-52, `SerialCmd17` (line 3893) di
 | Command | PIC behaviour | OTDirect-expected behaviour | MsgID | OT data shape | Test fixture | Notes |
 |---|---|---|---|---|---|---|
 | `CS=15.0` | `SetCtrlSetpoint`: writes `controlsetpt1/2`; PIC injects WRITE_DATA for `MSG_CTRLSETPT` (MsgID 1, `Tset`) on every thermostat request. Flow/CH water control setpoint. | Enqueue `WRITE_DATA MsgID 1`; data = f8.8 of 15.0 = `0x0F00`. Echo `CS: 15.00`. | 1 (`Tset`) | f8.8: `0x0F00` | `CS=15.0` -> `CS: 15.00` | CS = boiler flow setpoint override. Uses MSG_CTRLSETPT (1). |
-| `TC=+16.0` | `SetContSetPoint` (gateway.asm:4053): calls `GetPosFloatArg`; passes `b'01'` (manual-only) to `SetSetPoint`. `SetSetPoint` stores `setpoint1/2`, sets `OverrideReq`. PIC injects override into MsgID 9 (`TrOverride`) frames from thermostat. | Route to MsgID 16 (`TrSet`, room setpoint override). OTDirect does not implement the full PIC remote-override state machine. Enqueue `WRITE_DATA MsgID 16`; data = f8.8 of 16.0 = `0x1000`. Echo `TC: 16.00`. | 16 (`TrSet`) | f8.8: `0x1000` | `TC=+16.0` -> `TC: 16.00` | TASK-443 audit finding. TC must NOT map to MsgID 1. PIC maps TC to thermostat room setpoint override path (MsgID 9/16), not to boiler flow setpoint (MsgID 1). OTDirect minimal fix: route TC and TT identically to MsgID 16 (TrSet). |
-| `TT=18.5` | `SetTempSetPoint` (gateway.asm:4057): `GetPosFloatArg`; passes `b'11'` (manual + program) to `SetSetPoint`. Same room-setpoint override path as TC but allows auto-restore by thermostat program. | Route to MsgID 16 (`TrSet`); data = f8.8 of 18.5 = `0x1280`. Echo `TT: 18.50`. | 16 (`TrSet`) | f8.8: `0x1280` | `TT=18.5` -> `TT: 18.50` | TT = temporary, TC = continuous; OTDirect treats both as MsgID 16 because the PIC remote-override state machine is not modelled. Limitation documented in code comment at OTDirect.ino:2141. |
-| `TC=+0.0` | `GetPosFloatArg` zero: clears `setpoint1/2`, calls `ClearSetPoint`. Override cancelled. | Clear MsgID 16 write override. Echo `TC: 0.00`. | 16 | — | `TC=+0.0` -> `TC: 0.00` | Zero = clear override (PIC and OTDirect). |
-| `TT=0` | Same zero path as TC=0. Clears thermostat setpoint override. | Clear MsgID 16 write override. Echo `TT: 0.00`. | 16 | — | `TT=0` -> `TT: 0.00` | Zero = clear. |
+| `TC=+16.0` | `SetContSetPoint` (gateway.asm:4053): calls `GetPosFloatArg`; passes `b'01'` (manual-only) to `SetSetPoint`. `SetSetPoint` stores `setpoint1/2`, sets `OverrideReq`. PIC injects override into MsgID 9 (`TrOverride`) frames from thermostat AND publishes MsgID 100 low byte = 0x01 (Manual override priority). | TASK-466: route to MsgID 16 (`TrSet`) AND MsgID 100 (RemoteOverrideFunction) low byte = `0x01`. Enqueue both `WRITE_DATA` frames. Echo `TC: 16.00`. | 16 (`TrSet`) + 100 (`RemoteOverrideFunction`) | f8.8: `0x1000` (MsgID 16) + `0x0001` (MsgID 100) | `TC=+16.0` -> `TC: 16.00` | TASK-443 closed the safety bug (TC was hitting MsgID 1). TASK-466 added the PIC-parity MsgID 100 flag synthesis. MsgID 9 (TrOverride) is intentionally not synthesised. |
+| `TT=18.5` | `SetTempSetPoint` (gateway.asm:4057): `GetPosFloatArg`; passes `b'11'` (manual + program) to `SetSetPoint`. Same room-setpoint override path as TC, MsgID 100 low byte = 0x02 (Program override priority). Allows auto-restore by thermostat program. | TASK-466: route to MsgID 16 (`TrSet`) AND MsgID 100 low byte = `0x02`. Echo `TT: 18.50`. Auto-clears via state machine when thermostat resumes its own program (see TASK-466 row below). | 16 + 100 | f8.8: `0x1280` (MsgID 16) + `0x0002` (MsgID 100) | `TT=18.5` -> `TT: 18.50` | TASK-466 implemented the PIC distinction TT (program priority) vs TC (manual priority). |
+| `TC=+0.0` | `GetPosFloatArg` zero: clears `setpoint1/2`, calls `ClearSetPoint`. Override cancelled. PIC pushes a clearing MsgID 100 = 0 frame. | TASK-466: `clearRemoteOverride()` clears MsgID 16 + MsgID 100 overrides AND emits a one-shot `WRITE_DATA MsgID 100 = 0x0000` so the thermostat UI flips back. Echo `TC: 0.00`. | 16 + 100 | — | `TC=+0.0` -> `TC: 0.00` | Zero = clear override (PIC and OTDirect). One-shot clearing frame ensures UI consistency on the thermostat. |
+| `TT=0` | Same zero path as TC=0. Clears thermostat setpoint override. | TASK-466: same `clearRemoteOverride()` path. Echo `TT: 0.00`. | 16 + 100 | — | `TT=0` -> `TT: 0.00` | Zero = clear. |
+
+---
+
+### TASK-466 — TT=/TC= Remote-Override State Machine
+
+Citation: `gateway.asm` `SetSetPoint` family (line 4053+), `OverrideCH` region, `MSG_REMOTEOVR=100` (`OT-v4.2` row 351). OTDirect implementation: `setRemoteOverride()`, `clearRemoteOverride()`, `onThermostatMsgID16()` in `OTDirect.ino`.
+
+| Command | PIC behaviour | OTDirect-expected behaviour | MsgID | OT data shape | Test fixture | Notes |
+|---|---|---|---|---|---|---|
+| `TT=20` | `SetTempSetPoint`: f8.8 of 20.0 = `0x1400`; MsgID 100 low byte = `0x02` (Program override priority). | `setRemoteOverride(OT_OVERRIDE_TEMPORARY, 20.0)` enqueues `WRITE_DATA MsgID 16 data 0x1400` and `WRITE_DATA MsgID 100 data 0x0002`. State: `mode=TEMPORARY`, `f88Value=0x1400`, `honoredCount=0`. Echo `TT: 20.00`. | 16 + 100 | `0x1400` + `0x0002` | `TT=20` -> `TT: 20.00` | Temporary = program-priority. State machine arms auto-clear after honouring. |
+| `TC=15` | `SetContSetPoint`: f8.8 of 15.0 = `0x0F00`; MsgID 100 low byte = `0x01` (Manual override priority). | `setRemoteOverride(OT_OVERRIDE_CONSTANT, 15.0)` enqueues `WRITE_DATA MsgID 16 data 0x0F00` and `WRITE_DATA MsgID 100 data 0x0001`. State: `mode=CONSTANT`. Echo `TC: 15.00`. | 16 + 100 | `0x0F00` + `0x0001` | `TC=15` -> `TC: 15.00` | Constant = manual-priority. Auto-clear DOES NOT arm; only TT=0 / TC=0 / replacement clears it. |
+| `TT=0` (or `TC=0`) | Clear path: PIC zero-arg branch into `ClearSetPoint`; MsgID 100 = 0 published. | `clearRemoteOverride()`: clears MsgID 16 + MsgID 100 overrides; emits one-shot `WRITE_DATA MsgID 100 = 0x0000`. State `mode=NONE`. Echo `TT: 0.00` / `TC: 0.00`. | 16 + 100 | `0x0000` (MsgID 100 clear frame) | `TT=0` -> `TT: 0.00` | One-shot clearing frame matches PIC UI behaviour. |
+| TT honour cycle | After `SetSetPoint`, PIC waits for thermostat to publish a fresh MsgID 16 matching the override; counts cycles where thermostat echoes us. | `applyOverrides` calls `onThermostatMsgID16(msgType=1, f88)` BEFORE replacing the data. When `abs(f88 - override) < 0.25 C` (`OT_OVERRIDE_HONOR_DELTA_F88`), `honoredCount++`. | 16 | observed from thermostat | hardware: send TT=20, observe `honoredCount` increment as thermostat echoes 20.0 C | TT only — TC ignores the counter (no auto-clear). |
+| TT auto-clear | PIC: when honoured, then thermostat program shifts setpoint, PIC clears override flag. | `onThermostatMsgID16`: `mode==TEMPORARY` AND `honoredCount >= 3` AND `abs(f88 - override) > 0.5 C` -> calls `clearRemoteOverride()`. Logs `OTD: TT auto-clear (thermostat program resumed)`. | 16 + 100 | — | hardware: TT=20, drag thermostat program to 17 C after 3 cycles -> TT auto-clears within 1 cycle of the shift | Constants: `OT_OVERRIDE_HONOR_DELTA_F88=0x0040`, `OT_OVERRIDE_RELEASE_DELTA_F88=0x0080`, `OT_OVERRIDE_HONOR_THRESHOLD=3`. |
+| TC persists across same scenario | PIC: TC ignores program-priority bit; only manual clear releases. | TC stays active even after `honoredCount >= 3` and large deltas — `clearRemoteOverride()` is NOT called for `mode==CONSTANT`. | 16 + 100 | unchanged | hardware: TC=15, drag thermostat program -> TC stays | Mirrors PIC `b'01'` flag = manual-only. |
+| TT then TC (or vice versa) | PIC `SetSetPoint` overwrites setpoint1/2 + flag mask. | `setRemoteOverride()` always overwrites: `mode`, `f88Value`, `honoredCount=0`, `lastThermostatVal=0xFFFF`. New mode's MsgID 100 flags replace old via `enqueueWriteCommand(100, ...)`. | 16 + 100 | new value + new flag | `TT=20` then `TC=15` -> MsgID 16=`0x0F00`, MsgID 100=`0x0001`, mode=CONSTANT | Honour state resets cleanly on replacement. |
+| Reboot during active TT/TC | PIC: setpoint1/2 + OverrideReq lost on power cycle. | `otRemoteOverride` is file-static, not persisted. After reboot: `mode=NONE`, no MsgID 16/100 override. | — | — | hardware: TT=20, reboot, observe `PR=O` returns `PR: O=N` | Matches PIC. |
+| `PR=O` (TT active) | PIC `PrintOverride`: prints `O=T<value>` for temporary. | `PR=O` returns `PR: O=T<value>` when `otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY`. Falls back to `O=C<csVal>` for CS-only, else `O=N`. | — | — | after `TT=20`, `PR=O` -> `PR: O=T20.00` | TT/TC report takes precedence over CS in PR=O. |
+| `PR=O` (TC active) | PIC: prints `O=C<value>` for constant. | `PR=O` returns `PR: O=C<value>` when `mode == OT_OVERRIDE_CONSTANT`. | — | — | after `TC=15`, `PR=O` -> `PR: O=C15.00` | Same letter as CS but different state machine — distinguished internally via `state.otd.eOverrideMode`. |
+
+#### Independence from TASK-442 (CS/C2 expiry)
+
+`clearRemoteOverride()` deliberately does NOT touch `otCSLastCommandMs` or `otC2LastCommandMs`. CS (MsgID 1) and C2 (MsgID 8) are the boiler flow setpoints; TT/TC (MsgID 16) is the room setpoint. The two state machines are orthogonal. A user can run SAT control via `CS=` while simultaneously holding the room setpoint with `TT=`/`TC=` — both stay independent.
 
 ---
 

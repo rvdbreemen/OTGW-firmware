@@ -51,6 +51,29 @@ enum OTDirectMode : uint8_t {
   OTD_MODE_LOOPBACK = 4,   // Internal test: simulated boiler responses, no hardware needed
 };
 
+// TASK-466: PIC-style remote-override mode for TT=/TC= room-setpoint commands.
+// MsgID 16 (TrSet) carries the actual setpoint value; MsgID 100
+// (RemoteOverrideFunction) low byte carries flags telling the thermostat how
+// to treat it. PIC distinguishes:
+//   TT (temporary) -> Program override priority bit set (bit1 = 0x02)
+//   TC (constant)  -> Manual  override priority bit set (bit0 = 0x01)
+enum OTRemoteOverrideMode : uint8_t {
+  OT_OVERRIDE_NONE      = 0,
+  OT_OVERRIDE_TEMPORARY = 1,   // TT=
+  OT_OVERRIDE_CONSTANT  = 2,   // TC=
+};
+
+// TASK-466: runtime state for the TT=/TC= remote-override state machine.
+// Not persisted: matches PIC behaviour where heartbeat resets clear overrides.
+struct OTRemoteOverrideState {
+  OTRemoteOverrideMode mode;
+  uint16_t f88Value;            // current override value (f8.8 of MsgID 16)
+  uint32_t setAtMs;             // millis() when override was set
+  uint32_t lastThermostatMs;    // millis() of last MsgID 16 frame from thermostat
+  uint16_t lastThermostatVal;   // last thermostat-reported MsgID 16 value (f8.8)
+  uint8_t  honoredCount;        // number of cycles thermostat echoed our override
+};
+
 //====================================================================
 //=== state.otd — transient OT-direct runtime status ===
 //====================================================================
@@ -68,6 +91,9 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   bool     bThermostatConnected = false; // thermostat recently seen (within timeout)
   bool     bSetbackActive    = false;    // thermostat disconnected → setback override engaged
   uint32_t iLastThermostatMs = 0;        // millis() of last thermostat frame received
+  // TASK-466: PIC-style TT=/TC= remote-override mode (none/temporary/constant)
+  OTRemoteOverrideMode eOverrideMode = OT_OVERRIDE_NONE;
+  uint16_t iOverrideF88      = 0;        // f8.8 value of the active TT/TC override (0 when none)
 };
 
 //====================================================================

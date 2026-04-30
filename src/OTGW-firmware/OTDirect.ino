@@ -44,6 +44,10 @@ static void IRAM_ATTR slaveISR()  { otSlave.handleInterrupt(); }
 // declarations when scanning a single-TU build (PlatformIO Arduino builder).
 static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data);
 static unsigned long applyResponseModifiers(unsigned long response);
+// TASK-466: TT=/TC= remote-override state machine helpers
+static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius);
+static void clearRemoteOverride();
+static void onThermostatMsgID16(uint8_t msgType, uint16_t f88);
 
 // ---------------------------------------------------------------------------
 // Master request scheduler — periodic polls and writes to the boiler
@@ -290,15 +294,38 @@ struct OTFrameOverride {
 };
 
 static OTFrameOverride otOverrides[] = {
-  {  1, false, 0 },   // TSet — CS=/TC= override
+  {  1, false, 0 },   // TSet — CS= override
   {  7, false, 0 },   // CoolingControl — CC= override
   {  8, false, 0 },   // TsetCH2 — C2= override
   { 14, false, 0 },   // MaxRelModLevelSetting — MM= override
-  { 16, false, 0 },   // TrSet — TT= override
+  { 16, false, 0 },   // TrSet — TT=/TC= override
   { 56, false, 0 },   // TdhwSet — SW= override
   { 57, false, 0 },   // MaxTSet — SH= override
+  // TASK-466: MsgID 100 RemoteOverrideFunction — flag synthesis for TT (0x02) / TC (0x01)
+  { 100, false, 0 },  // RemoteOverrideFunction — TT/TC flag synthesis
 };
 static constexpr uint8_t OT_OVERRIDE_COUNT = sizeof(otOverrides) / sizeof(otOverrides[0]);
+
+// TASK-466: PIC-style TT=/TC= remote-override state machine (see OTDirecttypes.h
+// for the enum + struct). Single file-static instance: only one TT/TC override
+// is active at a time, second command replaces the first. Not persisted: PIC
+// resets these on power cycle / heartbeat reset, and so do we.
+static OTRemoteOverrideState otRemoteOverride = {
+  OT_OVERRIDE_NONE,  // mode
+  0,                 // f88Value
+  0,                 // setAtMs
+  0,                 // lastThermostatMs
+  0xFFFF,            // lastThermostatVal sentinel: "never observed"
+  0                  // honoredCount
+};
+
+// TASK-466: tunables for the auto-clear honour state machine. Kept as named
+// constants so future tuning is grep-able. Values mirror gateway.asm intent:
+// "thermostat is echoing us within ~quarter-degree" -> honoured;
+// "thermostat moved more than half a degree after honouring us" -> released.
+static constexpr uint16_t OT_OVERRIDE_HONOR_DELTA_F88   = (uint16_t)(0.25f * 256.0f); // 0x0040
+static constexpr uint16_t OT_OVERRIDE_RELEASE_DELTA_F88 = (uint16_t)(0.50f * 256.0f); // 0x0080
+static constexpr uint8_t  OT_OVERRIDE_HONOR_THRESHOLD   = 3;   // cycles before auto-clear is armed
 
 // TASK-442: PIC parity for CS/C2 heartbeat-driven expiry.
 // gateway.asm CommandExpiry invalidates OverrideCH/OverrideCH2 when the
@@ -409,11 +436,21 @@ static void clearUnknownCount(uint8_t msgId) {
 // original thermostat frame as 'T' and the modified frame as 'R'.
 static unsigned long applyOverrides(unsigned long frame, bool &modified) {
   modified = false;
-  uint8_t msgId = (frame >> 16) & 0xFF;
+  uint8_t msgType = (frame >> 28) & 0x07;
+  uint8_t msgId   = (frame >> 16) & 0xFF;
+  uint16_t origData = frame & 0xFFFF;
+
+  // TASK-466: observe thermostat-originated MsgID 16 frames for the TT=/TC=
+  // auto-clear state machine. Done BEFORE override replacement so the
+  // honour/release detector sees the thermostat's intended value, not ours.
+  // Bounded work: a couple of compares + one 8-bit increment, no I/O.
+  if (msgId == 16) {
+    onThermostatMsgID16(msgType, origData);
+  }
+
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
     if (otOverrides[i].active && otOverrides[i].msgId == msgId) {
       // Replace data value (lower 16 bits) while keeping msg type + data-id
-      uint16_t origData = frame & 0xFFFF;
       frame = (frame & 0xFFFF0000UL) | otOverrides[i].overrideValue;
       setOTParityBit(frame);
       modified = true;
@@ -1833,6 +1870,108 @@ static void clearWriteOverride(uint8_t msgId) {
 }
 
 // ---------------------------------------------------------------------------
+// TASK-466: TT=/TC= remote-override state machine
+// ---------------------------------------------------------------------------
+// PIC distinguishes TT (temporary) from TC (constant) via MsgID 100
+// (RemoteOverrideFunction) low-byte flag bits (gateway.asm SetSetPoint):
+//   bit0 = ManualChangePriority  -> TC sets, TT clears
+//   bit1 = ProgramChangePriority -> TT sets, TC clears
+// MsgID 16 (TrSet) carries the actual setpoint value in both cases. The
+// thermostat reads MsgID 100 from us (the gateway-as-slave) to decide whether
+// to honour the override or its own program. The boiler ignores MsgID 100 and
+// only sees MsgID 16, so MsgID 100 is purely a UX hint to the thermostat.
+//
+// Note: setRemoteOverride / clearRemoteOverride deliberately do NOT touch the
+// TASK-442 CS/C2 expiry timestamps (otCSLastCommandMs / otC2LastCommandMs).
+// TT/TC and CS/C2 are independent state machines.
+// ---------------------------------------------------------------------------
+static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
+  uint16_t f88 = (uint16_t)((int16_t)(celsius * 256.0f));
+
+  otRemoteOverride.mode             = mode;
+  otRemoteOverride.f88Value         = f88;
+  otRemoteOverride.setAtMs          = millis();
+  otRemoteOverride.honoredCount     = 0;
+  otRemoteOverride.lastThermostatVal = 0xFFFF;  // reset honour history
+  state.otd.eOverrideMode           = mode;
+  state.otd.iOverrideF88            = f88;
+
+  // MsgID 16: replace thermostat's TrSet on outbound to boiler
+  enqueueWriteCommand(16, f88, mode == OT_OVERRIDE_TEMPORARY ? "TT" : "TC");
+
+  // MsgID 100: low byte = priority bits (high byte unused per OT v4.2)
+  uint16_t flags = (mode == OT_OVERRIDE_TEMPORARY) ? 0x0002 : 0x0001;
+  enqueueWriteCommand(100, flags, "OVR-flags");
+}
+
+static void clearRemoteOverride() {
+  otRemoteOverride.mode              = OT_OVERRIDE_NONE;
+  otRemoteOverride.f88Value          = 0;
+  otRemoteOverride.honoredCount      = 0;
+  otRemoteOverride.lastThermostatVal = 0xFFFF;
+  state.otd.eOverrideMode            = OT_OVERRIDE_NONE;
+  state.otd.iOverrideF88             = 0;
+
+  clearWriteOverride(16);
+  clearWriteOverride(100);
+  // Push a clearing MsgID 100 = 0 frame so the thermostat's UI flips back to
+  // its own program. This is a one-shot WRITE_DATA, not a sticky override.
+  unsigned long clearFrame = OpenTherm::buildRequest(
+    OpenThermMessageType::WRITE_DATA,
+    static_cast<OpenThermMessageID>(100),
+    0
+  );
+  if (!otCmdEnqueue(clearFrame)) {
+    OTDDebugTln(F("OTD: OVR-clear dropped (queue full)"));
+  }
+}
+
+// Hook into the thermostat-side MsgID 16 inbound path (called from
+// applyOverrides). Implements the PIC TT= auto-clear trigger:
+//
+//   1. Honour-detection: while a TT/TC is active, count cycles where the
+//      thermostat reports a MsgID 16 value within ~0.25 C of our override.
+//   2. Release-detection (TT only): once we have been honoured for at least
+//      OT_OVERRIDE_HONOR_THRESHOLD cycles, the next thermostat MsgID 16
+//      whose value diverges by > 0.5 C means the thermostat program has
+//      taken over; release the override.
+//
+// TC overrides intentionally never auto-clear here — only TT does. TC is
+// "vacation mode": it stays until the user explicitly sends TC=0 (or a
+// replacement TT=). This matches gateway.asm SetContSetPoint semantics.
+static void onThermostatMsgID16(uint8_t msgType, uint16_t f88) {
+  // OT v4.2: thermostat-originated MsgID 16 frames are WRITE_DATA (type 1)
+  // carrying TrSet. Other types (READ_DATA queries) carry no setpoint and
+  // would skew honour detection. Filter strictly.
+  if (msgType != 1 /* WRITE_DATA */) return;
+
+  uint32_t now = millis();
+  otRemoteOverride.lastThermostatMs = now;
+
+  if (otRemoteOverride.mode == OT_OVERRIDE_NONE) {
+    otRemoteOverride.lastThermostatVal = f88;
+    return;
+  }
+
+  // Compute |delta| in f8.8 units, ignoring sign.
+  int32_t signedDelta = (int32_t)f88 - (int32_t)otRemoteOverride.f88Value;
+  uint32_t delta = (signedDelta < 0) ? (uint32_t)(-signedDelta) : (uint32_t)signedDelta;
+
+  if (delta < OT_OVERRIDE_HONOR_DELTA_F88) {
+    // Thermostat is echoing our value — count it as an honoured cycle.
+    if (otRemoteOverride.honoredCount < 0xFF) otRemoteOverride.honoredCount++;
+  } else if (otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY
+             && otRemoteOverride.honoredCount >= OT_OVERRIDE_HONOR_THRESHOLD
+             && delta > OT_OVERRIDE_RELEASE_DELTA_F88) {
+    // TT only: thermostat program has resumed after honouring us. Release.
+    OTDDebugTln(F("OTD: TT auto-clear (thermostat program resumed)"));
+    clearRemoteOverride();
+  }
+
+  otRemoteOverride.lastThermostatVal = f88;
+}
+
+// ---------------------------------------------------------------------------
 // resetTransientState — clear all transient state (called on GW=R and mode change)
 // Mirrors PIC hardware reset clearing all RAM, except persisted settings.
 // ---------------------------------------------------------------------------
@@ -1882,6 +2021,14 @@ static void resetTransientState() {
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
     otOverrides[i].active = false;
   }
+  // TASK-466: clear TT/TC remote-override state machine. Mirrors PIC
+  // behaviour where a hardware reset wipes setpoint1/2 + OverrideReq.
+  otRemoteOverride.mode              = OT_OVERRIDE_NONE;
+  otRemoteOverride.f88Value          = 0;
+  otRemoteOverride.honoredCount      = 0;
+  otRemoteOverride.lastThermostatVal = 0xFFFF;
+  state.otd.eOverrideMode            = OT_OVERRIDE_NONE;
+  state.otd.iOverrideF88             = 0;
   // Clear response modifiers
   clearAllResponseModifiers();
   // Clear setback state
@@ -2152,33 +2299,32 @@ void handleOTDirectCommand(const char* buf, int len) {
     dtostrf(temp, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
   }
-  // TC=xx.x — Constant room temperature override (MsgID 16 = TrSet, like TT=).
-  // TASK-443: was incorrectly mapped to MsgID 1 (TSet, flow/control setpoint),
-  // duplicating CS=. PIC gateway.asm distinguishes TC from CS: TC and TT are
-  // thermostat (room) setpoint overrides, CS is the flow/control setpoint.
-  // OpenTherm v4.2: MsgID 1 = TSet (control), MsgID 16 = TrSet (room).
-  // Minimal fix: route TC= to the same MsgID 16 path that TT= uses. The
-  // temporary-vs-constant distinction (PIC remote-override + auto-clear)
-  // is not modelled here; clients needing that should use PIC firmware.
+  // TC=xx.x — Constant ("vacation") room temperature override.
+  // TASK-466: PIC parity. Sets MsgID 16 (TrSet) to the requested value AND
+  // MsgID 100 (RemoteOverrideFunction) low byte = 0x01 (Manual override
+  // priority). Persists until TC=0 or TT= replaces it; the TT auto-clear
+  // state machine does NOT release a TC override.
   else if (cmd0 == 'T' && cmd1 == 'C') {
     float temp = atof(value);
     if (temp == 0.0f) {
-      clearWriteOverride(16);
+      clearRemoteOverride();
     } else {
-      uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
-      enqueueWriteCommand(16, f88, "TC");
+      setRemoteOverride(OT_OVERRIDE_CONSTANT, temp);
     }
     dtostrf(temp, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
   }
-  // TT=xx.x — Room setpoint / thermostat override (MsgID 16 = TrSet)
+  // TT=xx.x — Temporary room setpoint override.
+  // TASK-466: PIC parity. Sets MsgID 16 (TrSet) AND MsgID 100 low byte = 0x02
+  // (Program override priority). Auto-clears after the thermostat has echoed
+  // our value for OT_OVERRIDE_HONOR_THRESHOLD cycles and then moved on its
+  // own (program took over).
   else if (cmd0 == 'T' && cmd1 == 'T') {
     float temp = atof(value);
     if (temp == 0.0f) {
-      clearWriteOverride(16);
+      clearRemoteOverride();
     } else {
-      uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
-      enqueueWriteCommand(16, f88, "TT");
+      setRemoteOverride(OT_OVERRIDE_TEMPORARY, temp);
     }
     dtostrf(temp, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
@@ -2542,21 +2688,31 @@ void handleOTDirectCommand(const char* buf, int len) {
         }
         break;
       case 'O': {
-        // Setpoint override: check CS (constant) and TT (temporary)
-        bool csActive = false, ttActive = false;
-        uint16_t csVal = 0, ttVal = 0;
-        for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
-          if (otOverrides[i].active && otOverrides[i].msgId == 1)  { csActive = true; csVal = otOverrides[i].overrideValue; }
-          if (otOverrides[i].active && otOverrides[i].msgId == 16) { ttActive = true; ttVal = otOverrides[i].overrideValue; }
-        }
-        if (ttActive) {
-          dtostrf((int16_t)ttVal / 256.0f, 1, 2, rspBuf);
+        // Setpoint override report. TASK-466: TT/TC remote-override state
+        // machine takes precedence — it carries the explicit mode (T or C).
+        // Falls back to CS (boiler control setpoint) if no TT/TC is active
+        // and a CS override is in force.
+        if (otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY) {
+          dtostrf((int16_t)otRemoteOverride.f88Value / 256.0f, 1, 2, rspBuf);
           snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=T%s"), rspBuf);
-        } else if (csActive) {
-          dtostrf((int16_t)csVal / 256.0f, 1, 2, rspBuf);
+        } else if (otRemoteOverride.mode == OT_OVERRIDE_CONSTANT) {
+          dtostrf((int16_t)otRemoteOverride.f88Value / 256.0f, 1, 2, rspBuf);
           snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=C%s"), rspBuf);
         } else {
-          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=N"));
+          // No TT/TC: check for a CS (MsgID 1) flow setpoint override.
+          bool csActive = false;
+          uint16_t csVal = 0;
+          for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
+            if (otOverrides[i].active && otOverrides[i].msgId == 1) {
+              csActive = true; csVal = otOverrides[i].overrideValue; break;
+            }
+          }
+          if (csActive) {
+            dtostrf((int16_t)csVal / 256.0f, 1, 2, rspBuf);
+            snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=C%s"), rspBuf);
+          } else {
+            snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=N"));
+          }
         }
         otDirectBridgeProcessPRResponse(prBuf);
         break;
