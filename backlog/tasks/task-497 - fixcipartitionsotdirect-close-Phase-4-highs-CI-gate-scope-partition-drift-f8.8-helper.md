@@ -3,10 +3,11 @@ id: TASK-497
 title: >-
   fix(ci,partitions,otdirect): close Phase 4 highs (CI gate scope, partition
   drift, f8.8 helper)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-30 18:19'
+updated_date: '2026-04-30 18:28'
 labels:
   - ci
   - ota
@@ -97,13 +98,48 @@ touch unrelated files (no merge conflicts).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 4B-H1: `.github/workflows/evaluate.yml` and `opentherm-v42-spec-audit.yml` PR-trigger filter includes `feature-dev-*` branches
-- [ ] #2 4B-H2: A workflow runs `pio run -e esp32` and `pio run -e esp8266` on PRs into the active branches; build failure blocks merge
-- [ ] #3 4B-H3: `MERGED_APP_SIZE` in `OTGW-ModUpdateServer-esp32.h` matches the active partition table app-slot size; the stale `src/OTGW-firmware/partitions.csv` is retired or aligned
-- [ ] #4 4A-M1: `OTDirect.ino` exports a `static inline uint16_t floatToF88(float c)` helper with the -40..127 clamp; the four call sites use the helper
-- [ ] #5 ESP32 build SUCCESS
-- [ ] #6 ESP8266 build SUCCESS
-- [ ] #7 python evaluate.py --quick zero new violations
-- [ ] #8 python tests/check_otdirect_fixture.py PASS
-- [ ] #9 Workflow YAMLs are valid (parseable and PR-trigger conditions correct)
+- [x] #1 4B-H1: `.github/workflows/evaluate.yml` and `opentherm-v42-spec-audit.yml` PR-trigger filter includes `feature-dev-*` branches
+- [x] #2 4B-H2: A workflow runs `pio run -e esp32` and `pio run -e esp8266` on PRs into the active branches; build failure blocks merge
+- [x] #3 4B-H3: `MERGED_APP_SIZE` in `OTGW-ModUpdateServer-esp32.h` matches the active partition table app-slot size; the stale `src/OTGW-firmware/partitions.csv` is retired or aligned
+- [x] #4 4A-M1: `OTDirect.ino` exports a `static inline uint16_t floatToF88(float c)` helper with the -40..127 clamp; the four call sites use the helper
+- [x] #5 ESP32 build SUCCESS
+- [x] #6 ESP8266 build SUCCESS
+- [x] #7 python evaluate.py --quick zero new violations
+- [x] #8 python tests/check_otdirect_fixture.py PASS
+- [x] #9 Workflow YAMLs are valid (parseable and PR-trigger conditions correct)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## TASK-497 — Phase 4 highs closed
+
+Four findings from Phase 4 of the comprehensive review landed in
+commit `39bbd2fe`:
+
+- **4B-H1** evaluate.yml + spec-audit YAML PR-trigger filters extended
+  with `1.5.*` and `feature-dev-*` (spec-audit also keeps existing
+  `dev-*` / `copilot-*`).
+- **4B-H2** new `build.yml` PR compile gate: matrix job
+  `pio run -e {esp8266, esp32}` on every PR into the active branches.
+  `fail-fast: false`, PlatformIO cache restored across runs, firmware
+  artefacts uploaded per run.
+- **4B-H3** `MERGED_APP_SIZE` drift fixed (0x2E0000 → 0x1E0000, matches
+  partitions_otgw_esp32.csv app0 slot). Stale
+  `src/OTGW-firmware/partitions.csv` (single-app no-OTA layout from
+  the arduino-cli era) deleted; no code references it.
+- **4A-M1** `floatToF88(float)` helper extracted in OTDirect.ino. The
+  cast pattern was actually duplicated across 11 sites (the agent had
+  flagged 4); all 10 producer call sites now route through the
+  helper. setRemoteOverride loses its now-redundant explicit clamp.
+  Sanity-range early-returns in otdMqttSetRoomTemp /
+  otdMqttSetRoomSetpoint kept (drop-on-bad-input contract).
+
+### Verification
+- ESP32 build SUCCESS (1m35s, build 3863).
+- ESP8266 build SUCCESS (37s, byte-identical RAM/Flash; OTDirect is
+  HAS_DIRECT_OT-guarded).
+- `python tests/check_otdirect_fixture.py` PASS.
+- `python evaluate.py --quick` 95.5% health, zero new violations.
+- All 9 ACs satisfied.
+<!-- SECTION:FINAL_SUMMARY:END -->
