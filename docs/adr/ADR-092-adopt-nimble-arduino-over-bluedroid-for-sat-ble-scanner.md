@@ -47,12 +47,18 @@ Specific implementation decisions:
   `loop()` is never blocked by BLE scanning.
 - Use `setMaxResults(0)` so the library never builds a result list; we
   only consume callbacks. Saves heap.
-- Use scan interval/window 160/80 (50% radio duty during the 3-second
-  scan window), aligned with OT-Thing.
-- Periodic-scan model retained: a scan starts every
-  `settings.sat.iBleInterval` seconds with a duration of
-  `BLE_SCAN_DURATION_SEC = 3` seconds. The user-tunable knob is
-  preserved.
+- Use scan interval/window 160/80 (50% radio duty), aligned with OT-Thing.
+- **Continuous-scan model** (amended 2026-04-30, TASK-494): the scan
+  runs forever from `satBLEInit()` via `_pBLEScan->start(0, false, true)`,
+  matching the OT-Thing reference exactly. Earlier (initial draft of
+  this ADR) the firmware ran a periodic 3-second scan every
+  `iBleInterval` seconds. That model created a 30-second startup
+  blackout plus 90% off-time and was the root cause of the "BLE
+  sensors not discovered" defect TASK-494 closed. `iBleInterval` is
+  retained as a user setting for backwards-compatibility; its
+  semantics shift from "scan rate" to "publish/state-update cadence"
+  (gates `satBLEUpdateState()` + MQTT publish, never the BLE radio).
+  Existing user configs continue to load and round-trip cleanly.
 - Keep both ATC/pvvx (UUID `0x181A`) and BTHome v2 (UUID `0xFCD2`)
   parsers. Byte-layout of both formats is unchanged.
 - BTHome v2: now also validates the version-bit (`0x40`) and rejects

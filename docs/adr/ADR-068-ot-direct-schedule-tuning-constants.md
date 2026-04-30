@@ -12,7 +12,7 @@ The constants are:
 | Constant | Value | Location |
 |---|---|---|
 | `OT_STATUS_INTERVAL_MS` | 800 ms | Polling interval for MsgID 0 (status) |
-| `OT_CMD_QUEUE_SIZE` | 8 frames | Ring buffer for queued write commands |
+| `OT_CMD_QUEUE_SIZE` | 12 frames | Ring buffer for queued write commands; multi-channel fan-in convergence point. Coalesce-by-MsgID since 2026-04-30 (TASK-494). |
 | `OT_RESPONSE_OVERRIDE_MAX` | 16 entries | SR= response override table |
 | `OT_RESPONSE_MODIFY_MAX` | 8 entries | RM= response modifier table |
 | `OT_UNKNOWN_ID_MAX` | 16 entries | UI= unknown-ID intercept table |
@@ -28,13 +28,70 @@ The OpenTherm specification requires the master to send MsgID 0 (status) at leas
 - **800 ms (chosen)**: Provides a 200 ms safety margin against cooperative-loop jitter while matching the OT-Thing reference implementation. Sends 1.25 status frames per second instead of 1.0 — negligible overhead on a 32-bit bus.
 - **500 ms**: Would be safe but sends twice as many status frames as needed, consuming bus time that could be used for data polling.
 
-### `OT_CMD_QUEUE_SIZE = 8`
+### `OT_CMD_QUEUE_SIZE = 12` (amended 2026-04-30)
 
 The command queue drains one frame per master cycle (~800 ms minimum, governed by `OT_STATUS_INTERVAL_MS`). Users may issue multiple commands in a burst (e.g., `TT=20`, `SW=50`, `HW=1` from a Home Assistant automation).
 
 - **4 entries**: Insufficient for a 4-command MQTT burst. Commands would be silently dropped.
-- **8 entries (chosen)**: Covers typical automation bursts (3-5 commands). At 800 ms drain rate, 8 frames queue for up to 6.4 seconds — acceptable latency. Memory cost: 8 × 4 bytes = 32 bytes.
-- **16 entries**: Double the memory cost for marginal benefit. No documented use case generates more than 8 simultaneous commands.
+- **8 entries (initial choice)**: Covered typical automation bursts (3-5 commands).
+- **12 entries (current value)**: Increased to absorb the larger producer set introduced in 2.0.0 (TT/TC writes two frames per call — MsgID 16 + MsgID 100; CS/C2 expiry; SAT periodic writes). Memory cost: 12 × 4 bytes = 48 bytes. Drift between this ADR's table value and the code value was a pre-existing maintenance gap surfaced by Phase 3C of the comprehensive review on session `ace21a48..a61373b9`.
+- **16 entries**: Marginal benefit over 12 given the coalesce-by-MsgID semantics below — once duplicate-by-MsgID inserts collapse, capacity headroom is more than sufficient for realistic bursts.
+
+### Queue mechanics — coalesce-by-MsgID and the queue-is-the-channel principle (TASK-494)
+
+The OTDirect command queue is the **fan-in convergence point** for the
+multi-channel input model: MQTT commands, REST writes, WebUI clicks, and
+serial commands all converge here, regardless of channel of origin. The
+queue is THE path; OTDirect does not provide side-channel updates that
+bypass it. When the queue drops a frame, the command is genuinely lost
+from the user's perspective — visible failure, not silent recovery via
+override-table side-effects.
+
+This principle (owner-stated, binding) rules out two patterns that are
+otherwise tempting:
+
+- Decoupling the override-table update from queue-success. Tempting
+  because it would mask drops by always honouring the override-table.
+  Rejected because it makes drops invisible.
+- Increasing queue size to suppress drops. Tempting because it's
+  trivially cheap on RAM. Rejected because drops would then indicate
+  a producer-rate problem that should be investigated upstream, not
+  papered over downstream.
+
+Instead, the queue uses **coalesce-by-MsgID** semantics inside
+`otCmdEnqueue()`. Before adding a new entry to the head, the function
+scans pending entries (tail → head). If a frame for the same MsgID is
+already pending, the existing slot's data field is replaced in place
+and the function returns success without growing the queue depth.
+Otherwise, fall through to the existing add-to-head path.
+
+Properties:
+
+- **Coalesce key is MsgID only**, not full frame content. Two
+  producers each issuing TT=20 then TT=21 within one OT cycle
+  collapse into a single bus frame with the latest value (21). This
+  matches PIC's "latest WRITE_DATA per MsgID wins" semantics on the
+  bus.
+- **Position-preserving**. The existing entry stays in its queue
+  slot; only the data field is replaced. Order across DIFFERENT
+  MsgIDs is preserved (FIFO-by-MsgID).
+- **Self-consistent with the override-table state**: a `set then
+  clear` of MsgID 100 (TT/TC engagement followed by user-clear)
+  collapses to "clear" reaching the bus, and the override-table
+  state is also updated to inactive on each call. The two states
+  cannot disagree.
+- **Safe across the entire current producer set** (MsgIDs 1, 4, 7,
+  8, 14, 16, 56, 57, 99, 100, 116-123). All are "latest WRITE_DATA
+  wins" per OT v4.2. A future producer that adds an order-sensitive
+  MsgID (each value must reach the bus distinctly) must filter
+  upstream — `otCmdEnqueue` does not whitelist.
+
+A high-water-mark counter (`otCmdQueueHighWater`, file-static) is
+updated on each successful non-coalesce insert and logged via
+`OTDDebugTf`. Diagnostic purpose: in lab + soak it should never
+approach `OT_CMD_QUEUE_SIZE`. If it does, that is evidence of a
+producer-rate problem (worth a follow-up task), not a queue-size
+problem.
 
 ### 3-strike auto-disable threshold
 

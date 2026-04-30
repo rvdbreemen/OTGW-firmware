@@ -464,12 +464,56 @@ These topics are only available when BLE is enabled on ESP32 hardware.
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
-| `sat/ble_temp` | `"20.5"` | no | BLE sensor temperature (°C) |
+| `sat/ble_temp` | `"20.5"` | no | BLE sensor temperature (°C). Best/configured slot only — for multi-sensor visibility see the per-MAC topics below. |
 | `sat/ble_humidity` | `"55.0"` | no | BLE sensor humidity (%) |
 | `sat/ble_sensor_rssi` | `"-72"` | no | BLE sensor RSSI (dBm) |
 | `sat/ble_battery` | `"85"` | no | BLE sensor battery level (%) |
 | `sat/ble_sensor_count` | `"1"` | no | Number of active BLE sensors seen |
 | `sat/ble_temp_valid` | `"true"` | no | BLE temperature reading is valid and non-stale |
+
+##### Per-MAC topics (since 2.0.0, TASK-488)
+
+Every BLE sensor that is currently in a valid slot publishes its full set of
+state values under a per-MAC topic prefix. The MAC is rendered as 12 lowercase
+hex characters with no separators. These topics let multi-sensor deployments
+see every sensor independently, where the legacy flat topics above only cover
+the best/configured slot used as SAT control input.
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/ble/<mac>/temp` | `"20.50"` | no | Per-sensor temperature (°C, two decimals) |
+| `sat/ble/<mac>/rh` | `"55.20"` | no | Per-sensor humidity (%, two decimals) |
+| `sat/ble/<mac>/bat` | `"85"` | no | Per-sensor battery level (%) |
+| `sat/ble/<mac>/rssi` | `"-72"` | no | Per-sensor RSSI (dBm) |
+
+Example: a Xiaomi LYWSD03MMC at MAC `A4:C1:38:12:34:56` publishes under
+`OTGW/sat/ble/a4c138123456/temp` etc. The per-MAC topics update at the
+`iBleInterval` cadence (see `Advanced Settings`) on top of every BLE
+advertisement that the radio sees (continuous scan since 2.0.0).
+
+##### Home Assistant auto-discovery (since 2.0.0, TASK-488)
+
+For each first-seen MAC, the firmware publishes four retained
+auto-discovery configs to the standard HA prefix so the sensor appears
+in Home Assistant without manual yaml. Discovery is one-shot per MAC
+per session; subsequent scans of the same MAC do not re-publish.
+
+| Topic | Retained | Description |
+| ----- | -------- | ----------- |
+| `<HaPrefix>/sensor/<uniqueId>_ble_<mac>_temp/config` | yes | Temperature entity, `device_class: temperature`, °C |
+| `<HaPrefix>/sensor/<uniqueId>_ble_<mac>_rh/config` | yes | Humidity entity, `device_class: humidity`, % |
+| `<HaPrefix>/sensor/<uniqueId>_ble_<mac>_bat/config` | yes | Battery entity, `device_class: battery`, % |
+| `<HaPrefix>/sensor/<uniqueId>_ble_<mac>_rssi/config` | yes | Signal-strength entity, `device_class: signal_strength`, dBm |
+
+Each config also carries a `device` block grouping the four entities under
+a single HA device with `model: "BLE Sensor"`, `manufacturer: "BLE"`, and
+`via_device: <uniqueId>`. The state_topic field references the per-MAC
+topics in the table above.
+
+If `bDiscoveryPublished` was set but the publish failed (low heap, MQTT
+not yet connected, broker hiccup), the helper returns `false` and the
+caller retries on the next iBleInterval cycle — discovery is never
+silently dropped (TASK-489 + TASK-493).
 
 #### Value Tables
 

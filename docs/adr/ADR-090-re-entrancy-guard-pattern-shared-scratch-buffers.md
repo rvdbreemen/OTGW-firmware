@@ -24,6 +24,22 @@ File-scope or function-local-static mutable scratch state that is shared across 
 4. **No volatile required on ESP8266** [guideline-level]
    The cooperative single-threaded model means scratch guards do not need `volatile` because no ISR enters these paths. A future SAT/OTGW32 introduction of FreeRTOS-style threading would require revisiting this rule, but until then `volatile` is unnecessary noise.
 
+   **Amendment 2026-04-30 (TASK-497)**: the foresight clause has fired
+   on ESP32-S3 (OTGW32). The NimBLE 2.x scan callback runs on the BLE
+   host task on core 0 while the Arduino loop task runs on core 1. The
+   re-entrancy-guard pattern in this ADR is the right model for ESP8266
+   cooperative re-entry but does not cover task-to-task data races.
+   For the new cross-task case, use a `portMUX_TYPE` with the
+   snapshot pattern (writer wraps the slot-update in
+   `portENTER_CRITICAL` / `portEXIT_CRITICAL`; reader takes a stack
+   copy under the same lock and processes outside it). Critical
+   sections must stay short — one struct copy or one slot-update at
+   most — so the BLE radio task is never blocked. See
+   `src/OTGW-firmware/SATble.ino` (`_bleSensorsMux`) for the canonical
+   exemplar. The cooperative re-entry rules above (sub-rules 1-3) and
+   the exemplars in §A and §B remain authoritative for the cooperative
+   case; they do not extend to task-to-task hazards.
+
 5. **Two existing instances are exemplars** [guideline-level]
    New code should follow either the `MQTTAutoConfigSessionLock` shape or the `publishToSourceTopic` inUse-flag shape, not invent a third. If a third instance is added without choosing either, the next reviewer should ask why.
 
