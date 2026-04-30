@@ -411,6 +411,6 @@ struct SATSection {
   // BLE temperature sensor (Task #20, ESP32 only)
   bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning
   char     sBleMAC[18]        = "";            // Bind to specific sensor MAC (empty = accept all)
-  uint16_t iBleInterval       = 30;            // Scan interval in seconds (10-300)
+  uint16_t iBleInterval       = 30;            // Publish/state-update cadence (sec, 10-300). NOT scan rate: TASK-494 made the BLE scan continuous to match OT-Thing.
 #endif
 };

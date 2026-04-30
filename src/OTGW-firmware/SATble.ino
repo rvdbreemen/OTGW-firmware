@@ -35,7 +35,6 @@
 // --- BLE Sensor Constants ---
 #define SAT_BLE_MAX_SENSORS   4
 static const uint32_t BLE_STALE_MS          = 300000;   // 5 min stale timeout
-static const uint32_t BLE_SCAN_DURATION_SEC = 3;        // 3 second scan window per cycle
 
 // ATC/pvvx custom firmware service data UUID: 0x181A (Environmental Sensing)
 static const uint16_t ATC_SERVICE_UUID_16    = 0x181A;
@@ -66,7 +65,7 @@ struct BLESensorData {
 
 static BLESensorData _bleSensors[SAT_BLE_MAX_SENSORS];
 static NimBLEScan*   _pBLEScan       = nullptr;
-static uint32_t      _bleLastScanMs  = 0;
+static uint32_t      _bleLastPublishMs = 0;
 static bool          _bleInitialized = false;
 
 // TASK-497 (cross-phase): NimBLE 2.x scan callback runs on a separate
@@ -302,8 +301,17 @@ void satBLEInit()
   _pBLEScan->setInterval(160);       // 100 ms BLE scan-interval
   _pBLEScan->setWindow(80);          // 50 ms BLE scan-window (50% radio duty)
 
+  // TASK-494: Continuous-scan model — start the scan ONCE, run forever.
+  // Args: (duration_seconds=0 means forever, is_continue=false, restart=true).
+  // Callbacks fire on the BLE host task as advertisements arrive; loop() is
+  // never blocked. Matches the OT-Thing reference implementation, which
+  // discovers BLE sensors within seconds of boot. The earlier periodic
+  // 3-s/30-s model created a 30-s startup blackout plus 90 % off-time —
+  // sensors were rarely seen even when in range.
+  _pBLEScan->start(0, false, true);
+
   _bleInitialized = true;
-  DebugTln(F("SAT BLE: initialized (NimBLE 2.x)"));
+  DebugTln(F("SAT BLE: initialized (NimBLE 2.x, continuous scan)"));
 
   if (settings.sat.sBleMAC[0] != '\0') {
     DebugTf(PSTR("SAT BLE: bound to MAC %s\r\n"), settings.sat.sBleMAC);
@@ -323,23 +331,16 @@ void satBLELoop()
     if (!_bleInitialized) return;
   }
 
-  // Rate-limit scans
+  // TASK-494: scan runs continuously since satBLEInit(). Here we only
+  // throttle the publish/state-update cadence so MQTT and state.sat.*
+  // are refreshed every iBleInterval seconds rather than on every loop
+  // iteration. Scan callbacks update _bleSensors[] in real time on the
+  // BLE host task; satBLEUpdateState() picks the best slot and copies
+  // it into state.sat.* for SAT control input + MQTT publishing.
   uint32_t interval = (uint32_t)settings.sat.iBleInterval * 1000UL;
-  if ((millis() - _bleLastScanMs) < interval) return;
-  _bleLastScanMs = millis();
+  if ((millis() - _bleLastPublishMs) < interval) return;
+  _bleLastPublishMs = millis();
 
-  SATBLEDebugTf(PSTR("SAT BLE: scan starting async (interval=%us, duration=%us)\r\n"),
-                (unsigned)(interval / 1000UL),
-                (unsigned)BLE_SCAN_DURATION_SEC);
-
-  // NimBLE 2.x async scan: 3-arg form returns immediately, callbacks fire on
-  // the BLE host task. loop() is never blocked. Args: (duration_seconds,
-  // is_continue=false, restart=true). 'restart=true' handles the case where a
-  // previous scan window is still draining when our timer fires.
-  _pBLEScan->start(BLE_SCAN_DURATION_SEC, false, true);
-
-  // Update state from best sensor (uses whatever slots are valid right now;
-  // fresh callbacks during the next 3 s will refresh slots in place).
   satBLEUpdateState();
 }
 

@@ -256,19 +256,80 @@ static OTScheduleEntry otSchedule[] = {
 static constexpr uint8_t OT_SCHEDULE_SIZE = sizeof(otSchedule) / sizeof(otSchedule[0]);
 static uint8_t otScheduleIdx = 0;
 
-// Command ring buffer — queues frames from handleOTDirectCommand()
+// Command ring buffer — queues frames from handleOTDirectCommand() and
+// the various per-channel input paths (MQTT, REST, WebUI, telnet serial).
+// This is the FAN-IN convergence point per the OTDirect architecture: the
+// channel of origin does not matter, every command lands here.
+//
+// Sizing rationale (intentional, do not bump): in normal operation the
+// queue should never approach capacity. If drops occur, the producer rate
+// is the problem, not the queue size. See TASK-494 / TASK-466 / ADR-064
+// for the architectural model.
 static constexpr uint8_t OT_CMD_QUEUE_SIZE = 12;
 static uint32_t otCmdQueue[OT_CMD_QUEUE_SIZE];
 static uint8_t  otCmdHead = 0;   // next write position
 static uint8_t  otCmdTail = 0;   // next read position
+static uint8_t  otCmdQueueHighWater = 0;  // TASK-494: peak depth observed
 
 static bool otCmdQueueEmpty() { return otCmdHead == otCmdTail; }
 static bool otCmdQueueFull()  { return ((otCmdHead + 1) % OT_CMD_QUEUE_SIZE) == otCmdTail; }
 
+static uint8_t otCmdQueueDepth() {
+  return (otCmdHead + OT_CMD_QUEUE_SIZE - otCmdTail) % OT_CMD_QUEUE_SIZE;
+}
+
+// TASK-494: enqueue with coalesce-by-MsgID.
+//
+// If a frame for the SAME OT MsgID is already pending in the queue, replace
+// its data16 field in place and return success without growing the queue
+// depth. Otherwise add to the head as a normal ring-buffer push.
+//
+// Coalescing key: MsgID only (not full frame). Multiple producers issuing
+// the SAME MsgID with different data values within one OT cycle (~115 ms)
+// would otherwise consume one slot per call — wasteful, since the boiler
+// only acts on the most recent WRITE_DATA value per MsgID anyway.
+//
+// Position-preserving: the existing entry stays in its slot; only the data
+// is replaced. Order across DIFFERENT MsgIDs is preserved.
+//
+// Sequences like `set MsgID 100=X` then `set MsgID 100=Y` within one OT
+// cycle collapse to "Y" reaching the bus — intentional PIC-parity
+// semantics, self-consistent with the override-table state which is also
+// updated to the latest value on each call.
+//
+// Safe for the entire current producer set (MsgIDs 1, 4, 7, 8, 14, 16,
+// 56, 57, 99, 100, 116-123). If a future producer adds an order-sensitive
+// MsgID (each value must reach the bus distinctly), it must filter
+// upstream; the helper does not whitelist.
 static bool otCmdEnqueue(uint32_t frame) {
+  uint8_t newMsgId = (frame >> 16) & 0xFF;
+
+  // Walk pending entries tail → head; replace in place on MsgID match.
+  uint8_t i = otCmdTail;
+  while (i != otCmdHead) {
+    uint8_t existingMsgId = (otCmdQueue[i] >> 16) & 0xFF;
+    if (existingMsgId == newMsgId) {
+      otCmdQueue[i] = frame;
+      OTDDebugTf(PSTR("OTD: queue coalesced MsgID %u -> 0x%08lX\r\n"),
+                 (unsigned)newMsgId, (unsigned long)frame);
+      return true;
+    }
+    i = (i + 1) % OT_CMD_QUEUE_SIZE;
+  }
+
   if (otCmdQueueFull()) return false;
   otCmdQueue[otCmdHead] = frame;
   otCmdHead = (otCmdHead + 1) % OT_CMD_QUEUE_SIZE;
+
+  // Track peak depth for diagnostic visibility. Normal operation should
+  // keep this well below OT_CMD_QUEUE_SIZE; if it climbs, the producer
+  // rate is the issue (not size).
+  uint8_t depth = otCmdQueueDepth();
+  if (depth > otCmdQueueHighWater) {
+    otCmdQueueHighWater = depth;
+    OTDDebugTf(PSTR("OTD: queue high-water=%u (capacity=%u)\r\n"),
+               (unsigned)depth, (unsigned)OT_CMD_QUEUE_SIZE);
+  }
   return true;
 }
 
