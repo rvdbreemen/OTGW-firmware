@@ -5,10 +5,11 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-04-29 22:10'
-updated_date: '2026-04-29 23:21'
+updated_date: '2026-04-30 00:29'
 labels:
   - flash scripts
 dependencies: []
+ordinal: 1000
 ---
 
 ## Description

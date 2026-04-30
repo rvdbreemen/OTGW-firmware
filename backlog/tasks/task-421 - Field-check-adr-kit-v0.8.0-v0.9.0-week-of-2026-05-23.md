@@ -4,6 +4,7 @@ title: Field check adr-kit v0.8.0 + v0.9.0 (week of 2026-05-23)
 status: To Do
 assignee: []
 created_date: '2026-04-25 20:18'
+updated_date: '2026-04-30 00:37'
 labels:
   - adr-kit
   - external-repo
@@ -11,6 +12,7 @@ labels:
   - field-verification
 dependencies: []
 priority: low
+ordinal: 5000
 ---
 
 ## Description

@@ -4,9 +4,11 @@ title: Promote design-system drift gate from WARN to FAIL after grace release
 status: To Do
 assignee: []
 created_date: '2026-04-28 21:46'
+updated_date: '2026-04-30 00:37'
 labels:
   - tooling design-system ci-gate
 dependencies: []
+ordinal: 10000
 ---
 
 ## Description

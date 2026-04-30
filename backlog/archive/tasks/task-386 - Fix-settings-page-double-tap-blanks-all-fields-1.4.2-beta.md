@@ -4,7 +4,7 @@ title: 'Fix: settings page double-tap blanks all fields (1.4.2-beta)'
 status: To Do
 assignee: []
 created_date: '2026-04-23 06:54'
-updated_date: '2026-04-23 06:54'
+updated_date: '2026-04-30 00:39'
 labels:
   - bug
   - ui
@@ -15,6 +15,7 @@ references:
   - user andrebrait
   - '2026-04-23 02:11Z'
 priority: medium
+ordinal: 3000
 ---
 
 ## Description
@@ -35,4 +36,6 @@ Discord #beta-testing (andrebrait, 2026-04-23 02:11Z): on 1.4.2-beta, tapping 'S
 
 <!-- SECTION:NOTES:BEGIN -->
 Waiting for: screenshot + browser info. Suspect: async fetch race in data/index.js settings-tab handler.
+
+2026-04-30 closing as not-done (archive): single-reporter 1.4.2-beta UI bug, no Discord-response from andrebrait in 7 days (reported 2026-04-23). The 2.0.0 dev-branch web UI was heavily refactored after 1.4.2-beta (new index.js architecture, see TASK-470 design-system rework + various UI tasks). Even if the reporter eventually responds, the original fix-target may no longer exist as-is. If the symptom resurfaces in 2.0.0, a fresh task with current diagnostics is the cleaner path. Reopen by unarchive if needed.
 <!-- SECTION:NOTES:END -->
