@@ -1,5 +1,18 @@
 **v1.5.0-beta is a development release. It is not recommended for production deployments.** A stable `v1.5.0` will follow when the line has soaked in the field.
 
+## Update 2026-04-30: v1.5.0-beta.4 — master-topic filter for MQTT, log and REST state
+
+This build (`1.5.0-beta.4+476c34f`) is a fresh release on top of v1.5.0-beta.2. It carries two targeted fixes that together resolve the "value flapping" reports from beta testers running v1.4.1 and v1.5.0-beta.
+
+- **ADR-066: MQTT base topic gating by source and slave-echo** (TASK-478). Some OpenTherm MsgIDs (Tr, TrSet, TrSetCH2, MaxRelModLevelSetting, TrCH2, RFsensorStatus) have a Write-Ack data byte that is per-spec undefined; the boiler does not echo back a meaningful value. Since v1.4.1, those Write-Ack frames were treated as valid for the MQTT base topic, overwriting the legitimate Write-Data value and producing apparent oscillation between the thermostat-intent value and per-spec garbage. Fix: a new `is_value_valid_for_master_topic()` helper accepts only Read-Ack for OT_READ MsgIDs and only Write-Data for OT_WRITE / OT_RW MsgIDs at the base topic. Source-separated `/boiler` subtopic is gated independently by a new `bSlaveEchoesValue` flag in the MsgID lookup table.
+- **ADR-066 extension to log decode and REST state** (TASK-483). Beta.3 (TASK-478) only fixed the MQTT base topic, but the WebUI consumes two upstream tiers — the OT-log scherm (via WebSocket) and the stats panel (via REST `/api/v2/otgw/otmonitor` reading `OTcurrentSystemState`) — that kept the broader pre-fix filter and continued to flap. Fix: `print_f88`, `print_s16`, `print_s8s8`, `print_u16` now cache `is_value_valid_for_master_topic` once per call and gate both the `AddLogf` decoded value and the state write on it. Non-master-topic messages emit the label only (no misleading `= value`); the protocol event remains visible for diagnostics.
+
+Effect: REST stats panel for Tr / TrSet / TSet is stable, OT-log shows one decoded value per Write pair, READ-only MsgIDs are unchanged, MQTT regression-free. Memory-neutral after compiler optimization (Flash 69%, RAM 71% on ESP8266 D1 mini, identical to pre-fix baseline).
+
+Same `eesz=4M2M` partition layout as v1.5.0-beta.2; a firmware-only OTA from the previous beta keeps your settings. A full firmware + filesystem flash is also fine.
+
+---
+
 ## Update 2026-04-26: build refreshed with a DHCP fix
 
 This build (`1.5.0-beta+cd30617`) replaces the original `1.5.0-beta+d40c2f6` artefacts on this release. It carries one targeted fix:
