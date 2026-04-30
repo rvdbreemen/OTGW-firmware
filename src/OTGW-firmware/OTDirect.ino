@@ -1886,6 +1886,12 @@ static void clearWriteOverride(uint8_t msgId) {
 // TT/TC and CS/C2 are independent state machines.
 // ---------------------------------------------------------------------------
 static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
+  // TASK-495 (2A-H1): clamp to the f8.8 representable range before the cast.
+  // Out-of-range float-to-signed-narrow conversion is C/C++ undefined
+  // behaviour. Mirrors the existing range guard in otdMqttSetRoomSetpoint().
+  // -40..127 covers every realistic room/freezer-room/frost-protect setpoint.
+  if (celsius < -40.0f) celsius = -40.0f;
+  if (celsius > 127.0f) celsius = 127.0f;
   uint16_t f88 = (uint16_t)((int16_t)(celsius * 256.0f));
 
   otRemoteOverride.mode             = mode;

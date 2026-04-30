@@ -2065,12 +2065,17 @@ static bool bleSensorPublishOneDiscovery(const char* macCompact,
     return false;
   }
 
-  if (!beginMqttPublish(topic, (size_t)n, /*retain=*/true)) return false;
+  // TASK-496 (2B-H1): every return path that follows a network attempt feeds
+  // the watchdog. PubSubClient sockets can stall up to ~15 s on a flaky broker,
+  // and a 16-publish first-scan burst (4 sensors × 4 configs) can otherwise
+  // traverse all branches without a single watchdog kick.
+  if (!beginMqttPublish(topic, (size_t)n, /*retain=*/true)) { feedWatchDog(); return false; }
   if (!writeMqttChunk(payload, (size_t)n)) {
     MQTTclient.endPublish();
+    feedWatchDog();
     return false;
   }
-  if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
+  if (!MQTTclient.endPublish()) { PrintMQTTError(); feedWatchDog(); return false; }
   feedWatchDog();
   return true;
 }
@@ -2082,11 +2087,16 @@ static bool bleSensorPublishOneDiscovery(const char* macCompact,
 // loopMQTTDiscovery() is keyed by OT message ID and does not have a slot
 // for arbitrary MACs; per-scan caller cadence (iBleInterval, typically 30s)
 // already provides drip pacing.
-void bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColons)
+// TASK-493 (1A-H1): returns true only when ALL four discovery configs were
+// successfully published. The caller (satBLEPublishMQTT) gates the per-slot
+// `bDiscoveryPublished` flag on this return value; a transient first-scan
+// failure will retry on the next iBleInterval cycle instead of permanently
+// suppressing HA discovery for that sensor.
+bool bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColons)
 {
-  if (!macCompact || macCompact[0] == '\0') return;
-  if (!macWithColons || macWithColons[0] == '\0') return;
-  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
+  if (!macCompact || macCompact[0] == '\0') return false;
+  if (!macWithColons || macWithColons[0] == '\0') return false;
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return false;
 
   // Each kind: short-name, device_class, unit, value_template. All PROGMEM.
   bool ok;
@@ -2098,7 +2108,7 @@ void bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColo
         F("{{ value | float }}"));
   if (!ok) {
     MQTTDebugTf(PSTR("[ble-disc] temp publish failed for %s\r\n"), macCompact);
-    return;
+    return false;
   }
 
   ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
@@ -2109,7 +2119,7 @@ void bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColo
         F("{{ value | float }}"));
   if (!ok) {
     MQTTDebugTf(PSTR("[ble-disc] rh publish failed for %s\r\n"), macCompact);
-    return;
+    return false;
   }
 
   ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
@@ -2120,7 +2130,7 @@ void bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColo
         F("{{ value | int }}"));
   if (!ok) {
     MQTTDebugTf(PSTR("[ble-disc] bat publish failed for %s\r\n"), macCompact);
-    return;
+    return false;
   }
 
   ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
@@ -2131,10 +2141,11 @@ void bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColo
         F("{{ value | int }}"));
   if (!ok) {
     MQTTDebugTf(PSTR("[ble-disc] rssi publish failed for %s\r\n"), macCompact);
-    return;
+    return false;
   }
 
   MQTTDebugTf(PSTR("[ble-disc] published 4 HA configs for MAC %s\r\n"), macCompact);
+  return true;
 }
 #endif // defined(ESP32)
 

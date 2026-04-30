@@ -69,6 +69,18 @@ static NimBLEScan*   _pBLEScan       = nullptr;
 static uint32_t      _bleLastScanMs  = 0;
 static bool          _bleInitialized = false;
 
+// TASK-497 (cross-phase): NimBLE 2.x scan callback runs on a separate
+// FreeRTOS task on ESP32-S3 (the BLE host task on core 0) while the
+// Arduino loop task (core 1) reads _bleSensors[] in satBLEPublishMQTT()
+// and satBLEUpdateState(). Without synchronisation, multi-byte fields
+// (iLastSeenMs, fTemperature) can tear under concurrent access.
+//
+// Use portMUX to serialise: scan-callback writes hold the lock during the
+// slot update; loop-task readers take a quick snapshot under the lock,
+// then process the snapshot outside. Critical sections stay short (one
+// struct copy or one slot-update block) to avoid blocking the BLE radio.
+static portMUX_TYPE _bleSensorsMux = portMUX_INITIALIZER_UNLOCKED;
+
 // --- Forward declarations ---
 static bool parseBLEAtcFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);
 static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);
@@ -245,7 +257,11 @@ class SATBLEScanCallbacks : public NimBLEScanCallbacks {
       return;
     }
 
-    // TASK-488 follow-up: when a slot is recycled (was occupied by a
+    // TASK-497: serialise the slot update against loop-task reads.
+    // The block below is bounded constant time (~30 stores), so the
+    // critical section is microseconds, never blocking the BLE radio.
+    portENTER_CRITICAL(&_bleSensorsMux);
+    // TASK-489 follow-up: when a slot is recycled (was occupied by a
     // different MAC that went stale), the previous tenant's
     // bDiscoveryPublished flag is still set. Reset it so the new MAC
     // gets a fresh HA-discovery config published. For an unchanged
@@ -262,6 +278,7 @@ class SATBLEScanCallbacks : public NimBLEScanCallbacks {
     _bleSensors[slot].iRssi        = (int8_t)dev->getRSSI();
     _bleSensors[slot].bValid       = true;
     _bleSensors[slot].iLastSeenMs  = millis();
+    portEXIT_CRITICAL(&_bleSensorsMux);
 
     SATBLEDebugTf(PSTR("SAT BLE: sensor %s slot=%d temp=%.1f hum=%.1f batt=%u rssi=%d\r\n"),
                   macBuf, slot, temp, hum, (unsigned)batt,
@@ -336,11 +353,20 @@ void satBLEUpdateState()
   uint8_t sensorCount = 0;
 
   for (int i = 0; i < SAT_BLE_MAX_SENSORS; i++) {
-    if (!_bleSensors[i].bValid) continue;
+    // TASK-497: snapshot the slot under the BLE mutex, then process the local
+    // copy without the lock. Critical section is one struct copy (~40 bytes).
+    BLESensorData snap;
+    portENTER_CRITICAL(&_bleSensorsMux);
+    snap = _bleSensors[i];
+    portEXIT_CRITICAL(&_bleSensorsMux);
 
-    // Mark stale sensors as invalid
-    if ((now - _bleSensors[i].iLastSeenMs) > BLE_STALE_MS) {
+    if (!snap.bValid) continue;
+
+    // Mark stale sensors as invalid (write back through the lock)
+    if ((now - snap.iLastSeenMs) > BLE_STALE_MS) {
+      portENTER_CRITICAL(&_bleSensorsMux);
       _bleSensors[i].bValid = false;
+      portEXIT_CRITICAL(&_bleSensorsMux);
       continue;
     }
 
@@ -349,17 +375,17 @@ void satBLEUpdateState()
     // Use the configured MAC sensor if set, otherwise use first valid
     if (!found) {
       if (settings.sat.sBleMAC[0] == '\0' ||
-          strcasecmp(_bleSensors[i].sMacAddress, settings.sat.sBleMAC) == 0) {
-        state.sat.fBleTemp      = _bleSensors[i].fTemperature;
-        state.sat.fBleHumidity  = _bleSensors[i].fHumidity;
-        state.sat.iBleBattery   = _bleSensors[i].iBattery;
-        state.sat.iBleRssi      = _bleSensors[i].iRssi;
+          strcasecmp(snap.sMacAddress, settings.sat.sBleMAC) == 0) {
+        state.sat.fBleTemp      = snap.fTemperature;
+        state.sat.fBleHumidity  = snap.fHumidity;
+        state.sat.iBleBattery   = snap.iBattery;
+        state.sat.iBleRssi      = snap.iRssi;
         state.sat.bBleTempValid = true;
-        state.sat.iBleTempLastMs = _bleSensors[i].iLastSeenMs;
+        state.sat.iBleTempLastMs = snap.iLastSeenMs;
         found = true;
         SATBLEDebugTf(PSTR("SAT BLE: best sensor slot=%d mac=%s temp=%.1f age=%ums\r\n"),
-                      i, _bleSensors[i].sMacAddress, _bleSensors[i].fTemperature,
-                      (unsigned)(now - _bleSensors[i].iLastSeenMs));
+                      i, snap.sMacAddress, snap.fTemperature,
+                      (unsigned)(now - snap.iLastSeenMs));
       }
     }
   }
@@ -429,22 +455,36 @@ void satBLEPublishMQTT()
   sendMQTTData(F("sat/ble_temp_valid"), state.sat.bBleTempValid ? "true" : "false", false);
 
   // --- TASK-488: per-MAC state topics + one-shot HA discovery ---
-  // For every valid slot: compact MAC, publish 4 state topics,
-  // and (once per MAC) emit the HA discovery configs.
+  // For every valid slot: snapshot under the BLE mutex (TASK-497), then
+  // publish from the local copy so the network I/O does not hold the lock.
   for (int i = 0; i < SAT_BLE_MAX_SENSORS; i++) {
-    if (!_bleSensors[i].bValid) continue;
+    BLESensorData snap;
+    portENTER_CRITICAL(&_bleSensorsMux);
+    snap = _bleSensors[i];
+    portEXIT_CRITICAL(&_bleSensorsMux);
+
+    if (!snap.bValid) continue;
     char macCompact[13];
-    bleMacToCompact(_bleSensors[i].sMacAddress, macCompact, sizeof(macCompact));
+    bleMacToCompact(snap.sMacAddress, macCompact, sizeof(macCompact));
     if (macCompact[0] == '\0') continue;  // skip malformed
-    if (!_bleSensors[i].bDiscoveryPublished) {
-      bleSensorPublishHaDiscovery(macCompact, _bleSensors[i].sMacAddress);
-      _bleSensors[i].bDiscoveryPublished = true;
+
+    if (!snap.bDiscoveryPublished) {
+      // TASK-493 (1A-H1): only mark discovery as published when the helper
+      // actually succeeded. A transient first-scan failure (MQTT not yet
+      // connected, low heap, broker hiccup) will retry on the next
+      // iBleInterval cycle instead of permanently silencing HA discovery
+      // for this MAC. Write the flag back to the real slot under the lock.
+      if (bleSensorPublishHaDiscovery(macCompact, snap.sMacAddress)) {
+        portENTER_CRITICAL(&_bleSensorsMux);
+        _bleSensors[i].bDiscoveryPublished = true;
+        portEXIT_CRITICAL(&_bleSensorsMux);
+      }
     }
     bleSensorPublishStateTopics(macCompact,
-                                 _bleSensors[i].fTemperature,
-                                 _bleSensors[i].fHumidity,
-                                 _bleSensors[i].iBattery,
-                                 _bleSensors[i].iRssi);
+                                 snap.fTemperature,
+                                 snap.fHumidity,
+                                 snap.iBattery,
+                                 snap.iRssi);
   }
 }
 
