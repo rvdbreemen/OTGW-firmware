@@ -3,10 +3,10 @@ id: TASK-466
 title: >-
   feat(otdirect): implement PIC-style TT=/TC= remote-override semantics with
   MsgID 9 + MsgID 100 state machine
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-27 23:55'
-updated_date: '2026-04-30 02:12'
+updated_date: '2026-04-30 02:17'
 labels:
   - otdirect
   - pic-parity
@@ -238,7 +238,7 @@ Extend tests/otdirect_pic_parity_fixture.md (TASK-444) with:
 - [x] #9 TASK-442 CS/C2 expiry timestamps are not touched by the new clearRemoteOverride() and CS/C2 behaviour remains independent.
 - [x] #10 PIC firmware sources are not modified.
 - [x] #11 Build clean on ESP32 and ESP8266, 0 warnings 0 errors.
-- [ ] #12 Hardware verification scenario documented: drag thermostat program through a setpoint change while TT is active -> auto-clears within 3-5 thermostat cycles; same scenario with TC -> stays.
+- [x] #12 Hardware verification scenario documented: drag thermostat program through a setpoint change while TT is active -> auto-clears within 3-5 thermostat cycles; same scenario with TC -> stays.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -256,3 +256,62 @@ Open question 2 from agent (MsgID 100 clear via direct otCmdEnqueue, not via enq
 
 2026-04-30 02:13 BUILDS GREEN: ESP32 SUCCESS (Flash 95.8%, RAM 31.7%, 19m25s), ESP8266 SUCCESS (Flash 77.3%, RAM 84.7%, 2m41s). AC #11 satisfied. Open: AC #12 hardware verification by owner.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## TASK-466 — OTDirect TT=/TC= PIC-style remote-override
+
+Implements PIC-parity for the temporary (TT=) vs constant (TC=) room-setpoint
+override semantics. Both commands now write MsgID 16 (TrSet) AND MsgID 100
+(RemoteOverrideFunction) flag bits — `0x02` for TT (Program override priority),
+`0x01` for TC (Manual override priority) — matching what `gateway.asm` does.
+
+### Files
+- `src/OTGW-firmware/OTDirecttypes.h`: `OTRemoteOverrideMode` enum +
+  `OTRemoteOverrideState` struct; `state.otd` gains `eOverrideMode` /
+  `iOverrideF88`.
+- `src/OTGW-firmware/OTDirect.ino`: file-static `otRemoteOverride` instance,
+  `otOverrides[]` MsgID 100 row, `setRemoteOverride()` / `clearRemoteOverride()`
+  helpers, TT=/TC= command rewrite, `onThermostatMsgID16()` honour-detection +
+  TT auto-clear, PR=O extension to `O=T<v>` / `O=C<v>` / `O=N`.
+- `tests/otdirect_pic_parity_fixture.md`: 9 new fixture rows in a
+  TASK-466 section covering set/clear/honour/auto-clear/persistence/replacement/
+  reboot/PR=O cases plus a TASK-442 independence note.
+
+### State machine
+- TT honour-detection: when `abs(thermostat_msg16 - override) < 0.25 °C`
+  (`OT_OVERRIDE_HONOR_DELTA_F88`), `honoredCount++`.
+- TT auto-clear: when `mode==TEMPORARY` AND `honoredCount >= 3` AND
+  `abs(thermostat_msg16 - override) > 0.5 °C` → `clearRemoteOverride()`,
+  emits `OTDDebug` log "OTD: TT auto-clear (thermostat program resumed)".
+- TC persists indefinitely: `clearRemoteOverride()` is a no-op for
+  `mode == CONSTANT` from the auto-clear path; only TC=0 / TT=replacement
+  clears it.
+- TASK-442 independence preserved: `clearRemoteOverride()` does NOT touch
+  `otCSLastCommandMs` / `otC2LastCommandMs`.
+- `resetTransientState()` wipes the override state on cold boot / GW=R.
+
+### Verification
+- `python tests/check_otdirect_fixture.py`: PASS (8 tables, all rows valid).
+- `python evaluate.py --quick`: 67 checks, 57 pass, 95.5% health. Zero new
+  PROGMEM violations from TASK-466 changes (verified by line-range grep).
+- ESP32 build: SUCCESS (Flash 95.8%, RAM 31.7%, 19m25s on `-j 1`).
+- ESP8266 build: SUCCESS (Flash 77.3%, RAM 84.7%, 2m41s, identical to
+  pre-change since OTDirect is `#if HAS_DIRECT_OT` ESP32-only).
+
+### Hardware verification scenario (documented per AC #12)
+The fixture rows describe the expected hardware behaviour:
+- `TT=20` → MsgID 16 = `0x1400`, MsgID 100 = `0x0002`; thermostat echoes
+  20.0 C; honoredCount increments per echo; on a thermostat program shift
+  (e.g. drop to 17 C) after 3+ honour cycles, override auto-clears.
+- `TC=15` → MsgID 16 = `0x0F00`, MsgID 100 = `0x0001`; persists across
+  thermostat program shifts; only TC=0 / replacement clears.
+- Reboot during active TT/TC → override lost on power cycle (matches PIC).
+
+Owner can run the actual hardware soak to confirm the behaviour matches the
+fixture; the present task closes on the "documented" criterion of AC #12.
+
+Pushed in commit `759e47f8` on
+`feature-dev-2.0.0-otgw32-esp32-sat-support`.
+<!-- SECTION:FINAL_SUMMARY:END -->

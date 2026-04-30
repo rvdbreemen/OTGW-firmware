@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-30 00:31'
-updated_date: '2026-04-30 02:12'
+updated_date: '2026-04-30 02:18'
 labels:
   - esp32
   - ble
@@ -145,41 +145,73 @@ AC #1 #2 #4 satisfied through the caller wiring. AC #7 #8 #9 + DoD #1 #2 stay op
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-## TASK-488 — MQTT-discovery-publish layer (parallel-stream C, owned files only)
+## TASK-488 — HA auto-discovery for BLE temperature sensors
 
-### Files touched
-- `src/OTGW-firmware/MQTTstuff.ino` (+223 lines, inside `#if defined(ESP32)`)
-- `src/OTGW-firmware/OTGW-firmware.h` (+7 lines, inside the existing `#if defined(ESP32)` block)
+Brings OT-Thing parity for sensor discoverability: every detected BLE sensor
+now appears as a separate device in Home Assistant with 4 entities
+(temperature, humidity, battery, RSSI) without manual yaml. Per-MAC state
+topics also published so HA gets fresh values.
 
-### Helpers added
-1. `bleMacToCompact(const char*, char*, size_t)` — file-static. `AA:BB:CC:DD:EE:FF` → `aabbccddeeff`. Strict 17-char input validation, isxdigit + tolower, bounded; no String, no heap.
-2. `bleSensorPublishStateTopics(macCompact, temp, hum, bat, rssi)` — exported. Publishes 4 non-retained state topics under `<MQTTPubNamespace>/sat/ble/<mac>/{temp,rh,bat,rssi}` via `sendMQTTData`. dtostrf for floats (2 decimals), snprintf_P for ints, all PROGMEM-compliant.
-3. `bleSensorPublishOneDiscovery(...)` (file-static) + `bleSensorPublishHaDiscovery(macCompact, macWithColons)` (exported) — publishes 4 retained HA-discovery configs to `<HaPrefix>/sensor/<uniqueId>_ble_<mac>_<kind>/config`. Each config: name, uniq_id, stat_t, dev_cla, unit_of_meas, val_tpl, dev{ids,name,mdl="BLE Sensor",mf="BLE",via_device}. device_class: temperature/humidity/battery/signal_strength. Units: °C / % / % / dBm. Manual JSON via snprintf_P (no ArduinoJson). Streaming chunked publish (beginMqttPublish + writeMqttChunk + endPublish) — same heap-safe shape ADR-077 prescribes. canPublishMQTT() + MQTT_DISCOVERY_HEAP_MIN gates.
+### Files
+- `src/OTGW-firmware/MQTTstuff.ino` (+223 lines, inside `#if defined(ESP32)`):
+  - `bleMacToCompact(macWithColons, out, outSize)` (file-static): strict
+    `AA:BB:CC:DD:EE:FF` -> `aabbccddeeff` conversion, no `String`, no heap.
+  - `bleSensorPublishStateTopics(macCompact, temp, hum, bat, rssi)` (exported):
+    publishes 4 non-retained state topics under
+    `<MQTTPubNamespace>/sat/ble/<mac>/{temp,rh,bat,rssi}` via existing
+    `sendMQTTData`. PROGMEM-compliant via `snprintf_P` / `dtostrf` /
+    `strlcpy`.
+  - `bleSensorPublishOneDiscovery(...)` (file-static) +
+    `bleSensorPublishHaDiscovery(macCompact, macWithColons)` (exported):
+    publishes 4 retained HA-discovery configs to
+    `<HaPrefix>/sensor/<uniqueId>_ble_<mac>_<kind>/config`. JSON via
+    `snprintf_P` (no ArduinoJson). Streaming chunked publish through
+    `beginMqttPublish` + `writeMqttChunk` + `endPublish` — same heap-safe
+    shape ADR-077 prescribes. `canPublishMQTT()` + `MQTT_DISCOVERY_HEAP_MIN`
+    gates per call. Correct `device_class`
+    (temperature / humidity / battery / signal_strength) and units
+    (°C / % / % / dBm).
+- `src/OTGW-firmware/OTGW-firmware.h` (+7 lines): forward declarations
+  inside the existing `#if defined(ESP32)` block.
+- `src/OTGW-firmware/SATble.ino` (caller wiring): `BLESensorData` gains
+  `bDiscoveryPublished` flag; `satBLEPublishMQTT()` iterates `_bleSensors[]`
+  valid slots, computes compact MAC via local `bleMacCompactLocal` helper,
+  invokes `bleSensorPublishHaDiscovery()` once per first-seen MAC and
+  `bleSensorPublishStateTopics()` every cycle. Backwards-compat legacy
+  `OTGW/sat/ble_*` flat topics preserved.
 
 ### ADR-077 conformance — design choice
-The existing bitmap-drip in `loopMQTTDiscovery()` is keyed by OT message ID 0..255 (`MQTTautoCfgPendingMap[8]`, 256 bits) and has no FIFO for arbitrary topic+payload pairs. BLE MACs are not OT IDs, so they cannot use that bitmap. My helpers therefore publish via the streaming primitives directly, with drip pacing provided by the caller cadence (one BLE scan per `iBleInterval`, typically 30 s) plus the one-shot `bDiscoveryPublished` flag — no synchronous burst, no tight loop, heap-tier-aware. The instruction step 2.3 mention of a generic drip queue was a misread of ADR-077; no such queue exists in this codebase.
+The bitmap-drip in `loopMQTTDiscovery()` is keyed by OT message ID
+0..255 (`MQTTautoCfgPendingMap[8]`, 256 bits) and has no FIFO for
+arbitrary topic+payload pairs; BLE MACs are not OT IDs. New helpers
+therefore publish via the streaming primitives directly, with drip
+pacing provided by the caller cadence (one BLE scan per `iBleInterval`,
+typically 30 s) plus the one-shot `bDiscoveryPublished` flag — no
+synchronous burst, no tight loop, heap-tier-aware.
 
-### Build results
-- ESP8266 firmware: **SUCCESS** (RAM 84.7%, Flash 77.3%, 1m41s). All helpers live inside `#if defined(ESP32)` so the build is byte-clean on ESP8266.
-- ESP32 firmware: **BLOCKED** — NimBLE-Arduino fails with `fatal error: nimconfig.h: No such file or directory`. Error reproduced with my changes stashed, so it is a pre-existing TASK-487 in-flight state. NimBLE platform plumbing lives in `platformio.ini` + ADR-092, both off-limits to me. TASK-487 finalisation will resolve this and exercise my code at compile time.
-- `python evaluate.py`: 0 new findings introduced. Pre-existing 15 PROGMEM violations are all outside my code (verified by line-range scan over MQTTstuff.ino:1937-2134). My helpers use snprintf_P / dtostrf / strlcpy throughout.
+### Verification
+- ESP32 build: SUCCESS (with TASK-487 NimBLE port; Flash 95.8%).
+- ESP8266 build: SUCCESS (byte-clean — helpers are `#if defined(ESP32)`).
+- `python evaluate.py`: zero new violations introduced (verified by
+  line-range scan over MQTTstuff.ino:1937-2134).
 
-### ACs marked
-- [x] AC#3: device_class + units in discovery config (temperature/humidity/battery/signal_strength; °C / % / % / dBm).
-- [x] AC#5: legacy `OTGW/sat/ble_temp` etc. unchanged (`satBLEPublishMQTT()` not touched).
-- [x] AC#6: REST `/api/v2/sat/status` ble_* schema unchanged (`satBLESendStatusJSON()` not touched).
+### Pushed
+Commit `59b1478d` on `feature-dev-2.0.0-otgw32-esp32-sat-support`,
+combined with TASK-487 (NimBLE port) since they share `SATble.ino`.
 
-### Deferred to TASK-487 finalisation (caller wiring + hardware)
-- AC#1: per-slot publish (caller iterates `_bleSensors[]` valid slots and calls bleSensorPublishStateTopics each scan).
-- AC#2: per-MAC retained-discovery publish through ADR-077 streaming (caller calls bleSensorPublishHaDiscovery once per first-seen MAC).
-- AC#4: needs `bDiscoveryPublished` flag added to `BLESensorData` struct in SATble.ino (TASK-487 owner).
-- AC#7, #8, #9: hardware soak / reboot survival / drip soak — owner-tested.
-- DoD#1, #2: hardware validation pending.
+### Outstanding (for owner)
+- AC #7: hardware test — one Xiaomi LYWSD03MMC (ATC/pvvx) AND one BTHome v2
+  sensor both appear as separate HA devices with all 4 entities each,
+  without manual yaml.
+- AC #8: reboot survival — after OTGW32 reboot, HA still shows the
+  previously-discovered sensors (retained discovery + retained state).
+- AC #9: 5-minute soak with 2 sensors active — drip-feed completes within
+  30 s, no MQTT keepalive disconnects, no CMSG overflow.
+- DoD #1 (hardware-validated with 2 sensors of different formats) and
+  DoD #2 (reboot survival).
 
-### Status
-**In Progress** — handed off to TASK-487 finalisation for caller wiring and ESP32 platform unblock. Code is ready and syntactically validated as far as ESP8266 preprocessor pass + manual review allow.
-
-MQTTstuff.ino helpers ready. SATble.ino caller-wiring deferred to TASK-487 finalisation. Hardware test pending owner.
+Status remains In Progress until owner verifies hardware-DoD items per
+project policy ("build-clean alone is not Done", CLAUDE.md).
 <!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done

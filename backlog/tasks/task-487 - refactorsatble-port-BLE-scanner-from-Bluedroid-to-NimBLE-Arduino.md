@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-30 00:26'
-updated_date: '2026-04-30 02:12'
+updated_date: '2026-04-30 02:17'
 labels:
   - esp32
   - ble
@@ -144,6 +144,59 @@ AC #6 + DoD #1 (hardware verification) stay open for owner.
 
 AC #3 size note: post-change ESP32 flash 95.8%. Pre-change Bluedroid measurement requires a separate `git stash + build` cycle on dev HEAD which the owner can run for the PR description. NimBLE landing at 95.8% means a Bluedroid build would likely have spilled over the 1.92 MB OTA slot on this branch (which carried the 400+ KB SAT/OTDirect/Ethernet/OLED additions on top of TASK-20 baseline) — strongly supports the ADR-092 sizing argument.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## TASK-487 — Port BLE scanner from Bluedroid to NimBLE-Arduino (ADR-092)
+
+Replaces the classic Arduino-ESP32 BLE library (Bluedroid, ~700 KB flash)
+with NimBLE-Arduino 2.x (~250 KB flash) on ESP32 builds. Eliminates the
+3-second blocking call in `loop()` (the original 2-arg `start(duration, false)`
+was synchronous despite the misleading "false = non-blocking" comment).
+Aligns the SAT BLE scanner with the OT-Thing reference implementation.
+
+### Files
+- `platformio.ini`: `h2zero/NimBLE-Arduino @ ^2.1.0` added to `[env:esp32]`
+  `lib_deps`. NimBLE 2.5.0 is what `^2.1.0` resolves to today.
+- `src/OTGW-firmware/SATble.ino`: full rewrite on `<NimBLEDevice.h>`.
+  Scan callback now `NimBLEScanCallbacks::onResult(const NimBLEAdvertisedDevice*)`.
+  Service-data extraction uses `std::string` (no Arduino `String` heap-churn —
+  ADR-004 win). 3-arg async `start(BLE_SCAN_DURATION_SEC, false, true)` is the
+  only `start()` call site; `loop()` is never blocked. ATC/pvvx (UUID `0x181A`)
+  and BTHome v2 (UUID `0xFCD2`) parsers unchanged in byte-semantics; BTHome v2
+  now explicitly validates the version-bit (`0x40`) and rejects encrypted ads
+  (`0x01`).
+- `docs/adr/ADR-092-adopt-nimble-arduino-over-bluedroid-for-sat-ble-scanner.md`:
+  Status=Accepted, all four verification gates discharged.
+
+### Verification
+- ESP32 build: SUCCESS (Flash 95.8%, RAM 31.7%, 19m25s on `-j 1` to dodge
+  the Windows mkdir-race that hit parallel builds).
+- ESP8266 build: SUCCESS (Flash 77.3%, RAM 84.7%, 2m41s, byte-clean — BLE
+  code stays inside `#if defined(ESP32)`).
+- `python evaluate.py --quick`: 95.5% health, zero new violations.
+- AC #4 (no blocking call) verified by grep — only the async 3-arg form is
+  present.
+
+### Pushed
+Commit `59b1478d` on `feature-dev-2.0.0-otgw32-esp32-sat-support`. Combined
+with TASK-488 (HA discovery) since they share `SATble.ino` (multi-sensor
+publish loop).
+
+### Outstanding (for owner)
+- AC #6: hardware test with one Xiaomi LYWSD03MMC (ATC/pvvx) AND one BTHome v2
+  emitter on real OTGW32. Confirm `state.sat.fBleTemp` updates within
+  `iBleInterval` seconds.
+- AC #9: 5-minute soak with BLE enabled, observe zero MQTT keepalive
+  disconnects and zero CMSG overflow logs (telnet-attached).
+- DoD #1 (hardware-validated) and DoD #2 (pre/post flash-size delta — the
+  pre-change Bluedroid measurement requires a separate `git stash + build`
+  cycle on `dev` HEAD).
+
+Status remains In Progress until owner verifies hardware-DoD items per
+project policy ("build-clean alone is not Done", CLAUDE.md).
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
