@@ -3,10 +3,11 @@ id: TASK-482
 title: >-
   fix(tooling): evaluate.py PROGMEM gate false positives on macro continuations
   and auto-generated .cpp
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-29 21:10'
-updated_date: '2026-04-29 21:13'
+updated_date: '2026-04-30 00:44'
 labels:
   - tooling
   - evaluate.py
@@ -18,6 +19,7 @@ references:
   - src/OTGW-firmware/OTGWLogMacros.h
   - TASK-481
 priority: medium
+ordinal: 11000
 ---
 
 ## Description
@@ -108,10 +110,88 @@ Audit other gates in `evaluate.py` that use the same glob pattern; apply the sam
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 check_progmem_compliance skips lines that are continuations of multi-line #define macros (lines following one that ends with backslash)
-- [ ] #2 OTGWLogMacros.h no longer reports any PROGMEM violations from its macro bodies
-- [ ] #3 evaluate.py code_files glob excludes auto-generated *.ino.cpp files in the firmware source dir
-- [ ] #4 Audit pass: other evaluate.py gates that use the same glob pattern are checked, and the *.ino.cpp exclusion applied where appropriate
-- [ ] #5 Baseline PROGMEM violation count drops to a stable value reflecting only real source-file issues (count is reproducible across builds)
-- [ ] #6 evaluate.py --quick exit status reflects real violations only; no count variance from preprocessor output
+- [x] #1 check_progmem_compliance skips lines that are continuations of multi-line #define macros (lines following one that ends with backslash)
+- [x] #2 OTGWLogMacros.h no longer reports any PROGMEM violations from its macro bodies
+- [x] #3 evaluate.py code_files glob excludes auto-generated *.ino.cpp files in the firmware source dir
+- [x] #4 Audit pass: other evaluate.py gates that use the same glob pattern are checked, and the *.ino.cpp exclusion applied where appropriate
+- [x] #5 Baseline PROGMEM violation count drops to a stable value reflecting only real source-file issues (count is reproducible across builds)
+- [x] #6 evaluate.py --quick exit status reflects real violations only; no count variance from preprocessor output
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Step 1: Baseline captured. evaluate.py --quick reports 15 PROGMEM violations on feature-dev-2.0.0 HEAD. Inventory:
+- debugStuff.ino:91,100,101 (real snprintf calls — likely real)
+- FSexplorer.ino:111,192,214 (strcmp with string literal — likely real)
+- jsonStuff.ino:35 (real snprintf — likely real)
+- MQTTstuff.ino:1512,1518,1565 (snprintf — likely real)
+- OTGW-Core.ino:4847,4930 (strcmp — likely real)
+- OTGWLogMacros.h:18 (FALSE POSITIVE — macro continuation, Bug 1)
+- platform_esp32.h:221,231 (under audit — suspect macro continuation)
+
+No *.ino.cpp file currently in tree (no preprocessor build state present), so Bug 2 fix has no observable delta on this run but the filter is still correct to apply per AC #3. Auto-generated cpp files in directory: MQTTHaDiscovery.cpp, mqtt_discovery_verify.cpp — both real cpp source, not preprocessor output.
+
+Step 2-3: Implemented both fixes in evaluate.py.
+
+Bug 1 (macro continuation tracking): added prev_was_continuation state machine in check_progmem_compliance. When the previous line ended with a backslash (after .strip()), the current line is treated as a macro-body continuation and skipped; the chain continues if the current line also ends with a backslash. Comment-line and #define-opener branches now also set prev_was_continuation appropriately so multi-line macros are skipped end-to-end.
+
+Bug 2 (auto-generated *.ino.cpp exclusion): introduced a module-level helper `collect_firmware_source_files(src_dir, *, include_ino=True, include_cpp=True, include_h=True)` near is_hot_path_file. The helper filters `*.cpp` files whose name endswith `.ino.cpp`. `*.ino` and `*.h` globs are unaffected (verified Path.glob('*.ino') does NOT match `OTGW-firmware.ino.cpp`).
+
+Applied the helper at all 7 call sites that used the same `*.ino + *.cpp [+ *.h]` glob pattern: line 514 (ADR-086 time-boundary), 712 (ADR-062 reset audit), 1638 (Serial.print check), 1702 (large buffers), 1730 (PROGMEM compliance), 1781 (ArduinoJson ban), 1820 (Stack safety), 2076 (Security analysis), 2263 (Binary-safe compare). Two structure-checks that scan ino-only or h-only globs (lines 499, 509, 2075) were intentionally left as-is; their globs cannot match `.ino.cpp` (verified empirically).
+
+Step 5: Validation results.
+
+Baseline BEFORE fix: 15 PROGMEM violations (--quick).
+Baseline AFTER fix: 14 PROGMEM violations (--quick).
+Delta: -1 (the OTGWLogMacros.h:18 macro-continuation false positive). Confirmed real-only.
+
+Real violations remaining after fix (all have legitimate cause):
+- debugStuff.ino:91,100,101 (snprintf — real, addressable)
+- FSexplorer.ino:111,192,214 (strcmp with string literal — real)
+- jsonStuff.ino:35 (snprintf — real)
+- MQTTstuff.ino:1512,1518,1565 (snprintf — real)
+- OTGW-Core.ino:4847,4930 (strcmp — real)
+- platform_esp32.h:221,231 (snprintf in inline ESP32 helpers — real top-level functions, NOT macro continuations — verified by reading the file directly)
+
+Stability check: ran `python evaluate.py --quick` 3x; got `14 PROGMEM violations` on every run — stable, reproducible.
+
+Bug 2 observable test: created a fake `OTGW-firmware.ino.cpp` (copy of MQTTstuff.ino, 3 violations expected if scanned twice). Re-ran --quick: still 14 violations — confirmed the filter excludes the file as expected. Without the fix this would have inflated to 17.
+
+Full `python evaluate.py` runs cleanly: Total Checks: 86, Passed: 66, Warnings: 8, Failed: 1 (the expected PROGMEM 14-violations FAIL), Info: 11. No script crashes, no Tracebacks. Health Score 89.5%.
+
+AC #5 (count is stable / reproducible) and AC #6 (exit reflects real violations only, no preprocessor variance) both met.
+
+Out-of-scope confirmation: did not touch any production source files; the 14 remaining violations are real and live in another task (per task description's `Out of scope` clause).
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## Summary
+
+Fixed two systematic false-positive sources in evaluate.py's PROGMEM compliance gate (and other gates that share the same source-file glob).
+
+**Bug 1 (macro continuation lines):** `check_progmem_compliance()` now tracks a `prev_was_continuation` state: lines following a backslash-terminated line (whether a `#define` opener, a comment, or another continuation line) are skipped, with the chain continuing as long as the current line also ends with a backslash. Eliminates the `OTGWLogMacros.h:18` false positive on the multi-line `AddLogf` macro body.
+
+**Bug 2 (auto-generated `*.ino.cpp`):** Introduced module-level helper `collect_firmware_source_files(src_dir, *, include_ino, include_cpp, include_h)` that filters `*.cpp` files whose name ends with `.ino.cpp`. The PlatformIO Arduino preprocessor output is no longer scanned, so violation counts no longer inflate when a build state is present.
+
+**Audit pass (AC #4):** applied the helper at every call site that previously used the same `*.ino + *.cpp [+ *.h]` glob pattern — 9 sites in total: ADR-086 time-boundary (514), ADR-062 reset audit (712), Serial.print check (1638), large buffers (1702), PROGMEM compliance (1730), ArduinoJson ban (1781), Stack safety (1820), Security analysis (2076), Binary-safe compare (2263). Two pure ino-only / h-only globs left intact (Path.glob('*.ino') does NOT match `*.ino.cpp`, verified empirically).
+
+## Validation
+
+- BEFORE: 15 PROGMEM violations (--quick).
+- AFTER: 14 PROGMEM violations (--quick), stable across 3 successive runs.
+- Bug 2 observable test: copied MQTTstuff.ino to OTGW-firmware.ino.cpp (3 \"extra\" violations), re-ran --quick — still 14. Filter works.
+- Full `python evaluate.py` runs cleanly (86 checks, no Tracebacks).
+
+All 6 ACs checked.
+
+## Files touched
+
+- `evaluate.py` only (single-file diff per file-ownership boundary).
+
+## Out of scope
+
+The 14 remaining violations are all real and live in production source. Per the task description's `Out of scope` clause, fixing them is a separate task."
+<!-- SECTION:FINAL_SUMMARY:END -->

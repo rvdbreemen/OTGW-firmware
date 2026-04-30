@@ -225,6 +225,30 @@ def is_hot_path_file(filename: str) -> bool:
     return any(filename.startswith(p) for p in HOT_PATH_PREFIXES)
 
 
+def collect_firmware_source_files(
+    src_dir: Path,
+    *,
+    include_ino: bool = True,
+    include_cpp: bool = True,
+    include_h: bool = True,
+) -> List[Path]:
+    """Collect firmware source files for static-analysis gates.
+
+    Excludes auto-generated PlatformIO Arduino preprocessor output
+    (``*.ino.cpp``), which is a single concatenation of every ``.ino`` and
+    would otherwise inflate hit counts and make them depend on local build
+    state. See TASK-482 / ADR notes.
+    """
+    files: List[Path] = []
+    if include_ino:
+        files.extend(src_dir.glob("*.ino"))
+    if include_cpp:
+        files.extend(f for f in src_dir.glob("*.cpp") if not f.name.endswith(".ino.cpp"))
+    if include_h:
+        files.extend(src_dir.glob("*.h"))
+    return files
+
+
 def _strip_line_comments(line: str) -> str:
     """Return the portion of the line before a // line-comment (if any)."""
     return line.split('//', 1)[0]
@@ -510,9 +534,7 @@ class WorkspaceEvaluator:
         helpers = ["minuteChanged", "hourChanged", "dayChanged", "yearChanged"]
         src_dir = config.FIRMWARE_ROOT
         # Scan all C/C++ source files under firmware root (not library subtree).
-        source_files: List[Path] = []
-        for pattern in ("*.ino", "*.cpp", "*.h"):
-            source_files.extend(src_dir.glob(pattern))
+        source_files = collect_firmware_source_files(src_dir)
 
         for helper in helpers:
             # Pattern: helper name followed by '(' — catches calls and declarations.
@@ -708,9 +730,7 @@ class WorkspaceEvaluator:
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-062 PublishedTopic Counter Reset ==={Colors.ENDC}")
 
         src_dir = config.FIRMWARE_ROOT
-        source_files: List[Path] = []
-        for pattern in ("*.ino", "*.cpp", "*.h"):
-            source_files.extend(src_dir.glob(pattern))
+        source_files = collect_firmware_source_files(src_dir)
 
         reset_re = re.compile(r"iPublishedTopicCount\s*=\s*0")
         hits: List[Tuple[str, int, str]] = []
@@ -1635,7 +1655,7 @@ class WorkspaceEvaluator:
         string_other_hits: List[str] = []
 
         src_dir = config.FIRMWARE_ROOT
-        ino_cpp_files = list(src_dir.glob("*.ino")) + list(src_dir.glob("*.cpp"))
+        ino_cpp_files = collect_firmware_source_files(src_dir, include_h=False)
 
         for file in ino_cpp_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -1699,7 +1719,7 @@ class WorkspaceEvaluator:
         # Check for large buffers
         large_buffers: List[Tuple[str, int]] = []
         src_dir = config.FIRMWARE_ROOT
-        ino_cpp_files = list(src_dir.glob("*.ino")) + list(src_dir.glob("*.cpp")) + list(src_dir.glob("*.h"))
+        ino_cpp_files = collect_firmware_source_files(src_dir)
         
         for file in ino_cpp_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -1727,9 +1747,7 @@ class WorkspaceEvaluator:
 
         violations: List[str] = []
         src_dir = config.FIRMWARE_ROOT
-        code_files = (list(src_dir.glob("*.ino")) +
-                      list(src_dir.glob("*.cpp")) +
-                      list(src_dir.glob("*.h")))
+        code_files = collect_firmware_source_files(src_dir)
 
         patterns = [
             (re.compile(r'DebugTln\(\s*"'), 'DebugTln without F() wrapper'),
@@ -1745,11 +1763,28 @@ class WorkspaceEvaluator:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
                 lines = f.read().split('\n')
 
+            # Track multi-line #define macro continuations. Lines that follow a
+            # backslash-terminated line are part of the macro body, even though
+            # they don't start with "#define" themselves. The macro expands at
+            # the call site, so PROGMEM compliance is judged there, not here.
+            prev_was_continuation = False
             for i, line in enumerate(lines, 1):
-                stripped = line.lstrip()
-                # Skip comment lines and #define macros
-                if stripped.startswith('//') or stripped.startswith('/*') or stripped.startswith('#define'):
+                stripped = line.strip()
+
+                # If the previous line ended with a continuation, this line is
+                # a macro-body line — skip it but keep the chain alive if it
+                # also ends with a backslash.
+                if prev_was_continuation:
+                    prev_was_continuation = stripped.endswith('\\')
                     continue
+
+                # Skip comment lines and #define macro openers; remember whether
+                # the opener itself continues onto the next line.
+                if stripped.startswith('//') or stripped.startswith('/*') or stripped.startswith('#define'):
+                    prev_was_continuation = stripped.endswith('\\')
+                    continue
+
+                prev_was_continuation = False
 
                 for pat, desc in patterns:
                     if pat.search(line):
@@ -1778,9 +1813,7 @@ class WorkspaceEvaluator:
 
         violations: List[str] = []
         src_dir = config.FIRMWARE_ROOT
-        code_files = (list(src_dir.glob("*.ino")) +
-                      list(src_dir.glob("*.cpp")) +
-                      list(src_dir.glob("*.h")))
+        code_files = collect_firmware_source_files(src_dir)
 
         include_re = re.compile(r'#include\s*[<"]ArduinoJson')
         types_re = re.compile(
@@ -1817,9 +1850,7 @@ class WorkspaceEvaluator:
 
         warnings: List[str] = []
         src_dir = config.FIRMWARE_ROOT
-        code_files = (list(src_dir.glob("*.ino")) +
-                      list(src_dir.glob("*.cpp")) +
-                      list(src_dir.glob("*.h")))
+        code_files = collect_firmware_source_files(src_dir)
 
         # Match lines starting with whitespace, containing char name[SIZE], not static
         buf_re = re.compile(r'char\s+(\w+)\[(\d+)\]')
@@ -2073,9 +2104,7 @@ class WorkspaceEvaluator:
         }
         
         src_dir = config.FIRMWARE_ROOT
-        all_code_files = (list(src_dir.glob("*.ino")) + 
-                         list(src_dir.glob("*.cpp")) + 
-                         list(src_dir.glob("*.h")))
+        all_code_files = collect_firmware_source_files(src_dir)
         
         for file in all_code_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -2260,9 +2289,7 @@ class WorkspaceEvaluator:
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Binary-safe Compare Audit ==={Colors.ENDC}")
 
         src_dir = config.FIRMWARE_ROOT
-        code_files = (list(src_dir.glob("*.ino")) +
-                      list(src_dir.glob("*.cpp")) +
-                      list(src_dir.glob("*.h")))
+        code_files = collect_firmware_source_files(src_dir)
 
         hits: List[str] = []
         for file in code_files:
