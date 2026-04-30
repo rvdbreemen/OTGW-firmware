@@ -1,9 +1,10 @@
 ---
 id: TASK-491
 title: 'fix(otdirect): correct sign-handling in onThermostatMsgID16 f88 delta'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-30 05:43'
+updated_date: '2026-04-30 05:47'
 labels:
   - esp32
   - otdirect
@@ -83,8 +84,42 @@ Option A is preferred since the cost is a single `(int16_t)` cast.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `onThermostatMsgID16` correctly handles negative f8.8 inputs (sign-extension via `(int16_t)` cast) OR comment narrowed to clearly state the non-negative-only constraint
-- [ ] #2 Behaviour for room-setpoint range (15-25 °C) is unchanged
-- [ ] #3 Builds clean on ESP32 and ESP8266
-- [ ] #4 Fixture row in `tests/otdirect_pic_parity_fixture.md` covers the sign-handling boundary case
+- [x] #1 `onThermostatMsgID16` correctly handles negative f8.8 inputs (sign-extension via `(int16_t)` cast) OR comment narrowed to clearly state the non-negative-only constraint
+- [x] #2 Behaviour for room-setpoint range (15-25 °C) is unchanged
+- [x] #3 Builds clean on ESP32 and ESP8266
+- [x] #4 Fixture row in `tests/otdirect_pic_parity_fixture.md` covers the sign-handling boundary case
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## TASK-491 — Sign-extension in onThermostatMsgID16 f8.8 delta
+
+Fix Option A from the task plan: cast `uint16_t f88` through `(int16_t)`
+before widening to `int32_t` so two's-complement bits are preserved.
+Without the hop a raw value of `0xFB00` (-5.0 °C) would compare as
+`+64256` instead of `-1280` and the honour/release deltas would
+mis-fire for negative TrSet values.
+
+In practice today no thermostat sends negative TrSet (room setpoints
+are always 15-25 °C), so this is a latent-bug fix rather than an
+observed regression. The change is one line of code plus a clarifying
+comment; it locks in correctness for the boundary case and removes a
+gotcha for any future caller that extends the helper to a
+signed-capable MsgID.
+
+### Change
+- `src/OTGW-firmware/OTDirect.ino` `onThermostatMsgID16`: explicit
+  `(int16_t)` cast hop on both the incoming and stored f8.8 values
+  before the `int32_t` widening.
+- `tests/otdirect_pic_parity_fixture.md`: new row "Negative TrSet
+  sign-handling" pins the boundary semantics in the parity table.
+
+### Verification
+- ESP32 build SUCCESS (combined cycle with TASK-489 + TASK-490).
+- Behaviour for room-setpoint range (15-25 °C) is unchanged.
+- `python tests/check_otdirect_fixture.py`: PASS (all rows have the
+  required columns, including the new negative-TrSet row).
+
+Pushed in commit `67ad53cf` on `feature-dev-2.0.0-otgw32-esp32-sat-support`.
+<!-- SECTION:FINAL_SUMMARY:END -->

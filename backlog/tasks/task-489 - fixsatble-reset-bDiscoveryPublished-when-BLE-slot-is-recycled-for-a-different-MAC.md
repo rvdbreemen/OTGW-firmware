@@ -3,10 +3,11 @@ id: TASK-489
 title: >-
   fix(satble): reset bDiscoveryPublished when BLE slot is recycled for a
   different MAC
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-30 05:42'
+updated_date: '2026-04-30 05:47'
 labels:
   - esp32
   - ble
@@ -86,9 +87,35 @@ next `satBLEPublishMQTT()` call.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Scan callback resets `bDiscoveryPublished` to `false` when the MAC stored in the slot differs from the incoming advertisement's MAC
-- [ ] #2 Scan callback does NOT reset `bDiscoveryPublished` when the same MAC is seen again (no discovery spam on every scan)
-- [ ] #3 ESP32 build clean
-- [ ] #4 ESP8266 build unchanged (helpers stay inside `#if defined(ESP32)`)
-- [ ] #5 Comment in code explains the reset rationale so future readers understand the slot-recycling case
+- [x] #1 Scan callback resets `bDiscoveryPublished` to `false` when the MAC stored in the slot differs from the incoming advertisement's MAC
+- [x] #2 Scan callback does NOT reset `bDiscoveryPublished` when the same MAC is seen again (no discovery spam on every scan)
+- [x] #3 ESP32 build clean
+- [x] #4 ESP8266 build unchanged (helpers stay inside `#if defined(ESP32)`)
+- [x] #5 Comment in code explains the reset rationale so future readers understand the slot-recycling case
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## TASK-489 — bDiscoveryPublished slot-recycling reset
+
+Fixes the code-review finding that `BLESensorData::bDiscoveryPublished`
+was inherited across slot recycling: a stale slot reused for a new MAC
+would skip HA-discovery publishing because the previous tenant's flag
+remained `true`.
+
+### Change
+In `src/OTGW-firmware/SATble.ino` scan callback, before the `strlcpy`
+of the new MAC into the slot, the slot's currently-stored MAC is
+compared against the incoming advertisement's MAC; on mismatch
+`bDiscoveryPublished` is reset to `false`. For the same-MAC case the
+flag is preserved (no discovery spam on every scan).
+
+### Verification
+- ESP32 build SUCCESS (`-j 1`, 1m43s incremental).
+- ESP8266 build unaffected (BLE code is `#if defined(ESP32)`).
+- Inline comment explains the slot-recycling rationale so future
+  readers see why the strcmp guard is there.
+
+Pushed in commit `67ad53cf` on `feature-dev-2.0.0-otgw32-esp32-sat-support`.
+<!-- SECTION:FINAL_SUMMARY:END -->
