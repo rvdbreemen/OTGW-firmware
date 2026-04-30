@@ -1936,8 +1936,10 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
 
 // Convert "AA:BB:CC:DD:EE:FF" into "aabbccddeeff" (lowercase, no colons).
 // Bounded write; on malformed input (not exactly 17 chars / wrong colon
-// positions) writes empty string. No String, no heap.
-static void bleMacToCompact(const char* macWithColons, char* out, size_t outSize)
+// positions) writes empty string. No String, no heap. Exported for
+// SATble.ino which builds the compact MAC before calling
+// bleSensorPublishHaDiscovery / bleSensorPublishStateTopics.
+void bleMacToCompact(const char* macWithColons, char* out, size_t outSize)
 {
   if (!out || outSize == 0) return;
   out[0] = '\0';

@@ -397,35 +397,10 @@ float satBLEGetHumidity()
 }
 
 //=====================================================================
-// Compact a MAC string "AA:BB:CC:DD:EE:FF" -> "aabbccddeeff" (lowercase,
-// no colons). Used to build per-sensor MQTT topic paths and HA object_ids.
-// Bounded; on malformed input writes empty string.
-//=====================================================================
-static void bleMacCompactLocal(const char* macWithColons, char* out, size_t outSize)
-{
-  if (out == nullptr || outSize < 13) {
-    if (out != nullptr && outSize > 0) out[0] = '\0';
-    return;
-  }
-  out[0] = '\0';
-  if (macWithColons == nullptr) return;
-  size_t len = strnlen(macWithColons, 18);
-  if (len != 17) return;
-  size_t outPos = 0;
-  for (size_t i = 0; i < 17; i++) {
-    char c = macWithColons[i];
-    if (i % 3 == 2) {
-      if (c != ':') return;
-      continue;
-    }
-    if (!isxdigit((unsigned char)c)) return;
-    out[outPos++] = (char)tolower((unsigned char)c);
-  }
-  out[outPos] = '\0';
-}
-
-//=====================================================================
 // Publish BLE sensor data to MQTT
+// (MAC compact-form helper bleMacToCompact() lives in MQTTstuff.ino;
+//  declared in OTGW-firmware.h. TASK-492 consolidated the duplicate
+//  bleMacCompactLocal helper that previously lived here.)
 //=====================================================================
 void satBLEPublishMQTT()
 {
@@ -459,7 +434,7 @@ void satBLEPublishMQTT()
   for (int i = 0; i < SAT_BLE_MAX_SENSORS; i++) {
     if (!_bleSensors[i].bValid) continue;
     char macCompact[13];
-    bleMacCompactLocal(_bleSensors[i].sMacAddress, macCompact, sizeof(macCompact));
+    bleMacToCompact(_bleSensors[i].sMacAddress, macCompact, sizeof(macCompact));
     if (macCompact[0] == '\0') continue;  // skip malformed
     if (!_bleSensors[i].bDiscoveryPublished) {
       bleSensorPublishHaDiscovery(macCompact, _bleSensors[i].sMacAddress);

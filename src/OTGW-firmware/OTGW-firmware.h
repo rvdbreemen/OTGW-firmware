@@ -246,10 +246,13 @@ float satBLEGetHumidity();
 void satBLEPublishMQTT();
 void satBLESendStatusJSON();
 
-// TASK-488: BLE HA-discovery + per-MAC state-topic helpers (defined in MQTTstuff.ino).
-// Caller (satBLEPublishMQTT) wires these in once per first-seen MAC (discovery)
-// and on every scan iteration (state). One-shot discovery via per-slot
-// bDiscoveryPublished flag (added to BLESensorData in TASK-487 finalisation).
+// TASK-488 / TASK-492: BLE HA-discovery + per-MAC state-topic helpers
+// (defined in MQTTstuff.ino). Caller (satBLEPublishMQTT) wires these in once
+// per first-seen MAC (discovery) and on every scan iteration (state).
+// One-shot discovery via per-slot bDiscoveryPublished flag.
+// bleMacToCompact is the canonical "AA:BB:..:FF" -> "aabb..ff" helper used
+// by both the caller in SATble.ino and internally in MQTTstuff.ino.
+void bleMacToCompact(const char* macWithColons, char* out, size_t outSize);
 void bleSensorPublishStateTopics(const char* macCompact, float temp, float hum, uint8_t bat, int8_t rssi);
 void bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColons);
 #endif
