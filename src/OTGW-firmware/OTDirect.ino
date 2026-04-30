@@ -388,6 +388,22 @@ static constexpr uint16_t OT_OVERRIDE_HONOR_DELTA_F88   = (uint16_t)(0.25f * 256
 static constexpr uint16_t OT_OVERRIDE_RELEASE_DELTA_F88 = (uint16_t)(0.50f * 256.0f); // 0x0080
 static constexpr uint8_t  OT_OVERRIDE_HONOR_THRESHOLD   = 3;   // cycles before auto-clear is armed
 
+// TASK-497 (4A-M1): single canonical float-to-f8.8 cast with the same
+// `-40..127` clamp that TASK-495 added to setRemoteOverride(). f8.8 is a
+// 16-bit signed two's-complement fixed-point format; converting from
+// float to int16_t outside `[-128, 127]` is C/C++ undefined behaviour.
+// Every OTDirect call site that emits an f8.8 value to the bus must
+// route through this helper so the contract is checked exactly once.
+//
+// -40..127 covers all realistic OT v4.2 setpoints (room, flow, DHW)
+// including the negative outliers a frost-protect or freezer-room
+// deployment would emit.
+static inline uint16_t floatToF88(float celsius) {
+  if (celsius < -40.0f) celsius = -40.0f;
+  if (celsius > 127.0f) celsius = 127.0f;
+  return (uint16_t)((int16_t)(celsius * 256.0f));
+}
+
 // TASK-442: PIC parity for CS/C2 heartbeat-driven expiry.
 // gateway.asm CommandExpiry invalidates OverrideCH/OverrideCH2 when the
 // CS/C2 heartbeat flags have not been refreshed within ~60s. The
@@ -1694,17 +1710,15 @@ static void loopFlameRatio() {
 // Route room temperature from MQTT into MsgID 24 write cache
 void otdMqttSetRoomTemp(float tempC) {
   if (!isOTDirectEnabled()) return;
-  if (tempC < -40.0f || tempC > 127.0f) return;  // sanity range
-  uint16_t f88 = (uint16_t)((int16_t)(tempC * 256.0f));
-  enqueueWriteCommand(24, f88, "MQTT-room_temp");
+  if (tempC < -40.0f || tempC > 127.0f) return;  // sanity range — drop, don't clamp
+  enqueueWriteCommand(24, floatToF88(tempC), "MQTT-room_temp");
 }
 
 // Route room setpoint from MQTT into MsgID 16 write cache
 void otdMqttSetRoomSetpoint(float tempC) {
   if (!isOTDirectEnabled()) return;
-  if (tempC < -40.0f || tempC > 127.0f) return;  // sanity range
-  uint16_t f88 = (uint16_t)((int16_t)(tempC * 256.0f));
-  enqueueWriteCommand(16, f88, "MQTT-room_setpoint");
+  if (tempC < -40.0f || tempC > 127.0f) return;  // sanity range — drop, don't clamp
+  enqueueWriteCommand(16, floatToF88(tempC), "MQTT-room_setpoint");
 }
 
 // ---------------------------------------------------------------------------
@@ -1848,8 +1862,7 @@ void loopOTDirect() {
     if (IS_MASTER_MODE() && settings.otd.iCHMode != 0) {
       float flow = getFlowTemp();
       if (flow > 0.0f) {
-        uint16_t f88 = (uint16_t)((int16_t)(flow * 256.0f));
-        enqueueWriteCommand(1, f88, "heating-curve");
+        enqueueWriteCommand(1, floatToF88(flow), "heating-curve");
       }
     }
     otNextPiCtrl = millis();
@@ -1947,13 +1960,9 @@ static void clearWriteOverride(uint8_t msgId) {
 // TT/TC and CS/C2 are independent state machines.
 // ---------------------------------------------------------------------------
 static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
-  // TASK-495 (2A-H1): clamp to the f8.8 representable range before the cast.
-  // Out-of-range float-to-signed-narrow conversion is C/C++ undefined
-  // behaviour. Mirrors the existing range guard in otdMqttSetRoomSetpoint().
-  // -40..127 covers every realistic room/freezer-room/frost-protect setpoint.
-  if (celsius < -40.0f) celsius = -40.0f;
-  if (celsius > 127.0f) celsius = 127.0f;
-  uint16_t f88 = (uint16_t)((int16_t)(celsius * 256.0f));
+  // TASK-497 (4A-M1): cast through the canonical floatToF88 helper which
+  // includes the -40..127 clamp formerly inlined here (TASK-495).
+  uint16_t f88 = floatToF88(celsius);
 
   otRemoteOverride.mode             = mode;
   otRemoteOverride.f88Value         = f88;
@@ -2210,7 +2219,7 @@ static void checkThermostatTimeout() {
     if (otFailSafeEnabled && otCurrentMode == OTD_MODE_GATEWAY && !otSetbackEngaged) {
       otSetbackEngaged = true;
       state.otd.bSetbackActive = true;
-      uint16_t f88 = (uint16_t)((int16_t)(settings.otd.fSetbackTemp * 256.0f));
+      uint16_t f88 = floatToF88(settings.otd.fSetbackTemp);
       setOverride(1, f88);        // Override TSet (MsgID 1) to setback temp
       updateWriteCache(1, f88);   // Keep writing it to boiler
       char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb);
@@ -2364,7 +2373,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       clearWriteOverride(1);
       otCSLastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
-      uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
+      uint16_t f88 = floatToF88(temp);
       enqueueWriteCommand(1, f88, "CS");
       otCSLastCommandMs = millis();  // TASK-442: refresh expiry timer
       if (otCSLastCommandMs == 0) otCSLastCommandMs = 1;  // 0 sentinel reserved
@@ -2415,7 +2424,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       clearOverride(16);
     } else {
       otFakeRoomSetpoint = temp;
-      uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
+      uint16_t f88 = floatToF88(temp);
       setOverride(16, f88);
     }
     dtostrf(temp, 1, 2, rspBuf);
@@ -2428,7 +2437,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       clearWriteOverride(8);
       otC2LastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
-      uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
+      uint16_t f88 = floatToF88(temp);
       enqueueWriteCommand(8, f88, "C2");
       otC2LastCommandMs = millis();  // TASK-442: refresh expiry timer
       if (otC2LastCommandMs == 0) otC2LastCommandMs = 1;
@@ -2438,7 +2447,7 @@ void handleOTDirectCommand(const char* buf, int len) {
   }
   // CC=xx.x — Cooling control signal (MsgID 7, 0-100%)
   else if (cmd0 == 'C' && cmd1 == 'C') {
-    uint16_t f88 = (uint16_t)((int16_t)(atof(value) * 256.0f));
+    uint16_t f88 = floatToF88(atof(value));
     enqueueWriteCommand(7, f88, "CC");
     dtostrf(atof(value), 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
@@ -2449,7 +2458,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     if (temp == 0.0f) {
       clearWriteOverride(56);
     } else {
-      uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
+      uint16_t f88 = floatToF88(temp);
       enqueueWriteCommand(56, f88, "SW");
     }
     dtostrf(temp, 1, 2, rspBuf);
@@ -2461,7 +2470,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     if (temp == 0.0f) {
       clearWriteOverride(57);
     } else {
-      uint16_t f88 = (uint16_t)((int16_t)(temp * 256.0f));
+      uint16_t f88 = floatToF88(temp);
       enqueueWriteCommand(57, f88, "SH");
     }
     dtostrf(temp, 1, 2, rspBuf);
@@ -2473,7 +2482,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       clearWriteOverride(14);
       synthesizeResponse(buf, value);
     } else {
-      uint16_t f88 = (uint16_t)((int16_t)(atof(value) * 256.0f));
+      uint16_t f88 = floatToF88(atof(value));
       enqueueWriteCommand(14, f88, "MM");
       snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), atoi(value));
       synthesizeResponse(buf, rspBuf);
@@ -2485,7 +2494,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       clearWriteOverride(27);
       synthesizeResponse(buf, value);
     } else {
-      uint16_t f88 = (uint16_t)((int16_t)(atof(value) * 256.0f));
+      uint16_t f88 = floatToF88(atof(value));
       enqueueWriteCommand(27, f88, "OT");
       dtostrf(atof(value), 1, 2, rspBuf);
       synthesizeResponse(buf, rspBuf);
@@ -2623,7 +2632,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     if (cl == 0.0f) {
       clearWriteOverride(7);
     } else {
-      uint16_t f88 = (uint16_t)((int16_t)(cl * 256.0f));
+      uint16_t f88 = floatToF88(cl);
       enqueueWriteCommand(7, f88, "CL");
     }
     dtostrf(cl, 1, 2, rspBuf);

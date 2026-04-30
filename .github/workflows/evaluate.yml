@@ -6,6 +6,8 @@ on:
     branches:
       - dev
       - "1.4.*"
+      - "1.5.*"
+      - "feature-dev-*"
       - "release/**"
 
 jobs:

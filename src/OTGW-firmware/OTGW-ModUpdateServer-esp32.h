@@ -133,8 +133,12 @@ public:
 
 private:
   // Merged binary layout (from partitions_otgw_esp32.csv)
+  // 4B-H3: app0 slot size MUST match the active partition table value
+  // (`app, ota_0, 0x10000, 0x1E0000` in partitions_otgw_esp32.csv).
+  // Earlier value (0x2E0000) would trip Update.begin() range-check on
+  // merged-binary OTA uploads since the writeable region is smaller.
   static constexpr size_t MERGED_APP_OFFSET = 0x10000;   // bootloader + partition table
-  static constexpr size_t MERGED_APP_SIZE   = 0x2E0000;  // app0 partition size
+  static constexpr size_t MERGED_APP_SIZE   = 0x1E0000;  // app0 partition size (1.875 MB)
 
   void _resetUploadTracking() {
     _uploadTarget = UploadTarget::None;
