@@ -213,6 +213,67 @@ int main()
     checkU8  ("TC mode: still CONSTANT", OT_OVERRIDE_CONSTANT, s.mode);
   }
 
+  // 8. TASK-498 (3A-M1): otCmdEnqueue coalesce-by-MsgID semantics.
+  // Mirror the OTDirect.ino ring-buffer logic against TASK-494's
+  // intent: a second enqueue for the same MsgID replaces the data of
+  // the existing slot in place rather than consuming a new slot.
+  {
+    constexpr uint8_t QSIZE = 12;
+    uint32_t queue[QSIZE] = {0};
+    uint8_t  head = 0, tail = 0;
+
+    auto depth = [&]() -> uint8_t { return (head + QSIZE - tail) % QSIZE; };
+    auto enq   = [&](uint32_t frame) -> bool {
+      uint8_t newMsgId = (frame >> 16) & 0xFF;
+      // Coalesce scan
+      uint8_t i = tail;
+      while (i != head) {
+        uint8_t existingMsgId = (queue[i] >> 16) & 0xFF;
+        if (existingMsgId == newMsgId) {
+          queue[i] = frame;  // replace in place
+          return true;
+        }
+        i = (i + 1) % QSIZE;
+      }
+      // Add to head
+      if (((head + 1) % QSIZE) == tail) return false;  // full
+      queue[head] = frame;
+      head = (head + 1) % QSIZE;
+      return true;
+    };
+
+    // Helper to build a WRITE_DATA frame for a given MsgID + data16.
+    auto buildFrame = [](uint8_t msgId, uint16_t data) -> uint32_t {
+      // OT frame layout: type(3-bit) << 28 | reserved | msgid(8-bit) << 16 | data(16-bit).
+      // Test only needs MsgID extractability.
+      return (static_cast<uint32_t>(0x1) << 28) |
+             (static_cast<uint32_t>(msgId) << 16) |
+             static_cast<uint32_t>(data);
+    };
+
+    // Enqueue MsgID 16 = 0x1400 (TT=20.0). Depth becomes 1.
+    enq(buildFrame(16, 0x1400));
+    checkU8("coalesce: depth after first enqueue", 1, depth());
+
+    // Enqueue MsgID 16 = 0x1500 (TT=21.0) — same MsgID, should COALESCE.
+    // Depth must stay at 1; the slot's data field is replaced.
+    enq(buildFrame(16, 0x1500));
+    checkU8("coalesce: same-MsgID does not grow depth", 1, depth());
+    checkU16("coalesce: latest value wins", 0x1500, (uint16_t)(queue[tail] & 0xFFFF));
+
+    // Enqueue MsgID 100 = 0x0002 (TT-flags) — different MsgID, NOT coalesced.
+    // Depth grows to 2.
+    enq(buildFrame(100, 0x0002));
+    checkU8("coalesce: different-MsgID grows depth", 2, depth());
+
+    // Enqueue MsgID 16 = 0x1600 — coalesces against the FIRST slot, not the
+    // second. Order across different MsgIDs is preserved.
+    enq(buildFrame(16, 0x1600));
+    checkU8("coalesce: depth still 2 after another same-MsgID", 2, depth());
+    checkU16("coalesce: position-preserving (slot 0 is MsgID 16)",
+             16, (uint16_t)((queue[tail] >> 16) & 0xFF));
+  }
+
   std::printf("================================================\n");
   if (failures == 0) {
     std::printf("All assertions PASS\n");

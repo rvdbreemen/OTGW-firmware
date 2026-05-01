@@ -1915,11 +1915,11 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
 //
 // Caller wiring (lives in SATble.ino, finalised by TASK-487):
 //   In satBLEPublishMQTT(), iterate _bleSensors[] valid slots:
-//     1. Build macCompact via bleMacToCompact(slot.sMacAddress, ...).
+//     1. Build macCompact via satBLEMacToCompact(slot.sMacAddress, ...).
 //     2. If slot.bDiscoveryPublished is false:
-//          - Call bleSensorPublishHaDiscovery(macCompact, slot.sMacAddress)
+//          - Call satBLEPublishHaDiscovery(macCompact, slot.sMacAddress)
 //          - Set slot.bDiscoveryPublished = true on success path
-//     3. Call bleSensorPublishStateTopics(macCompact, slot.fTemperature, ...)
+//     3. Call satBLEPublishStateTopics(macCompact, slot.fTemperature, ...)
 //   The bDiscoveryPublished flag must be added to BLESensorData by TASK-487.
 //
 // ADR-077 conformance: HA discovery configs are emitted via the existing
@@ -1938,8 +1938,8 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
 // Bounded write; on malformed input (not exactly 17 chars / wrong colon
 // positions) writes empty string. No String, no heap. Exported for
 // SATble.ino which builds the compact MAC before calling
-// bleSensorPublishHaDiscovery / bleSensorPublishStateTopics.
-void bleMacToCompact(const char* macWithColons, char* out, size_t outSize)
+// satBLEPublishHaDiscovery / satBLEPublishStateTopics.
+void satBLEMacToCompact(const char* macWithColons, char* out, size_t outSize)
 {
   if (!out || outSize == 0) return;
   out[0] = '\0';
@@ -1964,7 +1964,7 @@ void bleMacToCompact(const char* macWithColons, char* out, size_t outSize)
 
 // Publish 4 BLE state topics under <MQTTPubNamespace>/sat/ble/<mac>/{temp,rh,bat,rssi}.
 // Not retained (state). Skips silently if MQTT is not connected.
-void bleSensorPublishStateTopics(const char* macCompact, float temp, float hum, uint8_t bat, int8_t rssi)
+void satBLEPublishStateTopics(const char* macCompact, float temp, float hum, uint8_t bat, int8_t rssi)
 {
   if (!macCompact || macCompact[0] == '\0') return;
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
@@ -2004,7 +2004,7 @@ void bleSensorPublishStateTopics(const char* macCompact, float temp, float hum, 
 // two-pass MEASURE-then-WRITE dance ADR-077 prescribes for unbounded
 // payloads. Heap pressure is still bounded by the canPublishMQTT() and
 // MQTT_DISCOVERY_HEAP_MIN gates per call, so behaviour is heap-safe.
-static bool bleSensorPublishOneDiscovery(const char* macCompact,
+static bool satBLEPublishOneDiscovery(const char* macCompact,
                                          const char* macWithColons,
                                          const char* kindKey,        // "temp" | "rh" | "bat" | "rssi"
                                          const __FlashStringHelper* friendlyName,
@@ -2092,7 +2092,7 @@ static bool bleSensorPublishOneDiscovery(const char* macCompact,
 // `bDiscoveryPublished` flag on this return value; a transient first-scan
 // failure will retry on the next iBleInterval cycle instead of permanently
 // suppressing HA discovery for that sensor.
-bool bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColons)
+bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons)
 {
   if (!macCompact || macCompact[0] == '\0') return false;
   if (!macWithColons || macWithColons[0] == '\0') return false;
@@ -2100,7 +2100,7 @@ bool bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColo
 
   // Each kind: short-name, device_class, unit, value_template. All PROGMEM.
   bool ok;
-  ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
+  ok = satBLEPublishOneDiscovery(macCompact, macWithColons,
         "temp",
         F("Temperature"),
         F("temperature"),
@@ -2111,7 +2111,7 @@ bool bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColo
     return false;
   }
 
-  ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
+  ok = satBLEPublishOneDiscovery(macCompact, macWithColons,
         "rh",
         F("Humidity"),
         F("humidity"),
@@ -2122,7 +2122,7 @@ bool bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColo
     return false;
   }
 
-  ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
+  ok = satBLEPublishOneDiscovery(macCompact, macWithColons,
         "bat",
         F("Battery"),
         F("battery"),
@@ -2133,7 +2133,7 @@ bool bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColo
     return false;
   }
 
-  ok = bleSensorPublishOneDiscovery(macCompact, macWithColons,
+  ok = satBLEPublishOneDiscovery(macCompact, macWithColons,
         "rssi",
         F("Signal Strength"),
         F("signal_strength"),

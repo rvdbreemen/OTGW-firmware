@@ -70,7 +70,8 @@ struct OTRemoteOverrideState {
   uint16_t f88Value;            // current override value (f8.8 of MsgID 16)
   uint32_t setAtMs;             // millis() when override was set
   uint32_t lastThermostatMs;    // millis() of last MsgID 16 frame from thermostat
-  uint16_t lastThermostatVal;   // last thermostat-reported MsgID 16 value (f8.8)
+  uint16_t lastThermostatVal;   // last thermostat-reported MsgID 16 value (f8.8); valid only when bHaveLastThermostat=true
+  bool     bHaveLastThermostat; // TASK-498 (1A-M2): true after first observed thermostat MsgID 16; replaces the 0xFFFF magic-value sentinel that collided with a valid -0.0039 °C
   uint8_t  honoredCount;        // number of cycles thermostat echoed our override
 };
 

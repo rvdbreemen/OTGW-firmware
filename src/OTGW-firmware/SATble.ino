@@ -161,6 +161,11 @@ static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, f
         pos += 1;
         break;
 
+      case 0x00:  // TASK-498 (2A-M3): BTHome v2 packet-id object — 1-byte payload, skip and continue
+        if (pos + 1 > len) return gotTemp;
+        pos += 1;
+        break;
+
       default:
         // Unknown object: we cannot determine its length, so stop parsing
         return gotTemp;
@@ -201,7 +206,7 @@ static int bleFindOrAllocSlot(const char* mac)
 //=====================================================================
 // NimBLE 2.x scan callback: parses advertisements for known sensor formats
 //=====================================================================
-class SATBLEScanCallbacks : public NimBLEScanCallbacks {
+class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
   void onResult(const NimBLEAdvertisedDevice* dev) override
   {
     float temp = 0.0f, hum = 0.0f;
@@ -425,7 +430,7 @@ float satBLEGetHumidity()
 
 //=====================================================================
 // Publish BLE sensor data to MQTT
-// (MAC compact-form helper bleMacToCompact() lives in MQTTstuff.ino;
+// (MAC compact-form helper satBLEMacToCompact() lives in MQTTstuff.ino;
 //  declared in OTGW-firmware.h. TASK-492 consolidated the duplicate
 //  bleMacCompactLocal helper that previously lived here.)
 //=====================================================================
@@ -466,7 +471,7 @@ void satBLEPublishMQTT()
 
     if (!snap.bValid) continue;
     char macCompact[13];
-    bleMacToCompact(snap.sMacAddress, macCompact, sizeof(macCompact));
+    satBLEMacToCompact(snap.sMacAddress, macCompact, sizeof(macCompact));
     if (macCompact[0] == '\0') continue;  // skip malformed
 
     if (!snap.bDiscoveryPublished) {
@@ -475,13 +480,13 @@ void satBLEPublishMQTT()
       // connected, low heap, broker hiccup) will retry on the next
       // iBleInterval cycle instead of permanently silencing HA discovery
       // for this MAC. Write the flag back to the real slot under the lock.
-      if (bleSensorPublishHaDiscovery(macCompact, snap.sMacAddress)) {
+      if (satBLEPublishHaDiscovery(macCompact, snap.sMacAddress)) {
         portENTER_CRITICAL(&_bleSensorsMux);
         _bleSensors[i].bDiscoveryPublished = true;
         portEXIT_CRITICAL(&_bleSensorsMux);
       }
     }
-    bleSensorPublishStateTopics(macCompact,
+    satBLEPublishStateTopics(macCompact,
                                  snap.fTemperature,
                                  snap.fHumidity,
                                  snap.iBattery,

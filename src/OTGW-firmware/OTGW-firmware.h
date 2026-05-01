@@ -250,14 +250,14 @@ void satBLESendStatusJSON();
 // (defined in MQTTstuff.ino). Caller (satBLEPublishMQTT) wires these in once
 // per first-seen MAC (discovery) and on every scan iteration (state).
 // One-shot discovery via per-slot bDiscoveryPublished flag.
-// bleMacToCompact is the canonical "AA:BB:..:FF" -> "aabb..ff" helper used
+// satBLEMacToCompact is the canonical "AA:BB:..:FF" -> "aabb..ff" helper used
 // by both the caller in SATble.ino and internally in MQTTstuff.ino.
-void bleMacToCompact(const char* macWithColons, char* out, size_t outSize);
-void bleSensorPublishStateTopics(const char* macCompact, float temp, float hum, uint8_t bat, int8_t rssi);
+void satBLEMacToCompact(const char* macWithColons, char* out, size_t outSize);
+void satBLEPublishStateTopics(const char* macCompact, float temp, float hum, uint8_t bat, int8_t rssi);
 // TASK-493 (1A-H1): returns true only when all 4 retained discovery configs
 // were successfully published; caller MUST gate per-MAC `bDiscoveryPublished`
 // on this so transient failures retry on the next iBleInterval cycle.
-bool bleSensorPublishHaDiscovery(const char* macCompact, const char* macWithColons);
+bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons);
 #endif
 
 // SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino

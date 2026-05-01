@@ -376,7 +376,8 @@ static OTRemoteOverrideState otRemoteOverride = {
   0,                 // f88Value
   0,                 // setAtMs
   0,                 // lastThermostatMs
-  0xFFFF,            // lastThermostatVal sentinel: "never observed"
+  0,                 // lastThermostatVal (only valid when bHaveLastThermostat=true)
+  false,             // bHaveLastThermostat — TASK-498 (1A-M2)
   0                  // honoredCount
 };
 
@@ -968,7 +969,17 @@ void sendOTDirectOverridesJSON() {
     first = false;
   }
 
-  httpServer.sendContent_P(PSTR("]}}"));
+  // TASK-498 (4B-M2): expose queue depth + high-water-mark so non-telnet
+  // clients (web UI, MQTT-driven dashboards) can monitor the OT command
+  // queue load. "queue" is a sibling of "overrides", not nested under it.
+  // Normal operation should keep highWater well below capacity; climbing
+  // values indicate a producer-rate problem worth investigation.
+  snprintf_P(chunk, sizeof(chunk),
+             PSTR("]},\"queue\":{\"depth\":%u,\"highWater\":%u,\"capacity\":%u}}"),
+             (unsigned)otCmdQueueDepth(),
+             (unsigned)otCmdQueueHighWater,
+             (unsigned)OT_CMD_QUEUE_SIZE);
+  httpServer.sendContent(chunk);
   httpServer.sendContent(F(""));  // end chunked stream
 }
 
@@ -1964,13 +1975,14 @@ static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
   // includes the -40..127 clamp formerly inlined here (TASK-495).
   uint16_t f88 = floatToF88(celsius);
 
-  otRemoteOverride.mode             = mode;
-  otRemoteOverride.f88Value         = f88;
-  otRemoteOverride.setAtMs          = millis();
-  otRemoteOverride.honoredCount     = 0;
-  otRemoteOverride.lastThermostatVal = 0xFFFF;  // reset honour history
-  state.otd.eOverrideMode           = mode;
-  state.otd.iOverrideF88            = f88;
+  otRemoteOverride.mode               = mode;
+  otRemoteOverride.f88Value           = f88;
+  otRemoteOverride.setAtMs            = millis();
+  otRemoteOverride.honoredCount       = 0;
+  otRemoteOverride.lastThermostatVal  = 0;       // value undefined until bHaveLastThermostat flips
+  otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2): reset honour history
+  state.otd.eOverrideMode             = mode;
+  state.otd.iOverrideF88              = f88;
 
   // MsgID 16: replace thermostat's TrSet on outbound to boiler
   enqueueWriteCommand(16, f88, mode == OT_OVERRIDE_TEMPORARY ? "TT" : "TC");
@@ -1981,12 +1993,13 @@ static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
 }
 
 static void clearRemoteOverride() {
-  otRemoteOverride.mode              = OT_OVERRIDE_NONE;
-  otRemoteOverride.f88Value          = 0;
-  otRemoteOverride.honoredCount      = 0;
-  otRemoteOverride.lastThermostatVal = 0xFFFF;
-  state.otd.eOverrideMode            = OT_OVERRIDE_NONE;
-  state.otd.iOverrideF88             = 0;
+  otRemoteOverride.mode                = OT_OVERRIDE_NONE;
+  otRemoteOverride.f88Value            = 0;
+  otRemoteOverride.honoredCount        = 0;
+  otRemoteOverride.lastThermostatVal   = 0;
+  otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2)
+  state.otd.eOverrideMode              = OT_OVERRIDE_NONE;
+  state.otd.iOverrideF88               = 0;
 
   clearWriteOverride(16);
   clearWriteOverride(100);
@@ -2025,7 +2038,8 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88) {
   otRemoteOverride.lastThermostatMs = now;
 
   if (otRemoteOverride.mode == OT_OVERRIDE_NONE) {
-    otRemoteOverride.lastThermostatVal = f88;
+    otRemoteOverride.lastThermostatVal   = f88;
+    otRemoteOverride.bHaveLastThermostat = true;
     return;
   }
 
@@ -2050,7 +2064,8 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88) {
     clearRemoteOverride();
   }
 
-  otRemoteOverride.lastThermostatVal = f88;
+  otRemoteOverride.lastThermostatVal   = f88;
+  otRemoteOverride.bHaveLastThermostat = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -2105,12 +2120,13 @@ static void resetTransientState() {
   }
   // TASK-466: clear TT/TC remote-override state machine. Mirrors PIC
   // behaviour where a hardware reset wipes setpoint1/2 + OverrideReq.
-  otRemoteOverride.mode              = OT_OVERRIDE_NONE;
-  otRemoteOverride.f88Value          = 0;
-  otRemoteOverride.honoredCount      = 0;
-  otRemoteOverride.lastThermostatVal = 0xFFFF;
-  state.otd.eOverrideMode            = OT_OVERRIDE_NONE;
-  state.otd.iOverrideF88             = 0;
+  otRemoteOverride.mode                = OT_OVERRIDE_NONE;
+  otRemoteOverride.f88Value            = 0;
+  otRemoteOverride.honoredCount        = 0;
+  otRemoteOverride.lastThermostatVal   = 0;
+  otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2)
+  state.otd.eOverrideMode              = OT_OVERRIDE_NONE;
+  state.otd.iOverrideF88               = 0;
   // Clear response modifiers
   clearAllResponseModifiers();
   // Clear setback state
