@@ -284,6 +284,36 @@ If you already have firmware and filesystem binary files:
 python3 flash_esp.py --firmware OTGW-firmware-fw.bin --filesystem OTGW-firmware-fs.bin
 ```
 
+### Release artefact verification
+
+Every GitHub release for OTGW-firmware ships a `SHA256SUMS.txt` file alongside the binaries (`firmware-esp32.bin`, `firmware-nodemcuv2.bin`, `littlefs-esp32.bin`, etc.). The file lists the SHA-256 digest of each artefact in the canonical `sha256sum` format: 64 hex characters, two spaces, filename.
+
+Verifying a download takes a few seconds and protects against three real failure modes:
+
+- A download mirror or CDN serving a tampered binary
+- Silent transit corruption (rare, but possible on flaky links)
+- Accidentally flashing a stale binary that you forgot you had on disk
+
+**Linux and macOS:**
+
+Place `SHA256SUMS.txt` in the same directory as the downloaded artefacts and run:
+
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+
+Each artefact prints `OK` on a successful match. Any mismatch prints `FAILED` and a non-zero exit code: do not flash that file.
+
+**Windows (PowerShell):**
+
+PowerShell's built-in `Get-FileHash` does the same job. Run it once per artefact and compare the printed digest against the matching line in `SHA256SUMS.txt`:
+
+```powershell
+Get-FileHash -Algorithm SHA256 firmware-esp32.bin
+```
+
+If the hashes match, the file is intact. If they do not match, redownload from the GitHub release page rather than from a mirror or cache.
+
 ### First-Time Setup: Connecting to Wi-Fi
 
 On the first boot after flashing, the device has no saved Wi-Fi credentials. It broadcasts a temporary Wi-Fi access point so you can configure it.

@@ -32,6 +32,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - ADR-066 documenting the source-aware MQTT publish gating decision (ported verbatim from `dev`)
 - `docs/api/MQTT-message-id-echo-audit.md` spec-audit reference per OpenTherm v4.2 (ported from `dev`)
 - `bSlaveEchoesValue` field on `OTlookup_t` populated for every MsgID
+- Added .github/workflows/dependency-scan.yml weekly outdated-deps visibility job (TASK-501 4B-M3)
+- Added tools/generate_release_sha256sums.py + docs/MANUAL.md release-verification section (TASK-501 4B-M4)
+- Added docs/templates/hardware-verification-log.md template for AC evidence capture (TASK-501 4B-M5)
+- Polished 8 comment / `static_cast` / named-constant Lows from Phase 1-4 review (TASK-502): BLE_STALE_MS static_assert tripwire, malformed-MAC debug log in satBLEMacToCompact, NimBLE 0.625 ms tick conversion comment, OT_OVERRIDE_*_DELTA_F88 float-truncation foot-gun note, satBLEPublishHaDiscovery / OTGW-firmware.h "publish cycle vs scan" wording refresh, named BLE_SCAN_INTERVAL_TICKS / BLE_SCAN_WINDOW_TICKS / BLE_SCAN_MAX_RESULTS constants, static_cast<int8_t> for getRSSI(), shared BLE_MAC_COMPACT_SIZE constant.
 
 ## [2.0.0-beta] - 2026-04-11
 

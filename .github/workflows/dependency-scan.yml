@@ -1,0 +1,91 @@
+name: PlatformIO dependency scan
+
+# 4B-M3: Visibility-only weekly scan of PlatformIO dependencies (TASK-501).
+#
+# This workflow is INTENTIONALLY non-blocking. It surfaces outdated library
+# and platform packages but does NOT fail the build, because:
+#   (a) several dependencies are pinned for compatibility reasons documented
+#       in ADRs (e.g. the platformio.ini esptoolpy pin restored under
+#       TASK-494 / 1B-H1, and the Arduino Core 2.7.4 pin for the 1.5.x LTS
+#       line); an automatic "outdated" verdict cannot judge those trade-offs;
+#   (b) CVE relevance is reviewed manually by the project owner against the
+#       firmware's actual attack surface (LAN-only HTTP/MQTT, no HTTPS).
+#
+# Output: a single artefact bundling the raw `pio pkg outdated` and
+# `pio pkg list` logs plus a markdown summary, and (on the weekly schedule)
+# a job summary rendered directly in the Actions UI for at-a-glance review.
+
+on:
+  schedule:
+    # Monday 06:00 UTC weekly — quiet hours, before the work week starts.
+    - cron: '0 6 * * 1'
+  pull_request:
+    branches:
+      - dev
+      - "feature-dev-*"
+    paths:
+      - "platformio.ini"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    name: pio pkg outdated (visibility-only)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install platformio
+
+      - name: List outdated packages
+        run: |
+          set -o pipefail
+          (pio pkg outdated -e nodemcuv2 -e esp32 2>&1 | tee outdated.txt) || true
+
+      - name: List installed packages
+        run: |
+          set -o pipefail
+          (pio pkg list -e nodemcuv2 -e esp32 2>&1 | tee pkglist.txt) || true
+
+      - name: Build dependency-scan summary
+        run: |
+          {
+            echo "# PlatformIO dependency scan"
+            echo
+            echo "Run: ${{ github.run_id }} (${{ github.event_name }}, ref ${{ github.ref }})"
+            echo
+            echo "## Outdated packages (\`pio pkg outdated\`)"
+            echo
+            echo '```'
+            cat outdated.txt
+            echo '```'
+            echo
+            echo "## Installed packages (\`pio pkg list\`)"
+            echo
+            echo '```'
+            cat pkglist.txt
+            echo '```'
+          } > dependency-scan-summary.md
+
+      - name: Publish job summary (scheduled runs only)
+        if: github.event_name == 'schedule'
+        run: cat dependency-scan-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload dependency-scan artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-${{ github.run_id }}
+          path: |
+            dependency-scan-summary.md
+            outdated.txt
+            pkglist.txt
+          if-no-files-found: warn
