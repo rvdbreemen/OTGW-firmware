@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T17:12:23.248Z
-> Files: 523 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T17:29:33.389Z
+> Files: 525 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -18,7 +18,7 @@
 - `build_task450.log` — Declares char (~11691 tok)
 - `build.py` — Colors: disable, print_step, print_success, print_error + 8 more (~30469 tok)
 - `CHANGELOG.md` — Change log (~7916 tok)
-- `CLAUDE.md` — OpenWolf (~3343 tok)
+- `CLAUDE.md` — OpenWolf (~3546 tok)
 - `config.py` — Base Paths (~129 tok)
 - `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 9 more (~32062 tok)
 - `flash_esp.py` — Colors: disable, print_header, print_success, print_error + 11 more (~10252 tok)
@@ -38,7 +38,7 @@
 - `github_last_checked.txt` (~7 tok)
 - `settings.20260412_173718.bak` (~26 tok)
 - `settings.20260421_085354.bak` (~1376 tok)
-- `settings.json` (~1926 tok)
+- `settings.json` (~2002 tok)
 - `settings.local.json` (~284 tok)
 - `tweakers_last_checked.txt` (~7 tok)
 
@@ -50,6 +50,10 @@
 ## .claude/docs/
 
 - `discord-backlog-bridge.md` — Discord Backlog Bridge -- Setup & Operations Guide (~987 tok)
+
+## .claude/hooks/
+
+- `backlog-mcp-guard.py` — PreToolUse guard: enforce Backlog.md MCP-over-CLI policy. (~1085 tok)
 
 ## .claude/rules/
 
@@ -130,6 +134,10 @@
 - `phase3a-testing.md` — Phase 3A: Test Coverage & Quality (~5680 tok)
 - `phase3b-documentation.md` — Phase 3B: Documentation Findings (~5632 tok)
 - `state.json` (~193 tok)
+
+## .githooks/
+
+- `commit-msg` — Git commit-msg hook — guard against TASK-NNN references without a tracked (~681 tok)
 
 ## .github/
 

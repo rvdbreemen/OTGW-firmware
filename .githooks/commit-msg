@@ -1,0 +1,74 @@
+#!/bin/sh
+# Git commit-msg hook — guard against TASK-NNN references without a tracked
+# task record.
+#
+# Why: on 2026-05-01 we landed three batch commits (83e0a72e/cbf713f9/e13e34b3)
+# whose messages reference TASK-500/501/502 while the corresponding markdown
+# files in backlog/tasks/ never made it into git. The Backlog MCP server
+# writes the task file to disk on task_create/task_complete, but `git add`
+# is the human's responsibility — easy to forget.
+#
+# This hook fails the commit if its message names TASK-NNN identifiers that
+# are not present in the index (tracked at HEAD or staged) under
+# backlog/tasks/task-NNN-*.md. Forces the markdown record to ride along
+# with whatever code change references it.
+#
+# Install (one-time per clone):
+#   git config core.hooksPath .githooks
+#
+# Bypass (rare, document why):
+#   git commit --no-verify
+
+msg_file="$1"
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+    exit 0
+fi
+
+# Strip comment lines (#-prefixed scissor + git's own comments) before scanning,
+# so commented-out TASK references in the editor template don't trigger.
+msg=$(grep -v '^#' "$msg_file")
+
+ids=$(printf '%s' "$msg" \
+    | grep -oE '[Tt][Aa][Ss][Kk]-[0-9]+' \
+    | tr '[:lower:]' '[:upper:]' \
+    | sort -u)
+
+if [ -z "$ids" ]; then
+    exit 0
+fi
+
+missing=""
+for id in $ids; do
+    num=$(printf '%s' "$id" | sed 's/TASK-//')
+    # ls-files lists tracked files in the index (HEAD + staged adds).
+    # Pattern matches both the old `task-NNN.md` and the long descriptive form.
+    matches=$(git ls-files "backlog/tasks/task-${num}.md" "backlog/tasks/task-${num} *.md" "backlog/tasks/task-${num}-*.md" 2>/dev/null)
+    if [ -z "$matches" ]; then
+        missing="$missing $id"
+    fi
+done
+
+if [ -n "$missing" ]; then
+    cat >&2 <<EOF
+commit-msg: blocked — task record(s) not in index for:$missing
+
+The commit message references the task ID(s) above, but no matching
+backlog/tasks/task-NNN-*.md file is tracked or staged.
+
+Fix one of these ways:
+  1. (Most likely) stage the missing record:
+       git add backlog/tasks/task-NNN-*.md
+       git commit --amend --no-edit   # if you want to roll it into THIS commit
+       # or: git commit -m "..."      # for a follow-up commit before retrying
+  2. Create the task first via the Backlog MCP server
+     (mcp__backlog__task_create), which writes the markdown file, then
+     'git add' it.
+  3. If the TASK-NNN reference in the message is unintentional, edit the
+     message to drop it.
+
+To bypass once (e.g. emergency hotfix): git commit --no-verify
+EOF
+    exit 1
+fi
+
+exit 0

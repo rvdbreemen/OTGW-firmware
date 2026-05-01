@@ -152,6 +152,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/backlog-mcp-guard.py\"",
+            "timeout": 5
+          }
+        ]
       }
     ]
   },

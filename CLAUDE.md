@@ -31,7 +31,12 @@ backlog task edit <id> --final-summary "..." # PR description
 backlog task edit <id> -s Done
 ```
 
-**CRITICAL: NEVER edit task files in `backlog/tasks/` directly. Always use the CLI.**
+**CRITICAL: NEVER edit task files in `backlog/tasks/` directly. Always use the MCP server (preferred) or the CLI as fallback.**
+
+Two hooks enforce this contract — they fail closed, you don't have to remember:
+
+- `.claude/hooks/backlog-mcp-guard.py` — PreToolUse guard wired in `.claude/settings.json`. Blocks `Edit/Write/MultiEdit` on `backlog/tasks/*.md` and Bash invocations of the `backlog` CLI. Stderr names the MCP equivalent so the model self-corrects without another round-trip.
+- `.githooks/commit-msg` — git hook that fails the commit if its message references `TASK-NNN` without a matching `backlog/tasks/task-NNN*.md` file in the index. Catches the failure mode where a code commit lands but its task record stays untracked. Install once per clone with `git config core.hooksPath .githooks`. Bypass with `git commit --no-verify` for emergencies (document why in the message).
 
 For the full CLI reference (all commands, AC management, DoD, multi-line input): read `docs/guides/backlog-cli.md`.
 
