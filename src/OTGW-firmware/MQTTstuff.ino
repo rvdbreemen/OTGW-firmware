@@ -1509,13 +1509,13 @@ void publishMQTTNumeric(const __FlashStringHelper* topic, float value, uint8_t d
  */
 void publishMQTTInt(const char* topic, int value) {
   static char buffer[12];
-  snprintf(buffer, sizeof(buffer), "%d", value);
+  snprintf_P(buffer, sizeof(buffer), PSTR("%d"), value);
   sendMQTTData(topic, buffer);
 }
 
 void publishMQTTInt(const __FlashStringHelper* topic, int value) {
   static char buffer[12];
-  snprintf(buffer, sizeof(buffer), "%d", value);
+  snprintf_P(buffer, sizeof(buffer), PSTR("%d"), value);
   sendMQTTData(topic, buffer);
 }
 
@@ -1562,7 +1562,7 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
   static char sourceTopic[MQTT_TOPIC_MAX_LEN];
   char sourceKeyBuf[16];
   if (!copySourceTableEntry(mqttSourceKeys, sourceIndex, sourceKeyBuf, sizeof(sourceKeyBuf))) { inUse = false; return; }
-  snprintf(sourceTopic, sizeof(sourceTopic), "%s/%s", topic, sourceKeyBuf);
+  snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s/%s"), topic, sourceKeyBuf);
   sendMQTTData(sourceTopic, json, false);
   inUse = false;
 }

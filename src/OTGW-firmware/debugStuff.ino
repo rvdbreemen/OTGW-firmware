@@ -88,7 +88,7 @@ void _debugBOL(const char *fn, int line)
    // expensive to run on every debug line under high-volume flags.
    if (now_sec != lastCachedSec) {
      ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, cachedTz);
-     snprintf(cachedPrefix, sizeof(cachedPrefix), "%02d:%02d:%02d.%%06d (%7u|%6u) ",
+     snprintf_P(cachedPrefix, sizeof(cachedPrefix), PSTR("%02d:%02d:%02d.%%06d (%7u|%6u) "),
               myTime.hour(), myTime.minute(), myTime.second(),
               platformFreeHeap(), platformMaxFreeBlock());
      lastCachedSec  = now_sec;
@@ -97,9 +97,12 @@ void _debugBOL(const char *fn, int line)
    // Per-call: expand cached prefix (fills in tv_usec), append fn(line).
    // HH:MM:SS, heap, and maxblock are baked into cachedPrefix once/sec;
    // only microseconds, function name, and line number vary per call.
+   // Note: the first snprintf() below cannot be snprintf_P — its format
+   // argument is the runtime RAM buffer cachedPrefix, not a string literal,
+   // so snprintf_P (which requires a PROGMEM format) does not apply here.
    int written = snprintf(_bol, sizeof(_bol), cachedPrefix, (int)now.tv_usec);
-   written += snprintf(_bol + written, sizeof(_bol) - written,
-                       "%-12.12s(%4d): ", fn, line);
+   written += snprintf_P(_bol + written, sizeof(_bol) - written,
+                       PSTR("%-12.12s(%4d): "), fn, line);
 
 
    // Ensure null termination even if truncated

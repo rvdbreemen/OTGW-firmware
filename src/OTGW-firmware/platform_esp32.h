@@ -218,7 +218,7 @@ inline bool platformRtcRead(uint32_t slot, uint32_t *data, size_t len) {
   Preferences prefs;
   if (!prefs.begin("otgw_rtc", true)) return false;  // read-only
   char key[12];
-  snprintf(key, sizeof(key), "s%u", (unsigned)slot);
+  snprintf_P(key, sizeof(key), PSTR("s%u"), (unsigned)slot);
   size_t got = prefs.getBytes(key, data, len);
   prefs.end();
   return (got == len);
@@ -228,7 +228,7 @@ inline bool platformRtcWrite(uint32_t slot, const uint32_t *data, size_t len) {
   Preferences prefs;
   if (!prefs.begin("otgw_rtc", false)) return false;  // read-write
   char key[12];
-  snprintf(key, sizeof(key), "s%u", (unsigned)slot);
+  snprintf_P(key, sizeof(key), PSTR("s%u"), (unsigned)slot);
   prefs.putBytes(key, data, len);
   prefs.end();
   return true;

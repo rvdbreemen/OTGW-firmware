@@ -3,9 +3,10 @@ id: TASK-505
 title: >-
   polish: clean up 14 pre-existing PROGMEM flash-string violations + refine
   evaluate.py regex
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-05-01 18:39'
+updated_date: '2026-05-01 18:44'
 labels:
   - polish
   - progmem
@@ -85,3 +86,9 @@ Pure observability/RAM-budget polish. ESP8266 is the constrained platform (~40KB
 - [ ] #6 Build clean on ESP8266 and ESP32-S3 (python build.py); no behavioural change
 - [ ] #7 No new violations introduced anywhere; verify by re-running python evaluate.py --quick post-fix
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Two-step execution. Step 1: source fixes for the 11 real violations (6 files: debugStuff.ino, jsonStuff.ino, MQTTstuff.ino, OTGW-Core.ino x2 sites, platform_esp32.h x2 sites). Pure mechanical: snprintf -> snprintf_P with PSTR around format, strcmp -> strcmp_P with PSTR around literal. No behaviour change. Step 2: refine evaluate.py's check_progmem_compliance so a literal nested inside an F() or PSTR() wrapper, or inside a sub-function-call (httpServer.arg("v")), no longer counts as a strcmp/strcasecmp false positive. Validate via python evaluate.py --quick (target: 0 PROGMEM violations, FAIL -> PASS) and python build.py (clean on both platforms).
+<!-- SECTION:PLAN:END -->

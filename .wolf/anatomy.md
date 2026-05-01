@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T17:29:33.389Z
-> Files: 525 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T18:48:39.846Z
+> Files: 532 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -20,7 +20,7 @@
 - `CHANGELOG.md` — Change log (~7916 tok)
 - `CLAUDE.md` — OpenWolf (~3546 tok)
 - `config.py` — Base Paths (~129 tok)
-- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 9 more (~32062 tok)
+- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~33493 tok)
 - `flash_esp.py` — Colors: disable, print_header, print_success, print_error + 11 more (~10252 tok)
 - `flash_otgw.bat` (~2681 tok)
 - `flash_otgw.sh` — flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware (Linux/macOS) (~3531 tok)
@@ -73,7 +73,7 @@
 
 ## .claude/skills/update-docs/
 
-- `SKILL.md` — /update-docs - Documentation Update Workflow (~3029 tok)
+- `SKILL.md` — /update-docs : Documentation Update Workflow (~3558 tok)
 
 ## .copilot-tracking/research/
 
@@ -857,3 +857,16 @@
 
 - `bubbleSort.h` — Declares of (~786 tok)
 - `combSort.h` — Declares is (~2882 tok)
+
+## .tmp/
+
+- `list_progmem.py` (~416 tok)
+
+## src/OTGW-firmware/
+
+- `debugStuff.ino` — declarations: bodies, if, yet (~1371 tok)
+- `jsonStuff.ino` — In-place buffer version to avoid heap allocations (~7444 tok)
+- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~26851 tok)
+- `OTDirect.ino` — Declares instances (~38751 tok)
+- `OTGW-Core.ino` — Declares char (~62293 tok)
+- `platform_esp32.h` — ************************************************************************ (~2720 tok)

@@ -32,7 +32,7 @@ void escapeJsonStringTo(const char* src, char* dest, size_t destSize) {
       case '\t': esc = "\\t";  break;
       default:
         if (*p < 0x20) {
-          snprintf(hex, sizeof(hex), "\\u%04X", (unsigned char)*p);
+          snprintf_P(hex, sizeof(hex), PSTR("\\u%04X"), (unsigned char)*p);
           esc = hex;
         }
     }

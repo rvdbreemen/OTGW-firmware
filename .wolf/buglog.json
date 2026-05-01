@@ -16,6 +16,54 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-01T17:28:33.651Z"
+    },
+    {
+      "id": "bug-002",
+      "timestamp": "2026-05-01T18:46:00.243Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/debugStuff.ino",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 6→9 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T18:46:00.243Z"
+    },
+    {
+      "id": "bug-003",
+      "timestamp": "2026-05-01T18:46:42.881Z",
+      "error_message": "Wrong condition in logic",
+      "file": "src/OTGW-firmware/OTGW-Core.ino",
+      "root_cause": "Condition was: if (strcmp(state.pic.sDeviceid, \"unknown\")",
+      "fix": "Changed to: if (strcmp_P(state.pic.sDeviceid, PSTR(\"unknown\")",
+      "tags": [
+        "auto-detected",
+        "logic-fix",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-01T18:46:50.597Z"
+    },
+    {
+      "id": "bug-004",
+      "timestamp": "2026-05-01T18:47:25.781Z",
+      "error_message": "Significant refactor of ",
+      "file": "evaluate.py",
+      "root_cause": "12 lines replaced/restructured",
+      "fix": "Rewrote 53→65 lines (12 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T18:47:25.781Z"
     }
   ]
 }

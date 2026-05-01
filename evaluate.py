@@ -254,6 +254,99 @@ def _strip_line_comments(line: str) -> str:
     return line.split('//', 1)[0]
 
 
+def _progmem_call_violates(line: str, open_paren_idx: int, arg_index) -> bool:
+    """Decide whether a call (snprintf/strcmp/strcasecmp/DebugTln/DebugTf) on `line`
+    has an unwrapped string literal as a DIRECT argument.
+
+    `line[open_paren_idx]` is the '(' that opens the call's argument list. We walk
+    forward, tracking paren depth. Only literals that appear at depth 1 (the call's
+    own arg list, not a nested sub-call) and are not immediately preceded by `F(`
+    or `PSTR(` count.
+
+    `arg_index`:
+      - None: any unwrapped literal at depth 1 is a violation. Used for DebugTln,
+        DebugTf, strcmp, strcasecmp.
+      - int N: only the Nth positional arg (0-based, separated by depth-1 commas)
+        being an unwrapped literal counts. Used for snprintf where the format
+        string is positional arg 1 (after the buffer at index 0).
+
+    Limitation: scans a single line. Multi-line calls would need a multi-line
+    join; for the firmware codebase, format strings and compare literals are
+    on the same line as the call, so this is sufficient (matches the prior
+    regex-only scan's reach).
+    """
+    if open_paren_idx < 0 or open_paren_idx >= len(line) or line[open_paren_idx] != '(':
+        return False
+    depth = 0
+    pos = open_paren_idx
+    current_arg = 0  # index of the positional arg we're currently inside (depth 1)
+    n = len(line)
+    while pos < n:
+        ch = line[pos]
+        if ch == '(':
+            depth += 1
+            pos += 1
+            continue
+        if ch == ')':
+            depth -= 1
+            if depth == 0:
+                return False  # end of the call's argument list
+            pos += 1
+            continue
+        if ch == ',' and depth == 1:
+            current_arg += 1
+            pos += 1
+            continue
+        if ch == '"' and depth == 1:
+            # Found a string literal at depth 1. Is it wrapped in F(...) or PSTR(...)?
+            # The wrapper would manifest as the immediately-preceding token being
+            # `F(` or `PSTR(`, i.e. depth would have just incremented from 1 to 2
+            # via that wrapper's '('. Since we're at depth 1 here, the literal is
+            # NOT inside such a wrapper.
+            if arg_index is None or current_arg == arg_index:
+                # Skip the literal contents to keep parser sane (handles \" escapes).
+                pos += 1
+                while pos < n and line[pos] != '"':
+                    if line[pos] == '\\' and pos + 1 < n:
+                        pos += 2
+                        continue
+                    pos += 1
+                return True
+            # literal at depth 1 but not the arg index we care about -> ignore,
+            # skip past it.
+            pos += 1
+            while pos < n and line[pos] != '"':
+                if line[pos] == '\\' and pos + 1 < n:
+                    pos += 2
+                    continue
+                pos += 1
+            pos += 1
+            continue
+        if ch == '"':
+            # Literal inside a sub-call (depth > 1) — not this call's concern.
+            pos += 1
+            while pos < n and line[pos] != '"':
+                if line[pos] == '\\' and pos + 1 < n:
+                    pos += 2
+                    continue
+                pos += 1
+            pos += 1
+            continue
+        if ch == "'":
+            # Char literal — skip past closing quote.
+            pos += 1
+            while pos < n and line[pos] != "'":
+                if line[pos] == '\\' and pos + 1 < n:
+                    pos += 2
+                    continue
+                pos += 1
+            pos += 1
+            continue
+        pos += 1
+    # Reached end of line without closing paren — be conservative, no violation.
+    return False
+
+
 def scan_string_usages_detailed(content: str, filename: str) -> List[str]:
     """Return "filename:lineno" entries for String-class declarations in content."""
     hits: List[str] = []
@@ -1749,15 +1842,30 @@ class WorkspaceEvaluator:
         src_dir = config.FIRMWARE_ROOT
         code_files = collect_firmware_source_files(src_dir)
 
-        patterns = [
-            (re.compile(r'DebugTln\(\s*"'), 'DebugTln without F() wrapper'),
-            (re.compile(r'DebugTf\(\s*"'), 'DebugTf without PSTR() wrapper'),
-            (re.compile(r'\bsnprintf\s*\('), 'snprintf without _P suffix'),
-            (re.compile(r'\bstrcmp\s*\([^)]*"'), 'strcmp with string literal (use strcmp_P + PSTR)'),
-            (re.compile(r'\bstrcasecmp\s*\([^)]*"'), 'strcasecmp with string literal (use strcasecmp_P + PSTR)'),
+        # Simple regex pre-filters — kept cheap. Real verification is done by
+        # _progmem_call_violates(), which parses the arg list at paren-depth 1
+        # so literals nested inside F(), PSTR(), or sub-function-calls (e.g.
+        # httpServer.arg("v") inside strcmp) do NOT count as violations.
+        debugln_re   = re.compile(r'\bDebugTln\s*\(')
+        debugf_re    = re.compile(r'\bDebugTf\s*\(')
+        snprintf_re  = re.compile(r'(?<!_P)\bsnprintf\s*\(')      # excludes snprintf_P
+        strcmp_re    = re.compile(r'(?<!_P)\bstrcmp\s*\(')         # excludes strcmp_P
+        strcasecmp_re = re.compile(r'(?<!_P)\bstrcasecmp\s*\(')   # excludes strcasecmp_P
+
+        # ('match-name', regex, description, literal-arg-index)
+        # literal-arg-index meaning:
+        #   None  -> any unwrapped literal at depth 1 is a violation (strcmp, strcasecmp)
+        #   N     -> only the Nth positional argument (0-based) being an unwrapped literal counts
+        #            (DebugTln/DebugTf format is arg 0; snprintf format is arg 1, after the
+        #            buffer at index 0). Other depth-1 literals are runtime data values, not
+        #            flash-candidate strings, and are correctly ignored.
+        call_specs = [
+            ('DebugTln',   debugln_re,    'DebugTln without F() wrapper',                    0),
+            ('DebugTf',    debugf_re,     'DebugTf without PSTR() wrapper',                  0),
+            ('snprintf',   snprintf_re,   'snprintf without _P suffix',                      1),
+            ('strcmp',     strcmp_re,     'strcmp with string literal (use strcmp_P + PSTR)', None),
+            ('strcasecmp', strcasecmp_re, 'strcasecmp with string literal (use strcasecmp_P + PSTR)', None),
         ]
-        # Negative lookahead pattern to exclude snprintf_P from snprintf hits
-        snprintf_p_re = re.compile(r'\bsnprintf_P\s*\(')
 
         for file in code_files:
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -1786,12 +1894,11 @@ class WorkspaceEvaluator:
 
                 prev_was_continuation = False
 
-                for pat, desc in patterns:
-                    if pat.search(line):
-                        # For snprintf, skip if it is actually snprintf_P
-                        if 'snprintf' in desc and snprintf_p_re.search(line):
-                            continue
-                        violations.append(f"{file.name}:{i}: {desc}")
+                for name, pat, desc, arg_idx in call_specs:
+                    for m in pat.finditer(line):
+                        # m.end() points just past the opening '(' of the call
+                        if _progmem_call_violates(line, m.end() - 1, arg_idx):
+                            violations.append(f"{file.name}:{i}: {desc}")
 
         if violations:
             self.add_result(EvaluationResult(
