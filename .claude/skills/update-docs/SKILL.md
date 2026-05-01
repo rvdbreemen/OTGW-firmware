@@ -1,12 +1,19 @@
 ---
 name: update-docs
-description: Update all OTGW-firmware documentation in one efficient parallel workflow
+description: Update all OTGW-firmware documentation in one sequential, backlog-tracked workflow
 disable-model-invocation: true
 ---
 
-# /update-docs - Documentation Update Workflow
+# /update-docs : Documentation Update Workflow
 
-Update all project documentation in a single efficient pass. Can be invoked standalone or as part of a release.
+Update all project documentation in one well-tracked sequential pass. Can be invoked standalone or as part of a release.
+
+## Why sequential and backlog-tracked
+
+This workflow used to spawn one subagent per affected manual chapter in parallel. Fast in theory, but on releases that touched four or more chapters it tripped Claude API concurrency limits and the run failed mid-flight. The new model has two properties:
+
+- **Exactly one subagent runs at a time.** Slower wall-clock, no rate-limit hits, and a deterministic order of operations.
+- **Every doc area is an AC on a single backlog task.** The run is replayable from the task on its own; progress is visible in `mcp__backlog__task_view` while the workflow runs in the background; partial failures leave a clear breadcrumb trail.
 
 ## Usage
 
@@ -18,27 +25,24 @@ Update all project documentation in a single efficient pass. Can be invoked stan
 
 ## Writing style rules
 
-- **Never use em dashes** anywhere. Use colons, periods, commas, or parentheses.
-- **All release documents must be in English** (international audience).
-- **Manual chapters**: English version always, Dutch version always.
+- **Never use em dashes.** Use colons, periods, commas, or parentheses.
+- **All release documents in English** (international audience).
+- **Manual chapters: English version always, Dutch version always.**
 - **No emojis** in technical documentation.
-- **Concise and correct over long and impressive**: a short accurate sentence beats a verbose vague one.
+- **Concise and correct over long and impressive.**
 
 ---
 
-## Phase 1: Scope Detection
+## Phase 1: Scope detection
 
-Determine what has changed and which documentation is affected.
+Determine what changed since the last release and which documentation is affected.
 
 ```bash
-# Get previous release tag (authoritative baseline)
 PREV_TAG=$(gh release view --json tagName --jq '.tagName' 2>/dev/null || git describe --tags --abbrev=0)
-
-# List changed source files since that tag
 git diff --name-only $PREV_TAG..HEAD
 ```
 
-Categorize changes into subsystems using this mapping:
+Categorize using this mapping:
 
 | Changed files match | Subsystem | Docs affected |
 |---|---|---|
@@ -53,21 +57,51 @@ Categorize changes into subsystems using this mapping:
 | `platformio.ini`, `build.py`, `flash_esp.py` | Build system | ch08/h08 (developer guide) |
 | `OTGW-firmware.ino` | Main/boot | ch01/h01 if feature-level |
 
-Build the affected set. If `--scope full` or more than 6 subsystems changed, treat all docs as affected.
+If `--scope full` or six or more subsystems changed, treat all docs as affected.
 
-**Report to user**: list affected subsystems and which docs will be updated. Proceed without waiting for confirmation unless `--release` mode (release has its own checkpoint).
+**Output of Phase 1:** an ordered list of affected doc areas, the PREV_TAG hash, and a categorized commit summary. Pass this to Phase 2 verbatim. Do NOT wait for user confirmation in standalone mode.
 
 ---
 
-## Phase 2: Parallel Content Updates
+## Phase 2: Plan as a backlog task
 
-Launch agents in background for all affected documentation areas simultaneously. Do NOT wait for one to finish before starting the next.
+Before any documentation is written, capture the run as one backlog task.
 
-### 2A: Manual chapters (English + Dutch)
+**Create the task** via `mcp__backlog__task_create`:
 
-For each affected manual chapter, launch ONE agent that updates both the English and Dutch versions.
+- `title`: `docs: update for changes since <PREV_TAG>` (in `--release` mode add the version: `docs: update for v<version> (changes since <PREV_TAG>)`)
+- `status`: `In Progress`
+- `assignee`: `["@claude"]`
+- `labels`: `["docs", "update-docs"]` (add `"release"` in --release mode)
+- `description`: paste the Phase 1 output verbatim (PREV_TAG, categorized commits, list of affected areas)
+- `acceptanceCriteria`: one entry per affected doc area, in execution order:
+    1. `Manual chapter <N> (<EN file>, <NL file>) updated`  (one AC per affected chapter)
+    2. `API documentation (openapi.yaml, README.md, MQTT.md, ...) updated`  (only if API changed)
+    3. `C4 architecture docs (<files>) updated`  (only if structural change)
+    4. `Cleanup phase complete (archive old releases, move misplaced files, reorg reviews)`
+    5. (--release only) `Release documents generated (RELEASE_NOTES, RELEASE_GITHUB, BREAKING_CHANGES, README What's New)`
 
-**Chapter to file mapping:**
+**Record the assigned `TASK-NNN` ID** returned by `task_create`. Phase 5's commit message uses it; the commit-msg hook will block the commit if the task file is not staged.
+
+---
+
+## Phase 3: Sequential execution
+
+**Exactly one subagent runs at a time.** When it finishes, update the backlog task and start the next.
+
+For each AC in order:
+
+1. Spawn ONE subagent in the background (`run_in_background=true`) with the relevant prompt template (3A / 3B / 3C / 3D below).
+2. Wait for the completion notification. Do not spawn the next subagent before this notification arrives.
+3. Read the agent's summary. If it reports errors, `mcp__backlog__task_edit --append-notes` with the failure detail and either retry once with a corrected prompt or escalate to the user.
+4. On success: `mcp__backlog__task_edit --check-ac <N>` to tick the AC, and `--append-notes` with a one-line summary of what was changed.
+5. Move to the next AC.
+
+### 3A: Manual chapter subagent
+
+Used for each affected manual chapter. One subagent per chapter, sequential.
+
+**Chapter mapping:**
 
 | Chapter | EN file | NL file |
 |---|---|---|
@@ -82,181 +116,133 @@ For each affected manual chapter, launch ONE agent that updates both the English
 | 9 (API reference) | `docs/manuals/en/ch09-api-reference.md` | `docs/manuals/nl/h09-api-referentie.md` |
 | 10 (Appendix) | `docs/manuals/en/ch10-appendix.md` | `docs/manuals/nl/h10-bijlagen.md` |
 
-**Agent prompt template for a chapter update:**
+**Prompt template:**
 
-> Read the current `[EN file]` and `[NL file]`. Read the git diff for the relevant source files: `git diff [PREV_TAG]..HEAD -- [source files]`. Update both files to reflect the changes accurately. Preserve all existing content that is still correct. The EN file must be in English, the NL file must be in Dutch. Technical terms stay in English in both. Keep the same `## Chapter N:` / `## Hoofdstuk N:` heading format. Write the updated files back.
+> Read the current `[EN file]` and `[NL file]`. Read the git diff for the relevant source files: `git diff [PREV_TAG]..HEAD -- [source files]`. Update both files to reflect the changes accurately. Preserve all existing content that is still correct. The EN file must be in English, the NL file must be in Dutch. Technical terms stay in English in both. Keep the same `## Chapter N:` / `## Hoofdstuk N:` heading format. Write the updated files back. Report which sections you changed and why; flag any change that needed an architectural decision rather than a doc edit.
 
-### 2B: API documentation
+### 3B: API documentation subagent
 
-If REST API or MQTT changed, launch a single agent to update all API docs in parallel:
+Single subagent, only if REST or MQTT changed.
 
-**Files to update:**
-- `docs/api/openapi.yaml` — OpenAPI 3.1 spec for all `/api/v2/` endpoints
-- `docs/api/README.md` — REST API human-readable reference
-- `docs/api/MQTT.md` — MQTT topics, payloads, retain flags
-- `docs/api/WEBSOCKET_FLOW.md` — only if WebSocket behavior changed
-- `docs/api/DALLAS_SENSOR_LABELS_API.md` — only if Dallas sensor API changed
+Files in scope: `docs/api/openapi.yaml`, `docs/api/README.md`, `docs/api/MQTT.md`, `docs/api/WEBSOCKET_FLOW.md` (only if WebSocket changed), `docs/api/DALLAS_SENSOR_LABELS_API.md` (only if Dallas API changed).
 
-**Agent instructions:**
-> Read the current docs in `docs/api/`. Read the git diff: `git diff [PREV_TAG]..HEAD -- restAPI.ino MQTTstuff.ino`. Update the affected API docs to match the current implementation. For openapi.yaml: ensure every endpoint present in `kV2Routes[]` in `restAPI.ino` has a spec entry. Add new endpoints, remove removed ones, update changed response schemas. For MQTT.md: verify topic paths and payload formats match the current `MQTTstuff.ino` publish calls.
+**Prompt template:**
 
-### 2C: C4 architecture docs (only if structural changes)
+> Read the current docs in `docs/api/`. Read the git diff: `git diff [PREV_TAG]..HEAD -- restAPI.ino MQTTstuff.ino`. Update the affected API docs to match the current implementation. For openapi.yaml: ensure every endpoint present in `kV2Routes[]` in `restAPI.ino` has a spec entry. Add new endpoints, remove removed ones, update changed response schemas. For MQTT.md: verify topic paths and payload formats match the current `MQTTstuff.ino` publish calls. Report endpoints added, removed, and changed.
 
-If new files, new components, or new dependencies were added:
+### 3C: C4 architecture docs subagent
 
-**Trigger condition:** `git diff --name-only $PREV_TAG..HEAD | grep -E "\.ino$" | wc -l` is 3 or more, OR a new `.ino` file was added.
+Single subagent, only if a new `.ino` file was added or three or more `.ino` files changed.
 
-Update the relevant `docs/c4/c4-code-*.md` and `docs/c4/c4-component-*.md` files. Do not rewrite from scratch — targeted updates only.
+**Prompt template:**
 
----
+> Read the current `docs/c4/c4-code-*.md` and `docs/c4/c4-component-*.md` files affected by the changes in `git diff [PREV_TAG]..HEAD -- src/OTGW-firmware/*.ino`. Targeted updates only, no rewrites from scratch. Preserve the existing C4 structure (Code level documents per source area, Component level per logical group). Report which sections were touched.
 
-## Phase 3: Release Documents (--release mode only)
+### 3D: Release documents (`--release` mode only)
 
-Only execute this phase when invoked as `/update-docs --release <version>` or when called from `/release`.
+Five sub-ACs, executed sequentially in order.
 
-### 3A: Gather changes and contributors
+**3D-1: Gather changes and contributors.** Single subagent.
 
 ```bash
-# All commits since previous release (exclude CI noise)
 git log $PREV_TAG..HEAD --oneline | grep -v "CI: update version.h"
 ```
 
-Categorize each commit: new feature, bug fix, internal improvement, breaking change.
+> Categorize each commit into: new feature, bug fix, internal improvement, breaking change. Scan `docs/adr/` for ADRs added or modified since `[PREV_TAG]`. Pull contributors from three sources sequentially: (1) `gh pr list --state merged --search "merged:>[PREV_DATE]" --json author,title --jq '.[] | "\(.author.login): \(.title)"'`. (2) Discord `#beta-testing` (channel `914498730001072149`) since `[PREV_DATE]`. (3) Discord `#devs-esp-firmware` (channel `924989767966425158`). Strip trailing digits from Discord usernames. Exclude bot IDs and maintainer `384411356616720384`. Output a structured commit-classification table and contributor list.
 
-Check `docs/adr/` for new or updated ADRs since `$PREV_TAG`.
+**3D-2: Generate `RELEASE_NOTES_<version>.md`** at repo root. Single subagent.
 
-**Contributors** (3 sources, run in parallel):
+> Read the template in `docs/process/RELEASE_PROCESS.md`. Write `RELEASE_NOTES_<version>.md` with sections: release summary (2-3 sentences), what's new (features grouped by subsystem), bug fixes, breaking changes (always explicit, either "none" or list), upgrade notes, known issues, contributors. Use the categorized commit list from 3D-1. English. No em dashes. No emojis.
 
-1. GitHub: `gh pr list --state merged --search "merged:>$PREV_DATE" --json author,title --jq '.[] | "\(.author.login): \(.title)"'`
-2. Discord `#beta-testing` (channel ID `914498730001072149`): messages since `$PREV_DATE`, extract testers
-3. Discord `#devs-esp-firmware` (channel ID `924989767966425158`): bug reports and contributors
+**3D-3: Generate `RELEASE_GITHUB_<version>.md`** at repo root. Single subagent.
 
-Strip trailing digits from Discord usernames. Exclude bot IDs and maintainer `384411356616720384`.
+> Concise GitHub release body. Sections: short intro (one sentence), highlights (bullet list, max eight items), bug fixes (bullet list), upgrade notes (only if needed), thank you (shoutout to most active contributor, bullet list of others, Discord invite link). English. No em dashes.
 
-### 3B: Generate release documents
+**3D-4: Update `docs/BREAKING_CHANGES.md`.** Single subagent.
 
-**`RELEASE_NOTES_<version>.md`** (at repo root):
+> Prepend a new version section to `docs/BREAKING_CHANGES.md`. Explicitly state whether there are breaking changes for this version: either "None" or a list. Read the existing file first to match its format.
 
-Follow the template in `docs/process/RELEASE_PROCESS.md`. Sections:
-- Release summary (2-3 sentences)
-- What's new (features, with subsystem grouping)
-- Bug fixes
-- Breaking changes (always explicit: either "none" or list them)
-- Upgrade notes
-- Known issues
-- Contributors
+**3D-5: Update `README.md` What's New section.** Single subagent.
 
-**`RELEASE_GITHUB_<version>.md`** (at repo root):
-
-Concise GitHub release body. Sections:
-- Short intro (1 sentence)
-- Highlights (bullet list, max 8 items)
-- Bug fixes (bullet list)
-- Upgrade notes (only if needed)
-- Thank you (shoutout to most active contributor + bullet list of others + Discord invite link)
-
-**`docs/BREAKING_CHANGES.md`** update:
-
-Prepend a new version section. Explicitly state whether there are breaking changes or not.
-
-**`README.md`** update:
-
-- Demote current "What's New in v<prev>" to "What was new in v<prev>"
-- Add new "What's New in v<version>" section with 4-6 bullet highlights
+> In `README.md`: demote the current "What's New in v<prev>" section to "What was new in v<prev>". Add a new "What's New in v<version>" section with four to six bullet highlights drawn from `RELEASE_NOTES_<version>.md`.
 
 ---
 
-## Phase 4: Docs Folder Cleanup
+## Phase 4: Docs folder cleanup
 
-Always run this phase, regardless of mode. It is fast and idempotent.
+Inline shell operations, no subagents. Always runs, regardless of mode. Idempotent.
 
 ### 4A: Archive old release notes
 
-Release notes older than 2 major versions ago belong in an archive. Move files from `docs/releases/` if there are more than 10 release note files. Strategy:
+If `docs/releases/` has more than ten release-note files, move the oldest into `docs/releases/archive/`, keeping the four newest in place.
 
 ```bash
-# Files to potentially archive (older versions, not current or last 2 releases)
-ls docs/releases/RELEASE_NOTES_*.md | sort | head -n -4  # keep 4 newest
+ls docs/releases/RELEASE_NOTES_*.md | sort | head -n -4
 ls docs/releases/RELEASE_GITHUB_*.md | sort | head -n -4
 ```
 
-Move archived files to `docs/releases/archive/` (create if needed).
-
 ### 4B: Move misplaced files
 
-Identify and move misplaced release documents from the repo root to `docs/releases/`:
+Identify and move release documents from the repo root to `docs/releases/`:
 
 ```bash
-# Release notes/github release files at repo root that belong in docs/releases/
 ls RELEASE_NOTES_*.md RELEASE_GITHUB_*.md GITHUB_RELEASE_*.md 2>/dev/null
 ```
 
-Exception: the CURRENT release's documents (`RELEASE_NOTES_<version>.md`, `RELEASE_GITHUB_<version>.md`) stay at root during the release phase for easy reference, then move after publication.
+Exception: the CURRENT release's documents stay at root during the release phase, then move after publication.
 
 ### 4C: Reviews folder organization
 
-If `docs/reviews/` has more than 15 subdirectories, group older ones by quarter:
-
-```bash
-ls docs/reviews/ | head -n -10  # directories to potentially group
-```
-
-Group format: `docs/reviews/archive/2026-Q1/` etc. Move only directories older than 90 days. Preserve the 10 most recent as-is.
+If `docs/reviews/` has more than fifteen subdirectories, group those older than ninety days under `docs/reviews/archive/<YYYY-Q<N>>/`. Preserve the ten most recent as-is.
 
 ### 4D: Verify docs/archive
 
-Ensure `docs/archive/MQTT_old.md` is in `docs/archive/` (it is). Check for any other clearly outdated files at `docs/` root level that should be archived:
-
-```bash
-ls docs/*.md | grep -v "BREAKING_CHANGES\|upgrade-from"
-```
-
-Files that are version-specific or clearly superseded go to `docs/archive/`.
+Check `docs/*.md` for clearly outdated files (version-specific or superseded) and move them to `docs/archive/`. `BREAKING_CHANGES.md` and `upgrade-from-*.md` always stay at root.
 
 ---
 
-## Phase 5: Verify, Commit, and Report
+## Phase 5: Verify, finalize, commit
 
-After all agents complete and cleanup is done:
+After all ACs are checked and cleanup is done:
 
-1. List all files modified in this run: `git diff --name-only`
-2. Summarize what was updated per category
-3. Report any docs that could not be auto-updated (e.g., architectural decision required)
-4. If in `--release` mode: present the full release documents (RELEASE_NOTES, RELEASE_GITHUB, README What's New) for user review before committing
+1. `git diff --name-only` to see what changed.
+2. Append a final summary to the backlog task: `mcp__backlog__task_edit --final-summary "<one paragraph: areas updated, contributors counted, anything notable>"`.
+3. Flip the task to `Done`: `mcp__backlog__task_complete` (preferred) or `mcp__backlog__task_edit -s Done`.
+4. Stage all docs PLUS the task file (the commit-msg hook requires it):
+   ```bash
+   git add docs/ README.md CHANGELOG.md backlog/tasks/task-<NNN>-*.md
+   ```
+5. Commit with the task ID in the message:
+   ```
+   docs: update documentation for changes since <PREV_TAG> (TASK-<NNN>)
+   ```
+6. **Standalone mode:** `git push`.
+7. **Release mode:** do NOT push. The `/release` skill commits and pushes everything together.
 
-**In standalone mode (`/update-docs` without `--release`) — MANDATORY:**
-
-Every standalone run MUST end with a commit and push. No exceptions. Do not ask the user whether to commit — just do it.
-
-```bash
-git add docs/ README.md CHANGELOG.md
-git commit -m "docs: update documentation for recent changes"
-git push
-```
-
-If there are no changes (`git diff --name-only` returns empty), skip the commit and report "no documentation changes detected."
-
-**In release mode:**
-- Do NOT commit yet — the release skill handles the commit as part of Phase 5 execution
+If `git diff --name-only` returns empty after Phase 3, skip the commit and report "no documentation changes detected." Still flip the backlog task to `Done` with the final-summary noting "no changes required."
 
 ---
 
 ## Integration with /release
 
 The `/release` skill calls this workflow in its Phase 4. When called from `/release`:
-- Skip Phase 5 commit (release skill commits everything together)
-- The release skill's CHECKPOINT 1 serves as the review gate for release documents
-- Pass `--release <version>` so Phase 3 runs and generates the release documents
+
+- Pass `--release <version>` so Phase 3D runs.
+- Phase 5 commit is skipped (release skill commits everything together with the version bump).
+- The release skill's CHECKPOINT 1 reviews the generated release documents before commit.
+- The sequential model still applies in `--release` mode: Phase 3D is itself five sequential subagents, not a parallel fan-out.
 
 ---
 
 ## Important rules
 
-- **Parallel first**: always launch multiple background agents simultaneously for independent doc areas
-- **Read before writing**: every agent must read the current version of the file before updating it
-- **Scope discipline**: only update what actually changed — do not rewrite docs for unchanged subsystems
-- **Preserve structure**: keep existing heading levels, table formats, and file organization intact
-- **Accuracy over completeness**: a correct partial update is better than a comprehensive inaccurate one
-- **Dutch chapters must be in Dutch**: never let English creep into NL files except for technical terms
-- **OpenAPI spec must match implementation**: always verify endpoints in spec against `kV2Routes[]` in `restAPI.ino`
-- **Always commit and push at end of standalone run**: every `/update-docs` run (without `--release`) must end with `git add docs/ README.md CHANGELOG.md && git commit && git push`. Never leave doc changes uncommitted.
+- **Sequential and backlog-tracked.** Exactly one subagent at a time. Every doc area is its own AC.
+- **One task per run.** Every standalone `/update-docs` invocation creates a NEW backlog task; do not reuse a previous task.
+- **Read before writing.** Every subagent must read the current version of a file before updating it.
+- **Scope discipline.** Only update what actually changed. Do not rewrite docs for unchanged subsystems.
+- **Preserve structure.** Keep existing heading levels, table formats, file organization.
+- **Accuracy over completeness.** A correct partial update beats a comprehensive inaccurate one.
+- **Dutch chapters in Dutch.** Technical terms stay English in both files.
+- **OpenAPI matches implementation.** Always verify endpoints against `kV2Routes[]` in `restAPI.ino`.
+- **Commit and push at end of standalone runs.** Never leave doc changes uncommitted.
+- **Release-mode commit is owned by /release.** Do not commit from inside `/update-docs` when invoked from the release skill.
