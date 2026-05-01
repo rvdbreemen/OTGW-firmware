@@ -702,6 +702,21 @@ static bool satRequestHasDetailFull()
       && httpServer.arg(F("detail")) == F("full");
 }
 
+#if defined(ESP32)
+// TASK-508: pull two named fields from a JSON body in one call. Trivial
+// wrapper over extractJsonField() (line 2167) so handleSAT label/forget
+// branches stay short.
+static bool satExtractTwoFields(const char* body,
+                                const __FlashStringHelper* k1, char* v1, size_t sz1,
+                                const __FlashStringHelper* k2, char* v2, size_t sz2)
+{
+  if (!body) return false;
+  if (!extractJsonField(body, k1, v1, sz1)) return false;
+  if (!extractJsonField(body, k2, v2, sz2)) return false;
+  return true;
+}
+#endif
+
 //=== SAT API handler ===
 // GET  /api/v2/sat/status               — returns full SAT runtime state
 // GET  /api/v2/sat/status?detail=full   — returns extended health diagnostics
@@ -836,6 +851,77 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     satHandleEnabled(val);
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
+#if defined(ESP32)
+  // TASK-508: BLE roster — discovery + select + label + forget.
+  // Sub-routes:
+  //   GET  /api/v2/sat/ble/discovery           — stream the roster as JSON
+  //   POST /api/v2/sat/ble/select   {mac}      — promote roster MAC to active sensor
+  //   POST /api/v2/sat/ble/label    {mac,label}— set persistent label for a roster slot
+  //   POST /api/v2/sat/ble/forget   {mac}      — drop slot + clean up HA discovery
+  else if (strcasecmp_P(sub, PSTR("ble")) == 0) {
+    if (wc < 6) { sendApiError(400, F("Missing BLE sub-action (discovery/select/label/forget)")); return; }
+    const char* act = words[5];
+
+    if (strcasecmp_P(act, PSTR("discovery")) == 0) {
+      if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+      satBLERosterSendJSON();
+    }
+    else if (strcasecmp_P(act, PSTR("select")) == 0) {
+      if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      char macBuf[18];
+      if (!extractJsonField(httpServer.arg(F("plain")).c_str(),
+                            F("mac"), macBuf, sizeof(macBuf))) {
+        sendApiError(400, F("Missing 'mac' field"));
+        return;
+      }
+      if (!satBLERosterSelect(macBuf)) {
+        sendApiError(404, F("MAC not in roster"));
+        return;
+      }
+      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    }
+    else if (strcasecmp_P(act, PSTR("label")) == 0) {
+      if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      char macBuf[18];
+      char labelBuf[32];
+      if (!satExtractTwoFields(httpServer.arg(F("plain")).c_str(),
+                                F("mac"),   macBuf,   sizeof(macBuf),
+                                F("label"), labelBuf, sizeof(labelBuf))) {
+        sendApiError(400, F("Missing 'mac' or 'label' field"));
+        return;
+      }
+      if (!satBLERosterSetLabel(macBuf, labelBuf)) {
+        sendApiError(404, F("MAC not in roster"));
+        return;
+      }
+      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    }
+    else if (strcasecmp_P(act, PSTR("forget")) == 0) {
+      if (method != HTTP_POST && method != HTTP_PUT && method != HTTP_DELETE) {
+        sendApiMethodNotAllowed(F("POST, PUT, DELETE"));
+        return;
+      }
+      char macBuf[18];
+      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      if (!extractJsonField(httpServer.arg(F("plain")).c_str(),
+                            F("mac"), macBuf, sizeof(macBuf))) {
+        sendApiError(400, F("Missing 'mac' field"));
+        return;
+      }
+      if (!satBLERosterForget(macBuf)) {
+        sendApiError(404, F("MAC not in roster"));
+        return;
+      }
+      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    }
+    else {
+      sendApiError(404, F("Unknown BLE sub-action (discovery/select/label/forget)"));
+    }
+  }
+#endif
   else if (strcasecmp_P(sub, PSTR("mode")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     char valBuf[16];

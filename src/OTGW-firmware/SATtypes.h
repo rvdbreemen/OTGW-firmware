@@ -314,6 +314,11 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
 //=== settings.sat — persisted SAT configuration ===
 //====================================================================
 
+// TASK-508: BLE roster size — persistent storage for self-discovery + labels.
+// 8 slots: typical setup is 1 active sensor + ~7 visible neighbours. See
+// SATSection sBleMac/sBleLabel below and SATble.ino _bleRuntime[].
+#define SAT_BLE_MAX_ROSTER 8
+
 struct SATSection {
   bool     bEnabled           = false;
   uint8_t  iHeatingSystem     = SAT_HSYS_AUTO; // SATHeatingSystem enum: auto/radiators/heat_pump/underfloor
@@ -412,5 +417,14 @@ struct SATSection {
   bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning
   char     sBleMAC[18]        = "";            // Bind to specific sensor MAC (empty = accept all)
   uint16_t iBleInterval       = 30;            // Publish/state-update cadence (sec, 10-300). NOT scan rate: TASK-494 made the BLE scan continuous to match OT-Thing.
+  // TASK-508: BLE sensor self-discovery roster (max SAT_BLE_MAX_ROSTER known
+  // sensors). sBleMac/sBleLabel are persistent here; runtime data (temp,
+  // rssi, age, discovery flags) lives in SATble.ino's _bleRuntime[] array
+  // indexed by the same slot. The 'selected' sensor is sBleMAC above
+  // (one of these 8 entries when set; kept for backward compatibility).
+  char     sBleMac[SAT_BLE_MAX_ROSTER][18]   = {{0}};   // Known sensor MACs (uppercase AA:BB:..)
+  char     sBleLabel[SAT_BLE_MAX_ROSTER][24] = {{0}};   // User-friendly names ("Woonkamer")
+  uint8_t  iBleRosterCount                   = 0;       // Count of populated slots
+  static_assert(sizeof(sBleLabel[0]) <= 100, "label too long for settingStuff line buffer");
 #endif
 };

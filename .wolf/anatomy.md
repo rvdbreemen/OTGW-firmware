@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T20:33:36.625Z
-> Files: 534 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T22:26:19.906Z
+> Files: 528 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -20,7 +20,7 @@
 - `CHANGELOG.md` — Change log (~7916 tok)
 - `CLAUDE.md` — OpenWolf (~3546 tok)
 - `config.py` — Base Paths (~129 tok)
-- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~33493 tok)
+- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 more (~33493 tok)
 - `flash_esp.py` — Colors: disable, print_header, print_success, print_error + 11 more (~10252 tok)
 - `flash_otgw.bat` (~2681 tok)
 - `flash_otgw.sh` — flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware (Linux/macOS) (~3531 tok)
@@ -849,29 +849,14 @@
 - `teensy32.txt` (~153 tok)
 - `WorstCaseBenchmark.ino` (~594 tok)
 
-## .pio/libdeps/esp32/AceSorting/src/
-
-- `AceSorting.h` (~577 tok)
-
-## .pio/libdeps/esp32/AceSorting/src/ace_sorting/
-
-- `bubbleSort.h` — Declares of (~786 tok)
-- `combSort.h` — Declares is (~2882 tok)
-
-## .tmp/
-
-- `list_progmem.py` (~416 tok)
-
 ## src/OTGW-firmware/
 
-- `debugStuff.ino` — declarations: bodies, if, yet (~1371 tok)
-- `jsonStuff.ino` — In-place buffer version to avoid heap allocations (~7444 tok)
-- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~26851 tok)
-- `OTDirect.ino` — Declares instances (~38751 tok)
-- `OTGW-Core.ino` — Declares char (~62293 tok)
-- `platform_esp32.h` — ************************************************************************ (~2720 tok)
-- `SATble.ino` — Declares uint32_t (~6633 tok)
+- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~28118 tok)
+- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~8235 tok)
+- `restAPI.ino` — include <string.h> (~31881 tok)
+- `SATble.ino` — Declares uint32_t (~9974 tok)
+- `settingStuff.ino` — include <ctype.h> (~16435 tok)
 
 ## src/OTGW-firmware/data/
 
-- `sat.js` — API routes: GET (1 endpoints) (~11153 tok)
+- `index.js` — Safely parse JSON with validation and error handling (~80111 tok)

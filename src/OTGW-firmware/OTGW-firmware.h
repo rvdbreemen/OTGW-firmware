@@ -260,7 +260,20 @@ void satBLEPublishStateTopics(const char* macCompact, float temp, float hum, uin
 // TASK-493 (1A-H1): returns true only when all 4 retained discovery configs
 // were successfully published; caller MUST gate per-MAC `bDiscoveryPublished`
 // on this so transient failures retry on the next iBleInterval cycle.
-bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons);
+// TASK-508: optional `label` injects a user-friendly name into HA's
+// `friendly_name` template. NULL or empty falls back to "BLE <mac>".
+bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons,
+                              const char* label = nullptr);
+// TASK-508: wipe HA retained discovery configs for one MAC by publishing
+// 4 zero-byte retained payloads. Called from Forget on the selected slot.
+void satBLEUnpublishDiscovery(const char* macCompact);
+// TASK-508: roster REST helpers (called from handleSAT in restAPI.ino).
+// All run on the Arduino loop task; settings mutations route through
+// updateSetting() so the existing 2-s flush debounce persists them.
+void satBLERosterSendJSON();
+bool satBLERosterSelect(const char* mac);
+bool satBLERosterSetLabel(const char* mac, const char* label);
+bool satBLERosterForget(const char* mac);
 #endif
 
 // SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino

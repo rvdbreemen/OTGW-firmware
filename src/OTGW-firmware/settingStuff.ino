@@ -364,6 +364,18 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
   writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC, true);
   writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval, true);
+  // TASK-508: BLE roster — 8 × {mac, label} + count. Indexed-key pattern
+  // mirrors fAreaWeight precedent. Empty slots serialise as "" — readers
+  // treat that as unused. cMsg is the writeSettings()-scoped escape buffer
+  // (no yield in this loop, so no clobber risk).
+  for (uint8_t i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+    file.printf_P(PSTR("  \"SATblemac%u\": \"%s\",\n"),
+                  (unsigned)i, settings.sat.sBleMac[i]);
+    escapeJsonStringTo(settings.sat.sBleLabel[i], cMsg, sizeof(cMsg));
+    file.printf_P(PSTR("  \"SATblelabel%u\": \"%s\",\n"),
+                  (unsigned)i, cMsg);
+  }
+  writeJsonIntKV(file, F("SATblerostercount"), settings.sat.iBleRosterCount, true);
 #endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
@@ -886,6 +898,43 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
   else if (strcasecmp_P(field, PSTR("SATbleinterval")) == 0) settings.sat.iBleInterval = constrain(atoi(newValue), 10, 300);
+  // TASK-508: roster slot keys — SATblemacN / SATblelabelN with N=0..7.
+  // Prefix-match + digit suffix to avoid 17 individual else-if branches.
+  // The exact-match SATblemac above takes precedence (legacy selected MAC).
+  else if (strncasecmp_P(field, PSTR("SATblemac"), 9) == 0 && isdigit((unsigned char)field[9])) {
+    int idx = atoi(field + 9);
+    if (idx >= 0 && idx < SAT_BLE_MAX_ROSTER) {
+      // Validate: empty (slot cleared) OR 17-char colon-separated hex MAC
+      bool valid = (newValue[0] == '\0');
+      if (!valid && strlen(newValue) == 17) {
+        valid = true;
+        for (int p = 0; valid && p < 17; p++) {
+          if (p == 2 || p == 5 || p == 8 || p == 11 || p == 14) {
+            valid = (newValue[p] == ':');
+          } else {
+            valid = isxdigit((unsigned char)newValue[p]);
+          }
+        }
+      }
+      if (valid) {
+        strlcpy(settings.sat.sBleMac[idx], newValue, sizeof(settings.sat.sBleMac[idx]));
+        // Canonicalise to uppercase so onResult comparisons via strcasecmp
+        // match the BLE-stack-emitted form.
+        for (int p = 0; settings.sat.sBleMac[idx][p]; p++) {
+          settings.sat.sBleMac[idx][p] = toupper((unsigned char)settings.sat.sBleMac[idx][p]);
+        }
+      }
+    }
+  }
+  else if (strncasecmp_P(field, PSTR("SATblelabel"), 11) == 0 && isdigit((unsigned char)field[11])) {
+    int idx = atoi(field + 11);
+    if (idx >= 0 && idx < SAT_BLE_MAX_ROSTER) {
+      strlcpy(settings.sat.sBleLabel[idx], newValue, sizeof(settings.sat.sBleLabel[idx]));
+    }
+  }
+  else if (strcasecmp_P(field, PSTR("SATblerostercount")) == 0) {
+    settings.sat.iBleRosterCount = (uint8_t)constrain(atoi(newValue), 0, SAT_BLE_MAX_ROSTER);
+  }
 #endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---

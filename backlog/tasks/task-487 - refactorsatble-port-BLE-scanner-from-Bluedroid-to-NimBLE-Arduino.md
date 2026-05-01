@@ -1,11 +1,11 @@
 ---
 id: TASK-487
 title: 'refactor(satble): port BLE scanner from Bluedroid to NimBLE-Arduino'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-30 00:26'
-updated_date: '2026-04-30 02:17'
+updated_date: '2026-05-01 22:32'
 labels:
   - esp32
   - ble
@@ -196,6 +196,8 @@ publish loop).
 
 Status remains In Progress until owner verifies hardware-DoD items per
 project policy ("build-clean alone is not Done", CLAUDE.md).
+
+[Admin-flip 2026-05-02] Status was lingering at In Progress although the work has been merged for some time. User-confirmed close-out, no code change in this session.
 <!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done

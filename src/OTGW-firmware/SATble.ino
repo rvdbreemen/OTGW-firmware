@@ -33,7 +33,9 @@
 #define SATBLEDebugf(fmt, ...)   do { if (state.debug.bSATBLE) Debugf(fmt, ##__VA_ARGS__); } while(0)
 
 // --- BLE Sensor Constants ---
-#define SAT_BLE_MAX_SENSORS   4
+// TASK-508: roster size moved to SATtypes.h (SAT_BLE_MAX_ROSTER = 8) so
+// settings.sat.sBleMac/sBleLabel can be sized symmetrically with the
+// runtime slot table below. Old SAT_BLE_MAX_SENSORS=4 retired.
 static const uint32_t BLE_STALE_MS          = 300000;   // 5 min stale timeout
 
 // Compile-time guard: BLE_STALE_MS must comfortably exceed one scan window so
@@ -70,21 +72,33 @@ static constexpr uint16_t BLE_SCAN_MAX_RESULTS    = 0;
 static_assert(BLE_SCAN_WINDOW_TICKS <= BLE_SCAN_INTERVAL_TICKS,
               "BLE_SCAN_WINDOW_TICKS must be <= BLE_SCAN_INTERVAL_TICKS");
 
-struct BLESensorData {
-  char     sMacAddress[18];     // "AA:BB:CC:DD:EE:FF"
+// TASK-508: transient runtime data, parallel to settings.sat.sBleMac[i] /
+// sBleLabel[i]. Slot is "in use" iff settings.sat.sBleMac[i][0] != '\0';
+// data is "fresh" iff iLastSeenMs > 0 AND (now - iLastSeenMs) <= BLE_STALE_MS.
+// Hot-path BLE callback only touches this struct under _bleSensorsMux —
+// labels live in settings (loop-task only) so the critical section stays
+// short.
+struct BLERuntime {
   float    fTemperature;        // 2 decimal precision
   float    fHumidity;
   uint8_t  iBattery;
   int8_t   iRssi;
-  bool     bValid;
-  uint32_t iLastSeenMs;
-  bool     bDiscoveryPublished; // TASK-488: HA-discovery sent at least once for this MAC
+  uint32_t iLastSeenMs;          // 0 = never seen since boot
+  bool     bDiscoveryPublished;  // TASK-488: HA-discovery sent at least once for this MAC
+  bool     bDiscoveryDirty;      // TASK-508: label changed → re-publish on next cycle
 };
 
-static BLESensorData _bleSensors[SAT_BLE_MAX_SENSORS];
-static NimBLEScan*   _pBLEScan       = nullptr;
-static uint32_t      _bleLastPublishMs = 0;
-static bool          _bleInitialized = false;
+static BLERuntime         _bleRuntime[SAT_BLE_MAX_ROSTER] = {};
+static NimBLEScan*        _pBLEScan          = nullptr;
+static uint32_t           _bleLastPublishMs  = 0;
+static bool               _bleInitialized    = false;
+// TASK-508: BLE host task sets this when it allocates a new roster slot;
+// satBLELoop() drains it (loop task) and triggers settingsDirty=true.
+// Avoids cross-task flash writes from the BLE callback.
+static volatile bool      _bleRosterDirty    = false;
+// TASK-508: counts ads dropped because roster is at SAT_BLE_MAX_ROSTER.
+// Surfaced in /api/v2/sat/ble/discovery so the UI can warn the user.
+static volatile uint32_t  _bleRosterFullCount = 0;
 
 // TASK-506: aggregated scan-stats counters. Incremented on the BLE host
 // task in onResult(); read+reset on the Arduino loop task in satBLELoop()
@@ -217,17 +231,22 @@ static bool bleMatchesConfiguredMAC(const char* mac)
 }
 
 //=====================================================================
-// Find existing slot for MAC or allocate a new one
-// Returns slot index (0..SAT_BLE_MAX_SENSORS-1) or -1 if full
+// Find existing slot for MAC or allocate a new one in the roster
+// Returns slot index (0..SAT_BLE_MAX_ROSTER-1) or -1 if full
+// TASK-508: the roster is settings-backed — `settings.sat.sBleMac[i][0]`
+// is non-zero iff that slot is in use. strcasecmp tolerates legacy
+// lowercase entries written by older firmware via the generic settings
+// POST path; new writes from onResult() are uppercased in advance.
 //=====================================================================
 static int bleFindOrAllocSlot(const char* mac)
 {
   int emptySlot = -1;
-  for (int i = 0; i < SAT_BLE_MAX_SENSORS; i++) {
-    if (_bleSensors[i].bValid && strcmp(_bleSensors[i].sMacAddress, mac) == 0) {
-      return i;  // Found existing
+  for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+    if (settings.sat.sBleMac[i][0] != '\0' &&
+        strcasecmp(settings.sat.sBleMac[i], mac) == 0) {
+      return i;  // Found existing roster entry
     }
-    if (!_bleSensors[i].bValid && emptySlot < 0) {
+    if (settings.sat.sBleMac[i][0] == '\0' && emptySlot < 0) {
       emptySlot = i;
     }
   }
@@ -279,44 +298,50 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     // Convert to uppercase AA:BB:CC:DD:EE:FF format
     for (int i = 0; macBuf[i]; i++) macBuf[i] = toupper((unsigned char)macBuf[i]);
 
-    // Check MAC filter
-    if (!bleMatchesConfiguredMAC(macBuf)) {
-      _bleFilterRejCount++;
-      SATBLEDebugTf(PSTR("SAT BLE: ad from %s rejected (filter='%s')\r\n"),
-                    macBuf, settings.sat.sBleMAC);
-      return;
-    }
-
-    // Find or allocate slot
+    // TASK-508: NO filter check here — every format-pass MAC enters the
+    // roster so the UI can offer self-discovery. The MAC filter
+    // (settings.sat.sBleMAC) is applied later in satBLEUpdateState() to
+    // pick which roster slot feeds state.sat.fBleTemp / SAT control.
     int slot = bleFindOrAllocSlot(macBuf);
     if (slot < 0) {
-      _bleNoSlotCount++;
-      SATBLEDebugTf(PSTR("SAT BLE: ad from %s rejected (no free slot)\r\n"), macBuf);
-      return;
+      _bleNoSlotCount++;          // legacy counter from TASK-506
+      _bleRosterFullCount++;      // TASK-508: surfaced via /api/v2/sat/ble/discovery
+      return;                     // no per-ad log: aggregated by stats counter
     }
 
-    // TASK-497: serialise the slot update against loop-task reads.
-    // The block below is bounded constant time (~30 stores), so the
-    // critical section is microseconds, never blocking the BLE radio.
+    // TASK-508: was-this-slot-empty determines whether we touch settings
+    // (and thus need to schedule a flush). Read BEFORE entering the
+    // critical section: settings.sat.sBleMac[i] is loop-task territory
+    // for everything except this single onResult write, and the BLE host
+    // task is the only writer to it under the mutex below.
+    bool isNewSlot = (settings.sat.sBleMac[slot][0] == '\0');
+
+    // TASK-497/508: serialise slot updates against loop-task readers.
+    // For a brand-new slot we also write `settings.sat.sBleMac[slot]`
+    // here (loop task only reads outside the lock; writes are mutually
+    // exclusive because there is exactly one BLE host task). The critical
+    // section is bounded constant time (~30 stores) — microseconds.
     portENTER_CRITICAL(&_bleSensorsMux);
-    // TASK-489 follow-up: when a slot is recycled (was occupied by a
-    // different MAC that went stale), the previous tenant's
-    // bDiscoveryPublished flag is still set. Reset it so the new MAC
-    // gets a fresh HA-discovery config published. For an unchanged
-    // MAC the strcmp matches and the flag is preserved (no spam).
-    if (strcmp(_bleSensors[slot].sMacAddress, macBuf) != 0) {
-      _bleSensors[slot].bDiscoveryPublished = false;
+    if (isNewSlot) {
+      strlcpy(settings.sat.sBleMac[slot], macBuf,
+              sizeof(settings.sat.sBleMac[slot]));
+      // Reset runtime defaults: a freshly-allocated slot must publish
+      // HA discovery once before its first state update is meaningful.
+      _bleRuntime[slot] = {};
     }
-
-    // Update sensor data
-    strlcpy(_bleSensors[slot].sMacAddress, macBuf, sizeof(_bleSensors[slot].sMacAddress));
-    _bleSensors[slot].fTemperature = temp;
-    _bleSensors[slot].fHumidity    = hum;
-    _bleSensors[slot].iBattery     = batt;
-    _bleSensors[slot].iRssi        = static_cast<int8_t>(dev->getRSSI());
-    _bleSensors[slot].bValid       = true;
-    _bleSensors[slot].iLastSeenMs  = millis();
+    _bleRuntime[slot].fTemperature = temp;
+    _bleRuntime[slot].fHumidity    = hum;
+    _bleRuntime[slot].iBattery     = batt;
+    _bleRuntime[slot].iRssi        = static_cast<int8_t>(dev->getRSSI());
+    _bleRuntime[slot].iLastSeenMs  = millis();
     portEXIT_CRITICAL(&_bleSensorsMux);
+
+    if (isNewSlot) {
+      // TASK-508: defer settings.flushSettings() to the loop task — that
+      // is where settingsDirty=true is allowed to be set safely. The
+      // flag is read+cleared once per iBleInterval in satBLELoop().
+      _bleRosterDirty = true;
+    }
 
     _bleAcceptCount++;
     SATBLEDebugTf(PSTR("SAT BLE: sensor %s slot=%d temp=%.2f hum=%.2f batt=%u rssi=%d\r\n"),
@@ -392,8 +417,62 @@ void satBLELoop()
                 (unsigned)_bleAdCount, (unsigned)_bleAcceptCount,
                 (unsigned)_bleFilterRejCount, (unsigned)_bleUnknownCount,
                 (unsigned)_bleNoSlotCount);
-  _bleAdCount = _bleAcceptCount = _bleFilterRejCount = _bleUnknownCount = _bleNoSlotCount = 0;
+  // C++20 deprecates chained assignment with a volatile-qualified left
+  // operand (-Wvolatile). Reset each counter individually.
+  _bleAdCount        = 0;
+  _bleAcceptCount    = 0;
+  _bleFilterRejCount = 0;
+  _bleUnknownCount   = 0;
+  _bleNoSlotCount    = 0;
   _bleStatsLastMs = millis();
+
+  // TASK-508: drain roster-dirty flag set by onResult() on the BLE host
+  // task when a NEW MAC was added. Recompute populated-slot count and
+  // route through updateSetting() so the existing 2-s debounce flushes
+  // /settings.ini exactly once per burst, regardless of how many new
+  // MACs arrived. updateSetting() is the only public API that marks
+  // the (file-static) settingsDirty flag.
+  if (_bleRosterDirty) {
+    _bleRosterDirty = false;
+    uint8_t cnt = 0;
+    for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+      if (settings.sat.sBleMac[i][0] != '\0') cnt++;
+    }
+    char cntBuf[8];
+    snprintf_P(cntBuf, sizeof(cntBuf), PSTR("%u"), (unsigned)cnt);
+    updateSetting("SATblerostercount", cntBuf);
+    SATBLEDebugTf(PSTR("SAT BLE: roster updated, %u slot(s) in use\r\n"),
+                  (unsigned)cnt);
+  }
+
+  // TASK-508: auto-select-if-only-one. Trigger when no MAC is selected
+  // (sBleMAC empty) AND exactly one roster slot has produced a sample
+  // within the last 2 × iBleInterval seconds. After promotion the filter
+  // is non-empty, so this gate fires zero times forever after — single-shot
+  // by construction. Runs on the loop task, so the updateSetting() flash
+  // path is safe (BLE host task can't race against settings flush here).
+  if (settings.sat.sBleMAC[0] == '\0') {
+    const uint32_t freshMs = 2u * (uint32_t)settings.sat.iBleInterval * 1000u;
+    const uint32_t now = millis();
+    int seenIdx = -1;
+    int seenCount = 0;
+    for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+      if (settings.sat.sBleMac[i][0] == '\0') continue;
+      BLERuntime snap;
+      portENTER_CRITICAL(&_bleSensorsMux);
+      snap = _bleRuntime[i];
+      portEXIT_CRITICAL(&_bleSensorsMux);
+      if (snap.iLastSeenMs && (now - snap.iLastSeenMs) <= freshMs) {
+        seenIdx = i;
+        seenCount++;
+      }
+    }
+    if (seenCount == 1) {
+      DebugTf(PSTR("SAT BLE: auto-select slot=%d mac=%s (only one fresh sensor)\r\n"),
+              seenIdx, settings.sat.sBleMac[seenIdx]);
+      updateSetting("SATblemac", settings.sat.sBleMac[seenIdx]);
+    }
+  }
 
   satBLEUpdateState();
 }
@@ -407,39 +486,42 @@ void satBLEUpdateState()
   bool found = false;
   uint8_t sensorCount = 0;
 
-  for (int i = 0; i < SAT_BLE_MAX_SENSORS; i++) {
-    // TASK-497: snapshot the slot under the BLE mutex, then process the local
-    // copy without the lock. Critical section is one struct copy (~40 bytes).
-    BLESensorData snap;
+  for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+    // TASK-508: roster-occupied test reads settings (loop-task only writer
+    // outside this is via REST/Forget which also runs here). Skip empty
+    // slots without taking the BLE mutex.
+    if (settings.sat.sBleMac[i][0] == '\0') continue;
+
+    // TASK-497: snapshot the runtime under the BLE mutex, then process
+    // the local copy without the lock. Critical section is one struct
+    // copy (~32 bytes).
+    BLERuntime snap;
     portENTER_CRITICAL(&_bleSensorsMux);
-    snap = _bleSensors[i];
+    snap = _bleRuntime[i];
     portEXIT_CRITICAL(&_bleSensorsMux);
 
-    if (!snap.bValid) continue;
-
-    // Mark stale sensors as invalid (write back through the lock)
-    if ((now - snap.iLastSeenMs) > BLE_STALE_MS) {
-      portENTER_CRITICAL(&_bleSensorsMux);
-      _bleSensors[i].bValid = false;
-      portEXIT_CRITICAL(&_bleSensorsMux);
-      continue;
-    }
+    // No sample yet (roster entry just allocated, ad never reseen),
+    // or sample is stale beyond BLE_STALE_MS: the roster entry stays
+    // (TASK-508: manual drop only via UI Forget) but data is not eligible
+    // as a SAT input.
+    if (snap.iLastSeenMs == 0) continue;
+    if ((now - snap.iLastSeenMs) > BLE_STALE_MS) continue;
 
     sensorCount++;
 
-    // Use the configured MAC sensor if set, otherwise use first valid
+    // Use the configured MAC sensor if set, otherwise use first fresh slot
     if (!found) {
       if (settings.sat.sBleMAC[0] == '\0' ||
-          strcasecmp(snap.sMacAddress, settings.sat.sBleMAC) == 0) {
-        state.sat.fBleTemp      = snap.fTemperature;
-        state.sat.fBleHumidity  = snap.fHumidity;
-        state.sat.iBleBattery   = snap.iBattery;
-        state.sat.iBleRssi      = snap.iRssi;
-        state.sat.bBleTempValid = true;
+          strcasecmp(settings.sat.sBleMac[i], settings.sat.sBleMAC) == 0) {
+        state.sat.fBleTemp       = snap.fTemperature;
+        state.sat.fBleHumidity   = snap.fHumidity;
+        state.sat.iBleBattery    = snap.iBattery;
+        state.sat.iBleRssi       = snap.iRssi;
+        state.sat.bBleTempValid  = true;
         state.sat.iBleTempLastMs = snap.iLastSeenMs;
         found = true;
         SATBLEDebugTf(PSTR("SAT BLE: best sensor slot=%d mac=%s temp=%.2f age=%ums\r\n"),
-                      i, snap.sMacAddress, snap.fTemperature,
+                      i, settings.sat.sBleMac[i], snap.fTemperature,
                       (unsigned)(now - snap.iLastSeenMs));
       }
     }
@@ -509,47 +591,62 @@ void satBLEPublishMQTT()
   sendMQTTData(F("sat/ble_sensor_count"), valBuf, false);
   sendMQTTData(F("sat/ble_temp_valid"), state.sat.bBleTempValid ? "true" : "false", false);
 
-  // --- TASK-488: per-MAC state topics + one-shot HA discovery ---
-  // For every valid slot: snapshot under the BLE mutex (TASK-497), then
-  // publish from the local copy so the network I/O does not hold the lock.
-  for (int i = 0; i < SAT_BLE_MAX_SENSORS; i++) {
-    BLESensorData snap;
-    portENTER_CRITICAL(&_bleSensorsMux);
-    snap = _bleSensors[i];
-    portEXIT_CRITICAL(&_bleSensorsMux);
+  // --- TASK-488/508: per-MAC state topics + one-shot HA discovery ---
+  // TASK-508 changes: publish ONLY for the user-selected MAC (one in the
+  // roster). Other roster slots are visible in /api/v2/sat/ble/discovery
+  // for the UI, but do not flood HA with passive entries the user never
+  // configured. Forget-with-HA-cleanup (Block C) wipes the selected
+  // sensor's retained discovery configs when removed.
+  if (settings.sat.sBleMAC[0] == '\0') return;  // no selection → no publish
 
-    if (!snap.bValid) continue;
-    char macCompact[BLE_MAC_COMPACT_SIZE];
-    satBLEMacToCompact(snap.sMacAddress, macCompact, sizeof(macCompact));
-    if (macCompact[0] == '\0') continue;  // skip malformed
-
-    if (!snap.bDiscoveryPublished) {
-      // TASK-493 (1A-H1): only mark discovery as published when the helper
-      // actually succeeded. A transient first-scan failure (MQTT not yet
-      // connected, low heap, broker hiccup) will retry on the next
-      // iBleInterval cycle instead of permanently silencing HA discovery
-      // for this MAC. Write the flag back to the real slot under the lock.
-      if (satBLEPublishHaDiscovery(macCompact, snap.sMacAddress)) {
-        portENTER_CRITICAL(&_bleSensorsMux);
-        _bleSensors[i].bDiscoveryPublished = true;
-        portEXIT_CRITICAL(&_bleSensorsMux);
-      }
+  int selectedSlot = -1;
+  for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+    if (settings.sat.sBleMac[i][0] == '\0') continue;
+    if (strcasecmp(settings.sat.sBleMac[i], settings.sat.sBleMAC) == 0) {
+      selectedSlot = i;
+      break;
     }
-    satBLEPublishStateTopics(macCompact,
-                                 snap.fTemperature,
-                                 snap.fHumidity,
-                                 snap.iBattery,
-                                 snap.iRssi);
-
-    // TASK-500 (2B-M1): worst-case first-scan burst is 4 sensors × (4 discovery
-    // configs + 4 state topics) = 32 publishes back-to-back. canPublishMQTT()
-    // gates start-of-burst, but does not throttle within the burst. A short
-    // yield between sensors releases the FreeRTOS loop task on ESP32 and ticks
-    // the cooperative scheduler on ESP8266 so other doBackgroundTasks consumers
-    // (PIC serial, OT scheduler, NTP) do not starve. delay(0) is the
-    // canonical Arduino "yield to other tasks without sleeping".
-    delay(0);
   }
+  if (selectedSlot < 0) return;  // selected MAC not in roster (yet)
+
+  // Snapshot runtime under the mutex; publish from the local copy so
+  // network I/O never holds the BLE lock.
+  BLERuntime snap;
+  portENTER_CRITICAL(&_bleSensorsMux);
+  snap = _bleRuntime[selectedSlot];
+  portEXIT_CRITICAL(&_bleSensorsMux);
+
+  if (snap.iLastSeenMs == 0) return;
+  if ((millis() - snap.iLastSeenMs) > BLE_STALE_MS) return;
+
+  char macCompact[BLE_MAC_COMPACT_SIZE];
+  satBLEMacToCompact(settings.sat.sBleMac[selectedSlot], macCompact,
+                     sizeof(macCompact));
+  if (macCompact[0] == '\0') return;  // malformed MAC
+
+  if (!snap.bDiscoveryPublished) {
+    // TASK-493 (1A-H1): only mark discovery as published when the helper
+    // actually succeeded. A transient first-scan failure (MQTT not yet
+    // connected, low heap, broker hiccup) will retry on the next
+    // iBleInterval cycle instead of permanently silencing HA discovery.
+    // TASK-508: pass the user-set label (may be empty — falls back to
+    // legacy "BLE <mac>" form inside satBLEPublishOneDiscovery).
+    const char* lbl = settings.sat.sBleLabel[selectedSlot];
+    if (satBLEPublishHaDiscovery(macCompact,
+                                  settings.sat.sBleMac[selectedSlot],
+                                  lbl)) {
+      portENTER_CRITICAL(&_bleSensorsMux);
+      _bleRuntime[selectedSlot].bDiscoveryPublished = true;
+      _bleRuntime[selectedSlot].bDiscoveryDirty     = false;
+      portEXIT_CRITICAL(&_bleSensorsMux);
+    }
+  }
+
+  satBLEPublishStateTopics(macCompact,
+                           snap.fTemperature,
+                           snap.fHumidity,
+                           snap.iBattery,
+                           snap.iRssi);
 }
 
 //=====================================================================
@@ -575,6 +672,204 @@ void satBLESendStatusJSON()
   if (settings.sat.sBleMAC[0] != '\0') {
     sendJsonMapEntry(F("ble_mac"),        settings.sat.sBleMAC);
   }
+}
+
+//=====================================================================
+// TASK-508: BLE roster REST helpers
+// All run on the Arduino loop task (called from handleSAT() in
+// restAPI.ino). Settings mutations go through updateSetting() so the
+// existing 2-s debounce / flushSettings() pipeline persists them.
+//=====================================================================
+
+// Find the slot index that contains `mac`, or -1 if not in roster.
+static int satBLERosterFindSlot(const char* mac)
+{
+  if (!mac || !mac[0]) return -1;
+  for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+    if (settings.sat.sBleMac[i][0] != '\0' &&
+        strcasecmp(settings.sat.sBleMac[i], mac) == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// Stream the discovery roster as JSON (one map with top-level meta plus
+// a "sensors" array of per-slot objects). Uses sendStartJsonMap +
+// sendJsonMapEntry for the meta fields, then drops to raw sendContent
+// for the array (the helpers do not support nested arrays).
+void satBLERosterSendJSON()
+{
+  const uint32_t now = millis();
+
+  uint8_t cnt = 0;
+  for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+    if (settings.sat.sBleMac[i][0] != '\0') cnt++;
+  }
+
+  sendStartJsonMap("");
+  sendJsonMapEntry(F("max_slots"),          (int32_t)SAT_BLE_MAX_ROSTER);
+  sendJsonMapEntry(F("populated_slots"),    (int32_t)cnt);
+  sendJsonMapEntry(F("roster_full"),        (cnt >= SAT_BLE_MAX_ROSTER));
+  sendJsonMapEntry(F("dropped_since_full"), (int32_t)_bleRosterFullCount);
+  sendJsonMapEntry(F("selected_mac"),       settings.sat.sBleMAC);
+
+  // Sensors array — manual JSON since the helpers do not nest arrays.
+  sendBeforenext(); sendIdent();
+  httpServer.sendContent_P(PSTR("\"sensors\": ["));
+
+  bool firstSensor = true;
+  for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+    if (settings.sat.sBleMac[i][0] == '\0') continue;
+
+    BLERuntime snap;
+    portENTER_CRITICAL(&_bleSensorsMux);
+    snap = _bleRuntime[i];
+    portEXIT_CRITICAL(&_bleSensorsMux);
+
+    bool fresh      = (snap.iLastSeenMs > 0 &&
+                       (now - snap.iLastSeenMs) <= BLE_STALE_MS);
+    bool isSelected = (settings.sat.sBleMAC[0] != '\0' &&
+                       strcasecmp(settings.sat.sBleMac[i],
+                                  settings.sat.sBleMAC) == 0);
+
+    char escapedLabel[64];
+    escapeJsonStringTo(settings.sat.sBleLabel[i], escapedLabel,
+                       sizeof(escapedLabel));
+
+    char tempBuf[12], humBuf[12];
+    dtostrf(snap.fTemperature, 1, 2, tempBuf);
+    dtostrf(snap.fHumidity,    1, 2, humBuf);
+
+    char buf[256];
+    snprintf_P(buf, sizeof(buf),
+               PSTR("%s{\"slot\":%d,\"mac\":\"%s\",\"label\":\"%s\","
+                    "\"temp\":%s,\"hum\":%s,\"battery\":%u,\"rssi\":%d,"
+                    "\"age_ms\":%u,\"valid\":%s,\"selected\":%s}"),
+               firstSensor ? "" : ",",
+               i,
+               settings.sat.sBleMac[i],
+               escapedLabel,
+               tempBuf, humBuf,
+               (unsigned)snap.iBattery,
+               (int)snap.iRssi,
+               (unsigned)(fresh ? (now - snap.iLastSeenMs) : 0),
+               fresh      ? "true" : "false",
+               isSelected ? "true" : "false");
+    httpServer.sendContent(buf);
+    firstSensor = false;
+  }
+  httpServer.sendContent_P(PSTR("]"));
+
+  sendEndJsonMap("");
+}
+
+// Promote a roster MAC to the active SAT input. Returns false if mac
+// is not in the roster.
+bool satBLERosterSelect(const char* mac)
+{
+  if (!mac || !mac[0]) return false;
+  int slot = satBLERosterFindSlot(mac);
+  if (slot < 0) return false;
+
+  // Canonicalise to uppercase before persisting (matches onResult form).
+  char macUpper[18];
+  strlcpy(macUpper, mac, sizeof(macUpper));
+  for (int p = 0; macUpper[p]; p++) {
+    macUpper[p] = toupper((unsigned char)macUpper[p]);
+  }
+  updateSetting("SATblemac", macUpper);
+
+  // Force re-publish so HA discovery reflects the new selection
+  // (label may have changed since this slot was last published).
+  portENTER_CRITICAL(&_bleSensorsMux);
+  _bleRuntime[slot].bDiscoveryPublished = false;
+  _bleRuntime[slot].bDiscoveryDirty     = true;
+  portEXIT_CRITICAL(&_bleSensorsMux);
+  return true;
+}
+
+// Set or update the user-friendly label for a roster slot.
+// Empty `label` clears the label. Returns false if mac is not in roster.
+bool satBLERosterSetLabel(const char* mac, const char* label)
+{
+  if (!mac || !mac[0] || !label) return false;
+  int slot = satBLERosterFindSlot(mac);
+  if (slot < 0) return false;
+
+  char keyBuf[20];
+  snprintf_P(keyBuf, sizeof(keyBuf), PSTR("SATblelabel%d"), slot);
+  updateSetting(keyBuf, label);
+
+  // If this is the selected MAC, queue a HA-discovery refresh so the
+  // friendly_name updates on the next publish cycle.
+  bool isSelected = (settings.sat.sBleMAC[0] != '\0' &&
+                     strcasecmp(settings.sat.sBleMac[slot],
+                                settings.sat.sBleMAC) == 0);
+  if (isSelected) {
+    portENTER_CRITICAL(&_bleSensorsMux);
+    _bleRuntime[slot].bDiscoveryPublished = false;
+    _bleRuntime[slot].bDiscoveryDirty     = true;
+    portEXIT_CRITICAL(&_bleSensorsMux);
+  }
+  return true;
+}
+
+// Drop a roster slot — clears persistent fields and runtime data.
+// If the forgotten MAC was the active selection, also clears sBleMAC
+// AND wipes its retained HA-discovery configs (Block C extension).
+// Returns false if mac is not in roster.
+bool satBLERosterForget(const char* mac)
+{
+  if (!mac || !mac[0]) return false;
+  int slot = satBLERosterFindSlot(mac);
+  if (slot < 0) return false;
+
+  bool isSelected = (settings.sat.sBleMAC[0] != '\0' &&
+                     strcasecmp(settings.sat.sBleMac[slot],
+                                settings.sat.sBleMAC) == 0);
+
+  // Snapshot publish state and reset runtime under the mutex.
+  bool wasPublished;
+  portENTER_CRITICAL(&_bleSensorsMux);
+  wasPublished = _bleRuntime[slot].bDiscoveryPublished;
+  _bleRuntime[slot] = {};
+  portEXIT_CRITICAL(&_bleSensorsMux);
+
+  // HA cleanup BEFORE clearing the MAC string — we still need it for
+  // the topic path. Publishes 4 zero-byte retained payloads so HA
+  // removes the device. Only relevant when the selected slot's
+  // discovery configs were ever published; an unpublished slot has
+  // nothing to wipe.
+  if (isSelected && wasPublished) {
+    char macCompact[BLE_MAC_COMPACT_SIZE];
+    satBLEMacToCompact(settings.sat.sBleMac[slot], macCompact,
+                       sizeof(macCompact));
+    if (macCompact[0] != '\0') {
+      satBLEUnpublishDiscovery(macCompact);
+    }
+  }
+
+  // Clear persistent slot fields via updateSetting (settings.ini flush).
+  char keyBuf[20];
+  snprintf_P(keyBuf, sizeof(keyBuf), PSTR("SATblemac%d"), slot);
+  updateSetting(keyBuf, "");
+  snprintf_P(keyBuf, sizeof(keyBuf), PSTR("SATblelabel%d"), slot);
+  updateSetting(keyBuf, "");
+
+  if (isSelected) {
+    updateSetting("SATblemac", "");
+  }
+
+  // Recompute populated count.
+  uint8_t cnt = 0;
+  for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+    if (settings.sat.sBleMac[i][0] != '\0') cnt++;
+  }
+  char cntBuf[8];
+  snprintf_P(cntBuf, sizeof(cntBuf), PSTR("%u"), (unsigned)cnt);
+  updateSetting("SATblerostercount", cntBuf);
+  return true;
 }
 
 #endif // defined(ESP32)

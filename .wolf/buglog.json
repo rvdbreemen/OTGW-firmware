@@ -96,6 +96,170 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-01T20:33:36.659Z"
+    },
+    {
+      "id": "bug-007",
+      "timestamp": "2026-05-01T21:33:36.714Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/SATble.ino",
+      "root_cause": "9 lines replaced/restructured",
+      "fix": "Rewrote 15→27 lines (9 removed) | Also: // Find existing slot for MAC or allocate a new on; // Returns slot index (0..SAT_BLE_MAX_SENSORS-1) o",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-01T21:33:57.332Z"
+    },
+    {
+      "id": "bug-008",
+      "timestamp": "2026-05-01T21:35:42.873Z",
+      "error_message": "Wrong operator: != should be ==",
+      "file": "src/OTGW-firmware/SATble.ino",
+      "root_cause": "Used \"!=\" instead of \"==\"",
+      "fix": "Changed operator != → ==",
+      "tags": [
+        "auto-detected",
+        "operator-fix",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T21:35:42.873Z"
+    },
+    {
+      "id": "bug-009",
+      "timestamp": "2026-05-01T21:36:24.587Z",
+      "error_message": "Missing guard clause",
+      "file": "src/OTGW-firmware/SATble.ino",
+      "root_cause": "No early return/throw for edge case: _bleRosterDirty",
+      "fix": "Added guard clause: if (_bleRosterDirty)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T21:36:24.588Z"
+    },
+    {
+      "id": "bug-010",
+      "timestamp": "2026-05-01T22:13:11.583Z",
+      "error_message": "Missing guard clause",
+      "file": "src/OTGW-firmware/SATble.ino",
+      "root_cause": "No early return/throw for edge case: settings.sat.sBleMAC[0] != '\\0'",
+      "fix": "Added guard clause: if (settings.sat.sBleMAC[0] != '\\0')",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T22:13:11.583Z"
+    },
+    {
+      "id": "bug-011",
+      "timestamp": "2026-05-01T22:13:51.795Z",
+      "error_message": "Missing guard clause",
+      "file": "src/OTGW-firmware/restAPI.ino",
+      "root_cause": "No early return/throw for edge case: !body",
+      "fix": "Added guard clause: if (!body)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T22:13:51.795Z"
+    },
+    {
+      "id": "bug-012",
+      "timestamp": "2026-05-01T22:18:10.712Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/MQTTstuff.ino",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 55→124 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T22:18:10.712Z"
+    },
+    {
+      "id": "bug-013",
+      "timestamp": "2026-05-01T22:19:02.147Z",
+      "error_message": "Missing guard clause",
+      "file": "src/OTGW-firmware/MQTTstuff.ino",
+      "root_cause": "No early return/throw for edge case: label && label[0] != '\\0'",
+      "fix": "Added guard clause: if (label && label[0] != '\\0')",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T22:19:02.147Z"
+    },
+    {
+      "id": "bug-014",
+      "timestamp": "2026-05-01T22:26:19.940Z",
+      "error_message": "Incorrect value in code",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "Had \"Enable BLE (Bluetooth Low Energy) temperature sen",
+      "fix": "Changed to \"Enable BLE (Bluetooth Low Energy) temperature sen",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T22:26:19.940Z"
+    },
+    {
+      "id": "bug-015",
+      "timestamp": "2026-05-01T22:34:00.000Z",
+      "error_message": "ESP32 build: 'settingsDirty' was not declared in this scope",
+      "file": "src/OTGW-firmware/SATble.ino",
+      "root_cause": "Phase-1 research suggested setting settingsDirty=true directly to trigger the settings-flush debounce, but settingsDirty is a file-static (private to settingStuff.ino:21) and not externally accessible. Cross-file write would require exposing it as extern, breaking encapsulation.",
+      "fix": "Route the dirty-trigger through updateSetting(\"SATblerostercount\", \"<n>\"). updateSetting() is the public API that already sets settingsDirty=true and RESTART_TIMER(timerFlushSettings) at lines 979-980. Same effect, encapsulation preserved.",
+      "tags": ["task-508", "settings", "encapsulation", "cross-task-write", "compile-error"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T22:34:00.000Z"
+    },
+    {
+      "id": "bug-016",
+      "timestamp": "2026-05-01T22:34:30.000Z",
+      "error_message": "ESP32 -Wvolatile deprecation warning on chained volatile-qualified assignment",
+      "file": "src/OTGW-firmware/SATble.ino",
+      "root_cause": "TASK-506 wrote `a = b = c = d = e = 0;` where all targets are volatile uint32_t. C++20 (DR2138) deprecates this idiom: the value of an assignment to a volatile lvalue is itself volatile and chaining propagates that. ESP8266 toolchain accepts it; ESP32-S3 xtensa-esp gcc warns.",
+      "fix": "Reset each counter on its own line. Verbose but C++20-clean and forward-compatible.",
+      "tags": ["task-508", "cpp20", "volatile", "deprecation"],
+      "related_bugs": ["bug-015"],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T22:34:30.000Z"
+    },
+    {
+      "id": "bug-017",
+      "timestamp": "2026-05-01T22:35:00.000Z",
+      "error_message": "PreToolUse hook blocked Edit on data/index.js: innerHTML with untrusted content",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "First version of buildBleSensorsPanel() / renderBleRoster() built panel HTML via .innerHTML with template-string-interpolated user data. Even with an HTML-escape helper for labels and strict regex MAC validation, the security hook blocks innerHTML on principle when interpolation touches user-controlled text.",
+      "fix": "Refactored to pure DOM API: createElement + textContent + appendChild for every node. No innerHTML anywhere in the new BLE panel code. Sensor labels go through textContent which the browser cannot interpret as HTML.",
+      "tags": ["task-508", "xss", "security-hook", "dom-api", "ui"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-01T22:35:00.000Z"
     }
   ]
 }

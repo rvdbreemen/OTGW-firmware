@@ -401,6 +401,7 @@ const char s_cmd_command[] PROGMEM = "command";
 const char s_cmd_setpoint[] PROGMEM = "setpoint";
 const char s_cmd_constant[] PROGMEM = "constant";
 const char s_cmd_outside[] PROGMEM = "outside";
+const char s_cmd_outside_temp[] PROGMEM = "outside_temp";
 const char s_cmd_hotwater[] PROGMEM = "hotwater";
 const char s_cmd_gatewaymode[] PROGMEM = "gatewaymode";
 const char s_cmd_setback[] PROGMEM = "setback";
@@ -481,6 +482,7 @@ const MQTT_set_cmd_t setcmds[] PROGMEM = {
   {   s_cmd_setpoint, s_otgw_TT, s_temp },
   {   s_cmd_constant, s_otgw_TC, s_temp },
   {   s_cmd_outside, s_otgw_OT, s_temp },
+  {   s_cmd_outside_temp, s_otgw_OT, s_temp },
   {   s_cmd_hotwater, s_otgw_HW, s_on },  // HW=0 (off), HW=1 (on), HW=P (DHW push), HW=<other> (auto)
   {   s_cmd_gatewaymode, s_otgw_GW, s_on },
   {   s_cmd_setback, s_otgw_SB, s_temp },
@@ -2023,13 +2025,41 @@ void satBLEPublishStateTopics(const char* macCompact, float temp, float hum, uin
 // two-pass MEASURE-then-WRITE dance ADR-077 prescribes for unbounded
 // payloads. Heap pressure is still bounded by the canPublishMQTT() and
 // MQTT_DISCOVERY_HEAP_MIN gates per call, so behaviour is heap-safe.
+// TASK-508: tiny JSON-escaper for user-supplied labels in HA discovery
+// payloads. Local to MQTTstuff.ino to avoid the global cMsg scratch
+// buffer used by escapeJsonStringTo() (which is unsafe to call from
+// here while writeSettings() may be flushing — even though they
+// currently share the loop task, this keeps the contract explicit).
+// Handles the only characters JSON forbids in a quoted string: " \ and
+// the ASCII control range 0x00-0x1F. Output is always NUL-terminated.
+static void mqttJsonEscape(const char* src, char* dst, size_t dstSize)
+{
+  if (!dst || dstSize == 0) return;
+  size_t di = 0;
+  for (size_t si = 0; src && src[si] && di + 1 < dstSize; si++) {
+    char c = src[si];
+    if (c == '"' || c == '\\') {
+      if (di + 2 >= dstSize) break;
+      dst[di++] = '\\';
+      dst[di++] = c;
+    } else if ((unsigned char)c < 0x20) {
+      if (di + 6 >= dstSize) break;
+      di += snprintf(dst + di, dstSize - di, "\\u%04x", (unsigned)c);
+    } else {
+      dst[di++] = c;
+    }
+  }
+  dst[di] = '\0';
+}
+
 static bool satBLEPublishOneDiscovery(const char* macCompact,
                                          const char* macWithColons,
                                          const char* kindKey,        // "temp" | "rh" | "bat" | "rssi"
                                          const __FlashStringHelper* friendlyName,
                                          const __FlashStringHelper* deviceClass,
                                          const __FlashStringHelper* unit,
-                                         const __FlashStringHelper* valueTemplate)
+                                         const __FlashStringHelper* valueTemplate,
+                                         const char* labelOverride)  // TASK-508: optional, NULL = legacy "BLE %s %s" form
 {
   if (!settings.mqtt.bEnable) return false;
   if (!MQTTclient.connected()) return false;
@@ -2051,33 +2081,74 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
              PSTR("%s/value/%s/sat/ble/%s/%s"),
              topTopic, uniqueId, macCompact, kindKey);
 
+  // TASK-508: when a user-set label is provided, render the entity name
+  // as "<label> <Kind>" (e.g. "Woonkamer Temperature") and the device
+  // name as "<label>". Both fields are JSON-escaped locally to handle
+  // quotes/backslashes in user input without reaching for cMsg.
+  bool useLabel = (labelOverride && labelOverride[0] != '\0');
+  char labelEsc[64] = {0};
+  if (useLabel) {
+    mqttJsonEscape(labelOverride, labelEsc, sizeof(labelEsc));
+  }
+
   // Compose the JSON payload into a single bounded RAM buffer.
+  // Two snprintf_P branches (label vs legacy) keep the format strings
+  // statically analysable and the headroom calculation explicit.
   char payload[768];
-  int n = snprintf_P(payload, sizeof(payload),
-    PSTR("{"
-      "\"name\":\"BLE %s %s\","
-      "\"uniq_id\":\"%s_ble_%s_%s\","
-      "\"stat_t\":\"%s\","
-      "\"dev_cla\":\"%S\","
-      "\"unit_of_meas\":\"%S\","
-      "\"val_tpl\":\"%S\","
-      "\"dev\":{"
-        "\"ids\":[\"%s_ble_%s\"],"
-        "\"name\":\"BLE %s\","
-        "\"mdl\":\"BLE Sensor\","
-        "\"mf\":\"BLE\","
-        "\"via_device\":\"%s\""
-      "}"
-    "}"),
-    macWithColons, reinterpret_cast<PGM_P>(friendlyName),
-    uniqueId, macCompact, kindKey,
-    stateTopic,
-    reinterpret_cast<PGM_P>(deviceClass),
-    reinterpret_cast<PGM_P>(unit),
-    reinterpret_cast<PGM_P>(valueTemplate),
-    uniqueId, macCompact,
-    macWithColons,
-    uniqueId);
+  int n;
+  if (useLabel) {
+    n = snprintf_P(payload, sizeof(payload),
+      PSTR("{"
+        "\"name\":\"%s %S\","
+        "\"uniq_id\":\"%s_ble_%s_%s\","
+        "\"stat_t\":\"%s\","
+        "\"dev_cla\":\"%S\","
+        "\"unit_of_meas\":\"%S\","
+        "\"val_tpl\":\"%S\","
+        "\"dev\":{"
+          "\"ids\":[\"%s_ble_%s\"],"
+          "\"name\":\"%s\","
+          "\"mdl\":\"BLE Sensor\","
+          "\"mf\":\"BLE\","
+          "\"via_device\":\"%s\""
+        "}"
+      "}"),
+      labelEsc, reinterpret_cast<PGM_P>(friendlyName),
+      uniqueId, macCompact, kindKey,
+      stateTopic,
+      reinterpret_cast<PGM_P>(deviceClass),
+      reinterpret_cast<PGM_P>(unit),
+      reinterpret_cast<PGM_P>(valueTemplate),
+      uniqueId, macCompact,
+      labelEsc,
+      uniqueId);
+  } else {
+    n = snprintf_P(payload, sizeof(payload),
+      PSTR("{"
+        "\"name\":\"BLE %s %s\","
+        "\"uniq_id\":\"%s_ble_%s_%s\","
+        "\"stat_t\":\"%s\","
+        "\"dev_cla\":\"%S\","
+        "\"unit_of_meas\":\"%S\","
+        "\"val_tpl\":\"%S\","
+        "\"dev\":{"
+          "\"ids\":[\"%s_ble_%s\"],"
+          "\"name\":\"BLE %s\","
+          "\"mdl\":\"BLE Sensor\","
+          "\"mf\":\"BLE\","
+          "\"via_device\":\"%s\""
+        "}"
+      "}"),
+      macWithColons, reinterpret_cast<PGM_P>(friendlyName),
+      uniqueId, macCompact, kindKey,
+      stateTopic,
+      reinterpret_cast<PGM_P>(deviceClass),
+      reinterpret_cast<PGM_P>(unit),
+      reinterpret_cast<PGM_P>(valueTemplate),
+      uniqueId, macCompact,
+      macWithColons,
+      uniqueId);
+  }
 
   if (n <= 0 || (size_t)n >= sizeof(payload)) {
     MQTTDebugTf(PSTR("[ble-disc] payload truncated for %s/%s\r\n"), macCompact, kindKey);
@@ -2112,7 +2183,8 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
 // `bDiscoveryPublished` flag on this return value; a transient first-scan
 // failure will retry on the next iBleInterval cycle instead of permanently
 // suppressing HA discovery for that sensor.
-bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons)
+bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons,
+                              const char* label /* TASK-508: optional, NULL/"" = legacy */)
 {
   if (!macCompact || macCompact[0] == '\0') return false;
   if (!macWithColons || macWithColons[0] == '\0') return false;
@@ -2125,7 +2197,8 @@ bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons)
         F("Temperature"),
         F("temperature"),
         F("°C"),
-        F("{{ value | float }}"));
+        F("{{ value | float }}"),
+        label);
   if (!ok) {
     MQTTDebugTf(PSTR("[ble-disc] temp publish failed for %s\r\n"), macCompact);
     return false;
@@ -2136,7 +2209,8 @@ bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons)
         F("Humidity"),
         F("humidity"),
         F("%"),
-        F("{{ value | float }}"));
+        F("{{ value | float }}"),
+        label);
   if (!ok) {
     MQTTDebugTf(PSTR("[ble-disc] rh publish failed for %s\r\n"), macCompact);
     return false;
@@ -2147,7 +2221,8 @@ bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons)
         F("Battery"),
         F("battery"),
         F("%"),
-        F("{{ value | int }}"));
+        F("{{ value | int }}"),
+        label);
   if (!ok) {
     MQTTDebugTf(PSTR("[ble-disc] bat publish failed for %s\r\n"), macCompact);
     return false;
@@ -2158,14 +2233,59 @@ bool satBLEPublishHaDiscovery(const char* macCompact, const char* macWithColons)
         F("Signal Strength"),
         F("signal_strength"),
         F("dBm"),
-        F("{{ value | int }}"));
+        F("{{ value | int }}"),
+        label);
   if (!ok) {
     MQTTDebugTf(PSTR("[ble-disc] rssi publish failed for %s\r\n"), macCompact);
     return false;
   }
 
-  MQTTDebugTf(PSTR("[ble-disc] published 4 HA configs for MAC %s\r\n"), macCompact);
+  if (label && label[0] != '\0') {
+    MQTTDebugTf(PSTR("[ble-disc] published 4 HA configs for MAC %s (label='%s')\r\n"),
+                macCompact, label);
+  } else {
+    MQTTDebugTf(PSTR("[ble-disc] published 4 HA configs for MAC %s\r\n"), macCompact);
+  }
   return true;
+}
+
+// TASK-508: wipe Home Assistant retained discovery configs for one BLE
+// MAC. Publishes 4 zero-byte retained payloads to the same topics
+// satBLEPublishOneDiscovery wrote — HA interprets empty retained
+// discovery as device removal. Called from satBLERosterForget() in
+// SATble.ino when the user drops the active selection.
+void satBLEUnpublishDiscovery(const char* macCompact)
+{
+  if (!macCompact || macCompact[0] == '\0') return;
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
+  if (!isValidIP(MQTTbrokerIP)) return;
+  if (!canPublishMQTT()) return;
+
+  const char* haPrefix = CSTR(settings.mqtt.sHaprefix);
+  const char* uniqueId = CSTR(settings.mqtt.sUniqueid);
+
+  // Same kind keys as satBLEPublishHaDiscovery / satBLEPublishOneDiscovery.
+  // PROGMEM kind names match the publish path; deviation here would leak
+  // orphans on the broker.
+  static const char* const kKinds[] = { "temp", "rh", "bat", "rssi" };
+
+  for (int k = 0; k < 4; k++) {
+    char topic[MQTT_TOPIC_MAX_LEN];
+    snprintf_P(topic, sizeof(topic),
+               PSTR("%s/sensor/%s_ble_%s_%s/config"),
+               haPrefix, uniqueId, macCompact, kKinds[k]);
+    // Zero-length retained payload via the streaming primitives — same
+    // path as the publish side, so retain semantics are identical.
+    if (beginMqttPublish(topic, 0, /*retain=*/true)) {
+      // No writeMqttChunk needed for empty payload.
+      if (!MQTTclient.endPublish()) {
+        PrintMQTTError();
+      }
+    }
+    feedWatchDog();
+  }
+  MQTTDebugTf(PSTR("[ble-disc] unpublished HA configs for MAC %s\r\n"),
+              macCompact);
 }
 #endif // defined(ESP32)
 
