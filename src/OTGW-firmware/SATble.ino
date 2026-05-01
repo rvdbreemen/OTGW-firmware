@@ -36,6 +36,11 @@
 #define SAT_BLE_MAX_SENSORS   4
 static const uint32_t BLE_STALE_MS          = 300000;   // 5 min stale timeout
 
+// Compile-time guard: BLE_STALE_MS must comfortably exceed one scan window so
+// the staleness check cannot evict a slot the radio just refreshed. Tripwire
+// for any future re-tuning that mixes the _MS / _SEC constant suffixes.
+static_assert(BLE_STALE_MS > 60000UL, "BLE_STALE_MS must be > 60 s; see SATble.ino BLE_STALE_MS / BLE_SCAN_INTERVAL_TICKS");
+
 // ATC/pvvx custom firmware service data UUID: 0x181A (Environmental Sensing)
 static const uint16_t ATC_SERVICE_UUID_16    = 0x181A;
 // BTHome v2 service data UUID: 0xFCD2
@@ -51,6 +56,19 @@ static const uint8_t BTHOME_V2_FLAG_ENCRYPTED   = 0x01;
 static const uint8_t BTHOME_OBJ_TEMPERATURE_S16 = 0x02;  // sint16, factor 0.01
 static const uint8_t BTHOME_OBJ_HUMIDITY_U16    = 0x03;  // uint16, factor 0.01
 static const uint8_t BTHOME_OBJ_BATTERY_U8      = 0x01;  // uint8, factor 1
+
+// NimBLE scan tuning. Argument unit is BLE-spec 0.625 ms ticks.
+// 50 % duty (window/interval) keeps the radio active half the time without
+// starving the WiFi/BT coexistence on a single-radio ESP32-S3.
+static constexpr uint16_t BLE_SCAN_INTERVAL_TICKS = 160;  // 100 ms
+static constexpr uint16_t BLE_SCAN_WINDOW_TICKS   = 80;   //  50 ms
+// Magic-zero NimBLE idiom: callback-only mode, library never builds a result list.
+static constexpr uint16_t BLE_SCAN_MAX_RESULTS    = 0;
+// NimBLE rejects window > interval at runtime; catch it at compile time so
+// any future re-tune flagging the wrong constant fails the build instead of
+// silently disabling the scan.
+static_assert(BLE_SCAN_WINDOW_TICKS <= BLE_SCAN_INTERVAL_TICKS,
+              "BLE_SCAN_WINDOW_TICKS must be <= BLE_SCAN_INTERVAL_TICKS");
 
 struct BLESensorData {
   char     sMacAddress[18];     // "AA:BB:CC:DD:EE:FF"
@@ -279,7 +297,7 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     _bleSensors[slot].fTemperature = temp;
     _bleSensors[slot].fHumidity    = hum;
     _bleSensors[slot].iBattery     = batt;
-    _bleSensors[slot].iRssi        = (int8_t)dev->getRSSI();
+    _bleSensors[slot].iRssi        = static_cast<int8_t>(dev->getRSSI());
     _bleSensors[slot].bValid       = true;
     _bleSensors[slot].iLastSeenMs  = millis();
     portEXIT_CRITICAL(&_bleSensorsMux);
@@ -301,10 +319,11 @@ void satBLEInit()
   _pBLEScan = NimBLEDevice::getScan();
   // wantDuplicates=true: callback fires for every advertisement, not just first
   _pBLEScan->setScanCallbacks(&_bleScanCallbacks, true);
-  _pBLEScan->setActiveScan(false);  // Passive scan to save power
-  _pBLEScan->setMaxResults(0);      // Callback-only mode; library never builds a result list
-  _pBLEScan->setInterval(160);       // 100 ms BLE scan-interval
-  _pBLEScan->setWindow(80);          // 50 ms BLE scan-window (50% radio duty)
+  _pBLEScan->setActiveScan(false);                    // Passive scan to save power
+  _pBLEScan->setMaxResults(BLE_SCAN_MAX_RESULTS);     // see BLE_SCAN_MAX_RESULTS at top of file
+  // NimBLE setInterval/setWindow take BLE-spec ticks of 0.625 ms each.
+  _pBLEScan->setInterval(BLE_SCAN_INTERVAL_TICKS);    // 100 ms scan-interval
+  _pBLEScan->setWindow(BLE_SCAN_WINDOW_TICKS);        //  50 ms scan-window (50 % radio duty)
 
   // TASK-494: Continuous-scan model — start the scan ONCE, run forever.
   // Args: (duration_seconds=0 means forever, is_continue=false, restart=true).
@@ -470,7 +489,7 @@ void satBLEPublishMQTT()
     portEXIT_CRITICAL(&_bleSensorsMux);
 
     if (!snap.bValid) continue;
-    char macCompact[13];
+    char macCompact[BLE_MAC_COMPACT_SIZE];
     satBLEMacToCompact(snap.sMacAddress, macCompact, sizeof(macCompact));
     if (macCompact[0] == '\0') continue;  // skip malformed
 

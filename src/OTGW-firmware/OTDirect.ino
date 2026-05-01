@@ -385,6 +385,10 @@ static OTRemoteOverrideState otRemoteOverride = {
 // constants so future tuning is grep-able. Values mirror gateway.asm intent:
 // "thermostat is echoing us within ~quarter-degree" -> honoured;
 // "thermostat moved more than half a degree after honouring us" -> released.
+// NB: the (uint16_t) cast TRUNCATES the float; only fractions of 1/256 land
+// exactly on an integer (0.25, 0.50, 0.125, ...). A future tuner picking 0.3
+// would silently get 76 instead of 76.8 — keep the fraction grid-aligned or
+// switch to integer literals (e.g. 0x0040, 0x0080) with the °C in a comment.
 static constexpr uint16_t OT_OVERRIDE_HONOR_DELTA_F88   = (uint16_t)(0.25f * 256.0f); // 0x0040
 static constexpr uint16_t OT_OVERRIDE_RELEASE_DELTA_F88 = (uint16_t)(0.50f * 256.0f); // 0x0080
 static constexpr uint8_t  OT_OVERRIDE_HONOR_THRESHOLD   = 3;   // cycles before auto-clear is armed

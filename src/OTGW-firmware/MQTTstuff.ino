@@ -1951,17 +1951,31 @@ void satBLEMacToCompact(const char* macWithColons, char* out, size_t outSize)
   if (!macWithColons) return;
   // Expect exactly 17 chars: "AA:BB:CC:DD:EE:FF"
   size_t inLen = strnlen(macWithColons, 18);
-  if (inLen != 17) return;
+  if (inLen != 17) {
+    MQTTDebugTf(PSTR("[ble-disc] malformed MAC '%s' (len=%u, want 17)\r\n"),
+                macWithColons, (unsigned)inLen);
+    return;
+  }
   // Need 12 hex chars + NUL in output.
-  if (outSize < 13) return;
+  if (outSize < BLE_MAC_COMPACT_SIZE) return;
   size_t o = 0;
   for (size_t i = 0; i < 17; i++) {
     char c = macWithColons[i];
     if ((i % 3) == 2) {
-      if (c != ':') { out[0] = '\0'; return; }
+      if (c != ':') {
+        MQTTDebugTf(PSTR("[ble-disc] malformed MAC '%s' (colon expected at %u)\r\n"),
+                    macWithColons, (unsigned)i);
+        out[0] = '\0';
+        return;
+      }
       continue;
     }
-    if (!isxdigit(static_cast<unsigned char>(c))) { out[0] = '\0'; return; }
+    if (!isxdigit(static_cast<unsigned char>(c))) {
+      MQTTDebugTf(PSTR("[ble-disc] malformed MAC '%s' (non-hex at %u)\r\n"),
+                  macWithColons, (unsigned)i);
+      out[0] = '\0';
+      return;
+    }
     out[o++] = static_cast<char>(tolower(static_cast<unsigned char>(c)));
   }
   out[o] = '\0';
@@ -2088,10 +2102,11 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
 // Publish 4 retained HA-discovery configs (temperature, humidity, battery,
 // signal_strength) for one BLE sensor MAC. One-shot per MAC: the caller is
 // responsible for tracking bDiscoveryPublished to avoid re-publishing on
-// every BLE scan. This is intentional — the bitmap-drip in
+// every publish cycle. This is intentional — the bitmap-drip in
 // loopMQTTDiscovery() is keyed by OT message ID and does not have a slot
-// for arbitrary MACs; per-scan caller cadence (iBleInterval, typically 30s)
-// already provides drip pacing.
+// for arbitrary MACs; the satBLEPublishMQTT cadence (every iBleInterval
+// seconds, typically 30 s — post-TASK-494 the BLE scan itself is continuous,
+// only the publish loop is throttled) already provides drip pacing.
 // TASK-493 (1A-H1): returns true only when ALL four discovery configs were
 // successfully published. The caller (satBLEPublishMQTT) gates the per-slot
 // `bDiscoveryPublished` flag on this return value; a transient first-scan

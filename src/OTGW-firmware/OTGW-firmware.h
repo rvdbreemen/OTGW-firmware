@@ -248,10 +248,13 @@ void satBLESendStatusJSON();
 
 // TASK-488 / TASK-492: BLE HA-discovery + per-MAC state-topic helpers
 // (defined in MQTTstuff.ino). Caller (satBLEPublishMQTT) wires these in once
-// per first-seen MAC (discovery) and on every scan iteration (state).
-// One-shot discovery via per-slot bDiscoveryPublished flag.
+// per first-seen MAC (discovery) and on every publish cycle (state) — the
+// publish cadence is iBleInterval, the radio scan itself is continuous since
+// TASK-494. One-shot discovery via per-slot bDiscoveryPublished flag.
 // satBLEMacToCompact is the canonical "AA:BB:..:FF" -> "aabb..ff" helper used
 // by both the caller in SATble.ino and internally in MQTTstuff.ino.
+// 12 hex chars + NUL — fixed by the BLE MAC layout, not a tunable.
+static constexpr size_t BLE_MAC_COMPACT_SIZE = 13;
 void satBLEMacToCompact(const char* macWithColons, char* out, size_t outSize);
 void satBLEPublishStateTopics(const char* macCompact, float temp, float hum, uint8_t bat, int8_t rssi);
 // TASK-493 (1A-H1): returns true only when all 4 retained discovery configs
