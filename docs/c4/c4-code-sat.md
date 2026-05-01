@@ -157,7 +157,7 @@ BLE advertisement scanning for temperature/humidity sensors.
 
 - Arduino core (millis, delay, Serial, digitalWrite, pinMode)
 - esp8266/esp32 HAL (PROGMEM, pgm_read_byte, strncpy_P, snprintf_P)
-- BLEDevice.h (ESP32 BLE scanning)
+- NimBLEDevice.h (ESP32 BLE scanning, NimBLE-Arduino 2.x per ADR-092 — Bluedroid replaced TASK-487)
 - Open-Meteo API (HTTP GET for weather data)
 
 ## Settings (Persistent Configuration)

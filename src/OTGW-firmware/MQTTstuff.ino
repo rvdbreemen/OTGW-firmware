@@ -1923,15 +1923,20 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
 //   The bDiscoveryPublished flag must be added to BLESensorData by TASK-487.
 //
 // ADR-077 conformance: HA discovery configs are emitted via the existing
-// chunked streaming primitives (beginMqttPublish + writeMqttChunk +
-// endPublish) — same heap-safe two-pass shape ADR-077 requires. The
-// 256-bit OT-ID drip bitmap (MQTTautoCfgPendingMap) does not apply here:
-// BLE MACs are not OT IDs. Drip pacing is provided by the caller cadence
-// (one BLE scan per iBleInterval, typically 30s) plus the one-shot
-// bDiscoveryPublished flag — there is no synchronous burst of N×4 retained
-// configs per scan. canPublishMQTT() and MQTT_DISCOVERY_HEAP_MIN gate every
-// publish, so heap pressure transparently defers via the existing tier
-// machine without needing a separate queue.
+// streaming primitives (beginMqttPublish + writeMqttChunk + endPublish)
+// using a SINGLE-buffer publish per the bounded-payload exception — the
+// per-config payload is statically capped at 768 bytes and all four BLE
+// configs comfortably fit. ADR-077 normally prescribes a two-pass
+// MEASURE-then-WRITE for unbounded payloads; the bounded case is the
+// addendum codified in ADR-077 (TASK-499 / 1B-M1).
+// The 256-bit OT-ID drip bitmap (MQTTautoCfgPendingMap) does not apply
+// here: BLE MACs are not OT IDs. Drip pacing is provided by the caller
+// cadence (one BLE scan per iBleInterval, typically 30 s) plus the
+// one-shot bDiscoveryPublished flag — there is no synchronous burst of
+// N×4 retained configs per scan. canPublishMQTT() and
+// MQTT_DISCOVERY_HEAP_MIN gate every publish, so heap pressure
+// transparently defers via the existing tier machine without needing a
+// separate queue.
 //===========================================================================================
 
 // Convert "AA:BB:CC:DD:EE:FF" into "aabbccddeeff" (lowercase, no colons).

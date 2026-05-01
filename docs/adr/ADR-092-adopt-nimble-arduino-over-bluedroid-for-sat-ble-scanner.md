@@ -136,15 +136,39 @@ both Bluedroid and NimBLE simultaneously. Rejected.
   ESP8266 build is unchanged: BLE code is already inside
   `#if defined(ESP32)`.
 
+## Cross-task race coverage (TASK-499 / 3B-M1)
+
+NimBLE 2.x runs the scan callback on a separate FreeRTOS task on
+ESP32-S3 (the BLE host task on core 0) while the Arduino loop task
+(core 1) reads `_bleSensors[]` in `satBLEPublishMQTT()` and
+`satBLEUpdateState()`. This is a task-to-task hazard, not the
+cooperative re-entry hazard ADR-090 was originally written for.
+
+The fix lives in TASK-497: a file-static `portMUX_TYPE _bleSensorsMux`
+in `SATble.ino`, with the snapshot pattern (writer wraps the slot
+update; reader takes a stack copy under the lock and processes
+outside). Critical sections stay short (one struct copy or one
+slot-update at most) so the BLE radio task is never blocked.
+
+ADR-090 has been amended (sub-rule 4 amendment 2026-04-30) to cover
+this case as a sibling of the cooperative re-entry exemplars. See
+ADR-090 for the canonical pattern; the rationale here is purely
+"NimBLE is the producer of this race, so the cross-reference belongs
+in this ADR too".
+
 ## Related
 
 - TASK-20 — original BLE temperature-sensor implementation
 - TASK-487 — implementation of this decision
 - TASK-488 — follow-up: HA auto-discovery for BLE sensors (depends on
   this ADR landing first)
+- TASK-494 — continuous-scan switch (amended into Decision section)
+- TASK-497 — cross-task `portMUX_TYPE` data-race fix (cross-referenced above)
 - ADR-004 — no `String` in hot paths
 - ADR-080 — binding ADR rules and CI gates (this ADR is structural;
   reviewed at PR, no automated gate is feasible since the change is a
   one-line lib_deps addition plus a file rewrite)
+- ADR-090 — re-entrancy / cross-task guard pattern (amended for
+  FreeRTOS-task case)
 - `other-projects/OT-Thing-OTGW32/Firmware/src/sensors.cpp` — reference
   implementation

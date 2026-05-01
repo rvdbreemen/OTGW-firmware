@@ -178,8 +178,9 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Implements full PIC command set across 9 categories:
 
 **Category 1: Setpoint Write Commands** (enqueue + cache + override)
-- `CS=xx.x` / `TC=xx.x` — Control setpoint (MsgID 1, TSet). Value 0 clears.
-- `TT=xx.x` — Room setpoint override (MsgID 16, TrSet). Value 0 clears.
+- `CS=xx.x` — Control setpoint (MsgID 1, TSet). Value 0 clears.
+- `TC=xx.x` — Temporary thermostat-side room override (MsgID 16, TrSet + MsgID 100 RemoteOverrideFunction flag bits). Auto-clears on next thermostat broadcast unless honoured. Value 0 clears.
+- `TT=xx.x` — Constant thermostat-side room override (MsgID 16, TrSet + MsgID 100 RemoteOverrideFunction flag bits). Persists until cleared. Value 0 clears.
 - `BS=xx.x` — Fake boiler room setpoint (intercepts thermostat MsgID 16 frame, replaces data bytes before forwarding). Value 0 clears.
 - `C2=xx.x` — Control setpoint CH2 (MsgID 8, TsetCH2)
 - `CC=xx.x` — Cooling control (MsgID 7, 0-100%)
@@ -493,7 +494,7 @@ struct OTFrameOverride {
   bool     active;
   uint16_t overrideValue;      // Data to inject into thermostat frame
 };
-static OTFrameOverride otOverrides[] // 7 entries: MsgID 1,7,8,14,16,56,57
+static OTFrameOverride otOverrides[] // 8 entries: MsgID 1,7,8,14,16,56,57,100 (100=RemoteOverrideFunction flag bits, TASK-466)
 ```
 
 #### Response Override

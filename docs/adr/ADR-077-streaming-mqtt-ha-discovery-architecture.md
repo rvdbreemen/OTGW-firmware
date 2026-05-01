@@ -62,6 +62,36 @@ Risks:
 - Drift between the archived `mqttha.cfg` and the streaming implementation is silent; there is no tool that diffs the two. Mitigation: treat `docs/archive/mqttha.cfg` strictly as historical, do not hand-edit it as if it were still a source of truth.
 - The `MqttJsonWriter` two-pass contract depends on the compose lambda being deterministic across MEASURE and WRITE passes. A future change that reads state between the two passes could produce a mismatched length and a truncated publish. This is a testable invariant and should be covered by a review comment in the relevant code.
 
+## Amendment 2026-05-01 (TASK-499 / 1B-M1) — Bounded-payload exception
+
+The two-pass MEASURE-then-WRITE shape above is required for **unbounded**
+or large variable-length payloads (the OT-message-id streaming functions
+that compose JSON from runtime state of unknown size). For payloads that
+are **statically bounded** at compile time, a single-buffer publish via
+the same streaming primitives is permitted, provided:
+
+- The bound is small enough to comfortably fit on the stack (rule of
+  thumb: ≤ 1 KB; current example uses 768 B).
+- `canPublishMQTT()` and `MQTT_DISCOVERY_HEAP_MIN` gate the call so the
+  heap-tier deferral semantics still apply.
+- A `feedWatchDog()` is called on every return path that follows a
+  network attempt (see TASK-496 / 2B-H1).
+
+Canonical example: `satBLEPublishOneDiscovery()` in `MQTTstuff.ino`
+publishes one of four discovery configs per call. Each payload is
+≤ 600 B (verified by snprintf_P bounds), so the function uses a single
+`char payload[768]` stack buffer and writes it as one
+`writeMqttChunk()` call. This avoids the two-pass dance for what is a
+fixed-size payload while still respecting the heap-safety gates that
+ADR-077 was written to enforce.
+
+The exception does NOT extend to:
+- Per-MsgID OT JSON streamers (variable structure, must remain two-pass).
+- Large device-block aggregations (stay two-pass).
+
+Future bounded-payload helpers should reuse the
+`satBLEPublishOneDiscovery` shape rather than re-derive it.
+
 ## Related
 
 - Prior ADRs: ADR-004 (no String class in hot paths), ADR-040 (MQTT source-specific topics), ADR-051 (OTGWSettings/OTGWState architecture), ADR-073 (SAT MQTT topic structure), ADR-088 (status-burst windowing producer side that lets this drip coexist with bursty Status traffic).
