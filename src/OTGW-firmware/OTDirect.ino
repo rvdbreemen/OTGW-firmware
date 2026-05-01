@@ -1883,8 +1883,14 @@ void loopOTDirect() {
 // ---------------------------------------------------------------------------
 // enqueueWriteCommand — build frame, enqueue, update write cache + override
 // Helper to reduce repetition in handleOTDirectCommand.
+//
+// Returns true iff the frame was successfully enqueued (cache + override table
+// updated). Callers that own extra-state outside the override table (e.g.
+// setRemoteOverride writing otRemoteOverride.* and state.otd.*) MUST sequence
+// their state-write AFTER a successful return so the queue is the single
+// source of truth — TASK-500 (1A-M1).
 // ---------------------------------------------------------------------------
-static void enqueueWriteCommand(uint8_t msgId, uint16_t dataValue, const char* label) {
+static bool enqueueWriteCommand(uint8_t msgId, uint16_t dataValue, const char* label) {
   unsigned long frame = OpenTherm::buildRequest(
     OpenThermMessageType::WRITE_DATA,
     static_cast<OpenThermMessageID>(msgId),
@@ -1892,13 +1898,14 @@ static void enqueueWriteCommand(uint8_t msgId, uint16_t dataValue, const char* l
   );
   if (!otCmdEnqueue(frame)) {
     DebugTf(PSTR("OT-direct: %s command dropped (queue full)\r\n"), label);
-    return;
+    return false;
   }
   // Update periodic write cache so the scheduler keeps refreshing this value
   updateWriteCache(msgId, dataValue);
   // Activate repeater override so thermostat frames for this MsgID get modified
   setOverride(msgId, dataValue);
   OTDDebugTf(PSTR("OTD: %s -> MsgID %u frame 0x%08lX\r\n"), label, msgId, frame);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1975,6 +1982,27 @@ static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
   // includes the -40..127 clamp formerly inlined here (TASK-495).
   uint16_t f88 = floatToF88(celsius);
 
+  // TASK-500 (1A-M1): "queue is the channel, no side-channels". Enqueue the
+  // primary frame (MsgID 16, TrSet) FIRST. If the queue is full, leave
+  // otRemoteOverride.* and state.otd.* untouched — the ghost-override bug
+  // happens when state claims an active override with no frame in flight.
+  // MsgID 16: replace thermostat's TrSet on outbound to boiler.
+  if (!enqueueWriteCommand(16, f88, mode == OT_OVERRIDE_TEMPORARY ? "TT" : "TC")) {
+    OTDDebugTln(F("OTD: OVR-set MsgID 16 dropped (queue full); state unchanged"));
+    return;
+  }
+
+  // MsgID 100: low byte = priority bits (high byte unused per OT v4.2). This
+  // is a UX hint to the thermostat — boiler ignores it. If MsgID 16 made it
+  // through but MsgID 100 didn't, we accept the partial state: boiler-side
+  // is correct, only the thermostat UI may briefly show "manual" until the
+  // periodic refresh re-emits it.
+  uint16_t flags = (mode == OT_OVERRIDE_TEMPORARY) ? 0x0002 : 0x0001;
+  if (!enqueueWriteCommand(100, flags, "OVR-flags")) {
+    OTDDebugTln(F("OTD: OVR-flags MsgID 100 dropped (queue full); MsgID 16 in flight"));
+  }
+
+  // Both queued (or 16-only with logged 100-drop) — now safe to commit state.
   otRemoteOverride.mode               = mode;
   otRemoteOverride.f88Value           = f88;
   otRemoteOverride.setAtMs            = millis();
@@ -1983,13 +2011,6 @@ static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
   otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2): reset honour history
   state.otd.eOverrideMode             = mode;
   state.otd.iOverrideF88              = f88;
-
-  // MsgID 16: replace thermostat's TrSet on outbound to boiler
-  enqueueWriteCommand(16, f88, mode == OT_OVERRIDE_TEMPORARY ? "TT" : "TC");
-
-  // MsgID 100: low byte = priority bits (high byte unused per OT v4.2)
-  uint16_t flags = (mode == OT_OVERRIDE_TEMPORARY) ? 0x0002 : 0x0001;
-  enqueueWriteCommand(100, flags, "OVR-flags");
 }
 
 static void clearRemoteOverride() {
@@ -2402,6 +2423,12 @@ void handleOTDirectCommand(const char* buf, int len) {
   // MsgID 100 (RemoteOverrideFunction) low byte = 0x01 (Manual override
   // priority). Persists until TC=0 or TT= replaces it; the TT auto-clear
   // state machine does NOT release a TC override.
+  //
+  // TASK-500 (1A-M3): "clear" trigger is exact-zero (gateway.asm SetSetPoint
+  // parity). Negative values are NOT treated as clear; they set a TEMPORARY/
+  // CONSTANT override at the negative °C, clamped to -40 °C by the floatToF88
+  // helper (f8.8 lower bound). This is by design, not a bug — matches PIC
+  // behaviour. To clear, send TC=0 (or TT=0).
   else if (cmd0 == 'T' && cmd1 == 'C') {
     float temp = atof(value);
     if (temp == 0.0f) {

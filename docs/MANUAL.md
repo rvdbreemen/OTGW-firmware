@@ -209,6 +209,14 @@ The S0 pulse counter reads electricity pulses from an energy meter that has an S
 
 Up to four Xiaomi LYWSD03MMC Bluetooth LE sensors are supported on the ESP32. The firmware reads them passively using the BTHome v2 protocol (these sensors broadcast their readings as advertisements; no pairing is required). Room temperature and humidity from these sensors feed into the SAT multi-zone averaging and are published to Home Assistant as individual sensor entities.
 
+**Trust model and MAC filtering.** BLE advertisements are unauthenticated broadcasts: any device in radio range can publish a BTHome v2 or ATC/pvvx packet that the firmware will parse and accept. The firmware applies the following filter:
+
+- If a sensor MAC is configured (Settings → SAT → BLE sensors), the firmware accepts only advertisements from that exact MAC.
+- If the configured-MAC list is empty, **the firmware accepts any parseable BTHome v2 / ATC sensor in range** and assigns it to a free slot until all four slots are filled. Once a slot is taken, only advertisements from that slot's MAC continue to update it (slot stickiness).
+- The firmware never writes to or queries BLE devices — reception only. There is no risk of leaking secrets or commands to a hostile sensor.
+
+In practice this means: in a typical home with one or two BTHome devices, default-allow is convenient and harmless. In a dense apartment building, or any environment where you do not control all nearby BLE devices, configure the MAC of each sensor explicitly so you do not pick up your neighbour's thermometer. Spoofing a configured MAC is theoretically possible but requires a hostile device with line-of-sight; the impact is bounded to feeding bogus temperature/humidity values into SAT.
+
 ### Flashing the Firmware
 
 #### First-Time Flashing with flash_esp.py (Recommended)

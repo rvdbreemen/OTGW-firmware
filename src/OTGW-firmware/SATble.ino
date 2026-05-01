@@ -491,6 +491,15 @@ void satBLEPublishMQTT()
                                  snap.fHumidity,
                                  snap.iBattery,
                                  snap.iRssi);
+
+    // TASK-500 (2B-M1): worst-case first-scan burst is 4 sensors × (4 discovery
+    // configs + 4 state topics) = 32 publishes back-to-back. canPublishMQTT()
+    // gates start-of-burst, but does not throttle within the burst. A short
+    // yield between sensors releases the FreeRTOS loop task on ESP32 and ticks
+    // the cooperative scheduler on ESP8266 so other doBackgroundTasks consumers
+    // (PIC serial, OT scheduler, NTP) do not starve. delay(0) is the
+    // canonical Arduino "yield to other tasks without sleeping".
+    delay(0);
   }
 }
 

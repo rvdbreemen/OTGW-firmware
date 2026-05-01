@@ -272,6 +272,29 @@ int main()
     checkU8("coalesce: depth still 2 after another same-MsgID", 2, depth());
     checkU16("coalesce: position-preserving (slot 0 is MsgID 16)",
              16, (uint16_t)((queue[tail] >> 16) & 0xFF));
+
+    // TASK-500 (3A-M5): extend coalesce coverage across the full producer set.
+    // Each of these MsgIDs is in the "latest-wins" producer table from the
+    // TASK-494 plan: MsgID 1 (CS=, TSet), MsgID 14 (MM=, MaxRelModLevel),
+    // MsgID 100 (already exercised above as the OVR-flags companion).
+    // Reset queue.
+    head = 0;
+    tail = 0;
+    enq(buildFrame(1, 0x1900));   // CS=25.0
+    enq(buildFrame(14, 0x6400));  // MM=100
+    enq(buildFrame(100, 0x0002)); // OVR-flags TT-priority
+    checkU8("coalesce: 3 distinct MsgIDs enqueue separately", 3, depth());
+
+    enq(buildFrame(1, 0x1A00));   // CS=26.0 — coalesces with first slot
+    checkU8("coalesce: MsgID 1 coalesces, depth still 3", 3, depth());
+    checkU16("coalesce: MsgID 1 latest-value-wins", 0x1A00,
+             (uint16_t)(queue[tail] & 0xFFFF));
+
+    enq(buildFrame(14, 0x5000));  // MM=80 — coalesces with second slot
+    checkU8("coalesce: MsgID 14 coalesces, depth still 3", 3, depth());
+
+    enq(buildFrame(100, 0x0001)); // OVR-flags TC-priority — coalesces
+    checkU8("coalesce: MsgID 100 coalesces, depth still 3", 3, depth());
   }
 
   std::printf("================================================\n");
