@@ -86,6 +86,19 @@ static NimBLEScan*   _pBLEScan       = nullptr;
 static uint32_t      _bleLastPublishMs = 0;
 static bool          _bleInitialized = false;
 
+// TASK-506: aggregated scan-stats counters. Incremented on the BLE host
+// task in onResult(); read+reset on the Arduino loop task in satBLELoop()
+// once per iBleInterval. volatile (not atomic) is sufficient: a torn
+// read or lost increment is invisible at logging granularity, and the
+// codebase has no std::atomic precedent. uint32_t at ~200 ads/sec wraps
+// in ~248d; window reset makes practical overflow impossible.
+static volatile uint32_t _bleAdCount        = 0;
+static volatile uint32_t _bleAcceptCount    = 0;
+static volatile uint32_t _bleFilterRejCount = 0;
+static volatile uint32_t _bleUnknownCount   = 0;
+static volatile uint32_t _bleNoSlotCount    = 0;
+static uint32_t          _bleStatsLastMs    = 0;
+
 // TASK-497 (cross-phase): NimBLE 2.x scan callback runs on a separate
 // FreeRTOS task on ESP32-S3 (the BLE host task on core 0) while the
 // Arduino loop task (core 1) reads _bleSensors[] in satBLEPublishMQTT()
@@ -231,9 +244,9 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     uint8_t batt = 0;
     bool parsed = false;
 
-    SATBLEDebugTf(PSTR("SAT BLE: ad from %s rssi=%d\r\n"),
-                  dev->getAddress().toString().c_str(),
-                  dev->getRSSI());
+    // TASK-506: count every ad; per-ad logging removed to cut spam.
+    // Aggregated stats emitted by satBLELoop() once per iBleInterval.
+    _bleAdCount++;
 
     // Try ATC/pvvx (UUID 0x181A) first.
     // NimBLE returns std::string by value; lifetime ends at end of this scope.
@@ -255,7 +268,8 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     }
 
     if (!parsed) {
-      SATBLEDebugTf(PSTR("SAT BLE: ad rejected (unknown format)\r\n"));
+      // TASK-506: counted only; per-ad reject log removed (was main spam source).
+      _bleUnknownCount++;
       return;
     }
 
@@ -267,6 +281,7 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
 
     // Check MAC filter
     if (!bleMatchesConfiguredMAC(macBuf)) {
+      _bleFilterRejCount++;
       SATBLEDebugTf(PSTR("SAT BLE: ad from %s rejected (filter='%s')\r\n"),
                     macBuf, settings.sat.sBleMAC);
       return;
@@ -275,6 +290,7 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     // Find or allocate slot
     int slot = bleFindOrAllocSlot(macBuf);
     if (slot < 0) {
+      _bleNoSlotCount++;
       SATBLEDebugTf(PSTR("SAT BLE: ad from %s rejected (no free slot)\r\n"), macBuf);
       return;
     }
@@ -302,6 +318,7 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     _bleSensors[slot].iLastSeenMs  = millis();
     portEXIT_CRITICAL(&_bleSensorsMux);
 
+    _bleAcceptCount++;
     SATBLEDebugTf(PSTR("SAT BLE: sensor %s slot=%d temp=%.1f hum=%.1f batt=%u rssi=%d\r\n"),
                   macBuf, slot, temp, hum, (unsigned)batt,
                   (int)dev->getRSSI());
@@ -364,6 +381,19 @@ void satBLELoop()
   uint32_t interval = (uint32_t)settings.sat.iBleInterval * 1000UL;
   if ((millis() - _bleLastPublishMs) < interval) return;
   _bleLastPublishMs = millis();
+
+  // TASK-506: emit aggregated scan-stats once per iBleInterval, then reset.
+  // Replaces the per-ad SATBLEDebug spam in onResult(). Same gate
+  // (state.debug.bSATBLE via SATBLEDebugTf macro) so toggling key '7'
+  // still controls visibility, but at fixed volume regardless of RF traffic.
+  uint32_t windowMs = millis() - _bleStatsLastMs;
+  SATBLEDebugTf(PSTR("SAT BLE: %us window: %u ads, %u accepted, %u filter-rej, %u unknown, %u no-slot\r\n"),
+                (unsigned)(windowMs / 1000),
+                (unsigned)_bleAdCount, (unsigned)_bleAcceptCount,
+                (unsigned)_bleFilterRejCount, (unsigned)_bleUnknownCount,
+                (unsigned)_bleNoSlotCount);
+  _bleAdCount = _bleAcceptCount = _bleFilterRejCount = _bleUnknownCount = _bleNoSlotCount = 0;
+  _bleStatsLastMs = millis();
 
   satBLEUpdateState();
 }

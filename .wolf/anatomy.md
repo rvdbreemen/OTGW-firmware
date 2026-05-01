@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T18:48:39.846Z
-> Files: 532 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T20:22:20.369Z
+> Files: 533 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -870,3 +870,4 @@
 - `OTDirect.ino` — Declares instances (~38751 tok)
 - `OTGW-Core.ino` — Declares char (~62293 tok)
 - `platform_esp32.h` — ************************************************************************ (~2720 tok)
+- `SATble.ino` — Declares uint32_t (~6633 tok)
