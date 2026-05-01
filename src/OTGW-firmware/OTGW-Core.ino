@@ -3022,15 +3022,15 @@ void checkCommandResponse(const char *buf, unsigned int len){
     for (unsigned int i = 0; i < len; i++) {
       OTDebug((char)buf[i]);
     }
-    OTDebugf(PSTR("] (%d)\r\n"), len); 
+    OTDebugf(PSTR("] (len=%d)\r\n"), len);
     return; //not a valid command response
   }
 
-  OTDebugT(F("CmdQueue: Checking if command is in in queue ["));
+  OTDebugT(F("CmdQueue: Checking if command is in queue ["));
   for (unsigned int i = 0; i < len; i++) {
     OTDebug((char)buf[i]);
   }
-  OTDebugf(PSTR("] (%d)\r\n"), len); 
+  OTDebugf(PSTR("] (len=%d)\r\n"), len);
 
   char cmd[3]; memset( cmd, 0, sizeof(cmd));
   char value[11]; memset( value, 0, sizeof(value));

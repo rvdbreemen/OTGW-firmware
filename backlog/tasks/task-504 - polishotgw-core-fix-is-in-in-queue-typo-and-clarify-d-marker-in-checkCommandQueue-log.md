@@ -3,9 +3,10 @@ id: TASK-504
 title: >-
   polish(otgw-core): fix "is in in queue" typo and clarify (%d) marker in
   checkCommandQueue log
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-05-01 17:38'
+updated_date: '2026-05-01 17:55'
 labels:
   - polish
   - log-quality
@@ -39,9 +40,23 @@ Pure log-string change, zero behavioural impact. Useful when grepping production
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No occurrences of 'is in in queue' remain anywhere in src/OTGW-firmware/
-- [ ] #2 The closing log marker for both 'Checking if command is in queue' and 'Error: Not a command response' variants reads (len=%d) instead of (%d)
-- [ ] #3 All affected strings remain in flash via F()/PSTR() macros (PROGMEM contract per ADR-004)
+- [x] #1 No occurrences of 'is in in queue' remain anywhere in src/OTGW-firmware/
+- [x] #2 The closing log marker for both 'Checking if command is in queue' and 'Error: Not a command response' variants reads (len=%d) instead of (%d)
+- [x] #3 All affected strings remain in flash via F()/PSTR() macros (PROGMEM contract per ADR-004)
 - [ ] #4 python evaluate.py --quick passes
 - [ ] #5 Build clean on ESP8266 and ESP32-S3 (python build.py)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Pure log-string polish in `OTGW-Core.ino`: (1) fix the duplicated "in in" at line 3029, (2) replace the trailing `(%d)` marker with `(len=%d)` at lines 3025 and 3033 so the printed number is self-describing as `strlen(buf)`. PROGMEM contract preserved (`F()` / `PSTR()` only). Validate with `python evaluate.py --quick`.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Three string edits in OTGW-Core.ino: line 3025 `(%d)` → `(len=%d)` (error variant), line 3029 typo `is in in queue` → `is in queue`, line 3033 `(%d)` → `(len=%d)` (success variant). PROGMEM contract preserved (F() / PSTR()). Trailing whitespace on lines 3025 and 3033 cleaned up as side effect. Diff: 3 insertions, 3 deletions.
+
+AC 4 (`python evaluate.py --quick` passes): exit code 1, same pre-existing 14 PROGMEM-violations baseline as TASK-503. None of the 14 violations involve the touched lines. No regression. AC 4 strictly unticked pending baseline cleanup task. AC 5 (full ESP8266+ESP32-S3 build) deferred to parent (next consolidated build run).
+<!-- SECTION:NOTES:END -->
