@@ -2410,17 +2410,22 @@ void handleOTDirectCommand(const char* buf, int len) {
   // CS=xx.x — Control setpoint (MsgID 1 = TSet). Value 0 clears override.
   if (cmd0 == 'C' && cmd1 == 'S') {
     float temp = atof(value);
+    bool enqueued = true;
     if (temp == 0.0f) {
       clearWriteOverride(1);
       otCSLastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
       uint16_t f88 = floatToF88(temp);
-      enqueueWriteCommand(1, f88, "CS");
-      otCSLastCommandMs = millis();  // TASK-442: refresh expiry timer
-      if (otCSLastCommandMs == 0) otCSLastCommandMs = 1;  // 0 sentinel reserved
+      enqueued = enqueueWriteCommand(1, f88, "CS");
+      if (enqueued) {
+        otCSLastCommandMs = millis();  // TASK-442: refresh expiry timer
+        if (otCSLastCommandMs == 0) otCSLastCommandMs = 1;  // 0 sentinel reserved
+      }
     }
-    dtostrf(temp, 1, 2, rspBuf);
-    synthesizeResponse(buf, rspBuf);
+    if (enqueued) {
+      dtostrf(temp, 1, 2, rspBuf);
+      synthesizeResponse(buf, rspBuf);
+    }
   }
   // TC=xx.x — Constant ("vacation") room temperature override.
   // TASK-466: PIC parity. Sets MsgID 16 (TrSet) to the requested value AND
@@ -2480,48 +2485,60 @@ void handleOTDirectCommand(const char* buf, int len) {
   // C2=xx.x — Control setpoint CH2 (MsgID 8 = TsetCH2). Value 0 clears.
   else if (cmd0 == 'C' && cmd1 == '2') {
     float temp = atof(value);
+    bool enqueued = true;
     if (temp == 0.0f) {
       clearWriteOverride(8);
       otC2LastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
       uint16_t f88 = floatToF88(temp);
-      enqueueWriteCommand(8, f88, "C2");
-      otC2LastCommandMs = millis();  // TASK-442: refresh expiry timer
-      if (otC2LastCommandMs == 0) otC2LastCommandMs = 1;
+      enqueued = enqueueWriteCommand(8, f88, "C2");
+      if (enqueued) {
+        otC2LastCommandMs = millis();  // TASK-442: refresh expiry timer
+        if (otC2LastCommandMs == 0) otC2LastCommandMs = 1;
+      }
     }
-    dtostrf(temp, 1, 2, rspBuf);
-    synthesizeResponse(buf, rspBuf);
+    if (enqueued) {
+      dtostrf(temp, 1, 2, rspBuf);
+      synthesizeResponse(buf, rspBuf);
+    }
   }
   // CC=xx.x — Cooling control signal (MsgID 7, 0-100%)
   else if (cmd0 == 'C' && cmd1 == 'C') {
     uint16_t f88 = floatToF88(atof(value));
-    enqueueWriteCommand(7, f88, "CC");
-    dtostrf(atof(value), 1, 2, rspBuf);
-    synthesizeResponse(buf, rspBuf);
+    if (enqueueWriteCommand(7, f88, "CC")) {
+      dtostrf(atof(value), 1, 2, rspBuf);
+      synthesizeResponse(buf, rspBuf);
+    }
   }
   // SW=xx.x — DHW setpoint (MsgID 56 = TdhwSet). Value 0 clears.
   else if (cmd0 == 'S' && cmd1 == 'W') {
     float temp = atof(value);
+    bool enqueued = true;
     if (temp == 0.0f) {
       clearWriteOverride(56);
     } else {
       uint16_t f88 = floatToF88(temp);
-      enqueueWriteCommand(56, f88, "SW");
+      enqueued = enqueueWriteCommand(56, f88, "SW");
     }
-    dtostrf(temp, 1, 2, rspBuf);
-    synthesizeResponse(buf, rspBuf);
+    if (enqueued) {
+      dtostrf(temp, 1, 2, rspBuf);
+      synthesizeResponse(buf, rspBuf);
+    }
   }
   // SH=xx.x — Max CH water setpoint (MsgID 57 = MaxTSet). Value 0 clears.
   else if (cmd0 == 'S' && cmd1 == 'H') {
     float temp = atof(value);
+    bool enqueued = true;
     if (temp == 0.0f) {
       clearWriteOverride(57);
     } else {
       uint16_t f88 = floatToF88(temp);
-      enqueueWriteCommand(57, f88, "SH");
+      enqueued = enqueueWriteCommand(57, f88, "SH");
     }
-    dtostrf(temp, 1, 2, rspBuf);
-    synthesizeResponse(buf, rspBuf);
+    if (enqueued) {
+      dtostrf(temp, 1, 2, rspBuf);
+      synthesizeResponse(buf, rspBuf);
+    }
   }
   // MM=xx — Max relative modulation level (MsgID 14). Non-numeric clears.
   else if (cmd0 == 'M' && cmd1 == 'M') {
@@ -2530,9 +2547,10 @@ void handleOTDirectCommand(const char* buf, int len) {
       synthesizeResponse(buf, value);
     } else {
       uint16_t f88 = floatToF88(atof(value));
-      enqueueWriteCommand(14, f88, "MM");
-      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), atoi(value));
-      synthesizeResponse(buf, rspBuf);
+      if (enqueueWriteCommand(14, f88, "MM")) {
+        snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), atoi(value));
+        synthesizeResponse(buf, rspBuf);
+      }
     }
   }
   // OT=xx.x — Outside temperature (MsgID 27 = Toutside). Non-numeric clears.
@@ -2542,9 +2560,10 @@ void handleOTDirectCommand(const char* buf, int len) {
       synthesizeResponse(buf, value);
     } else {
       uint16_t f88 = floatToF88(atof(value));
-      enqueueWriteCommand(27, f88, "OT");
-      dtostrf(atof(value), 1, 2, rspBuf);
-      synthesizeResponse(buf, rspBuf);
+      if (enqueueWriteCommand(27, f88, "OT")) {
+        dtostrf(atof(value), 1, 2, rspBuf);
+        synthesizeResponse(buf, rspBuf);
+      }
     }
   }
   // VS=xx — Ventilation setpoint (MsgID 71). Non-numeric clears.
@@ -2554,9 +2573,10 @@ void handleOTDirectCommand(const char* buf, int len) {
       synthesizeResponse(buf, value);
     } else {
       uint16_t data = ((uint16_t)(atoi(value) & 0xFF)) << 8;
-      enqueueWriteCommand(71, data, "VS");
-      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), atoi(value));
-      synthesizeResponse(buf, rspBuf);
+      if (enqueueWriteCommand(71, data, "VS")) {
+        snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), atoi(value));
+        synthesizeResponse(buf, rspBuf);
+      }
     }
   }
   // SC=HH:MM/DOW — Time sync (MsgID 20 = day/time)
@@ -2676,14 +2696,17 @@ void handleOTDirectCommand(const char* buf, int len) {
   // CL=xx.x — Cooling level (PIC-compatible alias for CC=, MsgID 7)
   else if (cmd0 == 'C' && cmd1 == 'L') {
     float cl = atof(value);
+    bool enqueued = true;
     if (cl == 0.0f) {
       clearWriteOverride(7);
     } else {
       uint16_t f88 = floatToF88(cl);
-      enqueueWriteCommand(7, f88, "CL");
+      enqueued = enqueueWriteCommand(7, f88, "CL");
     }
-    dtostrf(cl, 1, 2, rspBuf);
-    synthesizeResponse(buf, rspBuf);
+    if (enqueued) {
+      dtostrf(cl, 1, 2, rspBuf);
+      synthesizeResponse(buf, rspBuf);
+    }
   }
 
   // =====================================================================

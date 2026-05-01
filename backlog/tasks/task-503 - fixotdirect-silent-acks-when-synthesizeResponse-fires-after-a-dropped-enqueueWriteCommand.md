@@ -3,9 +3,10 @@ id: TASK-503
 title: >-
   fix(otdirect): silent acks when synthesizeResponse fires after a dropped
   enqueueWriteCommand
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-05-01 17:37'
+updated_date: '2026-05-01 17:55'
 labels:
   - bug
   - otdirect
@@ -52,10 +53,24 @@ Have each call site capture the return value from `enqueueWriteCommand` and skip
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every call site of enqueueWriteCommand in handleOTDirectCommand checks the bool return value before calling synthesizeResponse
-- [ ] #2 When enqueueWriteCommand returns false, no synthesized 'XX: value' line is emitted to telnet or processOT()
-- [ ] #3 The existing 'OT-direct: %s command dropped (queue full)' log inside enqueueWriteCommand remains the only drop notification (no double-logging)
-- [ ] #4 Unit/manual test: with the OT cmd queue artificially full, sending CS=62.0 produces the drop log and NO 'CS: 62.00' bare-line in telnet, and downstream state (state.sat.* or equivalent) does not advance
+- [x] #1 Every call site of enqueueWriteCommand in handleOTDirectCommand checks the bool return value before calling synthesizeResponse
+- [x] #2 When enqueueWriteCommand returns false, no synthesized 'XX: value' line is emitted to telnet or processOT()
+- [x] #3 The existing 'OT-direct: %s command dropped (queue full)' log inside enqueueWriteCommand remains the only drop notification (no double-logging)
+- [x] #4 Unit/manual test: with the OT cmd queue artificially full, sending CS=62.0 produces the drop log and NO 'CS: 62.00' bare-line in telnet, and downstream state (state.sat.* or equivalent) does not advance
 - [ ] #5 python evaluate.py passes
-- [ ] #6 No behavioral change on the healthy path: when enqueueWriteCommand returns true, synthesizeResponse fires exactly as before
+- [x] #6 No behavioral change on the healthy path: when enqueueWriteCommand returns true, synthesizeResponse fires exactly as before
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Capture the bool return value of every `enqueueWriteCommand(...)` call inside `handleOTDirectCommand` (CS, TC, TT, C2, CC, SW, SH, MM, OT, VS, SC, etc.) and gate the subsequent `synthesizeResponse(buf, rspBuf)` on success. The existing `OT-direct: %s command dropped (queue full)` log inside `enqueueWriteCommand` is the only drop notification; no new logging on the dropped path. Single-file change in `OTDirect.ino`. Validate with `python evaluate.py --quick`.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented in 9 call sites in handleOTDirectCommand (CS, C2, CC, SW, SH, MM, OT, VS, CL). Two patterns: (a) single-call branches (CC, MM, OT, VS) wrap the helper in `if (enqueueWriteCommand(...))`, (b) mixed clear+write branches (CS, C2, SW, SH, CL) introduce `bool enqueued = true;` default so the clear-path keeps synthesizing, then assign the helper return on the write-path and gate formatting + synthesizeResponse on `enqueued`. SC-time at line 2587 left as-is (no synthesizeResponse there to begin with). TASK-442 `otCSLastCommandMs` / `otC2LastCommandMs` refresh moved INSIDE the success branch since they mirror 'we successfully scheduled a setpoint' and must not advance on dropped frames.
+
+AC 5 (`python evaluate.py` passes): exit code 1, but agent verified via stash-test that the failure is the pre-existing 14 PROGMEM violations baseline, identical pre and post this change. No regression. Health Score 95.5%. Strictly AC 5 unticked; pre-existing baseline issue out of scope for this task — needs a separate cleanup task, see escalation in chat.
+<!-- SECTION:NOTES:END -->
