@@ -319,7 +319,7 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     portEXIT_CRITICAL(&_bleSensorsMux);
 
     _bleAcceptCount++;
-    SATBLEDebugTf(PSTR("SAT BLE: sensor %s slot=%d temp=%.1f hum=%.1f batt=%u rssi=%d\r\n"),
+    SATBLEDebugTf(PSTR("SAT BLE: sensor %s slot=%d temp=%.2f hum=%.2f batt=%u rssi=%d\r\n"),
                   macBuf, slot, temp, hum, (unsigned)batt,
                   (int)dev->getRSSI());
   }
@@ -438,7 +438,7 @@ void satBLEUpdateState()
         state.sat.bBleTempValid = true;
         state.sat.iBleTempLastMs = snap.iLastSeenMs;
         found = true;
-        SATBLEDebugTf(PSTR("SAT BLE: best sensor slot=%d mac=%s temp=%.1f age=%ums\r\n"),
+        SATBLEDebugTf(PSTR("SAT BLE: best sensor slot=%d mac=%s temp=%.2f age=%ums\r\n"),
                       i, snap.sMacAddress, snap.fTemperature,
                       (unsigned)(now - snap.iLastSeenMs));
       }

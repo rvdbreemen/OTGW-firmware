@@ -82,7 +82,9 @@ var SAT = (function() {
   }
 
   function fmtTemp(v) {
-    return (v !== null && v !== undefined) ? v.toFixed(1) + '\u00B0C' : '--';
+    // TASK-507: 2-decimal precision matches OT spec native f8.8 (~0.004C)
+    // and the BLE sensor data path (already 2-decimal in MQTT/storage).
+    return (v !== null && v !== undefined) ? v.toFixed(2) + '\u00B0C' : '--';
   }
 
   // --- Fetch SAT status from REST API ---

@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T20:22:20.369Z
-> Files: 533 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-01T20:33:36.625Z
+> Files: 534 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -871,3 +871,7 @@
 - `OTGW-Core.ino` — Declares char (~62293 tok)
 - `platform_esp32.h` — ************************************************************************ (~2720 tok)
 - `SATble.ino` — Declares uint32_t (~6633 tok)
+
+## src/OTGW-firmware/data/
+
+- `sat.js` — API routes: GET (1 endpoints) (~11153 tok)
