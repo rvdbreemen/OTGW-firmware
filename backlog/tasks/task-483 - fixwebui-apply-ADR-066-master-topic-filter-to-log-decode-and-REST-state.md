@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-29 22:20'
-updated_date: '2026-05-02 15:59'
+updated_date: '2026-05-02 16:48'
 labels:
   - webui
   - ADR-066
@@ -56,4 +56,47 @@ Port van TASK-481 (feature branch commit c694fbdf) naar dev / 1.5.0-beta.4. TASK
 2026-05-02 (post-merge build verification): AC #6 satisfied. Ran incremental `python build.py --firmware` on dev tip 794bd414 after fast-forward merge of fix-issue-ps1-master-topic-gate. Build exit 0, no compiler errors or warnings, artifact OTGW-firmware-1.5.0-beta.5+794bd41.ino.bin (0.70 MB) generated. Only cleanup notice was a Windows file-lock on .tmp/echarts/.git/objects (unrelated to firmware build).
 
 TASK-483 stays In Progress: AC #7 (hardware verification by _reuzenpanda_) still blocked on his telnet+OTmonitor logs. Per standing rule do NOT publish v1.5.0-beta.5 until those logs land.
+
+2026-05-02 postmortem (analysis of _reuzenpanda_'s "beta.4" log + PS=1 screenshot):
+
+**Version identification:** Tester-supplied log (PuTTY 2026-04-30 19:29:25) shows firmware githash `[297c6eb]` on every `checklittlef` line. That is `297c6eb1 chore(release): bump build to 1.5.0-beta.3+d5589f4 (3211)`, NOT beta.4. Beta.4 (`6b9b1146`) is functionally identical to beta.3: only version-string bumps in file headers, no code change. Tester's symptom report on "v1.5.0-beta.4" therefore reflects beta.3 behaviour.
+
+**PS=1 confirmed:** screenshot shows OTmonitor entries `19:18:38.850240 > PS=1` and `* PS=1 [print summary mode]`. Hypothesis A from the pre-implementation analysis block is confirmed: tester runs PS=1 summary mode.
+
+**Per-MsgID evidence from log (cycle around 19:29:28-29):**
+
+| MsgID | Name | Boiler Write-Ack as logged | Verdict |
+|---|---|---|---|
+| 14 | MaxRelModLevelSetting | `> MaxRelModLevelSetting = 0.00 %` | ungated, garbage published |
+| 16 | TrSet | `- TrSet = 0.00 °C <ignored>` | marked by PIC gateway-override (skipthis), not ADR-066 |
+| 24 | Tr | `> Tr = 0.00 °C` | ungated, garbage published |
+
+The `<ignored>` marker is NOT produced by `is_value_valid_for_master_topic()`. It comes from `OTdata.skipthis` (OTGW-Core.ino:4072), set true when the OTGW PIC in gateway-mode overrides a message (T->R or B->A within 500 ms window). For TrSet the PIC synthesises a gateway override with the correct value via `Answer Thermostat` (A-prefix); for Tr and MaxRelModLevelSetting it does not, so the boiler garbage Write-Ack passes through every ungated tier.
+
+**State of the 5 publish paths in beta.3/beta.4 (commit 297c6eb1):**
+
+In `print_f88` (OTGW-Core.ino:1923-1939 of 297c6eb1) `AddLogf(...)` always fired first, then the filter checks. Concretely:
+
+- Tier 1 (`AddLogf` → WebSocket → WebUI OT-log scherm): **ungated** — explains WebUI OT-log flapping for Tr and MaxRelModLevelSetting
+- Tier 2 (`value = _value` state-write → REST `/api/v2/otgw/otmonitor` → WebUI stats): gated by `is_value_valid` (broad), which accepts Write-Ack → **writes `OTcurrentSystemState.Tr = 0`** for non-echo MsgIDs → WebUI stats panel flaps
+- Tier 3 (`publishToSourceTopic` → MQTT subtopic per source): **gated** by `bSlaveEchoesValue` (original ADR-066)
+- Tier 4 (`sendMQTTData` base topic, live-bus path): **gated** by `is_value_valid_for_master_topic` (TASK-478 / ADR-066)
+- Tier 5 (`publishPSSummaryFieldValue` → base topic + `OTcurrentSystemState`, fires only on PS=1): **ungated** — pumps boiler garbage Write-Ack values into both outputs
+
+beta.3/beta.4 closed only 2 of 5 paths (Tiers 3 and 4, live-bus). Tiers 1, 2 and 5 remained open. Per-symptom mapping:
+
+1. WebUI OT-log shows `Tr = 0.00 °C` → ungated Tier 1
+2. WebUI stats panel flaps → ungated Tier 2 + ungated Tier 5 (two writers to `OTcurrentSystemState.Tr`, both broken)
+3. MQTT base topic flaps for tester specifically → ungated Tier 5 (Tier 4 live-bus was already gated, so this symptom is exclusive to PS=1 setups)
+4. HA-integration lag vs direct MQTT → not addressed by beta.5; likely HA-side polling cadence, separate investigation if symptom persists.
+
+**What beta.5 (this TASK-483 fix) adds:**
+
+- Tiers 1 + 2: `validForMaster` cache in `print_f88`/`s16`/`s8s8`/`u16`, gates `AddLogf` and state-write (ACs #1-#4)
+- Tier 5: new helper `is_msgid_valid_for_master_topic_in_ps_summary` + gates on all 6 value-bearing cases in `publishPSSummaryFieldValue` (ACs #8-#13)
+- Tiers 3 + 4 unchanged — already correct.
+
+All five known paths for non-echo MsgIDs are now gated in beta.5. For PS=1 setups (like tester's): all three WebUI/MQTT symptoms should resolve. For PS=0 setups: Tier 1 + Tier 2 fix resolves WebUI symptoms; MQTT base topic was already stable since beta.3 for that config.
+
+**AC #7 status:** awaiting tester install of v1.5.0-beta.5 plus fresh telnet/OTmonitor logs. Do NOT publish release until confirmed.
 <!-- SECTION:NOTES:END -->
