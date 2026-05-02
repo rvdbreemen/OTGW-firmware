@@ -42,8 +42,11 @@ static uint8_t  _weather_forecastPrecipProb[WEATHER_FORECAST_HOURS];
 static uint8_t  _weather_forecastCount = 0;
 #endif  // ifndef ESP8266
 
-// Timer — configurable interval, default 15 min
-DECLARE_TIMER_SEC(timerWeatherPoll, WEATHER_POLL_DEFAULT_SEC, CATCH_UP_MISSED_TICKS);
+// Timer — fires every 15 min.  SKIP_MISSED_TICKS: if the loop was busy and a
+// tick was missed, fire once then restart the full 15-min window.  Never
+// fire multiple times in a row to "catch up" — that would burn through the
+// OWM free-tier quota (1 000 calls/day) on a backlogged loop.
+DECLARE_TIMER_SEC(timerWeatherPoll, WEATHER_POLL_DEFAULT_SEC, SKIP_MISSED_TICKS);
 
 //=====================================================================
 //=== API URL format strings (PROGMEM) ===
@@ -348,6 +351,9 @@ void weatherFetch()
 void weatherLoop()
 {
   if (!settings.sat.bWeatherEnable) return;
+  // 5-minute startup gate: give the OT bus time to report Toutside before
+  // making the first weather API call.
+  if (millis() < (WEATHER_POLL_MIN_SEC * 1000UL)) return;
   if (!DUE(timerWeatherPoll)) return;
   weatherFetch();
 }
