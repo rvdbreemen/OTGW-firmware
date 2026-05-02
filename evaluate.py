@@ -1667,6 +1667,109 @@ class WorkspaceEvaluator:
             f"No actionable drift ({len(allowlisted_missing)} intentional no-style class(es) allowlisted)"
         ))
 
+    def check_ps_summary_master_topic_gate(self):
+        """ADR-066 amendment 2026-05-02 (TASK-483 ACs #8-#13):
+        ``publishPSSummaryFieldValue`` in ``OTGW-Core.ino`` must compute
+        ``validForMaster = is_msgid_valid_for_master_topic_in_ps_summary(...)``
+        and gate every ``sendMQTTData(...)`` / ``publishPSSummarySplitBytes(...)``
+        call plus every ``OTcurrentSystemState.X = ...`` assignment on it.
+        Without the gate, the PS=1 summary path bypasses the master-topic
+        invariant for non-echo MsgIDs (Tr / TrSet / TrSetCH2 / TRoomCH2 /
+        MaxRelModLevelSetting / RFsensorStatus) and reintroduces the v1.4.x
+        flapping regression.
+
+        The ``ot_flag8flag8`` case is excluded: it has its own per-MsgID
+        switch (status-flag semantics, parallel to the OT_Statusflags
+        exception in ``is_value_valid_for_master_topic``).
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== PS=1 Summary Master-Topic Gate ==={Colors.ENDC}")
+
+        core_ino = config.FIRMWARE_ROOT / "OTGW-Core.ino"
+        if not core_ino.exists():
+            self.add_result(EvaluationResult(
+                "ADR-066", "PS=1 master-topic gate", "WARN",
+                "OTGW-Core.ino not found"
+            ))
+            return
+
+        try:
+            source = core_ino.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "ADR-066", "PS=1 master-topic gate", "FAIL",
+                f"Could not read OTGW-Core.ino: {e}"
+            ))
+            return
+
+        sig_re = re.compile(r"^\s*static\s+bool\s+publishPSSummaryFieldValue\s*\(", re.MULTILINE)
+        m = sig_re.search(source)
+        if not m:
+            self.add_result(EvaluationResult(
+                "ADR-066", "PS=1 master-topic gate", "FAIL",
+                "publishPSSummaryFieldValue function not found in OTGW-Core.ino"
+            ))
+            return
+
+        body, _ = self._extract_function_body(source, m.start())
+        if not body:
+            self.add_result(EvaluationResult(
+                "ADR-066", "PS=1 master-topic gate", "FAIL",
+                "publishPSSummaryFieldValue body not parseable"
+            ))
+            return
+
+        guard_re = re.compile(
+            r"\bvalidForMaster\s*=\s*is_msgid_valid_for_master_topic_in_ps_summary\s*\("
+        )
+        if not guard_re.search(body):
+            self.add_result(EvaluationResult(
+                "ADR-066", "PS=1 master-topic gate", "FAIL",
+                "publishPSSummaryFieldValue does not compute validForMaster from "
+                "is_msgid_valid_for_master_topic_in_ps_summary()"
+            ))
+            return
+
+        value_cases = ['ot_f88', 'ot_s16', 'ot_u16', 'ot_s8s8', 'ot_u8u8', 'ot_u8']
+        case_split = re.split(r"^\s*case\s+(ot_\w+)\s*:", body, flags=re.MULTILINE)
+        cases = {}
+        for i in range(1, len(case_split), 2):
+            cases[case_split[i]] = case_split[i + 1] if i + 1 < len(case_split) else ""
+
+        issues: List[str] = []
+        for case_name in value_cases:
+            case_body = cases.get(case_name)
+            if case_body is None:
+                issues.append(f"{case_name}: case missing")
+                continue
+
+            lines = case_body.splitlines()
+            for line_no, line in enumerate(lines):
+                stripped = line.strip()
+                is_publish = (
+                    'sendMQTTData(' in stripped
+                    or 'publishPSSummarySplitBytes(' in stripped
+                )
+                is_state_write = re.match(r"OTcurrentSystemState\.\w+\s*=", stripped) is not None
+                if not (is_publish or is_state_write):
+                    continue
+                # Same-line guard or guard-block opened within last few lines.
+                window = '\n'.join(lines[max(0, line_no - 4):line_no + 1])
+                if 'if (validForMaster' not in window:
+                    issues.append(f"{case_name}: line '{stripped[:60]}' not gated on validForMaster")
+
+        if issues:
+            self.add_result(EvaluationResult(
+                "ADR-066", "PS=1 master-topic gate", "FAIL",
+                f"{len(issues)} ungated publish/state-write site(s) in publishPSSummaryFieldValue",
+                "; ".join(issues)
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-066", "PS=1 master-topic gate", "PASS",
+                f"publishPSSummaryFieldValue gates all {len(value_cases)} "
+                f"value-bearing cases on validForMaster"
+            ))
+
     # ===== ADR REFERENCE RESOLUTION (TASK-368) =====
 
     def check_adr_references_resolve(self):
@@ -2588,6 +2691,7 @@ class WorkspaceEvaluator:
         self.check_heap_fragmentation_promotion()     # TASK-428, ADR-089 sub-rule 2
         self.check_heap_tier_entry_counters()         # TASK-428, ADR-089 sub-rule 3
         self.check_design_system_drift()              # TASK-470, ADR-091 WARN grace gate
+        self.check_ps_summary_master_topic_gate()     # ADR-066 amendment / TASK-483
         self.check_adr_references_resolve()           # TASK-355/368
 
         if not quick:
