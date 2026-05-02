@@ -902,30 +902,61 @@ var SAT = (function() {
   }
 
   function showOwmWizard(d) {
-    var msg = 'Outside temperature is not available.';
-    msg += '\n\nEnter OpenWeatherMap API key (leave blank to cancel).';
-    var key = window.prompt(msg);
+    // Wizard step 1: key
+    var keyMsg = 'Outside temperature is not available.';
+    keyMsg += '\n\nStep 1/2: Enter OpenWeatherMap API key (leave blank to cancel).';
+    var key = window.prompt(keyMsg);
     if (!key) return;
-    fetch(APIGW + 'v2/settings', {
+
+    // Wizard step 2: coordinates (optional).
+    // Use current stored coords as default if available; otherwise rely on detect button.
+    var coordMsg = 'Step 2/2: Confirm coordinates as "lat,lon" (blank to keep current settings).';
+    var coord = window.prompt(coordMsg);
+
+    var posts = [];
+    posts.push(fetch(APIGW + 'v2/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{"name":"SATweatherapikey","value":"' + String(key).replace(/"/g, '') + '"}'
-    })
-      .then(function(r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return fetch(APIGW + 'v2/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{"name":"SATweatherenable","value":"1"}'
-        });
-      })
-      .then(function(r) {
-        if (r && !r.ok) throw new Error('HTTP ' + r.status);
-        showFeedback('OWM key saved; weather enabled', false);
+    }));
+
+    if (coord) {
+      var parts = coord.split(',');
+      if (parts.length === 2) {
+        var lat = parseFloat(parts[0]);
+        var lon = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          posts.push(fetch(APIGW + 'v2/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{"name":"SATweatherlat","value":"' + lat.toFixed(4) + '"}'
+          }));
+          posts.push(fetch(APIGW + 'v2/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{"name":"SATweatherlon","value":"' + lon.toFixed(4) + '"}'
+          }));
+        }
+      }
+    }
+
+    // Enable weather (Open-Meteo or OWM depending on key).
+    posts.push(fetch(APIGW + 'v2/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"name":"SATweatherenable","value":"1"}'
+    }));
+
+    Promise.all(posts)
+      .then(function(responses) {
+        for (var i = 0; i < responses.length; i++) {
+          if (responses[i] && !responses[i].ok) throw new Error('HTTP ' + responses[i].status);
+        }
+        showFeedback('Weather settings saved', false);
         setTimeout(fetchWeather, 2000);
       })
       .catch(function(e) {
-        showFeedback('Error saving API key: ' + e.message, true);
+        showFeedback('Error saving weather settings: ' + e.message, true);
       });
   }
 
