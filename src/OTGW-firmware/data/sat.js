@@ -908,55 +908,68 @@ var SAT = (function() {
     var key = window.prompt(keyMsg);
     if (!key) return;
 
-    // Wizard step 2: coordinates (optional).
-    // Use current stored coords as default if available; otherwise rely on detect button.
-    var coordMsg = 'Step 2/2: Confirm coordinates as "lat,lon" (blank to keep current settings).';
-    var coord = window.prompt(coordMsg);
+    // Wizard step 2: validate key (browser HTTPS).
+    // NOTE: This requires https context for fetch(). If blocked, skip validation.
+    validateOwmKey(key)
+      .then(function() {
+        return persistOwmSettings(key);
+      })
+      .catch(function(e) {
+        showFeedback('OWM validation failed: ' + e.message, true);
+      });
+  }
 
+  function validateOwmKey(key) {
+    // Use One Call 3 endpoint as a real validation call.
+    // Use current settings lat/lon if available, else default to 0/0 and fail.
+    return fetch(APIGW + 'v2/sat/weather')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(new Error('HTTP ' + r.status));
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) return Promise.reject(new Error('Not JSON'));
+        return r.json();
+      })
+      .then(function(w) {
+        var lat = parseFloat(w.latitude);
+        var lon = parseFloat(w.longitude);
+        if (!lat && !lon) throw new Error('No location set');
+
+        var url = 'https://api.openweathermap.org/data/3.0/onecall?lat=' + lat.toFixed(4)
+                + '&lon=' + lon.toFixed(4)
+                + '&appid=' + encodeURIComponent(key)
+                + '&units=metric&exclude=minutely,hourly,daily,alerts';
+
+        return fetch(url)
+          .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(function(j) {
+            if (!j || !j.current || typeof j.current.temp !== 'number') throw new Error('Invalid response');
+          });
+      });
+  }
+
+  function persistOwmSettings(key) {
     var posts = [];
     posts.push(fetch(APIGW + 'v2/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{"name":"SATweatherapikey","value":"' + String(key).replace(/"/g, '') + '"}'
     }));
-
-    if (coord) {
-      var parts = coord.split(',');
-      if (parts.length === 2) {
-        var lat = parseFloat(parts[0]);
-        var lon = parseFloat(parts[1]);
-        if (!isNaN(lat) && !isNaN(lon)) {
-          posts.push(fetch(APIGW + 'v2/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: '{"name":"SATweatherlat","value":"' + lat.toFixed(4) + '"}'
-          }));
-          posts.push(fetch(APIGW + 'v2/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: '{"name":"SATweatherlon","value":"' + lon.toFixed(4) + '"}'
-          }));
-        }
-      }
-    }
-
-    // Enable weather (Open-Meteo or OWM depending on key).
     posts.push(fetch(APIGW + 'v2/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{"name":"SATweatherenable","value":"1"}'
     }));
 
-    Promise.all(posts)
+    return Promise.all(posts)
       .then(function(responses) {
         for (var i = 0; i < responses.length; i++) {
           if (responses[i] && !responses[i].ok) throw new Error('HTTP ' + responses[i].status);
         }
-        showFeedback('Weather settings saved', false);
+        showFeedback('OWM key saved; weather enabled', false);
         setTimeout(fetchWeather, 2000);
-      })
-      .catch(function(e) {
-        showFeedback('Error saving weather settings: ' + e.message, true);
       });
   }
 
