@@ -7,9 +7,16 @@
 **  Original SAT component by Alex Wijnholds (https://github.com/Alexwijn/SAT)
 **  SAT concept and algorithm design by George Dellas
 **
-**  Weather data integration via Open-Meteo API.
-**  Fetches outdoor temperature, humidity, wind speed, and 24-hour
-**  hourly temperature forecast.  Free API, no key required.
+**  Weather data via Open-Meteo API (free, no API key required).
+**  HTTP only — firmware never does HTTPS (ADR constraint).
+**
+**  ESP8266: minimal request — 5 current fields only (temperature, feels-like,
+**           humidity, wind speed, cloud cover).  Response ~450 bytes.
+**           Stream-parsed with no heap allocation (no malloc).
+**
+**  ESP32:   full request — all 15 current fields + 24-hour hourly forecast
+**           arrays (temperature, dew point, cloud cover, precipitation
+**           probability).  Response ~3-4 KB.  Also stream-parsed.
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  TERMS OF USE: MIT License. See bottom of OTGW-firmware.h
@@ -17,121 +24,294 @@
 */
 
 // --- Constants ---
-static const uint16_t WEATHER_POLL_DEFAULT_SEC = 900;  // 15 min
-static const uint16_t WEATHER_POLL_MIN_SEC     = 300;  // 5 min
+static const uint16_t WEATHER_POLL_DEFAULT_SEC = 900;  // 15 min default
+static const uint16_t WEATHER_POLL_MIN_SEC     = 300;  // 5 min minimum
+
+// OpenWeatherMap hard floor (must match plan/req): 15 minutes.
+static const uint16_t WEATHER_OWM_MIN_SEC      = 900;
+
+// Hourly forecast arrays — ESP32 only.
+// ESP8266 does not request hourly data; omitting saves ~240 bytes of BSS.
+#ifndef ESP8266
 static const uint8_t  WEATHER_FORECAST_HOURS   = 24;
-
-// --- State ---
+// temperature_2m: primary thermal load forecast (float — °C)
 static float    _weather_forecastTemp[WEATHER_FORECAST_HOURS];
+// dew_point_2m: comfort / condensation forecast (float — °C)
+static float    _weather_forecastDewPt[WEATHER_FORECAST_HOURS];
+// cloud_cover: solar-gain forecast (uint8_t — % 0-100, saves 72 bytes vs float)
+static uint8_t  _weather_forecastCloud[WEATHER_FORECAST_HOURS];
+// precipitation_probability: scheduling guard (uint8_t — % 0-100)
+static uint8_t  _weather_forecastPrecipProb[WEATHER_FORECAST_HOURS];
 static uint8_t  _weather_forecastCount = 0;
+#endif  // ifndef ESP8266
 
-// Timer — uses configurable interval, default 15 min
-DECLARE_TIMER_SEC(timerWeatherPoll, WEATHER_POLL_DEFAULT_SEC, CATCH_UP_MISSED_TICKS);
+// Timer — fires every 15 min.  SKIP_MISSED_TICKS: if the loop was busy and a
+// tick was missed, fire once then restart the full 15-min window.  Never
+// fire multiple times in a row to "catch up" — that would burn through the
+// OWM free-tier quota (1 000 calls/day) on a backlogged loop.
+DECLARE_TIMER_SEC(timerWeatherPoll, WEATHER_POLL_DEFAULT_SEC, SKIP_MISSED_TICKS);
 
 //=====================================================================
-//=== Lightweight JSON helpers (no ArduinoJson!) ===
+//=== API URL format strings (PROGMEM) ===
 //=====================================================================
 
-// Find "key": <number> in a JSON string and return the float value.
-// Handles nested objects by searching for the exact key string.
-// Returns true if found and parsed successfully.
-static bool weatherJsonGetFloat(const char* json, PGM_P key, float* out)
+#ifdef ESP8266
+// Minimal current-conditions request: only the 5 fields SAT actually uses.
+// Produces ~450-byte response — stream-parsed with no heap allocation.
+// HTTP only (no TLS) — firmware never does HTTPS (ADR constraint).
+static const char kWeatherUrlFmt[] PROGMEM =
+  "http://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
+  "&current=temperature_2m,relative_humidity_2m,apparent_temperature"
+  ",wind_speed_10m,cloud_cover";
+
+// OpenWeatherMap Current Weather API (HTTP, firmware-side). Key required.
+static const char kWeatherOwmUrlFmt[] PROGMEM =
+  "http://api.openweathermap.org/data/2.5/weather?lat=%.4f&lon=%.4f&appid=%s&units=metric";
+#else
+// Full data set for ESP32: all 15 current fields + 24-hour hourly forecasts.
+static const char kWeatherUrlFmt[] PROGMEM =
+  "http://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
+  "&forecast_days=1"
+  "&current=temperature_2m,relative_humidity_2m,apparent_temperature"
+  ",is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover"
+  ",pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
+  "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature"
+  ",precipitation_probability,cloud_cover,cloud_cover_low,cloud_cover_mid";
+#endif  // ifdef ESP8266
+
+//=====================================================================
+//=== Streaming JSON parser — no heap allocation ===
+//=====================================================================
+// Single-pass character-by-character parser for the Open-Meteo flat JSON.
+// Uses WiFiClient::peek() for one-byte lookahead so number terminators
+// (commas, brackets) stay unconsumed in the stream for the outer loop.
+//
+// Peak stack use: ~60 bytes (keyBuf + numBuf).  No malloc at all.
+// The WiFiClient TCP receive buffer (~1 460 bytes) holds unread bytes
+// while each character is processed one at a time.
+
+// Read one byte from stream; block up to 5 s.  Returns -1 on timeout.
+static int wstreamGet(WiFiClient* s, HTTPClient* h)
 {
-  if (!json || !key || !out) return false;
-
-  // Build search pattern: "key":
-  char search[48];
-  snprintf_P(search, sizeof(search), PSTR("\"%s\":"), key);
-
-  const char* pos = strstr(json, search);
-  if (!pos) return false;
-
-  pos += strlen(search);
-  // Skip whitespace
-  while (*pos == ' ' || *pos == '\t') pos++;
-
-  char* endp = nullptr;
-  float val = strtod(pos, &endp);
-  if (endp == pos) return false;  // no number found
-
-  *out = val;
-  return true;
+  uint32_t start = millis();
+  while (!s->available()) {
+    if (millis() - start > 5000UL) return -1;  // millis()-wrap-safe
+    if (!h->connected())           return -1;
+    yield();
+  }
+  return s->read();
 }
 
-// Find "key":[ ... ] array in the "hourly" section and parse up to maxLen floats.
-// The Open-Meteo response has duplicate keys (temperature_2m in both "current"
-// and "hourly"), so we first locate the "hourly" section, then search within it.
-static bool weatherJsonGetArray(const char* json, PGM_P key, float* arr, uint8_t maxLen, uint8_t* count)
+// Peek at next byte without consuming; block up to 5 s.  Returns -1 on timeout.
+static int wstreamPeek(WiFiClient* s, HTTPClient* h)
 {
-  if (!json || !key || !arr || !count) return false;
-  *count = 0;
+  uint32_t start = millis();
+  while (!s->available()) {
+    if (millis() - start > 5000UL) return -1;  // millis()-wrap-safe
+    if (!h->connected())           return -1;
+    yield();
+  }
+  return s->peek();
+}
 
-  // Find "hourly" section first
-  const char* hourlyPos = strstr_P(json, PSTR("\"hourly\""));
-  if (!hourlyPos) return false;
+// Consume stream up to and including the closing '"'.
+// Opening '"' must already have been consumed.  Handles \" escapes.
+static void wstreamSkipString(WiFiClient* s, HTTPClient* h)
+{
+  int c;
+  while ((c = wstreamGet(s, h)) >= 0) {
+    if (c == '"') return;
+    if (c == '\\') wstreamGet(s, h);  // skip escaped char
+  }
+}
 
-  // Build search pattern: "key":[
-  char search[48];
-  snprintf_P(search, sizeof(search), PSTR("\"%s\":["), key);
+// Consume a complete JSON array (opening '[' already consumed).
+static void wstreamSkipArray(WiFiClient* s, HTTPClient* h)
+{
+  int depth = 1, c;
+  while ((c = wstreamGet(s, h)) >= 0 && depth > 0) {
+    if      (c == '[') depth++;
+    else if (c == ']') depth--;
+    else if (c == '"') wstreamSkipString(s, h);
+    if (depth > 0) yield();
+  }
+}
 
-  const char* pos = strstr(hourlyPos, search);
-  if (!pos) return false;
+// Read a JSON number from stream.  'firstChar' is the first digit or '-'
+// already consumed.  Uses peek() so the terminating delimiter (',', ']',
+// '}', etc.) remains unconsumed for the outer loop to process.
+static float wstreamReadNumber(WiFiClient* s, HTTPClient* h, char firstChar)
+{
+  char numBuf[20];
+  int  numLen = 0;
+  numBuf[numLen++] = firstChar;
+  while (numLen < (int)sizeof(numBuf) - 1) {   // leave room for '\0' at [sizeof-1]
+    int nc = wstreamPeek(s, h);
+    if (nc < 0) break;
+    char c = (char)nc;
+    if (!((c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+' || c == 'e' || c == 'E')) break;
+    s->read();           // confirmed number char — consume it
+    numBuf[numLen++] = c;
+  }
+  numBuf[numLen] = '\0';
+  return (float)strtod(numBuf, nullptr);
+}
 
-  pos += strlen(search);
+// Single-pass streaming parse of the Open-Meteo JSON response.
+// Populates state.sat.weather from the "current":{} section (all platforms).
+// On ESP32 also fills _weather_forecastXxx[] from the "hourly":{} section.
+static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
+{
+  char keyBuf[48];
+  int  keyLen;
+  int  depth        = 0;
+  bool inCurrent    = false;
+  bool inHourly     = false;
+  int  currentDepth = 0;
+  int  hourlyDepth  = 0;
 
-  uint8_t n = 0;
-  while (n < maxLen && *pos != '\0' && *pos != ']') {
-    // Skip whitespace and commas
-    while (*pos == ' ' || *pos == ',' || *pos == '\t' || *pos == '\n' || *pos == '\r') pos++;
-    if (*pos == ']' || *pos == '\0') break;
+#ifndef ESP8266
+  float*   arrFloat = nullptr;
+  uint8_t* arrU8    = nullptr;
+  uint8_t  arrMax   = 0;
+  uint8_t  arrPos   = 0;
+#endif
 
-    // Handle null values in the array
-    if (strncmp_P(pos, PSTR("null"), 4) == 0) {
-      arr[n++] = 0.0f;
-      pos += 4;
+  int ci;
+  while ((ci = wstreamGet(stream, http)) >= 0) {
+    char c = (char)ci;
+
+    if (c == '{') { depth++; continue; }
+    if (c == '}') {
+      if (--depth < currentDepth) inCurrent = false;
+      if (  depth < hourlyDepth)  inHourly  = false;
       continue;
     }
+    if (c != '"') continue;  // commas, whitespace — skip
 
-    char* endp = nullptr;
-    float val = strtod(pos, &endp);
-    if (endp == pos) break;  // not a number
-    arr[n++] = val;
-    pos = endp;
+    // ── Collect key string ──
+    keyLen = 0;
+    while ((ci = wstreamGet(stream, http)) >= 0 && (char)ci != '"') {
+      if (keyLen < (int)sizeof(keyBuf) - 1) keyBuf[keyLen++] = (char)ci;
+    }
+    keyBuf[keyLen] = '\0';
+
+    // ── Skip to ':' ──
+    while ((ci = wstreamGet(stream, http)) >= 0 && (char)ci != ':');
+    if (ci < 0) break;
+
+    // ── First non-whitespace char of value ──
+    while ((ci = wstreamGet(stream, http)) >= 0 &&
+           ((char)ci == ' ' || (char)ci == '\t' || (char)ci == '\n' || (char)ci == '\r'));
+    if (ci < 0) break;
+    c = (char)ci;
+
+    // ── Dispatch on value type ──
+    if (c == '"') {
+      wstreamSkipString(stream, http);
+
+    } else if (c == '{') {
+      depth++;
+      if      (strcmp_P(keyBuf, PSTR("current")) == 0) { inCurrent = true; currentDepth = depth; }
+      else if (strcmp_P(keyBuf, PSTR("hourly"))  == 0) { inHourly  = true; hourlyDepth  = depth; }
+
+    } else if (c == '[') {
+#ifndef ESP8266
+      if (inHourly) {
+        arrFloat = nullptr; arrU8 = nullptr; arrMax = 0; arrPos = 0;
+        if      (strcmp_P(keyBuf, PSTR("temperature_2m"))            == 0) { arrFloat = _weather_forecastTemp;        arrMax = WEATHER_FORECAST_HOURS; }
+        else if (strcmp_P(keyBuf, PSTR("dew_point_2m"))              == 0) { arrFloat = _weather_forecastDewPt;       arrMax = WEATHER_FORECAST_HOURS; }
+        else if (strcmp_P(keyBuf, PSTR("cloud_cover"))               == 0) { arrU8    = _weather_forecastCloud;       arrMax = WEATHER_FORECAST_HOURS; }
+        else if (strcmp_P(keyBuf, PSTR("precipitation_probability")) == 0) { arrU8    = _weather_forecastPrecipProb;  arrMax = WEATHER_FORECAST_HOURS; }
+
+        if (arrFloat || arrU8) {
+          while ((ci = wstreamGet(stream, http)) >= 0) {
+            c = (char)ci;
+            if (c == ']') break;
+            if (c == ',' || c == ' ' || c == '\t' || c == '\n' || c == '\r') continue;
+            if (c == 'n') {                                         // null
+              for (int i = 0; i < 3; i++) wstreamGet(stream, http);  // consume 'ull' after 'n'
+              if (arrPos < arrMax) { if (arrFloat) arrFloat[arrPos++] = 0.0f; else arrU8[arrPos++] = 0; }
+              continue;
+            }
+            if ((c >= '0' && c <= '9') || c == '-') {
+              float val = wstreamReadNumber(stream, http, c);
+              if (arrPos < arrMax) {
+                if (arrFloat) arrFloat[arrPos++] = val;
+                else          arrU8[arrPos++]    = (val < 0 ? 0 : val > 255 ? 255 : (uint8_t)(int)val);
+              }
+            }
+          }
+          if (arrFloat == _weather_forecastTemp) _weather_forecastCount = arrPos;
+        } else {
+          wstreamSkipArray(stream, http);
+        }
+      } else {
+        wstreamSkipArray(stream, http);
+      }
+#else
+      wstreamSkipArray(stream, http);
+#endif  // ifndef ESP8266
+
+    } else if ((c >= '0' && c <= '9') || c == '-') {
+      // ── Scalar number ──
+      float val = wstreamReadNumber(stream, http, c);
+      if (inCurrent) {
+        // Core SAT fields — both platforms
+        if      (strcmp_P(keyBuf, PSTR("temperature_2m"))       == 0) state.sat.weather.fTemperature  = val;
+        else if (strcmp_P(keyBuf, PSTR("apparent_temperature")) == 0) state.sat.weather.fApparentTemp  = val;
+        else if (strcmp_P(keyBuf, PSTR("relative_humidity_2m")) == 0) state.sat.weather.fHumidity      = val;
+        else if (strcmp_P(keyBuf, PSTR("wind_speed_10m"))       == 0) state.sat.weather.fWindSpeed     = val;
+        else if (strcmp_P(keyBuf, PSTR("cloud_cover"))          == 0) state.sat.weather.fCloudCover    = val;
+#ifndef ESP8266
+        // Extended fields — ESP32 only (not requested in ESP8266 URL)
+        else if (strcmp_P(keyBuf, PSTR("wind_direction_10m"))   == 0) state.sat.weather.fWindDirection = val;
+        else if (strcmp_P(keyBuf, PSTR("wind_gusts_10m"))       == 0) state.sat.weather.fWindGusts     = val;
+        else if (strcmp_P(keyBuf, PSTR("pressure_msl"))         == 0) state.sat.weather.fPressureMsl   = val;
+        else if (strcmp_P(keyBuf, PSTR("precipitation"))        == 0) state.sat.weather.fPrecipitation = val;
+        else if (strcmp_P(keyBuf, PSTR("rain"))                 == 0) state.sat.weather.fRain          = val;
+        else if (strcmp_P(keyBuf, PSTR("snowfall"))             == 0) state.sat.weather.fSnowfall      = val;
+        else if (strcmp_P(keyBuf, PSTR("weather_code"))         == 0) state.sat.weather.iWeatherCode   = (uint16_t)val;
+        else if (strcmp_P(keyBuf, PSTR("is_day"))               == 0) state.sat.weather.bIsDay         = (val > 0.0f);
+#endif  // ifndef ESP8266
+      }
+    }
+    // else: true/false/null at top level — not needed for weather fields
+
+    yield();
   }
-
-  *count = n;
-  return n > 0;
 }
 
 //=====================================================================
 //=== HTTP Fetch ===
 //=====================================================================
-void weatherFetch()
+static bool weatherShouldUseOwm()
+{
+  // Use OWM only when a key is configured.
+  return (settings.sat.sWeatherApiKey[0] != '\0');
+}
+
+static void weatherFetchOpenMeteo()
 {
   if (!settings.sat.bWeatherEnable) return;
-  // Need valid coordinates (not both zero)
   if (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f) {
     DebugTln(F("Weather: skipping fetch, no coordinates configured"));
     return;
   }
 
-  // Build URL
-  char url[220];
-  snprintf_P(url, sizeof(url),
-    PSTR("http://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
-         "&current=temperature_2m,relative_humidity_2m,wind_speed_10m"
-         "&hourly=temperature_2m&forecast_days=1"),
-    settings.sat.fWeatherLat, settings.sat.fWeatherLon);
+  // WiFiClient and HTTPClient are resolved via the platform include chain:
+  //   ESP8266: platform_esp8266.h → <ESP8266HTTPClient.h>
+  //   ESP32:   platform_esp32.h   → <HTTPClient.h>
+  // Both expose the same http.begin(WiFiClient&, url) API.
+  char url[512];
+  snprintf_P(url, sizeof(url), kWeatherUrlFmt,
+             settings.sat.fWeatherLat, settings.sat.fWeatherLon);
 
   DebugTf(PSTR("Weather: fetching %s\r\n"), url);
 
-  // WiFiClient and HTTPClient are resolved via the platform include chain:
-  //   ESP8266: platform_esp8266.h → <ESP8266HTTPClient.h> (provides WiFiClient, HTTPClient)
-  //   ESP32:   platform_esp32.h   → <HTTPClient.h>        (provides WiFiClient, HTTPClient)
-  // Both expose the same http.begin(WiFiClient&, url) API, so no #if guard is needed here.
   WiFiClient client;
   HTTPClient http;
-  http.setTimeout(5000);   // 5s timeout — ESP8266 HW WDT fires at ~8s; stay well within margin
+  http.setTimeout(5000);  // 5s — ESP8266 HW WDT fires at ~8s; stay within margin
 
   if (!http.begin(client, url)) {
     DebugTln(F("Weather: http.begin() failed"));
@@ -144,72 +324,31 @@ void weatherFetch()
   yield();
 
   if (httpCode == 200) {
-    // Replace String payload = http.getString() (ADR-004 hot-path repeat
-    // allocation every 15 min, 2-4 KB doubling growth) with a bounded heap
-    // buffer. Fixed 4 KB is plenty for current + 24h forecast; if heap is
-    // low we skip the fetch entirely rather than risk a failed malloc mid-loop.
-    constexpr size_t WEATHER_BUF_SIZE = 4096;
-    if (platformFreeHeap() < (WEATHER_BUF_SIZE + 4096)) {
-      DebugTln(F("Weather: free heap too low for fetch, skipping"));
-      state.sat.weather.iFetchErrors++;
-      http.end();
-      return;
-    }
-    char* json = (char*) malloc(WEATHER_BUF_SIZE);
-    if (!json) {
-      DebugTln(F("Weather: malloc failed, skipping"));
-      state.sat.weather.iFetchErrors++;
-      http.end();
-      return;
-    }
+    // Stream-parse directly — no heap allocation needed.
     WiFiClient* stream = http.getStreamPtr();
-    size_t total = 0;
-    while (stream && stream->connected() && total < WEATHER_BUF_SIZE - 1) {
-      int avail = stream->available();
-      if (avail <= 0) {
-        if (http.connected()) { yield(); delay(1); continue; }
-        break;
-      }
-      int toRead = (int)(WEATHER_BUF_SIZE - 1 - total);
-      if (toRead > avail) toRead = avail;
-      int got = stream->readBytes(json + total, toRead);
-      if (got <= 0) break;
-      total += (size_t)got;
-      yield();
-    }
-    json[total] = '\0';
+    weatherParseStream(stream, &http);
 
-    // Parse current weather from "current" section
-    float temp = 0.0f, hum = 0.0f, wind = 0.0f;
-
-    // Find "current" section to avoid matching hourly keys
-    const char* currentPos = strstr_P(json, PSTR("\"current\""));
-    if (currentPos) {
-      weatherJsonGetFloat(currentPos, PSTR("temperature_2m"), &temp);
-      weatherJsonGetFloat(currentPos, PSTR("relative_humidity_2m"), &hum);
-      weatherJsonGetFloat(currentPos, PSTR("wind_speed_10m"), &wind);
-
-      state.sat.weather.fTemperature = temp;
-      state.sat.weather.fHumidity    = hum;
-      state.sat.weather.fWindSpeed   = wind;
-    }
-
-    // Parse hourly forecast array
-    weatherJsonGetArray(json, PSTR("temperature_2m"),
-                        _weather_forecastTemp, WEATHER_FORECAST_HOURS,
-                        &_weather_forecastCount);
-
-    state.sat.weather.bValid = true;
+    state.sat.weather.bValid       = true;
     state.sat.weather.iLastUpdateMs = millis();
 
-    DebugTf(PSTR("Weather: %.1fC, %d%% humidity, %.1f km/h wind, %d forecast hours (read %u bytes)\r\n"),
+#ifdef ESP8266
+    DebugTf(PSTR("Weather: %.1fC (feels %.1fC), %d%% RH, %.1f km/h wind, %d%% cloud\r\n"),
       state.sat.weather.fTemperature,
+      state.sat.weather.fApparentTemp,
       (int)state.sat.weather.fHumidity,
       state.sat.weather.fWindSpeed,
-      _weather_forecastCount,
-      (unsigned)total);
+      (int)state.sat.weather.fCloudCover);
+#else
+    DebugTf(PSTR("Weather: %.1fC (feels %.1fC), %d%% RH, %.1f km/h wind, %d%% cloud, WMO %d, %d h forecast\r\n"),
+      state.sat.weather.fTemperature,
+      state.sat.weather.fApparentTemp,
+      (int)state.sat.weather.fHumidity,
+      state.sat.weather.fWindSpeed,
+      (int)state.sat.weather.fCloudCover,
+      (int)state.sat.weather.iWeatherCode,
+      _weather_forecastCount);
+#endif  // ifdef ESP8266
 
-    free(json);
   } else {
     DebugTf(PSTR("Weather: HTTP %d\r\n"), httpCode);
     state.sat.weather.iFetchErrors++;
@@ -219,13 +358,134 @@ void weatherFetch()
   feedWatchDog();
 }
 
+// Extract main.temp from OWM current-weather response.
+// Minimal streaming parse: find "main":{..."temp":<num>}.
+static bool weatherParseOwmTemp(WiFiClient* stream, HTTPClient* http, float* outTemp)
+{
+  static const char kNeedleMain[] PROGMEM = "\"main\":";
+  static const char kNeedleTemp[] PROGMEM = "\"temp\":";
+
+  const size_t mainLen = sizeof(kNeedleMain) - 1;
+  const size_t tempLen = sizeof(kNeedleTemp) - 1;
+
+  uint8_t mainPos = 0;
+  bool inMain = false;
+  uint8_t tempPos = 0;
+
+  int ci;
+  while ((ci = wstreamGet(stream, http)) >= 0) {
+    char c = (char)ci;
+
+    if (!inMain) {
+      if (c == (char)pgm_read_byte(&kNeedleMain[mainPos])) {
+        if (++mainPos >= mainLen) { inMain = true; }
+      } else {
+        mainPos = (c == (char)pgm_read_byte(&kNeedleMain[0])) ? 1 : 0;
+      }
+      continue;
+    }
+
+    if (c == (char)pgm_read_byte(&kNeedleTemp[tempPos])) {
+      if (++tempPos >= tempLen) {
+        // Skip whitespace after ':'
+        while ((ci = wstreamGet(stream, http)) >= 0) {
+          c = (char)ci;
+          if (!(c == ' ' || c == '\t' || c == '\n' || c == '\r')) break;
+        }
+        if (ci < 0) return false;
+        if (!((c >= '0' && c <= '9') || c == '-' || c == '+')) return false;
+        *outTemp = wstreamReadNumber(stream, http, c);
+        return true;
+      }
+    } else {
+      tempPos = (c == (char)pgm_read_byte(&kNeedleTemp[0])) ? 1 : 0;
+    }
+  }
+
+  return false;
+}
+
+static void weatherFetchOwm()
+{
+  if (!settings.sat.bWeatherEnable) return;
+  if (!weatherShouldUseOwm()) return;
+  if (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f) {
+    DebugTln(F("Weather(OWM): skipping fetch, no coordinates configured"));
+    return;
+  }
+
+  char url[512];
+  snprintf_P(url, sizeof(url), kWeatherOwmUrlFmt,
+             settings.sat.fWeatherLat,
+             settings.sat.fWeatherLon,
+             settings.sat.sWeatherApiKey);
+
+  DebugTf(PSTR("Weather(OWM): fetching %s\r\n"), url);
+
+  WiFiClient client;
+  HTTPClient http;
+  http.setTimeout(5000);
+
+  if (!http.begin(client, url)) {
+    DebugTln(F("Weather(OWM): http.begin() failed"));
+    state.sat.weather.iFetchErrors++;
+    return;
+  }
+
+  yield();
+  int httpCode = http.GET();
+  yield();
+
+  if (httpCode == 200) {
+    WiFiClient* stream = http.getStreamPtr();
+    float temp;
+    if (weatherParseOwmTemp(stream, &http, &temp)) {
+      state.sat.weather.fTemperature  = temp;
+      state.sat.weather.bValid        = true;
+      state.sat.weather.iLastUpdateMs = millis();
+      DebugTf(PSTR("Weather(OWM): %.1fC\r\n"), state.sat.weather.fTemperature);
+    } else {
+      DebugTln(F("Weather(OWM): parse failed"));
+      state.sat.weather.iFetchErrors++;
+    }
+  } else {
+    DebugTf(PSTR("Weather(OWM): HTTP %d\r\n"), httpCode);
+    state.sat.weather.iFetchErrors++;
+  }
+
+  http.end();
+  feedWatchDog();
+}
+
+void weatherFetch()
+{
+  // Prefer OWM when key is present; otherwise default to Open-Meteo.
+  if (weatherShouldUseOwm()) weatherFetchOwm();
+  else                       weatherFetchOpenMeteo();
+}
+
 //=====================================================================
 //=== Loop — called from main loop (timer-guarded) ===
 //=====================================================================
 void weatherLoop()
 {
   if (!settings.sat.bWeatherEnable) return;
+  // 5-minute startup gate: give the OT bus time to report Toutside before
+  // making the first weather API call.
+  if (millis() < (WEATHER_POLL_MIN_SEC * 1000UL)) return;
+  // If the OT bus already provides a valid outside temperature, avoid
+  // burning weather API calls (SAT only needs weather as a fallback).
+  if (state.sat.Toutside != 0) return;
   if (!DUE(timerWeatherPoll)) return;
+
+  // If we're using OWM, enforce a hard 15-min guard regardless of
+  // user-configured interval.
+  static uint32_t lastOwmFetchMs = 0;
+  if (weatherShouldUseOwm()) {
+    uint32_t now = millis();
+    if (lastOwmFetchMs != 0 && (uint32_t)(now - lastOwmFetchMs) < (WEATHER_OWM_MIN_SEC * 1000UL)) return;
+    lastOwmFetchMs = now;
+  }
   weatherFetch();
 }
 
@@ -235,21 +495,43 @@ void weatherLoop()
 void weatherSendStatusJSON()
 {
   sendStartJsonMap(F(""));
-  sendJsonMapEntry(F("enabled"),     settings.sat.bWeatherEnable);
-  sendJsonMapEntry(F("valid"),       state.sat.weather.bValid);
+  sendJsonMapEntry(F("enabled"),      settings.sat.bWeatherEnable);
+  sendJsonMapEntry(F("valid"),        state.sat.weather.bValid);
 
   {
-    char tmpBuf[8];
-    dtostrf(state.sat.weather.fTemperature, 1, 1, tmpBuf);
-    sendJsonMapEntry(F("temperature"),   tmpBuf);
-    dtostrf(state.sat.weather.fHumidity, 1, 0, tmpBuf);
-    sendJsonMapEntry(F("humidity"),      tmpBuf);
-    dtostrf(state.sat.weather.fWindSpeed, 1, 1, tmpBuf);
-    sendJsonMapEntry(F("wind_speed"),    tmpBuf);
-    dtostrf(settings.sat.fWeatherLat, 1, 4, tmpBuf);
-    sendJsonMapEntry(F("latitude"),      tmpBuf);
-    dtostrf(settings.sat.fWeatherLon, 1, 4, tmpBuf);
-    sendJsonMapEntry(F("longitude"),     tmpBuf);
+    char tmpBuf[10];
+    // Core SAT fields — both platforms
+    dtostrf(state.sat.weather.fTemperature,   1, 1, tmpBuf);
+    sendJsonMapEntry(F("temperature"),         tmpBuf);
+    dtostrf(state.sat.weather.fApparentTemp,  1, 1, tmpBuf);
+    sendJsonMapEntry(F("apparent_temp"),       tmpBuf);
+    dtostrf(state.sat.weather.fHumidity,      1, 0, tmpBuf);
+    sendJsonMapEntry(F("humidity"),            tmpBuf);
+    dtostrf(state.sat.weather.fWindSpeed,     1, 1, tmpBuf);
+    sendJsonMapEntry(F("wind_speed"),          tmpBuf);
+    dtostrf(state.sat.weather.fCloudCover,    1, 0, tmpBuf);
+    sendJsonMapEntry(F("cloud_cover"),         tmpBuf);
+#ifndef ESP8266
+    // Extended fields — ESP32 only
+    dtostrf(state.sat.weather.fWindDirection, 1, 0, tmpBuf);
+    sendJsonMapEntry(F("wind_direction"),      tmpBuf);
+    dtostrf(state.sat.weather.fWindGusts,     1, 1, tmpBuf);
+    sendJsonMapEntry(F("wind_gusts"),          tmpBuf);
+    dtostrf(state.sat.weather.fPressureMsl,   1, 1, tmpBuf);
+    sendJsonMapEntry(F("pressure_msl"),        tmpBuf);
+    dtostrf(state.sat.weather.fPrecipitation, 1, 1, tmpBuf);
+    sendJsonMapEntry(F("precipitation"),       tmpBuf);
+    dtostrf(state.sat.weather.fRain,          1, 1, tmpBuf);
+    sendJsonMapEntry(F("rain"),                tmpBuf);
+    dtostrf(state.sat.weather.fSnowfall,      1, 1, tmpBuf);
+    sendJsonMapEntry(F("snowfall"),            tmpBuf);
+    sendJsonMapEntry(F("weather_code"),        (int32_t)state.sat.weather.iWeatherCode);
+    sendJsonMapEntry(F("is_day"),              state.sat.weather.bIsDay);
+#endif  // ifndef ESP8266
+    dtostrf(settings.sat.fWeatherLat,         1, 4, tmpBuf);
+    sendJsonMapEntry(F("latitude"),            tmpBuf);
+    dtostrf(settings.sat.fWeatherLon,         1, 4, tmpBuf);
+    sendJsonMapEntry(F("longitude"),           tmpBuf);
   }
 
   sendJsonMapEntry(F("fetch_errors"), (int32_t)state.sat.weather.iFetchErrors);
@@ -262,27 +544,64 @@ void weatherSendStatusJSON()
     sendJsonMapEntry(F("age_seconds"), (int32_t)-1);
   }
 
-  // Forecast array as inline JSON array
-  // Single buffer: prefix "forecast": (12 chars) + array max ~169 chars = ~181 total, well within 300
+#ifndef ESP8266
+  // 24-hour forecast arrays — ESP32 only
   {
     char entryBuf[300];
-    // Write the JSON key prefix first; snprintf_P returns chars written (excluding NUL)
-    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast\":["));
+    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast_temp\":["));
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
       if (i > 0 && pos < sizeof(entryBuf) - 9) entryBuf[pos++] = ',';
       char tmpBuf[8];
       dtostrf(_weather_forecastTemp[i], 1, 1, tmpBuf);
       size_t len = strlen(tmpBuf);
-      if (pos + len < sizeof(entryBuf) - 2) {
-        memcpy(entryBuf + pos, tmpBuf, len);
-        pos += len;
-      }
+      if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
     }
-    entryBuf[pos++] = ']';
-    entryBuf[pos] = '\0';
-    sendBeforenext();
-    httpServer.sendContent(entryBuf);
+    entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
+    sendBeforenext(); httpServer.sendContent(entryBuf);
   }
+
+  {
+    char entryBuf[300];
+    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast_dewpt\":["));
+    for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
+      if (i > 0 && pos < sizeof(entryBuf) - 9) entryBuf[pos++] = ',';
+      char tmpBuf[8];
+      dtostrf(_weather_forecastDewPt[i], 1, 1, tmpBuf);
+      size_t len = strlen(tmpBuf);
+      if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
+    }
+    entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
+    sendBeforenext(); httpServer.sendContent(entryBuf);
+  }
+
+  {
+    char entryBuf[200];
+    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast_cloud\":["));
+    for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
+      if (i > 0 && pos < sizeof(entryBuf) - 5) entryBuf[pos++] = ',';
+      char tmpBuf[5];
+      snprintf(tmpBuf, sizeof(tmpBuf), "%d", (int)_weather_forecastCloud[i]);
+      size_t len = strlen(tmpBuf);
+      if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
+    }
+    entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
+    sendBeforenext(); httpServer.sendContent(entryBuf);
+  }
+
+  {
+    char entryBuf[200];
+    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast_precip_prob\":["));
+    for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
+      if (i > 0 && pos < sizeof(entryBuf) - 5) entryBuf[pos++] = ',';
+      char tmpBuf[5];
+      snprintf(tmpBuf, sizeof(tmpBuf), "%d", (int)_weather_forecastPrecipProb[i]);
+      size_t len = strlen(tmpBuf);
+      if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
+    }
+    entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
+    sendBeforenext(); httpServer.sendContent(entryBuf);
+  }
+#endif  // ifndef ESP8266
 
   sendEndJsonMap(F(""));
 }
@@ -297,14 +616,48 @@ void weatherPublishMQTT()
 
   char valBuf[16];
 
-  dtostrf(state.sat.weather.fTemperature, 1, 1, valBuf);
-  sendMQTTData(F("sat/weather/temperature"), valBuf, false);
+  // Core SAT fields — both platforms
+  dtostrf(state.sat.weather.fTemperature,  1, 1, valBuf);
+  sendMQTTData(F("sat/weather/temperature"),  valBuf, false);
 
-  dtostrf(state.sat.weather.fHumidity, 1, 0, valBuf);
-  sendMQTTData(F("sat/weather/humidity"), valBuf, false);
+  dtostrf(state.sat.weather.fApparentTemp, 1, 1, valBuf);
+  sendMQTTData(F("sat/weather/apparent_temp"), valBuf, false);
 
-  dtostrf(state.sat.weather.fWindSpeed, 1, 1, valBuf);
+  dtostrf(state.sat.weather.fHumidity,     1, 0, valBuf);
+  sendMQTTData(F("sat/weather/humidity"),  valBuf, false);
+
+  dtostrf(state.sat.weather.fWindSpeed,    1, 1, valBuf);
   sendMQTTData(F("sat/weather/wind_speed"), valBuf, false);
+
+  dtostrf(state.sat.weather.fCloudCover,   1, 0, valBuf);
+  sendMQTTData(F("sat/weather/cloud_cover"), valBuf, false);
+
+#ifndef ESP8266
+  // Extended fields — ESP32 only
+  dtostrf(state.sat.weather.fWindDirection, 1, 0, valBuf);
+  sendMQTTData(F("sat/weather/wind_direction"), valBuf, false);
+
+  dtostrf(state.sat.weather.fWindGusts,    1, 1, valBuf);
+  sendMQTTData(F("sat/weather/wind_gusts"), valBuf, false);
+
+  dtostrf(state.sat.weather.fPressureMsl,  1, 1, valBuf);
+  sendMQTTData(F("sat/weather/pressure_msl"), valBuf, false);
+
+  dtostrf(state.sat.weather.fPrecipitation, 1, 1, valBuf);
+  sendMQTTData(F("sat/weather/precipitation"), valBuf, false);
+
+  dtostrf(state.sat.weather.fRain,         1, 1, valBuf);
+  sendMQTTData(F("sat/weather/rain"),      valBuf, false);
+
+  dtostrf(state.sat.weather.fSnowfall,     1, 1, valBuf);
+  sendMQTTData(F("sat/weather/snowfall"),  valBuf, false);
+
+  snprintf(valBuf, sizeof(valBuf), "%d", (int)state.sat.weather.iWeatherCode);
+  sendMQTTData(F("sat/weather/weather_code"), valBuf, false);
+
+  snprintf(valBuf, sizeof(valBuf), "%d", state.sat.weather.bIsDay ? 1 : 0);
+  sendMQTTData(F("sat/weather/is_day"),    valBuf, false);
+#endif  // ifndef ESP8266
 }
 
 /***************************************************************************

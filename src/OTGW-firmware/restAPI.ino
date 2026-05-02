@@ -951,6 +951,20 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("weather")) == 0) {
+    if (wc == 5 && strcasecmp_P(words[5], PSTR("needs-setup")) == 0) {
+      if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+      // "Needs setup" means: after startup grace, outside temp still missing
+      // AND weather not yet valid. Browser uses this to trigger the wizard.
+      const bool needs = (millis() >= 300000UL)
+                      && (state.sat.Toutside == 0)
+                      && (!state.sat.weather.bValid);
+      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+      sendStartJsonMap(F(""));
+      sendJsonMapEntry(F("needs_setup"), needs);
+      sendJsonMapEntry(F("has_key"), (settings.sat.sWeatherApiKey[0] != '\0'));
+      sendEndJsonMap(F(""));
+      return;
+    }
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
     httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     weatherSendStatusJSON();

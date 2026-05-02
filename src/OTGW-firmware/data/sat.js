@@ -623,6 +623,11 @@ var SAT = (function() {
     fetchDHWBounds();    // get DHW setpoint upper/lower bounds (MsgID 48)
     fetchStatus(); // immediate first fetch
     fetchWeather(); // immediate weather fetch
+    // Auto-prefill weather coordinates once when none are configured yet.
+    // This is a best-effort helper: if geolocation is unavailable or blocked,
+    // leave it to the user to click "Detect Location".
+    maybeAutoPrefillWeatherLocation();
+    setTimeout(checkWeatherNeedsSetup, 3000);
     _pollTimer = setInterval(fetchStatus, POLL_INTERVAL_MS);
     _weatherTimer = setInterval(fetchWeather, 30000); // weather every 30s
     window.addEventListener('resize', resizeChart);
@@ -833,6 +838,148 @@ var SAT = (function() {
     }, function(err) {
       showFeedback('Location error: ' + err.message, true);
     }, { timeout: 10000 });
+  }
+
+  function maybeAutoPrefillWeatherLocation() {
+    if (!navigator.geolocation) return;
+
+    fetch(APIGW + 'v2/sat/weather')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(r.statusText);
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) return Promise.reject('Not JSON');
+        return r.json();
+      })
+      .then(function(w) {
+        var lat = parseFloat(w.latitude);
+        var lon = parseFloat(w.longitude);
+        if (!isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0)) return;
+
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          var latStr = pos.coords.latitude.toFixed(4);
+          var lonStr = pos.coords.longitude.toFixed(4);
+          var settings = [
+            { name: 'SATweatherlat', value: latStr },
+            { name: 'SATweatherlon', value: lonStr }
+          ];
+          var promises = [];
+          for (var i = 0; i < settings.length; i++) {
+            promises.push(
+              fetch(APIGW + 'v2/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{"name":"' + settings[i].name + '","value":"' + settings[i].value + '"}'
+              })
+            );
+          }
+          Promise.all(promises)
+            .then(function() {
+              // Refresh displayed coords.
+              fetchWeather();
+            })
+            .catch(function() {
+              // Silent failure; user can still use manual detect button.
+            });
+        }, function() {
+          // Silent failure; user can still use manual detect button.
+        }, { timeout: 5000, maximumAge: 3600000 });
+      })
+      .catch(function() {
+        // Ignore; fetchWeather() already logs warnings.
+      });
+  }
+
+  // --- OWM Onboarding Wizard ---
+  var _owmWizardShown = false;
+
+  function checkWeatherNeedsSetup() {
+    if (_owmWizardShown) return;
+    fetch(APIGW + 'v2/sat/weather/needs-setup')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(r.statusText);
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) return Promise.reject('Not JSON');
+        return r.json();
+      })
+      .then(function(d) {
+        if (d && d.needs_setup) {
+          _owmWizardShown = true;
+          showOwmWizard(d);
+        }
+      })
+      .catch(function() {});
+  }
+
+  function showOwmWizard(d) {
+    // Wizard step 1: key
+    var keyMsg = 'Outside temperature is not available.';
+    keyMsg += '\n\nStep 1/2: Enter OpenWeatherMap API key (leave blank to cancel).';
+    var key = window.prompt(keyMsg);
+    if (!key) return;
+
+    // Wizard step 2: validate key (browser HTTPS).
+    // NOTE: This requires https context for fetch(). If blocked, skip validation.
+    validateOwmKey(key)
+      .then(function() {
+        return persistOwmSettings(key);
+      })
+      .catch(function(e) {
+        showFeedback('OWM validation failed: ' + e.message, true);
+      });
+  }
+
+  function validateOwmKey(key) {
+    // Use One Call 3 endpoint as a real validation call.
+    // Use current settings lat/lon if available, else default to 0/0 and fail.
+    return fetch(APIGW + 'v2/sat/weather')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(new Error('HTTP ' + r.status));
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) return Promise.reject(new Error('Not JSON'));
+        return r.json();
+      })
+      .then(function(w) {
+        var lat = parseFloat(w.latitude);
+        var lon = parseFloat(w.longitude);
+        if (!lat && !lon) throw new Error('No location set');
+
+        var url = 'https://api.openweathermap.org/data/3.0/onecall?lat=' + lat.toFixed(4)
+                + '&lon=' + lon.toFixed(4)
+                + '&appid=' + encodeURIComponent(key)
+                + '&units=metric&exclude=minutely,hourly,daily,alerts';
+
+        return fetch(url)
+          .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(function(j) {
+            if (!j || !j.current || typeof j.current.temp !== 'number') throw new Error('Invalid response');
+          });
+      });
+  }
+
+  function persistOwmSettings(key) {
+    var posts = [];
+    posts.push(fetch(APIGW + 'v2/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"name":"SATweatherapikey","value":"' + String(key).replace(/"/g, '') + '"}'
+    }));
+    posts.push(fetch(APIGW + 'v2/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"name":"SATweatherenable","value":"1"}'
+    }));
+
+    return Promise.all(posts)
+      .then(function(responses) {
+        for (var i = 0; i < responses.length; i++) {
+          if (responses[i] && !responses[i].ok) throw new Error('HTTP ' + responses[i].status);
+        }
+        showFeedback('OWM key saved; weather enabled', false);
+        setTimeout(fetchWeather, 2000);
+      });
   }
 
   function toggleRawData() {
