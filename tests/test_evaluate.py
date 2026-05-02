@@ -497,6 +497,32 @@ class TestOTDirect25238BridgeRegression(unittest.TestCase):
         self.assertFalse(checks["ownership_split"])
 
 
+class TestHAOutsideTemperatureRoute(unittest.TestCase):
+    """Pin the HA outside-temperature command route into OTDirect/SAT state."""
+
+    def test_mqtt_outside_aliases_map_to_ot_command(self):
+        mqtt = (REPO_ROOT / "src" / "OTGW-firmware" / "MQTTstuff.ino").read_text(
+            encoding="utf-8",
+            errors="ignore",
+        )
+
+        self.assertIn('const char s_cmd_outside[] PROGMEM = "outside";', mqtt)
+        self.assertIn('const char s_cmd_outside_temp[] PROGMEM = "outside_temp";', mqtt)
+        self.assertIn("{   s_cmd_outside, s_otgw_OT, s_temp },", mqtt)
+        self.assertIn("{   s_cmd_outside_temp, s_otgw_OT, s_temp },", mqtt)
+
+    def test_otdirect_ot_command_updates_toutside_state(self):
+        otdirect = (REPO_ROOT / "src" / "OTGW-firmware" / "OTDirect.ino").read_text(
+            encoding="utf-8",
+            errors="ignore",
+        )
+
+        self.assertIn("else if (cmd0 == 'O' && cmd1 == 'T')", otdirect)
+        self.assertIn('enqueueWriteCommand(27, f88, "OT")', otdirect)
+        self.assertIn("OTcurrentSystemState.Toutside = (int16_t)f88 / 256.0f;", otdirect)
+        self.assertIn("dtostrf(OTcurrentSystemState.Toutside, 1, 2, rspBuf);", otdirect)
+
+
 class TestProgmemComplianceIntegration(unittest.TestCase):
     """Smoke test: confirm the main evaluator wiring still works end-to-end."""
 

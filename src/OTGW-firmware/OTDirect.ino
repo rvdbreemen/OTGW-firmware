@@ -2561,7 +2561,8 @@ void handleOTDirectCommand(const char* buf, int len) {
     } else {
       uint16_t f88 = floatToF88(atof(value));
       if (enqueueWriteCommand(27, f88, "OT")) {
-        dtostrf(atof(value), 1, 2, rspBuf);
+        OTcurrentSystemState.Toutside = (int16_t)f88 / 256.0f;
+        dtostrf(OTcurrentSystemState.Toutside, 1, 2, rspBuf);
         synthesizeResponse(buf, rspBuf);
       }
     }
