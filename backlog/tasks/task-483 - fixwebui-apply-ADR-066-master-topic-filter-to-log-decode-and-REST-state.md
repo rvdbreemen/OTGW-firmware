@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-29 22:20'
-updated_date: '2026-05-02 14:49'
+updated_date: '2026-05-02 15:59'
 labels:
   - webui
   - ADR-066
@@ -30,7 +30,7 @@ Port van TASK-481 (feature branch commit c694fbdf) naar dev / 1.5.0-beta.4. TASK
 - [x] #3 State-write is gated on validForMaster
 - [x] #4 Tier 3 (publishToSourceTopic) and Tier 4 (sendMQTTData base topic) call sites unchanged
 - [x] #5 evaluate.py passes (no new violations beyond pre-existing baseline)
-- [ ] #6 ESP8266 build clean (python build.py --firmware)
+- [x] #6 ESP8266 build clean (python build.py --firmware)
 - [ ] #7 Hardware verification deferred to tester: WebUI stats stable, OT-log shows one decoded value per WRITE-pair
 - [x] #8 #8 PS=1 summary path (publishPSSummaryFieldValue in OTGW-Core.ino) gates sendMQTTData base-topic publish on bSlaveEchoesValue lookup for non-echo MsgIDs (Tr/TrSet/TrSetCH2/TSet/TsetCH2/MaxRelModLevelSetting and any other OT_WRITE/OT_RW MsgID with bSlaveEchoesValue=false in OTmap)
 - [x] #9 #9 PS=1 summary path skips updatePSSummaryFloatState/U16State for non-echo MsgIDs to keep OTcurrentSystemState consistent with the live-bus gate
@@ -52,4 +52,8 @@ Port van TASK-481 (feature branch commit c694fbdf) naar dev / 1.5.0-beta.4. TASK
 2026-05-02: ACs #1-#4 marked satisfied by code review on dev branch. AC #5 (evaluate.py clean) and AC #6 (ESP8266 build clean) to be verified after implementing AC #8-#11. AC #7 (hardware verification by reporter) remains blocked on _reuzenpanda_'s telnet+OTmonitor logs and possibly on confirming whether his setup runs PS=1.
 
 2026-05-02 implementation landed on branch fix-issue-ps1-master-topic-gate. Commits: 8ad56896 (chore: triage bookkeeping for run 2026-05-02 on dev), 35d956b2 (chore: bump version to v1.5.0-beta.5), 07d67990 (fix: extend ADR-066 to PS=1 path). ACs #5/#8-#13 marked satisfied: evaluate.py --quick health 91.7% (no new violations beyond pre-existing 2 ADR-ref unresolved baseline + 2 unrelated WARN); new gate check_ps_summary_master_topic_gate registered and PASS; ADR-066 amended with PS=1 section; helper is_msgid_valid_for_master_topic_in_ps_summary added; all 6 value-bearing cases gated; ot_flag8flag8 untouched; setMsgLastUpdated retained as cosmetic; DebugTln trace one-per-call. AC #6 (ESP8266 build clean) pending: build was backgrounded twice during this session, output buffer empty when checked. AC #7 (hardware verification by _reuzenpanda_) blocked on his telnet+OTmonitor logs; do NOT publish v1.5.0-beta.5 until logs confirm whether his setup runs PS=1 (root cause match) or whether hypothesis B (live-bus residual / retained MQTT / HA-integration polling) needs separate investigation.
+
+2026-05-02 (post-merge build verification): AC #6 satisfied. Ran incremental `python build.py --firmware` on dev tip 794bd414 after fast-forward merge of fix-issue-ps1-master-topic-gate. Build exit 0, no compiler errors or warnings, artifact OTGW-firmware-1.5.0-beta.5+794bd41.ino.bin (0.70 MB) generated. Only cleanup notice was a Windows file-lock on .tmp/echarts/.git/objects (unrelated to firmware build).
+
+TASK-483 stays In Progress: AC #7 (hardware verification by _reuzenpanda_) still blocked on his telnet+OTmonitor logs. Per standing rule do NOT publish v1.5.0-beta.5 until those logs land.
 <!-- SECTION:NOTES:END -->
