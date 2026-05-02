@@ -3518,7 +3518,8 @@ var SAT_SETTINGS_GROUPS = [
       { key: 'satweatherenable',   label: 'Weather Enable',         type: 'b' },
       { key: 'satweatherlat',      label: 'Latitude',               type: 'f', min: -90.0, max: 90.0, step: 0.0001 },
       { key: 'satweatherlon',      label: 'Longitude',              type: 'f', min: -180.0, max: 180.0, step: 0.0001 },
-      { key: 'satweatherinterval', label: 'Fetch Interval',         type: 'i', unit: 's', min: 60, max: 3600, step: 60 },
+      // TASK-511: hard floor at 900 s (15 min) per OWM free-tier rate-limit (1000 calls/day).
+      { key: 'satweatherinterval', label: 'Fetch Interval',         type: 'i', unit: 's', min: 900, max: 3600, step: 60 },
       { key: 'satweatherapikey',   label: 'OWM API Key',            type: 's', maxlen: 64, size: 40, hidden: true }
     ]
   },
@@ -6217,7 +6218,7 @@ var translateTooltips = [
   , ["SATweatherenable", "Enable weather data fetching from Open-Meteo API (free, no key needed). Provides outdoor temperature fallback when no OT outdoor sensor is available."]
   , ["SATweatherlat", "Latitude for weather data. Use the Detect Location button on the SAT dashboard, or enter manually (-90 to 90)."]
   , ["SATweatherlon", "Longitude for weather data. Use the Detect Location button on the SAT dashboard, or enter manually (-180 to 180)."]
-  , ["SATweatherinterval", "How often to fetch weather data in seconds (300-3600). Default 900 (15 minutes). Minimum 300 (5 minutes)."]
+  , ["SATweatherinterval", "How often to fetch weather data in seconds (900-3600). Default 900 (15 minutes). Minimum 900 enforced to honour OpenWeatherMap free-tier rate-limit (1000 calls/day)."]
   , ["SATweatherapikey", "OpenWeatherMap API key. Get a free key at openweathermap.org. Leave blank to use Open-Meteo (free, no key needed)."]
   , ["otdmode", "Gateway: full control with overrides. Monitor: transparent pass-through, observe only. Bypass: thermostat talks directly to boiler via relay. Master: standalone, no thermostat needed."]
   , ["otdautodetect", "At boot, wait 5 seconds for thermostat on the bus. If none found, automatically switch to Master mode."]

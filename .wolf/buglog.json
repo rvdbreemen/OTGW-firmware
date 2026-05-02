@@ -232,7 +232,13 @@
       "file": "src/OTGW-firmware/SATble.ino",
       "root_cause": "Phase-1 research suggested setting settingsDirty=true directly to trigger the settings-flush debounce, but settingsDirty is a file-static (private to settingStuff.ino:21) and not externally accessible. Cross-file write would require exposing it as extern, breaking encapsulation.",
       "fix": "Route the dirty-trigger through updateSetting(\"SATblerostercount\", \"<n>\"). updateSetting() is the public API that already sets settingsDirty=true and RESTART_TIMER(timerFlushSettings) at lines 979-980. Same effect, encapsulation preserved.",
-      "tags": ["task-508", "settings", "encapsulation", "cross-task-write", "compile-error"],
+      "tags": [
+        "task-508",
+        "settings",
+        "encapsulation",
+        "cross-task-write",
+        "compile-error"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-01T22:34:00.000Z"
@@ -244,8 +250,15 @@
       "file": "src/OTGW-firmware/SATble.ino",
       "root_cause": "TASK-506 wrote `a = b = c = d = e = 0;` where all targets are volatile uint32_t. C++20 (DR2138) deprecates this idiom: the value of an assignment to a volatile lvalue is itself volatile and chaining propagates that. ESP8266 toolchain accepts it; ESP32-S3 xtensa-esp gcc warns.",
       "fix": "Reset each counter on its own line. Verbose but C++20-clean and forward-compatible.",
-      "tags": ["task-508", "cpp20", "volatile", "deprecation"],
-      "related_bugs": ["bug-015"],
+      "tags": [
+        "task-508",
+        "cpp20",
+        "volatile",
+        "deprecation"
+      ],
+      "related_bugs": [
+        "bug-015"
+      ],
       "occurrences": 1,
       "last_seen": "2026-05-01T22:34:30.000Z"
     },
@@ -256,10 +269,64 @@
       "file": "src/OTGW-firmware/data/index.js",
       "root_cause": "First version of buildBleSensorsPanel() / renderBleRoster() built panel HTML via .innerHTML with template-string-interpolated user data. Even with an HTML-escape helper for labels and strict regex MAC validation, the security hook blocks innerHTML on principle when interpolation touches user-controlled text.",
       "fix": "Refactored to pure DOM API: createElement + textContent + appendChild for every node. No innerHTML anywhere in the new BLE panel code. Sensor labels go through textContent which the browser cannot interpret as HTML.",
-      "tags": ["task-508", "xss", "security-hook", "dom-api", "ui"],
+      "tags": [
+        "task-508",
+        "xss",
+        "security-hook",
+        "dom-api",
+        "ui"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-01T22:35:00.000Z"
+    },
+    {
+      "id": "bug-018",
+      "timestamp": "2026-05-02T11:23:53.715Z",
+      "error_message": "Incorrect value in code",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "Had \"How often to fetch weather data in seconds (300-3",
+      "fix": "Changed to \"How often to fetch weather data in seconds (900-3",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-02T11:23:53.715Z"
+    },
+    {
+      "id": "bug-019",
+      "timestamp": "2026-05-02T11:24:23.384Z",
+      "error_message": "Significant refactor of ",
+      "file": "plan/feature-openweathermap-onboarding-1.md",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 5→5 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-02T11:24:23.385Z"
+    },
+    {
+      "id": "bug-020",
+      "timestamp": "2026-05-02T11:27:38.102Z",
+      "error_message": "Wrong condition in logic",
+      "file": "src/OTGW-firmware/SATweather.ino",
+      "root_cause": "Condition was: if (state.sat.Toutside != 0)",
+      "fix": "Changed to: if (OTcurrentSystemState.Toutside != 0.0f)",
+      "tags": [
+        "auto-detected",
+        "logic-fix",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-02T11:27:38.102Z"
     }
   ]
 }

@@ -955,8 +955,11 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
       // "Needs setup" means: after startup grace, outside temp still missing
       // AND weather not yet valid. Browser uses this to trigger the wizard.
+      // TASK-511: canonical struct is OTcurrentSystemState (PR #559 used a
+      // non-existent state.sat.Toutside). See OTGW-Core.ino:3490 where OT
+      // message ID 27 populates this field.
       const bool needs = (millis() >= 300000UL)
-                      && (state.sat.Toutside == 0)
+                      && (OTcurrentSystemState.Toutside == 0.0f)
                       && (!state.sat.weather.bValid);
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
       sendStartJsonMap(F(""));

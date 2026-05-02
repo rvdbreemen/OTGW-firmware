@@ -844,7 +844,10 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATweatherlat")) == 0)    settings.sat.fWeatherLat = constrain(atof(newValue), -90.0f, 90.0f);
   else if (strcasecmp_P(field, PSTR("SATweatherlon")) == 0)    settings.sat.fWeatherLon = constrain(atof(newValue), -180.0f, 180.0f);
   else if (strcasecmp_P(field, PSTR("SATweatherinterval")) == 0) {
-    settings.sat.iWeatherInterval = constrain(atoi(newValue), 300, 3600);
+    // TASK-511 (TASK-004 from OWM onboarding plan): hard floor at 900 s
+    // (15 min) to honour the OWM free-tier rate-limit promise. Both
+    // Open-Meteo and OWM share this floor.
+    settings.sat.iWeatherInterval = constrain(atoi(newValue), 900, 3600);
     CHANGE_INTERVAL_SEC(timerWeatherPoll, settings.sat.iWeatherInterval);
   }
   else if (strcasecmp_P(field, PSTR("SATweatherapikey")) == 0) {

@@ -55,6 +55,11 @@ DECLARE_TIMER_SEC(timerWeatherPoll, WEATHER_POLL_DEFAULT_SEC, SKIP_MISSED_TICKS)
 //=== API URL format strings (PROGMEM) ===
 //=====================================================================
 
+// TASK-511: Open-Meteo URL format differs per platform (ESP8266 minimal 5
+// fields, ESP32 full data set), so the Open-Meteo constant is per-platform.
+// OpenWeatherMap is platform-agnostic (same URL, same response shape) so the
+// OWM constant lives outside the platform split. PR #559 originally defined
+// kWeatherOwmUrlFmt only in the ESP8266 branch, breaking the ESP32 build.
 #ifdef ESP8266
 // Minimal current-conditions request: only the 5 fields SAT actually uses.
 // Produces ~450-byte response — stream-parsed with no heap allocation.
@@ -63,10 +68,6 @@ static const char kWeatherUrlFmt[] PROGMEM =
   "http://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
   "&current=temperature_2m,relative_humidity_2m,apparent_temperature"
   ",wind_speed_10m,cloud_cover";
-
-// OpenWeatherMap Current Weather API (HTTP, firmware-side). Key required.
-static const char kWeatherOwmUrlFmt[] PROGMEM =
-  "http://api.openweathermap.org/data/2.5/weather?lat=%.4f&lon=%.4f&appid=%s&units=metric";
 #else
 // Full data set for ESP32: all 15 current fields + 24-hour hourly forecasts.
 static const char kWeatherUrlFmt[] PROGMEM =
@@ -78,6 +79,11 @@ static const char kWeatherUrlFmt[] PROGMEM =
   "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature"
   ",precipitation_probability,cloud_cover,cloud_cover_low,cloud_cover_mid";
 #endif  // ifdef ESP8266
+
+// OpenWeatherMap Current Weather API (HTTP, firmware-side). Key required.
+// Same URL on both platforms; ~400-byte response.
+static const char kWeatherOwmUrlFmt[] PROGMEM =
+  "http://api.openweathermap.org/data/2.5/weather?lat=%.4f&lon=%.4f&appid=%s&units=metric";
 
 //=====================================================================
 //=== Streaming JSON parser — no heap allocation ===
@@ -475,7 +481,10 @@ void weatherLoop()
   if (millis() < (WEATHER_POLL_MIN_SEC * 1000UL)) return;
   // If the OT bus already provides a valid outside temperature, avoid
   // burning weather API calls (SAT only needs weather as a fallback).
-  if (state.sat.Toutside != 0) return;
+  // TASK-511: canonical struct is OTcurrentSystemState (see OTGW-Core.ino:3490
+  // where OT message ID 27 populates this field). PR #559 originally referenced
+  // a non-existent state.sat.Toutside and would not compile.
+  if (OTcurrentSystemState.Toutside != 0.0f) return;
   if (!DUE(timerWeatherPoll)) return;
 
   // If we're using OWM, enforce a hard 15-min guard regardless of
