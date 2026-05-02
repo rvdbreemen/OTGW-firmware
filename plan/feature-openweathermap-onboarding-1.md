@@ -1,16 +1,16 @@
 ---
 goal: OpenWeatherMap Onboarding - auto-detect missing outside temperature and guide user through API key + location setup
-version: 1.1
+version: 1.2
 date_created: 2026-05-02
 last_updated: 2026-05-02
 owner: rvdbreemen/OTGW-firmware
-status: 'Planned'
+status: 'In Progress'
 tags: [feature, weather, sat, ui, onboarding]
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: In Progress](https://img.shields.io/badge/status-In%20Progress-yellow)
 
 When OTGW-firmware starts up and the SAT subsystem has been running for at least 5 minutes
 without a valid outside temperature (neither from the OT bus nor the existing weather provider),
@@ -91,11 +91,12 @@ diagnosed and fixed first (Phase 0). Open-Meteo remains the zero-config fallback
 | Task | Description | Completed | Date |
 | ---- | ----------- | --------- | ---- |
 | TASK-000 | **Investigate zero-temperature bug**: With `bWeatherEnable=true` and valid lat/lon set, reproduce the "outside temp stays at zero" condition. Check via telnet debug output: (a) does `weatherFetch()` actually run (is `bWeatherEnable` true and `DUE(timerWeatherPoll)` firing)? (b) does the HTTP GET succeed with code 200? (c) is the JSON "current" section present and does `weatherJsonGetFloat()` find `temperature_2m`? Log findings. | | |
-| TASK-001 | **Fix `weatherJsonGetFloat()` PROGMEM key argument**: The function signature accepts `PGM_P key` but uses `snprintf_P(search, sizeof(search), PSTR("\"%s\":"), key)` where `%s` reads a RAM pointer. On ESP8266, PROGMEM `%s` in `snprintf_P` may not be portable. Fix by using `char keyBuf[32]` + `strncpy_P(keyBuf, key, sizeof(keyBuf)-1)` before building the search string, or by using `snprintf_P` with `%S` if supported, to ensure the key is correctly read from flash. Confirm fix with a test fetch producing a non-zero temperature on telnet. | | |
+| TASK-001 | **Fix `weatherJsonGetFloat()` + `weatherJsonGetArray()` PROGMEM key handling**: Both functions previously used `snprintf_P(search, sizeof(search), PSTR("\"%s\":"), key)` where `key` is a `PGM_P` (PROGMEM) — `%s` reads a RAM pointer, not a flash pointer. On ESP8266, unaligned flash reads cause Exception(2). Fixed by adding `char keyBuf[32]; strncpy_P(keyBuf, key, sizeof(keyBuf)-1);` before building the search string, and using `snprintf(search, sizeof(search), "\"...\", keyBuf)` (RAM-only). | ✓ | 2026-05-02 |
+| TASK-001a | **Expand Open-Meteo API to full SAT data set** (developer request): Update `weatherFetch()` URL to request all current-conditions fields relevant for SAT thermal load (`temperature_2m`, `apparent_temperature`, `relative_humidity_2m`, `is_day`, `precipitation`, `rain`, `showers`, `snowfall`, `weather_code`, `cloud_cover`, `pressure_msl`, `surface_pressure`, `wind_speed_10m`, `wind_direction_10m`, `wind_gusts_10m`) plus 24-hour hourly forecasts (`temperature_2m`, `relative_humidity_2m`, `dew_point_2m`, `apparent_temperature`, `precipitation_probability`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`). Add corresponding fields to `state.sat.weather` struct in `SATtypes.h`. Add new static hourly arrays (`_weather_forecastDewPt[]`, `_weather_forecastCloud[]` as uint8_t, `_weather_forecastPrecipProb[]` as uint8_t). Increase heap buffer from 4096 to 5120 bytes; lower guard from +4096 to +2048 (response is ~3-4 KB). Update `weatherSendStatusJSON()` and `weatherPublishMQTT()` to expose all new fields. Add `weatherJsonGetArrayU8()` helper for integer arrays. | ✓ | 2026-05-02 |
 | TASK-002 | **Verify `satGetOutsideTemp()` uses weather data when Toutside == 0**: The priority chain in `SATcontrol.ino` uses weather data only when `OTcurrentSystemState.Toutside == 0.0f`. Add telnet debug log entry when weather fallback is activated so the operator can confirm it is in use. | | |
 | TASK-003 | **Add `weatherLoop()` 5-minute startup gate and outside-temp guard**: Change `weatherLoop()` to: `if (state.uptime.iSeconds < 300) return;` (5-minute startup delay) and `if (OTcurrentSystemState.Toutside != 0.0f) return;` (skip when OT bus already provides outside temp). Both guards apply to both Open-Meteo and OWM paths. | | |
 | TASK-004 | **Fix minimum interval for Open-Meteo**: Enforce `iWeatherInterval >= 900` in `updateSetting()` (currently the setting allows 60 s as minimum per `sendJsonSettingObj` range). Change the `constrain()` floor from 60 to 900 to match the 15-minute requirement. Update the `sat-grp-weather` settings group `min` value in `index.js` to 900 accordingly. | | |
-| TASK-005 | **Validate auto-start after 5 minutes**: Reboot firmware, enable weather with valid lat/lon. Confirm via telnet debug log that the first fetch does NOT occur in the first 5 minutes, and DOES occur after 5 minutes when `Toutside == 0`. Confirm temperature reads non-zero. | | |
+| TASK-005 | **Validate auto-start after 5 minutes**: Reboot firmware, enable weather with valid lat/lon. Confirm via telnet debug log that the first fetch does NOT occur in the first 5 minutes, and DOES occur after 5 minutes when `Toutside == 0`. Confirm temperature reads non-zero and expanded telnet line shows e.g. `Weather: 7.3C (feels 4.1C), 72% RH, 12.5 km/h wind, 75% cloud, WMO 3, 24 h forecast, 4212 bytes`. | | |
 
 ### Implementation Phase 1 - Firmware: OWM setting + HTTP fetch
 

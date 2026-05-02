@@ -246,11 +246,23 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // OT setpoint sync
   bool     bSetpointMismatch      = false;
   uint32_t iMismatchSinceMs       = 0;
-  // Weather data (Open-Meteo API)
+  // Weather data (Open-Meteo API) — expanded field set for SAT thermal calculations
   struct {
-    float    fTemperature    = 0.0f;   // Current outdoor temperature (C)
-    float    fHumidity       = 0.0f;   // Current relative humidity (%)
-    float    fWindSpeed      = 0.0f;   // Current wind speed (km/h)
+    // --- Current conditions ---
+    float    fTemperature    = 0.0f;   // temperature_2m: outdoor temperature (°C)
+    float    fApparentTemp   = 0.0f;   // apparent_temperature: "feels like" (°C) — wind chill / heat index
+    float    fHumidity       = 0.0f;   // relative_humidity_2m (%)
+    float    fWindSpeed      = 0.0f;   // wind_speed_10m (km/h)
+    float    fWindDirection  = 0.0f;   // wind_direction_10m (°) — wind chill direction
+    float    fWindGusts      = 0.0f;   // wind_gusts_10m (km/h)
+    float    fCloudCover     = 0.0f;   // cloud_cover (%) — for solar gain decisions
+    float    fPressureMsl    = 0.0f;   // pressure_msl (hPa) — mean sea level pressure
+    float    fPrecipitation  = 0.0f;   // precipitation (mm/h) — total
+    float    fRain           = 0.0f;   // rain (mm/h)
+    float    fSnowfall       = 0.0f;   // snowfall (cm/h)
+    uint16_t iWeatherCode    = 0;      // weather_code (WMO code) — for UI display
+    bool     bIsDay          = true;   // is_day flag (1=day, 0=night) — solar gain
+    // --- State ---
     bool     bValid          = false;  // true after first successful fetch
     uint32_t iLastUpdateMs   = 0;      // millis() of last successful fetch
     uint16_t iFetchErrors    = 0;      // consecutive or total fetch error count
