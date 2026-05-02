@@ -462,18 +462,19 @@ var SAT = (function() {
       });
     }
 
-    // Current operating point
-    if (outsideTemp !== null && outsideTemp !== undefined &&
-        currentSetpoint !== null && currentSetpoint !== undefined) {
-      series.push({
-        name: 'Current',
-        type: 'scatter',
-        data: [[outsideTemp, Math.round(currentSetpoint * 10) / 10]],
-        symbolSize: 14,
-        itemStyle: { color: '#ff3300', borderColor: '#fff', borderWidth: 2 },
-        z: 10
-      });
-    }
+    // Current operating point — always include so the partial-update path in
+    // updateCurveChart can reliably move the dot without a full rebuild.
+    series.push({
+      name: 'Current',
+      type: 'scatter',
+      data: (outsideTemp !== null && outsideTemp !== undefined &&
+             currentSetpoint !== null && currentSetpoint !== undefined)
+        ? [[outsideTemp, Math.round(currentSetpoint * 10) / 10]]
+        : [],
+      symbolSize: 14,
+      itemStyle: { color: '#ff3300', borderColor: '#fff', borderWidth: 2 },
+      z: 10
+    });
 
     return {
       tooltip: {
@@ -522,6 +523,12 @@ var SAT = (function() {
     _curveChartInstance.setOption(buildCurveOption(1.5, 0, 20.0, null, null, 'light'));
   }
 
+  // Safe float comparison that avoids NaN when either value is null/undefined.
+  function _approxChanged(a, b, eps) {
+    if (a == null || b == null) return a !== b;
+    return Math.abs(a - b) > eps;
+  }
+
   function updateCurveChart(d) {
     if (!_curveChartInstance) return;
     var coeff = d.coefficient;
@@ -533,7 +540,7 @@ var SAT = (function() {
     // Only rebuild full curve family when parameters change
     var needsRebuild = (coeff !== _lastCurveCoeff ||
                         system !== _lastCurveSystem ||
-                        Math.abs(target - _lastCurveTarget) > 0.05);
+                        _approxChanged(target, _lastCurveTarget, 0.05));
 
     if (needsRebuild) {
       _lastCurveCoeff = coeff;
