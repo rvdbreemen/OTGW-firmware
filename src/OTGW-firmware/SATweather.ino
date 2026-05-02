@@ -297,6 +297,59 @@ static bool weatherShouldUseOwm()
   return (settings.sat.sWeatherApiKey[0] != '\0');
 }
 
+// Forward declaration so the public debug wrapper below can call the
+// file-static implementation that is defined further down.
+static void weatherFetchOpenMeteo();
+
+// Structured dump of the cached weather state to the telnet debug
+// console. Called after the manual fetch triggered by the 'w' shortcut.
+static void weatherDumpStateToTelnet()
+{
+  Debugln(F("--- Weather state (Open-Meteo) ---"));
+  Debugf(PSTR("  Valid         : %s\r\n"), state.sat.weather.bValid ? "YES" : "no");
+  if (state.sat.weather.iLastUpdateMs != 0) {
+    uint32_t ageMs = (uint32_t)(millis() - state.sat.weather.iLastUpdateMs);
+    Debugf(PSTR("  Last update   : %lu ms ago\r\n"), (unsigned long)ageMs);
+  } else {
+    Debugln(F("  Last update   : never"));
+  }
+  Debugf(PSTR("  Fetch errors  : %ld\r\n"), (long)state.sat.weather.iFetchErrors);
+  Debugf(PSTR("  Coords        : %.4f, %.4f\r\n"),
+         settings.sat.fWeatherLat, settings.sat.fWeatherLon);
+  if (!state.sat.weather.bValid) {
+    Debugln(F("  (no successful fetch yet — check enable flag, coords, network)"));
+    Debugln(F("---"));
+    return;
+  }
+  Debugf(PSTR("  Day/Night     : %s\r\n"), state.sat.weather.bIsDay ? "day" : "night");
+  Debugf(PSTR("  Weather code  : %u\r\n"), state.sat.weather.iWeatherCode);
+  Debugf(PSTR("  Temperature   : %.2f C  (apparent: %.2f C)\r\n"),
+         state.sat.weather.fTemperature, state.sat.weather.fApparentTemp);
+  Debugf(PSTR("  Humidity      : %d %%\r\n"), (int)state.sat.weather.fHumidity);
+  Debugf(PSTR("  Cloud cover   : %d %%\r\n"), (int)state.sat.weather.fCloudCover);
+  Debugf(PSTR("  Pressure      : %.1f hPa\r\n"), state.sat.weather.fPressureMsl);
+  Debugf(PSTR("  Wind speed    : %.1f km/h  (gusts: %.1f, dir: %.0f deg)\r\n"),
+         state.sat.weather.fWindSpeed,
+         state.sat.weather.fWindGusts,
+         state.sat.weather.fWindDirection);
+  Debugf(PSTR("  Precipitation : %.1f mm  (rain: %.1f, snow: %.1f)\r\n"),
+         state.sat.weather.fPrecipitation,
+         state.sat.weather.fRain,
+         state.sat.weather.fSnowfall);
+  Debugln(F("---"));
+}
+
+// Public entry point for the telnet debug 'w' shortcut. Bypasses the
+// 3600-second scheduler interval but still honours the bWeatherEnable
+// flag and coordinate-configured guard inside weatherFetchOpenMeteo().
+// Dumps the resulting cached state in a structured block.
+void weatherFetchOpenMeteoNow()
+{
+  DebugTln(F("Weather: manual Open-Meteo fetch triggered via debug telnet"));
+  weatherFetchOpenMeteo();
+  weatherDumpStateToTelnet();
+}
+
 static void weatherFetchOpenMeteo()
 {
   if (!settings.sat.bWeatherEnable) return;

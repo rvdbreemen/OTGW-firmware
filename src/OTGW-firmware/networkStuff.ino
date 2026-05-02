@@ -391,7 +391,12 @@ static void sendTelnetBanner(const char* ip)
   _debugPrintf_P(PSTR("    4 MQTT gating : %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
   _debugPrintf_P(PSTR("    5 Sensors     : %s\r\n"), CBOOLEAN(state.debug.bSensors));
   _debugPrintf_P(PSTR("    6 NTP sync    : %s\r\n"), CBOOLEAN(state.debug.bNTP));
+#if defined(ESP32)
+  _debugPrintf_P(PSTR("    7 SAT BLE     : %s\r\n"), CBOOLEAN(state.debug.bSATBLE));
+#endif
   debugTelnet.println(F("--------------------------------------------"));
+  debugTelnet.println(F("  Commands:"));
+  debugTelnet.println(F("    w  Open-Meteo fetch + dump"));
   debugTelnet.println(F("  Press 'h' for the full debug menu."));
   _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip);
   debugTelnet.println(F("============================================\r\n"));

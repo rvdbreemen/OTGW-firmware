@@ -1,3 +1,6 @@
+// Forward declaration — defined in SATweather.ino.
+void weatherFetchOpenMeteoNow();
+
 // Dispatch a single keypress from the telnet debug session.
 // Called from onTelnetInput() in networkStuff.ino via the SimpleTelnet
 // onInputReceived callback (line mode off — one char per call).
@@ -58,6 +61,7 @@ void handleDebugChar(char c){
                 Debugln(F("p) Reset PIC manually"));
                 Debugln(F("a) Send PR=A command to ID PIC firmware version and type"));
                 Debugln(F("s/S) Toggle OTGW serial simulation replay"));
+                Debugln(F("w) Trigger Open-Meteo weather fetch and dump state"));
                 Debugln(F("--- GPIO/Debug ---"));
                 Debugln(F("b) Blink LED 1 (5 times)"));
                 Debugln(F("i) Initialize relay outputs"));
@@ -201,6 +205,9 @@ void handleDebugChar(char c){
                 break;
             case 'f':
                 DebugTf(PSTR("MyDEBUG: %s\r\n"), CBOOLEAN(settings.bMyDEBUG));
+                break;
+            case 'w':
+                weatherFetchOpenMeteoNow();
                 break;
             default:
                 break;
