@@ -647,6 +647,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] = {
   { "max_modulation",         "SATmaxmodulation",     nullptr },
   { "dhw_setpoint",           "SATdhwsetpoint",       nullptr },
   { "dhw_enabled",            "SATdhwenabled",        nullptr },
+  { "dhw_enable",             "SATdhwenable",         nullptr }, // TASK-516: master DHW enable (HW= command, gated on MsgID 3 HB3)
   { "interval",               "SATinterval",          nullptr },
   { "ovp_value",              "SATovpvalue",          nullptr },
   { "ovp_enabled",            "SATovpenabled",        nullptr },
@@ -1808,8 +1809,13 @@ void doAutoConfigure(){
     streamClimateDiscovery(MQTTclient, 1, ctx);  // DHW Control
     feedWatchDog();
     streamNumberDiscovery(MQTTclient, ctx);       // Toutside Override
-    // SAT switches + select (TASK-284, piggyback on climate pseudo-ID 0)
-    for (uint8_t swIdx = 0; swIdx < 13; swIdx++) {
+    // SAT switches + select (TASK-284, piggyback on climate pseudo-ID 0).
+    // TASK-516: switch idx 13 (dhw_enable) is only emitted when the boiler
+    // reports MsgID 3 HB3=1 (storage tank); combi boilers get no inert entity.
+    const bool dhwEnableSwitchAllowed =
+        (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
+    for (uint8_t swIdx = 0; swIdx < 14; swIdx++) {
+      if (swIdx == 13 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
       streamSatSwitchDiscovery(MQTTclient, swIdx, ctx);
     }
@@ -1879,7 +1885,11 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   if (OTid == 0) {
     if (streamClimateDiscovery(MQTTclient, 0, ctx)) result = true;
     if (streamClimateDiscovery(MQTTclient, 1, ctx)) result = true;
-    for (uint8_t swIdx = 0; swIdx < 13; swIdx++) {
+    // TASK-516: idx 13 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
+    const bool dhwEnableSwitchAllowed =
+        (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
+    for (uint8_t swIdx = 0; swIdx < 14; swIdx++) {
+      if (swIdx == 13 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
       if (streamSatSwitchDiscovery(MQTTclient, swIdx, ctx)) result = true;
     }

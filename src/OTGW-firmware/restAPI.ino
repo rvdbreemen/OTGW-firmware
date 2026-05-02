@@ -1045,6 +1045,11 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATdhwsetpoint", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("dhw_enabled")) == 0) {
       updateSetting("SATdhwenabled", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("dhw_enable")) == 0) {
+      // TASK-516: master DHW enable (HW= command). updateSetting() routes to
+      // the SATdhwenable case in settingStuff.ino, which both persists the
+      // value and queues HW=0/HW=1 when MsgID 3 HB3=1 (storage tank).
+      updateSetting("SATdhwenable", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("interval")) == 0) {
       updateSetting("SATinterval", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("ovp_value")) == 0) {

@@ -303,6 +303,7 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset, true);
   writeJsonFloatKV(file, F("SATdhwsetpoint"), settings.sat.fDhwSetpoint, true);
   writeJsonBoolKV(file, F("SATdhwenabled"), settings.sat.bDhwEnabled, true);
+  writeJsonBoolKV(file, F("SATdhwenable"), settings.sat.bDhwEnable, true);
   writeJsonBoolKV(file, F("SATpushsetpoint"), settings.sat.bPushSetpoint, true);
   writeJsonFloatKV(file, F("SATflameoffset"), settings.sat.fFlameOffOffset, true);
   writeJsonBoolKV(file, F("SATwindowdetect"), settings.sat.bWindowDetection, true);
@@ -829,6 +830,20 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = constrain(atof(newValue), 0.0f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = constrain(atof(newValue), 0.0f, 60.0f);
   else if (strcasecmp_P(field, PSTR("SATdhwenabled")) == 0)     settings.sat.bDhwEnabled = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATdhwenable")) == 0) {
+    // TASK-516: master DHW enable. Persist always; only emit HW= when boiler
+    // reports MsgID 3 HB3=1 (storage tank). HB3 sits in bit 11 of the uint16
+    // SlaveConfigMemberIDcode (= bit 3 of the high byte). On combi boilers
+    // (HB3=0) we silently keep the setting in NVRAM but never push HW=.
+    bool newVal = EVALBOOLEAN(newValue);
+    bool changed = (settings.sat.bDhwEnable != newVal);
+    settings.sat.bDhwEnable = newVal;
+    if (changed && (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800)) {
+      const char *cmd = newVal ? "HW=1" : "HW=0";
+      addCommandToQueue(cmd, strlen(cmd), true);
+      DebugTf(PSTR("TASK-516: dhw_enable -> %s, queued %s\r\n"), CBOOLEAN(newVal), cmd);
+    }
+  }
   else if (strcasecmp_P(field, PSTR("SATpushsetpoint")) == 0)   settings.sat.bPushSetpoint = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATflameoffset")) == 0)    settings.sat.fFlameOffOffset = constrain(atof(newValue), 0.0f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATwindowdetect")) == 0)  settings.sat.bWindowDetection = EVALBOOLEAN(newValue);

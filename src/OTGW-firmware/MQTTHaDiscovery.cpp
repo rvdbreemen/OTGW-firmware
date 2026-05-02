@@ -2770,6 +2770,13 @@ bool streamSatSwitchDiscovery(PubSubClient &client,
         PSTR("-sat-pwm-auto-switch-enable"),  PSTR("_SAT_PWM_Auto_Switch"),
         PSTR("/sat/pwm_auto_switch"),         PSTR("/sat/pwm_auto_switch_enable"),
         PSTR("mdi:swap-horizontal"));
+    case 13:
+      // TASK-516: master DHW enable (HW= command). Only emitted by the caller
+      // when MsgID 3 HB3=1 (storage tank); combi boilers get no inert entity.
+      return streamSatBoolSwitch(client, ctx,
+        PSTR("-sat-dhw-enable"),              PSTR("_SAT_DHW_Enable"),
+        PSTR("/sat/dhw_enable"),              PSTR("/sat/dhw_enable"),
+        PSTR("mdi:water-boiler"));
     default:
       return false;
   }

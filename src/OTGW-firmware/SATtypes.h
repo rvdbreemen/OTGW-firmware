@@ -354,6 +354,7 @@ struct SATSection {
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
   float    fDhwSetpoint       = 0.0f;   // DHW setpoint (0=inactive, 30-60°C)
   bool     bDhwEnabled        = false;  // Enable DHW control in standalone/fallback mode
+  bool     bDhwEnable         = true;   // TASK-516: master DHW enable (HW= command). Only acted on when boiler reports MsgID 3 HB3=1 (storage tank). Default true keeps boiler-default DHW enabled.
   bool     bPushSetpoint      = false;  // Push SAT target to thermostat display (TC= command)
   float    fFlameOffOffset    = 0.0f;   // Setpoint offset when flame off (anti-cycling hysteresis)
   bool     bWindowDetection   = false;  // Enable window open detection via MQTT

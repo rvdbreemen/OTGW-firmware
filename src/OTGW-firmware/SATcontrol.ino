@@ -1568,6 +1568,12 @@ void satSendStatusJSON()
   sendJsonMapEntry(F("mod_suppressed"),        state.sat.bModSuppressed);
   sendJsonMapEntry(F("dhw_active"),             state.sat.bDhwActive);
   satSendJsonFloat(F("dhw_setpoint"),          settings.sat.fDhwSetpoint, 1);
+  // TASK-516: boiler-gated master DHW enable. dhw_config_tank is derived live
+  // from MsgID 3 HB3 (bit 11 of the uint16 SlaveConfigMemberIDcode); the UI
+  // uses it to decide whether to render the toggle. dhw_enable mirrors the
+  // user setting; only acted on (HW=) when dhw_config_tank=true.
+  sendJsonMapEntry(F("dhw_config_tank"),        (bool)(OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800));
+  sendJsonMapEntry(F("dhw_enable"),             settings.sat.bDhwEnable);
   sendJsonMapEntry(F("control_interval_sec"),  (int32_t)settings.sat.iControlInterval);
   sendJsonMapEntry(F("fallback_active"),       state.sat.bFallbackActive);
   sendJsonMapEntry(F("fallback_reason"),       (int32_t)state.sat.eFallbackReason);
@@ -2324,6 +2330,9 @@ void satPublishMQTT()
     sendMQTTData(F("sat/ovp_enabled"), settings.sat.bOvpEnabled ? "true" : "false", true);
     sendMQTTData(F("sat/preset_sync_enable"), settings.sat.bPresetSync ? "true" : "false", true);
     sendMQTTData(F("sat/dhw_enabled"), settings.sat.bDhwEnabled ? "true" : "false", true);
+    // TASK-516: master DHW enable mirror. Always published — HA hides/shows
+    // the switch entity via the discovery gate (only emitted on storage tank).
+    sendMQTTData(F("sat/dhw_enable"), settings.sat.bDhwEnable ? "true" : "false", true);
     sendMQTTData(F("sat/pwm_auto_switch_enable"), settings.sat.bPwmAutoSwitch ? "true" : "false", true);
   }
 

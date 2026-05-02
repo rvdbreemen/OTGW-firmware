@@ -688,6 +688,7 @@ var SAT = (function() {
   var _dhwSliderMin = 40;        // TdhwSetLB (MsgID 48 low byte), default fallback
   var _dhwSliderMax = 60;        // TdhwSetUB (MsgID 48 high byte), default fallback
   var _dhwSliderDirty = false;   // slider being dragged, defer sending command
+  var _dhwHwSwitchPending = false; // TASK-516: ignore polled state echoes while POST in flight
 
   function satPost(endpoint, value) {
     return fetch('/api/v2/sat/' + endpoint, {
@@ -1081,11 +1082,26 @@ var SAT = (function() {
     sendOTGWCommand('SW=' + intVal);
   }
 
-  // Called when HW switch is toggled
+  // Called when HW switch is toggled.
+  // TASK-516: route through the SAT dhw_enable setting (POST
+  // /api/v2/sat/settings/dhw_enable) so the value is persisted in NVRAM and
+  // the firmware decides whether to enqueue HW=0/HW=1 (only on storage tank).
+  // Visual state (label) is NOT updated optimistically; the next status poll
+  // confirms the change via d.dhw_enable, avoiding desync if the firmware
+  // rejects the value or HB3 turns out to be 0.
   function onDhwHwSwitch(checked) {
-    var lbl = el('sat-dhw-hw-label');
-    if (lbl) lbl.textContent = checked ? 'On' : 'Off';
-    sendOTGWCommand(checked ? 'HW=1' : 'HW=0');
+    _dhwHwSwitchPending = true;
+    fetch(APIGW + 'v2/sat/settings/dhw_enable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: checked ? 'true' : 'false'
+    }).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+    }).catch(function(e) {
+      showFeedback('DHW enable error: ' + e.message, true);
+    }).then(function() {
+      _dhwHwSwitchPending = false;
+    });
   }
 
   // Update DHW dashboard controls from SAT status data
@@ -1103,13 +1119,21 @@ var SAT = (function() {
       try { slider.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
     }
 
-    // Update HW switch display state from dhw_active (= SlaveStatus bit 0x04)
+    // TASK-516: drive visibility + state of the HW switch from server-derived
+    // fields. dhw_config_tank reflects MsgID 3 HB3 live; dhw_enable mirrors
+    // the persisted SAT setting that gates HW=0/HW=1 emission. Skip the
+    // checkbox sync while a user-initiated POST is in flight to avoid the
+    // toggle bouncing back before the server confirms.
+    if (d.dhw_config_tank !== undefined) {
+      _dhwStorageTank = !!d.dhw_config_tank;
+      updateDHWHwSwitch();
+    }
     if (_dhwStorageTank) {
       var hwSwitch = el('sat-dhw-hw-switch');
       var hwLbl = el('sat-dhw-hw-label');
-      if (hwSwitch && d.dhw_active !== undefined) {
-        hwSwitch.checked = !!d.dhw_active;
-        if (hwLbl) hwLbl.textContent = d.dhw_active ? 'On' : 'Off';
+      if (hwSwitch && d.dhw_enable !== undefined && !_dhwHwSwitchPending) {
+        hwSwitch.checked = !!d.dhw_enable;
+        if (hwLbl) hwLbl.textContent = d.dhw_enable ? 'On' : 'Off';
       }
     }
   }
