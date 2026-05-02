@@ -107,6 +107,7 @@ SAT combines a **weather-compensated heating curve** with a **PID v3 controller*
 - **OPV calibration**: finds the boiler's Overpressure Valve temperature so SAT stays below it
 - **Six safety layers**: flame health, CH circuit sync, setpoint mismatch, pressure, cycle classification, overshoot detection
 - **Open-Meteo integration**: optional free weather API for outdoor temperature when no local source is available
+- **OpenWeatherMap (OWM) support**: optional API key for outdoor temperature fallback, rate limited to one call per 15 minutes
 
 ### Quick start
 
