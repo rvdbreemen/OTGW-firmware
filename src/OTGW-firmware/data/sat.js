@@ -614,6 +614,10 @@ var SAT = (function() {
     fetchDHWBounds();    // get DHW setpoint upper/lower bounds (MsgID 48)
     fetchStatus(); // immediate first fetch
     fetchWeather(); // immediate weather fetch
+    // Auto-prefill weather coordinates once when none are configured yet.
+    // This is a best-effort helper: if geolocation is unavailable or blocked,
+    // leave it to the user to click "Detect Location".
+    maybeAutoPrefillWeatherLocation();
     _pollTimer = setInterval(fetchStatus, POLL_INTERVAL_MS);
     _weatherTimer = setInterval(fetchWeather, 30000); // weather every 30s
     window.addEventListener('resize', resizeChart);
@@ -824,6 +828,55 @@ var SAT = (function() {
     }, function(err) {
       showFeedback('Location error: ' + err.message, true);
     }, { timeout: 10000 });
+  }
+
+  function maybeAutoPrefillWeatherLocation() {
+    if (!navigator.geolocation) return;
+
+    fetch(APIGW + 'v2/sat/weather')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(r.statusText);
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) return Promise.reject('Not JSON');
+        return r.json();
+      })
+      .then(function(w) {
+        var lat = parseFloat(w.latitude);
+        var lon = parseFloat(w.longitude);
+        if (!isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0)) return;
+
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          var latStr = pos.coords.latitude.toFixed(4);
+          var lonStr = pos.coords.longitude.toFixed(4);
+          var settings = [
+            { name: 'SATweatherlat', value: latStr },
+            { name: 'SATweatherlon', value: lonStr }
+          ];
+          var promises = [];
+          for (var i = 0; i < settings.length; i++) {
+            promises.push(
+              fetch(APIGW + 'v2/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{"name":"' + settings[i].name + '","value":"' + settings[i].value + '"}'
+              })
+            );
+          }
+          Promise.all(promises)
+            .then(function() {
+              // Refresh displayed coords.
+              fetchWeather();
+            })
+            .catch(function() {
+              // Silent failure; user can still use manual detect button.
+            });
+        }, function() {
+          // Silent failure; user can still use manual detect button.
+        }, { timeout: 5000, maximumAge: 3600000 });
+      })
+      .catch(function() {
+        // Ignore; fetchWeather() already logs warnings.
+      });
   }
 
   function toggleRawData() {
