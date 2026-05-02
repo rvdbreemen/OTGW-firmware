@@ -919,21 +919,36 @@ static float satGetRoomTemp()
       return state.sat.fExternalTemp;
     }
   }
+  // TASK-521: Detect ghost Tr passthrough.
+  // OTcurrentSystemState.Tr is initialised to 0.0f at boot and only updated when MsgID 24
+  // arrives from the thermostat. In OTDirect/master configs without a thermostat, Tr stays
+  // at 0.0f forever — and a 0.0 reading crashed straight into the PID, producing
+  // error=-21 -> CS=62 (max heat) on a fictitious "freezing house". Track whether we have
+  // ever observed a non-zero Tr; if not, a current 0.0 is treated as "no source", not as
+  // a real reading. AC #6 (replacing the upstream init with NAN) is deferred to a follow-up
+  // task to keep this fix scoped to SATcontrol.ino.
+  static bool sTrEverNonZero = false;
   float otRoom = OTcurrentSystemState.Tr;  // OT message ID 24
+  if (otRoom != 0.0f) sTrEverNonZero = true;
+  const bool trGhost = (!sTrEverNonZero && otRoom == 0.0f);
+
   // Task #21: If in fallback mode and OT room temp is invalid, use thermal estimation
   if (state.sat.bFallbackActive && (otRoom < -10.0f || otRoom > 50.0f)) {
     if (state.sat.iLastKnownRoomMs > 0) {
       float outside = satGetOutsideTemp();
       return satEstimateRoomTemp(outside);
     }
+    // No last-known data either -- nothing valid to return.
+    return NAN;
   }
 
   // TASK-204: Thermal comfort mode -- substitute Summer Simmer Index as PID room temp input.
   // Matches Python climate.py thermal_comfort: the PID targets heat-index-adjusted perceived
   // temperature rather than raw sensor temp, so e.g. 22C at 70% humidity "feels like" 23C.
   // Only active when bThermalComfort is enabled AND humidity data is fresh (< iHumidityTimeoutS).
-  // Falls back silently to raw room temp if humidity is unavailable or stale.
-  if (settings.sat.bThermalComfort && state.sat.bHumidityValid) {
+  // TASK-521: skip SSI when otRoom is a ghost zero -- SSI(0,H) is meaningless and would mask
+  // the no-source condition from the control-loop NaN guard.
+  if (!trGhost && settings.sat.bThermalComfort && state.sat.bHumidityValid) {
     if ((millis() - state.sat.iHumidityLastMs) <= ((uint32_t)settings.sat.iHumidityTimeoutS * 1000UL)) {
       float ssi = satCalcSimmerIndex(otRoom, state.sat.fHumidity);
       SATDebugTf(PSTR("SAT: thermal_comfort: raw=%.1f SSI=%.1f H=%.0f%%\r\n"),
@@ -942,6 +957,11 @@ static float satGetRoomTemp()
     }
     SATDebugTln(F("SAT: thermal_comfort: humidity stale, using raw room temp"));
   }
+
+  // TASK-521: ghost-Tr final guard. If no other source returned, and Tr has never been
+  // observed as non-zero, return NAN so the control loop disengages safely instead of
+  // driving the PID against a bogus 0.0 reading.
+  if (trGhost) return NAN;
 
   return otRoom;
 }
@@ -3107,6 +3127,12 @@ static void satUpdateSolarGain()
   float roomTemp = satGetRoomTemp();
   uint32_t now = millis();
 
+  // TASK-521: NaN room temp means no valid source -- skip rate calc to avoid corrupting EMA.
+  if (isnan(roomTemp)) {
+    state.sat.fIndoorRiseRate = _solar_riseRateEma;
+    return;
+  }
+
   // Calculate rise rate (EMA smoothed), minimum 30s between samples
   if (_solar_prevMs > 0 && (now - _solar_prevMs) > 30000UL) {
     float dtHours = (float)(now - _solar_prevMs) / 3600000.0f;
@@ -3489,8 +3515,18 @@ void satControlLoop()
   SATDebugTf(PSTR("SAT loop: room=%.1f target=%.1f mode=%d enabled=%d\r\n"),
              roomTemp, targetTemp, (int)state.sat.eControlMode, (int)settings.sat.bEnabled);
 
-  // Validate room temp — count consecutive failures
-  if (roomTemp < -10.0f || roomTemp > 50.0f) {
+  // Validate room temp — count consecutive failures.
+  // TASK-521: NaN means satGetRoomTemp() found no valid source (no BLE, no MQTT external,
+  // no MultiArea, no MsgID 24 from a thermostat -- only a boot-time 0.0 ghost). Treat as
+  // invalid and let the existing skip-count machinery hold last-good for SAT_MAX_SKIP_COUNT
+  // cycles, then trip safety (CS=0 via satDisable -> boiler returns to thermostat control).
+  // Log once on entry to the skip window so the operator understands the disengagement.
+  if (isnan(roomTemp) || roomTemp < -10.0f || roomTemp > 50.0f) {
+    if (_sat_consecutiveSkips == 0) {
+      if (isnan(roomTemp)) {
+        DebugTln(F("SAT: all room-temp sources lost (no BLE/external/MultiArea/Tr) -- holding last-good, will disengage if not restored"));
+      }
+    }
     _sat_consecutiveSkips++;
     if (_sat_consecutiveSkips >= SAT_MAX_SKIP_COUNT) {
       DebugTln(F("SAT SAFETY: too many invalid room temp readings, disabling"));
