@@ -523,9 +523,11 @@ var SAT = (function() {
     _curveChartInstance.setOption(buildCurveOption(1.5, 0, 20.0, null, null, 'light'));
   }
 
-  // Safe float comparison that avoids NaN when either value is null/undefined.
+  // Safe float comparison: treats null/undefined/non-finite as "changed" so
+  // the curve always rebuilds rather than silently skipping.
   function _approxChanged(a, b, eps) {
     if (a == null || b == null) return a !== b;
+    if (!isFinite(a) || !isFinite(b)) return true;
     return Math.abs(a - b) > eps;
   }
 
