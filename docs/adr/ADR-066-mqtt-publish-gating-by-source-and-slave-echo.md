@@ -87,6 +87,33 @@ All other MsgIDs default to `bSlaveEchoesValue = true`. For MsgIDs without write
 - **`docs/api/MQTT-message-id-echo-audit.md`:** the per-MsgID classification table.
 - **OpenTherm v4.2 specification reference:** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`.
 
+## Amendment 1 — PS=1 summary path (TASK-483, 2026-05-02)
+
+The original decision (sections above) closed the live OT-bus path: `print_f88` / `print_s16` / `print_s8s8` / `print_u16` and `publishToSourceTopic` now gate on the master-topic invariant.
+
+A regression report from `_reuzenpanda_` on Discord `#beta-testing` (2026-04-30) revealed that v1.5.0-beta.4 still showed flapping on Tr / TrSet for users running with the PIC in `PS=1` (Print Summary) mode. Code-path analysis confirmed `publishPSSummaryFieldValue()` in `OTGW-Core.ino` was the only remaining ungated writer to the non-echo MsgID set; it bypassed both the master-topic publish gate and the `OTcurrentSystemState` write gate.
+
+The `PS=1` stream emits one value per MsgID, chosen by the PIC from its most recent observation. For MsgIDs with `bSlaveEchoesValue=false`, the PIC may have captured either the meaningful Write-Data or the per-spec undefined Write-Ack byte; the `PS=1` layer cannot distinguish these. The amendment therefore suppresses publication entirely for non-echo MsgIDs in PS=1 mode, rather than attempting per-frame disambiguation.
+
+### Amendment decision
+
+1. **A new helper `is_msgid_valid_for_master_topic_in_ps_summary(OTlookup)`** mirrors the master-topic invariant for the PS=1 context. It evaluates `true` for `OT_READ` MsgIDs (slave's Read-Ack always meaningful) and falls back to `OTlookup.bSlaveEchoesValue` otherwise. There is no `OpenthermData_t` parameter because `PS=1` carries no Write-Data / Write-Ack distinction at this layer.
+
+2. **`publishPSSummaryFieldValue()` computes `validForMaster` once** at function entry, using the global `OTlookupitem` already populated by the caller (`PROGMEM_readAnything(&OTmap[msgid], OTlookupitem)` at `OTGW-Core.ino:3653`). Each value-bearing case (`ot_f88`, `ot_s16`, `ot_u16`, `ot_s8s8`, `ot_u8u8`, `ot_u8`) gates `sendMQTTData(label, ...)` and the `OTcurrentSystemState` writes on `validForMaster`. The `ot_flag8flag8` case is untouched (status-flag semantics: per-MsgID switch already inside the case, parallel to the live-bus exception for `OT_Statusflags` / `OT_StatusVH` / `OT_SolarStorageMaster`).
+
+3. **`setMsgLastUpdated()` remains called regardless** of `validForMaster`. The epoch tick is cosmetic (drives WebUI freshness), consistent with the live-bus path at `OTGW-Core.ino:4034` where `setMsgLastUpdated` is gated only on the broader `is_value_valid` (not on the master-topic invariant).
+
+4. **One `DebugTln` trace per suppressed call** at function entry, format `"PS=1 master-topic gate suppressed MsgID %u (%s): bSlaveEchoesValue=false"`. Lets support correlate symptom ("value missing in HA") with port-23 telnet logs without enabling extra debug categories.
+
+### Effect on existing PS=1 users
+
+- **Boilers that echo all relevant MsgIDs (`bSlaveEchoesValue=true` for everything in their summary):** unchanged behaviour.
+- **Boilers where Tr / TrSet / TrSetCH2 / TRoomCH2 / MaxRelModLevelSetting / RFsensorStatus appear in the PS=1 summary:** these six MsgIDs stop publishing to the base topic and stop updating `OTcurrentSystemState`. HA entities tied to those base topics will go stale; their last retained value remains until cleared. This is the intended outcome (the prior PS=1 values were the same protocol-zero garbage the live-bus path already suppresses).
+
+### CI gate
+
+Per ADR-080, this amendment is binding-pattern-level: a new `evaluate.py` check `check_ps_summary_master_topic_gate` ensures any future case added to `publishPSSummaryFieldValue` is wrapped in the `validForMaster` guard. Without the CI gate, a future contributor could add a new `case ot_xxx:` and silently re-introduce the regression.
+
 ## Future amendments
 
 If a user reports flapping on a MsgID currently set to `bSlaveEchoesValue=true`, a captured Write-Data / Write-Ack pair from the boiler in question, plus this ADR amended (or a successor ADR), is sufficient to flip the flag. The audit doc is the source of truth; the OTlookupArr initializers are kept in sync at PR-review time.

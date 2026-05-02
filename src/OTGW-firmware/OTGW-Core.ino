@@ -1266,6 +1266,23 @@ bool is_value_valid_for_master_topic(OpenthermData_t OT, OTlookup_t OTlookup) {
   return _valid;
 }
 
+// ADR-066 (PS=1 amendment, TASK-483 ACs #8-#13): The PS=1 summary stream emits
+// one value per MsgID, chosen by the PIC from its most recent observation.
+// For OT_WRITE / OT_RW MsgIDs whose slave Write-Ack data byte is per-spec
+// undefined (bSlaveEchoesValue=false in OTmap[]), the PIC may have captured
+// either the meaningful Write-Data or the undefined Write-Ack byte; the PS=1
+// stream cannot distinguish these at this layer. For those MsgIDs we suppress
+// base-topic publication and state-write so the master-topic invariant holds
+// across both the live OT-bus path and the PS=1 path. READ messages are
+// always meaningful (slave's Read-Ack carries the value). Status-flag MsgIDs
+// (Statusflags / StatusVH) are handled inside ot_flag8flag8 with their own
+// per-MsgID switch and are not gated here.
+static bool is_msgid_valid_for_master_topic_in_ps_summary(const OTlookup_t &lookup)
+{
+  if (lookup.msgcmd == OT_READ) return true;
+  return lookup.bSlaveEchoesValue;
+}
+
 // =====================[ MQTT throttle helpers ]==================
 #define CoreMQTTDebugTf(...) ({ if (state.debug.bMQTTGate) DebugTf(__VA_ARGS__); })
 
@@ -3514,14 +3531,27 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
   char valueBuf[12] {0};
   const uint16_t trackedNow = currentTrackedSeconds();
 
+  // ADR-066 (PS=1 amendment): Caller already populated the global OTlookupitem
+  // via PROGMEM_readAnything(&OTmap[msgid], ...) before invoking us. Use it to
+  // gate base-topic publication and OTcurrentSystemState updates so the PS=1
+  // path matches the live OT-bus master-topic invariant. setMsgLastUpdated is
+  // intentionally left ungated (cosmetic epoch tick, consistent with
+  // OTGW-Core.ino:4034 in the live-bus path). The ot_flag8flag8 case keeps its
+  // own per-MsgID handling (status-flag semantics) and is not gated here.
+  const bool validForMaster = is_msgid_valid_for_master_topic_in_ps_summary(OTlookupitem);
+  if (!validForMaster) {
+    DebugTf(PSTR("PS=1 master-topic gate suppressed MsgID %u (%s): bSlaveEchoesValue=false\r\n"),
+            msgid, label);
+  }
+
   switch (valueType) {
     case ot_f88: {
       float value = 0.0f;
       if (!parseStrictFloat(rawField, value)) return false;
       dtostrf(value, 3, 2, valueBuf);
-      sendMQTTData(label, valueBuf);
+      if (validForMaster) sendMQTTData(label, valueBuf);
       setMsgLastUpdated(msgid, trackedNow);
-      updatePSSummaryFloatState(msgid, value);
+      if (validForMaster) updatePSSummaryFloatState(msgid, value);
       return true;
     }
 
@@ -3529,9 +3559,9 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       long parsedValue = 0;
       if (!parseStrictSignedLong(rawField, -32768L, 32767L, parsedValue)) return false;
       itoa(static_cast<int16_t>(parsedValue), valueBuf, 10);
-      sendMQTTData(label, valueBuf);
+      if (validForMaster) sendMQTTData(label, valueBuf);
       setMsgLastUpdated(msgid, trackedNow);
-      if (msgid == 33) OTcurrentSystemState.Texhaust = static_cast<int16_t>(parsedValue);
+      if (validForMaster && msgid == 33) OTcurrentSystemState.Texhaust = static_cast<int16_t>(parsedValue);
       return true;
     }
 
@@ -3539,9 +3569,9 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       unsigned long parsedValue = 0;
       if (!parseStrictUnsignedLong(rawField, 65535UL, parsedValue)) return false;
       utoa(static_cast<uint16_t>(parsedValue), valueBuf, 10);
-      sendMQTTData(label, valueBuf);
+      if (validForMaster) sendMQTTData(label, valueBuf);
       setMsgLastUpdated(msgid, trackedNow);
-      updatePSSummaryU16State(msgid, static_cast<uint16_t>(parsedValue));
+      if (validForMaster) updatePSSummaryU16State(msgid, static_cast<uint16_t>(parsedValue));
       return true;
     }
 
@@ -3552,10 +3582,12 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       char lowerValueBuf[12] {0};
       itoa(upperByte, valueBuf, 10);
       itoa(lowerByte, lowerValueBuf, 10);
-      publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
+      if (validForMaster) publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
       setMsgLastUpdated(msgid, trackedNow);
-      if (msgid == 48) OTcurrentSystemState.TdhwSetUBTdhwSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
-      else if (msgid == 49) OTcurrentSystemState.MaxTSetUBMaxTSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
+      if (validForMaster) {
+        if (msgid == 48) OTcurrentSystemState.TdhwSetUBTdhwSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
+        else if (msgid == 49) OTcurrentSystemState.MaxTSetUBMaxTSetLB = ((uint8_t)upperByte << 8) | (uint8_t)lowerByte;
+      }
       return true;
     }
 
@@ -3566,9 +3598,9 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       char lowerValueBuf[12] {0};
       utoa(upperByte, valueBuf, 10);
       utoa(lowerByte, lowerValueBuf, 10);
-      publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
+      if (validForMaster) publishPSSummarySplitBytes(label, "_value_hb", "_value_lb", valueBuf, lowerValueBuf);
       setMsgLastUpdated(msgid, trackedNow);
-      if (msgid == 15) OTcurrentSystemState.MaxCapacityMinModLevel = ((uint16_t)upperByte << 8) | lowerByte;
+      if (validForMaster && msgid == 15) OTcurrentSystemState.MaxCapacityMinModLevel = ((uint16_t)upperByte << 8) | lowerByte;
       return true;
     }
 
@@ -3576,10 +3608,12 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       unsigned long parsedValue = 0;
       if (!parseStrictUnsignedLong(rawField, 255UL, parsedValue)) return false;
       utoa(static_cast<uint8_t>(parsedValue), valueBuf, 10);
-      sendMQTTData(label, valueBuf);
+      if (validForMaster) sendMQTTData(label, valueBuf);
       setMsgLastUpdated(msgid, trackedNow);
-      if (msgid == 71) OTcurrentSystemState.ControlSetpointVH = static_cast<uint8_t>(parsedValue);
-      else if (msgid == 77) OTcurrentSystemState.RelativeVentilation = static_cast<uint8_t>(parsedValue);
+      if (validForMaster) {
+        if (msgid == 71) OTcurrentSystemState.ControlSetpointVH = static_cast<uint8_t>(parsedValue);
+        else if (msgid == 77) OTcurrentSystemState.RelativeVentilation = static_cast<uint8_t>(parsedValue);
+      }
       return true;
     }
 
