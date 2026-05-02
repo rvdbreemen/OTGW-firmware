@@ -354,6 +354,9 @@ void weatherLoop()
   // 5-minute startup gate: give the OT bus time to report Toutside before
   // making the first weather API call.
   if (millis() < (WEATHER_POLL_MIN_SEC * 1000UL)) return;
+  // If the OT bus already provides a valid outside temperature, avoid
+  // burning weather API calls (SAT only needs weather as a fallback).
+  if (state.sat.Toutside != 0) return;
   if (!DUE(timerWeatherPoll)) return;
   weatherFetch();
 }
