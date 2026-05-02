@@ -618,6 +618,7 @@ var SAT = (function() {
     // This is a best-effort helper: if geolocation is unavailable or blocked,
     // leave it to the user to click "Detect Location".
     maybeAutoPrefillWeatherLocation();
+    setTimeout(checkWeatherNeedsSetup, 3000);
     _pollTimer = setInterval(fetchStatus, POLL_INTERVAL_MS);
     _weatherTimer = setInterval(fetchWeather, 30000); // weather every 30s
     window.addEventListener('resize', resizeChart);
@@ -876,6 +877,55 @@ var SAT = (function() {
       })
       .catch(function() {
         // Ignore; fetchWeather() already logs warnings.
+      });
+  }
+
+  // --- OWM Onboarding Wizard ---
+  var _owmWizardShown = false;
+
+  function checkWeatherNeedsSetup() {
+    if (_owmWizardShown) return;
+    fetch(APIGW + 'v2/sat/weather/needs-setup')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(r.statusText);
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) return Promise.reject('Not JSON');
+        return r.json();
+      })
+      .then(function(d) {
+        if (d && d.needs_setup) {
+          _owmWizardShown = true;
+          showOwmWizard(d);
+        }
+      })
+      .catch(function() {});
+  }
+
+  function showOwmWizard(d) {
+    var msg = 'Outside temperature is not available.';
+    msg += '\n\nEnter OpenWeatherMap API key (leave blank to cancel).';
+    var key = window.prompt(msg);
+    if (!key) return;
+    fetch(APIGW + 'v2/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"name":"SATweatherapikey","value":"' + String(key).replace(/"/g, '') + '"}'
+    })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return fetch(APIGW + 'v2/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{"name":"SATweatherenable","value":"1"}'
+        });
+      })
+      .then(function(r) {
+        if (r && !r.ok) throw new Error('HTTP ' + r.status);
+        showFeedback('OWM key saved; weather enabled', false);
+        setTimeout(fetchWeather, 2000);
+      })
+      .catch(function(e) {
+        showFeedback('Error saving API key: ' + e.message, true);
       });
   }
 

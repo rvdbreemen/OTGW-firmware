@@ -370,6 +370,7 @@ struct SATSection {
   float    fWeatherLat        = 0.0f;   // Latitude (from browser geolocation or manual)
   float    fWeatherLon        = 0.0f;   // Longitude
   uint16_t iWeatherInterval   = 900;    // Poll interval in seconds (default 15 min, min 5 min)
+  char     sWeatherApiKey[65] = "";     // OpenWeatherMap API key (empty = Open-Meteo only)
   // Power/energy (Task #45)
   float    fBoilerCapacity    = 24.0f;  // Boiler capacity in kW (for power calculation)
   // Gas consumption estimation (Task #232)

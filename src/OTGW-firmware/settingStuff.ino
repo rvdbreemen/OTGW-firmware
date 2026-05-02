@@ -318,6 +318,7 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATweatherlat"), settings.sat.fWeatherLat, true);
   writeJsonFloatKV(file, F("SATweatherlon"), settings.sat.fWeatherLon, true);
   writeJsonIntKV(file, F("SATweatherinterval"), settings.sat.iWeatherInterval, true);
+  writeJsonStringKV(file, F("SATweatherapikey"), settings.sat.sWeatherApiKey, true);
   writeJsonFloatKV(file, F("SATboilercapacity"), settings.sat.fBoilerCapacity, true);
   writeJsonFloatKV(file, F("SATboilerratedkw"), settings.sat.fBoilerRatedKW, true);
   writeJsonFloatKV(file, F("SATboilerefficiency"), settings.sat.fBoilerEfficiency, true);
@@ -845,6 +846,9 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATweatherinterval")) == 0) {
     settings.sat.iWeatherInterval = constrain(atoi(newValue), 300, 3600);
     CHANGE_INTERVAL_SEC(timerWeatherPoll, settings.sat.iWeatherInterval);
+  }
+  else if (strcasecmp_P(field, PSTR("SATweatherapikey")) == 0) {
+    strlcpy(settings.sat.sWeatherApiKey, newValue, sizeof(settings.sat.sWeatherApiKey));
   }
   else if (strcasecmp_P(field, PSTR("SATboilercapacity")) == 0) settings.sat.fBoilerCapacity = constrain(atof(newValue), 1.0f, 100.0f);
   else if (strcasecmp_P(field, PSTR("SATboilerratedkw")) == 0)   settings.sat.fBoilerRatedKW = constrain(atof(newValue), 0.0f, 200.0f);
