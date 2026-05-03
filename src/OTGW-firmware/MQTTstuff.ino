@@ -1751,6 +1751,27 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   return ctx;
 }
 
+// TASK-528 / ADR-095: lazy-built bitmap of MsgIDs that have at least one
+// ANY_SOURCE-flagged entry in mqttHaSensors[]. Used by doAutoConfigure() and
+// doAutoConfigureMsgid() to suppress the base-entity publish for source-
+// templated MsgIDs when bSeparateSources is enabled (the three source variants
+// already cover them). Built once per boot; subsequent calls are O(1) with
+// two shifts + mask + bit test. 32 bytes static RAM.
+static bool msgIdHasAnySourceEntry(uint8_t id) {
+  static uint32_t bitmap[8] = {0};
+  static bool built = false;
+  if (!built) {
+    for (uint16_t i = 0; i < MQTT_HA_SENSOR_COUNT; i++) {
+      MqttHaSensorCfg cfg = readSensorCfg(i);
+      if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
+        bitmap[(cfg.id >> 5) & 0x07] |= (1U << (cfg.id & 0x1F));
+      }
+    }
+    built = true;
+  }
+  return (bitmap[(id >> 5) & 0x07] & (1U << (id & 0x1F))) != 0;
+}
+
 void doAutoConfigure(){
   // Force-publishes HA discovery configs for ALL entries.
   // Clears the "done" bitmap first so everything is re-sent.
@@ -1782,6 +1803,12 @@ void doAutoConfigure(){
           expandAndStreamSensorSources(MQTTclient, cfg, ctx);
         }
         // Skip source-template entries when separate sources disabled
+      } else if (settings.mqtt.bSeparateSources && msgIdHasAnySourceEntry(cfg.id)) {
+        // TASK-528 / ADR-095: suppress the base entity for source-templated
+        // MsgIDs when bSeparateSources is enabled. The three source variants
+        // (Thermostat / Boiler / Gateway) cover this MsgID; publishing the
+        // base would produce four near-identical HA entities (the regression
+        // _reuzenpanda_ reported on dev 1.5.0-beta.5).
       } else {
         streamSensorDiscovery(MQTTclient, cfg, ctx);
       }
@@ -1861,6 +1888,10 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
         if (settings.mqtt.bSeparateSources) {
           if (expandAndStreamSensorSources(MQTTclient, cfg, ctx)) result = true;
         }
+      } else if (settings.mqtt.bSeparateSources && msgIdHasAnySourceEntry(cfg.id)) {
+        // TASK-528 / ADR-095: suppress the base entity for source-templated
+        // MsgIDs when bSeparateSources is enabled. result stays unchanged —
+        // nothing was published in this iteration, which matches reality.
       } else {
         if (streamSensorDiscovery(MQTTclient, cfg, ctx)) result = true;
       }
