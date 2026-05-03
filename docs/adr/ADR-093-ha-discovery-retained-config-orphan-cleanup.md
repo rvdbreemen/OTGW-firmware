@@ -1,6 +1,7 @@
 # ADR-093 Home Assistant Discovery Retained-Config Orphan Cleanup
 
 **Status:** Accepted (guideline-level per ADR-080: one publisher today; promote to pattern-level with a CI gate when a second discoverable component adopts the pattern). Date: 2026-05-01.
+**Complemented by:** ADR-094 (2026-05-03) — per-device, firmware-driven removal on OTA upgrade. ADR-093 covers per-entity, user-driven removal (BLE roster forget); ADR-094 covers per-device, firmware-driven removal (OTA upgrade). Both publish zero-byte retained payloads via the same `beginMqttPublish + endPublish` streaming primitives. Together they form the complete HA discovery removal lifecycle on this branch.
 
 ## Context
 

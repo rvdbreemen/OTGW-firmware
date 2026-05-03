@@ -3,6 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-02-16  
 **Updated:** 2026-02-23 (Adapted to nested source topics and opt-in default)
+**Amended by:** ADR-095 (2026-05-03) — `bSeparateSources` semantics flipped from additive to exclusive: when enabled, the base entity is suppressed for source-templated MsgIDs and only the three source variants are published.
 **Decision Maker:** User: Rob van den Breemen (rvdbreemen)
 
 ## Context
