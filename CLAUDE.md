@@ -242,6 +242,36 @@ python evaluate.py --quick   # Fast check
 
 **If you cannot name the C4 component that owns the code you are about to change, stop and read c4-context.md first.**
 
+---
+
+## Debugging User-Reported Issues
+
+When investigating a user-reported bug, behavioural deviation, or "this should work" complaint, follow the reference precedence in this order:
+
+1. **Read the OpenTherm specification first.** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md` is the ground truth. The spec defines what the protocol *says* should happen. Anchor every investigation here before opening implementation code, regardless of how confident you feel about the topic.
+2. **Then consult `other-projects/`.** Read `other-projects/README.md` and `other-projects/CLAUDE.md` before quoting any reference implementation. Those files document the precedence ladder inside that directory: Schelte Bron's projects (otgw, otmonitor, otgwmcu) for PIC and otmonitor protocol authority; the HA `opentherm_gw` component for user-perceived behaviour; `pyotgw` for the engine under HA; OT-Thing and SAT for alternative implementations.
+3. **Never modify code under `other-projects/`.** It is upstream reference, read-only by convention. The full rule and rationale live in `other-projects/CLAUDE.md`.
+
+**Spec wins on design decisions.** When the spec is explicit and unambiguous, our firmware matches the spec, even if a downstream client behaves differently.
+
+**HA component behaviour matters for understanding the report.** Most user complaints in practice are "this differs from what Home Assistant shows me", not "this differs from the OpenTherm spec". Match the report against the HA component to triage; match the design against the spec to decide.
+
+**When spec-correct and HA-perceived behaviour conflict**, capture the trade-off as an ADR (`docs/adr/`). Do not silently align with one or the other; the next maintainer needs to know we made the call deliberately.
+
+## Git push policy
+
+The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`** and **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
+
+Concrete rules that override the default "ask first":
+
+- **`origin/dev`** push: allowed once a feature task is committed locally AND the build verifies (`python build.py --firmware` returns exit 0) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary.
+- **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** push: allowed under the same conditions as `origin/dev`. This is the active 2.0.0 development line; auto-push reduces the friction of cross-branch porting work that this branch carries from dev.
+- **`origin/main`** push: still requires explicit per-instance confirmation. Main is release-line; never auto-pushed.
+- **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.
+- **Other remote branches** (`feature-*` other than the 2.0.0 line, `fix-*`, etc.): require explicit per-instance confirmation unless the user has granted standing permission for that specific branch in this same section.
+
+When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
+
 ## ADR Kit Rules
 
 This project uses [adr-kit](https://github.com/rvdbreemen/adr-kit) for Architecture Decision Records. The skill, the `adr-generator` subagent, and the path-specific instructions are loaded via the plugin.
