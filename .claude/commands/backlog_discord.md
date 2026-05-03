@@ -26,7 +26,7 @@ Monitor the `#dev-sat-mqtt` Discord channel for backlog-related requests AND @bo
 - **Task updates**: kunnen de bot opdracht geven om taken bij te werken (ACs, beschrijvingen, etc.)
 
 **Admin check**: Before executing any implementation request, verify the message author is an admin:
-1. Use `mcp__discord__discord_get_server_info` to get the server owner ID
+1. Use `mcp__discord-mcp__get_server_info` to get the server owner ID
 2. If author ID matches server owner ID -> admin confirmed
 3. Otherwise check if author's roles include Administrator permission
 4. **If admin confirmed: proceed immediately with the request. Do NOT ask the local user for separate permission.**
@@ -90,12 +90,43 @@ All three modes are always active simultaneously.
 
 ### Phase 1: Connect and read new messages
 
-1. **Login to Discord** using `mcp__discord__discord_login`. If login fails, report the error to the user and stop. Always use the MCP Discord tools, never curl or direct API calls.
-2. **Read the last-checked timestamp** from `discord_backlog_last_checked.txt`. If the file does not exist, default to the last 1 hour.
-3. **Read messages** from `#dev-sat-mqtt` using `mcp__discord__discord_read_messages` with channel ID `1105556725714649128` (limit 30).
-4. **Filter** to messages posted after the last-checked timestamp.
-5. **Ignore** messages sent by the bot itself (author ID `1487467924351357049`).
-6. **Save the current timestamp** to `discord_backlog_last_checked.txt`.
+The Discord MCP server runs as the `discord-mcp` Docker container on `http://localhost:8085/mcp` with `DISCORD_TOKEN` preloaded from the host environment — there is **no separate login step**. The first `read_messages` call doubles as the connection check. **Tool namespace is `mcp__discord-mcp__*`.** Always use these MCP tools, never curl or direct Discord API calls (curl is fine for the CDN attachment downloads in Phase 1b — see below).
+
+1. **Read the last-checked timestamp** from `.claude/discord_backlog_last_checked.txt`. If the file does not exist, default to the last 1 hour.
+2. **Read messages** from `#dev-sat-mqtt` using `mcp__discord-mcp__read_messages` with `channelId="1105556725714649128"` and `count="30"`. The response payload includes per-message **attachment metadata** (attachment ID, filename, MIME type, size, signed CDN URL). This metadata is sufficient — the separate `mcp__discord-mcp__get_attachment` tool returns the same info and is redundant. If the call fails (connection refused, HTTP error), report the error to the user and stop.
+3. **Filter** to messages posted after the last-checked timestamp.
+4. **Ignore** messages sent by the bot itself (author ID `1487467924351357049`).
+5. **Save the current timestamp** to `.claude/discord_backlog_last_checked.txt`.
+
+### Phase 1b: Fetch attachment contents (when a relevant message has them)
+
+If a message that is directly addressed to the bot (@mention or backlog command) carries attachments — or a not-directly-addressed message has attachments that contain evidence relevant to a known open task or thread — fetch and inspect them. **The bot is no longer blind to logs and screenshots.** Earlier bot replies that said "I cannot read attachments through the bot, only message text" are obsolete; do not repeat that line.
+
+**Procedure depends on attachment type and analysis goal:**
+
+| Type | Goal | How |
+|---|---|---|
+| Text (`.txt`, `.log`, `.json`, `.md`) | AI-summarised quick read | `WebFetch(url, prompt="…")` — small model returns processed/summarised answers, not always verbatim |
+| Text (`.txt`, `.log`, `.json`, `.md`) | Verbatim line-precise diagnosis or `Grep` over content | PowerShell download → `Read` / `Grep` on the local file |
+| Image (`.png`, `.jpg`, `.webp`) | See the screenshot, extract on-screen text or layout | PowerShell download → `Read` on the **Windows path** (Read can open images in Claude Code) |
+
+**Download recipe (Windows-safe — do NOT use Git-Bash `/tmp/`, the Read tool cannot resolve those paths):**
+
+```powershell
+$dir = "$env:TEMP\discord-attach"
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+Invoke-WebRequest -Uri "<signed CDN URL from message>" -OutFile "$dir\<filename>" -UseBasicParsing
+```
+
+Then call `Read` with the full Windows path, e.g. `C:\Users\rvdbr\AppData\Local\Temp\discord-attach\<filename>`. To grep a long log: `Grep` on that same path.
+
+**Caveats:**
+
+- Discord CDN URLs are signed with `ex=<hex-epoch>` and expire roughly 7 days after the message was posted. If the download returns 403, request a fresh signed URL via `mcp__discord-mcp__read_messages` (Discord rolls a new one each call) or ask the poster to re-share.
+- `WebFetch` runs the content through a small AI model — for **forensic / line-precise** log diagnosis prefer the download-and-`Grep` route. Use `WebFetch` only for the "what does this log roughly show" question.
+- Clean-up of `$env:TEMP\discord-attach` is unnecessary — Windows TEMP rotates on its own. Don't make it a habit to commit those files anywhere.
+
+**When the bot inspects an attachment, name the finding in the Discord reply.** It signals to reporters that the bot actually *read* their evidence. Bad: "Thanks, can you paste the relevant lines?". Good: "Read `message_2.txt` (build `168bd9e`). I see five clean SAT cycles ending at 20:33:54 with `room=21.7 → CS=10.0`, then a stale-temp fallback at 20:33:54 …".
 
 ### Phase 2: Classify each message
 
@@ -154,7 +185,7 @@ If feedback appears in general conversation without addressing the bot, the bot 
 
 1. **Format** using Discord markdown (bold, code blocks, bullet lists)
 2. **Keep under 1900 characters** (Discord limit is 2000). If longer, summarize and offer "say `show task X` for details"
-3. **Post** to `#dev-sat-mqtt` using `mcp__discord__discord_send` with channel ID `1105556725714649128`
+3. **Post** to `#dev-sat-mqtt` using `mcp__discord-mcp__send_message` with `channelId="1105556725714649128"` and `message="<reply text>"`.
 
 ## Response formatting
 

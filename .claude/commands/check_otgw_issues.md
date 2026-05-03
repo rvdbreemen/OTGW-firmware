@@ -6,18 +6,21 @@ Scan the OTGW-firmware Discord server **and** GitHub issue tracker for new issue
 
 Follow these phases strictly and in order.
 
-### Phase 1: Login and read Discord messages
+### Phase 1: Read Discord messages
 
-1. **Login to Discord** using `mcp__discord__discord_login`.
-2. **Read the last-checked timestamp** from `.claude/discord_last_checked.txt`. If the file does not exist, default to messages from the last 7 days.
-3. **Read messages** from the following channels (use `mcp__discord__discord_read_messages`):
-   - `#beta-testing` — channel ID `914498730001072149` (limit 50)
-   - `#devs-esp-firmware` — channel ID `924989767966425158` (limit 50)
-   - `#english-support` — channel ID `931267109726593116` (limit 50)
-   - `#nederlandse-ondersteuning` — channel ID `815561033036333076` (limit 50)
-4. **Filter messages** to only those posted after the last-checked timestamp.
-5. **Exclude** messages from the maintainer (user ID `384411356616720384`, username `number3nl`) and bot accounts.
-6. **Save the current timestamp** to `.claude/discord_last_checked.txt` for next run.
+The Discord MCP server runs as the `discord-mcp` Docker container on `http://localhost:8085/mcp` with `DISCORD_TOKEN` preloaded from the host environment — there is **no separate login step**. The first `read_messages` call doubles as the connection check. **Tool namespace is `mcp__discord-mcp__*`.** Always use these MCP tools, never curl or direct Discord API calls (curl is fine for the CDN attachment downloads in Phase 1d — see below).
+
+1. **Read the last-checked timestamp** from `.claude/discord_last_checked.txt`. If the file does not exist, default to messages from the last 7 days.
+2. **Read messages** from the following channels using `mcp__discord-mcp__read_messages` with `count="50"`:
+   - `#beta-testing` — `channelId="914498730001072149"`
+   - `#devs-esp-firmware` — `channelId="924989767966425158"`
+   - `#english-support` — `channelId="931267109726593116"`
+   - `#nederlandse-ondersteuning` — `channelId="815561033036333076"`
+
+   The response payload includes per-message **attachment metadata** (attachment ID, filename, MIME type, size, signed CDN URL). The separate `mcp__discord-mcp__get_attachment` tool returns the same info and is redundant.
+3. **Filter messages** to only those posted after the last-checked timestamp.
+4. **Exclude** messages from the maintainer (user ID `384411356616720384`, username `number3nl`) and bot accounts.
+5. **Save the current timestamp** to `.claude/discord_last_checked.txt` for next run.
 
 ### Phase 1b: Fetch GitHub issues
 
@@ -61,6 +64,38 @@ Follow these phases strictly and in order.
 5. **Exclude** posts by the maintainer (Tweakers username `number3` or `rvdbreemen`) or purely social/off-topic messages.
 6. **Save the current timestamp** to `.claude/tweakers_last_checked.txt` for next run.
 7. **Note**: Tweakers is a Dutch forum — posts will be in Dutch. Summarize them in English for the triage list.
+
+### Phase 1d: Fetch attachment contents (logs, screenshots)
+
+Discord support channels (especially `#beta-testing`) carry the bulk of the **diagnostic evidence** as attached files: telnet logs, MQTT captures, screenshots of failing UIs. **Triage without reading the attachment is triage on partial information.** Earlier replies that said "I cannot read attachments through the bot, only message text" are obsolete; the bot can now both fetch and analyse them.
+
+For every message that survives Phase 1 filtering and carries one or more attachments, fetch the contents before drafting the triage entry. Same applies to GitHub issue bodies/comments that link CDN-hosted screenshots or paste log gists, and to Tweakers posts with image links.
+
+**Procedure depends on attachment type and analysis goal:**
+
+| Type | Goal | How |
+|---|---|---|
+| Text (`.txt`, `.log`, `.json`, `.md`) | AI-summarised quick read | `WebFetch(url, prompt="…")` — small model returns processed/summarised answers, not always verbatim |
+| Text (`.txt`, `.log`, `.json`, `.md`) | Verbatim, line-precise diagnosis or `Grep` over content | PowerShell download → `Read` / `Grep` on the local file |
+| Image (`.png`, `.jpg`, `.webp`) | See the screenshot, extract on-screen text or layout | PowerShell download → `Read` on the **Windows path** (Read can open images in Claude Code) |
+
+**Download recipe (Windows-safe — do NOT use Git-Bash `/tmp/`, the Read tool cannot resolve those paths):**
+
+```powershell
+$dir = "$env:TEMP\otgw-issues-attach"
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+Invoke-WebRequest -Uri "<signed CDN URL from message>" -OutFile "$dir\<filename>" -UseBasicParsing
+```
+
+Then call `Read` with the full Windows path, e.g. `C:\Users\rvdbr\AppData\Local\Temp\otgw-issues-attach\<filename>`. To grep a long log: `Grep` on that same path.
+
+**Caveats:**
+
+- Discord CDN URLs are signed with `ex=<hex-epoch>` and expire roughly 7 days after the message was posted. If the download returns 403, request a fresh signed URL via `mcp__discord-mcp__read_messages` (Discord rolls a new one each call) or ask the poster to re-share.
+- `WebFetch` runs the content through a small AI model — for **forensic / line-precise** log diagnosis prefer the download-and-`Grep` route. Use `WebFetch` only for the "what does this log roughly show" first-pass question.
+- Windows `$env:TEMP` rotates on its own; no clean-up needed. Don't commit downloaded attachments anywhere.
+
+**Triage output (Phase 2) MUST include a one-line attachment summary** for each item that carried evidence: e.g. `"Attached telnet log (58 KB, build 168bd9e): five clean SAT cycles, then stale-temp fallback at 20:33:54 driving room=0.0 → CS=62.0"`. This is what makes the triage actionable rather than cosmetic.
 
 ### Phase 2: Identify and triage issues
 

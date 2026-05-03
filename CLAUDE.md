@@ -46,6 +46,17 @@ Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. "Builds
 
 ---
 
+## MCP Servers
+
+Two MCP servers are wired into Claude Code for this project:
+
+- **`mcp__backlog__*`** — task management. Started locally by Claude Code itself (stdio).
+- **`mcp__discord-mcp__*`** — Discord I/O for `#dev-sat-mqtt` and the support channels. Runs as a long-lived Docker container (`saseq/discord-mcp`) on `http://localhost:8085/mcp`, pre-loaded with `DISCORD_TOKEN` from the Windows user environment. Most-used tools: `read_messages`, `send_message`, `get_server_info`, `read_private_messages`, `send_private_message`. There is no separate login tool — the container handshakes on its own at startup. For attachment contents (logs, screenshots), see `.claude/commands/backlog_discord.md` (Phase 1b) and `.claude/commands/check_otgw_issues.md` (Phase 1d).
+
+If Discord calls start failing with "Expected token to be set" or 401, the container session has drifted from the MCP client; `docker restart discord-mcp` plus an MCP reconnect (`/mcp` in Claude Code) brings it back. Full operational reference, restart procedure, channel discipline, and bot-side intent requirements: read `docs/guides/discord-mcp-server.md`.
+
+---
+
 ## Design Principles
 
 - **KISS**: Simplest solution that works. Share design choices so user decides on complexity.
