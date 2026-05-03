@@ -10,15 +10,16 @@ Requirements:
 - arduino-cli (installed automatically if not found) [legacy backend]
 
 Usage:
-    python build.py                      # Full build for ESP8266 + ESP32 (PlatformIO, incremental)
-    python build.py --target esp8266     # Build for ESP8266 only
-    python build.py --target esp32       # Build for ESP32 only
-    python build.py --firmware           # Build firmware only
-    python build.py --filesystem         # Build filesystem only
-    python build.py --clean              # Clean build artifacts
-    python build.py --distclean          # Clean build + cached dependencies
-    python build.py --arduino-cli        # Use arduino-cli backend instead
-    python build.py --help               # Show help
+    build                                # Full build on Windows Command Prompt
+    ./build.sh                           # Full build on Linux/macOS shells
+    build --target esp8266               # Build for ESP8266 only
+    build --target esp32                 # Build for ESP32 only
+    build --firmware                     # Build firmware only
+    build --filesystem                   # Build filesystem only
+    build --clean                        # Clean build artifacts
+    build --distclean                    # Clean build + cached dependencies
+    build --arduino-cli                  # Use arduino-cli backend instead
+    build --help                         # Show help
 """
 
 import argparse
@@ -2162,17 +2163,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python build.py                              # Full build (PlatformIO, incremental, default)
-  python build.py --target esp8266             # ESP8266 only
-  python build.py --target esp32               # ESP32 only
-  python build.py --firmware                   # Build firmware only
-  python build.py --filesystem                 # Build filesystem only
-  python build.py                              # Default: full build, merged bins, distribution zip
-  python build.py --no-merged --no-zip         # Faster dev build: skip merged + zip steps
-  python build.py --compress                   # Also produce gzip-compressed merged-full.bin
-  python build.py --clean                      # Clean build artifacts (keeps PlatformIO libdeps)
-  python build.py --distclean                  # Full clean including cores/libraries cache
-  python build.py --arduino-cli                # Use legacy arduino-cli backend
+  build                                      # Full build on Windows Command Prompt
+  ./build.sh                                 # Full build on Linux/macOS shells
+  build --target esp8266                     # ESP8266 only
+  build --target esp32                       # ESP32 only
+  build --firmware                           # Build firmware only
+  build --filesystem                         # Build filesystem only
+  build                                      # Default: full build, merged bins, distribution zip
+  build --no-merged --no-zip                 # Faster dev build: skip merged + zip steps
+  build --compress                           # Also produce gzip-compressed merged-full.bin
+  build --clean                              # Clean build artifacts (keeps PlatformIO libdeps)
+  build --distclean                          # Full clean including cores/libraries cache
+  build --arduino-cli                        # Use legacy arduino-cli backend
         """
     )
 

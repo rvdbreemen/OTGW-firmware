@@ -15,6 +15,7 @@ build/**
 arduino-cli.yaml
 _codeql_detected_source_root
 __pycache__/
+.build-venv/
 otgwmcu/**
 otgwmcu
 otmonitor-6.6/**
