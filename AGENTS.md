@@ -6,13 +6,13 @@ These instructions adapt the repository's Claude guidance for Codex agents. They
 
 ## Task Management
 
-Every meaningful code or documentation change should be backed by a Backlog task before implementation work starts. Use the Backlog.md CLI rules in the section below as the source of truth for reading, creating, updating, and completing tasks.
+Every meaningful code or documentation change should be backed by a Backlog task before implementation work starts. Use Backlog MCP tools as the primary interface for reading, creating, updating, and completing tasks.
 
-Codex agents must not edit files in `backlog/tasks/` directly. Use `backlog task create`, `backlog task edit`, `backlog task <id> --plain`, and `backlog search ... --plain`. If a Backlog MCP tool is explicitly available in the current session, it may be used for the same operations, but the CLI semantics below remain authoritative.
+Codex agents must not edit files in `backlog/tasks/` directly. Use Backlog MCP tools such as task view/search/create/edit when available. Use the Backlog CLI commands in the reference below only when the MCP tools are unavailable, missing required capability, or fail for the current operation.
 
 Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. A clean build is the minimum bar; the checklist covers hardware, browser, MQTT, and smoke-test expectations that compile checks do not cover.
 
-Known issue: `backlog task list` may return empty in this repository. Prefer `backlog search "<topic>" --plain` or `backlog task <id> --plain`. Read task files directly only as a read-only fallback, never to modify them.
+Known issue: `backlog task list` may return empty in this repository. Prefer Backlog MCP search/view; if falling back to CLI, prefer `backlog search "<topic>" --plain` or `backlog task <id> --plain`. Read task files directly only as a read-only fallback, never to modify them.
 
 ---
 
@@ -214,14 +214,14 @@ If you cannot name the C4 component that owns the code you are about to change, 
 ---
 
 <!-- BACKLOG.MD GUIDELINES START -->
-# Instructions for the usage of Backlog.md CLI Tool
+# Instructions for the usage of Backlog.md MCP / CLI Tooling
 
-## Backlog.md: Comprehensive Project Management Tool via CLI
+## Backlog.md: Comprehensive Project Management Tool via MCP or CLI
 
 ### Assistant Objective
 
-Efficiently manage all project tasks, status, and documentation using the Backlog.md CLI, ensuring all project metadata
-remains fully synchronized and up-to-date.
+Efficiently manage all project tasks, status, and documentation using Backlog MCP tools when available, with the
+Backlog.md CLI as fallback, ensuring all project metadata remains fully synchronized and up-to-date.
 
 ### Core Capabilities
 
@@ -239,30 +239,30 @@ remains fully synchronized and up-to-date.
 ### Why This Matters to You (AI Agent)
 
 1. **Comprehensive system** - Full project management capabilities through CLI
-2. **The CLI is the interface** - All operations go through `backlog` commands
-3. **Unified interaction model** - You can use CLI for both reading (`backlog task 1 --plain`) and writing (
-   `backlog task edit 1`)
-4. **Metadata stays synchronized** - The CLI handles all the complex relationships
+2. **MCP is the preferred interface** - Use Backlog MCP task tools first when they are available in the session
+3. **CLI is the fallback interface** - Use `backlog` commands only when MCP is unavailable or fails for the needed operation
+4. **Metadata stays synchronized** - MCP and CLI both preserve the complex relationships when used instead of direct file edits
 
 ### Key Understanding
 
 - **Tasks** live in `backlog/tasks/` as `task-<id> - <title>.md` files
-- **You interact via CLI only**: `backlog task create`, `backlog task edit`, etc.
-- **Use `--plain` flag** for AI-friendly output when viewing/listing
-- **Never bypass the CLI** - It handles Git, metadata, file naming, and relationships
+- **You interact via Backlog MCP first**: view/search/create/edit tasks through the MCP tools when available
+- **Fallback to CLI only when needed**: `backlog task create`, `backlog task edit`, etc.
+- **Use `--plain` flag** for AI-friendly output when viewing/listing through the CLI fallback
+- **Never bypass MCP/CLI for writes** - They handle Git, metadata, file naming, and relationships
 
 ---
 
-# ⚠️ CRITICAL: NEVER EDIT TASK FILES DIRECTLY. Edit Only via CLI
+# ⚠️ CRITICAL: NEVER EDIT TASK FILES DIRECTLY. Edit Only via MCP or CLI
 
-**ALL task operations MUST use the Backlog.md CLI commands**
+**ALL task operations MUST use Backlog MCP tools first, or Backlog.md CLI commands as fallback**
 
-- ✅ **DO**: Use `backlog task edit` and other CLI commands
-- ✅ **DO**: Use `backlog task create` to create new tasks
-- ✅ **DO**: Use `backlog task edit <id> --check-ac <index>` to mark acceptance criteria
+- ✅ **DO**: Use Backlog MCP task edit/create/view/search tools when available
+- ✅ **DO**: Use `backlog task edit` and other CLI commands when MCP is unavailable or fails
+- ✅ **DO**: Use MCP acceptance-criteria fields or `backlog task edit <id> --check-ac <index>` to mark acceptance criteria
 - ❌ **DON'T**: Edit markdown files directly
 - ❌ **DON'T**: Manually change checkboxes in files
-- ❌ **DON'T**: Add or modify text in task files without using CLI
+- ❌ **DON'T**: Add or modify text in task files without using MCP or CLI
 
 **Why?** Direct file editing breaks metadata synchronization, Git tracking, and task relationships.
 
@@ -279,9 +279,9 @@ remains fully synchronized and up-to-date.
 
 ### 🔧 **ACTING** (How to change things)
 
-- **All task operations MUST use the Backlog.md CLI tool**
+- **All task operations MUST use Backlog MCP first, with Backlog.md CLI as fallback**
 - This ensures metadata is correctly updated and the project stays in sync
-- **Always use `--plain` flag** when listing or viewing tasks for AI-friendly text output
+- **Always use `--plain` flag** when listing or viewing tasks through the CLI fallback for AI-friendly text output
 
 ---
 
@@ -635,12 +635,12 @@ backlog task edit 42 -s Done
 
 A task is **Done** only when **ALL** of the following are complete:
 
-### ✅ Via CLI Commands:
+### ✅ Via MCP or CLI Commands:
 
-1. **All acceptance criteria checked**: Use `backlog task edit <id> --check-ac <index>` for each
-2. **All Definition of Done items checked**: Use `backlog task edit <id> --check-dod <index>` for each
-3. **Final Summary added**: Use `backlog task edit <id> --final-summary "..."`
-4. **Status set to Done**: Use `backlog task edit <id> -s Done`
+1. **All acceptance criteria checked**: Use Backlog MCP `acceptanceCriteriaCheck` or CLI `backlog task edit <id> --check-ac <index>` for each
+2. **All Definition of Done items checked**: Use Backlog MCP `definitionOfDoneCheck` or CLI `backlog task edit <id> --check-dod <index>` for each
+3. **Final Summary added**: Use Backlog MCP `finalSummary` or CLI `backlog task edit <id> --final-summary "..."`
+4. **Status set to Done**: Use Backlog MCP `status: Done` or CLI `backlog task edit <id> -s Done`
 
 ### ✅ Via Code/Testing:
 
@@ -655,7 +655,7 @@ A task is **Done** only when **ALL** of the following are complete:
 
 ## 8. Finding Tasks and Content with Search
 
-When users ask you to find tasks related to a topic, use the `backlog search` command with `--plain` flag:
+When users ask you to find tasks related to a topic, use Backlog MCP search first. If MCP is unavailable or fails, use the `backlog search` command with `--plain` flag:
 
 ```bash
 # Search for tasks about authentication
@@ -683,24 +683,26 @@ backlog search "bug" --priority high --plain
 
 | Task         | ✅ DO                        | ❌ DON'T                         |
 |--------------|-----------------------------|---------------------------------|
-| View task    | `backlog task 42 --plain`   | Open and read .md file directly |
-| List tasks   | `backlog task list --plain` | Browse backlog/tasks folder     |
-| Check status | `backlog task 42 --plain`   | Look at file content            |
-| Find by topic| `backlog search "auth" --plain` | Manually grep through files |
+| View task    | MCP task view or `backlog task 42 --plain`   | Open and read .md file directly |
+| List tasks   | MCP task list/search or `backlog task list --plain` | Browse backlog/tasks folder     |
+| Check status | MCP task view or `backlog task 42 --plain`   | Look at file content            |
+| Find by topic| MCP task search or `backlog search "auth" --plain` | Manually grep through files |
 
 ### Modifying Tasks
 
 | Task          | ✅ DO                                 | ❌ DON'T                           |
 |---------------|--------------------------------------|-----------------------------------|
-| Check AC      | `backlog task edit 42 --check-ac 1`  | Change `- [ ]` to `- [x]` in file |
-| Add notes     | `backlog task edit 42 --notes "..."` | Type notes into .md file          |
-| Add final summary | `backlog task edit 42 --final-summary "..."` | Type summary into .md file |
-| Change status | `backlog task edit 42 -s Done`       | Edit status in frontmatter        |
-| Add AC        | `backlog task edit 42 --ac "New"`    | Add `- [ ] New` to file           |
+| Check AC      | MCP task edit or `backlog task edit 42 --check-ac 1`  | Change `- [ ]` to `- [x]` in file |
+| Add notes     | MCP task edit or `backlog task edit 42 --notes "..."` | Type notes into .md file          |
+| Add final summary | MCP task edit or `backlog task edit 42 --final-summary "..."` | Type summary into .md file |
+| Change status | MCP task edit or `backlog task edit 42 -s Done`       | Edit status in frontmatter        |
+| Add AC        | MCP task edit or `backlog task edit 42 --ac "New"`    | Add `- [ ] New` to file           |
 
 ---
 
-## 10. Complete CLI Command Reference
+## 10. Fallback CLI Command Reference
+
+Use these commands when Backlog MCP tools are unavailable or fail for the current operation.
 
 ### Task Creation
 
@@ -826,15 +828,15 @@ Tests:
 |----------------------|--------------------------------------------------------------------|
 | Task not found       | Check task ID with `backlog task list --plain`                     |
 | AC won't check       | Use correct index: `backlog task 42 --plain` to see AC numbers     |
-| Changes not saving   | Ensure you're using CLI, not editing files                         |
+| Changes not saving   | Ensure you're using MCP/CLI, not editing files                     |
 | Metadata out of sync | Re-edit via CLI to fix: `backlog task edit 42 -s <current-status>` |
 
 ---
 
 ## Remember: The Golden Rule
 
-**🎯 If you want to change ANYTHING in a task, use the `backlog task edit` command.**
-**📖 Use CLI to read tasks, exceptionally READ task files directly, never WRITE to them.**
+**🎯 If you want to change ANYTHING in a task, use Backlog MCP task edit first or the `backlog task edit` CLI fallback.**
+**📖 Use MCP/CLI to read tasks, exceptionally READ task files directly, never WRITE to them.**
 
 Full help available: `backlog --help`
 
