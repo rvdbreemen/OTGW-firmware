@@ -350,6 +350,28 @@
           </div>
         </div>
 
+        <!-- TASK-514: charts moved above other sections so they fit above the
+             fold on common laptop viewports (1366x768 and 1920x1080) without
+             scrolling. Mobile DOM order is preserved (charts still stack below
+             tiles), satisfying AC #4. -->
+
+        <!-- Chart -->
+        <div class="sat-section" data-view="simple expert diag">
+          <h3>Temperature History</h3>
+          <div id="sat-chart" class="ds-chart" style="width:100%;height:300px;"></div>
+        </div>
+
+        <!-- Heating Curve (Stooklijn) -->
+        <div class="sat-section" data-view="expert diag">
+          <h3 class="sat-curve-toggle"><button type="button" class="heading-toggle-btn" aria-expanded="true" aria-controls="sat-curve-section" onclick="SAT.toggleCurve()">Heating Curve (Stooklijn) <span id="sat-curve-arrow">&#9660;</span></button></h3>
+          <div id="sat-curve-section">
+            <div id="sat-curve-chart" class="ds-chart" style="width:100%;height:320px;"></div>
+            <div class="sat-curve-info">
+              <span id="sat-curve-label"></span>
+            </div>
+          </div>
+        </div>
+
         <!-- Simple view status summary -->
         <div class="sat-section sat-status-summary" data-view="simple">
           <div id="sat-simple-status" class="sat-simple-status">Idle</div>
@@ -411,23 +433,6 @@
           <div class="sat-controls-row" style="margin-top:8px">
             <button class="sat-btn" id="sat-btn-detect-location" onclick="SAT.detectLocation()">Detect Location</button>
             <span id="sat-weather-coords" class="sat-weather-coords"></span>
-          </div>
-        </div>
-
-        <!-- Chart -->
-        <div class="sat-section" data-view="simple expert diag">
-          <h3>Temperature History</h3>
-          <div id="sat-chart" class="ds-chart" style="width:100%;height:300px;"></div>
-        </div>
-
-        <!-- Heating Curve (Stooklijn) -->
-        <div class="sat-section" data-view="expert diag">
-          <h3 class="sat-curve-toggle"><button type="button" class="heading-toggle-btn" aria-expanded="true" aria-controls="sat-curve-section" onclick="SAT.toggleCurve()">Heating Curve (Stooklijn) <span id="sat-curve-arrow">&#9660;</span></button></h3>
-          <div id="sat-curve-section">
-            <div id="sat-curve-chart" class="ds-chart" style="width:100%;height:320px;"></div>
-            <div class="sat-curve-info">
-              <span id="sat-curve-label"></span>
-            </div>
           </div>
         </div>
 
