@@ -980,7 +980,7 @@ When `settings.mqtt.bSeparateSources` is enabled, discovery entries with source-
 
 - `{entity}_thermostat` - values from thermostat requests
 - `{entity}_boiler` - values from boiler responses
-- `{entity}_gateway` - values injected/modified by the gateway
+- `{entity}` - values injected/modified by the gateway (bare/historical naming, preserved for backward compatibility with pre-source-separation HA setups)
 
 ### SAT Discovery Entities
 
@@ -1144,7 +1144,7 @@ Runtime values interpolated into configs (instead of template placeholders) come
 | `mqttSubTopic` | Subscribe/command topic base |
 | `version` | `device.sw_version` and `origin.sw` |
 
-Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is handled at stream time by `expandAndStreamSensorSources()`, which emits three variants (`_thermostat`, `_boiler`, `_gateway`) for sensors marked with `MQTT_HA_FLAG_ANY_SOURCE`.
+Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is handled at stream time by `expandAndStreamSensorSources()`, which emits three variants (`_thermostat`, `_boiler`, and an empty suffix for gateway — preserving the historical bare entity name for backward compatibility) for sensors marked with `MQTT_HA_FLAG_ANY_SOURCE`.
 
 ---
 

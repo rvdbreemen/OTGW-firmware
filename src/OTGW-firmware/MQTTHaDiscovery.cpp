@@ -2288,7 +2288,7 @@ bool expandAndStreamSensorSources(PubSubClient &client,
 {
   static const char src_suffix_thermostat[] PROGMEM = "_thermostat";
   static const char src_suffix_boiler[] PROGMEM = "_boiler";
-  static const char src_suffix_gateway[] PROGMEM = "_gateway";
+  static const char src_suffix_gateway[] PROGMEM = "";
   static const char src_name_thermostat[] PROGMEM = "Thermostat";
   static const char src_name_boiler[] PROGMEM = "Boiler";
   static const char src_name_gateway[] PROGMEM = "Gateway";
