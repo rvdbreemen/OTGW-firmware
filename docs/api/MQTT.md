@@ -421,7 +421,7 @@ When `settings.mqtt.bSeparateSources` is enabled, discovery entries with source-
 
 - `{entity}_thermostat` - values from thermostat requests
 - `{entity}_boiler` - values from boiler responses
-- `{entity}_gateway` - values injected/modified by the gateway
+- `{entity}` - values injected/modified by the gateway (bare/historical naming, preserved for backward compatibility with pre-source-separation HA setups)
 
 ### Retained discovery verification (v1.4.1+)
 
@@ -470,7 +470,7 @@ Template placeholders:
 | `%mqtt_pub_topic%` | MQTT publish namespace |
 | `%mqtt_sub_topic%` | MQTT subscribe namespace |
 | `%homeassistant%` | HA discovery prefix |
-| `%source_suffix%` | Source suffix (_thermostat, _boiler, _gateway) |
+| `%source_suffix%` | Source suffix (_thermostat, _boiler, empty for gateway — keeps gateway bare for backward compat) |
 | `%source_name%` | Source display name (Thermostat, Boiler, Gateway) |
 | `%source_topic_segment%` | Source topic segment (thermostat, boiler, gateway) |
 
