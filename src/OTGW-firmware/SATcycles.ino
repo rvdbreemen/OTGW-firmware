@@ -541,7 +541,11 @@ void satCycleOnFlameChange(bool flameOn)
                durationSec, _cycle_maxFlowTemp);
     {
       static char _wsMsg[72];
-      snprintf_P(_wsMsg, sizeof(_wsMsg), PSTR("{\"type\":\"status\",\"msg\":\"Heating off, room %.1f deg C\"}"), OTcurrentSystemState.Tr);
+      if (isnan(OTcurrentSystemState.Tr)) {
+        strlcpy_P(_wsMsg, PSTR("{\"type\":\"status\",\"msg\":\"Heating off, room temp unknown\"}"), sizeof(_wsMsg));
+      } else {
+        snprintf_P(_wsMsg, sizeof(_wsMsg), PSTR("{\"type\":\"status\",\"msg\":\"Heating off, room %.1f deg C\"}"), OTcurrentSystemState.Tr);
+      }
       sendWebSocketJSON(_wsMsg);
     }
     // Compute p90/p10 from collected flow samples (Task #225)

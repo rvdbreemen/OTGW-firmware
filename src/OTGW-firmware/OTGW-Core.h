@@ -51,7 +51,7 @@ typedef struct {
 	uint16_t 	Date = 0; // u8 / u8  Calendar date 
 	uint16_t 	Year = 0; // u16  Calendar year 
 	float 		TrSetCH2 = 0.0f; // f8.8  Room Setpoint for 2nd CH circuit (°C)
-	float 		Tr = 0.0f; // f8.8  Room temperature (°C)
+	float 		Tr = NAN; // f8.8  Room temperature (°C). NAN-init per TASK-522: distinguishes "never observed" from a real 0 °C reading. Consumers must isnan()-guard before arithmetic or display.
 	float 		Tboiler = 0.0f; // f8.8  Boiler flow water temperature (°C)
 	float 		Tdhw = 0.0f; // f8.8  DHW temperature (°C)
 	float 		Toutside = 0.0f; // f8.8  Outside temperature (°C)

@@ -136,7 +136,7 @@ static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool state
     char val[16] = "";
     if      (strcmp_P(varName, PSTR("state"))      == 0) { snprintf_P(val, sizeof(val), stateOn ? PSTR("ON") : PSTR("OFF")); }
     else if (strcmp_P(varName, PSTR("tboiler"))    == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tboiler); }
-    else if (strcmp_P(varName, PSTR("tr"))         == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tr); }
+    else if (strcmp_P(varName, PSTR("tr"))         == 0) { if (isnan(OTcurrentSystemState.Tr)) strlcpy_P(val, PSTR("--"), sizeof(val)); else snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tr); }
     else if (strcmp_P(varName, PSTR("tset"))       == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.TSet); }
     else if (strcmp_P(varName, PSTR("tdhw"))       == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tdhw); }
     else if (strcmp_P(varName, PSTR("relmod"))     == 0) { snprintf_P(val, sizeof(val), PSTR("%.0f"), OTcurrentSystemState.RelModLevel); }

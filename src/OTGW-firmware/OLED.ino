@@ -152,7 +152,11 @@ static void drawPageHC1() {
 
   oledDisplay.setRow(3);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Room temp: %.1f C"), OTcurrentSystemState.Tr);
+  if (isnan(OTcurrentSystemState.Tr)) {
+    strlcpy_P(oledBuf, PSTR("Room temp: -- C"), sizeof(oledBuf));
+  } else {
+    snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Room temp: %.1f C"), OTcurrentSystemState.Tr);
+  }
   oledDisplay.print(oledBuf);
 
   oledDisplay.setRow(5);

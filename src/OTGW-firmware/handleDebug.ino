@@ -36,10 +36,16 @@ void handleDebugChar(char c){
                     CCONOFF(state.otBus.bBoilerState),
                     state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting");
                 Debugf(PSTR("OTGW Simulation: %s\r\n"), CBOOLEAN(state.debug.bOTGWSimulation));
-                Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
-                    OTcurrentSystemState.Tboiler,
-                    OTcurrentSystemState.Tr,
-                    OTcurrentSystemState.TrSet);
+                if (isnan(OTcurrentSystemState.Tr)) {
+                  Debugf(PSTR("CH Temp: %.1f°C | Room Temp: --°C | Setpoint: %.1f°C\r\n"),
+                      OTcurrentSystemState.Tboiler,
+                      OTcurrentSystemState.TrSet);
+                } else {
+                  Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
+                      OTcurrentSystemState.Tboiler,
+                      OTcurrentSystemState.Tr,
+                      OTcurrentSystemState.TrSet);
+                }
                 Debugln();
                 Debugln(F("--- Debug toggles ---"));
                 Debugf(PSTR("1) Toggle debuglog - OT message parsing: %s\r\n"), CBOOLEAN(state.debug.bOTmsg));

@@ -919,18 +919,12 @@ static float satGetRoomTemp()
       return state.sat.fExternalTemp;
     }
   }
-  // TASK-521: Detect ghost Tr passthrough.
-  // OTcurrentSystemState.Tr is initialised to 0.0f at boot and only updated when MsgID 24
-  // arrives from the thermostat. In OTDirect/master configs without a thermostat, Tr stays
-  // at 0.0f forever — and a 0.0 reading crashed straight into the PID, producing
-  // error=-21 -> CS=62 (max heat) on a fictitious "freezing house". Track whether we have
-  // ever observed a non-zero Tr; if not, a current 0.0 is treated as "no source", not as
-  // a real reading. AC #6 (replacing the upstream init with NAN) is deferred to a follow-up
-  // task to keep this fix scoped to SATcontrol.ino.
-  static bool sTrEverNonZero = false;
+  // TASK-522: ghost-Tr detection now uses the upstream NAN-init contract.
+  // OTcurrentSystemState.Tr is NAN until a MsgID 24 arrives. In OTDirect / master configs
+  // without a thermostat, Tr stays NAN forever — isnan() distinguishes "never observed"
+  // from a real reading without the static-bool bookkeeping that TASK-521 introduced.
   float otRoom = OTcurrentSystemState.Tr;  // OT message ID 24
-  if (otRoom != 0.0f) sTrEverNonZero = true;
-  const bool trGhost = (!sTrEverNonZero && otRoom == 0.0f);
+  const bool trGhost = isnan(otRoom);
 
   // Task #21: If in fallback mode and OT room temp is invalid, use thermal estimation
   if (state.sat.bFallbackActive && (otRoom < -10.0f || otRoom > 50.0f)) {
