@@ -791,3 +791,16 @@ Project-specific skills for GitHub Copilot live in `.github/skills/`. The `adr` 
 - **Always** use `addOTWGcmdtoqueue()` for OTGW commands
 - **Always** validate buffer sizes before string operations
 - **Always** feed watchdog in long-running loops: `feedWatchDog()`
+
+## Git push policy
+
+The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`** when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
+
+Concrete rules that override the default "ask first":
+
+- **`origin/dev`** push: allowed once a feature task is committed locally AND the build verifies (`python build.py --firmware` returns exit 0) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary.
+- **`origin/main`** push: still requires explicit per-instance confirmation. Main is release-line; never auto-pushed.
+- **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.
+- **Other remote branches** (`feature-*`, `fix-*`): require explicit per-instance confirmation unless the user has granted standing permission for that specific branch in this same section.
+
+When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
