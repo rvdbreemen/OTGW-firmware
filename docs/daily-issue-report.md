@@ -1,49 +1,28 @@
-# Daily Issue Report — 2026-04-23
+# Daily Issue Report — 2026-05-03
 
-**Generated**: 2026-04-23  
-**Period checked**: Since 2026-04-22T20:51:44Z (last check timestamp)
+**Generated**: 2026-05-03  
+**Period checked**: Since 2026-05-02T14:04:24Z (last check timestamp)
 
 ## Sources Checked
 
 | Source | Status | Result |
 |--------|--------|--------|
-| GitHub Issues | ✅ Scanned | 1 issue updated since last check (already tracked) |
+| GitHub Issues | ✅ Scanned | No issues updated since last check |
 | Tweakers forum | ❌ Unreachable | Host blocked by network policy |
 | Discord | ❌ Unavailable | Discord MCP not configured in this session |
 
 ## Findings
 
-### GitHub — Issue #554 (already tracked as TASK-384)
+No new issues in the last 24 hours.
 
-- **Source**: [GitHub #554](https://github.com/rvdbreemen/OTGW-firmware/issues/554)
-- **Reporter**: ArnoudPJ
-- **Created**: 2026-04-22T14:39Z (before last check, already in backlog)
-- **Updated**: 2026-04-22T20:57Z (after last check)
-- **Classification**: Bug report (needs-info)
-- **Summary**: User reported that v1.3.5 cannot be flashed directly to the Nodo-shop OTGW (WeMos D1 board) — it boots into a loop. Workaround found: flash v1.2 first, connect to WiFi, then OTA-update to the latest version. User shared this as a tip for others.
-- **New activity since last check**: Maintainer (rvdbreemen) added a detailed troubleshooting questionnaire at 20:55Z asking for: exact WeMos variant, OTGW PCB revision, flash tool and offsets used, whether both `.ino.bin` and `.littlefs.bin` were flashed, and serial output at 74880 baud during the bootloop.
-- **Backlog task**: TASK-384 — `Fix: v1.3.5 bootloop on fresh flash to Wemos D1` (status: To Do, label: needs-info). Awaiting reporter response.
+All open GitHub issues were last updated before 2026-05-02T14:04:24Z. The most recently active issues for reference:
 
-**No new user-reported issues since the last check.** The only update to #554 is from the maintainer; the reporter has not yet replied.
+| # | Title | Last Updated | Status |
+|---|-------|-------------|--------|
+| [#554](https://github.com/rvdbreemen/OTGW-firmware/issues/554) | Flashing onto the nodo-shop OTGW with the WeMos D1 | 2026-05-01T11:21Z | Open (needs-info, tracked as TASK-384) |
+| [#557](https://github.com/rvdbreemen/OTGW-firmware/issues/557) | Settings / Run Boot Command and PIC missing | 2026-04-29T20:39Z | Open (question) |
+| [#543](https://github.com/rvdbreemen/OTGW-firmware/issues/543) | Max CH water setpoint shows 0°C in HA Boiler entity | 2026-04-08T20:50Z | Open (bug, needs-info) |
 
-### Tweakers forum
+## Summary
 
-Not scanned — `https://gathering.tweakers.net/rss/list_messages/1653967` is not reachable from this environment (host not in network allowlist).
-
-### Discord
-
-Not scanned — Discord MCP tools (`mcp__discord__*`) are not available in this session.
-
-## Backlog Status (needs-info)
-
-| Task | Title | Source | Waiting for |
-|------|-------|--------|-------------|
-| TASK-384 | Fix: v1.3.5 bootloop on fresh flash to Wemos D1 | GitHub #554 | Serial logs + hardware details from ArnoudPJ |
-
-## Action Items
-
-- **TASK-384**: Monitor GitHub #554 for reporter follow-up. No code changes until hardware details and serial output are provided.
-
----
-
-*Report generated automatically by the `check_otgw_issues` skill.*
+No new user-reported bugs or actionable issues found in this check period. No backlog tasks created.
