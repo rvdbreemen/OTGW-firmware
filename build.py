@@ -9,12 +9,13 @@ Requirements:
 - arduino-cli (installed automatically if not found)
 
 Usage:
-    python build.py              # Full build (firmware + filesystem)
-    python build.py --firmware   # Build firmware only
-    python build.py --filesystem # Build filesystem only
-    python build.py --clean      # Clean build artifacts
-    python build.py --distclean  # Clean build + cached dependencies
-    python build.py --help       # Show help
+    build                        # Full build on Windows Command Prompt
+    ./build.sh                   # Full build on Linux/macOS shells
+    build --firmware             # Build firmware only
+    build --filesystem           # Build filesystem only
+    build --clean                # Clean build artifacts
+    build --distclean            # Clean build + cached dependencies
+    build --help                 # Show help
 """
 
 import argparse
@@ -839,13 +840,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python build.py                  # Full build (firmware + filesystem)
-  python build.py --firmware       # Build firmware only
-  python build.py --filesystem     # Build filesystem only
-  python build.py --merged         # Build and create merged binary (single flashable file)
-  python build.py --merged --compress  # Build and create compressed merged binary
-  python build.py --clean          # Clean build artifacts
-  python build.py --distclean      # Also remove cores/libraries cache
+  build                            # Full build on Windows Command Prompt
+  ./build.sh                       # Full build on Linux/macOS shells
+  build --firmware                 # Build firmware only
+  build --filesystem               # Build filesystem only
+  build --merged                   # Build and create merged binary (single flashable file)
+  build --merged --compress        # Build and create compressed merged binary
+  build --clean                    # Clean build artifacts
+  build --distclean                # Also remove cores/libraries cache
         """
     )
     

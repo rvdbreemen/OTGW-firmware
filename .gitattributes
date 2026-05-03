@@ -1,5 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+*.bat text eol=crlf
+*.sh  text eol=lf
 
 # CI-generated version assets — always keep our local copy during merges/rebases
 src/OTGW-firmware/version.h    merge=ours

@@ -10,8 +10,11 @@ git clone https://github.com/rvdbreemen/OTGW-firmware.git
 cd OTGW-firmware
 
 # Run the build script
-python build.py
+build        # Windows Command Prompt
+./build.sh   # Linux/macOS
 ```
+
+Windows examples assume Command Prompt. In PowerShell, use `.\build.bat` unless the repository root is on PATH.
 
 The build script will automatically:
 
@@ -50,6 +53,10 @@ If unresolved Git merge markers such as `<<<<<<<`, `=======`, or `>>>>>>>` are p
 
 ### Automatic Dependencies
 
+The build wrappers use or create a local `.build-venv` automatically. If `requirements-build.txt` or
+`requirements.txt` exists, the listed Python packages are installed quietly before `build.py` is started. If Python is
+not on PATH but an existing `.venv` works, the wrappers can use that as a fallback.
+
 The build script will automatically install:
 
 - **arduino-cli** - Downloaded and installed to your local bin directory if not present
@@ -85,7 +92,8 @@ BUILD_DIR = PROJECT_DIR / os.getenv("OTGW_BUILD_DIR", "build")
 ### Full Build (Firmware + Filesystem)
 
 ```bash
-python build.py
+build        # Windows Command Prompt
+./build.sh   # Linux/macOS
 ```
 
 This builds both the firmware and filesystem images with versioned filenames.
@@ -93,19 +101,22 @@ This builds both the firmware and filesystem images with versioned filenames.
 ### Build Firmware Only
 
 ```bash
-python build.py --firmware
+build --firmware        # Windows Command Prompt
+./build.sh --firmware   # Linux/macOS
 ```
 
 ### Build Filesystem Only
 
 ```bash
-python build.py --filesystem
+build --filesystem        # Windows Command Prompt
+./build.sh --filesystem   # Linux/macOS
 ```
 
 ### Clean Build Artifacts
 
 ```bash
-python build.py --clean
+build --clean        # Windows Command Prompt
+./build.sh --clean   # Linux/macOS
 ```
 
 This removes all build artifacts and downloaded dependencies.
@@ -113,10 +124,10 @@ This removes all build artifacts and downloaded dependencies.
 ### Additional Options
 
 ```bash
-python build.py --no-rename       # Build without renaming artifacts with version
-python build.py --no-install-cli  # Skip arduino-cli installation check
-python build.py --no-color        # Disable colored output
-python build.py --help            # Show all options
+build --no-rename       # Build without renaming artifacts with version
+build --no-install-cli  # Skip arduino-cli installation check
+build --no-color        # Disable colored output
+build --help            # Show all options
 ```
 
 ## Build Output
@@ -220,8 +231,10 @@ python3 --version
 1. **Clean and rebuild**:
 
    ```bash
-   python build.py --clean
-   python build.py
+   build --clean        # Windows Command Prompt
+   build                # Windows Command Prompt
+   ./build.sh --clean   # Linux/macOS
+   ./build.sh           # Linux/macOS
    ```
 
 2. **Check internet connection**: The first build downloads dependencies
@@ -233,8 +246,8 @@ python3 --version
 Make the script executable:
 
 ```bash
-chmod +x build.py
-./build.py
+chmod +x build.sh
+./build.sh
 ```
 
 ## Advanced Usage
