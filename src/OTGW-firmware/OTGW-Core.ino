@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.5.0-beta.7
+**  Version  : v1.5.0-beta.8
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2980,6 +2980,15 @@ void handleOTGWqueue(){
     if ((int32_t)(now - cmdqueue[i].due) >= 0) {
       OTGWDebugTf(PSTR("CmdQueue: Queue slot [%d] due\r\n"), i);
       sendOTGW(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
+      // GW=R resets the PIC; it sends no GW: response so the queue would
+      // never match it and would keep firing every OTGW_CMD_INTERVAL_MS,
+      // causing a continuous reset loop. Remove it immediately after send.
+      if (strcmp_P(cmdqueue[i].cmd, PSTR("GW=R")) == 0) {
+        OTGWDebugTln(F("CmdQueue: GW=R sent, removing (fire-and-forget)"));
+        removeFromCmdQueue(i);
+        i--;
+        continue;
+      }
       cmdqueue[i].retrycnt++;
       cmdqueue[i].due = now + OTGW_CMD_INTERVAL_MS;
       if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
@@ -4245,7 +4254,8 @@ void processOT(const char *buf, int len){
     OTGWDebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
     strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
-    sendMQTTversioninfo();
+    // MQTT publish is handled by the fwreportinfo callback (registered in setup).
+    // Calling sendMQTTversioninfo() here as well would produce duplicate publications.
     // Banner is the response to PR=A — remove it directly from the command queue
     for (int qi = 0; qi < cmdQueueSize; qi++) {
       if (cmdqueue[qi].cmd[0] == 'P' && cmdqueue[qi].cmd[1] == 'R' &&
@@ -4719,6 +4729,16 @@ void fwupgradestep(int pct) {
 
 void fwreportinfo(OTGWFirmware fw, const char *version) {
     DebugTln(F("Callback: fwreportinfo"));
+    // Belt-and-suspenders: if GW=R is still in the queue when the PIC restart
+    // fires, the fire-and-forget in handleOTGWqueue may not have run yet
+    // (e.g. fwreportinfo fires during the first send tick). Remove it here too.
+    for (int qi = 0; qi < cmdQueueSize; qi++) {
+      if (strcmp_P(cmdqueue[qi].cmd, PSTR("GW=R")) == 0) {
+        OTGWDebugTln(F("fwreportinfo: PIC restart confirms GW=R, removing from queue"));
+        removeFromCmdQueue(qi);
+        break;
+      }
+    }
     strlcpy(state.pic.sFwversion, version, sizeof(state.pic.sFwversion));
     //state.pic.sFwversion = String(OTGWSerial.firmwareVersion());
     DebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
