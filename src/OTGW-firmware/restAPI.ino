@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.5.0-beta.6
+**  Version  : v1.5.0-beta.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -165,6 +165,7 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTGWvalue(int msgid);
 void sendOTGWlabel(const char *msglabel);
@@ -565,6 +566,90 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendApiNotFound(originalURI);
 }
 
+// GET /api/v2/debug — machine-readable dump of all settings and runtime state.
+// Auth-protected: contains SSID, broker address, and other config details.
+static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (!checkHttpAuth()) return;
+
+  sendStartJsonMap(F("debug"));
+
+  // [build]
+  sendJsonMapEntry(F("build.version"),  _VERSION);
+  sendJsonMapEntry(F("build.number"),   (int32_t)_VERSION_BUILD);
+  sendJsonMapEntry(F("build.githash"),  _VERSION_GITHASH);
+  sendJsonMapEntry(F("build.date"),     _VERSION_DATE);
+
+  // [runtime]
+  sendJsonMapEntry(F("runtime.heap_free"),     (int32_t)ESP.getFreeHeap());
+  sendJsonMapEntry(F("runtime.heap_frag_pct"), (int32_t)ESP.getHeapFragmentation());
+  sendJsonMapEntry(F("runtime.heap_min_free"), (int32_t)getMinFreeHeap());
+  sendJsonMapEntry(F("runtime.heap_max_block"),(int32_t)ESP.getMaxFreeBlockSize());
+  sendJsonMapEntry(F("runtime.uptime_sec"),    (int32_t)state.uptime.iSeconds);
+  sendJsonMapEntry(F("runtime.reboots"),       (int32_t)state.uptime.iRebootCount);
+  sendJsonMapEntry(F("runtime.wifi_rssi"),     (int32_t)WiFi.RSSI());
+  {
+    char ipbuf[16];
+    strlcpy(ipbuf, WiFi.localIP().toString().c_str(), sizeof(ipbuf));
+    sendJsonMapEntry(F("runtime.wifi_ip"),     ipbuf);
+    strlcpy(ipbuf, WiFi.SSID().c_str(), sizeof(ipbuf));
+    sendJsonMapEntry(F("runtime.wifi_ssid"),   ipbuf);
+  }
+  sendJsonMapEntry(F("runtime.wifi_connected"), (WiFi.status() == WL_CONNECTED));
+
+  // [settings]
+  sendJsonMapEntry(F("settings.hostname"),       settings.sHostname);
+  sendJsonMapEntry(F("settings.ota_enabled"),    settings.bOTAEnabled);
+  sendJsonMapEntry(F("settings.led_enabled"),    settings.bLedEnabled);
+  sendJsonMapEntry(F("settings.http_auth"),      (settings.sHTTPpasswd[0] != '\0'));
+
+  // [settings.mqtt]
+  sendJsonMapEntry(F("settings.mqtt.broker"),    settings.mqtt.sBroker);
+  sendJsonMapEntry(F("settings.mqtt.port"),      (int32_t)settings.mqtt.iPort);
+  sendJsonMapEntry(F("settings.mqtt.user"),      settings.mqtt.sUser);
+  sendJsonMapEntry(F("settings.mqtt.passwd"),    "***");
+  sendJsonMapEntry(F("settings.mqtt.toptopic"),  settings.mqtt.sTopTopic);
+  sendJsonMapEntry(F("settings.mqtt.ha_prefix"), settings.mqtt.sHaprefix);
+  sendJsonMapEntry(F("settings.mqtt.unique_id"), settings.mqtt.sUniqueid);
+  sendJsonMapEntry(F("settings.mqtt.interval"),  (int32_t)settings.mqtt.iInterval);
+  sendJsonMapEntry(F("settings.mqtt.enabled"),   settings.mqtt.bEnabled);
+  sendJsonMapEntry(F("settings.mqtt.ha_disc"),   settings.mqtt.bHAdiscovery);
+  sendJsonMapEntry(F("settings.mqtt.disc_verify"), settings.mqtt.bDiscoveryAutoVerify);
+  sendJsonMapEntry(F("settings.mqtt.sep_src"),   settings.mqtt.bSeparateSources);
+
+  // [settings.ntp]
+  sendJsonMapEntry(F("settings.ntp.server"),     settings.ntp.sServer);
+  sendJsonMapEntry(F("settings.ntp.tz"),         settings.ntp.sTZ);
+  sendJsonMapEntry(F("settings.ntp.enabled"),    settings.ntp.bEnabled);
+
+  // [settings.sensors]
+  sendJsonMapEntry(F("settings.sensors.enabled"),  settings.sensors.bEnabled);
+  sendJsonMapEntry(F("settings.sensors.gpio"),     (int32_t)settings.sensors.iPin);
+  sendJsonMapEntry(F("settings.sensors.interval"), (int32_t)settings.sensors.iInterval);
+
+  // [settings.s0]
+  sendJsonMapEntry(F("settings.s0.enabled"),  settings.s0.bEnabled);
+  sendJsonMapEntry(F("settings.s0.gpio"),     (int32_t)settings.s0.iPin);
+  sendJsonMapEntry(F("settings.s0.interval"), (int32_t)settings.s0.iInterval);
+
+  // [state.mqtt]
+  sendJsonMapEntry(F("state.mqtt.connected"),  state.mqtt.bConnected);
+  sendJsonMapEntry(F("state.mqtt.reconnects"), (int32_t)state.mqtt.iReconnectCount);
+
+  // [state.otgw]
+  sendJsonMapEntry(F("state.otgw.online"),        state.otgw.bOnline);
+  sendJsonMapEntry(F("state.otgw.pic_enabled"),   state.otgw.bPICenabled);
+  sendJsonMapEntry(F("state.otgw.last_msg_epoch"), (int32_t)state.otgw.iLastMessageEpoch);
+
+  // [state.debug]
+  sendJsonMapEntry(F("state.debug.otgw_sim"),    state.debug.bOTGWSimulation);
+  sendJsonMapEntry(F("state.debug.sensor_sim"),  state.debug.bSensorSim);
+  sendJsonMapEntry(F("state.debug.restapi"),     state.debug.bRestAPI);
+  sendJsonMapEntry(F("state.debug.mqtt"),        state.debug.bMQTT);
+
+  sendEndJsonMap(F("debug"));
+}
+
 //=== Route dispatch table (ADR-050) ===
 // Adding a new v2 resource: (1) write handler function above, (2) add entry below.
 typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
@@ -586,6 +671,7 @@ static const char kRouteSimulate[]   PROGMEM = "simulate";
 static const char kRouteOtgw[]       PROGMEM = "otgw";
 static const char kRouteWebhook[]    PROGMEM = "webhook";
 static const char kRouteDiscovery[]  PROGMEM = "discovery";
+static const char kRouteDebugDump[]  PROGMEM = "debug";
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -600,6 +686,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteOtgw,       handleOtgw },
   { kRouteWebhook,    handleWebhook },
   { kRouteDiscovery,  handleDiscovery },
+  { kRouteDebugDump,  handleDebugDump },
   { nullptr,          nullptr }  // sentinel
 };
 
