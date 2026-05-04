@@ -135,7 +135,8 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 
   if (!wifiConnected)
   {
-    DebugTln(F("Starting config portal..."));
+    DebugTf(PSTR("Starting config portal (heap: %u free, %u fragmented, %u max block)...\r\n"),
+            ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
     if (!manageWiFi.startConfigPortal(thisAP))
     {
       DebugTln(F("failed to connect and hit timeout"));

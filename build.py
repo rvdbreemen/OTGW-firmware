@@ -214,7 +214,7 @@ def install_dependencies(project_dir, config_file):
     # They are replaced by SimpleTelnet (src/libraries/SimpleTelnet/),
     # which is picked up via the --libraries src/libraries flag in compile().
     libraries = [
-        "WiFiManager@2.0.17",
+        "WiFiManager@2.0.15-rc.1",
         "pubsubclient@2.8.0",
         "AceCommon@1.6.2",
         "AceSorting@1.0.0",

@@ -3,13 +3,13 @@ id: TASK-484
 title: >-
   Fix: WiFi setup AP mode webUI unreachable after Reset Wifi (andrebrait,
   1.5.0-beta)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-29 23:48'
-updated_date: '2026-05-04 06:23'
+updated_date: '2026-05-04 08:19'
 labels:
   - bug
-  - needs-info
   - wifi
   - wifimanager
 dependencies: []
@@ -34,10 +34,16 @@ Setup: Wemos D1 Mini classic, NodoShop OTGW v2.x, firmware 1.5.0-beta+ (after th
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduce on a clean device with WiFi reset triggered
-- [ ] #2 Identify why the WifiManager AP-mode HTTP server accepts TCP connections but aborts the GET response
-- [ ] #3 Either fix the AP-mode webserver or add diagnostics so future occurrences surface in serial output
-- [ ] #4 Add a confirmation modal in the webUI before Reset Wifi (defensive UX, requested by reporter)
+- [x] #2 Identify why the WifiManager AP-mode HTTP server accepts TCP connections but aborts the GET response
+- [x] #3 Either fix the AP-mode webserver or add diagnostics so future occurrences surface in serial output
+- [x] #4 Add a confirmation modal in the webUI before Reset Wifi (defensive UX, requested by reporter)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Downgrade WiFiManager van 2.0.17 naar 2.0.15-rc.1 in build.py (enige plek — project gebruikt arduino-cli, geen PlatformIO)\n2. Voeg heap-diagnostiek toe vlak voor startConfigPortal() in networkStuff.ino zodat toekomstige portal-problemen direct zichtbaar zijn in telnet-log\n3. Bouw firmware en verifieer compilatie\n4. Commit en push naar origin/dev\n5. Vraag andrebrait om te testen met fresh flash
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -53,4 +59,6 @@ Investigation path:
 2. Check WiFiManager 2.0.17 changelog/issues for AP HTTP server regressions on ESP8266.
 3. Try `autoConnect()` instead of `startConfigPortal()` as a behavioural comparison.
 4. Check if `setConfigPortalTimeout(240)` vs the old `setTimeout(240)` has different semantics that could cause the portal HTTP server to close before the user can connect.
+
+2026-05-04: Uitgevoerd — WiFiManager teruggerold van 2.0.17 naar 2.0.15-rc.1 in build.py (r1 van onderzoeksplan). Heap-diagnostiek toegevoegd in networkStuff.ino vlak voor startConfigPortal(): logt free heap, fragmentatie% en max block bij elke portal-start. AC4 (confirm dialog) was al aanwezig in index.js (regel 5948). Geen PIO-config aanwezig voor hoofdfirmware — build.py is de enige plek.
 <!-- SECTION:NOTES:END -->
