@@ -97,6 +97,7 @@ void feedWatchDog();   // defined in OTGW-firmware.ino
 
 void startWiFi(const char* hostname, int timeOut, bool forcePortal = false);
 void resetWiFiSettings(void);
+void refreshServicesAfterWifiReconnect();
 void startTelnet();
 void startMDNS(const char *hostname);
 void startLLMNR(const char *hostname);

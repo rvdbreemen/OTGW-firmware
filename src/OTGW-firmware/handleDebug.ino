@@ -149,7 +149,7 @@ void handleDebugChar(char c){
                 Debugln(F("D) Dump full debug info (settings + state)"));
                 Debugln(F("q) Force read settings"));
                 Debugln(F("F) Force MQTT discovery for ALL message IDs"));
-                Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
+                Debugln(F("r) Reconnect wifi and refresh mqtt/websocket clients"));
                 Debugln(F("p) Reset PIC manually"));
                 Debugln(F("a) Send PR=A command to ID PIC firmware version and type"));
                 Debugln(F("s/S) Toggle OTGW serial simulation replay"));
@@ -202,9 +202,7 @@ void handleDebugChar(char c){
                 {
                     DebugTln(F("Reconnecting to wifi"));
                     startWiFi(CSTR(settings.sHostname), 240);
-                    //check OTGW and telnet
-                    startTelnet();
-                    startOTGWstream();
+                    refreshServicesAfterWifiReconnect();
                 } else DebugTln(F("Wifi is connected"));
 
                 if (!state.mqtt.bConnected) {

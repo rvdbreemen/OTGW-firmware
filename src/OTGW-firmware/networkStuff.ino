@@ -200,6 +200,18 @@ enum WifiState_t {
 static WifiState_t wifiState = WIFI_IDLE;
 static int wifiRetryCount = 0;
 
+// Refresh services that truly depend on upstream connectivity.
+// TCP listeners (telnet, OTGW stream, WebSocket server) are started once at
+// boot and should not be re-bound on every WiFi reconnect.
+void refreshServicesAfterWifiReconnect() {
+  // Force MQTT state machine back into a clean reconnect cycle.
+  doMqttDisconnect();
+  startMQTT();
+
+  // Drop stale WS clients from before the WiFi outage; server keeps listening.
+  doWebSocketClose();
+}
+
 void loopWifi() {
   DECLARE_TIMER_SEC(timerWifiRetry, 30, CATCH_UP_MISSED_TICKS);
 
@@ -254,12 +266,9 @@ void loopWifi() {
       // the next DHCP exchange (renewal or reconnect) using the configured
       // name. See TASK-432 for the rationale (v1.2.0 baseline approach).
       WiFi.hostname(CSTR(settings.sHostname));
-      startTelnet();
-      startOTGWstream();
-      startMQTT();
-      startWebSocket();
+      refreshServicesAfterWifiReconnect();
       wifiState = WIFI_IDLE;
-      DebugTf(PSTR("WiFi: reconnected, services restarted; IP=%s\r\n"),
+      DebugTf(PSTR("WiFi: reconnected, services refreshed; IP=%s\r\n"),
               WiFi.localIP().toString().c_str());
       break;
 
