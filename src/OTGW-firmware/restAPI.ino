@@ -598,29 +598,27 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("runtime.wifi_connected"), (WiFi.status() == WL_CONNECTED));
 
   // [settings]
-  sendJsonMapEntry(F("settings.hostname"),       settings.sHostname);
-  sendJsonMapEntry(F("settings.ota_enabled"),    settings.bOTAEnabled);
-  sendJsonMapEntry(F("settings.led_enabled"),    settings.bLedEnabled);
-  sendJsonMapEntry(F("settings.http_auth"),      (settings.sHTTPpasswd[0] != '\0'));
+  sendJsonMapEntry(F("settings.hostname"),   settings.sHostname);
+  sendJsonMapEntry(F("settings.led_blink"),  settings.bLEDblink);
+  sendJsonMapEntry(F("settings.http_auth"),  (settings.sHTTPpasswd[0] != '\0'));
 
   // [settings.mqtt]
   sendJsonMapEntry(F("settings.mqtt.broker"),    settings.mqtt.sBroker);
-  sendJsonMapEntry(F("settings.mqtt.port"),      (int32_t)settings.mqtt.iPort);
+  sendJsonMapEntry(F("settings.mqtt.port"),      (int32_t)settings.mqtt.iBrokerPort);
   sendJsonMapEntry(F("settings.mqtt.user"),      settings.mqtt.sUser);
   sendJsonMapEntry(F("settings.mqtt.passwd"),    "***");
   sendJsonMapEntry(F("settings.mqtt.toptopic"),  settings.mqtt.sTopTopic);
   sendJsonMapEntry(F("settings.mqtt.ha_prefix"), settings.mqtt.sHaprefix);
   sendJsonMapEntry(F("settings.mqtt.unique_id"), settings.mqtt.sUniqueid);
   sendJsonMapEntry(F("settings.mqtt.interval"),  (int32_t)settings.mqtt.iInterval);
-  sendJsonMapEntry(F("settings.mqtt.enabled"),   settings.mqtt.bEnabled);
-  sendJsonMapEntry(F("settings.mqtt.ha_disc"),   settings.mqtt.bHAdiscovery);
+  sendJsonMapEntry(F("settings.mqtt.enabled"),   settings.mqtt.bEnable);
   sendJsonMapEntry(F("settings.mqtt.disc_verify"), settings.mqtt.bDiscoveryAutoVerify);
   sendJsonMapEntry(F("settings.mqtt.sep_src"),   settings.mqtt.bSeparateSources);
 
   // [settings.ntp]
-  sendJsonMapEntry(F("settings.ntp.server"),     settings.ntp.sServer);
-  sendJsonMapEntry(F("settings.ntp.tz"),         settings.ntp.sTZ);
-  sendJsonMapEntry(F("settings.ntp.enabled"),    settings.ntp.bEnabled);
+  sendJsonMapEntry(F("settings.ntp.server"),  settings.ntp.sHostname);
+  sendJsonMapEntry(F("settings.ntp.tz"),      settings.ntp.sTimezone);
+  sendJsonMapEntry(F("settings.ntp.enabled"), settings.ntp.bEnable);
 
   // [settings.sensors]
   sendJsonMapEntry(F("settings.sensors.enabled"),  settings.sensors.bEnabled);
@@ -633,19 +631,19 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("settings.s0.interval"), (int32_t)settings.s0.iInterval);
 
   // [state.mqtt]
-  sendJsonMapEntry(F("state.mqtt.connected"),  state.mqtt.bConnected);
-  sendJsonMapEntry(F("state.mqtt.reconnects"), (int32_t)state.mqtt.iReconnectCount);
+  sendJsonMapEntry(F("state.mqtt.connected"), state.mqtt.bConnected);
 
   // [state.otgw]
-  sendJsonMapEntry(F("state.otgw.online"),        state.otgw.bOnline);
-  sendJsonMapEntry(F("state.otgw.pic_enabled"),   state.otgw.bPICenabled);
-  sendJsonMapEntry(F("state.otgw.last_msg_epoch"), (int32_t)state.otgw.iLastMessageEpoch);
+  sendJsonMapEntry(F("state.otgw.online"),    state.otgw.bOnline);
+  sendJsonMapEntry(F("state.otgw.ps_mode"),   state.otgw.bPSmode);
+  sendJsonMapEntry(F("state.pic.available"),  state.pic.bAvailable);
+  sendJsonMapEntry(F("state.pic.fwversion"),  state.pic.sFwversion);
 
   // [state.debug]
-  sendJsonMapEntry(F("state.debug.otgw_sim"),    state.debug.bOTGWSimulation);
-  sendJsonMapEntry(F("state.debug.sensor_sim"),  state.debug.bSensorSim);
-  sendJsonMapEntry(F("state.debug.restapi"),     state.debug.bRestAPI);
-  sendJsonMapEntry(F("state.debug.mqtt"),        state.debug.bMQTT);
+  sendJsonMapEntry(F("state.debug.otgw_sim"),   state.debug.bOTGWSimulation);
+  sendJsonMapEntry(F("state.debug.sensor_sim"), state.debug.bSensorSim);
+  sendJsonMapEntry(F("state.debug.restapi"),    state.debug.bRestAPI);
+  sendJsonMapEntry(F("state.debug.mqtt"),       state.debug.bMQTT);
 
   sendEndJsonMap(F("debug"));
 }
