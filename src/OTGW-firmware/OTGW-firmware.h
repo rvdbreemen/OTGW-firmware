@@ -244,7 +244,8 @@ struct OTGWProtocol {          // state.otgw — OpenTherm protocol & bus state
 };
 
 struct MQTTRuntimeSection {    // state.mqtt — MQTT broker connection state
-  bool bConnected        = false;  // was statusMQTTconnection
+  bool     bConnected       = false;  // was statusMQTTconnection
+  uint32_t iLastConnectedMs = 0;      // millis() of last confirmed live connection; 0 = never connected
 };
 
 struct FlashSection {          // state.flash — Firmware upgrade operations

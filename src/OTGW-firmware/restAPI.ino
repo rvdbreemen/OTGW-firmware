@@ -166,6 +166,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTGWvalue(int msgid);
 void sendOTGWlabel(const char *msglabel);
@@ -566,6 +567,20 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendApiNotFound(originalURI);
 }
 
+//===[ /api/v2/mqtt — MQTT runtime actions ]===
+static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  // POST /api/v2/mqtt/republish — force full OT value republish (e.g. after broker wipe)
+  if (wc > 4 && strcmp_P(words[4], PSTR("republish")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+    requestMQTTRepublishAll();
+    sendCorsOriginHeader();
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\",\"message\":\"OT value republish requested\"}"));
+    return;
+  }
+  sendApiNotFound(originalURI);
+}
+
 // GET /api/v2/debug — machine-readable dump of all settings and runtime state.
 // Auth-protected: contains SSID, broker address, and other config details.
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
@@ -670,6 +685,7 @@ static const char kRouteOtgw[]       PROGMEM = "otgw";
 static const char kRouteWebhook[]    PROGMEM = "webhook";
 static const char kRouteDiscovery[]  PROGMEM = "discovery";
 static const char kRouteDebugDump[]  PROGMEM = "debug";
+static const char kRouteMqtt[]       PROGMEM = "mqtt";
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -685,6 +701,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteWebhook,    handleWebhook },
   { kRouteDiscovery,  handleDiscovery },
   { kRouteDebugDump,  handleDebugDump },
+  { kRouteMqtt,       handleMqtt },
   { nullptr,          nullptr }  // sentinel
 };
 
