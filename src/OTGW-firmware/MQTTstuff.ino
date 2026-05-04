@@ -779,11 +779,14 @@ void handleMQTT()
         // Republish all OT retained topics only if offline long enough that the broker
         // may have lost its retained state (e.g. broker restart without persistence).
         // Short outages are network blips — the broker still holds all retained topics.
-        // iLastConnectedMs == 0 means first boot (never connected) → always republish.
+        // iLastConnectedMs == 0 means never connected (first enable, first boot): treat
+        // as offlineMs = 0 so republish is skipped. mqttlastsent[] starts as
+        // TRACKED_TIME_UNSEEN, so the first-seen logic naturally publishes every value
+        // the first time it appears on the OT bus — no explicit republish needed.
         {
           uint32_t offlineMs = (state.mqtt.iLastConnectedMs > 0)
                                ? (millis() - state.mqtt.iLastConnectedMs)
-                               : MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS + 1;
+                               : 0;
           if (offlineMs > MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS) {
             DebugTf(PSTR("[MQTT] offline %lums > threshold, republishing all OT values\r\n"), (unsigned long)offlineMs);
             requestMQTTRepublishAll();
