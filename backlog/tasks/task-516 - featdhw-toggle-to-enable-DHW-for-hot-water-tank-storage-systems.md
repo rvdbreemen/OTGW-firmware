@@ -1,11 +1,11 @@
 ---
 id: TASK-516
 title: 'feat(dhw): toggle to enable DHW for hot water tank (storage) systems'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-02 18:32'
-updated_date: '2026-05-02 22:02'
+updated_date: '2026-05-05 08:25'
 labels:
   - sat
   - dhw
@@ -45,7 +45,7 @@ Sergeantd requests (Discord #dev-sat-mqtt 2026-04-28 06:07 UTC, msg 149856633344
 - [x] #6 Setting persisted in OTGWSettings per ADR-051 (Hungarian-prefixed bool, e.g. settings.sat.bDhwEnable) — only respected/sent when HB3=1
 - [x] #7 MQTT/HA discovery: emit the switch entity only when HB3=1; suppress on combi boilers
 - [x] #8 DHW slider behaviour unchanged in both cases
-- [ ] #9 Compiles clean on ESP8266 and ESP32
+- [x] #9 Compiles clean on ESP8266 and ESP32
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -142,4 +142,36 @@ Build status:
 - ESP8266: SUCCESS (pio run -e esp8266 — flash 77.7%, no warnings).
 - evaluate.py --quick: 0 failures, 2 pre-existing warnings.
 - ESP32: build environment (SCons signature DB on Windows) failed with FileNotFoundError on `.sconsign311.tmp`. Zero source-level errors, zero .o files produced — failure is at SCons graph-build before any compile step. Pre-existing infra issue, unrelated to this change. AC #9 ESP32 portion needs a clean ESP32 toolchain build run to confirm; the source is C++14-portable and uses no ESP8266-only APIs.
+
+AC #9 verified at HEAD 1d83577 with Python 3.12.13 + mklittlefs 4.1.0:
+- ESP8266: firmware + filesystem + merged binary + dist zip — all OK (3.98 MB merged, 773.5 KB zip).
+- ESP32-S3: firmware + filesystem + merged binaries + dist zip — all OK (1.87 MB / 3.94 MB / 1399.9 KB zip).
+- ./build.sh exit 0, no new compile warnings.
+- mklittlefs (4.1.0) installed via brew (Homebrew formula); was the missing toolchain piece for the ESP32 LittleFS image step. Earlier ESP32 buildfs failure was an environment gap, not a source-level compile error.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds an HB3-gated DHW enable switch surfacing the OTGW HW=0/HW=1 PIC command (translated natively by OTDirect on ESP32) as a UI/HA toggle. Boilers reporting MsgID 3 HB3=1 (storage tank) get the toggle next to the existing DHW slider; combi/instantaneous boilers (HB3=0) see the unchanged single-slider layout — no inert HA entity, no UI noise.
+
+Behaviour confirmed by sergeantd & number3nl on Discord 2026-05-02 (option b: HW-command toggle gated on MsgID 3 HB3). HB3 gate enforced at three layers so combi boilers cannot accidentally see the entity:
+- settings: HW= command suppressed when HB3=0
+- MQTT discovery: switch idx 13 skipped in both publish loops when HB3=0
+- UI: toggle row hidden via dhw_config_tank in JSON state
+
+Files touched (single feature commit on feature-dev-2.0.0-otgw32-esp32-sat-support):
+- src/OTGW-firmware/SATtypes.h — new bDhwEnable (default true)
+- src/OTGW-firmware/settingStuff.ino — persist + HB3-gated HW= emit
+- src/OTGW-firmware/restAPI.ino — POST /api/v2/sat/settings/dhw_enable
+- src/OTGW-firmware/MQTTstuff.ino + MQTTHaDiscovery.cpp — dispatch entry + HB3 gate
+- src/OTGW-firmware/SATcontrol.ino — dhw_config_tank/dhw_enable in JSON status
+- src/OTGW-firmware/data/index.html + sat.js — render + show/hide + POST handler
+
+Verification (HEAD 1d83577, Python 3.12.13 + mklittlefs 4.1.0):
+- ESP8266: ./build.sh produced firmware+filesystem+merged binary+dist zip cleanly.
+- ESP32-S3: full build cleanly (1.87 MB merged, 3.94 MB merged-full, 1399.9 KB dist zip).
+- evaluate.py --quick: 97.1% health, 0 failures.
+
+Manual on-device test plan (in task notes) covers HB3=0 vs HB3=1 boilers, OTGW classic (PIC) vs OTGW32 (OTDirect), and HA round-trip. Awaits user hardware verification on a tank-DHW boiler.
+<!-- SECTION:FINAL_SUMMARY:END -->
