@@ -1,11 +1,11 @@
 ---
 id: TASK-514
 title: 'UI: SAT dashboard graphs above-the-fold (move charts up, no scroll)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-02 18:31'
-updated_date: '2026-05-03 16:43'
+updated_date: '2026-05-05 08:10'
 labels:
   - ui
   - sat
@@ -28,11 +28,11 @@ Sergeantd reports (Discord #dev-sat-mqtt 2026-04-28 06:03 UTC, msg 1498565287757
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On 1920x1080 viewport the SAT dashboard charts are fully visible without scrolling
-- [ ] #2 On 1366x768 viewport at least the top chart is fully visible without scrolling
-- [ ] #3 Chart ordering preserved (heating curve / flow / output, in current order)
-- [ ] #4 No regression on mobile (≤480px) — charts stack below tiles, not above (mobile users scroll anyway)
-- [ ] #5 Layout change verified in Chrome and Firefox latest
+- [x] #1 On 1920x1080 viewport the SAT dashboard charts are fully visible without scrolling
+- [x] #2 On 1366x768 viewport at least the top chart is fully visible without scrolling
+- [x] #3 Chart ordering preserved (heating curve / flow / output, in current order)
+- [x] #4 No regression on mobile (≤480px) — charts stack below tiles, not above (mobile users scroll anyway)
+- [x] #5 Layout change verified in Chrome and Firefox latest
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -87,3 +87,28 @@ Eén Edit op `src/OTGW-firmware/data/index.html`: het chart-blok (regels 417-432
 - Geen CSS `order:` met @media. Onnodig — DOM-reorder volstaat voor zowel desktop als mobile per AC's.
 - Geen compactie van bestaande secties (kleinere tiles, minder padding). Out-of-scope; user kan dat later evalueren.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-05-05: Work was already shipped on feature-dev-2.0.0-otgw32-esp32-sat-support in commit 743dbfab9 (2026-05-03 18:47, "feat(satui): move SAT dashboard charts above-the-fold for laptop viewports"). Task was left In Progress. User confirmed visual/browser verification — closing.
+
+Implementation landed in commit 743dbfab on feature-dev-2.0.0-otgw32-esp32-sat-support (2026-05-03 18:47): pure DOM reorder in data/index.html — chart block (Temperature History + Heating Curve) moved from below Controls/DHW/Weather to right after the 2x2 tile grid.
+
+Layout math (per commit message):
+- 1366x768: top of Temperature History at ~300px, well within viewport (AC #2 satisfied).
+- 1920x1080: charts entirely above the fold (AC #1 satisfied).
+- Mobile ≤480px: DOM order preserved → charts stack below tiles (AC #4 satisfied).
+- Chart ordering preserved: Temperature History → Heating Curve (AC #3 satisfied).
+- Chrome + Firefox latest: visually verified by user (AC #5 satisfied).
+
+LittleFS image rebuilt by the build script; firmware binary unchanged.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT dashboard charts now sit above-the-fold on common laptop viewports (1366x768, 1920x1080) without scroll. Pure DOM reorder in data/index.html — the chart block moves from below Controls/DHW/Weather to immediately after the 2x2 tile grid. No CSS @media trick required; mobile DOM order keeps charts stacked below tiles, so accessibility (WCAG 1.3.2) and screen-reader / tab-key navigation stay aligned with visual order.
+
+Landed as commit 743dbfab on feature-dev-2.0.0-otgw32-esp32-sat-support (2026-05-03). LittleFS image rebuilt; firmware binary unchanged.
+<!-- SECTION:FINAL_SUMMARY:END -->
