@@ -4,3 +4,9 @@
 [submodule "Arduino/libraries/Time"]
 	path = Arduino/libraries/Time
 	url = https://github.com/PaulStoffregen/Time.git
+[submodule "src/libraries/SimpleTelnet"]
+	path = src/libraries/SimpleTelnet
+	url = https://github.com/rvdbreemen/SimpleTelnet
+[submodule "src/libraries/OpenTherm"]
+	path = src/libraries/OpenTherm
+	url = https://github.com/Phunkafizer/opentherm_library
