@@ -1,11 +1,11 @@
 ---
 id: TASK-544
 title: SAT heating curves invisible on 2.0.0 — diagnose and harden
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-05 08:54'
-updated_date: '2026-05-05 08:58'
+updated_date: '2026-05-05 15:58'
 labels:
   - bug
   - sat
@@ -159,4 +159,11 @@ Identical to 2C but applied unconditionally — silent-failure → visible-failu
 2026-05-05: Plan written into task. Maintainer reports hardware unavailable today, so Phase 1 (browser diagnostic ladder) is deferred. Phase 3 Fix B (LittleFS-mismatch banner) and Fix C (ECharts-unavailable message) are root-cause independent and can be prepared offline if requested — both convert silent failures to visible ones, low risk to push without hardware verification. Status stays "To Do" until maintainer confirms next move.
 
 Full design rationale and Phase 1/2 hypothesis evidence in plan file at ~/.claude/plans/van-de-week-hadden-parsed-scroll.md.
+
+[2026-05-05] Implemented the offline-safe hardening slice for TASK-544:
+- SAT page now renders a visible in-page LittleFS mismatch banner by reusing the existing device-time status message path (`getStatusMessageText()` via `statusMessageText`).
+- `sat-chart` and `sat-curve-chart` now show "Charts unavailable: echarts CDN failed to load" instead of failing silently when `window.echarts` is unavailable.
+- Heating-curve operating-point dot now suppresses itself when the point would fall outside the chart bounds (e.g. idle `heating_curve=0` below y-axis min).
+- Local validation: `./build.sh --target esp32` succeeded (firmware + LittleFS), `.build-venv/bin/python evaluate.py --quick` passed with no FAILs.
+- Remaining blocker: AC #1 and AC #3 still need browser/device verification on actual SAT hardware, so task stays In Progress.
 <!-- SECTION:NOTES:END -->

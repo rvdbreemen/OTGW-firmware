@@ -35,6 +35,11 @@ var SAT = (function() {
   var HC_BASE_OFFSET_FLOOR = 20.0;
   var HC_BASE_OFFSET_RAD   = 27.2;
   var HC_REF_TEMP          = 20.0;
+  var CURVE_X_MIN          = -15;
+  var CURVE_X_MAX          = 25;
+  var CURVE_Y_MIN          = 10;
+  var CURVE_Y_MAX          = 80;
+  var ECHARTS_UNAVAILABLE_TEXT = 'Charts unavailable: echarts CDN failed to load';
 
   // --- Debug helper (set window.SAT_DEBUG = true in browser console to enable) ---
   function _debug() {
@@ -79,6 +84,56 @@ var SAT = (function() {
   function removeClass(id, cls) {
     var e = el(id);
     if (e) e.classList.remove(cls);
+  }
+
+  function isLittleFSMismatchMessage(message) {
+    if (typeof message !== 'string') return false;
+    var normalized = message.toLowerCase();
+    return normalized.indexOf('littlefs') >= 0 || normalized.indexOf('flash your') >= 0;
+  }
+
+  function renderStatusBanner() {
+    var banner = el('sat-fs-mismatch-banner');
+    if (!banner) return;
+
+    var message = (typeof statusMessageText === 'string') ? statusMessageText : '';
+    if (isLittleFSMismatchMessage(message)) {
+      banner.textContent = message;
+      banner.classList.remove('hidden');
+      return;
+    }
+
+    banner.textContent = '';
+    banner.classList.add('hidden');
+  }
+
+  function showChartUnavailable(container) {
+    if (!container) return;
+    container.textContent = ECHARTS_UNAVAILABLE_TEXT;
+    container.classList.add('chart-unavailable');
+  }
+
+  function clearChartUnavailable(container) {
+    if (!container) return;
+    container.textContent = '';
+    container.classList.remove('chart-unavailable');
+  }
+
+  function buildCurrentPointData(outsideTemp, currentSetpoint) {
+    if (outsideTemp === null || outsideTemp === undefined ||
+        currentSetpoint === null || currentSetpoint === undefined) {
+      return [];
+    }
+    if (!isFinite(outsideTemp) || !isFinite(currentSetpoint)) {
+      return [];
+    }
+    if (outsideTemp < CURVE_X_MIN || outsideTemp > CURVE_X_MAX) {
+      return [];
+    }
+    if (currentSetpoint < CURVE_Y_MIN || currentSetpoint > CURVE_Y_MAX) {
+      return [];
+    }
+    return [[outsideTemp, Math.round(currentSetpoint * 10) / 10]];
   }
 
   function fmtTemp(v) {
@@ -346,7 +401,12 @@ var SAT = (function() {
   // --- Chart ---
   function initChart() {
     var container = el('sat-chart');
-    if (!container || typeof echarts === 'undefined') return;
+    if (!container) return;
+    if (typeof echarts === 'undefined') {
+      showChartUnavailable(container);
+      return;
+    }
+    clearChartUnavailable(container);
     _chartInstance = echarts.init(container, _otgwTheme());
     var option = {
       tooltip: { trigger: 'axis' },
@@ -467,10 +527,7 @@ var SAT = (function() {
     series.push({
       name: 'Current',
       type: 'scatter',
-      data: (outsideTemp !== null && outsideTemp !== undefined &&
-             currentSetpoint !== null && currentSetpoint !== undefined)
-        ? [[outsideTemp, Math.round(currentSetpoint * 10) / 10]]
-        : [],
+      data: buildCurrentPointData(outsideTemp, currentSetpoint),
       symbolSize: 14,
       itemStyle: { color: '#ff3300', borderColor: '#fff', borderWidth: 2 },
       z: 10
@@ -499,16 +556,16 @@ var SAT = (function() {
         name: 'Outside \u00B0C',
         nameLocation: 'center',
         nameGap: 25,
-        min: -15,
-        max: 25,
+        min: CURVE_X_MIN,
+        max: CURVE_X_MAX,
         interval: 5,
         axisLabel: { formatter: '{value}\u00B0' }
       },
       yAxis: {
         type: 'value',
         name: 'Flow \u00B0C',
-        min: 10,
-        max: 80,
+        min: CURVE_Y_MIN,
+        max: CURVE_Y_MAX,
         axisLabel: { formatter: '{value}\u00B0' }
       },
       series: series
@@ -517,7 +574,12 @@ var SAT = (function() {
 
   function initCurveChart() {
     var container = el('sat-curve-chart');
-    if (!container || typeof echarts === 'undefined') return;
+    if (!container) return;
+    if (typeof echarts === 'undefined') {
+      showChartUnavailable(container);
+      return;
+    }
+    clearChartUnavailable(container);
     _curveChartInstance = echarts.init(container, _otgwTheme());
     // Initial empty state — filled on first data fetch
     _curveChartInstance.setOption(buildCurveOption(1.5, 0, 20.0, null, null, 'light'));
@@ -558,9 +620,7 @@ var SAT = (function() {
         var update = [];
         for (var si = 0; si < seriesCount - 1; si++) update.push({});
         update.push({
-          data: (outside !== null && outside !== undefined && setpoint !== null && setpoint !== undefined)
-            ? [[outside, Math.round(setpoint * 10) / 10]]
-            : []
+          data: buildCurrentPointData(outside, setpoint)
         });
         _curveChartInstance.setOption({ series: update });
       }
@@ -616,6 +676,7 @@ var SAT = (function() {
 
   // --- Public API ---
   function start() {
+    renderStatusBanner();
     initView();
     initChart();
     initCurveChart();
@@ -1141,6 +1202,7 @@ var SAT = (function() {
   return {
     start: start,
     stop: stop,
+    renderStatusBanner: renderStatusBanner,
     setTheme: setTheme,
     switchView: switchView,
     toggleCurve: toggleCurve,

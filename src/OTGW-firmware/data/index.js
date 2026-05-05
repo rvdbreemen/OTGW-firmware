@@ -4125,6 +4125,9 @@ function refreshDevTime() {
         if (timeEl) timeEl.textContent = devtime.dateTime;
       }
       statusMessageText = devtime.message || '';
+      if (typeof SAT !== 'undefined' && SAT && typeof SAT.renderStatusBanner === 'function') {
+        SAT.renderStatusBanner();
+      }
       if (devtime.freeheap !== undefined)    currentFreeHeap = devtime.freeheap;
       if (devtime.maxfreeblock !== undefined) currentMaxFreeBlock = devtime.maxfreeblock;
       updateHeapDisplay();

@@ -450,6 +450,14 @@ body.dark .otmonrow,
   padding: var(--space-4);
   height: 280px;
 }
+.ds-chart.chart-unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--fg-3);
+  font-weight: 500;
+}
 
 /* =============================================================
  * 13. SAT PANEL
@@ -1671,4 +1679,3 @@ body.dark .sat-settings-group,
   background: var(--bg-surface);
   border-color: var(--border-1);
 }
-
