@@ -281,29 +281,72 @@ void loopWifi() {
 //===========================================================================================
 // Send the welcome banner to a freshly-connected telnet client.
 // Called from the SimpleTelnet onConnect callback — receives client IP as const char*.
-// Uses a series of small PROGMEM prints to stay off the stack.
+// Compact log-triage snapshot: identity, network/heap health, OTGW/PIC/MQTT/NTP state,
+// and the live state of every debug toggle. Mirrors the data sources of dumpDebugInfo()
+// ('D' command). Each line is a separate _debugPrintf_P / println so the 256-byte vsnprintf
+// stack buffer is reclaimed between fields.
 static void sendTelnetBanner(const char* ip)
 {
   debugTelnet.println(F("\r\n============================================"));
   debugTelnet.println(F("  OpenTherm Gateway -- OTGW-firmware"));
-  _debugPrintf_P(PSTR("  Version : %s\r\n"), _VERSION);
+  _debugPrintf_P(PSTR("  FW   : %s #%u  fs:%s\r\n"),
+    _VERSION,
+    (unsigned)_VERSION_BUILD,
+    checklittlefshash() ? "ok" : "mismatch");
+  _debugPrintf_P(PSTR("  Host : %s   Up: %s   Reboots: %lu\r\n"),
+    settings.sHostname,
+    upTime().c_str(),
+    (unsigned long)state.uptime.iRebootCount);
   debugTelnet.println(F("============================================"));
-  _debugPrintf_P(PSTR("  IP      : %s\r\n"), WiFi.localIP().toString().c_str());
-  _debugPrintf_P(PSTR("  WiFi    : %s\r\n"), WiFi.SSID().c_str());
-  _debugPrintf_P(PSTR("  OTGW    : %-10s  MQTT : %s\r\n"),
-    state.otgw.bOnline     ? "online"     : "offline",
-    state.mqtt.bConnected  ? "connected"  : "disconnected");
-  _debugPrintf_P(PSTR("  Heap    : %u bytes free\r\n"), ESP.getFreeHeap());
+  _debugPrintf_P(PSTR("  WiFi : %s   RSSI %d dBm   IP %s\r\n"),
+    WiFi.SSID().c_str(),
+    WiFi.RSSI(),
+    WiFi.localIP().toString().c_str());
+  _debugPrintf_P(PSTR("  Heap : free %u  frag %u%%  minFree %u  maxBlk %u\r\n"),
+    (unsigned)ESP.getFreeHeap(),
+    (unsigned)ESP.getHeapFragmentation(),
+    (unsigned)getMinFreeHeap(),
+    (unsigned)ESP.getMaxFreeBlockSize());
+  _debugPrintf_P(PSTR("  Drops: ws %lu  mqtt %lu   low/warn/crit %lu/%lu/%lu   slow %lu\r\n"),
+    (unsigned long)state.heapdiag.iWsDropsTotal,
+    (unsigned long)state.heapdiag.iMqttDropsTotal,
+    (unsigned long)state.heapdiag.iEnteredLowCount,
+    (unsigned long)state.heapdiag.iEnteredWarningCount,
+    (unsigned long)state.heapdiag.iEnteredCriticalCount,
+    (unsigned long)state.heapdiag.iDripSlowModeCount);
   debugTelnet.println(F("--------------------------------------------"));
-  debugTelnet.println(F("  Debug flags (key to toggle):"));
-  _debugPrintf_P(PSTR("    1 OT messages : %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
-  _debugPrintf_P(PSTR("    2 REST API    : %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
-  _debugPrintf_P(PSTR("    3 MQTT comms  : %s\r\n"), CBOOLEAN(state.debug.bMQTT));
-  _debugPrintf_P(PSTR("    4 MQTT gating : %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
-  _debugPrintf_P(PSTR("    5 Sensors     : %s\r\n"), CBOOLEAN(state.debug.bSensors));
-  _debugPrintf_P(PSTR("    6 NTP sync    : %s\r\n"), CBOOLEAN(state.debug.bNTP));
+  _debugPrintf_P(PSTR("  PIC  : %s  v%s   id %s\r\n"),
+    state.pic.sType, state.pic.sFwversion, state.pic.sDeviceid);
+  _debugPrintf_P(PSTR("  OTGW : %s   GW-mode: %s   Boiler: %s  Thermostat: %s   PS: %s\r\n"),
+    state.otgw.bOnline ? "online" : "offline",
+    state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting",
+    CCONOFF(state.otgw.bBoilerState),
+    CCONOFF(state.otgw.bThermostatState),
+    CCONOFF(state.otgw.bPSmode));
+  _debugPrintf_P(PSTR("  MQTT : %s   broker %s:%d   ha-prefix: %s\r\n"),
+    state.mqtt.bConnected ? "connected" : "disconnected",
+    settings.mqtt.sBroker,
+    (int)settings.mqtt.iBrokerPort,
+    settings.mqtt.sHaprefix);
+  _debugPrintf_P(PSTR("  NTP  : %s   tz %s   sendtime: %s\r\n"),
+    settings.ntp.bEnable ? "on" : "off",
+    settings.ntp.sTimezone,
+    CCONOFF(settings.ntp.bSendtime));
   debugTelnet.println(F("--------------------------------------------"));
-  debugTelnet.println(F("  Press 'h' for the full debug menu."));
+  debugTelnet.println(F("  Debug toggles (press key to flip):"));
+  _debugPrintf_P(PSTR("    1 OTmsg     [%s]    2 REST API  [%s]    3 MQTT      [%s]\r\n"),
+    state.debug.bOTmsg    ? "1" : "0",
+    state.debug.bRestAPI  ? "1" : "0",
+    state.debug.bMQTT     ? "1" : "0");
+  _debugPrintf_P(PSTR("    4 MQTTGate  [%s]    5 Sensors   [%s]    6 NTP       [%s]\r\n"),
+    state.debug.bMQTTGate ? "1" : "0",
+    state.debug.bSensors  ? "1" : "0",
+    state.debug.bNTP      ? "1" : "0");
+  _debugPrintf_P(PSTR("    d SensorSim [%s]    OTGW-Sim    [%s]\r\n"),
+    state.debug.bSensorSim       ? "1" : "0",
+    state.debug.bOTGWSimulation  ? "1" : "0");
+  debugTelnet.println(F("--------------------------------------------"));
+  debugTelnet.println(F("  Press 'h' for command menu, 'D' for full INI dump."));
   _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip);
   debugTelnet.println(F("============================================\r\n"));
 }

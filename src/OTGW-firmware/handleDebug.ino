@@ -117,50 +117,29 @@ void handleDebugChar(char c){
         switch (c){
             case 'h':
                 Debugln();
-                Debugln(F("---===[ Debug Help Menu ]===---"));
-                Debugf(PSTR("ESP Firmware: %s\r\n"), _VERSION);
-                Debugf(PSTR("FS Hash match: %s\r\n"), CBOOLEAN(checklittlefshash()));
-                Debugf(PSTR("PIC: %s | Type: %s | Version: %s\r\n"), state.pic.sDeviceid, state.pic.sType, state.pic.sFwversion);
+                Debugln(F("---===[ Debug Commands ]===---"));
+                Debugln(F("Toggle keys (current state shown in welcome banner):"));
+                Debugln(F("  1) OT message parsing       2) REST API handling"));
+                Debugln(F("  3) MQTT communication       4) MQTT interval gating"));
+                Debugln(F("  5) Sensor modules           6) NTP time sync"));
+                Debugln(F("  d) Dallas-sensor simulation"));
                 Debugln();
-                Debugln(F("--- Status ---"));
-                Debugf(PSTR("WiFi: %s | MQTT: %s | OTGW: %s\r\n"),
-                    (WiFi.status() == WL_CONNECTED) ? "Connected" : "Disconnected",
-                    CBOOLEAN(state.mqtt.bConnected),
-                    CBOOLEAN(state.otgw.bOnline));
-                Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway Mode: %s\r\n"),
-                    CCONOFF(state.otgw.bThermostatState),
-                    CCONOFF(state.otgw.bBoilerState),
-                    state.otgw.bGatewayModeKnown ? CCONOFF(state.otgw.bGatewayMode) : "detecting");
-                Debugf(PSTR("OTGW Simulation: %s\r\n"), CBOOLEAN(state.debug.bOTGWSimulation));
-                Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
-                    OTcurrentSystemState.Tboiler,
-                    OTcurrentSystemState.Tr,
-                    OTcurrentSystemState.TrSet);
-                Debugln();
-                Debugln(F("--- Debug toggles ---"));
-                Debugf(PSTR("1) Toggle debuglog - OT message parsing: %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
-                Debugf(PSTR("2) Toggle debuglog - REST API handling: %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
-                Debugf(PSTR("3) Toggle debuglog - MQTT communication: %s\r\n"), CBOOLEAN(state.debug.bMQTT));
-                Debugf(PSTR("4) Toggle debuglog - MQTT interval gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
-                Debugf(PSTR("5) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(state.debug.bSensors));
-                Debugf(PSTR("6) Toggle debuglog - NTP time sync: %s\r\n"), CBOOLEAN(state.debug.bNTP));
-                Debugf(PSTR("d) Toggle Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));
-                Debugln(F("--- Commands ---"));
-                Debugln(F("D) Dump full debug info (settings + state)"));
-                Debugln(F("q) Force read settings"));
-                Debugln(F("F) Force MQTT discovery for ALL message IDs"));
-                Debugln(F("r) Reconnect wifi and refresh mqtt/websocket clients"));
-                Debugln(F("p) Reset PIC manually"));
-                Debugln(F("a) Send PR=A command to ID PIC firmware version and type"));
-                Debugln(F("s/S) Toggle OTGW serial simulation replay"));
-                Debugln(F("--- GPIO/Debug ---"));
-                Debugln(F("b) Blink LED 1 (5 times)"));
-                Debugln(F("i) Initialize relay outputs"));
-                Debugln(F("u) GPIO output ON"));
-                Debugln(F("o) GPIO output OFF"));
-                Debugln(F("j) Read GPIO output state"));
-                Debugln(F("l) Toggle MyDEBUG"));
-                Debugln(F("f) Show MyDEBUG status"));
+                Debugln(F("--- Actions ---"));
+                Debugln(F("  D) Dump full debug info (settings + state, INI format)"));
+                Debugln(F("  q) Force read settings"));
+                Debugln(F("  F) Force MQTT discovery for ALL message IDs"));
+                Debugln(F("  r) Reconnect WiFi & refresh MQTT/WS clients"));
+                Debugln(F("  p) Reset PIC manually"));
+                Debugln(F("  a) Send PR=A to identify PIC firmware version & type"));
+                Debugln(F("  s/S) Toggle OTGW serial-simulation replay"));
+                Debugln(F("--- GPIO / Misc ---"));
+                Debugln(F("  b) Blink LED 1 (5x)"));
+                Debugln(F("  i) Initialize relay outputs"));
+                Debugln(F("  u) GPIO output ON"));
+                Debugln(F("  o) GPIO output OFF"));
+                Debugln(F("  j) Read GPIO output state"));
+                Debugln(F("  l) Toggle MyDEBUG"));
+                Debugln(F("  f) Show MyDEBUG status"));
                 Debugln();
                 break;
             case 'D':
