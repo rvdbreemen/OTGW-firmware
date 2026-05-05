@@ -1,11 +1,11 @@
 ---
 id: TASK-483
 title: 'fix(webui): apply ADR-066 master-topic filter to log decode and REST state'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-29 22:20'
-updated_date: '2026-05-02 16:48'
+updated_date: '2026-05-05 07:40'
 labels:
   - webui
   - ADR-066
@@ -31,7 +31,7 @@ Port van TASK-481 (feature branch commit c694fbdf) naar dev / 1.5.0-beta.4. TASK
 - [x] #4 Tier 3 (publishToSourceTopic) and Tier 4 (sendMQTTData base topic) call sites unchanged
 - [x] #5 evaluate.py passes (no new violations beyond pre-existing baseline)
 - [x] #6 ESP8266 build clean (python build.py --firmware)
-- [ ] #7 Hardware verification deferred to tester: WebUI stats stable, OT-log shows one decoded value per WRITE-pair
+- [x] #7 Hardware verification deferred to tester: WebUI stats stable, OT-log shows one decoded value per WRITE-pair
 - [x] #8 #8 PS=1 summary path (publishPSSummaryFieldValue in OTGW-Core.ino) gates sendMQTTData base-topic publish on bSlaveEchoesValue lookup for non-echo MsgIDs (Tr/TrSet/TrSetCH2/TSet/TsetCH2/MaxRelModLevelSetting and any other OT_WRITE/OT_RW MsgID with bSlaveEchoesValue=false in OTmap)
 - [x] #9 #9 PS=1 summary path skips updatePSSummaryFloatState/U16State for non-echo MsgIDs to keep OTcurrentSystemState consistent with the live-bus gate
 - [x] #10 #10 setMsgLastUpdated remains called regardless (cosmetic epoch tick consistent with live-bus path at OTGW-Core.ino:4034)
@@ -99,4 +99,12 @@ beta.3/beta.4 closed only 2 of 5 paths (Tiers 3 and 4, live-bus). Tiers 1, 2 and
 All five known paths for non-echo MsgIDs are now gated in beta.5. For PS=1 setups (like tester's): all three WebUI/MQTT symptoms should resolve. For PS=0 setups: Tier 1 + Tier 2 fix resolves WebUI symptoms; MQTT base topic was already stable since beta.3 for that config.
 
 **AC #7 status:** awaiting tester install of v1.5.0-beta.5 plus fresh telnet/OTmonitor logs. Do NOT publish release until confirmed.
+
+2026-05-05: AC #7 satisfied — _reuzenpanda_ confirmed v1.5.0-beta.5 resolves the WebUI/MQTT flapping (Tr/TrSet/MaxRelModLevelSetting on PS=1 setup). Closing task.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Verification (2026-05-05): tester _reuzenpanda_ confirmed beta.5 resolves all three WebUI/MQTT symptoms on his PS=1 setup. AC #7 hardware verification satisfied.
+<!-- SECTION:FINAL_SUMMARY:END -->

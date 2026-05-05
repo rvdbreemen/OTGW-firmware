@@ -3,11 +3,11 @@ id: TASK-484
 title: >-
   Fix: WiFi setup AP mode webUI unreachable after Reset Wifi (andrebrait,
   1.5.0-beta)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-29 23:48'
-updated_date: '2026-05-04 08:19'
+updated_date: '2026-05-05 07:40'
 labels:
   - bug
   - wifi
@@ -33,7 +33,7 @@ Setup: Wemos D1 Mini classic, NodoShop OTGW v2.x, firmware 1.5.0-beta+ (after th
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce on a clean device with WiFi reset triggered
+- [x] #1 Reproduce on a clean device with WiFi reset triggered
 - [x] #2 Identify why the WifiManager AP-mode HTTP server accepts TCP connections but aborts the GET response
 - [x] #3 Either fix the AP-mode webserver or add diagnostics so future occurrences surface in serial output
 - [x] #4 Add a confirmation modal in the webUI before Reset Wifi (defensive UX, requested by reporter)
@@ -61,4 +61,12 @@ Investigation path:
 4. Check if `setConfigPortalTimeout(240)` vs the old `setTimeout(240)` has different semantics that could cause the portal HTTP server to close before the user can connect.
 
 2026-05-04: Uitgevoerd — WiFiManager teruggerold van 2.0.17 naar 2.0.15-rc.1 in build.py (r1 van onderzoeksplan). Heap-diagnostiek toegevoegd in networkStuff.ino vlak voor startConfigPortal(): logt free heap, fragmentatie% en max block bij elke portal-start. AC4 (confirm dialog) was al aanwezig in index.js (regel 5948). Geen PIO-config aanwezig voor hoofdfirmware — build.py is de enige plek.
+
+2026-05-05: andrebrait confirmed fresh flash with WiFiManager 2.0.15-rc.1 rollback resolves the AP-mode webUI unreachable issue. AC #1 (reproduce + verify fix on clean device) satisfied. Closing task.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Verification (2026-05-05): reporter andrebrait confirmed fresh flash with WiFiManager 2.0.15-rc.1 rollback makes the AP-mode webUI reachable again. AC #1 satisfied.
+<!-- SECTION:FINAL_SUMMARY:END -->
