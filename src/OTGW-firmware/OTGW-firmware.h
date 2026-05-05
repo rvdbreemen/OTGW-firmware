@@ -844,6 +844,14 @@ byte      OTGWs0dataid = 245;                     // foney dataid for counter au
 // MQTTautoCfgPendingMap tracks this entry like any other in markAllMQTTConfigPending().
 byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats autoconfigure
 
+// Diagnostic discovery pseudo-IDs (TASK-540):
+//   248 — otgw-firmware/{reboot_count,reboot_reason,version,hostname}
+//   249 — otgw-pic/{version,deviceid,firmwaretype,designer,picavailable} (PIC-gated)
+//   250 — otgw-pic/settings/* (15 PR=-polled topics, PIC-gated)
+byte      OTGWfwinfoid       = 248;
+byte      OTGWpicinfoid      = 249;
+byte      OTGWpicsettingsid  = 250;
+
 //Now load Debug & network library
 #include "Debug.h"
 #include "networkStuff.h"

@@ -243,6 +243,33 @@ const char ha_lbl_stats_disc_last_missing[] PROGMEM       = "otgw-firmware/stats
 const char ha_lbl_stats_disc_last_orphan[] PROGMEM        = "otgw-firmware/stats/disc_last_orphan";
 const char ha_lbl_stats_disc_published_topics[] PROGMEM   = "otgw-firmware/stats/disc_published_topics";
 const char ha_lbl_stats_disc_last_verify_epoch[] PROGMEM  = "otgw-firmware/stats/disc_last_verify_epoch";
+// Firmware diagnostic labels (TASK-540, faux dataid 248). Plain topic paths.
+const char ha_lbl_fw_reboot_count[]  PROGMEM = "otgw-firmware/reboot_count";
+const char ha_lbl_fw_reboot_reason[] PROGMEM = "otgw-firmware/reboot_reason";
+const char ha_lbl_fw_version[]       PROGMEM = "otgw-firmware/version";
+const char ha_lbl_fw_hostname[]      PROGMEM = "otgw-firmware/hostname";
+// PIC info labels (TASK-540, faux dataid 249). MQTT_HA_FLAG_IS_PIC_ENTRY auto-prepends "otgw-pic/".
+const char ha_lbl_pic_version[]       PROGMEM = "version";
+const char ha_lbl_pic_deviceid[]      PROGMEM = "deviceid";
+const char ha_lbl_pic_firmwaretype[]  PROGMEM = "firmwaretype";
+const char ha_lbl_pic_designer[]      PROGMEM = "designer";
+const char ha_lbl_pic_available[]     PROGMEM = "picavailable";
+// PIC settings labels (TASK-540, faux dataid 250). IS_PIC flag prepends "otgw-pic/" → "otgw-pic/settings/<x>".
+const char ha_lbl_pic_set_setpoint_override[]   PROGMEM = "settings/setpoint_override";
+const char ha_lbl_pic_set_setback[]              PROGMEM = "settings/setback";
+const char ha_lbl_pic_set_dhw_override[]         PROGMEM = "settings/dhw_override";
+const char ha_lbl_pic_set_gpio[]                 PROGMEM = "settings/gpio";
+const char ha_lbl_pic_set_gpio_states[]          PROGMEM = "settings/gpio_states";
+const char ha_lbl_pic_set_led[]                  PROGMEM = "settings/led";
+const char ha_lbl_pic_set_tweaks[]               PROGMEM = "settings/tweaks";
+const char ha_lbl_pic_set_temp_sensor[]          PROGMEM = "settings/temp_sensor";
+const char ha_lbl_pic_set_smart_power[]          PROGMEM = "settings/smart_power";
+const char ha_lbl_pic_set_thermostat_detect[]    PROGMEM = "settings/thermostat_detect";
+const char ha_lbl_pic_set_builddate[]            PROGMEM = "settings/builddate";
+const char ha_lbl_pic_set_clock_mhz[]            PROGMEM = "settings/clock_mhz";
+const char ha_lbl_pic_set_reset_cause[]          PROGMEM = "settings/reset_cause";
+const char ha_lbl_pic_set_standalone_interval[]  PROGMEM = "settings/standalone_interval";
+const char ha_lbl_pic_set_voltage_ref[]          PROGMEM = "settings/voltage_ref";
 const char ha_lbl_centralheating[] PROGMEM = "centralheating";
 const char ha_lbl_centralheating2[] PROGMEM = "centralheating2";
 const char ha_lbl_ch2_enable[] PROGMEM = "ch2_enable";
@@ -522,6 +549,33 @@ const char ha_name_stats_disc_last_missing[] PROGMEM       = "Stats_Discovery_La
 const char ha_name_stats_disc_last_orphan[] PROGMEM        = "Stats_Discovery_Last_Orphan";
 const char ha_name_stats_disc_published_topics[] PROGMEM   = "Stats_Discovery_Published_Topics";
 const char ha_name_stats_disc_last_verify_epoch[] PROGMEM  = "Stats_Discovery_Last_Verify_Epoch";
+// Firmware diagnostic friendly names (TASK-540, faux dataid 248)
+const char ha_name_fw_reboot_count[]  PROGMEM = "Reboot_Count";
+const char ha_name_fw_reboot_reason[] PROGMEM = "Reboot_Reason";
+const char ha_name_fw_version[]       PROGMEM = "Firmware_Version";
+const char ha_name_fw_hostname[]      PROGMEM = "Hostname";
+// PIC info friendly names (TASK-540, faux dataid 249)
+const char ha_name_pic_version[]       PROGMEM = "PIC_Version";
+const char ha_name_pic_deviceid[]      PROGMEM = "PIC_DeviceID";
+const char ha_name_pic_firmwaretype[]  PROGMEM = "PIC_FirmwareType";
+const char ha_name_pic_designer[]      PROGMEM = "PIC_Designer";
+const char ha_name_pic_available[]     PROGMEM = "PIC_Available";
+// PIC settings friendly names (TASK-540, faux dataid 250)
+const char ha_name_pic_set_setpoint_override[]  PROGMEM = "PIC_Setpoint_Override";
+const char ha_name_pic_set_setback[]             PROGMEM = "PIC_Setback";
+const char ha_name_pic_set_dhw_override[]        PROGMEM = "PIC_DHW_Override";
+const char ha_name_pic_set_gpio[]                PROGMEM = "PIC_GPIO";
+const char ha_name_pic_set_gpio_states[]         PROGMEM = "PIC_GPIO_States";
+const char ha_name_pic_set_led[]                 PROGMEM = "PIC_LED";
+const char ha_name_pic_set_tweaks[]              PROGMEM = "PIC_Tweaks";
+const char ha_name_pic_set_temp_sensor[]         PROGMEM = "PIC_Temp_Sensor";
+const char ha_name_pic_set_smart_power[]         PROGMEM = "PIC_Smart_Power";
+const char ha_name_pic_set_thermostat_detect[]   PROGMEM = "PIC_Thermostat_Detect";
+const char ha_name_pic_set_builddate[]           PROGMEM = "PIC_Builddate";
+const char ha_name_pic_set_clock_mhz[]           PROGMEM = "PIC_Clock_MHz";
+const char ha_name_pic_set_reset_cause[]         PROGMEM = "PIC_Reset_Cause";
+const char ha_name_pic_set_standalone_interval[] PROGMEM = "PIC_Standalone_Interval";
+const char ha_name_pic_set_voltage_ref[]         PROGMEM = "PIC_Voltage_Ref";
 const char ha_name_central_heating[] PROGMEM = "Central_Heating";
 const char ha_name_central_heating_2[] PROGMEM = "Central_Heating_2";
 const char ha_name_central_heating_2_enable[] PROGMEM = "central_heating_2_enable";
@@ -577,7 +631,7 @@ const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storag
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
 
 // ========== Sensor array (289 entries, sorted by id) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 306;
+const uint16_t MQTT_HA_SENSOR_COUNT = 330;
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1009,6 +1063,38 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {247, 0x00, ha_lbl_stats_disc_last_orphan,        ha_name_stats_disc_last_orphan,        HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {247, 0x00, ha_lbl_stats_disc_published_topics,   ha_name_stats_disc_published_topics,   HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
     {247, 0x00, ha_lbl_stats_disc_last_verify_epoch,  ha_name_stats_disc_last_verify_epoch,  HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    // --- Pseudo-ID 248: firmware diagnostics (TASK-540) ---
+    // Plain otgw-firmware/* topics; entity_category=diagnostic.
+    {248, 0x00, ha_lbl_fw_reboot_count,  ha_name_fw_reboot_count,  HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter,             HaEntityCat::diagnostic, true},
+    {248, 0x00, ha_lbl_fw_reboot_reason, ha_name_fw_reboot_reason, HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {248, 0x00, ha_lbl_fw_version,       ha_name_fw_version,       HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {248, 0x00, ha_lbl_fw_hostname,      ha_name_fw_hostname,      HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    // --- Pseudo-ID 249: PIC info (TASK-540) ---
+    // 0x08 = MQTT_HA_FLAG_IS_PIC_ENTRY → "otgw-pic/" prefix added by streamSensorDiscovery
+    // and entries are skipped at publish time when isPICEnabled() is false.
+    {249, 0x08, ha_lbl_pic_version,      ha_name_pic_version,      HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {249, 0x08, ha_lbl_pic_deviceid,     ha_name_pic_deviceid,     HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {249, 0x08, ha_lbl_pic_firmwaretype, ha_name_pic_firmwaretype, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {249, 0x08, ha_lbl_pic_designer,     ha_name_pic_designer,     HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {249, 0x08, ha_lbl_pic_available,    ha_name_pic_available,    HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    // --- Pseudo-ID 250: PIC settings (TASK-540) ---
+    // 0x08 → "otgw-pic/" prefix; labels start with "settings/" so the final topic is
+    // <pubNs>/otgw-pic/settings/<x>. Mirrors publishAllPICsettings() in OTGW-Core.ino.
+    {250, 0x08, ha_lbl_pic_set_setpoint_override,   ha_name_pic_set_setpoint_override,   HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_setback,             ha_name_pic_set_setback,             HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_dhw_override,        ha_name_pic_set_dhw_override,        HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_gpio,                ha_name_pic_set_gpio,                HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_gpio_states,         ha_name_pic_set_gpio_states,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_led,                 ha_name_pic_set_led,                 HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_tweaks,              ha_name_pic_set_tweaks,              HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_temp_sensor,         ha_name_pic_set_temp_sensor,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_smart_power,         ha_name_pic_set_smart_power,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_thermostat_detect,   ha_name_pic_set_thermostat_detect,   HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_builddate,           ha_name_pic_set_builddate,           HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_clock_mhz,           ha_name_pic_set_clock_mhz,           HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_reset_cause,         ha_name_pic_set_reset_cause,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_standalone_interval, ha_name_pic_set_standalone_interval, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {250, 0x08, ha_lbl_pic_set_voltage_ref,         ha_name_pic_set_voltage_ref,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
 };
 
 // ========== Binary sensor array (53 entries, sorted by id) ==========
@@ -1331,9 +1417,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     284, // id 245, 4 entries
     288, // id 246, 1 entry
     289, // id 247, 17 entries
-    0xFFFF, // id 248
-    0xFFFF, // id 249
-    0xFFFF, // id 250
+    306, // id 248, 4 entries (TASK-540 firmware diagnostics)
+    310, // id 249, 5 entries (TASK-540 PIC info)
+    315, // id 250, 15 entries (TASK-540 PIC settings)
     0xFFFF, // id 251
     0xFFFF, // id 252
     0xFFFF, // id 253
