@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : helperStuff.h
-**  Version  : v2.0.0-alpha.2
+**  Version  : v2.0.0-alpha.3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
