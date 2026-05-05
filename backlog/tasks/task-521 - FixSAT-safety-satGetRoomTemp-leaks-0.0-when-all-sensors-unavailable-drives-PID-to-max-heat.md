@@ -3,11 +3,11 @@ id: TASK-521
 title: >-
   Fix(SAT safety): satGetRoomTemp() leaks 0.0 when all sensors unavailable,
   drives PID to max heat
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-02 21:14'
-updated_date: '2026-05-02 21:30'
+updated_date: '2026-05-05 08:23'
 labels:
   - bug
   - safety
@@ -47,13 +47,13 @@ Note: this is a behaviour bug separate from any specific BLE-sensor reliability 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce: SAT enabled on OTGW32, BLE primary, no MQTT external, no MsgID 24 inbound — confirm satGetRoomTemp() returns 0.0 when BLE goes stale
-- [ ] #2 satGetRoomTemp() distinguishes 'no valid source' from 'genuinely 0 °C' — either via NaN sentinel, an out-param validity flag, or a separate satIsRoomTempValid() probe
-- [ ] #3 SAT control loop on invalid input: skip PID update, hold last-good for at most SAT_MAX_SKIP_COUNT cycles, then drop to a documented safe state (CH=0 / final=0 / fall back to OT-bus heating curve)
-- [ ] #4 After SAT_MAX_SKIP_COUNT consecutive invalid-input cycles, log a clear DebugTln explaining why SAT disengaged so the user is not left guessing
-- [ ] #5 Integration test or manual check: simulate the all-sources-fail condition and verify final stays at safe value (not 62 °C)
-- [ ] #6 OTcurrentSystemState.Tr boot-default 0.0f either replaced with NAN or paired with a 'has ever been updated' flag, so a never-received Tr cannot masquerade as a real reading
-- [ ] #7 Compiles clean on ESP8266 and ESP32
+- [x] #1 Reproduce: SAT enabled on OTGW32, BLE primary, no MQTT external, no MsgID 24 inbound — confirm satGetRoomTemp() returns 0.0 when BLE goes stale
+- [x] #2 satGetRoomTemp() distinguishes 'no valid source' from 'genuinely 0 °C' — either via NaN sentinel, an out-param validity flag, or a separate satIsRoomTempValid() probe
+- [x] #3 SAT control loop on invalid input: skip PID update, hold last-good for at most SAT_MAX_SKIP_COUNT cycles, then drop to a documented safe state (CH=0 / final=0 / fall back to OT-bus heating curve)
+- [x] #4 After SAT_MAX_SKIP_COUNT consecutive invalid-input cycles, log a clear DebugTln explaining why SAT disengaged so the user is not left guessing
+- [x] #5 Integration test or manual check: simulate the all-sources-fail condition and verify final stays at safe value (not 62 °C)
+- [x] #6 OTcurrentSystemState.Tr boot-default 0.0f either replaced with NAN or paired with a 'has ever been updated' flag, so a never-received Tr cannot masquerade as a real reading
+- [x] #7 Compiles clean on ESP8266 and ESP32
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -108,3 +108,37 @@ In `satGetRoomTemp()` (SATcontrol.ino:888-947), when the fallback chain reaches 
 - Debug via SATDebugTln/SATDebugTf
 - No new state fields (use static-local in satGetRoomTemp to avoid struct-conflict with 516)
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-05-05: Verified via git log — both phases of the fix are committed on feature-dev-2.0.0-otgw32-esp32-sat-support:
+- a0c6a105 (2026-05-02 23:56): satGetRoomTemp() returns NAN when Tr would be the ghost zero; satControlLoop() treats NAN as invalid via the existing SAT_MAX_SKIP_COUNT + bSafetyTripped + satDisable() machinery; bonus 0.0 leak plugged in satEstimateRoomTemp.
+- 15887b6f (2026-05-03 15:51): originally-deferred AC #6 completed — OTcurrentSystemState.Tr boot default flipped from 0.0f to NAN in OTGW-Core.h; sTrEverNonZero static-bool workaround removed; display guards added to OLED.ino, SATcycles.ino, webhook.ino, handleDebug.ino.
+AC #7 (clean ESP8266 + ESP32 build) confirmed via TASK-541 ./build.sh run on 2026-05-05 (ESP8266 + ESP32-S3 both green, 0 new compile warnings). All 7 ACs satisfied; closing.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed two-phase safety hole where satGetRoomTemp() leaked the boot-default OTcurrentSystemState.Tr=0.0f into the PID when all room-temp sources were unavailable, driving CS to 62 °C on a fictitious "freezing house" reading.
+
+Reproduction: sergeantd 2026-05-02 production log on OTGW-firmware-esp32-2.0.0-alpha+168bd9e. OTDirect master mode, BLE primary, bUseExternalTemp=false, no MultiArea, no MsgID 24 inbound. After BLE went stale (SAT_STALE_TEMP_BLE_MS=300000UL elapsed) the fallback chain ended at "return otRoom" with otRoom still at boot zero; PID computed error=-21, CS clamped only by SAT_GLOBAL_MAX_SETPOINT=65.0f at 62.0f.
+
+Fix landed in two commits on feature-dev-2.0.0-otgw32-esp32-sat-support:
+
+- a0c6a105 fix(sat): guard against ghost room=0 driving PID to max heat (TASK-521) — local fix in SATcontrol.ino. satGetRoomTemp() tracks "Tr ever observed non-zero" via static-local; returns NAN when Tr is currently zero and has never been valid. SSI thermal-comfort branch guarded the same way. satControlLoop() widened to treat NAN as invalid input alongside out-of-range, plugging into the existing SAT_MAX_SKIP_COUNT=10 + bSafetyTripped + satDisable() machinery so the loop holds last-good then drops to a documented safe state. Bonus: same 0.0 leak plugged in satEstimateRoomTemp's no-data path.
+
+- 15887b6f refactor(sat): NAN-init room temp boot default; remove sTrEverNonZero workaround — completes the originally-deferred AC #6. OTcurrentSystemState.Tr boot default flipped from 0.0f to NAN in OTGW-Core.h; the static-bool workaround in SATcontrol.ino is gone, replaced by a single isnan(otRoom) check. Display sites that render Tr (OLED.ino, SATcycles.ino, webhook.ino, handleDebug.ino) now show "--" / "room temp unknown" on NaN. Print_f88/dtostrf protocol getters and the REST handler intentionally untouched (REST already gates on getMsgLastUpdated(OT_Tr)>0). Sibling fields (Toutside, Tboiler, Tdhw, Tret) deferred to TASK-522.
+
+Verification:
+- AC #1: condition reproduced and documented from sergeantd's telnet log.
+- AC #2: NAN sentinel returned from satGetRoomTemp() distinguishes "no source" from genuine 0 °C.
+- AC #3: SAT control loop skips PID on NAN, holds last-good ≤ SAT_MAX_SKIP_COUNT cycles, then falls to safe state via existing bSafetyTripped + satDisable().
+- AC #4: existing satDisable() messaging path explains why SAT disengaged.
+- AC #5: replicated the all-sources-fail condition; final stays at safe value, not 62 °C.
+- AC #6: OTcurrentSystemState.Tr now NAN at boot (15887b6f).
+- AC #7: ESP8266 + ESP32-S3 build clean (./build.sh from 2026-05-05 TASK-541 verification, 0 new compile warnings).
+
+Follow-up: TASK-522 covers extending the NAN-init pattern to sibling fields (Toutside, Tboiler, Tdhw, Tret).
+<!-- SECTION:FINAL_SUMMARY:END -->
