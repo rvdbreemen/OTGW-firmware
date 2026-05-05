@@ -305,6 +305,8 @@ Starting with hardware version 2.3, the included ESP8266 devkit changed from Nod
 | 1.x--2.0 | NodeMCU ESP8266 devkit |
 | 2.3--2.x | Wemos D1 mini ESP8266 devkit |
 
+For NodoShop boards in the **Wemos D1 mini family**, the firmware assumes the standard ESP8266 **UART0** pins (**TX/GPIO1**, **RX/GPIO3**) for PIC communication plus **D5/GPIO14** for PIC reset. A **Wemos D1 mini Pro** uses the same D1 mini-family footprint and pin mapping, so there is **no separate board profile or pin-remap option** in the firmware. If a Mini Pro still reports `picavailable=false`, the next step is a boot-time serial capture and hardware continuity/orientation check rather than a firmware pin-definition change.
+
 ## Connectivity summary
 
 | Port | Protocol | Purpose |

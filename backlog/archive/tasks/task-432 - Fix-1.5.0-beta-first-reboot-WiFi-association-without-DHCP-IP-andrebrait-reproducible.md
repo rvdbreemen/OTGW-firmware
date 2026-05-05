@@ -3,9 +3,11 @@ id: TASK-432
 title: >-
   Fix: 1.5.0-beta first-reboot WiFi association without DHCP/IP (andrebrait,
   reproducible)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@copilot'
 created_date: '2026-04-26 16:42'
+updated_date: '2026-05-05 21:51'
 labels:
   - bug
   - 1.5.0-beta
@@ -73,3 +75,35 @@ At 15:51 UTC: *"Some logging would be great, but it's hard to get I guess, as th
 - [ ] #4 Fix verified: at least 3 consecutive first-reboot cycles after flashing 1.5.0-beta acquire DHCP/IP without requiring a forced reconnect from the upstream router
 - [ ] #5 Reporter andrebrait confirms the fix on the same hardware where the symptom was reproduced
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Audit the current WiFi/DHCP boot path and the 1.4.2/1.5.0 reboot-related changes that could affect first-boot networking after flash.
+2. Identify where association, DHCP acquisition, and any forced disconnect/retry logic are logged or suppressed, then add the smallest observability needed if the current path is too opaque.
+3. Compare the current boot/restart flow with the pre-regression line to narrow likely causes before changing behavior.
+4. Implement only a root-cause fix or targeted diagnostics that preserve the existing local-network HTTP/WS design and reboot semantics.
+5. Validate with the normal build/evaluator flow and leave the task blocked only on hardware or reporter confirmation if lab reproduction is still unavailable.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- Verified on 2026-05-05 that this task is already implemented in the current dev branch.
+- Commit cd30617c (fix(wifi): remove wifi_station_dhcpc_start() to restore SDK-managed DHCP) explicitly references TASK-432 and removes the DHCP ownership takeover that caused the reported "associates but no IP until router-side reconnect" symptom.
+- Follow-up commit 0052d564 updated the v1.5.0-beta release notes/CHANGELOG to document the fix, and CHANGELOG Unreleased still carries the TASK-432 entry.
+- The live networkStuff.ino comments and code now match that fix, so this backlog task is stale and should be archived rather than reimplemented.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+TASK-432 was already resolved historically and does not need new code work.
+
+Evidence:
+- cd30617c removed wifi_station_dhcpc_start() from the reconnect path to restore SDK-managed DHCP and cites TASK-432 directly.
+- 0052d564 refreshed the v1.5.0-beta release notes/CHANGELOG to document that DHCP fix.
+- Current dev branch code in networkStuff.ino still contains the restored v1.2.0-style DHCP-management comments tied to TASK-432.
+
+Disposition: archive as obsolete/stale backlog item.
+<!-- SECTION:FINAL_SUMMARY:END -->
