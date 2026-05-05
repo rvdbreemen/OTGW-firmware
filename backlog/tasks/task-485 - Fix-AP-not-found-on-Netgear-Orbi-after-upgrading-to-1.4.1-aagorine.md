@@ -4,6 +4,7 @@ title: 'Fix: ''AP not found'' on Netgear Orbi after upgrading to 1.4.1 (aagorine
 status: To Do
 assignee: []
 created_date: '2026-04-29 23:49'
+updated_date: '2026-05-05 21:53'
 labels:
   - bug
   - needs-info
@@ -31,7 +32,7 @@ Maintainer advised trying 1.5.0-beta.2 (DHCP fix); tester response: 'Not yet, bu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Tester confirms whether 1.5.0-beta.2 or beta.4 resolves the issue
-- [ ] #2 If still broken, capture serial log during AP scan + connect attempt to identify whether ESP8266 sees the SSID at all
-- [ ] #3 Determine whether mesh-AP transparency (Orbi router-mode vs satellite) interacts with the ESP8266 WiFi driver
+- [ ] #1 If still broken, capture serial log during AP scan + connect attempt to identify whether ESP8266 sees the SSID at all
+- [ ] #2 Determine whether mesh-AP transparency (Orbi router-mode vs satellite) interacts with the ESP8266 WiFi driver
+- [ ] #3 Tester retests on the current 1.5.0-beta line (beta.15 as of 2026-05-05) and reports whether 'AP not found' still occurs on the Orbi mesh
 <!-- AC:END -->
