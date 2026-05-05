@@ -3,9 +3,11 @@ id: TASK-431
 title: >-
   Investigate: rapid WebUI page-refresh freezes the OTGW (1.4.2-beta), requires
   network drop to recover
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@copilot'
 created_date: '2026-04-26 10:16'
+updated_date: '2026-05-05 20:51'
 labels:
   - bug
   - webui
@@ -85,3 +87,25 @@ The 1.4.2-beta release notes (published a few minutes after crashevans' report) 
 - [ ] #4 Validate the fix with the same reproduction recipe; report negative result (cannot reproduce after fix) over at least 20 rapid reload cycles
 - [ ] #5 Update Discord #beta-testing thread (andrebrait, sergeantd, crashevans) with status and ask for re-test on a fresh build
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Audit the task evidence and verify which current files/ADR constraints govern the suspected burst-load path.
+2. Trace rapid page reload traffic through HTTP, REST, WebSocket, and WiFi-recovery code to identify the most likely contention points.
+3. Add lightweight telnet-visible instrumentation for request bursts, WebSocket churn, heap-tier transitions, and reconnect events.
+4. Reproduce locally or use reporter telnet logs to classify the root cause before changing behavior.
+5. Implement the narrowest safe fix, validate it with repeated reload cycles, then report findings and any retest/ADR follow-up.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- Diagnosis: rapid reloads could stack stale OT-log WebSocket sessions because the page intentionally kept the socket alive when hidden but did not explicitly close it on unload/reload. With the firmware-side MAX_WEBSOCKET_CLIENTS limit of 3 and heartbeat-based stale-client cleanup, a 5x/3s reload burst could outrun cleanup and leave the next page fighting stale sockets.
+- Fix applied in `src/OTGW-firmware/data/index.js`: added pagehide/beforeunload shutdown that saves buffered log data, clears pending reconnect timers, and closes the OT-log WebSocket before navigation; main-page reconnect now waits 250 ms so the previous socket can retire first.
+- Validation so far: `./build.sh` and `.build-venv/bin/python evaluate.py --quick` both pass.
+- Remaining blocker: AC #1/#4/#5 still need hardware or reporter confirmation (freeze-window telnet log and a 20-cycle rapid-reload retest on a fresh build).
+
+- Added focused firmware-side instrumentation in `src/OTGW-firmware/webSocketStuff.ino`: a 5-second burst window now emits a single summary line when rapid reloads cause clustered connect/disconnect/reject/error events. This should make the next telnet capture clearly show whether the fix still hits max-client or low-heap rejects.
+- Current code state is ready for field retest, but task closure is still blocked on AC #1/#4/#5: reproduce or capture a freeze-window telnet log, verify at least 20 rapid reload cycles on a fresh build, then report back in Discord #beta-testing.
+<!-- SECTION:NOTES:END -->

@@ -57,6 +57,74 @@ static bool wsInitialized = false;
 static unsigned long lastKeepaliveMs = 0;
 const unsigned long KEEPALIVE_INTERVAL_MS = 30000; // 30 seconds
 
+static const uint8_t WS_BURST_CONNECTED = 1;
+static const uint8_t WS_BURST_DISCONNECTED = 2;
+static const uint8_t WS_BURST_REJECTED_MAX = 3;
+static const uint8_t WS_BURST_REJECTED_HEAP = 4;
+static const uint8_t WS_BURST_ERROR = 5;
+
+static unsigned long wsBurstWindowStartMs = 0;
+static uint8_t wsBurstConnects = 0;
+static uint8_t wsBurstDisconnects = 0;
+static uint8_t wsBurstMaxRejects = 0;
+static uint8_t wsBurstHeapRejects = 0;
+static uint8_t wsBurstErrors = 0;
+static bool wsBurstLogged = false;
+const unsigned long WS_BURST_WINDOW_MS = 5000;
+const uint8_t WS_BURST_LOG_THRESHOLD = 3;
+
+static void resetWebSocketBurstWindow(unsigned long now) {
+  wsBurstWindowStartMs = now;
+  wsBurstConnects = 0;
+  wsBurstDisconnects = 0;
+  wsBurstMaxRejects = 0;
+  wsBurstHeapRejects = 0;
+  wsBurstErrors = 0;
+  wsBurstLogged = false;
+}
+
+static void noteWebSocketBurstEvent(uint8_t eventType) {
+  const unsigned long now = millis();
+  if ((wsBurstWindowStartMs == 0) || ((now - wsBurstWindowStartMs) > WS_BURST_WINDOW_MS)) {
+    resetWebSocketBurstWindow(now);
+  }
+
+  switch (eventType) {
+    case WS_BURST_CONNECTED:
+      wsBurstConnects++;
+      break;
+    case WS_BURST_DISCONNECTED:
+      wsBurstDisconnects++;
+      break;
+    case WS_BURST_REJECTED_MAX:
+      wsBurstMaxRejects++;
+      break;
+    case WS_BURST_REJECTED_HEAP:
+      wsBurstHeapRejects++;
+      break;
+    case WS_BURST_ERROR:
+      wsBurstErrors++;
+      break;
+  }
+
+  const uint8_t totalEvents = wsBurstConnects + wsBurstDisconnects + wsBurstMaxRejects + wsBurstHeapRejects + wsBurstErrors;
+  if (!wsBurstLogged && (totalEvents >= WS_BURST_LOG_THRESHOLD)) {
+    DebugTf(PSTR("[%lu] WebSocket burst window=%lums total=%u conn=%u disc=%u rejMax=%u rejHeap=%u err=%u clients=%u heap=%u maxBlk=%u\r\n"),
+            now,
+            WS_BURST_WINDOW_MS,
+            totalEvents,
+            wsBurstConnects,
+            wsBurstDisconnects,
+            wsBurstMaxRejects,
+            wsBurstHeapRejects,
+            wsBurstErrors,
+            wsClientCount,
+            ESP.getFreeHeap(),
+            ESP.getMaxFreeBlockSize());
+    wsBurstLogged = true;
+  }
+}
+
 bool hasWebSocketClients() {
   return wsInitialized && (wsClientCount > 0);
 }
@@ -68,6 +136,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
   switch(type) {
     case WStype_DISCONNECTED:
       wsClientCount = (wsClientCount > 0) ? (wsClientCount - 1) : 0;
+      noteWebSocketBurstEvent(WS_BURST_DISCONNECTED);
       DebugTf(PSTR("[%lu] WebSocket[%u] disconnected. Clients: %u\r\n"), millis(), num, wsClientCount);
       break;
       
@@ -75,6 +144,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       {
         // Check client limit before accepting connection
         if (wsClientCount >= MAX_WEBSOCKET_CLIENTS) {
+          noteWebSocketBurstEvent(WS_BURST_REJECTED_MAX);
           DebugTf(PSTR("[%lu] WebSocket[%u]: Max clients (%u) reached, rejecting connection\r\n"), 
             millis(), num, MAX_WEBSOCKET_CLIENTS);
           webSocket.disconnect(num);
@@ -84,6 +154,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         // Check heap health before accepting connection
         // Use WARNING threshold to be conservative
         if (ESP.getFreeHeap() < HEAP_WARNING_THRESHOLD) {
+          noteWebSocketBurstEvent(WS_BURST_REJECTED_HEAP);
           DebugTf(PSTR("[%lu] WebSocket[%u]: Low heap (%u bytes), rejecting connection\r\n"), 
             millis(), num, ESP.getFreeHeap());
           webSocket.disconnect(num);
@@ -92,6 +163,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         
         IPAddress ip = webSocket.remoteIP(num);
         wsClientCount++;
+        noteWebSocketBurstEvent(WS_BURST_CONNECTED);
         DebugTf(PSTR("[%lu] WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"), 
           millis(), num, ip[0], ip[1], ip[2], ip[3], wsClientCount);
       }
@@ -108,6 +180,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       break;
       
     case WStype_ERROR:
+      noteWebSocketBurstEvent(WS_BURST_ERROR);
       DebugTf(PSTR("[%lu] WebSocket[%u] error\r\n"), millis(), num);
       break;
       
