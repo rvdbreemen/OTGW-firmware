@@ -7,6 +7,7 @@ cd /d "%SCRIPT_DIR%" || exit /b 1
 set "PIP_DISABLE_PIP_VERSION_CHECK=1"
 set "PIP_NO_INPUT=1"
 set "PYTHONUTF8=1"
+set "PYTHONUNBUFFERED=1"
 
 set "BUILD_VENV_DIR=%SCRIPT_DIR%.build-venv"
 set "BUILD_VENV_PY=%BUILD_VENV_DIR%\Scripts\python.exe"

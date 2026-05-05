@@ -7,6 +7,7 @@ cd "$script_dir"
 export PIP_DISABLE_PIP_VERSION_CHECK=1
 export PIP_NO_INPUT=1
 export PYTHONUTF8=1
+export PYTHONUNBUFFERED=1
 
 python_exe=""
 
