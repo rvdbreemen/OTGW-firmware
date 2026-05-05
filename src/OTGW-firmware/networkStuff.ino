@@ -368,36 +368,163 @@ void loopWifi() {
 }
 
 //===========================================================================================
+// SAT enum stringifiers — used only by the welcome banner below. Short literal
+// strings; the compiler dedupes and places them in flash via the literal pool.
+static const char* satControlModeStr(SATControlMode m) {
+  switch (m) {
+    case SAT_MODE_OFF:        return "off";
+    case SAT_MODE_CONTINUOUS: return "continuous";
+    case SAT_MODE_PWM:        return "pwm";
+  }
+  return "?";
+}
+static const char* satBoilerStatusStr(SATBoilerStatus s) {
+  switch (s) {
+    case SAT_BS_OFF:               return "off";
+    case SAT_BS_IDLE:              return "idle";
+    case SAT_BS_PREHEATING:        return "preheat";
+    case SAT_BS_AT_SETPOINT:       return "at_setpoint";
+    case SAT_BS_MODULATING_UP:     return "mod_up";
+    case SAT_BS_MODULATING_DOWN:   return "mod_down";
+    case SAT_BS_IGNITION_SURGE:    return "ign_surge";
+    case SAT_BS_STALLED_IGNITION:  return "stalled";
+    case SAT_BS_ANTI_CYCLING:      return "anti_cycle";
+    case SAT_BS_PUMP_STARTING:     return "pump_start";
+    case SAT_BS_WAITING_FLAME:     return "wait_flame";
+    case SAT_BS_OVERSHOOT_COOLING: return "over_cool";
+    case SAT_BS_POST_CYCLE:        return "post_cycle";
+    case SAT_BS_HEATING:           return "heating";
+    case SAT_BS_COOLING:           return "cooling";
+  }
+  return "?";
+}
+static const char* satCycleClassStr(SATCycleClass c) {
+  switch (c) {
+    case SAT_CYCLE_NONE:      return "none";
+    case SAT_CYCLE_GOOD:      return "good";
+    case SAT_CYCLE_OVERSHOOT: return "overshoot";
+    case SAT_CYCLE_UNDERHEAT: return "underheat";
+    case SAT_CYCLE_SHORT:     return "short";
+    case SAT_CYCLE_UNCERTAIN: return "uncertain";
+  }
+  return "?";
+}
+
+//===========================================================================================
 // Send the welcome banner to a freshly-connected telnet client.
 // Called from the SimpleTelnet onConnect callback — receives client IP as const char*.
+// Compact log-triage snapshot covering: firmware identity + reset reason, hostname/uptime,
+// network transport (WiFi or Ethernet, AP-fallback if active), heap (computed fragmentation
+// via platform_esp32.h helpers), heap-diag drop counters, PIC, OT-bus, MQTT, NTP, SAT
+// control state, BLE sensor health (ESP32), and live state of every debug toggle. Each
+// line is its own _debugPrintf_P / println so the 256-byte vsnprintf stack buffer is
+// reclaimed between fields.
 static void sendTelnetBanner(const char* ip)
 {
+  char rstReason[40];
+  platformResetReason(rstReason, sizeof(rstReason));
+
   debugTelnet.println(F("\r\n============================================"));
   debugTelnet.println(F("  OpenTherm Gateway -- OTGW-firmware"));
-  _debugPrintf_P(PSTR("  Version : %s\r\n"), _VERSION);
+  _debugPrintf_P(PSTR("  FW   : %s #%u  fs:%s\r\n"),
+    _VERSION,
+    (unsigned)_VERSION_BUILD,
+    checklittlefshash() ? "ok" : "mismatch");
+  _debugPrintf_P(PSTR("  Boot : %s\r\n"), rstReason);
+  _debugPrintf_P(PSTR("  Host : %s   Up: %s   Reboots: %lu\r\n"),
+    settings.sHostname,
+    upTime().c_str(),
+    (unsigned long)state.uptime.iRebootCount);
   debugTelnet.println(F("============================================"));
-  _debugPrintf_P(PSTR("  IP      : %s\r\n"), getActiveIP().c_str());
-  debugTelnet.print(F("  Network : "));
-  debugTelnet.println(networkModeName());
-  _debugPrintf_P(PSTR("  OTGW    : %-10s  MQTT : %s\r\n"),
-    state.otBus.bOnline    ? "online"     : "offline",
-    state.mqtt.bConnected  ? "connected"  : "disconnected");
-  _debugPrintf_P(PSTR("  Heap    : %u bytes free\r\n"), platformFreeHeap());
+  debugTelnet.print(F("  Net  : "));
+  debugTelnet.print(networkModeName());
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) {
+    _debugPrintf_P(PSTR("   IP %s\r\n"), getActiveIP().c_str());
+  } else
+#endif
+  {
+    _debugPrintf_P(PSTR("   SSID %s   RSSI %d dBm   IP %s\r\n"),
+      WiFi.SSID().c_str(), WiFi.RSSI(), getActiveIP().c_str());
+  }
+#if defined(_VERSION_PRERELEASE)
+  if (state.net.bAPFallback) {
+    _debugPrintf_P(PSTR("         AP-Fallback active: %s\r\n"), state.net.sAPSSID);
+  }
+#endif
+  _debugPrintf_P(PSTR("  Heap : free %u  frag %u%%  minFree %u  maxBlk %u  sketchFree %u\r\n"),
+    (unsigned)platformFreeHeap(),
+    (unsigned)platformHeapFragmentation(),
+    (unsigned)platformMinFreeHeap(),
+    (unsigned)platformMaxFreeBlock(),
+    (unsigned)platformFreeSketchSpace());
+  _debugPrintf_P(PSTR("  Drops: ws %lu  mqtt %lu   low/warn/crit %lu/%lu/%lu   slow %lu\r\n"),
+    (unsigned long)state.heapdiag.iWsDropsTotal,
+    (unsigned long)state.heapdiag.iMqttDropsTotal,
+    (unsigned long)state.heapdiag.iEnteredLowCount,
+    (unsigned long)state.heapdiag.iEnteredWarningCount,
+    (unsigned long)state.heapdiag.iEnteredCriticalCount,
+    (unsigned long)state.heapdiag.iDripSlowModeCount);
   debugTelnet.println(F("--------------------------------------------"));
-  debugTelnet.println(F("  Debug flags (key to toggle):"));
-  _debugPrintf_P(PSTR("    1 OT messages : %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
-  _debugPrintf_P(PSTR("    2 REST API    : %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
-  _debugPrintf_P(PSTR("    3 MQTT comms  : %s\r\n"), CBOOLEAN(state.debug.bMQTT));
-  _debugPrintf_P(PSTR("    4 MQTT gating : %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
-  _debugPrintf_P(PSTR("    5 Sensors     : %s\r\n"), CBOOLEAN(state.debug.bSensors));
-  _debugPrintf_P(PSTR("    6 NTP sync    : %s\r\n"), CBOOLEAN(state.debug.bNTP));
+  _debugPrintf_P(PSTR("  PIC  : %s  v%s   id %s\r\n"),
+    state.pic.sType, state.pic.sFwversion, state.pic.sDeviceid);
+  _debugPrintf_P(PSTR("  OTbus: %s   GW-mode: %s   Boiler: %s  Thermostat: %s   PS: %s\r\n"),
+    state.otBus.bOnline ? "online" : "offline",
+    state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting",
+    CCONOFF(state.otBus.bBoilerState),
+    CCONOFF(state.otBus.bThermostatState),
+    CCONOFF(state.otBus.bPSmode));
+  _debugPrintf_P(PSTR("  MQTT : %s   broker %s:%d   ha-prefix: %s\r\n"),
+    state.mqtt.bConnected ? "connected" : "disconnected",
+    settings.mqtt.sBroker,
+    (int)settings.mqtt.iBrokerPort,
+    settings.mqtt.sHaprefix);
+  _debugPrintf_P(PSTR("  NTP  : %s   tz %s   sendtime: %s\r\n"),
+    settings.ntp.bEnable ? "on" : "off",
+    settings.ntp.sTimezone,
+    CCONOFF(settings.ntp.bSendtime));
+  debugTelnet.println(F("--------------------------------------------"));
+  _debugPrintf_P(PSTR("  SAT  : %s   mode %s   sp %.1fC   mod %u%%\r\n"),
+    state.sat.bActive ? "active" : "inactive",
+    satControlModeStr(state.sat.eControlMode),
+    (double)state.sat.fFinalSetpoint,
+    (unsigned)state.sat.iCurrentModulation);
+  _debugPrintf_P(PSTR("         status %s   lastCycle %s   fallback %s   wx %s\r\n"),
+    satBoilerStatusStr(state.sat.eBoilerStatus),
+    satCycleClassStr(state.sat.eLastCycleClass),
+    state.sat.bFallbackActive ? "ON" : "off",
+    state.sat.weather.bValid ? "ok" : "stale");
 #if defined(ESP32)
-  _debugPrintf_P(PSTR("    7 SAT BLE     : %s\r\n"), CBOOLEAN(state.debug.bSATBLE));
+  _debugPrintf_P(PSTR("  BLE  : sensors %u   batt %u%%   rssi %d dBm\r\n"),
+    (unsigned)state.sat.iBleSensorCount,
+    (unsigned)state.sat.iBleBattery,
+    (int)state.sat.iBleRssi);
 #endif
   debugTelnet.println(F("--------------------------------------------"));
-  debugTelnet.println(F("  Commands:"));
-  debugTelnet.println(F("    w  Open-Meteo fetch + dump"));
-  debugTelnet.println(F("  Press 'h' for the full debug menu."));
+  debugTelnet.println(F("  Debug toggles (press key to flip):"));
+  _debugPrintf_P(PSTR("    1 OTmsg     [%s]    2 REST API  [%s]    3 MQTT      [%s]\r\n"),
+    state.debug.bOTmsg    ? "1" : "0",
+    state.debug.bRestAPI  ? "1" : "0",
+    state.debug.bMQTT     ? "1" : "0");
+  _debugPrintf_P(PSTR("    4 Sensors   [%s]    5 SAT       [%s]    6 OTDirect  [%s]\r\n"),
+    state.debug.bSensors  ? "1" : "0",
+    state.debug.bSAT      ? "1" : "0",
+    state.debug.bOTDirect ? "1" : "0");
+#if defined(ESP32)
+  _debugPrintf_P(PSTR("    7 SATBLE    [%s]    g MQTTGate  [%s]    n NTP       [%s]\r\n"),
+    state.debug.bSATBLE   ? "1" : "0",
+    state.debug.bMQTTGate ? "1" : "0",
+    state.debug.bNTP      ? "1" : "0");
+#else
+  _debugPrintf_P(PSTR("    g MQTTGate  [%s]    n NTP       [%s]\r\n"),
+    state.debug.bMQTTGate ? "1" : "0",
+    state.debug.bNTP      ? "1" : "0");
+#endif
+  _debugPrintf_P(PSTR("    d SensorSim [%s]    OTGW-Sim    [%s]\r\n"),
+    state.debug.bSensorSim       ? "1" : "0",
+    state.debug.bOTGWSimulation  ? "1" : "0");
+  debugTelnet.println(F("--------------------------------------------"));
+  debugTelnet.println(F("  Press 'h' for command menu."));
   _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip);
   debugTelnet.println(F("============================================\r\n"));
 }

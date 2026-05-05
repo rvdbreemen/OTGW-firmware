@@ -8,74 +8,34 @@ void handleDebugChar(char c){
         switch (c){
             case 'h':
                 Debugln();
-                Debugln(F("---===[ Debug Help Menu ]===---"));
-                Debugf(PSTR("ESP Firmware: %s\r\n"), _VERSION);
-                Debugf(PSTR("FS Hash match: %s\r\n"), CBOOLEAN(checklittlefshash()));
-                Debugf(PSTR("PIC: %s | Type: %s | Version: %s\r\n"), state.pic.sDeviceid, state.pic.sType, state.pic.sFwversion);
-                Debugln();
-                Debugln(F("--- Status ---"));
-                Debugf(PSTR("Network: %s (%s) | MQTT: %s | OTGW: %s\r\n"),
-                    isNetworkUp() ? "Connected" : "Disconnected",
-#if defined(_VERSION_PRERELEASE)
-                    state.net.bAPFallback ? "AP Fallback" :
-#endif
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-                    (state.net.eMode == NET_ETHERNET) ? "Ethernet" : "WiFi",
-#else
-                    "WiFi",
-#endif
-                    CBOOLEAN(state.mqtt.bConnected),
-                    CBOOLEAN(state.otBus.bOnline));
-#if defined(_VERSION_PRERELEASE)
-                if (state.net.bAPFallback) {
-                  Debugf(PSTR("BETA AP MODE: SSID=[%s] IP=192.168.4.1 pass=otgw123\r\n"), state.net.sAPSSID);
-                }
-#endif
-                Debugf(PSTR("Thermostat: %s | Boiler: %s | Gateway Mode: %s\r\n"),
-                    CCONOFF(state.otBus.bThermostatState),
-                    CCONOFF(state.otBus.bBoilerState),
-                    state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting");
-                Debugf(PSTR("OTGW Simulation: %s\r\n"), CBOOLEAN(state.debug.bOTGWSimulation));
-                if (isnan(OTcurrentSystemState.Tr)) {
-                  Debugf(PSTR("CH Temp: %.1f°C | Room Temp: --°C | Setpoint: %.1f°C\r\n"),
-                      OTcurrentSystemState.Tboiler,
-                      OTcurrentSystemState.TrSet);
-                } else {
-                  Debugf(PSTR("CH Temp: %.1f°C | Room Temp: %.1f°C | Setpoint: %.1f°C\r\n"),
-                      OTcurrentSystemState.Tboiler,
-                      OTcurrentSystemState.Tr,
-                      OTcurrentSystemState.TrSet);
-                }
-                Debugln();
-                Debugln(F("--- Debug toggles ---"));
-                Debugf(PSTR("1) Toggle debuglog - OT message parsing: %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
-                Debugf(PSTR("2) Toggle debuglog - API handling: %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
-                Debugf(PSTR("3) Toggle debuglog - MQTT module: %s\r\n"), CBOOLEAN(state.debug.bMQTT));
-                Debugf(PSTR("4) Toggle debuglog - Sensor modules: %s\r\n"), CBOOLEAN(state.debug.bSensors));
-                Debugf(PSTR("5) Toggle debuglog - SAT control loop + cycles + HCR: %s\r\n"), CBOOLEAN(state.debug.bSAT));
-                Debugf(PSTR("6) Toggle debuglog - OTDirect frame handling + PI loop: %s\r\n"), CBOOLEAN(state.debug.bOTDirect));
+                Debugln(F("---===[ Debug Commands ]===---"));
+                Debugln(F("Toggle keys (current state shown in welcome banner):"));
+                Debugln(F("  1) OT message parsing       2) REST API handling"));
+                Debugln(F("  3) MQTT module              4) Sensor modules"));
+                Debugln(F("  5) SAT control loop         6) OTDirect frame handling"));
 #if defined(ESP32)
-                Debugf(PSTR("7) Toggle debuglog - SAT BLE sensor scan: %s\r\n"), CBOOLEAN(state.debug.bSATBLE));
+                Debugln(F("  7) SAT BLE sensor scan"));
 #endif
-                Debugf(PSTR("g) Toggle debuglog - MQTT interval gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
-                Debugf(PSTR("n) Toggle debuglog - NTP time sync: %s\r\n"), CBOOLEAN(state.debug.bNTP));
-                Debugf(PSTR("d) Toggle debug helper - Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));
-                Debugln(F("--- Commands ---"));
-                Debugln(F("q) Force read settings"));
-                Debugln(F("F) Force MQTT discovery for ALL message IDs"));
-                Debugln(F("r) Reconnect wifi, telnet, otgwstream and mqtt"));
-                Debugln(F("p) Reset PIC manually"));
-                Debugln(F("a) Send PR=A command to ID PIC firmware version and type"));
-                Debugln(F("s/S) Toggle OTGW serial simulation replay"));
-                Debugln(F("w) Trigger Open-Meteo weather fetch and dump state"));
-                Debugln(F("--- GPIO/Debug ---"));
-                Debugln(F("b) Blink LED 1 (5 times)"));
-                Debugln(F("i) Initialize relay outputs"));
-                Debugln(F("u) GPIO output ON"));
-                Debugln(F("o) GPIO output OFF"));
-                Debugln(F("j) Read GPIO output state"));
-                Debugln(F("l) Toggle MyDEBUG"));
-                Debugln(F("f) Show MyDEBUG status"));
+                Debugln(F("  g) MQTT interval gating     n) NTP time sync"));
+                Debugln(F("  d) Dallas-sensor simulation"));
+                Debugln();
+                Debugln(F("--- Actions ---"));
+                Debugln(F("  q) Force read settings"));
+                Debugln(F("  F) Force MQTT discovery for ALL message IDs"));
+                Debugln(F("  V) Trigger MQTT discovery verification"));
+                Debugln(F("  r) Reconnect WiFi/telnet/MQTT"));
+                Debugln(F("  p) Reset PIC manually"));
+                Debugln(F("  a) Send PR=A to identify PIC firmware version & type"));
+                Debugln(F("  s/S) Toggle OTGW serial-simulation replay"));
+                Debugln(F("  w) Trigger Open-Meteo weather fetch and dump state"));
+                Debugln(F("--- GPIO / Misc ---"));
+                Debugln(F("  b) Blink LED 1 (5x)"));
+                Debugln(F("  i) Initialize relay outputs"));
+                Debugln(F("  u) GPIO output ON"));
+                Debugln(F("  o) GPIO output OFF"));
+                Debugln(F("  j) Read GPIO output state"));
+                Debugln(F("  l) Toggle MyDEBUG"));
+                Debugln(F("  f) Show MyDEBUG status"));
                 Debugln();
                 break;
             case 'p':
