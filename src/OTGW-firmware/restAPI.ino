@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha
+**  Version  : v2.0.0-alpha.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1857,6 +1857,8 @@ void sendOTmonitorV2()
 // for REST consumers - they should parse by key.
 void sendDeviceInfoV2()
 {
+  const uint32_t startMs = millis();
+  restPerfBegin(REST_PERF_DEVICE_INFO);
   sendStartJsonMap(F("device"));
 
   // --- Firmware & build identity ---
@@ -2003,8 +2005,29 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("hd_drip_burst_skip"),        state.heapdiag.iDripActiveBurstSkipCount);
   sendJsonMapEntry(F("hd_drip_cooldown_skip"),     state.heapdiag.iDripCooldownSkipCount);
   sendJsonMapEntry(F("hd_drip_slowmode"),          state.heapdiag.iDripSlowModeCount);
+  sendJsonMapEntry(F("perf_sat_status_total_ms"),     state.restperf.satStatus.iLastTotalMs);
+  sendJsonMapEntry(F("perf_sat_status_send_ms"),      state.restperf.satStatus.iLastSendMs);
+  sendJsonMapEntry(F("perf_sat_status_render_ms"),    state.restperf.satStatus.iLastRenderMs);
+  sendJsonMapEntry(F("perf_sat_status_chunks"),       state.restperf.satStatus.iLastChunkCount);
+  sendJsonMapEntry(F("perf_device_info_total_ms"),    state.restperf.deviceInfo.iLastTotalMs);
+  sendJsonMapEntry(F("perf_device_info_send_ms"),     state.restperf.deviceInfo.iLastSendMs);
+  sendJsonMapEntry(F("perf_device_info_render_ms"),   state.restperf.deviceInfo.iLastRenderMs);
+  sendJsonMapEntry(F("perf_device_info_chunks"),      state.restperf.deviceInfo.iLastChunkCount);
+  sendJsonMapEntry(F("perf_device_info_max_ms"),      state.restperf.deviceInfo.iMaxTotalMs);
+  sendJsonMapEntry(F("perf_device_info_samples"),     state.restperf.deviceInfo.iSampleCount);
+  sendJsonMapEntry(F("perf_settings_total_ms"),       state.restperf.settings.iLastTotalMs);
+  sendJsonMapEntry(F("perf_settings_send_ms"),        state.restperf.settings.iLastSendMs);
+  sendJsonMapEntry(F("perf_settings_render_ms"),      state.restperf.settings.iLastRenderMs);
+  sendJsonMapEntry(F("perf_settings_chunks"),         state.restperf.settings.iLastChunkCount);
 
   sendEndJsonMap(F("device"));
+  const uint32_t totalMs = millis() - startMs;
+  restPerfCommit(REST_PERF_DEVICE_INFO, totalMs);
+  RESTDebugTf(PSTR("REST PERF device/info total=%lums send=%lums render=%lums chunks=%lu\r\n"),
+              (unsigned long)state.restperf.deviceInfo.iLastTotalMs,
+              (unsigned long)state.restperf.deviceInfo.iLastSendMs,
+              (unsigned long)state.restperf.deviceInfo.iLastRenderMs,
+              (unsigned long)state.restperf.deviceInfo.iLastChunkCount);
 
 } // sendDeviceInfoV2()
 
@@ -2240,6 +2263,8 @@ void sendDeviceTimeV2()
 //=======================================================================
 void sendDeviceSettings()
 {
+  const uint32_t startMs = millis();
+  restPerfBegin(REST_PERF_SETTINGS);
 
   sendStartJsonMap(F("settings"));
 
@@ -2486,6 +2511,13 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("httppasswd"), httpPasswordPlaceholder, "p", 40);
 
   sendEndJsonMap(F("settings"));
+  const uint32_t totalMs = millis() - startMs;
+  restPerfCommit(REST_PERF_SETTINGS, totalMs);
+  RESTDebugTf(PSTR("REST PERF settings total=%lums send=%lums render=%lums chunks=%lu\r\n"),
+              (unsigned long)state.restperf.settings.iLastTotalMs,
+              (unsigned long)state.restperf.settings.iLastSendMs,
+              (unsigned long)state.restperf.settings.iLastRenderMs,
+              (unsigned long)state.restperf.settings.iLastChunkCount);
 
 } // sendDeviceSettings()
 

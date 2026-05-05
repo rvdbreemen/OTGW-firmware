@@ -3,10 +3,11 @@ id: TASK-431
 title: >-
   Investigate: rapid WebUI page-refresh freezes the OTGW (1.4.2-beta), requires
   network drop to recover
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@copilot'
 created_date: '2026-04-26 10:16'
-updated_date: '2026-04-30 00:37'
+updated_date: '2026-05-05 21:47'
 labels:
   - bug
   - webui
@@ -87,3 +88,13 @@ The 1.4.2-beta release notes (published a few minutes after crashevans' report) 
 - [ ] #4 Validate the fix with the same reproduction recipe; report negative result (cannot reproduce after fix) over at least 20 rapid reload cycles
 - [ ] #5 Update Discord #beta-testing thread (andrebrait, sergeantd, crashevans) with status and ask for re-test on a fresh build
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- Confirmed the same browser lifecycle bug is still present on the 2.0.0 branch: hidden tabs keep the OT log WebSocket alive, but reload/unload did not explicitly close it.
+- Ported the dev mitigation into data/index.js: pagehide/beforeunload now persist the OT log buffer, stop polling timers, cancel delayed reconnects, and close the live OT log WebSocket; main-page reconnects now wait 250 ms so the previous page can retire its socket first.
+- Added low-noise firmware-side burst diagnostics in webSocketStuff.ino so the next telnet retest can distinguish connect/disconnect churn from max-client, low-heap, or error bursts.
+- Validation: ./build.sh and .build-venv/bin/python evaluate.py --quick both passed on the 2.0.0 worktree.
+- Still blocked on real hardware/telnet evidence for AC #1/#2/#4 and reporter follow-up for AC #5.
+<!-- SECTION:NOTES:END -->

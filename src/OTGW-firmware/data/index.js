@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha
+**  Version  : v2.0.0-alpha.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -309,13 +309,12 @@ function setActivePageSection(activeId) {
 
 document.addEventListener('visibilitychange', function () {
   if (!isPageVisible()) {
-    // When tab is hidden, stop UI updates to save resources but KEEP WebSocket connected
+    // When a tab is merely hidden, stop polling load but keep the OT log socket alive.
+    // Reload/navigation teardown is handled by pagehide/beforeunload.
     stopTimeUpdates();
     stopOTmonitorPolling();
     stopOTDStatusPolling();
     stopPICsettingsRefreshTimer();
-    // WebSocket stays connected to continue gathering data in background
-    // The watchdog timer will keep it alive and reconnect if needed
     return;
   }
   // When tab becomes visible again, resume UI updates
@@ -323,8 +322,8 @@ document.addEventListener('visibilitychange', function () {
     refreshDevTime();
     refreshGatewayMode(true);
     startTimeUpdates();
-    // Ensure WebSocket is connected (will reconnect if needed)
-    initOTLogWebSocket();
+    // Give any just-closed reload/navigation socket a brief head start before reconnecting.
+    scheduleOTLogWebSocketInit(false, 250);
     startOTmonitorPolling();
     if (isMainPageActive()) startOTDStatusPolling();
     startPICsettingsRefreshTimer();
@@ -953,6 +952,7 @@ window.saveBlobToLogDir = async function(filename, blob) {
 const WEBSOCKET_PORT = 81;
 let wsReconnectTimer = null;
 let wsWatchdogTimer = null;
+let wsConnectDelayTimer = null;
 const WS_WATCHDOG_TIMEOUT = 45000; // 45 seconds timeout (allows for 30s keepalive + 15s margin)
 // Per-message WebSocket console logs are gated behind this flag. It is
 // file-scoped; toggle from the browser console via `otgwDebug.verbose = true`
@@ -1317,11 +1317,52 @@ function stopPersistenceTimer() {
   }
 }
 
-// Save data when page is about to unload
-window.addEventListener('beforeunload', function() {
+function stopScheduledOTLogWebSocketInit() {
+  if (wsConnectDelayTimer) {
+    clearTimeout(wsConnectDelayTimer);
+    wsConnectDelayTimer = null;
+  }
+}
+
+function scheduleOTLogWebSocketInit(force, delayMs) {
+  stopScheduledOTLogWebSocketInit();
+
+  if (delayMs > 0) {
+    wsConnectDelayTimer = setTimeout(function() {
+      wsConnectDelayTimer = null;
+      initOTLogWebSocket(force);
+    }, delayMs);
+    return;
+  }
+
+  initOTLogWebSocket(force);
+}
+
+function shutdownPageNetworking(reason) {
+  console.log('[Lifecycle] Shutting down page networking: ' + reason);
+  stopTimeUpdates();
+  stopOTmonitorPolling();
+  stopOTDStatusPolling();
+  stopPICsettingsRefreshTimer();
+  stopScheduledOTLogWebSocketInit();
+  disconnectOTLogWebSocket();
+}
+
+function persistOTLogBufferForUnload() {
   if (otLogBuffer.length > 0) {
     saveDataToLocalStorage();
   }
+}
+
+window.addEventListener('pagehide', function(event) {
+  persistOTLogBufferForUnload();
+  shutdownPageNetworking(event && event.persisted ? 'pagehide (bfcache)' : 'pagehide');
+});
+
+// Save data and explicitly close live OT-log sockets before a full page unload/reload.
+window.addEventListener('beforeunload', function() {
+  persistOTLogBufferForUnload();
+  shutdownPageNetworking('beforeunload');
 });
 
 // Expose for debug console
@@ -3308,8 +3349,8 @@ function showMainPage() {
   if (!flashModeActive) {
     startOTmonitorPolling();
     startOTDStatusPolling();
-    // Initialize WebSocket for OT log streaming
-    initOTLogWebSocket();
+    // Delay reconnect slightly so a rapid reload can retire the previous page's socket first.
+    scheduleOTLogWebSocketInit(false, 250);
   }
 }
 

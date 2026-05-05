@@ -327,6 +327,42 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-02T11:27:38.102Z"
+    },
+    {
+      "id": "bug-021",
+      "timestamp": "2026-05-05T23:02:00.000Z",
+      "error_message": "TASK-530 field reports interpreted `hd_drip_cooldown_skip` on ESP32-S3 as heap-threshold throttling, but the counter was actually driven by the post-status-burst cooldown gate inherited from ESP8266 pacing.",
+      "file": "src/OTGW-firmware/MQTTstuff.ino",
+      "root_cause": "The 2.0.0 branch used one discovery-drip policy for both ESP8266 and ESP32. On ESP32, the 2000ms post-burst cooldown and ESP8266-oriented drip guard comments made normal discovery pacing look like heap pressure even when free heap and max alloc block were healthy.",
+      "fix": "Made the discovery-drip policy platform-aware: ESP32 now uses a 250ms post-status-burst cooldown, a lower last-ditch publish floor, and an ESP32-specific slow-mode guard based on both free heap and largest allocatable block. Updated MQTT API docs to clarify that `drip_cooldown_skip` is a pacing counter and that `max_block` maps to `platformMaxFreeBlock()`.",
+      "tags": [
+        "task-530",
+        "mqtt",
+        "discovery",
+        "esp32",
+        "heapdiag"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-05T23:02:00.000Z"
+    },
+    {
+      "id": "bug-022",
+      "timestamp": "2026-05-05T23:45:00.000Z",
+      "error_message": "Rapid WebUI reloads could leave stale OT-log WebSocket clients alive long enough to exhaust the three-client limit before the firmware reaped them.",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "The 2.0.0 WebUI kept the OT-log WebSocket open when a tab was hidden and did not explicitly close it on page unload or reload. A burst of reloads could therefore stack old sockets faster than heartbeat cleanup reclaimed them, making the next page instance look like a firmware freeze.",
+      "fix": "Added pagehide/beforeunload OT-log shutdown in index.js, persisted the OT-log buffer before unload, cancelled delayed reconnect timers, and delayed the next main-page reconnect by 250 ms. Added 5-second WebSocket burst diagnostics in webSocketStuff.ino so reload retests can distinguish churn from max-client, low-heap, or error bursts.",
+      "tags": [
+        "task-431",
+        "webui",
+        "websocket",
+        "reload-storm",
+        "diagnostics"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-05T23:45:00.000Z"
     }
   ]
 }

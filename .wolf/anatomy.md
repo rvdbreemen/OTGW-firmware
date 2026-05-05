@@ -6,6 +6,10 @@
 ## ./
 
 
+## .wolf/
+
+- `memory.md` — one-line running log of significant session actions and handoffs.
+
 ## .claude/
 
 

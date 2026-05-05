@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha
+**  Version  : v2.0.0-alpha.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -45,11 +45,15 @@ constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
 constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 // Minimum free heap required before attempting a discovery publish.
 // Streaming HA discovery (ADR-042: streaming JSON, no ArduinoJson) only needs
-// ~200 bytes per chunk, so the historical 1200-byte floor is obsolete. Value
-// aligned with HEAP_WARNING_THRESHOLD (3072) in canPublishMQTT(): if heap is
-// already at WARNING the drip skips rather than competing with publish-gate
-// throttling.
-constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 3000;  // Streaming needs ~200 bytes; aligned with WARNING tier
+// ~200 bytes per chunk, so the guard is an absolute "last safety rail", not a
+// performance throttle. ESP8266 keeps the historical WARNING-tier floor because
+// it only has ~80KB RAM total. ESP32 uses a lower absolute floor because the
+// larger DRAM budget should not block discovery while tens of KB are still free.
+#if defined(ESP32)
+constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 2048;
+#else
+constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 3000;  // aligned with WARNING tier on ESP8266
+#endif
 
 // PIC subtree prefix -- single source of truth for the otgw-pic/ MQTT subtree.
 // Declared extern in MQTTstuff.h. See ADR-065 for the public-API contract.
@@ -107,12 +111,12 @@ struct MQTTAutoConfigSessionLock {
 // TUNING (TASK-353): the Crashevans log shows Status-frames arriving at ~3s
 // cadence. A 10s cooldown overlapped consecutive bursts and stalled the drip
 // under heavy Status traffic (iDripCooldownSkipCount grew without discovery
-// progressing). 2000ms is the chosen default: it fits comfortably between
+// progressing). ESP8266 keeps a 2000ms cooldown: it fits comfortably between
 // Status-frames (~3s cadence leaves ~1s of drip window per cycle) while still
 // giving lwIP pbufs from the just-finished burst time to drain before the next
-// heap allocation. If you see iDripCooldownSkipCount climb again without
-// discovery progressing, consider lowering further; raising above ~2500ms
-// re-introduces the overlap stall.
+// heap allocation. ESP32 can drain the same burst with much more headroom, so
+// it uses a shorter cooldown to avoid counting ordinary discovery progress as
+// "pressure" when free heap is still tens of KB.
 //
 // Timeout safety: if endStatusBurst() is never reached (exception path),
 // isStatusBurstActive() auto-clears after STATUS_BURST_TIMEOUT_MS.
@@ -123,7 +127,11 @@ static unsigned long   burstCooldownUntilMs  = 0;
 static uint32_t        sDripDueAtMs          = 0;   // updated by loopMQTTDiscovery(); read by dripDueWithinMs()
 static bool            dripDeviceInfoPending = false; // true after markAllMQTTConfigPending(); first drip entity carries full device block
 constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
+#if defined(ESP32)
+constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 250;
+#else
 constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 2000;   // TASK-353: 10000->2000; stays under the ~3s Status cadence so the drip gets a window per cycle
+#endif
 
 void beginStatusBurst() {
   statusBurstActive = true;
@@ -1663,6 +1671,17 @@ void markAllMQTTConfigPending()
 constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 2;   // seconds (heap recovery between bursts)
 constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 10;  // seconds (heap pressure backoff)
 
+static bool discoveryDripHasHeapPressure() {
+#if defined(ESP32)
+  // ESP32-S3 has far more DRAM than ESP8266, so the drip should only slow down
+  // when both total free heap and the largest allocatable block are genuinely low.
+  return (platformFreeHeap() < 16384U) && (platformMaxFreeBlock() < 8192U);
+#else
+  // ESP8266 keeps the existing HEAP_LOW-based backoff policy from TASK-370.
+  return getHeapHealth() >= HEAP_LOW;
+#endif
+}
+
 void loopMQTTDiscovery()
 {
   DECLARE_TIMER_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
@@ -1673,7 +1692,7 @@ void loopMQTTDiscovery()
   // canPublishMQTT() starts dropping at HEAP_LOW (<6KB); if we only trigger
   // slow-mode at HEAP_WARNING (<4KB) we are too late — drops have already
   // started. Trigger at HEAP_LOW so the drip quiets down first.
-  bool heapPressure = (getHeapHealth() >= HEAP_LOW);
+  bool heapPressure = discoveryDripHasHeapPressure();
   // Hold current mode for at least one full interval before switching.
   // modeEnteredMs == 0 on first call: first switch is always allowed immediately.
   bool canSwitch = (modeEnteredMs == 0) ||

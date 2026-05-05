@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha
+**  Version  : v2.0.0-alpha.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -361,6 +361,31 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure
 };
 
+enum RestPerfTarget : uint8_t {
+  REST_PERF_NONE = 0,
+  REST_PERF_SAT_STATUS,
+  REST_PERF_DEVICE_INFO,
+  REST_PERF_SETTINGS
+};
+
+struct RestPerfSample {
+  uint32_t iLastTotalMs     = 0;
+  uint32_t iLastSendMs      = 0;
+  uint32_t iLastRenderMs    = 0;
+  uint32_t iLastChunkCount  = 0;
+  uint32_t iMaxTotalMs      = 0;
+  uint32_t iSampleCount     = 0;
+};
+
+struct RestPerfSection {
+  RestPerfSample satStatus;
+  RestPerfSample deviceInfo;
+  RestPerfSample settings;
+  RestPerfTarget eActiveTarget = REST_PERF_NONE;
+  uint32_t       iActiveSendMs = 0;
+  uint32_t       iActiveChunkCount = 0;
+};
+
 
 struct OTGWState {
   HardwareSection    hw;          // state.hw.eMode, state.hw.bOLEDPresent
@@ -375,6 +400,7 @@ struct OTGWState {
   DebugSection       debug;       // state.debug.bOTmsg, state.debug.bMQTT
   UptimeSection      uptime;      // state.uptime.iSeconds, state.uptime.iRebootCount
   HeapDiagSection    heapdiag;    // state.heapdiag.iMqttDropsTotal, ...
+  RestPerfSection    restperf;    // state.restperf — last REST timing breakdown for profiled endpoints
   DiscoverySection   discovery;   // state.discovery.iPublishedTopicCount, ... (ADR-062)
   PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
   SATRuntimeSection  sat;         // state.sat — SAT thermostat controller

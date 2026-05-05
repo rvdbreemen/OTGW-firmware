@@ -1539,11 +1539,13 @@ static void satSendJsonFloat(const __FlashStringHelper* cName, float fValue, uin
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  restSendContent(jsonBuff);
 }
 
 void satSendStatusJSON()
 {
+  const uint32_t startMs = millis();
+  restPerfBegin(REST_PERF_SAT_STATUS);
   sendStartJsonMap("");
   sendJsonMapEntry(F("enabled"),              settings.sat.bEnabled);
   sendJsonMapEntry(F("active"),               state.sat.bActive);
@@ -1703,7 +1705,7 @@ void satSendStatusJSON()
       snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_temp"), i);
       dtostrf(state.sat.fAreaTemp[i], 1, 1, numBuf);
       snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
-      sendBeforenext(); sendIdent(); httpServer.sendContent(jsonBuff);
+      sendBeforenext(); sendIdent(); restSendContent(jsonBuff);
       // area_N_valid
       snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_valid"), i);
       sendJsonMapEntry(nameBuf, state.sat.bAreaValid[i]);
@@ -1711,7 +1713,7 @@ void satSendStatusJSON()
       snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_weight"), i);
       dtostrf(settings.sat.fAreaWeight[i], 1, 2, numBuf);
       snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
-      sendBeforenext(); sendIdent(); httpServer.sendContent(jsonBuff);
+      sendBeforenext(); sendIdent(); restSendContent(jsonBuff);
     }
   }
 #if defined(ESP32)
@@ -1719,6 +1721,15 @@ void satSendStatusJSON()
   satBLESendStatusJSON();
 #endif
   sendEndJsonMap("");
+  const uint32_t totalMs = millis() - startMs;
+  restPerfCommit(REST_PERF_SAT_STATUS, totalMs);
+  if (state.debug.bRestAPI) {
+    DebugTf(PSTR("REST PERF sat/status total=%lums send=%lums render=%lums chunks=%lu\r\n"),
+            (unsigned long)state.restperf.satStatus.iLastTotalMs,
+            (unsigned long)state.restperf.satStatus.iLastSendMs,
+            (unsigned long)state.restperf.satStatus.iLastRenderMs,
+            (unsigned long)state.restperf.satStatus.iLastChunkCount);
+  }
 }
 
 //=====================================================================

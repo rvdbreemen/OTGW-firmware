@@ -1168,10 +1168,10 @@ The firmware publishes heap-pressure and discovery counters as 17 individual ret
 | `enter_warning` | uint32 | session counter | Transitions into the `HEAP_WARNING` tier. |
 | `enter_critical` | uint32 | session counter | Transitions into the `HEAP_CRITICAL` tier. |
 | `drip_burst_skip` | uint32 | session counter | Discovery drip ticks skipped while a Status-frame burst was active (TASK-342). |
-| `drip_cooldown_skip` | uint32 | session counter | Discovery drip ticks skipped in the post-burst cooldown window (TASK-347). |
+| `drip_cooldown_skip` | uint32 | session counter | Discovery drip ticks skipped in the post-burst cooldown window (TASK-347). This is a status-burst pacing counter, not a heap-pressure counter. |
 | `drip_slowmode` | uint32 | session counter | Transitions into the 10-second slow-mode cadence caused by heap pressure. |
 | `free_heap` | uint32 | live sample | `ESP.getFreeHeap()` at publish time, in bytes. |
-| `max_block` | uint32 | live sample | `ESP.getMaxFreeBlockSize()` at publish time, in bytes. |
+| `max_block` | uint32 | live sample | `platformMaxFreeBlock()` at publish time, in bytes. On ESP8266 this maps to `ESP.getMaxFreeBlockSize()`; on ESP32 it maps to `ESP.getMaxAllocHeap()`. |
 | `frag_pct` | uint8 | live sample | Heap fragmentation percentage at publish time (0 – 100). |
 | `disc_verify_runs` | uint32 | session counter | Lifetime count of retained-discovery verify windows started since boot. |
 | `disc_republish_triggered` | uint32 | session counter | Lifetime count of verify runs that ended with missing configs and triggered a republish. |

@@ -3,9 +3,11 @@ id: TASK-529
 title: >-
   Profile and fix 3-4 sec latency on /sat/status, /device/info, /settings
   (OTGW32 ESP32-S3)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-03 18:51'
+updated_date: '2026-05-05 16:21'
 labels:
   - performance
   - esp32
@@ -81,3 +83,22 @@ Voor het volledige onderzoek zie de Discord-thread in #dev-sat-mqtt op 2026-05-0
 - [ ] #8 Browser F12 capture toont na de fix géén `ERR_CONNECTION_TIMED_OUT` meer tijdens normale paginalaad
 - [ ] #9 Documenteer hoofdoorzaak en fix in een ADR (nieuw of update van bestaande)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Inspect the ESP32 REST and SAT JSON handlers involved in /api/v2/sat/status, /api/v2/device/info, and /api/v2/settings.
+2. Add lightweight timing instrumentation that separates handler/render time from total request time and surfaces it in a way we can read over REST/telnet without changing endpoint contracts.
+3. Audit known contention points around sendContent/sendJsonMap, telnet REST-debug logging, and discovery drip pressure so we can reduce obvious self-inflicted latency without hardware-only guesswork.
+4. Build and evaluate the branch, then update TASK-529 with findings and what still needs on-device measurement.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- Added request-scoped REST perf instrumentation for /api/v2/sat/status, /api/v2/device/info, and /api/v2/settings.
+- jsonStuff streaming helpers now accumulate sendContent/send_P time into T_send and chunk counts while handlers measure T_total; T_render is derived as total minus send time.
+- Exposed latest perf metrics through /api/v2/device/info and added optional telnet traces when REST debug is enabled.
+- Local validation passed with ./build.sh --target esp32 and .build-venv/bin/python evaluate.py --quick.
+- Remaining ACs still require OTGW32 hardware runs: reproduce the slow case, compare REST-debug/MQTT/drip variants, determine root cause, decide on AsyncWebServer migration, verify <500 ms latency and browser timeout recovery, and document the outcome in an ADR.
+<!-- SECTION:NOTES:END -->
