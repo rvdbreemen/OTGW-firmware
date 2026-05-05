@@ -57,6 +57,7 @@ struct MQTTSettingsSection {
   bool    bOTmessage       = false;
   uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
+  bool    bLegacyPort25238Enabled = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -125,8 +126,10 @@ enum class HaDeviceClass : uint8_t {
 enum class HaUnit : uint8_t {
     none = 0,           // no unit / empty string
     degC,               // degrees Celsius
+    deg,                // degrees
     percent,            // "%"
     bar,                // "bar"
+    hPa,                // "hPa"
     l_min,              // "l/min"
     kW,                 // "kW"
     W,                  // "W"
@@ -136,6 +139,9 @@ enum class HaUnit : uint8_t {
     rpm,                // "rpm"
     ppm,                // "ppm"
     mS,                 // "mS" (milliseconds, S0 pulse time)
+    m_s,                // "m/s"
+    mm,                 // "mm"
+    s,                  // "s" (seconds)
     h,                  // "h" (hours)
     kW_percent,         // "kW/%" (MaxCapacity composite)
     bytes,              // "B" (bytes, used by heap-diag sensors)
@@ -211,6 +217,13 @@ enum class HaEntityCat : uint8_t {
     _count
 };
 
+enum class HaBinaryPayload : uint8_t {
+    on_off = 0,         // Home Assistant default (ON/OFF)
+    true_false,         // "true" / "false"
+    one_zero,           // 1 / 0
+    _count
+};
+
 // ---------------------------------------------------------------------------
 // Enum-to-string lookup functions -- return PGM_P (flash pointer)
 // Returns nullptr for ::none values (caller should omit the JSON key).
@@ -256,6 +269,8 @@ struct MqttHaSensorCfg {
     HaIcon        icon;
     HaEntityCat   entityCat;
     bool          enabledByDefault;
+    PGM_P         valueTemplate;       // optional custom value_template; null => "{{ value }}"
+    PGM_P         jsonAttributesTopic; // optional relative topic path after <mqttPubTopic>/
 };
 
 // Binary sensor discovery config
@@ -267,6 +282,8 @@ struct MqttHaBinSensorCfg {
     HaIcon        icon;
     HaEntityCat   entityCat;
     bool          enabledByDefault;
+    PGM_P         deviceClass;     // optional HA binary_sensor device_class
+    HaBinaryPayload payload;
 };
 
 // ---------------------------------------------------------------------------
@@ -412,6 +429,9 @@ bool streamSensorDiscovery(PubSubClient &client,
 bool streamBinarySensorDiscovery(PubSubClient &client,
                                  const MqttHaBinSensorCfg &cfg,
                                  HaDiscoveryContext &ctx);
+
+bool streamSatZoneDiscovery(PubSubClient &client,
+                            HaDiscoveryContext &ctx);
 
 bool streamClimateDiscovery(PubSubClient &client,
                             uint8_t climateIdx,

@@ -18,6 +18,7 @@
 #define SIDE_EFFECT_MQTT   0x01
 #define SIDE_EFFECT_NTP    0x02
 #define SIDE_EFFECT_MDNS   0x04
+#define SIDE_EFFECT_OTGWSTREAM 0x08
 static bool    settingsDirty = false;
 static uint8_t pendingSideEffects = 0;
 
@@ -77,6 +78,10 @@ void flushSettings()
   if (pendingSideEffects & SIDE_EFFECT_NTP) {
     DebugTln(F("[Settings] Restarting NTP (deferred)"));
     startNTP();
+  }
+  if (pendingSideEffects & SIDE_EFFECT_OTGWSTREAM) {
+    DebugTln(F("[Settings] Applying legacy port 25238 setting (deferred)"));
+    applyLegacyPort25238Setting();
   }
   pendingSideEffects = 0;
 }
@@ -243,6 +248,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("MQTTOTmessage"), settings.mqtt.bOTmessage, true);
   writeJsonIntKV(file, F("MQTTinterval"), settings.mqtt.iInterval, true);
   writeJsonBoolKV(file, F("MQTTseparatesources"), settings.mqtt.bSeparateSources, true);
+  writeJsonBoolKV(file, F("LegacyPort25238Enabled"), settings.mqtt.bLegacyPort25238Enabled, true);
   writeJsonBoolKV(file, F("MQTTharebootdetection"), settings.mqtt.bHaRebootDetect, true);
   writeJsonBoolKV(file, F("MQTTdiscoveryAutoVerify"), settings.mqtt.bDiscoveryAutoVerify, true);
   writeJsonBoolKV(file, F("NTPenable"), settings.ntp.bEnable, true);
@@ -520,6 +526,7 @@ void readSettings(bool show)
     Debugf(PSTR("MQTT toptopic         : %s\r\n"), CSTR(settings.mqtt.sTopTopic));
     Debugf(PSTR("MQTT uniqueid         : %s\r\n"), CSTR(settings.mqtt.sUniqueid));
     Debugf(PSTR("MQTT separate sources : %s\r\n"), CBOOLEAN(settings.mqtt.bSeparateSources));
+    Debugf(PSTR("Legacy port 25238     : %s\r\n"), CBOOLEAN(settings.mqtt.bLegacyPort25238Enabled));
     Debugf(PSTR("MQTT interval         : %d\r\n"), settings.mqtt.iInterval);
     Debugf(PSTR("HA prefix             : %s\r\n"), CSTR(settings.mqtt.sHaprefix));
     Debugf(PSTR("HA reboot detection   : %s\r\n"), CBOOLEAN(settings.mqtt.bHaRebootDetect));
@@ -662,6 +669,10 @@ void updateSetting(const char *field, const char *newValue)
     else settings.mqtt.iInterval = (uint16_t)val;
   }
   else if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settings.mqtt.bSeparateSources = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("LegacyPort25238Enabled"))==0) {
+    settings.mqtt.bLegacyPort25238Enabled = EVALBOOLEAN(newValue);
+    pendingSideEffects |= SIDE_EFFECT_OTGWSTREAM;
+  }
   else if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settings.ntp.bEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("NTPhostname"))==0)    {
     strlcpy(settings.ntp.sHostname, newValue, sizeof(settings.ntp.sHostname));

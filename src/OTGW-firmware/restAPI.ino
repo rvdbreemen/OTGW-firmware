@@ -169,6 +169,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTValue(int msgid);
 void sendOTLabel(const char *msglabel);
@@ -1255,6 +1256,279 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendApiNotFound(originalURI);
 }
 
+static void debugFormatLocalIp(char* buf, size_t bufSize)
+{
+  IPAddress ip = WiFi.localIP();
+  snprintf_P(buf, bufSize, PSTR("%u.%u.%u.%u"), ip[0], ip[1], ip[2], ip[3]);
+}
+
+static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
+{
+  (void)words;
+  (void)wc;
+  (void)originalURI;
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+  if (!checkHttpAuth()) return;
+
+  char ipBuf[16];
+  char ssidBuf[33];
+  char hwModeBuf[16];
+  char netModeBuf[16];
+  debugFormatLocalIp(ipBuf, sizeof(ipBuf));
+  strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf));
+  snprintf_P(hwModeBuf, sizeof(hwModeBuf), PSTR("%S"), (PGM_P)hardwareModeName());
+  snprintf_P(netModeBuf, sizeof(netModeBuf), PSTR("%S"), (PGM_P)networkModeName());
+
+  sendStartJsonMap(F("debug"));
+
+  sendJsonMapEntry(F("build.version"), _VERSION);
+  sendJsonMapEntry(F("build.number"), (int32_t)_VERSION_BUILD);
+  sendJsonMapEntry(F("build.githash"), _VERSION_GITHASH);
+  sendJsonMapEntry(F("build.date"), _VERSION_DATE);
+
+  sendJsonMapEntry(F("runtime.heap_free"), (uint32_t)ESP.getFreeHeap());
+#if defined(ESP32)
+  sendJsonMapEntry(F("runtime.heap_min_free"), (uint32_t)ESP.getMinFreeHeap());
+  sendJsonMapEntry(F("runtime.heap_max_alloc"), (uint32_t)ESP.getMaxAllocHeap());
+#else
+  sendJsonMapEntry(F("runtime.heap_frag_pct"), (uint32_t)ESP.getHeapFragmentation());
+  sendJsonMapEntry(F("runtime.heap_min_free"), (uint32_t)getMinFreeHeap());
+  sendJsonMapEntry(F("runtime.heap_max_alloc"), (uint32_t)ESP.getMaxFreeBlockSize());
+#endif
+  sendJsonMapEntry(F("runtime.uptime_sec"), (uint32_t)state.uptime.iSeconds);
+  sendJsonMapEntry(F("runtime.reboots"), (uint32_t)state.uptime.iRebootCount);
+  sendJsonMapEntry(F("runtime.wifi_connected"), (WiFi.status() == WL_CONNECTED));
+  sendJsonMapEntry(F("runtime.wifi_rssi"), (int32_t)WiFi.RSSI());
+  sendJsonMapEntry(F("runtime.wifi_ip"), ipBuf);
+  sendJsonMapEntry(F("runtime.wifi_ssid"), ssidBuf);
+  sendJsonMapEntry(F("runtime.hw_mode"), hwModeBuf);
+  sendJsonMapEntry(F("runtime.net_mode"), netModeBuf);
+
+  sendJsonMapEntry(F("settings.hostname"), settings.sHostname);
+  sendJsonMapEntry(F("settings.http_passwd"), settings.sHTTPpasswd[0] ? "***" : "(not set)");
+  sendJsonMapEntry(F("settings.led_blink"), settings.bLEDblink);
+  sendJsonMapEntry(F("settings.dark_theme"), settings.bDarkTheme);
+  sendJsonMapEntry(F("settings.mydebug"), settings.bMyDEBUG);
+  sendJsonMapEntry(F("settings.nightly_restart"), settings.bNightlyRestart);
+  sendJsonMapEntry(F("settings.restart_hour"), (uint32_t)settings.iRestartHour);
+
+  sendJsonMapEntry(F("settings.mqtt.enabled"), settings.mqtt.bEnable);
+  sendJsonMapEntry(F("settings.mqtt.broker"), settings.mqtt.sBroker);
+  sendJsonMapEntry(F("settings.mqtt.port"), (uint32_t)settings.mqtt.iBrokerPort);
+  sendJsonMapEntry(F("settings.mqtt.user"), settings.mqtt.sUser);
+  sendJsonMapEntry(F("settings.mqtt.passwd"), settings.mqtt.sPasswd[0] ? "***" : "(not set)");
+  sendJsonMapEntry(F("settings.mqtt.ha_prefix"), settings.mqtt.sHaprefix);
+  sendJsonMapEntry(F("settings.mqtt.top_topic"), settings.mqtt.sTopTopic);
+  sendJsonMapEntry(F("settings.mqtt.unique_id"), settings.mqtt.sUniqueid);
+  sendJsonMapEntry(F("settings.mqtt.ot_message"), settings.mqtt.bOTmessage);
+  sendJsonMapEntry(F("settings.mqtt.interval"), (uint32_t)settings.mqtt.iInterval);
+  sendJsonMapEntry(F("settings.mqtt.sep_sources"), settings.mqtt.bSeparateSources);
+  sendJsonMapEntry(F("settings.mqtt.disc_verify"), settings.mqtt.bDiscoveryAutoVerify);
+  sendJsonMapEntry(F("settings.mqtt.ha_reboot"), settings.mqtt.bHaRebootDetect);
+  sendJsonMapEntry(F("settings.legacy.port25238"), settings.mqtt.bLegacyPort25238Enabled);
+
+  sendJsonMapEntry(F("settings.ntp.enabled"), settings.ntp.bEnable);
+  sendJsonMapEntry(F("settings.ntp.timezone"), settings.ntp.sTimezone);
+  sendJsonMapEntry(F("settings.ntp.hostname"), settings.ntp.sHostname);
+  sendJsonMapEntry(F("settings.ntp.sendtime"), settings.ntp.bSendtime);
+
+  sendJsonMapEntry(F("settings.sensors.enabled"), settings.sensors.bEnabled);
+  sendJsonMapEntry(F("settings.sensors.pin"), (int32_t)settings.sensors.iPin);
+  sendJsonMapEntry(F("settings.sensors.interval"), (int32_t)settings.sensors.iInterval);
+
+  sendJsonMapEntry(F("settings.s0.enabled"), settings.s0.bEnabled);
+  sendJsonMapEntry(F("settings.s0.pin"), (uint32_t)settings.s0.iPin);
+  sendJsonMapEntry(F("settings.s0.debounce_ms"), (uint32_t)settings.s0.iDebounceTime);
+  sendJsonMapEntry(F("settings.s0.pulse_kw"), (uint32_t)settings.s0.iPulsekw);
+  sendJsonMapEntry(F("settings.s0.interval"), (uint32_t)settings.s0.iInterval);
+
+  sendJsonMapEntry(F("settings.outputs.enabled"), settings.outputs.bEnabled);
+  sendJsonMapEntry(F("settings.outputs.pin"), (int32_t)settings.outputs.iPin);
+  sendJsonMapEntry(F("settings.outputs.trigger_bit"), (int32_t)settings.outputs.iTriggerBit);
+
+  sendJsonMapEntry(F("settings.sat.enabled"), settings.sat.bEnabled);
+  sendJsonMapEntry(F("settings.sat.heating_system"), (uint32_t)settings.sat.iHeatingSystem);
+  sendJsonMapEntry(F("settings.sat.target_temp"), settings.sat.fTargetTemp);
+  sendJsonMapEntry(F("settings.sat.curve_coeff"), settings.sat.fHeatingCurveCoeff);
+  sendJsonMapEntry(F("settings.sat.deadband"), settings.sat.fDeadband);
+  sendJsonMapEntry(F("settings.sat.control_interval"), (uint32_t)settings.sat.iControlInterval);
+  sendJsonMapEntry(F("settings.sat.use_external_temp"), settings.sat.bUseExternalTemp);
+  sendJsonMapEntry(F("settings.sat.pwm_auto_switch"), settings.sat.bPwmAutoSwitch);
+  sendJsonMapEntry(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
+  sendJsonMapEntry(F("settings.sat.ovp_value"), settings.sat.fOvpValue);
+  sendJsonMapEntry(F("settings.sat.ovp_enabled"), settings.sat.bOvpEnabled);
+  sendJsonMapEntry(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
+  sendJsonMapEntry(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
+  sendJsonMapEntry(F("settings.sat.dhw_enabled"), settings.sat.bDhwEnabled);
+  sendJsonMapEntry(F("settings.sat.dhw_enable"), settings.sat.bDhwEnable);
+  sendJsonMapEntry(F("settings.sat.window_detection"), settings.sat.bWindowDetection);
+  sendJsonMapEntry(F("settings.sat.weather_enable"), settings.sat.bWeatherEnable);
+  sendJsonMapEntry(F("settings.sat.weather_key"), settings.sat.sWeatherApiKey[0] ? "***" : "(not set)");
+  sendJsonMapEntry(F("settings.sat.boiler_capacity"), settings.sat.fBoilerCapacity);
+  sendJsonMapEntry(F("settings.sat.simulation"), settings.sat.bSimulation);
+  sendJsonMapEntry(F("settings.sat.solar_gain_enable"), settings.sat.bSolarGainEnable);
+  sendJsonMapEntry(F("settings.sat.summer_simmer"), settings.sat.bSummerSimmer);
+  sendJsonMapEntry(F("settings.sat.comfort_adjust"), settings.sat.bComfortAdjust);
+  sendJsonMapEntry(F("settings.sat.multi_area"), settings.sat.bMultiArea);
+  sendJsonMapEntry(F("settings.sat.auto_tune"), settings.sat.bAutoTune);
+  sendJsonMapEntry(F("settings.sat.max_setpoint"), settings.sat.fMaxSetpoint);
+  sendJsonMapEntry(F("settings.sat.sensor_max_age"), (uint32_t)settings.sat.iSensorMaxAgeS);
+  sendJsonMapEntry(F("settings.sat.error_monitoring"), settings.sat.bErrorMonitoring);
+  sendJsonMapEntry(F("settings.sat.auto_gains"), settings.sat.bAutoGains);
+  sendJsonMapEntry(F("settings.sat.thermal_comfort"), settings.sat.bThermalComfort);
+  sendJsonMapEntry(F("settings.sat.humidity_timeout"), (uint32_t)settings.sat.iHumidityTimeoutS);
+  sendJsonMapEntry(F("settings.sat.heating_mode"), (uint32_t)settings.sat.iHeatingMode);
+  sendJsonMapEntry(F("settings.sat.cycles_per_hour"), (uint32_t)settings.sat.iCyclesPerHour);
+  sendJsonMapEntry(F("settings.sat.valve_offset"), settings.sat.fValveOffset);
+  sendJsonMapEntry(F("settings.sat.solar_freeze_i"), settings.sat.bSolarFreezeIntegral);
+  sendJsonMapEntry(F("settings.sat.flush_threshold_h"), (uint32_t)settings.sat.iSatFlushThresholdH);
+  sendJsonMapEntry(F("settings.sat.zone_count"), (uint32_t)settings.sat.iZoneCount);
+  sendJsonMapEntry(F("settings.sat.zone_timeout_s"), (uint32_t)settings.sat.iZoneTimeoutS);
+
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  sendJsonMapEntry(F("settings.otd.mode"), (uint32_t)settings.otd.iMode);
+  sendJsonMapEntry(F("settings.otd.auto_detect"), settings.otd.bAutoDetect);
+  sendJsonMapEntry(F("settings.otd.setback_temp"), settings.otd.fSetbackTemp);
+  sendJsonMapEntry(F("settings.otd.setback_timeout"), (uint32_t)settings.otd.iSetbackTimeout);
+  sendJsonMapEntry(F("settings.otd.enable_slave"), settings.otd.bEnableSlave);
+  sendJsonMapEntry(F("settings.otd.summer_mode"), settings.otd.bSummerMode);
+  sendJsonMapEntry(F("settings.otd.fail_safe"), settings.otd.bFailSafe);
+  sendJsonMapEntry(F("settings.otd.msg_interval"), (uint32_t)settings.otd.iMsgInterval);
+  sendJsonMapEntry(F("settings.otd.has_bypass_relay"), settings.otd.bHasBypassRelay);
+  sendJsonMapEntry(F("settings.otd.ch_mode"), (uint32_t)settings.otd.iCHMode);
+  sendJsonMapEntry(F("settings.otd.flow_temp"), settings.otd.fFlowTemp);
+  sendJsonMapEntry(F("settings.otd.flow_max"), settings.otd.fFlowMax);
+  sendJsonMapEntry(F("settings.otd.room_setpoint"), settings.otd.fRoomSetpoint);
+  sendJsonMapEntry(F("settings.otd.gradient"), settings.otd.fGradient);
+  sendJsonMapEntry(F("settings.otd.exponent"), settings.otd.fExponent);
+  sendJsonMapEntry(F("settings.otd.offset"), settings.otd.fOffset);
+  sendJsonMapEntry(F("settings.otd.room_comp"), settings.otd.bRoomCompEnabled);
+  sendJsonMapEntry(F("settings.otd.kp"), settings.otd.fKp);
+  sendJsonMapEntry(F("settings.otd.ki"), settings.otd.fKi);
+  sendJsonMapEntry(F("settings.otd.kboost"), settings.otd.fKboost);
+#endif
+
+  sendJsonMapEntry(F("state.mqtt.connected"), state.mqtt.bConnected);
+  sendJsonMapEntry(F("state.pic.available"), state.pic.bAvailable);
+  sendJsonMapEntry(F("state.pic.device_id"), state.pic.sDeviceid);
+  sendJsonMapEntry(F("state.pic.type"), state.pic.sType);
+  sendJsonMapEntry(F("state.pic.fw_version"), state.pic.sFwversion);
+
+  sendJsonMapEntry(F("state.otbus.online"), state.otBus.bOnline);
+  sendJsonMapEntry(F("state.otbus.gateway_mode"), state.otBus.bGatewayMode);
+  sendJsonMapEntry(F("state.otbus.gateway_known"), state.otBus.bGatewayModeKnown);
+  sendJsonMapEntry(F("state.otbus.boiler_state"), state.otBus.bBoilerState);
+  sendJsonMapEntry(F("state.otbus.thermostat_state"), state.otBus.bThermostatState);
+  sendJsonMapEntry(F("state.otbus.ps_mode"), state.otBus.bPSmode);
+
+  sendJsonMapEntry(F("state.debug.ot_msg"), state.debug.bOTmsg);
+  sendJsonMapEntry(F("state.debug.rest_api"), state.debug.bRestAPI);
+  sendJsonMapEntry(F("state.debug.mqtt"), state.debug.bMQTT);
+  sendJsonMapEntry(F("state.debug.mqtt_gate"), state.debug.bMQTTGate);
+  sendJsonMapEntry(F("state.debug.sensors"), state.debug.bSensors);
+  sendJsonMapEntry(F("state.debug.ntp"), state.debug.bNTP);
+  sendJsonMapEntry(F("state.debug.sensor_sim"), state.debug.bSensorSim);
+  sendJsonMapEntry(F("state.debug.otgw_sim"), state.debug.bOTGWSimulation);
+  sendJsonMapEntry(F("state.debug.sat"), state.debug.bSAT);
+  sendJsonMapEntry(F("state.debug.otdirect"), state.debug.bOTDirect);
+#if defined(ESP32)
+  sendJsonMapEntry(F("state.debug.sat_ble"), state.debug.bSATBLE);
+#endif
+
+  sendJsonMapEntry(F("state.heap.ws_drops"), (uint32_t)state.heapdiag.iWsDropsTotal);
+  sendJsonMapEntry(F("state.heap.mqtt_drops"), (uint32_t)state.heapdiag.iMqttDropsTotal);
+  sendJsonMapEntry(F("state.heap.entered_low"), (uint32_t)state.heapdiag.iEnteredLowCount);
+  sendJsonMapEntry(F("state.heap.entered_warn"), (uint32_t)state.heapdiag.iEnteredWarningCount);
+  sendJsonMapEntry(F("state.heap.entered_crit"), (uint32_t)state.heapdiag.iEnteredCriticalCount);
+  sendJsonMapEntry(F("state.heap.drip_slow"), (uint32_t)state.heapdiag.iDripSlowModeCount);
+
+  sendJsonMapEntry(F("state.disco.published"), (uint32_t)state.discovery.iPublishedTopicCount);
+  sendJsonMapEntry(F("state.disco.verify_runs"), (uint32_t)state.discovery.iVerifyRunCount);
+  sendJsonMapEntry(F("state.disco.republishes"), (uint32_t)state.discovery.iRepublishTriggeredCount);
+  sendJsonMapEntry(F("state.disco.last_missing"), (uint32_t)state.discovery.iLastMissingCount);
+  sendJsonMapEntry(F("state.disco.last_orphan"), (uint32_t)state.discovery.iLastOrphanCount);
+  sendJsonMapEntry(F("state.disco.last_epoch"), (uint32_t)state.discovery.iLastVerifyEpoch);
+
+  { char boilerStatus[20]; satGetBoilerStatusName(boilerStatus, sizeof(boilerStatus));
+    sendJsonMapEntry(F("state.sat.boiler_status"), boilerStatus); }
+  { char manufacturer[12]; satGetManufacturerName(manufacturer, sizeof(manufacturer));
+    sendJsonMapEntry(F("state.sat.manufacturer"), manufacturer); }
+  sendJsonMapEntry(F("state.sat.active"), state.sat.bActive);
+  sendJsonMapEntry(F("state.sat.control_mode"), (int32_t)state.sat.eControlMode);
+  sendJsonMapEntry(F("state.sat.room_temp"), satGetRoomTemp());
+  sendJsonMapEntry(F("state.sat.outside_temp"), satGetOutsideTemp());
+  sendJsonMapEntry(F("state.sat.heating_curve"), state.sat.fHeatingCurveValue);
+  sendJsonMapEntry(F("state.sat.pid_output"), state.sat.fPidOutput);
+  sendJsonMapEntry(F("state.sat.final_setpoint"), state.sat.fFinalSetpoint);
+  sendJsonMapEntry(F("state.sat.error"), state.sat.fError);
+  sendJsonMapEntry(F("state.sat.pid_p"), state.sat.fPidP);
+  sendJsonMapEntry(F("state.sat.pid_i"), state.sat.fPidI);
+  sendJsonMapEntry(F("state.sat.pid_d"), state.sat.fPidD);
+  sendJsonMapEntry(F("state.sat.cycle_count"), (uint32_t)state.sat.iCycleCount);
+  sendJsonMapEntry(F("state.sat.last_cycle_class"), (int32_t)state.sat.eLastCycleClass);
+  sendJsonMapEntry(F("state.sat.duty_ratio"), state.sat.fDutyRatio);
+  sendJsonMapEntry(F("state.sat.pwm_duty"), state.sat.fPwmDutyCycle);
+  sendJsonMapEntry(F("state.sat.active_preset"), (int32_t)state.sat.eActivePreset);
+  sendJsonMapEntry(F("state.sat.mod_suppressed"), state.sat.bModSuppressed);
+  sendJsonMapEntry(F("state.sat.dhw_active"), state.sat.bDhwActive);
+  sendJsonMapEntry(F("state.sat.fallback_active"), state.sat.bFallbackActive);
+  sendJsonMapEntry(F("state.sat.fallback_reason"), (int32_t)state.sat.eFallbackReason);
+  sendJsonMapEntry(F("state.sat.current_mod"), (int32_t)state.sat.iCurrentModulation);
+  sendJsonMapEntry(F("state.sat.hsys_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
+  sendJsonMapEntry(F("state.sat.weather_valid"), state.sat.weather.bValid);
+  sendJsonMapEntry(F("state.sat.weather_temp"), state.sat.weather.fTemperature);
+  sendJsonMapEntry(F("state.sat.weather_humidity"), state.sat.weather.fHumidity);
+  sendJsonMapEntry(F("state.sat.weather_wind"), state.sat.weather.fWindSpeed);
+  sendJsonMapEntry(F("state.sat.weather_cloud"), state.sat.weather.fCloudCover);
+#if defined(ESP32)
+  sendJsonMapEntry(F("state.sat.weather_pressure"), state.sat.weather.fPressureMsl);
+  sendJsonMapEntry(F("state.sat.weather_is_day"), state.sat.weather.bIsDay);
+#endif
+  sendJsonMapEntry(F("state.sat.current_power"), state.sat.fCurrentPower);
+  sendJsonMapEntry(F("state.sat.energy_total"), state.sat.fEnergyTotal);
+  sendJsonMapEntry(F("state.sat.energy_est"), state.sat.fEnergyEstimatedKWh);
+  sendJsonMapEntry(F("state.sat.thermal_valid"), state.sat.bThermalModelValid);
+  sendJsonMapEntry(F("state.sat.thermal_drop"), state.sat.fThermalDropRate);
+  sendJsonMapEntry(F("state.sat.solar_gain"), state.sat.bSolarGainActive);
+  sendJsonMapEntry(F("state.sat.summer_active"), state.sat.bSummerActive);
+  sendJsonMapEntry(F("state.sat.humidity"), state.sat.fHumidity);
+  sendJsonMapEntry(F("state.sat.humidity_valid"), state.sat.bHumidityValid);
+  sendJsonMapEntry(F("state.sat.comfort_offset"), state.sat.fComfortOffset);
+  sendJsonMapEntry(F("state.sat.area0_temp"), state.sat.fAreaTemp[0]);
+  sendJsonMapEntry(F("state.sat.area1_temp"), state.sat.fAreaTemp[1]);
+  sendJsonMapEntry(F("state.sat.area2_temp"), state.sat.fAreaTemp[2]);
+  sendJsonMapEntry(F("state.sat.area3_temp"), state.sat.fAreaTemp[3]);
+  sendJsonMapEntry(F("state.sat.auto_tune_active"), state.sat.bAutoTuneActive);
+  sendJsonMapEntry(F("state.sat.auto_tune_cycles"), (uint32_t)state.sat.iAutoTuneCycles);
+  sendJsonMapEntry(F("state.sat.auto_tune_score"), state.sat.fAutoTuneScore);
+#if defined(ESP32)
+  sendJsonMapEntry(F("state.sat.ble_temp"), state.sat.fBleTemp);
+  sendJsonMapEntry(F("state.sat.ble_humidity"), state.sat.fBleHumidity);
+  sendJsonMapEntry(F("state.sat.ble_valid"), state.sat.bBleTempValid);
+  sendJsonMapEntry(F("state.sat.ble_count"), (uint32_t)state.sat.iBleSensorCount);
+  sendJsonMapEntry(F("state.sat.ble_battery"), (uint32_t)state.sat.iBleBattery);
+  sendJsonMapEntry(F("state.sat.ble_rssi"), (int32_t)state.sat.iBleRssi);
+#endif
+
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  sendJsonMapEntry(F("state.otd.schedule_total"), (uint32_t)state.otd.iScheduleTotal);
+  sendJsonMapEntry(F("state.otd.schedule_active"), (uint32_t)state.otd.iScheduleActive);
+  sendJsonMapEntry(F("state.otd.schedule_disabled"), (uint32_t)state.otd.iScheduleDisabled);
+  sendJsonMapEntry(F("state.otd.override_count"), (uint32_t)state.otd.iOverrideCount);
+  sendJsonMapEntry(F("state.otd.bypass_active"), state.otd.bBypassActive);
+  sendJsonMapEntry(F("state.otd.stepup_enabled"), state.otd.bStepUpEnabled);
+  sendJsonMapEntry(F("state.otd.monitor_mode"), state.otd.bMonitorMode);
+  sendJsonMapEntry(F("state.otd.mode"), (int32_t)state.otd.eMode);
+  sendJsonMapEntry(F("state.otd.master_mode"), state.otd.bMasterMode);
+  sendJsonMapEntry(F("state.otd.thermostat_connected"), state.otd.bThermostatConnected);
+  sendJsonMapEntry(F("state.otd.setback_active"), state.otd.bSetbackActive);
+  sendJsonMapEntry(F("state.otd.override_mode"), (int32_t)state.otd.eOverrideMode);
+  sendJsonMapEntry(F("state.otd.override_f88"), (uint32_t)state.otd.iOverrideF88);
+#endif
+
+  sendEndJsonMap(F("debug"));
+}
+
 //=== Route dispatch table (ADR-050) ===
 // Adding a new v2 resource: (1) write handler function above, (2) add entry below.
 typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
@@ -1280,6 +1554,7 @@ static const char kRouteOtdirect[]   PROGMEM = "otdirect";
 #endif
 static const char kRouteSat[]        PROGMEM = "sat";
 static const char kRouteDiscovery[]  PROGMEM = "discovery";
+static const char kRouteDebugDump[]  PROGMEM = "debug";
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -1298,6 +1573,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteWebhook,    handleWebhook },
   { kRouteSat,        handleSAT },
   { kRouteDiscovery,  handleDiscovery },
+  { kRouteDebugDump,  handleDebugDump },
   { nullptr,          nullptr }  // sentinel
 };
 
@@ -1991,6 +2267,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("mqttotmessage"), settings.mqtt.bOTmessage, "b");
   sendJsonSettingObj(F("mqttinterval"), settings.mqtt.iInterval, "i", 0, 3600);
   sendJsonSettingObj(F("mqttseparatesources"), settings.mqtt.bSeparateSources, "b");
+  sendJsonSettingObj(F("legacyport25238enabled"), settings.mqtt.bLegacyPort25238Enabled, "b");
   sendJsonSettingObj(F("ntpenable"), settings.ntp.bEnable, "b");
   sendJsonSettingObj(F("ntptimezone"), CSTR(settings.ntp.sTimezone), "s", 50);
   sendJsonSettingObj(F("ntphostname"), CSTR(settings.ntp.sHostname), "s", 50);
@@ -2224,7 +2501,7 @@ static const char* const PROGMEM knownSettings[] = {
   "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
   "hostname", "httppasswd", "ledblink", "nightlyrestart", "nightlyrestarthour",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
-  "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
+  "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources", "legacyport25238enabled",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
   "otdautodetect", "otdenableslave", "otdfailsafe", "otdmode", "otdmsginterval",

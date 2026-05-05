@@ -595,6 +595,7 @@ static void otDirectBridgeEvent(char prefix, const char* msg, size_t len) {
 // ---------------------------------------------------------------------------
 static void otDirectBridgeWriteLine(const char* line, size_t len) {
   if (!line || len == 0) return;
+  if (!settings.mqtt.bLegacyPort25238Enabled) return;
   OTGWstream.write(reinterpret_cast<const uint8_t*>(line), len);
   OTGWstream.write('\r');
   OTGWstream.write('\n');
@@ -613,6 +614,7 @@ static void otDirectBridgeProcessStatus(const char* status) {
 // ---------------------------------------------------------------------------
 void handleOTDirectBridgeStream() {
   if (!isOTDirectEnabled()) return;
+  if (!settings.mqtt.bLegacyPort25238Enabled) return;
 
   static constexpr size_t kMaxBridgeWrite = 128;
   static char sWrite[kMaxBridgeWrite];

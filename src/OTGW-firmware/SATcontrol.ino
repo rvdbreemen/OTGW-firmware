@@ -1103,6 +1103,27 @@ static SATZoneState satZones[4];
 // Maximum number of zones supported
 static const uint8_t SAT_MAX_ZONES = 4;
 
+uint8_t satGetMaxZones()
+{
+  return SAT_MAX_ZONES;
+}
+
+bool satShouldDiscoverZone(uint8_t zoneIndex)
+{
+  if (zoneIndex >= SAT_MAX_ZONES) return false;
+
+  uint8_t zoneCount = settings.sat.iZoneCount;
+  if (zoneCount > SAT_MAX_ZONES) zoneCount = SAT_MAX_ZONES;
+  if (zoneIndex < zoneCount) return true;
+
+  const uint32_t timeoutMs = static_cast<uint32_t>(settings.sat.iZoneTimeoutS) * 1000UL;
+  const SATZoneState& z = satZones[zoneIndex];
+  return z.bRoomValid &&
+         z.bSpValid &&
+         z.iLastUpdateMs != 0 &&
+         ((millis() - z.iLastUpdateMs) <= timeoutMs);
+}
+
 // Handler: push room temperature for zone n (1-based)
 bool satHandleZoneRoomTemp(uint8_t zone, const char* value)
 {
@@ -3843,4 +3864,3 @@ void satControlLoop()
   // --- Publish to MQTT ---
   satPublishMQTT();
 }
-

@@ -2,6 +2,8 @@ v2.0.0 is the biggest release in the project's history: a unified ESP8266/ESP32 
 
 > **Heads up for custom MQTT consumers**: one small breaking change. Three OT-bus presence topics (`boiler_connected`, `thermostat_connected`, `otgw_connected`) moved out of the hardware-specific `otgw-pic/*` and `otgw-otdirect/*` subtrees into the generic value namespace. Home Assistant users are unaffected; the firmware self-cleans stale retained payloads on first reconnect. See [Breaking changes](#breaking-changes) below.
 
+> **Heads up for pyotgw/otmonitor users**: the legacy TCP bridge on port 25238 is now disabled by default. Enable **Legacy TCP Port 25238** on the Settings page if an external TCP client needs it. ESP32/OTGW32 OTDirect decoding keeps running while the bridge is disabled.
+
 [Full release notes](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/releases/RELEASE_NOTES_2.0.0.md) | [README](https://github.com/rvdbreemen/OTGW-firmware/blob/main/README.md) | [API docs](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/api/README.md) | [MQTT topics](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/api/MQTT.md)
 
 ## Highlights
@@ -80,6 +82,7 @@ Payload semantics are unchanged: `"ON"` / `"OFF"`, retained.
 
 - **Home Assistant users**: nothing. Entity `unique_id`s are stable, discovery auto-republishes on reconnect, and history is preserved. On OTGW32 builds without a PIC, `Boiler connected` and `Thermostat connected` entities now appear for the first time (they were previously gated behind the PIC flag).
 - **Custom MQTT consumers** (Node-RED, openHAB, scripts) subscribed to the old topics: update your topic patterns to the new canonical paths. The firmware auto-cleans retained payloads on the deprecated topics at first reconnect, so no manual broker cleanup is required in the typical case. If you want to clean up manually, see the `mosquitto_pub` one-liner in the [MQTT migration guide](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/api/MQTT.md#migration-from-14x--pre-release-200-ot-bus-state-topics).
+- **pyotgw, otmonitor, and custom TCP bridge users**: enable **Legacy TCP Port 25238** on the Settings page. The listener is disabled by default on WiFi and Ethernet; OTDirect decoding itself is unaffected.
 
 Rationale: these values describe what the OTGW-firmware observes on the OpenTherm bus, not properties of the PIC coprocessor or the OT-direct driver. Grouping them under the hardware-specific subtrees made them disappear from Home Assistant on OTGW32 builds without a PIC, and forced custom consumers to switch topic prefixes when the underlying hardware changed. See ADR-084 (amends ADR-065) and the [MQTT migration guide](https://github.com/rvdbreemen/OTGW-firmware/blob/main/docs/api/MQTT.md#migration-from-14x--pre-release-200-ot-bus-state-topics) for the full story.
 
@@ -98,7 +101,7 @@ Rationale: these values describe what the OTGW-firmware observes on the OpenTher
 
 ## Upgrade notes
 
-- **Breaking changes vs v1.3.5:** see the [Breaking changes](#breaking-changes) section above. Only three MQTT topic paths changed (OT-bus presence values); REST endpoints and `settings.ini` format are unchanged. Home Assistant users are unaffected; custom MQTT consumers should update their topic patterns.
+- **Breaking changes vs v1.3.5:** see the [Breaking changes](#breaking-changes) section above. Three MQTT topic paths changed (OT-bus presence values), and the legacy TCP port 25238 bridge is disabled by default behind a new setting. Home Assistant users are unaffected; custom MQTT consumers should update their topic patterns.
 - **Flash both firmware and filesystem** (OLED support and SAT WebUI require the updated filesystem).
 - **Hard-refresh the browser** after flashing (Ctrl+F5).
 - **SAT is disabled by default.** Enable via `set/{nodeId}/sat/enabled = 1` over MQTT, or via the Settings page.

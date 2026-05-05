@@ -1634,6 +1634,9 @@ void markAllMQTTConfigPending()
   setMQTTConfigPending(OTGWpicsettingsid);
   // 2.0.0-specific diagnostic discovery (TASK-541): OTDirect flame metrics + SAT BLE/pressure health.
   setMQTTConfigPending(OTGWdiag200id);
+  // TASK-543: SAT user-facing discovery stays unconditional on this dual-target branch.
+  // Platform/runtime-specific publishers decide whether entities show live state.
+  setMQTTConfigPending(OTGWsatzoneid);
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }
@@ -1762,6 +1765,106 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   ctx.sourceName = "";
   ctx.sourceTopicSegment = "";
   return ctx;
+}
+
+static bool publishDiscoveryJson(PubSubClient &client,
+                                 const char *topic,
+                                 const char *payload,
+                                 size_t payloadLen)
+{
+  if (!client.beginPublish(topic, payloadLen, true)) return false;
+  if (client.write(reinterpret_cast<const uint8_t*>(payload), payloadLen) != payloadLen) {
+    client.endPublish();
+    return false;
+  }
+  if (!client.endPublish()) return false;
+  incPublishedTopicCount();
+  feedWatchDog();
+  return true;
+}
+
+static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryContext &ctx)
+{
+  int n;
+  if (ctx.isFirstEntity) {
+    n = snprintf_P(dest, destSize,
+                   PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"OpenTherm Gateway (%s)\",\"sw_version\":\"%s\"}"),
+                   ctx.nodeId, ctx.manufacturer, ctx.model, ctx.hostname, ctx.version);
+  } else {
+    n = snprintf_P(dest, destSize,
+                   PSTR("\"dev\":{\"identifiers\":\"%s\"}"),
+                   ctx.nodeId);
+  }
+  return (n > 0 && static_cast<size_t>(n) < destSize);
+}
+
+bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+
+  const uint8_t maxZones = satGetMaxZones();
+
+  char topic[160];
+  char payload[768];
+  char deviceBlock[256];
+
+  auto publishZoneSensor = [&](uint8_t zoneNumber,
+                               const char *metric,
+                               const char *friendlySuffix,
+                               const char *icon,
+                               const char *unit,
+                               const char *deviceClass,
+                               const char *stateClass) -> bool {
+    if (!buildDiscoveryDeviceBlock(deviceBlock, sizeof(deviceBlock), ctx)) return false;
+    int topicLen = snprintf_P(topic, sizeof(topic),
+                              PSTR("%s/sensor/%s/sat_zone_%u_%s/config"),
+                              ctx.haPrefix, ctx.nodeId, zoneNumber, metric);
+    if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
+    int payloadLen = snprintf_P(payload, sizeof(payload),
+                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_zone_%u_%s\",\"name\":\"%s_SAT_Zone_%u_%s\",\"stat_t\":\"%s/sat/zone/%u/%s\",\"device_class\":\"%s\",\"unit_of_measurement\":\"%s\",\"state_class\":\"%s\",\"icon\":\"mdi:%s\",\"value_template\":\"{{ value }}\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
+                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, zoneNumber, metric,
+                                ctx.hostname, zoneNumber, friendlySuffix,
+                                ctx.mqttPubTopic, zoneNumber, metric,
+                                deviceClass, unit, stateClass, icon, ctx.version);
+    if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
+    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    ctx.isFirstEntity = false;
+    return true;
+  };
+
+  auto publishZoneBinary = [&](uint8_t zoneNumber,
+                               const char *metric,
+                               const char *friendlySuffix,
+                               const char *icon) -> bool {
+    if (!buildDiscoveryDeviceBlock(deviceBlock, sizeof(deviceBlock), ctx)) return false;
+    int topicLen = snprintf_P(topic, sizeof(topic),
+                              PSTR("%s/binary_sensor/%s/sat_zone_%u_%s/config"),
+                              ctx.haPrefix, ctx.nodeId, zoneNumber, metric);
+    if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
+    int payloadLen = snprintf_P(payload, sizeof(payload),
+                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_zone_%u_%s\",\"name\":\"%s_SAT_Zone_%u_%s\",\"stat_t\":\"%s/sat/zone/%u/%s\",\"pl_on\":\"true\",\"pl_off\":\"false\",\"stat_on\":\"true\",\"stat_off\":\"false\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
+                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, zoneNumber, metric,
+                                ctx.hostname, zoneNumber, friendlySuffix,
+                                ctx.mqttPubTopic, zoneNumber, metric,
+                                icon, ctx.version);
+    if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
+    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    ctx.isFirstEntity = false;
+    return true;
+  };
+
+  // TASK-543 decision: publish zone discovery only for zones that are configured
+  // now or still considered active from recent SAT runtime data.
+  for (uint8_t i = 0; i < maxZones; i++) {
+    if (!satShouldDiscoverZone(i)) continue;
+    const uint8_t zoneNumber = i + 1;
+    if (!publishZoneBinary(zoneNumber, "active", "Active", "thermostat")) return false;
+    if (!publishZoneSensor(zoneNumber, "output", "Output", "thermometer", "°C", "temperature", "measurement")) return false;
+    if (!publishZoneSensor(zoneNumber, "error", "Error", "thermometer", "°C", "temperature", "measurement")) return false;
+  }
+
+  return true;
 }
 
 // TASK-528 / ADR-095: lazy-built bitmap of MsgIDs that have at least one
@@ -1943,6 +2046,10 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // Number (OT ID 27)
   if (OTid == 27) {
     if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
+  }
+
+  if (OTid == OTGWsatzoneid) {
+    if (streamSatZoneDiscovery(MQTTclient, ctx)) result = true;
   }
 
   return result;

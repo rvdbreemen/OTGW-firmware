@@ -10,7 +10,9 @@
 
 v2.0.0 is the largest release in the project's history. It adds a full dual-platform build for both ESP8266 and ESP32 (OTGW32), introduces SAT: an embedded PID heating controller with weather compensation and Home Assistant auto-discovery, adds OTDirect for native OpenTherm bus mastering on ESP32 without a PIC, brings wired Ethernet support for ESP32, adds an OLED display, and extends the API surface with 30+ new SAT and OTDirect MQTT topics and REST endpoints.
 
-REST endpoints and `settings.ini` format are unchanged from v1.x; one small MQTT breaking change applies to three OT-bus presence topics (see Breaking Changes below). The new features are otherwise purely additive. SAT is disabled by default.
+REST endpoints remain compatible with v1.x. One small MQTT breaking change applies to three OT-bus presence topics, and one new `settings.ini` key controls the legacy port 25238 bridge (see Breaking Changes below). The new features are otherwise purely additive. SAT is disabled by default.
+
+The legacy otmonitor TCP bridge on port 25238 is now opt-in. Users of pyotgw, otmonitor, or custom TCP clients must enable **Legacy TCP Port 25238** on the Settings page after upgrading. OTGW32/ESP32 OTDirect decoding continues to run when this bridge is disabled; only external TCP client access is blocked.
 
 ---
 
@@ -88,12 +90,13 @@ Payload semantics are unchanged: `"ON"` / `"OFF"`, retained.
 
 - **Home Assistant users**: nothing to do. Entity `unique_id`s are stable, discovery republishes automatically on reconnect, history is preserved. On OTGW32 builds without a PIC, `Boiler connected` and `Thermostat connected` entities now appear for the first time (they were previously gated behind `MQTT_HA_FLAG_IS_PIC_ENTRY`).
 - **Custom MQTT consumers** (Node-RED, openHAB, scripts) subscribed to the old paths: update your topic patterns. The firmware self-heals retained payloads on the deprecated topics at the first MQTT reconnect after upgrade, so no manual broker cleanup is required in the typical case. For manual cleanup, see the migration guide in `docs/api/MQTT.md` (search anchor: "Migration from 1.4.x").
+- **pyotgw, otmonitor, and custom TCP bridge users**: enable **Legacy TCP Port 25238** on the Settings page. The listener is disabled by default on both ESP8266 and ESP32/OTGW32, including Ethernet-connected devices.
 
 **Why:** these values describe what the firmware observes on the OpenTherm bus, not properties of the PIC coprocessor or the OT-direct driver. Grouping them under hardware-specific subtrees made them disappear from Home Assistant on OTGW32 builds without a PIC, and forced custom consumers to switch topic prefixes when the underlying hardware changed. ADR-084 amends ADR-065 to narrow the `otgw-pic/` subtree to strictly PIC-coprocessor properties (version, deviceid, firmwaretype, designer, picavailable, settings/*).
 
 **Self-healing cleanup**: a temporary firmware block subscribes briefly on each MQTT reconnect to the six deprecated topics and clears any retained payload it finds, then unsubscribes. Idempotent and free on brokers that never saw pre-2.0.0 firmware. Will be removed in firmware 2.3.0 or later (see in-source TEMPORARY MIGRATION CODE comment).
 
-REST endpoints and the `settings.ini` format are unchanged from v1.x.
+The legacy otmonitor TCP bridge setting is added to `settings.ini`; existing configurations default it to disabled until explicitly enabled.
 
 ---
 
@@ -454,8 +457,9 @@ The SAT Diagnostics view referenced `.sat-grid` and `.sat-row` CSS classes that 
 1. Flash both firmware and filesystem. The SAT WebUI and OLED support require the updated filesystem.
 2. Hard-refresh the browser after flashing (Ctrl+F5).
 3. SAT is disabled by default. To enable, set `sat/enabled = 1` via MQTT or the Settings page.
-4. All existing MQTT topics, REST endpoints, and `settings.ini` format are unchanged. No migration required.
-5. The triple-reset WiFi recovery behavior is unchanged.
+4. Custom MQTT consumers should review the OT-bus topic migration above.
+5. Enable **Legacy TCP Port 25238** after upgrade if pyotgw, otmonitor, or another external TCP client needs the old bridge.
+6. The triple-reset WiFi recovery behavior is unchanged.
 
 ### First-time ESP32 / OTGW32 installation
 

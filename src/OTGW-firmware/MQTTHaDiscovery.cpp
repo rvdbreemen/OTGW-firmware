@@ -21,8 +21,8 @@
 //                                            baseline before retirement)
 //
 // Current contents (hand-maintained):
-//   Sensors        : 306 entries (119 unique OT IDs + stats pseudo-ID 247)
-//   Binary sensors : 53 entries (10 unique OT IDs)
+//   Sensors        : 385 entries (122 unique OT/pseudo IDs incl. TASK-543 SAT groups)
+//   Binary sensors : 58 entries (12 unique OT/pseudo IDs)
 //   Climate        : 2 entries
 //   Number         : 1 entries
 
@@ -284,6 +284,69 @@ const char ha_lbl_sat_ble_sensor_count[]           PROGMEM = "sat/ble_sensor_cou
 const char ha_lbl_sat_ble_temp_valid[]             PROGMEM = "sat/ble_temp_valid";
 // SAT pressure status (string sibling of ch_pressure measurement which lives in TASK-543).
 const char ha_lbl_sat_ch_pressure_status[]         PROGMEM = "sat/ch_pressure_status";
+#define DECLARE_SAT_DISCOVERY_STRINGS(key, topic, friendly) \
+    const char ha_lbl_##key[] PROGMEM = topic; \
+    const char ha_name_##key[] PROGMEM = friendly;
+// TASK-543: user-facing SAT/OTDirect discovery surface (plain topic paths).
+DECLARE_SAT_DISCOVERY_STRINGS(sat_target,                 "sat/target",                        "SAT_Target")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_mode,                   "sat/mode",                          "SAT_Mode")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_setpoint,               "sat/setpoint",                      "SAT_Setpoint")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_heating_curve,          "sat/heating_curve",                 "SAT_Heating_Curve")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pid_output,             "sat/pid_output",                    "SAT_PID_Output")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_error,                  "sat/error",                         "SAT_Error")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_room_temp,              "sat/room_temp",                     "SAT_Room_Temp")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_outside_temp,           "sat/outside_temp",                  "SAT_Outside_Temp")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pid_p,                  "sat/pid_p",                         "SAT_PID_P")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pid_i,                  "sat/pid_i",                         "SAT_PID_I")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pid_d,                  "sat/pid_d",                         "SAT_PID_D")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_raw_derivative,         "sat/raw_derivative",                "SAT_Raw_Derivative")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_kp,                     "sat/kp",                            "SAT_Kp")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_ki,                     "sat/ki",                            "SAT_Ki")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_kd,                     "sat/kd",                            "SAT_Kd")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_boiler_status,          "sat/boiler_status",                 "SAT_Boiler_Status")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_cycle_class,            "sat/cycle_class",                   "SAT_Cycle_Class")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pwm_duty,               "sat/pwm_duty",                      "SAT_PWM_Duty")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_duty_ratio,             "sat/duty_ratio",                    "SAT_Duty_Ratio")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_overshoot_fraction,     "sat/overshoot_fraction",            "SAT_Overshoot_Fraction")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_cycle_phase,            "sat/cycle_phase",                   "SAT_Cycle_Phase")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_overshoot_margin,       "sat/overshoot_margin",              "SAT_Overshoot_Margin")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_cycles_this_hour,       "sat/cycles_this_hour",              "SAT_Cycles_This_Hour")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_cycles,             "sat/4h_cycles",                    "SAT_4H_Cycles")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_avg_on_sec,         "sat/4h_avg_on_sec",                "SAT_4H_Avg_On_Sec")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_avg_off_sec,        "sat/4h_avg_off_sec",               "SAT_4H_Avg_Off_Sec")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_avg_flow_temp,      "sat/4h_avg_flow_temp",             "SAT_4H_Avg_Flow_Temp")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_duty_ratio,         "sat/4h_duty_ratio",                "SAT_4H_Duty_Ratio")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_overshoot_fraction, "sat/4h_overshoot_fraction",        "SAT_4H_Overshoot_Fraction")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_underheat_fraction, "sat/4h_underheat_fraction",        "SAT_4H_Underheat_Fraction")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_flow_ret_delta_p50, "sat/4h_flow_ret_delta_p50",        "SAT_4H_Flow_Ret_Delta_P50")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_flow_ret_delta_p90, "sat/4h_flow_ret_delta_p90",        "SAT_4H_Flow_Ret_Delta_P90")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_ble_temp,              "sat/ble_temp",                     "SAT_BLE_Temp")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_ble_humidity,          "sat/ble_humidity",                 "SAT_BLE_Humidity")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_ch_pressure,           "sat/ch_pressure",                  "SAT_CH_Pressure")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_flame_status,          "sat/flame_status",                 "SAT_Flame_Status")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_temperature,   "sat/weather/temperature",          "SAT_Weather_Temperature")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_apparent_temp, "sat/weather/apparent_temp",        "SAT_Weather_Apparent_Temp")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_humidity,      "sat/weather/humidity",             "SAT_Weather_Humidity")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_wind_speed,    "sat/weather/wind_speed",           "SAT_Weather_Wind_Speed")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_wind_direction,"sat/weather/wind_direction",       "SAT_Weather_Wind_Direction")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_wind_gusts,    "sat/weather/wind_gusts",           "SAT_Weather_Wind_Gusts")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_cloud_cover,   "sat/weather/cloud_cover",          "SAT_Weather_Cloud_Cover")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_pressure_msl,  "sat/weather/pressure_msl",         "SAT_Weather_Pressure_MSL")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_precipitation, "sat/weather/precipitation",        "SAT_Weather_Precipitation")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_rain,          "sat/weather/rain",                 "SAT_Weather_Rain")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_snowfall,      "sat/weather/snowfall",             "SAT_Weather_Snowfall")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_weather_code,  "sat/weather/weather_code",         "SAT_Weather_Code")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_active,                "sat/active",                       "SAT_Active")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_safety_tripped,        "sat/safety_tripped",               "SAT_Safety_Tripped")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_flame_health,          "sat/flame_health",                 "SAT_Flame_Health")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_valves_open,           "sat/valves_open",                  "SAT_Valves_Open")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_is_day,        "sat/weather/is_day",               "SAT_Weather_Is_Day")
+static const char ha_tpl_sat_pwm_percent[]        PROGMEM = "{{ (value | float * 100) | round(0) }}";
+static const char ha_tpl_sat_ratio_percent[]      PROGMEM = "{{ (value | float * 100) | round(1) }}";
+static const char ha_tpl_sat_kmh_to_ms[]          PROGMEM = "{{ (value | float / 3.6) | round(1) }}";
+static const char ha_json_sat_pid_attributes[]    PROGMEM = "sat/pid_attributes";
+static const char ha_json_sat_cycle_attributes[]  PROGMEM = "sat/cycle_attributes";
+static const char ha_bincls_problem[]             PROGMEM = "problem";
 const char ha_lbl_centralheating[] PROGMEM = "centralheating";
 const char ha_lbl_centralheating2[] PROGMEM = "centralheating2";
 const char ha_lbl_ch2_enable[] PROGMEM = "ch2_enable";
@@ -598,6 +661,7 @@ const char ha_name_sat_ble_battery[]              PROGMEM = "SAT_BLE_Battery";
 const char ha_name_sat_ble_sensor_count[]         PROGMEM = "SAT_BLE_Sensor_Count";
 const char ha_name_sat_ble_temp_valid[]           PROGMEM = "SAT_BLE_Temp_Valid";
 const char ha_name_sat_ch_pressure_status[]       PROGMEM = "SAT_CH_Pressure_Status";
+#undef DECLARE_SAT_DISCOVERY_STRINGS
 const char ha_name_central_heating[] PROGMEM = "Central_Heating";
 const char ha_name_central_heating_2[] PROGMEM = "Central_Heating_2";
 const char ha_name_central_heating_2_enable[] PROGMEM = "central_heating_2_enable";
@@ -653,7 +717,7 @@ const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storag
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
 
 // ========== Sensor array (289 entries, sorted by id) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 337;
+const uint16_t MQTT_HA_SENSOR_COUNT = 385;
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1129,13 +1193,66 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {251, 0x00, ha_lbl_sat_ble_sensor_count,          ha_name_sat_ble_sensor_count,          HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement, HaIcon::counter,             HaEntityCat::diagnostic, true},
     {251, 0x00, ha_lbl_sat_ble_temp_valid,            ha_name_sat_ble_temp_valid,            HaDeviceClass::none, HaUnit::none,    HaStateClass::none,        HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {251, 0x00, ha_lbl_sat_ch_pressure_status,        ha_name_sat_ch_pressure_status,        HaDeviceClass::none, HaUnit::none,    HaStateClass::none,        HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    // --- Pseudo-ID 252: TASK-543 SAT control + PID + cycle + rolling statistics ---
+    {252, 0x00, ha_lbl_sat_target,                 ha_name_sat_target,                 HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_mode,                   ha_name_sat_mode,                   HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,             HaIcon::thermostat_icon, HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_setpoint,               ha_name_sat_setpoint,               HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_heating_curve,          ha_name_sat_heating_curve,          HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_pid_output,             ha_name_sat_pid_output,             HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 ha_json_sat_pid_attributes},
+    {252, 0x00, ha_lbl_sat_error,                  ha_name_sat_error,                  HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_room_temp,              ha_name_sat_room_temp,              HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_outside_temp,           ha_name_sat_outside_temp,           HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_pid_p,                  ha_name_sat_pid_p,                  HaDeviceClass::none,        HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_pid_i,                  ha_name_sat_pid_i,                  HaDeviceClass::none,        HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_pid_d,                  ha_name_sat_pid_d,                  HaDeviceClass::none,        HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_raw_derivative,         ha_name_sat_raw_derivative,         HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement,      HaIcon::speedometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_kp,                     ha_name_sat_kp,                     HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement,      HaIcon::tune_variant,    HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_ki,                     ha_name_sat_ki,                     HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement,      HaIcon::tune_variant,    HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_kd,                     ha_name_sat_kd,                     HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement,      HaIcon::tune_variant,    HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_boiler_status,          ha_name_sat_boiler_status,          HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,             HaIcon::water_boiler,    HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_cycle_class,            ha_name_sat_cycle_class,            HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,             HaIcon::history,         HaEntityCat::none, true, nullptr,                 ha_json_sat_cycle_attributes},
+    {252, 0x00, ha_lbl_sat_pwm_duty,               ha_name_sat_pwm_duty,               HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::pulse,           HaEntityCat::none, true, ha_tpl_sat_pwm_percent,  nullptr},
+    {252, 0x00, ha_lbl_sat_duty_ratio,             ha_name_sat_duty_ratio,             HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::percent_outline, HaEntityCat::none, true, ha_tpl_sat_ratio_percent, nullptr},
+    {252, 0x00, ha_lbl_sat_overshoot_fraction,     ha_name_sat_overshoot_fraction,     HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::percent_outline, HaEntityCat::none, true, ha_tpl_sat_ratio_percent, nullptr},
+    {252, 0x00, ha_lbl_sat_cycle_phase,            ha_name_sat_cycle_phase,            HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,             HaIcon::history,         HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_overshoot_margin,       ha_name_sat_overshoot_margin,       HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_cycles_this_hour,       ha_name_sat_cycles_this_hour,       HaDeviceClass::none,        HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter,         HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_4h_cycles,              ha_name_sat_4h_cycles,              HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement,      HaIcon::counter,         HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_4h_avg_on_sec,          ha_name_sat_4h_avg_on_sec,          HaDeviceClass::none,        HaUnit::s,       HaStateClass::measurement,      HaIcon::timer_outline,   HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_4h_avg_off_sec,         ha_name_sat_4h_avg_off_sec,         HaDeviceClass::none,        HaUnit::s,       HaStateClass::measurement,      HaIcon::timer_outline,   HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_4h_avg_flow_temp,       ha_name_sat_4h_avg_flow_temp,       HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_4h_duty_ratio,          ha_name_sat_4h_duty_ratio,          HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::percent_outline, HaEntityCat::none, true, ha_tpl_sat_ratio_percent, nullptr},
+    {252, 0x00, ha_lbl_sat_4h_overshoot_fraction,  ha_name_sat_4h_overshoot_fraction,  HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::percent_outline, HaEntityCat::none, true, ha_tpl_sat_ratio_percent, nullptr},
+    {252, 0x00, ha_lbl_sat_4h_underheat_fraction,  ha_name_sat_4h_underheat_fraction,  HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::percent_outline, HaEntityCat::none, true, ha_tpl_sat_ratio_percent, nullptr},
+    {252, 0x00, ha_lbl_sat_4h_flow_ret_delta_p50,  ha_name_sat_4h_flow_ret_delta_p50,  HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_4h_flow_ret_delta_p90,  ha_name_sat_4h_flow_ret_delta_p90,  HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    // --- Pseudo-ID 253: TASK-543 SAT BLE + pressure + weather primaries ---
+    {253, 0x00, ha_lbl_sat_ble_temp,               ha_name_sat_ble_temp,               HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement, HaIcon::thermometer,   HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_ble_humidity,           ha_name_sat_ble_humidity,           HaDeviceClass::humidity,    HaUnit::percent, HaStateClass::measurement, HaIcon::water_percent, HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_ch_pressure,            ha_name_sat_ch_pressure,            HaDeviceClass::pressure,    HaUnit::bar,     HaStateClass::measurement, HaIcon::gauge,         HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_temperature,    ha_name_sat_weather_temperature,    HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement, HaIcon::thermometer,   HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_apparent_temp,  ha_name_sat_weather_apparent_temp,  HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement, HaIcon::thermometer,   HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_humidity,       ha_name_sat_weather_humidity,       HaDeviceClass::humidity,    HaUnit::percent, HaStateClass::measurement, HaIcon::water_percent, HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_wind_speed,     ha_name_sat_weather_wind_speed,     HaDeviceClass::none,        HaUnit::m_s,     HaStateClass::measurement, HaIcon::fan,           HaEntityCat::none, true, ha_tpl_sat_kmh_to_ms, nullptr},
+    {253, 0x00, ha_lbl_sat_weather_wind_direction, ha_name_sat_weather_wind_direction, HaDeviceClass::none,        HaUnit::deg,     HaStateClass::measurement, HaIcon::angle_acute,   HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_wind_gusts,     ha_name_sat_weather_wind_gusts,     HaDeviceClass::none,        HaUnit::m_s,     HaStateClass::measurement, HaIcon::fan,           HaEntityCat::none, true, ha_tpl_sat_kmh_to_ms, nullptr},
+    {253, 0x00, ha_lbl_sat_weather_cloud_cover,    ha_name_sat_weather_cloud_cover,    HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement, HaIcon::solar_panel,   HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_pressure_msl,   ha_name_sat_weather_pressure_msl,   HaDeviceClass::pressure,    HaUnit::hPa,     HaStateClass::measurement, HaIcon::gauge,         HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_precipitation,  ha_name_sat_weather_precipitation,  HaDeviceClass::none,        HaUnit::mm,      HaStateClass::measurement, HaIcon::water,         HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_rain,           ha_name_sat_weather_rain,           HaDeviceClass::none,        HaUnit::mm,      HaStateClass::measurement, HaIcon::water,         HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_snowfall,       ha_name_sat_weather_snowfall,       HaDeviceClass::none,        HaUnit::mm,      HaStateClass::measurement, HaIcon::snowflake,     HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_weather_code,   ha_name_sat_weather_weather_code,   HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement, HaIcon::information,   HaEntityCat::none, true, nullptr,              nullptr},
+    // --- Pseudo-ID 254: TASK-543 SAT flame status string ---
+    {254, 0x00, ha_lbl_sat_flame_status,           ha_name_sat_flame_status,           HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::fire,          HaEntityCat::none, true, nullptr,              nullptr},
 };
 
-// ========== Binary sensor array (53 entries, sorted by id) ==========
-const uint16_t MQTT_HA_BINSENSOR_COUNT = 53;
+// ========== Binary sensor array (58 entries, sorted by id) ==========
+const uint16_t MQTT_HA_BINSENSOR_COUNT = 58;
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
+#define SAT_BIN(id, key, icon, cat, enabled, devCls, payloadKind) \
+    {id, 0x00, ha_lbl_##key, ha_name_##key, icon, cat, enabled, devCls, payloadKind}
     // --- OT ID 0 ---
     {  0, 0x00, ha_lbl_centralheating, ha_name_central_heating, HaIcon::radiator, HaEntityCat::none, true},
     {  0, 0x00, ha_lbl_centralheating2, ha_name_central_heating_2, HaIcon::radiator, HaEntityCat::none, true},
@@ -1203,7 +1320,15 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     {101, 0x00, ha_lbl_solar_storage_slave_fault_indicator, ha_name_solar_storage_slave_fault_indicator, HaIcon::alert_circle, HaEntityCat::none, false},
     // --- OT ID 113 ---
     {113, 0x00, ha_lbl_solar_storage_system_type, ha_name_solar_storage_system_type, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
+    // --- Pseudo-ID 253: TASK-543 weather binary ---
+    SAT_BIN(253, sat_weather_is_day, HaIcon::solar_panel, HaEntityCat::none, true, nullptr, HaBinaryPayload::one_zero),
+    // --- Pseudo-ID 254: TASK-543 SAT binary primaries ---
+    SAT_BIN(254, sat_active,         HaIcon::thermostat_icon, HaEntityCat::none, true, nullptr,           HaBinaryPayload::true_false),
+    SAT_BIN(254, sat_safety_tripped, HaIcon::alert_circle,    HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::true_false),
+    SAT_BIN(254, sat_flame_health,   HaIcon::fire,            HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::on_off),
+    SAT_BIN(254, sat_valves_open,    HaIcon::radiator,        HaEntityCat::none, true, nullptr,           HaBinaryPayload::true_false),
 };
+#undef SAT_BIN
 
 // ========== Index arrays (OT ID -> first entry) ==========
 const uint16_t PROGMEM mqttHaSensorIndex[256] = {
@@ -1459,9 +1584,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     310, // id 249, 5 entries (TASK-541 PIC info)
     315, // id 250, 15 entries (TASK-541 PIC settings)
     330, // id 251, 7 entries (TASK-541 OTDirect/SAT diagnostics)
-    0xFFFF, // id 252
-    0xFFFF, // id 253
-    0xFFFF, // id 254
+    337, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
+    369, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    384, // id 254, 1 entry  (TASK-543 SAT flame status)
     0xFFFF // id 255
 };
 
@@ -1719,8 +1844,8 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 250
     0xFFFF, // id 251
     0xFFFF, // id 252
-    0xFFFF, // id 253
-    0xFFFF, // id 254
+    53, // id 253, 1 entry  (TASK-543 weather is_day)
+    54, // id 254, 4 entries (TASK-543 SAT binary primaries)
     0xFFFF // id 255
 };
 
@@ -1746,7 +1871,9 @@ PGM_P haUnitStr(HaUnit u) {
     switch (u) {
         case HaUnit::none: return nullptr;
         case HaUnit::degC: { static const char s[] PROGMEM = "°C"; return s; }
+        case HaUnit::deg: { static const char s[] PROGMEM = "°"; return s; }
         case HaUnit::bar: { static const char s[] PROGMEM = "bar"; return s; }
+        case HaUnit::hPa: { static const char s[] PROGMEM = "hPa"; return s; }
         case HaUnit::percent: { static const char s[] PROGMEM = "%"; return s; }
         case HaUnit::l_min: { static const char s[] PROGMEM = "l/min"; return s; }
         case HaUnit::kW: { static const char s[] PROGMEM = "kW"; return s; }
@@ -1757,6 +1884,9 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::rpm: { static const char s[] PROGMEM = "rpm"; return s; }
         case HaUnit::ppm: { static const char s[] PROGMEM = "ppm"; return s; }
         case HaUnit::mS: { static const char s[] PROGMEM = "mS"; return s; }
+        case HaUnit::m_s: { static const char s[] PROGMEM = "m/s"; return s; }
+        case HaUnit::mm: { static const char s[] PROGMEM = "mm"; return s; }
+        case HaUnit::s: { static const char s[] PROGMEM = "s"; return s; }
         case HaUnit::h: { static const char s[] PROGMEM = "h"; return s; }
         case HaUnit::bytes: { static const char s[] PROGMEM = "B"; return s; }
         default: return nullptr;
@@ -1908,6 +2038,7 @@ static const char kIcon[]     PROGMEM = "icon";
 static const char kEntCat[]   PROGMEM = "entity_category";
 static const char kEnByDef[]  PROGMEM = "enabled_by_default";
 static const char kValTpl[]   PROGMEM = "value_template";
+static const char kJsonAttrTopic[] PROGMEM = "json_attributes_topic";
 static const char kOrigin[]   PROGMEM = "origin";
 static const char kUrl[]      PROGMEM = "url";
 
@@ -2065,9 +2196,20 @@ static bool composeSensorPayload(MqttJsonWriter &w,
 
   if (!cfg.enabledByDefault) { if (!writeJsonComma(w)) return false; if (!writeJsonKVBool(w, kEnByDef, false)) return false; }
 
-  // "value_template":"{{ value }}"
+  if (cfg.jsonAttributesTopic) {
+    if (!writeJsonComma(w)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kJsonAttrTopic)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (!w.writeChar('/')) return false;
+    if (!w.writeProgmem(cfg.jsonAttributesTopic)) return false;
+    if (!w.writeChar('"')) return false;
+  }
+
+  // "value_template":"{{ value }}" (or a per-entity override for JSON/unit conversions)
   if (!writeJsonComma(w)) return false;
-  if (!writeJsonKV_P(w, kValTpl, kValTplVal)) return false;
+  if (!writeJsonKV_P(w, kValTpl, cfg.valueTemplate ? cfg.valueTemplate : kValTplVal)) return false;
 
   // origin block
   if (!writeJsonComma(w)) return false;
@@ -2144,6 +2286,25 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
   if (catStr) { if (!writeJsonComma(w)) return false; if (!writeJsonKV_P(w, kEntCat, catStr)) return false; }
 
   if (!cfg.enabledByDefault) { if (!writeJsonComma(w)) return false; if (!writeJsonKVBool(w, kEnByDef, false)) return false; }
+
+  if (cfg.deviceClass) {
+    if (!writeJsonComma(w)) return false;
+    if (!writeJsonKV_P(w, kDevCls, cfg.deviceClass)) return false;
+  }
+
+  switch (cfg.payload) {
+    case HaBinaryPayload::true_false:
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeProgmem(PSTR("\"pl_on\":\"true\",\"pl_off\":\"false\",\"stat_on\":\"true\",\"stat_off\":\"false\""))) return false;
+      break;
+    case HaBinaryPayload::one_zero:
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeProgmem(PSTR("\"payload_on\":1,\"payload_off\":0"))) return false;
+      break;
+    case HaBinaryPayload::on_off:
+    default:
+      break;
+  }
 
   if (!writeJsonComma(w)) return false;
   if (!writeOriginBlock(w, ctx)) return false;
@@ -2598,7 +2759,7 @@ bool streamClimateDiscovery(PubSubClient &client,
     if (climateIdx == 0) {
       if (!w.writeProgmem(PSTR("\"initial\":\"20\",\"min_temp\":\"12\",\"max_temp\":\"28\",\"temp_step\":\"0.5\",\"precision\":0.1"))) return false;
     } else {
-      if (!w.writeProgmem(PSTR("\"initial\":\"43\",\"min_temp\":\"40\",\"max_temp\":\"60\",\"temp_step\":\"1\",\"precision\":1"))) return false;
+      if (!w.writeProgmem(PSTR("\"min_temp\":\"40\",\"max_temp\":\"60\",\"temp_step\":\"1\",\"precision\":1"))) return false;
     }
     if (!writeJsonComma(w)) return false;
 

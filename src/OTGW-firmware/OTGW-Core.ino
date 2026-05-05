@@ -3123,9 +3123,11 @@ static void dispatchOTGWInputLine(const char* buf, size_t len)
   if (len == 0) return;
 
   blinkLEDnow(LED2);
-  OTGWstream.write(reinterpret_cast<const uint8_t*>(buf), len);
-  OTGWstream.write('\r');
-  OTGWstream.write('\n');
+  if (settings.mqtt.bLegacyPort25238Enabled) {
+    OTGWstream.write(reinterpret_cast<const uint8_t*>(buf), len);
+    OTGWstream.write('\r');
+    OTGWstream.write('\n');
+  }
   processOT(buf, len);
 }
 
@@ -4394,63 +4396,65 @@ void handlePICSerial()
     }
   }
 
-  //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
-  while (OTGWstream.available()){
-    outByte = OTGWstream.read();  // read from port 25238
-    if (!state.debug.bOTGWSimulation) {
-      OTGWSerial.write(outByte);    // write to serial port
-    }
-    if (outByte == '\r')
-    { //on CR, do something...
-      sWrite[bytes_write] = 0;
-      if (state.debug.bOTGWSimulation) {
-        OTDebugTf(PSTR("Net2Ser blocked by simulation mode: [%s] (%d)\r\n"), sWrite, bytes_write);
-        if (bytes_write > 0) {
-          snprintf_P(cMsg, sizeof(cMsg), PSTR("Simulation blocked cmd [%s]"), sWrite);
-          sendEventToWebSocket('!', cMsg);
-        }
-      } else {
-        OTDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
-        if (bytes_write > 0) sendEventToWebSocket('>', sWrite); // log every ser2net command
-        // Track ser2net activity and remove conflicting queue entries
-        if (bytes_write >= 3 && sWrite[2] == '=') {
-          lastSer2netCmdMs = millis();
-          // Remove matching command from queue to prevent override
-          for (int qi = 0; qi < cmdQueueSize; qi++) {
-            if (cmdqueue[qi].cmd[0] == sWrite[0] && cmdqueue[qi].cmd[1] == sWrite[1]) {
-              // For PR commands, also match the register letter (e.g., ser2net PR=S must not remove PR=O)
-              if (sWrite[0] == 'P' && sWrite[1] == 'R' && bytes_write >= 4 && cmdqueue[qi].cmdlen >= 4) {
-                if (cmdqueue[qi].cmd[3] != sWrite[3]) continue;
+  if (settings.mqtt.bLegacyPort25238Enabled) {
+    //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
+    while (OTGWstream.available()){
+      outByte = OTGWstream.read();  // read from port 25238
+      if (!state.debug.bOTGWSimulation) {
+        OTGWSerial.write(outByte);    // write to serial port
+      }
+      if (outByte == '\r')
+      { //on CR, do something...
+        sWrite[bytes_write] = 0;
+        if (state.debug.bOTGWSimulation) {
+          OTDebugTf(PSTR("Net2Ser blocked by simulation mode: [%s] (%d)\r\n"), sWrite, bytes_write);
+          if (bytes_write > 0) {
+            snprintf_P(cMsg, sizeof(cMsg), PSTR("Simulation blocked cmd [%s]"), sWrite);
+            sendEventToWebSocket('!', cMsg);
+          }
+        } else {
+          OTDebugTf(PSTR("Net2Ser: Sending to OTGW: [%s] (%d)\r\n"), sWrite, bytes_write);
+          if (bytes_write > 0) sendEventToWebSocket('>', sWrite); // log every ser2net command
+          // Track ser2net activity and remove conflicting queue entries
+          if (bytes_write >= 3 && sWrite[2] == '=') {
+            lastSer2netCmdMs = millis();
+            // Remove matching command from queue to prevent override
+            for (int qi = 0; qi < cmdQueueSize; qi++) {
+              if (cmdqueue[qi].cmd[0] == sWrite[0] && cmdqueue[qi].cmd[1] == sWrite[1]) {
+                // For PR commands, also match the register letter (e.g., ser2net PR=S must not remove PR=O)
+                if (sWrite[0] == 'P' && sWrite[1] == 'R' && bytes_write >= 4 && cmdqueue[qi].cmdlen >= 4) {
+                  if (cmdqueue[qi].cmd[3] != sWrite[3]) continue;
+                }
+                OTDebugTf(PSTR("Ser2net: Removing [%s] from queue (overridden by ser2net)\r\n"), cmdqueue[qi].cmd);
+                removeFromCmdQueue(qi);
+                break;
               }
-              OTDebugTf(PSTR("Ser2net: Removing [%s] from queue (overridden by ser2net)\r\n"), cmdqueue[qi].cmd);
-              removeFromCmdQueue(qi);
-              break;
             }
           }
+          //check for reset command
+          if (strcmp_P(sWrite, PSTR("GW=R"))==0){
+            //detected [GW=R], then reset the gateway the gpio way
+            OTDebugTln(F("Detected: GW=R. Reset gateway command executed."));
+            sendEventToWebSocket_P('!', PSTR("GW=R [reset]"));
+            resetOTGW();
+          } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
+            //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
+            enterPSMode(nullptr, PSTR("PS=1 [print summary mode]"), true);
+          } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
+            //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
+            leavePSMode(nullptr, PSTR("PS=0 [raw mode]"));
+          }
         }
-        //check for reset command
-        if (strcmp_P(sWrite, PSTR("GW=R"))==0){
-          //detected [GW=R], then reset the gateway the gpio way
-          OTDebugTln(F("Detected: GW=R. Reset gateway command executed."));
-          sendEventToWebSocket_P('!', PSTR("GW=R [reset]"));
-          resetOTGW();
-        } else if (strcasecmp_P(sWrite, PSTR("PS=1"))==0) {
-          //detected [PS=1], then PrintSummary mode = true --> From this point on you need to ask for summary.
-          enterPSMode(nullptr, PSTR("PS=1 [print summary mode]"), true);
-        } else if (strcasecmp_P(sWrite, PSTR("PS=0"))==0) {
-          //detected [PS=0], then PrintSummary mode = OFF --> Raw mode is turned on again.
-          leavePSMode(nullptr, PSTR("PS=0 [raw mode]"));
-        }
+        bytes_write = 0; //start next line
+      } else if  (outByte == '\n')
+      {
+        // on LF, skip 
+      } 
+      else 
+      {
+        if (bytes_write < (MAX_BUFFER_WRITE-1))
+          sWrite[bytes_write++] = outByte;
       }
-      bytes_write = 0; //start next line
-    } else if  (outByte == '\n')
-    {
-      // on LF, skip 
-    } 
-    else 
-    {
-      if (bytes_write < (MAX_BUFFER_WRITE-1))
-        sWrite[bytes_write++] = outByte;
     }
   }
 #endif // HAS_PIC
@@ -4587,7 +4591,26 @@ const char* getOTGWValue(int msgid)
 
 void startPICStream()
 {
+  if (!settings.mqtt.bLegacyPort25238Enabled) {
+    DebugTln(F("[OTGW] Legacy TCP port 25238 disabled"));
+    OTGWstream.stop();
+    return;
+  }
+
+  DebugTln(F("[OTGW] Starting legacy TCP port 25238"));
   OTGWstream.begin(false);    // false = skip WiFi check; bind unconditionally
+}
+
+void stopPICStream()
+{
+  DebugTln(F("[OTGW] Stopping legacy TCP port 25238"));
+  OTGWstream.stop();
+}
+
+void applyLegacyPort25238Setting()
+{
+  if (settings.mqtt.bLegacyPort25238Enabled) startPICStream();
+  else stopPICStream();
 }
 
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------

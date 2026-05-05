@@ -224,6 +224,9 @@ void GetVersion(const char* hexfile, char* version, size_t destSize);
 void startWebSocket();
 void handleWebSocket();
 void handleDebug();
+void startPICStream();
+void stopPICStream();
+void applyLegacyPort25238Setting();
 void handleOTGWstream();
 void testWebhook(bool testOn);
 void evalWebhook();
@@ -624,11 +627,25 @@ byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats
 //   249 — otgw-pic/{version,deviceid,firmwaretype,designer,picavailable} (PIC-gated)
 //   250 — otgw-pic/settings/* (15 PR=-polled topics, PIC-gated)
 //   251 — 2.0.0-specific diagnostics: otgw32/flame_*, sat/ble_* health, sat/ch_pressure_status
-//         (SAT user-facing measurements + zones live in TASK-543)
+//   252 — TASK-543 SAT control/PID/cycle/statistics primaries
+//   253 — TASK-543 SAT BLE + pressure + weather primaries
+//   254 — TASK-543 SAT binary primaries + flame status
+//   255 — TASK-543 dynamic SAT zone discovery
+//
+// TASK-543 gating decision: publish discovery unconditionally on the dual-target
+// 2.0.0 branch. Runtime/platform publish paths determine whether an entity has
+// live data (for example ESP32-only weather/BLE fields on ESP8266 stay
+// unavailable instead of disappearing from discovery).
 byte      OTGWfwinfoid       = 248;
 byte      OTGWpicinfoid      = 249;
 byte      OTGWpicsettingsid  = 250;
 byte      OTGWdiag200id      = 251;
+byte      OTGWsatcoreid      = 252;
+byte      OTGWsatweatherid   = 253;
+byte      OTGWsatbinaryid    = 254;
+byte      OTGWsatzoneid      = 255;
+uint8_t   satGetMaxZones();
+bool      satShouldDiscoverZone(uint8_t zoneIndex);
 
 // Forward declarations for helperStuff.ino functions called from template
 // instantiations in OTGW-ModUpdateServer-impl.h (pulled in via networkStuff.h).
