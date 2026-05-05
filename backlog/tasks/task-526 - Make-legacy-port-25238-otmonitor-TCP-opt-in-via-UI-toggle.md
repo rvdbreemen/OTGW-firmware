@@ -1,9 +1,11 @@
 ---
 id: TASK-526
 title: Make legacy port 25238 (otmonitor TCP) opt-in via UI toggle
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@codex'
 created_date: '2026-05-03 10:48'
+updated_date: '2026-05-05 12:56'
 labels:
   - feature
   - ui
@@ -51,12 +53,51 @@ priority: medium
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Nieuwe bool setting bLegacyPort25238Enabled in OTGW-firmware.h (struct-default false, opt-in by design)
-- [ ] #2 JSON read/write voor key LegacyPort25238Enabled in settingStuff.ino, persisted in settings.ini
-- [ ] #3 UI-toggle op Settings-pagina van webUI met heldere label en help-tekst die uitlegt dat HA OpenTherm Gateway Python integratie en otmonitor desktop-tool dit nodig hebben
-- [ ] #4 TCP-listener op port 25238 wordt alleen gestart wanneer bLegacyPort25238Enabled=true; bij false start de listener niet
-- [ ] #5 Setting-wijziging tijdens runtime stopt/start de listener netjes zonder reboot, OF de UI documenteert duidelijk dat reboot vereist is
-- [ ] #6 Default false voor zowel nieuwe installs als bestaande devices (struct-default werkt via 'ontbrekende JSON-key houdt struct-default' patroon, zelfde als TASK-523 default-true sub-pattern)
-- [ ] #7 python evaluate.py --quick passes en python build.py --firmware succeeds
-- [ ] #8 Release-notes voor de versie waarin dit landt vermelden expliciet de gedragswijziging en de migratiestap voor HA Python integratie gebruikers
+- [x] #1 Nieuwe bool setting bLegacyPort25238Enabled in OTGW-firmware.h (struct-default false, opt-in by design)
+- [x] #2 JSON read/write voor key LegacyPort25238Enabled in settingStuff.ino, persisted in settings.ini
+- [x] #3 UI-toggle op Settings-pagina van webUI met heldere label en help-tekst die uitlegt dat HA OpenTherm Gateway Python integratie en otmonitor desktop-tool dit nodig hebben
+- [x] #4 TCP-listener op port 25238 wordt alleen gestart wanneer bLegacyPort25238Enabled=true; bij false start de listener niet
+- [x] #5 Setting-wijziging tijdens runtime stopt/start de listener netjes zonder reboot, OF de UI documenteert duidelijk dat reboot vereist is
+- [x] #6 Default false voor zowel nieuwe installs als bestaande devices (struct-default werkt via 'ontbrekende JSON-key houdt struct-default' patroon, zelfde als TASK-523 default-true sub-pattern)
+- [x] #7 python evaluate.py --quick passes en python build.py --firmware succeeds
+- [x] #8 Release-notes voor de versie waarin dit landt vermelden expliciet de gedragswijziging en de migratiestap voor HA Python integratie gebruikers
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Locate the OTGWstream/port-25238 lifecycle and SimpleTelnet API.
+2. Add bLegacyPort25238Enabled default false, persist/read it, expose it through the settings API and WebUI labels/help.
+3. Gate the port-25238 listener behind the setting and add a runtime apply hook on setting changes.
+4. Add a release note for the behavior/migration change.
+5. Run python evaluate.py --quick and python build.py --firmware; then update ACs, notes, final summary, and the prerelease tag for this coherent change set.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- Added bLegacyPort25238Enabled default false and persisted LegacyPort25238Enabled.
+- Exposed legacyport25238enabled through the REST settings API and WebUI labels/tooltips.
+- Gated OTGWstream port 25238 startup behind the setting and added deferred runtime apply via SimpleTelnet stop/begin.
+- Added v1.5.0-beta release note and bumped prerelease to beta.14 for this change set.
+
+- python3 evaluate.py --quick --no-color now passes after removing two stale ADR-080 references from ADR-066.
+- python3 build.py --firmware passes with network access; artifact: build/OTGW-firmware-1.5.0-beta.14+e54a281.ino.bin.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented the legacy otmonitor TCP port 25238 opt-in setting for the dev stream.
+
+Changes:
+- Added settings.mqtt.bLegacyPort25238Enabled with default false and persisted it as LegacyPort25238Enabled in settings.ini.
+- Exposed legacyport25238enabled through the REST settings API and WebUI Settings page with label/help text for HA OpenTherm Gateway Python integration, pyotgw, and otmonitor desktop users.
+- Gated OTGWstream startup behind the setting and added deferred runtime apply so WebUI changes stop/start the SimpleTelnet listener without reboot.
+- Added release-note migration guidance and bumped prerelease to 1.5.0-beta.14 for this change set.
+- Removed two stale ADR-080 references from ADR-066 so the quick evaluation gate passes.
+
+Verification:
+- python3 evaluate.py --quick --no-color: passes, 32 passed / 0 failed / 2 warnings.
+- python3 build.py --firmware: passes, artifact build/OTGW-firmware-1.5.0-beta.14+e54a281.ino.bin.
+<!-- SECTION:FINAL_SUMMARY:END -->

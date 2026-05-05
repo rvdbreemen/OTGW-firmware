@@ -2,7 +2,7 @@
 
 **Status:** Proposed
 **Date:** 2026-04-28
-**Classification:** structural (per ADR-080: no CI gate, manual review at PR time)
+**Classification:** structural (no CI gate, manual review at PR time)
 **Decision Maker:** User: Rob van den Breemen (rvdbreemen)
 
 ## Context
@@ -70,9 +70,9 @@ All other MsgIDs default to `bSlaveEchoesValue = true`. For MsgIDs without write
 
 - **Existing source-separation users (`bSeparateSources=true`)** see behavior change for the 6 non-echo MsgIDs only: their `/boiler` subtopic for those metrics stops receiving updates. Retained values on those subtopics remain stale until manually cleared. This is the intended outcome (the prior values were spurious zeros).
 
-## Verification gates (per ADR-080 process for Proposed → Accepted)
+## Verification gates
 
-1. **Completeness:** all four sections (Status, Context, Decision, Consequences) populated; all referenced ADRs (-040, -052, -080) and TASK references valid; audit doc cited and present.
+1. **Completeness:** all four sections (Status, Context, Decision, Consequences) populated; all referenced ADRs (-040, -052) and TASK references valid; audit doc cited and present.
 2. **Evidence:** field-report logs (Intergas, dev branch 1.5.0-beta+cd30617) showing the three confirmed non-echo cases retained in TASK-478 description and audit doc. Spec citation to `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md` for each non-echo entry.
 3. **Clarity:** the decision is implementable from the text alone (function names, struct field, call-site changes spelled out). The audit doc is unambiguous per MsgID.
 4. **Consistency:** does not contradict ADR-040 (extends it), does not contradict ADR-052 (refines per-topic eligibility within it). No conflict with ADR-006 (MQTT integration), ADR-038 (OT data flow pipeline), ADR-049 (no String in protocol path), ADR-051 (settings/state encapsulation).
@@ -82,7 +82,6 @@ All other MsgIDs default to `bSlaveEchoesValue = true`. For MsgIDs without write
 - **ADR-040:** MQTT Source-Specific Topics for OpenTherm Values (this ADR amends scope of "base topic always published" rule).
 - **ADR-052:** MQTT Publish Eligibility and Reconnect Refresh Contract (this ADR refines per-topic-class eligibility).
 - **ADR-051:** Dual Encapsulating Structs (provides the `state.*` / `settings.*` separation that `bSeparateSources` lives in).
-- **ADR-080:** CI-gate meta-rule (this ADR carries `structural` classification: no CI gate, reviewed at PR).
 - **TASK-478:** Implementation task tracking the code changes that realize this decision.
 - **`docs/api/MQTT-message-id-echo-audit.md`:** the per-MsgID classification table.
 - **OpenTherm v4.2 specification reference:** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`.

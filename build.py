@@ -432,7 +432,7 @@ def build_firmware(project_dir, config_file):
     print_step("Building firmware")
     
     fqbn = "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160,ip=lm2f"
-    cflags = "-DNO_GLOBAL_HTTPUPDATE"
+    cflags = f"-DNO_GLOBAL_HTTPUPDATE -I{config.FIRMWARE_ROOT}"
     
     # Use temporary directory for build artifacts
     temp_build_dir = config.TEMP_DIR / "build"

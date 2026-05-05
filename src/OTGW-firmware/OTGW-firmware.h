@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.5.0-beta.12
+**  Version  : v1.5.0-beta.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -175,7 +175,7 @@ enum class StatusMessage : uint8_t {
 };
 
 void readSettings(bool show);
-void writeSettings(bool show);
+bool writeSettings(bool show);
 void updateSetting(const char *field, const char *newValue);
 bool checkGPIOConflict(int pin, GPIOConflictCaller caller);
 const __FlashStringHelper* getStatusMessageText();
@@ -611,6 +611,7 @@ struct MQTTSettingsSection {
   bool    bOTmessage       = false;
   uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
+  bool    bLegacyPort25238Enabled = false; // Opt-in otmonitor TCP stream for legacy clients
   bool    bDiscoveryAutoVerify = true;  // ADR-062: daily auto-heal of retained discovery configs (TASK-351 wires the trigger; TASK-349 ships the field only)
 };
 

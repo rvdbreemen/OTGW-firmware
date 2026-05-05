@@ -1,5 +1,13 @@
 # GitHub Copilot Instructions for OTGW-firmware
 
+## Agent Workflow
+
+- This repository uses OpenWolf for context management. Read and follow `.wolf/OPENWOLF.md` every session.
+- Check `.wolf/anatomy.md` before reading files; prefer its summaries over full file reads when they are sufficient.
+- Check `.wolf/cerebrum.md` before generating code and respect the learned preferences and do-not-repeat items.
+- After significant actions, append a one-line entry to `.wolf/memory.md`. Update `.wolf/anatomy.md` after creating, deleting, or renaming files.
+- Read `.wolf/buglog.json` before fixing reported problems, and append a new bug entry after fixing a bug, build failure, runtime error, or other broken behavior.
+
 ## Project Overview
 
 This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provides network connectivity (Web UI, MQTT, REST API, and TCP serial socket) for the OpenTherm Gateway hardware, with a focus on reliable Home Assistant integration.
@@ -69,6 +77,19 @@ If the answer is unclear, stop and inspect `docs/adr/README.md` before proceedin
 ## Architecture Decision Records (ADRs)
 
 When making decisions for refactors, feature additions, or bug fixes, always review existing ADRs first so you understand prior context and constraints. Use `docs/adr/README.md` for the canonical ADR location, template, workflow, and superseding rules; do not introduce a conflicting template here.
+
+### ADR Lifecycle
+
+- **Proposed** -> Draft; **Accepted** -> Standing decision; **Deprecated** -> No longer recommended; **Superseded** -> Replaced by a newer ADR.
+- Never edit the body of an **Accepted** or **Deprecated** ADR. The only permitted change is updating its status to `Superseded by ADR-XXX`.
+- To reverse a prior decision, create a new ADR that supersedes the old one, then update the old ADR's status accordingly.
+
+### ADR Approval Workflow
+
+1. Create new ADRs with `Status: Proposed`.
+2. Stop and ask for user review before marking an ADR accepted.
+3. Iterate on the proposed ADR until the user explicitly approves it.
+4. Only then change the status to `Accepted`.
 
 ## Network Architecture and Security
 
@@ -190,6 +211,12 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
 - Every byte of string literal in RAM is a byte unavailable for runtime operations
 - This is **non-negotiable** - PROGMEM usage is critical for firmware stability
 - **Post-mortem rule**: If a bug involves `_P` helpers, `PGM_P`, or `__FlashStringHelper`, assume a storage-domain mismatch until proven otherwise.
+
+#### PROGMEM Pointer Safety on Arduino Core 3.1.2+
+
+- Standard C helpers like `strstr()`, `strncmp()`, and `strlen()` may perform word-aligned reads that are unsafe for unaligned flash pointers on ESP8266.
+- Use `pgm_strncmp_PP()` and `pgm_read_char()` from `MQTTstuff.h` for byte-safe PROGMEM access when needed.
+- Never pass PROGMEM pointers to `printf("%s")`, `MQTTclient.write()`, or `writeMqttChunk()`. Use `writeMqttProgmemChunk()` for PROGMEM MQTT payloads.
 
 #### File Serving and Streaming (CRITICAL - Prevents Memory Exhaustion)
 
@@ -563,8 +590,9 @@ Before implementing or modifying frontend features, verify browser support:
 
 ### Build and Test
 
-- **Build locally**: `python build.py` or `make -j$(nproc)`
-  - Build firmware only: `python build.py --firmware`
+- **Build locally**: prefer the platform wrapper: `./build.sh` on macOS/Linux or `build.bat` on Windows.
+  - If you use `build.py`, run the combined/default build so firmware and LittleFS assets stay in sync.
+  - Do not use `python build.py --firmware` for release or validation passes unless explicitly requested.
   - Build filesystem only: `python build.py --filesystem`
   - Clean build: `python build.py --clean`
   - Build script auto-installs arduino-cli if missing
@@ -590,6 +618,13 @@ Before implementing or modifying frontend features, verify browser support:
 - Write settings with `writeSettings()`
 - Settings structure is defined in `OTGW-firmware.h`
 
+### Settings and State Architecture
+
+- `OTGWSettings settings` holds persistent configuration and is serialized to LittleFS JSON.
+- `OTGWState state` holds transient runtime state and is never persisted.
+- Both use named two-level sub-sections with Hungarian prefixes such as `b`, `s`, `i`, and `f`.
+- Access settings/state through the structured members, for example `settings.mqtt.sBroker` and `state.otgw.bOnline`.
+
 ### Command Queue
 
 - OTGW commands are queued to prevent overrunning the serial buffer
@@ -601,6 +636,18 @@ Before implementing or modifying frontend features, verify browser support:
 - Use the `DECLARE_TIMER_SEC()` and `DECLARE_TIMER_MS()` macros
 - Check timers with `DUE(timer)` macro
 - Timers are defined in `safeTimers.h`
+
+### REST API Versioning
+
+- Preserve the three API generations: `/api/v0/` (legacy), `/api/v1/` (standard), and `/api/v2/` (preferred/current).
+- Add new v2 endpoints through the `kV2Routes[]` dispatch table in `restAPI.ino`.
+- Return JSON API errors via `sendApiError(httpCode, F("message"))`.
+
+### Static Buffers and Cooperative Scheduling
+
+- `doBackgroundTasks()` can be re-entered through `feedWatchDog()` and `yield()`.
+- Buffers that live across a yield window must be local/static with clear ownership, not ad hoc global scratch buffers.
+- Respect documented ownership rules for shared buffers such as `mqttAutoCfgScratch` and `ot_log_buffer`.
 
 ### GPIO and Hardware
 
@@ -796,8 +843,10 @@ docs/reviews/
 - Follow existing code organization (modular .ino files)
 - Add version bumps to `version.h` for releases
 - Update release notes in README.md for user-facing changes
+- When bumping prerelease versions, keep the same prerelease channel and increment only the numeric suffix (`beta.13` -> `beta.14`, `rc.1` -> `rc.2`).
+- Keep `_VERSION_PRERELEASE`, `_SEMVER_FULL`, `_SEMVER_NOBUILD`, and `_VERSION` consistent when changing firmware version metadata.
 - **Run evaluation before submitting**: `python evaluate.py` to check code quality
-- **Test builds**: `python build.py` before submitting
+- **Test builds**: prefer `./build.sh` or `build.bat`; if using `build.py`, build both firmware and filesystem together
 - Ensure changes work with the NodoShop OTGW hardware
 
 ## Development Tools
@@ -837,6 +886,27 @@ Comprehensive code quality analysis tool:
   - Validates build system health
 - **Exit codes**: Non-zero if any FAIL results (CI/CD integration)
 - See [docs/EVALUATION.md](../docs/EVALUATION.md) for detailed documentation
+
+## Git Push Policy
+
+- Pushing to `origin/dev` is allowed when it is logical to do so: the work is self-contained, committed locally, the combined build passes, and `python evaluate.py --quick` reports no new failures.
+- Pushing to `origin/main` still requires explicit per-instance user confirmation.
+- Force-pushing any branch still requires explicit per-instance confirmation; force-pushing `main` is forbidden.
+- When in doubt about whether a push is logical, ask first.
+
+## Worktree Layout
+
+This repository is intended to be used with two parallel git worktrees:
+
+| Worktree path | Branch | Purpose |
+|---|---|---|
+| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware` | `dev` | 1.5.x release line |
+| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware-2.0.0` | `feature-dev-2.0.0-otgw32-esp32-sat-support` | 2.0.0 ESP32 + SAT feature line |
+
+- Keep both worktrees present. Work on each branch in its own worktree instead of switching branches inside one checkout.
+- If one worktree is missing, recreate it with `git worktree add`.
+- For backlog tasks, always use the `backlog` CLI and never the backlog MCP server in this repository.
+- If `backlog task edit` reports `Task not found`, find the task file across both worktrees and rerun the command from the worktree that owns that task.
 
 <!-- BACKLOG.MD GUIDELINES START -->
 # Instructions for the usage of Backlog.md CLI Tool

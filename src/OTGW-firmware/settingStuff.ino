@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.5.0-beta.12
+**  Version  : v1.5.0-beta.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -18,6 +18,7 @@
 #define SIDE_EFFECT_MQTT   0x01
 #define SIDE_EFFECT_NTP    0x02
 #define SIDE_EFFECT_MDNS   0x04
+#define SIDE_EFFECT_OTGWSTREAM 0x08
 static bool    settingsDirty = false;
 static uint8_t pendingSideEffects = 0;
 
@@ -61,7 +62,11 @@ void flushSettings()
   if (!settingsDirty) return;
 
   DebugTln(F("[Settings] Flushing deferred settings write..."));
-  writeSettings(false);
+  bool settingsOk = writeSettings(false);
+  if (!settingsOk) {
+    DebugTln(F("[Settings] Deferred settings write failed; keeping dirty state"));
+    return;
+  }
   settingsDirty = false;
 
   // Apply deferred side effects — exactly once per service per save batch
@@ -77,6 +82,10 @@ void flushSettings()
   if (pendingSideEffects & SIDE_EFFECT_NTP) {
     DebugTln(F("[Settings] Restarting NTP (deferred)"));
     startNTP();
+  }
+  if (pendingSideEffects & SIDE_EFFECT_OTGWSTREAM) {
+    DebugTln(F("[Settings] Applying legacy port 25238 setting (deferred)"));
+    applyLegacyPort25238Setting();
   }
   pendingSideEffects = 0;
 }
@@ -176,35 +185,35 @@ static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, c
   return true;
 }
 
-static void writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value, bool withComma)
+static bool writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value, bool withComma)
 {
   // Use global cMsg as escape scratch — no heap allocation.
   // writeSettings() holds no yield() between calls, so cMsg cannot be clobbered mid-write.
   escapeJsonStringTo(value, cMsg, sizeof(cMsg));
-  file.printf_P(PSTR("  \"%S\": \"%s\"%s\n"),
-                reinterpret_cast<PGM_P>(key),
-                cMsg,
-                withComma ? "," : "");
+  return file.printf_P(PSTR("  \"%S\": \"%s\"%s\n"),
+                       reinterpret_cast<PGM_P>(key),
+                       cMsg,
+                       withComma ? "," : "") > 0;
 }
 
-static void writeJsonBoolKV(File& file, const __FlashStringHelper* key, bool value, bool withComma)
+static bool writeJsonBoolKV(File& file, const __FlashStringHelper* key, bool value, bool withComma)
 {
-  file.printf_P(PSTR("  \"%S\": %s%s\n"),
-                reinterpret_cast<PGM_P>(key),
-                value ? "true" : "false",
-                withComma ? "," : "");
+  return file.printf_P(PSTR("  \"%S\": %s%s\n"),
+                       reinterpret_cast<PGM_P>(key),
+                       value ? "true" : "false",
+                       withComma ? "," : "") > 0;
 }
 
-static void writeJsonIntKV(File& file, const __FlashStringHelper* key, int value, bool withComma)
+static bool writeJsonIntKV(File& file, const __FlashStringHelper* key, int value, bool withComma)
 {
-  file.printf_P(PSTR("  \"%S\": %d%s\n"),
-                reinterpret_cast<PGM_P>(key),
-                value,
-                withComma ? "," : "");
+  return file.printf_P(PSTR("  \"%S\": %d%s\n"),
+                       reinterpret_cast<PGM_P>(key),
+                       value,
+                       withComma ? "," : "") > 0;
 }
 
 //=======================================================================
-void writeSettings(bool show)
+bool writeSettings(bool show)
 {
 
   DebugTf(PSTR("[Settings] State: writeSettings called (show=%s)\r\n"), show ? "true" : "false");
@@ -213,66 +222,75 @@ void writeSettings(bool show)
   if (!file)
   {
     DebugTf(PSTR("[Settings] Error: open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_FILE);
-    return;
+    return false;
   }
 
   DebugT(F("[Settings] State: Writing JSON settings... "));
-  file.print(F("{\n"));
-  writeJsonStringKV(file, F("hostname"), settings.sHostname, true);
-  writeJsonStringKV(file, F("httppasswd"), settings.sHTTPpasswd, true);
-  writeJsonStringKV(file, F("DeviceManufacturer"), settings.device.sManufacturer, true);
-  writeJsonStringKV(file, F("DeviceModel"), settings.device.sModel, true);
-  writeJsonBoolKV(file, F("MQTTenable"), settings.mqtt.bEnable, true);
-  writeJsonStringKV(file, F("MQTTbroker"), settings.mqtt.sBroker, true);
-  writeJsonIntKV(file, F("MQTTbrokerPort"), settings.mqtt.iBrokerPort, true);
-  writeJsonStringKV(file, F("MQTTuser"), settings.mqtt.sUser, true);
-  writeJsonStringKV(file, F("MQTTpasswd"), settings.mqtt.sPasswd, true);
-  writeJsonStringKV(file, F("MQTTtoptopic"), settings.mqtt.sTopTopic, true);
-  writeJsonStringKV(file, F("MQTThaprefix"), settings.mqtt.sHaprefix, true);
-  writeJsonStringKV(file, F("MQTTuniqueid"), settings.mqtt.sUniqueid, true);
-  writeJsonBoolKV(file, F("MQTTOTmessage"), settings.mqtt.bOTmessage, true);
-  writeJsonIntKV(file, F("MQTTinterval"), settings.mqtt.iInterval, true);
-  writeJsonBoolKV(file, F("MQTTseparatesources"), settings.mqtt.bSeparateSources, true);
-  writeJsonBoolKV(file, F("MQTTharebootdetection"), settings.mqtt.bHaRebootDetect, true);
-  writeJsonBoolKV(file, F("MQTTdiscoveryAutoVerify"), settings.mqtt.bDiscoveryAutoVerify, true);
-  writeJsonBoolKV(file, F("NTPenable"), settings.ntp.bEnable, true);
-  writeJsonStringKV(file, F("NTPtimezone"), settings.ntp.sTimezone, true);
-  writeJsonStringKV(file, F("NTPhostname"), settings.ntp.sHostname, true);
-  writeJsonBoolKV(file, F("NTPsendtime"), settings.ntp.bSendtime, true);
-  writeJsonBoolKV(file, F("LEDblink"), settings.bLEDblink, true);
-  writeJsonBoolKV(file, F("darktheme"), settings.bDarkTheme, true);
-  writeJsonBoolKV(file, F("nightlyrestart"), settings.bNightlyRestart, true);
-  writeJsonIntKV(file, F("nightlyrestarthour"), settings.iRestartHour, true);
-  writeJsonBoolKV(file, F("ui_autoscroll"), settings.ui.bAutoScroll, true);
-  writeJsonBoolKV(file, F("ui_timestamps"), settings.ui.bShowTimestamp, true);
-  writeJsonBoolKV(file, F("ui_capture"), settings.ui.bCaptureMode, true);
-  writeJsonBoolKV(file, F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, true);
-  writeJsonBoolKV(file, F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, true);
-  writeJsonBoolKV(file, F("ui_autoexport"), settings.ui.bAutoExport, true);
-  writeJsonIntKV(file, F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, true);
-  writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settings.sensors.bEnabled, true);
-  writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settings.sensors.bLegacyFormat, true);
-  writeJsonIntKV(file, F("GPIOSENSORSpin"), settings.sensors.iPin, true);
-  writeJsonIntKV(file, F("GPIOSENSORSinterval"), settings.sensors.iInterval, true);
-  writeJsonBoolKV(file, F("S0COUNTERenabled"), settings.s0.bEnabled, true);
-  writeJsonIntKV(file, F("S0COUNTERpin"), settings.s0.iPin, true);
-  writeJsonIntKV(file, F("S0COUNTERdebouncetime"), settings.s0.iDebounceTime, true);
-  writeJsonIntKV(file, F("S0COUNTERpulsekw"), settings.s0.iPulsekw, true);
-  writeJsonIntKV(file, F("S0COUNTERinterval"), settings.s0.iInterval, true);
-  writeJsonBoolKV(file, F("OTGWcommandenable"), settings.otgw.bEnable, true);
-  writeJsonStringKV(file, F("OTGWcommands"), settings.otgw.sCommands, true);
-  writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settings.outputs.bEnabled, true);
-  writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settings.outputs.iPin, true);
-  writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settings.outputs.iTriggerBit, true);
-  writeJsonBoolKV(file, F("WebhookEnabled"), settings.webhook.bEnabled, true);
-  writeJsonStringKV(file, F("WebhookURLon"), settings.webhook.sURLon, true);
-  writeJsonStringKV(file, F("WebhookURLoff"), settings.webhook.sURLoff, true);
-  writeJsonIntKV(file, F("WebhookTriggerBit"), settings.webhook.iTriggerBit, true);
-  writeJsonStringKV(file, F("WebhookPayload"), settings.webhook.sPayload, true);
-  writeJsonStringKV(file, F("WebhookContentType"), settings.webhook.sContentType, false);
-  file.print(F("}\n"));
+  bool ok = file.print(F("{\n")) > 0;
+  ok = writeJsonStringKV(file, F("hostname"), settings.sHostname, true) && ok;
+  ok = writeJsonStringKV(file, F("httppasswd"), settings.sHTTPpasswd, true) && ok;
+  ok = writeJsonStringKV(file, F("DeviceManufacturer"), settings.device.sManufacturer, true) && ok;
+  ok = writeJsonStringKV(file, F("DeviceModel"), settings.device.sModel, true) && ok;
+  ok = writeJsonBoolKV(file, F("MQTTenable"), settings.mqtt.bEnable, true) && ok;
+  ok = writeJsonStringKV(file, F("MQTTbroker"), settings.mqtt.sBroker, true) && ok;
+  ok = writeJsonIntKV(file, F("MQTTbrokerPort"), settings.mqtt.iBrokerPort, true) && ok;
+  ok = writeJsonStringKV(file, F("MQTTuser"), settings.mqtt.sUser, true) && ok;
+  ok = writeJsonStringKV(file, F("MQTTpasswd"), settings.mqtt.sPasswd, true) && ok;
+  ok = writeJsonStringKV(file, F("MQTTtoptopic"), settings.mqtt.sTopTopic, true) && ok;
+  ok = writeJsonStringKV(file, F("MQTThaprefix"), settings.mqtt.sHaprefix, true) && ok;
+  ok = writeJsonStringKV(file, F("MQTTuniqueid"), settings.mqtt.sUniqueid, true) && ok;
+  ok = writeJsonBoolKV(file, F("MQTTOTmessage"), settings.mqtt.bOTmessage, true) && ok;
+  ok = writeJsonIntKV(file, F("MQTTinterval"), settings.mqtt.iInterval, true) && ok;
+  ok = writeJsonBoolKV(file, F("MQTTseparatesources"), settings.mqtt.bSeparateSources, true) && ok;
+  ok = writeJsonBoolKV(file, F("LegacyPort25238Enabled"), settings.mqtt.bLegacyPort25238Enabled, true) && ok;
+  ok = writeJsonBoolKV(file, F("MQTTharebootdetection"), settings.mqtt.bHaRebootDetect, true) && ok;
+  ok = writeJsonBoolKV(file, F("MQTTdiscoveryAutoVerify"), settings.mqtt.bDiscoveryAutoVerify, true) && ok;
+  ok = writeJsonBoolKV(file, F("NTPenable"), settings.ntp.bEnable, true) && ok;
+  ok = writeJsonStringKV(file, F("NTPtimezone"), settings.ntp.sTimezone, true) && ok;
+  ok = writeJsonStringKV(file, F("NTPhostname"), settings.ntp.sHostname, true) && ok;
+  ok = writeJsonBoolKV(file, F("NTPsendtime"), settings.ntp.bSendtime, true) && ok;
+  ok = writeJsonBoolKV(file, F("LEDblink"), settings.bLEDblink, true) && ok;
+  ok = writeJsonBoolKV(file, F("darktheme"), settings.bDarkTheme, true) && ok;
+  ok = writeJsonBoolKV(file, F("nightlyrestart"), settings.bNightlyRestart, true) && ok;
+  ok = writeJsonIntKV(file, F("nightlyrestarthour"), settings.iRestartHour, true) && ok;
+  ok = writeJsonBoolKV(file, F("ui_autoscroll"), settings.ui.bAutoScroll, true) && ok;
+  ok = writeJsonBoolKV(file, F("ui_timestamps"), settings.ui.bShowTimestamp, true) && ok;
+  ok = writeJsonBoolKV(file, F("ui_capture"), settings.ui.bCaptureMode, true) && ok;
+  ok = writeJsonBoolKV(file, F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, true) && ok;
+  ok = writeJsonBoolKV(file, F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, true) && ok;
+  ok = writeJsonBoolKV(file, F("ui_autoexport"), settings.ui.bAutoExport, true) && ok;
+  ok = writeJsonIntKV(file, F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, true) && ok;
+  ok = writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settings.sensors.bEnabled, true) && ok;
+  ok = writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settings.sensors.bLegacyFormat, true) && ok;
+  ok = writeJsonIntKV(file, F("GPIOSENSORSpin"), settings.sensors.iPin, true) && ok;
+  ok = writeJsonIntKV(file, F("GPIOSENSORSinterval"), settings.sensors.iInterval, true) && ok;
+  ok = writeJsonBoolKV(file, F("S0COUNTERenabled"), settings.s0.bEnabled, true) && ok;
+  ok = writeJsonIntKV(file, F("S0COUNTERpin"), settings.s0.iPin, true) && ok;
+  ok = writeJsonIntKV(file, F("S0COUNTERdebouncetime"), settings.s0.iDebounceTime, true) && ok;
+  ok = writeJsonIntKV(file, F("S0COUNTERpulsekw"), settings.s0.iPulsekw, true) && ok;
+  ok = writeJsonIntKV(file, F("S0COUNTERinterval"), settings.s0.iInterval, true) && ok;
+  ok = writeJsonBoolKV(file, F("OTGWcommandenable"), settings.otgw.bEnable, true) && ok;
+  ok = writeJsonStringKV(file, F("OTGWcommands"), settings.otgw.sCommands, true) && ok;
+  ok = writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settings.outputs.bEnabled, true) && ok;
+  ok = writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settings.outputs.iPin, true) && ok;
+  ok = writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settings.outputs.iTriggerBit, true) && ok;
+  ok = writeJsonBoolKV(file, F("WebhookEnabled"), settings.webhook.bEnabled, true) && ok;
+  ok = writeJsonStringKV(file, F("WebhookURLon"), settings.webhook.sURLon, true) && ok;
+  ok = writeJsonStringKV(file, F("WebhookURLoff"), settings.webhook.sURLoff, true) && ok;
+  ok = writeJsonIntKV(file, F("WebhookTriggerBit"), settings.webhook.iTriggerBit, true) && ok;
+  ok = writeJsonStringKV(file, F("WebhookPayload"), settings.webhook.sPayload, true) && ok;
+  ok = writeJsonStringKV(file, F("WebhookContentType"), settings.webhook.sContentType, false) && ok;
+  ok = (file.print(F("}\n")) > 0) && ok;
+  if (!ok) {
+    DebugTln(F("\r\n[Settings] Error: one or more settings writes failed"));
+  }
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
+  file.flush();
   file.close();  // Close write handle before any subsequent read
+  if (!ok) {
+    DebugTf(PSTR("[Settings] Error: Settings write incomplete for %s\r\n"), SETTINGS_FILE);
+    return false;
+  }
   DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
 
   if (show) {
@@ -284,6 +302,7 @@ void writeSettings(bool show)
     if (showFile) showFile.close();
   }
 
+  return true;
 } // writeSettings()
 
 
@@ -294,7 +313,7 @@ void readSettings(bool show)
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
-    writeSettings(show);
+    if (!writeSettings(show)) return;
     readSettings(false); //now it should work...
     return;
   }
@@ -514,6 +533,11 @@ void updateSetting(const char *field, const char *newValue)
     else settings.mqtt.iInterval = (uint16_t)val;
   }
   else if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settings.mqtt.bSeparateSources = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("LegacyPort25238Enabled"))==0 ||
+           strcasecmp_P(field, PSTR("legacyport25238enabled"))==0) {
+    settings.mqtt.bLegacyPort25238Enabled = EVALBOOLEAN(newValue);
+    pendingSideEffects |= SIDE_EFFECT_OTGWSTREAM;
+  }
   else if (strcasecmp_P(field, PSTR("NTPenable"))==0)      settings.ntp.bEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("NTPhostname"))==0)    {
     strlcpy(settings.ntp.sHostname, newValue, sizeof(settings.ntp.sHostname));

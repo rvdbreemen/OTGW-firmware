@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.5.0-beta.12
+**  Version  : v1.5.0-beta.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -565,14 +565,15 @@ static void prepareForReboot() {
   doWebSocketClose();     // close all WebSocket clients (wrapper, see webSocketStuff.ino)
   DebugTf(PSTR("[reboot]   ws close: %lums\r\n"), (unsigned long)(millis() - t));
 
-  // Final log line BEFORE debugTelnet.stop() kills our logging sink. Anything
-  // after this is best-effort — still emitted but will not reach telnet.
-  DebugTf(PSTR("[reboot]   stopping telnet+otgwstream, total=%lums heap=%u\r\n"),
+  // Final cleanup log before closing the OTGW TCP stream. Telnet logging stays
+  // up through the restart call so the final pre-restart line can still reach
+  // the operator.
+  DebugTf(PSTR("[reboot]   stopping otgwstream, total=%lums heap=%u\r\n"),
           (unsigned long)(millis() - tStart),
           (unsigned)ESP.getFreeHeap());
   DebugFlush();
 
-  // debugTelnet.stop();     // port 23 debug telnet
+  // Keep debugTelnet running so the final reboot log is still visible.
   OTGWstream.stop();      // port 25238 OTGW stream
 
   // IMPORTANT: do NOT call WiFi.disconnect() here. On ESP8266 Arduino with
@@ -584,11 +585,9 @@ static void prepareForReboot() {
   // with conf.ssid = 0 / conf.password = 0 when _persistent is true.
   // This was observed 2026-04-23 — reboot caused WiFi creds to be lost.
   //
-  // We don't actually need WiFi.disconnect() here: ESP.reset() (our final
-  // call below) is a bootrom jump that wipes all SDK state anyway, forcing
-  // a fresh association on the next boot. Keeping WiFi up through this
-  // cleanup phase is in fact necessary so the TCP FINs from the close/stop
-  // calls above can reach their peers before the reset fires.
+  // We intentionally keep WiFi up through this cleanup phase so the TCP FINs
+  // from the close/stop calls above can reach their peers before the restart
+  // fires.
 }
 
 // One-line boot/runtime signature with platform, hardware, heap, and reset
@@ -628,8 +627,8 @@ void logBootSignature(const char *phase) {
 // where services are not yet up and cleanup would be a no-op).
 // TASK-396: richly instrumented so every reboot leaves a breadcrumb trail in
 // the telnet log. Each phase logs its duration and a heap snapshot, except the
-// final "ESP.reset() now" line which is emitted AFTER telnet is torn down and
-// therefore only reaches a serial logger.
+// final "ESP.restart() now" line which is emitted before the restart request so
+// it can still reach telnet.
 void doRestart(const char* str) {
   const uint32_t tStart = millis();
   DebugTf(PSTR("[reboot] doRestart(\"%s\") begin, heap=%u minHeap=%u maxBlk=%u frag=%u\r\n"),
@@ -644,24 +643,18 @@ void doRestart(const char* str) {
   DebugTf(PSTR("[reboot]   flushSettings: %lums\r\n"), (unsigned long)(millis() - t));
 
   prepareForReboot();     // graceful shutdown: MQTT LWT, WS close frames, TCP FINs
-  // NOTE: prepareForReboot() called debugTelnet.stop() near its end, so every
-  // Debug* call from here on is silently dropped to telnet. Serial debug (if
-  // enabled in the build) still captures them. DebugFlush() is defensive.
+  // Telnet stays up through the final pre-restart log. DebugFlush() is
+  // defensive so the message is on the wire before the restart request.
 
   delay(2000);            // let TCP FINs + WiFi disassoc propagate (~1-2s RTT budget)
 
-  // ESP.reset() is a bootrom jump (address 0x40000080), equivalent to pressing
-  // the physical reset pin. It wipes ALL SDK and lwIP state, sidestepping the
-  // Core 3.1.0 regression where ESP.restart() could leave WiFi SDK state in a
-  // half-associated condition across the soft-reset. This matches the working
-  // manual recovery (physical reset button) that field testers discovered.
-  // Combined with the prepareForReboot() graceful cleanup above, we get both
-  // clean peer disconnects AND a guaranteed fresh boot.
-  // Never returns, so no safety-tail delay is required after this line.
-  DebugTf(PSTR("[reboot]   calling ESP.reset() after %lums total (this line may not reach telnet)\r\n"),
+  // Finish with the proven v1.2.0-style soft restart sequence after the newer
+  // cleanup/logging steps above.
+  DebugTf(PSTR("[reboot]   calling ESP.restart() after %lums total\r\n"),
           (unsigned long)(millis() - tStart));
   DebugFlush();
-  ESP.reset();
+  ESP.restart();
+  delay(5000);  // Safety tail retained from v1.2.0; should not normally return.
 }
 
 String upTime() 

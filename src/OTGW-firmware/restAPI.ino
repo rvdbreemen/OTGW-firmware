@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.5.0-beta.12
+**  Version  : v1.5.0-beta.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -629,6 +629,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("settings.mqtt.enabled"),   settings.mqtt.bEnable);
   sendJsonMapEntry(F("settings.mqtt.disc_verify"), settings.mqtt.bDiscoveryAutoVerify);
   sendJsonMapEntry(F("settings.mqtt.sep_src"),   settings.mqtt.bSeparateSources);
+  sendJsonMapEntry(F("settings.legacy.port_25238"), settings.mqtt.bLegacyPort25238Enabled);
 
   // [settings.ntp]
   sendJsonMapEntry(F("settings.ntp.server"),  settings.ntp.sHostname);
@@ -1259,6 +1260,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("mqttotmessage"), settings.mqtt.bOTmessage, "b");
   sendJsonSettingObj(F("mqttinterval"), settings.mqtt.iInterval, "i", 0, 3600);
   sendJsonSettingObj(F("mqttseparatesources"), settings.mqtt.bSeparateSources, "b");
+  sendJsonSettingObj(F("legacyport25238enabled"), settings.mqtt.bLegacyPort25238Enabled, "b");
   sendJsonSettingObj(F("ntpenable"), settings.ntp.bEnable, "b");
   sendJsonSettingObj(F("ntptimezone"), CSTR(settings.ntp.sTimezone), "s", 50);
   sendJsonSettingObj(F("ntphostname"), CSTR(settings.ntp.sHostname), "s", 50);
@@ -1311,7 +1313,7 @@ void sendDeviceSettings()
 static const char* const PROGMEM knownSettings[] = {
   "darktheme", "gpiooutputsenabled", "gpiooutputspin", "gpiooutputstriggerbit",
   "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
-  "hostname", "httppasswd", "ledblink", "nightlyrestart", "nightlyrestarthour",
+  "hostname", "httppasswd", "ledblink", "legacyport25238enabled", "nightlyrestart", "nightlyrestarthour",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
   "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",

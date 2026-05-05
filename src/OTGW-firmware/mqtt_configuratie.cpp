@@ -2570,7 +2570,7 @@ bool streamClimateDiscovery(PubSubClient &client,
     if (climateIdx == 0) {
       if (!w.writeProgmem(PSTR("\"initial\":\"20\",\"min_temp\":\"12\",\"max_temp\":\"28\",\"temp_step\":\"0.5\",\"precision\":0.1"))) return false;
     } else {
-      if (!w.writeProgmem(PSTR("\"initial\":\"43\",\"min_temp\":\"40\",\"max_temp\":\"60\",\"temp_step\":\"1\",\"precision\":1"))) return false;
+      if (!w.writeProgmem(PSTR("\"min_temp\":\"40\",\"max_temp\":\"60\",\"temp_step\":\"1\",\"precision\":1"))) return false;
     }
     if (!writeJsonComma(w)) return false;
 

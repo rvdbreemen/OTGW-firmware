@@ -34,8 +34,12 @@ extern OTGWState state;             // Global state object (provides flash.bESPa
 extern bool LittleFSmounted;        // LittleFS mount status flag
 extern bool updateLittleFSStatus(const char *probePath);
 extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
-extern void writeSettings(bool show); // Write settings from ESP memory to filesystem
+extern bool writeSettings(bool show); // Write settings from ESP memory to filesystem
 extern void settingsMarkClean();      // Clear dirty flag without writing or restarting services
+
+#ifndef OTA_FS_FINALIZE_TIMEOUT_MS
+#define OTA_FS_FINALIZE_TIMEOUT_MS 3000UL
+#endif
 
 #ifndef Debug
   //#warning Debug() was not defined!
@@ -48,6 +52,74 @@ extern void settingsMarkClean();      // Clear dirty flag without writing or res
 
 namespace esp8266httpupdateserver {
 using namespace esp8266webserver;
+
+static bool otaDeadlineExpired(uint32_t started, uint32_t timeoutMs)
+{
+  return timeoutMs > 0 && (millis() - started) > timeoutMs;
+}
+
+static bool finalizeFilesystemOtaAfterUpdateEnd(uint32_t timeoutMs)
+{
+  const uint32_t started = millis();
+
+  DebugTf(PSTR("[OTA][FS] finalize start, timeout=%lu ms\r\n"), (unsigned long)timeoutMs);
+  yield();
+
+  LittleFSConfig cfg;
+  cfg.setAutoFormat(false);
+  LittleFS.setConfig(cfg);
+
+  if (otaDeadlineExpired(started, timeoutMs)) {
+    DebugTln(F("[OTA][FS] finalize timeout before mount"));
+    return false;
+  }
+
+  DebugTln(F("[OTA][FS] mounting LittleFS after Update.end"));
+  LittleFSmounted = LittleFS.begin();
+  yield();
+
+  if (!LittleFSmounted) {
+    DebugTln(F("[OTA][FS] LittleFS.begin failed after FS OTA"));
+    return false;
+  }
+  DebugTln(F("[OTA][FS] mounted"));
+
+  if (otaDeadlineExpired(started, timeoutMs)) {
+    DebugTln(F("[OTA][FS] finalize timeout after mount"));
+    return false;
+  }
+
+  DebugTln(F("[OTA][FS] writing post-OTA probe"));
+  bool probeOk = updateLittleFSStatus(F("/.ota_post"));
+  yield();
+
+  if (!probeOk) {
+    DebugTln(F("[OTA][FS] post-OTA probe write failed; skipping settings restore"));
+    return false;
+  }
+  DebugTln(F("[OTA][FS] probe OK"));
+
+  if (otaDeadlineExpired(started, timeoutMs)) {
+    DebugTln(F("[OTA][FS] finalize timeout before settings restore"));
+    return false;
+  }
+
+  DebugTln(F("[OTA][FS] restoring settings"));
+  bool settingsOk = writeSettings(false);
+  yield();
+
+  if (!settingsOk) {
+    DebugTln(F("[OTA][FS] writeSettings failed after FS OTA"));
+    return false;
+  }
+  DebugTln(F("[OTA][FS] settings restore OK"));
+
+  settingsMarkClean();
+  yield();
+
+  DebugTf(PSTR("[OTA][FS] finalize complete in %lu ms\r\n"), (unsigned long)(millis() - started));
+  return true;
+}
 
 template <typename ServerType>
 ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(bool serial_debug)
@@ -291,17 +363,14 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_handleUploadEnd(HTTPUpload& u
     if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
     logBootSignature("[OTA] post-end");   // TASK-396 Phase 4: second probe, after Update.end(true) commits the image
 
+    bool fsFinalizeOk = true;
     if (_uploadTarget == "filesystem") {
-      LittleFSmounted = LittleFS.begin();
-      if (LittleFSmounted) {
-        updateLittleFSStatus(F("/.ota_post"));
-        if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
-        writeSettings(false);
-        settingsMarkClean();
+      if (_serial_output) DebugTln(F("[OTA][FS] Update.end OK"));
+      fsFinalizeOk = finalizeFilesystemOtaAfterUpdateEnd(OTA_FS_FINALIZE_TIMEOUT_MS);
+      if (fsFinalizeOk) {
         logBootSignature("[OTA] post-remount");   // TASK-396 Phase 4: third probe, FS-OTA only
       } else {
-        LittleFSmounted = false;
-        if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));
+        if (_serial_output) DebugTln(F("[OTA][FS] finalize failed or timed out; rebooting anyway"));
       }
     }
 
@@ -310,6 +379,7 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_handleUploadEnd(HTTPUpload& u
       DebugFlush();
     }
 
+    if (_serial_output) DebugTln(F("[OTA] clearing flash active"));
     ::state.flash.bESPactive = false;
   } else {
     _setUpdaterError();

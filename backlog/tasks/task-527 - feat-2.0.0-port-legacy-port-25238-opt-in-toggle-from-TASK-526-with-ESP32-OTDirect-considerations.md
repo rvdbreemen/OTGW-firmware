@@ -3,9 +3,11 @@ id: TASK-527
 title: >-
   feat-2.0.0: port legacy port 25238 opt-in toggle from TASK-526 (with ESP32 +
   OTDirect considerations)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@codex'
 created_date: '2026-05-03 10:49'
+updated_date: '2026-05-05 13:10'
 labels:
   - feature
   - ui
@@ -61,11 +63,53 @@ priority: medium
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 TASK-526 implementation 1-op-1 geport naar feature-2.0.0 met aanpassing voor ESP32 / OTDirect / Ethernet paden waar relevant
-- [ ] #2 Setting-naam en JSON-key consistent met dev-versie (bLegacyPort25238Enabled / LegacyPort25238Enabled) zodat een merge dev → feature-2.0.0 zonder semantische conflict werkt
-- [ ] #3 UI-toggle landed op de feature-2.0.0 versie van Settings-pagina, op een logische plek (Network of Advanced sectie)
-- [ ] #4 Op OTGW32-hardware (ESP32-S3, geen PIC): port 25238 uitschakelen verstoort de OTDirect OT-decoding niet
-- [ ] #5 Op Ethernet-variant: listener stopt/start netjes op de Ethernet-interface, niet alleen WiFi
-- [ ] #6 python build.py succeeds voor zowel esp8266:esp8266:d1_mini als de ESP32-S3 OTGW32 fqbn
-- [ ] #7 Release-notes voor de feature-2.0.0 versie waarin dit landt verwijzen naar dev's release-notes voor de migratie-guidance, plus eventuele hardware-specifieke notes
+- [x] #1 TASK-526 implementation 1-op-1 geport naar feature-2.0.0 met aanpassing voor ESP32 / OTDirect / Ethernet paden waar relevant
+- [x] #2 Setting-naam en JSON-key consistent met dev-versie (bLegacyPort25238Enabled / LegacyPort25238Enabled) zodat een merge dev → feature-2.0.0 zonder semantische conflict werkt
+- [x] #3 UI-toggle landed op de feature-2.0.0 versie van Settings-pagina, op een logische plek (Network of Advanced sectie)
+- [x] #4 Op OTGW32-hardware (ESP32-S3, geen PIC): port 25238 uitschakelen verstoort de OTDirect OT-decoding niet
+- [x] #5 Op Ethernet-variant: listener stopt/start netjes op de Ethernet-interface, niet alleen WiFi
+- [x] #6 python build.py succeeds voor zowel esp8266:esp8266:d1_mini als de ESP32-S3 OTGW32 fqbn
+- [x] #7 Release-notes voor de feature-2.0.0 versie waarin dit landt verwijzen naar dev's release-notes voor de migratie-guidance, plus eventuele hardware-specifieke notes
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Open the feature-2.0.0 worktree and inspect the port-25238 lifecycle, settings structs, REST settings API, and WebUI layout on that branch.
+2. Port the TASK-526 setting name and JSON key consistently: bLegacyPort25238Enabled / LegacyPort25238Enabled.
+3. Gate the legacy TCP listener behind the setting with runtime stop/start, accounting for ESP32, OTDirect, and Ethernet differences present on the branch.
+4. Add/adjust WebUI labels/help and release notes for 2.0.0.
+5. Run the required 2.0.0 validation build with firmware and filesystem together; then update ACs, notes, final summary, and prerelease version for this coherent change set.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- Ported the legacy TCP port 25238 setting into the 2.0.0 worktree.
+- Added runtime start/stop gating for the TCP listener and kept OTDirect decode loop independent from the TCP bridge.
+- Added WebUI labels/help, REST settings exposure, default filesystem setting, release notes, and bumped prerelease from alpha to alpha.1.
+
+- Validation: python3 evaluate.py --quick --no-color passed with 59 passed, 0 failed, 2 warnings.
+- Validation: python3 build.py --target all --no-color passed for ESP8266 and ESP32-S3, including firmware and LittleFS images for both targets.
+- Build produced esp8266 and esp32 .ino.bin/.littlefs.bin artifacts plus merged-full binaries. Build completed with an existing helper warning: flash_otgw.bat could not be copied to build/ because write_text(newline=...) is unsupported on this Python version; distribution zips were still created.
+- Hardware-specific ACs were verified by code-path/build review: OTDirect decode loop remains unconditional while only the TCP bridge is gated; SimpleTelnet listener start/stop is shared for WiFi/Ethernet.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ported the TASK-526 legacy TCP port 25238 opt-in behavior to the feature-2.0.0 worktree. The setting remains compatible with dev via bLegacyPort25238Enabled / LegacyPort25238Enabled, is exposed through REST/WebUI/default settings.ini, and defaults to disabled.
+
+Changes:
+- Added runtime start/stop gating for the SimpleTelnet listener on port 25238.
+- Gated PIC ser2net input/output and OTDirect TCP bridge I/O behind the setting while leaving loopOTDirect() and OT frame decoding untouched.
+- Added WebUI label/help text, known-settings whitelist entry, persisted settings support, and release-note migration guidance for pyotgw/otmonitor/custom TCP clients.
+- Bumped the 2.0.0 prerelease from alpha to alpha.1; build.py synchronized version headers/assets.
+
+Validation:
+- python3 evaluate.py --quick --no-color: 59 passed, 0 failed, 2 warnings.
+- python3 build.py --target all --no-color: passed for ESP8266 D1 Mini and ESP32-S3, building both firmware and LittleFS images for both targets.
+
+Notes:
+- No live hardware was connected; OTDirect and Ethernet acceptance were verified by branch code path and successful ESP32 build. The combined build emitted a non-fatal helper warning copying flash_otgw.bat to build/, while artifacts and distribution zips were created successfully.
+<!-- SECTION:FINAL_SUMMARY:END -->

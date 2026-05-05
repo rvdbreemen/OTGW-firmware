@@ -83,7 +83,7 @@ These remain compiled in but are off by default in stability builds; enable via 
 
 ## Behavioural notes for users
 
-- **No new MQTT topic, REST API, or settings format changes vs `v1.4.1`.** Existing automations and HA configurations carry over unchanged.
+- **Legacy otmonitor TCP port 25238 is now opt-in.** Users of the Home Assistant OpenTherm Gateway Python integration, `pyotgw`, or the original otmonitor desktop tool must enable `Legacy: enable otmonitor TCP port 25238` in the Web UI Settings page. MQTT-only users can leave it disabled, which is the new default.
 - **First-boot HA discovery cadence** is unchanged from `v1.4.1` (2 s normal / 10 s slow-mode). The discovery rewrite is reused as-is.
 - **`mqttha.cfg` is no longer in the filesystem image.** This is intentional and safe; the streaming discovery rewrite supersedes it. Users on a fresh flash see no difference.
 

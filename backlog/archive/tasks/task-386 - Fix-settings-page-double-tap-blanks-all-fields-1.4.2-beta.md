@@ -4,7 +4,7 @@ title: 'Fix: settings page double-tap blanks all fields (1.4.2-beta)'
 status: To Do
 assignee: []
 created_date: '2026-04-23 06:54'
-updated_date: '2026-04-23 06:54'
+updated_date: '2026-05-05 15:46'
 labels:
   - bug
   - ui
@@ -35,4 +35,6 @@ Discord #beta-testing (andrebrait, 2026-04-23 02:11Z): on 1.4.2-beta, tapping 'S
 
 <!-- SECTION:NOTES:BEGIN -->
 Waiting for: screenshot + browser info. Suspect: async fetch race in data/index.js settings-tab handler.
+
+[2026-05-05] Backlog review: archived after >7 days waiting for reporter screenshot/browser info with no follow-up.
 <!-- SECTION:NOTES:END -->

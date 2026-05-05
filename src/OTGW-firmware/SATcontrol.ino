@@ -3336,7 +3336,7 @@ static void satAutoTuneUpdate()
             _at_overshootCount, _at_undershootCount, _at_oscillationCount);
 
     // Persist updated coefficient
-    writeSettings(false);
+    (void)writeSettings(false);
   }
 
   // Reset counters for next tuning window

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.5.0-beta.12
+**  Version  : v1.5.0-beta.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4923,6 +4923,7 @@ var translateFields = [
   , ["mqttinterval", "MQTT Publish Interval (sec)"]
   , ["mqttotmessage", "MQTT Raw OpenTherm Messages"]
   , ["mqttseparatesources", "MQTT Separate Sources"]
+  , ["legacyport25238enabled", "Legacy: enable otmonitor TCP port 25238"]
   , ["otgwcommandenable", "Run Boot Command"]
   , ["otgwcommands", "Boot Command"]
   , ["thermostatconnected", "Thermostat Connected"]
@@ -4960,6 +4961,7 @@ var translateTooltips = [
   , ["mqttinterval", "Minimum time between repeated MQTT updates when a value does not change. Use 0 to publish every update."]
   , ["mqttotmessage", "Publish raw OpenTherm messages on MQTT for diagnostics and advanced integrations."]
   , ["mqttseparatesources", "Publish thermostat and boiler values on separate MQTT topics when available."]
+  , ["legacyport25238enabled", "Required for the Home Assistant OpenTherm Gateway Python integration and the otmonitor desktop tool. Disable if you only use MQTT."]
   , ["ntpenable", "Use an NTP server to keep the gateway clock in sync."]
   , ["ntptimezone", "Timezone name used for local time and daylight saving changes."]
   , ["ntphostname", "Hostname of the NTP server. The default pool server is usually fine."]

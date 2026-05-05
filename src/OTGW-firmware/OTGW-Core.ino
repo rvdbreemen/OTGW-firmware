@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.5.0-beta.12
+**  Version  : v1.5.0-beta.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4587,7 +4587,32 @@ const char* getOTGWValue(int msgid)
 
 void startOTGWstream()
 {
-  OTGWstream.begin(false);    // false = skip WiFi check; bind unconditionally
+  if (!settings.mqtt.bLegacyPort25238Enabled) {
+    DebugTln(F("[OTGWstream] legacy port 25238 disabled"));
+    OTGWstream.stop();
+    return;
+  }
+
+  if (OTGWstream.begin(false)) {    // false = skip WiFi check; bind unconditionally
+    DebugTln(F("[OTGWstream] legacy port 25238 enabled"));
+  } else {
+    DebugTln(F("[OTGWstream] legacy port 25238 start failed"));
+  }
+}
+
+void stopOTGWstream()
+{
+  DebugTln(F("[OTGWstream] stopping legacy port 25238"));
+  OTGWstream.stop();
+}
+
+void applyLegacyPort25238Setting()
+{
+  if (settings.mqtt.bLegacyPort25238Enabled) {
+    startOTGWstream();
+  } else {
+    stopOTGWstream();
+  }
 }
 
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------
