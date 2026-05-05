@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-04-26 16:42'
-updated_date: '2026-04-30 00:37'
+updated_date: '2026-05-05 21:53'
 labels:
   - bug
   - 1.5.0-beta
@@ -75,3 +75,15 @@ At 15:51 UTC: *"Some logging would be great, but it's hard to get I guess, as th
 - [ ] #4 Fix verified: at least 3 consecutive first-reboot cycles after flashing 1.5.0-beta acquire DHCP/IP without requiring a forced reconnect from the upstream router
 - [ ] #5 Reporter andrebrait confirms the fix on the same hardware where the symptom was reproduced
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-05-05: Triage update — no new info from andrebrait in the last 9 days. Two WiFi-relevant commits have landed on dev since the original report against beta+d40c2f6 (2026-04-26):
+- 8cf181d3 fix(wifi): avoid re-binding TCP listeners on WiFi reconnect
+- 38e37f6e fix(wifi): downgrade WiFiManager to 2.0.15-rc.1, add portal heap diagnostics
+
+Neither was filed specifically against this DHCP-on-first-reboot symptom, but both touch the WiFi/portal lifecycle and could plausibly affect first-boot DHCP behaviour. Current published prerelease is 1.5.0-beta.15 (cf41da4b, 2026-05-05). Recommended next step: ask andrebrait to retest against beta.15 with a clean wipe before flashing — that addresses both the DHCP question and the residual-state hypothesis (AC #3) in one go.
+
+No AC changes; all five remain blocked on hardware (lab repro or serial-during-boot capture) and reporter confirmation.
+<!-- SECTION:NOTES:END -->
