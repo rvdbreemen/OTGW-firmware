@@ -2276,8 +2276,15 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
 
 // ---------------------------------------------------------------------------
 // expandAndStreamSensorSources()
-// Expands a source-template sensor into 3 per-source variants
-// (thermostat/boiler/gateway) and streams each via streamSensorDiscovery().
+// Expands a source-template sensor into per-source variants and streams each
+// via streamSensorDiscovery(). For 0x07-flagged sensors, three variants are
+// emitted: /thermostat, /boiler, and the canonical (no suffix / no segment)
+// entity. The canonical entity carries the gateway-overridden value (or the
+// most recent live value when no override is active) — that is, the same
+// value HA would see on the base topic with bSeparateSources=false. There is
+// no /gateway variant: gateway-source frames are not published to a
+// per-source sub-topic; they reach the canonical topic via the sendMQTTData()
+// call that precedes every publishToSourceTopic() in OTGW-Core.ino.
 // Returns true if at least one variant was successfully published.
 // Lives here (not in MQTTstuff.ino) to avoid Arduino auto-prototyper
 // mangling custom-type parameters.
@@ -2287,20 +2294,21 @@ bool expandAndStreamSensorSources(PubSubClient &client,
                                   HaDiscoveryContext &ctx)
 {
   static const char src_suffix_thermostat[] PROGMEM = "_thermostat";
-  static const char src_suffix_boiler[] PROGMEM = "_boiler";
-  static const char src_suffix_gateway[] PROGMEM = "";
-  static const char src_name_thermostat[] PROGMEM = "Thermostat";
-  static const char src_name_boiler[] PROGMEM = "Boiler";
-  static const char src_name_gateway[] PROGMEM = "Gateway";
-  static const char src_seg_thermostat[] PROGMEM = "thermostat";
-  static const char src_seg_boiler[] PROGMEM = "boiler";
-  static const char src_seg_gateway[] PROGMEM = "gateway";
+  static const char src_suffix_boiler[]     PROGMEM = "_boiler";
+  static const char src_suffix_canonical[]  PROGMEM = "";
+  static const char src_name_thermostat[]   PROGMEM = "Thermostat";
+  static const char src_name_boiler[]       PROGMEM = "Boiler";
+  static const char src_name_canonical[]    PROGMEM = "";
+  static const char src_seg_thermostat[]    PROGMEM = "thermostat";
+  static const char src_seg_boiler[]        PROGMEM = "boiler";
+  static const char src_seg_canonical[]     PROGMEM = "";
 
   struct { PGM_P suffix; PGM_P name; PGM_P segment; } sources[] = {
     {src_suffix_thermostat, src_name_thermostat, src_seg_thermostat},
-    {src_suffix_boiler, src_name_boiler, src_seg_boiler},
-    {src_suffix_gateway, src_name_gateway, src_seg_gateway},
+    {src_suffix_boiler,     src_name_boiler,     src_seg_boiler},
+    {src_suffix_canonical,  src_name_canonical,  src_seg_canonical},
   };
+  constexpr uint8_t kSourceVariantCount = sizeof(sources) / sizeof(sources[0]);
 
   bool published = false;
   char suffixBuf[16], nameBuf[16], segBuf[16];
@@ -2310,7 +2318,7 @@ bool expandAndStreamSensorSources(PubSubClient &client,
   const char *origName = ctx.sourceName;
   const char *origSeg = ctx.sourceTopicSegment;
 
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < kSourceVariantCount; i++) {
     strncpy_P(suffixBuf, sources[i].suffix, sizeof(suffixBuf) - 1); suffixBuf[sizeof(suffixBuf)-1] = '\0';
     strncpy_P(nameBuf, sources[i].name, sizeof(nameBuf) - 1); nameBuf[sizeof(nameBuf)-1] = '\0';
     strncpy_P(segBuf, sources[i].segment, sizeof(segBuf) - 1); segBuf[sizeof(segBuf)-1] = '\0';
