@@ -1627,6 +1627,13 @@ void markAllMQTTConfigPending()
   setMQTTConfigPending(OTGWdallasdataid);
   // Heap/discovery statistics discovery (TASK-346): 17 retained otgw-firmware/stats/* topics
   setMQTTConfigPending(OTGWheapstatsid);
+  // Diagnostic discovery (TASK-540 / TASK-541): firmware info, PIC info, PIC settings.
+  // PIC pseudo-IDs use MQTT_HA_FLAG_IS_PIC_ENTRY so they self-skip when isPICEnabled() is false.
+  setMQTTConfigPending(OTGWfwinfoid);
+  setMQTTConfigPending(OTGWpicinfoid);
+  setMQTTConfigPending(OTGWpicsettingsid);
+  // 2.0.0-specific diagnostic discovery (TASK-541): OTDirect flame metrics + SAT BLE/pressure health.
+  setMQTTConfigPending(OTGWdiag200id);
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }

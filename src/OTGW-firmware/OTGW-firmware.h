@@ -619,6 +619,17 @@ byte      OTGWs0dataid = 245;                     // foney dataid for counter au
 // MQTTautoCfgPendingMap tracks this entry like any other in markAllMQTTConfigPending().
 byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats autoconfigure
 
+// Diagnostic discovery pseudo-IDs (TASK-540 / TASK-541):
+//   248 — otgw-firmware/{reboot_count,reboot_reason,version,hostname}
+//   249 — otgw-pic/{version,deviceid,firmwaretype,designer,picavailable} (PIC-gated)
+//   250 — otgw-pic/settings/* (15 PR=-polled topics, PIC-gated)
+//   251 — 2.0.0-specific diagnostics: otgw32/flame_*, sat/ble_* health, sat/ch_pressure_status
+//         (SAT user-facing measurements + zones live in TASK-543)
+byte      OTGWfwinfoid       = 248;
+byte      OTGWpicinfoid      = 249;
+byte      OTGWpicsettingsid  = 250;
+byte      OTGWdiag200id      = 251;
+
 // Forward declarations for helperStuff.ino functions called from template
 // instantiations in OTGW-ModUpdateServer-impl.h (pulled in via networkStuff.h).
 // Without these, GCC 4.8.2 (Arduino Core 2.7.4 toolchain) reports
