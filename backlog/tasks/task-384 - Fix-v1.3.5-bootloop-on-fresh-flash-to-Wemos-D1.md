@@ -1,10 +1,10 @@
 ---
 id: TASK-384
-title: 'Fix: v1.3.5 bootloop on fresh flash to Wemos D1'
+title: 'Fresh-flash bootloop on Wemos D1 mini (no-shield, multiple FW versions)'
 status: To Do
 assignee: []
 created_date: '2026-04-22 20:53'
-updated_date: '2026-05-02 14:10'
+updated_date: '2026-05-05 21:50'
 labels:
   - bug
   - needs-info
@@ -22,7 +22,7 @@ GitHub #554 (ArnoudPJ, 2026-04-22): A fresh Wemos D1 mini could not be flashed w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reporter confirms whether 1.4.1 direct-flash also bootloops on a fresh Wemos D1
+- [x] #1 Reporter confirms whether 1.4.1 direct-flash also bootloops on a fresh Wemos D1
 - [ ] #2 Serial output or telnet log during bootloop captured
 - [ ] #3 Root cause identified (partition mismatch, LittleFS init, PROGMEM alignment, or other)
 - [ ] #4 Fix verified by reporter or on a fresh Wemos D1 in the lab
@@ -40,4 +40,6 @@ Waiting for: (1) reporter answer on whether 1.4.1 direct-flash also bootloops; (
 2026-04-29: Second reporter dvd77 confirms identical bootloop on GitHub #554 (https://github.com/rvdbreemen/OTGW-firmware/issues/554#issuecomment-4344614879). Same serial output 'rst cause:2, boot mode:(3,7)' repeating, same failure across 1.3.5, 1.4.1 and 1.5.0-beta. dvd77 reports flashing succeeds (esptool reports OK) but reboot loop is immediate. Tested without OTGW board attached (only ESP8266 + dev board), so the bootloop is firmware-side, not PIC- or hardware-OTGW-related. Two reporters now confirms this is reproducible and not a one-off. Increasing priority justification: ArnoudPJ + dvd77 both unable to use new hardware; possible fresh-flash bug specific to certain Wemos D1 batches.
 
 2026-05-02 (check_otgw_issues): dvd77 posted follow-up on GitHub #554 at 2026-05-01T11:18Z (https://github.com/rvdbreemen/OTGW-firmware/issues/554#issuecomment-4359045635). Quote: 'Update : when connected to the OTGW board I had to retry 4 to 5 times to connect to the ESP8266 AP when it succeeded. Working for now on 1.4.1'. New data points: (a) the bootloop dvd77 saw without the OTGW board attached resolves once the OTGW shield is connected — i.e. ESP8266 alone (no PIC, no shield power loading) appears unable to complete boot for some firmware versions; (b) AP connection succeeds only after 4-5 retries; (c) v1.4.1 currently runs stable for dvd77 with shield attached. This is a workaround, not a fix — root cause for the no-shield bootloop is still unidentified. Hypothesis to verify: power draw / brownout behaviour without shield, or something in WiFi-init sequence that depends on shield-side hardware presence. Task remains needs-info: serial-during-bootloop capture from a dvd77-style no-shield setup is the missing evidence.
+
+2026-05-05: Triage update — title corrected. Original "v1.3.5 bootloop" framing is no longer accurate: dvd77 reproduced the same bootloop on 1.4.1 and 1.5.0-beta on 2026-04-29 (GitHub #554 comment 4344614879). AC #1 (reporter confirms 1.4.1 direct-flash also bootloops) is now satisfied by dvd77's evidence — checked. Remaining ACs #2-#4 still hold and remain blocked on serial-during-bootloop capture from a no-shield setup. Priority left at MEDIUM since both reporters have working setups via the shield-attach workaround.
 <!-- SECTION:NOTES:END -->
