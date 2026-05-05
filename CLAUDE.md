@@ -1,3 +1,10 @@
+# OpenWolf
+
+@.wolf/OPENWOLF.md
+
+This project uses OpenWolf for context management. Read and follow .wolf/OPENWOLF.md every session. Check .wolf/cerebrum.md before generating code. Check .wolf/anatomy.md before reading files.
+
+
 
 <!-- BACKLOG.MD GUIDELINES START -->
 # Instructions for the usage of Backlog.md CLI Tool
@@ -804,3 +811,28 @@ Concrete rules that override the default "ask first":
 - **Other remote branches** (`feature-*`, `fix-*`): require explicit per-instance confirmation unless the user has granted standing permission for that specific branch in this same section.
 
 When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
+
+## Worktree layout
+
+This project is intentionally checked out into **two parallel git worktrees** so the 1.5.x release line and the 2.0.0 feature line can be worked on side-by-side without branch-switch churn:
+
+| Worktree path | Branch | Purpose |
+|---|---|---|
+| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware` | `dev` | 1.5.x release line — the default working tree |
+| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware-2.0.0` | `feature-dev-2.0.0-otgw32-esp32-sat-support` | 2.0.0 ESP32 + SAT feature line |
+
+**Rule: keep both worktrees present.** Work that targets one branch (e.g. SAT dashboard / ESP32 / 2.0.0 features) belongs in its own worktree; work targeting `dev` belongs in the dev worktree. Never use `git checkout <other-branch>` inside one worktree to do work that belongs in the other — it defeats the point of the split and risks losing in-flight changes on the original branch.
+
+**If only one worktree exists, create the missing one before starting side-by-side work.** From inside the existing worktree:
+
+```bash
+# missing the 2.0.0 feature worktree:
+git worktree add ../OTGW-firmware-2.0.0 feature-dev-2.0.0-otgw32-esp32-sat-support
+
+# missing the dev worktree:
+git worktree add ../OTGW-firmware dev
+```
+
+Verify with `git worktree list`.
+
+**Backlog.md cross-tree quirk.** The `backlog` CLI can resolve `backlog task <id> --plain` from either worktree, but `backlog task edit` only writes to the worktree where the task file actually lives. If an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file. SAT / ESP32 / 2.0.0 tasks generally live in the feature worktree's `backlog/tasks/`, not in dev's.
