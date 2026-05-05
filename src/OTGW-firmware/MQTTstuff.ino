@@ -433,15 +433,17 @@ const char s_cmd_debugptr[] PROGMEM = "debugptr";
 
 // Source variant strings for separate-source MQTT data publishing.
 // Used by publishToSourceTopic() via copySourceTableEntry().
+// Gateway-source frames (OTGW_REQUEST_BOILER) are no longer published to a
+// per-source sub-topic — their value lands on the canonical topic via the
+// sendMQTTData() call that precedes every publishToSourceTopic() invocation.
 const char s_mqtt_src_key_thermostat[] PROGMEM = "thermostat";
 const char s_mqtt_src_key_boiler[] PROGMEM = "boiler";
-const char s_mqtt_src_key_gateway[] PROGMEM = "gateway";
 
 const char* const mqttSourceKeys[] PROGMEM = {
   s_mqtt_src_key_thermostat,
-  s_mqtt_src_key_boiler,
-  s_mqtt_src_key_gateway
+  s_mqtt_src_key_boiler
 };
+constexpr uint8_t MQTT_SOURCE_KEY_COUNT = sizeof(mqttSourceKeys) / sizeof(mqttSourceKeys[0]);
 
 const char s_otgw_TT[] PROGMEM = "TT";
 const char s_otgw_TC[] PROGMEM = "TC";
@@ -1178,20 +1180,24 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
 }
 
 // Shared source mapping for source-separated MQTT topics / HA discovery expansion.
-// Returns false for parity errors / unknown types (caller should not publish).
+// Returns false for parity errors / unknown types AND for gateway-as-thermostat
+// frames — those land on the canonical topic only (no /gateway sub-topic).
 static bool resolveSourceIndex(byte rsptype, uint8_t &sourceIndex) {
   switch (rsptype) {
     case OTGW_THERMOSTAT:        sourceIndex = 0; return true;
     case OTGW_BOILER:            sourceIndex = 1; return true;
     case OTGW_ANSWER_THERMOSTAT: sourceIndex = 1; return true;  // OTGW answers as boiler — value is boiler-side
-    case OTGW_REQUEST_BOILER:    sourceIndex = 2; return true;  // OTGW requests for itself — gateway source
+    // OTGW_REQUEST_BOILER (gateway-as-thermostat) intentionally drops through
+    // to default: gateway-substituted values are exposed via the canonical
+    // topic only, no /gateway sub-topic. The canonical topic is already
+    // written by sendMQTTData() before publishToSourceTopic() is called.
     default: return false;
   }
 }
 
 static bool copySourceTableEntry(const char* const table[], uint8_t sourceIndex, char *dest, size_t destSize)
 {
-  if (!dest || destSize == 0 || sourceIndex >= 3) return false;
+  if (!dest || destSize == 0 || sourceIndex >= MQTT_SOURCE_KEY_COUNT) return false;
   PGM_P pValue = (PGM_P)pgm_read_ptr(&table[sourceIndex]);
   if (!pValue) { dest[0] = '\0'; return false; }
   strncpy_P(dest, pValue, destSize - 1);
