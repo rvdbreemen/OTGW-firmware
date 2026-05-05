@@ -82,7 +82,14 @@ void _debugBOL(const char *fn, int line)
    static time_t lastCachedSec = 0;
    static char cachedPrefix[35] = "";  // "HH:MM:SS" + " ( heap| block) "
 
-   time_t now_sec = time(nullptr);
+   // Single atomic read: derive seconds from gettimeofday() so HH:MM:SS and
+   // .uuuuuu can never come from different second-ticks. Using time(nullptr)
+   // separately races: when the wall clock ticks between time() and
+   // gettimeofday(), the cached HH:MM:SS lags one second behind tv_usec, which
+   // makes log lines appear out of order within the same printed second.
+   timeval now;
+   gettimeofday(&now, nullptr);
+   time_t now_sec = now.tv_sec;
 
    // Initialize timezone on first call or refresh every 5 minutes (300 seconds)
    // Check now_sec > 0 to ensure time is set
@@ -96,9 +103,6 @@ void _debugBOL(const char *fn, int line)
      }
      // If timezone creation fails, keep using previous cached timezone
    }
-
-   timeval now;
-   gettimeofday(&now, nullptr);
 
    // If timezone not yet initialized, try to initialize it now (first call fallback)
    // This handles cases when time is not set yet (now_sec <= 0) or when primary initialization failed
