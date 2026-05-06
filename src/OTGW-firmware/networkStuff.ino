@@ -68,7 +68,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     bool gwOk = gw.fromString(settings.network.sStaticGW);
     bool snOk = sn.fromString(settings.network.sStaticSN);
     if (settings.network.sStaticDNS[0] != '\0')
-      dns.fromString(settings.network.sStaticDNS);
+    {
+      if (!dns.fromString(settings.network.sStaticDNS))
+        dns = gw; // invalid DNS address — fall back to gateway
+    }
     else
       dns = gw; // fall back to gateway as DNS when not specified
 
