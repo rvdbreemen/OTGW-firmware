@@ -1,10 +1,10 @@
 ---
 id: TASK-547
 title: 'Fix: Services unreachable after WiFi reconnect'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-06 09:04'
-updated_date: '2026-05-06 09:04'
+updated_date: '2026-05-06 09:09'
 labels:
   - bug
   - wifi
@@ -28,3 +28,15 @@ After a reboot the device reconnects to WiFi, gets an IP, and is pingable — bu
 - [ ] #2 debugTelnet and OTGWstream are stopped before being restarted in the WIFI_RECONNECTED handler
 - [ ] #3 No regression in normal WiFi reconnect behaviour (TASK-372 fix remains intact)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-05-06: Fixed in v1.5.0-beta.16, confirmed resolved by andrebrait. GitHub #560 closed.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed in v1.5.0-beta.16. Reporter andrebrait confirmed the issue is resolved. GitHub issue #560 closed as completed.
+<!-- SECTION:FINAL_SUMMARY:END -->
