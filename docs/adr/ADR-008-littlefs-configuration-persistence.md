@@ -1,8 +1,8 @@
 # ADR-008: LittleFS for Configuration Persistence
 
-**Status:** Accepted  
-**Date:** 2020-06-01 (Migration from SPIFFS)  
-**Updated:** 2026-02-16 (Added deferred side-effects bitmask documentation)
+## Status
+
+Accepted, 2020-06-01 (Migration from SPIFFS). Updated 2026-02-16 (Added deferred side-effects bitmask documentation).
 
 ## Context
 

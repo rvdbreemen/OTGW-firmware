@@ -1,8 +1,8 @@
 # ADR-017: WiFiManager for Initial Configuration
 
-**Status:** Accepted  
-**Date:** 2018-01-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2018-01-01 (Estimated). Updated 2026-01-28 (Documentation).
 
 ## Context
 

@@ -1,9 +1,8 @@
 # ADR-066: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification
 
-**Status:** Proposed
-**Date:** 2026-04-28
-**Classification:** structural (no CI gate, manual review at PR time)
-**Decision Maker:** User: Rob van den Breemen (rvdbreemen)
+## Status
+
+Proposed, 2026-04-28. Classification: structural (no CI gate, manual review at PR time). Decision Maker: User: Rob van den Breemen (rvdbreemen).
 
 ## Context
 
@@ -51,6 +50,10 @@ Encoded in `docs/api/MQTT-message-id-echo-audit.md`. Initial release marks 6 Msg
 
 All other MsgIDs default to `bSlaveEchoesValue = true`. For MsgIDs without write support (`R/-`) the field is moot but set to `true` for consistency.
 
+## Alternatives Considered
+
+<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+
 ## Consequences
 
 ### Positive
@@ -77,12 +80,15 @@ All other MsgIDs default to `bSlaveEchoesValue = true`. For MsgIDs without write
 3. **Clarity:** the decision is implementable from the text alone (function names, struct field, call-site changes spelled out). The audit doc is unambiguous per MsgID.
 4. **Consistency:** does not contradict ADR-040 (extends it), does not contradict ADR-052 (refines per-topic eligibility within it). No conflict with ADR-006 (MQTT integration), ADR-038 (OT data flow pipeline), ADR-049 (no String in protocol path), ADR-051 (settings/state encapsulation).
 
-## Related
+## Related Decisions
 
 - **ADR-040:** MQTT Source-Specific Topics for OpenTherm Values (this ADR amends scope of "base topic always published" rule).
 - **ADR-052:** MQTT Publish Eligibility and Reconnect Refresh Contract (this ADR refines per-topic-class eligibility).
 - **ADR-051:** Dual Encapsulating Structs (provides the `state.*` / `settings.*` separation that `bSeparateSources` lives in).
 - **TASK-478:** Implementation task tracking the code changes that realize this decision.
+
+## References
+
 - **`docs/api/MQTT-message-id-echo-audit.md`:** the per-MsgID classification table.
 - **OpenTherm v4.2 specification reference:** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`.
 

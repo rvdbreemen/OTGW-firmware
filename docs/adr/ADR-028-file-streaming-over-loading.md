@@ -1,9 +1,8 @@
 # ADR-028: File Streaming Over Loading for Memory Safety
 
-**Status:** Accepted  
-**Date:** 2026-02-01  
-**Updated:** 2026-02-01 (Initial version)  
-**Related to:** ADR-004 (Static Buffer Allocation), ADR-009 (PROGMEM String Literals)
+## Status
+
+Accepted, 2026-02-01. Updated 2026-02-01 (Initial version). Related to: ADR-004 (Static Buffer Allocation), ADR-009 (PROGMEM String Literals).
 
 ## Context
 
@@ -328,14 +327,7 @@ if (line.length() > 512) {  // Bounded response size
 }
 ```
 
-## Related Documentation
-
-- **Bug Fix Assessment:** `docs/reviews/2026-02-01_memory-management-bug-fix/BUG_FIX_ASSESSMENT.md`
-- **Quick Reference:** `docs/reviews/2026-02-01_memory-management-bug-fix/QUICK_REFERENCE.md`
-- **Executive Summary:** `docs/reviews/2026-02-01_memory-management-bug-fix/EXECUTIVE_SUMMARY.md`
-- **Copilot Instructions:** `.github/copilot-instructions.md` (lines 193-320)
-
-## Related ADRs
+## Related Decisions
 
 - **ADR-004:** Static Buffer Allocation Strategy
 - **ADR-009:** PROGMEM Usage for String Literals
@@ -345,6 +337,10 @@ if (line.length() > 512) {  // Bounded response size
 ## References
 
 - **Bug Fix Commit:** 2e935543b9381566d77545559bffdde98475a3e7
+- **Bug Fix Assessment:** `docs/reviews/2026-02-01_memory-management-bug-fix/BUG_FIX_ASSESSMENT.md`
+- **Quick Reference:** `docs/reviews/2026-02-01_memory-management-bug-fix/QUICK_REFERENCE.md`
+- **Executive Summary:** `docs/reviews/2026-02-01_memory-management-bug-fix/EXECUTIVE_SUMMARY.md`
+- **Copilot Instructions:** `.github/copilot-instructions.md` (lines 193-320)
 - **ESP8266 Arduino Core:** https://arduino-esp8266.readthedocs.io/
 - **ESP8266WebServer Documentation:** https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WebServer
 

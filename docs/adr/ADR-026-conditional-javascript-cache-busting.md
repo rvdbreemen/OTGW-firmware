@@ -1,8 +1,8 @@
 # ADR-026: Conditional JavaScript Cache-Busting for Firmware/Filesystem Version Mismatches
 
-**Status:** Accepted  
-**Date:** 2026-01-31  
-**Supersedes:** N/A
+## Status
+
+Accepted, 2026-01-31. Supersedes: N/A.
 
 ## Context
 

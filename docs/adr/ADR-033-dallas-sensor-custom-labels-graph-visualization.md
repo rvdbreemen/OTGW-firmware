@@ -215,3 +215,7 @@ Settings capacity: 2560 bytes (previously 1536, +1024)
 
 2026-02-04 (Initial implementation)
 2026-02-07 (Security fixes and ADR documentation)
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

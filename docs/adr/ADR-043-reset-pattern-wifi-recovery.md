@@ -1,7 +1,8 @@
 # ADR-043: Reset-Pattern WiFi Recovery Trigger
 
-**Status:** Accepted  
-**Date:** 2026-03-01
+## Status
+
+Accepted, 2026-03-01.
 
 ## Context
 

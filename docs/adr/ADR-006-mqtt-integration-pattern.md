@@ -1,9 +1,8 @@
 # ADR-006: MQTT Integration Pattern
 
-**Status:** Accepted
-**Date:** 2018-06-01 (Estimated)
-**Updated:** 2026-02-16 (Added complete state machine, heap-aware backpressure)
-**Updated:** 2026-03-05 (v1.3.0: configurable interval throttle, OTPublishGate RAII, PS=1 integration)
+## Status
+
+Accepted, 2018-06-01 (Estimated). Updated 2026-03-05 (v1.3.0: configurable interval throttle, OTPublishGate RAII, PS=1 integration).
 
 ## Context
 

@@ -1,8 +1,8 @@
 # ADR-053: Large Feature Buffer Static Allocation
 
-**Status:** Accepted  
-**Date:** 2026-03-21  
-**Supersedes:** ADR-004 (Static Buffer Allocation Strategy)
+## Status
+
+Accepted, 2026-03-21. Supersedes: ADR-004 (Static Buffer Allocation Strategy).
 
 ## Context
 

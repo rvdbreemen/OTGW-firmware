@@ -1,8 +1,8 @@
 # ADR-014: Dual Build System (Makefile + Python Script)
 
-**Status:** Accepted  
-**Date:** 2020-01-01 (build.py added)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2020-01-01 (build.py added). Updated 2026-01-28 (Documentation).
 
 ## Context
 

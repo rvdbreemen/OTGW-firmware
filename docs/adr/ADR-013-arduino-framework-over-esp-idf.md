@@ -1,8 +1,8 @@
 # ADR-013: Arduino Framework Over ESP-IDF
 
-**Status:** Accepted  
-**Date:** 2016-01-01 (Initial development)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2016-01-01 (Initial development). Updated 2026-01-28 (Documentation).
 
 ## Context
 

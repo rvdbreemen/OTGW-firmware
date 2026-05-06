@@ -1,8 +1,8 @@
 # ADR-023: File System Explorer HTTP Architecture
 
-**Status:** Accepted  
-**Date:** 2019-01-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2019-01-01 (Estimated). Updated 2026-01-28 (Documentation).
 
 ## Context
 

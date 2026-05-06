@@ -1,8 +1,8 @@
 # ADR-056: Protected Admin Endpoint Security and Secret-Handling Contract
 
-**Status:** Accepted  
-**Date:** 2026-03-21  
-**Supersedes:** ADR-054 (fully); continues the partial supersession of ADR-032 for protected admin endpoints and secret-handling behavior
+## Status
+
+Accepted, 2026-03-21. Supersedes: ADR-054 (fully); continues the partial supersession of ADR-032 for protected admin endpoints and secret-handling behavior.
 
 ## Context
 

@@ -1,8 +1,8 @@
 # ADR-002: Modular .ino File Architecture
 
-**Status:** Accepted  
-**Date:** 2018-06-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2018-06-01 (Estimated). Updated 2026-01-28 (Documentation).
 
 ## Context
 

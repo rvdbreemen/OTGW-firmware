@@ -1,8 +1,8 @@
 # ADR-044: Global State — extern Declaration in Header, Definition in .ino
 
-**Status:** Accepted
-**Date:** 2026-03-05
-**Context:** v1.3.0-beta refactoring review
+## Status
+
+Accepted, 2026-03-05. Context: v1.3.0-beta refactoring review.
 
 ## Context
 
@@ -120,3 +120,7 @@ The `OTPublishGate` RAII struct is defined in `OTGW-Core.h` because it is a stru
 - ADR-002: Modular `.ino` Architecture (explains why multiple files share a single TU)
 - ADR-006: MQTT Integration Pattern (uses `mqttlastsent`, `mqttPublishAllowed`, `OTPublishGate`)
 - ADR-004: Static Buffer Allocation Strategy (context for why large arrays are global rather than stack-allocated)
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

@@ -1,7 +1,8 @@
 # ADR-046: PS=1 Summary Translation with Shared Publish Helpers
 
-**Status:** Accepted  
-**Date:** 2026-03-07
+## Status
+
+Accepted, 2026-03-07.
 
 ## Context
 

@@ -1,9 +1,8 @@
 # ADR-048: Non-Blocking Webhook State Machine with Retry
 
-**Status:** Accepted
-**Date:** 2026-03-01
-**Relates to:** ADR-007 (Timer-Based Task Scheduling), ADR-047 (WiFi State Machine)
-**Clarification:** 2026-03-21 - This ADR remains the mechanism-level decision for cooperative webhook retry. The current implementation retains one pending transition at a time and does not queue or guarantee preservation of every intermediate state change during a retry cycle. See ADR-057 for the policy-level delivery contract.
+## Status
+
+Accepted, 2026-03-01. Relates to: ADR-007 (Timer-Based Task Scheduling), ADR-047 (WiFi State Machine). Clarification: 2026-03-21 - This ADR remains the mechanism-level decision for cooperative webhook retry. The current implementation retains one pending transition at a time and does not queue or guarantee preservation of every intermediate state change during a retry cycle. See ADR-057 for the policy-level delivery contract..
 
 ## Context
 
@@ -133,3 +132,7 @@ Refactored in P10 of the C++ refactoring plan (webhook.ino):
 - ADR-004: Static Buffer Allocation (no String in error path)
 - ADR-003: HTTP-Only (webhook targets local HTTP only)
 - ADR-032: No Authentication / Local Network Security (webhook URL validation)
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

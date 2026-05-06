@@ -1,10 +1,8 @@
 # ADR-040: MQTT Source-Specific Topics for OpenTherm Values
 
-**Status:** Accepted  
-**Date:** 2026-02-16  
-**Updated:** 2026-02-23 (Adapted to nested source topics and opt-in default)
-**Amended by:** ADR-068 (2026-05-03 — bSeparateSources is mutually exclusive between base and source-variants, removes the original "additive" property)
-**Decision Maker:** User: Rob van den Breemen (rvdbreemen)
+## Status
+
+Accepted, 2026-02-16. Updated 2026-02-23 (Adapted to nested source topics and opt-in default). Amended by: ADR-068 (2026-05-03 — bSeparateSources is mutually exclusive between base and source-variants, removes the original "additive" property). Decision Maker: User: Rob van den Breemen (rvdbreemen).
 
 ## Context
 

@@ -102,6 +102,10 @@ The check implementation should be resilient to:
 | New sub-minute granularity (e.g., every 10s) | Use `DECLARE_TIMER_SEC` + `DUE()` — these are not consume-on-read and can have multiple consumers safely. |
 | Moving a consumer between functions | Ensure the dispatcher still captures the flag exactly once; do not reintroduce the helper elsewhere. |
 
+## Alternatives Considered
+
+<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+
 ## Consequences
 
 ### Benefits
@@ -123,7 +127,7 @@ The check implementation should be resilient to:
 - **Multi-subscriber event bus with callback registration.** Rejected: overkill for four events on a microcontroller with no dynamic memory management pattern elsewhere.
 - **Convert the helpers to non-consuming (return flag without updating lastX; caller updates).** Rejected: breaks the existing call sites, requires every call to become two lines, error-prone transition.
 
-## Related
+## Related Decisions
 
 - ADR-062 — retained discovery verification (introduces the new daily consumer that motivates this rule)
 - TASK-345 — already established single-caller dispatch for `hourChanged()` in `doTaskEvery60s`; this refactor moves that same pattern into `doTaskMinuteChanged` for wall-clock alignment
@@ -131,3 +135,7 @@ The check implementation should be resilient to:
 - TASK-351 — adds the new daily consumer inside the unified dispatcher
 - `helperStuff.ino:467-515` — the four helper definitions (unchanged by this ADR)
 - `networkStuff.ino:494-504` — current `sendtimecommand` (signature changes in TASK-350)
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

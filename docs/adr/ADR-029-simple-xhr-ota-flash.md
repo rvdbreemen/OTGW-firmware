@@ -1,10 +1,8 @@
 # ADR-029: Simple XHR-Based OTA Flash (KISS Principle)
 
-**Status:** Accepted
-**Date:** 2026-02-04
-**Updated:** 2026-03-14 (Corrected health endpoint, watchdog mechanism, backup scope; removed dead `xhrUpload` function, `%SETTINGS_MSG%` placeholder, status tracking struct)  
-**Supersedes:** Previous WebSocket + Polling dual-mode flash implementation (dev branch)  
-**Related to:** ADR-003 (HTTP-Only Architecture), ADR-004 (Static Buffer Allocation), ADR-011 (Hardware Watchdog)
+## Status
+
+Accepted, 2026-02-04. Updated 2026-03-14 (Corrected health endpoint, watchdog mechanism, backup scope; removed dead `xhrUpload` function, `%SETTINGS_MSG%` placeholder, status tracking struct). Supersedes: Previous WebSocket + Polling dual-mode flash implementation (dev branch). Related to: ADR-003 (HTTP-Only Architecture), ADR-004 (Static Buffer Allocation), ADR-011 (Hardware Watchdog).
 
 ## Context
 
@@ -348,6 +346,10 @@ var errorEl            // Error message element
 - Flash: 10-30 seconds (no progress updates)
 - Health check: 10-30 seconds (countdown visible)
 - **Total: 30-90 seconds** (acceptable for infrequent operation)
+
+## Alternatives Considered
+
+<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
 
 ## Consequences
 

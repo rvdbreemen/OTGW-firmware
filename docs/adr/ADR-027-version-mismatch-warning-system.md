@@ -1,8 +1,8 @@
 # ADR-027: Version Mismatch Warning System in Web UI
 
-**Status:** Accepted  
-**Date:** 2026-01-31  
-**Supersedes:** N/A
+## Status
+
+Accepted, 2026-01-31. Supersedes: N/A.
 
 ## Context
 

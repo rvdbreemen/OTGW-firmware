@@ -1,8 +1,8 @@
 # ADR-031: Two-Microcontroller Coordination Architecture
 
-**Status:** Accepted  
-**Date:** 2026-02-07  
-**Decision Maker:** Copilot Agent based on codebase analysis
+## Status
+
+Accepted, 2026-02-07. Decision Maker: Copilot Agent based on codebase analysis.
 
 ## Context
 

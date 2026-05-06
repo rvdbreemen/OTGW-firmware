@@ -1,8 +1,8 @@
 # ADR-001: ESP8266 Platform Selection
 
-**Status:** Accepted  
-**Date:** 2016-01-01 (Initial implementation)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2016-01-01 (Initial implementation). Updated 2026-01-28 (Documentation).
 
 ## Context
 

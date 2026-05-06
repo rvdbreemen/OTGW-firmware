@@ -1,9 +1,8 @@
 # ADR-068: bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive
 
-**Status:** Accepted (amends ADR-040; structural-level per the binding-rule CI-gate convention)
-**Date:** 2026-05-03
-**Accepted:** 2026-05-03 (four verification gates passed: Completeness, Evidence, Clarity, Consistency)
-**Decision Maker:** User: Rob van den Breemen (rvdbreemen)
+## Status
+
+Accepted (amends ADR-040; structural-level per the binding-rule CI-gate convention), 2026-05-03. Accepted: 2026-05-03 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Decision Maker: User: Rob van den Breemen (rvdbreemen).
 
 ## Context
 
@@ -142,7 +141,7 @@ Without ADR-067, users upgrading from a pre-fix firmware with `bSeparateSources 
 3. **Clarity:** the decision is implementable from the text alone. Function names, branch shape, and the placement-of-`setMQTTConfigDone` invariant are spelled out. The bitmap layout (8 × uint32 = 32 bytes, indexed by `(id >> 5) & 0x07` and bit-tested by `1U << (id & 0x1F)`) is given concretely. Default vs opt-in behaviour stated in one sentence each.
 4. **Consistency:** does not contradict ADR-040; amends its "additive" property explicitly. Refines ADR-066's master-topic invariant by removing one half of the redundancy ADR-066 stabilised. Aligned with ADR-051 (`settings.mqtt.bSeparateSources` access pattern). Consistent with ADR-041 (JIT discovery state-machine integrity preserved by keeping `setMQTTConfigDone` outside the if-chain). Per the binding-rule CI-gate convention: structural classification, no CI gate required; reviewers should confirm at PR-time that (a) the `else if` ordering keeps `setMQTTConfigDone(cfg.id)` outside the chain in both loops, (b) the bitmap-build is lazy and idempotent, (c) `expandAndStreamSensorSources()` itself is unchanged.
 
-## Related
+## Related Decisions
 
 - **ADR-040:** MQTT Source-Specific Topics for OpenTherm Values. **This ADR amends ADR-040** by changing the "base topic / base entity always published" property to "base entity is suppressed for source-templated MsgIDs when `bSeparateSources = true`". Per the project amendment convention, ADR-040's status line should be updated to note "amended by ADR-068".
 - **ADR-041:** JIT HA Discovery. The `setMQTTConfigDone(cfg.id)` placement decision (kept outside the if-chain) preserves the JIT state-machine invariant that every iterated MsgID is recorded as configured exactly once.

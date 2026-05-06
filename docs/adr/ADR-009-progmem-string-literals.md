@@ -1,9 +1,8 @@
 # ADR-009: PROGMEM Usage for String Literals
 
-**Status:** Accepted  
-**Date:** 2018-06-01 (Initial adoption)  
-**Updated:** 2026-01-28 (Documentation)  
-**Enforced:** 2020-01-01 (Mandatory via evaluation framework)
+## Status
+
+Accepted, 2018-06-01 (Initial adoption). Updated 2026-01-28 (Documentation). Enforced: 2020-01-01 (Mandatory via evaluation framework).
 
 ## Context
 

@@ -1,9 +1,8 @@
 # ADR-012: PIC Firmware Upgrade via Web UI
 
-**Status:** Accepted  
-**Date:** 2019-06-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)  
-**Critical Fix:** Release Candidate v1.0.0-rc4 (Binary data parsing safety)
+## Status
+
+Accepted, 2019-06-01 (Estimated). Updated 2026-01-28 (Documentation). Critical Fix: Release Candidate v1.0.0-rc4 (Binary data parsing safety).
 
 ## Context
 

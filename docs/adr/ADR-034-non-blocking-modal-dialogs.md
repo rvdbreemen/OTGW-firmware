@@ -1,8 +1,8 @@
 # ADR-034: Non-Blocking Modal Dialogs for User Input
 
-**Status:** Accepted  
-**Date:** 2026-02-04  
-**Updated:** 2026-02-04
+## Status
+
+Accepted, 2026-02-04. Updated 2026-02-04.
 
 ## Context
 

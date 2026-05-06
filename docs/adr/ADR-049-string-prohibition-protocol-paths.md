@@ -1,8 +1,8 @@
 # ADR-049: String Class Prohibition in Protocol Paths
 
-**Status:** Accepted
-**Date:** 2026-03-01
-**Supersedes:** Strengthens ADR-004 (Static Buffer Allocation)
+## Status
+
+Accepted, 2026-03-01. Supersedes: Strengthens ADR-004 (Static Buffer Allocation).
 
 ## Context
 
@@ -78,3 +78,7 @@ Refactored in P1 of the C++ refactoring plan:
 - ADR-004: Static Buffer Allocation Strategy (foundational principle)
 - ADR-009: PROGMEM String Literals (complementary RAM savings)
 - ADR-016: OpenTherm Command Queue (affected data path)
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

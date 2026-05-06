@@ -1,10 +1,8 @@
 # ADR-005: WebSocket for Real-Time Streaming
 
-**Status:** Accepted  
-**Date:** 2019-06-01 (Estimated)  
-**Updated:** 2026-02-04 (OTA Flash Note)
+## Status
 
-**Note:** As of ADR-029 (2026-02-04), OTA firmware flash no longer uses WebSocket for progress updates. WebSocket is now used exclusively for OpenTherm message streaming.
+Accepted, 2019-06-01 (Estimated). Updated 2026-02-04 (OTA Flash Note). Note: As of ADR-029 (2026-02-04), OTA firmware flash no longer uses WebSocket for progress updates. WebSocket is now used exclusively for OpenTherm message streaming..
 
 ## Context
 

@@ -81,6 +81,10 @@ Auto-deleting would be dangerous: if the firmware incorrectly computes its own n
 - `tickDiscoveryVerification()` is polled from `handleMQTT()`. On MQTT disconnect mid-window, it fast-closes (clears flag without calling unsubscribe or buffer-restore; those are redundant on a dead client).
 - Buffer-size restoration is strictly ordered: `unsubscribe → setBufferSize(384)`. Unsubscribing at the large buffer prevents truncating the UNSUBSCRIBE packet.
 
+## Alternatives Considered
+
+<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+
 ## Consequences
 
 ### Benefits
@@ -116,7 +120,7 @@ These binding rules need CI-gate entries in `evaluate.py`:
 
 These gates land in TASK-349.
 
-## Related
+## Related Decisions
 
 - ADR-004 — no String in hot paths (all new code uses `char[]` + `snprintf_P`)
 - ADR-040 — source-specific topics explain why wildcard must be `/#`, not `/+/config`
@@ -127,3 +131,7 @@ These gates land in TASK-349.
 - TASK-349 — this ADR's implementation
 - TASK-351 — time-boundary dispatcher unification (prerequisite for TASK-350 auto-verify trigger)
 - TASK-350 — daily automatic verify triggered from unified dispatcher
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

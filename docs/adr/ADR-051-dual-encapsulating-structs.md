@@ -1,8 +1,8 @@
 # ADR-051: Dual Encapsulating Structs (Settings + State)
 
-**Status:** Accepted
-**Date:** 2026-03-01
-**Relates to:** ADR-008 (LittleFS Persistence), ADR-004 (Static Buffer Allocation)
+## Status
+
+Accepted, 2026-03-01. Relates to: ADR-008 (LittleFS Persistence), ADR-004 (Static Buffer Allocation).
 
 ## Context
 
@@ -126,3 +126,7 @@ Refactored in P5 of the C++ refactoring plan:
 - ADR-008: LittleFS Configuration Persistence (settings storage)
 - ADR-004: Static Buffer Allocation (char[] members, not String)
 - ADR-009: PROGMEM String Literals (default values use PSTR where applicable)
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

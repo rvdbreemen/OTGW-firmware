@@ -1,9 +1,8 @@
 # ADR-041: Just-In-Time Home Assistant MQTT Discovery
 
-**Status:** Accepted
-**Date:** 2026-02-24
-**Updated:** 2026-02-24 (Gap 2 resolved; `bForceAll` parameter removed; Serial `m` removed)
-**Decision Maker:** User: Rob van den Breemen (rvdbreemen)
+## Status
+
+Accepted, 2026-02-24. Updated 2026-02-24 (Gap 2 resolved; `bForceAll` parameter removed; Serial `m` removed). Decision Maker: User: Rob van den Breemen (rvdbreemen).
 
 ## Context
 
@@ -219,10 +218,14 @@ REST endpoints now call the parameterless `doAutoConfigure()`.
   reconnect triggers a round of Path B re-publishing (harmless, but unnecessary when broker
   is fine).
 
-## Related ADRs
+## Related Decisions
 
 - [ADR-004](ADR-004-static-buffer-allocation.md) — Static buffer allocation (scratch buffers
   used by `doAutoConfigure` and `doAutoConfigureMsgid`)
 - [ADR-006](ADR-006-mqtt-integration-pattern.md) — MQTT integration pattern
 - [ADR-040](ADR-040-mqtt-source-specific-topics.md) — Source-specific topics; source-template
   expansion in `doAutoConfigureMsgid` / `expandAndPublishSourceTemplates`
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

@@ -1,7 +1,8 @@
 # ADR-059: Ser2net Queue Awareness and Serial Bus Coordination
 
-**Status:** Accepted
-**Date:** 2026-03-28
+## Status
+
+Accepted, 2026-03-28.
 
 ## Context
 
@@ -46,6 +47,10 @@ When a ser2net command is detected (CR received, `sWrite` contains `XX=...`), th
 
 For PR commands (which can have multiple entries with different register letters, e.g., `PR=O`, `PR=S`), the removal also matches on the register letter at position 3 (`sWrite[3]` vs `cmdqueue[qi].cmd[3]`), consistent with the register-level matching used in `checkOTGWcmdqueue()`.
 
+## Alternatives Considered
+
+<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+
 ## Consequences
 
 ### Benefits
@@ -61,8 +66,12 @@ For PR commands (which can have multiple entries with different register letters
 - **Single entry removal:** Only the first matching queue entry is removed per ser2net command. If `forceQueue=true` caused duplicate entries with the same prefix, subsequent duplicates remain. In practice, deduplication in `addOTWGcmdtoqueue()` prevents this for non-PR commands, and PR commands use register-level matching.
 - **No deep integration:** Ser2net commands are not tracked in the queue, so the queue cannot retry or log them. This is intentional — ser2net is a passthrough, not a managed channel.
 
-## Related
+## Related Decisions
 
 - [ADR-016: OpenTherm Command Queue](ADR-016-opentherm-command-queue.md) — queue design and deduplication
 - [ADR-031: Two-Microcontroller Coordination Architecture](ADR-031-two-microcontroller-coordination-architecture.md) — ESP8266/PIC serial link
 - [ADR-058: Non-blocking PIC Command/Response](ADR-058-nonblocking-pic-command-response.md) — async PR= handling that populates the queue
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

@@ -1,9 +1,8 @@
 # ADR-007: Timer-Based Task Scheduling
 
-**Status:** Accepted  
-**Date:** 2018-06-01 (Estimated)
-**Updated:** 2026-03-26 (Timer cascade updated: removed 5s/30s, added 3s PIC readout)
-**Enhanced:** 2020-01-01 (49-day rollover protection)
+## Status
+
+Accepted, 2018-06-01 (Estimated). Updated 2026-03-26 (Timer cascade updated: removed 5s/30s, added 3s PIC readout). Enhanced: 2020-01-01 (49-day rollover protection).
 
 ## Context
 

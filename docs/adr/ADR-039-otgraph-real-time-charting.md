@@ -1,8 +1,8 @@
 # ADR-039: Real-Time OTGraph Charting Architecture
 
-**Status:** Accepted  
-**Date:** 2026-02-16  
-**Updated:** 2026-02-16 (Initial documentation of existing pattern)
+## Status
+
+Accepted, 2026-02-16. Updated 2026-02-16 (Initial documentation of existing pattern).
 
 ## Context
 

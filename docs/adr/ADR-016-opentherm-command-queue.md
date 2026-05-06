@@ -1,8 +1,8 @@
 # ADR-016: OpenTherm Command Queue with Deduplication
 
-**Status:** Accepted  
-**Date:** 2018-06-01 (Estimated)  
-**Updated:** 2026-02-16 (Clarified prefix-based deduplication, added v2 API cross-reference)
+## Status
+
+Accepted, 2018-06-01 (Estimated). Updated 2026-02-16 (Clarified prefix-based deduplication, added v2 API cross-reference).
 
 ## Context
 

@@ -1,8 +1,8 @@
 # ADR-061: WiFi Reconnect Timeout Tuning
 
-**Status:** Accepted
-**Date:** 2026-04-03
-**Supersedes:** ADR-047 (timeout and retry parameters only; state machine design unchanged)
+## Status
+
+Accepted, 2026-04-03. Supersedes: ADR-047 (timeout and retry parameters only; state machine design unchanged).
 
 ## Context
 
@@ -31,6 +31,10 @@ The state machine design from ADR-047 is unchanged — only the timing parameter
 
 `WiFi.setAutoReconnect(true)` is kept enabled. It handles brief WiFi glitches (channel hops, momentary interference) transparently at the radio level in under 1 second. `loopWifi()` serves as the fallback for longer outages where the SDK auto-reconnect is insufficient.
 
+## Alternatives Considered
+
+<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+
 ## Consequences
 
 ### Positive
@@ -42,7 +46,12 @@ The state machine design from ADR-047 is unchanged — only the timing parameter
 - Longer time before reboot on persistent failure (300s vs 75s)
   - Accepted: 5 minutes is still reasonable, and correct reconnection is more important than fast failure
 
-## Related
+## Related Decisions
+
 - ADR-047: Non-Blocking WiFi Reconnect State Machine (design unchanged, parameters updated)
+
+## References
+
 - `loopWifi()` in `OTGW-firmware.ino`
 - `startWiFi()` in `networkStuff.ino`
+

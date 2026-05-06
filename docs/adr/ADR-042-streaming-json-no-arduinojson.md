@@ -1,9 +1,8 @@
 # ADR-042: Streaming JSON I/O — No ArduinoJson
 
-**Status:** Accepted
-**Date:** 2026-02-28
-**Decision Maker:** User: Rob van den Breemen (rvdbreemen)
-**Supersedes:** ADR-018 (ArduinoJson for Data Interchange)
+## Status
+
+Accepted, 2026-02-28. Decision Maker: User: Rob van den Breemen (rvdbreemen). Supersedes: ADR-018 (ArduinoJson for Data Interchange).
 
 ## Context
 

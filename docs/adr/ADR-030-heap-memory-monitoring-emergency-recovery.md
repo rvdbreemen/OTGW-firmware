@@ -1,8 +1,8 @@
 # ADR-030: Heap Memory Monitoring and Emergency Recovery
 
-**Status:** Accepted  
-**Date:** 2026-02-07  
-**Decision Maker:** Copilot Agent based on codebase analysis
+## Status
+
+Accepted, 2026-02-07. Decision Maker: Copilot Agent based on codebase analysis.
 
 ## Context
 

@@ -1,7 +1,8 @@
 # ADR-052: MQTT Publish Eligibility and Reconnect Refresh Contract
 
-**Status:** Accepted  
-**Date:** 2026-03-17
+## Status
+
+Accepted, 2026-03-17.
 
 ## Context
 

@@ -1,8 +1,8 @@
 # ADR-025: Safari WebSocket Connection Management During Firmware Upload
 
-**Status:** Accepted  
-**Date:** 2026-01-29  
-**Supersedes:** N/A
+## Status
+
+Accepted, 2026-01-29. Supersedes: N/A.
 
 ## Context
 

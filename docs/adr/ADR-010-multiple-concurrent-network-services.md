@@ -1,8 +1,8 @@
 # ADR-010: Multiple Concurrent Network Services
 
-**Status:** Accepted  
-**Date:** 2019-01-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2019-01-01 (Estimated). Updated 2026-01-28 (Documentation).
 
 ## Context
 

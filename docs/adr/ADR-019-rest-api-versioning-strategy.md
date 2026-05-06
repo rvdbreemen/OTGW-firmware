@@ -1,8 +1,8 @@
 # ADR-019: REST API Versioning Strategy
 
-**Status:** Accepted  
-**Date:** 2020-06-01 (v1 introduced), 2024-01-01 (v2 introduced)  
-**Updated:** 2026-02-16 (Added ADR-035 cross-reference for v2 RESTful expansion)
+## Status
+
+Accepted, 2020-06-01 (v1 introduced), 2024-01-01 (v2 introduced). Updated 2026-02-16 (Added ADR-035 cross-reference for v2 RESTful expansion).
 
 ## Context
 

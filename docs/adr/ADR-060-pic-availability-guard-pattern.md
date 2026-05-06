@@ -1,7 +1,8 @@
 # ADR-060: PIC Availability Guard Pattern
 
-**Status:** Accepted
-**Date:** 2026-03-31
+## Status
+
+Accepted, 2026-03-31.
 
 ## Context
 

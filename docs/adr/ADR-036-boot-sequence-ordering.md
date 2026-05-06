@@ -1,8 +1,8 @@
 # ADR-036: Boot Sequence Initialization Ordering
 
-**Status:** Accepted  
-**Date:** 2026-02-16  
-**Updated:** 2026-03-21 (Swapped startNTP/startWiFi order to fix hostname regression)
+## Status
+
+Accepted, 2026-02-16. Updated 2026-03-21 (Swapped startNTP/startWiFi order to fix hostname regression).
 
 ## Context
 

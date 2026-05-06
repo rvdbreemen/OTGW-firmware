@@ -1,8 +1,8 @@
 # ADR-057: Webhook Delivery, Retry, and Protected Test Endpoint Policy
 
-**Status:** Accepted  
-**Date:** 2026-03-21  
-**Supersedes:** ADR-055
+## Status
+
+Accepted, 2026-03-21. Supersedes: ADR-055.
 
 ## Context
 

@@ -33,6 +33,10 @@ Operational consequences of this decision:
 
 3. **No silent subtree changes.** A rename, split, or removal requires a new ADR that supersedes this one, a dual-publish migration (see below), and release notes that call out the breaking change.
 
+## Alternatives Considered
+
+<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+
 ## Consequences
 
 **Benefits:**
@@ -82,7 +86,7 @@ Flag table entries with `MQTT_HA_FLAG_IS_PIC_ENTRY` set:
 
 Currently **no sensor table entries** carry the flag. The PIC-settings topics (`otgw-pic/settings/*`) are published but have no HA discovery. Adding discovery for them is out of scope for TASK-388 but is enabled by this ADR: future work sets the flag on the relevant sensor entries and the generator handles the prefix automatically.
 
-## Related
+## Related Decisions
 
 - **TASK-388** — the immediate bug fix that introduces `kPicSubtreePrefix` and activates the flag in the discovery generators. Links this ADR from source comments at `MQTTstuff.h:176`, `MQTTstuff.ino:55`, `mqtt_configuratie.cpp:1897, 1990, 2412`.
 - **TASK-389** — the task that authors this ADR and tracks its progression from Proposed to Accepted.
@@ -90,3 +94,7 @@ Currently **no sensor table entries** carry the flag. The PIC-settings topics (`
 - **ADR-004** — "No String class in hot paths". The `kPicSubtreePrefix` definition and the helper planned in TASK-390 both use PROGMEM-correct `char[]` patterns consistent with ADR-004.
 - **v1.3.0 release** — the release in which the `otgw-pic/` subtree was introduced. Tag `v1.3.0`; see `mqttha.cfg` entries for `boiler_connected` and `thermostat_connected` with `stat_t = %mqtt_pub_topic%/otgw-pic/<label>` as the original design.
 - **mqttha.cfg archive** — `docs/archive/mqttha-generator/` holds the retired `mqttha.cfg` and generator scripts. The historical `stat_t` literals there are the authoritative reference for the pre-takeover contract.
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

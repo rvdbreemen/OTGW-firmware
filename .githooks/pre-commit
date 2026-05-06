@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# adr-kit pre-commit hook (template; copied to project's .githooks/pre-commit by /adr-kit:install-hooks).
+#
+# Resolves the latest installed adr-kit version dynamically so plugin upgrades
+# don't require re-running install-hooks. Degrades gracefully when the plugin
+# cache is missing — the hook never blocks a commit because of tooling drift.
+#
+# Disable a single commit:    ADR_KIT_HOOK_DISABLE=1 git commit ...
+# Remove permanently:         /adr-kit:install-hooks --uninstall  (in a Claude Code session)
+
+set -e
+
+if [ "${ADR_KIT_HOOK_DISABLE:-0}" = "1" ]; then
+  echo "[adr-kit] hook disabled for this commit (ADR_KIT_HOOK_DISABLE=1)" >&2
+  exit 0
+fi
+
+ADR_KIT_BASE="${HOME}/.claude/plugins/cache/rvdbreemen-adr-kit/adr-kit"
+ADR_JUDGE=""
+if [ -d "$ADR_KIT_BASE" ]; then
+  # Pick the highest installed version (lexicographic sort works for SemVer-shaped dirs).
+  ADR_JUDGE=$(ls -d "$ADR_KIT_BASE"/*/bin/adr-judge 2>/dev/null | sort -V | tail -1)
+fi
+
+if [ -z "$ADR_JUDGE" ] || [ ! -x "$ADR_JUDGE" ]; then
+  echo "[adr-kit] adr-judge binary not found in plugin cache; skipping pre-commit ADR check." >&2
+  echo "[adr-kit] Re-install with /adr-kit:install-hooks in a Claude Code session." >&2
+  exit 0
+fi
+
+ROOT=$(git rev-parse --show-toplevel)
+DIFF=$(git diff --cached --unified=0)
+if [ -z "$DIFF" ]; then
+  exit 0
+fi
+
+# Run the deterministic judge. Exit codes:
+#   0  no declarative violations (advisory entries for llm_judge ADRs are non-blocking)
+#   1  declarative violation found
+#   2  config or runtime error
+echo "$DIFF" | "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/"

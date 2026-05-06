@@ -1,8 +1,8 @@
 # ADR-021: S0 Pulse Counter Hardware Interrupt Architecture
 
-**Status:** Accepted  
-**Date:** 2020-01-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2020-01-01 (Estimated). Updated 2026-01-28 (Documentation).
 
 ## Context
 

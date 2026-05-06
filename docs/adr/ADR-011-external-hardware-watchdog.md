@@ -1,8 +1,8 @@
 # ADR-011: External Hardware Watchdog for Reliability
 
-**Status:** Accepted  
-**Date:** 2018-01-01 (Estimated - initial hardware design)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2018-01-01 (Estimated - initial hardware design). Updated 2026-01-28 (Documentation).
 
 ## Context
 

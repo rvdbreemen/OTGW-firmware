@@ -1,8 +1,8 @@
 # ADR-035: RESTful API Compliance Strategy
 
-**Status:** Accepted  
-**Date:** 2026-02-16  
-**Supersedes:** None (extends ADR-019)
+## Status
+
+Accepted, 2026-02-16. Supersedes: None (extends ADR-019).
 
 ## Context
 

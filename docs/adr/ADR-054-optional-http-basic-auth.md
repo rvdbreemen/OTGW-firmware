@@ -1,9 +1,8 @@
 # ADR-054: Optional HTTP Basic Authentication for Settings
 
-**Status:** Superseded by ADR-056  
-**Date:** 2026-02-24  
-**Updated:** 2026-03-21 (Superseded - see ADR-056: Protected Admin Endpoint Security and Secret-Handling Contract)  
-**Supersedes:** ADR-032 (partially — ADR-032 remains the baseline; this adds opt-in auth for settings)
+## Status
+
+Superseded by ADR-056, 2026-02-24. Updated 2026-03-21 (Superseded - see ADR-056: Protected Admin Endpoint Security and Secret-Handling Contract). Supersedes: ADR-032 (partially — ADR-032 remains the baseline; this adds opt-in auth for settings).
 
 ## Context
 

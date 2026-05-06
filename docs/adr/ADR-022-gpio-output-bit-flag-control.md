@@ -1,8 +1,8 @@
 # ADR-022: GPIO Output Control (Bit-Flag Triggered Relays)
 
-**Status:** Accepted  
-**Date:** 2020-06-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2020-06-01 (Estimated). Updated 2026-01-28 (Documentation).
 
 ## Context
 

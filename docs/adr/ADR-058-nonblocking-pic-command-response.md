@@ -1,7 +1,8 @@
 # ADR-058: Non-blocking PIC Command/Response for PR= Queries
 
-**Status:** Accepted
-**Date:** 2026-03-27
+## Status
+
+Accepted, 2026-03-27.
 
 ## Context
 
@@ -39,6 +40,10 @@ A new static function `handlePRresponse(buf, len)` is called from `processOT()` 
 
 `doTaskEvery60s()` callers no longer read state synchronously after queuing a command. All state updates and MQTT publishing happen inside `handlePRresponse()` when the response arrives asynchronously.
 
+## Alternatives Considered
+
+<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+
 ## Consequences
 
 **Benefits:**
@@ -52,10 +57,14 @@ A new static function `handlePRresponse(buf, len)` is called from `processOT()` 
 - `checkOTGWcmdqueue()` matches on "PR" prefix, which is imprecise when multiple PR entries exist via `forceQueue=true`. In practice this is correct because PIC responds in FIFO order (single-threaded). Data processing in `handlePRresponse()` is always correct regardless, since it reads the register letter from the response content.
 - `executeCommand()` is retained but no longer called for PR= commands. It remains available for potential future use (e.g. debug console).
 
-## Related
+## Related Decisions
 
 - **ADR-016** — Command queue with deduplication (the infrastructure this change leverages)
 - **ADR-037** — Gateway mode detection via PR=M (decision unchanged; implementation now async)
 - **ADR-028** — File streaming over loading (related HTTP performance concern)
+
+## References
+
 - `OTGW-Core.ino` — `handlePRresponse()`, `queryNextPICsetting()`, `queryOTGWgatewaymode()`, `getpicfwversion()`, `processOT()`
 - `OTGW-firmware.ino` — `doTaskEvery60s()` caller restructuring
+

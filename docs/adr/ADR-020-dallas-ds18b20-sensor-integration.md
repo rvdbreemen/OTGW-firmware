@@ -1,11 +1,8 @@
 # ADR-020: Dallas DS18B20 Temperature Sensor Integration
 
-**Status:** Accepted  
-**Date:** 2019-01-01 (Estimated - Pre-GitHub)  
-**Updated:** 2026-02-04 (Custom labels and graph integration)  
-**Breaking Changes:** Planned for v1.0.0 final release (not yet released as of v1.0.0-rc6)
+## Status
 
-**Note on Dates:** This project's git history was truncated on April 23, 2021. Dates before 2021-04-23 are estimates. Git evidence shows sensor work in commits 9199e43 (2023-01-23) and fcd31a9 (2021-12-20). Custom labels added in 2026-02-04 (commits b2acbd7, 7c3a711).
+Accepted, 2019-01-01 (Estimated - Pre-GitHub). Updated 2026-02-04 (Custom labels and graph integration). Breaking Changes: Planned for v1.0.0 final release (not yet released as of v1.0.0-rc6). Note on Dates: This project's git history was truncated on April 23, 2021. Dates before 2021-04-23 are estimates. Git evidence shows sensor work in commits 9199e43 (2023-01-23) and fcd31a9 (2021-12-20). Custom labels added in 2026-02-04 (commits b2acbd7, 7c3a711)..
 
 ## Context
 

@@ -1,8 +1,8 @@
 # ADR-003: HTTP-Only Network Architecture (No HTTPS)
 
-**Status:** Accepted  
-**Date:** 2018-01-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)
+## Status
+
+Accepted, 2018-01-01 (Estimated). Updated 2026-01-28 (Documentation).
 
 ## Context
 

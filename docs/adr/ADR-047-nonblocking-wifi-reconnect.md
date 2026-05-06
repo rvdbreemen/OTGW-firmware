@@ -1,8 +1,8 @@
 # ADR-047: Non-Blocking WiFi Reconnect State Machine
 
-**Status:** Superseded by ADR-061 (timeout and retry parameters only; state machine design unchanged)
-**Date:** 2026-03-01
-**Relates to:** ADR-007 (Timer-Based Task Scheduling), ADR-001 (ESP8266 Platform)
+## Status
+
+Superseded by ADR-061 (timeout and retry parameters only; state machine design unchanged), 2026-03-01. Relates to: ADR-007 (Timer-Based Task Scheduling), ADR-001 (ESP8266 Platform).
 
 ## Context
 
@@ -144,3 +144,7 @@ Detailed analysis: `docs/reviews/2026-04-07_issue-525-sdk-dhcp-analysis/ANALYSIS
 - ADR-011: External Hardware Watchdog (must not block >3s)
 - ADR-001: ESP8266 Platform Selection (single-core, cooperative only)
 - ADR-048: Non-Blocking Webhook State Machine (same pattern)
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->

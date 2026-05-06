@@ -1,8 +1,8 @@
 # ADR-037: Gateway Mode Detection via PR=M Polling
 
-**Status:** Accepted  
-**Date:** 2026-02-16  
-**Updated:** 2026-02-16 (Initial documentation of existing pattern)
+## Status
+
+Accepted, 2026-02-16. Updated 2026-02-16 (Initial documentation of existing pattern).
 
 ## Context
 

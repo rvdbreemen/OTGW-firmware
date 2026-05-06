@@ -1,8 +1,8 @@
 # ADR-004: Static Buffer Allocation Strategy
 
-**Status:** Superseded by ADR-053  
-**Date:** 2020-01-01 (Estimated)  
-**Updated:** 2026-01-28 (Documentation)  
+## Status
+
+Superseded by ADR-053, 2020-01-01 (Estimated). Updated 2026-01-28 (Documentation).
 
 ## Context
 

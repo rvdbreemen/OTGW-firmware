@@ -1,8 +1,8 @@
 # ADR-050: Centralized API Route Dispatch Table
 
-**Status:** Accepted
-**Date:** 2026-03-01
-**Relates to:** ADR-035 (RESTful API Compliance), ADR-019 (REST API Versioning)
+## Status
+
+Accepted, 2026-03-01. Relates to: ADR-035 (RESTful API Compliance), ADR-019 (REST API Versioning).
 
 ## Context
 
@@ -111,3 +111,7 @@ Refactored in P2 of the C++ refactoring plan (restAPI.ino):
 - ADR-019: REST API Versioning Strategy (v1/v2 URI structure)
 - ADR-004: Static Buffer Allocation (PROGMEM route names)
 - ADR-009: PROGMEM String Literals (route constants in flash)
+
+## References
+
+<!-- TODO: populate from inline citations or external sources cited in the body. -->
