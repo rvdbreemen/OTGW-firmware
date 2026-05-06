@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.5.0-beta.16
+**  Version  : v1.5.0-beta.17
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -229,6 +229,11 @@ bool writeSettings(bool show)
   bool ok = file.print(F("{\n")) > 0;
   ok = writeJsonStringKV(file, F("hostname"), settings.sHostname, true) && ok;
   ok = writeJsonStringKV(file, F("httppasswd"), settings.sHTTPpasswd, true) && ok;
+  ok = writeJsonBoolKV(file, F("StaticIPenable"), settings.network.bStaticIP, true) && ok;
+  ok = writeJsonStringKV(file, F("StaticIP"), settings.network.sStaticIP, true) && ok;
+  ok = writeJsonStringKV(file, F("StaticGW"), settings.network.sStaticGW, true) && ok;
+  ok = writeJsonStringKV(file, F("StaticSN"), settings.network.sStaticSN, true) && ok;
+  ok = writeJsonStringKV(file, F("StaticDNS"), settings.network.sStaticDNS, true) && ok;
   ok = writeJsonStringKV(file, F("DeviceManufacturer"), settings.device.sManufacturer, true) && ok;
   ok = writeJsonStringKV(file, F("DeviceModel"), settings.device.sModel, true) && ok;
   ok = writeJsonBoolKV(file, F("MQTTenable"), settings.mqtt.bEnable, true) && ok;
@@ -391,6 +396,11 @@ void readSettings(bool show)
     Debugln(F("\r\n==== read Settings ===================================================\r"));
     Debugf(PSTR("Hostname              : %s\r\n"), CSTR(settings.sHostname));
     Debugf(PSTR("HTTP password         : %s\r\n"), settings.sHTTPpasswd[0] ? "***" : "(not set)");
+    Debugf(PSTR("Static IP enabled     : %s\r\n"), CBOOLEAN(settings.network.bStaticIP));
+    Debugf(PSTR("Static IP address     : %s\r\n"), CSTR(settings.network.sStaticIP));
+    Debugf(PSTR("Static IP gateway     : %s\r\n"), CSTR(settings.network.sStaticGW));
+    Debugf(PSTR("Static IP subnet      : %s\r\n"), CSTR(settings.network.sStaticSN));
+    Debugf(PSTR("Static IP DNS         : %s\r\n"), CSTR(settings.network.sStaticDNS));
     Debugf(PSTR("MQTT enabled          : %s\r\n"), CBOOLEAN(settings.mqtt.bEnable));
     Debugf(PSTR("MQTT broker           : %s\r\n"), CSTR(settings.mqtt.sBroker));
     Debugf(PSTR("MQTT port             : %d\r\n"), settings.mqtt.iBrokerPort);
@@ -468,6 +478,22 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("DeviceModel")) == 0) {
     strlcpy(settings.device.sModel, newValue, sizeof(settings.device.sModel));
+  }
+  else if (strcasecmp_P(field, PSTR("StaticIPenable")) == 0) {
+    settings.network.bStaticIP = EVALBOOLEAN(newValue);
+    DebugTln(F("Static IP setting changed; reboot required to apply."));
+  }
+  else if (strcasecmp_P(field, PSTR("StaticIP")) == 0) {
+    strlcpy(settings.network.sStaticIP, newValue, sizeof(settings.network.sStaticIP));
+  }
+  else if (strcasecmp_P(field, PSTR("StaticGW")) == 0) {
+    strlcpy(settings.network.sStaticGW, newValue, sizeof(settings.network.sStaticGW));
+  }
+  else if (strcasecmp_P(field, PSTR("StaticSN")) == 0) {
+    strlcpy(settings.network.sStaticSN, newValue, sizeof(settings.network.sStaticSN));
+  }
+  else if (strcasecmp_P(field, PSTR("StaticDNS")) == 0) {
+    strlcpy(settings.network.sStaticDNS, newValue, sizeof(settings.network.sStaticDNS));
   }
   else if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
     // Only update if not the placeholder value.

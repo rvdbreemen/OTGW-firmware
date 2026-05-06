@@ -4844,6 +4844,11 @@ var translateFields = [
 
   ["hostname", "Hostname"]
   , ["httppasswd", "Protected Endpoints Password"]
+  , ["staticipenable", "Static IP Enabled"]
+  , ["staticip", "Static IP Address"]
+  , ["staticgw", "Static IP Gateway"]
+  , ["staticsn", "Static IP Subnet Mask"]
+  , ["staticdns", "Static IP DNS Server"]
   , ["mqttbroker", "MQTT Broker Host/IP"]
   , ["mqttbrokerport", "MQTT Broker Port"]
   , ["mqttuser", "MQTT User"]
@@ -4986,6 +4991,11 @@ var translateTooltips = [
 
   ["hostname", "Device name on your network. Use letters, numbers and hyphens only."]
   , ["httppasswd", "Password for protected admin endpoints such as settings, maintenance actions, file management, reboot, and OTA update. Username is admin."]
+  , ["staticipenable", "Enable a fixed IP address instead of DHCP. All four address fields must be set. Requires reboot to take effect."]
+  , ["staticip", "Fixed IPv4 address for this device, e.g. 192.168.1.100. Leave empty to use DHCP."]
+  , ["staticgw", "Default gateway (router) IPv4 address, e.g. 192.168.1.1."]
+  , ["staticsn", "Subnet mask, e.g. 255.255.255.0."]
+  , ["staticdns", "Primary DNS server IPv4 address. Leave empty to use the gateway address."]
   , ["HostName", "Advertised hostname. Add .local when you open the device by mDNS name."]
   , ["ssid", "Read-only name of the Wi-Fi network the gateway is connected to."]
   , ["mqttconnected", "Read-only MQTT connection state. This should show connected after broker login succeeds."]
