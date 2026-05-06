@@ -38,19 +38,32 @@ Depending on your board and OS, install drivers as needed:
 
 ### Simple method (no Python required)
 
-Download the release zip, extract it, then run:
+1. From the GitHub release page, download `flash_otgw.sh` (Linux/macOS) or `flash_otgw.bat` (Windows) **and** both binary files:
+   - `OTGW-firmware-*.ino.bin` (firmware)
+   - `OTGW-firmware*.littlefs.bin` (filesystem)
+2. Place all three files in the same directory.
+3. Run the script:
 
 **Linux / macOS:**
 ```bash
+chmod +x flash_otgw.sh
 ./flash_otgw.sh
 ```
 
-**Windows:**
+**Windows** (run from Command Prompt or PowerShell):
 ```bat
 flash_otgw.bat
 ```
 
-The scripts download esptool automatically on first run, locate the `OTGW-firmware-*-merged.bin` file in the same directory, erase flash, and write the combined firmware + filesystem in one step. Select your serial port when prompted.
+The script downloads esptool on first run, auto-detects your serial port, erases flash, and writes both binaries — no prompts, no extra software needed.
+
+If multiple serial ports are present, the first one is used. Pass `--port` to pick a specific one:
+```bash
+./flash_otgw.sh --port /dev/ttyUSB1
+```
+```bat
+flash_otgw.bat --port COM5
+```
 
 ### Advanced method (Python)
 

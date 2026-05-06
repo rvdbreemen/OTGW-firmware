@@ -1,0 +1,28 @@
+name: Upload flash scripts to release
+
+# Uploads flash_otgw.sh and flash_otgw.bat to each GitHub Release so users
+# can download them alongside the firmware and filesystem binaries.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  upload-flash-scripts:
+    name: Attach flash scripts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to upload release assets
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Upload flash_otgw.sh and flash_otgw.bat to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            flash_otgw.sh
+            flash_otgw.bat
