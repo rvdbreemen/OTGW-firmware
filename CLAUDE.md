@@ -42,6 +42,9 @@ If unsure whether an AC is self-verifiable, prefer to **attempt** verification r
 - **Minimal change surface**: Small, focused changes. Each change needs a concrete justification.
 - **Comments about the present only**: Don't write defensive comments about hypothetical future scenarios ("if mode X is ever added, revisit this"). They imply a plan that doesn't exist. Real concerns belong in a backlog task, not a code comment.
 - **Fix the doc, not the identifier**: When a name is correct but a comment/docstring is stale, fix the comment. A rename touching N call sites is rarely a net win when the name itself isn't the bug.
+- **Surface assumptions, don't hide confusion**: When a request is ambiguous or a simpler path exists, say so before coding. Don't pick silently between interpretations — name them and ask.
+- **Verifiable goals over vague intent**: Translate tasks into a check before writing code ("add validation" → "tests for invalid inputs pass"; "fix bug" → "test reproduces it, then passes"). For backlog work, the AC checkboxes are the verification — if an AC is too vague to verify, sharpen it before implementing.
+- For deeper behavioural guardrails (anti-rationalisation, surgical-edit discipline), invoke `/andrej-karpathy-skills:karpathy-guidelines`.
 
 ---
 
