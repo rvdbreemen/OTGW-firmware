@@ -544,12 +544,26 @@ void resetOTGW() {
 /*
   To detect the pic, reset the pic, then find ETX in the response after reset (within 1 second).
   The ETX response is send by the bootload, when received it also means you have a pic connected.
+  Up to 3 attempts are made with a 500 ms gap so boards that need slightly more
+  time (e.g. Wemos D1 Mini Pro) are still detected without requiring the 60-second
+  runtime retry probe.
 */
 void detectPIC(){
   OTGWSerial.registerFirmwareCallback(fwreportinfo); //register the callback to report version, type en device ID
-  scheduleOTGWStartupQuietPeriod();
-  OTGWSerial.resetPic(); // make sure it the firmware is detected
-  state.pic.bAvailable = OTGWSerial.find(ETX);
+  for (int attempt = 1; attempt <= 3; attempt++) {
+    scheduleOTGWStartupQuietPeriod();
+    OTGWSerial.resetPic(); // make sure it the firmware is detected
+    state.pic.bAvailable = OTGWSerial.find(ETX);
+    if (state.pic.bAvailable) break;
+    if (attempt < 3) {
+      DebugTf(PSTR("detectPIC: no ETX on attempt %d/3, retrying...\r\n"), attempt);
+      // Feed the hardware watchdog only after setup completes (Wire is initialised
+      // there); during early boot the watchdog is disabled, so just delay.
+      if (state.bSetupComplete) feedWatchDog();
+      delay(500);
+      if (state.bSetupComplete) feedWatchDog();
+    }
+  }
   if (state.pic.bAvailable) {
       DebugTln(F("ETX found after reset: Pic detected!"));
   } else {
