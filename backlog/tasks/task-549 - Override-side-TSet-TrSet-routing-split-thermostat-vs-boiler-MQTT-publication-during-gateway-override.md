@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-05-06 23:02'
+updated_date: '2026-05-06 23:23'
 labels:
   - mqtt
   - routing
@@ -46,3 +47,23 @@ Files in scope: src/OTGW-firmware/OTGW-Core.ino (skipthis logic ~L4035-4060), sr
 - [ ] #6 Verified on hardware with an active CS=<value> override: thermostat topic shows the thermostat's request, boiler topic shows the override value, both update independently
 - [ ] #7 No regression to canonical /otgw-pic/value/<id> consumers (existing HA installations keep working)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Design captured in ADR-069 (Proposed) and docs/api/MQTT.md updated.
+
+- ADR-069 adopts the worldview semantic model:
+  - /thermostat = what thermostat sees (sent T + received A or B)
+  - /boiler    = what boiler sees (received T or R + sent B)
+  - canonical  = boiler-side worldview (= /boiler value, when both are published)
+  - no /gateway subtopic (override visible by /thermostat vs /boiler divergence)
+
+- Three implementation deltas spelled out in ADR-069 Decision section:
+  1. resolveSourceIndex (MQTTstuff.ino:1185) — A routes to /thermostat (was /boiler); R routes to /boiler (was canonical only)
+  2. OTGW-Core.ino:4046-4051 — replace skipthis=true (data loss) with a logging-only flag so T survives gateway-write override and B survives gateway-answer override
+  3. mqtt_configuratie.cpp:2367-2377 — comment block needs updating to reference ADR-069 worldview rationale (no code change in expansion itself)
+
+- ADR awaits human approval before Status flips to Accepted (per CLAUDE.md ADR workflow).
+- Implementation will start after ADR is Accepted.
+<!-- SECTION:NOTES:END -->
