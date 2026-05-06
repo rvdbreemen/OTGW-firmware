@@ -49,8 +49,6 @@ Files in scope: src/OTGW-firmware/OTGW-Core.ino (skipthis logic ~L4035-4060), sr
 - [x] #7 No regression to canonical /otgw-pic/value/<id> consumers (existing HA installations keep working)
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -95,3 +93,32 @@ Design captured in ADR-069 (Proposed) and docs/api/MQTT.md updated.
 - ADR awaits human approval before Status flips to Accepted (per CLAUDE.md ADR workflow).
 - Implementation will start after ADR is Accepted.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implements ADR-069 worldview MQTT subtopic semantics on the dev (1.5.x) line.
+
+Problem (reported by Andre on 2026-05-07 with full OT-log capture):
+  With bSeparateSources=true and CS=27.37 setpoint override active, the thermostat raised its setpoint from 20 to 23 °C. The thermostat-side TSet value disappeared from MQTT entirely; only the override value reached subscribers, on the wrong subtopic. Root cause: OTGW-Core.ino:4046-4051 marked T frames as skipthis=true when followed by R within 500 ms, dropping the value from every MQTT topic. Symmetric bug existed for B-followed-by-A (read-side answer override).
+
+Solution (ADR-069 Accepted 2026-05-07):
+  Replace skipthis-based suppression with a worldview routing model. Each subtopic now reflects what THAT device sees on the OT bus, regardless of which frame type carried the value:
+    /thermostat = thermostat-side worldview (T sent or A/B received)
+    /boiler     = boiler-side worldview (T/R received or B sent)
+    canonical   = boiler-side worldview (= /boiler value)
+  Override is observable as divergence between the two subtopics; no /gateway subtopic is needed (TASK-531 retirement ratified).
+
+Changes:
+  1. OTGW-Core.h — OpenthermData_t gains `byte bGatewaySubstituted` field (1 byte). Existing skipthis field retained, scoped to parity-error suppression only.
+  2. OTGW-Core.ino:4039-4060 (processOT) — (T,R)/(B,A) lookback now sets bGatewaySubstituted on the older frame instead of skipthis. Parity-error skipthis unchanged. Log decoration updated so <ignored> marker fires for both skipthis and bGatewaySubstituted, preserving OT-bus log readability for users who relied on the marker.
+  3. OTGW-Core.ino:1258 (is_value_valid_for_master_topic) — two new gates: A frames never reach canonical (boiler-side worldview), and T+bGatewaySubstituted never reach canonical (R will). Comment block expanded to explain the ADR-069 canonical = boiler-side reinterpretation.
+  4. MQTTstuff.ino:1208 (publishToSourceTopic) — fully rewritten with switch-based worldview routing. Routes to /thermostat and/or /boiler per (rsptype, OTdata.bGatewaySubstituted). The earlier table-based dispatch (mqttSourceKeys[], MQTT_SOURCE_KEY_COUNT, resolveSourceIndex, copySourceTableEntry, s_mqtt_src_key_thermostat, s_mqtt_src_key_boiler) is removed as dead code; subtopic names are now inlined PSTR literals in snprintf_P calls.
+  5. mqtt_configuratie.cpp:2367 (expandAndStreamSensorSources comment) — comment block updated to cite ADR-069 and the worldview model. Discovery generation logic itself unchanged.
+  6. docs/api/MQTT.md — « Source-Separated Topics » section rewritten with worldview semantics, frame-routing table, override example, and migration note. ADR-066 publish-gating contract preserved.
+  7. docs/adr/ADR-069-mqtt-source-topic-worldview-semantics.md — new ADR (Accepted 2026-05-07). ADR-040 and ADR-066 status lines amended to note the ADR-069 amendment/refinement.
+
+Verification:
+  - python3 build.py --firmware: exit 0. Build artifact: OTGW-firmware-1.5.0-beta.20+6c413af.ino.bin (0.70 MB). No new warnings.
+  - python3 evaluate.py --quick: 0 failures, 32 passed, 2 warnings (both pre-existing and unrelated: mqtt_discovery_verify.h header guard and sendMQTTheapdiag buffer arithmetic). Health score 94.4
+<!-- SECTION:FINAL_SUMMARY:END -->
