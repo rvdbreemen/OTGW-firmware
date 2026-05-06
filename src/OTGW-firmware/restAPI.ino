@@ -617,13 +617,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("settings.led_blink"),  settings.bLEDblink);
   sendJsonMapEntry(F("settings.http_auth"),  (settings.sHTTPpasswd[0] != '\0'));
 
-  // [settings.network]
-  sendJsonMapEntry(F("settings.network.static_ip_enable"), settings.network.bStaticIP);
-  sendJsonMapEntry(F("settings.network.static_ip"),  settings.network.sStaticIP);
-  sendJsonMapEntry(F("settings.network.static_gw"),  settings.network.sStaticGW);
-  sendJsonMapEntry(F("settings.network.static_sn"),  settings.network.sStaticSN);
-  sendJsonMapEntry(F("settings.network.static_dns"), settings.network.sStaticDNS);
-
   // [settings.mqtt]
   sendJsonMapEntry(F("settings.mqtt.broker"),    settings.mqtt.sBroker);
   sendJsonMapEntry(F("settings.mqtt.port"),      (int32_t)settings.mqtt.iBrokerPort);
@@ -1250,11 +1243,6 @@ void sendDeviceSettings()
 
   sendJsonSettingObj(F("hostname"), CSTR(settings.sHostname), "s", 32);
   { char ssidBuf[33]; strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf)); sendJsonSettingObj(F("ssid"), ssidBuf, "r", 32); }
-  sendJsonSettingObj(F("staticipenable"), settings.network.bStaticIP, "b");
-  sendJsonSettingObj(F("staticip"), CSTR(settings.network.sStaticIP), "s", 15);
-  sendJsonSettingObj(F("staticgw"), CSTR(settings.network.sStaticGW), "s", 15);
-  sendJsonSettingObj(F("staticsn"), CSTR(settings.network.sStaticSN), "s", 15);
-  sendJsonSettingObj(F("staticdns"), CSTR(settings.network.sStaticDNS), "s", 15);
   sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
   sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
   sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
@@ -1332,7 +1320,6 @@ static const char* const PROGMEM knownSettings[] = {
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
-  "staticdns", "staticgw", "staticip", "staticipenable", "staticsn",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
   "webhookcontenttype", "webhookenable", "webhookenabled",

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.5.0-beta.17
+**  Version  : v1.5.0-beta.16
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -53,42 +53,6 @@ void resetWiFiSettings(void)
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-
-  // Apply static IP configuration if enabled and all required fields are populated.
-  // WiFi.config() must be called before WiFi.begin() to take effect; it also
-  // suppresses the DHCP client for the duration of the session.
-  if (settings.network.bStaticIP &&
-      settings.network.sStaticIP[0] != '\0' &&
-      settings.network.sStaticGW[0] != '\0' &&
-      settings.network.sStaticSN[0] != '\0')
-  {
-    IPAddress ip, gw, sn;
-    IPAddress dns(0, 0, 0, 0);
-    bool ipOk = ip.fromString(settings.network.sStaticIP);
-    bool gwOk = gw.fromString(settings.network.sStaticGW);
-    bool snOk = sn.fromString(settings.network.sStaticSN);
-    if (settings.network.sStaticDNS[0] != '\0')
-    {
-      if (!dns.fromString(settings.network.sStaticDNS))
-        dns = gw; // invalid DNS address — fall back to gateway
-    }
-    else
-      dns = gw; // fall back to gateway as DNS when not specified
-
-    if (ipOk && gwOk && snOk)
-    {
-      DebugTf(PSTR("Static IP: %s  GW: %s  SN: %s  DNS: %s\r\n"),
-              settings.network.sStaticIP,
-              settings.network.sStaticGW,
-              settings.network.sStaticSN,
-              settings.network.sStaticDNS[0] != '\0' ? settings.network.sStaticDNS : settings.network.sStaticGW);
-      WiFi.config(ip, gw, sn, dns);
-    }
-    else
-    {
-      DebugTln(F("WARNING: Static IP settings invalid, falling back to DHCP."));
-    }
-  }
 
   WiFiManager manageWiFi;
   uint32_t lTime = millis();

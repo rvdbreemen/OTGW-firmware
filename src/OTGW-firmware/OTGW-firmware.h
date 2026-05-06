@@ -758,14 +758,6 @@ struct DeviceSection {
   char sModel[32]        = "OTGW";
 };
 
-struct NetworkSection {              // Static IP configuration (optional; all empty = DHCP)
-  bool bStaticIP  = false;           // Enable static IP (false = use DHCP, default)
-  char sStaticIP[16]  = "";          // IPv4 address, e.g. "192.168.1.100"
-  char sStaticGW[16]  = "";          // Default gateway, e.g. "192.168.1.1"
-  char sStaticSN[16]  = "";          // Subnet mask, e.g. "255.255.255.0"
-  char sStaticDNS[16] = "";          // Primary DNS server, e.g. "192.168.1.1"
-};
-
 struct OTGWSettings {
   // Device-level fields (universal device identity)
   char sHostname[41] = _HOSTNAME;
@@ -778,7 +770,6 @@ struct OTGWSettings {
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
   DeviceSection       device;
-  NetworkSection      network;
   MQTTSettingsSection mqtt;
   NTPSection          ntp;
   SensorsSection      sensors;
