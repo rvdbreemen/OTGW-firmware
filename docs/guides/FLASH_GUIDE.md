@@ -1,21 +1,32 @@
 # ESP8266 Flashing Guide
 
-This guide explains how to use `flash_esp.py` to flash OTGW-firmware onto your ESP8266 device (NodeMCU or Wemos D1 mini).
+This guide covers all methods for flashing OTGW-firmware onto your ESP8266 device (NodeMCU or Wemos D1 mini).
+
+## Flashing tools at a glance
+
+| Tool | Requires Python? | Best for |
+|---|---|---|
+| `flash_otgw.sh` / `flash_otgw.bat` | **No** | End users — run from terminal or double-click the `.bat` |
+| `flash_esp.py` | Yes (Python 3.6+) | Developers, OTA download, advanced options |
+
+Both tools are included in each release download and in the repository root.
+
+---
 
 ## Prerequisites
 
 ### Hardware
 - ESP8266 development board (NodeMCU or Wemos D1 mini)
-- MicroUSB cable
+- Micro USB cable (data cable, not charge-only)
 - Computer with USB port
 
 ### Software
-- Python 3.6 or higher
-- The `flash_esp.py` script will automatically install esptool if needed
+- **Simple method**: no extra software — `flash_otgw.sh`/`flash_otgw.bat` downloads esptool automatically on first run
+- **Advanced method**: Python 3.6 or higher — `flash_esp.py` installs esptool via pip if needed
 
 ### USB Drivers
 Depending on your board and OS, install drivers as needed:
-- Windows: CP210x or CH340 USB-to-UART driver
+- Windows: CP210x or CH340 USB-to-UART driver (check Device Manager if the port is missing)
 - macOS: Drivers are usually included on recent versions
 - Linux: Ensure your user is in the `dialout` group for serial port access (`sudo usermod -aG dialout $USER`)
 
@@ -25,7 +36,23 @@ Depending on your board and OS, install drivers as needed:
 
 > **Important**: A fresh install requires BOTH the firmware binary (`OTGW-firmware-<version>.ino.bin`) and the filesystem binary (`OTGW-firmware-<version>.ino.littlefs.bin`). Flashing only the firmware will cause the device to spend several minutes reformatting an empty filesystem on first boot — or, in the worst case, result in a bootloop.
 
-### Recommended procedure (fresh install)
+### Simple method (no Python required)
+
+Download the release zip, extract it, then run:
+
+**Linux / macOS:**
+```bash
+./flash_otgw.sh
+```
+
+**Windows:**
+```bat
+flash_otgw.bat
+```
+
+The scripts download esptool automatically on first run, locate the `OTGW-firmware-*-merged.bin` file in the same directory, erase flash, and write the combined firmware + filesystem in one step. Select your serial port when prompted.
+
+### Advanced method (Python)
 
 ```bash
 # Download the latest release and erase flash for a clean start
