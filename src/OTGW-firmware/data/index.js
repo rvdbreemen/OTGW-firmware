@@ -3106,7 +3106,19 @@ function settingsPage() {
   setActivePageSection('displaySettingsPage');
   var msgEl = document.getElementById("settingMessage");
   if (msgEl) { msgEl.textContent = "Loading settings\u2026"; msgEl.className = "loading"; }
-  refreshSettings();
+  // Fetch fresh PIC availability before rendering settings so that PIC-specific
+  // fields (Run Boot Command, Boot Command) are shown correctly even when PIC
+  // detection happened after the last home-page load (e.g. 60 s retry probe).
+  fetch(APIGW + 'v2/device/info')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(r.statusText); })
+    .then(function(json) {
+      applyPICAvailability((json.device || {}).picavailable);
+      refreshSettings();
+    })
+    .catch(function(err) {
+      console.warn('settingsPage: could not refresh PIC availability:', err);
+      refreshSettings();
+    });
 
 } // settingsPage()
 
