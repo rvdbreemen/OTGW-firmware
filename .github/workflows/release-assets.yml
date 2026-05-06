@@ -1,0 +1,84 @@
+name: Upload flash scripts and bundle to release
+
+# Runs when a GitHub Release is published.
+#
+# Two things happen:
+#   1. flash_otgw.sh and flash_otgw.bat are uploaded as individual release assets.
+#   2. A self-contained zip bundle is created and uploaded:
+#        OTGW-firmware-<version>-flash-bundle.zip
+#      Contents:
+#        README.md                           top-level project readme
+#        FLASH_GUIDE.md                      flashing guide (from docs/guides/)
+#        flash_otgw.sh                       Linux/macOS flash script
+#        flash_otgw.bat                      Windows flash script
+#        OTGW-firmware-*.ino.bin             firmware binary
+#        OTGW-firmware*.littlefs.bin         filesystem binary
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  upload-flash-assets:
+    name: Attach flash scripts and bundle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to upload release assets
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      # ---- Download the firmware and filesystem binaries from this release ----
+      - name: Download release binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p bundle_staging
+          gh release download "${{ github.event.release.tag_name }}" \
+            --pattern "*.ino.bin" \
+            --pattern "*.littlefs.bin" \
+            --dir bundle_staging
+          # Fail fast if either binary is missing
+          ls bundle_staging/*.ino.bin >/dev/null 2>&1 \
+            || { echo "ERROR: firmware binary (*.ino.bin) not found in release assets"; exit 1; }
+          ls bundle_staging/*.littlefs.bin >/dev/null 2>&1 \
+            || { echo "ERROR: filesystem binary (*.littlefs.bin) not found in release assets"; exit 1; }
+
+      # ---- Build the zip bundle -----------------------------------------------
+      - name: Create flash bundle zip
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          # Strip leading 'v' for the filename (v1.5.0 -> 1.5.0)
+          VERSION="${TAG#v}"
+          BUNDLE_NAME="OTGW-firmware-${VERSION}-flash-bundle"
+          BUNDLE_DIR="${BUNDLE_NAME}"
+
+          mkdir -p "${BUNDLE_DIR}"
+
+          # Scripts and documentation
+          cp flash_otgw.sh                    "${BUNDLE_DIR}/"
+          cp flash_otgw.bat                   "${BUNDLE_DIR}/"
+          cp README.md                        "${BUNDLE_DIR}/"
+          cp docs/guides/FLASH_GUIDE.md       "${BUNDLE_DIR}/"
+
+          # Firmware and filesystem binaries downloaded in the previous step
+          cp bundle_staging/*.ino.bin         "${BUNDLE_DIR}/"
+          cp bundle_staging/*.littlefs.bin    "${BUNDLE_DIR}/"
+
+          # Make shell script executable inside the zip
+          chmod +x "${BUNDLE_DIR}/flash_otgw.sh"
+
+          zip -r "${BUNDLE_NAME}.zip" "${BUNDLE_DIR}/"
+          echo "BUNDLE_ZIP=${BUNDLE_NAME}.zip" >> "$GITHUB_ENV"
+
+      # ---- Upload individual scripts + bundle to the release ------------------
+      - name: Upload assets to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            flash_otgw.sh
+            flash_otgw.bat
+            ${{ env.BUNDLE_ZIP }}
