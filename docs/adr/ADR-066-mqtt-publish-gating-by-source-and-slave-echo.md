@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-04-28. Classification: structural (no CI gate, manual review at PR time). Decision Maker: User: Rob van den Breemen (rvdbreemen).
+Proposed, 2026-04-28. Refined by: ADR-069 (2026-05-07 — canonical-topic interpretation shifted from "thermostat-side intent" to "boiler-side worldview"; per-MsgID `bSlaveEchoesValue` Write-Ack gate preserved). Classification: structural (no CI gate, manual review at PR time). Decision Maker: User: Rob van den Breemen (rvdbreemen).
 
 ## Context
 

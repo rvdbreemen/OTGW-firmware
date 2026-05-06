@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, 2026-02-16. Updated 2026-02-23 (Adapted to nested source topics and opt-in default). Amended by: ADR-068 (2026-05-03 — bSeparateSources is mutually exclusive between base and source-variants, removes the original "additive" property). Decision Maker: User: Rob van den Breemen (rvdbreemen).
+Accepted, 2026-02-16. Updated 2026-02-23 (Adapted to nested source topics and opt-in default). Amended by: ADR-068 (2026-05-03 — bSeparateSources is mutually exclusive between base and source-variants, removes the original "additive" property). Amended by: ADR-069 (2026-05-07 — subtopic semantics shifted from source-of-publication to worldview model; `/gateway` subtopic ratified as retired). Decision Maker: User: Rob van den Breemen (rvdbreemen).
 
 ## Context
 
