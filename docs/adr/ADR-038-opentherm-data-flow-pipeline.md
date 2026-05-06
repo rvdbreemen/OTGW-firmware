@@ -186,3 +186,11 @@ OTmonitor ──────► OTGWstream.read() ──► OTGWSerial.write()
 - WebSocket: `webSocketStuff.ino` sendLogToWebSocket()
 - State object: `OTGW-Core.h` OTcurrentSystemState struct
 - Heap backpressure: `helperStuff.ino` canPublishMQTT()
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

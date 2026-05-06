@@ -300,3 +300,11 @@ Required ports (outgoing):
 - OTmonitor protocol: https://otgw.tclcode.com/otmonitor.html
 - Network documentation: README.md, FLASH_GUIDE.md
 - Port allocation: `networkStuff.h`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

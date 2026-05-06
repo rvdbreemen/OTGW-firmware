@@ -332,3 +332,11 @@ pool.ntp.org  # DNS round-robin to nearest NTP server
 - Settings: `settingStuff.ino` (NTP configuration)
 - IANA timezone database: https://www.iana.org/time-zones
 - Debug output: `Debug.h` (timezone-aware timestamps)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

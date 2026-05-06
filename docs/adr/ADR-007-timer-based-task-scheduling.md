@@ -271,3 +271,11 @@ void loop() {
 - Main loop structure: `OTGW-firmware.ino` (loop function)
 - 49-day rollover fixes: Git history, v1.0.0 changelog
 - Watchdog feeding: `helperStuff.ino`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

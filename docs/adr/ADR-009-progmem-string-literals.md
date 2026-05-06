@@ -264,3 +264,11 @@ strcmp_P(value, PSTR("ON"));
 - Evaluation framework: `evaluate.py` (PROGMEM checks)
 - Copilot instructions: `.github/copilot-instructions.md` (PROGMEM section)
 - Binary data safety: ADR-004, `versionStuff.ino`, `src/libraries/OTGWSerial/`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

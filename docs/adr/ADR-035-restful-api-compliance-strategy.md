@@ -165,3 +165,11 @@ else if (wc > 2 && strcmp_P(words[2], PSTR("v2")) == 0)
 - RFC 7807 (Problem Details): https://tools.ietf.org/html/rfc7807
 - Implementation: `src/OTGW-firmware/restAPI.ino`
 - OpenAPI spec: `docs/api/openapi.yaml`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

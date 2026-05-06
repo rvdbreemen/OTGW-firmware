@@ -245,3 +245,11 @@ void doFeatureWork() {
 - Global scratch buffers: `src/OTGW-firmware/OTGW-firmware.h` (`CMSG_SIZE=512`, `SLINE_SIZE=1200`, `cMsg[CMSG_SIZE]`, `sLine[SLINE_SIZE]`)
 - Developer guidelines: `.github/copilot-instructions.md` (Memory Management section)
 - PR: copilot/review-codewijzigingen-sinds-laatste-release (code change and ADR follow-up)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

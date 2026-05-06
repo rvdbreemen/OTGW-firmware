@@ -348,3 +348,11 @@ After filesystem flash (match again):
 - **Backend:** `OTGW-Core.ino` lines 200-210 (version check enabled)
 - **API:** `/api/v0/devtime` endpoint (returns sMessage in JSON)
 - **Testing:** Verified on hardware with firmware/filesystem update sequence
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

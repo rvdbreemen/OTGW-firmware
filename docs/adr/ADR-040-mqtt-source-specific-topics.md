@@ -197,3 +197,11 @@ Example source-specific discovery line (conceptual):
 - HA discovery templates: `src/OTGW-firmware/data/mqttha.cfg`
 - Settings flag declaration: `src/OTGW-firmware/OTGW-firmware.h`
 - Source-separation analysis doc: `docs/reviews/2026-02-20_issue-143-source-separation/ISSUE_143_OPTIONS_ANALYSIS.md`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

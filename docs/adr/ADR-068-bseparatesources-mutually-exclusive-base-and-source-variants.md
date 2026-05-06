@@ -161,3 +161,11 @@ Without ADR-067, users upgrading from a pre-fix firmware with `bSeparateSources 
 - Cfg flag definition: `src/OTGW-firmware/MQTTstuff.h:172` (`MQTT_HA_FLAG_ANY_SOURCE = 0x07`).
 - Re-entrancy guard: `src/OTGW-firmware/MQTTstuff.ino:75-89` (`MQTTAutoConfigSessionLock`).
 - Field report: Discord `#beta-testing`, user `_reuzenpanda_`, 2026-04-30.
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

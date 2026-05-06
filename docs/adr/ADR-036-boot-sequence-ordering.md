@@ -174,3 +174,11 @@ correctly. NTP server can still be configured via the firmware settings page.
 - ESP8266 DHCP NTP override: ESP8266 Arduino Core `configTime()` documentation
 - WiFiManager timeout: `startWiFi()` in `networkStuff.h`
 - Watchdog control: `initWatchDog()` / `WatchDogEnabled()` in `OTGW-firmware.ino`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

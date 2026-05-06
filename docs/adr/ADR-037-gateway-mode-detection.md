@@ -171,3 +171,11 @@ This prevents time commands from corrupting the Print Summary output that OTmoni
 - PS=1 impact: `OTGW-firmware.ino` sendtimecommand()
 - PIC firmware commands: https://otgw.tclcode.com/firmware.html
 - PR command documentation: `PR=M` returns "G" (Gateway) or "M" (Monitor)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

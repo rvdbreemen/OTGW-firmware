@@ -347,3 +347,11 @@ if (line.length() > 512) {  // Bounded response size
 ---
 
 **This ADR formalizes the file streaming pattern as the standard approach for ESP8266 file serving, based on real-world production bug experience.**
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

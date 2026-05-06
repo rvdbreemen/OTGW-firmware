@@ -219,3 +219,11 @@ Settings capacity: 2560 bytes (previously 1536, +1024)
 ## References
 
 <!-- TODO: populate from inline citations or external sources cited in the body. -->
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

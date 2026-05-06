@@ -131,3 +131,11 @@ inline bool isGatewayFirmware() { return strcmp_P(state.pic.sType, PSTR("gateway
 - Boot detection: `src/OTGW-firmware/OTGW-Core.ino` (`detectPIC()`)
 - Auto-recovery: `src/OTGW-firmware/OTGW-Core.ino` (`processOT()` banner handler)
 - Frontend: `src/OTGW-firmware/data/index.js` (`applyPICAvailability()`)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

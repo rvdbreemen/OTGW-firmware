@@ -368,3 +368,11 @@ This ensures all command sources (MQTT, REST v1, REST v2, Web UI, boot commands)
 - MQTT commands: `MQTTstuff.ino` (setcmds array)
 - OpenTherm commands: https://otgw.tclcode.com/firmware.html (Schelte Bron documentation)
 - Command format: `OTGW-Core.h` (OpenTherm message IDs)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

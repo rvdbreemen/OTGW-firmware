@@ -733,3 +733,11 @@ console.log('[OTA] State: Device is healthy, redirecting');
 ---
 
 **Key Takeaway:** Simplicity wins. Real-time flash progress is not worth 1000+ lines of complex code, browser-specific workarounds, and maintenance burden. The KISS principle leads to more reliable, maintainable, and user-friendly software.
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

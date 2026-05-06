@@ -237,3 +237,11 @@ WebSocket reconnected (after reboot)
 - **Safari bug reports:** WebKit Bug Tracker (connection pool limits, iCloud Private Relay)
 - **Research:** Safari connection limits documented ~6 total, ~3 persistent
 - **Testing:** Verified on Safari 26 (macOS), Safari 26 (iOS), Chrome 120, Firefox 121
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

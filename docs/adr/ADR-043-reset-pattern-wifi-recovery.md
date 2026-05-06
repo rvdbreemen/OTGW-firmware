@@ -96,3 +96,11 @@ This provides reset-only recovery behavior without requiring boot-time button re
 - Implementation: `src/OTGW-firmware/networkStuff.h`
 - User docs: `README.md`
 - User guide: `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

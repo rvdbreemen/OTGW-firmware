@@ -229,3 +229,11 @@ REST endpoints now call the parameterless `doAutoConfigure()`.
 ## References
 
 <!-- TODO: populate from inline citations or external sources cited in the body. -->
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

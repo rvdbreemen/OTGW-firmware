@@ -401,3 +401,11 @@ if (upload.status == UPLOAD_FILE_WRITE) {
 - **ADR-029:** OTA flash implementation with watchdog handling
 - **ADR-030:** Heap monitoring as complementary software-level recovery
 - **ADR-007:** Timer-based architecture that enables rate-limited feeding
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

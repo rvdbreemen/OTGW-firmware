@@ -129,3 +129,24 @@ responses are generated once and streamed, so the streaming helpers are equally 
   (Dallas label file)
 - PR: https://github.com/rvdbreemen/OTGW-firmware/pull/459
 - Root-cause analysis: `docs/reviews/2026-02-01_memory-management-bug-fix/`
+
+## Enforcement
+
+```json
+{
+  "forbid_pattern": [
+    {
+      "pattern": "\\bArduinoJson\\b",
+      "path_glob": "src/**/*.{ino,cpp,h}",
+      "message": "ADR-042: streaming JSON only. ArduinoJson fragments the heap; use snprintf_P, sendJsonMapEntry, parseJsonKVLine instead."
+    }
+  ],
+  "forbid_import": [
+    {
+      "pattern": "^\\s*#\\s*include\\s+[<\"]ArduinoJson\\.h[>\"]",
+      "path_glob": "src/**",
+      "message": "ADR-042: include of ArduinoJson.h is forbidden. The streaming JSON helpers in jsonStuff.ino + sendJsonMapEntry replace it."
+    }
+  ]
+}
+```

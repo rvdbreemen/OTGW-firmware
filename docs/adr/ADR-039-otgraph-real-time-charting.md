@@ -207,3 +207,11 @@ Theme switching calls `OTGraph.setTheme()` which rebuilds the chart colors witho
 - WebSocket data source: `webSocketStuff.ino` sendLogToWebSocket()
 - Dallas sensor labels: `/api/v1/sensors/labels` endpoint
 - Theme switching: `data/index.js` applyTheme()
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

@@ -260,3 +260,11 @@ ws.onmessage = function(event) {
 - Web UI: `data/index.html` (firmware upload form)
 - Schelte Bron warning: https://otgw.tclcode.com/firmware.html (WiFi flashing warning)
 - Binary data safety: `.github/copilot-instructions.md` (Binary Data Handling section)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

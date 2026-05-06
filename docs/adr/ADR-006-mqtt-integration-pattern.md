@@ -311,3 +311,11 @@ binary_sensor.otgw_heating_active
 - Command mappings: `MQTTstuff.ino` (setcmds array)
 - Settings: `settingStuff.ino` (MQTT broker config)
 - Chunked streaming: README.md (v1.0.0 features)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

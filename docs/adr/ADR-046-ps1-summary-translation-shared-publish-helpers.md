@@ -107,3 +107,11 @@ This supersedes ADR-045's synthetic-frame design as the governing architectural 
 - Implementation: `src/OTGW-firmware/OTGW-Core.ino`
 - PS summary tables: `PSSUMMARY_MSGIDS_OLD`, `PSSUMMARY_MSGIDS_NEW`
 - Shared helpers: `enterPSMode()`, `leavePSMode()`, `publishCombinedStatusState()`, `publishCombinedStatusVHState()`, `publishRBPFlagsState()`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

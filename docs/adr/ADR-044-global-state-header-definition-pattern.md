@@ -124,3 +124,11 @@ The `OTPublishGate` RAII struct is defined in `OTGW-Core.h` because it is a stru
 ## References
 
 <!-- TODO: populate from inline citations or external sources cited in the body. -->
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

@@ -422,3 +422,11 @@ ESP8266: Re-query version
 ---
 
 **This ADR documents the two-microcontroller architecture that enables reliable OpenTherm protocol handling while providing modern network connectivity. The master/slave coordination pattern leverages the strengths of each processor: ESP8266 for networking, PIC for real-time protocol.**
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

@@ -197,3 +197,11 @@ In that mode:
 - Implementation area: `src/OTGW-firmware/MQTTstuff.ino`
 - Current publish tracking state: `mqttlastsent[256]`, `mqttlastsentstatusbit[16]`
 - MQTT interval setting: `settings.mqtt.iInterval`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

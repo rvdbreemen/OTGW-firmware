@@ -344,3 +344,11 @@ When GPIO LOW:
 - Implementation: `outputs_ext.ino`
 - OpenTherm specification: `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.pdf`
 - GPIO reference: ESP8266 pinout diagrams in `docs/`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

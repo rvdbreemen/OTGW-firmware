@@ -223,3 +223,11 @@ This ADR supersedes ADR-055 as the policy-level contract for:
 - `docs/adr/ADR-048-nonblocking-webhook-state-machine.md`
 - `RELEASE_NOTES_1.2.0.md`
 - `RELEASE_GITHUB_1.2.0.md`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

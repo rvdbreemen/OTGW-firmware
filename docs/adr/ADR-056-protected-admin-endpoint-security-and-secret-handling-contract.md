@@ -214,3 +214,11 @@ Configured protection is intended to reduce accidental or casual administrative 
 - `docs/api/README.md`
 - `RELEASE_NOTES_1.3.0.md`
 - `README.md`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

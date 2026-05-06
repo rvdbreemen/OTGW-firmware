@@ -153,3 +153,22 @@ Per this decision, the following **MUST** be documented:
 - Local network security model: Repository README.md "Network Architecture"
 - Copilot instructions: `.github/copilot-instructions.md` (Network Architecture section)
 - WebSocket implementation: `webSocketStuff.ino` (comments note HTTP-only)
+
+## Enforcement
+
+```json
+{
+  "forbid_pattern": [
+    {
+      "pattern": "\\bWiFiClientSecure\\b",
+      "path_glob": "src/**/*.{ino,cpp,h}",
+      "message": "ADR-003: HTTP/WS only on the LAN. WiFiClientSecure introduces TLS that the firmware does not support and will not maintain on ESP8266."
+    },
+    {
+      "pattern": "\\bBearSSL\\b",
+      "path_glob": "src/**/*.{ino,cpp,h}",
+      "message": "ADR-003: HTTP/WS only. BearSSL is the ESP8266 TLS path; not in scope. Use a reverse proxy if HTTPS is needed externally."
+    }
+  ]
+}
+```

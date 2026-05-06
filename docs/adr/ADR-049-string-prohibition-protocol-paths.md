@@ -82,3 +82,17 @@ Refactored in P1 of the C++ refactoring plan:
 ## References
 
 <!-- TODO: populate from inline citations or external sources cited in the body. -->
+
+## Enforcement
+
+```json
+{
+  "forbid_pattern": [
+    {
+      "pattern": "\\bString\\s+\\w+\\s*[=(;]",
+      "path_glob": "src/OTGW-firmware/{MQTTstuff,OTGW-Core,SATcontrol,SATcycles,SATpid,SATpressure,SATweather,restAPI,jsonStuff,handleDebug,networkStuff}.ino",
+      "message": "ADR-049: the Arduino String class is prohibited in protocol-handling paths. Use char[] buffers with strlcpy / snprintf_P / strncat. String fragments the heap on ESP8266 and the long-running protocol loops cannot afford it."
+    }
+  ]
+}
+```

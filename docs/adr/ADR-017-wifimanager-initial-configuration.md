@@ -328,3 +328,11 @@ wifiManager.setDebugOutput(true);  // Enable WiFiManager debug messages
 - Factory reset: `restAPI.ino` (factory reset endpoint)
 - LED patterns: `OTGW-firmware.ino` (LED control)
 - User guide: Repository wiki (first-time setup)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

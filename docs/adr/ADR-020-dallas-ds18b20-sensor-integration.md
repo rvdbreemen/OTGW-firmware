@@ -488,3 +488,11 @@ if (key.length === 16 &&
 - DS18B20 datasheet: https://datasheets.maximintegrated.com/en/ds/DS18B20.pdf
 - Wiring diagram: `docs/wemosd1mini-pinout-ds18b20.png`
 - Migration notes: README.md (v1.0.0 breaking changes)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

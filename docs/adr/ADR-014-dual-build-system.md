@@ -286,3 +286,11 @@ make data
 - Build documentation: `BUILD.md`
 - CI/CD workflow: `.github/workflows/build.yml`
 - mklittlefs: https://github.com/earlephilhower/mklittlefs
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

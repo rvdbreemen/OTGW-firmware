@@ -163,3 +163,11 @@ outputs_ext.ino           # GPIO output control
 - File organization: Repository root directory structure
 - Build system: `Makefile`, `build.py`
 - Coding conventions: `.github/copilot-instructions.md`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

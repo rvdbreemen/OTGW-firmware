@@ -374,3 +374,11 @@ HEAP-CRITICAL: Blocking WebSocket (dropped 50 msgs, heap=2800 bytes)
 ---
 
 **This ADR documents the critical heap monitoring and emergency recovery system that prevents memory exhaustion crashes on the resource-constrained ESP8266 platform.**
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

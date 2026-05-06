@@ -382,3 +382,11 @@ void publishS0Discovery() {
 - S0 Interface specification: IEC 62053-31
 - ESP8266 interrupts: https://arduino-esp8266.readthedocs.io/en/latest/reference.html#interrupts
 - Debouncing guide: https://www.arduino.cc/en/Tutorial/Debounce
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

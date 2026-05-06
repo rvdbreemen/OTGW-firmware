@@ -496,3 +496,11 @@ Published: homeassistant/sensor/otgw_123456_return_temp/config
 - Debug macros: `Debug.h`
 - TelnetStream library: https://github.com/jandrassy/TelnetStream
 - Telnet protocol: RFC 854
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

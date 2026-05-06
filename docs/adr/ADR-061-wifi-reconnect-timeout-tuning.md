@@ -55,3 +55,10 @@ The state machine design from ADR-047 is unchanged — only the timing parameter
 - `loopWifi()` in `OTGW-firmware.ino`
 - `startWiFi()` in `networkStuff.ino`
 
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

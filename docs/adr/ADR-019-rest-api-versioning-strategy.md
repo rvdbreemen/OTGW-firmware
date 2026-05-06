@@ -313,3 +313,11 @@ v1 → v2: Change URL, update parser to handle map
 - API examples: `example-api/` directory
 - Migration guide: `docs/API_CHANGES_v1.0.0.md`
 - Endpoint list: `restAPI.ino` (httpServer.on() calls)
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

@@ -427,3 +427,11 @@ Current local network use case is stable and well-suited to no-auth model.
 ---
 
 **This ADR explicitly documents the deliberate decision to omit authentication in favor of network-level security. The "no auth" pattern is a conscious architectural choice based on deployment model, memory constraints, and integration requirements - not an oversight or future TODO item.**
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

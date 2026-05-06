@@ -68,3 +68,10 @@ A new static function `handlePRresponse(buf, len)` is called from `processOT()` 
 - `OTGW-Core.ino` — `handlePRresponse()`, `queryNextPICsetting()`, `queryOTGWgatewaymode()`, `getpicfwversion()`, `processOT()`
 - `OTGW-firmware.ino` — `doTaskEvery60s()` caller restructuring
 
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

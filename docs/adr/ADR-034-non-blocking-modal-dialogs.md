@@ -380,3 +380,11 @@ alert('Label cannot be empty');  // Blocks everything!
 - Commit: 7c3a711 (replacement with non-blocking modal)
 - MDN Modal Dialog: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles/dialog_role
 - ARIA Best Practices: https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

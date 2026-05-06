@@ -135,3 +135,11 @@ These gates land in TASK-349.
 ## References
 
 <!-- TODO: populate from inline citations or external sources cited in the body. -->
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

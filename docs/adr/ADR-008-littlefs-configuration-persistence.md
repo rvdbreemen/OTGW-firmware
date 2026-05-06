@@ -332,3 +332,11 @@ void migrateFromSPIFFS() {
 - Migration code: Git history v0.8.0
 - ArduinoJson: https://arduinojson.org/
 - Flash specifications: ESP8266 datasheet
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

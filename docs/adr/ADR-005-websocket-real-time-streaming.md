@@ -212,3 +212,11 @@ void onWebSocketEvent(...) {
 - Browser compatibility: `docs/BROWSER_COMPATIBILITY_AUDIT_2026.md`
 - Heap protection: README.md (v1.0.0 features)
 - MDN WebSocket API: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

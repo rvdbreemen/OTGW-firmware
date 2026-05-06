@@ -98,3 +98,11 @@ Currently **no sensor table entries** carry the flag. The PIC-settings topics (`
 ## References
 
 <!-- TODO: populate from inline citations or external sources cited in the body. -->
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

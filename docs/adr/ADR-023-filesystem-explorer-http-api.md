@@ -501,3 +501,11 @@ bool isValidPath(const String& path) {
 - Web UI: `data/FSexplorer.html`
 - LittleFS documentation: https://arduino-esp8266.readthedocs.io/en/latest/filesystem.html
 - Update handler: `OTGW-ModUpdateServer-impl.h`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

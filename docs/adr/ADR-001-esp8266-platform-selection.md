@@ -118,3 +118,11 @@ Use the **ESP8266 (NodeMCU v1.0 / Wemos D1 mini)** as the network controller pla
 - NodeMCU Documentation: https://nodemcu.readthedocs.io/
 - Hardware schematics: `hardware/` directory
 - Build system: `BUILD.md`, `build.py`
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

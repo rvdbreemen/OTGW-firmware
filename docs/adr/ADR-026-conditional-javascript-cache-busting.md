@@ -289,3 +289,11 @@ String getFilesystemHash() {
 - **Testing:** Verified on hardware with firmware/filesystem update sequence
 - **Documentation:** `docs/SAFARI_FLASH_FIX.md`
 - **Research:** Safari caching behavior documented as most aggressive among major browsers
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

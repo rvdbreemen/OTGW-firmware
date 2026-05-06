@@ -136,3 +136,11 @@ Refactored in P10 of the C++ refactoring plan (webhook.ino):
 ## References
 
 <!-- TODO: populate from inline citations or external sources cited in the body. -->
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

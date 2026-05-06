@@ -233,3 +233,11 @@ arduino-cli compile \
 - Build system: `Makefile`, `build.py`
 - ESP-IDF comparison: https://docs.espressif.com/projects/esp8266-rtos-sdk/
 - Library list: Repository README.md
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```

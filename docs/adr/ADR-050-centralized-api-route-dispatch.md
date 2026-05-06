@@ -115,3 +115,11 @@ Refactored in P2 of the C++ refactoring plan (restAPI.ino):
 ## References
 
 <!-- TODO: populate from inline citations or external sources cited in the body. -->
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```
