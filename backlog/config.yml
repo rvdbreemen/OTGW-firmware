@@ -7,7 +7,7 @@ max_column_width: 20
 auto_open_browser: true
 default_port: 6420
 remote_operations: true
-auto_commit: false
+auto_commit: true
 bypass_git_hooks: false
 check_active_branches: true
 active_branch_days: 30
