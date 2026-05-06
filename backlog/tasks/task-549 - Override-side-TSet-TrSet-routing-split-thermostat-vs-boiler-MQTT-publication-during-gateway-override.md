@@ -3,10 +3,11 @@ id: TASK-549
 title: >-
   Override-side TSet/TrSet routing: split thermostat vs boiler MQTT publication
   during gateway override
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@rvdbreemen-claude'
 created_date: '2026-05-06 23:02'
-updated_date: '2026-05-06 23:23'
+updated_date: '2026-05-06 23:29'
 labels:
   - mqtt
   - routing
@@ -47,6 +48,31 @@ Files in scope: src/OTGW-firmware/OTGW-Core.ino (skipthis logic ~L4035-4060), sr
 - [ ] #6 Verified on hardware with an active CS=<value> override: thermostat topic shows the thermostat's request, boiler topic shows the override value, both update independently
 - [ ] #7 No regression to canonical /otgw-pic/value/<id> consumers (existing HA installations keep working)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. ADR-069 ratifies the worldview routing model (Accepted 2026-05-07). ADR-040 and ADR-066 status lines amended.
+
+2. Code changes (three sites):
+   a. MQTTstuff.ino:1185-1196 — resolveSourceIndex: A routes to /thermostat (was /boiler); add explicit case for R routing to /boiler (was canonical-only). Update comment block.
+   b. OTGW-Core.ino:4046-4060 — Replace skipthis=true on (T-followed-by-R) and (B-followed-by-A) with a logging-only marker (e.g. bGatewaySubstituted) so the value still reaches publishToSourceTopic. Preserve <ignored> log marker for OT-bus diagnostics. Verify downstream skipthis consumers (lines 1240, 1259) still suppress parity-error frames as intended.
+   c. mqtt_configuratie.cpp:2367-2377 — Update expandAndStreamSensorSources comment block to cite ADR-069 and reflect worldview semantics. Expansion logic unchanged.
+
+3. Build firmware (python build.py --firmware) — must exit 0.
+
+4. Run evaluator (python evaluate.py --quick) — must show no new failures.
+
+5. AC verification:
+   - ACs 1, 2, 3, 7 verifiable by code review + build success (routing changes; canonical backwards compat).
+   - AC 4 (HA discovery) verifiable by code inspection — generators unchanged per ADR-069.
+   - AC 5 (override visibility) covered by ADR-069 design — divergence between /thermostat and /boiler is the visibility mechanism.
+   - AC 6 (hardware verification) genuinely cannot be self-verified — requires a real OTGW with active CS=. Document in Final Summary; this is a documented exception per project policy.
+
+6. Per project policy: with one unverifiable AC (#6), task remains In Progress pending hardware verification by maintainer. Final Summary documents which ACs are code-verified vs hardware-pending.
+
+7. Commit + push to origin/dev (standing permission per CLAUDE.md when build green and evaluator clean).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
