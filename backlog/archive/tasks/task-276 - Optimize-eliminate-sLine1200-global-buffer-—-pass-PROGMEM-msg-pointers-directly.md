@@ -6,14 +6,13 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-04-15 21:28'
-updated_date: '2026-04-15 21:43'
+updated_date: '2026-05-06 12:32'
 labels:
   - performance
   - mqtt
   - memory
   - stap-1b
-dependencies:
-  - TASK-272
+dependencies: []
 references:
   - src/OTGW-firmware/MQTTstuff.ino
   - src/OTGW-firmware/OTGW-firmware.h

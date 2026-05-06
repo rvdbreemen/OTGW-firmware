@@ -5,14 +5,13 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-15 19:07'
-updated_date: '2026-04-15 20:48'
+updated_date: '2026-05-06 12:32'
 labels:
   - performance
   - mqtt
   - refactor
   - stap-1
-dependencies:
-  - TASK-271
+dependencies: []
 references:
   - src/OTGW-firmware/MQTTstuff.ino
   - src/OTGW-firmware/OTGW-Core.ino
