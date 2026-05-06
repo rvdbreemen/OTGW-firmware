@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@rvdbreemen-claude'
 created_date: '2026-05-06 23:02'
-updated_date: '2026-05-06 23:29'
+updated_date: '2026-05-06 23:42'
 labels:
   - mqtt
   - routing
@@ -40,14 +40,16 @@ Files in scope: src/OTGW-firmware/OTGW-Core.ino (skipthis logic ~L4035-4060), sr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Thermostat-originated T message for write-data IDs (eg TSet=1, TrSet=16, MaxRelModLevelSetting=14, TdhwSet=56) publishes its value to /otgw-pic/value/<id>/thermostat even when the gateway substitutes a different value via R
-- [ ] #2 Boiler-side value (R when gateway override is active, T pass-through when no override) publishes to /otgw-pic/value/<id>/boiler
-- [ ] #3 Canonical /otgw-pic/value/<id> continues to publish the value actually sent to the boiler (back-compat with ADR-065)
-- [ ] #4 HA discovery payload (when bSeparateSources=true) registers entities for the /thermostat and /boiler subtopics so they appear in HA without manual sensor configuration
-- [ ] #5 Override visibility: a user can determine from MQTT alone whether the boiler value equals the thermostat value or a gateway override (either via existing CS/TT/TC topics or a new gateway-state topic — design choice documented in Final Summary)
+- [x] #1 Thermostat-originated T message for write-data IDs (eg TSet=1, TrSet=16, MaxRelModLevelSetting=14, TdhwSet=56) publishes its value to /otgw-pic/value/<id>/thermostat even when the gateway substitutes a different value via R
+- [x] #2 Boiler-side value (R when gateway override is active, T pass-through when no override) publishes to /otgw-pic/value/<id>/boiler
+- [x] #3 Canonical /otgw-pic/value/<id> continues to publish the value actually sent to the boiler (back-compat with ADR-065)
+- [x] #4 HA discovery payload (when bSeparateSources=true) registers entities for the /thermostat and /boiler subtopics so they appear in HA without manual sensor configuration
+- [x] #5 Override visibility: a user can determine from MQTT alone whether the boiler value equals the thermostat value or a gateway override (either via existing CS/TT/TC topics or a new gateway-state topic — design choice documented in Final Summary)
 - [ ] #6 Verified on hardware with an active CS=<value> override: thermostat topic shows the thermostat's request, boiler topic shows the override value, both update independently
-- [ ] #7 No regression to canonical /otgw-pic/value/<id> consumers (existing HA installations keep working)
+- [x] #7 No regression to canonical /otgw-pic/value/<id> consumers (existing HA installations keep working)
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
