@@ -1265,17 +1265,33 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 }
 
 // ADR-066: Master-topic validity check. Mirrors is_value_valid but excludes
-// WRITE-ACK for OT_WRITE / OT_RW messages. The base topic carries the
-// thermostat-side intent (Read-Ack + Write-Data only); the slave's
-// protocol-undefined Write-Ack data byte is suppressed at the master topic.
-// Source-separated subtopics still use the broader is_value_valid; the
-// bSlaveEchoesValue flag in OTlookup_t gates /boiler publication for
-// non-echo MsgIDs.
+// WRITE-ACK for OT_WRITE / OT_RW messages.
+//
+// ADR-096 refines the canonical interpretation from "thermostat-side intent"
+// to "boiler-side worldview" (= the value that was actually transmitted to
+// the boiler, including any gateway override). Two additional gates implement
+// that shift:
+//   - OTGW_ANSWER_THERMOSTAT (A) frames are gateway-faked answers TO the
+//     thermostat; they never reach the boiler-side. Suppress canonical for A.
+//   - OTGW_THERMOSTAT (T) frames flagged bGatewaySubstituted=true did not
+//     reach the boiler (R replaced them). Suppress canonical for those T's;
+//     the corresponding R frame will populate canonical.
+// B frames (boiler responses) always publish to canonical regardless of
+// answer-substitution: B IS the boiler-side reality even when the gateway
+// fakes a different answer to the thermostat.
+//
+// Source-separated subtopics still use the broader is_value_valid; routing
+// across /thermostat vs /boiler is decided inside publishToSourceTopic() per
+// the ADR-096 worldview rules.
+//
 // See ADR-066 + docs/api/MQTT-message-id-echo-audit.md for the per-MsgID
-// classification rationale.
+// Write-Ack classification rationale (preserved by this ADR).
 bool is_value_valid_for_master_topic(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   if (isMsgIdReservedInActiveProfile(OT.id)) return false;
+  // ADR-096 canonical = boiler-side worldview gates:
+  if (OT.rsptype == OTGW_ANSWER_THERMOSTAT) return false;
+  if (OT.rsptype == OTGW_THERMOSTAT && OT.bGatewaySubstituted) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
   _valid = _valid || (OTlookup.msgcmd==OT_WRITE && OT.type==OT_WRITE_DATA);
@@ -4041,17 +4057,29 @@ void processOT(const char *buf, int len, bool suppressOutput){
     OTdata.valueHB = (value >> 8) & 0xFF;             // byte 3 = high byte
     OTdata.valueLB = value & 0xFF;                    // byte 4 = low byte
     OTdata.time = millis();                           // time of reception    
-    OTdata.skipthis = false;                          // default: do not skip this message (will be sent to MQTT and not stored in state data object)
-    
+    OTdata.skipthis = false;                          // default: do not skip this message (parity errors only set this true)
+    OTdata.bGatewaySubstituted = false;               // default: not substituted by gateway (ADR-096)
+
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       //just store current message and delay processing
       delayedOTdata = OTdata;       //store current msg
       OTDebugln(F("delaying first message!"));
     } else {                              //any other message will be processed
-      //when the gateway overrides the boiler or thermostat, then do not use the results for decoding anywhere (skip this)
-      //if B --> A, then gateway tells the thermostat what it needs to hear, then use current A message, and skip B value.
-      //if T --> R, then gateway overrides the thermostat, and tells the boiler what to do, then use current R message, and skip T value.
-      bool skipthis = (delayedOTdata.id == OTdata.id) && (OTdata.time - delayedOTdata.time < 500) &&  
+      // ADR-096 worldview semantics: when the gateway substitutes the bus traffic for an OT id
+      // (T → R on the master-side, or B → A on the slave-side response), the older (delayed)
+      // frame did not reach the *opposite* side. Earlier code marked the older frame as
+      // skipthis=true, which silently dropped the thermostat-side (or boiler-side) value
+      // entirely — the cause of the data-loss bug fixed by ADR-096. We now flag the older
+      // frame as bGatewaySubstituted=true; the publish-time worldview routing in
+      // publishToSourceTopic() then sends the value to the same-side subtopic only and
+      // suppresses canonical / opposite-side publication. The OT-bus log decoration ("<ignored>")
+      // is preserved as a diagnostic marker (see processOT log section).
+      // Pattern detection is unchanged from the original skipthis logic:
+      //   if T (master write) is followed within 500 ms by R (gateway-substituted write)
+      //     → T did not reach the boiler; R replaces it on canonical and /boiler.
+      //   if B (slave response) is followed within 500 ms by A (gateway-substituted answer)
+      //     → A reaches the thermostat instead of B; B still represents boiler-side reality.
+      bool bGatewaySubstituted = (delayedOTdata.id == OTdata.id) && (OTdata.time - delayedOTdata.time < 500) &&
            (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
             ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT)));
 
@@ -4059,10 +4087,10 @@ void processOT(const char *buf, int len, bool suppressOutput){
       tmpOTdata = delayedOTdata;          //fetch delayed msg
       delayedOTdata = OTdata;             //store current msg
       OTdata = tmpOTdata;                 //then process delayed msg
-      OTdata.skipthis = skipthis;         //skip if needed
+      OTdata.bGatewaySubstituted = bGatewaySubstituted;  //flag substitution if needed (ADR-096)
 
       //when parity error in OTGW then skip data to MQTT nor store it local in data object
-      OTdata.skipthis |= (OTdata.rsptype == OTGW_PARITY_ERROR);
+      OTdata.skipthis = (OTdata.rsptype == OTGW_PARITY_ERROR);
 
       //Read information from this OT message ready for use...
       if (OTdata.id <= OT_MSGID_MAX) {
@@ -4120,9 +4148,9 @@ void processOT(const char *buf, int len, bool suppressOutput){
       //OTDebugf("[%-30s]", messageIDToString(static_cast<OTLibMessageID>(OTdata.id)));
       //OTDebugf("[M=%d]",OTdata.master);
 
-      //Add indicators for parity error, skip message or valid value
-      if (OTdata.rsptype == OTGW_PARITY_ERROR) AddLog("P"); 
-      else if (OTdata.skipthis) AddLog("-"); 
+      //Add indicators for parity error, gateway-substituted frame, or valid value (ADR-096)
+      if (OTdata.rsptype == OTGW_PARITY_ERROR) AddLog("P");
+      else if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog("-");
       else if (is_value_valid(OTdata, OTlookupitem)) AddLog(">");
       else AddLog(" ");  //placeholder for alignment
       
@@ -4137,7 +4165,7 @@ void processOT(const char *buf, int len, bool suppressOutput){
         decodeAndPublishOTValue();
       }
 
-      if (OTdata.skipthis) AddLog(" <ignored> ");
+      if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");
       AddLogln();
       OTDebugT(skipOTLogTimestamp(ot_log_buffer));
 

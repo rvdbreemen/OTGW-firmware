@@ -4,6 +4,7 @@
 **Date:** 2026-04-28
 **Classification:** structural (per ADR-080: no CI gate, manual review at PR time)
 **Decision Maker:** User: Rob van den Breemen (rvdbreemen)
+**Refined by:** ADR-096 (2026-05-07) — worldview semantics: canonical-topic interpretation shifts from "thermostat-side intent" to "boiler-side worldview" while the per-MsgID `bSlaveEchoesValue` Write-Ack gate is preserved.
 
 ## Context
 

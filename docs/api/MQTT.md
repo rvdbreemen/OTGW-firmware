@@ -570,40 +570,54 @@ Where `{sensor_address}` is the Dallas 1-Wire address (e.g., `28FF64D1841703F1`)
 
 ### Source-Separated Topics (Optional)
 
-When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is additionally published to source-specific sub-topics:
+When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is published to two source-specific sub-topics:
 
 ```
 {TopTopic}/value/{UniqueId}/{label}/thermostat
 {TopTopic}/value/{UniqueId}/{label}/boiler
-{TopTopic}/value/{UniqueId}/{label}/gateway
 ```
 
-This allows distinguishing whether a value was sent by the thermostat (T-request), boiler (B-response), or injected/modified by the gateway.
+#### Subtopic semantics (2.0.0+, ADR-096 — worldview model)
 
-#### Publish gating per topic class (2.0.0+, ADR-066)
+Each subtopic shows what *that device* sees on the OpenTherm bus, regardless of which side put the frame on the wire.
 
-The base topic `{TopTopic}/value/{UniqueId}/{label}` publishes only the
-thermostat-side intent: Read-Ack for read-supported messages and Write-Data
-for write-supported messages. Slave Write-Ack values are NOT routed to the
-base topic. This avoids flapping between thermostat-written values and
-slave-acked protocol-zero values for non-echo MsgIDs.
+- **`/thermostat`** = the value the thermostat sent (write requests) or received (read responses, including any gateway-faked answer).
+- **`/boiler`** = the value the boiler received (write requests, including any gateway override) or sent (read responses).
 
-The `/boiler` subtopic is gated by a per-MsgID `bSlaveEchoesValue` flag in
-the OTlookup table. For MsgIDs where the OpenTherm v4.2 specification defines
-the slave's Write-Ack data field as undefined (typically `Tr` 24, `TrSet` 16,
-`MaxRelModLevelSetting` 14, `TrSetCH2` 23, `TRoomCH2` 37, `RFstrengthbatterylevel` 98),
-the `/boiler` subtopic is NOT updated for Write-Ack messages. The slave's
-acknowledgement carries no measurement; suppressing it avoids polluting
-the per-source observability surface with fake-zero readings.
+Override behavior is implicit: when the two subtopics diverge for the same metric, the gateway is intervening.
 
-For MsgIDs where the slave does store and echo the value (most R/W
-parameters, Class 5 remote boiler parameters such as `MaxTSet` 57 and
-`TdhwSet` 56, Class 6 transparent slave parameters, R/W counters), the
-`/boiler` subtopic continues to publish the slave's stored value, including
-clamped or modified variants distinct from the master's request.
+**Example: `TSet` with `CS=27.37` setpoint override active, thermostat asking 23 °C:**
 
-See `docs/api/MQTT-message-id-echo-audit.md` for the full per-MsgID
-classification with spec-citation rationale.
+| Topic | Value | Meaning |
+|---|---|---|
+| `…/value/<id>/TSet/thermostat` | `23.00` | What the thermostat asked for |
+| `…/value/<id>/TSet/boiler` | `27.37` | What the boiler actually received |
+| `…/value/<id>/TSet` (canonical) | `27.37` | What was actually transmitted (= boiler-side worldview) |
+
+Without override, all three publish the same value. The `/thermostat` and `/boiler` subtopics always update independently regardless of override state — `/thermostat` keeps showing the thermostat's intent, `/boiler` keeps showing what reaches the boiler.
+
+#### Frame-to-subtopic routing reference
+
+| OT frame | Direction | Routes to `/thermostat` | Routes to `/boiler` | Routes to canonical |
+|---|---|---|---|---|
+| `T` (thermostat-write) | M→S | yes | yes (when no R follows) | yes (when no R follows) |
+| `R` (gateway-substituted write) | M→S | no | yes | yes |
+| `B` (boiler-response) | S→M | yes (when no A follows) | yes | yes |
+| `A` (gateway-faked answer) | S→M | yes | no | no |
+
+There is no `/gateway` subtopic — override is visible by comparing `/thermostat` and `/boiler`.
+
+#### Canonical-topic publish gating (ADR-066, preserved)
+
+The canonical topic `{TopTopic}/value/{UniqueId}/{label}` does not receive Write-Ack frames. The `/boiler` subtopic is additionally gated by a per-MsgID `bSlaveEchoesValue` flag in the OTlookup table. For MsgIDs where the OpenTherm v4.2 specification defines the slave's Write-Ack data field as undefined (typically `Tr` 24, `TrSet` 16, `MaxRelModLevelSetting` 14, `TrSetCH2` 23, `TRoomCH2` 37, `RFstrengthbatterylevel` 98), the `/boiler` subtopic is NOT updated for Write-Ack messages. The slave's acknowledgement carries no measurement; suppressing it avoids polluting the per-source observability surface with fake-zero readings.
+
+For MsgIDs where the slave does store and echo the value (most R/W parameters, Class 5 remote boiler parameters such as `MaxTSet` 57 and `TdhwSet` 56, Class 6 transparent slave parameters, R/W counters), the `/boiler` subtopic continues to publish the slave's stored value, including clamped or modified variants distinct from the master's request.
+
+See `docs/api/MQTT-message-id-echo-audit.md` for the full per-MsgID classification with spec-citation rationale.
+
+#### Migration note (2.0.0 worldview shift)
+
+Earlier 2.0.0 alpha builds routed `A` (gateway-faked answer) frames to `/boiler` and dropped `T` frames during gateway override. ADR-096 corrected both: `A` now routes to `/thermostat` (where the value actually arrives), and `T` is preserved on `/thermostat` and canonical even when the gateway substitutes a different value to the boiler. HA users with `bSeparateSources = true` who built dashboards against the older routing should review their `/boiler` and `/thermostat` sensor bindings.
 
 ---
 
@@ -976,11 +990,13 @@ The firmware uses three discovery paths:
 
 ### Source-Separated Discovery
 
-When `settings.mqtt.bSeparateSources` is enabled, discovery entries with source-template placeholders are expanded into three variants:
+When `settings.mqtt.bSeparateSources` is enabled, discovery entries with source-template placeholders are expanded into two source-variant entities matching the worldview routing model (ADR-096), plus a canonical variant for default users:
 
-- `{entity}_thermostat` - values from thermostat requests
-- `{entity}_boiler` - values from boiler responses
-- `{entity}` - values injected/modified by the gateway (bare/historical naming, preserved for backward compatibility with pre-source-separation HA setups)
+- `{entity}_thermostat` — value the thermostat sees (its sent write or its received read response, including any gateway-faked answer)
+- `{entity}_boiler` — value the boiler sees (its received write, including any gateway override, or its sent read response)
+- `{entity}` — canonical (boiler-side worldview), suppressed for source-templated MsgIDs when `bSeparateSources` is enabled per ADR-095 mutual exclusion
+
+There is no `{entity}_gateway` variant; gateway override is observable via divergence between the two source-variant subtopics.
 
 ### SAT Discovery Entities
 
@@ -1144,7 +1160,7 @@ Runtime values interpolated into configs (instead of template placeholders) come
 | `mqttSubTopic` | Subscribe/command topic base |
 | `version` | `device.sw_version` and `origin.sw` |
 
-Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is handled at stream time by `expandAndStreamSensorSources()`, which emits three variants (`_thermostat`, `_boiler`, and an empty suffix for gateway — preserving the historical bare entity name for backward compatibility) for sensors marked with `MQTT_HA_FLAG_ANY_SOURCE`.
+Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is handled at stream time by `expandAndStreamSensorSources()`, which emits three variants (`_thermostat`, `_boiler`, and an empty suffix for the canonical/boiler-side-worldview entity that replaces the suppressed base when `bSeparateSources = true` per ADR-095) for sensors marked with `MQTT_HA_FLAG_ANY_SOURCE`. Per ADR-096 the routing of values to those variants is decided at publish time by `publishToSourceTopic()` using the worldview model: `/thermostat` carries what the thermostat sees, `/boiler` carries what the boiler sees, and canonical mirrors `/boiler`. There is no `_gateway` variant.
 
 ---
 

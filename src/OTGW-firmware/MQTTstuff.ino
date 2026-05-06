@@ -436,19 +436,10 @@ const char s_cmd_forcethermostat[] PROGMEM = "forcethermostat";
 const char s_cmd_voltageref[] PROGMEM = "voltageref";
 const char s_cmd_debugptr[] PROGMEM = "debugptr";
 
-// Source variant strings for separate-source MQTT data publishing.
-// Used by publishToSourceTopic() via copySourceTableEntry().
-// Gateway-source frames (OTGW_REQUEST_BOILER) are no longer published to a
-// per-source sub-topic — their value lands on the canonical topic via the
-// sendMQTTData() call that precedes every publishToSourceTopic() invocation.
-const char s_mqtt_src_key_thermostat[] PROGMEM = "thermostat";
-const char s_mqtt_src_key_boiler[] PROGMEM = "boiler";
-
-const char* const mqttSourceKeys[] PROGMEM = {
-  s_mqtt_src_key_thermostat,
-  s_mqtt_src_key_boiler
-};
-constexpr uint8_t MQTT_SOURCE_KEY_COUNT = sizeof(mqttSourceKeys) / sizeof(mqttSourceKeys[0]);
+// ADR-096: subtopic names "thermostat" and "boiler" are inlined into
+// snprintf_P calls in publishToSourceTopic(). The earlier table-based
+// dispatch (mqttSourceKeys[] / resolveSourceIndex / copySourceTableEntry)
+// was removed when worldview routing replaced the 1-of-N source mapping.
 
 const char s_otgw_TT[] PROGMEM = "TT";
 const char s_otgw_TC[] PROGMEM = "TC";
@@ -1532,32 +1523,32 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
   sendMQTTData(topic, buffer);
 }
 
-// Shared source mapping for source-separated MQTT topics / HA discovery expansion.
-// Returns false for parity errors / unknown types AND for gateway-as-thermostat
-// frames — those land on the canonical topic only (no /gateway sub-topic).
-static bool resolveSourceIndex(byte rsptype, uint8_t &sourceIndex) {
-  switch (rsptype) {
-    case OTGW_THERMOSTAT:        sourceIndex = 0; return true;
-    case OTGW_BOILER:            sourceIndex = 1; return true;
-    case OTGW_ANSWER_THERMOSTAT: sourceIndex = 1; return true;  // OTGW answers as boiler — value is boiler-side
-    // OTGW_REQUEST_BOILER (gateway-as-thermostat) intentionally drops through
-    // to default: gateway-substituted values are exposed via the canonical
-    // topic only, no /gateway sub-topic. The canonical topic is already
-    // written by sendMQTTData() before publishToSourceTopic() is called.
-    default: return false;
-  }
-}
-
-static bool copySourceTableEntry(const char* const table[], uint8_t sourceIndex, char *dest, size_t destSize)
-{
-  if (!dest || destSize == 0 || sourceIndex >= MQTT_SOURCE_KEY_COUNT) return false;
-  PGM_P pValue = (PGM_P)pgm_read_ptr(&table[sourceIndex]);
-  if (!pValue) { dest[0] = '\0'; return false; }
-  strncpy_P(dest, pValue, destSize - 1);
-  dest[destSize - 1] = '\0';
-  return true;
-}
-
+// ADR-096: Worldview routing for source-separated MQTT subtopics.
+//
+// Each subtopic represents what the named device sees on the OT bus,
+// regardless of which side originated the frame:
+//   /thermostat — value the thermostat sees: the value it sent (T) or
+//                 received (A under answer-override, B under pass-through)
+//   /boiler     — value the boiler received (R under override, T under
+//                 pass-through) or sent (B)
+//
+// Routing decisions per (rsptype, OTdata.bGatewaySubstituted):
+//
+//   T  no-override (bGS=false): /thermostat AND /boiler
+//   T  with R-follow (bGS=true): /thermostat only (R wins /boiler)
+//   R                          : /boiler only
+//   B  no-override (bGS=false): /thermostat AND /boiler
+//   B  with A-follow (bGS=true): /boiler only (A wins /thermostat)
+//   A                          : /thermostat only
+//
+// The bGatewaySubstituted flag is set on the OLDER frame in a (T,R) or (B,A)
+// sequence by processOT() in OTGW-Core.ino. The /gateway subtopic was retired
+// by TASK-532 and is ratified retired by ADR-096 — override visibility is
+// achieved by divergence between /thermostat and /boiler, not by a third
+// subtopic.
+//
+// The ADR-066 Write-Ack gate (bSlaveEchoesValue) is preserved unchanged for
+// /boiler publications.
 void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 {
   if (!settings.mqtt.bSeparateSources || !topic || !json) return;
@@ -1567,20 +1558,46 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
   // MaxRelModLevelSetting). The bSlaveEchoesValue flag is populated for
   // every MsgID in OTmap[] per docs/api/MQTT-message-id-echo-audit.md.
   // OTlookupitem is set by processOT before each print_* call and is
-  // therefore valid here.
+  // therefore valid here. OTdata is also valid here (set by processOT).
   if (rsptype == OT_WRITE_ACK && !OTlookupitem.bSlaveEchoesValue) return;
   // Re-entrancy guard: sendMQTTData may yield via feedWatchDog, allowing
   // a second processOT call to overwrite the static buffer mid-publish.
   static bool inUse = false;
   if (inUse) return;
   inUse = true;
-  uint8_t sourceIndex = 0;
-  if (!resolveSourceIndex(rsptype, sourceIndex)) { inUse = false; return; }
+
+  // Worldview routing decision (ADR-096).
+  bool toThermostat = false;
+  bool toBoiler = false;
+  switch (rsptype) {
+    case OTGW_THERMOSTAT:        // T: thermostat-sent write
+      toThermostat = true;
+      toBoiler = !OTdata.bGatewaySubstituted;  // R wins /boiler when override active
+      break;
+    case OTGW_BOILER:            // B: boiler-sent response
+      toBoiler = true;
+      toThermostat = !OTdata.bGatewaySubstituted;  // A wins /thermostat when answer-override active
+      break;
+    case OTGW_REQUEST_BOILER:    // R: gateway-substituted write (only the boiler sees this value)
+      toBoiler = true;
+      break;
+    case OTGW_ANSWER_THERMOSTAT: // A: gateway-faked answer (only the thermostat sees this value)
+      toThermostat = true;
+      break;
+    default:                     // parity errors, unknown types
+      inUse = false;
+      return;
+  }
+
   static char sourceTopic[MQTT_TOPIC_MAX_LEN];
-  char sourceKeyBuf[16];
-  if (!copySourceTableEntry(mqttSourceKeys, sourceIndex, sourceKeyBuf, sizeof(sourceKeyBuf))) { inUse = false; return; }
-  snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s/%s"), topic, sourceKeyBuf);
-  sendMQTTData(sourceTopic, json, false);
+  if (toThermostat) {
+    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s/thermostat"), topic);
+    sendMQTTData(sourceTopic, json, false);
+  }
+  if (toBoiler) {
+    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s/boiler"), topic);
+    sendMQTTData(sourceTopic, json, false);
+  }
   inUse = false;
 }
 

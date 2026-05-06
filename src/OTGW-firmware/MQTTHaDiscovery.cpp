@@ -2557,12 +2557,21 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
 // Expands a source-template sensor into per-source variants and streams each
 // via streamSensorDiscovery(). For 0x07-flagged sensors, three variants are
 // emitted: /thermostat, /boiler, and the canonical (no suffix / no segment)
-// entity. The canonical entity carries the gateway-overridden value (or the
-// most recent live value when no override is active) — that is, the same
-// value HA would see on the base topic with bSeparateSources=false. There is
-// no /gateway variant: gateway-source frames are not published to a
-// per-source sub-topic; they reach the canonical topic via the sendMQTTData()
-// call that precedes every publishToSourceTopic() in OTGW-Core.ino.
+// entity.
+//
+// Per ADR-096 (worldview semantics) the three entities map as follows:
+//   /thermostat — what the thermostat sees: the value it sent (T) or
+//                 received (A under answer-override, B under pass-through).
+//   /boiler     — what the boiler sees: the value it received (R under
+//                 write-override, T under pass-through) or sent (B).
+//   canonical   — boiler-side worldview: identical to /boiler when both are
+//                 published. Default users (bSeparateSources=false) see only
+//                 the canonical, which is suppressed for source-templated
+//                 MsgIDs when bSeparateSources=true (per ADR-095 mutual
+//                 exclusion).
+// There is no /gateway variant; override visibility comes from divergence
+// between /thermostat and /boiler. Routing is decided at publish time inside
+// publishToSourceTopic() in MQTTstuff.ino.
 // Returns true if at least one variant was successfully published.
 // Lives here (not in MQTTstuff.ino) to avoid Arduino auto-prototyper
 // mangling custom-type parameters.

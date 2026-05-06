@@ -555,8 +555,13 @@ struct OpenthermData_t {
   byte valueHB;
   byte valueLB;
   byte rsptype;
-  byte skipthis;   //when true, then do not send to MQTT
-  time_t time;  
+  byte skipthis;   //when true, then do not send to MQTT (parity errors only — see ADR-096)
+  byte bGatewaySubstituted; //ADR-096: true on the older frame in a (T,R) or (B,A) sequence
+                            //  - on T: gateway sent R instead → suppresses canonical and /boiler for this T (R wins them)
+                            //  - on B: gateway sent A instead → suppresses /thermostat for this B (A wins it)
+                            //Worldview routing decisions consult this flag; see publishToSourceTopic() and
+                            //is_value_valid_for_master_topic() in OTGW-Core.ino.
+  time_t time;
   /**
    * @return float representation of data packet value
    */
