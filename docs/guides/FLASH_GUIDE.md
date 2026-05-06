@@ -1,6 +1,6 @@
 # ESP8266 Flashing Guide
 
-This guide explains how to use flash_esp.py to flash OTGW-firmware onto your ESP8266 device (NodeMCU or Wemos D1 mini).
+This guide explains how to use `flash_esp.py` to flash OTGW-firmware onto your ESP8266 device (NodeMCU or Wemos D1 mini).
 
 ## Prerequisites
 
@@ -11,63 +11,185 @@ This guide explains how to use flash_esp.py to flash OTGW-firmware onto your ESP
 
 ### Software
 - Python 3.6 or higher
-- The flash_esp.py script will automatically install esptool if needed
+- The `flash_esp.py` script will automatically install esptool if needed
 
 ### USB Drivers
 Depending on your board and OS, install drivers as needed:
 - Windows: CP210x or CH340 USB-to-UART driver
 - macOS: Drivers are usually included on recent versions
-- Linux: Ensure your user is in the dialout group for serial port access
+- Linux: Ensure your user is in the `dialout` group for serial port access (`sudo usermod -aG dialout $USER`)
 
-## Quick Start
+---
 
-### Download Latest Release (Default)
+## Fresh Installation (First-Time Flash)
 
-Run without arguments to download and flash the latest release:
+> **Important**: A fresh install requires BOTH the firmware binary (`OTGW-firmware-<version>.ino.bin`) and the filesystem binary (`OTGW-firmware-<version>.ino.littlefs.bin`). Flashing only the firmware will cause the device to spend several minutes reformatting an empty filesystem on first boot — or, in the worst case, result in a bootloop.
 
-python3 flash_esp.py
+### Recommended procedure (fresh install)
 
-This will:
-1. Install esptool if needed
-2. Download the latest release firmware and filesystem
-3. Auto-detect serial ports
-4. Flash the device
-
-### Developer Mode - Build and Flash
-
-Use a local build and flash it:
-
-python3 flash_esp.py --build
-
-### Manual Mode - Use Existing Files
-
-If you already have the images:
-
-python3 flash_esp.py --firmware OTGW-firmware-fw.bin --filesystem OTGW-firmware-fs.bin
-
-## First-Time Installation (Erase)
-
-For a clean install, erase flash before flashing:
-
+```bash
+# Download the latest release and erase flash for a clean start
 python3 flash_esp.py --download --erase
+```
 
-Or for local builds:
+This does everything in one step:
+1. Downloads the latest `OTGW-firmware-<version>.ino.bin` (firmware) and `OTGW-firmware-<version>.ino.littlefs.bin` (filesystem) from GitHub
+2. Erases the entire flash chip before writing (removes any stale data from older versions)
+3. Flashes firmware at `0x0` and filesystem at `0x200000` in a single esptool operation
 
-python3 flash_esp.py --build --erase
+### Why `--erase` matters for a fresh install
+
+Older firmware versions (v1.3.x and below) used a different filesystem partition layout (1 MB LittleFS at `0x300000`). If you skip `--erase`, remnants of the old filesystem at the old address may remain. The new firmware will find no valid filesystem at the new address (`0x200000`) and will either:
+- Spend 5–10 minutes silently reformatting the flash (device appears unresponsive — not a bootloop)
+- Boot repeatedly into an error state that looks like a bootloop
+
+Using `--erase` eliminates this class of issue entirely.
+
+---
+
+## Upgrading via USB (Recommended for Major Version Changes)
+
+When upgrading from **v1.3.x or earlier** to **v1.4.x or later**, the LittleFS partition size changed from 1 MB to 2 MB. A firmware-only upgrade via USB will trigger a filesystem reformat on first boot and **wipe all your settings**.
+
+### Upgrade procedure (USB, preserving settings where possible)
+
+For upgrading v1.4.x → v1.5.x (same partition layout, no reformat needed):
+
+```bash
+python3 flash_esp.py --download
+```
+
+Both firmware and filesystem are written in a single operation. No erase is needed; settings stored in the filesystem are preserved.
+
+For upgrading v1.3.x or earlier → v1.4.x+ (partition layout change, settings will be lost):
+
+```bash
+# Back up settings from the Web UI first (Settings → Export), then:
+python3 flash_esp.py --download --erase
+```
+
+After the flash, re-import your settings via the Web UI.
+
+---
+
+## Upgrading via Web UI OTA
+
+> **WARNING**: When upgrading from v1.3.x or earlier to v1.4.x via the Web UI OTA page, you **must** flash the filesystem binary first, then the firmware binary. Flashing in the wrong order causes the new firmware to boot against the old 1 MB filesystem layout. The device will spend 5–10 minutes silently reformatting and will then lose all settings.
+
+**Correct OTA order for v1.3.x → v1.4.x upgrades:**
+
+1. Export your settings via the Web UI (Settings page → Export)
+2. On the Web UI Update page, upload `OTGW-firmware-*.littlefs.bin` first and wait for the reboot
+3. Upload `OTGW-firmware-*.ino.bin` second and wait for the reboot
+4. Hard-refresh the browser (Ctrl+F5)
+5. Re-import your settings
+
+**This order requirement does NOT apply to v1.4.x → v1.5.x upgrades** (the partition layout is identical).
+
+---
+
+## Quick Start (Standard)
+
+### Download latest release and flash
+
+```bash
+python3 flash_esp.py
+```
+
+Or explicitly:
+
+```bash
+python3 flash_esp.py --download
+```
+
+### Developer mode — build and flash from source
+
+```bash
+python3 flash_esp.py --build
+```
+
+### Manual mode — use existing binary files
+
+```bash
+python3 flash_esp.py --firmware OTGW-firmware-1.5.0.ino.bin --filesystem OTGW-firmware-1.5.0.ino.littlefs.bin
+```
+
+---
 
 ## Common Options
 
-- --port PORT: Serial port (e.g., COM5 or /dev/ttyUSB0)
-- --baud BAUD: Flash baud rate (default: 460800)
-- --erase: Erase flash before flashing
-- --no-interactive: Disable prompts for automation
+| Option | Description |
+|---|---|
+| `--port PORT` | Serial port (e.g., `COM5` or `/dev/ttyUSB0`) |
+| `--baud BAUD` | Flash baud rate (default: 460800; try 115200 on unstable connections) |
+| `--erase` | Erase entire flash before writing. **Use for first installs and cross-generation upgrades.** |
+| `--download` | Download latest release from GitHub and flash |
+| `--build` | Build firmware locally and flash (requires arduino-cli) |
+| `--no-interactive` / `-y` | Skip all prompts (for automation) |
+
+---
+
+## Troubleshooting Bootloops
+
+A bootloop (device resets repeatedly and never reaches the Web UI) after flashing is almost always caused by one of the following:
+
+### 1. Firmware flashed without a matching filesystem
+
+The firmware cannot find a valid filesystem and resets.
+
+**Fix:**
+
+```bash
+python3 flash_esp.py --download --erase
+```
+
+This erases the flash and writes both firmware and filesystem in one step.
+
+### 2. Upgrading from v1.3.x without erasing (stale filesystem at wrong offset)
+
+v1.4.x moved the filesystem partition from `0x300000` (1 MB) to `0x200000` (2 MB). If the old filesystem data is still present, the new firmware may behave unexpectedly.
+
+**Fix:**
+
+```bash
+python3 flash_esp.py --download --erase
+```
+
+### 3. Flash incomplete or interrupted
+
+**Fix:** Retry with a lower baud rate:
+
+```bash
+python3 flash_esp.py --download --erase --baud 115200
+```
+
+### 4. Diagnosing with the serial monitor
+
+If the device is in a bootloop, connect via USB and open a serial terminal at **74880 baud** to capture the ESP8266 ROM bootloader messages. Then switch to **115200 baud** once the firmware banner starts printing (if it does). The first 20–30 lines almost always identify the crash reason (e.g., `Exception 3`, `Fatal exception 28`, `LittleFS mount failed`).
+
+Tools: Arduino IDE Serial Monitor, PuTTY, `screen /dev/ttyUSB0 74880`, or any terminal at the correct baud.
+
+### 5. Hard recovery (device completely unresponsive)
+
+If the Web UI and serial output are both unavailable:
+
+```bash
+python3 flash_esp.py --download --erase --baud 115200 --port <your-port>
+```
+
+If the auto-detected port is wrong or no port appears, check Device Manager (Windows) or `ls /dev/tty*` (Linux/macOS) for the USB-serial adapter. Common driver packages: CP210x (Silicon Labs) or CH340 (WCH).
+
+---
 
 ## Notes
 
-- Never flash the PIC firmware over WiFi using OTmonitor.
-- Use a reliable USB cable and avoid hubs if you see flashing errors.
-- If auto-install of esptool fails, install it manually via pip.
+- **Never flash the PIC firmware over WiFi using OTmonitor** — this can brick the PIC microcontroller.
+- Use a reliable, direct USB cable (avoid hubs) to minimise flash errors.
+- If auto-install of esptool fails, install it manually: `pip install esptool`
+- On Linux, add yourself to the `dialout` group and log out/in before flashing.
 
-For full usage details, run:
+For full usage details:
 
+```bash
 python3 flash_esp.py --help
+```

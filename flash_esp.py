@@ -233,7 +233,10 @@ def build_firmware():
         if filesystem_file:
             print_info(f"Found filesystem: {filesystem_file.name}")
         else:
-            print_warning("Filesystem binary not found (optional)")
+            print_warning("Filesystem binary not found.")
+            print_warning("A fresh install requires BOTH firmware and filesystem binaries.")
+            print_warning("Without the filesystem, the device may bootloop or lose settings on first boot.")
+            print_warning("Run the full build (not firmware-only) to produce both binaries.")
         
         return {
             'firmware': firmware_file,
@@ -616,6 +619,25 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
     if not firmware_file and not filesystem_file:
         print_error("No files to flash!")
         return False
+
+    # Warn when only firmware is provided without filesystem
+    if firmware_file and not filesystem_file:
+        _sep = "-" * 56
+        print()
+        print_warning(_sep)
+        print_warning("IMPORTANT: No filesystem binary provided!")
+        print_warning("")
+        print_warning("Flashing firmware alone can cause a bootloop or wipe")
+        print_warning("all settings on first boot if:")
+        print_warning("  - This is a first-time install (no filesystem present)")
+        print_warning("  - You are upgrading from v1.3.x or earlier to v1.4.x+")
+        print_warning("    (the LittleFS partition size changed from 1 MB to 2 MB)")
+        print_warning("")
+        print_warning("Recommended: flash both firmware and filesystem together.")
+        print_warning("For a clean first install, also use --erase.")
+        print_warning("See docs/guides/FLASH_GUIDE.md for the upgrade procedure.")
+        print_warning(_sep)
+        print()
     
     print_header("Flashing ESP8266")
     
@@ -644,6 +666,11 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
         print_info("  2. Reconnect it to the OTGW")
         print_info("  3. Power on the device")
         print_info("  4. Connect to the Web UI or configure WiFi via AP mode")
+        if not filesystem_file:
+            print()
+            print_warning("Note: No filesystem was flashed. If the device bootloops,")
+            print_warning("reflash with the filesystem binary included, using --erase.")
+            print_warning("See docs/guides/FLASH_GUIDE.md for recovery instructions.")
         return True
     except subprocess.CalledProcessError as e:
         print_error(f"\nFlashing failed: {e}")
@@ -652,6 +679,8 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
         print_info("  - Try a different USB cable")
         print_info("  - Check if drivers are installed (CP210x or CH340)")
         print_info("  - Try reducing baud rate with --baud 115200")
+        print_info("  - For bootloops after flash: use --erase and flash both firmware + filesystem")
+        print_info("  - See docs/guides/FLASH_GUIDE.md for detailed troubleshooting")
         return False
 
 
