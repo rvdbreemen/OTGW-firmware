@@ -40,8 +40,6 @@ This is one of two paired tasks. The 2.0.0 worktree carries the sibling task.
 - [x] #8 After build green, the commit is pushed to origin/dev per CLAUDE.md push policy.
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -78,3 +76,24 @@ T5: ./build.sh exit 0; firmware + filesystem built (OTGW-firmware-1.5.0-beta.23+
 
 Commit 932be9d6 chore(hooks): enforce prerelease bump on firmware-touching commits — three files (.githooks/pre-commit, bin/bump-prerelease.sh, CLAUDE.md), no firmware paths so the new bump-check did not fire on its own commit. Pushed to origin/dev (c0e5bb5e..932be9d6).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Enforces a prerelease bump on every commit that changes firmware behaviour on dev so field testers on Discord can A/B builds by version string.
+
+Changes:
+- bin/bump-prerelease.sh — thin POSIX bash wrapper that parses _VERSION_PRERELEASE (must match ^[a-zA-Z]+\.[0-9]+$, e.g. beta.23/alpha.6), increments the trailing integer, and calls scripts/autoinc-semver.py --prerelease for the rewrite. Does NOT git-add — caller stages.
+- .githooks/pre-commit — extended after the adr-judge gate with a bump-check stanza. Triggers when any staged path is under src/OTGW-firmware/ (excluding version.h) or src/libraries/. Requires git diff --cached -- src/OTGW-firmware/version.h to show both a + and a - line on the _VERSION_PRERELEASE define. Gated by OTGW_BUMP_HOOK_DISABLE=1 for cherry-picks/merges. Preserves the existing adr-kit hook behaviour (gated by ADR_KIT_HOOK_DISABLE) and ordering — adr-judge runs first.
+- CLAUDE.md — new "## Versioning policy" section near "## Git push policy" covering trigger paths, non-trigger paths (docs/**, scripts/**, bin/**, .githooks/**, *.md, etc.), how to bump, hook enforcement, and the bypass env var.
+
+Smoke tests (all PASS): bump helper round-trip; hook BLOCKS firmware-only synthetic commit; hook PASSES docs-only commit; hook PASSES firmware+bump commit; ./build.sh exits 0. All synthetic state reverted.
+
+User impact: from now on, any firmware-touching commit that forgets the bump is blocked at commit time with a clear remediation hint. Bypass exists for legitimate cases (rebases/cherry-picks where the bump rides on a separate commit). The 2.0.0 worktree carries the sibling task (TASK-561) — symmetric implementation expected there.
+
+Risks/follow-ups:
+- The autoinc-semver.py cascade rewrites version strings across many .ino/.css/.html/.js files. Smoke tests showed this is reproducible and reversible. Authors should treat the cascade as part of the bump and stage everything autoinc touches.
+- `bin/` is now gitignored-friendly but tracked; future shell helpers can land alongside.
+
+Files: .githooks/pre-commit (extended), bin/bump-prerelease.sh (new), CLAUDE.md (new section). Commit 932be9d6, pushed to origin/dev.
+<!-- SECTION:FINAL_SUMMARY:END -->
