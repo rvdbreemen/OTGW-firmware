@@ -901,6 +901,8 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 #define HEAP_CRITICAL_THRESHOLD   1536   // Critical: Stop all non-essential operations
 #define HEAP_WARNING_THRESHOLD    3072   // Warning: Start throttling messages
 #define HEAP_LOW_THRESHOLD        5120   // Low: Begin reducing message frequency
+// HEAP_LOW_RESTORE_THRESHOLD (6144) is declared in OTGW-firmware.h so it is
+// visible to MQTTstuff.ino, which is concatenated before this file (TASK-553).
 
 // Throttling state
 static uint32_t lastWebSocketSendMs = 0;
