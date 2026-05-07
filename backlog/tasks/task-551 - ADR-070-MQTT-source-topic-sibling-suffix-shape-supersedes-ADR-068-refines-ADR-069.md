@@ -3,9 +3,11 @@ id: TASK-551
 title: >-
   ADR-070: MQTT source-topic sibling-suffix shape (supersedes ADR-068, refines
   ADR-069)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@rvdbreemen-claude'
 created_date: '2026-05-07 07:55'
+updated_date: '2026-05-07 08:02'
 labels:
   - feat-mqtt-suffix-shape
   - adr
@@ -51,3 +53,13 @@ Related: ADR-069, ADR-068, ADR-067 (boot-time discovery republish — the trigge
 - [ ] #9 Status flipped to Accepted, YYYY-MM-DD ONLY after explicit human approval — never self-approved (CLAUDE.md ADR workflow rule)
 - [ ] #10 ADR-068 status line edited to 'Superseded by ADR-070, YYYY-MM-DD.' (one line only; rest of ADR-068 immutable)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Read ADR-068, ADR-069 for cross-reference content and supersession chain.
+2. Author docs/adr/ADR-070-mqtt-source-topic-sibling-suffix-shape.md as Status: Proposed using the canonical body from the plan file.
+3. Verify all four ADR-kit gates pass (Completeness, Evidence, Clarity, Consistency).
+4. STOP — present ADR for human review (CLAUDE.md ADR workflow rule: never self-approve).
+5. After human approval, flip Status to Accepted, edit ADR-068 status line to Superseded by ADR-070, mark ACs done.
+<!-- SECTION:PLAN:END -->
