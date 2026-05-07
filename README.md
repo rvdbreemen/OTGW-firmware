@@ -4,12 +4,6 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **Don't Panic, but: this is the development branch.**
->
-> The README on `dev` describes work in progress (currently `1.5.0-beta`). Things may break. Things may compile-and-not-work. Things may work fine and then forget about it on a Tuesday. By using anything from this branch you accept the risk: lost settings, watchdog resets, partial filesystems, the works. Please use this branch only on a non-production device. Please do not flash it onto the gateway that runs your actual heating.
->
-> For production gateways, install the latest stable release (currently `v1.4.1`) from the [GitHub releases page](https://github.com/rvdbreemen/OTGW-firmware/releases/latest). The `main` branch never carries this disclaimer; if you see this block, you are reading the `dev` branch's README.
-
 ## What's New in v1.5.0
 
 v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Arduino Core 2.7.4**. It ships 29 beta builds worth of fixes, MQTT improvements, and Home Assistant discovery refinements.
