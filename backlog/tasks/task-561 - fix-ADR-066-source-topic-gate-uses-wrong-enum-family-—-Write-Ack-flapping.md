@@ -30,8 +30,6 @@ publishToSourceTopic() compares rsptype (OTGW_response_type, 0..5) against OT_WR
 - [x] #6 Field-validation note in Final Summary: with bSeparateSources=true, msgid 14 and 16 on _thermostat/_boiler no longer flap to 0 between Write-Data frames (tester sign-off via Discord; leave blocking AC if not yet confirmed)
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -102,4 +100,6 @@ Behavioural change is strictly narrower than the (broken) original: the gate now
 ## Field validation (AC #6 — blocking)
 
 AC #6 requires Discord tester sign-off that with `bSeparateSources=true` msgids 14 and 16 on `_thermostat`/`_boiler` no longer flap to 0 between Write-Data frames on beta.25. This cannot be self-verified — it requires hardware-in-the-loop testing on a live OTGW with HA. Per the CLAUDE.md "Autonomous task completion" exception ("hardware-specific tester feedback"), the task remains at **In Progress** until a tester confirms the flap is gone on beta.25 in Discord `#beta-testing`. ACs #1-5 are checked; AC #6 remains the documented blocking AC.
+
+Field validation 2026-05-07 (Andre, dev beta.25+5153537): the 6 flagged msgids (14, 16, 23, 24, 37, 98) confirmed stable in HA — values no longer flap to 0 between Write-Data frames with bSeparateSources=true. (Recorded in TASK-571 description; AC #6 closed.)
 <!-- SECTION:FINAL_SUMMARY:END -->
