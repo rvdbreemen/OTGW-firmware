@@ -1,0 +1,32 @@
+---
+id: TASK-571
+title: >-
+  fix(mqtt): flip MsgID 1 (TSet) bSlaveEchoesValue=false — heat-pump non-echo
+  flap
+status: To Do
+assignee: []
+created_date: '2026-05-07 20:06'
+labels:
+  - bug
+  - mqtt
+  - adr-066
+  - 2.0.0-port-needed
+dependencies: []
+priority: high
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Field validation on dev beta.25+5153537 (2026-05-07) confirmed TASK-561 ADR-066 fix works for the 6 flagged msgids (14, 16, 23, 24, 37, 98) — values stable in HA. EXCEPT TSet (MsgID 1) on the user's heat pump still flaps between override values and 0. Root cause: the heat pump's Write-Ack data field returns 0 instead of echoing the master value (per OT v4.2 spec ambiguity for MsgID 1; some Class 1 controllers do this, others echo). The audit doc (docs/api/MQTT-message-id-echo-audit.md lines 27, 140-141) explicitly anticipated this: 'Class 1 / Class 8 control writes that may be non-echo on certain boilers' — TSet listed as primary candidate for future investigation. Fix: flip MsgID 1's bSlaveEchoesValue from true to false in OTmap[] (OTGW-Core.h around line 354). The existing is_value_valid_for_master_topic + publishToSourceTopic gates will then suppress the protocol-zero Write-Ack data on canonical and _boiler topics for MsgID 1 the same way they do for 14/16/23/24/37/98.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 OTGW-Core.h OTmap[] entry for MsgID 1 (TSet) has bSlaveEchoesValue changed from true to false
+- [ ] #2 docs/api/MQTT-message-id-echo-audit.md updated: MsgID 1 row's bSlaveEchoesValue column changed to false; reason column updated with the field evidence (heat-pump tester report 2026-05-07); 'Future extensions' candidates list updates to mark TSet as confirmed and removes it from the candidate list
+- [ ] #3 python build.py --firmware exits 0 on dev
+- [ ] #4 python evaluate.py --quick — no new failures
+- [ ] #5 Prerelease bump committed alongside (beta.25 -> beta.26)
+- [ ] #6 Field validation on beta.26+: tester confirms TSet boiler value no longer flaps between override and 0 with bSeparateSources=true (deferred per CLAUDE.md self-verification policy)
+<!-- AC:END -->
