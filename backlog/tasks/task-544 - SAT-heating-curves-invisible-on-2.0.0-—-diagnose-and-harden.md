@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-05 08:54'
-updated_date: '2026-05-06 05:27'
+updated_date: '2026-05-07 18:01'
 labels:
   - bug
   - sat
@@ -51,8 +51,6 @@ Diagnostic ladder + recommended hardening documented in plan file ~/.claude/plan
 - [x] #6 No new String instances; no PROGMEM violations; no HTTPS-only assumptions on the firmware HTTP API
 - [ ] #7 ./build.sh build --target esp32 completes without new compile warnings; LittleFS image fits the configured partition size from partitions_otgw_esp32.csv
 <!-- AC:END -->
-
-
 
 ## Implementation Plan
 
@@ -182,4 +180,25 @@ Still needs on-hardware/in-browser validation:
 - AC #7: ./build.sh build --target esp32 clean compile + LittleFS partition fit check. Not run in this session because the 2.0.0 worktree carries unrelated uncommitted edits (TASK-409, MQTTstuff.ino) and a build run would not isolate SAT-only verification. Run after those commit or stash.
 
 No source changes were made in this session; the verification is read-only.
+
+---
+**Field evidence — SergeantD on alpha.3+ca845dd, 2026-05-07 (Discord)**
+
+Screenshot of SAT page submitted via Discord shows:
+- TEMPERATURE HISTORY panel: empty dark gray frame, no data plotted.
+- Heating Curve (Stooklijn) panel: empty dark gray frame, no curves drawn.
+
+**Diagnostic for AC #1**: Heating Curve panel is blank, but the static reference curves (10 grey lines for c=0.5..5.0, plus the highlighted active-c) are computed in JS from a fixed formula and do NOT depend on OT bus, MQTT, or any live data. They should render even on a cold device with no thermostat/boiler attached.
+
+Possible causes (all narrow the bug to chart initialisation, not data binding):
+1. echarts loaded but `setOption()` never called for the curve chart, OR called with empty `series` array.
+2. `echarts.init()` skipped because container layout is unresolved at init time.
+3. JS error mid-init that hid the AC #5 fallback ("Charts unavailable: echarts CDN failed to load") but didn't draw anything either.
+
+The Temperature History panel being blank is partly expected on his test setup: device is in OT-Direct mode with `online=0` and no boiler attached, so Tboiler / Tret / Tdhw genuinely have no data. However, BLE room temps and the `OT=24.8` outside override should still plot a trace; if those are also missing on the new build, that's a separate data-binding gap.
+
+**Action**: asked SergeantD on Discord (2026-05-07) to flash alpha.8+1efc2f8 and re-screenshot the SAT expert-mode page. If the grey reference curves still don't render on alpha.8, AC #1 remains unfit and we need a fresh init-trace.
+
+---
+**Plan reference**: implementation sequencing tracked in `/Users/Breee02/.claude/plans/clever-yawning-wreath.md` (local working plan, not in repo). **Ship 5** (gated by tester re-screenshot, not blocked by Ship 1-3). Cannot proceed until SergeantD or another tester submits an alpha.8+ SAT-page screenshot. data/sat.js:576 initCurveChart with echarts.init at :583 and reference curves at buildCurveOption :470 — read these only if curves remain blank on alpha.8.
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-03 18:51'
-updated_date: '2026-05-05 16:21'
+updated_date: '2026-05-07 18:01'
 labels:
   - performance
   - esp32
@@ -101,4 +101,35 @@ Voor het volledige onderzoek zie de Discord-thread in #dev-sat-mqtt op 2026-05-0
 - Exposed latest perf metrics through /api/v2/device/info and added optional telnet traces when REST debug is enabled.
 - Local validation passed with ./build.sh --target esp32 and .build-venv/bin/python evaluate.py --quick.
 - Remaining ACs still require OTGW32 hardware runs: reproduce the slow case, compare REST-debug/MQTT/drip variants, determine root cause, decide on AsyncWebServer migration, verify <500 ms latency and browser timeout recovery, and document the outcome in an ADR.
+
+---
+**Field evidence — SergeantD on alpha.3+ca845dd, 2026-05-07 (Discord)**
+
+Device: OTGW32 (ESP32-S3), OT-Direct mode, no PIC, no boiler attached, MQTT connected, BLE active (4 sensors).
+Heap healthy: 69-76 KB free, 31.7 KB max block, fragmentation 43%, hd_ws_drops=0, hd_mqtt_drops=0.
+
+`/api/v2/device/info` perf payload:
+- perf_sat_status_total_ms = 3843 (send=3816, render=27, chunks=406)
+- perf_device_info_total_ms = 3686 (send=3382, render=304, chunks=350)
+- perf_device_info_max_ms = 4091 (samples=15)
+- perf_settings_total_ms = 2840 (send=2804, render=36, chunks=292)
+
+Render is 27-304 ms; the time is in TCP send/flush. Confirms the sync `WebServer` flush hypothesis (AC #4).
+
+**Contributing factors observed in the same telnet capture** (worth folding into the investigation, not just `WebServer` flush):
+1. **settings.ini write storm during UI form edits** — six full LittleFS rewrites in 14 s for a single form interaction (13:30:54 to 13:31:08), each 30-80 ms. While each write runs, lwIP cannot service WS / HTTP. Tracked separately in TASK-NNN (settings debounce).
+2. **SAT loop re-emits unchanged OT commands every 30 s** (`MM=100` re-enqueued 17 times in 13 min). Adds command-queue pressure (`high-water=2..3 (capacity=12)` observed). Tracked separately in TASK-NNN (SAT write-on-change).
+
+Both aggravators put extra work on the same scheduler that has to flush HTTP responses. Resolving them may not eliminate the 4 s peak but should reduce its frequency.
+
+**Linked WebSocket symptom**: WS code 1006 reconnect loop (browser side) + server-side `webSocketEve disconnected` bursts (`burst window=5000ms total=3 conn=1 disc=2`). Visible during HTTP traffic; matches TCP-slot starvation hypothesis. Frontend reconnect-dedup is split into its own task (JS-only).
+
+---
+**Cross-reference backfill (2026-05-07):**
+- Settings debounce contributing factor → TASK-564
+- SAT write-on-change contributing factor → TASK-565
+- Frontend WebSocket reconnect-dedup symptom → TASK-563
+
+---
+**Plan reference**: implementation sequencing tracked in `/Users/Breee02/.claude/plans/clever-yawning-wreath.md` (local working plan, not in repo). **Ship 4** (investigation, parallel track — does not block Ship 1-3). Direction-of-investigation decision waits on the alpha.10 perf JSON from a tester after Ship 1 + Ship 2 land. Three possible outcomes mapped in the plan; do not commit to AsyncWebServer migration before the data point.
 <!-- SECTION:NOTES:END -->

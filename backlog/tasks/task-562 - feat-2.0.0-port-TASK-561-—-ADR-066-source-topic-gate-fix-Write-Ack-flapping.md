@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 13:17'
-updated_date: '2026-05-07 15:07'
+updated_date: '2026-05-07 18:01'
 labels:
   - bug
   - mqtt
@@ -45,6 +45,13 @@ Port the dev-branch fix for ADR-066 source-topic gate. Same defect on this branc
 8. Push to origin/feature-dev-2.0.0-otgw32-esp32-sat-support (standing permission)
 9. Check ACs #1-5; leave #6 unchecked (Discord field-validation pending); leave task In Progress
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+---
+**Plan reference**: implementation sequencing tracked in `/Users/Breee02/.claude/plans/clever-yawning-wreath.md` (local working plan, not in repo). **Field-validation gate** — implementation already shipped on alpha.8+1efc2f8. AC #6 awaits Discord confirmation that msgid 14/16 stop flapping with bSeparateSources=true on a real boiler. Sibling: dev TASK-561.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
