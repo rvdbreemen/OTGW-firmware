@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 12:18'
-updated_date: '2026-05-07 12:23'
+updated_date: '2026-05-07 12:35'
 labels:
   - hooks
   - tooling
@@ -58,3 +58,21 @@ This is one of two paired tasks. The 2.0.0 worktree carries the sibling task.
 8. Push to origin/dev per push policy.
 9. Wrap up TASK-560: append-notes, check ACs 1-8, final-summary, status Done.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented:
+- bin/bump-prerelease.sh (executable; parses ^[a-zA-Z]+\.[0-9]+$, increments trailing N, calls scripts/autoinc-semver.py --prerelease).
+- .githooks/pre-commit extended with bump-check stanza after the adr-judge gate; gated by OTGW_BUMP_HOOK_DISABLE=1; preserves adr-kit hook behaviour exactly.
+- CLAUDE.md "## Versioning policy" section appended near "## Git push policy".
+
+Five smoke tests, all PASS:
+T1: ./bin/bump-prerelease.sh printed "beta.23 → beta.24" and updated version.h + data/version.hash + cascaded source/asset files. Reverted clean.
+T2: hook BLOCKED a synthetic firmware-only commit (touched MQTTstuff.ino, no bump) — exit 1 with [bump] error. Reset clean.
+T3: hook PASSED a synthetic docs-only commit (docs/SMOKE-T3.md). Used throwaway path to keep real CLAUDE.md edit intact. Reset clean.
+T4: hook PASSED a synthetic firmware+bump commit (MQTTstuff.ino + version.h + data/version.hash). Reset clean.
+T5: ./build.sh exit 0; firmware + filesystem built (OTGW-firmware-1.5.0-beta.23+6616c85.ino.bin + .littlefs.bin). Build-time autoinc drift reverted clean.
+
+Commit 932be9d6 chore(hooks): enforce prerelease bump on firmware-touching commits — three files (.githooks/pre-commit, bin/bump-prerelease.sh, CLAUDE.md), no firmware paths so the new bump-check did not fire on its own commit. Pushed to origin/dev (c0e5bb5e..932be9d6).
+<!-- SECTION:NOTES:END -->
