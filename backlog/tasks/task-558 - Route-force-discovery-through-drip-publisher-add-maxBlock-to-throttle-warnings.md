@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 11:57'
-updated_date: '2026-05-07 11:59'
+updated_date: '2026-05-07 12:03'
 labels:
   - mqtt
   - heap
@@ -48,3 +48,13 @@ This is one of two paired tasks. The 2.0.0 worktree carries the sibling task (`f
 5. Stage changes, commit with descriptive message, push to origin/dev.
 6. Mark all ACs checked, write Final Summary, set Done.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Edited MQTTstuff.ino doAutoConfigure() → 3-line body that calls markAllMQTTConfigPending(); dropped synchronous publish loop, sessionLock, climate/number/Dallas synchronous blocks. The drip publisher (loopMQTTDiscovery) already handles climate (ID 0), number (ID 27), and Dallas (OTGWdallasdataid via configSensors()) — verified in MQTTstuff.ino:1299-1310 and :1416-1421.
+Edited 4 DebugTf throttle warnings in helperStuff.ino (HEAP-CRITICAL Blocking WebSocket :1000, WebSocket throttled :1032, HEAP-CRITICAL Blocking MQTT :1054, MQTT throttled :1086) to add ESP.getMaxFreeBlockSize() alongside ESP.getFreeHeap().
+Build ./build.sh: exit 0 (firmware 0.70 MB + filesystem 1.98 MB).
+Evaluator python3 evaluate.py --quick: 31 passed / 2 warnings / 1 failed — all pre-existing baseline (header guard mqtt_discovery_verify.h, sendMQTTheapdiag buffer regex, 2 unresolved ADR refs); no new failures introduced.
+Commit c0e5bb5e pushed to origin/dev (7728aefe..c0e5bb5e). adr-judge: 0 violations, 56 advisory (all llm_judge ADRs, expected).
+<!-- SECTION:NOTES:END -->
