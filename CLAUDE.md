@@ -246,6 +246,17 @@ Three OTGW-specific skills under `.claude/skills/`:
 
 Generic Anthropic-published skills (`pdf`, `docx`, `refactor`, `webapp-testing`, …) live under `.github/skills/` for Copilot. Consult them only when the task is actually about that domain (e.g., extracting from a PIC datasheet PDF).
 
+## Superpowers skills
+
+The `superpowers:using-superpowers` skill loads automatically each session and establishes the skill-discovery flow: if any installed skill might apply to the current task — even at low confidence — invoke it via the `Skill` tool before responding. Don't paraphrase a skill from memory; the on-disk version may have evolved.
+
+Two superpowers skills are particularly useful in this codebase:
+
+- **`superpowers:verification-before-completion`** — invoke before claiming any work done (build green, fix shipped, regression resolved, push complete). This project has many field-validation gates that tempt premature "done" claims; the skill enforces *fresh* evidence (re-run the verification command in the current message, read the actual output) instead of relying on prior runs or extrapolation. Especially relevant before flipping AC checkboxes, marking tasks Done, or pushing to `origin/dev` / `origin/feature-dev-2.0.0-otgw32-esp32-sat-support`.
+- **`superpowers:brainstorming`** — invoke before entering plan mode for any non-trivial feature or refactor. Pairs well with the cross-worktree master-plan rule (Worktree layout § Cross-worktree work) when a change spans both branches.
+
+Other superpowers skills (`debugging`, `frontend-design`, `mcp-builder`, …) — invoke whenever the task description matches the skill's stated domain. The bar is low: a 1% chance of fit means use it.
+
 ## Git push policy
 
 The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`** and **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
