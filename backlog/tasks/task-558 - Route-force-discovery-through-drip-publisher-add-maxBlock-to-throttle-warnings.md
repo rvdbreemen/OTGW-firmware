@@ -3,9 +3,11 @@ id: TASK-558
 title: >-
   Route force-discovery through drip publisher + add maxBlock to throttle
   warnings
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-07 11:57'
+updated_date: '2026-05-07 11:59'
 labels:
   - mqtt
   - heap
