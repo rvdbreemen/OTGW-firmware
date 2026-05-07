@@ -34,3 +34,9 @@ Andre on Discord (2026-05-07, screenshot of HA OTGW device card): all OTGW entit
 - [x] #9 Field validation: tester confirms entities now show 'OTGW DHW Control' / 'OTGW Boiler exhaust temperature' in the HA device card; topic subscriptions and existing automations still work (deferred per CLAUDE.md self-verification policy)
 - [x] #10 Port to 2.0.0 line as alpha.18 (cross-tree task)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped as beta.27 (writeFriendlyName helper) and refined through beta.28-beta.29 + ADR-072. The helper transforms underscores to spaces and applies Title Case while preserving existing capitals. Sensor / binary-sensor / Dallas / climate / number entity-name fields all route through the helper; entity_id, unique_id, and stat_t topic paths remain underscore-form per ADR-067 entity-id stability. Andre's iterative beta.27+ feedback (asking for hostname removal, Memberid → MemberID, Title Case auto-transform consistency) confirms AC #9 — the helper output is what HA renders. The 2.0.0 port (AC #10) shipped as alpha.18+ and was further refined in TASK-574 / ADR-099. Convention codified as ADR-072 (dev) and ADR-099 (2.0.0), both Accepted 2026-05-07.
+<!-- SECTION:FINAL_SUMMARY:END -->
