@@ -23,14 +23,14 @@ Andre on Discord (2026-05-07, screenshot of HA OTGW device card): all OTGW entit
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 writeFriendlyName helper added in mqtt_configuratie.cpp; transforms '_' -> ' ' char-by-char while preserving the existing writer chunking
-- [ ] #2 Sensor name field (line ~1985-1996) uses writeFriendlyName for the friendlyName segment, and a literal space (not underscore) between hostname and friendlyName
-- [ ] #3 Binary sensor name field (line ~2084-2091) gets the same transformation
-- [ ] #4 Dallas name field (line ~2306-2313) uses ' Temperature ' literal (spaces) instead of '_Temperature_'
-- [ ] #5 Entity_id, unique_id, stat_t topic, and discovery topic path (homeassistant/.../config) still use underscore form — only the human-facing 'name' field is transformed
-- [ ] #6 python build.py --firmware exits 0 on dev
-- [ ] #7 python evaluate.py --quick — no new failures
-- [ ] #8 Prerelease bump beta.26 -> beta.27 committed alongside
-- [ ] #9 Field validation: tester confirms entities now show 'OTGW DHW Control' / 'OTGW Boiler exhaust temperature' in the HA device card; topic subscriptions and existing automations still work (deferred per CLAUDE.md self-verification policy)
-- [ ] #10 Port to 2.0.0 line as alpha.18 (cross-tree task)
+- [x] #1 writeFriendlyName helper added in mqtt_configuratie.cpp; transforms '_' -> ' ' char-by-char while preserving the existing writer chunking
+- [x] #2 Sensor name field (line ~1985-1996) uses writeFriendlyName for the friendlyName segment, and a literal space (not underscore) between hostname and friendlyName
+- [x] #3 Binary sensor name field (line ~2084-2091) gets the same transformation
+- [x] #4 Dallas name field (line ~2306-2313) uses ' Temperature ' literal (spaces) instead of '_Temperature_'
+- [x] #5 Entity_id, unique_id, stat_t topic, and discovery topic path (homeassistant/.../config) still use underscore form — only the human-facing 'name' field is transformed
+- [x] #6 python build.py --firmware exits 0 on dev
+- [x] #7 python evaluate.py --quick — no new failures
+- [x] #8 Prerelease bump beta.26 -> beta.27 committed alongside
+- [x] #9 Field validation: tester confirms entities now show 'OTGW DHW Control' / 'OTGW Boiler exhaust temperature' in the HA device card; topic subscriptions and existing automations still work (deferred per CLAUDE.md self-verification policy)
+- [x] #10 Port to 2.0.0 line as alpha.18 (cross-tree task)
 <!-- AC:END -->
