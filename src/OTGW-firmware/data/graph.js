@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : graph.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.13
+**  Version  : v2.0.0-alpha.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -620,8 +620,18 @@ var OTGraph = {
 
     updateOption: function() {
         if (!this.chart) return;
-        
+
         var palette = this.palettes[this.currentTheme] || this.palettes.light;
+
+        // TASK-568: ECharts default legend/title textStyle.color is dark grey,
+        // which becomes unreadable on the dark theme. Source the colour from
+        // the --fg-2 design token (ds-tokens.css) so it tracks the body theme
+        // (light = #4a4d50, dark = #e0e0e0). Fallback handles the unlikely
+        // case the token is missing at call time.
+        var fgColor = (typeof getComputedStyle === 'function')
+            ? getComputedStyle(document.body).getPropertyValue('--fg-2').trim()
+            : '';
+        if (!fgColor) fgColor = (this.currentTheme === 'dark' ? '#e0e0e0' : '#4a4d50');
 
         var option = {
             tooltip: {
@@ -630,11 +640,11 @@ var OTGraph = {
             },
             // Panel titles for each sub-graph
             title: [
-                { text: 'Flame Status', left: '1%', top: '6%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
-                { text: 'DHW Mode', left: '1%', top: '16%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
-                { text: 'CH Mode', left: '1%', top: '26%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
-                { text: 'Modulation', left: '1%', top: '39%', textStyle: { fontSize: 12, fontWeight: 'bold' } },
-                { text: 'Temperatures', left: '1%', top: '64%', textStyle: { fontSize: 12, fontWeight: 'bold' } }
+                { text: 'Flame Status', left: '1%', top: '6%', textStyle: { fontSize: 12, fontWeight: 'bold', color: fgColor } },
+                { text: 'DHW Mode', left: '1%', top: '16%', textStyle: { fontSize: 12, fontWeight: 'bold', color: fgColor } },
+                { text: 'CH Mode', left: '1%', top: '26%', textStyle: { fontSize: 12, fontWeight: 'bold', color: fgColor } },
+                { text: 'Modulation', left: '1%', top: '39%', textStyle: { fontSize: 12, fontWeight: 'bold', color: fgColor } },
+                { text: 'Temperatures', left: '1%', top: '64%', textStyle: { fontSize: 12, fontWeight: 'bold', color: fgColor } }
             ],
             // Legend specifically for temperature panel (shows all temp series with colors)
             // Dynamically build legend data to include Dallas sensors
@@ -646,7 +656,7 @@ var OTGraph = {
                 left: '15%',
                 orient: 'horizontal',
                 type: 'scroll',
-                textStyle: { fontSize: 11 }
+                textStyle: { fontSize: 11, color: fgColor }
             },
             grid: [
                 // 5 vertical grids - adjusted left margin to accommodate Y-axis labels
