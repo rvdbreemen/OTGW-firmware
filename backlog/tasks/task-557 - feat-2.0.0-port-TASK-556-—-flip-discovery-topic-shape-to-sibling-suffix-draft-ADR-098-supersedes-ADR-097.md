@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 11:05'
-updated_date: '2026-05-07 11:38'
+updated_date: '2026-05-07 21:56'
 labels:
   - mqtt
   - discovery
@@ -42,7 +42,7 @@ Coordinated with dev TASK-556. Both worktrees adopt the discovery sibling-suffix
 - [x] #6 ADR-097 Enforcement carve-out comment is removed or updated to reference ADR-098
 - [x] #7 ADR-098 Enforcement block forbid_pattern matches the OLD nested format and would catch any regression
 - [x] #8 Build for ESP8266 target exits 0 with no new warnings
-- [ ] #9 Build for ESP32-S3 target exits 0 with no new warnings
+- [x] #9 Build for ESP32-S3 target exits 0 with no new warnings
 - [ ] #10 Field test on a beta unit (ESP8266 or ESP32-S3) with bSeparateSources=true confirms HA registers source-variant entities where they did NOT register before the change
 <!-- AC:END -->
 
@@ -91,4 +91,6 @@ Coordinated with dev TASK-556 (commit 4d9b5b42 on dev). Both ports use the same 
 AC #9 (field-log re-validation on hardware) and AC #10 (any other unmet) remain unchecked: requires hardware deployment of beta with this change.
 
 Push held locally awaiting explicit user approval per 2.0.0 feature-branch push policy.
+
+AC #9 confirmed via the verification build run on 2026-05-07: ./build.sh produced both ESP8266 and ESP32-S3 binaries cleanly (exit 0) with no new warnings. Only AC #10 (field test bSeparateSources=true on a beta unit confirming HA registers source-variant entities) remains as a hardware-gated blocker.
 <!-- SECTION:FINAL_SUMMARY:END -->
