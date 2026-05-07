@@ -2018,6 +2018,20 @@ static bool writeJsonOpen(MqttJsonWriter &w)  { return w.writeChar('{'); }
 static bool writeJsonClose(MqttJsonWriter &w) { return w.writeChar('}'); }
 static bool writeJsonComma(MqttJsonWriter &w) { return w.writeChar(','); }
 
+// Write a string to the JSON writer with '_' transformed to ' '. Used for the
+// human-facing "name" field in HA discovery configs so testers see
+// "OTGW Boiler exhaust temperature" instead of "OTGW_Boiler_exhaust_temperature"
+// in the HA UI. Transformation is friendly-name-only — unique_id, stat_t topic,
+// and entity_id all continue to use the underscore form (Andre, 2026-05-07).
+static bool writeFriendlyName(MqttJsonWriter &w, const char *s) {
+  if (!s) return true;
+  for (const char *p = s; *p; p++) {
+    char c = (*p == '_') ? ' ' : *p;
+    if (!w.writeChar(c)) return false;
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // PROGMEM string constants for discovery JSON keys
 // ---------------------------------------------------------------------------
@@ -2140,13 +2154,16 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "name":"<hostname>_<friendlyName>[ <sourceName>]"
+  // "name":"<hostname> <friendlyName>[ <sourceName>]"
+  // Underscores in friendlyName are transformed to spaces for HA UI legibility
+  // (Andre 2026-05-07). Entity IDs, unique_ids, and stat_t topics still use
+  // the underscore form — only the human-facing name field is transformed.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kName)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.hostname)) return false;
-  if (!w.writeChar('_')) return false;
-  if (!w.writeRam(friendlyName)) return false;
+  if (!w.writeChar(' ')) return false;
+  if (!writeFriendlyName(w, friendlyName)) return false;
   if (hasSrc && ctx.sourceName && ctx.sourceName[0]) {
     if (!w.writeChar(' ')) return false;
     if (!w.writeRam(ctx.sourceName)) return false;
@@ -2250,13 +2267,13 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "name":"<hostname>_<friendlyName>"
+  // "name":"<hostname> <friendlyName>" (underscores in friendlyName -> spaces)
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kName)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.hostname)) return false;
-  if (!w.writeChar('_')) return false;
-  if (!w.writeRam(friendlyName)) return false;
+  if (!w.writeChar(' ')) return false;
+  if (!writeFriendlyName(w, friendlyName)) return false;
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
@@ -2492,12 +2509,12 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
     if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
 
-    // "name":"<hostname>_Temperature_<sensorAddress>"
+    // "name":"<hostname> Temperature <sensorAddress>" (Andre 2026-05-07: spaces, not underscores)
     if (!w.writeChar('"')) return false;
     if (!w.writeProgmem(kName)) return false;
     if (!w.writeProgmem(PSTR("\":\""))) return false;
     if (!w.writeRam(ctx.hostname)) return false;
-    if (!w.writeProgmem(PSTR("_Temperature_"))) return false;
+    if (!w.writeProgmem(PSTR(" Temperature "))) return false;
     if (!w.writeRam(sensorAddress)) return false;
     if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
