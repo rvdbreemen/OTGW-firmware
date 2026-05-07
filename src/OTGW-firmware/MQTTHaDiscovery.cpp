@@ -2317,6 +2317,14 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
 // ---------------------------------------------------------------------------
 // Topic builders
 // ---------------------------------------------------------------------------
+// Source-variant discovery topics use sibling-suffix shape (`<label>_<src>`)
+// per ADR-098, which supersedes the nested-children carve-out from ADR-097.
+// HA's discovery dispatcher (homeassistant/components/mqtt/discovery.py
+// TOPIC_MATCHER) restricts object_id to [a-zA-Z0-9_-]+, so the previous
+// nested form (`<label>/<src>/config`) was rejected with "illegal discovery
+// topic" and silently discarded — affecting both ESP8266 and ESP32-S3 builds.
+// Canonical (no source) keeps the bare label as the object_id, which has
+// always matched the regex. Mirrors dev ADR-071 / TASK-556.
 static bool buildSensorDiscoveryTopic(char *dest, size_t destSize,
                                       const char *haPrefix, const char *nodeId,
                                       PGM_P label, const char *sourceTopicSegment)
@@ -2326,7 +2334,7 @@ static bool buildSensorDiscoveryTopic(char *dest, size_t destSize,
   sanitizeHaObjectId(labelBuf);
   int n;
   if (sourceTopicSegment && sourceTopicSegment[0]) {
-    n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s/%s/config"),
+    n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s_%s/config"),
                    haPrefix, nodeId, labelBuf, sourceTopicSegment);
   } else {
     n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s/config"),

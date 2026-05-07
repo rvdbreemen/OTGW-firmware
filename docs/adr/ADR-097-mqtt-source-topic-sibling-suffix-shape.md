@@ -1,6 +1,6 @@
 # ADR-097: MQTT Source-Topic Sibling-Suffix Shape (feature-2.0.0 port of ADR-070)
 
-**Status:** Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency)
+**Status:** Superseded by ADR-098, 2026-05-07. Original status: Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Reason for supersession: this ADR's discovery-topic carve-out (mirroring dev ADR-070 line 54) was based on the assumption that HA accepts nested discovery topic identifiers and handles `state_topic` deltas in-place. Empirical investigation against `homeassistant/components/mqtt/discovery.py:TOPIC_MATCHER` showed nested discovery topics (object_id containing `/`) are rejected before reaching the subscription layer. ADR-098 corrects the discovery-topic shape on this branch; the state-topic decision recorded here is preserved and remains in force. See dev sibling: ADR-070 → ADR-071 supersession.
 **Date:** 2026-05-07
 **Decision Maker:** User: Robert van den Breemen (rvdbreemen)
 
