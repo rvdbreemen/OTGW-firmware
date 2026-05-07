@@ -1956,88 +1956,14 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
 // TASK-528 / ADR-095) is removed. Source variants are now purely additive.
 
 void doAutoConfigure(){
-  // Force-publishes HA discovery configs for ALL entries.
-  // Clears the "done" bitmap first so everything is re-sent.
-  // Lock scope is limited to the publish loop; configSensors() acquires its own lock.
-
+  // Force-publishes HA discovery configs for ALL entries asynchronously.
+  // Routes through the drip publisher (markAllMQTTConfigPending +
+  // loopMQTTDiscovery) instead of streaming the full set inline. This
+  // eliminates the handleOTGW() stall during F-key force-discovery and
+  // POST /api/v2/otgw/discovery; the REST endpoint already returns
+  // 202 Accepted before this call, so the contract was always async.
   if (!settings.mqtt.bEnable) return;
-
-  {
-    MQTTAutoConfigSessionLock sessionLock;
-    if (!sessionLock.locked) {
-      MQTTDebugTln(F("MQTT autoconfig already running, skipping"));
-      return;
-    }
-
-    clearMQTTConfigDone();
-
-    HaDiscoveryContext ctx = buildDiscoveryContext(true);
-
-    // Stream sensor discoveries
-    for (uint16_t i = 0; i < MQTT_HA_SENSOR_COUNT; i++) {
-      feedWatchDog();
-      MqttHaSensorCfg cfg = readSensorCfg(i);
-
-      if (!isPICEnabled() && (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY)) continue;
-      if (cfg.id == OTGWdallasdataid) continue;  // Dallas handled separately
-
-      if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
-        if (settings.mqtt.bSeparateSources) {
-          expandAndStreamSensorSources(MQTTclient, cfg, ctx);
-        }
-        // Skip source-template entries when separate sources disabled
-      } else {
-        // ADR-097: base entity always emitted; ADR-095 mutual-exclusion dropped
-        // because sibling-suffix shape makes canonical and source variants
-        // distinct entities (TSet, TSet_thermostat, TSet_boiler).
-        streamSensorDiscovery(MQTTclient, cfg, ctx);
-      }
-      setMQTTConfigDone(cfg.id);
-      ctx.isFirstEntity = false;
-    }
-
-    // Stream binary sensor discoveries
-    for (uint16_t i = 0; i < MQTT_HA_BINSENSOR_COUNT; i++) {
-      feedWatchDog();
-      MqttHaBinSensorCfg cfg = readBinSensorCfg(i);
-
-      if (!isPICEnabled() && (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY)) continue;
-
-      streamBinarySensorDiscovery(MQTTclient, cfg, ctx);
-      setMQTTConfigDone(cfg.id);
-      ctx.isFirstEntity = false;
-    }
-
-    // Climate and number entities (hardcoded, not in PROGMEM arrays)
-    feedWatchDog();
-    streamClimateDiscovery(MQTTclient, 0, ctx);  // Thermostat
-    ctx.isFirstEntity = false;
-    feedWatchDog();
-    streamClimateDiscovery(MQTTclient, 1, ctx);  // DHW Control
-    feedWatchDog();
-    streamNumberDiscovery(MQTTclient, ctx);       // Toutside Override
-    // SAT switches + select (TASK-284, piggyback on climate pseudo-ID 0).
-    // TASK-516: switch idx 13 (dhw_enable) is only emitted when the boiler
-    // reports MsgID 3 HB3=1 (storage tank); combi boilers get no inert entity.
-    const bool dhwEnableSwitchAllowed =
-        (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
-    for (uint8_t swIdx = 0; swIdx < 14; swIdx++) {
-      if (swIdx == 13 && !dhwEnableSwitchAllowed) continue;
-      feedWatchDog();
-      streamSatSwitchDiscovery(MQTTclient, swIdx, ctx);
-    }
-    feedWatchDog();
-    streamSatSelectDiscovery(MQTTclient, 0, ctx);
-    // Mark climate/number IDs done
-    setMQTTConfigDone(0);   // climate + SAT switch/select entries are OT ID 0
-    setMQTTConfigDone(27);  // number entry is OT ID 27
-  } // Lock released here
-
-  // Trigger Dallas configuration separately as it requires specific sensor addresses.
-  // Always run after force (clearMQTTConfigDone above cleared the done flag).
-  if (settings.mqtt.bEnable) {
-    configSensors();
-  }
+  markAllMQTTConfigPending();
 }
 //===========================================================================================
 bool doAutoConfigureMsgid(byte OTid, bool isFirst)
