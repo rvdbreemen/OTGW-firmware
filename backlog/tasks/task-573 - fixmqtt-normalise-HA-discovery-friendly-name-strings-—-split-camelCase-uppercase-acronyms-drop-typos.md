@@ -34,3 +34,9 @@ Andre's field reports surfaced systematic friendly-name rendering defects after 
 - [ ] #6 No OTmap[] / OTGW-Core.h modification — git diff confirms zero touches outside mqtt_configuratie.cpp
 - [ ] #7 Field validation: Andre confirms HA shows clean Title-Case friendly names (Memberid -> MemberID, no glued strings, no trailing g on CH Pump Operation Hours)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. apply.py mapping; 2. verify scope (no labels/OTmap/slugs touched); 3. build firmware+filesystem; 4. evaluate --quick; 5. bump prerelease; 6. stage + commit + push
+<!-- SECTION:PLAN:END -->
