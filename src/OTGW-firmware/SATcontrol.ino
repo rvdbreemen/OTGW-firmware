@@ -234,6 +234,82 @@ static uint8_t _sat_consecutiveSkips  = 0;
 static uint8_t _sat_picFailCount      = 0;
 static bool    _sat_bootCS0sent       = false;  // One-shot: ensure CS=0 is sent once PIC is available
 static bool    _sat_prevDhwActive     = false;  // Track DHW transition to send SW= on entry (TASK-437)
+static bool    _sat_prevOTOnline      = false;  // Track OT-bus online edge for cache reset (TASK-565)
+
+// --- Write-on-change refresh window for SAT-emitted OT commands (TASK-565) ---
+// Even when CS/MM/CH/TC values are unchanged, re-emit at this cadence so a
+// rebooted PIC or a boiler whose internal state has drifted from our last
+// command resyncs to the current SAT intent. 5 min keeps tester-visible
+// latency on PIC reboot bounded while cutting steady-state OT traffic ~20x.
+static const uint32_t SAT_CMD_REFRESH_MS = 300000UL; // 5 min
+
+// Reset the SAT last-sent OT command cache so the next call to
+// satEnqueueIfChanged*() always enqueues. Used on offline->online edges,
+// safety/disable paths, and at boot.
+static inline void satResetCmdCache() {
+  state.sat.bLastSentValid = false;
+  state.sat.iLastSentCSMs  = 0;
+  state.sat.iLastSentMMMs  = 0;
+  state.sat.iLastSentCHMs  = 0;
+  state.sat.iLastSentTCMs  = 0;
+}
+
+// Enqueue CS=<setpoint> only if value changed (rounded to 0.1) or refresh
+// window elapsed. Returns true when an enqueue happened.
+static bool satEnqueueIfChangedCS(float setpoint) {
+  uint32_t now = millis();
+  int16_t newQ = (int16_t)lroundf(setpoint * 10.0f);
+  int16_t oldQ = (int16_t)lroundf(state.sat.fLastSentCS * 10.0f);
+  bool stale = (now - state.sat.iLastSentCSMs) >= SAT_CMD_REFRESH_MS;
+  if (state.sat.bLastSentValid && newQ == oldQ && !stale) return false;
+  char buf[16];
+  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), setpoint);
+  addCommandToQueue(buf, strlen(buf), false, 0);
+  state.sat.fLastSentCS     = (float)newQ / 10.0f;
+  state.sat.iLastSentCSMs   = now;
+  state.sat.bLastSentValid  = true;
+  return true;
+}
+
+static bool satEnqueueIfChangedMM(uint8_t mm) {
+  uint32_t now = millis();
+  bool stale = (now - state.sat.iLastSentMMMs) >= SAT_CMD_REFRESH_MS;
+  if (state.sat.bLastSentValid && mm == state.sat.iLastSentMM && !stale) return false;
+  char buf[8];
+  snprintf_P(buf, sizeof(buf), PSTR("MM=%u"), mm);
+  addCommandToQueue(buf, strlen(buf), false, 0);
+  state.sat.iLastSentMM     = mm;
+  state.sat.iLastSentMMMs   = now;
+  state.sat.bLastSentValid  = true;
+  return true;
+}
+
+// ch is 0 or 1 (CH=0 / CH=1). Both string forms are 4 chars.
+static bool satEnqueueIfChangedCH(uint8_t ch) {
+  uint32_t now = millis();
+  bool stale = (now - state.sat.iLastSentCHMs) >= SAT_CMD_REFRESH_MS;
+  if (state.sat.bLastSentValid && ch == state.sat.iLastSentCH && !stale) return false;
+  addCommandToQueue(ch ? "CH=1" : "CH=0", 4, false, 0);
+  state.sat.iLastSentCH     = ch;
+  state.sat.iLastSentCHMs   = now;
+  state.sat.bLastSentValid  = true;
+  return true;
+}
+
+static bool satEnqueueIfChangedTC(float tc) {
+  uint32_t now = millis();
+  int16_t newQ = (int16_t)lroundf(tc * 10.0f);
+  int16_t oldQ = (int16_t)lroundf(state.sat.fLastSentTC * 10.0f);
+  bool stale = (now - state.sat.iLastSentTCMs) >= SAT_CMD_REFRESH_MS;
+  if (state.sat.bLastSentValid && newQ == oldQ && !stale) return false;
+  char buf[16];
+  snprintf_P(buf, sizeof(buf), PSTR("TC=%.1f"), tc);
+  addCommandToQueue(buf, strlen(buf), false, 0);
+  state.sat.fLastSentTC     = (float)newQ / 10.0f;
+  state.sat.iLastSentTCMs   = now;
+  state.sat.bLastSentValid  = true;
+  return true;
+}
 
 // --- Thermal Drop Learning State (Task #21) ---
 static float    _thermal_prevRoom     = 0.0f;
@@ -1461,6 +1537,9 @@ void satDisable()
   // thermostat resumes authority. Python SAT uses a warm-idle setpoint because it *is*
   // the thermostat (standalone HA replacement); OTGW firmware is not, so it defers.
   addCommandToQueue("CS=0", 4, false, 0);
+  // TASK-565: clear the write-on-change cache so the next satControlLoop
+  // (re-enable, fallback, or recommissioning) re-emits all four SAT commands.
+  satResetCmdCache();
   SATDebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
 }
 
@@ -2911,6 +2990,11 @@ void initSAT()
   _sat_consecutiveSkips = 0;
   _sat_picFailCount = 0;
   _sat_bootCS0sent = false;
+  _sat_prevOTOnline = false;
+  // TASK-565: cache starts invalid; first call to satEnqueueIfChanged*()
+  // will always emit. Defensive reset in case the struct's default
+  // initialiser is bypassed by a non-zero state.sat memcpy somewhere.
+  satResetCmdCache();
 
   // BOOT SAFETY: Release any stale PIC control setpoint override.
   // After a crash/reboot, the PIC may still hold the last CS= value.
@@ -3442,6 +3526,15 @@ void satControlLoop()
     satLoadPidState();
   }
 
+  // TASK-565: detect OT-bus offline->online edge and reset write-on-change
+  // cache so a recovering boiler immediately receives the current SAT state
+  // (CS/MM/CH/TC) instead of waiting for the staleness window to expire.
+  bool otOnline = state.otBus.bOnline;
+  if (otOnline && !_sat_prevOTOnline) {
+    satResetCmdCache();
+  }
+  _sat_prevOTOnline = otOnline;
+
   // --- Fallback detection (Task #19): auto-enable SAT when external control lost ---
   // Runs BEFORE the bEnabled gate because it is the entry path that flips
   // bEnabled from false to true when the boiler controller loses MQTT.
@@ -3594,12 +3687,10 @@ void satControlLoop()
       float sysMax = satGetMaxSetpoint();
       if (state.sat.fFinalSetpoint > sysMax) state.sat.fFinalSetpoint = sysMax;
       if (hasOTCommandInterface()) {
-        char cmd[16];
-        snprintf_P(cmd, sizeof(cmd), PSTR("CS=%d"), (int)state.sat.fFinalSetpoint);
-        addCommandToQueue(cmd, strlen(cmd), false, 0);
-        snprintf_P(cmd, sizeof(cmd), PSTR("MM=%u"), settings.sat.iMaxRelModulation);
-        addCommandToQueue(cmd, strlen(cmd), false, 0);
-        addCommandToQueue("CH=1", 4, false, 0);
+        // TASK-565: write-on-change. Thermal safe-fallback path.
+        satEnqueueIfChangedCS((float)(int)state.sat.fFinalSetpoint);
+        satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
+        satEnqueueIfChangedCH(1);
       }
       satPublishMQTT();
       return;
@@ -3626,11 +3717,10 @@ void satControlLoop()
   if (state.sat.bSummerActive && settings.sat.bSummerSimmer) {
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
     if (hasOTCommandInterface()) {
-      addCommandToQueue("CS=10", 5, false, 0);
-      char mmBuf[8];
-      snprintf_P(mmBuf, sizeof(mmBuf), PSTR("MM=%u"), settings.sat.iMaxRelModulation);
-      addCommandToQueue(mmBuf, strlen(mmBuf), false, 0);
-      addCommandToQueue("CH=0", 4, false, 0);
+      // TASK-565: write-on-change. Summer-simmer path.
+      satEnqueueIfChangedCS(10.0f);
+      satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
+      satEnqueueIfChangedCH(0);
     }
     return; // Skip rest of control loop
   }
@@ -3639,11 +3729,10 @@ void satControlLoop()
   if (!state.sat.bValvesOpen) {
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
     if (hasOTCommandInterface()) {
-      addCommandToQueue("CS=10", 5, false, 0);
-      char mmBuf[8];
-      snprintf_P(mmBuf, sizeof(mmBuf), PSTR("MM=%u"), settings.sat.iMaxRelModulation);
-      addCommandToQueue(mmBuf, strlen(mmBuf), false, 0);
-      addCommandToQueue("CH=0", 4, false, 0);
+      // TASK-565: write-on-change. Valves-closed path.
+      satEnqueueIfChangedCS(10.0f);
+      satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
+      satEnqueueIfChangedCH(0);
     }
     // Don't update PID integral or record error statistics
     satPublishMQTT();
@@ -3822,24 +3911,21 @@ void satControlLoop()
 
   // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
   if (hasOTCommandInterface()) {
-    char cmdBuf[16];
-    snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("CS=%.1f"), finalSetpoint);
-    addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
-    // Send MM= (max relative modulation) alongside CS=
-    snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("MM=%u"), state.sat.iCurrentModulation);
-    addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
-    // Send CH= (central heating enable/disable) every cycle
+    // TASK-565: write-on-change. Main control block.
+    satEnqueueIfChangedCS(finalSetpoint);
+    satEnqueueIfChangedMM(state.sat.iCurrentModulation);
     bool wantHeating = (finalSetpoint > SAT_MIN_SETPOINT);
-    addCommandToQueue(wantHeating ? "CH=1" : "CH=0", 4, false, 0);
-    // Immergas quirk: send TP=11:12=<setpoint> alongside MM=
+    satEnqueueIfChangedCH(wantHeating ? 1 : 0);
+    // Immergas quirk: send TP=11:12=<setpoint> alongside MM=. Kept on
+    // unconditional enqueue per TASK-565: rare quirk path, not steady loop.
     if (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) {
+      char cmdBuf[16];
       snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("TP=11:12=%.0f"), finalSetpoint);
       addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
     }
     // Push SAT target to thermostat display via TC= command (Task #31)
     if (settings.sat.bPushSetpoint) {
-      snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("TC=%.1f"), settings.sat.fTargetTemp);
-      addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
+      satEnqueueIfChangedTC(settings.sat.fTargetTemp);
     }
     _sat_picFailCount = 0;
   } else {

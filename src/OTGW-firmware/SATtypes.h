@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.10
+**  Version  : v2.0.0-alpha.11
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -310,6 +310,20 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bAutoTuneActive        = false;  // Currently running auto-tune analysis
   uint16_t iAutoTuneCycles        = 0;      // Cycles analyzed since last adjustment
   float    fAutoTuneScore         = 0.0f;   // Current performance score (-1 to +1)
+  // Last-sent OT command cache (TASK-565). Write-on-change for the
+  // CS/MM/CH/TC commands the SAT loop emits every control cycle, so an
+  // unchanged value is not re-enqueued every 30 s. Refreshed every
+  // SAT_CMD_REFRESH_MS even when unchanged so a rebooted PIC / boiler
+  // re-syncs to current SAT state. Transient runtime state per ADR-051.
+  bool     bLastSentValid         = false;  // false until first emit, or after offline->online reset
+  float    fLastSentCS            = 0.0f;   // CS=<float> last emitted (rounded to .1)
+  uint8_t  iLastSentMM            = 0;      // MM=<uint> last emitted
+  uint8_t  iLastSentCH            = 0;      // CH=<0|1> last emitted
+  float    fLastSentTC            = 0.0f;   // TC=<float> last emitted (rounded to .1)
+  uint32_t iLastSentCSMs          = 0;
+  uint32_t iLastSentMMMs          = 0;
+  uint32_t iLastSentCHMs          = 0;
+  uint32_t iLastSentTCMs          = 0;
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   float    fBleTemp               = 0.0f;   // BLE sensor temperature (0.01C precision)
