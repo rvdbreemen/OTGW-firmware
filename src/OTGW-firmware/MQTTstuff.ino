@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.5.0-beta.20
+**  Version  : v1.5.0-beta.21
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1170,33 +1170,35 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
   sendMQTTData(topic, buffer);
 }
 
-// ADR-069 worldview routing for source-separated MQTT subtopics.
+// ADR-069 worldview routing + ADR-070 sibling-suffix topic shape.
 //
-// Each subtopic represents what *that device* sees on the OpenTherm bus,
-// regardless of which side put the frame on the wire:
+// Each per-source topic represents what *that device* sees on the OpenTherm
+// bus, regardless of which side put the frame on the wire. Topics are sibling
+// leaves of the canonical topic (suffix shape per ADR-070, replacing the
+// nested-children shape from beta.20):
 //
-//   /thermostat — value the thermostat sent (T) or received (A under override,
-//                 B under pass-through)
-//   /boiler     — value the boiler received (R under override, T under
-//                 pass-through) or sent (B)
+//   <topic>            canonical (boiler-side worldview)
+//   <topic>_thermostat value the thermostat sent (T) or received (A under
+//                      override, B under pass-through)
+//   <topic>_boiler     value the boiler received (R under override, T under
+//                      pass-through) or sent (B)
 //
 // Routing decisions per (rsptype, OTdata.bGatewaySubstituted):
 //
-//   T  no-override (bGS=false): /thermostat AND /boiler
-//   T  with R-follow (bGS=true): /thermostat only (R wins /boiler)
-//   R                          : /boiler only
-//   B  no-override (bGS=false): /thermostat AND /boiler
-//   B  with A-follow (bGS=true): /boiler only (A wins /thermostat)
-//   A                          : /thermostat only
+//   T  no-override (bGS=false): _thermostat AND _boiler
+//   T  with R-follow (bGS=true): _thermostat only (R wins _boiler)
+//   R                          : _boiler only
+//   B  no-override (bGS=false): _thermostat AND _boiler
+//   B  with A-follow (bGS=true): _boiler only (A wins _thermostat)
+//   A                          : _thermostat only
 //
 // The bGatewaySubstituted flag is set on the OLDER frame in a (T,R) or (B,A)
-// sequence by processOT() in OTGW-Core.ino:4046+. The /gateway subtopic was
-// retired by TASK-531 and is ratified retired by ADR-069 — override visibility
-// is achieved by divergence between /thermostat and /boiler, not by a third
-// subtopic.
+// sequence by processOT() in OTGW-Core.ino:4046+. There is no _gateway suffix;
+// override visibility is achieved by divergence between _thermostat and
+// _boiler, not by a third topic.
 //
 // The ADR-066 Write-Ack gate (bSlaveEchoesValue) is preserved unchanged for
-// /boiler publications.
+// _boiler publications.
 void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 {
   if (!settings.mqtt.bSeparateSources || !topic || !json) return;
@@ -1239,11 +1241,11 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 
   static char sourceTopic[MQTT_TOPIC_MAX_LEN];
   if (toThermostat) {
-    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s/thermostat"), topic);
+    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_thermostat"), topic);
     sendMQTTData(sourceTopic, json, false);
   }
   if (toBoiler) {
-    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s/boiler"), topic);
+    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_boiler"), topic);
     sendMQTTData(sourceTopic, json, false);
   }
   inUse = false;
@@ -1435,24 +1437,9 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   return ctx;
 }
 
-// Bitmap of MsgIDs that have an ANY_SOURCE-flagged entry in mqttHaSensors[].
-// Used to suppress base-entity publication when bSeparateSources is on so HA
-// does not show duplicate-friendly-name entries. Built lazily on first call;
-// safe under MQTTAutoConfigSessionLock held by both publish-loops.
-static bool msgIdHasAnySourceEntry(uint8_t id) {
-  static uint32_t bitmap[8] = {0};
-  static bool built = false;
-  if (!built) {
-    for (uint16_t i = 0; i < MQTT_HA_SENSOR_COUNT; i++) {
-      MqttHaSensorCfg cfg = readSensorCfg(i);
-      if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
-        bitmap[(cfg.id >> 5) & 0x07] |= (1U << (cfg.id & 0x1F));
-      }
-    }
-    built = true;
-  }
-  return (bitmap[(id >> 5) & 0x07] & (1U << (id & 0x1F))) != 0;
-}
+// ADR-070 supersedes ADR-068: under sibling-suffix shape the canonical
+// entity coexists with the source variants without semantic duplication, so
+// the base-entity suppression bitmap (msgIdHasAnySourceEntry) is removed.
 
 void doAutoConfigure(){
   // Force-publishes HA discovery configs for ALL entries.
@@ -1485,9 +1472,10 @@ void doAutoConfigure(){
           expandAndStreamSensorSources(MQTTclient, cfg, ctx);
         }
         // Skip source-template entries when separate sources disabled
-      } else if (settings.mqtt.bSeparateSources && msgIdHasAnySourceEntry(cfg.id)) {
-        // Skip base entity; source-variants cover this MsgID under bSeparateSources
       } else {
+        // ADR-070: base entity always emitted; ADR-068 mutual-exclusion dropped
+        // because sibling-suffix shape makes canonical and source variants
+        // distinct entities (TSet, TSet_thermostat, TSet_boiler).
         streamSensorDiscovery(MQTTclient, cfg, ctx);
       }
       setMQTTConfigDone(cfg.id);
@@ -1554,9 +1542,8 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
         if (settings.mqtt.bSeparateSources) {
           if (expandAndStreamSensorSources(MQTTclient, cfg, ctx)) result = true;
         }
-      } else if (settings.mqtt.bSeparateSources && msgIdHasAnySourceEntry(cfg.id)) {
-        // Skip base entity; source-variants cover this MsgID under bSeparateSources
       } else {
+        // ADR-070: base entity always emitted (ADR-068 suppression dropped).
         if (streamSensorDiscovery(MQTTclient, cfg, ctx)) result = true;
       }
       sIdx++;

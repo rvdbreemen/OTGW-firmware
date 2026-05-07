@@ -1996,8 +1996,10 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "stat_t":"<mqttPubTopic>/[otgw-pic/]<label>[/<sourceTopicSegment>]"
+  // "stat_t":"<mqttPubTopic>/[otgw-pic/]<label>[_<sourceTopicSegment>]"
   // otgw-pic/ prefix applied when MQTT_HA_FLAG_IS_PIC_ENTRY is set -- see ADR-065.
+  // Source segment uses underscore (sibling-suffix shape) per ADR-070, replacing
+  // the slash (nested-children shape) from beta.20 / ADR-069.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kStatT)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
@@ -2008,7 +2010,7 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   }
   if (!w.writeRam(label)) return false;
   if (hasSrc && ctx.sourceTopicSegment && ctx.sourceTopicSegment[0]) {
-    if (!w.writeChar('/')) return false;
+    if (!w.writeChar('_')) return false;  // ADR-070: sibling-suffix shape
     if (!w.writeRam(ctx.sourceTopicSegment)) return false;
   }
   if (!w.writeChar('"')) return false;
@@ -2367,22 +2369,24 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
 // ---------------------------------------------------------------------------
 // expandAndStreamSensorSources()
 // Expands a source-template sensor into per-source variants and streams each
-// via streamSensorDiscovery(). For 0x07-flagged sensors, three variants are
-// emitted: /thermostat, /boiler, and the canonical (no suffix / no segment)
-// entity.
+// via streamSensorDiscovery(). For 0x07-flagged sensors, two variants are
+// emitted: _thermostat and _boiler.
 //
-// Per ADR-069 (worldview semantics) the three entities map as follows:
-//   /thermostat — what the thermostat sees: the value it sent (T) or
+// Per ADR-069 (worldview semantics) and ADR-070 (sibling-suffix shape) the
+// two entities map as follows:
+//   _thermostat — what the thermostat sees: the value it sent (T) or
 //                 received (A under answer-override, B under pass-through).
-//   /boiler     — what the boiler sees: the value it received (R under
+//   _boiler     — what the boiler sees: the value it received (R under
 //                 write-override, T under pass-through) or sent (B).
-//   canonical   — boiler-side worldview: identical to /boiler when both are
-//                 published. Default users (bSeparateSources=false) see only
-//                 the canonical, which is suppressed for source-templated
-//                 MsgIDs when bSeparateSources=true (per ADR-068 mutual
-//                 exclusion).
-// There is no /gateway variant; override visibility comes from divergence
-// between /thermostat and /boiler. Routing is decided at publish time inside
+//
+// The canonical entity (boiler-side worldview, identical to _boiler when both
+// are published) is emitted by the SEPARATE base entry in mqttHaSensors[],
+// not by this function. ADR-070 dropped ADR-068's mutual-exclusion rule, so
+// the base entity is always advertised; this expansion adds two source
+// variants on top when bSeparateSources=true.
+//
+// There is no _gateway variant; override visibility comes from divergence
+// between _thermostat and _boiler. Routing is decided at publish time inside
 // publishToSourceTopic() in MQTTstuff.ino.
 // Returns true if at least one variant was successfully published.
 // Lives here (not in MQTTstuff.ino) to avoid Arduino auto-prototyper
@@ -2394,18 +2398,14 @@ bool expandAndStreamSensorSources(PubSubClient &client,
 {
   static const char src_suffix_thermostat[] PROGMEM = "_thermostat";
   static const char src_suffix_boiler[]     PROGMEM = "_boiler";
-  static const char src_suffix_canonical[]  PROGMEM = "";
   static const char src_name_thermostat[]   PROGMEM = "Thermostat";
   static const char src_name_boiler[]       PROGMEM = "Boiler";
-  static const char src_name_canonical[]    PROGMEM = "";
   static const char src_seg_thermostat[]    PROGMEM = "thermostat";
   static const char src_seg_boiler[]        PROGMEM = "boiler";
-  static const char src_seg_canonical[]     PROGMEM = "";
 
   struct { PGM_P suffix; PGM_P name; PGM_P segment; } sources[] = {
     {src_suffix_thermostat, src_name_thermostat, src_seg_thermostat},
     {src_suffix_boiler,     src_name_boiler,     src_seg_boiler},
-    {src_suffix_canonical,  src_name_canonical,  src_seg_canonical},
   };
   constexpr uint8_t kSourceVariantCount = sizeof(sources) / sizeof(sources[0]);
 

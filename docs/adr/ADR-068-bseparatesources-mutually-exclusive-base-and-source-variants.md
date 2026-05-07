@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (amends ADR-040; structural-level per the binding-rule CI-gate convention), 2026-05-03. Accepted: 2026-05-03 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Decision Maker: User: Rob van den Breemen (rvdbreemen).
+Superseded by ADR-070, 2026-05-07. Originally Accepted 2026-05-03 (amends ADR-040; structural-level per the binding-rule CI-gate convention; four verification gates passed: Completeness, Evidence, Clarity, Consistency). Decision Maker: User: Rob van den Breemen (rvdbreemen).
 
 ## Context
 
