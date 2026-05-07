@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Pre-commit hook for OTGW-firmware 2.0.0 worktree.
+# Enforces _VERSION_PRERELEASE bump when firmware code is staged.
+#
+# Bypass for one commit:  OTGW_BUMP_HOOK_DISABLE=1 git commit ...
+
+set -e
+
+if [ "${OTGW_BUMP_HOOK_DISABLE:-0}" = "1" ]; then
+  echo "[bump] hook disabled for this commit (OTGW_BUMP_HOOK_DISABLE=1)" >&2
+  exit 0
+fi
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+TRIGGER=$(echo "$STAGED" | awk '
+  /^src\/OTGW-firmware\/version\.h$/ { next }
+  /^src\/OTGW-firmware\// { print; next }
+  /^src\/libraries\// { print; next }
+')
+
+if [ -z "$TRIGGER" ]; then
+  exit 0
+fi
+
+PRERELEASE_DIFF=$(git diff --cached -- src/OTGW-firmware/version.h | grep -E '^[+-]#define _VERSION_PRERELEASE ' || true)
+MINUS=$(echo "$PRERELEASE_DIFF" | grep -c '^-' || true)
+PLUS=$(echo "$PRERELEASE_DIFF" | grep -c '^+' || true)
+
+if [ "$MINUS" -lt 1 ] || [ "$PLUS" -lt 1 ]; then
+  echo "" >&2
+  echo "[bump] commit touches firmware code but does not bump _VERSION_PRERELEASE." >&2
+  echo "[bump] Run bin/bump-prerelease.sh and stage src/OTGW-firmware/version.h + data/version.hash" >&2
+  echo "[bump] alongside your code change." >&2
+  echo "[bump] Bypass for this commit: OTGW_BUMP_HOOK_DISABLE=1 git commit ..." >&2
+  echo "" >&2
+  echo "[bump] Triggering paths in this commit:" >&2
+  echo "$TRIGGER" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+exit 0

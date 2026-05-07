@@ -272,6 +272,41 @@ Concrete rules that override the default "ask first":
 
 When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
 
+## Versioning policy
+
+Field-test users on Discord identify which build they are running by the prerelease tag in `_VERSION_PRERELEASE` (e.g. `alpha.6`, `beta.23`). Every commit that changes firmware behaviour must ship under its own prerelease tag so a tester can A/B two builds and report which one regressed. Implicit batching ("multiple fixes shipped under one tag") destroys that signal — so the policy is enforced mechanically.
+
+**What requires a prerelease bump** — any staged path under:
+
+- `src/OTGW-firmware/**` (the `.ino`/`.h`/`.cpp` sources and the LittleFS data assets), **except** `src/OTGW-firmware/version.h` itself;
+- `src/libraries/**` (vendored libs that link into the firmware).
+
+**What does NOT require a bump** (commit can land with no version change):
+
+- `*.md`, `docs/**`, `backlog/**`, `.claude/**` — pure documentation / project metadata;
+- `scripts/**`, `bin/**`, `.githooks/**` — host-side tooling not flashed to the device;
+- top-level `.py` / `.sh` / `.bat` — build orchestration, not firmware.
+
+**How to bump.** From the project root:
+
+```bash
+bin/bump-prerelease.sh        # parses current tag, increments trailing integer
+git add src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash
+git commit -m "..."
+```
+
+The helper requires the current tag to match `^[a-zA-Z]+\.[0-9]+$` (so `alpha.6` → `alpha.7`, `beta.23` → `beta.24`). If you need to change the alpha/beta word itself, edit `version.h` by hand and let `scripts/autoinc-semver.py` handle the rest.
+
+**Enforcement.** `.githooks/pre-commit` checks the staged diff. If any triggering path is staged but `_VERSION_PRERELEASE` is unchanged, the commit is rejected with a clear error. The hook is wired via `core.hooksPath = .githooks` (already set on this worktree).
+
+**Bypass for one commit.** Use sparingly — e.g. an emergency rollback, or a commit that only re-formats whitespace and genuinely does not need its own tag:
+
+```bash
+OTGW_BUMP_HOOK_DISABLE=1 git commit -m "..."
+```
+
+If you find yourself reaching for the bypass routinely, the rule is wrong, not the commit. Open a backlog task to revisit the policy.
+
 ## Worktree layout
 
 This project is intentionally checked out into **two parallel git worktrees** so the 1.5.x release line and the 2.0.0 feature line can be worked on side-by-side without branch-switch churn:
