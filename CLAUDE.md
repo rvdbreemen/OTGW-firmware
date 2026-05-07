@@ -212,9 +212,12 @@ Don't look for jest/pytest — there isn't a runner. Hardware-in-the-loop is the
 
 ## Build Commands
 
+Preferred wrapper (handles venv setup): `./build.sh` (macOS/Linux) or `build.bat` (Windows). Both invoke `build.py` underneath and build firmware + filesystem. Use a direct `python build.py` invocation only when the wrapper is unavailable.
+
 ```bash
-python build.py              # Build firmware + filesystem
-python build.py --firmware   # Firmware only
+./build.sh                   # Preferred — firmware + filesystem (handles venv)
+python build.py              # Build firmware + filesystem (no venv handling)
+python build.py --firmware   # Firmware only (also the push-policy gate)
 python build.py --clean      # Clean build
 python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
 python evaluate.py --quick   # Fast check
