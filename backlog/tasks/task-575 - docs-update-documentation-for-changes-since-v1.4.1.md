@@ -38,4 +38,6 @@ AC2 openapi.yaml + README.md: added GET /api/v2/debug (auth-gated diagnostic dum
 AC4 FLASH_GUIDE.md + BUILD.md: flash guide updated with no-Python scripts as preferred method, bootloop recovery alternatives, After Flashing section added. BUILD.md had build.sh/bat already documented; added python build.py fallback note.
 
 MQTT_LWT.md: reconnect diagram extended, new 'Reconnect Republish Behaviour' section (5-min threshold, 3 cases), Related Code updated. WIFI_RECOVERY_TRIPLE_RESET.md: untouched — procedure unchanged.
+
+BREAKING_CHANGES.md: new v1.5.0 section prepended with 3 breaking changes: sibling-suffix shape with mosquitto cleanup cmds, /gateway removal, HA friendly name Title Case (no automation breakage, unique_id unchanged).
 <!-- SECTION:NOTES:END -->
