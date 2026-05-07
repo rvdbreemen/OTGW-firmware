@@ -3,7 +3,7 @@ id: TASK-560
 title: >-
   Enforce prerelease bump on firmware-touching commits (hook + helper +
   CLAUDE.md)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 12:18'
