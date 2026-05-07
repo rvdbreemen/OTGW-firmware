@@ -25,13 +25,15 @@ Field validation on dev beta.25+5153537 (2026-05-07) confirmed TASK-561 ADR-066 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 OTGW-Core.h OTmap[] entry for MsgID 1 (TSet) has bSlaveEchoesValue changed from true to false
-- [ ] #2 docs/api/MQTT-message-id-echo-audit.md updated: MsgID 1 row's bSlaveEchoesValue column changed to false; reason column updated with the field evidence (heat-pump tester report 2026-05-07); 'Future extensions' candidates list updates to mark TSet as confirmed and removes it from the candidate list
-- [ ] #3 python build.py --firmware exits 0 on dev
-- [ ] #4 python evaluate.py --quick — no new failures
-- [ ] #5 Prerelease bump committed alongside (beta.25 -> beta.26)
+- [x] #1 OTGW-Core.h OTmap[] entry for MsgID 1 (TSet) has bSlaveEchoesValue changed from true to false
+- [x] #2 docs/api/MQTT-message-id-echo-audit.md updated: MsgID 1 row's bSlaveEchoesValue column changed to false; reason column updated with the field evidence (heat-pump tester report 2026-05-07); 'Future extensions' candidates list updates to mark TSet as confirmed and removes it from the candidate list
+- [x] #3 python build.py --firmware exits 0 on dev
+- [x] #4 python evaluate.py --quick — no new failures
+- [x] #5 Prerelease bump committed alongside (beta.25 -> beta.26)
 - [ ] #6 Field validation on beta.26+: tester confirms TSet boiler value no longer flaps between override and 0 with bSeparateSources=true (deferred per CLAUDE.md self-verification policy)
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
