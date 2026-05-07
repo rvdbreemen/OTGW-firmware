@@ -3,9 +3,11 @@ id: TASK-556
 title: >-
   feat(mqtt): flip discovery topic shape to sibling-suffix (implements ADR-071,
   supersedes ADR-070 carve-out)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-07 11:04'
+updated_date: '2026-05-07 11:09'
 labels:
   - mqtt
   - discovery
@@ -42,3 +44,19 @@ Coordinated with 2.0.0 sibling task (port + ADR-098 in 2.0.0 worktree).
 - [ ] #9 Field test on a beta unit with bSeparateSources=true confirms HA registers the source-variant entities (visible in HA Settings → Devices & Services → MQTT → entities list) where they did NOT register before the change
 - [ ] #10 docs/api/MQTT.md migration note updated: pre-ADR-071 retained nested discovery configs are zombies (HA never registered them) and may be cleaned with mosquitto_pub -t '<topic>' -r -n; included sample command for the nested paths
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Read mqtt_configuratie.cpp:2132-2148 in full (buildSensorDiscoveryTopic) to confirm the exact format string and surrounding context
+2. Edit the source-variant branch (line 2141-2142): change format string '%s/sensor/%s/%s/%s/config' to '%s/sensor/%s/%s_%s/config'. Use snprintf_P (PSTR) per project PROGMEM rule. Args order unchanged: haPrefix, nodeId, labelBuf, sourceTopicSegment.
+3. Update the canonical-branch comment (no code change there) to reference ADR-071 alongside the existing ADR-070 reference, so the two-shape design (canonical bare; source-variant sibling-suffix) is documented at the call site.
+4. Remove the ADR-070 carve-out comment elsewhere if it exists (search 'ADR-070' references in the discovery code). Replace with ADR-071 reference where appropriate.
+5. Run python build.py --firmware → exit 0
+6. Run python evaluate.py --quick → no new failures vs baseline
+7. Verify the ADR-071 Enforcement block forbid_pattern actually catches the OLD format (run bin/adr-judge against a synthetic diff to confirm)
+8. Commit on dev with feat(mqtt) prefix referencing TASK-556 and ADR-071
+9. Auto-push to origin/dev (allowed per project policy: feature commit + build green + evaluator green)
+10. Update docs/api/MQTT.md migration note: add the nested-discovery-zombie cleanup recipe (mosquitto_pub -t '<topic>' -r -n on the now-orphaned nested paths)
+11. Mark ACs and add Final Summary; AC #9 (field test on beta unit) remains unchecked — hardware required
+<!-- SECTION:PLAN:END -->
