@@ -3,9 +3,11 @@ id: TASK-553
 title: >-
   fix(mqtt): add threshold-hysteresis (deadband + K-ticks) to drip mode
   transitions to stop ~60-90s thrash
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-07 08:45'
+updated_date: '2026-05-07 08:50'
 labels:
   - mqtt
   - heap
@@ -40,3 +42,20 @@ Builds on TASK-370 (time hysteresis), keeps that hysteresis intact.
 - [ ] #7 Field-log re-capture under steady healthy heap shows zero spurious slowed/restored pairs over a 5-minute window (validated against beta.20 baseline log)
 - [ ] #8 Under real heap pressure (sustained freeHeap < 5120), slow-mode still engages within 1s (TASK-370 AC3 not regressed)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add HEAP_LOW_RESTORE_THRESHOLD constant in helperStuff.ino (= HEAP_LOW_THRESHOLD + 1024 = 6144)
+2. In loopMQTTDiscovery (MQTTstuff.ino):
+   - Keep entry trigger heapPressure = (getHeapHealth() >= HEAP_LOW)
+   - Add restore guard heapHealthyForRestore = (ESP.getFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD)
+   - Add static uint8_t consecutiveHealthyTicks counter
+   - Counter increments on healthy read, resets to 0 on unhealthy. Updated only when timer is due (tied to actual tick events, not every loop iteration)
+   - Restore branch: heapHealthyForRestore && consecutiveHealthyTicks >= 2
+3. Update block-header comment to document three hysteresis layers (time TASK-370, threshold TASK-553, K-ticks TASK-553)
+4. python build.py --firmware → exit 0
+5. python evaluate.py --quick → no new failures
+6. Commit on dev with feat(mqtt) prefix referencing TASK-553
+7. AC #7 (field-log re-capture) remains unchecked — hardware-only verification
+<!-- SECTION:PLAN:END -->
