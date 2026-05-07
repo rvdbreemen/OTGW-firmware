@@ -1,9 +1,11 @@
 ---
 id: TASK-572
 title: 'fix(mqtt): HA discovery friendly-name uses spaces, not underscores'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-07 20:25'
+updated_date: '2026-05-07 21:55'
 labels:
   - mqtt
   - ha-discovery
