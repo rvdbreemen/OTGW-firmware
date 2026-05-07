@@ -3,7 +3,7 @@ id: TASK-558
 title: >-
   Route force-discovery through drip publisher + add maxBlock to throttle
   warnings
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 11:57'
