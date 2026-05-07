@@ -37,3 +37,14 @@ This is one of two paired tasks. The 2.0.0 worktree carries the sibling task (`f
 - [ ] #6 Commit message clearly references both parts (drip-route force-discovery; maxBlock in throttle warnings) and the heap-analysis context.
 - [ ] #7 After build + evaluator are green, the commit is pushed to origin/dev per CLAUDE.md push policy.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Edit doAutoConfigure() body in src/OTGW-firmware/MQTTstuff.ino (around :1466) → replace with call to markAllMQTTConfigPending().
+2. Edit four DebugTf format strings in src/OTGW-firmware/helperStuff.ino (lines ~1000, ~1032, ~1054, ~1086) to add maxBlock=%u alongside heap=%u.
+3. Build: ./build.sh (firmware + filesystem).
+4. Evaluator: python evaluate.py --quick.
+5. Stage changes, commit with descriptive message, push to origin/dev.
+6. Mark all ACs checked, write Final Summary, set Done.
+<!-- SECTION:PLAN:END -->
