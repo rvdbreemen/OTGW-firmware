@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-05 08:54'
-updated_date: '2026-05-05 15:58'
+updated_date: '2026-05-06 05:27'
 labels:
   - bug
   - sat
@@ -44,13 +44,15 @@ Diagnostic ladder + recommended hardening documented in plan file ~/.claude/plan
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 On a fresh full filesystem flash with SAT enabled and coefficient=1.5, heating_system=0, target_temp=20.0, the SAT page in expert mode displays exactly 10 gray reference curves c=0.5..5.0 with c=1.5 highlighted orange
-- [ ] #2 With no boiler activity (heating_curve=0, outside_temp=0) no orange dot is plotted below the y-axis: either suppressed or clamped to y=10 with a tooltip/label explaining the boiler is idle
+- [x] #2 With no boiler activity (heating_curve=0, outside_temp=0) no orange dot is plotted below the y-axis: either suppressed or clamped to y=10 with a tooltip/label explaining the boiler is idle
 - [ ] #3 When outside_temp is changed via POST /api/v2/sat/externaloutdoor the orange dot moves on the X axis within one poll cycle (5s) without manual page reload
-- [ ] #4 When deployed LittleFS hash differs from firmware hash, the SAT page shows a visible banner re-using StatusMessage::LittleFSMismatch from helperStuff.ino:704
-- [ ] #5 When window.echarts is undefined, #sat-curve-chart shows the text 'Charts unavailable: echarts CDN failed to load' instead of remaining blank
-- [ ] #6 No new String instances; no PROGMEM violations; no HTTPS-only assumptions on the firmware HTTP API
+- [x] #4 When deployed LittleFS hash differs from firmware hash, the SAT page shows a visible banner re-using StatusMessage::LittleFSMismatch from helperStuff.ino:704
+- [x] #5 When window.echarts is undefined, #sat-curve-chart shows the text 'Charts unavailable: echarts CDN failed to load' instead of remaining blank
+- [x] #6 No new String instances; no PROGMEM violations; no HTTPS-only assumptions on the firmware HTTP API
 - [ ] #7 ./build.sh build --target esp32 completes without new compile warnings; LittleFS image fits the configured partition size from partitions_otgw_esp32.csv
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
@@ -166,4 +168,18 @@ Full design rationale and Phase 1/2 hypothesis evidence in plan file at ~/.claud
 - Heating-curve operating-point dot now suppresses itself when the point would fall outside the chart bounds (e.g. idle `heating_curve=0` below y-axis min).
 - Local validation: `./build.sh --target esp32` succeeded (firmware + LittleFS), `.build-venv/bin/python evaluate.py --quick` passed with no FAILs.
 - Remaining blocker: AC #1 and AC #3 still need browser/device verification on actual SAT hardware, so task stays In Progress.
+
+2026-05-06 (claude): Verified hardening ACs by code review against the live tree. The plumbing called out in the implementation plan is fully landed:
+
+- AC #4 (LittleFSMismatch banner): end-to-end path is helperStuff.ino:704 sets state.statusMessage=LittleFSMismatch -> restAPI.ino:2238 emits getStatusMessageText() under "message" in /api/v2/device/time -> data/index.js:4168 stores statusMessageText and calls SAT.renderStatusBanner() on every poll -> data/sat.js:95-108 renderStatusBanner() recognises the LittleFS string via isLittleFSMismatchMessage() and toggles div#sat-fs-mismatch-banner (index.html:308). Banner is also re-rendered on each devtime poll, so SAT page picks up the mismatch as soon as it is detected on-device.
+- AC #5 (echarts CDN fallback): both initChart() (sat.js:402) and initCurveChart() (sat.js:575) gate on typeof echarts === 'undefined' and call showChartUnavailable(container) which writes ECHARTS_UNAVAILABLE_TEXT and adds the .chart-unavailable class. components.css:453 styles it. Applies to #sat-curve-chart per AC and to #sat-chart as bonus.
+- AC #2 (no orange dot below y-axis when boiler idle): buildCurrentPointData() (sat.js:122) returns [] for null/non-finite inputs, for outside_temp outside [CURVE_X_MIN, CURVE_X_MAX]=[-15,25], and for currentSetpoint outside [CURVE_Y_MIN, CURVE_Y_MAX]=[10,80]. With heating_curve=0 the setpoint < 10 path returns [] -> the dot series receives no data -> nothing is plotted. Suppression branch satisfied.
+- AC #6 (no String/PROGMEM/HTTPS violations): python3 evaluate.py --quick on the 2.0.0 worktree -> 0 failed, 2 warnings unrelated to SAT (ADR-062 mqtt_configuratie.cpp absence, sendMQTTheapdiag buffer arithmetic check pattern miss), 97.1% health.
+
+Still needs on-hardware/in-browser validation:
+- AC #1: visual confirmation that 10 grey reference curves c=0.5..5.0 render with c=1.5 highlighted orange after a fresh full-FS flash with SAT enabled.
+- AC #3: visual confirmation that POSTing /api/v2/sat/externaloutdoor moves the orange dot within one 5s poll without page reload.
+- AC #7: ./build.sh build --target esp32 clean compile + LittleFS partition fit check. Not run in this session because the 2.0.0 worktree carries unrelated uncommitted edits (TASK-409, MQTTstuff.ino) and a build run would not isolate SAT-only verification. Run after those commit or stash.
+
+No source changes were made in this session; the verification is read-only.
 <!-- SECTION:NOTES:END -->
