@@ -1,7 +1,7 @@
 ---
 id: TASK-572
 title: 'fix(mqtt): HA discovery friendly-name uses spaces, not underscores'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 20:25'
