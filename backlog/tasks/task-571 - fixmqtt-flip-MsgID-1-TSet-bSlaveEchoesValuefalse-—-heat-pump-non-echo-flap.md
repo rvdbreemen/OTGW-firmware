@@ -32,3 +32,9 @@ Field validation on dev beta.25+5153537 (2026-05-07) confirmed TASK-561 ADR-066 
 - [ ] #5 Prerelease bump committed alongside (beta.25 -> beta.26)
 - [ ] #6 Field validation on beta.26+: tester confirms TSet boiler value no longer flaps between override and 0 with bSeparateSources=true (deferred per CLAUDE.md self-verification policy)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. flip OTmap[] entries for msgid 1, 7, 8, 71 (already done in beta.26); 2. update audit doc; 3. ship and bump prerelease; 4. wait on field validation.
+<!-- SECTION:PLAN:END -->
