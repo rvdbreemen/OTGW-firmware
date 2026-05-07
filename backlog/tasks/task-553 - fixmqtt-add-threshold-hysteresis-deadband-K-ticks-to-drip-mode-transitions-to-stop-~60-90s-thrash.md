@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 08:45'
-updated_date: '2026-05-07 09:06'
+updated_date: '2026-05-07 09:07'
 labels:
   - mqtt
   - heap
@@ -72,3 +72,36 @@ Key design decisions during implementation:
 
 Build: ./build.sh --firmware exit 0, no new warnings (734236 bytes / 70
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds threshold-hysteresis (deadband) and K-ticks consecutive-healthy-reads requirement on top of TASK-370 time-hysteresis to stop the ~60-90s slow/restore thrash observed in 1.5.0-beta.20+cbc21af field logs.
+
+Why
+The drip mode switcher in loopMQTTDiscovery was using HEAP_LOW_THRESHOLD (5120 bytes) as both entry and exit boundary. TASK-370 fixed same-second toggling via time-hysteresis (>=2s in normal, >=10s in slow), but borderline-recovery thrash remained: heap recovered just barely above 5120 during the 10s slow-dwell, then a Status-burst + WS pong overlap tipped it back. Cycle time observed: 60-90s. Quality-of-life — rate-limiter handled drops either way; this reduces telnet-log noise and gives more accurate iEnteredLowCount/iDripSlowModeCount telemetry.
+
+Changes
+- src/OTGW-firmware/OTGW-firmware.h: declared HEAP_LOW_RESTORE_THRESHOLD = 6144 (HEAP_LOW_THRESHOLD + 1024). Placed in header (not helperStuff.ino) so it is visible to MQTTstuff.ino, which is concatenated before helperStuff.ino in the Arduino sketch build.
+- src/OTGW-firmware/helperStuff.ino: comment cross-references the header declaration.
+- src/OTGW-firmware/MQTTstuff.ino (loopMQTTDiscovery):
+  - Added DRIP_RESTORE_K_TICKS = 2 constant.
+  - Added static uint8_t consecutiveHealthyTicks counter, updated once per timer tick (post-DUE): increments when ESP.getFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD, resets on any unhealthy read or on slow-mode entry.
+  - Restore branch now requires !heapPressure && consecutiveHealthyTicks >= 2 (i.e. ~20s of confirmed-healthy heap on the 10s slow cadence) in addition to the existing canSwitch time-hysteresis.
+  - Mode-switch decision moved inside the post-DUE block to tick-align with the counter update.
+  - Block-header comment updated to document all three hysteresis layers (time TASK-370 + threshold TASK-553 + K-ticks TASK-553).
+- src/OTGW-firmware/version.h, data/version.hash: build artifact bumps.
+
+Trade-off
+First slow-mode engagement under sustained pressure is now bounded by the current normal-mode interval (up to 2s) instead of loop-iteration latency. The drip cadence itself is 2s in normal mode so the actual discovery-publish latency under pressure is unchanged; only the mode-flag flip lags by at most one tick. canPublishMQTT() rate-limiter remains the authoritative safety net at HEAP_WARNING.
+
+Tests
+- ./build.sh --firmware exit 0 (734236 bytes / 70%, 58340 bytes RAM / 71%). No new warnings.
+- ./build.sh --evaluate / .build-venv/bin/python evaluate.py --quick: 31/2/1, 91.7% — identical to baseline (no regression).
+- Field-log re-capture (AC #7): requires hardware deployment, marked unchecked.
+
+Risks / Follow-ups
+- Field validation needed to confirm the thrash is gone in live operation. AC #7 is the gate.
+- If thrash persists after deployment, conservative fallback to N=2048 deadband (HEAP_LOW_RESTORE_THRESHOLD = 7168) is documented in the description.
+- 2.0.0 sibling task TASK-555 ports the same pattern with platform-aware deadband for ESP32-S3.
+<!-- SECTION:FINAL_SUMMARY:END -->
