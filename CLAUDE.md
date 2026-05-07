@@ -299,6 +299,41 @@ Verify with `git worktree list`.
 
 **CLI cross-tree behaviour.** `backlog task <id> --plain` resolves from either worktree, but `backlog task edit` only writes to the worktree where the task file actually lives. If an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file. SAT / ESP32 / 2.0.0 tasks generally live in the feature worktree's `backlog/tasks/`, not in dev's.
 
+### Cross-worktree work — ask first, then plan once, then parallelise
+
+Whenever you take on a bug fix, feature change, or architectural decision, **explicitly ask yourself**: *does this also need to land on the other worktree?* For 1.5.x↔2.0.0 the answer is almost always **yes** when the change touches:
+
+- Any file under `src/OTGW-firmware/` whose name is the same in both trees (most `.ino`, `.h`, `.cpp` and the LittleFS data assets) — even when the line numbers or filenames differ between branches (e.g. dev's `mqtt_configuratie.cpp` is `MQTTHaDiscovery.cpp` on 2.0.0), the architectural fix usually applies to both.
+- ADRs that codify a cross-cutting decision (MQTT topic shape, heap policy, discovery semantics, settings schema). The dev ADR and the 2.0.0 ADR live in their own worktrees and have separate numbering, but the *decision* must be coherent across both.
+- Anything driven by a HA-side, broker-side or PIC-side contract (HA discovery regex, MQTT retained behaviour, OpenTherm message ID semantics) — those are platform-independent and the firmware-side fix must apply on both branches.
+
+The answer is usually **no** when the change is genuinely scoped to a feature that only exists on one branch (SAT dashboard, ESP32-S3 board pinning, OTGW32 hardware bring-up → 2.0.0 only; LTS-1.4.x patch backports → only that branch).
+
+**If both: one master plan, two tasks, two agents.**
+
+1. **Write ONE master plan first**, before creating any task or spawning any agent. The plan covers *both* worktrees in a single document and must contain, for each change:
+   - The desired outcome in plain language (the "what" and "why").
+   - The exact file(s) and line number(s) on **both** branches — they often differ (dev refactor split files differently than 2.0.0). Read each branch's source to confirm; do not assume parity.
+   - Per-platform considerations explicitly called out for the 2.0.0 side (ESP8266 vs ESP32-S3 deadbands/thresholds, board-specific pin maps, conditional compilation flags `#if defined(ESP32)` etc.).
+   - The full AC list each per-worktree task will inherit (build commands per target, evaluator commands, field-validation gates, ADR-acceptance gates).
+   - Cross-tree dependencies and ordering — e.g. dev ADR-N must be Accepted before 2.0.0 ADR-M can be drafted; dev impl can be pushed before 2.0.0 impl is reviewed.
+   - The expected commit message prefix and the push gate per branch (`origin/dev` auto-push allowed under the dev worktree's policy; 2.0.0 feature branch push needs explicit confirmation).
+
+2. **Share the master plan with the user for approval** before any task creation. The user's "go" on the master plan replaces the per-task plan-review gate that would otherwise apply individually.
+
+3. **Then create two separate backlog tasks**, one per worktree. Use the convention `feat-2.0.0: port TASK-N — <title>` for the 2.0.0 sibling so cross-references stay legible. Each task carries its own AC list derived from the master plan; do not over-share ACs across tasks (each agent must be able to verify its own task in isolation).
+
+4. **Spawn two agents in parallel**, one per worktree. Each agent:
+   - Has its own self-contained prompt referencing the master plan (or restating its scope in full).
+   - Works exclusively in its own worktree and explicitly does not touch the other tree.
+   - Reports back independently with build/evaluator/commit/push receipts.
+
+5. **Verify both reports**, then report a consolidated summary to the user.
+
+Do **not** sequence (dev first, then 2.0.0 only after dev is fully done) unless there's a hard ordering dependency (e.g. 2.0.0 ADR cites a regex finding from the dev ADR — in that case dev ADR must be Accepted before the 2.0.0 ADR can be drafted, but the 2.0.0 *code* impl can still parallelise once both ADRs are Accepted).
+
+The benefit of writing the plan once is symmetry: agents see the same intent, the two ADRs cross-reference cleanly, the two commits land within minutes of each other, and the user reviews one design instead of two slightly-divergent designs.
+
 ## ADR Kit Rules
 
 This project uses [adr-kit](https://github.com/rvdbreemen/adr-kit) for Architecture Decision Records. The skill, the `adr-generator` subagent, and the path-specific instructions are loaded via the plugin.
