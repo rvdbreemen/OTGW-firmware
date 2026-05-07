@@ -29,3 +29,15 @@ publishToSourceTopic() compares rsptype (OTGW_response_type, 0..5) against OT_WR
 - [ ] #5 Prerelease bump committed alongside the firmware change via bin/bump-prerelease.sh
 - [ ] #6 Field-validation note in Final Summary: with bSeparateSources=true, msgid 14 and 16 on _thermostat/_boiler no longer flap to 0 between Write-Data frames (tester sign-off via Discord; leave blocking AC if not yet confirmed)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Fix predicate at MQTTstuff.ino:1212 to use OTdata.type == OT_WRITE_ACK && rsptype == OTGW_BOILER && !OTlookupitem.bSlaveEchoesValue.
+2. Update preceding comment block to call out the OTGW_response_type vs OpenThermMessageType enum-family distinction so a future reader sees why OTdata.type is the right field.
+3. Run bin/bump-prerelease.sh; stage version.h + data/version.hash alongside MQTTstuff.ino.
+4. python build.py --firmware (exit 0).
+5. python evaluate.py --quick (no new failures).
+6. Commit (adr-judge + bump-check pass), push to origin/dev (auto-authorised by policy).
+7. Check ACs 1-5; leave AC #6 unchecked (Discord field-validation gate); add Final Summary; leave task In Progress per CLAUDE.md autonomous-completion exception.
+<!-- SECTION:PLAN:END -->
