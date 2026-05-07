@@ -1,9 +1,11 @@
 ---
 id: TASK-561
 title: 'fix: ADR-066 source-topic gate uses wrong enum family — Write-Ack flapping'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-07 13:16'
+updated_date: '2026-05-07 13:18'
 labels:
   - bug
   - mqtt
