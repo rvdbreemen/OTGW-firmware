@@ -3,11 +3,11 @@ id: TASK-573
 title: >-
   fix(mqtt): normalise HA discovery friendly-name strings — split camelCase,
   uppercase acronyms, drop typos
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 21:23'
-updated_date: '2026-05-07 21:27'
+updated_date: '2026-05-07 21:33'
 labels:
   - mqtt
   - ha-discovery
