@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 12:18'
-updated_date: '2026-05-07 12:22'
+updated_date: '2026-05-07 12:23'
 labels:
   - hooks
   - tooling
@@ -39,3 +39,22 @@ This is one of two paired tasks. The 2.0.0 worktree carries the sibling task.
 - [ ] #7 Commit message is 'chore(hooks): enforce prerelease bump on firmware-touching commits' or similar; commit touches only .githooks/, bin/, CLAUDE.md (and is therefore exempt from the new bump check itself).
 - [ ] #8 After build green, the commit is pushed to origin/dev per CLAUDE.md push policy.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Verify pre-flight (hooksPath, version.h shape, autoinc script, build.sh, bin/ absent).
+2. Create bin/ + bin/bump-prerelease.sh; chmod +x.
+3. Extend .githooks/pre-commit with the bump-check stanza after the existing adr-judge logic.
+4. Append "## Versioning policy" to CLAUDE.md near "## Git push policy".
+5. Run five smoke tests in order, cleaning up between each:
+   - T1: bin/bump-prerelease.sh prints old→new and updates files; revert.
+   - T2: hook BLOCKS firmware-only synthetic commit.
+   - T3: hook PASSES docs-only synthetic commit (use throwaway .md, NOT real CLAUDE.md edit).
+   - T4: hook PASSES firmware+bump synthetic commit.
+   - T5: ./build.sh exits 0; revert version.h+hash drift.
+6. Stage explicit paths only (.githooks/pre-commit, bin/bump-prerelease.sh, CLAUDE.md).
+7. Commit with chore(hooks): ... message and Co-Authored-By trailer.
+8. Push to origin/dev per push policy.
+9. Wrap up TASK-560: append-notes, check ACs 1-8, final-summary, status Done.
+<!-- SECTION:PLAN:END -->
