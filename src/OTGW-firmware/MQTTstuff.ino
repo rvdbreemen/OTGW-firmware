@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.7
+**  Version  : v2.0.0-alpha.8
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1550,19 +1550,32 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
 // override visibility is achieved by divergence between _thermostat and
 // _boiler, not by a third topic.
 //
-// The ADR-066 Write-Ack gate (bSlaveEchoesValue) is preserved unchanged for
-// _boiler publications.
+// The ADR-066 Write-Ack gate (bSlaveEchoesValue) suppresses real-boiler
+// Write-Ack frames whose data byte is per-spec undefined; see the gate
+// comment inside the function for the OTdata.type vs rsptype distinction.
 void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 {
   if (!settings.mqtt.bSeparateSources || !topic || !json) return;
-  // ADR-066: skip /boiler subtopic for MsgIDs where the slave's Write-Ack
-  // data byte is per-spec undefined. Without this gate, /boiler shows
-  // protocol-zero readings that are not measurements (e.g. Tr, TrSet,
-  // MaxRelModLevelSetting). The bSlaveEchoesValue flag is populated for
-  // every MsgID in OTmap[] per docs/api/MQTT-message-id-echo-audit.md.
-  // OTlookupitem is set by processOT before each print_* call and is
-  // therefore valid here. OTdata is also valid here (set by processOT).
-  if (rsptype == OT_WRITE_ACK && !OTlookupitem.bSlaveEchoesValue) return;
+  // ADR-066: skip the source subtopics for MsgIDs where the slave's Write-Ack
+  // data byte is per-spec undefined. Without this gate, the _thermostat /
+  // _boiler topics flap between the Write-Data value and the Ack's protocol-
+  // zero (e.g. Tr, TrSet, MaxRelModLevelSetting). The bSlaveEchoesValue flag
+  // is populated for every MsgID in OTmap[] per
+  // docs/api/MQTT-message-id-echo-audit.md.
+  //
+  // The frame-type check MUST use OTdata.type (OpenThermMessageType, where
+  // OT_WRITE_ACK==B101==5), NOT rsptype (OTGW_response_type, 0..5). The two
+  // enum families collide numerically: rsptype==OT_WRITE_ACK is true only
+  // for OTGW_UNDEF, never for a real boiler Write-Ack. We additionally
+  // require rsptype==OTGW_BOILER so this only fires on real boiler frames
+  // (B), not on gateway-faked Answer-Thermostat frames (A) where the value
+  // is deliberately constructed.
+  //
+  // OTlookupitem and OTdata are set by processOT before each print_* call
+  // and are valid here.
+  if (OTdata.type == OT_WRITE_ACK
+      && rsptype == OTGW_BOILER
+      && !OTlookupitem.bSlaveEchoesValue) return;
   // Re-entrancy guard: sendMQTTData may yield via feedWatchDog, allowing
   // a second processOT call to overwrite the static buffer mid-publish.
   static bool inUse = false;
