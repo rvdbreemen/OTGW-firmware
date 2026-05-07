@@ -1187,7 +1187,16 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
 //   R                          : /boiler only
 //   B  no-override (bGS=false): /thermostat AND /boiler
 //   B  with A-follow (bGS=true): /boiler only (A wins /thermostat)
-//   A                          : /thermostat only
+//   A                          : /thermostat AND /boiler
+//
+// Note on A routing: ADR-069 originally specified A → /thermostat only, relying
+// on the preceding B frame to cover /boiler. However, some message IDs (e.g.
+// MaxTSet / ID 57) are handled by the OTGW as a standalone proxy without a
+// corresponding B frame from the boiler. In that case /boiler would never be
+// updated. Publishing A to both subtopics ensures /boiler always carries the
+// effective value. For the B→A override case, A (the OTGW-controlled value)
+// overwrites B (the boiler hardware value) in /boiler, which is acceptable and
+// reflects the value the thermostat actually received.
 //
 // The bGatewaySubstituted flag is set on the OLDER frame in a (T,R) or (B,A)
 // sequence by processOT() in OTGW-Core.ino:4046+. The /gateway subtopic was
@@ -1229,8 +1238,9 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
     case OTGW_REQUEST_BOILER:    // R: gateway-substituted write (only the boiler sees this value)
       toBoiler = true;
       break;
-    case OTGW_ANSWER_THERMOSTAT: // A: gateway-faked answer (only the thermostat sees this value)
+    case OTGW_ANSWER_THERMOSTAT: // A: gateway-faked answer; updates /thermostat AND /boiler
       toThermostat = true;
+      toBoiler = true;  // fix: publish to /boiler too — OTGW proxy msgs have no B frame
       break;
     default:                     // parity errors, unknown types
       inUse = false;
