@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v1.5.0-beta.25
+**  Version  : v1.5.0-beta.26
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -338,14 +338,14 @@ enum OpenThermMessageID {
 
     const OTlookup_t OTmap[] PROGMEM = {
         {   0, OT_READ  , ot_flag8flag8,	"Status", "Master and Slave status", "" , true },
-        {   1, OT_WRITE , ot_f88,        	"TSet", "Control setpoint", "°C" , true },
+        {   1, OT_WRITE , ot_f88,        	"TSet", "Control setpoint", "°C" , false},
         {   2, OT_WRITE , ot_flag8u8,    	"MasterConfigMemberIDcode", "Master Config / Member ID", "" , true },
         {   3, OT_READ  , ot_flag8u8,    	"SlaveConfigMemberIDcode", "Slave Config / Member ID", "" , true },
         {   4, OT_WRITE , ot_u8u8,       	"Command", "Command-Code", "" , true },
 		{   5, OT_READ  , ot_flag8u8,    	"ASFflags", "Application-specific fault", "" , true },
 		{   6, OT_READ  , ot_flag8flag8,    "RBPflags", "Remote-parameter flags", "" , true },
-		{   7, OT_WRITE , ot_f88,        	"CoolingControl", "Cooling control signal", "%" , true },
-		{   8, OT_WRITE , ot_f88,        	"TsetCH2", "Control setpoint for 2e CH circuit", "°C" , true },
+		{   7, OT_WRITE , ot_f88,        	"CoolingControl", "Cooling control signal", "%" , false},
+		{   8, OT_WRITE , ot_f88,        	"TsetCH2", "Control setpoint for 2e CH circuit", "°C" , false},
 		{   9, OT_READ  , ot_f88,        	"TrOverride", "Remote override room setpoint", "°C" , true },
 		{  10, OT_READ  , ot_u8u8,       	"TSP", "Number of TSPs", "" , true },
 		{  11, OT_RW    , ot_u8u8,       	"TSPindexTSPvalue", "Index number / Value of referred-to transparent slave parameter", "" , true },
@@ -408,7 +408,7 @@ enum OpenThermMessageID {
 		{  68, OT_UNDEF , ot_undef, 		"", "", "" , true },
 		{  69, OT_UNDEF , ot_undef, 		"", "", "" , true },
 		{  70, OT_READ  , ot_flag8flag8,  	"StatusVH", "Status Ventilation/Heat recovery", "" , true },
-		{  71, OT_WRITE , ot_u8, 			"ControlSetpointVH", "Control setpoint V/H", "%" , true },
+		{  71, OT_WRITE , ot_u8, 			"ControlSetpointVH", "Control setpoint V/H", "%" , false},
 		{  72, OT_READ  , ot_flag8u8, 		"ASFFaultCodeVH", "Application-specific Fault Flags/Code V/H", "" , true },
 		{  73, OT_READ  , ot_u16,		 	"DiagnosticCodeVH", "Diagnostic code V/H", "" , true },
 		{  74, OT_READ  , ot_flag8u8,		"ConfigMemberIDVH", "Config/Member ID V/H", "" , true },
