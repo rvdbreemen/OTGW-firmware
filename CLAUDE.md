@@ -245,14 +245,15 @@ Generic Anthropic-published skills (`pdf`, `docx`, `refactor`, `webapp-testing`,
 
 ## Git push policy
 
-The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`** when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
+The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`** and **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
 
 Concrete rules that override the default "ask first":
 
 - **`origin/dev`** push: allowed once a feature task is committed locally AND the build verifies (`python build.py --firmware` returns exit 0) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
+- **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** push: allowed under the same conditions as `origin/dev` (feature task committed locally, build green for the relevant target, evaluator green; docs-only commits skip both gates). This is the active 2.0.0 development line; auto-push reduces the friction of cross-branch porting work that this branch carries from dev. Mention the push in the user-facing summary.
 - **`origin/main`** push: still requires explicit per-instance confirmation. Main is release-line; never auto-pushed.
 - **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.
-- **Other remote branches** (`feature-*`, `fix-*`): require explicit per-instance confirmation unless the user has granted standing permission for that specific branch in this same section.
+- **Other remote branches** (`feature-*` other than the 2.0.0 line, `fix-*`, etc.): require explicit per-instance confirmation unless the user has granted standing permission for that specific branch in this same section.
 
 When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
 
