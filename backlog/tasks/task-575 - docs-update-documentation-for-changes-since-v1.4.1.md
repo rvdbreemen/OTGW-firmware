@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 22:47'
-updated_date: '2026-05-07 22:52'
+updated_date: '2026-05-07 22:53'
 labels:
   - docs
   - update-docs
@@ -45,3 +45,9 @@ AC6 Cleanup: 12 releases archived to docs/releases/archive/, docs/archive/ aange
 
 MQTT-message-id-echo-audit.md: geen wijzigingen nodig. Document was al up-to-date: 10 bSlaveEchoesValue=false entries kloppen exact met OTGW-Core.h. TASK-561 en TASK-571 waren al verwerkt in hetzelfde commit als de code.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Full-scope documentation update for v1.4.1 to v1.5.0 (10 agents in parallel).\n\nUpdated: MQTT.md (sibling-suffix, worldview, friendly names, diagnostic topics, republish threshold), openapi.yaml + API README (GET /api/v2/debug, POST /api/v2/mqtt/republish, legacyport25238enabled), WEBSOCKET_FLOW.md + QUICK_REFERENCE (250ms reconnect debounce, pagehide shutdown, server burst diagnostics), FLASH_GUIDE.md (no-Python scripts as preferred method, bootloop recovery), BUILD.md (python fallback note), MQTT_LWT.md (5-min republish threshold, reconnect diagram), docs/adr/README.md (ADR-065 through ADR-072 with supersession chain), BREAKING_CHANGES.md (3 breaking changes with mosquitto migration cmds), README.md What's New (demoted 1.4.x, added 1.5.0 highlights).\n\nUnchanged: WIFI_RECOVERY_TRIPLE_RESET.md (procedure correct), MQTT-message-id-echo-audit.md (already up-to-date after TASK-571/561 commits).\n\nCleanup: 12 old releases archived to docs/releases/archive/, docs/archive/ created with daily-issue-report.md and upgrade-from-0.x.md.
+<!-- SECTION:FINAL_SUMMARY:END -->
