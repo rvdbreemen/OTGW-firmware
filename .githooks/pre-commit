@@ -1,41 +1,72 @@
 #!/usr/bin/env bash
 # adr-kit pre-commit hook (template; copied to project's .githooks/pre-commit by /adr-kit:install-hooks).
+# Plus the OTGW-firmware bump-check (TASK-560) appended at the bottom.
 #
 # Resolves the latest installed adr-kit version dynamically so plugin upgrades
 # don't require re-running install-hooks. Degrades gracefully when the plugin
 # cache is missing — the hook never blocks a commit because of tooling drift.
 #
-# Disable a single commit:    ADR_KIT_HOOK_DISABLE=1 git commit ...
-# Remove permanently:         /adr-kit:install-hooks --uninstall  (in a Claude Code session)
+# Disable adr-judge for one commit:  ADR_KIT_HOOK_DISABLE=1 git commit ...
+# Disable bump-check for one commit: OTGW_BUMP_HOOK_DISABLE=1 git commit ...
+# Remove adr-kit hook permanently:   /adr-kit:install-hooks --uninstall  (in a Claude Code session)
 
 set -e
 
+ROOT=$(git rev-parse --show-toplevel)
+
+# ---- adr-kit gate ----
 if [ "${ADR_KIT_HOOK_DISABLE:-0}" = "1" ]; then
   echo "[adr-kit] hook disabled for this commit (ADR_KIT_HOOK_DISABLE=1)" >&2
-  exit 0
+else
+  ADR_KIT_BASE="${HOME}/.claude/plugins/cache/rvdbreemen-adr-kit/adr-kit"
+  ADR_JUDGE=""
+  if [ -d "$ADR_KIT_BASE" ]; then
+    # Pick the highest installed version (lexicographic sort works for SemVer-shaped dirs).
+    ADR_JUDGE=$(ls -d "$ADR_KIT_BASE"/*/bin/adr-judge 2>/dev/null | sort -V | tail -1)
+  fi
+
+  if [ -z "$ADR_JUDGE" ] || [ ! -x "$ADR_JUDGE" ]; then
+    echo "[adr-kit] adr-judge binary not found in plugin cache; skipping pre-commit ADR check." >&2
+    echo "[adr-kit] Re-install with /adr-kit:install-hooks in a Claude Code session." >&2
+  else
+    DIFF=$(git diff --cached --unified=0)
+    if [ -n "$DIFF" ]; then
+      # Run the deterministic judge. Exit codes:
+      #   0  no declarative violations (advisory entries for llm_judge ADRs are non-blocking)
+      #   1  declarative violation found
+      #   2  config or runtime error
+      echo "$DIFF" | "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/"
+    fi
+  fi
 fi
 
-ADR_KIT_BASE="${HOME}/.claude/plugins/cache/rvdbreemen-adr-kit/adr-kit"
-ADR_JUDGE=""
-if [ -d "$ADR_KIT_BASE" ]; then
-  # Pick the highest installed version (lexicographic sort works for SemVer-shaped dirs).
-  ADR_JUDGE=$(ls -d "$ADR_KIT_BASE"/*/bin/adr-judge 2>/dev/null | sort -V | tail -1)
+# ---- bump-prerelease check (TASK-560) ----
+# Trigger paths: any staged path under src/OTGW-firmware/ (excluding version.h itself)
+# or src/libraries/. If triggered, the same commit must change _VERSION_PRERELEASE
+# in src/OTGW-firmware/version.h (both a + and a - line for that #define).
+if [ "${OTGW_BUMP_HOOK_DISABLE:-0}" = "1" ]; then
+  echo "[bump] hook disabled for this commit (OTGW_BUMP_HOOK_DISABLE=1)" >&2
+else
+  STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+  TRIGGER=$(echo "$STAGED" | awk '
+    /^src\/OTGW-firmware\/version\.h$/ { next }
+    /^src\/OTGW-firmware\// { print; next }
+    /^src\/libraries\// { print; next }
+  ')
+  if [ -n "$TRIGGER" ]; then
+    PRERELEASE_DIFF=$(git diff --cached -- src/OTGW-firmware/version.h | grep -E '^[+-]#define _VERSION_PRERELEASE ' || true)
+    MINUS=$(echo "$PRERELEASE_DIFF" | grep -c '^-' || true)
+    PLUS=$(echo "$PRERELEASE_DIFF" | grep -c '^+' || true)
+    if [ "$MINUS" -lt 1 ] || [ "$PLUS" -lt 1 ]; then
+      echo "" >&2
+      echo "[bump] commit touches firmware code but does not bump _VERSION_PRERELEASE." >&2
+      echo "[bump] Run bin/bump-prerelease.sh and stage src/OTGW-firmware/version.h + data/version.hash" >&2
+      echo "[bump] alongside your code change." >&2
+      echo "[bump] Bypass for this commit: OTGW_BUMP_HOOK_DISABLE=1 git commit ..." >&2
+      echo "" >&2
+      echo "[bump] Triggering paths in this commit:" >&2
+      echo "$TRIGGER" | sed 's/^/  /' >&2
+      exit 1
+    fi
+  fi
 fi
-
-if [ -z "$ADR_JUDGE" ] || [ ! -x "$ADR_JUDGE" ]; then
-  echo "[adr-kit] adr-judge binary not found in plugin cache; skipping pre-commit ADR check." >&2
-  echo "[adr-kit] Re-install with /adr-kit:install-hooks in a Claude Code session." >&2
-  exit 0
-fi
-
-ROOT=$(git rev-parse --show-toplevel)
-DIFF=$(git diff --cached --unified=0)
-if [ -z "$DIFF" ]; then
-  exit 0
-fi
-
-# Run the deterministic judge. Exit codes:
-#   0  no declarative violations (advisory entries for llm_judge ADRs are non-blocking)
-#   1  declarative violation found
-#   2  config or runtime error
-echo "$DIFF" | "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/"

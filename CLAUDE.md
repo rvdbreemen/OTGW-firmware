@@ -257,6 +257,16 @@ Concrete rules that override the default "ask first":
 
 When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
 
+## Versioning policy
+
+Field testers on Discord identify issues by the version string ("on beta.23 I see..."), so each material firmware change must ship under its own prerelease tag (`_VERSION_PRERELEASE` in `src/OTGW-firmware/version.h`, currently `<word>.<N>` form, e.g. `beta.23`). Multiple commits batched under the same tag erase the testers' ability to A/B them.
+
+- **What requires a bump** — any commit whose staged paths include `src/OTGW-firmware/**` (excluding `src/OTGW-firmware/version.h` itself) or `src/libraries/**`. The same commit must update `_VERSION_PRERELEASE` (and the cascaded `_SEMVER_*`/`_VERSION` lines and `data/version.hash` that `scripts/autoinc-semver.py` rewrites).
+- **What does not** — docs-only / tooling-only commits: `*.md`, `docs/**`, `backlog/**`, `.claude/**`, `scripts/**`, `bin/**`, `.githooks/**`, top-level `.py`/`.sh`/`.bat`, and `data/version.hash` on its own. These cannot affect firmware behaviour and are exempt.
+- **How to bump** — run `bin/bump-prerelease.sh` from the project root. It parses the current tag (must match `^[a-zA-Z]+\.[0-9]+$`), increments the trailing integer, and calls `scripts/autoinc-semver.py --prerelease <new>` to rewrite `version.h` + `data/version.hash` + the cascaded fields. The helper does NOT git-add — stage `src/OTGW-firmware/version.h` and `src/OTGW-firmware/data/version.hash` yourself alongside the firmware change.
+- **Enforcement** — `.githooks/pre-commit` runs a bump-check after the adr-judge gate. If the staged set triggers and `git diff --cached -- src/OTGW-firmware/version.h` does not show a `+`/`-` pair on the `_VERSION_PRERELEASE` line, the commit is blocked with the path list and remediation hint.
+- **Bypass** — `OTGW_BUMP_HOOK_DISABLE=1 git commit ...` skips the bump-check for one commit. Intended for cherry-picks, merges, or rebases where the bump rides on a separate commit. Do not use it to dodge bumping a real change.
+
 ## Worktree layout
 
 This project is intentionally checked out into **two parallel git worktrees** so the 1.5.x release line and the 2.0.0 feature line can be worked on side-by-side without branch-switch churn:
