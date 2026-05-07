@@ -3,9 +3,11 @@ id: TASK-571
 title: >-
   fix(mqtt): flip MsgID 1 (TSet) bSlaveEchoesValue=false — heat-pump non-echo
   flap
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-07 20:06'
+updated_date: '2026-05-07 21:55'
 labels:
   - bug
   - mqtt
