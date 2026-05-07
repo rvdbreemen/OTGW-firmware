@@ -1,7 +1,7 @@
 ---
 id: TASK-575
 title: 'docs: update documentation for changes since v1.4.1'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 22:47'
