@@ -29,14 +29,16 @@ This is one of two paired tasks. The 2.0.0 worktree carries the sibling task (`f
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 doAutoConfigure() body in src/OTGW-firmware/MQTTstuff.ino is replaced with a call to markAllMQTTConfigPending() (no other behaviour). Function signature unchanged.
-- [ ] #2 Both callers (handleDebug.ino F-key and restAPI.ino POST /api/v2/otgw/discovery) compile and behave correctly without changes to their code.
-- [ ] #3 Four throttle warning DebugTf format strings in helperStuff.ino now include maxBlock: HEAP-CRITICAL Blocking WebSocket, WebSocket throttled, HEAP-CRITICAL Blocking MQTT, MQTT throttled. Format goes from (heap=%u bytes) to (heap=%u, maxBlock=%u bytes).
-- [ ] #4 ./build.sh exits 0 (firmware + filesystem build clean).
-- [ ] #5 python evaluate.py --quick reports no NEW failures versus dev HEAD baseline.
-- [ ] #6 Commit message clearly references both parts (drip-route force-discovery; maxBlock in throttle warnings) and the heap-analysis context.
-- [ ] #7 After build + evaluator are green, the commit is pushed to origin/dev per CLAUDE.md push policy.
+- [x] #1 doAutoConfigure() body in src/OTGW-firmware/MQTTstuff.ino is replaced with a call to markAllMQTTConfigPending() (no other behaviour). Function signature unchanged.
+- [x] #2 Both callers (handleDebug.ino F-key and restAPI.ino POST /api/v2/otgw/discovery) compile and behave correctly without changes to their code.
+- [x] #3 Four throttle warning DebugTf format strings in helperStuff.ino now include maxBlock: HEAP-CRITICAL Blocking WebSocket, WebSocket throttled, HEAP-CRITICAL Blocking MQTT, MQTT throttled. Format goes from (heap=%u bytes) to (heap=%u, maxBlock=%u bytes).
+- [x] #4 ./build.sh exits 0 (firmware + filesystem build clean).
+- [x] #5 python evaluate.py --quick reports no NEW failures versus dev HEAD baseline.
+- [x] #6 Commit message clearly references both parts (drip-route force-discovery; maxBlock in throttle warnings) and the heap-analysis context.
+- [x] #7 After build + evaluator are green, the commit is pushed to origin/dev per CLAUDE.md push policy.
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
