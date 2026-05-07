@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.8
+**  Version  : v2.0.0-alpha.9
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2607,10 +2607,19 @@ void postSettings()
     RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
   }
   updateSetting(field, newValue);
-  // Synchronous flush: persist to flash NOW so the 200 OK is truthful.
-  // The deferred timer still handles MQTT/NTP command updates, but HTTP
-  // saves must be durable before we confirm success to the browser.
-  flushSettings();
+  // TASK-564: do NOT call flushSettings() synchronously here. The earlier
+  // implementation flushed on every POST so the 200 OK was "truthful", but
+  // SergeantD's alpha.3 telnet log showed that pattern caused 6 full
+  // /settings.ini rewrites in 14 s during a single SAT/BLE form edit (each
+  // 30-80 ms of LittleFS work, blocking lwIP and contributing to WS code 1006
+  // reconnects). The 200 OK is still truthful: the new value is live in the
+  // in-RAM `settings` struct immediately, so any subsequent GET reflects it.
+  // updateSetting() schedules the 2-second debounce timer (RESTART_TIMER on
+  // timerFlushSettings); rapid sequential field POSTs now coalesce into one
+  // flash write. The sister SAT BLE path already relies on the same debounce
+  // (TASK-508). Pre-reboot durability is preserved by doRestart() in
+  // helperStuff.ino, which still calls flushSettings() synchronously before
+  // esp.restart().
   httpServer.send(200, F("application/json"), body);
 
 } // postSettings()

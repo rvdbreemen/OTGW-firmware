@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.8
+**  Version  : v2.0.0-alpha.9
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -583,7 +583,23 @@ void updateSetting(const char *field, const char *newValue)
     DebugTf(PSTR("-> field[%s], newValue[%s]\r\n"), field, newValue);
   }
 
-  if (strcasecmp_P(field, PSTR("hostname"))==0) 
+  // TASK-564: per-field no-op detection. SergeantD's alpha.3 telnet log showed
+  // 6 full /settings.ini rewrites in 14 s for a single SAT/BLE form interaction
+  // because identical-value writes (satblemac flushed twice with the same empty
+  // value; satexternaltemp toggled false→true→false→true) all marked the
+  // settings dirty. Snapshot the entire OTGWSettings struct + pendingSideEffects
+  // before the dispatch cascade runs; if memcmp shows zero diff after, restore
+  // pendingSideEffects and return early without setting settingsDirty or
+  // restarting the debounce timer.
+  //
+  // Static buffer (one per call site, not on stack) — OTGWSettings is ~1-2 KB on
+  // ESP8266 and would otherwise pressure the stack. updateSetting() is not
+  // re-entered (REST handler is sequential), so static is safe.
+  static OTGWSettings _noopSnapshot;
+  memcpy(&_noopSnapshot, &settings, sizeof(settings));
+  const uint8_t pendingSideEffectsSnapshot = pendingSideEffects;
+
+  if (strcasecmp_P(field, PSTR("hostname"))==0)
   { //make sure we have a valid hostname here...
     strlcpy(settings.sHostname, newValue, sizeof(settings.sHostname));
     if (strlen(settings.sHostname)==0) snprintf_P(settings.sHostname, sizeof(settings.sHostname), PSTR("OTGW-%06x"), (unsigned int)platformChipId());
@@ -1004,6 +1020,18 @@ void updateSetting(const char *field, const char *newValue)
 
   // Side-effect checks — independent if's, multiple can fire
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
+
+  // TASK-564: no-op detection. If the cascade above produced no change to the
+  // OTGWSettings struct, this update is identical to the current state — skip
+  // the dirty mark, restore pendingSideEffects to its pre-call value, and do
+  // NOT restart the debounce timer (which would have triggered a wasted flash
+  // rewrite). Verified by smoke test toggling satblemac twice with the same
+  // empty value: only one would-be flush fires.
+  if (memcmp(&_noopSnapshot, &settings, sizeof(settings)) == 0) {
+    pendingSideEffects = pendingSideEffectsSnapshot;
+    DebugTf(PSTR("[Settings] no-op skip: field[%s] equals current value, no flush scheduled\r\n"), field);
+    return;
+  }
 
   // Mark settings dirty and restart debounce timer — actual write + service
   // restarts are deferred to flushSettings() which runs from loop() timer.
