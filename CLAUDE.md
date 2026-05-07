@@ -13,7 +13,7 @@ This project uses OpenWolf for context management. Read and follow .wolf/OPENWOL
 
 **Every piece of work must have a backlog task before any code is written. No exceptions.**
 
-**Preferred interface: MCP server (`mcp__backlog__*`) over the CLI.** MCP calls take structured parameters (typed arrays, multi-line strings) — no shell-escape pain. Use the CLI only when an operation is not exposed via MCP or the MCP server is unreachable. Coverage includes task create/edit/view/list/search/archive/complete, documents, milestones, Definition of Done defaults, and the workflow/execution guides. The CLI reference below remains the authoritative semantics description — same underlying engine.
+**Always use the `backlog` CLI for task operations on this project. Do NOT use the `mcp__backlog__*` MCP server.** The MCP server indexes only one worktree at a time and serves stale cached state across the dev/2.0.0 split (verified 2026-05-05: MCP returned a pre-edit "In Progress" snapshot of TASK-514 long after the CLI marked it Done on disk in the 2.0.0 tree). The "Backlog.md: always use the CLI" section near the bottom of this file is the canonical statement; this paragraph is a reminder so the rule is the first thing seen.
 
 ```bash
 # Before writing any code (CLI shown for reference; MCP equivalents preferred):
@@ -36,7 +36,7 @@ backlog task edit <id> -s Done
 Two hooks enforce this contract — they fail closed, you don't have to remember:
 
 - `.claude/hooks/backlog-mcp-guard.py` — PreToolUse guard wired in `.claude/settings.json`. Blocks `Edit/Write/MultiEdit` on `backlog/tasks/*.md` and Bash invocations of the `backlog` CLI. Stderr names the MCP equivalent so the model self-corrects without another round-trip.
-- `.githooks/commit-msg` — git hook that fails the commit if its message references `TASK-NNN` without a matching `backlog/tasks/task-NNN*.md` file in the index. Catches the failure mode where a code commit lands but its task record stays untracked. Install once per clone with `git config core.hooksPath .githooks`. Bypass with `git commit --no-verify` for emergencies (document why in the message).
+- `.githooks/commit-msg` — git hook that fails the commit if its message references `TASK-NNN` without a matching `backlog/tasks/task-NNN*.md` file in the index. Catches the failure mode where a code commit lands but its task record stays untracked. Install once per clone with `git config core.hooksPath .githooks`. Bypass with `git commit --no-verify` for emergencies (document why in the message). **Currently inactive on this worktree because the hook file is not marked executable** — git emits a `hook was ignored` hint per commit. Run `chmod +x .githooks/commit-msg` to enable; tracked separately from the bump-check work.
 
 For the full CLI reference (all commands, AC management, DoD, multi-line input): read `docs/guides/backlog-cli.md`.
 
@@ -176,9 +176,12 @@ Per **ADR-080**, a new pattern-level ADR MUST either reference its CI gate (in `
 
 ## Build Commands
 
+Preferred wrapper (handles venv setup): `./build.sh` (macOS/Linux) or `build.bat` (Windows). Both invoke `build.py` underneath and build firmware + filesystem. Use a direct `python build.py` invocation only when the wrapper is unavailable.
+
 ```bash
-python build.py              # Build firmware + filesystem
-python build.py --firmware   # Firmware only
+./build.sh                   # Preferred — firmware + filesystem (handles venv)
+python build.py              # Build firmware + filesystem (no venv handling)
+python build.py --firmware   # Firmware only (also the push-policy gate)
 python build.py --clean      # Clean build
 python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
 python evaluate.py --quick   # Fast check
@@ -264,8 +267,8 @@ The default Claude Code instruction is "do not push without explicit user permis
 
 Concrete rules that override the default "ask first":
 
-- **`origin/dev`** push: allowed once a feature task is committed locally AND the build verifies (`python build.py --firmware` returns exit 0) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary.
-- **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** push: allowed under the same conditions as `origin/dev`. This is the active 2.0.0 development line; auto-push reduces the friction of cross-branch porting work that this branch carries from dev.
+- **`origin/dev`** push: allowed once a feature task is committed locally AND the build verifies (`python build.py --firmware` returns exit 0) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
+- **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** push: allowed under the same conditions as `origin/dev` (feature task committed locally, build green for the relevant target, evaluator green; docs-only commits skip both gates). This is the active 2.0.0 development line; auto-push reduces the friction of cross-branch porting work that this branch carries from dev.
 - **`origin/main`** push: still requires explicit per-instance confirmation. Main is release-line; never auto-pushed.
 - **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.
 - **Other remote branches** (`feature-*` other than the 2.0.0 line, `fix-*`, etc.): require explicit per-instance confirmation unless the user has granted standing permission for that specific branch in this same section.
