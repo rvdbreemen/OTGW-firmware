@@ -3,11 +3,11 @@ id: TASK-552
 title: >-
   Implement ADR-070: switch to sibling-suffix MQTT source topics + drop
   base-suppression
-status: In Progress
+status: Done
 assignee:
   - '@rvdbreemen-claude'
 created_date: '2026-05-07 07:56'
-updated_date: '2026-05-07 08:28'
+updated_date: '2026-05-07 15:48'
 labels:
   - feat-mqtt-suffix-shape
   - mqtt
