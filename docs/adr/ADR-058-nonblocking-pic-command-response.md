@@ -42,7 +42,23 @@ A new static function `handlePRresponse(buf, len)` is called from `processOT()` 
 
 ## Alternatives Considered
 
-<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+### Alternative A: Keep `executeCommand()` and yield/feed background tasks inside its busy-wait
+
+Leave the synchronous `executeCommand("PR=...")` callers untouched but extend the internal wait loop to call `doBackgroundTasks()` (or at least `httpServer.handleClient()`) in addition to `feedWatchDog()`, so the cooperative scheduler runs while waiting for the PIC response.
+
+**Rejected** because `doBackgroundTasks()` is the entry point that itself invokes `queryNextPICsetting()`, `queryOTGWgatewaymode()`, and the rest of the periodic work. Re-entering it from inside a synchronous PIC wait would create unbounded recursion and shared-buffer aliasing (see the "Static buffers, cooperative scheduling" rule in CLAUDE.md, where re-entry via `feedWatchDog()` is already documented as fragile). Selectively pumping just the HTTP server would split the scheduler in two and force every other subsystem (MQTT, WebSocket, telnet) to be added one by one — the complexity collapses back to "make the whole loop reentrant", which the firmware was explicitly designed to avoid.
+
+### Alternative B: Lengthen the PIC settings polling interval to mask the blocking
+
+Reduce the impact by spreading the 15 PR= queries across a much longer interval (e.g. one every 30 seconds instead of every 3 seconds), so the cumulative web-GUI starvation per minute drops below the user-visible threshold.
+
+**Rejected** because it does not fix the root cause: every individual `executeCommand("PR=...")` still blocks the loop for up to 2 seconds, which is long enough to cause "half pages" and timeouts on a single page load that happens to land in that window (the original v1.3.1 bug report). It also stretches the full PIC-settings discovery cycle from ~45 seconds to ~7.5 minutes, delaying MQTT discovery and Home Assistant entity availability after every reboot. Hiding a blocking call behind reduced frequency is a workaround, not a fix.
+
+### Alternative C (chosen): Fire-and-forget queue submission with centralized async response handling
+
+Queue every PR= via `addOTWGcmdtoqueue(cmd, len, /*forceQueue=*/true)` and dispatch responses through a single `handlePRresponse(buf, len)` in `processOT()`, which updates state and publishes MQTT when the response actually arrives.
+
+**Trade-off accepted**: state updates become eventually consistent (response lands ~100ms after the query, not synchronously), and `checkOTGWcmdqueue()` matches PR entries imprecisely on the 2-letter prefix. Both are tolerable: the PIC processes commands in FIFO order on a single-threaded serial link, and `handlePRresponse()` keys off the register letter in the response payload itself, so data routing is correct regardless of which queue slot held the request. The web GUI stays responsive during the full 45-second discovery cycle, and queue retries (5 attempts at 5s intervals) replace the previous single-attempt 1s timeout.
 
 ## Consequences
 

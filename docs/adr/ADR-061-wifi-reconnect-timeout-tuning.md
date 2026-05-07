@@ -33,7 +33,23 @@ The state machine design from ADR-047 is unchanged — only the timing parameter
 
 ## Alternatives Considered
 
-<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+### Alternative A: Keep the 5-second per-attempt timeout from ADR-047
+
+Leave the original ADR-047 parameters in place (5-second timeout, 15 retries, ~75-second budget before reboot) and look for the bug elsewhere — perhaps in `WiFi.setAutoReconnect()` or in the order of state-machine transitions.
+
+**Rejected** because root-cause analysis showed the 5-second timeout *is* the bug: ESP8266's `WiFi.begin()` restarts the full association process from scratch (scan + auth + association + DHCP), which routinely takes 5-10+ seconds in normal field conditions depending on AP load and signal strength. A 5-second deadline therefore guarantees that each `WiFi.begin()` is cancelled by the next one before it can finish, creating an infinite loop of interrupted attempts. The previous v1.2.0 `restartWifi()` used a 30-second window and worked reliably, which is the proof-by-existence that 5 seconds is too aggressive on this hardware.
+
+### Alternative B: Disable `WiFi.setAutoReconnect()` and rely solely on `loopWifi()` to drive reconnects
+
+Set `WiFi.setAutoReconnect(false)` so the SDK never auto-reconnects in the background, eliminating any chance of `loopWifi()` racing the SDK's own attempt. The state machine becomes the single owner of reconnect timing.
+
+**Rejected** because the SDK's auto-reconnect handles brief radio-level glitches (channel hops, momentary interference, beacon misses) transparently in well under 1 second — a class of disconnects the application layer should never even see. Disabling it would push every transient hiccup into the full `loopWifi()` state-machine cycle (currently bounded at 30 seconds per attempt), turning sub-second blips into multi-second outages from MQTT and WebSocket clients' perspectives. The 30-second timeout already gives the SDK ample room to handle these transparently before `loopWifi()` would intervene, so the race condition disappears without sacrificing the radio-level recovery path.
+
+### Alternative C (chosen): Lengthen per-attempt timeout to 30 s, reduce retries from 15 to 10
+
+Match the proven v1.2.0 30-second window per attempt, and pull the retry count down so the total budget before reboot stays bounded (300 s instead of an unbounded 450 s).
+
+**Trade-off accepted**: time-to-reboot on a genuinely unrecoverable failure grows from ~75 s to ~300 s. This is the right direction — successful reconnection matters far more than fast failure for an unattended IoT device, and 5 minutes is still a tolerable upper bound for the rare hard-failure case (AP genuinely gone, credentials wrong). The state-machine design from ADR-047 is preserved; only the timing parameters move.
 
 ## Consequences
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted, 2026-04-20
 
 ## Context
 
@@ -104,7 +104,29 @@ The check implementation should be resilient to:
 
 ## Alternatives Considered
 
-<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+### Alternative A: Per-consumer local-static (each new feature reimplements its own day/hour tracking)
+
+Let every new periodic feature carry its own `static int8_t lastDay` (or `lastHour`, `lastYear`) and roll its own `if (currentDay != lastDay) { ... lastDay = currentDay; }` block. The four `helperStuff.ino` helpers are left alone; they remain optional utilities that some callers happen to use.
+
+**Rejected** because it duplicates the wall-clock bookkeeping at every call site, hides the intent ("this work runs daily" disappears into a static-variable comparison), and makes feature removal error-prone — a contributor deleting a daily task can easily leave an orphan `lastDay` static behind. It also loses the central registry property: a maintainer who wants to know "what does this firmware do on every day boundary?" must grep the entire codebase for date comparisons rather than read one block of `if (dayFlag)` statements. The pattern proliferates with every new feature, multiplying the bookkeeping surface for no functional benefit.
+
+### Alternative B: Multi-subscriber event bus with callback registration
+
+Introduce a small in-firmware pub/sub: `registerOnDay(callback)` / `registerOnHour(callback)` etc., and have the four helpers fan out to all registered subscribers when a boundary fires. Each new daily feature would call `registerOnDay(myDailyTask)` from its `setup()`.
+
+**Rejected** because it is a substantial structural addition (a callback list, registration API, dispatch loop) for exactly four events on a microcontroller that has no other dynamic-callback patterns. It introduces ordering questions (which callback runs first?), error-handling questions (what if one callback yields and re-enters the dispatch?), and lifetime questions (no `unregister` story), all to solve a problem that a pre-computed local `bool` already solves in zero new code. Overkill given the actual scale.
+
+### Alternative C: Convert the helpers to non-consuming (return flag without updating `lastX`; callers update separately)
+
+Change the semantics so `dayChanged()` returns `true` whenever a day flip is observed and only updates `lastDay` when the caller explicitly calls a separate `ackDayChanged()` (or similar). Multiple callers can then safely ask "did the day flip?" and at least one of them, by convention, acknowledges.
+
+**Rejected** because it breaks every existing call site, requires every read to become a two-step pattern (read + ack), and pushes the "who acks?" responsibility onto contributors with no compile-time enforcement. Forgetting to ack means the helper returns `true` forever; double-acking has no effect but adds noise. The transition is error-prone and the resulting API is harder to reason about than the consume-on-read original.
+
+### Alternative D (chosen): Single call site per helper, downstream consumers read a captured `bool` flag
+
+Pin each of the four helpers to exactly one call site (the `doTaskMinuteChanged` dispatcher), capture the return into a local `bool` once per tick, and have all downstream daily/hourly/yearly work read that flag. Enforce the rule mechanically with a new `evaluate.py` check that fails the build if any helper has more than one call site.
+
+**Trade-off accepted**: requires a one-time refactor (TASK-350) that touches `OTGW-firmware.ino`, `networkStuff.ino` (signature change to `sendtimecommand`), and `evaluate.py`. After that, adding a new daily/hourly task is a one-line addition inside the appropriate `if (dayFlag)` / `if (hourFlag)` block, and the rule is machine-checked so future contributors cannot silently regress it.
 
 ## Consequences
 
@@ -123,9 +145,7 @@ The check implementation should be resilient to:
 
 ### Alternatives considered and rejected
 
-- **Per-consumer local-static (each feature reimplements day-tracking).** Rejected: duplicates state, obscures intent, makes removal of a consumer error-prone.
-- **Multi-subscriber event bus with callback registration.** Rejected: overkill for four events on a microcontroller with no dynamic memory management pattern elsewhere.
-- **Convert the helpers to non-consuming (return flag without updating lastX; caller updates).** Rejected: breaks the existing call sites, requires every call to become two lines, error-prone transition.
+See `## Alternatives Considered` above for the full discussion of the per-consumer local-static, multi-subscriber event bus, and non-consuming-helpers alternatives.
 
 ## Related Decisions
 

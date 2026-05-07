@@ -49,7 +49,23 @@ For PR commands (which can have multiple entries with different register letters
 
 ## Alternatives Considered
 
-<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+### Alternative A: Route ser2net traffic through the command queue
+
+Treat the TCP-to-serial bridge as just another producer for `addOTWGcmdtoqueue()`. Every line received on port 25238 would be parsed for a complete `XX=...` command and enqueued instead of written directly to `OTGWSerial`. The queue would then own all PIC bus access, eliminating logical interference, response confusion, and timing collisions in one stroke.
+
+**Rejected** because ser2net exists specifically to be a transparent passthrough for legacy clients (OTmonitor, scripted command tools) that predate this firmware and assume raw, low-latency serial semantics. Queuing introduces at least 1 second of latency (queue tick is once per second) and breaks per-byte streaming entirely — interactive sessions in OTmonitor would feel broken, and any tool that relies on prompt-style request/response timing would fail. The Context section makes this explicit: ser2net "clients know nothing about our firmware and expect flat serial communication", so changing that contract for an internal cleanliness win is the wrong trade.
+
+### Alternative B: Do nothing — accept the existing interference as a rare edge case
+
+Leave the firmware as-is. The collisions only matter when a user actively drives ser2net (e.g. with OTmonitor) at the same moment the queue happens to dispatch a command, which is statistically uncommon for casual users.
+
+**Rejected** because the failure mode is silent and counter-intuitive when it does fire: a user who sets `CS=30` via OTmonitor sees the firmware "undo" the change a second later when the queue retries `CS=55`, with no indication why. Power users (the exact population that uses ser2net + OTmonitor) are also the population most likely to file confused bug reports about "ghost commands". The fix is small (~20 lines and one timestamp) and isolated to the queue dispatcher, so the maintenance cost is much lower than the cost of debugging the interference reports it prevents.
+
+### Alternative C (chosen): Direct passthrough plus queue-side awareness
+
+Keep ser2net as a byte-by-byte direct write to `OTGWSerial`, but record the timestamp of each completed ser2net command, pause `handleOTGWqueue()` for 2 seconds after any ser2net activity, and proactively scrub matching queue entries when a ser2net command shadows them.
+
+**Trade-off accepted**: queued commands are delayed up to 2 seconds after the last ser2net byte, and only the first matching duplicate is removed per ser2net command. Both are negligible in practice — periodic queue work (PIC settings every 3s, time sync every 60s) tolerates a 2-second slip easily, and `addOTWGcmdtoqueue()` already deduplicates non-PR commands so multi-match cleanup is rarely needed. Ser2net keeps its zero-latency contract; the queue learns just enough about ser2net to stay out of its way.
 
 ## Consequences
 

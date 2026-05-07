@@ -349,7 +349,23 @@ var errorEl            // Error message element
 
 ## Alternatives Considered
 
-<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+### Alternative A: Keep the dual-mode WebSocket + HTTP polling implementation (status quo)
+
+Continue with the v1.2-era flash UI: a primary WebSocket connection to port 81 for real-time flash status, with HTTP polling of `/status` as a fallback when the WebSocket goes silent. This kept the "nice" 0/25/50/75/100% mid-flash progress indicator and the existing reconnect/backoff logic.
+
+**Rejected** because the implementation had grown to 1267 lines, 22+ functions, and 40+ state variables, with documented Safari-specific WebSocket connection hangs that required browser-detection workarounds (~50 lines of Safari-only code). The 36+ test cases (12 scenarios x 3 transport modes) made every change to the flash flow expensive. Real-time mid-flash progress is a "nice-to-have, not required" payoff that did not justify a 1000-line surface area or the race conditions between WebSocket and polling state.
+
+### Alternative B: HTTP polling only (drop WebSocket, keep mid-flash progress)
+
+Remove the WebSocket transport but keep an HTTP polling loop against `/status` every ~500ms during the flash write, so the user still sees granular flash-write progress.
+
+**Rejected** because the ESP8266 is busy writing to flash for 10-30 seconds per upload and the HTTP server is largely unresponsive during those writes — `/status` polls would time out or return stale data, making the "live" progress unreliable and misleading. Polling also still requires its own state machine (intervals, retries, "is the device rebooting yet?" detection), which kept much of the complexity that motivated the rewrite. The CPU/network overhead of constant polling against a watchdog-pressured device is wasteful for marginal UX value.
+
+### Alternative C (chosen): Single XHR upload + post-flash health-check polling
+
+Upload the file via a single `XMLHttpRequest`, let the backend block until the flash write completes before returning HTTP 200, then poll `/api/v2/health` once per second for up to 60 seconds to confirm the device is fully back online before redirecting.
+
+**Trade-off accepted**: no real-time flash-write progress (the user sees "Uploading: 100%" then waits 10-30 seconds), and no automatic retry on upload failure. Both are deemed acceptable because flash operations are infrequent (once per release), the wait is short, and explicit health-check verification is more reliable than heuristic success detection. Net result: 399 lines, 4 functions, 5 variables, no browser-specific code.
 
 ## Consequences
 

@@ -52,7 +52,29 @@ All other MsgIDs default to `bSlaveEchoesValue = true`. For MsgIDs without write
 
 ## Alternatives Considered
 
-<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+### Alternative A: Status quo — keep `is_value_valid` accepting Write-Ack universally
+
+Continue publishing every Write-Ack to both base topic and `/boiler` subtopic, regardless of MsgID. Fixes nothing.
+
+**Rejected** because the field-reported flapping on Tr (24), TrSet (16), and MaxRelModLevelSetting (14) is real user-visible noise: HA dashboards alternate between the master's actual value and protocol-zero. Doing nothing leaves the regression in place. The opt-in source separation feature loses credibility if the `/boiler` subtopic is dominated by fake zeros for the most-watched temperature MsgIDs.
+
+### Alternative B: Move the per-MsgID gate from `OTlookup_t` to the publish call sites
+
+Encode the non-echo classification as a `switch (msgId)` block inside `publishToSourceTopic` and the base-topic publish path. No `OTlookup_t` field added; no per-MsgID metadata change.
+
+**Rejected** because the classification belongs with the MsgID definition, not at the call site. Two publish paths exist today (live OT bus, PS=1 summary), with a third PS=1 amendment landing in the same release (TASK-483). Each path would have to maintain an identical switch, and a future fourth path would silently miss the gate. The single-source-of-truth principle is worth the one byte per `OTlookup_t` entry.
+
+### Alternative C: Drop the `/boiler` subtopic entirely for non-echo MsgIDs (do not publish at all)
+
+For the 6 identified MsgIDs, suppress the `/boiler` subtopic in both modes (Write-Data and Write-Ack), even though Write-Data carries the master's meaningful value.
+
+**Rejected** because Write-Data on these MsgIDs is the master-side intent and is correctly already captured by the `/thermostat` subtopic via the same Write-Data frame. Suppressing `/boiler` for Write-Data only is a no-op (Write-Data does not route to `/boiler` per ADR-040 framing). The actual question is Write-Ack only, which is what this ADR's gate addresses. Alternative C therefore reduces to "do less than necessary" — the Write-Ack flap remains and the rest of the carve-out is meaningless.
+
+### Alternative D (chosen): Per-MsgID `bSlaveEchoesValue` flag in `OTlookup_t` + base-topic Write-Ack exclusion
+
+Encoded above.
+
+**Trade-off accepted**: 1 byte per OTlookup entry (~256 bytes total) and the requirement to keep `docs/api/MQTT-message-id-echo-audit.md` in sync with code. Both are cheap relative to the regression closure.
 
 ## Consequences
 
@@ -117,7 +139,7 @@ The `PS=1` stream emits one value per MsgID, chosen by the PIC from its most rec
 
 ### CI gate
 
-Per ADR-080, this amendment is binding-pattern-level: a new `evaluate.py` check `check_ps_summary_master_topic_gate` ensures any future case added to `publishPSSummaryFieldValue` is wrapped in the `validForMaster` guard. Without the CI gate, a future contributor could add a new `case ot_xxx:` and silently re-introduce the regression.
+Per the project's binding-rule CI-gate convention (also referenced in ADR-068), this amendment is binding-pattern-level: a new `evaluate.py` check `check_ps_summary_master_topic_gate` ensures any future case added to `publishPSSummaryFieldValue` is wrapped in the `validForMaster` guard. Without the CI gate, a future contributor could add a new `case ot_xxx:` and silently re-introduce the regression.
 
 ## Future amendments
 

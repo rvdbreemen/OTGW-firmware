@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted, 2026-04-23
 
 ## Context
 
@@ -35,7 +35,29 @@ Operational consequences of this decision:
 
 ## Alternatives Considered
 
-<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+### Alternative A: Treat `otgw-pic/` as an internal implementation detail and reorganise it freely
+
+Declare the subtree as internal-only ("we never promised stability") and rename it to something tidier — for example flatten `otgw-pic/settings/*` to `pic_settings/*`, or merge it back into the per-device root with a different prefix scheme. Future refactors would be free to restructure it whenever a cleaner layout is found.
+
+**Rejected** because the subtree has been published since v1.3.0 (roughly 3+ years of installed base). Users have visibly built HA YAML snippets, NodeRED flows, Prometheus scrape rules, Grafana dashboards, and HACS integrations against these exact topic paths. Silently renaming or restructuring them would break every such integration without warning — exactly the failure class this ADR's own Context section documents (the `bc9bd6a2` / `3e1872ce` discovery takeover that left binary_sensor entities permanently `unavailable` because the discovery `stat_t` and the publish path drifted apart). Treating user-facing MQTT topics as internal is the same mistake the takeover made; the cost lands on users and on Discord support volume, not on the maintainer.
+
+### Alternative B: Deprecate the `otgw-pic/` subtree entirely and migrate everything to a flat or differently-namespaced layout
+
+Use TASK-388 as the trigger for a one-time hard migration: change every publish path away from `otgw-pic/`, update the discovery generators to match, and ship a single release that simply moves the namespace. Justify the break by the small number of consumers who need to update their YAML.
+
+**Rejected** because the maintainer cannot enumerate the consumer base — any hard break would surprise an unknown number of long-time users whose dashboards silently stop updating. Even if a dual-publish migration were done, the immediate fix (TASK-388) does not require a rename — it only requires the discovery side to match the publish side. Bundling a contentious topology change with a straightforward bug fix increases scope, increases regression risk, and conflates two release-notes stories. The right time to consider a rename is when there is a concrete design pressure for it, governed by a future ADR that supersedes this one.
+
+### Alternative C: Document the subtree informally in a README without committing to stability
+
+Write a README entry describing what currently lives under `otgw-pic/`, but stop short of declaring it a stable contract. Future renames would still be possible without an ADR, but at least new contributors would know the topics exist.
+
+**Rejected** because informal documentation has no enforcement story. New PIC-scoped entries could still be added without `MQTT_HA_FLAG_IS_PIC_ENTRY` (the original bug class), the 26 hardcoded literals stay scattered without a single source of truth, and a future contributor refactoring the namespace has no procedural barrier — only a polite README to ignore. The whole point of this ADR is to give the discovery generators and the migration policy *machine-relevant* anchors (the flag, the `kPicSubtreePrefix` constant, the supersede-this-ADR requirement) so accidental drift is structurally prevented.
+
+### Alternative D (chosen): Declare `otgw-pic/` a stable public topic API with single-source-of-truth, flag-driven discovery, and a heavy migration process
+
+Treat the subtree as part of the firmware's public interface, on the same footing as a REST endpoint or HA discovery `uniq_id`. Centralise the prefix in `kPicSubtreePrefix`, require `MQTT_HA_FLAG_IS_PIC_ENTRY` on every PIC-scoped discovery row, and gate any future rename behind a superseding ADR plus a dual-publish deprecation window of at least two minor releases.
+
+**Trade-off accepted**: callers wishing to reorganise the topic namespace for stylistic reasons (e.g. renaming `otgw-pic/settings/*` to `pic_settings/*`) must accept either the migration cost or leave the layout as-is. New entries under the subtree commit the project to long-term support of those exact paths. This asymmetry is intentional — quietly breaking user-facing MQTT contracts has historically (see this ADR's Context) cost users real troubleshooting time.
 
 ## Consequences
 

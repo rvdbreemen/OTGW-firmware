@@ -1,7 +1,7 @@
 # ADR-033: Dallas Sensor Custom Labels and Graph Visualization
 
 ## Status
-Accepted
+Accepted, 2026-02-07
 
 ## Context
 

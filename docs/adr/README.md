@@ -30,6 +30,8 @@ Architecture Decision Records capture important architectural decisions along wi
 
 ## ADR Index
 
+> **Numbering note:** ADR-063 was inadvertently skipped during the 2026-04-20 batch that added ADR-062 and ADR-064 (same commit). The number is unused and reserved as a no-op placeholder; do not retroactively assign it. Next available ADR numbers continue from the current highest. The Quick Navigation counts above predate ADR-061+ and do not yet reflect the full current index.
+
 ### Platform and Build System
 
 - **[ADR-001: ESP8266 Platform Selection](ADR-001-esp8266-platform-selection.md)**  

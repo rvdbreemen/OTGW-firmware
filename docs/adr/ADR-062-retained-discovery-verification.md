@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted, 2026-04-20
 
 ## Context
 
@@ -83,7 +83,29 @@ Auto-deleting would be dangerous: if the firmware incorrectly computes its own n
 
 ## Alternatives Considered
 
-<!-- TODO: document at least 2 alternatives that were considered and rejected, with reasoning. -->
+### Alternative A: Do nothing — rely on the existing three recovery paths
+
+Keep only the existing recovery triggers: OTGW MQTT reconnect, HA reboot detection via `homeassistant/status`, and the empty-bitmap initial publish at boot. Treat broker-side retained-message loss (Gap A) as a user-driven scenario solvable by restarting HA or the firmware.
+
+**Rejected** because Gap A is a real and recurring scenario in field deployments: mosquitto restarts without `persistence true` (the default), broker crashes on volatile filesystems, and infrastructure migrations that miss retained-topic replay all silently strip the OTGW's discovery configs while HA stays connected. None of the three existing triggers fire in those cases, leaving entities permanently in "unknown" state until the user restarts HA — a heavy and user-visible workaround. There is also no diagnostic surface (Gap B) for users to verify the broker actually still holds the configs, which complicates support troubleshooting on Discord.
+
+### Alternative B: Per-topic identity tracking (bitmap or hash table of received topics)
+
+Subscribe to the wildcard, then for each retained message received, record the specific topic identity in a per-topic bitmap (indexed by topic-hash) or in a reverse-lookup table from topic to msgid. On window close, identify exactly which topics are missing and re-publish only those, instead of triggering a full re-announce.
+
+**Rejected** because per-topic tracking adds at least ~32 bytes of RAM for the bitmap (more for the reverse lookup), needs a stable hash function across boots, and becomes brittle across the source-separation modes from ADR-040 (5-segment vs 6-segment topics). The full-re-announce path is already cheap on the outgoing side: the existing drip throttles publishes to one every 2 seconds, and broker retain-overwrite of an identical config is a no-op for HA. Spending RAM and flash on per-topic precision yields no observable benefit — the user-perceived recovery time is dominated by the drip cadence, not by how many topics are actually re-published.
+
+### Alternative C: Auto-delete orphan retained configs whose nodeId does not match ours
+
+When the wildcard subscription returns retained configs whose nodeId segment does NOT match this device's nodeId, publish an empty retained payload to those topics to clean up the broker.
+
+**Rejected** because the failure mode is catastrophic: if the firmware ever computes the wrong nodeId at boot — corrupt settings, a hostname change without coordination, MAC-based nodeId regression after a board swap — the auto-delete pass would wipe the configs of a *legitimate* neighbouring OTGW running on the same broker. Multi-device installs are common (one per zone, one per dwelling), and "I upgraded one OTGW and the others lost their HA entities" would be an extremely hard support case to diagnose. Counting orphans for visibility (`iLastOrphanCount` exposed via REST and heapdiag MQTT) gives users enough information to clean up manually with `mosquitto_pub -r -n`, without the blast radius of automatic deletion.
+
+### Alternative D (chosen): Wildcard subscribe with count-only verification and full re-announce on mismatch
+
+Subscribe to `<haprefix>/+/<nodeId>/#` for a 15-second window with a temporarily resized PubSubClient RX buffer (384 → 1024 B), count matching retained messages received, compare to `state.discovery.iPublishedTopicCount`, and trigger `markAllMQTTConfigPending()` only when `received < expected`. Foreign-nodeId messages are counted as orphans but not auto-deleted.
+
+**Trade-off accepted**: a single missing config triggers a full re-announce of all ~80 entries (coarse but cheap), and the transient +640 B RAM peak during the window must be guarded by heap-start (≥6000 B) and heap-abort (<4500 B) thresholds. Both are deemed acceptable: the re-announce uses the existing drip path with broker-idempotent payloads, and the heap thresholds align with the tightened TASK-344 numbers so the verify cleanly defers when the device is under memory pressure.
 
 ## Consequences
 
