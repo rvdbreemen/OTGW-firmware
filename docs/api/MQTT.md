@@ -570,54 +570,70 @@ Where `{sensor_address}` is the Dallas 1-Wire address (e.g., `28FF64D1841703F1`)
 
 ### Source-Separated Topics (Optional)
 
-When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is published to two source-specific sub-topics:
+When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is published to two source-specific sibling topics alongside the canonical topic:
 
 ```
-{TopTopic}/value/{UniqueId}/{label}/thermostat
-{TopTopic}/value/{UniqueId}/{label}/boiler
+{TopTopic}/value/{UniqueId}/{label}             ← canonical (always published)
+{TopTopic}/value/{UniqueId}/{label}_thermostat  ← when bSeparateSources=true
+{TopTopic}/value/{UniqueId}/{label}_boiler      ← when bSeparateSources=true
 ```
 
-#### Subtopic semantics (2.0.0+, ADR-096 — worldview model)
+All three are sibling leaves. Each is a normal MQTT topic — the canonical no longer has children, which makes topic-browser UX (mosquitto_sub, MQTT Explorer) straightforward and removes the structural ambiguity that the earlier nested shape created.
 
-Each subtopic shows what *that device* sees on the OpenTherm bus, regardless of which side put the frame on the wire.
+#### Topic semantics (2.0.0+, ADR-096 worldview model + ADR-097 sibling-suffix shape)
 
-- **`/thermostat`** = the value the thermostat sent (write requests) or received (read responses, including any gateway-faked answer).
-- **`/boiler`** = the value the boiler received (write requests, including any gateway override) or sent (read responses).
+Each per-source topic shows what *that device* sees on the OpenTherm bus, regardless of which side put the frame on the wire.
 
-Override behavior is implicit: when the two subtopics diverge for the same metric, the gateway is intervening.
+- **`{label}_thermostat`** = the value the thermostat sent (write requests) or received (read responses, including any gateway-faked answer).
+- **`{label}_boiler`** = the value the boiler received (write requests, including any gateway override) or sent (read responses).
+- **`{label}` (canonical)** = boiler-side worldview, identical to `{label}_boiler` when both are published.
+
+Override behavior is implicit: when the two source topics diverge for the same metric, the gateway is intervening.
 
 **Example: `TSet` with `CS=27.37` setpoint override active, thermostat asking 23 °C:**
 
 | Topic | Value | Meaning |
 |---|---|---|
-| `…/value/<id>/TSet/thermostat` | `23.00` | What the thermostat asked for |
-| `…/value/<id>/TSet/boiler` | `27.37` | What the boiler actually received |
+| `…/value/<id>/TSet_thermostat` | `23.00` | What the thermostat asked for |
+| `…/value/<id>/TSet_boiler` | `27.37` | What the boiler actually received |
 | `…/value/<id>/TSet` (canonical) | `27.37` | What was actually transmitted (= boiler-side worldview) |
 
-Without override, all three publish the same value. The `/thermostat` and `/boiler` subtopics always update independently regardless of override state — `/thermostat` keeps showing the thermostat's intent, `/boiler` keeps showing what reaches the boiler.
+Without override, all three publish the same value. `_thermostat` and `_boiler` always update independently regardless of override state — `_thermostat` keeps showing the thermostat's intent, `_boiler` keeps showing what reaches the boiler.
 
-#### Frame-to-subtopic routing reference
+#### Frame-to-topic routing reference
 
-| OT frame | Direction | Routes to `/thermostat` | Routes to `/boiler` | Routes to canonical |
+| OT frame | Direction | Routes to `_thermostat` | Routes to `_boiler` | Routes to canonical |
 |---|---|---|---|---|
 | `T` (thermostat-write) | M→S | yes | yes (when no R follows) | yes (when no R follows) |
 | `R` (gateway-substituted write) | M→S | no | yes | yes |
 | `B` (boiler-response) | S→M | yes (when no A follows) | yes | yes |
 | `A` (gateway-faked answer) | S→M | yes | no | no |
 
-There is no `/gateway` subtopic — override is visible by comparing `/thermostat` and `/boiler`.
+There is no `_gateway` topic — override is visible by comparing `_thermostat` and `_boiler`.
 
 #### Canonical-topic publish gating (ADR-066, preserved)
 
-The canonical topic `{TopTopic}/value/{UniqueId}/{label}` does not receive Write-Ack frames. The `/boiler` subtopic is additionally gated by a per-MsgID `bSlaveEchoesValue` flag in the OTlookup table. For MsgIDs where the OpenTherm v4.2 specification defines the slave's Write-Ack data field as undefined (typically `Tr` 24, `TrSet` 16, `MaxRelModLevelSetting` 14, `TrSetCH2` 23, `TRoomCH2` 37, `RFstrengthbatterylevel` 98), the `/boiler` subtopic is NOT updated for Write-Ack messages. The slave's acknowledgement carries no measurement; suppressing it avoids polluting the per-source observability surface with fake-zero readings.
+The canonical topic `{TopTopic}/value/{UniqueId}/{label}` does not receive Write-Ack frames. The `_boiler` topic is additionally gated by a per-MsgID `bSlaveEchoesValue` flag in the OTlookup table. For MsgIDs where the OpenTherm v4.2 specification defines the slave's Write-Ack data field as undefined (typically `Tr` 24, `TrSet` 16, `MaxRelModLevelSetting` 14, `TrSetCH2` 23, `TRoomCH2` 37, `RFstrengthbatterylevel` 98), the `_boiler` topic is NOT updated for Write-Ack messages. The slave's acknowledgement carries no measurement; suppressing it avoids polluting the per-source observability surface with fake-zero readings.
 
-For MsgIDs where the slave does store and echo the value (most R/W parameters, Class 5 remote boiler parameters such as `MaxTSet` 57 and `TdhwSet` 56, Class 6 transparent slave parameters, R/W counters), the `/boiler` subtopic continues to publish the slave's stored value, including clamped or modified variants distinct from the master's request.
+For MsgIDs where the slave does store and echo the value (most R/W parameters, Class 5 remote boiler parameters such as `MaxTSet` 57 and `TdhwSet` 56, Class 6 transparent slave parameters, R/W counters), the `_boiler` topic continues to publish the slave's stored value, including clamped or modified variants distinct from the master's request.
 
 See `docs/api/MQTT-message-id-echo-audit.md` for the full per-MsgID classification with spec-citation rationale.
 
-#### Migration note (2.0.0 worldview shift)
+#### Migration note (2.0.0 topic-shape transition)
 
-Earlier 2.0.0 alpha builds routed `A` (gateway-faked answer) frames to `/boiler` and dropped `T` frames during gateway override. ADR-096 corrected both: `A` now routes to `/thermostat` (where the value actually arrives), and `T` is preserved on `/thermostat` and canonical even when the gateway substitutes a different value to the boiler. HA users with `bSeparateSources = true` who built dashboards against the older routing should review their `/boiler` and `/thermostat` sensor bindings.
+Two changes shipped in successive 2.0.0 alpha builds. Migration guidance:
+
+1. **Worldview routing (ADR-096, alpha.3).** Earlier builds routed `A` (gateway-faked answer) frames to `/boiler` and dropped `T` frames during gateway override. ADR-096 corrected both: `A` now routes to the thermostat topic (where the value actually arrives), and `T` is preserved on the thermostat topic and canonical even when the gateway substitutes a different value to the boiler.
+2. **Sibling-suffix shape (ADR-097, alpha.4+).** Earlier builds used nested children topics (`{label}/thermostat`, `{label}/boiler`). ADR-097 replaces these with siblings (`{label}_thermostat`, `{label}_boiler`) so the canonical topic is a clean leaf without children. Discovery configs are auto-updated on boot — Home Assistant unsubscribes from the old topic and subscribes to the new one in place (verified against `homeassistant/components/mqtt/subscription.py`). The mutual-exclusion rule from ADR-095 is dropped; the canonical entity now stays advertised alongside the two source variants.
+
+**Cleanup of stale retained values:** old retained values at the previous nested topics (`{label}/thermostat`, `{label}/boiler`) linger on the broker as orphans because the firmware no longer publishes there. Home Assistant ignores them after discovery refresh (it has unsubscribed). Users with broker access can clear them with:
+
+```bash
+mosquitto_pub -h <broker> -t '<base>/value/<id>/<label>/thermostat' -r -n
+mosquitto_pub -h <broker> -t '<base>/value/<id>/<label>/boiler' -r -n
+```
+
+HA users with `bSeparateSources = true` who built **manual** YAML sensor configs against the older routing or topic shape should re-point them at `{label}_thermostat` / `{label}_boiler`. Auto-discovered users need no action.
 
 ---
 
@@ -990,13 +1006,13 @@ The firmware uses three discovery paths:
 
 ### Source-Separated Discovery
 
-When `settings.mqtt.bSeparateSources` is enabled, discovery entries with source-template placeholders are expanded into two source-variant entities matching the worldview routing model (ADR-096), plus a canonical variant for default users:
+When `settings.mqtt.bSeparateSources` is enabled, discovery entries with source-template placeholders are expanded into two source-variant entities matching the worldview routing model (ADR-096) and topic shape (ADR-097), additive to the always-advertised canonical entity:
 
-- `{entity}_thermostat` — value the thermostat sees (its sent write or its received read response, including any gateway-faked answer)
-- `{entity}_boiler` — value the boiler sees (its received write, including any gateway override, or its sent read response)
-- `{entity}` — canonical (boiler-side worldview), suppressed for source-templated MsgIDs when `bSeparateSources` is enabled per ADR-095 mutual exclusion
+- `{entity}` — canonical (boiler-side worldview), always advertised regardless of `bSeparateSources`. ADR-097 dropped ADR-095's mutual-exclusion rule because the canonical and source variants now have non-overlapping `state_topic`s.
+- `{entity}_thermostat` — value the thermostat sees (its sent write or its received read response, including any gateway-faked answer). State topic: `{base}/value/{id}/{label}_thermostat`.
+- `{entity}_boiler` — value the boiler sees (its received write, including any gateway override, or its sent read response). State topic: `{base}/value/{id}/{label}_boiler`.
 
-There is no `{entity}_gateway` variant; gateway override is observable via divergence between the two source-variant subtopics.
+There is no `{entity}_gateway` variant; gateway override is observable via divergence between the two source-variant topics.
 
 ### SAT Discovery Entities
 
@@ -1160,7 +1176,7 @@ Runtime values interpolated into configs (instead of template placeholders) come
 | `mqttSubTopic` | Subscribe/command topic base |
 | `version` | `device.sw_version` and `origin.sw` |
 
-Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is handled at stream time by `expandAndStreamSensorSources()`, which emits three variants (`_thermostat`, `_boiler`, and an empty suffix for the canonical/boiler-side-worldview entity that replaces the suppressed base when `bSeparateSources = true` per ADR-095) for sensors marked with `MQTT_HA_FLAG_ANY_SOURCE`. Per ADR-096 the routing of values to those variants is decided at publish time by `publishToSourceTopic()` using the worldview model: `/thermostat` carries what the thermostat sees, `/boiler` carries what the boiler sees, and canonical mirrors `/boiler`. There is no `_gateway` variant.
+Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is handled at stream time by `expandAndStreamSensorSources()`, which emits two variants (`_thermostat`, `_boiler`) for sensors marked with `MQTT_HA_FLAG_ANY_SOURCE`. The canonical entity is emitted by the SEPARATE non-`ANY_SOURCE` base entry in `mqttHaSensors[]` and is always advertised regardless of `bSeparateSources` (ADR-097 dropped ADR-095's mutual-exclusion rule). Per ADR-096 the routing of values to those variants is decided at publish time by `publishToSourceTopic()` using the worldview model: `_thermostat` carries what the thermostat sees, `_boiler` carries what the boiler sees, and canonical mirrors `_boiler`. Per ADR-097 the topic separator between the label and the source segment is an underscore (sibling-suffix shape), not a slash (the earlier nested-children shape). There is no `_gateway` variant.
 
 ---
 

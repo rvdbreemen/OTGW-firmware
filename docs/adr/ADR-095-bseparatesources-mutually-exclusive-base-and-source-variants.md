@@ -1,9 +1,9 @@
 # ADR-095: bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive (feature-2.0.0 port of ADR-068)
 
-**Status:** Accepted (amends ADR-040; structural-level per ADR-080)
+**Status:** Superseded by ADR-097, 2026-05-07
 **Date:** 2026-05-03
-**Accepted:** 2026-05-03 (four verification gates passed: Completeness, Evidence, Clarity, Consistency)
-**Decision Maker:** User: Rob van den Breemen (rvdbreemen)
+**Originally Accepted:** 2026-05-03 (amends ADR-040; structural-level per ADR-080; four verification gates passed: Completeness, Evidence, Clarity, Consistency)
+**Decision Maker:** User: Robert van den Breemen (rvdbreemen)
 
 Ports the decision from `dev`'s **ADR-068** to the `feature-dev-2.0.0-otgw32-esp32-sat-support` branch. Companion to **ADR-094** (the broker-side cleanup mechanism that makes this semantic flip safe across the upgrade boundary on this branch).
 
