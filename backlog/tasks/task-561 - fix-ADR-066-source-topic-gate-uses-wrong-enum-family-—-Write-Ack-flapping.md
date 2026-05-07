@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 13:16'
-updated_date: '2026-05-07 13:22'
+updated_date: '2026-05-07 18:02'
 labels:
   - bug
   - mqtt
@@ -41,6 +41,13 @@ publishToSourceTopic() compares rsptype (OTGW_response_type, 0..5) against OT_WR
 6. Commit (adr-judge + bump-check pass), push to origin/dev (auto-authorised by policy).
 7. Check ACs 1-5; leave AC #6 unchecked (Discord field-validation gate); add Final Summary; leave task In Progress per CLAUDE.md autonomous-completion exception.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+---
+**Plan reference**: implementation sequencing tracked in `/Users/Breee02/.claude/plans/clever-yawning-wreath.md` (local working plan, not in repo, in the dev maintainer's home dir). **Field-validation gate** — implementation already shipped on dev as beta.25+5153537. AC #6 awaits Discord confirmation that msgid 14/16 stop flapping with bSeparateSources=true on a real boiler. Sibling: 2.0.0 TASK-562.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
