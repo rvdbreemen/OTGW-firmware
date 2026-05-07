@@ -24,14 +24,14 @@ When the spec or evidence is ambiguous, the conservative default is `true` (publ
 | MsgID | Name | Direction | Class | bSlaveEchoesValue | Reason |
 |------:|------|:---------:|:-----:|:-----------------:|--------|
 | 0  | Status                              | R/- | 1 | true  | Read-only; flag value moot. Special bidirectional status exchange. |
-| 1  | TSet (Control Setpoint)             | -/W | 1 | true  | Default conservative. Spec does not define data field of Write-Ack as undefined. |
+| 1  | TSet (Control Setpoint)             | -/W | 1 | **false** | **Confirmed non-echo on heat-pump controllers**. Spec is ambiguous (Class 1 -/W; data field of Write-Ack not explicitly defined). Field tester (dev beta.25, 2026-05-07, telnet capture 22:05:45-22:07:42) reported persistent flap between override values and 0 on `<topic>_boiler` for MsgID 1 — heat-pump returns frame `D0010000` (Write-Ack with data=0x0000) instead of echoing the master's TSet=27.22. Most boilers (Intergas, Remeha) echo, but the spec permits both. Flag flipped 2026-05-07 to suppress the zero on the boiler-side worldview. Ported from dev beta.26 (commit 660d4b93). |
 | 2  | M-Config / M-MemberIDcode           | -/W | 2 | true  | Slave responds (per spec "S must respond"); response semantics include slave's own MemberID. Conservative. |
 | 3  | S-Config / S-MemberIDcode           | R/- | 2 | true  | Read-only; flag moot. |
 | 4  | Remote Request                      | -/W | 3 | true  | Special: HB = Request-Code, LB = Response-Code. Slave's response code is meaningful, not an echo, but conservative default. |
 | 5  | ASF-flags / OEM-fault-code          | R/- | 1 | true  | Read-only; flag moot. |
 | 6  | RBP-flags                           | R/- | 5 | true  | Read-only; flag moot. |
-| 7  | Cooling-control                     | -/W | 8 | true  | Default conservative. Master tells slave cooling level; spec does not explicitly state Write-Ack data is undefined. |
-| 8  | TsetCH2 (Control Setpoint CH2)      | -/W | 1 | true  | Parallel to MsgID 1; conservative default. |
+| 7  | Cooling-control                     | -/W | 8 | **false** | Class 8 `-/W` control write; spec ambiguous on Write-Ack data field. Flipped 2026-05-07 alongside MsgID 1 under the defensive-defaults policy: when the spec does not require echo, suppressing the slave's Write-Ack data byte avoids tester-visible flap on slaves that return protocol-zero. No direct field evidence yet (most testers don't exercise cooling). Ported from dev beta.26. |
+| 8  | TsetCH2 (Control Setpoint CH2)      | -/W | 1 | **false** | Parallel to MsgID 1 — same Class 1 `-/W` controller-side write, same f8.8 shape, same heat-pump non-echo risk by direct analogy. Flipped 2026-05-07 alongside MsgID 1. Ported from dev beta.26. |
 | 9  | TrOverride                          | R/- | 8 | true  | Read-only; flag moot. |
 | 10 | TSP count                           | R/- | 6 | true  | Read-only; flag moot. |
 | 11 | TSP-index / TSP-value               | R/W | 6 | true  | Transparent Slave Parameter; slave stores written value by definition. |
@@ -68,7 +68,7 @@ When the spec or evidence is ambiguous, the conservative default is `true` (publ
 | 56 | TdhwSet                             | R/W | 5 | true  | Pre-defined remote boiler parameter; slave stores. Intergas log shows OTGW gateway intercepting at 55°C. |
 | 57 | MaxTSet                             | R/W | 5 | true  | Pre-defined remote boiler parameter; slave stores. Intergas log: master writes 36, OTGW clips to 31, slave stores 65 (clamped to its own limit). Echo behavior is exactly why source-separation matters for this MsgID. |
 | 70 | Status ventilation/heat-recovery    | R/- | 1 | true  | Read-only; flag moot. |
-| 71 | Vset                                | -/W | 1 | true  | Default conservative. LB only used. |
+| 71 | Vset                                | -/W | 1 | **false** | Class 1 `-/W` V/H control write; spec ambiguous on Write-Ack data field. Flipped 2026-05-07 alongside MsgID 1 under the defensive-defaults policy. No direct V/H field evidence yet. Ported from dev beta.26. |
 | 72 | ASF-flags ventilation               | R/- | 1 | true  | Read-only; flag moot. |
 | 73 | OEM diagnostic ventilation          | R/- | 1 | true  | Read-only; flag moot. |
 | 74 | S-Config ventilation                | R/- | 2 | true  | Read-only; flag moot. |
@@ -129,15 +129,17 @@ When the spec or evidence is ambiguous, the conservative default is `true` (publ
 
 ## Summary
 
-- **MsgIDs marked `bSlaveEchoesValue=false`**: 6 entries (14, 16, 23, 24, 37, 98). All Class 4 (Sensor and Informational Data) `-/W` master-to-slave informational writes plus Class 8 `-/W` for MaxRelModLevelSetting. These are the MsgIDs where the slave Write-Ack data field is per-spec undefined (typically 0).
-- **MsgIDs marked `bSlaveEchoesValue=true`**: all others (~70 entries). For Read-only MsgIDs the flag is moot. For write-supported MsgIDs the conservative default applies.
+- **MsgIDs marked `bSlaveEchoesValue=false`**: 10 entries (1, 7, 8, 14, 16, 23, 24, 37, 71, 98). Three groups:
+  - **Class 4 `-/W` informational sensor writes** (14, 16, 23, 24, 37): per-spec undefined Write-Ack data field; slave does not store these values. Original audit (TASK-478).
+  - **Master-to-slave informational write** (98 RFstrengthbatterylevel): slave does not store, only acts on it.
+  - **Class 1 / Class 8 `-/W` control-direction writes** (1 TSet, 7 Cooling-control, 8 TsetCH2, 14 MaxRelModLevelSetting, 71 Vset): spec is ambiguous about Write-Ack data — both echo and protocol-zero are spec-compliant. Defensive-defaults policy (added 2026-05-07): suppress when spec does not REQUIRE echo, so user-visible flap on non-echo slaves is impossible by construction. MsgID 1 confirmed by heat-pump tester report on dev beta.25 (telnet captured frame `D0010000` Write-Ack with data=0x0000); MsgIDs 7, 8, 71 flipped under the same policy without direct field evidence (asymmetric cost: missing an echo is informational, seeing a flap is visibly broken).
+- **MsgIDs marked `bSlaveEchoesValue=true`**: all others (~66 entries). For Read-only MsgIDs the flag is moot. For write-supported MsgIDs (counters, TSPs, etc.) the slave is required by spec to store and echo, so `true` is correct.
 
 ## Future extensions
 
 If a user reports flapping on a MsgID currently set to `true`, capture an OpenTherm log showing the write/ack pair, verify the slave returns 0 (or other non-meaningful value) in the Write-Ack, and flip the flag to `false` with the log evidence cited in this audit doc.
 
-Candidates for future investigation if user reports surface them:
-- 1 (TSet), 8 (TsetCH2), 71 (Vset), 7 (Cooling-control): Class 1 / Class 8 control writes that may be non-echo on certain boilers.
+All Class 1 / Class 8 `-/W` control-direction candidates have been flipped to `false` as of 2026-05-07 (TSet, Cooling-control, TsetCH2, Vset — ported from dev beta.26). Future flips would target Class 2 / Class 4 R/W counter or configuration writes if a tester reports a similar pattern; the current spec analysis suggests those slaves are obligated to echo, so they should remain `true` until evidence shows otherwise.
 - 2 (M-Config), 4 (Remote Request), 124 (OT version Master), 126 (Master-version): protocol-handshake writes with ambiguous Write-Ack data semantics.
 
 ## References
