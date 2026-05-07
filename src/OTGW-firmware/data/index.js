@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.14
+**  Version  : v2.0.0-alpha.15
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3490,9 +3490,9 @@ var SAT_SETTINGS_GROUPS = [
       { key: 'satexternaltemp',   label: 'Use External Temp',  type: 'b' },
       { key: 'satsensormaxage',   label: 'Sensor Max Age',     type: 'i', unit: 's', min: 60, max: 86400, step: 60 },
       { key: 'satbleenable',      label: 'BLE Enable',         type: 'b' },
-      // TASK-508: legacy field. Beheerd via het BLE Sensoren paneel
-      // hierboven (zelf-ontdekking + selecteren). Readonly om
-      // dubbele bewerking te voorkomen.
+      // TASK-508: legacy field. Managed via the BLE Sensors panel
+      // above (auto-discovery + selection). Readonly to avoid
+      // duplicate editing.
       { key: 'satblemac',         label: 'BLE MAC Address',    type: 's', maxlen: 18, size: 20, readonly: true },
       { key: 'satbleinterval',    label: 'BLE Interval',       type: 'i', unit: 's', min: 10, max: 300, step: 5 }
     ]
@@ -3677,7 +3677,7 @@ function buildBleSensorsPanel(page) {
   arrow.className = 'sat-settings-arrow';
   arrow.textContent = '\u25bc';   // \u25bc
   toggleBtn.appendChild(arrow);
-  toggleBtn.appendChild(document.createTextNode(' BLE Sensoren'));
+  toggleBtn.appendChild(document.createTextNode(' BLE Sensors'));
   toggleBtn.addEventListener('click', function() {
     toggleSATSettingsGroup('sat-grp-ble-sensors-header');
   }, false);
@@ -3695,7 +3695,7 @@ function buildBleSensorsPanel(page) {
   activeRow.className = 'sat-row';
   var activeLab = document.createElement('span');
   activeLab.className = 'sat-label';
-  activeLab.textContent = 'Actieve sensor';
+  activeLab.textContent = 'Active sensor';
   var activeVal = document.createElement('span');
   activeVal.className = 'sat-value';
   activeVal.id = 'ble-active';
@@ -3714,10 +3714,10 @@ function buildBleSensorsPanel(page) {
   warnRow.hidden = true;
   var warnLab = document.createElement('span');
   warnLab.className = 'sat-label';
-  warnLab.textContent = 'Waarschuwing';
+  warnLab.textContent = 'Warning';
   var warnVal = document.createElement('span');
   warnVal.className = 'sat-value';
-  warnVal.textContent = 'Roster vol (8/8). Vergeet onbenutte sensors om nieuwe toe te voegen.';
+  warnVal.textContent = 'Roster full (8/8). Forget unused sensors to add new ones.';
   warnRow.appendChild(warnLab);
   warnRow.appendChild(warnVal);
 
@@ -3761,8 +3761,8 @@ function bleRowFor(s) {
   var ageStr;
   if (s.valid && typeof s.age_ms === 'number') {
     ageStr = (s.age_ms < 60000)
-             ? Math.round(s.age_ms / 1000) + 's oud'
-             : Math.round(s.age_ms / 60000) + 'm oud';
+             ? Math.round(s.age_ms / 1000) + 's old'
+             : Math.round(s.age_ms / 60000) + 'm old';
   } else {
     ageStr = 'stale';
   }
@@ -3773,7 +3773,7 @@ function bleRowFor(s) {
   row1.className = 'sat-row';
   var lab1 = document.createElement('span');
   lab1.className = 'sat-label';
-  lab1.textContent = mac + (s.selected ? ' \u2014 actief' : '');
+  lab1.textContent = mac + (s.selected ? ' \u2014 active' : '');
   var val1 = document.createElement('span');
   val1.className = 'sat-value';
   val1.textContent = temp + '\u00b0C / ' + ageStr + ' / ' + rssi + 'dBm';
@@ -3785,7 +3785,7 @@ function bleRowFor(s) {
   row2.className = 'sat-row';
   var lab2 = document.createElement('span');
   lab2.className = 'sat-label';
-  lab2.textContent = 'Naam';
+  lab2.textContent = 'Name';
   var val2 = document.createElement('span');
   val2.className = 'sat-value';
 
@@ -3794,25 +3794,25 @@ function bleRowFor(s) {
   input.id = 'ble-label-' + mac;
   input.value = s.label || '';
   input.maxLength = 23;
-  input.placeholder = '(geen naam)';
+  input.placeholder = '(no name)';
 
   var btnSave = document.createElement('button');
   btnSave.type = 'button';
   btnSave.className = 'sat-btn';
-  btnSave.textContent = 'Opslaan';
+  btnSave.textContent = 'Save';
   btnSave.addEventListener('click', function() { bleSaveLabel(mac); }, false);
 
   var btnSelect = document.createElement('button');
   btnSelect.type = 'button';
   btnSelect.className = 'sat-btn';
-  btnSelect.textContent = 'Selecteer';
+  btnSelect.textContent = 'Select';
   if (s.selected) btnSelect.disabled = true;
   btnSelect.addEventListener('click', function() { bleSelect(mac); }, false);
 
   var btnForget = document.createElement('button');
   btnForget.type = 'button';
   btnForget.className = 'sat-btn';
-  btnForget.textContent = 'Vergeet';
+  btnForget.textContent = 'Forget';
   btnForget.addEventListener('click', function() { bleForget(mac); }, false);
 
   val2.appendChild(input);
@@ -3847,9 +3847,9 @@ function renderBleRoster(j) {
       var temp = (typeof sel.temp === 'number') ? sel.temp.toFixed(2) + '\u00b0C' : '--';
       activeEl.textContent = label + ' (' + temp + ')';
     } else if (j.selected_mac) {
-      activeEl.textContent = j.selected_mac + ' (geen verse data)';
+      activeEl.textContent = j.selected_mac + ' (no fresh data)';
     } else {
-      activeEl.textContent = '(geen geselecteerd \u2014 kies hieronder)';
+      activeEl.textContent = '(none selected \u2014 pick one below)';
     }
   }
 
@@ -3863,7 +3863,7 @@ function renderBleRoster(j) {
     emptyRow.className = 'sat-row';
     var emptyVal = document.createElement('span');
     emptyVal.className = 'sat-value';
-    emptyVal.textContent = 'Geen sensoren ontdekt. Wacht ~30-60s op de eerstvolgende broadcast.';
+    emptyVal.textContent = 'No sensors discovered yet. Wait ~30-60s for the next broadcast.';
     emptyRow.appendChild(emptyVal);
     listEl.appendChild(emptyRow);
   } else {
@@ -3890,7 +3890,7 @@ function bleSelect(mac) {
   if (!bleIsValidMac(mac)) return;
   blePost('select', { mac: mac })
     .then(function() { refreshBleRoster(); })
-    .catch(function(e) { alert('Selectie mislukt: ' + e.message); });
+    .catch(function(e) { alert('Selection failed: ' + e.message); });
 }
 
 function bleSaveLabel(mac) {
@@ -3899,15 +3899,15 @@ function bleSaveLabel(mac) {
   var val = inp ? inp.value : '';
   blePost('label', { mac: mac, label: val })
     .then(function() { refreshBleRoster(); })
-    .catch(function(e) { alert('Label opslaan mislukt: ' + e.message); });
+    .catch(function(e) { alert('Failed to save label: ' + e.message); });
 }
 
 function bleForget(mac) {
   if (!bleIsValidMac(mac)) return;
-  if (!confirm('Sensor ' + mac + ' verwijderen uit roster?')) return;
+  if (!confirm('Remove sensor ' + mac + ' from roster?')) return;
   blePost('forget', { mac: mac })
     .then(function() { refreshBleRoster(); })
-    .catch(function(e) { alert('Verwijderen mislukt: ' + e.message); });
+    .catch(function(e) { alert('Removal failed: ' + e.message); });
 }
 
 function buildSATSettingsGroups(page, data) {
@@ -6274,8 +6274,8 @@ var translateTooltips = [
   , ["SATautotune", "Enable automatic PID gains self-tuning. Monitors heating cycle performance (overshoot, undershoot, oscillation) and gradually adjusts the heating curve coefficient. Tuning runs once per hour after at least 6 heating cycles."]
   , ["SATautotunerate", "Adjustment rate per tuning cycle (0.5%-10%). Default 2%. Lower values make smaller, more conservative adjustments. Higher values converge faster but risk instability."]
   , ["SATthermalcoeff", "Learned thermal drop coefficient (degrees C per hour per degree indoor-outdoor delta). Automatically updated by observing how fast the building cools when the boiler is off. Used during fallback mode to estimate room temperature. Default 0.05, typical range 0.02-0.1 for well-insulated buildings."]
-  , ["SATbleenable", "Enable BLE (Bluetooth Low Energy) temperature sensor scanning (ESP32 only). Supports Xiaomi LYWSD03MMC with ATC/pvvx custom firmware and BTHome v2 protocol sensors. Discovered sensors appear in the BLE Sensoren panel above where you can name them and pick one. When enabled, BLE temperature becomes the highest priority room temperature source for SAT."]
-  , ["SATblemac", "(Beheerd via het BLE Sensoren paneel hierboven) MAC address of the active BLE sensor. Leave empty for auto-select-if-only-one. Format AA:BB:CC:DD:EE:FF, uppercase."]
+  , ["SATbleenable", "Enable BLE (Bluetooth Low Energy) temperature sensor scanning (ESP32 only). Supports Xiaomi LYWSD03MMC with ATC/pvvx custom firmware and BTHome v2 protocol sensors. Discovered sensors appear in the BLE Sensors panel above where you can name them and pick one. When enabled, BLE temperature becomes the highest priority room temperature source for SAT."]
+  , ["SATblemac", "(Managed via the BLE Sensors panel above) MAC address of the active BLE sensor. Leave empty for auto-select-if-only-one. Format AA:BB:CC:DD:EE:FF, uppercase."]
   , ["SATbleinterval", "How often the gateway publishes BLE-sensor state (MQTT + state.sat.*) in seconds (10-300). Default 30 seconds. Since 2.0.0 the BLE radio scans continuously on ESP32 (matches OT-Thing); this setting controls publish/state-update cadence, not scan rate."]
   , ["SATweatherenable", "Enable weather data fetching from Open-Meteo API (free, no key needed). Provides outdoor temperature fallback when no OT outdoor sensor is available."]
   , ["SATweatherlat", "Latitude for weather data. Use the Detect Location button on the SAT dashboard, or enter manually (-90 to 90)."]

@@ -408,14 +408,9 @@ var SAT = (function() {
     }
     clearChartUnavailable(container);
     _chartInstance = echarts.init(container, _otgwTheme());
-    // TASK-568: ECharts legend.textStyle does not inherit the registered
-    // theme's top-level textStyle.color, so legend labels render in the
-    // ECharts default dark grey and disappear on the dark theme. Pull
-    // --fg-2 from ds-tokens.css so legend text tracks the body theme.
-    var _legendFg = getComputedStyle(document.body).getPropertyValue('--fg-2').trim() || '#4a4d50';
     var option = {
       tooltip: { trigger: 'axis' },
-      legend: { data: ['Setpoint', 'Flow', 'Room', 'Outside', 'PID'], bottom: 0, textStyle: { color: _legendFg } },
+      legend: { data: ['Setpoint', 'Flow', 'Room', 'Outside', 'PID'], bottom: 0 },
       grid: { left: 50, right: 20, top: 20, bottom: 60 },
       xAxis: { type: 'category', data: [], boundaryGap: false },
       yAxis: { type: 'value', name: '\u00B0C', axisLabel: { formatter: '{value}\u00B0' } },
@@ -461,7 +456,7 @@ var SAT = (function() {
     });
   }
 
-  // --- Heating Curve (Stooklijn) ---
+  // --- Heating Curve ---
   // JS port of satCalcHeatingCurve() from SATcontrol.ino
   function calcHeatingCurve(outsideTemp, targetTemp, coefficient, heatingSystem) {
     var baseOffset = (heatingSystem === 1) ? HC_BASE_OFFSET_FLOOR : HC_BASE_OFFSET_RAD;
@@ -736,13 +731,10 @@ var SAT = (function() {
       var container = el('sat-chart');
       _chartInstance.dispose();
       _chartInstance = echarts.init(container, themeArg);
-      // TASK-568: re-read --fg-2 token at theme switch so legend labels
-      // remain readable on whichever theme is active now.
-      var _legendFg2 = getComputedStyle(document.body).getPropertyValue('--fg-2').trim() || '#4a4d50';
       // Re-apply chart data
       var option = {
         tooltip: { trigger: 'axis' },
-        legend: { data: ['Setpoint', 'Flow', 'Room', 'Outside', 'PID'], bottom: 0, textStyle: { color: _legendFg2 } },
+        legend: { data: ['Setpoint', 'Flow', 'Room', 'Outside', 'PID'], bottom: 0 },
         grid: { left: 50, right: 20, top: 20, bottom: 60 },
         xAxis: { type: 'category', data: _chartData.time, boundaryGap: false },
         yAxis: { type: 'value', name: '\u00B0C', axisLabel: { formatter: '{value}\u00B0' } },
