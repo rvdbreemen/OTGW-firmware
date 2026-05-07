@@ -1464,76 +1464,11 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
 // the base-entity suppression bitmap (msgIdHasAnySourceEntry) is removed.
 
 void doAutoConfigure(){
-  // Force-publishes HA discovery configs for ALL entries.
-  // Clears the "done" bitmap first so everything is re-sent.
-  // Lock scope is limited to the publish loop; configSensors() acquires its own lock.
-
+  // Force-republish HA discovery configs by routing through the drip publisher.
+  // Enqueues every ID; loopMQTTDiscovery() drains them one per timer tick so
+  // handleOTGW() is not stalled by a single synchronous publish burst.
   if (!settings.mqtt.bEnable) return;
-
-  {
-    MQTTAutoConfigSessionLock sessionLock;
-    if (!sessionLock.locked) {
-      MQTTDebugTln(F("MQTT autoconfig already running, skipping"));
-      return;
-    }
-
-    clearMQTTConfigDone();
-
-    HaDiscoveryContext ctx = buildDiscoveryContext(true);
-
-    // Stream sensor discoveries
-    for (uint16_t i = 0; i < MQTT_HA_SENSOR_COUNT; i++) {
-      feedWatchDog();
-      MqttHaSensorCfg cfg = readSensorCfg(i);
-
-      if (!isPICEnabled() && (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY)) continue;
-      if (cfg.id == OTGWdallasdataid) continue;  // Dallas handled separately
-
-      if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
-        if (settings.mqtt.bSeparateSources) {
-          expandAndStreamSensorSources(MQTTclient, cfg, ctx);
-        }
-        // Skip source-template entries when separate sources disabled
-      } else {
-        // ADR-070: base entity always emitted; ADR-068 mutual-exclusion dropped
-        // because sibling-suffix shape makes canonical and source variants
-        // distinct entities (TSet, TSet_thermostat, TSet_boiler).
-        streamSensorDiscovery(MQTTclient, cfg, ctx);
-      }
-      setMQTTConfigDone(cfg.id);
-      ctx.isFirstEntity = false;
-    }
-
-    // Stream binary sensor discoveries
-    for (uint16_t i = 0; i < MQTT_HA_BINSENSOR_COUNT; i++) {
-      feedWatchDog();
-      MqttHaBinSensorCfg cfg = readBinSensorCfg(i);
-
-      if (!isPICEnabled() && (cfg.flags & MQTT_HA_FLAG_IS_PIC_ENTRY)) continue;
-
-      streamBinarySensorDiscovery(MQTTclient, cfg, ctx);
-      setMQTTConfigDone(cfg.id);
-      ctx.isFirstEntity = false;
-    }
-
-    // Climate and number entities (hardcoded, not in PROGMEM arrays)
-    feedWatchDog();
-    streamClimateDiscovery(MQTTclient, 0, ctx);  // Thermostat
-    ctx.isFirstEntity = false;
-    feedWatchDog();
-    streamClimateDiscovery(MQTTclient, 1, ctx);  // DHW Control
-    feedWatchDog();
-    streamNumberDiscovery(MQTTclient, ctx);       // Toutside Override
-    // Mark climate/number IDs done
-    setMQTTConfigDone(0);   // climate entries are OT ID 0
-    setMQTTConfigDone(27);  // number entry is OT ID 27
-  } // Lock released here
-
-  // Trigger Dallas configuration separately as it requires specific sensor addresses.
-  // Always run after force (clearMQTTConfigDone above cleared the done flag).
-  if (settings.mqtt.bEnable) {
-    configSensors();
-  }
+  markAllMQTTConfigPending();
 }
 //===========================================================================================
 bool doAutoConfigureMsgid(byte OTid, bool isFirst)

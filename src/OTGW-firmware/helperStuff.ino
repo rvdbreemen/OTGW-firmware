@@ -997,8 +997,8 @@ bool canSendWebSocket() {
     state.heapdiag.iWsDropsTotal++;
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
-      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u bytes)\r\n"),
-              webSocketDropCount, ESP.getFreeHeap());
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u, maxBlock=%u bytes)\r\n"),
+              webSocketDropCount, ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
       lastWebSocketWarningMs = now;
     }
     return false;
@@ -1029,8 +1029,8 @@ bool canSendWebSocket() {
   
   // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
   if (webSocketDropCount > 0 && (uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
-    DebugTf(PSTR("WebSocket throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
-            webSocketDropCount, ESP.getFreeHeap());
+    DebugTf(PSTR("WebSocket throttled: dropped %u msgs (heap=%u, maxBlock=%u bytes)\r\n"),
+            webSocketDropCount, ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
     lastWebSocketWarningMs = now;
     webSocketDropCount = 0; // reset counter after reporting
   }
@@ -1051,8 +1051,8 @@ bool canPublishMQTT() {
     state.heapdiag.iMqttDropsTotal++;
     // Log warning periodically (use unsigned arithmetic for rollover safety)
     if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
-      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u bytes)\r\n"),
-              mqttDropCount, ESP.getFreeHeap());
+      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u, maxBlock=%u bytes)\r\n"),
+              mqttDropCount, ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
       lastMQTTWarningMs = now;
     }
     return false;
@@ -1083,8 +1083,8 @@ bool canPublishMQTT() {
   
   // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
   if (mqttDropCount > 0 && (uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
-    DebugTf(PSTR("MQTT throttled: dropped %u msgs (heap=%u bytes)\r\n"), 
-            mqttDropCount, ESP.getFreeHeap());
+    DebugTf(PSTR("MQTT throttled: dropped %u msgs (heap=%u, maxBlock=%u bytes)\r\n"),
+            mqttDropCount, ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
     lastMQTTWarningMs = now;
     mqttDropCount = 0; // reset counter after reporting
   }
