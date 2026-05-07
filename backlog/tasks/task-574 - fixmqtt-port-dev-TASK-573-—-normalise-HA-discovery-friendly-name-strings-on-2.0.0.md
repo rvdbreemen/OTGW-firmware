@@ -3,11 +3,11 @@ id: TASK-574
 title: >-
   fix(mqtt): port dev TASK-573 — normalise HA discovery friendly-name strings on
   2.0.0
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 21:24'
-updated_date: '2026-05-07 21:28'
+updated_date: '2026-05-07 21:29'
 labels:
   - mqtt
   - ha-discovery
