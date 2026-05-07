@@ -1682,14 +1682,28 @@ void markAllMQTTConfigPending()
 // drip MUST back off before the publish gate starts dropping, otherwise we
 // only mitigate drops at the gate instead of preventing them at the source.
 //
-// Mode hysteresis: once a mode is entered, it holds for at least one full
-// timerDiscoveryDrip_interval before a switch is allowed in either direction.
-// Normal (2s) -> Slow: requires >=2s in normal; Slow (10s) -> Normal: requires
-// >=10s in slow. This prevents rapid oscillation when freeHeap hovers near
-// HEAP_LOW_THRESHOLD (TASK-370).
+// Three hysteresis layers gate normal<->slow mode transitions:
+//  1. Time hysteresis (TASK-370): a mode holds for at least one full
+//     timerDiscoveryDrip_interval before a switch is allowed in either
+//     direction. Normal (2s) -> Slow: requires >=2s in normal; Slow (10s)
+//     -> Normal: requires >=10s in slow.
+//  2. Threshold hysteresis (TASK-553 / TASK-555): entry trigger uses the
+//     existing discoveryDripHasHeapPressure() predicate; restore trigger
+//     uses the companion discoveryDripIsHeapHealthyForRestore() predicate
+//     with a deadband above the entry thresholds (1KB on ESP8266, 2KB on
+//     ESP32-S3 freeHeap + 1KB maxBlock). Schmitt-trigger pattern prevents
+//     a single post-recovery burst from immediately tipping back below
+//     the entry threshold.
+//  3. K-ticks hysteresis (TASK-553 / TASK-555): restore additionally
+//     requires consecutiveHealthyTicks >= 2 — i.e. ~20s of confirmed-
+//     healthy heap on the 10s slow-mode cadence — so a transient
+//     burst-aligned recovery sample cannot drive a premature restore.
+//     Counter is updated once per timer tick (post-DUE) and resets to 0
+//     on any unhealthy read or on slow-mode entry.
 //===========================================================================================
 constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 2;   // seconds (heap recovery between bursts)
 constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 10;  // seconds (heap pressure backoff)
+constexpr uint8_t DRIP_RESTORE_K_TICKS      = 2;   // TASK-555: consecutive healthy ticks required to restore
 
 static bool discoveryDripHasHeapPressure() {
 #if defined(ESP32)
@@ -1702,33 +1716,63 @@ static bool discoveryDripHasHeapPressure() {
 #endif
 }
 
+// Companion to discoveryDripHasHeapPressure(): returns true when heap is
+// comfortably above the entry thresholds, with a deadband to prevent thrash
+// (TASK-553 / TASK-555). Used together with the K-ticks counter to gate
+// slow->normal restoration.
+static bool discoveryDripIsHeapHealthyForRestore() {
+#if defined(ESP32)
+  // ~12-15% deadband above entry thresholds (16384/8192). Conservative
+  // starting values; ESP32-S3 has ~300KB DRAM so thrash is unlikely in
+  // field but pattern-symmetry with ESP8266 keeps the port clean. Tunable
+  // post-validation.
+  return (platformFreeHeap() >= 18432U) && (platformMaxFreeBlock() >= 9216U);
+#else
+  // ESP8266: 1KB deadband above HEAP_LOW_THRESHOLD (5120). See declaration
+  // in OTGW-firmware.h for sizing rationale.
+  return ESP.getFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD;
+#endif
+}
+
 void loopMQTTDiscovery()
 {
   DECLARE_TIMER_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
   static uint32_t modeEnteredMs = 0;  // millis() when current mode was entered; 0 = boot
+  static uint8_t  consecutiveHealthyTicks = 0;  // TASK-555: K-ticks counter for restore decision
   sDripDueAtMs = timerDiscoveryDrip_due;  // expose due-time for dripDueWithinMs()
 
-  // Adaptive interval: back off BEFORE the publish gate engages.
-  // canPublishMQTT() starts dropping at HEAP_LOW (<6KB); if we only trigger
-  // slow-mode at HEAP_WARNING (<4KB) we are too late — drops have already
-  // started. Trigger at HEAP_LOW so the drip quiets down first.
+  if (!DUE(timerDiscoveryDrip)) return;
+
+  // Tick-boundary K-ticks counter update: runs exactly once per timer tick.
+  // Increments when heap is comfortably above entry thresholds (deadband),
+  // resets on any unhealthy read. The restore decision below requires this
+  // counter to reach DRIP_RESTORE_K_TICKS (TASK-555).
+  if (discoveryDripIsHeapHealthyForRestore()) {
+    if (consecutiveHealthyTicks < 0xFF) consecutiveHealthyTicks++;
+  } else {
+    consecutiveHealthyTicks = 0;
+  }
+
+  // Mode switch decision (per-tick). Entry trigger uses the existing
+  // pressure predicate; restore trigger uses the threshold-hysteresis
+  // predicate plus the K-ticks counter.
   bool heapPressure = discoveryDripHasHeapPressure();
-  // Hold current mode for at least one full interval before switching.
-  // modeEnteredMs == 0 on first call: first switch is always allowed immediately.
   bool canSwitch = (modeEnteredMs == 0) ||
                    ((millis() - modeEnteredMs) >= timerDiscoveryDrip_interval);
   if (heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_SLOW * 1000UL && canSwitch) {
     CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_SLOW, SKIP_MISSED_TICKS);
     state.heapdiag.iDripSlowModeCount++;
     modeEnteredMs = millis();
+    consecutiveHealthyTicks = 0;  // restore needs fresh K healthy ticks (TASK-555)
     MQTTDebugTf(PSTR("[drip] slowed to %ds (heap pressure)\r\n"), DISCOVERY_INTERVAL_SLOW);
-  } else if (!heapPressure && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_NORMAL * 1000UL && canSwitch) {
+  } else if (!heapPressure
+             && consecutiveHealthyTicks >= DRIP_RESTORE_K_TICKS
+             && timerDiscoveryDrip_interval != DISCOVERY_INTERVAL_NORMAL * 1000UL
+             && canSwitch) {
     CHANGE_INTERVAL_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
     modeEnteredMs = millis();
     MQTTDebugTf(PSTR("[drip] restored to %ds (heap healthy)\r\n"), DISCOVERY_INTERVAL_NORMAL);
   }
-
-  if (!DUE(timerDiscoveryDrip)) return;
 
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;

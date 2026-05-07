@@ -150,6 +150,17 @@ enum HeapHealthLevel {
   HEAP_WARNING,
   HEAP_CRITICAL
 };
+// Restore-side deadband above HEAP_LOW_THRESHOLD (5120). Used by the discovery
+// drip (loopMQTTDiscovery in MQTTstuff.ino) on the ESP8266 path to decide when
+// slow-mode may revert to normal-mode. Schmitt-trigger: enter at HEAP_LOW
+// (freeHeap<5120), exit only when freeHeap has climbed +1KB above that boundary.
+// Sized to cover one discovery alloc footprint (~1KB transient incl. broker-side
+// TX buffers) so a single Status-burst + WS pong overlap does not immediately
+// tip back across the entry threshold (TASK-553 / TASK-555). Declared here (not
+// in helperStuff.ino) because MQTTstuff.ino is concatenated before helperStuff.ino
+// in the Arduino sketch build, so a #define in helperStuff would not be visible
+// to MQTTstuff. ESP32 path uses a different helper with platform-scaled values.
+#define HEAP_LOW_RESTORE_THRESHOLD 6144  // bytes (HEAP_LOW_THRESHOLD + 1024)
 HeapHealthLevel getHeapHealth();
 uint8_t getHeapFragmentation();
 bool canSendWebSocket();
