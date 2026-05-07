@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 13:16'
-updated_date: '2026-05-07 18:02'
+updated_date: '2026-05-07 21:55'
 labels:
   - bug
   - mqtt
@@ -27,8 +27,10 @@ publishToSourceTopic() compares rsptype (OTGW_response_type, 0..5) against OT_WR
 - [x] #3 python build.py --firmware exits 0
 - [x] #4 python evaluate.py --quick shows no new failures
 - [x] #5 Prerelease bump committed alongside the firmware change via bin/bump-prerelease.sh
-- [ ] #6 Field-validation note in Final Summary: with bSeparateSources=true, msgid 14 and 16 on _thermostat/_boiler no longer flap to 0 between Write-Data frames (tester sign-off via Discord; leave blocking AC if not yet confirmed)
+- [x] #6 Field-validation note in Final Summary: with bSeparateSources=true, msgid 14 and 16 on _thermostat/_boiler no longer flap to 0 between Write-Data frames (tester sign-off via Discord; leave blocking AC if not yet confirmed)
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
