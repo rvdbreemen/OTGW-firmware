@@ -55,6 +55,8 @@ Optional HTTP Basic Auth. When a password is configured in device settings, muta
 - MQTT discovery: `POST /api/v2/otgw/discovery`, `POST /api/v2/otgw/autoconfigure`
 - Simulation: `POST /api/v2/simulate/start`, `POST /api/v2/simulate/stop`
 - Webhook test: `POST /api/v2/webhook/test`
+- Diagnostic dump: `GET /api/v2/debug` (contains network credentials)
+- MQTT republish: `POST /api/v2/mqtt/republish`
 - File management, reboot, reset, and OTA update endpoints
 
 **Unprotected endpoints** (always accessible):
@@ -242,7 +244,7 @@ Update a single device setting.
 - `401` - Authentication required
 - `403` - CSRF protection: invalid origin
 
-**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`
+**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `legacyport25238enabled`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`
 
 ---
 
@@ -644,6 +646,97 @@ Triggers a test webhook call to verify the configured webhook URL is reachable.
 
 ---
 
+### Debug Diagnostics
+
+#### `GET /api/v2/debug`
+
+Returns a flat JSON map containing all device settings and current runtime state. This is the REST equivalent of the `D` telnet command.
+
+**Authentication**: Required when an HTTP password is configured. The response contains network credentials (SSID, broker address).
+
+**Response** `200 OK`:
+```json
+{
+  "debug": {
+    "build.version": "1.5.0-beta.29",
+    "build.number": 29,
+    "build.githash": "abc1234",
+    "build.date": "May  8 2026",
+    "runtime.heap_free": 26800,
+    "runtime.heap_frag_pct": 5,
+    "runtime.heap_min_free": 22400,
+    "runtime.heap_max_block": 18432,
+    "runtime.uptime_sec": 86400,
+    "runtime.reboots": 3,
+    "runtime.wifi_rssi": -60,
+    "runtime.wifi_ip": "192.168.1.100",
+    "runtime.wifi_ssid": "MyHomeNetwork",
+    "runtime.wifi_connected": true,
+    "settings.hostname": "OTGW",
+    "settings.led_blink": true,
+    "settings.http_auth": false,
+    "settings.mqtt.broker": "homeassistant.local",
+    "settings.mqtt.port": 1883,
+    "settings.mqtt.user": "otgw",
+    "settings.mqtt.passwd": "***",
+    "settings.mqtt.toptopic": "OTGW",
+    "settings.mqtt.ha_prefix": "homeassistant",
+    "settings.mqtt.unique_id": "otgw-1a2b3c",
+    "settings.mqtt.interval": 30,
+    "settings.mqtt.enabled": true,
+    "settings.mqtt.disc_verify": true,
+    "settings.mqtt.sep_src": false,
+    "settings.legacy.port_25238": false,
+    "settings.ntp.server": "pool.ntp.org",
+    "settings.ntp.tz": "Europe/Amsterdam",
+    "settings.ntp.enabled": true,
+    "settings.sensors.enabled": false,
+    "settings.sensors.gpio": 4,
+    "settings.sensors.interval": 30,
+    "settings.s0.enabled": false,
+    "settings.s0.gpio": 14,
+    "settings.s0.interval": 60,
+    "state.mqtt.connected": true,
+    "state.otgw.online": true,
+    "state.otgw.ps_mode": false,
+    "state.pic.available": true,
+    "state.pic.fwversion": "5.4",
+    "state.debug.otgw_sim": false,
+    "state.debug.sensor_sim": false,
+    "state.debug.restapi": false,
+    "state.debug.mqtt": false
+  }
+}
+```
+
+Key notes:
+- HTTP and MQTT passwords are never included in the response. `settings.http_auth` is a boolean that indicates whether a password is configured.
+- `settings.mqtt.passwd` is always `"***"`.
+- All fields use dot-notation keys inside the `debug` wrapper object.
+
+---
+
+### MQTT Runtime Actions
+
+#### `POST /api/v2/mqtt/republish`
+
+Forces an immediate republish of all OpenTherm measurement values to MQTT. Use this after a broker wipe or when retained state needs to be restored without waiting for the normal publish cadence.
+
+This is distinct from `POST /api/v2/discovery/republish`, which re-publishes Home Assistant autodiscovery configurations. This endpoint re-publishes the actual OpenTherm measurement values.
+
+**Authentication**: Required when an HTTP password is configured.
+
+**Response** `200 OK`:
+```json
+{"status": "ok", "message": "OT value republish requested"}
+```
+
+**Error responses**:
+- `405` - Method not allowed (only POST is accepted)
+- `503` - MQTT is not connected
+
+---
+
 ### Non-API Routes
 
 These routes are served directly by the web server (not under `/api`):
@@ -861,6 +954,20 @@ curl -X POST http://otgw.local/api/v2/simulate/start
 
 ```bash
 curl -X POST "http://otgw.local/api/v2/webhook/test?state=on"
+```
+
+### Get Diagnostic Dump
+
+```bash
+curl http://otgw.local/api/v2/debug
+# With auth:
+curl -u admin:password http://otgw.local/api/v2/debug
+```
+
+### Force MQTT Value Republish
+
+```bash
+curl -X POST http://otgw.local/api/v2/mqtt/republish
 ```
 
 ## Integration Examples

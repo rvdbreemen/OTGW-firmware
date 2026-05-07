@@ -103,6 +103,30 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-057: Webhook Delivery, Retry, and Protected Test Endpoint Policy](ADR-057-webhook-delivery-retry-and-protected-test-endpoint-policy.md)** 🆕
   Defines edge-triggered outbound webhook delivery, bounded timeout and retry behavior, local-only URL policy, and the protected webhook test endpoint; builds on ADR-048's non-blocking state machine.
 
+- **[ADR-065: otgw-pic/ MQTT Subtree as Stable Public Topic API](ADR-065-otgw-pic-mqtt-subtree.md)** *(Accepted)*
+  Declares the `otgw-pic/` MQTT subtree a stable public API surface; renames, splits, or deprecations require a coordinated migration strategy. Introduces `kPicSubtreePrefix` as the single source of truth and fixes HA discovery `stat_t` mismatch that kept `boiler_connected` and `thermostat_connected` permanently unavailable.
+
+- **[ADR-066: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification](ADR-066-mqtt-publish-gating-by-source-and-slave-echo.md)** *(Proposed; refined by ADR-069)*
+  Constrains the base topic to thermostat-side intent (Read-Ack and Write-Data only) and introduces per-MsgID `bSlaveEchoesValue` metadata to gate `/boiler` subtopic publications so that non-echo Write-Ack zeroes no longer flap the base or source topics.
+
+- **[ADR-067: HA Discovery State Reconciliation on OTA Upgrade](ADR-067-ha-discovery-state-reconciliation-on-ota-upgrade.md)** *(Deprecated, withdrawn)*
+  Automatic wipe of retained HA discovery topics on boot after a firmware upgrade was implemented and tested but proved too fragile on ESP8266 resource constraints; feature removed and users directed to manual cleanup via MQTT Explorer.
+
+- **[ADR-068: bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive](ADR-068-bseparatesources-mutually-exclusive-base-and-source-variants.md)** *(Superseded by ADR-070)*
+  Declared that enabling `bSeparateSources` suppresses the redundant base entity for source-templated MsgIDs, eliminating duplicate HA entity names; superseded by ADR-070 which also fixes the topic shape.
+
+- **[ADR-069: MQTT Source-Subtopic Worldview Semantics](ADR-069-mqtt-source-topic-worldview-semantics.md)** *(Accepted)*
+  Redefines per-source subtopic semantics from source-of-publication to worldview model: `/thermostat` shows what the thermostat side sees, `/boiler` shows what the boiler side receives, eliminating the `/gateway` third subtopic and fixing data-loss for write-only metrics during gateway override.
+
+- **[ADR-070: MQTT Source-Topic Sibling-Suffix Shape](ADR-070-mqtt-source-topic-sibling-suffix-shape.md)** *(Superseded by ADR-071)*
+  Replaced the nested `<metric>/thermostat` child-topic shape with sibling-suffix `<metric>_thermostat` for state topics; the discovery-topic carve-out in this ADR was subsequently found incorrect and corrected by ADR-071.
+
+- **[ADR-071: MQTT Discovery Topic Sibling-Suffix Shape](ADR-071-mqtt-discovery-topic-sibling-suffix-shape.md)** *(Accepted)*
+  Extends ADR-070 to apply the sibling-suffix shape to HA discovery topics (`<id>_thermostat/config`) after empirical investigation showed that HA's `TOPIC_MATCHER` regex rejects nested `object_id` segments; both state and discovery topics now use the flat sibling-suffix convention.
+
+- **[ADR-072: HA Discovery Friendly-Name Format](ADR-072-ha-discovery-friendly-name-format.md)** *(Accepted)*
+  Mandates a uniform `writeFriendlyName()` transform for all HA discovery `name` fields: underscores become spaces, each word is title-cased, and the hostname prefix is stripped; eliminates the confusing `OTGW_SomeCamelCase` labels that field testers flagged across multiple beta releases.
+
 ### System Architecture
 
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
@@ -352,6 +376,10 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 11. 2026: ADR-054 (Optional HTTP Basic Auth), ADR-055 (Webhook HTTP integration)
 12. 2026: ADR-056 (Protected admin security contract), ADR-057 (Webhook delivery + test endpoint policy)
 13. 2026: ADR-060 (PIC availability guard pattern)
+14. 2026: ADR-065 (otgw-pic/ MQTT subtree stable API), ADR-066 (publish gating by source and slave-echo, Proposed)
+15. 2026: ADR-067 (HA discovery OTA reconciliation, Deprecated), ADR-068 (bSeparateSources mutually exclusive, Superseded by ADR-070)
+16. 2026: ADR-069 (MQTT source-subtopic worldview semantics), ADR-070 (sibling-suffix state topic, Superseded by ADR-071)
+17. 2026: ADR-071 (MQTT discovery sibling-suffix shape), ADR-072 (HA discovery friendly-name format)
 
 ## When to Create an ADR
 

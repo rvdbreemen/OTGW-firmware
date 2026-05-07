@@ -34,8 +34,9 @@ new WebSocket("ws://esp-ip:81/") ↓
    - Does NOT initiate outbound connections
 
 2. **Browser = CLIENT (Initiator)**
-   - Creates WebSocket connection when page loads
+   - Creates WebSocket connection when page loads (with a 250 ms debounce on page show and tab-visibility restore)
    - Connects TO the ESP8266
+   - Explicitly closes the socket on `pagehide` and `beforeunload` to avoid overlap with the next page's connection
    - Reconnects automatically if disconnected
 
 3. **Protocol**
@@ -52,7 +53,7 @@ new WebSocket("ws://esp-ip:81/") ↓
 
 - **Server:** `webSocketStuff.ino` (ESP8266 code)
 - **Client:** `data/index.js` (Browser JavaScript)
-- **Detailed docs:** `docs/WEBSOCKET_FLOW.md`
+- **Detailed docs:** `docs/api/WEBSOCKET_FLOW.md`
 
 ## Common Misconceptions
 
@@ -65,6 +66,15 @@ new WebSocket("ws://esp-ip:81/") ↓
 ❌ **WRONG:** "WebSocket uses the same port as HTTP (port 80)"
 ✅ **CORRECT:** "WebSocket uses a separate port (81), HTTP uses port 80"
 
+## Reload-Storm Mitigation (v1.5.0)
+
+Rapid browser reloads used to produce overlapping connect/disconnect events. Two changes address this:
+
+- **Client:** `scheduleOTLogWebSocketInit(false, 250)` replaces the direct `initOTLogWebSocket()` call on page show and tab-visibility restore. The 250 ms delay lets the previous page's socket close before a new one opens. `pagehide` and `beforeunload` cancel the pending timer and close the current socket immediately.
+- **Server:** A 5-second sliding window counts lifecycle events. When 3+ events accumulate, a single burst-summary line is written to the telnet debug log. This is diagnostics only; no protocol behavior changes.
+
+If you see `WebSocket burst window=5000ms` in your telnet log during normal operation, a client is reconnecting unusually fast.
+
 ## Architecture Decision Records
 
 - **ADR-005:** WebSocket for Real-Time Streaming
@@ -73,6 +83,6 @@ new WebSocket("ws://esp-ip:81/") ↓
 
 ## See Also
 
-- Full documentation: `docs/WEBSOCKET_FLOW.md`
+- Full documentation: `docs/api/WEBSOCKET_FLOW.md`
 - Browser compatibility: `docs/reviews/2026-01-26_browser-compatibility-review/`
 - WebSocket library: https://github.com/Links2004/arduinoWebSockets

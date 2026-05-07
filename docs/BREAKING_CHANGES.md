@@ -4,6 +4,118 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.5.0
+
+### Breaking: MQTT source-topic shape changed to sibling-suffix (ADR-070, ADR-071)
+
+When the `Separate Sources` setting (`bSeparateSources`) is enabled, the per-source variant topics for dual-source OpenTherm message IDs (for example `TSet`, which is written by the thermostat and echoed by the boiler) have changed shape.
+
+**Old shape (v1.4.x, nested children):**
+
+```
+<topTopic>/value/<uniqueid>/TSet           (canonical)
+<topTopic>/value/<uniqueid>/TSet/thermostat
+<topTopic>/value/<uniqueid>/TSet/boiler
+```
+
+**New shape (v1.5.0, sibling-suffix):**
+
+```
+<topTopic>/value/<uniqueid>/TSet           (canonical, unchanged)
+<topTopic>/value/<uniqueid>/TSet_thermostat
+<topTopic>/value/<uniqueid>/TSet_boiler
+```
+
+The same suffix rule applies to the HA discovery topics:
+
+```
+homeassistant/sensor/<id>/TSet/config           (canonical, unchanged)
+homeassistant/sensor/<id>/TSet_thermostat/config  (was TSet/thermostat/config)
+homeassistant/sensor/<id>/TSet_boiler/config      (was TSet/boiler/config)
+```
+
+Note: the nested discovery topic shape (`TSet/thermostat/config`) was silently rejected by HA's `TOPIC_MATCHER` regex at all times, so `bSeparateSources` source-variant entities never registered in HA under v1.4.x. The sibling-suffix shape is what actually makes those entities appear in HA for the first time.
+
+**What breaks:**
+
+- Any manual HA YAML sensor configuration, Node-RED flow, or Grafana dashboard that subscribes to `<topTopic>/value/<uniqueid>/<msgid>/thermostat` or `<topTopic>/value/<uniqueid>/<msgid>/boiler` (the old nested state topics). These subscriptions will receive no new data after upgrading.
+- Any MQTT wildcard subscription that relied on the nested child structure will need to be updated to match the new suffix pattern.
+
+**Migration:**
+
+1. If you use HA MQTT auto-discovery (`bSeparateSources=true`): no action required. HA's subscription logic picks up the new `state_topic` value from the updated discovery payload automatically on the next firmware boot (ADR-067 republishes discovery at boot). The source-variant entities will appear in HA for the first time as working entities.
+2. If you have manually configured YAML sensors pointing at `<topTopic>/value/<uniqueid>/<msgid>/thermostat` or `<topTopic>/value/<uniqueid>/<msgid>/boiler`: update the `state_topic` values to use the underscore-suffix form (`<msgid>_thermostat`, `<msgid>_boiler`).
+3. Clear zombie retained values left at the old nested state-topic paths. The firmware no longer publishes there. On mosquitto: `mosquitto_pub -t '<topTopic>/value/<uniqueid>/<msgid>/thermostat' -r -n` and the same for `/boiler`.
+4. Clear zombie retained discovery configs at the old nested discovery paths. They were already invisible to HA (rejected before registration), but topic browsers display them. On mosquitto: `mosquitto_pub -t 'homeassistant/sensor/<id>/<msgid>/thermostat/config' -r -n` and the same for `/boiler/config`.
+
+---
+
+### Breaking: /gateway sub-topic removed (TASK-538)
+
+The per-message-ID sub-topic `/gateway` has been removed.
+
+**Old topic (v1.4.x):**
+
+```
+<topTopic>/value/<uniqueid>/<msgid>/gateway
+```
+
+**New equivalent (v1.5.0):**
+
+```
+<topTopic>/value/<uniqueid>/<msgid>
+```
+
+The canonical base topic now carries the value that was previously published on the `/gateway` sub-topic. There is no longer a `/gateway` child topic at all.
+
+**What breaks:**
+
+- Any automation, subscription, or integration that reads from `<topTopic>/value/<uniqueid>/<msgid>/gateway` will receive no new data after upgrading.
+
+**Migration:**
+
+Update every subscription and `state_topic` reference that ends in `/<msgid>/gateway` to use `/<msgid>` instead (drop the `/gateway` suffix). On mosquitto, clear the stale retained value: `mosquitto_pub -t '<topTopic>/value/<uniqueid>/<msgid>/gateway' -r -n`.
+
+---
+
+### Breaking: HA discovery entity names changed to human-readable Title Case (ADR-072, TASK-572, TASK-573)
+
+The `name` field in all HA MQTT discovery payloads has changed format.
+
+**Old format (v1.4.x):** underscore-separated identifier string with hostname prefix, for example:
+
+```
+OTGW_TdhwSet
+OTGW_Status_Master_Memberid_Code
+OTGW_ElectricalCurrentBurnerFlame
+OTGW_CHPumpOperationHoursg
+```
+
+**New format (v1.5.0):** human-readable Title Case with spaces, no hostname prefix, acronyms in canonical caps, for example:
+
+```
+DHW Setpoint
+Status Master MemberID Code
+Electrical Current Burner Flame
+CH Pump Operation Hours
+```
+
+The `unique_id` field in every discovery payload is unchanged. HA uses `unique_id` for entity identity tracking, so existing automations and entity-ID references are not broken by the name change alone.
+
+**What breaks:**
+
+- The user-visible entity display name in HA updates on the next discovery cycle after flashing v1.5.0. This is cosmetic: the entity_id and unique_id are stable. Dashboards built on entity_id (for example `sensor.otgw_tdhwset`) continue to work without change.
+- HA derives an initial `entity_id` from the `name` on first discovery for brand-new entities. If a user has renamed an entity inside HA and pinned it to the old generated entity_id, the rename is sticky and unaffected.
+- If a user has a custom dashboard card that displays the HA `friendly_name` as a label and relied on the exact old string (for example `OTGW_TdhwSet`), the displayed label will change.
+
+**Migration:**
+
+For most users: no action required. The entity display names update automatically on the next discovery cycle.
+
+If you want to clean up stale HA entity entries that carry the old names: remove them from the HA entity registry (Settings, Devices and Services, MQTT, find the OTGW device, remove stale entities), then trigger a discovery republish from the OTGW web UI or wait for the next firmware boot.
+
+---
+
 ## 🛑 v1.4.2
 
 ### Breaking: heap diagnostic MQTT topic split from one JSON blob into 17 individual retained topics

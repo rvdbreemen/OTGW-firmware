@@ -57,6 +57,13 @@ The build wrappers use or create a local `.build-venv` automatically. If `requir
 `requirements.txt` exists, the listed Python packages are installed quietly before `build.py` is started. If Python is
 not on PATH but an existing `.venv` works, the wrappers can use that as a fallback.
 
+If the wrapper is unavailable (e.g. in CI or a container that already has a configured venv), call `build.py` directly:
+
+```bash
+python build.py           # full build — firmware + filesystem
+python build.py --firmware  # firmware only
+```
+
 The build script will automatically install:
 
 - **arduino-cli** - Downloaded and installed to your local bin directory if not present
@@ -254,7 +261,7 @@ chmod +x build.sh
 
 ### Using Makefile Directly
 
-The build script uses the Makefile underneath. You can also use make directly:
+`build.py` (and the `build.sh`/`build.bat` wrappers) use the Makefile underneath. You can also invoke `make` directly, though this bypasses the automatic venv setup that the wrappers provide:
 
 ```bash
 make -j$(nproc)              # Build firmware (parallel)

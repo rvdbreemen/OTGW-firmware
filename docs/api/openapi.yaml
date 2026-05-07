@@ -66,6 +66,10 @@ tags:
     description: Webhook testing
   - name: Discovery
     description: Retained MQTT auto-discovery verification and republish (ADR-062)
+  - name: Debug
+    description: Diagnostic dump of settings and runtime state
+  - name: MQTT
+    description: MQTT runtime actions (republish, etc.)
 
 paths:
   /v2/health:
@@ -1283,6 +1287,252 @@ paths:
           description: Authentication required
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/debug:
+    get:
+      tags:
+        - Debug
+      summary: Get machine-readable diagnostic dump
+      description: |
+        Returns a flat JSON map containing all device settings and current
+        runtime state. Intended for diagnostics, support, and automated
+        health reporting.
+
+        The response mirrors the `D` telnet command output but as JSON.
+        Sensitive fields are redacted: HTTP and MQTT passwords are never
+        returned; `settings.http_auth` is a boolean indicating whether a
+        password is configured.
+
+        **Authentication**: Required when an HTTP password is configured.
+        The endpoint contains network credentials (SSID, broker address)
+        so it is always auth-gated when a password is set.
+      operationId: getDebugDump
+      security:
+        - basicAuth: []
+      responses:
+        '200':
+          description: Diagnostic dump retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  debug:
+                    type: object
+                    properties:
+                      build.version:
+                        type: string
+                        description: Firmware version string
+                        example: "1.5.0-beta.29"
+                      build.number:
+                        type: integer
+                        description: Firmware build number
+                      build.githash:
+                        type: string
+                        description: Git commit hash of the firmware build
+                      build.date:
+                        type: string
+                        description: Build date string
+                      runtime.heap_free:
+                        type: integer
+                        description: Free heap memory in bytes
+                      runtime.heap_frag_pct:
+                        type: integer
+                        description: Heap fragmentation percentage (0-100)
+                      runtime.heap_min_free:
+                        type: integer
+                        description: Historical minimum free heap since boot
+                      runtime.heap_max_block:
+                        type: integer
+                        description: Largest contiguous free heap block in bytes
+                      runtime.uptime_sec:
+                        type: integer
+                        description: Uptime in seconds since last boot
+                      runtime.reboots:
+                        type: integer
+                        description: Total reboot counter stored in RTC memory
+                      runtime.wifi_rssi:
+                        type: integer
+                        description: WiFi signal strength in dBm
+                      runtime.wifi_ip:
+                        type: string
+                        description: Device IP address
+                      runtime.wifi_ssid:
+                        type: string
+                        description: Connected WiFi SSID
+                      runtime.wifi_connected:
+                        type: boolean
+                      settings.hostname:
+                        type: string
+                      settings.led_blink:
+                        type: boolean
+                      settings.http_auth:
+                        type: boolean
+                        description: True when an HTTP password is configured (password value is never returned)
+                      settings.mqtt.broker:
+                        type: string
+                      settings.mqtt.port:
+                        type: integer
+                      settings.mqtt.user:
+                        type: string
+                      settings.mqtt.passwd:
+                        type: string
+                        description: Always "***" regardless of actual password
+                        example: "***"
+                      settings.mqtt.toptopic:
+                        type: string
+                      settings.mqtt.ha_prefix:
+                        type: string
+                      settings.mqtt.unique_id:
+                        type: string
+                      settings.mqtt.interval:
+                        type: integer
+                      settings.mqtt.enabled:
+                        type: boolean
+                      settings.mqtt.disc_verify:
+                        type: boolean
+                      settings.mqtt.sep_src:
+                        type: boolean
+                      settings.legacy.port_25238:
+                        type: boolean
+                        description: Legacy TCP port 25238 enabled
+                      settings.ntp.server:
+                        type: string
+                      settings.ntp.tz:
+                        type: string
+                      settings.ntp.enabled:
+                        type: boolean
+                      settings.sensors.enabled:
+                        type: boolean
+                      settings.sensors.gpio:
+                        type: integer
+                      settings.sensors.interval:
+                        type: integer
+                      settings.s0.enabled:
+                        type: boolean
+                      settings.s0.gpio:
+                        type: integer
+                      settings.s0.interval:
+                        type: integer
+                      state.mqtt.connected:
+                        type: boolean
+                      state.otgw.online:
+                        type: boolean
+                      state.otgw.ps_mode:
+                        type: boolean
+                      state.pic.available:
+                        type: boolean
+                      state.pic.fwversion:
+                        type: string
+                      state.debug.otgw_sim:
+                        type: boolean
+                      state.debug.sensor_sim:
+                        type: boolean
+                      state.debug.restapi:
+                        type: boolean
+                      state.debug.mqtt:
+                        type: boolean
+              example:
+                debug:
+                  build.version: "1.5.0-beta.29"
+                  build.number: 29
+                  build.githash: "abc1234"
+                  build.date: "May  8 2026"
+                  runtime.heap_free: 26800
+                  runtime.heap_frag_pct: 5
+                  runtime.heap_min_free: 22400
+                  runtime.heap_max_block: 18432
+                  runtime.uptime_sec: 86400
+                  runtime.reboots: 3
+                  runtime.wifi_rssi: -60
+                  runtime.wifi_ip: "192.168.1.100"
+                  runtime.wifi_ssid: "MyHomeNetwork"
+                  runtime.wifi_connected: true
+                  settings.hostname: "OTGW"
+                  settings.led_blink: true
+                  settings.http_auth: false
+                  settings.mqtt.broker: "homeassistant.local"
+                  settings.mqtt.port: 1883
+                  settings.mqtt.user: "otgw"
+                  settings.mqtt.passwd: "***"
+                  settings.mqtt.toptopic: "OTGW"
+                  settings.mqtt.ha_prefix: "homeassistant"
+                  settings.mqtt.unique_id: "otgw-1a2b3c"
+                  settings.mqtt.interval: 30
+                  settings.mqtt.enabled: true
+                  settings.mqtt.disc_verify: true
+                  settings.mqtt.sep_src: false
+                  settings.legacy.port_25238: false
+                  settings.ntp.server: "pool.ntp.org"
+                  settings.ntp.tz: "Europe/Amsterdam"
+                  settings.ntp.enabled: true
+                  settings.sensors.enabled: false
+                  settings.sensors.gpio: 4
+                  settings.sensors.interval: 30
+                  settings.s0.enabled: false
+                  settings.s0.gpio: 14
+                  settings.s0.interval: 60
+                  state.mqtt.connected: true
+                  state.otgw.online: true
+                  state.otgw.ps_mode: false
+                  state.pic.available: true
+                  state.pic.fwversion: "5.4"
+                  state.debug.otgw_sim: false
+                  state.debug.sensor_sim: false
+                  state.debug.restapi: false
+                  state.debug.mqtt: false
+        '401':
+          description: Authentication required
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/mqtt/republish:
+    post:
+      tags:
+        - MQTT
+      summary: Force full OT value republish to MQTT
+      description: |
+        Marks all OpenTherm values as dirty and triggers an immediate republish
+        of all retained MQTT topics. Use this after a broker wipe or when you
+        need to restore all MQTT retained state without waiting for the normal
+        publish cadence.
+
+        This is distinct from `/v2/discovery/republish`, which re-publishes Home
+        Assistant autodiscovery configs. This endpoint re-publishes the actual
+        OpenTherm measurement values.
+
+        **Authentication**: Required when an HTTP password is configured.
+      operationId: mqttRepublishAll
+      security:
+        - basicAuth: []
+      responses:
+        '200':
+          description: Republish requested successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  message:
+                    type: string
+              example:
+                status: "ok"
+                message: "OT value republish requested"
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '503':
+          description: MQTT is not connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error:
+                  status: 503
+                  message: "MQTT not connected"
 
   # --- backward-compatibility aliases (prefer primary endpoints above) ---
 

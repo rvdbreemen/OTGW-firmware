@@ -36,6 +36,7 @@ On MQTT connect:
 4. **Subscribes** to `{TopTopic}/set/{UniqueId}/#` for incoming commands
 5. **Subscribes** to `homeassistant/status` for Home Assistant lifecycle detection
 6. **Publishes** version info, state information, and cached PIC settings
+7. **Conditional OT republish**: Re-publishes all retained OT values only if the offline duration exceeded 5 minutes (the broker-loss threshold). Short outages are treated as network blips — the broker still holds retained topics. First boot and first-enable scenarios do not trigger a republish; the first-seen mechanism publishes each value naturally as it appears on the OT bus.
 
 ---
 
@@ -49,7 +50,8 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 
 | Topic | Value | Description |
 | ----- | ----- | ----------- |
-| `otgw-firmware/version` | `"1.3.0"` | Firmware version string |
+| `otgw-firmware/hostname` | `"otgw-living"` | Device hostname (retained; maps UniqueId to a human-readable name) |
+| `otgw-firmware/version` | `"1.5.0-beta.29"` | Firmware version string |
 | `otgw-firmware/reboot_count` | `"42"` | Number of reboots since first boot |
 | `otgw-firmware/reboot_reason` | `"Software/System restart"` | Last reboot reason |
 | `otgw-firmware/uptime` | `"12345"` | Uptime in seconds (not retained) |
@@ -296,22 +298,22 @@ Where `{sensor_address}` is the Dallas 1-Wire address (e.g., `28FF64D1841703F1`)
 When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is published to two source-specific sibling topics alongside the canonical topic:
 
 ```
-{TopTopic}/value/{UniqueId}/{label}             ← canonical (always published)
-{TopTopic}/value/{UniqueId}/{label}_thermostat  ← when bSeparateSources=true
-{TopTopic}/value/{UniqueId}/{label}_boiler      ← when bSeparateSources=true
+{TopTopic}/value/{UniqueId}/{label}             <- canonical (always published)
+{TopTopic}/value/{UniqueId}/{label}_thermostat  <- when bSeparateSources=true
+{TopTopic}/value/{UniqueId}/{label}_boiler      <- when bSeparateSources=true
 ```
 
-All three are sibling leaves. Each is a normal MQTT topic — the canonical no longer has children, which makes topic-browser UX (mosquitto_sub, MQTT Explorer) straightforward and removes the structural ambiguity that the earlier nested shape created.
+All three are sibling leaves. Each is a normal MQTT topic — the canonical has no children, which makes topic-browser UX (mosquitto_sub, MQTT Explorer) straightforward and removes the structural ambiguity that an earlier nested shape would create.
 
-#### Topic semantics (1.5.x+, ADR-069 worldview model + ADR-070 sibling-suffix shape)
+There is no `_gateway` topic. Gateway override is observable by comparing `_thermostat` and `_boiler` — divergence means the gateway is intervening.
+
+#### Worldview semantics (ADR-069)
 
 Each per-source topic shows what *that device* sees on the OpenTherm bus, regardless of which side put the frame on the wire.
 
-- **`{label}_thermostat`** = the value the thermostat sent (write requests) or received (read responses, including any gateway-faked answer).
-- **`{label}_boiler`** = the value the boiler received (write requests, including any gateway override) or sent (read responses).
-- **`{label}` (canonical)** = boiler-side worldview, identical to `{label}_boiler` when both are published.
-
-Override behavior is implicit: when the two source topics diverge for the same metric, the gateway is intervening.
+- **`{label}_thermostat`** = the value the thermostat sent (write requests) or received (read responses, including any gateway-faked answer via `A` frame).
+- **`{label}_boiler`** = the value the boiler received (write requests, including any gateway override via `R` frame) or sent (read responses).
+- **`{label}` (canonical)** = boiler-side worldview, identical to `{label}_boiler` for writes. For reads without answer-override, same as `{label}_boiler`. During answer-override, canonical carries `B` (the boiler's actual response) rather than the gateway-faked `A` value.
 
 **Example: `TSet` with `CS=27.37` setpoint override active, thermostat asking 23 °C:**
 
@@ -319,9 +321,9 @@ Override behavior is implicit: when the two source topics diverge for the same m
 |---|---|---|
 | `…/value/<id>/TSet_thermostat` | `23.00` | What the thermostat asked for |
 | `…/value/<id>/TSet_boiler` | `27.37` | What the boiler actually received |
-| `…/value/<id>/TSet` (canonical) | `27.37` | What was actually transmitted (= boiler-side worldview) |
+| `…/value/<id>/TSet` (canonical) | `27.37` | Boiler-side worldview (= what reached the boiler) |
 
-Without override, all three publish the same value. `_thermostat` and `_boiler` always update independently regardless of override state — `_thermostat` keeps showing the thermostat's intent, `_boiler` keeps showing what reaches the boiler.
+Without override, all three publish the same value. `_thermostat` and `_boiler` always update independently regardless of override state.
 
 #### Frame-to-topic routing reference
 
@@ -331,8 +333,6 @@ Without override, all three publish the same value. `_thermostat` and `_boiler` 
 | `R` (gateway-substituted write) | M→S | no | yes | yes |
 | `B` (boiler-response) | S→M | yes (when no A follows) | yes | yes |
 | `A` (gateway-faked answer) | S→M | yes | no | no |
-
-There is no `_gateway` topic — override is visible by comparing `_thermostat` and `_boiler`.
 
 #### Canonical-topic publish gating (ADR-066, preserved)
 
@@ -467,7 +467,21 @@ When `settings.mqtt.bSeparateSources` is enabled, source-templated discovery ent
 - `{entity}_thermostat` — value the thermostat sees (its sent write or its received read response, including any gateway-faked answer)
 - `{entity}_boiler` — value the boiler sees (its received write, including any gateway override, or its sent read response)
 
-Per ADR-068 the base `{entity}` is suppressed for source-templated MsgIDs when `bSeparateSources` is enabled — only the two source-variant entities are published. For non-source-templated MsgIDs the base entity continues to publish in both modes. There is no `{entity}_gateway` variant; gateway override is observable via divergence between the two source-variants.
+The base `{entity}` is also advertised in discovery alongside both source variants (ADR-070 dropped the earlier mutual-exclusion rule from ADR-068). This means existing HA dashboards referencing the canonical entity continue to work when a user enables `bSeparateSources` — the option is purely additive.
+
+For non-source-templated MsgIDs the base entity continues to publish in both modes.
+
+There is no `{entity}_gateway` variant; gateway override is observable via divergence between the two source-variant topics.
+
+#### Discovery topic shape (ADR-071)
+
+Discovery topics for source variants use sibling-suffix shape, matching the state topic shape. This is required because Home Assistant's discovery dispatcher (`discovery.py:TOPIC_MATCHER`) only accepts `[a-zA-Z0-9_-]+` for the `object_id` segment — slashes in the object ID cause the payload to be silently discarded.
+
+| Layer | Discovery topic |
+|---|---|
+| canonical | `{haprefix}/sensor/{nodeId}/{label}/config` |
+| thermostat view | `{haprefix}/sensor/{nodeId}/{label}_thermostat/config` |
+| boiler view | `{haprefix}/sensor/{nodeId}/{label}_boiler/config` |
 
 ### Retained discovery verification (v1.4.1+)
 
@@ -490,6 +504,26 @@ Since 1.4.1 the firmware can actively verify that its retained Home Assistant di
 - `disc_last_missing > 0` immediately after a run means a republish was just triggered. Wait for the drip to finish (observable via `pending_ids` on `GET /api/v2/discovery`), then start a second verify. If `last_missing` is still non-zero after two or three passes, investigate the broker: retained-message settings, persistence configuration, backup/restore gaps.
 - `disc_last_orphan > 0` is purely informational. On a shared broker it is expected and does not require action.
 - If `verify_runs` increases but `disc_last_verify_epoch` does not, the verify is aborting early because the heap dropped below the abort threshold during the window. This is harmless but indicates the device is under memory pressure from another subsystem.
+
+### Entity Friendly Names (ADR-072)
+
+The `name` field in every HA discovery payload follows a uniform format (shipping from beta.29 onward):
+
+- Underscores replaced with spaces.
+- First letter of each word capitalised (Title Case).
+- Existing capitals preserved, so recognised acronyms render consistently: `DHW`, `CH`, `VH`, `OEM`, `ASF`, `RBP`, `GPIO`, `LED`, `MQTT`, `RF`, `OTC`, etc.
+- No hostname prefix. The device-card title already shows the gateway hostname once; repeating it on every entity name is redundant.
+
+**Examples:**
+
+| Internal PROGMEM string | Rendered in HA |
+|---|---|
+| `DHW_Setpoint` | `DHW Setpoint` |
+| `Burner_Unsuccessful_Starts` | `Burner Unsuccessful Starts` |
+| `CH_Water_Pressure` | `CH Water Pressure` |
+| `Status_Master_MemberID_Code` | `Status Master MemberID Code` |
+
+Slug strings (used in `state_topic` paths and `unique_id` fields) are unaffected by this change and remain stable across upgrades.
 
 ### Discovery Lifecycle
 
@@ -516,7 +550,7 @@ Template placeholders:
 | `%mqtt_pub_topic%` | MQTT publish namespace |
 | `%mqtt_sub_topic%` | MQTT subscribe namespace |
 | `%homeassistant%` | HA discovery prefix |
-| `%source_suffix%` | Source suffix (`_thermostat`, `_boiler`, or empty for the canonical-variant entity that replaces the suppressed base when `bSeparateSources = true`) |
+| `%source_suffix%` | Source suffix (`_thermostat`, `_boiler`, or empty for the canonical entity) |
 | `%source_name%` | Source display name (`Thermostat`, `Boiler`, or empty for the canonical variant) |
 | `%source_topic_segment%` | Source topic segment (`thermostat`, `boiler`, or empty for the canonical topic). No `gateway` segment exists; gateway override is observable via divergence between the two source-variant subtopics (ADR-069). |
 
@@ -524,7 +558,7 @@ Template placeholders:
 
 ## Heap diagnostic telemetry
 
-The firmware publishes heap-pressure and discovery counters as 17 individual retained topics under `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/*`. Each metric lives on its own topic (no JSON bundling) so consumers can subscribe to a single counter, expose it as a Home Assistant sensor without JSON path templating, or graph it directly in Grafana.
+The firmware publishes heap-pressure and discovery counters as 17 individual retained topics under `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/*`. Each metric lives on its own topic (no JSON bundling) so consumers can subscribe to a single counter, expose it as a Home Assistant sensor without JSON path templating, or graph it directly in Grafana. These topics are announced via HA discovery so they appear automatically as diagnostic entities under the OTGW device card.
 
 **Topic prefix**: `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/<metric>` (all retained)
 
@@ -586,7 +620,9 @@ The `canPublishMQTT()` function checks heap health before each publish. When fre
 
 ### Republish on Reconnect
 
-On MQTT (re)connect, the firmware calls `requestMQTTRepublishAll()` to reset all value-change tracking, ensuring the next observed value for each message ID is published regardless of whether it matches the previously published value.
+On MQTT (re)connect, the firmware checks how long the connection was offline. If the offline duration exceeded 5 minutes (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`), a full republish is triggered on the assumption that the broker may have lost its retained state (for example, mosquitto restarted without persistence). Short outages (under 5 minutes) are treated as network blips — the broker still holds all retained topics, so no republish is performed.
+
+First boot and first-enable scenarios are treated as zero offline duration, so no republish is triggered. Instead, the first-seen mechanism publishes each OT value naturally the first time it appears on the OT bus.
 
 ---
 

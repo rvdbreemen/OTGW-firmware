@@ -5,6 +5,8 @@
 Document Title: WebSocket Communication Flow Architecture
 Creation Date: 2026-02-02
 Firmware Version: v1.0.0-rc6
+Last Updated: 2026-05-08
+Firmware Version (updated): v1.5.0-beta.29
 Document Type: Architecture Documentation
 Status: COMPLETE
 ---
@@ -96,8 +98,8 @@ Browser Client                ESP8266 Device
 2. **Client Properties**:
    - **Initiator:** Browser JavaScript code
    - **Trigger:** Page load, navigation to main page, or after flash operations
-   - **Auto-reconnect:** Attempts reconnection every 5 seconds on disconnect
-   - **Watchdog:** 30-second timeout, reconnects if no messages received
+   - **Auto-reconnect:** Attempts reconnection every 5 seconds on disconnect; reconnect is debounced by 250 ms on page load and tab-visibility restore to avoid a rapid double-connect during browser reload (see "Reload-Storm Mitigation" below)
+   - **Watchdog:** 45-second timeout (30 s keepalive + 15 s margin), reconnects if no messages received
 
 ## Complete Connection Lifecycle
 
@@ -147,7 +149,11 @@ Browser Loads Web UI:
 
 **Key Code:**
 ```javascript
-// data/index.js:996
+// data/index.js - showMainPage(), called when the main page section becomes active
+// A 250 ms delay lets the previous page's socket retire before a new one opens.
+scheduleOTLogWebSocketInit(false, 250);
+
+// scheduleOTLogWebSocketInit internally calls:
 otLogWS = new WebSocket(wsURL);  // Browser connects TO ESP8266
 ```
 
@@ -290,7 +296,7 @@ Connection Loss & Reconnection:
 
 **Browser Auto-Reconnect:**
 ```javascript
-// data/index.js:1017-1036
+// data/index.js - onclose handler
 otLogWS.onclose = function() {
   console.log('OT Log WebSocket disconnected');
   updateWSStatus(false);
@@ -303,6 +309,28 @@ otLogWS.onclose = function() {
     }, delay);
   }
 };
+```
+
+**Browser Page-Lifecycle Shutdown (added v1.5.0):**
+
+When a browser tab is reloaded or navigated away, both `pagehide` and `beforeunload` now explicitly close the WebSocket and cancel any pending reconnect timer before the page is torn down. This prevents the previous page's socket from remaining open on the server while the new page is already attempting its own connection:
+
+```javascript
+// data/index.js - pagehide and beforeunload handlers
+function shutdownPageNetworking(reason) {
+  stopScheduledOTLogWebSocketInit();  // Cancel pending delayed connect
+  disconnectOTLogWebSocket();         // Close current socket immediately
+}
+
+window.addEventListener('pagehide', function(event) {
+  persistOTLogBufferForUnload();
+  shutdownPageNetworking(event.persisted ? 'pagehide (bfcache)' : 'pagehide');
+});
+
+window.addEventListener('beforeunload', function() {
+  persistOTLogBufferForUnload();
+  shutdownPageNetworking('beforeunload');
+});
 ```
 
 **ESP8266 Cleanup:**
@@ -452,6 +480,39 @@ if (ESP.getFreeHeap() < HEAP_WARNING_THRESHOLD) {
 }
 ```
 
+## Reload-Storm Mitigation (added v1.5.0)
+
+Rapid browser reloads previously caused a short burst of WebSocket events on the ESP8266: the old page's socket disconnected while the new page was already requesting a new connection. In the worst case this could push `wsClientCount` briefly over the limit and log spurious rejections.
+
+Two complementary changes address this:
+
+### Client-side: 250 ms connect debounce
+
+`initOTLogWebSocket()` is no longer called directly from `showMainPage()` or the `visibilitychange` handler. Instead, `scheduleOTLogWebSocketInit(force, 250)` inserts a 250 ms delay. If the tab is torn down again within that window (e.g. another reload), `shutdownPageNetworking()` cancels the pending timer via `stopScheduledOTLogWebSocketInit()` before it fires. This means a rapid reload produces at most one clean connect/disconnect pair rather than an overlapping pair.
+
+```javascript
+// On page section show:
+scheduleOTLogWebSocketInit(false, 250);  // delayed
+
+// On visibilitychange (tab becomes visible again):
+scheduleOTLogWebSocketInit(false, 250);  // delayed
+
+// On pagehide / beforeunload:
+shutdownPageNetworking(reason);           // cancels timer + closes socket
+```
+
+### Server-side: burst-event diagnostics
+
+`webSocketStuff.ino` maintains a sliding 5-second window of connection lifecycle events (connects, disconnects, heap rejections, max-client rejections, errors). When the total within a window reaches 3 or more, a single telnet debug line is emitted:
+
+```
+[millis] WebSocket burst window=5000ms total=N conn=A disc=B rejMax=C rejHeap=D err=E clients=F heap=G maxBlk=H
+```
+
+This is diagnostic only; it does not change protocol behavior. If you see this line in the telnet log during normal use, it indicates rapid client churn that is worth investigating.
+
+**Burst log threshold:** 3 events in 5 seconds (constants `WS_BURST_LOG_THRESHOLD` and `WS_BURST_WINDOW_MS` in `webSocketStuff.ino`).
+
 ## Special Scenarios
 
 ### During Firmware Flash
@@ -577,6 +638,6 @@ Send keepalives       ────────→ Reset watchdog
 
 ---
 
-**Last Updated:** 2026-02-02  
-**Firmware Version:** v1.0.0-rc6  
-**Document Version:** 1.0
+**Last Updated:** 2026-05-08
+**Firmware Version:** v1.5.0-beta.29
+**Document Version:** 1.1

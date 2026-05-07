@@ -101,11 +101,16 @@ python3 flash_esp.py --download
 
 Both firmware and filesystem are written in a single operation. No erase is needed; settings stored in the filesystem are preserved.
 
+> **Note**: `flash_otgw.sh` and `flash_otgw.bat` always erase the entire flash before writing. They are not suitable for settings-preserving upgrades. Use `flash_esp.py --download` (without `--erase`) when you want to keep your settings.
+
 For upgrading v1.3.x or earlier → v1.4.x+ (partition layout change, settings will be lost):
 
 ```bash
 # Back up settings from the Web UI first (Settings → Export), then:
 python3 flash_esp.py --download --erase
+# or the no-Python scripts, which also erase:
+./flash_otgw.sh      # Linux/macOS
+flash_otgw.bat       # Windows
 ```
 
 After the flash, re-import your settings via the Web UI.
@@ -130,7 +135,22 @@ After the flash, re-import your settings via the Web UI.
 
 ## Quick Start (Standard)
 
-### Download latest release and flash
+### Preferred: no-Python scripts
+
+Download `flash_otgw.sh` (Linux/macOS) or `flash_otgw.bat` (Windows) and both binary files from the GitHub release page. Place all three in the same directory and run:
+
+```bash
+chmod +x flash_otgw.sh
+./flash_otgw.sh          # Linux/macOS
+```
+
+```bat
+flash_otgw.bat           :: Windows — Command Prompt or PowerShell
+```
+
+The script downloads esptool on first run (no Python needed), erases flash, and writes both images in one step.
+
+### Download latest release and flash (Python)
 
 ```bash
 python3 flash_esp.py
@@ -177,13 +197,18 @@ A bootloop (device resets repeatedly and never reaches the Web UI) after flashin
 
 The firmware cannot find a valid filesystem and resets.
 
-**Fix:**
+**Fix:** Erase the flash and write both firmware and filesystem in one step.
 
+No-Python scripts (erase is always included):
+```bash
+./flash_otgw.sh      # Linux/macOS
+flash_otgw.bat       # Windows
+```
+
+Python:
 ```bash
 python3 flash_esp.py --download --erase
 ```
-
-This erases the flash and writes both firmware and filesystem in one step.
 
 ### 2. Upgrading from v1.3.x without erasing (stale filesystem at wrong offset)
 
@@ -191,14 +216,28 @@ v1.4.x moved the filesystem partition from `0x300000` (1 MB) to `0x200000` (2 MB
 
 **Fix:**
 
+No-Python scripts:
+```bash
+./flash_otgw.sh      # Linux/macOS
+flash_otgw.bat       # Windows
+```
+
+Python:
 ```bash
 python3 flash_esp.py --download --erase
 ```
 
 ### 3. Flash incomplete or interrupted
 
-**Fix:** Retry with a lower baud rate:
+**Fix:** Retry with a lower baud rate.
 
+No-Python scripts:
+```bash
+./flash_otgw.sh --baud 115200
+flash_otgw.bat --baud 115200
+```
+
+Python:
 ```bash
 python3 flash_esp.py --download --erase --baud 115200
 ```
@@ -211,13 +250,26 @@ Tools: Arduino IDE Serial Monitor, PuTTY, `screen /dev/ttyUSB0 74880`, or any te
 
 ### 5. Hard recovery (device completely unresponsive)
 
-If the Web UI and serial output are both unavailable:
+If the Web UI and serial output are both unavailable, specify the port and a conservative baud rate explicitly.
 
+No-Python scripts:
+```bash
+./flash_otgw.sh --port /dev/ttyUSB0 --baud 115200
+flash_otgw.bat --port COM3 --baud 115200
+```
+
+Python:
 ```bash
 python3 flash_esp.py --download --erase --baud 115200 --port <your-port>
 ```
 
-If the auto-detected port is wrong or no port appears, check Device Manager (Windows) or `ls /dev/tty*` (Linux/macOS) for the USB-serial adapter. Common driver packages: CP210x (Silicon Labs) or CH340 (WCH).
+If no port appears, check Device Manager (Windows) or `ls /dev/tty*` (Linux/macOS) for the USB-serial adapter. Common driver packages: CP210x (Silicon Labs) or CH340 (WCH).
+
+---
+
+## After Flashing
+
+After a fresh flash (whether via the simple scripts or `flash_esp.py`), the device opens a WiFi access point named `OTGW-<MAC-address>`. Connect to it and browse to `http://192.168.4.1` to configure your WiFi network and other settings. On subsequent boots the device connects to your configured network.
 
 ---
 
@@ -226,9 +278,9 @@ If the auto-detected port is wrong or no port appears, check Device Manager (Win
 - **Never flash the PIC firmware over WiFi using OTmonitor** — this can brick the PIC microcontroller.
 - Use a reliable, direct USB cable (avoid hubs) to minimise flash errors.
 - If auto-install of esptool fails, install it manually: `pip install esptool`
-- On Linux, add yourself to the `dialout` group and log out/in before flashing.
+- On Linux, add yourself to the `dialout` group and log out/in before flashing. On first run, `flash_otgw.sh` auto-escalates with `sudo` if serial port access is denied.
 
-For full usage details:
+For full usage details of the Python tool:
 
 ```bash
 python3 flash_esp.py --help

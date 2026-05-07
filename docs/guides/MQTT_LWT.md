@@ -72,7 +72,26 @@ Broker detects TCP timeout
     |
     v
 Broker publishes "offline" on OTGW/value/otgw-XX  (retained)  <-- LWT
+    |
+    v
+ESP8266 reconnects
+    |
+    +---> publish "online" on OTGW/value/otgw-XX  (retained)  <-- birth message
+    |
+    +---> was offline > 5 min?
+          yes: republish all OT retained topics (broker may have lost state)
+          no:  skip republish (broker still holds retained topics)
 ```
+
+## Reconnect Republish Behaviour
+
+After the birth message (`"online"`) is published, the firmware decides whether to force-republish all OT retained topics. The decision is based on how long the device was offline:
+
+- **Offline for more than 5 minutes**: The broker may have restarted or lost its retained state. The firmware calls `requestMQTTRepublishAll()` to push all current OT values back to the broker so subscribers see up-to-date data.
+- **Offline for 5 minutes or less**: The broker almost certainly still holds all retained topics from before the outage. Republishing is skipped to avoid unnecessary broker load.
+- **First boot or first enable**: Offline duration is treated as zero, so republish is skipped. The first-seen mechanism in the OT processing loop handles initial publication: every message ID is published the first time it appears on the OpenTherm bus.
+
+The threshold is defined in `MQTTstuff.ino` as `MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS = 300000` (5 minutes). The offline duration is measured from the last confirmed-live MQTT tick stored in `state.mqtt.iLastConnectedMs`.
 
 ## How Home Assistant Uses This
 
@@ -109,7 +128,8 @@ Without retain, availability would only be known to subscribers who happened to 
 
 ## Related Code
 
-- **LWT + birth message**: `src/OTGW-firmware/MQTTstuff.ino` (lines 786-807)
+- **LWT + birth message**: `src/OTGW-firmware/MQTTstuff.ino` — `handleMQTT()`, `MQTT_STATE_IS_CONNECTED` and reconnect block
+- **Reconnect republish threshold**: `src/OTGW-firmware/MQTTstuff.ino` — `MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS` constant and the `offlineMs` check in `handleMQTT()`
 - **Availability macro**: `src/OTGW-firmware/OTGW-firmware.h:73` — `CONLINEOFFLINE(x)`
 - **HA discovery configs**: `src/OTGW-firmware/data/mqttha.cfg` — `avty_t` field
 - **MQTT topic documentation**: `docs/api/MQTT.md` — Connection Lifecycle section

@@ -10,7 +10,18 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 >
 > For production gateways, install the latest stable release (currently `v1.4.1`) from the [GitHub releases page](https://github.com/rvdbreemen/OTGW-firmware/releases/latest). The `main` branch never carries this disclaimer; if you see this block, you are reading the `dev` branch's README.
 
-## What's coming in v1.5.0-beta (LTS line on Arduino Core 2.7.4)
+## What's New in v1.5.0
+
+- **Sibling-suffix MQTT topic shape (ADR-070/071)**: cleaner topic hierarchy with source-separated sub-topics per device.
+- **Worldview semantics for /thermostat and /boiler**: each sub-topic now reflects the correct actor perspective (ADR-069).
+- **Human-readable HA discovery friendly names**: entity names use spaces and Title Case instead of raw identifiers (ADR-072).
+- **HA discovery for diagnostic topics**: heap stats, reboot count, PIC diagnostics, and related firmware metrics publish proper HA sensors.
+- **New REST endpoint GET /api/v2/debug**: one-call diagnostic dump for troubleshooting and field support.
+- **Write-Ack MQTT gating bug fixed**: enum-family misclassification that silenced Write-Ack messages corrected (ADR-066).
+- **MsgID 1 TSet flip for heat-pump stability**: non-echo flapping on TSet corrected for heat-pump boilers.
+- **No-Python flash and build scripts**: `flash_otgw.sh` / `flash_otgw.bat` and `build.sh` / `build.bat` handle environment setup automatically.
+
+## What was coming in v1.5.0-beta (LTS line on Arduino Core 2.7.4)
 
 The `1.5.x` line is the long-term-support track of OTGW-firmware on the ESP8266, built on **Arduino Core 2.7.4**. Field experience of `v1.4.x` on Arduino Core 3.1.2 surfaced post-OTA reboot reliability and PROGMEM alignment classes of issue that did not appear on Core 2.7.4. The `1.5.x` LTS line gives users who prefer the proven, conservative platform a place to land.
 
