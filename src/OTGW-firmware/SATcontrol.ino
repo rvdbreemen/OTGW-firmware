@@ -1613,7 +1613,11 @@ static void satSendJsonFloat(const __FlashStringHelper* cName, float fValue, uin
   strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
   nameBuf[sizeof(nameBuf) - 1] = 0;
   char numBuf[16];
-  dtostrf(fValue, 1, decimals, numBuf);
+  if (isnan(fValue) || isinf(fValue)) {
+    strcpy_P(numBuf, PSTR("null"));
+  } else {
+    dtostrf(fValue, 1, decimals, numBuf);
+  }
   char jsonBuff[60];
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
   sendBeforenext();
