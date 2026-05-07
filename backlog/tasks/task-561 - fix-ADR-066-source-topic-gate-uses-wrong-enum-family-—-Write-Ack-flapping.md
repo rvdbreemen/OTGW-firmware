@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 13:16'
-updated_date: '2026-05-07 13:18'
+updated_date: '2026-05-07 13:22'
 labels:
   - bug
   - mqtt
@@ -22,13 +22,15 @@ publishToSourceTopic() compares rsptype (OTGW_response_type, 0..5) against OT_WR
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Predicate at MQTTstuff.ino:1212 is replaced with: OTdata.type == OT_WRITE_ACK && rsptype == OTGW_BOILER && !OTlookupitem.bSlaveEchoesValue
-- [ ] #2 Comment block immediately above the gate is updated so a future reader can see why OTdata.type (not rsptype) is the right field
-- [ ] #3 python build.py --firmware exits 0
-- [ ] #4 python evaluate.py --quick shows no new failures
-- [ ] #5 Prerelease bump committed alongside the firmware change via bin/bump-prerelease.sh
+- [x] #1 Predicate at MQTTstuff.ino:1212 is replaced with: OTdata.type == OT_WRITE_ACK && rsptype == OTGW_BOILER && !OTlookupitem.bSlaveEchoesValue
+- [x] #2 Comment block immediately above the gate is updated so a future reader can see why OTdata.type (not rsptype) is the right field
+- [x] #3 python build.py --firmware exits 0
+- [x] #4 python evaluate.py --quick shows no new failures
+- [x] #5 Prerelease bump committed alongside the firmware change via bin/bump-prerelease.sh
 - [ ] #6 Field-validation note in Final Summary: with bSeparateSources=true, msgid 14 and 16 on _thermostat/_boiler no longer flap to 0 between Write-Data frames (tester sign-off via Discord; leave blocking AC if not yet confirmed)
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
