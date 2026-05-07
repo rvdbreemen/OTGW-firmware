@@ -1861,16 +1861,29 @@ static bool writeJsonOpen(MqttJsonWriter &w)  { return w.writeChar('{'); }
 static bool writeJsonClose(MqttJsonWriter &w) { return w.writeChar('}'); }
 static bool writeJsonComma(MqttJsonWriter &w) { return w.writeChar(','); }
 
-// Write a string to the JSON writer with '_' transformed to ' '. Used for the
-// human-facing "name" field in HA discovery configs so testers see
-// "OTGW Boiler exhaust temperature" instead of "OTGW_Boiler_exhaust_temperature"
-// in the HA UI. Transformation is friendly-name-only — unique_id, stat_t topic,
-// and entity_id all continue to use the underscore form (Andre, 2026-05-07).
+// Write a string to the JSON writer for the human-facing "name" field in HA
+// discovery configs. Two transforms applied char-by-char:
+//   1. '_' becomes ' ' (sibling-of-hostname / inter-word separators)
+//   2. The first letter of every word is upper-cased; existing capitals are
+//      preserved. Word boundary = start-of-string or after a space.
+//
+// This produces consistent Title Case from the heterogeneously-cased PROGMEM
+// friendlyName tables: "central_heating", "Solar_collector_temperature",
+// "status_vh_master" all render as "Central Heating", "Solar Collector
+// Temperature", "Status Vh Master". Mixed-case acronyms in the source like
+// "CH2" or "DHW" are preserved unchanged because the transform never lowercases.
+//
+// Transformation is friendly-name-only — unique_id, stat_t topic, entity_id,
+// and discovery topic path continue to use the underscore form (Andre, 2026-05-07).
 static bool writeFriendlyName(MqttJsonWriter &w, const char *s) {
   if (!s) return true;
+  bool atWordStart = true;
   for (const char *p = s; *p; p++) {
-    char c = (*p == '_') ? ' ' : *p;
+    char c = *p;
+    if (c == '_') c = ' ';
+    if (atWordStart && c >= 'a' && c <= 'z') c = c - 'a' + 'A';
     if (!w.writeChar(c)) return false;
+    atWordStart = (c == ' ');
   }
   return true;
 }
@@ -1996,15 +2009,13 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "name":"<hostname> <friendlyName>[ <sourceName>]"
-  // Underscores in friendlyName are transformed to spaces for HA UI legibility
-  // (Andre 2026-05-07). Entity IDs, unique_ids, and stat_t topics still use
-  // the underscore form — only the human-facing name field is transformed.
+  // "name":"<friendlyName>[ <sourceName>]"
+  // Hostname dropped (device card title shows "OpenTherm Gateway (<hostname>)"
+  // already, so prepending hostname to entity name is redundant). writeFriendlyName
+  // applies '_' -> ' ' + Title Case for consistent rendering. (Andre 2026-05-07.)
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kName)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
-  if (!w.writeRam(ctx.hostname)) return false;
-  if (!w.writeChar(' ')) return false;
   if (!writeFriendlyName(w, friendlyName)) return false;
   if (hasSrc && ctx.sourceName && ctx.sourceName[0]) {
     if (!w.writeChar(' ')) return false;
@@ -2098,12 +2109,10 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "name":"<hostname> <friendlyName>" (underscores in friendlyName -> spaces)
+  // "name":"<friendlyName>" (hostname dropped, '_' -> ' ' + Title Case)
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kName)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
-  if (!w.writeRam(ctx.hostname)) return false;
-  if (!w.writeChar(' ')) return false;
   if (!writeFriendlyName(w, friendlyName)) return false;
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
@@ -2320,12 +2329,10 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
     if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
 
-    // "name":"<hostname> Temperature <sensorAddress>" (Andre 2026-05-07: spaces, not underscores)
+    // "name":"Temperature <sensorAddress>" (hostname dropped per Andre 2026-05-07)
     if (!w.writeChar('"')) return false;
     if (!w.writeProgmem(kName)) return false;
-    if (!w.writeProgmem(PSTR("\":\""))) return false;
-    if (!w.writeRam(ctx.hostname)) return false;
-    if (!w.writeProgmem(PSTR(" Temperature "))) return false;
+    if (!w.writeProgmem(PSTR("\":\"Temperature "))) return false;
     if (!w.writeRam(sensorAddress)) return false;
     if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
@@ -2517,19 +2524,15 @@ bool streamClimateDiscovery(PubSubClient &client,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // name + uniq_id
+    // name + uniq_id (hostname dropped from name per Andre 2026-05-07; uniq_id keeps it)
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
-      if (!w.writeRam(ctx.hostname)) return false;
-      if (!w.writeProgmem(PSTR("_Thermostat\""))) return false;
+      if (!w.writeProgmem(PSTR("\"name\":\"Thermostat\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
       if (!w.writeRam(ctx.nodeId)) return false;
       if (!w.writeProgmem(PSTR("-thermostat\""))) return false;
     } else {
-      if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
-      if (!w.writeRam(ctx.hostname)) return false;
-      if (!w.writeProgmem(PSTR("_DHW_Control\""))) return false;
+      if (!w.writeProgmem(PSTR("\"name\":\"DHW Control\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
       if (!w.writeRam(ctx.nodeId)) return false;
@@ -2680,9 +2683,8 @@ bool streamNumberDiscovery(PubSubClient &client,
     // device_class + name
     if (!writeJsonKV_P(w, kDevCls, PSTR("temperature"))) return false;
     if (!writeJsonComma(w)) return false;
-    if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
-    if (!w.writeRam(ctx.hostname)) return false;
-    if (!w.writeProgmem(PSTR("_Outside_Temperature_Override\""))) return false;
+    // hostname dropped from name (Andre 2026-05-07)
+    if (!w.writeProgmem(PSTR("\"name\":\"Outside Temperature Override\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     // cmd_t
