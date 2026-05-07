@@ -10,14 +10,42 @@ The separate ESP32 / SAT v2.0.0 exploration on `feature-dev-2.0.0-otgw32-esp32-s
 
 ## [Unreleased]
 
-### Fixed
-- WiFi association without DHCP/IP after first reboot post-flash on the initial `1.5.0-beta+d40c2f6` build (TASK-432). Removed `wifi_station_dhcpc_start()` from `loopWifi()` `WIFI_DISCONNECTED` so the SDK regains autonomous DHCP management. Returns to the v1.2.0 baseline pattern; resolves the "associates but no IP, requires forced router-side reconnect" symptom reported by andrebrait on 2026-04-26.
-- Master MQTT topic flapping between real value and `0` for `Tr` (room temperature), `TrSet` (room setpoint), `MaxRelModLevelSetting`, and analogous master-to-slave informational write messages. Regression introduced in v1.4.1 when `is_value_valid()` was widened to accept slave Write-Ack values for `OT_WRITE` and `OT_RW` messages. Per ADR-066, the base topic now uses v1.3.5 semantics again (Read-Ack and Write-Data only); the optional `/boiler` subtopic is gated by a per-MsgID `bSlaveEchoesValue` flag for messages whose slave Write-Ack data byte is per-spec undefined. Spec-audit covering all OT v4.2 MsgIDs lives in `docs/api/MQTT-message-id-echo-audit.md`. Tracked as TASK-478.
+_No unreleased changes yet. New work on `dev` lands here._
+
+## [1.5.0] - 2026-05-08
+
+First stable release of the `1.5.x` LTS line on Arduino Core 2.7.4. Promotes 29 beta builds of fixes, MQTT improvements, and HA discovery refinements to stable.
 
 ### Added
-- ADR-066 documenting the source-aware MQTT publish gating decision
+- MQTT worldview semantics for `/thermostat` and `/boiler` source subtopics (ADR-069, TASK-549)
+- Sibling-suffix MQTT source topic shape: `<msgid>_thermostat` / `<msgid>_boiler` (ADR-070, TASK-552)
+- Sibling-suffix HA discovery topic shape replacing nested children (ADR-071, TASK-556)
+- Drip mode threshold-hysteresis: deadband and K-tick dampening for stable source topics (TASK-553)
+- HA auto-discovery for PIC and firmware diagnostic topics (TASK-540)
+- Compact telnet welcome banner with log-triage snapshot and inline toggle list (TASK-545)
+- `GET /api/v2/debug` REST endpoint for one-call diagnostic dump (TASK-536)
+- HA discovery friendly names in human-readable Title Case with MDI icons (ADR-072, TASK-572, TASK-573)
+- No-Python flash scripts: `flash_otgw.sh` / `flash_otgw.bat` and `build.sh` / `build.bat`
+- ADR-066 documenting source-aware MQTT publish gating decision
 - `docs/api/MQTT-message-id-echo-audit.md` spec-audit reference per OpenTherm v4.2
 - `bSlaveEchoesValue` field on `OTlookup_t` populated for every MsgID
+- Smart MQTT republish: `POST /api/v2/mqtt/republish` endpoint; republish on reconnect gated at 5-minute offline threshold
+
+### Changed
+- `/gateway` sub-topic removed; canonical base topic replaces it (TASK-538)
+- ADR-066 MQTT base topic gating extended to OT-log WebSocket and REST state (TASK-483)
+- Force-discovery routed through drip publisher with `maxBlock` throttle to prevent log flooding
+- MQTT publish gating tightened: 250 ms minimum spacing between gated fan-out publishes
+
+### Fixed
+- Master MQTT topic flapping for `Tr`, `TrSet`, `MaxRelModLevelSetting`, and analogous write-only MsgIDs (ADR-066, TASK-478): base topic uses Read-Ack and Write-Data only; per-MsgID `bSlaveEchoesValue` flag gates the boiler echo path
+- ADR-066 Write-Ack gate enum-family bug that silenced valid Write-Ack publications (TASK-561)
+- MsgID 1 `TSet` `bSlaveEchoesValue` flip to `false` for heat-pump boiler stability (TASK-571)
+- WiFi: DHCP lease not acquired after first reboot post-flash (TASK-432); `wifi_station_dhcpc_start()` removed, SDK manages DHCP autonomously
+- WiFi: TCP listeners re-bound on reconnect causing port-already-in-use errors
+- GW=R PIC reset command stuck in queue causing infinite PIC reset loop (TASK-538 queue fix); GW=R is now fire-and-forget
+- WebSocket reload-storm churn: 250 ms reconnect debounce and `pagehide` shutdown handler added
+- Non-monotonic debug timestamps in `_debugBOL` across a second-tick boundary
 
 ## [1.5.0-beta] - 2026-04-26
 

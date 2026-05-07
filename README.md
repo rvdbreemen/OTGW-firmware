@@ -12,35 +12,30 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## What's New in v1.5.0
 
-- **Sibling-suffix MQTT topic shape (ADR-070/071)**: cleaner topic hierarchy with source-separated sub-topics per device.
-- **Worldview semantics for /thermostat and /boiler**: each sub-topic now reflects the correct actor perspective (ADR-069).
-- **Human-readable HA discovery friendly names**: entity names use spaces and Title Case instead of raw identifiers (ADR-072).
-- **HA discovery for diagnostic topics**: heap stats, reboot count, PIC diagnostics, and related firmware metrics publish proper HA sensors.
-- **New REST endpoint GET /api/v2/debug**: one-call diagnostic dump for troubleshooting and field support.
-- **Write-Ack MQTT gating bug fixed**: enum-family misclassification that silenced Write-Ack messages corrected (ADR-066).
-- **MsgID 1 TSet flip for heat-pump stability**: non-echo flapping on TSet corrected for heat-pump boilers.
-- **No-Python flash and build scripts**: `flash_otgw.sh` / `flash_otgw.bat` and `build.sh` / `build.bat` handle environment setup automatically.
+v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Arduino Core 2.7.4**. It ships 29 beta builds worth of fixes, MQTT improvements, and Home Assistant discovery refinements.
 
-## What was coming in v1.5.0-beta (LTS line on Arduino Core 2.7.4)
+- **Sibling-suffix MQTT topic shape (ADR-070/071)**: `TSet_thermostat` / `TSet_boiler` instead of `TSet/thermostat` / `TSet/boiler` — source-variant entities now actually register in HA for the first time.
+- **Worldview semantics for /thermostat and /boiler (ADR-069)**: each sub-topic reflects the correct actor perspective.
+- **Human-readable HA discovery friendly names (ADR-072)**: entity names use spaces and Title Case; `unique_id` unchanged so automations are unaffected.
+- **HA discovery for diagnostic topics**: PIC and firmware metrics publish proper HA sensors.
+- **GET /api/v2/debug**: one-call diagnostic dump for troubleshooting and field support.
+- **MQTT topic flapping fixed (ADR-066)**: base topic uses Read-Ack and Write-Data only; `bSlaveEchoesValue` per-MsgID flag gates the boiler echo path.
+- **TSet flip for heat-pump stability**: MsgID 1 `bSlaveEchoesValue=false` stops flapping on non-echoing boilers.
+- **No-Python flash and build scripts**: `flash_otgw.sh` / `flash_otgw.bat` and `build.sh` / `build.bat`.
+- **Arduino Core 2.7.4 baseline**: partition layout retained at `eesz=4M2M` — no filesystem partition reformat needed when upgrading from v1.4.1.
 
-The `1.5.x` line is the long-term-support track of OTGW-firmware on the ESP8266, built on **Arduino Core 2.7.4**. Field experience of `v1.4.x` on Arduino Core 3.1.2 surfaced post-OTA reboot reliability and PROGMEM alignment classes of issue that did not appear on Core 2.7.4. The `1.5.x` LTS line gives users who prefer the proven, conservative platform a place to land.
+Full release notes: [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-> **Status: BETA, in active development on `dev`.** Not recommended for production deployments. A stable `v1.5.0` will follow once the line has soaked in the field. Users staying on `v1.4.1` need no action; `v1.4.1` continues to be the latest stable release.
+## Latest stable release: v1.5.0
 
-Full release notes: [RELEASE_NOTES_1.5.0-beta.md](RELEASE_NOTES_1.5.0-beta.md).
+`v1.5.0` is the current stable release. It runs on Arduino Core 2.7.4 and brings sibling-suffix MQTT topics, worldview semantics, human-readable HA discovery entity names, targeted bug fixes for MQTT topic flapping and WiFi DHCP, and reboot reliability hardening. Upgrading from v1.4.1 requires no filesystem partition reformat.
 
-What's different from `v1.4.1`:
+Full release notes: [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md)
 
-- **Arduino Core 2.7.4 baseline**: partition layout retained at `eesz=4M2M` (4 MB flash, 2 MB LittleFS) from v1.4.x, so `v1.4.1 → 1.5.x` needs no filesystem partition reformat. lwIP returns to the version shipped with Core 2.7.4. PROGMEM byte-safe helpers introduced for Core 3.1.2 are kept as defensive code.
-- **Reboot reliability hardening**: deferred reboot with lifecycle heap snapshots, explicit service cleanup before `ESP.restart()`, `ESP.reset()` fallback path, `WiFi.disconnect()` removed from the reboot path (it wiped NVRAM credentials on Core 3.1.x).
-- **MQTT publish gating tightened**: msgId 0 / 5 / 6 / 100 fan-out gates with 60 s heartbeat, 1 s minimum spacing between gated publishes (250 ms in the latest beta), `BGTRACE`/`OTTRACE` off by default.
-- **HA auto-discovery for stats topics**: `otgw-firmware/stats/*` metrics now publish proper HA sensors instead of raw JSON, with `IS_PIC_ENTRY` flag honoured and pseudo-ID 247 stats repaired.
-- **WebUI design system**: self-hosted Inter and JetBrains Mono fonts, design tokens, cross-browser dark/light theme hardening, log render hotpath fix (10k entry cap on restore buffer).
-- **Boot and loop diagnostics**: `logBootSignature()` boot telemetry, optional `BGTRACE` per-phase timing in `doBackgroundTasks` and main loop, `processOT` sub-trace with per-phase heap and time deltas.
+## Previous stable release: v1.4.1
 
-## Latest stable release: v1.4.1
-
-`v1.4.1` is the latest published stable release on the Arduino Core 3.1.2 line. Highlights: SimpleTelnet migration, MQTT HA discovery streaming rewrite (309 configs across 80+ msgIds), WiFi reconnect hardening after router reboot, heap-aware discovery drip with fragmentation gates, retained-discovery self-heal ([ADR-062](docs/adr/ADR-062-retained-discovery-verification.md)), unified time-boundary dispatcher ([ADR-064](docs/adr/ADR-064-time-boundary-single-caller-contract.md)), OpenTherm v4.2 alignment fixes.
+`v1.4.1` was the previous stable release on the Arduino Core 3.1.2 line. Highlights: SimpleTelnet migration, MQTT HA discovery streaming rewrite (309 configs across 80+ msgIds), WiFi reconnect hardening after router reboot, heap-aware discovery drip with fragmentation gates, retained-discovery self-heal ([ADR-062](docs/adr/ADR-062-retained-discovery-verification.md)), unified time-boundary dispatcher ([ADR-064](docs/adr/ADR-064-time-boundary-single-caller-contract.md)), OpenTherm v4.2 alignment fixes.
 
 > **Upgrade warning for v1.4.1**: the Arduino Core 3.1.2 upgrade changed the LittleFS partition from 1 MB to 2 MB. Flash the **filesystem binary first** (`*.littlefs.bin`), then the firmware binary, to preserve your settings. Reverse order triggers a 5-10 minute partition reformat on boot and all settings are lost. Full procedure in the [v1.4.1 release notes](docs/releases/RELEASE_NOTES_1.4.1.md).
 
