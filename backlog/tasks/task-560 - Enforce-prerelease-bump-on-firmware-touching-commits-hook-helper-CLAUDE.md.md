@@ -30,15 +30,17 @@ This is one of two paired tasks. The 2.0.0 worktree carries the sibling task.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 bin/bump-prerelease.sh exists, is executable, parses _VERSION_PRERELEASE matching ^[a-zA-Z]+\.[0-9]+$, increments the trailing integer, calls scripts/autoinc-semver.py with --prerelease, and prints old→new to stdout. Refuses with a clear error on non-matching tags or when not run from project root.
-- [ ] #2 .githooks/pre-commit extends the existing adr-kit hook: adr-judge runs first (gated by ADR_KIT_HOOK_DISABLE), then a bump-check runs (gated by OTGW_BUMP_HOOK_DISABLE). Either gate may block; both must pass for the commit to proceed.
-- [ ] #3 Bump-check trigger: any staged path under src/OTGW-firmware/ (excluding src/OTGW-firmware/version.h) or src/libraries/. If triggered, requires that git diff --cached for src/OTGW-firmware/version.h shows both a + and a - line containing _VERSION_PRERELEASE.
-- [ ] #4 Bump-check non-trigger paths (no bump required): *.md, docs/**, backlog/**, .claude/**, scripts/**, bin/**, .githooks/**, top-level .py/.sh/.bat. Verified by smoke test.
-- [ ] #5 Five smoke tests pass on the dev worktree: (1) bin/bump-prerelease.sh parses+increments+reverts cleanly; (2) hook BLOCKS a firmware-only synthetic commit; (3) hook PASSES a docs-only commit; (4) hook PASSES a firmware+bump commit; (5) ./build.sh exits 0. All synthetic state cleaned up after testing.
-- [ ] #6 CLAUDE.md gains a '## Versioning policy' section covering: what requires a bump, what does not, how to bump (bin/bump-prerelease.sh), and the OTGW_BUMP_HOOK_DISABLE bypass env var.
-- [ ] #7 Commit message is 'chore(hooks): enforce prerelease bump on firmware-touching commits' or similar; commit touches only .githooks/, bin/, CLAUDE.md (and is therefore exempt from the new bump check itself).
-- [ ] #8 After build green, the commit is pushed to origin/dev per CLAUDE.md push policy.
+- [x] #1 bin/bump-prerelease.sh exists, is executable, parses _VERSION_PRERELEASE matching ^[a-zA-Z]+\.[0-9]+$, increments the trailing integer, calls scripts/autoinc-semver.py with --prerelease, and prints old→new to stdout. Refuses with a clear error on non-matching tags or when not run from project root.
+- [x] #2 .githooks/pre-commit extends the existing adr-kit hook: adr-judge runs first (gated by ADR_KIT_HOOK_DISABLE), then a bump-check runs (gated by OTGW_BUMP_HOOK_DISABLE). Either gate may block; both must pass for the commit to proceed.
+- [x] #3 Bump-check trigger: any staged path under src/OTGW-firmware/ (excluding src/OTGW-firmware/version.h) or src/libraries/. If triggered, requires that git diff --cached for src/OTGW-firmware/version.h shows both a + and a - line containing _VERSION_PRERELEASE.
+- [x] #4 Bump-check non-trigger paths (no bump required): *.md, docs/**, backlog/**, .claude/**, scripts/**, bin/**, .githooks/**, top-level .py/.sh/.bat. Verified by smoke test.
+- [x] #5 Five smoke tests pass on the dev worktree: (1) bin/bump-prerelease.sh parses+increments+reverts cleanly; (2) hook BLOCKS a firmware-only synthetic commit; (3) hook PASSES a docs-only commit; (4) hook PASSES a firmware+bump commit; (5) ./build.sh exits 0. All synthetic state cleaned up after testing.
+- [x] #6 CLAUDE.md gains a '## Versioning policy' section covering: what requires a bump, what does not, how to bump (bin/bump-prerelease.sh), and the OTGW_BUMP_HOOK_DISABLE bypass env var.
+- [x] #7 Commit message is 'chore(hooks): enforce prerelease bump on firmware-touching commits' or similar; commit touches only .githooks/, bin/, CLAUDE.md (and is therefore exempt from the new bump check itself).
+- [x] #8 After build green, the commit is pushed to origin/dev per CLAUDE.md push policy.
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
