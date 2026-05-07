@@ -45,8 +45,6 @@ Coordinated with 2.0.0 sibling task (port + ADR-098 in 2.0.0 worktree).
 - [x] #10 docs/api/MQTT.md migration note updated: pre-ADR-071 retained nested discovery configs are zombies (HA never registered them) and may be cleaned with mosquitto_pub -t '<topic>' -r -n; included sample command for the nested paths
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -62,3 +60,29 @@ Coordinated with 2.0.0 sibling task (port + ADR-098 in 2.0.0 worktree).
 10. Update docs/api/MQTT.md migration note: add the nested-discovery-zombie cleanup recipe (mosquitto_pub -t '<topic>' -r -n on the now-orphaned nested paths)
 11. Mark ACs and add Final Summary; AC #9 (field test on beta unit) remains unchecked — hardware required
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implements ADR-071 by flipping the source-variant MQTT discovery topic shape from nested children (homeassistant/sensor/<id>/<entity>/<src>/config) to sibling-suffix (homeassistant/sensor/<id>/<entity>_<src>/config). Supersedes ADR-070's discovery-topic carve-out only; ADR-070's state-topic decision (`<label>_thermostat` / `<label>_boiler`) is preserved.
+
+Why:
+- ADR-070 claimed HA accepts nested discovery topics and handles them via subscription.async_prepare_subscribe_topics. Empirical test against home-assistant/core dev branch (homeassistant/components/mqtt/discovery.py:63-66) showed HA's TOPIC_MATCHER regex restricts object_id to [a-zA-Z0-9_-]+. The slash after the entity name fails the regex; HA logs "Received message on illegal discovery topic" (discovery.py:397-406) and silently discards the config.
+- Field consequence on beta.21+: every user with bSeparateSources=true sees only the canonical entity register; the source variants never appear in HA. Pre-flip configs sit retained on the broker as zombies.
+
+Changes:
+- src/OTGW-firmware/mqtt_configuratie.cpp: source-variant snprintf_P format string flipped to `%s/sensor/%s/%s_%s/config`; comment block above buildSensorDiscoveryTopic documents the supersession and the regex finding.
+- docs/adr/ADR-071-mqtt-discovery-topic-sibling-suffix-shape.md: new Accepted ADR with Enforcement forbid_pattern that catches the OLD nested format on regression.
+- docs/adr/ADR-070-mqtt-source-topic-sibling-suffix-shape.md: Status line updated to "Superseded by ADR-071, 2026-05-07"; body unchanged per immutability protocol.
+- docs/api/MQTT.md: migration note added covering the zombie nested-discovery configs left behind by beta.21 builds, with mosquitto_sub enumeration and mosquitto_pub -r -n cleanup recipe.
+
+Verification:
+- python build.py --firmware: exit 0, no new warnings, sketch 70% / RAM 71% (matches baseline).
+- python evaluate.py --quick: 31 passed / 2 warnings / 1 failed / 91.7% health (matches baseline; no regression).
+- grep 'PSTR("%s/sensor/%s/%s/%s/config")' on the source tree returns no matches.
+- adr-judge pre-commit: 0 violations, 56 advisory (all benign llm_judge:true ADRs).
+
+Commit 4d9b5b42 pushed to origin/dev.
+
+AC #9 (field test on a beta unit with bSeparateSources=true confirming HA registers the source-variant entities) is hardware-blocked; task remains In Progress pending field confirmation. All other ACs (#1-#8, #10) verified and checked.
+<!-- SECTION:FINAL_SUMMARY:END -->
