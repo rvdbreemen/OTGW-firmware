@@ -358,6 +358,22 @@ mosquitto_pub -h <broker> -t '<base>/value/<id>/<label>/boiler' -r -n
 
 HA users with `bSeparateSources = true` who built **manual** YAML sensor configs against the older routing or topic shape should re-point them at `{label}_thermostat` / `{label}_boiler`. Auto-discovered users need no action.
 
+#### Migration note (zombie discovery configs from beta.21, ADR-071)
+
+ADR-070 originally kept the **discovery** topic nested (`homeassistant/sensor/<id>/<entity>/thermostat/config`) while flattening the **state** topic to a sibling suffix. Empirical testing against `homeassistant/components/mqtt/discovery.py` showed HA's `TOPIC_MATCHER` regex requires `[a-zA-Z0-9_-]+` for `object_id` — slashes after the entity name fail the match and HA logs `illegal discovery topic` and discards the config. ADR-071 (beta.22+) supersedes that carve-out: discovery topics are now sibling-suffix too, e.g. `homeassistant/sensor/<id>/<entity>_thermostat/config`. The state-topic decision from ADR-070 is unchanged.
+
+**Cleanup of zombie discovery configs:** retained nested-discovery configs published by beta.21 builds are zombies — HA never registered them, but they sit retained on the broker. Enumerate and clear them with:
+
+```bash
+# enumerate zombies (Ctrl-C after a second)
+mosquitto_sub -h <broker> -v -t 'homeassistant/sensor/+/+/thermostat/config' -t 'homeassistant/sensor/+/+/boiler/config'
+# clear each one (substitute the actual topic from the listing above)
+mosquitto_pub -h <broker> -t 'homeassistant/sensor/<id>/<entity>/thermostat/config' -r -n
+mosquitto_pub -h <broker> -t 'homeassistant/sensor/<id>/<entity>/boiler/config'    -r -n
+```
+
+Auto-discovered users on beta.22+ get fresh sibling-suffix configs on the next boot; the zombies are cosmetic broker state, not active HA entities.
+
 ---
 
 ## Subscribed Topics

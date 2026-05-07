@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Classification: structural amendment to ADR-069 and supersession of ADR-068. Decision Maker: User: Robert van den Breemen (rvdbreemen).
+Superseded by ADR-071, 2026-05-07. Original status: Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Classification: structural amendment to ADR-069 and supersession of ADR-068. Decision Maker: User: Robert van den Breemen (rvdbreemen). Reason for supersession: the discovery-topic carve-out in this ADR (lines 54 and 121 Enforcement comment) was based on the assumption that HA accepts nested discovery topic identifiers and handles `state_topic` deltas in-place via `subscription.async_prepare_subscribe_topics`. Empirical investigation against `homeassistant/components/mqtt/discovery.py:TOPIC_MATCHER` (regex `[a-zA-Z0-9_-]+` for `object_id`) showed nested discovery topics are rejected before reaching the subscription layer. ADR-071 corrects the discovery-topic shape; the state-topic decision recorded in this ADR is preserved and remains in force.
 
 ## Context
 
