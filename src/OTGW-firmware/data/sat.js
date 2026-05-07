@@ -467,6 +467,24 @@ var SAT = (function() {
     return baseOffset + (coefficient / 4.0) * curveValue;
   }
 
+  // Reference-curve palette (TASK-566): perceptually ordered ramp from
+  // cool blue (low c) through cyan/green to warm yellow (high c).
+  // Picked so each c reads naturally as "low → high" in one glance, while
+  // staying clearly distinct from the grid colour (#bbb/#555) and from the
+  // active-curve / current-dot orange (#ff6600 / #ff3300).
+  var REF_CURVE_COLORS = [
+    '#1f77b4', // c=0.5  blue
+    '#3a8fd1', // c=1.0
+    '#2ca0c2', // c=1.5  blue-cyan
+    '#26b3a3', // c=2.0
+    '#3fbf6f', // c=2.5  green
+    '#7dc445', // c=3.0
+    '#b9c233', // c=3.5  yellow-green
+    '#d9b432', // c=4.0
+    '#e6a233', // c=4.5
+    '#e8c233'  // c=5.0  yellow
+  ];
+
   function buildCurveOption(coeff, system, target, outsideTemp, currentSetpoint, theme) {
     // X axis: outside temperatures from -15 to 25
     var xData = [];
@@ -475,13 +493,14 @@ var SAT = (function() {
     var series = [];
     // Reference curves: coefficient 0.5 to 5.0, step 0.5
     var refCoeffs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
-    var isLight = (theme !== 'dark');
     for (var ci = 0; ci < refCoeffs.length; ci++) {
       var c = refCoeffs[ci];
       var isActive = (Math.abs(c - coeff) < 0.05);
+      // xAxis is type:'value', so series.data must be [x,y] pairs — scalar
+      // y-only values would be plotted at array-index x and clip off-chart.
       var data = [];
       for (var xi = 0; xi < xData.length; xi++) {
-        data.push(Math.round(calcHeatingCurve(xData[xi], target, c, system) * 10) / 10);
+        data.push([xData[xi], Math.round(calcHeatingCurve(xData[xi], target, c, system) * 10) / 10]);
       }
       series.push({
         name: 'c=' + c.toFixed(1),
@@ -490,8 +509,8 @@ var SAT = (function() {
         data: data,
         symbol: 'none',
         lineStyle: {
-          width: isActive ? 3 : 1,
-          color: isActive ? '#ff6600' : (isLight ? '#bbb' : '#555')
+          width: isActive ? 3 : 1.5,
+          color: isActive ? '#ff6600' : REF_CURVE_COLORS[ci]
         },
         emphasis: { disabled: true },
         silent: true,
@@ -507,7 +526,7 @@ var SAT = (function() {
     if (!matchesRef && coeff > 0) {
       var activeData = [];
       for (var ai = 0; ai < xData.length; ai++) {
-        activeData.push(Math.round(calcHeatingCurve(xData[ai], target, coeff, system) * 10) / 10);
+        activeData.push([xData[ai], Math.round(calcHeatingCurve(xData[ai], target, coeff, system) * 10) / 10]);
       }
       series.push({
         name: 'c=' + coeff.toFixed(1),
