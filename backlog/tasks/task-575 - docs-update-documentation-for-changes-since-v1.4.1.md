@@ -25,7 +25,7 @@ Full-scope documentation update for firmware changes v1.4.1..HEAD. Triggered by 
 - [x] #3 API docs updated: WEBSOCKET_FLOW.md and WEBSOCKET_QUICK_REFERENCE.md reflect reload-storm mitigation
 - [x] #4 Guides updated: FLASH_GUIDE.md covers no-Python flash scripts; BUILD.md covers build wrappers
 - [x] #5 ADR cross-references verified: docs/adr/README.md lists ADR-065 through ADR-072
-- [ ] #6 Cleanup phase complete: old releases archived, misplaced root files moved
+- [x] #6 Cleanup phase complete: old releases archived, misplaced root files moved
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,4 +40,6 @@ AC4 FLASH_GUIDE.md + BUILD.md: flash guide updated with no-Python scripts as pre
 MQTT_LWT.md: reconnect diagram extended, new 'Reconnect Republish Behaviour' section (5-min threshold, 3 cases), Related Code updated. WIFI_RECOVERY_TRIPLE_RESET.md: untouched — procedure unchanged.
 
 BREAKING_CHANGES.md: new v1.5.0 section prepended with 3 breaking changes: sibling-suffix shape with mosquitto cleanup cmds, /gateway removal, HA friendly name Title Case (no automation breakage, unique_id unchanged).
+
+AC6 Cleanup: 12 releases archived to docs/releases/archive/, docs/archive/ aangemaakt met daily-issue-report.md en upgrade-from-0.x.md. Root bevindt alleen 1.5.0-beta bestanden.
 <!-- SECTION:NOTES:END -->
