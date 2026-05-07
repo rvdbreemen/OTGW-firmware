@@ -3,9 +3,11 @@ id: TASK-552
 title: >-
   Implement ADR-070: switch to sibling-suffix MQTT source topics + drop
   base-suppression
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@rvdbreemen-claude'
 created_date: '2026-05-07 07:56'
+updated_date: '2026-05-07 08:24'
 labels:
   - feat-mqtt-suffix-shape
   - mqtt
@@ -67,3 +69,22 @@ AC #13 is hardware-pending (cannot self-verify); document that in Final Summary 
 - [ ] #12 docs/api/MQTT.md 'Source-Separated Topics' section updated: new topic table + one-paragraph migration note covering orphan retained values at old nested topics
 - [ ] #13 Hardware verification (cannot self-verify; pending Andre/Robert): with active CS=27.37 override and thermostat asking 23.00, mosquitto_sub at <base>/value/+/TSet_thermostat shows 23.00 and <base>/value/+/TSet_boiler shows 27.37; HA dev tools shows three TSet sensors under one device card
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. ADR-070 must be Accepted (verified via TASK-551 Done state).
+2. Edit MQTTstuff.ino:1242,1246 PSTR literals (slash -> underscore).
+3. Edit MQTTstuff.ino:1173-1199 comment block to describe sibling-suffix shape; cite ADR-070.
+4. Delete msgIdHasAnySourceEntry helper at lines 1438-1455 (dead code after suppression branches removed); leave a one-liner comment citing ADR-070 superseding ADR-068.
+5. Collapse if/else at MQTTstuff.ino:1483-1492 (doAutoConfigure) and 1553-1561 (doAutoConfigureMsgid) so canonical entity always emits.
+6. Edit mqtt_configuratie.cpp:2011 separator slash -> underscore in composeSensorPayload stat_t builder.
+7. Update mqtt_configuratie.cpp:1999 doc comment.
+8. Update mqtt_configuratie.cpp:2367-2386 expandAndStreamSensorSources comment block; cite ADR-070.
+9. Drop canonical row from source-variants table at mqtt_configuratie.cpp:2406-2408 (and unused PROGMEM constants); table now has 2 rows.
+10. Update docs/api/MQTT.md "Source-Separated Topics" section: new topic table, sibling-suffix examples, migration note covering both topology shift and orphan retained values.
+11. Bump version.h _VERSION_PRERELEASE to beta.21.
+12. python build.py --firmware (must exit 0).
+13. python evaluate.py --quick (must show no NEW failures).
+14. Commit + push to origin/dev (auto-allowed per CLAUDE.md push policy when build green and evaluator clean).
+<!-- SECTION:PLAN:END -->
