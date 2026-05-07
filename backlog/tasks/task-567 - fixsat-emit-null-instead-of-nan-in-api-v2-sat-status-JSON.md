@@ -1,0 +1,32 @@
+---
+id: TASK-567
+title: 'fix(sat): emit null instead of nan in /api/v2/sat/status JSON'
+status: To Do
+assignee: []
+created_date: '2026-05-07 19:21'
+labels:
+  - sat
+  - rest-api
+  - json
+  - 2.0.0
+dependencies: []
+priority: high
+ordinal: 30000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+satSendJsonFloat() at SATcontrol.ino:1610 emits float values via dtostrf() without checking isnan/isinf. When room_temp / outside_temp / etc. are NaN (e.g. SergeantD's cold device with no thermostat / no BLE temp / no MQTT temp), the JSON payload contains the literal token nan which is not valid JSON. Result: client-side JSON.parse() in data/sat.js:156 throws SyntaxError, the SAT page can't render any data, the live UI looks frozen. Field evidence: SergeantD's alpha.8 browser console (2026-05-07) shows repeated [SAT] fetch error: SyntaxError: Unexpected token 'a', ...m_temp: nan, ou... — every fetch fails. Fix: in satSendJsonFloat, if isnan(fValue) || isinf(fValue), emit the literal null token instead of dtostrf output. ~5 line change, no behaviour change for finite values.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 satSendJsonFloat() in src/OTGW-firmware/SATcontrol.ino emits the literal JSON null token (not 'null' as a string) when fValue is NaN or Inf; finite values continue to emit via dtostrf with the requested precision unchanged
+- [ ] #2 GET /api/v2/sat/status response is parseable by JSON.parse() in all states (cold device with no temp source, normal operation, edge transitions). Verified via curl + jq on the running device
+- [ ] #3 data/sat.js:156 [SAT] fetch error console messages disappear in the same scenario that produced them on alpha.8
+- [ ] #4 ./build.sh --firmware exits 0 for both ESP8266 and ESP32 targets
+- [ ] #5 python3 evaluate.py --quick — no new failures
+- [ ] #6 Prerelease bump committed alongside the firmware change (alpha.11 -> alpha.12) per project versioning policy
+- [ ] #7 Field validation on alpha.12+: SergeantD or another tester confirms the SAT page no longer shows fetch errors with no thermostat / no BLE source
+<!-- AC:END -->

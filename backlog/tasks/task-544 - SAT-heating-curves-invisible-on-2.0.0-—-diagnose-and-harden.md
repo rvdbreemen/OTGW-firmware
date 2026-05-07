@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-05 08:54'
-updated_date: '2026-05-07 18:01'
+updated_date: '2026-05-07 19:21'
 labels:
   - bug
   - sat
@@ -201,4 +201,13 @@ The Temperature History panel being blank is partly expected on his test setup: 
 
 ---
 **Plan reference**: implementation sequencing tracked in `/Users/Breee02/.claude/plans/clever-yawning-wreath.md` (local working plan, not in repo). **Ship 5** (gated by tester re-screenshot, not blocked by Ship 1-3). Cannot proceed until SergeantD or another tester submits an alpha.8+ SAT-page screenshot. data/sat.js:576 initCurveChart with echarts.init at :583 and reference curves at buildCurveOption :470 — read these only if curves remain blank on alpha.8.
+
+---
+**Update 2026-05-07 (alpha.8 field evidence from SergeantD):**
+
+The chart-init bug is resolved between alpha.3 and alpha.8 — the panel now renders grid, axes, "Outside °C" / "Flow °C" labels, AND the active orange dot at the current outside/flow point. echarts is initialised and the active series is constructed. AC #5 (echarts CDN fallback) is now moot because echarts is loading.
+
+What still fails: the 10 grey reference curves c=0.5..5.0 are missing from the rendered chart. Diagnosis narrowed: it's a series-construction defect in buildCurveOption() at data/sat.js:470, NOT a chart-init failure.
+
+**Status superseded by TASK-566** which targets the new (narrower) defect. AC #1 of THIS task should be considered resolved for the chart-init aspect; the c-curves aspect carried forward to TASK-566.
 <!-- SECTION:NOTES:END -->
