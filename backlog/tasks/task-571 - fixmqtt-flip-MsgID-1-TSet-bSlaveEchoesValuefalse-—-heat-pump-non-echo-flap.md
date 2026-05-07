@@ -33,10 +33,14 @@ Field validation on dev beta.25+5153537 (2026-05-07) confirmed TASK-561 ADR-066 
 - [ ] #6 Field validation on beta.26+: tester confirms TSet boiler value no longer flaps between override and 0 with bSeparateSources=true (deferred per CLAUDE.md self-verification policy)
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
 1. flip OTmap[] entries for msgid 1, 7, 8, 71 (already done in beta.26); 2. update audit doc; 3. ship and bump prerelease; 4. wait on field validation.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Class 1 / Class 8 control-write flag flips applied to msgid 1 (TSet), 7 (CoolingControl), 8 (TsetCH2), 71 (ControlSetpointVH) — all four bSlaveEchoesValue flipped from true to false per defensive-defaults policy. OTmap[] in OTGW-Core.h:341, 347, 348, 411 confirmed. Audit doc docs/api/MQTT-message-id-echo-audit.md row 27 (TSet) updated with field-tester evidence; candidate list cleared. Bump beta.25 → beta.26 landed in commit 660d4b93. AC #6 (tester confirms TSet boiler value no longer flaps with bSeparateSources=true post-fix) remains gated on Andre's re-flash and re-observation; not self-verifiable from our side.
+<!-- SECTION:FINAL_SUMMARY:END -->
