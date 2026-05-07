@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 22:47'
-updated_date: '2026-05-07 22:51'
+updated_date: '2026-05-07 22:52'
 labels:
   - docs
   - update-docs
@@ -42,4 +42,6 @@ MQTT_LWT.md: reconnect diagram extended, new 'Reconnect Republish Behaviour' sec
 BREAKING_CHANGES.md: new v1.5.0 section prepended with 3 breaking changes: sibling-suffix shape with mosquitto cleanup cmds, /gateway removal, HA friendly name Title Case (no automation breakage, unique_id unchanged).
 
 AC6 Cleanup: 12 releases archived to docs/releases/archive/, docs/archive/ aangemaakt met daily-issue-report.md en upgrade-from-0.x.md. Root bevindt alleen 1.5.0-beta bestanden.
+
+MQTT-message-id-echo-audit.md: geen wijzigingen nodig. Document was al up-to-date: 10 bSlaveEchoesValue=false entries kloppen exact met OTGW-Core.h. TASK-561 en TASK-571 waren al verwerkt in hetzelfde commit als de code.
 <!-- SECTION:NOTES:END -->
