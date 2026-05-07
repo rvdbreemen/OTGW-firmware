@@ -61,6 +61,12 @@ Coordinated with 2.0.0 sibling task (port + ADR-098 in 2.0.0 worktree).
 11. Mark ACs and add Final Summary; AC #9 (field test on beta unit) remains unchecked — hardware required
 <!-- SECTION:PLAN:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- 2026-05-07 13:30: Build green (sketch 70%/RAM 71%); evaluator green (31/2/1, 91.7% health, baseline match); old nested format string absent from tree; commit 4d9b5b42 pushed to origin/dev; ADR-071 enforcement block live in pre-commit pipeline (0 violations).
+<!-- SECTION:NOTES:END -->
+
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
