@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.9
+**  Version  : v2.0.0-alpha.10
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1578,6 +1578,22 @@ function initOTLogWebSocket(force) {
       setOTLogCommandsOnly(true);
     }
     return; // Do not connect WebSocket
+  }
+
+  // TASK-563: Refuse re-entry while a handshake is already in flight or open.
+  // Multiple call sites (initMainPage->updateOTLogResponsiveState at 3248,
+  // showMainPage->scheduleOTLogWebSocketInit at 3353, firmwarePage at 3359,
+  // watchdog at 1436) can race within ~1s on page load. Without this guard,
+  // attempt #2 tears down the CONNECTING socket from attempt #1 and opens a
+  // duplicate, inflating wsConnectionAttempts and amplifying any 1006 storm.
+  // force=true (performFlash) intentionally bypasses to guarantee a fresh
+  // socket for flash-progress streaming.
+  if (!force && otLogWS &&
+      (otLogWS.readyState === WebSocket.CONNECTING ||
+       otLogWS.readyState === WebSocket.OPEN)) {
+    console.log('[WebSocket] Skipping connect: socket already ' +
+                (otLogWS.readyState === WebSocket.CONNECTING ? 'CONNECTING' : 'OPEN'));
+    return;
   }
 
   // Clear any pending reconnect timer
