@@ -91,6 +91,7 @@ Add one AC per affected area in execution order:
 3. Feature / fix notes under `docs/features/` or `docs/fixes/` (only if a feature shipped or a bug fix landed in this window)
 4. Cleanup phase
 5. (--release only) Release documents generated (`RELEASE_NOTES_<v>.md`, `RELEASE_GITHUB_<v>.md`, `BREAKING_CHANGES.md` update, `README.md` What's New)
+6. (--release only) `CHANGELOG.md` updated with new version section
 
 **Record the assigned `TASK-NNN` ID** returned by the CLI. Phase 5's commit message uses it; the commit-msg hook may block the commit if the task file is not staged (the bump-prerelease hook on dev doesn't enforce TASK-NNN today, but stage the task file regardless for traceability).
 
@@ -153,6 +154,10 @@ git log $PREV_TAG..HEAD --oneline | grep -v "CI: update version.h"
 **3C-5: Update `README.md` What's New section.** Single subagent.
 
 > In `README.md`: demote the current "What's New in v<prev>" section to "What was new in v<prev>". Add a new "What's New in v<version>" section with four to six bullet highlights drawn from `RELEASE_NOTES_<version>.md`.
+
+**3C-6: Update `CHANGELOG.md`** at repo root. Single subagent.
+
+> Prepend a new version section to `CHANGELOG.md` following the [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) format. Read the current file first. Use the categorized commit list from 3C-1 to populate the sections. Only include sections (Added/Changed/Fixed/Removed/Deprecated/Security) that have content. Breaking changes go under Changed or Removed with a "(breaking)" note. Move the content from `[Unreleased]` to the new version section. Add a new empty `[Unreleased]` section at the top. Add a version comparison link at the bottom of the file pointing to the GitHub release tag. No em dashes. No emojis. English only.
 
 ---
 
