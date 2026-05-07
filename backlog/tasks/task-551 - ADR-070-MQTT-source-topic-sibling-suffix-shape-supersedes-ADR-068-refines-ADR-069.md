@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@rvdbreemen-claude'
 created_date: '2026-05-07 07:55'
-updated_date: '2026-05-07 08:02'
+updated_date: '2026-05-07 08:20'
 labels:
   - feat-mqtt-suffix-shape
   - adr
@@ -42,17 +42,19 @@ Related: ADR-069, ADR-068, ADR-067 (boot-time discovery republish — the trigge
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/adr/ADR-070-mqtt-source-topic-sibling-suffix-shape.md exists with Status: Proposed
-- [ ] #2 ADR cites Andre's beta feedback (2026-05-07) and the HA source verification (mqtt/sensor.py, mqtt/subscription.py) in Context
-- [ ] #3 Decision section states sibling-suffix shape (<id>_<view>), drops ADR-068 mutual exclusion, preserves ADR-069 routing semantics
-- [ ] #4 At least 3 alternatives documented with rejection reasons (keep nested + better docs; sibling but keep mutual exclusion; separate top-level prefix per view; non-underscore separator)
-- [ ] #5 Consequences cover positive (clean leaves; stable canonical for dashboards) and negative (orphan retained values at old topics; ~3 entities per dual-source MsgID under bSeparateSources=true)
-- [ ] #6 Related section names: Supersedes ADR-068; Refines ADR-069; Preserves ADR-065, ADR-066, ADR-067; cross-references 2.0.0 mirror ADR-097
-- [ ] #7 Enforcement block (JSON) with forbid_pattern for PSTR("%s/(thermostat|boiler)") literals scoped to src/OTGW-firmware/MQTTstuff.ino; mqtt_configuratie.cpp explicitly excluded since buildSensorDiscoveryTopic legitimately uses slash there for HA discovery topic identifiers
+- [x] #1 docs/adr/ADR-070-mqtt-source-topic-sibling-suffix-shape.md exists with Status: Proposed
+- [x] #2 ADR cites Andre's beta feedback (2026-05-07) and the HA source verification (mqtt/sensor.py, mqtt/subscription.py) in Context
+- [x] #3 Decision section states sibling-suffix shape (<id>_<view>), drops ADR-068 mutual exclusion, preserves ADR-069 routing semantics
+- [x] #4 At least 3 alternatives documented with rejection reasons (keep nested + better docs; sibling but keep mutual exclusion; separate top-level prefix per view; non-underscore separator)
+- [x] #5 Consequences cover positive (clean leaves; stable canonical for dashboards) and negative (orphan retained values at old topics; ~3 entities per dual-source MsgID under bSeparateSources=true)
+- [x] #6 Related section names: Supersedes ADR-068; Refines ADR-069; Preserves ADR-065, ADR-066, ADR-067; cross-references 2.0.0 mirror ADR-097
+- [x] #7 Enforcement block (JSON) with forbid_pattern for PSTR("%s/(thermostat|boiler)") literals scoped to src/OTGW-firmware/MQTTstuff.ino; mqtt_configuratie.cpp explicitly excluded since buildSensorDiscoveryTopic legitimately uses slash there for HA discovery topic identifiers
 - [ ] #8 All four ADR-kit verification gates pass (/adr-kit:lint clean)
-- [ ] #9 Status flipped to Accepted, YYYY-MM-DD ONLY after explicit human approval — never self-approved (CLAUDE.md ADR workflow rule)
-- [ ] #10 ADR-068 status line edited to 'Superseded by ADR-070, YYYY-MM-DD.' (one line only; rest of ADR-068 immutable)
+- [x] #9 Status flipped to Accepted, YYYY-MM-DD ONLY after explicit human approval — never self-approved (CLAUDE.md ADR workflow rule)
+- [x] #10 ADR-068 status line edited to 'Superseded by ADR-070, YYYY-MM-DD.' (one line only; rest of ADR-068 immutable)
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
