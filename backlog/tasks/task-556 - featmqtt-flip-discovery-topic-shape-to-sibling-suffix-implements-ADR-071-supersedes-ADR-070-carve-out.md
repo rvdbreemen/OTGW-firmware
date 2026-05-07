@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 11:04'
-updated_date: '2026-05-07 11:09'
+updated_date: '2026-05-07 11:27'
 labels:
   - mqtt
   - discovery
@@ -33,17 +33,19 @@ Coordinated with 2.0.0 sibling task (port + ADR-098 in 2.0.0 worktree).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ADR-071 has been reviewed and approved by user; status flipped from Proposed to Accepted before implementation begins
-- [ ] #2 ADR-070 status line updated to 'Superseded by ADR-071, YYYY-MM-DD'; body of ADR-070 unchanged (immutability protocol)
-- [ ] #3 buildSensorDiscoveryTopic in mqtt_configuratie.cpp:2140-2146 changed: source-variant branch format string is '%s/sensor/%s/%s_%s/config' (sibling-suffix) instead of '%s/sensor/%s/%s/%s/config' (nested)
-- [ ] #4 Canonical-branch format string is unchanged ('%s/sensor/%s/%s/config') — no source attribution
-- [ ] #5 ADR-070 Enforcement carve-out comment in mqtt_configuratie.cpp (above line 2148) is removed or updated to reference ADR-071
-- [ ] #6 ADR-071 Enforcement block forbid_pattern matches the OLD nested format and would catch any regression
-- [ ] #7 python build.py --firmware exit 0 with no new warnings
-- [ ] #8 python evaluate.py --quick shows no new failures vs baseline
+- [x] #1 ADR-071 has been reviewed and approved by user; status flipped from Proposed to Accepted before implementation begins
+- [x] #2 ADR-070 status line updated to 'Superseded by ADR-071, YYYY-MM-DD'; body of ADR-070 unchanged (immutability protocol)
+- [x] #3 buildSensorDiscoveryTopic in mqtt_configuratie.cpp:2140-2146 changed: source-variant branch format string is '%s/sensor/%s/%s_%s/config' (sibling-suffix) instead of '%s/sensor/%s/%s/%s/config' (nested)
+- [x] #4 Canonical-branch format string is unchanged ('%s/sensor/%s/%s/config') — no source attribution
+- [x] #5 ADR-070 Enforcement carve-out comment in mqtt_configuratie.cpp (above line 2148) is removed or updated to reference ADR-071
+- [x] #6 ADR-071 Enforcement block forbid_pattern matches the OLD nested format and would catch any regression
+- [x] #7 python build.py --firmware exit 0 with no new warnings
+- [x] #8 python evaluate.py --quick shows no new failures vs baseline
 - [ ] #9 Field test on a beta unit with bSeparateSources=true confirms HA registers the source-variant entities (visible in HA Settings → Devices & Services → MQTT → entities list) where they did NOT register before the change
-- [ ] #10 docs/api/MQTT.md migration note updated: pre-ADR-071 retained nested discovery configs are zombies (HA never registered them) and may be cleaned with mosquitto_pub -t '<topic>' -r -n; included sample command for the nested paths
+- [x] #10 docs/api/MQTT.md migration note updated: pre-ADR-071 retained nested discovery configs are zombies (HA never registered them) and may be cleaned with mosquitto_pub -t '<topic>' -r -n; included sample command for the nested paths
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
