@@ -4,6 +4,7 @@ title: 'feat-2.0.0: port TASK-577 — Pure JIT MQTT discovery for feature branch
 status: To Do
 assignee: []
 created_date: '2026-05-08 10:39'
+updated_date: '2026-05-08 10:49'
 labels:
   - mqtt
   - ha-discovery
@@ -20,12 +21,12 @@ Port the pure JIT MQTT discovery implementation from dev (TASK-577, commit 1bb58
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 publishNonOTDiscoveryConfigs() function added with same pseudo-ID set as dev
-- [ ] #2 clearMQTTConfigPending() function added
-- [ ] #3 startMQTT() calls publishNonOTDiscoveryConfigs() instead of markAllMQTTConfigPending()
-- [ ] #4 homeassistant/status online handler does not call markAllMQTTConfigPending()
-- [ ] #5 Broker restart: offlineMs > 5 min path calls clearMQTTConfigDone() + clearMQTTConfigPending() + publishNonOTDiscoveryConfigs()
+- [x] #1 publishNonOTDiscoveryConfigs() function added with same pseudo-ID set as dev
+- [x] #2 clearMQTTConfigPending() function added
+- [x] #3 startMQTT() calls publishNonOTDiscoveryConfigs() instead of markAllMQTTConfigPending()
+- [x] #4 homeassistant/status online handler does not call markAllMQTTConfigPending()
+- [x] #5 Broker restart: offlineMs > 5 min path calls clearMQTTConfigDone() + clearMQTTConfigPending() + publishNonOTDiscoveryConfigs()
 - [ ] #6 ADR sibling created on 2.0.0 worktree (separate ADR numbering)
-- [ ] #7 Build passes on feature branch
-- [ ] #8 Evaluator green on feature branch
+- [x] #7 Build passes on feature branch
+- [x] #8 Evaluator green on feature branch
 <!-- AC:END -->
