@@ -3,11 +3,11 @@ id: TASK-588
 title: >-
   fix(sat): correct PID integral clamp from positive-only to symmetric
   plus-minus curve_value
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-08 16:48'
-updated_date: '2026-05-08 17:36'
+updated_date: '2026-05-08 17:39'
 labels: []
 dependencies: []
 priority: medium
@@ -21,11 +21,11 @@ The C++ SATpid.ino clamps the integral to [0, curveValue] (positive only, plus a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Integral clamp in SATpid.ino changed from [0, curveValue] to [-curveValue, +curveValue]
-- [ ] #2 Positive and negative integral accumulation both work within the band
-- [ ] #3 Hard overflow cap preserved symmetrically at +/-20 degrees (or +-curveValue if curveValue > 20)
-- [ ] #4 Existing integration tests pass; no regression in normal heating scenarios
-- [ ] #5 Change documented in code comment citing Python reference
+- [x] #1 Integral clamp in SATpid.ino changed from [0, curveValue] to [-curveValue, +curveValue]
+- [x] #2 Positive and negative integral accumulation both work within the band
+- [x] #3 Hard overflow cap preserved symmetrically at +/-20 degrees (or +-curveValue if curveValue > 20)
+- [x] #4 Existing integration tests pass; no regression in normal heating scenarios
+- [x] #5 Change documented in code comment citing Python reference
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -38,3 +38,9 @@ The C++ SATpid.ino clamps the integral to [0, curveValue] (positive only, plus a
 5. Build firmware to verify clean compile
 6. Commit and push
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Changed _pidUpdateIntegral() clamp from positive-only [0, curveValue] to symmetric [-curveValue, +curveValue]. Added negative hard cap at -SAT_PID_INTEGRAL_ABS_MAX. Updated function and call-site comments to cite Python reference (clamp_to_range). Build passes (exit 0), evaluator 94.1% (pre-existing PROGMEM violations, not introduced by this change). Committed as alpha.28 in 17ca4045.
+<!-- SECTION:FINAL_SUMMARY:END -->
