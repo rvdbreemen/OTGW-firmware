@@ -10,7 +10,15 @@ The separate ESP32 / SAT v2.0.0 exploration on `feature-dev-2.0.0-otgw32-esp32-s
 
 ## [Unreleased]
 
-_No unreleased changes yet. New work on `dev` lands here._
+### Changed
+- Pure JIT MQTT discovery: only non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC) are queued at boot; OT MsgID discovery configs publish on first MsgID reception, not on connect (ADR-073, supersedes ADR-041)
+
+### Fixed
+- `sat/climate_attributes` now wired as `json_attributes_topic` on the HA thermostat entity; SAT PID/curve attributes appear as `extra_state_attributes` (TASK-589)
+- `flash_otgw.bat` COM port detection via registry; PS1 generation; auto-download of binaries when not found locally
+
+### Removed
+- Orphaned `sat/pressure_health_attr` JSON publish; pressure data is already available via flat scalar topics `sat/pressure`, `sat/pressure_drop_rate`, and `sat/pressure_alarm` (TASK-590)
 
 ## [1.5.0] - 2026-05-08
 
