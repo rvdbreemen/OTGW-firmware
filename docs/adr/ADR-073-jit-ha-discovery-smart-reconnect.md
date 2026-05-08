@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-05-08. Decision Maker: User: Robert van den Breemen (rvdbreemen).
+Accepted, 2026-05-08. Decision Maker: User: Robert van den Breemen (rvdbreemen).
 
 ## Context
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, 2026-02-24. Updated 2026-02-24 (Gap 2 resolved; `bForceAll` parameter removed; Serial `m` removed). Decision Maker: User: Rob van den Breemen (rvdbreemen).
+Superseded by ADR-073, 2026-05-08. Originally accepted 2026-02-24.
 
 ## Context
 
