@@ -138,8 +138,12 @@ if not "%ARG_PORT%"=="" (
 ) else (
     set "PORT_LIST_FILE=%TEMP%\otgw_ports_%RANDOM%.txt"
     powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-        "Get-CimInstance Win32_SerialPort | Sort-Object DeviceID |" ^
-        "ForEach-Object { $_.DeviceID }" > "!PORT_LIST_FILE!"
+        "$r='HKLM:\HARDWARE\DEVICEMAP\SERIALCOMM';" ^
+        "if (Test-Path $r) {" ^
+        "  Get-ItemProperty $r | Get-Member -MemberType NoteProperty |" ^
+        "  Where-Object { $_.Name -notlike 'PS*' } |" ^
+        "  ForEach-Object { (Get-ItemProperty $r).($_.Name) } | Sort-Object" ^
+        "}" > "!PORT_LIST_FILE!"
 
     set "PORT_COUNT=0"
     for /f "usebackq tokens=*" %%A in ("!PORT_LIST_FILE!") do (
