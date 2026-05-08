@@ -88,9 +88,10 @@ Three independent UX failures came out of Discord field testing in early May 202
 
 ```json
 {
-  "llm_judge": true,
-  "guidance": "Count occurrences of `writeRam(ctx.hostname)` in src/OTGW-firmware/mqtt_configuratie.cpp. The post-diff content MUST contain exactly one such call, at the device-card builder (the line immediately following the literal `\"OpenTherm Gateway (\"`). Two or more calls means a contributor has reintroduced the hostname-as-prefix anti-pattern in an entity-name builder; the diff is in violation. Also flag any new `const char ha_name_*[] PROGMEM = \"...\";` declaration whose string value contains a glued camelCase word (e.g. `ElectricalCurrentBurnerFlame`, `OEMFaultCode`) or a lowercase acronym fragment (e.g. `Memberid`, `Dayofweek`, `vh_*`, `dhw_*`, `rbp_*`) — those will render defectively after `_` → space + Title Case."
+  "llm_judge": true
 }
 ```
 
 A purely declarative `forbid_pattern` cannot express "exactly one occurrence per file"; the count check is therefore routed through the in-session LLM judge via `/adr-kit:judge` and surfaces as advisory in the pre-commit hook's `bin/adr-judge` output.
+
+LLM judge guidance: Count occurrences of `writeRam(ctx.hostname)` in `src/OTGW-firmware/mqtt_configuratie.cpp`. The post-diff content MUST contain exactly one such call, at the device-card builder (the line immediately following the literal `"OpenTherm Gateway ("`). Two or more calls means a contributor has reintroduced the hostname-as-prefix anti-pattern in an entity-name builder; the diff is in violation. Also flag any new `const char ha_name_*[] PROGMEM = "...";` declaration whose string value contains a glued camelCase word (e.g. `ElectricalCurrentBurnerFlame`, `OEMFaultCode`) or a lowercase acronym fragment (e.g. `Memberid`, `Dayofweek`, `vh_*`, `dhw_*`, `rbp_*`) — those will render defectively after `_` → space + Title Case.

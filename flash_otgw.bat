@@ -90,34 +90,40 @@ REM ---- Step 2: locate firmware and filesystem binaries ----------------------
 set "FW_FILE="
 set "FS_FILE="
 
-for %%D in ("%SCRIPT_DIR%." "%SCRIPT_DIR%build") do (
-    if not defined FW_FILE (
-        for %%F in ("%%~D\OTGW-firmware-*.ino.bin") do (
-            if not defined FW_FILE set "FW_FILE=%%F"
-        )
-    )
-    if not defined FS_FILE (
-        for %%F in ("%%~D\OTGW-firmware*.littlefs.bin") do (
-            if not defined FS_FILE set "FS_FILE=%%F"
-        )
-    )
+for %%F in ("%SCRIPT_DIR%OTGW-firmware-*.ino.bin") do (
+    if not defined FW_FILE set "FW_FILE=%%F"
+)
+for %%F in ("%SCRIPT_DIR%OTGW-firmware*.littlefs.bin") do (
+    if not defined FS_FILE set "FS_FILE=%%F"
 )
 
+if not defined FW_FILE goto try_download
+if not defined FS_FILE goto try_download
+goto after_download
+
+:try_download
+call :download_release_binaries "%SCRIPT_DIR%"
+if errorlevel 1 (
+    echo [ERROR] Auto-download failed. Download the release binaries manually
+    echo         and place them in the same directory as this script.
+    exit /b 1
+)
+for %%F in ("%SCRIPT_DIR%OTGW-firmware-*.ino.bin") do (
+    if not defined FW_FILE set "FW_FILE=%%F"
+)
+for %%F in ("%SCRIPT_DIR%OTGW-firmware*.littlefs.bin") do (
+    if not defined FS_FILE set "FS_FILE=%%F"
+)
 if not defined FW_FILE (
-    echo [ERROR] Firmware binary not found.
-    echo         Expected: OTGW-firmware-*.ino.bin
-    echo         Download the firmware from the GitHub release page and place it
-    echo         in the same directory as this script.
+    echo [ERROR] Firmware binary not found after download.
+    exit /b 1
+)
+if not defined FS_FILE (
+    echo [ERROR] Filesystem binary not found after download.
     exit /b 1
 )
 
-if not defined FS_FILE (
-    echo [ERROR] Filesystem binary not found.
-    echo         Expected: OTGW-firmware*.littlefs.bin
-    echo         Download the filesystem binary from the GitHub release page and
-    echo         place it in the same directory as this script.
-    exit /b 1
-)
+:after_download
 
 for %%F in ("%FW_FILE%") do set "FW_NAME=%%~nxF"
 for %%F in ("%FS_FILE%") do set "FS_NAME=%%~nxF"
@@ -132,8 +138,12 @@ if not "%ARG_PORT%"=="" (
 ) else (
     set "PORT_LIST_FILE=%TEMP%\otgw_ports_%RANDOM%.txt"
     powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-        "Get-CimInstance Win32_SerialPort | Sort-Object DeviceID |" ^
-        "ForEach-Object { $_.DeviceID }" > "!PORT_LIST_FILE!"
+        "$r='HKLM:\HARDWARE\DEVICEMAP\SERIALCOMM';" ^
+        "if (Test-Path $r) {" ^
+        "  Get-ItemProperty $r | Get-Member -MemberType NoteProperty |" ^
+        "  Where-Object { $_.Name -notlike 'PS*' } |" ^
+        "  ForEach-Object { (Get-ItemProperty $r).($_.Name) } | Sort-Object" ^
+        "}" > "!PORT_LIST_FILE!"
 
     set "PORT_COUNT=0"
     for /f "usebackq tokens=*" %%A in ("!PORT_LIST_FILE!") do (
@@ -143,9 +153,14 @@ if not "%ARG_PORT%"=="" (
     del "!PORT_LIST_FILE!" >nul 2>&1
 
     if !PORT_COUNT! EQU 0 (
-        echo [ERROR] No serial ports found. Connect your OTGW via USB and try again.
-        echo         Install CP210x or CH340 USB-serial drivers if the port is missing.
-        exit /b 1
+        echo [WARN] No serial ports detected automatically.
+        echo        Connect your OTGW via USB, or install CP210x / CH340 USB-serial drivers.
+        echo.
+        set /p "ARG_PORT=Enter COM port manually (e.g. COM3), or press Enter to cancel: "
+        if not defined ARG_PORT exit /b 1
+        if "!ARG_PORT!"=="" exit /b 1
+        echo [OK] Port:       !ARG_PORT! (manual^)
+        goto after_port_detection
     )
 
     set "ARG_PORT=!PORT_1!"
@@ -156,6 +171,7 @@ if not "%ARG_PORT%"=="" (
         echo [INFO] Use --port to select a different port.
     )
 )
+:after_port_detection
 
 REM ---- Step 4: summary ------------------------------------------------------
 echo.
@@ -194,6 +210,37 @@ echo  Connect to WiFi AP "OTGW-^<MAC-address^>" and browse to
 echo  http://192.168.4.1 to configure WiFi settings.
 echo ============================================================
 exit /b 0
+
+
+:download_release_binaries
+echo [INFO] Fetching latest release info from GitHub...
+set "DL_DIR=%~1"
+set "_DL_PS=%TEMP%\otgw_dl_%RANDOM%.ps1"
+echo $ProgressPreference = 'SilentlyContinue' > "%_DL_PS%"
+echo [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 >> "%_DL_PS%"
+echo try { >> "%_DL_PS%"
+echo     $hdr = @{ 'User-Agent' = 'OTGW-Flash-Tool' } >> "%_DL_PS%"
+echo     $rel = Invoke-WebRequest -UseBasicParsing -Uri 'https://api.github.com/repos/rvdbreemen/OTGW-firmware/releases/latest' -Headers $hdr ^| ConvertFrom-Json >> "%_DL_PS%"
+echo     Write-Host "[INFO] Release: $($rel.name)" >> "%_DL_PS%"
+echo     $found = 0 >> "%_DL_PS%"
+echo     foreach ^($a in $rel.assets^) { >> "%_DL_PS%"
+echo         if ^($a.name -match '\.ino\.bin$' -or $a.name -match '\.littlefs\.bin$'^) { >> "%_DL_PS%"
+echo             $out = Join-Path '%DL_DIR%' $a.name >> "%_DL_PS%"
+echo             Write-Host "[INFO] Downloading $($a.name)..." >> "%_DL_PS%"
+echo             Invoke-WebRequest -UseBasicParsing -Uri $a.browser_download_url -OutFile $out -ErrorAction Stop >> "%_DL_PS%"
+echo             Write-Host "[OK]   $($a.name)" >> "%_DL_PS%"
+echo             $found++ >> "%_DL_PS%"
+echo         } >> "%_DL_PS%"
+echo     } >> "%_DL_PS%"
+echo     if ^($found -eq 0^) { Write-Host '[ERROR] No .ino.bin or .littlefs.bin assets found in release'; exit 1 } >> "%_DL_PS%"
+echo } catch { >> "%_DL_PS%"
+echo     Write-Host "[ERROR] Download failed: $_" >> "%_DL_PS%"
+echo     exit 1 >> "%_DL_PS%"
+echo } >> "%_DL_PS%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%_DL_PS%"
+set "_dl_err=%ERRORLEVEL%"
+del "%_DL_PS%" >nul 2>&1
+exit /b %_dl_err%
 
 
 :parse_args
