@@ -12,11 +12,9 @@ ADR-041 established the JIT discovery principle but left two gaps. In practice, 
 
 Field evidence (Discord, 2026-05-08): telnet log confirmed all 256 configs published sequentially at boot.
 
-### 2.0.0-specific note: broker restart heuristic not ported
+### 2.0.0-specific note: broker restart heuristic ported (gap resolved 2026-05-08)
 
-On the dev branch (ADR-073 §3), the broker restart heuristic piggybacks on an existing `offlineMs > MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS` block in the MQTT connect success handler. That block does not exist in the current 2.0.0 `MQTTstuff.ino` — data republish on reconnect is handled unconditionally here. Porting the threshold check is a separate behavioural change and is deferred to a follow-up ADR.
-
-Consequence: on 2.0.0, any MQTT reconnect (even a transient blip) leaves the done-bitmap intact. This is acceptable because the JIT trigger in `processOT()` will re-queue any MsgID whose done-bit gets cleared by a future bitmap reset.
+The broker restart heuristic from ADR-073 §3 is now implemented on this branch. The 2.0.0 connect success handler previously republished unconditionally; it now uses the same `offlineMs > MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS` guard as dev. The required infrastructure (`iLastConnectedMs` already present in `MQTTstuff.h:38`, `MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS` constant added) was introduced alongside the heuristic.
 
 ### 2.0.0-specific note: firmware/PIC pseudo-IDs not yet present
 
@@ -24,7 +22,7 @@ Consequence: on 2.0.0, any MQTT reconnect (even a transient blip) leaves the don
 
 ## Decision
 
-Identical to ADR-073 §1, §2, §4, §5 — broker restart heuristic (§3) deferred.
+Identical to ADR-073 §1–§5 (including broker restart heuristic §3, now implemented).
 
 ### 1. Remove bulk publish from automatic triggers
 
@@ -44,7 +42,19 @@ Identical to ADR-073 §1, §2, §4, §5 — broker restart heuristic (§3) defer
 
 ### 3. Broker restart heuristic
 
-**Deferred.** The 2.0.0 connect success handler republishes unconditionally; adding `offlineMs` tracking is a separate change. Gap documented here; addressed in a follow-up ADR when the threshold check is ported.
+Identical to ADR-073 §3. In the MQTT connect success branch, if `offlineMs > MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS` (5 minutes):
+
+```cpp
+if (offlineMs > MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS) {
+    requestMQTTRepublishAll();           // republish OT data values
+    clearMQTTConfigDone();               // reset discovery done-bitmap
+    clearMQTTConfigPending();            // clear stale queue
+    publishNonOTDiscoveryConfigs();      // queue non-OT configs immediately
+    // OT ID configs re-publish JIT as messages arrive
+}
+```
+
+`state.mqtt.iLastConnectedMs` is stamped on each confirmed-live `MQTTclient.loop()` tick in the `MQTT_STATE_IS_CONNECTED` handler. `iLastConnectedMs == 0` (never connected) yields `offlineMs = 0`, skipping republish on first boot.
 
 ### 4. Force path unchanged
 
@@ -60,13 +70,14 @@ Already present and correct on this branch (lines 4087–4088 and 3546–3547).
 |---|---|
 | Boot / `startMQTT()` | `clearMQTTConfigDone()` + `clearMQTTConfigPending()` + `publishNonOTDiscoveryConfigs()`; OT IDs publish JIT |
 | Top-topic changed | Same as boot |
-| MQTT reconnect (any duration) | No action — bitmaps intact (broker restart heuristic deferred) |
+| MQTT reconnect, offline ≤ 5 min | No action — bitmaps intact, broker retains everything |
+| MQTT reconnect, offline > 5 min | `clearMQTTConfigDone()` + `clearMQTTConfigPending()` + `publishNonOTDiscoveryConfigs()` + `requestMQTTRepublishAll()` |
 | HA restart (`homeassistant/status → online`) | No action — broker retains configs |
 | Force (REST or Serial `F`) | `markAllMQTTConfigPending()` — all IDs queued immediately |
 
 ## Alternatives Considered
 
-See ADR-073 — identical reasoning. The only 2.0.0-specific alternative considered was porting the broker restart heuristic in the same commit; deferred because it requires separate `offlineMs` infrastructure that adds risk outside the narrow scope of this port.
+See ADR-073 — identical reasoning.
 
 ## Consequences
 
@@ -76,20 +87,21 @@ Same as ADR-073: no bulk publish at boot, HA entities appear JIT, HA restart is 
 
 ### Negative / Risks
 
-- Broker restart leaves done-bitmap stale until a `startMQTT()` (top-topic change, explicit restart) clears it. Mitigated by: (a) `doAutoConfigure()` force path, (b) the deferred follow-up ADR.
 - Firmware/PIC info entities not queued at boot (pending arrival of `OTGWfwinfoid` etc. on this branch).
+- 5-minute heuristic is approximate: a broker that restarts and recovers in under 5 minutes looks like a normal reconnect; retained configs survive in that case, so the heuristic is conservative in the right direction.
 
 ## Related Decisions
 
-- **Ports dev ADR-073** to 2.0.0 worktree. Decisions are coherent across both branches; implementation gap (broker heuristic) documented above.
+- **Ports dev ADR-073** to 2.0.0 worktree. Decisions are now fully coherent across both branches; no implementation gaps remain.
 - **Supersedes 2.0.0 ADR-041 equivalent** — the JIT principle from ADR-041 is preserved; the bulk-at-boot anti-pattern is removed.
 - ADR-006, ADR-040, ADR-062, ADR-067 (dev numbering equivalents) — unaffected.
 
 ## References
 
 - dev ADR-073: `docs/adr/ADR-073-jit-ha-discovery-smart-reconnect.md` (dev worktree).
-- `src/OTGW-firmware/MQTTstuff.ino:568` — `startMQTT()` change (2.0.0 line number post-pull).
-- `src/OTGW-firmware/MQTTstuff.ino:775` — `homeassistant/status` handler change.
+- `src/OTGW-firmware/MQTTstuff.ino:574` — `startMQTT()` change.
+- `src/OTGW-firmware/MQTTstuff.ino` — `homeassistant/status` handler change (no action on HA online).
+- `src/OTGW-firmware/MQTTstuff.ino` — broker restart heuristic block in connect success handler.
 - `src/OTGW-firmware/OTGW-Core.ino:4087-4088` — existing JIT trigger (unchanged).
 
 ## Enforcement
