@@ -1,10 +1,11 @@
 ---
 id: TASK-548
 title: 'Feature: Static IP address settings'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-06 09:04'
-updated_date: '2026-05-06 09:04'
+updated_date: '2026-05-08 21:35'
 labels:
   - feature
   - networking
