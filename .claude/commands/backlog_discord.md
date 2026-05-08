@@ -4,7 +4,7 @@ Monitor a Discord channel for backlog-related requests, execute them via the Bac
 
 ## Configuration
 
-- **Bot channel**: `#devs-esp-firmware` — channel ID `924989767966425158`
+- **Bot channel**: `#dev-sat-mqtt` — channel ID `1105556725714649128`
 - **Timestamp file**: `.claude/discord_backlog_last_checked.txt`
 - **Bot user ID to ignore**: `384411356616720384` (maintainer, not the bot itself — adjust if needed)
 
@@ -12,10 +12,10 @@ Monitor a Discord channel for backlog-related requests, execute them via the Bac
 
 ### Phase 1: Connect and read new messages
 
-The Discord MCP server runs as the `discord-mcp` Docker container on `http://localhost:8085/mcp` with `DISCORD_TOKEN` preloaded from the host environment — there is **no separate login step**. The first `read_messages` call doubles as the connection check. **Tool namespace is `mcp__discord-mcp__*`.** Always use these MCP tools, never curl or direct Discord API calls (curl is fine for the CDN attachment downloads in Phase 1b — see below).
+The Discord MCP server is the ExilProductions fork (`discord-mcp-exil`), started as a stdio process by Claude Code via `uv run python -m discord_mcp.main --transport stdio`. There is **no separate login step** — the `DISCORD_TOKEN` is injected via the MCP server config. The first tool call doubles as the connection check. **Tool namespace is `mcp__discord-mcp__*`.** Always use these MCP tools, never curl or direct Discord API calls (curl is fine for the CDN attachment downloads in Phase 1b — see below).
 
 1. **Read the last-checked timestamp** from `.claude/discord_backlog_last_checked.txt`. If the file does not exist, default to the last 1 hour.
-2. **Read messages** from the bot channel using `mcp__discord-mcp__read_messages` with `channelId="924989767966425158"` and `count="30"`. The response payload includes per-message **attachment metadata** (attachment ID, filename, MIME type, size, signed CDN URL).
+2. **Read messages** from the bot channel using `mcp__discord-mcp__fetch_channel_history` with `channel_id="1105556725714649128"` and `limit=30`. The response payload includes per-message **attachment metadata** (attachment ID, filename, MIME type, size, signed CDN URL).
 3. **Filter** to messages posted after the last-checked timestamp.
 4. **Ignore** messages sent by bots (including yourself).
 5. **Save the current timestamp** to `.claude/discord_backlog_last_checked.txt`.
@@ -38,7 +38,7 @@ New-Item -ItemType Directory -Force -Path $dir | Out-Null
 Invoke-WebRequest -Uri "<signed CDN URL from message>" -OutFile "$dir\<filename>" -UseBasicParsing
 ```
 
-Then call `Read` with the full Windows path, e.g. `C:\Users\rvdbr\AppData\Local\Temp\discord-attach\<filename>`. Discord CDN URLs are signed with `ex=<hex-epoch>` and expire ~7 days after the message was posted — if 403, fetch a fresh signed URL via `mcp__discord-mcp__read_messages` (Discord rolls a new one each call).
+Then call `Read` with the full Windows path, e.g. `C:\Users\rvdbr\AppData\Local\Temp\discord-attach\<filename>`. Discord CDN URLs are signed with `ex=<hex-epoch>` and expire ~7 days after the message was posted — if 403, fetch a fresh signed URL via `mcp__discord-mcp__fetch_channel_history` (Discord rolls a new one each call).
 
 When the bot uses an attachment to inform a reply, name the finding briefly so the reporter knows the bot actually read their evidence.
 
@@ -91,7 +91,7 @@ For each actionable message, do the following:
    - For board view: group tasks by status column
    - Keep responses under 1900 characters (Discord limit is 2000). If longer, summarize and offer to show more.
 
-4. **Post the response** to the same channel using `mcp__discord-mcp__send_message` with `channelId="924989767966425158"` and `message="<reply text>"`.
+4. **Post the response** to the same channel using `mcp__discord-mcp__send_message_to_channel` with `channel_id="1105556725714649128"` and `content="<reply text>"`.
 
 ### Phase 4: Handle conversational follow-ups
 

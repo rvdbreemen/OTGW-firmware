@@ -92,8 +92,7 @@ On `main`, gather all information AND generate all documentation in one pass. Pr
 - `gh pr list --state merged --search "merged:>YYYY-MM-DD" --json author,title --jq '.[] | "\(.author.login): \(.title)"'`
 
 *Source 2 - Discord #beta-testing channel:*
-- Log in to Discord: `mcp__discord__discord_login` (bot: OTGW bot)
-- Read messages from `#beta-testing` (channel ID: `914498730001072149`) with limit 100
+- Read messages from `#beta-testing` using `mcp__discord-mcp__fetch_channel_history` with `channel_id="914498730001072149"` and `limit=100`
 - Filter messages since the previous release date
 - Extract unique contributors (exclude bot accounts and the maintainer `number3nl` / user ID `384411356616720384`)
 - For each contributor, note what they did: tested builds, reported bugs, shared logs, provided diagnostic insights

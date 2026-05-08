@@ -8,16 +8,16 @@ Follow these phases strictly and in order.
 
 ### Phase 1: Read Discord messages
 
-The Discord MCP server runs as the `discord-mcp` Docker container on `http://localhost:8085/mcp` with `DISCORD_TOKEN` preloaded from the host environment — there is **no separate login step**. The first `read_messages` call doubles as the connection check. **Tool namespace is `mcp__discord-mcp__*`.** Always use these MCP tools, never curl or direct Discord API calls (curl is fine for the CDN attachment downloads in Phase 1d — see below).
+The Discord MCP server is the ExilProductions fork (`discord-mcp-exil`), started as a stdio process by Claude Code via `uv run python -m discord_mcp.main --transport stdio`. There is **no separate login step** — the `DISCORD_TOKEN` is injected via the MCP server config. The first tool call doubles as the connection check. **Tool namespace is `mcp__discord-mcp__*`.** Always use these MCP tools, never curl or direct Discord API calls (curl is fine for the CDN attachment downloads in Phase 1d — see below).
 
 1. **Read the last-checked timestamp** from `.claude/discord_last_checked.txt`. If the file does not exist, default to messages from the last 7 days.
-2. **Read messages** from the following channels using `mcp__discord-mcp__read_messages` with `count="50"`:
-   - `#beta-testing` — `channelId="914498730001072149"`
-   - `#devs-esp-firmware` — `channelId="924989767966425158"`
-   - `#english-support` — `channelId="931267109726593116"`
-   - `#nederlandse-ondersteuning` — `channelId="815561033036333076"`
+2. **Read messages** from the following channels using `mcp__discord-mcp__fetch_channel_history` with `limit=50`:
+   - `#beta-testing` — `channel_id="914498730001072149"`
+   - `#devs-esp-firmware` — `channel_id="924989767966425158"`
+   - `#english-support` — `channel_id="931267109726593116"`
+   - `#nederlandse-ondersteuning` — `channel_id="815561033036333076"`
 
-   The response payload includes per-message **attachment metadata** (attachment ID, filename, MIME type, size, signed CDN URL). The separate `mcp__discord-mcp__get_attachment` tool returns the same info and is redundant.
+   The response payload includes per-message **attachment metadata** (attachment ID, filename, MIME type, size, signed CDN URL). There is no separate `get_attachment` tool in this server — use the CDN URL from the message payload directly.
 3. **Filter messages** to only those posted after the last-checked timestamp.
 4. **Exclude** messages from the maintainer (user ID `384411356616720384`, username `number3nl`) and bot accounts.
 5. **Save the current timestamp** to `.claude/discord_last_checked.txt` for next run.
@@ -89,7 +89,7 @@ Then call `Read` with the full Windows path, e.g. `C:\Users\rvdbr\AppData\Local\
 
 **Caveats:**
 
-- Discord CDN URLs are signed with `ex=<hex-epoch>` and expire roughly 7 days after the message was posted. If the download returns 403, request a fresh signed URL via `mcp__discord-mcp__read_messages` (Discord rolls a new one each call) or ask the poster to re-share.
+- Discord CDN URLs are signed with `ex=<hex-epoch>` and expire roughly 7 days after the message was posted. If the download returns 403, request a fresh signed URL via `mcp__discord-mcp__fetch_channel_history` (Discord rolls a new one each call) or ask the poster to re-share.
 - `WebFetch` runs the content through a small AI model — for **forensic / line-precise** log diagnosis prefer the download-and-`Grep` route. Use `WebFetch` only for the "what does this log roughly show" first-pass question.
 - Windows `$env:TEMP` rotates on its own; no clean-up needed. Don't commit downloaded attachments anywhere.
 
