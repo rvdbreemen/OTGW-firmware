@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-08 17:13'
-updated_date: '2026-05-08 21:29'
+updated_date: '2026-05-08 21:30'
 labels:
   - sat
   - mqtt
@@ -33,9 +33,9 @@ Resolution options:
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Either: MQTTHaDiscovery.cpp has a json_attributes_topic entry binding sat/pressure_health_attr to the sat/pressure_health entity
-- [ ] #2 Or: the publish block at SATcontrol.ino:2042-2062 is deleted
-- [ ] #3 No orphaned MQTT publish on sat/pressure_health_attr remains
-- [ ] #4 Build passes and evaluator shows no new failures
+- [x] #2 Or: the publish block at SATcontrol.ino:2042-2062 is deleted
+- [x] #3 No orphaned MQTT publish on sat/pressure_health_attr remains
+- [x] #4 Build passes and evaluator shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
