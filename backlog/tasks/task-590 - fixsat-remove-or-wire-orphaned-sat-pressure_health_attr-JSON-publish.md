@@ -1,9 +1,11 @@
 ---
 id: TASK-590
 title: 'fix(sat): remove or wire orphaned sat/pressure_health_attr JSON publish'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-08 17:13'
+updated_date: '2026-05-08 21:29'
 labels:
   - sat
   - mqtt
