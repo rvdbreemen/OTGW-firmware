@@ -287,8 +287,8 @@ This project is intentionally checked out into **two parallel git worktrees** so
 
 | Worktree path | Branch | Purpose |
 |---|---|---|
-| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware` | `dev` | 1.5.x release line — the default working tree |
-| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware-2.0.0` | `feature-dev-2.0.0-otgw32-esp32-sat-support` | 2.0.0 ESP32 + SAT feature line |
+| `D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware` | `dev` | 1.5.x release line — the default working tree |
+| `D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware-2.0.0` | `feature-dev-2.0.0-otgw32-esp32-sat-support` | 2.0.0 ESP32 + SAT feature line |
 
 **The 2.0.0 worktree has its own `CLAUDE.md`** with ESP32/SAT-specific rules and a richer toolchain (C4 docs, hooks, adr-kit plugin, discord-mcp server). When working in that tree, those rules supersede this file's guidance. The two files are not synchronised — divergence is intentional, since the platforms and tooling differ.
 
@@ -306,7 +306,7 @@ git worktree add ../OTGW-firmware dev
 
 Verify with `git worktree list`.
 
-**Backlog.md: always use the CLI, never the MCP server.** The `backlog` MCP server (`mcp__backlog__task_*` tools) inherits the launching session's working directory and indexes only that single worktree. Tasks living in a sibling worktree are invisible to `mcp__backlog__task_search`, and `mcp__backlog__task_view` returns cached/stale content for cross-tree tasks (verified 2026-05-05: MCP kept returning the pre-edit "In Progress" snapshot of TASK-514 long after a CLI edit had marked it Done on disk in the 2.0.0 tree). Mixing CLI and MCP on the same task is fragile because MCP caches and does not reflect CLI-side writes without a server restart. **Use `backlog task ...` CLI for every read, edit, create, complete, and archive in this project.**
+**Backlog.md: prefer `mcp__backlog__*` tools for single-worktree operations; fall back to the CLI when MCP doesn't cover the operation.** For cross-tree tasks (reading or editing a task that lives in the sibling worktree), always use the CLI — the `backlog` MCP server inherits the launching session's working directory and is blind to the other tree. Tasks living in a sibling worktree are invisible to `mcp__backlog__task_search`, and `mcp__backlog__task_view` returns cached/stale content for cross-tree tasks (verified 2026-05-05: MCP kept returning the pre-edit "In Progress" snapshot of TASK-514 long after a CLI edit had marked it Done on disk in the 2.0.0 tree). Mixing CLI and MCP on the same task is fragile because MCP caches and does not reflect CLI-side writes without a server restart.
 
 **CLI cross-tree behaviour.** `backlog task <id> --plain` resolves from either worktree, but `backlog task edit` only writes to the worktree where the task file actually lives. If an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file. SAT / ESP32 / 2.0.0 tasks generally live in the feature worktree's `backlog/tasks/`, not in dev's.
 
