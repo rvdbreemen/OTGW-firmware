@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.21
+**  Version  : v2.0.0-alpha.22
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -56,6 +56,7 @@ constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 2048;
 #else
 constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 3000;  // aligned with WARNING tier on ESP8266
 #endif
+constexpr uint32_t MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS = 300000UL;  // 5 minutes
 
 // PIC subtree prefix -- single source of truth for the otgw-pic/ MQTT subtree.
 // Declared extern in MQTTstuff.h. See ADR-065 for the public-API contract.
@@ -1017,8 +1018,25 @@ void handleMQTT()
         sendMQTT(MQTTPubNamespace, "online");
         DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
 
-        // Force re-publish of all OT values so HA gets current state after reconnect.
-        requestMQTTRepublishAll();
+        // Republish OT retained topics and reset discovery only if offline long enough
+        // that the broker may have lost its retained state (e.g. broker restart without
+        // persistence). Short outages are network blips — broker still holds everything.
+        // iLastConnectedMs == 0 means never connected (first boot): skip republish.
+        {
+          uint32_t offlineMs = (state.mqtt.iLastConnectedMs > 0)
+                               ? (millis() - state.mqtt.iLastConnectedMs)
+                               : 0;
+          if (offlineMs > MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS) {
+            DebugTf(PSTR("[MQTT] offline %lums > threshold — broker may have restarted; republishing values + resetting discovery\r\n"), (unsigned long)offlineMs);
+            requestMQTTRepublishAll();
+            // Broker restart assumed: retained discovery configs may be gone (ADR-100).
+            clearMQTTConfigDone();
+            clearMQTTConfigPending();
+            publishNonOTDiscoveryConfigs();
+          } else {
+            DebugTf(PSTR("[MQTT] offline %lums <= threshold, broker retains topics — skipping republish\r\n"), (unsigned long)offlineMs);
+          }
+        }
         DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
 
         //Subscribe to topics
@@ -1066,9 +1084,10 @@ void handleMQTT()
     
     case MQTT_STATE_IS_CONNECTED:
       if DUE(timerMQTTdebugisconnected) MQTTDebugTln(F("MQTT State: MQTT is Connected"));
-      if (MQTTclient.connected()) 
+      if (MQTTclient.connected())
       { //if the MQTT client is connected, then please do a .loop call...
         MQTTclient.loop();
+        state.mqtt.iLastConnectedMs = millis();  // stamp each confirmed-live tick for offline-duration tracking
       }
       else
       { //else go and wait 10 minutes, before trying again.
