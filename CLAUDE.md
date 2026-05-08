@@ -16,10 +16,10 @@ This project uses OpenWolf for context management. Read and follow .wolf/OPENWOL
 **Always use the `backlog` CLI for task operations on this project. Do NOT use the `mcp__backlog__*` MCP server.** The MCP server indexes only one worktree at a time and serves stale cached state across the dev/2.0.0 split (verified 2026-05-05: MCP returned a pre-edit "In Progress" snapshot of TASK-514 long after the CLI marked it Done on disk in the 2.0.0 tree). The "Backlog.md: always use the CLI" section near the bottom of this file is the canonical statement; this paragraph is a reminder so the rule is the first thing seen.
 
 ```bash
-# Before writing any code (CLI shown for reference; MCP equivalents preferred):
-backlog search "<topic>" --plain           # 1. Find existing task       (mcp__backlog__task_search)
-backlog task create "Title" -d "..." --ac "..."  # 2. Create if none     (mcp__backlog__task_create)
-backlog task edit <id> -s "In Progress" -a @claude  # 3. Start it        (mcp__backlog__task_edit)
+# Before writing any code:
+backlog search "<topic>" --plain           # 1. Find existing task
+backlog task create "Title" -d "..." --ac "..."  # 2. Create if none
+backlog task edit <id> -s "In Progress" -a @claude  # 3. Start it
 backlog task edit <id> --plan "..."        # 4. Write plan, share with user, WAIT for approval
 
 # During implementation:
@@ -31,11 +31,11 @@ backlog task edit <id> --final-summary "..." # PR description
 backlog task edit <id> -s Done
 ```
 
-**CRITICAL: NEVER edit task files in `backlog/tasks/` directly. Always use the MCP server (preferred) or the CLI as fallback.**
+**CRITICAL: NEVER edit task files in `backlog/tasks/` directly. Always use the `backlog` CLI.**
 
 Two hooks enforce this contract — they fail closed, you don't have to remember:
 
-- `.claude/hooks/backlog-mcp-guard.py` — PreToolUse guard wired in `.claude/settings.json`. Blocks `Edit/Write/MultiEdit` on `backlog/tasks/*.md` and Bash invocations of the `backlog` CLI. Stderr names the MCP equivalent so the model self-corrects without another round-trip.
+- `.claude/hooks/backlog-mcp-guard.py` — PreToolUse guard wired in `.claude/settings.json`. Blocks `Edit/Write/MultiEdit` on `backlog/tasks/*.md` (direct file edits are never allowed). Does NOT block `backlog` CLI invocations — CLI is the preferred interface.
 - `.githooks/commit-msg` — git hook that fails the commit if its message references `TASK-NNN` without a matching `backlog/tasks/task-NNN*.md` file in the index. Catches the failure mode where a code commit lands but its task record stays untracked. Install once per clone with `git config core.hooksPath .githooks`. Bypass with `git commit --no-verify` for emergencies (document why in the message).
 
 For the full CLI reference (all commands, AC management, DoD, multi-line input): read `docs/guides/backlog-cli.md`.
