@@ -3,9 +3,11 @@ id: TASK-589
 title: >-
   fix(sat): remove or wire orphaned sat/climate_attributes JSON publish
   (512-byte static buffer)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-08 17:12'
+updated_date: '2026-05-08 21:21'
 labels:
   - sat
   - mqtt
