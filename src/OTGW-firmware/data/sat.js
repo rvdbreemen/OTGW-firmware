@@ -467,28 +467,21 @@ var SAT = (function() {
     return baseOffset + (coefficient / 4.0) * curveValue;
   }
 
-  // Reference-curve palette (TASK-566): perceptually ordered ramp from
-  // cool blue (low c) through cyan/green to warm yellow (high c).
-  // Picked so each c reads naturally as "low → high" in one glance, while
-  // staying clearly distinct from the grid colour (#bbb/#555) and from the
-  // active-curve / current-dot orange (#ff6600 / #ff3300).
-  var REF_CURVE_COLORS = [
-    '#1f77b4', // c=0.5  blue
-    '#3a8fd1', // c=1.0
-    '#2ca0c2', // c=1.5  blue-cyan
-    '#26b3a3', // c=2.0
-    '#3fbf6f', // c=2.5  green
-    '#7dc445', // c=3.0
-    '#b9c233', // c=3.5  yellow-green
-    '#d9b432', // c=4.0
-    '#e6a233', // c=4.5
-    '#e8c233'  // c=5.0  yellow
-  ];
+  // TASK-579: Reference curves are muted so the active curve stands out.
+  // All reference curves use the same low-opacity grey regardless of theme.
+  var REF_CURVE_COLOR_LIGHT = 'rgba(150,160,170,0.35)';
+  var REF_CURVE_COLOR_DARK  = 'rgba(180,190,200,0.28)';
+  var ACTIVE_CURVE_COLOR    = '#ff6600';
+  var ACTIVE_CURVE_WIDTH    = 3;
+  var REF_CURVE_WIDTH       = 1;
 
   function buildCurveOption(coeff, system, target, outsideTemp, currentSetpoint, theme) {
     // X axis: outside temperatures from -15 to 25
     var xData = [];
     for (var t = -15; t <= 25; t++) xData.push(t);
+
+    // TASK-579: muted color for reference curves; active curve is orange
+    var refColor = (theme === 'dark') ? REF_CURVE_COLOR_DARK : REF_CURVE_COLOR_LIGHT;
 
     var series = [];
     // Reference curves: coefficient 0.5 to 5.0, step 0.5
@@ -509,8 +502,8 @@ var SAT = (function() {
         data: data,
         symbol: 'none',
         lineStyle: {
-          width: isActive ? 3 : 1.5,
-          color: isActive ? '#ff6600' : REF_CURVE_COLORS[ci]
+          width: isActive ? ACTIVE_CURVE_WIDTH : REF_CURVE_WIDTH,
+          color: isActive ? ACTIVE_CURVE_COLOR : refColor
         },
         emphasis: { disabled: true },
         silent: true,
@@ -534,12 +527,28 @@ var SAT = (function() {
         smooth: true,
         data: activeData,
         symbol: 'none',
-        lineStyle: { width: 3, color: '#ff6600' },
+        lineStyle: { width: ACTIVE_CURVE_WIDTH, color: ACTIVE_CURVE_COLOR },
         emphasis: { disabled: true },
         silent: true,
         z: 5
       });
     }
+
+    // TASK-579: Curve position marker — dot on the active curve at current outside temp
+    var curvePosData = [];
+    if (outsideTemp !== null && outsideTemp !== undefined && isFinite(outsideTemp)) {
+      var curveFlowAtOutside = Math.round(calcHeatingCurve(outsideTemp, target, coeff, system) * 10) / 10;
+      curvePosData = [[outsideTemp, curveFlowAtOutside]];
+    }
+    series.push({
+      name: 'Curve Pos',
+      type: 'scatter',
+      data: curvePosData,
+      symbolSize: 10,
+      itemStyle: { color: ACTIVE_CURVE_COLOR, borderColor: '#fff', borderWidth: 2 },
+      silent: true,
+      z: 8
+    });
 
     // Current operating point — always include so the partial-update path in
     // updateCurveChart can reliably move the dot without a full rebuild.
@@ -561,9 +570,11 @@ var SAT = (function() {
           for (var pi = 0; pi < params.length; pi++) {
             if (params[pi].seriesType === 'scatter') continue;
             var val = params[pi].data;
-            if (val !== null && val !== undefined) {
+            // line series data may be scalar or [x, y] array
+            var displayVal = (Array.isArray(val) && val.length >= 2) ? val[1] : val;
+            if (displayVal !== null && displayVal !== undefined) {
               tip += '<span style="color:' + params[pi].color + '">\u25CF</span> '
-                   + params[pi].seriesName + ': ' + val + '\u00B0C<br/>';
+                   + params[pi].seriesName + ': ' + displayVal + '\u00B0C<br/>';
             }
           }
           return tip;
@@ -601,7 +612,8 @@ var SAT = (function() {
     clearChartUnavailable(container);
     _curveChartInstance = echarts.init(container, _otgwTheme());
     // Initial empty state — filled on first data fetch
-    _curveChartInstance.setOption(buildCurveOption(1.5, 0, 20.0, null, null, 'light'));
+    var initTheme = document.body.classList.contains('dark') ? 'dark' : 'light';
+    _curveChartInstance.setOption(buildCurveOption(1.5, 0, 20.0, null, null, initTheme));
   }
 
   // Safe float comparison: treats null/undefined/non-finite as "changed" so
@@ -631,16 +643,23 @@ var SAT = (function() {
       _lastCurveTarget = target;
       var theme = document.body.classList.contains('dark') ? 'dark' : 'light';
       _curveChartInstance.setOption(buildCurveOption(coeff, system, target, outside, setpoint, theme), true);
+      // Re-overlay calibration markers after full curve rebuild (TASK-586)
+      _renderMarkersOnChart();
     } else {
-      // Just update operating point (last series)
+      // Update both trailing scatter series: Curve Pos (second-to-last) and Current (last)
       var seriesCount = _curveChartInstance.getOption().series.length;
       var lastSeries = _curveChartInstance.getOption().series[seriesCount - 1];
-      if (lastSeries && lastSeries.type === 'scatter') {
+      if (lastSeries && lastSeries.type === 'scatter' && seriesCount >= 2) {
         var update = [];
-        for (var si = 0; si < seriesCount - 1; si++) update.push({});
-        update.push({
-          data: buildCurrentPointData(outside, setpoint)
-        });
+        for (var si = 0; si < seriesCount - 2; si++) update.push({});
+        // Curve Pos: orange dot on active curve at current outside temp
+        var curvePosUpdate = [];
+        if (outside !== null && outside !== undefined && isFinite(outside)) {
+          var fp = Math.round(calcHeatingCurve(outside, _lastCurveTarget, _lastCurveCoeff, _lastCurveSystem) * 10) / 10;
+          curvePosUpdate = [[outside, fp]];
+        }
+        update.push({ data: curvePosUpdate });
+        update.push({ data: buildCurrentPointData(outside, setpoint) });
         _curveChartInstance.setOption({ series: update });
       }
     }
@@ -699,6 +718,8 @@ var SAT = (function() {
     initView();
     initChart();
     initCurveChart();
+    _initCurveClickHandler();  // TASK-586: click-to-add-marker on curve chart
+    loadMarkers();              // TASK-586: load persisted calibration markers
     fetchSlaveConfig();  // detect storage tank boiler (MsgID 3 bit 3)
     fetchDHWBounds();    // get DHW setpoint upper/lower bounds (MsgID 48)
     fetchStatus(); // immediate first fetch
@@ -1218,6 +1239,151 @@ var SAT = (function() {
     }
   }
 
+  // --- TASK-586: Calibration Marker System ---
+  var _markers = [];  // [{id, label, outside_temp, flow_temp}]
+  var MARKER_COLOR = '#9b59b6';  // purple diamonds
+
+  function loadMarkers() {
+    fetch(APIGW + 'v2/sat/markers')
+      .then(function(r) {
+        if (!r.ok) return Promise.reject(r.statusText);
+        return r.json();
+      })
+      .then(function(data) {
+        // Backend streams the raw JSON array directly (not wrapped in an object)
+        _markers = Array.isArray(data) ? data :
+                   (data && Array.isArray(data.markers)) ? data.markers : [];
+        _renderMarkersOnChart();
+        _renderMarkerList();
+      })
+      .catch(function(err) {
+        console.warn('[SAT] marker load error:', err);
+        _markers = [];
+      });
+  }
+
+  function _renderMarkersOnChart() {
+    if (!_curveChartInstance) return;
+    var opt = _curveChartInstance.getOption();
+    var series = (opt && opt.series) ? opt.series : [];
+
+    // Remove any previous marker series (named 'Markers')
+    var filtered = [];
+    for (var i = 0; i < series.length; i++) {
+      if (series[i].name !== 'Markers') filtered.push(series[i]);
+    }
+
+    // Build marker data: [[outside_temp, flow_temp]]
+    var markerData = [];
+    for (var mi = 0; mi < _markers.length; mi++) {
+      var m = _markers[mi];
+      markerData.push({
+        value: [m.outside_temp, m.flow_temp],
+        _markerId: m.id,
+        _markerLabel: m.label || ''
+      });
+    }
+
+    filtered.push({
+      name: 'Markers',
+      type: 'scatter',
+      data: markerData,
+      symbol: 'diamond',
+      symbolSize: 14,
+      itemStyle: { color: MARKER_COLOR, borderColor: '#fff', borderWidth: 2 },
+      z: 9,
+      tooltip: {
+        formatter: function(params) {
+          var d = params.data;
+          var lbl = (d && d._markerLabel) ? d._markerLabel : 'Marker';
+          var v = (d && d.value) ? d.value : [0, 0];
+          return lbl + '<br/>Outside: ' + v[0] + '°C<br/>Flow: ' + v[1] + '°C';
+        }
+      }
+    });
+
+    _curveChartInstance.setOption({ series: filtered }, false);
+  }
+
+  function _renderMarkerList() {
+    var list = el('sat-marker-list');
+    if (!list) return;
+    while (list.firstChild) list.removeChild(list.firstChild);
+
+    if (!_markers.length) {
+      var empty = document.createElement('li');
+      empty.className = 'sat-marker-empty';
+      empty.textContent = 'No markers. Click on the curve chart to add one.';
+      list.appendChild(empty);
+      return;
+    }
+
+    for (var i = 0; i < _markers.length; i++) {
+      (function(m) {
+        var li = document.createElement('li');
+        li.className = 'sat-marker-item';
+
+        var span = document.createElement('span');
+        span.textContent = (m.label || 'Marker') + ' — Outside: ' + m.outside_temp + '°C, Flow: ' + m.flow_temp + '°C';
+        li.appendChild(span);
+
+        var btn = document.createElement('button');
+        btn.className = 'sat-marker-del';
+        btn.setAttribute('aria-label', 'Delete marker');
+        btn.textContent = '×';
+        btn.onclick = function() { deleteMarker(m.id); };
+        li.appendChild(btn);
+
+        list.appendChild(li);
+      })(_markers[i]);
+    }
+  }
+
+  function deleteMarker(id) {
+    fetch(APIGW + 'v2/sat/markers/' + id, { method: 'DELETE' })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return loadMarkers();
+      })
+      .catch(function(e) {
+        showFeedback('Delete marker error: ' + e.message, true);
+      });
+  }
+
+  function addMarkerAtClick(outside_temp, flow_temp) {
+    var label = 'Marker ' + new Date().toLocaleTimeString();
+    var body = JSON.stringify({ label: label, outside_temp: outside_temp, flow_temp: flow_temp });
+    fetch(APIGW + 'v2/sat/markers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body
+    })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return loadMarkers();
+      })
+      .catch(function(e) {
+        showFeedback('Add marker error: ' + e.message, true);
+      });
+  }
+
+  function _initCurveClickHandler() {
+    if (!_curveChartInstance) return;
+    _curveChartInstance.on('click', function(params) {
+      // Only add marker on background click (not on a series point)
+      if (params.componentType !== 'series') {
+        var coords = _curveChartInstance.convertFromPixel('grid', [params.offsetX, params.offsetY]);
+        if (!coords || coords.length < 2) return;
+        var outside_temp = Math.round(coords[0] * 10) / 10;
+        var flow_temp = Math.round(coords[1] * 10) / 10;
+        // Clamp to chart bounds
+        if (outside_temp < CURVE_X_MIN || outside_temp > CURVE_X_MAX) return;
+        if (flow_temp < CURVE_Y_MIN || flow_temp > CURVE_Y_MAX) return;
+        addMarkerAtClick(outside_temp, flow_temp);
+      }
+    });
+  }
+
   return {
     start: start,
     stop: stop,
@@ -1234,6 +1400,7 @@ var SAT = (function() {
     detectLocation: detectLocation,
     onDhwSliderInput: onDhwSliderInput,
     onDhwSliderChange: onDhwSliderChange,
-    onDhwHwSwitch: onDhwHwSwitch
+    onDhwHwSwitch: onDhwHwSwitch,
+    deleteMarker: deleteMarker
   };
 })();

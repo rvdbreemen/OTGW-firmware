@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v2.0.0-alpha.22
+**  Version  : v2.0.0-alpha.26
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -291,6 +291,18 @@ if (settings.mqtt.bEnable) {
       // DebugTf(PSTR("Topic: %s -- Payload: %s\r\n"), strDeviceAddress, _msg);
       if (state.debug.bSensors) DebugFlush();
       sendMQTTData(strDeviceAddress, _msg);
+    }
+
+    // TASK-587: Auto-route sensor temperature to SAT area if address is mapped
+    for (int areaIdx = 0; areaIdx < 4; areaIdx++) {
+      if (settings.sat.sSensorArea[areaIdx][0] != '\0' &&
+          strcasecmp(strDeviceAddress, settings.sat.sSensorArea[areaIdx]) == 0) {
+        satSetAreaTemp(areaIdx, DallasrealDevice[i].tempC);
+        if (state.debug.bSensors) {
+          DebugTf(PSTR("Sensor [%s] auto-routed to SAT area %d: %4.1f\r\n"),
+                  strDeviceAddress, areaIdx, DallasrealDevice[i].tempC);
+        }
+      }
     }
   }
   if (state.debug.bSensorSim)

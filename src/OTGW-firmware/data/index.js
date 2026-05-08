@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.22
+**  Version  : v2.0.0-alpha.26
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3640,6 +3640,8 @@ function refreshSATSettings() {
         // TASK-508: BLE sensors panel goes ABOVE the generic groups so
         // self-discovery + selection is the first thing the user sees.
         buildBleSensorsPanel(page);
+        // TASK-587: DS18B20 area-sensor mapping panel, built once then refreshed
+        buildDallasSensorAreasPanel(page);
         buildSATSettingsGroups(page, data);
       } else {
         // Just update values
@@ -3647,6 +3649,8 @@ function refreshSATSettings() {
       }
       // TASK-508: refresh roster on every poll (5s cadence via fetchSATSettings).
       refreshBleRoster();
+      // TASK-587: refresh sensor-area panel on each poll
+      refreshDallasSensorAreas();
     })
     .catch(function(error) {
       if (msgEl) { msgEl.textContent = 'Error loading settings: ' + error.message; msgEl.className = 'error'; }
@@ -3729,6 +3733,161 @@ function buildBleSensorsPanel(page) {
   grpDiv.appendChild(header);
   grpDiv.appendChild(body);
   page.appendChild(grpDiv);
+}
+
+// TASK-587: DS18B20 sensor-to-SAT-area mapping panel.
+// Built once via buildDallasSensorAreasPanel(); updated by refreshDallasSensorAreas().
+// All DOM nodes via createElement/textContent — no innerHTML on user-controlled data.
+function buildDallasSensorAreasPanel(page) {
+  var grpDiv = document.createElement('div');
+  grpDiv.className = 'sat-settings-group';
+  grpDiv.id = 'sat-grp-dallas-areas';
+
+  var header = document.createElement('div');
+  header.className = 'sat-settings-group-header';
+  header.id = 'sat-grp-dallas-areas-header';
+
+  var toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'sat-settings-group-toggle';
+  toggleBtn.setAttribute('aria-expanded', 'true');
+  toggleBtn.setAttribute('aria-controls', 'sat-grp-dallas-areas-body');
+  var arrow = document.createElement('span');
+  arrow.className = 'sat-settings-arrow';
+  arrow.textContent = '▼';
+  toggleBtn.appendChild(arrow);
+  toggleBtn.appendChild(document.createTextNode(' DS18B20 Area Sensor Mapping'));
+  toggleBtn.addEventListener('click', function() {
+    toggleSATSettingsGroup('sat-grp-dallas-areas-header');
+  }, false);
+  header.appendChild(toggleBtn);
+
+  var body = document.createElement('div');
+  body.className = 'sat-settings-group-body';
+  body.id = 'sat-grp-dallas-areas-body';
+
+  var hint = document.createElement('p');
+  hint.className = 'sat-label';
+  hint.textContent = 'Map a discovered DS18B20 sensor to each SAT area. Temperature is auto-forwarded on each poll cycle.';
+  body.appendChild(hint);
+
+  var grid = document.createElement('div');
+  grid.className = 'sat-grid';
+  grid.id = 'dallas-areas-grid';
+  body.appendChild(grid);
+
+  grpDiv.appendChild(header);
+  grpDiv.appendChild(body);
+  page.appendChild(grpDiv);
+}
+
+// Fetch discovered Dallas sensors + current mappings, then render dropdowns.
+function refreshDallasSensorAreas() {
+  var grid = document.getElementById('dallas-areas-grid');
+  if (!grid) return;
+
+  var emptyAreas = [{sensor:''},{sensor:''},{sensor:''},{sensor:''}];
+
+  Promise.all([
+    fetch(APIGW + 'v2/sensors').then(function(r) {
+      if (!r.ok) return null;
+      return r.json();
+    }).catch(function() { return null; }),
+    fetch(APIGW + 'v2/sensors/labels').then(function(r) {
+      if (!r.ok) return {};
+      return r.json();
+    }).catch(function() { return {}; }),
+    fetch(APIGW + 'v2/sat/sensor-areas').then(function(r) {
+      if (!r.ok) return { areas: emptyAreas };
+      return r.json();
+    }).catch(function() { return { areas: emptyAreas }; })
+  ]).then(function(results) {
+    var statusJson = results[0];
+    var labelsMap  = results[1] || {};
+    var areaData   = results[2] || { areas: emptyAreas };
+    var areas      = areaData.areas || emptyAreas;
+
+    var sensors = [];
+    var devObj = statusJson && statusJson.sensors && statusJson.sensors.devices;
+    if (devObj) {
+      Object.keys(devObj).forEach(function(addr) {
+        var upperAddr = addr.toUpperCase();
+        sensors.push({ address: upperAddr, label: labelsMap[addr] || labelsMap[upperAddr] || '' });
+      });
+    }
+    renderDallasSensorAreas(grid, sensors, areas);
+  });
+}
+
+function renderDallasSensorAreas(grid, sensors, areas) {
+  while (grid.firstChild) grid.removeChild(grid.firstChild);
+
+  for (var i = 0; i < 4; i++) {
+    (function(areaIdx) {
+      var row = document.createElement('div');
+      row.className = 'sat-row';
+
+      var lab = document.createElement('span');
+      lab.className = 'sat-label';
+      lab.textContent = 'Area ' + areaIdx;
+
+      var sel = document.createElement('select');
+      sel.className = 'sat-value';
+      sel.id = 'dallas-area-sel-' + areaIdx;
+
+      var optNone = document.createElement('option');
+      optNone.value = '';
+      optNone.textContent = '-- none --';
+      sel.appendChild(optNone);
+
+      var currentAddr = (areas[areaIdx] && areas[areaIdx].sensor) ? areas[areaIdx].sensor.toUpperCase() : '';
+      sensors.forEach(function(s) {
+        var addr = (s.address || '').toUpperCase();
+        if (!addr) return;
+        var opt = document.createElement('option');
+        opt.value = addr;
+        opt.textContent = s.label ? (s.label + ' (' + addr + ')') : addr;
+        if (addr === currentAddr) opt.selected = true;
+        sel.appendChild(opt);
+      });
+
+      if (currentAddr && !sensors.some(function(s) {
+        return (s.address || '').toUpperCase() === currentAddr;
+      })) {
+        var optManual = document.createElement('option');
+        optManual.value = currentAddr;
+        optManual.textContent = currentAddr + ' (manual)';
+        optManual.selected = true;
+        sel.appendChild(optManual);
+      }
+
+      var saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'sat-btn';
+      saveBtn.textContent = 'Save';
+      saveBtn.addEventListener('click', function() {
+        saveDallasAreaSensor(areaIdx, sel.value);
+      }, false);
+
+      row.appendChild(lab);
+      row.appendChild(sel);
+      row.appendChild(saveBtn);
+      grid.appendChild(row);
+    })(i);
+  }
+}
+
+function saveDallasAreaSensor(areaIdx, sensorAddr) {
+  fetch(APIGW + 'v2/sat/sensor-areas', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ area: areaIdx, sensor: sensorAddr })
+  })
+  .then(function(r) {
+    if (!r.ok) return r.json().then(function(e) { throw new Error(e.error || ('HTTP ' + r.status)); });
+    return r.json();
+  })
+  .catch(function(e) { alert('Save failed: ' + e.message); });
 }
 
 // TASK-508: pull /api/v2/sat/ble/discovery and render the roster.
@@ -5593,6 +5752,11 @@ function refreshSettings() {
       // Hide PIC-related settings rows when no PIC is detected
       applyPICAvailability(picAvailable, otCommandInterfaceAvailable);
       applyOTDirectAvailability(otDirectAvailable);
+      // TASK-585: build WiFi scan panel once, after all other groups are rendered
+      var settingsPageEl = document.getElementById('settingsPage');
+      if (settingsPageEl && !document.getElementById('wifi-scan-panel')) {
+        buildWifiScanPanel(settingsPageEl);
+      }
     })
     .catch(function (error) {
       var msgEl = document.getElementById("settingMessage");
@@ -7253,4 +7417,105 @@ function resetWiFiSettingsUI() {
   if (confirm('Reset Wi-Fi settings?\n\nThis will clear the stored Wi-Fi credentials and reboot the device in Access Point (AP) mode.\n\nAfter the reboot, connect to the "OTGW-XXXXXX" Wi-Fi network to reconfigure.')) {
     window.location.href = localURL + '/ResetWireless';
   }
+}
+
+// TASK-585: WiFi scan panel for the Settings page.
+// Shows a "Scan" button and, after scan completes, a dropdown of nearby networks.
+// Informational: allows user to see available SSIDs without leaving the page.
+// All DOM nodes via createElement/textContent — no innerHTML on user-controlled data.
+function buildWifiScanPanel(parentEl) {
+  var section = document.createElement('section');
+  section.className = 'ds-card settings-group';
+  section.id = 'wifi-scan-panel';
+
+  var heading = document.createElement('h3');
+  heading.className = 'settings-group-title';
+  heading.textContent = 'Available Wi-Fi Networks';
+  section.appendChild(heading);
+
+  var body = document.createElement('div');
+  body.className = 'settings-group-body';
+
+  var info = document.createElement('p');
+  info.className = 'settings-field-container';
+  info.textContent = 'Scan for nearby Wi-Fi networks. Use the Reset WiFi button on the SSID field above to switch networks.';
+  body.appendChild(info);
+
+  var row = document.createElement('div');
+  row.className = 'settingDiv';
+
+  var scanBtn = document.createElement('button');
+  scanBtn.type = 'button';
+  scanBtn.className = 'sat-btn';
+  scanBtn.id = 'wifi-scan-btn';
+  scanBtn.textContent = 'Scan';
+
+  var statusEl = document.createElement('span');
+  statusEl.id = 'wifi-scan-status';
+  statusEl.className = 'sat-label';
+  statusEl.textContent = '';
+  statusEl.style.marginLeft = '8px';
+
+  var netSel = document.createElement('select');
+  netSel.id = 'wifi-scan-result';
+  netSel.className = 'input-normal';
+  netSel.style.marginLeft = '8px';
+  netSel.style.display = 'none';
+
+  scanBtn.addEventListener('click', function() { startWifiScan(scanBtn, statusEl, netSel); }, false);
+
+  row.appendChild(scanBtn);
+  row.appendChild(statusEl);
+  row.appendChild(netSel);
+  body.appendChild(row);
+  section.appendChild(body);
+  parentEl.appendChild(section);
+}
+
+var _wifiScanPollTimer = null;
+function startWifiScan(btn, statusEl, netSel) {
+  if (_wifiScanPollTimer) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Scanning…'; }
+  if (statusEl) statusEl.textContent = '';
+  if (netSel) netSel.style.display = 'none';
+
+  function poll() {
+    fetch(APIGW + 'v2/network/scan')
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(j) {
+        if (j.status === 'scanning') {
+          _wifiScanPollTimer = setTimeout(poll, 1000);
+          return;
+        }
+        clearTimeout(_wifiScanPollTimer);
+        _wifiScanPollTimer = null;
+        if (btn) { btn.disabled = false; btn.textContent = 'Scan'; }
+        if (!j.networks || j.networks.length === 0) {
+          if (statusEl) statusEl.textContent = 'No networks found.';
+          return;
+        }
+        if (statusEl) statusEl.textContent = j.count + ' network(s) found';
+        while (netSel.firstChild) netSel.removeChild(netSel.firstChild);
+        j.networks.forEach(function(n) {
+          var opt = document.createElement('option');
+          opt.value = n.ssid;
+          var connTag = n.connected ? ' (current)' : '';
+          var lockTag = n.secured ? ' [secured]' : '';
+          opt.textContent = n.ssid + ' [ch' + n.channel + ', ' + n.rssi + 'dBm]' + lockTag + connTag;
+          if (n.connected) opt.selected = true;
+          netSel.appendChild(opt);
+        });
+        netSel.style.display = '';
+      })
+      .catch(function(e) {
+        clearTimeout(_wifiScanPollTimer);
+        _wifiScanPollTimer = null;
+        if (btn) { btn.disabled = false; btn.textContent = 'Scan'; }
+        if (statusEl) statusEl.textContent = 'Scan failed: ' + e.message;
+      });
+  }
+  poll();
 }
