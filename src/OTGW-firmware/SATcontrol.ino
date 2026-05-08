@@ -1268,11 +1268,15 @@ static float satZonePidStep(uint8_t idx, float outsideTemp)
   float error = target - roomTemp;
   float deadband = settings.sat.fDeadband;
 
-  // Integral: only inside deadband (matches SAT Python convention)
+  // Integral: only inside deadband (matches SAT Python convention).
+  // Symmetric clamp [-curveValue, +curveValue] mirrors primary PID (TASK-588).
+  // Negative accumulation is needed when the zone overshoots its setpoint.
   if (fabsf(error) <= deadband) {
     z.fPidIntegral += ki * error * 60.0f;   // SAT_PID_UPDATE_INTERVAL = 60s
-    if (z.fPidIntegral < 0.0f)        z.fPidIntegral = 0.0f;
-    if (z.fPidIntegral > curveValue)  z.fPidIntegral = curveValue;
+    if (z.fPidIntegral < -curveValue) z.fPidIntegral = -curveValue;
+    if (z.fPidIntegral >  curveValue) z.fPidIntegral =  curveValue;
+    if (z.fPidIntegral >  20.0f)     z.fPidIntegral =  20.0f;
+    if (z.fPidIntegral < -20.0f)     z.fPidIntegral = -20.0f;
   } else {
     z.fPidIntegral = 0.0f;
   }
