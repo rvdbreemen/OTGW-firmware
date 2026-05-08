@@ -31,3 +31,9 @@ Replace unconditional boot-republish of all 256 OT discovery configs with a pure
 - [x] #8 Build passes: python build.py exits 0
 - [x] #9 Evaluator green: python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pure JIT MQTT discovery implemented on dev/MQTTstuff.ino. Removed markAllMQTTConfigPending() from startMQTT() and homeassistant/status online handler. Added clearMQTTConfigPending() and publishNonOTDiscoveryConfigs() (queues only climate/number/Dallas/heap-stats/firmware-info/PIC pseudo-IDs). Broker restart detection: offlineMs > 5 min resets both bitmaps + calls publishNonOTDiscoveryConfigs(). Force path (doAutoConfigure) unchanged. JIT trigger in OTGW-Core.ino was already correct. ADR-073 added as Proposed. Build green, evaluator unchanged, pushed as commit 1bb58d8f (beta.30).
+<!-- SECTION:FINAL_SUMMARY:END -->
