@@ -37,3 +37,9 @@ Resolution options:
 - [ ] #3 No orphaned MQTT publish on sat/pressure_health_attr remains
 - [ ] #4 Build passes and evaluator shows no new failures
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Remove the sat/pressure_health_attr publish block (lines 1888-1908 in SATcontrol.ino). The flat scalar topics (sat/pressure, sat/pressure_drop_rate, sat/pressure_alarm) already cover all the data. No HA discovery entry exists for sat/pressure_health itself, so wiring option would require a larger change out of scope. Removing the orphan is the minimal fix.
+<!-- SECTION:PLAN:END -->
