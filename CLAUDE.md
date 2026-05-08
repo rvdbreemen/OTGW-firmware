@@ -248,7 +248,7 @@ Generic Anthropic-published skills (`pdf`, `docx`, `refactor`, `webapp-testing`,
 
 ## Superpowers skills
 
-The `superpowers:using-superpowers` skill loads automatically each session and establishes the skill-discovery flow: if any installed skill might apply to the current task — even at low confidence — invoke it via the `Skill` tool before responding. Don't paraphrase a skill from memory; the on-disk version may have evolved.
+**At the start of every conversation, invoke `superpowers:using-superpowers` via the `Skill` tool before doing anything else.** This establishes the skill-discovery flow: if any installed skill might apply to the current task — even at low confidence — invoke it via the `Skill` tool before responding. Don't paraphrase a skill from memory; the on-disk version may have evolved.
 
 Two superpowers skills are particularly useful in this codebase:
 
