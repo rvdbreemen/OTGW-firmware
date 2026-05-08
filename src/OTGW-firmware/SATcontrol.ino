@@ -1885,27 +1885,6 @@ void satPublishMQTT()
     sendMQTTData(F("sat/pressure_drop_rate"), pBuf, false);
     sendMQTTData(F("sat/pressure_alarm"), state.sat.bPressureAlarm ? "true" : "false", false);
     sendMQTTData(F("sat/pressure_health"), state.sat.bPressureHealthy ? "ON" : "OFF", true);
-    // JSON attributes for pressure_health binary sensor (Task #59)
-    static char pressAttrBuf[200];
-    char sBuf[12];
-    int pos = 0;
-    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
-                      PSTR("{\"pressure\":"));
-    dtostrf(OTcurrentSystemState.CHPressure, 1, 2, sBuf);
-    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
-                      PSTR("%s,\"smoothed_pressure\":"), sBuf);
-    dtostrf(state.sat.fSmoothedPressure, 1, 2, sBuf);
-    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
-                      PSTR("%s,\"pressure_drop_rate_bar_per_hour\":"), sBuf);
-    dtostrf(state.sat.fPressureDropRate, 1, 3, sBuf);
-    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
-                      PSTR("%s,\"last_pressure\":"), sBuf);
-    dtostrf(state.sat.fLastPressure, 1, 2, sBuf);
-    pos += snprintf_P(pressAttrBuf + pos, sizeof(pressAttrBuf) - pos,
-                      PSTR("%s,\"last_pressure_timestamp\":%lu,\"last_seen_pressure_timestamp\":%lu}"),
-                      sBuf, state.sat.iLastPressureMs / 1000UL,
-                      state.sat.iLastSeenPressureMs / 1000UL);
-    sendMQTTData(F("sat/pressure_health_attr"), pressAttrBuf, false);
   }
   // Task #226: publish sat/ch_pressure + sat/ch_pressure_status
   satPressureHealthPublish();
