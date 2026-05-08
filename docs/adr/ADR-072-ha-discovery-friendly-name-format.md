@@ -21,7 +21,7 @@ Three independent UX failures came out of Discord field testing in early May 202
 
 [ADR-041](ADR-041-jit-ha-discovery.md) defines the JIT discovery publishing pipeline but is silent on what `name` SHOULD look like. Without a written contract every new entity added carried the risk of reintroducing the same defect class — caught only by serial Discord rounds with field testers, weeks after merge.
 
-### Alternatives considered
+## Alternatives Considered
 
 - **Status quo: identifier-as-label.** Rejected. Field-validated as confusing; required Andre to translate every entity name before describing problems on Discord.
 - **Compute friendly name in HA's `name_template` Jinja per entity.** Rejected. Pushes UX complexity onto every HA installation, invisible to users who don't author templates, and divergent across users. Firmware should ship clean defaults.
@@ -77,20 +77,27 @@ Three independent UX failures came out of Discord field testing in early May 202
 - A contributor adding a new entity could bypass the helper and write `name` directly with `writeRam(ctx.hostname) + literal_suffix`, reintroducing both classes of defect (hostname prefix + glued words). Mitigated by the Enforcement block (count check via `llm_judge`) and code-review checklist.
 - The recognised-acronym list is finite. New OpenTherm spec features may introduce acronyms not in the list (e.g. a future `WB`, `CH3`). Mitigation: extend the list when adding the entity. The ADR's list is illustrative; ADR text will not be re-issued for each acronym addition.
 
-## Related
+## Related Decisions
 
 - [ADR-041](ADR-041-jit-ha-discovery.md) — JIT HA discovery publishing pipeline. This ADR fills a gap left by ADR-041 (which describes WHEN discovery is published but not WHAT the `name` field looks like).
 - [ADR-067](ADR-067-ha-discovery-state-reconciliation-on-ota-upgrade.md) — entity-id stability across upgrades; the entity-name churn from this decision flows through that mechanism on first OTA after upgrade.
 - TASK-573 — applied this convention to the existing 125 PROGMEM friendly-name strings in `mqtt_configuratie.cpp` (shipped as `beta.29`).
 - 2.0.0 sibling: ADR-099 — codifies the same decision on the 2.0.0 worktree (separate file because each worktree has its own ADR numbering; the *decision* is coherent across both).
 
+## References
+
+- Discord field testing, 2026-05-07: Andre (`beta.26`/`beta.27` screenshots), SergeantD (`alpha.3` reflash logs) — primary UX evidence driving this decision.
+- `src/OTGW-firmware/mqtt_configuratie.cpp:1878` — `writeFriendlyName` helper implementation.
+- `src/OTGW-firmware/mqtt_configuratie.cpp:1937` — single `writeRam(ctx.hostname)` call at device-card builder.
+
 ## Enforcement
 
 ```json
 {
-  "llm_judge": true,
-  "guidance": "Count occurrences of `writeRam(ctx.hostname)` in src/OTGW-firmware/mqtt_configuratie.cpp. The post-diff content MUST contain exactly one such call, at the device-card builder (the line immediately following the literal `\"OpenTherm Gateway (\"`). Two or more calls means a contributor has reintroduced the hostname-as-prefix anti-pattern in an entity-name builder; the diff is in violation. Also flag any new `const char ha_name_*[] PROGMEM = \"...\";` declaration whose string value contains a glued camelCase word (e.g. `ElectricalCurrentBurnerFlame`, `OEMFaultCode`) or a lowercase acronym fragment (e.g. `Memberid`, `Dayofweek`, `vh_*`, `dhw_*`, `rbp_*`) — those will render defectively after `_` → space + Title Case."
+  "llm_judge": true
 }
 ```
 
 A purely declarative `forbid_pattern` cannot express "exactly one occurrence per file"; the count check is therefore routed through the in-session LLM judge via `/adr-kit:judge` and surfaces as advisory in the pre-commit hook's `bin/adr-judge` output.
+
+LLM judge guidance: Count occurrences of `writeRam(ctx.hostname)` in `src/OTGW-firmware/mqtt_configuratie.cpp`. The post-diff content MUST contain exactly one such call, at the device-card builder (the line immediately following the literal `"OpenTherm Gateway ("`). Two or more calls means a contributor has reintroduced the hostname-as-prefix anti-pattern in an entity-name builder; the diff is in violation. Also flag any new `const char ha_name_*[] PROGMEM = "...";` declaration whose string value contains a glued camelCase word (e.g. `ElectricalCurrentBurnerFlame`, `OEMFaultCode`) or a lowercase acronym fragment (e.g. `Memberid`, `Dayofweek`, `vh_*`, `dhw_*`, `rbp_*`) — those will render defectively after `_` to space + Title Case.

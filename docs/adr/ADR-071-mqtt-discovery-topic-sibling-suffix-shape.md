@@ -102,7 +102,7 @@ The 2.0.0 line carries the same change under a sibling ADR (ADR-098 Proposed, pa
 
 - The `composeSensorPayload` `unique_id` construction (`<nodeId>-<label>_<source>` at `mqtt_configuratie.cpp:1980-1981`) is already underscore-separated and matches the new discovery-topic suffix. No change required there. HA's identity tracking continues to deduplicate cleanly across the migration.
 
-## Related
+## Related Decisions
 
 - **Supersedes ADR-070** (`MQTT Source-Topic Sibling-Suffix Shape`). After this ADR is Accepted, ADR-070's Status line will be updated to `Superseded by ADR-071, 2026-05-07.` per project supersession protocol. ADR-070's body remains immutable as the historical record of the original (partially-correct) decision.
 - **Builds on ADR-067** (boot-time discovery republish — the trigger that delivers the corrected shape to HA without manual user action).
