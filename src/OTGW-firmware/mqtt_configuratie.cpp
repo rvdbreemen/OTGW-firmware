@@ -2623,6 +2623,14 @@ bool streamClimateDiscovery(PubSubClient &client,
       if (!writeJsonKV_P(w, kIcon, PSTR("mdi:water-boiler"))) return false;
     }
 
+    // json_attributes_topic: SAT climate attributes (Task #72 / TASK-589)
+    if (climateIdx == 0) {
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeProgmem(PSTR("\"json_attributes_topic\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(PSTR("/sat/climate_attributes\""))) return false;
+    }
+
     // origin
     if (!writeJsonComma(w)) return false;
     if (!writeOriginBlock(w, ctx)) return false;
