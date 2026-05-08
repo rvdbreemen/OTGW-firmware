@@ -1,11 +1,11 @@
 ---
 id: TASK-576
 title: 'feat: add CHANGELOG.md (Keep a Changelog) and integrate into release workflow'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 22:55'
-updated_date: '2026-05-08 21:33'
+updated_date: '2026-05-08 21:34'
 labels:
   - docs
   - release
@@ -27,3 +27,9 @@ Implement a CHANGELOG.md following https://keepachangelog.com/en/1.1.0/ format.\
 - [x] #4 /update-docs skill updated: CHANGELOG.md update added as AC 3C-6 in the release phase with clear instructions
 - [x] #5 CHANGELOG.md committed and pushed to origin/dev
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+CHANGELOG.md already existed from the v1.5.0 release prep (commit 0719e086). All ACs were satisfied:\n\n- AC#1-3: CHANGELOG.md at repo root with keepachangelog 1.1.0 format, entries v1.0.0 to v1.5.0, Unreleased section at top.\n- AC#4: update-docs skill already updated (commit 3bde46d4) with CHANGELOG.md as AC 3C-6.\n- AC#5: CHANGELOG.md committed and pushed.\n\nAdditional work this session: updated Unreleased section with 1.5.1-beta.1 through beta.3 changes (JIT discovery, TASK-589, TASK-590).\nPushed: origin/dev 7612870a.
+<!-- SECTION:FINAL_SUMMARY:END -->
