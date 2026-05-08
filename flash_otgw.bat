@@ -212,29 +212,27 @@ exit /b 0
 echo [INFO] Fetching latest release info from GitHub...
 set "DL_DIR=%~1"
 set "_DL_PS=%TEMP%\otgw_dl_%RANDOM%.ps1"
-(
-    echo $ProgressPreference = 'SilentlyContinue'
-    echo [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    echo try {
-    echo     $hdr = @{ 'User-Agent' = 'OTGW-Flash-Tool' }
-    echo     $rel = Invoke-WebRequest -UseBasicParsing -Uri 'https://api.github.com/repos/rvdbreemen/OTGW-firmware/releases/latest' -Headers $hdr ^| ConvertFrom-Json
-    echo     Write-Host "[INFO] Release: $($rel.name)"
-    echo     $found = 0
-    echo     foreach ($a in $rel.assets) {
-    echo         if ($a.name -match '\.ino\.bin$' -or $a.name -match '\.littlefs\.bin$') {
-    echo             $out = Join-Path '%DL_DIR%' $a.name
-    echo             Write-Host "[INFO] Downloading $($a.name)..."
-    echo             Invoke-WebRequest -UseBasicParsing -Uri $a.browser_download_url -OutFile $out -ErrorAction Stop
-    echo             Write-Host "[OK]   $($a.name)"
-    echo             $found++
-    echo         }
-    echo     }
-    echo     if ($found -eq 0) { Write-Host '[ERROR] No .ino.bin or .littlefs.bin assets found in release'; exit 1 }
-    echo } catch {
-    echo     Write-Host "[ERROR] Download failed: $_"
-    echo     exit 1
-    echo }
-) > "%_DL_PS%"
+echo $ProgressPreference = 'SilentlyContinue' > "%_DL_PS%"
+echo [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 >> "%_DL_PS%"
+echo try { >> "%_DL_PS%"
+echo     $hdr = @{ 'User-Agent' = 'OTGW-Flash-Tool' } >> "%_DL_PS%"
+echo     $rel = Invoke-WebRequest -UseBasicParsing -Uri 'https://api.github.com/repos/rvdbreemen/OTGW-firmware/releases/latest' -Headers $hdr ^| ConvertFrom-Json >> "%_DL_PS%"
+echo     Write-Host "[INFO] Release: $($rel.name)" >> "%_DL_PS%"
+echo     $found = 0 >> "%_DL_PS%"
+echo     foreach ^($a in $rel.assets^) { >> "%_DL_PS%"
+echo         if ^($a.name -match '\.ino\.bin$' -or $a.name -match '\.littlefs\.bin$'^) { >> "%_DL_PS%"
+echo             $out = Join-Path '%DL_DIR%' $a.name >> "%_DL_PS%"
+echo             Write-Host "[INFO] Downloading $($a.name)..." >> "%_DL_PS%"
+echo             Invoke-WebRequest -UseBasicParsing -Uri $a.browser_download_url -OutFile $out -ErrorAction Stop >> "%_DL_PS%"
+echo             Write-Host "[OK]   $($a.name)" >> "%_DL_PS%"
+echo             $found++ >> "%_DL_PS%"
+echo         } >> "%_DL_PS%"
+echo     } >> "%_DL_PS%"
+echo     if ^($found -eq 0^) { Write-Host '[ERROR] No .ino.bin or .littlefs.bin assets found in release'; exit 1 } >> "%_DL_PS%"
+echo } catch { >> "%_DL_PS%"
+echo     Write-Host "[ERROR] Download failed: $_" >> "%_DL_PS%"
+echo     exit 1 >> "%_DL_PS%"
+echo } >> "%_DL_PS%"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%_DL_PS%"
 set "_dl_err=%ERRORLEVEL%"
 del "%_DL_PS%" >nul 2>&1
