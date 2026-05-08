@@ -1,15 +1,15 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.26
+**  Version  : v2.0.0-alpha.27
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
 **  OLED display module for OTGW-firmware.
 **  Works on both ESP8266 (PIC-based OTGW) and ESP32-S3 (OTGW32).
 **  Drives a 128x64 SSD1306 I2C OLED display with runtime detection.
-**  Shows OpenTherm status, temperatures, and system info on 4 pages
-**  cycled via the boot/config button.
+**  Shows network status, OT-Direct status, device info and temperatures
+**  on 5 pages cycled via the config button (GPIO 9).
 **
 **  Uses SSD1306Ascii (text-only, no framebuffer) to save ~1KB RAM
 **  compared to Adafruit_SSD1306 which requires a 1024-byte framebuffer.
@@ -17,15 +17,22 @@
 **  Design:
 **  - Runtime I2C probe at 0x3C - if no display, all code is skipped
 **  - Reads values directly from OTcurrentSystemState (no JSON layer)
-**  - Button ISR on PIN_BUTTON with software debounce
-**  - Auto-off after 30s of inactivity
+**  - Button ISR on PIN_CONFIG_BUTTON (GPIO 9) with software debounce
+**  - Auto-off after 30s of inactivity; button press wakes from off
 **  - 1 Hz display refresh (non-blocking, cooperative)
+**
+**  Pages (0=off, 1-5=content):
+**  1 Network   - transport, IP, MQTT broker + status
+**  2 OT Status - hardware mode, bus state, flame, temps
+**  3 Device    - firmware version, hostname, uptime, heap
+**  4 Dashboard - key temps + flame/CH/DHW at a glance
+**  5 Heating   - HC1 + HC2 room setpoints and flow temps
 **
 **  TERMS OF USE: MIT License. See bottom of file.
 ***************************************************************************
 */
 
-#if HAS_OLED_CAPABLE
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
 
 #include <Wire.h>
 #include <SSD1306Ascii.h>
@@ -35,13 +42,20 @@
 #define OLED_STR_HELPER(x) #x
 #define OLED_STR(x)        OLED_STR_HELPER(x)
 
+// Button pin: prefer PIN_CONFIG_BUTTON (GPIO 9 on OTGW32); fall back to PIN_BUTTON
+#if defined(PIN_CONFIG_BUTTON)
+  #define OLED_BUTTON_PIN PIN_CONFIG_BUTTON
+#else
+  #define OLED_BUTTON_PIN PIN_BUTTON
+#endif
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 static constexpr uint8_t  OLED_ADDR         = 0x3C;
 static constexpr uint32_t OLED_REFRESH_MS   = 1000;   // 1 Hz refresh
 static constexpr uint32_t OLED_TIMEOUT_MS   = 30000;  // auto-off after 30s
-static constexpr uint8_t  OLED_NUM_PAGES    = 5;      // 0=off, 1-4=content pages
+static constexpr uint8_t  OLED_NUM_PAGES    = 6;      // 0=off, 1-5=content pages
 static constexpr uint32_t OLED_DEBOUNCE_MS  = 300;
 
 // SSD1306Ascii uses row-based positioning (rows of 8 pixels for System5x7 font).
@@ -79,7 +93,7 @@ static bool probeOLED() {
 }
 
 // ---------------------------------------------------------------------------
-// drawHeader - common header line with title and page indicator
+// drawHeader - common header row with title and page indicator
 // ---------------------------------------------------------------------------
 static void drawHeader(const __FlashStringHelper* title) {
   oledDisplay.setRow(0);
@@ -97,7 +111,149 @@ static void drawHeader(const __FlashStringHelper* title) {
 }
 
 // ---------------------------------------------------------------------------
-// Page 1: Dashboard - key temperatures + flame/CH/DHW status
+// Page 1: Network status - transport, IP, MQTT
+// ---------------------------------------------------------------------------
+static void drawPageNetwork() {
+  drawHeader(F("Network"));
+
+  oledDisplay.setRow(2);
+  oledDisplay.setCol(0);
+  if (isNetworkUp()) {
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+    if (state.net.eMode == NET_ETHERNET) {
+      oledDisplay.print(F("Ethernet"));
+    } else
+#endif
+    {
+      oledDisplay.print(F("WiFi: "));
+      // Truncate SSID to 14 chars to fit display
+      char ssidBuf[15];
+      strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf));
+      oledDisplay.print(ssidBuf);
+    }
+
+    oledDisplay.setRow(3);
+    oledDisplay.setCol(0);
+    oledDisplay.print(F("IP: "));
+    oledDisplay.print(getActiveIP());
+
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+    if (state.net.eMode != NET_ETHERNET) {
+#endif
+      oledDisplay.setRow(4);
+      oledDisplay.setCol(0);
+      snprintf_P(oledBuf, sizeof(oledBuf), PSTR("RSSI: %d dBm"), (int)WiFi.RSSI());
+      oledDisplay.print(oledBuf);
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+    }
+#endif
+  } else {
+    oledDisplay.print(F("Network: offline"));
+  }
+
+  // MQTT status + broker
+  oledDisplay.setRow(5);
+  oledDisplay.setCol(0);
+  oledDisplay.print(state.mqtt.bConnected ? F("MQTT: connected") : F("MQTT: offline"));
+
+  oledDisplay.setRow(6);
+  oledDisplay.setCol(0);
+  // Truncate broker to fit
+  char brokerBuf[OLED_COLS + 1];
+  strlcpy(brokerBuf, settings.mqtt.sBroker, sizeof(brokerBuf));
+  oledDisplay.print(brokerBuf);
+}
+
+// ---------------------------------------------------------------------------
+// Page 2: OT-Direct / OpenTherm bus status
+// ---------------------------------------------------------------------------
+static void drawPageOTStatus() {
+  drawHeader(F("OT Status"));
+
+  // Hardware mode
+  oledDisplay.setRow(2);
+  oledDisplay.setCol(0);
+  oledDisplay.print(F("Mode: "));
+  oledDisplay.print(hardwareModeName());
+
+  // Bus online/offline
+  oledDisplay.setRow(3);
+  oledDisplay.setCol(0);
+  oledDisplay.print(F("Bus:  "));
+  oledDisplay.print(state.otBus.bOnline ? F("online") : F("offline"));
+
+  // Flame and modulation
+  bool flameOn = (OTcurrentSystemState.SlaveStatus & 0x08) != 0;
+  oledDisplay.setRow(4);
+  oledDisplay.setCol(0);
+  if (flameOn) {
+    snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Flame:on  Mod:%.0f%%"), OTcurrentSystemState.RelModLevel);
+    oledDisplay.print(oledBuf);
+  } else {
+    oledDisplay.print(F("Flame: off"));
+  }
+
+  // CH / DHW active flags
+  bool chActive  = (OTcurrentSystemState.SlaveStatus & 0x02) != 0;
+  bool dhwActive = (OTcurrentSystemState.SlaveStatus & 0x04) != 0;
+  oledDisplay.setRow(5);
+  oledDisplay.setCol(0);
+  oledDisplay.print(F("CH:"));
+  oledDisplay.print(chActive  ? F("on  ") : F("off "));
+  oledDisplay.print(F("DHW:"));
+  oledDisplay.print(dhwActive ? F("on")   : F("off"));
+
+  // Setpoint and boiler temp
+  oledDisplay.setRow(6);
+  oledDisplay.setCol(0);
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Set:%.1f Boil:%.1f"), OTcurrentSystemState.TSet, OTcurrentSystemState.Tboiler);
+  oledDisplay.print(oledBuf);
+}
+
+// ---------------------------------------------------------------------------
+// Page 3: Device status - version, hostname, uptime, heap
+// ---------------------------------------------------------------------------
+static void drawPageDevice() {
+  drawHeader(F("Device"));
+
+  // Firmware version
+  oledDisplay.setRow(2);
+  oledDisplay.setCol(0);
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("FW %d.%d.%d-" OLED_STR(_VERSION_PRERELEASE)),
+    _VERSION_MAJOR, _VERSION_MINOR, _VERSION_PATCH);
+  oledDisplay.print(oledBuf);
+
+  // Hostname (truncated to fit)
+  oledDisplay.setRow(3);
+  oledDisplay.setCol(0);
+  char hostBuf[OLED_COLS + 1];
+  strlcpy(hostBuf, settings.sHostname, sizeof(hostBuf));
+  oledDisplay.print(hostBuf);
+
+  // Uptime: format as DDd HHh MMm
+  uint32_t secs = state.uptime.iSeconds;
+  uint32_t days = secs / 86400;
+  uint32_t hrs  = (secs % 86400) / 3600;
+  uint32_t mins = (secs % 3600) / 60;
+  oledDisplay.setRow(5);
+  oledDisplay.setCol(0);
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Up: %ud %02uh %02um"), (unsigned)days, (unsigned)hrs, (unsigned)mins);
+  oledDisplay.print(oledBuf);
+
+  // Free heap and reboot count
+  oledDisplay.setRow(6);
+  oledDisplay.setCol(0);
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Heap: %u B"), (unsigned)ESP.getFreeHeap());
+  oledDisplay.print(oledBuf);
+
+  oledDisplay.setRow(7);
+  oledDisplay.setCol(0);
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Reboots: %u"), (unsigned)state.uptime.iRebootCount);
+  oledDisplay.print(oledBuf);
+}
+
+// ---------------------------------------------------------------------------
+// Page 4: Dashboard - key temperatures + flame/CH/DHW status
 // ---------------------------------------------------------------------------
 static void drawPageDashboard() {
   drawHeader(F("Dashboard"));
@@ -140,124 +296,41 @@ static void drawPageDashboard() {
 }
 
 // ---------------------------------------------------------------------------
-// Page 2: Heating Circuit 1
+// Page 5: Heating circuits - HC1 and HC2 setpoints / flow temps
 // ---------------------------------------------------------------------------
-static void drawPageHC1() {
-  drawHeader(F("Heating Circuit 1"));
+static void drawPageHeating() {
+  drawHeader(F("Heating"));
 
+  // HC1
   oledDisplay.setRow(2);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Room setp: %.1f C"), OTcurrentSystemState.TrSet);
-  oledDisplay.print(oledBuf);
-
+  oledDisplay.print(F("HC1:"));
   oledDisplay.setRow(3);
   oledDisplay.setCol(0);
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR(" Set:%.1f Rm:"), OTcurrentSystemState.TrSet);
+  oledDisplay.print(oledBuf);
   if (isnan(OTcurrentSystemState.Tr)) {
-    strlcpy_P(oledBuf, PSTR("Room temp: -- C"), sizeof(oledBuf));
+    oledDisplay.print(F("--"));
   } else {
-    snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Room temp: %.1f C"), OTcurrentSystemState.Tr);
+    snprintf_P(oledBuf, sizeof(oledBuf), PSTR("%.1f"), OTcurrentSystemState.Tr);
+    oledDisplay.print(oledBuf);
   }
+  oledDisplay.setRow(4);
+  oledDisplay.setCol(0);
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR(" Flow:%.1f Ret:%.1f"), OTcurrentSystemState.Tboiler, OTcurrentSystemState.Tret);
   oledDisplay.print(oledBuf);
 
+  // HC2
   oledDisplay.setRow(5);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Flow temp: %.1f C"), OTcurrentSystemState.Tboiler);
-  oledDisplay.print(oledBuf);
-
+  oledDisplay.print(F("HC2:"));
   oledDisplay.setRow(6);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Ret. temp: %.1f C"), OTcurrentSystemState.Tret);
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR(" Set:%.1f Rm:%.1f"), OTcurrentSystemState.TrSetCH2, OTcurrentSystemState.TRoomCH2);
   oledDisplay.print(oledBuf);
-}
-
-// ---------------------------------------------------------------------------
-// Page 3: Heating Circuit 2
-// ---------------------------------------------------------------------------
-static void drawPageHC2() {
-  drawHeader(F("Heating Circuit 2"));
-
-  oledDisplay.setRow(2);
-  oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Room setp: %.1f C"), OTcurrentSystemState.TrSetCH2);
-  oledDisplay.print(oledBuf);
-
-  oledDisplay.setRow(3);
-  oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Room temp: %.1f C"), OTcurrentSystemState.TRoomCH2);
-  oledDisplay.print(oledBuf);
-
-  oledDisplay.setRow(5);
-  oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Flow temp: %.1f C"), OTcurrentSystemState.TflowCH2);
-  oledDisplay.print(oledBuf);
-
-  oledDisplay.setRow(6);
-  oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("DHW  temp: %.1f C"), OTcurrentSystemState.Tdhw);
-  oledDisplay.print(oledBuf);
-}
-
-// ---------------------------------------------------------------------------
-// Page 4: System Status
-// ---------------------------------------------------------------------------
-static void drawPageSystem() {
-  drawHeader(F("System Status"));
-
-  // Network
-  oledDisplay.setRow(2);
-  oledDisplay.setCol(0);
-  if (isNetworkUp()) {
-#if defined(_VERSION_PRERELEASE)
-    if (state.net.bAPFallback) {
-      oledDisplay.print(F("AP MODE: "));
-      // Truncate SSID to fit display
-      char apSSID[15];
-      strlcpy(apSSID, state.net.sAPSSID, sizeof(apSSID));
-      oledDisplay.print(apSSID);
-      oledDisplay.setRow(3);
-      oledDisplay.setCol(0);
-      oledDisplay.print(F("IP: 192.168.4.1"));
-    } else
-#endif
-    {
-      oledDisplay.print(networkModeName());
-      oledDisplay.print(F(": "));
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-      if (state.net.eMode == NET_ETHERNET) {
-        oledDisplay.print(F("Wired"));
-      } else
-#endif
-      {
-        String ssid = WiFi.SSID();
-        if (ssid.length() > 14) ssid = ssid.substring(0, 14);
-        oledDisplay.print(ssid);
-      }
-      oledDisplay.setRow(3);
-      oledDisplay.setCol(0);
-      oledDisplay.print(F("IP: "));
-      oledDisplay.print(getActiveIP());
-    }
-  } else {
-    oledDisplay.print(F("Network: offline"));
-  }
-
-  // MQTT
-  oledDisplay.setRow(5);
-  oledDisplay.setCol(0);
-  oledDisplay.print(F("MQTT: "));
-  oledDisplay.print(state.mqtt.bConnected ? F("connected") : F("offline"));
-
-  // OT bus
-  oledDisplay.setRow(6);
-  oledDisplay.setCol(0);
-  oledDisplay.print(F("OT bus: "));
-  oledDisplay.print(state.otBus.bOnline ? F("online") : F("offline"));
-
-  // Firmware version
   oledDisplay.setRow(7);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("FW %d.%d.%d-" OLED_STR(_VERSION_PRERELEASE)),
-    _VERSION_MAJOR, _VERSION_MINOR, _VERSION_PATCH);
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR(" Flow:%.1f"), OTcurrentSystemState.TflowCH2);
   oledDisplay.print(oledBuf);
 }
 
@@ -278,6 +351,10 @@ void initOLED() {
   oledPresent = true;
   oledPage = 1;
   oledLastActivity = millis();
+
+  // Advertise OLED presence in runtime state
+  state.hw.bOLEDPresent = true;
+
   DebugTln(F("OLED: Display initialized (128x64 SSD1306Ascii)"));
 
   // Boot splash
@@ -285,7 +362,7 @@ void initOLED() {
   oledDisplay.set2X();
   oledDisplay.setRow(0);
   oledDisplay.setCol(16);
-#if HAS_DIRECT_OT
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   oledDisplay.println(F("OTGW32"));
 #else
   oledDisplay.println(F("OTGW"));
@@ -298,10 +375,10 @@ void initOLED() {
   oledDisplay.setCol(0);
   oledDisplay.println(F("Press button for info"));
 
-  // Button ISR for page cycling
-  pinMode(PIN_BUTTON, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), oledButtonISR, FALLING);
-  DebugTf(PSTR("OLED: Button ISR on GPIO %d\r\n"), PIN_BUTTON);
+  // Button ISR for page cycling (GPIO 9 = PIN_CONFIG_BUTTON on OTGW32)
+  pinMode(OLED_BUTTON_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(OLED_BUTTON_PIN), oledButtonISR, FALLING);
+  DebugTf(PSTR("OLED: Button ISR on GPIO %d\r\n"), OLED_BUTTON_PIN);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,12 +396,20 @@ void loopOLED() {
       oledLastDebounce = now;
       oledLastActivity = now;
 
-      oledPage = (oledPage + 1) % OLED_NUM_PAGES;
       if (oledPage == 0) {
-        oledDisplay.ssd1306WriteCmd(0xAE);  // DISPLAYOFF
-      } else {
+        // Wake from off: go to page 1 and turn display on
+        oledPage = 1;
         oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
         oledLastRefresh = 0;  // force immediate redraw
+      } else {
+        // Cycle to next page; wrap to 0=off
+        oledPage = (oledPage + 1) % OLED_NUM_PAGES;
+        if (oledPage == 0) {
+          oledDisplay.ssd1306WriteCmd(0xAE);  // DISPLAYOFF
+        } else {
+          oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
+          oledLastRefresh = 0;  // force immediate redraw
+        }
       }
     }
   }
@@ -344,10 +429,11 @@ void loopOLED() {
 
   oledDisplay.clear();
   switch (oledPage) {
-    case 1: drawPageDashboard(); break;
-    case 2: drawPageHC1();       break;
-    case 3: drawPageHC2();       break;
-    case 4: drawPageSystem();    break;
+    case 1: drawPageNetwork();   break;
+    case 2: drawPageOTStatus();  break;
+    case 3: drawPageDevice();    break;
+    case 4: drawPageDashboard(); break;
+    case 5: drawPageHeating();   break;
   }
 }
 
@@ -359,11 +445,12 @@ void oledWake() {
   if (oledPage == 0) {
     oledPage = 1;
     oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
+    oledLastRefresh = 0;
   }
   oledLastActivity = millis();
 }
 
-#endif // HAS_OLED_CAPABLE
+#endif // defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
 
 /***************************************************************************
 *

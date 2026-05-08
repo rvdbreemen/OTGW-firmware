@@ -2,9 +2,9 @@
 
 ## Status
 
-Proposed. Awaiting acceptance by Decision Maker.
+Accepted. Date: 2026-05-08.
 
-**Decision Maker:** User: Robert van den Breemen (rvdbreemen) — explicit design choice stated 2026-05-08.
+**Decision Maker:** User: Robert van den Breemen (rvdbreemen) — explicit design choice stated and accepted 2026-05-08.
 
 ## Context
 

@@ -155,6 +155,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-093: Home Assistant Discovery Retained-Config Orphan Cleanup](ADR-093-ha-discovery-retained-config-orphan-cleanup.md)** 🆕  
   Guideline-level under ADR-080 (one adopter today: BLE roster). When the firmware terminates the lifecycle of a previously advertised HA entity, it publishes a zero-byte retained payload to each discovery config topic via the same streaming primitives as the publish path. Documents the symmetry contract for `satBLEUnpublishDiscovery` in `MQTTstuff.ino` and the `bDiscoveryPublished` gate in `satBLERosterForget`.
 
+- **[ADR-101: Flat Per-Value MQTT Topics Over Aggregated JSON Payloads](ADR-101-flat-per-value-mqtt-topics-over-aggregated-json-payloads.md)** 🆕  
+  Binding decision (owner: Robert van den Breemen, 2026-05-08): OTGW-firmware publishes one plain scalar per topic; aggregated JSON blobs on value topics are forbidden. HA auto-discovery metadata travels separately on `homeassistant/#` config topics. OT-Thing nested-JSON and Tasmota SENSOR-JSON dialects are explicitly not supported. Enforced by `adr-judge` pre-commit hook.
+
 ### System Architecture
 
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
