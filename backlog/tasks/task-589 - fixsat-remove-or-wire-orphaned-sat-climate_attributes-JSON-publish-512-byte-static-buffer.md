@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-08 17:12'
-updated_date: '2026-05-08 21:21'
+updated_date: '2026-05-08 21:25'
 labels:
   - sat
   - mqtt
@@ -43,3 +43,9 @@ Resolution options:
 - [ ] #4 No orphaned MQTT publish on sat/climate_attributes remains
 - [ ] #5 Build passes and evaluator shows no new failures
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add json_attributes_topic field to streamClimateDiscovery (climateIdx==0) in mqtt_configuratie.cpp, pointing to <mqttPubTopic>/sat/climate_attributes.\n2. Build verify with python build.py --firmware.\n3. Run python evaluate.py --quick.\n4. Bump prerelease, commit, push.
+<!-- SECTION:PLAN:END -->
