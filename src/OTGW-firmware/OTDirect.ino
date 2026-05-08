@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.33
+**  Version  : v2.0.0-alpha.34
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -262,6 +262,11 @@ static uint8_t otScheduleIdx = 0;
 // See OT spec: slave config HB bits 6-7 = 0b10 indicates ventilation/HRV.
 // We also accept the cached MsgID 3 HB as a fallback if explicit bits differ.
 static constexpr uint32_t OT_VENT_FAST_INTERVAL_MS = 10000;  // 10s fast vent poll
+
+// Raw boiler response cache — forward-declared here so otIsVentSlave() can use
+// them; defined with initializers further below.
+static uint16_t otBoilerCache[128];
+static bool     otBoilerCacheValid[128];
 
 // otIsVentSlave() — true when the boiler slave reports a ventilation/HRV
 // application type in its slave configuration (MsgID 3).
@@ -576,12 +581,6 @@ static void updateWriteCache(uint8_t msgId, uint16_t value) {
     }
   }
 }
-
-// Raw boiler response cache — indexed by MsgID (0-127).
-// Updated on every successful boiler response, used by master mode to
-// respond to thermostat READ_DATA with real boiler values.
-static uint16_t otBoilerCache[128] = { 0 };
-static bool     otBoilerCacheValid[128] = { false };
 
 // Async state tracking for non-blocking OT requests
 static bool     otMasterRequestActive = false;   // true while waiting for boiler response
@@ -2695,7 +2694,7 @@ void handleOTDirectCommand(const char* buf, int len) {
       // Clear persisted ventilation setpoint on explicit clear command
       if (settings.otd.iVentSetpoint != 0) {
         settings.otd.iVentSetpoint = 0;
-        writeSettings();
+        writeSettings(false);
       }
     } else {
       int setpt = constrain(atoi(value), 0, 100);
@@ -2706,7 +2705,7 @@ void handleOTDirectCommand(const char* buf, int len) {
         // TASK-584: persist across reboots
         if (settings.otd.iVentSetpoint != (uint8_t)setpt) {
           settings.otd.iVentSetpoint = (uint8_t)setpt;
-          writeSettings();
+          writeSettings(false);
         }
       }
     }

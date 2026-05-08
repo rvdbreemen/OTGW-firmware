@@ -265,7 +265,7 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
 
     // TASK-506: count every ad; per-ad logging removed to cut spam.
     // Aggregated stats emitted by satBLELoop() once per iBleInterval.
-    _bleAdCount++;
+    _bleAdCount += 1;
 
     // Try ATC/pvvx (UUID 0x181A) first.
     // NimBLE returns std::string by value; lifetime ends at end of this scope.
@@ -288,7 +288,7 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
 
     if (!parsed) {
       // TASK-506: counted only; per-ad reject log removed (was main spam source).
-      _bleUnknownCount++;
+      _bleUnknownCount += 1;
       return;
     }
 
@@ -304,8 +304,8 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     // pick which roster slot feeds state.sat.fBleTemp / SAT control.
     int slot = bleFindOrAllocSlot(macBuf);
     if (slot < 0) {
-      _bleNoSlotCount++;          // legacy counter from TASK-506
-      _bleRosterFullCount++;      // TASK-508: surfaced via /api/v2/sat/ble/discovery
+      _bleNoSlotCount     += 1;   // legacy counter from TASK-506
+      _bleRosterFullCount += 1;   // TASK-508: surfaced via /api/v2/sat/ble/discovery
       return;                     // no per-ad log: aggregated by stats counter
     }
 
@@ -343,7 +343,7 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
       _bleRosterDirty = true;
     }
 
-    _bleAcceptCount++;
+    _bleAcceptCount += 1;
     SATBLEDebugTf(PSTR("SAT BLE: sensor %s slot=%d temp=%.2f hum=%.2f batt=%u rssi=%d\r\n"),
                   macBuf, slot, temp, hum, (unsigned)batt,
                   (int)dev->getRSSI());

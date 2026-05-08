@@ -2813,6 +2813,16 @@ bool streamClimateDiscovery(PubSubClient &client,
       if (!writeJsonKV_P(w, kIcon, PSTR("mdi:water-boiler"))) return false;
     }
 
+    // json_attributes_topic: SAT PID/curve attributes on the thermostat entity (TASK-594)
+    if (climateIdx == 0) {
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeChar('"')) return false;
+      if (!w.writeProgmem(kJsonAttrTopic)) return false;
+      if (!w.writeProgmem(PSTR("\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(PSTR("/sat/climate_attributes\""))) return false;
+    }
+
     // origin
     if (!writeJsonComma(w)) return false;
     if (!writeOriginBlock(w, ctx)) return false;

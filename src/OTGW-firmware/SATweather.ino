@@ -172,11 +172,10 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
   int  keyLen;
   int  depth        = 0;
   bool inCurrent    = false;
-  bool inHourly     = false;
   int  currentDepth = 0;
-  int  hourlyDepth  = 0;
-
 #ifndef ESP8266
+  bool inHourly    = false;
+  int  hourlyDepth = 0;
   float*   arrFloat = nullptr;
   uint8_t* arrU8    = nullptr;
   uint8_t  arrMax   = 0;
@@ -190,7 +189,9 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
     if (c == '{') { depth++; continue; }
     if (c == '}') {
       if (--depth < currentDepth) inCurrent = false;
+      #ifndef ESP8266
       if (  depth < hourlyDepth)  inHourly  = false;
+      #endif
       continue;
     }
     if (c != '"') continue;  // commas, whitespace — skip
@@ -218,8 +219,10 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
 
     } else if (c == '{') {
       depth++;
-      if      (strcmp_P(keyBuf, PSTR("current")) == 0) { inCurrent = true; currentDepth = depth; }
+      if (strcmp_P(keyBuf, PSTR("current")) == 0) { inCurrent = true; currentDepth = depth; }
+      #ifndef ESP8266
       else if (strcmp_P(keyBuf, PSTR("hourly"))  == 0) { inHourly  = true; hourlyDepth  = depth; }
+      #endif
 
     } else if (c == '[') {
 #ifndef ESP8266
