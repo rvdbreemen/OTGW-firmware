@@ -1,7 +1,7 @@
 ---
 id: TASK-577
 title: Pure JIT MQTT discovery — publish OT configs only when MsgID received
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-08 10:23'
