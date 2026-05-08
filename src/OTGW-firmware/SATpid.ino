@@ -100,7 +100,7 @@ static void _pidCalculateGains(float curveValue)
 // Per sergeantd / SAT Python (pid.py): integral is ONLY active INSIDE the
 // deadband as a smooth compensator for external heat sources (sun, cooking,
 // activity). Outside the deadband, the heating curve replaces the integral
-// role. Clamp to [0, curveValue] — positive only.
+// role. Clamp to [-curveValue, +curveValue] — symmetric (Python: clamp_to_range).
 static void _pidUpdateIntegral(float error, float curveValue, bool force)
 {
   float deadband = settings.sat.fDeadband;
@@ -120,13 +120,17 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
   // Accumulate: Ki * error * PID_UPDATE_INTERVAL (fixed 60s per SAT Python)
   _pid_integral += state.sat.fKi * error * SAT_PID_UPDATE_INTERVAL;
 
-  // Clamp integral to [0, curveValue] — positive only (SAT Python convention)
-  if (_pid_integral < 0.0f)      _pid_integral = 0.0f;
-  if (_pid_integral > curveValue) _pid_integral = curveValue;
+  // Clamp integral symmetrically to [-curveValue, +curveValue].
+  // Python reference: clamp_to_range(integral, curve_value) → [-curve_value, +curve_value].
+  // Negative accumulation is required when room temp overshoots target (mild weather):
+  // the integral must be able to nudge flow setpoint below the heating curve.
+  if (_pid_integral < -curveValue) _pid_integral = -curveValue;
+  if (_pid_integral >  curveValue) _pid_integral =  curveValue;
 
-  // Hard absolute cap — defense against runaway
+  // Hard absolute cap — symmetric safety bound against runaway in both directions
   static const float SAT_PID_INTEGRAL_ABS_MAX = 20.0f;
-  if (_pid_integral > SAT_PID_INTEGRAL_ABS_MAX) _pid_integral = SAT_PID_INTEGRAL_ABS_MAX;
+  if (_pid_integral >  SAT_PID_INTEGRAL_ABS_MAX) _pid_integral =  SAT_PID_INTEGRAL_ABS_MAX;
+  if (_pid_integral < -SAT_PID_INTEGRAL_ABS_MAX) _pid_integral = -SAT_PID_INTEGRAL_ABS_MAX;
 }
 
 //=== Derivative Update ===
