@@ -30,3 +30,9 @@ Port the pure JIT MQTT discovery implementation from dev (TASK-577, commit 1bb58
 - [x] #7 Build passes on feature branch
 - [x] #8 Evaluator green on feature branch
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Port van TASK-577 naar feature-dev-2.0.0-otgw32-esp32-sat-support. Zelfde 5 wijzigingen als dev: forward declarations, startMQTT(), HA-status handler, clearMQTTConfigPending(), publishNonOTDiscoveryConfigs(). Verschil vs dev: OTGWfwinfoid/pic-IDs bestaan niet op 2.0.0 (gedocumenteerd ADR-100), broker-restart heuristiek uitgesteld (geen offlineMs-blok in 2.0.0 connect-handler). AC6 (ADR sibling Proposed) geslaagd als ADR-100. Build groen, pushed als ff30df62 (alpha.21).
+<!-- SECTION:FINAL_SUMMARY:END -->
