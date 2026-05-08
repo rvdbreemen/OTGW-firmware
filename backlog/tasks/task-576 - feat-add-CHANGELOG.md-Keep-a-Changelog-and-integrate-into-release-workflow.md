@@ -5,6 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 22:55'
+updated_date: '2026-05-08 21:33'
 labels:
   - docs
   - release
@@ -20,9 +21,9 @@ Implement a CHANGELOG.md following https://keepachangelog.com/en/1.1.0/ format.\
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 CHANGELOG.md created at repo root following keepachangelog.com 1.1.0 format with entries for every release from v1.0.0 to v1.5.0
-- [ ] #2 Each version entry has correct sections: Added, Changed, Fixed, Removed, Deprecated, Security (only sections with content)
-- [ ] #3 Unreleased section present at top for tracking upcoming changes
-- [ ] #4 /update-docs skill updated: CHANGELOG.md update added as AC 3C-6 in the release phase with clear instructions
-- [ ] #5 CHANGELOG.md committed and pushed to origin/dev
+- [x] #1 CHANGELOG.md created at repo root following keepachangelog.com 1.1.0 format with entries for every release from v1.0.0 to v1.5.0
+- [x] #2 Each version entry has correct sections: Added, Changed, Fixed, Removed, Deprecated, Security (only sections with content)
+- [x] #3 Unreleased section present at top for tracking upcoming changes
+- [x] #4 /update-docs skill updated: CHANGELOG.md update added as AC 3C-6 in the release phase with clear instructions
+- [x] #5 CHANGELOG.md committed and pushed to origin/dev
 <!-- AC:END -->
