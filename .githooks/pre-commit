@@ -35,7 +35,12 @@ else
       #   0  no declarative violations (advisory entries for llm_judge ADRs are non-blocking)
       #   1  declarative violation found
       #   2  config or runtime error
-      echo "$DIFF" | "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/"
+      ADR_OUT=$(echo "$DIFF" | "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/")
+      ADR_EXIT=$?
+      # Suppress individual llm_judge advisory lines (one per ADR with llm_judge:true,
+      # very noisy on projects with many ADRs). Violations and the summary line are kept.
+      printf '%s\n' "$ADR_OUT" | grep -vE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true"
+      [ "$ADR_EXIT" -ne 0 ] && exit "$ADR_EXIT"
     fi
   fi
 fi
