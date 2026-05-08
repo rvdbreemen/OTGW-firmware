@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.22
+**  Version  : v2.0.0-alpha.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -170,6 +170,8 @@ static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+// TASK-585: WiFi network scan
+static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTValue(int msgid);
 void sendOTLabel(const char *msglabel);
@@ -399,6 +401,15 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       sendJsonMapEntry(F("kp"),              settings.otd.fKp);
       sendJsonMapEntry(F("ki"),              settings.otd.fKi);
       sendJsonMapEntry(F("kboost"),          settings.otd.fKboost);
+      // TASK-582: CH hysteresis deadband
+      sendJsonMapEntry(F("hysteresis_enable"), settings.otd.bHysteresisEnable);
+      sendJsonMapEntry(F("hysteresis"),        settings.otd.fHysteresis);
+      // TASK-584: ventilation override persistence
+      sendJsonMapEntry(F("vent_enable"),      settings.otd.bVentEnable);
+      sendJsonMapEntry(F("open_bypass"),      settings.otd.bOpenBypass);
+      sendJsonMapEntry(F("auto_bypass"),      settings.otd.bAutoBypass);
+      sendJsonMapEntry(F("free_vent_enable"), settings.otd.bFreeVentEnable);
+      sendJsonMapEntry(F("vent_setpoint"),    (int)settings.otd.iVentSetpoint);
       sendEndJsonMap(F("otdirect_settings"));
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (httpServer.hasArg("setbacktemp"))    updateSetting("OTDsetbacktemp", httpServer.arg("setbacktemp").c_str());
@@ -415,6 +426,15 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       if (httpServer.hasArg("kp"))           updateSetting("OTDkp", httpServer.arg("kp").c_str());
       if (httpServer.hasArg("ki"))           updateSetting("OTDki", httpServer.arg("ki").c_str());
       if (httpServer.hasArg("kboost"))       updateSetting("OTDkboost", httpServer.arg("kboost").c_str());
+      // TASK-582: CH hysteresis deadband settings
+      if (httpServer.hasArg("hysteresisenable")) updateSetting("OTDhysteresisenable", httpServer.arg("hysteresisenable").c_str());
+      if (httpServer.hasArg("hysteresis"))       updateSetting("OTDhysteresis", httpServer.arg("hysteresis").c_str());
+      // TASK-584: ventilation override persistence settings
+      if (httpServer.hasArg("ventenable"))    updateSetting("OTDventenable", httpServer.arg("ventenable").c_str());
+      if (httpServer.hasArg("openbypass"))    updateSetting("OTDopenbypass", httpServer.arg("openbypass").c_str());
+      if (httpServer.hasArg("autobypass"))    updateSetting("OTDautobypass", httpServer.arg("autobypass").c_str());
+      if (httpServer.hasArg("freeventenable")) updateSetting("OTDfreeventenable", httpServer.arg("freeventenable").c_str());
+      if (httpServer.hasArg("ventsetpoint"))  updateSetting("OTDventsetpoint", httpServer.arg("ventsetpoint").c_str());
       sendOTDirectStatus();
     } else {
       sendApiMethodNotAllowed(F("GET, POST"));
@@ -1154,6 +1174,210 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     snprintf_P(respBuf, sizeof(respBuf), PSTR("{\"status\":\"ok\",\"setting\":\"%s\",\"value\":\"%s\"}"), settingName, val);
     httpServer.send(200, F("application/json"), respBuf);
   }
+  // --- TASK-586: Heating curve calibration markers ---
+  // GET  /api/v2/sat/markers           — return all markers as JSON array
+  // POST /api/v2/sat/markers           — add marker; body: {"outside_temp":5.0,"flow_temp":55.0,"label":"optional"}
+  // DELETE /api/v2/sat/markers/<id>    — delete marker by integer id
+  else if (strcasecmp_P(sub, PSTR("markers")) == 0) {
+    static const char kSatMarkersFile[] PROGMEM = "/sat_markers.json";
+    static const int  kSatMarkersMax    = 20;
+
+    if (method == HTTP_GET) {
+      // Stream file directly; return empty array if not present
+      char fname[24];
+      strlcpy_P(fname, kSatMarkersFile, sizeof(fname));
+      File f = LittleFS.open(fname, "r");
+      if (!f) {
+        httpServer.send(200, F("application/json"), F("[]"));
+      } else {
+        httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+        httpServer.streamFile(f, F("application/json"));
+        f.close();
+      }
+    }
+    else if (method == HTTP_POST) {
+      // Parse outside_temp, flow_temp, optional label from JSON body
+      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      const String& bodyStr = httpServer.arg(F("plain"));
+      const char* body = bodyStr.c_str();
+      char otBuf[10], ftBuf[10], lblBuf[32];
+      otBuf[0] = '\0'; ftBuf[0] = '\0'; lblBuf[0] = '\0';
+      extractJsonField(body, F("outside_temp"), otBuf, sizeof(otBuf));
+      extractJsonField(body, F("flow_temp"),    ftBuf, sizeof(ftBuf));
+      extractJsonField(body, F("label"),        lblBuf, sizeof(lblBuf));
+      float ot = atof(otBuf);
+      float ft = atof(ftBuf);
+      if (otBuf[0] == '\0' || ftBuf[0] == '\0' ||
+          ot < -15.0f || ot > 25.0f || ft < 10.0f || ft > 90.0f) {
+        sendApiError(400, F("outside_temp (-15..25) and flow_temp (10..90) required"));
+        return;
+      }
+      // Read existing markers, append, write back (max 20)
+      char fname[24];
+      strlcpy_P(fname, kSatMarkersFile, sizeof(fname));
+      // Load existing JSON array into a simple buffer
+      char markersBuf[2048] = "[]";
+      File rf = LittleFS.open(fname, "r");
+      if (rf) {
+        size_t n = rf.readBytes(markersBuf, sizeof(markersBuf) - 1);
+        markersBuf[n] = '\0';
+        rf.close();
+      }
+      // Count existing markers
+      int mcount = 0;
+      const char* p = markersBuf;
+      while (*p) { if (*p == '{') mcount++; p++; }
+      if (mcount >= kSatMarkersMax) {
+        sendApiError(409, F("Maximum markers (20) reached; delete one first"));
+        return;
+      }
+      // Find max id
+      int maxId = 0;
+      {
+        const char* ip = markersBuf;
+        while ((ip = strstr(ip, "\"id\":")) != nullptr) {
+          ip += 5;
+          while (*ip == ' ') ip++;
+          int v = atoi(ip);
+          if (v > maxId) maxId = v;
+          ip++;
+        }
+      }
+      int newId = maxId + 1;
+      // Get current epoch
+      time_t now = time(nullptr);
+      // Build new entry
+      char entry[192];
+      // Escape label (reject embedded quotes for simplicity)
+      for (char* lp = lblBuf; *lp; lp++) { if (*lp == '"' || *lp == '\\') *lp = '_'; }
+      snprintf_P(entry, sizeof(entry),
+        PSTR("{\"id\":%d,\"outside_temp\":%.1f,\"flow_temp\":%.1f,\"added\":%lu,\"label\":\"%s\"}"),
+        newId, ot, ft, (unsigned long)now, lblBuf);
+      // Insert: remove trailing ']', append entry, close
+      size_t mlen = strlen(markersBuf);
+      while (mlen > 0 && markersBuf[mlen - 1] != ']') mlen--;
+      if (mlen > 0) markersBuf[mlen - 1] = '\0';
+      char newBuf[2048];
+      if (strcmp(markersBuf, "[") == 0 || strcmp(markersBuf, "") == 0 || mcount == 0) {
+        snprintf_P(newBuf, sizeof(newBuf), PSTR("[%s]"), entry);
+      } else {
+        snprintf_P(newBuf, sizeof(newBuf), PSTR("%s,%s]"), markersBuf, entry);
+      }
+      File wf = LittleFS.open(fname, "w");
+      if (!wf) { sendApiError(500, F("Cannot write markers file")); return; }
+      wf.print(newBuf);
+      wf.close();
+      char resp[64];
+      snprintf_P(resp, sizeof(resp), PSTR("{\"status\":\"ok\",\"id\":%d}"), newId);
+      httpServer.send(201, F("application/json"), resp);
+    }
+    else if (method == HTTP_DELETE) {
+      // DELETE /api/v2/sat/markers/<id>
+      if (wc < 6) { sendApiError(400, F("Missing marker id in path")); return; }
+      int delId = atoi(words[5]);
+      if (delId <= 0) { sendApiError(400, F("Invalid marker id")); return; }
+      char fname[24];
+      strlcpy_P(fname, kSatMarkersFile, sizeof(fname));
+      File rf = LittleFS.open(fname, "r");
+      if (!rf) { sendApiError(404, F("No markers found")); return; }
+      char inBuf[2048];
+      size_t n = rf.readBytes(inBuf, sizeof(inBuf) - 1);
+      inBuf[n] = '\0';
+      rf.close();
+      // Remove the entry with matching id — find and excise it
+      char outBuf[2048];
+      outBuf[0] = '['; outBuf[1] = '\0';
+      bool found = false;
+      bool firstOut = true;
+      const char* ep = inBuf;
+      while ((ep = strchr(ep, '{')) != nullptr) {
+        // find end of object
+        const char* eEnd = strchr(ep, '}');
+        if (!eEnd) break;
+        // extract id from this object
+        const char* idp = strstr(ep, "\"id\":");
+        if (idp && idp < eEnd) {
+          idp += 5;
+          while (*idp == ' ') idp++;
+          int thisId = atoi(idp);
+          if (thisId == delId) { found = true; ep = eEnd + 1; continue; }
+        }
+        // copy this entry to output
+        char entry2[256];
+        size_t elen = (eEnd - ep) + 1;
+        if (elen >= sizeof(entry2)) elen = sizeof(entry2) - 1;
+        memcpy(entry2, ep, elen);
+        entry2[elen] = '\0';
+        if (!firstOut) strlcat(outBuf, ",", sizeof(outBuf));
+        strlcat(outBuf, entry2, sizeof(outBuf));
+        firstOut = false;
+        ep = eEnd + 1;
+      }
+      strlcat(outBuf, "]", sizeof(outBuf));
+      if (!found) { sendApiError(404, F("Marker id not found")); return; }
+      File wf = LittleFS.open(fname, "w");
+      if (!wf) { sendApiError(500, F("Cannot write markers file")); return; }
+      wf.print(outBuf);
+      wf.close();
+      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    }
+    else {
+      sendApiMethodNotAllowed(F("GET, POST, DELETE"));
+    }
+  }
+  // --- TASK-587: DS18B20 sensor-to-SAT-area mapping ---
+  // GET   /api/v2/sat/sensor-areas         — return all 4 area mappings as JSON
+  // PATCH /api/v2/sat/sensor-areas         — body: {"area":0,"sensor":"AABBCCDD11223344"} (empty sensor clears)
+  else if (strcasecmp_P(sub, PSTR("sensor-areas")) == 0) {
+    if (method == HTTP_GET) {
+      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+      char resp[256];
+      snprintf_P(resp, sizeof(resp),
+        PSTR("{\"areas\":["
+             "{\"index\":0,\"sensor\":\"%s\"},"
+             "{\"index\":1,\"sensor\":\"%s\"},"
+             "{\"index\":2,\"sensor\":\"%s\"},"
+             "{\"index\":3,\"sensor\":\"%s\"}"
+             "]}"),
+        settings.sat.sSensorArea[0],
+        settings.sat.sSensorArea[1],
+        settings.sat.sSensorArea[2],
+        settings.sat.sSensorArea[3]);
+      httpServer.send(200, F("application/json"), resp);
+    }
+    else if (method == HTTP_PATCH || method == HTTP_POST || method == HTTP_PUT) {
+      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      const String& bodyStr = httpServer.arg(F("plain"));
+      const char* body = bodyStr.c_str();
+      char areaBuf[4], sensorBuf[18];
+      areaBuf[0] = '\0'; sensorBuf[0] = '\0';
+      extractJsonField(body, F("area"),   areaBuf,   sizeof(areaBuf));
+      extractJsonField(body, F("sensor"), sensorBuf, sizeof(sensorBuf));
+      if (areaBuf[0] == '\0') { sendApiError(400, F("Missing 'area' field (0-3)")); return; }
+      int areaIdx = atoi(areaBuf);
+      if (areaIdx < 0 || areaIdx >= 4) { sendApiError(400, F("'area' must be 0-3")); return; }
+      // Validate sensor: empty (clear) or exactly 16 hex chars
+      size_t slen = strlen(sensorBuf);
+      if (slen != 0 && slen != 16) { sendApiError(400, F("'sensor' must be 16 hex chars or empty string")); return; }
+      if (slen == 16) {
+        for (size_t ci = 0; ci < 16; ci++) {
+          if (!isxdigit((unsigned char)sensorBuf[ci])) {
+            sendApiError(400, F("'sensor' must be 16 hex chars"));
+            return;
+          }
+        }
+        // Normalize to uppercase
+        for (size_t ci = 0; ci < 16; ci++) sensorBuf[ci] = toupper((unsigned char)sensorBuf[ci]);
+      }
+      char settingKey[16];
+      snprintf_P(settingKey, sizeof(settingKey), PSTR("SATsensorarea%d"), areaIdx);
+      updateSetting(settingKey, sensorBuf);
+      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    }
+    else {
+      sendApiMethodNotAllowed(F("GET, PATCH, POST, PUT"));
+    }
+  }
   else {
     sendApiNotFound(originalURI);
   }
@@ -1529,6 +1753,82 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendEndJsonMap(F("debug"));
 }
 
+// TASK-585: WiFi network scan
+// GET /api/v2/network/scan — async WiFi scan
+//   First call: starts scan, returns {"status":"scanning"}
+//   Subsequent calls: returns {"status":"ready","networks":[...]} once done
+//   Each network: {"ssid":"...","rssi":-60,"channel":6,"secured":true,"connected":true}
+// Guard: refuses scan during OTA or PIC flash operations.
+static int16_t _wifiScanState = WIFI_SCAN_FAILED; // -1=failed, 0=idle, WIFI_SCAN_RUNNING=-2
+static bool    _wifiScanStarted = false;
+
+static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
+{
+  if (wc < 5 || strcasecmp_P(words[4], PSTR("scan")) != 0) {
+    sendApiError(404, F("Unknown network sub-resource (try /scan)"));
+    return;
+  }
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+
+  // Guard: no scan during PIC flash (WiFi scan uses significant CPU)
+  if (state.flash.bPICactive) {
+    sendApiError(503, F("Scan unavailable during PIC flash"));
+    return;
+  }
+
+  // Read current scan state
+  int16_t scanResult = WiFi.scanComplete();
+
+  if (scanResult == WIFI_SCAN_RUNNING) {
+    // Scan in progress — report scanning
+    httpServer.send(200, F("application/json"), F("{\"status\":\"scanning\"}"));
+    return;
+  }
+
+  if (scanResult == WIFI_SCAN_FAILED || !_wifiScanStarted) {
+    // Start async scan (non-blocking)
+    WiFi.scanNetworks(true /*async*/);
+    _wifiScanStarted = true;
+    httpServer.send(200, F("application/json"), F("{\"status\":\"scanning\"}"));
+    return;
+  }
+
+  // scanResult >= 0: scan complete, scanResult = number of networks
+  _wifiScanStarted = false;
+  // Build JSON response using chunked streaming (avoid large static buffer)
+  char connectedSsid[33];
+  strlcpy(connectedSsid, WiFi.SSID().c_str(), sizeof(connectedSsid));
+
+  httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  httpServer.send(200, F("application/json"), F(""));
+
+  char chunk[256];
+  snprintf_P(chunk, sizeof(chunk), PSTR("{\"status\":\"ready\",\"count\":%d,\"networks\":["), scanResult);
+  httpServer.sendContent(chunk);
+
+  for (int16_t i = 0; i < scanResult; i++) {
+    char ssidBuf[33];
+    strlcpy(ssidBuf, WiFi.SSID(i).c_str(), sizeof(ssidBuf));
+    // Escape quotes in SSID
+    for (char* p = ssidBuf; *p; p++) { if (*p == '"' || *p == '\\') *p = '_'; }
+    bool isConn = (strcmp(ssidBuf, connectedSsid) == 0);
+    bool secured = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+    snprintf_P(chunk, sizeof(chunk),
+      PSTR("%s{\"ssid\":\"%s\",\"rssi\":%d,\"channel\":%d,\"secured\":%s,\"connected\":%s}"),
+      (i > 0 ? "," : ""),
+      ssidBuf, WiFi.RSSI(i), WiFi.channel(i),
+      secured ? "true" : "false",
+      isConn ? "true" : "false");
+    httpServer.sendContent(chunk);
+  }
+  httpServer.sendContent(F("]}"));
+  httpServer.sendContent(F(""));  // terminate chunked transfer
+
+  // Release scan memory
+  WiFi.scanDelete();
+}
+
 //=== Route dispatch table (ADR-050) ===
 // Adding a new v2 resource: (1) write handler function above, (2) add entry below.
 typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
@@ -1555,6 +1855,7 @@ static const char kRouteOtdirect[]   PROGMEM = "otdirect";
 static const char kRouteSat[]        PROGMEM = "sat";
 static const char kRouteDiscovery[]  PROGMEM = "discovery";
 static const char kRouteDebugDump[]  PROGMEM = "debug";
+static const char kRouteNetwork[]    PROGMEM = "network";  // TASK-585
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -1574,6 +1875,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteSat,        handleSAT },
   { kRouteDiscovery,  handleDiscovery },
   { kRouteDebugDump,  handleDebugDump },
+  { kRouteNetwork,    handleNetwork },  // TASK-585: WiFi scan
   { nullptr,          nullptr }  // sentinel
 };
 
@@ -2147,6 +2449,8 @@ void sendOTDirectStatus()
     dtostrf(getFlameRatioFreq(), 1, 1, freqBuf);
     sendJsonMapEntry(F("flame_cycles_per_hour"), freqBuf);
   }
+  // TASK-582: CH hysteresis suspension state
+  sendJsonMapEntry(F("ch_suspended"),          state.otd.bCHSuspended);
   sendEndJsonMap(F("otdirect_status"));
 } // sendOTDirectStatus()
 #endif

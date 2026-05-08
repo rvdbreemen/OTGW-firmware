@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.22
+**  Version  : v2.0.0-alpha.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -255,6 +255,28 @@ static OTScheduleEntry otSchedule[] = {
 
 static constexpr uint8_t OT_SCHEDULE_SIZE = sizeof(otSchedule) / sizeof(otSchedule[0]);
 static uint8_t otScheduleIdx = 0;
+
+// TASK-583: fast ventilation poll interval — 10s when slave app is vent/HRV.
+// Only MsgIDs 70 (V/H status) and 71 (V/H setpoint) move to this tier;
+// diagnostic MsgIDs 72-76 remain in the 60s slow-poll tier.
+// See OT spec: slave config HB bits 6-7 = 0b10 indicates ventilation/HRV.
+// We also accept the cached MsgID 3 HB as a fallback if explicit bits differ.
+static constexpr uint32_t OT_VENT_FAST_INTERVAL_MS = 10000;  // 10s fast vent poll
+
+// otIsVentSlave() — true when the boiler slave reports a ventilation/HRV
+// application type in its slave configuration (MsgID 3).
+//
+// OT spec: slave config byte (MsgID 3 high byte) bits 6-7:
+//   00 = boiler/CH  01 = solar collector  10 = heat pump  11 = ventilation/HRV
+// Interpretation varies by implementation; bit 1 of the low byte (member ID)
+// being non-zero is treated as an additional heuristic.
+// Primary check: bits 6-7 = 0b11 (0xC0 mask) in the slave config HB.
+static inline bool otIsVentSlave() {
+  if (!otBoilerCacheValid[3]) return false;
+  uint8_t slaveCfgHB = (otBoilerCache[3] >> 8) & 0xFF;
+  // bits 6-7 == 0b11 → ventilation/HRV application per OT spec
+  return ((slaveCfgHB & 0xC0) == 0xC0);
+}
 
 // Command ring buffer — queues frames from handleOTDirectCommand() and
 // the various per-channel input paths (MQTT, REST, WebUI, telnet serial).
@@ -749,6 +771,16 @@ void initOTDirect() {
   otFailSafeEnabled = settings.otd.bFailSafe;
   otMinIntervalMs   = settings.otd.iMsgInterval;
   if (otSummerMode) otMasterStatusFlags |= 0x20;
+
+  // TASK-584: restore persisted ventilation setpoint to write cache so the
+  // scheduler will re-apply it to the boiler after boot without a new command.
+  if (settings.otd.iVentSetpoint > 0) {
+    uint16_t ventData = ((uint16_t)settings.otd.iVentSetpoint) << 8;
+    updateWriteCache(71, ventData);
+    setOverride(71, ventData);
+    OTDDebugTf(PSTR("OT-direct: restored vent setpoint %u%% from settings\r\n"),
+               settings.otd.iVentSetpoint);
+  }
 
   {
     const char* modeNames[] = { "bypass", "gateway", "monitor", "master" };
@@ -1339,6 +1371,12 @@ static void scheduleMasterRequest() {
 
     // Offline: use slow retry interval for MsgID 0 to avoid hammering a dead bus
     uint32_t interval = (busOffline && entry.msgId == 0) ? OT_OFFLINE_RETRY_MS : entry.intervalMs;
+    // TASK-583: promote MsgID 70 (V/H status) and 71 (V/H setpoint) to fast-poll
+    // when the slave configuration (MsgID 3 HB bits 6-7 == 0b11) indicates a
+    // ventilation/HRV application.  MsgIDs 72-76 remain in the slow-poll tier.
+    if ((entry.msgId == 70 || entry.msgId == 71) && otIsVentSlave()) {
+      interval = OT_VENT_FAST_INTERVAL_MS;
+    }
 
     if ((now - entry.lastSentMs) >= interval) {
       unsigned long request;
@@ -1615,6 +1653,78 @@ static void loopPiCtrl() {
 }
 
 // ===========================================================================
+// TASK-582: CH hysteresis suspension logic
+// ===========================================================================
+// loopCHHysteresis — suspend/resume CH heating based on configurable deadband.
+//
+// When room temperature exceeds (setpoint + hysteresis/2), MsgID 0 CH-enable
+// bit (bit0) is cleared, suspending central heating.  When room temperature
+// falls back to (setpoint - hysteresis/2) or below, CH-enable is restored.
+//
+// Guards:
+//   - bHysteresisEnable must be true in settings.otd (false = backward compat)
+//   - Room temperature must be available in otBoilerCache[24] (MsgID 24 = Tr)
+//   - CH setpoint must be available in otBoilerCache[16] (MsgID 16 = TrSet)
+//   - SAT active: bypass entirely; SAT manages its own control (state.sat.bActive)
+//   - Publishes transition events to MQTT topic otgw32/ch_suspended (retained)
+//
+// Called every 10s from doOTDirectLoop() — matches the temperature read interval.
+static void loopCHHysteresis() {
+  // SAT active: SAT owns the control loop, skip hysteresis
+#if defined(HAS_SAT) && HAS_SAT
+  if (state.sat.bActive) {
+    // If we had suspended CH, restore it before handing back to SAT
+    if (state.otd.bCHSuspended) {
+      state.otd.bCHSuspended = false;
+      otMasterStatusFlags |= 0x01;  // re-enable CH
+      sendMQTTData(F("otgw32/ch_suspended"), "false", true);
+      OTDDebugTln(F("OTD: hysteresis: SAT active, CH-suspend released"));
+    }
+    return;
+  }
+#endif
+
+  if (!settings.otd.bHysteresisEnable) {
+    // Feature disabled — ensure we're not holding a stale suspension
+    if (state.otd.bCHSuspended) {
+      state.otd.bCHSuspended = false;
+      otMasterStatusFlags |= 0x01;
+      sendMQTTData(F("otgw32/ch_suspended"), "false", true);
+      OTDDebugTln(F("OTD: hysteresis: disabled, CH-suspend released"));
+    }
+    return;
+  }
+
+  // Room temperature and setpoint must both be in cache
+  if (!otBoilerCacheValid[24] || !otBoilerCacheValid[16]) {
+    OTDDebugTln(F("OTD: hysteresis: room temp or setpoint not available, skipping"));
+    return;
+  }
+
+  float rt  = (int16_t)otBoilerCache[24] / 256.0f;  // room temp (f8.8)
+  float rsp = (int16_t)otBoilerCache[16] / 256.0f;  // room setpoint (f8.8)
+  float half = settings.otd.fHysteresis / 2.0f;
+
+  bool wasSuspended = state.otd.bCHSuspended;
+
+  if (!wasSuspended && rt >= (rsp + half)) {
+    // Room temp exceeded upper threshold — suspend CH
+    state.otd.bCHSuspended = true;
+    otMasterStatusFlags &= ~0x01;  // clear CH enable bit
+    sendMQTTData(F("otgw32/ch_suspended"), "true", true);
+    OTDDebugTf(PSTR("OTD: hysteresis: CH suspended rt=%.1f rsp=%.1f (+%.2f)\r\n"),
+               rt, rsp, half);
+  } else if (wasSuspended && rt <= (rsp - half)) {
+    // Room temp fell back below lower threshold — resume CH
+    state.otd.bCHSuspended = false;
+    otMasterStatusFlags |= 0x01;   // set CH enable bit
+    sendMQTTData(F("otgw32/ch_suspended"), "false", true);
+    OTDDebugTf(PSTR("OTD: hysteresis: CH resumed rt=%.1f rsp=%.1f (-%.2f)\r\n"),
+               rt, rsp, half);
+  }
+}
+
+// ===========================================================================
 // TASK-184: Flame ratio tracking
 // ===========================================================================
 
@@ -1883,6 +1993,12 @@ void loopOTDirect() {
       }
     }
     otNextPiCtrl = millis();
+  }
+
+  // TASK-582: CH hysteresis suspension — run every 10s (matches temperature read interval)
+  DECLARE_TIMER_SEC(timerCHHysteresis, 10, SKIP_MISSED_TICKS);
+  if (DUE(timerCHHysteresis)) {
+    loopCHHysteresis();
   }
 }
 
@@ -2570,15 +2686,28 @@ void handleOTDirectCommand(const char* buf, int len) {
     }
   }
   // VS=xx — Ventilation setpoint (MsgID 71). Non-numeric clears.
+  // TASK-584: accepted value is also written through to settings.otd.iVentSetpoint
+  // so it survives a reboot without user re-applying the command.
   else if (cmd0 == 'V' && cmd1 == 'S') {
     if (!isdigit((unsigned char)value[0])) {
       clearWriteOverride(71);
       synthesizeResponse(buf, value);
+      // Clear persisted ventilation setpoint on explicit clear command
+      if (settings.otd.iVentSetpoint != 0) {
+        settings.otd.iVentSetpoint = 0;
+        writeSettings();
+      }
     } else {
-      uint16_t data = ((uint16_t)(atoi(value) & 0xFF)) << 8;
+      int setpt = constrain(atoi(value), 0, 100);
+      uint16_t data = ((uint16_t)(setpt & 0xFF)) << 8;
       if (enqueueWriteCommand(71, data, "VS")) {
-        snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), atoi(value));
+        snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), setpt);
         synthesizeResponse(buf, rspBuf);
+        // TASK-584: persist across reboots
+        if (settings.otd.iVentSetpoint != (uint8_t)setpt) {
+          settings.otd.iVentSetpoint = (uint8_t)setpt;
+          writeSettings();
+        }
       }
     }
   }

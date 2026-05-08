@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-alpha.22
+**  Version  : v2.0.0-alpha.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -95,6 +95,8 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   // TASK-466: PIC-style TT=/TC= remote-override mode (none/temporary/constant)
   OTRemoteOverrideMode eOverrideMode = OT_OVERRIDE_NONE;
   uint16_t iOverrideF88      = 0;        // f8.8 value of the active TT/TC override (0 when none)
+  // TASK-582: CH hysteresis suspension state
+  bool     bCHSuspended      = false;    // true = CH suspended by hysteresis deadband logic
 };
 
 //====================================================================
@@ -123,6 +125,15 @@ struct OTDirectSettingsSection {
   float    fKp                = 5.0f;  // Proportional gain (K/K)
   float    fKi                = 0.5f;  // Integral gain (1/h)
   float    fKboost            = 2.0f;  // Boost gain (K/K), applied when error > 1°C
+  // --- TASK-582: CH hysteresis deadband ---
+  bool     bHysteresisEnable  = false; // Enable CH suspension hysteresis (false = backward compat)
+  float    fHysteresis        = 0.5f;  // Total deadband width in °C (range 0.0-2.0); each side = fHysteresis/2
+  // --- TASK-584: ventilation override persistence ---
+  bool     bVentEnable        = false; // Ventilation control enabled (OT MsgID 70 HB bit0)
+  bool     bOpenBypass        = false; // Open bypass valve (OT MsgID 70 HB bit2)
+  bool     bAutoBypass        = false; // Automatic bypass valve mode (OT MsgID 70 HB bit3)
+  bool     bFreeVentEnable    = false; // Free ventilation mode (OT MsgID 70 HB bit4)
+  uint8_t  iVentSetpoint      = 0;     // Ventilation setpoint 0-100% (OT MsgID 71 HB)
 };
 
 #endif // HAS_DIRECT_OT

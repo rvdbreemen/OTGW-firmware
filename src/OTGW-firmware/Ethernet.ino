@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Ethernet.ino
-**  Version  : v2.0.0-alpha.22
+**  Version  : v2.0.0-alpha.23
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -28,6 +28,10 @@ static uint8_t ethMac[6] = {0};
 
 // Network management state
 static bool ethInitialized = false;
+// Set when a mode transition to Ethernet occurred but the MQTT publish is still
+// pending (MQTT reconnect is async; the publish fires on the next loopEthernet
+// tick once the broker is confirmed connected).
+static bool ethModePubPending = false;
 
 //=======================================================================
 // Derive a locally-administered MAC from the ESP32 eFuse MAC.
@@ -119,7 +123,7 @@ static bool startEthernet(uint16_t dhcpTimeoutMs) {
 }
 
 //=======================================================================
-// Switch from WiFi to Ethernet: disconnect WiFi, update state.
+// Switch from WiFi to Ethernet: disconnect WiFi, update state, restart services.
 //=======================================================================
 static void switchToEthernet() {
   DebugTln(F("Network: switching to Ethernet"));
@@ -129,10 +133,18 @@ static void switchToEthernet() {
   ethInitialized = true;
   // Re-register mDNS on the new interface
   startMDNS(CSTR(settings.sHostname));
+  // Restart MQTT and WebSocket on the new interface.
+  // MQTT connect is async — actual broker connection happens in subsequent
+  // handleMQTT() calls. Set a flag so loopEthernet() publishes the mode
+  // topic on the next tick once the broker confirms the connection.
+  startMQTT();
+  startWebSocket();
+  ethModePubPending = true;
 }
 
 //=======================================================================
-// Switch from Ethernet to WiFi: re-enable WiFi, update state.
+// Switch from Ethernet to WiFi: re-enable WiFi, update state, restart services.
+// Service restart happens in loopWifi() WIFI_RECONNECTED state once connected.
 //=======================================================================
 static void switchToWiFi() {
   DebugTln(F("Network: switching to WiFi"));
@@ -140,6 +152,9 @@ static void switchToWiFi() {
   state.net.bEthernetLink = false;
   ethInitialized = false;
   WiFi.begin();
+  // Note: MQTT/WebSocket restart happens in loopWifi()/WIFI_RECONNECTED once
+  // the WiFi association is confirmed. Publishing "wifi" here would race with
+  // a not-yet-connected WiFi — loopWifi() handles the reconnect announcement.
 }
 
 //=======================================================================
@@ -170,12 +185,22 @@ void initEthernet() {
 // loopEthernet() — called from doBackgroundTasks(), every 5 seconds.
 // Monitors link state and handles automatic WiFi↔Ethernet failover.
 // Self-guarded: returns immediately if no W5500 hardware.
+//
+// Transition logic:
+//   WiFi active + cable inserted  → DHCP → switchToEthernet() (publishes "ethernet")
+//   Ethernet active + cable lost  → switchToWiFi()             (publishes "wifi" via loopWifi/RECONNECTED)
 //=======================================================================
 void loopEthernet() {
   if (!state.hw.bEthernetPresent) return;
 
   DECLARE_TIMER_SEC(timerEthCheck, 5, CATCH_UP_MISSED_TICKS);
   if (!DUE(timerEthCheck)) return;
+
+  // Drain pending "ethernet" mode publish once MQTT has reconnected
+  if (ethModePubPending && state.mqtt.bConnected) {
+    sendMQTTData(F("otgw-firmware/network/mode"), F("ethernet"), true);
+    ethModePubPending = false;
+  }
 
   bool linkUp = (Ethernet.linkStatus() == LinkON);
   state.net.bEthernetLink = linkUp;
@@ -187,7 +212,9 @@ void loopEthernet() {
       switchToEthernet();
     }
   } else if (!linkUp && state.net.eMode == NET_ETHERNET) {
-    // Cable unplugged — fall back to WiFi
+    // Cable unplugged — fall back to WiFi.
+    // Publish while MQTT is still connected via Ethernet (before the switch drops it).
+    sendMQTTData(F("otgw-firmware/network/mode"), F("wifi"), true);
     DebugTln(F("Ethernet: link lost, falling back to WiFi"));
     switchToWiFi();
   }

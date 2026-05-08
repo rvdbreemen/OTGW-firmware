@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.22
+**  Version  : v2.0.0-alpha.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -366,7 +366,12 @@ void writeSettings(bool show)
   writeJsonIntKV(file, F("SATflushtreshold"), settings.sat.iSatFlushThresholdH, true);
   // Multi-zone PID (Task #233)
   writeJsonIntKV(file, F("SATzonecount"), settings.sat.iZoneCount, true);
-  writeJsonIntKV(file, F("SATzonetimeout"), settings.sat.iZoneTimeoutS, false);
+  writeJsonIntKV(file, F("SATzonetimeout"), settings.sat.iZoneTimeoutS, true);
+  // TASK-587: DS18B20 sensor-to-SAT-area mapping (area 0..3)
+  writeJsonStringKV(file, F("SATsensorarea0"), settings.sat.sSensorArea[0], true);
+  writeJsonStringKV(file, F("SATsensorarea1"), settings.sat.sSensorArea[1], true);
+  writeJsonStringKV(file, F("SATsensorarea2"), settings.sat.sSensorArea[2], true);
+  writeJsonStringKV(file, F("SATsensorarea3"), settings.sat.sSensorArea[3], false);
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
@@ -407,6 +412,15 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("OTDkp"), settings.otd.fKp, true);
   writeJsonFloatKV(file, F("OTDki"), settings.otd.fKi, true);
   writeJsonFloatKV(file, F("OTDkboost"), settings.otd.fKboost, true);
+  // --- TASK-582: CH hysteresis deadband ---
+  writeJsonBoolKV(file, F("OTDhysteresisenable"), settings.otd.bHysteresisEnable, true);
+  writeJsonFloatKV(file, F("OTDhysteresis"), settings.otd.fHysteresis, true);
+  // --- TASK-584: ventilation override persistence ---
+  writeJsonBoolKV(file, F("OTDventenable"), settings.otd.bVentEnable, true);
+  writeJsonBoolKV(file, F("OTDopenbypass"), settings.otd.bOpenBypass, true);
+  writeJsonBoolKV(file, F("OTDautobypass"), settings.otd.bAutoBypass, true);
+  writeJsonBoolKV(file, F("OTDfreeventenable"), settings.otd.bFreeVentEnable, true);
+  writeJsonIntKV(file, F("OTDventsetpoint"), settings.otd.iVentSetpoint, true);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
@@ -942,6 +956,11 @@ void updateSetting(const char *field, const char *newValue)
   // Multi-zone PID (Task #233)
   else if (strcasecmp_P(field, PSTR("SATzonecount")) == 0)    settings.sat.iZoneCount = (uint8_t)constrain(atoi(newValue), 1, 4);
   else if (strcasecmp_P(field, PSTR("SATzonetimeout")) == 0)  settings.sat.iZoneTimeoutS = (uint16_t)constrain(atoi(newValue), 30, 3600);
+  // TASK-587: DS18B20 sensor-to-SAT-area mapping
+  else if (strcasecmp_P(field, PSTR("SATsensorarea0")) == 0) strlcpy(settings.sat.sSensorArea[0], newValue, sizeof(settings.sat.sSensorArea[0]));
+  else if (strcasecmp_P(field, PSTR("SATsensorarea1")) == 0) strlcpy(settings.sat.sSensorArea[1], newValue, sizeof(settings.sat.sSensorArea[1]));
+  else if (strcasecmp_P(field, PSTR("SATsensorarea2")) == 0) strlcpy(settings.sat.sSensorArea[2], newValue, sizeof(settings.sat.sSensorArea[2]));
+  else if (strcasecmp_P(field, PSTR("SATsensorarea3")) == 0) strlcpy(settings.sat.sSensorArea[3], newValue, sizeof(settings.sat.sSensorArea[3]));
 #if defined(ESP32)
   // --- BLE temperature sensor settings (Task #20) ---
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);
@@ -1008,6 +1027,15 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDkp")) == 0)             settings.otd.fKp = constrain(atof(newValue), 0.0f, 20.0f);
   else if (strcasecmp_P(field, PSTR("OTDki")) == 0)             settings.otd.fKi = constrain(atof(newValue), 0.0f, 5.0f);
   else if (strcasecmp_P(field, PSTR("OTDkboost")) == 0)         settings.otd.fKboost = constrain(atof(newValue), 0.0f, 10.0f);
+  // --- TASK-582: CH hysteresis deadband ---
+  else if (strcasecmp_P(field, PSTR("OTDhysteresisenable")) == 0) settings.otd.bHysteresisEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDhysteresis")) == 0)       settings.otd.fHysteresis = constrain(atof(newValue), 0.0f, 2.0f);
+  // --- TASK-584: ventilation override persistence ---
+  else if (strcasecmp_P(field, PSTR("OTDventenable")) == 0)      settings.otd.bVentEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDopenbypass")) == 0)      settings.otd.bOpenBypass = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDautobypass")) == 0)      settings.otd.bAutoBypass = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDfreeventenable")) == 0)  settings.otd.bFreeVentEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDventsetpoint")) == 0)    settings.otd.iVentSetpoint = (uint8_t)constrain(atoi(newValue), 0, 100);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)

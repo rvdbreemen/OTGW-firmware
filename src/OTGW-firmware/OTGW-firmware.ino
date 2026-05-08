@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.22
+**  Version  : v2.0.0-alpha.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -186,6 +186,10 @@ void setup() {
   startMQTT();               // start the MQTT after webserver, always.
  
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
+  // OLED init after Wire.begin() (called inside initWatchDog on ESP32 path)
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
+  initOLED();
+#endif
   platformResetReason(lastReset, sizeof(lastReset));
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();
@@ -536,6 +540,9 @@ void doBackgroundTasks()
   // startWebSocket()/startMQTT(), potentially tearing down the HTTP connection
   // carrying the OTA data and leaving the LittleFS partition partially written.
   if (!isFlashing()) loopWifi();
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (!isFlashing()) loopEthernet();   // W5500 link-poll + WiFi↔Ethernet failover (every 5s)
+#endif
 
   // Check for critically low heap and attempt recovery if needed
   if (getHeapHealth() == HEAP_CRITICAL) {
@@ -607,6 +614,9 @@ void loop()
       weatherLoop();                    // Weather data fetch (timer-guarded, Task #50)
 #if HAS_PIC
       handlePendingUpgrade();           // Check if we need to start an upgrade
+#endif
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
+      loopOLED();                       // OLED display refresh and button handling (OTGW32 only)
 #endif
     }
 
