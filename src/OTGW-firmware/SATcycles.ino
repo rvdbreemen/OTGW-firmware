@@ -73,6 +73,19 @@ static uint16_t _flow_sampleHead  = 0;  // next write position (needs uint16 for
 static uint16_t _flow_sampleCount = 0;  // valid sample count (0..SAT_FLOW_SAMPLE_SIZE)
 #endif
 
+// --- Tail ring buffer for end-of-cycle 180s classification window ---
+// Sampled at 1Hz for a true time-based window, independent of loop rate.
+// 180 slots on ESP32 = 180s tail. ESP8266 caps at SAT_FLOW_SAMPLE_SIZE (64s).
+#if defined(ESP8266)
+  #define SAT_TAIL_SAMPLE_SIZE SAT_FLOW_SAMPLE_SIZE   // 64 slots = 64s at 1Hz
+#else
+  #define SAT_TAIL_SAMPLE_SIZE 180                    // 180 slots = 180s at 1Hz
+#endif
+static float    _tail_samples[SAT_TAIL_SAMPLE_SIZE];
+static uint8_t  _tail_sampleHead  = 0;
+static uint8_t  _tail_sampleCount = 0;
+static uint32_t _tail_lastSampleMs = 0;
+
 // --- Current Cycle State ---
 static bool     _cycle_flameOn          = false;
 static uint32_t _cycle_flameOnStartMs   = 0;
@@ -187,6 +200,11 @@ void satCycleInit()
   memset(_flow_samples, 0, sizeof(_flow_samples));
   _flow_sampleHead  = 0;
   _flow_sampleCount = 0;
+  // Tail ring buffer (180s window)
+  memset(_tail_samples, 0, sizeof(_tail_samples));
+  _tail_sampleHead  = 0;
+  _tail_sampleCount = 0;
+  _tail_lastSampleMs = 0;
   // Rolling 4-hour window (Task #227)
   memset(_win4h, 0, sizeof(_win4h));
   _win4hHead  = 0;
@@ -377,6 +395,36 @@ static float _flowPercentile(uint8_t pct)
   return sorted[idx];
 }
 
+//=== Tail-window percentile (Task #590) ===
+// Same insertion-sort approach as _flowPercentile(), but uses the 1Hz-gated
+// tail ring buffer so only the final SAT_TAIL_SAMPLE_SIZE seconds of the
+// cycle are considered.
+static float _tailPercentile(uint8_t pct)
+{
+  if (_tail_sampleCount == 0) return 0.0f;
+
+  float sorted[SAT_TAIL_SAMPLE_SIZE];
+  uint8_t n = _tail_sampleCount;
+  for (uint8_t i = 0; i < n; i++) {
+    uint8_t src = (_tail_sampleHead + SAT_TAIL_SAMPLE_SIZE - n + i) % SAT_TAIL_SAMPLE_SIZE;
+    sorted[i] = _tail_samples[src];
+  }
+
+  for (uint8_t i = 1; i < n; i++) {
+    float key = sorted[i];
+    int8_t j = (int8_t)i - 1;
+    while (j >= 0 && sorted[j] > key) {
+      sorted[j + 1] = sorted[j];
+      j--;
+    }
+    sorted[j + 1] = key;
+  }
+
+  uint8_t idx = (uint8_t)((uint16_t)pct * (n - 1) / 100);
+  if (idx >= n) idx = n - 1;
+  return sorted[idx];
+}
+
 //=== Determine cycle kind from DHW sample fraction ===
 static SATCycleKind _cycleDetectKind()
 {
@@ -525,6 +573,11 @@ void satCycleOnFlameChange(bool flameOn)
     _flow_samples[_flow_sampleHead] = OTcurrentSystemState.Tboiler;
     _flow_sampleHead = (_flow_sampleHead + 1) % SAT_FLOW_SAMPLE_SIZE;
     _flow_sampleCount = 1;
+    // Reset tail ring buffer (Task #590: 180s end-of-cycle window)
+    memset(_tail_samples, 0, sizeof(_tail_samples));
+    _tail_sampleHead  = 0;
+    _tail_sampleCount = 0;
+    _tail_lastSampleMs = now;
     // Reset flow-return delta accumulator (Task #227)
     _cycle_sumFlowRetDelta = 0.0f;
     _cycle_deltasamples    = 0;
@@ -551,7 +604,14 @@ void satCycleOnFlameChange(bool flameOn)
     // Compute p90/p10 from collected flow samples (Task #225)
     float p90 = (_flow_sampleCount >= 10) ? _flowPercentile(90) : _cycle_maxFlowTemp;
     float p10 = (_flow_sampleCount >= 10) ? _flowPercentile(10) : _cycle_minFlowTemp;
-    SATCycleClass cls = _cycleClassify(durationSec, p90, p10,
+    // Task #590: tail-window percentiles (last 180s at 1Hz, or full buffer if shorter).
+    // A cycle that self-corrected should not be classified OVERSHOOT from its early peak.
+    float tailP90 = (_tail_sampleCount >= 10) ? _tailPercentile(90) : p90;
+    float tailP10 = (_tail_sampleCount >= 10) ? _tailPercentile(10) : p10;
+    float tailP50 = (_tail_sampleCount >= 10) ? _tailPercentile(50) : (p90 + p10) * 0.5f;
+    SATDebugTf(PSTR("SAT cycle classify: fullP90=%.1f tailP90=%.1f tailP50=%.1f tailP10=%.1f tailN=%u\r\n"),
+               p90, tailP90, tailP50, tailP10, (unsigned)_tail_sampleCount);
+    SATCycleClass cls = _cycleClassify(durationSec, tailP90, tailP10,
                                         _cycle_setpointAtStart, _cycle_overshootSec);
     _cycleRecord(cls, durationSec, _cycle_maxFlowTemp, _cycle_overshootSec);
 
@@ -606,6 +666,15 @@ void satCycleSample()
   if ((_flow_sampleCount & 0x0F) == 0) { // log every 16th sample to avoid flood
     SATDebugTf(PSTR("SAT sample: flow=%.1f n=%u sp=%.1f os=%.0fs\r\n"),
                flowTemp, (unsigned)_flow_sampleCount, _cycle_setpointAtStart, _cycle_overshootSec);
+  }
+
+  // Tail ring buffer: 1Hz-gated for time-accurate window (Task #590)
+  uint32_t nowMs = millis();
+  if (nowMs - _tail_lastSampleMs >= 1000UL) {
+    _tail_samples[_tail_sampleHead] = flowTemp;
+    _tail_sampleHead = (_tail_sampleHead + 1) % SAT_TAIL_SAMPLE_SIZE;
+    if (_tail_sampleCount < SAT_TAIL_SAMPLE_SIZE) _tail_sampleCount++;
+    _tail_lastSampleMs = nowMs;
   }
 
   // Track overshoot seconds: time flow temp is above setpoint + margin
