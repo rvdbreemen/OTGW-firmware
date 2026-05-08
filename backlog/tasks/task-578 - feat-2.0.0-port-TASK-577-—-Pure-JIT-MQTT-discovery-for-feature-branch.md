@@ -1,7 +1,7 @@
 ---
 id: TASK-578
 title: 'feat-2.0.0: port TASK-577 — Pure JIT MQTT discovery for feature branch'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-08 10:39'
 updated_date: '2026-05-08 10:49'
