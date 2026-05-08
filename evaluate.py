@@ -1618,8 +1618,8 @@ class WorkspaceEvaluator:
     def check_design_system_drift(self):
         """ADR-091 binding rule: literal classes emitted by HTML/JS must either
         have a CSS selector in data/*.css or be listed in the documented
-        allowlist above. First release reports actionable drift as WARN; TASK-480
-        tracks promoting this to FAIL after the grace release.
+        allowlist above. Grace release complete (TASK-480): actionable drift is
+        now FAIL so CI blocks new design-system class drift.
         """
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Design-System Class Drift ==={Colors.ENDC}")
 
@@ -1654,7 +1654,7 @@ class WorkspaceEvaluator:
             self.add_result(EvaluationResult(
                 "Design System",
                 "Class drift",
-                "WARN",
+                "FAIL",
                 f"{len(missing)} referenced CSS class(es) have no selector",
                 "; ".join(details[:20])
             ))
@@ -2690,7 +2690,7 @@ class WorkspaceEvaluator:
         self.check_heap_tier_thresholds_ordered()     # TASK-428, ADR-089 sub-rule 1
         self.check_heap_fragmentation_promotion()     # TASK-428, ADR-089 sub-rule 2
         self.check_heap_tier_entry_counters()         # TASK-428, ADR-089 sub-rule 3
-        self.check_design_system_drift()              # TASK-470, ADR-091 WARN grace gate
+        self.check_design_system_drift()              # TASK-470, ADR-091 FAIL gate (TASK-480 grace complete)
         self.check_ps_summary_master_topic_gate()     # ADR-066 amendment / TASK-483
         self.check_adr_references_resolve()           # TASK-355/368
 

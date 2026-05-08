@@ -532,6 +532,42 @@ body.dark .otmonrow,
   margin-top: 16px;
 }
 
+/* Calibration marker panel (TASK-586) — below heating curve chart */
+.sat-marker-panel {
+  margin-top: var(--space-5);
+}
+.sat-marker-heading {
+  font: 600 var(--fs-xs) / var(--lh-tight) var(--font-sans);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--fg-4); margin: 0 0 var(--space-3);
+}
+.sat-marker-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+.sat-marker-empty {
+  font-size: var(--fs-xs); color: var(--fg-4); font-style: italic;
+  padding: var(--space-2) 0;
+}
+.sat-marker-item {
+  display: flex; align-items: center; gap: var(--space-3);
+  font-size: var(--fs-xs); color: var(--fg-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1); border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+}
+.sat-marker-item span { flex: 1; }
+.sat-marker-del {
+  flex-shrink: 0;
+  background: none; border: 1px solid var(--status-warn);
+  color: var(--status-warn); border-radius: var(--radius-sm);
+  font-size: var(--fs-sm); line-height: 1;
+  width: 20px; height: 20px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.sat-marker-del:hover { background: var(--status-warn); color: var(--fg-inv); }
+
 /* =============================================================
  * 14. SETTINGS FORM ROWS
  * ============================================================= */

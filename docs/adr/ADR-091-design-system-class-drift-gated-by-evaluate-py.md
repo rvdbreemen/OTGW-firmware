@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-04-28)
+Accepted (2026-04-28). Gate promoted from WARN to FAIL on 2026-05-08 (TASK-480).
 
 ## Context
 

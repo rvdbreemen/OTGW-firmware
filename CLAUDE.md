@@ -44,6 +44,18 @@ Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. "Builds
 
 **Known bug:** `backlog task list` returns empty. Use `backlog task <id> --plain` or read `backlog/tasks/` directly.
 
+## Auto-advance to next task (project policy)
+
+After completing a task (or reaching a blocking state with no self-verifiable ACs remaining), **immediately analyse the backlog and pick up the highest-priority actionable task** without waiting for the user to prompt. Apply the following selection order:
+
+1. Highest-priority task with all non-field-validation ACs unblocked (can be started and verified without hardware).
+2. If all open tasks are blocked on field validation or external input, report that state and idle.
+
+Exceptions — do NOT auto-advance:
+- User has explicitly asked you to stop or wait.
+- The next task requires a plan approval checkpoint (per KISS principle: share choices so user decides on complexity).
+- The next task is a cross-worktree master-plan task (requires the one-plan-then-two-agents protocol).
+
 ---
 
 ## MCP Servers
