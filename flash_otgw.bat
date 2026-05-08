@@ -90,17 +90,11 @@ REM ---- Step 2: locate firmware and filesystem binaries ----------------------
 set "FW_FILE="
 set "FS_FILE="
 
-for %%D in ("%SCRIPT_DIR%." "%SCRIPT_DIR%build") do (
-    if not defined FW_FILE (
-        for %%F in ("%%~D\OTGW-firmware-*.ino.bin") do (
-            if not defined FW_FILE set "FW_FILE=%%F"
-        )
-    )
-    if not defined FS_FILE (
-        for %%F in ("%%~D\OTGW-firmware*.littlefs.bin") do (
-            if not defined FS_FILE set "FS_FILE=%%F"
-        )
-    )
+for %%F in ("%SCRIPT_DIR%OTGW-firmware-*.ino.bin") do (
+    if not defined FW_FILE set "FW_FILE=%%F"
+)
+for %%F in ("%SCRIPT_DIR%OTGW-firmware*.littlefs.bin") do (
+    if not defined FS_FILE set "FS_FILE=%%F"
 )
 
 if not defined FW_FILE goto try_download
@@ -114,17 +108,11 @@ if errorlevel 1 (
     echo         and place them in the same directory as this script.
     exit /b 1
 )
-for %%D in ("%SCRIPT_DIR%." "%SCRIPT_DIR%build") do (
-    if not defined FW_FILE (
-        for %%F in ("%%~D\OTGW-firmware-*.ino.bin") do (
-            if not defined FW_FILE set "FW_FILE=%%F"
-        )
-    )
-    if not defined FS_FILE (
-        for %%F in ("%%~D\OTGW-firmware*.littlefs.bin") do (
-            if not defined FS_FILE set "FS_FILE=%%F"
-        )
-    )
+for %%F in ("%SCRIPT_DIR%OTGW-firmware-*.ino.bin") do (
+    if not defined FW_FILE set "FW_FILE=%%F"
+)
+for %%F in ("%SCRIPT_DIR%OTGW-firmware*.littlefs.bin") do (
+    if not defined FS_FILE set "FS_FILE=%%F"
 )
 if not defined FW_FILE (
     echo [ERROR] Firmware binary not found after download.
