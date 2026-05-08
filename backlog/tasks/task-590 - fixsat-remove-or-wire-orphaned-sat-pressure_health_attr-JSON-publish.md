@@ -1,7 +1,7 @@
 ---
 id: TASK-590
 title: 'fix(sat): remove or wire orphaned sat/pressure_health_attr JSON publish'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-08 17:13'
@@ -43,3 +43,9 @@ Resolution options:
 <!-- SECTION:PLAN:BEGIN -->
 Remove the sat/pressure_health_attr publish block (lines 1888-1908 in SATcontrol.ino). The flat scalar topics (sat/pressure, sat/pressure_drop_rate, sat/pressure_alarm) already cover all the data. No HA discovery entry exists for sat/pressure_health itself, so wiring option would require a larger change out of scope. Removing the orphan is the minimal fix.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Removed the orphaned sat/pressure_health_attr publish block from satPublishMQTT().\n\nRationale: no HA discovery entry existed for sat/pressure_health (the binary sensor topic), so sat/pressure_health_attr was consumed by nobody. Wiring would require a new SAT binary sensor discovery path out of scope for this task. The flat scalar topics already cover the pressure data.\n\nChanges:\n- Deleted 20-line pressAttrBuf block (static char[200] + JSON build + sendMQTTData call).\n- Version bumped beta.2 -> beta.3.\n\nBuild: pass. No new evaluator failures.\nPushed: origin/dev a1a7795e.
+<!-- SECTION:FINAL_SUMMARY:END -->
