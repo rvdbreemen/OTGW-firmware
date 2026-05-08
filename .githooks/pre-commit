@@ -39,7 +39,7 @@ else
       ADR_EXIT=$?
       # Suppress individual llm_judge advisory lines (one per ADR with llm_judge:true,
       # very noisy on projects with many ADRs). Violations and the summary line are kept.
-      printf '%s\n' "$ADR_OUT" | grep -vE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true" >&2
+      printf '%s\n' "$ADR_OUT" | grep -avE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true" >&2
       [ "$ADR_EXIT" -ne 0 ] && exit "$ADR_EXIT"
     fi
   fi
