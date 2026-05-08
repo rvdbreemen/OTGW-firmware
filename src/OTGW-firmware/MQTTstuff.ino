@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.20
+**  Version  : v2.0.0-alpha.21
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -32,6 +32,8 @@
 void doAutoConfigure();
 void setMQTTConfigPending(const uint8_t MSGid);
 void markAllMQTTConfigPending();
+void clearMQTTConfigPending();
+void publishNonOTDiscoveryConfigs();
 void loopMQTTDiscovery();
 
 // Declare some variables within global scope
@@ -561,11 +563,15 @@ void startMQTT()
   MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
   
   stateMQTT = MQTT_STATE_INIT;
-  //setup for mqtt discovery — mark all IDs pending for async drip publish
+  // Rebuild namespaces (also needed when top-topic changes).
   strlcpy(NodeId, CSTR(settings.mqtt.sUniqueid), sizeof(NodeId));
   buildNamespace(MQTTPubNamespace, sizeof(MQTTPubNamespace), CSTR(settings.mqtt.sTopTopic), "value", NodeId);
   buildNamespace(MQTTSubNamespace, sizeof(MQTTSubNamespace), CSTR(settings.mqtt.sTopTopic), "set", NodeId);
-  markAllMQTTConfigPending();  // queue all discovery for async drip publish
+  // Fresh start: clear done/pending bitmaps, then queue only non-OT configs.
+  // OT ID configs publish JIT as each MsgID is received on the bus (ADR-100).
+  clearMQTTConfigDone();
+  clearMQTTConfigPending();
+  publishNonOTDiscoveryConfigs();
   handleMQTT(); //initialize the MQTT statemachine
 }
 
@@ -770,9 +776,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     } else if ((strcasecmp_P(msgPayload, PSTR("online")) == 0) && bHAcycle){
       DebugTln(F("Home Assistant went online!"));
       bHAcycle = false; //clear flag, so it does not trigger again
-      // HA restart does not affect the MQTT broker connection; no reconnect needed.
-      // Mark all discovery pending for async drip re-publish.
-      markAllMQTTConfigPending();
+      // HA restart does not affect broker retained messages; no discovery republish needed.
+      // Retained configs are already on the broker; HA reads them via homeassistant/# subscription.
     } else {
       DebugTf(PSTR("Home Assistant Status=[%s] and HA cycle status [%s]\r\n"), msgPayload, CBOOLEAN(bHAcycle)); 
     }
@@ -1636,9 +1641,30 @@ void clearMQTTConfigDone()
   state.discovery.iPublishedTopicCount = 0;
 }
 //===========================================================================================
-// Pending-bitmap helpers for async drip-discovery (ADR-pending).
+// Pending-bitmap helpers for async drip-discovery (ADR-100).
 // MQTTautoCfgPendingMap[8] mirrors MQTTautoConfigMap layout: 8 × uint32_t = 256 bits.
 // Setting a bit means "this OT ID needs its discovery config (re-)published".
+//===========================================================================================
+void clearMQTTConfigPending()
+{
+  memset(MQTTautoCfgPendingMap, 0, sizeof(MQTTautoCfgPendingMap));
+}
+//===========================================================================================
+// publishNonOTDiscoveryConfigs() — queue only the non-OT discovery configs for drip publish.
+// Called at boot, top-topic change, and broker restart.
+// OT ID configs are NOT queued here; they publish JIT as each MsgID arrives on the bus.
+// Note: OTGWfwinfoid / OTGWpicinfoid / OTGWpicsettingsid do not exist on this branch yet.
+//===========================================================================================
+void publishNonOTDiscoveryConfigs()
+{
+  if (!settings.mqtt.bEnable) return;
+  setMQTTConfigPending(0);                  // climate: thermostat + DHW control
+  setMQTTConfigPending(27);                 // number: outside temperature override
+  setMQTTConfigPending(OTGWdallasdataid);   // Dallas temperature sensors
+  setMQTTConfigPending(OTGWheapstatsid);    // heap / discovery statistics
+  dripDeviceInfoPending = true;
+  MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
+}
 //===========================================================================================
 void setMQTTConfigPending(const uint8_t MSGid)
 {
