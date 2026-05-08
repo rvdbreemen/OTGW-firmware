@@ -86,6 +86,30 @@ branch of the SAT Python project is ported into this firmware.
 | **Language** | C/C++ (ESP32-S3, Arduino / PlatformIO) |
 | **License** | Mixed: hardware CC BY-SA 4.0, firmware GPL v3, docs CC BY 4.0 — Copyright (c) 2025 Seegel Systeme |
 
+### Feature parity audit — 2026-05-08
+
+A full 5-domain audit comparing OT-Thing-OTGW32 against OTGW-firmware 2.0.0 was
+completed on 2026-05-08. Full findings: `docs/guides/OT_THING_FEATURE_PARITY.md`.
+
+**Summary verdict:** OTGW-firmware 2.0.0 is a comprehensive superset of OT-Thing across
+all domains (MQTT/HA discovery, OT protocol, UI, sensors, settings). The following gaps
+were identified and tracked as backlog tasks:
+
+| Gap | Backlog task | Priority |
+|-----|-------------|----------|
+| OLED UI driver (5-page display, button pagination) | TASK-580 | medium |
+| Dynamic Ethernet↔WiFi failover at runtime | TASK-581 | medium |
+| OTDirect hysteresis + CH suspension logic | TASK-582 | medium |
+| Ventilation MsgID polling: 60s → 10s when vent active | TASK-583 | low |
+| Persist ventilation overrides across reboots | TASK-584 | low |
+| WiFi network scan REST endpoint + UI selector | TASK-585 | low |
+| Heating curve marker system for calibration points | TASK-586 | medium |
+| Named DS18B20 → SAT area mapping in settings UI | TASK-587 | low |
+
+Items absent in both OT-Thing and OTGW-firmware (not tracked as gaps):
+- Direct MQTT room-temp → OT bus routing (TC= injection)
+- Bypass control topics (`openBypass`, `autoBypass`, `freeVentEnable`) — stubbed in OT-Thing too
+
 ---
 
 ## OT-Thing-Pkunfazir
