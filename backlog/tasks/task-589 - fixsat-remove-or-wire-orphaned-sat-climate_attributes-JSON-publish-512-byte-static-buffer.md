@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-08 17:12'
-updated_date: '2026-05-08 21:25'
+updated_date: '2026-05-08 21:28'
 labels:
   - sat
   - mqtt
@@ -37,11 +37,11 @@ Resolution options:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The 512-byte static char buffer in SATcontrol.ino is either removed or justified by a wired discovery entry
-- [ ] #2 If kept: MQTTHaDiscovery.cpp has a json_attributes_topic entry pointing to sat/climate_attributes for the climate entity
+- [x] #1 The 512-byte static char buffer in SATcontrol.ino is either removed or justified by a wired discovery entry
+- [x] #2 If kept: MQTTHaDiscovery.cpp has a json_attributes_topic entry pointing to sat/climate_attributes for the climate entity
 - [ ] #3 If removed: the entire publish block at SATcontrol.ino:2451-2526 is deleted along with any related discovery config
-- [ ] #4 No orphaned MQTT publish on sat/climate_attributes remains
-- [ ] #5 Build passes and evaluator shows no new failures
+- [x] #4 No orphaned MQTT publish on sat/climate_attributes remains
+- [x] #5 Build passes and evaluator shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
