@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.28
+**  Version  : v2.0.0-alpha.29
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -440,6 +440,7 @@ struct SATSection {
   // Multi-zone PID (Task #233)
   uint8_t  iZoneCount          = 1;    // Number of active heating zones (1-4, default 1 = single-zone)
   uint16_t iZoneTimeoutS       = 300;  // Seconds without update before zone is considered inactive (default 5 min)
+  float    fZoneAggregationHeadroom = 5.0f; // Headroom added to P75 zone aggregate (°C, default 5.0)
   // TASK-587: DS18B20 sensor-to-SAT-area mapping (area 0..3)
   char sSensorArea[4][17] = {{0}};  // Dallas address (16 hex chars + null) per area; empty = unmapped
 #if defined(ESP32)

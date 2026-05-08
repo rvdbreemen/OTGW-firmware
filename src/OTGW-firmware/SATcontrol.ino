@@ -3792,20 +3792,55 @@ void satControlLoop()
   // Zones 2-4 are only evaluated when sat_zone_count > 1.
   // If all zones are inactive, falls back to single-zone (primary) pidOutput.
   if (settings.sat.iZoneCount > 1) {
-    float zoneMax = SAT_MIN_SETPOINT;
+    float zoneOutputs[SAT_MAX_ZONES];
     uint8_t activeZones = 0;
+    float maxOvershoot = 0.0f;
     uint8_t zoneCount = settings.sat.iZoneCount;
     if (zoneCount > SAT_MAX_ZONES) zoneCount = SAT_MAX_ZONES;
+
     for (uint8_t z = 0; z < zoneCount; z++) {
       float zOut = satZonePidStep(z, outsideTemp);
       if (zOut > SAT_MIN_SETPOINT) {
-        if (zOut > zoneMax) zoneMax = zOut;
-        activeZones++;
+        zoneOutputs[activeZones++] = zOut;
+        // Track overshoot: room above setpoint means this zone is over-heated
+        float overshoot = satZones[z].fRoomTemp - satZones[z].fSetpoint;
+        if (overshoot > maxOvershoot) maxOvershoot = overshoot;
       }
     }
-    if (activeZones > 0) {
-      pidOutput = zoneMax;
-      SATDebugTf(PSTR("SAT: multi-zone %u active zones, max setpoint=%.1f\r\n"), activeZones, pidOutput);
+
+    if (activeZones == 0) {
+      // No active zones: keep primary pidOutput
+    } else if (activeZones < 2) {
+      // Single active zone: use its output directly (backward compat, AC#5)
+      pidOutput = zoneOutputs[0];
+      SATDebugTf(PSTR("SAT: multi-zone 1 active zone, setpoint=%.1f\r\n"), pidOutput);
+    } else {
+      // P75 aggregation: sort ascending (bubble sort, max 4 elements)
+      for (uint8_t i = 0; i < activeZones - 1; i++) {
+        for (uint8_t j = 0; j < activeZones - 1 - i; j++) {
+          if (zoneOutputs[j] > zoneOutputs[j + 1]) {
+            float tmp = zoneOutputs[j];
+            zoneOutputs[j] = zoneOutputs[j + 1];
+            zoneOutputs[j + 1] = tmp;
+          }
+        }
+      }
+      // P75 index: ceiling rank method — ceil(0.75 * N) - 1, 0-based
+      uint8_t p75idx = (uint8_t)(ceilf(0.75f * (float)activeZones)) - 1;
+      float aggregate = zoneOutputs[p75idx] + settings.sat.fZoneAggregationHeadroom;
+
+      // Overshoot cap: reduce aggregate by the maximum zone overshoot
+      // so over-heated zones are not driven further above their setpoint
+      if (maxOvershoot > 0.0f) {
+        aggregate -= maxOvershoot;
+        SATDebugTf(PSTR("SAT: overshoot cap %.1f applied\r\n"), maxOvershoot);
+      }
+
+      if (aggregate < SAT_MIN_SETPOINT) aggregate = SAT_MIN_SETPOINT;
+      pidOutput = aggregate;
+      SATDebugTf(PSTR("SAT: multi-zone P75[%u/%u]=%.1f hdroom=%.1f overshoot=%.1f -> %.1f\r\n"),
+                 p75idx, activeZones, zoneOutputs[p75idx],
+                 settings.sat.fZoneAggregationHeadroom, maxOvershoot, pidOutput);
     }
     // Publish zone diagnostics (retained MQTT)
     satPublishZoneDiagnostics();
