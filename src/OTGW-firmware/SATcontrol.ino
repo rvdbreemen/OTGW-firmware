@@ -1406,10 +1406,10 @@ void satSavePidState()
 {
   File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "w");
   if (!f) return;
-  char buf[160];
+  char buf[192];
   time_t ts = time(nullptr);
-  snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"err\":%.2f,\"ts\":%lu}"),
-             state.sat.fPidI, state.sat.fPidD, state.sat.fError, (unsigned long)ts);
+  snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"rd\":%.4f,\"err\":%.2f,\"ts\":%lu}"),
+             state.sat.fPidI, state.sat.fPidD, state.sat.fRawDerivative, state.sat.fError, (unsigned long)ts);
   f.print(buf);
   f.close();
   _pidLastSaveMs = millis();
@@ -1423,12 +1423,13 @@ void satLoadPidState()
   size_t len = f.readBytes(buf, sizeof(buf) - 1);
   buf[len] = 0;
   f.close();
-  // Simple parse: extract values from {"i":X,"d":Y,"err":Z,"ts":N}
-  float i = 0, d = 0, err = 0;
+  // Simple parse: extract values from {"i":X,"d":Y,"rd":Z,"err":W,"ts":N}
+  float i = 0, d = 0, rd = 0, err = 0;
   unsigned long savedTs = 0;
   char* p;
   if ((p = strstr(buf, "\"i\":"))   != nullptr) i      = atof(p + 4);
   if ((p = strstr(buf, "\"d\":"))   != nullptr) d      = atof(p + 4);
+  if ((p = strstr(buf, "\"rd\":"))  != nullptr) rd     = atof(p + 5);
   if ((p = strstr(buf, "\"err\":")) != nullptr) err    = atof(p + 6);
   if ((p = strstr(buf, "\"ts\":"))  != nullptr) savedTs = strtoul(p + 5, nullptr, 10);
 
@@ -1444,11 +1445,13 @@ void satLoadPidState()
             (unsigned long)(nowTs - (time_t)savedTs));
     return;
   }
-  state.sat.fPidI = i;
-  state.sat.fPidD = d;
+  state.sat.fPidD  = d;
   state.sat.fError = err;
-  SATDebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f err=%.2f age=%lus)\r\n"),
-          i, d, err, (unsigned long)(nowTs - (time_t)savedTs));
+  // satPidRestoreState() sets _pid_integral and _pid_rawDerivative directly
+  // so the next satPidUpdate() warm-starts instead of cold-starting at zero.
+  satPidRestoreState(i, rd);
+  SATDebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f rd=%.4f err=%.2f age=%lus)\r\n"),
+          i, d, rd, err, (unsigned long)(nowTs - (time_t)savedTs));
 }
 
 //=== Energy State Persistence (Task #196) ===
@@ -1530,10 +1533,10 @@ void satDisable()
   state.sat.eControlMode = SAT_MODE_OFF;
   state.sat.bActive = false;
   state.sat.fFinalSetpoint = 0.0f;
-  satSavePidState();         // Persist PID state before reset
+  satPidReset();
+  satSavePidState();         // Persist zeros after reset so next boot cold-starts (AC #5)
   satSaveEnergyState();      // Persist energy total before reset (Task #196)
   satSaveEstimatedEnergy();  // Persist estimated gas energy before reset (Task #232)
-  satPidReset();
   satHCRReset();        // Reset daily-median recommendation (Task #228)
   // Intentional: release boiler control to the thermostat (CS=0) rather than holding
   // a warm-idle setpoint like Python SAT's COLD_SETPOINT=22C. OTGW is a gateway
@@ -1555,6 +1558,7 @@ void satFlushShortLivedData()
   // Reset PID integral (only the integral — P and D terms don't need clearing)
   state.sat.fPidI = 0.0f;
   satPidReset();
+  satSavePidState();         // Persist zeros so next boot does not restore stale integral (AC #5)
   // Flush cycle window (in-memory and file)
   satFlushCycleWindow();
   SATDebugTln(F("SAT: short-lived data flushed (PID integral + cycle window)"));

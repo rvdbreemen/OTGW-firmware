@@ -39,6 +39,23 @@ static uint32_t _pid_lastUpdateMs     = 0;
 static uint32_t _pid_lastDerivativeMs = 0;
 static bool   _pid_initialized        = false;
 
+//=== Restore PID internal state from persistence (Task #589) ===
+// Called from satLoadPidState() after staleness validation.
+// Sets _pid_integral and _pid_rawDerivative directly so the very next
+// satPidUpdate() call warm-starts instead of cold-starting from zero.
+// _pid_initialized stays false so the first call still initialises
+// timestamps and lastRoomTemp from live data — we only pre-load the
+// accumulated values that take many minutes to rebuild.
+void satPidRestoreState(float integral, float rawDerivative)
+{
+  _pid_integral      = integral;
+  _pid_rawDerivative = rawDerivative;
+  state.sat.fPidI    = integral;
+  state.sat.fRawDerivative = rawDerivative;
+  SATDebugTf(PSTR("SAT: PID internal state pre-loaded (I=%.4f rawD=%.4f)\r\n"),
+             integral, rawDerivative);
+}
+
 //=== Integral-only Reset (debug tool) ===
 void satResetIntegral()
 {
