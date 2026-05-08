@@ -1,9 +1,11 @@
 ---
 id: TASK-577
 title: Pure JIT MQTT discovery — publish OT configs only when MsgID received
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-08 10:23'
+updated_date: '2026-05-08 10:23'
 labels:
   - mqtt
   - ha-discovery
