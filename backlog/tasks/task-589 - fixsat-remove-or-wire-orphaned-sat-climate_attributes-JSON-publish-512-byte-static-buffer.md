@@ -49,3 +49,9 @@ Resolution options:
 <!-- SECTION:PLAN:BEGIN -->
 1. Add json_attributes_topic field to streamClimateDiscovery (climateIdx==0) in mqtt_configuratie.cpp, pointing to <mqttPubTopic>/sat/climate_attributes.\n2. Build verify with python build.py --firmware.\n3. Run python evaluate.py --quick.\n4. Bump prerelease, commit, push.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Wired sat/climate_attributes as json_attributes_topic on the HA thermostat climate entity.\n\nChanges:\n- mqtt_configuratie.cpp streamClimateDiscovery(): added json_attributes_topic field for climateIdx==0, pointing to <mqttPubTopic>/sat/climate_attributes.\n- Version bumped beta.1 -> beta.2.\n\nResult: HA now surfaces the 16 SAT PID/curve fields (kp, ki, kd, error_pid, curve_value, setpoint, etc.) as extra_state_attributes on the Thermostat entity. No orphaned publish remains.\n\nBuild: pass. Evaluator: no new failures (1 pre-existing ADR unresolved-reference failure unchanged).\nPushed: origin/dev ee370527.
+<!-- SECTION:FINAL_SUMMARY:END -->
