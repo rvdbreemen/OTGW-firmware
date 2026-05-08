@@ -103,21 +103,39 @@ for %%D in ("%SCRIPT_DIR%." "%SCRIPT_DIR%build") do (
     )
 )
 
+if not defined FW_FILE goto try_download
+if not defined FS_FILE goto try_download
+goto after_download
+
+:try_download
+call :download_release_binaries "%SCRIPT_DIR%"
+if errorlevel 1 (
+    echo [ERROR] Auto-download failed. Download the release binaries manually
+    echo         and place them in the same directory as this script.
+    exit /b 1
+)
+for %%D in ("%SCRIPT_DIR%." "%SCRIPT_DIR%build") do (
+    if not defined FW_FILE (
+        for %%F in ("%%~D\OTGW-firmware-*.ino.bin") do (
+            if not defined FW_FILE set "FW_FILE=%%F"
+        )
+    )
+    if not defined FS_FILE (
+        for %%F in ("%%~D\OTGW-firmware*.littlefs.bin") do (
+            if not defined FS_FILE set "FS_FILE=%%F"
+        )
+    )
+)
 if not defined FW_FILE (
-    echo [ERROR] Firmware binary not found.
-    echo         Expected: OTGW-firmware-*.ino.bin
-    echo         Download the firmware from the GitHub release page and place it
-    echo         in the same directory as this script.
+    echo [ERROR] Firmware binary not found after download.
+    exit /b 1
+)
+if not defined FS_FILE (
+    echo [ERROR] Filesystem binary not found after download.
     exit /b 1
 )
 
-if not defined FS_FILE (
-    echo [ERROR] Filesystem binary not found.
-    echo         Expected: OTGW-firmware*.littlefs.bin
-    echo         Download the filesystem binary from the GitHub release page and
-    echo         place it in the same directory as this script.
-    exit /b 1
-)
+:after_download
 
 for %%F in ("%FW_FILE%") do set "FW_NAME=%%~nxF"
 for %%F in ("%FS_FILE%") do set "FS_NAME=%%~nxF"
@@ -143,9 +161,14 @@ if not "%ARG_PORT%"=="" (
     del "!PORT_LIST_FILE!" >nul 2>&1
 
     if !PORT_COUNT! EQU 0 (
-        echo [ERROR] No serial ports found. Connect your OTGW via USB and try again.
-        echo         Install CP210x or CH340 USB-serial drivers if the port is missing.
-        exit /b 1
+        echo [WARN] No serial ports detected automatically.
+        echo        Connect your OTGW via USB, or install CP210x / CH340 USB-serial drivers.
+        echo.
+        set /p "ARG_PORT=Enter COM port manually (e.g. COM3), or press Enter to cancel: "
+        if not defined ARG_PORT exit /b 1
+        if "!ARG_PORT!"=="" exit /b 1
+        echo [OK] Port:       !ARG_PORT! (manual^)
+        goto after_port_detection
     )
 
     set "ARG_PORT=!PORT_1!"
@@ -156,6 +179,7 @@ if not "%ARG_PORT%"=="" (
         echo [INFO] Use --port to select a different port.
     )
 )
+:after_port_detection
 
 REM ---- Step 4: summary ------------------------------------------------------
 echo.
@@ -194,6 +218,39 @@ echo  Connect to WiFi AP "OTGW-^<MAC-address^>" and browse to
 echo  http://192.168.4.1 to configure WiFi settings.
 echo ============================================================
 exit /b 0
+
+
+:download_release_binaries
+echo [INFO] Fetching latest release info from GitHub...
+set "DL_DIR=%~1"
+set "_DL_PS=%TEMP%\otgw_dl_%RANDOM%.ps1"
+(
+    echo $ProgressPreference = 'SilentlyContinue'
+    echo [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    echo try {
+    echo     $hdr = @{ 'User-Agent' = 'OTGW-Flash-Tool' }
+    echo     $rel = Invoke-WebRequest -UseBasicParsing -Uri 'https://api.github.com/repos/rvdbreemen/OTGW-firmware/releases/latest' -Headers $hdr ^| ConvertFrom-Json
+    echo     Write-Host "[INFO] Release: $($rel.name)"
+    echo     $found = 0
+    echo     foreach ($a in $rel.assets) {
+    echo         if ($a.name -match '\.ino\.bin$' -or $a.name -match '\.littlefs\.bin$') {
+    echo             $out = Join-Path '%DL_DIR%' $a.name
+    echo             Write-Host "[INFO] Downloading $($a.name)..."
+    echo             Invoke-WebRequest -UseBasicParsing -Uri $a.browser_download_url -OutFile $out -ErrorAction Stop
+    echo             Write-Host "[OK]   $($a.name)"
+    echo             $found++
+    echo         }
+    echo     }
+    echo     if ($found -eq 0) { Write-Host '[ERROR] No .ino.bin or .littlefs.bin assets found in release'; exit 1 }
+    echo } catch {
+    echo     Write-Host "[ERROR] Download failed: $_"
+    echo     exit 1
+    echo }
+) > "%_DL_PS%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%_DL_PS%"
+set "_dl_err=%ERRORLEVEL%"
+del "%_DL_PS%" >nul 2>&1
+exit /b %_dl_err%
 
 
 :parse_args
