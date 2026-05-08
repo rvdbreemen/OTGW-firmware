@@ -129,7 +129,7 @@ Proceed directly after Phase 4 approval. No additional confirmation needed.
 3. **Run `python build.py`** to produce the release build. Fix any issues.
 4. **Commit the release build** and push `main` to remote
 5. **Create draft GitHub release with tag**: Derive a short title (3-6 words) summarizing the release theme. Use format `v<version> - <Short Title>`. Examples: `v1.3.2 - File Explorer Reliability Fix`, `v1.4.0 - REST API v3 & Prometheus`. Command: `gh release create v<version> --target main --title "v<version> - <Short Title>" --notes-file RELEASE_GITHUB_<version>.md --draft`
-6. **Upload build artifacts to the draft release**: `gh release upload v<version> build/*.ino.bin build/*.littlefs.bin --clobber`
+6. **Upload build artifacts to the draft release**: `gh release upload v<version> build/*.ino.bin build/*.littlefs.bin flash_otgw.sh flash_otgw.bat --clobber`
 7. **Verify artifacts are attached**: `gh release view v<version> --json assets --jq '.assets[].name'`
 8. **Publish the release**: `gh release edit v<version> --draft=false --latest`
 
