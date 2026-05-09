@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4979,6 +4979,8 @@ var translateFields = [
   , ["webhooktriggerbit", "Webhook Trigger Bit (0-15)"]
   , ["webhookpayload", "Webhook Payload Template"]
   , ["webhookcontenttype", "Webhook Content-Type (POST)"]
+  , ["displayenabled", "OLED Display Enabled"]
+  , ["displaytype", "Display Type (0=SSD1306, 1=SH1106)"]
   
 ];
 
@@ -5035,6 +5037,8 @@ var translateTooltips = [
   , ["webhooktriggerbit", "Status bit number that triggers the webhook. Use values 0 through 15."]
   , ["webhookpayload", "Optional POST body. Leave empty when the receiving service does not need a payload."]
   , ["webhookcontenttype", "HTTP Content-Type header sent with POST requests, for example application/json."]
+  , ["displayenabled", "Enable auto-detection of a small I2C OLED display (128x64 pixels) connected to the D1/D2 header. The firmware probes I2C address 0x3C and 0x3D at boot. Requires a reboot after changing."]
+  , ["displaytype", "Select the display controller: 0 = SSD1306 (common 0.96 inch displays), 1 = SH1106 (common 1.3 inch displays). Requires a reboot after changing."]
 
 ];
 

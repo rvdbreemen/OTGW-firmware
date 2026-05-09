@@ -221,7 +221,8 @@ def install_dependencies(project_dir, config_file):
         "AceTime@2.0.1",
         "OneWire@2.3.8",
         "DallasTemperature@4.0.6",
-        "WebSockets@2.3.6"
+        "WebSockets@2.3.6",
+        "U8g2@2.34.22"
     ]
     
     for lib in libraries:

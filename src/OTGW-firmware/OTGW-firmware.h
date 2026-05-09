@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -678,6 +678,11 @@ struct OTGWBootSection {            // PIC boot-time command injection
   char sCommands[129] = "";
 };
 
+struct DisplaySection {             // I2C OLED display (optional hardware)
+  bool    bEnabled   = false;       // Try to detect and use OLED (off by default, opt-in)
+  uint8_t iType      = 0;           // 0 = SSD1306 128x64, 1 = SH1106 128x64
+};
+
 #if defined(ENABLE_SAT)
 //--- SAT (Smart Autotune Thermostat) settings ---
 struct SATSection {
@@ -789,6 +794,7 @@ struct OTGWSettings {
   WebhookSection      webhook;
   UISection           ui;
   OTGWBootSection     otgw;
+  DisplaySection      display;
 #if defined(ENABLE_SAT)
   SATSection          sat;
 #endif
