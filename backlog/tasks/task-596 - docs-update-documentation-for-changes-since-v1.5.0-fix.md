@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-09 00:04'
-updated_date: '2026-05-09 00:11'
+updated_date: '2026-05-09 00:12'
 labels:
   - docs
   - update-docs
@@ -22,7 +22,7 @@ Sequential doc update pass after v1.5.0 release. PREV_TAG: v1.5.0-fix. Key chang
 <!-- AC:BEGIN -->
 - [x] #1 API documentation (docs/api/MQTT.md, openapi.yaml, README.md, WEBSOCKET_FLOW.md, WEBSOCKET_QUICK_REFERENCE.md) updated to reflect JIT discovery, SAT changes, and WebSocket behavior
 - [x] #2 ADR README (docs/adr/README.md) updated with ADR-070, ADR-071, ADR-072, ADR-073 entries
-- [ ] #3 Cleanup phase complete: RELEASE_NOTES_1.5.0.md and RELEASE_GITHUB_1.5.0.md moved to docs/releases/, misplaced files resolved
+- [x] #3 Cleanup phase complete: RELEASE_NOTES_1.5.0.md and RELEASE_GITHUB_1.5.0.md moved to docs/releases/, misplaced files resolved
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -31,4 +31,6 @@ Sequential doc update pass after v1.5.0 release. PREV_TAG: v1.5.0-fix. Key chang
 AC1 done: MQTT.md updated with JIT discovery semantics (ADR-073), SAT topics section added (climate_attributes, pressure scalars, pressure_health_attr removal). README.md one correction on POST /api/v2/discovery/verify. openapi.yaml/WEBSOCKET docs unchanged (version-bump only). Flag: mqttharebootdetection may be no-op post-ADR-073, noted in docs but no removal decision needed yet.
 
 AC2 done: ADR README updated — ADR-041 entry added (marked superseded by ADR-073), ADR-073 entry added in Integration section and Decision Timeline. ADR-070/071/072 were already present.
+
+AC3 done: RELEASE_NOTES_1.5.0.md and RELEASE_GITHUB_1.5.0.md moved from root to docs/releases/. RELEASE_NOTES/GITHUB_1.3.3 and 1.3.4 archived to docs/releases/archive/ (keeping 4 newest). docs/ root clean.
 <!-- SECTION:NOTES:END -->
