@@ -97,6 +97,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-040: MQTT Source-Specific Topics for OpenTherm Values](ADR-040-mqtt-source-specific-topics.md)** 🆕
   Additive source-specific MQTT and HA discovery topics using nested `<metric>/<source>` paths with opt-in enablement (`MQTTseparatesources`) and backward-compatible base topics.
 
+- **[ADR-041: Just-In-Time Home Assistant MQTT Discovery](ADR-041-jit-ha-discovery.md)** *(Superseded by ADR-073)*
+  Established the JIT discovery principle: OT MsgID discovery configs publish only when that MsgID is received on the bus, not as a bulk sweep at boot. Implementation gaps documented in ADR-041 are resolved by ADR-073.
+
 - **[ADR-055: Webhook Outbound HTTP Integration](ADR-055-webhook-outbound-http-integration.md)** *(Superseded by ADR-057)*
   Historical record of introducing local-network outbound webhook support before retry, protected test-endpoint, and delivery policy were consolidated in ADR-057.
 
@@ -126,6 +129,9 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-072: HA Discovery Friendly-Name Format](ADR-072-ha-discovery-friendly-name-format.md)** *(Accepted)*
   Mandates a uniform `writeFriendlyName()` transform for all HA discovery `name` fields: underscores become spaces, each word is title-cased, and the hostname prefix is stripped; eliminates the confusing `OTGW_SomeCamelCase` labels that field testers flagged across multiple beta releases.
+
+- **[ADR-073: JIT HA Discovery with Smart Reconnect](ADR-073-jit-ha-discovery-smart-reconnect.md)** *(Accepted)*
+  Supersedes ADR-041. Removes the bulk-publish sweep from all automatic triggers, introduces a `publishNonOTDiscoveryConfigs()` set for non-OT pseudo-IDs, and adds a 5-minute offline heuristic to reset discovery bitmaps on probable broker restart without requiring the unavailable CONNACK `sessionPresent` flag.
 
 ### System Architecture
 
@@ -371,7 +377,7 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 6. 2024: ADR-019 (API v2)
 7. 2026: ADR-025 (Safari WebSocket fix), ADR-026 (Cache-busting), ADR-027 (Version warnings)
 8. 2026: ADR-036 (Boot sequence), ADR-037 (Gateway mode), ADR-038 (Data flow), ADR-039 (OTGraph)
-9. 2026: ADR-040 (MQTT source topics), ADR-041 (JIT HA discovery), ADR-042 (No ArduinoJson), ADR-043 (Triple-reset WiFi)
+9. 2026: ADR-040 (MQTT source topics), ADR-041 (JIT HA discovery, superseded by ADR-073), ADR-042 (No ArduinoJson), ADR-043 (Triple-reset WiFi)
 10. 2026: ADR-044 (Global state header definition), ADR-045 (PS=1 summary parsing)
 11. 2026: ADR-054 (Optional HTTP Basic Auth), ADR-055 (Webhook HTTP integration)
 12. 2026: ADR-056 (Protected admin security contract), ADR-057 (Webhook delivery + test endpoint policy)
@@ -379,7 +385,7 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 14. 2026: ADR-065 (otgw-pic/ MQTT subtree stable API), ADR-066 (publish gating by source and slave-echo, Proposed)
 15. 2026: ADR-067 (HA discovery OTA reconciliation, Deprecated), ADR-068 (bSeparateSources mutually exclusive, Superseded by ADR-070)
 16. 2026: ADR-069 (MQTT source-subtopic worldview semantics), ADR-070 (sibling-suffix state topic, Superseded by ADR-071)
-17. 2026: ADR-071 (MQTT discovery sibling-suffix shape), ADR-072 (HA discovery friendly-name format)
+17. 2026: ADR-071 (MQTT discovery sibling-suffix shape), ADR-072 (HA discovery friendly-name format), ADR-073 (JIT HA discovery smart reconnect, supersedes ADR-041)
 
 ## When to Create an ADR
 

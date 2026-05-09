@@ -32,11 +32,11 @@ On MQTT connect:
 
 1. **Birth message**: Publishes `"online"` to the publish namespace root (retained)
 2. **Last Will**: Configured to publish `"offline"` to the publish namespace root (retained) when the connection drops
-3. **Discovery reset**: Clears all HA discovery state so JIT discovery re-publishes
+3. **Discovery reset**: Clears the discovery done/pending bitmaps. Non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC info) are immediately queued for drip publication. OT message ID discovery configs are **not** queued here; they publish JIT as each MsgID is first received on the bus (ADR-073).
 4. **Subscribes** to `{TopTopic}/set/{UniqueId}/#` for incoming commands
 5. **Subscribes** to `homeassistant/status` for Home Assistant lifecycle detection
 6. **Publishes** version info, state information, and cached PIC settings
-7. **Conditional OT republish**: Re-publishes all retained OT values only if the offline duration exceeded 5 minutes (the broker-loss threshold). Short outages are treated as network blips — the broker still holds retained topics. First boot and first-enable scenarios do not trigger a republish; the first-seen mechanism publishes each value naturally as it appears on the OT bus.
+7. **Conditional OT republish**: Re-publishes all retained OT values only if the offline duration exceeded 5 minutes (the broker-loss threshold). Short outages are treated as network blips — the broker still holds retained topics. First boot and first-enable scenarios do not trigger a republish; the first-seen mechanism publishes each value naturally as it appears on the OT bus. On assumed broker restart (offline duration exceeded threshold), the discovery done/pending bitmaps are also reset and non-OT configs are re-queued, so JIT re-publishes OT configs as messages arrive.
 
 ---
 
@@ -293,6 +293,48 @@ Published when GPIO sensors are enabled (`settings.sensors.bEnabled`):
 
 Where `{sensor_address}` is the Dallas 1-Wire address (e.g., `28FF64D1841703F1`). The address format depends on the `gpiosensorslegacyformat` setting.
 
+### SAT (Smart Autotune) Topics
+
+Published when the SAT subsystem is active (`settings.sat.bEnabled`). Topics are published under the standard publish namespace, i.e. at `{TopTopic}/value/{UniqueId}/sat/<metric>`.
+
+#### SAT Pressure Topics
+
+| Topic | Value | Description |
+| ----- | ----- | ----------- |
+| `sat/pressure` | `"1.45"` | Current CH water pressure in bar |
+| `sat/pressure_drop_rate` | `"-0.002"` | Pressure drop rate in bar/hour |
+| `sat/pressure_alarm` | `"true"` / `"false"` | Pressure alarm active |
+| `sat/pressure_health` | `"ON"` / `"OFF"` | Pressure health status (retained) |
+
+Note: the `sat/pressure_health_attr` JSON attributes topic was removed in v1.5.1-beta.3. The individual scalar topics (`sat/pressure`, `sat/pressure_drop_rate`, `sat/pressure_alarm`) remain and provide the same data without a JSON bundle.
+
+#### SAT Climate Attributes Topic
+
+| Topic | Value | Description |
+| ----- | ----- | ----------- |
+| `sat/climate_attributes` | JSON object | Extra state attributes for the HA thermostat climate entity; wired as `json_attributes_topic` in the discovery config |
+
+The `sat/climate_attributes` payload is a JSON object containing PID and heating-curve state fields. Home Assistant reads this topic as `json_attributes_topic` on the SAT thermostat entity. Fields published:
+
+| JSON key | Type | Description |
+| -------- | ---- | ----------- |
+| `optimal_coefficient` | float | Heating curve coefficient |
+| `coefficient_derivative` | float | Coefficient derivative (0.0, not tracked) |
+| `minimum_setpoint` | float | Minimum boiler setpoint (SAT_MIN_SETPOINT) |
+| `boiler_flame_timing` | float | Duration of last completed flame cycle in seconds |
+| `boiler_temperature_cold` | float | Boiler temperature when flame is off |
+| `boiler_temperature_tracking` | bool | EMA tracking state (always false) |
+| `boiler_temperature_derivative` | float | Temperature derivative (0.0, not tracked) |
+| `error_source` | string | Error source zone (always `"main"`) |
+| `error_pid` | float | Current PID error (target minus room) |
+| `integral_enabled` | bool | Integral term active |
+| `derivative_enabled` | bool | Derivative term active |
+| `derivative_raw` | float | Raw filtered derivative before PID scaling |
+| `current_kp` | float | Current proportional gain |
+| `current_ki` | float | Current integral gain |
+| `current_kd` | float | Current derivative gain |
+| `relative_modulation_enabled` | bool | Relative modulation active (false when manufacturer quirk disables it) |
+
 ### Source-Separated Topics (Optional)
 
 When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is published to two source-specific sibling topics alongside the canonical topic:
@@ -429,7 +471,7 @@ Commands can also be sent using the two-letter OTGW command codes directly as to
 
 | Topic | Description |
 | ----- | ----------- |
-| `homeassistant/status` | Monitors HA lifecycle (`online`/`offline`). On `offline` then `online`, re-publishes all HA discovery configs. |
+| `homeassistant/status` | Monitors HA lifecycle (`online`/`offline`). On HA restart, HA re-reads retained discovery configs from the broker via its `homeassistant/#` subscription. The firmware does not republish configs on this event; retained configs are already on the broker (ADR-073). |
 
 ---
 
@@ -458,7 +500,9 @@ The firmware uses two discovery paths:
 
 1. **Bulk discovery (Path A)**: Triggered manually via REST API (`POST /api/v2/otgw/discovery`) or serial command (`F`). Publishes all configs from the `mqttha.cfg` file.
 
-2. **JIT discovery (Path B)**: Automatically publishes discovery configs the first time an OpenTherm message ID is observed. This avoids publishing configs for message IDs that the specific thermostat/boiler combination never uses.
+2. **JIT discovery (Path B, ADR-073)**: OT message ID discovery configs are published the first time that MsgID is received on the OpenTherm bus. This is now the sole automatic mechanism for OT IDs. Non-OT pseudo-IDs (climate thermostat/DHW control, outside temperature number, Dallas sensors, heap stats, firmware/PIC info) are queued at boot and published via the normal drip pipeline — they do not wait for a bus message.
+
+   On assumed broker restart (offline duration exceeded 5 minutes), the discovery state resets and the same split applies: non-OT configs are re-queued immediately, OT configs re-publish as each MsgID re-appears on the bus.
 
 ### Source-Separated Discovery
 
@@ -487,7 +531,7 @@ Discovery topics for source variants use sibling-suffix shape, matching the stat
 
 Since 1.4.1 the firmware can actively verify that its retained Home Assistant discovery configs are still present on the broker. This closes the gap where the broker loses retained state while Home Assistant stays connected, such as a `mosquitto` restart without `persistence true`, a volatile-filesystem crash or a manual `mosquitto_pub -r -n` deletion. None of those events fire the `homeassistant/status` offline → online transition, so the legacy reconnect-driven republish paths cannot recover from them. See [ADR-062](../adr/ADR-062-retained-discovery-verification.md) for the mechanism and the memory trade-offs.
 
-**Mechanism**. The firmware subscribes to the node-scoped wildcard `<haprefix>/+/<nodeId>/#` for a 15-second window, counts retained discovery messages that arrive, and compares the total against `state.discovery.iPublishedTopicCount`. If fewer than expected arrive, it calls `markAllMQTTConfigPending()` and the drip re-announces every config. Foreign-nodeId retained configs that happen to pass through the wildcard are counted separately as "orphans" for diagnostics.
+**Mechanism**. The firmware subscribes to the node-scoped wildcard `<haprefix>/+/<nodeId>/#` for a 15-second window, counts retained discovery messages that arrive, and compares the total against `state.discovery.iPublishedTopicCount`. If fewer than expected arrive, it resets the discovery bitmaps and queues non-OT configs for drip re-publication; OT ID configs re-publish JIT as messages arrive (ADR-073). Foreign-nodeId retained configs that happen to pass through the wildcard are counted separately as "orphans" for diagnostics.
 
 **Triggers**. A verify run can start in three ways:
 
@@ -527,8 +571,9 @@ Slug strings (used in `state_topic` paths and `unique_id` fields) are unaffected
 
 ### Discovery Lifecycle
 
-- On MQTT connect: discovery state is reset, JIT re-publishes as messages arrive
-- On Home Assistant restart (detected via `homeassistant/status`): discovery state is reset
+- **On MQTT connect**: discovery bitmaps are reset; non-OT configs are queued for drip publication; OT ID configs publish JIT as each MsgID arrives on the bus (ADR-073).
+- **On assumed broker restart** (offline duration exceeded 5 minutes): same as on connect -- bitmaps reset, non-OT configs queued, OT ID configs publish JIT.
+- **On Home Assistant restart** (detected via `homeassistant/status`): HA reads retained discovery configs from the broker automatically via its `homeassistant/#` subscription. The firmware does not republish on this event (ADR-073). Retained configs are already on the broker from the original publication.
 - Discovery configs are published with `retain = true`
 
 ### Configuration File
@@ -640,7 +685,7 @@ These MQTT-related settings are configurable via the REST API (`/api/v2/settings
 | `mqtttoptopic` | `"OTGW"` | Top-level topic prefix |
 | `mqtthaprefix` | `"homeassistant"` | HA discovery prefix |
 | `mqttuniqueid` | `"otgw-{MAC}"` | Unique device ID |
-| `mqttharebootdetection` | `true` | Re-publish discovery on HA restart |
+| `mqttharebootdetection` | `true` | Detect HA offline/online cycle before acting on `homeassistant/status`. When enabled (default), requires HA to go offline first. When disabled, any `online` message triggers the cycle. Since ADR-073 the online event no longer republishes discovery configs; this setting is retained for compatibility. |
 | `mqttotmessage` | `false` | Publish raw OT messages |
 | `mqttinterval` | `0` | Minimum publish interval (seconds, 0 = no throttle) |
 | `mqttseparatesources` | `false` | Publish to source-separated sub-topics |
