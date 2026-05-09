@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2252,6 +2252,11 @@ void print_ASFflags(uint16_t& value)
     char _msg[15] {0};
     utoa(OTdata.valueLB, _msg, 10);
     sendMQTTData(F("OEMFaultCode"), _msg);
+    // Human-readable OEM fault code from user-supplied lookup table (oem_lookup.json).
+    char _desc[80] {0};
+    if (lookupOEMCode("OEMFaultCode", OTdata.valueLB, _desc, sizeof(_desc)) && _desc[0] != '\0') {
+      sendMQTTData(F("OEMFaultCode_desc"), _desc);
+    }
 
     //bit: [clear/0, set/1]
     //0: Service request [service not req’d, service required]
@@ -2610,6 +2615,61 @@ void print_u8_hb(uint16_t& value)
 void print_u8_lb(uint16_t& value)
 {
   print_u8_single(value, false);
+}
+
+// Publish human-readable description for a TSP parameter index from oem_lookup.json.
+// HB = TSP index (which parameter), LB = TSP value (current setting).
+// Publishes {label}_desc with the description of the parameter at this index.
+static void publishLookupDesc(const char* lookupCategory, uint8_t lookupCode, const char* baseLabel)
+{
+  char _desc[80] {0};
+  if (!lookupOEMCode(lookupCategory, lookupCode, _desc, sizeof(_desc)) || _desc[0] == '\0') return;
+  strlcpy(otTopic, baseLabel, sizeof(otTopic));
+  strlcat(otTopic, "_desc", sizeof(otTopic));
+  sendMQTTData(otTopic, _desc);
+}
+
+// TSP index/value — OT register 11 (main), 75 (V/H), 91 (solar storage).
+// Lookup key: "TSP.{index}", "TSPVH.{index}", "TSPSolar.{index}"
+void print_TSPvalue(uint16_t& value)
+{
+  print_u8u8(value);
+  if (is_value_valid(OTdata, OTlookupitem)) {
+    const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    switch (static_cast<OpenThermMessageID>(OTdata.id)) {
+      case OT_TSPindexTSPvalue:             publishLookupDesc("TSP",      OTdata.valueHB, baseTopic); break;
+      case OT_TSPEntryVH:                   publishLookupDesc("TSPVH",    OTdata.valueHB, baseTopic); break;
+      case OT_SolarStorageTSPindexTSPvalue: publishLookupDesc("TSPSolar", OTdata.valueHB, baseTopic); break;
+      default: break;
+    }
+  }
+}
+
+// FHB index/value — OT register 13 (main), 77 (V/H), 93 (solar storage).
+// Lookup key for fault code description: "OEMFaultCode.{value}" (main), "OEMFaultCodeVH.{value}" (V/H).
+// Lookup key for slot label: "FHB.{index}", "FHBVH.{index}", "FHBSolar.{index}"
+void print_FHBvalue(uint16_t& value)
+{
+  print_u8u8(value);
+  if (is_value_valid(OTdata, OTlookupitem)) {
+    const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    switch (static_cast<OpenThermMessageID>(OTdata.id)) {
+      case OT_FHBindexFHBvalue:
+        // Publish the fault code description from the OEM fault lookup.
+        publishLookupDesc("OEMFaultCode", OTdata.valueLB, baseTopic);
+        // Also publish the FHB slot label if the user provided one.
+        publishLookupDesc("FHB",          OTdata.valueHB, baseTopic);
+        break;
+      case OT_FaultBufferEntryVH:
+        publishLookupDesc("OEMFaultCodeVH", OTdata.valueLB, baseTopic);
+        publishLookupDesc("FHBVH",          OTdata.valueHB, baseTopic);
+        break;
+      case OT_SolarStorageFHBindexFHBvalue:
+        publishLookupDesc("FHBSolar", OTdata.valueHB, baseTopic);
+        break;
+      default: break;
+    }
+  }
 }
 
 static PGM_P rfSensorTypeToString_P(uint8_t code)
@@ -3754,9 +3814,9 @@ static bool decodeAndPublishStatusAndConfigValue(OpenThermMessageID msgId)
     case OT_Command:                                print_command(OTcurrentSystemState.Command );  return true;
     case OT_RBPflags:                               print_RBPflags(OTcurrentSystemState.RBPflags); return true;
     case OT_TSP:                                    print_u8u8(OTcurrentSystemState.TSP); return true;
-    case OT_TSPindexTSPvalue:                       print_u8u8(OTcurrentSystemState.TSPindexTSPvalue); return true;
+    case OT_TSPindexTSPvalue:                       print_TSPvalue(OTcurrentSystemState.TSPindexTSPvalue); return true;
     case OT_FHBsize:                                print_u8u8(OTcurrentSystemState.FHBsize); return true;
-    case OT_FHBindexFHBvalue:                       print_u8u8(OTcurrentSystemState.FHBindexFHBvalue); return true;
+    case OT_FHBindexFHBvalue:                       print_FHBvalue(OTcurrentSystemState.FHBindexFHBvalue); return true;
     case OT_MaxCapacityMinModLevel:                 print_u8u8(OTcurrentSystemState.MaxCapacityMinModLevel); return true;
     case OT_Date:                                   print_date(OTcurrentSystemState.Date); return true;
     case OT_Year:                                   print_u16(OTcurrentSystemState.Year); return true;
@@ -3862,9 +3922,9 @@ static bool decodeAndPublishVentilationValue(OpenThermMessageID msgId)
     case OT_RemoteParameterSettingVH:               print_vh_remoteparametersetting(OTcurrentSystemState.RemoteParameterSettingVH); return true;
     case OT_NominalVentilationValue:                print_u8_hb(OTcurrentSystemState.NominalVentilationValue); return true;
     case OT_TSPNumberVH:                            print_u8u8(OTcurrentSystemState.TSPNumberVH); return true;
-    case OT_TSPEntryVH:                             print_u8u8(OTcurrentSystemState.TSPEntryVH); return true;
+    case OT_TSPEntryVH:                             print_TSPvalue(OTcurrentSystemState.TSPEntryVH); return true;
     case OT_FaultBufferSizeVH:                      print_u8u8(OTcurrentSystemState.FaultBufferSizeVH); return true;
-    case OT_FaultBufferEntryVH:                     print_u8u8(OTcurrentSystemState.FaultBufferEntryVH); return true;
+    case OT_FaultBufferEntryVH:                     print_FHBvalue(OTcurrentSystemState.FaultBufferEntryVH); return true;
     default:
       return false;
   }
@@ -3889,9 +3949,9 @@ static bool decodeAndPublishSolarStorageValue(OpenThermMessageID msgId)
     case OT_SolarStorageSlaveConfigMemberIDcode:    print_solarstorage_slavememberid(OTcurrentSystemState.SolarStorageSlaveConfigMemberIDcode); return true;
     case OT_SolarStorageVersionType:                print_u8u8(OTcurrentSystemState.SolarStorageVersionType); return true;
     case OT_SolarStorageTSP:                        print_u8u8(OTcurrentSystemState.SolarStorageTSP ); return true;
-    case OT_SolarStorageTSPindexTSPvalue:           print_u8u8(OTcurrentSystemState.SolarStorageTSPindexTSPvalue ); return true;
+    case OT_SolarStorageTSPindexTSPvalue:           print_TSPvalue(OTcurrentSystemState.SolarStorageTSPindexTSPvalue ); return true;
     case OT_SolarStorageFHBsize:                    print_u8u8(OTcurrentSystemState.SolarStorageFHBsize ); return true;
-    case OT_SolarStorageFHBindexFHBvalue:           print_u8u8(OTcurrentSystemState.SolarStorageFHBindexFHBvalue ); return true;
+    case OT_SolarStorageFHBindexFHBvalue:           print_FHBvalue(OTcurrentSystemState.SolarStorageFHBindexFHBvalue ); return true;
     default:
       return false;
   }

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -67,6 +67,7 @@ void setLed(int8_t, uint8_t);
 //Defaults and macro definitions
 #define _HOSTNAME       "OTGW"
 #define SETTINGS_FILE         "/settings.ini"
+#define OEM_LOOKUP_FILE       "/oem_lookup.json"
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
@@ -189,6 +190,7 @@ void readSettings(bool show);
 bool writeSettings(bool show);
 void updateSetting(const char *field, const char *newValue);
 bool checkGPIOConflict(int pin, GPIOConflictCaller caller);
+bool lookupOEMCode(const char* category, uint16_t code, char* descOut, size_t descOutLen);
 const __FlashStringHelper* getStatusMessageText();
 void escapeJsonStringTo(const char* src, char* dest, size_t destSize);
 void GetVersion(const char* hexfile, char* version, size_t destSize);

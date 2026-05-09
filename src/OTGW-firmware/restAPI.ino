@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -167,6 +167,7 @@ static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
 static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleLookup(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTGWvalue(int msgid);
 void sendOTGWlabel(const char *msglabel);
@@ -581,7 +582,73 @@ static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   sendApiNotFound(originalURI);
 }
 
-// GET /api/v2/debug — machine-readable dump of all settings and runtime state.
+//===[ /api/v2/lookup — OEM code / TSP / FHB human-readable lookup (oem_lookup.json) ]===
+//
+// GET /api/v2/lookup/{category}/{code}
+//   Returns the description for the given category and numeric code from oem_lookup.json.
+//   Response: {"lookup":{"category":"OEMFaultCode","code":19,"description":"E:19 Water pressure too low"}}
+//   404 if lookup file missing or no matching entry found.
+//   400 if category or code is missing/invalid.
+//
+// GET /api/v2/lookup
+//   Returns info about the lookup file (exists flag and file size).
+//   Response: {"lookup":{"file":"/oem_lookup.json","exists":true,"size":3180}}
+//
+static void handleLookup(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+
+  // GET /api/v2/lookup  — file info
+  if (wc <= 4 || words[4][0] == '\0') {
+    const bool exists = LittleFS.exists(OEM_LOOKUP_FILE);
+    char jsonBuf[128];
+    if (exists) {
+      File f = LittleFS.open(OEM_LOOKUP_FILE, "r");
+      const size_t sz = f ? f.size() : 0;
+      if (f) f.close();
+      snprintf_P(jsonBuf, sizeof(jsonBuf),
+        PSTR("{\"lookup\":{\"file\":\"%s\",\"exists\":true,\"size\":%u}}"),
+        OEM_LOOKUP_FILE, (unsigned)sz);
+    } else {
+      snprintf_P(jsonBuf, sizeof(jsonBuf),
+        PSTR("{\"lookup\":{\"file\":\"%s\",\"exists\":false,\"size\":0}}"),
+        OEM_LOOKUP_FILE);
+    }
+    sendCorsOriginHeader();
+    httpServer.send(200, F("application/json"), jsonBuf);
+    return;
+  }
+
+  // GET /api/v2/lookup/{category}  — must have at least a category
+  const char* category = words[4];
+  if (category[0] == '\0') { sendApiError(400, F("Missing lookup category")); return; }
+
+  // GET /api/v2/lookup/{category}/{code}
+  if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing lookup code")); return; }
+  if (!isDigitStr(words[5])) { sendApiError(400, F("Code must be a decimal integer 0-255")); return; }
+  const long codeVal = strtol(words[5], nullptr, 10);
+  if (codeVal < 0 || codeVal > 255) { sendApiError(400, F("Code out of range (0-255)")); return; }
+
+  if (!LittleFS.exists(OEM_LOOKUP_FILE)) {
+    sendApiError(404, F("Lookup file not found; upload oem_lookup.json via the file explorer"));
+    return;
+  }
+
+  char descBuf[100] {0};
+  const bool found = lookupOEMCode(category, static_cast<uint8_t>(codeVal), descBuf, sizeof(descBuf));
+  if (!found || descBuf[0] == '\0') {
+    sendApiError(404, F("No entry for this category/code in oem_lookup.json"));
+    return;
+  }
+
+  // Escape description for JSON output (reuse cMsg scratch, same size as CMSG_SIZE).
+  escapeJsonStringTo(descBuf, cMsg, sizeof(cMsg));
+  char jsonBuf[180];
+  snprintf_P(jsonBuf, sizeof(jsonBuf),
+    PSTR("{\"lookup\":{\"category\":\"%s\",\"code\":%ld,\"description\":\"%s\"}}"),
+    category, codeVal, cMsg);
+  sendCorsOriginHeader();
+  httpServer.send(200, F("application/json"), jsonBuf);
+}
 // Auth-protected: contains SSID, broker address, and other config details.
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
@@ -687,6 +754,7 @@ static const char kRouteWebhook[]    PROGMEM = "webhook";
 static const char kRouteDiscovery[]  PROGMEM = "discovery";
 static const char kRouteDebugDump[]  PROGMEM = "debug";
 static const char kRouteMqtt[]       PROGMEM = "mqtt";
+static const char kRouteLookup[]     PROGMEM = "lookup";
 
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
@@ -703,6 +771,7 @@ static const ApiRoute kV2Routes[] = {
   { kRouteDiscovery,  handleDiscovery },
   { kRouteDebugDump,  handleDebugDump },
   { kRouteMqtt,       handleMqtt },
+  { kRouteLookup,     handleLookup },
   { nullptr,          nullptr }  // sentinel
 };
 
