@@ -25,7 +25,10 @@ OTGW_Display::OTGW_Display()
 
 OTGW_Display::~OTGW_Display()
 {
-  delete u8g2;
+  if (u8g2) {
+    delete u8g2;
+    u8g2 = nullptr;
+  }
 }
 
 // ─── begin() ────────────────────────────────────────────────────────────────
@@ -132,6 +135,7 @@ void OTGW_Display::tick()
 
 /**
  * Show a temporary full-screen message.  Pass "" to resume normal rotation.
+ * str is clipped to sizeof(_message)-1 = 63 characters by strlcpy.
  */
 void OTGW_Display::message(const char *str)
 {
@@ -170,16 +174,11 @@ void OTGW_Display::draw_status_column()
   u8g2->drawStr(112, 4, flameOn ? "F" : "-");
 
   // Modulation bar: RelModLevel 0-100 % → 0-44 px bar height (bottom-up)
-  float modPct = OTcurrentSystemState.RelModLevel;
-  if (modPct < 0.0f) modPct = 0.0f;
-  if (modPct > 100.0f) modPct = 100.0f;
+  float modPct = constrain(OTcurrentSystemState.RelModLevel, 0.0f, 100.0f);
   uint8_t barH = (uint8_t)(modPct * 44.0f / 100.0f);
   if (barH > 0) {
     u8g2->drawBox(111, 63 - barH, 14, barH);
   }
-
-  // Reset font for content pages
-  u8g2->setFont(u8g2_font_t0_14b_mr);
 }
 
 // ─── Page: welcome screen ────────────────────────────────────────────────────
@@ -214,8 +213,9 @@ void OTGW_Display::draw_display_page_time()
   u8g2->drawUTF8(4, 4, "Date / Time");
 
   time_t now = time(nullptr);
+  // Unix timestamp for 2000-01-01 00:00:00 UTC: a value below this means
+  // NTP has not yet synced since the default epoch starts at Jan 1 1970 0:0:0.
   if (now < 946684800L) {
-    // NTP not yet synced (before 2000-01-01)
     u8g2->drawUTF8(4, 24, "Syncing NTP..");
     return;
   }
