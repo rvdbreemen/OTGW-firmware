@@ -34,3 +34,9 @@ AC2 done: ADR README updated — ADR-041 entry added (marked superseded by ADR-0
 
 AC3 done: RELEASE_NOTES_1.5.0.md and RELEASE_GITHUB_1.5.0.md moved from root to docs/releases/. RELEASE_NOTES/GITHUB_1.3.3 and 1.3.4 archived to docs/releases/archive/ (keeping 4 newest). docs/ root clean.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Updated documentation for changes since v1.5.0-fix (beta.1-3 cycle). MQTT.md updated with JIT discovery semantics per ADR-073 (split boot vs. JIT behavior, SAT topics section added, pressure_health_attr removal noted). docs/api/README.md corrected discovery/verify endpoint description. docs/adr/README.md: ADR-041 entry added as superseded, ADR-073 entry added in Integration section and Decision Timeline. Release docs housekeeping: RELEASE_NOTES/GITHUB_1.5.0.md moved from root to docs/releases/; 1.3.3 and 1.3.4 archived. Side note flagged: mqttharebootdetection setting is effectively a no-op post-ADR-073 -- noted in MQTT.md docs, no code change.
+<!-- SECTION:FINAL_SUMMARY:END -->
