@@ -1182,41 +1182,50 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
 //
 // Routing decisions per (rsptype, OTdata.bGatewaySubstituted):
 //
-//   T  no-override (bGS=false): /thermostat AND /boiler
-//   T  with R-follow (bGS=true): /thermostat only (R wins /boiler)
-//   R                          : /boiler only
-//   B  no-override (bGS=false): /thermostat AND /boiler
-//   B  with A-follow (bGS=true): /boiler only (A wins /thermostat)
-//   A                          : /thermostat AND /boiler
+//   T  no-override (bGS=false): _thermostat AND _boiler
+//   T  with R-follow (bGS=true): _thermostat only (R wins _boiler)
+//   R                          : _boiler only
+//   B  no-override (bGS=false): _thermostat AND _boiler
+//   B  with A-follow (bGS=true): _boiler only (A wins _thermostat)
+//   A                          : _thermostat AND _boiler
 //
-// Note on A routing: ADR-069 originally specified A → /thermostat only, relying
-// on the preceding B frame to cover /boiler. However, some message IDs (e.g.
-// MaxTSet / ID 57) are handled by the OTGW as a standalone proxy without a
-// corresponding B frame from the boiler. In that case /boiler would never be
-// updated. Publishing A to both subtopics ensures /boiler always carries the
-// effective value. For the B→A override case, A (the OTGW-controlled value)
-// overwrites B (the boiler hardware value) in /boiler, which is acceptable and
-// reflects the value the thermostat actually received.
+// Note on A routing: ADR-069 specified A → _thermostat only, relying on a
+// preceding B frame to populate _boiler. But for OTGW-proxied IDs (e.g.
+// MaxTSet / ID 57), the OTGW answers directly with no B frame, so _boiler
+// would never receive a value. Publishing A to both subtopics ensures
+// _boiler always carries the effective value. For the B→A override case, A
+// overwrites _boiler with the OTGW-controlled value, which is acceptable.
 //
 // The bGatewaySubstituted flag is set on the OLDER frame in a (T,R) or (B,A)
-// sequence by processOT() in OTGW-Core.ino:4046+. The /gateway subtopic was
-// retired by TASK-531 and is ratified retired by ADR-069 — override visibility
-// is achieved by divergence between /thermostat and /boiler, not by a third
-// subtopic.
+// sequence by processOT() in OTGW-Core.ino:4046+. There is no _gateway suffix;
+// override visibility is achieved by divergence between _thermostat and
+// _boiler, not by a third topic.
 //
 // The ADR-066 Write-Ack gate (bSlaveEchoesValue) is preserved unchanged for
-// /boiler publications.
+// _boiler publications.
 void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 {
   if (!settings.mqtt.bSeparateSources || !topic || !json) return;
-  // ADR-066: skip /boiler subtopic for MsgIDs where the slave's Write-Ack
-  // data byte is per-spec undefined. Without this gate, /boiler shows
-  // protocol-zero readings that are not measurements (e.g. Tr, TrSet,
-  // MaxRelModLevelSetting). The bSlaveEchoesValue flag is populated for
-  // every MsgID in OTmap[] per docs/api/MQTT-message-id-echo-audit.md.
-  // OTlookupitem is set by processOT before each print_* call and is
-  // therefore valid here. OTdata is also valid here (set by processOT).
-  if (rsptype == OT_WRITE_ACK && !OTlookupitem.bSlaveEchoesValue) return;
+  // ADR-066: skip the source subtopics for MsgIDs where the slave's Write-Ack
+  // data byte is per-spec undefined. Without this gate, the _thermostat /
+  // _boiler topics flap between the Write-Data value and the Ack's protocol-
+  // zero (e.g. Tr, TrSet, MaxRelModLevelSetting). The bSlaveEchoesValue flag
+  // is populated for every MsgID in OTmap[] per
+  // docs/api/MQTT-message-id-echo-audit.md.
+  //
+  // The frame-type check MUST use OTdata.type (OpenThermMessageType, where
+  // OT_WRITE_ACK==B101==5), NOT rsptype (OTGW_response_type, 0..5). The two
+  // enum families collide numerically: rsptype==OT_WRITE_ACK is true only
+  // for OTGW_UNDEF, never for a real boiler Write-Ack. We additionally
+  // require rsptype==OTGW_BOILER so this only fires on real boiler frames
+  // (B), not on gateway-faked Answer-Thermostat frames (A) where the value
+  // is deliberately constructed.
+  //
+  // OTlookupitem and OTdata are set by processOT before each print_* call
+  // and are valid here.
+  if (OTdata.type == OT_WRITE_ACK
+      && rsptype == OTGW_BOILER
+      && !OTlookupitem.bSlaveEchoesValue) return;
   // Re-entrancy guard: sendMQTTData may yield via feedWatchDog, allowing
   // a second processOT call to overwrite the static buffer mid-publish.
   static bool inUse = false;
@@ -1229,18 +1238,18 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
   switch (rsptype) {
     case OTGW_THERMOSTAT:        // T: thermostat-sent write
       toThermostat = true;
-      toBoiler = !OTdata.bGatewaySubstituted;  // R wins /boiler when override active
+      toBoiler = !OTdata.bGatewaySubstituted;  // R wins _boiler when override active
       break;
     case OTGW_BOILER:            // B: boiler-sent response
       toBoiler = true;
-      toThermostat = !OTdata.bGatewaySubstituted;  // A wins /thermostat when answer-override active
+      toThermostat = !OTdata.bGatewaySubstituted;  // A wins _thermostat when answer-override active
       break;
     case OTGW_REQUEST_BOILER:    // R: gateway-substituted write (only the boiler sees this value)
       toBoiler = true;
       break;
-    case OTGW_ANSWER_THERMOSTAT: // A: gateway-faked answer; updates /thermostat AND /boiler
+    case OTGW_ANSWER_THERMOSTAT: // A: gateway-faked answer; updates _thermostat AND _boiler
       toThermostat = true;
-      toBoiler = true;  // fix: publish to /boiler too — OTGW proxy msgs have no B frame
+      toBoiler = true;  // fix: also publish to _boiler — OTGW proxy msgs have no B frame
       break;
     default:                     // parity errors, unknown types
       inUse = false;
@@ -1249,11 +1258,11 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 
   static char sourceTopic[MQTT_TOPIC_MAX_LEN];
   if (toThermostat) {
-    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s/thermostat"), topic);
+    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_thermostat"), topic);
     sendMQTTData(sourceTopic, json, false);
   }
   if (toBoiler) {
-    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s/boiler"), topic);
+    snprintf_P(sourceTopic, sizeof(sourceTopic), PSTR("%s_boiler"), topic);
     sendMQTTData(sourceTopic, json, false);
   }
   inUse = false;
