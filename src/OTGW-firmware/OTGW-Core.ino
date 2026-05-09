@@ -2619,14 +2619,16 @@ void print_u8_lb(uint16_t& value)
 
 // Publish human-readable description for a TSP parameter index from oem_lookup.json.
 // HB = TSP index (which parameter), LB = TSP value (current setting).
-// Publishes {label}_desc with the description of the parameter at this index.
+// Publishes {baseLabel}_desc with the description of the parameter at this index.
+// Uses a local topic buffer to avoid depending on the shared otTopic scratch.
 static void publishLookupDesc(const char* lookupCategory, uint8_t lookupCode, const char* baseLabel)
 {
   char _desc[80] {0};
   if (!lookupOEMCode(lookupCategory, lookupCode, _desc, sizeof(_desc)) || _desc[0] == '\0') return;
-  strlcpy(otTopic, baseLabel, sizeof(otTopic));
-  strlcat(otTopic, "_desc", sizeof(otTopic));
-  sendMQTTData(otTopic, _desc);
+  char descTopic[OT_TOPIC_LEN];
+  strlcpy(descTopic, baseLabel, sizeof(descTopic));
+  strlcat(descTopic, "_desc", sizeof(descTopic));
+  sendMQTTData(descTopic, _desc);
 }
 
 // TSP index/value — OT register 11 (main), 75 (V/H), 91 (solar storage).

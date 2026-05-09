@@ -634,18 +634,19 @@ static void handleLookup(const char words[][API_WORD_LEN], uint8_t wc, HTTPMetho
   }
 
   char descBuf[100] {0};
-  const bool found = lookupOEMCode(category, static_cast<uint8_t>(codeVal), descBuf, sizeof(descBuf));
+  const bool found = lookupOEMCode(category, static_cast<uint16_t>(codeVal), descBuf, sizeof(descBuf));
   if (!found || descBuf[0] == '\0') {
     sendApiError(404, F("No entry for this category/code in oem_lookup.json"));
     return;
   }
 
-  // Escape description for JSON output (reuse cMsg scratch, same size as CMSG_SIZE).
-  escapeJsonStringTo(descBuf, cMsg, sizeof(cMsg));
+  // Escape description for JSON output into a local buffer.
+  char escapedDesc[110] {0};
+  escapeJsonStringTo(descBuf, escapedDesc, sizeof(escapedDesc));
   char jsonBuf[180];
   snprintf_P(jsonBuf, sizeof(jsonBuf),
     PSTR("{\"lookup\":{\"category\":\"%s\",\"code\":%ld,\"description\":\"%s\"}}"),
-    category, codeVal, cMsg);
+    category, codeVal, escapedDesc);
   sendCorsOriginHeader();
   httpServer.send(200, F("application/json"), jsonBuf);
 }

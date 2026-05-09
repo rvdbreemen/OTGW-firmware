@@ -712,6 +712,9 @@ bool lookupOEMCode(const char* category, uint16_t code, char* descOut, size_t de
   if (!descOut || descOutLen == 0) return false;
   descOut[0] = '\0';
   if (!category || category[0] == '\0') return false;
+  // Guard against unexpectedly long category strings that would truncate searchKey.
+  // Longest built-in category is "OEMFaultCodeVH" (14 chars). Limit to 40.
+  if (strlen(category) > 40) return false;
 
   if (!LittleFS.exists(OEM_LOOKUP_FILE)) return false;
 
