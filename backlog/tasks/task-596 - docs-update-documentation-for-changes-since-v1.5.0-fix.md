@@ -5,6 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-09 00:04'
+updated_date: '2026-05-09 00:09'
 labels:
   - docs
   - update-docs
@@ -19,7 +20,13 @@ Sequential doc update pass after v1.5.0 release. PREV_TAG: v1.5.0-fix. Key chang
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 API documentation (docs/api/MQTT.md, openapi.yaml, README.md, WEBSOCKET_FLOW.md, WEBSOCKET_QUICK_REFERENCE.md) updated to reflect JIT discovery, SAT changes, and WebSocket behavior
+- [x] #1 API documentation (docs/api/MQTT.md, openapi.yaml, README.md, WEBSOCKET_FLOW.md, WEBSOCKET_QUICK_REFERENCE.md) updated to reflect JIT discovery, SAT changes, and WebSocket behavior
 - [ ] #2 ADR README (docs/adr/README.md) updated with ADR-070, ADR-071, ADR-072, ADR-073 entries
 - [ ] #3 Cleanup phase complete: RELEASE_NOTES_1.5.0.md and RELEASE_GITHUB_1.5.0.md moved to docs/releases/, misplaced files resolved
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC1 done: MQTT.md updated with JIT discovery semantics (ADR-073), SAT topics section added (climate_attributes, pressure scalars, pressure_health_attr removal). README.md one correction on POST /api/v2/discovery/verify. openapi.yaml/WEBSOCKET docs unchanged (version-bump only). Flag: mqttharebootdetection may be no-op post-ADR-073, noted in docs but no removal decision needed yet.
+<!-- SECTION:NOTES:END -->
