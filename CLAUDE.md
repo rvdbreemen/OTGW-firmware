@@ -19,6 +19,18 @@ All task operations go through the **`backlog` CLI** — never edit task files d
 
 Full CLI reference: @.claude/backlog-cli-reference.md
 
+### Commit batching (MANDATORY) — do not produce backlog-only commits mid-feature
+
+Backlog task edits must ride in the **same commit** as the code change they describe. A feature lifecycle (status → In Progress, plan, AC checks, notes, final summary, status → Done) frequently produces 5+ separate `backlog task edit` invocations; if each one auto-commits, the firmware history fills with 1-file admin commits and `git log` signal-to-noise collapses (60% of the last 100 commits on `dev` were exactly this — see `docs/reviews/2026-05-11_last-100-commits-multi-perspective/REVIEW.md` section C2; remediation tracked in TASK-598).
+
+Rules:
+
+1. **Default**: stage your `backlog/tasks/*.md` edits alongside the source change and land them in one commit. Use the same commit prefix as the code (`fix(...)`, `feat(...)`, etc.); do **not** prefix `chore(backlog):` when riding with code.
+2. **`auto_commit` is off** in `backlog/config.yml` (TASK-598). The CLI writes the file but does not commit; you must stage explicitly. If you find `auto_commit: true` after TASK-598 lands, that is a regression — flip it back.
+3. **End-of-day rollups are the only exception.** A single commit prefixed `chore(backlog): roll up TASK-* updates` may carry only `backlog/tasks/*` paths. List the task IDs in the body. Avoid using this as a way to dodge in-feature batching.
+4. **`.githooks/pre-commit` warns (non-blocking)** when the staged set is exclusively `backlog/tasks/*`. The warning is the surface; if you see it, ask: should this ride with the code instead? Bypass for legitimate rollups: `OTGW_BACKLOG_WARN_DISABLE=1 git commit ...`.
+5. **Mass updates** (e.g. relabelling 20 tasks): one commit is fine, prefix `chore(backlog):` and explain in the body.
+
 ## Autonomous task completion (project policy)
 
 When you've satisfied all 8 Definition-of-Done items from the reference (every AC checked, every DoD item checked, Final Summary added, build passes, evaluator green, no regressions) — set the task status to **Done** immediately. Do not leave the task at "In Progress" waiting for the user to flip it.
@@ -274,6 +286,8 @@ When in doubt about whether a push is "logical", err toward asking. The cost of 
 ## Versioning policy
 
 Field testers on Discord identify issues by the version string ("on beta.23 I see..."), so each material firmware change must ship under its own prerelease tag (`_VERSION_PRERELEASE` in `src/OTGW-firmware/version.h`, currently `<word>.<N>` form, e.g. `beta.23`). Multiple commits batched under the same tag erase the testers' ability to A/B them.
+
+**`src/OTGW-firmware/version.h` is the sole source of truth for the version string.** Do not add `**  Version  : v...` or `//  Version  : v...` header-comment lines to source files, and do not extend `scripts/autoinc-semver.py` to propagate the string into anything other than `src/OTGW-firmware/version.h` + `src/OTGW-firmware/data/version.hash`. The old per-file stamp cascade (touched 25-27 files on every bump, polluted `git blame`, caused spurious dev↔2.0.0 merge conflicts) is being removed under TASK-597; once removed, do not reintroduce it. Runtime code reads the macros (`_VERSION`, `_SEMVER_FULL`, `_VERSION_PRERELEASE`) directly — there is no need to duplicate the string into comments.
 
 - **What requires a bump** — any commit whose staged paths include `src/OTGW-firmware/**` (excluding `src/OTGW-firmware/version.h` itself) or `src/libraries/**`. The same commit must update `_VERSION_PRERELEASE` (and the cascaded `_SEMVER_*`/`_VERSION` lines and `data/version.hash` that `scripts/autoinc-semver.py` rewrites).
 - **What does not** — docs-only / tooling-only commits: `*.md`, `docs/**`, `backlog/**`, `.claude/**`, `scripts/**`, `bin/**`, `.githooks/**`, top-level `.py`/`.sh`/`.bat`, and `data/version.hash` on its own. These cannot affect firmware behaviour and are exempt.
