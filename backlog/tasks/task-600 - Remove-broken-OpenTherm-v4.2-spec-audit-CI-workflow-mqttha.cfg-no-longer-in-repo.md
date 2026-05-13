@@ -3,9 +3,11 @@ id: TASK-600
 title: >-
   Remove broken OpenTherm v4.2 spec audit CI workflow (mqttha.cfg no longer in
   repo)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-13 17:39'
+updated_date: '2026-05-13 17:39'
 labels:
   - ci
   - cleanup
