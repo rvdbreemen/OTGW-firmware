@@ -3,9 +3,11 @@ id: TASK-599
 title: >-
   Harden flash_otgw scripts — spec parity (.sh auto-download), SHA256 integrity,
   version-aware selection, port VID/PID filtering
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-13 17:11'
+updated_date: '2026-05-13 17:13'
 labels:
   - flash
   - tooling
