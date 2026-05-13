@@ -2,15 +2,19 @@ name: Upload flash scripts and bundle to release
 
 # Runs when a GitHub Release is published.
 #
-# Two things happen:
+# Three things happen:
 #   1. flash_otgw.sh and flash_otgw.bat are uploaded as individual release assets.
-#   2. A self-contained zip bundle is created and uploaded:
+#   2. A SHA256SUMS file is generated for the firmware/filesystem binaries
+#      and uploaded as a release asset. flash_otgw.sh / flash_otgw.bat fetch
+#      and verify against this file on auto-download.
+#   3. A self-contained zip bundle is created and uploaded:
 #        OTGW-firmware-<version>-flash-bundle.zip
 #      Contents:
 #        README.md                           top-level project readme
 #        FLASH_GUIDE.md                      flashing guide (from docs/guides/)
 #        flash_otgw.sh                       Linux/macOS flash script
 #        flash_otgw.bat                      Windows flash script
+#        SHA256SUMS                          integrity manifest for the bins
 #        OTGW-firmware-*.ino.bin             firmware binary
 #        OTGW-firmware*.littlefs.bin         filesystem binary
 
@@ -47,6 +51,16 @@ jobs:
           ls bundle_staging/*.littlefs.bin >/dev/null 2>&1 \
             || { echo "ERROR: filesystem binary (*.littlefs.bin) not found in release assets"; exit 1; }
 
+      # ---- Generate SHA256SUMS for the firmware/filesystem binaries -----------
+      # flash_otgw.sh / flash_otgw.bat fetch this file on auto-download and
+      # verify each binary's hash before flashing. Lines are
+      # "<sha256>  <basename>" (two spaces) — the standard sha256sum -c format.
+      - name: Generate SHA256SUMS
+        run: |
+          ( cd bundle_staging && sha256sum *.ino.bin *.littlefs.bin ) > SHA256SUMS
+          echo "--- SHA256SUMS ---"
+          cat SHA256SUMS
+
       # ---- Build the zip bundle -----------------------------------------------
       - name: Create flash bundle zip
         run: |
@@ -68,6 +82,9 @@ jobs:
           cp bundle_staging/*.ino.bin         "${BUNDLE_DIR}/"
           cp bundle_staging/*.littlefs.bin    "${BUNDLE_DIR}/"
 
+          # Integrity manifest
+          cp SHA256SUMS                       "${BUNDLE_DIR}/"
+
           # Make shell script executable inside the zip
           chmod +x "${BUNDLE_DIR}/flash_otgw.sh"
 
@@ -81,4 +98,5 @@ jobs:
           files: |
             flash_otgw.sh
             flash_otgw.bat
+            SHA256SUMS
             ${{ env.BUNDLE_ZIP }}

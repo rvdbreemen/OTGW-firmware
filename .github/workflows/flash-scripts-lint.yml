@@ -1,0 +1,51 @@
+name: Flash scripts lint
+
+# Lightweight cross-checks for the two zero-install flash scripts.
+# These checks are deliberately small and shell-based — no toolchain setup —
+# so they run on every PR and push for fast feedback.
+#
+# Today they enforce:
+#   1. ESPTOOL_VERSION is pinned to the same string in flash_otgw.sh and
+#      flash_otgw.bat. The two scripts must stay in lockstep so that the
+#      pinned SHA256 constants below the version line stay valid for both.
+#   2. flash_otgw.sh passes `bash -n` (parse check).
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'flash_otgw.sh'
+      - 'flash_otgw.bat'
+      - '.github/workflows/flash-scripts-lint.yml'
+  pull_request:
+    paths:
+      - 'flash_otgw.sh'
+      - 'flash_otgw.bat'
+      - '.github/workflows/flash-scripts-lint.yml'
+
+jobs:
+  lint:
+    name: Cross-check flash_otgw.sh and flash_otgw.bat
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify ESPTOOL_VERSION pinned identically in .sh and .bat
+        run: |
+          SH_VER="$(grep -E '^ESPTOOL_VERSION=' flash_otgw.sh | head -n1 | sed -E 's/^ESPTOOL_VERSION=//' | tr -d '"')"
+          BAT_VER="$(grep -E '^set "ESPTOOL_VERSION=' flash_otgw.bat | head -n1 | sed -E 's/^set "ESPTOOL_VERSION=//;s/"$//')"
+          echo "flash_otgw.sh  ESPTOOL_VERSION = '${SH_VER}'"
+          echo "flash_otgw.bat ESPTOOL_VERSION = '${BAT_VER}'"
+          if [ -z "$SH_VER" ] || [ -z "$BAT_VER" ]; then
+            echo "::error::Could not parse ESPTOOL_VERSION from one of the flash scripts."
+            exit 1
+          fi
+          if [ "$SH_VER" != "$BAT_VER" ]; then
+            echo "::error::ESPTOOL_VERSION mismatch between flash_otgw.sh ('${SH_VER}') and flash_otgw.bat ('${BAT_VER}'). Bump both."
+            exit 1
+          fi
+
+      - name: bash -n flash_otgw.sh
+        run: bash -n flash_otgw.sh
