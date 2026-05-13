@@ -23,6 +23,9 @@ on:
       - 'flash_otgw.bat'
       - '.github/workflows/flash-scripts-lint.yml'
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Cross-check flash_otgw.sh and flash_otgw.bat
@@ -34,8 +37,11 @@ jobs:
 
       - name: Verify ESPTOOL_VERSION pinned identically in .sh and .bat
         run: |
-          SH_VER="$(grep -E '^ESPTOOL_VERSION=' flash_otgw.sh | head -n1 | sed -E 's/^ESPTOOL_VERSION=//' | tr -d '"')"
-          BAT_VER="$(grep -E '^set "ESPTOOL_VERSION=' flash_otgw.bat | head -n1 | sed -E 's/^set "ESPTOOL_VERSION=//;s/"$//')"
+          # Capture only the value *between the quotes* so trailing CRLF on
+          # flash_otgw.bat (forced by .gitattributes "*.bat text eol=crlf")
+          # doesn't survive into the compared string.
+          SH_VER="$(sed -n 's/^ESPTOOL_VERSION="\([^"]*\)".*/\1/p' flash_otgw.sh | head -n1)"
+          BAT_VER="$(sed -n 's/^set "ESPTOOL_VERSION=\([^"]*\)".*/\1/p' flash_otgw.bat | head -n1)"
           echo "flash_otgw.sh  ESPTOOL_VERSION = '${SH_VER}'"
           echo "flash_otgw.bat ESPTOOL_VERSION = '${BAT_VER}'"
           if [ -z "$SH_VER" ] || [ -z "$BAT_VER" ]; then
