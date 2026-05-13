@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-13 17:11'
-updated_date: '2026-05-13 17:14'
+updated_date: '2026-05-13 17:18'
 labels:
   - flash
   - tooling
@@ -70,10 +70,11 @@ No automated tests for the shell scripts today (`test_flash_automation.py` cover
 - [ ] #11 .bat PowerShell download payload no longer string-substitutes %DL_DIR% into the heredoc body. The download directory is passed via the OTGW_DL_DIR environment variable and read inside PS as $env:OTGW_DL_DIR. Verified by running with a script path that contains a single-quote character.
 - [ ] #12 Both scripts fall back from https://api.github.com/repos/rvdbreemen/OTGW-firmware/releases/latest to the static redirect https://github.com/rvdbreemen/OTGW-firmware/releases/latest/download/<asset> on HTTP 403 (rate-limit) or 5xx; a single [WARN] line is printed before fallback.
 - [ ] #13 Both scripts' --help output documents the new flags (--yes, --list-ports) and the integrity-verification behaviour. Help-text structure (section order, option order, example invocations) is aligned between .sh and .bat. A grep-based CI check fails the build if ESPTOOL_VERSION differs between the two files.
-- [ ] #14 .sh Linux sudo auto-escalation becomes opt-in via --sudo flag. Default when port is not writable: print actionable instructions ('sudo usermod -aG dialout $USER' then log out/in) and exit non-zero. No silent privilege escalation.
-- [ ] #15 python evaluate.py --quick shows no new failures attributable to this change.
-- [ ] #16 Manual smoke test on a Wemos D1 mini in an empty directory: fresh USB plug → run .sh and .bat separately → each auto-downloads bins + esptool, verifies hashes, detects port via VID/PID, shows summary with resolved firmware version, prompts y/N, flashes on y, device boots and serves OTGW-<MAC> AP. Output recorded in Implementation Notes.
+- [ ] #14 python evaluate.py --quick shows no new failures attributable to this change.
+- [ ] #15 Manual smoke test on a Wemos D1 mini in an empty directory: fresh USB plug → run .sh and .bat separately → each auto-downloads bins + esptool, verifies hashes, detects port via VID/PID, shows summary with resolved firmware version, prompts y/N, flashes on y, device boots and serves OTGW-<MAC> AP. Output recorded in Implementation Notes.
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
