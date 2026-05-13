@@ -3,7 +3,7 @@ id: TASK-600
 title: >-
   Remove broken OpenTherm v4.2 spec audit CI workflow (mqttha.cfg no longer in
   repo)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-13 17:39'
@@ -29,8 +29,14 @@ Surfaced while watching PR #570 — the audit fired and failed on each of the PR
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Delete .github/workflows/opentherm-v42-spec-audit.yml from the repo.
-- [ ] #2 Do not delete tools/opentherm_v42_spec_audit.py (kept for future revival).
-- [ ] #3 Confirm no other workflow / branch-protection / README badge references this workflow file before deletion.
+- [x] #1 Delete .github/workflows/opentherm-v42-spec-audit.yml from the repo.
+- [x] #2 Do not delete tools/opentherm_v42_spec_audit.py (kept for future revival).
+- [x] #3 Confirm no other workflow / branch-protection / README badge references this workflow file before deletion.
 - [ ] #4 After push, the next CI run on the branch no longer schedules a 'Spec-driven OT v4.2 audit' check.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Deleted .github/workflows/opentherm-v42-spec-audit.yml. Audit ran tools/opentherm_v42_spec_audit.py which requires src/OTGW-firmware/data/mqttha.cfg — the file was removed by archived TASK-272 (MQTT autodiscovery moved to PROGMEM index). Every PR run since exited 2 with 'missing required file'. Python tool retained on disk for future revival. AC #4 (next CI run does not schedule the audit) will be verified by the next push to PR #570.
+<!-- SECTION:FINAL_SUMMARY:END -->
