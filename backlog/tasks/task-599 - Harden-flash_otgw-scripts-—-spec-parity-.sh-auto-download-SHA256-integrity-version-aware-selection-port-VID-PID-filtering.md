@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-13 17:11'
-updated_date: '2026-05-13 17:13'
+updated_date: '2026-05-13 17:14'
 labels:
   - flash
   - tooling
@@ -74,3 +74,71 @@ No automated tests for the shell scripts today (`test_flash_automation.py` cover
 - [ ] #15 python evaluate.py --quick shows no new failures attributable to this change.
 - [ ] #16 Manual smoke test on a Wemos D1 mini in an empty directory: fresh USB plug → run .sh and .bat separately → each auto-downloads bins + esptool, verifies hashes, detects port via VID/PID, shows summary with resolved firmware version, prompts y/N, flashes on y, device boots and serves OTGW-<MAC> AP. Output recorded in Implementation Notes.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+## Implementation Plan
+
+**Branch:** `claude/review-otgw-flash-scripts-XZI4w` (already on it). Tooling-only changes — exempt from version bump (CLAUDE.md §Versioning policy).
+
+### Phase A — Pin esptool SHA256s (AC #2, #3)
+Pin per-platform constants near top of both scripts, sourced from `https://github.com/espressif/esptool/releases/tag/v4.8.1` (fetched at impl time, not pre-baked into this plan).
+- `.sh`: `ESPTOOL_SHA256_LINUX_AMD64`, `..._LINUX_ARM64`, `..._LINUX_ARM32`, `..._MACOS`.
+- `.bat`: `ESPTOOL_SHA256_WIN64`.
+Add `verify_sha256` helper in `.sh` (uses `sha256sum` on Linux, `shasum -a 256` on macOS). `.bat` uses `certutil -hashfile`.
+Mismatch → red error citing expected vs actual + exit 1.
+
+### Phase B — Spec parity: .sh auto-download (AC #1)
+Port `.bat :download_release_binaries` logic into `.sh`:
+- New function `download_release_binaries()` callable when `FW_FILE` / `FS_FILE` are empty after local scan.
+- Use `curl` (already present in the script flow) with `User-Agent: OTGW-Flash-Tool` and `Accept: application/vnd.github+json` headers.
+- Parse `releases/latest` JSON with `grep`+`sed` (no `jq` dependency).
+- Filter assets to `\.ino\.bin$` and `\.littlefs\.bin$`. Download each via `browser_download_url`.
+- Same error semantics as `.bat`: print actionable hint if 0 matching assets found.
+
+### Phase C — Release SHA256SUMS asset + verification (AC #4)
+Extend `.github/workflows/release-assets.yml` (existing — already runs on release publish):
+- New step after the "Download release binaries" step: `sha256sum bundle_staging/*.ino.bin bundle_staging/*.littlefs.bin | sed "s| bundle_staging/|  |" > SHA256SUMS`.
+- Attach `SHA256SUMS` via the existing `softprops/action-gh-release@v2` step (add to `files:` block).
+- Include `SHA256SUMS` in the flash-bundle zip too.
+Both scripts after auto-downloading bins:
+- Fetch `SHA256SUMS` from the same release (asset filter).
+- For each downloaded bin, look up its line by basename, compute its hash, compare.
+- Mismatch → exit code **3** (distinct from network failure exit 1 and bad-arg exit 2).
+Locally-present (not auto-downloaded) bins are flashed without verification — backwards-compat for offline use; documented in `--help`.
+
+### Phase D — Version-aware file selection + display (AC #5, #6)
+- `.sh`: `find_first_match` → `find_highest_version`. `ls "$dir"/OTGW-firmware-*.ino.bin 2>/dev/null | sort -V -r | head -n 1`. `sort -V` is GNU+BSD.
+- `.bat`: replace single `for %%F` with a sort by parsed `<X>.<Y>.<Z>` segments. Pure cmd: `for /f` reading a `dir /b` then a sub-routine that picks the max via tokenised numeric compare.
+- Both: extract version from chosen filename (regex `OTGW-firmware-(.+?)\.ino\.bin`) and print as `Version: <v>` in the "Ready to flash" summary block.
+
+### Phase E — VID/PID port detection + --list-ports (AC #8, #9, #10)
+VID/PID allowlist: CP210x `10c4:ea60`, CH340 `1a86:7523`, FTDI `0403:6001`.
+- `.sh` Linux: walk `/sys/class/tty/ttyUSB*/device/../idVendor` and `idProduct` (3 levels up via `realpath`); match against allowlist. Optionally read `product`/`manufacturer` for display.
+- `.sh` macOS: `system_profiler SPUSBDataType -json` parsed via `grep`/`sed` for VID/PID + bsd_name (saves us from depending on `ioreg` xpath). Falls back to glob.
+- `.bat`: `Get-PnpDevice -Class Ports -PresentOnly` → filter on `InstanceId -match "VID_<H>&PID_<H>"`. Falls back to current `SERIALCOMM` enumeration.
+- `--list-ports`: new arg parsed first (before esptool download), prints `<port>  <vid:pid>  <description>` lines, exits 0.
+
+### Phase F — Confirmation prompt + opt-in sudo (AC #7, #14)
+- `--yes` / `-y` flag in both scripts. Default: prompt `Continue? [y/N]: ` with 30s timeout (`.sh` `read -t 30 -r ans`, `.bat` `choice /c yn /t 30 /d n`). Anything not `y`/`Y` aborts cleanly.
+- `.sh`: `maybe_sudo_relaunch` becomes opt-in via `--sudo`. Default path when device not writable: print "Add yourself to the dialout group: sudo usermod -aG dialout $USER, then log out/in" and exit non-zero. Keep dialout/uucp detection to refine the message.
+
+### Phase G — .bat PowerShell env-var passing + GitHub API fallback (AC #11, #12)
+- `.bat`: replace all `%DL_DIR%` interpolation inside the PS heredoc with `$env:OTGW_DL_DIR`. Set `OTGW_DL_DIR` via `set "OTGW_DL_DIR=%~1"` before invoking PowerShell. Manual smoke test path: `C:\tmp\rob's dir` (quote in path).
+- Both scripts: on HTTP 403 or 5xx from `api.github.com/...releases/latest`, fall back to fetching `SHA256SUMS` from `https://github.com/<repo>/releases/latest/download/SHA256SUMS` (always at this URL once Phase C ships) and parse the filenames from there.
+
+### Phase H — Help-text alignment + CI sync check (AC #13)
+- Rewrite both `--help` blocks with identical section order: NAME / SYNOPSIS / DESCRIPTION / OPTIONS / FIRST-RUN / AFTER FLASHING. Same example lines.
+- New file `.github/workflows/flash-scripts-lint.yml`: grep `ESPTOOL_VERSION="..."` (sh) and `ESPTOOL_VERSION=...` (bat) and fail if they differ. Runs on PR + push to `dev`.
+
+### Phase I — Verification (AC #15, #16)
+- `python evaluate.py --quick` → must be clean.
+- Local unit-style checks: temp dir with mocked binaries `OTGW-firmware-1.5.0.ino.bin` + `OTGW-firmware-1.10.0.ino.bin`, stub `esptool` on PATH, run `flash_otgw.sh --yes --port /dev/null --list-ports`, assert version=1.10.0 picked and `--list-ports` exits 0 without flashing.
+- AC #16 (Wemos D1 mini hardware smoke test) — **cannot self-verify** in this environment. Will leave that AC unchecked and flag it in Final Summary; task remains In Progress until field-validated. This is the documented exception case in CLAUDE.md §Autonomous task completion.
+
+### Risks / scope notes
+- `.bat` numeric semver sort is ~30 lines of cmd. If it gets too gnarly I will fall back to `sort -V`-equivalent via PowerShell one-liner inside the .bat (cmd calls PS, gets sorted output).
+- `--list-ports` description field requires reading `/sys/class/tty/.../product` (Linux) and parsing system_profiler output (macOS). If macOS parsing proves fragile in the smoke test, ship `--list-ports` with VID/PID only on macOS and call it out in the help text.
+- Backward compat: removing silent sudo escalation is a behaviour change. Mitigation: clear actionable error message so an existing user knows exactly what to do.
+<!-- SECTION:PLAN:END -->
