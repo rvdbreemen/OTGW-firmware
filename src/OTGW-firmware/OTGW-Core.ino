@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4107,10 +4107,21 @@ void processOT(const char *buf, int len){
       }
 
       // Queue MQTT HA discovery for this OT message ID if not yet published.
-      // Non-blocking: just sets the pending bit; drainOnePendingDiscovery()
-      // (3-second timer in main loop) handles the actual publish.
+      // Non-blocking: just sets the pending bit; loopMQTTDiscovery() drains it.
+      //
+      // hasConfig filter mirrors markAllMQTTConfigPending() (MQTTstuff.ino:1336-1345)
+      // so JIT and F-force paths enqueue the same ID set. Without it, an OT-bus
+      // message for an ID with a valid OTmap msgcmd but no HA sensor/binsensor
+      // entry would set a pending bit doAutoConfigureMsgid() cannot publish;
+      // the drip loop retains the bit on failure (MQTTstuff.ino:1475-1482) and
+      // re-picks the same lowest-numbered ID forever, stalling all subsequent
+      // drip progress until the operator runs F. (ADR-073)
       if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable) {
-        if (!getMQTTConfigDone(OTdata.id)) {
+        const bool hasConfig = (readSensorIndex(OTdata.id) != MQTT_HA_INDEX_NONE)
+                            || (readBinSensorIndex(OTdata.id) != MQTT_HA_INDEX_NONE)
+                            || (OTdata.id == 0)   // climate (thermostat + DHW)
+                            || (OTdata.id == 27); // number (Toutside override)
+        if (hasConfig && !getMQTTConfigDone(OTdata.id)) {
           setMQTTConfigPending(OTdata.id);
         }
       }
