@@ -1,9 +1,11 @@
 ---
 id: TASK-601
 title: 'fix(mqtt): JIT discovery — gate on hasConfig so phantom IDs don''t stall drip'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-14 16:57'
+updated_date: '2026-05-14 16:57'
 labels:
   - mqtt
   - bug
@@ -37,3 +39,17 @@ Scope: src/OTGW-firmware/OTGW-Core.ino:4109-4116 only. No change to drip loop, F
 - [ ] #6 Commit message follows project convention; mentions JIT phantom-ID stall + ADR-073 reference
 - [ ] #7 Branch claude/fix-jit-mqtt-discovery-N7Yos pushed with draft PR open
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Verify the suspect call site once more: OTGW-Core.ino:4109-4116 — JIT branch in processOT() after PROGMEM_readAnything(OTmap[id]).
+2. Confirm readSensorIndex/readBinSensorIndex are usable from OTGW-Core.ino (inline in MQTTstuff.h, visible TU-wide after MQTTstuff.ino preprocessing).
+3. Apply the gate. Mirror exactly the filter that markAllMQTTConfigPending() at MQTTstuff.ino:1336-1342 uses, plus the special pseudo-IDs (0 climate, 27 number) that markAllMQTTConfigPending() explicitly re-adds. Comment briefly that this matches the F path symmetry per ADR-073.
+4. Bump prerelease beta.3 → beta.4 (bin/bump-prerelease.sh).
+5. Build: python build.py --firmware. Confirm exit 0.
+6. Evaluator: python evaluate.py --quick. Confirm no new failures.
+7. Commit on claude/fix-jit-mqtt-discovery-N7Yos. Message: fix(mqtt): gate JIT discovery on hasConfig — stop phantom-ID drip stall (ADR-073). Stage version.h + data/version.hash alongside OTGW-Core.ino.
+8. Push the branch. Create a draft PR pointing at dev.
+9. Mark ACs done, write Final Summary, set status Done.
+<!-- SECTION:PLAN:END -->
