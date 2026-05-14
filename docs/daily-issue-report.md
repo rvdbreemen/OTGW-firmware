@@ -1,7 +1,7 @@
-# Daily Issue Report — 2026-05-09
+# Daily Issue Report — 2026-05-14
 
-**Generated**: 2026-05-09  
-**Period checked**: Last 24 hours (since 2026-05-08T00:00:00Z)
+**Generated**: 2026-05-14  
+**Period checked**: Last 24 hours (since 2026-05-13T00:00:00Z)
 
 ## Sources Checked
 
@@ -17,26 +17,16 @@ No new issues in the last 24 hours.
 
 ### GitHub
 
-No open issues were updated since 2026-05-08.
+No open issues were updated since 2026-05-13. Query: `rvdbreemen/OTGW-firmware`, state `OPEN`, ordered by `UPDATED_AT DESC`, since `2026-05-13T00:00:00Z` — returned 0 results.
 
-### Tweakers forum
+### Tweakers Forum
 
-Not scanned — `https://gathering.tweakers.net/rss/list_messages/1653967` is not reachable from this environment (host not in network allowlist).
+Unable to fetch `https://gathering.tweakers.net/rss/list_messages/1653967` — the host is blocked by the session's network allowlist. Tweakers coverage is unavailable until the host is added to the allowlist or an alternative proxy is configured.
 
 ### Discord
 
-Not scanned — Discord MCP tools (`mcp__discord__*`) are not available in this session.
+Discord MCP server is not connected in this session. No Discord data available.
 
-## Summary
+## Action Items
 
-| Source | New bugs | Feature requests | Questions | Not relevant |
-|--------|----------|------------------|-----------|--------------|
-| GitHub | 0 | 0 | 0 | 0 |
-| Tweakers | N/A | N/A | N/A | N/A |
-| Discord | N/A | N/A | N/A | N/A |
-
-No new issues in the last 24 hours.
-
----
-
-*Report generated automatically by the `check_otgw_issues` skill.*
+None — no new bug reports, feature requests, or questions found.
