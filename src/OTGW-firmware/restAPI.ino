@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1296,6 +1296,8 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("webhooktriggerbit"), settings.webhook.iTriggerBit, "i", 0, 15);
   sendJsonSettingObj(F("webhookpayload"), CSTR(settings.webhook.sPayload), "s", 200);
   sendJsonSettingObj(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
+  sendJsonSettingObj(F("displayenabled"), settings.display.bEnabled, "b");
+  sendJsonSettingObj(F("displaytype"), (int)settings.display.iType, "i", 0, 1);
   char httpPasswordPlaceholder[sizeof("password=40")];
   snprintf_P(httpPasswordPlaceholder,
              sizeof(httpPasswordPlaceholder),
@@ -1324,6 +1326,7 @@ static const char* const PROGMEM knownSettings[] = {
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
+  "displayenabled", "displaytype",
 };
 
 static bool isKnownSetting(const char* field) {

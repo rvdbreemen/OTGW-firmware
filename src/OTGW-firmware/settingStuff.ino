@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -279,7 +279,9 @@ bool writeSettings(bool show)
   ok = writeJsonStringKV(file, F("WebhookURLoff"), settings.webhook.sURLoff, true) && ok;
   ok = writeJsonIntKV(file, F("WebhookTriggerBit"), settings.webhook.iTriggerBit, true) && ok;
   ok = writeJsonStringKV(file, F("WebhookPayload"), settings.webhook.sPayload, true) && ok;
-  ok = writeJsonStringKV(file, F("WebhookContentType"), settings.webhook.sContentType, false) && ok;
+  ok = writeJsonStringKV(file, F("WebhookContentType"), settings.webhook.sContentType, true) && ok;
+  ok = writeJsonBoolKV(file, F("DisplayEnabled"), settings.display.bEnabled, true) && ok;
+  ok = writeJsonIntKV(file, F("DisplayType"), settings.display.iType, false) && ok;
   ok = (file.print(F("}\n")) > 0) && ok;
   if (!ok) {
     DebugTln(F("\r\n[Settings] Error: one or more settings writes failed"));
@@ -429,6 +431,8 @@ void readSettings(bool show)
     Debugf(PSTR("Webhook Trigger Bit   : %d\r\n"), settings.webhook.iTriggerBit);
     Debugf(PSTR("Webhook Payload       : %s\r\n"), CSTR(settings.webhook.sPayload));
     Debugf(PSTR("Webhook ContentType   : %s\r\n"), CSTR(settings.webhook.sContentType));
+    Debugf(PSTR("Display enabled       : %s\r\n"), CBOOLEAN(settings.display.bEnabled));
+    Debugf(PSTR("Display type          : %u (0=SSD1306,1=SH1106)\r\n"), settings.display.iType);
   }
 
   Debugln(F("-\r\n"));
@@ -673,6 +677,14 @@ void updateSetting(const char *field, const char *newValue)
       strcasecmp_P(field, PSTR("webhookpayload")) == 0)    strlcpy(settings.webhook.sPayload, newValue, sizeof(settings.webhook.sPayload));
   else if (strcasecmp_P(field, PSTR("WebhookContentType")) == 0 ||
       strcasecmp_P(field, PSTR("webhookcontenttype")) == 0) strlcpy(settings.webhook.sContentType, newValue, sizeof(settings.webhook.sContentType));
+  else if (strcasecmp_P(field, PSTR("DisplayEnabled")) == 0 ||
+      strcasecmp_P(field, PSTR("displayenabled")) == 0)
+    settings.display.bEnabled = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("DisplayType")) == 0 ||
+      strcasecmp_P(field, PSTR("displaytype")) == 0) {
+    int val = atoi(newValue);
+    settings.display.iType = (uint8_t)constrain(val, 0, 1);
+  }
 
   // Side-effect checks — independent if's, multiple can fire
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -27,6 +27,7 @@
 
 #include "version.h"
 #include "OTGW-firmware.h"
+#include "OTGW-Display.h"
 
 #define SetupDebugTln(...) ({  DebugTln(__VA_ARGS__);    })
 #define SetupDebugln(...)  ({  Debugln(__VA_ARGS__);    })
@@ -41,6 +42,9 @@
 
 DECLARE_TIMER_SEC(timerpollsensor, settings.sensors.iInterval, CATCH_UP_MISSED_TICKS);
 DECLARE_TIMER_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS);
+
+// Optional I2C OLED display — auto-detected in display.begin()
+OTGW_Display display;
 
 #define WIFI_PORTAL_RESET_MAGIC           0x4F544750UL  // "OTGP"
 #define WIFI_PORTAL_RESET_RTC_SLOT        96            // RTC user memory slot (4-byte units)
@@ -199,6 +203,10 @@ void setup() {
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
+
+  // Initialise the optional I2C OLED display.
+  // Wire.begin() is called inside initWatchDog() above, so I2C is ready here.
+  display.begin();
 
   // One-line boot signature for field diagnostics (TASK-395, port from 2.0.0
   // TASK-394 Phase 2). Captured AFTER full init so heap/fragmentation reflect
@@ -428,6 +436,7 @@ void loop()
 {
   DECLARE_TIMER_SEC(timer1s, 1, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer3s, 3, SKIP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(timer5s, 5, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
 
@@ -440,6 +449,7 @@ void loop()
       if (DUE(timer60s))                doTaskEvery60s();
       if (DUE(timer3s))                 doTaskEvery3s();
       if (DUE(timer1s))                 doTaskEvery1s();
+      if (DUE(timer5s))                 display.tick();   // update optional OLED display
       if (minuteChanged())              doTaskMinuteChanged(); //ADR-064: sole minuteChanged() caller; hour/day/year dispatch lives inside
       {
         uint32_t _bgPrev = micros();
