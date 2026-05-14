@@ -310,6 +310,16 @@ Verify with `git worktree list`.
 
 **CLI cross-tree behaviour.** `backlog task <id> --plain` resolves from either worktree, but `backlog task edit` only writes to the worktree where the task file actually lives. If an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file. SAT / ESP32 / 2.0.0 tasks generally live in the feature worktree's `backlog/tasks/`, not in dev's.
 
+**Fallback when both MCP and CLI are unavailable.** If `mcp__backlog__*` tools are not registered for the session AND `backlog` is not on `PATH` (fresh container, web session, or a worktree where the global install is missing), do NOT fall back to editing task files by hand. Instead, invoke the CLI through `npx`:
+
+```bash
+npx -y backlog.md task list --plain
+npx -y backlog.md task <id> --plain
+npx -y backlog.md task edit <id> -s "In Progress" -a @myself
+```
+
+`npx -y backlog.md` resolves to the same binary as the global `backlog` command and preserves all metadata/Git tracking guarantees. After the first invocation `npx` caches the package, so subsequent calls are fast. Only after `npx` itself fails (no network, no Node) should you escalate to the user — never bypass the CLI by hand-editing markdown.
+
 ### Cross-worktree work — ask first, then plan once, then parallelise
 
 Whenever you take on a bug fix, feature change, or architectural decision, **explicitly ask yourself**: *does this also need to land on the other worktree?* For 1.5.x↔2.0.0 the answer is almost always **yes** when the change touches:
