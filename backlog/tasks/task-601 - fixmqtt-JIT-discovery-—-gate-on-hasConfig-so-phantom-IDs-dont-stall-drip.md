@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-14 16:57'
-updated_date: '2026-05-14 16:57'
+updated_date: '2026-05-14 17:00'
 labels:
   - mqtt
   - bug
@@ -31,13 +31,13 @@ Scope: src/OTGW-firmware/OTGW-Core.ino:4109-4116 only. No change to drip loop, F
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 JIT branch in processOT() (OTGW-Core.ino:4109-4116) gates setMQTTConfigPending on a hasConfig predicate (readSensorIndex != NONE || readBinSensorIndex != NONE || id == 0 || id == 27)
-- [ ] #2 doAutoConfigure (F path) behaviour unchanged: markAllMQTTConfigPending still publishes all known IDs
+- [x] #1 JIT branch in processOT() (OTGW-Core.ino:4109-4116) gates setMQTTConfigPending on a hasConfig predicate (readSensorIndex != NONE || readBinSensorIndex != NONE || id == 0 || id == 27)
+- [x] #2 doAutoConfigure (F path) behaviour unchanged: markAllMQTTConfigPending still publishes all known IDs
 - [ ] #3 Build green: python build.py --firmware exits 0
-- [ ] #4 Evaluator green: python evaluate.py --quick shows no new failures vs baseline
-- [ ] #5 Version prerelease bumped (beta.3 → beta.4) via bin/bump-prerelease.sh; version.h + data/version.hash staged
-- [ ] #6 Commit message follows project convention; mentions JIT phantom-ID stall + ADR-073 reference
-- [ ] #7 Branch claude/fix-jit-mqtt-discovery-N7Yos pushed with draft PR open
+- [x] #4 Evaluator green: python evaluate.py --quick shows no new failures vs baseline
+- [x] #5 Version prerelease bumped (beta.3 → beta.4) via bin/bump-prerelease.sh; version.h + data/version.hash staged
+- [x] #6 Commit message follows project convention; mentions JIT phantom-ID stall + ADR-073 reference
+- [x] #7 Branch claude/fix-jit-mqtt-discovery-N7Yos pushed with draft PR open
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -53,3 +53,39 @@ Scope: src/OTGW-firmware/OTGW-Core.ino:4109-4116 only. No change to drip loop, F
 8. Push the branch. Create a draft PR pointing at dev.
 9. Mark ACs done, write Final Summary, set status Done.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation complete. Single-point fix in OTGW-Core.ino:4109-4126 (lines extended by docstring). Pre-release bumped beta.3 -> beta.4. Committed as f6f65bf. Pushed to claude/fix-jit-mqtt-discovery-N7Yos. Draft PR #572 opened against dev.
+
+Blocking AC3 (build green): could NOT be self-verified in this sandbox -- python build.py --firmware fails to download arduino-cli (HTTP 403 on downloads.arduino.cc from this network). The maintainer's local workstation or CI must verify exit 0 before merging. Evaluator (AC4) was self-verified: same health score 91.7% before and after the patch, with identical pre-existing failures.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixes a JIT MQTT discovery stall introduced (implicitly) with ADR-073's pure-JIT model.
+
+Root cause
+The JIT trigger at OTGW-Core.ino:4112-4116 enqueued ANY OT MsgID with valid is_value_valid into the discovery pending bitmap. For an ID whose OTmap msgcmd is valid but which has no HA sensor/binsensor entry, doAutoConfigureMsgid() returns false and the drip loop intentionally keeps the pending bit set (MQTTstuff.ino:1475-1482, "retain pending"). The drip's per-tick bitmap scan picks the lowest pending bit, fails on the phantom ID, retains it, and never advances. Real-config IDs queued later in the bitmap never get their turn. Visible symptom: clean-boot device shows zero HA discovery topics until operator presses Serial F.
+
+F worked because markAllMQTTConfigPending() (the F path) filters at enqueue: it only sets pending for IDs where readSensorIndex != NONE || readBinSensorIndex != NONE (MQTTstuff.ino:1336-1345). JIT did not apply that filter, breaking the symmetry.
+
+Fix
+Mirror the same hasConfig predicate in the JIT branch (climate ID 0 and number ID 27 added explicitly to match the pseudo-IDs that markAllMQTTConfigPending() re-adds). Both trigger paths now enqueue an identical ID set and the drip loop is guaranteed forward progress under normal traffic.
+
+Scope discipline
+- One conditional added at one site (OTGW-Core.ino:4109-4126).
+- Drip-loop "retain on failure" semantics preserved -- still correct for transient publish failures; just no longer reachable from JIT enqueue under normal operation.
+- F path, value-publish layer, settings, ADR-062 verify path: untouched.
+- Pre-release bumped beta.3 -> beta.4 per project versioning policy (firmware-touching commit).
+
+Field validation pending
+Tester must boot clean device + clean broker on beta.4, wait 3-6 minutes without pressing F, and confirm HA entities trickle in. Build verification (python build.py --firmware exit 0) also pending -- sandbox couldn't install arduino-cli (HTTP 403). Both gates need to be cleared on a real workstation/CI before the PR moves out of draft.
+
+Files
+- src/OTGW-firmware/OTGW-Core.ino (+15 -4 lines of real change)
+- src/OTGW-firmware/version.h, data/version.hash (bump-prerelease.sh output)
+- 24 .ino/.h/.css/.js/.html files (cosmetic version-comment bumps from bump-prerelease.sh)
+<!-- SECTION:FINAL_SUMMARY:END -->
