@@ -1,8 +1,7 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> ⚠️ **Don't Panic, but: this is the development branch.**
-> You are looking at `dev`, which tracks the next release (`v1.5.1-beta`).
-> For the current stable release, see the [`main` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/main) or the [v1.5.0 release](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0).
+> ✅ This branch tracks the stable/public release line.
+> For in-progress development changes, see the [`dev` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/dev).
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
@@ -25,11 +24,12 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.5.0
+## Latest stable release: v1.5.0-fix2
 
-`v1.5.0` is the current stable release. It runs on Arduino Core 2.7.4 and brings sibling-suffix MQTT topics, worldview semantics, human-readable HA discovery entity names, targeted bug fixes for MQTT topic flapping and WiFi DHCP, and reboot reliability hardening. Upgrading from v1.4.1 requires no filesystem partition reformat.
+`v1.5.0-fix2` is the current stable release tag on `main`. It keeps the `v1.5.0` Arduino Core 2.7.4 baseline and includes maintenance fixes on top of the stable 1.5.0 release.
 
-Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)
+Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
+Maintenance release tags: [v1.5.0-fix](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix), [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2)
 
 ## Previous stable release: v1.4.1
 
@@ -380,7 +380,7 @@ For historical versions (`v1.3.x` and older), links intentionally point to [docs
 
 | Version | Highlights |
 | --- | --- |
-| **1.5.x** | LTS line on Arduino Core 2.7.4 (in development): reboot reliability hardening, tighter MQTT publish gating, HA discovery for stats topics, WebUI design system, boot/loop diagnostics. [1.5.0-beta](docs/releases/RELEASE_NOTES_1.5.0-beta.md) |
+| **1.5.x** | Stable LTS line on Arduino Core 2.7.4. `v1.5.0` introduced reboot reliability hardening, tighter MQTT publish gating, HA discovery for stats topics, WebUI design system, and boot/loop diagnostics. [1.5.0](docs/releases/RELEASE_NOTES_1.5.0.md) [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2) |
 | **1.4.x** | Arduino Core 3.1.2 baseline, SimpleTelnet migration, MQTT HA discovery streaming rewrite (309 configs / 80+ msgIds), WiFi reconnect hardening, heap-aware discovery drip, retained-discovery self-heal, unified time-boundary dispatcher, OpenTherm v4.2 alignment. [1.4.1](docs/releases/RELEASE_NOTES_1.4.1.md) |
 | **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/archive/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/archive/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/archive/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/archive/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/archive/RELEASE_NOTES_1.3.4.md) [1.3.5](docs/releases/RELEASE_NOTES_1.3.5.md) |
 | **1.2.0** | Complete HA discovery expansion (309 configs, 80+ message IDs), OpenTherm v4.2 alignment, webhook support, source-separated MQTT topics, v0/v1 API removed. [Notes](docs/releases/archive/RELEASE_NOTES_1.2.0.md) |
