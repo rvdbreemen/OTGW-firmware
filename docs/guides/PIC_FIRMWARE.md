@@ -9,22 +9,50 @@ OpenTherm Gateway hardware and PIC firmware.
 
 ---
 
-## Why the PIC firmware is needed
+## Two firmwares, one device
 
-The OpenTherm Gateway is built around a **PIC microcontroller** (PIC16F88 or PIC16F1847).
-This PIC is the heart of the gateway: it sits on the OpenTherm bus between your thermostat
-and your boiler and handles all real-time bus communication.
+The NodoShop OpenTherm Gateway contains **two separate processors**, each running its own
+firmware. Understanding what each one does helps you keep your gateway working and up to date.
 
-The ESP8266 (running this firmware) acts as the network layer — it exposes the Web UI, MQTT,
-REST API, and TCP socket — but it cannot talk directly to the OpenTherm bus. **All
-OpenTherm bus traffic passes through the PIC.** Without a working PIC firmware:
+### The PIC microcontroller — the OpenTherm brain
 
-- No messages can be read from the thermostat or boiler.
-- No setpoint overrides can be sent to the boiler.
-- None of the network integrations (MQTT, Home Assistant, etc.) receive any data.
+The gateway is built around a **PIC microcontroller** (PIC16F88 or PIC16F1847). The PIC sits
+physically on the OpenTherm bus, the two-wire connection between your thermostat and your
+boiler. It is the only part of the device that can speak the OpenTherm protocol:
 
-In short: the ESP8266 firmware and the PIC firmware together make the gateway work. They
-are separate pieces and must both be up to date.
+- It reads every message your thermostat sends to the boiler, and every reply from the boiler.
+- It lets the gateway *intercept* those messages so it can, for example, raise or lower the
+  boiler's hot-water temperature setpoint independently of what the thermostat asked for.
+- It sends commands to the boiler on behalf of the gateway when you request an override.
+
+Without a working PIC firmware:
+
+- No OpenTherm messages can be read at all.
+- No setpoints can be overridden.
+- Nothing reaches your smart home (no MQTT data, no Home Assistant sensors, no Web UI readings).
+
+The PIC firmware is written and maintained by **Schelte Bron**, the original designer of the
+OpenTherm Gateway hardware. The OTGW-firmware downloads the latest PIC firmware from
+[otgw.tclcode.com](https://otgw.tclcode.com/) and programs it into the PIC for you.
+
+### The ESP8266 — the network and smart-home layer
+
+Alongside the PIC sits an **ESP8266 Wi-Fi module** running *this* firmware (OTGW-firmware).
+The ESP8266 cannot talk to the OpenTherm bus directly, but it is the part that connects your
+gateway to your home network and to your smart home:
+
+- Provides the **Web UI** you use to monitor your heating system and manage settings.
+- Publishes OpenTherm data to **MQTT** so Home Assistant and other platforms receive live
+  sensor readings and can send setpoint commands back.
+- Handles **automatic PIC firmware upgrades** — checking for new versions and flashing them
+  without you needing a programmer or serial cable.
+- Keeps time, stores settings, and runs the watchdog that reboots the device if something
+  goes wrong.
+
+In short: **the PIC is the OpenTherm specialist; the ESP8266 is the network connector.**
+Both must be present and running correct firmware for the gateway to work. They are updated
+separately — this guide covers the PIC side; for the ESP8266 see the
+[ESP8266 Flashing Guide](FLASH_GUIDE.md).
 
 ---
 
