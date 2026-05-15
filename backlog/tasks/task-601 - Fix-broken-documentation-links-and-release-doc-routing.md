@@ -1,9 +1,10 @@
 ---
 id: TASK-601
 title: Fix broken documentation links and release-doc routing
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-05-15 09:09'
+updated_date: '2026-05-15 09:09'
 labels: []
 dependencies: []
 ---
