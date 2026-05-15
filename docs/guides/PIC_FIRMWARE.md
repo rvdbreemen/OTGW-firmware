@@ -1,0 +1,267 @@
+# PIC Firmware Guide — Language / Taal
+
+This guide is available in English and Dutch. Choose your language below.
+
+| Language | Link |
+|---|---|
+| 🇬🇧 English | [PIC_FIRMWARE_EN.md](PIC_FIRMWARE_EN.md) |
+| 🇳🇱 Nederlands | [PIC_FIRMWARE_NL.md](PIC_FIRMWARE_NL.md) |
+
+---
+
+> *You were redirected here from a link to `PIC_FIRMWARE.md`. The content has been
+> split into language-specific files. Please update your bookmarks.*
+
+---
+
+## Two firmwares, one device
+
+The NodoShop OpenTherm Gateway contains **two separate processors**, each running its own
+firmware. Understanding what each one does helps you keep your gateway working and up to date.
+
+### The PIC microcontroller — the OpenTherm brain
+
+The gateway is built around a **PIC microcontroller** (PIC16F88 or PIC16F1847). The PIC sits
+physically on the OpenTherm bus, the two-wire connection between your thermostat and your
+boiler. It is the only part of the device that can speak the OpenTherm protocol:
+
+- It reads every message your thermostat sends to the boiler, and every reply from the boiler.
+- It lets the gateway *intercept* those messages so it can, for example, raise or lower the
+  boiler's hot-water temperature setpoint independently of what the thermostat asked for.
+- It sends commands to the boiler on behalf of the gateway when you request an override.
+
+Without a working PIC firmware:
+
+- No OpenTherm messages can be read at all.
+- No setpoints can be overridden.
+- Nothing reaches your smart home (no MQTT data, no Home Assistant sensors, no Web UI readings).
+
+The PIC firmware is written and maintained by **Schelte Bron**, the original designer of the
+OpenTherm Gateway hardware. The OTGW-firmware downloads the latest PIC firmware from
+[otgw.tclcode.com](https://otgw.tclcode.com/) and programs it into the PIC for you.
+
+### The ESP8266 — the home-automation integration layer
+
+Alongside the PIC sits an **ESP8266 Wi-Fi module** running *this* firmware (OTGW-firmware).
+The PIC is the bus-level electrical interface; the ESP8266 is where all the intelligence
+lives. It fully understands the OpenTherm protocol, decodes every message the PIC relays,
+and bridges your heating system to your smart home.
+
+#### Full OpenTherm protocol understanding
+
+OTGW-firmware is not a passive relay. It contains a complete OpenTherm decoder that parses
+every raw frame the PIC passes along:
+
+- All **80+ OpenTherm message IDs** defined by the OpenTherm specification (v2.2 and v4.2)
+  are decoded: heating setpoints, boiler temperatures, water pressure, modulation level,
+  DHW, solar thermal, CH2, ventilation, humidity, operational counters, fault codes, and more.
+- Each decoded value is stored by name (`TBoiler`, `TSet`, `FlameStatus`, `FaultCode`, …)
+  so the rest of the firmware can work with meaningful data instead of raw byte frames.
+- The live OpenTherm message log in the Web UI shows every message type, direction, and
+  decoded value as they arrive in real time.
+
+#### Controlling the heater through the PIC
+
+OTGW-firmware is also the command layer. When you (or your smart home) want to change the
+boiler's behaviour, OTGW-firmware translates the request into the correct PIC serial command
+and queues it for delivery:
+
+- Temporary room temperature override (`TT` command)
+- CH water temperature setpoint override (`SW` command)
+- DHW setpoint override, outside temperature injection, and all other OTGW commands
+- A command queue ensures commands are sent in order without overrunning the serial buffer
+
+#### Home Assistant integration via MQTT
+
+OTGW-firmware is the recommended integration layer for Home Assistant:
+
+- **309 auto-discovery configurations** across 80+ message IDs — entities appear in Home
+  Assistant automatically, including a climate entity with temperature control.
+- Source-separated MQTT topics (thermostat vs. boiler perspective) for accurate state.
+- Configurable publish interval to keep data fresh without flooding the broker.
+- **Webhook support** — trigger HTTP calls when status bits change (flame on, fault detected,
+  CH active, DHW active, etc.).
+
+#### REST API
+
+A fully documented REST API (`/api/v2/`) lets any tool query or control the gateway:
+
+- Query decoded OpenTherm data by message ID or human-readable label.
+- Submit OTGW commands and read PIC gateway settings.
+- Manage device settings, Dallas sensor labels, and diagnostic data.
+- OpenAPI 3.0 specification available for Swagger UI, Postman, or code generation.
+
+#### Web interface
+
+- Live OpenTherm message log via WebSocket — filtered, pauseable, with per-message decoding.
+- Real-time graphs for boiler temperatures, setpoints, water pressure, and modulation level.
+- PIC gateway settings panel — all 15 PIC configuration registers readable from the browser.
+- Firmware and filesystem OTA updates with health-check reboot verification.
+- File system explorer with upload, download, and delete.
+- Dark/light theme toggle.
+
+#### External sensors and meters
+
+- **Dallas temperature sensors** (DS18B20/DS18S20/DS1822) with custom labels, real-time
+  graphs, and Home Assistant auto-discovery — entirely independent of OpenTherm.
+- **S0 pulse counter** — kWh meter pulse counting on a configurable GPIO pin.
+
+#### TCP serial socket for OTmonitor
+
+A raw TCP socket on port **25238** exposes the OTGW serial protocol so OTmonitor and other
+tools can communicate with the PIC. OTGW-firmware detects ser2net traffic and pauses its own
+command queue to avoid conflicts.
+
+#### Reliability and networking
+
+- **NTP time synchronisation** with configurable timezone.
+- **Non-blocking WiFi reconnect** state machine — heating continues while WiFi recovers.
+- **Triple-reset WiFi recovery** — three quick power cycles reopen the WiFiManager captive
+  portal without reflashing.
+- Hardware watchdog reboot if the firmware hangs.
+- Optional HTTP Basic Auth for settings and maintenance endpoints.
+- Telnet diagnostics server (port 23) for field troubleshooting.
+
+#### Automatic PIC firmware management
+
+OTGW-firmware checks for new PIC firmware versions, downloads them from
+[otgw.tclcode.com](https://otgw.tclcode.com/), and programs them into the PIC — all from
+the Web UI, without a programmer or serial cable. It detects the PIC variant (PIC16F88 vs.
+PIC16F1847) automatically and selects the correct image.
+
+---
+
+In short: **the PIC provides the OpenTherm bus interface; OTGW-firmware fully understands
+the protocol, decodes every message, controls the heater, and connects it all to your smart
+home.** Both must be present and running correct firmware for the gateway to work. They are
+updated separately — this guide covers the PIC side; for the ESP8266 see the
+[ESP8266 Flashing Guide](FLASH_GUIDE.md).
+
+---
+
+## The three PIC firmware images
+
+Schelte Bron provides three firmware images for the PIC. The OTGW-firmware stores them in
+the LittleFS filesystem so they can be flashed directly from the Web UI.
+
+### 1. `gateway.hex` — Standard gateway firmware
+
+This is the normal operating firmware. It implements the full OpenTherm Gateway feature set:
+
+- Intercepts all OpenTherm messages between thermostat and boiler.
+- Allows the ESP8266 to override setpoints, read sensor data, and inject commands.
+- Supports all OTGW serial commands (`TT`, `SW`, `PR`, `GW`, etc.).
+- Enables Home Assistant integration, MQTT publishing, and REST API responses.
+
+**This is the firmware that should be running during normal use.**
+It is automatically selected for the update check whenever the device is running in
+standard gateway mode.
+
+### 2. `interface.hex` — Interface firmware
+
+The interface firmware turns the OTGW hardware into a simpler **OpenTherm interface** rather
+than a full gateway. In this mode the PIC acts as a pass-through: the thermostat and boiler
+communicate with each other directly, and the ESP8266 can read messages but cannot intercept
+or override them.
+
+Use cases:
+- Systems where gateway interception is not wanted or causes compatibility problems.
+- Reading OpenTherm data from an installation without affecting the thermostat–boiler dialogue.
+
+> **Note:** With the interface firmware loaded, the gateway-specific override commands
+> (`TT`, `SW`, etc.) no longer work. Switch back to `gateway.hex` to restore full gateway
+> functionality.
+
+For more details, see the
+[OTGW firmware page](https://otgw.tclcode.com/firmware.html) on Schelte's website.
+
+### 3. `diagnose.hex` — Diagnostic firmware
+
+The diagnostic firmware replaces the standard firmware temporarily to help diagnose
+problems with the gateway hardware or OpenTherm wiring. It provides six tests that give
+detailed information about the electrical and timing behaviour of the bus.
+
+Normal thermostat–boiler communication continues while most tests run. The one exception
+is Test #4 (delay symmetry), which requires the master and slave interfaces to be looped
+together.
+
+**Available tests:**
+
+| # | Name | Description |
+|---|------|-------------|
+| 1 | LED test | Pulls LED outputs low one by one to verify LED wiring. Works without thermostat/boiler connected. Send `<CR>` to end. |
+| 2 | Bit timing — thermostat | Reports high/low durations (µs) for each thermostat message. Each value should fall in a half-bit (400–650 µs) or full-bit (900–1150 µs) range. Requires thermostat connected. Send `<CR>` to end. |
+| 3 | Bit timing — boiler | Same as test #2 but for the boiler side. If no thermostat is connected, a test message is sent every second. Send `<CR>` to end. |
+| 4 | Delay symmetry | Measures opto-coupler propagation delay in both directions (low-to-high and high-to-low). Requires a loopback between master and slave interfaces. Test ends automatically once all four measurements are complete. |
+| 5 | Voltage levels | Performs A/D measurements on both interfaces and the reference voltage. Reports the logical high and low voltage levels. At the end, prompts for a new reference voltage setting (`VR` command). Useful when messages are not being decoded correctly. |
+| 6 | Idle times | Measures the idle time (ms) between OpenTherm messages. |
+
+After running the desired tests, flash `gateway.hex` back to restore normal operation.
+
+---
+
+## How to upgrade the PIC firmware
+
+### Via the Web UI (recommended)
+
+The OTGW-firmware Web UI provides a built-in PIC firmware upgrade feature. This is the
+recommended method because the upgrade routine (originally from Schelte Bron's NodeMCU
+firmware) handles all the low-level PIC programming protocol steps automatically.
+
+1. Open the Web UI in your browser (e.g. `http://<device-ip>/`).
+2. Navigate to **Settings → PIC Firmware** (or the **Update** tab, depending on your version).
+3. The current PIC firmware type and version are shown.
+4. Click **Check for update** to compare the installed version against the latest available on
+   [otgw.tclcode.com](https://otgw.tclcode.com/).
+5. If an update is available (or if you want to switch firmware type), select the firmware
+   image: **gateway**, **interface**, or **diagnose**.
+6. Click **Flash** (or **Upgrade**). The firmware downloads the `.hex` file from
+   `otgw.tclcode.com` over HTTP and programs it into the PIC directly from the ESP8266.
+7. Progress is displayed in the UI. Do not power off the device during programming.
+8. After completion, the PIC reboots automatically and the new version is shown.
+
+> **Security note:** The `.hex` file is downloaded over plain HTTP from `otgw.tclcode.com`.
+> Make sure the device is on a trusted local network.
+
+> **Important:** Never flash the PIC firmware using the **OTmonitor** application over
+> Wi-Fi. This can corrupt the PIC and leave it in an unrecoverable state. Always use the
+> built-in Web UI upgrade feature.
+
+### Manual upload via the filesystem explorer *(advanced users only)*
+
+> **⚠️ Advanced users only.** This method is intended for developers or users who have a
+> custom or patched `.hex` file. If you are not sure whether you need this, use the
+> Web UI upgrade described above instead.
+
+1. Open the filesystem explorer at `http://<device-ip>/fs`.
+2. Upload your `.hex` file (e.g. `gateway.hex`) to the root of the filesystem.
+3. Trigger the upgrade via the Web UI as described above.
+
+---
+
+## Which PIC processor do I have?
+
+The Web UI displays the detected processor type alongside the firmware version. There are
+two hardware variants:
+
+| Processor | Used in firmware versions |
+|-----------|--------------------------|
+| PIC16F88 | Older gateway.hex versions (< 5.x for gateway) |
+| PIC16F1847 | Newer versions (introduced in gateway 5.x / 6.x) |
+
+The `OTGW_ERROR_DEVICE` error during an upgrade means you tried to flash a `.hex` file
+built for the wrong PIC variant. The OTGW-firmware detects the correct variant automatically
+and selects the right image from `otgw.tclcode.com`.
+
+---
+
+## Further reading
+
+- [Schelte Bron's OTGW project](https://otgw.tclcode.com/) — hardware design, PIC firmware
+  downloads, command reference, and support forum.
+- [OTGW firmware commands](https://otgw.tclcode.com/firmware.html) — full list of serial
+  commands supported by the PIC firmware.
+- [OTGW support forum](https://otgw.tclcode.com/support/forum) — community support for
+  hardware and PIC firmware issues.
+- [ESP8266 Flashing Guide](FLASH_GUIDE.md) — how to flash the ESP8266 firmware (separate
+  from the PIC firmware).

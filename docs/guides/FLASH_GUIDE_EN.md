@@ -1,18 +1,109 @@
-# ESP8266 Firmware Guide — Language / Taal
+# ESP8266 Firmware Guide
 
-This guide is available in English and Dutch. Choose your language below.
+*→ Ook beschikbaar in het [Nederlands](FLASH_GUIDE_NL.md)*
 
-| Language | Link |
-|---|---|
-| 🇬🇧 English | [FLASH_GUIDE_EN.md](FLASH_GUIDE_EN.md) |
-| 🇳🇱 Nederlands | [FLASH_GUIDE_NL.md](FLASH_GUIDE_NL.md) |
+This guide covers what OTGW-firmware adds on top of the PIC firmware, and all methods for
+flashing OTGW-firmware onto your ESP8266 device (NodeMCU or Wemos D1 mini).
+
+For information about the PIC microcontroller firmware, see the
+[PIC Firmware Guide](PIC_FIRMWARE_EN.md).
 
 ---
 
-> *You were redirected here from a link to `FLASH_GUIDE.md`. The content has been
-> split into language-specific files. Please update your bookmarks.*
+## What OTGW-firmware adds on top of the PIC
 
-## Flashing tools at a glance
+Alongside the PIC sits an **ESP8266 Wi-Fi module** running OTGW-firmware. The PIC is the
+bus-level electrical interface; the ESP8266 is where all the intelligence lives. It fully
+understands the OpenTherm protocol, decodes every message the PIC relays, and bridges your
+heating system to your smart home.
+
+### Full OpenTherm protocol understanding
+
+OTGW-firmware is not a passive relay. It contains a complete OpenTherm decoder that parses
+every raw frame the PIC passes along:
+
+- All **80+ OpenTherm message IDs** defined by the OpenTherm specification (v2.2 and v4.2)
+  are decoded: heating setpoints, boiler temperatures, water pressure, modulation level,
+  DHW, solar thermal, CH2, ventilation, humidity, operational counters, fault codes, and more.
+- Each decoded value is stored by name (`TBoiler`, `TSet`, `FlameStatus`, `FaultCode`, …)
+  so the rest of the firmware can work with meaningful data instead of raw byte frames.
+- The live OpenTherm message log in the Web UI shows every message type, direction, and
+  decoded value as they arrive in real time.
+
+### Controlling the heater through the PIC
+
+OTGW-firmware is also the command layer. When you (or your smart home) want to change the
+boiler's behaviour, OTGW-firmware translates the request into the correct PIC serial command
+and queues it for delivery:
+
+- Temporary room temperature override (`TT` command)
+- CH water temperature setpoint override (`SW` command)
+- DHW setpoint override, outside temperature injection, and all other OTGW commands
+- A command queue ensures commands are sent in order without overrunning the serial buffer
+
+### Home Assistant integration via MQTT
+
+OTGW-firmware is the recommended integration layer for Home Assistant:
+
+- **309 auto-discovery configurations** across 80+ message IDs — entities appear in Home
+  Assistant automatically, including a climate entity with temperature control.
+- Source-separated MQTT topics (thermostat vs. boiler perspective) for accurate state.
+- Configurable publish interval to keep data fresh without flooding the broker.
+- **Webhook support** — trigger HTTP calls when status bits change (flame on, fault detected,
+  CH active, DHW active, etc.).
+
+### REST API
+
+A fully documented REST API (`/api/v2/`) lets any tool query or control the gateway:
+
+- Query decoded OpenTherm data by message ID or human-readable label.
+- Submit OTGW commands and read PIC gateway settings.
+- Manage device settings, Dallas sensor labels, and diagnostic data.
+- OpenAPI 3.0 specification available for Swagger UI, Postman, or code generation.
+
+### Web interface
+
+- Live OpenTherm message log via WebSocket — filtered, pauseable, with per-message decoding.
+- Real-time graphs for boiler temperatures, setpoints, water pressure, and modulation level.
+- PIC gateway settings panel — all 15 PIC configuration registers readable from the browser.
+- Firmware and filesystem OTA updates with health-check reboot verification.
+- File system explorer with upload, download, and delete.
+- Dark/light theme toggle.
+
+### External sensors and meters
+
+- **Dallas temperature sensors** (DS18B20/DS18S20/DS1822) with custom labels, real-time
+  graphs, and Home Assistant auto-discovery — entirely independent of OpenTherm.
+- **S0 pulse counter** — kWh meter pulse counting on a configurable GPIO pin.
+
+### TCP serial socket for OTmonitor
+
+A raw TCP socket on port **25238** exposes the OTGW serial protocol so OTmonitor and other
+tools can communicate with the PIC. OTGW-firmware detects ser2net traffic and pauses its own
+command queue to avoid conflicts.
+
+### Reliability and networking
+
+- **NTP time synchronisation** with configurable timezone.
+- **Non-blocking WiFi reconnect** state machine — heating continues while WiFi recovers.
+- **Triple-reset WiFi recovery** — three quick power cycles reopen the WiFiManager captive
+  portal without reflashing.
+- Hardware watchdog reboot if the firmware hangs.
+- Optional HTTP Basic Auth for settings and maintenance endpoints.
+- Telnet diagnostics server (port 23) for field troubleshooting.
+
+### Automatic PIC firmware management
+
+OTGW-firmware checks for new PIC firmware versions, downloads them from
+[otgw.tclcode.com](https://otgw.tclcode.com/), and programs them into the PIC — all from
+the Web UI, without a programmer or serial cable. It detects the PIC variant (PIC16F88 vs.
+PIC16F1847) automatically and selects the correct image.
+
+---
+
+## Flashing the ESP8266
+
+### Flashing tools at a glance
 
 | Tool | Requires Python? | Best for |
 |---|---|---|
@@ -23,18 +114,18 @@ Both tools are included in each release download and in the repository root.
 
 ---
 
-## Prerequisites
+### Prerequisites
 
-### Hardware
+#### Hardware
 - ESP8266 development board (NodeMCU or Wemos D1 mini)
 - Micro USB cable (data cable, not charge-only)
 - Computer with USB port
 
-### Software
+#### Software
 - **Simple method**: no extra software — `flash_otgw.sh`/`flash_otgw.bat` downloads esptool automatically on first run
 - **Advanced method**: Python 3.6 or higher — `flash_esp.py` installs esptool via pip if needed
 
-### USB Drivers
+#### USB Drivers
 Depending on your board and OS, install drivers as needed:
 - Windows: CP210x or CH340 USB-to-UART driver (check Device Manager if the port is missing)
 - macOS: Drivers are usually included on recent versions
@@ -42,11 +133,11 @@ Depending on your board and OS, install drivers as needed:
 
 ---
 
-## Fresh Installation (First-Time Flash)
+### Fresh Installation (First-Time Flash)
 
 > **Important**: A fresh install requires BOTH the firmware binary (`OTGW-firmware-<version>.ino.bin`) and the filesystem binary (`OTGW-firmware-<version>.ino.littlefs.bin`). Flashing only the firmware will cause the device to spend several minutes reformatting an empty filesystem on first boot — or, in the worst case, result in a bootloop.
 
-### Simple method (no Python required)
+#### Simple method (no Python required)
 
 1. From the GitHub release page, download `flash_otgw.sh` (Linux/macOS) or `flash_otgw.bat` (Windows) **and** both binary files:
    - `OTGW-firmware-*.ino.bin` (firmware)
@@ -75,7 +166,7 @@ If multiple serial ports are present, the first one is used. Pass `--port` to pi
 flash_otgw.bat --port COM5
 ```
 
-### Advanced method (Python)
+#### Advanced method (Python)
 
 ```bash
 # Download the latest release and erase flash for a clean start
@@ -87,7 +178,7 @@ This does everything in one step:
 2. Erases the entire flash chip before writing (removes any stale data from older versions)
 3. Flashes firmware at `0x0` and filesystem at `0x200000` in a single esptool operation
 
-### Why `--erase` matters for a fresh install
+#### Why `--erase` matters for a fresh install
 
 Older firmware versions (v1.3.x and below) used a different filesystem partition layout (1 MB LittleFS at `0x300000`). If you skip `--erase`, remnants of the old filesystem at the old address may remain. The new firmware will find no valid filesystem at the new address (`0x200000`) and will either:
 - Spend 5–10 minutes silently reformatting the flash (device appears unresponsive — not a bootloop)
@@ -97,11 +188,11 @@ Using `--erase` eliminates this class of issue entirely.
 
 ---
 
-## Upgrading via USB (Recommended for Major Version Changes)
+### Upgrading via USB (Recommended for Major Version Changes)
 
 When upgrading from **v1.3.x or earlier** to **v1.4.x or later**, the LittleFS partition size changed from 1 MB to 2 MB. A firmware-only upgrade via USB will trigger a filesystem reformat on first boot and **wipe all your settings**.
 
-### Upgrade procedure (USB, preserving settings where possible)
+#### Upgrade procedure (USB, preserving settings where possible)
 
 For upgrading v1.4.x → v1.5.x (same partition layout, no reformat needed):
 
@@ -127,7 +218,7 @@ After the flash, re-import your settings via the Web UI.
 
 ---
 
-## Upgrading via Web UI OTA
+### Upgrading via Web UI OTA
 
 > **WARNING**: When upgrading from v1.3.x or earlier to v1.4.x via the Web UI OTA page, you **must** flash the filesystem binary first, then the firmware binary. Flashing in the wrong order causes the new firmware to boot against the old 1 MB filesystem layout. The device will spend 5–10 minutes silently reformatting and will then lose all settings.
 
@@ -143,9 +234,9 @@ After the flash, re-import your settings via the Web UI.
 
 ---
 
-## Quick Start (Standard)
+### Quick Start (Standard)
 
-### Preferred: no-Python scripts
+#### Preferred: no-Python scripts
 
 Download `flash_otgw.sh` (Linux/macOS) or `flash_otgw.bat` (Windows) and both binary files from the GitHub release page. Place all three in the same directory and run:
 
@@ -160,7 +251,7 @@ flash_otgw.bat           :: Windows — Command Prompt or PowerShell
 
 The script downloads esptool on first run (no Python needed), erases flash, and writes both images in one step.
 
-### Download latest release and flash (Python)
+#### Download latest release and flash (Python)
 
 ```bash
 python3 flash_esp.py
@@ -172,13 +263,13 @@ Or explicitly:
 python3 flash_esp.py --download
 ```
 
-### Developer mode — build and flash from source
+#### Developer mode — build and flash from source
 
 ```bash
 python3 flash_esp.py --build
 ```
 
-### Manual mode — use existing binary files
+#### Manual mode — use existing binary files
 
 ```bash
 python3 flash_esp.py --firmware OTGW-firmware-1.5.0.ino.bin --filesystem OTGW-firmware-1.5.0.ino.littlefs.bin
@@ -186,7 +277,7 @@ python3 flash_esp.py --firmware OTGW-firmware-1.5.0.ino.bin --filesystem OTGW-fi
 
 ---
 
-## Common Options
+### Common Options
 
 | Option | Description |
 |---|---|
@@ -199,11 +290,11 @@ python3 flash_esp.py --firmware OTGW-firmware-1.5.0.ino.bin --filesystem OTGW-fi
 
 ---
 
-## Troubleshooting Bootloops
+### Troubleshooting Bootloops
 
 A bootloop (device resets repeatedly and never reaches the Web UI) after flashing is almost always caused by one of the following:
 
-### 1. Firmware flashed without a matching filesystem
+#### 1. Firmware flashed without a matching filesystem
 
 The firmware cannot find a valid filesystem and resets.
 
@@ -220,7 +311,7 @@ Python:
 python3 flash_esp.py --download --erase
 ```
 
-### 2. Upgrading from v1.3.x without erasing (stale filesystem at wrong offset)
+#### 2. Upgrading from v1.3.x without erasing (stale filesystem at wrong offset)
 
 v1.4.x moved the filesystem partition from `0x300000` (1 MB) to `0x200000` (2 MB). If the old filesystem data is still present, the new firmware may behave unexpectedly.
 
@@ -237,7 +328,7 @@ Python:
 python3 flash_esp.py --download --erase
 ```
 
-### 3. Flash incomplete or interrupted
+#### 3. Flash incomplete or interrupted
 
 **Fix:** Retry with a lower baud rate.
 
@@ -252,13 +343,13 @@ Python:
 python3 flash_esp.py --download --erase --baud 115200
 ```
 
-### 4. Diagnosing with the serial monitor
+#### 4. Diagnosing with the serial monitor
 
 If the device is in a bootloop, connect via USB and open a serial terminal at **74880 baud** to capture the ESP8266 ROM bootloader messages. Then switch to **115200 baud** once the firmware banner starts printing (if it does). The first 20–30 lines almost always identify the crash reason (e.g., `Exception 3`, `Fatal exception 28`, `LittleFS mount failed`).
 
 Tools: Arduino IDE Serial Monitor, PuTTY, `screen /dev/ttyUSB0 74880`, or any terminal at the correct baud.
 
-### 5. Hard recovery (device completely unresponsive)
+#### 5. Hard recovery (device completely unresponsive)
 
 If the Web UI and serial output are both unavailable, specify the port and a conservative baud rate explicitly.
 
@@ -277,13 +368,13 @@ If no port appears, check Device Manager (Windows) or `ls /dev/tty*` (Linux/macO
 
 ---
 
-## After Flashing
+### After Flashing
 
 After a fresh flash (whether via the simple scripts or `flash_esp.py`), the device opens a WiFi access point named `OTGW-<MAC-address>`. Connect to it and browse to `http://192.168.4.1` to configure your WiFi network and other settings. On subsequent boots the device connects to your configured network.
 
 ---
 
-## Notes
+### Notes
 
 - **Never flash the PIC firmware over WiFi using OTmonitor** — this can brick the PIC microcontroller.
 - Use a reliable, direct USB cable (avoid hubs) to minimise flash errors.
