@@ -289,12 +289,10 @@ tr[style*="background-color"] {
     background-color: #d4edda !important;
 }
 
-/* Hide firmware update button on touch devices (phones and tablets).
-   pointer:coarse = finger/stylus input; hover:none = no mouse hover capability.
-   This is more reliable than screen width, which can misfire on resized desktop windows. */
-@media (pointer: coarse) and (hover: none) {
+/* Hide firmware update button on small touch layouts.
+   Also check viewport width so touch-capable desktops (e.g. Surface) keep showing it. */
+@media (pointer: coarse) and (hover: none) and (max-width: 900px) {
     .desktop-only {
         display: none;
     }
 }
-
