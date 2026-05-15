@@ -38,27 +38,98 @@ OpenTherm Gateway hardware. The OTGW-firmware downloads the latest PIC firmware 
 ### The ESP8266 — the home-automation integration layer
 
 Alongside the PIC sits an **ESP8266 Wi-Fi module** running *this* firmware (OTGW-firmware).
-While the PIC handles the raw bus signal, the ESP8266 is where all the intelligence lives:
+The PIC is the bus-level electrical interface; the ESP8266 is where all the intelligence
+lives. It fully understands the OpenTherm protocol, decodes every message the PIC relays,
+and bridges your heating system to your smart home.
 
-- **Decodes every OpenTherm message.** Every raw frame that the PIC captures — thermostat
-  requests, boiler responses, status flags, sensor readings — is decoded by OTGW-firmware
-  against the full OpenTherm specification. The result is a rich set of named values
-  (boiler water temperature, flame state, setpoints, error codes, …) rather than raw bytes.
-- **Drives your smart home.** It publishes those decoded values to **MQTT** with Home
-  Assistant Auto Discovery, so sensors and controls appear automatically in HA. It also
-  exposes a REST API and a raw TCP socket for OTmonitor and other integrations.
-- **Sends commands to the PIC to control the heater.** When Home Assistant (or you, via the
-  Web UI) requests a setpoint change, OTGW-firmware translates that into the correct OTGW
-  serial command and sends it to the PIC, which injects it into the OpenTherm bus.
-- Provides the **Web UI** for real-time monitoring, settings, and diagnostics.
-- Handles **automatic PIC firmware upgrades** — checking for new PIC versions and flashing
-  them without a programmer or serial cable.
-- Keeps time, stores settings, and runs the watchdog that reboots the device if something
-  goes wrong.
+#### Full OpenTherm protocol understanding
 
-In short: **the PIC speaks OpenTherm; OTGW-firmware understands it and connects it to your
-smart home.** Both must be present and running correct firmware for the gateway to work.
-They are updated separately — this guide covers the PIC side; for the ESP8266 see the
+OTGW-firmware is not a passive relay. It contains a complete OpenTherm decoder that parses
+every raw frame the PIC passes along:
+
+- All **80+ OpenTherm message IDs** defined by the OpenTherm specification (v2.2 and v4.2)
+  are decoded: heating setpoints, boiler temperatures, water pressure, modulation level,
+  DHW, solar thermal, CH2, ventilation, humidity, operational counters, fault codes, and more.
+- Each decoded value is stored by name (`TBoiler`, `TSet`, `FlameStatus`, `FaultCode`, …)
+  so the rest of the firmware can work with meaningful data instead of raw byte frames.
+- The live OpenTherm message log in the Web UI shows every message type, direction, and
+  decoded value as they arrive in real time.
+
+#### Controlling the heater through the PIC
+
+OTGW-firmware is also the command layer. When you (or your smart home) want to change the
+boiler's behaviour, OTGW-firmware translates the request into the correct PIC serial command
+and queues it for delivery:
+
+- Temporary room temperature override (`TT` command)
+- CH water temperature setpoint override (`SW` command)
+- DHW setpoint override, outside temperature injection, and all other OTGW commands
+- A command queue ensures commands are sent in order without overrunning the serial buffer
+
+#### Home Assistant integration via MQTT
+
+OTGW-firmware is the recommended integration layer for Home Assistant:
+
+- **309 auto-discovery configurations** across 80+ message IDs — entities appear in Home
+  Assistant automatically, including a climate entity with temperature control.
+- Source-separated MQTT topics (thermostat vs. boiler perspective) for accurate state.
+- Configurable publish interval to keep data fresh without flooding the broker.
+- **Webhook support** — trigger HTTP calls when status bits change (flame on, fault detected,
+  CH active, DHW active, etc.).
+
+#### REST API
+
+A fully documented REST API (`/api/v2/`) lets any tool query or control the gateway:
+
+- Query decoded OpenTherm data by message ID or human-readable label.
+- Submit OTGW commands and read PIC gateway settings.
+- Manage device settings, Dallas sensor labels, and diagnostic data.
+- OpenAPI 3.0 specification available for Swagger UI, Postman, or code generation.
+
+#### Web interface
+
+- Live OpenTherm message log via WebSocket — filtered, pauseable, with per-message decoding.
+- Real-time graphs for boiler temperatures, setpoints, water pressure, and modulation level.
+- PIC gateway settings panel — all 15 PIC configuration registers readable from the browser.
+- Firmware and filesystem OTA updates with health-check reboot verification.
+- File system explorer with upload, download, and delete.
+- Dark/light theme toggle.
+
+#### External sensors and meters
+
+- **Dallas temperature sensors** (DS18B20/DS18S20/DS1822) with custom labels, real-time
+  graphs, and Home Assistant auto-discovery — entirely independent of OpenTherm.
+- **S0 pulse counter** — kWh meter pulse counting on a configurable GPIO pin.
+
+#### TCP serial socket for OTmonitor
+
+A raw TCP socket on port **25238** exposes the OTGW serial protocol so OTmonitor and other
+tools can communicate with the PIC. OTGW-firmware detects ser2net traffic and pauses its own
+command queue to avoid conflicts.
+
+#### Reliability and networking
+
+- **NTP time synchronisation** with configurable timezone.
+- **Non-blocking WiFi reconnect** state machine — heating continues while WiFi recovers.
+- **Triple-reset WiFi recovery** — three quick power cycles reopen the WiFiManager captive
+  portal without reflashing.
+- Hardware watchdog reboot if the firmware hangs.
+- Optional HTTP Basic Auth for settings and maintenance endpoints.
+- Telnet diagnostics server (port 23) for field troubleshooting.
+
+#### Automatic PIC firmware management
+
+OTGW-firmware checks for new PIC firmware versions, downloads them from
+[otgw.tclcode.com](https://otgw.tclcode.com/), and programs them into the PIC — all from
+the Web UI, without a programmer or serial cable. It detects the PIC variant (PIC16F88 vs.
+PIC16F1847) automatically and selects the correct image.
+
+---
+
+In short: **the PIC provides the OpenTherm bus interface; OTGW-firmware fully understands
+the protocol, decodes every message, controls the heater, and connects it all to your smart
+home.** Both must be present and running correct firmware for the gateway to work. They are
+updated separately — this guide covers the PIC side; for the ESP8266 see the
 [ESP8266 Flashing Guide](FLASH_GUIDE.md).
 
 ---
