@@ -298,9 +298,14 @@ tr[style*="background-color"] {
     color: #e8f5e9;
 }
 
-/* Hide firmware update button on small touch layouts.
-   Also check viewport width so touch-capable desktops (e.g. Surface) keep showing it. */
-@media (pointer: coarse) and (hover: none) and (max-width: 900px) {
+/* Explicit platform rule: keep firmware update hidden on iPad/iPhone and Android phones. */
+.hide-fw-update .desktop-only {
+    display: none;
+}
+
+/* Fallback: hide on small touch-only layouts, but keep visible on touch-capable desktops.
+   900px targets phone-sized layouts while avoiding Surface-class desktop viewports. */
+@media (pointer: coarse) and (hover: none) and (any-hover: none) and (max-width: 900px) {
     .desktop-only {
         display: none;
     }

@@ -19,13 +19,27 @@
       <script>
         (function() {
           var css = "FSexplorer.css";
+          var rootClasses = [];
           try {
             var storedTheme = localStorage.getItem('theme');
             if (storedTheme === 'dark') {
               css = "FSexplorer_dark.css";
-              document.documentElement.className = 'dark';
+              rootClasses.push('dark');
+            }
+
+            var ua = navigator.userAgent || '';
+            // UA/platform checks are intentional here: requirement is platform-specific
+            // (hide on iPad/iPhone/Android phones, keep Surface visible). This complements
+            // the CSS fallback media query, but still carries normal UA-spoofing limitations.
+            var isAppleMobileDevice = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            var isAndroidMobilePhone = /Android/i.test(ua) && /Mobile/i.test(ua);
+            if (isAppleMobileDevice || isAndroidMobilePhone) {
+              rootClasses.push('hide-fw-update');
             }
           } catch (e) { console.error(e); }
+          if (rootClasses.length) {
+            document.documentElement.className = rootClasses.join(' ');
+          }
           document.write('<link rel="stylesheet" href="' + css + '" id="theme-style">');
         })();
       </script>
