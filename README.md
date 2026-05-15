@@ -100,7 +100,7 @@ Version 1.1.0 builds on the stable v1.0.0 foundation with Dallas temperature sen
 - **RESTful API v2** — 13 new endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS/OPTIONS support, RESTful resource naming (`messages/{id}`, `commands`, `device/info`). All frontend calls migrated to v2. See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
 - **20-bug codebase review** — Memory safety (OOB write, stack overflow), data integrity (MQTT hour bitmask, −127°C sensor published to MQTT), concurrency (ISR race in S0 counter), security (reflected XSS), reliability (file descriptor leak, null pointer crash, 750ms blocking sensor read), GPIO output feature fix, flash wear reduction (20 writes → 1). Full details: [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md).
 - **WebUI Data Persistence** — Automatic `localStorage` persistence with debounced saves, dynamic memory management, normal/capture modes, and auto-restoration on page load.
-- **Heap Memory Monitoring** — 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control ([ADR-030](docs/adr/ADR-030-heap-memory-monitoring.md)).
+- **Heap Memory Monitoring** — 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control ([ADR-030](docs/adr/ADR-030-heap-memory-monitoring-emergency-recovery.md)).
 - **Browser Debug Console (`otgwDebug`)** — Full diagnostic toolkit in the browser console: `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `sendCmd()`, `exportLogs()`, and more.
 - **PS Mode detection** — Automatic detection of `PS=1`; hides the OT log section, disables WebSocket streaming, suppresses time-sync commands.
 - **MQTT auth fix** — Whitespace automatically trimmed from MQTT credentials, fixing auth failures when upgrading from v0.10.x.
@@ -348,12 +348,14 @@ Read-only monitoring (sensor values, device status, WebSocket connection) stays 
 | MQTT topic reference | [docs/api/MQTT.md](docs/api/MQTT.md) |
 | Dallas sensor labels API | [docs/api/DALLAS_SENSOR_LABELS_API.md](docs/api/DALLAS_SENSOR_LABELS_API.md) |
 | Webhook documentation | [docs/features/webhook.md](docs/features/webhook.md) |
-| Flash guide | [docs/FLASH_GUIDE.md](docs/guides/FLASH_GUIDE.md) |
-| Local build guide | [docs/BUILD.md](docs/guides/BUILD.md) |
-| Code quality checker | [docs/EVALUATION.md](docs/process/EVALUATION.md) |
+| Flash guide | [docs/guides/FLASH_GUIDE.md](docs/guides/FLASH_GUIDE.md) |
+| Local build guide | [docs/guides/BUILD.md](docs/guides/BUILD.md) |
+| Code quality checker | [docs/process/EVALUATION.md](docs/process/EVALUATION.md) |
 | Architecture Decision Records | [docs/adr/README.md](docs/adr/README.md) |
 | WebSocket architecture | [docs/api/WEBSOCKET_FLOW.md](docs/api/WEBSOCKET_FLOW.md) |
-| Upgrading from 0.9.x / 0.10.y | [docs/upgrade-from-0.x.md](docs/archive/upgrade-from-0.x.md) |
+| Upgrading from 0.9.x / 0.10.y | [docs/archive/upgrade-from-0.x.md](docs/archive/upgrade-from-0.x.md) |
+| Release notes index (current + archive) | [docs/releases/README.md](docs/releases/README.md) |
+| Documentation link policy | [docs/process/DOCUMENTATION_LINKS_POLICY.md](docs/process/DOCUMENTATION_LINKS_POLICY.md) |
 
 ## Important warnings
 
@@ -381,9 +383,9 @@ For historical versions (`v1.3.x` and older), links intentionally point to [docs
 | **1.5.x** | LTS line on Arduino Core 2.7.4 (in development): reboot reliability hardening, tighter MQTT publish gating, HA discovery for stats topics, WebUI design system, boot/loop diagnostics. [1.5.0-beta](docs/releases/RELEASE_NOTES_1.5.0-beta.md) |
 | **1.4.x** | Arduino Core 3.1.2 baseline, SimpleTelnet migration, MQTT HA discovery streaming rewrite (309 configs / 80+ msgIds), WiFi reconnect hardening, heap-aware discovery drip, retained-discovery self-heal, unified time-boundary dispatcher, OpenTherm v4.2 alignment. [1.4.1](docs/releases/RELEASE_NOTES_1.4.1.md) |
 | **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/archive/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/archive/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/archive/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/archive/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/archive/RELEASE_NOTES_1.3.4.md) [1.3.5](docs/releases/RELEASE_NOTES_1.3.5.md) |
-| **1.2.0** | Complete HA discovery expansion (309 configs, 80+ message IDs), OpenTherm v4.2 alignment, webhook support, source-separated MQTT topics, v0/v1 API removed. [Notes](docs/releases/RELEASE_NOTES_1.2.0.md) |
-| **1.1.0** | Dallas sensor custom labels and graphs, RESTful API v2 (13 new endpoints), WebUI data persistence, browser debug console, PS mode detection, 20 bug fixes. [Notes](docs/releases/RELEASE_NOTES_1.1.0.md) |
-| **1.0.0** | Milestone release: real-time graphs, modern Web UI with dark mode, WebSocket live log, MQTT auto-discovery, interactive flashing tool, PROGMEM memory safety. [Notes](docs/releases/RELEASE_NOTES_1.0.0.md) |
+| **1.2.0** | Complete HA discovery expansion (309 configs, 80+ message IDs), OpenTherm v4.2 alignment, webhook support, source-separated MQTT topics, v0/v1 API removed. [Notes](docs/releases/archive/RELEASE_NOTES_1.2.0.md) |
+| **1.1.0** | Dallas sensor custom labels and graphs, RESTful API v2 (13 new endpoints), WebUI data persistence, browser debug console, PS mode detection, 20 bug fixes. [Notes](docs/releases/archive/RELEASE_NOTES_1.1.0.md) |
+| **1.0.0** | Milestone release: real-time graphs, modern Web UI with dark mode, WebSocket live log, MQTT auto-discovery, interactive flashing tool, PROGMEM memory safety. [Notes](docs/releases/archive/RELEASE_NOTES_1.0.0.md) |
 | 0.10.3 | MQTT password masking, HA discovery template improvements, status function fixes. |
 | 0.10.2 | PIC firmware update fix, filesystem update with latest PIC firmware. |
 | 0.10.1 | Build process improvements, VH status parsing fix, WiFi quality indicator. |

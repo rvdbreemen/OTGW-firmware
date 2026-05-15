@@ -50,14 +50,14 @@ See [ADR-035](../../adr/ADR-035-restful-api-compliance-strategy.md) for the full
 - DS18x20 sensors automatically appear in the real-time temperature graph with a 16-color palette
 - Full support for both light and dark themes
 - Sensor labels (when set) displayed in graph legend instead of raw hardware addresses
-- See: [docs/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md](../../TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md)
+- See: [docs/features/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md](../../features/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md)
 
 ### Dallas Sensor REST API
 
 - `GET /api/v2/sensors/labels` — retrieve all sensor labels as a JSON map
 - `POST /api/v2/sensors/labels` — update sensor labels in bulk (read-modify-write pattern)
 - Aliases available at `/api/v1/sensors/labels` for backward compatibility
-- See: [docs/DALLAS_SENSOR_LABELS_API.md](../../DALLAS_SENSOR_LABELS_API.md)
+- See: [docs/api/DALLAS_SENSOR_LABELS_API.md](../../api/DALLAS_SENSOR_LABELS_API.md)
 
 ### WebUI Data Persistence
 
@@ -221,7 +221,7 @@ Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](../..
 - 4-level health system: CRITICAL (<3 KB), WARNING (3–5 KB), LOW (5–8 KB), HEALTHY (>8 KB)
 - Adaptive throttling reduces WebSocket and MQTT traffic under memory pressure
 - Active WebSocket backpressure control prevents the ESP8266 from running out of heap under sustained load
-- See: [ADR-030](../../adr/ADR-030-heap-memory-monitoring.md)
+- See: [ADR-030](../../adr/ADR-030-heap-memory-monitoring-emergency-recovery.md)
 
 ### Memory Optimizations
 
@@ -256,10 +256,10 @@ Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](../..
 ### Documentation
 
 - 6 new Architecture Decision Records (ADR-030 through ADR-035):
-  - [ADR-030](../../adr/ADR-030-heap-memory-monitoring.md): Heap Memory Monitoring and Emergency Recovery
-  - [ADR-031](../../adr/ADR-031-two-microcontroller-coordination.md): Two-Microcontroller Coordination Architecture
-  - [ADR-032](../../adr/ADR-032-no-authentication-pattern.md): No Authentication Pattern / Local Network Security Model
-  - [ADR-033](../../adr/ADR-033-dallas-sensor-labels.md): Dallas Sensor Custom Labels and Graph Visualization
+  - [ADR-030](../../adr/ADR-030-heap-memory-monitoring-emergency-recovery.md): Heap Memory Monitoring and Emergency Recovery
+  - [ADR-031](../../adr/ADR-031-two-microcontroller-coordination-architecture.md): Two-Microcontroller Coordination Architecture
+  - [ADR-032](../../adr/ADR-032-no-authentication-local-network-security.md): No Authentication Pattern / Local Network Security Model
+  - [ADR-033](../../adr/ADR-033-dallas-sensor-custom-labels-graph-visualization.md): Dallas Sensor Custom Labels and Graph Visualization
   - [ADR-034](../../adr/ADR-034-non-blocking-modal-dialogs.md): Non-Blocking Modal Dialogs for User Input
   - [ADR-035](../../adr/ADR-035-restful-api-compliance-strategy.md): RESTful API Compliance Strategy
 - Comprehensive codebase review archive with all 20 findings: [docs/reviews/2026-02-13_codebase-review/](../../reviews/2026-02-13_codebase-review/)
