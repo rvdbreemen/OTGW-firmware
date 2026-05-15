@@ -116,45 +116,15 @@ firmware) handles all the low-level PIC programming protocol steps automatically
 > Wi-Fi. This can corrupt the PIC and leave it in an unrecoverable state. Always use the
 > built-in Web UI upgrade feature.
 
-### Via the REST API
+### Manual upload via the filesystem explorer *(advanced users only)*
 
-The upgrade can also be triggered programmatically:
-
-```http
-POST /api/v1/otgw/flash/pic
-Content-Type: application/json
-
-{"filename": "gateway.hex"}
-```
-
-Valid filenames: `gateway.hex`, `interface.hex`, `diagnose.hex`.
-
-Poll the flash status with:
-
-```http
-GET /api/v1/otgw/flash/status
-```
-
-Response example:
-
-```json
-{
-  "flashstatus": {
-    "flashing": true,
-    "progress": 42,
-    "filename": "gateway.hex",
-    "error": ""
-  }
-}
-```
-
-### Manual upload via the filesystem explorer
-
-If you have a custom or patched `.hex` file, you can upload it manually:
+> **⚠️ Advanced users only.** This method is intended for developers or users who have a
+> custom or patched `.hex` file. If you are not sure whether you need this, use the
+> Web UI upgrade described above instead.
 
 1. Open the filesystem explorer at `http://<device-ip>/fs`.
 2. Upload your `.hex` file (e.g. `gateway.hex`) to the root of the filesystem.
-3. Trigger the upgrade via the Web UI or REST API as described above.
+3. Trigger the upgrade via the Web UI as described above.
 
 ---
 
