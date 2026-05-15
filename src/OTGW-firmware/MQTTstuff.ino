@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -401,6 +401,7 @@ const char s_temp[] PROGMEM = "temp";
 const char s_on[] PROGMEM = "on";
 const char s_level[] PROGMEM = "level";
 const char s_function[] PROGMEM = "function";
+const char s_reset[] PROGMEM = "reset";
 const char s_empty[] PROGMEM = "";
 
 const char s_cmd_command[] PROGMEM = "command";
@@ -432,6 +433,16 @@ const char s_cmd_overridehb[] PROGMEM = "overridehb";
 const char s_cmd_forcethermostat[] PROGMEM = "forcethermostat";
 const char s_cmd_voltageref[] PROGMEM = "voltageref";
 const char s_cmd_debugptr[] PROGMEM = "debugptr";
+const char s_cmd_gpioa[] PROGMEM = "gpioa";
+const char s_cmd_gpiob[] PROGMEM = "gpiob";
+const char s_cmd_leda[] PROGMEM = "leda";
+const char s_cmd_ledb[] PROGMEM = "ledb";
+const char s_cmd_ledc[] PROGMEM = "ledc";
+const char s_cmd_ledd[] PROGMEM = "ledd";
+const char s_cmd_lede[] PROGMEM = "lede";
+const char s_cmd_ledf[] PROGMEM = "ledf";
+const char s_cmd_setclock[] PROGMEM = "setclock";
+const char s_cmd_resetgateway[] PROGMEM = "resetgateway";
 
 // ADR-069: subtopic names "thermostat" and "boiler" are inlined into
 // snprintf_P calls in publishToSourceTopic(). The earlier table-based
@@ -466,6 +477,15 @@ const char s_otgw_OH[] PROGMEM = "OH";
 const char s_otgw_FT[] PROGMEM = "FT";
 const char s_otgw_VR[] PROGMEM = "VR";
 const char s_otgw_DP[] PROGMEM = "DP";
+const char s_otgw_GA[] PROGMEM = "GA";
+const char s_otgw_GB[] PROGMEM = "GB";
+const char s_otgw_LA[] PROGMEM = "LA";
+const char s_otgw_LB[] PROGMEM = "LB";
+const char s_otgw_LC[] PROGMEM = "LC";
+const char s_otgw_LD[] PROGMEM = "LD";
+const char s_otgw_LE[] PROGMEM = "LE";
+const char s_otgw_LF[] PROGMEM = "LF";
+const char s_otgw_SC[] PROGMEM = "SC";
 
 struct MQTT_set_cmd_t
 {
@@ -505,6 +525,17 @@ const MQTT_set_cmd_t setcmds[] PROGMEM = {
   {   s_cmd_forcethermostat, s_otgw_FT, s_function },
   {   s_cmd_voltageref, s_otgw_VR, s_function },
   {   s_cmd_debugptr, s_otgw_DP, s_function },
+  // GPIO / LED / clock / reset — parity with HA Core opentherm_gw named services
+  {   s_cmd_gpioa, s_otgw_GA, s_function },        // GA=0..7 (GPIO A function)
+  {   s_cmd_gpiob, s_otgw_GB, s_function },        // GB=0..7 (GPIO B function)
+  {   s_cmd_leda, s_otgw_LA, s_function },         // LA=B/C/E/F/H/M/O/P/R/T/W/X
+  {   s_cmd_ledb, s_otgw_LB, s_function },
+  {   s_cmd_ledc, s_otgw_LC, s_function },
+  {   s_cmd_ledd, s_otgw_LD, s_function },
+  {   s_cmd_lede, s_otgw_LE, s_function },
+  {   s_cmd_ledf, s_otgw_LF, s_function },
+  {   s_cmd_setclock, s_otgw_SC, s_function },     // SC=day/HH:MM (e.g. "3/14:30")
+  {   s_cmd_resetgateway, s_empty, s_reset },      // hardware PIC reset, payload ignored
 } ;
 
 const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
@@ -670,6 +701,10 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
             MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
             addOTWGcmdtoqueue(otgwcmd, strlen(otgwcmd), true);
+          } else if (pOtType == s_reset) {
+            //hardware PIC reset - payload is ignored
+            MQTTDebugTln(F(" found command: resetgateway - resetting PIC"));
+            resetOTGW();
           } else {
             //all other commands are <otgwcmd>=<payload message>
             // Copy command string from Flash to temp buffer for snprintf

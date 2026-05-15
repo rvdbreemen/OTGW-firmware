@@ -443,6 +443,16 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `chenable` | `"1"` | `CH=1` | Central heating enable |
 | `chenable2` | `"0"` | `H2=0` | Central heating 2 enable |
 | `ventsetpt` | `"50"` | `VS=50` | Ventilation setpoint |
+| `gpioa` | `"0"` | `GA=0` | GPIO A function (0–7, see PIC firmware docs) |
+| `gpiob` | `"0"` | `GB=0` | GPIO B function (0–7, see PIC firmware docs) |
+| `leda` | `"F"` | `LA=F` | LED A function code (B/C/E/F/H/M/O/P/R/T/W/X) |
+| `ledb` | `"F"` | `LB=F` | LED B function code |
+| `ledc` | `"F"` | `LC=F` | LED C function code |
+| `ledd` | `"F"` | `LD=F` | LED D function code |
+| `lede` | `"F"` | `LE=F` | LED E function code |
+| `ledf` | `"F"` | `LF=F` | LED F function code |
+| `setclock` | `"3/14:30"` | `SC=3/14:30` | Set PIC clock (day 1=Mon…7=Sun, `day/HH:MM`) |
+| `resetgateway` | *(any)* | *(hardware reset)* | Reset the OTGW PIC via hardware reset pin; payload ignored |
 
 #### Advanced Commands
 
