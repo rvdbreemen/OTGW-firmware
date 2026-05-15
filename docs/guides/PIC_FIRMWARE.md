@@ -35,23 +35,30 @@ The PIC firmware is written and maintained by **Schelte Bron**, the original des
 OpenTherm Gateway hardware. The OTGW-firmware downloads the latest PIC firmware from
 [otgw.tclcode.com](https://otgw.tclcode.com/) and programs it into the PIC for you.
 
-### The ESP8266 — the network and smart-home layer
+### The ESP8266 — the home-automation integration layer
 
 Alongside the PIC sits an **ESP8266 Wi-Fi module** running *this* firmware (OTGW-firmware).
-The ESP8266 cannot talk to the OpenTherm bus directly, but it is the part that connects your
-gateway to your home network and to your smart home:
+While the PIC handles the raw bus signal, the ESP8266 is where all the intelligence lives:
 
-- Provides the **Web UI** you use to monitor your heating system and manage settings.
-- Publishes OpenTherm data to **MQTT** so Home Assistant and other platforms receive live
-  sensor readings and can send setpoint commands back.
-- Handles **automatic PIC firmware upgrades** — checking for new versions and flashing them
-  without you needing a programmer or serial cable.
+- **Decodes every OpenTherm message.** Every raw frame that the PIC captures — thermostat
+  requests, boiler responses, status flags, sensor readings — is decoded by OTGW-firmware
+  against the full OpenTherm specification. The result is a rich set of named values
+  (boiler water temperature, flame state, setpoints, error codes, …) rather than raw bytes.
+- **Drives your smart home.** It publishes those decoded values to **MQTT** with Home
+  Assistant Auto Discovery, so sensors and controls appear automatically in HA. It also
+  exposes a REST API and a raw TCP socket for OTmonitor and other integrations.
+- **Sends commands to the PIC to control the heater.** When Home Assistant (or you, via the
+  Web UI) requests a setpoint change, OTGW-firmware translates that into the correct OTGW
+  serial command and sends it to the PIC, which injects it into the OpenTherm bus.
+- Provides the **Web UI** for real-time monitoring, settings, and diagnostics.
+- Handles **automatic PIC firmware upgrades** — checking for new PIC versions and flashing
+  them without a programmer or serial cable.
 - Keeps time, stores settings, and runs the watchdog that reboots the device if something
   goes wrong.
 
-In short: **the PIC is the OpenTherm specialist; the ESP8266 is the network connector.**
-Both must be present and running correct firmware for the gateway to work. They are updated
-separately — this guide covers the PIC side; for the ESP8266 see the
+In short: **the PIC speaks OpenTherm; OTGW-firmware understands it and connects it to your
+smart home.** Both must be present and running correct firmware for the gateway to work.
+They are updated separately — this guide covers the PIC side; for the ESP8266 see the
 [ESP8266 Flashing Guide](FLASH_GUIDE.md).
 
 ---
