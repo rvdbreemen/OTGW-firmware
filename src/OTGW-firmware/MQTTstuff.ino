@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.5.1-beta.4
+**  Version  : v1.5.1-beta.5
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1350,6 +1350,7 @@ void publishNonOTDiscoveryConfigs()
   setMQTTConfigPending(OTGWfwinfoid);       // firmware info
   setMQTTConfigPending(OTGWpicinfoid);      // PIC info
   setMQTTConfigPending(OTGWpicsettingsid);  // PIC settings
+  setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
 }
@@ -1387,6 +1388,8 @@ void markAllMQTTConfigPending()
   setMQTTConfigPending(OTGWfwinfoid);
   setMQTTConfigPending(OTGWpicinfoid);
   setMQTTConfigPending(OTGWpicsettingsid);
+  // PIC control entities (pseudo-ID 251): resetgateway button + gpioa/gpiob/leda-f selects.
+  setMQTTConfigPending(OTGWpiccontrolsid);
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }
@@ -1608,6 +1611,24 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // Number (OT ID 27)
   if (OTid == 27) {
     if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
+  }
+
+  // PIC control entities (pseudo-ID 251): only publish when PIC is available.
+  if (OTid == OTGWpiccontrolsid) {
+    if (isPICEnabled()) {
+      // resetgateway button
+      if (streamButtonDiscovery(MQTTclient, ctx)) result = true;
+      // GPIO A/B function selects (idx 0-1)
+      for (uint8_t i = 0; i <= 1; i++) {
+        if (streamSelectDiscovery(MQTTclient, i, ctx)) result = true;
+        feedWatchDog();
+      }
+      // LED A-F function selects (idx 2-7)
+      for (uint8_t i = 2; i <= 7; i++) {
+        if (streamSelectDiscovery(MQTTclient, i, ctx)) result = true;
+        feedWatchDog();
+      }
+    }
   }
 
   return result;

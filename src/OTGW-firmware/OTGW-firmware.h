@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.5.1-beta.4
+**  Version  : v1.5.1-beta.5
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -860,9 +860,12 @@ byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats
 //   248 — otgw-firmware/{reboot_count,reboot_reason,version,hostname}
 //   249 — otgw-pic/{version,deviceid,firmwaretype,designer,picavailable} (PIC-gated)
 //   250 — otgw-pic/settings/* (15 PR=-polled topics, PIC-gated)
+// PIC control discovery pseudo-ID:
+//   251 — resetgateway button + gpioa/gpiob/leda-f select entities (PIC-gated)
 byte      OTGWfwinfoid       = 248;
 byte      OTGWpicinfoid      = 249;
 byte      OTGWpicsettingsid  = 250;
+byte      OTGWpiccontrolsid  = 251;
 
 //Now load Debug & network library
 #include "Debug.h"
