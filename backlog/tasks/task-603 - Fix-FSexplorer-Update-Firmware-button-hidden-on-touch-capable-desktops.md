@@ -1,9 +1,11 @@
 ---
 id: TASK-603
 title: Fix FSexplorer Update Firmware button hidden on touch-capable desktops
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@copilot'
 created_date: '2026-05-15 16:15'
+updated_date: '2026-05-15 16:16'
 labels: []
 dependencies: []
 ---
