@@ -1,7 +1,7 @@
 ---
 id: TASK-602
 title: Fix README completeness for main branch
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-15 10:27'
 updated_date: '2026-05-15 10:29'
