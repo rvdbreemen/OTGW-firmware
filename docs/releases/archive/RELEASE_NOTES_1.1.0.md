@@ -31,7 +31,7 @@ There are **no breaking changes** in v1.1.0 relative to v1.0.0.
 | `GET /api/firmwarefilelist` | `GET /api/v2/firmware/files` |
 | `GET /api/listfiles` | `GET /api/v2/filesystem/files` |
 
-See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for the full migration guide.
+See [ADR-035](../../adr/ADR-035-restful-api-compliance-strategy.md) for the full migration guide.
 
 ---
 
@@ -43,21 +43,21 @@ See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for the full 
 - Labels stored in `/dallas_labels.ini` on LittleFS with zero backend RAM usage
 - Maximum 16 characters per label
 - Automatic label backup to browser during filesystem flash and auto-restore after reboot
-- See: [docs/features/dallas-temperature-sensors.md](docs/features/dallas-temperature-sensors.md)
+- See: [docs/features/dallas-temperature-sensors.md](../../features/dallas-temperature-sensors.md)
 
 ### Dallas Sensor Graph Visualization
 
 - DS18x20 sensors automatically appear in the real-time temperature graph with a 16-color palette
 - Full support for both light and dark themes
 - Sensor labels (when set) displayed in graph legend instead of raw hardware addresses
-- See: [docs/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md](docs/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md)
+- See: [docs/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md](../../TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md)
 
 ### Dallas Sensor REST API
 
 - `GET /api/v2/sensors/labels` — retrieve all sensor labels as a JSON map
 - `POST /api/v2/sensors/labels` — update sensor labels in bulk (read-modify-write pattern)
 - Aliases available at `/api/v1/sensors/labels` for backward compatibility
-- See: [docs/DALLAS_SENSOR_LABELS_API.md](docs/DALLAS_SENSOR_LABELS_API.md)
+- See: [docs/DALLAS_SENSOR_LABELS_API.md](../../DALLAS_SENSOR_LABELS_API.md)
 
 ### WebUI Data Persistence
 
@@ -68,13 +68,13 @@ See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for the full 
 - Auto-restoration of log buffer and user preferences on page load
 - Graceful error handling for storage quota exceeded, corrupted data, or missing localStorage
 - Log buffer automatically cleared after a firmware/filesystem flash to ensure a clean post-flash view
-- See: [docs/features/data-persistence.md](docs/features/data-persistence.md)
+- See: [docs/features/data-persistence.md](../../features/data-persistence.md)
 
 ### Browser Debug Console (`otgwDebug`)
 
 - Full diagnostic toolkit accessible from the browser's JavaScript console
 - Commands: `status()`, `info()`, `settings()`, `wsStatus()`, `wsReconnect()`, `otmonitor()`, `logs()`, `api()`, `health()`, `sendCmd()`, `exportLogs()`, `exportData()`, `persistence()`
-- See: [docs/guides/browser-debug-console.md](docs/guides/browser-debug-console.md)
+- See: [docs/guides/browser-debug-console.md](../../guides/browser-debug-console.md)
 
 ### Non-Blocking Modal Dialogs
 
@@ -115,8 +115,8 @@ See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for the full 
 - Versioned replacements for unversioned endpoints: `GET /api/v2/firmware/files`, `GET /api/v2/filesystem/files`
 - Backward-compatible aliases for smooth migration: `/otgw/id/`, `/otgw/label/`, `/otgw/command/`
 - JSON 404 responses for all `/api/*` routes (HTML 404 for non-API routes)
-- Full OpenAPI 3.0 specification: [docs/api/openapi.yaml](docs/api/openapi.yaml)
-- See: [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md), [API Documentation](docs/api/README.md)
+- Full OpenAPI 3.0 specification: [docs/api/openapi.yaml](../../api/openapi.yaml)
+- See: [ADR-035](../../adr/ADR-035-restful-api-compliance-strategy.md), [API Documentation](../../api/README.md)
 
 ### Frontend Migration to v2 API
 
@@ -138,7 +138,7 @@ See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for the full 
 - **Root cause:** `strlcpy()` preserves whitespace that the Arduino `String` class previously auto-trimmed; users copying credentials from text editors introduced invisible trailing spaces
 - **Fix:** Automatic `trimwhitespace()` now applied to MQTT username and password in both `readSettings()` (on boot) and `updateSetting()` (on change) — no user action needed
 - Commit: `eba5d51` (2026-02-10)
-- See: [docs/fixes/mqtt-whitespace-auth-fix.md](docs/fixes/mqtt-whitespace-auth-fix.md)
+- See: [docs/fixes/mqtt-whitespace-auth-fix.md](../../fixes/mqtt-whitespace-auth-fix.md)
 
 ### Streaming File Serving (Memory Management Fix)
 
@@ -147,7 +147,7 @@ See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for the full 
 - Version-aware caching with proper `Cache-Control` headers; filesystem hash cached statically
 - **Result:** 95% reduction in RAM used for file serving; UI is fast and responsive
 - Commit: `2e93554` (2026-02-01)
-- See: [docs/reviews/2026-02-01_memory-management-bug-fix/](docs/reviews/2026-02-01_memory-management-bug-fix/)
+- See: [docs/reviews/2026-02-01_memory-management-bug-fix/](../../reviews/2026-02-01_memory-management-bug-fix/)
 
 ### Settings Persistence Fix
 
@@ -171,7 +171,7 @@ See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md) for the full 
 ### Codebase Review Fixes — 20 Findings Resolved
 
 A comprehensive review of all `.ino`, `.h`, and `.cpp` files identified and resolved 20 bugs across multiple categories.
-Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md)
+Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](../../reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md)
 
 **Critical & High Priority (13 findings):**
 
@@ -221,7 +221,7 @@ Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](docs/
 - 4-level health system: CRITICAL (<3 KB), WARNING (3–5 KB), LOW (5–8 KB), HEALTHY (>8 KB)
 - Adaptive throttling reduces WebSocket and MQTT traffic under memory pressure
 - Active WebSocket backpressure control prevents the ESP8266 from running out of heap under sustained load
-- See: [ADR-030](docs/adr/ADR-030-heap-memory-monitoring.md)
+- See: [ADR-030](../../adr/ADR-030-heap-memory-monitoring.md)
 
 ### Memory Optimizations
 
@@ -256,18 +256,18 @@ Full details: [docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md](docs/
 ### Documentation
 
 - 6 new Architecture Decision Records (ADR-030 through ADR-035):
-  - [ADR-030](docs/adr/ADR-030-heap-memory-monitoring.md): Heap Memory Monitoring and Emergency Recovery
-  - [ADR-031](docs/adr/ADR-031-two-microcontroller-coordination.md): Two-Microcontroller Coordination Architecture
-  - [ADR-032](docs/adr/ADR-032-no-authentication-pattern.md): No Authentication Pattern / Local Network Security Model
-  - [ADR-033](docs/adr/ADR-033-dallas-sensor-labels.md): Dallas Sensor Custom Labels and Graph Visualization
-  - [ADR-034](docs/adr/ADR-034-non-blocking-modal-dialogs.md): Non-Blocking Modal Dialogs for User Input
-  - [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md): RESTful API Compliance Strategy
-- Comprehensive codebase review archive with all 20 findings: [docs/reviews/2026-02-13_codebase-review/](docs/reviews/2026-02-13_codebase-review/)
-- REST API evaluation and improvement plan: [docs/reviews/2026-02-16_restful-api-evaluation/](docs/reviews/2026-02-16_restful-api-evaluation/)
-- Full OpenAPI 3.0 specification updated for all v2 endpoints: [docs/api/openapi.yaml](docs/api/openapi.yaml)
-- Updated API reference documentation: [docs/api/README.md](docs/api/README.md)
+  - [ADR-030](../../adr/ADR-030-heap-memory-monitoring.md): Heap Memory Monitoring and Emergency Recovery
+  - [ADR-031](../../adr/ADR-031-two-microcontroller-coordination.md): Two-Microcontroller Coordination Architecture
+  - [ADR-032](../../adr/ADR-032-no-authentication-pattern.md): No Authentication Pattern / Local Network Security Model
+  - [ADR-033](../../adr/ADR-033-dallas-sensor-labels.md): Dallas Sensor Custom Labels and Graph Visualization
+  - [ADR-034](../../adr/ADR-034-non-blocking-modal-dialogs.md): Non-Blocking Modal Dialogs for User Input
+  - [ADR-035](../../adr/ADR-035-restful-api-compliance-strategy.md): RESTful API Compliance Strategy
+- Comprehensive codebase review archive with all 20 findings: [docs/reviews/2026-02-13_codebase-review/](../../reviews/2026-02-13_codebase-review/)
+- REST API evaluation and improvement plan: [docs/reviews/2026-02-16_restful-api-evaluation/](../../reviews/2026-02-16_restful-api-evaluation/)
+- Full OpenAPI 3.0 specification updated for all v2 endpoints: [docs/api/openapi.yaml](../../api/openapi.yaml)
+- Updated API reference documentation: [docs/api/README.md](../../api/README.md)
 - New feature docs: Dallas sensors, data persistence, gateway mode
-- OpenTherm v4.2 specification converted to searchable Markdown: [docs/opentherm specification/](docs/opentherm%20specification/))
+- OpenTherm v4.2 specification converted to searchable Markdown: [docs/opentherm specification/](../../opentherm%20specification/))
 
 ---
 

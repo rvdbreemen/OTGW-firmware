@@ -166,7 +166,7 @@ When saved WiFi credentials are no longer valid, you no longer need to reflash t
 - The device immediately reopens the WiFiManager captive portal for reconfiguration.
 - Normal reboot behavior remains unchanged outside that reset pattern.
 
-Detailed guide: [docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md](docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md)
+Detailed guide: [docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md](../../guides/WIFI_RECOVERY_TRIPLE_RESET.md)
 
 ### OTA / LittleFS Hardening
 
@@ -306,7 +306,7 @@ There are **no new breaking changes** in v1.3.0 relative to `main` / `v1.2.0`.
 | Settings format | No migration required |
 | Protected endpoints auth | New optional feature, disabled by default |
 
-The migration items introduced in `v1.2.0` still apply where relevant. If you are upgrading from older than `v1.2.0`, review the earlier MQTT and API migration notes first. See [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) and [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md).
+The migration items introduced in `v1.2.0` still apply where relevant. If you are upgrading from older than `v1.2.0`, review the earlier MQTT and API migration notes first. See [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) and [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md).
 
 ---
 
