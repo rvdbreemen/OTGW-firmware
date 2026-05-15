@@ -3,7 +3,7 @@
 **Status:** Beta, in active development on `dev`.
 **Branch:** dev (LTS line on Arduino Core 2.7.4)
 **Branch baseline:** 2026-04-26
-**Previous release:** [v1.4.1](docs/releases/RELEASE_NOTES_1.4.1.md)
+**Previous release:** [v1.4.1](RELEASE_NOTES_1.4.1.md)
 
 > **This is a development release.** It is not recommended for production deployments. Use it on a test device or a spare gateway. A stable `v1.5.0` will follow when the line has soaked in the field.
 
@@ -127,4 +127,4 @@ Join us on [Discord](https://discord.gg/zjW3ju7vGQ) for support and discussion.
 
 ---
 
-Previous release: [v1.4.1](docs/releases/RELEASE_NOTES_1.4.1.md)
+Previous release: [v1.4.1](RELEASE_NOTES_1.4.1.md)

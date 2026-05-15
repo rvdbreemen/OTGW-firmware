@@ -3,7 +3,7 @@
 **Release date:** 2026-05-08
 **Branch:** main (from dev)
 **Compare:** [v1.4.1...v1.5.0](https://github.com/rvdbreemen/OTGW-firmware/compare/v1.4.1...v1.5.0)
-**Previous release:** [v1.4.1](docs/releases/RELEASE_NOTES_1.4.1.md)
+**Previous release:** [v1.4.1](RELEASE_NOTES_1.4.1.md)
 
 ---
 

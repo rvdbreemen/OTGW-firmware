@@ -70,7 +70,7 @@ To enable: set `MQTTseparatesources = true` in settings, then run MQTT discovery
 
 All `/api/v0/` and `/api/v1/` endpoints have been **removed**. Any client calling these paths will now receive **410 Gone**.
 
-**Migration**: Update all integrations to use the `/api/v2/` equivalents. See [docs/api/README.md](docs/api/README.md) for the complete v2 endpoint reference. The v2 API has been available since v1.1.0 — no functional changes were made to the v2 endpoints themselves.
+**Migration**: Update all integrations to use the `/api/v2/` equivalents. See [docs/api/README.md](../../api/README.md) for the complete v2 endpoint reference. The v2 API has been available since v1.1.0 — no functional changes were made to the v2 endpoints themselves.
 
 ---
 
@@ -241,7 +241,7 @@ A new webhook feature allows the firmware to make an outbound HTTP call when a c
 
 The v0 and v1 REST API versions have been removed. Any request to `/api/v0/` or `/api/v1/` now returns **410 Gone**.
 
-- Only `/api/v2/` endpoints remain — see [docs/api/README.md](docs/api/README.md) for the full reference.
+- Only `/api/v2/` endpoints remain — see [docs/api/README.md](../../api/README.md) for the full reference.
 - ArduinoJson dependency removed; settings I/O replaced with lightweight streaming helpers (`wStrF`, `wBoolF`, `wIntF`, `parseSettingsLine()`), reducing both flash and RAM usage.
 - All in-firmware references to v1 endpoints (OTA health polling, sensor label restore) updated to v2.
 - OpenAPI specification and API documentation updated to v2-only.
@@ -270,7 +270,7 @@ The v0 and v1 REST API versions have been removed. Any request to `/api/v0/` or 
 - Full OpenAPI specification for all v2 endpoints in `docs/api/openapi.yaml`.
 - Main Web UI migrated to v2 API — a few auxiliary flows (such as OTA health/label restore) still use v1 endpoints.
 - API compliance score improved from 5.4 → 8.5/10.
-- See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
+- See [ADR-035](../../adr/ADR-035-restful-api-compliance-strategy.md).
 
 #### Memory and performance improvements
 
@@ -295,7 +295,7 @@ The v0 and v1 REST API versions have been removed. Any request to `/api/v0/` or 
 - **Feature fix**: GPIO outputs gated by debug flag — the feature was completely non-functional before this fix.
 - **MQTT whitespace auth fix**: Automatic trimming of whitespace in MQTT credentials, fixing authentication failures when upgrading from v0.10.x.
 
-Full details in [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md).
+Full details in [Codebase Review](../../reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md).
 
 ---
 

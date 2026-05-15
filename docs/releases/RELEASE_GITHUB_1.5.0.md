@@ -1,7 +1,7 @@
 v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Arduino Core 2.7.4**. It ships 29 beta builds worth of fixes, MQTT improvements, and Home Assistant discovery refinements on the proven, conservative Core version.
 
 Full release notes: [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md)
-Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](../BREAKING_CHANGES.md)
 
 ---
 
@@ -30,7 +30,7 @@ Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
 ## Breaking changes
 
-Three breaking changes vs v1.4.1. See [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md) for migration commands.
+Three breaking changes vs v1.4.1. See [docs/BREAKING_CHANGES.md](../BREAKING_CHANGES.md) for migration commands.
 
 1. **MQTT source topics: sibling-suffix shape** — `<msgid>/thermostat` and `<msgid>/boiler` become `<msgid>_thermostat` and `<msgid>_boiler`
 2. **`/gateway` sub-topic removed** — canonical base topic replaces it
