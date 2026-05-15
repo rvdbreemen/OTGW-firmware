@@ -37,9 +37,9 @@
               rootClasses.push('hide-fw-update');
             }
           } catch (e) { console.error(e); }
-          if (rootClasses.length) {
-            document.documentElement.className = rootClasses.join(' ');
-          }
+          rootClasses.forEach(function(className) {
+            document.documentElement.classList.add(className);
+          });
           document.write('<link rel="stylesheet" href="' + css + '" id="theme-style">');
         })();
       </script>

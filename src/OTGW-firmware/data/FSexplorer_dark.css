@@ -303,8 +303,9 @@ tr[style*="background-color"] {
     display: none;
 }
 
-/* Fallback: hide on small touch-only layouts, but keep visible on touch-capable desktops.
-   900px targets phone-sized layouts while avoiding Surface-class desktop viewports. */
+/* Fallback: hide on small pure touch layouts (no input can hover),
+   but keep visible on touch-capable desktops that also have hover input.
+   900px targets phone-sized layouts and stays below Surface Pro portrait width (912px). */
 @media (pointer: coarse) and (hover: none) and (any-hover: none) and (max-width: 900px) {
     .desktop-only {
         display: none;
