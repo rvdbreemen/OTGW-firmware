@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -685,6 +685,65 @@ void updateSetting(const char *field, const char *newValue)
   RESTART_TIMER(timerFlushSettings);
 
 } // updateSetting()
+
+
+//=======================================================================
+// OEM Lookup — streaming scan of oem_lookup.json without loading into RAM.
+//
+// Key format: "CATEGORY.CODE" where CODE is a decimal integer 0-255.
+// Example:    "OEMFaultCode.19"  ->  "E:19 Water pressure too low"
+//
+// Supported categories (also used as MQTT topic suffixes for _desc topics):
+//   OEMFaultCode   register 5  LB — main boiler OEM fault code
+//   OEMFaultCodeVH register 72 LB — ventilation/heat-recovery OEM fault code
+//   OEMDiagCode    register 73/115 — OEM diagnostic code (u16, fits 0-255 range)
+//   TSP            register 11 HB index — transparent slave parameter name
+//   TSPVH          register 89 HB index — TSP for ventilation/heat-recovery
+//   TSPSolar       register 106 HB index — TSP for solar storage
+//   FHB            register 13 HB index — fault history buffer slot label
+//   FHBVH          register 91 HB index — FHB for ventilation/heat-recovery
+//   FHBSolar       register 108 HB index — FHB for solar storage
+//
+// Returns true and fills descOut when an entry is found; false otherwise.
+// Keeps only one line in RAM at a time — no heap allocation.
+//=======================================================================
+bool lookupOEMCode(const char* category, uint16_t code, char* descOut, size_t descOutLen)
+{
+  if (!descOut || descOutLen == 0) return false;
+  descOut[0] = '\0';
+  if (!category || category[0] == '\0') return false;
+  // Guard against unexpectedly long category strings that would truncate searchKey.
+  // Longest built-in category is "OEMFaultCodeVH" (14 chars). Limit to 40.
+  if (strlen(category) > 40) return false;
+
+  if (!LittleFS.exists(OEM_LOOKUP_FILE)) return false;
+
+  File f = LittleFS.open(OEM_LOOKUP_FILE, "r");
+  if (!f) return false;
+
+  // Build the key we're searching for: "CATEGORY.CODE"
+  char searchKey[50];
+  snprintf_P(searchKey, sizeof(searchKey), PSTR("%s.%u"), category, (unsigned)code);
+
+  char lineBuf[180];
+  char keyBuf[60];
+  char valueBuf[100];
+  bool found = false;
+
+  while (f.available() && !found) {
+    size_t lineLen = f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
+    lineBuf[lineLen] = '\0';
+    if (parseJsonKVLine(lineBuf, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
+      if (strcmp(keyBuf, searchKey) == 0) {
+        strlcpy(descOut, valueBuf, descOutLen);
+        found = true;
+      }
+    }
+  }
+
+  f.close();
+  return found;
+}
 
 
 /***************************************************************************
