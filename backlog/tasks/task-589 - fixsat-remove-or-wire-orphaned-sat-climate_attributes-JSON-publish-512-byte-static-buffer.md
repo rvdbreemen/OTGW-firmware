@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-08 17:12'
-updated_date: '2026-05-08 21:29'
+updated_date: '2026-05-16 09:07'
 labels:
   - sat
   - mqtt
@@ -49,6 +49,12 @@ Resolution options:
 <!-- SECTION:PLAN:BEGIN -->
 1. Add json_attributes_topic field to streamClimateDiscovery (climateIdx==0) in mqtt_configuratie.cpp, pointing to <mqttPubTopic>/sat/climate_attributes.\n2. Build verify with python build.py --firmware.\n3. Run python evaluate.py --quick.\n4. Bump prerelease, commit, push.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Superseded on dev by TASK-611: the wired sat/climate_attributes json_attributes_topic was removed from mqtt_configuratie.cpp because SAT is gated out on dev (ENABLE_SAT never defined), so the topic was never fed. Correct dev resolution is removal (this task's AC#3 arm). SAT/discovery remain intact on feature-dev-2.0.0.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

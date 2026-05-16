@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-08 17:13'
-updated_date: '2026-05-08 21:30'
+updated_date: '2026-05-16 09:07'
 labels:
   - sat
   - mqtt
@@ -43,6 +43,12 @@ Resolution options:
 <!-- SECTION:PLAN:BEGIN -->
 Remove the sat/pressure_health_attr publish block (lines 1888-1908 in SATcontrol.ino). The flat scalar topics (sat/pressure, sat/pressure_drop_rate, sat/pressure_alarm) already cover all the data. No HA discovery entry exists for sat/pressure_health itself, so wiring option would require a larger change out of scope. Removing the orphan is the minimal fix.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Superseded on dev by TASK-611: SATcontrol.ino (where the pressure_health_attr block lived) was deleted from dev entirely. The 2.0.0 worktree retains SAT; no impact there.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

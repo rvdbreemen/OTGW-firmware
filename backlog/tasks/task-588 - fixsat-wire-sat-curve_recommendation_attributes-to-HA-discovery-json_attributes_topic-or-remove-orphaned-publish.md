@@ -3,9 +3,10 @@ id: TASK-588
 title: >-
   fix(sat): wire sat/curve_recommendation_attributes to HA discovery
   json_attributes_topic or remove orphaned publish
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-08 17:11'
+updated_date: '2026-05-16 09:07'
 labels:
   - sat
   - mqtt
@@ -42,3 +43,15 @@ JSON payload published:
 - [ ] #3 Or: each field is published as a separate flat scalar topic per ADR-101 and the JSON publish is replaced
 - [ ] #4 No orphaned MQTT publish remains (a topic published to but never subscribed via discovery)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Resolved on dev by TASK-611: all SAT source (SATcontrol.ino et al.) removed from the dev branch, so the sat/curve_recommendation_attributes orphan no longer exists on dev. SAT remains a 2.0.0 feature; discovery for SAT topics on the 2.0.0 line is tracked separately (TASK-543).
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as moot-on-dev. TASK-611 removed the entire SAT subsystem from the dev branch (5 SAT*.ino files + gated header blocks + the live climate json_attributes_topic). The orphaned sat/curve_recommendation_attributes publish this task described lived in SATcontrol.ino, which no longer exists on dev. No dev code change required here; the SAT feature and its discovery wiring remain on feature-dev-2.0.0.
+<!-- SECTION:FINAL_SUMMARY:END -->

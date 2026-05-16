@@ -162,14 +162,14 @@ Flashing in this order preserves your settings. Flashing the firmware first trig
 
 ## Breaking changes
 
-**LittleFS partition size changed from 1 MB to 2 MB**: flash the filesystem binary first, firmware second to preserve your settings. Flashing firmware first triggers a 5-10 minute unresponsive boot while the partition reformats, and all settings are lost. See the WARNING section above and [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md) for the cumulative log.
+**LittleFS partition size changed from 1 MB to 2 MB**: flash the filesystem binary first, firmware second to preserve your settings. Flashing firmware first triggers a 5-10 minute unresponsive boot while the partition reformats, and all settings are lost. See the WARNING section above and [docs/BREAKING_CHANGES.md](../BREAKING_CHANGES.md) for the cumulative log.
 
 All MQTT topics, REST API endpoints, and settings format are otherwise identical to `v1.3.5`.
 
 ## Architecture Decision Records
 
-- [ADR-062: Retained discovery verification](docs/adr/ADR-062-retained-discovery-verification.md) (Accepted)
-- [ADR-064: Time-boundary single-caller contract](docs/adr/ADR-064-time-boundary-single-caller-contract.md) (Accepted)
+- [ADR-062: Retained discovery verification](../adr/ADR-062-retained-discovery-verification.md) (Accepted)
+- [ADR-064: Time-boundary single-caller contract](../adr/ADR-064-time-boundary-single-caller-contract.md) (Accepted)
 
 ## Thank you
 
