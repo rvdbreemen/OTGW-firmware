@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:18'
-updated_date: '2026-05-16 07:18'
+updated_date: '2026-05-16 07:32'
 labels:
   - bug
   - mqtt
@@ -23,14 +23,14 @@ Two field testers on 1.5.0 report the Home Assistant 'DHW Control' (and Thermost
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Base namespace topic no longer receives OT-bus online/offline: both sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline)) call sites removed (OTGW-Core.ino ~4029 and MQTTstuff.ino ~1113)
-- [ ] #2 otgw_connected sensor still publishes OT-bus liveness unchanged (sendMQTTDataPic otgw_connected companion lines retained)
-- [ ] #3 MQTT birth (online retained on connect) and LWT (offline retained) on the base topic remain intact and unchanged
-- [ ] #4 HA DHW Control, Thermostat, and sensor/binary-sensor entities remain available while MQTT is connected, independent of OT-bus traffic gaps
-- [ ] #5 New ADR (docs/adr/ADR-074) authored with >=2 alternatives, consequences, Enforcement block forbidding reintroduction of sendMQTT(MQTTPubNamespace, CONLINEOFFLINE; Status moved to Accepted only after explicit user approval
+- [x] #1 Base namespace topic no longer receives OT-bus online/offline: both sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline)) call sites removed (OTGW-Core.ino ~4029 and MQTTstuff.ino ~1113)
+- [x] #2 otgw_connected sensor still publishes OT-bus liveness unchanged (sendMQTTDataPic otgw_connected companion lines retained)
+- [x] #3 MQTT birth (online retained on connect) and LWT (offline retained) on the base topic remain intact and unchanged
+- [x] #4 HA DHW Control, Thermostat, and sensor/binary-sensor entities remain available while MQTT is connected, independent of OT-bus traffic gaps
+- [x] #5 New ADR (docs/adr/ADR-074) authored with >=2 alternatives, consequences, Enforcement block forbidding reintroduction of sendMQTT(MQTTPubNamespace, CONLINEOFFLINE; Status moved to Accepted only after explicit user approval
 - [ ] #6 python build.py --firmware exits 0
-- [ ] #7 python evaluate.py --quick shows no new failures
-- [ ] #8 _VERSION_PRERELEASE bumped via bin/bump-prerelease.sh and version.h + data/version.hash staged with the firmware change
+- [x] #7 python evaluate.py --quick shows no new failures
+- [x] #8 _VERSION_PRERELEASE bumped via bin/bump-prerelease.sh and version.h + data/version.hash staged with the firmware change
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,11 @@ Two field testers on 1.5.0 report the Home Assistant 'DHW Control' (and Thermost
 6. Commit, push origin claude/fix-dhw-control-issue-bFtJ6, open draft PR
 7. Mark ACs, set Done
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented: removed sendMQTT(MQTTPubNamespace, CONLINEOFFLINE) at OTGW-Core.ino:4029 and MQTTstuff.ino:1113; otgw_connected retained. ADR-074 authored + user-Accepted in-session; declarative forbid_pattern Enforcement. Prerelease beta.3->beta.4. evaluate.py --quick: 4 unresolved ADR refs are PRE-EXISTING on dev (README->ADR-063; Accepted/immutable ADR-070->097, ADR-072->099x2) — my ADR-102 sibling ref escaped via forward-citation, so 0 new offenders. Committed ea75ea56 + 2d49113 4; pushed claude/fix-dhw-control-issue-bFtJ6; draft PR #583.
+
+AC#6 (python build.py --firmware exit 0) NOT self-verifiable in the Claude-on-the-web sandbox: network policy blocks downloads.arduino.cc and arduino-cli is not pre-installed, so the toolchain cannot be fetched. Dev CI (#583) has no firmware-build job (CodeQL + evaluate.py + claude-review only), so the compile gate is delegated to the maintainer/local build. Change is a pure 2-line deletion (no new identifiers; MQTTPubNamespace/CONLINEOFFLINE still used by the birth path) so compile risk is minimal but unverified here.
+<!-- SECTION:NOTES:END -->
