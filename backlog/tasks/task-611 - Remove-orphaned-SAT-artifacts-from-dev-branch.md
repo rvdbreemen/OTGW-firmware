@@ -1,9 +1,11 @@
 ---
 id: TASK-611
 title: Remove orphaned SAT artifacts from dev branch
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-16 09:02'
+updated_date: '2026-05-16 09:02'
 labels:
   - sat
   - cleanup
@@ -30,3 +32,18 @@ SAT (Smart Autotune Thermostat) is a 2.0.0 feature. Its source leaked onto dev v
 - [ ] #9 python evaluate.py --quick shows no new failures vs baseline
 - [ ] #10 Change is dev-only; the 2.0.0 SAT feature line is not modified
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Capture evaluator baseline (python evaluate.py --quick) before changes
+2. Delete the 5 SAT*.ino files (git rm)
+3. Strip the 8 #if defined(ENABLE_SAT) blocks from OTGW-firmware.h (168-171, 202-235, 279-281, 363-576, 588-590, 602-605, 681-763, 792-794)
+4. Remove the live json_attributes_topic -> /sat/climate_attributes block in mqtt_configuratie.cpp (2626-2632)
+5. Fix CLAUDE.md Layout line (drop SATcontrol.ino)
+6. grep audit: no genuine SAT refs remain
+7. Bump prerelease via bin/bump-prerelease.sh; stage version.h + data/version.hash
+8. python build.py --firmware (exit 0) + python evaluate.py --quick (no new failures)
+9. Resolve TASK-588 as moot-on-dev; note 589/590 superseded
+10. Commit, push to claude/remove-sat-artifacts-ZD5mM, open draft PR into dev
+<!-- SECTION:PLAN:END -->
