@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-16 12:47'
-updated_date: '2026-05-16 12:49'
+updated_date: '2026-05-16 12:52'
 labels:
   - cleanup
   - tech-debt
@@ -44,4 +44,6 @@ The prior SAT removal (#586 / its task) deleted the SAT*.ino implementation file
 
 <!-- SECTION:NOTES:BEGIN -->
 Removed 8 dead #if defined(ENABLE_SAT) regions from OTGW-firmware.h via deterministic state-machine filter (348 lines; 898 -> 550). Verified: 0 ENABLE_SAT and 0 SAT-subsystem refs under src/OTGW-firmware/ (firmware+data); block boundaries join cleanly (addOTWGcmdtoqueue->sendLogToWebSocket, OTGWState/OTGWSettings structs intact, no dangling braces). Prerelease beta.7 -> beta.8 (autoinc-semver cascade, same file-set pattern as prior SAT-removal #586). evaluate.py --quick: identical to pre-change baseline (Failed:1 = 4 pre-existing unresolved ADR refs, unrelated to this change) -> no new failures. AC3 (python build.py --firmware) NOT self-verifiable here: remote env network policy blocks downloads.arduino.cc (HTTP 403), arduino-cli cannot install. Change is compile-inert by construction (deleted blocks were gated by ENABLE_SAT, never defined -> never in any TU). PR CI covers the real compile.
+
+CI "Run evaluate.py --quick" failed on PR #589 — diagnosed as PRE-EXISTING on origin/dev, NOT a regression. Proof: clean origin/dev worktree runs evaluate.py --quick -> exit 1, Failed:1, "4 unresolved ADR reference(s) out of 1230"; my branch -> byte-identical (exit 1, same Failed:1, same 4 refs). git diff origin/dev HEAD -- evaluate.py docs/adr/ is empty (PR touches neither). evaluate.py exits 1 on any failure and the dev branch already carries this 1 failure (stale ADR cross-refs in docs, unrelated to SAT). Out of scope for a dead-code-removal PR; not fixing here. Recommend a separate backlog task to resolve the 4 dangling ADR references on dev.
 <!-- SECTION:NOTES:END -->
