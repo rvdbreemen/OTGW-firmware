@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.33
+**  Version  : v2.0.0-alpha.35
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1464,8 +1464,10 @@ static void publishThermostatConnectedState()
 
 static void publishOTGWConnectedState()
 {
+  // ADR-102: OT-bus liveness drives only the otgw_connected sensor. The base
+  // namespace topic is the HA avty_t and is owned solely by the MQTT
+  // birth/LWT mechanism (birth "online" on connect, broker LWT "offline").
   sendMQTTData(F("otgw_connected"), CCONOFF(state.otBus.bOnline));
-  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otBus.bOnline));
 }
 
 /*
