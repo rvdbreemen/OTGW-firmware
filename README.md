@@ -1,7 +1,7 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> ✅ This branch tracks the stable/public release line.
-> For in-progress development changes, see the [`dev` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/dev).
+> ⚠️ **This is the development branch (`dev`)** — the 1.5.x maintenance line, tracking the next `1.5.x` release.
+> For the current stable release, see the [`main` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/main) or the [v1.5.0 release](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0).
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
@@ -21,7 +21,7 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 - **No-Python flash and build scripts**: `flash_otgw.sh` / `flash_otgw.bat` and `build.sh` / `build.bat`.
 - **Arduino Core 2.7.4 baseline**: partition layout retained at `eesz=4M2M` — no filesystem partition reformat needed when upgrading from v1.4.1.
 
-Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)
+Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
 ## Latest stable release: v1.5.0-fix2

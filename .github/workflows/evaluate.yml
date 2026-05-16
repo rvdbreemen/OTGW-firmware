@@ -49,6 +49,8 @@ jobs:
             root / "docs" / "releases",
             root / "docs" / "api",
             root / "docs" / "features",
+            root / "docs" / "guides",
+            root / "docs" / "process",
           ]
           md_files = []
           for item in scope:
