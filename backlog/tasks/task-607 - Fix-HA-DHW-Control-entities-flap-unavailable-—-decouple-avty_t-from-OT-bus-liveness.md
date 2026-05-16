@@ -3,9 +3,11 @@ id: TASK-607
 title: >-
   Fix: HA DHW Control & entities flap unavailable — decouple avty_t from OT-bus
   liveness
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-16 07:18'
+updated_date: '2026-05-16 07:18'
 labels:
   - bug
   - mqtt
@@ -30,3 +32,15 @@ Two field testers on 1.5.0 report the Home Assistant 'DHW Control' (and Thermost
 - [ ] #7 python evaluate.py --quick shows no new failures
 - [ ] #8 _VERSION_PRERELEASE bumped via bin/bump-prerelease.sh and version.h + data/version.hash staged with the firmware change
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Author docs/adr/ADR-074 (Proposed): decouple HA avty_t from OT-bus liveness; >=2 alternatives; Enforcement block
+2. Present ADR-074 to user for explicit acceptance (ADR gate)
+3. On acceptance: remove sendMQTT(MQTTPubNamespace, CONLINEOFFLINE) at OTGW-Core.ino ~4029 and MQTTstuff.ino ~1113; keep otgw_connected publishes
+4. Bump _VERSION_PRERELEASE via bin/bump-prerelease.sh; stage version.h + data/version.hash
+5. python build.py --firmware (exit 0); python evaluate.py --quick (no new failures)
+6. Commit, push origin claude/fix-dhw-control-issue-bFtJ6, open draft PR
+7. Mark ACs, set Done
+<!-- SECTION:PLAN:END -->
