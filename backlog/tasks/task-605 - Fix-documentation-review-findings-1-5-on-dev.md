@@ -1,11 +1,11 @@
 ---
 id: TASK-605
 title: Fix documentation review findings 1-5 on dev
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:10'
-updated_date: '2026-05-16 07:13'
+updated_date: '2026-05-16 07:20'
 labels:
   - documentation
 dependencies: []
@@ -41,14 +41,5 @@ Address the 5 findings from the dev documentation review: README dev/stable bann
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Fixed all 5 dev documentation-review findings.
-
-Changes:
-- F1 README.md banner: replaced the main-oriented "stable/public release line" wording (self-contradictory on dev) with branch-correct text identifying dev as the 1.5.x maintenance line, pointing to main/v1.5.0 for stable.
-- F2 DOCUMENTATION_LINKS_POLICY.md rule 4: reworded so it matches actual placement (v1.3.4 and older archived; v1.3.5/v1.4.1/v1.5.x stay current) instead of the contradictory "v1.3.x and older".
-- F3 .github/workflows/evaluate.yml: added docs/guides and docs/process to the markdown link-check scope (previously the guardrail did not cover the files the recent doc cluster added).
-- F4 fixed broken relative links: docs/guides/BUILD.md (../ -> ../../ for README/Makefile/scripts) and docs/guides/browser-debug-console.md (../ -> ../../ for README anchors; .ino links repointed to real ../../src/OTGW-firmware/ paths).
-- F5 README.md:24 hard break (match line-31 trailing-space convention); PIC_FIRMWARE_EN.md "hot-water" -> "central-heating water" setpoint (matches NL aanvoerwatertemperatuur, removes DHW ambiguity); FLASH_GUIDE_NL.md "volgordekeuze" -> "volgorde-eis".
-
-Verification: extended internal link checker (README + docs/{releases,api,features,guides,process}) reports 0 broken links. Docs/CI-tooling only: no version bump, no ADR.
+CI note: PR #581 'Run evaluate.py --quick' is RED but PRE-EXISTING on dev base 97fd601 (verified: identical "4 unresolved ADR reference(s) out of 1224", Health 91.7%, before and after this commit; this commit changes zero ADR references). The markdown link-check step this PR governs passes (0 broken). Not a regression — out of scope for a docs review.
 <!-- SECTION:FINAL_SUMMARY:END -->
