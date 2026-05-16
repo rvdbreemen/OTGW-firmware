@@ -270,7 +270,7 @@ Importeer na het flashen je instellingen opnieuw via de webinterface.
 4. Vernieuw de browser hard (Ctrl+F5)
 5. Importeer je instellingen opnieuw
 
-**Deze volgordekeuze geldt NIET voor v1.4.x → v1.5.x upgrades** (de partitie-indeling
+**Deze volgorde-eis geldt NIET voor v1.4.x → v1.5.x upgrades** (de partitie-indeling
 is identiek).
 
 ---

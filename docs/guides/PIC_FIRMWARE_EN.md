@@ -24,7 +24,7 @@ boiler. It is the only part of the device that can speak the OpenTherm protocol:
 
 - It reads every message your thermostat sends to the boiler, and every reply from the boiler.
 - It lets the gateway *intercept* those messages so it can, for example, raise or lower the
-  boiler's hot-water temperature setpoint independently of what the thermostat asked for.
+  boiler's central-heating water temperature setpoint independently of what the thermostat asked for.
 - It sends commands to the boiler on behalf of the gateway when you request an override.
 
 Without a working PIC firmware:
