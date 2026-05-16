@@ -455,10 +455,10 @@ console.log('Flash mode:', flashModeActive)
 
 ## See Also
 
-- [Telnet Debug Interface](../handleDebug.ino) - Server-side debug menu
-- [REST API Documentation](../README.md#rest-api) - API endpoint reference
-- [MQTT Commands](../README.md#mqtt) - MQTT command reference
-- [WebSocket Implementation](../webSocketStuff.ino) - WebSocket source code
+- [Telnet Debug Interface](../../src/OTGW-firmware/handleDebug.ino) - Server-side debug menu
+- [REST API Documentation](../../README.md#rest-api) - API endpoint reference
+- [MQTT Commands](../../README.md#mqtt) - MQTT command reference
+- [WebSocket Implementation](../../src/OTGW-firmware/webSocketStuff.ino) - WebSocket source code
 
 ---
 

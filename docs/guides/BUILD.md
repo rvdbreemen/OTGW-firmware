@@ -320,10 +320,10 @@ The GitHub Actions workflow (`.github/workflows/main.yml`) uses the same Makefil
 
 ## Further Reading
 
-- **Main README**: [../README.md](../README.md)
+- **Main README**: [../../README.md](../../README.md)
 - **Wiki**: <https://github.com/rvdbreemen/OTGW-firmware/wiki>
-- **Makefile reference**: [../Makefile](../Makefile)
-- **Version script**: [../scripts/autoinc-semver.py](../scripts/autoinc-semver.py)
+- **Makefile reference**: [../../Makefile](../../Makefile)
+- **Version script**: [../../scripts/autoinc-semver.py](../../scripts/autoinc-semver.py)
 
 ## Getting Help
 
