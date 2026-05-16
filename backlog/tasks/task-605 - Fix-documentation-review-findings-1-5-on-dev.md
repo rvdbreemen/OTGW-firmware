@@ -1,9 +1,11 @@
 ---
 id: TASK-605
 title: Fix documentation review findings 1-5 on dev
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-16 07:10'
+updated_date: '2026-05-16 07:10'
 labels:
   - documentation
 dependencies: []
@@ -24,3 +26,14 @@ Address the 5 findings from the dev documentation review: README dev/stable bann
 - [ ] #5 Cosmetic nits fixed: README.md:24 hard break, PIC_FIRMWARE_EN.md CH-water wording, FLASH_GUIDE_NL.md volgorde-eis
 - [ ] #6 Extended internal link checker reports 0 broken links across README + docs/{releases,api,features,guides,process}
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. F1 README.md:3-4 banner -> dev/maintenance wording
+2. F2 DOCUMENTATION_LINKS_POLICY.md:18 reword rule 4
+3. F4 fix ../ links in BUILD.md + browser-debug-console.md (verified targets)
+4. F3 add docs/guides+docs/process to evaluate.yml scope
+5. F5 README hard break, PIC_FIRMWARE_EN CH wording, FLASH_GUIDE_NL volgorde-eis
+6. Run extended link checker -> 0 broken; commit+push; draft PR
+<!-- SECTION:PLAN:END -->
