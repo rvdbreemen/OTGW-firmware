@@ -14,8 +14,12 @@ The separate ESP32 / SAT v2.0.0 exploration on `feature-dev-2.0.0-otgw32-esp32-s
 - Pure JIT MQTT discovery: only non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC) are queued at boot; OT MsgID discovery configs publish on first MsgID reception, not on connect (ADR-073, supersedes ADR-041)
 
 ### Fixed
+- JIT MQTT discovery could stall: the just-in-time trigger enqueued any OT MsgID with a valid value, including IDs with no HA sensor/binsensor config; `doAutoConfigureMsgid()` fails for those and the drip loop retains the pending bit, so the per-tick scan re-picked the same phantom ID forever and never published the real entities until the operator pressed `F`. The JIT trigger now applies the same `hasConfig` filter as the force path so both enqueue an identical ID set (ADR-073, TASK-601)
 - `sat/climate_attributes` now wired as `json_attributes_topic` on the HA thermostat entity; SAT PID/curve attributes appear as `extra_state_attributes` (TASK-589)
 - `flash_otgw.bat` COM port detection via registry; PS1 generation; auto-download of binaries when not found locally
+
+### Documentation
+- `docs/guides/MQTT_STALE_TOPICS_CLEANUP.md`: added a "Recovering missing HA entities" section distinguishing the just-in-time progressive-appearance behaviour and PIC-only-reset semantics from the upgrade stale-topic cleanup, with escalating recovery steps (wait → force re-announce → clear broker + reboot)
 
 ### Removed
 - Orphaned `sat/pressure_health_attr` JSON publish; pressure data is already available via flat scalar topics `sat/pressure`, `sat/pressure_drop_rate`, and `sat/pressure_alarm` (TASK-590)

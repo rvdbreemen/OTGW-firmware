@@ -1,5 +1,57 @@
 # Cleaning Up Stale MQTT Retained Topics After Firmware Upgrade
 
+> **Entities never appeared at all** (as opposed to *duplicated* or *stale*)?
+> See **[Recovering missing HA entities](#recovering-missing-ha-entities)** below
+> first — that is usually a different, simpler situation than the upgrade
+> cleanup described in the rest of this guide.
+
+## Recovering missing HA entities
+
+**Symptom:** value topics arrive (you can see live OT values), but some or all
+Home Assistant entities never get created — no duplicates, just absent.
+
+**Background.** The firmware publishes each OT MsgID's discovery config
+**just-in-time**: the config for a given MsgID is sent the first time that
+MsgID is seen on the OpenTherm bus after the ESP (re)starts, then the broker
+**retains** it. A few consequences follow:
+
+- Entities appear **progressively**, not all at once. Frequently-polled values
+  (room/boiler temperature, setpoints) show up within seconds; rarely-sent
+  diagnostic IDs can take minutes — or never, if the boiler never sends them.
+- A **PIC-only reset does not re-publish anything**, and it does not need to:
+  the `GW=R` command and the on-board reset button restart only the OTGW PIC,
+  not the ESP. The MQTT session stays up and the broker still holds every
+  retained discovery config, so Home Assistant keeps all its entities. A full
+  ESP restart (web UI **Reboot**, power cycle, OTA) is what re-runs the
+  just-in-time cycle from scratch.
+- Some OT MsgIDs are answered by the boiler with **Unknown-Data-Id** (the
+  thermostat asks, this particular boiler does not implement it — e.g.
+  `MaxRelModLevelSetting`, `Tr`, `ElectricalCurrentBurnerFlame`). No valid
+  value is ever produced, so no entity is created. This is normal and is a
+  property of your boiler, not a firmware fault — you can simply ignore those.
+
+**Do this, in order of effort — stop as soon as entities appear:**
+
+1. **Wait ~5 minutes** with normal OT traffic after the last full ESP restart.
+   Most active entities self-populate in that window as their MsgIDs are seen.
+2. **Force a full re-announce.** Open the OTGW web interface → **MQTT** tab →
+   **Re-publish discovery** (or REST: `curl -X POST
+   http://otgw.local/api/v2/discovery/republish`, or the Serial/telnet debug
+   command **`F`**). This queues *every* known MsgID for discovery immediately;
+   they then drip out over a few minutes. Safe to repeat — the broker
+   deduplicates identical retained configs, so no Home Assistant churn.
+3. **Clear the broker, then reboot.** If entities are still missing after
+   step 2, the retained discovery state on the broker is likely corrupt or was
+   manually removed. Remove the retained topics using **Step 2** below, then
+   restart the OTGW from the web UI (full ESP restart). The just-in-time cycle
+   re-publishes everything fresh.
+
+If after all three steps an entity is still absent, it is almost certainly an
+Unknown-Data-Id MsgID (see Background) — that entity will not exist for your
+boiler and that is expected.
+
+---
+
 ## Why does this happen?
 
 When the OTGW firmware publishes sensor and entity information to Home Assistant, it uses a
