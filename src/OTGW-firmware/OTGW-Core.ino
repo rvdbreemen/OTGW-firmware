@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.5.1-beta.4
+**  Version  : v1.5.1-beta.6
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4116,12 +4116,16 @@ void processOT(const char *buf, int len){
       // the drip loop retains the bit on failure (MQTTstuff.ino:1475-1482) and
       // re-picks the same lowest-numbered ID forever, stalling all subsequent
       // drip progress until the operator runs F. (ADR-073)
-      if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable) {
+      // getMQTTConfigDone() (one bit read) is checked before hasConfig (two
+      // PROGMEM word reads): after warm-up most MsgIDs are already "done" and
+      // arrive frequently, so the cheap done-bit short-circuits the hot path.
+      if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable
+          && !getMQTTConfigDone(OTdata.id)) {
         const bool hasConfig = (readSensorIndex(OTdata.id) != MQTT_HA_INDEX_NONE)
                             || (readBinSensorIndex(OTdata.id) != MQTT_HA_INDEX_NONE)
                             || (OTdata.id == 0)   // climate (thermostat + DHW)
                             || (OTdata.id == 27); // number (Toutside override)
-        if (hasConfig && !getMQTTConfigDone(OTdata.id)) {
+        if (hasConfig) {
           setMQTTConfigPending(OTdata.id);
         }
       }

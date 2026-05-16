@@ -35,15 +35,16 @@ MsgID is seen on the OpenTherm bus after the ESP (re)starts, then the broker
 1. **Wait ~5 minutes** with normal OT traffic after the last full ESP restart.
    Most active entities self-populate in that window as their MsgIDs are seen.
 2. **Force a full re-announce.** Open the OTGW web interface → **MQTT** tab →
-   **Re-publish discovery** (or REST: `curl -X POST
-   http://otgw.local/api/v2/discovery/republish`, or the Serial/telnet debug
-   command **`F`**). This queues *every* known MsgID for discovery immediately;
-   they then drip out over a few minutes. Safe to repeat — the broker
-   deduplicates identical retained configs, so no Home Assistant churn.
+   **Re-publish discovery** (or REST: `curl -X POST http://otgw.local/api/v2/discovery/republish`,
+   or the Serial/telnet debug command **`F`**). This queues *every* known MsgID
+   for discovery immediately; they then drip out over a few minutes. Safe to
+   repeat — the broker deduplicates identical retained configs, so no Home
+   Assistant churn.
 3. **Clear the broker, then reboot.** If entities are still missing after
    step 2, the retained discovery state on the broker is likely corrupt or was
-   manually removed. Remove the retained topics using **Step 2** below, then
-   restart the OTGW from the web UI (full ESP restart). The just-in-time cycle
+   manually removed. Remove the retained topics by following the
+   **"Step 2 — Remove the stale retained topics"** section below, then restart
+   the OTGW from the web UI (full ESP restart). The just-in-time cycle
    re-publishes everything fresh.
 
 If after all three steps an entity is still absent, it is almost certainly an
