@@ -1,7 +1,7 @@
 ---
 id: TASK-611
 title: Standalone HA discovery wipe script
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 08:59'
