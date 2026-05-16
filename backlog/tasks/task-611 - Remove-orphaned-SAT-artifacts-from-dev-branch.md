@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-16 09:02'
-updated_date: '2026-05-16 09:07'
+updated_date: '2026-05-16 09:08'
 labels:
   - sat
   - cleanup
@@ -60,3 +60,27 @@ Implementation complete.
 - Evaluator: 31 pass / 1 fail / 2 warn — IDENTICAL to pre-change baseline (0 new failures; the 1 failure is the pre-existing ADR unresolved-reference issue).
 - AC#8 (python build.py --firmware exit 0) BLOCKED: this remote container has no arduino-cli and the network policy 403-blocks downloads.arduino.cc, so the ESP8266 core/index cannot be fetched and there is no local ~/.arduino15 cache. arduino-cli 1.4.1 was sideloaded from GitHub but core update-index still 403s. Build gate must run in PR CI. Change correctness argued by construction: only mqtt_configuratie.cpp touches compiled code (gated SAT was never compiled on dev); that edit is a self-contained statement removal verified by inspection.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Removed the orphaned SAT (Smart Autotune Thermostat) subsystem from the dev branch. SAT is a 2.0.0 feature; its source had leaked onto dev via the squashed import. All SAT code on dev was gated behind #if defined(ENABLE_SAT), and ENABLE_SAT is never defined on dev (no #define, no build flag) — so it contributed zero bytes to the dev firmware.
+
+Changes:
+- Deleted 5 fully-gated source files: SATcontrol.ino, SATcycles.ino, SATweather.ino, SATpid.ino, SATpressure.ino (~5,500 lines).
+- Removed the 8 #if defined(ENABLE_SAT) blocks from OTGW-firmware.h (forward decls, SAT enums/state structs, SATRuntimeSection/SATSection settings, debug flag, command-queue alias, hasOTCommandInterface). Preprocessor balance and struct integrity verified.
+- Removed the one LIVE non-gated artifact: the climate json_attributes_topic -> /sat/climate_attributes block in mqtt_configuratie.cpp (added by TASK-589). On dev SAT never published that topic, so HA received a dead attributes reference; removal is the correct dev-side resolution of TASK-589 (its AC#3 "remove" arm).
+- Fixed the stale CLAUDE.md Layout line that listed SATcontrol.ino as a dev sibling .ino.
+- Resolved dev SAT backlog TASK-588 (moot-on-dev); annotated 589/590 as superseded on dev.
+- Version bumped beta.4 -> beta.5 (commit touches src/OTGW-firmware/**).
+
+User impact: none on the dev firmware binary (gated code was never compiled). The only HA-visible change is that the Thermostat climate discovery config no longer advertises a json_attributes_topic that was never populated on dev — a corrective cleanup, not a feature loss.
+
+Validation:
+- python evaluate.py --quick: 31 pass / 2 warn / 1 fail — IDENTICAL to pre-change baseline. Zero new failures (the single failure is the pre-existing ADR unresolved-reference issue).
+- python build.py --firmware: NOT verifiable in this container — no arduino-cli + network policy 403-blocks downloads.arduino.cc (ESP8266 core/index unfetchable, no local cache). arduino-cli 1.4.1 sideloaded from GitHub but core update-index still 403s. This DoD/AC item is environment-blocked and must be confirmed by PR CI. Compile risk is minimal by construction: gated SAT was never compiled on dev (deleting empty TUs and never-compiled preprocessor text cannot change the build); the sole compiled-code edit (mqtt_configuratie.cpp) is a self-contained statement removal verified syntactically by inspection.
+
+Scope: dev-only. The 2.0.0 SAT feature line (feature-dev-2.0.0-otgw32-esp32-sat-support) is intentionally untouched.
+
+Status: left In Progress pending PR-CI build confirmation (AC#8 environment-blocked per project policy).
+<!-- SECTION:FINAL_SUMMARY:END -->
