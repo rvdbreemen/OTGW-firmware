@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 08:50'
-updated_date: '2026-05-16 08:53'
+updated_date: '2026-05-16 09:28'
 labels:
   - mqtt
   - investigation
@@ -58,6 +58,8 @@ This task captures the diagnosis. Implementation deferred until the maintainer c
 
 <!-- SECTION:NOTES:BEGIN -->
 Maintainer decision: keep ADR-073 semantics as-is. GW=R / physical PIC reset stays PIC-only; no rediscovery is needed because the MQTT session survives a PIC-only reset and the broker retains all discovery configs. No firmware change for this task. The user-visible 'missing entities' symptom is addressed by the phantom-ID drip-stall fix (TASK-601, PR #572) plus documented recovery guidance.
+
+Maintainer reconfirmed scope (2026-05-16): PIC resets (GW=R, physical button, internal resetOTGW) are NEVER a discovery trigger. Only ESP-level restart / cold boot / OTA / watchdog / exception are. This is exactly the existing behaviour — gTrackingStateInitializer + startMQTT() clear the done/pending bitmaps on every ESP program start, and the JIT trigger then instantly re-marks on incoming OT bus traffic. No code change, no ADR supersession. The visible-entities outcome is delivered by the TASK-601 phantom-ID drip-stall fix in PR #572 (the marking was always instant; the drip uitlevering was the broken link).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
