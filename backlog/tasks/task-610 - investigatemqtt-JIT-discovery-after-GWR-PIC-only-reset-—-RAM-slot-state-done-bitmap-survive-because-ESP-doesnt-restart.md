@@ -3,11 +3,11 @@ id: TASK-610
 title: >-
   investigate(mqtt): JIT discovery after GW=R / PIC-only reset — RAM slot-state
   + done-bitmap survive because ESP doesn't restart
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 08:50'
-updated_date: '2026-05-16 08:50'
+updated_date: '2026-05-16 08:53'
 labels:
   - mqtt
   - investigation
@@ -50,6 +50,30 @@ This task captures the diagnosis. Implementation deferred until the maintainer c
 - [x] #2 Confirm sentinel + firstSeen computation — DONE: 0xFFFF, time-bits == sentinel
 - [x] #3 Enumerate every reset path for resetMqttTrackedState + done-bitmap — DONE
 - [x] #4 Confirm UI-reboot vs GW=R asymmetry mechanism — DONE: ESP.restart vs PIC-only
-- [ ] #5 Maintainer confirms desired semantics (option 1 RAM-only republish-on-restart / option 3 reset-all-paths / no-change) before any implementation
-- [ ] #6 If implementation approved: test-matrix (cold/UI/GW=R/physical/F/broker-reconnect) results recorded in PR
+- [x] #5 Maintainer confirms desired semantics (option 1 RAM-only republish-on-restart / option 3 reset-all-paths / no-change) before any implementation
+- [x] #6 If implementation approved: test-matrix (cold/UI/GW=R/physical/F/broker-reconnect) results recorded in PR
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Maintainer decision: keep ADR-073 semantics as-is. GW=R / physical PIC reset stays PIC-only; no rediscovery is needed because the MQTT session survives a PIC-only reset and the broker retains all discovery configs. No firmware change for this task. The user-visible 'missing entities' symptom is addressed by the phantom-ID drip-stall fix (TASK-601, PR #572) plus documented recovery guidance.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Investigation only — no firmware change (maintainer chose to keep ADR-073 as-is).
+
+Findings (static analysis, corrects the refined handover's premise):
+- Slot-state mqttlastsent[] is pure RAM (OTGW-Core.ino:255), not RTC/LittleFS.
+- Sentinel TRACKED_TIME_UNSEEN=0xFFFF; the {0} static init is NOT 'unseen' — resetMqttTrackedState() writes the real sentinel.
+- resetMqttTrackedState() runs from a C++ static-init object (gTrackingStateInitializer) on every ESP program start (cold boot, ESP.restart, watchdog, OTA), and from requestMQTTRepublishAll() on the >5min broker-restart heuristic. NOT on GW=R, physical reset, normal reconnect, settings change, or F.
+- UI/FSexplorer/nightly reboot -> doRestart() -> ESP.restart(): full restart re-runs static-init AND startMQTT() (clears done+pending bitmaps). Clean JIT cycle.
+- GW=R / physical button -> resetOTGW() -> OTGWSerial.resetPic() only: ESP keeps running, mqttlastsent[] and the MQTTautoConfigMap done-bitmap survive.
+- Premise correction: the JIT trigger (processOT() ~4112, post-TASK-601) does NOT depend on firstSeen. Its gate is is_value_valid && bEnable && hasConfig && !getMQTTConfigDone(id). firstSeen only throttles value-topic publishing. After GW=R the real suppressor (correctly) is the done-bitmap, and since the MQTT session is unaffected the broker still retains every config — HA loses nothing, so there is nothing to republish.
+
+Decision: keep ADR-073 semantics. The 'missing entities' field symptom is the cold-boot/fresh-flash phantom-ID drip stall, already fixed in TASK-601 / PR #572. Added user-facing recovery documentation (CHANGELOG + docs/guides/MQTT_STALE_TOPICS_CLEANUP.md 'Recovering missing HA entities' section) covering progressive JIT appearance, PIC-only-reset semantics, Unknown-Data-Id boiler behaviour, and escalating recovery steps.
+
+Outcome: docs-only deliverable on branch claude/fix-jit-mqtt-discovery-N7Yos (rides PR #572). No code, no ADR change.
+<!-- SECTION:FINAL_SUMMARY:END -->
