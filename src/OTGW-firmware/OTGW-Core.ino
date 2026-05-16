@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.5.1-beta.3
+**  Version  : v1.5.1-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4024,11 +4024,12 @@ void processOT(const char *buf, int len){
     //OpenTherm is active when at least one side (boiler or thermostat) is communicating on the bus.
     state.otgw.bOnline = state.otgw.bBoilerState || state.otgw.bThermostatState;
     if ((state.otgw.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
+      // ADR-074: OT-bus liveness drives only the otgw_connected sensor, never
+      // the base namespace topic (that topic is the HA avty_t, owned by the
+      // MQTT birth/LWT mechanism — see MQTTstuff.ino).
       if (isPICEnabled()) {
         sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
-        sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
       }
-      // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
       bOTGWpreviousstate = state.otgw.bOnline; //remember state, so we can detect statechanges
     }
 
