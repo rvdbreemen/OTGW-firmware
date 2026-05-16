@@ -70,30 +70,34 @@ functionaliteit geïmplementeerd:
 Deze wordt automatisch geselecteerd bij de updatecontrole wanneer het apparaat in de
 standaard gateway-modus werkt.
 
+Broninformatie: [Gateway firmware details](https://otgw.tclcode.com/firmware.html)
+
 ### 2. `interface.hex` — Interface-firmware
 
-De interface-firmware maakt van de OTGW-hardware een eenvoudigere **OpenTherm-interface**
-in plaats van een volledige gateway. In deze modus fungeert de PIC als doorvoer: de
-thermostaat en cv-ketel communiceren rechtstreeks met elkaar, en de ESP8266 kan berichten
-lezen maar niet onderscheppen of overschrijven.
+De interface-firmware maakt van de OTGW-hardware een **serieel-naar-OpenTherm interface**
+voor experimenten. De firmware rapporteert OpenTherm-berichten op de seriële poort, maar
+stuurt ze niet zelfstandig door tussen thermostaat en ketel. Je moet zelf een OpenTherm-
+bericht als 8 hex-tekens (plus carriage return) aanbieden; daarna bepaalt de firmware op
+basis van de bericht-richting of het bericht naar thermostaat of ketel wordt gestuurd.
 
 Gebruikssituaties:
-- Systemen waarbij gateway-onderschepping ongewenst is of compatibiliteitsproblemen
-  veroorzaakt.
-- OpenTherm-data uitlezen zonder de communicatie tussen thermostaat en ketel te beïnvloeden.
+- Experimenteren met het OpenTherm-protocol en eigen berichtmanipulatie.
+- Situaties waarin je handmatige berichtcontrole wilt in plaats van volledige gateway-logica.
 
 > **Let op:** Met de interface-firmware kunnen de gateway-specifieke overschrijvingscommando's
 > (`TT`, `SW`, enz.) niet worden gebruikt. Schakel terug naar `gateway.hex` om de volledige
 > gateway-functionaliteit te herstellen.
 
-Zie voor meer details de [OTGW firmware-pagina](https://otgw.tclcode.com/firmware.html) op
-de website van Schelte.
+Zie voor meer details:
+- [Interface firmware details](https://otgw.tclcode.com/interface.html)
+- [Firmware-overzicht](https://otgw.tclcode.com/firmware.html)
 
 ### 3. `diagnose.hex` — Diagnostische firmware
 
-De diagnostische firmware vervangt tijdelijk de standaardfirmware om problemen met de
-gateway-hardware of OpenTherm-bedrading te helpen diagnosticeren. Het biedt zes tests die
-gedetailleerde informatie geven over het elektrische en timinggedrag van de bus.
+De diagnostische firmware vervangt tijdelijk de normale gateway-firmware om problemen met
+gateway-hardware en OpenTherm-bedrading te onderzoeken. De firmware biedt zes tests met
+gedetailleerde timing- en spanningsinformatie, terwijl communicatie tussen thermostaat en
+ketel in de meeste tests actief blijft.
 
 Normale communicatie tussen thermostaat en ketel gaat door terwijl de meeste tests lopen.
 De uitzondering is Test #4 (vertragingssymmetrie), waarvoor de master- en slave-interfaces
@@ -112,6 +116,8 @@ via een loopback op elkaar moeten worden aangesloten.
 
 Flash `gateway.hex` terug nadat je de gewenste tests hebt uitgevoerd om de normale
 werking te herstellen.
+
+Broninformatie: [Diagnostische firmware details](https://otgw.tclcode.com/diagnose.html)
 
 ---
 

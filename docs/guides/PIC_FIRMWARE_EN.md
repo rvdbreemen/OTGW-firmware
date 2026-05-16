@@ -68,29 +68,33 @@ This is the normal operating firmware. It implements the full OpenTherm Gateway 
 It is automatically selected for the update check whenever the device is running in
 standard gateway mode.
 
+Source details: [Gateway firmware details](https://otgw.tclcode.com/firmware.html)
+
 ### 2. `interface.hex` — Interface firmware
 
-The interface firmware turns the OTGW hardware into a simpler **OpenTherm interface** rather
-than a full gateway. In this mode the PIC acts as a pass-through: the thermostat and boiler
-communicate with each other directly, and the ESP8266 can read messages but cannot intercept
-or override them.
+The interface firmware turns the OTGW hardware into a **serial-to-OpenTherm interface** for
+experimentation. It reports OpenTherm traffic to the serial connection, but it does **not**
+forward thermostat/boiler messages on its own. You must send an 8-hex-character OpenTherm
+frame (followed by carriage return), and the firmware transmits it to thermostat or boiler
+based on message direction.
 
 Use cases:
-- Systems where gateway interception is not wanted or causes compatibility problems.
-- Reading OpenTherm data from an installation without affecting the thermostat–boiler dialogue.
+- OpenTherm protocol experiments and custom message manipulation tooling.
+- Installations where you want manual message control instead of full gateway behaviour.
 
 > **Note:** With the interface firmware loaded, the gateway-specific override commands
 > (`TT`, `SW`, etc.) no longer work. Switch back to `gateway.hex` to restore full gateway
 > functionality.
 
-For more details, see the
-[OTGW firmware page](https://otgw.tclcode.com/firmware.html) on Schelte's website.
+For more details, see:
+- [Interface firmware details](https://otgw.tclcode.com/interface.html)
+- [Firmware overview](https://otgw.tclcode.com/firmware.html)
 
 ### 3. `diagnose.hex` — Diagnostic firmware
 
-The diagnostic firmware replaces the standard firmware temporarily to help diagnose
-problems with the gateway hardware or OpenTherm wiring. It provides six tests that give
-detailed information about the electrical and timing behaviour of the bus.
+The diagnostic firmware temporarily replaces normal gateway firmware to help diagnose
+gateway hardware and OpenTherm wiring issues. It provides six tests with detailed
+timing/electrical information, while thermostat↔boiler communication usually keeps running.
 
 Normal thermostat–boiler communication continues while most tests run. The one exception
 is Test #4 (delay symmetry), which requires the master and slave interfaces to be looped
@@ -108,6 +112,8 @@ together.
 | 6 | Idle times | Measures the idle time (ms) between OpenTherm messages. |
 
 After running the desired tests, flash `gateway.hex` back to restore normal operation.
+
+Source details: [Diagnostic firmware details](https://otgw.tclcode.com/diagnose.html)
 
 ---
 
