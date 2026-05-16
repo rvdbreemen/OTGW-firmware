@@ -1,11 +1,13 @@
 ---
 id: TASK-612
 title: >-
-  investigate(mqtt): bit-extracted sub-topics 'unknown' in HA — non-retained
-  state vs retained discovery, NOT a missing first-seen term
-status: To Do
-assignee: []
+  fix(mqtt): first-seen bit/byte fan-out starved by 250ms shared rate-gate
+  (ASF/RBP/VH stay unknown)
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-16 09:51'
+updated_date: '2026-05-16 09:54'
 labels:
   - mqtt
   - investigation
@@ -50,3 +52,19 @@ Scope: investigation only. No code until maintainer picks a direction. Supersede
 - [ ] #4 Maintainer chooses direction (Option R retained / Option S re-publish-after-discovery / document-only / no-op) before any implementation
 - [ ] #5 Toutside 0x7FFF behaviour decision recorded (recommend document-only)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Exempt the one-shot first-seen and forcePublish cases from the 250ms spacing gate in shouldPublishTrackedStatusBit() and shouldPublishTrackedStatusByte(); keep spacing ONLY for the recurring 60s heartbeat (intervalElapsed). valueChanged already bypasses. Matches maintainer semantics: publish on first seen, then only on change or every 60s.
+2. build.py --firmware (sandbox: arduino-cli blocked — note limitation) + evaluate.py --quick no-regression.
+3. Commit on PR branch, push (fast-forward), update PR.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Maintainer pointer confirmed + refined the root cause.
+
+The per-bit gate shouldPublishTrackedStatusBit() DOES have a firstSeen term, but the firstSeen/forcePublish/intervalElapsed branch is throttled by a SINGLE global mqttLastGatedPublishMs at MQTT_GATED_PUBLISH_SPACING_MS=250ms (OTGW-Core.ino:289-290,1564,1603). A parent message decodes its whole fan-out (ASF: 1 byte+6 bits; RBP: 2 bytes+4 bits; Status: 2 bytes+15 bits) inside ONE processOT() call, microseconds apart. Only the first slot passes the 250ms gate; the rest return false (deferred), keep firstSeen=true, and retry ONLY on the next parent frame. msgId 0 Status recurs ~every 3s and its bits also change (valueChanged bypasses the gate) so it mostly self-heals; ASF(5)/RBP(6)/VH parents are polled rarely, so their deferred first-seen publishes starve — entities stay unknown in HA. This matches the field report and the maintainer's observation exactly.\n\nNote: the earlier non-retained-state angle is a secondary contributor, not the primary cause; primary cause is rate-gate starvation of the one-shot first-seen burst.
+<!-- SECTION:NOTES:END -->
