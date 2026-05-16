@@ -52,3 +52,19 @@ Implemented: removed sendMQTT(MQTTPubNamespace, CONLINEOFFLINE) at OTGW-Core.ino
 
 AC#6 (python build.py --firmware exit 0) NOT self-verifiable in the Claude-on-the-web sandbox: network policy blocks downloads.arduino.cc and arduino-cli is not pre-installed, so the toolchain cannot be fetched. Dev CI (#583) has no firmware-build job (CodeQL + evaluate.py + claude-review only), so the compile gate is delegated to the maintainer/local build. Change is a pure 2-line deletion (no new identifiers; MQTTPubNamespace/CONLINEOFFLINE still used by the birth path) so compile risk is minimal but unverified here.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixes HA DHW Control/Thermostat/all entities flapping unavailable on 1.5.x (field-confirmed by two testers on 1.5.0+0719e08).
+
+Root cause: every HA discovery composer sets avty_t to the base namespace topic, which was also overwritten with online/offline derived from OT-bus liveness (30s wall-clock window). Regression since 1.5.0/TASK-538 moved online/offline onto the canonical base topic.
+
+Change: removed the two sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline)) writes (OTGW-Core.ino, MQTTstuff.ino). Base topic now owned solely by MQTT birth/LWT; OT-bus liveness stays on the unchanged otgw_connected sensor. No discovery-schema change. Documented contract change in CHANGELOG + ADR-074 (Accepted, declarative Enforcement).
+
+User impact: HA entities stay available whenever the gateway is MQTT-connected, regardless of OT-bus traffic gaps. Consumers that read the base topic as OT-liveness must move to otgw_connected.
+
+Tests: evaluate.py --quick has no NEW failures (4 unresolved-ADR-ref offenders are pre-existing on dev / immutable Accepted ADRs). Prerelease beta.3->beta.4. Draft PR #583.
+
+OPEN/BLOCKER: AC#6 firmware build not self-verifiable in sandbox (no arduino-cli, network blocked) and dev CI has no build job — compile gate delegated to maintainer/local build. Task left In Progress pending that confirmation.
+<!-- SECTION:FINAL_SUMMARY:END -->
