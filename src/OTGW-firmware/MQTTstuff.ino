@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.5.1-beta.5
+**  Version  : v1.5.1-beta.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1109,10 +1109,8 @@ void sendMQTTstateinformation(){
   if (state.otgw.bGatewayModeKnown) {
     sendMQTTDataPic(F("gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
   }
-  // ADR-074: OT-bus liveness drives only the otgw_connected sensor. The base
-  // namespace topic is the HA avty_t and is owned solely by the MQTT
-  // birth/LWT mechanism (startMQTT/birth at "online", broker LWT at "offline").
   sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
+  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
 }
 
 /*
