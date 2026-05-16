@@ -79,7 +79,7 @@ Single translation unit — Arduino concatenates every `.ino` in `src/OTGW-firmw
 - `loop()` — calls `doBackgroundTasks()` and yields.
 - `doBackgroundTasks()` — the actual work loop: timers, queue draining, watchdog, MQTT publish. **Re-entrant** via `feedWatchDog()` → `yield()` (see "Static buffers, cooperative scheduling" below).
 
-Sibling `.ino` files in the same directory are organised by feature (`MQTTstuff.ino`, `restAPI.ino`, `OTGW-Core.ino`, `SATcontrol.ino`, `networkStuff.ino`, `settingStuff.ino`, …). Each contributes free functions to the single translation unit; there are no class-based modules.
+Sibling `.ino` files in the same directory are organised by feature (`MQTTstuff.ino`, `restAPI.ino`, `OTGW-Core.ino`, `networkStuff.ino`, `settingStuff.ino`, …). Each contributes free functions to the single translation unit; there are no class-based modules.
 
 ## Architecture Decision Records (ADRs)
 
