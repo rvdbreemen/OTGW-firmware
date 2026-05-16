@@ -3,9 +3,11 @@ id: TASK-610
 title: >-
   investigate(mqtt): JIT discovery after GW=R / PIC-only reset — RAM slot-state
   + done-bitmap survive because ESP doesn't restart
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-16 08:50'
+updated_date: '2026-05-16 08:50'
 labels:
   - mqtt
   - investigation
@@ -44,10 +46,10 @@ This task captures the diagnosis. Implementation deferred until the maintainer c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Confirm storage location of slot-state (RAM vs RTC vs LittleFS) — DONE: RAM-only
-- [ ] #2 Confirm sentinel + firstSeen computation — DONE: 0xFFFF, time-bits == sentinel
-- [ ] #3 Enumerate every reset path for resetMqttTrackedState + done-bitmap — DONE
-- [ ] #4 Confirm UI-reboot vs GW=R asymmetry mechanism — DONE: ESP.restart vs PIC-only
+- [x] #1 Confirm storage location of slot-state (RAM vs RTC vs LittleFS) — DONE: RAM-only
+- [x] #2 Confirm sentinel + firstSeen computation — DONE: 0xFFFF, time-bits == sentinel
+- [x] #3 Enumerate every reset path for resetMqttTrackedState + done-bitmap — DONE
+- [x] #4 Confirm UI-reboot vs GW=R asymmetry mechanism — DONE: ESP.restart vs PIC-only
 - [ ] #5 Maintainer confirms desired semantics (option 1 RAM-only republish-on-restart / option 3 reset-all-paths / no-change) before any implementation
 - [ ] #6 If implementation approved: test-matrix (cold/UI/GW=R/physical/F/broker-reconnect) results recorded in PR
 <!-- AC:END -->
