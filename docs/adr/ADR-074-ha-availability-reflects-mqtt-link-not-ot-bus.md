@@ -139,10 +139,11 @@ is exactly correct HA availability semantics for every entity.
 - ADR-006 (MQTT integration pattern), ADR-062 (retained discovery
   verification), ADR-073 (JIT HA discovery) — unaffected; this ADR only
   changes what is *not* written to the availability topic.
-- 2.0.0 sibling: ADR-102 in the
-  `feature-dev-2.0.0-otgw32-esp32-sat-support` worktree applies the same
-  decision to the ESP32/SAT line (`MQTTHaDiscovery.cpp`,
-  `publishOTGWConnectedState()`), cross-referencing this ADR.
+- 2.0.0 sibling: ADR-102 (proposed on the
+  `feature-dev-2.0.0-otgw32-esp32-sat-support` worktree, not present in this
+  tree) applies the same decision to the ESP32/SAT line
+  (`MQTTHaDiscovery.cpp`, `publishOTGWConnectedState()`), cross-referencing
+  this ADR.
 
 ## References
 
