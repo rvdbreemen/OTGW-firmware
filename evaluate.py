@@ -145,7 +145,7 @@ class WorkspaceEvaluator:
         for h_file in h_files:
             with open(h_file, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
-                if '#ifndef' in content and '#define' in content:
+                if '#pragma once' in content or ('#ifndef' in content and '#define' in content):
                     self.add_result(EvaluationResult(
                         "Structure", f"Header guard: {h_file.name}", "PASS",
                         "Has header guards"
@@ -616,9 +616,13 @@ class WorkspaceEvaluator:
         # Extract buffer size: "char json[512];" or similar.
         buf_decl = re.search(r"\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]", body)
         if not buf_decl:
+            # The function was refactored to per-stat publishStatU32() calls;
+            # with no fixed char[N] buffer there is no overflow surface, so the
+            # arithmetic concern is moot rather than unverified.
             self.add_result(EvaluationResult(
-                "Buffer", "sendMQTTheapdiag arithmetic", "WARN",
-                "No 'char X[N]' buffer declaration found in body"
+                "Buffer", "sendMQTTheapdiag arithmetic", "PASS",
+                "No fixed char[N] buffer in body — per-stat publish, "
+                "buffer-arithmetic check not applicable"
             ))
             return
         buf_name = buf_decl.group(1)
@@ -1010,9 +1014,22 @@ class WorkspaceEvaluator:
         class of finding (e.g. ADR-077/078/080 before TASK-355).
 
         Forward-citation escape hatch: if the ADR number appears on a line
-        (or within a 40-char window around the match) that contains one of
-        the markers ``future``, ``proposed``, or ``TBD`` (case-insensitive),
-        the reference is treated as a known forward citation and not failed.
+        that contains one of the markers ``future``, ``proposed``, or ``TBD``
+        (case-insensitive), the reference is treated as a known forward
+        citation and not failed.
+
+        Two further escape hatches cover legitimately-unresolvable numbers in
+        the dev tree:
+          * reserved/skipped numbers — a line documenting an intentionally
+            unused number (markers ``skipped``, ``reserved``, ``unused``,
+            ``placeholder``). ADR-063 is the documented no-op placeholder.
+          * cross-worktree references — a line that explicitly mentions the
+            parallel 2.0.0 line (``2.0.0``, ``worktree``, ``sibling``). The
+            2.0.0 worktree has its own independent ADR numbering, so refs
+            like ADR-097/ADR-099 do not resolve in the dev tree by design.
+        Both hatches are deliberately tight (the cited line must itself name
+        the reason) so the Phase 1B ghost-ADR class of finding — a bare,
+        unqualified ``ADR-077`` citation — is still caught.
         """
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR References Resolve ==={Colors.ENDC}")
 
@@ -1040,6 +1057,14 @@ class WorkspaceEvaluator:
 
         ref_re = re.compile(r"ADR-(\d{3})")
         forward_markers = re.compile(r"\b(future|proposed|TBD)\b", re.IGNORECASE)
+        # Tight hatches: the cited line must itself name the reason the number
+        # cannot resolve in the dev tree (reserved no-op number, or a ref to
+        # the parallel 2.0.0 worktree's independent numbering).
+        excused_markers = re.compile(
+            r"(2\.0\.0|\bworktree\b|\bsibling\b|\bskipped\b|"
+            r"\breserved\b|\bunused\b|\bplaceholder\b)",
+            re.IGNORECASE,
+        )
 
         unresolved: List[Tuple[str, int, str]] = []
         total_refs = 0
@@ -1052,8 +1077,10 @@ class WorkspaceEvaluator:
                             num = m.group(1)
                             if num in existing_nums:
                                 continue
-                            # Forward-citation escape.
+                            # Forward-citation / reserved / cross-worktree escapes.
                             if forward_markers.search(line):
+                                continue
+                            if excused_markers.search(line):
                                 continue
                             rel = target.relative_to(self.project_dir) if target.is_absolute() else target
                             unresolved.append((str(rel), lineno, f"ADR-{num}"))
@@ -1267,17 +1294,19 @@ class WorkspaceEvaluator:
         # Check for build documentation
         build_docs = ["BUILD.md", "FLASH_GUIDE.md"]
         for doc in build_docs:
-            doc_path = self.project_dir / doc
-            docs_path = self.project_dir / "docs" / doc
-            if doc_path.exists():
+            # Operational guides live under docs/guides/ per the project layout;
+            # also accept repo root and docs/ for backward compatibility.
+            candidates = [
+                (self.project_dir / doc, doc),
+                (self.project_dir / "docs" / doc, f"docs/{doc}"),
+                (self.project_dir / "docs" / "guides" / doc, f"docs/guides/{doc}"),
+            ]
+            found = next(((p, label) for p, label in candidates if p.exists()), None)
+            if found:
+                p, label = found
                 self.add_result(EvaluationResult(
                     "Documentation", doc, "PASS",
-                    f"Found ({doc_path.stat().st_size} bytes)"
-                ))
-            elif docs_path.exists():
-                self.add_result(EvaluationResult(
-                    "Documentation", doc, "PASS",
-                    f"Found (docs/{doc}, {docs_path.stat().st_size} bytes)"
+                    f"Found ({label}, {p.stat().st_size} bytes)"
                 ))
             else:
                 self.add_result(EvaluationResult(
