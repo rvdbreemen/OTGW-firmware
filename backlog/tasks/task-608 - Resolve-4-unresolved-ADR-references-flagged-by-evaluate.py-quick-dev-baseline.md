@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:26'
-updated_date: '2026-05-17 10:03'
+updated_date: '2026-05-17 10:04'
 labels:
   - ci
   - tech-debt
@@ -27,3 +27,11 @@ evaluate.py --quick fails the [ADR] References resolve check with '4 unresolved 
 - [ ] #3 python evaluate.py --quick reports the [ADR] References resolve check as passing (0 unresolved out of total)
 - [ ] #4 python evaluate.py --quick shows no new failures vs the documented baseline (Health Score improves; Failed count for this check is 0)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Confirm the 4 unresolved refs: README.md:33->ADR-063 (documented reserved no-op), ADR-070:66->ADR-097 and ADR-072:65/85->ADR-099 (cross-worktree refs to 2.0.0 line)
+2. Resolution path: none are dev-tree ADRs that should exist; fix check_adr_references_resolve to recognize reserved/skipped/unused numbers and cross-worktree (2.0.0/worktree/sibling/port) refs via the existing escape-hatch mechanism
+3. Run evaluate.py --quick to confirm 0 unresolved
+<!-- SECTION:PLAN:END -->
