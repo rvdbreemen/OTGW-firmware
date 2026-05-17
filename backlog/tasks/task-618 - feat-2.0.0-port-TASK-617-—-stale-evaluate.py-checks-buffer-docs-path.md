@@ -1,11 +1,11 @@
 ---
 id: TASK-618
 title: 'feat-2.0.0: port TASK-617 — stale evaluate.py checks (buffer + docs path)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-17 10:23'
-updated_date: '2026-05-17 10:24'
+updated_date: '2026-05-17 21:18'
 labels:
   - tooling
 dependencies: []
