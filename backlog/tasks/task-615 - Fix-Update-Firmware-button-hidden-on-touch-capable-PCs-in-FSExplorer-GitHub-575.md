@@ -6,9 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-05-17 07:07'
+updated_date: '2026-05-17 07:07'
 labels:
   - bug
 dependencies: []
+references:
+  - 'https://github.com/rvdbreemen/OTGW-firmware/issues/575'
+  - 'GitHub reporter: rkuijer'
+  - '2026-05-15'
 priority: medium
 ---
 
