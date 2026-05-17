@@ -3,9 +3,11 @@ id: TASK-621
 title: >-
   fix(build): auto-init missing git submodules in build.py
   (SimpleTelnet/OpenTherm)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-17 21:55'
+updated_date: '2026-05-17 21:55'
 labels: []
 dependencies: []
 ---
