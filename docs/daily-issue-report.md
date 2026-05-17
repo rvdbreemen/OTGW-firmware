@@ -1,47 +1,57 @@
-# Daily Issue Report — 2026-05-16
+# Daily Issue Report — 2026-05-17
 
-**Generated**: 2026-05-16  
-**Period checked**: Last 24 hours (since 2026-05-15T00:00:00Z)
+## Summary
 
-## Sources Checked
-
-| Source | Status | Result |
-|--------|--------|--------|
-| GitHub Issues | ✅ Scanned | 1 new issue updated in last 24h |
-| Tweakers forum | ❌ Unreachable | Host blocked by network policy |
-| Discord | ❌ Unavailable | Discord MCP not configured in this session |
-
-## Findings
-
-### Bug Reports
+- **GitHub**: 1 new bug report since last check (2026-05-08). No issues updated in the strict last-24-hour window (since 2026-05-16).
+- **Tweakers**: Feed unavailable — host blocked by network policy in this execution environment.
+- **Discord**: MCP server not configured in this execution environment.
 
 ---
 
-#### [#575] "Update Firmware" button not visible after updating to v1.5.0
+## New Issues Found
 
-- **Source**: GitHub Issues
+### 1. GitHub #575 — "Update Firmware" button hidden on touch-capable PCs
+
+- **Source**: GitHub — https://github.com/rvdbreemen/OTGW-firmware/issues/575
 - **Reporter**: rkuijer
-- **URL**: https://github.com/rvdbreemen/OTGW-firmware/issues/575
-- **Created**: 2026-05-15T12:33:16Z
-- **Updated**: 2026-05-15T16:14:19Z
-- **Labels**: bug, good first issue, question
 - **Classification**: Bug report
-- **Comments**: 3
+- **Created**: 2026-05-15 · **Updated**: 2026-05-15
+- **Labels**: bug, good first issue, question
 
-**Summary**: After upgrading to v1.5.0, the "Update Firmware" button on the FSExplorer page is no longer visible on a Microsoft Surface Pro 9 (touch device) in both Chrome and Firefox.
+**Summary**:
+After upgrading to v1.5.0, the "Update Firmware" button on the FSExplorer page disappears on a Microsoft Surface Pro 9 (PC) in both Chrome and Firefox. The reporter traced the root cause to a CSS media query that hides elements with class `desktop-only` on any device that reports `pointer: coarse` and `hover: none` — which the Surface Pro 9 satisfies even when used as a laptop. Removing `desktop-only` from the button container via DevTools instantly reveals the button.
 
-**Root cause (identified by reporter)**: The button's container `<div>` has `class="desktop-only"`. The FSExplorer CSS contains a media query `@media (pointer: coarse) and (hover: none) { .desktop-only { display: none; } }` which hides all `.desktop-only` elements on touch devices. The Surface Pro 9 triggers this rule, causing the Update Firmware button to vanish.
+**Maintainer response (rvdbreemen)**:
+> "Ahhh my bad. I didn't notice the surface pro remark. That should have worked. Will go and put on the backlog to fix this."
 
-**Suggested fixes**:
-1. Remove `desktop-only` class from the Update Firmware form wrapper (so it shows on all devices).
-2. Change the media query to hide based on viewport width instead of pointer/hover type.
-3. Introduce a more specific CSS class for elements that are truly touch-incompatible.
-
-**HTML/CSS evidence**: Removing the `class="desktop-only"` attribute via DevTools immediately restores the button visibility, confirming the diagnosis.
+**Backlog**: Created **TASK-615** — Fix: Update Firmware button hidden on touch-capable PCs in FSExplorer (GitHub #575)
 
 ---
 
-## Notes
+## Issues Reviewed but Not Actioned
 
-- **Tweakers forum**: The RSS endpoint at `gathering.tweakers.net` is not reachable from this execution environment due to network allowlist policy. Tweakers posts could not be scanned.
-- **Discord**: No Discord MCP server is configured for this session; Discord `#beta-testing` channel was not scanned.
+### GitHub #154 — "[Request] Suggestions to improve security"
+
+- **Source**: GitHub — https://github.com/rvdbreemen/OTGW-firmware/issues/154
+- **Reporter**: 0crap (original, 2022)
+- **Classification**: Feature request — not relevant for daily bug triage
+- **Updated**: 2026-05-09 (metadata/label change only; last comment was 2024-07-20)
+- **Decision**: No new user content, no backlog action needed.
+
+---
+
+## Sources Not Available
+
+| Source | Status | Reason |
+|--------|--------|--------|
+| Tweakers RSS | Blocked | `gathering.tweakers.net` not in network allowlist |
+| Discord #beta-testing | Not available | Discord MCP not configured in this session |
+| Discord #english-support | Not available | Discord MCP not configured in this session |
+| Discord #nederlandse-ondersteuning | Not available | Discord MCP not configured in this session |
+| Discord #devs-esp-firmware | Not available | Discord MCP not configured in this session |
+
+---
+
+## Timestamps Updated
+
+- Last check: 2026-05-17T00:00:00Z (all sources)
