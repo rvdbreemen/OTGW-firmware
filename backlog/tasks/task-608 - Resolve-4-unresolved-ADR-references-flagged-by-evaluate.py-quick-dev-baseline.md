@@ -3,9 +3,11 @@ id: TASK-608
 title: >-
   Resolve 4 unresolved ADR references flagged by evaluate.py --quick (dev
   baseline)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-16 07:26'
+updated_date: '2026-05-17 10:03'
 labels:
   - ci
   - tech-debt
