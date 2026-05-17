@@ -24,3 +24,12 @@ evaluate.py reports 3 WARN-level checks that are bugs in the evaluator itself, n
 - [ ] #3 Documentation check finds BUILD.md and FLASH_GUIDE.md in docs/guides/
 - [ ] #4 python evaluate.py: header-guard, buffer-arithmetic, and BUILD/FLASH doc checks all pass; no new failures introduced
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Header-guard check (evaluate.py:148): also accept "#pragma once"
+2. Buffer-arithmetic check (evaluate.py:618): PASS when no char[N] buffer in body (refactored to per-stat publishStatU32)
+3. Doc check (evaluate.py:1271): add docs/guides/<doc> to search paths
+4. Run python evaluate.py to confirm all three pass, no regressions
+<!-- SECTION:PLAN:END -->
