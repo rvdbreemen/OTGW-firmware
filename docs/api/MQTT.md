@@ -479,6 +479,8 @@ Commands can also be sent using the two-letter OTGW command codes directly as to
 
 The firmware supports Home Assistant MQTT auto-discovery, publishing discovery configuration messages to the `{haprefix}/` topic tree (default: `homeassistant/`).
 
+> **Other consumers of this discovery format:** openHAB and Domoticz both ingest the Home Assistant MQTT Discovery convention directly — no firmware change is needed. See [`docs/guides/OPENHAB.md`](../guides/OPENHAB.md) and [`docs/guides/DOMOTICZ.md`](../guides/DOMOTICZ.md) for setup.
+
 ### Discovery Configuration
 
 Discovery topics follow the pattern:
