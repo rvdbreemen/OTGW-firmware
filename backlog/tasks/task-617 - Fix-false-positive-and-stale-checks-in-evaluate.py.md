@@ -1,8 +1,9 @@
 ---
 id: TASK-617
 title: Fix false-positive and stale checks in evaluate.py
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-17 10:03'
 updated_date: '2026-05-17 10:03'
 labels:
