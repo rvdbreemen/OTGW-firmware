@@ -3,7 +3,7 @@ id: TASK-608
 title: >-
   Resolve 4 unresolved ADR references flagged by evaluate.py --quick (dev
   baseline)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:26'
