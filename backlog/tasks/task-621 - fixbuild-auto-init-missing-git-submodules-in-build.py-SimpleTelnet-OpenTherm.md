@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-17 21:55'
-updated_date: '2026-05-17 21:55'
+updated_date: '2026-05-17 21:56'
 labels: []
 dependencies: []
 ---
@@ -26,3 +26,13 @@ build.py fails out-of-the-box in fresh clones / web-container sessions because t
 - [ ] #4 python build.py --firmware exits 0 on a fresh checkout with uninitialized submodules without any manual 'git submodule update --init'
 - [ ] #5 python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add SUBMODULE_LIBS constant + ensure_submodules(project_dir) to build.py
+2. Presence check = directory contains any .h (rglob); skip git entirely when present
+3. When missing: guard for non-git checkout and missing git binary (warn+continue, no crash); else run git submodule update --init <paths> via run_command(check=False); re-verify and warn if still missing
+4. Call ensure_submodules() in main() after clean-handling, before install_arduino_cli
+5. Verify: clear submodules, python build.py --firmware exits 0 with no manual init; re-run with submodules present = fast no-op; python evaluate.py --quick no new failures
+<!-- SECTION:PLAN:END -->
