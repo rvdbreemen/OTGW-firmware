@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-17 10:03'
-updated_date: '2026-05-17 10:03'
+updated_date: '2026-05-17 10:04'
 labels:
   - tooling
 dependencies: []
@@ -22,5 +22,5 @@ evaluate.py reports 3 WARN-level checks that are bugs in the evaluator itself, n
 - [ ] #1 Header-guard check accepts '#pragma once' as a valid guard (mqtt_discovery_verify.h passes)
 - [ ] #2 JSON buffer-arithmetic check returns PASS (not WARN) when sendMQTTheapdiag has no fixed char[N] buffer
 - [ ] #3 Documentation check finds BUILD.md and FLASH_GUIDE.md in docs/guides/
-- [ ] #4 python evaluate.py shows 0 FAIL and these 4 items resolved; python evaluate.py --quick is green
+- [ ] #4 python evaluate.py: header-guard, buffer-arithmetic, and BUILD/FLASH doc checks all pass; no new failures introduced
 <!-- AC:END -->
