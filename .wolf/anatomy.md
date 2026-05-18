@@ -1,14 +1,11 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-02T11:31:35.052Z
-> Files: 5 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-18T05:02:45.254Z
+> Files: 8 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
-
-## .wolf/
-
-- `memory.md` — one-line running log of significant session actions and handoffs.
+- `CHANGELOG.md` — Changelog (~8031 tok)
 
 ## .claude/
 
@@ -330,6 +327,14 @@
 
 ## .pio/libdeps/esp32/AceSorting/examples/WorstCaseBenchmark/
 
+
+## .wolf/
+
+
+## docs/adr/
+
+- `ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md` — ADR-102: HA Entity Availability Reflects the MQTT Link, Not OpenTherm-Bus Liveness (2.0.0) (~1984 tok)
+- `README.md` — Project documentation (~9864 tok)
 
 ## plan/
 

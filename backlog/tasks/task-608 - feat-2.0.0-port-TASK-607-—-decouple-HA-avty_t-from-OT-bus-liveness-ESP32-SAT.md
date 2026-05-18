@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:18'
-updated_date: '2026-05-18 05:01'
+updated_date: '2026-05-18 05:03'
 labels:
   - bug
   - mqtt
@@ -58,6 +58,8 @@ Review-comment polish (PR #585 Copilot review, 4 threads):
 2. Add CHANGELOG.md [Unreleased] entry mirroring dev sibling (substantiates ADR-102 "documented in the changelog" claim + migration guidance).
 3. Disambiguate the dev ADR-074 cross-ref in ADR-102 (local 2.0.0 ADR-074 is a different SAT-audit ADR; add resolvable dev PR #583 reference).
 4. ADR-080 gate gap: no bin/adr-judge on 2.0.0 so forbid_pattern is unenforced — add "Gate pending — tracked as TASK-623" note to ADR-102 Consequences + created TASK-623.
+
+Review-comment polish committed 3f8f281c, pushed to claude/fix-dhw-control-issue-2.0.0-bFtJ6 (PR #585). Docs-only (no src/** — no version bump; build/evaluator gates skipped per docs-only policy). All 4 Copilot threads addressed: README index entry, CHANGELOG [Unreleased] Fixed entry, dev ADR-074 xref disambiguated (resolvable dev PR #583), ADR-080 gate-pending note → TASK-623. Task remains In Progress: AC#6 (ESP32 build) still deferred to PR #585 CI per prior handoff.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
