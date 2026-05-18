@@ -443,6 +443,16 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `chenable` | `"1"` | `CH=1` | Central heating enable |
 | `chenable2` | `"0"` | `H2=0` | Central heating 2 enable |
 | `ventsetpt` | `"50"` | `VS=50` | Ventilation setpoint |
+| `gpioa` | `"0"` | `GA=0` | GPIO A function (0–7, see PIC firmware docs) |
+| `gpiob` | `"0"` | `GB=0` | GPIO B function (0–7, see PIC firmware docs) |
+| `leda` | `"F"` | `LA=F` | LED A function code (B/C/E/F/H/M/O/P/R/T/W/X) |
+| `ledb` | `"F"` | `LB=F` | LED B function code |
+| `ledc` | `"F"` | `LC=F` | LED C function code |
+| `ledd` | `"F"` | `LD=F` | LED D function code |
+| `lede` | `"F"` | `LE=F` | LED E function code |
+| `ledf` | `"F"` | `LF=F` | LED F function code |
+| `setclock` | `"3/14:30"` | `SC=3/14:30` | Set PIC clock (day 1=Mon…7=Sun, `day/HH:MM`) |
+| `resetgateway` | *(any)* | *(hardware reset)* | Reset the OTGW PIC via hardware reset pin; payload ignored |
 
 #### Advanced Commands
 
@@ -496,13 +506,61 @@ Where:
 - `{node_id}` = `settings.mqtt.sUniqueid` (default: `otgw-{MAC}`)
 - `{object_id}` = unique identifier for the entity
 
+### Discovered Entity Types
+
+The firmware publishes discovery configs for the following HA entity types:
+
+| HA Component | Count | Pseudo-ID | Description |
+|---|---|---|---|
+| `sensor` | 306 | OT IDs 0–253 | OpenTherm numeric and status values |
+| `binary_sensor` | 53 | OT IDs 0–253 | OpenTherm flag bits |
+| `climate` | 2 | ID 0 | Thermostat (CH) and DHW control |
+| `number` | 1 | ID 27 | Outside temperature override |
+| `sensor` (stats) | 17 | pseudo-ID 247 | Heap and discovery diagnostics |
+| `sensor` (fw info) | 4 | pseudo-ID 248 | Firmware version, hostname, reboot info |
+| `sensor` (PIC info) | 5 | pseudo-ID 249 | PIC firmware/device info (PIC-gated) |
+| `sensor` (PIC settings) | 15 | pseudo-ID 250 | PIC PR=-polled settings (PIC-gated) |
+| `button` | 1 | pseudo-ID 251 | Reset Gateway |
+| `select` | 8 | pseudo-ID 251 | GPIO A/B and LED A–F function selects |
+| `sensor` (Dallas) | dynamic | pseudo-ID 246 | Dallas temperature sensors (one per address) |
+
+#### PIC Control Entities (pseudo-ID 251)
+
+These entities are always published; their command and state topics are PIC-gated at the source (set-commands are ignored when no PIC is detected, and the `otgw-pic/settings/*` state topics only update while the PIC is available). They appear under the OTGW device card in Home Assistant.
+
+**Button:**
+
+| Object ID | HA name | Command topic | Notes |
+|---|---|---|---|
+| `resetgateway` | Reset Gateway | `{set}/resetgateway` | Triggers a hardware PIC reset; payload `"1"` (any value accepted). `entity_category: config`. |
+
+**Selects — GPIO function (options `0`–`7`):**
+
+| Object ID | HA name | State topic | `value_template` | Command topic |
+|---|---|---|---|---|
+| `gpioa` | GPIO A Function | `otgw-pic/settings/gpio` | `{{ value[0] }}` | `{set}/gpioa` |
+| `gpiob` | GPIO B Function | `otgw-pic/settings/gpio` | `{{ value[1] }}` | `{set}/gpiob` |
+
+**Selects — LED function (options `B C E F H M O P R T W X`):**
+
+| Object ID | HA name | State topic | `value_template` | Command topic |
+|---|---|---|---|---|
+| `leda` | LED A Function | `otgw-pic/settings/led` | `{{ value[0] }}` | `{set}/leda` |
+| `ledb` | LED B Function | `otgw-pic/settings/led` | `{{ value[1] }}` | `{set}/ledb` |
+| `ledc` | LED C Function | `otgw-pic/settings/led` | `{{ value[2] }}` | `{set}/ledc` |
+| `ledd` | LED D Function | `otgw-pic/settings/led` | `{{ value[3] }}` | `{set}/ledd` |
+| `lede` | LED E Function | `otgw-pic/settings/led` | `{{ value[4] }}` | `{set}/lede` |
+| `ledf` | LED F Function | `otgw-pic/settings/led` | `{{ value[5] }}` | `{set}/ledf` |
+
+> **State topics** are under `{TopTopic}/value/{UniqueId}/` as for all PIC-settings topics. The select `value_template` reads the single character at the relevant position of the 2-char (GPIO) or 6-char (LED) string published by the PIC. The `{set}` prefix above is `{TopTopic}/set/{UniqueId}`.
+
 ### Discovery Modes
 
 The firmware uses two discovery paths:
 
 1. **Bulk discovery (Path A)**: Triggered manually via REST API (`POST /api/v2/otgw/discovery`) or serial command (`F`). Publishes all configs from the `mqttha.cfg` file.
 
-2. **JIT discovery (Path B, ADR-073)**: OT message ID discovery configs are published the first time that MsgID is received on the OpenTherm bus. This is now the sole automatic mechanism for OT IDs. Non-OT pseudo-IDs (climate thermostat/DHW control, outside temperature number, Dallas sensors, heap stats, firmware/PIC info) are queued at boot and published via the normal drip pipeline — they do not wait for a bus message.
+2. **JIT discovery (Path B, ADR-073)**: OT message ID discovery configs are published the first time that MsgID is received on the OpenTherm bus. This is now the sole automatic mechanism for OT IDs. Non-OT pseudo-IDs (climate thermostat/DHW control, outside temperature number, Dallas sensors, heap stats, firmware/PIC info, PIC control entities) are queued at boot and published via the normal drip pipeline — they do not wait for a bus message.
 
    On assumed broker restart (offline duration exceeded 5 minutes), the discovery state resets and the same split applies: non-OT configs are re-queued immediately, OT configs re-publish as each MsgID re-appears on the bus.
 
