@@ -458,4 +458,14 @@ bool expandAndStreamSensorSources(PubSubClient &client,
                                   const MqttHaSensorCfg &cfg,
                                   HaDiscoveryContext &ctx);
 
+// Button discovery: one entity for resetgateway (pseudo-ID 244)
+bool streamButtonDiscovery(PubSubClient &client,
+                           HaDiscoveryContext &ctx);
+
+// Select discovery: GPIO and LED function selects (pseudo-ID 244)
+// selectIdx: 0=gpioa, 1=gpiob, 2=leda, 3=ledb, 4=ledc, 5=ledd, 6=lede, 7=ledf
+bool streamSelectDiscovery(PubSubClient &client,
+                           uint8_t selectIdx,
+                           HaDiscoveryContext &ctx);
+
 // end of MQTTstuff.h

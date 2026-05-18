@@ -677,6 +677,13 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `failsafe` | `"0"` / `"1"` | `FS=0` / `FS=1` | Fail-safety on thermostat disconnect. 1=activate setback when thermostat is silent; 0=disable. Persisted. |
 | `gpioa` | `"0"`-`"9"` | `GA=x` | GPIO-A function code. On OTGW32: stored locally and returned by PR=G query, but has no hardware effect. |
 | `gpiob` | `"0"`-`"9"` | `GB=x` | GPIO-B function code. On OTGW32: stored locally and returned by PR=G query, but has no hardware effect. |
+| `leda` | `"F"` | `LA=F` | LED A function code (B/C/E/F/H/M/O/P/R/T/W/X). Dedicated topic for `LA=`. |
+| `ledb` | `"F"` | `LB=F` | LED B function code. |
+| `ledc` | `"F"` | `LC=F` | LED C function code. |
+| `ledd` | `"F"` | `LD=F` | LED D function code. |
+| `lede` | `"F"` | `LE=F` | LED E function code. |
+| `ledf` | `"F"` | `LF=F` | LED F function code. |
+| `resetgateway` | *(any)* | *(hardware reset)* | Reset the OTGW PIC via the hardware reset pin; payload ignored. No-op on OTGW32 (no PIC). |
 
 **Gateway mode values (`gatewaymode` topic)**
 
@@ -990,9 +997,18 @@ The firmware emits the following entity categories (verified against `MQTTHaDisc
 | `number` | 1 | `streamNumberDiscovery()` | `Toutside_override` slider |
 | `switch` (SAT, TASK-284) | 13 | `streamSatSwitchDiscovery(idx=0..12)` | See list below |
 | `select` (SAT, TASK-284) | 1 | `streamSatSelectDiscovery(idx=0)` | `sat_heating_system` (options `"0"`..`"3"`) |
+| `button` (PIC control) | 1 | `streamButtonDiscovery()` | `resetgateway` — pseudo-ID 244 |
+| `select` (PIC control) | 8 | `streamSelectDiscovery(idx=0..7)` | `gpioa`/`gpiob` + `leda`–`ledf` — pseudo-ID 244 |
 | `sensor` (Dallas) | runtime | `streamDallasSensorDiscovery()` via `configSensors()` | Published per detected 1-Wire address |
 
 The SAT switch and select entries piggyback on OT pseudo-ID 0 in the discovery bitmap (they are streamed alongside the climate entities and marked done together with ID 0). The number entity is marked done with OT ID 27.
+
+#### PIC Control Entities (pseudo-ID 244)
+
+Published unconditionally via the discovery drip, like the other PIC pseudo-IDs (249/250) on this dual-target branch (the TASK-543 gating decision): the entity is always discovered, and the set-commands plus the `otgw-pic/settings/*` state topics are PIC-gated at their source (ignored / not updated when no PIC is present; no-op on OTGW32). They appear under the OTGW device card in Home Assistant.
+
+- **Button** `resetgateway` → `{set}/resetgateway` (`entity_category: config`, `payload_press: "1"`, hardware PIC reset).
+- **Selects** `gpioa`/`gpiob` (options `0`–`7`, state `otgw-pic/settings/gpio`, `value_template {{ value[0|1] }}`) and `leda`–`ledf` (options `B C E F H M O P R T W X`, state `otgw-pic/settings/led`, `value_template {{ value[0..5] }}`); command topics `{set}/{gpioa|…|ledf}`.
 
 ### Discovery Modes
 

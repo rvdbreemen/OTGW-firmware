@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.36
+**  Version  : v2.0.0-alpha.37
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -406,6 +406,7 @@ const char s_temp[] PROGMEM = "temp";
 const char s_on[] PROGMEM = "on";
 const char s_level[] PROGMEM = "level";
 const char s_function[] PROGMEM = "function";
+const char s_reset[] PROGMEM = "reset";
 const char s_empty[] PROGMEM = "";
 
 const char s_cmd_command[] PROGMEM = "command";
@@ -438,6 +439,15 @@ const char s_cmd_overridehb[] PROGMEM = "overridehb";
 const char s_cmd_forcethermostat[] PROGMEM = "forcethermostat";
 const char s_cmd_voltageref[] PROGMEM = "voltageref";
 const char s_cmd_debugptr[] PROGMEM = "debugptr";
+const char s_cmd_gpioa[] PROGMEM = "gpioa";
+const char s_cmd_gpiob[] PROGMEM = "gpiob";
+const char s_cmd_leda[] PROGMEM = "leda";
+const char s_cmd_ledb[] PROGMEM = "ledb";
+const char s_cmd_ledc[] PROGMEM = "ledc";
+const char s_cmd_ledd[] PROGMEM = "ledd";
+const char s_cmd_lede[] PROGMEM = "lede";
+const char s_cmd_ledf[] PROGMEM = "ledf";
+const char s_cmd_resetgateway[] PROGMEM = "resetgateway";
 
 // ADR-096: subtopic names "thermostat" and "boiler" are inlined into
 // snprintf_P calls in publishToSourceTopic(). The earlier table-based
@@ -472,6 +482,14 @@ const char s_otgw_OH[] PROGMEM = "OH";
 const char s_otgw_FT[] PROGMEM = "FT";
 const char s_otgw_VR[] PROGMEM = "VR";
 const char s_otgw_DP[] PROGMEM = "DP";
+const char s_otgw_GA[] PROGMEM = "GA";
+const char s_otgw_GB[] PROGMEM = "GB";
+const char s_otgw_LA[] PROGMEM = "LA";
+const char s_otgw_LB[] PROGMEM = "LB";
+const char s_otgw_LC[] PROGMEM = "LC";
+const char s_otgw_LD[] PROGMEM = "LD";
+const char s_otgw_LE[] PROGMEM = "LE";
+const char s_otgw_LF[] PROGMEM = "LF";
 
 struct MQTT_set_cmd_t
 {
@@ -512,6 +530,16 @@ const MQTT_set_cmd_t setcmds[] PROGMEM = {
   {   s_cmd_forcethermostat, s_otgw_FT, s_function },
   {   s_cmd_voltageref, s_otgw_VR, s_function },
   {   s_cmd_debugptr, s_otgw_DP, s_function },
+  // GPIO / LED / clock / reset — parity with HA Core opentherm_gw named services
+  {   s_cmd_gpioa, s_otgw_GA, s_function },        // GA=0..7 (GPIO A function)
+  {   s_cmd_gpiob, s_otgw_GB, s_function },        // GB=0..7 (GPIO B function)
+  {   s_cmd_leda, s_otgw_LA, s_function },         // LA=B/C/E/F/H/M/O/P/R/T/W/X
+  {   s_cmd_ledb, s_otgw_LB, s_function },
+  {   s_cmd_ledc, s_otgw_LC, s_function },
+  {   s_cmd_ledd, s_otgw_LD, s_function },
+  {   s_cmd_lede, s_otgw_LE, s_function },
+  {   s_cmd_ledf, s_otgw_LF, s_function },
+  {   s_cmd_resetgateway, s_empty, s_reset },      // hardware PIC reset, payload ignored
 } ;
 
 const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
@@ -909,6 +937,10 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
             MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
             addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
+          } else if (pOtType == s_reset) {
+            //hardware PIC reset - payload is ignored (resetOTGW() self-guards on PIC/platform)
+            MQTTDebugf(PSTR(" found command: resetgateway - resetting PIC\r\n"));
+            resetOTGW();
           } else {
             //all other commands are <otgwcmd>=<payload message>
             // Copy command string from Flash to temp buffer for snprintf
@@ -1720,6 +1752,10 @@ void markAllMQTTConfigPending()
   setMQTTConfigPending(OTGWfwinfoid);
   setMQTTConfigPending(OTGWpicinfoid);
   setMQTTConfigPending(OTGWpicsettingsid);
+  // PIC control entities (pseudo-ID 244): resetgateway button + gpioa/gpiob/leda-f
+  // selects. Discovery unconditional like the other PIC pseudo-IDs; the
+  // set-commands and otgw-pic/ state topics are PIC-gated at their source.
+  setMQTTConfigPending(OTGWpiccontrolsid);
   // 2.0.0-specific diagnostic discovery (TASK-541): OTDirect flame metrics + SAT BLE/pressure health.
   setMQTTConfigPending(OTGWdiag200id);
   // TASK-543: SAT user-facing discovery stays unconditional on this dual-target branch.
@@ -2097,6 +2133,21 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
 
   if (OTid == OTGWsatzoneid) {
     if (streamSatZoneDiscovery(MQTTclient, ctx)) result = true;
+  }
+
+  // PIC control entities (pseudo-ID 244): resetgateway button + GPIO/LED selects.
+  // Published unconditionally — like the other PIC pseudo-IDs (249/250) the entity
+  // is always discovered; the set-commands and otgw-pic/ state topics are PIC-gated
+  // at their source. Gating discovery on isPICEnabled() would leave result=false on
+  // PIC-less devices and make loopMQTTDiscovery() retry this ID every drip tick
+  // forever (the bug fixed on dev in PR #596).
+  if (OTid == OTGWpiccontrolsid) {
+    if (streamButtonDiscovery(MQTTclient, ctx)) result = true;
+    feedWatchDog();
+    for (uint8_t i = 0; i <= 7; i++) {
+      if (streamSelectDiscovery(MQTTclient, i, ctx)) result = true;
+      feedWatchDog();
+    }
   }
 
   return result;

@@ -3185,3 +3185,199 @@ bool streamSatSelectDiscovery(PubSubClient &client,
   feedWatchDog();
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// PIC control entities (pseudo-ID OTGWpiccontrolsid = 244) — port of dev PR#576.
+//
+// Published unconditionally, like the other PIC pseudo-IDs (249/250) on this
+// dual-target branch (TASK-543 gating decision in OTGW-firmware.h): the entity
+// is always discovered; the set-commands and the otgw-pic/ state topics are
+// PIC-gated at their source. Gating discovery on isPICEnabled() would make
+// doAutoConfigureMsgid() return false on PIC-less devices and spin the
+// discovery drip forever (the bug fixed on dev in PR #596).
+// ---------------------------------------------------------------------------
+
+// resetgateway -> HA button. No stat_t; cmd_t + payload_press only.
+bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
+
+  char topic[STREAM_TOPIC_MAX];
+  snprintf_P(topic, sizeof(topic), PSTR("%s/button/%s/resetgateway/config"),
+             ctx.haPrefix, ctx.nodeId);
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
+    if (!w.writeRam(ctx.nodeId)) return false;
+    if (!w.writeProgmem(PSTR("-resetgateway\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"name\":\"Reset Gateway\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttSubTopic)) return false;
+    if (!w.writeProgmem(PSTR("/resetgateway\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"payload_press\":\"1\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeJsonKV_P(w, kEntCat, PSTR("config"))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeJsonKV_P(w, kIcon, PSTR("mdi:restart"))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeOriginBlock(w, ctx)) return false;
+    return writeJsonClose(w);
+  };
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.endPublish();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  feedWatchDog();
+  return true;
+}
+
+// GPIO/LED function selects.
+// selectIdx: 0=gpioa 1=gpiob 2=leda 3=ledb 4=ledc 5=ledd 6=lede 7=ledf
+// State topics published by the existing PIC PR= polling:
+//   GPIO: <mqttPubTopic>/otgw-pic/settings/gpio (2-char string, e.g. "05")
+//   LED:  <mqttPubTopic>/otgw-pic/settings/led  (6-char string, e.g. "RFFTTT")
+static const char kSelLabel0[] PROGMEM = "gpioa";
+static const char kSelLabel1[] PROGMEM = "gpiob";
+static const char kSelLabel2[] PROGMEM = "leda";
+static const char kSelLabel3[] PROGMEM = "ledb";
+static const char kSelLabel4[] PROGMEM = "ledc";
+static const char kSelLabel5[] PROGMEM = "ledd";
+static const char kSelLabel6[] PROGMEM = "lede";
+static const char kSelLabel7[] PROGMEM = "ledf";
+static const char* const kSelLabels[] PROGMEM = {
+    kSelLabel0, kSelLabel1, kSelLabel2, kSelLabel3,
+    kSelLabel4, kSelLabel5, kSelLabel6, kSelLabel7
+};
+static const char kSelName0[] PROGMEM = "GPIO A Function";
+static const char kSelName1[] PROGMEM = "GPIO B Function";
+static const char kSelName2[] PROGMEM = "LED A Function";
+static const char kSelName3[] PROGMEM = "LED B Function";
+static const char kSelName4[] PROGMEM = "LED C Function";
+static const char kSelName5[] PROGMEM = "LED D Function";
+static const char kSelName6[] PROGMEM = "LED E Function";
+static const char kSelName7[] PROGMEM = "LED F Function";
+static const char* const kSelNames[] PROGMEM = {
+    kSelName0, kSelName1, kSelName2, kSelName3,
+    kSelName4, kSelName5, kSelName6, kSelName7
+};
+static const char kSelGpioOptions[] PROGMEM = "[\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\"]";
+static const char kSelLedOptions[]  PROGMEM = "[\"B\",\"C\",\"E\",\"F\",\"H\",\"M\",\"O\",\"P\",\"R\",\"T\",\"W\",\"X\"]";
+
+bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryContext &ctx)
+{
+  if (selectIdx > 7) return false;
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
+
+  char label[12];
+  char name[20];
+  strlcpy_P(label, (PGM_P)pgm_read_ptr(&kSelLabels[selectIdx]), sizeof(label));
+  strlcpy_P(name,  (PGM_P)pgm_read_ptr(&kSelNames[selectIdx]),  sizeof(name));
+
+  bool    isGpio  = (selectIdx < 2);
+  uint8_t charPos = isGpio ? selectIdx : (uint8_t)(selectIdx - 2);
+
+  char topic[STREAM_TOPIC_MAX];
+  snprintf_P(topic, sizeof(topic), PSTR("%s/select/%s/%s/config"),
+             ctx.haPrefix, ctx.nodeId, label);
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
+    if (!w.writeRam(ctx.nodeId)) return false;
+    if (!w.writeChar('-')) return false;
+    if (!w.writeRam(label)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+    if (!w.writeRam(name)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // stat_t: <mqttPubTopic>/otgw-pic/settings/{gpio,led}
+    if (!w.writeProgmem(PSTR("\"stat_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (!w.writeChar('/')) return false;
+    if (!w.writeProgmem(kPicSubtreePrefix)) return false;
+    if (!w.writeProgmem(isGpio ? PSTR("settings/gpio\"") : PSTR("settings/led\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // value_template: {{ value[N] }}
+    if (!w.writeProgmem(PSTR("\"value_template\":\"{{ value["))) return false;
+    if (!w.writeChar((char)('0' + charPos))) return false;
+    if (!w.writeProgmem(PSTR("] }}\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttSubTopic)) return false;
+    if (!w.writeChar('/')) return false;
+    if (!w.writeRam(label)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!w.writeProgmem(PSTR("\"options\":"))) return false;
+    if (!w.writeProgmem(isGpio ? kSelGpioOptions : kSelLedOptions)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeJsonKV_P(w, kEntCat, PSTR("config"))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeJsonKV_P(w, kIcon, isGpio ? PSTR("mdi:pin") : PSTR("mdi:led-outline"))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    if (!writeOriginBlock(w, ctx)) return false;
+    return writeJsonClose(w);
+  };
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.endPublish();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  feedWatchDog();
+  return true;
+}
