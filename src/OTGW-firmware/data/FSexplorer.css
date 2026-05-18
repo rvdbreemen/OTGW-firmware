@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v1.5.1-beta.10
+**  Version  : v1.5.1-beta.11
 ***************************************************************************  
 */
 :root {
@@ -289,10 +289,12 @@ tr[style*="background-color"] {
     background-color: #d4edda !important;
 }
 
-/* Hide firmware update button on touch devices (phones and tablets).
-   pointer:coarse = finger/stylus input; hover:none = no mouse hover capability.
-   This is more reliable than screen width, which can misfire on resized desktop windows. */
-@media (pointer: coarse) and (hover: none) {
+/* Hide firmware update button on small touch-only screens (phones, portrait tablets).
+   pointer:coarse + hover:none = finger/stylus primary input with no hover.
+   max-width:900px keeps touch-capable desktops visible: a Surface Pro is ~912px+
+   even in portrait, and a mouse desktop never matches pointer:coarse so a
+   resized-narrow desktop window is unaffected (GitHub #575). */
+@media (pointer: coarse) and (hover: none) and (max-width: 900px) {
     .desktop-only {
         display: none;
     }
