@@ -508,25 +508,37 @@ Where:
 
 ### Discovered Entity Types
 
-The firmware publishes discovery configs for the following HA entity types:
+The firmware publishes discovery configs for the following HA entity types. The
+exact per-type counts track the PROGMEM tables in `mqtt_configuratie.cpp` and
+change as those tables grow, so only the stable pseudo-ID mapping is listed here:
 
-| HA Component | Count | Pseudo-ID | Description |
-|---|---|---|---|
-| `sensor` | 306 | OT IDs 0–253 | OpenTherm numeric and status values |
-| `binary_sensor` | 53 | OT IDs 0–253 | OpenTherm flag bits |
-| `climate` | 2 | ID 0 | Thermostat (CH) and DHW control |
-| `number` | 1 | ID 27 | Outside temperature override |
-| `sensor` (stats) | 17 | pseudo-ID 247 | Heap and discovery diagnostics |
-| `sensor` (fw info) | 4 | pseudo-ID 248 | Firmware version, hostname, reboot info |
-| `sensor` (PIC info) | 5 | pseudo-ID 249 | PIC firmware/device info (PIC-gated) |
-| `sensor` (PIC settings) | 15 | pseudo-ID 250 | PIC PR=-polled settings (PIC-gated) |
-| `button` | 1 | pseudo-ID 251 | Reset Gateway |
-| `select` | 8 | pseudo-ID 251 | GPIO A/B and LED A–F function selects |
-| `sensor` (Dallas) | dynamic | pseudo-ID 246 | Dallas temperature sensors (one per address) |
+| HA Component | Pseudo-ID | Description |
+|---|---|---|
+| `sensor` | OT IDs 0–253 | OpenTherm numeric and status values |
+| `binary_sensor` | OT IDs 0–253 | OpenTherm flag bits |
+| `climate` | ID 0 | Thermostat (CH) and DHW control |
+| `number` | ID 27 | Outside temperature override |
+| `sensor` (Dallas) | pseudo-ID 246 | Dallas temperature sensors (one per detected address) |
+| `sensor` (stats) | pseudo-ID 247 | Heap and discovery diagnostics |
+| `sensor` (fw info) | pseudo-ID 248 | Firmware version, hostname, reboot info |
+| `sensor` (PIC info) | pseudo-ID 249 | PIC firmware/device info |
+| `sensor` (PIC settings) | pseudo-ID 250 | PIC PR=-polled settings |
+| `button` | pseudo-ID 251 | Reset Gateway |
+| `select` | pseudo-ID 251 | GPIO A/B and LED A–F function selects |
+
+All discovery configs — including the PIC pseudo-IDs 249/250/251 — are published
+**unconditionally** via the drip pipeline regardless of `isPICEnabled()`. The PIC
+dependency is enforced only at the data source: the `otgw-pic/*` state topics
+update only while a PIC is available, and the corresponding set-commands are
+ignored when no PIC is detected. Entities therefore appear in Home Assistant and
+simply show "unavailable" until PIC data flows.
 
 #### PIC Control Entities (pseudo-ID 251)
 
-These entities are always published; their command and state topics are PIC-gated at the source (set-commands are ignored when no PIC is detected, and the `otgw-pic/settings/*` state topics only update while the PIC is available). They appear under the OTGW device card in Home Assistant.
+These entities follow that same rule — the discovery configs are always
+published; the `{set}/…` command topics are ignored when no PIC is detected and
+the `otgw-pic/settings/*` state topics only update while the PIC is available.
+They appear under the OTGW device card in Home Assistant.
 
 **Button:**
 

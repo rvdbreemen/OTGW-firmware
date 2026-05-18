@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.5.1-beta.9
+**  Version  : v1.5.1-beta.10
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1621,15 +1621,21 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // source. Gating discovery on isPICEnabled() here would leave result=false on
   // PIC-less devices and make loopMQTTDiscovery() retry this ID every drip tick
   // forever (PR#576 review finding).
+  //
+  // All-or-nothing: the pending bit is cleared only when every one of the nine
+  // configs published this tick. If any single publish fails (transient MQTT/heap),
+  // result stays false so loopMQTTDiscovery() retains the pending bit and retries
+  // the whole set next tick. The configs are retained idempotent publishes, so
+  // re-publishing the ones that already succeeded is harmless.
   if (OTid == OTGWpiccontrolsid) {
-    // resetgateway button
-    if (streamButtonDiscovery(MQTTclient, ctx)) result = true;
+    bool allOk = streamButtonDiscovery(MQTTclient, ctx);  // resetgateway button
     feedWatchDog();
     // gpioa/gpiob + leda-ledf function selects (idx 0-7)
     for (uint8_t i = 0; i <= 7; i++) {
-      if (streamSelectDiscovery(MQTTclient, i, ctx)) result = true;
+      if (!streamSelectDiscovery(MQTTclient, i, ctx)) allOk = false;
       feedWatchDog();
     }
+    if (allOk) result = true;
   }
 
   return result;
