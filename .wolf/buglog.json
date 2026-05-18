@@ -363,6 +363,22 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-05T23:45:00.000Z"
+    },
+    {
+      "id": "bug-023",
+      "timestamp": "2026-05-18T05:01:56.113Z",
+      "error_message": "Significant refactor of ",
+      "file": "docs/adr/ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 3→8 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-18T05:01:56.113Z"
     }
   ]
 }

@@ -158,6 +158,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-101: Flat Per-Value MQTT Topics Over Aggregated JSON Payloads](ADR-101-flat-per-value-mqtt-topics-over-aggregated-json-payloads.md)** 🆕  
   Binding decision (owner: Robert van den Breemen, 2026-05-08): OTGW-firmware publishes one plain scalar per topic; aggregated JSON blobs on value topics are forbidden. HA auto-discovery metadata travels separately on `homeassistant/#` config topics. OT-Thing nested-JSON and Tasmota SENSOR-JSON dialects are explicitly not supported. Enforced by `adr-judge` pre-commit hook.
 
+- **[ADR-102: HA Entity Availability Reflects the MQTT Link, Not OpenTherm-Bus Liveness (2.0.0)](ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md)** 🆕  
+  2.0.0 sibling of dev ADR-074 (dev PR #583). HA entity availability (`avty_t` = base namespace topic) must reflect only the ESP↔MQTT link (birth/LWT); `publishOTGWConnectedState()` no longer overwrites it with OT-bus liveness, which flapped every HA entity (`DHW Control`/`Thermostat`/SAT cards most visibly). OT-bus liveness stays on the `otgw_connected` sensor. Binding pattern; CI gate pending under ADR-080 (TASK-623).
+
 ### System Architecture
 
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
