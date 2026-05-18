@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp32.h
-**  Version  : v2.0.0-alpha.37
+**  Version  : v2.0.0-alpha.38
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

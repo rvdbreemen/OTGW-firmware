@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-18T05:02:45.254Z
-> Files: 8 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-18T08:37:00.636Z
+> Files: 9 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -342,6 +342,7 @@
 
 ## src/OTGW-firmware/
 
+- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~31604 tok)
 - `restAPI.ino` — include <string.h> (~32136 tok)
 - `SATweather.ino` — Declares uint16_t (~7653 tok)
 - `settingStuff.ino` — include <ctype.h> (~16551 tok)
