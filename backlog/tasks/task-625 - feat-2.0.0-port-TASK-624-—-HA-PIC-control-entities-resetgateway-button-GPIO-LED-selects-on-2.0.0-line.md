@@ -3,10 +3,11 @@ id: TASK-625
 title: >-
   feat-2.0.0: port TASK-624 — HA PIC-control entities (resetgateway button +
   GPIO/LED selects) on 2.0.0 line
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-18 07:54'
+updated_date: '2026-05-18 08:12'
 labels: []
 dependencies:
   - TASK-624
@@ -28,3 +29,16 @@ Port the PR#576 feature (TASK-624) to the feature-dev-2.0.0-otgw32-esp32-sat-sup
 - [ ] #6 docs/api/MQTT.md (2.0.0) updated with the new entities/commands
 - [ ] #7 Delivered on a dedicated branch off feature-dev-2.0.0-otgw32-esp32-sat-support with a draft PR targeting that branch; cross-referenced to TASK-624 / PR#576
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. OTGW-firmware.h: add OTGWpiccontrolsid=244 + comment
+2. MQTTstuff.h: add HaIcon restart/pin/led_outline before _count; declare streamButtonDiscovery + streamSelectDiscovery
+3. MQTTHaDiscovery.cpp: add haIconStr restart/pin/led-outline cases; ADD MISSING haEntityCatStr config case (2.0.0 bug); append composeButtonPayload/streamButtonDiscovery + composeSelectPayload/streamSelectDiscovery (port of dev code, 2.0.0 helper API)
+4. MQTTstuff.ino: add s_reset + s_cmd_*/s_otgw_* PROGMEM + setcmds rows; resetgateway->resetOTGW() branch in handleMQTT dispatch; OTGWpiccontrolsid into markAllMQTTConfigPending (parity with 249/250/diag200 — NOT publishNonOT, matching 2.0.0 convention); doAutoConfigureMsgid pseudo-ID 244 block WITHOUT isPICEnabled gate
+5. docs/api/MQTT.md (2.0.0): set-commands + PIC Control Entities section
+6. bin/bump-prerelease.sh (alpha.36->alpha.37)
+7. build + evaluate for 2.0.0 target
+8. commit, push -u origin claude/port-pr576-2.0.0-GvEv0, draft PR -> feature-dev-2.0.0-otgw32-esp32-sat-support
+<!-- SECTION:PLAN:END -->
