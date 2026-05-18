@@ -270,6 +270,67 @@ def check_python_version():
     print_success(f"Python {version.major}.{version.minor}.{version.micro}")
 
 
+# Build-critical vendored libraries that ship as git submodules. A plain
+# `git clone` without `--recurse-submodules` leaves these empty, which makes
+# the firmware compile fail late with a confusing missing-header error.
+SUBMODULE_LIBS = [
+    "src/libraries/SimpleTelnet",
+    "src/libraries/OpenTherm",
+]
+
+
+def _submodule_has_sources(lib_dir):
+    """A submodule is considered present if its tree contains any header."""
+    return lib_dir.is_dir() and next(lib_dir.rglob("*.h"), None) is not None
+
+
+def ensure_submodules(project_dir):
+    """Self-heal: init build-critical git submodules when their sources are missing."""
+    print_step("Checking git submodules")
+
+    missing = [
+        rel for rel in SUBMODULE_LIBS
+        if not _submodule_has_sources(project_dir / rel)
+    ]
+    if not missing:
+        print_success("Submodule libraries present")
+        return
+
+    print_warning(f"Missing submodule sources: {', '.join(missing)}")
+
+    if not (project_dir / ".git").exists():
+        print_warning(
+            "Not a git checkout - cannot auto-init submodules. "
+            "Obtain a full clone or fetch the sources with: "
+            "git submodule update --init"
+        )
+        return
+    if not shutil.which("git"):
+        print_warning(
+            "git not found on PATH - cannot auto-init submodules. "
+            "Install git and run: git submodule update --init"
+        )
+        return
+
+    result = run_command(
+        ["git", "submodule", "update", "--init"] + missing,
+        cwd=project_dir,
+        check=False,
+    )
+
+    still_missing = [
+        rel for rel in SUBMODULE_LIBS
+        if not _submodule_has_sources(project_dir / rel)
+    ]
+    if result.returncode != 0 or still_missing:
+        print_warning(
+            "Submodule init incomplete - the firmware compile will likely "
+            "fail. Resolve network/access and run: git submodule update --init"
+        )
+        return
+    print_success("Submodule libraries initialized")
+
+
 def setup_arduino_config(project_dir, target_names):
     """Setup arduino-cli configuration"""
     print_step("Configuring arduino-cli")
@@ -2347,6 +2408,9 @@ Examples:
     if args.distclean:
         clean_build(project_dir, distclean=True)
         return
+
+    # Self-heal missing git submodules (fresh clone / web-container sessions)
+    ensure_submodules(project_dir)
 
     # Resolve target list
     if args.target == "all":

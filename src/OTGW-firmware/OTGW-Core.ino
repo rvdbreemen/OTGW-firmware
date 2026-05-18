@@ -1573,12 +1573,21 @@ static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlo
   const bool intervalElapsed = !firstSeen
                              && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
   if (firstSeen || forcePublish || intervalElapsed) {
-    // TASK-402: rate-gate — ≥MQTT_GATED_PUBLISH_SPACING_MS since last non-change
-    // publish. Deferred calls return false; the firstSeen/intervalElapsed flags
-    // stay true until our lastTime gets updated, so the bit retries on the next
-    // OT frame automatically.
+    // TASK-402 rate-gate, refined by TASK-612: the 250ms spacing exists to
+    // spread the RECURRING 60s heartbeat fan-out, not the one-shot
+    // first-seen/forced burst. mqttLastGatedPublishMs is a single global
+    // shared by every bit/byte slot, and a parent message decodes its whole
+    // fan-out (ASF 1B+6b, RBP 2B+4b, Status 2B+15b) inside one processOT()
+    // call. Spacing the first-seen burst meant only the first slot passed and
+    // the rest deferred to the next parent frame — fine for msgId 0 (≈3s
+    // cadence) but starving ASF/RBP/VH (polled rarely), so those HA entities
+    // stayed "unknown". first-seen fires once per slot per boot (bounded,
+    // naturally spread as parents arrive) and valueChanged already bypasses
+    // this gate, so exempting first-seen/forced here is safe and consistent.
     const uint32_t nowMs = millis();
-    if (mqttLastGatedPublishMs != 0 && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
+    if (intervalElapsed && !forcePublish
+        && mqttLastGatedPublishMs != 0
+        && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
       return false;
     }
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
@@ -1616,8 +1625,13 @@ static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteS
   const bool intervalElapsed = !firstSeen
                              && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
   if (firstSeen || forcePublish || intervalElapsed) {
+    // TASK-612: same exemption as the bit path — rate-gate only the recurring
+    // 60s heartbeat, never the one-shot first-seen/forced burst (see the
+    // detailed rationale in shouldPublishTrackedStatusBit()).
     const uint32_t nowMs = millis();
-    if (mqttLastGatedPublishMs != 0 && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
+    if (intervalElapsed && !forcePublish
+        && mqttLastGatedPublishMs != 0
+        && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
       return false;
     }
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};

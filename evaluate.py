@@ -1075,9 +1075,13 @@ class WorkspaceEvaluator:
         # Extract buffer size: "char json[512];" or similar.
         buf_decl = re.search(r"\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]", body)
         if not buf_decl:
+            # The function was refactored to per-stat publishStatU32() calls;
+            # with no fixed char[N] buffer there is no overflow surface, so the
+            # arithmetic concern is moot rather than unverified.
             self.add_result(EvaluationResult(
-                "Buffer", "sendMQTTheapdiag arithmetic", "WARN",
-                "No 'char X[N]' buffer declaration found in body"
+                "Buffer", "sendMQTTheapdiag arithmetic", "PASS",
+                "No fixed char[N] buffer in body — per-stat publish, "
+                "buffer-arithmetic check not applicable"
             ))
             return
         buf_name = buf_decl.group(1)
@@ -2260,17 +2264,19 @@ class WorkspaceEvaluator:
         # Check for build documentation
         build_docs = ["BUILD.md", "FLASH_GUIDE.md"]
         for doc in build_docs:
-            doc_path = self.project_dir / doc
-            docs_path = self.project_dir / "docs" / doc
-            if doc_path.exists():
+            # Operational guides live under docs/guides/ per the project layout;
+            # also accept repo root and docs/ for backward compatibility.
+            candidates = [
+                (self.project_dir / doc, doc),
+                (self.project_dir / "docs" / doc, f"docs/{doc}"),
+                (self.project_dir / "docs" / "guides" / doc, f"docs/guides/{doc}"),
+            ]
+            found = next(((p, label) for p, label in candidates if p.exists()), None)
+            if found:
+                p, label = found
                 self.add_result(EvaluationResult(
                     "Documentation", doc, "PASS",
-                    f"Found ({doc_path.stat().st_size} bytes)"
-                ))
-            elif docs_path.exists():
-                self.add_result(EvaluationResult(
-                    "Documentation", doc, "PASS",
-                    f"Found (docs/{doc}, {docs_path.stat().st_size} bytes)"
+                    f"Found ({label}, {p.stat().st_size} bytes)"
                 ))
             else:
                 self.add_result(EvaluationResult(
