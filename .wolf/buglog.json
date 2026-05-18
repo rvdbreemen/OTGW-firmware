@@ -379,6 +379,22 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-18T05:01:56.113Z"
+    },
+    {
+      "id": "bug-024",
+      "timestamp": "2026-05-18T08:37:00.650Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/MQTTstuff.ino",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 14→20 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-18T08:37:00.650Z"
     }
   ]
 }

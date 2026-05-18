@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.36
+**  Version  : v2.0.0-alpha.38
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -673,6 +673,9 @@ byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats
 // 2.0.0 branch. Runtime/platform publish paths determine whether an entity has
 // live data (for example ESP32-only weather/BLE fields on ESP8266 stay
 // unavailable instead of disappearing from discovery).
+// 244 — resetgateway button + gpioa/gpiob/leda-f select entities (PIC control;
+//       discovery unconditional per the TASK-543 gating decision above)
+byte      OTGWpiccontrolsid  = 244;
 byte      OTGWfwinfoid       = 248;
 byte      OTGWpicinfoid      = 249;
 byte      OTGWpicsettingsid  = 250;
