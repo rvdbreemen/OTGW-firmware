@@ -7,6 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-18 07:53'
+updated_date: '2026-05-18 07:54'
 labels: []
 dependencies: []
 ---
@@ -27,3 +28,16 @@ PR#576 adds HA MQTT discovery for resetgateway (button), gpioa/gpiob + leda-ledf
 - [ ] #6 docs/api/MQTT.md updated with new set-commands + PIC Control Entities (pseudo-ID 251) section
 - [ ] #7 Committed and pushed to claude/fix-pr576-port-2.0.0-GvEv0; draft PR opened targeting dev; PR#576 cross-referenced
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. MQTTstuff.h: add HaIcon restart/pin/led_outline before _count; declare streamButtonDiscovery + streamSelectDiscovery
+2. mqtt_configuratie.cpp: add haIconStr cases (restart/pin/led-outline) + haEntityCatStr config case; add composeButtonPayload/streamButtonDiscovery + composeSelectPayload/streamSelectDiscovery (PR576 code, current-dev helper API)
+3. MQTTstuff.ino: add s_reset + s_cmd_*/s_otgw_* PROGMEM + setcmds rows; resetgateway->resetOTGW() branch in handleMQTTcallback; OTGWpiccontrolsid wired into publishNonOTDiscoveryConfigs + markAllMQTTConfigPending + clearMQTTConfigPending; doAutoConfigureMsgid pseudo-ID 251 block WITHOUT isPICEnabled() gate (fix)
+4. OTGW-firmware.h: add OTGWpiccontrolsid=251 + comment
+5. docs/api/MQTT.md: set-commands rows + PIC Control Entities section
+6. bin/bump-prerelease.sh (beta.8->beta.9); stage version.h + data/version.hash
+7. python build.py --firmware (exit 0); python evaluate.py --quick (no new failures)
+8. commit, push -u origin claude/fix-pr576-port-2.0.0-GvEv0, draft PR -> dev, cross-ref #576
+<!-- SECTION:PLAN:END -->
