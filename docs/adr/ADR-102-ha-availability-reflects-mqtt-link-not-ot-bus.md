@@ -109,13 +109,24 @@ which is correct HA availability semantics for every entity. The 30-second
   (the post-`/gateway`-removal behaviour carried from dev): they must
   migrate to the `otgw_connected` sensor. Documented in the changelog.
 - A future contributor could reintroduce the base-topic liveness write.
-  Mitigated by the Enforcement block below and code review.
+  Mitigated by code review and the declarative Enforcement block below.
+  **Gate pending — tracked as TASK-623.** This is a binding code-level
+  pattern ADR; per ADR-080 it must ship an `evaluate.py`/test gate. The
+  2.0.0 worktree has no `bin/adr-judge`, so the `forbid_pattern` block below
+  is not yet mechanically enforced here. TASK-623 adds the `evaluate.py`
+  check; on landing, this note is replaced with a link to that check
+  (ADR-080 gate exit criteria, option 1).
 
 ## Related Decisions
 
-- **Sibling of dev ADR-074** (`feature dev / dev` worktree) — identical
-  decision; this ADR is the 2.0.0 port. Kept coherent across both lines per
-  the cross-worktree workflow.
+- **Sibling of the dev-line ADR-074** — identical decision; this ADR is the
+  2.0.0 port, kept coherent across both lines per the cross-worktree
+  workflow. ADR numbering is per-worktree: on **this** (2.0.0) branch
+  `docs/adr/ADR-074-adr-audit-sat-integration-phase.md` is an unrelated SAT
+  audit ADR. The sibling is `ADR-074` on the **dev** worktree
+  (`docs/adr/ADR-074-ha-availability-reflects-mqtt-link-not-ot-bus.md`,
+  delivered by dev PR #583); follow that PR, not this branch's local
+  `ADR-074`.
 - 2.0.0 MQTT/HA discovery ADRs (ADR-097, ADR-099, ADR-101) — unaffected;
   this ADR only changes what is *not* written to the availability topic.
 
@@ -123,7 +134,10 @@ which is correct HA availability semantics for every entity. The 30-second
 
 - Discord field reports, 2026-05-16: two testers, `DHW Control` flapping,
   DHW controls dead (dev line; 2.0.0 shares the code shape).
-- dev `docs/adr/ADR-074-ha-availability-reflects-mqtt-link-not-ot-bus.md`.
+- Dev-line sibling ADR-074, delivered by **dev PR #583**
+  (`rvdbreemen/OTGW-firmware#583`) — the resolvable reference. Its file is
+  `docs/adr/ADR-074-ha-availability-reflects-mqtt-link-not-ot-bus.md` on the
+  `dev` worktree, *not* this branch's `ADR-074-adr-audit-sat-integration-phase.md`.
 - `src/OTGW-firmware/MQTTstuff.ino:1465-1469` — `publishOTGWConnectedState()`
   (liveness write removed; `otgw_connected` retained).
 - `src/OTGW-firmware/MQTTstuff.ino:1000`/`1005`/`1018` — LWT + birth on the

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:18'
-updated_date: '2026-05-16 07:33'
+updated_date: '2026-05-18 05:01'
 labels:
   - bug
   - mqtt
@@ -52,6 +52,12 @@ Port of dev TASK-607 to the 2.0.0 ESP32/SAT line. Same architectural defect: MQT
 Implemented: removed the single sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otBus.bOnline)) line in the shared publishOTGWConnectedState() helper (MQTTstuff.ino:1468) — covers both processOT() and sendMQTTstateinformation() paths. otgw_connected retained. ADR-102 authored, cross-references dev ADR-074 (same decision the maintainer Accepted in-session for ADR-074), declarative forbid_pattern Enforcement. Prerelease alpha.34->alpha.35. evaluate.py ADR-refs: 0 unresolved on the 2.0.0 tree (no new offender). Commit 003119b0 (unsigned — maintainer authorized one-off --no-gpg-sign; cloud signer rejects this branch as source). Pushed claude/fix-dhw-control-issue-2.0.0-bFtJ6; draft PR #585.
 
 AC#6 (ESP32 build): PR #585 CI runs pio esp8266 + esp32 jobs — verification delegated there (in progress at handoff; could not run locally — sandbox blocks arduino-cli download). Task left In Progress pending CI #585 build result.
+
+Review-comment polish (PR #585 Copilot review, 4 threads):
+1. Add ADR-102 to docs/adr/README.md MQTT subsection (index discoverability).
+2. Add CHANGELOG.md [Unreleased] entry mirroring dev sibling (substantiates ADR-102 "documented in the changelog" claim + migration guidance).
+3. Disambiguate the dev ADR-074 cross-ref in ADR-102 (local 2.0.0 ADR-074 is a different SAT-audit ADR; add resolvable dev PR #583 reference).
+4. ADR-080 gate gap: no bin/adr-judge on 2.0.0 so forbid_pattern is unenforced — add "Gate pending — tracked as TASK-623" note to ADR-102 Consequences + created TASK-623.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
