@@ -1,14 +1,29 @@
 # Critical Multi-Perspective Review — last 100 commits on `dev`
 
-**Date**: 2026-05-11
-**Scope**: HEAD..HEAD~100 on branch `dev` (range `f863aebe..660d4b93`).
+**Date**: 2026-05-18 (updated; original 2026-05-11)
+**Scope**: HEAD..HEAD~100 on branch `dev` (range `8527c56..ebbbb4d`).
 **Tone**: deliberately critical. Findings are biased toward what is wrong, weak, or fragile. Where something is good, that is also called out but kept brief.
+
+---
+
+## Changelog since 2026-05-11 review
+
+Robert has been busy. The 2026-05-11 review covered range `f863aebe..660d4b93`. The window has shifted substantially — the new HEAD is `ebbbb4d` (2026-05-18), 26 new commits past the old boundary. Key changes to prior findings:
+
+| Prior finding | Outcome |
+|---|---|
+| **CRITICAL A1** — `SATcontrol.ino` 17 unguarded `pos += snprintf_P` | **RESOLVED** — SAT subsystem removed from dev (`a25c3b1`) |
+| **HIGH C1** — 480k-line build-artefact commits | **REFRAMED** — was a merge-sequence diff artefact, not real |
+| **MEDIUM A2** — `logfile.txt` 1.6 MB at repo root | **STILL OPEN** — plus `commits.txt` added |
+| **MEDIUM A3** — version-stamp cascade 25+ files | **TRACKED** — TASK-597 created, not fixed |
+| **MEDIUM A4/R3** — `writeFriendlyName` underscore-only split | **STILL OPEN** — no task created yet |
+| **NEW HIGH** — ADR-074 implementation silently reverted | **NEW** — code still drives avty_t from OT-bus liveness |
+
+---
 
 ## TL;DR
 
-The last 100 commits ship a coherent product story — the JIT-MQTT-discovery line of work (ADR-073) is well-scoped and well-evidenced — but the *repo hygiene around that story is poor*. Two commits add a combined ~480k lines of build artefacts. A 10 643-line `logfile.txt` is now part of the firmware tree. Sixty percent of commits are pure backlog admin. Every prerelease bump rewrites a header comment in 25-plus files for zero functional reason. There is at least one latent buffer-bounds bug in `SATcontrol.ino` that is the same shape as the one the SAT-pressure-attr removal just deleted. The HA-friendly-name normalisation has been re-fixed *four times* in this window — TASK-572, TASK-572-port, TASK-573, TASK-574 — and the underlying transform is still split-on-underscore only, which guarantees the next round will look identical.
-
-Refactoring is needed, but only narrowly. Recommendations are at the end.
+Significant product progress since the last review: SAT subsystem cleaned up, JIT discovery bugs patched, HA availability correctly decoupled by ADR-074. But ADR-074's actual code changes were **silently rolled back** by a subsequent squash-merge from an older branch — HA entity availability still flaps with OT-bus liveness in the current `beta.11`. `logfile.txt` is still in the tree. Backlog-admin noise improved from 60% to 44% of commits. The new PIC-control entities (button + selects) are well-implemented.
 
 ---
 
@@ -16,354 +31,258 @@ Refactoring is needed, but only narrowly. Recommendations are at the end.
 
 | Category | Count | Notes |
 |---|---:|---|
-| Total commits in window | 100 | range `f863aebe..660d4b93` |
-| `Update task TASK-*` / `Create task TASK-*` | **60** | pure `backlog/tasks/*.md` edits |
-| `docs(*)` | 12 | ADR, CHANGELOG, README, daily-issue-report |
-| `fix(*)` | 13 | MQTT/SAT/flash/pre-commit |
-| `feat(*)` | 2 | JIT MQTT discovery, flash auto-download |
-| `chore(*)` | 7 | version bumps, build-artefact refreshes, adr-kit |
-| Merge commits | 2 | `c4d1280a`, `ac317dc4` |
-| Authored by `noreply@anthropic.com` | 47 (Co-Authored) | Claude touched ~half of substantive commits |
+| Total commits in window | 100 | range `8527c56..ebbbb4d` |
+| `Update task TASK-*` / `Create task TASK-*` | **44** | improved from 60 in prior window |
+| `docs(*)` | 23 | ADR, guides, daily reports, CHANGELOG |
+| `fix(*)` | 14 | MQTT/SAT/flash/UI/build |
+| `feat(*)` | 3 | JIT discovery, flash scripts, PIC-control entities |
+| `chore(*)` | 10 | SAT cleanup, version bumps, adr-kit |
+| Other | 6 | merges, empty commits, backlog-only |
+| Authored by `noreply@anthropic.com` | ~42 (Co-Authored) | consistent attribution |
 
-Substantive code commits: 13. The other 87 are housekeeping, docs, version cascades, or auto-generated noise.
+Firmware-touching commits (changed `src/**`): ~20. The other 80 are housekeeping, docs, version stamps, or backlog admin.
 
 ---
 
 ## 2. Perspective A — Code quality & ESP8266 constraints
 
-### A1. **CRITICAL** — unguarded `pos += snprintf_P(...)` in `SATcontrol.ino:2272-2348`
+### A1. ~~CRITICAL~~ → **RESOLVED** — `SATcontrol.ino` buffer overrun
 
-The SAT climate-attributes block (`fix(sat) ee37052`, beta.2) builds a 512-byte JSON blob with the canonical-but-unsafe pattern:
+`a25c3b1 chore(sat): remove orphaned SAT subsystem from dev branch` and `4fcd30a chore(sat): remove dead ENABLE_SAT scaffolding` together completely removed the SAT subsystem from `dev`. The 17 unguarded `pos += snprintf_P` calls are gone. `4fcd30a` also cleaned `OTGW-firmware.h` of 350 lines of dead `#ifdef ENABLE_SAT` scaffolding.
 
-```cpp
-static char climAttrBuf[512];
-int pos = 0;
-pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR("..."));
-// 16 more identical lines, no clamp
-```
+**This is the right call.** SAT belongs on the 2.0.0 branch where it is actively maintained. No residual dead state detected.
 
-`snprintf` returns *would-have-written* length, not bytes-actually-written. Once `pos >= sizeof(climAttrBuf)`, `sizeof(climAttrBuf) - pos` is an unsigned underflow → ~4 GB, telling subsequent `snprintf` calls they have unlimited room. Result: writes past the buffer, stack/data corruption, Exception (3)/(28). On the current 16-field payload it stays around 350-400 bytes so the bug is latent, but adding even one new attribute or widening a float format can blow it.
+### A2. **MEDIUM** — `logfile.txt` (10 643 lines) and `commits.txt` still in repo root
 
-Notably, this is the *exact* same pattern just deleted by `a1a7795 fix(sat): remove orphaned sat/pressure_health_attr` (beta.3, TASK-590). Removing the symptom did not remove the foot-gun in the sibling block ~400 lines up.
+`f863aeb Create logfile.txt` is still in the 100-commit window. `logfile.txt` (a captured telnet stream, ~1.6 MB) and a new `commits.txt` (68 lines, a `git log` dump) are both tracked files at the repo root. `.gitignore` covers `*.log` and `*.bin` but not `*.txt`.
 
-`grep -c "pos += snprintf_P" SATcontrol.ino` = **17**, with **0** guards.
+**Remediation**: `git rm logfile.txt commits.txt && echo "*.txt" >> .gitignore` at the root, or at minimum `echo "/logfile.txt\n/commits.txt" >> .gitignore` then `git rm --cached logfile.txt commits.txt`. Add a pre-push hook: `find . -maxdepth 1 -name "*.txt" -size +100k` → block.
 
-**Fix**: introduce a helper or clamp every call site:
+The commit message "Create logfile.txt" remains content-free. No `why`.
 
-```cpp
-int wrote = snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR("..."));
-if (wrote < 0 || wrote >= (int)(sizeof(climAttrBuf) - pos)) { /* truncate / abort */ }
-pos += wrote;
-```
+### A3. **MEDIUM** — version-stamp cascade (tracked, not fixed)
 
-Better: route through `MqttJsonWriter` (already used for HA discovery in `mqtt_configuratie.cpp`) so this bypasses static buffers entirely.
+Every `.ino`/`.h`/`.css`/`.html`/`.js` carries a `**  Version  : v1.5.1-beta.N` header rewritten by `scripts/autoinc-semver.py`. TASK-597 was created to fix this. The fix has not landed — `ebbbb4d` (beta.11) rewrites 14 files for a 1-CSS-selector UI change. Every single-line fix still ships as a 14–27 file diff. TASK-597 priority should be elevated; this is the single biggest reviewability tax in the repo.
 
-### A2. **MEDIUM** — `logfile.txt` (10 643 lines, 1.6 MB) committed to firmware tree (`f863aeb`)
+### A4. **LOW** — `writeFriendlyName` still underscore-only split
 
-`.gitignore` covers `*.log` but `logfile.txt` slips through. The file is a captured telnet stream and has zero relation to firmware build; it inflates clone size by ~1.6 MB permanently and confuses repo-wide grep/lint. Either:
-
-- delete it and add `logfile*.txt` to `.gitignore`, or
-- move it under `docs/diagnostics/` next to the other evidence captures.
-
-The commit message "Create logfile.txt" is also content-free — no `why`.
-
-### A3. **MEDIUM** — version-stamp cascade churn in 25+ files per bump
-
-Every `.ino`, `.h`, `.cpp`, `.css`, `.html`, `.js` carries a `**  Version  : v1.5.x-beta.N` header comment that `scripts/autoinc-semver.py` rewrites on every prerelease bump. Sample evidence:
-
-| Commit | Subject | Files | Substantive change |
-|---|---|---:|---|
-| `503461c8` | reset prerelease to beta.1 | 26 | none — pure stamp churn |
-| `5903b215` | refresh build artefacts post-beta.29 | 2 | only `version.h` + `version.hash` |
-| `ee370527` | wire `sat/climate_attributes` | 27 | **1** source-line addition in `mqtt_configuratie.cpp` |
-| `a1a7795e` | remove `pressure_health_attr` | 27 | **1** source-block deletion in `SATcontrol.ino` |
-| `660d4b93` | flip Class 1/8 echo flags | 27 | **4** rows in `OTmap[]` |
-
-`git blame` for any file gets dominated by version stamps. Reviewers chasing what changed have to mentally filter the `-/+` noise on every commit. There is one source of truth (`version.h`) — propagating it into 25 header comments is a YAGNI of the worst kind.
-
-### A4. **LOW** — friendlyName transform is `_` → space + Title Case, still
-
-`writeFriendlyName` (`mqtt_configuratie.cpp:1876`) splits on underscore. This is exactly why the project has now shipped four fixes in this window:
-
-1. `fc72adfe` — fix(mqtt): HA discovery friendly name uses spaces, not underscores (TASK-572)
-2. `9a53a4f1` — fix(mqtt): drop hostname + Title-Case all HA discovery friendly names (TASK-572)
-3. `6d162be4` — fix(mqtt): normalise HA discovery friendly-name strings (TASK-573, 254 lines of PROGMEM string churn)
-4. `4b14fa71` — same on 2.0.0 (TASK-574)
-
-Each round added underscores to `~125` PROGMEM string literals because the transform cannot split `OEMFaultCode` / `MaxCapacityMinModLevel_hb_u8` / `DayTime_dayofweek` on case boundaries. We are doing the splitter's job by hand in 256-entry PROGMEM tables. The next time a tester says "MyEntityNameRendersWrong" we will be back here for a fifth round.
-
-A 25-line camelCase-aware splitter in `writeFriendlyName` would have made all four fixes a one-line change. Note: the transform runs in flash-streaming context so it has to allocate nothing — but a single-pass state machine over the RAM buffer is allocation-free.
-
-### A5. **LOW** — broker-restart heuristic is not field-tunable
-
-`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS = 300000UL` (5 min) is `constexpr` (`MQTTstuff.ino:58`). ADR-073's own "Negative/Risks" section warns:
-
-> A broker without persistence that recovers in under 5 minutes would leave stale discovery state — mitigated by the fact that MQTT brokers with persistence (the common case) retain messages across restarts.
-
-`mosquitto`'s default config does not persist retained messages. A user running default `mosquitto` who restarts it during a config tweak gets a silent JIT-discovery hole until the next OT bus event re-publishes each MsgID. There is no setting in `OTGWSettings` for this and no debug command to force it lower for testing. At minimum, expose it as a setting; better, treat any reconnect from a clean state as broker-restart-suspect and republish.
-
-### A6. **LOW** — `iLastConnectedMs` stamp every tick is a minor write-amplification pattern
-
-`MQTTstuff.ino:845` writes `state.mqtt.iLastConnectedMs = millis()` on every `MQTT_STATE_IS_CONNECTED` invocation while connected. State is RAM-only (not persisted) so flash-wear is not the concern. The concern is the comment ("stamp each confirmed-live tick") buries the actual semantics — what we want is "the last time we *saw* the connection healthy", and the value is read only in the `offlineMs` computation on next reconnect. The current implementation works, but the variable name + comment encourage a future maintainer to read it for the wrong reason (e.g., uptime, last-tx).
+`6d162be4` patched ~125 PROGMEM strings by hand to add underscores. `writeFriendlyName` (called from `mqtt_configuratie.cpp`) still only splits on underscore — camelCase boundaries (`OEMFaultCode`, `MaxCapacityMinModLevel`) still cannot be split automatically. Next time a tester adds a new OT entity with a camelCase name, the fix cycle repeats. A 20-line single-pass state-machine would close this permanently. No task exists for this — R3 from the prior review is still outstanding.
 
 ---
 
 ## 3. Perspective B — Architecture & design
 
-### B1. JIT MQTT discovery (ADR-073, `1bb58d8f`) — the headline change
+### B1. **NEW HIGH** — ADR-074 implementation silently reverted by squash-merge
 
-**Positive**: the ADR is one of the better-written ones in the directory. It explicitly cites the field-evidence Discord log (2026-05-08, 256 configs published at boot), enumerates four rejected alternatives with reasons, and the `Enforcement` block has `llm_judge: true` plus targeted guidance ("flag any `markAllMQTTConfigPending()` outside `doAutoConfigure()`"). The trigger table at the end is the kind of document that survives a reviewer cold-reading the file two years later. Supersession of ADR-041 is recorded correctly (immutability respected; only Status updated).
+ADR-074 ("HA entity availability reflects MQTT link, not OT-bus liveness", Accepted 2026-05-16) was correctly implemented in `7b0d167`. Within the same day, a squash-merge of PR #572 (`a82de1e fix(mqtt): JIT discovery hasConfig gate`) landed on a branch base that predated `7b0d167`, silently restoring both removed callsites:
 
-**Negative**:
-- **Progressive entity discovery is a real product regression in the corner case where the boiler is in standby.** A heat pump that only chatters when actively heating might leave MsgID-related entities invisible to HA for hours after a boot. ADR-073 lists this under Negatives but does not propose a mitigation. A "kick the bus" force-poll after boot (read MsgID 0 + a curated handful) would close the gap without breaking JIT.
-- **`publishNonOTDiscoveryConfigs()` is duplicated logic with `markAllMQTTConfigPending()` (lines 1311–1318 vs 1344–1354).** Both enumerate the same seven pseudo-ID set. A typo in one and not the other will silently desynchronise boot vs force paths. Factor it.
-- **`verifyAccessorMarkAllMQTTConfigPending()`** at line 260 is an obvious testing seam, but the project has no test runner. Either delete it or wire it to a Serial debug command and document the contract.
+| File | Callsite | State after `7b0d167` | State in current `beta.11` |
+|---|---|---|---|
+| `OTGW-Core.ino:4042` | `sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline))` | **removed** | **back** |
+| `MQTTstuff.ino:1148` | same, in `sendMQTTstateinformation()` | **removed** | **back** |
 
-### B2. SAT `pressure_health_attr` removal (`a1a7795e`, TASK-590)
+`git diff 7b0d167 origin/dev -- src/OTGW-firmware/OTGW-Core.ino` confirms the reintroduction. The ADR-074 comment added by `7b0d167` in `MQTTstuff.ino` is also gone.
 
-Clean removal — but the commit deletes the publish and the static buffer, not the underlying state (`state.sat.fSmoothedPressure`, `iLastPressureMs`, `iLastSeenPressureMs`). If those are now only used by the deleted attr block, they are dead state taking RAM. A quick check:
+**Effect**: HA entity availability on `<toptopic>/value/<nodeid>` still flaps with OT-bus liveness. Every entity (climate, sensor, binary_sensor, number) becomes `unavailable` when the OT bus goes quiet for 30 seconds. The two field testers who reported DHW Control flapping in beta on 2026-05-16 still experience this bug in beta.11.
 
-```
-$ grep -rn "fSmoothedPressure\|iLastPressureMs\|iLastSeenPressureMs" src/OTGW-firmware/
-```
+**Fix**: Re-apply the two-line removal from `7b0d167`. In `processOT()` (OTGW-Core.ino), remove the `sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline))` call inside the `isPICEnabled()` block. In `sendMQTTstateinformation()` (MQTTstuff.ino:1148), do the same. OT-bus liveness should drive only `otgw-pic/otgw_connected` (which `sendMQTTDataPic` already does correctly on the line above each removed call).
 
-would tell us in 30 seconds whether ~20 bytes of `OTGWState` is leakable. The commit does not document this check.
+**Process note**: this is the exact failure mode the "one master plan, two tasks, two agents" cross-worktree rule is designed to prevent. PR #572 was developed against an older dev and merged without rebasing onto `7b0d167`. Pre-merge rebase or a CI check on the `avty_t` callsites would have caught this.
 
-### B3. SAT `climate_attributes` wire-up (`ee37052`)
+### B2. **POSITIVE** — JIT discovery hasConfig gate (`a82de1e`)
 
-Correct fix — discovery now declares the json_attributes_topic that was being published into the void. Two observations:
+The JIT implementation (`1bb58d8f`, ADR-073) had a subtle re-entrancy bug: OT IDs that had their discovery config bit set (e.g. via a legacy topic, or a retained MQTT message from a previous firmware) but that had never been received on the OT bus could stall the drip publisher. `a82de1e` adds a `hasConfig` gate that checks the OTmap entry exists before setting pending — phantom IDs now never enter the drip queue. Correct fix, well-commented.
 
-- **`climateIdx == 0` is a magic number.** The streaming function iterates climate entities; only the *thermostat* (index 0) gets the attrs block. If a future `climateIdx == 1` (DHW) ever needs attrs, the conditional becomes an else-if chain. Name the constant (`SAT_CLIMATE_INDEX_THERMOSTAT = 0`) — the rename is a 5-token diff and forestalls the magic-number creep.
-- **The attribute set is hardcoded in two unrelated files** — `SATcontrol.ino` builds the JSON; `mqtt_configuratie.cpp` declares the discovery hook. Adding a new attribute means editing both *and* HA's downstream YAML. There is no single contract document. Either add a comment "if you add a field here, also update X" in both spots, or move the field list into a shared header table.
+### B3. **POSITIVE** — PIC-control entities (pseudo-ID 251, `908e1e1`)
 
-### B4. OT echo audit flips (`660d4b93`, TASK-571)
+New feature: 9 HA entities for gateway PIC control — one `button` (resetgateway) and eight `select` entities (gpioa/b, leda-ledf). Implementation is clean:
 
-The reasoning is sound and explicitly grounded in a *captured telnet log with timestamps* — exactly the evidence quality we want. The "Defensive-defaults policy" written into the commit message ("when the spec does not REQUIRE the slave to echo, default to suppress") is the kind of project policy that should live in an ADR, not in commit prose. Right now, three months from now nobody will find this when deciding what default to use for a new MsgID.
+- PROGMEM strings for command names and PIC command codes allocated correctly.
+- All-or-nothing semantics: the pending bit is cleared only when all 9 discovery configs are published successfully in a single drip tick. Good atomic-ness for a constrained heap.
+- Correctly added to BOTH `publishNonOTDiscoveryConfigs()` AND `markAllMQTTConfigPending()` — the R4 duplication risk (from prior review) was managed with discipline.
+- Unconditional discovery (no `isPICEnabled()` gate) is explicitly documented with the rationale (`isPICEnabled()` false causes `result=false` and infinite drip retry — PR #576 review finding).
 
-Also: MsgID 1 has *direct* field evidence; 7, 8, 71 were flipped by analogy ("same shape, same rationale"). The commit message admits this and offers to flip back individually if a tester complains. That is reasonable risk management but it also means we are shipping behaviour changes without field validation on 3 of the 4 MsgIDs flipped — and the next deployment with a different boiler model becomes the validation step. A "candidate flips needing field confirmation" backlog entry would close the loop.
+The comment block explaining the `isPICEnabled()` gate decision is exactly the kind of non-obvious constraint documentation the project principles call for.
 
-### B5. Branch strategy (worktree layout)
+### B4. **MEDIUM** — non-OT pseudo-ID list still duplicated (R4 outstanding)
 
-`CLAUDE.md` documents the 1.5.x / 2.0.0 split as parallel worktrees, with "if both: one master plan, two tasks, two agents." The TASK-572/573/574 pattern (dev fix + 2.0.0 port within hours) shows this works. But the cost is visible — `1d6c3c84` / `5876caaa` / `66cc24b7` / `4b14fa71` are all explicit ports tagged "port-of-N". Each port commit is hand-mirrored and exposed to drift. Over four iterations on the same friendly-name issue, the cost compounds.
-
-If a fix touches `mqtt_configuratie.cpp` or `OTGW-Core.h` on both branches and the diff is mechanically identical, a `git cherry-pick` discipline + a CI check that flags un-ported "dev → 2.0.0" commits would be cheaper than the manual port-tasks. Not a refactor, but worth a process tweak.
+`publishNonOTDiscoveryConfigs()` and `markAllMQTTConfigPending()` both explicitly enumerate the same 8 non-OT pseudo-IDs. The `908e1e1` commit added `OTGWpiccontrolsid` to both in sync — but the structural risk remains. A future contributor adding a new pseudo-ID entity will need to update two places and may miss one. Extracting to `static const uint8_t kNonOTPseudoIds[] PROGMEM = {...}` + a loop is a 10-line change.
 
 ---
 
 ## 4. Perspective C — Git hygiene & commit discipline
 
-### C1. **HIGH** — 480k-line build-artefact commits hidden under fix labels
+### C1. **REFRAMED** — "480k-line build-artefact commits" (prior HIGH)
 
-Two of the last 60 commits add enormous diffs that are not what the subject line claims:
+Re-examined: `67980f1 fix(flash_otgw.bat)` is a real 1-file, 8-line change. `5903b21 chore(version): refresh build artefacts post-beta.29` is a real 2-file change. The prior review's "480k lines" figure was an artefact of how `git diff` calculated the delta when the merge commit `ac317dc4` (merge main → dev) was at the boundary of the shallow clone. Not a real ongoing issue.
 
-| Commit | Subject | Files | Insertions |
-|---|---|---:|---:|
-| `67980f1e` | `fix(flash_otgw.bat): use registry for COM port detection` | **941** | **240 940** |
-| `5903b215` (older, but resurfaced under `ac317dc4` merge) | `chore(version): refresh build artefacts post-beta.29` | 937 | 240 486 |
+The underlying concern — large merge commits with misleading subjects — is still real but does not recur in the new window.
 
-`67980f1e` claims to be a flash-script fix but its diff includes the entire `.claude/` skill tree, `mqtt_configuratie.cpp` (2729 lines), `OTGWSerial.cpp` (1046 lines), `restAPI.ino` (1519 lines), `tests/`, and `tools/`. It is functionally a re-add of the whole codebase masquerading as a one-line `.bat` fix. (It is in fact a merge of an old branch state — see `ac317dc4 chore: merge main back to dev (flash tool fixes + ADR-072 schema fix)` — but the merge-merge sequence has made the resulting linear history misleading.)
+### C2. **MEDIUM** — 44% backlog-admin commits (improved from 60%)
 
-**Impact**: `git log -p src/OTGW-firmware/MQTTstuff.ino` jumps to a 2729-line "added" event at this commit. `git bisect` becomes useless inside this window. PR-style review is impossible.
+| Window | Admin commits | % of 100 |
+|---|---|---|
+| Prior (to 2026-05-07) | 60 | 60% |
+| Current (to 2026-05-18) | 44 | 44% |
 
-**Fix**: in future, if a merge-back drags in artefacts, separate out the artefact-refresh into its own commit with a clear `chore(merge-back):` label, and resolve the merge as a proper merge commit (`git merge --no-ff`) rather than a flattened mega-commit.
+The CLAUDE.md commit-batching policy (added in `1cec3e3`) and TASK-598 exist to address this. Improvement is visible — the new window has more substantive commits. However, 44% is still the plurality. Until TASK-598 lands, "review the last 100 commits" effectively means reviewing ~56 substantive ones while filtering 44 admin ones.
 
-### C2. **HIGH** — 60% of commits are `Update task TASK-*` housekeeping
+### C3. **MEDIUM** — squash-merge without rebase erased ADR-074 fix (see B1)
 
-Of the last 100 commits:
+Beyond the commit count, the deeper hygiene issue is that a squash-merge (`a82de1e`, PR #572) landed without rebasing on `7b0d167` (PR #583, same day). In a squash-merge workflow, the entire PR history becomes one commit whose parent is the HEAD at merge time, but the CONTENT can predate concurrent changes. Result: a silent regression.
 
-- 47 `Update task TASK-*` (1 file changed, 1-8 lines, in `backlog/tasks/`)
-- 13 `Create task TASK-*`
-- 1 daily-issue-report
-- 39 other (substantive + docs + version bumps)
+**Recommendation**: before merging any PR on an active day, `git fetch && git rebase origin/dev` in the PR branch, then re-run evaluate.py. Or add a CI step: `grep -n "sendMQTT(MQTTPubNamespace" src/OTGW-firmware/OTGW-Core.ino src/OTGW-firmware/MQTTstuff.ino` — any hit is an ADR-074 violation.
 
-Every CLI-edit to a backlog task file becomes a commit. `git log --oneline` is now dominated by backlog admin. Two systemic options:
+### C4. **LOW** — `Initial plan (#567)` empty merge commit still present
 
-1. **Squash backlog updates into the originating code commit.** A task moving through To Do → In Progress → AC-checked → Done → Final-Summary should not produce 5 commits. Either edit the task file in the same commit as the code change (Backlog.md CLI supports this) or batch backlog updates into one daily `chore(backlog):` commit.
-2. **Move `backlog/` to a separate branch or repo.** Keeps firmware history clean. Heavier lift; only worth it if option 1 fails.
+`64a86679` carries no payload — it's a Copilot-authored merge of a PR branch with no content. Still sitting in mainline `dev`. Either close + delete, or squash into the first real commit that follows it.
 
-Without one of these, "review the last 100 commits" effectively means "review the last 39 substantive commits because the other 61 are admin noise."
+### C5. **POSITIVE** — Co-Authored-By discipline consistent
 
-### C3. **MEDIUM** — `Initial plan (#567)` empty merge commit (`64a86679`)
-
-A Copilot-authored merge with no payload, sitting on `dev`. If the PR was intended to seed something, the seed never landed. Either close + delete the branch, or commit content. Empty commits in mainline are a cognitive cost.
-
-### C4. **LOW** — Two consecutive commits in the window share the same subject
-
-`5903b215 chore(version): refresh build artefacts post-beta.29` appears twice in the window (different SHAs but identical subject line, ~3 days apart). Distinguishing them requires reading the bodies. Date-stamp the subject (`post-beta.29 (2026-05-05)`) or vary the wording.
-
-### C5. **POSITIVE** — Co-Authored-By discipline is consistent
-
-47 of the substantive commits explicitly co-author Claude. This is what good provenance looks like and worth preserving.
+Attribution is clean throughout the new window. Claude co-authorships are accurate (co-authored where AI contributed, author-only where the maintainer worked alone).
 
 ---
 
 ## 5. Perspective D — Documentation & ADRs
 
-### D1. ADR cadence is too high relative to feature velocity
+### D1. ADR-074 — well-written, implementation broken (see B1)
 
-The window contains ADR-069, 070, 071, 072, 073 plus the supersession of 041. Five new ADRs and one supersede in ~3 months. Looking at the supersession chain:
+ADR-074 is solid: field evidence from two users with timings ("~20 s unavailable, ~2 s available"), root-cause code path traced to three specific lines, correct diagnosis of the TASK-538 regression. The Decision is clear imperative. Consequences list the one edge case (PIC-disabled devices publishing to the OT subtree is already guarded). Status is correctly Accepted.
 
-- ADR-069: worldview semantics for `/thermostat`-`/boiler` subtopics (TASK-549)
-- ADR-070: sibling-suffix source topic shape (TASK-552)
-- ADR-071: flip discovery topic shape to sibling-suffix (supersedes ADR-070!, TASK-556)
-- ADR-072: HA discovery friendly-name format
-- ADR-073: JIT discovery + smart reconnect (supersedes ADR-041)
+The problem is not the ADR — it's the merge that rolled back the code. The ADR is now in an inconsistent state: Accepted but not implemented.
 
-ADR-070 was superseded by ADR-071 *in the same release cycle*. That is not "stable architecture decisions" — it is iterative design captured as ADR. The kit's pre-commit judge is now arbitrating between rapidly-shifting positions. Either:
+### D2. ADR cadence — stable
 
-- raise the bar for ADR-Accept (the kit's gates already require Evidence + Alternatives + Consequences; the Evidence gate should require *field* evidence, not "we discussed this on Discord"), or
-- introduce a `Status: Provisional` between Proposed and Accepted for in-cycle decisions that may move within weeks.
+No new ADRs authored since ADR-074. Five ADRs in the prior window had already pushed the cadence higher than ideal. The pause is healthy. ADR-073 and ADR-074 are both evidence-grounded and self-contained — no in-cycle supersession.
 
-If ADRs move every two weeks they are commits with ceremony. The point of an ADR is that the cost of writing it forces deliberation; that lever weakens when supersession is routine.
+### D3. **LOW** — no-news daily-report commits continue
 
-### D2. **POSITIVE** — ADR-073 is exemplary
+`bf0acf6 docs: daily issue report 2026-05-18 — no new issues` adds a commit that only says three sources found nothing. Still inflates `git log`. Either skip commits when no actionable findings exist, or aggregate weekly.
 
-Field-evidence telnet log, four rejected alternatives, explicit trigger-table, `llm_judge` block. Use this as the template for future ADRs.
+### D4. **POSITIVE** — Documentation depth improved
 
-### D3. Daily-issue-report bot writes commits even when nothing happened (`2c86589e`)
-
-> docs(issues): daily issue report 2026-05-09 — no new issues
-> GitHub: no open issues updated in last 24h.
-> Tweakers: feed inaccessible (network blocked).
-> Discord: MCP not configured in this session.
-
-This is a commit that *only* says "I ran and found nothing actionable, and two of three sources were not even checked." It still inflates `git log` and `docs/daily-issue-report.md` churns. Either skip the commit on no-news days, or aggregate weekly.
+`15cf48a docs: add openHAB and Domoticz integration guides` and `4390778 docs: fix dev documentation-review findings 1-5` show the documentation backlog is being actively worked. The integration guides are new content (not re-wraps of existing text).
 
 ---
 
 ## 6. Perspective E — Security & robustness
 
-### E1. The `logfile.txt` commit contains *operational telnet output*
+### E1. `logfile.txt` in public tree (see A2)
 
-Skimmed, no obvious secrets (no MQTT credentials, no JWT, no SSID/PSK). But: it contains live `mqttlastsent` timestamps, OT message captures, and an `httpServer` access log of the maintainer's home network. This is the kind of file you ship to a single tester for diagnosis, not to a public GitHub repo. Audit the file before deciding to delete vs move — if there are any credential leaks the answer is `git filter-repo`, not `git rm`.
+Still present. Skimmed on 2026-05-11: no obvious credentials. The file contains live telnet output (OT message captures, HTTP access log). Maintaining it in a public GitHub repo is unnecessary exposure. Remove before next release.
 
-### E2. No new attack-surface additions
+### E2. `a82de1e` MQTT rate-gate change (TASK-612)
 
-The window does not add HTTPS, WSS, auth, or new external endpoints. JIT discovery only *reduces* the number of outbound MQTT publishes. REST API surface unchanged. Telnet remains the debug interface (per project policy).
+`a82de1e` also refines the MQTT publish rate gate: `first-seen` and `forced` publishes now bypass the 250ms spacing gate, which previously starved entities like ASF/RBP/VH whose parent OT messages arrive rarely. Correct — a one-shot first-seen event should not be rate-limited by a gate designed for recurring 60s heartbeats. The comment explains the invariant clearly.
 
-### E3. `writeFriendlyName` correctly handles RAM-only input
+### E3. No new attack surface
 
-`mqtt_configuratie.cpp:1985,2090` use `strlcpy_P` to copy the PROGMEM friendly-name into a `char friendlyName[80]` RAM buffer before passing to `writeFriendlyName`. No flash-alignment crash class (ADR-related, ESP8266 Core 3.1.2+). No truncation risk for the current longest string. Good.
+The PIC-control entities (`908e1e1`) extend MQTT command dispatch — the `resetgateway` button triggers `resetOTGW()` which resets the PIC. This is command-injection-safe: the payload is explicitly ignored (`payload is ignored` comment), and the function name lookup goes through a PROGMEM table with `strcmp_P` comparisons. No shell exec, no format string exposure. REST API surface unchanged.
 
 ---
 
 ## 7. Perspective F — Build, release, and tooling
 
-### F1. Pre-commit hook fix-fixes (`34fbe28`, `d1b8140`, `0acc3d5`)
+### F1. **POSITIVE** — `evaluate.py` false-positive fixes (`946708b`)
 
-Three sequential commits to land a single feature (suppress adr-judge advisory spam):
+`946708b Fix false-positive and stale checks in evaluate.py` tightens the evaluator:
+- Removes stale pattern checks that fired on correct code
+- Adds context-aware matching to reduce false positives on PROGMEM-safe patterns
 
-1. `34fbe28` — added the redirect
-2. `d1b8140` — *also* capture stderr (oversight from step 1)
-3. `0acc3d5` — use `grep -a` because emoji in adr-judge output broke step 1's grep
+This is important: a false-positive-heavy evaluator trains maintainers to ignore its output. The fix restores trust in the CI baseline.
 
-A 5-minute test run before the first commit would have caught (2) and (3). The hook is committed but apparently not exercised before pushing. Worth adding a `bin/test-pre-commit.sh` that runs the hook over a fixture diff.
+### F2. **POSITIVE** — git submodule auto-init in build.py (`4ae9627`)
 
-### F2. `flash_otgw.bat` fixes (5 commits in window)
+`4ae9627 fix(build): auto-init missing git submodules in build.py` adds a check-and-init step so a fresh clone that forgets `--recursive` doesn't silently produce a broken build. Simple, high-value reliability fix.
 
-| SHA | What |
-|---|---|
-| `1d3db7da` | auto-download binaries when missing |
-| `53128e25` | only search script dir, not `build/` |
-| `7c9a66ce` | fix PS1 generation via individual echo lines |
-| `67980f1e` | use registry for COM port detection (and accidentally re-add the world) |
-| `d541e7dd` | fix PS1 generation + COM port detection + ADR-072 schema |
+### F3. **POSITIVE** — flash script hardening (`c2f46e1`)
 
-Five iterations on one `.bat` script suggests the script is fragile or untested. The project has `test_flash_automation.py` (`tests/`) but it does not seem to gate these commits. Either turn it into a CI step or accept that the flash script lives outside the test envelope and budget for these iterations.
+`c2f46e1 fix(flash): harden flash_otgw.sh/.bat — spec parity, SHA256 integrity, version-aware selection` adds:
+- SHA256 integrity verification of downloaded binaries
+- Version-aware esptool/esptool.py selection
+- Spec parity between the `.sh` and `.bat` scripts
 
-### F3. **POSITIVE** — Release process is documented
+After five iterative flash-script commits in the prior window, this commit looks like the stabilising one. SHA256 verification is a meaningful security improvement for the download path.
 
-`0719e086 docs(release): prepare v1.5.0 stable release notes` and `79aeb5dd chore(release): v1.5.0 release build` look right. CHANGELOG cascaded. Beta notes archived to `docs/releases/`. The 1.5.0 release process worked.
+### F4. **LOW** — Release cycle: beta.11 for a 1-selector CSS fix
+
+`ebbbb4d` (FSexplorer Update Firmware button fix) bumps to beta.11 for adding two CSS rules (`@media (hover: hover)` and cursor override). The fix is correct and important (GitHub #575). But it required rewriting 14 files for 2 CSS lines — exactly the cost the TASK-597 version-stamp fix would eliminate. Until TASK-597 lands, every minor fix will keep burning bump slots.
 
 ---
 
-## 8. Refactoring recommendations (answering "Do we need any refactoring?")
+## 8. Updated refactoring recommendations
 
-**Short answer**: yes, but only the four below. Resist any larger refactor — KISS/YAGNI as per `CLAUDE.md`. Everything else in this review is an *incident* (a single bug, a single bad commit) and is one-PR-each.
+### R1. ~~SAT JSON builders (`MqttJsonWriter` migration)~~ → RESOLVED
 
-### R1. **Centralise PROGMEM-to-RAM JSON building.** Priority: high.
+SAT subsystem removed from dev. R1 is closed.
 
-Same code shape exists in:
-- `SATcontrol.ino:2270-2348` (climate_attributes, 17 unguarded `pos += snprintf_P`)
-- `SATcontrol.ino:1731+` (PID attributes, Task #55)
-- `SATcontrol.ino:1885+` (deleted pressure_health_attr — was identical pattern)
+### R2. Remove per-file version-stamp comments (TASK-597) — priority medium
 
-`mqtt_configuratie.cpp` has the `MqttJsonWriter` abstraction that handles bounds correctly. Migrate the SAT JSON builders to it. Eliminates the latent buffer-overflow class and removes ~150 lines of repetition. Self-contained PR, no architectural change.
+Status: TRACKED. TASK-597 exists; no implementation yet. The pain is real (every 1-line fix ships as 14-27 file diff). Priority should be elevated — this is the single highest-ROI cleanup in the repo. One-time mechanical edit + tooling change.
 
-### R2. **Remove per-file version stamp comments.** Priority: medium.
+### R3. Replace `writeFriendlyName` underscore-only split — priority medium
 
-Delete the `**  Version  : v1.5.x-beta.N` line from every `.ino`/`.h`/`.cpp`/`.css`/`.html`/`.js` header block. Keep `version.h` as the sole source. Update `scripts/autoinc-semver.py` to only touch `version.h` and `data/version.hash`. Every future prerelease bump becomes a 2-file diff instead of 27-file. Massive reviewability win, zero functional change. One-time mechanical edit + tooling tweak.
+Status: NOT STARTED, no task. The `6d162be4` hand-patch treated the symptom, not the cause. Next new OT entity with a camelCase identifier name restarts the cycle. A 20-line allocation-free state machine (uppercase-boundary detection + underscore split) closes this permanently.
 
-### R3. **Replace `writeFriendlyName` underscore-split with case+underscore split.** Priority: medium.
+### R4. De-duplicate non-OT pseudo-ID list — priority low
 
-Single function, ~15 lines added, handles `OEMFaultCode → OEM Fault Code`, `MaxCapacityMinModLevel → Max Capacity Min Mod Level`, `dayofweek → Day Of Week`. Removes the need for the ~125 PROGMEM string corrections in `6d162be4` and prevents the same fix-cycle from coming back a fifth time. Token-by-token logic, allocation-free, fits in streaming writer.
+Status: NOT STARTED. `publishNonOTDiscoveryConfigs()` and `markAllMQTTConfigPending()` still enumerate the same pseudo-IDs independently. `908e1e1` correctly maintained both in sync for pseudo-ID 251, but the structural divergence risk remains. One `static const uint8_t kNonOTPseudoIds[] PROGMEM = {...}` and a loop in each function.
 
-### R4. **De-duplicate non-OT pseudo-ID list.** Priority: low.
+### R5. **NEW — Re-apply ADR-074 code changes — priority HIGH**
 
-`publishNonOTDiscoveryConfigs()` (`MQTTstuff.ino:1308`) and `markAllMQTTConfigPending()` (`MQTTstuff.ino:1330`) both list:
-```cpp
-setMQTTConfigPending(0);   // climate
-setMQTTConfigPending(27);  // outside temp
-setMQTTConfigPending(OTGWdallasdataid);
-setMQTTConfigPending(OTGWheapstatsid);
-setMQTTConfigPending(OTGWfwinfoid);
-setMQTTConfigPending(OTGWpicinfoid);
-setMQTTConfigPending(OTGWpicsettingsid);
-```
+Status: REGRESSION — was fixed in `7b0d167`, silently reverted. Two targeted one-line removals:
 
-Extract to `static const uint8_t kNonOTPseudoIds[] PROGMEM = {...}` and a single loop. Trivial PR. Prevents the "add a new non-OT entity, forget to update both lists" bug.
+1. `OTGW-Core.ino` — inside `if ((state.otgw.bOnline != bOTGWpreviousstate) || ...)` → `if (isPICEnabled())` block: remove `sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));`
+2. `MQTTstuff.ino` — in `sendMQTTstateinformation()`: remove the same call at line 1148.
 
-### Things that look like refactor candidates but are not (yet)
-
-- **JIT discovery model**: do not refactor — ADR-073 is fresh, evidence-grounded, and matches `CLAUDE.md` design principles. Watch for the "broker without persistence under 5 min" failure mode in field reports first.
-- **OTmap[] echo flags**: do not refactor into a runtime-configurable table — the static table is correct per the project's "typed internal control flow" rule. Just keep updating individual rows as field evidence arrives.
-- **SAT subsystem**: do not refactor — it works, it has tests of a sort (hardware-in-the-loop on Andre's installation), and the recent fixes are local.
-- **Sketch concat / single-translation-unit**: do not touch — this is Arduino-IDE-compatible by design and changing it breaks the contributor on-ramp.
+OT-bus liveness should drive only `otgw-pic/otgw_connected` (already done via `sendMQTTDataPic(F("otgw_connected"), ...)`). The LWT/birth mechanism owns the namespace topic. This is the fix HA field testers need to stop seeing entity availability flap.
 
 ---
 
 ## 9. Process recommendations (no code change)
 
-1. **Squash backlog admin commits into the originating code commit.** Or at minimum, batch end-of-day. The signal-to-noise of `git log` would improve ~3x.
-2. **Add a `git pre-push` hook** that rejects commits adding files matching `*.txt` > 100 KB at the repo root. Would have caught `logfile.txt`.
-3. **Audit ADR cadence.** Five ADRs in three months with one in-cycle supersede suggests the gates are too easy or the cycle is too fast. Either raise Evidence-gate strictness or introduce `Status: Provisional`.
-4. **For cross-worktree fixes that are mechanically identical**, prefer `git cherry-pick` over hand-mirrored "port-of" commits. Add a CI check that scans `dev` HEAD~30 for fixes to dual-tracked files and flags missing 2.0.0 mirrors.
+1. **Rebase PRs before merge on active dev days.** PR #572 + PR #583 merged same-day without rebase; the ADR-074 regression resulted. Pre-merge rebase is a 30-second step.
+2. **Add a CI lint for the two ADR-074 callsites.** `grep -n "sendMQTT(MQTTPubNamespace, CONLINEOFFLINE" src/OTGW-firmware/*.ino` — any hit blocks merge. Cheap, specific, permanent enforcement.
+3. **Elevate TASK-597 (version-stamp cascade).** The 14-27 file diffs are the biggest ongoing tax on reviewability and bisectability. Until it lands, every bump review is noisy.
+4. **Create a task for R3 (writeFriendlyName).** The fix is ~20 lines. A task makes it schedulable and prevents the next round of PROGMEM string hand-patches.
+5. **Resolve or remove `logfile.txt`/`commits.txt` before v1.5.1 stable.** They have no place in the firmware tree.
 
 ---
 
-## 10. What did the last 100 commits do *well*?
+## 10. What did the new commits do well?
 
-To balance the criticism:
-
-- **JIT discovery is a real product improvement** — the bulk-publish-at-boot regression was real, the evidence was captured, the fix is minimal, the ADR is excellent.
-- **Field-evidence discipline on OT echo flags** — the captured telnet log in `660d4b93`'s commit message is a model for how to ship boiler-protocol changes.
-- **Versioning policy is enforced** — `bin/bump-prerelease.sh` + pre-commit gate seems to have prevented the "two fixes share a beta tag" problem the policy was designed to solve.
-- **ADR immutability is respected** — ADR-041's content was not edited when ADR-073 superseded it; only the Status line moved. This is harder than it looks and worth keeping.
-- **Co-authorship attribution is consistent** — Claude is credited where it contributed, maintainer-only commits are clean.
+- **SAT cleanup was thorough.** `a25c3b1` removed the whole subsystem, `4fcd30a` cleaned up the scaffolding. No dead state, no TODO trail. This is how platform-specific code should be managed across a worktree split.
+- **JIT discovery bug catch was fast.** ADR-073 was accepted in late April; the hasConfig gate regression (`a82de1e`) was caught and fixed within the same release cycle. That's the right cadence for an actively field-tested firmware.
+- **PIC-control entities are well-scoped.** `908e1e1` adds a meaningful feature (HA-native PIC reset and GPIO control) without introducing complexity. The all-or-nothing publish semantics and the unconditional-discovery rationale comment are exemplary.
+- **evaluate.py trust restored.** `946708b` is a quiet but important commit. A tool people trust gets used; a tool with false positives gets ignored.
+- **Backlog noise is trending down.** 44% admin commits vs 60% is measurable progress. CLAUDE.md commit-batching policy is the right lever.
 
 ---
 
-## Appendix — substantive commits in window
+## Appendix — substantive commits in new window (since prior review boundary `660d4b93`)
 
 ```
-f863aebe  Create logfile.txt                                             [E1, A2]
-64a86679  Initial plan (#567)                                            [C3]
-51356205  docs: update documentation for changes since v1.5.0-fix
-ad963c7c  chore(discord-mcp): update skill files for ExilProductions
-a1a7795e  fix(sat): remove orphaned sat/pressure_health_attr (beta.3)    [A1, B2]
-ee370527  fix(sat): wire sat/climate_attributes (beta.2)                 [A1, B3]
-503461c8  chore(version): reset prerelease to beta.1                     [A3]
-1bb58d8f  feat(mqtt): pure JIT MQTT discovery                            [B1, R1]
-d541e7dd  fix(flash_otgw.bat): PS1 generation + COM port + schema        [F2]
-67980f1e  fix(flash_otgw.bat): registry for COM port detection           [C1]
-5903b215  chore(version): refresh build artefacts post-beta.29           [A3, C1]
-0719e086  docs(release): v1.5.0 stable release notes                     [F3]
-79aeb5dd  chore(release): v1.5.0 release build
-660d4b93  fix(mqtt): flip Class 1/8 control writes (TASK-571)            [B4]
-6d162be4  fix(mqtt): normalise HA discovery friendly-name strings        [A4, R3]
-9a53a4f1  fix(mqtt): drop hostname + Title-Case friendly names           [A4]
-fc72adfe  fix(mqtt): friendly name uses spaces, not underscores          [A4]
-e38cf970  docs(adr): ADR-072 — HA discovery friendly-name format         [D1]
+c2f46e1  fix(flash): harden flash_otgw.sh/.bat (SHA256, version-aware)    [F3]
+f863aeb  Create logfile.txt                                                [A2, E1]
+64a8667  Initial plan (#567) — empty merge commit                          [C4]
+a1a7795  fix(sat): remove orphaned pressure_health_attr (beta.3)
+ee37052  fix(sat): wire sat/climate_attributes (beta.2)
+1bb58d8  feat(mqtt): pure JIT MQTT discovery (ADR-073)                     [B2]
+7b0d167  fix(mqtt): HA availability reflects MQTT link (ADR-074)           [B1★]
+e6f9983  chore(backlog): track CI baseline follow-ups
+8dcca6e  feat(tooling): standalone HA discovery topic wiper
+a25c3b1  chore(sat): remove orphaned SAT subsystem from dev                [A1]
+a82de1e  fix(mqtt): JIT hasConfig gate (PR #572, squash-merged)            [B1★, B2, E2]
+4fcd30a  chore(sat): remove dead ENABLE_SAT scaffolding                    [A1]
+7b0d167→a82de1e: ADR-074 regression introduced here ★
+946708b  Fix false-positive stale checks in evaluate.py                    [F1]
+4ae9627  fix(build): auto-init missing git submodules                      [F2]
+15cf48a  docs: add openHAB and Domoticz integration guides                 [D4]
+4390778  docs: fix dev documentation-review findings 1-5                   [D4]
+908e1e1  feat(discovery): HA button+select PIC-control entities (ID 251)   [B3, B4, E3]
+ebbbb4d  fix(ui): FSexplorer Update Firmware visible on touch desktops     [F4]
 ```
+
+★ = ADR-074 regression introduced between `7b0d167` and `a82de1e` via squash-merge without rebase.
 
 Tags `[X.N]` cross-reference to section numbers above.
