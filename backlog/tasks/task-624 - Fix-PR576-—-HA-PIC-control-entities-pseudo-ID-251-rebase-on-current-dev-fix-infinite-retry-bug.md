@@ -3,11 +3,11 @@ id: TASK-624
 title: >-
   Fix PR#576 — HA PIC-control entities (pseudo-ID 251): rebase on current dev +
   fix infinite-retry bug
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-18 07:53'
-updated_date: '2026-05-18 07:54'
+updated_date: '2026-05-18 08:03'
 labels: []
 dependencies: []
 ---
@@ -20,13 +20,13 @@ PR#576 adds HA MQTT discovery for resetgateway (button), gpioa/gpiob + leda-ledf
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 PR#576 feature re-applied on current dev: resetgateway button + gpioa/gpiob/leda-ledf select discovery (pseudo-ID OTGWpiccontrolsid=251) and MQTT set-commands (GA/GB/LA-LF/SC + resetgateway via s_reset->resetOTGW()) integrated with current dev's MqttJsonWriter streaming infra
-- [ ] #2 Infinite-retry bug fixed: pseudo-ID 251 discovery publishes unconditionally (no isPICEnabled() gate in doAutoConfigureMsgid); loopMQTTDiscovery clears the pending bit on success; behaviour parallels existing PIC pseudo-IDs 249/250
-- [ ] #3 Version bumped per policy via bin/bump-prerelease.sh (beta.8 -> beta.9); version.h + data/version.hash staged with the firmware change
-- [ ] #4 python build.py --firmware exits 0
-- [ ] #5 python evaluate.py --quick shows no new failures vs dev baseline
-- [ ] #6 docs/api/MQTT.md updated with new set-commands + PIC Control Entities (pseudo-ID 251) section
-- [ ] #7 Committed and pushed to claude/fix-pr576-port-2.0.0-GvEv0; draft PR opened targeting dev; PR#576 cross-referenced
+- [x] #1 PR#576 feature re-applied on current dev: resetgateway button + gpioa/gpiob/leda-ledf select discovery (pseudo-ID OTGWpiccontrolsid=251) and MQTT set-commands (GA/GB/LA-LF/SC + resetgateway via s_reset->resetOTGW()) integrated with current dev's MqttJsonWriter streaming infra
+- [x] #2 Infinite-retry bug fixed: pseudo-ID 251 discovery publishes unconditionally (no isPICEnabled() gate in doAutoConfigureMsgid); loopMQTTDiscovery clears the pending bit on success; behaviour parallels existing PIC pseudo-IDs 249/250
+- [x] #3 Version bumped per policy via bin/bump-prerelease.sh (beta.8 -> beta.9); version.h + data/version.hash staged with the firmware change
+- [x] #4 python build.py --firmware exits 0
+- [x] #5 python evaluate.py --quick shows no new failures vs dev baseline
+- [x] #6 docs/api/MQTT.md updated with new set-commands + PIC Control Entities (pseudo-ID 251) section
+- [x] #7 Committed and pushed to claude/fix-pr576-port-2.0.0-GvEv0; draft PR opened targeting dev; PR#576 cross-referenced
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -41,3 +41,19 @@ PR#576 adds HA MQTT discovery for resetgateway (button), gpioa/gpiob + leda-ledf
 7. python build.py --firmware (exit 0); python evaluate.py --quick (no new failures)
 8. commit, push -u origin claude/fix-pr576-port-2.0.0-GvEv0, draft PR -> dev, cross-ref #576
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Re-applied PR#576 on current dev (zero conflict — the #576 dirty state was pure version-stamp drift, beta.3 vs beta.8) and fixed the reviewer-flagged infinite-retry bug.
+
+What changed:
+- resetgateway -> HA button; gpioa/gpiob/leda-ledf -> HA selects under pseudo-ID OTGWpiccontrolsid=251 (mqtt_configuratie.cpp streamButtonDiscovery/streamSelectDiscovery; MQTTstuff.h decls + 3 HaIcons; haEntityCatStr config case).
+- MQTT set-commands GA/GB/LA-LF/SC; resetgateway via new s_reset type -> resetOTGW().
+- Wired into publishNonOTDiscoveryConfigs + markAllMQTTConfigPending.
+- docs/api/MQTT.md: set-commands + PIC Control Entities section.
+
+Bug fix: pseudo-ID 251 discovery now publishes unconditionally (no isPICEnabled() gate in doAutoConfigureMsgid), matching the established 249/250 PIC pseudo-ID convention (entity always discovered; data + set-commands PIC-gated at source per ADR-065). loopMQTTDiscovery clears the pending bit on success; the old gate left result=false on PIC-less devices and spun the drip every tick forever.
+
+Validation: python build.py --firmware exit 0 (1.5.1-beta.9+1705ad3); python evaluate.py --quick 0 failed / 34 passed / health 100%. Version bumped via bin/bump-prerelease.sh (beta.8->beta.9). Pushed to claude/fix-pr576-port-2.0.0-GvEv0; draft PR #596 -> dev; PR#576 cross-referenced.
+<!-- SECTION:FINAL_SUMMARY:END -->
