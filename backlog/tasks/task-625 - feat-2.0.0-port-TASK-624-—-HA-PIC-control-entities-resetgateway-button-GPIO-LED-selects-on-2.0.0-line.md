@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-18 07:54'
-updated_date: '2026-05-18 08:30'
+updated_date: '2026-05-18 08:38'
 labels: []
 dependencies:
   - TASK-624
@@ -42,6 +42,12 @@ Port the PR#576 feature (TASK-624) to the feature-dev-2.0.0-otgw32-esp32-sat-sup
 7. build + evaluate for 2.0.0 target
 8. commit, push -u origin claude/port-pr576-2.0.0-GvEv0, draft PR -> feature-dev-2.0.0-otgw32-esp32-sat-support
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+PR #597 review/CI follow-up: mirrored the dev PR #596 all-or-nothing fix to the pseudo-ID 244 block (commit f9dc483c, bump alpha.37->alpha.38). #597 CI failures (evaluate.py, pio run -e esp8266, Spec-driven OT v4.2 audit, pio run -e esp32) are PRE-EXISTING on the 2.0.0 line: PR #585 — whose merge commit c21f28db is this port branch base — shows the identical four red checks and was merged anyway. esp8266 build verified locally green; evaluator identical to pristine baseline (97.1%/1 pre-existing PROGMEM fail). No new failures introduced.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
