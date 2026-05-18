@@ -23,6 +23,8 @@
 //   Binary sensors : 53 entries (10 unique OT IDs)
 //   Climate        : 2 entries
 //   Number         : 1 entries
+//   Button         : 1 entry  (pseudo-ID 251: resetgateway)
+//   Selects        : 8 entries (pseudo-ID 251: gpioa/gpiob/leda-f)
 
 #include "MQTTstuff.h"
 
@@ -1778,6 +1780,9 @@ PGM_P haIconStr(HaIcon ic) {
         case HaIcon::tag: { static const char s[] PROGMEM = "tag"; return s; }
         case HaIcon::tune_variant: { static const char s[] PROGMEM = "tune-variant"; return s; }
         case HaIcon::water: { static const char s[] PROGMEM = "water"; return s; }
+        case HaIcon::restart: { static const char s[] PROGMEM = "restart"; return s; }
+        case HaIcon::pin: { static const char s[] PROGMEM = "pin"; return s; }
+        case HaIcon::led_outline: { static const char s[] PROGMEM = "led-outline"; return s; }
         default: return nullptr;
     }
 }
@@ -1786,6 +1791,7 @@ PGM_P haEntityCatStr(HaEntityCat ec) {
     switch (ec) {
         case HaEntityCat::none: return nullptr;
         case HaEntityCat::diagnostic: { static const char s[] PROGMEM = "diagnostic"; return s; }
+        case HaEntityCat::config: { static const char s[] PROGMEM = "config"; return s; }
         default: return nullptr;
     }
 }
@@ -2718,6 +2724,247 @@ bool streamNumberDiscovery(PubSubClient &client,
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
+    client.endPublish();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
+  feedWatchDog();
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Button payload composer — resetgateway
+// HA button entity: no stat_t, just cmd_t + payload_press.
+// Discovery topic: <haPrefix>/button/<nodeId>/resetgateway/config
+// ---------------------------------------------------------------------------
+static bool composeButtonPayload(MqttJsonWriter &w, const HaDiscoveryContext &ctx)
+{
+  if (!writeJsonOpen(w)) return false;
+
+  if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+  if (!writeJsonComma(w)) return false;
+
+  if (!writeDeviceBlock(w, ctx)) return false;
+  if (!writeJsonComma(w)) return false;
+
+  // "uniq_id":"<nodeId>-resetgateway"
+  if (!w.writeChar('"')) return false;
+  if (!w.writeProgmem(kUniqId)) return false;
+  if (!w.writeProgmem(PSTR("\":\""))) return false;
+  if (!w.writeRam(ctx.nodeId)) return false;
+  if (!w.writeProgmem(PSTR("-resetgateway\""))) return false;
+  if (!writeJsonComma(w)) return false;
+
+  if (!w.writeProgmem(PSTR("\"name\":\"Reset Gateway\""))) return false;
+  if (!writeJsonComma(w)) return false;
+
+  // "cmd_t":"<mqttSubTopic>/resetgateway"
+  if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
+  if (!w.writeRam(ctx.mqttSubTopic)) return false;
+  if (!w.writeProgmem(PSTR("/resetgateway\""))) return false;
+  if (!writeJsonComma(w)) return false;
+
+  if (!w.writeProgmem(PSTR("\"payload_press\":\"1\""))) return false;
+  if (!writeJsonComma(w)) return false;
+
+  if (!writeJsonKV_P(w, kEntCat, PSTR("config"))) return false;
+  if (!writeJsonComma(w)) return false;
+  if (!writeJsonKV_P(w, kIcon, PSTR("mdi:restart"))) return false;
+  if (!writeJsonComma(w)) return false;
+
+  if (!writeOriginBlock(w, ctx)) return false;
+  return writeJsonClose(w);
+}
+
+// Public API: streamButtonDiscovery
+bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+
+  char topic[STREAM_TOPIC_MAX];
+  int n = snprintf_P(topic, sizeof(topic), PSTR("%s/button/%s/resetgateway/config"),
+                     ctx.haPrefix, ctx.nodeId);
+  if (n <= 0 || static_cast<size_t>(n) >= sizeof(topic)) return false;
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!composeButtonPayload(measure, ctx)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!composeButtonPayload(writer, ctx) || !writer.ok) {
+    client.endPublish();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
+  feedWatchDog();
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Select payload composer — GPIO and LED function selects
+//
+// selectIdx: 0=gpioa  1=gpiob  2=leda  3=ledb  4=ledc  5=ledd  6=lede  7=ledf
+//
+// State topics (published by existing OTGW-Core.ino PR= polling):
+//   GPIO: <mqttPubTopic>/otgw-pic/settings/gpio  (2-char string, e.g. "05")
+//   LED:  <mqttPubTopic>/otgw-pic/settings/led   (6-char string, e.g. "RFFTTT")
+//
+// value_template extracts the single character at the relevant position.
+// Options: ["0".."7"] for GPIO, ["B","C","E","F","H","M","O","P","R","T","W","X"] for LED.
+// ---------------------------------------------------------------------------
+
+// PROGMEM label/name tables for the 8 select entities
+static const char kSelLabel0[] PROGMEM = "gpioa";
+static const char kSelLabel1[] PROGMEM = "gpiob";
+static const char kSelLabel2[] PROGMEM = "leda";
+static const char kSelLabel3[] PROGMEM = "ledb";
+static const char kSelLabel4[] PROGMEM = "ledc";
+static const char kSelLabel5[] PROGMEM = "ledd";
+static const char kSelLabel6[] PROGMEM = "lede";
+static const char kSelLabel7[] PROGMEM = "ledf";
+static const char* const kSelLabels[] PROGMEM = {
+    kSelLabel0, kSelLabel1, kSelLabel2, kSelLabel3,
+    kSelLabel4, kSelLabel5, kSelLabel6, kSelLabel7
+};
+
+static const char kSelName0[] PROGMEM = "GPIO A Function";
+static const char kSelName1[] PROGMEM = "GPIO B Function";
+static const char kSelName2[] PROGMEM = "LED A Function";
+static const char kSelName3[] PROGMEM = "LED B Function";
+static const char kSelName4[] PROGMEM = "LED C Function";
+static const char kSelName5[] PROGMEM = "LED D Function";
+static const char kSelName6[] PROGMEM = "LED E Function";
+static const char kSelName7[] PROGMEM = "LED F Function";
+static const char* const kSelNames[] PROGMEM = {
+    kSelName0, kSelName1, kSelName2, kSelName3,
+    kSelName4, kSelName5, kSelName6, kSelName7
+};
+
+// Shared PROGMEM strings
+static const char kSelGpioOptions[]    PROGMEM = "[\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\"]";
+static const char kSelLedOptions[]     PROGMEM = "[\"B\",\"C\",\"E\",\"F\",\"H\",\"M\",\"O\",\"P\",\"R\",\"T\",\"W\",\"X\"]";
+static const char kSelGpioStatSuffix[] PROGMEM = "settings/gpio";
+static const char kSelLedStatSuffix[]  PROGMEM = "settings/led";
+
+static bool composeSelectPayload(MqttJsonWriter &w, uint8_t idx, const HaDiscoveryContext &ctx)
+{
+  if (idx > 7) return false;
+
+  // Resolve label and name from PROGMEM pointer tables
+  PGM_P labelPP = (PGM_P)pgm_read_ptr(&kSelLabels[idx]);
+  PGM_P namePP  = (PGM_P)pgm_read_ptr(&kSelNames[idx]);
+
+  char label[12];
+  char name[20];
+  strlcpy_P(label, labelPP, sizeof(label));
+  strlcpy_P(name,  namePP,  sizeof(name));
+
+  // Character position within the state topic value
+  // idx 0 (gpioa) -> pos 0, idx 1 (gpiob) -> pos 1
+  // idx 2 (leda)  -> pos 0, idx 3 (ledb)  -> pos 1, ..., idx 7 (ledf) -> pos 5
+  uint8_t charPos = (idx < 2) ? idx : (uint8_t)(idx - 2);
+  bool isGpio = (idx < 2);
+
+  if (!writeJsonOpen(w)) return false;
+
+  if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+  if (!writeJsonComma(w)) return false;
+
+  if (!writeDeviceBlock(w, ctx)) return false;
+  if (!writeJsonComma(w)) return false;
+
+  // "uniq_id":"<nodeId>-<label>"
+  if (!w.writeChar('"')) return false;
+  if (!w.writeProgmem(kUniqId)) return false;
+  if (!w.writeProgmem(PSTR("\":\""))) return false;
+  if (!w.writeRam(ctx.nodeId)) return false;
+  if (!w.writeChar('-')) return false;
+  if (!w.writeRam(label)) return false;
+  if (!w.writeChar('"')) return false;
+  if (!writeJsonComma(w)) return false;
+
+  // "name":"<Name>"
+  if (!w.writeChar('"')) return false;
+  if (!w.writeProgmem(kName)) return false;
+  if (!w.writeProgmem(PSTR("\":\""))) return false;
+  if (!w.writeRam(name)) return false;
+  if (!w.writeChar('"')) return false;
+  if (!writeJsonComma(w)) return false;
+
+  // "stat_t":"<mqttPubTopic>/otgw-pic/settings/gpio" or ".../led"
+  if (!w.writeChar('"')) return false;
+  if (!w.writeProgmem(kStatT)) return false;
+  if (!w.writeProgmem(PSTR("\":\""))) return false;
+  if (!w.writeRam(ctx.mqttPubTopic)) return false;
+  if (!w.writeChar('/')) return false;
+  if (!w.writeProgmem(kPicSubtreePrefix)) return false;
+  if (!w.writeProgmem(isGpio ? kSelGpioStatSuffix : kSelLedStatSuffix)) return false;
+  if (!w.writeChar('"')) return false;
+  if (!writeJsonComma(w)) return false;
+
+  // "value_template":"{{ value[N] }}"
+  if (!w.writeChar('"')) return false;
+  if (!w.writeProgmem(kValTpl)) return false;
+  if (!w.writeProgmem(PSTR("\":\"{{ value["))) return false;
+  if (!w.writeChar((char)('0' + charPos))) return false;
+  if (!w.writeProgmem(PSTR("] }}\""))) return false;
+  if (!writeJsonComma(w)) return false;
+
+  // "cmd_t":"<mqttSubTopic>/<label>"
+  if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
+  if (!w.writeRam(ctx.mqttSubTopic)) return false;
+  if (!w.writeChar('/')) return false;
+  if (!w.writeRam(label)) return false;
+  if (!w.writeChar('"')) return false;
+  if (!writeJsonComma(w)) return false;
+
+  // "options":[...]
+  if (!w.writeProgmem(PSTR("\"options\":"))) return false;
+  if (!w.writeProgmem(isGpio ? kSelGpioOptions : kSelLedOptions)) return false;
+  if (!writeJsonComma(w)) return false;
+
+  if (!writeJsonKV_P(w, kEntCat, PSTR("config"))) return false;
+  if (!writeJsonComma(w)) return false;
+
+  // icon: mdi:pin for GPIO, mdi:led-outline for LED
+  if (!writeJsonKV_P(w, kIcon, isGpio ? PSTR("mdi:pin") : PSTR("mdi:led-outline"))) return false;
+  if (!writeJsonComma(w)) return false;
+
+  if (!writeOriginBlock(w, ctx)) return false;
+  return writeJsonClose(w);
+}
+
+// Public API: streamSelectDiscovery
+bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (selectIdx > 7) return false;
+
+  PGM_P labelPP = (PGM_P)pgm_read_ptr(&kSelLabels[selectIdx]);
+  char label[12];
+  strlcpy_P(label, labelPP, sizeof(label));
+
+  char topic[STREAM_TOPIC_MAX];
+  int n = snprintf_P(topic, sizeof(topic), PSTR("%s/select/%s/%s/config"),
+                     ctx.haPrefix, ctx.nodeId, label);
+  if (n <= 0 || static_cast<size_t>(n) >= sizeof(topic)) return false;
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!composeSelectPayload(measure, selectIdx, ctx)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!composeSelectPayload(writer, selectIdx, ctx) || !writer.ok) {
     client.endPublish();
     return false;
   }
