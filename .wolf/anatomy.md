@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-18T08:37:00.636Z
-> Files: 9 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-19T16:19:58.638Z
+> Files: 13 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -333,7 +333,9 @@
 
 ## docs/adr/
 
+- `ADR-096-mqtt-source-topic-worldview-semantics.md` — ADR-096: MQTT Source-Subtopic Worldview Semantics (~6753 tok)
 - `ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md` — ADR-102: HA Entity Availability Reflects the MQTT Link, Not OpenTherm-Bus Liveness (2.0.0) (~1984 tok)
+- `ADR-103-mqtt-source-topic-proxy-answer-routing.md` — ADR-103: MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement (~3159 tok)
 - `README.md` — Project documentation (~9864 tok)
 
 ## plan/
@@ -342,7 +344,9 @@
 
 ## src/OTGW-firmware/
 
-- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~31604 tok)
+- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~31733 tok)
+- `OTGW-Core.h` — ifndef OTGWCore_h (~10494 tok)
+- `OTGW-Core.ino` — Declares char (~62624 tok)
 - `restAPI.ino` — include <string.h> (~32136 tok)
 - `SATweather.ino` — Declares uint16_t (~7653 tok)
 - `settingStuff.ino` — include <ctype.h> (~16551 tok)
