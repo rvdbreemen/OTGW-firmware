@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Classification: structural amendment to ADR-040 and ADR-066 (publish-gating). Decision Maker: User: Rob van den Breemen (rvdbreemen).
+Superseded by ADR-103, 2026-05-19. Original status: Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Classification: structural amendment to ADR-040 and ADR-066 (publish-gating). Decision Maker: User: Rob van den Breemen (rvdbreemen). Reason for supersession: the worldview routing table assumed every readable MsgID has a boiler `B` frame; for OTGW-proxied IDs (e.g. MaxTSet/57, no-boiler, boiler-unsupported) the gateway answers `A` with no `B`, starving canonical and `_boiler`. ADR-103 restates the full routing table with a proxy-answer vs answer-override split that preserves this ADR's override invariant.
 
 This ADR is the 2.0.0 (ESP32 + SAT) port of dev-line ADR-069. The decision content is identical; the differences are: (a) the dev-side ADR-068 reference becomes ADR-095 in this branch, and (b) the file rename from `mqtt_configuratie.cpp` (dev) to `MQTTHaDiscovery.cpp` (2.0.0) shifts the discovery-generator references.
 
