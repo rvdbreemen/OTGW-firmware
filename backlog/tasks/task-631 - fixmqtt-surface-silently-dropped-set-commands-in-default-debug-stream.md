@@ -27,8 +27,6 @@ A 1.5.0 field report (outside-temperature MQTT override 'stopped working') expos
 - [ ] #7 python build.py --firmware exits 0
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -39,3 +37,23 @@ A 1.5.0 field report (outside-temperature MQTT override 'stopped working') expos
 5. build.py --firmware (gate)
 6. Force-push working branch; PR #602 auto-updates
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Rebased onto origin/dev 447915db (1.6.0-beta.1) per maintainer request. Drop sites byte-identical on new base; 2-line MQTTstuff fix applied verbatim. Version re-derived 1.6.0-beta.1 -> beta.2 (stale beta.3->beta.4 from old base discarded per maintainer decision). evaluate.py --quick now 100% (34/0/0) - earlier 1 failure + 2 warnings were dev-baseline, since fixed on dev, never mine. AC#7 (build.py --firmware) NOT verifiable: sandbox blocks downloads.arduino.cc (HTTP 403), no cached arduino-cli. Log-macro swap with identical arg shapes at existing call sites; compile risk minimal but gate formally unverified.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Promote two silently-dropped MQTT set-command sites to the always-on debug stream so "MQTT override silently stopped working" reports are self-diagnosable. Rebased onto current origin/dev (1.6.0-beta.2).
+
+Changes: src/OTGW-firmware/MQTTstuff.ino - two log lines MQTTDebug* -> DebugTf, each printing the rejected command token. Noise filters intentionally left conditional. Prerelease re-derived 1.6.0-beta.1 -> beta.2 with standard cascade. 2 functional lines; PROGMEM-safe; no behaviour change beyond log visibility.
+
+Tests: evaluate.py --quick green (34 pass / 0 warn / 0 fail).
+
+BLOCKING / still In Progress: AC#7 python build.py --firmware could not run (sandbox blocks arduino-cli download, HTTP 403). Per project autonomous-completion policy, unmet build DoD keeps task In Progress; maintainer must run firmware build in a network-capable worktree before Done/merge of PR #602.
+
+Companion: equivalent change ported to a separate branch off origin/feature-dev-2.0.0-otgw32-esp32-sat-support with its own draft PR (cross-worktree two-PR pattern).
+<!-- SECTION:FINAL_SUMMARY:END -->
