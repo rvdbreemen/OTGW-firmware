@@ -1,9 +1,11 @@
 ---
 id: TASK-626
 title: Fix MQTT proxy-answer routing (ADR-075) — dev line
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@rvdbreemen-claude'
 created_date: '2026-05-19 16:11'
+updated_date: '2026-05-19 16:11'
 labels:
   - mqtt
   - routing
@@ -29,3 +31,17 @@ ADR-069 starved canonical and _boiler for OTGW-proxied MsgIDs (MaxTSet/57, no-bo
 - [ ] #6 _VERSION_PRERELEASE bumped via bin/bump-prerelease.sh in the same commit as the firmware change
 - [ ] #7 Hardware validation with an active answer-override (TT=/CS= on a read id): _boiler retains the boiler B value, not the faked A
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Accept ADR-075, supersede ADR-069 (done in prior commit)
+2. OTGW-Core.h: add byte bAnswerOverride after bGatewaySubstituted
+3. OTGW-Core.ino ~4071: init OTdata.bAnswerOverride=false
+4. OTGW-Core.ino ~4099: delayedOTdata.bAnswerOverride = bGatewaySubstituted (propagate to promoted A)
+5. OTGW-Core.ino:1276: gate canonical block on && OT.bAnswerOverride
+6. MQTTstuff.ino A-case: toBoiler = !OTdata.bAnswerOverride; update routing comment block
+7. build.py --firmware exit 0; evaluate.py --quick no new failures
+8. bin/bump-prerelease.sh; stage version.h + data/version.hash
+9. Commit + push claude/review-pr-565-analysis-eFPJE
+<!-- SECTION:PLAN:END -->
