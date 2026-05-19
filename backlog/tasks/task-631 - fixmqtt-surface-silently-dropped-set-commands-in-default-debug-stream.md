@@ -18,14 +18,16 @@ A 1.5.0 field report (outside-temperature MQTT override 'stopped working') expos
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 PIC-unavailable drop site in handleMQTTcallback() logs via always-on DebugTf (not gated on state.debug.bMQTT) and includes the rejected command token
-- [ ] #2 Unknown-command drop site (findMQTTSetCommandIndex miss) logs via always-on DebugTf and includes the rejected command token
-- [ ] #3 Broker-noise filter branches (wrong top topic / missing 'set' token) intentionally NOT promoted, so no default-log flood regression
-- [ ] #4 PROGMEM-safe: PSTR format strings, %s fed RAM char[] topicToken; no control-flow/drop-behaviour change
-- [ ] #5 Prerelease re-derived from the rebased base and bumped per versioning policy, cascade staged in the same commit
-- [ ] #6 python evaluate.py --quick shows no new failures vs baseline
+- [x] #1 PIC-unavailable drop site in handleMQTTcallback() logs via always-on DebugTf (not gated on state.debug.bMQTT) and includes the rejected command token
+- [x] #2 Unknown-command drop site (findMQTTSetCommandIndex miss) logs via always-on DebugTf and includes the rejected command token
+- [x] #3 Broker-noise filter branches (wrong top topic / missing 'set' token) intentionally NOT promoted, so no default-log flood regression
+- [x] #4 PROGMEM-safe: PSTR format strings, %s fed RAM char[] topicToken; no control-flow/drop-behaviour change
+- [x] #5 Prerelease re-derived from the rebased base and bumped per versioning policy, cascade staged in the same commit
+- [x] #6 python evaluate.py --quick shows no new failures vs baseline
 - [ ] #7 python build.py --firmware exits 0
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
