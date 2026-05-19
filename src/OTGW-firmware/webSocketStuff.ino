@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v1.6.0-beta.1
+**  Version  : v1.6.0-beta.2
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **

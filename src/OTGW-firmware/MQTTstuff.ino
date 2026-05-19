@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.6.0-beta.1
+**  Version  : v1.6.0-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -688,7 +688,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       MQTTDebugf(PSTR("%s"), topicToken);
       if (topicToken[0] != '\0') {
         if (!isPICEnabled()) {
-          MQTTDebugln(F(" MQTT command ignored: no PIC detected"));
+          DebugTf(PSTR("MQTT command [%s] dropped: no PIC detected\r\n"), topicToken);
           return;
         }
         const int cmdIndex = findMQTTSetCommandIndex(topicToken);
@@ -719,7 +719,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
         } else {
           //no match found
           MQTTDebugln();
-          MQTTDebugTf(PSTR("No match found for command: [%s]\r\n"), topicToken);
+          DebugTf(PSTR("MQTT command [%s] dropped: no matching OTGW command (check topic spelling)\r\n"), topicToken);
         }
       }
     }
