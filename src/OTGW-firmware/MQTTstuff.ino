@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.39
+**  Version  : v2.0.0-alpha.40
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -924,7 +924,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
         // gatewaymode/raw command topics. PIC-only behaviour (firmware flashing,
         // PIC availability, PIC settings) stays gated on isPICEnabled() elsewhere.
         if (!hasOTCommandInterface()) {
-          MQTTDebugln(F(" MQTT command ignored: no OT command interface available"));
+          DebugTf(PSTR("MQTT command [%s] dropped: no OT command interface available\r\n"), topicToken);
           return;
         }
         const int cmdIndex = findMQTTSetCommandIndex(topicToken);
@@ -955,7 +955,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
         } else {
           //no match found
           MQTTDebugln();
-          MQTTDebugTf(PSTR("No match found for command: [%s]\r\n"), topicToken);
+          DebugTf(PSTR("MQTT command [%s] dropped: no matching OTGW command (check topic spelling)\r\n"), topicToken);
         }
       }
     }
