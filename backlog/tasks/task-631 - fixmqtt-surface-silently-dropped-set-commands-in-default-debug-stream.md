@@ -1,9 +1,11 @@
 ---
 id: TASK-631
 title: 'fix(mqtt): surface silently-dropped set-commands in default debug stream'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-19 20:14'
+updated_date: '2026-05-19 20:14'
 labels: []
 dependencies: []
 ---
@@ -24,3 +26,14 @@ A 1.5.0 field report (outside-temperature MQTT override 'stopped working') expos
 - [ ] #6 python evaluate.py --quick shows no new failures vs baseline
 - [ ] #7 python build.py --firmware exits 0
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Inspect the two drop sites on current origin/dev (1.6.0-beta.1) - confirmed byte-identical, lines 690-691 / 721-722
+2. Replant branch on origin/dev; re-apply the 2-line MQTTstuff fix verbatim
+3. Re-derive version bump from new base (1.6.0-beta.1 -> beta.2) per maintainer decision
+4. evaluate.py --quick (no new failures)
+5. build.py --firmware (gate)
+6. Force-push working branch; PR #602 auto-updates
+<!-- SECTION:PLAN:END -->
