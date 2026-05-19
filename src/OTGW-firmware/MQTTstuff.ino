@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.38
+**  Version  : v2.0.0-alpha.39
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1594,17 +1594,21 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
 //   <topic>_boiler     value the boiler received (R under override, T under
 //                      pass-through) or sent (B)
 //
-// Routing decisions per (rsptype, OTdata.bGatewaySubstituted):
+// Routing decisions per (rsptype, OTdata.bGatewaySubstituted, OTdata.bAnswerOverride):
 //
 //   T  no-override (bGS=false): _thermostat AND _boiler
 //   T  with R-follow (bGS=true): _thermostat only (R wins _boiler)
 //   R                          : _boiler only
 //   B  no-override (bGS=false): _thermostat AND _boiler
 //   B  with A-follow (bGS=true): _boiler only (A wins _thermostat)
-//   A                          : _thermostat only
+//   A  answer-override (bAnswerOverride=true) : _thermostat only (genuine B owns _boiler)
+//   A  proxy answer    (bAnswerOverride=false): _thermostat AND _boiler (no B exists)
 //
 // The bGatewaySubstituted flag is set on the OLDER frame in a (T,R) or (B,A)
-// sequence by processOT() in OTGW-Core.ino. There is no _gateway suffix;
+// sequence by processOT() in OTGW-Core.ino. ADR-103: bAnswerOverride is set
+// true only on an A that followed a B (answer-override); a proxy A (no
+// preceding B — e.g. MaxTSet/57) keeps it false so its value reaches _boiler
+// and canonical instead of being starved. There is no _gateway suffix;
 // override visibility is achieved by divergence between _thermostat and
 // _boiler, not by a third topic.
 //
@@ -1640,7 +1644,7 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
   if (inUse) return;
   inUse = true;
 
-  // Worldview routing decision (ADR-096).
+  // Worldview routing decision (ADR-096, refined by ADR-103 for proxy A).
   bool toThermostat = false;
   bool toBoiler = false;
   switch (rsptype) {
@@ -1655,8 +1659,9 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
     case OTGW_REQUEST_BOILER:    // R: gateway-substituted write (only the boiler sees this value)
       toBoiler = true;
       break;
-    case OTGW_ANSWER_THERMOSTAT: // A: gateway-faked answer (only the thermostat sees this value)
+    case OTGW_ANSWER_THERMOSTAT: // A: gateway-faked answer
       toThermostat = true;
+      toBoiler = !OTdata.bAnswerOverride;  // ADR-103: proxy A (no B) → _boiler too; override A → _thermostat only
       break;
     default:                     // parity errors, unknown types
       inUse = false;
