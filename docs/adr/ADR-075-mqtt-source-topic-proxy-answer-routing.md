@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Classification: supersession of ADR-069 (worldview routing table is restated here in full with one added row). Decision Maker: User: Robert van den Breemen (rvdbreemen) — pending approval.
+Accepted, 2026-05-19 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Classification: supersession of ADR-069 (worldview routing table is restated here in full with one added row). Decision Maker: User: Robert van den Breemen (rvdbreemen).
 
 ## Context
 

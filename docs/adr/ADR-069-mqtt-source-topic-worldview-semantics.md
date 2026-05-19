@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Classification: structural amendment to ADR-040 and ADR-066. Decision Maker: User: Rob van den Breemen (rvdbreemen).
+Superseded by ADR-075, 2026-05-19. Original status: Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Classification: structural amendment to ADR-040 and ADR-066. Decision Maker: User: Rob van den Breemen (rvdbreemen). Reason for supersession: the worldview routing table assumed every readable MsgID has a boiler `B` frame; for OTGW-proxied IDs (e.g. MaxTSet/57, no-boiler, boiler-unsupported) the gateway answers `A` with no `B`, starving canonical and `_boiler`. ADR-075 restates the full routing table with a proxy-answer vs answer-override split that preserves this ADR's override invariant.
 
 ## Context
 
