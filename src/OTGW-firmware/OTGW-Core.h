@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.38
+**  Version  : v2.0.0-alpha.39
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -561,6 +561,9 @@ struct OpenthermData_t {
                             //  - on B: gateway sent A instead → suppresses /thermostat for this B (A wins it)
                             //Worldview routing decisions consult this flag; see publishToSourceTopic() and
                             //is_value_valid_for_master_topic() in OTGW-Core.ino.
+  byte bAnswerOverride;     //ADR-103: 1 only on an answer-override A (a (B,A) pair was detected); 0 (default)
+                            //on a proxy A (no preceding B — e.g. MaxTSet/57). Proxy A reaches _thermostat,
+                            //_boiler and canonical; answer-override A reaches _thermostat only (ADR-096 invariant).
   time_t time;
   /**
    * @return float representation of data packet value

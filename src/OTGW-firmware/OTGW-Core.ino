@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.38
+**  Version  : v2.0.0-alpha.39
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1289,8 +1289,10 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 bool is_value_valid_for_master_topic(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   if (isMsgIdReservedInActiveProfile(OT.id)) return false;
-  // ADR-096 canonical = boiler-side worldview gates:
-  if (OT.rsptype == OTGW_ANSWER_THERMOSTAT) return false;
+  // ADR-096/ADR-103 canonical = boiler-side worldview gates:
+  // ADR-103: only an answer-override A (a genuine B owns canonical) is blocked. A proxy A
+  // (no preceding B — e.g. MaxTSet/57) IS the boiler-side value and reaches canonical.
+  if (OT.rsptype == OTGW_ANSWER_THERMOSTAT && OT.bAnswerOverride) return false;
   if (OT.rsptype == OTGW_THERMOSTAT && OT.bGatewaySubstituted) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
@@ -4073,6 +4075,7 @@ void processOT(const char *buf, int len, bool suppressOutput){
     OTdata.time = millis();                           // time of reception    
     OTdata.skipthis = false;                          // default: do not skip this message (parity errors only set this true)
     OTdata.bGatewaySubstituted = false;               // default: not substituted by gateway (ADR-096)
+    OTdata.bAnswerOverride = false;                   // ADR-103: default proxy A (no preceding B)
 
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       //just store current message and delay processing
@@ -4100,6 +4103,10 @@ void processOT(const char *buf, int len, bool suppressOutput){
       //delay message processing by 1 message, to make sure detection of value decoding is done correctly with R and A message.
       tmpOTdata = delayedOTdata;          //fetch delayed msg
       delayedOTdata = OTdata;             //store current msg
+      // ADR-103: mark the incoming A (now the delayed frame) as an answer-override A iff a
+      // (B,A) pair was just detected. It rides the struct copy to the cycle that publishes
+      // it. A proxy A (no preceding B) keeps the init default 0 → reaches _boiler/canonical.
+      delayedOTdata.bAnswerOverride = bGatewaySubstituted && (delayedOTdata.rsptype == OTGW_ANSWER_THERMOSTAT);
       OTdata = tmpOTdata;                 //then process delayed msg
       OTdata.bGatewaySubstituted = bGatewaySubstituted;  //flag substitution if needed (ADR-096)
 
