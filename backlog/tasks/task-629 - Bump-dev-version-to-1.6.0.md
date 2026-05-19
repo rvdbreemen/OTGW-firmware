@@ -1,11 +1,11 @@
 ---
 id: TASK-629
 title: Bump dev version to 1.6.0
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-19 16:49'
-updated_date: '2026-05-19 16:51'
+updated_date: '2026-05-19 16:53'
 labels:
   - versioning
   - release
@@ -20,11 +20,11 @@ Promote the accumulated 1.5.1-beta.* dev line to a 1.6.0 minor version. The beta
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 version.h shows _VERSION_MAJOR 1 / _VERSION_MINOR 6 / _VERSION_PATCH 0 and all _SEMVER_*/_VERSION lines consistently reflect 1.6.0 with the chosen prerelease tag
-- [ ] #2 data/version.hash and version.h _VERSION_GITHASH/_VERSION_DATE/_VERSION_TIME regenerated via scripts/autoinc-semver.py (not hand-edited)
-- [ ] #3 python build.py --firmware exits 0
-- [ ] #4 python evaluate.py --quick shows no new failures vs dev baseline
-- [ ] #5 Change committed to claude/bump-version-mUmdS and a draft PR opened against dev
+- [x] #1 version.h shows _VERSION_MAJOR 1 / _VERSION_MINOR 6 / _VERSION_PATCH 0 and all _SEMVER_*/_VERSION lines consistently reflect 1.6.0 with the chosen prerelease tag
+- [x] #2 data/version.hash and version.h _VERSION_GITHASH/_VERSION_DATE/_VERSION_TIME regenerated via scripts/autoinc-semver.py (not hand-edited)
+- [x] #3 python build.py --firmware exits 0
+- [x] #4 python evaluate.py --quick shows no new failures vs dev baseline
+- [x] #5 Change committed to claude/bump-version-mUmdS and a draft PR opened against dev
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -37,3 +37,15 @@ Promote the accumulated 1.5.1-beta.* dev line to a 1.6.0 minor version. The beta
 5. python evaluate.py --quick (no new failures)
 6. Commit to claude/bump-version-mUmdS, push -u origin, open draft PR against dev
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Promoted the dev line from 1.5.1-beta.12 to 1.6.0-beta.1.
+
+Why minor: the beta line is mostly MQTT/HA correctness fixes (ADR-073/074/075) + SAT cleanup, but #596 added a new user-visible HA capability (button/select PIC-control entities, pseudo-ID 251). Semver -> MINOR bump, not a 1.5.1 patch. Beta counter reset to beta.1 for the new line.
+
+Changes: version.h MINOR 5->6 / PATCH 1->0 / PRERELEASE beta.12->beta.1; _SEMVER_*/_VERSION cascade + build# + githash + date/time + data/version.hash regenerated via scripts/autoinc-semver.py; 24 source/data files got the one-line Version: header auto-synced (same pattern as every prior bump).
+
+Verification: build.py --firmware exit 0 (OTGW-firmware-1.6.0-beta.1+3da7c87.ino.bin); evaluate.py --quick 34 passed / 0 failed / 100
+<!-- SECTION:FINAL_SUMMARY:END -->
