@@ -175,6 +175,9 @@ jobs:
 
           # Locate the in-repo release notes file for this build (best-effort).
           # Prefer the exact version, then the line's beta file, then archived copies.
+          # NOTES_PATH is the on-disk path (used for inlining the digest below).
+          # NOTES_LINK is the GitHub blob URL at the tag (used as the read-full link).
+          NOTES_PATH=""
           NOTES_LINK=""
           for candidate in \
             "RELEASE_NOTES_${VERSION}.md" \
@@ -183,11 +186,31 @@ jobs:
             "docs/releases/RELEASE_NOTES_${BASE_VERSION}-beta.md"
           do
             if [ -f "${candidate}" ]; then
+              NOTES_PATH="${candidate}"
               NOTES_LINK="https://github.com/${REPO}/blob/${TAG}/${candidate}"
               echo "Release notes file at tagged commit: ${candidate}"
               break
             fi
           done
+
+          # Extract the digest (content above the '<!-- digest:end -->' sentinel)
+          # for inline preview in the release body. If the sentinel is missing,
+          # inline the whole file. If no notes file was found, the inline
+          # section is omitted entirely (graceful fallback to the pre-digest
+          # release body shape).
+          DIGEST_FILE=""
+          if [ -n "${NOTES_PATH}" ]; then
+            DIGEST_FILE="release_body_digest.md"
+            if grep -q '<!-- digest:end -->' "${NOTES_PATH}"; then
+              awk '/<!-- digest:end -->/{exit} {print}' "${NOTES_PATH}" > "${DIGEST_FILE}"
+              echo "Digest extracted from ${NOTES_PATH} (above '<!-- digest:end -->' marker)."
+            else
+              cp "${NOTES_PATH}" "${DIGEST_FILE}"
+              echo "WARN: ${NOTES_PATH} has no '<!-- digest:end -->' sentinel; inlining the entire file as the release-page digest."
+            fi
+            # Strip the leading H1 if present; the release body provides its own H2 heading.
+            sed -i '1{/^# /d}' "${DIGEST_FILE}"
+          fi
 
           {
             echo "Beta prerelease **${TAG}**."
@@ -199,9 +222,19 @@ jobs:
             echo "- [\`README.md\`](https://github.com/${REPO}/blob/${TAG}/README.md) — landing page and current dev-line status."
             echo "- [\`CHANGELOG.md\`](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) — running change log for the next release."
             if [ -n "${NOTES_LINK}" ]; then
-              echo "- [Release notes for this line](${NOTES_LINK})."
+              echo "- [Read the full release notes for this line](${NOTES_LINK})."
             fi
             echo ""
+            if [ -n "${DIGEST_FILE}" ] && [ -s "${DIGEST_FILE}" ]; then
+              echo "## What's new since the last public release"
+              echo ""
+              cat "${DIGEST_FILE}"
+              echo ""
+              if [ -n "${NOTES_LINK}" ]; then
+                echo "_Read the full release notes: [${NOTES_PATH}](${NOTES_LINK})._"
+                echo ""
+              fi
+            fi
             echo "### Compare to the latest public release"
             echo ""
             if [ -n "${PREV}" ]; then
