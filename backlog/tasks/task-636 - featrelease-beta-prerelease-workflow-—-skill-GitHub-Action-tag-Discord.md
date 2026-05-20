@@ -3,7 +3,7 @@ id: TASK-636
 title: >-
   feat(release): beta-prerelease workflow — skill + GitHub Action + tag +
   Discord
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-20 09:43'
