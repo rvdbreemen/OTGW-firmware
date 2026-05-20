@@ -36,8 +36,8 @@ Do NOT use this skill for:
 | Target branch | `dev` then merge to `main` | `dev` only |
 | Bumps `_SEMVER_CORE` | yes (1.5.0 -> 1.6.0) | no |
 | Bumps `_VERSION_PRERELEASE` | sets to `beta.0` after release | increments by 1 |
-| Edits `README.md` | yes (What's New section) | no |
-| Generates `RELEASE_NOTES_*.md` | yes | no |
+| Edits `README.md` | yes (What's New section) | yes (Phase 1 staleness gate refreshes the "What's new on dev" section when needed) |
+| Maintains `RELEASE_NOTES_*.md` | yes (per stable: `RELEASE_NOTES_<version>.md`) | yes (per beta line: `RELEASE_NOTES_<base>-beta.md`); CI inlines the digest above the `<!-- digest:end -->` sentinel into the release body |
 | GitHub release marked prerelease | no | yes |
 | Discord channels | `#nederlandse-ondersteuning`, `#english-support` | `#beta-testing` |
 | Frequency | once per minor cycle | many times per minor cycle |
@@ -51,7 +51,7 @@ Do NOT use this skill for:
 
 ## Process
 
-Nine phases. Only **one mandatory checkpoint** (the Discord announcement at the end). All other phases proceed automatically unless something unexpected happens.
+Ten phases. The narrative-refresh gate (Phase 1) runs **before** the version bump so a stale README or CHANGELOG cannot ride out under a fresh tag. Only **one mandatory checkpoint** (the Discord announcement at the end). All other phases proceed automatically unless the staleness check fires or something unexpected happens.
 
 ### Phase 0: Prepare - clean state on dev
 
@@ -64,16 +64,49 @@ Nine phases. Only **one mandatory checkpoint** (the Discord announcement at the 
    git fetch --tags
    git tag --list 'v*-*.*' --sort=-v:refname | head -1
    ```
-   Store this as `PREV_TAG` for the release body diff link in Phase 6.
-4. **Read current version**: `grep _VERSION_PRERELEASE src/OTGW-firmware/version.h` and store the current value (e.g. `beta.3`).
+   Store this as `PREV_TAG` for the release body diff link in Phase 7.
+4. **Detect the latest PUBLIC stable release**:
+   ```bash
+   LATEST_PUBLIC=$(gh release view --json tagName --jq '.tagName' 2>/dev/null \
+                   || git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+                        | grep -v -- '-' | head -1)
+   ```
+   Store this as `LATEST_PUBLIC`. Used by Phase 1 for the staleness diff and by the Phase 9 Discord announcement.
+5. **Read current version**: `grep _VERSION_PRERELEASE src/OTGW-firmware/version.h` and store the current value (e.g. `beta.3`).
 
-### Phase 1: ADR validation
+### Phase 1: README + CHANGELOG staleness gate (mandatory, runs first)
+
+**Why this is now Phase 1, not Phase 2.5.** The GitHub Action checks out the repo at the tag commit and reads `README.md`, `CHANGELOG.md`, and `RELEASE_NOTES_<base>-beta.md` to compose the release body. If those files are stale, the tag locks the stale narrative onto the release page (immutable releases policy — see Trap 1). The check therefore gates the bump: a stale narrative blocks Phase 2 and downstream phases until the user (or this skill) refreshes the docs.
+
+**The staleness check (run automatically):**
+
+1. List commits between `LATEST_PUBLIC` and `HEAD` on `dev`, subject only:
+   ```bash
+   git log --pretty=format:'%h %s' "${LATEST_PUBLIC}..HEAD" -- src/OTGW-firmware/ src/libraries/ docs/ data/
+   ```
+   This is the set of changes the next release page should account for. Filtering paths trims trivial chore commits.
+2. Read the existing narrative bullets:
+   - `README.md` "What's new on dev (since <LATEST_PUBLIC>)" section (between the dev banner and the "What's New in v<stable>" anchor).
+   - `CHANGELOG.md` `## [Unreleased]` section.
+   - `RELEASE_NOTES_<base>-beta.md` digest region (above the `<!-- digest:end -->` sentinel), if the file exists.
+3. **Heuristic match (not regex parsing):** for each commit subject in step 1, look for a topical match in any of the three narratives. A match can be by ADR number, TASK ID, PR number, or a substring of the subject. Missing items are listed as candidates for the user.
+4. **Decision:**
+   - **All commits accounted for** ⇒ pass silently, continue to Phase 2.
+   - **One or more commits missing from the narrative** ⇒ STOP. Print the missing-commit list, the file(s) that should receive entries (README and/or CHANGELOG and/or RELEASE_NOTES), and ask the user whether to (a) refresh the docs in this session before bumping, (b) skip the missing items deliberately (justify in the commit message), or (c) abort the beta cut.
+5. **Authoring rules** when the gate fires and you refresh in-session:
+   - `CHANGELOG.md` — append under `## [Unreleased]` using [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) headings (`### Added`, `### Changed`, `### Fixed`, `### Removed`, `### Documentation`). One short bullet per change, with the ADR/TASK/PR reference in parentheses.
+   - `README.md` — refresh the dev-banner version label and the "What's new on dev (since <LATEST_PUBLIC>)" section. Do NOT touch the "What's New in v<stable>" section; that belongs to the last shipped stable and stays as the historical anchor.
+   - `RELEASE_NOTES_<base>-beta.md` — if the line carries a narrative bigger than the CHANGELOG bullets warrant, maintain a per-line notes file at the repo root. The CI workflow inlines the content above the `<!-- digest:end -->` sentinel into the release body under a "What's new since the last public release" heading; the link below the inlined teaser points to the full file for the long form.
+
+**Skip allowed only when**: the bump is a re-cut at the same change surface (for example, the previous tag hit the immutable-release trap and we are reissuing under a fresh number). The narrative did not change, only the tag did. Note the reason in the commit message and proceed straight to Phase 2.
+
+### Phase 2: ADR validation
 
 Skip by default. Only stop and create an ADR if the staged firmware change introduces a new architectural pattern, a new dependency, or shifts an NFR (heap budget, MQTT topic shape, settings schema). Most beta cycles do not need this gate.
 
 **Conditional stop:** Only pause for user input if an ADR is actually needed.
 
-### Phase 2: Bump prerelease
+### Phase 3: Bump prerelease
 
 Run the bump helper from the project root:
 
@@ -83,21 +116,9 @@ bin/bump-prerelease.sh
 
 The helper rewrites `src/OTGW-firmware/version.h` (`_VERSION_PRERELEASE`, `_SEMVER_FULL`, `_SEMVER_NOBUILD`, `_VERSION`) and `src/OTGW-firmware/data/version.hash`. It prints the transition (e.g. `beta.3 -> beta.4`). Store the new value as `NEW_PRERELEASE`.
 
-The helper does NOT git-add. You stage the files yourself in Phase 5.
+The helper does NOT git-add. You stage the files yourself in Phase 6.
 
-### Phase 2.5: Update README and CHANGELOG (mandatory)
-
-The GitHub release body is mostly a thin shell that links *back* into the repo. Keep those targets in shape on every beta cut so testers reading the release page on mobile can find the narrative.
-
-1. **`CHANGELOG.md`** — append new entries under `## [Unreleased]` (or open a new `## [<base_version>-beta] - YYYY-MM-DD` section if you prefer to scope per beta line). Keep the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) headings (`### Added`, `### Changed`, `### Fixed`, `### Removed`, `### Documentation`). One short bullet per change, with the ADR/TASK reference in parentheses.
-2. **`README.md`** — refresh the dev-branch banner and the "What's new on dev" / "Latest beta line" paragraph so the first screen of the README reflects what this beta carries. Do not touch the "What's New in v<stable>" section — that belongs to the last shipped stable and stays as the historical anchor.
-3. **`RELEASE_NOTES_<base_version>-beta.md`** (optional but recommended) — if the line carries a narrative bigger than the CHANGELOG bullets warrant, keep a per-line release-notes file at the repo root. The CI workflow auto-detects and links it in the release body.
-
-These three files are what the workflow links to in the GitHub release body. If any of them is stale, the release page tells testers the wrong story.
-
-**Skip allowed only when**: the bump is a re-cut at the same change surface (e.g., beta.4 hit the immutable-release trap and we are reissuing as beta.5). The README/CHANGELOG narrative did not change, only the tag did. Note the reason in the commit message.
-
-### Phase 3: Build verification (mandatory gate)
+### Phase 4: Build verification (mandatory gate)
 
 ```bash
 python build.py --firmware
@@ -105,7 +126,7 @@ python build.py --firmware
 
 Must exit 0. If the build fails, fix the issue, re-run the bump if needed, and retry. Do NOT proceed to commit or push on a broken build.
 
-### Phase 4: Evaluator (mandatory gate)
+### Phase 5: Evaluator (mandatory gate)
 
 ```bash
 python evaluate.py --quick
@@ -113,9 +134,9 @@ python evaluate.py --quick
 
 Must show no new failures. If new failures appear, fix them (or, if pre-existing baseline failures unrelated to this change, document that in the commit message). Do NOT proceed on a regressed evaluator.
 
-### Phase 5: Commit and push to dev
+### Phase 6: Commit and push to dev
 
-1. **Stage** the firmware change, the version bump, AND the documentation refresh from Phase 2.5:
+1. **Stage** the firmware change, the version bump, AND the documentation refresh from Phase 1 (if anything was refreshed in this cycle):
    ```bash
    git add src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash \
            <firmware-files> \
@@ -135,9 +156,9 @@ Must show no new failures. If new failures appear, fix them (or, if pre-existing
 
 If the pre-commit hook blocks (bump-check fails because version.h was not staged), re-stage and retry. Do NOT use `OTGW_BUMP_HOOK_DISABLE=1` here: the whole point of this skill is to bump+commit together.
 
-The README + CHANGELOG must land in the SAME commit (or a commit ordered before the tag) because the GitHub Action checks out the code at the tag and reads these files when composing the release body. Stale documentation at the tagged commit = stale release page.
+The README + CHANGELOG + RELEASE_NOTES must land in the SAME commit (or a commit ordered before the tag) because the GitHub Action checks out the code at the tag and reads these files when composing the release body. Stale documentation at the tagged commit = stale release page. Phase 1's staleness gate is what keeps this contract honest; do not skip it.
 
-### Phase 6: Create and push the prerelease tag
+### Phase 7: Create and push the prerelease tag
 
 Construct the tag from `_SEMVER_CORE` and the new prerelease label:
 
@@ -156,7 +177,7 @@ git push origin "${TAG}"
 
 The push fires `.github/workflows/beta-prerelease.yml`. The Action builds firmware + filesystem binaries, creates a GitHub release with `prerelease: true`, and uploads the `.ino.bin` and `.littlefs.bin` as assets. The existing `release-assets.yml` workflow then chains in on `release: published` to attach SHA256SUMS, `flash_otgw.sh`, `flash_otgw.bat`, and the flash-bundle zip.
 
-### Phase 7: Wait for the GitHub Action
+### Phase 8: Wait for the GitHub Action
 
 1. Open the Actions tab: `https://github.com/rvdbreemen/OTGW-firmware/actions`
 2. Watch the `Beta prerelease publish` workflow run on the new tag.
@@ -168,12 +189,12 @@ The push fires `.github/workflows/beta-prerelease.yml`. The Action builds firmwa
 
 If the Action fails, inspect the logs, fix the issue (usually a build regression or a missing secret), and either re-run via `workflow_dispatch` or push a new tag.
 
-### Phase 8: Discord announcement (CHECKPOINT)
+### Phase 9: Discord announcement (CHECKPOINT)
 
-Prepare a one-paragraph announcement for `#beta-testing` (channel ID `914498730001072149`). The Diff link points at the **latest public stable release** (`LATEST_PUBLIC`), not the previous beta — testers usually want to know what changed since the last shipping version. Get the value with:
+Prepare a one-paragraph announcement for `#beta-testing` (channel ID `914498730001072149`). The Diff link points at the **latest public stable release** (`LATEST_PUBLIC`), not the previous beta — testers usually want to know what changed since the last shipping version. Reuse the `LATEST_PUBLIC` value already resolved in Phase 0:
 
 ```bash
-LATEST_PUBLIC=$(gh release view --json tagName --jq '.tagName')
+echo "${LATEST_PUBLIC}"   # captured at the start of the flow
 ```
 
 Template:
@@ -215,7 +236,7 @@ The Action publishes the release on the SHA the tag points to, so an arbitrary c
 - **Always push to remote after every commit**: keep local and remote in sync.
 - **Never force-push to dev**: standing permission only covers normal pushes.
 - **Build and evaluator gates are mandatory**: do not push a tag if either gate is red.
-- **One checkpoint**: the Discord announcement in Phase 8. All other phases proceed automatically.
+- **One checkpoint**: the Discord announcement in Phase 9. All other phases proceed automatically.
 - **Bump-check hook is your friend**: if the pre-commit hook blocks the firmware commit, you forgot to stage `version.h` or `data/version.hash`. Fix the staging, do NOT bypass with `OTGW_BUMP_HOOK_DISABLE=1`.
 - **CI build is a deliberate departure from /release**: full releases build locally (so the maintainer toolchain is canonical), betas build in CI (so the maintainer does not pay 5 minutes per cycle). The build script (`build.py`) is the same; only the host differs.
 
@@ -251,6 +272,6 @@ Testers usually want to know what changed since the last *shipping* version, not
 
 ### Trap 5: Release body that does not link the in-repo narrative
 
-The GitHub release body composed by CI is short by design (auto-generated). Testers reading it on mobile need a one-tap path to the README, CHANGELOG, and per-line release notes.
+The GitHub release body composed by CI is short by design (auto-generated). Testers reading it on mobile need a one-tap path to the README, CHANGELOG, and per-line release notes, plus an inline preview of what changed.
 
-**Workaround in workflow:** the release body links `README.md`, `CHANGELOG.md`, and `RELEASE_NOTES_<base>-beta.md` (auto-detected at the tagged commit). These must be up-to-date at the tagged commit — see Phase 2.5.
+**Workaround in workflow:** the release body links `README.md`, `CHANGELOG.md`, and `RELEASE_NOTES_<base>-beta.md` (auto-detected at the tagged commit), and inlines the content of `RELEASE_NOTES_<base>-beta.md` above the `<!-- digest:end -->` sentinel as a "What's new since the last public release" teaser. These must be up-to-date at the tagged commit. Phase 1's staleness gate is the contractual mechanism that keeps them in sync.
