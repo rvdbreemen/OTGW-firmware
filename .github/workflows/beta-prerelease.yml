@@ -37,8 +37,13 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing prerelease tag to (re)publish (e.g. v1.6.0-beta.4)'
+        description: 'Prerelease tag to (re)publish (e.g. v1.6.0-beta.4). Created at `ref` if missing.'
         required: true
+        type: string
+      ref:
+        description: 'Branch or commit to tag if `tag` does not yet exist on origin (default: dev). Ignored when the tag already exists.'
+        required: false
+        default: 'dev'
         type: string
 
 jobs:
@@ -49,6 +54,23 @@ jobs:
       contents: write   # required to create release and upload assets
 
     steps:
+      - name: Create tag if missing (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          REF="${{ inputs.ref }}"
+          if gh api "repos/${{ github.repository }}/git/refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists on origin, reusing it."
+          else
+            SHA=$(gh api "repos/${{ github.repository }}/commits/${REF}" --jq '.sha')
+            [ -n "${SHA}" ] || { echo "ERROR: could not resolve ref '${REF}' to a commit SHA"; exit 1; }
+            echo "Creating tag ${TAG} at ${REF} (${SHA})"
+            gh api -X POST "repos/${{ github.repository }}/git/refs" \
+              -f ref="refs/tags/${TAG}" -f sha="${SHA}"
+          fi
+
       - name: Resolve tag name
         id: tag
         run: |
