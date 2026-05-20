@@ -30,7 +30,7 @@ Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.6`). The list be
 - **`/beta-prerelease` skill + GitHub Action** for tag-driven (and, after #609, workflow-dispatch-driven) beta publishing, with draft-first asset attachment to satisfy GitHub's immutable-releases policy.
 
 **Code hygiene**
-- **Orphaned SAT subsystem removed from dev** (#586) and the dead `ENABLE_SAT` scaffolding cleaned out (#589). SAT lives only on `feature-dev-2.0.0-otgw32-esp32-sat-support` and is no longer carried as inert code on the 1.5.x/1.6.x line.
+- **Dead and orphaned code paths cleaned out of `dev`** (#586, #589): inactive subsystem code and its matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.
 
 **Documentation**
 - New integration guides for **openHAB** and **Domoticz**.
