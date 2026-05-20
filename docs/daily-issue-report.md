@@ -1,39 +1,44 @@
-# Daily Issue Report — 2026-05-19
+# Daily Issue Report — 2026-05-20
 
 ## Summary
 
-- **GitHub**: No new issues updated in the last 24 hours (since 2026-05-18T00:00:00Z). Most recent open issue was #575, last updated 2026-05-15.
+- **GitHub**: 1 issue updated in the last 24 hours (since 2026-05-19T00:00:00Z).
 - **Tweakers**: Feed unavailable — `gathering.tweakers.net` blocked by network egress policy in this environment.
 - **Discord**: MCP server not configured in this execution environment.
 
-No new issues in the last 24 hours.
+---
+
+## GitHub Issues
+
+### Issue #575 — "Update Firmware" button not visible after updating to v1.5.0
+
+- **URL**: https://github.com/rvdbreemen/OTGW-firmware/issues/575
+- **Reporter**: rkuijer
+- **Source**: GitHub
+- **Classification**: Bug report
+- **Last updated**: 2026-05-19T18:45:44Z
+- **Labels**: bug, good first issue, question
+
+**Summary**: After upgrading to v1.5.0, the "Update Firmware" button on the FSExplorer page is invisible. The reporter (using a Microsoft Surface Pro 9 — a touch-capable laptop) traced the root cause to a CSS media query:
+
+```css
+@media (pointer: coarse) and (hover: none) {
+  .desktop-only { display: none; }
+}
+```
+
+The Surface Pro 9 satisfies `pointer: coarse` when used in tablet mode, causing the button's wrapping `<span class="desktop-only">` to be hidden even on a full PC. The fix is to remove `desktop-only` from the Update Firmware form, or use a viewport-width-based rule instead of a pointer/hover heuristic.
+
+**Status**: rvdbreemen confirmed the bug on 2026-05-19 and announced a fix will be released in the next beta.
 
 ---
 
-## Sources Not Available
+## Tweakers Forum
 
-| Source | Status | Reason |
-|--------|--------|--------|
-| Tweakers RSS | Blocked | `gathering.tweakers.net` not in network allowlist |
-| Discord #beta-testing | Not available | Discord MCP not configured in this session |
-| Discord #english-support | Not available | Discord MCP not configured in this session |
-| Discord #nederlandse-ondersteuning | Not available | Discord MCP not configured in this session |
-| Discord #devs-esp-firmware | Not available | Discord MCP not configured in this session |
+Unavailable — outbound HTTP to `gathering.tweakers.net` is blocked by network egress policy in this execution environment. No Tweakers posts could be checked.
 
 ---
 
-## Previously Tracked Issues (still open)
+## Discord
 
-| # | Title | Reporter | Labels | Last Updated | Backlog |
-|---|-------|----------|--------|-------------|---------|
-| [#575](https://github.com/rvdbreemen/OTGW-firmware/issues/575) | "Update Firmware" button not visible after updating to v1.5.0, root cause found | rkuijer | bug, good first issue, question | 2026-05-15 | TASK-615 |
-| [#557](https://github.com/rvdbreemen/OTGW-firmware/issues/557) | Settings / Run Boot Command and PIC missing | dwd1 | bug, question | 2026-05-06 | — |
-| [#561](https://github.com/rvdbreemen/OTGW-firmware/issues/561) | [Feature] Static IP address settings | andrebrait | enhancement | 2026-05-06 | — |
-
----
-
-## Timestamps
-
-- Last check: 2026-05-19T00:00:00Z
-
-*Report generated: 2026-05-19 by Claude Code daily issue check.*
+MCP server not configured in this execution environment. No Discord posts checked.
