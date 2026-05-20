@@ -427,6 +427,22 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-19T16:18:31.878Z"
+    },
+    {
+      "id": "bug-027",
+      "timestamp": "2026-05-20T06:11:50.002Z",
+      "error_message": "Incorrect value in code",
+      "file": "src/OTGW-firmware/restAPI.ino",
+      "root_cause": "Had \") == 0 || strcmp(markersBuf, \"",
+      "fix": "Changed to \")) == 0 || markersBuf[0] == '",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-20T06:11:50.002Z"
     }
   ]
 }

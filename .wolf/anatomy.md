@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-19T16:19:58.638Z
-> Files: 13 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-20T06:14:09.859Z
+> Files: 14 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -237,6 +237,7 @@
 
 ## .github/workflows/
 
+- `build.yml` — CI: PlatformIO firmware build (~456 tok)
 
 ## .pio/libdeps/esp32/
 
@@ -347,7 +348,7 @@
 - `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~31733 tok)
 - `OTGW-Core.h` — ifndef OTGWCore_h (~10494 tok)
 - `OTGW-Core.ino` — Declares char (~62624 tok)
-- `restAPI.ino` — include <string.h> (~32136 tok)
+- `restAPI.ino` — include <string.h> (~40900 tok)
 - `SATweather.ino` — Declares uint16_t (~7653 tok)
 - `settingStuff.ino` — include <ctype.h> (~16551 tok)
 

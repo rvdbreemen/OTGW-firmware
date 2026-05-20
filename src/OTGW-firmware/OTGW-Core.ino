@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.40
+**  Version  : v2.0.0-alpha.42
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2126,8 +2126,9 @@ void print_status(uint16_t& value)
     AddLog(OTlookupitem.label);
     AddLogf(" = Master [%s]", _flag8_master);
 
-    //Master Status
-    if (is_value_valid(OTdata, OTlookupitem)){
+    //Master Status — ADR-069 boiler-side worldview: suppress canonical for
+    //gateway-substituted T-frames so the HW override is reflected in dhw_enable.
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)){
       publishMasterStatusState(OTdata.valueHB, _flag8_master);
     }
   } else {
@@ -2154,13 +2155,14 @@ void print_status(uint16_t& value)
     AddLog(OTlookupitem.label);
     AddLogf(" = Slave  [%s]", _flag8_slave);
     
-    //Slave Status
-    if (is_value_valid(OTdata, OTlookupitem)){
+    //Slave Status — ADR-069 boiler-side worldview: suppress canonical for
+    //gateway-faked A-frames so the boiler's true DHW mode is what we publish.
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)){
       publishSlaveStatusState(OTdata.valueLB, _flag8_slave);
     }
   }
 
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid_for_master_topic(OTdata, OTlookupitem)){
     // AddLogf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
     value = (OTcurrentSystemState.MasterStatus<<8) | OTcurrentSystemState.SlaveStatus;
   }

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.40
+**  Version  : v2.0.0-alpha.42
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1258,7 +1258,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       while (mlen > 0 && markersBuf[mlen - 1] != ']') mlen--;
       if (mlen > 0) markersBuf[mlen - 1] = '\0';
       char newBuf[2048];
-      if (strcmp(markersBuf, "[") == 0 || strcmp(markersBuf, "") == 0 || mcount == 0) {
+      if (strcmp_P(markersBuf, PSTR("[")) == 0 || markersBuf[0] == '\0' || mcount == 0) {
         snprintf_P(newBuf, sizeof(newBuf), PSTR("[%s]"), entry);
       } else {
         snprintf_P(newBuf, sizeof(newBuf), PSTR("%s,%s]"), markersBuf, entry);
