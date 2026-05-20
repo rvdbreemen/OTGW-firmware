@@ -1,9 +1,11 @@
 ---
 id: TASK-639
 title: Inline 'since last public release' digest in beta GitHub release body
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-20 15:36'
+updated_date: '2026-05-20 15:36'
 labels:
   - release
   - docs
@@ -26,4 +28,6 @@ The beta-prerelease.yml workflow currently composes a thin release body that onl
 - [ ] #5 When the notes file exists but has no digest-end sentinel, the workflow inlines the entire file (best-effort behaviour, documented in the workflow comments).
 - [ ] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures on the commit that introduces the change.
 - [ ] #7 Changes commit to claude/beta-release-prep-qUipc and a draft PR is opened against dev.
+- [ ] #8 .claude/skills/beta-prerelease/SKILL.md is restructured so the README + CHANGELOG check is moved from Phase 2.5 (after bump) to Phase 1 (before bump). The check gates the rest of the flow: if README's 'What's new on dev' or CHANGELOG's [Unreleased] section is stale relative to commits since the last public stable, the skill halts and asks the user to refresh first.
+- [ ] #9 Skill text spells out the staleness check explicitly: a deterministic pre-flight that diffs commit log since the latest public stable (gh release view --json tagName) against the bullets already present in README/CHANGELOG, calling out any commit subject not yet narrated. Heuristic, not a hard regex match.
 <!-- AC:END -->
