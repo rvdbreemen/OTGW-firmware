@@ -28,10 +28,18 @@ Follow-up to TASK-637. Three commits since v1.5.0-fix2 were not captured in the 
 - [x] #8 Existing CHANGELOG and README content remains intact; this update is purely additive (or surgically corrective on the slip narrative)
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
 1. Identify commits not yet reflected in README/CHANGELOG: PR #581, PR #574, TASK-596 (51356205).\n2. Add three bullets to CHANGELOG Unreleased Documentation: TASK-596 docs+API+ADR update; release-notes housekeeping move/archive; #581 docs-review findings + dev banner restore.\n3. Add a bullet under Unreleased Changed or Added for the link-check CI workflow added in #581.\n4. Add API/ADR/release-notes housekeeping mention to the README What's new on dev Documentation block.\n5. Verify no em dashes in new prose; commit and push to claude/document-changelog-changes-3JN5C; PR remains open.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Surfaced three previously unrecorded commits in the README dev section and CHANGELOG Unreleased: PR #581 (docs-review findings 1-5 fix and link-check scope extension), PR #574 (brief main-branch styling slip on dev README, corrected in #581), and TASK-596 commit 51356205 (API/ADR docs refresh plus release-notes housekeeping).
+
+CHANGELOG.md Unreleased gains three Documentation bullets and the existing #573 Added bullet now mentions the #581 scope extension to docs/guides and docs/process. README What's new on dev Documentation block gains two new bullets covering the API/ADR mid-cycle refresh and the release-notes housekeeping, and the existing link-validation bullet now also reflects the CI-scope extension.
+
+No em dashes in new prose. Docs-only commit; build/evaluator gates skipped per CLAUDE.md push policy. Follow-up to TASK-637.
+<!-- SECTION:FINAL_SUMMARY:END -->
