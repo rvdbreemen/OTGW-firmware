@@ -1,7 +1,7 @@
 ---
 id: TASK-638
 title: Document remaining unrecorded commits since v1.5.0-fix2 in README + CHANGELOG
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-20 12:23'
