@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-20 09:43'
-updated_date: '2026-05-20 09:47'
+updated_date: '2026-05-20 09:52'
 labels:
   - release
   - tooling
@@ -24,19 +24,19 @@ Develop a complete beta-prerelease workflow that parallels the existing /release
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Skill file .claude/skills/beta-prerelease/SKILL.md exists with name+description frontmatter and disable-model-invocation:true (matching the /release skill convention)
-- [ ] #2 Skill documents the full local flow: clean-state check on dev, run bin/bump-prerelease.sh, build.py --firmware green, evaluate.py --quick green, stage firmware change + version.h + data/version.hash, commit with conventional message, push origin/dev, create+push tag vSEMVER_CORE-PRERELEASE (e.g. v1.6.0-beta.4), post to Discord #beta-testing
-- [ ] #3 Skill writing-style rules are explicit: no em dashes, English-only release notes, no emojis (matching the /release skill style block)
-- [ ] #4 Action builds firmware (.ino.bin) and filesystem (.littlefs.bin) binaries using the same build.py invocation as a local build
-- [ ] #5 Action creates a GitHub release marked prerelease:true, with the tag name as title and a body containing the version string and a link to the dev branch diff since the previous prerelease tag
-- [ ] #6 Action uploads .ino.bin and .littlefs.bin as release assets so the existing release-assets.yml workflow (triggered on release:published) chains in to attach SHA256SUMS, flash_otgw.sh/.bat, and the flash-bundle zip
-- [ ] #7 Documentation lives in the skill itself (no separate docs/guides/ file) to keep the source of truth singular, matching the /release skill pattern
-- [ ] #8 Skill explicitly differentiates itself from /release: beta does not merge to main, does not edit README, does not bump _SEMVER_CORE (only _VERSION_PRERELEASE), and is repeatable many times within one minor cycle
-- [ ] #9 Verification: a dry-run section in the skill explains how to test the workflow without actually publishing (e.g. push a vX.Y.Z-beta.test tag to a throwaway branch and confirm the Action fires)
-- [ ] #10 python build.py --firmware exits 0 after the changes (no firmware code is modified, but the gate still applies)
-- [ ] #11 python evaluate.py --quick shows no new failures
-- [ ] #12 Final-summary section of the task contains a PR-style summary suitable for the GitHub PR body
-- [ ] #13 GitHub Action .github/workflows/beta-prerelease.yml triggers on push of tags matching v*-*.* (broad prerelease glob, excludes full releases without dash) and supports workflow_dispatch for manual re-run
+- [x] #1 Skill file .claude/skills/beta-prerelease/SKILL.md exists with name+description frontmatter and disable-model-invocation:true (matching the /release skill convention)
+- [x] #2 Skill documents the full local flow: clean-state check on dev, run bin/bump-prerelease.sh, build.py --firmware green, evaluate.py --quick green, stage firmware change + version.h + data/version.hash, commit with conventional message, push origin/dev, create+push tag vSEMVER_CORE-PRERELEASE (e.g. v1.6.0-beta.4), post to Discord #beta-testing
+- [x] #3 Skill writing-style rules are explicit: no em dashes, English-only release notes, no emojis (matching the /release skill style block)
+- [x] #4 Action builds firmware (.ino.bin) and filesystem (.littlefs.bin) binaries using the same build.py invocation as a local build
+- [x] #5 Action creates a GitHub release marked prerelease:true, with the tag name as title and a body containing the version string and a link to the dev branch diff since the previous prerelease tag
+- [x] #6 Action uploads .ino.bin and .littlefs.bin as release assets so the existing release-assets.yml workflow (triggered on release:published) chains in to attach SHA256SUMS, flash_otgw.sh/.bat, and the flash-bundle zip
+- [x] #7 Documentation lives in the skill itself (no separate docs/guides/ file) to keep the source of truth singular, matching the /release skill pattern
+- [x] #8 Skill explicitly differentiates itself from /release: beta does not merge to main, does not edit README, does not bump _SEMVER_CORE (only _VERSION_PRERELEASE), and is repeatable many times within one minor cycle
+- [x] #9 Verification: a dry-run section in the skill explains how to test the workflow without actually publishing (e.g. push a vX.Y.Z-beta.test tag to a throwaway branch and confirm the Action fires)
+- [x] #10 python build.py --firmware exits 0 after the changes (no firmware code is modified, but the gate still applies)
+- [x] #11 python evaluate.py --quick shows no new failures
+- [x] #12 Final-summary section of the task contains a PR-style summary suitable for the GitHub PR body
+- [x] #13 GitHub Action .github/workflows/beta-prerelease.yml triggers on push of tags matching v*-*.* (broad prerelease glob, excludes full releases without dash) and supports workflow_dispatch for manual re-run
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -118,3 +118,62 @@ Develop a complete beta-prerelease workflow that parallels the existing /release
 - ADR: none (tooling parallel to /release, falls under "minor features within existing patterns")
 - 2.0.0 port: skipped (out of scope, 2.0.0 manages its own release flow)
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds a complete beta-prerelease workflow parallel to the existing /release skill. Two artefacts, no other firmware code touched.
+
+## What landed
+
+**.claude/skills/beta-prerelease/SKILL.md** (user-only slash command, disable-model-invocation:true). 8 phases:
+- 0: clean-state on dev, detect previous prerelease tag
+- 1: ADR validation (skip-by-default)
+- 2: bin/bump-prerelease.sh
+- 3: python build.py --firmware (mandatory gate)
+- 4: python evaluate.py --quick (mandatory gate)
+- 5: stage firmware + version.h + data/version.hash, commit, push origin/dev
+- 6: tag v${SEMVER_CORE}-${PRERELEASE} (e.g. v1.6.0-beta.4), push tag
+- 7: wait for the GitHub Action, verify assets
+- 8: Discord announcement template in #beta-testing (one mandatory checkpoint)
+
+Style rules match /release: no em dashes, English-only, no emojis. Dry-run section included.
+
+**.github/workflows/beta-prerelease.yml**. Triggers on push of tags matching v*-*.* (broad prerelease glob: beta, alpha, rc all qualify; full releases v1.5.0 without a dash are excluded). Also supports workflow_dispatch for manual re-run. Job:
+1. Resolve tag from GITHUB_REF or workflow_dispatch input
+2. Checkout at the tag
+3. Setup Python 3.x
+4. python build.py (build.py auto-installs arduino-cli on ubuntu-latest)
+5. Locate build/*.ino.bin and build/*.littlefs.bin
+6. Detect previous prerelease tag for diff link
+7. Compose release body (tag, diff link, Discord pointer)
+8. gh release create --prerelease (or edit if it already exists)
+9. gh release upload for both binaries
+10. Verify assets attached
+
+The existing .github/workflows/release-assets.yml chains in automatically on release:published, attaching SHA256SUMS, flash_otgw.sh, flash_otgw.bat, and the OTGW-firmware-<version>-flash-bundle.zip. No change needed to release-assets.yml.
+
+## Design decisions locked with maintainer
+
+- Tag glob v*-*.* (broad, future-proof)
+- Discord: template-only in skill, no webhook automation (no secret setup)
+- No ADR (tooling parallel to existing pattern)
+- No 2.0.0 port in this PR (out of scope)
+- CI build is a deliberate departure from /release's "no CI workflows for releases" rule. Betas happen frequently; CI saves time; the build script is the same, only the host differs. Documented in the skill.
+
+## Verification
+
+- python build.py --firmware exit 0 (output: OTGW-firmware-1.6.0-beta.3+eacddbc.ino.bin, 0.71 MB)
+- python evaluate.py --quick: 34 passed, 0 warnings, 0 failed, 100% health score
+- python3 yaml.safe_load on the workflow file: valid
+
+## PR
+
+Draft PR #607: https://github.com/rvdbreemen/OTGW-firmware/pull/607
+
+## Risks and follow-ups
+
+- The Action does not auto-announce on Discord. The skill produces a template the maintainer pastes. Acceptable for now; can be upgraded to a webhook later if cycle frequency justifies it.
+- 2.0.0 port deferred to a separate task once dev implementation is reviewed and merged.
+- First real-world dry-run is in the test plan of PR #607 (maintainer pushes v0.0.0-beta.dryrun on a throwaway branch).
+<!-- SECTION:FINAL_SUMMARY:END -->
