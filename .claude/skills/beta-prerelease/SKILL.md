@@ -51,7 +51,7 @@ Do NOT use this skill for:
 
 ## Process
 
-Eight phases. Only **one mandatory checkpoint** (the Discord announcement at the end). All other phases proceed automatically unless something unexpected happens.
+Nine phases. Only **one mandatory checkpoint** (the Discord announcement at the end). All other phases proceed automatically unless something unexpected happens.
 
 ### Phase 0: Prepare - clean state on dev
 
@@ -85,6 +85,18 @@ The helper rewrites `src/OTGW-firmware/version.h` (`_VERSION_PRERELEASE`, `_SEMV
 
 The helper does NOT git-add. You stage the files yourself in Phase 5.
 
+### Phase 2.5: Update README and CHANGELOG (mandatory)
+
+The GitHub release body is mostly a thin shell that links *back* into the repo. Keep those targets in shape on every beta cut so testers reading the release page on mobile can find the narrative.
+
+1. **`CHANGELOG.md`** — append new entries under `## [Unreleased]` (or open a new `## [<base_version>-beta] - YYYY-MM-DD` section if you prefer to scope per beta line). Keep the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) headings (`### Added`, `### Changed`, `### Fixed`, `### Removed`, `### Documentation`). One short bullet per change, with the ADR/TASK reference in parentheses.
+2. **`README.md`** — refresh the dev-branch banner and the "What's new on dev" / "Latest beta line" paragraph so the first screen of the README reflects what this beta carries. Do not touch the "What's New in v<stable>" section — that belongs to the last shipped stable and stays as the historical anchor.
+3. **`RELEASE_NOTES_<base_version>-beta.md`** (optional but recommended) — if the line carries a narrative bigger than the CHANGELOG bullets warrant, keep a per-line release-notes file at the repo root. The CI workflow auto-detects and links it in the release body.
+
+These three files are what the workflow links to in the GitHub release body. If any of them is stale, the release page tells testers the wrong story.
+
+**Skip allowed only when**: the bump is a re-cut at the same change surface (e.g., beta.4 hit the immutable-release trap and we are reissuing as beta.5). The README/CHANGELOG narrative did not change, only the tag did. Note the reason in the commit message.
+
 ### Phase 3: Build verification (mandatory gate)
 
 ```bash
@@ -103,9 +115,12 @@ Must show no new failures. If new failures appear, fix them (or, if pre-existing
 
 ### Phase 5: Commit and push to dev
 
-1. **Stage** the firmware change plus the version bump:
+1. **Stage** the firmware change, the version bump, AND the documentation refresh from Phase 2.5:
    ```bash
-   git add src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash <firmware-files>
+   git add src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash \
+           <firmware-files> \
+           CHANGELOG.md README.md \
+           RELEASE_NOTES_*-beta.md   # if you maintain a per-line notes file
    ```
 2. **Commit** with a conventional message that includes the new prerelease tag:
    ```bash
@@ -119,6 +134,8 @@ Must show no new failures. If new failures appear, fix them (or, if pre-existing
    ```
 
 If the pre-commit hook blocks (bump-check fails because version.h was not staged), re-stage and retry. Do NOT use `OTGW_BUMP_HOOK_DISABLE=1` here: the whole point of this skill is to bump+commit together.
+
+The README + CHANGELOG must land in the SAME commit (or a commit ordered before the tag) because the GitHub Action checks out the code at the tag and reads these files when composing the release body. Stale documentation at the tagged commit = stale release page.
 
 ### Phase 6: Create and push the prerelease tag
 
@@ -153,7 +170,13 @@ If the Action fails, inspect the logs, fix the issue (usually a build regression
 
 ### Phase 8: Discord announcement (CHECKPOINT)
 
-Prepare a one-paragraph announcement for `#beta-testing` (channel ID `914498730001072149`). Template:
+Prepare a one-paragraph announcement for `#beta-testing` (channel ID `914498730001072149`). The Diff link points at the **latest public stable release** (`LATEST_PUBLIC`), not the previous beta — testers usually want to know what changed since the last shipping version. Get the value with:
+
+```bash
+LATEST_PUBLIC=$(gh release view --json tagName --jq '.tagName')
+```
+
+Template:
 
 ```
 Beta ${NEW_PRERELEASE} is up.
@@ -161,7 +184,8 @@ Beta ${NEW_PRERELEASE} is up.
 Version: ${SEMVER_CORE}-${NEW_PRERELEASE}
 What is new: <one or two sentences describing the changes in this beta>
 Download: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/${TAG}
-Diff vs ${PREV_TAG}: https://github.com/rvdbreemen/OTGW-firmware/compare/${PREV_TAG}...${TAG}
+Diff vs ${LATEST_PUBLIC} (current Latest stable): https://github.com/rvdbreemen/OTGW-firmware/compare/${LATEST_PUBLIC}...${TAG}
+Changelog: https://github.com/rvdbreemen/OTGW-firmware/blob/${TAG}/CHANGELOG.md
 
 Please flash and report findings here (good and bad).
 ```
@@ -194,3 +218,39 @@ The Action publishes the release on the SHA the tag points to, so an arbitrary c
 - **One checkpoint**: the Discord announcement in Phase 8. All other phases proceed automatically.
 - **Bump-check hook is your friend**: if the pre-commit hook blocks the firmware commit, you forgot to stage `version.h` or `data/version.hash`. Fix the staging, do NOT bypass with `OTGW_BUMP_HOOK_DISABLE=1`.
 - **CI build is a deliberate departure from /release**: full releases build locally (so the maintainer toolchain is canonical), betas build in CI (so the maintainer does not pay 5 minutes per cycle). The build script (`build.py`) is the same; only the host differs.
+
+## Known traps (lessons from past beta runs)
+
+Captured here so the same trap is never re-stepped. The `.github/workflows/beta-prerelease.yml` workflow already encodes the workarounds; this section documents *why* the workflow looks the way it does.
+
+### Trap 1: Immutable-releases policy locks the release at publish
+
+The repo has GitHub's "Enforce immutable releases" enabled. The naive flow (`gh release create $TAG --prerelease ...` then `gh release upload $TAG ...`) fails because the release is immutable from the moment of publish; the upload step returns `HTTP 422 Cannot upload assets to an immutable release`.
+
+**Workaround in workflow:** draft-first publication. `gh release create --draft --prerelease ... <all asset files>` attaches every asset in one atomic call while the release is still a draft (drafts are mutable). Only after that, `gh release edit --draft=false` flips it to published — immutability kicks in at that step, with all assets already attached.
+
+Do NOT try to recover by uploading later; it will not work.
+
+### Trap 2: A tag used by a deleted immutable release is reserved forever
+
+If a published immutable release is deleted, GitHub still permanently reserves the tag name. A new release attempt at the same tag fails with `tag_name was used by an immutable release` plus `Cannot create ref due to creations being restricted`.
+
+**Workaround:** bump the prerelease and retry under a new tag. There is no way to reclaim a tag name once an immutable release has held it, even after deletion. Document the skipped tag in the next commit message so testers can decode the gap.
+
+### Trap 3: GITHUB_TOKEN-created release events do not chain
+
+`release-assets.yml` listens on `release: published`. Events created by `secrets.GITHUB_TOKEN` (which is what this workflow uses) do NOT trigger downstream workflows. The old `beta-prerelease.yml` claimed `release-assets.yml` would chain in; it does not.
+
+**Workaround:** `beta-prerelease.yml` is now self-contained. It generates `SHA256SUMS`, builds the flash-bundle zip, and uploads `flash_otgw.sh` / `flash_otgw.bat` itself, instead of relying on `release-assets.yml`. The stable `/release` flow still uses `release-assets.yml` because the maintainer creates the stable release locally with a PAT, which does chain.
+
+### Trap 4: Diff link to the previous beta hides what testers care about
+
+Testers usually want to know what changed since the last *shipping* version, not since some intermediate beta most of them never installed.
+
+**Workaround in workflow:** the diff link in the release body points at the **latest PUBLIC stable release** (resolved via `gh release view --json tagName` — GitHub's "Latest" flag is by construction a non-prerelease). Fallback to the most recent dashless `v[0-9]*.[0-9]*.[0-9]*` tag if no release is flagged as Latest.
+
+### Trap 5: Release body that does not link the in-repo narrative
+
+The GitHub release body composed by CI is short by design (auto-generated). Testers reading it on mobile need a one-tap path to the README, CHANGELOG, and per-line release notes.
+
+**Workaround in workflow:** the release body links `README.md`, `CHANGELOG.md`, and `RELEASE_NOTES_<base>-beta.md` (auto-detected at the tagged commit). These must be up-to-date at the tagged commit — see Phase 2.5.
