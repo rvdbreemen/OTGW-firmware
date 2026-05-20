@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-20 12:23'
-updated_date: '2026-05-20 12:23'
+updated_date: '2026-05-20 12:25'
 labels: []
 dependencies: []
 ---
@@ -18,15 +18,17 @@ Follow-up to TASK-637. Three commits since v1.5.0-fix2 were not captured in the 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 CHANGELOG.md Unreleased Documentation section gains a bullet for the TASK-596 docs update (MQTT.md JIT semantics, /discovery/verify endpoint fix, ADR README index ADR-041/ADR-073 entries)
-- [ ] #2 CHANGELOG.md Unreleased Documentation section gains a bullet for the release housekeeping (RELEASE_NOTES_1.5.0 moved from repo root to docs/releases/; 1.3.3/1.3.4 archived to docs/releases/archive/)
-- [ ] #3 CHANGELOG.md Unreleased Documentation section gains a bullet for the docs-review findings 1-5 fix (#581) — stale ../ link paths corrected across BUILD.md, FLASH_GUIDE_NL.md, PIC_FIRMWARE_EN.md, browser-debug-console.md, DOCUMENTATION_LINKS_POLICY.md
-- [ ] #4 CHANGELOG.md Unreleased Changed or Added section reflects the link-check job added to .github/workflows/evaluate.yml (#581)
-- [ ] #5 CHANGELOG.md Unreleased Documentation section notes the dev README banner restore in #581 after a brief main-branch styling slip in #574
-- [ ] #6 README dev section What's new on dev mentions API/ADR/release-notes housekeeping in the Documentation block
-- [ ] #7 No em dashes in any new prose (use colons, periods, commas, parentheses)
-- [ ] #8 Existing CHANGELOG and README content remains intact; this update is purely additive (or surgically corrective on the slip narrative)
+- [x] #1 CHANGELOG.md Unreleased Documentation section gains a bullet for the TASK-596 docs update (MQTT.md JIT semantics, /discovery/verify endpoint fix, ADR README index ADR-041/ADR-073 entries)
+- [x] #2 CHANGELOG.md Unreleased Documentation section gains a bullet for the release housekeeping (RELEASE_NOTES_1.5.0 moved from repo root to docs/releases/; 1.3.3/1.3.4 archived to docs/releases/archive/)
+- [x] #3 CHANGELOG.md Unreleased Documentation section gains a bullet for the docs-review findings 1-5 fix (#581) — stale ../ link paths corrected across BUILD.md, FLASH_GUIDE_NL.md, PIC_FIRMWARE_EN.md, browser-debug-console.md, DOCUMENTATION_LINKS_POLICY.md
+- [x] #4 CHANGELOG.md Unreleased Changed or Added section reflects the link-check job added to .github/workflows/evaluate.yml (#581)
+- [x] #5 CHANGELOG.md Unreleased Documentation section notes the dev README banner restore in #581 after a brief main-branch styling slip in #574
+- [x] #6 README dev section What's new on dev mentions API/ADR/release-notes housekeeping in the Documentation block
+- [x] #7 No em dashes in any new prose (use colons, periods, commas, parentheses)
+- [x] #8 Existing CHANGELOG and README content remains intact; this update is purely additive (or surgically corrective on the slip narrative)
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
