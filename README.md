@@ -30,14 +30,16 @@ Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.6`). The list be
 - **`/beta-prerelease` skill + GitHub Action** for tag-driven (and, after #609, workflow-dispatch-driven) beta publishing, with draft-first asset attachment to satisfy GitHub's immutable-releases policy.
 
 **Code hygiene**
-- **Orphaned SAT subsystem removed from dev** (#586) and the dead `ENABLE_SAT` scaffolding cleaned out (#589). SAT lives only on `feature-dev-2.0.0-otgw32-esp32-sat-support` and is no longer carried as inert code on the 1.5.x/1.6.x line.
+- **Dead and orphaned code paths cleaned out of `dev`** (#586, #589): inactive subsystem code and its matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.
 
 **Documentation**
 - New integration guides for **openHAB** and **Domoticz**.
 - New Dutch beginner guide for cleaning up stale MQTT topics in MQTT Explorer.
 - PIC and ESP firmware guides split into EN/NL language variants, with PIC guide scope restored and ESP-flash docs routed to `FLASH_GUIDE.md`.
 - `MQTT_STALE_TOPICS_CLEANUP.md`: added a "Recovering missing HA entities" section distinguishing JIT progressive appearance from upgrade stale-topic cleanup.
-- Documentation link paths normalised; markdown link-validation guardrail added.
+- API and ADR docs refreshed mid-cycle: `docs/api/MQTT.md` documents the boot vs. JIT discovery split per ADR-073, `docs/api/README.md` corrects the `/discovery/verify` endpoint description, and `docs/adr/README.md` gains the ADR-041 (Superseded) and ADR-073 entries.
+- Release-notes housekeeping: `RELEASE_NOTES_1.5.0.md` moved out of the repo root into `docs/releases/`; older `1.3.3` and `1.3.4` notes archived under `docs/releases/archive/`.
+- Documentation link paths normalised; markdown link-validation guardrail introduced (#573) and its CI scope extended to `docs/guides/` and `docs/process/` in `.github/workflows/evaluate.yml` (#581) to keep documentation cross-links honest.
 
 Full per-commit detail lives in [`CHANGELOG.md`](CHANGELOG.md) under `## [Unreleased]`. Architectural rationale lives in the linked ADRs under [`docs/adr/`](docs/adr/).
 

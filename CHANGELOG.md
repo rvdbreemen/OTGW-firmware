@@ -6,8 +6,6 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 For full release notes per version, see the matching `RELEASE_NOTES_<version>.md` file. Current release notes live at the repository root; previous release notes are archived in [`docs/releases/`](docs/releases/).
 
-The separate ESP32 / SAT v2.0.0 exploration on `feature-dev-2.0.0-otgw32-esp32-sat-support` is tracked outside this changelog; it targets a different platform and lifecycle.
-
 ## [Unreleased]
 
 Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
@@ -17,7 +15,7 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - Standalone HA discovery topic wiper for cleaning stale retained discovery topics out of the broker (TASK-611, #587)
 - `/beta-prerelease` skill plus `.github/workflows/beta-prerelease.yml` GitHub Action for tag-driven beta publishing; draft-first release creation with all assets attached in one atomic call to satisfy GitHub's immutable-releases policy (#607)
 - `beta-prerelease.yml` `workflow_dispatch` now accepts a `ref` input and creates the tag at that ref if missing, enabling end-to-end beta publishing from the GitHub Actions UI without a local `git push` (#609)
-- Markdown link-validation guardrails for repository documentation (#573)
+- Markdown link-validation guardrails for repository documentation (#573); link-check scope extended to `docs/guides/` and `docs/process/` in `.github/workflows/evaluate.yml` (#581) so the `../` link-path rot caught manually during the documentation review is enforced in CI
 
 ### Changed
 - Pure JIT MQTT discovery: only non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC) are queued at boot; OT MsgID discovery configs publish on first MsgID reception, not on connect (ADR-073, supersedes ADR-041)
@@ -43,9 +41,12 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - Schelte firmware detail links added and PIC summaries aligned (#580)
 - Repository documentation link paths normalised (#573)
 - `CLAUDE.md`: documented `npx -y backlog.md` fallback when both the backlog MCP and the backlog CLI are unavailable (#571)
+- API and ADR documentation refreshed mid-cycle (TASK-596): `docs/api/MQTT.md` documents the boot vs. JIT split per ADR-073; `docs/api/README.md` corrects the `/discovery/verify` REST endpoint description; `docs/adr/README.md` gains the ADR-041 (Superseded) and ADR-073 (Accepted) index entries
+- Release-notes housekeeping (TASK-596): `RELEASE_NOTES_1.5.0.md` and `RELEASE_GITHUB_1.5.0.md` moved from the repo root into `docs/releases/`; the older `1.3.3` and `1.3.4` notes (both `RELEASE_NOTES_*` and `RELEASE_GITHUB_*`) archived under `docs/releases/archive/`
+- Documentation-review findings 1-5 fixed (#581): stale `../` link paths corrected across `docs/guides/BUILD.md`, `docs/guides/FLASH_GUIDE_NL.md`, `docs/guides/PIC_FIRMWARE_EN.md`, `docs/guides/browser-debug-console.md`, and `docs/process/DOCUMENTATION_LINKS_POLICY.md`. The dev README banner was also restored to its dev-line styling in the same PR after a brief main-branch-styling slip introduced upstream in #574
 
 ### Removed
-- Orphaned SAT subsystem excised from `dev` (#586) and the dead `ENABLE_SAT` scaffolding cleaned out of `OTGW-firmware.h` (#589). SAT is carried only on `feature-dev-2.0.0-otgw32-esp32-sat-support` going forward.
+- Dead and orphaned code paths cleaned out of `dev` (#586, #589): inactive subsystem code and the matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.
 - Accidentally committed root files removed; `.gitignore` tightened so they cannot return (TASK-635, #606)
 
 ## [1.5.0] - 2026-05-08
