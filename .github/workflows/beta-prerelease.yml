@@ -1,0 +1,151 @@
+name: Beta prerelease publish
+
+# Fires when a prerelease tag is pushed (any tag with a dash after the version,
+# e.g. v1.6.0-beta.4, v1.6.0-alpha.2, v1.6.0-rc.1). Full-release tags
+# (v1.5.0, no dash) are NOT matched; those are handled by the /release skill
+# and the release-assets.yml workflow chains in on release:published.
+#
+# Two jobs:
+#   1. Build firmware + filesystem binaries with build.py (same as a local build).
+#   2. Create a GitHub release marked prerelease:true, upload the binaries.
+#
+# After this Action publishes the release, the existing release-assets.yml
+# workflow fires on release:published and attaches SHA256SUMS, flash_otgw.sh,
+# flash_otgw.bat, and the OTGW-firmware-<version>-flash-bundle.zip.
+#
+# Manual re-run: workflow_dispatch with a tag input lets the maintainer re-run
+# without pushing a new tag (useful when the Action fails on a transient error
+# and the tag/release already exist).
+
+on:
+  push:
+    tags:
+      - 'v*-*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing prerelease tag to (re)publish (e.g. v1.6.0-beta.4)'
+        required: true
+        type: string
+
+jobs:
+  build-and-publish:
+    name: Build firmware and publish prerelease
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to create release and upload assets
+
+    steps:
+      - name: Resolve tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved tag: ${TAG}"
+
+      - name: Checkout code at tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0   # needed for previous-tag detection
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Build firmware and filesystem
+        run: |
+          python build.py
+          echo "--- build artefacts ---"
+          ls -la build/ || true
+
+      - name: Locate built binaries
+        id: binaries
+        run: |
+          FW=$(ls build/*.ino.bin 2>/dev/null | head -1)
+          FS=$(ls build/*.littlefs.bin 2>/dev/null | head -1)
+          if [ -z "${FW}" ]; then
+            echo "ERROR: firmware binary (*.ino.bin) not found in build/"
+            exit 1
+          fi
+          if [ -z "${FS}" ]; then
+            echo "ERROR: filesystem binary (*.littlefs.bin) not found in build/"
+            exit 1
+          fi
+          echo "firmware=${FW}" >> "${GITHUB_OUTPUT}"
+          echo "filesystem=${FS}" >> "${GITHUB_OUTPUT}"
+          echo "Found firmware:   ${FW}"
+          echo "Found filesystem: ${FS}"
+
+      - name: Detect previous prerelease tag (for diff link)
+        id: prev
+        run: |
+          CURRENT="${{ steps.tag.outputs.tag }}"
+          # All prerelease tags sorted newest-first, then strip the current one
+          PREV=$(git tag --list 'v*-*.*' --sort=-v:refname | grep -vx "${CURRENT}" | head -1)
+          echo "prev_tag=${PREV}" >> "${GITHUB_OUTPUT}"
+          echo "Previous prerelease tag: ${PREV:-<none>}"
+
+      - name: Compose release body
+        id: body
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          PREV="${{ steps.prev.outputs.prev_tag }}"
+          REPO="${{ github.repository }}"
+          {
+            echo "Beta prerelease ${TAG}."
+            echo ""
+            echo "Published automatically from a tag push on the \`dev\` branch."
+            echo ""
+            if [ -n "${PREV}" ]; then
+              echo "Diff vs previous prerelease: https://github.com/${REPO}/compare/${PREV}...${TAG}"
+            else
+              echo "No previous prerelease tag detected."
+            fi
+            echo ""
+            echo "Field testers: please flash and report findings in Discord \`#beta-testing\`."
+          } > release_body.md
+          echo "--- release body ---"
+          cat release_body.md
+
+      - name: Create or update GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists, updating body and ensuring prerelease flag."
+            gh release edit "${TAG}" \
+              --prerelease \
+              --title "${TAG}" \
+              --notes-file release_body.md
+          else
+            echo "Creating new prerelease ${TAG}."
+            gh release create "${TAG}" \
+              --prerelease \
+              --title "${TAG}" \
+              --notes-file release_body.md
+          fi
+
+      - name: Upload firmware and filesystem binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          gh release upload "${TAG}" \
+            "${{ steps.binaries.outputs.firmware }}" \
+            "${{ steps.binaries.outputs.filesystem }}" \
+            --clobber
+
+      - name: Verify assets attached
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          echo "--- assets on ${TAG} ---"
+          gh release view "${TAG}" --json assets --jq '.assets[].name'

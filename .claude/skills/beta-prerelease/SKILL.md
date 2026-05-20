@@ -1,0 +1,196 @@
+---
+name: beta-prerelease
+description: Publish an OTGW-firmware beta prerelease — bump _VERSION_PRERELEASE, push to dev, tag, and let CI build + publish the GitHub prerelease
+disable-model-invocation: true
+---
+
+# /beta-prerelease - OTGW-firmware Beta Prerelease Skill
+
+Publish a single beta build to the field testers in Discord `#beta-testing`. Lightweight, repeatable many times within one minor cycle. Parallels the `/release` skill but does NOT merge to main, does NOT touch README, and does NOT bump `_SEMVER_CORE`.
+
+## Usage
+
+```
+/beta-prerelease
+```
+
+No arguments. The skill auto-detects the current `_VERSION_PRERELEASE` in `src/OTGW-firmware/version.h` and increments it via `bin/bump-prerelease.sh`.
+
+## When to use this skill
+
+Run `/beta-prerelease` when:
+
+- A firmware change under `src/OTGW-firmware/**` or `src/libraries/**` is committed and ready for field testing.
+- The pre-commit hook (`.githooks/pre-commit`) has already enforced the in-commit bump, OR you are about to commit and want a clean orchestrated cycle.
+- The change is not yet ready for a full release to `main`. For a full release use `/release <version>` instead.
+
+Do NOT use this skill for:
+
+- Docs-only commits (`*.md`, `docs/**`, `backlog/**`, `.claude/**`, `scripts/**`). Those are exempt from the bump and do not need a prerelease tag.
+- Full releases to `main`. Use `/release <version>`.
+
+## How this differs from /release
+
+| Aspect | `/release` | `/beta-prerelease` |
+|---|---|---|
+| Target branch | `dev` then merge to `main` | `dev` only |
+| Bumps `_SEMVER_CORE` | yes (1.5.0 -> 1.6.0) | no |
+| Bumps `_VERSION_PRERELEASE` | sets to `beta.0` after release | increments by 1 |
+| Edits `README.md` | yes (What's New section) | no |
+| Generates `RELEASE_NOTES_*.md` | yes | no |
+| GitHub release marked prerelease | no | yes |
+| Discord channels | `#nederlandse-ondersteuning`, `#english-support` | `#beta-testing` |
+| Frequency | once per minor cycle | many times per minor cycle |
+| Mandatory checkpoints | 2 | 1 (Discord announcement) |
+
+## Writing style rules
+
+- **Never use em dashes** in any output: not in release notes, GitHub release body, Discord messages, commit messages, or conversation text. Use colons, periods, commas, or parentheses instead.
+- **All release notes and GitHub release messages MUST be in English** (international audience).
+- **No emojis** in release notes or Discord posts unless the existing format uses them.
+
+## Process
+
+Eight phases. Only **one mandatory checkpoint** (the Discord announcement at the end). All other phases proceed automatically unless something unexpected happens.
+
+### Phase 0: Prepare - clean state on dev
+
+1. **Ensure you are on `dev`**: `git checkout dev`
+2. **Verify clean state**:
+   - `git status` must show `nothing to commit, working tree clean` (or only the firmware change about to be bumped+committed)
+   - `git pull origin dev` to incorporate any remote changes
+3. **Detect the latest prerelease tag**:
+   ```bash
+   git fetch --tags
+   git tag --list 'v*-*.*' --sort=-v:refname | head -1
+   ```
+   Store this as `PREV_TAG` for the release body diff link in Phase 6.
+4. **Read current version**: `grep _VERSION_PRERELEASE src/OTGW-firmware/version.h` and store the current value (e.g. `beta.3`).
+
+### Phase 1: ADR validation
+
+Skip by default. Only stop and create an ADR if the staged firmware change introduces a new architectural pattern, a new dependency, or shifts an NFR (heap budget, MQTT topic shape, settings schema). Most beta cycles do not need this gate.
+
+**Conditional stop:** Only pause for user input if an ADR is actually needed.
+
+### Phase 2: Bump prerelease
+
+Run the bump helper from the project root:
+
+```bash
+bin/bump-prerelease.sh
+```
+
+The helper rewrites `src/OTGW-firmware/version.h` (`_VERSION_PRERELEASE`, `_SEMVER_FULL`, `_SEMVER_NOBUILD`, `_VERSION`) and `src/OTGW-firmware/data/version.hash`. It prints the transition (e.g. `beta.3 -> beta.4`). Store the new value as `NEW_PRERELEASE`.
+
+The helper does NOT git-add. You stage the files yourself in Phase 5.
+
+### Phase 3: Build verification (mandatory gate)
+
+```bash
+python build.py --firmware
+```
+
+Must exit 0. If the build fails, fix the issue, re-run the bump if needed, and retry. Do NOT proceed to commit or push on a broken build.
+
+### Phase 4: Evaluator (mandatory gate)
+
+```bash
+python evaluate.py --quick
+```
+
+Must show no new failures. If new failures appear, fix them (or, if pre-existing baseline failures unrelated to this change, document that in the commit message). Do NOT proceed on a regressed evaluator.
+
+### Phase 5: Commit and push to dev
+
+1. **Stage** the firmware change plus the version bump:
+   ```bash
+   git add src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash <firmware-files>
+   ```
+2. **Commit** with a conventional message that includes the new prerelease tag:
+   ```bash
+   git commit -m "chore(release): ${NEW_PRERELEASE}
+
+   <one-line summary of what is in this beta>"
+   ```
+3. **Push** to dev:
+   ```bash
+   git push origin dev
+   ```
+
+If the pre-commit hook blocks (bump-check fails because version.h was not staged), re-stage and retry. Do NOT use `OTGW_BUMP_HOOK_DISABLE=1` here: the whole point of this skill is to bump+commit together.
+
+### Phase 6: Create and push the prerelease tag
+
+Construct the tag from `_SEMVER_CORE` and the new prerelease label:
+
+```bash
+SEMVER_CORE=$(grep '_SEMVER_CORE ' src/OTGW-firmware/version.h | awk -F'"' '{print $2}')
+TAG="v${SEMVER_CORE}-${NEW_PRERELEASE}"
+# example: v1.6.0-beta.4
+```
+
+Create an annotated tag and push it:
+
+```bash
+git tag -a "${TAG}" -m "Beta prerelease ${NEW_PRERELEASE}"
+git push origin "${TAG}"
+```
+
+The push fires `.github/workflows/beta-prerelease.yml`. The Action builds firmware + filesystem binaries, creates a GitHub release with `prerelease: true`, and uploads the `.ino.bin` and `.littlefs.bin` as assets. The existing `release-assets.yml` workflow then chains in on `release: published` to attach SHA256SUMS, `flash_otgw.sh`, `flash_otgw.bat`, and the flash-bundle zip.
+
+### Phase 7: Wait for the GitHub Action
+
+1. Open the Actions tab: `https://github.com/rvdbreemen/OTGW-firmware/actions`
+2. Watch the `Beta prerelease publish` workflow run on the new tag.
+3. When it succeeds, verify the release exists:
+   ```bash
+   gh release view "${TAG}" --json tagName,isPrerelease,assets --jq '{tag: .tagName, prerelease: .isPrerelease, assets: [.assets[].name]}'
+   ```
+   Expected assets: `*.ino.bin`, `*.littlefs.bin`, `SHA256SUMS`, `flash_otgw.sh`, `flash_otgw.bat`, `OTGW-firmware-*-flash-bundle.zip`.
+
+If the Action fails, inspect the logs, fix the issue (usually a build regression or a missing secret), and either re-run via `workflow_dispatch` or push a new tag.
+
+### Phase 8: Discord announcement (CHECKPOINT)
+
+Prepare a one-paragraph announcement for `#beta-testing` (channel ID `914498730001072149`). Template:
+
+```
+Beta ${NEW_PRERELEASE} is up.
+
+Version: ${SEMVER_CORE}-${NEW_PRERELEASE}
+What is new: <one or two sentences describing the changes in this beta>
+Download: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/${TAG}
+Diff vs ${PREV_TAG}: https://github.com/rvdbreemen/OTGW-firmware/compare/${PREV_TAG}...${TAG}
+
+Please flash and report findings here (good and bad).
+```
+
+**CHECKPOINT: Show the announcement to the user before sending.** After approval, the user copies the text into `#beta-testing` (Discord MCP integration is optional and depends on session setup; default flow is copy-paste).
+
+## Dry-run (testing the workflow without publishing)
+
+To verify `beta-prerelease.yml` fires correctly without affecting field testers:
+
+1. Branch off `dev`: `git checkout -b test/beta-prerelease-dryrun`
+2. Push a throwaway tag: `git tag -a v0.0.0-beta.dryrun -m "dryrun" && git push origin v0.0.0-beta.dryrun`
+3. Watch the Action run in the Actions tab.
+4. After it publishes, delete the release and the tag:
+   ```bash
+   gh release delete v0.0.0-beta.dryrun --yes
+   git push --delete origin v0.0.0-beta.dryrun
+   git tag -d v0.0.0-beta.dryrun
+   ```
+5. Delete the throwaway branch.
+
+The Action publishes the release on the SHA the tag points to, so an arbitrary commit on a throwaway branch is fine for the dry-run.
+
+## Important rules
+
+- **Never use em dashes** in any generated text. Use colons, periods, commas, or parentheses.
+- **Always push to remote after every commit**: keep local and remote in sync.
+- **Never force-push to dev**: standing permission only covers normal pushes.
+- **Build and evaluator gates are mandatory**: do not push a tag if either gate is red.
+- **One checkpoint**: the Discord announcement in Phase 8. All other phases proceed automatically.
+- **Bump-check hook is your friend**: if the pre-commit hook blocks the firmware commit, you forgot to stage `version.h` or `data/version.hash`. Fix the staging, do NOT bypass with `OTGW_BUMP_HOOK_DISABLE=1`.
+- **CI build is a deliberate departure from /release**: full releases build locally (so the maintainer toolchain is canonical), betas build in CI (so the maintainer does not pay 5 minutes per cycle). The build script (`build.py`) is the same; only the host differs.
