@@ -3,11 +3,11 @@ id: TASK-635
 title: >-
   Remove accidentally committed root files (logfile.txt, .codex) and tighten
   .gitignore
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-20 09:30'
-updated_date: '2026-05-20 09:31'
+updated_date: '2026-05-20 09:32'
 labels: []
 dependencies: []
 priority: low
@@ -28,11 +28,11 @@ Why not history-rewrite: removing from the active tree is the KISS option. Histo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 logfile.txt removed from working tree (git rm)
-- [ ] #2 .codex removed from working tree (git rm)
-- [ ] #3 .gitignore extended with /logfile.* and /.codex root-anchored patterns to prevent recurrence
-- [ ] #4 Repository builds and existing CI still pass (docs/tooling-only path; no firmware source touched, no version bump required per project policy)
-- [ ] #5 Commit pushed to development branch and a draft PR opened against dev
+- [x] #1 logfile.txt removed from working tree (git rm)
+- [x] #2 .codex removed from working tree (git rm)
+- [x] #3 .gitignore extended with /logfile.* and /.codex root-anchored patterns to prevent recurrence
+- [x] #4 Repository builds and existing CI still pass (docs/tooling-only path; no firmware source touched, no version bump required per project policy)
+- [x] #5 Commit pushed to development branch and a draft PR opened against dev
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,20 @@ Why not history-rewrite: removing from the active tree is the KISS option. Histo
 4. Push branch and open draft PR against dev
 5. Check ACs, add final summary, mark Done
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Removed two accidentally committed root files and added gitignore rules to prevent recurrence.
+
+Changes:
+- git rm logfile.txt (1.6 MB serial-log dump from f863aebe).
+- git rm .codex (empty stub from b0515f6a).
+- .gitignore extended with /logfile.* and /.codex root-anchored patterns.
+
+Docs/tooling-only path per project policy: no firmware source touched, no version bump, build/evaluator gates not required.
+
+History was deliberately not rewritten — the file is a non-secret debug log and a rewrite would invalidate every contributor checkout. The historical blob is tolerated; preventing future ones is the goal.
+
+Pushed: origin/claude/review-commits-refactor-plan-Hho3Q @ 7b68556d. Draft PR #606 opened against dev.
+<!-- SECTION:FINAL_SUMMARY:END -->
