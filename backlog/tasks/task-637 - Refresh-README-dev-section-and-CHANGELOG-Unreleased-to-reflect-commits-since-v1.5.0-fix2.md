@@ -3,9 +3,11 @@ id: TASK-637
 title: >-
   Refresh README dev section and CHANGELOG Unreleased to reflect commits since
   v1.5.0-fix2
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-20 11:25'
+updated_date: '2026-05-20 11:25'
 labels: []
 dependencies: []
 ---
@@ -24,3 +26,13 @@ Audit the 50+ commits between tag v1.5.0-fix2 (current latest public stable) and
 - [ ] #4 No em dashes in any new prose (uses colons, periods, commas, or parentheses)
 - [ ] #5 Changes commit to claude/create-beta-prerelease-em9Kh and a draft PR is opened against dev
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Re-read README dev banner / What's New / Latest stable sections.
+2. Re-read CHANGELOG Unreleased section.
+3. Insert new README section What's new on dev (since v1.5.0-fix2) between the dev banner and the v1.5.0 anchor.
+4. Append missing bullets to CHANGELOG Unreleased grouped by Added / Changed / Fixed / Documentation / Removed.
+5. Commit on claude branch and open draft PR against dev.
+<!-- SECTION:PLAN:END -->
