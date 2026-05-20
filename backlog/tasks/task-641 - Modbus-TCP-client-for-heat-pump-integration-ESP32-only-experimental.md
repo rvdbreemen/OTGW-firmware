@@ -4,6 +4,7 @@ title: 'Modbus TCP client for heat pump integration (ESP32-only, experimental)'
 status: To Do
 assignee: []
 created_date: '2026-05-20 18:31'
+updated_date: '2026-05-20 21:33'
 labels:
   - feature
   - esp32-only
@@ -36,6 +37,8 @@ The strategic intent is to acknowledge the heat-pump direction without committin
 This task does NOT wire Modbus into SAT's control loop. SAT continues to operate purely on OpenTherm and external sensor inputs. A future task may introduce Modbus-derived inputs into SAT, but that decision is deferred until this base feature is mature.
 
 Pairs with TASK-640 (PV-surplus boost): typical user flow becomes "P1 meter → HA → MQTT publishes pv_surplus_w to SAT → SAT boosts target → heat pump runs harder on PV", while OTGW separately polls the heat pump via Modbus for visibility and exposes a "DHW setpoint boost on surplus" write that HA can trigger.
+
+Related: TASK-640 (narrative dependency, not blocking — feature is architecturally independent from PV-surplus boost).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -62,4 +65,17 @@ Pairs with TASK-640 (PV-surplus boost): typical user flow becomes "P1 meter → 
 - [ ] #20 Default behavior: with bEnabled = false (default), Modbus task not started, no FreeRTOS task, no LittleFS file read, no MQTT topics published. Zero runtime cost when disabled
 - [ ] #21 Resource budget when enabled: total RAM footprint (task stack + register state + connection buffer) < 12KB on ESP32. Flash impact < 50KB. Validate before merge
 - [ ] #22 Safety: no register write occurs without explicit user action (MQTT publish, REST call, WebUI button). No autonomous writes from firmware logic. SAT may NOT write to Modbus registers in this task (deferred to future task)
+- [ ] #23 JSON schema versioning: modbus.json MUST contain schema_version: 1 at top level. Unknown future schema versions -> subsystem disabled at runtime, modbus/status = config_error, clear error in debug log. No crash, no boot loop
+- [ ] #24 JSON config size limit: total modbus.json file size capped at 8KB. Files exceeding limit -> modbus/status = config_error, subsystem stays disabled. Enforced at load time before parsing
+- [ ] #25 Schema bitmask support: optional per-register fields 'bitmask' (uint32, applied as AND after scale/offset) and 'bit' (uint8, 0-31, single-bit extraction). Compatible only with integer types (u16/s16/u32/s32) and bool. Invalid combinations (bitmask on float/string) -> config_error. Enables compressor_on/defrost/fault flag extraction from packed status registers
+- [ ] #26 Schema string type: new register type 'string' with mandatory 'length' field (1-32 bytes). Decoded as ASCII (non-printable bytes replaced with '?'), published as MQTT string value. Mutually exclusive with bitmask/bit/scale/offset (those fields ignored when type=string)
+- [ ] #27 Schema enum value-mapping: optional per-register 'enum' field as JSON object (e.g. {"0":"off","1":"heating","2":"cooling","3":"dhw"}). When present, MQTT publishes the mapped string value instead of the numeric value; unmapped values published as numeric. HA discovery declares the entity as sensor with options list when enum is present
+- [ ] #28 Schema state_class for HA discovery: new optional per-register field 'state_class' (none/measurement/total/total_increasing, default measurement). Passed through to HA auto-discovery payload so kWh counters appear correctly in the HA Energy dashboard. Validated against the four allowed values at config load time
+- [ ] #29 Modbus protocol exception handling: protocol-level exceptions (codes 0x01-0x0B: illegal function, illegal data address, illegal data value, slave device failure, acknowledge, slave busy, NAK, memory parity error, gateway path unavailable, gateway target device failed to respond) are distinguished from transport failures (connection timeout, TCP RST, DNS failure). Protocol exceptions do NOT increment consecutive_failures (only transport failures do), and surface as per-register diagnostics rather than subsystem-level failure
+- [ ] #30 Per-register diagnostic topics: modbus/<register_name>/last_success_ms (ms since last successful read, uint32) and modbus/<register_name>/last_error (last Modbus exception name like illegal_data_address, or 'transport' for connection failure, or 'none' when register has been read successfully since boot). Updated after every poll attempt
+- [ ] #31 Atomic multi-register reads: u32/s32/float register types MUST be read in a single Modbus frame (read of 2 consecutive registers in one request). The polling batcher may NEVER split a multi-register value across two separate read requests. Document this constraint in the batching code with a comment so future refactors don't break it
+- [ ] #32 Read-back after write: after a successful write to a writable register, the firmware MUST trigger a single-register re-poll of that register within 2 seconds (independent of the regular poll cycle). The re-poll result is published normally via modbusPublishMQTT(), ensuring MQTT/HA reflect the new value without waiting for the next heartbeat
+- [ ] #33 Write rate-limiting: minimum 500 ms between any two writes on the Modbus bus, AND minimum 1000 ms between two writes to the same register. Excess writes are rejected immediately with modbus/<register_name>/write_result = throttled (no Modbus traffic generated). Prevents accidental DoS of the heat pump from a misbehaving HA automation
+- [ ] #34 First-poll burst publish: on subsystem (re)start (boot, re-enable, register map reload), the first successful poll publishes ALL register values via modbusPublishMQTT() regardless of the publish-interval gating. Prevents HA from showing 'unknown' for up to one heartbeat interval after boot
+- [ ] #35 Discovery orphan cleanup on register map reload: when a register is removed from modbus.json and the map is reloaded, the previously published retained HA discovery topics for that register MUST be cleared (empty retained payload), AND retained value topics under <topPrefix>/value/<nodeId>/modbus/<removed_name> MUST be cleared. Follows ADR-093 orphan cleanup policy. Verify HA entity disappears within one discovery cycle
 <!-- AC:END -->
