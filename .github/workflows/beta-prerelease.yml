@@ -196,8 +196,8 @@ jobs:
             echo ""
             echo "### What is in this build"
             echo ""
-            echo "- [\`README.md\`](https://github.com/${REPO}/blob/dev/README.md) — landing page and current dev-line status."
-            echo "- [\`CHANGELOG.md\`](https://github.com/${REPO}/blob/dev/CHANGELOG.md) — running change log for the next release."
+            echo "- [\`README.md\`](https://github.com/${REPO}/blob/${TAG}/README.md) — landing page and current dev-line status."
+            echo "- [\`CHANGELOG.md\`](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) — running change log for the next release."
             if [ -n "${NOTES_LINK}" ]; then
               echo "- [Release notes for this line](${NOTES_LINK})."
             fi
