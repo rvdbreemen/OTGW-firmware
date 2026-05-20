@@ -3,9 +3,11 @@ id: TASK-635
 title: >-
   Remove accidentally committed root files (logfile.txt, .codex) and tighten
   .gitignore
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-20 09:30'
+updated_date: '2026-05-20 09:31'
 labels: []
 dependencies: []
 priority: low
@@ -32,3 +34,13 @@ Why not history-rewrite: removing from the active tree is the KISS option. Histo
 - [ ] #4 Repository builds and existing CI still pass (docs/tooling-only path; no firmware source touched, no version bump required per project policy)
 - [ ] #5 Commit pushed to development branch and a draft PR opened against dev
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. git rm logfile.txt .codex (working-tree removal; history retained)
+2. Extend .gitignore with /logfile.* and /.codex root-anchored patterns
+3. Commit on current branch (claude/review-commits-refactor-plan-Hho3Q) — docs/tooling-only path, no version bump
+4. Push branch and open draft PR against dev
+5. Check ACs, add final summary, mark Done
+<!-- SECTION:PLAN:END -->
