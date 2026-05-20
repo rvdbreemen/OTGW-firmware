@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-20 09:43'
-updated_date: '2026-05-20 09:43'
+updated_date: '2026-05-20 09:45'
 labels:
   - release
   - tooling
@@ -38,3 +38,73 @@ Develop a complete beta-prerelease workflow that parallels the existing /release
 - [ ] #12 python evaluate.py --quick shows no new failures
 - [ ] #13 Final-summary section of the task contains a PR-style summary suitable for the GitHub PR body
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+## Plan — TASK-636 beta-prerelease workflow
+
+### 1. Artefacten (twee bestanden + één optionele update)
+
+**A) `.claude/skills/beta-prerelease/SKILL.md`** — slash-command skill, parallel aan `/release`
+- Frontmatter: `name: beta-prerelease`, `disable-model-invocation: true` (gebruiker triggert handmatig, niet model)
+- Writing-style block: geen em dashes, English-only release notes, geen emojis
+- Phases (analoog aan /release maar lichter):
+  - Phase 0 - Prepare: `git checkout dev`, clean state check, `git pull`, detect latest prerelease tag via `git tag --list 'v*-beta.*' --sort=-v:refname | head -1`
+  - Phase 1 - ADR validation: skip-by-default met disclaimer; alleen pauzeren als changes ADR-impact hebben
+  - Phase 2 - Bump: run `bin/bump-prerelease.sh`, capture old->new (bv. `beta.3 -> beta.4`)
+  - Phase 3 - Build verify: `python build.py --firmware` exit 0 (mandatory gate)
+  - Phase 4 - Evaluator: `python evaluate.py --quick` (mandatory gate)
+  - Phase 5 - Commit + push: stage firmware change + `version.h` + `data/version.hash`, commit met conventional message `chore(release): beta.N`, push `origin/dev`
+  - Phase 6 - Tag: construeer `v${SEMVER_CORE}-${PRERELEASE}` (bv. `v1.6.0-beta.4`), `git tag -a` met message, `git push origin <tag>`
+  - Phase 7 - GitHub Action wachten: hint dat workflow op tag-push fired; URL naar Actions tab
+  - Phase 8 - Discord aankondiging: template-block met versie, een-paragraaf summary, link naar release. Skill biedt de tekst aan; user paste'd of (als discord-mcp tools beschikbaar) Claude post via MCP
+- Differentiatie van /release expliciet gedocumenteerd: geen main-merge, geen README-edit, geen `_SEMVER_CORE` bump, herhaalbaar binnen één minor cycle
+- Dry-run sectie: hoe te testen zonder publicatie (test tag `v0.0.0-beta.test` pushen, Action runnen, release deleten)
+
+**B) `.github/workflows/beta-prerelease.yml`** — GitHub Action, fires op prerelease tag push
+- Trigger: `on.push.tags: ['v*-*.*']` (matcht alle prereleases via dash; full releases `v1.5.0` zonder dash matchen niet) + `workflow_dispatch` voor manuele re-run
+- Job `build-and-publish`:
+  1. checkout
+  2. setup-python@v5 met 3.x
+  3. `python build.py` (firmware + filesystem) — build.py installeert arduino-cli auto
+  4. Locate binaries in `build/` (pattern `*.ino.bin` en `*.littlefs.bin` per `config.py:BUILD_DIR`)
+  5. `gh release create` met `--prerelease`, tag van push event, title = tag, body = link naar dev branch diff sinds previous prerelease tag
+  6. `gh release upload` voor beide .bin files
+- Chain met bestaande `release-assets.yml`: die fired op `release: published`, dus wanneer onze Action de prerelease publiceert pikt release-assets.yml hem op en attached SHA256SUMS + flash_otgw.sh/.bat + flash-bundle zip (geen wijziging nodig in release-assets.yml; getest mentaal door de trigger spec te lezen)
+- Permissions: `contents: write` om release te creeren
+
+**C) Geen wijzigingen aan `release-assets.yml`** — die werkt al voor elke published release (incl. prereleases). Wordt alleen geverifieerd.
+
+### 2. Wat NIET in scope is
+- Geen automatische Discord-post via GitHub Action webhook in deze iteratie. Reden: vereist `DISCORD_WEBHOOK_URL` secret-setup buiten code; toegevoegd als follow-up task indien gewenst.
+- Geen wijziging aan `bin/bump-prerelease.sh` — die werkt prima.
+- Geen wijziging aan CLAUDE.md versioning-policy sectie — die blijft de canonical reference.
+- Geen ADR. Dit is build/CI tooling binnen een bestaande pattern (parallel aan `/release`), valt onder "minor features within existing patterns" per CLAUDE.md ADR-richtlijn. Open voor discussie als je vindt dat het wel een ADR verdient.
+
+### 3. Cross-worktree impact (per CLAUDE.md rule)
+- 2.0.0 worktree heeft eigen version.h en eigen beta cycle. Dezelfde skill+workflow kan analoog werken op de feature-dev-2.0.0 branch. Maar:
+  - Deze remote container heeft maar 1 worktree (geverifieerd: alleen `dev`-tree zichtbaar)
+  - Cross-worktree port wordt apart taak (`feat-2.0.0: port TASK-636`) zodra de dev-implementatie merged is
+  - Niet blocking voor deze task
+
+### 4. Verification gates (matchen ACs)
+1. Skill file bestaat met juiste frontmatter en alle 8 phases
+2. GitHub Action YAML is geldig (`yamllint` of dry-parse)
+3. `python build.py --firmware` exit 0 (geen firmware-impact verwacht, maar gate geldt altijd)
+4. `python evaluate.py --quick` geen nieuwe failures
+5. Manuele review: skill style block matcht /release conventie
+
+### 5. Branch + push strategie
+- Werk op huidige branch `claude/beta-prerelease-workflow-CsHd8`
+- Commits per artefact: (1) skill, (2) workflow, optioneel (3) docs/cleanup
+- Push naar origin met `-u` op die branch
+- Draft PR aanmaken na push (per repo-instructie)
+- Geen merge naar dev tot je expliciet akkoord geeft
+
+### Vragen voor de gebruiker (graag bevestigen of corrigeren)
+- (a) Tag-glob `v*-*.*` OK, of voorkeur voor expliciet `v*-beta.*` + `v*-alpha.*`?
+- (b) Discord-post in deze task alleen als template (manueel) of toch ook automatisch via webhook (vereist DISCORD_WEBHOOK_URL secret setup buiten code)?
+- (c) Akkoord om ADR over te slaan?
+- (d) Akkoord om de 2.0.0-port als aparte follow-up task te plannen?
+<!-- SECTION:PLAN:END -->
