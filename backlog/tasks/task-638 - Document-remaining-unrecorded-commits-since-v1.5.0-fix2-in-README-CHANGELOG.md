@@ -27,3 +27,9 @@ Follow-up to TASK-637. Three commits since v1.5.0-fix2 were not captured in the 
 - [ ] #7 No em dashes in any new prose (use colons, periods, commas, parentheses)
 - [ ] #8 Existing CHANGELOG and README content remains intact; this update is purely additive (or surgically corrective on the slip narrative)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Identify commits not yet reflected in README/CHANGELOG: PR #581, PR #574, TASK-596 (51356205).\n2. Add three bullets to CHANGELOG Unreleased Documentation: TASK-596 docs+API+ADR update; release-notes housekeeping move/archive; #581 docs-review findings + dev banner restore.\n3. Add a bullet under Unreleased Changed or Added for the link-check CI workflow added in #581.\n4. Add API/ADR/release-notes housekeeping mention to the README What's new on dev Documentation block.\n5. Verify no em dashes in new prose; commit and push to claude/document-changelog-changes-3JN5C; PR remains open.
+<!-- SECTION:PLAN:END -->
