@@ -20,7 +20,7 @@ The bullets below summarise the user-visible changes that have landed on `dev` s
 - **Flash scripts hardened**: `flash_otgw.sh` / `flash_otgw.bat` now mirror spec parity, verify SHA256 integrity, and pick the binary that matches the requested version. The `.bat` variant detects COM ports through the Windows registry and auto-downloads binaries when not found locally.
 - **`build.py` auto-initialises missing git submodules** so a fresh clone or stale checkout builds without manual `git submodule update`.
 - **`evaluate.py`** false-positive and stale checks fixed; the gate is now meaningful again.
-- **`/beta-prerelease` skill + GitHub Action** for tag-driven (and, after the May 2026 workflow refresh, workflow-dispatch-driven) beta publishing, with draft-first asset attachment to satisfy GitHub's immutable-releases policy.
+- **`/beta-prerelease` skill + GitHub Action** for tag-driven (and, after the May 2026 workflow refresh, workflow-dispatch-driven) beta publishing, with draft-first asset attachment to satisfy GitHub's immutable-releases policy. The release body now inlines a "What's new since the last public release" digest sourced from this file's content above the `<!-- digest:end -->` sentinel, and the skill gates the README + CHANGELOG staleness check before the version bump so a stale narrative cannot ride out under a fresh tag.
 
 **Code hygiene**
 - **Dead and orphaned code paths cleaned out of `dev`**: inactive subsystem code and its matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.

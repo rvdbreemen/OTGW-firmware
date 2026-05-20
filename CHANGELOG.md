@@ -15,6 +15,7 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - Standalone HA discovery topic wiper for cleaning stale retained discovery topics out of the broker (TASK-611, #587)
 - `/beta-prerelease` skill plus `.github/workflows/beta-prerelease.yml` GitHub Action for tag-driven beta publishing; draft-first release creation with all assets attached in one atomic call to satisfy GitHub's immutable-releases policy (#607)
 - `beta-prerelease.yml` `workflow_dispatch` now accepts a `ref` input and creates the tag at that ref if missing, enabling end-to-end beta publishing from the GitHub Actions UI without a local `git push` (#609)
+- `beta-prerelease.yml` release body now inlines a "What's new since the last public release" digest sourced from `RELEASE_NOTES_<base>-beta.md` above a `<!-- digest:end -->` sentinel; the `/beta-prerelease` skill restructured so README + CHANGELOG staleness check runs as Phase 1 (pre-bump) instead of Phase 2.5 (post-bump), preventing stale narrative from locking onto an immutable tagged release; new `RELEASE_NOTES_1.6.0-beta.md` at repo root carries the per-line narrative (TASK-639, #612)
 - Markdown link-validation guardrails for repository documentation (#573); link-check scope extended to `docs/guides/` and `docs/process/` in `.github/workflows/evaluate.yml` (#581) so the `../` link-path rot caught manually during the documentation review is enforced in CI
 
 ### Changed
