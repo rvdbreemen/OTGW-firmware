@@ -10,20 +10,43 @@ The separate ESP32 / SAT v2.0.0 exploration on `feature-dev-2.0.0-otgw32-esp32-s
 
 ## [Unreleased]
 
+Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
+
+### Added
+- HA discovery: PIC-control entities exposed as `button` and `select` under pseudo-ID 251 (TASK-PR#576, #596)
+- Standalone HA discovery topic wiper for cleaning stale retained discovery topics out of the broker (TASK-611, #587)
+- `/beta-prerelease` skill plus `.github/workflows/beta-prerelease.yml` GitHub Action for tag-driven beta publishing; draft-first release creation with all assets attached in one atomic call to satisfy GitHub's immutable-releases policy (#607)
+- `beta-prerelease.yml` `workflow_dispatch` now accepts a `ref` input and creates the tag at that ref if missing, enabling end-to-end beta publishing from the GitHub Actions UI without a local `git push` (#609)
+- Markdown link-validation guardrails for repository documentation (#573)
+
 ### Changed
 - Pure JIT MQTT discovery: only non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC) are queued at boot; OT MsgID discovery configs publish on first MsgID reception, not on connect (ADR-073, supersedes ADR-041)
+- Dev version line bumped to `1.6.0-beta.N` (was `1.5.x-beta.N`) (#601)
 
 ### Fixed
 - HA `DHW Control`, `Thermostat`, and all sensor entities flapping `unavailable` (regression since 1.5.0/TASK-538): HA entity availability (`avty_t`) now reflects only the ESP↔MQTT link (birth/LWT) instead of OpenTherm-bus liveness. OT-bus liveness remains on the dedicated `otgw_connected` sensor. **Contract change:** consumers that read the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to the `otgw_connected` sensor (ADR-074, TASK-607)
+- MQTT proxy-answer (no-B) routing: MsgIDs without a boiler response now route to the correct worldview topic instead of going silent; root cause behind PR #565 (ADR-075, #599)
+- MsgID 0 Status canonical publish gated on boiler-side worldview so the canonical topic stops flapping on thermostat-only frames (TASK-633, #604)
+- Silently-dropped MQTT set-commands now surface in the default debug stream instead of being swallowed (#602)
 - JIT MQTT discovery could stall: the just-in-time trigger enqueued any OT MsgID with a valid value, including IDs with no HA sensor/binsensor config; `doAutoConfigureMsgid()` fails for those and the drip loop retains the pending bit, so the per-tick scan re-picked the same phantom ID forever and never published the real entities until the operator pressed `F`. The JIT trigger now applies the same `hasConfig` filter as the force path so both enqueue an identical ID set (ADR-073, TASK-601)
-- `sat/climate_attributes` now wired as `json_attributes_topic` on the HA thermostat entity; SAT PID/curve attributes appear as `extra_state_attributes` (TASK-589)
+- FSexplorer **Update Firmware** button hidden on touch-capable desktops: the touch-class CSS media query no longer suppresses the upload control (GitHub #575, #598)
+- `flash_otgw.sh` / `flash_otgw.bat` hardened: spec parity between the two scripts, SHA256 integrity verification, version-aware binary selection (#570)
 - `flash_otgw.bat` COM port detection via registry; PS1 generation; auto-download of binaries when not found locally
+- `build.py` auto-initialises missing git submodules so a fresh clone or stale checkout builds without manual `git submodule update` (#594)
+- `evaluate.py` false-positive and stale-check fixes; CI gate is now meaningful again (#592)
 
 ### Documentation
-- `docs/guides/MQTT_STALE_TOPICS_CLEANUP.md`: added a "Recovering missing HA entities" section distinguishing the just-in-time progressive-appearance behaviour and PIC-only-reset semantics from the upgrade stale-topic cleanup, with escalating recovery steps (wait → force re-announce → clear broker + reboot)
+- `docs/guides/MQTT_STALE_TOPICS_CLEANUP.md`: added a "Recovering missing HA entities" section distinguishing the just-in-time progressive-appearance behaviour and PIC-only-reset semantics from the upgrade stale-topic cleanup, with escalating recovery steps (wait, force re-announce, clear broker + reboot)
+- New integration guides for openHAB and Domoticz (#590)
+- New Dutch beginner guide for cleaning up stale MQTT topics in MQTT Explorer
+- PIC and ESP firmware guides split into EN/NL language variants (#578); PIC guide scope restored and ESP-flash docs routed to `FLASH_GUIDE.md` (#579)
+- Schelte firmware detail links added and PIC summaries aligned (#580)
+- Repository documentation link paths normalised (#573)
+- `CLAUDE.md`: documented `npx -y backlog.md` fallback when both the backlog MCP and the backlog CLI are unavailable (#571)
 
 ### Removed
-- Orphaned `sat/pressure_health_attr` JSON publish; pressure data is already available via flat scalar topics `sat/pressure`, `sat/pressure_drop_rate`, and `sat/pressure_alarm` (TASK-590)
+- Orphaned SAT subsystem excised from `dev` (#586) and the dead `ENABLE_SAT` scaffolding cleaned out of `OTGW-firmware.h` (#589). SAT is carried only on `feature-dev-2.0.0-otgw32-esp32-sat-support` going forward.
+- Accidentally committed root files removed; `.gitignore` tightened so they cannot return (TASK-635, #606)
 
 ## [1.5.0] - 2026-05-08
 

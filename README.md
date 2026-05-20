@@ -1,11 +1,45 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
-> ⚠️ **This is the development branch (`dev`)** — the 1.5.x maintenance line, tracking the next `1.5.x` release.
+> ⚠️ **This is the development branch (`dev`)**: the 1.5.x maintenance line, currently tracking the next stable release as **1.6.0** prereleases (`1.6.0-beta.N`).
 > For the current stable release, see the [`main` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/main) or the [v1.5.0 release](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0).
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
+
+## What's new on dev (since v1.5.0-fix2)
+
+Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.6`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
+
+**MQTT and Home Assistant discovery**
+- **HA availability now reflects the MQTT link, not the OpenTherm bus** (ADR-074, regression fix). Entities like `DHW Control` and `Thermostat` no longer flap `unavailable` when the boiler stops talking; OT-bus liveness lives on the dedicated `otgw_connected` sensor. **Contract change:** consumers reading the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to `otgw_connected`.
+- **Pure JIT MQTT discovery** (ADR-073, supersedes ADR-041): only non-OT pseudo-IDs queue at boot; OT MsgID discovery configs publish on first MsgID reception. Stalled-discovery edge case fixed by aligning the JIT trigger with the force-path `hasConfig` filter.
+- **Proxy-answer (no-B) routing fix** (ADR-075): MsgIDs without a boiler response now route to the correct worldview topic instead of going silent.
+- **MsgID 0 Status canonical publish gated on boiler-side worldview** so the canonical topic no longer flaps on thermostat-only frames.
+- **HA PIC-control entities**: new `button` and `select` discovery configs under pseudo-ID 251 expose the PIC reset and mode controls as proper HA entities.
+- **Standalone HA discovery topic wiper**: one-shot helper for cleaning stale retained discovery topics out of the broker (TASK-611).
+
+**Web UI and diagnostics**
+- **FSexplorer "Update Firmware" button** is visible again on touch-capable desktops; the touch-class media query no longer hides the upload control.
+- **Set-command debug surfacing**: silently-dropped set-commands now appear in the default debug stream instead of being swallowed.
+
+**Tooling and build**
+- **Flash scripts hardened**: `flash_otgw.sh` / `flash_otgw.bat` now mirror spec parity, verify SHA256 integrity, and pick the binary that matches the requested version. The `.bat` variant detects COM ports through the Windows registry and auto-downloads binaries when not found locally.
+- **`build.py` auto-initialises missing git submodules** so a fresh clone or a stale checkout builds without manual `git submodule update`.
+- **`evaluate.py`** false-positive and stale checks fixed; the gate is now meaningful again.
+- **`/beta-prerelease` skill + GitHub Action** for tag-driven (and, after #609, workflow-dispatch-driven) beta publishing, with draft-first asset attachment to satisfy GitHub's immutable-releases policy.
+
+**Code hygiene**
+- **Orphaned SAT subsystem removed from dev** (#586) and the dead `ENABLE_SAT` scaffolding cleaned out (#589). SAT lives only on `feature-dev-2.0.0-otgw32-esp32-sat-support` and is no longer carried as inert code on the 1.5.x/1.6.x line.
+
+**Documentation**
+- New integration guides for **openHAB** and **Domoticz**.
+- New Dutch beginner guide for cleaning up stale MQTT topics in MQTT Explorer.
+- PIC and ESP firmware guides split into EN/NL language variants, with PIC guide scope restored and ESP-flash docs routed to `FLASH_GUIDE.md`.
+- `MQTT_STALE_TOPICS_CLEANUP.md`: added a "Recovering missing HA entities" section distinguishing JIT progressive appearance from upgrade stale-topic cleanup.
+- Documentation link paths normalised; markdown link-validation guardrail added.
+
+Full per-commit detail lives in [`CHANGELOG.md`](CHANGELOG.md) under `## [Unreleased]`. Architectural rationale lives in the linked ADRs under [`docs/adr/`](docs/adr/).
 
 ## What's New in v1.5.0
 
