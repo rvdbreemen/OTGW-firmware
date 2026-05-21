@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.49
+**  Version  : v2.0.0-alpha.50
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4410,6 +4410,10 @@ void handlePICSerial()
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128
+  // Sync webserver: bound work per call so a burst of OT lines or net→serial
+  // commands cannot starve httpServer.handleClient(). Pending bytes drain on
+  // the next call.
+  static constexpr size_t kMaxLinesPerDrain = 4;
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
@@ -4442,7 +4446,8 @@ void handlePICSerial()
       reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
     }
     
-    while (OTGWSerial.available()) {
+    size_t linesProcessed = 0;
+    while (OTGWSerial.available() && linesProcessed < kMaxLinesPerDrain) {
       outByte = OTGWSerial.read();
       if (outByte == '\r' || outByte == '\n') {
         if ((bytes_read == 0) && !discardCurrentReadLine) continue;
@@ -4460,6 +4465,7 @@ void handlePICSerial()
 
         bytes_read = 0;
         discardCurrentReadLine = false;
+        linesProcessed++;
       } else if (bytes_read < (MAX_BUFFER_READ-1)) {
         if (!discardCurrentReadLine) {
           sRead[bytes_read++] = outByte;
@@ -4489,7 +4495,8 @@ void handlePICSerial()
 
   if (settings.mqtt.bLegacyPort25238Enabled) {
     //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
-    while (OTGWstream.available()){
+    size_t cmdsProcessed = 0;
+    while (OTGWstream.available() && cmdsProcessed < kMaxLinesPerDrain){
       outByte = OTGWstream.read();  // read from port 25238
       if (!state.debug.bOTGWSimulation) {
         OTGWSerial.write(outByte);    // write to serial port
@@ -4537,6 +4544,7 @@ void handlePICSerial()
           }
         }
         bytes_write = 0; //start next line
+        cmdsProcessed++;
       } else if  (outByte == '\n')
       {
         // on LF, skip 

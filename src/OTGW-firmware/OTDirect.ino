@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.49
+**  Version  : v2.0.0-alpha.50
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -638,12 +638,17 @@ void handleOTDirectBridgeStream() {
   if (!settings.mqtt.bLegacyPort25238Enabled) return;
 
   static constexpr size_t kMaxBridgeWrite = 128;
+  // Sync webserver: bound dispatched commands per call so a flooded TCP client
+  // on port 25238 cannot starve httpServer.handleClient(). Pending bytes drain
+  // on the next call.
+  static constexpr size_t kMaxLinesPerDrain = 4;
   static char sWrite[kMaxBridgeWrite];
   static size_t bytes_write = 0;
   static bool discardCurrentWriteLine = false;
   static uint32_t droppedWriteLines = 0;
+  size_t cmdsProcessed = 0;
 
-  while (OTGWstream.available()) {
+  while (OTGWstream.available() && cmdsProcessed < kMaxLinesPerDrain) {
     int inByte = OTGWstream.read();
     if (inByte < 0) break;
 
@@ -666,6 +671,7 @@ void handleOTDirectBridgeStream() {
 
       bytes_write = 0;
       discardCurrentWriteLine = false;
+      cmdsProcessed++;
     } else if (outByte == '\n') {
       continue;
     } else if (bytes_write < (kMaxBridgeWrite - 1)) {
