@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Superseded by ADR-078, 2026-05-21.
 
 ## Context
 
