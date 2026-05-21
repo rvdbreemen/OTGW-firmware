@@ -44,7 +44,6 @@ static void dumpDebugInfo() {
   Debugf(PSTR("interval: %u\r\n"), (unsigned)settings.mqtt.iInterval);
   Debugf(PSTR("separate_sources: %s\r\n"), settings.mqtt.bSeparateSources ? "true" : "false");
   Debugf(PSTR("disc_auto_verify: %s\r\n"), settings.mqtt.bDiscoveryAutoVerify ? "true" : "false");
-  Debugf(PSTR("publish_ha_core_aliases: %s\r\n"), settings.mqtt.bPublishHaCoreAliases ? "true" : "false");
   // [settings.ntp]
   Debugln(F("[settings.ntp]"));
   Debugf(PSTR("enabled: %s\r\n"), settings.ntp.bEnable ? "true" : "false");

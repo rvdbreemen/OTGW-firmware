@@ -326,49 +326,6 @@ const char ha_lbl_remote_override_program_change_priority[] PROGMEM = "remote_ov
 const char ha_lbl_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storage_slave_fault_indicator";
 const char ha_lbl_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
 
-// ---------------------------------------------------------------------------
-// ADR-077: HA-core alias labels (37 topics, gated by settings.mqtt.bPublishHaCoreAliases)
-// Category A: supports_* capability aliases (12)
-const char ha_lbl_alias_supports_master_smart_power[]                       PROGMEM = "supports_master_smart_power";
-const char ha_lbl_alias_supports_hot_water[]                                PROGMEM = "supports_hot_water";
-const char ha_lbl_alias_supports_cooling[]                                  PROGMEM = "supports_cooling";
-const char ha_lbl_alias_supports_pump_control[]                             PROGMEM = "supports_pump_control";
-const char ha_lbl_alias_supports_ch_2[]                                     PROGMEM = "supports_ch_2";
-const char ha_lbl_alias_supports_remote_reset[]                             PROGMEM = "supports_remote_reset";
-const char ha_lbl_alias_supports_lockout_reset[]                            PROGMEM = "supports_lockout_reset";
-const char ha_lbl_alias_supports_hot_water_setpoint_transfer[]              PROGMEM = "supports_hot_water_setpoint_transfer";
-const char ha_lbl_alias_supports_central_heating_setpoint_transfer[]        PROGMEM = "supports_central_heating_setpoint_transfer";
-const char ha_lbl_alias_supports_hot_water_setpoint_writing[]               PROGMEM = "supports_hot_water_setpoint_writing";
-const char ha_lbl_alias_supports_central_heating_setpoint_writing[]         PROGMEM = "supports_central_heating_setpoint_writing";
-const char ha_lbl_alias_supports_ventilation_bypass[]                       PROGMEM = "supports_ventilation_bypass";
-// Category B: plain-name HA-core verbatim (12)
-const char ha_lbl_alias_fault_indication[]                                  PROGMEM = "fault_indication";
-const char ha_lbl_alias_central_heating[]                                   PROGMEM = "central_heating";
-const char ha_lbl_alias_hot_water[]                                         PROGMEM = "hot_water";
-const char ha_lbl_alias_central_heating_2[]                                 PROGMEM = "central_heating_2";
-const char ha_lbl_alias_diagnostic_indication[]                             PROGMEM = "diagnostic_indication";
-const char ha_lbl_alias_control_type[]                                      PROGMEM = "control_type";
-const char ha_lbl_alias_hot_water_config[]                                  PROGMEM = "hot_water_config";
-const char ha_lbl_alias_service_required[]                                  PROGMEM = "service_required";
-const char ha_lbl_alias_gas_fault[]                                         PROGMEM = "gas_fault";
-const char ha_lbl_alias_water_overtemperature[]                             PROGMEM = "water_overtemperature";
-const char ha_lbl_alias_override_manual_change_prio[]                       PROGMEM = "override_manual_change_prio";
-const char ha_lbl_alias_override_program_change_prio[]                      PROGMEM = "override_program_change_prio";
-// Category C: plain-name firmware-coined (13)
-const char ha_lbl_alias_ventilation_enabled[]                               PROGMEM = "ventilation_enabled";
-const char ha_lbl_alias_ventilation_bypass_position[]                       PROGMEM = "ventilation_bypass_position";
-const char ha_lbl_alias_ventilation_bypass_mode[]                           PROGMEM = "ventilation_bypass_mode";
-const char ha_lbl_alias_ventilation_free_mode[]                             PROGMEM = "ventilation_free_mode";
-const char ha_lbl_alias_ventilation_fault[]                                 PROGMEM = "ventilation_fault";
-const char ha_lbl_alias_ventilation_active[]                                PROGMEM = "ventilation_active";
-const char ha_lbl_alias_ventilation_bypass_status[]                         PROGMEM = "ventilation_bypass_status";
-const char ha_lbl_alias_ventilation_bypass_automatic[]                      PROGMEM = "ventilation_bypass_automatic";
-const char ha_lbl_alias_ventilation_free_status[]                           PROGMEM = "ventilation_free_status";
-const char ha_lbl_alias_ventilation_diagnostic[]                            PROGMEM = "ventilation_diagnostic";
-const char ha_lbl_alias_ventilation_system_type[]                           PROGMEM = "ventilation_system_type";
-const char ha_lbl_alias_ventilation_speed_control_type[]                    PROGMEM = "ventilation_speed_control_type";
-const char ha_lbl_alias_solar_storage_fault[]                               PROGMEM = "solar_storage_fault";
-
 // ========== Named PROGMEM strings: Friendly names ==========
 const char ha_name_status_master[] PROGMEM = "Status_Master";
 const char ha_name_status_slave[] PROGMEM = "Status_Slave";
@@ -673,49 +630,6 @@ const char ha_name_remote_override_manual_change_priority[] PROGMEM = "remote_ov
 const char ha_name_remote_override_program_change_priority[] PROGMEM = "remote_override_program_change_priority";
 const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storage_slave_fault_indicator";
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
-
-// ---------------------------------------------------------------------------
-// ADR-077: HA-core alias friendly names (37 entries)
-// Category A: supports_* capability aliases (12)
-const char ha_name_alias_supports_master_smart_power[]                       PROGMEM = "Supports_master_smart_power";
-const char ha_name_alias_supports_hot_water[]                                PROGMEM = "Supports_hot_water";
-const char ha_name_alias_supports_cooling[]                                  PROGMEM = "Supports_cooling";
-const char ha_name_alias_supports_pump_control[]                             PROGMEM = "Supports_pump_control";
-const char ha_name_alias_supports_ch_2[]                                     PROGMEM = "Supports_CH_2";
-const char ha_name_alias_supports_remote_reset[]                             PROGMEM = "Supports_remote_reset";
-const char ha_name_alias_supports_lockout_reset[]                            PROGMEM = "Supports_lockout_reset";
-const char ha_name_alias_supports_hot_water_setpoint_transfer[]              PROGMEM = "Supports_hot_water_setpoint_transfer";
-const char ha_name_alias_supports_central_heating_setpoint_transfer[]        PROGMEM = "Supports_central_heating_setpoint_transfer";
-const char ha_name_alias_supports_hot_water_setpoint_writing[]               PROGMEM = "Supports_hot_water_setpoint_writing";
-const char ha_name_alias_supports_central_heating_setpoint_writing[]         PROGMEM = "Supports_central_heating_setpoint_writing";
-const char ha_name_alias_supports_ventilation_bypass[]                       PROGMEM = "Supports_ventilation_bypass";
-// Category B: plain-name HA-core verbatim (12)
-const char ha_name_alias_fault_indication[]                                  PROGMEM = "Fault_indication";
-const char ha_name_alias_central_heating[]                                   PROGMEM = "Central_heating";
-const char ha_name_alias_hot_water[]                                         PROGMEM = "Hot_water";
-const char ha_name_alias_central_heating_2[]                                 PROGMEM = "Central_heating_2";
-const char ha_name_alias_diagnostic_indication[]                             PROGMEM = "Diagnostic_indication";
-const char ha_name_alias_control_type[]                                      PROGMEM = "Control_type";
-const char ha_name_alias_hot_water_config[]                                  PROGMEM = "Hot_water_config";
-const char ha_name_alias_service_required[]                                  PROGMEM = "Service_required";
-const char ha_name_alias_gas_fault[]                                         PROGMEM = "Gas_fault";
-const char ha_name_alias_water_overtemperature[]                             PROGMEM = "Water_overtemperature";
-const char ha_name_alias_override_manual_change_prio[]                       PROGMEM = "Override_manual_change_prio";
-const char ha_name_alias_override_program_change_prio[]                      PROGMEM = "Override_program_change_prio";
-// Category C: plain-name firmware-coined (13)
-const char ha_name_alias_ventilation_enabled[]                               PROGMEM = "Ventilation_enabled";
-const char ha_name_alias_ventilation_bypass_position[]                       PROGMEM = "Ventilation_bypass_position";
-const char ha_name_alias_ventilation_bypass_mode[]                           PROGMEM = "Ventilation_bypass_mode";
-const char ha_name_alias_ventilation_free_mode[]                             PROGMEM = "Ventilation_free_mode";
-const char ha_name_alias_ventilation_fault[]                                 PROGMEM = "Ventilation_fault";
-const char ha_name_alias_ventilation_active[]                                PROGMEM = "Ventilation_active";
-const char ha_name_alias_ventilation_bypass_status[]                         PROGMEM = "Ventilation_bypass_status";
-const char ha_name_alias_ventilation_bypass_automatic[]                      PROGMEM = "Ventilation_bypass_automatic";
-const char ha_name_alias_ventilation_free_status[]                           PROGMEM = "Ventilation_free_status";
-const char ha_name_alias_ventilation_diagnostic[]                            PROGMEM = "Ventilation_diagnostic";
-const char ha_name_alias_ventilation_system_type[]                           PROGMEM = "Ventilation_system_type";
-const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
-const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
 // ========== Sensor array (289 entries, sorted by id) ==========
 const uint16_t MQTT_HA_SENSOR_COUNT = 330;
 
@@ -1183,13 +1097,8 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {250, 0x08, ha_lbl_pic_set_voltage_ref,         ha_name_pic_set_voltage_ref,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
 };
 
-// ========== Binary sensor array (53 indexed + 37 ADR-077 aliases = 90 entries) ==========
-// First 53 rows are sorted by OT id and indexed via mqttHaBinSensorIndex[].
-// Rows 53..89 are ADR-077 HA-core aliases, NOT contiguous by OT id and NOT covered
-// by the index. The discovery dispatcher walks the alias tail separately (see
-// MQTTstuff.ino streamHaDiscoveryEntries()).
-const uint16_t MQTT_HA_BINSENSOR_COUNT         = 90;
-const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 53;
+// ========== Binary sensor array (53 entries, sorted by id) ==========
+const uint16_t MQTT_HA_BINSENSOR_COUNT = 53;
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1256,51 +1165,6 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     {101, 0x00, ha_lbl_solar_storage_slave_fault_indicator, ha_name_solar_storage_slave_fault_indicator, HaIcon::alert_circle, HaEntityCat::none, false},
     // --- OT ID 113 ---
     {113, 0x00, ha_lbl_solar_storage_system_type, ha_name_solar_storage_system_type, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
-
-    // ---------------------------------------------------------------------------
-    // ADR-077: HA-core aliases (37 rows) — gated by settings.mqtt.bPublishHaCoreAliases
-    // via MQTT_HA_FLAG_IS_HA_CORE_ALIAS (0x10) in streamBinarySensorDiscovery().
-    // Each alias mirrors its current-name sibling's icon/category/enabledByDefault.
-    // --- ADR-077 Category A: supports_* capability aliases (12) ---
-    {  2, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_master_smart_power,                ha_name_alias_supports_master_smart_power,                HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  3, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_hot_water,                         ha_name_alias_supports_hot_water,                         HaIcon::water_boiler,           HaEntityCat::diagnostic, true},
-    {  3, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_cooling,                           ha_name_alias_supports_cooling,                           HaIcon::snowflake,              HaEntityCat::diagnostic, true},
-    {  3, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_pump_control,                      ha_name_alias_supports_pump_control,                      HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  3, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_ch_2,                              ha_name_alias_supports_ch_2,                              HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, false},
-    {  3, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_remote_reset,                      ha_name_alias_supports_remote_reset,                      HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_lockout_reset,                     ha_name_alias_supports_lockout_reset,                     HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  6, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_hot_water_setpoint_transfer,       ha_name_alias_supports_hot_water_setpoint_transfer,       HaIcon::water_boiler,           HaEntityCat::diagnostic, true},
-    {  6, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_central_heating_setpoint_transfer, ha_name_alias_supports_central_heating_setpoint_transfer, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  6, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_hot_water_setpoint_writing,        ha_name_alias_supports_hot_water_setpoint_writing,        HaIcon::water_boiler,           HaEntityCat::diagnostic, true},
-    {  6, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_central_heating_setpoint_writing,  ha_name_alias_supports_central_heating_setpoint_writing,  HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    { 74, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_ventilation_bypass,                ha_name_alias_supports_ventilation_bypass,                HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, false},
-    // --- ADR-077 Category B: plain-name HA-core verbatim (12) ---
-    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_fault_indication,             ha_name_alias_fault_indication,             HaIcon::alert_circle,           HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_central_heating,              ha_name_alias_central_heating,              HaIcon::radiator,               HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_hot_water,                    ha_name_alias_hot_water,                    HaIcon::water_boiler,           HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_central_heating_2,            ha_name_alias_central_heating_2,            HaIcon::radiator,               HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_diagnostic_indication,        ha_name_alias_diagnostic_indication,        HaIcon::information,            HaEntityCat::none, true},
-    {  3, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_control_type,                 ha_name_alias_control_type,                 HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  3, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_hot_water_config,             ha_name_alias_hot_water_config,             HaIcon::water_boiler,           HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_service_required,             ha_name_alias_service_required,             HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_gas_fault,                    ha_name_alias_gas_fault,                    HaIcon::alert_circle,           HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_water_overtemperature,        ha_name_alias_water_overtemperature,        HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {100, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_override_manual_change_prio,  ha_name_alias_override_manual_change_prio,  HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
-    {100, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_override_program_change_prio, ha_name_alias_override_program_change_prio, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
-    // --- ADR-077 Category C: plain-name firmware-coined (13) ---
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_enabled,          ha_name_alias_ventilation_enabled,          HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_bypass_position,  ha_name_alias_ventilation_bypass_position,  HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_bypass_mode,      ha_name_alias_ventilation_bypass_mode,      HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_free_mode,        ha_name_alias_ventilation_free_mode,        HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_fault,            ha_name_alias_ventilation_fault,            HaIcon::alert_circle,           HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_active,           ha_name_alias_ventilation_active,           HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_bypass_status,    ha_name_alias_ventilation_bypass_status,    HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_bypass_automatic, ha_name_alias_ventilation_bypass_automatic, HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_free_status,      ha_name_alias_ventilation_free_status,      HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_diagnostic,       ha_name_alias_ventilation_diagnostic,       HaIcon::information,            HaEntityCat::none, false},
-    { 74, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_system_type,      ha_name_alias_ventilation_system_type,      HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, false},
-    { 74, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_speed_control_type, ha_name_alias_ventilation_speed_control_type, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, false},
-    {101, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_solar_storage_fault,          ha_name_alias_solar_storage_fault,          HaIcon::alert_circle,           HaEntityCat::none, false},
 };
 
 // ========== Index arrays (OT ID -> first entry) ==========
@@ -2386,9 +2250,6 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
   if (!client.connected()) return false;
   if (!canPublishMQTT()) return false;
   if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
-  // ADR-077: alias-row gating happens at the iterator level (MQTTstuff.ino
-  // streamHaDiscoveryEntries) where `settings` is in scope — this file does
-  // not include OTGW-firmware.h.
 
   char topic[STREAM_TOPIC_MAX];
   if (!buildBinSensorDiscoveryTopic(topic, sizeof(topic), ctx.haPrefix, ctx.nodeId,
