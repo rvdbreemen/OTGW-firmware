@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-21T09:16:34.482Z
-> Files: 15 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-21T20:16:19.235Z
+> Files: 16 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -352,6 +352,7 @@
 - `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~31733 tok)
 - `OTGW-Core.h` — ifndef OTGWCore_h (~10494 tok)
 - `OTGW-Core.ino` — Declares char (~63087 tok)
+- `OTGW-firmware.ino` — Declares WifiPortalResetState (~6800 tok)
 - `restAPI.ino` — include <string.h> (~40900 tok)
 - `SATweather.ino` — Declares uint16_t (~7653 tok)
 - `settingStuff.ino` — include <ctype.h> (~16551 tok)
