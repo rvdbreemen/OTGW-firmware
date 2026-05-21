@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.44
+**  Version  : v2.0.0-alpha.45
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3737,11 +3737,22 @@ void processPSSummary(const char *buf, int len) {
       if (msgid <= OT_MSGID_MAX) {
         PROGMEM_readAnything(&OTmap[msgid], OTlookupitem);
         const char *label = OTlookupitem.label;
+        // ADR-104 Decision item 7: scope mqttPendingSlot commit to this frame.
+        // shouldPublishMQTTForPSField installs pending; capture the pre-publish
+        // success count, run the publish path, then commit if any sendMQTTData
+        // succeeded — else clear the pending so a later unrelated publish
+        // cannot silently commit it.
+        const uint32_t preSuccessCount = mqttSendSuccessCount;
         OTPublishGate psGate(shouldPublishMQTTForPSField(msgid));
 
         if (publishPSSummaryFieldValue(msgid, OTlookupitem.type, label, fBuf)) {
           ensurePSSummaryDiscovery(msgid);
           logPSSummaryField(label, fBuf);
+        }
+
+        if (mqttPendingSlot.pending) {
+          if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
+          else                                        mqttPendingSlot.pending = false;
         }
       }
     }
@@ -4168,9 +4179,19 @@ void processOT(const char *buf, int len, bool suppressOutput){
       // OTPublishGate RAII: gate closes for this OT slot's throttle decision and
       // is guaranteed to reopen (restore true) when the scope exits, even on early
       // return. Non-OT sends (event_report, etc.) that follow are not affected. (ADR-006)
+      // ADR-104 Decision item 7: scope mqttPendingSlot commit to this OT frame.
+      // shouldPublishMQTTForID installs pending; capture the pre-publish success
+      // count, run decodeAndPublishOTValue, then commit if any sendMQTTData
+      // succeeded — else clear the pending so a later unrelated publish cannot
+      // silently commit it.
       {
+        const uint32_t preSuccessCount = mqttSendSuccessCount;
         OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
         decodeAndPublishOTValue();
+        if (mqttPendingSlot.pending) {
+          if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
+          else                                        mqttPendingSlot.pending = false;
+        }
       }
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");
