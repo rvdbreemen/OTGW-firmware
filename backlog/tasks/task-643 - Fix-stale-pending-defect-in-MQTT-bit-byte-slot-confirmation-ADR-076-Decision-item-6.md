@@ -3,11 +3,11 @@ id: TASK-643
 title: >-
   Fix stale-pending defect in MQTT bit/byte slot confirmation (ADR-076 Decision
   item 6)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-21 07:37'
-updated_date: '2026-05-21 07:45'
+updated_date: '2026-05-21 07:46'
 labels:
   - mqtt
   - adr-076
