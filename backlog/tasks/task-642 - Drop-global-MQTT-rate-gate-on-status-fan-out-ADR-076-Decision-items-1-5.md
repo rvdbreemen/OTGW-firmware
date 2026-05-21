@@ -1,11 +1,11 @@
 ---
 id: TASK-642
 title: Drop global MQTT rate-gate on status fan-out (ADR-076 Decision items 1-5)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-21 07:36'
-updated_date: '2026-05-21 07:40'
+updated_date: '2026-05-21 07:41'
 labels:
   - mqtt
   - adr-076
