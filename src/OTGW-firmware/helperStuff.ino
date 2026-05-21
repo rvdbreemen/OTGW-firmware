@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.6.0-beta.14
+**  Version  : v1.6.0-beta.15
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1173,12 +1173,18 @@ void blinkLEDnow(uint8_t led = LED1){
 
 }
 
-//===[ no-blocking delay with running background tasks in ms ]===
+//===[ cooperative delay running background tasks in ms ]===
+// Previously used DECLARE_TIMER_MS, which expands to static locals: init-once
+// semantics made the wait collapse to 0 ms on the first call and freeze at the
+// first interval ever passed on later calls. Use a local timestamp so each call
+// honours its own delay_ms parameter and millis() rollover is handled by the
+// unsigned subtraction.
 void delayms(unsigned long delay_ms)
 {
-  DECLARE_TIMER_MS(timerDelayms, delay_ms);
-  while (DUE(timerDelayms))
+  uint32_t start = millis();
+  while ((uint32_t)(millis() - start) < delay_ms) {
     doBackgroundTasks();
+  }
 }
 
 /***************************************************************************
