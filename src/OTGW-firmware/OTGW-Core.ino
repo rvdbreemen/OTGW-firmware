@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.42
+**  Version  : v2.0.0-alpha.45
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -256,19 +256,13 @@ static uint16_t mqttlastsentRBPbyte[2]  = {0};  // msgId 6 RBP: 0=transfer_enabl
 static uint16_t mqttlastsentRObit[2]    = {0};  // msgId 100 Remote Override: 0=manual, 1=program
 static uint16_t mqttlastsentRObyte[1]   = {0};  // msgId 100 Remote Override LB flag8
 
-// TASK-402: global rate-gate — enforce MQTT_GATED_PUBLISH_SPACING_MS between
-// any two gated publishes for first-seen, heartbeat, and force paths.
-// Change-detect publishes bypass the gate (priority: bit-flip goes out
-// immediately) and do NOT update the timer, so a subsequent non-change publish
-// honours spacing relative to the previous non-change publish only.
-// Boot sentinel mqttLastGatedPublishMs==0 means "nothing published yet, first
-// pass is free" — earliest bit at boot goes through without waiting.
-// TASK-402 v2: spacing tightened from 1000ms to 250ms per user request.
-// With 44 gated slots across msgId 0/70/5/6/100, boot-time full fanout
-// completes in ~11s; the 60s heartbeat storm spreads over ~4s (16 bits at
-// 250ms each). Still one publish per tick, so handleMQTT peaks stay low.
-static uint32_t mqttLastGatedPublishMs = 0;
-static constexpr uint32_t MQTT_GATED_PUBLISH_SPACING_MS = 250;
+// ADR-104 (2.0.0 sibling of dev's ADR-076): a global rate-gate (TASK-402's
+// MQTT_GATED_PUBLISH_SPACING_MS) used to live here and was meant to spread the
+// 60s heartbeat storm across slots. Instead it starved per-bit slots inside
+// the same fan-out (the combined byte always grabbed the token first, the
+// bits lost it for the next heartbeat too). Removed under ADR-104 — heap-tier
+// back-pressure via canPublishMQTT() (ADR-030 / ADR-089) is now the sole
+// publish throttle.
 
 // Pending MQTT throttle slot update — applied only after successful publish.
 // Prevents the throttle from "burning" a slot when sendMQTTData fails silently.
@@ -413,9 +407,6 @@ static void resetMqttTrackedState()
   mqttlastsentRObit[0]  = TRACKED_TIME_UNSEEN;
   mqttlastsentRObit[1]  = TRACKED_TIME_UNSEEN;
   mqttlastsentRObyte[0] = TRACKED_TIME_UNSEEN;
-  // TASK-402: reset rate-gate sentinel so post-reset the first non-change
-  // publish goes through immediately instead of waiting 1s.
-  mqttLastGatedPublishMs = 0;
 }
 
 struct TrackingStateInitializer {
@@ -1562,11 +1553,8 @@ static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlo
   const uint16_t lastTime = trackedSlots[bitSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
-  // TASK-402: change-detect has absolute priority — bit-flips publish
-  // immediately, bypassing the 1s rate-gate. Excludes firstSeen (handled
-  // below as a first-seen publish, not a "flip"). Change-detect publishes
-  // do NOT update mqttLastGatedPublishMs, so a concurrent heartbeat/first-seen
-  // publish schedules against the previous non-change publish, not the flip.
+  // Change-detect has absolute priority — bit-flips publish immediately.
+  // Excludes firstSeen (handled below as a first-seen publish, not a "flip").
   const bool valueChanged = !firstSeen && (newVal != prevVal);
   if (valueChanged) {
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
@@ -1575,25 +1563,11 @@ static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlo
   const bool intervalElapsed = !firstSeen
                              && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
   if (firstSeen || forcePublish || intervalElapsed) {
-    // TASK-402 rate-gate, refined by TASK-612: the 250ms spacing exists to
-    // spread the RECURRING 60s heartbeat fan-out, not the one-shot
-    // first-seen/forced burst. mqttLastGatedPublishMs is a single global
-    // shared by every bit/byte slot, and a parent message decodes its whole
-    // fan-out (ASF 1B+6b, RBP 2B+4b, Status 2B+15b) inside one processOT()
-    // call. Spacing the first-seen burst meant only the first slot passed and
-    // the rest deferred to the next parent frame — fine for msgId 0 (≈3s
-    // cadence) but starving ASF/RBP/VH (polled rarely), so those HA entities
-    // stayed "unknown". first-seen fires once per slot per boot (bounded,
-    // naturally spread as parents arrive) and valueChanged already bypasses
-    // this gate, so exempting first-seen/forced here is safe and consistent.
-    const uint32_t nowMs = millis();
-    if (intervalElapsed && !forcePublish
-        && mqttLastGatedPublishMs != 0
-        && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
-      return false;
-    }
+    // ADR-104 (2.0.0 sibling of dev's ADR-076): per-slot heartbeat only. No
+    // global cross-slot spacing — that was TASK-402's MQTT_GATED_PUBLISH_
+    // SPACING_MS and it starved the per-bit slots when the combined byte won
+    // the token at every tick.
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
-    mqttLastGatedPublishMs = nowMs;
     return true;
   }
   return false;
@@ -1617,8 +1591,7 @@ static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteS
   const uint16_t lastTime = trackedSlots[byteSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
-  // TASK-402: change-detect priority — byte changed -> immediate publish,
-  // no spacing check, no spacing-timer update. Same rationale as bit path.
+  // Change-detect priority — byte changed -> immediate publish.
   const bool valueChanged = !firstSeen && (newVal != prevVal);
   if (valueChanged) {
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
@@ -1627,17 +1600,10 @@ static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteS
   const bool intervalElapsed = !firstSeen
                              && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
   if (firstSeen || forcePublish || intervalElapsed) {
-    // TASK-612: same exemption as the bit path — rate-gate only the recurring
-    // 60s heartbeat, never the one-shot first-seen/forced burst (see the
-    // detailed rationale in shouldPublishTrackedStatusBit()).
-    const uint32_t nowMs = millis();
-    if (intervalElapsed && !forcePublish
-        && mqttLastGatedPublishMs != 0
-        && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
-      return false;
-    }
+    // ADR-104 (2.0.0 sibling of dev's ADR-076): per-slot heartbeat only — see
+    // shouldPublishTrackedStatusBit() for the rationale on removing the global
+    // rate-gate.
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
-    mqttLastGatedPublishMs = nowMs;
     return true;
   }
   return false;
@@ -1662,7 +1628,11 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-347: arm cooldown only for real sends
-  publishMQTTOnOff(topic, newVal);
+  // ADR-104: commit pending bit-slot only when sendMQTTData confirms success.
+  // On any early-return (heap throttle, disconnect) discard the pending so an
+  // unrelated downstream publish cannot silently commit it.
+  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
+  else                                 mqttPendingBitSlot.pending = false;
 }
 
 static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal,
@@ -1672,7 +1642,8 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-354: arm cooldown only for real sends
-  publishMQTTOnOff(topic, newVal);
+  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
+  else                                 mqttPendingBitSlot.pending = false;
 }
 
 // TASK-401: generic gate-wrapped publish helpers for non-Status fan-out
@@ -1687,7 +1658,9 @@ static void publishGatedBitMQTT(uint16_t *trackedSlots, uint8_t bitSlot,
 {
   const bool allowPublish = shouldPublishTrackedStatusBit(trackedSlots, bitSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
-  publishMQTTOnOff(topic, newVal);
+  // ADR-104: commit pending only when sendMQTTData confirms success.
+  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
+  else                                 mqttPendingBitSlot.pending = false;
 }
 
 static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
@@ -1696,7 +1669,9 @@ static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
 {
   const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
-  sendMQTTData(topic, payload);
+  // ADR-104: commit pending only when sendMQTTData confirms success.
+  if (sendMQTTData(topic, payload)) confirmMQTTPublishByteSlot();
+  else                              mqttPendingByteSlot.pending = false;
 }
 
 // Overload for dynamically-built char* topics (e.g. "<msgid>_flag8").
@@ -1706,7 +1681,9 @@ static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
 {
   const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
-  sendMQTTData(topic, payload);
+  // ADR-104: commit pending only when sendMQTTData confirms success.
+  if (sendMQTTData(topic, payload)) confirmMQTTPublishByteSlot();
+  else                              mqttPendingByteSlot.pending = false;
 }
 
 static void copyBinaryByteString(uint8_t value, char *dest, size_t destSize)
@@ -1772,7 +1749,9 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData("status_master", statusText);
+    // ADR-104: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData("status_master", statusText)) confirmMQTTPublishByteSlot();
+    else                                           mqttPendingByteSlot.pending = false;
   }
   publishStatusBitMQTT(0, "ch_enable",        (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
   publishStatusBitMQTT(1, "dhw_enable",       (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
@@ -1813,7 +1792,9 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData("status_slave", statusText);
+    // ADR-104: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData("status_slave", statusText)) confirmMQTTPublishByteSlot();
+    else                                          mqttPendingByteSlot.pending = false;
   }
   publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
   publishStatusBitMQTT(9,  "centralheating",       (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
@@ -1896,7 +1877,9 @@ static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData(F("status_vh_master"), statusText);
+    // ADR-104: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData(F("status_vh_master"), statusText)) confirmMQTTPublishByteSlot();
+    else                                                 mqttPendingByteSlot.pending = false;
   }
   publishStatusVHBitMQTT(0, "vh_ventilation_enabled",    (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
   publishStatusVHBitMQTT(1, "vh_bypass_position",        (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
@@ -1934,7 +1917,9 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData(F("status_vh_slave"), statusText);
+    // ADR-104: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData(F("status_vh_slave"), statusText)) confirmMQTTPublishByteSlot();
+    else                                                mqttPendingByteSlot.pending = false;
   }
   publishStatusVHBitMQTT(0, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
   publishStatusVHBitMQTT(1, "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
@@ -3752,11 +3737,22 @@ void processPSSummary(const char *buf, int len) {
       if (msgid <= OT_MSGID_MAX) {
         PROGMEM_readAnything(&OTmap[msgid], OTlookupitem);
         const char *label = OTlookupitem.label;
+        // ADR-104 Decision item 7: scope mqttPendingSlot commit to this frame.
+        // shouldPublishMQTTForPSField installs pending; capture the pre-publish
+        // success count, run the publish path, then commit if any sendMQTTData
+        // succeeded — else clear the pending so a later unrelated publish
+        // cannot silently commit it.
+        const uint32_t preSuccessCount = mqttSendSuccessCount;
         OTPublishGate psGate(shouldPublishMQTTForPSField(msgid));
 
         if (publishPSSummaryFieldValue(msgid, OTlookupitem.type, label, fBuf)) {
           ensurePSSummaryDiscovery(msgid);
           logPSSummaryField(label, fBuf);
+        }
+
+        if (mqttPendingSlot.pending) {
+          if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
+          else                                        mqttPendingSlot.pending = false;
         }
       }
     }
@@ -4183,9 +4179,19 @@ void processOT(const char *buf, int len, bool suppressOutput){
       // OTPublishGate RAII: gate closes for this OT slot's throttle decision and
       // is guaranteed to reopen (restore true) when the scope exits, even on early
       // return. Non-OT sends (event_report, etc.) that follow are not affected. (ADR-006)
+      // ADR-104 Decision item 7: scope mqttPendingSlot commit to this OT frame.
+      // shouldPublishMQTTForID installs pending; capture the pre-publish success
+      // count, run decodeAndPublishOTValue, then commit if any sendMQTTData
+      // succeeded — else clear the pending so a later unrelated publish cannot
+      // silently commit it.
       {
+        const uint32_t preSuccessCount = mqttSendSuccessCount;
         OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
         decodeAndPublishOTValue();
+        if (mqttPendingSlot.pending) {
+          if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
+          else                                        mqttPendingSlot.pending = false;
+        }
       }
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");

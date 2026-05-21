@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.42
+**  Version  : v2.0.0-alpha.45
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1189,57 +1189,66 @@ void PrintMQTTError(){
   }
 }
 
-/* 
+// ADR-104 Decision item 7: monotonic publish-success counter. Each
+// sendMQTTData() success path increments this exactly once. OTPublishGate
+// callers capture pre/post values to determine whether any send landed during
+// their frame and commit the matching mqttPendingSlot accordingly.
+uint32_t mqttSendSuccessCount = 0;
+
+/*
   topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
   json:   <string> , payload to send
-  retain: <bool> , retain mqtt message  
+  retain: <bool> , retain mqtt message
 */
-void sendMQTTData(const char* topic, const char *json, const bool retain)
+bool sendMQTTData(const char* topic, const char *json, const bool retain)
 {
-  if (!settings.mqtt.bEnable) return;
-  if (!mqttPublishAllowed) return;
-  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
-  
+  if (!settings.mqtt.bEnable) return false;
+  if (!mqttPublishAllowed) return false;
+  if (!MQTTclient.connected()) { return false; }  // handleMQTT() logs disconnect and manages reconnect
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return false;}
+
   // Check heap health before publishing
   if (!canPublishMQTT()) {
     // Message dropped due to low heap - canPublishMQTT() handles logging
-    return;
+    return false;
   }
-  
+
   char full_topic[MQTT_TOPIC_MAX_LEN];
   snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
   strlcat(full_topic, topic, sizeof(full_topic));
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settings.mqtt.sBroker, settings.mqtt.iBrokerPort, full_topic, json);
   const size_t payloadLen = strlen(json);
-  if (!beginMqttPublish(full_topic, payloadLen, retain)) return;
+  if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttChunk(json, payloadLen)) {
     MQTTclient.endPublish();
-    return;
+    return false;
   }
-  if (!MQTTclient.endPublish()) { PrintMQTTError(); return; }
-  // Publish succeeded — confirm any pending throttle slot updates
-  confirmMQTTPublishSlot();
-  confirmMQTTPublishBitSlot();
-  confirmMQTTPublishByteSlot();
+  if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
+  // ADR-104 Decision item 7: no auto-commit of pending slot updates inside
+  // sendMQTTData. Bit/byte slots commit-or-discard in their per-helper publish
+  // path; the normal-msgId mqttPendingSlot is committed-or-discarded by the
+  // OTPublishGate caller using the mqttSendSuccessCount delta to detect
+  // whether any send landed during the frame.
+  ++mqttSendSuccessCount;
   feedWatchDog();//feed the dog
+  return true;
 } // sendMQTTData()
 
-void sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool retain)
+bool sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool retain)
 {
   char topicBuf[MQTT_TOPIC_MAX_LEN];
   strncpy_P(topicBuf, reinterpret_cast<PGM_P>(topic), sizeof(topicBuf) - 1);
   topicBuf[sizeof(topicBuf) - 1] = '\0';
-  sendMQTTData(topicBuf, json, retain);
+  return sendMQTTData(topicBuf, json, retain);
 }
 
-void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *json, const bool retain)
+bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *json, const bool retain)
 {
-  if (!settings.mqtt.bEnable) return;
-  if (!mqttPublishAllowed) return;
-  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;}
-  if (!canPublishMQTT()) return;
+  if (!settings.mqtt.bEnable) return false;
+  if (!mqttPublishAllowed) return false;
+  if (!MQTTclient.connected()) { return false; }  // handleMQTT() logs disconnect and manages reconnect
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return false;}
+  if (!canPublishMQTT()) return false;
 
   char topicBuf[MQTT_TOPIC_MAX_LEN];
   char full_topic[MQTT_TOPIC_MAX_LEN];
@@ -1257,16 +1266,16 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
 
   PGM_P payload = reinterpret_cast<PGM_P>(json);
   const size_t payloadLen = strlen_P(payload);
-  if (!beginMqttPublish(full_topic, payloadLen, retain)) return;
+  if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttProgmemChunk(payload, payloadLen)) {
     MQTTclient.endPublish();
-    return;
+    return false;
   }
-  if (!MQTTclient.endPublish()) { PrintMQTTError(); return; }
-  confirmMQTTPublishSlot();
-  confirmMQTTPublishBitSlot();
-  confirmMQTTPublishByteSlot();
+  if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
+  // ADR-104 Decision item 7: no auto-commit. See char* overload comment.
+  ++mqttSendSuccessCount;
   feedWatchDog();
+  return true;
 }
 
 //===========================================================================================
@@ -1539,15 +1548,16 @@ void sendMQTT(const char* topic, const char *json) {
 //===========================================================================================
 
 /**
- * Publish ON/OFF value to MQTT topic
- * Reduces duplicate pattern of boolean-to-string conversion
+ * Publish ON/OFF value to MQTT topic.
+ * ADR-104: returns sendMQTTData()'s success so bit/byte publish helpers can
+ * commit-or-discard their pending throttle-slot records.
  */
-void publishMQTTOnOff(const char* topic, bool value) {
-  sendMQTTData(topic, value ? "ON" : "OFF");
+bool publishMQTTOnOff(const char* topic, bool value) {
+  return sendMQTTData(topic, value ? "ON" : "OFF");
 }
 
-void publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
-  sendMQTTData(topic, value ? "ON" : "OFF");
+bool publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
+  return sendMQTTData(topic, value ? "ON" : "OFF");
 }
 
 /**
