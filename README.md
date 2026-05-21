@@ -9,7 +9,7 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## What's new on dev (since v1.5.0-fix2)
 
-Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.7`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
+Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.16`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
 
 **MQTT and Home Assistant discovery**
 - **HA availability now reflects the MQTT link, not the OpenTherm bus** (ADR-074, regression fix). Entities like `DHW Control` and `Thermostat` no longer flap `unavailable` when the boiler stops talking; OT-bus liveness lives on the dedicated `otgw_connected` sensor. **Contract change:** consumers reading the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to `otgw_connected`.
@@ -18,6 +18,7 @@ Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.7`). The list be
 - **MsgID 0 Status canonical publish gated on boiler-side worldview** so the canonical topic no longer flaps on thermostat-only frames.
 - **HA PIC-control entities**: new `button` and `select` discovery configs under pseudo-ID 251 expose the PIC reset and mode controls as proper HA entities.
 - **Standalone HA discovery topic wiper**: one-shot helper for cleaning stale retained discovery topics out of the broker (TASK-611).
+- **HA capability-flag binary sensors for bits 2-5 no longer stuck at `unknown`** (ADR-076, PR #614): the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so cooling, OTC active, CH2 active, and summer/winter all reach their retained topics on every status change.
 
 **Web UI and diagnostics**
 - **FSexplorer "Update Firmware" button** is visible again on touch-capable desktops; the touch-class media query no longer hides the upload control.
@@ -28,6 +29,9 @@ Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.7`). The list be
 - **`build.py` auto-initialises missing git submodules** so a fresh clone or a stale checkout builds without manual `git submodule update`.
 - **`evaluate.py`** false-positive and stale checks fixed; the gate is now meaningful again.
 - **`/beta-prerelease` skill + GitHub Action** for tag-driven (and, after #609, workflow-dispatch-driven) beta publishing, with draft-first asset attachment to satisfy GitHub's immutable-releases policy. The release body now inlines a "What's new since the last public release" digest sourced from `RELEASE_NOTES_<base>-beta.md` above a `<!-- digest:end -->` sentinel, and the `/beta-prerelease` skill gates the README + CHANGELOG staleness check before the version bump (#612).
+
+**Performance**
+- **Mainloop responsiveness audit** (TASK-651, TASK-652, PR #617): all blocking `delay()` / `delayMs()` calls on the cooperative path replaced with non-blocking timer checks so `doBackgroundTasks()` keeps running at full cadence under load.
 
 **Code hygiene**
 - **Dead and orphaned code paths cleaned out of `dev`** (#586, #589): inactive subsystem code and its matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.

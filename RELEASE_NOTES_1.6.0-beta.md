@@ -11,6 +11,10 @@ The bullets below summarise the user-visible changes that have landed on `dev` s
 - **MsgID 0 Status canonical publish** gated on boiler-side worldview so the canonical topic no longer flaps on thermostat-only frames.
 - **HA PIC-control entities**: new `button` and `select` discovery configs under pseudo-ID 251 expose the PIC reset and mode controls as proper HA entities.
 - **Standalone HA discovery topic wiper**: one-shot helper for cleaning stale retained discovery topics out of the broker.
+- **HA capability-flag binary sensors (bits 2-5) no longer stuck at `unknown`** (ADR-076, PR #614): the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames. The rate gate is dropped and the per-bit publish is scoped to all three pending types so cooling, OTC active, CH2 active, and summer/winter reach their retained topics on every status change.
+
+**Performance**
+- **Mainloop responsiveness audit** (TASK-651, TASK-652, PR #617): all blocking `delay()` / `delayMs()` calls on the cooperative path replaced with non-blocking timer checks so `doBackgroundTasks()` keeps running at full cadence under load. This fixes occasional missed MQTT publish ticks and UI responsiveness drops under heavy OpenTherm traffic.
 
 **Web UI and diagnostics**
 - **FSexplorer "Update Firmware" button** is visible again on touch-capable desktops; the touch-class media query no longer hides the upload control.
@@ -39,6 +43,18 @@ Below is the long-form version of the digest above, with one section per area an
   - **Action for tester:** if any of your automations or dashboards key off the base value topic to detect that the boiler is talking, switch them to the `otgw_connected` sensor instead. The base value topic is no longer reliable for that purpose.
 - **JIT (just-in-time) discovery (ADR-073, supersedes ADR-041).** Discovery configs for OpenTherm MsgIDs are no longer published at boot. They publish the first time the gateway sees a value for that MsgID, which trims a large startup burst and means HA only sees entities that are actually relevant to the connected boiler+thermostat. Boot-time discovery still applies to the small set of non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC). The `F` force-republish action remains available for one-shot recovery.
 - **MsgID 0 Status gating (TASK-633).** The canonical `Status` topic now gates on the boiler-side worldview so it stops flapping on thermostat-only frames. This is a quality-of-life fix; no automation contract change.
+- **Capability-flag bits 2-5 unknown in HA (ADR-076, TASK-649, PR #614).** The MQTT status fanout had a global rate gate that suppressed per-bit publishes on subsequent MsgID 5 frames. Bits 2-5 (cooling, OTC active, CH2 active, summer/winter) therefore appeared `unknown` in Home Assistant unless the boiler happened to send the first MsgID 5 after a discovery republish. The fix drops the rate gate and scopes the per-bit publish across all three pending types so every status change reaches every retained capability-flag topic.
+  - **Action for tester:** if you previously saw `unknown` on `cooling_active`, `otc_active`, `ch2_active`, or `summer_winter_mode`, those entities should now populate within one MsgID 5 cycle after boot. No HA config change is required.
+
+### Mainloop responsiveness
+
+- **`delay()` / `delayMs()` audit (TASK-651, TASK-652, PR #617).** A handful of blocking `delay()` / `delayMs()` calls on the cooperative path were stalling `doBackgroundTasks()` for tens of milliseconds at a time, which manifested as occasional missed MQTT publish ticks and a sluggish Web UI under heavy OpenTherm traffic. Each site is now a non-blocking timer check (`DECLARE_TIMER_MS` / `DUE()`), so the loop yields back to the scheduler at full cadence.
+  - **Action for tester:** if you previously noticed the Web UI lagging during a thermostat write or the live OT log stuttering, please confirm it is smooth on this beta. Heap and uptime should also report on schedule via MQTT.
+
+### Architecture decisions worth noting
+
+- **ADR-076 (Accepted).** Drops the global MQTT status fanout rate gate so all 13 capability-flag bits reach their retained topics on every status change.
+- **ADR-077 (Superseded by ADR-078).** HA-core-style capability-flag aliases (37 opt-in topics) were drafted in detail and implemented behind a feature flag during the beta.8-beta.12 cycle. Field testing surfaced enough scope creep and complexity for the 1.6.0 stabilisation window that the change was reverted from `dev` and deferred to the 2.0.0 line. The decision is captured in ADR-078; no user-visible behaviour change in the 1.6.0 line.
 
 ### Web UI fixes worth field-validating
 
