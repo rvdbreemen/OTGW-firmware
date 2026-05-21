@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.6.0-beta.9
+**  Version  : v1.6.0-beta.10
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -947,10 +947,16 @@ void PrintMQTTError(){
   }
 }
 
-/* 
+// ADR-076 (extended in TASK-644): monotonic publish-success counter. Each
+// sendMQTTData() success path increments this exactly once. OTPublishGate
+// callers capture pre/post values to determine whether any send landed during
+// their frame and commit the matching mqttPendingSlot accordingly.
+uint32_t mqttSendSuccessCount = 0;
+
+/*
   topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
   json:   <string> , payload to send
-  retain: <bool> , retain mqtt message  
+  retain: <bool> , retain mqtt message
 */
 bool sendMQTTData(const char* topic, const char *json, const bool retain)
 {
@@ -976,11 +982,12 @@ bool sendMQTTData(const char* topic, const char *json, const bool retain)
     return false;
   }
   if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
-  // Publish succeeded — confirm any pending normal-msgId throttle slot update.
-  // Bit/byte slot confirmations live in the per-helper publish path (ADR-076);
-  // an unrelated sendMQTTData() must not commit a pending record left over
-  // from a heap-throttled bit/byte publish.
-  confirmMQTTPublishSlot();
+  // ADR-076 (extended in TASK-644): no auto-commit of pending slot updates
+  // inside sendMQTTData. Bit/byte slots commit-or-discard in their per-helper
+  // publish path; the normal-msgId mqttPendingSlot is committed-or-discarded
+  // by the OTPublishGate caller using the mqttSendSuccessCount delta to detect
+  // whether any send landed during the frame.
+  ++mqttSendSuccessCount;
   feedWatchDog();//feed the dog
   return true;
 } // sendMQTTData()
@@ -1023,8 +1030,9 @@ bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
     return false;
   }
   if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
-  // Bit/byte slot confirmations live in the per-helper publish path (ADR-076).
-  confirmMQTTPublishSlot();
+  // ADR-076 (extended in TASK-644): no auto-commit of pending slot updates
+  // inside sendMQTTData. See the corresponding comment in the char* overload.
+  ++mqttSendSuccessCount;
   feedWatchDog();
   return true;
 }
