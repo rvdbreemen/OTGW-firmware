@@ -21,8 +21,10 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 ### Changed
 - Pure JIT MQTT discovery: only non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC) are queued at boot; OT MsgID discovery configs publish on first MsgID reception, not on connect (ADR-073, supersedes ADR-041)
 - Dev version line bumped to `1.6.0-beta.N` (was `1.5.x-beta.N`) (#601)
+- Mainloop responsiveness audit: `delay()` / `delayMs()` usages on the cooperative path replaced with non-blocking timer checks so `doBackgroundTasks()` keeps running at full cadence under load (TASK-651, TASK-652, #617)
 
 ### Fixed
+- HA capability-flag binary sensors for bits 2-5 (cooling, OTC active, CH2 active, summer/winter) stuck at `unknown` in Home Assistant: the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so every bit reaches its retained topic on every status change (ADR-076, TASK-649, #614)
 - HA `DHW Control`, `Thermostat`, and all sensor entities flapping `unavailable` (regression since 1.5.0/TASK-538): HA entity availability (`avty_t`) now reflects only the ESP↔MQTT link (birth/LWT) instead of OpenTherm-bus liveness. OT-bus liveness remains on the dedicated `otgw_connected` sensor. **Contract change:** consumers that read the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to the `otgw_connected` sensor (ADR-074, TASK-607)
 - MQTT proxy-answer (no-B) routing: MsgIDs without a boiler response now route to the correct worldview topic instead of going silent; root cause behind PR #565 (ADR-075, #599)
 - MsgID 0 Status canonical publish gated on boiler-side worldview so the canonical topic stops flapping on thermostat-only frames (TASK-633, #604)
@@ -45,6 +47,8 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - API and ADR documentation refreshed mid-cycle (TASK-596): `docs/api/MQTT.md` documents the boot vs. JIT split per ADR-073; `docs/api/README.md` corrects the `/discovery/verify` REST endpoint description; `docs/adr/README.md` gains the ADR-041 (Superseded) and ADR-073 (Accepted) index entries
 - Release-notes housekeeping (TASK-596): `RELEASE_NOTES_1.5.0.md` and `RELEASE_GITHUB_1.5.0.md` moved from the repo root into `docs/releases/`; the older `1.3.3` and `1.3.4` notes (both `RELEASE_NOTES_*` and `RELEASE_GITHUB_*`) archived under `docs/releases/archive/`
 - Documentation-review findings 1-5 fixed (#581): stale `../` link paths corrected across `docs/guides/BUILD.md`, `docs/guides/FLASH_GUIDE_NL.md`, `docs/guides/PIC_FIRMWARE_EN.md`, `docs/guides/browser-debug-console.md`, and `docs/process/DOCUMENTATION_LINKS_POLICY.md`. The dev README banner was also restored to its dev-line styling in the same PR after a brief main-branch-styling slip introduced upstream in #574
+- ADR-076 accepted: drops the global MQTT status fanout rate gate so all 13 capability-flag bits reach their retained topics on every status change
+- ADR-077 proposed and then superseded by ADR-078: HA-core-style capability-flag aliases (37 opt-in topics) were drafted, implemented behind a feature flag, then reverted from `dev` and deferred to the 2.0.0 line; ADR-078 captures the deferral rationale
 
 ### Removed
 - Dead and orphaned code paths cleaned out of `dev` (#586, #589): inactive subsystem code and the matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.
