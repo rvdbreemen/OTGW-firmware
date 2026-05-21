@@ -3,11 +3,11 @@ id: TASK-649
 title: >-
   Audit HA capability-flag binary_sensors (MsgID 2/3/6) vs HA core opentherm_gw
   semantics — non-breaking fixes only
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-21 08:53'
-updated_date: '2026-05-21 09:08'
+updated_date: '2026-05-21 09:10'
 labels:
   - audit
   - ha-discovery
