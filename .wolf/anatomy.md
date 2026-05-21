@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-20T06:14:09.859Z
-> Files: 14 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-21T09:16:34.482Z
+> Files: 15 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -339,6 +339,10 @@
 - `ADR-103-mqtt-source-topic-proxy-answer-routing.md` — ADR-103: MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement (~3159 tok)
 - `README.md` — Project documentation (~9864 tok)
 
+## docs/audits/
+
+- `2026-05-21-ha-capability-flags-feature-2.0.0.md` — Audit: HA capability-flag binary_sensors (MsgID 2/3/6) vs HA core opentherm_gw — feature-2.0.0 branc (~2846 tok)
+
 ## plan/
 
 - `feature-openweathermap-onboarding-1.md` — Introduction (~7501 tok)
@@ -347,7 +351,7 @@
 
 - `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~31733 tok)
 - `OTGW-Core.h` — ifndef OTGWCore_h (~10494 tok)
-- `OTGW-Core.ino` — Declares char (~62624 tok)
+- `OTGW-Core.ino` — Declares char (~63087 tok)
 - `restAPI.ino` — include <string.h> (~40900 tok)
 - `SATweather.ino` — Declares uint16_t (~7653 tok)
 - `settingStuff.ino` — include <ctype.h> (~16551 tok)
