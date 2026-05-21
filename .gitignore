@@ -57,6 +57,7 @@ logs-issue/*
 .claude/github_last_checked.txt
 .claude/tweakers_last_checked.txt
 .wolf/
+.claude/worktrees/
 tools/esptool/
 
 # Accidental root drops (TASK-635): seen via GitHub web UI uploads / empty stubs.
