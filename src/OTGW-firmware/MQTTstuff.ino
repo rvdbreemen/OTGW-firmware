@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.47
+**  Version  : v2.0.0-alpha.48
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -35,6 +35,9 @@ void markAllMQTTConfigPending();
 void clearMQTTConfigPending();
 void publishNonOTDiscoveryConfigs();
 void loopMQTTDiscovery();
+// ADR-106: topic-naming-mode cleanup helpers
+void armTopicCleanupOnLegacyToggle(bool newUseLegacy);
+void runTopicCleanupStep();
 
 // Declare some variables within global scope
 
@@ -2114,21 +2117,27 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     }
   }
 
-  // Binary sensors — indexed range
+  // Binary sensors — indexed range. ADR-106: filter by naming mode.
+  // - new mode (default, bUseLegacyOtTopics=false): SKIP rows flagged
+  //   MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS (they have an alias replacement).
+  // - legacy mode (bUseLegacyOtTopics=true): publish all indexed rows.
+  const bool useLegacy = settings.mqtt.bUseLegacyOtTopics;
   uint16_t bIdx = readBinSensorIndex(OTid);
   if (bIdx != MQTT_HA_INDEX_NONE) {
     while (bIdx < MQTT_HA_BINSENSOR_INDEXED_COUNT) {
       MqttHaBinSensorCfg cfg = readBinSensorCfg(bIdx);
       if (cfg.id != OTid) break;
-      if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+      const bool skipReplaced = !useLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS);
+      if (!skipReplaced) {
+        if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+      }
       bIdx++;
       feedWatchDog();
     }
   }
-  // ADR-105: alias tail (non-contiguous; not covered by index). Only walked
-  // when bPublishHaCoreAliases is on so a default-off install pays no extra
-  // discovery iteration cost.
-  if (settings.mqtt.bPublishHaCoreAliases) {
+  // ADR-106: alias tail (non-contiguous; not covered by index). Walked only
+  // in new mode — these are the new defaults. Legacy mode skips them entirely.
+  if (!useLegacy) {
     for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
       MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
       if (cfg.id != OTid) continue;
@@ -2579,6 +2588,162 @@ void satBLEUnpublishDiscovery(const char* macCompact)
               macCompact);
 }
 #endif // defined(ESP32)
+
+// ============================================================================
+// ADR-106: topic-naming-mode cleanup machinery
+// ============================================================================
+// When settings.mqtt.bUseLegacyOtTopics toggles, the firmware needs to clear
+// the OTHER name set's retained discovery configs from the broker so HA
+// removes those entities. We don't clear retained state-topic values — those
+// stale out naturally via the LWT/availability fall.
+//
+// State: 1 byte mode + 5-byte bitmap, persisted to LittleFS '/topic_cleanup.bin'
+//   mode 0  = idle (no cleanup pending)
+//   mode 1  = clear 37 alias topics       (toggle was new→legacy)
+//   mode 2  = clear 37 legacy-replaced    (toggle was legacy→new)
+// Bitmap bit N = "the N-th topic in this mode is still pending".
+//
+// Drain is paced (1 publish per loop tick) and gated by canPublishMQTT().
+// Reboot mid-drain: state is on flash, resumed lazily by runTopicCleanupStep.
+// MQTT disconnect mid-drain: runTopicCleanupStep no-ops while not connected,
+// auto-resumes when MQTT reconnects.
+// ----------------------------------------------------------------------------
+
+constexpr uint8_t TOPIC_CLEANUP_MODE_IDLE             = 0;
+constexpr uint8_t TOPIC_CLEANUP_MODE_CLEAR_ALIASES    = 1;
+constexpr uint8_t TOPIC_CLEANUP_MODE_CLEAR_LEGACY_REP = 2;
+constexpr const char *kTopicCleanupFile = "/topic_cleanup.bin";
+
+struct TopicCleanupState {
+  uint8_t mode;        // see TOPIC_CLEANUP_MODE_* above
+  uint8_t bitmap[5];   // 40 bits; up to 37 used (3 unused top bits cleared at arm)
+};
+static TopicCleanupState g_topicCleanup = {TOPIC_CLEANUP_MODE_IDLE, {0, 0, 0, 0, 0}};
+static bool              g_topicCleanupLoaded = false;
+
+static void writeTopicCleanupState() {
+  File f = LittleFS.open(kTopicCleanupFile, "w");
+  if (!f) return;
+  f.write(&g_topicCleanup.mode, 1);
+  f.write(g_topicCleanup.bitmap, sizeof(g_topicCleanup.bitmap));
+  f.close();
+}
+
+static void deleteTopicCleanupFile() {
+  if (LittleFS.exists(kTopicCleanupFile)) LittleFS.remove(kTopicCleanupFile);
+}
+
+static void readTopicCleanupStateOnce() {
+  if (g_topicCleanupLoaded) return;
+  g_topicCleanupLoaded = true;
+  if (!LittleFS.exists(kTopicCleanupFile)) return;
+  File f = LittleFS.open(kTopicCleanupFile, "r");
+  if (!f) return;
+  uint8_t buf[6] = {0};
+  if (f.read(buf, sizeof(buf)) == (int)sizeof(buf)) {
+    g_topicCleanup.mode = buf[0];
+    memcpy(g_topicCleanup.bitmap, &buf[1], 5);
+  }
+  f.close();
+  if (g_topicCleanup.mode != TOPIC_CLEANUP_MODE_IDLE) {
+    DebugTf(PSTR("[ADR-106] topic cleanup state resumed from flash (mode=%u)\r\n"),
+            (unsigned)g_topicCleanup.mode);
+  }
+}
+
+// Arm cleanup: called from settingStuff.ino when bUseLegacyOtTopics flips.
+// newUseLegacy=true  → we're entering legacy mode → clear the alias topics.
+// newUseLegacy=false → we're entering new mode    → clear the legacy-replaced topics.
+void armTopicCleanupOnLegacyToggle(bool newUseLegacy) {
+  readTopicCleanupStateOnce();
+  g_topicCleanup.mode = newUseLegacy ? TOPIC_CLEANUP_MODE_CLEAR_ALIASES
+                                     : TOPIC_CLEANUP_MODE_CLEAR_LEGACY_REP;
+  // Set all 37 bits (bits 0..36 = pending). Bits 37..39 stay 0.
+  memset(g_topicCleanup.bitmap, 0xFF, 4);
+  g_topicCleanup.bitmap[4] = 0x1F;  // 5 low bits set (bits 32..36); bits 37..39 cleared
+  writeTopicCleanupState();
+  DebugTf(PSTR("[ADR-106] armed topic cleanup mode=%u (37 topics pending)\r\n"),
+          (unsigned)g_topicCleanup.mode);
+}
+
+// Find the N-th legacy-replaced row in mqttHaBinSensors[] (indexed range
+// 0..MQTT_HA_BINSENSOR_INDEXED_COUNT-1). Returns -1 if not found.
+static int16_t findNthLegacyReplacedRow(uint8_t n) {
+  uint8_t count = 0;
+  for (uint16_t i = 0; i < MQTT_HA_BINSENSOR_INDEXED_COUNT; i++) {
+    MqttHaBinSensorCfg cfg = readBinSensorCfg(i);
+    if (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS) {
+      if (count == n) return (int16_t)i;
+      count++;
+    }
+  }
+  return -1;
+}
+
+// Publish an empty retained payload to the discovery topic for the given row.
+// HA reads zero-length retained as "remove this entity".
+static bool publishEmptyDiscoveryFor(const MqttHaBinSensorCfg &cfg) {
+  if (!MQTTclient.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  char labelBuf[48];
+  strlcpy_P(labelBuf, cfg.label, sizeof(labelBuf));
+  char topic[MQTT_TOPIC_MAX_LEN];
+  snprintf_P(topic, sizeof(topic), PSTR("%s/binary_sensor/%s/%s/config"),
+             CSTR(settings.mqtt.sHaprefix), CSTR(settings.mqtt.sUniqueid), labelBuf);
+  // Zero-length retained payload via the streaming primitives — same path
+  // as the deregister code in mqttSatBLEUnpublishHaDiscoveryForMac().
+  if (!beginMqttPublish(topic, 0, /*retain=*/true)) return false;
+  if (!MQTTclient.endPublish()) return false;
+  return true;
+}
+
+// Drain one bit per call from doBackgroundTasks(). Total work = up to 37
+// successful publishes per toggle, paced by the loop tick cadence.
+void runTopicCleanupStep() {
+  readTopicCleanupStateOnce();
+  if (g_topicCleanup.mode == TOPIC_CLEANUP_MODE_IDLE) return;
+  if (!MQTTclient.connected()) return;  // resume on next connect
+  if (!canPublishMQTT()) return;
+
+  // Find the next pending bit (lowest set bit).
+  int8_t bitIdx = -1;
+  for (uint8_t i = 0; i < 37; i++) {
+    if (g_topicCleanup.bitmap[i >> 3] & (1 << (i & 7))) { bitIdx = i; break; }
+  }
+  if (bitIdx < 0) {
+    // Drain complete.
+    DebugTln(F("[ADR-106] topic cleanup complete; deleting state file"));
+    g_topicCleanup.mode = TOPIC_CLEANUP_MODE_IDLE;
+    memset(g_topicCleanup.bitmap, 0, sizeof(g_topicCleanup.bitmap));
+    deleteTopicCleanupFile();
+    return;
+  }
+
+  // Look up the row this bit refers to.
+  int16_t rowIdx = -1;
+  if (g_topicCleanup.mode == TOPIC_CLEANUP_MODE_CLEAR_ALIASES) {
+    // Alias rows are at indices MQTT_HA_BINSENSOR_INDEXED_COUNT..COUNT-1 (37 entries).
+    rowIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT + bitIdx;
+    if (rowIdx >= (int16_t)MQTT_HA_BINSENSOR_COUNT) rowIdx = -1;
+  } else if (g_topicCleanup.mode == TOPIC_CLEANUP_MODE_CLEAR_LEGACY_REP) {
+    rowIdx = findNthLegacyReplacedRow((uint8_t)bitIdx);
+  }
+  if (rowIdx < 0) {
+    // Mapping failure (shouldn't happen) — clear the bit and persist to avoid
+    // an infinite loop, then return.
+    g_topicCleanup.bitmap[bitIdx >> 3] &= ~(1 << (bitIdx & 7));
+    writeTopicCleanupState();
+    return;
+  }
+
+  MqttHaBinSensorCfg cfg = readBinSensorCfg((uint16_t)rowIdx);
+  if (publishEmptyDiscoveryFor(cfg)) {
+    g_topicCleanup.bitmap[bitIdx >> 3] &= ~(1 << (bitIdx & 7));
+    writeTopicCleanupState();
+    feedWatchDog();
+  }
+  // On failure: leave bit set, retry next tick.
+}
 
 
 /***************************************************************************

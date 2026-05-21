@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.47
+**  Version  : v2.0.0-alpha.48
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -203,6 +203,9 @@ void sendMQTTDataPic(const __FlashStringHelper* label, const char* value);
 void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper* value);
 void publishToSourceTopic(const char*, const char*, byte);
 void loopMQTTDiscovery();
+// ADR-106: topic-naming-mode cleanup helpers (defined in MQTTstuff.ino).
+void armTopicCleanupOnLegacyToggle(bool newUseLegacy);
+void runTopicCleanupStep();
 void setMQTTConfigPending(const uint8_t MSGid);
 void markAllMQTTConfigPending();
 const char *messageIDToString(OTLibMessageID message_id);

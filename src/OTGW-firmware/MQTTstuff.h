@@ -58,7 +58,7 @@ struct MQTTSettingsSection {
   uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
   bool    bLegacyPort25238Enabled = false;
-  bool    bPublishHaCoreAliases = false; // ADR-105: publish HA-core-style alias topics (supports_*, fault_indication, etc.) alongside the firmware's current labels for the 37 capability/state/type/fault bits on MsgID 0/2/3/5/6/70/74/100/101
+  bool    bUseLegacyOtTopics = false;  // ADR-106: false (default) → publish new self-describing names (supports_*, fault_indication, ventilation_*, etc.). true → publish legacy OT-spec-derived names. Mutually exclusive — never both at the same time. Toggle triggers cleanup of the OTHER set's retained discovery topics.
 };
 
 // ---------------------------------------------------------------------------
@@ -244,8 +244,9 @@ constexpr uint8_t MQTT_HA_FLAG_SOURCE_SUFFIX        = 0x01;
 constexpr uint8_t MQTT_HA_FLAG_SOURCE_NAME          = 0x02;
 constexpr uint8_t MQTT_HA_FLAG_SOURCE_TOPIC_SEGMENT = 0x04;
 constexpr uint8_t MQTT_HA_FLAG_IS_PIC_ENTRY         = 0x08;
-constexpr uint8_t MQTT_HA_FLAG_IS_HA_CORE_ALIAS     = 0x10;  // ADR-105: gated by settings.mqtt.bPublishHaCoreAliases
-constexpr uint8_t MQTT_HA_FLAG_ANY_SOURCE           = 0x07;
+constexpr uint8_t MQTT_HA_FLAG_IS_HA_CORE_ALIAS         = 0x10;  // ADR-106: published in new mode (default; settings.mqtt.bUseLegacyOtTopics=false). Skipped in legacy mode.
+constexpr uint8_t MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS  = 0x20;  // ADR-106: legacy row that has an alias replacement. Skipped in new mode, published in legacy mode.
+constexpr uint8_t MQTT_HA_FLAG_ANY_SOURCE                = 0x07;
 #endif
 
 // ---------------------------------------------------------------------------

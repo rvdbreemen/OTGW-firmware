@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.47
+**  Version  : v2.0.0-alpha.48
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1626,18 +1626,15 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
                           bool forcePublish, uint8_t previousBits, uint8_t currentBits,
                           const char* aliasLabel = nullptr) {
   const bool allowPublish = shouldPublishStatusBit(bitSlot, newVal, prevVal, forcePublish);
-  logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
+  // ADR-106: pick exactly one label — alias in new mode (default), legacy in legacy mode.
+  // If aliasLabel is nullptr the bit has no alias replacement and topic always wins.
+  const char* labelToPublish = (aliasLabel && !settings.mqtt.bUseLegacyOtTopics) ? aliasLabel : topic;
+  logMQTTStatusBitDecision(bitSlot, labelToPublish, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-347: arm cooldown only for real sends
   // ADR-104: commit pending bit-slot only when sendMQTTData confirms success.
-  // On any early-return (heap throttle, disconnect) discard the pending so an
-  // unrelated downstream publish cannot silently commit it.
-  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
-  else                                 mqttPendingBitSlot.pending = false;
-  // ADR-105: alias mirror, rides on the same allowPublish gate.
-  if (allowPublish && aliasLabel && settings.mqtt.bPublishHaCoreAliases) {
-    publishMQTTOnOff(aliasLabel, newVal);
-  }
+  if (publishMQTTOnOff(labelToPublish, newVal)) confirmMQTTPublishBitSlot();
+  else                                          mqttPendingBitSlot.pending = false;
 }
 
 static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal,
@@ -1645,15 +1642,13 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
                                    const char* aliasLabel = nullptr)
 {
   const bool allowPublish = shouldPublishStatusVHBit(bitSlot, newVal, prevVal, forcePublish);
-  logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
+  // ADR-106: pick exactly one label.
+  const char* labelToPublish = (aliasLabel && !settings.mqtt.bUseLegacyOtTopics) ? aliasLabel : topic;
+  logMQTTStatusBitDecision(bitSlot, labelToPublish, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-354: arm cooldown only for real sends
-  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
-  else                                 mqttPendingBitSlot.pending = false;
-  // ADR-105: alias mirror.
-  if (allowPublish && aliasLabel && settings.mqtt.bPublishHaCoreAliases) {
-    publishMQTTOnOff(aliasLabel, newVal);
-  }
+  if (publishMQTTOnOff(labelToPublish, newVal)) confirmMQTTPublishBitSlot();
+  else                                          mqttPendingBitSlot.pending = false;
 }
 
 // TASK-401: generic gate-wrapped publish helpers for non-Status fan-out
@@ -1668,14 +1663,13 @@ static void publishGatedBitMQTT(uint16_t *trackedSlots, uint8_t bitSlot,
                                 const __FlashStringHelper *aliasLabel = nullptr)
 {
   const bool allowPublish = shouldPublishTrackedStatusBit(trackedSlots, bitSlot, newVal, prevVal, /*forcePublish=*/false);
+  // ADR-106: pick exactly one label — alias in new mode (default), legacy in legacy mode.
+  const __FlashStringHelper *labelToPublish =
+      (aliasLabel && !settings.mqtt.bUseLegacyOtTopics) ? aliasLabel : topic;
   OTPublishGate gate(allowPublish);
   // ADR-104: commit pending only when sendMQTTData confirms success.
-  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
-  else                                 mqttPendingBitSlot.pending = false;
-  // ADR-105: alias mirror, rides on the same gate.
-  if (allowPublish && aliasLabel && settings.mqtt.bPublishHaCoreAliases) {
-    publishMQTTOnOff(aliasLabel, newVal);
-  }
+  if (publishMQTTOnOff(labelToPublish, newVal)) confirmMQTTPublishBitSlot();
+  else                                          mqttPendingBitSlot.pending = false;
 }
 
 static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
@@ -2197,11 +2191,10 @@ void print_solar_storage_status(uint16_t& value)
     AddLogf("\r\n%s = Slave Solar Mode Status [%d] ", OTlookupitem.label, SlaveSolarModeStatus);
     AddLogf("\r\n%s = Slave Solar Status [%d] ", OTlookupitem.label, SlaveSolarStatus);
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData(F("solar_storage_slave_fault_indicator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));
-      // ADR-105: HA-core-style alias mirror.
-      if (settings.mqtt.bPublishHaCoreAliases) {
-        sendMQTTData(F("solar_storage_fault"), ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));
-      }
+      // ADR-106: pick legacy vs new label.
+      sendMQTTData(settings.mqtt.bUseLegacyOtTopics ? F("solar_storage_slave_fault_indicator")
+                                                    : F("solar_storage_fault"),
+                   ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));
       sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  
       sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  
       OTcurrentSystemState.SolarSlaveStatus = OTdata.valueLB;
@@ -2355,23 +2348,17 @@ void print_slavememberid(uint16_t& value)
     //     audited in docs/audits/2026-05-21-ha-capability-flags-feature-2.0.0.md (TASK-650).
     // 7:  Heat/cool mode control
 
-    sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
-    sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
-    sendMQTTData(F("cooling_config"),                          (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
-    sendMQTTData(F("dhw_config"),                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
-    sendMQTTData(F("master_low_off_pump_control_function"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));
-    sendMQTTData(F("ch2_present"),                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
-    sendMQTTData(F("remote_water_filling_function"),           (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));
-    sendMQTTData(F("heat_cool_mode_control"),                  (((OTdata.valueHB) & 0x80) ? "ON" : "OFF"));
-    // ADR-105: HA-core-style alias mirrors (7 entries; HB7 heat_cool_mode_control intentionally not aliased).
-    if (settings.mqtt.bPublishHaCoreAliases) {
-      sendMQTTData(F("supports_hot_water"),                                  (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
-      sendMQTTData(F("control_type"),                                        (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
-      sendMQTTData(F("supports_cooling"),                                    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
-      sendMQTTData(F("hot_water_config"),                                    (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
-      sendMQTTData(F("supports_pump_control"),                               (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));
-      sendMQTTData(F("supports_ch_2"),                                       (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
-      sendMQTTData(F("supports_remote_reset"),                               (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));
+    // ADR-106: pick legacy vs new label per bit. Heat_cool_mode_control (HB7) has no alias and always publishes its legacy name.
+    {
+      const bool useLegacy = settings.mqtt.bUseLegacyOtTopics;
+      sendMQTTData(useLegacy ? F("dhw_present")                          : F("supports_hot_water"),     (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
+      sendMQTTData(useLegacy ? F("control_type_modulation")              : F("control_type"),           (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
+      sendMQTTData(useLegacy ? F("cooling_config")                       : F("supports_cooling"),       (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
+      sendMQTTData(useLegacy ? F("dhw_config")                           : F("hot_water_config"),       (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
+      sendMQTTData(useLegacy ? F("master_low_off_pump_control_function") : F("supports_pump_control"),  (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));
+      sendMQTTData(useLegacy ? F("ch2_present")                          : F("supports_ch_2"),          (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
+      sendMQTTData(useLegacy ? F("remote_water_filling_function")        : F("supports_remote_reset"),  (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));
+      sendMQTTData(F("heat_cool_mode_control"),                                                          (((OTdata.valueHB) & 0x80) ? "ON" : "OFF"));
     }
     // SAT: auto-detect manufacturer from slave MemberID code
     satDetectManufacturer(OTdata.valueLB);
@@ -2386,11 +2373,10 @@ void print_mastermemberid(uint16_t& value)
     //Build string for MQTT
     char _msg[15] {0};
     sendMQTTData(F("master_configuration"), byte_to_binary(OTdata.valueHB));
-    sendMQTTData(F("master_configuration_smart_power"), (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
-    // ADR-105: HA-core-style alias mirror.
-    if (settings.mqtt.bPublishHaCoreAliases) {
-      sendMQTTData(F("supports_master_smart_power"), (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
-    }  
+    // ADR-106: pick legacy vs new label.
+    sendMQTTData(settings.mqtt.bUseLegacyOtTopics ? F("master_configuration_smart_power")
+                                                  : F("supports_master_smart_power"),
+                 (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
     
     utoa(OTdata.valueLB, _msg, 10);
     sendMQTTData(F("master_memberid_code"), _msg);
@@ -2405,14 +2391,12 @@ void print_vh_configmemberid(uint16_t& value)
     //Build string for MQTT
     char _msg[15] {0};
     sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); 
-    sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
-    sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
-    sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
-    // ADR-105: HA-core-style alias mirrors for MsgID 74 (Category A + C).
-    if (settings.mqtt.bPublishHaCoreAliases) {
-      sendMQTTData(F("ventilation_system_type"),         (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
-      sendMQTTData(F("supports_ventilation_bypass"),     (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
-      sendMQTTData(F("ventilation_speed_control_type"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
+    // ADR-106: pick legacy vs new label per bit.
+    {
+      const bool useLegacy = settings.mqtt.bUseLegacyOtTopics;
+      sendMQTTData(useLegacy ? F("vh_configuration_system_type")   : F("ventilation_system_type"),         (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
+      sendMQTTData(useLegacy ? F("vh_configuration_bypass")        : F("supports_ventilation_bypass"),     (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
+      sendMQTTData(useLegacy ? F("vh_configuration_speed_control") : F("ventilation_speed_control_type"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
     }
     // SAT auto-detect: bit 0 of HB = system type (0=boiler, 1=heat pump)
     state.sat.iDetectedHeatingSystem = ((OTdata.valueHB) & 0x01) ? SAT_HSYS_HEAT_PUMP : SAT_HSYS_RADIATORS;  
