@@ -443,6 +443,54 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-20T06:11:50.002Z"
+    },
+    {
+      "id": "bug-028",
+      "timestamp": "2026-05-21T20:25:14.662Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/MQTTstuff.ino",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 8→10 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-21T20:25:14.662Z"
+    },
+    {
+      "id": "bug-029",
+      "timestamp": "2026-05-21T21:08:28.288Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/OTGW-firmware.ino",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 7→3 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-21T21:08:28.288Z"
+    },
+    {
+      "id": "bug-030",
+      "timestamp": "2026-05-21T21:08:53.001Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/version.h",
+      "root_cause": "12 lines replaced/restructured",
+      "fix": "Rewrote 25→11 lines (12 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "h"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-21T21:08:53.001Z"
     }
   ]
 }

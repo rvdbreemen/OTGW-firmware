@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-21T09:16:34.482Z
-> Files: 15 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-21T21:08:58.631Z
+> Files: 19 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -349,13 +349,17 @@
 
 ## src/OTGW-firmware/
 
-- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~31733 tok)
+- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~34163 tok)
+- `OTDirect.ino` — Declares instances (~39550 tok)
 - `OTGW-Core.h` — ifndef OTGWCore_h (~10494 tok)
-- `OTGW-Core.ino` — Declares char (~63087 tok)
+- `OTGW-Core.ino` — Declares char (~63936 tok)
+- `OTGW-firmware.ino` — Declares WifiPortalResetState (~6893 tok)
 - `restAPI.ino` — include <string.h> (~40900 tok)
 - `SATweather.ino` — Declares uint16_t (~7653 tok)
 - `settingStuff.ino` — include <ctype.h> (~16551 tok)
+- `version.h` — The version number conforms to semver.org format (~195 tok)
 
 ## src/OTGW-firmware/data/
 
 - `index.js` — Safely parse JSON with validation and error handling (~80243 tok)
+- `version.hash` (~3 tok)
