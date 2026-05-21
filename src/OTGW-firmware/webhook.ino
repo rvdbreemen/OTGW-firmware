@@ -1,6 +1,6 @@
 /*********
 **  Program  : webhook.ino
-**  Version  : v1.6.0-beta.7
+**  Version  : v1.6.0-beta.8
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
