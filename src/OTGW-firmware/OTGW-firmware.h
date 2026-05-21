@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.6.0-beta.11
+**  Version  : v1.6.0-beta.12
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -375,6 +375,7 @@ struct MQTTSettingsSection {
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
   bool    bLegacyPort25238Enabled = false; // Opt-in otmonitor TCP stream for legacy clients
   bool    bDiscoveryAutoVerify = true;  // ADR-062: daily auto-heal of retained discovery configs (TASK-351 wires the trigger; TASK-349 ships the field only)
+  bool    bPublishHaCoreAliases = false; // ADR-077: publish HA-core-style alias topics (supports_*, fault_indication, etc.) alongside the firmware's current labels for the 37 capability/state/type/fault bits on MsgID 0/2/3/5/6/70/74/100/101
 };
 
 struct NTPSection {

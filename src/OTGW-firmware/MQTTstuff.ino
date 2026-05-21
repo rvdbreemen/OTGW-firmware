@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.6.0-beta.11
+**  Version  : v1.6.0-beta.12
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1609,14 +1609,24 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     }
   }
 
-  // Binary sensors
+  // Binary sensors — indexed range
   uint16_t bIdx = readBinSensorIndex(OTid);
   if (bIdx != MQTT_HA_INDEX_NONE) {
-    while (bIdx < MQTT_HA_BINSENSOR_COUNT) {
+    while (bIdx < MQTT_HA_BINSENSOR_INDEXED_COUNT) {
       MqttHaBinSensorCfg cfg = readBinSensorCfg(bIdx);
       if (cfg.id != OTid) break;
       if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
       bIdx++;
+      feedWatchDog();
+    }
+  }
+  // ADR-077: alias tail (non-contiguous; not covered by index). streamBinarySensorDiscovery()
+  // itself short-circuits these when bPublishHaCoreAliases is off.
+  if (settings.mqtt.bPublishHaCoreAliases) {
+    for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
+      MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
+      if (cfg.id != OTid) continue;
+      if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
       feedWatchDog();
     }
   }
