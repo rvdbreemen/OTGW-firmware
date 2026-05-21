@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.6.0-beta.13
+**  Version  : v1.6.0-beta.15
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -420,7 +420,7 @@ void doBackgroundTasks()
       loopNTP();                   BGTRACE("ntp");
     }
   } //otherwise, just wait until reconnected gracefully
-  delay(1);
+  yield();
   return;
 }
 
