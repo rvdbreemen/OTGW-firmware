@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.51
+**  Version  : v2.0.0-alpha.52
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1106,10 +1106,11 @@ void handleMQTT()
       else
       { // no connection, back off non-blockingly (3s, 6s, 9s, 12s between attempts)
         // so HTTP/WebSocket keep getting served between connect tries.
-        uint32_t backoffSec = 3UL * reconnectAttempts;
+        // Inline timer-bump (vs CHANGE_INTERVAL_SEC) to save ~50 bytes of flash
+        // on ESP32; safeTimers.h DUE() only reads _due, so this is sufficient.
+        timerMQTTwaitforretry_due = millis() + (3000UL * reconnectAttempts);
         MQTTDebugln(F(" .. \r"));
-        MQTTDebugTf(PSTR("failed, retrycount=[%d], rc=[%d] ..  try again in %lu seconds\r\n"), reconnectAttempts, MQTTclient.state(), (unsigned long)backoffSec);
-        CHANGE_INTERVAL_SEC(timerMQTTwaitforretry, backoffSec, SKIP_MISSED_TICKS);
+        MQTTDebugTf(PSTR("failed, retrycount=[%d], rc=[%d] ..  try again\r\n"), reconnectAttempts, MQTTclient.state());
         stateMQTT = MQTT_STATE_WAIT_CONNECTION_ATTEMPT;  // if the re-connect did not work, then return to wait for reconnect
         MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_CONNECTION_ATTEMPT"));
       }

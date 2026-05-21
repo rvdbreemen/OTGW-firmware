@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-21T20:25:14.647Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-21T20:46:53.976Z
 > Files: 17 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
@@ -349,7 +349,7 @@
 
 ## src/OTGW-firmware/
 
-- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~34148 tok)
+- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~34163 tok)
 - `OTDirect.ino` — Declares instances (~39550 tok)
 - `OTGW-Core.h` — ifndef OTGWCore_h (~10494 tok)
 - `OTGW-Core.ino` — Declares char (~63936 tok)
