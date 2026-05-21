@@ -29,8 +29,6 @@ The synchronous ESP8266WebServer is sensitive to per-tick latency. doBackgroundT
 - [ ] #5 Field validation: beta build remains stable under load (telnet + WS + MQTT + HTTP); reported back via Discord
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -43,3 +41,28 @@ The synchronous ESP8266WebServer is sensitive to per-tick latency. doBackgroundT
 7. Open draft PR.
 8. Field validation AC stays open until beta tester confirmation.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced delay(1) with yield() at end of doBackgroundTasks() (OTGW-firmware.ino:423). The synchronous ESP8266WebServer polls via httpServer.handleClient() inside this function every iteration; the trailing delay(1) capped the loop at ~1000 Hz and added a 1 ms latency floor to every poll. yield() gives the SDK the same esp_schedule() hint without the wait. feedWatchDog() at the top of the function and httpServer.handleClient() already yield internally, so this is just a final scheduling courtesy.
+
+Audit also reviewed every other delay() in the firmware:
+- networkStuff.ino:124,162 — setup() WiFi connect-poll loop (not in mainloop).
+- networkStuff.ino:143,145; helperStuff.ino:512,649,657 — bracketing ESP.restart() / unreachable post-restart guards.
+- helperStuff.ino:1135 — emergencyHeapRecovery(), rate-limited to once/30 s on HEAP_CRITICAL only.
+- OTGW-Core.ino:976 — initWatchDog(), setup() only.
+- libraries/OTGWSerial.cpp:891 — OTGWSerial::resetPic(), setup() / explicit reset.
+- OTGW-ModUpdateServer-impl.h:201 — delay(0) yield.
+None reachable from steady-state mainloop. No delayMicroseconds() anywhere.
+
+Verification:
+- python build.py --firmware: exit 0 (OTGW-firmware-1.6.0-beta.14+be6d64f.ino.bin, 0.71 MB).
+- python evaluate.py --quick: 34 passed, 0 warnings, 0 failures, health 100%.
+
+Prerelease bumped beta.13 -> beta.14 so field testers can A/B against beta.13.
+
+PR: rvdbreemen/OTGW-firmware#617 (draft).
+
+Blocking AC: field validation under telnet + WS + MQTT + HTTP load on a beta-tester device. Cannot be self-verified; leaving task In Progress until Discord #beta-testing confirms stability.
+<!-- SECTION:FINAL_SUMMARY:END -->
