@@ -1,9 +1,11 @@
 ---
 id: TASK-642
 title: Drop global MQTT rate-gate on status fan-out (ADR-076 Decision items 1-5)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-21 07:36'
+updated_date: '2026-05-21 07:37'
 labels:
   - mqtt
   - adr-076
@@ -35,3 +37,9 @@ Implement ADR-076 Decision items 1-5: remove the 250 ms MQTT_GATED_PUBLISH_SPACI
 - [ ] #12 No code comment in OTGW-Core.ino still references MQTT_GATED_PUBLISH_SPACING_MS, mqttLastGatedPublishMs, or the rate-gate as an active mechanism (references in /// blocks may explain the removal under ADR-076)
 - [ ] #13 ADR-076 is cited in at least one code comment near the deleted region as the authority for the removal
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Read OTGW-Core.ino lines 252-310 (region 1) and lines 1543-1627 (region 2) to confirm exact textual surface of the deletions.\n2. Remove static uint32_t mqttLastGatedPublishMs and static constexpr uint32_t MQTT_GATED_PUBLISH_SPACING_MS at lines 289-290.\n3. Remove the TASK-402 comment block (lines 278-288) that explains the rate-gate.\n4. Remove the rate-gate if-block in shouldPublishTrackedStatusBit() (lines 1572-1577) and the trailing mqttLastGatedPublishMs assignment (line 1579).\n5. Remove the rate-gate if-block in shouldPublishTrackedStatusByte() (lines 1616-1621) and the trailing mqttLastGatedPublishMs assignment (line 1623).\n6. Remove mqttLastGatedPublishMs = 0 from resetMqttTrackedState() (line 437).\n7. Update the surrounding code comments to reference ADR-076 and remove stale TASK-402/612 explanations.\n8. Run python build.py --firmware; verify exit 0.\n9. Run python evaluate.py --quick; verify no new failures.\n10. Bump prerelease via bin/bump-prerelease.sh; stage version.h + data/version.hash.\n11. Commit. Defer push until TASK-643 also lands so both arrive under one beta tag.
+<!-- SECTION:PLAN:END -->
