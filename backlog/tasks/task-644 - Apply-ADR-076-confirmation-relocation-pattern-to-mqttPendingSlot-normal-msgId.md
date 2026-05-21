@@ -39,5 +39,14 @@ Bug fix within the existing pattern established by ADR-076: the normal-msgId pen
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Add  to OTGW-firmware.h after the sendMQTTData declarations.\n2. Define  at file scope in MQTTstuff.ino.\n3. In both sendMQTTData() success paths (the void→bool refactor done in TASK-643): increment mqttSendSuccessCount before , and remove the confirmMQTTPublishSlot() call.\n4. Inline at OTGW-Core.ino line 4185 region: wrap OTPublishGate block with success-count capture and post-block commit-or-clear of mqttPendingSlot.\n5. Same at line 3714 region for PS=1 path.\n6. Verify grep that confirmMQTTPublishSlot is only called from the two wrapper sites and from resetMqttTrackedState (if it does any reset).\n7. Bump prerelease beta.9 → beta.10.\n8. python build.py --firmware; exit 0.\n9. python evaluate.py --quick; no new failures.\n10. Commit.
+1. Add extern uint32_t mqttSendSuccessCount; to OTGW-firmware.h after the sendMQTTData declarations.
+2. Define uint32_t mqttSendSuccessCount = 0; at file scope in MQTTstuff.ino.
+3. In both sendMQTTData() success paths (the void to bool refactor done in TASK-643): increment mqttSendSuccessCount before return true, and remove the confirmMQTTPublishSlot() call.
+4. Inline at OTGW-Core.ino line 4185 region: wrap OTPublishGate block with success-count capture and post-block commit-or-clear of mqttPendingSlot.
+5. Same at line 3714 region for PS=1 path.
+6. Verify grep that confirmMQTTPublishSlot is only called from the two wrapper sites and from resetMqttTrackedState if it does any reset.
+7. Bump prerelease beta.9 to beta.10.
+8. python build.py --firmware; exit 0.
+9. python evaluate.py --quick; no new failures.
+10. Commit.
 <!-- SECTION:PLAN:END -->
