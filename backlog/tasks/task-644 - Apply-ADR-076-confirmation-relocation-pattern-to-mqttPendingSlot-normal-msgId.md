@@ -3,11 +3,11 @@ id: TASK-644
 title: >-
   Apply ADR-076 confirmation-relocation pattern to mqttPendingSlot
   (normal-msgId)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-21 07:52'
-updated_date: '2026-05-21 07:55'
+updated_date: '2026-05-21 07:56'
 labels:
   - mqtt
   - adr-076-pattern
