@@ -320,12 +320,18 @@ void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
     }
 }
 
-//===[ no-blocking delay with running background tasks in ms ]===
+//===[ cooperative delay running background tasks in ms ]===
+// Previously used DECLARE_TIMER_MS, which expands to static locals: init-once
+// semantics made the wait collapse to 0 ms on the first call and freeze at the
+// first interval ever passed on later calls. Use a local timestamp so each call
+// honours its own delay_ms parameter and millis() rollover is handled by the
+// unsigned subtraction.
 void delayms(unsigned long delay_ms)
 {
-  DECLARE_TIMER_MS(timerDelayms, delay_ms);
-  while (DUE(timerDelayms))
+  uint32_t start = millis();
+  while ((uint32_t)(millis() - start) < delay_ms) {
     doBackgroundTasks();
+  }
 }
 
 //=====================================================================
