@@ -46,17 +46,17 @@ On zero-fix outcome, the audit-report doc at docs/audits/2026-05-21-ha-capabilit
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Read each of the 13 binary_sensor entries (11 HA-core-matched + 2 firmware-extras) in mqtt_configuratie.cpp and record their current entity_category, device_class (if any), icon, retain flag, and the actual ON/OFF payload values published by OTGW-Core.ino
-- [ ] #2 Confirm all 13 entries have entity_category=diagnostic (HA core uses DIAGNOSTIC for all capability flags); if any are missing, set them
-- [ ] #3 Confirm no entry asserts a device_class — capability flags in HA core use device_class=None; if any wrongly assert PROBLEM/RUNNING/HEAT, remove it
-- [ ] #4 Confirm the discovery payload's payload_on / payload_off (or value_template) matches what OTGW-Core.ino's sendMQTTData actually publishes ("ON" / "OFF")
-- [ ] #5 Confirm all 13 discovery configs are published with retain=true
-- [ ] #6 Spot-check the friendly ha_name_* strings for typos and basic English correctness; fix only clear typos, not naming-style changes
-- [ ] #7 Add a code comment at the MsgID 3 bit-6 decode site noting that pyotgw names this bit DATA_SLAVE_REMOTE_RESET while the OT spec and our label call it remote_water_filling_function — both refer to the same wire bit
-- [ ] #8 Produce docs/audits/2026-05-21-ha-capability-flags-dev.md capturing the per-entry findings table, any fixes applied, and a one-line conclusion (parity-confirmed / fixes-applied)
-- [ ] #9 OFF-LIMITS — no changes to ha_lbl_* (topic labels), no new bits decoded, no MsgID handler changes, no ADR-070 source-separated layer changes, no gating/cadence logic changes
-- [ ] #10 build.py --firmware exits 0; evaluate.py --quick shows no new findings
-- [ ] #11 If any firmware code changed, _VERSION_PRERELEASE bumped via bin/bump-prerelease.sh and src/OTGW-firmware/version.h + data/version.hash staged
+- [x] #1 Read each of the 13 binary_sensor entries (11 HA-core-matched + 2 firmware-extras) in mqtt_configuratie.cpp and record their current entity_category, device_class (if any), icon, retain flag, and the actual ON/OFF payload values published by OTGW-Core.ino
+- [x] #2 Confirm all 13 entries have entity_category=diagnostic (HA core uses DIAGNOSTIC for all capability flags); if any are missing, set them
+- [x] #3 Confirm no entry asserts a device_class — capability flags in HA core use device_class=None; if any wrongly assert PROBLEM/RUNNING/HEAT, remove it
+- [x] #4 Confirm the discovery payload's payload_on / payload_off (or value_template) matches what OTGW-Core.ino's sendMQTTData actually publishes ("ON" / "OFF")
+- [x] #5 Confirm all 13 discovery configs are published with retain=true
+- [x] #6 Spot-check the friendly ha_name_* strings for typos and basic English correctness; fix only clear typos, not naming-style changes
+- [x] #7 Add a code comment at the MsgID 3 bit-6 decode site noting that pyotgw names this bit DATA_SLAVE_REMOTE_RESET while the OT spec and our label call it remote_water_filling_function — both refer to the same wire bit
+- [x] #8 Produce docs/audits/2026-05-21-ha-capability-flags-dev.md capturing the per-entry findings table, any fixes applied, and a one-line conclusion (parity-confirmed / fixes-applied)
+- [x] #9 OFF-LIMITS — no changes to ha_lbl_* (topic labels), no new bits decoded, no MsgID handler changes, no ADR-070 source-separated layer changes, no gating/cadence logic changes
+- [x] #10 build.py --firmware exits 0; evaluate.py --quick shows no new findings
+- [x] #11 If any firmware code changed, _VERSION_PRERELEASE bumped via bin/bump-prerelease.sh and src/OTGW-firmware/version.h + data/version.hash staged
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -72,3 +72,30 @@ On zero-fix outcome, the audit-report doc at docs/audits/2026-05-21-ha-capabilit
 8. Bump prerelease (bin/bump-prerelease.sh) since firmware comment was touched
 9. Commit, push to origin/dev, mark Done
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Audited 13 HA capability-flag binary_sensors (MsgID 2/3/6) against HA core opentherm_gw semantics. Outcome: parity-confirmed; one clarifying-comment fix applied.
+
+Key findings:
+- All 13 discovery entries in mqttHaBinSensors[] (mqtt_configuratie.cpp:1124-1147) already publish with entity_category=diagnostic.
+- MqttHaBinSensorCfg struct (MQTTstuff.h:205-213) has no deviceClass field, so no binary_sensor entry can wrongly assert one — matches HA core's device_class=None.
+- composeBinSensorPayload (mqtt_configuratie.cpp:2089-2157) emits avty_t (availability_topic) for all entries.
+- streamBinarySensorDiscovery (line 2262) calls beginPublish(..., /*retained=*/true) — all 13 entries publish with retain=true.
+- payload_on/off keys are omitted from the discovery JSON, so HA defaults "ON"/"OFF" apply — which is exactly what publishMQTTOnOff (MQTTstuff.ino:1179) and the print_*_memberid / publishRBPFlagsState publishers in OTGW-Core.ino emit.
+
+Fixes applied:
+- src/OTGW-firmware/OTGW-Core.ino:print_slavememberid() bit-6 comment block expanded to note that pyotgw/HA core names this bit DATA_SLAVE_REMOTE_RESET while the OT spec and this firmware label it remote_water_filling_function (same wire bit). Cross-references the audit doc.
+
+Deliverable:
+- docs/audits/2026-05-21-ha-capability-flags-dev.md — per-entry findings table, fixes applied, and the off-limits items observed but not addressed (friendly-name casing inconsistencies, plural "Cooling_configs" — all naming-style, not typos).
+
+Verification:
+- python build.py --firmware → exit 0 (1.6.0-beta.11).
+- python evaluate.py --quick → 34/0/0/2, health 100.0% (identical to pre-change baseline; no new findings).
+
+Version: prerelease bumped beta.10 → beta.11 via bin/bump-prerelease.sh. Cascaded across 24 files by scripts/autoinc-semver.py as designed.
+
+Off-limits respected: no ha_lbl_* topic-label changes; no new bit decoders; no MsgID handler logic changes; no ADR-070 source-separated layer touched; no gating/cadence changes.
+<!-- SECTION:FINAL_SUMMARY:END -->
