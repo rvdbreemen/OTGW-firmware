@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.6.0-beta.8
+**  Version  : v1.6.0-beta.9
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1608,7 +1608,11 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-347: arm cooldown only for real sends
-  publishMQTTOnOff(topic, newVal);
+  // ADR-076: commit pending bit-slot only when sendMQTTData confirms success.
+  // On any early-return (heap throttle, disconnect) discard the pending so an
+  // unrelated downstream publish cannot silently commit it.
+  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
+  else                                 mqttPendingBitSlot.pending = false;
 }
 
 static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal,
@@ -1618,7 +1622,8 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-354: arm cooldown only for real sends
-  publishMQTTOnOff(topic, newVal);
+  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
+  else                                 mqttPendingBitSlot.pending = false;
 }
 
 // TASK-401: generic gate-wrapped publish helpers for non-Status fan-out
@@ -1633,7 +1638,9 @@ static void publishGatedBitMQTT(uint16_t *trackedSlots, uint8_t bitSlot,
 {
   const bool allowPublish = shouldPublishTrackedStatusBit(trackedSlots, bitSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
-  publishMQTTOnOff(topic, newVal);
+  // ADR-076: commit pending only when sendMQTTData confirms success.
+  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
+  else                                 mqttPendingBitSlot.pending = false;
 }
 
 static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
@@ -1642,7 +1649,9 @@ static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
 {
   const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
-  sendMQTTData(topic, payload);
+  // ADR-076: commit pending only when sendMQTTData confirms success.
+  if (sendMQTTData(topic, payload)) confirmMQTTPublishByteSlot();
+  else                              mqttPendingByteSlot.pending = false;
 }
 
 // Overload for dynamically-built char* topics (e.g. "<msgid>_flag8").
@@ -1652,7 +1661,8 @@ static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
 {
   const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
-  sendMQTTData(topic, payload);
+  if (sendMQTTData(topic, payload)) confirmMQTTPublishByteSlot();
+  else                              mqttPendingByteSlot.pending = false;
 }
 
 static void copyBinaryByteString(uint8_t value, char *dest, size_t destSize)
@@ -1718,7 +1728,9 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData("status_master", statusText);
+    // ADR-076: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData("status_master", statusText)) confirmMQTTPublishByteSlot();
+    else                                           mqttPendingByteSlot.pending = false;
   }
   publishStatusBitMQTT(0, "ch_enable",        (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
   publishStatusBitMQTT(1, "dhw_enable",       (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
@@ -1759,7 +1771,9 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData("status_slave", statusText);
+    // ADR-076: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData("status_slave", statusText)) confirmMQTTPublishByteSlot();
+    else                                          mqttPendingByteSlot.pending = false;
   }
   publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
   publishStatusBitMQTT(9,  "centralheating",       (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
@@ -1842,7 +1856,9 @@ static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData(F("status_vh_master"), statusText);
+    // ADR-076: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData(F("status_vh_master"), statusText)) confirmMQTTPublishByteSlot();
+    else                                                 mqttPendingByteSlot.pending = false;
   }
   publishStatusVHBitMQTT(0, "vh_ventilation_enabled",    (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
   publishStatusVHBitMQTT(1, "vh_bypass_position",        (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
@@ -1880,7 +1896,9 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData(F("status_vh_slave"), statusText);
+    // ADR-076: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData(F("status_vh_slave"), statusText)) confirmMQTTPublishByteSlot();
+    else                                                mqttPendingByteSlot.pending = false;
   }
   publishStatusVHBitMQTT(0, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
   publishStatusVHBitMQTT(1, "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);

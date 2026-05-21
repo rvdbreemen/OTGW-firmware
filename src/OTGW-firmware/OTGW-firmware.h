@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.6.0-beta.8
+**  Version  : v1.6.0-beta.9
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -133,9 +133,13 @@ bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
 
 //prototype
-void sendMQTTData(const char*, const char*, const bool = false);
-void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
-void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
+// ADR-076: return true iff the publish reached MQTTclient.endPublish() success.
+// Bit/byte slot helpers use the return value to commit or discard pending
+// throttle-slot updates so a heap-throttled early-return cannot leave a stale
+// pending that the next unrelated publish silently commits.
+bool sendMQTTData(const char*, const char*, const bool = false);
+bool sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
+bool sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
 // PIC subtree helper -- prepends kPicSubtreePrefix so the otgw-pic/ subtree
 // name has a single source of truth (ADR-065). Used by TASK-390 migrations.
 void sendMQTTDataPic(const __FlashStringHelper* label, const char* value);
