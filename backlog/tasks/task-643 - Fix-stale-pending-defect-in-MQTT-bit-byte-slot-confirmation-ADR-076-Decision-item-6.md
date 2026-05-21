@@ -3,9 +3,11 @@ id: TASK-643
 title: >-
   Fix stale-pending defect in MQTT bit/byte slot confirmation (ADR-076 Decision
   item 6)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-21 07:37'
+updated_date: '2026-05-21 07:41'
 labels:
   - mqtt
   - adr-076
@@ -42,3 +44,9 @@ Implement ADR-076 Decision item 6: a heap-throttled sendMQTTData() currently lea
 - [ ] #17 python evaluate.py --quick shows no new failures vs the pre-change baseline
 - [ ] #18 ADR-076 is cited in at least one comment near the relocated confirmation logic
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Inspect sendMQTTData() overloads and publish helpers to confirm exact call surface.\n2. Change all three sendMQTTData() overloads + their declarations in OTGW-firmware.h from void to bool. Return true on successful endPublish, false on any guard or early-return path.\n3. Change publishMQTTOnOff() overloads in MQTTstuff.ino from void to bool, propagating the sendMQTTData() return.\n4. Remove confirmMQTTPublishBitSlot() and confirmMQTTPublishByteSlot() calls from sendMQTTData() in MQTTstuff.ino. Keep confirmMQTTPublishSlot() (out of scope for ADR-076).\n5. In publishStatusBitMQTT, publishStatusVHBitMQTT, publishGatedBitMQTT, and the byte equivalents (publishStatusByteMQTT, publishStatusVHByteMQTT, publishGatedByteMQTT): capture publishMQTTOnOff()/sendMQTTData() return; commit pending via confirmMQTTPublishBitSlot/ByteSlot() on true, OR clear mqttPendingBitSlot/ByteSlot.pending=false on false.\n6. Audit every caller of shouldPublishTrackedStatusBit/Byte to verify each goes through one of the audited helpers.\n7. Bump prerelease beta.8 → beta.9.\n8. python build.py --firmware; verify exit 0.\n9. python evaluate.py --quick; verify no new failures.\n10. Commit.
+<!-- SECTION:PLAN:END -->
