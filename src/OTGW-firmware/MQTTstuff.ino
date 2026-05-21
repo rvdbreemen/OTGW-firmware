@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.50
+**  Version  : v2.0.0-alpha.51
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1002,7 +1002,12 @@ void handleMQTT()
         MQTTclient.disconnect();
         MQTTclient.setServer(MQTTbrokerIPchar, settings.mqtt.iBrokerPort);
         MQTTclient.setCallback(handleMQTTcallback);
-        MQTTclient.setSocketTimeout(15);  // Increased from 4 to 15 seconds for better stability
+        // Sync webserver: socket timeout caps the worst-case freeze when the
+        // broker is unreachable (PubSubClient.connect() blocks for this long).
+        // 5s keeps HTTP/WS responsive during outages; the state machine still
+        // backs off cleanly via timerMQTTwaitforretry between attempts and
+        // falls back to a 10-minute wait after 5 failures.
+        MQTTclient.setSocketTimeout(5);
         MQTTclient.setKeepAlive(60);      // Set to 60 seconds (default was 15) to reduce reconnections
         uint8_t mac[6]{0};
         WiFi.macAddress(mac);
@@ -1099,10 +1104,12 @@ void handleMQTT()
         DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
       }
       else
-      { // no connection, try again, do a non-blocking wait for 3 seconds.
+      { // no connection, back off non-blockingly (3s, 6s, 9s, 12s between attempts)
+        // so HTTP/WebSocket keep getting served between connect tries.
+        uint32_t backoffSec = 3UL * reconnectAttempts;
         MQTTDebugln(F(" .. \r"));
-        MQTTDebugTf(PSTR("failed, retrycount=[%d], rc=[%d] ..  try again in 3 seconds\r\n"), reconnectAttempts, MQTTclient.state());
-        RESTART_TIMER(timerMQTTwaitforretry);
+        MQTTDebugTf(PSTR("failed, retrycount=[%d], rc=[%d] ..  try again in %lu seconds\r\n"), reconnectAttempts, MQTTclient.state(), (unsigned long)backoffSec);
+        CHANGE_INTERVAL_SEC(timerMQTTwaitforretry, backoffSec, SKIP_MISSED_TICKS);
         stateMQTT = MQTT_STATE_WAIT_CONNECTION_ATTEMPT;  // if the re-connect did not work, then return to wait for reconnect
         MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_CONNECTION_ATTEMPT"));
       }
