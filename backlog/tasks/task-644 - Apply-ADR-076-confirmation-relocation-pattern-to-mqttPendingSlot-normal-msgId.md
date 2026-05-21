@@ -3,9 +3,11 @@ id: TASK-644
 title: >-
   Apply ADR-076 confirmation-relocation pattern to mqttPendingSlot
   (normal-msgId)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-21 07:52'
+updated_date: '2026-05-21 07:53'
 labels:
   - mqtt
   - adr-076-pattern
@@ -33,3 +35,9 @@ Bug fix within the existing pattern established by ADR-076: the normal-msgId pen
 - [ ] #8 python evaluate.py --quick shows no new failures vs the pre-change baseline
 - [ ] #9 Code comments cite ADR-076 as the authority for the pattern even though this is the third application of it
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add  to OTGW-firmware.h after the sendMQTTData declarations.\n2. Define  at file scope in MQTTstuff.ino.\n3. In both sendMQTTData() success paths (the void→bool refactor done in TASK-643): increment mqttSendSuccessCount before , and remove the confirmMQTTPublishSlot() call.\n4. Inline at OTGW-Core.ino line 4185 region: wrap OTPublishGate block with success-count capture and post-block commit-or-clear of mqttPendingSlot.\n5. Same at line 3714 region for PS=1 path.\n6. Verify grep that confirmMQTTPublishSlot is only called from the two wrapper sites and from resetMqttTrackedState (if it does any reset).\n7. Bump prerelease beta.9 → beta.10.\n8. python build.py --firmware; exit 0.\n9. python evaluate.py --quick; no new failures.\n10. Commit.
+<!-- SECTION:PLAN:END -->
