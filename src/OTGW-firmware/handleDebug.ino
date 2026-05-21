@@ -63,6 +63,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("interval: %u\r\n"), (unsigned)settings.mqtt.iInterval);
     Debugf(PSTR("separate_sources: %s\r\n"), settings.mqtt.bSeparateSources ? "true" : "false");
     Debugf(PSTR("disc_auto_verify: %s\r\n"), settings.mqtt.bDiscoveryAutoVerify ? "true" : "false");
+    Debugf(PSTR("publish_ha_core_aliases: %s\r\n"), settings.mqtt.bPublishHaCoreAliases ? "true" : "false");
     Debugf(PSTR("legacy_port25238: %s\r\n"), settings.mqtt.bLegacyPort25238Enabled ? "true" : "false");
 
     Debugln(F("[settings.ntp]"));

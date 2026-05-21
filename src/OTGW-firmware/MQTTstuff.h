@@ -58,6 +58,7 @@ struct MQTTSettingsSection {
   uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
   bool    bLegacyPort25238Enabled = false;
+  bool    bPublishHaCoreAliases = false; // ADR-105: publish HA-core-style alias topics (supports_*, fault_indication, etc.) alongside the firmware's current labels for the 37 capability/state/type/fault bits on MsgID 0/2/3/5/6/70/74/100/101
 };
 
 // ---------------------------------------------------------------------------
@@ -243,6 +244,7 @@ constexpr uint8_t MQTT_HA_FLAG_SOURCE_SUFFIX        = 0x01;
 constexpr uint8_t MQTT_HA_FLAG_SOURCE_NAME          = 0x02;
 constexpr uint8_t MQTT_HA_FLAG_SOURCE_TOPIC_SEGMENT = 0x04;
 constexpr uint8_t MQTT_HA_FLAG_IS_PIC_ENTRY         = 0x08;
+constexpr uint8_t MQTT_HA_FLAG_IS_HA_CORE_ALIAS     = 0x10;  // ADR-105: gated by settings.mqtt.bPublishHaCoreAliases
 constexpr uint8_t MQTT_HA_FLAG_ANY_SOURCE           = 0x07;
 #endif
 
@@ -300,6 +302,7 @@ extern const uint16_t PROGMEM mqttHaBinSensorIndex[256];
 // Entry counts
 extern const uint16_t MQTT_HA_SENSOR_COUNT;
 extern const uint16_t MQTT_HA_BINSENSOR_COUNT;
+extern const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT;  // ADR-105: first N rows covered by mqttHaBinSensorIndex[]; rows >= this are alias tail.
 
 // ---------------------------------------------------------------------------
 // PROGMEM read helpers

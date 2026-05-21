@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.46
+**  Version  : v2.0.0-alpha.47
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -251,6 +251,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("LegacyPort25238Enabled"), settings.mqtt.bLegacyPort25238Enabled, true);
   writeJsonBoolKV(file, F("MQTTharebootdetection"), settings.mqtt.bHaRebootDetect, true);
   writeJsonBoolKV(file, F("MQTTdiscoveryAutoVerify"), settings.mqtt.bDiscoveryAutoVerify, true);
+  writeJsonBoolKV(file, F("MQTTpublishHaCoreAliases"), settings.mqtt.bPublishHaCoreAliases, true);
   writeJsonBoolKV(file, F("NTPenable"), settings.ntp.bEnable, true);
   writeJsonStringKV(file, F("NTPtimezone"), settings.ntp.sTimezone, true);
   writeJsonStringKV(file, F("NTPhostname"), settings.ntp.sHostname, true);
@@ -546,6 +547,7 @@ void readSettings(bool show)
     Debugf(PSTR("HA prefix             : %s\r\n"), CSTR(settings.mqtt.sHaprefix));
     Debugf(PSTR("HA reboot detection   : %s\r\n"), CBOOLEAN(settings.mqtt.bHaRebootDetect));
     Debugf(PSTR("Discovery auto-verify : %s\r\n"), CBOOLEAN(settings.mqtt.bDiscoveryAutoVerify));
+    Debugf(PSTR("HA-core aliases       : %s\r\n"), CBOOLEAN(settings.mqtt.bPublishHaCoreAliases));
     Debugf(PSTR("NTP enabled           : %s\r\n"), CBOOLEAN(settings.ntp.bEnable));
     Debugf(PSTR("NPT timezone          : %s\r\n"), CSTR(settings.ntp.sTimezone));
     Debugf(PSTR("NPT hostname          : %s\r\n"), CSTR(settings.ntp.sHostname));
@@ -689,6 +691,7 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("MQTTharebootdetection"))==0)      settings.mqtt.bHaRebootDetect = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("MQTTdiscoveryAutoVerify"))==0)    settings.mqtt.bDiscoveryAutoVerify = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("MQTTpublishHaCoreAliases"))==0)   settings.mqtt.bPublishHaCoreAliases = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("MQTTuniqueid")) == 0)  {
     strlcpy(settings.mqtt.sUniqueid, newValue, sizeof(settings.mqtt.sUniqueid));
     if (strlen(settings.mqtt.sUniqueid) == 0)   strlcpy(settings.mqtt.sUniqueid, getUniqueId(), sizeof(settings.mqtt.sUniqueid));

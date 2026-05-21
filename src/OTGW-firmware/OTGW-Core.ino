@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.46
+**  Version  : v2.0.0-alpha.47
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1623,7 +1623,8 @@ static bool shouldPublishStatusVHByte(uint8_t byteSlot, uint8_t newVal, uint8_t 
 // Uses OTPublishGate (RAII) so the outer gate state is always restored even if
 // publishMQTTOnOff() or any callee throws or early-returns. (ADR-006)
 void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal,
-                          bool forcePublish, uint8_t previousBits, uint8_t currentBits) {
+                          bool forcePublish, uint8_t previousBits, uint8_t currentBits,
+                          const char* aliasLabel = nullptr) {
   const bool allowPublish = shouldPublishStatusBit(bitSlot, newVal, prevVal, forcePublish);
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
@@ -1633,10 +1634,15 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
   // unrelated downstream publish cannot silently commit it.
   if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
   else                                 mqttPendingBitSlot.pending = false;
+  // ADR-105: alias mirror, rides on the same allowPublish gate.
+  if (allowPublish && aliasLabel && settings.mqtt.bPublishHaCoreAliases) {
+    publishMQTTOnOff(aliasLabel, newVal);
+  }
 }
 
 static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal,
-                                   bool forcePublish, uint8_t previousBits, uint8_t currentBits)
+                                   bool forcePublish, uint8_t previousBits, uint8_t currentBits,
+                                   const char* aliasLabel = nullptr)
 {
   const bool allowPublish = shouldPublishStatusVHBit(bitSlot, newVal, prevVal, forcePublish);
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
@@ -1644,6 +1650,10 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-354: arm cooldown only for real sends
   if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
   else                                 mqttPendingBitSlot.pending = false;
+  // ADR-105: alias mirror.
+  if (allowPublish && aliasLabel && settings.mqtt.bPublishHaCoreAliases) {
+    publishMQTTOnOff(aliasLabel, newVal);
+  }
 }
 
 // TASK-401: generic gate-wrapped publish helpers for non-Status fan-out
@@ -1654,13 +1664,18 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
 // less often.
 static void publishGatedBitMQTT(uint16_t *trackedSlots, uint8_t bitSlot,
                                 const __FlashStringHelper *topic,
-                                bool newVal, bool prevVal)
+                                bool newVal, bool prevVal,
+                                const __FlashStringHelper *aliasLabel = nullptr)
 {
   const bool allowPublish = shouldPublishTrackedStatusBit(trackedSlots, bitSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
   // ADR-104: commit pending only when sendMQTTData confirms success.
   if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
   else                                 mqttPendingBitSlot.pending = false;
+  // ADR-105: alias mirror, rides on the same gate.
+  if (allowPublish && aliasLabel && settings.mqtt.bPublishHaCoreAliases) {
+    publishMQTTOnOff(aliasLabel, newVal);
+  }
 }
 
 static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
@@ -1796,13 +1811,13 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
     if (sendMQTTData("status_slave", statusText)) confirmMQTTPublishByteSlot();
     else                                          mqttPendingByteSlot.pending = false;
   }
-  publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
-  publishStatusBitMQTT(9,  "centralheating",       (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
-  publishStatusBitMQTT(10, "domestichotwater",     (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB);
+  publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB, "fault_indication");
+  publishStatusBitMQTT(9,  "centralheating",       (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB, "central_heating");
+  publishStatusBitMQTT(10, "domestichotwater",     (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB, "hot_water");
   publishStatusBitMQTT(11, "flame",                (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB);
   publishStatusBitMQTT(12, "cooling",              (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB);
-  publishStatusBitMQTT(13, "centralheating2",      (valueLB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueLB);
-  publishStatusBitMQTT(14, "diagnostic_indicator", (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB);
+  publishStatusBitMQTT(13, "centralheating2",      (valueLB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueLB, "central_heating_2");
+  publishStatusBitMQTT(14, "diagnostic_indicator", (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB, "diagnostic_indication");
   publishStatusBitMQTT(15, "electric_production",  (valueLB & 0x80), (previousStatus & 0x80), forcePublish, previousStatus, valueLB);
   endStatusBurst();
 }
@@ -1881,10 +1896,10 @@ static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
     if (sendMQTTData(F("status_vh_master"), statusText)) confirmMQTTPublishByteSlot();
     else                                                 mqttPendingByteSlot.pending = false;
   }
-  publishStatusVHBitMQTT(0, "vh_ventilation_enabled",    (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
-  publishStatusVHBitMQTT(1, "vh_bypass_position",        (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
-  publishStatusVHBitMQTT(2, "vh_bypass_mode",            (valueHB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueHB);
-  publishStatusVHBitMQTT(3, "vh_free_ventilation_mode", (valueHB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueHB);
+  publishStatusVHBitMQTT(0, "vh_ventilation_enabled",    (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB, "ventilation_enabled");
+  publishStatusVHBitMQTT(1, "vh_bypass_position",        (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB, "ventilation_bypass_position");
+  publishStatusVHBitMQTT(2, "vh_bypass_mode",            (valueHB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueHB, "ventilation_bypass_mode");
+  publishStatusVHBitMQTT(3, "vh_free_ventilation_mode", (valueHB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueHB, "ventilation_free_mode");
   endStatusBurst();
 }
 
@@ -1921,12 +1936,12 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
     if (sendMQTTData(F("status_vh_slave"), statusText)) confirmMQTTPublishByteSlot();
     else                                                mqttPendingByteSlot.pending = false;
   }
-  publishStatusVHBitMQTT(0, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(1, "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(2, "vh_bypass_status",           (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(3, "vh_bypass_automatic_status", (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(4, "vh_free_ventliation_status", (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(6, "vh_diagnostic_indicator",    (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(0, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB, "ventilation_fault");
+  publishStatusVHBitMQTT(1, "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB, "ventilation_active");
+  publishStatusVHBitMQTT(2, "vh_bypass_status",           (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB, "ventilation_bypass_status");
+  publishStatusVHBitMQTT(3, "vh_bypass_automatic_status", (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB, "ventilation_bypass_automatic");
+  publishStatusVHBitMQTT(4, "vh_free_ventliation_status", (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB, "ventilation_free_status");
+  publishStatusVHBitMQTT(6, "vh_diagnostic_indicator",    (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB, "ventilation_diagnostic");
   endStatusBurst();
 }
 
@@ -1957,13 +1972,17 @@ static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWr
   publishGatedByteMQTT(mqttlastsentRBPbyte, 1, F("RBP_flags_read_write"), readWriteText,
                        readWriteFlags, prevReadWrite);
   publishGatedBitMQTT(mqttlastsentRBPbit, 0, F("rbp_dhw_setpoint"),
-                      (transferEnableFlags & 0x01), (prevTransfer & 0x01));
+                      (transferEnableFlags & 0x01), (prevTransfer & 0x01),
+                      F("supports_hot_water_setpoint_transfer"));
   publishGatedBitMQTT(mqttlastsentRBPbit, 1, F("rbp_max_ch_setpoint"),
-                      (transferEnableFlags & 0x02), (prevTransfer & 0x02));
+                      (transferEnableFlags & 0x02), (prevTransfer & 0x02),
+                      F("supports_central_heating_setpoint_transfer"));
   publishGatedBitMQTT(mqttlastsentRBPbit, 2, F("rbp_rw_dhw_setpoint"),
-                      (readWriteFlags & 0x01), (prevReadWrite & 0x01));
+                      (readWriteFlags & 0x01), (prevReadWrite & 0x01),
+                      F("supports_hot_water_setpoint_writing"));
   publishGatedBitMQTT(mqttlastsentRBPbit, 3, F("rbp_rw_max_ch_setpoint"),
-                      (readWriteFlags & 0x02), (prevReadWrite & 0x02));
+                      (readWriteFlags & 0x02), (prevReadWrite & 0x02),
+                      F("supports_central_heating_setpoint_writing"));
 
   return ((uint16_t)transferEnableFlags << 8) | readWriteFlags;
 }
@@ -2178,7 +2197,11 @@ void print_solar_storage_status(uint16_t& value)
     AddLogf("\r\n%s = Slave Solar Mode Status [%d] ", OTlookupitem.label, SlaveSolarModeStatus);
     AddLogf("\r\n%s = Slave Solar Status [%d] ", OTlookupitem.label, SlaveSolarStatus);
     if (is_value_valid(OTdata, OTlookupitem)){
-      sendMQTTData(F("solar_storage_slave_fault_indicator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));   
+      sendMQTTData(F("solar_storage_slave_fault_indicator"),  ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));
+      // ADR-105: HA-core-style alias mirror.
+      if (settings.mqtt.bPublishHaCoreAliases) {
+        sendMQTTData(F("solar_storage_fault"), ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));
+      }
       sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  
       sendMQTTData(F("solar_storage_slave_status"), itoa(SlaveSolarStatus, _msg, 10));  
       OTcurrentSystemState.SolarSlaveStatus = OTdata.valueLB;
@@ -2282,12 +2305,12 @@ void print_ASFflags(uint16_t& value)
     //5: Water over-temp[ no OvT fault, over-temperat. Fault]
     //6: reserved
     //7: reserved
-    publishGatedBitMQTT(mqttlastsentASFbit, 0, F("service_request"),        (newHB & 0x01), (prevHB & 0x01));
-    publishGatedBitMQTT(mqttlastsentASFbit, 1, F("lockout_reset"),          (newHB & 0x02), (prevHB & 0x02));
+    publishGatedBitMQTT(mqttlastsentASFbit, 0, F("service_request"),        (newHB & 0x01), (prevHB & 0x01), F("service_required"));
+    publishGatedBitMQTT(mqttlastsentASFbit, 1, F("lockout_reset"),          (newHB & 0x02), (prevHB & 0x02), F("supports_lockout_reset"));
     publishGatedBitMQTT(mqttlastsentASFbit, 2, F("low_water_pressure"),     (newHB & 0x04), (prevHB & 0x04));
-    publishGatedBitMQTT(mqttlastsentASFbit, 3, F("gas_flame_fault"),        (newHB & 0x08), (prevHB & 0x08));
+    publishGatedBitMQTT(mqttlastsentASFbit, 3, F("gas_flame_fault"),        (newHB & 0x08), (prevHB & 0x08), F("gas_fault"));
     publishGatedBitMQTT(mqttlastsentASFbit, 4, F("air_pressure_fault"),     (newHB & 0x10), (prevHB & 0x10));
-    publishGatedBitMQTT(mqttlastsentASFbit, 5, F("water_over_temperature"), (newHB & 0x20), (prevHB & 0x20));
+    publishGatedBitMQTT(mqttlastsentASFbit, 5, F("water_over_temperature"), (newHB & 0x20), (prevHB & 0x20), F("water_overtemperature"));
     value = OTdata.u16();
   }
 }
@@ -2332,14 +2355,24 @@ void print_slavememberid(uint16_t& value)
     //     audited in docs/audits/2026-05-21-ha-capability-flags-feature-2.0.0.md (TASK-650).
     // 7:  Heat/cool mode control
 
-    sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
-    sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
-    sendMQTTData(F("cooling_config"),                          (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));  
-    sendMQTTData(F("dhw_config"),                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));  
-    sendMQTTData(F("master_low_off_pump_control_function"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));   
-    sendMQTTData(F("ch2_present"),                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));  
-    sendMQTTData(F("remote_water_filling_function"),           (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));    
+    sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
+    sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
+    sendMQTTData(F("cooling_config"),                          (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
+    sendMQTTData(F("dhw_config"),                              (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
+    sendMQTTData(F("master_low_off_pump_control_function"),    (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));
+    sendMQTTData(F("ch2_present"),                             (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
+    sendMQTTData(F("remote_water_filling_function"),           (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));
     sendMQTTData(F("heat_cool_mode_control"),                  (((OTdata.valueHB) & 0x80) ? "ON" : "OFF"));
+    // ADR-105: HA-core-style alias mirrors (7 entries; HB7 heat_cool_mode_control intentionally not aliased).
+    if (settings.mqtt.bPublishHaCoreAliases) {
+      sendMQTTData(F("supports_hot_water"),                                  (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
+      sendMQTTData(F("control_type"),                                        (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
+      sendMQTTData(F("supports_cooling"),                                    (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
+      sendMQTTData(F("hot_water_config"),                                    (((OTdata.valueHB) & 0x08) ? "ON" : "OFF"));
+      sendMQTTData(F("supports_pump_control"),                               (((OTdata.valueHB) & 0x10) ? "ON" : "OFF"));
+      sendMQTTData(F("supports_ch_2"),                                       (((OTdata.valueHB) & 0x20) ? "ON" : "OFF"));
+      sendMQTTData(F("supports_remote_reset"),                               (((OTdata.valueHB) & 0x40) ? "ON" : "OFF"));
+    }
     // SAT: auto-detect manufacturer from slave MemberID code
     satDetectManufacturer(OTdata.valueLB);
     value = OTdata.u16();
@@ -2353,7 +2386,11 @@ void print_mastermemberid(uint16_t& value)
     //Build string for MQTT
     char _msg[15] {0};
     sendMQTTData(F("master_configuration"), byte_to_binary(OTdata.valueHB));
-    sendMQTTData(F("master_configuration_smart_power"), (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
+    sendMQTTData(F("master_configuration_smart_power"), (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
+    // ADR-105: HA-core-style alias mirror.
+    if (settings.mqtt.bPublishHaCoreAliases) {
+      sendMQTTData(F("supports_master_smart_power"), (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
+    }  
     
     utoa(OTdata.valueLB, _msg, 10);
     sendMQTTData(F("master_memberid_code"), _msg);
@@ -2371,6 +2408,12 @@ void print_vh_configmemberid(uint16_t& value)
     sendMQTTData(F("vh_configuration_system_type"),    (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
     sendMQTTData(F("vh_configuration_bypass"),         (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
     sendMQTTData(F("vh_configuration_speed_control"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
+    // ADR-105: HA-core-style alias mirrors for MsgID 74 (Category A + C).
+    if (settings.mqtt.bPublishHaCoreAliases) {
+      sendMQTTData(F("ventilation_system_type"),         (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
+      sendMQTTData(F("supports_ventilation_bypass"),     (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
+      sendMQTTData(F("ventilation_speed_control_type"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
+    }
     // SAT auto-detect: bit 0 of HB = system type (0=boiler, 1=heat pump)
     state.sat.iDetectedHeatingSystem = ((OTdata.valueHB) & 0x01) ? SAT_HSYS_HEAT_PUMP : SAT_HSYS_RADIATORS;  
     
@@ -2430,9 +2473,11 @@ void print_remoteoverridefunction(uint16_t& value)
     publishGatedByteMQTT(mqttlastsentRObyte, 0, otTopic, byte_to_binary(newLB), newLB, prevLB);
     //report remote override flags to MQTT
     publishGatedBitMQTT(mqttlastsentRObit, 0, F("remote_override_manual_change_priority"),
-                        (newLB & 0x01), (prevLB & 0x01));
+                        (newLB & 0x01), (prevLB & 0x01),
+                        F("override_manual_change_prio"));
     publishGatedBitMQTT(mqttlastsentRObit, 1, F("remote_override_program_change_priority"),
-                        (newLB & 0x02), (prevLB & 0x02));
+                        (newLB & 0x02), (prevLB & 0x02),
+                        F("override_program_change_prio"));
     value = OTdata.u16();
   }
 }
