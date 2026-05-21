@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-21 20:23'
-updated_date: '2026-05-21 20:23'
+updated_date: '2026-05-21 20:27'
 labels:
   - performance
   - mainloop
@@ -22,12 +22,14 @@ The synchronous ESP8266WebServer is sensitive to per-tick latency. doBackgroundT
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 delay(1) at OTGW-firmware.ino end of doBackgroundTasks() is replaced with yield()
-- [ ] #2 python build.py --firmware exits 0
-- [ ] #3 python evaluate.py --quick shows no new failures
-- [ ] #4 Prerelease version is bumped (bin/bump-prerelease.sh) and staged with the change
+- [x] #1 delay(1) at OTGW-firmware.ino end of doBackgroundTasks() is replaced with yield()
+- [x] #2 python build.py --firmware exits 0
+- [x] #3 python evaluate.py --quick shows no new failures
+- [x] #4 Prerelease version is bumped (bin/bump-prerelease.sh) and staged with the change
 - [ ] #5 Field validation: beta build remains stable under load (telnet + WS + MQTT + HTTP); reported back via Discord
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
