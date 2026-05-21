@@ -3,9 +3,11 @@ id: TASK-649
 title: >-
   Audit HA capability-flag binary_sensors (MsgID 2/3/6) vs HA core opentherm_gw
   semantics — non-breaking fixes only
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-21 08:53'
+updated_date: '2026-05-21 09:08'
 labels:
   - audit
   - ha-discovery
@@ -56,3 +58,17 @@ On zero-fix outcome, the audit-report doc at docs/audits/2026-05-21-ha-capabilit
 - [ ] #10 build.py --firmware exits 0; evaluate.py --quick shows no new findings
 - [ ] #11 If any firmware code changed, _VERSION_PRERELEASE bumped via bin/bump-prerelease.sh and src/OTGW-firmware/version.h + data/version.hash staged
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Read mqttHaBinSensors[] entries (mqtt_configuratie.cpp:1124-1147) for MsgID 2/3/6
+2. Inspect composeBinSensorPayload (mqtt_configuratie.cpp:2089-2157) and streamBinarySensorDiscovery (line 2246) to confirm JSON keys, retain flag, availability_topic
+3. Inspect publisher functions in OTGW-Core.ino: print_mastermemberid, print_slavememberid, print_RBPflags/publishRBPFlagsState
+4. Confirm publishMQTTOnOff emits literal "ON"/"OFF" (MQTTstuff.ino:1179)
+5. Add bit-6 ambiguity comment at print_slavememberid bit-6 site (AC#7)
+6. Write audit report at docs/audits/2026-05-21-ha-capability-flags-dev.md
+7. Run build.py --firmware and evaluate.py --quick — confirm green
+8. Bump prerelease (bin/bump-prerelease.sh) since firmware comment was touched
+9. Commit, push to origin/dev, mark Done
+<!-- SECTION:PLAN:END -->
