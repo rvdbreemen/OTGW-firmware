@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.6.0-beta.10
+**  Version  : v1.6.0-beta.11
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2304,7 +2304,12 @@ void print_slavememberid(uint16_t& value)
     //     not allowed] 
     // 5:  CH2 present  [CH2 not present, CH2 present] 
     // 6:  Remote water filling function
-    // 7:  Heat/cool mode control 
+    //     NOTE: pyotgw / HA core's opentherm_gw integration names this bit
+    //     DATA_SLAVE_REMOTE_RESET. The OpenTherm 2.2 spec and this firmware's
+    //     label call it "remote_water_filling_function". Both refer to the
+    //     same wire bit (MsgID 3, HB bit 6); HA-side discovery parity is
+    //     audited in docs/audits/2026-05-21-ha-capability-flags-dev.md (TASK-649).
+    // 7:  Heat/cool mode control
 
     sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
     sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
