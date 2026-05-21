@@ -3,11 +3,11 @@ id: TASK-651
 title: >-
   feat-2.0.0: reduce sync webserver latency in main loop
   (delay/drain/MQTT-connect)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-21 20:15'
-updated_date: '2026-05-21 20:27'
+updated_date: '2026-05-21 21:15'
 labels:
   - performance
   - mqtt
@@ -53,6 +53,8 @@ Local verification (build sandbox has no ESP32 toolchain due to SSL policy, so e
 - python evaluate.py --quick: 0 failures (Health Score 98.5%, 1 pre-existing warning) after each commit
 
 Draft PR #618 opened against feature-dev-2.0.0-otgw32-esp32-sat-support. CI: evaluate.py already green; pio esp8266 + pio esp32 + claude-review still running at the time of close.
+
+PR #618 merged into feature-dev-2.0.0-otgw32-esp32-sat-support (2026-05-21, merge commit 3f154d1d). Merge graph absorbed PR #619 (TASK-651 dev-line port) so Fix #1 reached the 2.0.0 line via the official squash from that PR; Fixes #3, #4, and the ESP32-flash slim landed via this PR's merge commit c5fdd638. Final ESP32 flash margin before merge: 281 bytes (up from 41 pre-rebase reconciliation).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
