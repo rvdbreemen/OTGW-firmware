@@ -28,6 +28,7 @@ evaluation-report.json
 src/OTGW-firmware/data/*.gz
 .claude/settings.local.json
 .claude/.vscode/mcp.json
+.claude/worktrees/
 .mcp.json
 logs-issue/*
 /src/OTGW-firmware/build
