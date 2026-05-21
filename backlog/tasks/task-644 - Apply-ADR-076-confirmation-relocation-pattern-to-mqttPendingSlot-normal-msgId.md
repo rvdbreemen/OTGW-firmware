@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-21 07:52'
-updated_date: '2026-05-21 07:53'
+updated_date: '2026-05-21 07:55'
 labels:
   - mqtt
   - adr-076-pattern
@@ -25,15 +25,15 @@ Bug fix within the existing pattern established by ADR-076: the normal-msgId pen
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Global uint32_t mqttSendSuccessCount declared in OTGW-firmware.h and defined in MQTTstuff.ino; incremented at the end of each sendMQTTData() success path (both overloads that actually publish)
-- [ ] #2 confirmMQTTPublishSlot() call is removed from both sendMQTTData() success paths in MQTTstuff.ino — sendMQTTData no longer commits any pending slot record
-- [ ] #3 Normal-msgId publish site (OTGW-Core.ino around line 4185) wraps the OTPublishGate block with: capture pre-block mqttSendSuccessCount → run gate+decodeAndPublishOTValue → if mqttPendingSlot.pending, commit via confirmMQTTPublishSlot() when count advanced, else clear .pending=false
-- [ ] #4 PS=1 publish site (OTGW-Core.ino around line 3714) wraps its OTPublishGate block with the same commit-or-clear logic
-- [ ] #5 No remaining call to confirmMQTTPublishSlot() inside sendMQTTData() — grep confirms only the two new wrapper sites call it
-- [ ] #6 Prerelease tag bumped via bin/bump-prerelease.sh and the bumped version.h + data/version.hash staged with the firmware change
-- [ ] #7 python build.py --firmware exits 0
-- [ ] #8 python evaluate.py --quick shows no new failures vs the pre-change baseline
-- [ ] #9 Code comments cite ADR-076 as the authority for the pattern even though this is the third application of it
+- [x] #1 Global uint32_t mqttSendSuccessCount declared in OTGW-firmware.h and defined in MQTTstuff.ino; incremented at the end of each sendMQTTData() success path (both overloads that actually publish)
+- [x] #2 confirmMQTTPublishSlot() call is removed from both sendMQTTData() success paths in MQTTstuff.ino — sendMQTTData no longer commits any pending slot record
+- [x] #3 Normal-msgId publish site (OTGW-Core.ino around line 4185) wraps the OTPublishGate block with: capture pre-block mqttSendSuccessCount → run gate+decodeAndPublishOTValue → if mqttPendingSlot.pending, commit via confirmMQTTPublishSlot() when count advanced, else clear .pending=false
+- [x] #4 PS=1 publish site (OTGW-Core.ino around line 3714) wraps its OTPublishGate block with the same commit-or-clear logic
+- [x] #5 No remaining call to confirmMQTTPublishSlot() inside sendMQTTData() — grep confirms only the two new wrapper sites call it
+- [x] #6 Prerelease tag bumped via bin/bump-prerelease.sh and the bumped version.h + data/version.hash staged with the firmware change
+- [x] #7 python build.py --firmware exits 0
+- [x] #8 python evaluate.py --quick shows no new failures vs the pre-change baseline
+- [x] #9 Code comments cite ADR-076 as the authority for the pattern even though this is the third application of it
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,3 +50,40 @@ Bug fix within the existing pattern established by ADR-076: the normal-msgId pen
 9. python evaluate.py --quick; no new failures.
 10. Commit.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation completed.
+
+- Added uint32_t mqttSendSuccessCount = 0 at file scope in MQTTstuff.ino, just above sendMQTTData. extern declared in OTGW-firmware.h with ADR-076-pattern comment.
+- Both sendMQTTData success paths now `++mqttSendSuccessCount` instead of confirmMQTTPublishSlot().
+- OTGW-Core.ino line 3714 area (PS=1 path) and line 4185 area (normal OT decode path) now capture preSuccessCount before the OTPublishGate scope, run the publish path, and after the gate scope commit-or-clear mqttPendingSlot based on whether the counter advanced.
+- Grep confirms confirmMQTTPublishSlot is now called only from those two OTPublishGate wrapper sites plus its definition.
+- Prerelease beta.9 → beta.10.
+- python build.py --firmware: exit 0, OTGW-firmware-1.6.0-beta.10 artifact.
+- python evaluate.py --quick: 34 pass / 0 fail / 0 warn / 2 info / Health 100%.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed the third instance of the ADR-076 stale-pending defect — this time on mqttPendingSlot (normal-msgId throttle).
+
+Problem: shouldPublishMQTTForID() and shouldPublishMQTTForPSField() install mqttPendingSlot.pending=true inside an OTPublishGate block. Multiple sendMQTTData() calls may follow within that block (base topic + source-separated topic + flag8 expansions). Previously, the first successful sendMQTTData inside the block committed the pending via confirmMQTTPublishSlot(). If all sends in the block failed (heap throttle), pending stayed dirty, and a later unrelated successful sendMQTTData() (e.g. heartbeat, discovery drip) silently committed the stale pending — advancing mqttlastsent[idx] without HA receiving the value.
+
+Fix: identical structural pattern to ADR-076 Decision item 6 (bit/byte fix), adapted for the multi-publish normal-msgId path.
+
+Changes:
+- src/OTGW-firmware/OTGW-firmware.h: extern uint32_t mqttSendSuccessCount, with comment explaining the OTPublishGate caller contract.
+- src/OTGW-firmware/MQTTstuff.ino: defined the counter; both sendMQTTData() success paths increment it instead of calling confirmMQTTPublishSlot().
+- src/OTGW-firmware/OTGW-Core.ino lines ~3714 and ~4185: each OTPublishGate block now captures preSuccessCount, runs the publish, and either commits (if mqttSendSuccessCount advanced) or clears mqttPendingSlot.pending=false.
+
+No new ADR. Per CLAUDE.md: "Do NOT create ADRs for: bug fixes within existing patterns" — this is the same pattern ADR-076 already authorized, extended to a third slot type.
+
+Verification:
+- python build.py --firmware: exit 0, artifact OTGW-firmware-1.6.0-beta.10.
+- python evaluate.py --quick: 34 pass / 0 fail / 0 warn / 2 info / Health 100%.
+
+All three slot-confirmation paths (bit, byte, normal) now follow the same contract: pending is scoped to the publish that installed it; an unrelated sendMQTTData() can never silently commit a stale pending record.
+<!-- SECTION:FINAL_SUMMARY:END -->
