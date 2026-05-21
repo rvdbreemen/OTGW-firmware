@@ -1,9 +1,11 @@
 ---
 id: TASK-652
 title: Fix delayms() static-timer bug — actually wait the requested ms
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-21 20:32'
+updated_date: '2026-05-21 20:32'
 labels:
   - bug
   - led
@@ -26,3 +28,13 @@ delayms() uses DECLARE_TIMER_MS which expands to static locals. Static vars are 
 - [ ] #4 python evaluate.py --quick shows no new failures
 - [ ] #5 Prerelease bumped and staged with the fix
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Replace static DECLARE_TIMER_MS inside delayms() with a local millis()-based loop.
+2. Bump prerelease beta.14 -> beta.15.
+3. python build.py --firmware.
+4. python evaluate.py --quick.
+5. Commit on the audit branch and push; PR #617 already covers the broader audit, so this rides along.
+<!-- SECTION:PLAN:END -->
