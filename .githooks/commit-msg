@@ -15,12 +15,18 @@
 #
 # Install (one-time per clone): git config core.hooksPath .githooks
 # Bypass for one commit:         git commit --no-verify
+#                                OR: OTGW_TASK_HOOK_DISABLE=1 git commit ...
 # Exemption tags (in subject):   [no-task], chore(housekeeping|release|meta|daily-report):
 
 set -e
 
 msg_file="$1"
 if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+    exit 0
+fi
+
+if [ "${OTGW_TASK_HOOK_DISABLE:-0}" = "1" ]; then
+    echo "[task-hook] disabled for this commit (OTGW_TASK_HOOK_DISABLE=1)" >&2
     exit 0
 fi
 
