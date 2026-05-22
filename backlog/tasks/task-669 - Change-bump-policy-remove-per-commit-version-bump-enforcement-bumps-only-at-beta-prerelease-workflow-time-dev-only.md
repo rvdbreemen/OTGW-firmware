@@ -3,9 +3,11 @@ id: TASK-669
 title: >-
   Change bump policy: remove per-commit version bump enforcement; bumps only at
   beta-prerelease workflow time (dev only)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 07:06'
+updated_date: '2026-05-22 07:06'
 labels:
   - ci
   - policy
@@ -28,3 +30,13 @@ Current dev policy: every firmware-touching commit must bump _VERSION_PRERELEASE
 - [ ] #5 OTGW_BUMP_HOOK_DISABLE env-var documentation removed from CLAUDE.md (no longer needed)
 - [ ] #6 Change applies to dev worktree ONLY — 2.0.0 worktree retains its own bump policy unchanged
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Rewrite CLAUDE.md 'Versioning policy' section: drop the per-commit bump requirement and the enforcement / bypass subsections. Replace with: bumps happen only at /beta-prerelease invocation, which runs bin/bump-prerelease.sh as part of its phase 2.
+2. Edit .githooks/pre-commit: remove the entire bump-check block (lines ~50-100 after the adr-kit gate). Keep only the adr-kit gate.
+3. Edit .githooks/README.md: remove the pre-commit "bump-prerelease check" subsection; note that bumps happen via the /beta-prerelease skill.
+4. Self-test: a firmware commit that does NOT change version.h should pass pre-commit without the bypass env-var.
+5. Commit + push to a fresh branch off origin/dev; open draft PR.
+<!-- SECTION:PLAN:END -->
