@@ -3,9 +3,11 @@ id: TASK-665
 title: >-
   Document intentional bAnswerOverride=false on first OT message (one-shot boot
   drift)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 06:23'
+updated_date: '2026-05-22 06:25'
 labels:
   - docs
   - correctness
