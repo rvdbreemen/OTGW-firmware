@@ -3,9 +3,11 @@ id: TASK-658
 title: >-
   Backlog admin: flip 6 completed-but-In-Progress tasks to Done + triage 6
   long-stale In Progress tasks
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 05:52'
+updated_date: '2026-05-22 06:24'
 labels:
   - backlog-admin
 dependencies: []
