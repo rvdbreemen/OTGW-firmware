@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:18'
-updated_date: '2026-05-16 07:32'
+updated_date: '2026-05-22 06:39'
 labels:
   - bug
   - mqtt
@@ -51,6 +51,8 @@ Two field testers on 1.5.0 report the Home Assistant 'DHW Control' (and Thermost
 Implemented: removed sendMQTT(MQTTPubNamespace, CONLINEOFFLINE) at OTGW-Core.ino:4029 and MQTTstuff.ino:1113; otgw_connected retained. ADR-074 authored + user-Accepted in-session; declarative forbid_pattern Enforcement. Prerelease beta.3->beta.4. evaluate.py --quick: 4 unresolved ADR refs are PRE-EXISTING on dev (README->ADR-063; Accepted/immutable ADR-070->097, ADR-072->099x2) — my ADR-102 sibling ref escaped via forward-citation, so 0 new offenders. Committed ea75ea56 + 2d49113 4; pushed claude/fix-dhw-control-issue-bFtJ6; draft PR #583.
 
 AC#6 (python build.py --firmware exit 0) NOT self-verifiable in the Claude-on-the-web sandbox: network policy blocks downloads.arduino.cc and arduino-cli is not pre-installed, so the toolchain cannot be fetched. Dev CI (#583) has no firmware-build job (CodeQL + evaluate.py + claude-review only), so the compile gate is delegated to the maintainer/local build. Change is a pure 2-line deletion (no new identifiers; MQTTPubNamespace/CONLINEOFFLINE still used by the birth path) so compile risk is minimal but unverified here.
+
+Triage 2026-05-22 by TASK-658 backlog admin: AC#1 verification — sendMQTT(MQTTPubNamespace, CONLINEOFFLINE) calls STILL PRESENT on origin/dev at OTGW-Core.ino:4044 and MQTTstuff.ino:1158. The two-line removal has NOT landed on origin/dev despite CHANGELOG mentioning TASK-607/ADR-074. Final Summary claim of field-confirmation predates landing — PR #583 not yet merged. Leaving In Progress: blocking AC#1 until the two sendMQTT(MQTTPubNamespace, CONLINEOFFLINE) deletions are merged into origin/dev. AC#6 (build.py --firmware) remains sandbox-blocked but de-facto verified post-merge.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

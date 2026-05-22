@@ -29,6 +29,17 @@ name: Beta prerelease publish
 #
 # Manual re-run: workflow_dispatch with a tag input lets the maintainer
 # re-publish a stuck draft without pushing a new tag.
+#
+# Security model: this workflow publishes a prerelease the moment a tag
+# matching `v*-*.*` is pushed OR a workflow_dispatch run completes — there
+# is no human-approval gate between draft and publish. The "create as
+# draft then flip to live" pattern only works around GitHub's
+# immutable-release upload restriction, NOT as a review checkpoint.
+# Anyone with `contents: write` on the repo can therefore trigger a
+# published prerelease. The `ref` input on workflow_dispatch is
+# hard-restricted (below) to dev / main / explicit commit SHAs to prevent
+# publishing arbitrary PR-head refs.
+# See TASK-656 for the design discussion.
 
 on:
   push:
@@ -41,7 +52,7 @@ on:
         required: true
         type: string
       ref:
-        description: 'Branch or commit to tag if `tag` does not yet exist on origin (default: dev). Ignored when the tag already exists.'
+        description: 'Branch or commit to tag if `tag` does not yet exist (must be `dev` or a 7-40 char hex SHA — main and PR refs are rejected; stable releases use the /release skill). Ignored when the tag already exists.'
         required: false
         default: 'dev'
         type: string
@@ -61,14 +72,29 @@ jobs:
         run: |
           TAG="${{ inputs.tag }}"
           REF="${{ inputs.ref }}"
-          if gh api "repos/${{ github.repository }}/git/refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists on origin, reusing it."
-          else
+          # TASK-656: hard-restrict the ref to dev or a 7-40 char hex SHA.
+          # This workflow is the BETA-prerelease pipeline — stable releases (main)
+          # go through the /release skill and a different workflow chain, so main
+          # is intentionally NOT allowed here. gh api would otherwise resolve
+          # arbitrary refs (refs/pull/<N>/head, feature/...) and a maintainer
+          # dispatch could publish a prerelease from un-reviewed PR code. The
+          # tag-already-exists path is exempt because the tag itself is the
+          # source of truth at that point.
+          if ! gh api "repos/${{ github.repository }}/git/refs/tags/${TAG}" >/dev/null 2>&1; then
+            if ! echo "${REF}" | grep -qE '^(dev|[0-9a-f]{7,40})$'; then
+              echo "ERROR: ref '${REF}' is not allowed. Must be 'dev' or a 7-40 char hex commit SHA."
+              echo "       Beta-prerelease workflow is dev-only; stable releases use the /release skill."
+              echo "       This guard also prevents publishing from arbitrary PR refs (refs/pull/<N>/head)."
+              echo "       See TASK-656."
+              exit 1
+            fi
             SHA=$(gh api "repos/${{ github.repository }}/commits/${REF}" --jq '.sha')
             [ -n "${SHA}" ] || { echo "ERROR: could not resolve ref '${REF}' to a commit SHA"; exit 1; }
             echo "Creating tag ${TAG} at ${REF} (${SHA})"
             gh api -X POST "repos/${{ github.repository }}/git/refs" \
               -f ref="refs/tags/${TAG}" -f sha="${SHA}"
+          else
+            echo "Tag ${TAG} already exists on origin, reusing it."
           fi
 
       - name: Resolve tag name

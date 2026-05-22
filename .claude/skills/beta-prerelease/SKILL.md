@@ -250,6 +250,8 @@ The repo has GitHub's "Enforce immutable releases" enabled. The naive flow (`gh 
 
 **Workaround in workflow:** draft-first publication. `gh release create --draft --prerelease ... <all asset files>` attaches every asset in one atomic call while the release is still a draft (drafts are mutable). Only after that, `gh release edit --draft=false` flips it to published — immutability kicks in at that step, with all assets already attached.
 
+> ⚠️ **Security model:** "draft-first" is a workaround for the immutable-release upload restriction, **not** a human-approval checkpoint. The single workflow job flips draft → published unconditionally. Anyone with `contents: write` on the repo who pushes a tag matching `v*-*.*` (or dispatches the workflow) triggers a published prerelease. The `workflow_dispatch` `ref` input is hard-restricted to `dev` / `main` / explicit commit SHAs to prevent publishing arbitrary PR-head refs (TASK-656). If a true reviewer-gated flow becomes necessary, split the publish step into a separate job behind a GitHub Environment that requires approval.
+
 Do NOT try to recover by uploading later; it will not work.
 
 ### Trap 2: A tag used by a deleted immutable release is reserved forever

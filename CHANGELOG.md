@@ -22,6 +22,7 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - Pure JIT MQTT discovery: only non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC) are queued at boot; OT MsgID discovery configs publish on first MsgID reception, not on connect (ADR-073, supersedes ADR-041)
 - Dev version line bumped to `1.6.0-beta.N` (was `1.5.x-beta.N`) (#601)
 - Mainloop responsiveness audit: `delay()` / `delayMs()` usages on the cooperative path replaced with non-blocking timer checks so `doBackgroundTasks()` keeps running at full cadence under load (TASK-651, TASK-652, #617)
+- MQTT `resetgateway` command now requires payload `"1"` (matching the HA-discovery `payload_press` value already in use) and is rate-limited to one PIC reset per 5 seconds. Non-matching payloads are logged and ignored; rapid retries inside the cooldown window are silently dropped with a log line. Closes the unauthenticated-LAN reset-storm path raised by the dev review (TASK-661)
 
 ### Fixed
 - HA capability-flag binary sensors for bits 2-5 (cooling, OTC active, CH2 active, summer/winter) stuck at `unknown` in Home Assistant: the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so every bit reaches its retained topic on every status change (ADR-076, TASK-649, #614)

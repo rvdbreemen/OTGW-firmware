@@ -616,14 +616,29 @@ class WorkspaceEvaluator:
         # Extract buffer size: "char json[512];" or similar.
         buf_decl = re.search(r"\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]", body)
         if not buf_decl:
-            # The function was refactored to per-stat publishStatU32() calls;
-            # with no fixed char[N] buffer there is no overflow surface, so the
-            # arithmetic concern is moot rather than unverified.
-            self.add_result(EvaluationResult(
-                "Buffer", "sendMQTTheapdiag arithmetic", "PASS",
-                "No fixed char[N] buffer in body — per-stat publish, "
-                "buffer-arithmetic check not applicable"
-            ))
+            # No fixed char[N] buffer found. Two possible states:
+            # (a) Function was refactored to per-stat publishStatU32() calls — no
+            #     buffer means no overflow surface; the arithmetic concern is moot.
+            # (b) Regression: someone re-introduced an snprintf-into-an-unsized-buffer
+            #     pattern (e.g. renamed the buffer to something the regex doesn't
+            #     match, or using a parameter instead of a local). That IS unsafe.
+            # TASK-660: distinguish (a) from (b) by checking whether snprintf(_P) is
+            # actually used in the body. If snprintf is gone too, we're in (a) and
+            # PASS is correct. If snprintf is still present, we're in (b) and the
+            # check should WARN so the regression doesn't ship silently.
+            if re.search(r"\bsnprintf(?:_P)?\s*\(", body):
+                self.add_result(EvaluationResult(
+                    "Buffer", "sendMQTTheapdiag arithmetic", "WARN",
+                    "snprintf(_P) present in sendMQTTheapdiag body but no char[N] "
+                    "buffer declaration matched the regex — possible regression "
+                    "(renamed buffer? parameter? unsized?). Inspect manually."
+                ))
+            else:
+                self.add_result(EvaluationResult(
+                    "Buffer", "sendMQTTheapdiag arithmetic", "PASS",
+                    "No fixed char[N] buffer AND no snprintf in body — per-stat "
+                    "publish, buffer-arithmetic check not applicable"
+                ))
             return
         buf_name = buf_decl.group(1)
         buf_size = int(buf_decl.group(2))
@@ -1060,8 +1075,22 @@ class WorkspaceEvaluator:
         # Tight hatches: the cited line must itself name the reason the number
         # cannot resolve in the dev tree (reserved no-op number, or a ref to
         # the parallel 2.0.0 worktree's independent numbering).
+        # TASK-660: the previous bare "2.0.0" match excused any line mentioning
+        # the version string, which the review flagged as too wide (a comment
+        # like "see v2.0.0 release notes" would excuse an unrelated unresolved
+        # ADR on the same line). Narrowed to a set of phrases that actually
+        # appear in this repo's cross-tree references:
+        #   - "2.0.0 worktree/line/branch/tree/design/topic-naming" — phrasing
+        #     used in ADRs that explicitly call out cross-worktree work.
+        #   - "on 2.0.0" — prepositional form used in Enforcement-block messages.
+        #   - "feature-dev-2.0.0" — direct mention of the 2.0.0 branch name.
+        # Verbal-context markers (worktree, sibling, skipped, reserved, unused,
+        # placeholder) remain unchanged — those are unambiguous on their own.
         excused_markers = re.compile(
-            r"(2\.0\.0|\bworktree\b|\bsibling\b|\bskipped\b|"
+            r"(2\.0\.0\s+(?:worktree|line|branch|tree|design|topic-naming)|"
+            r"\bon\s+2\.0\.0\b|"
+            r"feature-dev-2\.0\.0|"
+            r"\bworktree\b|\bsibling\b|\bskipped\b|"
             r"\breserved\b|\bunused\b|\bplaceholder\b)",
             re.IGNORECASE,
         )

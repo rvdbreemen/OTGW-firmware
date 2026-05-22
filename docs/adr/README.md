@@ -112,8 +112,8 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-066: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification](ADR-066-mqtt-publish-gating-by-source-and-slave-echo.md)** *(Proposed; refined by ADR-069)*
   Constrains the base topic to thermostat-side intent (Read-Ack and Write-Data only) and introduces per-MsgID `bSlaveEchoesValue` metadata to gate `/boiler` subtopic publications so that non-echo Write-Ack zeroes no longer flap the base or source topics.
 
-- **[ADR-067: HA Discovery State Reconciliation on OTA Upgrade](ADR-067-ha-discovery-state-reconciliation-on-ota-upgrade.md)** *(Deprecated, withdrawn)*
-  Automatic wipe of retained HA discovery topics on boot after a firmware upgrade was implemented and tested but proved too fragile on ESP8266 resource constraints; feature removed and users directed to manual cleanup via MQTT Explorer.
+- **[ADR-067: HA Discovery State Reconciliation on OTA Upgrade](ADR-067-ha-discovery-state-reconciliation-on-ota-upgrade.md)** *(Deprecated)*
+  Automatic wipe of retained HA discovery topics on boot after a firmware upgrade was implemented and tested but proved too fragile on ESP8266 resource constraints; feature was withdrawn from implementation and users directed to manual cleanup via MQTT Explorer.
 
 - **[ADR-068: bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive](ADR-068-bseparatesources-mutually-exclusive-base-and-source-variants.md)** *(Superseded by ADR-070)*
   Declared that enabling `bSeparateSources` suppresses the redundant base entity for source-templated MsgIDs, eliminating duplicate HA entity names; superseded by ADR-070 which also fixes the topic shape.
@@ -132,6 +132,21 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - **[ADR-073: JIT HA Discovery with Smart Reconnect](ADR-073-jit-ha-discovery-smart-reconnect.md)** *(Accepted)*
   Supersedes ADR-041. Removes the bulk-publish sweep from all automatic triggers, introduces a `publishNonOTDiscoveryConfigs()` set for non-OT pseudo-IDs, and adds a 5-minute offline heuristic to reset discovery bitmaps on probable broker restart without requiring the unavailable CONNACK `sessionPresent` flag.
+
+- **[ADR-074: HA Entity Availability Reflects the MQTT Link, Not OpenTherm-Bus Liveness](ADR-074-ha-availability-reflects-mqtt-link-not-ot-bus.md)** *(Accepted)*
+  HA entity availability is owned exclusively by the MQTT LWT/birth pair on `<toptopic>/<hostname>` — OT-bus liveness does not write to that topic. Eliminates the DHW Control / Thermostat unavailable-flap field testers reported during quiet OT-bus periods.
+
+- **[ADR-075: MQTT Source-Topic Worldview Routing — Proxy-Answer Refinement](ADR-075-mqtt-source-topic-proxy-answer-routing.md)** *(Accepted)*
+  Supersedes ADR-069. Adds `bAnswerOverride` discriminator so proxy-A (no preceding B) frames publish to `_thermostat`, `_boiler` AND canonical for proxy-answered IDs (e.g. MaxTSet/57), while genuine answer-override frames still publish to `_thermostat` only (ADR-069 invariant preserved). Fixes data-starvation on MQTT-Explorer-flagged read IDs.
+
+- **[ADR-076: MQTT Status Fan-Out — Drop Global Rate-Gate, Keep Per-Slot Heartbeat](ADR-076-mqtt-status-fanout-drop-global-rate-gate.md)** *(Accepted)*
+  Removes the 250 ms global `MQTT_GATED_PUBLISH_SPACING_MS` rate-gate that was starving first-seen ASF/RBP/VH bit/byte fan-out. Replaces it with per-slot heartbeat + commit-or-discard pending-slot bookkeeping; throughput becomes bounded by per-slot age rather than a global cooldown.
+
+- **[ADR-077: Publish HA-Core-Style Capability-Flag Aliases on dev](ADR-077-mqtt-ha-core-capability-flag-aliases.md)** *(Superseded by ADR-078)*
+  Proposed publishing HA-core-style self-describing aliases for the MsgID 2/3/6 capability/state/type/fault bits under a `bPublishHaCoreAliases` setting. Withdrawn from the dev (1.5.x) line by ADR-078 to avoid shipping the alias schema before its 2.0.0 successor has stabilised.
+
+- **[ADR-078: Defer HA-Core Capability-Flag Aliases — Ship on 2.0.0 Only](ADR-078-defer-ha-core-aliases-to-2-0-0-revert-from-dev.md)** *(Accepted)*
+  Reverts ADR-077 from the dev branch and reserves HA-core capability-flag aliases for the 2.0.0 line. Includes a forbid-pattern Enforcement block that prevents re-introduction on dev (the `bPublishHaCoreAliases` symbol must not reappear under `src/OTGW-firmware/`).
 
 ### System Architecture
 
@@ -386,6 +401,8 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 15. 2026: ADR-067 (HA discovery OTA reconciliation, Deprecated), ADR-068 (bSeparateSources mutually exclusive, Superseded by ADR-070)
 16. 2026: ADR-069 (MQTT source-subtopic worldview semantics), ADR-070 (sibling-suffix state topic, Superseded by ADR-071)
 17. 2026: ADR-071 (MQTT discovery sibling-suffix shape), ADR-072 (HA discovery friendly-name format), ADR-073 (JIT HA discovery smart reconnect, supersedes ADR-041)
+18. 2026: ADR-074 (HA availability reflects MQTT link, not OT bus), ADR-075 (MQTT source-topic proxy-answer routing, supersedes ADR-069)
+19. 2026: ADR-076 (drop global status fan-out rate-gate), ADR-077 (HA-core capability-flag aliases, Superseded by ADR-078), ADR-078 (defer HA-core aliases to 2.0.0, supersedes ADR-077)
 
 ## When to Create an ADR
 

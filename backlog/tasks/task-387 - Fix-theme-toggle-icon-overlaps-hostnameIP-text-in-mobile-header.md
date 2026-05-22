@@ -1,10 +1,10 @@
 ---
 id: TASK-387
 title: 'Fix: theme toggle icon overlaps hostname+IP text in mobile header'
-status: In Progress
+status: To Do
 assignee: []
 created_date: '2026-04-23 07:43'
-updated_date: '2026-04-23 07:48'
+updated_date: '2026-05-22 06:41'
 labels:
   - bug
   - ui
@@ -34,4 +34,6 @@ Discord #beta-testing (sergeantd, 2026-04-23 07:11Z, screenshot attached): on mo
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-04-23: Fix landed on dev (commit c0eb1682). Added .headerrow { padding-right: 32px; } inside the @media (max-width: 600px) block in both index.css and index_dark.css. Reserves horizontal space for the absolute-positioned theme toggle so flex content (hostname+IP .headercolumn) no longer flows under it. Desktop unchanged. Awaiting field validation by sergeantd on mobile.
+
+Triage 2026-05-22: still relevant but no active work in 14+ days; deprioritised. Mobile header theme-toggle overlap reported by sergeantd on 2026-04-23. No new reports since 1.5.0; the touch-PC FSexplorer fix (commit ebbbb4df, beta.7) may have touched related header CSS — re-validate before active work.
 <!-- SECTION:NOTES:END -->

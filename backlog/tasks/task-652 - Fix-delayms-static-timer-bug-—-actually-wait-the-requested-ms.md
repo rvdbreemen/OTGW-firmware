@@ -1,11 +1,11 @@
 ---
 id: TASK-652
 title: Fix delayms() static-timer bug — actually wait the requested ms
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-21 20:32'
-updated_date: '2026-05-21 20:34'
+updated_date: '2026-05-22 06:39'
 labels:
   - bug
   - led

@@ -1,11 +1,11 @@
 ---
 id: TASK-633
 title: 'Fix: dhw_enable canonical topic ignores HW override (regression of #84/#108)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-20 06:46'
-updated_date: '2026-05-20 06:46'
+updated_date: '2026-05-22 06:38'
 labels:
   - bug
   - mqtt
@@ -41,3 +41,13 @@ Build AC checked off as CI proxy: build.py --firmware still firewalled (HTTP 403
 
 PR #604 mergeable_state moved dirty -> unstable (waiting on CI re-run).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Landing commit 103ed603 (PR #604, dev) — fix(mqtt): gate MsgID 0 Status canonical publish on boiler-side worldview. Shipped in beta.7 release (chore(release): beta.7, commit da0e387f) and later betas through beta.16.
+
+Root cause: MsgID 0 print_status() used legacy is_value_valid() instead of the ADR-066/ADR-069 boiler-side worldview gate is_value_valid_for_master_topic(). Gateway-substituted T-frames and gateway-faked A-frames overwrote the canonical dhw_enable / status_master / Statusflags state with pre-override values; HW=0 left dhw_enable=ON in MQTT/REST. Verbatim regression of historical issues #84 and #108.
+
+Fix: is_value_valid_for_master_topic() now guards the master-side publish (~line 2113), slave-side publish (~line 2141), and final Statusflags state write-back (~line 2146) in print_status. Companion 2.0.0 port tracked separately. Evaluate.py --quick green; build verified on merge by maintainer.
+<!-- SECTION:FINAL_SUMMARY:END -->
