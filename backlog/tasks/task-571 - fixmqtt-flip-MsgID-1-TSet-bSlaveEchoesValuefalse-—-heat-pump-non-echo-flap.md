@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 20:06'
-updated_date: '2026-05-07 21:55'
+updated_date: '2026-05-22 06:41'
 labels:
   - bug
   - mqtt
@@ -38,6 +38,12 @@ Field validation on dev beta.25+5153537 (2026-05-07) confirmed TASK-561 ADR-066 
 <!-- SECTION:PLAN:BEGIN -->
 1. flip OTmap[] entries for msgid 1, 7, 8, 71 (already done in beta.26); 2. update audit doc; 3. ship and bump prerelease; 4. wait on field validation.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-05-22: code change shipped on dev (commit 660d4b93) and made it into main/v1.5.0-fix2. AC#6 (field validation by tester) is the residual blocker. No new TSet-flap reports since 1.5.0 stable was tagged. Blocked on positive field signal — re-open if a tester re-tests on 1.6.0-beta.16+ and confirms or denies.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
