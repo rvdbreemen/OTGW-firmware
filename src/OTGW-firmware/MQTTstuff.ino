@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.6.0-beta.18
+**  Version  : v1.6.0-beta.19
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -702,9 +702,26 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
             addOTWGcmdtoqueue(otgwcmd, strlen(otgwcmd), true);
           } else if (pOtType == s_reset) {
-            //hardware PIC reset - payload is ignored
-            MQTTDebugTln(F(" found command: resetgateway - resetting PIC"));
-            resetOTGW();
+            // TASK-661: payload validation + rate-limit. Hardware PIC reset is
+            // disruptive (interrupts any in-flight OT command); previously the
+            // payload was ignored entirely. Match HA-discovery payload_press="1".
+            // Rate-limit to once per RESETGATEWAY_COOLDOWN_MS to absorb storms
+            // from misconfigured automations.
+            if (strcmp_P(msgPayload, PSTR("1")) != 0) {
+              MQTTDebugf(PSTR(" command: resetgateway - ignored, payload [%s] != \"1\"\r\n"), msgPayload);
+            } else {
+              static uint32_t lastResetMs = 0;
+              const uint32_t RESETGATEWAY_COOLDOWN_MS = 5000;
+              uint32_t now = millis();
+              if (lastResetMs != 0 && (uint32_t)(now - lastResetMs) < RESETGATEWAY_COOLDOWN_MS) {
+                MQTTDebugTf(PSTR(" command: resetgateway - rate-limited (%lu ms cooldown remaining)\r\n"),
+                            (unsigned long)(RESETGATEWAY_COOLDOWN_MS - (now - lastResetMs)));
+              } else {
+                lastResetMs = now;
+                MQTTDebugTln(F(" found command: resetgateway - resetting PIC"));
+                resetOTGW();
+              }
+            }
           } else {
             //all other commands are <otgwcmd>=<payload message>
             // Copy command string from Flash to temp buffer for snprintf
