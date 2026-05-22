@@ -3,9 +3,11 @@ id: TASK-654
 title: >-
   Implement ADR-074: delete two sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(...))
   writes
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 05:51'
+updated_date: '2026-05-22 06:24'
 labels:
   - adr-074
   - bug
