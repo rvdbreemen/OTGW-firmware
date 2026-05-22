@@ -1,7 +1,7 @@
 ---
 id: TASK-633
 title: 'Fix: dhw_enable canonical topic ignores HW override (regression of #84/#108)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-20 06:46'
