@@ -3,9 +3,11 @@ id: TASK-655
 title: >-
   Refresh docs/adr/README.md index with ADR-074-078 + relocate meta verification
   files + normalize ADR-067 status
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 05:51'
+updated_date: '2026-05-22 06:24'
 labels:
   - docs
   - adr
