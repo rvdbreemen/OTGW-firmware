@@ -1,0 +1,33 @@
+---
+id: TASK-655
+title: >-
+  Refresh docs/adr/README.md index with ADR-074-078 + relocate meta verification
+  files + normalize ADR-067 status
+status: To Do
+assignee: []
+created_date: '2026-05-22 05:51'
+labels:
+  - docs
+  - adr
+dependencies: []
+references:
+  - docs/adr/README.md
+  - docs/adr/ADR-074-ha-availability-reflects-mqtt-link-not-ot-bus.md
+  - docs/adr/ADR-078-defer-ha-core-aliases-to-2-0-0-revert-from-dev.md
+priority: high
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+ADR README index stops at ADR-073; ADR-074/075/076/077/078 are missing — five accepted/superseded decisions actively cited in CHANGELOG/README. Four upper-snake-case meta files (ADR_DATE_VERIFICATION.md, ADR_DATE_EVIDENCE_EXAMPLES.md, ADR_VERIFICATION_REPORT.md, VERIFICATION_SUMMARY.md) pollute docs/adr/ and break the ADR-NNN-kebab.md convention. ADR-067 status reads non-standard 'Deprecated, withdrawn'.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 docs/adr/README.md index lists ADR-074 (HA availability), ADR-075 (proxy-A routing), ADR-076 (drop rate-gate), ADR-077 (Superseded by ADR-078), ADR-078 (Accepted) under appropriate sections
+- [ ] #2 Decision Timeline (README.md) extended through ADR-078
+- [ ] #3 ADR-067 listed as '*(Deprecated)*' — narrative about withdrawal moved into the ADR body, not the index label
+- [ ] #4 Four meta files moved to docs/audits/ with YYYY-MM-DD prefix OR to docs/process/ if normative
+- [ ] #5 Section counts in README.md updated to match new totals
+<!-- AC:END -->
