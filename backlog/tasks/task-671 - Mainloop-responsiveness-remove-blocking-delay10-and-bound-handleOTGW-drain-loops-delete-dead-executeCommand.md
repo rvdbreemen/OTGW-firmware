@@ -3,9 +3,11 @@ id: TASK-671
 title: >-
   Mainloop responsiveness: remove blocking delay(10) and bound handleOTGW drain
   loops; delete dead executeCommand
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 11:20'
+updated_date: '2026-05-22 11:20'
 labels:
   - responsiveness
   - refactor
@@ -37,3 +39,9 @@ Same scope is mirrored to a sibling 2.0.0 task that ports the fix where the code
 - [ ] #6 python evaluate.py --quick reports no new failures
 - [ ] #7 Same audit applied to 2.0.0 worktree; mirror task created if code matches
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Fix A1: remove delay(10) in helperStuff.ino:1135, keep yield()\n2. Fix A2/A3: add line-cap (max 4 lines) to both drain-loops in OTGW-Core.ino handleOTGW()\n3. Fix B: delete executeCommand() function in OTGW-Core.ino (lines ~864-960)\n4. Verify: grep for executeCommand to confirm no callers\n5. Build: python build.py --firmware exits 0\n6. Eval: python evaluate.py --quick no new failures\n7. Commit with descriptive message\n8. Create 2.0.0 worktree, audit same locations, port fixes\n9. Build/eval 2.0.0, commit\n10. Push both branches per push policy\n11. Investigate D-category synchronous blockers
+<!-- SECTION:PLAN:END -->
