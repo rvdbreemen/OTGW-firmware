@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.6.0-beta.16
+**  Version  : v1.6.0-beta.17
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4041,9 +4041,10 @@ void processOT(const char *buf, int len){
     if ((state.otgw.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
       if (isPICEnabled()) {
         sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
-        sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
       }
-      // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
+      // ADR-074: availability of HA entities reflects MQTT-link state (LWT/birth),
+      // not OT-bus liveness. Do not republish to MQTTPubNamespace on bus state changes —
+      // the LWT/birth pair on <toptopic>/<hostname> owns the availability topic.
       bOTGWpreviousstate = state.otgw.bOnline; //remember state, so we can detect statechanges
     }
 

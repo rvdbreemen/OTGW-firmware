@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.6.0-beta.16
+**  Version  : v1.6.0-beta.17
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1155,7 +1155,8 @@ void sendMQTTstateinformation(){
     sendMQTTDataPic(F("gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
   }
   sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
-  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+  // ADR-074: do NOT write OT-bus state to the MQTT availability topic. The LWT/birth
+  // pair on <toptopic>/<hostname> owns availability and reflects MQTT-link state.
 }
 
 /*
