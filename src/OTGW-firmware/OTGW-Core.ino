@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.52
+**  Version  : v2.0.0-alpha.53
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4110,7 +4110,13 @@ void processOT(const char *buf, int len, bool suppressOutput){
     OTdata.bAnswerOverride = false;                   // ADR-103: default proxy A (no preceding B)
 
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
-      //just store current message and delay processing
+      // Boot-time one-shot: the very first OT frame has no prior delayed frame to pair
+      // against, so the (B,A) and (T,R) substitution-detection logic below cannot run.
+      // We store the raw frame with bAnswerOverride=false / bGatewaySubstituted=false
+      // initialised above. Worst case: if the first frame happens to be an A that was
+      // already an answer-override on the bus, it would reach _boiler/canonical once;
+      // the next (B,A) pair recomputes correctly and behaviour self-corrects. Bounded,
+      // intentional, one-shot drift — port from dev TASK-665.
       delayedOTdata = OTdata;       //store current msg
       OTDebugln(F("delaying first message!"));
     } else {                              //any other message will be processed

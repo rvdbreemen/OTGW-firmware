@@ -69,7 +69,7 @@ Entity **availability** uses the MQTT LWT/birth message (`avty_t` → `online`/`
 | No OTGW devices appear | Prefix mismatch — confirm `settings.mqtt.sHaprefix` equals the *Auto Discovery Prefix*. Verify configs exist: `mosquitto_sub -v -t '<haprefix>/#'`. |
 | Devices appear but show no value | They exist as discovery configs but the value hasn't been published yet (JIT discovery) — values arrive once the MsgID is seen on the OpenTherm bus. |
 | Device shows as "off"/unavailable | Availability topic not received — check the LWT/birth topic publishes `online` (see `MQTT_LWT.md`). |
-| Duplicate / stale devices | Old retained configs from a previous topic shape. Clear zombie/orphan retained configs per the migration notes in `docs/api/MQTT.md`, then republish. |
+| Duplicate / stale devices | Old retained configs from a previous topic shape. Clear zombie/orphan retained configs per [`docs/api/MQTT.md` — Migration note (2.0.0 topic-shape transition)](../api/MQTT.md#migration-note-200-topic-shape-transition), then republish. |
 
 ## Related
 
