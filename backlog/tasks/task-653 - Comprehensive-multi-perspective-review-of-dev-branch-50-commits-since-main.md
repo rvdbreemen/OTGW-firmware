@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-22 05:37'
-updated_date: '2026-05-22 05:37'
+updated_date: '2026-05-22 05:53'
 labels:
   - review
   - dev-branch
@@ -21,17 +21,19 @@ Broad review of origin/main..origin/dev (50 commits, ~17k+/-23k LOC) covering al
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Code-correctness review completed and findings documented
-- [ ] #2 Security review completed and findings documented
-- [ ] #3 ESP8266-platform review (PROGMEM/RAM/heap/yield/static-buffer) completed and findings documented
-- [ ] #4 ADR-compliance check against all Accepted ADRs touching changed code completed
-- [ ] #5 Frontend/UI review (FSexplorer touch fix, HA discovery JS, data/*) completed
-- [ ] #6 Release- and CI-pipeline review (beta-prerelease workflow, evaluate.py, build.py submodule fix, versioning policy) completed
-- [ ] #7 Docs/integration-guides review (openHAB, Domoticz, Dutch MQTT cleanup, daily issue reports) completed
-- [ ] #8 Backlog hygiene review completed (every dev commit traceable to a TASK; completed tasks have Final Summary; no orphan In Progress)
-- [ ] #9 Findings consolidated in Final Summary with severity + location + suggested follow-up tasks
-- [ ] #10 Follow-up backlog tasks created for each actionable High/Medium finding
+- [x] #1 Code-correctness review completed and findings documented
+- [x] #2 Security review completed and findings documented
+- [x] #3 ESP8266-platform review (PROGMEM/RAM/heap/yield/static-buffer) completed and findings documented
+- [x] #4 ADR-compliance check against all Accepted ADRs touching changed code completed
+- [x] #5 Frontend/UI review (FSexplorer touch fix, HA discovery JS, data/*) completed
+- [x] #6 Release- and CI-pipeline review (beta-prerelease workflow, evaluate.py, build.py submodule fix, versioning policy) completed
+- [x] #7 Docs/integration-guides review (openHAB, Domoticz, Dutch MQTT cleanup, daily issue reports) completed
+- [x] #8 Backlog hygiene review completed (every dev commit traceable to a TASK; completed tasks have Final Summary; no orphan In Progress)
+- [x] #9 Findings consolidated in Final Summary with severity + location + suggested follow-up tasks
+- [x] #10 Follow-up backlog tasks created for each actionable High/Medium finding
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
