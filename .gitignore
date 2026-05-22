@@ -63,3 +63,12 @@ tools/esptool/
 # Accidental root drops (TASK-635): seen via GitHub web UI uploads / empty stubs.
 /logfile.*
 /.codex
+
+# Field-test debug dumps uploaded via GitHub web UI (TASK-657).
+/OTGW_*.txt
+/OTGW_*.log
+# Bulk planning uploads that were briefly committed and reverted on 2026-05-20 (TASK-657).
+/plan/
+
+# Daily issue reports are operational artefacts, not version-controlled history (TASK-663).
+docs/daily-issue-report.md
