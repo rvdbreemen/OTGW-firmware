@@ -4,9 +4,11 @@ title: >-
   feat-2.0.0: port review findings to 2.0.0 — .gitignore (TASK-657),
   daily-report (TASK-663), anchor fix (TASK-664), boot-msg comment (TASK-665),
   HTML stream verify (TASK-662)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 06:24'
+updated_date: '2026-05-22 06:25'
 labels:
   - port
   - 2.0.0
