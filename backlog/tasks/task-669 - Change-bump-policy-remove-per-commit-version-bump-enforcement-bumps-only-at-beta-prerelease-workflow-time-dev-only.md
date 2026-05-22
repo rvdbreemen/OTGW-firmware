@@ -3,11 +3,11 @@ id: TASK-669
 title: >-
   Change bump policy: remove per-commit version bump enforcement; bumps only at
   beta-prerelease workflow time (dev only)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-22 07:06'
-updated_date: '2026-05-22 07:06'
+updated_date: '2026-05-22 07:08'
 labels:
   - ci
   - policy
@@ -23,12 +23,12 @@ Current dev policy: every firmware-touching commit must bump _VERSION_PRERELEASE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 CLAUDE.md Versioning policy section rewritten: bumps happen at release-prep time only, not per commit
-- [ ] #2 .githooks/pre-commit bump-check block removed (both _VERSION_PRERELEASE and the data/version.hash companion check from TASK-660)
-- [ ] #3 .githooks/README.md updated to reflect that pre-commit no longer runs the bump-check
-- [ ] #4 .claude/skills/beta-prerelease/SKILL.md confirmed to call bin/bump-prerelease.sh at the right phase (no change needed if already does)
-- [ ] #5 OTGW_BUMP_HOOK_DISABLE env-var documentation removed from CLAUDE.md (no longer needed)
-- [ ] #6 Change applies to dev worktree ONLY — 2.0.0 worktree retains its own bump policy unchanged
+- [x] #1 CLAUDE.md Versioning policy section rewritten: bumps happen at release-prep time only, not per commit
+- [x] #2 .githooks/pre-commit bump-check block removed (both _VERSION_PRERELEASE and the data/version.hash companion check from TASK-660)
+- [x] #3 .githooks/README.md updated to reflect that pre-commit no longer runs the bump-check
+- [x] #4 .claude/skills/beta-prerelease/SKILL.md confirmed to call bin/bump-prerelease.sh at the right phase (no change needed if already does)
+- [x] #5 OTGW_BUMP_HOOK_DISABLE env-var documentation removed from CLAUDE.md (no longer needed)
+- [x] #6 Change applies to dev worktree ONLY — 2.0.0 worktree retains its own bump policy unchanged
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -40,3 +40,9 @@ Current dev policy: every firmware-touching commit must bump _VERSION_PRERELEASE
 4. Self-test: a firmware commit that does NOT change version.h should pass pre-commit without the bypass env-var.
 5. Commit + push to a fresh branch off origin/dev; open draft PR.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Removed per-commit bump enforcement on dev. Commit 392ccc2f. (a) .githooks/pre-commit: bump-check block removed (TASK-560 + the data/version.hash companion from TASK-660). adr-kit gate at the top unchanged. (b) CLAUDE.md 'Versioning policy' rewritten: bumps happen only as Phase 2 of /beta-prerelease (which calls bin/bump-prerelease.sh). Field-tester A/B traceability is preserved by release cadence, not per-commit. (c) .githooks/README.md updated with a one-paragraph note + pointer to CLAUDE.md. (d) Skill .claude/skills/beta-prerelease/SKILL.md already calls bin/bump-prerelease.sh at the right phase — no change needed. (e) OTGW_BUMP_HOOK_DISABLE env-var no longer needed; removed from CLAUDE.md. (f) 2.0.0 worktree intentionally NOT changed — its per-commit bump-check remains active per user instruction (branch-local policy). Self-tested: firmware-touching commit without version.h change now passes pre-commit; only the commit-msg TASK-NNN-ref hook (TASK-659) remains as an unrelated guard.
+<!-- SECTION:FINAL_SUMMARY:END -->
