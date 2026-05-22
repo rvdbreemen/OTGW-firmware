@@ -3,9 +3,11 @@ id: TASK-659
 title: >-
   Add commit-msg hook enforcing TASK-NNN reference in firmware/docs commit
   subjects
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 05:52'
+updated_date: '2026-05-22 06:24'
 labels:
   - ci
   - process
