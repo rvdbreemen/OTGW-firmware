@@ -3,9 +3,11 @@ id: TASK-664
 title: >-
   Fix openHAB/Domoticz guide anchor referencing non-existent 'migration notes'
   heading in docs/api/MQTT.md
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 06:23'
+updated_date: '2026-05-22 06:25'
 labels:
   - docs
 dependencies: []
