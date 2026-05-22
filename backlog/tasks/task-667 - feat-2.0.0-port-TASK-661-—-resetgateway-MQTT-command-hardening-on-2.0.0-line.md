@@ -1,9 +1,11 @@
 ---
 id: TASK-667
 title: 'feat-2.0.0: port TASK-661 — resetgateway MQTT command hardening on 2.0.0 line'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 06:24'
+updated_date: '2026-05-22 06:25'
 labels:
   - port
   - 2.0.0
