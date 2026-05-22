@@ -3,11 +3,11 @@ id: TASK-637
 title: >-
   Refresh README dev section and CHANGELOG Unreleased to reflect commits since
   v1.5.0-fix2
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-20 11:25'
-updated_date: '2026-05-20 11:30'
+updated_date: '2026-05-22 06:38'
 labels: []
 dependencies: []
 ---
