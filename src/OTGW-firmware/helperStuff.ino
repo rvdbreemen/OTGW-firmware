@@ -1077,11 +1077,12 @@ void emergencyHeapRecovery() {
   
   uint32_t heapBefore = platformFreeHeap();
   DebugTf(PSTR("Emergency heap recovery starting (heap=%u bytes)\r\n"), heapBefore);
-  
-  // Yield to allow ESP8266 to do housekeeping
+
+  // One yield() hands a scheduler slot to the SDK so it can run its own
+  // free-pool housekeeping. delay() is intentionally avoided: this runs from
+  // doBackgroundTasks() and must stay non-blocking (TASK-672, port of TASK-671).
   yield();
-  delay(10);
-  
+
   uint32_t heapAfter = platformFreeHeap();
   // Calculate recovered bytes safely (handle case where heap decreased)
   // Use int32_t to avoid overflow and allow negative values
