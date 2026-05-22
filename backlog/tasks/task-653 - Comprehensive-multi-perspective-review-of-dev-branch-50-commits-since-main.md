@@ -1,9 +1,11 @@
 ---
 id: TASK-653
 title: Comprehensive multi-perspective review of dev branch (50 commits since main)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 05:37'
+updated_date: '2026-05-22 05:37'
 labels:
   - review
   - dev-branch
@@ -30,3 +32,18 @@ Broad review of origin/main..origin/dev (50 commits, ~17k+/-23k LOC) covering al
 - [ ] #9 Findings consolidated in Final Summary with severity + location + suggested follow-up tasks
 - [ ] #10 Follow-up backlog tasks created for each actionable High/Medium finding
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Gather diff slices per perspective (file groups + key commits).
+2. Spawn 4 parallel review agents:
+   a. Code correctness + security + ADR-compliance (high-signal engineering)
+   b. ESP8266 platform compliance (PROGMEM/RAM/yield/static-buffers)
+   c. Frontend/UI + release/CI pipeline
+   d. Docs/integration-guides + backlog hygiene
+3. Consolidate reports into severity-ranked finding list.
+4. Create follow-up backlog tasks for actionable High/Medium findings.
+5. Add Final Summary with chat-pasteable consolidation.
+6. Mark Done.
+<!-- SECTION:PLAN:END -->
