@@ -4,9 +4,13 @@
 
 De webinterface van OTGW-firmware is een single-page application (SPA) die door het apparaat zelf wordt geserveerd. U heeft geen app, geen cloud en geen account nodig. Open een browser en navigeer naar `http://otgw.local/` of het IP-adres van uw apparaat.
 
-De interface werkt in Google Chrome, Mozilla Firefox en Apple Safari (laatste twee versies). Andere browsers worden niet officieel ondersteund.
+De interface werkt in de huidige plus twee voorgaande major-versies van Google Chrome, Mozilla Firefox en Apple Safari. Andere browsers worden niet officieel ondersteund.
 
-De SPA bestaat uit vier JavaScript-bestanden (`index.js`, `sat.js`, `graph.js`, en aanvullende ondersteuning) en bijbehorende CSS, allemaal opgeslagen in het LittleFS-bestandssysteem van het apparaat. Communicatie met de firmware verloopt via REST API (JSON over HTTP) voor instellingen en opdrachten, en via WebSocket voor de realtime OpenTherm-log.
+**Let op:** op de 2.0.0-lijn is de webinterface Engelstalig. De resterende Nederlandse UI-strings die uit het OTTHING-platform waren overgenomen, zijn verwijderd (TASK-569). Deze handleiding blijft Nederlands; de schermteksten waarnaar verwezen wordt, zijn in het Engels.
+
+De SPA bestaat uit de bestanden `index.html`, `index.js`, `sat.js`, `graph.js`, `sat-slider.js`, `theme-toggle.js`, `echarts-theme.js`, en de design-system CSS (`ds-tokens.css`, `components.css`), allemaal opgeslagen op het LittleFS-bestandssysteem van het apparaat. ECharts wordt vanaf het jsDelivr CDN geladen met SRI-hash. Communicatie met de firmware verloopt via de REST API (JSON over HTTP) voor instellingen en opdrachten, en via WebSocket voor de realtime OpenTherm-log.
+
+Een persistent banner bovenaan elke pagina waarschuwt zodra de firmware-buildhash niet overeenkomt met de hash van het geflashte LittleFS-image, met een directe link naar de flash utility.
 
 ---
 
@@ -18,11 +22,10 @@ De navigatiebalk bovenaan de pagina bevat de volgende tabbladen:
 |---|---|
 | **Home** | Startpagina met live OpenTherm-log, OT-Direct status (OTGW32) en temperatuurgrafieken |
 | **SAT** | SAT-thermostaat dashboard: temperatuurkaarten, presets, stooklijn, PID-diagnostiek |
-| **Instellingen** | Alle apparaat- en netwerkinstellingen, inclusief nachtelijke herstart |
-| **Geavanceerd** | Bestandsbeheer (FSexplorer), firmware-update, PIC-firmware |
-| **Thema** | Schakelaar voor licht/donker thema (rechts in de balk) |
+| **Settings** | Alle apparaat- en netwerkinstellingen, inclusief nachtelijke herstart |
+| **Advanced** | Uitklapmenu met PIC firmware, Webhook, Debug Information en File system contents (FSexplorer) |
 
-De navigatiebalk toont rechts ook de Wi-Fi-signaalbalkjes (of Ethernet-icoon), de heap-geheugenstatus en de huidige verbindingsstatus.
+Naast de tabbladen toont de header rechts de Wi-Fi-signaalbalkjes (of Ethernet-icoon), het heap-geheugen, de huidige tijd, de hostnaam en versie van het apparaat, en een zon/maan-knop voor het lichte of donkere thema.
 
 ---
 
@@ -57,12 +60,23 @@ Het bericht-ID correspondeert met het OpenTherm-protocol. Alle 80+ gedefinieerde
 
 #### Filtermogelijkheden
 
-Boven de loglijst staat een filterbalk. U kunt:
+Boven de loglijst staat een werkbalk. U kunt:
 
 - Op tekst filteren: typ een woord of waarde om alleen overeenkomende regels te tonen
 - Op bericht-ID filteren: voer een numeriek ID in
-- De log pauzeren: klik op de pauzeknop om het scrollen te stoppen zonder de verbinding te verbreken
-- De log exporteren: kopieer de zichtbare log naar het klembord of download als tekstbestand
+- Auto-scroll aan- of uitzetten en zelf scrollen om automatisch te pauzeren
+- Tijdstempels tonen of verbergen
+- **Capture**-modus inschakelen voor een grotere in-memory buffer (tot ongeveer 1 miljoen regels)
+- **Stream**-modus inschakelen om de log live naar een lokaal bestand te schrijven (alleen Chrome/Edge)
+- De zichtbare log handmatig downloaden of via **Auto** elke 15 minuten automatisch laten opslaan
+
+#### Sub-tabbladen Log, Statistics en Graph
+
+De OpenTherm Monitor heeft drie sub-tabbladen:
+
+- **Log**: de live gestreamde berichten zoals hierboven beschreven.
+- **Statistics**: een sorteerbare tabel per bericht-ID met hexadecimaal en decimaal ID, richting, omschrijving, interval (s) en laatst gemeten waarde.
+- **Graph**: een ECharts-tijdreeksgrafiek met instelbaar tijdvenster (10 minuten tot 24 uur), losse knoppen voor **Screenshot** en **Export Data** (CSV), plus bijbehorende **Auto-save PNG**- en **Auto-save CSV**-checkboxen voor periodieke export.
 
 #### Commandobalk
 
@@ -161,6 +175,11 @@ De Diagnostics-weergave voegt toe:
 
 Door op de knop **Settings** in de SAT-header te klikken, opent u een aparte SAT Settings pagina. Instellingen zijn georganiseerd in inklapbare groepen: Thermostat, Heating, PID, DHW, Pressure, Smart Features, Safety, Energy, Weather, Sync en Advanced. Elke groep heeft een eigen **Save**-knop om wijzigingen afzonderlijk op te slaan.
 
+Boven de algemene groepen verschijnen twee extra panelen op ESP32-builds:
+
+- **BLE Sensors**: lijst van Bluetooth Low Energy-sensoren die de firmware heeft ontdekt (Xiaomi LYWSD03MMC met ATC/pvvx custom firmware, BTHome v2). Elke rij toont het MAC-adres, een bewerkbare naam, hoe oud de laatste advertisement is, en de acties **Select** en **Forget**. De roster is gemaximeerd op acht items en wordt ook via MQTT naar Home Assistant gepubliceerd. Het veld `SATblemac` onderaan is alleen contextuele weergave: de actieve sensor wordt in dit paneel gekozen in plaats van met de hand getypt (TASK-508).
+- **DS18B20 Area Sensor Mapping**: koppelt elk SAT-zonegebied via een dropdown aan een gedetecteerde DS18B20-sensor. De gekozen mapping wordt elke pollcyclus naar SAT doorgegeven, zodat een bekabelde sensor als bron voor de kamertemperatuur van een specifiek gebied kan dienen.
+
 #### DHW-bediening
 
 Een DHW-sectie (Domestic Hot Water) is zichtbaar op alle SAT-weergaven. Deze biedt een schuifregelaar om de warmwatertemperatuur in te stellen (40-60 graden C) en een optionele forceerknop om handmatig warmwaterverwarming te activeren.
@@ -204,6 +223,10 @@ Klik op **Opslaan** onderaan een sectie om de wijzigingen toe te passen. De mees
 | Reset WiFi | Knop naast het SSID-veld. Wist de opgeslagen Wi-Fi-gegevens en herstart het apparaat in Access Point (AP) modus | n.v.t. |
 
 Om naar een ander Wi-Fi-netwerk over te schakelen, klikt u op **Reset WiFi** en bevestigt u de dialoog. Het apparaat herstart, start een AP met de naam `OTGW-XXXXXX` (waarbij `XXXXXX` afgeleid is van het chip-ID) en opent opnieuw de captive portal, zodat u tegen het nieuwe netwerk kunt authenticeren. Dezelfde actie is beschikbaar onder **FSexplorer > System Actions** via de knop *Reset Wireless*.
+
+#### Wi-Fi-scan (Settings-pagina)
+
+Onder de Wi-Fi-sectie staat een Wi-Fi-scanpaneel (TASK-585). Met de knop **Scan** wordt `/api/v2/network/scan` aangeroepen; het resultaat vult een dropdown met gedetecteerde SSID's, signaalsterkte en beveiligingsvlag. Een netwerk uit de dropdown selecteren vult automatisch het SSID-veld, zodat een Reset WiFi-handeling daarna direct aansluit op het gekozen netwerk zonder dat de SSID met de hand getypt hoeft te worden.
 
 #### MQTT sectie
 
@@ -273,6 +296,8 @@ Wanneer een wachtwoord is ingesteld, vragen de volgende acties om authenticatie:
 
 Live monitoring, sensorwaarden en de WebSocket-stream blijven zonder authenticatie toegankelijk, zodat dashboards en integraties niet stuk gaan.
 
+De 2.0.0-firmware vraagt de HTTP Basic Auth-challenge direct op de root (`/`) op, zodat de browser de credentials in de cache heeft voordat de geladen UI zelf een REST-call doet. Dit voorkomt dat halverwege een sessie alsnog een loginpopup verschijnt. De server verzamelt ook de `Origin`- en `Referer`-headers van elk verzoek, zodat de REST-laag een same-origin CSRF-controle kan afdwingen (ADR-056).
+
 **Opmerking:** De firmware ondersteunt uitsluitend HTTP en WS (geen HTTPS, geen WSS). Stel HTTP Basic Auth alleen in op een vertrouwd thuisnetwerk. Voor externe toegang wordt een VPN aangeraden; een HTTPS-reverse proxy werkt wel voor de REST API, maar de live OpenTherm-log via WebSocket vereist een plain `ws://`-verbinding.
 
 #### Webhook sectie
@@ -341,14 +366,24 @@ Mogelijkheden:
 - Bladeren door bestanden en submappen. Mappen staan bovenaan en de lijst is alfabetisch gesorteerd (hoofdletter-ongevoelig). In een submap verschijnt een `.. (Parent)`-link om terug te navigeren.
 - Bestanden uploaden via het **Upload File** formulier. Een voortgangsbalk toont de uploadstatus en de bestandsgrootte wordt vooraf gecontroleerd tegen de beschikbare vrije ruimte.
 - Bestanden downloaden via de **Download** link in de rij van een bestand.
-- Bestanden verwijderen met de **Delete** link. Beveiligde systeembestanden (`FSexplorer.html`, `FSexplorer.css`, `FSexplorer.png`, `index.html`, `index.js`, `index.css`, `settings.png`) kunnen niet via de UI worden verwijderd.
+- Bestanden verwijderen via de **Delete** link.
 - Beschikbare en gebruikte schijfruimte van de LittleFS-partitie bekijken onderaan de lijst.
 
-Onder de bestandenlijst staat een **System Actions**-paneel met snelkoppelingen naar **Update Firmware** (alleen op desktopbrowsers), **ReBoot**, **Reset Wireless** (identieke actie als Reset WiFi op de Instellingen-pagina) en **Exit FSexplorer** (terug naar de hoofdpagina).
+Onder de bestandenlijst staat een **System Actions**-paneel met snelkoppelingen naar **Update Firmware** (alleen op desktopbrowsers), **ReBoot**, **Reset Wireless** (identieke actie als Reset WiFi op de Settings-pagina) en **Exit FSexplorer** (terug naar de hoofdpagina).
 
-**Let op:** Verwijder ook geen niet-beveiligde systeembestanden zoals `/settings.ini`, `/sat.js`, `/graph.js`, `/index_common.css` of `/index_dark.css`. Dit kan de werking van de webinterface verstoren. Herstel is mogelijk door het LittleFS-bestandssysteem opnieuw te flashen via USB.
+**Let op:** Verwijder geen actieve assets zoals `index.html`, `index.js`, `sat.js`, `graph.js`, `components.css`, `ds-tokens.css` of `/settings.ini`. Dit kan de werking van de webinterface verstoren. Herstel is mogelijk door het LittleFS-bestandssysteem opnieuw te flashen via USB.
 
-De firmware streamt bestanden in plaats van ze in RAM te bufferen, dus er is geen harde uploadlimiet anders dan de beschikbare ruimte in de LittleFS-partitie. Grote assets zoals `index.html` (~11 KB) worden altijd via `streamFile()` geserveerd om de beperkte ESP8266-heap te ontzien.
+Wanneer `index.html` ontbreekt (bijvoorbeeld omdat het LittleFS-image nog niet is geflasht), serveren de FSexplorer-routes `FSexplorer.html` direct als fallback-pagina, zodat u alsnog een filesystem-image kunt uploaden.
+
+De firmware streamt alle bestanden in plaats van ze in RAM te bufferen, dus er is geen harde uploadlimiet anders dan de beschikbare ruimte in de LittleFS-partitie. Het `index.html`-bestand is op 2.0.0 enkele tientallen kilobytes groot en wordt altijd via `streamFile()` geserveerd om de beperkte ESP8266-heap te ontzien (TASK-668).
+
+#### Asset-caching en de ETag-flow
+
+De webinterface gebruikt een ETag-gebaseerde cachingstrategie gecombineerd met versioned URLs voor JavaScript:
+
+- `index.html` wordt geserveerd met de huidige filesystem-hash als `ETag`. De browser cachet de pagina maar revalideert altijd via `If-None-Match`. Een ongewijzigd filesystem antwoordt met `304 Not Modified`; een geflasht filesystem antwoordt met `200` en de nieuwe inhoud.
+- `index.js` en `graph.js` worden geladen met een `?v=<fsHash>`-querystring. Aanvragen met de juiste hash krijgen `Cache-Control: public, max-age=86400`; een kale aanvraag zonder `?v=` krijgt `Cache-Control: no-cache`, zodat een verouderde URL nooit oude JavaScript serveert.
+- Wanneer een vooraf gegzipte `index.js.gz` of `graph.js.gz` op het LittleFS-image staat, kiest de server deze automatisch en laat `streamFile()` de `Content-Encoding: gzip`-header zetten (TASK-304/TASK-433).
 
 ---
 

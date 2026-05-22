@@ -3,8 +3,8 @@
 ## Overview
 
 - **Name**: MQTT Client and Home Assistant Auto-Discovery Module
-- **Description**: Complete MQTT client implementation for the OTGW-firmware ESP8266/ESP32 gateway. Provides MQTT publish/subscribe functionality, streaming Home Assistant auto-discovery configuration, command handling, and OpenTherm message-to-MQTT mapping. Discovery architecture shifted from file-based PROGMEM table generation to data-driven streaming functions with two-pass JSON writing.
-- **Location**: `/src/OTGW-firmware/MQTTstuff.ino`, `/src/OTGW-firmware/MQTTstuff.h`, `/src/OTGW-firmware/MQTTHaDiscovery.cpp`
+- **Description**: Complete MQTT client implementation for the OTGW-firmware ESP8266/ESP32 gateway. Provides MQTT publish/subscribe functionality, streaming Home Assistant auto-discovery configuration, command handling, and OpenTherm message-to-MQTT mapping. Discovery architecture is data-driven streaming with two-pass JSON writing; OT-ID discovery is published Just-In-Time on first message arrival (ADR-100). Default value topics use flat per-value scalars (ADR-101) under self-describing names (ADR-106), with a legacy compatibility toggle.
+- **Location**: `/src/OTGW-firmware/MQTTstuff.ino`, `/src/OTGW-firmware/MQTTstuff.h`, `/src/OTGW-firmware/MQTTHaDiscovery.cpp`, `/src/OTGW-firmware/mqtt_discovery_verify.cpp`
 - **Language**: Arduino C/C++ (with PubSubClient library integration)
 - **Purpose**: Enables MQTT-based integration with home automation systems (Home Assistant), publishes OpenTherm data to configurable topics, handles MQTT commands for controlling the OTGW gateway, and manages streaming auto-discovery of sensors, binary sensors, climate entities, and SAT controls in Home Assistant.
 
@@ -24,8 +24,8 @@
 - `struct MqttHaSensorCfg` (MQTTstuff.h)
   - Description: Sensor discovery config for a single OpenTherm message ID
   - Fields:
-    - `uint8_t id`: OT message ID (0-255), or 245/246 for S0/Dallas
-    - `uint8_t flags`: MQTT_HA_FLAG_* bit flags for source expansion
+    - `uint8_t id`: OT message ID (0-255), or 244/245/246 pseudo-IDs (244=PIC controls, 245/246=S0/Dallas)
+    - `uint8_t flags`: MQTT_HA_FLAG_* bit flags (source expansion, PIC entry, ADR-106 alias / legacy-replaced markers)
     - `PGM_P label`: Sensor label for MQTT topic (e.g., "TSet")
     - `PGM_P friendlyName`: Display name for Home Assistant
     - `HaDeviceClass deviceClass`: HA device class enum
@@ -34,15 +34,22 @@
     - `HaIcon icon`: MDI icon enum
     - `HaEntityCat entityCat`: HA entity category enum (diagnostic, config)
     - `bool enabledByDefault`: Whether entity is enabled in HA by default
-  - Location: MQTTstuff.h:177-188
+  - Location: MQTTstuff.h
   - Source: hand-written table in `MQTTHaDiscovery.cpp` (see ADR-077; `docs/archive/mqttha.cfg` is historical reference only)
-  - Array: `mqttHaSensors[289]` (118 unique OT IDs)
+  - Array: `mqttHaSensors[]` — covers OT messages plus the ADR-106 self-describing alias tail (non-contiguous; alias rows live outside the indexed range and are walked separately)
 
 - `struct MqttHaBinSensorCfg` (MQTTstuff.h)
   - Description: Binary sensor discovery config
   - Fields: Similar to MqttHaSensorCfg, but without unit and stateClass
-  - Location: MQTTstuff.h:191-199
-  - Array: `mqttHaBinSensors[53]` (10 unique OT IDs)
+  - Location: MQTTstuff.h
+  - Array: `mqttHaBinSensors[]` (binary OT status bits plus ADR-106 alias tail)
+
+#### Discovery Flag Constants (MQTTstuff.h)
+
+- `MQTT_HA_FLAG_SOURCE_SUFFIX` (0x01), `MQTT_HA_FLAG_SOURCE_NAME` (0x02), `MQTT_HA_FLAG_SOURCE_TOPIC_SEGMENT` (0x04): Source-expansion bits for `bSeparateSources`. `MQTT_HA_FLAG_ANY_SOURCE` (0x07) is the mask.
+- `MQTT_HA_FLAG_IS_PIC_ENTRY` (0x08): Pseudo-ID 244 entries (resetgateway button + GPIO/LED selects). Self-skip when `isPICEnabled()` is false.
+- `MQTT_HA_FLAG_IS_HA_CORE_ALIAS` (0x10): ADR-106 self-describing alias row. Published in new mode (default), skipped in legacy mode.
+- `MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS` (0x20): ADR-106 legacy OT-spec name that has an alias replacement. Skipped in new mode, published in legacy mode.
 
 - `struct HaDiscoveryContext` (MQTTstuff.h)
   - Description: Runtime context passed to streaming discovery functions
@@ -343,15 +350,23 @@ The module avoids large heap allocations by streaming discovery payloads in smal
 
 ### Home Assistant Auto-Discovery (Streaming Architecture)
 
-Discovery configs are generated on-the-fly by streaming functions in `MQTTHaDiscovery.cpp`. The previous file-based PROGMEM generation (mqttha.cfg parsed by tools/generate_mqttha_progmem.py into pools) has been replaced by data-driven tables (`mqttHaSensors[289]`, `mqttHaBinSensors[53]`) with corresponding streaming functions. Discovery includes hardcoded stream functions for climate (Thermostat + DHW Control pseudo-ID 0), number (Toutside Override pseudo-ID 27), SAT switches (13 boolean controls via switchIdx 0-12), SAT select (sat_heating_system pseudo-ID), and Dallas sensors (runtime address-based).
+Discovery configs are generated on-the-fly by streaming functions in `MQTTHaDiscovery.cpp`. The previous file-based PROGMEM generation (mqttha.cfg parsed by tools/generate_mqttha_progmem.py into pools) has been replaced by data-driven tables (`mqttHaSensors[]`, `mqttHaBinSensors[]`) with corresponding streaming functions. Discovery includes hardcoded stream functions for climate (Thermostat + DHW Control pseudo-ID 0), number (Toutside Override pseudo-ID 27), SAT switches (13 boolean controls via switchIdx 0-12), SAT select (sat_heating_system pseudo-ID), Dallas sensors (runtime address-based), and PIC pseudo-ID 244 (button + GPIO/LED selects).
 
-Three discovery paths exist:
+ADR-106 (self-describing topic names) splits sensor/binary-sensor rows into two parallel sets:
+- Legacy OT-spec-derived names (e.g. `slave_member_id_code`) carry `MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS` when superseded.
+- Self-describing alias rows (e.g. `manufacturer_code`) carry `MQTT_HA_FLAG_IS_HA_CORE_ALIAS` and live in a non-contiguous tail past the indexed range.
 
-**Path A (Bulk)**: `doAutoConfigure()` iterates sensor/binary sensor tables and calls hardcoded stream functions. Used only for explicit refresh (Serial 'F' command, REST API).
+`settings.mqtt.bUseLegacyOtTopics` (default `false`) selects which set is published. Toggling the flag arms an idempotent cleanup pass (`armAdr106Cleanup()` / drain loop in MQTTstuff.ino) that retains-cleans the 37 retained discovery topics of the *other* set on the broker. The two sets are mutually exclusive — never both at the same time.
 
-**Path B (JIT)**: `doAutoConfigureMsgid(OTid)` called from processOT() on first message of type not yet discovered.
+Discovery paths (ADR-100 JIT-by-default):
 
-**Path C (Drip)**: `loopMQTTDiscovery()` publishes one pending config per timer tick (3s normal, 30s under heap pressure). Primary production path.
+**Path B (JIT, default)**: `doAutoConfigureMsgid(OTid)` is called from `processOT()` on the first message of an OT ID. This is the primary production path — discovery configs only appear for OT messages actually seen on the bus, eliminating the 200+ ghost entities of the old bulk publish.
+
+**Path C (Drip, broker-restart only)**: `loopMQTTDiscovery()` publishes one pending config per timer tick (3s normal, 30s under heap pressure). Triggered only when broker restart is detected (retained discovery presumed lost); seeded by `markAllMQTTConfigPending()` over OT IDs already seen this session, not the full 256-ID range.
+
+**Path A (Bulk)**: `doAutoConfigure()` iterates sensor/binary sensor tables and calls hardcoded stream functions. Reserved for explicit refresh (telnet 'F' shortcut, REST API `/api/v2/otgw/discovery`). ADR-106 mode-filter (legacy vs alias) is applied during the iteration so bulk publishes are mode-consistent.
+
+`mqtt_discovery_verify.cpp` provides build-time and runtime sanity helpers for the discovery tables (PROGMEM index integrity, no duplicate OT IDs, ADR-106 flag exclusivity).
 
 - `bool streamSensorDiscovery(PubSubClient &client, const MqttHaSensorCfg &cfg, HaDiscoveryContext &ctx)`
   - Description: Stream a single sensor discovery config to MQTT
@@ -398,6 +413,15 @@ Three discovery paths exist:
   - Description: Stream SAT select entity discovery
   - Location: MQTTHaDiscovery.cpp
   - Currently: selectIdx = 0 for sat_heating_system dropdown
+
+- `bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)`
+  - Description: Stream HA button discovery for the PIC `resetgateway` action (pseudo-ID 244).
+  - Location: MQTTHaDiscovery.cpp
+  - Notes: TASK-668 hardens the `resetgateway` MQTT handler — only payload `"1"` triggers, and a rate-limit cooldown prevents accidental rapid PIC resets.
+
+- `bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryContext &ctx)`
+  - Description: Stream HA select discovery for PIC GPIO and LED function choosers (pseudo-ID 244). `selectIdx`: 0=gpioa, 1=gpiob, 2..7=leda..ledf.
+  - Location: MQTTHaDiscovery.cpp
 
 - `bool streamDallasSensorDiscovery(PubSubClient &client, const char *sensorAddress, HaDiscoveryContext &ctx)`
   - Description: Stream Dallas temperature sensor discovery
@@ -638,8 +662,7 @@ Two bitmaps track discovery state: `MQTTautoConfigMap[8]` (published/done) and `
 - `MQTT_NAMESPACE_MAX_LEN`: 192 bytes
 - `MQTT_TOPIC_MAX_LEN`: 200 bytes
 - `MQTT_CLIENT_BUFFER_SIZE`: 384 bytes (PubSubClient inbound buffer)
-- `MQTT_HA_SENSOR_COUNT`: 289 (total sensor entries in mqttHaSensors[])
-- `MQTT_HA_BINSENSOR_COUNT`: 53 (total binary sensor entries in mqttHaBinSensors[])
+- `MQTT_HA_SENSOR_COUNT`, `MQTT_HA_BINSENSOR_COUNT`: total entries in the two discovery tables (varies with ADR-106 alias tail; see `MQTTHaDiscovery.cpp` for the authoritative size)
 - `MQTT_HA_INDEX_NONE`: 0xFFFF (sentinel for no discovery entry in index table)
 - `DISCOVERY_INTERVAL_NORMAL`: 3 seconds (drip publisher interval, healthy heap)
 - `DISCOVERY_INTERVAL_SLOW`: 30 seconds (drip publisher interval, low heap pressure)
@@ -710,36 +733,37 @@ PubSubClient's `beginPublish()` → `write()` → `endPublish()` API allows effi
 
 Discovery configs are generated on-the-fly by streaming functions in `MQTTHaDiscovery.cpp` that use the two-pass MqttJsonWriter. Configs are driven by:
 
-- `mqttHaSensors[289]` and `mqttHaSensorIndex[256]`: Sensor discovery table (118 unique OT IDs)
-- `mqttHaBinSensors[53]` and `mqttHaBinSensorIndex[256]`: Binary sensor discovery table (10 unique OT IDs)
-- Hardcoded streaming functions: `streamClimateDiscovery()`, `streamNumberDiscovery()`, `streamSatSwitchDiscovery()`, `streamSatSelectDiscovery()`, `streamDallasSensorDiscovery()`
+- `mqttHaSensors[]` + sensor index table — OT message sensors plus ADR-106 self-describing alias tail (non-contiguous, walked separately)
+- `mqttHaBinSensors[]` + binary sensor index table — OT message binary sensors plus ADR-106 alias tail
+- Hardcoded streaming functions: `streamClimateDiscovery()`, `streamNumberDiscovery()`, `streamSatSwitchDiscovery()`, `streamSatSelectDiscovery()`, `streamDallasSensorDiscovery()`, `streamButtonDiscovery()` (PIC resetgateway), `streamSelectDiscovery()` (PIC GPIO/LED selects)
 
-The module supports three auto-discovery paths:
+ADR-100 makes JIT the default production path. The module supports three publication paths:
 
-**Path A (Bulk)**: `doAutoConfigure()` calls all streaming functions in sequence.
-- Used only for explicit refresh via Serial 'F' command or REST API trigger
-- Iterates sensor and binary sensor tables, calling corresponding stream functions
-- Calls hardcoded stream functions for climate, number, SAT switches/selects
-- Publishes Dallas sensor discovery via separate `configSensors()` call
-- Publishes all entries synchronously in one operation
-
-**Path B (JIT)**: `doAutoConfigureMsgid(OTid)` called from `processOT()` on first message of a new type.
+**Path B (JIT, default)**: `doAutoConfigureMsgid(OTid)` called from `processOT()` on first message of a new type.
 - Looks up OT ID in sensor/binary sensor index tables
 - Calls corresponding stream function if entry found
-- Handles pseudo-IDs: 0 (climate), 27 (number), SAT switches via switchIdx mapping
+- Handles pseudo-IDs: 0 (climate), 27 (number), SAT switches via switchIdx mapping, 244 (PIC button + selects), 245/246 (S0/Dallas)
 - Only publishes if not already in `MQTTautoConfigMap` bitfield
 - Avoids flooding broker with configs for message IDs never seen in real deployments
+- Applies the ADR-106 mode filter — legacy or alias row, never both
 
-**Path C (Drip)**: `loopMQTTDiscovery()` is the primary discovery path after MQTT connect or HA restart.
+**Path C (Drip, broker-restart recovery)**: `loopMQTTDiscovery()` runs when broker restart is detected (retained discovery presumed lost).
 - Called from main loop on every iteration; manages its own internal timer
 - Publishes exactly one pending discovery config per timer tick (3s normal, 30s under heap pressure)
 - Uses `MQTTautoCfgPendingMap[8]` bitmap (8 x uint32_t = 256 bits) to track pending OT IDs and pseudo-IDs
-- `markAllMQTTConfigPending()` populates the pending bitmap from indices on connect/reconnect
+- `markAllMQTTConfigPending()` seeds the pending bitmap from OT IDs already seen this session, NOT the full 256-ID range (matches the JIT-by-default policy)
 - Spreads discovery publishes over time to avoid broker and heap pressure spikes
 - Adaptive interval: slows to 30s when `getHeapHealth() >= HEAP_WARNING`, restores to 3s when healthy
 - Guards against low heap via `MQTT_DISCOVERY_HEAP_MIN` (8000 bytes) check before each publish
 
-**Path C is the default** production path. Path A is an explicit utility. Path B handles late-arriving message IDs not yet covered by the drip.
+**Path A (Bulk)**: `doAutoConfigure()` calls all streaming functions in sequence.
+- Reserved for explicit refresh via telnet 'F' shortcut or REST API `/api/v2/otgw/discovery`
+- Iterates sensor and binary sensor tables, calling corresponding stream functions
+- Calls hardcoded stream functions for climate, number, SAT switches/selects, PIC button/select
+- Publishes Dallas sensor discovery via separate `configSensors()` call
+- Applies the ADR-106 mode filter so the bulk pass is internally consistent
+
+**Path B is the default** production path. Path C handles broker restart. Path A is an explicit utility.
 
 ### Source-Separated Topics
 
@@ -784,13 +808,19 @@ Incoming MQTT commands follow the topic structure:
 
 **Standard OTGW commands** (e.g., `setpoint`, `outside_temp`) are mapped via the `setcmds[]` dispatch table to OTGW command codes (e.g., `TT`, `OT`), then queued to the PIC via `addOTWGcmdtoqueue()`.
 
-**SAT (Simple Auto Temp) commands** are a special family handled directly:
+**PIC reset (`resetgateway`)** — hardened in TASK-668. The handler ignores any payload other than literal `"1"` and enforces a cooldown rate-limit; both reasons are surfaced in the MQTT debug stream so silently-dropped attempts are visible during integration. Exposed as an HA button via `streamButtonDiscovery()` (pseudo-ID 244).
+
+**SAT (Smart Adaptive Thermostat) commands** are a special family handled directly:
 - `sat/target`: Set target temperature
 - `sat/enabled`: Enable/disable SAT
 - `sat/control_mode`: Set control mode
 - Plus many others for tuning and calibration
 
-All commands are validated, payload length checked, and invalid payloads rejected.
+All commands are validated, payload length checked, and invalid payloads rejected. Silently-dropped set commands surface in the default debug stream (no flag required) so MQTT-side integration issues are observable without enabling per-module debug flags.
+
+### Value Topic Shape (ADR-101)
+
+Value topics carry plain scalars, never JSON objects. Each decoded OT field is published to its own topic with the value as a bare string (`Tboiler` → `"65.50"`, `flame_on` → `"ON"`). ADR-101 forbids aggregated JSON payloads on value topics, which would force HA value_templates and slow consumer parsing. Discovery payloads on `homeassistant/.../config` topics remain JSON — ADR-101 governs only the value topic shape.
 
 ### Heap Health Check
 
@@ -874,11 +904,11 @@ doAutoConfigure() [manual trigger via Serial 'F' or REST API]
   ↓
   Home Assistant ingests all discovery configs, auto-creates entities
 
-MQTT connect or HA restart detected
+Broker restart detected (or HA restart with bHaRebootDetect enabled)
   ↓
   markAllMQTTConfigPending()
     ├─ Clears MQTTautoConfigMap (published) bitmap
-    └─ Iterates mqttHaSensorIndex[256] + pseudo-IDs: sets pending bit for each
+    └─ Sets pending bit only for OT IDs already observed this session + relevant pseudo-IDs
   ↓
   loopMQTTDiscovery() [called from main loop, every iteration]
     ├─ Timer check (3s normal / 30s under heap pressure)
@@ -1118,9 +1148,10 @@ classDiagram
 
 ## File Statistics
 
-- **MQTTstuff.ino**: 1,494 lines (MQTT state machine, publishing, command dispatch)
-- **MQTTstuff.h**: 361 lines (header with enums, structs, streaming function declarations)
-- **MQTTHaDiscovery.cpp**: 2,737 lines (auto-generated from mqttha.cfg: data tables, streaming discovery functions)
+- **MQTTstuff.ino**: ~2,800 lines (MQTT state machine, publishing, command dispatch, ADR-106 cleanup orchestration)
+- **MQTTstuff.h**: ~475 lines (header with enums, structs, flag constants, streaming function declarations)
+- **MQTTHaDiscovery.cpp**: ~3,500 lines (data tables, streaming discovery functions; previously `mqtt_configuratie.cpp`)
+- **mqtt_discovery_verify.cpp**: discovery table integrity helpers (PROGMEM index correctness, ADR-106 flag exclusivity)
 - **Key Functions**: 50+ public/static functions
 - **Global Variables**: 25+ module-level globals
 - **PROGMEM Data**: Sensor/binary sensor label and name strings, discovery context strings

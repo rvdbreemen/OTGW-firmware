@@ -36,9 +36,11 @@ Er zijn drie gereserveerde prefixen; slechts een is actief:
 
 Intern worden `/api/v2/`-verzoeken afgehandeld door een statische routetabel `kV2Routes[]` in `src/OTGW-firmware/restAPI.ino`. Elk top-level resourcepadsegment wijst naar een handlerfunctie:
 
-`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (alleen OTGW32), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`.
+`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (alleen OTGW32), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`, `discovery`, `debug`, `network`.
 
 Een nieuw eindpunt toevoegen kost twee regels: registreer een handler en voeg een regel toe aan `kV2Routes[]`. Zo blijft de API stabiel over builds heen: het dispatch-oppervlak is klein, expliciet en herleesbaar.
+
+CORS-preflight `OPTIONS`-verzoeken op elk `/api/v2/...`-pad worden centraal afgehandeld en retourneren HTTP 204 met de noodzakelijke CORS-headers voor browserclients.
 
 #### Berichtformaat
 
@@ -66,15 +68,19 @@ Veelvoorkomende foutcodes:
 | 403 | Forbidden: CSRF-controle mislukt |
 | 404 | Not Found: onbekend eindpunt of bron |
 | 405 | Method Not Allowed |
+| 409 | Conflict: actie geweigerd vanwege toestand (verificatie al actief, markerquotum bereikt) |
 | 410 | Gone: verouderde API-versie (v0, v1) |
 | 413 | Request Entity Too Large: commando te lang |
-| 414 | URI Too Long |
-| 500 | Internal Server Error |
-| 503 | Service Unavailable: weinig geheugen, geen OT-interface, enz. |
+| 414 | URI Too Long: URI overschrijdt de 50-byte parserbuffer |
+| 429 | Too Many Requests: cooldown actief (bijv. `/api/v2/discovery/republish`) |
+| 500 | Internal Server Error: weinig geheugen (< 4 KB), bestandssysteemfout |
+| 503 | Service Unavailable: MQTT niet verbonden, geen OT-interface, PIC-flash bezig |
 
 #### Authenticatie
 
-Alle POST- en PUT-verzoeken vereisen HTTP Basic Auth wanneer een HTTP-wachtwoord is ingesteld. GET-verzoeken vereisen authenticatie alleen voor gevoelige gegevens (instellingen, PIC-instellingen). CORS `OPTIONS`-verzoeken worden altijd toegestaan (RFC 7231). Dezelfde-oorsprong-validatie via `Origin`/`Referer`-headers beschermt tegen CSRF-aanvallen (ADR-054).
+Alle POST- en PUT-verzoeken vereisen HTTP Basic Auth wanneer een HTTP-wachtwoord is ingesteld (ADR-056). De gebruikersnaam is de apparaathostname (standaard `OTGW`). Authenticatie wordt centraal gecontroleerd voordat een mutatiehandler wordt uitgevoerd.
+
+GET-verzoeken vereisen authenticatie alleen voor gevoelige gegevens (`/api/v2/settings`, `/api/v2/sat/*`, `/api/v2/debug`, PIC-instellingen). CORS `OPTIONS`-verzoeken worden altijd toegestaan (RFC 7231). Dezelfde-oorsprong-validatie via `Origin`/`Referer`-headers beschermt tegen CSRF-aanvallen (ADR-054). Beide controles, HTTP Basic Auth en CSRF, moeten slagen voordat een mutatie wordt uitgevoerd.
 
 ---
 
@@ -343,7 +349,13 @@ Apparaatinformatie opvragen (firmware, hardware, netwerk). Geen authenticatie ve
 
 Op OTGW32-hardware: het veld `otdirectavailable` is `true` en aanvullende `otd*`-velden zijn aanwezig (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`).
 
-Het veld `otcommandinterface` is `true` wanneer een PIC- of OT-direct-interface aanwezig en actief is.
+Het veld `otcommandinterface` is een string met de actieve OT-interface: `"PIC"`, `"OT-Direct"` of `"None"` (compatibiliteitsopmerking: eerdere versies retourneerden een boolean).
+
+Op Ethernet-capabele hardware (OTGW32) zijn aanvullende velden zichtbaar voor de bedrade-link-status: `ethernetpresent` (PHY gedetecteerd) en `ethernetlink` (kabel aangesloten en link actief). Wanneer de actieve netwerkmodus `ethernet` is, retourneert het `ssid`-veld de letterlijke string `"Wired"` en wordt `wifirssi` als `0` gerapporteerd. De runtime kan zonder reboot tussen WiFi en Ethernet failoveren (TASK-581); `networkmode` weerspiegelt het momenteel actieve transport.
+
+Wanneer het apparaat in AP-fallback-modus draait (alleen-prerelease vangnet voor onbereikbare WiFi), is `apfallback: true` aanwezig en bevat `ssid` de AP-SSID.
+
+Aanvullende velden ontsluiten MQTT-discovery-telemetrie (`disc_published_topics`, `disc_pending_ids`, `disc_verify_runs`, `disc_republish_triggered`, `disc_last_missing`, `disc_last_orphan`, `disc_last_outcome`) en REST-handler-timing (`perf_device_info_total_ms`, `perf_settings_total_ms`, `perf_sat_status_total_ms`, …) voor ADR-062- en TASK-361-observability.
 
 ---
 
@@ -451,7 +463,40 @@ Buitentemperatuur aanleveren vanuit een externe bron. Overschrijft de OT MsgID 2
 | POST | `/api/v2/sat/reset_integral` | Alleen PID-integraal resetten |
 | POST | `/api/v2/sat/area/{0-3}` | Gebiedstemperatuur aanleveren (multi-area modus) |
 | GET | `/api/v2/sat/weather` | Weerdata gebruikt door de verwarmingscurve |
+| GET | `/api/v2/sat/weather/needs-setup` | Geeft aan of de weer-onboardingwizard getoond moet worden (TASK-511) |
 | POST | `/api/v2/sat/settings/{naam}` | SAT-instelling bijwerken (spiegelt MQTT `sat/*`-commando's) |
+| GET / POST / DELETE | `/api/v2/sat/markers` | Verwarmingscurve-kalibratiemarkers beheren (TASK-586) |
+| GET / PATCH | `/api/v2/sat/sensor-areas` | DS18B20-naar-SAT-area-mapping (TASK-587) |
+| GET | `/api/v2/sat/ble/discovery` | BLE-roster opvragen (alleen ESP32, TASK-508) |
+| POST | `/api/v2/sat/ble/select` | BLE-sensor selecteren via `{"mac": "..."}` (alleen ESP32) |
+| POST | `/api/v2/sat/ble/label` | BLE-sensorlabel zetten via `{"mac": "...", "label": "..."}` (alleen ESP32) |
+| POST / DELETE | `/api/v2/sat/ble/forget` | BLE-roster-slot wissen via `{"mac": "..."}` (alleen ESP32) |
+
+##### POST /api/v2/sat/settings/{naam}
+
+Het volledige instellingenvocabulaire bevat onder andere: `heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `ovp_value`, `ovp_enabled`, `ovp_start`, `ovp_stop`, `push_setpoint`, `flame_off_offset`, `force_pwm`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `auto_tune`, `auto_tune_rate`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `pwm_auto_switch`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`. De namen `ovp_start`, `ovp_stop` en `reset_integral` accepteren geen waarde. Onbekende namen retourneren HTTP 404.
+
+##### GET / POST / DELETE /api/v2/sat/markers
+
+Beheer van door de gebruiker geplaatste kalibratiemarkers op de verwarmingscurve (TASK-586). Markers worden bewaard in `/sat_markers.json` op LittleFS. De web-UI toont ze als ankerpunten op de verwarmingscurvegrafiek.
+
+- **GET** retourneert de markerarray (of `[]` indien leeg).
+- **POST** voegt een marker toe. Body: `{"outside_temp": 5.0, "flow_temp": 55.0, "label": "optionele tekst"}`. Bereik: `outside_temp` -15..25, `flow_temp` 10..90. Retourneert HTTP 201 met `{"id": N}`. Maximum 20 markers; een extra `POST` retourneert HTTP 409.
+- **DELETE** `/api/v2/sat/markers/{id}` verwijdert de marker met de gegeven id.
+
+##### GET / PATCH /api/v2/sat/sensor-areas
+
+Beheer van de DS18B20-naar-SAT-area-mapping voor multi-area modus (TASK-587). Elk van vier areas (`0..3`) kan worden gekoppeld aan een Dallas-sensor via diens 16-tekens ROM-adres.
+
+- **GET** retourneert de huidige mapping:
+  ```json
+  {"areas":[{"index":0,"sensor":"28FF64D1841703F1"},{"index":1,"sensor":""},{"index":2,"sensor":""},{"index":3,"sensor":""}]}
+  ```
+- **PATCH** (of POST / PUT) werkt een mapping bij. Body: `{"area": 0, "sensor": "28FF64D1841703F1"}`. Een lege `sensor`-string wist het slot. Het 16-teken ROM-adres moet hex zijn; anders HTTP 400.
+
+##### SAT BLE-roster (alleen ESP32)
+
+De BLE-roster toont nabije BLE-temperatuursensoren die door de ESP32-S3 worden gedetecteerd en laat de gebruiker er een promoveren tot actieve kamertemperatuurbron (TASK-508). Alle vier de eindpunten retourneren HTTP 404 wanneer het opgegeven MAC-adres niet in de roster staat. Op ESP8266-builds zijn deze paden afwezig (route geeft 404).
 
 ---
 
@@ -491,13 +536,15 @@ Bedrijfsmodus instellen.
 
 **Query parameter:** `mode=gateway|monitor|bypass|master|loopback`
 
-| Modus | Beschrijving |
-|-------|-------------|
-| `gateway` | Volledige gateway: scheduler + thermostaat-doorschakeling + overrides (standaard) |
-| `monitor` | Transparante doorvoer: alle frames ongewijzigd doorgestuurd |
-| `bypass` | Thermostaat rechtstreeks op ketel via relais; OTDirect inactief |
-| `master` | Zelfstandige OT-master: alleen scheduler, geen thermostaat verwacht |
-| `loopback` | Interne test: gesimuleerde ketelantwoorden, geen hardware nodig |
+| Modus | PIC-code | Beschrijving |
+|-------|----------|-------------|
+| `gateway` | `GW=1` | Volledige gateway: scheduler + thermostaat-doorschakeling + overrides (standaard) |
+| `monitor` | `GW=0` | Transparante doorvoer: alle frames ongewijzigd doorgestuurd (PIC-parity, TASK-438) |
+| `bypass` | `GW=P` | Thermostaat rechtstreeks op ketel via relais; OTDirect inactief |
+| `master` | `GW=S` | Zelfstandige OT-master: alleen scheduler, geen thermostaat verwacht |
+| `loopback` | `GW=L` | Interne test: gesimuleerde ketelantwoorden, geen hardware nodig |
+
+Opmerking (TASK-438): `monitor` is nu gekoppeld aan `GW=0` voor parity met PIC-firmwareconventies. De pre-2.0-mapping die `GW=0` voor bypass gebruikte, is verplaatst naar de alias `GW=P`.
 
 ##### GET /api/v2/otdirect/settings
 
@@ -588,6 +635,56 @@ Een test-webhook versturen. Authenticatie vereist.
 
 ---
 
+#### MQTT Discovery-verificatie (ADR-062)
+
+Deze eindpunten ontsluiten de bitmap-gestuurde discovery-publisher en zijn verificatievenster. Ze vormen de runtime-contract gebruikt door de Maintenance-pagina van de web-UI en door HA-integratiescripts.
+
+##### GET /api/v2/discovery
+
+Retourneert de huidige discovery-status en tellers. `last_outcome` is een van `clean`, `missing`, `aborted_heap`, `aborted_disconnect`, `unknown`.
+
+```json
+{
+  "verification": {"active": false, "last_epoch": 1774548600, "last_missing": 0, "last_orphan": 0, "last_outcome": "clean"},
+  "counters":     {"published_topics": 217, "pending_ids": 0, "verify_runs": 4, "republish_triggered": 1},
+  "settings":     {"auto_verify": true}
+}
+```
+
+##### POST /api/v2/discovery/verify
+
+Start een verificatievenster. De firmware abonneert zich op zijn eigen discovery-prefix, telt retained config-topics en rapporteert `missing` en `orphan` totalen. Authenticatie vereist.
+
+Geweigerd met HTTP 503 wanneer MQTT niet verbonden is of het vrije geheugen onder de verificatie-drempel ligt. Geweigerd met HTTP 409 wanneer er al een verificatievenster loopt of de drip-publisher nog pending ID's heeft. Bij succes HTTP 202 met `{"status":"verification_started","expected":N,"window_ms":15000}`.
+
+##### POST /api/v2/discovery/republish
+
+Markeert alle discovery-topics als pending voor de drip-publisher. Authenticatie vereist.
+
+Onderworpen aan een 60 s cooldown om te voorkomen dat de drip-queue permanent niet-leeg blijft (TASK-356). Opeenvolgende aanroepen binnen de cooldown retourneren HTTP 429 met het aantal resterende seconden. Bij succes HTTP 200 met `{"status":"marked_pending","count":N}`.
+
+#### Debug-dump
+
+##### GET /api/v2/debug
+
+Retourneert een enkel plat JSON-object met build-identiteit, runtime-state, instellingen, MQTT-status, OT-bus-status, heap- en discovery-tellers, SAT-runtime en (waar van toepassing) OTDirect-runtime. Authenticatie vereist.
+
+Dit is de primaire diagnostische snapshot bij issue-rapportage; de veldenset is bewust breed en valt niet onder het stabiele contract. Gevoelige waarden (`http_passwd`, `mqtt.passwd`, `sat.weather_key`) zijn gemaskeerd als `"***"` wanneer ze zijn ingesteld.
+
+#### Netwerk
+
+##### GET /api/v2/network/scan
+
+Start en polt een asynchrone WiFi-scan (TASK-585). Wordt gebruikt door de WiFi-kiezer op de Settings-pagina.
+
+- Eerste aanroep: start de scan en retourneert `{"status":"scanning"}`.
+- Vervolgaanroepen tijdens de scan: retourneren `{"status":"scanning"}`.
+- Na voltooiing: retourneert eenmaal `{"status":"ready","count":N,"networks":[...]}`. Elke `networks`-entry: `{"ssid":"...", "rssi":-60, "channel":6, "secured":true, "connected":true}`.
+
+Geweigerd met HTTP 503 zolang een PIC-flash-operatie loopt (de radio kan dan geen CPU delen). De scanbuffer wordt vrijgegeven nadat het resultaat is geserveerd.
+
+---
+
 ### 9.3 WebSocket-API
 
 Voor de volledige verbindingslevenscyclus, broadcast-gating-regels en de heap-backpressure-toestandsmachine, zie `docs/api/WEBSOCKET_FLOW.md`.
@@ -644,6 +741,8 @@ Elk bericht is een JSON-object met een `type`-veld:
 #### Herverbindingsgedrag
 
 De web-UI verbindt automatisch opnieuw bij verbindingsverlies (3 seconden vertraging). Er is geen berichtgeschiedenis; de stream is alleen live.
+
+De SPA voorkomt re-entry van `initOTLogWebSocket()` zodat een snelle pagina-reload geen dubbele WebSocket-clients lekt op de firmware (TASK-563).
 
 #### Heap backpressure
 
@@ -843,8 +942,20 @@ Publiceer een platte-tekstpayload naar deze topics. Deze tabel is een snelle ref
 | `chenable` | `"1"` / `"0"` | `CH=...` | CV-vrijgave |
 | `coolingenable` | `"1"` / `"0"` | `CE=...` | Koeling vrijgave |
 | `summermode` | `"1"` / `"0"` | `SM=...` | Zomermodus (opgeslagen in flash) |
+| `outside_temp` | `"8.0"` | `OT=8.0` | Buitentemperatuur (alias van `outside`) |
+| `setback` | `"15.0"` | `SB=15.0` | Setback-temperatuur |
+| `ventsetpt` | `"50"` | `VS=50` | Ventilatie-setpoint |
+| `temperaturesensor` | `"O"` / `"R"` | `TS=O` / `TS=R` | Temperatuursensorfunctie (outside / return) |
+| `addalternative` / `delalternative` | `"34"` | `AA=…` / `DA=…` | OT-MsgID toevoegen aan/verwijderen uit alternatieve-rotatie |
+| `unknownid` / `knownid` | `"34"` | `UI=…` / `KI=…` | MsgID als onbekend / bekend markeren |
+| `priomsg` | `"5"` | `PM=5` | Prioriteitsbericht instellen |
+| `setresponse` / `clearrespons` | `"34:0000"` / `"34"` | `SR=…` / `CR=…` | Stored response zetten / wissen |
+| `resetcounter` | `"H"` | `RS=H` | PIC-teller resetten (`H`, `T`, `B`, `M`, `S`) |
+| `gpioa` / `gpiob` | `"0".."7"` | `GA=…` / `GB=…` | GPIO A/B functie instellen |
+| `leda`..`ledf` | letter | `LA=…`..`LF=…` | LED A..F functie (B/C/E/F/H/M/O/P/R/T/W/X) |
+| `resetgateway` | (genegeerd) | hardware-reset | PIC hardware-resetten (payload genegeerd) |
 
-Let op: Commando's worden alleen verwerkt wanneer een OT-interface (PIC of OTDirect) beschikbaar is. Zonder interface worden MQTT-commando's genegeerd met een debugmelding.
+Let op: Commando's worden alleen verwerkt wanneer een OT-interface (PIC of OTDirect) beschikbaar is. Zonder interface worden MQTT-commando's in de standaard-debugstream zichtbaar gemaakt en daarna verwijderd (niet langer stilletjes gedropt; zie commit 5571d9b7).
 
 **SAT-commando's:**
 
@@ -878,15 +989,26 @@ Meer dan 40 aanvullende SAT-instellingen zijn beschikbaar via MQTT. De volledige
 
 #### Brongescheiden onderwerpen (optioneel)
 
-Wanneer `settings.mqtt.bSeparateSources = true`, worden OpenTherm-waarden aanvullend gepubliceerd naar:
+Wanneer `settings.mqtt.bSeparateSources = true`, worden OpenTherm-waarden aanvullend gepubliceerd met een sibling-suffix-shape (ADR-097):
 
 ```
-{TopTopic}/value/{UniqueId}/{label}/thermostat   (T-berichten)
-{TopTopic}/value/{UniqueId}/{label}/boiler        (B-berichten)
-{TopTopic}/value/{UniqueId}/{label}/gateway       (R/A-berichten)
+{TopTopic}/value/{UniqueId}/{label}_thermostat   (T-frame)
+{TopTopic}/value/{UniqueId}/{label}_boiler        (B-frame)
+{TopTopic}/value/{UniqueId}/{label}_gateway       (R-frame)
+{TopTopic}/value/{UniqueId}/{label}_answer        (A-frame, proxy-antwoord)
 ```
 
-Dit maakt het mogelijk om te onderscheiden of een waarde afkomstig is van de thermostaat, de ketel of de gateway.
+Sibling-suffix-namen (`<label>_<source>`) vervangen de oudere subtopic-shape zodat het HA-discovery `state_topic`-regex aan een enkel segment blijft gebonden. Proxy-antwoorden (A-prefix) worden geleid naar `_answer`, niet gecollapst op `_thermostat`, conform ADR-103.
+
+Dit maakt het mogelijk om te onderscheiden of een waarde afkomstig is van de thermostaat, de ketel, de gateway of een proxy-antwoord.
+
+#### Zelfbeschrijvende onderwerpnamen (ADR-106, standaard in 2.0.0)
+
+Uitgebrachte 2.0.0-firmware publiceert OpenTherm-waarden onder zelfbeschrijvende onderwerpnamen: het label bevat de OT-semantische rol en eenheid (bijvoorbeeld `tboiler_c`, `controlsetpoint_c`, `chmodus`, `flame_status`). De korte legacy-namen uit de 1.4.x-lijn (`boilertemperature`, `controlsetpoint`, …) blijven beschikbaar via de toggle `settings.mqtt.bUseLegacyOtTopics = true` voor gebruikers die hun dashboards of automatiseringen niet kunnen migreren. Dit is een breaking change voor verse installaties; de toggle is het ondersteunde downgradepad.
+
+#### HA-Core alias-topics (ADR-105, opt-in)
+
+Wanneer `settings.mqtt.bHaCoreAliasEnable = true`, worden 37 aanvullende topic-aliassen gepubliceerd onder namen die overeenkomen met de Home Assistant Core `opentherm_gw`-integratie. Dit geeft gebruikers die migreren van die integratie drop-in-compatibiliteit voor bestaande automatiseringen. De aliassen zijn pure mirrors; firmware-side semantiek blijft ongewijzigd.
 
 #### Home Assistant Auto-Discovery
 
@@ -896,21 +1018,28 @@ Wanneer `mqtthadiscovery` is ingeschakeld, publiceert de firmware discovery-payl
 
 Discovery gebruikt een asynchrone bitmap-gestuurde drip publisher. In plaats van alle 200+ entity-configuraties in een burst te verzenden:
 
-1. Alle bericht-ID's worden als "pending" gemarkeerd in een bitmap.
+1. Bericht-ID's worden als "pending" gemarkeerd in een bitmap.
 2. Vanuit de hoofdlus wordt per interval (normaal 2 seconden) een discovery-bericht gepubliceerd.
 3. Bij weinig vrij geheugen (< 8000 bytes) wordt het interval vertraagd.
 4. Bij voldoende geheugen keert het interval terug naar normaal.
 
-Een volledige discovery-cyclus duurt circa 6-8 minuten bij normaal tempo.
+##### Just-in-time discovery (TASK-578)
+
+De 2.0.0-firmware publiceert OT-waarde-discovery-configs uitsluitend wanneer de bijbehorende MsgID minstens een keer op de bus is waargenomen. De drip-publisher loopt door alle bekende ID's, maar voegt een ID pas toe aan de pending-bitmap nadat `msglastupdated[id]` is gezet. Dit elimineert het eerdere gedrag waarbij entities werden geadverteerd voor MsgID's die de ketel nooit uitwisselt; de HA-entitylijst sluit nu aan op wat het apparaat daadwerkelijk rapporteert.
 
 Discovery wordt geactiveerd:
-- Bij firmware-opstart of MQTT-instellingswijziging (alle ID's pending).
-- Bij aanroep van `POST /api/v2/otgw/discovery` (alle ID's pending).
-- Wanneer Home Assistant `"online"` stuurt naar `homeassistant/status` na offline te zijn geweest.
+- Bij firmware-opstart of MQTT-instellingswijziging (alle in aanmerking komende ID's pending).
+- Bij aanroep van `POST /api/v2/otgw/discovery` of `POST /api/v2/discovery/republish` (alle in aanmerking komende ID's pending).
+- Wanneer Home Assistant `"online"` stuurt naar `homeassistant/status` na offline te zijn geweest, mits de broker-restart-heuristiek (ADR-100) geen sessieverlies meldt.
+- Wanneer een nieuw MsgID voor het eerst na opstart wordt waargenomen (single-ID JIT-publicatie).
 
 **Integratie-opmerking:** Na het activeren van discovery verschijnen entiteiten geleidelijk in Home Assistant gedurende enkele minuten. Dit is normaal gedrag.
 
+Discovery-payloads bevatten apparaat-metadata, entiteitnamen, meeteenheid, device class, state topics en een availability topic. De `availability`-referentie is gekoppeld aan de MQTT-clientverbinding (ADR-102), niet aan OT-bus-liveness; HA markeert entities alleen als `unavailable` wanneer de firmware echt los van de broker is.
+
 Discovery-sjablonen zijn gecompileerd in PROGMEM (flash-geheugen) tijdens het bouwen vanuit het `mqttha.cfg`-bestand, waardoor LittleFS I/O tijdens discovery-publicatie wordt geelimineerd.
+
+Pending-state-fan-out voor retained sensors (cycle class, flame status, OEM fault code) wordt niet langer gehinderd door de 250 ms rate-gate (ADR-104); first-seen-waarden bereiken HA in de eerste publish-lus.
 
 #### Retain-vlaggen samenvatting
 

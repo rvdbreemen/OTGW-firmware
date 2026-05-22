@@ -2,7 +2,9 @@
 
 ### Overview
 
-The OTGW web interface is a single-page application (SPA) served directly by the device itself, with no cloud service or external server required. Open it in any modern browser (Chrome, Firefox, or Safari) by navigating to `http://otgw.local/` or to the device's IP address: `http://<device-ip>/`.
+The OTGW web interface is a single-page application (SPA) served directly by the device itself, with no cloud service or external server required. Open it in any modern browser by navigating to `http://otgw.local/` or to the device's IP address: `http://<device-ip>/`.
+
+The supported browsers are the current and previous two major versions of Chrome, Firefox, and Safari. The UI is English-only on the 2.0.0 line: localised Dutch strings that used to appear in the OTTHING-platform port have been removed (TASK-569).
 
 The interface provides:
 
@@ -14,7 +16,7 @@ The interface provides:
 - OTA firmware updates.
 - A file manager for LittleFS.
 
-The interface adapts to desktop and mobile screens and supports both light and dark themes.
+The interface adapts to desktop and mobile screens and supports both light and dark themes. A persistent firmware/filesystem mismatch banner appears at the top of every page when the running firmware build hash does not match the LittleFS image hash, with a direct link to the flash utility.
 
 ### Navigation
 
@@ -46,8 +48,15 @@ The log viewer includes:
 
 - **Search/filter**: type a message ID number or label keyword to filter the displayed lines.
 - **Auto-scroll**: the log follows new messages automatically. Click anywhere in the log to pause auto-scroll; click the scroll-to-bottom button to resume.
-- **Export**: download the current log buffer as a text file using the export button.
+- **Timestamps**, **Capture mode** (in-memory buffer up to about 1 M lines), and **Stream to file** (live append to a local file in Chrome/Edge).
+- **Download** the current buffer as a text file; **Auto-download** writes a snapshot every 15 minutes.
 - **Command bar**: send one-shot commands (`TT=20.5`, `GW=R`, etc.) directly from the log view and see the response in-line. On ESP8266, these are PIC commands. On OTGW32, the command bar is also available when OT-Direct provides the command interface.
+
+The OpenTherm Monitor panel exposes three sub-tabs:
+
+- **Log**: the live streamed log described above.
+- **Statistics**: a sortable per-message-ID table with hex/decimal ID, direction, description, interval, and last value. Useful for spotting bus traffic patterns at a glance.
+- **Graph**: an ECharts time-series view with a configurable window (10 minutes to 24 hours), one-off **Screenshot** and **Export Data** (CSV) buttons, and matching **Auto-save PNG** / **Auto-save CSV** checkboxes for periodic snapshots.
 
 The browser persists the log buffer to `localStorage` between sessions, so a page refresh does not lose recent data. The buffer is cleared automatically after a firmware or filesystem flash.
 
@@ -141,6 +150,11 @@ The Diagnostics view adds:
 
 Clicking the **Settings** button in the SAT header opens a dedicated SAT Settings page. Settings are organized into collapsible groups: Thermostat, Heating, PID, DHW, Pressure, Smart Features, Safety, Energy, Weather, Sync, and Advanced. Each group has its own **Save** button to persist changes individually.
 
+Two extra panels appear above the generic settings groups on ESP32 builds:
+
+- **BLE Sensors**: lists Bluetooth Low Energy sensors discovered by the firmware (Xiaomi LYWSD03MMC with ATC/pvvx custom firmware, BTHome v2). Each row shows the MAC, an editable name, the freshness of the last advertisement, and **Select** / **Forget** actions. The roster is capped at eight entries and is also exposed over MQTT for Home Assistant. The `SATblemac` field below the panel is read-only context: the active sensor is chosen here rather than typed by hand (TASK-508).
+- **DS18B20 Area Sensor Mapping**: maps each SAT zone area to a discovered DS18B20 sensor via dropdowns. The selected mapping is forwarded to SAT on every poll cycle so a wired sensor can act as the room-temperature source for a specific area.
+
 #### DHW Controls
 
 A DHW (Domestic Hot Water) section is visible on all SAT views. It provides a slider to set the hot water setpoint temperature (40-60 degrees C) and an optional force switch to manually trigger hot water heating.
@@ -174,6 +188,10 @@ The Settings tab contains all device configuration, organized into sections. Aft
 | Reset WiFi | Button next to the SSID field. Clears the stored Wi-Fi credentials and reboots the device in Access Point (AP) mode |
 
 To move the gateway to a different Wi-Fi network, click **Reset WiFi** and confirm the prompt. The device reboots, starts an AP named `OTGW-XXXXXX` (where `XXXXXX` is derived from the chip ID), and reopens the captive portal so you can select and authenticate against the new network. The Reset WiFi action is also available under **FSexplorer > System Actions** as the *Reset Wireless* button.
+
+#### Wi-Fi Scan (Settings page)
+
+The Settings page also includes a Wi-Fi scan panel that lists nearby networks (TASK-585). Press **Scan** to call `/api/v2/network/scan`; the result populates a dropdown with the detected SSIDs, RSSI, and security flags. Selecting a network from the dropdown fills the SSID field so you can pair the scan with the Reset WiFi flow without typing the SSID by hand.
 
 #### MQTT
 
@@ -250,6 +268,8 @@ When an endpoint password is set, the following actions require authentication:
 
 Live monitoring, sensor values, and the WebSocket stream remain accessible without authentication.
 
+The 2.0.0 firmware issues the HTTP Basic Auth challenge on the root page (`/`) up front, so the browser caches the credentials before any REST call is dispatched from the loaded UI. This avoids a mid-session popup the first time an authenticated API endpoint is called. The server also collects the `Origin` and `Referer` headers on every request so the REST layer can enforce a same-origin CSRF check (ADR-056).
+
 #### Webhook
 
 | Setting | Description |
@@ -309,12 +329,24 @@ Features:
 - Browse files and subdirectories. Directories are listed first and alphabetically sorted (case-insensitive). A `.. (Parent)` link appears in subdirectories for navigation.
 - Upload new files via the **Upload File** form. A progress bar shows upload status, and the file size is checked against available free space before upload is allowed.
 - Download any file by clicking **Download** on its row.
-- Delete files with the **Delete** link. Protected system files (`FSexplorer.html`, `FSexplorer.css`, `FSexplorer.png`, `index.html`, `index.js`, `index.css`, `settings.png`) cannot be deleted from the UI.
+- Delete files with the **Delete** link.
 - View storage usage at the bottom of the listing (used and total bytes of the LittleFS partition).
 
 A **System Actions** panel below the file list provides quick buttons for **Update Firmware** (desktop browsers only), **ReBoot**, **Reset Wireless** (same action as Reset WiFi on the Settings page), and **Exit FSexplorer** (returns to the main page).
 
-This is useful for manually backing up or restoring `settings.ini`, `dallas_labels.ini`, the SAT PID state file, or custom web assets. The firmware streams files rather than buffering them into RAM, so there is no hard upload size limit beyond the available LittleFS partition space. The main `index.html` (~11 KB) and other assets are always served via `streamFile()` to avoid loading them into the limited ESP8266 heap.
+This is useful for manually backing up or restoring `settings.ini`, `dallas_labels.ini`, the SAT PID state file, or custom web assets. The firmware always streams files rather than buffering them into RAM, so there is no hard upload size limit beyond the available LittleFS partition space. The main `index.html` (now several tens of kilobytes on 2.0.0) and all other assets are served via `streamFile()` to avoid loading them into the limited ESP8266 heap (TASK-668).
+
+When the FSexplorer routes detect that `index.html` is missing (filesystem not mounted or image not yet flashed), the routes serve `FSexplorer.html` directly so the user can still upload a filesystem image from the file manager.
+
+#### Asset caching and the ETag flow
+
+The web UI uses an ETag-based caching scheme that combines fast revalidation with a versioned URL strategy for JavaScript assets:
+
+- `index.html` is served with the current filesystem hash as its `ETag`. The browser caches the page but always revalidates via `If-None-Match`. Unchanged filesystem returns `304 Not Modified`; a flashed filesystem returns `200` with fresh content.
+- `index.js` and `graph.js` are loaded with a `?v=<fsHash>` query string. Versioned requests get `Cache-Control: public, max-age=86400`; a bare request (no `?v=`) gets `Cache-Control: no-cache` so that a stale URL never serves stale JavaScript.
+- If a pre-gzipped `index.js.gz` or `graph.js.gz` exists on the LittleFS image, the server prefers it and lets `streamFile()` emit `Content-Encoding: gzip` automatically (TASK-304/TASK-433).
+
+When an endpoint password is configured, an HTTP Basic Auth challenge is issued on the `/` route up front so the browser caches credentials before any API call runs. This avoids a mid-session popup when an authenticated REST call is dispatched from the loaded page. The server also collects `Origin` and `Referer` headers so the REST API can enforce the same-origin CSRF check (ADR-056).
 
 ### Light and Dark Theme
 

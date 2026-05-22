@@ -23,7 +23,7 @@ Zodra de verbinding is gemaakt, slaat de firmware de gegevens op in flash. Bij i
 De firmware implementeert een tweelaags herstelmechanisme:
 
 - **Laag 1**: De WiFi SDK (`WiFi.setAutoReconnect(true)`) herstelt kortdurende onderbrekingen (typisch binnen 30 seconden) transparant op radioniveau.
-- **Laag 2**: Bij langere uitval neemt de toestandsmachine `loopWifi()` het over. Deze is volledig non-blocking: elke aanroep keert binnen minder dan een milliseconde terug, zodat de watchdog, de OpenTherm-berichtenverwerking, de MQTT-keepalives en de Web UI gewoon blijven draaien tijdens een herverbindingspoging. Per poging krijgt WiFi 30 seconden om scan, associatie en DHCP te voltooien. In productiebuilds herstart het apparaat na 10 mislukte pogingen. In betabuilds activeert de firmware na 2 mislukte pogingen de AP-fallbackmodus (zie paragraaf 6.1.3) in plaats van te herstarten.
+- **Laag 2**: Bij langere uitval neemt de toestandsmachine `loopWifi()` het over. Deze is volledig non-blocking: elke aanroep keert binnen minder dan een milliseconde terug, zodat de watchdog, de OpenTherm-berichtenverwerking, de MQTT-keepalives en de Web UI gewoon blijven draaien tijdens een herverbindingspoging. Per poging krijgt WiFi 30 seconden om scan, associatie en DHCP te voltooien. In productiebuilds herstart het apparaat na 10 mislukte pogingen (maximaal 300 seconden voor de reboot). In betabuilds activeert de firmware na 2 mislukte pogingen de AP-fallbackmodus (zie paragraaf 6.1.3) in plaats van te herstarten. Deze waarden zijn vastgelegd in ADR-075 (vervangt de oorspronkelijke 5 seconden / 15 retries uit ADR-047) om `WiFi.begin()` een volledig associatievenster te geven en te voorkomen dat de SDK auto-reconnect halverwege wordt afgebroken.
 
 Bij herstel van de verbinding:
 - Herstelt de firmware de geconfigureerde hostnaam.
@@ -85,9 +85,13 @@ Typische aansluitingen:
 | MISO | Zie boards.h `PIN_SPI_MISO` |
 | MOSI | Zie boards.h `PIN_SPI_MOSI` |
 
-#### 6.2.3 Prioriteit boven WiFi
+#### 6.2.3 Prioriteit boven WiFi en runtime-failover
 
-Ethernet heeft altijd prioriteit. Wanneer de W5500 aanwezig is en een kabel is aangesloten, wordt WiFi uitgeschakeld. Als de kabel tijdens bedrijf wordt verwijderd, detecteert de firmware dit (elke 5 seconden gecontroleerd) en schakelt automatisch terug naar WiFi. Wordt de kabel teruggeplaatst, dan schakelt de firmware terug naar Ethernet. Deze failover verloopt zonder herstart en zonder configuratie.
+Ethernet heeft altijd prioriteit. Wanneer de W5500 aanwezig is en een kabel is aangesloten, wordt WiFi uitgeschakeld. Als de kabel tijdens bedrijf wordt verwijderd, detecteert de firmware dit (de link wordt elke 5 seconden gepolld in `loopEthernet()`) en schakelt automatisch terug naar WiFi. Wordt de kabel teruggeplaatst, dan voert de firmware DHCP uit (timeout van 2 seconden bij hot-plug) en schakelt terug naar Ethernet. Deze failover verloopt zonder herstart en zonder configuratie.
+
+Bij elke wisseling registreert de firmware mDNS opnieuw op het nieuwe interface, herstart MQTT en de WebSocket-server, en publiceert een retained topic `otgw-firmware/network/mode` met waarde `wifi` of `ethernet`. De overgang naar `ethernet` wordt gepubliceerd zodra de MQTT-broker de nieuwe verbinding bevestigt (uitgestelde drain binnen `loopEthernet()`). De overgang naar `wifi` wordt gepubliceerd voordat de kabel-verloren-switch wordt uitgevoerd, zodat de broker dit nog ziet terwijl MQTT op de bekabelde verbinding actief is.
+
+Het actieve transport is voor de Web UI en Home Assistant zichtbaar via `/api/v2/device/info`, dat op OTGW32-hardware drie extra velden toevoegt: `networkmode` (`wifi` of `ethernet`), `ethernetpresent` (W5500 gedetecteerd) en `ethernetlink` (kabel aanwezig). De koptekstbalk in de Web UI peilt `/api/v2/device/time` één keer per seconde om het netwerkicoon (WiFi of Ethernet) gesynchroniseerd te houden met het actieve transport.
 
 #### 6.2.4 MAC-adres
 
@@ -95,7 +99,7 @@ De firmware leidt een uniek lokaal-beheerd MAC-adres af van het ESP32-eFuse MAC.
 
 #### 6.2.5 Statisch IP op Ethernet
 
-Ethernet ondersteunt een eigen statische IP-configuratie, los van WiFi. Configureer dit op de Settings-pagina onder het Ethernet-gedeelte. Wanneer de velden leeg zijn, gebruikt Ethernet DHCP met een timeout van 1 seconde bij het opstarten.
+Ethernet heeft een eigen statische IP-configuratie, los van het WiFi static IP. Configureer dit op de Settings-pagina onder het Ethernet-gedeelte, of via de REST-instellingen `ETHstaticip` (boolean), `ETHipaddress`, `ETHgateway`, `ETHsubnet` en `ETHdns`. Wanneer `ETHstaticip` op false staat (standaard), gebruikt Ethernet DHCP met een timeout van 1 seconde bij het opstarten en 2 seconden bij kabel-hot-plug. Als `ETHdns` op `0.0.0.0` staat, wordt het gateway-adres als DNS-server gebruikt.
 
 ---
 
@@ -181,7 +185,9 @@ De ESP8266 SDK initialiseert `time()` met de waarde `0xFFFFFFFF` (jaar 2106) voo
 
 OTA (Over-The-Air) staat voor draadloze firmware-updates. Hiermee kunt u de firmware bijwerken zonder USB-kabel.
 
-Het OTA-update-endpoint is `/update`. Wanneer een HTTP-wachtwoord is ingesteld, is de pagina beveiligd met HTTP Basic Auth.
+Het OTA-update-endpoint is `/update`. Het valt onder de beschermde-admin-grens uit ADR-056 (vervangt ADR-054). Wanneer `settingHTTPpasswd` leeg is, is het endpoint open. Wanneer een wachtwoord is ingesteld, vereist het endpoint HTTP Basic Auth met gebruikersnaam `admin`. Hetzelfde wachtwoord wordt bij WiFi- of Ethernet-startup doorgegeven aan de OTA-updateserver, zodat een wijziging zonder her-flash actief wordt na de eerstvolgende reboot.
+
+Browserverzoeken naar beschermde admin-endpoints (waaronder `/update`, `/upload`, `/ReBoot`, `/ResetWireless` en `POST /api/v2/settings`) worden bovendien gecontroleerd op overeenkomst van `Origin`/`Referer` met `Host`. Dit is een lichte CSRF-mitigatie, geen volledig sessieframework: verzoeken zonder `Origin` of `Referer` (curl, OTmonitor, scripts) worden toegestaan voor achterwaartse compatibiliteit; afwijkende origins worden afgewezen met HTTP 403.
 
 **Stappen:**
 1. Navigeer naar `http://otgw.local/update` in uw browser.

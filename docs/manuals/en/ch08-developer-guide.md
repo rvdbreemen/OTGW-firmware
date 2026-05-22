@@ -10,33 +10,35 @@ The repository root contains the firmware source, build tooling, documentation, 
 
 #### Source Files
 
-All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files. Arduino compiles the main sketch plus all `.ino` files in the same directory as a single translation unit. Each `.ino` file owns one logical domain:
+All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files plus a small number of `.cpp` translation units for large generated tables. Arduino concatenates the main sketch and every sibling `.ino` file into a single translation unit; `.cpp` files are compiled separately. Each file owns one logical domain:
 
 | File | Domain |
 |------|--------|
 | `OTGW-firmware.ino` | Main entry point: `setup()`, `loop()`, boot sequence, LED management |
 | `OTGW-Core.ino` | OpenTherm protocol decoding, PIC serial I/O, command queue, MQTT throttle |
 | `OTGW-Core.h` | OpenTherm data structures: `OTdataStruct`, `OTLibMessageID`, frame type enums |
-| `OTGW-firmware.h` | Shared typedefs, all struct definitions (`OTGWSettings`, `OTGWState`), forward declarations, constants |
+| `OTGW-firmware.h` | Top-level aggregator: includes the per-component `*types.h` headers, defines the aggregate `OTGWSettings` / `OTGWState` structs, forward declarations, shared constants |
+| `*types.h` | Per-component state + settings struct headers (ADR-079 / ADR-081). One file per subsystem: `SATtypes.h`, `OTDirecttypes.h`, `Devicetypes.h`, `Hardwaretypes.h`, `Networktypes.h`, `PICtypes.h`, `OTBustypes.h`, `Flashtypes.h`, `Uptimetypes.h`, `NTPtypes.h`, `Sensorstypes.h`, `S0types.h`, `Outputstypes.h`, `Webhooktypes.h`, `UItypes.h` |
 | `MQTTstuff.ino` | MQTT client state machine, HA auto-discovery, command subscriptions, `sendMQTTData()` |
 | `networkStuff.ino` | WiFi, mDNS, LLMNR, NTP, OTA, network platform abstraction |
 | `restAPI.ino` | REST API v2 dispatch table, all resource handlers, HTTP Basic Auth, CSRF, file serving |
 | `FSexplorer.ino` | LittleFS browser: file listing, upload/delete endpoints |
 | `jsonStuff.ino` | Low-level JSON formatting helpers: `sendJsonMapEntry()`, `sendJsonKVLine()`, streaming map builders |
-| `settingStuff.ino` | Settings load/save (LittleFS JSON), `updateSetting()` validation, side-effect dispatch |
+| `settingStuff.ino` | Settings load/save (LittleFS JSON), `updateSetting()` validation, debounced flush, side-effect dispatch |
 | `webSocketStuff.ino` | WebSocket server on port 81, OT log streaming, heap backpressure gate |
 | `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS status helpers |
-| `OTDirect.ino` | ESP32-only: direct GPIO OpenTherm bus via ISR, OTDirect operating modes, frame bridge |
+| `OTDirect.ino` | ESP32-only: direct GPIO OpenTherm bus via ISR, OTDirect operating modes, command queue coalesce-by-MsgID |
 | `SATcontrol.ino` | SAT control loop, heating curve, boiler state machine, setpoint injection, master enable/disable |
 | `SATpid.ino` | PID v3 implementation: proportional, integral, derivative with deadband |
 | `SATcycles.ino` | Cycle classification, overshoot detection, anti-cycling |
 | `SATpressure.ino` | SAT boiler pressure monitoring, low-pressure warning, trend detection |
 | `SATweather.ino` | Open-Meteo weather fetch, outdoor temperature for SAT heating curve |
-| `SATble.ino` | ESP32 BLE room temperature sensor integration (BTHome protocol) |
+| `SATble.ino` | ESP32 BLE room-temperature sensor scanner on NimBLE-Arduino (ADR-092), BTHome v2 protocol |
 | `MQTTHaDiscovery.cpp` | Generated PROGMEM tables for MQTT Home Assistant auto-discovery (sensors, binary sensors, climate, number entities) |
+| `mqtt_discovery_verify.cpp` | Compile-time sanity checks for the discovery tables (no runtime cost) |
 | `sensors_ext.ino`, `s0PulseCount.ino`, `OLED.ino` | Dallas DS18B20 temperature sensors, S0 pulse counter, OLED display |
 | `Ethernet.ino` | W5500 SPI Ethernet runtime probe and failover (ESP32 only) |
-| `boards.h` | Board-specific pin maps and feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`) |
+| `boards.h` | Board-specific pin maps and feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`) |
 | `safeTimers.h` | Timer macros: `DECLARE_TIMER_SEC()`, `DUE()`, `RESTART_TIMER()` |
 | `platform.h`, `platform_esp8266.h`, `platform_esp32.h` | Platform abstraction layer |
 
@@ -55,7 +57,8 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 
 | File / Directory | Purpose |
 |-----------------|---------|
-| `build.py` | Primary build script: invokes PlatformIO internally, packages firmware and LittleFS artifacts |
+| `build.py` | Primary build script: invokes PlatformIO internally, packages firmware and LittleFS artifacts, produces per-target distribution zips |
+| `flash_esp.py` | Cross-platform flasher: detects port, downloads release zip, writes firmware + filesystem for ESP8266 and ESP32 |
 | `platformio.ini` | PlatformIO project: `esp8266` and `esp32` environments |
 | `evaluate.py` | Static code quality checker: PROGMEM usage, unsafe patterns, String class audit |
 | `scripts/` | PlatformIO pre-build scripts: version injection, library patching |
@@ -104,10 +107,12 @@ PlatformIO is the preferred build system and is used for both ESP8266 and ESP32.
 
 | Environment | Target | Board | Core | CPU |
 |-------------|--------|-------|------|-----|
-| `esp8266` | Wemos D1 mini / NodeMCU (NodoShop OTGW) | `d1_mini` | Arduino Core 3.1.2 (espressif8266) | 160 MHz |
+| `esp8266` | Wemos D1 mini / NodeMCU (NodoShop OTGW) | `d1_mini` | Arduino Core 2.7.4 LTS via `espressif8266@2.6.3` (GCC 4.8.2) | 160 MHz |
 | `esp32` | NodoShop OTGW32 (ESP32-S3) | `esp32-s3-devkitc-1` | pioarduino espressif32 fork | 240 MHz |
 
-The ESP8266 LittleFS partition size is 2 072 576 bytes (approximately 2 MB). This is configured in `platformio.ini` via the board options.
+The ESP8266 environment is pinned to `espressif8266@2.6.3` (Arduino Core 2.7.4 LTS). It was briefly tested on `espressif8266@4.2.1` (Core 3.1.2 / GCC 10.3) but reverted after field reports of unaligned PROGMEM reads from word-aligned `strstr` / `strncmp` accesses against flash. Core 2.7.4 is the production target for the entire 1.5.x and 2.0.0 lines.
+
+The ESP8266 LittleFS partition size is 2 072 576 bytes (approximately 2 MB). The ESP32 layout is `4M2M` (2 MB LittleFS, `boot_app0.bin` included at `0xe000`, DIO flash mode). All of this is configured in `platformio.ini` via the board options.
 
 ```bash
 pio run                          # Build all environments
@@ -187,13 +192,14 @@ The firmware supports two official Nodoshop hardware variants, defined in `board
 
 #### Feature Flags
 
-Three compile-time flags in `boards.h` describe the hardware capabilities of each board:
+Four compile-time flags in `boards.h` describe the hardware capabilities of each board:
 
 | Flag | Type | OTGW WiFi (ESP8266) | OTGW32 (ESP32) | Meaning |
 |------|------|---------------------|----------------|---------|
 | `HAS_PIC` | `0` / `1` | `1` | `0` | Board has a PIC co-processor that handles the OpenTherm electrical bus over UART |
 | `HAS_DIRECT_OT` | `0` / `1` | `0` | `1` | Board drives the OpenTherm bus directly from GPIO via the OTDirect ISR |
 | `HAS_ETH_CAPABLE` | `0` / `1` | `0` | `1` | Board has a W5500 SPI Ethernet module |
+| `HAS_OLED_CAPABLE` | `0` / `1` | `0` | `1` | Board carries the onboard SSD1306 128x64 I2C OLED (runtime probe at address `0x3C`) |
 
 Use these flags in conditional compilation:
 
@@ -288,6 +294,8 @@ For comparisons use `strcmp_P(ram_ptr, PSTR("keyword"))` or `strcasecmp_P()`. Ne
 
 Binary data (non-null-terminated buffers) must use `memcmp_P()`. Using `strncmp_P` or `strstr_P` on binary data causes an Exception 2 crash.
 
+The MQTT path adds two ESP8266 PROGMEM-safety helpers declared in `MQTTstuff.h`: `pgm_strncmp_PP()` (byte-by-byte PROGMEM/PROGMEM compare) and `writeMqttProgmemChunk()` (streams a PROGMEM payload to the broker without `read-into-RAM` first). Use them when both operands live in flash; never pass a `PGM_P` to `printf("%s", ...)` or `MQTTclient.write()`.
+
 #### Platform Abstraction Layer (ADR-061)
 
 All ESP8266/ESP32 SDK differences are isolated in three files: `platform.h`, `platform_esp8266.h`, and `platform_esp32.h`. Application code includes only `platform.h` and calls the unified functions. Never call platform-specific SDK functions directly in `.ino` files.
@@ -327,9 +335,9 @@ bool canSendWebSocket();   // false when heap is below HEAP_WARNING threshold
 
 Always check the appropriate gate before sending MQTT messages in background tasks. The heap monitor in `helperStuff.ino` defines four levels: `HEAP_HEALTHY` (>8 KB), `HEAP_LOW` (5-8 KB), `HEAP_WARNING` (3-5 KB), `HEAP_CRITICAL` (<3 KB).
 
-#### Settings / State Separation (ADR-051)
+#### Settings / State Separation (ADR-051, amended by ADR-079 and ADR-081)
 
-All persistent configuration lives in `OTGWSettings settings` (serialised to `/settings.ini` on LittleFS). All transient runtime state lives in `OTGWState state`. Both structs are defined in `OTGW-firmware.h` and use two-level named sub-sections with Hungarian prefixes:
+All persistent configuration lives in `OTGWSettings settings` (serialised to `/settings.ini` on LittleFS). All transient runtime state lives in `OTGWState state`. Both structs use two-level named sub-sections with Hungarian prefixes:
 
 ```cpp
 settings.mqtt.sBroker          // persistent: MQTT broker hostname
@@ -338,7 +346,9 @@ state.otgw.bOnline             // transient: PIC serial link alive
 state.pic.sFwversion           // transient: PIC firmware version string
 ```
 
-Never persist transient state. Never access `state` fields from `writeSettings()`.
+Per ADR-079, each subsystem owns its section structs in a `*types.h` header (for example `SATtypes.h` declares both `SATRuntimeSection` and `SATSection`; `OTDirecttypes.h` declares both `OTDirectSection` and `OTDirectSettingsSection`). `OTGW-firmware.h` now just `#include`s those headers and defines the aggregate `OTGWSettings` / `OTGWState` plus the global `settings` and `state` instances. ADR-081 keeps the rule simple: if a component already has a `<Component>stuff.h` sibling, the types fold into that file instead of creating a separate `<Component>types.h`. Field access is unchanged: still `settings.sat.<field>` / `state.sat.<field>`.
+
+Never persist transient state. Never access `state` fields from `writeSettings()`. When adding a new subsystem prefer a fresh `<Component>types.h` over growing `OTGW-firmware.h`.
 
 ---
 
@@ -443,10 +453,10 @@ For periodically published values, call `sendMQTTData()` inside a `DUE()` check 
 
 #### Subscribe Side
 
-The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` on MQTT connect. Incoming messages are dispatched in `mqttCallback()` in `MQTTstuff.ino`. The dispatch table is `cmdtable[]`, an array of `MQTT_set_cmd_t` structs:
+The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` on MQTT connect. Incoming messages are dispatched in `mqttCallback()` in `MQTTstuff.ino`. The dispatch table is `setcmds[]`, an array of `MQTT_set_cmd_t` structs (ADR-078):
 
 ```cpp
-static const MQTT_set_cmd_t cmdtable[] PROGMEM = {
+const MQTT_set_cmd_t setcmds[] PROGMEM = {
   { PSTR("setpoint"),    PSTR("TT"), PSTR("temperature") },
   { PSTR("mycommand"),   PSTR("XX"), PSTR("raw")         },  // new entry
   // ...
@@ -464,7 +474,9 @@ For commands that do not map to a PIC command (e.g., SAT-specific topics), add a
 
 HA discovery payloads are built at runtime from compile-time PROGMEM tables in `MQTTHaDiscovery.cpp`. The streaming discovery emitter in `MQTTstuff.ino` (`doAutoConfigure()` / `doAutoConfigureMsgid()`) walks those tables and streams each discovery message directly to the broker without buffering a full payload in RAM. `MQTTHaDiscovery.cpp` is the source of truth; the older `mqttha.cfg` template has been archived to `docs/archive/`.
 
-To add a new discoverable entity, append a new entry to the appropriate PROGMEM array (sensors, binary sensors, climate, number) in `MQTTHaDiscovery.cpp`, using the existing entries as templates. Fields that vary per entity (device class, unit, state class, icon, entity category) are encoded as enum values to keep flash usage bounded. Rebuild firmware and re-run discovery (press `F` on the telnet debug console) to publish the new entity.
+Discovery is **just-in-time** (ADR-100): the OT-specific configs are only published once the matching MsgID is actually seen on the bus, with a broker-restart heuristic gating republish on reconnect. Topics themselves follow the **flat per-value** shape (ADR-101): one MQTT topic per value, never aggregated JSON. ADR-106 governs the default topic naming (self-describing); the legacy aggregated shape stays reachable via the `bUseLegacyOtTopics` toggle.
+
+To add a new discoverable entity, append a new entry to the appropriate PROGMEM array (sensors, binary sensors, climate, number) in `MQTTHaDiscovery.cpp`, using the existing entries as templates. Fields that vary per entity (device class, unit, state class, icon, entity category) are encoded as enum values to keep flash usage bounded. Rebuild firmware and force discovery (press `F` on the telnet debug console) to republish the new entity.
 
 ---
 
@@ -474,7 +486,7 @@ Adding a setting requires changes in four places: the struct definition, the ser
 
 #### Step 1: Add to the Settings Struct
 
-Open `OTGW-firmware.h`. Find the relevant sub-section struct (e.g., `MQTTSection`, `SATSection`, `DeviceSection`). Add the new field with its type and default value:
+Open the relevant per-component header (for SAT: `SATtypes.h`; for OTDirect: `OTDirecttypes.h`; for the HA device identity: `Devicetypes.h`; new subsystems get a fresh `<Component>types.h`). Find the section struct (`SATSection`, `OTDirectSettingsSection`, `DeviceSection`, ...) and add the new field with its type and default value:
 
 ```cpp
 struct MySection {
@@ -485,9 +497,12 @@ struct MySection {
 };
 ```
 
-If adding to an existing section, add to the appropriate struct. If creating a new section, add it to `OTGWSettings`:
+If adding to an existing section, add to the appropriate struct. If creating a new section, add a new `<Component>types.h` containing the struct, include it from `OTGW-firmware.h`, and reference it from `OTGWSettings`:
 
 ```cpp
+// OTGW-firmware.h
+#include "Mytypes.h"
+
 struct OTGWSettings {
   // ... existing sections ...
   MySection my;   // access as settings.my.bMyNewFlag
@@ -522,7 +537,7 @@ else if (strcasecmp_P(field, PSTR("mystring")) == 0) {
 }
 ```
 
-The `settingsDirty` flag triggers a deferred LittleFS write (typically after a 2-second debounce timer).
+The `settingsDirty` flag triggers a deferred LittleFS write (typically after a 2-second debounce timer). `writeSettings()` skips the actual flash write when the serialised content matches the on-disk copy, so a no-op `updateSetting()` round-trip does not wear the flash.
 
 #### Step 4: Expose via REST API (Optional)
 
@@ -674,7 +689,7 @@ RESTART_TIMER(timerMQTTpublish);                                 // reset countd
 
 ### Command Queue
 
-All commands to the OTGW PIC must go through `addCommandToQueue()`. Direct UART writes are forbidden because the PIC requires response matching and command ordering.
+All commands to the OTGW PIC must go through `addCommandToQueue()`. Direct UART writes are forbidden because the PIC requires response matching and command ordering. On OTGW32 (no PIC), the same API funnels into the OTDirect queue, which **coalesces by MsgID** (TASK-494): if a frame for the same OT MsgID is already pending, the older entry is replaced in place, so multiple producers issuing the same MsgID within one OT cycle (~115 ms) never flood the bus.
 
 ```cpp
 // Signature:
@@ -689,7 +704,7 @@ addCommandToQueue(PSTR("GW=1"), 4);                // gateway mode on
 addCommandToQueue(PSTR("PR=A"), 4, false, 500);    // custom 500 ms send delay
 ```
 
-The queue is processed in the OTGW-Core background task. Responses from the PIC are matched against outstanding commands and published to MQTT. On OTGW32 (OTDirect), the queue is handled internally by `loopOTDirect()`.
+The queue is processed in the OTGW-Core background task. Responses from the PIC are matched against outstanding commands and published to MQTT. On OTGW32 (OTDirect), the queue is handled internally by `loopOTDirect()`, which also exposes a high-water-mark diagnostic on the telnet console.
 
 Never call `addCommandToQueue()` from an ISR or from within the PIC response handler.
 
@@ -741,7 +756,7 @@ The `sRead[256]` buffer in `handleOTGW()` is a `static` local, making it re-entr
 
 ### Architecture Decision Records
 
-ADRs live in `docs/adr/`. There are 76+ ADRs covering every significant design decision. ADRs are immutable once Accepted.
+ADRs live in `docs/adr/`. There are 100+ ADRs covering every significant design decision. ADRs are immutable once Accepted.
 
 #### When to Read ADRs
 
@@ -771,6 +786,13 @@ Not required for: pure bug fixes, minor features within existing patterns.
 | ADR-064 | OTDirect operating-mode architecture | Gateway / Monitor / Thermostat / Off modes on ESP32 |
 | ADR-069 | SAT PID v3 implementation | Current PID control law for Smart Autotune Thermostat |
 | ADR-072 | SAT platform compatibility layer | SAT builds on both ESP8266 and ESP32 via shared abstractions |
+| ADR-079 | Per-component type headers | Each subsystem owns its state + settings structs in `<Component>types.h` |
+| ADR-081 | Types merge into `<Component>stuff.h` | Amendment to ADR-079: fold into the existing stuff sibling when one exists |
+| ADR-090 | Re-entrancy guard pattern for shared scratch buffers | `MQTTAutoConfigSessionLock` and the `inUse` flag on `publishToSourceTopic` |
+| ADR-092 | NimBLE-Arduino for BLE scanner | OTGW32 SAT BLE replaces Bluedroid with NimBLE-Arduino 2.x |
+| ADR-100 | JIT HA discovery + smart reconnect | OT configs only published once the MsgID is seen; broker-restart heuristic gates republish |
+| ADR-101 | Flat per-value MQTT topics | One topic per value; no aggregated JSON payloads |
+| ADR-106 | Self-describing MQTT topic names | New default topic naming; legacy shape behind `bUseLegacyOtTopics` |
 
 #### Creating a New ADR
 

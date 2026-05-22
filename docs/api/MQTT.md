@@ -3,6 +3,12 @@
 This document describes all MQTT topics published and subscribed to by the OTGW-firmware.
 
 > **Breaking change in 2.0.0 (MQTT consumers please read):** three OT-bus presence values (`boiler_connected`, `thermostat_connected`, `otgw_connected`) have moved out of the hardware-specific `otgw-pic/` and `otgw-otdirect/` subtrees into the generic `OTGW/value/<uniqueId>/` namespace. The `otgw-otdirect/ot_online` topic has been retired; the same concept now lives under `otgw_connected`. The firmware self-heals retained payloads on the deprecated topics at first MQTT reconnect. Home Assistant users do not need to do anything; custom consumers should update their topic patterns. See [OT-bus state (generic, since 2.0.0)](#ot-bus-state-generic-since-200) and [Migration from 1.4.x / pre-release 2.0.0 (OT-bus state topics)](#migration-from-14x--pre-release-200-ot-bus-state-topics). Background: ADR-084.
+>
+> **Breaking change in 2.0.0 (binary_sensor topic labels):** 37 OT-spec-derived binary_sensor topic labels have been replaced with HA-core-style self-describing aliases (`dhw_present` → `supports_hot_water`, etc.). The two name sets are mutually exclusive; setting `mqttuselegacyottopics = true` switches back to the legacy labels. The firmware drains the retained payloads of the *other* name set on toggle (cleanup state persisted to `/mqtt_topic_cleanup.bin` to survive power loss mid-drain). Background: ADR-105 (superseded) → ADR-106.
+>
+> **Discovery in 2.0.0 is pure JIT (ADR-100).** The boot-time and `homeassistant/status → online` bulk publishes are gone; only climate, the outside-temp number, Dallas sensors, and heap-stats are pre-published. Per-MsgID configs are published the first time the firmware sees the matching OT frame. A broker-restart heuristic still triggers a full republish when the gateway has been disconnected from MQTT for more than 5 minutes (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`).
+>
+> **Flat per-value topics are policy (ADR-101).** The firmware never publishes aggregated JSON value payloads. Each value lives on its own topic with a scalar payload. HA discovery configs are the only JSON publishes, as required by the discovery protocol. Do not propose OT-Thing-style nested-JSON shims.
 
 ## Overview
 
@@ -683,7 +689,7 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `ledd` | `"F"` | `LD=F` | LED D function code. |
 | `lede` | `"F"` | `LE=F` | LED E function code. |
 | `ledf` | `"F"` | `LF=F` | LED F function code. |
-| `resetgateway` | *(any)* | *(hardware reset)* | Reset the OTGW PIC via the hardware reset pin; payload ignored. No-op on OTGW32 (no PIC). |
+| `resetgateway` | `"1"` | *(hardware reset)* | Reset the OTGW PIC via the hardware reset pin. Payload must be exactly `"1"` (matches the HA-discovery button `payload_press`); any other payload is logged and ignored. Rate-limited to one reset per 5 seconds to absorb storms from misconfigured automations (TASK-668). No-op on OTGW32 (no PIC). |
 
 **Gateway mode values (`gatewaymode` topic)**
 
@@ -992,7 +998,7 @@ The firmware emits the following entity categories (verified against `MQTTHaDisc
 | Component | Count | Source | Notes |
 |-----------|-------|--------|-------|
 | `sensor` | 289 | PROGMEM table `mqttHaSensorCfg[]` (indexed via `mqttHaSensorIndex[256]`) | Covers all OT numeric fields, status decoding, RBP, VH, solar, SAT sensor fan-out |
-| `binary_sensor` | 53 | PROGMEM table `mqttHaBinSensorCfg[]` (indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries |
+| `binary_sensor` | 53 | PROGMEM table `mqttHaBinSensorCfg[]` (indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries. 37 of these rows have HA-core-style alias siblings (ADR-106); the discovery streamer publishes exactly one of the two name sets depending on `settings.mqtt.bUseLegacyOtTopics`. |
 | `climate` | 2 | `streamClimateDiscovery(idx=0/1)` | 0 = Thermostat, 1 = DHW Control |
 | `number` | 1 | `streamNumberDiscovery()` | `Toutside_override` slider |
 | `switch` (SAT, TASK-284) | 13 | `streamSatSwitchDiscovery(idx=0..12)` | See list below |
@@ -1007,18 +1013,22 @@ The SAT switch and select entries piggyback on OT pseudo-ID 0 in the discovery b
 
 Published unconditionally via the discovery drip, like the other PIC pseudo-IDs (249/250) on this dual-target branch (the TASK-543 gating decision): the entity is always discovered, and the set-commands plus the `otgw-pic/settings/*` state topics are PIC-gated at their source (ignored / not updated when no PIC is present; no-op on OTGW32). They appear under the OTGW device card in Home Assistant.
 
-- **Button** `resetgateway` → `{set}/resetgateway` (`entity_category: config`, `payload_press: "1"`, hardware PIC reset).
+- **Button** `resetgateway` → `{set}/resetgateway` (`entity_category: config`, `payload_press: "1"`, hardware PIC reset). The handler enforces the same payload (`"1"`) and adds a 5-second rate-limit so a misconfigured automation cannot storm the PIC (TASK-668).
 - **Selects** `gpioa`/`gpiob` (options `0`–`7`, state `otgw-pic/settings/gpio`, `value_template {{ value[0|1] }}`) and `leda`–`ledf` (options `B C E F H M O P R T W X`, state `otgw-pic/settings/led`, `value_template {{ value[0..5] }}`); command topics `{set}/{gpioa|…|ledf}`.
 
 ### Discovery Modes
 
-The firmware uses three discovery paths:
+Since 2.0.0 (ADR-100) the firmware uses pure JIT discovery for per-MsgID configs:
 
-1. **Drip publisher (background)**: After boot, MQTT connect, or Home Assistant restart, all known OT message IDs are queued in a bitmap. The `loopMQTTDiscovery()` function in the main loop drip-publishes one discovery config every 3 seconds (slowed to 30 seconds under heap pressure). This avoids MQTT burst storms that previously caused heap exhaustion on the ESP8266.
+1. **Boot / MQTT connect**: only the non-OT entities are queued for the drip — climate (pseudo-ID 0), the outside-temperature number (ID 27), Dallas sensors, and heap statistics. Per-OT-MsgID configs are NOT pre-published. Across HA restarts the broker retains the discovery configs already published, so HA simply re-loads them.
 
-2. **JIT discovery (on OT message)**: When an OpenTherm message ID is observed for the first time and its discovery config has not yet been published, the config is sent immediately. This ensures discovery is available even before the drip publisher reaches that ID.
+2. **JIT discovery (on OT message)**: when an OpenTherm message ID is observed for the first time after boot and its discovery config has not yet been published, the config is sent before the value publish. This is the only path through which OT-MsgID configs reach the broker on a fresh-broker scenario.
 
-3. **Manual force**: Triggered via REST API (`POST /api/v2/otgw/discovery`) or the `F` serial command. Marks all IDs as pending and the drip publisher re-publishes them over the following minutes.
+3. **Broker restart heuristic**: in the MQTT connect-success branch, if the firmware was offline for more than `MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS` (5 minutes), the done-bitmap is cleared and `requestMQTTRepublishAll()` is called so the JIT path repopulates the broker. This recovers from broker reinstall / persistence loss without the boot-time storm of pre-2.0.0 builds.
+
+4. **Manual force**: triggered via REST API (`POST /api/v2/otgw/discovery`) or the `F` serial command. Marks all IDs as pending and the drip publisher re-publishes them over the following minutes.
+
+The `loopMQTTDiscovery()` drip cadence is unchanged: one config every 3 seconds, slowed to one every 30 seconds under heap pressure.
 
 ### Source-Separated Discovery
 
@@ -1290,6 +1300,7 @@ These MQTT-related settings are configurable via the REST API (`/api/v2/settings
 | `mqttotmessage` | `false` | Publish raw OT messages |
 | `mqttinterval` | `0` | Minimum publish interval (seconds, 0 = no throttle) |
 | `mqttseparatesources` | `false` | Publish to source-separated sub-topics |
+| `mqttuselegacyottopics` | `false` | When `true`, publish the 37 legacy OT-spec-derived binary_sensor names; when `false` (default in 2.0.0), publish the new self-describing HA-core-style aliases instead. The two name sets are mutually exclusive (ADR-106). Toggle triggers cleanup of the retained payloads in the other name set via a persistent bitmap in `/mqtt_topic_cleanup.bin`. |
 
 ---
 

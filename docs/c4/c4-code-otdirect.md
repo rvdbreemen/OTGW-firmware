@@ -21,7 +21,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 ### Key Design Patterns
 
 - **Non-Blocking Async**: Uses `OpenTherm::sendRequestAsync()` with completion checks in `loopOTDirect()` — never blocks the scheduler
-- **Ring Buffers**: Schedule table (66 entries), command queue (12 frames), override tables (7 setpoint, 16 response, 8 response-modify), unknown-ID blacklist (16 entries)
+- **Ring Buffers**: Schedule table (66 entries), command queue (12 frames, **coalesce-by-MsgID** — TASK-494, repeated set commands for the same MsgID overwrite the pending entry instead of stacking), override tables (8 repeater including MsgID 100 for TT/TC flag synthesis, 16 response, 8 response-modify), unknown-ID blacklist (16 entries)
 - **3-Strike Auto-Blacklist**: MsgIDs that return UNKNOWN_DATA_ID three times are auto-disabled from polling
 - **Periodic Write Cache**: Boiler setpoints are written every 15s to keep values alive if thermostat disconnects
 - **Repeater Overrides**: Thermostat frames can be intercepted and their data values replaced before forwarding to boiler (gateway mode)
@@ -179,8 +179,8 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 
 **Category 1: Setpoint Write Commands** (enqueue + cache + override)
 - `CS=xx.x` — Control setpoint (MsgID 1, TSet). Value 0 clears.
-- `TC=xx.x` — Temporary thermostat-side room override (MsgID 16, TrSet + MsgID 100 RemoteOverrideFunction flag bits). Auto-clears on next thermostat broadcast unless honoured. Value 0 clears.
-- `TT=xx.x` — Constant thermostat-side room override (MsgID 16, TrSet + MsgID 100 RemoteOverrideFunction flag bits). Persists until cleared. Value 0 clears.
+- `TT=xx.x` — Temporary thermostat-side room override (MsgID 16, TrSet + MsgID 100 RemoteOverrideFunction priority bit 0x02). Auto-clears on next thermostat broadcast unless honoured (TASK-466 PIC-parity semantics). Value 0 clears.
+- `TC=xx.x` — Constant thermostat-side room override (MsgID 16, TrSet + MsgID 100 RemoteOverrideFunction priority bit 0x01). Persists until cleared (TASK-466 PIC-parity semantics). Value 0 clears.
 - `BS=xx.x` — Fake boiler room setpoint (intercepts thermostat MsgID 16 frame, replaces data bytes before forwarding). Value 0 clears.
 - `C2=xx.x` — Control setpoint CH2 (MsgID 8, TsetCH2)
 - `CC=xx.x` — Cooling control (MsgID 7, 0-100%)
@@ -497,6 +497,13 @@ struct OTFrameOverride {
 static OTFrameOverride otOverrides[] // 8 entries: MsgID 1,7,8,14,16,56,57,100 (100=RemoteOverrideFunction flag bits, TASK-466)
 ```
 
+**TT=/TC= remote-override state machine (TASK-466, PIC-parity)**: MsgID 100 (`RemoteOverrideFunction`) is a UX hint published to the thermostat alongside the MsgID 16 setpoint inject:
+- TT (temporary): MsgID 100 low byte = `0x02` (priority bit, thermostat may auto-clear on next broadcast)
+- TC (constant): MsgID 100 low byte = `0x01` (priority bit, thermostat must honor until cleared)
+- `clearRemoteOverride()` (CS=0, TT=0, TC=0) drops both the MsgID 16 inject and the MsgID 100 flag.
+
+The boiler ignores MsgID 100 and only sees MsgID 16 — MsgID 100 is purely a hint to the thermostat. If the MsgID 16 enqueue succeeds but MsgID 100 hits a full queue, the partial state is accepted: boiler-side override stays in effect, thermostat-side hint catches up on the next attempt. The state machine variable `otRemoteOverride` tracks the active mode (`OT_OVERRIDE_NONE`/`TEMPORARY`/`CONSTANT`), the f8.8 value, the timestamp it was set, and whether the thermostat has been observed to honor it (`honoredCount`, `bHaveLastThermostat`).
+
 #### Response Override
 ```cpp
 struct OTResponseOverride {
@@ -541,7 +548,10 @@ static constexpr uint8_t OT_CMD_QUEUE_SIZE = 12;
 static uint32_t otCmdQueue[OT_CMD_QUEUE_SIZE];
 static uint8_t  otCmdHead = 0;   // Write position
 static uint8_t  otCmdTail = 0;   // Read position
+static uint8_t  otCmdQueueHighWater = 0;  // TASK-494: peak depth observed
 ```
+
+**Coalesce-by-MsgID (TASK-494)**: `enqueueCommand()` walks the pending entries for any frame with the same MsgID and overwrites it in place rather than appending. This is the only correct behavior for the rapid `set MsgID 100=X` / `set MsgID 100=Y` sequences MQTT can produce — the older value is stale by definition; appending stacks would saturate the queue and surface as a queue-full error even when the actual demand is one slot. High-water (`otCmdQueueHighWater`) is published as a diagnostic so a genuine saturation versus a stale-value churn can be told apart at runtime.
 
 #### Boiler Response Cache
 ```cpp

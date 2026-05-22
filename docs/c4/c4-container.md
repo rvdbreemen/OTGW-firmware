@@ -67,7 +67,7 @@ All containers live on a single physical device. There is no Docker, no Kubernet
 - **Type**: Web Application (single-page application, runs in the user's browser)
 - **Technology**: HTML5, CSS3, ES5+ JavaScript, ECharts (Apache), WebSocket API
 - **Platform**: Modern browser (Chrome, Firefox, Safari — latest + 2 versions back)
-- **Description**: A self-contained SPA delivered to the browser by the firmware's HTTP server. The browser loads `index.html` (~11 KB) from port 80, which pulls in `index.js` (~3000 lines), `sat.js` (~600 lines), `graph.js` (~800 lines), and CSS files — all served from LittleFS. Once loaded, the SPA communicates with the firmware exclusively via REST API (JSON over HTTP) and WebSocket (real-time OT log stream). There is no server-side rendering; all UI state is client-side.
+- **Description**: A self-contained SPA delivered to the browser by the firmware's HTTP server. The browser loads `index.html` (~11 KB) from port 80, which pulls in `index.js`, `sat.js` (+ `sat-slider.js`), `graph.js`, `theme-toggle.js`, `echarts-theme.js`, and the design-system CSS pair (`ds-tokens.css`, `components.css`) — all served from LittleFS. The SPA is English-only (TASK-569 stripped Dutch UI strings). Once loaded, it communicates with the firmware exclusively via REST API (JSON over HTTP) and WebSocket (real-time OT log stream). There is no server-side rendering; all UI state is client-side.
 - **Components delivered**:
   - Web Assets (index.js, sat.js, graph.js, CSS): [c4-component-web-interface.md](./c4-component-web-interface.md)
 - **Capabilities**:
@@ -93,19 +93,23 @@ All containers live on a single physical device. There is no Docker, no Kubernet
 |---|---|---|
 | `/settings.ini` | ~4 KB | Device configuration (all `OTGWSettings` fields as JSON) |
 | `/index.html` | ~11 KB | SPA entry point |
-| `/index.js` | ~120 KB | Main UI JavaScript |
-| `/sat.js` | ~25 KB | SAT dashboard JavaScript |
-| `/graph.js` | ~35 KB | ECharts temperature graph JavaScript |
-| `/index.css`, `/index_dark.css`, `/index_common.css` | ~15 KB total | Themes |
-| `/FSexplorer.html`, `/FSexplorer.css` | ~10 KB | File explorer |
-| `/mqttha.cfg` | ~100 KB | 200+ Home Assistant MQTT discovery templates |
+| `/index.js` | large | Main UI JavaScript (English-only since TASK-569) |
+| `/sat.js`, `/sat-slider.js` | medium | SAT dashboard + shared slider widget |
+| `/graph.js` | medium | ECharts temperature graph JavaScript |
+| `/theme-toggle.js`, `/echarts-theme.js` | small | Theme switching + ECharts theme registration |
+| `/ds-tokens.css`, `/components.css` | medium | Design-system tokens + component styles (single sheet, both themes via CSS variables) |
+| `/design.html` | medium | Internal style-guide / component gallery (not linked from the SPA) |
+| `/FSexplorer.html` | small | File explorer (no separate theme files) |
 | `/dallas_labels.ini` | <1 KB | DS18B20 sensor address-to-label mappings |
+| `/sat_markers.json` | <1 KB | SAT heating-curve calibration markers (TASK-586) |
 | `/gateway.hex` | varies | PIC16F88 or PIC16F1847 firmware binaries |
 | `/pid_state.json` | <1 KB | SAT PID integral/derivative state (persisted across restarts) |
 | `/reboot_count.txt` | <1 KB | Persistent reboot counter |
 | `/reboot_log.txt` | <5 KB | Circular log of last 20 reboot events |
 | `/version.hash` | <0.1 KB | Firmware/filesystem version hash for mismatch detection |
 | `/otgw.replay` | varies | Optional OT message replay log for simulation mode |
+
+Note: the previous `/mqttha.cfg` LittleFS file has been retired. HA MQTT discovery is now published directly from PROGMEM data tables in `MQTTHaDiscovery.cpp` (ADR-077). Default discovery semantics: JIT on first OT message (ADR-100), flat per-value scalar topics (ADR-101), self-describing names (ADR-106).
 
 ---
 

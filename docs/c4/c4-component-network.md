@@ -21,7 +21,8 @@ A critical secondary responsibility is platform abstraction. The `platform_esp82
 - **OpenTherm time commands**: Sends `SC=`, `SR=21:`, `SR=22:` to PIC on NTP sync to keep boiler clock accurate
 - **mDNS/LLMNR hostname resolution**: Registers `<hostname>.local` via mDNS (both platforms); LLMNR for Windows name resolution (ESP8266 only)
 - **Multi-path hostname synchronization**: Corrects ESP8266 SDK bug that resets hostname during `configTime()` call; guards with `sDhcpHostnameFixed` flag against repeated re-announces
-- **Ethernet failover** (ESP32 + W5500): Probes W5500 via SPI VERSION register at boot; DHCP with 1-second timeout; hot-plug cable detection every 5 seconds; switches WiFi off when Ethernet active
+- **Runtime WiFi↔Ethernet failover** (ESP32 + W5500, TASK-581): Probes W5500 via SPI VERSION register at boot; DHCP with 1-second timeout; hot-plug cable detection every 5 seconds; transitions disconnect WiFi (`switchToEthernet()`) or restart it (`switchToWiFi()`) on the fly without reboot. The mode-transition MQTT publish is deferred until the MQTT client reconnects.
+- **Per-component types header** (`Networktypes.h`, ADR-079 / ADR-081): Bundles `OTGWNetworkMode`, `NetworkSection`, `EthernetSection` for the network transport. Prerelease-only `NET_AP_FALLBACK` is compile-time-guarded by `_VERSION_PRERELEASE` so production builds cannot enter AP fallback.
 - **Platform abstraction**: 25+ inline platform functions covering hostname, MAC, filesystem, CPU, reset info, RTC memory, serial error flags
 - **Telnet debug server**: `TelnetStream` on port 23 for real-time firmware log output
 - **WebSocket buffer optimization**: Reduces per-client buffer from 512 to 256 bytes via `WEBSOCKETS_MAX_DATA_SIZE 256`, freeing ~768 bytes per 3-client scenario on ESP8266

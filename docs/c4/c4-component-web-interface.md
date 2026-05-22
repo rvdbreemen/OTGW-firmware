@@ -111,13 +111,16 @@ The client side (Web Assets) is a self-contained SPA served directly from Little
 - **Description**: Static assets served to browser clients.
 - **Files served**:
   - `index.html` — SPA entry point (~11 KB, ETag-cached)
-  - `index.js` — main UI controller (~3000 lines, version-stamped URL)
-  - `sat.js` — SAT dashboard (~600 lines)
-  - `graph.js` — ECharts temperature graph (~800 lines)
-  - `index.css`, `index_dark.css`, `index_common.css` — themes
-  - `FSexplorer.html`, `FSexplorer.css` — LittleFS file browser
-  - `mqttha.cfg` — HA discovery config (200+ entries, ~100 KB)
+  - `index.js` — main UI controller (English-only since TASK-569; version-stamped URL)
+  - `sat.js` — SAT dashboard (heating-curve markers, sensor-area mapping, BLE roster, WiFi scan)
+  - `sat-slider.js` — shared slider widget
+  - `graph.js` — ECharts temperature graph
+  - `theme-toggle.js`, `echarts-theme.js` — theme switch + ECharts theme registration
+  - `ds-tokens.css`, `components.css` — design-system tokens + component styles (single sheet, no per-theme files)
+  - `design.html` — internal style guide / component gallery
+  - `FSexplorer.html` — LittleFS file browser (styled by `components.css`)
   - `pic16f88/*.hex`, `pic16f1847/*.hex` — PIC firmware binaries
+  - HA MQTT discovery is no longer served from a runtime `mqttha.cfg`; it is published from PROGMEM tables in the firmware (ADR-077)
 
 ## Dependencies
 

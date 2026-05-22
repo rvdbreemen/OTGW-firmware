@@ -41,29 +41,36 @@ On the OTGW32 board (ESP32), the hardware includes onboard OpenTherm circuitry t
 #### ESP32 / OTGW32 Only
 
 - OTDirect: direct GPIO OpenTherm bus communication with five operating modes (no PIC required).
-- W5500 Ethernet with automatic cable-detect failover between wired Ethernet and Wi-Fi.
+- W5500 Ethernet with dynamic, runtime cable-detect failover between wired Ethernet and Wi-Fi (no reboot required).
 - BLE room temperature and humidity sensors: up to four Xiaomi LYWSD03MMC sensors read passively via BTHome v2 protocol.
 - AP fallback mode (beta): the web UI stays reachable even when the home network is unavailable.
 
 ### What Is New in v2.0.0
 
-Version 2.0.0 is a major platform release. It ships full ESP32 and OTGW32 support alongside the established ESP8266 path, all in a single unified codebase. There are no breaking changes to MQTT topics or the REST API from v1.x. Settings files from v1.3.x load without modification.
+Version 2.0.0 is a major platform release. It ships full ESP32 and OTGW32 support alongside the established ESP8266 path, all in a single unified codebase. Settings files from v1.3.x load without modification.
+
+Version 2.0.0 is still in alpha at the time of writing. It is feature complete on the established functionality but receives ongoing refinement on SAT, OTDirect, and the new MQTT topic shape (see below). Track the GitHub Releases page for the current alpha tag.
+
+**Breaking change in this release.** v2.0.0 changes the default MQTT topic names to a new self-describing scheme (ADR-106). Thirty-seven OT-spec-derived binary sensor topics are renamed to clearer, Home Assistant friendly labels (for example, the legacy `master_ch_enable` becomes `central_heating_enabled`). Users with existing automations pinned to the legacy labels can flip `settings.mqtt.bUseLegacyOtTopics` to `true` and keep the v1.x behaviour. The two modes are mutually exclusive: either the new names or the legacy names publish, never both. The REST API is unchanged from v1.x.
 
 #### Highlights
 
 - **OTGW32 / ESP32 platform**: Native ESP32 support. The OTGW32 board combines an ESP32 with onboard OpenTherm circuitry. The PIC gateway chip is optional. Build with `pio run -e esp32`.
 - **OTDirect**: ESP32-only direct GPIO OpenTherm master/slave with five operating modes: thermostat, boiler, gateway, monitor, and a combined master+slave pair, all without a PIC co-processor.
-- **Ethernet (W5500)**: Wired Ethernet via W5500 SPI on the OTGW32 board. The firmware auto-detects cable presence and switches transparently between Ethernet and Wi-Fi in both directions.
+- **Ethernet (W5500) with runtime failover**: Wired Ethernet via W5500 SPI on the OTGW32 board. The firmware detects cable presence dynamically and switches transparently between Ethernet and Wi-Fi in both directions while running, without a reboot.
 - **BLE temperature sensors**: On ESP32, up to four Xiaomi LYWSD03MMC sensors are read passively over Bluetooth LE. Room temperature and humidity feed directly into SAT and Home Assistant.
 - **SAT (Smart Autotune Thermostat)**: A full embedded heating controller with weather-compensated PID control, multi-zone support, Summer Simmer Index, solar gain compensation, pressure monitoring, OPV calibration, and six configurable presets.
 - **Weather integration (Open-Meteo)**: Free weather API provides outdoor temperature and solar data for SAT when no local sensor is available.
 - **OLED display**: 128x64 SSD1306 I2C display on both platforms. Four information pages cover status, temperatures, network, and boiler. A button cycles pages; the display turns off automatically after a configurable timeout.
 - **250+ Home Assistant entities**: Full climate entity, all SAT entities, pressure monitoring, BLE sensor entities, and OLED status, all via MQTT auto-discovery.
-- **Streaming MQTT HA discovery**: Auto-discovery payloads are now compiled into flash (PROGMEM) and published via an asynchronous, bitmap-driven drip publisher that streams each entity directly to the broker. This replaces the previous LittleFS- and RAM-staged approach, eliminating large staging buffers and improving heap stability on ESP8266. The streaming pipeline also covers SAT switches and select entities (TASK-284), runtime-discovered Dallas sensors, and the climate/number entities.
+- **Streaming MQTT HA discovery**: Auto-discovery payloads are now compiled into flash (PROGMEM) and published via an asynchronous, bitmap-driven drip publisher that streams each entity directly to the broker. This replaces the previous LittleFS- and RAM-staged approach, eliminating large staging buffers and improving heap stability on ESP8266. The streaming pipeline also covers SAT switches and select entities (TASK-284), runtime-discovered Dallas sensors, the climate and number entities, and HA button and select entities for PIC commands.
+- **Just-in-time MQTT discovery (ADR-100)**: Discovery configs for OpenTherm MsgIDs are now published only when the boiler or thermostat first emits that MsgID, instead of bulk-publishing all 256 IDs at every boot. This keeps the broker registry focused on the IDs your hardware actually uses and reduces start-up MQTT traffic. The handler for the `homeassistant/status` online event also no longer republishes everything; the broker retains discovery configs across HA restarts.
+- **Flat per-value MQTT topics (ADR-101)**: Each sensor or control value publishes as a plain scalar on its own topic. No aggregated JSON state topics. This is a deliberate design choice that keeps auto-discovery transparent and avoids the need for a custom HA component.
+- **English-only web UI**: Leftover Dutch UI strings inherited from the OTTHING platform port have been removed. The web UI is now consistently English (TASK-569).
 - **Nightly restart scheduling**: Configurable automatic reboot at a chosen time and day to recover from heap fragmentation on long-running ESP8266 devices.
 - **Platform abstraction (boards.h)**: A new `boards.h` header defines pin maps, feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`), and hardware capabilities per board variant. This cleanly separates platform-specific configuration from application logic.
 - **SimpleTelnet**: The telnet debug log now uses SimpleTelnet, a unified multi-client telnet library that replaces the separate TelnetStream and ESPTelnet libraries used in v1.x.
-- **Toolchain refresh**: ESP8266 builds now use Arduino core 3.1.2 (up from 2.7.4 in v1.3.5), and time handling has moved to AceTime 4.x. These updates bring current lwIP, updated Wi-Fi stack, and a smaller, faster time library.
+- **Toolchain**: ESP8266 builds stay on Arduino core 2.7.4, the LTS baseline. The 1.4.x line briefly moved to core 3.1.2 but the v1.5.x LTS line reverted to 2.7.4 for field-tested stability (lwIP returned to the 2.7.4 release alongside it). Time handling has moved to AceTime 4.x, which is core-version independent and brings a smaller, faster time library.
 - **Wi-Fi resilience**: AP fallback mode keeps the web UI reachable when the home network is unavailable. A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
 - **PlatformIO build**: Unified `platformio.ini` with `esp8266` and `esp32` environments. Arduino IDE still works for ESP8266.
 

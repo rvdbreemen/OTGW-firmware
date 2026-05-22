@@ -22,7 +22,7 @@
 
 ### Core Data Structures
 
-#### `OTdataStruct` (OTGW-Core.h, line 26-173)
+#### `OTdataStruct` (OTGW-Core.h)
 - **Purpose**: Central repository for all OpenTherm state from the boiler/thermostat
 - **Members**: 
   - Status flags (master/slave) and configuration
@@ -32,7 +32,10 @@
   - Counters: BurnerOperationHours, CHPumpStarts, etc.
   - Extended features: Solar storage, ventilation/heat recovery, RF sensors, vendor-specific, brand identification
   - Error tracking: error01-04, errorBufferOverflow
-- **Scope**: Global singleton `OTdataStruct OTcurrentSystemState` (OTGW-Core.h:175)
+  - **Routing discriminators (ADR-103)**:
+    - `bAnswerOverride` — true when the current `A`-prefix frame is a gateway answer that *substitutes* a real boiler `B` frame (genuine answer-override). False on the more common case of an `A`-prefix proxy frame (no preceding `B`).
+    - `bGatewaySubstituted` — true when the gateway injected the substitution itself.
+- **Scope**: Global singleton `OTdataStruct OTcurrentSystemState`
 - **Note**: Flame status is in SlaveStatus bit 3 (NOT MasterStatus); MasterStatus bit 3 is OTC (Outside Temperature Compensation) enabled (bug fix: commit d85e668c)
 
 #### `OpenthermData_t` (OTGW-Core.h, embedded)
@@ -503,6 +506,15 @@ After PIC reset, event logging is suppressed for 15 seconds to allow PIC to stab
 ### Connection State Tracking (v1.3.5+)
 
 Three independent state publishers track OpenTherm bus connectivity: boiler (30s inactivity timeout), thermostat (30s), and combined bus (OR logic). Published separately to MQTT topics otgw/boiler_connected, otgw/thermostat_connected, otgw/otgw_online to enable Home Assistant automations when devices disconnect.
+
+### Answer-Override vs Proxy-Answer Routing (ADR-103)
+
+The gateway emits two flavours of `A`-prefix (gateway-answer) frames on the OT bus:
+
+1. **Proxy answer (default)**: An `A` frame issued without any preceding `B` (boiler response). The boiler has nothing canonical to say about this MsgID — the gateway speaks for itself. Routes to MQTT and discovery exactly like a normal frame.
+2. **Answer-override (substitution)**: An `A` frame issued *because* a `B` frame for that MsgID was intercepted and the gateway is replacing the canonical value. Carries `bAnswerOverride=true`.
+
+The canonical-publish gate (ADR-096/ADR-103) blocks only answer-overrides — proxy answers are forwarded normally to preserve gateway-originated values that have no boiler-side equivalent. The pairing is tracked across the delayed-frame buffer: when an `A` arrives, the previous `B` (if any) is examined; if the `A` replaces it, `delayedOTdata.bAnswerOverride` is set during routing. TASK-665 (ported from dev) added a one-shot first-OT-message handling note in `processOT()` to document the intentional drift during the first frame after boot.
 
 ### Flame Detection Bug Fix (v1.3.5, commit d85e668c)
 
