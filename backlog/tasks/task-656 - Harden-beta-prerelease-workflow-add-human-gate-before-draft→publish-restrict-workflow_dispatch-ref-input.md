@@ -3,9 +3,11 @@ id: TASK-656
 title: >-
   Harden beta-prerelease workflow: add human-gate before draft→publish +
   restrict workflow_dispatch ref input
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 05:51'
+updated_date: '2026-05-22 06:24'
 labels:
   - ci
   - security
