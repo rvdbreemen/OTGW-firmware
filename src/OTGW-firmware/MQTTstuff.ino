@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.52
+**  Version  : v2.0.0-alpha.53
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -941,9 +941,27 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
             addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
           } else if (pOtType == s_reset) {
-            //hardware PIC reset - payload is ignored (resetOTGW() self-guards on PIC/platform)
-            MQTTDebugf(PSTR(" found command: resetgateway - resetting PIC\r\n"));
-            resetOTGW();
+            // TASK-669 (port of dev TASK-661): payload validation + rate-limit.
+            // Hardware PIC reset is disruptive (interrupts any in-flight OT
+            // command); the older code ignored payload entirely. Match the
+            // HA-discovery payload_press="1" already published by the button
+            // entity, and rate-limit to one reset per RESETGATEWAY_COOLDOWN_MS
+            // to absorb storms from misconfigured automations.
+            if (strcmp_P(msgPayload, PSTR("1")) != 0) {
+              MQTTDebugf(PSTR(" command: resetgateway - ignored, payload [%s] != \"1\"\r\n"), msgPayload);
+            } else {
+              static uint32_t lastResetMs = 0;
+              const uint32_t RESETGATEWAY_COOLDOWN_MS = 5000;
+              uint32_t now = millis();
+              if (lastResetMs != 0 && (uint32_t)(now - lastResetMs) < RESETGATEWAY_COOLDOWN_MS) {
+                MQTTDebugf(PSTR(" command: resetgateway - rate-limited (%lu ms cooldown remaining)\r\n"),
+                           (unsigned long)(RESETGATEWAY_COOLDOWN_MS - (now - lastResetMs)));
+              } else {
+                lastResetMs = now;
+                MQTTDebugf(PSTR(" found command: resetgateway - resetting PIC\r\n"));
+                resetOTGW();
+              }
+            }
           } else {
             //all other commands are <otgwcmd>=<payload message>
             // Copy command string from Flash to temp buffer for snprintf

@@ -14,6 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - **`settings.sat.iBleInterval` semantics** (TASK-494). Repurposed from "BLE scan rate" to "publish/state-update cadence". The BLE radio scans continuously on ESP32 since this release; existing user configs continue to load and round-trip cleanly. WebUI tooltip updated.
+- **MQTT `resetgateway` command** now requires payload `"1"` (matching the HA-discovery `payload_press` value already shipped) and is rate-limited to one PIC reset per 5 seconds. Non-matching payloads are logged and ignored; rapid retries inside the cooldown window are silently dropped with a log line. Closes the unauthenticated-LAN reset-storm path raised by the dev review (TASK-668, port of dev TASK-661).
 
 ### Fixed
 

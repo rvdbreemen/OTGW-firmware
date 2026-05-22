@@ -67,7 +67,7 @@ Discovery configs are **retained** on the broker (the firmware also actively re-
 | Nothing in the Inbox | Prefix mismatch — confirm `settings.mqtt.sHaprefix` equals openHAB's HA discovery base topic. Verify configs exist: `mosquitto_sub -v -t '<haprefix>/#'`. |
 | Thing appears but Channels are offline | Availability topic not seen. Check the device's LWT/birth topic is publishing `online` (see `MQTT_LWT.md`). |
 | Some entities missing | Those entities not yet seen on the OpenTherm bus (JIT discovery) — they appear once their MsgID is received. Or the entity uses a construct outside openHAB's supported subset. |
-| Stale Things after a topic-shape change | Clear zombie/orphan retained configs as documented in `docs/api/MQTT.md` (migration notes), then republish. |
+| Stale Things after a topic-shape change | Clear zombie/orphan retained configs as documented in [`docs/api/MQTT.md` — Migration note (2.0.0 topic-shape transition)](../api/MQTT.md#migration-note-200-topic-shape-transition), then republish. |
 
 ## Related
 

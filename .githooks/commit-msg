@@ -1,74 +1,116 @@
 #!/bin/sh
-# Git commit-msg hook — guard against TASK-NNN references without a tracked
-# task record.
+# Git commit-msg hook (OTGW dev) — two enforcement passes:
 #
-# Why: on 2026-05-01 we landed three batch commits (83e0a72e/cbf713f9/e13e34b3)
-# whose messages reference TASK-500/501/502 while the corresponding markdown
-# files in backlog/tasks/ never made it into git. The Backlog MCP server
-# writes the task file to disk on task_create/task_complete, but `git add`
-# is the human's responsibility — easy to forget.
+# 1. If the commit touches firmware (src/OTGW-firmware/, src/libraries/) or
+#    docs/backlog markdown (docs/, backlog/), require the subject to reference
+#    a TASK-NNN identifier OR an explicit exemption tag.
 #
-# This hook fails the commit if its message names TASK-NNN identifiers that
-# are not present in the index (tracked at HEAD or staged) under
-# backlog/tasks/task-NNN-*.md. Forces the markdown record to ride along
-# with whatever code change references it.
+# 2. If any TASK-NNN is referenced in the message, require the corresponding
+#    backlog/tasks/task-NNN-*.md file to be tracked or staged.
 #
-# Install (one-time per clone):
-#   git config core.hooksPath .githooks
+# Why: CLAUDE.md policy is "every piece of work must have a backlog task before
+# any code is written. No exceptions." Audit on 2026-05-21 (TASK-653) showed
+# ~70% of dev commits in the v1.5.0..1.6.0-beta.16 window lacked a TASK-NNN
+# reference. The 2.0.0 worktree already enforces pass (2) but not pass (1).
 #
-# Bypass (rare, document why):
-#   git commit --no-verify
+# Install (one-time per clone): git config core.hooksPath .githooks
+# Bypass for one commit:         git commit --no-verify
+#                                OR: OTGW_TASK_HOOK_DISABLE=1 git commit ...
+# Exemption tags (in subject):   [no-task], chore(housekeeping|release|meta|daily-report):
+
+set -e
 
 msg_file="$1"
 if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
     exit 0
 fi
 
-# Strip comment lines (#-prefixed scissor + git's own comments) before scanning,
-# so commented-out TASK references in the editor template don't trigger.
-msg=$(grep -v '^#' "$msg_file")
+if [ "${OTGW_TASK_HOOK_DISABLE:-0}" = "1" ]; then
+    echo "[task-hook] disabled for this commit (OTGW_TASK_HOOK_DISABLE=1)" >&2
+    exit 0
+fi
+
+# Strip the diff scissor section and comment lines so a commented TASK ref in
+# the editor template doesn't trigger pass (2).
+msg=$(sed -n '/^# ------------------------ >8 ------------------------$/q;p' "$msg_file" | grep -v '^#')
+
+# --- Pass 1: require TASK-NNN for firmware/docs commits ---------------------
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)
+trigger=$(printf '%s\n' "$staged" | awk '
+  /^src\/OTGW-firmware\// { print; next }
+  /^src\/libraries\// { print; next }
+  /^docs\// { print; next }
+  /^backlog\// { print; next }
+')
+
+exempt=0
+case "$msg" in
+  *"[no-task]"*) exempt=1 ;;
+esac
+subject=$(printf '%s\n' "$msg" | head -1)
+case "$subject" in
+  "chore(housekeeping):"*|"chore(release):"*|"chore(meta):"*|"chore(daily-report):"*) exempt=1 ;;
+esac
 
 ids=$(printf '%s' "$msg" \
     | grep -oE '[Tt][Aa][Ss][Kk]-[0-9]+' \
     | tr '[:lower:]' '[:upper:]' \
     | sort -u)
 
-if [ -z "$ids" ]; then
-    exit 0
-fi
-
-missing=""
-for id in $ids; do
-    num=$(printf '%s' "$id" | sed 's/TASK-//')
-    # ls-files lists tracked files in the index (HEAD + staged adds).
-    # Pattern matches both the old `task-NNN.md` and the long descriptive form.
-    matches=$(git ls-files "backlog/tasks/task-${num}.md" "backlog/tasks/task-${num} *.md" "backlog/tasks/task-${num}-*.md" 2>/dev/null)
-    if [ -z "$matches" ]; then
-        missing="$missing $id"
-    fi
-done
-
-if [ -n "$missing" ]; then
+if [ -n "$trigger" ] && [ "$exempt" -eq 0 ] && [ -z "$ids" ]; then
     cat >&2 <<EOF
-commit-msg: blocked — task record(s) not in index for:$missing
+commit-msg: blocked — firmware/docs commit lacks TASK-NNN reference.
 
-The commit message references the task ID(s) above, but no matching
-backlog/tasks/task-NNN-*.md file is tracked or staged.
+Staged paths matching firmware/docs:
+$(printf '%s\n' "$trigger" | sed 's/^/  /')
 
-Fix one of these ways:
-  1. (Most likely) stage the missing record:
-       git add backlog/tasks/task-NNN-*.md
-       git commit --amend --no-edit   # if you want to roll it into THIS commit
-       # or: git commit -m "..."      # for a follow-up commit before retrying
-  2. Create the task first via the Backlog MCP server
-     (mcp__backlog__task_create), which writes the markdown file, then
-     'git add' it.
-  3. If the TASK-NNN reference in the message is unintentional, edit the
-     message to drop it.
+Add a TASK-NNN reference to the subject, e.g.:
+  feat(mqtt): proxy-A routing fix (TASK-626)
 
-To bypass once (e.g. emergency hotfix): git commit --no-verify
+Or use an exemption tag for housekeeping commits:
+  [no-task]                              (anywhere in body)
+  chore(housekeeping): ...               (subject prefix)
+  chore(release): ...                    (subject prefix)
+  chore(meta): ...                       (subject prefix)
+  chore(daily-report): ...               (subject prefix)
+
+Bypass for one commit: git commit --no-verify
 EOF
     exit 1
+fi
+
+# --- Pass 2: TASK-NNN reference must have a staged/tracked task file --------
+
+if [ -n "$ids" ]; then
+    missing=""
+    for id in $ids; do
+        num=$(printf '%s' "$id" | sed 's/TASK-//')
+        matches=$(git ls-files "backlog/tasks/task-${num}.md" "backlog/tasks/task-${num} *.md" "backlog/tasks/task-${num}-*.md" 2>/dev/null)
+        if [ -z "$matches" ]; then
+            missing="$missing $id"
+        fi
+    done
+    if [ -n "$missing" ]; then
+        cat >&2 <<EOF
+commit-msg: blocked — task record(s) not in index for:$missing
+
+The commit references TASK-NNN identifier(s) above, but no matching
+backlog/tasks/task-NNN-*.md file is tracked or staged.
+
+Fix one of these:
+  1. Stage the missing record:
+       git add backlog/tasks/task-NNN-*.md
+       git commit --amend --no-edit
+     (or: git commit -m "..." as a follow-up before retrying)
+  2. Create the task first via 'npx -y backlog.md task create ...', which
+     writes the markdown file, then 'git add' it.
+  3. Drop the unintended TASK-NNN reference from the message.
+
+Bypass once: git commit --no-verify
+EOF
+        exit 1
+    fi
 fi
 
 exit 0
