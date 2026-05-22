@@ -3,9 +3,11 @@ id: TASK-662
 title: >-
   Verify FSexplorer.html / index.html stream correctly from LittleFS (no
   f.readString)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 06:23'
+updated_date: '2026-05-22 06:25'
 labels:
   - verification
 dependencies: []
