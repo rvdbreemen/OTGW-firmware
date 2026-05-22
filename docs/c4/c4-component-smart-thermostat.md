@@ -28,9 +28,10 @@ External inputs arrive via MQTT subscribe commands (`sat/target`, `sat/indoor_te
 - **Window detection**: Pause heating on open-window signal; auto-resume after configurable timeout
 - **CH pressure monitoring**: Exponential moving average smoothing, linear regression drop-rate detection, alarm confirmation with hysteresis
 - **Manufacturer detection**: Auto-identifies boiler brand from OT MsgID 3 slave MemberID (18 manufacturers); applies per-manufacturer quirks (e.g., `SAT_QUIRK_NO_REL_MOD` for Ideal/Nefit/Intergas)
-- **Multi-area temperature** (TASK-25): Accepts temperature inputs for up to 4 independent zones
+- **Multi-area temperature** (TASK-25): Accepts temperature inputs for up to 4 independent zones; DS18B20-to-area mapping persisted via `/api/v2/sat/sensor-areas`
+- **Heating-curve calibration markers** (TASK-586): Up to 20 (outside, flow) markers persisted to `/sat_markers.json` and rendered on the SAT dashboard for empirical curve tuning
 - **PID state persistence**: Saves last error, integral, and derivative to LittleFS; restores on restart to avoid cold-start integral reset
-- **BLE temperature sensing** (ESP32 only, `SATble.ino`): Passive BLE advertisement scanning for Bluetooth temperature sensors
+- **BLE temperature sensing** (ESP32 only, `SATble.ino`): Continuous NimBLE-Arduino 2.x passive scanning (ADR-092, TASK-487/488/494). Settings-backed roster of up to 8 MACs; self-discovering with labels, auto-select, and HA discovery propagation (TASK-508)
 
 ## Code Modules
 
@@ -74,6 +75,10 @@ External inputs arrive via MQTT subscribe commands (`sat/target`, `sat/indoor_te
   - `POST /api/v2/sat/preset` — apply preset
   - `POST /api/v2/sat/reset_integral` — reset PID integral
   - `POST /api/v2/sat/settings/<name>` — update individual SAT settings field
+  - `GET|POST|DELETE /api/v2/sat/markers[/<id>]` — heating-curve calibration markers (TASK-586)
+  - `GET|PATCH /api/v2/sat/sensor-areas` — DS18B20 multi-area mapping (Task #25)
+  - `GET /api/v2/sat/weather/needs-setup` — frontend gate for weather onboarding
+  - `GET /api/v2/sat/ble/discovery`, `POST /api/v2/sat/ble/{select,label,forget}` — BLE roster management (ESP32 only)
 
 ### SAT State Output (MQTT)
 
@@ -105,9 +110,9 @@ External inputs arrive via MQTT subscribe commands (`sat/target`, `sat/indoor_te
 
 ### External Systems
 
-- **LittleFS**: `/pid_state.json` — PID state persistence across restarts
-- **Weather API** (`SATweather.ino`): External HTTP call to fetch outdoor temperature when not provided via MQTT or OT MsgID 27
-- **BLE stack** (ESP32 only, `SATble.ino`): Passive BLE advertisement scanning for Bluetooth temperature sensors
+- **LittleFS**: `/pid_state.json` (PID state across restarts), `/sat_markers.json` (calibration markers, TASK-586)
+- **Open-Meteo API** (`SATweather.ino`): Free HTTP weather service (no API key); fetched for outdoor temperature + 24-hour forecast when not provided via MQTT or OT MsgID 27. ESP8266 fetches a minimal 5-field projection; ESP32 fetches the full thermal data set.
+- **NimBLE-Arduino 2.x** (ESP32 only, `SATble.ino`, ADR-092): Continuous passive BLE scanning, callback-only mode, roster-backed by settings
 
 ## Component Diagram
 

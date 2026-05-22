@@ -74,6 +74,8 @@ Open the OTGW-firmware web UI and go to the Settings page. The MQTT section has 
 | HA Discovery Prefix | `homeassistant` | Must match the discovery prefix in HA MQTT integration |
 | Device Manufacturer | `NodoShop` | Shown in the HA device info block. Editable. |
 | Device Model | `OTGW` | Shown in the HA device info block. Editable. |
+| Separate Sources | off | When on, publishes per-source sibling topics (`<topic>_thermostat` and `<topic>_boiler`) alongside the canonical topic (ADR-097). The canonical entity is always kept. |
+| Use Legacy OT Topics | off | When off (default), publishes the new self-describing binary_sensor labels. When on, publishes the legacy OT-spec labels instead. Mutually exclusive: never both at the same time. See section 4.4. |
 
 The manufacturer and model are now configurable so the same firmware can be labelled correctly when it runs on different hardware variants (classic NodoShop OTGW, ESP32 OT-Shield, etc.). These values appear in Home Assistant under Settings > Devices and Services > MQTT > OTGW. As a small nod to the origin of the project, a separate `otgw-pic/designer` topic is always published with the value `Schelte Bron`, to credit the original PIC firmware author.
 
@@ -123,6 +125,30 @@ The firmware publishes a birth/last-will message at the root of the publish name
 OTGW/value/otgw-AABBCCDDEEFF   →  "online"  (retained, published on connect)
 OTGW/value/otgw-AABBCCDDEEFF   →  "offline" (retained, last will on disconnect)
 ```
+
+Since 2.0.0 this topic is owned exclusively by the MQTT birth/LWT mechanism. HA entity availability tracks the ESP-to-broker link only; an idle OpenTherm bus no longer makes all HA entities flap to `unavailable`. The OT-bus liveness is exposed separately under `otgw_connected` (ADR-102).
+
+#### Topic-naming mode (new in 2.0.0, breaking)
+
+Per ADR-106, 37 binary_sensor labels were renamed to self-describing names by default. Examples:
+
+| Legacy label (pre-2.0.0) | New default label |
+|---|---|
+| `dhw_present` | `supports_hot_water` |
+| `cooling_config` | `supports_cooling` |
+| `fault` | `fault_indication` |
+| `centralheating` | `central_heating` |
+| `domestichotwater` | `hot_water` |
+| `vh_bypass_position` | `ventilation_bypass_position` |
+| `solar_storage_slave_fault_indicator` | `solar_storage_fault` |
+
+The full mapping is in ADR-105 (Categories A, B, C). The new names match Home Assistant core's `opentherm_gw` integration where possible, so automations carry over without rewriting.
+
+To restore the legacy labels, enable `Use Legacy OT Topics` in the MQTT settings (`MQTTuseLegacyOtTopics` on disk, `mqttuselegacyottopics` over REST). The two modes are mutually exclusive: the firmware never publishes both the new and the legacy label for the same bit. When you flip the toggle, the firmware drains the retained discovery configs from the other mode in the background so the broker stays tidy.
+
+On a fresh upgrade from a pre-ADR-106 build, 37 stale retained legacy discovery configs may linger on your broker until you either (a) toggle `Use Legacy OT Topics` once and back, or (b) manually purge them with `mosquitto_pub -t '<haPrefix>/binary_sensor/<gw>/<legacy_label>/config' -n -r`. HA entities for the old names show as `unavailable` until cleaned up.
+
+The 21 binary_sensor labels without an alias (`flame`, `cooling`, `low_water_pressure`, `air_pressure_fault`, `electric_production`, master-side enable bits, etc.) are unaffected and always publish under their existing name.
 
 ---
 
@@ -183,12 +209,14 @@ The streaming functions (`streamSensorDiscovery`, `streamBinarySensorDiscovery`,
 
 The legacy `mqttha.cfg` file that earlier versions stored on LittleFS is no longer used at runtime. It has been archived to `docs/archive/mqttha.cfg` as a reference for the original template layout only.
 
-#### Bitmap-driven drip publisher
+#### Bitmap-driven drip publisher (JIT, ADR-100)
 
-Discovery is incremental. A 256-bit "done" bitmap tracks which OpenTherm message IDs have already had their discovery entities published. Two entry points drive the pipeline:
+Discovery is incremental and just-in-time. A 256-bit "done" bitmap tracks which OpenTherm message IDs have already had their discovery entities published. Two entry points drive the pipeline:
 
-- `doAutoConfigure()` clears the bitmap and streams all entities in one pass. Used on boot, on a manual force, and whenever Home Assistant itself restarts.
-- `doAutoConfigureMsgid(OTid)` publishes only the discovery entries that belong to one OpenTherm message ID, and only if the bitmap shows that ID has not yet been done. It is called opportunistically as OT traffic flows by, so the discovery set for a given boiler is built up naturally as messages are observed.
+- `doAutoConfigure()` is reserved for the explicit force path (telnet `F`, REST `POST /api/v2/otgw/discovery`). It marks every OT id pending and streams them all.
+- `doAutoConfigureMsgid(OTid)` runs opportunistically: each time an OpenTherm message of a given id arrives on the bus, the corresponding discovery entries are streamed once, then the bitmap bit is set so the same id never re-publishes. This means the discovery set for a given boiler is built up naturally as messages are observed, rather than dumping all 256 possible ids at boot.
+
+At boot the firmware queues only the non-OT entities (climate + DHW, outside-temperature override number, Dallas sensors, heap stats); the OT data sensors appear in HA as their MsgIDs are first seen.
 
 Two pseudo-IDs are used to hang non-OT entities off the bitmap:
 
@@ -203,12 +231,14 @@ Every `stream*Discovery` function checks free heap (`STREAM_HEAP_MIN = 4000` byt
 
 #### Re-discovery triggers
 
-The firmware re-publishes all discovery configurations in two situations:
+The firmware re-publishes discovery configurations in these situations:
 
-1. **Firmware boot or MQTT settings change.** The bitmap is cleared and `doAutoConfigure()` streams every entity.
-2. **Home Assistant restart.** The firmware monitors `homeassistant/status`. When HA comes back online, `doAutoConfigure()` is called again.
+1. **Firmware boot.** The bitmap is cleared and the non-OT configs are queued immediately. OT configs publish JIT as MsgIDs arrive.
+2. **Top Topic changed.** Same as boot.
+3. **MQTT reconnect after > 5 minutes offline (broker-restart heuristic).** Treated as a probable broker restart: bitmaps are cleared and non-OT configs are queued again; OT configs publish JIT as MsgIDs arrive. A short reconnect (≤ 5 minutes) does nothing, because the broker has retained the discovery configs.
+4. **Manual force.** Telnet `F` or `POST /api/v2/otgw/discovery` marks every OT id pending so the full set re-streams.
 
-On a simple MQTT reconnect (for example a brief network interruption) discovery is *not* re-run. The broker retains the discovery messages, so re-publishing on every reconnect would be unnecessary.
+Home Assistant restart (`homeassistant/status → online`) no longer triggers a re-publish on its own. The broker retains the discovery messages, so HA picks them up directly from retained state.
 
 #### Forcing a full rediscovery
 
@@ -263,6 +293,20 @@ If SAT is enabled, the thermostat climate is the SAT-driven one and supports mod
 #### Number Entity
 
 A number entity is published for the outside-temperature override, letting HA push a value as if it came from a wired outdoor sensor.
+
+#### Button Entity (PIC reset)
+
+A `button` entity called `resetgateway` is published under pseudo-ID 244 with `entity_category: config` and `payload_press: "1"`. Pressing it from the HA dashboard hardware-resets the PIC over its reset pin. To avoid storms from misconfigured automations the firmware now requires the exact payload `"1"` and applies a 5-second cooldown between successive resets; any other payload is silently ignored.
+
+#### BLE Sensor Entities (ESP32 only, new in 2.0.0)
+
+When BLE is enabled on ESP32 hardware, each first-seen sensor is published as its own HA device with four sensor entities (temperature, humidity, battery, RSSI). Per-sensor state topics are published under:
+
+```
+OTGW/value/<uniqueId>/sat/ble/<mac>/{temp,rh,bat,rssi}
+```
+
+The MAC is rendered as 12 lowercase hex characters with no separators (e.g. `a4c138123456`). Discovery is one-shot per MAC per session. The four entities are grouped under a single HA device with `model: "BLE Sensor"` and `via_device: <uniqueId>`.
 
 #### SAT Switches and Select (new in 2.0.0)
 
@@ -358,6 +402,18 @@ action:
       topic: "OTGW/set/otgw-AABBCCDDEEFF/command"
       payload: "TT=21.5"
 ```
+
+#### Hardware-Resetting the PIC
+
+```yaml
+action:
+  - service: mqtt.publish
+    data:
+      topic: "OTGW/set/otgw-AABBCCDDEEFF/resetgateway"
+      payload: "1"
+```
+
+The payload must be exactly `"1"`; any other value is ignored. A 5-second cooldown is applied so repeated triggers are rate-limited to one PIC reset per 5 seconds. This is a no-op on OTGW32 hardware (no PIC). The HA `Reset Gateway` button entity publishes this exact payload automatically.
 
 ---
 

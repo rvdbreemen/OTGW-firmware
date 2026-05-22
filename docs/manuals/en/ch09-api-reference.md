@@ -36,9 +36,11 @@ The device hostname defaults to `otgw.local` (mDNS / LLMNR). Alternatively, use 
 
 Internally, `/api/v2/` requests are dispatched by a static route table `kV2Routes[]` defined in `src/OTGW-firmware/restAPI.ino`. Each top-level resource segment maps to a single handler function:
 
-`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (OTGW32 only), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`.
+`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (OTGW32 only), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`, `discovery`, `debug`, `network`.
 
 Adding a new endpoint is a two-line change: register a handler and add one entry to `kV2Routes[]`. This is why the API is stable across builds: the dispatch surface is small, explicit, and reviewed.
+
+Pre-flight `OPTIONS` requests on any `/api/v2/...` path are handled centrally and return HTTP 204 with the CORS headers required by browser clients.
 
 #### Transport
 
@@ -48,13 +50,11 @@ Adding a new endpoint is a two-line change: register a handler and add one entry
 
 #### Authentication
 
-All POST and PUT requests require HTTP Basic Authentication when an HTTP password is configured in Settings. The username is the device hostname (default `OTGW`). Authentication is checked centrally before any mutation handler runs.
+All POST and PUT requests require HTTP Basic Authentication when an HTTP password is configured in Settings. The username is the device hostname (default `OTGW`). Authentication is checked centrally before any mutation handler runs (ADR-056).
 
-GET endpoints for sensitive data (settings, PIC settings) also require authentication.
+GET endpoints for sensitive data (`/api/v2/settings`, `/api/v2/sat/*`, `/api/v2/debug`) also require authentication. Unauthenticated GET endpoints (health, sensor data, OT values, device info) are intentionally public.
 
-Unauthenticated GET endpoints (health, sensor data, OT values) are intentionally public.
-
-CSRF same-origin validation is enforced for authenticated browser requests: the `Origin`/`Referer` header must match the `Host` header (ADR-054).
+CSRF same-origin validation is enforced for authenticated browser requests: the `Origin`/`Referer` header must match the `Host` header (ADR-054). The same-origin check is paired with HTTP Basic Auth; both must succeed for the mutation to be executed.
 
 #### Error Response Format
 
@@ -78,11 +78,13 @@ HTTP status codes follow RFC 7231. Common error codes:
 | 403 | Forbidden: CSRF check failed |
 | 404 | Not Found: unknown endpoint or resource |
 | 405 | Method Not Allowed |
+| 409 | Conflict: action refused due to state (verification already active, marker quota reached) |
 | 410 | Gone: deprecated API version (v0, v1) |
 | 413 | Request Entity Too Large: command string too long |
-| 414 | URI Too Long |
-| 500 | Internal Server Error |
-| 503 | Service Unavailable: low heap, no OT command interface, etc. |
+| 414 | URI Too Long: request URI exceeds the 50-byte parser buffer |
+| 429 | Too Many Requests: cooldown active (e.g. `/api/v2/discovery/republish`) |
+| 500 | Internal Server Error: low heap (< 4 KB), filesystem write failure |
+| 503 | Service Unavailable: MQTT not connected, no OT command interface, PIC flash in progress |
 
 ---
 
@@ -235,7 +237,13 @@ Returns hardware and platform information. No authentication required.
 
 On OTGW32 hardware: the `otdirectavailable` field is `true`, and additional `otd*` fields are included (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`). On standard ESP8266+PIC builds, only `otdirectavailable: false` is present.
 
-The `otcommandinterface` field is `true` when either a PIC or OT-direct hardware interface is present and active.
+The `otcommandinterface` field is a string identifying the active OT interface: `"PIC"`, `"OT-Direct"`, or `"None"` (compatibility note: earlier releases returned a boolean).
+
+On Ethernet-capable hardware (OTGW32), additional fields surface the wired-link state: `ethernetpresent` (PHY detected), `ethernetlink` (cable plugged in and link up). When the active network mode is `ethernet`, the `ssid` field returns the literal string `"Wired"` and `wifirssi` is reported as `0`. The runtime can fail over between WiFi and Ethernet without a reboot (TASK-581); `networkmode` reflects the currently active transport.
+
+When the device is running in AP-fallback mode (a prerelease-only safety net for unreachable WiFi), `apfallback: true` is included and `ssid` carries the AP SSID.
+
+Additional fields surface MQTT discovery telemetry (`disc_published_topics`, `disc_pending_ids`, `disc_verify_runs`, `disc_republish_triggered`, `disc_last_missing`, `disc_last_orphan`, `disc_last_outcome`) and REST handler timing (`perf_device_info_total_ms`, `perf_settings_total_ms`, `perf_sat_status_total_ms`, …) for ADR-062 and TASK-361 observability.
 
 ##### GET /api/v2/device/time
 
@@ -547,11 +555,58 @@ Returns the current weather data used by the SAT heating curve (outside temperat
 
 Update a named SAT setting. Authentication required.
 
-**Parameters:** `{name}` is the setting name, e.g., `heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `summer_threshold`, `ovp_value`, `ovp_enabled`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, and many more.
+**Parameters:** `{name}` is the setting name. The handler accepts the full SAT setting vocabulary, including:
 
-**Request body:** New value as plain string or JSON `{"value": "..."}`.
+`heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `ovp_value`, `ovp_enabled`, `ovp_start`, `ovp_stop`, `push_setpoint`, `flame_off_offset`, `force_pwm`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `auto_tune`, `auto_tune_rate`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `pwm_auto_switch`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`.
 
-This endpoint mirrors all the MQTT `sat/*` setting commands, providing parity between REST and MQTT configuration.
+**Request body:** New value as plain string or JSON `{"value": "..."}`. The `ovp_start`, `ovp_stop`, and `reset_integral` setting names take no value (the action is implicit).
+
+**Response (HTTP 200):**
+
+```json
+{"status": "ok", "setting": "heating_curve", "value": "1.8"}
+```
+
+Unknown setting names return HTTP 404. This endpoint mirrors the full MQTT `sat/<setting>` command vocabulary, providing parity between REST and MQTT configuration.
+
+##### GET / POST / DELETE /api/v2/sat/markers
+
+Manage user-placed heating-curve calibration markers (TASK-586). Markers are persisted in `/sat_markers.json` on LittleFS. The web UI renders them as anchor points on the heating-curve graph.
+
+- **GET** returns the marker array (or `[]` when no markers exist).
+- **POST** appends a marker. Body: `{"outside_temp": 5.0, "flow_temp": 55.0, "label": "optional text"}`. `outside_temp` must lie in -15..25, `flow_temp` in 10..90. Returns HTTP 201 with `{"id": N}`. Maximum 20 markers; further `POST` returns HTTP 409.
+- **DELETE** `/api/v2/sat/markers/{id}` removes the marker with the given integer id.
+
+##### GET / PATCH /api/v2/sat/sensor-areas
+
+Manage the DS18B20-to-SAT-area mapping for multi-area mode (TASK-587). Each of four areas (`0..3`) can be bound to a Dallas sensor by its 16-character ROM address.
+
+- **GET** returns the current mapping:
+  ```json
+  {"areas":[{"index":0,"sensor":"28FF64D1841703F1"},{"index":1,"sensor":""},{"index":2,"sensor":""},{"index":3,"sensor":""}]}
+  ```
+- **PATCH** (or POST / PUT) updates one mapping. Body: `{"area": 0, "sensor": "28FF64D1841703F1"}`. An empty `sensor` string clears the slot. The 16-character ROM address must be hex; non-hex returns HTTP 400.
+
+##### GET /api/v2/sat/weather
+
+Returns the current weather data used by the SAT heating curve (Open-Meteo source).
+
+##### GET /api/v2/sat/weather/needs-setup
+
+Reports whether the SAT weather onboarding wizard should be shown. Returns `{"needs_setup": true|false, "has_key": true|false}`. The flag becomes `true` after the 5-minute startup grace window if neither OT MsgID 27 (outside temperature) nor a valid weather record is available (TASK-511).
+
+##### SAT BLE roster (ESP32 only)
+
+The BLE roster surfaces nearby BLE temperature sensors discovered by the ESP32-S3 radio and lets the user promote one to the active room-temperature source (TASK-508).
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v2/sat/ble/discovery` | Stream the current roster as JSON (MAC, RSSI, label, last seen). |
+| POST | `/api/v2/sat/ble/select` | Body `{"mac": "AA:BB:CC:DD:EE:FF"}` — promote the roster entry to the active SAT BLE sensor. |
+| POST | `/api/v2/sat/ble/label` | Body `{"mac": "AA:BB:CC:DD:EE:FF", "label": "Living room"}` — set the persistent label for a roster slot. |
+| POST or DELETE | `/api/v2/sat/ble/forget` | Body `{"mac": "AA:BB:CC:DD:EE:FF"}` — drop the slot and clean up its HA discovery entries. |
+
+All four endpoints return HTTP 404 when the supplied MAC is not in the roster. These endpoints are not present on ESP8266 builds (route returns 404).
 
 ---
 
@@ -592,13 +647,15 @@ Set OTDirect operating mode.
 
 **Query parameter:** `mode=gateway|monitor|bypass|master|loopback`
 
-| Mode | Description |
-|------|-------------|
-| `gateway` | Full gateway: scheduler + thermostat forwarding + overrides (default) |
-| `monitor` | Transparent pass-through: all frames forwarded unmodified |
-| `bypass` | Thermostat wired directly to boiler via relay; OTDirect inactive |
-| `master` | Standalone OT master: scheduler only, no thermostat expected |
-| `loopback` | Internal test: simulated boiler responses, no hardware needed |
+| Mode | PIC code | Description |
+|------|----------|-------------|
+| `gateway` | `GW=1` | Full gateway: scheduler + thermostat forwarding + overrides (default) |
+| `monitor` | `GW=0` | Transparent pass-through: all frames forwarded unmodified (PIC parity, TASK-438) |
+| `bypass` | `GW=P` | Thermostat wired directly to boiler via relay; OTDirect inactive |
+| `master` | `GW=S` | Standalone OT master: scheduler only, no thermostat expected |
+| `loopback` | `GW=L` | Internal test: simulated boiler responses, no hardware needed |
+
+Note (TASK-438): `monitor` is now mapped to `GW=0` for parity with PIC firmware conventions. The pre-2.0 mapping that used `GW=0` for bypass has been moved to the `GW=P` alias.
 
 ##### GET /api/v2/otdirect/settings
 
@@ -684,6 +741,71 @@ Returns a listing of all files in LittleFS with sizes.
 ##### GET /api/v2/filesystem/hash-check
 
 Returns the filesystem content hash compared to the firmware hash. Used to detect mismatches after a firmware-only OTA update.
+
+---
+
+#### MQTT Discovery Verification (ADR-062)
+
+These endpoints expose the bitmap-driven discovery publisher and its verification window. They are the runtime contract used by the web UI Maintenance page and by Home Assistant integration scripts.
+
+##### GET /api/v2/discovery
+
+Returns the current discovery state and counters.
+
+```json
+{
+  "verification": {
+    "active": false,
+    "last_epoch": 1774548600,
+    "last_missing": 0,
+    "last_orphan": 0,
+    "last_outcome": "clean"
+  },
+  "counters": {
+    "published_topics": 217,
+    "pending_ids": 0,
+    "verify_runs": 4,
+    "republish_triggered": 1
+  },
+  "settings": {
+    "auto_verify": true
+  }
+}
+```
+
+`last_outcome` is one of `clean`, `missing`, `aborted_heap`, `aborted_disconnect`, `unknown`.
+
+##### POST /api/v2/discovery/verify
+
+Starts a verification window. The firmware subscribes to its own discovery prefix, counts retained config topics, and reports `missing` and `orphan` totals. Authentication required.
+
+Refused with HTTP 503 when MQTT is disconnected or free heap is below the verification threshold. Refused with HTTP 409 when a verification window is already active or when the drip publisher still has pending IDs. Returns HTTP 202 on success with `{"status":"verification_started","expected":N,"window_ms":15000}`.
+
+##### POST /api/v2/discovery/republish
+
+Marks every discovery topic pending for the drip publisher. Authentication required.
+
+Subject to a 60-second cooldown to prevent the drip queue being held permanently non-empty (TASK-356). Successive invocations within the cooldown return HTTP 429 with the remaining seconds. Returns HTTP 200 with `{"status":"marked_pending","count":N}` on success.
+
+#### Debug Dump
+
+##### GET /api/v2/debug
+
+Returns a single flat JSON object summarising build identity, runtime state, settings, MQTT state, OT bus state, heap and discovery counters, SAT runtime, and OTDirect runtime where applicable. Authentication required.
+
+This is the primary diagnostic snapshot used when filing issues; the field set is intentionally broad and not part of the public contract — fields may be added in any release. Sensitive values (`http_passwd`, `mqtt.passwd`, `sat.weather_key`) are masked to `"***"` when set.
+
+#### Network
+
+##### GET /api/v2/network/scan
+
+Initiates and polls an asynchronous WiFi scan (TASK-585). Used by the Settings page WiFi-picker.
+
+- First call: starts the scan and returns `{"status":"scanning"}`.
+- Subsequent calls while the scan is in progress: returns `{"status":"scanning"}`.
+- After the scan completes: returns `{"status":"ready","count":N,"networks":[...]}` once. Each `networks` entry is `{"ssid":"...", "rssi":-60, "channel":6, "secured":true, "connected":true}`.
+
+Refused with HTTP 503 while a PIC flash operation is in progress (the radio cannot share CPU). The scan buffer is released after the result is served.
 
 ---
 
@@ -776,6 +898,8 @@ When SAT is active, state change events are broadcast on significant transitions
 #### Reconnection Behavior
 
 The browser SPA implements automatic reconnection with a 3-second delay after disconnection. If the device reboots, the browser detects the close event and reconnects when the device comes back online. There is no message history; the stream is live-only.
+
+The SPA hardens the reconnect against re-entry of `initOTLogWebSocket()` so a fast page reload cannot leak duplicate WebSocket clients on the firmware (TASK-563).
 
 #### Heap Backpressure
 
@@ -921,15 +1045,26 @@ The exact set of published topics depends on which message IDs your boiler and t
 
 ##### Source-Separated Topics (Optional)
 
-When `mqttseparatesources` is enabled:
+When `mqttseparatesources` is enabled, OpenTherm values are additionally published with a sibling-suffix shape (ADR-097):
 
 ```
-{TopTopic}/value/{UniqueId}/{label}/thermostat   <-- thermostat-side value (T-prefix frame)
-{TopTopic}/value/{UniqueId}/{label}/boiler       <-- boiler-side value (B-prefix frame)
-{TopTopic}/value/{UniqueId}/{label}/gateway      <-- gateway-injected value (A-prefix frame)
+{TopTopic}/value/{UniqueId}/{label}_thermostat   <-- thermostat-side value (T-prefix frame)
+{TopTopic}/value/{UniqueId}/{label}_boiler       <-- boiler-side value (B-prefix frame)
+{TopTopic}/value/{UniqueId}/{label}_gateway      <-- gateway-injected value (R-prefix frame)
+{TopTopic}/value/{UniqueId}/{label}_answer       <-- proxy/answer (A-prefix frame)
 ```
 
-This allows Home Assistant automations to distinguish between what the thermostat requested and what the boiler confirmed.
+Sibling-suffix names (`<label>_<source>`) replace the older subtopic shape so HA-discovery `state_topic` regex stays anchored to a single segment. Proxy answers (A-prefix) are routed to `_answer`, not collapsed onto `_thermostat`, per ADR-103.
+
+This allows Home Assistant automations to distinguish between what the thermostat requested, what the boiler confirmed, and what the gateway injected.
+
+##### Self-Describing Topic Names (ADR-106, default in 2.0.0)
+
+Released 2.0.0 firmware publishes OpenTherm values under self-describing topic names: each label conveys its OT semantic role and unit in the topic itself (for example, `tboiler_c`, `controlsetpoint_c`, `chmodus`, `flame_status`). The legacy short names from the 1.4.x line (`boilertemperature`, `controlsetpoint`, …) remain available via the toggle `settings.mqtt.bUseLegacyOtTopics = true` for users who cannot migrate dashboards or automations. This is a breaking change for fresh installs; the toggle is the supported downgrade path.
+
+##### HA-Core Alias Topics (ADR-105, opt-in)
+
+When `settings.mqtt.bHaCoreAliasEnable` is `true`, 37 additional topic aliases are published under names that match the Home Assistant Core `opentherm_gw` integration. This gives users migrating from the HA-Core integration drop-in compatibility for existing automations. The aliases are pure mirrors; firmware-side semantics remain unchanged.
 
 ##### S0 Pulse Counter
 
@@ -1013,9 +1148,23 @@ Publish a plain text payload to these topics. This table is a quick reference fo
 | `chenable` | `"1"` / `"0"` | `CH=1` / `CH=0` | Central heating enable bit |
 | `coolingenable` | `"1"` / `"0"` | `CE=1` / `CE=0` | Cooling enable bit |
 | `summermode` | `"1"` / `"0"` | `SM=1` / `SM=0` | Summer mode (persisted to flash) |
+| `outside_temp` | `"8.0"` | `OT=8.0` | Outside temperature override (alias of `outside`) |
+| `setback` | `"15.0"` | `SB=15.0` | Setback temperature override |
+| `ventsetpt` | `"50"` | `VS=50` | Ventilation setpoint |
+| `temperaturesensor` | `"O"` / `"R"` | `TS=O` / `TS=R` | Temperature sensor function (outside / return) |
+| `addalternative` | `"34"` | `AA=34` | Add OT MsgID to alternative-request rotation |
+| `delalternative` | `"34"` | `DA=34` | Remove OT MsgID from alternative-request rotation |
+| `unknownid` / `knownid` | `"34"` | `UI=34` / `KI=34` | Mark MsgID as unknown / known |
+| `priomsg` | `"5"` | `PM=5` | Set priority message |
+| `setresponse` | `"34:0000"` | `SR=34:0000` | Set stored response |
+| `clearrespons` | `"34"` | `CR=34` | Clear stored response |
+| `resetcounter` | `"H"` | `RS=H` | Reset PIC counter (`H`, `T`, `B`, `M`, `S`) |
+| `gpioa` / `gpiob` | `"0".."7"` | `GA=…` / `GB=…` | Set GPIO A / B function |
+| `leda`..`ledf` | letter | `LA=…`..`LF=…` | Set LED A..F function (B/C/E/F/H/M/O/P/R/T/W/X) |
+| `resetgateway` | (ignored) | hardware reset | Hardware-reset the PIC (payload ignored) |
 | `command` | `"TT=21.50"` | (raw) | Raw OTGW command passthrough |
 
-Note: Commands are only processed when an OT command interface (PIC or OTDirect) is detected. If no interface is available, MQTT commands are silently ignored with a debug log message.
+Note: Commands are only processed when an OT command interface (PIC or OTDirect) is detected. If no interface is available, MQTT commands are surfaced in the default debug stream and discarded (no longer silently dropped, per change set commit 5571d9b7).
 
 ##### SAT Command Topics
 
@@ -1057,23 +1206,30 @@ When `mqtthadiscovery` is enabled, the firmware publishes MQTT discovery payload
 
 Discovery uses an async bitmap-driven drip publisher. Instead of sending all 200+ entity configurations in a burst, the firmware:
 
-1. Marks all message IDs as "pending" in a bitmap.
+1. Marks message IDs as "pending" in a bitmap.
 2. From the main loop, publishes one discovery message per interval (typically 2 seconds).
 3. When free heap drops below 8000 bytes, the interval slows down to reduce memory pressure.
 4. When heap recovers, the interval returns to normal.
 
-This approach prevents heap exhaustion and MQTT broker flooding that could occur with bulk discovery. A full discovery cycle takes approximately 6-8 minutes at normal pace.
+This approach prevents heap exhaustion and MQTT broker flooding that could occur with bulk discovery.
+
+##### Just-in-time discovery (TASK-578)
+
+The 2.0.0 firmware publishes OT-value discovery configs only when the corresponding MsgID has been observed at least once on the bus. The drip publisher walks all known IDs, but only adds an ID to the pending bitmap after `msglastupdated[id]` has been set. This eliminates the previous behaviour of advertising entities for MsgIDs that the boiler never exchanges, keeping the HA entity list aligned with what the device actually reports.
 
 Discovery is triggered:
-- On firmware boot or MQTT settings change (all IDs marked pending for drip publish).
-- When `POST /api/v2/otgw/discovery` is called (all IDs marked pending).
-- When Home Assistant sends `"online"` to `homeassistant/status` after being offline (all IDs marked pending).
+- On firmware boot or MQTT settings change (all eligible IDs marked pending).
+- When `POST /api/v2/otgw/discovery` or `POST /api/v2/discovery/republish` is called (all eligible IDs marked pending).
+- When Home Assistant sends `"online"` to `homeassistant/status` after being offline (all eligible IDs marked pending), provided the broker-restart heuristic (ADR-100) has not also signalled a session loss.
+- When a new MsgID is observed for the first time after boot (single-ID JIT publish).
 
-**Integration note:** After triggering a discovery republish, entities appear in Home Assistant gradually over several minutes as the drip publisher works through the pending bitmap. This is normal behavior, not an error.
+**Integration note:** After triggering a discovery republish, entities appear in Home Assistant gradually over several minutes as the drip publisher works through the pending bitmap. This is normal behaviour, not an error.
 
-Discovery payloads include device metadata, entity names, unit of measurement, device class, and state topics. The firmware creates approximately 200+ entities covering all sensors, binary sensors, and a climate entity for SAT.
+Discovery payloads include device metadata, entity names, unit of measurement, device class, state topics, and an availability topic. The `availability` reference is bound to the MQTT-client link (ADR-102), not to OT-bus liveness; HA marks entities `unavailable` only when the firmware is genuinely off-broker.
 
-Discovery templates are now compiled into PROGMEM (flash memory) at build time from the `mqttha.cfg` file, eliminating LittleFS I/O during discovery publishing.
+Discovery templates are compiled into PROGMEM (flash memory) at build time from the `mqttha.cfg` file, eliminating LittleFS I/O during discovery publishing.
+
+Pending-state fan-out for retained sensors (cycle class, flame status, OEM fault code) is no longer throttled by the 250 ms rate-gate (ADR-104); first-seen values reach HA on the first publish loop tick.
 
 ---
 

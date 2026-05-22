@@ -107,6 +107,8 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satautotune` | false | bool | Enable automatic PID gains tuning |
 | `satautotunerate` | 0.02 | 0-1 | Adjustment rate per tuning cycle (2%) |
 
+The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a `+/-20 C` hard safety cap (alpha.28 / alpha.30). Negative accumulation is required in mild weather so the controller can nudge the flow setpoint below the heating curve when the room is slightly above target. The PID integral and raw derivative state are persisted on every save and **warm-started** on the next boot (alpha.32), so a power cycle does not reset to a cold start. `sat/flush` or an explicit `satdisable` clears the persisted state.
+
 #### Advanced control
 
 | Setting | Default | Range | Description |
@@ -228,7 +230,9 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/simulation" -m "
 
 ### 5.9 Weather Integration (Open-Meteo)
 
-SAT can fetch outdoor temperature, humidity, wind speed, and a 24-hour hourly temperature forecast from the Open-Meteo API. This is a free API that requires no API key.
+SAT can fetch outdoor weather data and a 24-hour hourly temperature forecast from the Open-Meteo API. This is a free API that requires no API key.
+
+On ESP32 the firmware requests the full Open-Meteo current-conditions set: temperature, apparent temperature, humidity, wind speed / direction / gusts, cloud cover, sea-level pressure, precipitation / rain / snowfall, sun elevation, WMO weather code, and the `is_day` flag. The hourly arrays include temperature, dew point, cloud cover, and precipitation probability. ESP8266 stays on a minimal 5-field request to fit memory.
 
 Weather data provides:
 - Outdoor temperature for the heating curve (fallback or primary, depending on configuration).
@@ -243,7 +247,7 @@ Weather data provides:
 | `satweatherlon` | 0.0 | -180 to 180 | Longitude |
 | `satweatherinterval` | 900 | 300-3600 s | Poll interval (default 15 min, minimum 5 min) |
 
-The web UI can auto-detect your location using browser geolocation. Weather data is fetched via plain HTTP (no HTTPS).
+The web UI can auto-detect your location using browser geolocation. Weather data is fetched via plain HTTP (no HTTPS). The first fetch is gated 5 minutes after boot so DHCP, NTP, and MQTT have time to settle before the first HTTPS-free Open-Meteo call. The streaming JSON parser is allocation-free (no malloc inside the SAT loop). For debugging, the telnet console accepts `w` to force an immediate fetch + dump (TASK-513).
 
 ---
 
@@ -286,6 +290,8 @@ SAT tracks flame on/off transitions and classifies each completed heating cycle.
 - SHORT_CYCLING: cycle shorter than 60 seconds (indicates boiler cannot modulate low enough).
 - OVERSHOOT: flow temperature exceeded setpoint plus overshoot margin for more than 60 seconds.
 - UNDERHEAT: flow temperature stayed more than 2 C below setpoint for more than 180 seconds.
+
+Since alpha.31, classification uses **tail-window percentiles** (last 180 s on ESP32, 64 s on ESP8266) rather than the full-cycle P90/P10. A cycle that started with overshoot but corrected itself is no longer flagged OVERSHOOT on the strength of its early peak; the full-cycle P90 is still logged alongside for diagnostics.
 
 **Rolling statistics:**
 - Cycles per hour counter (rolling 60-minute window, max 6).
@@ -350,7 +356,13 @@ When enabled, SAT automatically disables heating when the outdoor temperature st
 
 SAT supports up to 4 temperature input areas with configurable weights. The effective room temperature used by the PID controller is the weighted average of all valid, non-stale area temperatures.
 
-Areas are pushed via MQTT:
+Areas can be fed from three independent sources:
+
+1. **MQTT push** to `sat/area/<0..3>`.
+2. **DS18B20 sensor mapping** (TASK-587). A Dallas sensor address (16 hex chars) can be bound to an area in the Settings UI; `pollSensors()` then routes that sensor's reading to `satSetAreaTemp()` automatically. REST endpoints: `GET /api/v2/sat/sensor-areas`, `PATCH /api/v2/sat/sensor-areas`. Persisted as `settings.sat.sSensorArea[0..3]`.
+3. **REST API** `POST /api/v2/sat/area/<n>`.
+
+Example MQTT push:
 ```bash
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/area/0" -m "21.5"
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/area/1" -m "20.8"
@@ -368,7 +380,12 @@ Each area value expires after 5 minutes without an update. Stale areas are exclu
 
 ### 5.15 Multi-Zone PID Control
 
-For homes with multiple independently controlled heating zones (e.g., separate radiator circuits or zone valves), SAT supports up to 4 PID zones. Each zone runs its own PID calculation, and the highest (most demanding) setpoint wins.
+For homes with multiple independently controlled heating zones (e.g., separate radiator circuits or zone valves), SAT supports up to 4 PID zones. Each zone runs its own PID calculation. The zones are aggregated into a single boiler setpoint as follows (alpha.29 / alpha.30):
+
+- **P75 selection**: the per-zone PID outputs are sorted and the 75th-percentile value is picked (ceiling rank). For 4 zones this filters out a single highest-demand outlier instead of letting it dominate.
+- **Headroom**: a fixed offset (`satzoneheadroom`, default 5.0 C) is added to the P75 result, giving the boiler enough margin to satisfy the upper-demand zones.
+- **Overshoot cap**: if any zone is already above its target, the aggregate setpoint is reduced to prevent over-heating compliant zones.
+- Each zone PID uses a symmetric integral clamp `[-curveValue, +curveValue]` so a zone that is slightly above its target can pull its share of the setpoint below the heating curve.
 
 Zones receive their temperature and target via MQTT. Zone 1 always maps to the primary SAT target temperature. Zones 2-4 receive independent targets and temperature inputs.
 
@@ -376,6 +393,7 @@ Zones receive their temperature and target via MQTT. Zone 1 always maps to the p
 |---|---|---|---|
 | `satzonecount` | 1 | 1-4 | Number of active heating zones |
 | `satzonetimeout` | 300 | 60-3600 s | Seconds without update before a zone goes inactive |
+| `satzoneheadroom` | 5.0 | 0-15 C | Headroom added to the P75 zone-aggregate setpoint |
 
 When `satzonecount` is 1 (default), SAT operates in single-zone mode and this feature has no overhead.
 
@@ -383,20 +401,44 @@ When `satzonecount` is 1 (default), SAT operates in single-zone mode and this fe
 
 ### 5.16 BLE Temperature Sensor (ESP32 Only)
 
-On ESP32 builds (OTGW32 / Thermo-Nova), SAT can scan for BLE temperature sensors and use them as room temperature input. Supported sensor formats:
+On ESP32 builds (OTGW32 / Thermo-Nova), SAT scans for BLE temperature sensors and uses one as the room temperature input. The BLE stack is **NimBLE-Arduino** (ADR-092), which replaced Bluedroid in 2.0.0 and frees roughly 400 KB of flash. Supported advertising formats:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC with custom firmware): service data UUID 0x181A. Reports temperature, humidity, and battery level.
-- **BTHome v2**: service data UUID 0xFCD2. Standard BTHome protocol for temperature and humidity sensors.
+- **BTHome v2**: service data UUID 0xFCD2. Standard BTHome protocol for temperature and humidity sensors. Encrypted advertisements are rejected.
 
-Up to 4 BLE sensors can be tracked simultaneously.
+The radio runs a **continuous scan** from boot (TASK-494). Every format-pass advertisement is folded into a persistent 8-slot roster, regardless of whether it is currently selected. The `satbleinterval` setting controls the publish / state-update cadence; it does **not** throttle the radio scan itself.
+
+#### Self-discovering roster (TASK-508)
+
+Open the SAT settings panel in the web UI to see the discovered roster: each entry shows the last temperature, RSSI, and age. Give entries friendly labels ("Living room", "Bedroom"); the active sensor is selected from the roster. Auto-select promotes the single fresh sensor when only one is in range. Labels propagate to Home Assistant via the retained discovery configs (per-MAC entities are created automatically). "Forget" wipes a slot and clears its HA discovery topics with zero-byte retained payloads.
+
+The roster is exposed at:
+
+- `GET /api/v2/sat/ble/discovery` - JSON dump of all roster slots
+- `POST /api/v2/sat/ble/select` `{"mac":"AA:BB:.."}` - promote MAC to active sensor
+- `POST /api/v2/sat/ble/label`  `{"mac":"AA:BB:..","label":"Living room"}` - rename a slot
+- `POST /api/v2/sat/ble/forget` `{"mac":"AA:BB:.."}` - drop slot and clean up HA
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
 | `satbleenable` | false | bool | Enable BLE temperature sensor scanning |
-| `satblemac` | "" | MAC address | Bind to specific sensor (empty = accept all) |
-| `satbleinterval` | 30 | 10-300 s | Scan interval |
+| `satblemac` | "" | MAC address | Active sensor MAC (set via roster select; empty = auto-select first fresh entry) |
+| `satbleinterval` | 30 | 10-300 s | Publish / state-update cadence (NOT scan rate; scan is continuous) |
 
-BLE temperature values expire after 5 minutes without a new advertisement. SAT falls back to MQTT or OT bus values when BLE data is stale.
+#### MQTT topic shape
+
+Per-sensor state is published under the `sat/ble/<mac>/...` subtree (compact MAC, no colons):
+
+| Topic suffix | Payload |
+|---|---|
+| `sat/ble/<mac>/temp` | Temperature (C) |
+| `sat/ble/<mac>/rh` | Relative humidity (%) |
+| `sat/ble/<mac>/bat` | Battery level (%) |
+| `sat/ble/<mac>/rssi` | Signal strength (dBm) |
+
+The legacy `sat/ble_temp` / `sat/ble_humidity` / `sat/ble_sensor_rssi` / `sat/ble_battery` / `sat/ble_sensor_count` / `sat/ble_temp_valid` topics carry the currently-selected sensor's values for backward compatibility.
+
+BLE temperature values expire after 5 minutes without a new advertisement. SAT falls back to MQTT or OT bus values when the selected sensor goes stale.
 
 ---
 
@@ -460,7 +502,16 @@ When MQTT is enabled, SAT entities are automatically discovered by Home Assistan
 
 **Climate entity**: The firmware publishes a thermostat climate entity via HA auto-discovery (`climate.<hostname>_thermostat`). It shows current room temperature, target temperature, and mode. HA-visible modes are `off` and `heat`; the `off` / `heat` mapping is driven by the `thermostat_connected` state of the PIC, so switching heat off in HA releases SAT control. Target temperature bounds follow the HA discovery config: min 12 C, max 28 C, step 0.5 C, precision 0.1 C. Setting the target in HA sends a `TT=` command, which SAT persists to ESP flash. Presets (comfort, eco, away, sleep, home, activity) are pushed through `sat/preset` when configured.
 
+The climate entity also publishes `sat/climate_attributes` (a JSON blob) as the HA `json_attributes_topic` (TASK-594). HA surfaces the SAT operational state as climate-card attributes (mode, PID output, error, curve recommendation, etc.) without requiring template sensors.
+
 A second climate entity (`climate.<hostname>_dhw_control`) exposes DHW setpoint control when the boiler supports it, with modes `off` / `auto` and range 40-60 C.
+
+**TT= and TC= remote-override semantics (TASK-466)**: When `satpushsetpoint` is enabled, SAT pushes its target to the thermostat display using PIC-parity remote-override semantics on OpenTherm MsgID 16 + MsgID 100 (`RemoteOverrideFunction`). The two commands carry different priorities:
+
+- `TT=<v>` -  program-priority override; auto-clears when the thermostat sends three consecutive MsgID 16 frames within 0.25 C of the override, then the next frame differs by more than 0.5 C (typically a scheduled program change).
+- `TC=<v>` -  manual-priority override; persists indefinitely until cleared by `TC=0` or replacement.
+
+Inbound thermostat MsgID 16 frames are observed by the OTDirect state machine; the auto-clear honoredCount is driven from that stream. The current override mode is reflected in the `PR=O` report as `O=T<v>` (TT), `O=C<v>` (TC), or `O=N` (none). Multi-channel set commands (MQTT, REST, web UI, serial) are coalesced by MsgID inside the OTDirect command queue (TASK-494): repeated WRITE_DATA for the same MsgID within one OT cycle collapses to a latest-value-wins single frame on the bus.
 
 **SAT settings entities (Task-81 / Task-284)**: Since 2.0.0, all controllable SAT parameters are exposed as HA entities so the full SAT feature set can be driven from a dashboard without sending raw MQTT messages.
 
@@ -534,9 +585,9 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 
 ### 5.22 Known Limitations
 
-- Not all thermostats report room temperature on OT MsgID 24. If yours does not, use an external sensor pushed via MQTT, REST API, or BLE (ESP32).
+- Not all thermostats report room temperature on OT MsgID 24. If yours does not, use an external sensor pushed via MQTT, REST API, BLE (ESP32), or a DS18B20 sensor mapped to an area.
 - Outdoor temperature (MsgID 27) is rarely exchanged on the bus. An external push, weather API fetch, or REST API push is typically needed.
-- BLE temperature sensor scanning requires an ESP32 build.
+- BLE temperature sensor scanning requires an ESP32 build. The roster holds up to 8 sensors; only one is selected as the active SAT input at a time.
 - SAT controls the flow temperature setpoint, but the wall thermostat still controls whether heating is enabled or disabled.
 - Multi-zone support runs independent PID loops per zone, but SAT controls a single boiler. Individual boiler circuits per zone are not supported.
 - The PIC co-processor holds the last `CS=` setpoint if the ESP fails. Layer 1 (boot safety) corrects this at the next startup.
@@ -566,7 +617,7 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 
 ### 5.24 Debugging and Calibration
 
-**Telnet debug trace.** SAT has its own conditional debug channel. Connect to the OTGW on TCP port 23 and press `5` to toggle SAT control, cycle, and HCR tracing. It is enabled by default in 2.0.0. The complete set of toggles is shown in the telnet welcome banner.
+**Telnet debug trace.** SAT has its own conditional debug channel. Connect to the OTGW on TCP port 23 and press `5` to toggle SAT control / cycle / HCR tracing (default on in 2.0.0), `6` for OTDirect tracing (default on), and `7` for the SAT BLE scan debug stream (per-advertisement summary). The telnet `w` shortcut forces an immediate Open-Meteo fetch + dump. The complete set of toggles is shown in the telnet welcome banner.
 
 **OPV (Overshoot Protection Value) calibration.** SAT can measure the minimum stable boiler setpoint (the point at which the flame stays lit without short-cycling) and use it as a lower clamp. Trigger a calibration run with:
 

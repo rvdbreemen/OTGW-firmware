@@ -17,9 +17,13 @@ Both sub-systems share the same JSON formatting infrastructure (`jsonStuff.ino`)
 
 - **MQTT state machine**: Six-state connection lifecycle (INIT, TRY_CONNECT, CONNECTED, WAIT_ATTEMPT, WAIT_RECONNECT, ERROR) with configurable retry intervals (3s between attempts, 10 minutes after 5 failures)
 - **Chunked MQTT publishing**: Streams payloads in 128-byte RAM chunks or 63-byte PROGMEM chunks via `beginPublish()`/`endPublish()`; never copies full payload into a single buffer
-- **Home Assistant auto-discovery**: Uses PROGMEM lookup tables (`mqttha_progmem.cpp/h`, auto-generated from `mqttha.cfg`) for O(1) discovery config access per OT message ID. Template variables (`%mqtt_pub_topic%`, `%node_id%`, `%version%`, `%source_topic_segment%`, etc.) rendered from PROGMEM string pools. Publishes to `homeassistant/<domain>/<node_id>/<entity>/config`. LittleFS file scan has been eliminated.
-- **Async drip discovery** (ADR-041 + bitmap-driven): `loopMQTTDiscovery()` publishes one pending discovery config per timer tick from the main loop (3s normal, 30s under heap pressure). `MQTTautoCfgPendingMap[8]` bitmap tracks which IDs need publishing. `markAllMQTTConfigPending()` populates the bitmap on MQTT connect or HA restart.
-- **Just-In-Time (JIT) MQTT discovery**: `doAutoConfigureMsgid()` publishes discovery config for a message ID on first OT message arrival, using O(1) PROGMEM index lookup via `mqttHaCfgIndex[256]`
+- **Home Assistant auto-discovery (streaming)**: Data-driven tables in `MQTTHaDiscovery.cpp` plus hardcoded stream functions for climate (pseudo-ID 0), number (pseudo-ID 27), SAT switches / selects, Dallas sensors, and PIC pseudo-ID 244 controls (`streamButtonDiscovery` for `resetgateway`, `streamSelectDiscovery` for GPIO/LED selects). Two-pass `MqttJsonWriter` (MEASURE then WRITE) avoids large discovery buffers. Publishes to `homeassistant/<domain>/<node_id>/<entity>/config`.
+- **Just-In-Time (JIT) MQTT discovery — default** (ADR-100): `doAutoConfigureMsgid()` publishes discovery config for an OT message ID on first arrival via `processOT()`. No discovery is published for OT IDs never seen on the bus — eliminates the 200+ ghost entities of the previous bulk approach.
+- **Drip discovery on broker restart only**: `loopMQTTDiscovery()` is seeded by `markAllMQTTConfigPending()` over OT IDs already observed this session (not the full 256-ID range) when a broker restart is detected; publishes one config per timer tick (3s normal, 30s under heap pressure).
+- **Flat per-value MQTT topics** (ADR-101): Value topics carry plain scalars, never aggregated JSON. Discovery payloads on `homeassistant/.../config` remain JSON — ADR-101 governs the value topic shape only.
+- **Self-describing topic names by default** (ADR-106): `settings.mqtt.bUseLegacyOtTopics=false` (default) publishes self-describing names (e.g. `manufacturer_code`); `=true` reverts to legacy OT-spec-derived names (e.g. `slave_member_id_code`). Mutually exclusive. Toggling arms a cleanup pass that retains-cleans the other set's 37 discovery topics on the broker.
+- **`resetgateway` hardening** (TASK-668): MQTT command only fires on payload `"1"`; cooldown rate-limit prevents accidental rapid PIC resets; both rejection reasons surface in the default debug stream.
+- **Silently-dropped MQTT set commands surface in default debug**: Integration issues are observable without enabling per-module debug flags.
 - **Source-separated MQTT topics**: Optionally publishes each OT message to three sub-topics (`/thermostat`, `/boiler`, `/gateway`) for fine-grained Home Assistant entity mapping
 - **MQTT command dispatch**: Routes incoming `{topTopic}/set/{nodeId}/{command}` payloads to PIC command queue or SAT functions via PROGMEM lookup table
 - **Home Assistant reboot detection**: Subscribes to `homeassistant/status`; re-publishes discovery on HA restart
@@ -95,12 +99,14 @@ Both sub-systems share the same JSON formatting infrastructure (`jsonStuff.ino`)
   - `GET /api/v2/flash/status` — flash memory metrics
   - `GET /api/v2/pic/flash-status|update-check|settings` — PIC firmware status
   - `GET|POST|PUT /api/v2/otgw/otmonitor|messages/{id}|commands|discovery` — OT state and command injection
-  - `GET|POST|PUT /api/v2/sat/*` — SAT status, control, diagnostics
+  - `GET|POST|PUT /api/v2/sat/*` — SAT status, control, diagnostics; plus `markers`, `sensor-areas`, `weather/needs-setup`, `ble/{discovery,select,label,forget}` (ESP32) sub-resources
   - `GET|POST|PUT /api/v2/otdirect/*` — OTDirect mode/settings/overrides (ESP32 only)
   - `GET /api/v2/firmware/files` — OTA firmware file inventory
   - `GET /api/v2/filesystem/files|hash-check` — LittleFS file listing and hash validation
   - `GET|POST|PUT /api/v2/simulate` — OTGW message simulation control
   - `POST|PUT /api/v2/webhook/test` — webhook test trigger
+  - `GET /api/v2/debug` — snapshot of all debug-related flags + local IP (support / bug reports)
+  - `GET /api/v2/network/scan` — WiFi scan for Settings page (TASK-585)
 - **Error format**: `{"error":{"status":N,"message":"..."}}`
 
 ### File Serving Interface
@@ -125,8 +131,8 @@ Both sub-systems share the same JSON formatting infrastructure (`jsonStuff.ino`)
 
 ### External Systems
 
-- **PubSubClient** (nick-o-mathew): MQTT 3.1.1 client library
-- **LittleFS**: `dallas_labels.ini`, `index.html`, `index.js`, `sat.js`, `graph.js`, CSS files, PIC hex files (note: `mqttha.cfg` discovery config has been moved to PROGMEM tables at build time)
+- **PubSubClient** (Nick O'Leary): MQTT 3.1.1 client library
+- **LittleFS**: `dallas_labels.ini`, `/sat_markers.json` (TASK-586), `/pid_state.json`, `index.html`, `index.js`, `sat.js`, `graph.js`, `components.css`, `ds-tokens.css`, PIC hex files. The runtime `mqttha.cfg` template file has been retired — discovery is published from PROGMEM tables in `MQTTHaDiscovery.cpp`.
 - **MQTT Broker**: External broker (Mosquitto, Home Assistant Mosquitto add-on, etc.)
 - **Home Assistant**: Consumes MQTT discovery payloads and published OT telemetry
 

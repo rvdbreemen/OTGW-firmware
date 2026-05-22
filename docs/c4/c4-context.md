@@ -98,7 +98,7 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 
 ### MQTT Integration and Home Assistant Auto-Discovery
 
-- **Description**: The firmware publishes all OpenTherm measurements to a configurable MQTT broker using a structured topic hierarchy. It also publishes Home Assistant MQTT discovery payloads, which cause Home Assistant to create over 200 entities automatically, including sensors, binary sensors, and a climate entity, all without any manual YAML configuration. Data is published when values change and periodically as a heartbeat.
+- **Description**: The firmware publishes all OpenTherm measurements to a configurable MQTT broker using a structured topic hierarchy. Value topics carry plain scalars (ADR-101). Home Assistant MQTT discovery is published Just-In-Time on the first arrival of each OT message ID (ADR-100), so only entities for messages actually seen on the bus are created — over 200 are possible but the device starts clean. Entity names default to self-describing form (ADR-106), with a legacy compatibility toggle. Data is published when values change and periodically as a heartbeat.
 - **Users**: Home Assistant, MQTT Automation Scripts, Home Automation Enthusiast.
 
 ### REST API for Programmatic Access

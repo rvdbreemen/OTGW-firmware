@@ -3,8 +3,8 @@
 ## Overview
 
 - **Name**: Network & WiFi Management Module (OTGW-firmware)
-- **Description**: Unified network connectivity layer (v1.3.5+) providing WiFi with non-blocking reconnection (ADR-047), NTP time synchronization with timezone support, mDNS/LLMNR hostname resolution, SimpleTelnet 1.0.0 debug server, and optional Ethernet failover (ESP32 + W5500). Updated for Arduino Core 3.1.2 (ESP8266) with lwIP2 Low Memory variant (TCP_MSS=536). WiFiClient sync mode enabled to reduce TCP buffer copy overhead.
-- **Location**: `/src/OTGW-firmware/` (primary files: `networkStuff.ino`, `networkStuff.h`, `Ethernet.ino`, `platform.h`, `platform_esp8266.h`, `platform_esp32.h`); `src/libraries/SimpleTelnet/src/SimpleTelnet.h`
+- **Description**: Unified network connectivity layer providing WiFi with non-blocking reconnection (ADR-047), NTP time synchronization with timezone support, mDNS/LLMNR hostname resolution, SimpleTelnet 1.0.0 debug server, and runtime WiFi↔Ethernet failover (ESP32 + W5500, TASK-581). Updated for Arduino Core 3.1.2 (ESP8266) with lwIP2 Low Memory variant (TCP_MSS=536). WiFiClient sync mode enabled to reduce TCP buffer copy overhead. Per-component types are isolated in `Networktypes.h` (ADR-079 / ADR-081).
+- **Location**: `/src/OTGW-firmware/` (primary files: `networkStuff.ino`, `networkStuff.h`, `Ethernet.ino`, `Networktypes.h`, `platform.h`, `platform_esp8266.h`, `platform_esp32.h`); `src/libraries/SimpleTelnet/src/SimpleTelnet.h`
 - **Language**: Arduino C/C++ (ESP8266/ESP32), templated C++ (SimpleTelnet library)
 - **Purpose**: Abstracts WiFi/Ethernet connectivity, NTP time sync, hostname management, platform-specific features, and debug telnet interface behind a unified API. Ensures reliable network connectivity with automatic failover, proper DHCP hostname negotiation, and responsive debug terminal.
 
@@ -164,6 +164,14 @@
 - **Return Type**: `void`
 - **Description**: Platform-specific MAC address retrieval. On ESP8266: `WiFi.macAddress(mac)`. On ESP32: `esp_efuse_mac_get_default(mac)`.
 
+### Per-Component Types Header (Networktypes.h, ADR-079 / ADR-081)
+
+`Networktypes.h` bundles the network transport types as a single component header (included after `boards.h`):
+
+- `enum OTGWNetworkMode`: `NET_WIFI`, `NET_ETHERNET`, plus prerelease-only `NET_AP_FALLBACK` (guarded by `_VERSION_PRERELEASE` so production builds physically cannot enter AP fallback).
+- `struct NetworkSection` (`state.net`): runtime transport state. Always carries the prerelease AP-fallback fields under guard; Ethernet fields (`eMode`, `bEthernetLink`) are present only on `HAS_ETH_CAPABLE` builds.
+- `struct EthernetSection` (`settings.eth`, `HAS_ETH_CAPABLE` only): persisted static-IP configuration — `bStaticIP`, `sIPaddress`, `sGateway`, `sSubnet`, `sDNS`.
+
 ### Ethernet Support (ESP32 + W5500 only)
 
 #### `void initEthernet(void)`
@@ -174,11 +182,11 @@
   Called once from `setup()` on ESP32 boards with W5500 hardware. Probes W5500 via SPI VERSION register, derives a locally-administered MAC from ESP32 eFuse, attempts DHCP (1-second timeout for fast boot). If successful, switches WiFi off and initializes Ethernet as primary network interface. If W5500 present but no link, remains on WiFi.
 
 #### `void loopEthernet(void)`
-- **Location**: `Ethernet.ino:174-199` (guarded by `HAS_ETH_CAPABLE`)
+- **Location**: `Ethernet.ino` (guarded by `HAS_ETH_CAPABLE`)
 - **Parameters**: None
 - **Return Type**: `void`
 - **Description**: 
-  Automatic WiFi ↔ Ethernet failover monitor called from `doBackgroundTasks()` every 5 seconds (if W5500 present). Monitors cable plug/unplug via `Ethernet.linkStatus()`. On cable insertion, attempts DHCP (2-second timeout) and switches to Ethernet. On cable removal, falls back to WiFi. Calls `Ethernet.maintain()` to keep DHCP lease alive when on Ethernet.
+  Automatic WiFi ↔ Ethernet failover monitor called from `doBackgroundTasks()` every 5 seconds (if W5500 present, TASK-581). Monitors cable plug/unplug via `Ethernet.linkStatus()`. On cable insertion, attempts DHCP (2-second timeout) and switches to Ethernet via `switchToEthernet()`. On cable removal, falls back to WiFi via `switchToWiFi()`. Calls `Ethernet.maintain()` to keep DHCP lease alive when on Ethernet. The mode-transition MQTT publish (announcing the new IP/MAC under `otgw-firmware/network_mode` etc.) is deferred via a pending-publish flag until the MQTT reconnect completes — `loopEthernet()` fires it on the next iteration once `MQTTclient.connected()` returns true.
 
 #### `bool probeW5500(void)` (static)
 - **Location**: `Ethernet.ino:50-78`
@@ -612,6 +620,8 @@ graph TB
 
 - **ADR-047**: WiFi non-blocking auto-reconnect (loopWifi state machine for extended outages)
 - **ADR-051**: Settings & state architecture (ntp.*, eth.* settings structures)
+- **ADR-079 / ADR-081**: Per-component types headers; network types live in `Networktypes.h`
+- **TASK-581**: Runtime WiFi↔Ethernet failover (cable hot-plug detection drives loopEthernet)
 - **Issue #525**: SDK DHCP calls removed while connected (was causing timeouts and unreachability after router reboot)
 - **OTGW-firmware.h**: Settings definitions and state structures
 - **safeTimers.h**: Timer macro definitions

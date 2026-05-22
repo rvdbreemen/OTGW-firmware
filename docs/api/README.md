@@ -53,13 +53,17 @@ Optional HTTP Basic Auth. When a password is configured in device settings, muta
 - Settings: `GET/POST/PUT /api/v2/settings`
 - OTGW commands: `POST /api/v2/otgw/commands`, `POST /api/v2/otgw/command/{cmd}`
 - MQTT discovery: `POST /api/v2/otgw/discovery`, `POST /api/v2/otgw/autoconfigure`
+- Discovery verify/republish: `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`
 - Simulation: `POST /api/v2/simulate/start`, `POST /api/v2/simulate/stop`
 - Webhook test: `POST /api/v2/webhook/test`
+- Debug dump: `GET /api/v2/debug`
+- All `POST/PUT/PATCH/DELETE` SAT endpoints (including markers, sensor-areas, and BLE roster)
 - File management, reboot, reset, and OTA update endpoints
 
 **Unprotected endpoints** (always accessible):
 
 - Health, device info/time/crashlog, OpenTherm data, sensor labels, PIC settings, firmware/filesystem info
+- Network scan: `GET /api/v2/network/scan`
 
 CSRF same-origin validation is enforced for authenticated requests from browsers (Origin/Referer header must match the Host header).
 
@@ -770,6 +774,63 @@ Triggers a test webhook call to verify the configured webhook URL is reachable.
 
 ---
 
+### Debug
+
+#### `GET /api/v2/debug`
+
+Returns a flat JSON map of build identifiers, runtime counters, every persistent setting (sensitive fields masked), and the full transient state struct. Intended for bug reports and field-support triage; the shape is not part of the long-term stable contract and may gain new keys between releases. OT-direct sub-sections appear only on OTGW32 builds; SAT BLE and weather sub-sections only on ESP32 builds.
+
+**Authentication**: Required (when password is configured)
+
+Sensitive values (HTTP password, MQTT password, weather API key) are emitted as `"***"` when present and `"(not set)"` when empty.
+
+**Response** `200 OK`:
+```json
+{
+  "debug": {
+    "build.version": "2.0.0-alpha.34",
+    "build.number": 1234,
+    "runtime.heap_free": 25600,
+    "settings.mqtt.broker": "192.168.1.10",
+    "settings.mqtt.passwd": "***",
+    "state.mqtt.connected": true
+  }
+}
+```
+
+The authoritative key list is `handleDebugDump()` in `src/OTGW-firmware/restAPI.ino`.
+
+---
+
+### Network
+
+#### `GET /api/v2/network/scan`
+
+Triggers and reports a non-blocking WiFi network scan (TASK-585). First call starts the scan and returns `{"status":"scanning"}`. Subsequent polls return the same payload while the scan is in progress. Once complete the response is `{"status":"ready","count":N,"networks":[...]}`, the scan buffer is freed, and the next call starts a fresh scan.
+
+**Authentication**: Not required
+
+**Response while scanning** `200 OK`:
+```json
+{"status": "scanning"}
+```
+
+**Response when ready** `200 OK`:
+```json
+{
+  "status": "ready",
+  "count": 2,
+  "networks": [
+    {"ssid": "MyWiFi", "rssi": -55, "channel": 6, "secured": true, "connected": true},
+    {"ssid": "Guest",  "rssi": -78, "channel": 11, "secured": true, "connected": false}
+  ]
+}
+```
+
+Quotes and backslashes in SSIDs are replaced with `_` to keep the JSON valid without escaping. A PIC flash in progress causes the endpoint to return `503` (`Scan unavailable during PIC flash`).
+
+---
+
 ### SAT (Smart Autotune Thermostat)
 
 The SAT endpoints provide access to the embedded smart heating controller. SAT runs entirely on the ESP  - these endpoints are for monitoring state and pushing external inputs.
@@ -918,6 +979,110 @@ Flushes short-lived SAT data (PID integral accumulator and cycle statistics wind
 ```json
 {"result": "ok", "flushed": ["pid", "cycles"]}
 ```
+
+#### `GET /api/v2/sat/weather/needs-setup`
+
+Reports whether the browser-side weather setup wizard should be shown (TASK-511). Becomes `true` only after a 5-minute startup grace window AND when the canonical outside temperature (`OTcurrentSystemState.Toutside`, populated from OT MsgID 27) is still zero AND the SAT weather provider has not produced a valid reading.
+
+**Authentication**: Required (when password is configured)
+
+**Response** `200 OK`:
+```json
+{"needs_setup": false, "has_key": true}
+```
+
+#### `GET /api/v2/sat/markers`
+
+Lists heating-curve calibration markers persisted to `/sat_markers.json` (TASK-586). Returns an empty array when the file does not yet exist.
+
+**Authentication**: Required (when password is configured)
+
+**Response** `200 OK`:
+```json
+[
+  {"id": 1, "outside_temp": 5.0, "flow_temp": 45.5, "added": 1774548600, "label": "evening"}
+]
+```
+
+#### `POST /api/v2/sat/markers`
+
+Appends a marker (TASK-586). Up to 20 markers may be stored; a 409 is returned when the limit is reached. The new `id` is `max(existing_id) + 1`. The `added` timestamp is the current epoch when the marker is written.
+
+**Authentication**: Required (when password is configured)
+
+**Request body**:
+```json
+{"outside_temp": 5.0, "flow_temp": 45.5, "label": "optional"}
+```
+
+| Field | Range |
+|-------|-------|
+| `outside_temp` | -15.0 to 25.0 °C |
+| `flow_temp` | 10.0 to 90.0 °C |
+| `label` | optional, max 31 chars; embedded quote/backslash replaced with `_` |
+
+**Response** `201 Created`:
+```json
+{"status": "ok", "id": 4}
+```
+
+#### `DELETE /api/v2/sat/markers/{id}`
+
+Removes the marker with the given numeric `id` (TASK-586).
+
+**Authentication**: Required (when password is configured)
+
+**Response** `200 OK`:
+```json
+{"status": "ok"}
+```
+
+**Error responses**: `404` when the id is not found or the file does not exist.
+
+#### `GET /api/v2/sat/sensor-areas`
+
+Returns the persistent Dallas-to-SAT-area mapping (TASK-587). Empty `sensor` strings indicate unmapped slots; addresses are 16 uppercase hex characters.
+
+**Authentication**: Required (when password is configured)
+
+**Response** `200 OK`:
+```json
+{
+  "areas": [
+    {"index": 0, "sensor": "28FF64D1841703F1"},
+    {"index": 1, "sensor": ""},
+    {"index": 2, "sensor": ""},
+    {"index": 3, "sensor": ""}
+  ]
+}
+```
+
+#### `PATCH /api/v2/sat/sensor-areas` | `POST` | `PUT`
+
+Updates one of the four slots (TASK-587). Addresses are validated as 16 hex characters and normalised to uppercase; an empty `sensor` string clears the slot. The handler also accepts POST and PUT for browsers that cannot issue PATCH.
+
+**Authentication**: Required (when password is configured)
+
+**Request body**:
+```json
+{"area": 0, "sensor": "28FF64D1841703F1"}
+```
+
+**Response** `200 OK`:
+```json
+{"status": "ok"}
+```
+
+#### BLE roster (ESP32 only)
+
+The `/v2/sat/ble/*` family is only mounted on ESP32 builds (TASK-508). On ESP8266 builds these paths return 404.
+
+- `GET /api/v2/sat/ble/discovery` — stream the BLE roster as JSON (slot MAC, label, last temp/humidity, RSSI, selection state).
+- `POST /api/v2/sat/ble/select` — body `{"mac":"AA:BB:CC:DD:EE:FF"}`; promote a roster MAC to the active sensor slot.
+- `POST /api/v2/sat/ble/label` — body `{"mac":"...","label":"Living room"}`; set the persistent label.
+- `POST | PUT | DELETE /api/v2/sat/ble/forget` — body `{"mac":"..."}`; drop the slot and unpublish its HA discovery config.
+
+All four return `{"status":"ok"}` on success. `404` is returned when the MAC is not present in the roster.
 
 ---
 

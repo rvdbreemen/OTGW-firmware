@@ -15,7 +15,7 @@ When no credentials are stored, the device starts a WiFi access point named afte
 The firmware uses a two-tier reconnection strategy:
 
 1. The ESP SDK's built-in auto-reconnect (`WiFi.setAutoReconnect(true)`) handles short blips (typically under 30 seconds) transparently at the radio level.
-2. For longer outages, the application-level `loopWifi()` state machine takes over. The state machine is fully non-blocking: each call returns in well under a millisecond, so the watchdog, OpenTherm message processing, MQTT keepalives, and the web UI all keep running during reconnection. It retries with a 30-second window per attempt (enough for a full scan, association, and DHCP exchange) and gives up after 10 attempts, rebooting the device. In beta builds it enters AP fallback mode after 2 failed retries instead (see section 6.1.3).
+2. For longer outages, the application-level `loopWifi()` state machine takes over. The state machine is fully non-blocking: each call returns in well under a millisecond, so the watchdog, OpenTherm message processing, MQTT keepalives, and the web UI all keep running during reconnection. It retries with a 30-second window per attempt (enough for a full scan, association, and DHCP exchange) and gives up after 10 attempts, rebooting the device (max time before reboot: 300 seconds). In beta builds it enters AP fallback mode after 2 failed retries instead (see section 6.1.3). These timing parameters are codified in ADR-075 (which supersedes the original 5-second/15-retry values from ADR-047) to give `WiFi.begin()` a full association window and avoid cancelling the SDK auto-reconnect mid-flight.
 
 After a successful reconnect, the firmware re-applies the configured hostname, forces a DHCP re-announce so the router learns the correct hostname, and restarts Telnet, MQTT, and WebSocket services automatically. Per the fix for issue #525, the SDK DHCP client is only restarted while the station is disconnected. Touching `wifi_station_dhcpc_start()` on an associated station resets the IP to `0.0.0.0` and prevents recovery after a router reboot.
 
@@ -72,9 +72,13 @@ Typical connections:
 | MISO | See boards.h `PIN_SPI_MISO` |
 | MOSI | See boards.h `PIN_SPI_MOSI` |
 
-#### 6.2.3 Priority over WiFi
+#### 6.2.3 Priority over WiFi and runtime failover
 
-Ethernet always takes priority. When the W5500 is present and a cable is plugged in, WiFi is disabled. If the cable is unplugged at runtime, the firmware detects this (checked every 5 seconds) and switches back to WiFi automatically. When the cable is reconnected, it switches back to Ethernet. This failover happens without a reboot and without configuration.
+Ethernet always takes priority. When the W5500 is present and a cable is plugged in, WiFi is disabled. If the cable is unplugged at runtime, the firmware detects this (the link is polled every 5 seconds in `loopEthernet()`) and switches back to WiFi automatically. When the cable is reconnected, DHCP runs (2-second timeout on hot-plug) and the firmware switches back to Ethernet. This failover happens without a reboot and without configuration.
+
+On every transition the firmware re-registers mDNS on the new interface, restarts the MQTT client and the WebSocket server, and publishes a retained `otgw-firmware/network/mode` topic with value `wifi` or `ethernet`. The transition to `ethernet` is published as soon as the MQTT broker confirms the new connection (a deferred drain inside `loopEthernet()`). The transition to `wifi` is published before the cable-loss switch so the broker sees it while MQTT is still alive on the wired interface.
+
+The current transport is exposed to the web UI and Home Assistant through `/api/v2/device/info`, which adds three fields on OTGW32 hardware: `networkmode` (`wifi` or `ethernet`), `ethernetpresent` (W5500 detected), and `ethernetlink` (cable present). The header bar in the web UI polls `/api/v2/device/time` once per second to keep the network icon (WiFi or Ethernet) in sync with the active transport.
 
 #### 6.2.4 MAC Address
 
@@ -82,7 +86,7 @@ The firmware derives a unique locally-administered MAC address from the ESP32 eF
 
 #### 6.2.5 Static IP on Ethernet
 
-Ethernet supports static IP configuration separately from WiFi. Configure it in the Settings page under the Ethernet section. When left empty, the default is DHCP with a 1-second timeout at boot.
+Ethernet has its own static IP configuration, independent of the WiFi static IP. Configure it in the Settings page under the Ethernet section, or via the REST settings keys `ETHstaticip` (boolean), `ETHipaddress`, `ETHgateway`, `ETHsubnet`, and `ETHdns`. When `ETHstaticip` is false (the default), Ethernet uses DHCP with a 1-second timeout at boot and a 2-second timeout on cable hot-plug. When `ETHdns` is `0.0.0.0`, the gateway address is used as the DNS server.
 
 ---
 
@@ -160,7 +164,9 @@ The ESP8266 SDK initializes `time()` to `0xFFFFFFFF` (year 2106) before the firs
 
 ### 6.6 OTA Firmware Updates
 
-The OTA update endpoint is at `/update`. Authentication uses HTTP Basic Auth when a password is configured.
+The OTA update endpoint is at `/update`. It sits behind the protected-admin boundary defined in ADR-056 (which supersedes ADR-054). When `settingHTTPpasswd` is empty, the endpoint is open. When a password is set, the endpoint requires HTTP Basic Auth with username `admin`. The same password is propagated to the OTA update server at WiFi or Ethernet startup, so a settings change takes effect on the next reboot without re-flashing.
+
+Browser requests to protected admin endpoints (including `/update`, `/upload`, `/ReBoot`, `/ResetWireless`, and `POST /api/v2/settings`) are additionally checked for `Origin`/`Referer` matching `Host`. This is a lightweight CSRF mitigation, not a full session framework: requests without `Origin` or `Referer` (curl, OTmonitor, scripts) are allowed for backward compatibility; mismatched origins are rejected with HTTP 403.
 
 **Steps:**
 1. Open `http://otgw.local/update` in your browser.

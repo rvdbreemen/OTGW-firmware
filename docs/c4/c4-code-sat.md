@@ -116,30 +116,41 @@ CH water pressure monitoring, health status, drop-rate detection (Task #226).
 
 ### Module: SATweather.ino
 
-Open-Meteo API integration for outdoor temperature, humidity, wind, and 24-hour forecast.
+Open-Meteo API integration for outdoor temperature, humidity, wind, and 24-hour forecast (no API key required). Single-pass streaming JSON parse — character-by-character over the response stream, no full buffer materialisation, no ArduinoJson. The Open-Meteo URL template is per-platform: ESP8266 uses a minimal 5-field projection, ESP32 fetches the full thermal data set. A 5-minute startup gate (Phase 0 onboarding, TASK-511) suppresses the first request until WiFi is stable. Telnet shortcut `w` triggers an immediate fetch and dumps the parsed state (TASK-513).
 
 #### Key Functions
 
-- `weatherJsonGetFloat(const char* json, PGM_P key, float* out): bool` (static, line 38-59)
+- `weatherJsonGetFloat(const char* json, PGM_P key, float* out): bool` (static)
   - Extracts "key": <number> from JSON string
 
-- `weatherJsonGetArray(const char* json, PGM_P key, float* arr, uint8_t maxLen, uint8_t* count): bool` (static, line 64+)
+- `weatherJsonGetArray(const char* json, PGM_P key, float* arr, uint8_t maxLen, uint8_t* count): bool` (static)
   - Extracts JSON array from "hourly" section (24-hour temperature forecast)
 
 - `satWeatherUpdate(): void`
   - Fetches current weather + 24-hour forecast from Open-Meteo API
 
-### Module: SATble.ino (ESP32 Only)
+### Module: SATble.ino (ESP32 Only) — NimBLE-Arduino 2.x (ADR-092)
 
-BLE advertisement scanning for temperature/humidity sensors.
+BLE advertisement scanning for temperature/humidity sensors, built on NimBLE-Arduino 2.x (TASK-487/488 replaced the classic Bluedroid stack — smaller RAM/flash footprint, scan-callback API). Uses the magic-zero idiom: scan window/interval and result-list cap configured so NimBLE only fires the callback and never builds an internal result list (keeps heap pressure flat under continuous scanning).
+
+Operates in **continuous-scan** mode (TASK-494): the scan runs uninterrupted on the BLE host task; advertisements flow into a per-MAC roster (`SAT_BLE_MAX_ROSTER = 8`) that is settings-backed (`settings.sat.sBleMac[i]`) and survives reboot. Per-ad debug logging was replaced by aggregated periodic scan-stats (TASK-506) to cut spam.
+
+Auto-discovery: every format-passing MAC enters the roster on first sight. The frontend (`/api/v2/sat/ble/*`) lets the user promote a roster slot to the active sensor, attach a persistent label, or forget it. HA discovery for each roster MAC is published lazily (`bDiscoveryPublished`) and re-published on label change (`bDiscoveryDirty`).
 
 #### Key Functions
 
-- `parseBLEAtcFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt): bool` (static, line 67-87)
+- `parseBLEAtcFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt): bool` (static)
   - Parses ATC/pvvx custom firmware format (service data UUID 0x181A)
 
-- `parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt): bool` (static, line 94+)
+- `parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt): bool` (static)
   - Parses BTHome v2 format (service data UUID 0xFCD2)
+
+- `SATBLEScanCallbacks::onResult(const NimBLEAdvertisedDevice*)`
+  - NimBLE 2.x scan callback. Runs on the BLE host task; defers `flushSettings()` to the loop task so writes never happen from BLE context.
+
+### Multi-Area Room Temperature Mapping (Task #25)
+
+Up to 4 weighted room-temperature areas. Each area accepts either a DS18B20 sensor address (mapped via `/api/v2/sat/sensor-areas`) or an MQTT/BLE-pushed float. The SAT control loop computes a weighted average when `settings.sat.bMultiArea` is true and at least one valid input is fresh. The frontend persists the address→area mapping; the firmware caches the current float per area in `state.sat.fAreaTemp[4]`.
 
 ## Dependencies
 
@@ -157,8 +168,8 @@ BLE advertisement scanning for temperature/humidity sensors.
 
 - Arduino core (millis, delay, Serial, digitalWrite, pinMode)
 - esp8266/esp32 HAL (PROGMEM, pgm_read_byte, strncpy_P, snprintf_P)
-- NimBLEDevice.h (ESP32 BLE scanning, NimBLE-Arduino 2.x per ADR-092 — Bluedroid replaced TASK-487)
-- Open-Meteo API (HTTP GET for weather data)
+- NimBLEDevice.h (ESP32 BLE scanning, NimBLE-Arduino 2.x per ADR-092 — Bluedroid replaced TASK-487/488; continuous scan in callback-only mode, TASK-494)
+- Open-Meteo API (HTTP GET for weather data; free, no API key)
 
 ## Settings (Persistent Configuration)
 

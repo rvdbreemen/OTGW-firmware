@@ -7,10 +7,10 @@ The OTGW-firmware synthesizes 10 code-level modules into 6 logical components. T
 | Component | Type | Description | Documentation |
 |-----------|------|-------------|---------------|
 | OpenTherm Core | Application Component | Protocol decoding, PIC serial comm, command queue, MQTT throttle, watchdog management, OTDirect GPIO stack (ESP32) | [c4-component-opentherm-core.md](./c4-component-opentherm-core.md) |
-| Network and Connectivity | Application Component | WiFi, NTP, mDNS/LLMNR, Ethernet failover (ESP32+W5500), platform abstraction | [c4-component-network.md](./c4-component-network.md) |
-| Integration Layer | Application Component | MQTT client + HA auto-discovery (PROGMEM drip publisher), REST API v2, JSON streaming, file serving, auth/CSRF | [c4-component-integration-layer.md](./c4-component-integration-layer.md) |
+| Network and Connectivity | Application Component | WiFi, NTP, mDNS/LLMNR, runtime WiFi↔Ethernet failover (ESP32+W5500, TASK-581), platform abstraction | [c4-component-network.md](./c4-component-network.md) |
+| Integration Layer | Application Component | MQTT client + HA auto-discovery (JIT-by-default per ADR-100, flat per-value topics per ADR-101, self-describing names per ADR-106), REST API v2, JSON streaming, file serving, auth/CSRF | [c4-component-integration-layer.md](./c4-component-integration-layer.md) |
 | Configuration and State | Application Component | Persistent settings (OTGWSettings), runtime state (OTGWState), LittleFS JSON, deferred write, side-effect coordination | [c4-component-configuration-state.md](./c4-component-configuration-state.md) |
-| Smart Thermostat (SAT) | Application Component | Heating curve, PID v3 with deadband, anti-cycling, OPV calibration, boiler state machine, weather compensation, BLE | [c4-component-smart-thermostat.md](./c4-component-smart-thermostat.md) |
+| Smart Thermostat (SAT) | Application Component | Heating curve, PID v3 with deadband, anti-cycling, OPV calibration, boiler state machine, Open-Meteo weather, NimBLE-Arduino 2.x BLE roster (ADR-092), multi-area DS18B20 mapping, calibration markers | [c4-component-smart-thermostat.md](./c4-component-smart-thermostat.md) |
 | Sensors and Hardware | Application Component | Dallas DS18B20 (1-Wire), S0 pulse energy meter, GPIO relay, OLED display, sensor simulation | [c4-component-sensors-hardware.md](./c4-component-sensors-hardware.md) |
 | Web Interface | Application Component | WebSocket OT stream, telnet debug, heap health, safe timers, webhook, browser SPA (HTML/CSS/JS + ECharts) | [c4-component-web-interface.md](./c4-component-web-interface.md) |
 

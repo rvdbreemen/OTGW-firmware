@@ -113,6 +113,8 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satautotune` | `false` | bool | Automatische PID-gains bijsturing inschakelen |
 | `satautotunerate` | `0.02` | 0-1 | Bijstellingspercentage per afstemcyclus (2%) |
 
+De integraalterm gebruikt een **symmetrische clamp** `[-curveValue, +curveValue]` met een harde veiligheidsgrens van `+/-20 C` (alpha.28 / alpha.30). Negatieve accumulatie is nodig bij mild weer zodat de regelaar het flow-setpoint onder de verwarmingscurve kan trekken wanneer de kamer licht boven het doel zit. De PID-integraal en de ruwe-afgeleide-toestand worden bij elke save gepersisteerd en bij de volgende boot **warm gestart** (alpha.32), dus een power cycle leidt niet tot een cold start. `sat/flush` of een expliciete `satdisable` wist de gepersisteerde state.
+
 #### Geavanceerde regeling
 
 | Parameter | Standaard | Bereik | Omschrijving |
@@ -261,7 +263,9 @@ curl -X POST -d '{"name":"satsimulation","value":"true"}' \
 
 ### 5.8 Weerintegratie (Open-Meteo)
 
-SAT kan buitentemperatuur, luchtvochtigheid, windsnelheid en een 24-uurs uurtemperatuurverwachting ophalen via de Open-Meteo API. Dit is een gratis API zonder API-sleutel.
+SAT kan weerdata en een 24-uurs uurtemperatuurverwachting ophalen via de Open-Meteo API. Dit is een gratis API zonder API-sleutel.
+
+Op ESP32 vraagt de firmware de volledige Open-Meteo current-conditions set op: temperatuur, gevoelstemperatuur, luchtvochtigheid, windsnelheid / -richting / -vlagen, bewolking, zeespiegeldruk, neerslag / regen / sneeuwval, zonne-elevatie, WMO weather code, en de `is_day`-vlag. De uurarrays bevatten temperatuur, dauwpunt, bewolking en neerslagkans. ESP8266 blijft op een minimaal 5-velden-verzoek om binnen het geheugenbudget te passen.
 
 Weerdata levert:
 - Buitentemperatuur voor de verwarmingscurve (als terugval of primaire bron).
@@ -276,7 +280,7 @@ Weerdata levert:
 | `satweatherlon` | `0.0` | -180 tot 180 | Lengtegraad |
 | `satweatherinterval` | `900` | 300-3600 s | Poll-interval (standaard 15 min, minimum 5 min) |
 
-De webinterface kan uw locatie automatisch detecteren via de browser. Weerdata wordt opgehaald via plain HTTP (geen HTTPS).
+De webinterface kan uw locatie automatisch detecteren via de browser. Weerdata wordt opgehaald via plain HTTP (geen HTTPS). De eerste fetch wordt 5 minuten na opstart vertraagd zodat DHCP, NTP en MQTT eerst tot rust kunnen komen. De streaming JSON-parser is allocatie-vrij (geen malloc in de SAT-loop). Voor debugging accepteert de telnet-console `w` om direct een fetch + dump te forceren (TASK-513).
 
 ---
 
@@ -319,6 +323,8 @@ SAT volgt vlam aan/uit-overgangen en classificeert elke voltooide verwarmingscyc
 - SHORT_CYCLING: cyclus korter dan 60 seconden (ketel kan niet laag genoeg moduleren).
 - OVERSHOOT: aanvoertemperatuur overschreed setpoint + overshoot-marge langer dan 60 seconden.
 - UNDERHEAT: aanvoertemperatuur bleef meer dan 2 C onder het setpoint langer dan 180 seconden.
+
+Sinds alpha.31 gebruikt de classificatie **tail-window percentielen** (laatste 180 s op ESP32, 64 s op ESP8266) in plaats van de full-cycle P90/P10. Een cyclus die begon met overshoot maar zichzelf corrigeerde, wordt niet meer als OVERSHOOT bestempeld op basis van zijn vroege piek; de full-cycle P90 wordt voor diagnostiek wel naast de tail-waarde gelogd.
 
 **Rolling statistieken:**
 - Cycli per uur teller (rollend 60-minuten venster, max 6).
@@ -383,7 +389,13 @@ Indien ingeschakeld, schakelt SAT automatisch de verwarming uit wanneer de buite
 
 SAT ondersteunt tot 4 temperatuurinvoerzones met configureerbare gewichten. De effectieve ruimtetemperatuur die door de PID-controller wordt gebruikt, is het gewogen gemiddelde van alle geldige, niet-verlopen area-temperaturen.
 
-Zones worden aangeboden via MQTT:
+Area-waarden kunnen uit drie onafhankelijke bronnen komen:
+
+1. **MQTT-push** naar `sat/area/<0..3>`.
+2. **DS18B20 sensor-toewijzing** (TASK-587). Een Dallas-sensoradres (16 hex-tekens) kan in de Settings-UI aan een area worden gekoppeld; `pollSensors()` routeert de meting van die sensor dan automatisch naar `satSetAreaTemp()`. REST-endpoints: `GET /api/v2/sat/sensor-areas`, `PATCH /api/v2/sat/sensor-areas`. Opgeslagen als `settings.sat.sSensorArea[0..3]`.
+3. **REST API** `POST /api/v2/sat/area/<n>`.
+
+Voorbeeld MQTT-push:
 ```bash
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/area/0" -m "21.5"
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/area/1" -m "20.8"
@@ -401,7 +413,12 @@ Elke area-waarde vervalt na 5 minuten zonder update. Verlopen zones worden uitge
 
 ### 5.14 Multi-zone PID-regeling
 
-Voor woningen met meerdere onafhankelijk geregelde verwarmingszones (bijv. aparte radiatorcircuits of zoneafsluiters) ondersteunt SAT tot 4 PID-zones. Elke zone voert zijn eigen PID-berekening uit, en het hoogste (meest veeleisende) setpoint wint.
+Voor woningen met meerdere onafhankelijk geregelde verwarmingszones (bijv. aparte radiatorcircuits of zoneafsluiters) ondersteunt SAT tot 4 PID-zones. Elke zone voert zijn eigen PID-berekening uit. De zones worden vervolgens geaggregeerd tot een enkel ketel-setpoint (alpha.29 / alpha.30):
+
+- **P75-selectie**: de per-zone PID-uitvoeren worden gesorteerd en de waarde op het 75e percentiel (afgerond naar boven) wordt gekozen. Bij 4 zones filtert dit een enkele uitschietende veeleisende zone weg in plaats van die dominant te laten zijn.
+- **Headroom**: een vaste offset (`satzoneheadroom`, standaard 5,0 C) wordt boven op de P75-uitkomst opgeteld zodat de ketel marge heeft voor de zones met hogere vraag.
+- **Overshoot-cap**: als er al een zone boven zijn doel zit, wordt het aggregaat-setpoint verlaagd om over-verhitting van conformerende zones te voorkomen.
+- Elke zone-PID gebruikt een symmetrische integral-clamp `[-curveValue, +curveValue]` zodat een zone die net boven zijn doel zit zijn aandeel van het setpoint onder de verwarmingscurve kan trekken.
 
 Zones ontvangen hun temperatuur en doel via MQTT. Zone 1 komt altijd overeen met de primaire SAT-doeltemperatuur. Zones 2-4 ontvangen onafhankelijke doelen en temperatuurinvoer.
 
@@ -409,6 +426,7 @@ Zones ontvangen hun temperatuur en doel via MQTT. Zone 1 komt altijd overeen met
 |---|---|---|---|
 | `satzonecount` | `1` | 1-4 | Aantal actieve verwarmingszones |
 | `satzonetimeout` | `300` | 60-3600 s | Seconden zonder update voordat een zone inactief wordt |
+| `satzoneheadroom` | `5.0` | 0-15 C | Headroom boven op het P75-zone-aggregaat |
 
 Wanneer `satzonecount` 1 is (standaard), werkt SAT in single-zone modus en heeft deze functie geen overhead.
 
@@ -416,20 +434,44 @@ Wanneer `satzonecount` 1 is (standaard), werkt SAT in single-zone modus en heeft
 
 ### 5.15 BLE-temperatuursensor (alleen ESP32)
 
-Op ESP32-builds (OTGW32 / Thermo-Nova) kan SAT BLE-temperatuursensoren scannen en als ruimtetemperatuurinvoer gebruiken. Ondersteunde sensorformaten:
+Op ESP32-builds (OTGW32 / Thermo-Nova) scant SAT BLE-temperatuursensoren en gebruikt er een als ruimtetemperatuurinvoer. De BLE-stack is **NimBLE-Arduino** (ADR-092), die in 2.0.0 Bluedroid heeft vervangen en zo'n 400 KB flash bespaart. Ondersteunde advertising-formaten:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC met custom firmware): service data UUID 0x181A. Rapporteert temperatuur, luchtvochtigheid en batterijniveau.
-- **BTHome v2**: service data UUID 0xFCD2. Standaard BTHome-protocol voor temperatuur- en luchtvochtigheidssensoren.
+- **BTHome v2**: service data UUID 0xFCD2. Standaard BTHome-protocol voor temperatuur- en luchtvochtigheidssensoren. Versleutelde advertisements worden geweigerd.
 
-Maximaal 4 BLE-sensoren worden gelijktijdig gevolgd.
+De radio voert sinds 2.0.0 een **continue scan** uit vanaf boot (TASK-494). Elk geldig advertisement wordt opgenomen in een persistent 8-slot roster, ongeacht of het geselecteerd is. De parameter `satbleinterval` regelt nu de publish/state-update-cadans en niet langer de radio-scan zelf.
+
+#### Zelfontdekkende sensor-roster (TASK-508)
+
+Open het SAT-instellingenpaneel in de webinterface om het ontdekte roster te zien. Elke regel toont de laatste temperatuur, RSSI en leeftijd. Geef sensoren herkenbare labels ("Woonkamer", "Slaapkamer"); de actieve sensor wordt vanuit het roster geselecteerd. Auto-select promoveert de enige verse sensor wanneer er maar een in bereik is. Labels worden via de retained discovery-configs doorgegeven aan Home Assistant (per-MAC entiteiten worden automatisch aangemaakt). "Forget" leegt een slot en wist de bijbehorende HA-discovery-topics met zero-byte retained payloads.
+
+REST-endpoints voor het roster:
+
+- `GET /api/v2/sat/ble/discovery` -  JSON-dump van alle roster-slots
+- `POST /api/v2/sat/ble/select` `{"mac":"AA:BB:.."}` -  MAC promoveren tot actieve sensor
+- `POST /api/v2/sat/ble/label`  `{"mac":"AA:BB:..","label":"Woonkamer"}` -  slot hernoemen
+- `POST /api/v2/sat/ble/forget` `{"mac":"AA:BB:.."}` -  slot wissen en HA opruimen
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
 | `satbleenable` | `false` | bool | BLE-temperatuursensor scanning inschakelen |
-| `satblemac` | `""` | MAC-adres | Koppelen aan specifieke sensor (leeg = alles accepteren) |
-| `satbleinterval` | `30` | 10-300 s | Scaninterval |
+| `satblemac` | `""` | MAC-adres | Actieve sensor-MAC (via roster select gezet; leeg = eerste verse slot wordt automatisch gekozen) |
+| `satbleinterval` | `30` | 10-300 s | Publish/state-update-cadans (NIET scaninterval; de scan is continu) |
 
-BLE-temperatuurwaarden vervallen na 5 minuten zonder nieuw advertisement. SAT valt terug op MQTT- of OT-buswaarden wanneer BLE-data verlopen is.
+#### MQTT-topicstructuur
+
+Per-sensor-state wordt gepubliceerd onder de subtree `sat/ble/<mac>/...` (compacte MAC, zonder dubbele punten):
+
+| Topic-suffix | Payload |
+|---|---|
+| `sat/ble/<mac>/temp` | Temperatuur (C) |
+| `sat/ble/<mac>/rh` | Relatieve luchtvochtigheid (%) |
+| `sat/ble/<mac>/bat` | Batterijniveau (%) |
+| `sat/ble/<mac>/rssi` | Signaalsterkte (dBm) |
+
+De oude topics `sat/ble_temp` / `sat/ble_humidity` / `sat/ble_sensor_rssi` / `sat/ble_battery` / `sat/ble_sensor_count` / `sat/ble_temp_valid` blijven bestaan en dragen de waarden van de huidige geselecteerde sensor voor achterwaartse compatibiliteit.
+
+BLE-temperatuurwaarden vervallen na 5 minuten zonder nieuw advertisement. SAT valt terug op MQTT- of OT-buswaarden wanneer de geselecteerde sensor verloopt.
 
 ---
 
@@ -499,6 +541,17 @@ Wanneer SAT is ingeschakeld en MQTT met auto-discovery is geconfigureerd, public
 | `climate.<hostname>_dhw_control` | Optionele warmwater-klimaatentiteit, modi `off` / `auto`, bereik 40 C tot 60 C |
 
 De HA-zichtbare modi zijn `off` en `heat`. De mode-status volgt de `thermostat_connected`-status van de PIC, dus als u in HA naar `off` schakelt, laat SAT de setpoint-override los. Het instellen van de doeltemperatuur via HA stuurt een `TT=` commando, dat SAT persisteert naar ESP-flash. Presets (comfort, eco, away, sleep, home, activity) worden doorgestuurd via `sat/preset` als ze zijn geconfigureerd.
+
+De klimaatentiteit publiceert ook `sat/climate_attributes` (een JSON-blob) als `json_attributes_topic` (TASK-594). HA toont de SAT-bedrijfstoestand zo als attributen van de klimaat-kaart (modus, PID-uitvoer, fout, curve-aanbeveling enz.) zonder dat template-sensors nodig zijn.
+
+#### TT= en TC= remote-override semantiek (TASK-466)
+
+Wanneer `satpushsetpoint` aan staat, duwt SAT zijn doel naar het thermostaatdisplay met PIC-pariteits-remote-override semantiek op OpenTherm MsgID 16 + MsgID 100 (`RemoteOverrideFunction`). De twee commando's hebben verschillende prioriteiten:
+
+- `TT=<v>` -  program-prioriteit override; auto-clear als de thermostaat drie opeenvolgende MsgID 16-frames binnen 0,25 C van de override stuurt en het daaropvolgende frame meer dan 0,5 C afwijkt (typisch een geprogrammeerde programmawisseling).
+- `TC=<v>` -  manual-prioriteit override; blijft onbeperkt actief tot `TC=0` of vervanging.
+
+Inkomende thermostaat-MsgID 16-frames worden door de OTDirect-toestandsmachine waargenomen; de auto-clear honoredCount wordt vanuit die stroom gevoed. De huidige override-modus wordt gespiegeld in de `PR=O`-rapportage als `O=T<v>` (TT), `O=C<v>` (TC) of `O=N` (geen). Multi-kanaals set-commando's (MQTT, REST, web-UI, serieel) worden binnen de OTDirect-commandowachtrij gecoalesceerd per MsgID (TASK-494): herhaalde WRITE_DATA voor dezelfde MsgID binnen een OT-cyclus collapsen tot een enkel "laatste waarde wint"-frame op de bus.
 
 #### SAT-instellingen als HA-entiteiten (Task-81 / Task-284)
 
@@ -580,9 +633,9 @@ De externe temperatuurwaarden vervallen automatisch na respectievelijk 5 minuten
 
 ### 5.21 Bekende beperkingen
 
-- Niet alle thermostaten sturen ruimtetemperatuur via OT MsgID 24. Als de uwe dat niet doet, gebruik dan een externe sensor via MQTT, REST API, of BLE (ESP32).
+- Niet alle thermostaten sturen ruimtetemperatuur via OT MsgID 24. Als de uwe dat niet doet, gebruik dan een externe sensor via MQTT, REST API, BLE (ESP32) of een DS18B20-sensor gekoppeld aan een area.
 - Buitentemperatuur (MsgID 27) wordt zelden via de bus uitgewisseld. Een externe push, weather API fetch, of REST API push is doorgaans nodig.
-- BLE-temperatuursensoren zijn alleen beschikbaar op de ESP32 (OTGW32).
+- BLE-temperatuursensoren zijn alleen beschikbaar op de ESP32 (OTGW32). Het roster heeft 8 slots; slechts een sensor tegelijk is geselecteerd als actieve SAT-invoer.
 - SAT bestuurt het aanvoertemperatuur-setpoint, maar de wandthermostaat bepaalt nog steeds of de verwarming is ingeschakeld of uitgeschakeld.
 - Multi-zone ondersteuning draait onafhankelijke PID-lussen per zone, maar SAT bestuurt een enkele ketel. Afzonderlijke ketelcircuits per zone worden niet ondersteund.
 - De PIC co-processor houdt het laatste `CS=`-setpoint vast als de ESP uitvalt. Laag 1 (opstart-veiligheid) corrigeert dit bij de volgende start.
@@ -612,7 +665,7 @@ De externe temperatuurwaarden vervallen automatisch na respectievelijk 5 minuten
 
 ### 5.23 Debuggen en kalibratie
 
-**Telnet debug-trace.** SAT heeft zijn eigen conditionele debugkanaal. Verbind met de OTGW via TCP-poort 23 en druk op `5` om SAT control-, cycle- en HCR-tracing om te schakelen. In 2.0.0 staat deze standaard aan. Alle togglekeys worden getoond in de telnet-welkomstbanner.
+**Telnet debug-trace.** SAT heeft zijn eigen conditionele debugkanaal. Verbind met de OTGW via TCP-poort 23 en druk op `5` om SAT control-/cycle-/HCR-tracing om te schakelen (standaard aan in 2.0.0), op `6` voor OTDirect-tracing (standaard aan), en op `7` voor de SAT-BLE-scan-debugstroom (per-advertisement samenvatting). De telnet-shortcut `w` forceert direct een Open-Meteo-fetch + dump. Alle togglekeys worden getoond in de telnet-welkomstbanner.
 
 **OPV-kalibratie (Overshoot Protection Value).** SAT kan het minimale stabiele ketelsetpoint meten (het punt waarop de vlam blijft branden zonder kort-cycleren) en dit als ondergrens toepassen. Start een kalibratieronde met:
 

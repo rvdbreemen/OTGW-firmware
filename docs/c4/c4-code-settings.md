@@ -4,7 +4,7 @@
 
 - **Name**: Settings Module (OTGW-firmware Settings & Persistence Layer)
 - **Description**: Persistent configuration management system for OTGW-firmware. Handles reading/writing settings to LittleFS as JSON without ArduinoJson library, provides server-side validation, and deferred-write optimization to reduce flash wear.
-- **Location**: `/src/OTGW-firmware/settingStuff.ino` + settings structs in `/src/OTGW-firmware/OTGW-firmware.h`
+- **Location**: `/src/OTGW-firmware/settingStuff.ino`; the global `settings` / `state` instances declared in `/src/OTGW-firmware/OTGW-firmware.h`; per-component types live in their own `*types.h` headers under `/src/OTGW-firmware/` (ADR-079 / ADR-081)
 - **Language**: Arduino C/C++ (ESP8266/ESP32)
 - **Purpose**: Provide persistent configuration storage, REST API handler for settings updates, and service restart coordination through deferred-write patterns. Foundation for all module configuration: network, MQTT, GPIO, WebSocket, SAT thermostat, OT-direct, and hardware-specific features.
 
@@ -232,8 +232,24 @@
 ## Data Model: OTGWSettings Struct
 
 ### Location
-- `OTGW-firmware.h:940` — struct definition
-- Global instance: `OTGWSettings settings` (OTGW-firmware.h:966)
+- `OTGW-firmware.h` — root `OTGWSettings` and `OTGWState` struct definitions; global instances `settings`, `state`
+- Per-component types in dedicated `*types.h` headers (ADR-079 / ADR-081), each included after `boards.h`:
+  - `Devicetypes.h` — `DeviceSection`
+  - `Hardwaretypes.h` — runtime hardware capability struct
+  - `Networktypes.h` — `OTGWNetworkMode`, `NetworkSection`, `EthernetSection`
+  - `NTPtypes.h` — `NTPSection` + status enum
+  - `Sensorstypes.h` — `SensorsSection`
+  - `S0types.h` — `S0Section`
+  - `Outputstypes.h` — `OutputsSection`
+  - `Webhooktypes.h` — `WebhookSection`
+  - `UItypes.h` — `UISection`
+  - `PICtypes.h` — `PICSection`, `PICBootSection`
+  - `OTBustypes.h` — `OTBusSection` (runtime bus state)
+  - `OTDirecttypes.h` — `OTDirectSettingsSection`, OTDirect runtime state + mode/override enums
+  - `Flashtypes.h` — flash/board-id types
+  - `Uptimetypes.h` — uptime/runtime counters
+  - `SATtypes.h` — SAT settings + runtime state (largest header; multi-area, BLE roster, weather)
+- ADR-081 folded the previously separate `Componenttypes.h` declarations into the per-component headers above.
 
 ### Architecture (ADR-051: Two-Level Named Sub-Sections)
 
@@ -507,6 +523,7 @@ All numeric/enum fields constrained during `updateSetting()`:
 - `flushSettings()` consumes flag; clears after write
 - `settingsMarkClean()` allows manual clear (e.g., after OTA reboot window)
 - Prevents accidental writes during boot or external flash operations
+- **Per-field no-op detection (TASK-564)**: `updateSetting()` compares the new value against the current stored value for each field and skips dirty-flagging + debounce-timer restart when they match. Cosmetic UI saves (an unchanged form posted back) no longer cost a flash write or a service restart.
 
 ## Call Graph
 

@@ -18,37 +18,41 @@
 |------|------|---------|
 | `index.html` | ~11 KB | Main SPA entry point; loads CSS (with theme detection), JS modules, and ECharts library. Template-driven layout with page sections for Home, SAT, Settings, Advanced modes. Includes OT-Direct panel (OTGW32 only). |
 
-### Stylesheets
+### Stylesheets (Design-System Migration)
 
-| File | Size | Purpose |
-|------|------|---------|
-| `index.css` | Light theme styles; header bar, nav tabs, tables, settings fields, OT log viewer, graph container |
-| `index_dark.css` | Dark theme override; same structure as `index.css` but dark color palette |
-| `index_common.css` | Shared responsive rules for both themes; mobile breakpoints (≤768px), layout flex utilities, button styles, form spacing |
+The previous trio `index.css` / `index_dark.css` / `index_common.css` and the `FSexplorer.css` / `FSexplorer_dark.css` pair have been removed. Styling is now driven by a single CSS variable token layer plus one component sheet that both themes consume:
+
+| File | Purpose |
+|------|---------|
+| `ds-tokens.css` | Design-system tokens: light/dark colour palettes, spacing scale, typography variables. Single source of truth — themes are pure variable swaps. |
+| `components.css` | Component styles (header, nav tabs, tables, settings fields, OT log viewer, graph container, file explorer). Consumes only `ds-tokens.css` variables; no hardcoded colours. |
+| `design.html` | Living component gallery / style guide — every reusable widget rendered once with token labels for visual regression review. Not linked from the SPA; loaded directly when iterating on tokens. |
+| `theme-toggle.js` | Sun/moon toggle button; persists choice in `localStorage`, applies the right `data-theme` attribute, fires a `themechange` event for the ECharts theme listener. |
+| `echarts-theme.js` | ECharts theme registration (light + dark); listens for `themechange` and re-renders graph y-axes / legends. |
 
 ### JavaScript Modules
 
 | File | Size | Purpose |
 |------|------|---------|
-| `index.js` | ~3000 lines | **Main UI controller**. Handles: page navigation, WebSocket OT log streaming, REST API polling, local storage caching, theme switching, settings persistence, firmware flashing, device info display. Core logic for all pages except SAT. |
-| `sat.js` | ~600 lines | **SAT (Smart Autotune Thermostat) dashboard**. Fetches `/api/v2/sat/status`, renders heating curve, PID controls, preset buttons, temperature charts, simulation toggle, boiler state labels. |
-| `graph.js` | ~800 lines | **Real-time temperature/OT graph visualization**. ECharts-based multi-grid chart with 5 separate y-axes (Flame, DHW, CH, Modulation, Temperatures). Handles live data streaming, theme synchronization, memory-aware buffering (24h), Dallas sensor auto-discovery and color mapping. |
+| `index.js` | ~7500 lines | **Main UI controller**. Handles: page navigation, WebSocket OT log streaming, REST API polling, local storage caching, theme switching, settings persistence, firmware flashing, device info display. Core logic for all pages except SAT. **English-only** (TASK-569 removed all Dutch UI strings). |
+| `sat.js` | ~1400 lines | **SAT (Smart Adaptive Thermostat) dashboard**. Fetches `/api/v2/sat/status`, renders heating curve with calibration markers (TASK-586), PID controls, preset buttons, temperature charts, simulation toggle, boiler state labels, sensor-area mapping UI, BLE roster, WiFi scan picker. |
+| `sat-slider.js` | ~50 lines | Slider widget shared across SAT setpoint / curve controls. |
+| `graph.js` | ~1100 lines | **Real-time temperature/OT graph visualization**. ECharts-based multi-grid chart with 5 separate y-axes (Flame, DHW, CH, Modulation, Temperatures). Handles live data streaming, theme synchronization, memory-aware buffering (24h), Dallas sensor auto-discovery and color mapping. |
 
 ### Configuration & Data Files
 
 | File | Size | Purpose |
 |------|------|---------|
 | `settings.ini` | JSON | Default device settings template (hostname, MQTT broker/port, NTP timezone, OTGWcommands startup). Seed data for first-time setup. |
-| `mqttha.cfg` | ~100 KB | **Home Assistant MQTT Auto-Config definitions**. Defines 200+ MQTT discovery payloads (climate, binary_sensor, sensor) for Home Assistant integration. Includes device metadata (manufacturer, model, version). Templated with `%mqtt_pub_topic%`, `%node_id%`, `%version%` substitutions. |
-| `otgw_simulation.log` | Sample data | Example OT message log for testing/demo purposes. |
+| `version.hash` | <0.1 KB | Firmware/filesystem version hash for mismatch detection banner. |
+
+Note: `mqttha.cfg` and the file-based discovery template approach have been retired. Discovery is now driven by the PROGMEM data tables and streaming functions in `MQTTHaDiscovery.cpp` (ADR-077). `docs/archive/mqttha.cfg` is kept as historical reference only.
 
 ### File System Explorer (LittleFS Web UI)
 
-| File | Size | Purpose |
-|------|------|---------|
-| `FSexplorer.html` | ~4 KB | Standalone file browser for managing LittleFS files (upload, delete, rename, download). Embedded in "Advanced" menu. |
-| `FSexplorer.css` | Light theme for file explorer |
-| `FSexplorer_dark.css` | Dark theme for file explorer |
+| File | Purpose |
+|------|---------|
+| `FSexplorer.html` | Standalone file browser for managing LittleFS files (upload, delete, rename, download). Styled by `components.css` + `ds-tokens.css` (no separate theme files). Embedded in "Advanced" menu. |
 | `FSexplorer.png` | Icon/graphic for file explorer UI |
 
 ### Assets & Media
@@ -482,13 +486,13 @@ Formatted display (example):
 [12:34:56.123] T 0 → P5A80 | Status: Master and Boiler (T)
 ```
 
-### Theme Switching
+### Theme Switching (Design-System Tokens)
 
 1. **Storage**: `localStorage.setItem('theme', 'dark' | 'light')`
-2. **Detection**: On page load, check localStorage; if not set, check `window.matchMedia('(prefers-color-scheme: dark)')`
-3. **CSS Injection**: Script in `<head>` of `index.html` dynamically selects `index.css` or `index_dark.css` before page renders
-4. **Sync**: Graph and all charts re-render with new palette when theme changes
-5. **Button**: Theme toggle button updates icon (☀/🌙) and text
+2. **Detection**: On page load, `theme-toggle.js` reads localStorage; if unset, falls back to `window.matchMedia('(prefers-color-scheme: dark)')`.
+3. **Token swap**: The chosen theme sets `data-theme="dark"` (or `"light"`) on `<html>`. `ds-tokens.css` defines both palettes via CSS variables; `components.css` consumes only variables, so the switch is a single attribute flip — no second stylesheet to load, no FOUC.
+4. **Sync**: A `themechange` custom event fires; `echarts-theme.js` listens and re-applies the matching ECharts theme so graph y-axes / legends recolour in place.
+5. **Button**: Sun/moon toggle in `theme-toggle.js` updates its own glyph based on `data-theme`.
 
 ---
 
@@ -540,7 +544,7 @@ Formatted display (example):
 
 ### MQTT Integration
 
-- Uses `mqttha.cfg` for Home Assistant MQTT discovery auto-configuration
+- HA discovery is published by the firmware from PROGMEM tables in `MQTTHaDiscovery.cpp` (ADR-077); the `mqttha.cfg` file in `data/` no longer exists. ADR-100 defaults to JIT discovery (on first OT message arrival); ADR-101 keeps value topics as flat per-value scalars; ADR-106 publishes self-describing names by default.
 - Topics: `OTGW/*` (default), `homeassistant/climate/*/config`, etc.
 - Publishes: OT state, temperatures, flame status, DHW, CH, mode statuses
 - Subscribes: Thermostat setpoint commands, DHW control commands
@@ -581,27 +585,17 @@ Formatted display (example):
 
 ## Theme System
 
-### Light Theme (index.css)
+### Token Layer (ds-tokens.css)
 
-- **Background**: Cyan/light blue (`#e6ffff`)
-- **Header**: Sky blue (`#00bffe`)
-- **Text**: Black on light backgrounds
-- **Accent**: Light blue tables, white form inputs
+Light and dark palettes are defined as CSS custom properties on `:root` and on `[data-theme="dark"]`. Tokens cover surface/background colours, text levels, accent (header / focus), borders, table rows, and graph palette. Themes are pure variable swaps — no separate stylesheet per theme.
 
-### Dark Theme (index_dark.css)
+### Component Layer (components.css)
 
-- **Background**: Dark gray/charcoal
-- **Header**: Dark blue
-- **Text**: White/light gray on dark backgrounds
-- **Accent**: Dark tables, darker form inputs
+All visible widgets (header, nav tabs, tables, settings fields, OT log viewer, file explorer, graph container, SAT panels) are styled here. The sheet consumes only `ds-tokens.css` variables — no hardcoded colours, no theme-specific rules. Responsive rules (`@media (max-width: 768px)` for mobile) and accessibility (ARIA labels, semantic button roles) live in the same file.
 
-### Common Styles (index_common.css)
+### Style Guide (design.html)
 
-- Mobile responsiveness: `@media (max-width: 768px)` — hide OT log, stack nav vertically, adjust button sizes
-- Navigation bar: Flexbox row layout with wrapping
-- Settings form: 320px field width, left-floated columns
-- Tab system: Active/inactive tab styling
-- Accessibility: ARIA labels on interactive elements, semantic button roles
+`design.html` renders every reusable widget once with its token label. Not linked from the SPA; loaded directly when iterating on tokens to catch regressions visually.
 
 ---
 
@@ -611,10 +605,10 @@ Formatted display (example):
 
 1. ESP8266 firmware (`OTGW-firmware.ino`) initializes LittleFS at startup
 2. Files in `data/` directory are embedded during build: `python build.py` packs all files into SPIFFS/LittleFS image
-3. HTTP server (AsyncWebServer) routes:
+3. HTTP server routes:
    - `/` → `/index.html`
-   - `/index.css`, `/index_dark.css`, `/index_common.css` → CSS files
-   - `/index.js`, `/graph.js`, `/sat.js` → JavaScript modules
+   - `/ds-tokens.css`, `/components.css` → CSS files
+   - `/index.js`, `/graph.js`, `/sat.js`, `/sat-slider.js`, `/theme-toggle.js`, `/echarts-theme.js` → JavaScript modules
    - `/pic16f88/*`, `/pic16f1847/*` → PIC firmware binaries and version files
    - `/api/*` → REST endpoints (handled by firmware C++ code)
    - `/ws` → WebSocket endpoint (handled by firmware C++ code)
@@ -622,9 +616,10 @@ Formatted display (example):
 ### File Size Constraints
 
 - **ESP8266 Flash**: Total 4 MB; firmware + LittleFS split typically 2 MB / 2 MB
-- **index.html**: ~11 KB (relatively large; streamed by default to avoid RAM overhead)
-- **JavaScript**: ~3 KB (index.js) + 600 B (sat.js) + 800 B (graph.js) = ~4.4 KB total
-- **CSS**: ~10 KB total (index.css + dark + common)
+- **ESP32 (OTGW32)**: Custom partition table; LittleFS partition 768 KB
+- **index.html**: ~11 KB (streamed by default to avoid RAM overhead)
+- **JavaScript**: index.js (largest, multi-page controller) + sat.js + graph.js + small helpers; total well under flash budget
+- **CSS**: `ds-tokens.css` + `components.css` (single sheet per concern; both themes live in `ds-tokens.css`)
 - **PIC binaries**: ~100 KB total (multiple versions for 2 PIC types)
 
 ### Build Process
@@ -763,7 +758,7 @@ The SAT module is a complete subsystem for thermostat autotune:
 ### Firmware Components
 
 - **index.ino**: HTTP server setup, REST endpoints, WebSocket handler
-- **MQTTstuff.ino**: MQTT auto-config generation (mqttha.cfg processing)
+- **MQTTstuff.ino** / **MQTTHaDiscovery.cpp**: MQTT HA auto-discovery streaming from PROGMEM tables (replaces former runtime `mqttha.cfg` parsing)
 - **SATcontrol.ino**: SAT algorithm and real-time control (backend)
 - **restAPI.ino**: REST endpoint implementation
 

@@ -56,12 +56,16 @@ Sinds v2.0.0 bevat de firmware een `boards.h`-header die pin-mappings, feature f
 
 ### Nieuwe functies in v2.0.0
 
-v2.0.0 is een grote platformrelease. Het levert volledige ondersteuning voor het ESP32-platform en de OTGW32-hardware, naast het bestaande ESP8266-pad, in een enkele uniforme codebase. Er zijn geen breaking changes aan MQTT-topics of de REST API ten opzichte van v1.x. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
+v2.0.0 is een grote platformrelease. Het levert volledige ondersteuning voor het ESP32-platform en de OTGW32-hardware, naast het bestaande ESP8266-pad, in een enkele uniforme codebase. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
+
+v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functionaliteit is feature-compleet, maar SAT, OTDirect en de nieuwe MQTT-topicnamen (zie hieronder) worden nog verder verfijnd. Volg de GitHub Releases-pagina voor de actuele alpha-tag.
+
+**Breaking change in deze release.** v2.0.0 gebruikt standaard een nieuwe, zelfbeschrijvende set MQTT-topicnamen (ADR-106). Zevenendertig OT-spec-georiënteerde binary_sensor-topics krijgen een duidelijker, Home Assistant-vriendelijk label (bijvoorbeeld: `master_ch_enable` wordt `central_heating_enabled`). Gebruikers met bestaande automations op de oude labels kunnen `settings.mqtt.bUseLegacyOtTopics` op `true` zetten om het v1.x-gedrag te behouden. De twee modi sluiten elkaar uit: of de nieuwe namen, of de oude namen worden gepubliceerd, nooit beide tegelijk. De REST API is ongewijzigd ten opzichte van v1.x.
 
 **ESP32 / OTGW32-ondersteuning**
 - Volledige compilatie en werking op ESP32 naast de bestaande ESP8266
 - OTDirect: directe GPIO-implementatie van OpenTherm, zonder PIC co-processor, met vijf werkingsmodi (thermostaat, ketel, gateway, monitor en gecombineerd master+slave)
-- W5500 SPI Ethernet: bekabeld netwerk met automatische failover van en naar Wi-Fi
+- W5500 SPI Ethernet: bekabeld netwerk met dynamische runtime-failover van en naar Wi-Fi (zonder reboot)
 - BLE temperatuursensoren: passieve Bluetooth LE-scan van Xiaomi LYWSD03MMC via BTHome v2 (maximaal 4 sensoren)
 - Aangepaste partitietabel met twee OTA-sloten van 1,5 MB en 768 KB LittleFS
 
@@ -78,7 +82,9 @@ v2.0.0 is een grote platformrelease. Het levert volledige ondersteuning voor het
 **MQTT en Home Assistant**
 - 250+ auto-discovery entiteiten: climate entity, SAT-sensoren, BLE-sensoren, drukbewaking, OLED-status
 - Streaming MQTT discovery: discovery payloads worden gecompileerd in flash (PROGMEM) en asynchroon gepubliceerd via een bitmap-gestuurd drip-mechanisme dat elke entiteit rechtstreeks naar de broker streamt. Dit vervangt de eerdere LittleFS- en RAM-gebaseerde aanpak en elimineert grote staging-buffers.
-- SAT switches en select entities zijn toegevoegd aan de HA discovery via dezelfde streaming-pipeline (TASK-284), samen met runtime-gedetecteerde Dallas-sensoren en de climate/number entiteiten.
+- SAT switches en select entities zijn toegevoegd aan de HA discovery via dezelfde streaming-pipeline (TASK-284), samen met runtime-gedetecteerde Dallas-sensoren, de climate- en number-entiteiten, en HA button- en select-entiteiten voor PIC-commando's.
+- Just-in-time MQTT discovery (ADR-100): discovery-configs voor OpenTherm MsgIDs worden nu pas gepubliceerd wanneer de ketel of thermostaat die MsgID voor het eerst zendt, in plaats van bij elke boot alle 256 IDs in bulk te publiceren. Dit houdt het broker-register beperkt tot de IDs die uw hardware daadwerkelijk gebruikt en vermindert MQTT-verkeer bij het opstarten.
+- Platte MQTT-topics per waarde (ADR-101): elke sensor of regelwaarde wordt als platte scalar op zijn eigen topic gepubliceerd. Geen samengestelde JSON-state-topics. Dit is een bewuste keuze die auto-discovery transparant houdt en een eigen HA-component overbodig maakt.
 
 **Netwerk en stabiliteit**
 - AP-fallbackmodus: als Wi-Fi drie keer achter elkaar mislukt, opent het apparaat een accesspoint
@@ -86,11 +92,14 @@ v2.0.0 is een grote platformrelease. Het levert volledige ondersteuning voor het
 - Driedubbele reset-procedure om Wi-Fi-instellingen te wissen zonder serieel
 - Nachtelijke herstart: configureerbare automatische reboot (tijdstip en dagkeuze) om heap-fragmentatie op te lossen bij langlopende ESP8266-apparaten
 
+**Webinterface**
+- De webinterface is uitsluitend Engelstalig. Resterende Nederlandse strings uit de OTTHING-platformport zijn verwijderd (TASK-569). Dit handboek blijft Nederlandstalig.
+
 **Build en tooling**
 - Gecentraliseerde PlatformIO-build voor zowel ESP8266 als ESP32
 - Platformabstractie via `boards.h` met feature flags per printvariant
 - SimpleTelnet: uniforme multi-client telnet-bibliotheek ter vervanging van TelnetStream en ESPTelnet uit v1.x
-- Toolchain-update: ESP8266-builds gebruiken nu Arduino core 3.1.2 (was 2.7.4 in v1.3.5), en tijdafhandeling is overgezet op AceTime 4.x. Dit levert een actuele lwIP, een vernieuwde Wi-Fi-stack en een kleinere, snellere tijd-bibliotheek op.
+- Toolchain: ESP8266-builds blijven op Arduino core 2.7.4 (de LTS-basis). De 1.4.x-lijn stapte tijdelijk over op core 3.1.2, maar de v1.5.x-LTS-lijn is teruggekeerd naar 2.7.4 voor veldgeteste stabiliteit (lwIP ging mee terug naar de 2.7.4-release). De tijdafhandeling is overgezet op AceTime 4.x; dat staat los van de core-versie en levert een kleinere, snellere tijd-bibliotheek op.
 - Verbeterd `build.py`-script en `flash_esp.py` met ESP32-ondersteuning
 
 ---

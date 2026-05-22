@@ -64,6 +64,10 @@ tags:
     description: OTGW simulation mode control
   - name: Webhook
     description: Webhook testing
+  - name: Debug
+    description: Flat key/value diagnostic dump of build, runtime, settings and state
+  - name: Network
+    description: WiFi scan and network diagnostics
   - name: SAT
     description: |
       SAT (Smart Autotune Thermostat) is an embedded heating controller that runs entirely
@@ -139,6 +143,134 @@ paths:
                         enum: ["true", "false"]
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/debug:
+    get:
+      tags:
+        - Debug
+      summary: Flat diagnostic dump
+      description: |
+        Returns a flat JSON map of build identifiers, runtime counters, every
+        persistent setting (sensitive fields masked), and the full transient
+        state struct. The output is intended for bug reports and field support
+        triage; the shape is not part of the long-term stable contract and may
+        gain new keys between releases.
+
+        Sensitive setting values (HTTP password, MQTT password, weather API
+        key) are emitted as `"***"` when present and `"(not set)"` when empty.
+        OT-direct sub-sections appear only on OTGW32 builds; SAT BLE and
+        weather sub-sections only on ESP32 builds.
+
+        Always requires authentication when an HTTP password is configured.
+      operationId: getDebugDump
+      security:
+        - basicAuth: []
+      responses:
+        '200':
+          description: Diagnostic dump retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  debug:
+                    type: object
+                    description: |
+                      Flat key/value map. Keys are dotted paths grouped under
+                      `build.*`, `runtime.*`, `settings.<section>.*`,
+                      `state.<section>.*`. See `handleDebugDump()` in
+                      `restAPI.ino` for the authoritative key list.
+        '401':
+          description: Authentication required
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/network/scan:
+    get:
+      tags:
+        - Network
+      summary: Asynchronous WiFi network scan
+      description: |
+        Triggers and reports a non-blocking WiFi network scan (TASK-585).
+
+        First call starts the scan and returns `{"status":"scanning"}`.
+        Subsequent polls return the same payload while the scan is in
+        progress. Once complete the response is `{"status":"ready","count":N,"networks":[...]}`,
+        the scan buffer is freed, and the next call starts a fresh scan.
+
+        Refuses to scan while a PIC flash is in progress (returns 503).
+        Quotes and backslashes in SSIDs are replaced with underscore to keep
+        the JSON valid without escaping.
+      operationId: scanWifiNetworks
+      responses:
+        '200':
+          description: Scan in progress or completed
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [scanning]
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [ready]
+                      count:
+                        type: integer
+                      networks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ssid:
+                              type: string
+                            rssi:
+                              type: integer
+                              description: Signal strength in dBm
+                            channel:
+                              type: integer
+                            secured:
+                              type: boolean
+                            connected:
+                              type: boolean
+                              description: True when this is the SSID the device is currently associated with
+              examples:
+                scanning:
+                  value:
+                    status: scanning
+                ready:
+                  value:
+                    status: ready
+                    count: 2
+                    networks:
+                      - ssid: "MyWiFi"
+                        rssi: -55
+                        channel: 6
+                        secured: true
+                        connected: true
+                      - ssid: "Guest"
+                        rssi: -78
+                        channel: 11
+                        secured: true
+                        connected: false
+        '404':
+          description: Unknown sub-resource (only `/scan` is implemented)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '503':
+          description: Scan unavailable during a PIC flash operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
   /v2/settings:
     get:
@@ -2449,6 +2581,490 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/weather/needs-setup:
+    get:
+      tags:
+        - SAT
+      summary: Report whether the weather setup wizard should be shown
+      description: |
+        Returns whether the browser-side weather setup wizard should be
+        triggered (TASK-511). Becomes `true` only after a 5-minute startup
+        grace window AND when the canonical outside temperature
+        (`OTcurrentSystemState.Toutside`, populated from OT MsgID 27) is
+        still zero AND the SAT weather provider has not produced a valid
+        reading. The `has_key` field surfaces whether an Open-Meteo /
+        provider API key is already stored.
+      operationId: getSatWeatherNeedsSetup
+      responses:
+        '200':
+          description: Setup status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  needs_setup:
+                    type: boolean
+                  has_key:
+                    type: boolean
+              example:
+                needs_setup: false
+                has_key: true
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/ble/discovery:
+    get:
+      tags:
+        - SAT
+      summary: BLE sensor roster (ESP32 only)
+      description: |
+        Streams the BLE roster as JSON (TASK-508). Each roster slot lists the
+        discovered MAC, persistent label, last temperature/humidity, RSSI,
+        and selection state. ESP32-only endpoint; the entire `/v2/sat/ble/*`
+        family returns 404 from the SAT handler on ESP8266 builds.
+      operationId: getSatBleDiscovery
+      responses:
+        '200':
+          description: Roster retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Roster payload as produced by `satBLERosterSendJSON()`.
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/ble/select:
+    post:
+      tags:
+        - SAT
+      summary: Promote a roster MAC to the active BLE sensor (ESP32 only)
+      description: |
+        Promotes the named MAC from the roster to the active SAT BLE sensor
+        slot (TASK-508). The MAC must already be present in the roster from
+        a prior discovery cycle.
+      operationId: setSatBleSelect
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mac]
+              properties:
+                mac:
+                  type: string
+                  example: "AA:BB:CC:DD:EE:FF"
+      responses:
+        '200':
+          description: Roster slot selected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: MAC not present in roster
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - SAT
+      summary: Promote a roster MAC (PUT alias)
+      operationId: setSatBleSelectPut
+      requestBody:
+        $ref: '#/paths/~1v2~1sat~1ble~1select/post/requestBody'
+      responses:
+        '200':
+          description: Roster slot selected
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: MAC not present in roster
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/ble/label:
+    post:
+      tags:
+        - SAT
+      summary: Set the persistent label on a roster slot (ESP32 only)
+      description: |
+        Updates the user-visible label for the named MAC in the BLE roster
+        (TASK-508). Label is persisted alongside the roster slot.
+      operationId: setSatBleLabel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mac, label]
+              properties:
+                mac:
+                  type: string
+                  example: "AA:BB:CC:DD:EE:FF"
+                label:
+                  type: string
+                  maxLength: 31
+                  example: "Living room"
+      responses:
+        '200':
+          description: Label updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: MAC not present in roster
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - SAT
+      summary: Set roster label (PUT alias)
+      operationId: setSatBleLabelPut
+      requestBody:
+        $ref: '#/paths/~1v2~1sat~1ble~1label/post/requestBody'
+      responses:
+        '200':
+          description: Label updated
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: MAC not present in roster
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/ble/forget:
+    post:
+      tags:
+        - SAT
+      summary: Drop a roster slot and its HA discovery (ESP32 only)
+      description: |
+        Removes the named MAC from the BLE roster and unpublishes the matching
+        Home Assistant discovery config (TASK-508). Accepts POST, PUT, or
+        DELETE; the body always carries the MAC.
+      operationId: forgetSatBle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mac]
+              properties:
+                mac:
+                  type: string
+                  example: "AA:BB:CC:DD:EE:FF"
+      responses:
+        '200':
+          description: Roster slot removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: MAC not present in roster
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - SAT
+      summary: Drop a roster slot (PUT alias)
+      operationId: forgetSatBlePut
+      requestBody:
+        $ref: '#/paths/~1v2~1sat~1ble~1forget/post/requestBody'
+      responses:
+        '200':
+          description: Roster slot removed
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: MAC not present in roster
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    delete:
+      tags:
+        - SAT
+      summary: Drop a roster slot (DELETE alias)
+      operationId: forgetSatBleDelete
+      requestBody:
+        $ref: '#/paths/~1v2~1sat~1ble~1forget/post/requestBody'
+      responses:
+        '200':
+          description: Roster slot removed
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: MAC not present in roster
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/markers:
+    get:
+      tags:
+        - SAT
+      summary: List heating-curve calibration markers
+      description: |
+        Returns the heating-curve calibration markers persisted to
+        `/sat_markers.json` (TASK-586). Each marker is an object with
+        `id`, `outside_temp`, `flow_temp`, `added` (unix epoch), and
+        optional `label`. Returns an empty JSON array when the file does
+        not yet exist.
+      operationId: listSatMarkers
+      responses:
+        '200':
+          description: Marker list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    outside_temp:
+                      type: number
+                    flow_temp:
+                      type: number
+                    added:
+                      type: integer
+                      description: Unix epoch when the marker was created
+                    label:
+                      type: string
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    post:
+      tags:
+        - SAT
+      summary: Add a heating-curve calibration marker
+      description: |
+        Appends a marker to `/sat_markers.json` (TASK-586). The store keeps
+        at most 20 markers; a 409 is returned when the limit is reached. The
+        new `id` is `max(existing_id) + 1`. The `added` timestamp is the
+        current epoch when the marker is written.
+      operationId: addSatMarker
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outside_temp, flow_temp]
+              properties:
+                outside_temp:
+                  type: number
+                  minimum: -15
+                  maximum: 25
+                flow_temp:
+                  type: number
+                  minimum: 10
+                  maximum: 90
+                label:
+                  type: string
+                  maxLength: 31
+      responses:
+        '201':
+          description: Marker created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  id:
+                    type: integer
+              example:
+                status: ok
+                id: 4
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '409':
+          description: Marker store is full (20 markers maximum)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '500':
+          description: Cannot write `/sat_markers.json` to LittleFS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /v2/sat/markers/{id}:
+    delete:
+      tags:
+        - SAT
+      summary: Delete a heating-curve calibration marker
+      description: |
+        Removes the marker with the given numeric `id` from
+        `/sat_markers.json` (TASK-586).
+      operationId: deleteSatMarker
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Marker removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: Marker id not found, or the markers file does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '500':
+          description: Cannot write `/sat_markers.json` to LittleFS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /v2/sat/sensor-areas:
+    get:
+      tags:
+        - SAT
+      summary: Get Dallas-to-SAT-area mapping
+      description: |
+        Returns the persistent mapping of Dallas 1-Wire sensor addresses to
+        the four SAT area slots (TASK-587). An empty `sensor` string means
+        the slot is unmapped. Addresses are 16 uppercase hex characters.
+      operationId: getSatSensorAreas
+      responses:
+        '200':
+          description: Mapping retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  areas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:
+                          type: integer
+                          minimum: 0
+                          maximum: 3
+                        sensor:
+                          type: string
+                          description: 16-hex-character Dallas address or empty string
+              example:
+                areas:
+                  - index: 0
+                    sensor: "28FF64D1841703F1"
+                  - index: 1
+                    sensor: ""
+                  - index: 2
+                    sensor: ""
+                  - index: 3
+                    sensor: ""
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    patch:
+      tags:
+        - SAT
+      summary: Update one Dallas-to-SAT-area mapping
+      description: |
+        Updates one of the four mapping slots (TASK-587). The body specifies
+        the slot `area` (0-3) and the Dallas sensor address. An empty string
+        clears the slot. Addresses are validated as 16 hex characters and
+        normalised to uppercase before persistence. Also accepts POST and
+        PUT for browsers that cannot issue PATCH.
+      operationId: setSatSensorArea
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [area]
+              properties:
+                area:
+                  type: integer
+                  minimum: 0
+                  maximum: 3
+                sensor:
+                  type: string
+                  pattern: '^([0-9A-Fa-f]{16})?$'
+                  description: 16-hex-character Dallas address, or empty string to clear the slot
+      responses:
+        '200':
+          description: Mapping updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    post:
+      tags:
+        - SAT
+      summary: Update one Dallas-to-SAT-area mapping (POST alias)
+      operationId: setSatSensorAreaPost
+      requestBody:
+        $ref: '#/paths/~1v2~1sat~1sensor-areas/patch/requestBody'
+      responses:
+        '200':
+          description: Mapping updated
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      tags:
+        - SAT
+      summary: Update one Dallas-to-SAT-area mapping (PUT alias)
+      operationId: setSatSensorAreaPut
+      requestBody:
+        $ref: '#/paths/~1v2~1sat~1sensor-areas/patch/requestBody'
+      responses:
+        '200':
+          description: Mapping updated
         '400':
           $ref: '#/components/responses/BadRequestJson'
         '405':

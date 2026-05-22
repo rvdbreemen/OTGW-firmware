@@ -199,6 +199,19 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 - **Route**: `POST /api/v2/webhook/test?state=on|off|1|0` → `testWebhook(bool)`
 - **Auth**: Not required
 
+#### `void handleDebugDump()`
+- **Purpose**: Snapshot of every debug-related flag (state.debug.b*, settings.bMyDEBUG) plus current local IP — single endpoint for support / bug reports.
+- **HTTP Method**: GET only
+- **Route**: `GET /api/v2/debug` → JSON map with `settings.mydebug`, all `state.debug.*` booleans, and `ip`.
+- **Auth**: Not required.
+
+#### `void handleNetwork()` (TASK-585)
+- **Purpose**: WiFi scan for the Settings page network picker.
+- **HTTP Method**: GET only.
+- **Route**: `GET /api/v2/network/scan` → JSON array of `{ssid, rssi, encryption, channel}` for visible networks.
+- **Auth**: Not required.
+- **Notes**: Single-shot active scan; cooperative-scheduler-friendly (results buffered, no blocking wait).
+
 #### `void handleSAT()`
 - **Location**: `restAPI.ino:644–821`
 - **Purpose**: Smart Ambient Temperature (SAT) control and diagnostics
@@ -215,6 +228,13 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
   - `POST /api/v2/sat/preset` — apply preset
   - `POST /api/v2/sat/settings/<name>` — update SAT settings (mirrors MQTT sat/* commands)
   - `POST /api/v2/sat/reset_integral` — reset PID integral
+  - `GET /api/v2/sat/markers` / `POST` (add) / `DELETE /api/v2/sat/markers/<id>` — heating-curve calibration markers persisted to `/sat_markers.json` (TASK-586); max 20 markers; body `{"outside_temp":..,"flow_temp":..,"label":"..."}`
+  - `GET /api/v2/sat/sensor-areas` / `PATCH /api/v2/sat/sensor-areas` — multi-area DS18B20 mapping (Task #25); body `{"area":0..3,"sensor":"AABBCCDD11223344"}` (empty sensor clears)
+  - `GET /api/v2/sat/weather/needs-setup` — true when SAT weather is enabled but coordinates/source are unconfigured (frontend onboarding gate)
+  - `GET /api/v2/sat/ble/discovery` — stream the BLE roster as JSON (TASK-508)
+  - `POST /api/v2/sat/ble/select` — `{mac}`: promote roster MAC to active sensor
+  - `POST /api/v2/sat/ble/label` — `{mac,label}`: set persistent label for a roster slot
+  - `POST /api/v2/sat/ble/forget` — `{mac}`: drop slot and clean up its HA discovery
 - **Auth**: Required (`checkHttpAuth()` at start)
 - **Extended diagnostics** (`?detail=full`):
   - Sync diagnostics (setpoint, modulation, CH mismatch)
@@ -577,6 +597,18 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 | POST/PUT | `/api/v2/sat/preset` | handleSAT | Yes | Apply preset |
 | POST/PUT | `/api/v2/sat/settings/<name>` | handleSAT | Yes | Update SAT setting |
 | POST | `/api/v2/sat/reset_integral` | handleSAT | Yes | Reset PID integral |
+| GET | `/api/v2/sat/markers` | handleSAT | Yes | List calibration markers (heating curve) |
+| POST | `/api/v2/sat/markers` | handleSAT | Yes | Add calibration marker (max 20, TASK-586) |
+| DELETE | `/api/v2/sat/markers/<id>` | handleSAT | Yes | Delete calibration marker by id |
+| GET | `/api/v2/sat/sensor-areas` | handleSAT | Yes | Multi-area DS18B20 mapping |
+| PATCH | `/api/v2/sat/sensor-areas` | handleSAT | Yes | Update one area→sensor mapping |
+| GET | `/api/v2/sat/weather/needs-setup` | handleSAT | Yes | Weather onboarding gate |
+| GET | `/api/v2/sat/ble/discovery` | handleSAT | Yes | BLE sensor roster (ESP32 only) |
+| POST | `/api/v2/sat/ble/select` | handleSAT | Yes | Promote roster slot to active BLE sensor |
+| POST | `/api/v2/sat/ble/label` | handleSAT | Yes | Set persistent label for roster slot |
+| POST | `/api/v2/sat/ble/forget` | handleSAT | Yes | Drop roster slot + HA discovery cleanup |
+| GET | `/api/v2/debug` | handleDebugDump | No | Snapshot of all debug flags + local IP |
+| GET | `/api/v2/network/scan` | handleNetwork | No | WiFi scan for Settings page (TASK-585) |
 | OPTIONS | `/api/v2/*` | sendApiOptions | N/A | CORS preflight |
 
 ### File Serving Routes
