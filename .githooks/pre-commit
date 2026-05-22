@@ -73,5 +73,20 @@ else
       echo "$TRIGGER" | sed 's/^/  /' >&2
       exit 1
     fi
+    # TASK-660: version.h bumped, but did the committer also stage
+    # data/version.hash? bin/bump-prerelease.sh rewrites both, so the hash
+    # SHOULD also be in the staged set. A committer who runs the bump
+    # script but only stages version.h ships a stale frontend cache-bust
+    # hash; the browser then keeps serving the old data/index.js next to
+    # the new firmware build.
+    HASH_STAGED=$(echo "$STAGED" | grep -c '^src/OTGW-firmware/data/version\.hash$' || true)
+    if [ "$HASH_STAGED" -lt 1 ]; then
+      echo "" >&2
+      echo "[bump] _VERSION_PRERELEASE changed but data/version.hash is NOT staged." >&2
+      echo "[bump] bin/bump-prerelease.sh rewrites both — stage them together:" >&2
+      echo "[bump]   git add src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash" >&2
+      echo "[bump] Bypass for this commit: OTGW_BUMP_HOOK_DISABLE=1 git commit ..." >&2
+      exit 1
+    fi
   fi
 fi
