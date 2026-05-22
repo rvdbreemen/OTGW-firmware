@@ -12,20 +12,19 @@ git config core.hooksPath .githooks
 
 ### `pre-commit`
 
-Two passes:
+One pass:
 
 1. **adr-kit gate** — runs `bin/adr-judge` against the staged diff to enforce
    `## Enforcement` blocks in Accepted ADRs. Degrades gracefully (logs and
    continues) when `adr-judge` is not installed. See `.claude/adr-kit-guide.md`.
    Bypass: `ADR_KIT_HOOK_DISABLE=1 git commit ...`
 
-2. **bump-prerelease check** (TASK-560) — if the staged set includes paths
-   under `src/OTGW-firmware/` (excluding `version.h` itself) or
-   `src/libraries/`, the same commit must change `_VERSION_PRERELEASE` in
-   `src/OTGW-firmware/version.h` (both a `+` and a `-` line on that
-   `#define`). Run `bin/bump-prerelease.sh` and stage `version.h` +
-   `data/version.hash` alongside your code change.
-   Bypass: `OTGW_BUMP_HOOK_DISABLE=1 git commit ...`
+> The per-commit `_VERSION_PRERELEASE` bump-check (TASK-560 + the
+> `data/version.hash` companion from TASK-660) was **removed by TASK-669**.
+> Bumps now happen once per beta release as Phase 2 of the
+> `/beta-prerelease` skill (which calls `bin/bump-prerelease.sh`), not per
+> commit. See `CLAUDE.md` → Versioning policy for the rationale. The 2.0.0
+> worktree keeps its own per-commit bump-check; that policy is branch-local.
 
 ### `commit-msg` (TASK-659)
 
