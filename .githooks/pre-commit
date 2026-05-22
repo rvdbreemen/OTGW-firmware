@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # adr-kit pre-commit hook (template; copied to project's .githooks/pre-commit by /adr-kit:install-hooks).
-# Plus the OTGW-firmware bump-check (TASK-560) appended at the bottom.
 #
 # Resolves the latest installed adr-kit version dynamically so plugin upgrades
 # don't require re-running install-hooks. Degrades gracefully when the plugin
 # cache is missing — the hook never blocks a commit because of tooling drift.
 #
 # Disable adr-judge for one commit:  ADR_KIT_HOOK_DISABLE=1 git commit ...
-# Disable bump-check for one commit: OTGW_BUMP_HOOK_DISABLE=1 git commit ...
 # Remove adr-kit hook permanently:   /adr-kit:install-hooks --uninstall  (in a Claude Code session)
+#
+# NOTE: this hook used to also run a per-commit bump-check (TASK-560 + TASK-660)
+# that required firmware-touching commits to bump _VERSION_PRERELEASE in
+# version.h. That check was removed by TASK-669 — bumps now happen only at
+# /beta-prerelease invocation time, not per commit. See CLAUDE.md Versioning
+# policy for details. The 2.0.0 worktree keeps its own bump-check unchanged.
 
 set -e
 
@@ -45,48 +49,9 @@ else
   fi
 fi
 
-# ---- bump-prerelease check (TASK-560) ----
-# Trigger paths: any staged path under src/OTGW-firmware/ (excluding version.h itself)
-# or src/libraries/. If triggered, the same commit must change _VERSION_PRERELEASE
-# in src/OTGW-firmware/version.h (both a + and a - line for that #define).
-if [ "${OTGW_BUMP_HOOK_DISABLE:-0}" = "1" ]; then
-  echo "[bump] hook disabled for this commit (OTGW_BUMP_HOOK_DISABLE=1)" >&2
-else
-  STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
-  TRIGGER=$(echo "$STAGED" | awk '
-    /^src\/OTGW-firmware\/version\.h$/ { next }
-    /^src\/OTGW-firmware\// { print; next }
-    /^src\/libraries\// { print; next }
-  ')
-  if [ -n "$TRIGGER" ]; then
-    PRERELEASE_DIFF=$(git diff --cached -- src/OTGW-firmware/version.h | grep -E '^[+-]#define _VERSION_PRERELEASE ' || true)
-    MINUS=$(echo "$PRERELEASE_DIFF" | grep -c '^-' || true)
-    PLUS=$(echo "$PRERELEASE_DIFF" | grep -c '^+' || true)
-    if [ "$MINUS" -lt 1 ] || [ "$PLUS" -lt 1 ]; then
-      echo "" >&2
-      echo "[bump] commit touches firmware code but does not bump _VERSION_PRERELEASE." >&2
-      echo "[bump] Run bin/bump-prerelease.sh and stage src/OTGW-firmware/version.h + data/version.hash" >&2
-      echo "[bump] alongside your code change." >&2
-      echo "[bump] Bypass for this commit: OTGW_BUMP_HOOK_DISABLE=1 git commit ..." >&2
-      echo "" >&2
-      echo "[bump] Triggering paths in this commit:" >&2
-      echo "$TRIGGER" | sed 's/^/  /' >&2
-      exit 1
-    fi
-    # TASK-660: version.h bumped, but did the committer also stage
-    # data/version.hash? bin/bump-prerelease.sh rewrites both, so the hash
-    # SHOULD also be in the staged set. A committer who runs the bump
-    # script but only stages version.h ships a stale frontend cache-bust
-    # hash; the browser then keeps serving the old data/index.js next to
-    # the new firmware build.
-    HASH_STAGED=$(echo "$STAGED" | grep -c '^src/OTGW-firmware/data/version\.hash$' || true)
-    if [ "$HASH_STAGED" -lt 1 ]; then
-      echo "" >&2
-      echo "[bump] _VERSION_PRERELEASE changed but data/version.hash is NOT staged." >&2
-      echo "[bump] bin/bump-prerelease.sh rewrites both — stage them together:" >&2
-      echo "[bump]   git add src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash" >&2
-      echo "[bump] Bypass for this commit: OTGW_BUMP_HOOK_DISABLE=1 git commit ..." >&2
-      exit 1
-    fi
-  fi
-fi
+# ---- bump-prerelease check (REMOVED by TASK-669) ----
+# Previously enforced that firmware-touching commits also bumped
+# _VERSION_PRERELEASE in version.h (TASK-560 + companion data/version.hash
+# staging check from TASK-660). Removed because the project moved to a
+# release-only bump model: bumps now happen once per beta release as part
+# of the /beta-prerelease skill (Phase 2), not per commit.
