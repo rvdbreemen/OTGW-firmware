@@ -1,9 +1,11 @@
 ---
 id: TASK-661
 title: 'Harden resetgateway MQTT command: payload validation + rate-limit'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-22 05:52'
+updated_date: '2026-05-22 06:25'
 labels:
   - security
   - mqtt
