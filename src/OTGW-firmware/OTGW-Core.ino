@@ -860,106 +860,6 @@ void sendOTGWbootcmd(){
   }
 }
 
-//===================[ OTGW Command & Response ]===================
-void executeCommand(const char* sCmd, char* outBuf, size_t outSize, bool mirrorToWebSocket){
-  //send command to OTGW — uses char[] buffers per ADR-004 (no heap allocation)
-  if (outSize > 0) outBuf[0] = '\0';
-  OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), sCmd);
-  size_t cmdLen = strlen(sCmd);
-  if (!isPICEnabled()) {
-    OTGWDebugTln(F("executeCommand: No PIC detected - command ignored"));
-    strlcpy(outBuf, "NG - No PIC detected, command ignored.", outSize);
-    if (mirrorToWebSocket && hasWebSocketClients()) {
-      sendEventToWebSocket_P('!', PSTR("NG - No PIC detected, command ignored."));
-    }
-    return;
-  }
-  if (state.debug.bOTGWSimulation) {
-    OTGWDebugTln(F("OTGW simulation active - executeCommand blocked"));
-    strlcpy(outBuf, "SE - OTGW simulation active.", outSize);
-    if (mirrorToWebSocket && hasWebSocketClients()) {
-      sendEventToWebSocket_P('!', PSTR("SE - OTGW simulation active."));
-    }
-    return;
-  }
-  if (cmdLen < 2) {
-    OTGWDebugTln(F("Send command too short"));
-    strlcpy(outBuf, "SE - Command too short.", outSize);
-    if (mirrorToWebSocket && hasWebSocketClients()) {
-      sendEventToWebSocket_P('!', PSTR("SE - Command too short."));
-    }
-    return;
-  }
-  OTGWSerial.setTimeout(1000);
-  DECLARE_TIMER_MS(tmrWaitForIt, 1000);
-  while((OTGWSerial.availableForWrite() < (int)(cmdLen+2)) && !DUE(tmrWaitForIt)){
-    feedWatchDog();
-  }
-  OTGWSerial.write(sCmd);
-  OTGWSerial.write("\r\n");
-  OTGWSerial.flush();
-  if (mirrorToWebSocket && hasWebSocketClients()) {
-    sendEventToWebSocket('>', sCmd);
-  }
-  //wait for response
-  RESTART_TIMER(tmrWaitForIt);
-  while(!OTGWSerial.available() && !DUE(tmrWaitForIt)) {
-    feedWatchDog();
-  }
-  char cmdPrefix[3] = { sCmd[0], sCmd[1], '\0' };
-  OTGWDebugTf(PSTR("Awaiting response prefix: [%s]\r\n"), cmdPrefix);
-  //fetch a line into static buffer (saves 256 bytes of stack)
-  static char line[256];
-  int lineLen = OTGWSerial.readBytesUntil('\n', line, sizeof(line)-1);
-  line[lineLen] = '\0';
-  // Trim trailing whitespace (CR, spaces)
-  while (lineLen > 0 && (line[lineLen-1] == '\r' || line[lineLen-1] == ' ' || line[lineLen-1] == '\t')) {
-    line[--lineLen] = '\0';
-  }
-
-  if (lineLen >= 3 && strncmp(line, cmdPrefix, 2) == 0 && line[2] == ':'){
-    // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
-    // Command:   "TT=19.125"
-    // Response:  "TT: 19.13"
-    //            [XX:response string]
-    strlcpy(outBuf, line + 3, outSize);
-  } else if (strncmp(line, "NG", 2) == 0){
-    strlcpy(outBuf, "NG - No Good. The command code is unknown.", outSize);
-  } else if (strncmp(line, "SE", 2) == 0){
-    strlcpy(outBuf, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", outSize);
-  } else if (strncmp(line, "BV", 2) == 0){
-    strlcpy(outBuf, "BV - Bad Value. The command contained a data value that is not allowed.", outSize);
-  } else if (strncmp(line, "OR", 2) == 0){
-    strlcpy(outBuf, "OR - Out of Range. A number was specified outside of the allowed range.", outSize);
-  } else if (strncmp(line, "NS", 2) == 0){
-    strlcpy(outBuf, "NS - No Space. The alternative Data-ID could not be added because the table is full.", outSize);
-  } else if (strncmp(line, "NF", 2) == 0){
-    strlcpy(outBuf, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", outSize);
-  } else if (strncmp(line, "OE", 2) == 0){
-    strlcpy(outBuf, "OE - Overrun Error. The processor was busy and failed to process all received characters.", outSize);
-  } else if (lineLen == 0) {
-    //just an empty line... most likely it's a timeout situation
-    strlcpy(outBuf, "TO - Timeout. No response.", outSize);
-  } else {
-    strlcpy(outBuf, line, outSize); //some commands return a string, just return that.
-  }
-  if (mirrorToWebSocket && hasWebSocketClients()) {
-    if (lineLen == 0) {
-      sendEventToWebSocket_P('!', PSTR("TO - Timeout. No response."));
-    } else if ((strncmp(line, "NG", 2) == 0) ||
-               (strncmp(line, "SE", 2) == 0) ||
-               (strncmp(line, "BV", 2) == 0) ||
-               (strncmp(line, "OR", 2) == 0) ||
-               (strncmp(line, "NS", 2) == 0) ||
-               (strncmp(line, "NF", 2) == 0) ||
-               (strncmp(line, "OE", 2) == 0)) {
-      sendEventToWebSocket('!', line);
-    } else {
-      sendEventToWebSocket('<', line);
-    }
-  }
-  OTGWDebugTf(PSTR("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n"), sCmd, cmdPrefix, line, outBuf);
-}
 //===================[ Watchdog OTGW ]===============================
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   // Hardware WatchDog is based on:
@@ -4399,6 +4299,11 @@ void handleOTGW()
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128
+  // TASK-671: per-call cap on completed lines processed by each drain loop.
+  // PIC sends roughly one OT message per second; loop() ticks every few ms,
+  // so 4 lines/tick easily keeps up at steady state and bounds the worst
+  // case (boot dump, ser2net paste) to ~5-10ms instead of 10-50ms stalls.
+  #define HANDLE_OTGW_LINES_PER_CALL 4
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
@@ -4431,7 +4336,13 @@ void handleOTGW()
       reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
     }
     
-    while (OTGWSerial.available()) {
+    // TASK-671: bound the drain so a PIC burst can't stall the mainloop.
+    // Cap at HANDLE_OTGW_LINES_PER_CALL completed lines; remaining bytes stay
+    // in the UART RX buffer and are drained on the next doBackgroundTasks().
+    // No yield() inside this loop: the static sRead/bytes_read state would
+    // be clobbered if handleOTGW() re-entered via yield -> doBackgroundTasks.
+    uint8_t serialLinesProcessed = 0;
+    while (OTGWSerial.available() && serialLinesProcessed < HANDLE_OTGW_LINES_PER_CALL) {
       outByte = OTGWSerial.read();
       if (outByte == '\r' || outByte == '\n') {
         if ((bytes_read == 0) && !discardCurrentReadLine) continue;
@@ -4449,6 +4360,7 @@ void handleOTGW()
 
         bytes_read = 0;
         discardCurrentReadLine = false;
+        serialLinesProcessed++;
       } else if (bytes_read < (MAX_BUFFER_READ-1)) {
         if (!discardCurrentReadLine) {
           sRead[bytes_read++] = outByte;
@@ -4477,7 +4389,12 @@ void handleOTGW()
   }
 
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
-  while (OTGWstream.available()){
+  // TASK-671: same per-call cap as the serial drain above. A ser2net echo
+  // storm or large paste from OTmonitor could otherwise spin here for tens
+  // of milliseconds and starve MQTT/WS/HTTP. Static sWrite/bytes_write state
+  // again forbids yielding inside the loop.
+  uint8_t netLinesProcessed = 0;
+  while (OTGWstream.available() && netLinesProcessed < HANDLE_OTGW_LINES_PER_CALL){
     outByte = OTGWstream.read();  // read from port 25238
     if (!state.debug.bOTGWSimulation) {
       OTGWSerial.write(outByte);    // write to serial port
@@ -4525,11 +4442,12 @@ void handleOTGW()
         }
       }
       bytes_write = 0; //start next line
+      netLinesProcessed++;
     } else if  (outByte == '\n')
     {
-      // on LF, skip 
-    } 
-    else 
+      // on LF, skip
+    }
+    else
     {
       if (bytes_write < (MAX_BUFFER_WRITE-1))
         sWrite[bytes_write++] = outByte;
