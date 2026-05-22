@@ -3,7 +3,7 @@ id: TASK-658
 title: >-
   Backlog admin: flip 6 completed-but-In-Progress tasks to Done + triage 6
   long-stale In Progress tasks
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-22 05:52'
