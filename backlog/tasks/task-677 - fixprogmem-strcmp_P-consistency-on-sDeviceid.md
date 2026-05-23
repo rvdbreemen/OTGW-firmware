@@ -23,3 +23,12 @@ Two sites in OTGW-Core.ino compare state.pic.sDeviceid with a literal "unknown" 
 - [ ] #3 python build.py --firmware exits 0
 - [ ] #4 python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Replace strcmp at line 4913 with strcmp_P + PSTR
+2. Replace strcmp at line 4998 with strcmp_P + PSTR
+3. Build firmware to verify
+4. Run evaluator quick to verify
+<!-- SECTION:PLAN:END -->
