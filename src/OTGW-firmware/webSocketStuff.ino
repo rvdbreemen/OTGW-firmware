@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-alpha.53
+**  Version  : v2.0.0-alpha.54
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -41,6 +41,14 @@ WebSocketsServer webSocket = WebSocketsServer(81);
 // Same pattern as doMqttDisconnect() in MQTTstuff.ino.
 void doWebSocketClose() {
   webSocket.close();
+}
+
+// Disconnect-all wrapper for emergencyHeapRecovery() in helperStuff.ino (ADR-107
+// action #1). Same scoping rationale as doWebSocketClose() above. disconnect()
+// without a client index closes all connected WS clients, releasing their
+// lwIP buffers (~2-4 KB each). Browsers reconnect via the graph.js auto-reconnect.
+void doWebSocketDisconnectAll() {
+  webSocket.disconnect();
 }
 
 // Track number of connected WebSocket clients

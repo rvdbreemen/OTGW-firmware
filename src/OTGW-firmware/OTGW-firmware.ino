@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.53
+**  Version  : v2.0.0-alpha.54
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -592,40 +592,40 @@ void loop()
 
   if (!isFlashing()) {
     // Only run these tasks when NOT flashing firmware (ESP or PIC)
-      if (DUE(timerFlushSettings))      flushSettings();  // coalesced settings write + service restarts
-      if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin
-      if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
-      if (DUE(timer5min))               do5minevent();
-      if (DUE(timer60s))                doTaskEvery60s();
-      if (DUE(timer3s))                 doTaskEvery3s();
-      if (DUE(timer1s))                 doTaskEvery1s();
-      if (DUE(timer500ms)) {
-        // LED2 fast blink (2x/s) when WiFi is up but no OT traffic for >10s
-        bool noOT = (WiFi.status() == WL_CONNECTED) &&
-                    ((lastOTmsgMs == 0) || ((millis() - lastOTmsgMs) > 10000UL));
-        if (noOT) {
-          static bool _led2Fast = false;
-          _led2Fast = !_led2Fast;
-          setLed(LED2, _led2Fast ? ON : OFF);
-        }
+    if (DUE(timerFlushSettings))      flushSettings();  // coalesced settings write + service restarts
+    if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin
+    if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
+    if (DUE(timer5min))               do5minevent();
+    if (DUE(timer60s))                doTaskEvery60s();
+    if (DUE(timer3s))                 doTaskEvery3s();
+    if (DUE(timer1s))                 doTaskEvery1s();
+    if (DUE(timer500ms)) {
+      // LED2 fast blink (2x/s) when WiFi is up but no OT traffic for >10s
+      bool noOT = (WiFi.status() == WL_CONNECTED) &&
+                  ((lastOTmsgMs == 0) || ((millis() - lastOTmsgMs) > 10000UL));
+      if (noOT) {
+        static bool _led2Fast = false;
+        _led2Fast = !_led2Fast;
+        setLed(LED2, _led2Fast ? ON : OFF);
       }
-      if (minuteChanged())              doTaskMinuteChanged(); //ADR-086: sole minuteChanged() caller; hour/day/year dispatch lives inside
-      loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, 2s normal / 10s slow)
-      runTopicCleanupStep();            // ADR-106: drain stale-mode discovery topics after bUseLegacyOtTopics toggle
-      evalOutputs();                    // when the bits change, the output gpio bit will follow
-      evalWebhook();                    // when the trigger bit changes, fire the webhook
-      satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)
+    }
+    if (minuteChanged())              doTaskMinuteChanged(); //ADR-086: sole minuteChanged() caller; hour/day/year dispatch lives inside
+    loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, 2s normal / 10s slow)
+    runTopicCleanupStep();            // ADR-106: drain stale-mode discovery topics after bUseLegacyOtTopics toggle
+    evalOutputs();                    // when the bits change, the output gpio bit will follow
+    evalWebhook();                    // when the trigger bit changes, fire the webhook
+    satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)
 #if defined(ESP32)
-      satBLELoop();                     // BLE temperature sensor scan (timer-guarded, Task #20)
+    satBLELoop();                     // BLE temperature sensor scan (timer-guarded, Task #20)
 #endif
-      weatherLoop();                    // Weather data fetch (timer-guarded, Task #50)
+    weatherLoop();                    // Weather data fetch (timer-guarded, Task #50)
 #if HAS_PIC
-      handlePendingUpgrade();           // Check if we need to start an upgrade
+    handlePendingUpgrade();           // Check if we need to start an upgrade
 #endif
 #if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
-      loopOLED();                       // OLED display refresh and button handling (OTGW32 only)
+    loopOLED();                       // OLED display refresh and button handling (OTGW32 only)
 #endif
-    }
+  }
 
   doBackgroundTasks();              // run background tasks
 
