@@ -3,11 +3,11 @@ id: TASK-397
 title: >-
   Diagnose random doBackgroundTasks loop stalls — BGTRACE always-on
   instrumentation
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-24 09:37'
-updated_date: '2026-05-22 06:41'
+updated_date: '2026-05-23 05:40'
 labels:
   - debug
   - diagnostics
@@ -44,3 +44,9 @@ User reports that the main loop breaks randomly on dev (1.4.x) while it was stab
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-05-22: still relevant but no active work in 14+ days; deprioritised. Diagnostic instrumentation task — no recent loop-stall reports in Discord since 1.5.0 stabilised. Re-open if 1.6.0-beta surfaces loop stalls warranting BGTRACE.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+BGTRACE instrumentation removed in TASK-673; stall-class bugs addressed by TASK-651/652/671. Future stall diagnosis re-adds gerichter.
+<!-- SECTION:FINAL_SUMMARY:END -->
