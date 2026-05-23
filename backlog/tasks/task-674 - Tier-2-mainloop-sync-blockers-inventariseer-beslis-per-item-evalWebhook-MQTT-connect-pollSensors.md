@@ -3,7 +3,7 @@ id: TASK-674
 title: >-
   Tier-2 mainloop sync-blockers: inventariseer, beslis per item (evalWebhook,
   MQTT connect, pollSensors)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-23 05:28'
