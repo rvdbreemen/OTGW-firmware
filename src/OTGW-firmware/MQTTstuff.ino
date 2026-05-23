@@ -775,8 +775,13 @@ void handleMQTT()
         MQTTclient.disconnect();
         MQTTclient.setServer(MQTTbrokerIPchar, settings.mqtt.iBrokerPort);
         MQTTclient.setCallback(handleMQTTcallback);
-        MQTTclient.setSocketTimeout(15);  // Increased from 4 to 15 seconds for better stability
-        MQTTclient.setKeepAlive(60);      // Set to 60 seconds (default was 15) to reduce reconnections
+        // 15 s socketTimeout caps the PubSubClient connect() stall during broker
+        // outage (worst case ~15 s, retry-gated to 42 s by timerMQTTwaitforconnect).
+        // Tighter values regress reconnect stability on busy WiFi / slow brokers
+        // — accepted as a known sync-blocker (ADR-080 / TASK-674 Item 6).
+        MQTTclient.setSocketTimeout(15);
+        // 60 s keepalive reduces MQTT reconnect churn vs PubSubClient's 15 s default.
+        MQTTclient.setKeepAlive(60);
         uint8_t mac[6]{0};
         WiFi.macAddress(mac);
         snprintf_P(MQTTclientId, sizeof(MQTTclientId), PSTR("%s%02X%02X%02X%02X%02X%02X"), _HOSTNAME, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
