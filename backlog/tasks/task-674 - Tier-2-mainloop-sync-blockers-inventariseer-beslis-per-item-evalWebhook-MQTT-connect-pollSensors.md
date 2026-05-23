@@ -41,10 +41,6 @@ De drie items:
 - [x] #6 Bij negeren: rationale in deze task's Final Summary
 <!-- AC:END -->
 
-
-
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -57,3 +53,27 @@ De drie items:
 7. Draft PR on each branch
 8. Flag ADRs as Proposed; ask user to approve to Accepted before closing TASK-674
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Tier-2 mainloop sync-blocker review (TASK-671/TASK-673 follow-up). Three known synchronous blockers in the main loop were inventoried; per-item dispositions:
+
+**Item 5 — webhook `http.setTimeout` (`webhook.ino:222`).** Reduced from 1000 ms to 500 ms. Local LAN GETs/POSTs complete in <50 ms; the existing WH_PENDING → WH_RETRY_WAIT retry budget (30 s × 3) absorbs slow responders, so the tighter timeout cannot lose a real state change. Comment rewritten to explain the constraint, not the history.
+
+**Item 6 — `MQTTclient.setSocketTimeout(15)` (`MQTTstuff.ino:778`).** Accepted as a known sync-blocker bounded to outage-only (worst case 15 s every 42 s; steady state is non-blocking). Authored ADR-080 (Accepted 2026-05-23) capturing the envelope, the rationale for not lowering the value, and an Enforcement block that blocks any future change to the literal via `bin/adr-judge`. The `MQTTstuff.ino:778` comment was rewritten from a history note ("Increased from 4 to 15…") to a why-only invariant referencing ADR-080.
+
+**Item 7 — `sensors.getTempC()` per-sensor cost (`sensors_ext.ino:259`).** Not-a-finding. `initSensors()` already calls `setWaitForConversion(false)` (TASK-651 work), so the 750 ms DS18B20 conversion does not block. The remaining ~10 ms per call is the OneWire bus-protocol transaction (reset + ROM match + read scratchpad) and is not firmware-tunable without replacing the DallasTemperature library. With N=2-4 sensors at a default 20 s cadence, the ~20-40 ms tick is negligible. Closed with no code change.
+
+**Sibling work on 2.0.0** lives in TASK-676 (PR #636). Item 5 was ported verbatim. Item 6 needed no code change on 2.0.0 — that branch already runs `setSocketTimeout(5)` with an explanatory in-code comment; ADR-108 (Proposed) captures the 5 s envelope as the accepted bound on 2.0.0 with explicit rationale for the divergence from dev's 15 s. Item 7 closed identically on both branches.
+
+**Tests**
+- `python build.py --firmware`: exit 0, binary 0.71 MB (no size regression).
+- `python evaluate.py --quick`: 34/36 pass, 0 fail, 0 warning.
+
+**Open items**
+- Hardware/beta validation (in-the-field webhook latency observation; broker-outage MQTT reconnect behaviour) — the only gate not self-verifiable from this remote sandbox. PR #635 carries the test plan.
+- One additional cold-path drain spotted at `OTGW-Core.ino:3136` (unbounded `while (OTGWSerial.available())` in the simulation re-init path) — flagged in the review write-up but explicitly out of scope for TASK-674; can be opened as a low-priority follow-up if desired.
+
+Refs ADR-080 (Accepted), ADR-108 (Proposed on 2.0.0), TASK-676 (2.0.0 sibling), PR #635, PR #636.
+<!-- SECTION:FINAL_SUMMARY:END -->
