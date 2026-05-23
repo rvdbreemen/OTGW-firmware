@@ -1025,6 +1025,7 @@ void handleMQTT()
         // 5s keeps HTTP/WS responsive during outages; the state machine still
         // backs off cleanly via timerMQTTwaitforretry between attempts and
         // falls back to a 10-minute wait after 5 failures.
+        // Accepted sync-blocker — see ADR-108 (sibling of dev ADR-080).
         MQTTclient.setSocketTimeout(5);
         MQTTclient.setKeepAlive(60);      // Set to 60 seconds (default was 15) to reduce reconnections
         uint8_t mac[6]{0};
