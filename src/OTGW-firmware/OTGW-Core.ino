@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.54
+**  Version  : v2.0.0-alpha.57
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3898,6 +3898,71 @@ static void decodeAndPublishOTValue()
           OTdata.s16());
 }
 
+// PIC status / error tokens emitted by OTGW firmware as bare lines on the
+// serial bus. Each entry collapses an "else if (strcmp_P) { Debugln + report }"
+// branch into a single table row; the lookup loop in handlePICStatusToken()
+// replaces 12 hand-written branches with one walk. All strings live in PROGMEM.
+namespace {
+  const char picTok_NG[]    PROGMEM = "NG";
+  const char picTok_SE[]    PROGMEM = "SE";
+  const char picTok_BV[]    PROGMEM = "BV";
+  const char picTok_OR[]    PROGMEM = "OR";
+  const char picTok_NS[]    PROGMEM = "NS";
+  const char picTok_NF[]    PROGMEM = "NF";
+  const char picTok_OE[]    PROGMEM = "OE";
+  const char picTok_TDis[]  PROGMEM = "Thermostat disconnected";
+  const char picTok_TCon[]  PROGMEM = "Thermostat connected";
+  const char picTok_PwrL[]  PROGMEM = "Low power";
+  const char picTok_PwrM[]  PROGMEM = "Medium power";
+  const char picTok_PwrH[]  PROGMEM = "High power";
+
+  const char picMsg_NG[]    PROGMEM = "NG - No Good. The command code is unknown.";
+  const char picMsg_SE[]    PROGMEM = "SE - Syntax Error. The command contained an unexpected character or was incomplete.";
+  const char picMsg_BV[]    PROGMEM = "BV - Bad Value. The command contained a data value that is not allowed.";
+  const char picMsg_OR[]    PROGMEM = "OR - Out of Range. A number was specified outside of the allowed range.";
+  const char picMsg_NS[]    PROGMEM = "NS - No Space. The alternative Data-ID could not be added because the table is full.";
+  const char picMsg_NF[]    PROGMEM = "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.";
+  const char picMsg_OE[]    PROGMEM = "OE - Overrun Error. The processor was busy and failed to process all received characters.";
+
+  struct PICStatusEntry {
+    const char *token;     // PROGMEM
+    const char *message;   // PROGMEM (may equal token for short events)
+    char        severity;  // '!' for errors, '*' for state events
+  };
+
+  const PICStatusEntry kPICStatusTokens[] PROGMEM = {
+    { picTok_NG,   picMsg_NG,   '!' },
+    { picTok_SE,   picMsg_SE,   '!' },
+    { picTok_BV,   picMsg_BV,   '!' },
+    { picTok_OR,   picMsg_OR,   '!' },
+    { picTok_NS,   picMsg_NS,   '!' },
+    { picTok_NF,   picMsg_NF,   '!' },
+    { picTok_OE,   picMsg_OE,   '!' },
+    { picTok_TDis, picTok_TDis, '*' },
+    { picTok_TCon, picTok_TCon, '*' },
+    { picTok_PwrL, picTok_PwrL, '*' },
+    { picTok_PwrM, picTok_PwrM, '*' },
+    { picTok_PwrH, picTok_PwrH, '*' },
+  };
+  const size_t kPICStatusTokenCount = sizeof(kPICStatusTokens) / sizeof(kPICStatusTokens[0]);
+}
+
+// Returns true if buf matches one of the table entries and the event has been
+// reported. Callers fall through to the next branch when this returns false.
+static bool handlePICStatusToken(const char *buf) {
+  for (size_t i = 0; i < kPICStatusTokenCount; i++) {
+    PGM_P tok = (PGM_P) pgm_read_ptr(&kPICStatusTokens[i].token);
+    if (strcmp_P(buf, tok) == 0) {
+      PGM_P msg = (PGM_P) pgm_read_ptr(&kPICStatusTokens[i].message);
+      char sev = (char) pgm_read_byte(&kPICStatusTokens[i].severity);
+      Debugln(reinterpret_cast<const __FlashStringHelper*>(msg));
+      reportOTGWEvent_P(msg, sev, true);
+      return true;
+    }
+  }
+  return false;
+}
+
 /*
   Process OTGW messages coming from the PIC.
   It knows about:
@@ -4153,42 +4218,8 @@ void processOT(const char *buf, int len, bool suppressOutput){
     }
     Debugln(buf);
     reportOTGWEvent(buf, '<', true);
-  } else if (strcmp_P(buf, PSTR("NG")) == 0) {
-    Debugln(F("NG - No Good. The command code is unknown."));
-    reportOTGWEvent_P(PSTR("NG - No Good. The command code is unknown."), '!', true);
-  } else if (strcmp_P(buf, PSTR("SE")) == 0) {
-    Debugln(F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
-    reportOTGWEvent_P(PSTR("SE - Syntax Error. The command contained an unexpected character or was incomplete."), '!', true);
-  } else if (strcmp_P(buf, PSTR("BV")) == 0) {
-    Debugln(F("BV - Bad Value. The command contained a data value that is not allowed."));
-    reportOTGWEvent_P(PSTR("BV - Bad Value. The command contained a data value that is not allowed."), '!', true);
-  } else if (strcmp_P(buf, PSTR("OR")) == 0) {
-    Debugln(F("OR - Out of Range. A number was specified outside of the allowed range."));
-    reportOTGWEvent_P(PSTR("OR - Out of Range. A number was specified outside of the allowed range."), '!', true);
-  } else if (strcmp_P(buf, PSTR("NS")) == 0) {
-    Debugln(F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
-    reportOTGWEvent_P(PSTR("NS - No Space. The alternative Data-ID could not be added because the table is full."), '!', true);
-  } else if (strcmp_P(buf, PSTR("NF")) == 0) {
-    Debugln(F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
-    reportOTGWEvent_P(PSTR("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."), '!', true);
-  } else if (strcmp_P(buf, PSTR("OE")) == 0) {
-    Debugln(F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
-    reportOTGWEvent_P(PSTR("OE - Overrun Error. The processor was busy and failed to process all received characters."), '!', true);
-  } else if (strcmp_P(buf, PSTR("Thermostat disconnected")) == 0) {
-    Debugln(F("Thermostat disconnected"));
-    reportOTGWEvent_P(PSTR("Thermostat disconnected"), '*', true);
-  } else if (strcmp_P(buf, PSTR("Thermostat connected")) == 0) {
-    Debugln(F("Thermostat connected"));
-    reportOTGWEvent_P(PSTR("Thermostat connected"), '*', true);
-  } else if (strcmp_P(buf, PSTR("Low power")) == 0) {
-    Debugln(F("Low power"));
-    reportOTGWEvent_P(PSTR("Low power"), '*', true);
-  } else if (strcmp_P(buf, PSTR("Medium power")) == 0) {
-    Debugln(F("Medium power"));
-    reportOTGWEvent_P(PSTR("Medium power"), '*', true);
-  } else if (strcmp_P(buf, PSTR("High power")) == 0) {
-    Debugln(F("High power"));
-    reportOTGWEvent_P(PSTR("High power"), '*', true);
+  } else if (handlePICStatusToken(buf)) {
+    // handled inside lookup table — see kPICStatusTokens above
   // cMsg SAFETY NOTE: snprintf_P(cMsg,...) → sendEventToWebSocket('!', cMsg) is safe here.
   // sendEventToWebSocket copies cMsg into ot_log_buffer synchronously (AddLog call) before
   // any yield. So even if doBackgroundTasks re-enters via feedWatchDog, cMsg is no longer
@@ -4966,16 +4997,22 @@ void upgradepic() {
     return;
   }
 
-  const String action = httpServer.arg("action");
-  const String filename = httpServer.arg("name");
-  const String version = httpServer.arg("version");
+  // ADR-004: stack char[] buffers replace the previous 3 'const String' locals.
+  // 80 bytes covers the longest realistic action/filename/version (typical
+  // filenames are ~30 chars; "upgrade"/"refresh"/"delete" are <=7).
+  char action[80];
+  char filename[80];
+  char version[80];
+  strlcpy(action,   httpServer.arg("action").c_str(),  sizeof(action));
+  strlcpy(filename, httpServer.arg("name").c_str(),    sizeof(filename));
+  strlcpy(version,  httpServer.arg("version").c_str(), sizeof(version));
 
   DebugTln(F("=== PIC Flash HTTP Request Received ==="));
-  DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
+  DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action, filename, version);
   DebugTf(PSTR("PIC Device ID: %s\r\n"), state.pic.sDeviceid);
   DebugTf(PSTR("Current state: state.flash.bPICactive=%d, state.flash.bESPactive=%d\r\n"), state.flash.bPICactive, state.flash.bESPactive);
-  
-  if (action.isEmpty() || filename.isEmpty()) {
+
+  if (action[0] == '\0' || filename[0] == '\0') {
     DebugTln(F("ERROR: Missing action or filename parameter"));
     httpServer.send_P(400, PSTR("text/plain"), PSTR("Missing action or name"));
     return;
@@ -4986,25 +5023,27 @@ void upgradepic() {
     httpServer.send_P(400, PSTR("text/plain"), PSTR("PIC device not detected"));
     return; // no pic version found, don't upgrade
   }
-  
-  if (action == F("upgrade")) {
-    DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+
+  if (strcmp_P(action, PSTR("upgrade")) == 0) {
+    DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename);
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
     httpServer.client().flush();  // Ensure response buffer is sent to client
     DebugTln(F("HTTP response sent and flushed"));
-    
+
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
-    snprintf_P(pendingUpgradePath, sizeof(pendingUpgradePath), PSTR("/%s/%s"), state.pic.sDeviceid, filename.c_str());
+    snprintf_P(pendingUpgradePath, sizeof(pendingUpgradePath), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
     DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath);
     DebugTln(F("=== HTTP handler complete, upgrade will start in main loop ==="));
     return;
-  } else if (action == F("refresh")) {
-    DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+  } else if (strcmp_P(action, PSTR("refresh")) == 0) {
+    DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename);
+    // refreshpic still takes String args; the implicit String(const char*)
+    // ctor at the call site keeps the change scoped to this handler.
     refreshpic(filename, version);
-  } else if (action == F("delete")) {
-    DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+  } else if (strcmp_P(action, PSTR("delete")) == 0) {
+    DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename);
     char path[64];
-    snprintf_P(path, sizeof(path), PSTR("/%s/%s"), state.pic.sDeviceid, filename.c_str());
+    snprintf_P(path, sizeof(path), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
     LittleFS.remove(path);
     char *ext = strstr(path, ".hex");
     if (ext) {

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp8266.h
-**  Version  : v2.0.0-alpha.54
+**  Version  : v2.0.0-alpha.57
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
