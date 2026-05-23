@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-23 16:11'
-updated_date: '2026-05-23 16:11'
+updated_date: '2026-05-23 16:16'
 labels: []
 dependencies: []
 ---
@@ -26,8 +26,9 @@ src/OTGW-firmware/OTGW-Core.ino:4151-4186 has 12 uniform else-if branches matchi
 - [ ] #4 Surrounding else-if chain (lines around strstr_P(\"\\r\\nError 01\")) is preserved
 - [ ] #5 python build.py --firmware exits 0
 - [ ] #6 python evaluate.py --quick shows no new failures
-- [ ] #7 Net line count on OTGW-Core.ino reduced by roughly 30-50 lines
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
