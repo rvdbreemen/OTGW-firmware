@@ -3,9 +3,11 @@ id: TASK-678
 title: >-
   perf(fs): replace readStringUntil/String with stack char[] in
   apifirmwarefilelist
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-23 16:06'
+updated_date: '2026-05-23 16:06'
 labels: []
 dependencies: []
 ---
@@ -24,3 +26,13 @@ src/OTGW-firmware/FSexplorer.ino:321 uses f.readStringUntil('\n') (heap-allocati
 - [ ] #4 python build.py --firmware exits 0
 - [ ] #5 python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Declare char version[32]/fwversion[32]
+2. readBytesUntil into version + NUL + CR trim
+3. Update strcmp/length/copy/write-back/JSON emit to use C strings
+4. Build firmware
+5. Run evaluator quick
+<!-- SECTION:PLAN:END -->
