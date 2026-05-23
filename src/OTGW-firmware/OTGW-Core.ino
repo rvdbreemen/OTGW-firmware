@@ -3876,6 +3876,66 @@ static void decodeAndPublishOTValue()
   #define OTTRACE(name) ((void)0)
 #endif
 
+// --- PIC short-token dispatch table (TASK-680) ---------------------------
+// Collapses 12 uniform else-if branches in processOT into one PROGMEM lookup.
+// Each branch was: Debugln(F(msg)) + reportOTGWEvent_P(PSTR(msg), severity, true).
+// Severity '!' = command error, '*' = status notification. All branches set
+// suppressDuringStartup=true; that flag remains hard-coded in the helper.
+static const char OTGW_TOK_NG[]   PROGMEM = "NG";
+static const char OTGW_TOK_SE[]   PROGMEM = "SE";
+static const char OTGW_TOK_BV[]   PROGMEM = "BV";
+static const char OTGW_TOK_OR[]   PROGMEM = "OR";
+static const char OTGW_TOK_NS[]   PROGMEM = "NS";
+static const char OTGW_TOK_NF[]   PROGMEM = "NF";
+static const char OTGW_TOK_OE[]   PROGMEM = "OE";
+static const char OTGW_MSG_NG[]   PROGMEM = "NG - No Good. The command code is unknown.";
+static const char OTGW_MSG_SE[]   PROGMEM = "SE - Syntax Error. The command contained an unexpected character or was incomplete.";
+static const char OTGW_MSG_BV[]   PROGMEM = "BV - Bad Value. The command contained a data value that is not allowed.";
+static const char OTGW_MSG_OR[]   PROGMEM = "OR - Out of Range. A number was specified outside of the allowed range.";
+static const char OTGW_MSG_NS[]   PROGMEM = "NS - No Space. The alternative Data-ID could not be added because the table is full.";
+static const char OTGW_MSG_NF[]   PROGMEM = "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.";
+static const char OTGW_MSG_OE[]   PROGMEM = "OE - Overrun Error. The processor was busy and failed to process all received characters.";
+// For these five the on-bus token IS the human message; share one string for both fields.
+static const char OTGW_S_THERMO_DISC[] PROGMEM = "Thermostat disconnected";
+static const char OTGW_S_THERMO_CONN[] PROGMEM = "Thermostat connected";
+static const char OTGW_S_LOW_POWER[]   PROGMEM = "Low power";
+static const char OTGW_S_MED_POWER[]   PROGMEM = "Medium power";
+static const char OTGW_S_HIGH_POWER[]  PROGMEM = "High power";
+
+struct OTGWErrorCode {
+  PGM_P token;     // PROGMEM string to match against buf
+  PGM_P message;   // PROGMEM string fed to Debugln + reportOTGWEvent_P
+  char  severity;  // '!' (command error) or '*' (status)
+};
+
+static const OTGWErrorCode kOTGWErrorCodes[] PROGMEM = {
+  { OTGW_TOK_NG, OTGW_MSG_NG, '!' },
+  { OTGW_TOK_SE, OTGW_MSG_SE, '!' },
+  { OTGW_TOK_BV, OTGW_MSG_BV, '!' },
+  { OTGW_TOK_OR, OTGW_MSG_OR, '!' },
+  { OTGW_TOK_NS, OTGW_MSG_NS, '!' },
+  { OTGW_TOK_NF, OTGW_MSG_NF, '!' },
+  { OTGW_TOK_OE, OTGW_MSG_OE, '!' },
+  { OTGW_S_THERMO_DISC, OTGW_S_THERMO_DISC, '*' },
+  { OTGW_S_THERMO_CONN, OTGW_S_THERMO_CONN, '*' },
+  { OTGW_S_LOW_POWER,   OTGW_S_LOW_POWER,   '*' },
+  { OTGW_S_MED_POWER,   OTGW_S_MED_POWER,   '*' },
+  { OTGW_S_HIGH_POWER,  OTGW_S_HIGH_POWER,  '*' },
+};
+
+static bool handleOTGWErrorCode(const char *buf) {
+  for (size_t i = 0; i < sizeof(kOTGWErrorCodes)/sizeof(kOTGWErrorCodes[0]); ++i) {
+    OTGWErrorCode e;
+    memcpy_P(&e, &kOTGWErrorCodes[i], sizeof(e));
+    if (strcmp_P(buf, e.token) == 0) {
+      Debugln(reinterpret_cast<const __FlashStringHelper*>(e.message));
+      reportOTGWEvent_P(e.message, e.severity, true);
+      return true;
+    }
+  }
+  return false;
+}
+
 /*
   Process OTGW messages coming from the PIC.
   It knows about:
@@ -4148,42 +4208,9 @@ void processOT(const char *buf, int len){
     }
     Debugln(buf);
     reportOTGWEvent(buf, '<', true);
-  } else if (strcmp_P(buf, PSTR("NG")) == 0) {
-    Debugln(F("NG - No Good. The command code is unknown."));
-    reportOTGWEvent_P(PSTR("NG - No Good. The command code is unknown."), '!', true);
-  } else if (strcmp_P(buf, PSTR("SE")) == 0) {
-    Debugln(F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
-    reportOTGWEvent_P(PSTR("SE - Syntax Error. The command contained an unexpected character or was incomplete."), '!', true);
-  } else if (strcmp_P(buf, PSTR("BV")) == 0) {
-    Debugln(F("BV - Bad Value. The command contained a data value that is not allowed."));
-    reportOTGWEvent_P(PSTR("BV - Bad Value. The command contained a data value that is not allowed."), '!', true);
-  } else if (strcmp_P(buf, PSTR("OR")) == 0) {
-    Debugln(F("OR - Out of Range. A number was specified outside of the allowed range."));
-    reportOTGWEvent_P(PSTR("OR - Out of Range. A number was specified outside of the allowed range."), '!', true);
-  } else if (strcmp_P(buf, PSTR("NS")) == 0) {
-    Debugln(F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
-    reportOTGWEvent_P(PSTR("NS - No Space. The alternative Data-ID could not be added because the table is full."), '!', true);
-  } else if (strcmp_P(buf, PSTR("NF")) == 0) {
-    Debugln(F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
-    reportOTGWEvent_P(PSTR("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."), '!', true);
-  } else if (strcmp_P(buf, PSTR("OE")) == 0) {
-    Debugln(F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
-    reportOTGWEvent_P(PSTR("OE - Overrun Error. The processor was busy and failed to process all received characters."), '!', true);
-  } else if (strcmp_P(buf, PSTR("Thermostat disconnected")) == 0) {
-    Debugln(F("Thermostat disconnected"));
-    reportOTGWEvent_P(PSTR("Thermostat disconnected"), '*', true);
-  } else if (strcmp_P(buf, PSTR("Thermostat connected")) == 0) {
-    Debugln(F("Thermostat connected"));
-    reportOTGWEvent_P(PSTR("Thermostat connected"), '*', true);
-  } else if (strcmp_P(buf, PSTR("Low power")) == 0) {
-    Debugln(F("Low power"));
-    reportOTGWEvent_P(PSTR("Low power"), '*', true);
-  } else if (strcmp_P(buf, PSTR("Medium power")) == 0) {
-    Debugln(F("Medium power"));
-    reportOTGWEvent_P(PSTR("Medium power"), '*', true);
-  } else if (strcmp_P(buf, PSTR("High power")) == 0) {
-    Debugln(F("High power"));
-    reportOTGWEvent_P(PSTR("High power"), '*', true);
+  } else if (handleOTGWErrorCode(buf)) {
+    // Matched a known PIC short-token (NG/SE/BV/OR/NS/NF/OE or status notification);
+    // table dispatch above performed the Debugln + reportOTGWEvent_P. See kOTGWErrorCodes.
   // cMsg SAFETY NOTE: snprintf_P(cMsg,...) → sendEventToWebSocket('!', cMsg) is safe here.
   // sendEventToWebSocket copies cMsg into ot_log_buffer synchronously (AddLog call) before
   // any yield. So even if doBackgroundTasks re-enters via feedWatchDog, cMsg is no longer
