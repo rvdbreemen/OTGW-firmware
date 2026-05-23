@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-23 16:11'
-updated_date: '2026-05-23 16:12'
+updated_date: '2026-05-23 16:16'
 labels: []
 dependencies: []
 ordinal: 56000
@@ -27,8 +27,10 @@ Master plan: /root/.claude/plans/evaluate-the-found-issues-misty-frog.md
 - [x] #4 refreshpic(String,String) still callable: pass char-buffer .c_str() implicitly (String constructor) OR refactor refreshpic — choose minimal-blast-radius option
 - [x] #5 python build.py --firmware --target esp8266 exits 0
 - [x] #6 python evaluate.py --quick: no new failures
-- [ ] #7 Commit pushed to claude/beta20-improvements-2.0.0-xRpVI
+- [x] #7 Commit pushed to claude/beta20-improvements-2.0.0-xRpVI
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 

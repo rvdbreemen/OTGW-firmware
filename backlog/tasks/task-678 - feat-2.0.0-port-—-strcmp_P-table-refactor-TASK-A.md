@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-23 16:05'
-updated_date: '2026-05-23 16:08'
+updated_date: '2026-05-23 16:16'
 labels: []
 dependencies: []
 ordinal: 55000
@@ -26,8 +26,10 @@ Master plan: /root/.claude/plans/evaluate-the-found-issues-misty-frog.md
 - [x] #3 python build.py --firmware --target esp8266 exits 0
 - [x] #4 python evaluate.py --quick: no new failures (baseline: 60 passed, 0 failed)
 - [x] #5 Commit pushed to claude/beta20-improvements-2.0.0-xRpVI
-- [ ] #6 PROGMEM table refactor: 12 hand-written else-if branches collapsed into 1 lookup loop + 12-row table; net LOC delta on OTGW-Core.ino is +31 (38 lines of mechanical duplication replaced by named-string declarations + structured table — clarity gain over pure LOC reduction)
+- [x] #6 PROGMEM table refactor: 12 hand-written else-if branches collapsed into 1 lookup loop + 12-row table; net LOC delta on OTGW-Core.ino is +31 (38 lines of mechanical duplication replaced by named-string declarations + structured table — clarity gain over pure LOC reduction)
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-23 16:12'
-updated_date: '2026-05-23 16:14'
+updated_date: '2026-05-23 16:16'
 labels: []
 dependencies: []
 ordinal: 57000
@@ -26,8 +26,10 @@ Master plan: /root/.claude/plans/evaluate-the-found-issues-misty-frog.md
 - [x] #3 Behaviour unchanged for short version strings; long strings now truncated cleanly at 31 chars instead of growing the heap
 - [x] #4 python build.py --firmware --target esp8266 exits 0
 - [x] #5 python evaluate.py --quick: no new failures
-- [ ] #6 Commit pushed to claude/beta20-improvements-2.0.0-xRpVI
+- [x] #6 Commit pushed to claude/beta20-improvements-2.0.0-xRpVI
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
