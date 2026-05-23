@@ -1,9 +1,11 @@
 ---
 id: TASK-673
 title: 'Mainloop review follow-up: 4 Tier-1 fixes (TASK-671 follow-up)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-23 05:28'
+updated_date: '2026-05-23 05:29'
 labels:
   - responsiveness
   - refactor
