@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.53
+**  Version  : v2.0.0-alpha.54
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4944,21 +4944,20 @@ void refreshpic(String filename, String version) {
 }
 
 // --- Pending Upgrade Logic ---
-String pendingUpgradePath = "";
+static char pendingUpgradePath[80] = {0};
 
 void handlePendingUpgrade() {
-  if (pendingUpgradePath != F("")) {
-    DebugTln(F(""));
-    DebugTln(F("=== Starting Deferred PIC Upgrade ==="));
-    DebugTf(PSTR("Hex file path: %s\r\n"), pendingUpgradePath.c_str());
-    DebugTf(PSTR("Flash state: state.flash.bESPactive=%d, state.flash.bPICactive=%d\r\n"), state.flash.bESPactive, state.flash.bPICactive);
-    DebugTf(PSTR("Free heap: %d bytes\r\n"), platformFreeHeap());
-    upgradepicnow(pendingUpgradePath.c_str());
-    pendingUpgradePath = "";
-    DebugTln(F("Deferred upgrade initiated, upgrade now runs in background"));
-    DebugTln(F("Monitor progress via telnet or WebUI"));
-    DebugTln(F("======================================="));
-  }
+  if (pendingUpgradePath[0] == '\0') return;
+  DebugTln(F(""));
+  DebugTln(F("=== Starting Deferred PIC Upgrade ==="));
+  DebugTf(PSTR("Hex file path: %s\r\n"), pendingUpgradePath);
+  DebugTf(PSTR("Flash state: state.flash.bESPactive=%d, state.flash.bPICactive=%d\r\n"), state.flash.bESPactive, state.flash.bPICactive);
+  DebugTf(PSTR("Free heap: %d bytes\r\n"), platformFreeHeap());
+  upgradepicnow(pendingUpgradePath);
+  pendingUpgradePath[0] = '\0';
+  DebugTln(F("Deferred upgrade initiated, upgrade now runs in background"));
+  DebugTln(F("Monitor progress via telnet or WebUI"));
+  DebugTln(F("======================================="));
 }
 
 void upgradepic() {
@@ -4995,8 +4994,8 @@ void upgradepic() {
     DebugTln(F("HTTP response sent and flushed"));
     
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
-    pendingUpgradePath = "/" + String(state.pic.sDeviceid) + "/" + filename;
-    DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath.c_str());
+    snprintf_P(pendingUpgradePath, sizeof(pendingUpgradePath), PSTR("/%s/%s"), state.pic.sDeviceid, filename.c_str());
+    DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath);
     DebugTln(F("=== HTTP handler complete, upgrade will start in main loop ==="));
     return;
   } else if (action == F("refresh")) {
