@@ -40,3 +40,16 @@ De drie items:
 - [ ] #5 Bij fixen: nieuwe implementation-task per item aangemaakt met expliciete scope
 - [ ] #6 Bij negeren: rationale in deze task's Final Summary
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Item 5 (webhook): drop http.setTimeout from 1000 to 500ms; collapse stale "was 3s" comment to a why-only line
+2. Item 6 (MQTT connect): author Proposed ADR on dev capturing the 15s socketTimeout + 42s retry budget as a known sync-blocker tied to broker outage; replace MQTTstuff.ino:778 history comment with rationale; reference the ADR
+3. Item 7 (pollSensors): no code change; documented in Final Summary as not-a-finding because setWaitForConversion(false) already absorbs the 750ms, and the remaining ~10ms/sensor is OneWire-protocol-inherent
+4. Build python build.py --firmware exit 0, evaluate.py --quick no new failures on dev
+5. Mirror to 2.0.0 in a sibling task: same Item 5 patch, sibling 2.0.0 ADR (separate numbering), same comment cleanups; build+eval there too
+6. Commits land per branch; push to origin/dev (allowed by policy) and origin/feature-dev-2.0.0-otgw32-esp32-sat-support (allowed by policy)
+7. Draft PR on each branch
+8. Flag ADRs as Proposed; ask user to approve to Accepted before closing TASK-674
+<!-- SECTION:PLAN:END -->
