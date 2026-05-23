@@ -4910,7 +4910,7 @@ String checkforupdatepic(String filename){
 }
 
 void refreshpic(String filename, String version) {
-  if (strcmp(state.pic.sDeviceid, "unknown") == 0) return; // no pic version found, don't upgrade
+  if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0) return; // no pic version found, don't upgrade
 
   WiFiClient client;
   HTTPClient http;
@@ -4995,7 +4995,7 @@ void upgradepic() {
     return;
   }
 
-  if (strcmp(state.pic.sDeviceid, "unknown") == 0) {
+  if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0) {
     DebugTln(F("ERROR: PIC device id is unknown, cannot upgrade"));
     httpServer.send_P(400, PSTR("text/plain"), PSTR("PIC device not detected"));
     return; // no pic version found, don't upgrade
