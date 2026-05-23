@@ -15,6 +15,9 @@ The bullets below summarise the user-visible changes that have landed on `dev` s
 
 **Performance**
 - **Mainloop responsiveness audit** (TASK-651, TASK-652, PR #617): all blocking `delay()` / `delayMs()` calls on the cooperative path replaced with non-blocking timer checks so `doBackgroundTasks()` keeps running at full cadence under load. This fixes occasional missed MQTT publish ticks and UI responsiveness drops under heavy OpenTherm traffic.
+- **Mainloop Tier-1 follow-up** (TASK-671, PR #626): `handleOTGW()` PIC drain loops now bounded at four lines per call, so a noisy PIC cannot starve the rest of the loop; the dead `executeCommand` path is removed; a stray `delay(1)` on the cooperative path is replaced with `yield()`.
+- **Mainloop Tier-1 follow-up #2** (TASK-673, PR #633): `String` usage removed from hot paths in `helperStuff.ino` / `webhook.ino`; `emergencyHeapRecovery()` is now real recovery (drops the OTGWstream client and pauses the discovery drip for one tick when heap is critical, see ADR-079); always-on `BGTRACE` instrumentation dropped from production builds.
+- **Mainloop Tier-2 dispositions** (TASK-674, PR #635): webhook HTTP timeout tightened from 1000 ms to 500 ms (the existing webhook retry state machine absorbs the slack); the per-sensor OneWire read in `pollSensors()` is bus-physics-bound and not firmware-tunable; the 15 s `MQTTclient.setSocketTimeout()` is documented and accepted in ADR-080 as a known synchronous blocker bounded by the 42 s retry gate.
 
 **Web UI and diagnostics**
 - **FSexplorer "Update Firmware" button** is visible again on touch-capable desktops; the touch-class media query no longer hides the upload control.
@@ -50,11 +53,22 @@ Below is the long-form version of the digest above, with one section per area an
 
 - **`delay()` / `delayMs()` audit (TASK-651, TASK-652, PR #617).** A handful of blocking `delay()` / `delayMs()` calls on the cooperative path were stalling `doBackgroundTasks()` for tens of milliseconds at a time, which manifested as occasional missed MQTT publish ticks and a sluggish Web UI under heavy OpenTherm traffic. Each site is now a non-blocking timer check (`DECLARE_TIMER_MS` / `DUE()`), so the loop yields back to the scheduler at full cadence.
   - **Action for tester:** if you previously noticed the Web UI lagging during a thermostat write or the live OT log stuttering, please confirm it is smooth on this beta. Heap and uptime should also report on schedule via MQTT.
+- **Tier-1 follow-up (TASK-671, PR #626).** The PIC drain loops inside `handleOTGW()` were unbounded: a noisy PIC could starve the rest of `doBackgroundTasks()` for hundreds of milliseconds. Each drain loop is now capped at four lines per call, so PIC traffic spikes no longer steal the entire mainloop slot. The dead `executeCommand` path was removed and a stray `delay(1)` on the cooperative path is now `yield()`.
+- **Tier-1 follow-up #2 (TASK-673, PR #633).** Three findings from the second mainloop review:
+  - `String` usage removed from hot paths in `helperStuff.ino` / `webhook.ino` (heap-fragmentation per ADR-004).
+  - `emergencyHeapRecovery()` reworked from a yield-and-log no-op into a real recovery routine (ADR-079): when `getHeapHealth() == HEAP_CRITICAL`, the OTGWstream client is dropped (operator can reconnect via OTmonitor) and the discovery drip is paused for one tick to stop adding pressure. MQTT and telnet are intentionally NOT dropped (MQTT reconnect is itself an expensive synchronous operation; telnet is the operator's live-diagnostics channel).
+  - Always-on `BGTRACE` instrumentation removed from production builds.
+- **Tier-2 dispositions (TASK-674, PR #635).** Three remaining synchronous blockers in the mainloop were inventoried:
+  - **Webhook HTTP** (Item 5): timeout reduced from 1000 ms to 500 ms. The existing per-webhook retry state machine absorbs the slack.
+  - **MQTT connect** (Item 6): `MQTTclient.setSocketTimeout(15)` accepted as a known sync-blocker (ADR-080). Worst-case 15 s stall per connect attempt, gated to one attempt every 42 s by `timerMQTTwaitforconnect`. The PIC serial path is hardware-buffered and the `handleOTGW()` drain is bounded (TASK-671), so the stall does not cause UART overrun. Replacing PubSubClient with an async client is out of scope for the 1.6.0 line.
+  - **OneWire / Dallas read** (Item 7): bus-physics-bound (parasitic-power conversion time) and not firmware-tunable; left as-is.
 
 ### Architecture decisions worth noting
 
 - **ADR-076 (Accepted).** Drops the global MQTT status fanout rate gate so all 13 capability-flag bits reach their retained topics on every status change.
 - **ADR-077 (Superseded by ADR-078).** HA-core-style capability-flag aliases (37 opt-in topics) were drafted in detail and implemented behind a feature flag during the beta.8-beta.12 cycle. Field testing surfaced enough scope creep and complexity for the 1.6.0 stabilisation window that the change was reverted from `dev` and deferred to the 2.0.0 line. The decision is captured in ADR-078; no user-visible behaviour change in the 1.6.0 line.
+- **ADR-079 (Accepted).** Defines what `emergencyHeapRecovery()` actually does when `getHeapHealth() == HEAP_CRITICAL`: drop the OTGWstream client (HA reconnects, operator reconnects via OTmonitor) and pause the discovery drip for one tick. MQTT and telnet are intentionally NOT dropped. Replaces the prior "yield + log" no-op behaviour.
+- **ADR-080 (Accepted).** Accepts the existing 15 s `MQTTclient.setSocketTimeout()` as a known synchronous main-loop blocker, bounded by 15 s worst-case stall per connect attempt and the 42 s `timerMQTTwaitforconnect` retry gate. Replacing PubSubClient with an async MQTT client is recorded as out of scope for the 1.6.0 stabilisation window.
 
 ### Web UI fixes worth field-validating
 

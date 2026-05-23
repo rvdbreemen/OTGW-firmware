@@ -23,6 +23,10 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - Dev version line bumped to `1.6.0-beta.N` (was `1.5.x-beta.N`) (#601)
 - Mainloop responsiveness audit: `delay()` / `delayMs()` usages on the cooperative path replaced with non-blocking timer checks so `doBackgroundTasks()` keeps running at full cadence under load (TASK-651, TASK-652, #617)
 - MQTT `resetgateway` command now requires payload `"1"` (matching the HA-discovery `payload_press` value already in use) and is rate-limited to one PIC reset per 5 seconds. Non-matching payloads are logged and ignored; rapid retries inside the cooldown window are silently dropped with a log line. Closes the unauthenticated-LAN reset-storm path raised by the dev review (TASK-661)
+- Mainloop Tier-1 follow-up: `handleOTGW()` PIC drain loops bounded at 4 lines per call, dead `executeCommand` path deleted, and the last stray `delay(1)` on the cooperative path replaced with `yield()` (TASK-671, #626)
+- Mainloop Tier-1 follow-up #2: `String` usage removed from `helperStuff.ino` / `webhook.ino` hot paths; `emergencyHeapRecovery()` reworked to actually free RAM (drops the OTGWstream client and skips one discovery-drip tick when heap is critical, per ADR-079); always-on `BGTRACE` instrumentation dropped from production builds (TASK-673, #633)
+- Mainloop Tier-2 dispositions: webhook HTTP timeout tightened from 1000 ms to 500 ms; the per-sensor OneWire read in `pollSensors()` left as bus-physics-bound; the 15 s MQTT connect socket timeout accepted as a known sync-blocker bounded by the 42 s retry gate (TASK-674, ADR-080, #635)
+- Version-bump policy: per-commit `_VERSION_PRERELEASE` enforcement removed from `.githooks/pre-commit` on `dev`; the bump is now performed once per beta cut by `bin/bump-prerelease.sh` inside the `/beta-prerelease` skill (TASK-669, #624)
 
 ### Fixed
 - HA capability-flag binary sensors for bits 2-5 (cooling, OTC active, CH2 active, summer/winter) stuck at `unknown` in Home Assistant: the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so every bit reaches its retained topic on every status change (ADR-076, TASK-649, #614)
@@ -50,6 +54,8 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - Documentation-review findings 1-5 fixed (#581): stale `../` link paths corrected across `docs/guides/BUILD.md`, `docs/guides/FLASH_GUIDE_NL.md`, `docs/guides/PIC_FIRMWARE_EN.md`, `docs/guides/browser-debug-console.md`, and `docs/process/DOCUMENTATION_LINKS_POLICY.md`. The dev README banner was also restored to its dev-line styling in the same PR after a brief main-branch-styling slip introduced upstream in #574
 - ADR-076 accepted: drops the global MQTT status fanout rate gate so all 13 capability-flag bits reach their retained topics on every status change
 - ADR-077 proposed and then superseded by ADR-078: HA-core-style capability-flag aliases (37 opt-in topics) were drafted, implemented behind a feature flag, then reverted from `dev` and deferred to the 2.0.0 line; ADR-078 captures the deferral rationale
+- ADR-079 accepted: `emergencyHeapRecovery()` defined as real recovery (drop OTGWstream client, skip one discovery-drip tick) instead of the previous "yield + log" no-op (TASK-673)
+- ADR-080 accepted: the 15 s `MQTTclient.setSocketTimeout()` documented as a known main-loop sync-blocker bounded by the 42 s retry gate; replacing PubSubClient with an async client is explicitly out of scope for the 1.6.0 line (TASK-674)
 
 ### Removed
 - Dead and orphaned code paths cleaned out of `dev` (#586, #589): inactive subsystem code and the matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.

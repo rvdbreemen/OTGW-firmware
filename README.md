@@ -9,7 +9,7 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## What's new on dev (since v1.5.0-fix2)
 
-Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.16`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
+Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.20`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
 
 **MQTT and Home Assistant discovery**
 - **HA availability now reflects the MQTT link, not the OpenTherm bus** (ADR-074, regression fix). Entities like `DHW Control` and `Thermostat` no longer flap `unavailable` when the boiler stops talking; OT-bus liveness lives on the dedicated `otgw_connected` sensor. **Contract change:** consumers reading the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to `otgw_connected`.
@@ -32,6 +32,9 @@ Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.16`). The list b
 
 **Performance**
 - **Mainloop responsiveness audit** (TASK-651, TASK-652, PR #617): all blocking `delay()` / `delayMs()` calls on the cooperative path replaced with non-blocking timer checks so `doBackgroundTasks()` keeps running at full cadence under load.
+- **Mainloop Tier-1 follow-up** (TASK-671, PR #626): `handleOTGW()` drain loops are now bounded (max 4 lines per call) so a noisy PIC cannot starve the rest of the loop; the dead `executeCommand` path is removed; a stray `delay(1)` on the cooperative path is replaced with a `yield()`.
+- **Mainloop Tier-1 follow-up #2** (TASK-673, PR #633): `String` usage removed from hot paths in `helperStuff.ino` / `webhook.ino`; `emergencyHeapRecovery()` is now a real recovery routine (drops the OTGWstream client and pauses the discovery drip for one tick when heap is critical, see ADR-079); the always-on `BGTRACE` instrumentation is dropped from production builds.
+- **Mainloop Tier-2 dispositions** (TASK-674, PR #635): webhook HTTP timeout tightened from 1000 ms to 500 ms; the existing webhook retry state machine absorbs the slack. The remaining synchronous blocker, `MQTTclient.connect()` with a 15 s socket timeout, is documented and accepted in ADR-080 (15 s worst-case stall every 42 s during a broker outage; bounded `handleOTGW()` drains keep the PIC serial path safe).
 
 **Code hygiene**
 - **Dead and orphaned code paths cleaned out of `dev`** (#586, #589): inactive subsystem code and its matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.
