@@ -289,7 +289,9 @@ void apifirmwarefilelist() {
   
   // 150 bytes covers longest entry: path (~30) + version (~32) + fwversion (~32) + JSON overhead
   char entryBuffer[150];
-  String version, fwversion;
+  // ADR-004: stack char[] instead of String to avoid per-iteration heap churn.
+  char version[32]    = {0};
+  char fwversion[32]  = {0};
   Dir dir;
   File f;
   bool firstEntry = true;
@@ -311,30 +313,34 @@ void apifirmwarefilelist() {
   while (dir.next()) {
     DebugTf(PSTR("dir.fileName()=%s\r\n"), dir.fileName().c_str());
     if (dir.fileName().endsWith(".hex")) {
-      version="";
-      fwversion="";
-      String hexfile = dirpath + "/" + dir.fileName();   
+      version[0]   = '\0';
+      fwversion[0] = '\0';
+      String hexfile = dirpath + "/" + dir.fileName();
       String verfile = hexfile;
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
       if (f) {
-        version = f.readStringUntil('\n');
-        version.trim();
+        // ADR-004: readBytesUntil into stack buffer (pattern: helperStuff.ino:738, 790).
+        size_t n = f.readBytesUntil('\n', (uint8_t*)version, sizeof(version) - 1);
+        version[n] = '\0';
+        // Trim trailing CR (Windows-style lines) and whitespace.
+        while (n > 0 && (version[n-1] == '\r' || version[n-1] == ' ' || version[n-1] == '\t')) {
+          version[--n] = '\0';
+        }
         f.close();
-      } 
-      
-      char fwversionBuf[32] = {0};
-      GetVersion(hexfile.c_str(), fwversionBuf, sizeof(fwversionBuf));
-      fwversion = fwversionBuf;
+      }
 
-      DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion.c_str());  
-      if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) {
-        version=fwversion;
+      GetVersion(hexfile.c_str(), fwversion, sizeof(fwversion));
+
+      DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion);
+      if (fwversion[0] != '\0' && strcmp(fwversion, version) != 0) {
+        strlcpy(version, fwversion, sizeof(version));
         if (f = LittleFS.open(verfile, "w")) {
-          DebugTf(PSTR("writing %s to %s\r\n"),version.c_str(),verfile.c_str());
-          f.print(version + "\n");
+          DebugTf(PSTR("writing %s to %s\r\n"), version, verfile.c_str());
+          f.print(version);
+          f.print('\n');
           f.close();
-        } 
+        }
       }
       Debugln();
       
