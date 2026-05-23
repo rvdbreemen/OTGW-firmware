@@ -4980,16 +4980,19 @@ void upgradepic() {
     return;
   }
 
-  const String action = httpServer.arg("action");
-  const String filename = httpServer.arg("name");
-  const String version = httpServer.arg("version");
+  // ADR-004 / TASK-673: stack char[] instead of String for HTTP args.
+  // 80 bytes covers a hex filename + path overhead; truncation via strlcpy is safe.
+  char action[80], filename[80], version[80];
+  strlcpy(action,   httpServer.arg("action").c_str(),  sizeof(action));
+  strlcpy(filename, httpServer.arg("name").c_str(),    sizeof(filename));
+  strlcpy(version,  httpServer.arg("version").c_str(), sizeof(version));
 
   DebugTln(F("=== PIC Flash HTTP Request Received ==="));
-  DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
+  DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action, filename, version);
   DebugTf(PSTR("PIC Device ID: %s\r\n"), state.pic.sDeviceid);
   DebugTf(PSTR("Current state: state.flash.bPICactive=%d, state.flash.bESPactive=%d\r\n"), state.flash.bPICactive, state.flash.bESPactive);
-  
-  if (action.isEmpty() || filename.isEmpty()) {
+
+  if (action[0] == '\0' || filename[0] == '\0') {
     DebugTln(F("ERROR: Missing action or filename parameter"));
     httpServer.send_P(400, PSTR("text/plain"), PSTR("Missing action or name"));
     return;
@@ -5000,25 +5003,25 @@ void upgradepic() {
     httpServer.send_P(400, PSTR("text/plain"), PSTR("PIC device not detected"));
     return; // no pic version found, don't upgrade
   }
-  
-  if (action == F("upgrade")) {
-    DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+
+  if (strcmp_P(action, PSTR("upgrade")) == 0) {
+    DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename);
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
     httpServer.client().flush();  // Ensure response buffer is sent to client
     DebugTln(F("HTTP response sent and flushed"));
-    
+
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
-    snprintf_P(pendingUpgradePath, sizeof(pendingUpgradePath), PSTR("/%s/%s"), state.pic.sDeviceid, filename.c_str());
+    snprintf_P(pendingUpgradePath, sizeof(pendingUpgradePath), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
     DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath);
     DebugTln(F("=== HTTP handler complete, upgrade will start in main loop ==="));
     return;
-  } else if (action == F("refresh")) {
-    DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+  } else if (strcmp_P(action, PSTR("refresh")) == 0) {
+    DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename);
     refreshpic(filename, version);
-  } else if (action == F("delete")) {
-    DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+  } else if (strcmp_P(action, PSTR("delete")) == 0) {
+    DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename);
     char path[64];
-    snprintf_P(path, sizeof(path), PSTR("/%s/%s"), state.pic.sDeviceid, filename.c_str());
+    snprintf_P(path, sizeof(path), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
     LittleFS.remove(path);
     char *ext = strstr(path, ".hex");
     if (ext) {
