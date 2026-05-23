@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-23 05:28'
-updated_date: '2026-05-23 10:50'
+updated_date: '2026-05-23 11:05'
 labels:
   - mainloop
   - responsiveness
@@ -33,13 +33,15 @@ De drie items:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Item 5 (evalWebhook): trigger-condities, huidige bound (1s), alternatieven (AsyncHTTPClient, kortere timeout, queue-and-fire) gedocumenteerd; per-item beslissing genoteerd
-- [ ] #2 Item 6 (MQTTclient.connect blocking): trigger-condities (broker outage), bound (15s socketTimeout x 42s retry), alternatieven (kortere socketTimeout, vervangen PubSubClient) gedocumenteerd; per-item beslissing genoteerd
-- [ ] #3 Item 7 (pollSensors OneWire): trigger-condities, bound (~10ms x sensor count), alternatieven (twee-fase poll request->read) gedocumenteerd; per-item beslissing genoteerd
+- [x] #1 Item 5 (evalWebhook): trigger-condities, huidige bound (1s), alternatieven (AsyncHTTPClient, kortere timeout, queue-and-fire) gedocumenteerd; per-item beslissing genoteerd
+- [x] #2 Item 6 (MQTTclient.connect blocking): trigger-condities (broker outage), bound (15s socketTimeout x 42s retry), alternatieven (kortere socketTimeout, vervangen PubSubClient) gedocumenteerd; per-item beslissing genoteerd
+- [x] #3 Item 7 (pollSensors OneWire): trigger-condities, bound (~10ms x sensor count), alternatieven (twee-fase poll request->read) gedocumenteerd; per-item beslissing genoteerd
 - [ ] #4 Bij accepteren: ADR Proposed -> Accepted voor 'known sync-blocker surface' OF item-specifieke ADR
-- [ ] #5 Bij fixen: nieuwe implementation-task per item aangemaakt met expliciete scope
-- [ ] #6 Bij negeren: rationale in deze task's Final Summary
+- [x] #5 Bij fixen: nieuwe implementation-task per item aangemaakt met expliciete scope
+- [x] #6 Bij negeren: rationale in deze task's Final Summary
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
