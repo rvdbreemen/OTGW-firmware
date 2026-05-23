@@ -3,9 +3,11 @@ id: TASK-680
 title: >-
   refactor(otgw-core): collapse 12-branch strcmp_P chain into PROGMEM lookup
   table
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-23 16:11'
+updated_date: '2026-05-23 16:11'
 labels: []
 dependencies: []
 ---
@@ -26,3 +28,14 @@ src/OTGW-firmware/OTGW-Core.ino:4151-4186 has 12 uniform else-if branches matchi
 - [ ] #6 python evaluate.py --quick shows no new failures
 - [ ] #7 Net line count on OTGW-Core.ino reduced by roughly 30-50 lines
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Define PROGMEM token/message strings (one pair per entry) above processOT
+2. Define PROGMEM table OTGWErrorCode kOTGWErrorCodes[12] with {token, message, severity}
+3. Implement static helper handleOTGWErrorCode(const char* buf) returning bool: loops through table via memcpy_P, strcmp_P on token, on match emits Debugln (via __FlashStringHelper* cast) + reportOTGWEvent_P
+4. Replace the 12 else-if branches with one else-if calling the helper
+5. Build firmware
+6. Run evaluator quick
+<!-- SECTION:PLAN:END -->
