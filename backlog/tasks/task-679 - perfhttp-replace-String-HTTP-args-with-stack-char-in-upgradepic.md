@@ -1,9 +1,11 @@
 ---
 id: TASK-679
 title: 'perf(http): replace String HTTP args with stack char[] in upgradepic'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-23 16:08'
+updated_date: '2026-05-23 16:08'
 labels: []
 dependencies: []
 ---
@@ -22,3 +24,14 @@ src/OTGW-firmware/OTGW-Core.ino:4983-4985 declares three const String locals (ac
 - [ ] #4 python build.py --firmware exits 0
 - [ ] #5 python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Replace const String action/filename/version with char[80] + strlcpy from httpServer.arg()
+2. Update isEmpty checks (== [0]) and == F() comparisons (strcmp_P)
+3. Drop .c_str() calls within the handler scope
+4. Confirm refreshpic call site still compiles (String implicit constructor accepts char*)
+5. Build firmware
+6. Run evaluator quick
+<!-- SECTION:PLAN:END -->
