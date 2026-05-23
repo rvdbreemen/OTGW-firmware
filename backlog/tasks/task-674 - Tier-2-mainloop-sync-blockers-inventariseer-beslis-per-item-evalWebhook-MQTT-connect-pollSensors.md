@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-23 05:28'
-updated_date: '2026-05-23 11:05'
+updated_date: '2026-05-23 11:06'
 labels:
   - mainloop
   - responsiveness
@@ -36,10 +36,12 @@ De drie items:
 - [x] #1 Item 5 (evalWebhook): trigger-condities, huidige bound (1s), alternatieven (AsyncHTTPClient, kortere timeout, queue-and-fire) gedocumenteerd; per-item beslissing genoteerd
 - [x] #2 Item 6 (MQTTclient.connect blocking): trigger-condities (broker outage), bound (15s socketTimeout x 42s retry), alternatieven (kortere socketTimeout, vervangen PubSubClient) gedocumenteerd; per-item beslissing genoteerd
 - [x] #3 Item 7 (pollSensors OneWire): trigger-condities, bound (~10ms x sensor count), alternatieven (twee-fase poll request->read) gedocumenteerd; per-item beslissing genoteerd
-- [ ] #4 Bij accepteren: ADR Proposed -> Accepted voor 'known sync-blocker surface' OF item-specifieke ADR
+- [x] #4 Bij accepteren: ADR Proposed -> Accepted voor 'known sync-blocker surface' OF item-specifieke ADR
 - [x] #5 Bij fixen: nieuwe implementation-task per item aangemaakt met expliciete scope
 - [x] #6 Bij negeren: rationale in deze task's Final Summary
 <!-- AC:END -->
+
+
 
 
 
