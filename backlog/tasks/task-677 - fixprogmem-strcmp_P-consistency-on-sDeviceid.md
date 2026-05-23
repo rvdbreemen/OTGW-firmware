@@ -1,9 +1,11 @@
 ---
 id: TASK-677
 title: 'fix(progmem): strcmp_P consistency on sDeviceid'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-23 16:03'
+updated_date: '2026-05-23 16:03'
 labels: []
 dependencies: []
 ---
