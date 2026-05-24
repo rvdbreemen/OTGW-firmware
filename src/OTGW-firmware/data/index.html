@@ -170,9 +170,10 @@
              (role=tablist/tab, aria-selected, data-tab). The tab-switching
              behaviour stays driven by openLogTab() in index.js. -->
         <nav class="ot-log-tabs" role="tablist">
-          <button type="button" class="tab-link active" role="tab" aria-selected="true"  data-tab="log"   onclick="openLogTab(event, 'Log')">Log</button>
-          <button type="button" class="tab-link"        role="tab" aria-selected="false" data-tab="stats" onclick="openLogTab(event, 'Statistics')">Statistics</button>
-          <button type="button" class="tab-link"        role="tab" aria-selected="false" data-tab="graph" onclick="openLogTab(event, 'Graph')">Graph</button>
+          <button type="button" class="tab-link active" role="tab" aria-selected="true"  data-tab="log"       onclick="openLogTab(event, 'Log')">Log</button>
+          <button type="button" class="tab-link"        role="tab" aria-selected="false" data-tab="stats"     onclick="openLogTab(event, 'Statistics')">Statistics</button>
+          <button type="button" class="tab-link"        role="tab" aria-selected="false" data-tab="otsupport" onclick="openLogTab(event, 'OTSupport')">OT Support</button>
+          <button type="button" class="tab-link"        role="tab" aria-selected="false" data-tab="graph"     onclick="openLogTab(event, 'Graph')">Graph</button>
         </nav>
 
         <div id="Log" class="tab-content active">
@@ -242,6 +243,27 @@
                 <span id="boilerUnsupportedLine" class="hidden" title="OT msgIDs the boiler answered with Unknown-Data-Id at least once this session.">
                   Boiler does not implement: <span id="boilerUnsupportedList"></span>
                 </span>
+             </div>
+        </div>
+
+        <div id="OTSupport" class="tab-content">
+             <div class="ot-stats-container">
+                <table class="ot-stats-table" id="otSupportTable">
+                    <thead>
+                        <tr>
+                            <th>MsgID</th>
+                            <th>Name</th>
+                            <th title="What the thermostat has asked for at least once this session (or per persisted /ot-thermo.json).">Thermostat</th>
+                            <th title="What the boiler has acknowledged or refused at least once (or per persisted /ot-boiler.json).">Boiler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+             </div>
+             <div class="ot-log-footer">
+                <span>Observed msgIDs: <span id="otSupportCount">0</span></span>
+                <span id="otSupportEmpty" class="hidden">No OT-bus traffic observed yet — wait a minute or check the connection to thermostat / boiler.</span>
              </div>
         </div>
 

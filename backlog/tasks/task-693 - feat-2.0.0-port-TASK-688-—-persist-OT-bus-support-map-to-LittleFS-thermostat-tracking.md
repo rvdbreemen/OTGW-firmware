@@ -3,11 +3,11 @@ id: TASK-693
 title: >-
   feat-2.0.0: port TASK-688 — persist OT-bus support map to LittleFS +
   thermostat tracking
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-24 08:19'
-updated_date: '2026-05-24 08:35'
+updated_date: '2026-05-24 08:36'
 labels:
   - port-from-dev
   - diagnostics
