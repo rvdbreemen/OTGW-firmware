@@ -3,11 +3,11 @@ id: TASK-691
 title: >-
   feat-2.0.0: port TASK-685 — Unknown-Data-Id direction-aware suffix on every
   emit
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-24 08:18'
-updated_date: '2026-05-24 08:26'
+updated_date: '2026-05-24 08:27'
 labels:
   - port-from-dev
   - diagnostics

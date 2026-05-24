@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.59
+**  Version  : v2.0.0-alpha.60
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -211,6 +211,13 @@ void markAllMQTTConfigPending();
 const char *messageIDToString(OTLibMessageID message_id);
 void addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendMQTTheapdiag();
+// TASK-692 port (dev TASK-686): boiler-support-map accessors. State lives at
+// file scope in OTGW-Core.ino; publisher lives in MQTTstuff.ino.
+bool isBoilerMsgIdUnsupportedRead(uint8_t id);
+bool isBoilerMsgIdUnsupportedWrite(uint8_t id);
+bool getBoilerUnsupportedDirty();
+void clearBoilerUnsupportedDirty();
+void publishBoilerUnsupportedMsgids();    // MQTT retained CSV ("14W,16W,24R,...")
 void doMqttDisconnect();                 // graceful disconnect for reboot path (MQTTclient is file-static)
 void doWebSocketClose();                 // close all WS clients before reboot (webSocket not extern'd in any header)
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart

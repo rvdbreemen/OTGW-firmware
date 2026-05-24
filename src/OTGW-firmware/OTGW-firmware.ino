@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.59
+**  Version  : v2.0.0-alpha.60
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -476,6 +476,15 @@ void doTaskMinuteChanged(){
   // Per-minute work (unconditional).
   // WiFi reconnect is handled by loopWifi() state machine in doBackgroundTasks().
   sendtimecommand(dayFlag, yearFlag);
+
+  // TASK-692 port (dev TASK-686): republish boiler unsupported-msgID CSV only
+  // when a new id has been observed since the last publish. After boot warm-up
+  // the dirty flag fires a handful of times then stays clean, so this is at
+  // most one extra publish per minute and zero in steady state.
+  if (getBoilerUnsupportedDirty()) {
+    publishBoilerUnsupportedMsgids();
+    clearBoilerUnsupportedDirty();
+  }
 
   // Hourly consumers. New hourly tasks extend THIS block, never add a second
   // hourChanged() call elsewhere.
