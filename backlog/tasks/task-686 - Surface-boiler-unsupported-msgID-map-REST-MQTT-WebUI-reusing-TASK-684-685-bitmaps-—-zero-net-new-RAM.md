@@ -3,9 +3,11 @@ id: TASK-686
 title: >-
   Surface boiler unsupported-msgID map (REST + MQTT + WebUI), reusing
   TASK-684/685 bitmaps — zero net new RAM
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-24 06:46'
+updated_date: '2026-05-24 06:53'
 labels:
   - diagnostics
   - beta.20
