@@ -3,9 +3,11 @@ id: TASK-688
 title: >-
   Persist OT-bus support map to LittleFS as JSON (boiler + thermostat),
   read-on-boot, 15-min debounced atomic write
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-24 07:16'
+updated_date: '2026-05-24 07:16'
 labels:
   - diagnostics
   - opentherm
@@ -13,6 +15,10 @@ labels:
   - observability
   - user-experience
 dependencies: []
+references:
+  - TASK-686 (REST/MQTT/WebUI surface that this layer makes durable)
+  - 'Conversation: user-requested JSON format'
+  - robustness guidance
 priority: medium
 ---
 
@@ -66,3 +72,32 @@ Out of scope:
 - [ ] #7 python build.py --firmware exits 0.
 - [ ] #8 python evaluate.py --quick shows no new failures vs current dev.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. State layout (file scope in OTGW-Core.ino):
+   - Existing (already at file scope from TASK-686 step 1): boilerLastMasterWasWrite[32], boilerUnsupportedRead[32], boilerUnsupportedWrite[32], boilerUnsupportedDirty.
+   - New: thermostatSentRead[32], thermostatSentWrite[32], boilerAckedRead[32], boilerAckedWrite[32], thermostatFileDirty, boilerFileDirty.
+   - Net new RAM: 4 x 32 + 2 = 130 bytes. Running total: ~227 B static.
+   - Accessors in OTGW-Core.ino + declarations in OTGW-firmware.h: isThermostatMsgIdSentRead/Write, isBoilerMsgIdAckedRead/Write.
+
+2. processOT updates (no behaviour change to existing branches):
+   - Master Read-Data:  set thermostatSentRead bit; if was 0 set thermostatFileDirty.
+   - Master Write-Data: set thermostatSentWrite bit; if was 0 set thermostatFileDirty.
+   - Slave Read-Ack:    set boilerAckedRead bit; if was 0 set boilerFileDirty.
+   - Slave Write-Ack:   set boilerAckedWrite bit; if was 0 set boilerFileDirty.
+   - Slave Unknown-Data-Id (existing block): also set boilerFileDirty.
+
+3. File I/O (new functions in OTGW-Core.ino):
+   - void loadOtSupportFile(const char* path, /* targets */) -- stream-parse JSON via Stream::find + parseInt. Returns true on header magic match; false on missing/corrupt (caller logs once and continues with zero state).
+   - void writeOtSupportFile(const char* path, ...) -- stream-write JSON to <path>.tmp, LittleFS.remove(path), LittleFS.rename(tmp -> path). One File handle, no large buffer.
+   - void loadOtSupportFiles() -- called from setup() after LittleFS.begin(). Loads both files.
+   - void saveOtSupportFilesIfDirty() -- per dirty flag, writes the corresponding file; clears the flag.
+
+4. Cron tick: doTaskMinuteChanged maintains a uint8_t minutesSinceLastOtSupportFlush. Increments by 1 each call; when >=15, invokes saveOtSupportFilesIfDirty() and resets counter to 0. Boundary: a write only happens when dirty AND counter elapsed -- bounds writes to <= 2 per 15-min window.
+
+5. setup() integration: after LittleFS.begin() and before doBackgroundTasks() starts, call loadOtSupportFiles(). Order check: ensure the OT-bus reader does not run before LittleFS is mounted.
+
+6. Build + evaluate + commit + push.
+<!-- SECTION:PLAN:END -->
