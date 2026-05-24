@@ -5520,6 +5520,7 @@ function openLogTab(evt, tabName) {
   currentTab = tabName;
   if (currentTab === 'Statistics') {
       updateStatisticsDisplay();
+      refreshBoilerSupport();
   } else if (currentTab === 'Graph' && typeof OTGraph !== 'undefined') {
       // Ensure the chart resizes when the tab becomes visible
       if (OTGraph.resize) OTGraph.resize();
@@ -5685,6 +5686,40 @@ function sortStats(col) {
         statsSortAsc = true;
     }
     updateStatisticsDisplay();
+}
+
+// TASK-686: render the "Boiler does not implement" line at the bottom of the
+// Statistics tab. Sourced from /api/v2/otgw/boiler-support, which is populated
+// in real time as the firmware observes slave Unknown-Data-Id responses
+// (processOT → bitmaps in OTGW-Core.ino). Hidden when both arrays are empty so
+// new installs / fresh-boot states do not show an empty banner.
+function refreshBoilerSupport() {
+    var line = document.getElementById('boilerUnsupportedLine');
+    var list = document.getElementById('boilerUnsupportedList');
+    if (!line || !list) return;
+    fetch(APIGW + "v2/otgw/boiler-support")
+        .then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(function (json) {
+            var r = (json && Array.isArray(json.unsupported_read))  ? json.unsupported_read  : [];
+            var w = (json && Array.isArray(json.unsupported_write)) ? json.unsupported_write : [];
+            if (r.length === 0 && w.length === 0) {
+                line.classList.add('hidden');
+                list.textContent = '';
+                return;
+            }
+            var parts = [];
+            r.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', read)'); });
+            w.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', write)'); });
+            list.textContent = parts.join(', ');
+            line.classList.remove('hidden');
+        })
+        .catch(function () {
+            // Endpoint may not exist on older firmware — keep silent.
+            line.classList.add('hidden');
+        });
 }
 
 //============================================================================

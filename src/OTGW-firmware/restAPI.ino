@@ -443,6 +443,45 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing label")); return; }
     sendOTGWlabel(words[5]);
+  } else if (strcmp_P(words[4], PSTR("boiler-support")) == 0) {
+    // TASK-686: GET /api/v2/otgw/boiler-support → unsupported_read / unsupported_write
+    // arrays sourced from the in-RAM bitmaps populated by processOT (TASK-684/685).
+    // Streamed in chunks so even pathological boilers (hundreds of unsupported ids)
+    // do not need a large stack buffer.
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendCorsOriginHeader();
+    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"unsupported_read\":["));
+    bool first = true;
+    char ent[64];
+    for (int i = 0; i <= 255; i++) {
+      if (!isBoilerMsgIdUnsupportedRead((uint8_t)i)) continue;
+      OTlookup_t item;
+      const char* label = "Unknown";
+      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; }
+      snprintf_P(ent, sizeof(ent),
+                 first ? PSTR("{\"id\":%d,\"label\":\"%s\"}")
+                       : PSTR(",{\"id\":%d,\"label\":\"%s\"}"),
+                 i, label);
+      httpServer.sendContent(ent);
+      first = false;
+    }
+    httpServer.sendContent_P(PSTR("],\"unsupported_write\":["));
+    first = true;
+    for (int i = 0; i <= 255; i++) {
+      if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
+      OTlookup_t item;
+      const char* label = "Unknown";
+      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; }
+      snprintf_P(ent, sizeof(ent),
+                 first ? PSTR("{\"id\":%d,\"label\":\"%s\"}")
+                       : PSTR(",{\"id\":%d,\"label\":\"%s\"}"),
+                 i, label);
+      httpServer.sendContent(ent);
+      first = false;
+    }
+    httpServer.sendContent_P(PSTR("]}"));
+    httpServer.sendContent(F(""));
   } else {
     sendApiNotFound(originalURI);
   }

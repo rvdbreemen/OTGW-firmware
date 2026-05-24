@@ -873,6 +873,8 @@ void handleMQTT()
         DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
         sendMQTTversioninfo();
         publishAllPICsettings();
+        publishBoilerUnsupportedMsgids();  // TASK-686: republish the retained CSV so HA/dashboards see it after every reconnect.
+        clearBoilerUnsupportedDirty();
         DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
       }
       else
@@ -1134,6 +1136,35 @@ static void publishStatU32(const __FlashStringHelper *topic, unsigned long value
   char buf[12];  // max uint32 decimal = 10 digits + sign + NUL
   snprintf_P(buf, sizeof(buf), PSTR("%lu"), value);
   sendMQTTData(topic, buf, true);  // retained
+}
+
+// TASK-686: publish the boiler unsupported-msgID map as one MQTT retained CSV.
+// Payload shape: "<id>R" for read-direction Unknown-Data-Id, "<id>W" for write.
+// Examples (typical boiler): "14W,16W,24R,26R,27R,33R,36R". Empty bitmap → "".
+// Single 256-byte stack buffer: realistic boilers flag <20 msgIDs so the buffer
+// is comfortably large. The (pos + 6 > sizeof) guards truncate silently rather
+// than overflow on pathological inputs.
+void publishBoilerUnsupportedMsgids() {
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
+  char csv[256] = {0};
+  size_t pos = 0;
+  for (int i = 0; i <= 255; i++) {
+    if (!isBoilerMsgIdUnsupportedRead((uint8_t)i)) continue;
+    if (pos + 6 > sizeof(csv)) break;  // 6 = ",NNNR" + NUL
+    int n = snprintf_P(csv + pos, sizeof(csv) - pos,
+                       pos == 0 ? PSTR("%dR") : PSTR(",%dR"), i);
+    if (n < 0) break;
+    pos += (size_t)n;
+  }
+  for (int i = 0; i <= 255; i++) {
+    if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
+    if (pos + 6 > sizeof(csv)) break;
+    int n = snprintf_P(csv + pos, sizeof(csv) - pos,
+                       pos == 0 ? PSTR("%dW") : PSTR(",%dW"), i);
+    if (n < 0) break;
+    pos += (size_t)n;
+  }
+  sendMQTTData(F("otgw-firmware/boiler/unsupported_msgids"), csv, true);  // retained
 }
 
 void sendMQTTheapdiag(){

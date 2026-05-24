@@ -156,6 +156,12 @@ void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper
 void publishToSourceTopic(const char*, const char*, byte);
 void loopMQTTDiscovery();
 void sendMQTTheapdiag();
+// TASK-686: support-map accessors (state lives in OTGW-Core.ino at file scope).
+bool isBoilerMsgIdUnsupportedRead(uint8_t id);
+bool isBoilerMsgIdUnsupportedWrite(uint8_t id);
+bool getBoilerUnsupportedDirty();
+void clearBoilerUnsupportedDirty();
+void publishBoilerUnsupportedMsgids();     // TASK-686: MQTT retained CSV ("14W,16W,24R,...")
 void doMqttDisconnect();                 // graceful disconnect for reboot path (MQTTclient is file-static)
 void doWebSocketClose();                 // close all WS clients before reboot (webSocket not extern'd in any header)
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
