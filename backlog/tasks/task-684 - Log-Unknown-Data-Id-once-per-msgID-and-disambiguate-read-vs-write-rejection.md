@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-24 06:32'
-updated_date: '2026-05-24 06:37'
+updated_date: '2026-05-24 06:39'
 labels:
   - diagnostics
   - beta.20
@@ -38,13 +38,15 @@ Out of scope: surfacing the support map on REST/stats/MQTT (that's a follow-up t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A new per-msgID bitmap (or equivalent) records whether 'Unknown-Data-Id' has already been logged for a given msgID in this boot session. State lives in RAM only, resets on reboot.
-- [ ] #2 The first Unknown-Data-Id occurrence for any msgID in the current boot emits a clearly-worded line. Subsequent identical occurrences are suppressed (no log line).
-- [ ] #3 The log line distinguishes the two cases: a Read-direction Unknown-Data-Id reads as 'boiler does not implement msgID N (<name>)'; a Write-direction Unknown-Data-Id reads as 'boiler rejected write to msgID N (<name>=<value or -->)'.
-- [ ] #4 The full raw OT-message line (e.g. 'B70100500  16 Unknown-Data-Id - TrSet <ignored>') is preserved unchanged so existing log-grepping tools keep working.
-- [ ] #5 python build.py --firmware exits 0.
-- [ ] #6 python evaluate.py --quick shows no new failures vs current dev.
+- [x] #1 A new per-msgID bitmap (or equivalent) records whether 'Unknown-Data-Id' has already been logged for a given msgID in this boot session. State lives in RAM only, resets on reboot.
+- [x] #2 The first Unknown-Data-Id occurrence for any msgID in the current boot emits a clearly-worded line. Subsequent identical occurrences are suppressed (no log line).
+- [x] #3 The log line distinguishes the two cases: a Read-direction Unknown-Data-Id reads as 'boiler does not implement msgID N (<name>)'; a Write-direction Unknown-Data-Id reads as 'boiler rejected write to msgID N (<name>=<value or -->)'.
+- [x] #4 The full raw OT-message line (e.g. 'B70100500  16 Unknown-Data-Id - TrSet <ignored>') is preserved unchanged so existing log-grepping tools keep working.
+- [x] #5 python build.py --firmware exits 0.
+- [x] #6 python evaluate.py --quick shows no new failures vs current dev.
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
