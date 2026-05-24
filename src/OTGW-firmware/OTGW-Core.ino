@@ -3949,6 +3949,13 @@ void processOT(const char *buf, int len){
   static bool bOTGWboilerpreviousstate = false;
   static bool bOTGWthermostatpreviousstate = false;
   static bool bOTGWpreviousstate = false;
+  // TASK-684: per-msgID bitmaps so a slave Unknown-Data-Id is announced once per
+  // (id, direction) instead of every 2-3 s. lastMasterWasWrite remembers the direction
+  // of the most-recent master frame so the once-only line phrases correctly (the slave
+  // type-7 response alone does not carry the master's read/write intent).
+  static uint8_t lastMasterWasWrite[32] = {0};
+  static uint8_t unknownLoggedRead[32]  = {0};
+  static uint8_t unknownLoggedWrite[32] = {0};
   time_t now = time(nullptr);
 
   if (isvalidotmsg(buf, len)) { 
@@ -4088,6 +4095,35 @@ void processOT(const char *buf, int len){
         OTlookupitem.unit = "";
       }
 
+      // TASK-684: classify slave Unknown-Data-Id (msg-type 7) and announce it
+      // once per (id, direction) instead of every cycle. The slave's type-7
+      // response does not carry the master's intent, so we look at the direction
+      // of the most-recent master frame for this id.
+      bool suppressTelnetForRepeat = false;
+      {
+        const uint8_t idx  = OTdata.id >> 3;
+        const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
+        if (OTdata.masterslave == 0) {
+          if (OTdata.type == OT_WRITE_DATA)     lastMasterWasWrite[idx] |=  mask;
+          else if (OTdata.type == OT_READ_DATA) lastMasterWasWrite[idx] &= ~mask;
+        } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
+          const bool isWriteCtx = (lastMasterWasWrite[idx] & mask) != 0;
+          uint8_t * const logged = isWriteCtx ? unknownLoggedWrite : unknownLoggedRead;
+          if (logged[idx] & mask) {
+            suppressTelnetForRepeat = true;
+          } else {
+            logged[idx] |= mask;
+            if (isWriteCtx) {
+              OTGWDebugTf(PSTR("boiler does not accept writes to msgID %d (%s) - Unknown-Data-Id\r\n"),
+                          OTdata.id, OTlookupitem.label);
+            } else {
+              OTGWDebugTf(PSTR("boiler does not implement msgID %d (%s) - Unknown-Data-Id\r\n"),
+                          OTdata.id, OTlookupitem.label);
+            }
+          }
+        }
+      }
+
       //keep track of last update time — only for valid responses
       if (is_value_valid(OTdata, OTlookupitem)) {
         setMsgLastUpdated(OTdata.id, currentTrackedSeconds());
@@ -4182,7 +4218,12 @@ void processOT(const char *buf, int len){
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");
       AddLogln();
-      OTGWDebugT(skipOTLogTimestamp(ot_log_buffer));
+      // TASK-684: skip telnet emission for repeated slave Unknown-Data-Id; the
+      // first occurrence already produced a clear once-per-(id,direction) line above.
+      // WebSocket OT Monitor still sees every frame for live-stream continuity.
+      if (!suppressTelnetForRepeat) {
+        OTGWDebugT(skipOTLogTimestamp(ot_log_buffer));
+      }
       OTTRACE("post-debug");
 
       // Send log buffer directly to WebSocket (no JSON, no queue)
