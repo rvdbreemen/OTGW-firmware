@@ -3,11 +3,11 @@ id: TASK-692
 title: >-
   feat-2.0.0: port TASK-686 — surface boiler unsupported-msgID map via REST,
   MQTT, WebUI
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-24 08:18'
-updated_date: '2026-05-24 08:31'
+updated_date: '2026-05-24 08:32'
 labels:
   - port-from-dev
   - diagnostics
