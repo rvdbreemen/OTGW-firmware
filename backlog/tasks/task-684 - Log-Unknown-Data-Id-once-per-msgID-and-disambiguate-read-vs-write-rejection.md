@@ -1,7 +1,7 @@
 ---
 id: TASK-684
 title: Log Unknown-Data-Id once per msgID and disambiguate read-vs-write rejection
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-24 06:32'
