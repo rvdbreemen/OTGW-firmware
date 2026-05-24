@@ -44,8 +44,6 @@ Out of scope: any behaviour change in file serving, version detection, or git-ha
 - [x] #6 python evaluate.py --quick shows no new failures vs current dev.
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -78,3 +76,19 @@ Out of scope: any behaviour change in file serving, version detection, or git-ha
 8. git push -u origin claude/beta-20-log-review-7gnaR.
 9. Open draft PR.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented + verified locally:
+- FSexplorer.ino:267-282 onNotFound rewrite with served/404 branching.
+- FSexplorer.ino:287-374 apifirmwarefilelist JSON mirroring dropped, traces gated, summary added.
+- versionStuff.ino:19 GetVersion entry trace removed.
+- helperStuff.ino:730-758 checklittlefshash silent on match.
+
+Build: python build.py --firmware -> exit 0 (1.6.0-beta.20+607861e).
+Evaluator: python evaluate.py --quick -> 34 passed / 0 warnings / 0 failures (100%).
+Commit: 554e7eda.
+Push: claude/beta-20-log-review-7gnaR.
+Draft PR: https://github.com/rvdbreemen/OTGW-firmware/pull/640
+<!-- SECTION:NOTES:END -->
