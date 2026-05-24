@@ -3943,19 +3943,36 @@ static bool handleOTGWErrorCode(const char *buf) {
   - error format
   - ...
 */
+// TASK-684 / TASK-685 / TASK-686: per-msgID bitmaps tracking which msgIDs the
+// boiler has flagged Unknown-Data-Id, split by direction. Populated in processOT
+// (idempotent set on every observation). Consumed by:
+//   - the AddLog suffix path below (plain-English wording),
+//   - the REST handler /api/v2/otgw/boiler-support (restAPI.ino),
+//   - the MQTT publisher publishBoilerUnsupportedMsgids (MQTTstuff.ino).
+// File-scope so other compilation units can read them via the accessors below.
+// Memory: 96 bytes static RAM total + 1 byte dirty flag = 97 bytes.
+static uint8_t boilerLastMasterWasWrite[32] = {0};
+static uint8_t boilerUnsupportedRead[32]    = {0};
+static uint8_t boilerUnsupportedWrite[32]   = {0};
+// Set on every 0->1 transition so the MQTT periodic publisher only republishes
+// the CSV when the set actually grew. Cleared after publish.
+static bool boilerUnsupportedDirty = false;
+
+bool isBoilerMsgIdUnsupportedRead(uint8_t id) {
+  return (boilerUnsupportedRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isBoilerMsgIdUnsupportedWrite(uint8_t id) {
+  return (boilerUnsupportedWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool getBoilerUnsupportedDirty()   { return boilerUnsupportedDirty; }
+void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
+
 void processOT(const char *buf, int len){
   static time_t epochBoilerlastseen = 0;
   static time_t epochThermostatlastseen = 0;
   static bool bOTGWboilerpreviousstate = false;
   static bool bOTGWthermostatpreviousstate = false;
   static bool bOTGWpreviousstate = false;
-  // TASK-684: per-msgID bitmaps so a slave Unknown-Data-Id is announced once per
-  // (id, direction) instead of every 2-3 s. lastMasterWasWrite remembers the direction
-  // of the most-recent master frame so the once-only line phrases correctly (the slave
-  // type-7 response alone does not carry the master's read/write intent).
-  static uint8_t lastMasterWasWrite[32] = {0};
-  static uint8_t unknownLoggedRead[32]  = {0};
-  static uint8_t unknownLoggedWrite[32] = {0};
   time_t now = time(nullptr);
 
   if (isvalidotmsg(buf, len)) { 
@@ -4095,23 +4112,27 @@ void processOT(const char *buf, int len){
         OTlookupitem.unit = "";
       }
 
-      // TASK-685 (revises TASK-684): record direction and Unknown-Data-Id into
-      // the bitmaps that TASK-686 surfaces via REST/MQTT/WebUI. The slave's
-      // type-7 response does not carry the master's intent on its own, so we
-      // remember the most-recent master direction per msgID. No suppression of
-      // log lines — telnet is not always on, so silencing after the first emit
-      // would leave later-connecting testers blind. The plain-English suffix
-      // is appended to the OT-bus log line below (every emit).
+      // TASK-685 / TASK-686: record direction and Unknown-Data-Id into the
+      // bitmaps surfaced via REST/MQTT/WebUI. The slave's type-7 response does
+      // not carry the master's intent on its own, so we remember the most-recent
+      // master direction per msgID. No log-line suppression — telnet is not
+      // always on, so silencing after first emit would leave later-connecting
+      // testers blind. The plain-English suffix is appended below (every emit).
+      // The dirty flag fires on 0->1 transitions only so the periodic MQTT
+      // republisher does the publish work just once per newly-discovered id.
       {
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
         if (OTdata.masterslave == 0) {
-          if (OTdata.type == OT_WRITE_DATA)     lastMasterWasWrite[idx] |=  mask;
-          else if (OTdata.type == OT_READ_DATA) lastMasterWasWrite[idx] &= ~mask;
+          if (OTdata.type == OT_WRITE_DATA)     boilerLastMasterWasWrite[idx] |=  mask;
+          else if (OTdata.type == OT_READ_DATA) boilerLastMasterWasWrite[idx] &= ~mask;
         } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
-          const bool isWriteCtx = (lastMasterWasWrite[idx] & mask) != 0;
-          uint8_t * const logged = isWriteCtx ? unknownLoggedWrite : unknownLoggedRead;
-          logged[idx] |= mask;  // idempotent; populates the support map for TASK-686
+          const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
+          uint8_t * const bitmap = isWriteCtx ? boilerUnsupportedWrite : boilerUnsupportedRead;
+          if ((bitmap[idx] & mask) == 0) {
+            bitmap[idx] |= mask;
+            boilerUnsupportedDirty = true;
+          }
         }
       }
 
@@ -4215,7 +4236,7 @@ void processOT(const char *buf, int len){
       if (OTdata.masterslave == 1 && OTdata.type == OT_UNKNOWN_DATA_ID) {
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
-        const bool isWriteCtx = (lastMasterWasWrite[idx] & mask) != 0;
+        const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
         AddLog(isWriteCtx ? " (boiler rejected write)" : " (boiler does not implement)");
       }
       AddLogln();
