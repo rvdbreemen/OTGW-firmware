@@ -1,11 +1,11 @@
 ---
 id: TASK-694
 title: 'feat-2.0.0: port TASK-689 — WebUI OT Support tab showing bilateral msgID map'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-24 08:19'
-updated_date: '2026-05-24 08:38'
+updated_date: '2026-05-24 08:39'
 labels:
   - port-from-dev
   - diagnostics
