@@ -1108,7 +1108,9 @@ void logHeapStats() {
   }
   
   DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u\r\n"),
-          freeHeap, maxBlock, levelStr, webSocketDropCount, mqttDropCount);
+          freeHeap, maxBlock, levelStr,
+          (uint32_t)state.heapdiag.iWsDropsTotal,
+          (uint32_t)state.heapdiag.iMqttDropsTotal);
 }
 
 //===========================================================================================
