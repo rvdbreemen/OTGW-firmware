@@ -16,7 +16,6 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
   char datamem[256]={0}; // prevent buffer overrun
   unsigned short ptr;
   File f;
-  DebugTf(PSTR("GetVersion opening %s\r\n"),hexfile);
   f = LittleFS.open(hexfile, "r");
   if (f)  // only proceed if file exists
   {

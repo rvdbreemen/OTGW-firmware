@@ -742,10 +742,9 @@ bool checklittlefshash(){
       }
       fh.close();
     }
-    DebugTf(PSTR("Check githash = [%s]\r\n"), _githash);
-    DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), _githash, _VERSION_GITHASH);
     bool match = (strcasecmp(_githash, _VERSION_GITHASH)==0);
     if (!match) {
+      DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), _githash, _VERSION_GITHASH);
       DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"),
               _VERSION_GITHASH, _githash);
       DebugTln(F("This may cause compatibility issues. Flash matching filesystem version."));
