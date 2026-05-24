@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.57
+**  Version  : v2.0.0-alpha.58
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -289,27 +289,22 @@ void setupFSexplorer(){
   httpServer.on("/ReBoot", reBootESP);
   httpServer.on("/ResetWireless", resetWirelessButton);
  
-  httpServer.onNotFound([]() 
+  httpServer.onNotFound([]()
   {
-    if (state.debug.bRestAPI) DebugTf(PSTR("in 'onNotFound()'!! [%s] => \r\n"), httpServer.uri().c_str());
     if (httpServer.uri().indexOf("/api/") == 0)
     {
-      if (state.debug.bRestAPI) DebugTf(PSTR("next: processAPI(%s)\r\n"), httpServer.uri().c_str());
       processAPI();
+      return;
     }
-    // else if (httpServer.uri() == "/")
-    // {
-    //   DebugTln(F("index requested.."));
-    //   sendIndexPage();
-    // }
-    else
-    {
-      if (state.debug.bRestAPI) DebugTf(PSTR("next: handleFile(%s)\r\n")
-                      , String(httpServer.urlDecode(httpServer.uri())).c_str());
-      if (!handleFile(httpServer.urlDecode(httpServer.uri())))
-      {
-        httpServer.send_P(404, PSTR("text/plain"), PSTR("FileNotFound\r\n"));
-      }
+    // TASK-683 port: emit one outcome-bearing line per static request — 200
+    // gated on bRestAPI (chatty debug surface), 404 always-on (actionable).
+    String path = httpServer.urlDecode(httpServer.uri());
+    const bool served = handleFile(String(path));
+    if (!served) {
+      httpServer.send_P(404, PSTR("text/plain"), PSTR("FileNotFound\r\n"));
+      DebugTf(PSTR("http GET %s => 404\r\n"), path.c_str());
+    } else if (state.debug.bRestAPI) {
+      DebugTf(PSTR("http GET %s => 200 (file)\r\n"), path.c_str());
     }
   });
   
@@ -317,8 +312,13 @@ void setupFSexplorer(){
 
 //=====================================================================================
 void apifirmwarefilelist() {
-  DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
-  
+  // TASK-683 port: drop JSON-mirror-to-telnet noise. Function-entry trace and
+  // per-file GetVersion result lines are gated on bRestAPI; one always-on
+  // summary line is emitted at the end.
+  const unsigned long startMs = millis();
+  unsigned int entryCount = 0;
+  if (state.debug.bRestAPI) DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
+
   // 150 bytes covers longest entry: path (~30) + version (~32) + fwversion (~32) + JSON overhead
   char entryBuffer[150];
   // ADR-004: stack char[] instead of String to avoid per-iteration heap churn.
@@ -328,7 +328,7 @@ void apifirmwarefilelist() {
   bool firstEntry = true;
 
   String dirpath = "/" + String(state.pic.sDeviceid);
-  DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
+  if (state.debug.bRestAPI) DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
 
   // Start chunked response with JSON array opening
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
@@ -336,20 +336,17 @@ void apifirmwarefilelist() {
   httpServer.send(200, F("application/json"), F(""));
   httpServer.sendContent(F("["));
 
-  // Also stream to debug telnet
-  DebugTln(F("--- Firmware File List (streamed) ---"));
-  DebugTln(F("["));
-
   PlatformDir dir(dirpath.c_str());
   if (!dir.valid()) {
     httpServer.sendContent(F("]\r\n"));
     httpServer.sendContent(F(""));
+    DebugTf(PSTR("api firmware/files: 0 entries (%lums)\r\n"),
+            (unsigned long)(millis() - startMs));
     return;
   }
   while (dir.next()) {
     String entryName = dir.fileName();
     size_t entrySize = dir.fileSize();
-    DebugTf(PSTR("entry=%s\r\n"), entryName.c_str());
     if (entryName.endsWith(".hex")) {
       version[0]   = '\0';
       fwversion[0] = '\0';
@@ -370,22 +367,20 @@ void apifirmwarefilelist() {
 
       GetVersion(hexfile.c_str(), fwversion, sizeof(fwversion));
 
-      DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion);
+      if (state.debug.bRestAPI) DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion);
       if (fwversion[0] != '\0' && strcmp(fwversion, version) != 0) {
         strlcpy(version, fwversion, sizeof(version));
         if (f = LittleFS.open(verfile, "w")) {
-          DebugTf(PSTR("writing %s to %s\r\n"), version, verfile.c_str());
+          if (state.debug.bRestAPI) DebugTf(PSTR("writing %s to %s\r\n"), version, verfile.c_str());
           f.print(version);
           f.print('\n');
           f.close();
         }
       }
-      Debugln();
 
       // Add comma separator after first entry
       if (!firstEntry) {
         httpServer.sendContent(F(","));
-        DebugTln(F(",")); // Also to debug telnet
       }
       firstEntry = false;
 
@@ -396,20 +391,17 @@ void apifirmwarefilelist() {
                  CSTR(entryName), CSTR(version), (int)entrySize);
       httpServer.sendContent(entryBuffer);
 
-      // Also stream entry to debug telnet
-      DebugTf(PSTR("  %s\r\n"), entryBuffer);
-
       feedWatchDog(); // Feed watchdog during potentially long operation
+      entryCount++;
     }
   }
-  
+
   // Close JSON array
   httpServer.sendContent(F("]\r\n"));
   httpServer.sendContent(F("")); // End chunked response
-  
-  // Also close JSON array in debug telnet
-  DebugTln(F("]"));
-  DebugTln(F("--- End of Firmware File List ---"));
+
+  DebugTf(PSTR("api firmware/files: %u entries (%lums)\r\n"),
+          entryCount, (unsigned long)(millis() - startMs));
 }
 
 
