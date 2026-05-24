@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.57
+**  Version  : v2.0.0-alpha.64
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -694,10 +694,11 @@ bool checklittlefshash(){
       }
       fh.close();
     }
-    DebugTf(PSTR("Check githash = [%s]\r\n"), _githash);
-    DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), _githash, _VERSION_GITHASH);
     bool match = (strcasecmp(_githash, _VERSION_GITHASH)==0);
     if (!match) {
+      // TASK-683 port: print the FS vs FW hash pair only on mismatch (happy
+      // path is silent). WARNING block + statusMessage update unchanged.
+      DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), _githash, _VERSION_GITHASH);
       DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"),
               _VERSION_GITHASH, _githash);
       DebugTln(F("This may cause compatibility issues. Flash matching filesystem version."));

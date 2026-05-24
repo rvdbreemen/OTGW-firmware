@@ -16,7 +16,9 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
   char datamem[256]={0}; // prevent buffer overrun
   unsigned short ptr;
   File f;
-  DebugTf(PSTR("GetVersion opening %s\r\n"),hexfile);
+  // TASK-683 port: dropped 'GetVersion opening %s' entry trace (always-on
+  // noise; fires 3x per Update-page open). Banner-not-found warning below
+  // is preserved — it is actionable.
   f = LittleFS.open(hexfile, "r");
   if (f)  // only proceed if file exists
   {

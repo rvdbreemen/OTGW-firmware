@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.57
+**  Version  : v2.0.0-alpha.64
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -591,6 +591,79 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing label")); return; }
     sendOTLabel(words[5]);
+  } else if (strcmp_P(words[4], PSTR("boiler-support")) == 0) {
+    // TASK-692 port (dev TASK-686): GET /api/v2/otgw/boiler-support ->
+    // unsupported_read / unsupported_write arrays sourced from the in-RAM
+    // bitmaps populated by processOT. Streamed in chunks so even pathological
+    // boilers (hundreds of unsupported ids) do not need a large stack buffer.
+    // TASK-696: leading comma emitted via sendContent(F(",")) so we ship one
+    // PSTR format string per row instead of two — saves flash on ESP32.
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendCorsOriginHeader();
+    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"unsupported_read\":["));
+    bool first = true;
+    char ent[64];
+    for (int i = 0; i <= 255; i++) {
+      if (!isBoilerMsgIdUnsupportedRead((uint8_t)i)) continue;
+      OTlookup_t item;
+      const char* label = "Unknown";
+      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; }
+      if (!first) httpServer.sendContent(F(","));
+      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\"}"), i, label);
+      httpServer.sendContent(ent);
+      first = false;
+    }
+    httpServer.sendContent_P(PSTR("],\"unsupported_write\":["));
+    first = true;
+    for (int i = 0; i <= 255; i++) {
+      if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
+      OTlookup_t item;
+      const char* label = "Unknown";
+      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; }
+      if (!first) httpServer.sendContent(F(","));
+      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\"}"), i, label);
+      httpServer.sendContent(ent);
+      first = false;
+    }
+    httpServer.sendContent_P(PSTR("]}"));
+    httpServer.sendContent(F(""));
+  } else if (strcmp_P(words[4], PSTR("ot-support")) == 0) {
+    // TASK-694 port (dev TASK-689): GET /api/v2/otgw/ot-support -> bilateral
+    // OT support map. Compact mode — only msgIDs where at least one of the
+    // six bitmaps has the bit set. One streamed JSON object per row, no
+    // full-payload allocation.
+    // TASK-696: single PSTR format per row (leading comma via sendContent).
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendCorsOriginHeader();
+    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"msgids\":["));
+    bool first = true;
+    char row[160];
+    for (int i = 0; i <= 255; i++) {
+      const uint8_t id = (uint8_t)i;
+      const bool tsR  = isThermostatMsgIdSentRead(id);
+      const bool tsW  = isThermostatMsgIdSentWrite(id);
+      const bool blAR = isBoilerMsgIdAckedRead(id);
+      const bool blAW = isBoilerMsgIdAckedWrite(id);
+      const bool blUR = isBoilerMsgIdUnsupportedRead(id);
+      const bool blUW = isBoilerMsgIdUnsupportedWrite(id);
+      if (!(tsR || tsW || blAR || blAW || blUR || blUW)) continue;
+      OTlookup_t item;
+      const char* label = "Unknown";
+      if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; }
+      if (!first) httpServer.sendContent(F(","));
+      snprintf_P(row, sizeof(row),
+                 PSTR("{\"id\":%u,\"label\":\"%s\",\"tsR\":%s,\"tsW\":%s,\"blAR\":%s,\"blAW\":%s,\"blUR\":%s,\"blUW\":%s}"),
+                 id, label,
+                 tsR  ? "true" : "false", tsW  ? "true" : "false",
+                 blAR ? "true" : "false", blAW ? "true" : "false",
+                 blUR ? "true" : "false", blUW ? "true" : "false");
+      httpServer.sendContent(row);
+      first = false;
+    }
+    httpServer.sendContent_P(PSTR("]}"));
+    httpServer.sendContent(F(""));
   } else {
     sendApiNotFound(originalURI);
   }

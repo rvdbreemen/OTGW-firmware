@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.57
+**  Version  : v2.0.0-alpha.64
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3970,6 +3970,49 @@ static bool handlePICStatusToken(const char *buf) {
   - error format
   - ...
 */
+// TASK-691 / TASK-692 / TASK-693 port (dev TASK-685/686/688): per-msgID bitmaps
+// recording each side of the OT bus's observed capability. Populated in
+// processOT (idempotent set on every observation). File scope so REST/MQTT/
+// file-persistence layers can read them through the accessors below.
+//
+// Memory: 6 * 32 = 192 B bitmaps + 3 B dirty flags + 32 B scratch = 227 B.
+//
+// Persistence (TASK-693): the *FileDirty flags drive 15-min debounced atomic
+// writes to /ot-thermo.json and /ot-boiler.json (saveOtSupportFilesIfDirty).
+// boilerUnsupportedDirty stays independent because the MQTT republish has its
+// own (1-min) cadence and consumes only the unsupported subset.
+static uint8_t boilerLastMasterWasWrite[32] = {0};  // scratch — not persisted
+static uint8_t boilerUnsupportedRead[32]    = {0};
+static uint8_t boilerUnsupportedWrite[32]   = {0};
+static uint8_t boilerAckedRead[32]          = {0};
+static uint8_t boilerAckedWrite[32]         = {0};
+static uint8_t thermostatSentRead[32]       = {0};
+static uint8_t thermostatSentWrite[32]      = {0};
+static bool boilerUnsupportedDirty = false;  // MQTT CSV republish gate (1-min cadence)
+static bool boilerFileDirty        = false;  // /ot-boiler.json   write gate (15-min cadence)
+static bool thermostatFileDirty    = false;  // /ot-thermo.json   write gate (15-min cadence)
+
+bool isBoilerMsgIdUnsupportedRead(uint8_t id) {
+  return (boilerUnsupportedRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isBoilerMsgIdUnsupportedWrite(uint8_t id) {
+  return (boilerUnsupportedWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isBoilerMsgIdAckedRead(uint8_t id) {
+  return (boilerAckedRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isBoilerMsgIdAckedWrite(uint8_t id) {
+  return (boilerAckedWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isThermostatMsgIdSentRead(uint8_t id) {
+  return (thermostatSentRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isThermostatMsgIdSentWrite(uint8_t id) {
+  return (thermostatSentWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool getBoilerUnsupportedDirty()   { return boilerUnsupportedDirty; }
+void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
+
 void processOT(const char *buf, int len, bool suppressOutput){
   // suppressOutput (TASK-293): when true, skip per-frame output paths and the
   // auto-leave-PS-mode heuristic. State updates, decoded value publishing,
@@ -4122,6 +4165,56 @@ void processOT(const char *buf, int len, bool suppressOutput){
         OTlookupitem.unit = "";
       }
 
+      // TASK-691 / TASK-692 / TASK-693 port (dev TASK-685/686/688): maintain
+      // the six per-msgID bitmaps that describe each side of the OT bus.
+      // Dirty flags fire only on 0->1 transitions so the periodic publishers
+      // (MQTT every minute, file every 15 min) do work exactly once per
+      // newly-discovered (id, direction).
+      {
+        const uint8_t idx  = OTdata.id >> 3;
+        const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
+        if (OTdata.masterslave == 0) {
+          // Master frame — track thermostat-side requests.
+          if (OTdata.type == OT_WRITE_DATA) {
+            boilerLastMasterWasWrite[idx] |= mask;
+            if ((thermostatSentWrite[idx] & mask) == 0) {
+              thermostatSentWrite[idx] |= mask;
+              thermostatFileDirty = true;
+            }
+          } else if (OTdata.type == OT_READ_DATA) {
+            boilerLastMasterWasWrite[idx] &= ~mask;
+            if ((thermostatSentRead[idx] & mask) == 0) {
+              thermostatSentRead[idx] |= mask;
+              thermostatFileDirty = true;
+            }
+          }
+        } else {
+          // Slave frame — track boiler-side response classification.
+          if (OTdata.type == OT_READ_ACK) {
+            if ((boilerAckedRead[idx] & mask) == 0) {
+              boilerAckedRead[idx] |= mask;
+              boilerFileDirty = true;
+            }
+          } else if (OTdata.type == OT_WRITE_ACK) {
+            if ((boilerAckedWrite[idx] & mask) == 0) {
+              boilerAckedWrite[idx] |= mask;
+              boilerFileDirty = true;
+            }
+          } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
+            // Master direction is read from boilerLastMasterWasWrite (set on
+            // the preceding master frame). The slave's type-7 alone doesn't
+            // carry intent.
+            const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
+            uint8_t * const bitmap = isWriteCtx ? boilerUnsupportedWrite : boilerUnsupportedRead;
+            if ((bitmap[idx] & mask) == 0) {
+              bitmap[idx] |= mask;
+              boilerUnsupportedDirty = true;  // MQTT republish (1-min cadence)
+              boilerFileDirty        = true;  // file write     (15-min cadence)
+            }
+          }
+        }
+      }
+
       //keep track of last update time — only for valid responses
       if (is_value_valid(OTdata, OTlookupitem)) {
         setMsgLastUpdated(OTdata.id, currentTrackedSeconds());
@@ -4193,6 +4286,17 @@ void processOT(const char *buf, int len, bool suppressOutput){
       }
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");
+      // TASK-691 / TASK-692 port (dev TASK-685/686): plain-English direction-
+      // aware suffix on slave Unknown-Data-Id. Emitted on every occurrence so
+      // a tester who opens telnet after the first such frame still sees the
+      // diagnostic context. The same suffix reaches the WebSocket OT Monitor
+      // via the shared ot_log_buffer.
+      if (OTdata.masterslave == 1 && OTdata.type == OT_UNKNOWN_DATA_ID) {
+        const uint8_t idx  = OTdata.id >> 3;
+        const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
+        const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
+        AddLog(isWriteCtx ? " (boiler rejected write)" : " (boiler does not implement)");
+      }
       AddLogln();
       OTDebugT(skipOTLogTimestamp(ot_log_buffer));
 
@@ -5055,6 +5159,193 @@ void upgradepic() {
   httpServer.send_P(303, PSTR("text/html; charset=UTF-8"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
 }
 #endif // HAS_PIC — end of PIC firmware upgrade functions
+
+// =========================================================================
+// TASK-693 port (dev TASK-688): persist the OT-bus support map across reboots.
+//
+// Files (LittleFS):
+//   /ot-thermo.json — {"v":1,"device":"thermostat","sent_read":[...],"sent_write":[...]}
+//   /ot-boiler.json — {"v":1,"device":"boiler","acked_read":[...],"acked_write":[...],
+//                     "unsupported_read":[...],"unsupported_write":[...]}
+//
+// Read on boot (loadOtSupportFiles, called from setup() after LittleFS.begin).
+// Write every 15 min from do15minevent when the per-file dirty flag is
+// set. Atomic: write to <path>.tmp, remove canonical, rename. A power loss
+// mid-write leaves a *.tmp dangling; the next boot ignores it (only the
+// canonical name is loaded) and the next dirty write replaces it.
+//
+// Stream-based reader (Stream::find + parseInt) and writer (file.print per id)
+// — no large RAM buffer at any point.
+// =========================================================================
+
+// TASK-695: scan `f` forward until `target` is fully matched at the current
+// position. Returns true and leaves the cursor immediately after the match;
+// returns false on EOF. Replaces Stream::find() — which depended on Stream's
+// timeout-driven read() and is not portably available on LittleFS::File
+// across ESP8266 vs ESP32 (the original cause of the PR #641 ESP32 build).
+// Naive state machine: fine because our search keys (e.g. "acked_read":[) have
+// no repeated prefix character. If a future key has overlapping prefixes,
+// switch to KMP.
+static bool fileFindToken(File &f, const char *target) {
+  const size_t tlen = strlen(target);
+  if (tlen == 0) return true;
+  size_t mi = 0;
+  while (f.available()) {
+    int c = f.read();
+    if (c < 0) return false;
+    if ((char)c == target[mi]) {
+      if (++mi == tlen) return true;
+    } else {
+      mi = ((char)c == target[0]) ? 1 : 0;
+    }
+  }
+  return false;
+}
+
+// TASK-695: read a JSON integer array body from `f` (the cursor is positioned
+// just after '['). Each unsigned decimal integer found sets the matching bit
+// in `bitmap`. Stops on ']' or EOF. Replaces Stream::parseInt(), which had
+// the same portability problem as Stream::find(). Tolerates whitespace,
+// commas, and trailing values without a final separator.
+static void parseIntArrayInto(File &f, uint8_t bitmap[32]) {
+  long val = -1;  // -1 = "not accumulating", >=0 = current number in progress
+  while (f.available()) {
+    int c = f.read();
+    if (c < 0 || c == ']') break;
+    if (c >= '0' && c <= '9') {
+      if (val < 0) val = 0;
+      val = val * 10 + (c - '0');
+    } else if (val >= 0) {
+      if (val <= 255) bitmap[val >> 3] |= (uint8_t)(1u << (val & 7));
+      val = -1;
+    }
+  }
+  // Finalize any trailing number not followed by a delimiter (defensive — our
+  // writer always emits a ']', but the helper stays robust to malformed files).
+  if (val >= 0 && val <= 255) bitmap[val >> 3] |= (uint8_t)(1u << (val & 7));
+}
+
+// Read one named integer array from an open File, into a 32-byte bitmap.
+// Uses only File::read() / available() — no Stream::find() / parseInt(), which
+// are not portably available on LittleFS::File between ESP8266 and ESP32.
+// Returns true if the key was found (regardless of how many ids it contained).
+static bool readBitmapArrayFromJson(File &f, const __FlashStringHelper *keyPattern, uint8_t bitmap[32]) {
+  // Cursor reset so multiple calls on the same file find each key independently.
+  f.seek(0);
+  char patBuf[40];
+  strncpy_P(patBuf, reinterpret_cast<PGM_P>(keyPattern), sizeof(patBuf) - 1);
+  patBuf[sizeof(patBuf) - 1] = '\0';
+  if (!fileFindToken(f, patBuf)) return false;
+  parseIntArrayInto(f, bitmap);
+  return true;
+}
+
+// Stream one bitmap as a JSON integer array body (no brackets) to an open File.
+static void writeBitmapArrayToJson(File &f, const uint8_t bitmap[32]) {
+  bool first = true;
+  for (int i = 0; i <= 255; i++) {
+    if ((bitmap[i >> 3] & (uint8_t)(1u << (i & 7))) == 0) continue;
+    if (!first) f.print(',');
+    f.print(i);
+    first = false;
+  }
+}
+
+void loadOtSupportFiles() {
+  // Thermostat side.
+  File f = LittleFS.open("/ot-thermo.json", "r");
+  if (f) {
+    // Magic gate: read the start of the file and verify "v":1 is present.
+    char header[16] = {0};
+    int n = f.read((uint8_t*)header, sizeof(header) - 1);
+    header[n > 0 ? n : 0] = '\0';
+    if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+      // TASK-696: short keys (sr/sw/ar/aw/ur/uw) to trim flash on ESP32.
+      // The file is firmware-internal; the WebUI / REST surfaces use the long
+      // names. Magic "v":1 unchanged so a future schema bump can still gate.
+      readBitmapArrayFromJson(f, F("\"sr\":["), thermostatSentRead);
+      readBitmapArrayFromJson(f, F("\"sw\":["), thermostatSentWrite);
+      DebugTln(F("ot-support: thermostat profile loaded from /ot-thermo.json"));
+    } else {
+      DebugTln(F("ot-support: /ot-thermo.json header missing/invalid — starting fresh"));
+    }
+    f.close();
+  }
+  // Boiler side.
+  f = LittleFS.open("/ot-boiler.json", "r");
+  if (f) {
+    char header[16] = {0};
+    int n = f.read((uint8_t*)header, sizeof(header) - 1);
+    header[n > 0 ? n : 0] = '\0';
+    if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+      readBitmapArrayFromJson(f, F("\"ar\":["), boilerAckedRead);
+      readBitmapArrayFromJson(f, F("\"aw\":["), boilerAckedWrite);
+      readBitmapArrayFromJson(f, F("\"ur\":["), boilerUnsupportedRead);
+      readBitmapArrayFromJson(f, F("\"uw\":["), boilerUnsupportedWrite);
+      DebugTln(F("ot-support: boiler profile loaded from /ot-boiler.json"));
+    } else {
+      DebugTln(F("ot-support: /ot-boiler.json header missing/invalid — starting fresh"));
+    }
+    f.close();
+  }
+  // We loaded what's on disk, so the on-disk copy matches RAM: not dirty.
+  thermostatFileDirty = false;
+  boilerFileDirty     = false;
+}
+
+// Atomic write: <path>.tmp -> remove canonical -> rename. A power loss between
+// the two final steps leaves only one valid file (either the old canonical or
+// the new *.tmp ignored by loadOtSupportFiles); next dirty write recovers.
+static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
+  File f = LittleFS.open(tmpPath, "w");
+  if (!f) return false;
+  // TASK-696: short keys (sr/sw) match the reader and save ~30 B per write.
+  f.print(F("{\"v\":1,\"device\":\"thermostat\",\"sr\":["));
+  writeBitmapArrayToJson(f, thermostatSentRead);
+  f.print(F("],\"sw\":["));
+  writeBitmapArrayToJson(f, thermostatSentWrite);
+  f.print(F("]}\n"));
+  f.close();
+  LittleFS.remove(canonicalPath);  // no-op if absent
+  return LittleFS.rename(tmpPath, canonicalPath);
+}
+
+static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
+  File f = LittleFS.open(tmpPath, "w");
+  if (!f) return false;
+  // TASK-696: short keys (ar/aw/ur/uw) match the reader; saves ~100 B per write.
+  f.print(F("{\"v\":1,\"device\":\"boiler\",\"ar\":["));
+  writeBitmapArrayToJson(f, boilerAckedRead);
+  f.print(F("],\"aw\":["));
+  writeBitmapArrayToJson(f, boilerAckedWrite);
+  f.print(F("],\"ur\":["));
+  writeBitmapArrayToJson(f, boilerUnsupportedRead);
+  f.print(F("],\"uw\":["));
+  writeBitmapArrayToJson(f, boilerUnsupportedWrite);
+  f.print(F("]}\n"));
+  f.close();
+  LittleFS.remove(canonicalPath);
+  return LittleFS.rename(tmpPath, canonicalPath);
+}
+
+void saveOtSupportFilesIfDirty() {
+  if (thermostatFileDirty) {
+    if (writeOtThermoFile("/ot-thermo.json", "/ot-thermo.json.tmp")) {
+      thermostatFileDirty = false;
+      DebugTln(F("ot-support: /ot-thermo.json written"));
+    } else {
+      DebugTln(F("ot-support: /ot-thermo.json write FAILED — will retry"));
+    }
+  }
+  if (boilerFileDirty) {
+    if (writeOtBoilerFile("/ot-boiler.json", "/ot-boiler.json.tmp")) {
+      boilerFileDirty = false;
+      DebugTln(F("ot-support: /ot-boiler.json written"));
+    } else {
+      DebugTln(F("ot-support: /ot-boiler.json write FAILED — will retry"));
+    }
+  }
+}
 
 /***************************************************************************
 *
