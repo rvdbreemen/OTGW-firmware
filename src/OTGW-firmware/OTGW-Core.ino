@@ -3943,26 +3943,45 @@ static bool handleOTGWErrorCode(const char *buf) {
   - error format
   - ...
 */
-// TASK-684 / TASK-685 / TASK-686: per-msgID bitmaps tracking which msgIDs the
-// boiler has flagged Unknown-Data-Id, split by direction. Populated in processOT
-// (idempotent set on every observation). Consumed by:
-//   - the AddLog suffix path below (plain-English wording),
-//   - the REST handler /api/v2/otgw/boiler-support (restAPI.ino),
-//   - the MQTT publisher publishBoilerUnsupportedMsgids (MQTTstuff.ino).
-// File-scope so other compilation units can read them via the accessors below.
-// Memory: 96 bytes static RAM total + 1 byte dirty flag = 97 bytes.
-static uint8_t boilerLastMasterWasWrite[32] = {0};
+// TASK-684 / TASK-685 / TASK-686 / TASK-688: per-msgID bitmaps recording each
+// side of the OT bus's observed capability. Populated in processOT (idempotent
+// set on every observation). File scope so REST/MQTT/file-persistence layers
+// can read them through the accessors below.
+//
+// Memory: 6 * 32 = 192 B bitmaps + 3 B dirty flags + 32 B scratch = 227 B.
+//
+// Persistence (TASK-688): the *FileDirty flags drive 15-min debounced atomic
+// writes to /ot-thermo.json and /ot-boiler.json (saveOtSupportFilesIfDirty).
+// boilerUnsupportedDirty stays independent because the MQTT republish has its
+// own (1-min) cadence and consumes only the unsupported subset.
+static uint8_t boilerLastMasterWasWrite[32] = {0};  // scratch — not persisted
 static uint8_t boilerUnsupportedRead[32]    = {0};
 static uint8_t boilerUnsupportedWrite[32]   = {0};
-// Set on every 0->1 transition so the MQTT periodic publisher only republishes
-// the CSV when the set actually grew. Cleared after publish.
-static bool boilerUnsupportedDirty = false;
+static uint8_t boilerAckedRead[32]          = {0};
+static uint8_t boilerAckedWrite[32]         = {0};
+static uint8_t thermostatSentRead[32]       = {0};
+static uint8_t thermostatSentWrite[32]      = {0};
+static bool boilerUnsupportedDirty = false;  // MQTT CSV republish gate (1-min cadence)
+static bool boilerFileDirty        = false;  // /ot-boiler.json   write gate (15-min cadence)
+static bool thermostatFileDirty    = false;  // /ot-thermo.json   write gate (15-min cadence)
 
 bool isBoilerMsgIdUnsupportedRead(uint8_t id) {
   return (boilerUnsupportedRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
 }
 bool isBoilerMsgIdUnsupportedWrite(uint8_t id) {
   return (boilerUnsupportedWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isBoilerMsgIdAckedRead(uint8_t id) {
+  return (boilerAckedRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isBoilerMsgIdAckedWrite(uint8_t id) {
+  return (boilerAckedWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isThermostatMsgIdSentRead(uint8_t id) {
+  return (thermostatSentRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isThermostatMsgIdSentWrite(uint8_t id) {
+  return (thermostatSentWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
 }
 bool getBoilerUnsupportedDirty()   { return boilerUnsupportedDirty; }
 void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
@@ -4112,26 +4131,51 @@ void processOT(const char *buf, int len){
         OTlookupitem.unit = "";
       }
 
-      // TASK-685 / TASK-686: record direction and Unknown-Data-Id into the
-      // bitmaps surfaced via REST/MQTT/WebUI. The slave's type-7 response does
-      // not carry the master's intent on its own, so we remember the most-recent
-      // master direction per msgID. No log-line suppression — telnet is not
-      // always on, so silencing after first emit would leave later-connecting
-      // testers blind. The plain-English suffix is appended below (every emit).
-      // The dirty flag fires on 0->1 transitions only so the periodic MQTT
-      // republisher does the publish work just once per newly-discovered id.
+      // TASK-685 / TASK-686 / TASK-688: maintain the six per-msgID bitmaps that
+      // describe each side of the OT bus. Dirty flags fire only on 0->1
+      // transitions so the periodic publishers (MQTT every minute, file every
+      // 15 min) do work exactly once per newly-discovered (id, direction).
       {
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
         if (OTdata.masterslave == 0) {
-          if (OTdata.type == OT_WRITE_DATA)     boilerLastMasterWasWrite[idx] |=  mask;
-          else if (OTdata.type == OT_READ_DATA) boilerLastMasterWasWrite[idx] &= ~mask;
-        } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
-          const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
-          uint8_t * const bitmap = isWriteCtx ? boilerUnsupportedWrite : boilerUnsupportedRead;
-          if ((bitmap[idx] & mask) == 0) {
-            bitmap[idx] |= mask;
-            boilerUnsupportedDirty = true;
+          // Master frame — track thermostat-side requests.
+          if (OTdata.type == OT_WRITE_DATA) {
+            boilerLastMasterWasWrite[idx] |= mask;
+            if ((thermostatSentWrite[idx] & mask) == 0) {
+              thermostatSentWrite[idx] |= mask;
+              thermostatFileDirty = true;
+            }
+          } else if (OTdata.type == OT_READ_DATA) {
+            boilerLastMasterWasWrite[idx] &= ~mask;
+            if ((thermostatSentRead[idx] & mask) == 0) {
+              thermostatSentRead[idx] |= mask;
+              thermostatFileDirty = true;
+            }
+          }
+        } else {
+          // Slave frame — track boiler-side response classification.
+          if (OTdata.type == OT_READ_ACK) {
+            if ((boilerAckedRead[idx] & mask) == 0) {
+              boilerAckedRead[idx] |= mask;
+              boilerFileDirty = true;
+            }
+          } else if (OTdata.type == OT_WRITE_ACK) {
+            if ((boilerAckedWrite[idx] & mask) == 0) {
+              boilerAckedWrite[idx] |= mask;
+              boilerFileDirty = true;
+            }
+          } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
+            // Master direction is read from boilerLastMasterWasWrite (set on
+            // the preceding master frame). The slave's type-7 alone doesn't
+            // carry intent.
+            const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
+            uint8_t * const bitmap = isWriteCtx ? boilerUnsupportedWrite : boilerUnsupportedRead;
+            if ((bitmap[idx] & mask) == 0) {
+              bitmap[idx] |= mask;
+              boilerUnsupportedDirty = true;  // MQTT republish (1-min cadence)
+              boilerFileDirty        = true;  // file write     (15-min cadence)
+            }
           }
         }
       }
@@ -5116,6 +5160,152 @@ void upgradepic() {
   }
   httpServer.sendHeader(F("Location"), F("index.html#tabPICflash"), true);
   httpServer.send_P(303, PSTR("text/html; charset=UTF-8"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
+}
+
+// =========================================================================
+// TASK-688: persist the OT-bus support map across reboots.
+//
+// Files (LittleFS):
+//   /ot-thermo.json — {"v":1,"device":"thermostat","sent_read":[...],"sent_write":[...]}
+//   /ot-boiler.json — {"v":1,"device":"boiler","acked_read":[...],"acked_write":[...],
+//                     "unsupported_read":[...],"unsupported_write":[...]}
+//
+// Read on boot (loadOtSupportFiles, called from setup() after LittleFS.begin).
+// Write every 15 min from doTaskMinuteChanged when the per-file dirty flag is
+// set. Atomic: write to <path>.tmp, remove canonical, rename. A power loss
+// mid-write leaves a *.tmp dangling; the next boot ignores it (only the
+// canonical name is loaded) and the next dirty write replaces it.
+//
+// Stream-based reader (Stream::find + parseInt) and writer (file.print per id)
+// — no large RAM buffer at any point.
+// =========================================================================
+
+static const char OT_SUPPORT_FILE_VERSION = '1';
+
+// Read one named integer array from an open File, into a 32-byte bitmap.
+// Streams via Stream::find() + parseInt(); does NOT allocate a buffer.
+// Returns true if the key was found (regardless of how many ids it contained).
+static bool readBitmapArrayFromJson(File &f, const __FlashStringHelper *keyPattern, uint8_t bitmap[32]) {
+  // Stream::find() advances the read cursor past the matched pattern. We
+  // reset to start so multiple calls on the same file find each key.
+  f.seek(0);
+  char patBuf[40];
+  strncpy_P(patBuf, reinterpret_cast<PGM_P>(keyPattern), sizeof(patBuf) - 1);
+  patBuf[sizeof(patBuf) - 1] = '\0';
+  if (!f.find(patBuf)) return false;
+  while (f.available()) {
+    int c = f.peek();
+    if (c == ']') break;
+    if (c >= '0' && c <= '9') {
+      long id = f.parseInt();
+      if (id >= 0 && id <= 255) bitmap[id >> 3] |= (uint8_t)(1u << (id & 7));
+    } else {
+      f.read();  // consume separator (comma / whitespace)
+    }
+  }
+  return true;
+}
+
+// Stream one bitmap as a JSON integer array body (no brackets) to an open File.
+static void writeBitmapArrayToJson(File &f, const uint8_t bitmap[32]) {
+  bool first = true;
+  for (int i = 0; i <= 255; i++) {
+    if ((bitmap[i >> 3] & (uint8_t)(1u << (i & 7))) == 0) continue;
+    if (!first) f.print(',');
+    f.print(i);
+    first = false;
+  }
+}
+
+void loadOtSupportFiles() {
+  // Thermostat side.
+  File f = LittleFS.open("/ot-thermo.json", "r");
+  if (f) {
+    // Magic gate: read the start of the file and verify "v":1 is present.
+    char header[16] = {0};
+    int n = f.read((uint8_t*)header, sizeof(header) - 1);
+    header[n > 0 ? n : 0] = '\0';
+    if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+      readBitmapArrayFromJson(f, F("\"sent_read\":["),  thermostatSentRead);
+      readBitmapArrayFromJson(f, F("\"sent_write\":["), thermostatSentWrite);
+      DebugTln(F("ot-support: thermostat profile loaded from /ot-thermo.json"));
+    } else {
+      DebugTln(F("ot-support: /ot-thermo.json header missing/invalid — starting fresh"));
+    }
+    f.close();
+  }
+  // Boiler side.
+  f = LittleFS.open("/ot-boiler.json", "r");
+  if (f) {
+    char header[16] = {0};
+    int n = f.read((uint8_t*)header, sizeof(header) - 1);
+    header[n > 0 ? n : 0] = '\0';
+    if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+      readBitmapArrayFromJson(f, F("\"acked_read\":["),       boilerAckedRead);
+      readBitmapArrayFromJson(f, F("\"acked_write\":["),      boilerAckedWrite);
+      readBitmapArrayFromJson(f, F("\"unsupported_read\":["), boilerUnsupportedRead);
+      readBitmapArrayFromJson(f, F("\"unsupported_write\":["),boilerUnsupportedWrite);
+      DebugTln(F("ot-support: boiler profile loaded from /ot-boiler.json"));
+    } else {
+      DebugTln(F("ot-support: /ot-boiler.json header missing/invalid — starting fresh"));
+    }
+    f.close();
+  }
+  // We loaded what's on disk, so the on-disk copy matches RAM: not dirty.
+  thermostatFileDirty = false;
+  boilerFileDirty     = false;
+}
+
+// Atomic write: <path>.tmp -> remove canonical -> rename. A power loss between
+// the two final steps leaves only one valid file (either the old canonical or
+// the new *.tmp ignored by loadOtSupportFiles); next dirty write recovers.
+static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
+  File f = LittleFS.open(tmpPath, "w");
+  if (!f) return false;
+  f.print(F("{\"v\":1,\"device\":\"thermostat\",\"sent_read\":["));
+  writeBitmapArrayToJson(f, thermostatSentRead);
+  f.print(F("],\"sent_write\":["));
+  writeBitmapArrayToJson(f, thermostatSentWrite);
+  f.print(F("]}\n"));
+  f.close();
+  LittleFS.remove(canonicalPath);  // no-op if absent
+  return LittleFS.rename(tmpPath, canonicalPath);
+}
+
+static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
+  File f = LittleFS.open(tmpPath, "w");
+  if (!f) return false;
+  f.print(F("{\"v\":1,\"device\":\"boiler\",\"acked_read\":["));
+  writeBitmapArrayToJson(f, boilerAckedRead);
+  f.print(F("],\"acked_write\":["));
+  writeBitmapArrayToJson(f, boilerAckedWrite);
+  f.print(F("],\"unsupported_read\":["));
+  writeBitmapArrayToJson(f, boilerUnsupportedRead);
+  f.print(F("],\"unsupported_write\":["));
+  writeBitmapArrayToJson(f, boilerUnsupportedWrite);
+  f.print(F("]}\n"));
+  f.close();
+  LittleFS.remove(canonicalPath);
+  return LittleFS.rename(tmpPath, canonicalPath);
+}
+
+void saveOtSupportFilesIfDirty() {
+  if (thermostatFileDirty) {
+    if (writeOtThermoFile("/ot-thermo.json", "/ot-thermo.json.tmp")) {
+      thermostatFileDirty = false;
+      DebugTln(F("ot-support: /ot-thermo.json written"));
+    } else {
+      DebugTln(F("ot-support: /ot-thermo.json write FAILED — will retry"));
+    }
+  }
+  if (boilerFileDirty) {
+    if (writeOtBoilerFile("/ot-boiler.json", "/ot-boiler.json.tmp")) {
+      boilerFileDirty = false;
+      DebugTln(F("ot-support: /ot-boiler.json written"));
+    } else {
+      DebugTln(F("ot-support: /ot-boiler.json write FAILED — will retry"));
+    }
+  }
 }
 
 /***************************************************************************

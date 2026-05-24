@@ -156,12 +156,18 @@ void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper
 void publishToSourceTopic(const char*, const char*, byte);
 void loopMQTTDiscovery();
 void sendMQTTheapdiag();
-// TASK-686: support-map accessors (state lives in OTGW-Core.ino at file scope).
+// TASK-686 / TASK-688: support-map accessors (state lives in OTGW-Core.ino at file scope).
 bool isBoilerMsgIdUnsupportedRead(uint8_t id);
 bool isBoilerMsgIdUnsupportedWrite(uint8_t id);
+bool isBoilerMsgIdAckedRead(uint8_t id);
+bool isBoilerMsgIdAckedWrite(uint8_t id);
+bool isThermostatMsgIdSentRead(uint8_t id);
+bool isThermostatMsgIdSentWrite(uint8_t id);
 bool getBoilerUnsupportedDirty();
 void clearBoilerUnsupportedDirty();
 void publishBoilerUnsupportedMsgids();     // TASK-686: MQTT retained CSV ("14W,16W,24R,...")
+void loadOtSupportFiles();                  // TASK-688: read /ot-thermo.json and /ot-boiler.json at boot
+void saveOtSupportFilesIfDirty();           // TASK-688: 15-min debounced atomic write
 void doMqttDisconnect();                 // graceful disconnect for reboot path (MQTTclient is file-static)
 void doWebSocketClose();                 // close all WS clients before reboot (webSocket not extern'd in any header)
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
