@@ -13,6 +13,10 @@ labels:
   - beta.20
   - log-cleanup
 dependencies: []
+references:
+  - OTGW_1.6_beta_20.txt (crashevans
+  - FW 1.6.0-beta.20+591131f
+  - 'build #3380)'
 priority: medium
 ---
 
