@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-24 06:46'
-updated_date: '2026-05-24 06:47'
+updated_date: '2026-05-24 06:53'
 labels:
   - diagnostics
   - beta.20
@@ -44,10 +44,10 @@ References:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Inside processOT(), the OTGWDebugTf calls that emit the once-per-(id, direction) plain-English line are removed. The bitmaps unknownLoggedRead and unknownLoggedWrite are kept and continue to be set whenever Unknown-Data-Id is observed, but no longer drive suppression.
-- [ ] #2 The suppressTelnetForRepeat flag and the gated OTGWDebugT call are removed. Telnet emission of the raw OT-bus line for Unknown-Data-Id is unconditional, exactly as it was before TASK-684.
-- [ ] #3 The existing OT-bus log line gains a short direction-aware plain-English suffix on every Unknown-Data-Id frame: '(boiler does not implement)' for read direction, '(boiler rejected write)' for write direction. The suffix is appended via AddLog in processOT() so the same string reaches both telnet (OTGWDebugT) and WebSocket OT Monitor (sendLogToWebSocket).
-- [ ] #4 lastMasterWasWrite is preserved and continues to be updated on every master frame so the suffix-wording branch picks the correct direction.
-- [ ] #5 python build.py --firmware exits 0.
-- [ ] #6 python evaluate.py --quick shows no new failures vs current dev.
+- [x] #1 Inside processOT(), the OTGWDebugTf calls that emit the once-per-(id, direction) plain-English line are removed. The bitmaps unknownLoggedRead and unknownLoggedWrite are kept and continue to be set whenever Unknown-Data-Id is observed, but no longer drive suppression.
+- [x] #2 The suppressTelnetForRepeat flag and the gated OTGWDebugT call are removed. Telnet emission of the raw OT-bus line for Unknown-Data-Id is unconditional, exactly as it was before TASK-684.
+- [x] #3 The existing OT-bus log line gains a short direction-aware plain-English suffix on every Unknown-Data-Id frame: '(boiler does not implement)' for read direction, '(boiler rejected write)' for write direction. The suffix is appended via AddLog in processOT() so the same string reaches both telnet (OTGWDebugT) and WebSocket OT Monitor (sendLogToWebSocket).
+- [x] #4 lastMasterWasWrite is preserved and continues to be updated on every master frame so the suffix-wording branch picks the correct direction.
+- [x] #5 python build.py --firmware exits 0.
+- [x] #6 python evaluate.py --quick shows no new failures vs current dev.
 <!-- AC:END -->
