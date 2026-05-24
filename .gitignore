@@ -72,3 +72,6 @@ tools/esptool/
 
 # Daily issue reports are operational artefacts, not version-controlled history (TASK-663).
 docs/daily-issue-report.md
+
+# Local build log output
+logs/
