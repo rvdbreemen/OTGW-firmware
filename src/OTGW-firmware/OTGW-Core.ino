@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.58
+**  Version  : v2.0.0-alpha.59
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3981,6 +3981,15 @@ void processOT(const char *buf, int len, bool suppressOutput){
   static bool bOTGWboilerpreviousstate = false;
   static bool bOTGWthermostatpreviousstate = false;
   static bool bOTGWpreviousstate = false;
+  // TASK-691 port (dev TASK-685): per-msgID bitmaps tracking the most-recent
+  // master direction and which msgIDs the boiler has flagged Unknown-Data-Id,
+  // split by direction. Populated below on every relevant frame; consumed by
+  // the AddLog suffix path further down. Subsequent port (TASK-692) will
+  // promote these to file scope and expose accessors for REST/MQTT/WebUI.
+  // Memory: 96 bytes static RAM (3 x 32-byte bitmaps).
+  static uint8_t lastMasterWasWrite[32] = {0};
+  static uint8_t unknownLoggedRead[32]  = {0};
+  static uint8_t unknownLoggedWrite[32] = {0};
   time_t now = time(nullptr);
 
   if (isvalidotmsg(buf, len)) {
@@ -4122,6 +4131,25 @@ void processOT(const char *buf, int len, bool suppressOutput){
         OTlookupitem.unit = "";
       }
 
+      // TASK-691 port (dev TASK-685): record direction and Unknown-Data-Id
+      // into the bitmaps used by the AddLog suffix path below. The slave's
+      // type-7 response does not carry the master's intent on its own, so we
+      // remember the most-recent master direction per msgID. No log-line
+      // suppression — telnet is not always on, so silencing after first emit
+      // would leave later-connecting testers blind.
+      {
+        const uint8_t idx  = OTdata.id >> 3;
+        const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
+        if (OTdata.masterslave == 0) {
+          if (OTdata.type == OT_WRITE_DATA)     lastMasterWasWrite[idx] |=  mask;
+          else if (OTdata.type == OT_READ_DATA) lastMasterWasWrite[idx] &= ~mask;
+        } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
+          const bool isWriteCtx = (lastMasterWasWrite[idx] & mask) != 0;
+          uint8_t * const logged = isWriteCtx ? unknownLoggedWrite : unknownLoggedRead;
+          logged[idx] |= mask;  // idempotent; consumed by TASK-692 port
+        }
+      }
+
       //keep track of last update time — only for valid responses
       if (is_value_valid(OTdata, OTlookupitem)) {
         setMsgLastUpdated(OTdata.id, currentTrackedSeconds());
@@ -4193,6 +4221,17 @@ void processOT(const char *buf, int len, bool suppressOutput){
       }
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");
+      // TASK-691 port (dev TASK-685): plain-English direction-aware suffix on
+      // slave Unknown-Data-Id. Emitted on every occurrence so a tester who
+      // opens telnet after the first such frame still sees the diagnostic
+      // context. The same suffix reaches the WebSocket OT Monitor via the
+      // shared ot_log_buffer.
+      if (OTdata.masterslave == 1 && OTdata.type == OT_UNKNOWN_DATA_ID) {
+        const uint8_t idx  = OTdata.id >> 3;
+        const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
+        const bool isWriteCtx = (lastMasterWasWrite[idx] & mask) != 0;
+        AddLog(isWriteCtx ? " (boiler rejected write)" : " (boiler does not implement)");
+      }
       AddLogln();
       OTDebugT(skipOTLogTimestamp(ot_log_buffer));
 

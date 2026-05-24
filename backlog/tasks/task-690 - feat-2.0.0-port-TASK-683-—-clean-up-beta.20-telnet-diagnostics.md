@@ -1,11 +1,11 @@
 ---
 id: TASK-690
 title: 'feat-2.0.0: port TASK-683 — clean up beta.20 telnet diagnostics'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-24 08:18'
-updated_date: '2026-05-24 08:23'
+updated_date: '2026-05-24 08:24'
 labels:
   - port-from-dev
   - diagnostics
