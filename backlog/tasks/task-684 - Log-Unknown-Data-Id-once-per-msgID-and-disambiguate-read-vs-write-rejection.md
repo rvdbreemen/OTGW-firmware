@@ -46,8 +46,6 @@ Out of scope: surfacing the support map on REST/stats/MQTT (that's a follow-up t
 - [x] #6 python evaluate.py --quick shows no new failures vs current dev.
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -72,3 +70,17 @@ Out of scope: surfacing the support map on REST/stats/MQTT (that's a follow-up t
 4. Build (python build.py --firmware) and evaluator (python evaluate.py --quick).
 5. Commit on the existing claude/beta-20-log-review-7gnaR branch; PR #640 picks up the new commit automatically.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented in OTGW-Core.ino:
+- 3x 32-byte static bitmaps added at the top of processOT() (lastMasterWasWrite / unknownLoggedRead / unknownLoggedWrite).
+- Direction tracking + once-per-(id, direction) emission inserted just after OTlookupitem is loaded.
+- OTGWDebugT telnet emission gated on !suppressTelnetForRepeat; sendLogToWebSocket unchanged so the WebUI OT Monitor still sees every frame.
+
+Build: python build.py --firmware -> exit 0 (1.6.0-beta.20+4583d52).
+Evaluator: python evaluate.py --quick -> 34 passed / 0 / 0 (100% health).
+Commit: c30695f0.
+Landed on the existing claude/beta-20-log-review-7gnaR branch -> PR #640 picks it up automatically.
+<!-- SECTION:NOTES:END -->
