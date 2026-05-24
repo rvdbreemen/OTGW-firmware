@@ -84,3 +84,35 @@ Evaluator: python evaluate.py --quick -> 34 passed / 0 / 0 (100% health).
 Commit: c30695f0.
 Landed on the existing claude/beta-20-log-review-7gnaR branch -> PR #640 picks it up automatically.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Made the Unknown-Data-Id telnet output both quieter and more readable. processOT() now tracks the most-recent master frame direction per msgID and emits a single direction-aware line the first time a slave Unknown-Data-Id arrives for a given (id, direction) pair, then suppresses repeats on the telnet stream while leaving the WebSocket OT Monitor untouched.
+
+## Changes (OTGW-Core.ino)
+- Added three 32-byte function-local static bitmaps in processOT():
+  - lastMasterWasWrite[32]: bit=1 if the most-recent master frame for that msgID was a Write-Data.
+  - unknownLoggedRead[32]: bit set once the "boiler does not implement msgID N" line has been emitted for that id.
+  - unknownLoggedWrite[32]: same for the write-direction line.
+- After OTlookupitem is loaded, a small block updates lastMasterWasWrite on master frames and, on slave Unknown-Data-Id frames, decides whether to emit the once-only clear line or set suppressTelnetForRepeat=true.
+- The OTGWDebugT(skipOTLogTimestamp(ot_log_buffer)) call is gated on !suppressTelnetForRepeat. sendLogToWebSocket(ot_log_buffer) is unchanged -- the WebUI live OT Monitor still receives every frame so existing tooling that subscribes to the WS stream is unaffected.
+
+## Net effect on a crashevans-style capture
+For the 7-8 msgIDs the boiler permanently does not support, the telnet output goes from ~145 repeated raw lines in ~10 min to about 7-8 clear one-liners (one per id/direction) followed by silence on the telnet stream. The plain-English wording also makes it obvious which case happened:
+- "boiler does not implement msgID 33 (Texhaust) - Unknown-Data-Id"
+- "boiler does not accept writes to msgID 16 (TrSet) - Unknown-Data-Id"
+
+## Memory and risk
+- 96 bytes static RAM (3x 32-byte bitmaps) inside processOT().
+- No behaviour change to MQTT publishing, value decoding, gateway substitution, or the WebSocket OT Monitor stream.
+- Bitmaps reset on reboot, so a new boot session re-announces each unsupported msgID once.
+
+## Verification
+- python build.py --firmware exits 0 (1.6.0-beta.20+4583d52).
+- python evaluate.py --quick: 34 passed / 0 warnings / 0 failures (100% health).
+
+## Follow-ups (out of scope)
+- T2 surfacing the per-msgID support map on REST / stats page / MQTT retained topic.
+- T3 HA discovery suppression for known-unsupported msgIDs (would need an ADR).
+<!-- SECTION:FINAL_SUMMARY:END -->
