@@ -20,6 +20,9 @@ The bullets below summarise the user-visible changes that have landed on `dev` s
 - **Mainloop Tier-2 dispositions** (TASK-674, PR #635): webhook HTTP timeout tightened from 1000 ms to 500 ms (the existing webhook retry state machine absorbs the slack); the per-sensor OneWire read in `pollSensors()` is bus-physics-bound and not firmware-tunable; the 15 s `MQTTclient.setSocketTimeout()` is documented and accepted in ADR-080 as a known synchronous blocker bounded by the 42 s retry gate.
 
 **Web UI and diagnostics**
+- **Bilateral OT-bus support map** (TASK-683, 684, 686, 688, PR #640): the gateway now tracks which OpenTherm MsgIDs have actually been seen from the thermostat side, the boiler side, or both. The telnet diagnostic view labels each data point with a direction-aware "T / B / T+B" indicator. A new `GET /api/v2/otgw/support-map` REST endpoint exposes the bitmaps; the Web UI shows the map so you can see at a glance which data points your system is actually exchanging.
+- **Heap drop counters in the per-minute log are now correct** (TASK-697, PR #642): `logHeapStats` was printing the window-scoped drop counters (which reset to 0 after each throttle warning) instead of the lifetime totals. The per-minute heap line now shows monotonically increasing lifetime values, consistent with MQTT stats topics, `/api/v2/heap`, and the debug dump.
+- **Telnet diagnostic noise reduced** (TASK-683, PR #640): `onNotFound` now emits accurate `200 (file)` / `404` lines; the firmware-file-list endpoint no longer mirrors its JSON output to the telnet log; `checklittlefshash` is silent on a matching hash (only logs on mismatch).
 - **FSexplorer "Update Firmware" button** is visible again on touch-capable desktops; the touch-class media query no longer hides the upload control.
 - **Set-command debug surfacing**: silently-dropped set-commands now appear in the default debug stream instead of being swallowed.
 

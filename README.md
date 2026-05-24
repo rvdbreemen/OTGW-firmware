@@ -9,7 +9,7 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## What's new on dev (since v1.5.0-fix2)
 
-Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.20`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
+Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.21`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
 
 **MQTT and Home Assistant discovery**
 - **HA availability now reflects the MQTT link, not the OpenTherm bus** (ADR-074, regression fix). Entities like `DHW Control` and `Thermostat` no longer flap `unavailable` when the boiler stops talking; OT-bus liveness lives on the dedicated `otgw_connected` sensor. **Contract change:** consumers reading the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to `otgw_connected`.
@@ -21,6 +21,9 @@ Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.20`). The list b
 - **HA capability-flag binary sensors for bits 2-5 no longer stuck at `unknown`** (ADR-076, PR #614): the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so cooling, OTC active, CH2 active, and summer/winter all reach their retained topics on every status change.
 
 **Web UI and diagnostics**
+- **Bilateral OT-bus support map** (TASK-686, PR #640): the gateway now tracks which OpenTherm MsgIDs are seen from the thermostat side, the boiler side, or both. The telnet view labels each data point "T / B / T+B"; a new `GET /api/v2/otgw/support-map` endpoint exposes the bitmaps; the Web UI shows which data points your system is actually exchanging.
+- **Heap drop counters now show lifetime totals** (TASK-697, PR #642): the per-minute `logHeapStats` line was showing window-scoped drop counters (which reset after each throttle warning) instead of the monotonic lifetime totals. Now consistent with MQTT stats topics and `/api/v2/heap`.
+- **Telnet diagnostic noise reduced** (TASK-683, PR #640): `onNotFound` now logs accurate HTTP status; the firmware-file-list API no longer mirrors its JSON to telnet; `checklittlefshash` is silent on a hash match.
 - **FSexplorer "Update Firmware" button** is visible again on touch-capable desktops; the touch-class media query no longer hides the upload control.
 - **Set-command debug surfacing**: silently-dropped set-commands now appear in the default debug stream instead of being swallowed.
 

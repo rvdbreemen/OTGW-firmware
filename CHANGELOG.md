@@ -11,6 +11,7 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 
 ### Added
+- Bilateral OT-bus support map: bitmaps tracking which MsgIDs are seen from thermostat side and boiler side, with direction-aware "T/B/T+B" labels in the telnet diagnostic view and a new `GET /api/v2/otgw/support-map` REST endpoint; Web UI shows which data points the gateway has actually observed (TASK-683, TASK-684, TASK-685, TASK-686, TASK-688, #640)
 - HA discovery: PIC-control entities exposed as `button` and `select` under pseudo-ID 251 (TASK-PR#576, #596)
 - Standalone HA discovery topic wiper for cleaning stale retained discovery topics out of the broker (TASK-611, #587)
 - `/beta-prerelease` skill plus `.github/workflows/beta-prerelease.yml` GitHub Action for tag-driven beta publishing; draft-first release creation with all assets attached in one atomic call to satisfy GitHub's immutable-releases policy (#607)
@@ -29,6 +30,8 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - Version-bump policy: per-commit `_VERSION_PRERELEASE` enforcement removed from `.githooks/pre-commit` on `dev`; the bump is now performed once per beta cut by `bin/bump-prerelease.sh` inside the `/beta-prerelease` skill (TASK-669, #624)
 
 ### Fixed
+- `logHeapStats` in `helperStuff.ino` was printing the window drop counters (`webSocketDropCount` / `mqttDropCount`) which reset to 0 after each throttle warning, making the per-minute heap line show ephemeral snapshots instead of monotonic lifetime totals; now prints the correct `state.heapdiag.iWsDropsTotal` / `iMqttDropsTotal` as every other consumer already does (TASK-697, #642)
+- Beta.20 telnet diagnostic noise cleaned up: `onNotFound` handler now emits accurate `200 (file)` / `404` lines; `apifirmwarefilelist` no longer mirrors JSON to telnet; `checklittlefshash` suppressed on match; PROGMEM fixes for `strcmp_P` chains in `OTGW-Core.ino` and FSexplorer path handling (#637)
 - HA capability-flag binary sensors for bits 2-5 (cooling, OTC active, CH2 active, summer/winter) stuck at `unknown` in Home Assistant: the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so every bit reaches its retained topic on every status change (ADR-076, TASK-649, #614)
 - HA `DHW Control`, `Thermostat`, and all sensor entities flapping `unavailable` (regression since 1.5.0/TASK-538): HA entity availability (`avty_t`) now reflects only the ESP↔MQTT link (birth/LWT) instead of OpenTherm-bus liveness. OT-bus liveness remains on the dedicated `otgw_connected` sensor. **Contract change:** consumers that read the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to the `otgw_connected` sensor (ADR-074, TASK-607)
 - MQTT proxy-answer (no-B) routing: MsgIDs without a boiler response now route to the correct worldview topic instead of going silent; root cause behind PR #565 (ADR-075, #599)
