@@ -3,9 +3,11 @@ id: TASK-685
 title: >-
   Revise Unknown-Data-Id logging: drop TASK-684 suppression, keep plain-English
   direction-aware text on every emit
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-24 06:46'
+updated_date: '2026-05-24 06:47'
 labels:
   - diagnostics
   - beta.20
@@ -13,6 +15,9 @@ labels:
   - opentherm
   - revision
 dependencies: []
+references:
+  - TASK-684 (the one being revised)
+  - OTGW_1.6_beta_20.txt (crashevans)
 priority: medium
 ---
 
