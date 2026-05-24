@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.62
+**  Version  : v2.0.0-alpha.63
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5178,27 +5178,65 @@ void upgradepic() {
 // — no large RAM buffer at any point.
 // =========================================================================
 
+// TASK-695: scan `f` forward until `target` is fully matched at the current
+// position. Returns true and leaves the cursor immediately after the match;
+// returns false on EOF. Replaces Stream::find() — which depended on Stream's
+// timeout-driven read() and is not portably available on LittleFS::File
+// across ESP8266 vs ESP32 (the original cause of the PR #641 ESP32 build).
+// Naive state machine: fine because our search keys (e.g. "acked_read":[) have
+// no repeated prefix character. If a future key has overlapping prefixes,
+// switch to KMP.
+static bool fileFindToken(File &f, const char *target) {
+  const size_t tlen = strlen(target);
+  if (tlen == 0) return true;
+  size_t mi = 0;
+  while (f.available()) {
+    int c = f.read();
+    if (c < 0) return false;
+    if ((char)c == target[mi]) {
+      if (++mi == tlen) return true;
+    } else {
+      mi = ((char)c == target[0]) ? 1 : 0;
+    }
+  }
+  return false;
+}
+
+// TASK-695: read a JSON integer array body from `f` (the cursor is positioned
+// just after '['). Each unsigned decimal integer found sets the matching bit
+// in `bitmap`. Stops on ']' or EOF. Replaces Stream::parseInt(), which had
+// the same portability problem as Stream::find(). Tolerates whitespace,
+// commas, and trailing values without a final separator.
+static void parseIntArrayInto(File &f, uint8_t bitmap[32]) {
+  long val = -1;  // -1 = "not accumulating", >=0 = current number in progress
+  while (f.available()) {
+    int c = f.read();
+    if (c < 0 || c == ']') break;
+    if (c >= '0' && c <= '9') {
+      if (val < 0) val = 0;
+      val = val * 10 + (c - '0');
+    } else if (val >= 0) {
+      if (val <= 255) bitmap[val >> 3] |= (uint8_t)(1u << (val & 7));
+      val = -1;
+    }
+  }
+  // Finalize any trailing number not followed by a delimiter (defensive — our
+  // writer always emits a ']', but the helper stays robust to malformed files).
+  if (val >= 0 && val <= 255) bitmap[val >> 3] |= (uint8_t)(1u << (val & 7));
+}
+
 // Read one named integer array from an open File, into a 32-byte bitmap.
-// Streams via Stream::find() + parseInt(); does NOT allocate a buffer.
+// Uses only File::read() / available() — no Stream::find() / parseInt(), which
+// are not portably available on LittleFS::File between ESP8266 and ESP32.
 // Returns true if the key was found (regardless of how many ids it contained).
 static bool readBitmapArrayFromJson(File &f, const __FlashStringHelper *keyPattern, uint8_t bitmap[32]) {
-  // Stream::find() advances the read cursor past the matched pattern. We
-  // reset to start so multiple calls on the same file find each key.
+  // Cursor reset so multiple calls on the same file find each key independently.
   f.seek(0);
   char patBuf[40];
   strncpy_P(patBuf, reinterpret_cast<PGM_P>(keyPattern), sizeof(patBuf) - 1);
   patBuf[sizeof(patBuf) - 1] = '\0';
-  if (!f.find(patBuf)) return false;
-  while (f.available()) {
-    int c = f.peek();
-    if (c == ']') break;
-    if (c >= '0' && c <= '9') {
-      long id = f.parseInt();
-      if (id >= 0 && id <= 255) bitmap[id >> 3] |= (uint8_t)(1u << (id & 7));
-    } else {
-      f.read();  // consume separator (comma / whitespace)
-    }
-  }
+  if (!fileFindToken(f, patBuf)) return false;
+  parseIntArrayInto(f, bitmap);
   return true;
 }
 
