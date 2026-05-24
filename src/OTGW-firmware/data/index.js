@@ -5520,6 +5520,9 @@ function openLogTab(evt, tabName) {
   currentTab = tabName;
   if (currentTab === 'Statistics') {
       updateStatisticsDisplay();
+      refreshBoilerSupport();
+  } else if (currentTab === 'OTSupport') {
+      refreshOtSupport();
   } else if (currentTab === 'Graph' && typeof OTGraph !== 'undefined') {
       // Ensure the chart resizes when the tab becomes visible
       if (OTGraph.resize) OTGraph.resize();
@@ -5685,6 +5688,91 @@ function sortStats(col) {
         statsSortAsc = true;
     }
     updateStatisticsDisplay();
+}
+
+// TASK-689: render the bilateral OT-support map in the 'OT Support' tab.
+// Sourced from /api/v2/otgw/ot-support which streams one JSON object per
+// observed msgID (compact mode — empty rows are not in the response).
+function refreshOtSupport() {
+    var tbody = document.querySelector('#otSupportTable tbody');
+    var countEl = document.getElementById('otSupportCount');
+    var emptyEl = document.getElementById('otSupportEmpty');
+    if (!tbody) return;
+    fetch(APIGW + "v2/otgw/ot-support")
+        .then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(function (json) {
+            var rows = (json && Array.isArray(json.msgids)) ? json.msgids : [];
+            if (rows.length === 0) {
+                tbody.innerHTML = '';
+                if (countEl) countEl.textContent = '0';
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                return;
+            }
+            if (emptyEl) emptyEl.classList.add('hidden');
+            rows.sort(function (a, b) { return (a.id || 0) - (b.id || 0); });
+            var html = '';
+            rows.forEach(function (r) {
+                var tsParts = [];
+                if (r.tsR) tsParts.push('R');
+                if (r.tsW) tsParts.push('W');
+                var tsCell = tsParts.length ? tsParts.join(' ') : '-';
+                var blParts = [];
+                if (r.blAR) blParts.push('R-ack');
+                if (r.blAW) blParts.push('W-ack');
+                if (r.blUR) blParts.push('⚠ no read support');
+                if (r.blUW) blParts.push('⚠ rejects write');
+                var blCell = blParts.length ? blParts.join(' ') : '-';
+                html += '<tr>';
+                html += '<td>' + escapeHtml(String(r.id)) + '</td>';
+                html += '<td>' + escapeHtml(r.label || 'Unknown') + '</td>';
+                html += '<td>' + escapeHtml(tsCell) + '</td>';
+                html += '<td>' + escapeHtml(blCell) + '</td>';
+                html += '</tr>';
+            });
+            tbody.innerHTML = html;
+            if (countEl) countEl.textContent = String(rows.length);
+        })
+        .catch(function () {
+            // Endpoint missing (older firmware) or fetch failed — keep table as-is.
+            if (emptyEl) emptyEl.classList.remove('hidden');
+        });
+}
+
+// TASK-686: render the "Boiler does not implement" line at the bottom of the
+// Statistics tab. Sourced from /api/v2/otgw/boiler-support, which is populated
+// in real time as the firmware observes slave Unknown-Data-Id responses
+// (processOT → bitmaps in OTGW-Core.ino). Hidden when both arrays are empty so
+// new installs / fresh-boot states do not show an empty banner.
+function refreshBoilerSupport() {
+    var line = document.getElementById('boilerUnsupportedLine');
+    var list = document.getElementById('boilerUnsupportedList');
+    if (!line || !list) return;
+    fetch(APIGW + "v2/otgw/boiler-support")
+        .then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(function (json) {
+            var r = (json && Array.isArray(json.unsupported_read))  ? json.unsupported_read  : [];
+            var w = (json && Array.isArray(json.unsupported_write)) ? json.unsupported_write : [];
+            if (r.length === 0 && w.length === 0) {
+                line.classList.add('hidden');
+                list.textContent = '';
+                return;
+            }
+            var parts = [];
+            r.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', read)'); });
+            w.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', write)'); });
+            list.textContent = parts.join(', ');
+            line.classList.remove('hidden');
+        })
+        .catch(function () {
+            // Endpoint may not exist on older firmware — keep silent.
+            line.classList.add('hidden');
+        });
 }
 
 //============================================================================

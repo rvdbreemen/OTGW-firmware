@@ -141,6 +141,7 @@ void setup() {
   if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
   readSettings(true);
   checklittlefshash();
+  loadOtSupportFiles();  // TASK-688: warm the in-RAM support bitmaps from prior-boot knowledge
 
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;
@@ -311,6 +312,15 @@ void doTaskMinuteChanged(){
   // WiFi reconnect is handled by loopWifi() state machine in doBackgroundTasks().
   sendtimecommand(dayFlag, yearFlag);
 
+  // TASK-686: republish boiler unsupported-msgID CSV only when a new id has been
+  // observed since the last publish. After boot warm-up the dirty flag fires a
+  // handful of times then stays clean, so this is at most one extra publish per
+  // minute and zero in steady state.
+  if (getBoilerUnsupportedDirty()) {
+    publishBoilerUnsupportedMsgids();
+    clearBoilerUnsupportedDirty();
+  }
+
   // Hourly consumers. New hourly tasks extend THIS block, never add a second
   // hourChanged() call elsewhere.
   if (hourFlag) {
@@ -338,6 +348,15 @@ void do5minevent(){
   sendMQTTversioninfo();
   sendMQTTstateinformation();
   publishAllPICsettings();  // Re-publish cached PIC settings every 5 min
+}
+
+//===[ Do task every 15min — TASK-688 ]===
+// Debounced flush of /ot-thermo.json and /ot-boiler.json. The per-file dirty
+// flag in OTGW-Core.ino gates the actual write, so a quiet boiler/thermostat
+// causes zero filesystem writes. Ceiling: 2 writes per 15-min window per file,
+// roughly 192 writes per day on a part rated 100k+ erase cycles per sector.
+void do15minevent(){
+  saveOtSupportFilesIfDirty();
 }
 
 static void handleEspFlashBackgroundTasks()
@@ -402,12 +421,14 @@ void loop()
   DECLARE_TIMER_SEC(timer3s, 3, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_MIN(timer15min, 15, CATCH_UP_MISSED_TICKS);  // TASK-688
 
   if (!isFlashing()) {
     // Only run these tasks when NOT flashing firmware (ESP or PIC)
     if (DUE(timerFlushSettings))      flushSettings();  // coalesced settings write + service restarts
     if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin
     if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
+    if (DUE(timer15min))              do15minevent();   // TASK-688: persist /ot-thermo.json + /ot-boiler.json
     if (DUE(timer5min))               do5minevent();
     if (DUE(timer60s))                doTaskEvery60s();
     if (DUE(timer3s))                 doTaskEvery3s();
