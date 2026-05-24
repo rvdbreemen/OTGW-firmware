@@ -3,9 +3,11 @@ id: TASK-683
 title: >-
   Clean up beta.20 telnet diagnostics: accurate onNotFound + drop
   apifirmwarefilelist println-debug + silent checklittlefshash on match
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-24 06:20'
+updated_date: '2026-05-24 06:20'
 labels:
   - diagnostics
   - beta.20
