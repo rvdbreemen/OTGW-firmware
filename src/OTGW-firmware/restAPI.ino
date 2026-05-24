@@ -482,6 +482,40 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     }
     httpServer.sendContent_P(PSTR("]}"));
     httpServer.sendContent(F(""));
+  } else if (strcmp_P(words[4], PSTR("ot-support")) == 0) {
+    // TASK-689: GET /api/v2/otgw/ot-support → bilateral OT support map.
+    // Compact mode — only msgIDs where at least one of the six bitmaps has the
+    // bit set. One streamed JSON object per row, no full-payload allocation.
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendCorsOriginHeader();
+    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"msgids\":["));
+    bool first = true;
+    char row[160];
+    for (int i = 0; i <= 255; i++) {
+      const uint8_t id = (uint8_t)i;
+      const bool tsR  = isThermostatMsgIdSentRead(id);
+      const bool tsW  = isThermostatMsgIdSentWrite(id);
+      const bool blAR = isBoilerMsgIdAckedRead(id);
+      const bool blAW = isBoilerMsgIdAckedWrite(id);
+      const bool blUR = isBoilerMsgIdUnsupportedRead(id);
+      const bool blUW = isBoilerMsgIdUnsupportedWrite(id);
+      if (!(tsR || tsW || blAR || blAW || blUR || blUW)) continue;
+      OTlookup_t item;
+      const char* label = "Unknown";
+      if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; }
+      snprintf_P(row, sizeof(row),
+                 first ? PSTR("{\"id\":%u,\"label\":\"%s\",\"tsR\":%s,\"tsW\":%s,\"blAR\":%s,\"blAW\":%s,\"blUR\":%s,\"blUW\":%s}")
+                       : PSTR(",{\"id\":%u,\"label\":\"%s\",\"tsR\":%s,\"tsW\":%s,\"blAR\":%s,\"blAW\":%s,\"blUR\":%s,\"blUW\":%s}"),
+                 id, label,
+                 tsR  ? "true" : "false", tsW  ? "true" : "false",
+                 blAR ? "true" : "false", blAW ? "true" : "false",
+                 blUR ? "true" : "false", blUW ? "true" : "false");
+      httpServer.sendContent(row);
+      first = false;
+    }
+    httpServer.sendContent_P(PSTR("]}"));
+    httpServer.sendContent(F(""));
   } else {
     sendApiNotFound(originalURI);
   }
