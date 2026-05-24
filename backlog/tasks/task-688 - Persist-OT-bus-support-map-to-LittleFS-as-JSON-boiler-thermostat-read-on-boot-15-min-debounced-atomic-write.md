@@ -3,11 +3,11 @@ id: TASK-688
 title: >-
   Persist OT-bus support map to LittleFS as JSON (boiler + thermostat),
   read-on-boot, 15-min debounced atomic write
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-24 07:16'
-updated_date: '2026-05-24 07:16'
+updated_date: '2026-05-24 07:22'
 labels:
   - diagnostics
   - opentherm
@@ -63,14 +63,14 @@ Out of scope:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Six bitmaps total exist as file-scope statics in OTGW-Core.ino: thermostatSentRead, thermostatSentWrite, boilerAckedRead, boilerAckedWrite (new) plus boilerUnsupportedRead, boilerUnsupportedWrite (existing from TASK-685). Updated inside processOT on the appropriate frame types. Two new dirty flags (thermostatFileDirty, boilerFileDirty) set on any 0->1 transition in their respective halves.
-- [ ] #2 On every Read-Data / Write-Data master frame, the matching thermostatSent* bit is set. On every Read-Ack / Write-Ack slave frame, the matching boilerAcked* bit is set. The existing Unknown-Data-Id handling (TASK-685) continues to set boilerUnsupported* and also sets boilerFileDirty.
-- [ ] #3 setup() invokes loadOtSupportFiles() once after LittleFS.begin(). For each file: if absent or header magic/version mismatch, leave bitmaps zero and log one DebugTln warning. Otherwise stream-parse the integer arrays into their bitmaps.
-- [ ] #4 doTaskMinuteChanged() runs a 15-minute counter (or DECLARE_TIMER_MS at 15*60*1000). When the counter elapses, saveOtSupportFilesIfDirty() is called: for each file whose dirty flag is set, the file is written via the atomic *.tmp/remove/rename dance, then the flag is cleared. Files with no dirty flag are not touched.
-- [ ] #5 Reading uses Stream::find + parseInt (no large RAM buffer). Writing uses File.print per integer (no large RAM buffer).
-- [ ] #6 On corrupt / partially-written *.tmp leftover from a power loss, the next boot ignores the *.tmp file (only the canonical filename is loaded), saveOtSupportFilesIfDirty() overwrites it with a fresh good copy on the first write cycle.
-- [ ] #7 python build.py --firmware exits 0.
-- [ ] #8 python evaluate.py --quick shows no new failures vs current dev.
+- [x] #1 Six bitmaps total exist as file-scope statics in OTGW-Core.ino: thermostatSentRead, thermostatSentWrite, boilerAckedRead, boilerAckedWrite (new) plus boilerUnsupportedRead, boilerUnsupportedWrite (existing from TASK-685). Updated inside processOT on the appropriate frame types. Two new dirty flags (thermostatFileDirty, boilerFileDirty) set on any 0->1 transition in their respective halves.
+- [x] #2 On every Read-Data / Write-Data master frame, the matching thermostatSent* bit is set. On every Read-Ack / Write-Ack slave frame, the matching boilerAcked* bit is set. The existing Unknown-Data-Id handling (TASK-685) continues to set boilerUnsupported* and also sets boilerFileDirty.
+- [x] #3 setup() invokes loadOtSupportFiles() once after LittleFS.begin(). For each file: if absent or header magic/version mismatch, leave bitmaps zero and log one DebugTln warning. Otherwise stream-parse the integer arrays into their bitmaps.
+- [x] #4 doTaskMinuteChanged() runs a 15-minute counter (or DECLARE_TIMER_MS at 15*60*1000). When the counter elapses, saveOtSupportFilesIfDirty() is called: for each file whose dirty flag is set, the file is written via the atomic *.tmp/remove/rename dance, then the flag is cleared. Files with no dirty flag are not touched.
+- [x] #5 Reading uses Stream::find + parseInt (no large RAM buffer). Writing uses File.print per integer (no large RAM buffer).
+- [x] #6 On corrupt / partially-written *.tmp leftover from a power loss, the next boot ignores the *.tmp file (only the canonical filename is loaded), saveOtSupportFilesIfDirty() overwrites it with a fresh good copy on the first write cycle.
+- [x] #7 python build.py --firmware exits 0.
+- [x] #8 python evaluate.py --quick shows no new failures vs current dev.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -101,3 +101,55 @@ Out of scope:
 
 6. Build + evaluate + commit + push.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented in commit ee926eaa:
+- 6 file-scope bitmaps in OTGW-Core.ino: thermostatSentRead/Write, boilerAckedRead/Write (new) + boilerUnsupportedRead/Write (existing); scratch boilerLastMasterWasWrite preserved.
+- 3 dirty flags: thermostatFileDirty, boilerFileDirty (new) + boilerUnsupportedDirty (existing). All set on 0->1 only.
+- processOT branches for OT_READ_DATA, OT_WRITE_DATA, OT_READ_ACK, OT_WRITE_ACK, OT_UNKNOWN_DATA_ID.
+- loadOtSupportFiles called from setup() right after LittleFS.begin() / readSettings / checklittlefshash.
+- saveOtSupportFilesIfDirty called from new do15minevent() driven by DECLARE_TIMER_MIN(timer15min, 15, CATCH_UP_MISSED_TICKS) -- discrete timer following the do5minevent pattern (NOT piggybacked on doTaskMinuteChanged, per user direction).
+- Stream-based read (Stream::find + parseInt) and write (file.print per id). No large RAM buffer.
+- Atomic write via *.tmp -> remove canonical -> rename. Magic gate "v":1 on read; missing/corrupt logs one warning and starts fresh.
+
+Build: python build.py --firmware exit 0.
+Evaluator: python evaluate.py --quick 34/0/0 (100%).
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Persisted the bilateral OT-bus support map (thermostat-sent + boiler-acked + boiler-unsupported) to LittleFS as two JSON files, read on boot and atomically rewritten every 15 minutes when the corresponding dirty flag is set.
+
+## Architecture
+- **In-RAM model**: six 32-byte bitmaps + three dirty flags + 32 B scratch = 227 B static RAM (was 97 B in TASK-686 baseline). Each (msgID, direction) pair is one bit.
+- **Persistence layer**: stream-based JSON I/O (Stream::find for keys, parseInt for values on read; file.print per integer on write). No large buffer in either direction.
+- **Atomicity**: write to <path>.tmp, remove canonical, rename. A power loss between rename steps leaves a *.tmp dangling; the next boot ignores it (only canonical names are loaded) and the next dirty write replaces it.
+- **Magic gate**: each file has a "v":1 field; missing/corrupt/wrong-version files log one warning and start with a fresh empty state.
+- **Cron**: discrete `do15minevent()` driven by `DECLARE_TIMER_MIN(timer15min, 15, CATCH_UP_MISSED_TICKS)` declared in loop(), matching the existing `do5minevent` pattern (NOT piggybacked on `doTaskMinuteChanged` per user direction).
+- **Wear ceiling**: at most 2 writes per 15-min window per file. ~192 writes/day under continuous discovery on LittleFS sectors rated 100k+ erase cycles.
+
+## Files
+- `/ot-thermo.json` — `{"v":1,"device":"thermostat","sent_read":[...],"sent_write":[...]}`
+- `/ot-boiler.json` — `{"v":1,"device":"boiler","acked_read":[...],"acked_write":[...],"unsupported_read":[...],"unsupported_write":[...]}`
+
+Maintainers fetch the files via FSexplorer when triaging — internal-use only; no REST/MQTT surfacing of the new fields per user direction.
+
+## processOT changes
+Four new idempotent set-bit branches added to the existing classification block:
+- Master Read-Data  -> thermostatSentRead
+- Master Write-Data -> thermostatSentWrite
+- Slave Read-Ack    -> boilerAckedRead
+- Slave Write-Ack   -> boilerAckedWrite
+Dirty flag fires only on 0->1 transitions so the file writer does work just once per newly-discovered (id, direction).
+
+## Verification
+- python build.py --firmware exits 0.
+- python evaluate.py --quick: 34 passed / 0 warnings / 0 failures (100% health).
+
+## Risks / follow-ups
+- Boiler swap mid-life: bitmaps accumulate forever; a replaced boiler shows the union with the previous one. Acceptable for internal-use. Reset would mean adding a "delete files" REST endpoint; out of scope.
+- Thermostat-sent + boiler-acked are not surfaced via REST/MQTT/WebUI (internal-use only per user direction). If needed later, a /api/v2/otgw/ot-support endpoint mirroring the existing /api/v2/otgw/boiler-support is a small addition.
+<!-- SECTION:FINAL_SUMMARY:END -->
