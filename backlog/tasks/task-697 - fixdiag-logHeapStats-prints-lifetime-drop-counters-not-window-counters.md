@@ -1,9 +1,11 @@
 ---
 id: TASK-697
 title: 'fix(diag): logHeapStats prints lifetime drop counters, not window counters'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-24 21:35'
+updated_date: '2026-05-24 21:35'
 labels:
   - diagnostics
   - bug-fix
