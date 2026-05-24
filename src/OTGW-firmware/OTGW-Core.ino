@@ -4095,11 +4095,13 @@ void processOT(const char *buf, int len){
         OTlookupitem.unit = "";
       }
 
-      // TASK-684: classify slave Unknown-Data-Id (msg-type 7) and announce it
-      // once per (id, direction) instead of every cycle. The slave's type-7
-      // response does not carry the master's intent, so we look at the direction
-      // of the most-recent master frame for this id.
-      bool suppressTelnetForRepeat = false;
+      // TASK-685 (revises TASK-684): record direction and Unknown-Data-Id into
+      // the bitmaps that TASK-686 surfaces via REST/MQTT/WebUI. The slave's
+      // type-7 response does not carry the master's intent on its own, so we
+      // remember the most-recent master direction per msgID. No suppression of
+      // log lines — telnet is not always on, so silencing after the first emit
+      // would leave later-connecting testers blind. The plain-English suffix
+      // is appended to the OT-bus log line below (every emit).
       {
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
@@ -4109,18 +4111,7 @@ void processOT(const char *buf, int len){
         } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
           const bool isWriteCtx = (lastMasterWasWrite[idx] & mask) != 0;
           uint8_t * const logged = isWriteCtx ? unknownLoggedWrite : unknownLoggedRead;
-          if (logged[idx] & mask) {
-            suppressTelnetForRepeat = true;
-          } else {
-            logged[idx] |= mask;
-            if (isWriteCtx) {
-              OTGWDebugTf(PSTR("boiler does not accept writes to msgID %d (%s) - Unknown-Data-Id\r\n"),
-                          OTdata.id, OTlookupitem.label);
-            } else {
-              OTGWDebugTf(PSTR("boiler does not implement msgID %d (%s) - Unknown-Data-Id\r\n"),
-                          OTdata.id, OTlookupitem.label);
-            }
-          }
+          logged[idx] |= mask;  // idempotent; populates the support map for TASK-686
         }
       }
 
@@ -4217,13 +4208,18 @@ void processOT(const char *buf, int len){
       OTTRACE("post-decode");
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");
-      AddLogln();
-      // TASK-684: skip telnet emission for repeated slave Unknown-Data-Id; the
-      // first occurrence already produced a clear once-per-(id,direction) line above.
-      // WebSocket OT Monitor still sees every frame for live-stream continuity.
-      if (!suppressTelnetForRepeat) {
-        OTGWDebugT(skipOTLogTimestamp(ot_log_buffer));
+      // TASK-685: plain-English direction-aware suffix on slave Unknown-Data-Id.
+      // Emitted on every occurrence so a tester who opens telnet after the first
+      // such frame still sees the diagnostic context. The same suffix reaches the
+      // WebSocket OT Monitor via the shared ot_log_buffer.
+      if (OTdata.masterslave == 1 && OTdata.type == OT_UNKNOWN_DATA_ID) {
+        const uint8_t idx  = OTdata.id >> 3;
+        const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
+        const bool isWriteCtx = (lastMasterWasWrite[idx] & mask) != 0;
+        AddLog(isWriteCtx ? " (boiler rejected write)" : " (boiler does not implement)");
       }
+      AddLogln();
+      OTGWDebugT(skipOTLogTimestamp(ot_log_buffer));
       OTTRACE("post-debug");
 
       // Send log buffer directly to WebSocket (no JSON, no queue)
