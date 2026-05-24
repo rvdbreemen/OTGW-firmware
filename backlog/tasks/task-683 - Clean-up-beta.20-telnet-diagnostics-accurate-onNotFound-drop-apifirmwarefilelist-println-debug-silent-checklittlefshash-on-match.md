@@ -92,3 +92,29 @@ Commit: 554e7eda.
 Push: claude/beta-20-log-review-7gnaR.
 Draft PR: https://github.com/rvdbreemen/OTGW-firmware/pull/640
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Cleaned up four diagnostic surfaces visible in crashevans's beta.20 telnet log so future field captures are easier to read. No behaviour changes to file serving, version detection, or git-hash checking.
+
+## Changes
+- **FSexplorer.ino onNotFound**: replaced misleading "onNotFound: handleFile(...)" (which fires for every non-route URL whether the file exists or not, and was silent on the actual 404 path) with one outcome-bearing line per request: "http GET /path => 200 (file)" (gated on state.debug.bRestAPI) or "http GET /path => 404" (always-on, since the failure is the interesting signal). Early-return after processAPI() flattens the branches.
+- **FSexplorer.ino apifirmwarefilelist**: dropped the JSON-to-telnet mirroring (bare "[", ",", "]" lines, per-entry JSON dump, --- banner --- lines, per-iteration dir.fileName()) since the HTTP response already carries the JSON. Gated the function-entry and per-file GetVersion result lines on state.debug.bRestAPI. Added one always-on summary at end: "api firmware/files: N entries (Xms)".
+- **versionStuff.ino GetVersion**: removed the unconditional "GetVersion opening <path>" entry trace; the "banner not found in <path>" warning is preserved.
+- **helperStuff.ino checklittlefshash**: silent on FS/FW hash match (the happy path emits nothing); mismatch still emits the existing WARNING block and the FS/FW comparison line for context.
+
+## Net effect on the next crashevans-style capture
+- Update-page open: 15+ noise lines -> 1 summary line.
+- Per-minute static cost: 2 lines (hash) -> 0.
+- Static request: misleading wording -> accurate wording with 404 visibility.
+
+## Verification
+- python build.py --firmware exits 0 (1.6.0-beta.20+607861e).
+- python evaluate.py --quick: 34 passed / 0 warnings / 0 failures (100% health).
+
+## Risks / follow-ups
+- CI on PR #640 still in flight at task close (6 jobs in_progress); local checks passed both gates. Re-open if CI fails.
+- Performance work on apifirmwarefilelist (try .ver before .hex scan, save ~145 ms per call) is a separate task — not done here.
+- The OTGWDebug* family (CmdQueue / OT-bus traces) intentionally untouched — those are user-toggleable via the 1/2/3 debug keys.
+<!-- SECTION:FINAL_SUMMARY:END -->
