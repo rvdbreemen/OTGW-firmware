@@ -3,11 +3,11 @@ id: TASK-695
 title: >-
   fix(persistence): replace Stream::find/parseInt with portable byte parser
   (TASK-693 follow-up; PR #641 ESP32 build fix)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-24 09:14'
-updated_date: '2026-05-24 09:35'
+updated_date: '2026-05-24 10:13'
 labels:
   - fix
   - port-from-dev
@@ -30,7 +30,7 @@ PR #641 (port of dev TASK-688) fails the ESP32 build in CI. Local reproduction b
 - [x] #2 Helpers are static (TU-local), use only File::read(), File::available(), File::peek() — methods inherited from FS::FileImpl on both ESP8266 and ESP32 LittleFS.
 - [x] #3 Behaviour preserved: a well-formed /ot-thermo.json or /ot-boiler.json still loads the same bitmap state as before. Malformed input (truncated, no closing ']') exits cleanly without crash.
 - [x] #4 python build.py --firmware --target esp8266 exits 0 (local; ESP32 verified by CI rerun on PR #641).
-- [ ] #5 CI pio run -e esp32 on PR #641 passes after the push.
+- [x] #5 CI pio run -e esp32 on PR #641 passes after the push.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -39,4 +39,22 @@ PR #641 (port of dev TASK-688) fails the ESP32 build in CI. Local reproduction b
 Commit f251ad6a pushed to feat-2.0.0/port-beta-20-log-review. PR #641 CI re-runs automatically; AC#5 (ESP32 green) blocked on that result. If CI still fails, the new error will point to the actual cause and we re-diagnose.
 
 CI logs finally retrieved (via certifi-bundle patch + check-runs/annotations API): real failure was firmware-size overflow, not Stream::find/parseInt API compatibility. ESP32 firmware = 1,969,847 B vs 1,966,080 B partition limit = 3,767 B over. The Stream-parser swap from this commit is fine but did not help. Need a follow-up to trim flash.
+
+PR #641 merged with this commit included alongside TASK-696. CI passed on the merge build (ESP32 + ESP8266 both green), so AC#5 is satisfied retroactively.
+
+Post-merge diagnosis note: this fix turned out to be unrelated to the actual cause (which was flash-budget — TASK-696 enabled -flto to recover 105 KB). The Stream::find/parseInt swap shipped anyway because it is harmless and slightly more portable. Worth treating as a lesson: when CI logs are unreachable, run the failing target locally before changing code on a hypothesis.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced Stream::find()/parseInt() on LittleFS::File with a manual byte parser (fileFindToken + parseIntArrayInto) using only File::read()/available()/peek(). The original suspicion was that those Stream methods were the ESP32 build failure on PR #641 — but TASK-696 (-flto + flash-budget) turned out to be the real fix. This change shipped anyway because the manual parser is harmless: same observable behaviour on well-formed JSON, more defensive on malformed input, and removes any future portability risk between ESP8266 and ESP32 LittleFS Stream inheritance.
+
+## Verification
+- pio run -e esp8266: SUCCESS (locally).
+- pio run -e esp32: SUCCESS (merged build on PR #641).
+- python evaluate.py --quick: 60 / 1 warn / 0 (unchanged baseline).
+
+## Process note for future cross-tree work
+Gated on CI log access I could not get without auth. Burned a round of guessing. The actual unblocker was patching the sandbox certifi bundle to trust the egress TLS-Inspection CA, then running `pio run -e esp32` locally to see the size-overflow error directly. Worth wiring this into a session-start hook so the next port-from-dev task does not repeat the same dead end.
+<!-- SECTION:FINAL_SUMMARY:END -->
