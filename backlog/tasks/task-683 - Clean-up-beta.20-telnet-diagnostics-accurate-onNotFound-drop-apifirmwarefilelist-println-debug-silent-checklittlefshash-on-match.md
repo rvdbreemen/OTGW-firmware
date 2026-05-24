@@ -43,3 +43,36 @@ Out of scope: any behaviour change in file serving, version detection, or git-ha
 - [ ] #5 python build.py --firmware exits 0.
 - [ ] #6 python evaluate.py --quick shows no new failures vs current dev.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. FSexplorer.ino:267-282 onNotFound lambda
+   - Decode URI once into a String, call handleFile with a copy (handleFile takes String&&), branch on result.
+   - If !served: send 404 (unchanged behaviour).
+   - Emit one line per request:
+     * served: DebugTf(PSTR("http GET %s => 200 (file)\r\n"), path.c_str()) gated on state.debug.bRestAPI
+     * 404: DebugTf(PSTR("http GET %s => 404\r\n"), path.c_str()) always-on
+   - Early-return after processAPI() to flatten the branches.
+
+2. FSexplorer.ino:287-374 apifirmwarefilelist
+   - Gate the existing API/dirpath function-entry lines on state.debug.bRestAPI.
+   - Drop all DebugTln/DebugTf calls that mirror JSON output to telnet (lines 309, 310, 350, 362, 373, 374) and the per-iteration dir.fileName line (314).
+   - Gate the per-file GetVersion(...) returned [...] line (335) on state.debug.bRestAPI.
+   - Drop the bare Debugln() at 345.
+   - Track elapsed millis and emit one always-on summary at end: DebugTf(PSTR("api firmware/files: %u entries (%lums)\r\n"), entryCount, elapsed).
+
+3. versionStuff.ino:19 GetVersion
+   - Drop the unconditional DebugTf(PSTR("GetVersion opening %s\r\n"),hexfile) line.
+   - Keep the "banner not found in %s" warning at line 117.
+
+4. helperStuff.ino:745-746 checklittlefshash
+   - Move the two DebugTf calls inside an "if (!match)" branch so the happy path is silent.
+   - Keep the existing WARNING block + state.statusMessage update on mismatch.
+
+5. python build.py --firmware  → expect exit 0.
+6. python evaluate.py --quick   → expect no new failures vs dev.
+7. git add changed files, commit with descriptive message referencing TASK-683.
+8. git push -u origin claude/beta-20-log-review-7gnaR.
+9. Open draft PR.
+<!-- SECTION:PLAN:END -->
