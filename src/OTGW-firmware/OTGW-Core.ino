@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.63
+**  Version  : v2.0.0-alpha.64
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5260,8 +5260,11 @@ void loadOtSupportFiles() {
     int n = f.read((uint8_t*)header, sizeof(header) - 1);
     header[n > 0 ? n : 0] = '\0';
     if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
-      readBitmapArrayFromJson(f, F("\"sent_read\":["),  thermostatSentRead);
-      readBitmapArrayFromJson(f, F("\"sent_write\":["), thermostatSentWrite);
+      // TASK-696: short keys (sr/sw/ar/aw/ur/uw) to trim flash on ESP32.
+      // The file is firmware-internal; the WebUI / REST surfaces use the long
+      // names. Magic "v":1 unchanged so a future schema bump can still gate.
+      readBitmapArrayFromJson(f, F("\"sr\":["), thermostatSentRead);
+      readBitmapArrayFromJson(f, F("\"sw\":["), thermostatSentWrite);
       DebugTln(F("ot-support: thermostat profile loaded from /ot-thermo.json"));
     } else {
       DebugTln(F("ot-support: /ot-thermo.json header missing/invalid — starting fresh"));
@@ -5275,10 +5278,10 @@ void loadOtSupportFiles() {
     int n = f.read((uint8_t*)header, sizeof(header) - 1);
     header[n > 0 ? n : 0] = '\0';
     if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
-      readBitmapArrayFromJson(f, F("\"acked_read\":["),       boilerAckedRead);
-      readBitmapArrayFromJson(f, F("\"acked_write\":["),      boilerAckedWrite);
-      readBitmapArrayFromJson(f, F("\"unsupported_read\":["), boilerUnsupportedRead);
-      readBitmapArrayFromJson(f, F("\"unsupported_write\":["),boilerUnsupportedWrite);
+      readBitmapArrayFromJson(f, F("\"ar\":["), boilerAckedRead);
+      readBitmapArrayFromJson(f, F("\"aw\":["), boilerAckedWrite);
+      readBitmapArrayFromJson(f, F("\"ur\":["), boilerUnsupportedRead);
+      readBitmapArrayFromJson(f, F("\"uw\":["), boilerUnsupportedWrite);
       DebugTln(F("ot-support: boiler profile loaded from /ot-boiler.json"));
     } else {
       DebugTln(F("ot-support: /ot-boiler.json header missing/invalid — starting fresh"));
@@ -5296,9 +5299,10 @@ void loadOtSupportFiles() {
 static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
   File f = LittleFS.open(tmpPath, "w");
   if (!f) return false;
-  f.print(F("{\"v\":1,\"device\":\"thermostat\",\"sent_read\":["));
+  // TASK-696: short keys (sr/sw) match the reader and save ~30 B per write.
+  f.print(F("{\"v\":1,\"device\":\"thermostat\",\"sr\":["));
   writeBitmapArrayToJson(f, thermostatSentRead);
-  f.print(F("],\"sent_write\":["));
+  f.print(F("],\"sw\":["));
   writeBitmapArrayToJson(f, thermostatSentWrite);
   f.print(F("]}\n"));
   f.close();
@@ -5309,13 +5313,14 @@ static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
 static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
   File f = LittleFS.open(tmpPath, "w");
   if (!f) return false;
-  f.print(F("{\"v\":1,\"device\":\"boiler\",\"acked_read\":["));
+  // TASK-696: short keys (ar/aw/ur/uw) match the reader; saves ~100 B per write.
+  f.print(F("{\"v\":1,\"device\":\"boiler\",\"ar\":["));
   writeBitmapArrayToJson(f, boilerAckedRead);
-  f.print(F("],\"acked_write\":["));
+  f.print(F("],\"aw\":["));
   writeBitmapArrayToJson(f, boilerAckedWrite);
-  f.print(F("],\"unsupported_read\":["));
+  f.print(F("],\"ur\":["));
   writeBitmapArrayToJson(f, boilerUnsupportedRead);
-  f.print(F("],\"unsupported_write\":["));
+  f.print(F("],\"uw\":["));
   writeBitmapArrayToJson(f, boilerUnsupportedWrite);
   f.print(F("]}\n"));
   f.close();

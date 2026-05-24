@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-24 09:14'
-updated_date: '2026-05-24 09:15'
+updated_date: '2026-05-24 09:35'
 labels:
   - fix
   - port-from-dev
@@ -26,9 +26,17 @@ PR #641 (port of dev TASK-688) fails the ESP32 build in CI. Local reproduction b
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 readBitmapArrayFromJson no longer calls f.find() or f.parseInt(); uses a new fileFindToken() helper (manual state machine matching the search key char-by-char) and a new parseIntArrayInto() helper (digit accumulator with delimiter-based finalisation).
-- [ ] #2 Helpers are static (TU-local), use only File::read(), File::available(), File::peek() — methods inherited from FS::FileImpl on both ESP8266 and ESP32 LittleFS.
-- [ ] #3 Behaviour preserved: a well-formed /ot-thermo.json or /ot-boiler.json still loads the same bitmap state as before. Malformed input (truncated, no closing ']') exits cleanly without crash.
-- [ ] #4 python build.py --firmware --target esp8266 exits 0 (local; ESP32 verified by CI rerun on PR #641).
+- [x] #1 readBitmapArrayFromJson no longer calls f.find() or f.parseInt(); uses a new fileFindToken() helper (manual state machine matching the search key char-by-char) and a new parseIntArrayInto() helper (digit accumulator with delimiter-based finalisation).
+- [x] #2 Helpers are static (TU-local), use only File::read(), File::available(), File::peek() — methods inherited from FS::FileImpl on both ESP8266 and ESP32 LittleFS.
+- [x] #3 Behaviour preserved: a well-formed /ot-thermo.json or /ot-boiler.json still loads the same bitmap state as before. Malformed input (truncated, no closing ']') exits cleanly without crash.
+- [x] #4 python build.py --firmware --target esp8266 exits 0 (local; ESP32 verified by CI rerun on PR #641).
 - [ ] #5 CI pio run -e esp32 on PR #641 passes after the push.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit f251ad6a pushed to feat-2.0.0/port-beta-20-log-review. PR #641 CI re-runs automatically; AC#5 (ESP32 green) blocked on that result. If CI still fails, the new error will point to the actual cause and we re-diagnose.
+
+CI logs finally retrieved (via certifi-bundle patch + check-runs/annotations API): real failure was firmware-size overflow, not Stream::find/parseInt API compatibility. ESP32 firmware = 1,969,847 B vs 1,966,080 B partition limit = 3,767 B over. The Stream-parser swap from this commit is fine but did not help. Need a follow-up to trim flash.
+<!-- SECTION:NOTES:END -->

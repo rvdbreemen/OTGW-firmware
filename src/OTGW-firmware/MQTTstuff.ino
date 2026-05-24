@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.63
+**  Version  : v2.0.0-alpha.64
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1497,13 +1497,15 @@ static void publishStatU32(const __FlashStringHelper *topic, unsigned long value
 // truncate silently rather than overflow on pathological inputs.
 void publishBoilerUnsupportedMsgids() {
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
+  // TASK-696: single PSTR format string with a sep prefix ("" or ",") replaces
+  // the previous pos==0 dual-format pattern — one fewer PSTR literal per loop.
   char csv[256] = {0};
   size_t pos = 0;
   for (int i = 0; i <= 255; i++) {
     if (!isBoilerMsgIdUnsupportedRead((uint8_t)i)) continue;
     if (pos + 6 > sizeof(csv)) break;  // 6 = ",NNNR" + NUL
     int n = snprintf_P(csv + pos, sizeof(csv) - pos,
-                       pos == 0 ? PSTR("%dR") : PSTR(",%dR"), i);
+                       PSTR("%s%dR"), pos == 0 ? "" : ",", i);
     if (n < 0) break;
     pos += (size_t)n;
   }
@@ -1511,7 +1513,7 @@ void publishBoilerUnsupportedMsgids() {
     if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
     if (pos + 6 > sizeof(csv)) break;
     int n = snprintf_P(csv + pos, sizeof(csv) - pos,
-                       pos == 0 ? PSTR("%dW") : PSTR(",%dW"), i);
+                       PSTR("%s%dW"), pos == 0 ? "" : ",", i);
     if (n < 0) break;
     pos += (size_t)n;
   }

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.63
+**  Version  : v2.0.0-alpha.64
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -596,6 +596,8 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // unsupported_read / unsupported_write arrays sourced from the in-RAM
     // bitmaps populated by processOT. Streamed in chunks so even pathological
     // boilers (hundreds of unsupported ids) do not need a large stack buffer.
+    // TASK-696: leading comma emitted via sendContent(F(",")) so we ship one
+    // PSTR format string per row instead of two — saves flash on ESP32.
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
     httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -607,10 +609,8 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       OTlookup_t item;
       const char* label = "Unknown";
       if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; }
-      snprintf_P(ent, sizeof(ent),
-                 first ? PSTR("{\"id\":%d,\"label\":\"%s\"}")
-                       : PSTR(",{\"id\":%d,\"label\":\"%s\"}"),
-                 i, label);
+      if (!first) httpServer.sendContent(F(","));
+      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\"}"), i, label);
       httpServer.sendContent(ent);
       first = false;
     }
@@ -621,10 +621,8 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       OTlookup_t item;
       const char* label = "Unknown";
       if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; }
-      snprintf_P(ent, sizeof(ent),
-                 first ? PSTR("{\"id\":%d,\"label\":\"%s\"}")
-                       : PSTR(",{\"id\":%d,\"label\":\"%s\"}"),
-                 i, label);
+      if (!first) httpServer.sendContent(F(","));
+      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\"}"), i, label);
       httpServer.sendContent(ent);
       first = false;
     }
@@ -635,6 +633,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // OT support map. Compact mode — only msgIDs where at least one of the
     // six bitmaps has the bit set. One streamed JSON object per row, no
     // full-payload allocation.
+    // TASK-696: single PSTR format per row (leading comma via sendContent).
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
     httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -653,9 +652,9 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       OTlookup_t item;
       const char* label = "Unknown";
       if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; }
+      if (!first) httpServer.sendContent(F(","));
       snprintf_P(row, sizeof(row),
-                 first ? PSTR("{\"id\":%u,\"label\":\"%s\",\"tsR\":%s,\"tsW\":%s,\"blAR\":%s,\"blAW\":%s,\"blUR\":%s,\"blUW\":%s}")
-                       : PSTR(",{\"id\":%u,\"label\":\"%s\",\"tsR\":%s,\"tsW\":%s,\"blAR\":%s,\"blAW\":%s,\"blUR\":%s,\"blUW\":%s}"),
+                 PSTR("{\"id\":%u,\"label\":\"%s\",\"tsR\":%s,\"tsW\":%s,\"blAR\":%s,\"blAW\":%s,\"blUR\":%s,\"blUW\":%s}"),
                  id, label,
                  tsR  ? "true" : "false", tsW  ? "true" : "false",
                  blAR ? "true" : "false", blAW ? "true" : "false",
