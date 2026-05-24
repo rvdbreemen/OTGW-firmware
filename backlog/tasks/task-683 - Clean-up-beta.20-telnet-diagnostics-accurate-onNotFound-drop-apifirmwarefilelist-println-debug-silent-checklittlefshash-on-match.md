@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-24 06:20'
-updated_date: '2026-05-24 06:20'
+updated_date: '2026-05-24 06:26'
 labels:
   - diagnostics
   - beta.20
@@ -36,13 +36,15 @@ Out of scope: any behaviour change in file serving, version detection, or git-ha
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 FSexplorer.ino onNotFound emits one accurate line per static request: 'http GET /path => 200 (file)' (gated on state.debug.bRestAPI) or 'http GET /path => 404' (always-on). No 'onNotFound' wording remains.
-- [ ] #2 apifirmwarefilelist no longer mirrors JSON output to telnet (no bare '[', ',', ']' lines, no per-entry JSON dump, no '--- banner ---' lines). Function entry + per-file GetVersion result lines are gated on state.debug.bRestAPI. One always-on summary 'api firmware/files: N entries (Xms)' is emitted at end.
-- [ ] #3 versionStuff.ino GetVersion no longer emits the 'GetVersion opening <path>' entry trace. The 'banner not found in <path>' warning is preserved.
-- [ ] #4 checklittlefshash is silent on match. The mismatch path still emits the existing WARNING block. The boot banner 'fs:ok' / 'fs:mismatch' is unchanged.
-- [ ] #5 python build.py --firmware exits 0.
-- [ ] #6 python evaluate.py --quick shows no new failures vs current dev.
+- [x] #1 FSexplorer.ino onNotFound emits one accurate line per static request: 'http GET /path => 200 (file)' (gated on state.debug.bRestAPI) or 'http GET /path => 404' (always-on). No 'onNotFound' wording remains.
+- [x] #2 apifirmwarefilelist no longer mirrors JSON output to telnet (no bare '[', ',', ']' lines, no per-entry JSON dump, no '--- banner ---' lines). Function entry + per-file GetVersion result lines are gated on state.debug.bRestAPI. One always-on summary 'api firmware/files: N entries (Xms)' is emitted at end.
+- [x] #3 versionStuff.ino GetVersion no longer emits the 'GetVersion opening <path>' entry trace. The 'banner not found in <path>' warning is preserved.
+- [x] #4 checklittlefshash is silent on match. The mismatch path still emits the existing WARNING block. The boot banner 'fs:ok' / 'fs:mismatch' is unchanged.
+- [x] #5 python build.py --firmware exits 0.
+- [x] #6 python evaluate.py --quick shows no new failures vs current dev.
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
