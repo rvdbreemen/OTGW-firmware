@@ -1,15 +1,22 @@
 ---
 id: TASK-684
 title: Log Unknown-Data-Id once per msgID and disambiguate read-vs-write rejection
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-24 06:32'
+updated_date: '2026-05-24 06:33'
 labels:
   - diagnostics
   - beta.20
   - log-cleanup
   - opentherm
 dependencies: []
+references:
+  - OTGW_1.6_beta_20.txt (crashevans
+  - FW 1.6.0-beta.20+591131f
+  - 'build #3380)'
+  - 'Conversation: T1a/T1b suggestions from beta-20 log review'
 priority: medium
 ---
 
