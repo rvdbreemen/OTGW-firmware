@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-06 09:04'
-updated_date: '2026-05-25 22:37'
+updated_date: '2026-05-25 22:38'
 labels:
   - feature
   - networking
@@ -31,3 +31,9 @@ Request to add a static IP address configuration option in the firmware. Motivat
 - [ ] #3 If static IP is not configured (default), behaviour is unchanged (DHCP)
 - [ ] #4 Settings are persisted to LittleFS and survive reboot
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. WifiSection struct toevoegen aan OTGW-firmware.h (sStaticIp[16], sSubnet[16], sGateway[16], sDns1[16], sDns2[16]) en wifi-member aan OTGWSettings\n2. networkStuff.ino: WiFi.config() aanroepen voor WiFi.begin() als sStaticIp niet leeg is\n3. settingStuff.ino: writeSettings() + updateSetting() + readSettings() show-blok uitbreiden\n4. restAPI.ino: nieuwe velden in de GET settings response en POST handler\n5. index.html: 4 inputvelden toevoegen in het bestaande Network/WiFi settings blok\n6. Build groen + evaluator groen\n7. Commit + push
+<!-- SECTION:PLAN:END -->
