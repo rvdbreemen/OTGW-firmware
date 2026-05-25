@@ -1,7 +1,7 @@
 ---
 id: TASK-548
 title: 'Feature: Static IP address settings'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-06 09:04'
