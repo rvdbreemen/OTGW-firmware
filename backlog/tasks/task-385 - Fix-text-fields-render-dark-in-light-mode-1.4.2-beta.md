@@ -39,3 +39,9 @@ Waiting for: screenshot + browser/OS info from andrebrait. Possible regressions 
 
 Triage 2026-05-22: still relevant but no active work in 14+ days; deprioritised. 1.4.2-beta era UI bug; no follow-up screenshot from andrebrait, no recent reports against 1.5.x/1.6.0-beta. May already be fixed by subsequent CSS hardening.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fix committed in c0eb1682 (2026-04-23). Root cause: mobile browsers (iOS Safari, Android Chromium) honour OS dark-mode UA text colours for form widgets despite color-scheme:light, when CSS does not explicitly set color. Fix: explicit background-color:white; color:black on input base rule plus .input-normal / .input-changed in index.css. AC #3 (andrebrait field-confirmation) remains: no further reports on 1.5.x/1.6.0-beta, fix present in current dev.
+<!-- SECTION:FINAL_SUMMARY:END -->
