@@ -3,11 +3,11 @@ id: TASK-657
 title: >-
   Repo hygiene: remove OTGW_1.6_beta_7.txt + extend .gitignore for
   OTGW_*.{txt,log} + add /plan/
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-22 05:52'
-updated_date: '2026-05-25 21:54'
+updated_date: '2026-05-25 21:55'
 labels:
   - repo-hygiene
 dependencies: []
@@ -31,3 +31,9 @@ An 830 KB field-test debug log (OTGW_1.6_beta_7.txt, commit 67e63d97 'Add files 
 - [x] #4 No previously-tracked file is shadowed by the new ignore patterns (git ls-files | grep -E 'OTGW_.*\.(txt|log)' returns empty before commit)
 - [x] #5 Commit cites TASK-635 in subject for traceability
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All .gitignore patterns (/OTGW_*.txt, /OTGW_*.log, /plan/) committed in 4cca4d07 (TASK-635). OTGW_1.6_beta_7.txt removed from index in same or earlier commit. git ls-files root-level OTGW log check returns empty. No previously-tracked files shadowed.
+<!-- SECTION:FINAL_SUMMARY:END -->
