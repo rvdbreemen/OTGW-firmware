@@ -327,6 +327,15 @@ void doTaskMinuteChanged(){
   if (hourFlag) {
     runNightlyRestartCheck();     // TASK-345: moved from doTaskEvery60s
     sendMQTTheapdiag();            // TASK-346: moved from doTaskEvery60s
+    // TASK-704: first-run trigger — if verify has never completed (epoch==0) and
+    // auto-verify is on, attempt it every hour until it succeeds. startDiscovery-
+    // Verification() enforces all preconditions (NTP, uptime>3600s, heap, no drip,
+    // MQTT connected) internally and is a no-op when any precondition fails.
+    // Once a verify completes (even aborted), iLastVerifyEpoch becomes non-zero and
+    // this path stays silent; the daily trigger at midnight handles subsequent runs.
+    if (settings.mqtt.bDiscoveryAutoVerify && state.discovery.iLastVerifyEpoch == 0) {
+      startDiscoveryVerification();
+    }
   }
 
   // Daily consumers (TASK-351).
