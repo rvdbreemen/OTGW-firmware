@@ -93,7 +93,7 @@ void cacheBootFlashInfo() {
   sBootFlash.flashChipMode       = flashMode[ESP.getFlashChipMode()];
   FSInfo fsinfo;
   LittleFS.info(fsinfo);
-  sBootFlash.littleFSSizeMB      = floorf(fsinfo.totalBytes / (1024.0f * 1024.0f));
+  sBootFlash.littleFSSizeMB      = fsinfo.totalBytes / (1024.0f * 1024.0f);
 }
 
 //=======================================================================
