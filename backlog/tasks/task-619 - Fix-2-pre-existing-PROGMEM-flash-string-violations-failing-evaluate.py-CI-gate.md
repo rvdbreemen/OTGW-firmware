@@ -1,10 +1,10 @@
 ---
 id: TASK-619
 title: Fix 2 pre-existing PROGMEM flash-string violations failing evaluate.py CI gate
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-17 13:23'
-updated_date: '2026-05-25 22:35'
+updated_date: '2026-05-25 22:36'
 labels:
   - bug
   - firmware
