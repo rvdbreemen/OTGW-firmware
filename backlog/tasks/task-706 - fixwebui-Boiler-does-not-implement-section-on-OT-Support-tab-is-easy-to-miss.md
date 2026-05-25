@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-25 20:40'
-updated_date: '2026-05-25 20:41'
+updated_date: '2026-05-25 20:44'
 labels:
   - bug
   - webui
@@ -33,3 +33,9 @@ Reported by crashevans on #beta-testing (2026-05-25) via screenshot. The 'Boiler
 - [ ] #3 Styling is consistent with existing WebUI conventions (no new CSS frameworks)
 - [ ] #4 python build.py exits 0; python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Stijl #boilerUnsupportedLine als een zichtbare card/banner ipv inline voettekst\n2. Voeg achtergrondkleur, rand en icoon-prefix toe zodat het opvalt\n3. CSS-only change in index.css — geen HTML of JS wijzigingen nodig
+<!-- SECTION:PLAN:END -->
