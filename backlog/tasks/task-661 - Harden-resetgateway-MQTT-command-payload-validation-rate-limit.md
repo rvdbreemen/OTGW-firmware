@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-22 05:52'
-updated_date: '2026-05-22 06:46'
+updated_date: '2026-05-25 22:12'
 labels:
   - security
   - mqtt
@@ -24,7 +24,7 @@ The new resetgateway set-command (MQTTstuff.ino:704-707, commit 908e1e16) lets a
 - [x] #1 MQTTstuff.ino:704-707 resetgateway dispatch requires exact payload match ('1' OR 'press' OR 'PRESS' — pick one and document in ADR/CHANGELOG)
 - [x] #2 resetgateway rate-limited: subsequent calls within N seconds (suggest 5-10s) are silently dropped with a DebugTln log line; N defined as a const at top of the file
 - [x] #3 HA discovery payload_press value matches whatever the dispatch now requires (no drift between discovery and implementation)
-- [ ] #4 Field-test: rapid-fire MQTT publish of resetgateway only resets once per window; non-matching payloads are logged + ignored
+- [x] #4 Field-test: rapid-fire MQTT publish of resetgateway only resets once per window; non-matching payloads are logged + ignored
 <!-- AC:END -->
 
 ## Final Summary
