@@ -3,11 +3,11 @@ id: TASK-704
 title: >-
   Fix: discovery last-verify outcome always shows Unknown
   (disc_last_verify_epoch stays 0)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-25 20:34'
-updated_date: '2026-05-25 22:33'
+updated_date: '2026-05-25 22:34'
 labels:
   - bug
   - mqtt
