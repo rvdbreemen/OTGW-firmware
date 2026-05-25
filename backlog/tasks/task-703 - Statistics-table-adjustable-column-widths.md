@@ -1,9 +1,11 @@
 ---
 id: TASK-703
 title: 'Statistics table: adjustable column widths'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-25 17:16'
+updated_date: '2026-05-25 22:55'
 labels:
   - ui
   - enhancement
