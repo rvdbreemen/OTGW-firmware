@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-20 15:36'
-updated_date: '2026-05-20 15:36'
+updated_date: '2026-05-25 20:48'
 labels:
   - release
   - docs
@@ -21,15 +21,15 @@ The beta-prerelease.yml workflow currently composes a thin release body that onl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 RELEASE_NOTES_1.6.0-beta.md exists at the repo root with a curated 'What's new since v1.5.0-fix2' narrative, grouped by area (MQTT/HA discovery, Web UI/diagnostics, tooling/build, code hygiene, documentation). No em dashes.
-- [ ] #2 The notes file contains an HTML-comment digest-end sentinel (e.g. '<!-- digest:end -->') marking the teaser cutoff. Content above the sentinel is the release-page digest; content below is the long-form detail referenced via the existing 'Read full release notes' link.
-- [ ] #3 .github/workflows/beta-prerelease.yml inlines the teaser content (lines 1..sentinel, sentinel line stripped) under a new '## What's new since the last public release' heading inside the composed release body, placed between 'What is in this build' and 'Compare to the latest public release'.
-- [ ] #4 When no notes file is found at the tagged commit, the workflow falls back to the previous behaviour (no inline summary, no 'Read full release notes' link) without erroring.
-- [ ] #5 When the notes file exists but has no digest-end sentinel, the workflow inlines the entire file (best-effort behaviour, documented in the workflow comments).
-- [ ] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures on the commit that introduces the change.
-- [ ] #7 Changes commit to claude/beta-release-prep-qUipc and a draft PR is opened against dev.
-- [ ] #8 .claude/skills/beta-prerelease/SKILL.md is restructured so the README + CHANGELOG check is moved from Phase 2.5 (after bump) to Phase 1 (before bump). The check gates the rest of the flow: if README's 'What's new on dev' or CHANGELOG's [Unreleased] section is stale relative to commits since the last public stable, the skill halts and asks the user to refresh first.
-- [ ] #9 Skill text spells out the staleness check explicitly: a deterministic pre-flight that diffs commit log since the latest public stable (gh release view --json tagName) against the bullets already present in README/CHANGELOG, calling out any commit subject not yet narrated. Heuristic, not a hard regex match.
+- [x] #1 RELEASE_NOTES_1.6.0-beta.md exists at the repo root with a curated 'What's new since v1.5.0-fix2' narrative, grouped by area (MQTT/HA discovery, Web UI/diagnostics, tooling/build, code hygiene, documentation). No em dashes.
+- [x] #2 The notes file contains an HTML-comment digest-end sentinel (e.g. '<!-- digest:end -->') marking the teaser cutoff. Content above the sentinel is the release-page digest; content below is the long-form detail referenced via the existing 'Read full release notes' link.
+- [x] #3 .github/workflows/beta-prerelease.yml inlines the teaser content (lines 1..sentinel, sentinel line stripped) under a new '## What's new since the last public release' heading inside the composed release body, placed between 'What is in this build' and 'Compare to the latest public release'.
+- [x] #4 When no notes file is found at the tagged commit, the workflow falls back to the previous behaviour (no inline summary, no 'Read full release notes' link) without erroring.
+- [x] #5 When the notes file exists but has no digest-end sentinel, the workflow inlines the entire file (best-effort behaviour, documented in the workflow comments).
+- [x] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures on the commit that introduces the change.
+- [x] #7 Changes commit to claude/beta-release-prep-qUipc and a draft PR is opened against dev.
+- [x] #8 .claude/skills/beta-prerelease/SKILL.md is restructured so the README + CHANGELOG check is moved from Phase 2.5 (after bump) to Phase 1 (before bump). The check gates the rest of the flow: if README's 'What's new on dev' or CHANGELOG's [Unreleased] section is stale relative to commits since the last public stable, the skill halts and asks the user to refresh first.
+- [x] #9 Skill text spells out the staleness check explicitly: a deterministic pre-flight that diffs commit log since the latest public stable (gh release view --json tagName) against the bullets already present in README/CHANGELOG, calling out any commit subject not yet narrated. Heuristic, not a hard regex match.
 <!-- AC:END -->
 
 ## Implementation Plan
