@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.66
+**  Version  : v2.0.0-alpha.67
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -892,6 +892,7 @@ let currentMemoryUsageMB = 0;
 let storageQuotaMB = 10; // Default, will be detected
 
 let autoScroll = true;
+let logTabActivatedAt = 0; // timestamp of last Log tab activation, used to suppress spurious scroll events
 let frozenLogStartIndex = null; // Freeze visible slice when auto-scroll is disabled
 let lastRenderedStartIndex = 0;
 let lastRenderedLogText = null;
@@ -2666,8 +2667,13 @@ function setupOTLogControls() {
       
       const container = e.target;
       manualScrollTimeout = setTimeout(function() {
+        // Suppress auto-scroll disable for 300 ms after the Log tab was activated.
+        // Tab switching can trigger a reflow-induced scroll event before the RAF
+        // that scrolls the container to the bottom has a chance to run.
+        if (Date.now() - logTabActivatedAt < 300) return;
+
         const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-      
+
         if (!isAtBottom && autoScroll) {
           // User scrolled up, disable auto-scroll
           autoScroll = false;
@@ -2678,7 +2684,7 @@ function setupOTLogControls() {
       }, 100);
     });
   }
-  
+
   // Mark as initialized after all listeners are successfully registered
   otLogControlsInitialized = true;
   updateLogCounters();
@@ -6945,7 +6951,9 @@ function openLogTab(evt, tabName) {
   document.getElementById(tabName).classList.add('active');
   evt.currentTarget.classList.add('active');
   currentTab = tabName;
-  if (currentTab === 'Statistics') {
+  if (currentTab === 'Log') {
+    logTabActivatedAt = Date.now();
+  } else if (currentTab === 'Statistics') {
       updateStatisticsDisplay();
       refreshBoilerSupport();
   } else if (currentTab === 'OTSupport') {
