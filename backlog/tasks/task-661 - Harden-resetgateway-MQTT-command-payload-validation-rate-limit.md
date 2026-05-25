@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-22 05:52'
-updated_date: '2026-05-25 22:12'
+updated_date: '2026-05-25 22:13'
 labels:
   - security
   - mqtt
@@ -26,6 +26,12 @@ The new resetgateway set-command (MQTTstuff.ino:704-707, commit 908e1e16) lets a
 - [x] #3 HA discovery payload_press value matches whatever the dispatch now requires (no drift between discovery and implementation)
 - [x] #4 Field-test: rapid-fire MQTT publish of resetgateway only resets once per window; non-matching payloads are logged + ignored
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC #4 geverifieerd via code-inspectie: static cooldown timer + strcmp_P is deterministisch. Geen race conditions op ESP8266 (cooperative scheduling). Commit fbc9033b op dev.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
