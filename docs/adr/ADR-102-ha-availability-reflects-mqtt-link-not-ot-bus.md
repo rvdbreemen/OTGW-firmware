@@ -109,13 +109,10 @@ which is correct HA availability semantics for every entity. The 30-second
   (the post-`/gateway`-removal behaviour carried from dev): they must
   migrate to the `otgw_connected` sensor. Documented in the changelog.
 - A future contributor could reintroduce the base-topic liveness write.
-  Mitigated by code review and the declarative Enforcement block below.
-  **Gate pending — tracked as TASK-623.** This is a binding code-level
-  pattern ADR; per ADR-080 it must ship an `evaluate.py`/test gate. The
-  2.0.0 worktree has no `bin/adr-judge`, so the `forbid_pattern` block below
-  is not yet mechanically enforced here. TASK-623 adds the `evaluate.py`
-  check; on landing, this note is replaced with a link to that check
-  (ADR-080 gate exit criteria, option 1).
+  Mitigated by code review and the `evaluate.py` gate below (ADR-080
+  exit criteria met by TASK-623): `check_adr102_otbus_liveness_topic()`
+  in `evaluate.py` flags `sendMQTT(MQTTPubNamespace, CONLINEOFFLINE`
+  as FAIL and runs in both `--quick` and full mode.
 
 ## Related Decisions
 

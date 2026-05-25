@@ -2496,6 +2496,41 @@ class WorkspaceEvaluator:
                 "version.h not found"
             ))
 
+    # ===== ADR-102: OT-BUS LIVENESS TOPIC BAN =====
+
+    def check_adr102_otbus_liveness_topic(self):
+        """ADR-102 CI gate: sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(...)) must never appear.
+        That call writes OT-bus liveness to the HA availability topic, conflating MQTT-link
+        state with OT-bus state and causing all HA entities to flap."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-102: OT-Bus Liveness Topic Ban ==={Colors.ENDC}")
+
+        forbidden_re = re.compile(
+            r'sendMQTT\s*\(\s*MQTTPubNamespace\s*,\s*CONLINEOFFLINE'
+        )
+        src_dir = config.FIRMWARE_ROOT
+        code_files = collect_firmware_source_files(src_dir)
+
+        violations: List[str] = []
+        for file in code_files:
+            with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+            for i, line in enumerate(lines, 1):
+                if forbidden_re.search(line):
+                    violations.append(f"{file.name}:{i}: {line.strip()}")
+
+        if violations:
+            self.add_result(EvaluationResult(
+                "ADR-102", "OT-bus liveness topic ban", "FAIL",
+                f"Found {len(violations)} forbidden sendMQTT(MQTTPubNamespace, CONLINEOFFLINE) call(s) — "
+                "ADR-102: HA avty_t must reflect only the MQTT link (birth/LWT); use otgw_connected for OT-bus liveness",
+                "; ".join(violations)
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-102", "OT-bus liveness topic ban", "PASS",
+                "No sendMQTT(MQTTPubNamespace, CONLINEOFFLINE) call sites found"
+            ))
+
     # ===== BINARY-SAFE COMPARE CHECK =====
 
     def check_binary_safe_compare(self):
@@ -2683,6 +2718,7 @@ class WorkspaceEvaluator:
         self.check_no_arduinojson()
         self.check_binary_safe_compare()
         self.check_otdirect_25238_bridge()
+        self.check_adr102_otbus_liveness_topic()     # ADR-102 CI gate (TASK-623)
         self.check_adr_gates()
         self.check_backlog_hygiene()
         self.check_time_boundary_single_caller()      # ADR-086 CI gate (originally ADR-064, TASK-350)
