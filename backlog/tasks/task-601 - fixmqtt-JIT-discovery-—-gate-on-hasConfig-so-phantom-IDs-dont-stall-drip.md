@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-14 16:57'
-updated_date: '2026-05-25 22:14'
+updated_date: '2026-05-25 22:15'
 labels:
   - mqtt
   - bug
@@ -60,6 +60,8 @@ Scope: src/OTGW-firmware/OTGW-Core.ino:4109-4116 only. No change to drip loop, F
 Implementation complete. Single-point fix in OTGW-Core.ino:4109-4126 (lines extended by docstring). Pre-release bumped beta.3 -> beta.4. Committed as f6f65bf. Pushed to claude/fix-jit-mqtt-discovery-N7Yos. Draft PR #572 opened against dev.
 
 Blocking AC3 (build green): could NOT be self-verified in this sandbox -- python build.py --firmware fails to download arduino-cli (HTTP 403 on downloads.arduino.cc from this network). The maintainer's local workstation or CI must verify exit 0 before merging. Evaluator (AC4) was self-verified: same health score 91.7% before and after the patch, with identical pre-existing failures.
+
+AC #3 geverifieerd: python build.py --firmware exit 0 op dev (commit a82de1e4 gemerged). Evaluator 100% groen.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
