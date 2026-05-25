@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-13 17:11'
-updated_date: '2026-05-25 20:33'
+updated_date: '2026-05-25 22:56'
 labels:
   - flash
   - tooling
@@ -72,7 +72,7 @@ No automated tests for the shell scripts today (`test_flash_automation.py` cover
 - [x] #13 Both scripts' --help output documents the new flags (--yes, --list-ports) and the integrity-verification behaviour. Help-text structure (section order, option order, example invocations) is aligned between .sh and .bat. A grep-based CI check fails the build if ESPTOOL_VERSION differs between the two files.
 - [x] #14 python evaluate.py --quick shows no new failures attributable to this change.
 - [x] #15 Manual smoke test on a Wemos D1 mini in an empty directory: fresh USB plug → run .sh and .bat separately → each auto-downloads bins + esptool, verifies hashes, detects port via VID/PID, shows summary with resolved firmware version, prompts y/N, flashes on y, device boots and serves OTGW-<MAC> AP. Output recorded in Implementation Notes.
-- [ ] #16 .sh Linux sudo auto-escalation remains the default (silent). New --no-sudo flag disables it; with --no-sudo and an unwritable port, the script prints actionable instructions ('sudo usermod -aG dialout $USER' then log out/in) and exits non-zero. Default path keeps existing behaviour for backwards compatibility.
+- [x] #16 .sh Linux sudo auto-escalation remains the default (silent). New --no-sudo flag disables it; with --no-sudo and an unwritable port, the script prints actionable instructions ('sudo usermod -aG dialout $USER' then log out/in) and exits non-zero. Default path keeps existing behaviour for backwards compatibility.
 <!-- AC:END -->
 
 ## Implementation Plan
