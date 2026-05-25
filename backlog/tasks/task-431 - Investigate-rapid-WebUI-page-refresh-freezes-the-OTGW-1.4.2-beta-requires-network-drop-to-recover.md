@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@copilot'
 created_date: '2026-04-26 10:16'
-updated_date: '2026-05-22 06:41'
+updated_date: '2026-05-25 21:59'
 labels:
   - bug
   - webui
@@ -111,3 +111,9 @@ The 1.4.2-beta release notes (published a few minutes after crashevans' report) 
 
 Triage 2026-05-22: blocked on field reproduction. Original 1.4.2-beta report from andrebrait (2026-04-23); no further reports in 14+ days against 1.5.x/1.6.0-beta. Re-open when a fresh report reproduces against current beta line or when an ESP heap audit gives a structural lead.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+User confirmed resolved (2026-05-25). Rapid WebUI page-refresh freeze reported by andrebrait on 1.4.2-beta+62fdacd. No longer reproducible on current dev build. Root cause likely addressed by subsequent WebSocket lifecycle and heap-management improvements (ADR-088, ADR-089 era). Closing as stale / field-validated fixed.
+<!-- SECTION:FINAL_SUMMARY:END -->
