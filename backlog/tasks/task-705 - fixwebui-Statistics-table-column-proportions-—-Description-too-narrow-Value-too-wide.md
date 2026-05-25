@@ -3,14 +3,20 @@ id: TASK-705
 title: >-
   fix(webui): Statistics table column proportions — Description too narrow,
   Value too wide
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-25 20:39'
+updated_date: '2026-05-25 20:41'
 labels:
   - bug
   - webui
   - ux
 dependencies: []
+references:
+  - 'Discord #beta-testing'
+  - user Simon Templar
+  - '2026-05-25'
 priority: low
 ---
 
