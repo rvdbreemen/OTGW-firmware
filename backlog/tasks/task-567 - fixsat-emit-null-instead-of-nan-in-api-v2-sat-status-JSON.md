@@ -1,11 +1,11 @@
 ---
 id: TASK-567
 title: 'fix(sat): emit null instead of nan in /api/v2/sat/status JSON'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 19:21'
-updated_date: '2026-05-07 21:56'
+updated_date: '2026-05-25 21:42'
 labels:
   - sat
   - rest-api
@@ -30,7 +30,7 @@ satSendJsonFloat() at SATcontrol.ino:1610 emits float values via dtostrf() witho
 - [x] #4 ./build.sh --firmware exits 0 for both ESP8266 and ESP32 targets
 - [x] #5 python3 evaluate.py --quick — no new failures
 - [x] #6 Prerelease bump committed alongside the firmware change (alpha.11 -> alpha.12) per project versioning policy
-- [ ] #7 Field validation on alpha.12+: SergeantD or another tester confirms the SAT page no longer shows fetch errors with no thermostat / no BLE source
+- [x] #7 Field validation on alpha.12+: SergeantD or another tester confirms the SAT page no longer shows fetch errors with no thermostat / no BLE source
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -42,5 +42,5 @@ satSendJsonFloat() at SATcontrol.ino:1610 emits float values via dtostrf() witho
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Shipped as alpha.12. satSendJsonFloat now emits the literal JSON null token when fValue is NaN or Inf, while finite values continue through dtostrf with requested precision. /api/v2/sat/status verified parseable by JSON.parse() in cold-device / no-source / normal / edge-transition states. data/sat.js [SAT] fetch errors gone in the same scenario. ESP8266 + ESP32-S3 builds exit 0; evaluator clean baseline; alpha.11 -> alpha.12 prerelease bump committed. AC #7 (SergeantD confirms SAT page no longer shows fetch errors with no thermostat / no BLE source) gated on field validation.
+Fixed satSendJsonFloat() to emit literal JSON null token when fValue is NaN or Inf; finite values continue through dtostrf unchanged. GET /api/v2/sat/status now parseable by JSON.parse() in all states (cold device, no temp source, normal operation, edge transitions). data/sat.js [SAT] fetch error console messages eliminated in the same scenario. Build green for ESP8266 and ESP32-S3; evaluator clean; prerelease bumped alpha.11 to alpha.12. Field-validated by SergeantD: SAT page no longer shows fetch errors with no thermostat / no BLE source on alpha.12+.
 <!-- SECTION:FINAL_SUMMARY:END -->

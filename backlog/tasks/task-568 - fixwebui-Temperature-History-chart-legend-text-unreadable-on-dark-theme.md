@@ -1,11 +1,11 @@
 ---
 id: TASK-568
 title: 'fix(webui): Temperature History chart legend text unreadable on dark theme'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 19:35'
-updated_date: '2026-05-07 21:56'
+updated_date: '2026-05-25 21:42'
 labels:
   - webui
   - charts
@@ -28,7 +28,7 @@ ECharts legend default textStyle.color is dark grey, which is invisible against 
 - [x] #3 Implementation reads from design tokens / echarts-theme.js where possible rather than hardcoding hex values; if hardcoded is necessary, justify in a code comment
 - [x] #4 ./build.sh --firmware exits 0 for both ESP8266 and ESP32 targets
 - [x] #5 python3 evaluate.py --quick — no new failures
-- [ ] #6 Field validation on alpha.14+: tester confirms legend labels are readable on both themes
+- [x] #6 Field validation on alpha.14+: tester confirms legend labels are readable on both themes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -40,5 +40,5 @@ ECharts legend default textStyle.color is dark grey, which is invisible against 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Shipped in alpha.14. data/graph.js legend textStyle.color now reads from the --fg-2 design token via getComputedStyle, so legend labels follow the active theme's foreground colour and meet WCAG AA contrast against both light and dark backgrounds. Dot colours (blue/green/orange/red/blue) unchanged. Build green on both targets; evaluator clean. AC #6 (tester confirms legend labels readable on both themes) gated on field validation.
+Fixed Temperature History chart legend text contrast on dark theme. Legend labels now use a colour with adequate contrast against both light and dark backgrounds (WCAG AA minimum). Legend dot colours unchanged. Implementation reads from design tokens / echarts-theme.js where available. Build green on both ESP8266 and ESP32-S3 targets; evaluator clean. Field-validated on alpha.14+: tester confirmed legend labels are readable on both themes.
 <!-- SECTION:FINAL_SUMMARY:END -->

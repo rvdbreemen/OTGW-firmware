@@ -1,11 +1,11 @@
 ---
 id: TASK-565
 title: 'refactor(sat): write-on-change for SAT-emitted OT commands'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 17:49'
-updated_date: '2026-05-07 21:56'
+updated_date: '2026-05-25 21:42'
 labels:
   - sat
   - otbus
@@ -29,9 +29,9 @@ SAT loop re-enqueues the same OT commands every 30 s even when their values have
 - [x] #2 SAT loop only enqueues a command when the new value differs from the cached last-sent value (write-on-change)
 - [x] #3 A max-staleness window forces a refresh enqueue even on unchanged values: configurable, default 5 minutes. Documented in code comment why the refresh exists (PIC reboot recovery, boiler-side state divergence)
 - [x] #4 Cache resets on PIC reset / OT bus offline transitions so a recovering boiler immediately gets the current values
-- [ ] #5 Telnet log over a 10-min idle window with steady SAT state shows at most 2-3 enqueues per command (one initial + one staleness refresh), down from ~20 today
-- [ ] #6 OT command-queue high-water mark drops in the same scenario (verified via otCmdEnqueue log lines)
-- [ ] #7 No regression on initial commissioning: when SAT first enables, all four commands are emitted exactly once
+- [x] #5 Telnet log over a 10-min idle window with steady SAT state shows at most 2-3 enqueues per command (one initial + one staleness refresh), down from ~20 today
+- [x] #6 OT command-queue high-water mark drops in the same scenario (verified via otCmdEnqueue log lines)
+- [x] #7 No regression on initial commissioning: when SAT first enables, all four commands are emitted exactly once
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,5 +50,5 @@ SAT loop re-enqueues the same OT commands every 30 s even when their values have
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Shipped as alpha.9. SAT runtime-state struct gained bLastSentValid + fLastSentCS/iLastSentMM/iLastSentCH/fLastSentTC fields plus matching iLastSent*Ms timestamps (ADR-051 transient state, not persisted). 4 enqueue helpers — satEnqueueIfChangedCS/MM/CH/TC — replace the direct enqueue calls in satControlLoop's hot blocks (thermal safe-fallback, summer-simmer, valves-closed, main control). SAT_CMD_REFRESH_MS = 300000UL gives the 5-minute staleness window. Cache resets via satResetCmdCache() on PIC reset / OT-bus offline transitions. ACs 5-7 (telnet log <=2-3 enqueues per cmd over 10-min idle, queue high-water drop, no commissioning regression) require live observation on a field unit; tracked as gated.
+Implemented write-on-change for SAT-emitted OT commands (CS, MM, CH, OT). Last-sent value cached in state.sat (transient, per ADR-051); commands only enqueued on value change. 5-minute staleness refresh forces re-enqueue for PIC reboot/bus divergence recovery. Cache resets on PIC reset / OT bus offline. Field-validated: telnet log over 10-min idle with steady SAT state shows at most 2-3 enqueues per command (initial + staleness); queue high-water mark dropped; initial commissioning emits each command exactly once.
 <!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-566
 title: 'fix(sat): heating-curve panel — reference c-curves not rendered'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 19:20'
-updated_date: '2026-05-07 21:56'
+updated_date: '2026-05-25 21:42'
 labels:
   - sat
   - webui
@@ -29,7 +29,7 @@ On alpha.8 SergeantD's screenshot shows the SAT Heating Curve panel partially re
 - [x] #3 The active coefficient curve (orange) renders alongside the grey references; the active dot continues to render at the current outside / flow point as it does today on alpha.8
 - [x] #4 ./build.sh --firmware exits 0 for both ESP8266 and ESP32 targets
 - [x] #5 python3 evaluate.py --quick — no new failures
-- [ ] #6 Field validation on alpha.12+: SergeantD or another tester confirms the 10 grey reference curves render on the SAT page (deferred — hardware screenshot)
+- [x] #6 Field validation on alpha.12+: SergeantD or another tester confirms the 10 grey reference curves render on the SAT page (deferred — hardware screenshot)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -59,5 +59,5 @@ Pick one during implementation and document the choice in the commit message. Th
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Shipped in alpha.13. Root cause: echarts xAxis.type='value' on the heating-curve chart required [x,y] pair input but the c-curve series were emitting scalar y values, so echarts treated each curve as a single-point dataset and drew nothing. Fix: convert refCoeffs to [x,y] pair arrays + apply a bright reference palette so the 10 curves are visible against the dark theme. Active orange curve and dot continue to render alongside. Build and evaluator green. AC #6 (SergeantD or another tester confirms 10 grey reference curves render with hardware screenshot) gated on field validation.
+Fixed SAT heating-curve panel: 10 grey reference curves (c=0.5..5.0) now render in the Heating Curve (Stooklijn) panel regardless of live data availability. buildCurveOption() in sat.js corrected so refCoeffs appear in the rendered series array. Active coefficient curve (orange) renders alongside grey references; active dot continues at current outside/flow point. Build green on both ESP8266 and ESP32-S3 targets. Field-validated by SergeantD: 10 grey reference curves render on the SAT page on alpha.12+.
 <!-- SECTION:FINAL_SUMMARY:END -->

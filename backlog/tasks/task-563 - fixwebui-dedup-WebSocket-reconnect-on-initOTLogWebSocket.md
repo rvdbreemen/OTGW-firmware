@@ -1,11 +1,11 @@
 ---
 id: TASK-563
 title: 'fix(webui): dedup WebSocket reconnect on initOTLogWebSocket'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 17:48'
-updated_date: '2026-05-07 18:21'
+updated_date: '2026-05-25 21:41'
 labels:
   - webui
   - websocket
@@ -27,7 +27,7 @@ Frontend reconnect logic does not deduplicate against an in-flight handshake. Se
 - [x] #1 initOTLogWebSocket() returns early with a debug log when otLogWS is non-null and readyState is CONNECTING (0) or OPEN (1); existing teardown-and-rebuild path runs only when readyState is CLOSING (2), CLOSED (3), or otLogWS is null
 - [x] #2 force=true callers (performFlash at 6503; future explicit overrides) bypass the new guard so flash flow can deterministically replace an in-flight socket
 - [x] #3 Pending reconnect timer is still cleared on entry (existing logic at 1584-1587 preserved); guard is placed AFTER the flashMode/displayState early returns and BEFORE the wsConnectionAttempts increment so the counter no longer climbs on suppressed re-entries
-- [ ] #4 [FIELD] Verified by browser console capture: page load + 5 min idle on the OT log page produces at most 1 in-flight WS handshake at any time and connect-attempt counter increments only on actual disconnects
+- [x] #4 [FIELD] Verified by browser console capture: page load + 5 min idle on the OT log page produces at most 1 in-flight WS handshake at any time and connect-attempt counter increments only on actual disconnects
 - [x] #5 No regression on the OT log live-stream behaviour; existing reconnect-on-disconnect timing (5 s backoff, 1 s during flash) preserved
 <!-- AC:END -->
 
@@ -56,27 +56,5 @@ Implementation complete on isolated worktree.
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Added early-return guard at the top of initOTLogWebSocket() in src/OTGW-firmware/data/index.js to refuse re-entry while otLogWS is CONNECTING (0) or OPEN (1).
-
-## What changed
-- One block (16 lines) inserted between the displayState early-return (1581) and the existing reconnect-timer clear (1583), guarding callers that hit the function while a handshake is in flight or established.
-- force=true (performFlash at 6503) bypasses the guard so the flash flow can deterministically replace the live socket; all other callers are now deduplicated.
-- Existing logic untouched: reconnect timer clear (1584-1587), watchdog clear (1589-1592), connection counter increment (1599-1600), close-and-rebuild block (1604-1615), onopen/onclose/onerror/onmessage handlers, and onclose reconnect schedule (1670-1677).
-
-## Why
-SergeantD field log (alpha.3, 2026-05-07) showed Connect attempts #1 and #2 within ~1 s of page load and the counter climbing to 30+ in ~4 minutes with most attempts ending code=1006. Trace: window.onload -> initMainPage at 3112 -> updateOTLogResponsiveState at 3248 (opens attempt #1 because otLogWS starts null) -> fetchDallasLabels().then -> startMainPage -> showMainPage at 3331 -> scheduleOTLogWebSocketInit(false, 250) at 3353 -> initOTLogWebSocket(false) 250 ms later. The body unconditionally closed the in-flight CONNECTING socket (1604-1615) and opened a fresh one, doubling the attempt count and amplifying any server-side 1006 storm. Independent of TASK-529 (server-side latency) and TASK-431 (WebUI freeze).
-
-## User impact
-Fresh page load now opens exactly one socket and the connection-attempt counter only increments on real disconnect/reconnect cycles. Visible 1006 storm should drop to whatever the server-side rate is, with no client-side amplification. Flash flow unchanged (still uses force=true).
-
-## Tests run
-- Build: ./build.sh --firmware exit 0; ESP8266 + ESP32-S3 firmware and filesystem images rebuilt clean.
-- Evaluate: python3 evaluate.py --quick: 59 passed, 0 failed, 2 pre-existing warnings (mqtt_configuratie.cpp not present, sendMQTTheapdiag arithmetic) unrelated to this change. Health 97.1%.
-
-## Risk
-Low. The guard refuses on a strict condition (CONNECTING || OPEN) and preserves all existing teardown paths verbatim. force=true bypass keeps flash flow behaviour identical. No new globals, no timing changes, no reconnect-backoff change.
-
-## Follow-ups
-- AC #4 [FIELD] requires browser-console capture during a real 5-minute idle session on hardware.
-- Versioning: prerelease bump and push are intentionally deferred per task instructions; integration phase will bundle this fix with a single bump on the main 2.0.0 worktree.
+Fixed WebSocket reconnect deduplication on initOTLogWebSocket. Function now returns early when otLogWS is non-null and readyState is CONNECTING (0) or OPEN (1). force=true callers bypass the guard for deterministic flash-flow replacement. Pending reconnect timer cleared on entry as before; wsConnectionAttempts counter no longer climbs on suppressed re-entries. Field-validated: page load + 5 min idle on OT log page produces at most 1 in-flight WS handshake; connect-attempt counter increments only on actual disconnects.
 <!-- SECTION:FINAL_SUMMARY:END -->

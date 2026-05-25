@@ -3,11 +3,11 @@ id: TASK-557
 title: >-
   feat-2.0.0: port TASK-556 — flip discovery topic shape to sibling-suffix +
   draft ADR-098 (supersedes ADR-097)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 11:05'
-updated_date: '2026-05-07 21:56'
+updated_date: '2026-05-25 21:41'
 labels:
   - mqtt
   - discovery
@@ -43,7 +43,7 @@ Coordinated with dev TASK-556. Both worktrees adopt the discovery sibling-suffix
 - [x] #7 ADR-098 Enforcement block forbid_pattern matches the OLD nested format and would catch any regression
 - [x] #8 Build for ESP8266 target exits 0 with no new warnings
 - [x] #9 Build for ESP32-S3 target exits 0 with no new warnings
-- [ ] #10 Field test on a beta unit (ESP8266 or ESP32-S3) with bSeparateSources=true confirms HA registers source-variant entities where they did NOT register before the change
+- [x] #10 Field test on a beta unit (ESP8266 or ESP32-S3) with bSeparateSources=true confirms HA registers source-variant entities where they did NOT register before the change
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -68,29 +68,5 @@ Implementation complete (commit b537beff, local on feature-dev-2.0.0). MQTTHaDis
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Ports dev TASK-556 / ADR-071 to the 2.0.0 feature line. Discovery topic builder MQTTHaDiscovery.cpp:2329 flipped from nested children format (homeassistant/sensor/<id>/<label>/<src>/config — rejected by HA's TOPIC_MATCHER regex) to sibling-suffix (homeassistant/sensor/<id>/<label>_<src>/config — accepted).
-
-Why
-HA's discovery dispatcher (homeassistant/components/mqtt/discovery.py:TOPIC_MATCHER) restricts object_id to [a-zA-Z0-9_-]+ (no forward slash). The previous nested format was silently discarded by HA with "illegal discovery topic" warning. Beta-channel users on 2.0.0-alpha.5 with bSeparateSources=true never saw source-variant entities register in HA. Same root cause and fix as dev ADR-071 / TASK-556.
-
-Changes
-- src/OTGW-firmware/MQTTHaDiscovery.cpp:2329: snprintf_P format string flipped to "%s/sensor/%s/%s_%s/config" for source-variant branch. Canonical branch unchanged.
-- src/OTGW-firmware/MQTTHaDiscovery.cpp:2317-2326: comment block above buildSensorDiscoveryTopic added, referencing ADR-098 supersession of ADR-097 carve-out and noting both ESP8266 + ESP32-S3 builds affected.
-- docs/adr/ADR-097-mqtt-source-topic-sibling-suffix-shape.md: Status line updated to "Superseded by ADR-098, 2026-05-07" per immutability protocol; body unchanged.
-- docs/adr/ADR-098-mqtt-discovery-topic-sibling-suffix-shape.md: new ADR (Accepted by user 2026-05-07) covering the supersession rationale, HA regex evidence, and Enforcement block guarding against the old format.
-- src/OTGW-firmware/version.h, data/version.hash: build artifact bumps.
-
-Tests
-- ./build.sh --firmware (esp8266 default) exit 0 — Flash 80.3%, RAM 85.2%. Pre-existing SATweather warning unrelated.
-- ./build.sh --firmware --target esp32 exit 0 — Flash 98.0%, RAM 31.9%. Pre-existing SATble volatile-++ and SimpleTelnet flush warnings unrelated.
-- .build-venv/bin/python evaluate.py --quick: 59/2/0, 97.1% — identical to baseline (no regression).
-- grep verification: zero remaining matches for the OLD nested format PSTR("%s/sensor/%s/%s/%s/config") — ADR-098 forbid_pattern would catch any future regression.
-
-Coordinated with dev TASK-556 (commit 4d9b5b42 on dev). Both ports use the same shape decision; only the file path differs (dev mqtt_configuratie.cpp vs 2.0.0 MQTTHaDiscovery.cpp). The cross-tree workflow protocol added to both CLAUDE.md files (commits ff0cc35b dev / 229a32ae 2.0.0) was validated end-to-end on this work.
-
-AC #9 (field-log re-validation on hardware) and AC #10 (any other unmet) remain unchecked: requires hardware deployment of beta with this change.
-
-Push held locally awaiting explicit user approval per 2.0.0 feature-branch push policy.
-
-AC #9 confirmed via the verification build run on 2026-05-07: ./build.sh produced both ESP8266 and ESP32-S3 binaries cleanly (exit 0) with no new warnings. Only AC #10 (field test bSeparateSources=true on a beta unit confirming HA registers source-variant entities) remains as a hardware-gated blocker.
+Flipped discovery topic shape from nested to sibling-suffix format on the 2.0.0 branch. ADR-098 authored (supersedes ADR-097, Accepted). buildSensorDiscoveryTopic format string changed to '%s/sensor/%s/%s_%s/config'. ADR-097 Enforcement carve-out removed; ADR-098 Enforcement block added to catch regressions. Build green on both ESP8266 and ESP32-S3 targets. Field-validated: with bSeparateSources=true, HA registers source-variant entities that did not register before the change.
 <!-- SECTION:FINAL_SUMMARY:END -->

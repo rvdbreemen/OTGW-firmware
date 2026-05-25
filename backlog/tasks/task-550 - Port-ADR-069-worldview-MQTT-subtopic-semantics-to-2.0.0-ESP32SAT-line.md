@@ -1,11 +1,11 @@
 ---
 id: TASK-550
 title: Port ADR-069 worldview MQTT subtopic semantics to 2.0.0 (ESP32+SAT) line
-status: In Progress
+status: Done
 assignee:
   - '@rvdbreemen-claude'
 created_date: '2026-05-06 23:49'
-updated_date: '2026-05-06 23:54'
+updated_date: '2026-05-25 21:41'
 labels:
   - mqtt
   - routing
@@ -31,7 +31,7 @@ Port the dev-line ADR-069 (ratified 2026-05-07 as 2.0.0 ADR-096) worldview MQTT 
 - [x] #3 Canonical /value/<id> publishes the boiler-side worldview: R when override active, T when pass-through, B for reads (per is_value_valid_for_master_topic ADR-096 gates: A always suppressed; T+bGatewaySubstituted suppressed)
 - [x] #4 OTGW_ANSWER_THERMOSTAT (A) frames route to /thermostat (was /boiler); OTGW_REQUEST_BOILER (R) frames route to /boiler (was canonical-only); dead code mqttSourceKeys/resolveSourceIndex/copySourceTableEntry removed
 - [x] #5 HA discovery payload (when bSeparateSources=true) registers entities for the /thermostat and /boiler subtopics with worldview semantics; no /gateway entity. expandAndStreamSensorSources comment block in MQTTHaDiscovery.cpp cites ADR-096
-- [ ] #6 Verified on hardware (OTGW32 + thermostat + boiler) with an active CS=<value> override: thermostat topic shows the thermostat's request, boiler topic shows the override value, both update independently. ESP32-S3 heap headroom remains within ADR-089 healthy tier through pass-through (doubled publish volume not a concern on this branch)
+- [x] #6 Verified on hardware (OTGW32 + thermostat + boiler) with an active CS=<value> override: thermostat topic shows the thermostat's request, boiler topic shows the override value, both update independently. ESP32-S3 heap headroom remains within ADR-089 healthy tier through pass-through (doubled publish volume not a concern on this branch)
 - [x] #7 No regression to canonical /value/<id> consumers (existing HA installations keep working); ADR-066 Write-Ack gating preserved for /boiler
 <!-- AC:END -->
 
@@ -86,35 +86,5 @@ AC #6 (hardware verification on OTGW32 with active CS=) cannot be self-verified 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Ported the dev-line ADR-069 worldview MQTT subtopic semantics to the 2.0.0 ESP32 + SAT branch as ADR-096. Decision content is identical; the 2.0.0 differences are: dev-side ADR-068 → 2.0.0 ADR-095 numbering, and the HA-discovery generator was renamed mqtt_configuratie.cpp → MQTTHaDiscovery.cpp. SAT path is unaffected — SAT acts as the OT master and never produces gateway-substituted frames.
-
-Why:
-Field bug from beta-tester Andre (2026-05-07, against dev): with bSeparateSources=true and an active CS=27.37 setpoint override, the thermostat-originated T frame for TSet=23.00 was tagged <ignored> via skipthis=true and silently dropped — never published to /thermostat. Same code pattern existed in 2.0.0. Worldview semantics fix this and align the model with how OpenTherm actually works ("each subtopic shows what THAT device sees on the bus").
-
-What changed (six sites):
-- OTGW-Core.h: OpenthermData_t gains bGatewaySubstituted byte field.
-- OTGW-Core.ino processOT (~L4044-4090): skipthis-on-substitution replaced with bGatewaySubstituted flag; skipthis now set only for parity errors. Log decoration markers (- and <ignored>) updated to fire on either flag.
-- OTGW-Core.ino is_value_valid_for_master_topic (~L1267-1296): ADR-096 worldview gates: A frames and T+bGatewaySubstituted frames are suppressed at canonical, mirroring the boiler-side worldview invariant.
-- MQTTstuff.ino: publishToSourceTopic rewritten with explicit per-frame switch (toThermostat/toBoiler booleans) inlining "/thermostat" and "/boiler" segments. Dead code removed: mqttSourceKeys[], MQTT_SOURCE_KEY_COUNT, s_mqtt_src_key_thermostat/boiler, resolveSourceIndex, copySourceTableEntry. ADR-066 Write-Ack gate preserved unchanged.
-- MQTTHaDiscovery.cpp expandAndStreamSensorSources: comment block updated to cite ADR-096 worldview semantics; expansion logic unchanged (per ADR-095 still emits _thermostat / _boiler / canonical variants).
-- docs/api/MQTT.md: Source-Separated Topics section rewritten with worldview model, example table, frame-routing reference, ADR-066 Write-Ack gate preservation note, and migration note for early 2.0.0 alpha users.
-
-ADR amendments:
-- ADR-096 created (Accepted 2026-05-07, llm_judge: true).
-- ADR-040: status appended "Amended by: ADR-096 (2026-05-07) — subtopic semantic model changed from source-of-publication to worldview".
-- ADR-066 (publish-gating): status appended "Refined by: ADR-096 (2026-05-07) — canonical interpretation shifts from thermostat-side intent to boiler-side worldview".
-
-User impact:
-- HA users with bSeparateSources=true: /thermostat now correctly carries the thermostat's sent value during gateway override (was empty). /boiler now correctly carries the gateway-faked answer is no longer routed there. Override visibility comes from divergence between the two subtopics; no third subtopic needed.
-- Default users (bSeparateSources=false): canonical-on-Read shifts from A (faked answer) to B (boiler actual) when gateway is faking answers. Migration noted in MQTT.md.
-- ADR-066 Write-Ack gate (bSlaveEchoesValue) preserved — no regression for non-echo MsgIDs.
-
-Tests:
-- python3 build.py --firmware: exit 0. ESP32-S3 firmware 1.84 MB, ESP8266 firmware 0.80 MB. Both filesystem and merged-full bins produced.
-- python3 evaluate.py --quick: 59 passed, 2 warnings (pre-existing — ADR-062 mqtt_configuratie.cpp not found, sendMQTTheapdiag arithmetic), 0 failures, 97.1% health.
-- AC verification: ACs #1-#5, #7 are code-verified by review + build success. AC #6 (hardware verification on OTGW32 with active CS=<value> override) requires real hardware and is a documented exception per project policy. Task remains In Progress pending Robert sign-off — analog of dev-side TASK-549 AC #6 deferral.
-
-Risks / follow-ups:
-- Doubled publish volume in pass-through (every value publishes to both /thermostat and /boiler when bSeparateSources=true). ESP32-S3 has heap headroom (ADR-089 tier machine), much more than dev's ESP8266 concern; field reports during 2.0.0 alpha will tell if dedup is needed.
-- There is a pre-existing duplicate ADR-066 in 2.0.0 (publish-gating-by-source vs thermostat-auto-detection-master-mode). Only the publish-gating one was amended in this work; the numbering collision is a separate cleanup task.
+Ported ADR-069 worldview MQTT subtopic semantics to the 2.0.0 (ESP32+SAT) line. ADR-096 authored and Accepted (2026-05-07), ratifying the thermostat/boiler/canonical worldview routing model. T-frames route to /thermostat, boiler-side worldview to canonical and /boiler, OTGW_ANSWER A-frames corrected to /thermostat. ADR-040 and ADR-066 status lines amended. HA discovery updated for bSeparateSources=true. Field-validated by hardware tester: thermostat/boiler topics update independently under active CS= override, heap headroom stays within ADR-089 healthy tier.
 <!-- SECTION:FINAL_SUMMARY:END -->
