@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-25 20:34'
-updated_date: '2026-05-25 22:26'
+updated_date: '2026-05-25 22:33'
 labels:
   - bug
   - mqtt
@@ -28,9 +28,9 @@ Reported by crashevans on #beta-testing (2026-05-25) running beta.21. The disc_l
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 disc_verify_runs increments correctly after a verify cycle completes
-- [ ] #2 disc_last_verify_epoch publishes a non-zero value (Unix timestamp) after the first verify run
-- [ ] #3 WebUI 'Discovery last verify outcome' shows a meaningful value (not Unknown) after firmware has been running for >30 minutes with MQTT connected
+- [x] #1 disc_verify_runs increments correctly after a verify cycle completes
+- [x] #2 disc_last_verify_epoch publishes a non-zero value (Unix timestamp) after the first verify run
+- [x] #3 WebUI 'Discovery last verify outcome' shows a meaningful value (not Unknown) after firmware has been running for >30 minutes with MQTT connected
 <!-- AC:END -->
 
 ## Implementation Plan
