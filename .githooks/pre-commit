@@ -43,7 +43,7 @@ else
       ADR_EXIT=$?
       # Suppress individual llm_judge advisory lines (one per ADR with llm_judge:true,
       # very noisy on projects with many ADRs). Violations and the summary line are kept.
-      printf '%s\n' "$ADR_OUT" | grep -avE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true" >&2
+      printf '%s\n' "$ADR_OUT" | grep -avE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true" >&2 || true
       [ "$ADR_EXIT" -ne 0 ] && exit "$ADR_EXIT"
     fi
   fi
@@ -55,3 +55,5 @@ fi
 # staging check from TASK-660). Removed because the project moved to a
 # release-only bump model: bumps now happen once per beta release as part
 # of the /beta-prerelease skill (Phase 2), not per commit.
+
+exit 0
