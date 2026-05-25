@@ -1,10 +1,10 @@
 ---
 id: TASK-387
 title: 'Fix: theme toggle icon overlaps hostname+IP text in mobile header'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-23 07:43'
-updated_date: '2026-05-25 22:30'
+updated_date: '2026-05-25 22:31'
 labels:
   - bug
   - ui
