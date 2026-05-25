@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-06 09:04'
-updated_date: '2026-05-25 22:38'
+updated_date: '2026-05-25 22:51'
 labels:
   - feature
   - networking
@@ -26,10 +26,10 @@ Request to add a static IP address configuration option in the firmware. Motivat
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 User can configure a static IP address, subnet mask, gateway, and DNS server in the firmware settings
-- [ ] #2 If static IP is configured, the firmware uses it instead of DHCP on boot
-- [ ] #3 If static IP is not configured (default), behaviour is unchanged (DHCP)
-- [ ] #4 Settings are persisted to LittleFS and survive reboot
+- [x] #1 User can configure a static IP address, subnet mask, gateway, and DNS server in the firmware settings
+- [x] #2 If static IP is configured, the firmware uses it instead of DHCP on boot
+- [x] #3 If static IP is not configured (default), behaviour is unchanged (DHCP)
+- [x] #4 Settings are persisted to LittleFS and survive reboot
 <!-- AC:END -->
 
 ## Implementation Plan
