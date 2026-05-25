@@ -3,7 +3,7 @@ id: TASK-431
 title: >-
   Investigate: rapid WebUI page-refresh freezes the OTGW (1.4.2-beta), requires
   network drop to recover
-status: In Progress
+status: Done
 assignee:
   - '@copilot'
 created_date: '2026-04-26 10:16'
