@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-20 15:36'
-updated_date: '2026-05-25 20:48'
+updated_date: '2026-05-25 20:49'
 labels:
   - release
   - docs
@@ -44,3 +44,9 @@ The beta-prerelease.yml workflow currently composes a thin release body that onl
 7. Push branch and open draft PR against dev so the maintainer can review before the next tag push.
 8. Mark all ACs and set status to Done.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented inline 'since last public release' digest in beta GitHub release body. RELEASE_NOTES_1.6.0-beta.md added at repo root with digest region above '<!-- digest:end -->' sentinel. Workflow (.github/workflows/beta-prerelease.yml) updated to inline digest content under '## What''s new since the last public release' heading. Fallback behaviour for missing file or missing sentinel both handled. SKILL.md restructured: README/CHANGELOG staleness check moved to Phase 1 (before bump), with explicit deterministic pre-flight documented. Merged as PR #612 on 2026-05-20.
+<!-- SECTION:FINAL_SUMMARY:END -->
