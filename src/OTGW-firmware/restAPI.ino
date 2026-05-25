@@ -68,6 +68,34 @@ static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
   sendApiError(405, F("Method not allowed"));
 }
 
+// A: Boot-time flash & filesystem values cached once at startup.
+// Avoids 8 SPI-flash queries on every /api/v2/device/info call.
+struct BootFlashCache {
+  uint32_t    sketchSize;
+  uint32_t    freeSketchSpace;
+  char        flashChipId[9];     // formatted as "%08X"
+  float       flashChipSizeMB;
+  float       flashChipRealSizeMB;
+  float       flashChipSpeedMHz;
+  const char* flashChipMode;      // pointer into flashMode[] (RODATA)
+  float       littleFSSizeMB;
+};
+static BootFlashCache sBootFlash;
+
+void cacheBootFlashInfo() {
+  sBootFlash.sketchSize          = ESP.getSketchSize();
+  sBootFlash.freeSketchSpace     = ESP.getFreeSketchSpace();
+  snprintf_P(sBootFlash.flashChipId, sizeof(sBootFlash.flashChipId),
+             PSTR("%08X"), ESP.getFlashChipId());
+  sBootFlash.flashChipSizeMB     = ESP.getFlashChipSize()     / 1024.0f / 1024.0f;
+  sBootFlash.flashChipRealSizeMB = ESP.getFlashChipRealSize() / 1024.0f / 1024.0f;
+  sBootFlash.flashChipSpeedMHz   = floorf(ESP.getFlashChipSpeed() / 1000.0f / 1000.0f);
+  sBootFlash.flashChipMode       = flashMode[ESP.getFlashChipMode()];
+  FSInfo fsinfo;
+  LittleFS.info(fsinfo);
+  sBootFlash.littleFSSizeMB      = floorf(fsinfo.totalBytes / (1024.0f * 1024.0f));
+}
+
 //=======================================================================
 // CSRF same-origin helper for admin operations (ADR-054)
 // Returns true if the request appears to come from the same origin.
@@ -1049,8 +1077,16 @@ void sendOTmonitorV2()
 // group rather than appending at the end, so related metrics stay
 // adjacent on the page. JSON object order is not an API guarantee for
 // REST consumers - they should parse by key.
+// C: Minimum contiguous heap block required to safely stream this response.
+// If maxFreeBlock is below this, return 503 instead of compounding heap pressure.
+#define DEVICE_INFO_MIN_HEAP_BLOCK  8192
+
 void sendDeviceInfoV2()
 {
+  if (ESP.getMaxFreeBlockSize() < DEVICE_INFO_MIN_HEAP_BLOCK) {
+    sendApiError(503, F("low heap"));
+    return;
+  }
   sendStartJsonMap(F("device"));
 
   // --- Firmware & build identity ---
@@ -1105,20 +1141,15 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
   sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
 
-  // --- Flash, sketch & filesystem storage ---
-  sendJsonMapEntry(F("sketchsize"), ESP.getSketchSize() );
-  sendJsonMapEntry(F("freesketchspace"),  ESP.getFreeSketchSpace() );
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), ESP.getFlashChipId());
-  sendJsonMapEntry(F("flashchipid"), cMsg);
-  sendJsonMapEntry(F("flashchipsize"), (ESP.getFlashChipSize() / 1024.0f / 1024.0f));
-  sendJsonMapEntry(F("flashchiprealsize"), (ESP.getFlashChipRealSize() / 1024.0f / 1024.0f));
-  sendJsonMapEntry(F("flashchipspeed"), floorf((ESP.getFlashChipSpeed() / 1000.0f / 1000.0f)));
-  {
-    FlashMode_t ideMode = ESP.getFlashChipMode();
-    sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode]);
-  }
-  LittleFS.info(LittleFSinfo);
-  sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+  // --- Flash, sketch & filesystem storage (values cached at boot by cacheBootFlashInfo) ---
+  sendJsonMapEntry(F("sketchsize"),       sBootFlash.sketchSize);
+  sendJsonMapEntry(F("freesketchspace"),  sBootFlash.freeSketchSpace);
+  sendJsonMapEntry(F("flashchipid"),      sBootFlash.flashChipId);
+  sendJsonMapEntry(F("flashchipsize"),    sBootFlash.flashChipSizeMB);
+  sendJsonMapEntry(F("flashchiprealsize"),sBootFlash.flashChipRealSizeMB);
+  sendJsonMapEntry(F("flashchipspeed"),   sBootFlash.flashChipSpeedMHz);
+  sendJsonMapEntry(F("flashchipmode"),    sBootFlash.flashChipMode);
+  sendJsonMapEntry(F("LittleFSsize"),     sBootFlash.littleFSSizeMB);
 
   // --- Reliability drops (heap-pressure side effects) ---
   sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
