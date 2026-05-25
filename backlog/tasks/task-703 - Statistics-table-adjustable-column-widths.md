@@ -1,7 +1,7 @@
 ---
 id: TASK-703
 title: 'Statistics table: adjustable column widths'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-25 17:16'
