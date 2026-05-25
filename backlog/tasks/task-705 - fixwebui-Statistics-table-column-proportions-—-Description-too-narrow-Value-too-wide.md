@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-25 20:39'
-updated_date: '2026-05-25 20:48'
+updated_date: '2026-05-25 22:03'
 labels:
   - bug
   - webui
@@ -48,5 +48,5 @@ Implemented: swapped Description (was 200px) en Value (was auto) in .ot-stats-ta
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-CSS-only fix: swapped Description (was 200px fixed → nu auto) en Value (was auto → nu 180px fixed) in .ot-stats-table. Description krijgt nu de flexibele ruimte; values zijn kort genoeg voor een vaste breedte. Commit 00a332db. Build groen, evaluator 100%.
+CSS: .ot-stats-table th:nth-child(4) width:auto (Description), th:nth-child(6) width:180px (Value). Column order in index.html confirmed as Flag/ID/Name/Description/Type/Value. Committed in e2145143.
 <!-- SECTION:FINAL_SUMMARY:END -->
