@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-25 17:16'
-updated_date: '2026-05-25 23:03'
+updated_date: '2026-05-25 23:04'
 labels:
   - ui
   - enhancement
@@ -25,3 +25,9 @@ Simon Templar (beta.21 feedback): Description column is too small, Value column 
 - [x] #2 Column width preference is persisted via localStorage so it survives page reload
 - [x] #3 Works in Chrome, Firefox, Safari (latest-2)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Add drag-to-resize column widths to Statistics table. Implemented via colgroup/col elements and mousedown/mousemove/mouseup drag handle on th right edges. Widths persisted to localStorage key otStatsColWidths. Restores on page load and tab switch. Works cross-browser (Chrome, Firefox, Safari). No external dependencies.
+<!-- SECTION:FINAL_SUMMARY:END -->
