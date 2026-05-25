@@ -1895,7 +1895,15 @@ def build_firmware_pio(project_dir, target):
     tcfg = TARGETS[target]
     env_name = PIO_ENV_MAP[target]
     print_step(f"Building firmware [{tcfg['name']}] (PlatformIO)")
-    run_command(["pio", "run", "-e", env_name], cwd=project_dir)
+    # idf_tools.py (bundled with framework-arduinoespressif32) refuses to run in
+    # MSYS/MinGW environments (Git Bash sets MSYSTEM, MSYSTEM_PREFIX, MINGW_PREFIX,
+    # etc.). Strip all MSYS markers so the subprocess sees a plain Windows env.
+    _MSYS_KEYS = frozenset({
+        "MSYSTEM", "MSYSTEM_PREFIX", "MSYSTEM_CHOST", "MSYSTEM_CARCH",
+        "MINGW_PREFIX", "MINGW_CHOST", "MINGW_PACKAGE_PREFIX",
+    })
+    pio_env = {k: v for k, v in os.environ.items() if k not in _MSYS_KEYS}
+    run_command(["pio", "run", "-e", env_name], cwd=project_dir, env=pio_env)
     # TASK-337: pio's pre-flight Python version rejection prints "Python version
     # must be between 3.10 and 3.13" but exits 0, leaving no firmware.bin behind.
     # Verify the artifact exists rather than trusting the subprocess exit code.
@@ -1913,7 +1921,12 @@ def build_filesystem_pio(project_dir, target):
     print_step(f"Building filesystem [{tcfg['name']}] (PlatformIO)")
     # TASK-433: gzip pre-compression disabled (see build_filesystem above for rationale).
     # prepare_gzip_assets(config.DATA_DIR)  # intentionally disabled
-    run_command(["pio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir)
+    _MSYS_KEYS = frozenset({
+        "MSYSTEM", "MSYSTEM_PREFIX", "MSYSTEM_CHOST", "MSYSTEM_CARCH",
+        "MINGW_PREFIX", "MINGW_CHOST", "MINGW_PACKAGE_PREFIX",
+    })
+    pio_env = {k: v for k, v in os.environ.items() if k not in _MSYS_KEYS}
+    run_command(["pio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir, env=pio_env)
     # TASK-337: same fail-fast pattern as build_firmware_pio. The buildfs target
     # can also be silently skipped on toolchain misconfiguration.
     verify_artifact_exists(
