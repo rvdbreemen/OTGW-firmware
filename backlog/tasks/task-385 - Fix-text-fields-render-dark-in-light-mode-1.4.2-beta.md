@@ -4,7 +4,7 @@ title: 'Fix: text fields render dark in light mode (1.4.2-beta)'
 status: To Do
 assignee: []
 created_date: '2026-04-23 06:53'
-updated_date: '2026-05-22 06:41'
+updated_date: '2026-05-25 22:28'
 labels:
   - bug
   - ui
@@ -25,8 +25,8 @@ Discord #beta-testing (andrebrait, 2026-04-23 02:09Z): after upgrading from 1.3.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Screenshot from andrebrait saved or inspected to see exact rendering
-- [ ] #2 Root cause identified (CSS regression in light theme, color-scheme interaction, or mobile-specific)
+- [x] #1 Screenshot from andrebrait saved or inspected to see exact rendering
+- [x] #2 Root cause identified (CSS regression in light theme, color-scheme interaction, or mobile-specific)
 - [ ] #3 Fix confirmed by andrebrait on 1.4.2-beta hardware
 <!-- AC:END -->
 
