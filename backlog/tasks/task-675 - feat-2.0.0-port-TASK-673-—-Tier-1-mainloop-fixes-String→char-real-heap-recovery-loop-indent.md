@@ -3,11 +3,11 @@ id: TASK-675
 title: >-
   feat-2.0.0: port TASK-673 — Tier-1 mainloop fixes (String→char[], real heap
   recovery, loop indent)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-23 05:29'
-updated_date: '2026-05-23 05:47'
+updated_date: '2026-05-25 21:50'
 labels:
   - responsiveness
   - refactor
@@ -32,7 +32,7 @@ Master plan: /root/.claude/plans/hoe-zou-je-tier-cryptic-pascal.md
 - [x] #2 emergencyHeapRecovery() implementeert ADR-acties met platformFreeHeap(); telnet log toont before/after
 - [x] #3 Nieuwe ADR is geaccepteerd en verwijst naar dev sibling-ADR
 - [x] #4 loop() body uniform geindenteerd 4 spaces (incl. 2.0.0-specifieke regels)
-- [ ] #5 python build.py --firmware exit 0 voor zowel ESP8266 als ESP32 targets
+- [x] #5 python build.py --firmware exit 0 voor zowel ESP8266 als ESP32 targets
 - [x] #6 python evaluate.py --quick geen nieuwe failures
 <!-- AC:END -->
 
@@ -52,3 +52,9 @@ Evaluator: 60 passed, 0 failed, 1 pre-existing warning (mqtt_configuratie.cpp no
 
 BLOCKER: cannot create signed commit. /home/claude/.ssh/commit_signing_key.pub is empty (0 bytes); the /tmp/code-sign helper reports 'missing source' from the signing server (status 400). Infrastructure issue, not a code issue. All code changes are staged and ready; the working tree is clean apart from these staged changes. Build (ESP8266) green, evaluator green, all static checks pass. Requires either a working signing key or an explicit user request to bypass signing for this single commit.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Port of TASK-673/674 Tier-1 mainloop fixes to 2.0.0. pendingUpgradePath changed to static char[80] within #if HAS_PIC (no String). emergencyHeapRecovery() implemented with platformFreeHeap() per ADR actions, telnet log shows before/after heap. New ADR authored (cross-references dev sibling ADR), accepted. loop() body uniformly indented 4 spaces including 2.0.0-specific lines. evaluate.py --quick shows no new failures. python build.py --firmware exits 0 for both ESP8266 (alpha.68) and ESP32-S3 targets. Previous blocker (commit signing key in sandbox) resolved.
+<!-- SECTION:FINAL_SUMMARY:END -->
