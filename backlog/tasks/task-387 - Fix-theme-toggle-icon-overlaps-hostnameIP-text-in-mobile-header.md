@@ -37,3 +37,9 @@ Discord #beta-testing (sergeantd, 2026-04-23 07:11Z, screenshot attached): on mo
 
 Triage 2026-05-22: still relevant but no active work in 14+ days; deprioritised. Mobile header theme-toggle overlap reported by sergeantd on 2026-04-23. No new reports since 1.5.0; the touch-PC FSexplorer fix (commit ebbbb4df, beta.7) may have touched related header CSS — re-validate before active work.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fix committed in c0eb1682 (2026-04-23). Added padding-right:32px inside @media(max-width:600px) on .headerrow. Reserves space for the absolute-positioned theme toggle so flex hostname+IP content does not flow under it. Desktop layout (>600px) unchanged. AC #4 (Android Chrome + iOS Safari) not self-verifiable; no new reports on 1.5.x/1.6.0-beta.
+<!-- SECTION:FINAL_SUMMARY:END -->
