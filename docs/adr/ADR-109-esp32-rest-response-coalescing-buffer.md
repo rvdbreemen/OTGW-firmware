@@ -1,7 +1,7 @@
 # ADR-109 — ESP32 REST response coalescing buffer
 
 ## Status
-Proposed
+Accepted, 2026-05-26
 
 ## Context
 
