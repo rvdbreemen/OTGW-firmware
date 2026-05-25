@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-13 17:11'
-updated_date: '2026-05-13 17:26'
+updated_date: '2026-05-25 20:33'
 labels:
   - flash
   - tooling
@@ -142,6 +142,12 @@ VID/PID allowlist: CP210x `10c4:ea60`, CH340 `1a86:7523`, FTDI `0403:6001`.
 - `--list-ports` description field requires reading `/sys/class/tty/.../product` (Linux) and parsing system_profiler output (macOS). If macOS parsing proves fragile in the smoke test, ship `--list-ports` with VID/PID only on macOS and call it out in the help text.
 - Backward compat: removing silent sudo escalation is a behaviour change. Mitigation: clear actionable error message so an existing user knows exactly what to do.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-05-25: User 'otgw' (#beta-testing) reports flash_otgw.sh exits silently on Linux (openSUSE Leap 16.0). Root cause: find_highest_version() calls 'ls -1 $1/$2'; ls exits 2 when no files match, propagated by set -e. Suggested fix: append '|| true' to lines 565 and 566. Secondary issue: after that fix, GitHub API returns error (details unclear). Reporter offered to test a fixed version.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
