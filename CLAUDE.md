@@ -19,6 +19,16 @@ All task operations go through the **`backlog` CLI** — never edit task files d
 
 Full CLI reference: @.claude/backlog-cli-reference.md
 
+## Task pickup (MANDATORY)
+
+When picking up any task from the backlog — whether newly created or already existing — the **first** action before any code, research, or file reading is:
+
+```bash
+backlog task edit <id> -s "In Progress" -a @claude
+```
+
+This makes the task visible in the correct board column immediately. Skipping this step leaves the task in "To Do" while it is actually being worked on, which creates false visibility for the user and breaks board accuracy.
+
 ## Autonomous task completion (project policy)
 
 When you've satisfied all 8 Definition-of-Done items from the reference (every AC checked, every DoD item checked, Final Summary added, build passes, evaluator green, no regressions) — set the task status to **Done** immediately. Do not leave the task at "In Progress" waiting for the user to flip it.
