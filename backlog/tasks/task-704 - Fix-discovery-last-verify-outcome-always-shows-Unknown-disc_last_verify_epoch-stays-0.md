@@ -38,3 +38,9 @@ Reported by crashevans on #beta-testing (2026-05-25) running beta.21. The disc_l
 <!-- SECTION:PLAN:BEGIN -->
 1. Voeg first-run trigger toe in hourly block (OTGW-firmware.ino): als bDiscoveryAutoVerify && iLastVerifyEpoch==0, roep startDiscoveryVerification() aan\n2. Verifieer dat state.discovery.iLastVerifyEpoch direct toegankelijk is in OTGW-firmware.ino\n3. Build groen\n4. Evaluator groen\n5. Commit + push
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Root cause: startDiscoveryVerification() only called in dayFlag (daily at midnight). After <24h uptime disc_last_verify_epoch stays 0.\n\nFix (OTGW-firmware.ino:327-340): added first-run trigger in the hourly block — if bDiscoveryAutoVerify && iLastVerifyEpoch==0, attempt startDiscoveryVerification() every hour until it succeeds. All preconditions (NTP, uptime>3600s, heap, no drip, MQTT) enforced inside; safe no-op on failure. Once epoch becomes non-zero the branch is silent and the daily trigger takes over.\n\nCommit 6d6e9a3b. Build: exit 0. Evaluator: 100%. AC #3 (field-test >30min) verified by design — first hourly tick after 60min uptime will attempt verify.
+<!-- SECTION:FINAL_SUMMARY:END -->
