@@ -1,11 +1,11 @@
 ---
 id: TASK-544
 title: SAT heating curves invisible on 2.0.0 — diagnose and harden
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-05 08:54'
-updated_date: '2026-05-07 19:21'
+updated_date: '2026-05-25 22:04'
 labels:
   - bug
   - sat
@@ -43,13 +43,13 @@ Diagnostic ladder + recommended hardening documented in plan file ~/.claude/plan
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On a fresh full filesystem flash with SAT enabled and coefficient=1.5, heating_system=0, target_temp=20.0, the SAT page in expert mode displays exactly 10 gray reference curves c=0.5..5.0 with c=1.5 highlighted orange
+- [x] #1 On a fresh full filesystem flash with SAT enabled and coefficient=1.5, heating_system=0, target_temp=20.0, the SAT page in expert mode displays exactly 10 gray reference curves c=0.5..5.0 with c=1.5 highlighted orange
 - [x] #2 With no boiler activity (heating_curve=0, outside_temp=0) no orange dot is plotted below the y-axis: either suppressed or clamped to y=10 with a tooltip/label explaining the boiler is idle
-- [ ] #3 When outside_temp is changed via POST /api/v2/sat/externaloutdoor the orange dot moves on the X axis within one poll cycle (5s) without manual page reload
+- [x] #3 When outside_temp is changed via POST /api/v2/sat/externaloutdoor the orange dot moves on the X axis within one poll cycle (5s) without manual page reload
 - [x] #4 When deployed LittleFS hash differs from firmware hash, the SAT page shows a visible banner re-using StatusMessage::LittleFSMismatch from helperStuff.ino:704
 - [x] #5 When window.echarts is undefined, #sat-curve-chart shows the text 'Charts unavailable: echarts CDN failed to load' instead of remaining blank
 - [x] #6 No new String instances; no PROGMEM violations; no HTTPS-only assumptions on the firmware HTTP API
-- [ ] #7 ./build.sh build --target esp32 completes without new compile warnings; LittleFS image fits the configured partition size from partitions_otgw_esp32.csv
+- [x] #7 ./build.sh build --target esp32 completes without new compile warnings; LittleFS image fits the configured partition size from partitions_otgw_esp32.csv
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -211,3 +211,9 @@ What still fails: the 10 grey reference curves c=0.5..5.0 are missing from the r
 
 **Status superseded by TASK-566** which targets the new (narrower) defect. AC #1 of THIS task should be considered resolved for the chart-init aspect; the c-curves aspect carried forward to TASK-566.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT heating-curves diagnose and harden completed. Root cause (c-curves missing): series-construction defect in buildCurveOption fixed by TASK-566 (alpha.12); refCoeffs=[0.5..5.0] loop now iterates all 10 reference curves and includes them in the series array. Chart initialises immediately with buildCurveOption(1.5,0,20.0,null,null) before first API poll so curves render even on a cold device. AC #2 (dot suppression below y-axis): buildCurrentPointData returns [] when setpoint outside [10,80]. AC #3 (externaloutdoor moves dot within one poll): POST stores state.sat.fExternalOutdoor -> returned as outside_temp in next sat/status poll -> updateCurveChart else-branch updates only the scatter dot series without full rebuild. AC #4 (LittleFS mismatch banner): helperStuff.ino:704 -> restAPI.ino:2238 -> index.js:4168 -> sat.js:95 full path confirmed. AC #5 (echarts CDN fallback): initChart+initCurveChart both gate on typeof echarts === undefined. AC #7 (build): python build.py --firmware --filesystem --target esp32 exits SUCCESS; LittleFS image fits partition (merged-full created cleanly); only pre-existing SimpleTelnet deprecation warnings, none from SAT code. Field-validated by SergeantD on alpha.12+: reference curves and orange dot render correctly.
+<!-- SECTION:FINAL_SUMMARY:END -->
