@@ -3,14 +3,20 @@ id: TASK-706
 title: >-
   fix(webui): 'Boiler does not implement' section on OT Support tab is easy to
   miss
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-25 20:40'
+updated_date: '2026-05-25 20:41'
 labels:
   - bug
   - webui
   - ux
 dependencies: []
+references:
+  - 'Discord #beta-testing'
+  - user crashevans
+  - '2026-05-25'
 priority: low
 ---
 
