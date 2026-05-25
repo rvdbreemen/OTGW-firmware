@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.69
+**  Version  : v2.0.0-alpha.70
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -846,6 +846,7 @@ static bool satExtractTwoFields(const char* body,
 // POST /api/v2/sat/target               — set target temperature (body: "21.0" or {"value":"21.0"})
 // POST /api/v2/sat/externaltemp         — push indoor temp
 // POST /api/v2/sat/externaloutdoor      — push outdoor temp
+// POST /api/v2/sat/pvsurplus            — push PV-surplus power in W (TASK-640)
 // POST /api/v2/sat/humidity             — push indoor humidity (0-100%)
 // POST /api/v2/sat/area/<0-3>           — push area temperature (multi-area)
 // POST /api/v2/sat/flush                — flush short-lived data (PID integral + cycle window)
@@ -914,6 +915,23 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     }
     if (!val || !satHandleExternalOutdoor(val)) {
       sendApiError(400, F("Invalid or missing numeric value"));
+      return;
+    }
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+  }
+  // POST /api/v2/sat/pvsurplus — push PV-surplus power (TASK-640).
+  // Body: "1500" or {"value":"1500"} or {"value":1500}. Range 0-50000 W.
+  else if (strcasecmp_P(sub, PSTR("pvsurplus")) == 0) {
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
+    if (httpServer.hasArg(F("plain"))) {
+      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    } else if (wc > 5) {
+      val = words[5];
+    }
+    if (!val || !satHandlePvSurplus(val)) {
+      sendApiError(400, F("Invalid or missing numeric value (0-50000 W)"));
       return;
     }
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
@@ -2887,6 +2905,21 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satvalveoffset"), tmpBuf, "f", -1, 1);
   }
   sendJsonSettingObj(F("satsolarfreezeint"), settings.sat.bSolarFreezeIntegral, "b");
+  // PV-surplus setpoint boost (TASK-640)
+  sendJsonSettingObj(F("satpvboostenabled"),        settings.sat.bPvBoostEnabled, "b");
+  sendJsonSettingObj(F("satpvboostthresholdw"),     (int32_t)settings.sat.iPvBoostThresholdW, "i", 100, 10000);
+  sendJsonSettingObj(F("satpvboostholds"),          (int32_t)settings.sat.iPvBoostHoldS, "i", 30, 600);
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fPvBoostDeltaC, 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satpvboostdeltac"), tmpBuf, "f", 0, 5);
+  }
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fPvBoostMaxIndoorC, 1, 2, tmpBuf);
+    sendJsonSettingObj(F("satpvboostmaxindoorc"), tmpBuf, "f", 18, 28);
+  }
+  sendJsonSettingObj(F("satpvboostmaxdurationmin"), (int32_t)settings.sat.iPvBoostMaxDurationMin, "i", 30, 1440);
 #if defined(ESP32)
   // --- SAT BLE Sensor settings (Task #20, ESP32 only) ---
   sendJsonSettingObj(F("satbleenable"), settings.sat.bBleEnable, "b");
@@ -2962,6 +2995,9 @@ static const char* const PROGMEM knownSettings[] = {
   "satinterval", "satmanufacturer", "satmultiarea", "satmultiareacount",
   "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpresetsync", "satpresetsynctopic",
+  // TASK-640: PV-surplus setpoint boost settings
+  "satpvboostdeltac", "satpvboostenabled", "satpvboostholds",
+  "satpvboostmaxdurationmin", "satpvboostmaxindoorc", "satpvboostthresholdw",
   "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation",
   "satsolargain", "satsolarminrise", "satsolaroffset",
   "satsummerminhours", "satsummersimmer", "satsummerthreshold",

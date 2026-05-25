@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.69
+**  Version  : v2.0.0-alpha.70
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -197,6 +197,14 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool  bExternalTempValid       = false;
   bool  bExternalOutdoorValid    = false;
   uint32_t iLastControlMs        = 0;
+  // PV-surplus boost runtime state (TASK-640)
+  float    fExternalPvSurplusW      = 0.0f;   // Last received PV surplus power (W)
+  bool     bExternalPvSurplusValid  = false;  // PV surplus value is fresh and valid
+  uint32_t iExternalPvSurplusLastMs = 0;      // millis() of last PV surplus update
+  bool     bPvBoostActive           = false;  // Boost currently applied
+  uint32_t iPvBoostStartedMs        = 0;      // millis() when current hold/active period started
+  float    fPvBoostAppliedC         = 0.0f;   // Current boost applied (0 when inactive)
+  uint32_t iPvBoostCooldownMs       = 0;      // millis() when cooldown expires (0 = no cooldown)
   // Safety / fallback
   uint32_t iExternalTempLastMs   = 0;   // millis() when external indoor temp was last received
   uint32_t iExternalOutdoorLastMs = 0;  // millis() when external outdoor temp was last received
@@ -443,6 +451,13 @@ struct SATSection {
   float    fZoneAggregationHeadroom = 5.0f; // Headroom added to P75 zone aggregate (°C, default 5.0)
   // TASK-587: DS18B20 sensor-to-SAT-area mapping (area 0..3)
   char sSensorArea[4][17] = {{0}};  // Dallas address (16 hex chars + null) per area; empty = unmapped
+  // PV-surplus setpoint boost (TASK-640)
+  bool     bPvBoostEnabled        = false;   // Enable PV-surplus boost
+  uint16_t iPvBoostThresholdW     = 1500;    // Surplus threshold in W (100-10000)
+  uint16_t iPvBoostHoldS          = 120;     // Hold-time before boost activates (30-600 s)
+  float    fPvBoostDeltaC         = 1.5f;    // Temperature boost delta °C (0.5-5.0)
+  float    fPvBoostMaxIndoorC     = 23.0f;   // Indoor max during boost (18.0-28.0 °C)
+  uint16_t iPvBoostMaxDurationMin = 240;     // Max continuous boost (30-1440 min)
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning

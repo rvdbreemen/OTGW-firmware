@@ -703,6 +703,72 @@ Remember to enable `satexternaltemp` in settings for indoor readings, and to pus
 
 ---
 
+## PV-Surplus Setpoint Boost (TASK-640)
+
+When excess PV power is available, SAT can opportunistically boost the room
+target temperature to absorb that energy as thermal mass in the building. This
+trades short-term overshoot for longer-term gas savings on cold days when PV
+production happens during heating hours.
+
+### How it works
+
+1. Home Assistant (or any MQTT publisher) pushes a surplus power value in
+   Watts to `set/<nodeId>/sat/pv_surplus_w`, or POSTs to
+   `/api/v2/sat/pvsurplus`. Surplus = export power, i.e. PV production minus
+   household consumption.
+2. When `pv_surplus_w >= pv_boost_threshold_w` for `pv_boost_hold_s` seconds
+   continuously, AND the indoor temp is below `pv_boost_max_indoor_c`, SAT
+   applies an additive boost of `pv_boost_delta_c` °C to the effective room
+   target. The boost is layered on top of the active preset and comfort
+   offset; `settings.sat.fTargetTemp` itself is never mutated.
+3. Boost deactivates as soon as surplus drops below 80% of the threshold
+   (hysteresis), OR the indoor ceiling is reached, OR a safety guard trips
+   (safety_tripped, window_open, dhw_active).
+4. Stale-input expiry: if no `pv_surplus_w` update arrives within
+   `sensor_max_age` seconds (default 6 h), the value is invalidated and the
+   boost deactivates immediately.
+5. Hard cap: after `pv_boost_max_duration_min` minutes of continuous boost,
+   the boost deactivates and a 30-minute cooldown blocks re-activation. This
+   guards against runaway behavior from a stuck surplus signal.
+
+### Settings
+
+| Key | Default | Range | Purpose |
+|---|---|---|---|
+| `satpvboostenabled` | false | bool | Master enable; feature is fully inert when false |
+| `satpvboostthresholdw` | 1500 | 100-10000 W | Minimum surplus to consider boosting |
+| `satpvboostholds` | 120 | 30-600 s | Hold-time before activation (prevents flapping) |
+| `satpvboostdeltac` | 1.5 | 0.5-5.0 °C | How much to boost the target |
+| `satpvboostmaxindoorc` | 23.0 | 18.0-28.0 °C | Indoor ceiling; never boost above this |
+| `satpvboostmaxdurationmin` | 240 | 30-1440 min | Max continuous boost before cooldown |
+
+### Limits and non-goals
+
+- This is a setpoint boost only. It does NOT divert PV energy into DHW; a
+  separate DHW boost would need its own logic and is out of scope.
+- The feature does not measure PV directly. You must supply surplus from
+  somewhere (P1 meter, inverter integration, solar API).
+- The hysteresis is fixed at 80% of the threshold. The hold-time is the
+  primary tuning knob for flap protection.
+- ADR-110 records the design decisions.
+
+### HA automation example
+
+```yaml
+automation:
+  - alias: "OTGW: push PV surplus to SAT"
+    trigger:
+      - platform: state
+        entity_id: sensor.solar_surplus_w
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "set/otgw/sat/pv_surplus_w"
+          payload: "{{ [0, states('sensor.solar_surplus_w') | int] | max }}"
+```
+
+---
+
 ## References
 
 - **SAT upstream**: [github.com/Alexwijn/SAT](https://github.com/Alexwijn/SAT) — Original Home Assistant integration

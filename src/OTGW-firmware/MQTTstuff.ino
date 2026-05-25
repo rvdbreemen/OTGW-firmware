@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.69
+**  Version  : v2.0.0-alpha.70
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -625,6 +625,8 @@ bool bHAcycle = false;
 static void _satTargetTempCmd(const char* v)     { satHandleTargetTemp(v); }
 static void _satExtTempCmd(const char* v)        { satHandleExternalTemp(v); }
 static void _satExtOutdoorCmd(const char* v)     { satHandleExternalOutdoor(v); }
+static void _satPvSurplusCmd(const char* v)      { satHandlePvSurplus(v); }                  // TASK-640
+static void _satPvBoostEnabledCmd(const char* v) { satHandlePvBoostEnabled(v); }             // TASK-640
 static void _satHumidityCmd(const char* v)       { satHandleHumidity(v); }
 static void _satSunElevationCmd(const char* v)   { satHandleSunElevation(v); }
 
@@ -666,6 +668,10 @@ static const SatMqttCmdEntry kSatMqttCmds[] = {
   { "target",                 nullptr,                _satTargetTempCmd },
   { "indoor_temp",            nullptr,                _satExtTempCmd },
   { "outdoor_temp",           nullptr,                _satExtOutdoorCmd },
+  // TASK-640: PV-surplus boost. set/<nodeId>/sat/pv_surplus_w (watts),
+  //                              set/<nodeId>/sat/pv_boost_enabled (0/1).
+  { "pv_surplus_w",           nullptr,                _satPvSurplusCmd },
+  { "pv_boost_enabled",       nullptr,                _satPvBoostEnabledCmd },
   { "enabled",                nullptr,                satHandleEnabled },
   { "control_mode",           nullptr,                satHandleControlMode },
   { "preset",                 nullptr,                satHandlePreset },
@@ -740,6 +746,12 @@ static const SatMqttCmdEntry kSatMqttCmds[] = {
   { "zone_timeout_s",         "SATzonetimeout",       nullptr },
   { "solar_min_elevation",    "SATsolarminelev",      nullptr },
   { "flush_threshold_h",      "SATflushtreshold",     nullptr },
+  // TASK-640: PV-surplus boost settings (numeric set-commands).
+  { "pv_boost_threshold_w",      "SATpvboostthresholdw",   nullptr },
+  { "pv_boost_hold_s",           "SATpvboostholds",        nullptr },
+  { "pv_boost_delta_c",          "SATpvboostdeltac",       nullptr },
+  { "pv_boost_max_indoor_c",     "SATpvboostmaxindoorc",   nullptr },
+  { "pv_boost_max_duration_min", "SATpvboostmaxdurationmin", nullptr },
 
   { nullptr, nullptr, nullptr } // sentinel
 };
@@ -2055,6 +2067,9 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
   return (n > 0 && static_cast<size_t>(n) < destSize);
 }
 
+// Forward declaration — defined just below streamSatZoneDiscovery (TASK-640).
+static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &ctx);
+
 bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
 {
   if (!client.connected()) return false;
@@ -2119,6 +2134,136 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
     if (!publishZoneBinary(zoneNumber, "active", "Active", "thermostat")) return false;
     if (!publishZoneSensor(zoneNumber, "output", "Output", "thermometer", "°C", "temperature", "measurement")) return false;
     if (!publishZoneSensor(zoneNumber, "error", "Error", "thermometer", "°C", "temperature", "measurement")) return false;
+  }
+
+  // TASK-640: PV-surplus boost discovery. Chained into the zone discovery drip
+  // slot so we don't have to allocate a new pseudo-ID. The switch + 5 number
+  // entities are emitted unconditionally (so users can enable the feature from
+  // HA); the sensor / binary_sensor entities are emitted only when enabled to
+  // keep the dashboard clean for users who don't use it.
+  if (!streamSatPvBoostDiscovery(client, ctx)) return false;
+
+  return true;
+}
+
+// TASK-640: PV-surplus boost HA auto-discovery.
+// Mirrors the local-lambda pattern of streamSatZoneDiscovery: small helpers
+// stamp out sensor/binary_sensor/switch/number configs with the shared device
+// block + origin block. All entities live under the unique-id namespace
+// "<nodeId>-sat_pv_boost_*" so HA aggregates them under the OTGW device.
+static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+
+  char topic[180];
+  char payload[768];
+  char deviceBlock[256];
+
+  auto publishSensor = [&](const char *metric,
+                           const char *friendlySuffix,
+                           const char *unit,
+                           const char *deviceClass,
+                           const char *stateClass,
+                           const char *icon) -> bool {
+    if (!buildDiscoveryDeviceBlock(deviceBlock, sizeof(deviceBlock), ctx)) return false;
+    int topicLen = snprintf_P(topic, sizeof(topic),
+                              PSTR("%s/sensor/%s/sat_pv_%s/config"),
+                              ctx.haPrefix, ctx.nodeId, metric);
+    if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
+    int payloadLen = snprintf_P(payload, sizeof(payload),
+                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/pv_%s\",\"device_class\":\"%s\",\"unit_of_measurement\":\"%s\",\"state_class\":\"%s\",\"icon\":\"mdi:%s\",\"value_template\":\"{{ value }}\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
+                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, metric,
+                                ctx.hostname, friendlySuffix,
+                                ctx.mqttPubTopic, metric,
+                                deviceClass, unit, stateClass, icon, ctx.version);
+    if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
+    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    ctx.isFirstEntity = false;
+    return true;
+  };
+
+  auto publishBinary = [&](const char *metric,
+                           const char *friendlySuffix,
+                           const char *icon) -> bool {
+    if (!buildDiscoveryDeviceBlock(deviceBlock, sizeof(deviceBlock), ctx)) return false;
+    int topicLen = snprintf_P(topic, sizeof(topic),
+                              PSTR("%s/binary_sensor/%s/sat_pv_%s/config"),
+                              ctx.haPrefix, ctx.nodeId, metric);
+    if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
+    int payloadLen = snprintf_P(payload, sizeof(payload),
+                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/pv_%s\",\"pl_on\":\"true\",\"pl_off\":\"false\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
+                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, metric,
+                                ctx.hostname, friendlySuffix,
+                                ctx.mqttPubTopic, metric,
+                                icon, ctx.version);
+    if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
+    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    ctx.isFirstEntity = false;
+    return true;
+  };
+
+  auto publishSwitch = [&](const char *metric,
+                           const char *friendlySuffix,
+                           const char *icon) -> bool {
+    if (!buildDiscoveryDeviceBlock(deviceBlock, sizeof(deviceBlock), ctx)) return false;
+    int topicLen = snprintf_P(topic, sizeof(topic),
+                              PSTR("%s/switch/%s/sat_pv_%s/config"),
+                              ctx.haPrefix, ctx.nodeId, metric);
+    if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
+    int payloadLen = snprintf_P(payload, sizeof(payload),
+                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/%s\",\"cmd_t\":\"%s/sat/%s\",\"pl_on\":\"1\",\"pl_off\":\"0\",\"stat_on\":\"1\",\"stat_off\":\"0\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
+                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, metric,
+                                ctx.hostname, friendlySuffix,
+                                ctx.mqttPubTopic, metric,
+                                ctx.mqttSubTopic, metric,
+                                icon, ctx.version);
+    if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
+    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    ctx.isFirstEntity = false;
+    return true;
+  };
+
+  auto publishNumber = [&](const char *metric,
+                           const char *friendlySuffix,
+                           float minVal, float maxVal, float step,
+                           const char *unit,
+                           const char *icon) -> bool {
+    if (!buildDiscoveryDeviceBlock(deviceBlock, sizeof(deviceBlock), ctx)) return false;
+    int topicLen = snprintf_P(topic, sizeof(topic),
+                              PSTR("%s/number/%s/sat_pv_%s/config"),
+                              ctx.haPrefix, ctx.nodeId, metric);
+    if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
+    char minBuf[12], maxBuf[12], stepBuf[12];
+    dtostrf(minVal, 1, 2, minBuf);
+    dtostrf(maxVal, 1, 2, maxBuf);
+    dtostrf(step,   1, 2, stepBuf);
+    int payloadLen = snprintf_P(payload, sizeof(payload),
+                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/%s\",\"cmd_t\":\"%s/sat/%s\",\"min\":%s,\"max\":%s,\"step\":%s,\"unit_of_measurement\":\"%s\",\"mode\":\"box\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
+                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, metric,
+                                ctx.hostname, friendlySuffix,
+                                ctx.mqttPubTopic, metric,
+                                ctx.mqttSubTopic, metric,
+                                minBuf, maxBuf, stepBuf, unit, icon, ctx.version);
+    if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
+    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    ctx.isFirstEntity = false;
+    return true;
+  };
+
+  // Always-on entities: switch + 5 numbers (so HA users can enable from UI).
+  if (!publishSwitch("boost_enabled", "PV_Boost_Enabled", "solar-power-variant")) return false;
+  if (!publishNumber("boost_threshold_w",      "PV_Boost_Threshold",     100, 10000, 100, "W",   "flash"))         return false;
+  if (!publishNumber("boost_hold_s",           "PV_Boost_Hold",           30,   600,  10, "s",   "timer-sand"))    return false;
+  if (!publishNumber("boost_delta_c",          "PV_Boost_Delta",         0.5,    5,  0.1, "°C",  "thermometer-plus")) return false;
+  if (!publishNumber("boost_max_indoor_c",     "PV_Boost_Max_Indoor",     18,    28, 0.5, "°C",  "home-thermometer")) return false;
+  if (!publishNumber("boost_max_duration_min", "PV_Boost_Max_Duration",   30,  1440,  10, "min", "timer"))         return false;
+
+  // Telemetry entities: only when feature is enabled, keeps dashboard clean.
+  if (settings.sat.bPvBoostEnabled) {
+    if (!publishSensor("surplus_w",     "Surplus",        "W",  "power",       "measurement", "solar-power")) return false;
+    if (!publishBinary("boost_active",  "Boost_Active",                                       "fire")) return false;
+    if (!publishSensor("boost_applied_c","Boost_Applied", "°C", "temperature", "measurement", "thermometer-chevron-up")) return false;
   }
 
   return true;

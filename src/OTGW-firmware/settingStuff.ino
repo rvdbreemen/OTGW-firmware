@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.69
+**  Version  : v2.0.0-alpha.70
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -373,7 +373,14 @@ void writeSettings(bool show)
   writeJsonStringKV(file, F("SATsensorarea0"), settings.sat.sSensorArea[0], true);
   writeJsonStringKV(file, F("SATsensorarea1"), settings.sat.sSensorArea[1], true);
   writeJsonStringKV(file, F("SATsensorarea2"), settings.sat.sSensorArea[2], true);
-  writeJsonStringKV(file, F("SATsensorarea3"), settings.sat.sSensorArea[3], false);
+  writeJsonStringKV(file, F("SATsensorarea3"), settings.sat.sSensorArea[3], true);
+  // PV-surplus setpoint boost (TASK-640)
+  writeJsonBoolKV (file, F("SATpvboostenabled"),        settings.sat.bPvBoostEnabled,        true);
+  writeJsonIntKV  (file, F("SATpvboostthresholdw"),     settings.sat.iPvBoostThresholdW,     true);
+  writeJsonIntKV  (file, F("SATpvboostholds"),          settings.sat.iPvBoostHoldS,          true);
+  writeJsonFloatKV(file, F("SATpvboostdeltac"),         settings.sat.fPvBoostDeltaC,         true);
+  writeJsonFloatKV(file, F("SATpvboostmaxindoorc"),     settings.sat.fPvBoostMaxIndoorC,     true);
+  writeJsonIntKV  (file, F("SATpvboostmaxdurationmin"), settings.sat.iPvBoostMaxDurationMin, false);
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
@@ -972,6 +979,20 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATsensorarea1")) == 0) strlcpy(settings.sat.sSensorArea[1], newValue, sizeof(settings.sat.sSensorArea[1]));
   else if (strcasecmp_P(field, PSTR("SATsensorarea2")) == 0) strlcpy(settings.sat.sSensorArea[2], newValue, sizeof(settings.sat.sSensorArea[2]));
   else if (strcasecmp_P(field, PSTR("SATsensorarea3")) == 0) strlcpy(settings.sat.sSensorArea[3], newValue, sizeof(settings.sat.sSensorArea[3]));
+  // PV-surplus setpoint boost (TASK-640)
+  else if (strcasecmp_P(field, PSTR("SATpvboostenabled")) == 0) {
+    settings.sat.bPvBoostEnabled = (strcasecmp_P(newValue, PSTR("true")) == 0 || atoi(newValue) != 0);
+    if (!settings.sat.bPvBoostEnabled) {
+      state.sat.bPvBoostActive = false;
+      state.sat.fPvBoostAppliedC = 0.0f;
+      state.sat.iPvBoostStartedMs = 0;
+    }
+  }
+  else if (strcasecmp_P(field, PSTR("SATpvboostthresholdw")) == 0)     settings.sat.iPvBoostThresholdW = (uint16_t)constrain(atoi(newValue), 100, 10000);
+  else if (strcasecmp_P(field, PSTR("SATpvboostholds")) == 0)          settings.sat.iPvBoostHoldS = (uint16_t)constrain(atoi(newValue), 30, 600);
+  else if (strcasecmp_P(field, PSTR("SATpvboostdeltac")) == 0)         settings.sat.fPvBoostDeltaC = constrain(strtof(newValue, nullptr), 0.5f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATpvboostmaxindoorc")) == 0)     settings.sat.fPvBoostMaxIndoorC = constrain(strtof(newValue, nullptr), 18.0f, 28.0f);
+  else if (strcasecmp_P(field, PSTR("SATpvboostmaxdurationmin")) == 0) settings.sat.iPvBoostMaxDurationMin = (uint16_t)constrain(atoi(newValue), 30, 1440);
 #if defined(ESP32)
   // --- BLE temperature sensor settings (Task #20) ---
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);

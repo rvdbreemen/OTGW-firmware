@@ -2334,6 +2334,38 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
+  /v2/sat/pvsurplus:
+    post:
+      tags:
+        - SAT
+      summary: Push PV-surplus power (TASK-640)
+      description: |
+        Injects a PV-surplus power reading in Watts. When the surplus exceeds the
+        configured threshold for the hold-time and feature is enabled
+        (`satpvboostenabled`), SAT applies an additive boost of
+        `satpvboostdeltac` °C to the effective target. Reading expires after
+        `sensor_max_age` (default 6 h). Body is a plain numeric string or JSON
+        `{"value":"1800"}`. Range: 0 to 50000 W.
+      operationId: setSatPvSurplus
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "1800"
+      responses:
+        '200':
+          description: PV-surplus value accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
   /v2/sat/reset_integral:
     post:
       tags:

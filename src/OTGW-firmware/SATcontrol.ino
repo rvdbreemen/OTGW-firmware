@@ -1078,6 +1078,121 @@ bool satHandleExternalTemp(const char* value)
   return false;
 }
 
+// --- PV-surplus boost handlers (TASK-640) ---
+bool satHandlePvSurplus(const char* value)
+{
+  if (!value || !*value) return false;
+  char* endp = nullptr;
+  float w = strtof(value, &endp);
+  if (endp == value || *endp != '\0') return false;  // non-numeric input
+  if (w < 0.0f || w > 50000.0f) return false;
+  state.sat.fExternalPvSurplusW = w;
+  state.sat.bExternalPvSurplusValid = true;
+  state.sat.iExternalPvSurplusLastMs = millis();
+  SATDebugTf(PSTR("SAT: PV surplus set to %.0fW\r\n"), w);
+  return true;
+}
+
+bool satHandlePvBoostEnabled(const char* value)
+{
+  if (!value || !*value) return false;
+  bool en = (strcasecmp_P(value, PSTR("true")) == 0 || atoi(value) != 0);
+  settings.sat.bPvBoostEnabled = en;
+  if (!en) {
+    state.sat.bPvBoostActive = false;
+    state.sat.fPvBoostAppliedC = 0.0f;
+    state.sat.iPvBoostStartedMs = 0;
+  }
+  SATDebugTf(PSTR("SAT: PV boost %s\r\n"), en ? "enabled" : "disabled");
+  return true;
+}
+
+// satUpdatePvBoost — TASK-640. Called once per control cycle BEFORE the
+// heating-curve calculation. Owns activation/deactivation logic including:
+//   - stale-input expiry (reuses iSensorMaxAgeS)
+//   - hold-time before activation
+//   - 20% hysteresis on deactivation
+//   - safety guards (safety_tripped, window_open, dhw_active)
+//   - indoor temp ceiling
+//   - max continuous duration + 30-min cooldown
+// Never mutates settings.sat.fTargetTemp; only sets state.sat.fPvBoostAppliedC
+// which is added to effectiveTarget by the caller.
+static void satUpdatePvBoost()
+{
+  if (!settings.sat.bPvBoostEnabled) {
+    state.sat.bPvBoostActive = false;
+    state.sat.fPvBoostAppliedC = 0.0f;
+    state.sat.iPvBoostStartedMs = 0;
+    return;
+  }
+
+  uint32_t now = millis();
+
+  // Stale-input expiry (reuses iSensorMaxAgeS for symmetry with other external inputs)
+  if (state.sat.bExternalPvSurplusValid &&
+      (now - state.sat.iExternalPvSurplusLastMs) > ((uint32_t)settings.sat.iSensorMaxAgeS * 1000UL)) {
+    state.sat.bExternalPvSurplusValid = false;
+    SATDebugTln(F("SAT: PV surplus stale, deactivating boost"));
+  }
+
+  // Cooldown guard (30-min cooldown after max-duration reached)
+  if (state.sat.iPvBoostCooldownMs != 0 && now < state.sat.iPvBoostCooldownMs) {
+    state.sat.bPvBoostActive = false;
+    state.sat.fPvBoostAppliedC = 0.0f;
+    return;
+  }
+  if (state.sat.iPvBoostCooldownMs != 0 && now >= state.sat.iPvBoostCooldownMs) {
+    state.sat.iPvBoostCooldownMs = 0;  // cooldown expired
+  }
+
+  // Safety guards: no boost when safety tripped, window open, or DHW priority
+  if (state.sat.bSafetyTripped || state.sat.bWindowOpen || state.sat.bDhwActive) {
+    state.sat.bPvBoostActive = false;
+    state.sat.fPvBoostAppliedC = 0.0f;
+    state.sat.iPvBoostStartedMs = 0;
+    return;
+  }
+
+  float surplus = state.sat.bExternalPvSurplusValid ? state.sat.fExternalPvSurplusW : 0.0f;
+  float threshold = (float)settings.sat.iPvBoostThresholdW;
+  float roomTemp = satGetRoomTemp();
+  bool atCeiling = (!isnan(roomTemp) && roomTemp >= settings.sat.fPvBoostMaxIndoorC);
+
+  if (!state.sat.bPvBoostActive) {
+    // Deactivated: check if conditions are met to start the hold-time
+    if (surplus >= threshold && !atCeiling) {
+      if (state.sat.iPvBoostStartedMs == 0)
+        state.sat.iPvBoostStartedMs = now;
+      if ((now - state.sat.iPvBoostStartedMs) >= ((uint32_t)settings.sat.iPvBoostHoldS * 1000UL)) {
+        state.sat.bPvBoostActive = true;
+        state.sat.fPvBoostAppliedC = settings.sat.fPvBoostDeltaC;
+        SATDebugTf(PSTR("SAT: PV boost activated (+%.1fC, surplus=%.0fW)\r\n"),
+                   settings.sat.fPvBoostDeltaC, surplus);
+      }
+    } else {
+      state.sat.iPvBoostStartedMs = 0;  // surplus dropped, reset hold-time
+    }
+  } else {
+    // Active: deactivate if surplus dropped below 80% threshold or ceiling reached
+    if (surplus < (threshold * 0.8f) || atCeiling) {
+      state.sat.bPvBoostActive = false;
+      state.sat.fPvBoostAppliedC = 0.0f;
+      state.sat.iPvBoostStartedMs = 0;
+      SATDebugTln(F("SAT: PV boost deactivated"));
+    } else {
+      // Max-duration cap
+      uint32_t maxMs = (uint32_t)settings.sat.iPvBoostMaxDurationMin * 60000UL;
+      if ((now - state.sat.iPvBoostStartedMs) >= maxMs) {
+        state.sat.bPvBoostActive = false;
+        state.sat.fPvBoostAppliedC = 0.0f;
+        state.sat.iPvBoostCooldownMs = now + 1800000UL;  // 30-min cooldown
+        state.sat.iPvBoostStartedMs = 0;
+        SATDebugTln(F("SAT: PV boost max-duration reached, 30-min cooldown"));
+      }
+    }
+  }
+}
+
 bool satHandleExternalOutdoor(const char* value)
 {
   if (!value || !*value) return false;
@@ -1714,6 +1829,12 @@ void satSendStatusJSON()
   satSendJsonFloat(F("max_setpoint_system"), satGetMaxSetpoint(), 1);
   sendJsonMapEntry(F("external_temp_valid"),  state.sat.bExternalTempValid);
   sendJsonMapEntry(F("external_outdoor_valid"), state.sat.bExternalOutdoorValid);
+  // PV-surplus boost (TASK-640)
+  satSendJsonFloat(F("pv_surplus_w"),          state.sat.fExternalPvSurplusW, 0);
+  sendJsonMapEntry(F("pv_surplus_valid"),      state.sat.bExternalPvSurplusValid);
+  sendJsonMapEntry(F("pv_boost_active"),       state.sat.bPvBoostActive);
+  satSendJsonFloat(F("pv_boost_applied_c"),    state.sat.fPvBoostAppliedC, 1);
+  sendJsonMapEntry(F("pv_boost_enabled"),      settings.sat.bPvBoostEnabled);
   sendJsonMapEntry(F("safety_tripped"),       state.sat.bSafetyTripped);
   sendJsonMapEntry(F("valves_open"),            state.sat.bValvesOpen);
   sendJsonMapEntry(F("window_open"),           state.sat.bWindowOpen);
@@ -2050,6 +2171,34 @@ void satPublishMQTT()
 
   // Window detection
   sendMQTTData(F("sat/window_open"), state.sat.bWindowOpen ? "true" : "false", false);
+
+  // PV-surplus boost (TASK-640)
+  // Runtime telemetry only published when feature is enabled — keeps the
+  // broker quiet for the 99% of users who don't use it.
+  if (settings.sat.bPvBoostEnabled) {
+    char pvBuf[12];
+    dtostrf(state.sat.fExternalPvSurplusW, 1, 0, pvBuf);
+    sendMQTTData(F("sat/pv_surplus_w"), pvBuf, true);
+    sendMQTTData(F("sat/pv_surplus_valid"), state.sat.bExternalPvSurplusValid ? "true" : "false", true);
+    sendMQTTData(F("sat/pv_boost_active"), state.sat.bPvBoostActive ? "true" : "false", true);
+    dtostrf(state.sat.fPvBoostAppliedC, 1, 1, pvBuf);
+    sendMQTTData(F("sat/pv_boost_applied_c"), pvBuf, true);
+  }
+  // Settings: always published so HA discovery entities have a state topic.
+  {
+    char sBuf[12];
+    sendMQTTData(F("sat/pv_boost_enabled"), settings.sat.bPvBoostEnabled ? "1" : "0", true);
+    snprintf_P(sBuf, sizeof(sBuf), PSTR("%u"), (unsigned)settings.sat.iPvBoostThresholdW);
+    sendMQTTData(F("sat/pv_boost_threshold_w"), sBuf, true);
+    snprintf_P(sBuf, sizeof(sBuf), PSTR("%u"), (unsigned)settings.sat.iPvBoostHoldS);
+    sendMQTTData(F("sat/pv_boost_hold_s"), sBuf, true);
+    dtostrf(settings.sat.fPvBoostDeltaC, 1, 1, sBuf);
+    sendMQTTData(F("sat/pv_boost_delta_c"), sBuf, true);
+    dtostrf(settings.sat.fPvBoostMaxIndoorC, 1, 1, sBuf);
+    sendMQTTData(F("sat/pv_boost_max_indoor_c"), sBuf, true);
+    snprintf_P(sBuf, sizeof(sBuf), PSTR("%u"), (unsigned)settings.sat.iPvBoostMaxDurationMin);
+    sendMQTTData(F("sat/pv_boost_max_duration_min"), sBuf, true);
+  }
 
   // Pressure monitoring
   { char pBuf[12];
@@ -3777,7 +3926,16 @@ void satControlLoop()
     state.sat.iHumidityLastMs = state.sat.weather.iLastUpdateMs;
   }
   satUpdateComfort();
+
+  // --- PV-surplus setpoint boost (TASK-640) ---
+  // Run before heating-curve calc so the boost is reflected in this cycle.
+  // satUpdatePvBoost() never mutates settings.sat.fTargetTemp; the boost is
+  // additive on effectiveTarget only.
+  satUpdatePvBoost();
+
   float effectiveTarget = targetTemp + state.sat.fComfortOffset;
+  if (state.sat.bPvBoostActive)
+    effectiveTarget += state.sat.fPvBoostAppliedC;
 
   // --- Calculate heating curve ---
   float curveValue = satCalcHeatingCurve(effectiveTarget, outsideTemp);

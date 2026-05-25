@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.68
+**  Version  : v2.0.0-alpha.70
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3436,6 +3436,51 @@ function satPage() {
   }
 } // satPage()
 
+// TASK-640: refresh the PV-boost status badge in the SAT dashboard summary.
+// Best-effort: silently no-ops if the summary container isn't present in the
+// active layout. Polls /api/v2/sat/status, finds (or creates) a pill element
+// inside .sat-status-summary, and renders one of three states:
+//   - active:  "PV boost: +X.X°C active"
+//   - armed:   "PV boost: armed (surplus N W < T W threshold)"
+//   - off:     pill removed (feature disabled or no data)
+function refreshSatPvBoostBadge() {
+  var container = document.querySelector('.sat-status-summary');
+  if (!container) return;
+  fetch(APIGW + 'v2/sat/status')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(json) {
+      if (!json) return;
+      var pill = container.querySelector('#sat-pv-boost-badge');
+      var enabled = !!json.pv_boost_enabled;
+      var active = !!json.pv_boost_active;
+      var applied = Number(json.pv_boost_applied_c || 0);
+      var surplus = Number(json.pv_surplus_w || 0);
+      var threshold = Number(json.pv_boost_threshold_w || 0); // present in /settings, not /status
+      // /status doesn't carry threshold; fall back to the surplus-only message.
+      if (!enabled) {
+        if (pill && pill.parentNode) pill.parentNode.removeChild(pill);
+        return;
+      }
+      if (!pill) {
+        pill = document.createElement('span');
+        pill.id = 'sat-pv-boost-badge';
+        pill.className = 'ds-pill';
+        pill.style.marginLeft = '8px';
+        container.appendChild(pill);
+      }
+      if (active) {
+        pill.textContent = 'PV boost: +' + applied.toFixed(1) + '°C active';
+        pill.style.background = '#f5b300';
+        pill.style.color = '#000';
+      } else {
+        pill.textContent = 'PV boost: armed (surplus ' + Math.round(surplus) + 'W)';
+        pill.style.background = '';
+        pill.style.color = '';
+      }
+    })
+    .catch(function() {});
+}
+
 function satSettingsPage() {
   disconnectOTLogWebSocket();
   stopOTmonitorPolling();
@@ -3443,6 +3488,7 @@ function satSettingsPage() {
   refreshDevTime();
   setActivePageSection('displaySATSettingsPage');
   refreshSATSettings();
+  refreshSatPvBoostBadge();  // TASK-640
 } // satSettingsPage()
 
 // ============================================================================
@@ -3575,6 +3621,20 @@ var SAT_SETTINGS_GROUPS = [
     title: 'Energy',
     fields: [
       { key: 'satboilercapacity', label: 'Boiler Capacity', type: 'f', unit: 'kW', min: 1.0, max: 100.0, step: 0.5 }
+    ]
+  },
+  {
+    // TASK-640: PV-surplus opportunistic setpoint boost.
+    // Disabled by default; HA-side automation publishes pv_surplus_w.
+    id: 'sat-grp-pvboost',
+    title: 'PV Surplus Boost',
+    fields: [
+      { key: 'satpvboostenabled',        label: 'PV Boost Enable',     type: 'b' },
+      { key: 'satpvboostthresholdw',     label: 'Surplus Threshold',   type: 'i', unit: 'W',   min: 100,  max: 10000, step: 100 },
+      { key: 'satpvboostholds',          label: 'Hold Time',           type: 'i', unit: 's',   min: 30,   max: 600,   step: 10  },
+      { key: 'satpvboostdeltac',         label: 'Boost Delta',         type: 'f', unit: '°C', min: 0.5, max: 5.0, step: 0.1 },
+      { key: 'satpvboostmaxindoorc',     label: 'Max Indoor Ceiling',  type: 'f', unit: '°C', min: 18.0, max: 28.0, step: 0.5 },
+      { key: 'satpvboostmaxdurationmin', label: 'Max Boost Duration',  type: 'i', unit: 'min', min: 30,   max: 1440,  step: 10  }
     ]
   },
   {
