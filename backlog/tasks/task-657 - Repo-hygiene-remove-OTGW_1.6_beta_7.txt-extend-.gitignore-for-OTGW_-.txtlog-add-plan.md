@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-22 05:52'
-updated_date: '2026-05-22 06:24'
+updated_date: '2026-05-25 21:54'
 labels:
   - repo-hygiene
 dependencies: []
@@ -25,9 +25,9 @@ An 830 KB field-test debug log (OTGW_1.6_beta_7.txt, commit 67e63d97 'Add files 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 git rm OTGW_1.6_beta_7.txt; commit removes the file from the working tree
-- [ ] #2 .gitignore extended with /OTGW_*.txt and /OTGW_*.log (anchored to repo root)
-- [ ] #3 .gitignore extended with /plan/ to prevent future web-UI bulk uploads
-- [ ] #4 No previously-tracked file is shadowed by the new ignore patterns (git ls-files | grep -E 'OTGW_.*\.(txt|log)' returns empty before commit)
-- [ ] #5 Commit cites TASK-635 in subject for traceability
+- [x] #1 git rm OTGW_1.6_beta_7.txt; commit removes the file from the working tree
+- [x] #2 .gitignore extended with /OTGW_*.txt and /OTGW_*.log (anchored to repo root)
+- [x] #3 .gitignore extended with /plan/ to prevent future web-UI bulk uploads
+- [x] #4 No previously-tracked file is shadowed by the new ignore patterns (git ls-files | grep -E 'OTGW_.*\.(txt|log)' returns empty before commit)
+- [x] #5 Commit cites TASK-635 in subject for traceability
 <!-- AC:END -->
