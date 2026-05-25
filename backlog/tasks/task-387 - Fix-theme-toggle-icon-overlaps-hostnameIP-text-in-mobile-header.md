@@ -4,7 +4,7 @@ title: 'Fix: theme toggle icon overlaps hostname+IP text in mobile header'
 status: To Do
 assignee: []
 created_date: '2026-04-23 07:43'
-updated_date: '2026-05-22 06:41'
+updated_date: '2026-05-25 22:30'
 labels:
   - bug
   - ui
@@ -24,9 +24,9 @@ Discord #beta-testing (sergeantd, 2026-04-23 07:11Z, screenshot attached): on mo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Theme toggle no longer overlaps the hostname/IP text on mobile viewports (<=600px)
-- [ ] #2 Toggle remains reachable and tappable at the same visual location (top-right of header)
-- [ ] #3 Desktop layout (>600px) unchanged
+- [x] #1 Theme toggle no longer overlaps the hostname/IP text on mobile viewports (<=600px)
+- [x] #2 Toggle remains reachable and tappable at the same visual location (top-right of header)
+- [x] #3 Desktop layout (>600px) unchanged
 - [ ] #4 Tested on Android Chrome and iOS Safari
 <!-- AC:END -->
 
