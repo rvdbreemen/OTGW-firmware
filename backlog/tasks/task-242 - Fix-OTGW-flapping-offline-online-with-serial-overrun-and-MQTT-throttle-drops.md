@@ -1,7 +1,7 @@
 ---
 id: TASK-242
 title: 'Fix: OTGW flapping offline/online with serial overrun and MQTT throttle drops'
-status: In Progress
+status: Done
 assignee:
   - '@number3nl'
 created_date: '2026-04-10 20:34'
