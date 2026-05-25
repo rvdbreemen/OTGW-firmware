@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-25 20:39'
-updated_date: '2026-05-25 20:43'
+updated_date: '2026-05-25 20:45'
 labels:
   - bug
   - webui
@@ -38,3 +38,9 @@ Reported by Simon Templar on #beta-testing (2026-05-25) running beta.21. The Sta
 <!-- SECTION:PLAN:BEGIN -->
 1. Swap Description (200px fixed) and Value (auto) column widths in .ot-stats-table\n2. Description krijgt auto (groeit mee), Value krijgt 180px fixed — logischer want values zijn kort (23.5 C, ON, 107 hrs)\n3. CSS-only change in index.css
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented: swapped Description (was 200px) en Value (was auto) in .ot-stats-table CSS — Description krijgt nu auto (groeit mee met tabel), Value krijgt 180px fixed. index.css alleen.
+<!-- SECTION:NOTES:END -->
