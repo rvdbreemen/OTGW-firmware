@@ -1,9 +1,11 @@
 ---
 id: TASK-627
 title: 'feat-2.0.0: port TASK-626 — MQTT proxy-answer routing fix'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-19 16:11'
+updated_date: '2026-05-25 22:56'
 labels:
   - mqtt
   - routing
