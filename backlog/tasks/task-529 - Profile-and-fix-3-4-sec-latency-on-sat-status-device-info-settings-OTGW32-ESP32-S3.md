@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-03 18:51'
-updated_date: '2026-05-25 22:16'
+updated_date: '2026-05-25 22:17'
 labels:
   - performance
   - esp32
@@ -137,3 +137,20 @@ Added coalescing TX buffer to jsonStuff.ino (#ifdef ESP32 only). Static 4096-byt
 
 ADR-109 drafted (docs/adr/ADR-109-esp32-rest-response-coalescing-buffer.md). ACs 1/4/5/9 closed offline. ACs 2/3/6/7/8 require hardware validation by SergeantD on current alpha build.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Identified and documented the root cause of 3-4s REST latency on ESP32-S3 (OTGW32).
+
+Root cause: sync WebServer TCP flush costs ~13ms/call on ESP32 vs ~1.2ms on ESP8266 (FreeRTOS/lwIP scheduling overhead). Original streaming helpers called sendContent() per JSON entry, producing 300-400 flushes per response.
+
+Fix already in codebase: 4KB static coalescing buffer (sTxBuf, jsonStuff.ino:197) under #ifdef ESP32 guard. restTxAppend() accumulates all JSON content; restFlushTxBuf() drains at sendEndJsonMap/sendEndJsonObj. Expected: 400 flushes -> ~4 flushes -> T_send ~52ms vs ~3.8s baseline.
+
+Instrumentation: state.restperf (T_total, T_send, T_render, chunk_count) exposed via /api/v2/device/info.
+
+ADR-109 written: documents AsyncWebServer rejection and buffered-coalescing decision.
+
+ACs closed offline: #1 (instrumentation), #4 (bottleneck: TCP flush), #5 (no AsyncWebServer), #9 (ADR-109 Proposed).
+ACs pending hardware: #2 (reproduce baseline), #3 (isolated measurement), #6 (<500ms verify), #7 (ESP8266 no-regression runtime), #8 (browser F12).
+<!-- SECTION:FINAL_SUMMARY:END -->
