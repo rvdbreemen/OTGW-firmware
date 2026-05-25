@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-14 16:57'
-updated_date: '2026-05-14 17:00'
+updated_date: '2026-05-25 22:14'
 labels:
   - mqtt
   - bug
@@ -33,7 +33,7 @@ Scope: src/OTGW-firmware/OTGW-Core.ino:4109-4116 only. No change to drip loop, F
 <!-- AC:BEGIN -->
 - [x] #1 JIT branch in processOT() (OTGW-Core.ino:4109-4116) gates setMQTTConfigPending on a hasConfig predicate (readSensorIndex != NONE || readBinSensorIndex != NONE || id == 0 || id == 27)
 - [x] #2 doAutoConfigure (F path) behaviour unchanged: markAllMQTTConfigPending still publishes all known IDs
-- [ ] #3 Build green: python build.py --firmware exits 0
+- [x] #3 Build green: python build.py --firmware exits 0
 - [x] #4 Evaluator green: python evaluate.py --quick shows no new failures vs baseline
 - [x] #5 Version prerelease bumped (beta.3 → beta.4) via bin/bump-prerelease.sh; version.h + data/version.hash staged
 - [x] #6 Commit message follows project convention; mentions JIT phantom-ID stall + ADR-073 reference
