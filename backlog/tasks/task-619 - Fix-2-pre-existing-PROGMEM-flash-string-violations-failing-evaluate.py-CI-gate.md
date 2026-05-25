@@ -4,6 +4,7 @@ title: Fix 2 pre-existing PROGMEM flash-string violations failing evaluate.py CI
 status: To Do
 assignee: []
 created_date: '2026-05-17 13:23'
+updated_date: '2026-05-25 22:35'
 labels:
   - bug
   - firmware
@@ -20,9 +21,9 @@ python evaluate.py --quick fails the '[PROGMEM] Flash string compliance' check w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The 2 PROGMEM violations flagged by 'python evaluate.py --quick' on dev are located and their file:line documented in the task implementation notes
-- [ ] #2 Each violation fixed so the string literal is stored in flash per the project PROGMEM rules, with no functional/behavioural change
-- [ ] #3 'python evaluate.py --quick' reports 0 failed checks on dev (the [PROGMEM] Flash string compliance check passes)
-- [ ] #4 'python build.py --firmware' exits 0 (firmware compiles clean)
+- [x] #1 The 2 PROGMEM violations flagged by 'python evaluate.py --quick' on dev are located and their file:line documented in the task implementation notes
+- [x] #2 Each violation fixed so the string literal is stored in flash per the project PROGMEM rules, with no functional/behavioural change
+- [x] #3 'python evaluate.py --quick' reports 0 failed checks on dev (the [PROGMEM] Flash string compliance check passes)
+- [x] #4 'python build.py --firmware' exits 0 (firmware compiles clean)
 - [ ] #5 The implementing commit bumps _VERSION_PRERELEASE per the versioning policy (staged paths include src/OTGW-firmware/**)
 <!-- AC:END -->
