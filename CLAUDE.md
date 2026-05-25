@@ -44,6 +44,16 @@ Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. "Builds
 
 **Known bug:** `backlog task list` returns empty. Use `backlog task <id> --plain` or read `backlog/tasks/` directly.
 
+## Task pickup (MANDATORY)
+
+**When picking up any task from the backlog — whether newly created or already existing — the first action before any code, research, or file reading is:**
+
+```bash
+backlog task edit <id> -s "In Progress" -a @claude
+```
+
+This makes the task visible in the correct board column immediately. Skipping this step leaves the task in "To Do" while it is actually being worked on, which creates false visibility for the user and breaks board accuracy.
+
 ## Auto-advance to next task (project policy)
 
 After completing a task (or reaching a blocking state with no self-verifiable ACs remaining), **immediately analyse the backlog and pick up the highest-priority actionable task** without waiting for the user to prompt. Apply the following selection order:
