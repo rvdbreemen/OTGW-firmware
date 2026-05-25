@@ -30,3 +30,9 @@ Roughly 70% of the 50 dev commits reference a PR number (#576, #594, #596, #598,
 - [x] #4 core.hooksPath documented in CLAUDE.md / .githooks/README so new clones pick the hook up
 - [x] #5 Self-test commit: a commit with no TASK ref is blocked; same commit with TASK ref or exemption tag passes
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+commit-msg hook installed at .githooks/commit-msg. Enforces TASK-NNN reference for commits touching src/OTGW-firmware/**, src/libraries/**, docs/**, backlog/**. Exemptions: [no-task] tag, chore(housekeeping|release|meta|daily-report): prefix. Bypass: OTGW_TASK_HOOK_DISABLE=1. core.hooksPath=.githooks documented in .githooks/README.md and CLAUDE.md. Hook verified active in session — commits without TASK refs are blocked.
+<!-- SECTION:FINAL_SUMMARY:END -->
