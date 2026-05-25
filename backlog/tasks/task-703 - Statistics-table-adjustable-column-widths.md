@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-25 17:16'
-updated_date: '2026-05-25 22:55'
+updated_date: '2026-05-25 23:03'
 labels:
   - ui
   - enhancement
@@ -21,7 +21,7 @@ Simon Templar (beta.21 feedback): Description column is too small, Value column 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Column boundary in Statistics table is draggable (mouse drag on column header edge)
-- [ ] #2 Column width preference is persisted via localStorage so it survives page reload
-- [ ] #3 Works in Chrome, Firefox, Safari (latest-2)
+- [x] #1 Column boundary in Statistics table is draggable (mouse drag on column header edge)
+- [x] #2 Column width preference is persisted via localStorage so it survives page reload
+- [x] #3 Works in Chrome, Firefox, Safari (latest-2)
 <!-- AC:END -->
