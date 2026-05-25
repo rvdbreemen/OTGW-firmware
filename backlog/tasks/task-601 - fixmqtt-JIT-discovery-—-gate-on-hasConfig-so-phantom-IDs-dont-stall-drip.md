@@ -1,7 +1,7 @@
 ---
 id: TASK-601
 title: 'fix(mqtt): JIT discovery — gate on hasConfig so phantom IDs don''t stall drip'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-14 16:57'
