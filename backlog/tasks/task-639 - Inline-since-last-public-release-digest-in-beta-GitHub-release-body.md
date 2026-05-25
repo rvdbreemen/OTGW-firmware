@@ -1,11 +1,11 @@
 ---
 id: TASK-639
 title: Inline 'since last public release' digest in beta GitHub release body
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-20 15:36'
-updated_date: '2026-05-25 20:49'
+updated_date: '2026-05-25 20:51'
 labels:
   - release
   - docs
