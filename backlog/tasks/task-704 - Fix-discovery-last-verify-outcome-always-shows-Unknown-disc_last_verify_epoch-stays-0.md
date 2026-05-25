@@ -6,11 +6,16 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-05-25 20:34'
+updated_date: '2026-05-25 20:34'
 labels:
   - bug
   - mqtt
   - discovery
 dependencies: []
+references:
+  - 'Discord #beta-testing'
+  - user crashevans
+  - '2026-05-25'
 priority: medium
 ---
 
