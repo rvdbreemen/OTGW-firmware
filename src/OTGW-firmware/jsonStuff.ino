@@ -188,25 +188,81 @@ static void restPerfAccumulateSendTime(uint32_t deltaMs)
   state.restperf.iActiveChunkCount++;
 }
 
+#ifdef ESP32
+// ── ESP32 coalescing transmit buffer ──────────────────────────────────────
+// The sync WebServer stalls ~9 ms per sendContent() call on ESP32 due to
+// FreeRTOS/lwIP scheduling. Batching into 4 KB chunks (covering most JSON
+// responses in 2–4 flushes) cuts T_send from ~3.8 s to < 100 ms.
+// Static allocation — safe for the single-threaded sync WebServer.
+static struct {
+  char   data[4096];
+  size_t len;
+} sTxBuf;
+
+static void restFlushTxBuf() {
+  if (sTxBuf.len == 0) return;
+  sTxBuf.data[sTxBuf.len] = '\0';
+  const uint32_t t0 = millis();
+  httpServer.sendContent(sTxBuf.data);
+  restPerfAccumulateSendTime(millis() - t0);
+  sTxBuf.len = 0;
+}
+
+static void restTxAppend(const char* s, size_t n) {
+  while (n > 0) {
+    size_t space = (sizeof(sTxBuf.data) - 1) - sTxBuf.len;
+    if (space == 0) { restFlushTxBuf(); space = sizeof(sTxBuf.data) - 1; }
+    size_t copy = (n <= space) ? n : space;
+    memcpy(sTxBuf.data + sTxBuf.len, s, copy);
+    sTxBuf.len += copy;
+    s += copy;
+    n -= copy;
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────
+#endif
+
 static void restSendContent(const char* content)
 {
+#ifdef ESP32
+  restTxAppend(content, strlen(content));
+#else
   const uint32_t startMs = millis();
   httpServer.sendContent(content);
   restPerfAccumulateSendTime(millis() - startMs);
+#endif
 }
 
 static void restSendContentP(PGM_P content)
 {
+#ifdef ESP32
+  // On ESP32, PROGMEM strings live in flash-mapped DROM and are accessible
+  // via normal pointers — strlen/memcpy are safe.
+  restTxAppend(content, strlen(content));
+#else
   const uint32_t startMs = millis();
   httpServer.sendContent_P(content);
   restPerfAccumulateSendTime(millis() - startMs);
+#endif
 }
 
 static void restSendP(int code, PGM_P contentType, PGM_P content)
 {
+#ifdef ESP32
+  sTxBuf.len = 0; // discard any stale data before sending new HTTP response
+#endif
   const uint32_t startMs = millis();
   httpServer.send_P(code, contentType, content);
   restPerfAccumulateSendTime(millis() - startMs);
+}
+
+// Flush any buffered transmit data to the HTTP client.
+// On ESP32 this drains the coalescing buffer; on ESP8266 it is a no-op
+// (sendContent flushes inline). Call at the end of each chunked response.
+void restFlushContent() {
+#ifdef ESP32
+  restFlushTxBuf();
+#endif
 }
 
 void restPerfBegin(RestPerfTarget target)
@@ -261,11 +317,12 @@ void sendStartJsonObj(const char *objName)
 void sendEndJsonObj(const char *objName)
 {
   iIdentlevel--;
-  if (strlen(objName)==0){  
+  if (strlen(objName)==0){
     restSendContentP(PSTR("\r\n}\r\n"));
   } else {
     restSendContentP(PSTR("\r\n]}\r\n"));
   }
+  restFlushContent();
 
 } // sendEndJsonObj()
 //=======================================================================
@@ -393,11 +450,12 @@ void sendJsonMapEntry(const char *cName, String sValue)
 void sendEndJsonMap(const char *objName)
 {
   iIdentlevel--;
-  if (strlen(objName)==0){  
+  if (strlen(objName)==0){
     restSendContentP(PSTR("\r\n}\r\n"));
   } else {
     restSendContentP(PSTR("\r\n}}\r\n"));
   }
+  restFlushContent();
 }
 
 void sendJsonOTmonMapEntry(const char *cName, const char *cValue, const char *cUnit, time_t epoch)

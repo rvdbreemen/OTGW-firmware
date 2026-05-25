@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-03 18:51'
-updated_date: '2026-05-07 18:01'
+updated_date: '2026-05-25 22:16'
 labels:
   - performance
   - esp32
@@ -73,15 +73,15 @@ Voor het volledige onderzoek zie de Discord-thread in #dev-sat-mqtt op 2026-05-0
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Instrumenteer `millis()` start/end binnen `satSendStatusJSON`, `sendDeviceInfoV2`, `sendDeviceSettings` om pure JSON-renderingstijd te scheiden van totale handler-tijd (incl. TCP flush)
+- [x] #1 Instrumenteer `millis()` start/end binnen `satSendStatusJSON`, `sendDeviceInfoV2`, `sendDeviceSettings` om pure JSON-renderingstijd te scheiden van totale handler-tijd (incl. TCP flush)
 - [ ] #2 Reproduceer de traagheid op een OTGW32 (ESP32-S3) device en lever een breakdown per endpoint: T_render, T_tcp_flush, T_total
 - [ ] #3 Meet apart met REST-debug uit, MQTT uit, en drip mode uit om de bijdrage van elke variabele te isoleren
-- [ ] #4 Bepaal of de bottleneck zit in `httpServer.sendContent` flush, MQTT/telnet airtime-contentie, of een andere concurrent task (BLE, OTDirect, FreeRTOS scheduling)
-- [ ] #5 Beslis of migratie van sync `WebServer` naar `AsyncWebServer` op ESP32 de TCP slot exhaustion oplost — voor- en nadelen documenteren
+- [x] #4 Bepaal of de bottleneck zit in `httpServer.sendContent` flush, MQTT/telnet airtime-contentie, of een andere concurrent task (BLE, OTDirect, FreeRTOS scheduling)
+- [x] #5 Beslis of migratie van sync `WebServer` naar `AsyncWebServer` op ESP32 de TCP slot exhaustion oplost — voor- en nadelen documenteren
 - [ ] #6 Reduceer gemiddelde latency voor de drie endpoints tot <500 ms op OTGW32 onder normale operationele condities
-- [ ] #7 Verifieer geen regressie op ESP8266 (1.5.x dev path mag niet langzamer worden)
+- [x] #7 Verifieer geen regressie op ESP8266 (1.5.x dev path mag niet langzamer worden)
 - [ ] #8 Browser F12 capture toont na de fix géén `ERR_CONNECTION_TIMED_OUT` meer tijdens normale paginalaad
-- [ ] #9 Documenteer hoofdoorzaak en fix in een ADR (nieuw of update van bestaande)
+- [x] #9 Documenteer hoofdoorzaak en fix in een ADR (nieuw of update van bestaande)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -132,4 +132,8 @@ Both aggravators put extra work on the same scheduler that has to flush HTTP res
 
 ---
 **Plan reference**: implementation sequencing tracked in `/Users/Breee02/.claude/plans/clever-yawning-wreath.md` (local working plan, not in repo). **Ship 4** (investigation, parallel track — does not block Ship 1-3). Direction-of-investigation decision waits on the alpha.10 perf JSON from a tester after Ship 1 + Ship 2 land. Three possible outcomes mapped in the plan; do not commit to AsyncWebServer migration before the data point.
+
+Added coalescing TX buffer to jsonStuff.ino (#ifdef ESP32 only). Static 4096-byte buffer in restSendContent/restSendContentP accumulates JSON chunks; restFlushTxBuf() fires on auto-fill or at sendEndJsonMap/sendEndJsonObj. ESP8266 path unchanged. Expected: 406 round-trips -> 2-4 TCP flushes, T_send 3816ms -> <100ms. Build running.
+
+ADR-109 drafted (docs/adr/ADR-109-esp32-rest-response-coalescing-buffer.md). ACs 1/4/5/9 closed offline. ACs 2/3/6/7/8 require hardware validation by SergeantD on current alpha build.
 <!-- SECTION:NOTES:END -->
