@@ -1,10 +1,10 @@
 ---
 id: TASK-385
 title: 'Fix: text fields render dark in light mode (1.4.2-beta)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-23 06:53'
-updated_date: '2026-05-25 22:28'
+updated_date: '2026-05-25 22:29'
 labels:
   - bug
   - ui
