@@ -897,6 +897,19 @@
   display: inline-block;
 }
 
+#boilerUnsupportedLine {
+  background: #fff3cd;
+  border: 1px solid #f0ad4e;
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: #7a5800;
+  font-weight: 500;
+  max-width: 75%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
   /* Firmware Upgrade Progress */
   #flashProgressSection {
     margin-top: 12px;
@@ -1006,9 +1019,9 @@ body.disable-interaction {
 .ot-stats-table th:nth-child(1) { width: 40px; }  /* Hex */
 .ot-stats-table th:nth-child(2) { width: 40px; }  /* Dec */
 .ot-stats-table th:nth-child(3) { width: 70px; }  /* Direction */
-.ot-stats-table th:nth-child(4) { width: 200px; } /* Description */
+.ot-stats-table th:nth-child(4) { width: auto; }  /* Description - takes remaining space */
 .ot-stats-table th:nth-child(5) { width: 80px; }  /* Interval */
-.ot-stats-table th:nth-child(6) { width: auto; }  /* Value - takes remaining space */
+.ot-stats-table th:nth-child(6) { width: 180px; } /* Value - fixed; values are short */
 
 .ot-stats-table th, .ot-stats-table td {
   text-align: left;
