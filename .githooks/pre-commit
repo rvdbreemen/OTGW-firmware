@@ -5,55 +5,55 @@
 # don't require re-running install-hooks. Degrades gracefully when the plugin
 # cache is missing — the hook never blocks a commit because of tooling drift.
 #
-# Disable adr-judge for one commit:  ADR_KIT_HOOK_DISABLE=1 git commit ...
-# Remove adr-kit hook permanently:   /adr-kit:install-hooks --uninstall  (in a Claude Code session)
+# As of v0.13.0 the LLM pass (Claude Sonnet) is enabled by default. ADRs with
+# `"llm_judge": true` are evaluated against the staged diff via `claude -p`.
+# A missing `claude` CLI logs a warning and falls back to declarative-only.
 #
-# NOTE: this hook used to also run a per-commit bump-check (TASK-560 + TASK-660)
-# that required firmware-touching commits to bump _VERSION_PRERELEASE in
-# version.h. That check was removed by TASK-669 — bumps now happen only at
-# /beta-prerelease invocation time, not per commit. See CLAUDE.md Versioning
-# policy for details. The 2.0.0 worktree keeps its own bump-check unchanged.
+# Disable LLM pass per commit:  ADR_KIT_NO_LLM=1 git commit ...
+# Disable hook entirely:        ADR_KIT_HOOK_DISABLE=1 git commit ...
+# Remove permanently:           /adr-kit:install-hooks --uninstall  (in a Claude Code session)
 
 set -e
 
-ROOT=$(git rev-parse --show-toplevel)
-
-# ---- adr-kit gate ----
 if [ "${ADR_KIT_HOOK_DISABLE:-0}" = "1" ]; then
   echo "[adr-kit] hook disabled for this commit (ADR_KIT_HOOK_DISABLE=1)" >&2
-else
-  ADR_KIT_BASE="${HOME}/.claude/plugins/cache/rvdbreemen-adr-kit/adr-kit"
-  ADR_JUDGE=""
-  if [ -d "$ADR_KIT_BASE" ]; then
-    # Pick the highest installed version (lexicographic sort works for SemVer-shaped dirs).
-    ADR_JUDGE=$(ls -d "$ADR_KIT_BASE"/*/bin/adr-judge 2>/dev/null | sort -V | tail -1)
-  fi
-
-  if [ -z "$ADR_JUDGE" ] || [ ! -x "$ADR_JUDGE" ]; then
-    echo "[adr-kit] adr-judge binary not found in plugin cache; skipping pre-commit ADR check." >&2
-    echo "[adr-kit] Re-install with /adr-kit:install-hooks in a Claude Code session." >&2
-  else
-    DIFF=$(git diff --cached --unified=0)
-    if [ -n "$DIFF" ]; then
-      # Run the deterministic judge. Exit codes:
-      #   0  no declarative violations (advisory entries for llm_judge ADRs are non-blocking)
-      #   1  declarative violation found
-      #   2  config or runtime error
-      ADR_OUT=$(echo "$DIFF" | "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/" 2>&1)
-      ADR_EXIT=$?
-      # Suppress individual llm_judge advisory lines (one per ADR with llm_judge:true,
-      # very noisy on projects with many ADRs). Violations and the summary line are kept.
-      printf '%s\n' "$ADR_OUT" | grep -avE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true" >&2 || true
-      [ "$ADR_EXIT" -ne 0 ] && exit "$ADR_EXIT"
-    fi
-  fi
+  exit 0
 fi
 
-# ---- bump-prerelease check (REMOVED by TASK-669) ----
-# Previously enforced that firmware-touching commits also bumped
-# _VERSION_PRERELEASE in version.h (TASK-560 + companion data/version.hash
-# staging check from TASK-660). Removed because the project moved to a
-# release-only bump model: bumps now happen once per beta release as part
-# of the /beta-prerelease skill (Phase 2), not per commit.
+ADR_KIT_BASE="${HOME}/.claude/plugins/cache/rvdbreemen-adr-kit/adr-kit"
+ADR_JUDGE=""
+if [ -d "$ADR_KIT_BASE" ]; then
+  # Pick the highest installed version (lexicographic sort works for SemVer-shaped dirs).
+  ADR_JUDGE=$(ls -d "$ADR_KIT_BASE"/*/bin/adr-judge 2>/dev/null | sort -V | tail -1)
+fi
+
+if [ -z "$ADR_JUDGE" ] || [ ! -x "$ADR_JUDGE" ]; then
+  echo "[adr-kit] adr-judge binary not found in plugin cache; skipping pre-commit ADR check." >&2
+  echo "[adr-kit] Re-install with /adr-kit:install-hooks in a Claude Code session." >&2
+  exit 0
+fi
+
+ROOT=$(git rev-parse --show-toplevel)
+DIFF=$(git diff --cached --unified=0)
+if [ -z "$DIFF" ]; then
+  exit 0
+fi
+
+# Run the judge. Default mode (v0.13.0+):
+#   - declarative pass:  fast, regex-only, exits non-zero on violation
+#   - LLM pass:          claude -p --model claude-sonnet-4-6 evaluates llm_judge:true
+#                        ADRs in one batched call; falls back gracefully if `claude`
+#                        is missing or unauthenticated
+# Exit codes:
+#   0  no violations (advisory entries are non-blocking)
+#   1  at least one violation (declarative or LLM)
+#   2  config or runtime error
+ADR_OUT=$(echo "$DIFF" | "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/" --llm 2>&1)
+ADR_EXIT=$?
+# Suppress per-ADR llm_judge advisory lines: they repeat once per ADR with llm_judge:true
+# and become very noisy on projects with many ADRs. Violations and the summary line
+# (e.g. "[adr-judge] OK 0 violations, 57 advisory") are preserved.
+printf '%s\n' "$ADR_OUT" | grep -avE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true" >&2 || true
+[ "$ADR_EXIT" -ne 0 ] && exit "$ADR_EXIT"
 
 exit 0
