@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-19 16:11'
-updated_date: '2026-05-25 22:56'
+updated_date: '2026-05-25 23:00'
 labels:
   - mqtt
   - routing
@@ -30,3 +30,9 @@ Port of TASK-626 / ADR-075 to the 2.0.0 feature line (feature-dev-2.0.0-otgw32-e
 - [ ] #4 Build green for the relevant 2.0.0 target; evaluator no new failures
 - [ ] #5 Version prerelease bumped on the feature line in the same commit as the firmware change
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Port was already completed as TASK-628 in the 2.0.0 worktree (PR #600, commit 41423f78, merged 2026-05-19). ADR-103 authored, all 5 code changes present, build+eval green, prerelease bumped alpha.39. No additional work needed.
+<!-- SECTION:FINAL_SUMMARY:END -->
