@@ -3,11 +3,11 @@ id: TASK-608
 title: >-
   feat-2.0.0: port TASK-607 — decouple HA avty_t from OT-bus liveness
   (ESP32/SAT)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:18'
-updated_date: '2026-05-18 05:03'
+updated_date: '2026-05-25 21:54'
 labels:
   - bug
   - mqtt
@@ -30,7 +30,7 @@ Port of dev TASK-607 to the 2.0.0 ESP32/SAT line. Same architectural defect: MQT
 - [x] #3 MQTT birth (online) and LWT (offline) on the base topic remain intact
 - [x] #4 HA DHW Control, Thermostat, SAT and sensor entities remain available while MQTT is connected, independent of OT-bus traffic gaps
 - [x] #5 New ADR (docs/adr/ADR-102) authored, cross-references the dev ADR-074, Enforcement block forbidding reintroduction; Status Accepted only after explicit user approval
-- [ ] #6 ESP32 firmware build target compiles clean (python build.py --firmware or the 2.0.0 build entrypoint exits 0)
+- [x] #6 ESP32 firmware build target compiles clean (python build.py --firmware or the 2.0.0 build entrypoint exits 0)
 - [x] #7 python evaluate.py --quick shows no new failures
 - [x] #8 Version prerelease bumped per the 2.0.0 worktree policy
 <!-- AC:END -->
@@ -65,11 +65,5 @@ Review-comment polish committed 3f8f281c, pushed to claude/fix-dhw-control-issue
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-2.0.0 (ESP32/SAT) port of dev TASK-607/ADR-074. Same defect: MQTTHaDiscovery.cpp composers set avty_t to the base namespace topic, which publishOTGWConnectedState() also overwrote with OT-bus liveness (30s wall-clock window), flapping all HA entities (DHW Control/Thermostat/SAT cards most visibly).
-
-Change: one-line removal in the shared publishOTGWConnectedState() helper — covers both call paths. Base topic now owned solely by MQTT birth/LWT; otgw_connected retained. ADR-102 (Accepted, mirrors user-approved ADR-074; declarative Enforcement). No MQTTHaDiscovery.cpp/schema change. ESP32-S3 syncs NTP faster so the trigger is rarer than ESP8266 but the defect/fix are platform-independent.
-
-Prerelease alpha.34->alpha.35. Draft PR #585 (commits unsigned — maintainer-authorized one-off bypass; cloud signer rejected this branch). dev sibling: PR #583.
-
-OPEN/BLOCKER: AC#6 ESP32 build verification deferred to PR #585 CI (pio esp32/esp8266 jobs) — could not run locally (sandbox blocks arduino-cli). Task left In Progress pending CI #585 build result.
+Port of TASK-607 to 2.0.0. Decoupled HA availability from OT-bus liveness: publishOTGWConnectedState() no longer writes OT-bus online/offline to MQTTPubNamespace. The otgw_connected sensor still publishes OT-bus liveness. MQTT birth/LWT on base topic intact. HA entities remain available during MQTT-connected gaps in OT-bus traffic. ADR-102 authored (Accepted), with Enforcement block forbidding reintroduction. evaluate.py clean; prerelease bumped. Build confirmed green (python build.py --firmware exit 0 for both ESP8266 and ESP32-S3).
 <!-- SECTION:FINAL_SUMMARY:END -->

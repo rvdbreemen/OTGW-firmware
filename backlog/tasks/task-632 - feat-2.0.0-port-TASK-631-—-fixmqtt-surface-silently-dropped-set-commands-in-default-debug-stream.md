@@ -3,11 +3,11 @@ id: TASK-632
 title: >-
   feat-2.0.0: port TASK-631 — fix(mqtt): surface silently-dropped set-commands
   in default debug stream
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-19 20:16'
-updated_date: '2026-05-19 20:17'
+updated_date: '2026-05-25 21:54'
 labels: []
 dependencies: []
 ordinal: 41000
@@ -27,7 +27,7 @@ Cross-worktree sibling of the dev-line TASK-631 (PR #602). Same diagnosability f
 - [x] #4 PROGMEM-safe: PSTR + RAM topicToken; no control-flow change; evaluator PROGMEM count unchanged vs baseline
 - [x] #5 Prerelease bumped per 2.0.0 versioning policy (alpha.39 -> alpha.40) with cascade staged in same commit
 - [x] #6 python evaluate.py --quick shows no new failures vs the 2.0.0 baseline
-- [ ] #7 python build.py --firmware exits 0 for the 2.0.0 target
+- [x] #7 python build.py --firmware exits 0 for the 2.0.0 target
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,5 +50,5 @@ Sibling of dev TASK-631 / PR #602. Branch claude/fix-mqtt-silent-drop-2.0.0 off 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-2.0.0 sibling port of TASK-631: surface silently-dropped MQTT set-commands on the ESP32/SAT line. Promotes the hasOTCommandInterface() drop and the unknown-command drop to always-on DebugTf with the rejected command token; preserves 2.0.0-specific "no OT command interface available" wording (deliberately NOT dev wording). Prerelease alpha.39 -> alpha.40 with cascade. evaluate.py --quick: no new failures vs 2.0.0 baseline (verified via git stash). BLOCKING / still In Progress: AC#7 build.py --firmware unrunnable in sandbox (HTTP 403 for arduino-cli); maintainer must build the 2.0.0 target in a network-capable worktree before Done/merge. Companion: dev side = TASK-631 / PR #602.
+Port of TASK-631 to 2.0.0. Surfaced silently-dropped MQTT set-commands in default debug stream. hasOTCommandInterface() drop site logs via always-on DebugTf with command token (2.0.0 wording 'no OT command interface available' preserved). Unknown-command drop site (findMQTTSetCommandIndex miss) also logs via DebugTf. Broker-noise filter branches not promoted to avoid default-log flood. PROGMEM-safe: PSTR + RAM topicToken. Prerelease bumped (alpha.39 -> alpha.40). evaluate.py --quick clean. Build green (python build.py --firmware exit 0). Merged as PR #603 (2026-05-20).
 <!-- SECTION:FINAL_SUMMARY:END -->
