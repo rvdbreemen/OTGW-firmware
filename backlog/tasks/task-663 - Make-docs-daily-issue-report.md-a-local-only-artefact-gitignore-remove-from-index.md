@@ -3,11 +3,11 @@ id: TASK-663
 title: >-
   Make docs/daily-issue-report.md a local-only artefact (gitignore + remove from
   index)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-22 06:23'
-updated_date: '2026-05-25 21:56'
+updated_date: '2026-05-25 21:57'
 labels:
   - docs
   - housekeeping
