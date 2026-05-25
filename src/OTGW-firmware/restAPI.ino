@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.65
+**  Version  : v2.0.0-alpha.66
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -69,6 +69,35 @@ static void sendApiError(int httpCode, const __FlashStringHelper* message) {
 static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
   httpServer.sendHeader(F("Allow"), allowedMethods);
   sendApiError(405, F("Method not allowed"));
+}
+
+// A: Boot-time flash & filesystem values cached once at startup.
+// Avoids repeated SPI-flash queries on every /api/v2/device/info call.
+// Uses platform abstraction functions so this compiles on both ESP8266 and ESP32.
+struct BootFlashCache {
+  uint32_t    sketchSize;
+  uint32_t    freeSketchSpace;
+  char        flashChipId[9];     // formatted as "%08X"
+  float       flashChipSizeMB;
+  float       flashChipRealSizeMB;
+  float       flashChipSpeedMHz;
+  uint8_t     flashChipModeIdx;   // index into flashMode[] array
+  float       littleFSSizeMB;
+};
+static BootFlashCache sBootFlash;
+
+void cacheBootFlashInfo() {
+  sBootFlash.sketchSize          = platformSketchSize();
+  sBootFlash.freeSketchSpace     = platformFreeSketchSpace();
+  snprintf_P(sBootFlash.flashChipId, sizeof(sBootFlash.flashChipId),
+             PSTR("%08X"), (unsigned int)platformFlashChipId());
+  sBootFlash.flashChipSizeMB     = platformFlashChipSize()     / 1024.0f / 1024.0f;
+  sBootFlash.flashChipRealSizeMB = platformFlashChipRealSize() / 1024.0f / 1024.0f;
+  sBootFlash.flashChipSpeedMHz   = floorf(platformFlashChipSpeed() / 1000.0f / 1000.0f);
+  sBootFlash.flashChipModeIdx    = platformFlashChipMode();
+  FSInfo fsinfo;
+  platformFSInfo(fsinfo);
+  sBootFlash.littleFSSizeMB      = floorf(fsinfo.totalBytes / (1024.0f * 1024.0f));
 }
 
 //=======================================================================
@@ -2234,8 +2263,16 @@ void sendOTmonitorV2()
 // matching group rather than appending at the end, so related metrics
 // stay adjacent on the page. JSON object order is not an API guarantee
 // for REST consumers - they should parse by key.
+// C: Minimum contiguous heap block required to safely stream this response.
+// If maxFreeBlock is below this, return 503 instead of compounding heap pressure.
+#define DEVICE_INFO_MIN_HEAP_BLOCK  8192
+
 void sendDeviceInfoV2()
 {
+  if (platformMaxFreeBlock() < DEVICE_INFO_MIN_HEAP_BLOCK) {
+    sendApiError(503, F("low heap"));
+    return;
+  }
   const uint32_t startMs = millis();
   restPerfBegin(REST_PERF_DEVICE_INFO);
   sendStartJsonMap(F("device"));
@@ -2354,20 +2391,15 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
   sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
 
-  // --- Flash, sketch & filesystem storage ---
-  sendJsonMapEntry(F("sketchsize"), platformSketchSize());
-  sendJsonMapEntry(F("freesketchspace"),  platformFreeSketchSpace());
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%08X"), (unsigned int)platformFlashChipId());
-  sendJsonMapEntry(F("flashchipid"), cMsg);
-  sendJsonMapEntry(F("flashchipsize"), (platformFlashChipSize() / 1024.0f / 1024.0f));
-  sendJsonMapEntry(F("flashchiprealsize"), (platformFlashChipRealSize() / 1024.0f / 1024.0f));
-  sendJsonMapEntry(F("flashchipspeed"), floorf((platformFlashChipSpeed() / 1000.0f / 1000.0f)));
-  {
-    uint8_t ideMode = platformFlashChipMode();
-    sendJsonMapEntry(F("flashchipmode"), flashMode[ideMode < 4 ? ideMode : 4]);
-  }
-  platformFSInfo(LittleFSinfo);
-  sendJsonMapEntry(F("LittleFSsize"), floorf((LittleFSinfo.totalBytes / (1024.0f * 1024.0f))));
+  // --- Flash, sketch & filesystem storage (values cached at boot by cacheBootFlashInfo) ---
+  sendJsonMapEntry(F("sketchsize"),       sBootFlash.sketchSize);
+  sendJsonMapEntry(F("freesketchspace"),  sBootFlash.freeSketchSpace);
+  sendJsonMapEntry(F("flashchipid"),      sBootFlash.flashChipId);
+  sendJsonMapEntry(F("flashchipsize"),    sBootFlash.flashChipSizeMB);
+  sendJsonMapEntry(F("flashchiprealsize"),sBootFlash.flashChipRealSizeMB);
+  sendJsonMapEntry(F("flashchipspeed"),   sBootFlash.flashChipSpeedMHz);
+  sendJsonMapEntry(F("flashchipmode"),    flashMode[sBootFlash.flashChipModeIdx < 4 ? sBootFlash.flashChipModeIdx : 4]);
+  sendJsonMapEntry(F("LittleFSsize"),     sBootFlash.littleFSSizeMB);
 
   // --- Reliability drops (heap-pressure side effects) ---
   sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);

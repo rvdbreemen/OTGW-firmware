@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.65
+**  Version  : v2.0.0-alpha.66
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -145,6 +145,7 @@ void setup() {
 
   LittleFSmounted = LittleFS.begin();
   if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
+  cacheBootFlashInfo();   // A: cache static flash/FS values once; used by /api/v2/device/info
   readSettings(true);
   checklittlefshash();
   loadOtSupportFiles();  // TASK-693 port: warm the in-RAM support bitmaps from prior-boot knowledge
