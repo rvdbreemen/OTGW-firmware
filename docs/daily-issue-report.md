@@ -1,14 +1,14 @@
-# Daily Issue Report — 2026-05-24
+# Daily Issue Report — 2026-05-25
 
-**Generated:** 2026-05-24T07:09:25Z
-**GitHub window:** since 2026-05-23T00:00:00Z (last check)
-**Tweakers window:** since 2026-05-17T00:00:00Z (last successful fetch)
+**Generated:** 2026-05-25T07:07:29Z
+**GitHub window:** since 2026-05-24T07:09:25Z (last check)
+**Tweakers window:** since 2026-05-24T07:09:25Z (last successful attempt)
 
 ## Summary
 
 No new issues in the last 24 hours.
 
-- **GitHub**: 0 new or updated open issues since 2026-05-23T00:00:00Z.
+- **GitHub**: 0 new or updated open issues since 2026-05-24T07:09:25Z.
 - **Tweakers**: Feed unavailable — `gathering.tweakers.net` blocked by egress policy in this execution environment.
 - **Discord**: MCP server not configured in this execution environment.
 
@@ -41,5 +41,5 @@ Most recently active open bugs tracked on GitHub:
 
 ## Timestamps Updated
 
-- GitHub last check: 2026-05-24T07:09:25Z
-- Tweakers last check: 2026-05-24T07:09:25Z (timestamp advanced; feed still blocked)
+- GitHub last check: 2026-05-25T07:07:29Z
+- Tweakers last check: 2026-05-25T07:07:29Z (timestamp advanced; feed still blocked)
