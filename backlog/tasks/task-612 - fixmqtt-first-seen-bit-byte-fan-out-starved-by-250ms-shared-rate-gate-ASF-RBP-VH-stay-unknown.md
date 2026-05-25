@@ -3,11 +3,11 @@ id: TASK-612
 title: >-
   fix(mqtt): first-seen bit/byte fan-out starved by 250ms shared rate-gate
   (ASF/RBP/VH stay unknown)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 09:51'
-updated_date: '2026-05-25 20:50'
+updated_date: '2026-05-25 20:51'
 labels:
   - mqtt
   - investigation
