@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-25 20:40'
-updated_date: '2026-05-25 20:49'
+updated_date: '2026-05-25 22:04'
 labels:
   - bug
   - webui
@@ -49,5 +49,5 @@ Implemented: CSS toegevoegd voor #boilerUnsupportedLine — amber achtergrond (#
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-CSS-only fix: #boilerUnsupportedLine gestijld als amber badge (achtergrond #fff3cd, rand #f0ad4e, tekst #7a5800, border-radius, padding, max-width 75% + ellipsis). Valt nu direct op in de Statistics footer. Lege lijst blijft hidden via bestaande JS-logica. Commit 00a332db. Build groen, evaluator 100%.
+CSS amber badge voor #boilerUnsupportedLine toegevoegd in index.css. Amber achtergrond, border-radius 4px, max-width 75% met ellipsis. Alle 4 ACs gecheckt. Committed in e2145143.
 <!-- SECTION:FINAL_SUMMARY:END -->
