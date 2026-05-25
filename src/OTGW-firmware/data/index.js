@@ -3076,7 +3076,10 @@ function showMainPage() {
   refreshDevTime();
   
   setActivePageSection('displayMainPage');
-  
+  // If the Log inner tab is active, the scroll container just became visible —
+  // same reflow-scroll race as openLogTab; suppress the handler for 300 ms.
+  if (currentTab === 'Log') logTabActivatedAt = Date.now();
+
   refreshDevInfo();
   refreshOTmonitor();
   
