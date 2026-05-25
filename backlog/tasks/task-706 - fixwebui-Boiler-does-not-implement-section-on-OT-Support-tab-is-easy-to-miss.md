@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-25 20:40'
-updated_date: '2026-05-25 20:44'
+updated_date: '2026-05-25 20:46'
 labels:
   - bug
   - webui
@@ -39,3 +39,9 @@ Reported by crashevans on #beta-testing (2026-05-25) via screenshot. The 'Boiler
 <!-- SECTION:PLAN:BEGIN -->
 1. Stijl #boilerUnsupportedLine als een zichtbare card/banner ipv inline voettekst\n2. Voeg achtergrondkleur, rand en icoon-prefix toe zodat het opvalt\n3. CSS-only change in index.css — geen HTML of JS wijzigingen nodig
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented: CSS toegevoegd voor #boilerUnsupportedLine — amber achtergrond (#fff3cd), oranje rand (#f0ad4e), donkere tekst (#7a5800), border-radius, padding, max-width 75% met ellipsis. Zichtbaar als badge in de Statistics footer. index.css alleen.
+<!-- SECTION:NOTES:END -->
