@@ -32,3 +32,9 @@ Reported by crashevans on #beta-testing (2026-05-25) running beta.21. The disc_l
 - [ ] #2 disc_last_verify_epoch publishes a non-zero value (Unix timestamp) after the first verify run
 - [ ] #3 WebUI 'Discovery last verify outcome' shows a meaningful value (not Unknown) after firmware has been running for >30 minutes with MQTT connected
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Voeg first-run trigger toe in hourly block (OTGW-firmware.ino): als bDiscoveryAutoVerify && iLastVerifyEpoch==0, roep startDiscoveryVerification() aan\n2. Verifieer dat state.discovery.iLastVerifyEpoch direct toegankelijk is in OTGW-firmware.ino\n3. Build groen\n4. Evaluator groen\n5. Commit + push
+<!-- SECTION:PLAN:END -->
