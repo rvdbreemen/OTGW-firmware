@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-22 06:23'
-updated_date: '2026-05-22 06:25'
+updated_date: '2026-05-25 21:55'
 labels:
   - docs
   - housekeeping
@@ -23,8 +23,8 @@ Daily issue report agent commits overwrite a single shared docs/daily-issue-repo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 /.gitignore on dev contains 'docs/daily-issue-report.md' (already added in same commit as TASK-657)
-- [ ] #2 git rm --cached docs/daily-issue-report.md removes the file from the index without deleting from disk; commit captures the removal
-- [ ] #3 If docs/archive/daily-issue-report.md still exists, remove via git rm and commit (it's an orphaned 2026-05-06 snapshot)
-- [ ] #4 Future daily-report agents update the local file but do not stage it
+- [x] #1 /.gitignore on dev contains 'docs/daily-issue-report.md' (already added in same commit as TASK-657)
+- [x] #2 git rm --cached docs/daily-issue-report.md removes the file from the index without deleting from disk; commit captures the removal
+- [x] #3 If docs/archive/daily-issue-report.md still exists, remove via git rm and commit (it's an orphaned 2026-05-06 snapshot)
+- [x] #4 Future daily-report agents update the local file but do not stage it
 <!-- AC:END -->

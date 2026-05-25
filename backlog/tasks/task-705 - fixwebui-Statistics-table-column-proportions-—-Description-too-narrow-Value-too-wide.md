@@ -3,11 +3,11 @@ id: TASK-705
 title: >-
   fix(webui): Statistics table column proportions — Description too narrow,
   Value too wide
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-25 20:39'
-updated_date: '2026-05-25 20:45'
+updated_date: '2026-05-25 20:48'
 labels:
   - bug
   - webui
@@ -28,9 +28,9 @@ Reported by Simon Templar on #beta-testing (2026-05-25) running beta.21. The Sta
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Statistics table Description column is wide enough to show typical sensor names without truncation at 1280px browser width
-- [ ] #2 Value column does not dominate the table width disproportionately
-- [ ] #3 Fix uses CSS only (no JS changes); no regressions on mobile/narrow viewport
+- [x] #1 Statistics table Description column is wide enough to show typical sensor names without truncation at 1280px browser width
+- [x] #2 Value column does not dominate the table width disproportionately
+- [x] #3 Fix uses CSS only (no JS changes); no regressions on mobile/narrow viewport
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,9 @@ Reported by Simon Templar on #beta-testing (2026-05-25) running beta.21. The Sta
 <!-- SECTION:NOTES:BEGIN -->
 Implemented: swapped Description (was 200px) en Value (was auto) in .ot-stats-table CSS — Description krijgt nu auto (groeit mee met tabel), Value krijgt 180px fixed. index.css alleen.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+CSS-only fix: swapped Description (was 200px fixed → nu auto) en Value (was auto → nu 180px fixed) in .ot-stats-table. Description krijgt nu de flexibele ruimte; values zijn kort genoeg voor een vaste breedte. Commit 00a332db. Build groen, evaluator 100%.
+<!-- SECTION:FINAL_SUMMARY:END -->

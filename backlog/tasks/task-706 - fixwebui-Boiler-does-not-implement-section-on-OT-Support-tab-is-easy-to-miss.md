@@ -3,11 +3,11 @@ id: TASK-706
 title: >-
   fix(webui): 'Boiler does not implement' section on OT Support tab is easy to
   miss
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-25 20:40'
-updated_date: '2026-05-25 20:46'
+updated_date: '2026-05-25 20:49'
 labels:
   - bug
   - webui
@@ -28,10 +28,10 @@ Reported by crashevans on #beta-testing (2026-05-25) via screenshot. The 'Boiler
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The 'Boiler does not implement' section on the OT Support tab is visually separated from the table (not inline footer text)
-- [ ] #2 When the list is empty (boiler implements everything), nothing extra is rendered
-- [ ] #3 Styling is consistent with existing WebUI conventions (no new CSS frameworks)
-- [ ] #4 python build.py exits 0; python evaluate.py --quick shows no new failures
+- [x] #1 The 'Boiler does not implement' section on the OT Support tab is visually separated from the table (not inline footer text)
+- [x] #2 When the list is empty (boiler implements everything), nothing extra is rendered
+- [x] #3 Styling is consistent with existing WebUI conventions (no new CSS frameworks)
+- [x] #4 python build.py exits 0; python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -45,3 +45,9 @@ Reported by crashevans on #beta-testing (2026-05-25) via screenshot. The 'Boiler
 <!-- SECTION:NOTES:BEGIN -->
 Implemented: CSS toegevoegd voor #boilerUnsupportedLine — amber achtergrond (#fff3cd), oranje rand (#f0ad4e), donkere tekst (#7a5800), border-radius, padding, max-width 75% met ellipsis. Zichtbaar als badge in de Statistics footer. index.css alleen.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+CSS-only fix: #boilerUnsupportedLine gestijld als amber badge (achtergrond #fff3cd, rand #f0ad4e, tekst #7a5800, border-radius, padding, max-width 75% + ellipsis). Valt nu direct op in de Statistics footer. Lege lijst blijft hidden via bestaande JS-logica. Commit 00a332db. Build groen, evaluator 100%.
+<!-- SECTION:FINAL_SUMMARY:END -->
