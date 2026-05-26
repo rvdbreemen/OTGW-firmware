@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-26 15:52'
-updated_date: '2026-05-26 15:58'
+updated_date: '2026-05-26 16:01'
 labels:
   - backlog
   - maintenance
@@ -42,4 +42,6 @@ Archive policy applied on branch dev by Codex (GPT-5): archive verified complete
 Policy refinement from user discussion: use release publication as the ordinary archive threshold. Rationale: Done remains visible until delivery is public; archive clears delivered history without losing task auditability. A regression follow-up does not block archiving the shipped parent when the corrective work is separately tracked.
 
 Policy correction confirmed by user: public beta prereleases are test publications, not shipped releases for backlog archive purposes. Stable archive cutoff is v1.5.0-fix2, confirmed through `gh release list` as a non-prerelease GitHub release published on 2026-05-08; v1.6.0-beta.23 remains a pre-release and does not qualify tasks for archive.
+
+Stable-release archive audit: v1.5.0-fix2 contains 50 tasks already marked Done; 48 remain in the current Done column. Excluded as feature-line-only rather than shipped in this stable dev release: TASK-527, TASK-537, TASK-539, TASK-541, TASK-542, TASK-543, TASK-546. TASK-545 is no longer in current Done. Eligible current stable-release archive set (41): TASK-86, TASK-352, TASK-353, TASK-354, TASK-382, TASK-383, TASK-388, TASK-389, TASK-390, TASK-391, TASK-392, TASK-395, TASK-396, TASK-398, TASK-399, TASK-400, TASK-401, TASK-402, TASK-403, TASK-478, TASK-483, TASK-484, TASK-486, TASK-522, TASK-526, TASK-531, TASK-534, TASK-535, TASK-536, TASK-538, TASK-540, TASK-547, TASK-551, TASK-552, TASK-558, TASK-559, TASK-560, TASK-561, TASK-572, TASK-573, TASK-575.
 <!-- SECTION:NOTES:END -->
