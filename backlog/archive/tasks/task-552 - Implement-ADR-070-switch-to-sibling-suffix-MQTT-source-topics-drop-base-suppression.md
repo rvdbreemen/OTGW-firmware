@@ -7,15 +7,14 @@ status: Done
 assignee:
   - '@rvdbreemen-claude'
 created_date: '2026-05-07 07:56'
-updated_date: '2026-05-07 15:48'
+updated_date: '2026-05-26 16:04'
 labels:
   - feat-mqtt-suffix-shape
   - mqtt
   - impl
   - ha-discovery
   - dev-1.5x
-dependencies:
-  - TASK-551
+dependencies: []
 priority: high
 ---
 

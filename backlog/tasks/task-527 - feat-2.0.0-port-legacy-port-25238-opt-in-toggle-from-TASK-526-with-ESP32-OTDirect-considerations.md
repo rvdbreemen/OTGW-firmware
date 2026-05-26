@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-03 10:49'
-updated_date: '2026-05-05 13:10'
+updated_date: '2026-05-26 16:04'
 labels:
   - feature
   - ui
@@ -15,8 +15,7 @@ labels:
   - network
   - feature-2.0.0
   - port-forward
-dependencies:
-  - TASK-526
+dependencies: []
 references:
   - docs/c4/c4-component-network.md
   - docs/c4/c4-component-integration-layer.md

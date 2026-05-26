@@ -7,14 +7,13 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-05 05:10'
-updated_date: '2026-05-05 05:58'
+updated_date: '2026-05-26 16:04'
 labels:
   - mqtt
   - ha-discovery
   - port
   - feat-2.0.0
-dependencies:
-  - TASK-538
+dependencies: []
 priority: medium
 ---
 
