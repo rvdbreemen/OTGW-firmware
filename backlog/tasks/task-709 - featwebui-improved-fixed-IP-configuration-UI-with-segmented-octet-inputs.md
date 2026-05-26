@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-26 12:58'
-updated_date: '2026-05-26 13:01'
+updated_date: '2026-05-26 13:02'
 labels:
   - bug
   - webui
@@ -38,3 +38,9 @@ André (andrebrait, Discord #beta-testing 2026-05-26) reported that the fixed IP
 - [ ] #10 firmware compiles clean (python build.py --firmware exits 0)
 - [ ] #11 evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. restAPI.ino: add wifi_current_subnet/gateway/dns1/dns2 to sendDeviceInfoV2()\n2. index.js: add wifisubnet/wifigateway/wifidns1/wifidns2 to hiddenSettings\n3. index.js: add renderFixedIPSection() custom renderer with octet inputs\n4. index.js: wire toggle handler (show/hide + prefillFromDHCP)\n5. index.js: wire octet UX (auto-advance, backspace, paste)\n6. index.js: integrate with saveSettings() via collapseOctetGroups()\n7. index.css: style octet inputs as connected unit\n8. Build + evaluator check
+<!-- SECTION:PLAN:END -->
