@@ -846,10 +846,15 @@ void satHandlePreset(const char* value)
       settings.sat.fTargetTemp = state.sat.fPreCustomTemp;
       state.sat.fPidI = 0.0f;  // Reset integral to avoid overshoot on temp jump
       SATDebugTf(PSTR("SAT: preset cleared, restored pre-custom target %.1f\r\n"), settings.sat.fTargetTemp);
-      // Publish restored target immediately so MQTT stays in sync
+      // Publish restored target immediately so MQTT stays in sync.
+      // ADR-111 exception: event-driven echo on preset-clear (latency matters
+      // for HA; cannot wait for satPublishMQTT()'s next 30s tick). The next
+      // satPublishMQTT() pass will pick up the same value through its shadow
+      // (sat/target uses SAT_EPS_TEMP=0.05) and either no-op or heartbeat.
       if (state.mqtt.bConnected) {
         char valBuf[12];
         dtostrf(settings.sat.fTargetTemp, 1, 1, valBuf);
+        // ADR-111 exception: see block comment above — event-driven echo.
         sendMQTTData(F("sat/target"), valBuf, true);
       }
     }
@@ -2189,16 +2194,7 @@ void satPublishMQTT()
     if (fs != SAT_FS_INSUFFICIENT_DATA) {
       bool problem = (fs == SAT_FS_STUCK_ON || fs == SAT_FS_STUCK_OFF ||
                       fs == SAT_FS_PWM_SHORT || fs == SAT_FS_SHORT_CYCLING);
-      // Reuse SATShadowB for the ON/OFF binary, payload via direct send to
-      // preserve the historical "ON"/"OFF" labels (not "true"/"false").
-      const bool firstSeen    = (s_flame_health.nextRepublishMs == 0);
-      const bool valueDiff    = !firstSeen && (s_flame_health.last != (int8_t)(problem ? 1 : 0));
-      const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_flame_health.nextRepublishMs) >= 0;
-      if (firstSeen || valueDiff || heartbeatDue) {
-        s_flame_health.last            = (int8_t)(problem ? 1 : 0);
-        s_flame_health.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-        sendMQTTData(F("sat/flame_health"), problem ? "ON" : "OFF", true);
-      }
+      publishIfChangedBStr(F("sat/flame_health"), problem, s_flame_health, "ON", "OFF", true);
     }
   }
 
@@ -2224,20 +2220,8 @@ void satPublishMQTT()
     publishIfChangedF(F("sat/pv_boost_applied_c"), state.sat.fPvBoostAppliedC,        s_pv_boost_applied_c, SAT_EPS_TEMP, 1, true);
   }
   // PV-boost settings always published so HA discovery entities have a state topic.
-  // Note: pv_boost_enabled historically uses "1"/"0" payload (not true/false);
-  // route through sendMQTTData directly to preserve that payload format, with
-  // our own change+heartbeat gate.
-  {
-    const bool current      = settings.sat.bPvBoostEnabled;
-    const bool firstSeen    = (s_pv_boost_enabled.nextRepublishMs == 0);
-    const bool valueDiff    = !firstSeen && (s_pv_boost_enabled.last != (int8_t)(current ? 1 : 0));
-    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_pv_boost_enabled.nextRepublishMs) >= 0;
-    if (firstSeen || valueDiff || heartbeatDue) {
-      s_pv_boost_enabled.last            = (int8_t)(current ? 1 : 0);
-      s_pv_boost_enabled.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-      sendMQTTData(F("sat/pv_boost_enabled"), current ? "1" : "0", true);
-    }
-  }
+  // pv_boost_enabled historically uses "1"/"0" payload (not true/false).
+  publishIfChangedBStr(F("sat/pv_boost_enabled"), settings.sat.bPvBoostEnabled, s_pv_boost_enabled, "1", "0", true);
   publishIfChangedI(F("sat/pv_boost_threshold_w"),    (int32_t)settings.sat.iPvBoostThresholdW,    s_pv_boost_threshold_w,    true);
   publishIfChangedI(F("sat/pv_boost_hold_s"),         (int32_t)settings.sat.iPvBoostHoldS,         s_pv_boost_hold_s,         true);
   publishIfChangedF(F("sat/pv_boost_delta_c"),        settings.sat.fPvBoostDeltaC,                 s_pv_boost_delta_c,        SAT_EPS_TEMP, 1, true);
@@ -2250,18 +2234,8 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/pressure"),           state.sat.fSmoothedPressure, s_pressure,           SAT_EPS_PRESSURE, 2, false);
   publishIfChangedF(F("sat/pressure_drop_rate"), state.sat.fPressureDropRate, s_pressure_drop_rate, SAT_EPS_FRACTION, 3, false);
   publishIfChangedB(F("sat/pressure_alarm"),     state.sat.bPressureAlarm,    s_pressure_alarm,     false);
-  // pressure_health uses "ON"/"OFF" payload — preserve via direct send.
-  {
-    const bool current      = state.sat.bPressureHealthy;
-    const bool firstSeen    = (s_pressure_health.nextRepublishMs == 0);
-    const bool valueDiff    = !firstSeen && (s_pressure_health.last != (int8_t)(current ? 1 : 0));
-    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_pressure_health.nextRepublishMs) >= 0;
-    if (firstSeen || valueDiff || heartbeatDue) {
-      s_pressure_health.last            = (int8_t)(current ? 1 : 0);
-      s_pressure_health.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-      sendMQTTData(F("sat/pressure_health"), current ? "ON" : "OFF", true);
-    }
-  }
+  // pressure_health uses "ON"/"OFF" payload.
+  publishIfChangedBStr(F("sat/pressure_health"), state.sat.bPressureHealthy, s_pressure_health, "ON", "OFF", true);
   satPressureHealthPublish();
 
   // ---------------------------------------------------------------------------
@@ -2332,31 +2306,10 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/comfort_offset"), state.sat.fComfortOffset,  s_comfort_offset,  SAT_EPS_ERROR, 2, false);
 
   // ---------------------------------------------------------------------------
-  // Simulation, auto-tune. Both use "ON"/"OFF" payloads historically — route
-  // via SATShadowB but emit the legacy payload directly.
+  // Simulation, auto-tune. Both use "ON"/"OFF" payloads historically.
   // ---------------------------------------------------------------------------
-  {
-    const bool current      = settings.sat.bSimulation;
-    const bool firstSeen    = (s_simulation.nextRepublishMs == 0);
-    const bool valueDiff    = !firstSeen && (s_simulation.last != (int8_t)(current ? 1 : 0));
-    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_simulation.nextRepublishMs) >= 0;
-    if (firstSeen || valueDiff || heartbeatDue) {
-      s_simulation.last            = (int8_t)(current ? 1 : 0);
-      s_simulation.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-      sendMQTTData(F("sat/simulation"), current ? "ON" : "OFF", true);
-    }
-  }
-  {
-    const bool current      = settings.sat.bAutoTune;
-    const bool firstSeen    = (s_auto_tune.nextRepublishMs == 0);
-    const bool valueDiff    = !firstSeen && (s_auto_tune.last != (int8_t)(current ? 1 : 0));
-    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_auto_tune.nextRepublishMs) >= 0;
-    if (firstSeen || valueDiff || heartbeatDue) {
-      s_auto_tune.last            = (int8_t)(current ? 1 : 0);
-      s_auto_tune.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-      sendMQTTData(F("sat/auto_tune"), current ? "ON" : "OFF", true);
-    }
-  }
+  publishIfChangedBStr(F("sat/simulation"), settings.sat.bSimulation, s_simulation, "ON", "OFF", true);
+  publishIfChangedBStr(F("sat/auto_tune"),  settings.sat.bAutoTune,   s_auto_tune,  "ON", "OFF", true);
   if (settings.sat.bAutoTune) {
     publishIfChangedF(F("sat/auto_tune_score"),  state.sat.fAutoTuneScore,    s_auto_tune_score,  SAT_EPS_FRACTION, 2, false);
     publishIfChangedF(F("sat/auto_tune_rate"),   settings.sat.fAutoTuneRate,  s_auto_tune_rate,   SAT_EPS_FRACTION, 3, false);
@@ -2389,31 +2342,16 @@ void satPublishMQTT()
   }
 
   // ---------------------------------------------------------------------------
-  // Device + Cycle health binary sensors ("ON"/"OFF" payloads — direct send).
+  // Device + Cycle health binary sensors ("ON"/"OFF" payloads).
   // ---------------------------------------------------------------------------
+  publishIfChangedBStr(F("sat/device_health"),
+                       (state.sat.eBoilerStatus == SAT_BS_OFF),
+                       s_device_health, "ON", "OFF", true);
   {
-    const bool current      = (state.sat.eBoilerStatus == SAT_BS_OFF);
-    const bool firstSeen    = (s_device_health.nextRepublishMs == 0);
-    const bool valueDiff    = !firstSeen && (s_device_health.last != (int8_t)(current ? 1 : 0));
-    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_device_health.nextRepublishMs) >= 0;
-    if (firstSeen || valueDiff || heartbeatDue) {
-      s_device_health.last            = (int8_t)(current ? 1 : 0);
-      s_device_health.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-      sendMQTTData(F("sat/device_health"), current ? "ON" : "OFF", true);
-    }
-  }
-  {
-    bool current = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT ||
-                    state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT ||
-                    state.sat.eLastCycleClass == SAT_CYCLE_SHORT);
-    const bool firstSeen    = (s_cycle_health.nextRepublishMs == 0);
-    const bool valueDiff    = !firstSeen && (s_cycle_health.last != (int8_t)(current ? 1 : 0));
-    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_cycle_health.nextRepublishMs) >= 0;
-    if (firstSeen || valueDiff || heartbeatDue) {
-      s_cycle_health.last            = (int8_t)(current ? 1 : 0);
-      s_cycle_health.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-      sendMQTTData(F("sat/cycle_health"), current ? "ON" : "OFF", true);
-    }
+    bool cycleProb = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT ||
+                      state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT ||
+                      state.sat.eLastCycleClass == SAT_CYCLE_SHORT);
+    publishIfChangedBStr(F("sat/cycle_health"), cycleProb, s_cycle_health, "ON", "OFF", true);
   }
 
   // ---------------------------------------------------------------------------
@@ -2498,15 +2436,7 @@ void satPublishMQTT()
       else if (syncSetpointMismatchSince == 0) syncSetpointMismatchSince = millis();
       bool problem = mismatch && syncSetpointMismatchSince > 0 &&
                      (millis() - syncSetpointMismatchSince >= 60000UL);
-      // ON/OFF payload — direct send through SATShadowB gate.
-      const bool firstSeen    = (s_setpoint_sync.nextRepublishMs == 0);
-      const bool valueDiff    = !firstSeen && (s_setpoint_sync.last != (int8_t)(problem ? 1 : 0));
-      const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_setpoint_sync.nextRepublishMs) >= 0;
-      if (firstSeen || valueDiff || heartbeatDue) {
-        s_setpoint_sync.last            = (int8_t)(problem ? 1 : 0);
-        s_setpoint_sync.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-        sendMQTTData(F("sat/setpoint_sync"), problem ? "ON" : "OFF", true);
-      }
+      publishIfChangedBStr(F("sat/setpoint_sync"), problem, s_setpoint_sync, "ON", "OFF", true);
     }
 
     static unsigned long syncModulationMismatchSince = 0;
@@ -2518,14 +2448,7 @@ void satPublishMQTT()
       else if (syncModulationMismatchSince == 0) syncModulationMismatchSince = millis();
       bool problem = mismatch && syncModulationMismatchSince > 0 &&
                      (millis() - syncModulationMismatchSince >= 60000UL);
-      const bool firstSeen    = (s_modulation_sync.nextRepublishMs == 0);
-      const bool valueDiff    = !firstSeen && (s_modulation_sync.last != (int8_t)(problem ? 1 : 0));
-      const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_modulation_sync.nextRepublishMs) >= 0;
-      if (firstSeen || valueDiff || heartbeatDue) {
-        s_modulation_sync.last            = (int8_t)(problem ? 1 : 0);
-        s_modulation_sync.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-        sendMQTTData(F("sat/modulation_sync"), problem ? "ON" : "OFF", true);
-      }
+      publishIfChangedBStr(F("sat/modulation_sync"), problem, s_modulation_sync, "ON", "OFF", true);
     }
 
     static unsigned long syncCHMismatchSince = 0;
@@ -2537,14 +2460,7 @@ void satPublishMQTT()
       else if (syncCHMismatchSince == 0) syncCHMismatchSince = millis();
       bool problem = mismatch && syncCHMismatchSince > 0 &&
                      (millis() - syncCHMismatchSince >= 60000UL);
-      const bool firstSeen    = (s_ch_sync.nextRepublishMs == 0);
-      const bool valueDiff    = !firstSeen && (s_ch_sync.last != (int8_t)(problem ? 1 : 0));
-      const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_ch_sync.nextRepublishMs) >= 0;
-      if (firstSeen || valueDiff || heartbeatDue) {
-        s_ch_sync.last            = (int8_t)(problem ? 1 : 0);
-        s_ch_sync.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-        sendMQTTData(F("sat/ch_sync"), problem ? "ON" : "OFF", true);
-      }
+      publishIfChangedBStr(F("sat/ch_sync"), problem, s_ch_sync, "ON", "OFF", true);
     }
   }
 

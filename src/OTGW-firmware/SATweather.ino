@@ -707,19 +707,8 @@ void weatherPublishMQTT()
   publishIfChangedF(F("sat/weather/snowfall"),       state.sat.weather.fSnowfall,      s_w_snowfall,     SAT_EPS_TEMP_COARSE, 1, false);
   publishIfChangedI(F("sat/weather/weather_code"),   (int32_t)state.sat.weather.iWeatherCode, s_w_weather_code, false);
 
-  // is_day historically uses "1"/"0" payload (not "true"/"false") — gate via
-  // SATShadowB but emit the legacy payload directly.
-  {
-    const bool current      = state.sat.weather.bIsDay;
-    const bool firstSeen    = (s_w_is_day.nextRepublishMs == 0);
-    const bool valueDiff    = !firstSeen && (s_w_is_day.last != (int8_t)(current ? 1 : 0));
-    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_w_is_day.nextRepublishMs) >= 0;
-    if (firstSeen || valueDiff || heartbeatDue) {
-      s_w_is_day.last            = (int8_t)(current ? 1 : 0);
-      s_w_is_day.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
-      sendMQTTData(F("sat/weather/is_day"), current ? "1" : "0", false);
-    }
-  }
+  // is_day historically uses "1"/"0" payload (not "true"/"false").
+  publishIfChangedBStr(F("sat/weather/is_day"), state.sat.weather.bIsDay, s_w_is_day, "1", "0", false);
 #endif  // ifndef ESP8266
 }
 

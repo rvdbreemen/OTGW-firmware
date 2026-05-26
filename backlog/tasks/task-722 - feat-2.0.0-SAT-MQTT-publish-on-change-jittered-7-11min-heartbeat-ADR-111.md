@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-26 19:11'
-updated_date: '2026-05-26 19:30'
+updated_date: '2026-05-26 20:43'
 labels:
   - feat-2.0.0
   - mqtt
@@ -27,13 +27,13 @@ De OTGW32 2.0.0 firmware publiceert ~74 MQTT-topics onder sat/* elke control-cyc
 - [x] #2 ADR-111 is door de gebruiker reviewed en goedgekeurd; status geflipt naar 'Accepted, YYYY-MM-DD' (geen self-approval).
 - [x] #3 src/OTGW-firmware/SATmqttPublish.h aangemaakt met struct-definities SATShadowF/I/B/S, 4 helper-prototypes, tolerantie-constanten (SAT_EPS_*), en inline satRandomHeartbeatMs() + satRandomBootScatterMs() functies (ESP32/ESP8266 conditional via #if defined(ESP32)).
 - [x] #4 src/OTGW-firmware/SATmqttPublish.cpp aangemaakt met 4 helper-implementaties die de eligibility-formule uit ADR-111 sub-rule 2 toepassen: first-seen OR value-differs OR heartbeat-due. Float-vergelijking gebruikt fabsf(current - last) >= tolerance. Shadow-write gebeurt voor de sendMQTTData-call.
-- [ ] #5 satPublishMQTT() in SATcontrol.ino (regels ~1986-2279) gerefactord: elke sendMQTTData(F("sat/..."), ...) vervangen door corresponderende publishIfChanged* helper met file-static shadow naast huidige functie. Geen gedragsverandering anders dan het on-change + heartbeat gate.
-- [ ] #6 satPressureHealthPublish() in SATpressure.ino (regels ~62-72) gerefactord volgens hetzelfde patroon.
-- [ ] #7 satBLEPublishStateTopics() in SATble.ino (regels ~570-650) gerefactord. BLE-mutex-snapshot blijft intact; shadow-state buiten de mutex.
-- [ ] #8 weatherPublishMQTT() in SATweather.ino (regels ~677-724) gerefactord. Weather-poll-timer (15min) blijft ongewijzigd; helpers gaten alleen door heartbeat-check.
-- [ ] #9 Memory-budget: totale BSS-toename voor SAT-shadows blijft onder 1.5 KB. Verifieerbaar via python build.py --firmware map-file inspectie of nm op de elf.
-- [ ] #10 evaluate.py heeft nieuwe gate check_sat_publishes_use_helpers die failt als sendMQTTData(F("sat/...") of sendMQTTData(PSTR("sat/...") matcht in file anders dan SATmqttPublish.cpp. python evaluate.py --quick is groen.
-- [ ] #11 python build.py --firmware returnt exit 0 zonder nieuwe warnings.
+- [x] #5 satPublishMQTT() in SATcontrol.ino (regels ~1986-2279) gerefactord: elke sendMQTTData(F("sat/..."), ...) vervangen door corresponderende publishIfChanged* helper met file-static shadow naast huidige functie. Geen gedragsverandering anders dan het on-change + heartbeat gate.
+- [x] #6 satPressureHealthPublish() in SATpressure.ino (regels ~62-72) gerefactord volgens hetzelfde patroon.
+- [x] #7 satBLEPublishStateTopics() in SATble.ino (regels ~570-650) gerefactord. BLE-mutex-snapshot blijft intact; shadow-state buiten de mutex.
+- [x] #8 weatherPublishMQTT() in SATweather.ino (regels ~677-724) gerefactord. Weather-poll-timer (15min) blijft ongewijzigd; helpers gaten alleen door heartbeat-check.
+- [x] #9 Memory-budget: totale BSS-toename voor SAT-shadows blijft onder 1.5 KB. Verifieerbaar via python build.py --firmware map-file inspectie of nm op de elf.
+- [x] #10 evaluate.py heeft nieuwe gate check_sat_publishes_use_helpers die failt als sendMQTTData(F("sat/...") of sendMQTTData(PSTR("sat/...") matcht in file anders dan SATmqttPublish.cpp. python evaluate.py --quick is groen.
+- [x] #11 python build.py --firmware returnt exit 0 zonder nieuwe warnings.
 - [ ] #12 Beta-build geflasht naar test-device. In telnet-log waarneembaar: significante reductie in sat/* publish-frequentie, en heartbeat-publishes verspreid binnen 7-11min venster per topic. Documenteer voor/na publish-rate in Final Summary.
 - [ ] #13 Field-validation: minstens 1 beta-tester in Discord #dev-sat-mqtt bevestigt dat HA-historiek significant kalmer is en geen functionaliteit ontbreekt (geen 'unavailable' sensoren na 11min).
 - [ ] #14 HA-dashboard toont nog steeds live waarden binnen acceptabele cadence (WebSocket-pad raakt SAT-publish niet, maar verifieer dat HA-dashboard geen verloren sensoren toont).
@@ -49,6 +49,17 @@ De OTGW32 2.0.0 firmware publiceert ~74 MQTT-topics onder sat/* elke control-cyc
 - python build.py --firmware: exit 0
 - python evaluate.py --quick: 0 failed, 62 passed, 1 unrelated pre-existing warning
 Next step: refactor satPublishMQTT() in SATcontrol.ino (~50 call-sites, batched per group).
+
+2026-05-26: Second milestone — full refactor committed.
+- satPublishMQTT() (SATcontrol.ino): ~50 publishes routed through helpers; per-veld float tolerance; 4 JSON-blobs gated via anyChanged signal + heartbeat.
+- satPressureHealthPublish() (SATpressure.ino): 2 publishes refactored.
+- satBLEPublishMQTT()/satBLEPublishStateTopics() (SATble.ino+MQTTstuff.ino): 6 publishes + per-MAC shadow reset on selection change.
+- weatherPublishMQTT() (SATweather.ino): 13 publishes refactored (ESP32-only fields conditionally compiled).
+- 11 inline manual-gated ON/OFF/1/0 binary publishes consolidated into new publishIfChangedBStr helper.
+- One legitimate exception: sat/target event-driven echo in satHandlePreset (preset-clear); marked with // ADR-111 exception comment; gate respects same-line/2-line-back marker.
+- evaluate.py gate check_sat_publishes_use_helpers added (forbid raw sendMQTTData(F("sat/...") outside SATmqttPublish.cpp, allows comment-marked exceptions).
+- char* topic overloads added to helpers (publishIfChangedF/I/B/S) for runtime-built topics (sat/ble/<mac>/temp etc).
+- Build green: ESP8266 RAM 91.0% (74588B; ~104B delta from no-refactor baseline incl. ~1KB shadow allocation), Flash 82.9
 <!-- SECTION:NOTES:END -->
 
 ## Definition of Done

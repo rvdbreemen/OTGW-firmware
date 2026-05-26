@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-alpha.73
+**  Version  : v2.0.0-alpha.75
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -29,6 +29,12 @@
 // unit.
 bool sendMQTTData(const __FlashStringHelper* topic, const char* json, const bool retain);
 bool sendMQTTData(const char* topic, const char* json, const bool retain);
+
+// Forward-declare the internal helpers so the char* overloads (defined first
+// in this file) can call them — the definitions live further down to keep
+// related code grouped.
+static inline bool     satHeartbeatDue(uint32_t nextRepublishMs);
+static inline uint32_t satNextDeadline(bool wasFirstSeen);
 
 // ---------------------------------------------------------------------------
 // const char* topic overloads — body is identical to the F() overloads. We
@@ -214,6 +220,26 @@ bool publishIfChangedS(const __FlashStringHelper* topic, const char* current,
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
 
   sendMQTTData(topic, current, retained);
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Bool helper with custom labels (ADR-111). Behaves like publishIfChangedB
+// but emits caller-supplied on/off labels — for HA binary_sensor entities
+// that expect "ON"/"OFF" or "1"/"0" instead of "true"/"false".
+// ---------------------------------------------------------------------------
+
+bool publishIfChangedBStr(const __FlashStringHelper* topic, bool current,
+                          SATShadowB& shadow, const char* onLabel,
+                          const char* offLabel, bool retained)
+{
+  const bool firstSeen    = (shadow.nextRepublishMs == 0);
+  const bool valueDiff    = !firstSeen && (shadow.last != (int8_t)(current ? 1 : 0));
+  const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
+  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  shadow.last            = (int8_t)(current ? 1 : 0);
+  shadow.nextRepublishMs = satNextDeadline(firstSeen);
+  sendMQTTData(topic, current ? onLabel : offLabel, retained);
   return true;
 }
 

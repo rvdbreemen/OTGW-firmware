@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-alpha.73
+**  Version  : v2.0.0-alpha.75
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -172,6 +172,16 @@ bool publishIfChangedB(const __FlashStringHelper* topic, bool current,
 
 bool publishIfChangedS(const __FlashStringHelper* topic, const char* current,
                        SATShadowS& shadow, bool retained);
+
+// Same as publishIfChangedB but emits caller-supplied labels for true/false
+// (e.g. "ON"/"OFF" or "1"/"0") instead of "true"/"false". Used for HA
+// binary_sensor entities whose state payload convention isn't true/false:
+// sat/flame_health, sat/device_health, sat/cycle_health, sat/setpoint_sync,
+// sat/modulation_sync, sat/ch_sync, sat/pressure_health, sat/simulation,
+// sat/auto_tune, sat/pv_boost_enabled, sat/weather/is_day.
+bool publishIfChangedBStr(const __FlashStringHelper* topic, bool current,
+                          SATShadowB& shadow, const char* onLabel,
+                          const char* offLabel, bool retained);
 
 // `const char*` topic overloads for runtime-built topics (e.g. sat/ble/<mac>/temp,
 // sat/area/<idx>). Same semantics; just routes through the matching sendMQTTData

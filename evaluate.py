@@ -2531,6 +2531,74 @@ class WorkspaceEvaluator:
                 "No sendMQTT(MQTTPubNamespace, CONLINEOFFLINE) call sites found"
             ))
 
+    # ===== ADR-111: SAT publishes use helpers =====
+
+    def check_sat_publishes_use_helpers(self):
+        """ADR-111 binding rule: every MQTT publish under sat/* must flow through
+        the publishIfChanged{F,I,B,S} helpers in SATmqttPublish.cpp. Direct
+        sendMQTTData(F("sat/..."), ...) or sendMQTTData(PSTR("sat/..."), ...)
+        outside the helper implementation file is forbidden — it bypasses the
+        on-change + jittered-heartbeat gate and reverts the broker-flood the
+        ADR was written to fix.
+
+        We deliberately allow:
+        - SATmqttPublish.cpp: the helper implementation itself.
+        - sendMQTTData(topic, ...) where topic is a runtime char buffer built
+          with snprintf_P (sat/ble/<mac>/..., sat/area/<i>) — those flow
+          through publishIfChanged*'s const char* overloads, also implemented
+          in SATmqttPublish.cpp. The regex below only catches literal F()/PSTR()
+          sat/* topics, which is the misuse class we care about.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-111 SAT Publishes Use Helpers ==={Colors.ENDC}")
+
+        src_root = config.FIRMWARE_ROOT
+        whitelist = {"SATmqttPublish.cpp"}
+        # Match: sendMQTTData(F("sat/...   or   sendMQTTData(PSTR("sat/...
+        # Allow arbitrary whitespace between tokens.
+        bad_re = re.compile(r'sendMQTTData\s*\(\s*(?:F|PSTR)\s*\(\s*"sat/')
+
+        violations = []
+        for path in sorted(src_root.glob("*.ino")) + sorted(src_root.glob("*.cpp")):
+            if path.name in whitelist:
+                continue
+            try:
+                lines = path.read_text(encoding='utf-8', errors='ignore').split('\n')
+            except OSError:
+                continue
+            for idx, line in enumerate(lines):
+                stripped = line.lstrip()
+                if stripped.startswith("//"):
+                    continue
+                if not bad_re.search(line):
+                    continue
+                # Allow a documented exception when the call carries an
+                # `// ADR-111 exception:` marker on the same line or one of
+                # the two preceding lines. Use sparingly — every exception
+                # is a code-review smell.
+                exception_window = "\n".join(lines[max(0, idx - 2):idx + 1])
+                if "ADR-111 exception:" in exception_window:
+                    continue
+                violations.append((path.name, idx + 1, stripped[:120]))
+
+        if not violations:
+            self.add_result(EvaluationResult(
+                "ADR-111", "SAT publishes use publishIfChanged helpers", "PASS",
+                "No raw sendMQTTData(F(\"sat/...\")) call sites outside SATmqttPublish.cpp"
+            ))
+            return
+
+        for fname, lineno, snippet in violations[:10]:
+            self.add_result(EvaluationResult(
+                "ADR-111", "SAT publishes use publishIfChanged helpers", "FAIL",
+                f"Raw sendMQTTData(F(\"sat/...\")) bypasses on-change + heartbeat: {snippet}",
+                f"{fname}:{lineno}"
+            ))
+        if len(violations) > 10:
+            self.add_result(EvaluationResult(
+                "ADR-111", "SAT publishes use publishIfChanged helpers", "FAIL",
+                f"... and {len(violations) - 10} more violations (showing first 10)"
+            ))
+
     # ===== BINARY-SAFE COMPARE CHECK =====
 
     def check_binary_safe_compare(self):
@@ -2719,6 +2787,7 @@ class WorkspaceEvaluator:
         self.check_binary_safe_compare()
         self.check_otdirect_25238_bridge()
         self.check_adr102_otbus_liveness_topic()     # ADR-102 CI gate (TASK-623)
+        self.check_sat_publishes_use_helpers()       # ADR-111 CI gate (TASK-722)
         self.check_adr_gates()
         self.check_backlog_hygiene()
         self.check_time_boundary_single_caller()      # ADR-086 CI gate (originally ADR-064, TASK-350)
