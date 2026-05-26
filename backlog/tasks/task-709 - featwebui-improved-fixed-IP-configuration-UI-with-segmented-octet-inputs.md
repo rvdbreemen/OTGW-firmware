@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-26 12:58'
-updated_date: '2026-05-26 13:08'
+updated_date: '2026-05-26 13:11'
 labels:
   - bug
   - webui
@@ -26,17 +26,17 @@ André (andrebrait, Discord #beta-testing 2026-05-26) reported that the fixed IP
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Checkbox labelled 'Use DHCP' is rendered above the fixed IP fields; it is checked by default when sStaticIp is empty
-- [ ] #2 Fixed IP fields (IP, Subnet, Gateway, DNS1, DNS2) are hidden when 'Use DHCP' is checked and visible when unchecked
-- [ ] #3 Each IP address field renders as 4 segmented number inputs separated by dots; each input accepts 0-255 only
-- [ ] #4 Unchecking 'Use DHCP' auto-fetches device/info and prefills all IP fields with current DHCP lease values
-- [ ] #5 DNS1 and DNS2 prefill from current DHCP DNS if available; otherwise fields remain empty
-- [ ] #6 Auto-advance: 3 digits entered or '.' pressed moves focus to next octet; backspace on empty octet moves focus back
-- [ ] #7 Paste of full dotted-decimal IP into any octet field splits and fills all 4 octets of that group
-- [ ] #8 Save sends wifistaticip as empty string when DHCP is selected, or as joined dotted-decimal when fixed IP is selected
-- [ ] #9 restAPI.ino sendDeviceInfoV2() exposes wifi_current_subnet, wifi_current_gateway, wifi_current_dns1, wifi_current_dns2
-- [ ] #10 firmware compiles clean (python build.py --firmware exits 0)
-- [ ] #11 evaluate.py --quick shows no new failures
+- [x] #1 Checkbox labelled 'Use DHCP' is rendered above the fixed IP fields; it is checked by default when sStaticIp is empty
+- [x] #2 Fixed IP fields (IP, Subnet, Gateway, DNS1, DNS2) are hidden when 'Use DHCP' is checked and visible when unchecked
+- [x] #3 Each IP address field renders as 4 segmented number inputs separated by dots; each input accepts 0-255 only
+- [x] #4 Unchecking 'Use DHCP' auto-fetches device/info and prefills all IP fields with current DHCP lease values
+- [x] #5 DNS1 and DNS2 prefill from current DHCP DNS if available; otherwise fields remain empty
+- [x] #6 Auto-advance: 3 digits entered or '.' pressed moves focus to next octet; backspace on empty octet moves focus back
+- [x] #7 Paste of full dotted-decimal IP into any octet field splits and fills all 4 octets of that group
+- [x] #8 Save sends wifistaticip as empty string when DHCP is selected, or as joined dotted-decimal when fixed IP is selected
+- [x] #9 restAPI.ino sendDeviceInfoV2() exposes wifi_current_subnet, wifi_current_gateway, wifi_current_dns1, wifi_current_dns2
+- [x] #10 firmware compiles clean (python build.py --firmware exits 0)
+- [x] #11 evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
