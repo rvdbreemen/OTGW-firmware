@@ -432,6 +432,27 @@ body.dark .otmonrow,
 }
 .ot-stats-table tr:hover { background: var(--bg-panel); }
 
+/* Drag-to-resize handle on right edge of each stats-table header. */
+.ot-stats-table th .col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 11;
+}
+.ot-stats-table th .col-resizer:hover,
+.ot-stats-table th .col-resizer.dragging {
+  background-color: var(--border-1);
+}
+body.col-resizing,
+body.col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
 /* =============================================================
  * 12. CHART CONTAINER (ECharts via CDN)
  *

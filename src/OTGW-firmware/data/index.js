@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.70
+**  Version  : v2.0.0-alpha.71
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3145,6 +3145,7 @@ function initMainPage() {
 
   renderSharedPageNavShell();
   updateThemeToggle();
+  initStatsColResizers();
 
   // theme-toggle.js is the canonical toggle; listen for its event to handle
   // side-effects: chart re-theme, server persistence, settings checkbox sync.
@@ -6930,6 +6931,107 @@ function handleFlashMessage(data) {
 ** Statistics Tab Functions
 ***************************************************************************
 */
+
+// --- Stats table column resize (TASK-703 port) --------------------------
+var STATS_COL_STORAGE_KEY = 'otStatsColWidths';
+var STATS_COL_MIN_WIDTH = 30;
+var otStatsResizeState = null;
+
+function getStatsTableCols() {
+  var table = document.getElementById('otStatsTable');
+  if (!table) return null;
+  var colgroup = table.querySelector('colgroup');
+  if (!colgroup) return null;
+  return colgroup.querySelectorAll('col');
+}
+
+function loadStatsColWidths() {
+  try {
+    var raw = localStorage.getItem(STATS_COL_STORAGE_KEY);
+    if (!raw) return null;
+    var arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return null;
+    return arr;
+  } catch (e) { return null; }
+}
+
+function saveStatsColWidths() {
+  var cols = getStatsTableCols();
+  if (!cols) return;
+  var widths = [];
+  for (var i = 0; i < cols.length; i++) {
+    widths.push(cols[i].style.width || '');
+  }
+  try { localStorage.setItem(STATS_COL_STORAGE_KEY, JSON.stringify(widths)); } catch (e) {}
+}
+
+function applyStoredStatsColWidths() {
+  var cols = getStatsTableCols();
+  if (!cols) return;
+  var widths = loadStatsColWidths();
+  if (!widths) return;
+  for (var i = 0; i < cols.length && i < widths.length; i++) {
+    if (widths[i]) cols[i].style.width = widths[i];
+  }
+}
+
+function onStatsResizeMove(e) {
+  if (!otStatsResizeState) return;
+  var newWidth = otStatsResizeState.startWidth + (e.clientX - otStatsResizeState.startX);
+  if (newWidth < STATS_COL_MIN_WIDTH) newWidth = STATS_COL_MIN_WIDTH;
+  otStatsResizeState.col.style.width = newWidth + 'px';
+  e.preventDefault();
+}
+
+function onStatsResizeUp() {
+  if (!otStatsResizeState) return;
+  if (otStatsResizeState.handle) otStatsResizeState.handle.classList.remove('dragging');
+  document.body.classList.remove('col-resizing');
+  document.removeEventListener('mousemove', onStatsResizeMove);
+  document.removeEventListener('mouseup', onStatsResizeUp);
+  otStatsResizeState = null;
+  saveStatsColWidths();
+}
+
+function onStatsResizeDown(e) {
+  if (e.button !== 0) return;
+  var handle = e.currentTarget;
+  var th = handle.parentNode;
+  var idx = th.cellIndex;
+  var cols = getStatsTableCols();
+  if (!cols || idx < 0 || idx >= cols.length) return;
+  var col = cols[idx];
+  var startWidth = th.getBoundingClientRect().width;
+  col.style.width = startWidth + 'px';
+  otStatsResizeState = { col: col, handle: handle, startX: e.clientX, startWidth: startWidth };
+  handle.classList.add('dragging');
+  document.body.classList.add('col-resizing');
+  document.addEventListener('mousemove', onStatsResizeMove);
+  document.addEventListener('mouseup', onStatsResizeUp);
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function initStatsColResizers() {
+  var table = document.getElementById('otStatsTable');
+  if (!table) return;
+  if (table.getAttribute('data-resizers-init') === '1') {
+    applyStoredStatsColWidths();
+    return;
+  }
+  var ths = table.querySelectorAll('thead th');
+  for (var i = 0; i < ths.length; i++) {
+    if (i === ths.length - 1) continue;
+    var handle = document.createElement('div');
+    handle.className = 'col-resizer';
+    handle.addEventListener('mousedown', onStatsResizeDown);
+    handle.addEventListener('click', function(ev) { ev.stopPropagation(); });
+    ths[i].appendChild(handle);
+  }
+  table.setAttribute('data-resizers-init', '1');
+  applyStoredStatsColWidths();
+}
+
 var statsBuffer = {};
 var statsSortCol = 1; // Default sort by Dec ID
 var statsSortAsc = true;
@@ -7017,6 +7119,7 @@ function openLogTab(evt, tabName) {
   if (currentTab === 'Log') {
     logTabActivatedAt = Date.now();
   } else if (currentTab === 'Statistics') {
+      initStatsColResizers();
       updateStatisticsDisplay();
       refreshBoilerSupport();
   } else if (currentTab === 'OTSupport') {
