@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:26'
-updated_date: '2026-05-26 09:15'
+updated_date: '2026-05-26 09:19'
 labels:
   - ci
   - tech-debt
@@ -29,22 +29,5 @@ The 2.0.0 feature line (feature-dev-2.0.0-otgw32-esp32-sat-support, base 201b301
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Triaged all four pre-existing CI baseline failures on the 2.0.0 feature line (baseline alpha.34 / PR #582, 2026-05-16). All four are already green on current HEAD (alpha.70+86f392d); no code change required.
-
-Findings per check:
-
-1. evaluate.py --quick — was Failed:1, Health 95.6% at alpha.34. Now 0 Failed, 1 warning (informational: ADR-062 instrumentation check skipped because mqtt_configuratie.cpp not present), Health 98.6%. Fixed by intervening 2.0.0 work since alpha.34. Verified locally and on PR #605 CI (most recent merged 2.0.0 PR).
-
-2. Spec-driven OT v4.2 audit — workflow no longer exists in .github/workflows/ on the 2.0.0 branch. Removed in an earlier CI cleanup (the directory currently contains only build.yml, claude.yml, claude-code-review.yml, dependency-scan.yml, evaluate.yml, trigger-copilot-agent.yml). Check cannot be red because the job no longer runs.
-
-3. pio run -e esp8266 — was failing with 'SimpleTelnet.h: No such file or directory' on PR #582. Root cause: vendored library not on PlatformIO lib path. Fixed: platformio.ini [env] block sets lib_extra_dirs = src/libraries, picking up src/libraries/SimpleTelnet/. PR #605 esp8266 pass (3m44s on esp32, 1m28s on esp8266).
-
-4. pio run -e esp32 — same lib_extra_dirs fix covers both targets. PR #605 esp32 pass.
-
-Local verification (2026-05-26, HEAD = alpha.70+86f392d):
-- python build.py --firmware exit 0 (Arduino CLI build, project's standard gate)
-- python evaluate.py --quick: 61 passed / 1 warning / 0 failed / 7 info, Health 98.6%
-- gh pr checks 605 (last merged 2.0.0 PR): evaluate.py pass, pio esp8266 pass, pio esp32 pass, claude-review pass
-
-No follow-ups deferred — all four baseline reds are demonstrably green on HEAD.
+Triage-only: all 4 baseline CI failures already resolved on HEAD. evaluate.py --quick: 0 failed, 98.6%; OT v4.2 audit workflow removed; pio esp8266+esp32: pass (lib_extra_dirs fix in platformio.ini via PR#605). No code changes needed.
 <!-- SECTION:FINAL_SUMMARY:END -->
