@@ -1,11 +1,11 @@
 ---
 id: TASK-711
 title: 'adr-kit Feature 2: Automated Retirement Detection'
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-26 13:37'
-updated_date: '2026-05-26 16:52'
+updated_date: '2026-05-26 17:16'
 labels:
   - adr-kit
   - phase-1
@@ -78,21 +78,29 @@ DELIVERABLES:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 bin/adr-retire tool created with all 4 detectors implemented
-- [ ] #2 Each detector returns confidence score (0.0-1.0)
-- [ ] #3 Retirement score = average of 4 signals
-- [ ] #4 JSON output includes all signal scores
-- [ ] #5 Markdown output is human-readable
-- [ ] #6 Recommendations: RETIRE (>=0.8), REVIEW (>=0.6), MONITOR (>=0.4), KEEP (<0.4)
-- [ ] #7 Performance <2s on 30-ADR suite
-- [ ] #8 15+ test cases passing
-- [ ] #9 GitHub Actions workflow creates weekly issues
-- [ ] #10 skills/retire/SKILL.md created
-- [ ] #11 All existing tests pass
+- [x] #1 bin/adr-retire tool created with all 4 detectors implemented
+- [x] #2 Each detector returns confidence score (0.0-1.0)
+- [x] #3 Retirement score = average of 4 signals
+- [x] #4 JSON output includes all signal scores
+- [x] #5 Markdown output is human-readable
+- [x] #6 Recommendations: RETIRE (>=0.8), REVIEW (>=0.6), MONITOR (>=0.4), KEEP (<0.4)
+- [x] #7 Performance <2s on 30-ADR suite
+- [x] #8 15+ test cases passing
+- [x] #9 GitHub Actions workflow creates weekly issues
+- [x] #10 skills/retire/SKILL.md created
+- [x] #11 All existing tests pass
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-05-26: Picked up by @codex for Phase 1 execution. Implementation target is the standalone repo D:\Users\Robert\Documents\GitHub\RvdB\adr-kit on branch v0.14-dev. Initial inspection found bin/adr-retire present but with placeholder staleness, technology-removal, and policy-mismatch detectors plus placeholder tests; the workflow and retire skill deliverables are not yet present.
+
+Completed by @codex in standalone adr-kit repo on branch v0.14-dev, commit 2c0ce50. Replaced placeholder detectors with deterministic staleness, explicit technology disappearance, broken supersession, and policy-pattern checks; added JSON/Markdown/text reports, weekly audit workflow, retire skill, and 22 real retirement tests including 30-ADR budget coverage. Broken supersession checking also covers Superseded ADR records and respects its configuration flag. Verification: python -m pytest -q reported 94 passed; script compilation, Markdown lint, JSON/schema checks, and CLI smoke runs passed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented v0.14 Phase 1 retirement detection in adr-kit commit 2c0ce50 on v0.14-dev. bin/adr-retire now reports four bounded signal scores and threshold-based recommendations, with a read-only retire skill and optional weekly GitHub issue workflow. Placeholder tests were removed in favor of executable detector, reporting, configuration, and performance tests; complete validation passes.
+<!-- SECTION:FINAL_SUMMARY:END -->
