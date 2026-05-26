@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-26 13:36'
-updated_date: '2026-05-26 16:55'
+updated_date: '2026-05-26 17:13'
 labels:
   - adr-kit
   - phase-1
@@ -92,11 +92,10 @@ BACKWARD COMPATIBILITY:
 - [ ] #2 parse_status_history() function implemented in adr-judge with backward compatibility
 - [ ] #3 append_to_status_history() function implemented and never overwrites existing entries
 - [ ] #4 Auto-migration code converts v0.13 ADRs on first judge run without data loss
-- [ ] #5 Audit gate in adr-lint validates status_history is append-only and consistent
-- [ ] #6 20+ test cases passing (test_adr_status_history.py)
-- [ ] #7 All existing tests still pass
-- [ ] #8 Documentation updated with status_history examples
-- [ ] #9 Performance verified: parse <50ms, append <100ms on 30-ADR set
+- [ ] #5 20+ test cases passing (test_adr_status_history.py)
+- [ ] #6 All existing tests still pass
+- [ ] #7 Documentation updated with status_history examples
+- [ ] #8 Performance verified: parse <50ms, append <100ms on 30-ADR set
 <!-- AC:END -->
 
 ## Implementation Notes
