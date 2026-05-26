@@ -9,7 +9,7 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## What's new on dev (since v1.5.0-fix2)
 
-Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.22`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
+Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.23`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
 
 **MQTT and Home Assistant discovery**
 - **HA availability now reflects the MQTT link, not the OpenTherm bus** (ADR-074, regression fix). Entities like `DHW Control` and `Thermostat` no longer flap `unavailable` when the boiler stops talking; OT-bus liveness lives on the dedicated `otgw_connected` sensor. **Contract change:** consumers reading the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to `otgw_connected`.
@@ -21,7 +21,7 @@ Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.22`). The list b
 - **HA capability-flag binary sensors for bits 2-5 no longer stuck at `unknown`** (ADR-076, PR #614): the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so cooling, OTC active, CH2 active, and summer/winter all reach their retained topics on every status change.
 
 **Settings and networking**
-- **Static IP address support** (TASK-548): configure a fixed IP, subnet, gateway, and up to two DNS servers in the firmware settings. Persisted across reboots and applied before WiFiManager connects, so the device lands on a predictable address every time.
+- **Static IP address support with improved UI** (TASK-548, TASK-709): configure a fixed IP, subnet, gateway, and up to two DNS servers in the firmware settings. Persisted across reboots and applied before WiFiManager connects. The settings page shows a "Use DHCP" toggle; unchecking it reveals the IP fields and auto-fills them from the current DHCP lease. Each address uses four segmented inputs (0-255 per octet) with auto-advance and paste support.
 
 **Web UI and diagnostics**
 - **Statistics table drag-to-resize columns** (TASK-703): grab any column header edge in the Statistics tab to resize it. Width preferences are saved in localStorage and survive page reloads.
