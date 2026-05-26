@@ -1,11 +1,11 @@
 ---
 id: TASK-709.1
 title: 'fix(webui): document fixed-IP mobile octet follow-up and Codex tracking rule'
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-26 15:05'
-updated_date: '2026-05-26 15:16'
+updated_date: '2026-05-26 15:17'
 labels:
   - bug
   - webui
@@ -31,12 +31,12 @@ Follow-up to TASK-709. On 2026-05-26 the fixed-IP segmented inputs were reported
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each fixed-IP address type displays its four dotted octet inputs on one non-wrapping line at smartphone and desktop widths.
-- [ ] #2 Each octet accepts numeric entry only, is limited to three digits and values from 0 through 255, and supports forward keyboard/mobile entry without breaking the row layout.
-- [ ] #3 Existing configured fixed-IP values populate when the screen first renders, and incomplete or invalid fixed-IP values cannot be saved.
-- [ ] #4 The fixed-IP section is usable in both light and dark themes.
-- [ ] #5 AGENTS.md tells Codex to create or pick up a Backlog task before any code or file work and to follow the CLI pickup and closure workflow from CLAUDE.md.
-- [ ] #6 Implementation notes contain branch and coding-agent metadata plus validation evidence for the UI behavior and evaluator result.
+- [x] #1 Each fixed-IP address type displays its four dotted octet inputs on one non-wrapping line at smartphone and desktop widths.
+- [x] #2 Each octet accepts numeric entry only, is limited to three digits and values from 0 through 255, and supports forward keyboard/mobile entry without breaking the row layout.
+- [x] #3 Existing configured fixed-IP values populate when the screen first renders, and incomplete or invalid fixed-IP values cannot be saved.
+- [x] #4 The fixed-IP section is usable in both light and dark themes.
+- [x] #5 AGENTS.md tells Codex to create or pick up a Backlog task before any code or file work and to follow the CLI pickup and closure workflow from CLAUDE.md.
+- [x] #6 Implementation notes contain branch and coding-agent metadata plus validation evidence for the UI behavior and evaluator result.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -60,3 +60,9 @@ Validation evidence (2026-05-26): node --check src/OTGW-firmware/data/index.js p
 
 Browser evidence: a temporary localhost fixture with mocked /api/v2/settings was exercised using headless Playwright Chromium. At 360px light, 1280px light, and 320px dark, all five fixed-IP address groups stayed within the viewport with all four octets on one line; smartphone octets were 40px each and stored values rendered initially. Dark mode used the fixed-IP dark styling. Interaction assertions passed for 9999 clamping to 255, maxlength=3, numeric input mode, three-digit/dot forward navigation, and blocking Save with an incomplete required IP address. Temporary browser fixture files and test-results were removed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Completed on branch dev by Codex (GPT-5). This retrospective follow-up records the TASK-709 mobile regression correction: fixed-IP octet groups now remain on one dotted row per address type at phone and desktop widths; entry is numeric, capped at 0-255/three digits, auto-advances, restores stored values on initial rendering, and blocks invalid saves; dark-mode component styles are included. AGENTS.md now mirrors CLAUDE.md's mandatory Backlog-before-edits, pickup, evidence, and autonomous-closure rules for Codex, including how to handle already-started untracked work. Verified with node syntax checking, git diff whitespace checking, evaluate.py --quick (0 failures), the combined firmware plus LittleFS build, and fresh Playwright assertions for responsive layouts and input behavior. The validated UI and AGENTS.md file changes remain in the working tree for normal packaging/commit handling.
+<!-- SECTION:FINAL_SUMMARY:END -->
