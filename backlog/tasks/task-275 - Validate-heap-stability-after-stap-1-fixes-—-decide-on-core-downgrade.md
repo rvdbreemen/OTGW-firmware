@@ -1,10 +1,11 @@
 ---
 id: TASK-275
 title: 'Validate: heap stability after stap-1 fixes — decide on core downgrade'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-15 19:59'
-updated_date: '2026-05-06 12:32'
+updated_date: '2026-05-26 09:39'
 labels:
   - validation
   - stability
