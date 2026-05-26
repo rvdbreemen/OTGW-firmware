@@ -1,10 +1,11 @@
 ---
 id: TASK-709
 title: 'feat(webui): improved fixed IP configuration UI with segmented octet inputs'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-26 12:58'
-updated_date: '2026-05-26 12:59'
+updated_date: '2026-05-26 13:01'
 labels:
   - bug
   - webui
