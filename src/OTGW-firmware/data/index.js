@@ -4464,8 +4464,17 @@ function prefillFromDHCP() {
     .then(function(json) {
       if (!json || !json.device) return;
       var d = json.device;
+      function isValidPrefillIP(value) {
+        if (!value) return false;
+        var parts = value.split('.');
+        if (parts.length !== 4) return false;
+        return parts.every(function(p) {
+          var n = parseInt(p, 10);
+          return p !== '' && !isNaN(n) && n >= 0 && n <= 254;
+        });
+      }
       function prefillIfEmpty(fieldKey, value) {
-        if (!value || value === '0.0.0.0') return;
+        if (!isValidPrefillIP(value)) return;
         var inputs = getOctetInputs(fieldKey);
         if (inputs.length > 0 && inputs.every(function(i) { return i.value === ''; })) {
           splitIpToOctets(fieldKey, value);
@@ -5034,10 +5043,10 @@ function sendPostSetting(field, value) {
       //return response.text()
       const msgEl = document.getElementById("settingMessage");
       if (response.ok) {
-        if (msgEl) msgEl.textContent = "Saving changes... SUCCESS";
+        if (msgEl) { msgEl.className = "success"; msgEl.textContent = "Saving changes... SUCCESS"; }
         setTimeout(function () {
           const msgEl = document.getElementById("settingMessage");
-          if (msgEl) msgEl.textContent = "";
+          if (msgEl) { msgEl.textContent = ""; msgEl.className = ""; }
         }, 2000); //and clear the message
       } else {
         if (msgEl) msgEl.textContent = "Saving changes... FAILED";

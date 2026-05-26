@@ -587,6 +587,10 @@
   display: block;
   background-color: coral;
 }
+#settingMessage.success {
+  display: block;
+  background-color: #4CAF50;
+}
 
   /* define tag selectors () -------------------------------------------------- */
   
@@ -642,6 +646,11 @@
 
   .fixed-ip-field-label {
     padding-left: 24px;
+    text-align: left;
+  }
+
+  .fixed-ip-section .settings-field-container {
+    text-align: left;
   }
 
   .fixed-ip-dhcp-label {
