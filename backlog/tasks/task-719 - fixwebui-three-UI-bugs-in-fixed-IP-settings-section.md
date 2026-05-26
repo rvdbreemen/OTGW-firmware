@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-26 17:44'
-updated_date: '2026-05-26 17:45'
+updated_date: '2026-05-26 17:46'
 labels:
   - bug
   - webui
@@ -27,4 +27,5 @@ Three bugs found in fixed-IP settings UI based on andrebrait feedback in #beta-t
 - [ ] #3 After a successful save, the orange/coral settingMessage box disappears (className is cleared along with textContent)
 - [ ] #4 Build compiles clean (python build.py exits 0)
 - [ ] #5 evaluate.py --quick shows no new failures
+- [ ] #6 When DNS Server 1 (or DNS Server 2) is available and valid from the DHCP lease, it is pre-filled when the user unchecks DHCP
 <!-- AC:END -->
