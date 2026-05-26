@@ -25,3 +25,11 @@ The Done column contains a large accumulated set of completed tasks. Archive the
 - [ ] #2 Preserve or restore backlog auto_commit configuration after batching archive operations into a coherent commit.
 - [ ] #3 Final notes record the number archived, remaining Done holdback, branch, coding agent, and verification state.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Apply an archive criterion: tasks may leave Done once completion is verified and their implementation is committed/released or intentionally obsolete; retain tasks tied to current uncommitted follow-up work or unresolved proof.
+2. Archive the completed historical Done set through the Backlog CLI, retaining TASK-709 and TASK-709.1 while the fixed-IP correction remains in the working tree.
+3. Verify Done/archive counts, restore any CLI configuration changed for batching, record the result, and close/archive this maintenance task.
+<!-- SECTION:PLAN:END -->
