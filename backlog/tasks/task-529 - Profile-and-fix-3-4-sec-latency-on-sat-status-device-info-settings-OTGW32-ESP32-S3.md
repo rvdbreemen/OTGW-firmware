@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-03 18:51'
-updated_date: '2026-05-25 22:22'
+updated_date: '2026-05-25 22:40'
 labels:
   - performance
   - esp32
@@ -136,6 +136,8 @@ Both aggravators put extra work on the same scheduler that has to flush HTTP res
 Added coalescing TX buffer to jsonStuff.ino (#ifdef ESP32 only). Static 4096-byte buffer in restSendContent/restSendContentP accumulates JSON chunks; restFlushTxBuf() fires on auto-fill or at sendEndJsonMap/sendEndJsonObj. ESP8266 path unchanged. Expected: 406 round-trips -> 2-4 TCP flushes, T_send 3816ms -> <100ms. Build running.
 
 ADR-109 drafted (docs/adr/ADR-109-esp32-rest-response-coalescing-buffer.md). ACs 1/4/5/9 closed offline. ACs 2/3/6/7/8 require hardware validation by SergeantD on current alpha build.
+
+ESP8266 build (2.0.0) clean: alpha.69+e7f8b92. #ifdef ESP32 guard in jsonStuff.ino:191 ensures the coalescing buffer path is ESP32-only. ESP8266 sendContent/sendContent_P calls are byte-identical to before the fix.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -1,11 +1,11 @@
 ---
 id: TASK-640
 title: 'SAT: PV-surplus aware setpoint boost (opportunistic heat absorption)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-20 18:26'
-updated_date: '2026-05-25 23:05'
+updated_date: '2026-05-25 23:06'
 labels:
   - sat
   - feature
