@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-22 20:53'
-updated_date: '2026-05-26 09:53'
+updated_date: '2026-05-26 09:56'
 labels:
   - bug
   - needs-info
@@ -25,7 +25,7 @@ GitHub #554 (ArnoudPJ, 2026-04-22): A fresh Wemos D1 mini could not be flashed w
 <!-- AC:BEGIN -->
 - [x] #1 Reporter confirms whether 1.4.1 direct-flash also bootloops on a fresh Wemos D1
 - [ ] #2 Serial output or telnet log during bootloop captured
-- [ ] #3 Root cause identified (partition mismatch, LittleFS init, PROGMEM alignment, or other)
+- [x] #3 Root cause identified (partition mismatch, LittleFS init, PROGMEM alignment, or other)
 - [ ] #4 Fix verified by reporter or on a fresh Wemos D1 in the lab
 <!-- AC:END -->
 
