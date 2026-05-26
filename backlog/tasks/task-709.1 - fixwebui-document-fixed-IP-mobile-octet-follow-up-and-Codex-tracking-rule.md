@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-26 15:05'
-updated_date: '2026-05-26 15:06'
+updated_date: '2026-05-26 15:07'
 labels:
   - bug
   - webui
@@ -38,3 +38,11 @@ Follow-up to TASK-709. On 2026-05-26 the fixed-IP segmented inputs were reported
 - [ ] #5 AGENTS.md tells Codex to create or pick up a Backlog task before any code or file work and to follow the CLI pickup and closure workflow from CLAUDE.md.
 - [ ] #6 Implementation notes contain branch and coding-agent metadata plus validation evidence for the UI behavior and evaluator result.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Record the fixed-IP responsive/entry correction already present in the working tree as the follow-up to TASK-709.
+2. Align AGENTS.md with CLAUDE.md so Codex must track work in Backlog before editing and use the pickup/closure workflow.
+3. Re-run relevant validation, attach branch/agent and evidence notes, check acceptance criteria, and close this follow-up when verified.
+<!-- SECTION:PLAN:END -->
