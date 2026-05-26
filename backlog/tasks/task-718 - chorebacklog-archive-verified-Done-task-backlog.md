@@ -1,9 +1,11 @@
 ---
 id: TASK-718
 title: 'chore(backlog): archive verified Done task backlog'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-26 15:52'
+updated_date: '2026-05-26 15:53'
 labels:
   - backlog
   - maintenance
