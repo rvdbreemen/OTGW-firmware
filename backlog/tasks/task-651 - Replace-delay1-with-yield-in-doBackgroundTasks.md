@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-21 20:23'
-updated_date: '2026-05-21 20:27'
+updated_date: '2026-05-26 18:02'
 labels:
   - performance
   - mainloop
@@ -26,7 +26,7 @@ The synchronous ESP8266WebServer is sensitive to per-tick latency. doBackgroundT
 - [x] #2 python build.py --firmware exits 0
 - [x] #3 python evaluate.py --quick shows no new failures
 - [x] #4 Prerelease version is bumped (bin/bump-prerelease.sh) and staged with the change
-- [ ] #5 Field validation: beta build remains stable under load (telnet + WS + MQTT + HTTP); reported back via Discord
+- [x] #5 Field validation: beta build remains stable under load (telnet + WS + MQTT + HTTP); reported back via Discord
 <!-- AC:END -->
 
 ## Implementation Plan
