@@ -9,7 +9,7 @@ This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gatew
 
 ## What's new on dev (since v1.5.0-fix2)
 
-Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.24`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
+Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.25`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
 
 **MQTT and Home Assistant discovery**
 - **HA availability now reflects the MQTT link, not the OpenTherm bus** (ADR-074, regression fix). Entities like `DHW Control` and `Thermostat` no longer flap `unavailable` when the boiler stops talking; OT-bus liveness lives on the dedicated `otgw_connected` sensor. **Contract change:** consumers reading the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to `otgw_connected`.
@@ -26,6 +26,7 @@ Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.24`). The list b
 **Web UI and diagnostics**
 - **Statistics table drag-to-resize columns** (TASK-703): grab any column header edge in the Statistics tab to resize it. Width preferences are saved in localStorage and survive page reloads.
 - **LittleFS size display fixed** (TASK-701): the device-info API and Web UI were showing 1 MB filesystem instead of the correct 2 MB; fixed by reading the partition size from the LittleFS descriptor.
+- **Device-info low-heap precheck corrected** (TASK-723): `/api/v2/device/info` no longer returns a premature `503` solely because its largest contiguous heap block drops below the former 8 KB guard; the endpoint still retains its lower allocation safety guard.
 - **OT log auto-scroll preserved** (TASK-701): switching tabs or navigating back to the main page no longer resets the scroll position in the OT log.
 - **Statistics column proportions and badge styling refined** (TASK-705, TASK-706): column widths are better balanced after the support-map feature landed; the "boiler unsupported" badge is visually consistent.
 - **Bilateral OT-bus support map** (TASK-686, PR #640): the gateway now tracks which OpenTherm MsgIDs are seen from the thermostat side, the boiler side, or both. The telnet view labels each data point "T / B / T+B"; a new `GET /api/v2/otgw/support-map` endpoint exposes the bitmaps; the Web UI shows which data points your system is actually exchanging.

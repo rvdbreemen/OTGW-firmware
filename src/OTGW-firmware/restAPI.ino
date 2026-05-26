@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.6.0-beta.24
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1077,9 +1077,11 @@ void sendOTmonitorV2()
 // group rather than appending at the end, so related metrics stay
 // adjacent on the page. JSON object order is not an API guarantee for
 // REST consumers - they should parse by key.
-// C: Minimum contiguous heap block required to safely stream this response.
-// If maxFreeBlock is below this, return 503 instead of compounding heap pressure.
-#define DEVICE_INFO_MIN_HEAP_BLOCK  8192
+// Keep one pbuf-sized contiguous block available while streaming. processAPI()
+// already rejects requests below 4096 bytes free heap; requiring 8192 bytes
+// here rejected healthy-but-fragmented beta.24 requests even though JSON uses
+// a static 512-byte flush buffer.
+#define DEVICE_INFO_MIN_HEAP_BLOCK  1536
 
 void sendDeviceInfoV2()
 {

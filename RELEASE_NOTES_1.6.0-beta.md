@@ -25,6 +25,7 @@ The bullets below summarise the user-visible changes that have landed on `dev` s
 **Web UI and diagnostics**
 - **Statistics table drag-to-resize columns** (TASK-703): grab any column header edge in the Statistics tab to resize it. Width preferences are saved in localStorage and survive page reloads.
 - **LittleFS size display fixed** (TASK-701): the device-info API and Web UI were reporting 1 MB filesystem instead of the correct 2 MB.
+- **Device-info low-heap precheck corrected** (TASK-723): `/api/v2/device/info` no longer returns a premature `503` solely because its largest contiguous heap block drops below the former 8 KB guard; the endpoint still preserves its lower allocation safety guard.
 - **OT log scroll position preserved** (TASK-701): switching tabs or navigating back to the main page no longer resets the scroll position in the OT log.
 - **Statistics column proportions and badge styling refined** (TASK-705, TASK-706): column widths are better balanced; the "boiler unsupported" badge is visually consistent.
 - **MQTT discovery verify hourly trigger** (TASK-704): entities missed by the JIT pass are now recovered automatically every hour without user intervention.
