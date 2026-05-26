@@ -622,6 +622,94 @@
     background: #c62828;
   }
 
+  /* Fixed IP configuration section */
+  .fixed-ip-section {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .fixed-ip-row {
+    display: flex;
+    align-items: center;
+    text-align: right;
+    border-bottom: 1px solid #b0d8f0;
+    padding: 3px 0;
+  }
+
+  .fixed-ip-row:last-child {
+    border-bottom: none;
+  }
+
+  .fixed-ip-field-label {
+    padding-left: 24px;
+  }
+
+  .fixed-ip-dhcp-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .dhcp-toggle-cb {
+    width: auto;
+    cursor: pointer;
+  }
+
+  .fixed-ip-fields {
+    background: #dff0fb;
+    border-top: 1px solid #b0d8f0;
+  }
+
+  .octet-group {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+    padding: 1px 4px;
+    background: white;
+    gap: 1px;
+  }
+
+  .octet-input {
+    width: 38px;
+    border: none;
+    outline: none;
+    text-align: center;
+    padding: 2px 0;
+    background: transparent;
+    color: black;
+    font-size: 14px;
+    -moz-appearance: textfield;
+  }
+
+  .octet-input::-webkit-outer-spin-button,
+  .octet-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .octet-input:focus {
+    background: #e8f4ff;
+    border-radius: 2px;
+  }
+
+  .octet-dot {
+    color: #444;
+    font-weight: bold;
+    user-select: none;
+    padding: 0 1px;
+  }
+
+  .fixed-ip-notice {
+    text-align: right;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #c67000;
+    font-style: italic;
+  }
+
   /*
   ***************************************************************************
   *

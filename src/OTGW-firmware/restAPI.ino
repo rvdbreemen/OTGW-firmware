@@ -1103,7 +1103,11 @@ void sendDeviceInfoV2()
 
   // --- Network identity ---
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
-  sendJsonMapEntry(F("ipaddress"), CSTR(WiFi.localIP().toString()));
+  sendJsonMapEntry(F("ipaddress"),            CSTR(WiFi.localIP().toString()));
+  sendJsonMapEntry(F("wifi_current_subnet"),  CSTR(WiFi.subnetMask().toString()));
+  sendJsonMapEntry(F("wifi_current_gateway"), CSTR(WiFi.gatewayIP().toString()));
+  sendJsonMapEntry(F("wifi_current_dns1"),    CSTR(WiFi.dnsIP(0).toString()));
+  sendJsonMapEntry(F("wifi_current_dns2"),    CSTR(WiFi.dnsIP(1).toString()));
   sendJsonMapEntry(F("macaddress"), CSTR(WiFi.macAddress()));
   sendJsonMapEntry(F("ssid"), CSTR(WiFi.SSID()));
   sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());

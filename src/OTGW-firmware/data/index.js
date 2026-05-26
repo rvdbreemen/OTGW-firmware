@@ -4282,7 +4282,11 @@ const hiddenSettings = [
   "webhookurloff",
   "webhooktriggerbit",
   "webhookpayload",
-  "webhookcontenttype"
+  "webhookcontenttype",
+  "wifisubnet",
+  "wifigateway",
+  "wifidns1",
+  "wifidns2"
 ];
 
 const httpPasswordPlaceholderValues = ["notthepassword", "notthispassword"];
@@ -4333,6 +4337,242 @@ function getOriginalPasswordPrefill(field) {
   return currentValue;
 }
 
+//============================================================================
+// Fixed IP configuration UI — segmented octet inputs
+//============================================================================
+
+var IP_FIELD_DEFS = [
+  { key: 'wifistaticip', label: 'IP Address',   required: true  },
+  { key: 'wifisubnet',   label: 'Subnet Mask',   required: true  },
+  { key: 'wifigateway',  label: 'Gateway',        required: true  },
+  { key: 'wifidns1',    label: 'DNS Server 1',   required: false },
+  { key: 'wifidns2',    label: 'DNS Server 2',   required: false },
+];
+
+function makeOctetGroup(fieldKey) {
+  var grp = document.createElement('div');
+  grp.className = 'octet-group';
+  grp.dataset.field = fieldKey;
+  for (var i = 0; i < 4; i++) {
+    if (i > 0) {
+      var dot = document.createElement('span');
+      dot.className = 'octet-dot';
+      dot.textContent = '.';
+      grp.appendChild(dot);
+    }
+    var oct = document.createElement('input');
+    oct.type = 'number';
+    oct.min = '0';
+    oct.max = '255';
+    oct.className = 'octet-input';
+    oct.dataset.field = fieldKey;
+    oct.dataset.oct = String(i);
+    grp.appendChild(oct);
+  }
+  return grp;
+}
+
+function getOctetInputs(fieldKey) {
+  var grp = document.querySelector('.octet-group[data-field="' + fieldKey + '"]');
+  if (!grp) return [];
+  return Array.from(grp.querySelectorAll('.octet-input'));
+}
+
+function splitIpToOctets(fieldKey, ipStr) {
+  var parts = (typeof ipStr === 'string' && ipStr.length > 0) ? ipStr.split('.') : [];
+  getOctetInputs(fieldKey).forEach(function(inp, i) {
+    inp.value = parts[i] !== undefined ? parts[i] : '';
+  });
+}
+
+function joinOctetsToIp(fieldKey) {
+  var inputs = getOctetInputs(fieldKey);
+  if (inputs.length !== 4) return '';
+  var parts = inputs.map(function(inp) { return inp.value.trim(); });
+  return parts.some(function(p) { return p === ''; }) ? '' : parts.join('.');
+}
+
+function markFixedIPChanged() {
+  IP_FIELD_DEFS.forEach(function(def) {
+    var h = document.getElementById(def.key);
+    if (h) h.className = 'input-changed';
+  });
+  setVisible('btnSaveSettings', true);
+}
+
+function updateFixedIPVisibility(useDHCP) {
+  var fieldsDiv = document.getElementById('fixed-ip-fields');
+  if (fieldsDiv) fieldsDiv.style.display = useDHCP ? 'none' : '';
+}
+
+function collapseOctetGroupsForSave() {
+  var dhcpCb = document.querySelector('#D_wifistaticip .dhcp-toggle-cb');
+  var useDHCP = !dhcpCb || dhcpCb.checked;
+  IP_FIELD_DEFS.forEach(function(def) {
+    var h = document.getElementById(def.key);
+    if (!h || h.className !== 'input-changed') return;
+    h.value = useDHCP ? '' : (joinOctetsToIp(def.key) || '');
+  });
+}
+
+function prefillFromDHCP() {
+  fetch(APIGW + 'v2/device/info')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(json) {
+      if (!json || !json.device) return;
+      var d = json.device;
+      function prefillIfEmpty(fieldKey, value) {
+        if (!value || value === '0.0.0.0') return;
+        var inputs = getOctetInputs(fieldKey);
+        if (inputs.length > 0 && inputs.every(function(i) { return i.value === ''; })) {
+          splitIpToOctets(fieldKey, value);
+        }
+      }
+      prefillIfEmpty('wifistaticip', d.ipaddress);
+      prefillIfEmpty('wifisubnet',   d.wifi_current_subnet);
+      prefillIfEmpty('wifigateway',  d.wifi_current_gateway);
+      prefillIfEmpty('wifidns1',     d.wifi_current_dns1);
+      prefillIfEmpty('wifidns2',     d.wifi_current_dns2);
+      markFixedIPChanged();
+    })
+    .catch(function() {});
+}
+
+function wireOctetGroup(grp) {
+  var octInputs = Array.from(grp.querySelectorAll('.octet-input'));
+  octInputs.forEach(function(inp, idx) {
+    inp.addEventListener('input', function() {
+      var v = parseInt(this.value, 10);
+      if (!isNaN(v)) {
+        if (v > 255) this.value = '255';
+        if (v < 0)   this.value = '0';
+      }
+      if (this.value.length >= 3 && idx < 3) {
+        octInputs[idx + 1].focus();
+        octInputs[idx + 1].select();
+      }
+      markFixedIPChanged();
+    });
+    inp.addEventListener('keydown', function(e) {
+      if ((e.key === '.' || e.key === 'ArrowRight') && idx < 3 && this.selectionStart === this.value.length) {
+        e.preventDefault();
+        octInputs[idx + 1].focus();
+        octInputs[idx + 1].select();
+      }
+      if (e.key === 'Backspace' && this.value === '' && idx > 0) {
+        e.preventDefault();
+        var prev = octInputs[idx - 1];
+        prev.focus();
+        prev.setSelectionRange(prev.value.length, prev.value.length);
+      }
+    });
+    inp.addEventListener('paste', function(e) {
+      var txt = (e.clipboardData || window.clipboardData).getData('text');
+      var parts = txt.trim().split('.');
+      if (parts.length === 4) {
+        e.preventDefault();
+        octInputs.forEach(function(o, i) {
+          var val = parseInt(parts[i], 10);
+          o.value = isNaN(val) ? '' : Math.max(0, Math.min(255, val));
+        });
+        markFixedIPChanged();
+      }
+    });
+  });
+}
+
+function renderFixedIPSection(currentIpValue, allSettings) {
+  var settingsPage = document.getElementById('settingsPage');
+  var existing = document.getElementById('D_wifistaticip');
+
+  if (existing) {
+    var useDHCP = !currentIpValue || currentIpValue === '';
+    var dhcpCb = existing.querySelector('.dhcp-toggle-cb');
+    if (dhcpCb) dhcpCb.checked = useDHCP;
+    updateFixedIPVisibility(useDHCP);
+    IP_FIELD_DEFS.forEach(function(def) {
+      var val = def.key === 'wifistaticip' ? (currentIpValue || '') : (allSettings[def.key] ? allSettings[def.key].value : '');
+      splitIpToOctets(def.key, val);
+      var h = document.getElementById(def.key);
+      if (h) { h.value = val; h.className = 'input-normal'; h.setAttribute('data-original', val); }
+    });
+    return;
+  }
+
+  var useDHCP = !currentIpValue || currentIpValue === '';
+
+  var sectionDiv = document.createElement('div');
+  sectionDiv.id = 'D_wifistaticip';
+  sectionDiv.className = 'settingDiv fixed-ip-section';
+
+  // DHCP toggle row
+  var toggleRow = document.createElement('div');
+  toggleRow.className = 'fixed-ip-row';
+  var toggleLbl = document.createElement('label');
+  toggleLbl.className = 'settings-field-container';
+  toggleLbl.title = 'When checked the device gets its IP address from your router (DHCP). Uncheck to set a fixed IP.';
+  toggleLbl.textContent = 'IP Configuration';
+  var toggleInputDiv = document.createElement('div');
+  toggleInputDiv.className = 'settings-input-container';
+  var dhcpOuterLabel = document.createElement('label');
+  dhcpOuterLabel.className = 'fixed-ip-dhcp-label';
+  var dhcpCb = document.createElement('input');
+  dhcpCb.type = 'checkbox';
+  dhcpCb.className = 'dhcp-toggle-cb';
+  dhcpCb.checked = useDHCP;
+  dhcpOuterLabel.appendChild(dhcpCb);
+  dhcpOuterLabel.appendChild(document.createTextNode(' Use DHCP (automatic IP)'));
+  toggleInputDiv.appendChild(dhcpOuterLabel);
+  toggleRow.appendChild(toggleLbl);
+  toggleRow.appendChild(toggleInputDiv);
+  sectionDiv.appendChild(toggleRow);
+
+  // Fixed IP fields container
+  var fieldsDiv = document.createElement('div');
+  fieldsDiv.id = 'fixed-ip-fields';
+  fieldsDiv.className = 'fixed-ip-fields';
+  fieldsDiv.style.display = useDHCP ? 'none' : '';
+
+  IP_FIELD_DEFS.forEach(function(def) {
+    var row = document.createElement('div');
+    row.className = 'fixed-ip-row';
+    var lbl = document.createElement('label');
+    lbl.className = 'settings-field-container fixed-ip-field-label';
+    lbl.textContent = def.label + (def.required ? '' : ' (optional)');
+    var inputDiv = document.createElement('div');
+    inputDiv.className = 'settings-input-container';
+    var grp = makeOctetGroup(def.key);
+    wireOctetGroup(grp);
+    inputDiv.appendChild(grp);
+    var hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.id = def.key;
+    hidden.className = 'input-normal';
+    var initialValue = def.key === 'wifistaticip' ? (currentIpValue || '') : (allSettings[def.key] ? allSettings[def.key].value : '');
+    hidden.value = initialValue;
+    hidden.setAttribute('data-original', initialValue);
+    inputDiv.appendChild(hidden);
+    row.appendChild(lbl);
+    row.appendChild(inputDiv);
+    fieldsDiv.appendChild(row);
+    splitIpToOctets(def.key, initialValue);
+  });
+
+  var notice = document.createElement('div');
+  notice.className = 'fixed-ip-notice';
+  notice.textContent = '⚠ A reboot is required for network changes to take effect.';
+  fieldsDiv.appendChild(notice);
+  sectionDiv.appendChild(fieldsDiv);
+
+  dhcpCb.addEventListener('change', function() {
+    updateFixedIPVisibility(this.checked);
+    markFixedIPChanged();
+    if (!this.checked) prefillFromDHCP();
+  });
+
+  settingsPage.appendChild(sectionDiv);
+}
+
 function refreshSettings() {
   console.log("refreshSettings() ..");
   data = {};
@@ -4354,6 +4594,9 @@ function refreshSettings() {
         console.log("[" + key + "]=>[" + s.value + "]");
         // Skip hidden settings
         if (key.startsWith('#') || hiddenSettings.includes(key)) continue;
+
+        // Fixed IP section: custom renderer handles wifistaticip and its companions
+        if (key === 'wifistaticip') { renderFixedIPSection(s.value, data); continue; }
 
         var settings = document.getElementById('settingsPage');
         if ((document.getElementById("D_" + key)) == null) {
@@ -4667,6 +4910,7 @@ function saveWebhookSettings() {
 //============================================================================  
 function saveSettings() {
   console.log("saveSettings() ...");
+  collapseOctetGroupsForSave();
   let changes = false;
 
   //--- has anything changed?
