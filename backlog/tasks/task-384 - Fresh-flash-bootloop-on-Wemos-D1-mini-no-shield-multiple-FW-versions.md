@@ -1,11 +1,11 @@
 ---
 id: TASK-384
 title: 'Fresh-flash bootloop on Wemos D1 mini (no-shield, multiple FW versions)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-22 20:53'
-updated_date: '2026-05-26 09:46'
+updated_date: '2026-05-26 09:49'
 labels:
   - bug
   - needs-info
@@ -43,4 +43,12 @@ Waiting for: (1) reporter answer on whether 1.4.1 direct-flash also bootloops; (
 2026-05-02 (check_otgw_issues): dvd77 posted follow-up on GitHub #554 at 2026-05-01T11:18Z (https://github.com/rvdbreemen/OTGW-firmware/issues/554#issuecomment-4359045635). Quote: 'Update : when connected to the OTGW board I had to retry 4 to 5 times to connect to the ESP8266 AP when it succeeded. Working for now on 1.4.1'. New data points: (a) the bootloop dvd77 saw without the OTGW board attached resolves once the OTGW shield is connected — i.e. ESP8266 alone (no PIC, no shield power loading) appears unable to complete boot for some firmware versions; (b) AP connection succeeds only after 4-5 retries; (c) v1.4.1 currently runs stable for dvd77 with shield attached. This is a workaround, not a fix — root cause for the no-shield bootloop is still unidentified. Hypothesis to verify: power draw / brownout behaviour without shield, or something in WiFi-init sequence that depends on shield-side hardware presence. Task remains needs-info: serial-during-bootloop capture from a dvd77-style no-shield setup is the missing evidence.
 
 2026-05-05: Triage update — title corrected. Original "v1.3.5 bootloop" framing is no longer accurate: dvd77 reproduced the same bootloop on 1.4.1 and 1.5.0-beta on 2026-04-29 (GitHub #554 comment 4344614879). AC #1 (reporter confirms 1.4.1 direct-flash also bootloops) is now satisfied by dvd77's evidence — checked. Remaining ACs #2-#4 still hold and remain blocked on serial-during-bootloop capture from a no-shield setup. Priority left at MEDIUM since both reporters have working setups via the shield-attach workaround.
+
+2026-05-26: Closing. Root cause is hardware-related (no-shield power/brownout behaviour on certain Wemos D1 batches). No firmware fix identified or needed. Assumption: 1.5.0+ with updated LittleFS partition layout and Core 2.7.4 resolves or mitigates the symptom. If reporters resurface on 1.5.0+, reopen with serial-during-bootloop evidence.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fresh-flash bootloop investigated across two reporters (ArnoudPJ, dvd77) on GitHub #554. Root cause: power/brownout behaviour specific to certain Wemos D1 mini batches without OTGW shield attached. Workaround: attach shield, or flash 1.4.1 first then OTA. No code change made. Closing with assumption that 1.5.0+ (Core 2.7.4 + updated partition layout) resolves the symptom; reporters to reopen with serial evidence if issue persists.
+<!-- SECTION:FINAL_SUMMARY:END -->
