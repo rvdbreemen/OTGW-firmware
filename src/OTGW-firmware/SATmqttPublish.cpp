@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-alpha.72
+**  Version  : v2.0.0-alpha.73
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -16,12 +16,86 @@
 ***************************************************************************
 */
 #include "SATmqttPublish.h"
-#include "OTGW-firmware.h"   // sendMQTTData() overloads
 
 #include <Arduino.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+
+// Forward-declare just the sendMQTTData overloads we need. We deliberately
+// do NOT include OTGW-firmware.h here — that header carries global variable
+// definitions (state, OTlookupitem, ...) intended for the main TU only and
+// would cause multiple-definition link errors in this separate compilation
+// unit.
+bool sendMQTTData(const __FlashStringHelper* topic, const char* json, const bool retain);
+bool sendMQTTData(const char* topic, const char* json, const bool retain);
+
+// ---------------------------------------------------------------------------
+// const char* topic overloads — body is identical to the F() overloads. We
+// duplicate (rather than template) because PROGMEM topic strings should stay
+// in flash on ESP8266; templating would force one shared body and either
+// drag F() topics into RAM or PSTR()-decode at every call.
+// ---------------------------------------------------------------------------
+
+bool publishIfChangedF(const char* topic, float current,
+                       SATShadowF& shadow, float tolerance, uint8_t decimals,
+                       bool retained)
+{
+  const bool firstSeen    = !shadow.valid;
+  const bool valueDiff    = !firstSeen && (fabsf(current - shadow.last) >= tolerance);
+  const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
+  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  shadow.last            = current;
+  shadow.valid           = true;
+  shadow.nextRepublishMs = satNextDeadline(firstSeen);
+  char buf[16];
+  dtostrf(current, 1, decimals, buf);
+  sendMQTTData(topic, buf, retained);
+  return true;
+}
+
+bool publishIfChangedI(const char* topic, int32_t current,
+                       SATShadowI& shadow, bool retained)
+{
+  const bool firstSeen    = !shadow.valid;
+  const bool valueDiff    = !firstSeen && (current != shadow.last);
+  const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
+  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  shadow.last            = current;
+  shadow.valid           = true;
+  shadow.nextRepublishMs = satNextDeadline(firstSeen);
+  char buf[16];
+  snprintf_P(buf, sizeof(buf), PSTR("%ld"), (long)current);
+  sendMQTTData(topic, buf, retained);
+  return true;
+}
+
+bool publishIfChangedB(const char* topic, bool current,
+                       SATShadowB& shadow, bool retained)
+{
+  const bool firstSeen    = (shadow.nextRepublishMs == 0);
+  const bool valueDiff    = !firstSeen && (shadow.last != (int8_t)(current ? 1 : 0));
+  const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
+  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  shadow.last            = (int8_t)(current ? 1 : 0);
+  shadow.nextRepublishMs = satNextDeadline(firstSeen);
+  sendMQTTData(topic, current ? "true" : "false", retained);
+  return true;
+}
+
+bool publishIfChangedS(const char* topic, const char* current,
+                       SATShadowS& shadow, bool retained)
+{
+  const bool firstSeen    = !shadow.valid;
+  const bool valueDiff    = !firstSeen && (strncmp(current, shadow.last, sizeof(shadow.last)) != 0);
+  const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
+  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  strlcpy(shadow.last, current, sizeof(shadow.last));
+  shadow.valid           = true;
+  shadow.nextRepublishMs = satNextDeadline(firstSeen);
+  sendMQTTData(topic, current, retained);
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -140,5 +214,27 @@ bool publishIfChangedS(const __FlashStringHelper* topic, const char* current,
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
 
   sendMQTTData(topic, current, retained);
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// JSON attributes blob helper. Source-change signal comes from the caller
+// (typically `anyChanged |= publishIfChangedF(...)` over the blob's source
+// fields); the blob itself doesn't need a value-shadow because we never want
+// to publish identical JSON. `nextRepublishMs == 0` doubles as the
+// "uninitialised" marker (BSS zero-init).
+// ---------------------------------------------------------------------------
+
+bool publishJsonAttrIfChanged(const __FlashStringHelper* topic, const char* json,
+                              uint32_t& nextRepublishMs, bool anyChanged,
+                              bool retained)
+{
+  const bool firstSeen    = (nextRepublishMs == 0);
+  const bool heartbeatDue = !firstSeen && satHeartbeatDue(nextRepublishMs);
+
+  if (!firstSeen && !anyChanged && !heartbeatDue) return false;
+
+  nextRepublishMs = satNextDeadline(firstSeen);
+  sendMQTTData(topic, json, retained);
   return true;
 }

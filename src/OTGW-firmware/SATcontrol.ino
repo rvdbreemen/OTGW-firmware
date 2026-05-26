@@ -1988,69 +1988,138 @@ void satPublishMQTT()
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
   if (!settings.sat.bEnabled) return;
 
-  SATDebugTln(F("SAT: publishing MQTT state"));
+  SATDebugTln(F("SAT: publishing MQTT state (ADR-111 on-change + heartbeat)"));
 
-  char valBuf[16];
+  // ---------------------------------------------------------------------------
+  // ADR-111: per-topic shadows.
+  // All shadows are BSS zero-initialised on first call to this function; the
+  // helpers publish on first-seen, on change (with per-field tolerance), or
+  // when the per-topic heartbeat (uniform random 7-11 min) is due.
+  // ---------------------------------------------------------------------------
+  static SATShadowS s_mode, s_boiler_status, s_cycle_class, s_cycle_phase;
+  static SATShadowS s_flame_status, s_manufacturer, s_heating_curve_rec;
+  static SATShadowS s_curve_recommendation, s_modulation_state, s_pwm_state;
+  static SATShadowS s_summer_simmer_perception, s_heating_mode;
+  static SATShadowF s_setpoint, s_heating_curve, s_pid_output, s_target;
+  static SATShadowF s_error, s_pid_p, s_pid_i, s_pid_d, s_raw_derivative;
+  static SATShadowF s_pwm_duty, s_duty_ratio, s_overshoot_fraction;
+  static SATShadowF s_4h_avg_on, s_4h_avg_off, s_4h_avg_flow, s_4h_duty_ratio;
+  static SATShadowF s_4h_overshoot, s_4h_underheat, s_4h_delta_p50, s_4h_delta_p90;
+  static SATShadowF s_overshoot_margin, s_room_temp, s_outside_temp;
+  static SATShadowF s_kp, s_ki, s_kd;
+  static SATShadowF s_pre_custom_temp, s_pre_activity_temp;
+  static SATShadowF s_pv_surplus_w, s_pv_boost_applied_c, s_pv_boost_delta_c;
+  static SATShadowF s_pv_boost_max_indoor_c;
+  static SATShadowF s_pressure, s_pressure_drop_rate;
+  static SATShadowF s_error_mean, s_error_stddev;
+  static SATShadowF s_power, s_energy_total, s_energy_estimated_kwh;
+  static SATShadowF s_thermal_coeff, s_thermal_drop_rate, s_estimated_room;
+  static SATShadowF s_indoor_rise_rate, s_sun_elevation;
+  static SATShadowF s_summer_hours_above, s_humidity, s_comfort_offset;
+  static SATShadowF s_auto_tune_score, s_auto_tune_rate, s_auto_gains_value;
+  static SATShadowF s_valve_offset;
+  static SATShadowF s_area_0, s_area_1, s_area_2, s_area_3;
+  static SATShadowF s_ssi, s_summer_simmer_index;
+  static SATShadowF s_dhw_setpoint, s_max_setpoint, s_requested_setpoint, s_consumption;
+  static SATShadowF s_heating_curve_coeff, s_deadband;
+  static SATShadowF s_flame_off_offset, s_flow_offset, s_mod_sup_delay, s_mod_sup_offset;
+  static SATShadowF s_boiler_capacity, s_boiler_rated_kw, s_boiler_efficiency;
+  static SATShadowF s_comfort_humidity, s_comfort_max_offset;
+  static SATShadowF s_summer_threshold, s_target_temp_step;
+  static SATShadowF s_min_pressure, s_max_pressure, s_max_pressure_drop;
+  static SATShadowF s_preset_comfort, s_preset_eco, s_preset_away;
+  static SATShadowF s_preset_sleep, s_preset_activity, s_preset_home;
+  static SATShadowF s_ovp_value;
+  static SATShadowI s_cycles_this_hour, s_4h_cycles, s_current_modulation;
+  static SATShadowI s_pv_boost_threshold_w, s_pv_boost_hold_s, s_pv_boost_max_duration_min;
+  static SATShadowI s_sensor_max_age, s_cycles_per_hour, s_humidity_timeout_s;
+  static SATShadowI s_control_interval, s_max_modulation;
+  static SATShadowI s_heating_system, s_manufacturer_id;
+  static SATShadowB s_active, s_safety_tripped, s_flame_health, s_valves_open;
+  static SATShadowB s_window_open;
+  static SATShadowB s_pv_surplus_valid, s_pv_boost_active, s_pv_boost_enabled;
+  static SATShadowB s_pressure_alarm, s_pressure_health;
+  static SATShadowB s_modulation_reliable, s_setpoint_mismatch;
+  static SATShadowB s_thermal_model_valid;
+  static SATShadowB s_solar_gain_active, s_summer_active;
+  static SATShadowB s_humidity_valid;
+  static SATShadowB s_simulation, s_auto_tune, s_auto_tune_active;
+  static SATShadowB s_error_monitoring, s_solar_freeze_integral;
+  static SATShadowB s_device_health, s_cycle_health;
+  static SATShadowB s_setpoint_sync, s_modulation_sync, s_ch_sync;
+  static SATShadowB s_solar_gain_enable, s_summer_simmer_enable, s_comfort_adjust_enable;
+  static SATShadowB s_thermal_comfort, s_multi_area_enable, s_auto_tune_enable;
+  static SATShadowB s_simulation_enable, s_window_detection_enable, s_force_pwm_enable;
+  static SATShadowB s_push_setpoint_enable, s_ovp_enabled, s_preset_sync_enable;
+  static SATShadowB s_dhw_enabled, s_dhw_enable, s_pwm_auto_switch_enable;
+  // JSON-blob heartbeat counters (BSS zero-init == first-seen sentinel).
+  static uint32_t s_pid_attrs_hb        = 0;
+  static uint32_t s_cycle_attrs_hb      = 0;
+  static uint32_t s_curve_rec_attrs_hb  = 0;
+  static uint32_t s_climate_attrs_hb    = 0;
+  // Local "last cycle count" tracker — when iCycleCount changes a new cycle
+  // finished, which is the natural trigger for cycle_attributes republish.
+  static uint32_t s_last_cycle_count    = 0;
 
-  // Control mode: off/continuous/pwm
-  static const char* modeNames[] = { "off", "continuous", "pwm" };
-  uint8_t modeIdx = (uint8_t)state.sat.eControlMode;
-  sendMQTTData(F("sat/mode"), modeNames[modeIdx < 3 ? modeIdx : 0], true);
-
-  // Key temperatures
-  dtostrf(state.sat.fFinalSetpoint, 1, 1, valBuf);
-  sendMQTTData(F("sat/setpoint"), valBuf, true);
-
-  dtostrf(state.sat.fHeatingCurveValue, 1, 1, valBuf);
-  sendMQTTData(F("sat/heating_curve"), valBuf, true);
-
-  dtostrf(state.sat.fPidOutput, 1, 1, valBuf);
-  sendMQTTData(F("sat/pid_output"), valBuf, true);
-
-  dtostrf(settings.sat.fTargetTemp, 1, 1, valBuf);
-  sendMQTTData(F("sat/target"), valBuf, true);
-
-  dtostrf(state.sat.fError, 1, 2, valBuf);
-  sendMQTTData(F("sat/error"), valBuf, false);
-
-  // PID terms
-  dtostrf(state.sat.fPidP, 1, 2, valBuf);
-  sendMQTTData(F("sat/pid_p"), valBuf, false);
-
-  dtostrf(state.sat.fPidI, 1, 2, valBuf);
-  sendMQTTData(F("sat/pid_i"), valBuf, false);
-
-  dtostrf(state.sat.fPidD, 1, 2, valBuf);
-  sendMQTTData(F("sat/pid_d"), valBuf, false);
-
-  // PID JSON attributes for HA (json_attributes_topic) — Task #55
+  // ---------------------------------------------------------------------------
+  // Control mode
+  // ---------------------------------------------------------------------------
+  static const char* const modeNames[] = { "off", "continuous", "pwm" };
   {
-    char jsonBuf[128];
-    snprintf_P(jsonBuf, sizeof(jsonBuf), PSTR("{\"error\":%.2f,\"proportional\":%.2f,\"integral\":%.2f,\"derivative\":%.2f}"),
-      state.sat.fError, state.sat.fPidP, state.sat.fPidI, state.sat.fPidD);
-    sendMQTTData(F("sat/pid_attributes"), jsonBuf, false);
+    uint8_t modeIdx = (uint8_t)state.sat.eControlMode;
+    publishIfChangedS(F("sat/mode"), modeNames[modeIdx < 3 ? modeIdx : 0], s_mode, true);
   }
 
-  dtostrf(state.sat.fRawDerivative, 1, 4, valBuf);
-  sendMQTTData(F("sat/raw_derivative"), valBuf, false);
+  // ---------------------------------------------------------------------------
+  // Key temperatures + PID state
+  // ---------------------------------------------------------------------------
+  publishIfChangedF(F("sat/setpoint"),       state.sat.fFinalSetpoint,    s_setpoint,      SAT_EPS_TEMP,        1, true);
+  publishIfChangedF(F("sat/heating_curve"),  state.sat.fHeatingCurveValue,s_heating_curve, SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedF(F("sat/pid_output"),     state.sat.fPidOutput,        s_pid_output,    SAT_EPS_PID_OUTPUT,  1, true);
+  publishIfChangedF(F("sat/target"),         settings.sat.fTargetTemp,    s_target,        SAT_EPS_TEMP,        1, true);
 
-  feedWatchDog(); // ~15 publishes done; prevent WDT trip on slow broker
+  bool pidChanged = false;
+  pidChanged |= publishIfChangedF(F("sat/error"), state.sat.fError, s_error,       SAT_EPS_ERROR,    2, false);
+  pidChanged |= publishIfChangedF(F("sat/pid_p"), state.sat.fPidP,  s_pid_p,       SAT_EPS_PID_TERM, 2, false);
+  pidChanged |= publishIfChangedF(F("sat/pid_i"), state.sat.fPidI,  s_pid_i,       SAT_EPS_PID_TERM, 2, false);
+  pidChanged |= publishIfChangedF(F("sat/pid_d"), state.sat.fPidD,  s_pid_d,       SAT_EPS_PID_TERM, 2, false);
 
-  // Boiler status (string label)
+  // PID JSON attributes (Task #55) — coherent with the 4 individual publishes above.
+  {
+    char jsonBuf[128];
+    snprintf_P(jsonBuf, sizeof(jsonBuf),
+      PSTR("{\"error\":%.2f,\"proportional\":%.2f,\"integral\":%.2f,\"derivative\":%.2f}"),
+      state.sat.fError, state.sat.fPidP, state.sat.fPidI, state.sat.fPidD);
+    publishJsonAttrIfChanged(F("sat/pid_attributes"), jsonBuf, s_pid_attrs_hb, pidChanged, false);
+  }
+
+  publishIfChangedF(F("sat/raw_derivative"), state.sat.fRawDerivative, s_raw_derivative, SAT_EPS_DERIVATIVE, 4, false);
+
+  feedWatchDog();
+
+  // ---------------------------------------------------------------------------
+  // Boiler status, cycle class + JSON, PWM duty, cycle metrics, 4h stats
+  // ---------------------------------------------------------------------------
   { char bsName[20]; satGetBoilerStatusName(bsName, sizeof(bsName));
-    sendMQTTData(F("sat/boiler_status"), bsName, false); }
+    publishIfChangedS(F("sat/boiler_status"), bsName, s_boiler_status, false); }
 
-  // Cycle class (string label)
-  { static const char* const ccNames[] PROGMEM = {
+  {
+    static const char* const ccNames[] = {
       "none", "good", "overshoot", "underheat", "short", "uncertain"
     };
     int ccIdx = (int)state.sat.eLastCycleClass;
     if (ccIdx < 0 || ccIdx > 5) ccIdx = 0;
-    sendMQTTData(F("sat/cycle_class"), ccNames[ccIdx], false);
+    publishIfChangedS(F("sat/cycle_class"), ccNames[ccIdx], s_cycle_class, false);
   }
 
-  // Cycle Status JSON attributes (Task #53)
-  { static const char* const ckNames[] PROGMEM = {
+  // Cycle attributes JSON — re-publish on cycle-count change (a new cycle
+  // finished) or heartbeat. Source values are not all individually published,
+  // so we track iCycleCount locally as the "anything new?" signal.
+  {
+    bool cycleAdvanced = ((uint32_t)state.sat.iCycleCount != s_last_cycle_count);
+    s_last_cycle_count = (uint32_t)state.sat.iCycleCount;
+
+    static const char* const ckNames[] = {
       "UNKNOWN", "CENTRAL_HEATING", "DOMESTIC_HOT_WATER", "MIXED"
     };
     int ckIdx = (int)state.sat.eLastCycleKind;
@@ -2064,312 +2133,302 @@ void satPublishMQTT()
       state.sat.fCycleMaxFlow,
       state.sat.fLastCycleFractionCH,
       state.sat.fLastCycleFractionDHW);
-    sendMQTTData(F("sat/cycle_attributes"), jBuf, false);
+    publishJsonAttrIfChanged(F("sat/cycle_attributes"), jBuf, s_cycle_attrs_hb, cycleAdvanced, false);
   }
 
-  // PWM duty
-  dtostrf(state.sat.fPwmDutyCycle, 1, 2, valBuf);
-  sendMQTTData(F("sat/pwm_duty"), valBuf, false);
+  publishIfChangedF(F("sat/pwm_duty"),           state.sat.fPwmDutyCycle,      s_pwm_duty,           SAT_EPS_FRACTION, 2, false);
+  publishIfChangedF(F("sat/duty_ratio"),         state.sat.fDutyRatio,         s_duty_ratio,         SAT_EPS_FRACTION, 3, false);
+  publishIfChangedF(F("sat/overshoot_fraction"), state.sat.fOvershootFraction, s_overshoot_fraction, SAT_EPS_FRACTION, 3, false);
 
-  // Cycle health metrics
-  dtostrf(state.sat.fDutyRatio, 1, 3, valBuf);
-  sendMQTTData(F("sat/duty_ratio"), valBuf, false);
+  publishIfChangedS(F("sat/cycle_phase"),       satCycleGetPhaseName(),                            s_cycle_phase,       false);
+  publishIfChangedI(F("sat/cycles_this_hour"),  (int32_t)satCycleGetCyclesThisHour(),              s_cycles_this_hour,  false);
 
-  dtostrf(state.sat.fOvershootFraction, 1, 3, valBuf);
-  sendMQTTData(F("sat/overshoot_fraction"), valBuf, false);
+  publishIfChangedI(F("sat/4h_cycles"),               (int32_t)state.sat.i4hCycles,             s_4h_cycles,     false);
+  publishIfChangedF(F("sat/4h_avg_on_sec"),           state.sat.f4hAvgOnSec,                    s_4h_avg_on,     SAT_EPS_DURATION, 1, false);
+  publishIfChangedF(F("sat/4h_avg_off_sec"),          state.sat.f4hAvgOffSec,                   s_4h_avg_off,    SAT_EPS_DURATION, 1, false);
+  publishIfChangedF(F("sat/4h_avg_flow_temp"),        state.sat.f4hAvgFlow,                     s_4h_avg_flow,   SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedF(F("sat/4h_duty_ratio"),           state.sat.f4hDutyRatio,                   s_4h_duty_ratio, SAT_EPS_FRACTION, 3, false);
+  publishIfChangedF(F("sat/4h_overshoot_fraction"),   state.sat.f4hOvershootFraction,           s_4h_overshoot,  SAT_EPS_FRACTION, 3, false);
+  publishIfChangedF(F("sat/4h_underheat_fraction"),   state.sat.f4hUnderheatFraction,           s_4h_underheat,  SAT_EPS_FRACTION, 3, false);
+  publishIfChangedF(F("sat/4h_flow_ret_delta_p50"),   state.sat.f4hFlowRetDeltaP50,             s_4h_delta_p50,  SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedF(F("sat/4h_flow_ret_delta_p90"),   state.sat.f4hFlowRetDeltaP90,             s_4h_delta_p90,  SAT_EPS_TEMP_COARSE, 1, false);
 
-  // Cycle phase
-  sendMQTTData(F("sat/cycle_phase"), satCycleGetPhaseName(), false);
+  feedWatchDog();
 
-  // Per-hour cycle counter (Task #203)
-  snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)satCycleGetCyclesThisHour());
-  sendMQTTData(F("sat/cycles_this_hour"), valBuf, false);
+  // ---------------------------------------------------------------------------
+  // Overshoot margin, active, temps, gains, safety, flame
+  // ---------------------------------------------------------------------------
+  publishIfChangedF(F("sat/overshoot_margin"), settings.sat.fOvershootMargin, s_overshoot_margin, SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedB(F("sat/active"),           state.sat.bActive,             s_active,           true);
 
-  // Rolling 4-hour window statistics (Task #227)
-  snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)state.sat.i4hCycles);
-  sendMQTTData(F("sat/4h_cycles"), valBuf, false);
-  dtostrf(state.sat.f4hAvgOnSec, 1, 1, valBuf);
-  sendMQTTData(F("sat/4h_avg_on_sec"), valBuf, false);
-  dtostrf(state.sat.f4hAvgOffSec, 1, 1, valBuf);
-  sendMQTTData(F("sat/4h_avg_off_sec"), valBuf, false);
-  dtostrf(state.sat.f4hAvgFlow, 1, 1, valBuf);
-  sendMQTTData(F("sat/4h_avg_flow_temp"), valBuf, false);
-  dtostrf(state.sat.f4hDutyRatio, 1, 3, valBuf);
-  sendMQTTData(F("sat/4h_duty_ratio"), valBuf, false);
-  dtostrf(state.sat.f4hOvershootFraction, 1, 3, valBuf);
-  sendMQTTData(F("sat/4h_overshoot_fraction"), valBuf, false);
-  dtostrf(state.sat.f4hUnderheatFraction, 1, 3, valBuf);
-  sendMQTTData(F("sat/4h_underheat_fraction"), valBuf, false);
-  dtostrf(state.sat.f4hFlowRetDeltaP50, 1, 1, valBuf);
-  sendMQTTData(F("sat/4h_flow_ret_delta_p50"), valBuf, false);
-  dtostrf(state.sat.f4hFlowRetDeltaP90, 1, 1, valBuf);
-  sendMQTTData(F("sat/4h_flow_ret_delta_p90"), valBuf, false);
+  publishIfChangedF(F("sat/room_temp"),    satGetRoomTemp(),    s_room_temp,    SAT_EPS_TEMP, 1, false);
+  publishIfChangedF(F("sat/outside_temp"), satGetOutsideTemp(), s_outside_temp, SAT_EPS_TEMP, 1, false);
 
-  feedWatchDog(); // ~35 publishes done; prevent WDT trip on slow broker
+  publishIfChangedF(F("sat/kp"), state.sat.fKp, s_kp, SAT_EPS_KP, 4, false);
+  publishIfChangedF(F("sat/ki"), state.sat.fKi, s_ki, SAT_EPS_KI, 6, false);
+  publishIfChangedF(F("sat/kd"), state.sat.fKd, s_kd, SAT_EPS_KD, 2, false);
 
-  // Overshoot margin
-  dtostrf(settings.sat.fOvershootMargin, 1, 1, valBuf);
-  sendMQTTData(F("sat/overshoot_margin"), valBuf, true);
-
-  // Active state
-  sendMQTTData(F("sat/active"), state.sat.bActive ? "true" : "false", true);
-
-  // Room and outside temps
-  dtostrf(satGetRoomTemp(), 1, 1, valBuf);
-  sendMQTTData(F("sat/room_temp"), valBuf, false);
-
-  dtostrf(satGetOutsideTemp(), 1, 1, valBuf);
-  sendMQTTData(F("sat/outside_temp"), valBuf, false);
-
-  // PID gains
-  dtostrf(state.sat.fKp, 1, 4, valBuf);
-  sendMQTTData(F("sat/kp"), valBuf, false);
-
-  dtostrf(state.sat.fKi, 1, 6, valBuf);
-  sendMQTTData(F("sat/ki"), valBuf, false);
-
-  dtostrf(state.sat.fKd, 1, 2, valBuf);
-  sendMQTTData(F("sat/kd"), valBuf, false);
-
-  // Safety
-  sendMQTTData(F("sat/safety_tripped"), state.sat.bSafetyTripped ? "true" : "false", false);
+  publishIfChangedB(F("sat/safety_tripped"), state.sat.bSafetyTripped, s_safety_tripped, false);
 
   // Flame Status (Task #70)
-  { static const char* const fsNames[] PROGMEM = {
+  {
+    static const char* const fsNames[] = {
       "INSUFFICIENT_DATA", "HEALTHY", "IDLE_OK", "STUCK_ON",
       "STUCK_OFF", "PWM_SHORT", "SHORT_CYCLING"
     };
     int fsIdx = (int)state.sat.eFlameStatus;
     if (fsIdx < 0 || fsIdx > 6) fsIdx = 0;
-    sendMQTTData(F("sat/flame_status"), fsNames[fsIdx], false);
+    publishIfChangedS(F("sat/flame_status"), fsNames[fsIdx], s_flame_status, false);
   }
 
-  // Flame Health binary sensor (Task #71)
-  { SATFlameStatus fs = state.sat.eFlameStatus;
-    // Problem if stuck or short cycling; unavailable (don't publish) if insufficient data
+  // Flame Health binary sensor (Task #71). Skipped entirely when status is
+  // INSUFFICIENT_DATA — that intentional "no publish at all" path means HA
+  // shows the sensor as unavailable rather than incorrectly healthy.
+  {
+    SATFlameStatus fs = state.sat.eFlameStatus;
     if (fs != SAT_FS_INSUFFICIENT_DATA) {
       bool problem = (fs == SAT_FS_STUCK_ON || fs == SAT_FS_STUCK_OFF ||
                       fs == SAT_FS_PWM_SHORT || fs == SAT_FS_SHORT_CYCLING);
-      sendMQTTData(F("sat/flame_health"), problem ? "ON" : "OFF", true);
+      // Reuse SATShadowB for the ON/OFF binary, payload via direct send to
+      // preserve the historical "ON"/"OFF" labels (not "true"/"false").
+      const bool firstSeen    = (s_flame_health.nextRepublishMs == 0);
+      const bool valueDiff    = !firstSeen && (s_flame_health.last != (int8_t)(problem ? 1 : 0));
+      const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_flame_health.nextRepublishMs) >= 0;
+      if (firstSeen || valueDiff || heartbeatDue) {
+        s_flame_health.last            = (int8_t)(problem ? 1 : 0);
+        s_flame_health.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+        sendMQTTData(F("sat/flame_health"), problem ? "ON" : "OFF", true);
+      }
     }
   }
 
-  // TRV valve detection (Task #29)
-  sendMQTTData(F("sat/valves_open"), state.sat.bValvesOpen ? "true" : "false", false);
+  publishIfChangedB(F("sat/valves_open"), state.sat.bValvesOpen, s_valves_open, false);
 
-  // Pre-temperature tracking (Task #67)
-  { char valBuf[12];
-    if (state.sat.fPreCustomTemp > 0.0f) {
-      dtostrf(state.sat.fPreCustomTemp, 1, 1, valBuf);
-      sendMQTTData(F("sat/pre_custom_temperature"), valBuf, false);
-    }
-    if (state.sat.fPreActivityTemp > 0.0f) {
-      dtostrf(state.sat.fPreActivityTemp, 1, 1, valBuf);
-      sendMQTTData(F("sat/pre_activity_temperature"), valBuf, false);
-    }
+  // Pre-temperature tracking (Task #67) — only published when > 0.
+  if (state.sat.fPreCustomTemp > 0.0f) {
+    publishIfChangedF(F("sat/pre_custom_temperature"), state.sat.fPreCustomTemp, s_pre_custom_temp, SAT_EPS_TEMP, 1, false);
+  }
+  if (state.sat.fPreActivityTemp > 0.0f) {
+    publishIfChangedF(F("sat/pre_activity_temperature"), state.sat.fPreActivityTemp, s_pre_activity_temp, SAT_EPS_TEMP, 1, false);
   }
 
-  // Window detection
-  sendMQTTData(F("sat/window_open"), state.sat.bWindowOpen ? "true" : "false", false);
+  publishIfChangedB(F("sat/window_open"), state.sat.bWindowOpen, s_window_open, false);
 
-  // PV-surplus boost (TASK-640)
-  // Runtime telemetry only published when feature is enabled — keeps the
-  // broker quiet for the 99% of users who don't use it.
+  // ---------------------------------------------------------------------------
+  // PV-surplus boost (TASK-640). Runtime telemetry only when feature enabled.
+  // ---------------------------------------------------------------------------
   if (settings.sat.bPvBoostEnabled) {
-    char pvBuf[12];
-    dtostrf(state.sat.fExternalPvSurplusW, 1, 0, pvBuf);
-    sendMQTTData(F("sat/pv_surplus_w"), pvBuf, true);
-    sendMQTTData(F("sat/pv_surplus_valid"), state.sat.bExternalPvSurplusValid ? "true" : "false", true);
-    sendMQTTData(F("sat/pv_boost_active"), state.sat.bPvBoostActive ? "true" : "false", true);
-    dtostrf(state.sat.fPvBoostAppliedC, 1, 1, pvBuf);
-    sendMQTTData(F("sat/pv_boost_applied_c"), pvBuf, true);
+    publishIfChangedF(F("sat/pv_surplus_w"),       state.sat.fExternalPvSurplusW,     s_pv_surplus_w,       SAT_EPS_PV_W, 0, true);
+    publishIfChangedB(F("sat/pv_surplus_valid"),   state.sat.bExternalPvSurplusValid, s_pv_surplus_valid,   true);
+    publishIfChangedB(F("sat/pv_boost_active"),    state.sat.bPvBoostActive,          s_pv_boost_active,    true);
+    publishIfChangedF(F("sat/pv_boost_applied_c"), state.sat.fPvBoostAppliedC,        s_pv_boost_applied_c, SAT_EPS_TEMP, 1, true);
   }
-  // Settings: always published so HA discovery entities have a state topic.
+  // PV-boost settings always published so HA discovery entities have a state topic.
+  // Note: pv_boost_enabled historically uses "1"/"0" payload (not true/false);
+  // route through sendMQTTData directly to preserve that payload format, with
+  // our own change+heartbeat gate.
   {
-    char sBuf[12];
-    sendMQTTData(F("sat/pv_boost_enabled"), settings.sat.bPvBoostEnabled ? "1" : "0", true);
-    snprintf_P(sBuf, sizeof(sBuf), PSTR("%u"), (unsigned)settings.sat.iPvBoostThresholdW);
-    sendMQTTData(F("sat/pv_boost_threshold_w"), sBuf, true);
-    snprintf_P(sBuf, sizeof(sBuf), PSTR("%u"), (unsigned)settings.sat.iPvBoostHoldS);
-    sendMQTTData(F("sat/pv_boost_hold_s"), sBuf, true);
-    dtostrf(settings.sat.fPvBoostDeltaC, 1, 1, sBuf);
-    sendMQTTData(F("sat/pv_boost_delta_c"), sBuf, true);
-    dtostrf(settings.sat.fPvBoostMaxIndoorC, 1, 1, sBuf);
-    sendMQTTData(F("sat/pv_boost_max_indoor_c"), sBuf, true);
-    snprintf_P(sBuf, sizeof(sBuf), PSTR("%u"), (unsigned)settings.sat.iPvBoostMaxDurationMin);
-    sendMQTTData(F("sat/pv_boost_max_duration_min"), sBuf, true);
+    const bool current      = settings.sat.bPvBoostEnabled;
+    const bool firstSeen    = (s_pv_boost_enabled.nextRepublishMs == 0);
+    const bool valueDiff    = !firstSeen && (s_pv_boost_enabled.last != (int8_t)(current ? 1 : 0));
+    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_pv_boost_enabled.nextRepublishMs) >= 0;
+    if (firstSeen || valueDiff || heartbeatDue) {
+      s_pv_boost_enabled.last            = (int8_t)(current ? 1 : 0);
+      s_pv_boost_enabled.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+      sendMQTTData(F("sat/pv_boost_enabled"), current ? "1" : "0", true);
+    }
   }
+  publishIfChangedI(F("sat/pv_boost_threshold_w"),    (int32_t)settings.sat.iPvBoostThresholdW,    s_pv_boost_threshold_w,    true);
+  publishIfChangedI(F("sat/pv_boost_hold_s"),         (int32_t)settings.sat.iPvBoostHoldS,         s_pv_boost_hold_s,         true);
+  publishIfChangedF(F("sat/pv_boost_delta_c"),        settings.sat.fPvBoostDeltaC,                 s_pv_boost_delta_c,        SAT_EPS_TEMP, 1, true);
+  publishIfChangedF(F("sat/pv_boost_max_indoor_c"),   settings.sat.fPvBoostMaxIndoorC,             s_pv_boost_max_indoor_c,   SAT_EPS_TEMP, 1, true);
+  publishIfChangedI(F("sat/pv_boost_max_duration_min"), (int32_t)settings.sat.iPvBoostMaxDurationMin, s_pv_boost_max_duration_min, true);
 
-  // Pressure monitoring
-  { char pBuf[12];
-    dtostrf(state.sat.fSmoothedPressure, 1, 2, pBuf);
-    sendMQTTData(F("sat/pressure"), pBuf, false);
-    dtostrf(state.sat.fPressureDropRate, 1, 3, pBuf);
-    sendMQTTData(F("sat/pressure_drop_rate"), pBuf, false);
-    sendMQTTData(F("sat/pressure_alarm"), state.sat.bPressureAlarm ? "true" : "false", false);
-    sendMQTTData(F("sat/pressure_health"), state.sat.bPressureHealthy ? "ON" : "OFF", true);
+  // ---------------------------------------------------------------------------
+  // Pressure monitoring + ch_pressure delegate
+  // ---------------------------------------------------------------------------
+  publishIfChangedF(F("sat/pressure"),           state.sat.fSmoothedPressure, s_pressure,           SAT_EPS_PRESSURE, 2, false);
+  publishIfChangedF(F("sat/pressure_drop_rate"), state.sat.fPressureDropRate, s_pressure_drop_rate, SAT_EPS_FRACTION, 3, false);
+  publishIfChangedB(F("sat/pressure_alarm"),     state.sat.bPressureAlarm,    s_pressure_alarm,     false);
+  // pressure_health uses "ON"/"OFF" payload — preserve via direct send.
+  {
+    const bool current      = state.sat.bPressureHealthy;
+    const bool firstSeen    = (s_pressure_health.nextRepublishMs == 0);
+    const bool valueDiff    = !firstSeen && (s_pressure_health.last != (int8_t)(current ? 1 : 0));
+    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_pressure_health.nextRepublishMs) >= 0;
+    if (firstSeen || valueDiff || heartbeatDue) {
+      s_pressure_health.last            = (int8_t)(current ? 1 : 0);
+      s_pressure_health.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+      sendMQTTData(F("sat/pressure_health"), current ? "ON" : "OFF", true);
+    }
   }
-  // Task #226: publish sat/ch_pressure + sat/ch_pressure_status
   satPressureHealthPublish();
 
-  // Current modulation level (published so HA auto-discovery entity has a live topic)
-  snprintf_P(valBuf, sizeof(valBuf), PSTR("%d"), (int)state.sat.iCurrentModulation);
-  sendMQTTData(F("sat/current_modulation"), valBuf, false);
+  // ---------------------------------------------------------------------------
+  // Modulation + setpoint sync
+  // ---------------------------------------------------------------------------
+  publishIfChangedI(F("sat/current_modulation"),  (int32_t)state.sat.iCurrentModulation,   s_current_modulation,    false);
+  publishIfChangedB(F("sat/modulation_reliable"), state.sat.bModulationReliable,           s_modulation_reliable,   false);
+  publishIfChangedB(F("sat/setpoint_mismatch"),   state.sat.bSetpointMismatch,             s_setpoint_mismatch,     false);
 
-  // Modulation reliability + setpoint sync
-  sendMQTTData(F("sat/modulation_reliable"), state.sat.bModulationReliable ? "true" : "false", false);
-  sendMQTTData(F("sat/setpoint_mismatch"), state.sat.bSetpointMismatch ? "true" : "false", false);
-
-  // Heating curve recommendation
-  { static const char* const crNames[] = { "insufficient", "increase", "decrease", "hold" };
+  // ---------------------------------------------------------------------------
+  // Heating curve recommendation + JSON attributes
+  // ---------------------------------------------------------------------------
+  bool curveRecChanged = false;
+  {
+    static const char* const crNames[] = { "insufficient", "increase", "decrease", "hold" };
     int crIdx = (int)state.sat.eCurveRecommendation;
     if (crIdx < 0 || crIdx > 3) crIdx = 0;
-    sendMQTTData(F("sat/curve_recommendation"), crNames[crIdx], false);
+    curveRecChanged = publishIfChangedS(F("sat/curve_recommendation"), crNames[crIdx], s_curve_recommendation, false);
   }
-
-  // Curve Recommendation JSON attributes (Task #54)
-  { char jBuf[180];
+  {
+    char jBuf[180];
     snprintf_P(jBuf, sizeof(jBuf),
       PSTR("{\"error_threshold\":%.2f,\"daily_mean_error\":%.2f,\"daily_sample_count\":%u,\"recent_mean_error\":%.2f}"),
       settings.sat.fDeadband * 2.0f,
       state.sat.fMeanError,
       (unsigned)state.sat.iErrorSampleCount,
       state.sat.fError);
-    sendMQTTData(F("sat/curve_recommendation_attributes"), jBuf, false);
+    publishJsonAttrIfChanged(F("sat/curve_recommendation_attributes"), jBuf, s_curve_rec_attrs_hb, curveRecChanged, false);
   }
 
-  // Daily median heating curve recommendation (Task #228) — retained so HA sees it after restart
-  sendMQTTData(F("sat/heating_curve_recommendation"), state.sat.sHeatCurveRec, true);
+  publishIfChangedS(F("sat/heating_curve_recommendation"), state.sat.sHeatCurveRec, s_heating_curve_rec, true);
 
-  // Error statistics
-  { char sBuf[12];
-    dtostrf(state.sat.fMeanError, 1, 2, sBuf);
-    sendMQTTData(F("sat/error_mean"), sBuf, false);
-    dtostrf(state.sat.fErrorStdDev, 1, 3, sBuf);
-    sendMQTTData(F("sat/error_stddev"), sBuf, false);
-  }
+  publishIfChangedF(F("sat/error_mean"),   state.sat.fMeanError,   s_error_mean,   SAT_EPS_ERROR,    2, false);
+  publishIfChangedF(F("sat/error_stddev"), state.sat.fErrorStdDev, s_error_stddev, SAT_EPS_FRACTION, 3, false);
 
-  // Power and energy (Task #45)
-  dtostrf(state.sat.fCurrentPower, 1, 2, valBuf);
-  sendMQTTData(F("sat/power"), valBuf, false);
-  dtostrf(state.sat.fEnergyTotal, 1, 3, valBuf);
-  sendMQTTData(F("sat/energy_total"), valBuf, true);  // retained for HA energy dashboard
+  // ---------------------------------------------------------------------------
+  // Power + energy + manufacturer + thermal model
+  // ---------------------------------------------------------------------------
+  publishIfChangedF(F("sat/power"),        state.sat.fCurrentPower, s_power,        SAT_EPS_POWER,  2, false);
+  publishIfChangedF(F("sat/energy_total"), state.sat.fEnergyTotal,  s_energy_total, SAT_EPS_ENERGY, 3, true);
 
-  // Gas consumption estimate (Task #232)
   if (settings.sat.fBoilerRatedKW > 0.0f) {
-    dtostrf(state.sat.fEnergyEstimatedKWh, 1, 3, valBuf);
-    sendMQTTData(F("sat/energy_estimated_kwh"), valBuf, true); // retained for HA energy dashboard
+    publishIfChangedF(F("sat/energy_estimated_kwh"), state.sat.fEnergyEstimatedKWh, s_energy_estimated_kwh, SAT_EPS_ENERGY, 3, true);
   }
 
-  // Manufacturer
   { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
-    sendMQTTData(F("sat/manufacturer"), mfrName, true); }
+    publishIfChangedS(F("sat/manufacturer"), mfrName, s_manufacturer, true); }
 
-  // Thermal drop learning (Task #21)
-  // AC#10: MQTT publish thermal_drop_rate
-  { char thBuf[12];
-    dtostrf(settings.sat.fThermalCoeff, 1, 4, thBuf);
-    sendMQTTData(F("sat/thermal_coeff"), thBuf, true);
-    dtostrf(state.sat.fThermalDropRate, 1, 4, thBuf);
-    sendMQTTData(F("sat/thermal_drop_rate"), thBuf, false);
-    sendMQTTData(F("sat/thermal_model_valid"), state.sat.bThermalModelValid ? "true" : "false", true);
-    dtostrf(state.sat.fEstimatedRoom, 1, 1, thBuf);
-    sendMQTTData(F("sat/estimated_room"), thBuf, false);
+  publishIfChangedF(F("sat/thermal_coeff"),       settings.sat.fThermalCoeff,    s_thermal_coeff,       SAT_EPS_DERIVATIVE,  4, true);
+  publishIfChangedF(F("sat/thermal_drop_rate"),   state.sat.fThermalDropRate,    s_thermal_drop_rate,   SAT_EPS_DERIVATIVE,  4, false);
+  publishIfChangedB(F("sat/thermal_model_valid"), state.sat.bThermalModelValid,  s_thermal_model_valid, true);
+  publishIfChangedF(F("sat/estimated_room"),      state.sat.fEstimatedRoom,      s_estimated_room,      SAT_EPS_TEMP,        1, false);
+
+  // ---------------------------------------------------------------------------
+  // Solar gain + summer + thermal comfort
+  // ---------------------------------------------------------------------------
+  publishIfChangedB(F("sat/solar_gain"),      state.sat.bSolarGainActive, s_solar_gain_active, false);
+  publishIfChangedF(F("sat/indoor_rise_rate"), state.sat.fIndoorRiseRate, s_indoor_rise_rate,  SAT_EPS_FRACTION, 2, false);
+  if (state.sat.bSunElevationValid) {
+    publishIfChangedF(F("sat/solar_gain_sun_elevation"), state.sat.fSunElevation, s_sun_elevation, SAT_EPS_TEMP_COARSE, 1, false);
   }
 
-  // Solar gain (Task #23)
-  sendMQTTData(F("sat/solar_gain"), state.sat.bSolarGainActive ? "true" : "false", false);
-  { char sgBuf[12];
-    dtostrf(state.sat.fIndoorRiseRate, 1, 2, sgBuf);
-    sendMQTTData(F("sat/indoor_rise_rate"), sgBuf, false);
-    // Sun elevation (Task #68)
-    if (state.sat.bSunElevationValid) {
-      dtostrf(state.sat.fSunElevation, 1, 1, sgBuf);
-      sendMQTTData(F("sat/solar_gain_sun_elevation"), sgBuf, false);
+  publishIfChangedB(F("sat/summer_active"),       state.sat.bSummerActive,    s_summer_active,       false);
+  publishIfChangedF(F("sat/summer_hours_above"),  state.sat.fSummerHoursAbove, s_summer_hours_above,  SAT_EPS_DURATION, 1, false);
+
+  publishIfChangedF(F("sat/humidity"),       state.sat.fHumidity,       s_humidity,        SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedB(F("sat/humidity_valid"), state.sat.bHumidityValid,  s_humidity_valid,  false);
+  publishIfChangedF(F("sat/comfort_offset"), state.sat.fComfortOffset,  s_comfort_offset,  SAT_EPS_ERROR, 2, false);
+
+  // ---------------------------------------------------------------------------
+  // Simulation, auto-tune. Both use "ON"/"OFF" payloads historically — route
+  // via SATShadowB but emit the legacy payload directly.
+  // ---------------------------------------------------------------------------
+  {
+    const bool current      = settings.sat.bSimulation;
+    const bool firstSeen    = (s_simulation.nextRepublishMs == 0);
+    const bool valueDiff    = !firstSeen && (s_simulation.last != (int8_t)(current ? 1 : 0));
+    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_simulation.nextRepublishMs) >= 0;
+    if (firstSeen || valueDiff || heartbeatDue) {
+      s_simulation.last            = (int8_t)(current ? 1 : 0);
+      s_simulation.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+      sendMQTTData(F("sat/simulation"), current ? "ON" : "OFF", true);
     }
   }
-
-  // Summer simmer (Task #24)
-  sendMQTTData(F("sat/summer_active"), state.sat.bSummerActive ? "true" : "false", false);
-  { char suBuf[12];
-    dtostrf(state.sat.fSummerHoursAbove, 1, 1, suBuf);
-    sendMQTTData(F("sat/summer_hours_above"), suBuf, false);
-  }
-
-  // Thermal comfort (Task #28/#47/#231)
-  { char cBuf[12];
-    dtostrf(state.sat.fHumidity, 1, 1, cBuf);   // 1 decimal (TASK-231)
-    sendMQTTData(F("sat/humidity"), cBuf, false);
-    sendMQTTData(F("sat/humidity_valid"), state.sat.bHumidityValid ? "true" : "false", false);
-    dtostrf(state.sat.fComfortOffset, 1, 2, cBuf);
-    sendMQTTData(F("sat/comfort_offset"), cBuf, false);
-  }
-
-  // Simulation (Task #37)
-  sendMQTTData(F("sat/simulation"), settings.sat.bSimulation ? "ON" : "OFF", true);
-
-  // PID auto-tuning (Task #27)
-  sendMQTTData(F("sat/auto_tune"), settings.sat.bAutoTune ? "ON" : "OFF", true);
-  if (settings.sat.bAutoTune) {
-    char atBuf[12];
-    dtostrf(state.sat.fAutoTuneScore, 1, 2, atBuf);
-    sendMQTTData(F("sat/auto_tune_score"), atBuf, false);
-    dtostrf(settings.sat.fAutoTuneRate, 1, 3, atBuf);
-    sendMQTTData(F("sat/auto_tune_rate"), atBuf, false);
-    sendMQTTData(F("sat/auto_tune_active"), state.sat.bAutoTuneActive ? "true" : "false", false);
-  }
-
-  // SAT Python parity settings (Task #82)
   {
-    char agBuf[12];
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%lu"), (unsigned long)settings.sat.iSensorMaxAgeS);
-    sendMQTTData(F("sat/sensor_max_age"), valBuf, true);
-    sendMQTTData(F("sat/error_monitoring"), settings.sat.bErrorMonitoring ? "true" : "false", true);
-    dtostrf(settings.sat.fAutoGainsValue, 1, 2, agBuf);
-    sendMQTTData(F("sat/auto_gains_value"), agBuf, true);
-    sendMQTTData(F("sat/heating_mode"), settings.sat.iHeatingMode == 1 ? "eco" : "comfort", true);
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)settings.sat.iCyclesPerHour);
-    sendMQTTData(F("sat/cycles_per_hour"), valBuf, true);
-    dtostrf(settings.sat.fValveOffset, 1, 2, agBuf);
-    sendMQTTData(F("sat/valve_offset"), agBuf, true);
-    sendMQTTData(F("sat/solar_freeze_integral"), settings.sat.bSolarFreezeIntegral ? "true" : "false", true);
+    const bool current      = settings.sat.bAutoTune;
+    const bool firstSeen    = (s_auto_tune.nextRepublishMs == 0);
+    const bool valueDiff    = !firstSeen && (s_auto_tune.last != (int8_t)(current ? 1 : 0));
+    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_auto_tune.nextRepublishMs) >= 0;
+    if (firstSeen || valueDiff || heartbeatDue) {
+      s_auto_tune.last            = (int8_t)(current ? 1 : 0);
+      s_auto_tune.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+      sendMQTTData(F("sat/auto_tune"), current ? "ON" : "OFF", true);
+    }
+  }
+  if (settings.sat.bAutoTune) {
+    publishIfChangedF(F("sat/auto_tune_score"),  state.sat.fAutoTuneScore,    s_auto_tune_score,  SAT_EPS_FRACTION, 2, false);
+    publishIfChangedF(F("sat/auto_tune_rate"),   settings.sat.fAutoTuneRate,  s_auto_tune_rate,   SAT_EPS_FRACTION, 3, false);
+    publishIfChangedB(F("sat/auto_tune_active"), state.sat.bAutoTuneActive,   s_auto_tune_active, false);
   }
 
-  // Multi-area (Task #25)
+  // ---------------------------------------------------------------------------
+  // SAT Python parity settings (Task #82)
+  // ---------------------------------------------------------------------------
+  publishIfChangedI(F("sat/sensor_max_age"),       (int32_t)settings.sat.iSensorMaxAgeS,  s_sensor_max_age,       true);
+  publishIfChangedB(F("sat/error_monitoring"),     settings.sat.bErrorMonitoring,         s_error_monitoring,     true);
+  publishIfChangedF(F("sat/auto_gains_value"),     settings.sat.fAutoGainsValue,          s_auto_gains_value,     SAT_EPS_FRACTION, 2, true);
+  publishIfChangedS(F("sat/heating_mode"),         settings.sat.iHeatingMode == 1 ? "eco" : "comfort", s_heating_mode, true);
+  publishIfChangedI(F("sat/cycles_per_hour"),      (int32_t)settings.sat.iCyclesPerHour,  s_cycles_per_hour,      true);
+  publishIfChangedF(F("sat/valve_offset"),         settings.sat.fValveOffset,             s_valve_offset,         SAT_EPS_FRACTION, 2, true);
+  publishIfChangedB(F("sat/solar_freeze_integral"), settings.sat.bSolarFreezeIntegral,    s_solar_freeze_integral, true);
+
+  // ---------------------------------------------------------------------------
+  // Multi-area (Task #25). Hard-coded fan-out for up to 4 areas (SAT_MAX_AREAS
+  // is the upper bound; helpers require compile-time F() topics). Each area
+  // shadow is independent, so per-area on-change + heartbeat works naturally.
+  // ---------------------------------------------------------------------------
   if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
     uint8_t cnt = settings.sat.iMultiAreaCount;
     if (cnt > SAT_MAX_AREAS) cnt = SAT_MAX_AREAS;
-    char topicBuf[24];
-    char vBuf[12];
-    for (uint8_t i = 0; i < cnt; i++) {
-      snprintf_P(topicBuf, sizeof(topicBuf), PSTR("sat/area/%u"), i);
-      dtostrf(state.sat.fAreaTemp[i], 1, 1, vBuf);
-      sendMQTTData(topicBuf, vBuf, false);
+    if (cnt > 0) publishIfChangedF(F("sat/area/0"), state.sat.fAreaTemp[0], s_area_0, SAT_EPS_TEMP, 1, false);
+    if (cnt > 1) publishIfChangedF(F("sat/area/1"), state.sat.fAreaTemp[1], s_area_1, SAT_EPS_TEMP, 1, false);
+    if (cnt > 2) publishIfChangedF(F("sat/area/2"), state.sat.fAreaTemp[2], s_area_2, SAT_EPS_TEMP, 1, false);
+    if (cnt > 3) publishIfChangedF(F("sat/area/3"), state.sat.fAreaTemp[3], s_area_3, SAT_EPS_TEMP, 1, false);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Device + Cycle health binary sensors ("ON"/"OFF" payloads — direct send).
+  // ---------------------------------------------------------------------------
+  {
+    const bool current      = (state.sat.eBoilerStatus == SAT_BS_OFF);
+    const bool firstSeen    = (s_device_health.nextRepublishMs == 0);
+    const bool valueDiff    = !firstSeen && (s_device_health.last != (int8_t)(current ? 1 : 0));
+    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_device_health.nextRepublishMs) >= 0;
+    if (firstSeen || valueDiff || heartbeatDue) {
+      s_device_health.last            = (int8_t)(current ? 1 : 0);
+      s_device_health.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+      sendMQTTData(F("sat/device_health"), current ? "ON" : "OFF", true);
+    }
+  }
+  {
+    bool current = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT ||
+                    state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT ||
+                    state.sat.eLastCycleClass == SAT_CYCLE_SHORT);
+    const bool firstSeen    = (s_cycle_health.nextRepublishMs == 0);
+    const bool valueDiff    = !firstSeen && (s_cycle_health.last != (int8_t)(current ? 1 : 0));
+    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_cycle_health.nextRepublishMs) >= 0;
+    if (firstSeen || valueDiff || heartbeatDue) {
+      s_cycle_health.last            = (int8_t)(current ? 1 : 0);
+      s_cycle_health.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+      sendMQTTData(F("sat/cycle_health"), current ? "ON" : "OFF", true);
     }
   }
 
-  // Device Health binary sensor (Task #60): ON = problem (boiler off / no data)
-  sendMQTTData(F("sat/device_health"), (state.sat.eBoilerStatus == SAT_BS_OFF) ? "ON" : "OFF", true);
-
-  // Cycle Health binary sensor (Task #61): ON = problem (overshoot, underheat, or short)
-  {
-    bool cycleProb = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT ||
-                      state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT ||
-                      state.sat.eLastCycleClass == SAT_CYCLE_SHORT);
-    sendMQTTData(F("sat/cycle_health"), cycleProb ? "ON" : "OFF", true);
-  }
-
-  // Summer Simmer Index (Task #64): requires valid humidity
+  // ---------------------------------------------------------------------------
+  // Summer Simmer Index (Task #64): requires valid humidity.
+  // ---------------------------------------------------------------------------
   if (state.sat.bHumidityValid && state.sat.fHumidity > 0) {
     float simmerIdx = satCalcSimmerIndex(satGetRoomTemp(), state.sat.fHumidity);
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%.2f"), simmerIdx);
-    sendMQTTData(F("sat/ssi"), valBuf, false);          // short alias (TASK-231)
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%.1f"), simmerIdx);
-    sendMQTTData(F("sat/summer_simmer_index"), valBuf, false);
-    sendMQTTData(F("sat/summer_simmer_perception"), satSimmerPerception(simmerIdx), false);
+    publishIfChangedF(F("sat/ssi"),                 simmerIdx, s_ssi,                 SAT_EPS_ERROR,       2, false);
+    publishIfChangedF(F("sat/summer_simmer_index"), simmerIdx, s_summer_simmer_index, SAT_EPS_TEMP_COARSE, 1, false);
+    publishIfChangedS(F("sat/summer_simmer_perception"), satSimmerPerception(simmerIdx), s_summer_simmer_perception, false);
   }
 
-  // Relative Modulation State (Task #65)
+  // ---------------------------------------------------------------------------
+  // Modulation state + PWM state (string enums)
+  // ---------------------------------------------------------------------------
   {
     const char* modState = "OFF";
     if (state.sat.bActive) {
@@ -2383,40 +2442,37 @@ void satPublishMQTT()
         modState = "ACTIVE";
       }
     }
-    sendMQTTData(F("sat/modulation_state"), modState, false);
+    publishIfChangedS(F("sat/modulation_state"), modState, s_modulation_state, false);
   }
-
-  // PWM Status (Task #66): ON/OFF/IDLE
   {
     const char* pwmState = "IDLE";
     if (state.sat.eControlMode == SAT_MODE_PWM) {
       pwmState = state.sat.bPwmFlameRequested ? "ON" : "OFF";
     }
-    sendMQTTData(F("sat/pwm_state"), pwmState, false);
+    publishIfChangedS(F("sat/pwm_state"), pwmState, s_pwm_state, false);
   }
 
-  // DHW setpoint (Task #62: HA number entity)
-  dtostrf(settings.sat.fDhwSetpoint, 1, 1, valBuf);
-  sendMQTTData(F("sat/dhw_setpoint"), valBuf, true);
+  // ---------------------------------------------------------------------------
+  // DHW + max setpoint + requested setpoint + (optional) gas consumption.
+  // ---------------------------------------------------------------------------
+  publishIfChangedF(F("sat/dhw_setpoint"), settings.sat.fDhwSetpoint, s_dhw_setpoint, SAT_EPS_TEMP, 1, true);
+  publishIfChangedF(F("sat/max_setpoint"), satGetMaxSetpoint(),       s_max_setpoint, SAT_EPS_TEMP_COARSE, 1, true);
 
-  // Max setpoint for heating system (Task #63: HA number entity)
-  dtostrf(satGetMaxSetpoint(), 1, 1, valBuf);
-  sendMQTTData(F("sat/max_setpoint"), valBuf, true);
-
-  // Requested setpoint: PID output clamped to [min, max] before PWM (Task #51)
   {
     float reqSp = state.sat.fPidOutput;
     float sysMax = satGetMaxSetpoint();
     if (reqSp < SAT_MIN_SETPOINT) reqSp = SAT_MIN_SETPOINT;
     if (reqSp > sysMax)           reqSp = sysMax;
-    dtostrf(reqSp, 1, 1, valBuf);
-    sendMQTTData(F("sat/requested_setpoint"), valBuf, false);
+    publishIfChangedF(F("sat/requested_setpoint"), reqSp, s_requested_setpoint, SAT_EPS_TEMP_COARSE, 1, false);
   }
 
-  // Gas consumption m3/h (Task #52) — only when min+max consumption configured
+  // Gas consumption m3/h (Task #52). The original code reads minCons/maxCons
+  // as 0.0 placeholders — the entire block is currently dead. Refactor it
+  // through the helper anyway, so when minCons/maxCons get real settings
+  // hooks the on-change pattern is already in place.
   {
-    float minCons = 0.0f;  // TODO: from settings when available
-    float maxCons = 0.0f;  // TODO: from settings when available
+    float minCons = 0.0f;
+    float maxCons = 0.0f;
     if (minCons > 0 && maxCons > 0) {
       float consumption = 0.0f;
       bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
@@ -2424,261 +2480,168 @@ void satPublishMQTT()
         float modFrac = OTcurrentSystemState.RelModLevel / 100.0f;
         consumption = minCons + (modFrac * (maxCons - minCons));
       }
-      snprintf_P(valBuf, sizeof(valBuf), PSTR("%.3f"), consumption);
-      sendMQTTData(F("sat/consumption"), valBuf, false);
+      publishIfChangedF(F("sat/consumption"), consumption, s_consumption, SAT_EPS_FRACTION, 3, false);
     }
   }
 
-  // Synchronization binary sensors (Tasks #56, #57, #58)
-  // Each uses a 60-second delay to avoid false positives during normal transitions.
+  // ---------------------------------------------------------------------------
+  // Sync binary sensors (Tasks #56/#57/#58). The 60-second mismatch debounce
+  // is unchanged — only the publish itself goes through the helper.
+  // ---------------------------------------------------------------------------
   {
-    // Task #56: Control Setpoint Synchronization
     static unsigned long syncSetpointMismatchSince = 0;
     {
       float satSetpoint = state.sat.fFinalSetpoint;
       float boilerSetpoint = OTcurrentSystemState.TSet;
       bool mismatch = (fabsf(satSetpoint - boilerSetpoint) > 0.5f) && state.sat.bActive;
-
-      if (!mismatch) {
-        syncSetpointMismatchSince = 0;
-      } else if (syncSetpointMismatchSince == 0) {
-        syncSetpointMismatchSince = millis();
-      }
-
+      if (!mismatch) syncSetpointMismatchSince = 0;
+      else if (syncSetpointMismatchSince == 0) syncSetpointMismatchSince = millis();
       bool problem = mismatch && syncSetpointMismatchSince > 0 &&
                      (millis() - syncSetpointMismatchSince >= 60000UL);
-      sendMQTTData(F("sat/setpoint_sync"), problem ? "ON" : "OFF", true);
+      // ON/OFF payload — direct send through SATShadowB gate.
+      const bool firstSeen    = (s_setpoint_sync.nextRepublishMs == 0);
+      const bool valueDiff    = !firstSeen && (s_setpoint_sync.last != (int8_t)(problem ? 1 : 0));
+      const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_setpoint_sync.nextRepublishMs) >= 0;
+      if (firstSeen || valueDiff || heartbeatDue) {
+        s_setpoint_sync.last            = (int8_t)(problem ? 1 : 0);
+        s_setpoint_sync.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+        sendMQTTData(F("sat/setpoint_sync"), problem ? "ON" : "OFF", true);
+      }
     }
 
-    // Task #57: Relative Modulation Synchronization
     static unsigned long syncModulationMismatchSince = 0;
     {
       int satMod = (int)settings.sat.iMaxRelModulation;
       int boilerMod = (int)OTcurrentSystemState.MaxRelModLevelSetting;
       bool mismatch = (satMod != boilerMod) && state.sat.bActive;
-
       if (!mismatch) syncModulationMismatchSince = 0;
       else if (syncModulationMismatchSince == 0) syncModulationMismatchSince = millis();
-
       bool problem = mismatch && syncModulationMismatchSince > 0 &&
                      (millis() - syncModulationMismatchSince >= 60000UL);
-      sendMQTTData(F("sat/modulation_sync"), problem ? "ON" : "OFF", true);
+      const bool firstSeen    = (s_modulation_sync.nextRepublishMs == 0);
+      const bool valueDiff    = !firstSeen && (s_modulation_sync.last != (int8_t)(problem ? 1 : 0));
+      const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_modulation_sync.nextRepublishMs) >= 0;
+      if (firstSeen || valueDiff || heartbeatDue) {
+        s_modulation_sync.last            = (int8_t)(problem ? 1 : 0);
+        s_modulation_sync.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+        sendMQTTData(F("sat/modulation_sync"), problem ? "ON" : "OFF", true);
+      }
     }
 
-    // Task #58: Central Heating Synchronization
     static unsigned long syncCHMismatchSince = 0;
     {
-      bool boilerActive = (OTcurrentSystemState.SlaveStatus & 0x02) != 0;  // Bit 1 = CH active
+      bool boilerActive = (OTcurrentSystemState.SlaveStatus & 0x02) != 0;
       bool satHeating = state.sat.bActive;
       bool mismatch = (satHeating != boilerActive);
-
       if (!mismatch) syncCHMismatchSince = 0;
       else if (syncCHMismatchSince == 0) syncCHMismatchSince = millis();
-
       bool problem = mismatch && syncCHMismatchSince > 0 &&
                      (millis() - syncCHMismatchSince >= 60000UL);
-      sendMQTTData(F("sat/ch_sync"), problem ? "ON" : "OFF", true);
+      const bool firstSeen    = (s_ch_sync.nextRepublishMs == 0);
+      const bool valueDiff    = !firstSeen && (s_ch_sync.last != (int8_t)(problem ? 1 : 0));
+      const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_ch_sync.nextRepublishMs) >= 0;
+      if (firstSeen || valueDiff || heartbeatDue) {
+        s_ch_sync.last            = (int8_t)(problem ? 1 : 0);
+        s_ch_sync.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+        sendMQTTData(F("sat/ch_sync"), problem ? "ON" : "OFF", true);
+      }
     }
   }
 
-  // --- Task #81: Publish all SAT settings as individual MQTT topics for HA entities ---
-  {
-    // Number settings (float)
-    dtostrf(settings.sat.fHeatingCurveCoeff, 1, 1, valBuf);
-    sendMQTTData(F("sat/heating_curve_coeff"), valBuf, true);
+  feedWatchDog();
 
-    dtostrf(settings.sat.fDeadband, 1, 2, valBuf);
-    sendMQTTData(F("sat/deadband"), valBuf, true);
+  // ---------------------------------------------------------------------------
+  // SAT settings as individual HA-entity state topics (Task #81)
+  // ---------------------------------------------------------------------------
+  publishIfChangedF(F("sat/heating_curve_coeff"), settings.sat.fHeatingCurveCoeff, s_heating_curve_coeff, SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedF(F("sat/deadband"),            settings.sat.fDeadband,          s_deadband,            SAT_EPS_ERROR,       2, true);
+  publishIfChangedI(F("sat/control_interval"),    (int32_t)settings.sat.iControlInterval, s_control_interval, true);
+  publishIfChangedI(F("sat/max_modulation"),      (int32_t)settings.sat.iMaxRelModulation, s_max_modulation, true);
+  publishIfChangedF(F("sat/flame_off_offset"),    settings.sat.fFlameOffOffset,    s_flame_off_offset,    SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedF(F("sat/flow_offset"),         settings.sat.fFlowOffset,        s_flow_offset,         SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedF(F("sat/mod_sup_delay"),       settings.sat.fModSupDelay,       s_mod_sup_delay,       SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedF(F("sat/mod_sup_offset"),      settings.sat.fModSupOffset,      s_mod_sup_offset,      SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedF(F("sat/boiler_capacity"),     settings.sat.fBoilerCapacity,    s_boiler_capacity,     SAT_EPS_POWER,       1, true);
+  publishIfChangedF(F("sat/boiler_rated_kw"),     settings.sat.fBoilerRatedKW,     s_boiler_rated_kw,     SAT_EPS_POWER,       1, true);
+  publishIfChangedF(F("sat/boiler_efficiency"),   settings.sat.fBoilerEfficiency,  s_boiler_efficiency,   SAT_EPS_FRACTION,    2, true);
+  publishIfChangedF(F("sat/comfort_humidity"),    settings.sat.fComfortHumidity,   s_comfort_humidity,    SAT_EPS_DURATION,    0, true);
+  publishIfChangedF(F("sat/comfort_max_offset"),  settings.sat.fComfortMaxOffset,  s_comfort_max_offset,  SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedF(F("sat/summer_threshold"),    settings.sat.fSummerThreshold,   s_summer_threshold,    SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedF(F("sat/target_temp_step"),    settings.sat.fTargetTempStep,    s_target_temp_step,    SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedF(F("sat/min_pressure"),        settings.sat.fMinPressure,       s_min_pressure,        SAT_EPS_PRESSURE,    1, true);
+  publishIfChangedF(F("sat/max_pressure"),        settings.sat.fMaxPressure,       s_max_pressure,        SAT_EPS_PRESSURE,    1, true);
+  publishIfChangedF(F("sat/max_pressure_drop"),   settings.sat.fMaxPressureDrop,   s_max_pressure_drop,   SAT_EPS_PRESSURE,    2, true);
+  publishIfChangedF(F("sat/preset_comfort"),      settings.sat.fPresetComfort,     s_preset_comfort,      SAT_EPS_TEMP,        1, true);
+  publishIfChangedF(F("sat/preset_eco"),          settings.sat.fPresetEco,         s_preset_eco,          SAT_EPS_TEMP,        1, true);
+  publishIfChangedF(F("sat/preset_away"),         settings.sat.fPresetAway,        s_preset_away,         SAT_EPS_TEMP,        1, true);
+  publishIfChangedF(F("sat/preset_sleep"),        settings.sat.fPresetSleep,       s_preset_sleep,        SAT_EPS_TEMP,        1, true);
+  publishIfChangedF(F("sat/preset_activity"),     settings.sat.fPresetActivity,    s_preset_activity,     SAT_EPS_TEMP,        1, true);
+  publishIfChangedF(F("sat/preset_home"),         settings.sat.fPresetHome,        s_preset_home,         SAT_EPS_TEMP,        1, true);
+  publishIfChangedF(F("sat/ovp_value"),           settings.sat.fOvpValue,          s_ovp_value,           SAT_EPS_TEMP_COARSE, 1, true);
+  publishIfChangedI(F("sat/heating_system"),      (int32_t)settings.sat.iHeatingSystem,  s_heating_system,    true);
+  publishIfChangedI(F("sat/manufacturer_id"),     (int32_t)settings.sat.iManufacturer,   s_manufacturer_id,   true);
 
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), settings.sat.iControlInterval);
-    sendMQTTData(F("sat/control_interval"), valBuf, true);
+  publishIfChangedB(F("sat/solar_gain_enable"),       settings.sat.bSolarGainEnable,  s_solar_gain_enable,       true);
+  publishIfChangedB(F("sat/summer_simmer_enable"),    settings.sat.bSummerSimmer,     s_summer_simmer_enable,    true);
+  publishIfChangedB(F("sat/comfort_adjust_enable"),   settings.sat.bComfortAdjust,    s_comfort_adjust_enable,   true);
+  publishIfChangedB(F("sat/thermal_comfort"),         settings.sat.bThermalComfort,   s_thermal_comfort,         true);
+  publishIfChangedI(F("sat/humidity_timeout_s"),      (int32_t)settings.sat.iHumidityTimeoutS, s_humidity_timeout_s, true);
+  publishIfChangedB(F("sat/multi_area_enable"),       settings.sat.bMultiArea,        s_multi_area_enable,       true);
+  publishIfChangedB(F("sat/auto_tune_enable"),        settings.sat.bAutoTune,         s_auto_tune_enable,        true);
+  publishIfChangedB(F("sat/simulation_enable"),       settings.sat.bSimulation,       s_simulation_enable,       true);
+  publishIfChangedB(F("sat/window_detection_enable"), settings.sat.bWindowDetection,  s_window_detection_enable, true);
+  publishIfChangedB(F("sat/force_pwm_enable"),        settings.sat.bForcePWM,         s_force_pwm_enable,        true);
+  publishIfChangedB(F("sat/push_setpoint_enable"),    settings.sat.bPushSetpoint,     s_push_setpoint_enable,    true);
+  publishIfChangedB(F("sat/ovp_enabled"),             settings.sat.bOvpEnabled,       s_ovp_enabled,             true);
+  publishIfChangedB(F("sat/preset_sync_enable"),      settings.sat.bPresetSync,       s_preset_sync_enable,      true);
+  publishIfChangedB(F("sat/dhw_enabled"),             settings.sat.bDhwEnabled,       s_dhw_enabled,             true);
+  publishIfChangedB(F("sat/dhw_enable"),              settings.sat.bDhwEnable,        s_dhw_enable,              true);
+  publishIfChangedB(F("sat/pwm_auto_switch_enable"),  settings.sat.bPwmAutoSwitch,    s_pwm_auto_switch_enable,  true);
 
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), settings.sat.iMaxRelModulation);
-    sendMQTTData(F("sat/max_modulation"), valBuf, true);
-
-    dtostrf(settings.sat.fFlameOffOffset, 1, 1, valBuf);
-    sendMQTTData(F("sat/flame_off_offset"), valBuf, true);
-
-    dtostrf(settings.sat.fFlowOffset, 1, 1, valBuf);
-    sendMQTTData(F("sat/flow_offset"), valBuf, true);
-
-    dtostrf(settings.sat.fModSupDelay, 1, 1, valBuf);
-    sendMQTTData(F("sat/mod_sup_delay"), valBuf, true);
-
-    dtostrf(settings.sat.fModSupOffset, 1, 1, valBuf);
-    sendMQTTData(F("sat/mod_sup_offset"), valBuf, true);
-
-    dtostrf(settings.sat.fBoilerCapacity, 1, 1, valBuf);
-    sendMQTTData(F("sat/boiler_capacity"), valBuf, true);
-
-    dtostrf(settings.sat.fBoilerRatedKW, 1, 1, valBuf);
-    sendMQTTData(F("sat/boiler_rated_kw"), valBuf, true);
-
-    dtostrf(settings.sat.fBoilerEfficiency, 1, 2, valBuf);
-    sendMQTTData(F("sat/boiler_efficiency"), valBuf, true);
-
-    dtostrf(settings.sat.fComfortHumidity, 1, 0, valBuf);
-    sendMQTTData(F("sat/comfort_humidity"), valBuf, true);
-
-    dtostrf(settings.sat.fComfortMaxOffset, 1, 1, valBuf);
-    sendMQTTData(F("sat/comfort_max_offset"), valBuf, true);
-
-    dtostrf(settings.sat.fSummerThreshold, 1, 1, valBuf);
-    sendMQTTData(F("sat/summer_threshold"), valBuf, true);
-
-    dtostrf(settings.sat.fTargetTempStep, 1, 1, valBuf);
-    sendMQTTData(F("sat/target_temp_step"), valBuf, true);
-
-    dtostrf(settings.sat.fMinPressure, 1, 1, valBuf);
-    sendMQTTData(F("sat/min_pressure"), valBuf, true);
-
-    dtostrf(settings.sat.fMaxPressure, 1, 1, valBuf);
-    sendMQTTData(F("sat/max_pressure"), valBuf, true);
-
-    dtostrf(settings.sat.fMaxPressureDrop, 1, 2, valBuf);
-    sendMQTTData(F("sat/max_pressure_drop"), valBuf, true);
-
-    // Preset temperatures
-    dtostrf(settings.sat.fPresetComfort, 1, 1, valBuf);
-    sendMQTTData(F("sat/preset_comfort"), valBuf, true);
-
-    dtostrf(settings.sat.fPresetEco, 1, 1, valBuf);
-    sendMQTTData(F("sat/preset_eco"), valBuf, true);
-
-    dtostrf(settings.sat.fPresetAway, 1, 1, valBuf);
-    sendMQTTData(F("sat/preset_away"), valBuf, true);
-
-    dtostrf(settings.sat.fPresetSleep, 1, 1, valBuf);
-    sendMQTTData(F("sat/preset_sleep"), valBuf, true);
-
-    dtostrf(settings.sat.fPresetActivity, 1, 1, valBuf);
-    sendMQTTData(F("sat/preset_activity"), valBuf, true);
-
-    dtostrf(settings.sat.fPresetHome, 1, 1, valBuf);
-    sendMQTTData(F("sat/preset_home"), valBuf, true);
-
-    // OVP value (already has cmd topic, add state for completeness)
-    dtostrf(settings.sat.fOvpValue, 1, 1, valBuf);
-    sendMQTTData(F("sat/ovp_value"), valBuf, true);
-
-    // Heating system type (integer)
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), settings.sat.iHeatingSystem);
-    sendMQTTData(F("sat/heating_system"), valBuf, true);
-
-    // Manufacturer (integer)
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), settings.sat.iManufacturer);
-    sendMQTTData(F("sat/manufacturer_id"), valBuf, true);
-
-    // Switch (boolean) settings
-    sendMQTTData(F("sat/solar_gain_enable"), settings.sat.bSolarGainEnable ? "true" : "false", true);
-    sendMQTTData(F("sat/summer_simmer_enable"), settings.sat.bSummerSimmer ? "true" : "false", true);
-    sendMQTTData(F("sat/comfort_adjust_enable"), settings.sat.bComfortAdjust ? "true" : "false", true);
-    // TASK-204/231: thermal comfort mode state (SSI substitution for PID room temp)
-    sendMQTTData(F("sat/thermal_comfort"), settings.sat.bThermalComfort ? "true" : "false", true);
-    { char tcBuf[8];
-      snprintf_P(tcBuf, sizeof(tcBuf), PSTR("%u"), (unsigned)settings.sat.iHumidityTimeoutS);
-      sendMQTTData(F("sat/humidity_timeout_s"), tcBuf, true); }
-    sendMQTTData(F("sat/multi_area_enable"), settings.sat.bMultiArea ? "true" : "false", true);
-    sendMQTTData(F("sat/auto_tune_enable"), settings.sat.bAutoTune ? "true" : "false", true);
-    sendMQTTData(F("sat/simulation_enable"), settings.sat.bSimulation ? "true" : "false", true);
-    sendMQTTData(F("sat/window_detection_enable"), settings.sat.bWindowDetection ? "true" : "false", true);
-    sendMQTTData(F("sat/force_pwm_enable"), settings.sat.bForcePWM ? "true" : "false", true);
-    sendMQTTData(F("sat/push_setpoint_enable"), settings.sat.bPushSetpoint ? "true" : "false", true);
-    sendMQTTData(F("sat/ovp_enabled"), settings.sat.bOvpEnabled ? "true" : "false", true);
-    sendMQTTData(F("sat/preset_sync_enable"), settings.sat.bPresetSync ? "true" : "false", true);
-    sendMQTTData(F("sat/dhw_enabled"), settings.sat.bDhwEnabled ? "true" : "false", true);
-    // TASK-516: master DHW enable mirror. Always published — HA hides/shows
-    // the switch entity via the discovery gate (only emitted on storage tank).
-    sendMQTTData(F("sat/dhw_enable"), settings.sat.bDhwEnable ? "true" : "false", true);
-    sendMQTTData(F("sat/pwm_auto_switch_enable"), settings.sat.bPwmAutoSwitch ? "true" : "false", true);
-  }
-
-  // Climate entity extra_state_attributes JSON blob (Task #72)
-  // Publishes sat/climate_attributes for HA json_attributes_topic
+  // ---------------------------------------------------------------------------
+  // Climate entity extra_state_attributes JSON blob (Task #72). Aggregates 13
+  // fields; we don't try to track individual change — heartbeat-only suffices.
+  // ---------------------------------------------------------------------------
   {
     static char climAttrBuf[512];
     char fBuf[16];
     int pos = 0;
-
-    // optimal_coefficient — heating curve coefficient (maps to SAT Python optimal_coefficient)
     pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR("{"));
     dtostrf(settings.sat.fHeatingCurveCoeff, 1, 2, fBuf);
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR("\"optimal_coefficient\":%s"), fBuf);
-
-    // coefficient_derivative — not tracked in firmware; publish 0.0
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"coefficient_derivative\":0.0"));
-
-    // minimum_setpoint — static minimum boiler setpoint (SAT_MIN_SETPOINT = 10.0)
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR("\"optimal_coefficient\":%s"), fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"coefficient_derivative\":0.0"));
     dtostrf(SAT_MIN_SETPOINT, 1, 1, fBuf);
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"minimum_setpoint\":%s"), fBuf);
-
-    // boiler_flame_timing — duration of last completed flame cycle in seconds
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"boiler_flame_timing\":%.1f"), state.sat.fLastCycleDuration);
-
-    // boiler_temperature_cold — boiler temp when flame is off (Tboiler when not heating)
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"minimum_setpoint\":%s"), fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"boiler_flame_timing\":%.1f"), state.sat.fLastCycleDuration);
     dtostrf(OTcurrentSystemState.Tboiler, 1, 1, fBuf);
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"boiler_temperature_cold\":%s"), fBuf);
-
-    // boiler_temperature_tracking — no EMA tracking state in firmware; publish false
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"boiler_temperature_tracking\":false"));
-
-    // boiler_temperature_derivative — not tracked; publish 0.0
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"boiler_temperature_derivative\":0.0"));
-
-    // error_source — single zone; always "main"
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"error_source\":\"main\""));
-
-    // error_pid — current PID error (target - room)
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"boiler_temperature_cold\":%s"), fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"boiler_temperature_tracking\":false"));
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"boiler_temperature_derivative\":0.0"));
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"error_source\":\"main\""));
     dtostrf(state.sat.fError, 1, 2, fBuf);
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"error_pid\":%s"), fBuf);
-
-    // integral_enabled — integral is always active when SAT is running
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"integral_enabled\":true"));
-
-    // derivative_enabled — derivative is always active when SAT is running
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"derivative_enabled\":true"));
-
-    // derivative_raw — raw (filtered) derivative before PID scaling
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"error_pid\":%s"), fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"integral_enabled\":true"));
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"derivative_enabled\":true"));
     dtostrf(state.sat.fRawDerivative, 1, 4, fBuf);
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"derivative_raw\":%s"), fBuf);
-
-    // current_kp, current_ki, current_kd — current PID gains
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"derivative_raw\":%s"), fBuf);
     dtostrf(state.sat.fKp, 1, 4, fBuf);
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"current_kp\":%s"), fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"current_kp\":%s"), fBuf);
     dtostrf(state.sat.fKi, 1, 6, fBuf);
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"current_ki\":%s"), fBuf);
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"current_ki\":%s"), fBuf);
     dtostrf(state.sat.fKd, 1, 2, fBuf);
-    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
-                      PSTR(",\"current_kd\":%s"), fBuf);
-
-    // relative_modulation_enabled — true unless manufacturer quirk disables it
+    pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"current_kd\":%s"), fBuf);
     bool relModEnabled = !(satGetManufacturerQuirks() & SAT_QUIRK_NO_REL_MOD);
     pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos,
                       PSTR(",\"relative_modulation_enabled\":%s}"),
                       relModEnabled ? "true" : "false");
-
-    sendMQTTData(F("sat/climate_attributes"), climAttrBuf, false);
+    publishJsonAttrIfChanged(F("sat/climate_attributes"), climAttrBuf, s_climate_attrs_hb, /*anyChanged=*/false, false);
   }
 
-  // Weather data (Task #50)
+  // Weather data (Task #50) — uses its own helpers internally.
   weatherPublishMQTT();
 
 #if defined(ESP32)
-  // BLE sensor data (Task #20)
+  // BLE sensor data (Task #20) — uses its own helpers internally.
   satBLEPublishMQTT();
 #endif
 }

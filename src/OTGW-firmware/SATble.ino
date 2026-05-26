@@ -570,26 +570,21 @@ void satBLEPublishMQTT()
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
   if (!settings.sat.bBleEnable) return;
 
-  char valBuf[16];
+  // ADR-111: on-change + jittered heartbeat. Shadows are BSS zero-init.
+  static SATShadowF s_ble_temp, s_ble_humidity;
+  static SATShadowI s_ble_rssi, s_ble_battery, s_ble_sensor_count;
+  static SATShadowB s_ble_temp_valid;
 
   // --- Legacy flat topics (best/configured slot) — backwards compat ---
   if (state.sat.bBleTempValid) {
-    dtostrf(state.sat.fBleTemp, 1, 2, valBuf);
-    sendMQTTData(F("sat/ble_temp"), valBuf, false);
-
-    dtostrf(state.sat.fBleHumidity, 1, 2, valBuf);
-    sendMQTTData(F("sat/ble_humidity"), valBuf, false);
-
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%d"), (int)state.sat.iBleRssi);
-    sendMQTTData(F("sat/ble_sensor_rssi"), valBuf, false);
-
-    snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)state.sat.iBleBattery);
-    sendMQTTData(F("sat/ble_battery"), valBuf, false);
+    publishIfChangedF(F("sat/ble_temp"),        state.sat.fBleTemp,             s_ble_temp,     SAT_EPS_TEMP, 2, false);
+    publishIfChangedF(F("sat/ble_humidity"),    state.sat.fBleHumidity,         s_ble_humidity, SAT_EPS_TEMP_COARSE, 2, false);
+    publishIfChangedI(F("sat/ble_sensor_rssi"), (int32_t)state.sat.iBleRssi,    s_ble_rssi,     false);
+    publishIfChangedI(F("sat/ble_battery"),     (int32_t)state.sat.iBleBattery, s_ble_battery,  false);
   }
 
-  snprintf_P(valBuf, sizeof(valBuf), PSTR("%u"), (unsigned)state.sat.iBleSensorCount);
-  sendMQTTData(F("sat/ble_sensor_count"), valBuf, false);
-  sendMQTTData(F("sat/ble_temp_valid"), state.sat.bBleTempValid ? "true" : "false", false);
+  publishIfChangedI(F("sat/ble_sensor_count"), (int32_t)state.sat.iBleSensorCount, s_ble_sensor_count, false);
+  publishIfChangedB(F("sat/ble_temp_valid"),   state.sat.bBleTempValid,             s_ble_temp_valid,  false);
 
   // --- TASK-488/508: per-MAC state topics + one-shot HA discovery ---
   // TASK-508 changes: publish ONLY for the user-selected MAC (one in the

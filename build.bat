@@ -12,6 +12,9 @@ set "PYTHONUNBUFFERED=1"
 set "BUILD_VENV_DIR=%SCRIPT_DIR%.build-venv"
 set "BUILD_VENV_PY=%BUILD_VENV_DIR%\Scripts\python.exe"
 set "DEV_VENV_PY=%SCRIPT_DIR%.venv\Scripts\python.exe"
+set "BOOTSTRAP_PY_DIR=%SCRIPT_DIR%.build-python"
+set "BOOTSTRAP_PY_EXE=%BOOTSTRAP_PY_DIR%\python.exe"
+set "BOOTSTRAP_PY_VER=3.12.10"
 
 call :use_python_if_valid "%BUILD_VENV_PY%"
 
@@ -28,11 +31,16 @@ if not defined PYTHON_EXE (
 )
 
 if not defined PYTHON_EXE (
+    call :bootstrap_portable_python
+)
+
+if not defined PYTHON_EXE (
     echo ERROR: Python 3 not found. Install Python 3 or provide a working .venv. 1>&2
     exit /b 1
 )
 
 set "PATH=%PYTHON_DIR%;%PATH%"
+set "PYTHONPATH=%SCRIPT_DIR%;%PYTHONPATH%"
 
 call :ensure_pip
 if errorlevel 1 exit /b 1
@@ -89,4 +97,72 @@ if exist "%SCRIPT_DIR%requirements.txt" (
     if errorlevel 1 exit /b 1
 )
 
+exit /b 0
+
+:bootstrap_portable_python
+call :use_python_if_valid "%BOOTSTRAP_PY_EXE%"
+if not errorlevel 1 (
+    call :ensure_bootstrap_python_path
+    exit /b 0
+)
+
+if /I "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
+    set "PYTHON_EMBED_FILE=python-%BOOTSTRAP_PY_VER%-embed-amd64.zip"
+) else (
+    set "PYTHON_EMBED_FILE=python-%BOOTSTRAP_PY_VER%-embed-win32.zip"
+)
+
+set "PYTHON_EMBED_URL=https://www.python.org/ftp/python/%BOOTSTRAP_PY_VER%/%PYTHON_EMBED_FILE%"
+set "PYTHON_EMBED_ZIP=%TEMP%\%PYTHON_EMBED_FILE%"
+set "GET_PIP_FILE=%TEMP%\get-pip.py"
+
+echo INFO: Python 3 not found. Bootstrapping portable Python %BOOTSTRAP_PY_VER%...
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri '%PYTHON_EMBED_URL%' -OutFile '%PYTHON_EMBED_ZIP%'"
+if errorlevel 1 (
+    echo ERROR: Failed to download portable Python from %PYTHON_EMBED_URL% 1>&2
+    exit /b 1
+)
+
+if exist "%BOOTSTRAP_PY_DIR%" rd /s /q "%BOOTSTRAP_PY_DIR%"
+mkdir "%BOOTSTRAP_PY_DIR%" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: Failed to create portable Python directory: %BOOTSTRAP_PY_DIR% 1>&2
+    exit /b 1
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%PYTHON_EMBED_ZIP%' -DestinationPath '%BOOTSTRAP_PY_DIR%' -Force"
+if errorlevel 1 (
+    echo ERROR: Failed to unpack portable Python archive: %PYTHON_EMBED_ZIP% 1>&2
+    exit /b 1
+)
+
+if exist "%BOOTSTRAP_PY_DIR%\python*._pth" (
+    call :ensure_bootstrap_python_path
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile '%GET_PIP_FILE%'"
+if errorlevel 1 (
+    echo ERROR: Failed to download pip bootstrap script. 1>&2
+    exit /b 1
+)
+
+"%BOOTSTRAP_PY_EXE%" "%GET_PIP_FILE%" --disable-pip-version-check --no-input --quiet
+if errorlevel 1 (
+    echo ERROR: Failed to install pip into portable Python runtime. 1>&2
+    exit /b 1
+)
+
+call :use_python_if_valid "%BOOTSTRAP_PY_EXE%"
+if errorlevel 1 (
+    echo ERROR: Portable Python bootstrap did not produce a valid Python 3 runtime. 1>&2
+    exit /b 1
+)
+
+echo INFO: Portable Python runtime bootstrapped successfully.
+exit /b 0
+
+:ensure_bootstrap_python_path
+if not exist "%BOOTSTRAP_PY_DIR%\python*._pth" exit /b 0
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$repo = '%SCRIPT_DIR%'.TrimEnd('\\'); $pth = Get-ChildItem -Path '%BOOTSTRAP_PY_DIR%' -Filter 'python*._pth' | Select-Object -First 1; if ($pth) { $content = Get-Content -Path $pth.FullName; $updated = $false; $new = @(); foreach ($line in $content) { if ($line.Trim() -eq '#import site') { $new += 'import site'; $updated = $true } else { $new += $line } }; if (-not $updated -and ($new -notcontains 'import site')) { $new += 'import site' }; if ($new -notcontains $repo) { $new += $repo }; Set-Content -Path $pth.FullName -Value $new -Encoding Ascii }"
 exit /b 0

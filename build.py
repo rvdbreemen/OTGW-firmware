@@ -1763,12 +1763,28 @@ def check_esptool():
         pass
 
     print_info("esptool not found. Installing...")
+
+    # Embedded/portable Python runtimes may not include setuptools/wheel.
+    # esptool can resolve to an sdist, which requires these build backends.
+    try:
+        bootstrap = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q", "setuptools", "wheel"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if bootstrap.returncode != 0:
+            detail = (bootstrap.stderr or bootstrap.stdout or "").strip()
+            if detail:
+                print_warning(f"Failed to preinstall setuptools/wheel: {detail.splitlines()[-1]}")
+    except Exception:
+        pass
     
     # Try multiple installation strategies
     install_attempts = [
-        ([sys.executable, "-m", "pip", "install", "--user", "esptool"], "user installation"),
-        ([sys.executable, "-m", "pip", "install", "--break-system-packages", "esptool"], "system installation with override"),
-        ([sys.executable, "-m", "pip", "install", "esptool"], "standard installation"),
+        ([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--prefer-binary", "esptool"], "standard installation"),
+        ([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--prefer-binary", "--user", "esptool"], "user installation"),
+        ([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--prefer-binary", "--break-system-packages", "esptool"], "system installation with override"),
     ]
     
     for cmd, description in install_attempts:
@@ -1782,6 +1798,9 @@ def check_esptool():
             if result.returncode == 0:
                 print_success(f"esptool installed successfully ({description})")
                 return True
+            detail = (result.stderr or result.stdout or "").strip()
+            if detail:
+                print_warning(f"esptool install failed ({description}): {detail.splitlines()[-1]}")
         except Exception:
             continue
     
@@ -1936,8 +1955,13 @@ def build_filesystem_pio(project_dir, target):
     print_success(f"Filesystem build complete [{tcfg['name']}]")
 
 
-def collect_pio_artifacts(project_dir, target):
-    """Copy PlatformIO build artifacts to the common build/ directory."""
+def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesystem=True, want_elf=True):
+    """Copy PlatformIO build artifacts to the common build/ directory.
+
+    On Windows, `pio run -t buildfs` may clean parts of `.pio/build/<env>` and
+    remove `firmware.bin` produced by an earlier firmware step. Call this in
+    phases (firmware first, filesystem later) to make artifact persistence robust.
+    """
     tcfg = TARGETS[target]
     env_name = PIO_ENV_MAP[target]
     print_step(f"Collecting build artifacts [{tcfg['name']}]")
@@ -1949,31 +1973,34 @@ def collect_pio_artifacts(project_dir, target):
     collected = []
 
     # Firmware binary
-    fw_src = pio_build_dir / "firmware.bin"
-    if fw_src.exists():
-        fw_dest = build_dir / f"{config.PROJECT_NAME}-{target}.ino.bin"
-        shutil.copy2(fw_src, fw_dest)
-        print_info(f"Copied: firmware.bin -> {fw_dest.name}")
-        collected.append(fw_dest)
+    if want_firmware:
+        fw_src = pio_build_dir / "firmware.bin"
+        if fw_src.exists():
+            fw_dest = build_dir / f"{config.PROJECT_NAME}-{target}.ino.bin"
+            shutil.copy2(fw_src, fw_dest)
+            print_info(f"Copied: firmware.bin -> {fw_dest.name}")
+            collected.append(fw_dest)
 
     # Filesystem binary
-    fs_src = pio_build_dir / "littlefs.bin"
-    if fs_src.exists():
-        fs_dest = build_dir / f"{config.PROJECT_NAME}-{target}.littlefs.bin"
-        shutil.copy2(fs_src, fs_dest)
-        print_info(f"Copied: littlefs.bin -> {fs_dest.name}")
-        collected.append(fs_dest)
+    if want_filesystem:
+        fs_src = pio_build_dir / "littlefs.bin"
+        if fs_src.exists():
+            fs_dest = build_dir / f"{config.PROJECT_NAME}-{target}.littlefs.bin"
+            shutil.copy2(fs_src, fs_dest)
+            print_info(f"Copied: littlefs.bin -> {fs_dest.name}")
+            collected.append(fs_dest)
 
-    # ELF file — always collected for crash debugging (addr2line, exception decoder)
-    elf_src = pio_build_dir / "firmware.elf"
-    if elf_src.exists():
-        elf_dest = build_dir / f"{config.PROJECT_NAME}-{target}.elf"
-        shutil.copy2(elf_src, elf_dest)
-        print_info(f"Copied: firmware.elf -> {elf_dest.name}")
-        collected.append(elf_dest)
+    # ELF file — useful for crash debugging (addr2line, exception decoder)
+    if want_elf:
+        elf_src = pio_build_dir / "firmware.elf"
+        if elf_src.exists():
+            elf_dest = build_dir / f"{config.PROJECT_NAME}-{target}.elf"
+            shutil.copy2(elf_src, elf_dest)
+            print_info(f"Copied: firmware.elf -> {elf_dest.name}")
+            collected.append(elf_dest)
 
     # ESP32 extras needed for merged binary
-    if target == "esp32":
+    if target == "esp32" and want_firmware:
         for extra in ["bootloader.bin", "partitions.bin"]:
             src = pio_build_dir / extra
             if src.exists():
@@ -1990,9 +2017,16 @@ def collect_pio_artifacts(project_dir, target):
         # in build_firmware_pio / build_filesystem_pio already catch this
         # earlier; this is belt-and-suspenders for any future entry point
         # that bypasses those.
+        requested = []
+        if want_firmware:
+            requested.append("firmware")
+        if want_filesystem:
+            requested.append("filesystem")
+        if want_elf:
+            requested.append("elf")
         print_error(
             f"No build artifacts found in PlatformIO output for "
-            f"{tcfg['name']} (looked under {pio_build_dir})"
+            f"{tcfg['name']} (requested: {', '.join(requested)}; looked under {pio_build_dir})"
         )
         sys.exit(2)
 
@@ -2468,13 +2502,15 @@ Examples:
             # PlatformIO build path
             if args.firmware and not args.filesystem:
                 build_firmware_pio(project_dir, target)
+                collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesystem=False, want_elf=True)
             elif args.filesystem and not args.firmware:
                 build_filesystem_pio(project_dir, target)
+                collect_pio_artifacts(project_dir, target, want_firmware=False, want_filesystem=True, want_elf=False)
             else:
                 build_firmware_pio(project_dir, target)
+                collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesystem=False, want_elf=True)
                 build_filesystem_pio(project_dir, target)
-
-            collect_pio_artifacts(project_dir, target)
+                collect_pio_artifacts(project_dir, target, want_firmware=False, want_filesystem=True, want_elf=False)
         else:
             # Arduino-CLI build path
             if args.firmware and not args.filesystem:

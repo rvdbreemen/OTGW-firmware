@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-alpha.72
+**  Version  : v2.0.0-alpha.73
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -46,12 +46,10 @@
 #if defined(ESP32)
   #include <esp_system.h>   // esp_random()
 #endif
-// ESP8266: os_random() is provided via <user_interface.h> which is already
-// pulled in by the Arduino core for ESP8266. Including it explicitly would
-// fight with the core's own include order; we forward-declare instead.
-#if !defined(ESP32)
-extern "C" uint32_t os_random(void);
-#endif
+// ESP8266: os_random() (return type 'unsigned long') is declared in osapi.h,
+// which is transitively pulled in by <Arduino.h> via the ESP8266 core's
+// pgmspace.h. No forward declaration needed — and adding one trips an
+// ambiguous-overload (uint32_t vs unsigned long, same size but distinct types).
 
 // ---------------------------------------------------------------------------
 // Heartbeat jitter window (per ADR-111 sub-rule 3).
@@ -65,7 +63,7 @@ static inline uint32_t satRandomU32() {
 #if defined(ESP32)
   return esp_random();
 #else
-  return os_random();
+  return (uint32_t)os_random();
 #endif
 }
 
@@ -174,3 +172,28 @@ bool publishIfChangedB(const __FlashStringHelper* topic, bool current,
 
 bool publishIfChangedS(const __FlashStringHelper* topic, const char* current,
                        SATShadowS& shadow, bool retained);
+
+// `const char*` topic overloads for runtime-built topics (e.g. sat/ble/<mac>/temp,
+// sat/area/<idx>). Same semantics; just routes through the matching sendMQTTData
+// overload internally. Callers are responsible for matching shadow ↔ topic
+// stably across calls (typically a function-static shadow per logical topic).
+bool publishIfChangedF(const char* topic, float current,
+                       SATShadowF& shadow, float tolerance, uint8_t decimals,
+                       bool retained);
+bool publishIfChangedI(const char* topic, int32_t current,
+                       SATShadowI& shadow, bool retained);
+bool publishIfChangedB(const char* topic, bool current,
+                       SATShadowB& shadow, bool retained);
+bool publishIfChangedS(const char* topic, const char* current,
+                       SATShadowS& shadow, bool retained);
+
+// JSON-attributes blob helper. Used for HA `json_attributes_topic` payloads
+// that are too large (≥ ~100 bytes) to shadow as a string. The caller passes
+// `anyChanged` derived from OR'ing the return values of the publishIfChanged*
+// calls for the blob's source fields. Publishes when first-seen, any source
+// changed, or the per-blob heartbeat is due. The caller maintains a single
+// `static uint32_t nextRepublishMs = 0;` next to the blob — BSS zero-init
+// stands in for "never published". Returns true when a publish happened.
+bool publishJsonAttrIfChanged(const __FlashStringHelper* topic, const char* json,
+                              uint32_t& nextRepublishMs, bool anyChanged,
+                              bool retained);

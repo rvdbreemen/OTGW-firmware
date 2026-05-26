@@ -112,3 +112,12 @@ void _debugBOL(const char *fn, int line)
 
    debugTelnet.print(_bol);
 }
+
+void enableDebugForPrerelease() {
+  state.debug.bRestAPI    = true;
+  state.debug.bMQTT       = true;
+  state.debug.bMQTTGate   = true;
+  state.debug.bSensors    = true;
+  state.debug.bSATBLE     = true;
+  DebugTln(F("[prerelease] verbose debug enabled: restapi mqtt mqtt_gate sensors sat_ble"));
+}

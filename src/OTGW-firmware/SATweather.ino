@@ -679,49 +679,47 @@ void weatherPublishMQTT()
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
   if (!settings.sat.bWeatherEnable || !state.sat.weather.bValid) return;
 
-  char valBuf[16];
+  // ADR-111: on-change + jittered heartbeat. The outer rate-limit
+  // (settings.sat.iWeatherInterval, default 900s) still applies; these
+  // helpers further suppress publishes when the polled values haven't
+  // changed since the last poll.
+  static SATShadowF s_w_temp, s_w_apparent, s_w_humidity, s_w_wind_speed, s_w_cloud_cover;
+#ifndef ESP8266
+  static SATShadowF s_w_wind_dir, s_w_wind_gusts, s_w_pressure_msl;
+  static SATShadowF s_w_precip, s_w_rain, s_w_snowfall;
+  static SATShadowI s_w_weather_code;
+  static SATShadowB s_w_is_day;
+#endif
 
-  // Core SAT fields — both platforms
-  dtostrf(state.sat.weather.fTemperature,  1, 1, valBuf);
-  sendMQTTData(F("sat/weather/temperature"),  valBuf, false);
-
-  dtostrf(state.sat.weather.fApparentTemp, 1, 1, valBuf);
-  sendMQTTData(F("sat/weather/apparent_temp"), valBuf, false);
-
-  dtostrf(state.sat.weather.fHumidity,     1, 0, valBuf);
-  sendMQTTData(F("sat/weather/humidity"),  valBuf, false);
-
-  dtostrf(state.sat.weather.fWindSpeed,    1, 1, valBuf);
-  sendMQTTData(F("sat/weather/wind_speed"), valBuf, false);
-
-  dtostrf(state.sat.weather.fCloudCover,   1, 0, valBuf);
-  sendMQTTData(F("sat/weather/cloud_cover"), valBuf, false);
+  // Core fields — both platforms
+  publishIfChangedF(F("sat/weather/temperature"),   state.sat.weather.fTemperature, s_w_temp,        SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedF(F("sat/weather/apparent_temp"), state.sat.weather.fApparentTemp,s_w_apparent,    SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedF(F("sat/weather/humidity"),      state.sat.weather.fHumidity,    s_w_humidity,    SAT_EPS_DURATION,    0, false);
+  publishIfChangedF(F("sat/weather/wind_speed"),    state.sat.weather.fWindSpeed,   s_w_wind_speed,  SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedF(F("sat/weather/cloud_cover"),   state.sat.weather.fCloudCover,  s_w_cloud_cover, SAT_EPS_DURATION,    0, false);
 
 #ifndef ESP8266
-  // Extended fields — ESP32 only
-  dtostrf(state.sat.weather.fWindDirection, 1, 0, valBuf);
-  sendMQTTData(F("sat/weather/wind_direction"), valBuf, false);
+  publishIfChangedF(F("sat/weather/wind_direction"), state.sat.weather.fWindDirection, s_w_wind_dir,     SAT_EPS_DURATION,    0, false);
+  publishIfChangedF(F("sat/weather/wind_gusts"),     state.sat.weather.fWindGusts,     s_w_wind_gusts,   SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedF(F("sat/weather/pressure_msl"),   state.sat.weather.fPressureMsl,   s_w_pressure_msl, SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedF(F("sat/weather/precipitation"),  state.sat.weather.fPrecipitation, s_w_precip,       SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedF(F("sat/weather/rain"),           state.sat.weather.fRain,          s_w_rain,         SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedF(F("sat/weather/snowfall"),       state.sat.weather.fSnowfall,      s_w_snowfall,     SAT_EPS_TEMP_COARSE, 1, false);
+  publishIfChangedI(F("sat/weather/weather_code"),   (int32_t)state.sat.weather.iWeatherCode, s_w_weather_code, false);
 
-  dtostrf(state.sat.weather.fWindGusts,    1, 1, valBuf);
-  sendMQTTData(F("sat/weather/wind_gusts"), valBuf, false);
-
-  dtostrf(state.sat.weather.fPressureMsl,  1, 1, valBuf);
-  sendMQTTData(F("sat/weather/pressure_msl"), valBuf, false);
-
-  dtostrf(state.sat.weather.fPrecipitation, 1, 1, valBuf);
-  sendMQTTData(F("sat/weather/precipitation"), valBuf, false);
-
-  dtostrf(state.sat.weather.fRain,         1, 1, valBuf);
-  sendMQTTData(F("sat/weather/rain"),      valBuf, false);
-
-  dtostrf(state.sat.weather.fSnowfall,     1, 1, valBuf);
-  sendMQTTData(F("sat/weather/snowfall"),  valBuf, false);
-
-  snprintf(valBuf, sizeof(valBuf), "%d", (int)state.sat.weather.iWeatherCode);
-  sendMQTTData(F("sat/weather/weather_code"), valBuf, false);
-
-  snprintf(valBuf, sizeof(valBuf), "%d", state.sat.weather.bIsDay ? 1 : 0);
-  sendMQTTData(F("sat/weather/is_day"),    valBuf, false);
+  // is_day historically uses "1"/"0" payload (not "true"/"false") — gate via
+  // SATShadowB but emit the legacy payload directly.
+  {
+    const bool current      = state.sat.weather.bIsDay;
+    const bool firstSeen    = (s_w_is_day.nextRepublishMs == 0);
+    const bool valueDiff    = !firstSeen && (s_w_is_day.last != (int8_t)(current ? 1 : 0));
+    const bool heartbeatDue = !firstSeen && !valueDiff && (int32_t)(millis() - s_w_is_day.nextRepublishMs) >= 0;
+    if (firstSeen || valueDiff || heartbeatDue) {
+      s_w_is_day.last            = (int8_t)(current ? 1 : 0);
+      s_w_is_day.nextRepublishMs = millis() + (firstSeen ? satRandomBootScatterMs() : satRandomHeartbeatMs());
+      sendMQTTData(F("sat/weather/is_day"), current ? "1" : "0", false);
+    }
+  }
 #endif  // ifndef ESP8266
 }
 

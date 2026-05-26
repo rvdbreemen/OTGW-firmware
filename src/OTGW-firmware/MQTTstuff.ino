@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.72
+**  Version  : v2.0.0-alpha.73
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2490,33 +2490,44 @@ void satBLEMacToCompact(const char* macWithColons, char* out, size_t outSize)
 
 // Publish 4 BLE state topics under <MQTTPubNamespace>/sat/ble/<mac>/{temp,rh,bat,rssi}.
 // Not retained (state). Skips silently if MQTT is not connected.
+//
+// ADR-111: on-change + jittered heartbeat. The shadows below cover the
+// "currently published MAC". When the selected MAC changes (user picks a
+// different sensor) we reset all four shadows so values for the new MAC
+// don't get suppressed by stale comparisons against the previous MAC.
 void satBLEPublishStateTopics(const char* macCompact, float temp, float hum, uint8_t bat, int8_t rssi)
 {
   if (!macCompact || macCompact[0] == '\0') return;
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
 
+  static SATShadowF s_ble_temp;
+  static SATShadowF s_ble_rh;
+  static SATShadowI s_ble_bat;
+  static SATShadowI s_ble_rssi;
+  static char       s_last_mac[BLE_MAC_COMPACT_SIZE] = {0};
+
+  // MAC changed (or first call): wipe shadows so the new MAC publishes fresh.
+  if (strncmp(macCompact, s_last_mac, sizeof(s_last_mac)) != 0) {
+    s_ble_temp = SATShadowF{};
+    s_ble_rh   = SATShadowF{};
+    s_ble_bat  = SATShadowI{};
+    s_ble_rssi = SATShadowI{};
+    strlcpy(s_last_mac, macCompact, sizeof(s_last_mac));
+  }
+
   char topic[64];
-  char value[16];
 
-  // Temperature (°C)
   snprintf_P(topic, sizeof(topic), PSTR("sat/ble/%s/temp"), macCompact);
-  dtostrf(temp, 1, 2, value);
-  sendMQTTData(topic, value, false);
+  publishIfChangedF(topic, temp, s_ble_temp, SAT_EPS_TEMP,        2, false);
 
-  // Relative humidity (%)
   snprintf_P(topic, sizeof(topic), PSTR("sat/ble/%s/rh"), macCompact);
-  dtostrf(hum, 1, 2, value);
-  sendMQTTData(topic, value, false);
+  publishIfChangedF(topic, hum,  s_ble_rh,   SAT_EPS_TEMP_COARSE, 2, false);
 
-  // Battery (%)
   snprintf_P(topic, sizeof(topic), PSTR("sat/ble/%s/bat"), macCompact);
-  snprintf_P(value, sizeof(value), PSTR("%u"), (unsigned)bat);
-  sendMQTTData(topic, value, false);
+  publishIfChangedI(topic, (int32_t)bat,  s_ble_bat,  false);
 
-  // RSSI (dBm)
   snprintf_P(topic, sizeof(topic), PSTR("sat/ble/%s/rssi"), macCompact);
-  snprintf_P(value, sizeof(value), PSTR("%d"), (int)rssi);
-  sendMQTTData(topic, value, false);
+  publishIfChangedI(topic, (int32_t)rssi, s_ble_rssi, false);
 }
 
 // Build one HA discovery config payload and publish it retained to

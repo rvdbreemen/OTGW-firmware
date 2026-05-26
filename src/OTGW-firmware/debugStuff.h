@@ -90,3 +90,4 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
 // picks up this header.
 void _debugPrintf_P(PGM_P fmt, ...);
 void _debugBOL(const char *fn, int line);
+void enableDebugForPrerelease();

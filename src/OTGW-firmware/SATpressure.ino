@@ -61,12 +61,10 @@ void satPressureHealthUpdate()
 // ---------------------------------------------------------------------------
 void satPressureHealthPublish()
 {
-  char buf[12];
+  // ADR-111: on-change + jittered heartbeat. Shadows are BSS zero-init.
+  static SATShadowF s_ch_pressure;
+  static SATShadowS s_ch_pressure_status;
 
-  // sat/ch_pressure — current raw OT MsgID 18 reading (bar)
-  dtostrf(state.sat.fBoilerPressure, 1, 2, buf);
-  sendMQTTData(F("sat/ch_pressure"), buf, false);
-
-  // sat/ch_pressure_status — "ok", "low", or "high"
-  sendMQTTData(F("sat/ch_pressure_status"), state.sat.sPressureStatus, false);
+  publishIfChangedF(F("sat/ch_pressure"), state.sat.fBoilerPressure, s_ch_pressure, SAT_EPS_PRESSURE, 2, false);
+  publishIfChangedS(F("sat/ch_pressure_status"), state.sat.sPressureStatus, s_ch_pressure_status, false);
 }
