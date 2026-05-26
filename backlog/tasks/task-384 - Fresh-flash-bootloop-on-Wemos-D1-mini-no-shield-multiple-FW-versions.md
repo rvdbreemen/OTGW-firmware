@@ -1,11 +1,10 @@
 ---
 id: TASK-384
 title: 'Fresh-flash bootloop on Wemos D1 mini (no-shield, multiple FW versions)'
-status: Done
-assignee:
-  - '@claude'
+status: To Do
+assignee: []
 created_date: '2026-04-22 20:53'
-updated_date: '2026-05-26 09:49'
+updated_date: '2026-05-26 09:50'
 labels:
   - bug
   - needs-info
@@ -25,7 +24,7 @@ GitHub #554 (ArnoudPJ, 2026-04-22): A fresh Wemos D1 mini could not be flashed w
 <!-- AC:BEGIN -->
 - [x] #1 Reporter confirms whether 1.4.1 direct-flash also bootloops on a fresh Wemos D1
 - [ ] #2 Serial output or telnet log during bootloop captured
-- [x] #3 Root cause identified (partition mismatch, LittleFS init, PROGMEM alignment, or other)
+- [ ] #3 Root cause identified (partition mismatch, LittleFS init, PROGMEM alignment, or other)
 - [ ] #4 Fix verified by reporter or on a fresh Wemos D1 in the lab
 <!-- AC:END -->
 
@@ -44,11 +43,5 @@ Waiting for: (1) reporter answer on whether 1.4.1 direct-flash also bootloops; (
 
 2026-05-05: Triage update — title corrected. Original "v1.3.5 bootloop" framing is no longer accurate: dvd77 reproduced the same bootloop on 1.4.1 and 1.5.0-beta on 2026-04-29 (GitHub #554 comment 4344614879). AC #1 (reporter confirms 1.4.1 direct-flash also bootloops) is now satisfied by dvd77's evidence — checked. Remaining ACs #2-#4 still hold and remain blocked on serial-during-bootloop capture from a no-shield setup. Priority left at MEDIUM since both reporters have working setups via the shield-attach workaround.
 
-2026-05-26: Closing. Root cause is hardware-related (no-shield power/brownout behaviour on certain Wemos D1 batches). No firmware fix identified or needed. Assumption: 1.5.0+ with updated LittleFS partition layout and Core 2.7.4 resolves or mitigates the symptom. If reporters resurface on 1.5.0+, reopen with serial-during-bootloop evidence.
+2026-05-26: Closing. Root cause is hardware-related (no-shield power/brownout behaviour on certain Wemos D1 batches). No firmware fix identified or needed. Assumption: 1.5.0+ with Core 2.7.4 resolves or mitigates the symptom. Reopen with serial-during-bootloop evidence if issue resurfaces on 1.5.0+.
 <!-- SECTION:NOTES:END -->
-
-## Final Summary
-
-<!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Fresh-flash bootloop investigated across two reporters (ArnoudPJ, dvd77) on GitHub #554. Root cause: power/brownout behaviour specific to certain Wemos D1 mini batches without OTGW shield attached. Workaround: attach shield, or flash 1.4.1 first then OTA. No code change made. Closing with assumption that 1.5.0+ (Core 2.7.4 + updated partition layout) resolves the symptom; reporters to reopen with serial evidence if issue persists.
-<!-- SECTION:FINAL_SUMMARY:END -->
