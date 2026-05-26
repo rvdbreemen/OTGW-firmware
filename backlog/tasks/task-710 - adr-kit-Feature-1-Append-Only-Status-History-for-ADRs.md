@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-26 13:36'
-updated_date: '2026-05-26 16:52'
+updated_date: '2026-05-26 16:55'
 labels:
   - adr-kit
   - phase-1
@@ -103,4 +103,6 @@ BACKWARD COMPATIBILITY:
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-05-26: Picked up by @codex for Phase 1 execution. Implementation target is the standalone repo D:\Users\Robert\Documents\GitHub\RvdB\adr-kit on branch v0.14-dev. Initial inspection found template scaffolding present, but bin/adr-judge parse/append/migration support, bin/adr-lint audit gate, and real status-history tests are not yet implemented.
+
+Implementation decision: the drafted silent auto-migration on every pre-commit judge invocation is unsafe because judging staged content must not silently create unstaged ADR modifications. Phase 1 will provide explicit 'adr-judge --migrate-status-history' migration, preserving normal judge runs as read-only while meeting the no-data-loss upgrade objective.
 <!-- SECTION:NOTES:END -->
