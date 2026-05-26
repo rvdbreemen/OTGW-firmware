@@ -1,10 +1,11 @@
 ---
 id: TASK-707
 title: 'feat-2.0.0: port TASK-703 — Statistics table draggable column widths'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-25 23:05'
-updated_date: '2026-05-25 23:08'
+updated_date: '2026-05-26 09:33'
 labels:
   - ui
   - feat-2.0.0
