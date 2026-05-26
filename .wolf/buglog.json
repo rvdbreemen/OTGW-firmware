@@ -2,6 +2,26 @@
   "version": 1,
   "bugs": [
     {
+      "id": "bug-032",
+      "timestamp": "2026-05-26T19:30:00.000Z",
+      "error_message": "WSL build.sh exits immediately when Python 3 is unavailable",
+      "file": "build.sh",
+      "root_cause": "Script only attempted existing interpreters/.venv and had no unattended runtime bootstrap path",
+      "fix": "Added local Miniconda-based Python bootstrap fallback, downloader abstraction, pip ensurepip/get-pip fallback, and repo PYTHONPATH export for self-contained execution",
+      "tags": [
+        "build",
+        "wsl",
+        "bootstrap",
+        "python",
+        "shell"
+      ],
+      "related_bugs": [
+        "bug-031"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-05-26T19:30:00.000Z"
+    },
+    {
       "id": "bug-001",
       "timestamp": "2026-05-01T17:28:33.651Z",
       "error_message": "Significant refactor of ",
@@ -491,6 +511,24 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-21T21:08:53.001Z"
+    },
+    {
+      "id": "bug-031",
+      "timestamp": "2026-05-26T16:58:00.000Z",
+      "error_message": "Windows build.bat failed on clean environment and later lost firmware artifacts during buildfs phase",
+      "file": "build.bat, build.py",
+      "root_cause": "build.bat required preinstalled Python and embedded Python lacked repo import path; build.py esptool auto-install could fail without setuptools/wheel; and PlatformIO buildfs on Windows could clean .pio artifacts causing missing firmware.bin before merge step.",
+      "fix": "Added portable Python bootstrap in build.bat (download + extract + pip bootstrap), repaired embedded python*._pth with repo path/import site, hardened esptool installation in build.py by preinstalling setuptools/wheel and better pip strategy, and switched to phased artifact collection (firmware first, filesystem second) to preserve binaries across build phases.",
+      "tags": [
+        "build",
+        "windows",
+        "bootstrap",
+        "platformio",
+        "esptool"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-26T16:58:00.000Z"
     }
   ]
 }

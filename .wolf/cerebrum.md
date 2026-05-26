@@ -18,8 +18,10 @@
 ## Do-Not-Repeat
 
 <!-- Mistakes made and corrected. Each entry prevents the same mistake recurring. -->
+- **2026-05-26**: For WSL/Linux build reliability, do not assume system Python/pip exists or that package-manager installs are acceptable. `build.sh` must self-bootstrap an isolated local Python runtime and pip non-interactively when needed.
 - **2026-05-26**: Version bump in 2.0.0 src files (comment headers) from a `build.py` run lands as unstaged changes. The pre-commit hook blocks the commit with "does not bump _VERSION_PRERELEASE" even when the version was already bumped in a previous commit. Use `OTGW_BUMP_HOOK_DISABLE=1 git commit` with a `chore(meta):` prefix to commit the housekeeping header updates. The commit-msg hook requires either a TASK-NNN reference or an exemption prefix (`chore(meta):`, `chore(release):`, `chore(housekeeping):`, `chore(daily-report):`).
 - **2026-05-26**: The backlog CLI auto-stages and auto-commits task file changes. The adr-kit pre-commit hook can auto-change ADR Status from Proposed to Accepted. Do not manually re-write or re-commit ADR files after `backlog task edit` — check git log first to avoid duplicating the commit.
+- **2026-05-26**: On Windows, overlapping `build.bat`/`pio` runs can leave locked `.pio\build` artifacts and cause false missing-bin/link errors. Before concluding there is a source regression, ensure only one PlatformIO process is active and rerun once clean.
 <!-- Format: [YYYY-MM-DD] Description of what went wrong and what to do instead. -->
 
 ## Decision Log

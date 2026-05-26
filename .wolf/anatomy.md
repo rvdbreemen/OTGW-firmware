@@ -2,6 +2,7 @@
 
 > Auto-maintained by OpenWolf. Last scanned: 2026-05-21T21:08:58.631Z
 > Files: 19 tracked | Anatomy hits: 0 | Misses: 0
+> Session note (2026-05-26): Hardened `build.sh` for unattended WSL bootstrap (local Python runtime fallback + pip fallback path).
 
 ## ./
 
