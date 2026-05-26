@@ -1,9 +1,11 @@
 ---
 id: TASK-710
 title: 'adr-kit Feature 1: Append-Only Status History for ADRs'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-26 13:36'
+updated_date: '2026-05-26 16:52'
 labels:
   - adr-kit
   - phase-1
@@ -96,3 +98,9 @@ BACKWARD COMPATIBILITY:
 - [ ] #8 Documentation updated with status_history examples
 - [ ] #9 Performance verified: parse <50ms, append <100ms on 30-ADR set
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-05-26: Picked up by @codex for Phase 1 execution. Implementation target is the standalone repo D:\Users\Robert\Documents\GitHub\RvdB\adr-kit on branch v0.14-dev. Initial inspection found template scaffolding present, but bin/adr-judge parse/append/migration support, bin/adr-lint audit gate, and real status-history tests are not yet implemented.
+<!-- SECTION:NOTES:END -->
