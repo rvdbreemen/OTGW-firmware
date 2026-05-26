@@ -1,9 +1,11 @@
 ---
 id: TASK-609
 title: 'feat-2.0.0: triage pre-existing CI baseline failures on the alpha branch'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-16 07:26'
+updated_date: '2026-05-26 09:14'
 labels:
   - ci
   - tech-debt
@@ -19,7 +21,7 @@ The 2.0.0 feature line (feature-dev-2.0.0-otgw32-esp32-sat-support, base 201b301
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each failing 2.0.0 check (evaluate.py --quick, Spec-driven OT v4.2 audit, pio run -e esp8266, pio run -e esp32) is triaged with documented root cause
-- [ ] #2 Each is either fixed, or has a tracked follow-up with explicit rationale if intentionally deferred for alpha
-- [ ] #3 A clean docs-only PR against the 2.0.0 branch shows no baseline reds, OR remaining reds are explicitly accepted-for-alpha and documented in the task
+- [x] #1 Each failing 2.0.0 check (evaluate.py --quick, Spec-driven OT v4.2 audit, pio run -e esp8266, pio run -e esp32) is triaged with documented root cause
+- [x] #2 Each is either fixed, or has a tracked follow-up with explicit rationale if intentionally deferred for alpha
+- [x] #3 A clean docs-only PR against the 2.0.0 branch shows no baseline reds, OR remaining reds are explicitly accepted-for-alpha and documented in the task
 <!-- AC:END -->
