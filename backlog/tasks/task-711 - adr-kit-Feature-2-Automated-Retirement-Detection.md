@@ -1,9 +1,11 @@
 ---
 id: TASK-711
 title: 'adr-kit Feature 2: Automated Retirement Detection'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-26 13:37'
+updated_date: '2026-05-26 16:52'
 labels:
   - adr-kit
   - phase-1
@@ -88,3 +90,9 @@ DELIVERABLES:
 - [ ] #10 skills/retire/SKILL.md created
 - [ ] #11 All existing tests pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-05-26: Picked up by @codex for Phase 1 execution. Implementation target is the standalone repo D:\Users\Robert\Documents\GitHub\RvdB\adr-kit on branch v0.14-dev. Initial inspection found bin/adr-retire present but with placeholder staleness, technology-removal, and policy-mismatch detectors plus placeholder tests; the workflow and retire skill deliverables are not yet present.
+<!-- SECTION:NOTES:END -->
