@@ -1,9 +1,11 @@
 ---
 id: TASK-709.1
 title: 'fix(webui): document fixed-IP mobile octet follow-up and Codex tracking rule'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-26 15:05'
+updated_date: '2026-05-26 15:06'
 labels:
   - bug
   - webui
