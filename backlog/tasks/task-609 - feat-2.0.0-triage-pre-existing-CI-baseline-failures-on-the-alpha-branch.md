@@ -1,7 +1,7 @@
 ---
 id: TASK-609
 title: 'feat-2.0.0: triage pre-existing CI baseline failures on the alpha branch'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 07:26'
