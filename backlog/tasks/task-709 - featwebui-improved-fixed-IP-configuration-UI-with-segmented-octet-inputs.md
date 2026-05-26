@@ -4,11 +4,16 @@ title: 'feat(webui): improved fixed IP configuration UI with segmented octet inp
 status: To Do
 assignee: []
 created_date: '2026-05-26 12:58'
+updated_date: '2026-05-26 12:59'
 labels:
   - bug
   - webui
   - network
 dependencies: []
+references:
+  - 'Discord #beta-testing'
+  - user andrebrait
+  - '2026-05-26'
 priority: medium
 ---
 
