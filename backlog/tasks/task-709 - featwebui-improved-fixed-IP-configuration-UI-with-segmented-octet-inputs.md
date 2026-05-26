@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-26 12:58'
-updated_date: '2026-05-26 13:11'
+updated_date: '2026-05-26 13:12'
 labels:
   - bug
   - webui
@@ -50,3 +50,25 @@ André (andrebrait, Discord #beta-testing 2026-05-26) reported that the fixed IP
 <!-- SECTION:NOTES:BEGIN -->
 Implemented in 3 files:\n- restAPI.ino: added wifi_current_subnet/gateway/dns1/dns2 to sendDeviceInfoV2() using CSTR(WiFi.*().toString())\n- index.js: hiddenSettings extended with 4 companion keys; IP_FIELD_DEFS + 8 new functions (renderFixedIPSection, makeOctetGroup, wireOctetGroup, splitIpToOctets, joinOctetsToIp, markFixedIPChanged, collapseOctetGroupsForSave, prefillFromDHCP); special-case in refreshSettings loop; collapseOctetGroupsForSave() call added to saveSettings()\n- index.css: octet-group, octet-input, fixed-ip-section, fixed-ip-row, fixed-ip-fields, fixed-ip-notice styles added\nBuild running in background.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Improved fixed IP configuration UI based on Discord feedback from andrebrait (2026-05-26).
+
+Changes:
+- restAPI.ino: sendDeviceInfoV2() now exposes wifi_current_subnet, wifi_current_gateway, wifi_current_dns1, wifi_current_dns2 via WiFi.subnetMask/gatewayIP/dnsIP() for DHCP-prefill
+- index.js: wifisubnet/wifigateway/wifidns1/wifidns2 added to hiddenSettings (rendered by custom section); 8 new functions implement the fixed IP section (renderFixedIPSection, makeOctetGroup, wireOctetGroup, splitIpToOctets, joinOctetsToIp, markFixedIPChanged, collapseOctetGroupsForSave, prefillFromDHCP); collapseOctetGroupsForSave() called at start of saveSettings()
+- index.css: styles for octet-group, octet-input, fixed-ip-section, fixed-ip-row, fixed-ip-fields, fixed-ip-notice
+
+UX behaviour:
+- 'Use DHCP (automatic IP)' checkbox shown first, checked by default when no static IP is configured
+- Fixed IP fields hidden while DHCP is active
+- Unchecking DHCP auto-fetches device/info and prefills all 5 fields from current lease (0.0.0.0 values are skipped)
+- Each IP field = 4 segmented number inputs (0-255), auto-advance on 3 digits or '.', backspace on empty returns to previous, paste of full IP splits across octets
+- DNS fields are optional; empty = use router default
+- Reboot notice shown below the fixed IP fields
+- Save: DHCP selected clears all 5 static IP settings; fixed IP joins octets to dotted-decimal
+
+Build: exit 0 (1.6.0-beta.22+1902fb0). Evaluator: 100% health.
+<!-- SECTION:FINAL_SUMMARY:END -->
