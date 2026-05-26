@@ -2871,6 +2871,7 @@ function initMainPage() {
 
   renderSharedPageNavShell();
   updateThemeToggle();
+  initStatsColResizers();
 
   function doThemeToggle() {
     var isDark = localStorage.getItem('theme') !== 'dark';  // toggle
@@ -4938,6 +4939,11 @@ var translateFields = [
   , ["flashchipmode", "Flash Mode"]
   , ["boardtype", "Board Type"]
   , ["ssid", "Wi-Fi Network (SSID)"]
+  , ["wifistaticip", "Static IP Address"]
+  , ["wifisubnet", "Subnet Mask"]
+  , ["wifigateway", "Default Gateway"]
+  , ["wifidns1", "DNS Server 1"]
+  , ["wifidns2", "DNS Server 2"]
   , ["wifirssi", "Wi-Fi Signal Strength (dBm)"]
   , ["wifiquality", "Wi-Fi Quality (%)"]
   , ["wifiquality_text", "Wi-Fi Quality"]
@@ -4997,6 +5003,11 @@ var translateTooltips = [
   , ["httppasswd", "Password for protected admin endpoints such as settings, maintenance actions, file management, reboot, and OTA update. Username is admin."]
   , ["HostName", "Advertised hostname. Add .local when you open the device by mDNS name."]
   , ["ssid", "Read-only name of the Wi-Fi network the gateway is connected to."]
+  , ["wifistaticip", "Static IP address for this device. Leave empty to use DHCP. Requires reboot to take effect."]
+  , ["wifisubnet", "Subnet mask, e.g. 255.255.255.0. Required when static IP is set."]
+  , ["wifigateway", "Default gateway (router) IP address. Required when static IP is set."]
+  , ["wifidns1", "Primary DNS server, e.g. 8.8.8.8. Optional — used when static IP is configured."]
+  , ["wifidns2", "Secondary DNS server, e.g. 8.8.4.4. Optional fallback DNS."]
   , ["mqttconnected", "Read-only MQTT connection state. This should show connected after broker login succeeds."]
   , ["mqttenable", "Turn MQTT publishing on when you use an MQTT broker like Home Assistant."]
   , ["mqttbroker", "Hostname or IP address of your MQTT broker."]
@@ -5443,6 +5454,127 @@ function handleFlashMessage(data) {
 ** Statistics Tab Functions
 ***************************************************************************
 */
+
+// --- Stats table column resize (TASK-703) -------------------------------
+// Drag the right edge of any <th> in #otStatsTable to resize that column.
+// Widths are mirrored onto the matching <col> in the table's <colgroup> and
+// persisted in localStorage so they survive reloads and tab switches.
+var STATS_COL_STORAGE_KEY = 'otStatsColWidths';
+var STATS_COL_MIN_WIDTH = 30;
+var otStatsResizeState = null;
+
+function getStatsTableCols() {
+  var table = document.getElementById('otStatsTable');
+  if (!table) return null;
+  var colgroup = table.querySelector('colgroup');
+  if (!colgroup) return null;
+  return colgroup.querySelectorAll('col');
+}
+
+function loadStatsColWidths() {
+  try {
+    var raw = localStorage.getItem(STATS_COL_STORAGE_KEY);
+    if (!raw) return null;
+    var arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return null;
+    return arr;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveStatsColWidths() {
+  var cols = getStatsTableCols();
+  if (!cols) return;
+  var widths = [];
+  for (var i = 0; i < cols.length; i++) {
+    var w = cols[i].style.width;
+    widths.push(w || '');
+  }
+  try {
+    localStorage.setItem(STATS_COL_STORAGE_KEY, JSON.stringify(widths));
+  } catch (e) { /* quota or disabled storage — ignore */ }
+}
+
+function applyStoredStatsColWidths() {
+  var cols = getStatsTableCols();
+  if (!cols) return;
+  var widths = loadStatsColWidths();
+  if (!widths) return;
+  for (var i = 0; i < cols.length && i < widths.length; i++) {
+    if (widths[i]) cols[i].style.width = widths[i];
+  }
+}
+
+function onStatsResizeMove(e) {
+  if (!otStatsResizeState) return;
+  var dx = e.clientX - otStatsResizeState.startX;
+  var newWidth = otStatsResizeState.startWidth + dx;
+  if (newWidth < STATS_COL_MIN_WIDTH) newWidth = STATS_COL_MIN_WIDTH;
+  otStatsResizeState.col.style.width = newWidth + 'px';
+  e.preventDefault();
+}
+
+function onStatsResizeUp() {
+  if (!otStatsResizeState) return;
+  if (otStatsResizeState.handle) {
+    otStatsResizeState.handle.classList.remove('dragging');
+  }
+  document.body.classList.remove('col-resizing');
+  document.removeEventListener('mousemove', onStatsResizeMove);
+  document.removeEventListener('mouseup', onStatsResizeUp);
+  otStatsResizeState = null;
+  saveStatsColWidths();
+}
+
+function onStatsResizeDown(e) {
+  if (e.button !== 0) return;
+  var handle = e.currentTarget;
+  var th = handle.parentNode;
+  var idx = th.cellIndex;
+  var cols = getStatsTableCols();
+  if (!cols || idx < 0 || idx >= cols.length) return;
+  var col = cols[idx];
+  // Seed from the rendered th width so the first drag doesn't snap.
+  var startWidth = th.getBoundingClientRect().width;
+  col.style.width = startWidth + 'px';
+  otStatsResizeState = {
+    col: col,
+    handle: handle,
+    startX: e.clientX,
+    startWidth: startWidth
+  };
+  handle.classList.add('dragging');
+  document.body.classList.add('col-resizing');
+  document.addEventListener('mousemove', onStatsResizeMove);
+  document.addEventListener('mouseup', onStatsResizeUp);
+  // Don't trigger the th's onclick sort handler.
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function initStatsColResizers() {
+  var table = document.getElementById('otStatsTable');
+  if (!table) return;
+  if (table.getAttribute('data-resizers-init') === '1') {
+    applyStoredStatsColWidths();
+    return;
+  }
+  var ths = table.querySelectorAll('thead th');
+  for (var i = 0; i < ths.length; i++) {
+    // Don't put a resizer on the last column — there's nothing to drag against.
+    if (i === ths.length - 1) continue;
+    var handle = document.createElement('div');
+    handle.className = 'col-resizer';
+    handle.addEventListener('mousedown', onStatsResizeDown);
+    // Swallow clicks so they never reach the th sort handler.
+    handle.addEventListener('click', function(ev) { ev.stopPropagation(); });
+    ths[i].appendChild(handle);
+  }
+  table.setAttribute('data-resizers-init', '1');
+  applyStoredStatsColWidths();
+}
+
 var statsBuffer = {};
 var statsSortCol = 1; // Default sort by Dec ID
 var statsSortAsc = true;
@@ -5530,6 +5662,7 @@ function openLogTab(evt, tabName) {
   if (currentTab === 'Log') {
     logTabActivatedAt = Date.now();
   } else if (currentTab === 'Statistics') {
+      initStatsColResizers();
       updateStatisticsDisplay();
       refreshBoilerSupport();
   } else if (currentTab === 'OTSupport') {

@@ -1041,6 +1041,31 @@ body.disable-interaction {
   cursor: pointer;
 }
 
+/* Drag-to-resize handle on right edge of each stats-table header.
+   `position: sticky` already establishes a positioning context, so the
+   absolutely-positioned resizer anchors to the th. */
+.ot-stats-table th .col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 11;
+}
+
+.ot-stats-table th .col-resizer:hover,
+.ot-stats-table th .col-resizer.dragging {
+  background-color: #b8b8b8;
+}
+
+body.col-resizing,
+body.col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
 .ot-stats-table th:hover {
   background-color: #e6e6e6;
 }
