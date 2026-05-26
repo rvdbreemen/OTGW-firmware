@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-15 19:59'
-updated_date: '2026-05-26 09:39'
+updated_date: '2026-05-26 09:44'
 labels:
   - validation
   - stability
@@ -40,3 +40,34 @@ Decision point: this task is Done when either (a) beta confirms stability on 3.1
 - [ ] #2 logHeapStats data shows MQTT_drops=0 and WS_drops=0 during representative workload
 - [ ] #3 Decision documented: stay on 3.1.2 OR create downgrade task with explicit scope
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-05-26: Decision analysis completed.
+
+Timeline:
+- stap-1 shipped: 2026-04-15 (commit 1df3eca5 — MQTT discovery burst fix + PROGMEM index refactor)
+- stap-2+3 shipped: 2026-04-16 (commit 375b1c1b — lwIP already Low Memory, nightly restart)
+- Today: 2026-05-26 — 41 days since stap-1 deployment. AC#1 (7-day window) is well past.
+
+Core version finding (critical):
+- build.py board_manager URL points to 2.7.4 package index
+- Installed Core: arduino/packages/esp8266/hardware/esp8266/2.7.4/
+- The TASK-398 LTS branch (created 2026-04-24) established the 2.7.4 Core for the LTS line. The dev branch ALSO uses 2.7.4 (the build.py additional_urls + installed Core confirm this). The Core downgrade happened as part of TASK-398/LTS work and is already reflected in dev.
+- Conclusion: dev is already on Core 2.7.4. The 3.1.2 vs 2.7.4 decision point in this task's description referred to a hypothetical downgrade that was executed as TASK-398 and merged into the 1.5.x line.
+
+Heap stability evidence since stap-1:
+- TASK-697 (Done, 2026-05-23): fixed logHeapStats lifetime counter bug — counters now accurate
+- TASK-701 (Done): reduced /api/v2/device/info heap pressure
+- Current beta: 1.6.0-beta.21 (2026-05-26) — 21 betas shipped since stap-1, no heap-related reboot-loop reports in backlog
+- No open heap-stability tasks in backlog; all heap-related tasks are Done
+- The project moved from 1.4.x → 1.5.0 → 1.6.0 beta line without a core-downgrade task being created, consistent with the decision to STAY on 2.7.4 (which dev already uses)
+
+AC#2 assessment:
+- No open bugs showing MQTT_drops or WS_drops persistently non-zero
+- TASK-697 fixed the counter reporting so they now reflect lifetime totals accurately
+- No tester reports of repeated discovery-burst drops since stap-1
+
+AC#3 decision: STAY — Core is already 2.7.4 on dev. No separate downgrade task needed. The stap-4 validation window has completed with stable results.
+<!-- SECTION:NOTES:END -->
