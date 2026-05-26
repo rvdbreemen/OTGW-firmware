@@ -4,7 +4,7 @@ title: 'ADR-Kit v0.14.0 Upgrade: Complete Implementation Deep Dive'
 status: In Progress
 assignee: []
 created_date: '2026-05-26 11:03'
-updated_date: '2026-05-26 11:06'
+updated_date: '2026-05-26 11:14'
 labels: []
 milestone: v0.14.0 Upgrade
 dependencies: []
@@ -292,3 +292,119 @@ bin/adr-judge --diff <(git diff --cached) --profile
 4. **Weekly reviews:** Check progress, iterate on edge cases
 5. **Field testing:** Deploy v0.14.0-beta to 2–3 repos before stable
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## COMPLETE DEEP DIVE: FEATURES 4-8
+
+### Feature 4: Semantic Relevance Ranking
+
+**Algorithm:** Score ADRs on keywords (0.40), domain tags (0.25), related decisions (0.15), acceptance status (0.10), recency (0.10)
+
+**Implementation:** `bin/adr-context --task "implement caching" --limit 5` returns top 5 ranked ADRs with scores + reasoning
+
+**Integration:** `/adr-kit:judge` skill auto-loads relevant ADRs for agent context
+
+**Test cases:** 15+ covering keyword extraction, domain inference, scoring, performance <100ms on 30 ADRs
+
+---
+
+### Feature 5: Policy Block Validation Schema
+
+**Goal:** Catch malformed Enforcement blocks early with JSON schema + regex validation
+
+**Implementation:**
+- `schemas/adr-enforcement.schema.json`: stricter validation (required fields, no extra properties)
+- `adr-lint` new **Policy gate**: schema validation + regex compilation checks + warnings on common mistakes
+- `adr-judge --dry-run-enforcement ADR-0001`: shows what rules match staged diff
+
+**Warnings:**
+- Unescaped dot without quantifier (matches any char) → use \. or [.]
+- path_glob="**" too broad → consider narrowing to src/
+- Excessive .* sequences → may cause backtracking
+
+**Test cases:** 10+ covering schema validation, regex errors, dry-run output
+
+---
+
+### Feature 6: Multi-Language Fallback Scripts
+
+**Goal:** Go/Rust/Java projects get validation scripts; not just JS/Python
+
+**Implementation:** `bin/adr-generate-scripts --language [go|rust|java|shell]`
+- Generates per-ADR validation scripts
+- Scripts are standalone (no adr-kit dependency)
+- `/adr-kit:init`: offers to generate scripts after ADRs created
+
+**Templates:** Go, Rust, Shell fallback for any language
+
+**Test cases:** 15+ covering script generation, compilation (Go/Rust), diff validation
+
+---
+
+### Feature 7: ADR Health Dashboard
+
+**Goal:** Weekly operational visibility via CLI + GitHub Actions
+
+**Implementation:** `bin/adr-status --format [json|markdown|table]`
+
+**Output includes:**
+- Summary: total, accepted, proposed, superseded, deprecated, avg age
+- Enforcement health: violations, hook timing, policy validity per ADR
+- Retirement candidates: 90+ day stale with recommendation + action links
+- Warnings: violations in CI, broken chains, regex issues
+
+**GitHub Actions:** Weekly cron (Monday 6am) creates issue if candidates exist
+
+**Test cases:** 15+ covering stats, enforcement health, retirement detection, output formats
+
+---
+
+### Feature 8: Agent Lifecycle Decision Tree + Quality Feedback
+
+**Goal:** Guide agents when to create ADRs; give early quality feedback
+
+**Decision Tree (in agents/adr-generator.md):**
+1. Library/tool/storage choice? → YES → call adr_preflight
+2. Code pattern affecting >1 module? → YES → call adr_preflight
+3. Governance/process? → YES → adr_preflight optional
+4. Otherwise → no ADR needed
+
+**Quality Feedback:**
+- Calculate score 0.0-1.0 from 4 gates (completeness, evidence, clarity, consistency)
+- Return score breakdown + issues
+- Warn on: vague language (may, might, could), <2 alternatives, no metrics, short consequences
+
+**adr-lint:** new advisory **Quality gate** (non-blocking, helpful suggestions)
+
+**Test cases:** 10+ covering score calculation, quality issues, vague patterns
+
+---
+
+## COMPLETE PHASE TIMELINE
+
+**Phase 1 (Weeks 1–2):** Status history + retirement → v0.14.0  
+**Phase 2 (Weeks 3–4):** Performance budgets + health dashboard → v0.14.1  
+**Phase 3 (Weeks 5–6):** Semantic ranking + policy validation → v0.15.0  
+**Phase 4 (Weeks 7–8):** Multi-language + lifecycle guidance → v0.15.1  
+
+**Total test coverage:** 110+ new test cases  
+**Backward compatible:** Auto-migration v0.13 → v0.14  
+**Release cadence:** Stable release every 2 weeks  
+
+---
+
+## IMPLEMENTATION READY
+
+All 8 features have:
+- ✅ Complete architectural design
+- ✅ Code sketches + algorithms
+- ✅ Test strategies with 10+ cases each
+- ✅ Configuration examples
+- ✅ Integration points with existing skills
+- ✅ Risk mitigation strategies
+- ✅ Success metrics
+
+**Ready to start Week 1 implementation on v0.14-dev branch**
+<!-- SECTION:NOTES:END -->
