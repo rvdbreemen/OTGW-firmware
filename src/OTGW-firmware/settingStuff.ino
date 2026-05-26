@@ -231,6 +231,11 @@ bool writeSettings(bool show)
   ok = writeJsonStringKV(file, F("httppasswd"), settings.sHTTPpasswd, true) && ok;
   ok = writeJsonStringKV(file, F("DeviceManufacturer"), settings.device.sManufacturer, true) && ok;
   ok = writeJsonStringKV(file, F("DeviceModel"), settings.device.sModel, true) && ok;
+  ok = writeJsonStringKV(file, F("WifiStaticIP"), settings.wifi.sStaticIp, true) && ok;
+  ok = writeJsonStringKV(file, F("WifiSubnet"), settings.wifi.sSubnet, true) && ok;
+  ok = writeJsonStringKV(file, F("WifiGateway"), settings.wifi.sGateway, true) && ok;
+  ok = writeJsonStringKV(file, F("WifiDns1"), settings.wifi.sDns1, true) && ok;
+  ok = writeJsonStringKV(file, F("WifiDns2"), settings.wifi.sDns2, true) && ok;
   ok = writeJsonBoolKV(file, F("MQTTenable"), settings.mqtt.bEnable, true) && ok;
   ok = writeJsonStringKV(file, F("MQTTbroker"), settings.mqtt.sBroker, true) && ok;
   ok = writeJsonIntKV(file, F("MQTTbrokerPort"), settings.mqtt.iBrokerPort, true) && ok;
@@ -391,6 +396,13 @@ void readSettings(bool show)
     Debugln(F("\r\n==== read Settings ===================================================\r"));
     Debugf(PSTR("Hostname              : %s\r\n"), CSTR(settings.sHostname));
     Debugf(PSTR("HTTP password         : %s\r\n"), settings.sHTTPpasswd[0] ? "***" : "(not set)");
+    Debugf(PSTR("Device manufacturer   : %s\r\n"), CSTR(settings.device.sManufacturer));
+    Debugf(PSTR("Device model          : %s\r\n"), CSTR(settings.device.sModel));
+    Debugf(PSTR("WiFi static IP        : %s\r\n"), settings.wifi.sStaticIp[0] ? settings.wifi.sStaticIp : "(DHCP)");
+    Debugf(PSTR("WiFi subnet           : %s\r\n"), CSTR(settings.wifi.sSubnet));
+    Debugf(PSTR("WiFi gateway          : %s\r\n"), CSTR(settings.wifi.sGateway));
+    Debugf(PSTR("WiFi DNS1             : %s\r\n"), CSTR(settings.wifi.sDns1));
+    Debugf(PSTR("WiFi DNS2             : %s\r\n"), CSTR(settings.wifi.sDns2));
     Debugf(PSTR("MQTT enabled          : %s\r\n"), CBOOLEAN(settings.mqtt.bEnable));
     Debugf(PSTR("MQTT broker           : %s\r\n"), CSTR(settings.mqtt.sBroker));
     Debugf(PSTR("MQTT port             : %d\r\n"), settings.mqtt.iBrokerPort);
@@ -468,6 +480,21 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("DeviceModel")) == 0) {
     strlcpy(settings.device.sModel, newValue, sizeof(settings.device.sModel));
+  }
+  else if (strcasecmp_P(field, PSTR("WifiStaticIP")) == 0) {
+    strlcpy(settings.wifi.sStaticIp, newValue, sizeof(settings.wifi.sStaticIp));
+  }
+  else if (strcasecmp_P(field, PSTR("WifiSubnet")) == 0) {
+    strlcpy(settings.wifi.sSubnet, newValue, sizeof(settings.wifi.sSubnet));
+  }
+  else if (strcasecmp_P(field, PSTR("WifiGateway")) == 0) {
+    strlcpy(settings.wifi.sGateway, newValue, sizeof(settings.wifi.sGateway));
+  }
+  else if (strcasecmp_P(field, PSTR("WifiDns1")) == 0) {
+    strlcpy(settings.wifi.sDns1, newValue, sizeof(settings.wifi.sDns1));
+  }
+  else if (strcasecmp_P(field, PSTR("WifiDns2")) == 0) {
+    strlcpy(settings.wifi.sDns2, newValue, sizeof(settings.wifi.sDns2));
   }
   else if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
     // Only update if not the placeholder value.

@@ -1347,6 +1347,11 @@ void sendDeviceSettings()
 
   sendJsonSettingObj(F("hostname"), CSTR(settings.sHostname), "s", 32);
   { char ssidBuf[33]; strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf)); sendJsonSettingObj(F("ssid"), ssidBuf, "r", 32); }
+  sendJsonSettingObj(F("wifistaticip"), CSTR(settings.wifi.sStaticIp), "s", 15);
+  sendJsonSettingObj(F("wifisubnet"), CSTR(settings.wifi.sSubnet), "s", 15);
+  sendJsonSettingObj(F("wifigateway"), CSTR(settings.wifi.sGateway), "s", 15);
+  sendJsonSettingObj(F("wifidns1"), CSTR(settings.wifi.sDns1), "s", 15);
+  sendJsonSettingObj(F("wifidns2"), CSTR(settings.wifi.sDns2), "s", 15);
   sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
   sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
   sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
@@ -1428,6 +1433,7 @@ static const char* const PROGMEM knownSettings[] = {
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
+  "wifidns1", "wifidns2", "wifigateway", "wifistaticip", "wifisubnet",
 };
 
 static bool isKnownSetting(const char* field) {
