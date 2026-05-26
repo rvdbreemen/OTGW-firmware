@@ -2911,13 +2911,16 @@ function initMainPage() {
   Array.from(document.getElementsByClassName('btnSaveSettings')).forEach(
     function (el, idx, arr) {
       el.addEventListener('click', function () {
+        var canHideSave = true;
         if (document.getElementById("displayWebhookPage").classList.contains('active')) {
           saveWebhookSettings();
         } else {
-          saveSettings();
+          canHideSave = saveSettings();
         }
         toggleHidden('adv_dropdown', true);
-        toggleHidden('btnSaveSettings', true);
+        if (canHideSave !== false) {
+          toggleHidden('btnSaveSettings', true);
+        }
       });
     }
   );
@@ -4349,10 +4352,12 @@ var IP_FIELD_DEFS = [
   { key: 'wifidns2',    label: 'DNS Server 2',   required: false },
 ];
 
-function makeOctetGroup(fieldKey) {
+function makeOctetGroup(fieldKey, fieldLabel) {
   var grp = document.createElement('div');
   grp.className = 'octet-group';
   grp.dataset.field = fieldKey;
+  grp.setAttribute('role', 'group');
+  grp.setAttribute('aria-label', fieldLabel);
   for (var i = 0; i < 4; i++) {
     if (i > 0) {
       var dot = document.createElement('span');
@@ -4361,12 +4366,16 @@ function makeOctetGroup(fieldKey) {
       grp.appendChild(dot);
     }
     var oct = document.createElement('input');
-    oct.type = 'number';
-    oct.min = '0';
-    oct.max = '255';
+    oct.type = 'text';
+    oct.inputMode = 'numeric';
+    oct.pattern = '[0-9]*';
+    oct.maxLength = 3;
+    oct.autocomplete = 'off';
+    oct.setAttribute('enterkeyhint', i < 3 ? 'next' : 'done');
     oct.className = 'octet-input';
     oct.dataset.field = fieldKey;
     oct.dataset.oct = String(i);
+    oct.setAttribute('aria-label', fieldLabel + ' octet ' + String(i + 1));
     grp.appendChild(oct);
   }
   return grp;
@@ -4385,11 +4394,19 @@ function splitIpToOctets(fieldKey, ipStr) {
   });
 }
 
+function normalizeOctetValue(value) {
+  var digits = String(value || '').replace(/\D/g, '').substring(0, 3);
+  if (digits === '') return '';
+  return parseInt(digits, 10) > 255 ? '255' : digits;
+}
+
 function joinOctetsToIp(fieldKey) {
   var inputs = getOctetInputs(fieldKey);
   if (inputs.length !== 4) return '';
   var parts = inputs.map(function(inp) { return inp.value.trim(); });
-  return parts.some(function(p) { return p === ''; }) ? '' : parts.join('.');
+  return parts.some(function(p) { return p === ''; }) ? '' : parts.map(function(p) {
+    return String(parseInt(p, 10));
+  }).join('.');
 }
 
 function markFixedIPChanged() {
@@ -4405,14 +4422,40 @@ function updateFixedIPVisibility(useDHCP) {
   if (fieldsDiv) fieldsDiv.style.display = useDHCP ? 'none' : '';
 }
 
+function validateFixedIPFields(useDHCP) {
+  if (useDHCP) return '';
+  for (var i = 0; i < IP_FIELD_DEFS.length; i++) {
+    var def = IP_FIELD_DEFS[i];
+    var values = getOctetInputs(def.key).map(function(inp) { return inp.value.trim(); });
+    var hasAnyValue = values.some(function(value) { return value !== ''; });
+    var hasInvalidValue = values.some(function(value) {
+      return value !== '' && (!/^\d{1,3}$/.test(value) || parseInt(value, 10) > 255);
+    });
+    if (hasInvalidValue || ((def.required || hasAnyValue) && values.some(function(value) { return value === ''; }))) {
+      return def.label + ' must contain four numbers from 0 to 255.';
+    }
+  }
+  return '';
+}
+
 function collapseOctetGroupsForSave() {
   var dhcpCb = document.querySelector('#D_wifistaticip .dhcp-toggle-cb');
   var useDHCP = !dhcpCb || dhcpCb.checked;
+  var validationMessage = validateFixedIPFields(useDHCP);
+  if (validationMessage) {
+    var msgEl = document.getElementById('settingMessage');
+    if (msgEl) {
+      msgEl.textContent = validationMessage;
+      msgEl.className = 'error';
+    }
+    return false;
+  }
   IP_FIELD_DEFS.forEach(function(def) {
     var h = document.getElementById(def.key);
     if (!h || h.className !== 'input-changed') return;
     h.value = useDHCP ? '' : (joinOctetsToIp(def.key) || '');
   });
+  return true;
 }
 
 function prefillFromDHCP() {
@@ -4442,11 +4485,7 @@ function wireOctetGroup(grp) {
   var octInputs = Array.from(grp.querySelectorAll('.octet-input'));
   octInputs.forEach(function(inp, idx) {
     inp.addEventListener('input', function() {
-      var v = parseInt(this.value, 10);
-      if (!isNaN(v)) {
-        if (v > 255) this.value = '255';
-        if (v < 0)   this.value = '0';
-      }
+      this.value = normalizeOctetValue(this.value);
       if (this.value.length >= 3 && idx < 3) {
         octInputs[idx + 1].focus();
         octInputs[idx + 1].select();
@@ -4454,7 +4493,7 @@ function wireOctetGroup(grp) {
       markFixedIPChanged();
     });
     inp.addEventListener('keydown', function(e) {
-      if ((e.key === '.' || e.key === 'ArrowRight') && idx < 3 && this.selectionStart === this.value.length) {
+      if ((e.key === '.' || e.key === 'Enter' || e.key === 'ArrowRight') && idx < 3 && this.selectionStart === this.value.length) {
         e.preventDefault();
         octInputs[idx + 1].focus();
         octInputs[idx + 1].select();
@@ -4465,16 +4504,28 @@ function wireOctetGroup(grp) {
         prev.focus();
         prev.setSelectionRange(prev.value.length, prev.value.length);
       }
+      if (e.key === 'ArrowLeft' && idx > 0 && this.selectionStart === 0) {
+        e.preventDefault();
+        var previous = octInputs[idx - 1];
+        previous.focus();
+        previous.setSelectionRange(previous.value.length, previous.value.length);
+      }
     });
     inp.addEventListener('paste', function(e) {
       var txt = (e.clipboardData || window.clipboardData).getData('text');
       var parts = txt.trim().split('.');
-      if (parts.length === 4) {
+      if (txt.indexOf('.') >= 0) {
         e.preventDefault();
+        if (parts.length !== 4 || parts.some(function(part) {
+          return !/^\d{1,3}$/.test(part) || parseInt(part, 10) > 255;
+        })) {
+          return;
+        }
         octInputs.forEach(function(o, i) {
-          var val = parseInt(parts[i], 10);
-          o.value = isNaN(val) ? '' : Math.max(0, Math.min(255, val));
+          o.value = String(parseInt(parts[i], 10));
         });
+        octInputs[3].focus();
+        octInputs[3].select();
         markFixedIPChanged();
       }
     });
@@ -4541,7 +4592,7 @@ function renderFixedIPSection(currentIpValue, allSettings) {
     lbl.textContent = def.label + (def.required ? '' : ' (optional)');
     var inputDiv = document.createElement('div');
     inputDiv.className = 'settings-input-container';
-    var grp = makeOctetGroup(def.key);
+    var grp = makeOctetGroup(def.key, def.label);
     wireOctetGroup(grp);
     inputDiv.appendChild(grp);
     var hidden = document.createElement('input');
@@ -4555,7 +4606,6 @@ function renderFixedIPSection(currentIpValue, allSettings) {
     row.appendChild(lbl);
     row.appendChild(inputDiv);
     fieldsDiv.appendChild(row);
-    splitIpToOctets(def.key, initialValue);
   });
 
   var notice = document.createElement('div');
@@ -4571,6 +4621,10 @@ function renderFixedIPSection(currentIpValue, allSettings) {
   });
 
   settingsPage.appendChild(sectionDiv);
+  IP_FIELD_DEFS.forEach(function(def) {
+    var initialValue = def.key === 'wifistaticip' ? (currentIpValue || '') : (allSettings[def.key] ? allSettings[def.key].value : '');
+    splitIpToOctets(def.key, initialValue);
+  });
 }
 
 function refreshSettings() {
@@ -4910,7 +4964,9 @@ function saveWebhookSettings() {
 //============================================================================  
 function saveSettings() {
   console.log("saveSettings() ...");
-  collapseOctetGroupsForSave();
+  if (!collapseOctetGroupsForSave()) {
+    return false;
+  }
   let changes = false;
 
   //--- has anything changed?
@@ -4953,6 +5009,7 @@ function saveSettings() {
       sendPostSetting(field, value);
     }
   }
+  return true;
 } // saveSettings()
 
 

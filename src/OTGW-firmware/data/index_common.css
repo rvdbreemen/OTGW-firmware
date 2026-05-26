@@ -135,6 +135,31 @@
     transform-origin: left center;
   }
 
+  .fixed-ip-section .fixed-ip-row {
+    display: block;
+    padding: 8px 0;
+  }
+
+  .fixed-ip-section .fixed-ip-field-label {
+    display: block;
+    padding-left: 0;
+  }
+
+  .fixed-ip-section .octet-group {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  .fixed-ip-section .octet-input {
+    flex: 0 0 40px;
+    width: 40px;
+    max-width: 40px;
+    min-height: 40px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
   #settingMessage {
     width: auto;
     max-width: 100%;
