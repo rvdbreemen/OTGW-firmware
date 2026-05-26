@@ -1,10 +1,10 @@
 ---
 id: TASK-384
 title: 'Fresh-flash bootloop on Wemos D1 mini (no-shield, multiple FW versions)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-22 20:53'
-updated_date: '2026-05-26 09:50'
+updated_date: '2026-05-26 09:51'
 labels:
   - bug
   - needs-info
@@ -45,3 +45,9 @@ Waiting for: (1) reporter answer on whether 1.4.1 direct-flash also bootloops; (
 
 2026-05-26: Closing. Root cause is hardware-related (no-shield power/brownout behaviour on certain Wemos D1 batches). No firmware fix identified or needed. Assumption: 1.5.0+ with Core 2.7.4 resolves or mitigates the symptom. Reopen with serial-during-bootloop evidence if issue resurfaces on 1.5.0+.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fresh-flash bootloop investigated across two reporters (ArnoudPJ, dvd77) on GitHub #554. Root cause: power/brownout behaviour specific to certain Wemos D1 mini batches without OTGW shield attached. Workaround: attach shield, or flash 1.4.1 first then OTA. No code change made. Closing with assumption that 1.5.0+ (Core 2.7.4 + updated partition layout) resolves the symptom; reporters to reopen with serial evidence if issue persists on 1.5.0+.
+<!-- SECTION:FINAL_SUMMARY:END -->
