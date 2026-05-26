@@ -645,7 +645,7 @@ step "Flashing firmware and filesystem..."
 
 if ! "$ESPTOOL_BIN" --chip esp8266 --port "$ARG_PORT" --baud "$ARG_BAUD" \
     --before default_reset --after hard_reset \
-    write_flash -z --erase-all \
+    write_flash --flash_mode dio -z --erase-all \
     0x0       "$FW_FILE" \
     0x200000  "$FS_FILE"; then
     echo
@@ -655,6 +655,7 @@ if ! "$ESPTOOL_BIN" --chip esp8266 --port "$ARG_PORT" --baud "$ARG_BAUD" \
     err "    - Install CP210x or CH340 USB-serial drivers if missing"
     err "    - Try a lower baud rate: --baud 115200"
     err "    - Specify the port explicitly: --port $ARG_PORT"
+    err "    - Boya flash chip (vendor ID 0x68): requires --flash_mode dio (never qio)"
     exit "$EXIT_GENERIC"
 fi
 

@@ -260,7 +260,7 @@ if errorlevel 2 (
 REM ---- Step 7: flash --------------------------------------------------------
 echo [STEP] Flashing firmware and filesystem...
 
-"%ESPTOOL_EXE%" --chip esp8266 --port %ARG_PORT% --baud %ARG_BAUD% --before default_reset --after hard_reset write_flash -z --erase-all 0x0 "%FW_FILE%" 0x200000 "%FS_FILE%"
+"%ESPTOOL_EXE%" --chip esp8266 --port %ARG_PORT% --baud %ARG_BAUD% --before default_reset --after hard_reset write_flash --flash_mode dio -z --erase-all 0x0 "%FW_FILE%" 0x200000 "%FS_FILE%"
 
 if errorlevel 1 (
     echo.
@@ -270,6 +270,7 @@ if errorlevel 1 (
     echo           - Install CP210x or CH340 USB-serial drivers
     echo           - Try a lower baud rate: --baud 115200
     echo           - Specify the correct port: --port COM3
+    echo           - Boya flash chip ^(vendor ID 0x68^): requires --flash_mode dio ^(never qio^)
     exit /b %EXIT_GENERIC%
 )
 
