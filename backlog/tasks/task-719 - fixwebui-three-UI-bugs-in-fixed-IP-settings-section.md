@@ -1,11 +1,11 @@
 ---
 id: TASK-719
 title: 'fix(webui): three UI bugs in fixed-IP settings section'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-26 17:44'
-updated_date: '2026-05-26 17:52'
+updated_date: '2026-05-26 17:53'
 labels:
   - bug
   - webui
