@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-26 17:44'
-updated_date: '2026-05-26 17:46'
+updated_date: '2026-05-26 17:51'
 labels:
   - bug
   - webui
@@ -22,10 +22,10 @@ Three bugs found in fixed-IP settings UI based on andrebrait feedback in #beta-t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Labels in IP Configuration section (IP Configuration header, IP Address, Subnet Mask, Gateway, DNS Server 1, DNS Server 2) are left-aligned in both desktop and mobile views
-- [ ] #2 Unchecking DHCP when no secondary DNS is configured no longer prefills DNS Server 2 with partial garbage values (255, 0.0.0.0, 255.255.255.255, or any non-4-octet value)
-- [ ] #3 After a successful save, the orange/coral settingMessage box disappears (className is cleared along with textContent)
-- [ ] #4 Build compiles clean (python build.py exits 0)
-- [ ] #5 evaluate.py --quick shows no new failures
-- [ ] #6 When DNS Server 1 (or DNS Server 2) is available and valid from the DHCP lease, it is pre-filled when the user unchecks DHCP
+- [x] #1 Labels in IP Configuration section (IP Configuration header, IP Address, Subnet Mask, Gateway, DNS Server 1, DNS Server 2) are left-aligned in both desktop and mobile views
+- [x] #2 Unchecking DHCP when no secondary DNS is configured no longer prefills DNS Server 2 with partial garbage values (255, 0.0.0.0, 255.255.255.255, or any non-4-octet value)
+- [x] #3 After a successful save, the orange/coral settingMessage box disappears (className is cleared along with textContent)
+- [x] #4 Build compiles clean (python build.py exits 0)
+- [x] #5 evaluate.py --quick shows no new failures
+- [x] #6 When DNS Server 1 (or DNS Server 2) is available and valid from the DHCP lease, it is pre-filled when the user unchecks DHCP
 <!-- AC:END -->
