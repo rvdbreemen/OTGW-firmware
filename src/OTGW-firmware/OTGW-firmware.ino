@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.73
+**  Version  : v2.0.0-alpha.74
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -177,6 +177,10 @@ void setup() {
   setLed(LED1, OFF);
 
   startTelnet();              // start the debug port 23
+#if defined(_VERSION_PRERELEASE)
+  if (strstr(_SEMVER_FULL, "alpha") || strstr(_SEMVER_FULL, "beta"))
+    enableDebugForPrerelease();
+#endif
   startMDNS(CSTR(settings.sHostname));
   startLLMNR(CSTR(settings.sHostname));
   setupFSexplorer();
