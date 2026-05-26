@@ -1,11 +1,11 @@
 ---
 id: TASK-651
 title: Replace delay(1) with yield() in doBackgroundTasks()
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-21 20:23'
-updated_date: '2026-05-26 18:02'
+updated_date: '2026-05-26 18:03'
 labels:
   - performance
   - mainloop
