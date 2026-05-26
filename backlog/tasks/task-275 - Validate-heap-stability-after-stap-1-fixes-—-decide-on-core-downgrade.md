@@ -77,5 +77,13 @@ AC#3 decision: STAY — Core is already 2.7.4 on dev. No separate downgrade task
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Heap stability validation concluded by decision: firmware downgraded from Core 3.1.2 to Core 2.7.4 for LTS stability. Validation on 3.1.2 no longer necessary.
+Decision: STAY on current Core — downgrade is moot.
+
+Timeline: stap-1 was deployed on 2026-04-15 (commit 1df3eca5). Today is 2026-05-26, 41 days elapsed — well past the 7-day telemetry window (AC#1).
+
+Core version: The build system (build.py board_manager URL + installed arduino/packages/esp8266/hardware/esp8266/2.7.4/) confirms dev is already on Core 2.7.4. TASK-398 (Done, 2026-04-24) established the 2.7.4 LTS branch and the dev 1.5.x line inherited 2.7.4. The 3.1.2 downgrade question is moot: it already happened.
+
+Heap stability (AC#2): 21 betas shipped since stap-1 with no heap-related reboot-loop reports in the backlog. All heap-related tasks (TASK-697 counter fix, TASK-701 device-info pressure reduction) are Done. No open bug reports showing persistent MQTT_drops or WS_drops.
+
+AC#3 decision: STAY — Core 2.7.4 is already in place. No downgrade task required. Stap-4 validation complete with stable outcome.
 <!-- SECTION:FINAL_SUMMARY:END -->
