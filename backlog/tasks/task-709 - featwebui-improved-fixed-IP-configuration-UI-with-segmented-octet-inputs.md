@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-26 12:58'
-updated_date: '2026-05-26 13:02'
+updated_date: '2026-05-26 13:08'
 labels:
   - bug
   - webui
@@ -44,3 +44,9 @@ André (andrebrait, Discord #beta-testing 2026-05-26) reported that the fixed IP
 <!-- SECTION:PLAN:BEGIN -->
 1. restAPI.ino: add wifi_current_subnet/gateway/dns1/dns2 to sendDeviceInfoV2()\n2. index.js: add wifisubnet/wifigateway/wifidns1/wifidns2 to hiddenSettings\n3. index.js: add renderFixedIPSection() custom renderer with octet inputs\n4. index.js: wire toggle handler (show/hide + prefillFromDHCP)\n5. index.js: wire octet UX (auto-advance, backspace, paste)\n6. index.js: integrate with saveSettings() via collapseOctetGroups()\n7. index.css: style octet inputs as connected unit\n8. Build + evaluator check
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented in 3 files:\n- restAPI.ino: added wifi_current_subnet/gateway/dns1/dns2 to sendDeviceInfoV2() using CSTR(WiFi.*().toString())\n- index.js: hiddenSettings extended with 4 companion keys; IP_FIELD_DEFS + 8 new functions (renderFixedIPSection, makeOctetGroup, wireOctetGroup, splitIpToOctets, joinOctetsToIp, markFixedIPChanged, collapseOctetGroupsForSave, prefillFromDHCP); special-case in refreshSettings loop; collapseOctetGroupsForSave() call added to saveSettings()\n- index.css: octet-group, octet-input, fixed-ip-section, fixed-ip-row, fixed-ip-fields, fixed-ip-notice styles added\nBuild running in background.
+<!-- SECTION:NOTES:END -->
