@@ -1,10 +1,11 @@
 ---
 id: TASK-384
 title: 'Fresh-flash bootloop on Wemos D1 mini (no-shield, multiple FW versions)'
-status: Done
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-22 20:53'
-updated_date: '2026-05-26 09:51'
+updated_date: '2026-05-26 09:53'
 labels:
   - bug
   - needs-info
