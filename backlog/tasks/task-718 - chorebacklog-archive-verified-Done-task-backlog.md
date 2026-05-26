@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-26 15:52'
-updated_date: '2026-05-26 16:19'
+updated_date: '2026-05-26 16:21'
 labels:
   - backlog
   - maintenance
@@ -50,10 +50,12 @@ Archive execution result: archived 43 task records representing 42 distinct task
 The Backlog CLI automatically updated retained feature-line records TASK-527, TASK-539, and TASK-541 while archiving their dev dependencies/related tasks; those relationship metadata edits are retained as part of the archive operation. Excluded feature-line Done tasks remain visible because v1.5.0-fix2 did not ship their 2.0.0/ESP32/SAT implementation: TASK-527, TASK-537, TASK-539, TASK-541, TASK-542, TASK-543, TASK-546. Current beta-cycle/post-stable work also remains visible.
 
 Packaging and closure verification: archive moves and CLI relationship updates were committed as 74ee1f77 (`chore(backlog): archive stable release tasks (TASK-718)`). `backlog config get autoCommit` returns `true` after batching. A fresh stable-snapshot comparison against v1.5.0-fix2 reports zero qualifying Done records still unarchived. The Done board retains 96 items for beta-cycle/post-stable work and feature-2.0.0-only work, including TASK-709/TASK-709.1 and excluded TASK-527/TASK-537/TASK-539/TASK-541/TASK-542/TASK-543/TASK-546.
+
+Count correction: the archive verification measured 96 remaining Done items before TASK-718 was closed. Closing this maintenance task correctly places it in Done until a future stable release, so the post-closure board count is 97.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Applied the backlog archive policy agreed with the user: archive tasks after they ship in a public stable release, not merely after a beta pre-release. Confirmed through GitHub releases that the stable cutoff is v1.5.0-fix2 (published 2026-05-08) and that v1.6.0-beta.23 is a pre-release only. Archived 43 task records representing 42 distinct task IDs that were Done in the stable release history; TASK-538 had two separate eligible records. The Backlog CLI also updated retained feature-task relationship metadata for TASK-527, TASK-539, and TASK-541. Batched moves were committed in 74ee1f77. Restored `autoCommit=true` and verified that no qualifying stable-release Done record remains unarchived; 96 Done items remain visible because they are beta-cycle/post-stable or feature-2.0.0-only work. This is backlog administration only; no firmware validation build was required.
+Applied the backlog archive policy agreed with the user: archive tasks after they ship in a public stable release, not merely after a beta pre-release. Confirmed through GitHub releases that the stable cutoff is v1.5.0-fix2 (published 2026-05-08) and that v1.6.0-beta.23 is a pre-release only. Archived 43 task records representing 42 distinct task IDs that were Done in the stable release history; TASK-538 had two separate eligible records. The Backlog CLI also updated retained feature-task relationship metadata for TASK-527, TASK-539, and TASK-541. Batched moves were committed in 74ee1f77. Restored `autoCommit=true` and verified that no qualifying stable-release Done record remains unarchived. After closing this maintenance task, 97 Done items remain visible because they are beta-cycle/post-stable, feature-2.0.0-only work, or this unreleased administration task itself. This is backlog administration only; no firmware validation build was required.
 <!-- SECTION:FINAL_SUMMARY:END -->
