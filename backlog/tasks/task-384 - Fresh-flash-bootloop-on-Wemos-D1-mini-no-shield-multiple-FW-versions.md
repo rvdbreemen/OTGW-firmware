@@ -45,6 +45,16 @@ Waiting for: (1) reporter answer on whether 1.4.1 direct-flash also bootloops; (
 2026-05-05: Triage update — title corrected. Original "v1.3.5 bootloop" framing is no longer accurate: dvd77 reproduced the same bootloop on 1.4.1 and 1.5.0-beta on 2026-04-29 (GitHub #554 comment 4344614879). AC #1 (reporter confirms 1.4.1 direct-flash also bootloops) is now satisfied by dvd77's evidence — checked. Remaining ACs #2-#4 still hold and remain blocked on serial-during-bootloop capture from a no-shield setup. Priority left at MEDIUM since both reporters have working setups via the shield-attach workaround.
 
 2026-05-26: Closing. Root cause is hardware-related (no-shield power/brownout behaviour on certain Wemos D1 batches). No firmware fix identified or needed. Assumption: 1.5.0+ with Core 2.7.4 resolves or mitigates the symptom. Reopen with serial-during-bootloop evidence if issue resurfaces on 1.5.0+.
+
+2026-05-26: Root cause analysis complete.
+
+ArnoudPJ (GitHub #554, 2026-04-22): explicitly used --flash_mode qio on a Boya SPI flash chip (vendor ID 0x68). Boya requires DIO mode; QIO fails to set the STATUS register correctly during programming, causing a bootloop on every fresh flash.
+
+dvd77 (GitHub #554, 2026-04-29): tested on v1.3.5, v1.4.1, and v1.5.0-beta — all bootloop. The broader version range suggests either the same Boya chip + wrong flash mode, or a power/brownout issue on a fresh device with empty LittleFS.
+
+Fix applied (commit bb1758b3): added --flash_mode dio explicitly to flash_otgw.sh, flash_otgw.bat, and flash_esp.py. Also added Boya troubleshooting note to .sh and .bat help output.
+
+AC #2 and #4 still open: need dvd77 serial log during bootloop (AC#2) and reporter confirmation of fix (AC#4). GitHub #554 comment posted explaining root cause and asking for retesting.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
