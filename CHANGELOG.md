@@ -11,6 +11,8 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 
 ### Added
+- Static IP address settings: `wifistaticip`, `wifisubnet`, `wifigateway`, `wifidns1`, `wifidns2` are now persisted in settings and applied before WiFiManager connect, enabling DHCP-bypass for environments where the router does not assign predictable addresses (TASK-548)
+- Statistics table columns are now drag-to-resize: a grab handle on each column header lets the user adjust column widths, persisted in localStorage under `otStatsColWidths` so preferences survive page reloads (TASK-703)
 - Bilateral OT-bus support map: bitmaps tracking which MsgIDs are seen from thermostat side and boiler side, with direction-aware "T/B/T+B" labels in the telnet diagnostic view and a new `GET /api/v2/otgw/support-map` REST endpoint; Web UI shows which data points the gateway has actually observed (TASK-683, TASK-684, TASK-685, TASK-686, TASK-688, #640)
 - HA discovery: PIC-control entities exposed as `button` and `select` under pseudo-ID 251 (TASK-PR#576, #596)
 - Standalone HA discovery topic wiper for cleaning stale retained discovery topics out of the broker (TASK-611, #587)
@@ -30,6 +32,11 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - Version-bump policy: per-commit `_VERSION_PRERELEASE` enforcement removed from `.githooks/pre-commit` on `dev`; the bump is now performed once per beta cut by `bin/bump-prerelease.sh` inside the `/beta-prerelease` skill (TASK-669, #624)
 
 ### Fixed
+- LittleFS filesystem size was reported as 1 MB instead of 2 MB in the device-info API and Web UI; the partition size is now read directly from the LittleFS partition descriptor (TASK-701)
+- Auto-scroll in the OT log was reset when switching tabs and when navigating back to the main page; scroll position is now preserved across tab switches and page revisits (TASK-701)
+- `GET /api/v2/device/info` triggered multiple TCP yield points and excessive heap churn on each call; buffer allocations reduced and yield points consolidated (TASK-701)
+- MQTT discovery verify now runs an hourly first-run trigger in addition to the existing force-path, so any entities missed by the JIT pass are recovered automatically without user intervention (TASK-704)
+- Statistics table column widths and the "boiler unsupported" badge were visually unbalanced after the support-map feature landed; column proportions corrected and badge styling refined (TASK-705, TASK-706)
 - `logHeapStats` in `helperStuff.ino` was printing the window drop counters (`webSocketDropCount` / `mqttDropCount`) which reset to 0 after each throttle warning, making the per-minute heap line show ephemeral snapshots instead of monotonic lifetime totals; now prints the correct `state.heapdiag.iWsDropsTotal` / `iMqttDropsTotal` as every other consumer already does (TASK-697, #642)
 - Beta.20 telnet diagnostic noise cleaned up: `onNotFound` handler now emits accurate `200 (file)` / `404` lines; `apifirmwarefilelist` no longer mirrors JSON to telnet; `checklittlefshash` suppressed on match; PROGMEM fixes for `strcmp_P` chains in `OTGW-Core.ino` and FSexplorer path handling (#637)
 - HA capability-flag binary sensors for bits 2-5 (cooling, OTC active, CH2 active, summer/winter) stuck at `unknown` in Home Assistant: the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so every bit reaches its retained topic on every status change (ADR-076, TASK-649, #614)
