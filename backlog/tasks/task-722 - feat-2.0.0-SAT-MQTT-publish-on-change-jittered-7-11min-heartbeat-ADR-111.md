@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-26 19:11'
-updated_date: '2026-05-26 20:43'
+updated_date: '2026-05-26 20:44'
 labels:
   - feat-2.0.0
   - mqtt
@@ -61,6 +61,41 @@ Next step: refactor satPublishMQTT() in SATcontrol.ino (~50 call-sites, batched 
 - char* topic overloads added to helpers (publishIfChangedF/I/B/S) for runtime-built topics (sat/ble/<mac>/temp etc).
 - Build green: ESP8266 RAM 91.0% (74588B; ~104B delta from no-refactor baseline incl. ~1KB shadow allocation), Flash 82.9
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ADR-111 implemented end-to-end. The OTGW32 2.0.0 firmware now publishes ~74 SAT MQTT topics via on-change + jittered 7-11min heartbeat helpers instead of unconditional 30s-cycle blasts.
+
+## What landed
+
+- ADR-111 (Accepted 2026-05-26) with 6 sub-rules: helper API, eligibility formula, jitter window, per-field tolerance table, MQTT-reconnect policy, scope boundary. Enforcement block declares forbid_pattern + llm_judge.
+- SATmqttPublish.h / .cpp: shadow structs (F/I/B/S), 5 helpers (publishIfChangedF/I/B/S/BStr) with const-char* topic overloads, publishJsonAttrIfChanged for large-payload blobs, SAT_EPS_* tolerance constants, satRandomHeartbeatMs/satRandomBootScatterMs using esp_random/os_random.
+- Refactored: SATcontrol.ino satPublishMQTT() (~50 publishes + 4 JSON blobs), SATpressure.ino satPressureHealthPublish() (2), SATble.ino satBLEPublishMQTT() + MQTTstuff.ino satBLEPublishStateTopics() (6), SATweather.ino weatherPublishMQTT() (13).
+- One documented exception: sat/target event-driven echo in satHandlePreset (preset-clear path), marked // ADR-111 exception.
+- New evaluate.py gate check_sat_publishes_use_helpers (forbid raw sendMQTTData(F("sat/...") outside helpers; respects exception markers).
+
+## Verification
+
+- python build.py --firmware: exit 0. ESP8266 RAM 91.0% (74588 B), Flash 82.9%. ESP32S3 RAM 34.8%, Flash 95.1%.
+- python evaluate.py --quick: 63 passed, 0 failed, 1 unrelated warning.
+- Memory delta: ~104 B BSS on ESP8266 vs the helpers-only baseline (well under the 1.5 KB cap in AC#9).
+
+## Commits + push
+
+- 2c6acfab: feat(sat): introduce ADR-111 + SATmqttPublish helpers (alpha.72)
+- 10670393: feat(sat): on-change + jittered heartbeat publish (ADR-111, TASK-722) (alpha.75)
+- Pushed to origin/feature-dev-2.0.0-otgw32-esp32-sat-support.
+
+## Remaining (AC#12-14 require field validation)
+
+These ACs cannot be self-verified from this session:
+- AC#12: beta-build flashed to test-device + telnet-log evidence (publish-rate before/after).
+- AC#13: Discord #dev-sat-mqtt beta-tester confirmation (≥1 tester reports HA-historiek significantly quieter, no functional regression).
+- AC#14: HA dashboard verification (no unavailable sensors after the 11-min heartbeat window, retained topics survive reconnect).
+
+Next steps for the maintainer: OTA-flash alpha.75 to a test device, capture telnet log for ~15 min steady-state, post comparison to #dev-sat-mqtt, and close ACs 12-14 once field-validated.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
