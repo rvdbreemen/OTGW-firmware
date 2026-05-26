@@ -33,6 +33,7 @@ Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
 - Version-bump policy: per-commit `_VERSION_PRERELEASE` enforcement removed from `.githooks/pre-commit` on `dev`; the bump is now performed once per beta cut by `bin/bump-prerelease.sh` inside the `/beta-prerelease` skill (TASK-669, #624)
 
 ### Fixed
+- Fixed IP UI octet inputs switched from `type="number"` to `type="text"` with `inputMode="numeric"` for correct mobile keyboards; ARIA `role="group"` and per-octet `aria-label` added for screen-reader accessibility; paste handler now validates all four octets before applying; `ArrowLeft` navigation added; per-field range validation runs before save and blocks the save button from hiding on invalid input; octet initialisation moved after DOM append so values render correctly on first load; dark-theme and common-theme CSS added for the fixed-IP section (TASK-709)
 - LittleFS filesystem size was reported as 1 MB instead of 2 MB in the device-info API and Web UI; the partition size is now read directly from the LittleFS partition descriptor (TASK-701)
 - Auto-scroll in the OT log was reset when switching tabs and when navigating back to the main page; scroll position is now preserved across tab switches and page revisits (TASK-701)
 - `GET /api/v2/device/info` triggered multiple TCP yield points and excessive heap churn on each call; buffer allocations reduced and yield points consolidated (TASK-701)
