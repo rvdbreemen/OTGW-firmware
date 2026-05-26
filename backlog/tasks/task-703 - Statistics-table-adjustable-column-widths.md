@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-25 17:16'
-updated_date: '2026-05-25 23:04'
+updated_date: '2026-05-26 09:18'
 labels:
   - ui
   - enhancement
@@ -29,5 +29,5 @@ Simon Templar (beta.21 feedback): Description column is too small, Value column 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Add drag-to-resize column widths to Statistics table. Implemented via colgroup/col elements and mousedown/mousemove/mouseup drag handle on th right edges. Widths persisted to localStorage key otStatsColWidths. Restores on page load and tab switch. Works cross-browser (Chrome, Firefox, Safari). No external dependencies.
+Add drag-to-resize column widths to Statistics table. Implemented via colgroup/col elements and mousedown/mousemove/mouseup drag handles on th right edges. Widths persisted to localStorage key otStatsColWidths. Restored on page load and tab switch. Global col-resizing cursor class prevents text selection mid-drag. Minimum column width 30px. Works cross-browser. No external dependencies. Build green, evaluator 100%.
 <!-- SECTION:FINAL_SUMMARY:END -->
