@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.75
+**  Version  : v2.0.0-alpha.76
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1796,7 +1796,6 @@ void clearMQTTConfigPending()
 // publishNonOTDiscoveryConfigs() — queue only the non-OT discovery configs for drip publish.
 // Called at boot, top-topic change, and broker restart.
 // OT ID configs are NOT queued here; they publish JIT as each MsgID arrives on the bus.
-// Note: OTGWfwinfoid / OTGWpicinfoid / OTGWpicsettingsid do not exist on this branch yet.
 //===========================================================================================
 void publishNonOTDiscoveryConfigs()
 {
@@ -1805,6 +1804,10 @@ void publishNonOTDiscoveryConfigs()
   setMQTTConfigPending(27);                 // number: outside temperature override
   setMQTTConfigPending(OTGWdallasdataid);   // Dallas temperature sensors
   setMQTTConfigPending(OTGWheapstatsid);    // heap / discovery statistics
+  setMQTTConfigPending(OTGWfwinfoid);       // firmware info
+  setMQTTConfigPending(OTGWpicinfoid);      // PIC info
+  setMQTTConfigPending(OTGWpicsettingsid);  // PIC settings
+  setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
 }
