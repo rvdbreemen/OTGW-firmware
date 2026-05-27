@@ -3,11 +3,11 @@ id: TASK-725
 title: >-
   feat-2.0.0: port TASK-709 — fixed IP segmented octet UI for both Ethernet
   (W5500) and Wi-Fi
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-27 13:24'
-updated_date: '2026-05-27 22:10'
+updated_date: '2026-05-27 22:33'
 labels:
   - feat
   - webui
@@ -26,23 +26,29 @@ Port and extend the fixed-IP configuration UI from dev (TASK-709 + TASK-724) to 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Checkbox 'Use DHCP (automatic IP)' is rendered for the Ethernet static IP section; checked when ethstaticip=false
-- [ ] #2 Ethernet static IP fields (IP Address, Subnet Mask, Gateway, DNS Server) are hidden when DHCP is checked and visible when unchecked
-- [ ] #3 Each IP field renders as 4 segmented number inputs (0-255) separated by dots, using the 2.0.0 design-system CSS tokens
-- [ ] #4 Unchecking DHCP fetches device/info and prefills all 4 fields from current Ethernet DHCP lease (ETH.subnetMask/gatewayIP/dnsIP)
-- [ ] #5 sendDeviceInfoV2() in restAPI.ino exposes eth_current_subnet, eth_current_gateway, eth_current_dns via ETH.* API
-- [ ] #6 Save: DHCP checked saves ethstaticip=false and clears IP fields; fixed Ethernet saves ethstaticip=true with joined dotted-decimal values
-- [ ] #7 All CSS uses design-system tokens (var(--space-*), var(--fg-*), var(--brand-*)); labels are left-aligned via existing .settingDiv .settings-field-container rule
-- [ ] #8 python build.py exits 0 (ESP32 target)
-- [ ] #9 Ethernet DHCP toggle: checkbox 'Use DHCP' shown for Ethernet section; checked when ethstaticip=false; IP fields hidden/shown accordingly
-- [ ] #10 Ethernet segmented inputs: IP Address, Subnet Mask, Gateway, DNS Server each rendered as 4 octet inputs (0-255) with auto-advance and paste support
-- [ ] #11 Ethernet DHCP prefill: unchecking fetches device/info; eth_current_subnet/gateway/dns added to sendDeviceInfoV2() via ETH.*
-- [ ] #12 Ethernet save: DHCP checked -> ethstaticip=false + IP fields cleared; fixed -> ethstaticip=true + joined dotted-decimal
-- [ ] #13 Wi-Fi settings backend: WifiSection added to OTGWSettings with wifistaticip (str), wifisubnet, wifigateway, wifidns1, wifidns2; persisted to LittleFS
-- [ ] #14 Wi-Fi network apply: static IP applied via WiFi.config() at connect time when wifistaticip is non-empty; reverts to DHCP when empty
-- [ ] #15 Wi-Fi REST API: wifistaticip and companions exposed via settings endpoint; companion keys (wifisubnet etc.) are in hiddenSettings (rendered by custom section)
-- [ ] #16 Wi-Fi DHCP toggle UI: same pattern as Ethernet; DHCP prefill uses wifi_current_subnet/gateway/dns1/dns2 from sendDeviceInfoV2()
-- [ ] #17 Wi-Fi segmented inputs: IP Address, Subnet Mask, Gateway, DNS Server 1, DNS Server 2 (optional) with same UX as Ethernet section
-- [ ] #18 All new CSS uses design-system tokens; labels are left-aligned via existing .settingDiv .settings-field-container rule
+- [x] #1 Checkbox 'Use DHCP (automatic IP)' is rendered for the Ethernet static IP section; checked when ethstaticip=false
+- [x] #2 Ethernet static IP fields (IP Address, Subnet Mask, Gateway, DNS Server) are hidden when DHCP is checked and visible when unchecked
+- [x] #3 Each IP field renders as 4 segmented number inputs (0-255) separated by dots, using the 2.0.0 design-system CSS tokens
+- [x] #4 Unchecking DHCP fetches device/info and prefills all 4 fields from current Ethernet DHCP lease (ETH.subnetMask/gatewayIP/dnsIP)
+- [x] #5 sendDeviceInfoV2() in restAPI.ino exposes eth_current_subnet, eth_current_gateway, eth_current_dns via ETH.* API
+- [x] #6 Save: DHCP checked saves ethstaticip=false and clears IP fields; fixed Ethernet saves ethstaticip=true with joined dotted-decimal values
+- [x] #7 All CSS uses design-system tokens (var(--space-*), var(--fg-*), var(--brand-*)); labels are left-aligned via existing .settingDiv .settings-field-container rule
+- [x] #8 python build.py exits 0 (ESP32 target)
+- [x] #9 Ethernet DHCP toggle: checkbox 'Use DHCP' shown for Ethernet section; checked when ethstaticip=false; IP fields hidden/shown accordingly
+- [x] #10 Ethernet segmented inputs: IP Address, Subnet Mask, Gateway, DNS Server each rendered as 4 octet inputs (0-255) with auto-advance and paste support
+- [x] #11 Ethernet DHCP prefill: unchecking fetches device/info; eth_current_subnet/gateway/dns added to sendDeviceInfoV2() via ETH.*
+- [x] #12 Ethernet save: DHCP checked -> ethstaticip=false + IP fields cleared; fixed -> ethstaticip=true + joined dotted-decimal
+- [x] #13 Wi-Fi settings backend: WifiSection added to OTGWSettings with wifistaticip (str), wifisubnet, wifigateway, wifidns1, wifidns2; persisted to LittleFS
+- [x] #14 Wi-Fi network apply: static IP applied via WiFi.config() at connect time when wifistaticip is non-empty; reverts to DHCP when empty
+- [x] #15 Wi-Fi REST API: wifistaticip and companions exposed via settings endpoint; companion keys (wifisubnet etc.) are in hiddenSettings (rendered by custom section)
+- [x] #16 Wi-Fi DHCP toggle UI: same pattern as Ethernet; DHCP prefill uses wifi_current_subnet/gateway/dns1/dns2 from sendDeviceInfoV2()
+- [x] #17 Wi-Fi segmented inputs: IP Address, Subnet Mask, Gateway, DNS Server 1, DNS Server 2 (optional) with same UX as Ethernet section
+- [x] #18 All new CSS uses design-system tokens; labels are left-aligned via existing .settingDiv .settings-field-container rule
 - [ ] #19 python build.py exits 0 (ESP32 target)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+WiFi en Ethernet fixed IP geport naar 2.0.0: WifiSection backend, persistentie, WiFi.config(), REST API, segmented octet UI in Network group.
+<!-- SECTION:FINAL_SUMMARY:END -->

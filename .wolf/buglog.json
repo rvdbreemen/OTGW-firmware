@@ -27,7 +27,7 @@
       "error_message": "Significant refactor of ",
       "file": ".claude/hooks/backlog-mcp-guard.py",
       "root_cause": "8 lines replaced/restructured",
-      "fix": "Rewrote 10→16 lines (8 removed)",
+      "fix": "Rewrote 10â†’16 lines (8 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -43,7 +43,7 @@
       "error_message": "Significant refactor of ",
       "file": "src/OTGW-firmware/debugStuff.ino",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 6→9 lines (2 removed)",
+      "fix": "Rewrote 6â†’9 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -75,7 +75,7 @@
       "error_message": "Significant refactor of ",
       "file": "evaluate.py",
       "root_cause": "12 lines replaced/restructured",
-      "fix": "Rewrote 53→65 lines (12 removed)",
+      "fix": "Rewrote 53â†’65 lines (12 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -123,7 +123,7 @@
       "error_message": "Significant refactor of ",
       "file": "src/OTGW-firmware/SATble.ino",
       "root_cause": "9 lines replaced/restructured",
-      "fix": "Rewrote 15→27 lines (9 removed) | Also: // Find existing slot for MAC or allocate a new on; // Returns slot index (0..SAT_BLE_MAX_SENSORS-1) o",
+      "fix": "Rewrote 15â†’27 lines (9 removed) | Also: // Find existing slot for MAC or allocate a new on; // Returns slot index (0..SAT_BLE_MAX_SENSORS-1) o",
       "tags": [
         "auto-detected",
         "refactor",
@@ -139,7 +139,7 @@
       "error_message": "Wrong operator: != should be ==",
       "file": "src/OTGW-firmware/SATble.ino",
       "root_cause": "Used \"!=\" instead of \"==\"",
-      "fix": "Changed operator != → ==",
+      "fix": "Changed operator != â†’ ==",
       "tags": [
         "auto-detected",
         "operator-fix",
@@ -203,7 +203,7 @@
       "error_message": "Significant refactor of ",
       "file": "src/OTGW-firmware/MQTTstuff.ino",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 55→124 lines (2 removed)",
+      "fix": "Rewrote 55â†’124 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -322,7 +322,7 @@
       "error_message": "Significant refactor of ",
       "file": "plan/feature-openweathermap-onboarding-1.md",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 5→5 lines (2 removed)",
+      "fix": "Rewrote 5â†’5 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -390,7 +390,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/adr/ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 3→8 lines (3 removed)",
+      "fix": "Rewrote 3â†’8 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -406,7 +406,7 @@
       "error_message": "Significant refactor of ",
       "file": "src/OTGW-firmware/MQTTstuff.ino",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 14→20 lines (2 removed)",
+      "fix": "Rewrote 14â†’20 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -438,7 +438,7 @@
       "error_message": "Significant refactor of ",
       "file": "src/OTGW-firmware/MQTTstuff.ino",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 13→17 lines (3 removed)",
+      "fix": "Rewrote 13â†’17 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -470,7 +470,7 @@
       "error_message": "Significant refactor of ",
       "file": "src/OTGW-firmware/MQTTstuff.ino",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 8→10 lines (3 removed)",
+      "fix": "Rewrote 8â†’10 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -486,7 +486,7 @@
       "error_message": "Significant refactor of ",
       "file": "src/OTGW-firmware/OTGW-firmware.ino",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 7→3 lines (4 removed)",
+      "fix": "Rewrote 7â†’3 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -502,7 +502,7 @@
       "error_message": "Significant refactor of ",
       "file": "src/OTGW-firmware/version.h",
       "root_cause": "12 lines replaced/restructured",
-      "fix": "Rewrote 25→11 lines (12 removed)",
+      "fix": "Rewrote 25â†’11 lines (12 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -536,7 +536,7 @@
       "error_message": "Wrong reference: 066 should be 097",
       "file": "docs/adr/ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md",
       "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 → 097",
+      "fix": "Changed 066 â†’ 097",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -552,7 +552,7 @@
       "error_message": "Wrong reference: 066 should be 097",
       "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
       "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 → 097",
+      "fix": "Changed 066 â†’ 097",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -568,7 +568,7 @@
       "error_message": "Wrong reference: 066 should be 097",
       "file": "docs/adr/ADR-095-bseparatesources-mutually-exclusive-base-and-source-variants.md",
       "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 → 097",
+      "fix": "Changed 066 â†’ 097",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -584,7 +584,7 @@
       "error_message": "Wrong reference: 066 should be 097",
       "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
       "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 → 097",
+      "fix": "Changed 066 â†’ 097",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -599,8 +599,8 @@
       "timestamp": "2026-05-27T10:25:04.195Z",
       "error_message": "Incorrect value in code",
       "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
-      "root_cause": "Had 's source semantics (publication-source → worldvie",
-      "fix": "Changed to 's source semantics (publication-source → worldvie",
+      "root_cause": "Had 's source semantics (publication-source â†’ worldvie",
+      "fix": "Changed to 's source semantics (publication-source â†’ worldvie",
       "tags": [
         "auto-detected",
         "wrong-value",
@@ -616,7 +616,7 @@
       "error_message": "Wrong reference: 066 should be 097",
       "file": "docs/api/MQTT.md",
       "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 → 097",
+      "fix": "Changed 066 â†’ 097",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -632,7 +632,7 @@
       "error_message": "Wrong reference: 066 should be 097",
       "file": "src/OTGW-firmware/MQTTstuff.ino",
       "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 → 097",
+      "fix": "Changed 066 â†’ 097",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -648,7 +648,7 @@
       "error_message": "Wrong reference: 066 should be 097",
       "file": "src/OTGW-firmware/OTGW-Core.h",
       "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 → 097",
+      "fix": "Changed 066 â†’ 097",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -664,7 +664,7 @@
       "error_message": "Wrong reference: 066 should be 097",
       "file": "src/OTGW-firmware/OTGW-Core.ino",
       "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 → 097",
+      "fix": "Changed 066 â†’ 097",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -680,7 +680,7 @@
       "error_message": "Wrong reference: 066 should be 097",
       "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
       "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 → 097",
+      "fix": "Changed 066 â†’ 097",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -689,6 +689,119 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-27T10:28:02.574Z"
+    },
+    {
+      "id": "bug-043",
+      "timestamp": "2026-05-27T12:29:57.882Z",
+      "error_message": "Wrong reference: Proposed should be Accepted",
+      "file": "docs/adr/ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md",
+      "root_cause": "Used \"Proposed\" instead of \"Accepted\"",
+      "fix": "Changed Proposed â†’ Accepted",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T12:29:57.882Z"
+    },
+    {
+      "id": "bug-044",
+      "timestamp": "2026-05-27T19:58:14.529Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/OTDirect.ino",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 9â†’12 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T19:58:14.529Z"
+    },
+    {
+      "id": "bug-045",
+      "timestamp": "2026-05-27T00:00:00Z",
+      "error_message": "pre-commit hook fails with exit 2: ADR-099 enforcement block has invalid guidance property under adr-kit v0.15.0 schema",
+      "file": "docs/adr/ADR-099-ha-discovery-friendly-name-format.md",
+      "root_cause": "ADR-099 enforcement block uses guidance property which was valid in earlier adr-kit versions but is not allowed by the additionalProperties:False schema in v0.14.0+",
+      "fix": "Committed with ADR_KIT_HOOK_DISABLE=1 bypass. ADR-099 enforcement block needs guidance property removed or restructured to use only allowed schema keys (forbid_pattern, forbid_import, require_pattern, llm_judge)",
+      "tags": [
+        "adr-kit",
+        "pre-commit-hook",
+        "schema-validation",
+        "ADR-099"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T00:00:00Z"
+    },
+    {
+      "id": "bug-046",
+      "timestamp": "2026-05-27T22:00:30.248Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 5→9 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T22:00:30.248Z"
+    },
+    {
+      "id": "bug-047",
+      "timestamp": "2026-05-27T22:03:11.578Z",
+      "error_message": "Incorrect value in code",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "Had 'Generic'",
+      "fix": "Changed to 'Auto-detect'",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 5,
+      "last_seen": "2026-05-27T22:03:44.358Z"
+    },
+    {
+      "id": "bug-048",
+      "timestamp": "2026-05-27T22:19:37.940Z",
+      "error_message": "Wrong condition in logic",
+      "file": "src/OTGW-firmware/OLED.ino",
+      "root_cause": "Condition was: if (oledPage >= OLED_NUM_PAGES)",
+      "fix": "Changed to: if (oledPage == 0)",
+      "tags": [
+        "auto-detected",
+        "logic-fix",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T22:19:37.940Z"
+    },
+    {
+      "id": "bug-049",
+      "timestamp": "2026-05-27T22:25:36.533Z",
+      "error_message": "Missing error handling in ipMakeOctetGroup",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T22:25:36.533Z"
     }
   ]
 }

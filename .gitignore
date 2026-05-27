@@ -33,6 +33,7 @@ src/OTGW-firmware/data/*.gz
 logs-issue/*
 /src/OTGW-firmware/build
 *.ino.map
+*.ino.cpp
 tmpclaude-*
 nul
 plan.md
