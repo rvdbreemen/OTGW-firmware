@@ -1,11 +1,11 @@
 ---
 id: TASK-735
 title: 'fix(webui): align settings form and default fixed-IP subnet'
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-27 21:59'
-updated_date: '2026-05-27 22:37'
+updated_date: '2026-05-27 22:38'
 labels:
   - webui settings
 dependencies: []
