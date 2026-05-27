@@ -61,9 +61,14 @@ Check whether any architectural changes since the previous release require new o
 ### Phase 2: Stabilize dev branch
 
 1. Commit all open/uncommitted changes on `dev` and push to remote
-2. Run `python build.py` to verify the build works
-3. Commit version.h changes from build.py and push to remote
-4. If the build fails, fix the issue, commit and push again. Repeat until green.
+2. Run the build and filter output:
+   ```bash
+   mkdir -p .tmp
+   python build.py 2>&1 | tee .tmp/build_release.log | tail -10
+   echo "Exit: $?"
+   ```
+   If exit code != 0: read `.tmp/build_release.log` for diagnosis, fix, retry. If exit code == 0: proceed — do NOT read the full log.
+3. Commit version.h changes from build.py and push to remote.
 
 **No checkpoint.** If the build succeeds, proceed automatically to Phase 3.
 
@@ -111,7 +116,12 @@ Proceed directly after Phase 4 approval. No additional confirmation needed.
 
 1. **Commit all outstanding changes on `main`** and push to remote
 2. **Remove pre-release from `version.h`**: Comment out `_VERSION_PRERELEASE` so the build produces a clean `v<version>` without `-beta`. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
-3. **Run `python build.py`** to produce the release build. Fix any issues.
+3. **Run the release build**:
+   ```bash
+   python build.py 2>&1 | tee .tmp/build_release_final.log | tail -10
+   echo "Exit: $?"
+   ```
+   Fix any issues. Read `.tmp/build_release_final.log` only on failure.
 4. **Commit the release build** and push `main` to remote
 5. **Create draft GitHub release with tag**: Derive a short title (3-6 words) summarizing the release theme. Use format `v<version> - <Short Title>`. Examples: `v1.3.2 - File Explorer Reliability Fix`, `v1.4.0 - REST API v3 & Prometheus`. Command: `gh release create v<version> --target main --title "v<version> - <Short Title>" --notes-file RELEASE_GITHUB_<version>.md --draft`
 6. **Upload build artifacts to the draft release**: `gh release upload v<version> build/*.ino.bin build/*.littlefs.bin --clobber`

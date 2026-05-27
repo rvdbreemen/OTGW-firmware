@@ -1,271 +1,150 @@
-# /backlog_discord -- Respond to backlog commands and @bot mentions from Discord
+# /backlog_discord — Respond to backlog commands from Discord
 
-Monitor the `#dev-sat-mqtt` Discord channel for backlog-related requests AND @bot mentions, execute them via the Backlog MCP, and post results back to Discord.
+Monitor `#dev-sat-mqtt` for backlog-related requests, execute them via the Backlog CLI, and post results back.
+
+## Token-efficiency rules (apply throughout all phases)
+
+- **B1 task list**: Always add a status filter or `--limit 20`. Never call `backlog task list --plain` bare. Default to `-s "In Progress"` unless the user asked for a different status or all tasks.
+- **B2 board**: Do NOT call `backlog board --plain` — it dumps everything. Instead run three targeted queries (To Do / In Progress / Done) with `--limit 5` each and compose a compact summary.
+- **B3 attachments**: Only fetch attachments when the message text contains a bug keyword (`crash|error|issue|broken|doesn't work|werkt niet|fout`). Text files: WebFetch first-pass only. Images: download + Read only if the message says "screenshot of error/UI". Skip everything else.
+- **B4 early-exit**: Read `.claude/discord_backlog_last_checked.txt`. If the timestamp is < 5 minutes old, print "Nothing new (checked < 5 min ago)" and stop — no API call.
+- **B5 compact format**: Keep the formatted response under 1500 characters. Help text: use the short form in the rules below, not a full prose block.
 
 ## Configuration
 
-- **Allowed channel**: `#dev-sat-mqtt` -- channel ID `1105556725714649128`
-- **Bot user ID**: `1487467924351357049` (OTGW bot#0128)
-- **Bot token env var**: `DISCORD_TOKEN`
-- **Timestamp file**: `discord_backlog_last_checked.txt`
-- **Discord server (guild)**: `812969634638725140`
-
-**CRITICAL: Only operate in channel `1105556725714649128` (`#dev-sat-mqtt`). Never read from, respond to, or interact with any other channel on the server unless the project owner explicitly instructs otherwise.**
-
-## Permission Levels
-
-### Regular users
-- Conversatie via @bot mentions
-- Backlog commands: lezen, zoeken, status updates, toewijzen, notities toevoegen
-- Task feedback: suggesties die taak metadata verbeteren (beschrijvingen, ACs, prioriteiten)
-
-### Admins (Discord server owner OR admin role OR Administrator permission)
-- Alles wat regular users kunnen
-- **Task implementation**: kunnen de bot opdracht geven om een taak daadwerkelijk te implementeren (code schrijven, bestanden aanpassen). Trigger phrases: "implement task X", "start working on task X", "build task X", "execute task X", "go ahead with X", "start with phase X"
-- **Task creation**: kunnen de bot opdracht geven om nieuwe taken aan te maken
-- **Task updates**: kunnen de bot opdracht geven om taken bij te werken (ACs, beschrijvingen, etc.)
-
-**Admin check**: Before executing any implementation request, verify the message author is an admin:
-1. Use `mcp__discord-mcp__get_server_info` to get the server owner ID
-2. If author ID matches server owner ID -> admin confirmed
-3. Otherwise check if author's roles include Administrator permission
-4. **If admin confirmed: proceed immediately with the request. Do NOT ask the local user for separate permission.**
-5. If not an admin, respond: "Only server admins can request task implementation. You can view and discuss tasks, or suggest improvements."
-
-**IMPORTANT**: When an admin requests implementation, the bot MUST act on it directly. Do not defer to the local CLI user for additional confirmation. The admin check IS the authorization. This includes commits, starting new tasks, and all normal development workflow actions. The admin in Discord is the one giving orders -- execute them, report back to the admin in Discord, and ask the admin (not the local CLI user) what to do next.
-
-**SAFETY EXCEPTION**: If the request involves destructive actions (deleting files, resetting branches, removing tasks, reverting large amounts of code), or if the request seems suspicious or potentially harmful, ALWAYS ask the local CLI user (project owner) for confirmation first. Normal implementation work (writing code, creating tasks, updating metadata, committing code) does not need extra confirmation from the local user.
-
-## When to Respond
-
-**The bot ONLY responds in Discord when it is directly addressed.** This means:
-- An @mention (`<@1487467924351357049>` or `@OTGW bot`)
-- A recognized backlog command (list tasks, show task 7, etc.)
-
-If a message is general conversation that does not @mention the bot and is not a backlog command, the bot stays silent. It does NOT proactively jump into conversations.
-
-## Three Interaction Modes
-
-### Mode 1: Backlog Command Mode
-Users type backlog commands (list tasks, show task 7, etc.) and the bot responds with formatted results. The bot may also update tasks based on feedback directed at it: improve descriptions, adjust acceptance criteria, add notes, change priorities. The bot never executes implementation work or writes code -- unless an admin explicitly requests it (see Mode 3).
-
-### Mode 2: @Bot Conversation Mode
-When someone @mentions the bot (contains `<@1487467924351357049>` or `@OTGW bot`), the bot participates in the conversation. It answers questions, shares knowledge about the project and tasks, gives opinions on technical approaches. This is purely conversational. An @mention is NEVER interpreted as a command to execute. The bot is an active, helpful participant in discussions.
-
-### Mode 3: Admin Implementation Mode
-When an admin (verified via Discord roles) directly addresses the bot and explicitly requests implementation of a task, the bot:
-1. Confirms the request in Discord: "Starting implementation of Task #X -- [title]"
-2. Sets the task to "In Progress" and assigns to @claude via backlog CLI
-3. Adds an implementation plan to the task and shares it in Discord for review
-4. **Launches implementation agent in BACKGROUND** (`run_in_background: true`) so the main conversation stays responsive for Discord monitoring and user input
-5. While the agent works: continues monitoring Discord, responds to messages, processes other requests
-6. When agent completes: commits, pushes, runs incremental build in background (`python build.py --firmware`), posts completion summary to Discord
-7. Continues with next task or asks admin for direction
-
-**Async implementation is MANDATORY.** Never block the main conversation waiting for an implementation agent. The Discord cron loop and user interaction must always remain responsive.
-
-**After completing a task, always present the admin with clear next steps:**
-- Which tasks are now unblocked
-- What the recommended next task is (based on the implementation plan/phases)
-- Any blockers or dependencies that need attention
-
-**Task completion workflow (MANDATORY — in this exact order):**
-1. `git add <specific files changed by this task>`
-2. `git commit -m "descriptive title (not task ID)"`
-3. `git push` to remote
-4. `backlog task edit <id> -s Done` — mark done in backlog
-5. Run `python build.py --firmware` in background (incremental, no --clean)
-6. Post completion summary to Discord
-7. Start next task immediately (don't wait for build)
-
-**Agents MUST include git add + commit + push in their task prompt.** A task is not finished until its changes are committed. Never leave uncommitted task changes on the working tree.
-
-The bot should keep the admin informed and in control of the implementation flow. Never silently stop working -- always communicate what happened and what's needed next.
-
-If a non-admin requests implementation, the bot politely declines and explains only admins can trigger implementation.
-
-All three modes are always active simultaneously.
+- **Bot channel**: `#dev-sat-mqtt` — channel ID `1105556725714649128`
+- **Timestamp file**: `.claude/discord_backlog_last_checked.txt`
+- **Maintainer user ID to ignore**: `384411356616720384`
 
 ## Workflow
 
-### Phase 1: Connect and read new messages
+### Phase 1: Early-exit + read new messages (B4)
 
-The Discord MCP server runs as the `discord-mcp` Docker container on `http://localhost:8085/mcp` with `DISCORD_TOKEN` preloaded from the host environment — there is **no separate login step**. The first `read_messages` call doubles as the connection check. **Tool namespace is `mcp__discord-mcp__*`.** Always use these MCP tools, never curl or direct Discord API calls (curl is fine for the CDN attachment downloads in Phase 1b — see below).
+1. Read `.claude/discord_backlog_last_checked.txt`. If absent, default to 1 hour ago.
+2. **Early-exit (B4)**: if timestamp is < 5 minutes old → print "Nothing new (checked < 5 min ago)" and stop.
+3. Fetch messages: `mcp__discord-mcp__fetch_channel_history` with `channel_id="1105556725714649128"` and `limit=25`.
+4. Filter to messages after the last-checked timestamp. Discard the rest immediately.
+5. Ignore messages from bots and maintainer (user ID `384411356616720384`).
+6. Write current UTC timestamp to `.claude/discord_backlog_last_checked.txt`.
 
-1. **Read the last-checked timestamp** from `.claude/discord_backlog_last_checked.txt`. If the file does not exist, default to the last 1 hour.
-2. **Read messages** from `#dev-sat-mqtt` using `mcp__discord-mcp__read_messages` with `channelId="1105556725714649128"` and `count="30"`. The response payload includes per-message **attachment metadata** (attachment ID, filename, MIME type, size, signed CDN URL). This metadata is sufficient — the separate `mcp__discord-mcp__get_attachment` tool returns the same info and is redundant. If the call fails (connection refused, HTTP error), report the error to the user and stop.
-3. **Filter** to messages posted after the last-checked timestamp.
-4. **Ignore** messages sent by the bot itself (author ID `1487467924351357049`).
-5. **Save the current timestamp** to `.claude/discord_backlog_last_checked.txt`.
+**Tool namespace**: `mcp__discord-mcp__*`. No login step — `DISCORD_TOKEN` is injected via MCP config.
 
-### Phase 1b: Fetch attachment contents (when a relevant message has them)
+### Phase 1b: Attachments — conditional only (B3)
 
-If a message that is directly addressed to the bot (@mention or backlog command) carries attachments — or a not-directly-addressed message has attachments that contain evidence relevant to a known open task or thread — fetch and inspect them. **The bot is no longer blind to logs and screenshots.** Earlier bot replies that said "I cannot read attachments through the bot, only message text" are obsolete; do not repeat that line.
+Only process attachments for messages that pass Phase 1 filtering **and** contain a bug keyword in the message text (`crash|error|issue|broken|doesn't work|werkt niet|fout`).
 
-**Procedure depends on attachment type and analysis goal:**
+For qualifying messages:
+- **Text files** (`.txt`, `.log`, `.json`): WebFetch first-pass only:
+  ```
+  WebFetch(url=<CDN URL>, prompt="Does this log show errors or unexpected behavior? Yes/no + one sentence.")
+  ```
+  If "no": skip. If "yes": note the finding in the reply.
+- **Images**: download and Read only if the message explicitly says "screenshot of error/UI":
+  ```powershell
+  $dir = "$env:TEMP\discord-attach"
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  Invoke-WebRequest -Uri "<CDN URL>" -OutFile "$dir\<filename>" -UseBasicParsing
+  ```
+  Then `Read` with the full Windows path.
+- **All other attachments**: skip silently.
 
-| Type | Goal | How |
-|---|---|---|
-| Text (`.txt`, `.log`, `.json`, `.md`) | AI-summarised quick read | `WebFetch(url, prompt="…")` — small model returns processed/summarised answers, not always verbatim |
-| Text (`.txt`, `.log`, `.json`, `.md`) | Verbatim line-precise diagnosis or `Grep` over content | PowerShell download → `Read` / `Grep` on the local file |
-| Image (`.png`, `.jpg`, `.webp`) | See the screenshot, extract on-screen text or layout | PowerShell download → `Read` on the **Windows path** (Read can open images in Claude Code) |
+Discord CDN URLs expire ~7 days after posting. On 403: re-call `fetch_channel_history` for a fresh URL.
 
-**Download recipe (Windows-safe — do NOT use Git-Bash `/tmp/`, the Read tool cannot resolve those paths):**
+### Phase 2: Identify actionable messages
 
-```powershell
-$dir = "$env:TEMP\discord-attach"
-New-Item -ItemType Directory -Force -Path $dir | Out-Null
-Invoke-WebRequest -Uri "<signed CDN URL from message>" -OutFile "$dir\<filename>" -UseBasicParsing
+A message is actionable if it asks about tasks, backlog, status, or assignments. Ignore general chat.
+
+**Supported intents**:
+
+| Intent | Example |
+|--------|---------|
+| List tasks | "list tasks", "show backlog", "tasks in progress" |
+| Show task | "show task 42", "details on task 42" |
+| Update status | "move task 42 to in progress", "mark task 42 done" |
+| Assign | "assign task 42 to @sara" |
+| Add note | "add note to task 42: started refactoring" |
+| Search | "find tasks about mqtt", "search auth" |
+| Board | "board", "show the board", "kanban" |
+| Help | "help", "what can you do?" |
+
+### Phase 3: Execute and respond (B1, B2)
+
+For each actionable message:
+
+1. Parse intent and extract parameters.
+2. Execute the backlog operation:
+
+   | Intent | Command |
+   |--------|---------|
+   | List tasks (default) | `backlog task list -s "In Progress" --plain` (B1) |
+   | List tasks by status | `backlog task list -s "<status>" --plain` |
+   | List all tasks | `backlog task list --plain --limit 20` (B1 — always cap) |
+   | Show task | `backlog task <id> --plain` |
+   | Update status | `backlog task edit <id> -s "New Status"` |
+   | Assign | `backlog task edit <id> -a @name` |
+   | Add note | `backlog task edit <id> --append-notes "note"` |
+   | Search | `backlog search "query" --plain` |
+   | Board (B2) | Three queries: `backlog task list -s "To Do" --plain --limit 5`, `-s "In Progress" --limit 5`, `-s "Done" --limit 5` |
+   | Help | No command — use the compact help text below |
+
+3. Format and post the response (see formatting guidelines below).
+4. Post via `mcp__discord-mcp__discord_post_message` with `channel_id="1105556725714649128"`.
+
+### Phase 4: Conversational follow-ups
+
+If a message is a reply in a thread where the bot posted task details, treat it as a contextual update using the task ID from context:
+
+- "mark AC 1 done" → `backlog task edit <id> --check-ac 1`
+- "assign this to @dev" → `backlog task edit <id> -a @dev`
+- "add a note: fixed the bug" → `backlog task edit <id> --append-notes "fixed the bug"`
+- "what are the open ACs?" → re-fetch and show unchecked ACs only
+
+## Response formatting guidelines (B5)
+
+Keep all responses under 1500 characters. Use Discord markdown.
+
+**Task list:**
+```
+**Tasks — In Progress**
+- **#7** Setup MQTT reconnect (`In Progress`, @rob)
+- **#12** Add REST endpoint (`In Progress`, @sara)
+_2 tasks. "show task <id>" for details._
 ```
 
-Then call `Read` with the full Windows path, e.g. `C:\Users\rvdbr\AppData\Local\Temp\discord-attach\<filename>`. To grep a long log: `Grep` on that same path.
-
-**Caveats:**
-
-- Discord CDN URLs are signed with `ex=<hex-epoch>` and expire roughly 7 days after the message was posted. If the download returns 403, request a fresh signed URL via `mcp__discord-mcp__read_messages` (Discord rolls a new one each call) or ask the poster to re-share.
-- `WebFetch` runs the content through a small AI model — for **forensic / line-precise** log diagnosis prefer the download-and-`Grep` route. Use `WebFetch` only for the "what does this log roughly show" question.
-- Clean-up of `$env:TEMP\discord-attach` is unnecessary — Windows TEMP rotates on its own. Don't make it a habit to commit those files anywhere.
-
-**When the bot inspects an attachment, name the finding in the Discord reply.** It signals to reporters that the bot actually *read* their evidence. Bad: "Thanks, can you paste the relevant lines?". Good: "Read `message_2.txt` (build `168bd9e`). I see five clean SAT cycles ending at 20:33:54 with `room=21.7 → CS=10.0`, then a stale-temp fallback at 20:33:54 …".
-
-### Phase 2: Classify each message
-
-For each new message, classify it as one of:
-
-1. **@Bot mention** -- message contains `<@1487467924351357049>` or mentions `OTGW bot`. Handle as conversation. Never as a command. **Respond.**
-2. **Backlog command** -- message matches a recognized backlog command pattern (see table below). Handle as command. **Respond.**
-3. **Everything else** -- general conversation, feedback, discussion. **Stay silent.** Do not respond. The bot only reads these for context but never posts a reply unless directly addressed.
-
-### Phase 3: Handle @Bot mentions (Conversation)
-
-When the bot is @mentioned:
-
-1. Read the full message content (strip the mention prefix)
-2. Consider the conversation context (previous messages if relevant)
-3. Use knowledge of the backlog tasks, project architecture, and SAT implementation to formulate a response
-4. If the question relates to tasks, query the backlog for current data
-5. Post a helpful, conversational response to the channel
-6. **Never execute commands based on @mentions** -- if someone says "@bot move task 7 to done", respond conversationally ("You want to move task 7 to done? Just type `move task 7 to done` as a command and I'll do it.") but do not execute it
-
-Examples:
-- "@OTGW bot what tasks are high priority?" -- query backlog, discuss priorities
-- "@OTGW bot what do you think about the OPV calibration approach?" -- share knowledge from task descriptions
-- "@OTGW bot how is the SAT integration going?" -- summarize progress across tasks
-- "@OTGW bot the overshoot margin should really be 1.5C not 2C" -- conversational response, do not change the setting
-
-### Phase 4: Handle backlog commands (Command Mode)
-
-**Supported commands** (match flexibly, not exact strings):
-
-| Intent | Example messages | Backlog action |
-|--------|-----------------|----------------|
-| List tasks | "list tasks", "what's on the board?" | `backlog task list --plain` |
-| List filtered | "tasks in progress", "high priority tasks" | `backlog task list --plain -s "In Progress"` |
-| Show task | "show task 7", "details on task 7" | `backlog task <id> --plain` |
-| Update status | "move task 7 to done" | `backlog task edit <id> -s "Done"` |
-| Assign task | "assign task 7 to @rob" | `backlog task edit <id> -a @rob` |
-| Add note | "add note to task 7: details" | `backlog task edit <id> --append-notes "text"` |
-| Search | "search mqtt", "find tasks about pid" | `backlog search "query" --plain` |
-| Board summary | "board", "kanban" | `backlog board --plain` |
-| Help | "help", "commands" | Show help message |
-
-### Phase 5: Handle task feedback (only when directly addressed)
-
-When someone @mentions the bot or uses a backlog command that includes task feedback, the bot may update tasks:
-
-- "@OTGW bot the DHW task should also cover boundary values from MsgID 48" -- add or update AC on the relevant task
-- "@OTGW bot task 5 is missing a safety timeout for the calibration" -- add AC to task 5
-- "add note to task 7: the PID integral was inverted" -- explicit command, update the task
-
-If feedback appears in general conversation without addressing the bot, the bot stays silent and does not act on it.
-
-**Scope limit**: The bot updates task metadata only (descriptions, ACs, notes, status, assignments, priorities). It never writes code, never implements features, and never makes architectural decisions -- unless an admin explicitly triggers implementation (Mode 3).
-
-### Phase 6: Format and post response
-
-1. **Format** using Discord markdown (bold, code blocks, bullet lists)
-2. **Keep under 1900 characters** (Discord limit is 2000). If longer, summarize and offer "say `show task X` for details"
-3. **Post** to `#dev-sat-mqtt` using `mcp__discord-mcp__send_message` with `channelId="1105556725714649128"` and `message="<reply text>"`.
-
-## Response formatting
-
-### Task list
+**Task detail:**
 ```
-**Backlog Tasks** (In Progress)
-
-- **#7** Setup MQTT reconnect -- `In Progress` (@rob)
-- **#12** Add REST endpoint -- `In Progress` (@sara)
-
-_2 tasks shown. Say "show task <id>" for details._
+**Task #7 — Setup MQTT reconnect**
+Status: In Progress | Assignee: @rob | Priority: high
+Implement MQTT reconnect with exponential backoff.
+AC: [ ] #1 Reconnect in 30s  [x] #2 Backoff  [ ] #3 Log attempts
 ```
 
-### Task detail
+**Board (B2 — three-column compact):**
 ```
-**Task #7 -- Setup MQTT reconnect**
-**Status:** In Progress | **Assignee:** @rob | **Priority:** high
-
-**Description:**
-Implement automatic MQTT reconnection with exponential backoff.
-
-**Acceptance Criteria:**
-- [ ] #1 Reconnect within 30s of disconnect
-- [x] #2 Exponential backoff
-- [ ] #3 Log reconnection attempts
+**Board**
+To Do (2): #3 Refactor settings, #9 Add OTA check
+In Progress (2): #7 MQTT reconnect (@rob), #12 REST endpoint (@sara)
+Done (last 5): #1, #4, #6, #8, #11
 ```
 
-### @Bot conversation
+**Update confirmation:**
 ```
-Good question! Based on the backlog, we have 21 tasks for the SAT integration. 3 are done (TASK-1, 7, 8), 18 still To Do. The highest priority remaining are modulation control (TASK-4) and OPV calibration (TASK-5). Want to know more about any of these?
-```
-
-### Task feedback update
-```
-Good point! I've updated **Task #3** (DHW control):
-- Added AC: "Read DHW boundary values from OT MsgID 48 (hb=max, lb=min)"
-- Updated description to mention boundary value constraints
-
-Say `show task 3` to see the full updated task.
+Done — Task #7 → **In Progress**.
 ```
 
-### Help
+**Help (compact):**
 ```
-**OTGW Backlog Bot**
-
-I manage the project task board and chat about the project.
-
-**View tasks**
-- `list tasks` -- show all tasks
-- `list tasks in progress` -- filter by status
-- `show task 7` -- full details
-- `board` -- Kanban overview
-- `search mqtt` -- find tasks by topic
-
-**Update tasks**
-- `move task 7 to in progress` -- change status
-- `assign task 7 to @rob` -- assign someone
-- `add note to task 7: text` -- append a note
-
-**Chat**
-@mention me with any question about the project, tasks, or SAT integration!
-
-**Feedback**
-Just share your thoughts on tasks in the channel. If your feedback is actionable, I'll update the relevant task and confirm what I changed.
+**Backlog Bot**
+list tasks | list tasks in progress | show task 7 | board | search mqtt
+move task 7 to in progress | mark task 7 done | assign task 7 to @rob
+add note to task 7: your note here
+In a thread: mark AC 1 done | what are the open ACs?
 ```
 
 ## Important rules
 
-- **ONLY operate in `#dev-sat-mqtt`** (channel `1105556725714649128`). No exceptions unless the project owner says otherwise.
-- **@mentions are conversation, never commands** -- respond helpfully, never execute actions from an @mention.
-- **Backlog commands are task management only** -- read, update status, assign, search, improve task definitions. Never implement or write code.
-- **Task feedback is welcome** -- update task metadata based on channel feedback, always confirm what changed.
-- **Be an active participant** -- the bot is not passive. It engages in discussions, shares knowledge, and helps move the project forward through conversation and task management.
-- **Be concise** -- Discord is chat, keep responses short and scannable.
-- **Respect the backlog CLI** -- always use CLI commands, never edit task files directly.
-- **Post friendly errors** -- e.g. "Task 99 not found. Try `list tasks` to see what's available."
-- **Always announce task start AND finish on Discord** -- two posts per task: one at start, one at completion.
-- **ALWAYS run implementation agents in background** (`run_in_background: true`) -- never block the main conversation. This keeps Discord monitoring and user interaction responsive while code is being written.
-- **ALWAYS run builds in background** -- after committing, run `python build.py --firmware` (incremental, no --clean) with `run_in_background: true`. Don't wait for build results before starting next task.
-- **Always commit task changes before marking Done** -- `git add <files> && git commit && git push` is MANDATORY at task completion. A task is not Done if its code changes are uncommitted.
-- **Commit with descriptive titles** -- use feature descriptions, not task IDs. Task IDs are forgotten, descriptions persist in git history.
-- **Push after every commit** -- always `git push` to remote immediately after committing.
-- **Maximize parallel execution** -- after each task completes (or at the start of a cron cycle), check the full backlog for tasks that can run in parallel with any already-running agents. A task can run in parallel if it touches different files/subsystems. Launch all eligible tasks in background simultaneously. Do NOT wait for one to finish before starting the next. Blocked tasks (marked "waiting for information" or similar) are skipped. Make the decision autonomously — do not ask for permission.
+- **Never modify tasks without explicit user request**
+- **Always use the backlog CLI** — never edit task files directly
+- **If ambiguous**, ask for clarification in Discord rather than guessing
+- **If CLI returns an error**, post a friendly message ("Task 99 not found — use `list tasks` to see available tasks")
+- **Skip non-backlog messages** — do not respond to general chat
