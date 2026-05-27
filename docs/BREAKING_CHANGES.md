@@ -4,6 +4,28 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.6.0
+
+### Breaking: HA entity availability reflects MQTT link, not OT-bus liveness (ADR-074)
+
+HA entity availability (`avty_t`) now reflects the ESP-to-MQTT link (birth/LWT) instead of OpenTherm-bus liveness. Entities like `DHW Control` and `Thermostat` will no longer go `unavailable` when the boiler stops responding on the OT bus; they only become `unavailable` when the MQTT connection itself drops.
+
+OT-bus liveness is now reported exclusively on the dedicated `otgw_connected` binary sensor.
+
+**Who is affected:** users with automations that trigger on HA sensor entities going `unavailable` as a proxy for "boiler is unreachable." These automations must be migrated to trigger on the `otgw_connected` sensor instead.
+
+**Who is not affected:** users who monitor the dedicated `otgw_connected` sensor (already the recommended approach), or users who do not use OT-bus liveness as an automation trigger.
+
+### Breaking: `resetgateway` MQTT command requires payload `"1"` (TASK-661)
+
+The `resetgateway` MQTT command now requires payload `"1"`. Commands with any other payload are logged and ignored. The command is also rate-limited to one PIC reset per 5 seconds.
+
+**Who is affected:** custom automations that send a `resetgateway` command with an empty payload or any value other than `"1"`. Update the automation payload to `"1"`.
+
+**Who is not affected:** Home Assistant automations using the HA-discovery `button` entity for the PIC reset. The discovery config already specifies `payload_press: "1"` so these automations are unaffected.
+
+---
+
 ## v1.5.0
 
 ### Breaking: MQTT source-topic shape changed to sibling-suffix (ADR-070, ADR-071)

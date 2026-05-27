@@ -8,7 +8,11 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
+_No unreleased changes yet. New work on `dev` lands here._
+
+## [1.6.0] - 2026-05-28
+
+MQTT and HA reliability overhaul, static IP support, bilateral OT-bus diagnostics, and mainloop performance improvements. Full notes: [RELEASE_NOTES_1.6.0.md](RELEASE_NOTES_1.6.0.md).
 
 ### Added
 - Static IP address settings: `wifistaticip`, `wifisubnet`, `wifigateway`, `wifidns1`, `wifidns2` are now persisted in settings and applied before WiFiManager connect, enabling DHCP-bypass for environments where the router does not assign predictable addresses (TASK-548)
