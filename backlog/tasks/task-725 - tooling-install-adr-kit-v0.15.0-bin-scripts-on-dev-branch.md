@@ -1,11 +1,11 @@
 ---
 id: TASK-725
 title: 'tooling: install adr-kit v0.15.0 bin scripts on dev branch'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-27 17:07'
-updated_date: '2026-05-27 17:10'
+updated_date: '2026-05-27 17:11'
 labels: []
 dependencies: []
 ---
