@@ -1,11 +1,11 @@
 ---
 id: TASK-727
 title: 'perf: optimize release skill for lower token usage'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-27 17:44'
-updated_date: '2026-05-27 17:47'
+updated_date: '2026-05-27 17:48'
 labels:
   - tooling
   - performance
