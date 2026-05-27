@@ -3179,82 +3179,99 @@ bool streamSatSwitchDiscovery(PubSubClient &client,
                               HaDiscoveryContext &ctx)
 {
   // uniqSuffix, nameSuffix, cmdSub, statSub, icon
+  bool published = false;
   switch (switchIdx) {
     case 0:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-solar-gain-enable"),       PSTR("_SAT_Solar_Gain"),
         PSTR("/sat/solar_gain"),              PSTR("/sat/solar_gain_enable"),
         PSTR("mdi:white-balance-sunny"));
+      break;
     case 1:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-summer-simmer-enable"),    PSTR("_SAT_Summer_Simmer"),
         PSTR("/sat/summer_simmer"),           PSTR("/sat/summer_simmer_enable"),
         PSTR("mdi:weather-sunny-alert"));
+      break;
     case 2:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-comfort-adjust-enable"),   PSTR("_SAT_Comfort_Adjust"),
         PSTR("/sat/comfort_adjust"),          PSTR("/sat/comfort_adjust_enable"),
         PSTR("mdi:water-thermometer"));
+      break;
     case 3:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-multi-area-enable"),       PSTR("_SAT_Multi_Area"),
         PSTR("/sat/multi_area"),              PSTR("/sat/multi_area_enable"),
         PSTR("mdi:home-group"));
+      break;
     case 4:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-auto-tune-enable"),        PSTR("_SAT_Auto_Tune"),
         PSTR("/sat/auto_tune"),               PSTR("/sat/auto_tune_enable"),
         PSTR("mdi:auto-fix"));
+      break;
     case 5:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-simulation-enable"),       PSTR("_SAT_Simulation"),
         PSTR("/sat/simulation"),              PSTR("/sat/simulation_enable"),
         PSTR("mdi:flask"));
+      break;
     case 6:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-window-detection-enable"), PSTR("_SAT_Window_Detection"),
         PSTR("/sat/window_detection"),        PSTR("/sat/window_detection_enable"),
         PSTR("mdi:window-open-variant"));
+      break;
     case 7:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-force-pwm-enable"),        PSTR("_SAT_Force_PWM"),
         PSTR("/sat/force_pwm"),               PSTR("/sat/force_pwm_enable"),
         PSTR("mdi:pulse"));
+      break;
     case 8:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-push-setpoint-enable"),    PSTR("_SAT_Push_Setpoint"),
         PSTR("/sat/push_setpoint"),           PSTR("/sat/push_setpoint_enable"),
         PSTR("mdi:upload"));
+      break;
     case 9:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-ovp-enabled"),             PSTR("_SAT_OVP_Enabled"),
         PSTR("/sat/ovp_enabled"),             PSTR("/sat/ovp_enabled"),
         PSTR("mdi:shield-check"));
+      break;
     case 10:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-preset-sync-enable"),      PSTR("_SAT_Preset_Sync"),
         PSTR("/sat/preset_sync"),             PSTR("/sat/preset_sync_enable"),
         PSTR("mdi:sync"));
+      break;
     case 11:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-dhw-enabled"),             PSTR("_SAT_DHW_Enabled"),
         PSTR("/sat/dhw_enabled"),             PSTR("/sat/dhw_enabled"),
         PSTR("mdi:water-boiler"));
+      break;
     case 12:
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-pwm-auto-switch-enable"),  PSTR("_SAT_PWM_Auto_Switch"),
         PSTR("/sat/pwm_auto_switch"),         PSTR("/sat/pwm_auto_switch_enable"),
         PSTR("mdi:swap-horizontal"));
+      break;
     case 13:
       // TASK-516: master DHW enable (HW= command). Only emitted by the caller
       // when MsgID 3 HB3=1 (storage tank); combi boilers get no inert entity.
-      return streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(client, ctx,
         PSTR("-sat-dhw-enable"),              PSTR("_SAT_DHW_Enable"),
         PSTR("/sat/dhw_enable"),              PSTR("/sat/dhw_enable"),
         PSTR("mdi:water-boiler"));
+      break;
     default:
       return false;
   }
+  if (published) incPublishedTopicCount();   // ADR-062 / TASK-349
+  return published;
 }
 
 bool streamSatSelectDiscovery(PubSubClient &client,
@@ -3320,6 +3337,7 @@ bool streamSatSelectDiscovery(PubSubClient &client,
   }
 
   if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -3393,6 +3411,7 @@ bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
   }
 
   if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
@@ -3516,6 +3535,7 @@ bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryC
   }
 
   if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   feedWatchDog();
   return true;
 }
