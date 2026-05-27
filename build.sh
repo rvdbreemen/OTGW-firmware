@@ -151,4 +151,26 @@ install_requirements() {
 install_requirements "$script_dir/requirements-build.txt"
 install_requirements "$script_dir/requirements.txt"
 
+# WSL + Windows .pio cache guard: Windows PlatformIO embeds absolute Windows paths (D:\...)
+# in its build cache. When WSL runs PlatformIO on that cache, GCC gets invalid include paths
+# and fails with "No such file or directory" for headers that exist on Windows but not at
+# Linux paths. Auto-clean when WSL is detected and a Windows-compiled .pio/build/ is present.
+if grep -qi "microsoft\|wsl" /proc/version 2>/dev/null; then
+    pio_build_dir="$script_dir/.pio/build"
+    needs_clean=0
+    if [ -d "$pio_build_dir" ]; then
+        # A Windows build leaves .rsp/.d files with absolute Windows paths (e.g. D:/Users/...).
+        # Detecting a Windows drive letter pattern [A-Z]:/ is a reliable signal.
+        if find "$pio_build_dir" \( -name "*.rsp" -o -name "*.d" \) -print0 2>/dev/null \
+               | xargs -0 grep -lI "[A-Z]:/" 2>/dev/null \
+               | grep -q .; then
+            needs_clean=1
+        fi
+    fi
+    if [ "$needs_clean" -eq 1 ]; then
+        echo "WSL detected: stale Windows .pio/build cache found — running clean first..." >&2
+        "$python_exe" -m platformio run --target clean
+    fi
+fi
+
 exec "$python_exe" "$script_dir/build.py" "$@"
