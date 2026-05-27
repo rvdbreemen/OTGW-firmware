@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.81
+**  Version  : v2.0.0-alpha.82
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -5989,14 +5989,16 @@ var SETTINGS_GROUPS = [
   { id: 's0',       title: 'S0 Pulse Counter',  prefixes: ['S0COUNTER'] },
   { id: 'otgw',     title: 'OpenTherm Gateway', prefixes: ['OTGW'] },
   { id: 'outputs',  title: 'GPIO Outputs',      prefixes: ['GPIOOUTPUTS'] },
-  { id: 'webhook',  title: 'Webhook',           prefixes: ['Webhook'] }
+  { id: 'webhook',  title: 'Webhook',           prefixes: ['Webhook'] },
+  { id: 'sat',      title: 'SAT',               prefixes: ['SAT'] }
 ];
 
 function getSettingsGroupId(key) {
+  var keyLower = key.toLowerCase();
   for (var g = 0; g < SETTINGS_GROUPS.length; g++) {
     var prefixes = SETTINGS_GROUPS[g].prefixes;
     for (var p = 0; p < prefixes.length; p++) {
-      if (key.indexOf(prefixes[p]) === 0) return SETTINGS_GROUPS[g].id;
+      if (keyLower.indexOf(prefixes[p].toLowerCase()) === 0) return SETTINGS_GROUPS[g].id;
     }
   }
   return 'other';
@@ -6776,6 +6778,7 @@ var translateFields = [
   , ["mqttinterval", "MQTT Publish Interval (sec)"]
   , ["mqttotmessage", "MQTT Raw OpenTherm Messages"]
   , ["mqttseparatesources", "MQTT Separate Sources"]
+  , ["mqttuselegacyottopics", "MQTT Use Legacy OT Topics"]
   , ["legacyport25238enabled", "Legacy TCP Port 25238"]
   , ["otgwcommandenable", "Run Boot Command"]
   , ["otgwcommands", "Boot Command"]
@@ -6828,6 +6831,26 @@ var translateFields = [
   , ["SATareaweight1", "SAT Area 1 Weight"]
   , ["SATareaweight2", "SAT Area 2 Weight"]
   , ["SATareaweight3", "SAT Area 3 Weight"]
+  , ["SATtempstep", "SAT Temperature Step (°C)"]
+  , ["SATpresethome", "SAT Preset: Home"]
+  , ["SATsimulation", "SAT Simulation Mode"]
+  , ["SATsimheatrate", "SAT Sim Heat Rate (°C/min)"]
+  , ["SATsimcoolrate", "SAT Sim Cool Rate (°C/min)"]
+  , ["SATautotune", "SAT Auto-Tune Enable"]
+  , ["SATautotunerate", "SAT Auto-Tune Rate"]
+  , ["SATerrormon", "SAT Error Monitoring"]
+  , ["SATsensormaxage", "SAT Sensor Max Age (sec)"]
+  , ["SATautogains", "SAT Auto-Gains Value"]
+  , ["SATheatingmode", "SAT Heating Mode"]
+  , ["SATcyclesperhour", "SAT Cycles Per Hour"]
+  , ["SATvalveoffset", "SAT Valve Offset (°C)"]
+  , ["SATsolarfreezeint", "SAT Solar Freeze Integral"]
+  , ["SATpvboostenabled", "SAT PV Boost Enabled"]
+  , ["SATpvboostthresholdw", "SAT PV Boost Threshold (W)"]
+  , ["SATpvboostholds", "SAT PV Boost Hold Duration (sec)"]
+  , ["SATpvboostdeltac", "SAT PV Boost Setpoint Delta (°C)"]
+  , ["SATpvboostmaxindoorc", "SAT PV Boost Max Indoor Temp (°C)"]
+  , ["SATpvboostmaxdurationmin", "SAT PV Boost Max Duration (min)"]
   , ["SATthermalcoeff", "SAT Thermal Drop Coefficient"]
   , ["SATbleenable", "SAT BLE Sensor Enable"]
   , ["SATblemac", "SAT BLE Sensor MAC Address"]
