@@ -741,18 +741,23 @@ class WorkspaceEvaluator:
 
     def check_discovery_counter_instrumented(self):
         """ADR-062 binding rule: every ``bool stream*Discovery(`` helper in
-        ``mqtt_configuratie.cpp`` must contain at least one ``incPublishedTopicCount()``
-        call. Without this, a newly-added helper would silently under-count its
-        retained-discovery publishes, causing the daily verify pass to see a
-        false-missing state and republish the entire discovery set.
+        ``mqtt_configuratie.cpp`` (dev/1.5.x) or ``MQTTHaDiscovery.cpp``
+        (feature-dev-2.0.0, renamed per ADR-077) must contain at least one
+        ``incPublishedTopicCount()`` call. Without this, a newly-added helper
+        would silently under-count its retained-discovery publishes, causing
+        the daily verify pass to see a false-missing state and republish the
+        entire discovery set.
         """
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-062 Discovery Counter Instrumented ==={Colors.ENDC}")
 
+        # Try dev (1.5.x) name first, then 2.0.0 name (ADR-077 rename).
         cpp = config.FIRMWARE_ROOT / "mqtt_configuratie.cpp"
+        if not cpp.exists():
+            cpp = config.FIRMWARE_ROOT / "MQTTHaDiscovery.cpp"
         if not cpp.exists():
             self.add_result(EvaluationResult(
                 "ADR-062", "Discovery counter instrumented", "WARN",
-                "mqtt_configuratie.cpp not found — cannot verify"
+                "Neither mqtt_configuratie.cpp nor MQTTHaDiscovery.cpp found — cannot verify"
             ))
             return
 
@@ -761,7 +766,7 @@ class WorkspaceEvaluator:
         except OSError as e:
             self.add_result(EvaluationResult(
                 "ADR-062", "Discovery counter instrumented", "FAIL",
-                f"Could not read mqtt_configuratie.cpp: {e}"
+                f"Could not read {cpp.name}: {e}"
             ))
             return
 

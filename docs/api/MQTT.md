@@ -291,7 +291,42 @@ The exact set of published topics depends on which OpenTherm message IDs the the
 
 ### SAT (Smart Autotune Thermostat)
 
-Published every control loop interval (default 30 s) when SAT is enabled. Topics are under the standard publish namespace. The complete topic inventory is in [backlog/docs/doc-1 - sat-mqtt-topics.md](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
+Topics are under the standard publish namespace when SAT is enabled. The complete topic inventory is in [backlog/docs/doc-1 - sat-mqtt-topics.md](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
+
+#### Publish semantics (ADR-111, since 2.0.0-alpha.72)
+
+SAT topics no longer publish on every control cycle. Each topic under `sat/*` uses **on-change + jittered heartbeat** semantics:
+
+1. **First-seen**: published immediately at first evaluation (boot or first SAT enable).
+2. **On-change**: published when the value differs from the last-published value by more than a per-field tolerance (float fields) or strictly (bool/int/string fields). See tolerance table below.
+3. **Jittered heartbeat**: each topic independently schedules a heartbeat at a random time in the `[7 min, 11 min]` window after its last publish. This keeps non-retained topics alive in Home Assistant without a synchronised burst.
+4. **Boot-scatter**: the first heartbeat after boot is scheduled at a random point in `[0, 11 min]` per topic, so the post-boot wave is spread across the full 11-minute window.
+
+**Maximum observation delay:** 11 minutes in the worst case (silent value, first heartbeat not yet due). Retained topics recover immediately from broker memory on reconnect; non-retained topics re-appear within 11 minutes.
+
+**MQTT reconnect:** SAT shadows are **not** reset on reconnect. Retained topics are already present on the broker. Non-retained topics re-publish within 11 minutes via the scheduled heartbeat. This is an intentional divergence from the OT publish contract (ADR-052), which resets on reconnect.
+
+**Float tolerance constants** (from `SATmqttPublish.h`):
+
+| Constant | Value | Used for |
+|---|---|---|
+| `SAT_EPS_TEMP` | 0.05 °C | `setpoint`, `target`, `room_temp`, `outside_temp` |
+| `SAT_EPS_TEMP_COARSE` | 0.1 °C | `heating_curve`, `thermal_drop_rate` display |
+| `SAT_EPS_PID_OUTPUT` | 0.5 °C | `pid_output` (derivative jitter damping) |
+| `SAT_EPS_PID_TERM` | 0.1 °C | `pid_p`, `pid_i`, `pid_d` |
+| `SAT_EPS_ERROR` | 0.05 °C | `error` |
+| `SAT_EPS_KP` | 0.01 | `kp` |
+| `SAT_EPS_KI` | 0.00001 | `ki` |
+| `SAT_EPS_KD` | 0.1 | `kd` |
+| `SAT_EPS_DERIVATIVE` | 0.0005 | `raw_derivative` |
+| `SAT_EPS_FRACTION` | 0.005 | `duty_ratio`, `overshoot_fraction` |
+| `SAT_EPS_PRESSURE` | 0.02 bar | `pressure`, `pressure_drop_rate` |
+| `SAT_EPS_POWER` | 0.05 kW | `power` |
+| `SAT_EPS_ENERGY` | 0.005 kWh | `energy_total` |
+| `SAT_EPS_PV_W` | 25 W | PV topics |
+| `SAT_EPS_DURATION` | 1.0 s | duration fields |
+
+These thresholds are tunable; they are guideline-level under ADR-111 and may be adjusted based on field feedback without requiring a new ADR.
 
 #### Core Control State
 
