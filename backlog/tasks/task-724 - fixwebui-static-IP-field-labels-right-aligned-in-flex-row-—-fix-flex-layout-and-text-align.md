@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-27 13:01'
-updated_date: '2026-05-27 13:02'
+updated_date: '2026-05-27 13:03'
 labels:
   - bug
   - webui
@@ -31,3 +31,9 @@ In the IP Configuration section (when DHCP is disabled), the labels 'IP Configur
 - [ ] #2 Input fields (octet groups) remain unchanged and visually correct
 - [ ] #3 python build.py exits 0 (no filesystem asset issues)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. CSS (index.css): Change .fixed-ip-row { text-align: right } to text-align: left and add justify-content: flex-start - fixes root cause (Chrome/Android interprets text-align:right on flex as justify-content:flex-end)\n2. JS (index.js): Add fixed-ip-field-label class to toggleLbl (IP Configuration header) for consistency\n3. Run python build.py to verify\n4. Commit
+<!-- SECTION:PLAN:END -->
