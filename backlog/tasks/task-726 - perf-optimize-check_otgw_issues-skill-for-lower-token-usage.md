@@ -1,7 +1,7 @@
 ---
 id: TASK-726
 title: 'perf: optimize check_otgw_issues skill for lower token usage'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-27 17:37'
