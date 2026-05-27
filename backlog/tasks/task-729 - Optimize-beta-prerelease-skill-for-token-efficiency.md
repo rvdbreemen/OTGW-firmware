@@ -1,9 +1,11 @@
 ---
 id: TASK-729
 title: Optimize beta-prerelease skill for token efficiency
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-27 18:01'
+updated_date: '2026-05-27 18:02'
 labels:
   - optimization
   - skill
