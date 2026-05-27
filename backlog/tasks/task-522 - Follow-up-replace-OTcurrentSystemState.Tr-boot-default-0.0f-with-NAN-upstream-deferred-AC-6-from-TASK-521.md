@@ -3,11 +3,11 @@ id: TASK-522
 title: >-
   Follow-up: replace OTcurrentSystemState.Tr boot-default 0.0f with NAN upstream
   (deferred AC #6 from TASK-521)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-02 21:59'
-updated_date: '2026-05-03 13:49'
+updated_date: '2026-05-27 10:39'
 labels:
   - refactor
   - sat
@@ -45,11 +45,11 @@ TASK-521 deferred its AC #6 to keep parallel execution safe with TASK-516, which
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 OTGW-Core.h struct: Tr (and audited siblings) initialised to NAN instead of 0.0f
+- [x] #1 OTGW-Core.h struct: Tr (and audited siblings) initialised to NAN instead of 0.0f
 - [x] #2 All sites that read Tr / Toutside / etc. updated to isnan()-guard before arithmetic or comparison
 - [x] #3 TASK-521's sTrEverNonZero static-local in satGetRoomTemp() removed; the NAN-flow handles the same case naturally
 - [x] #4 Audit report (in task notes): which OTcurrentSystemState fields were checked, which were changed, which were left alone (and why)
-- [ ] #5 Compiles clean on ESP8266 and ESP32
+- [x] #5 Compiles clean on ESP8266 and ESP32
 - [x] #6 No regression in normal-operation behaviour: when sensors are valid, all paths produce the same outputs as before
 <!-- AC:END -->
 
@@ -134,3 +134,9 @@ Phase 1 scope: **Tr only**. Decision rationale: TASK-521 explicitly identified T
 
 **Phase 2 recommendation:** follow-up task extending NAN-init to **Toutside** specifically. Other fields can stay at 0.0f indefinitely; boot-default ambiguity isn't meaningful for setpoints or non-safety sensors.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Tr = NAN reeds aanwezig in OTGW-Core.h:54 (float Tr = NAN). Toutside op 0.0f gelaten conform audit: 0 graden is een geldige wintermeting, onzeker of NAN-init hier meer kwaad dan goed doet. AC#2 (isnan guards), AC#3 (sTrEverNonZero verwijderd), AC#4 (auditrapport) waren al gemarkeerd. Build groen (alpha.75 ESP32+ESP8266). Geen code-wijziging nodig — implementatie was al compleet.
+<!-- SECTION:FINAL_SUMMARY:END -->

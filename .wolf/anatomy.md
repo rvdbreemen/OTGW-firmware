@@ -1,12 +1,11 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-21T21:08:58.631Z
-> Files: 19 tracked | Anatomy hits: 0 | Misses: 0
-> Session note (2026-05-26): Hardened `build.sh` for unattended WSL bootstrap (local Python runtime fallback + pip fallback path).
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-27T10:54:40.138Z
+> Files: 14 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
-- `CHANGELOG.md` — Changelog (~8031 tok)
+- `build.sh` (~1471 tok)
 
 ## .claude/
 
@@ -238,7 +237,6 @@
 
 ## .github/workflows/
 
-- `build.yml` — CI: PlatformIO firmware build (~456 tok)
 
 ## .pio/libdeps/esp32/
 
@@ -333,34 +331,36 @@
 ## .wolf/
 
 
+## C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/
+
+- `feedback_auto_advance_2_0_0.md` (~251 tok)
+- `MEMORY.md` — OTGW-firmware Project Memory (~3223 tok)
+
 ## docs/adr/
 
-- `ADR-096-mqtt-source-topic-worldview-semantics.md` — ADR-096: MQTT Source-Subtopic Worldview Semantics (~6753 tok)
-- `ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md` — ADR-102: HA Entity Availability Reflects the MQTT Link, Not OpenTherm-Bus Liveness (2.0.0) (~1984 tok)
-- `ADR-103-mqtt-source-topic-proxy-answer-routing.md` — ADR-103: MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement (~3159 tok)
-- `README.md` — Project documentation (~9864 tok)
+- `ADR-094-ha-discovery-state-reconciliation-on-ota-upgrade.md` — ADR-094: Home Assistant discovery state reconciliation on OTA upgrade (feature-2.0.0 port of ADR-067 (~7153 tok)
+- `ADR-095-bseparatesources-mutually-exclusive-base-and-source-variants.md` — ADR-095: bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive (feature-2.0.0 p (~5773 tok)
+- `ADR-096-mqtt-source-topic-worldview-semantics.md` — ADR-096: MQTT Source-Subtopic Worldview Semantics (~6803 tok)
+- `ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md` — ADR-097: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification (~3353 tok)
+- `ADR-103-mqtt-source-topic-proxy-answer-routing.md` — ADR-103: MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement (~3192 tok)
+- `ADR-112-pure-jit-mqtt-discovery.md` — ADR-112: Pure JIT MQTT Discovery (2.0.0 sibling of dev ADR-073) (~1235 tok)
+- `README.md` — Project documentation (~10169 tok)
+
+## docs/api/
+
+- `MQTT.md` — OTGW-firmware MQTT Topic Documentation (~22804 tok)
 
 ## docs/audits/
 
-- `2026-05-21-ha-capability-flags-feature-2.0.0.md` — Audit: HA capability-flag binary_sensors (MsgID 2/3/6) vs HA core opentherm_gw — feature-2.0.0 branc (~2846 tok)
 
 ## plan/
 
-- `feature-openweathermap-onboarding-1.md` — Introduction (~7501 tok)
 
 ## src/OTGW-firmware/
 
-- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~34163 tok)
-- `OTDirect.ino` — Declares instances (~39550 tok)
-- `OTGW-Core.h` — ifndef OTGWCore_h (~10494 tok)
-- `OTGW-Core.ino` — Declares char (~63936 tok)
-- `OTGW-firmware.ino` — Declares WifiPortalResetState (~6893 tok)
-- `restAPI.ino` — include <string.h> (~40900 tok)
-- `SATweather.ino` — Declares uint16_t (~7653 tok)
-- `settingStuff.ino` — include <ctype.h> (~16551 tok)
-- `version.h` — The version number conforms to semver.org format (~195 tok)
+- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~38556 tok)
+- `OTGW-Core.h` — ifndef OTGWCore_h (~10661 tok)
+- `OTGW-Core.ino` — Declares char (~68038 tok)
 
 ## src/OTGW-firmware/data/
 
-- `index.js` — Safely parse JSON with validation and error handling (~80243 tok)
-- `version.hash` (~3 tok)

@@ -529,6 +529,166 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-26T16:58:00.000Z"
+    },
+    {
+      "id": "bug-033",
+      "timestamp": "2026-05-27T10:22:01.515Z",
+      "error_message": "Wrong reference: 066 should be 097",
+      "file": "docs/adr/ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md",
+      "root_cause": "Used \"066\" instead of \"097\"",
+      "fix": "Changed 066 → 097",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T10:22:01.515Z"
+    },
+    {
+      "id": "bug-034",
+      "timestamp": "2026-05-27T10:22:24.739Z",
+      "error_message": "Wrong reference: 066 should be 097",
+      "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
+      "root_cause": "Used \"066\" instead of \"097\"",
+      "fix": "Changed 066 → 097",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-27T10:22:30.233Z"
+    },
+    {
+      "id": "bug-035",
+      "timestamp": "2026-05-27T10:22:49.118Z",
+      "error_message": "Wrong reference: 066 should be 097",
+      "file": "docs/adr/ADR-095-bseparatesources-mutually-exclusive-base-and-source-variants.md",
+      "root_cause": "Used \"066\" instead of \"097\"",
+      "fix": "Changed 066 → 097",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 3,
+      "last_seen": "2026-05-27T10:23:12.880Z"
+    },
+    {
+      "id": "bug-036",
+      "timestamp": "2026-05-27T10:23:34.904Z",
+      "error_message": "Wrong reference: 066 should be 097",
+      "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
+      "root_cause": "Used \"066\" instead of \"097\"",
+      "fix": "Changed 066 → 097",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 9,
+      "last_seen": "2026-05-27T10:24:58.431Z"
+    },
+    {
+      "id": "bug-037",
+      "timestamp": "2026-05-27T10:25:04.195Z",
+      "error_message": "Incorrect value in code",
+      "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
+      "root_cause": "Had 's source semantics (publication-source → worldvie",
+      "fix": "Changed to 's source semantics (publication-source → worldvie",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T10:25:04.195Z"
+    },
+    {
+      "id": "bug-038",
+      "timestamp": "2026-05-27T10:25:27.129Z",
+      "error_message": "Wrong reference: 066 should be 097",
+      "file": "docs/api/MQTT.md",
+      "root_cause": "Used \"066\" instead of \"097\"",
+      "fix": "Changed 066 → 097",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T10:25:27.129Z"
+    },
+    {
+      "id": "bug-039",
+      "timestamp": "2026-05-27T10:25:38.940Z",
+      "error_message": "Wrong reference: 066 should be 097",
+      "file": "src/OTGW-firmware/MQTTstuff.ino",
+      "root_cause": "Used \"066\" instead of \"097\"",
+      "fix": "Changed 066 → 097",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-27T10:25:45.758Z"
+    },
+    {
+      "id": "bug-040",
+      "timestamp": "2026-05-27T10:25:51.629Z",
+      "error_message": "Wrong reference: 066 should be 097",
+      "file": "src/OTGW-firmware/OTGW-Core.h",
+      "root_cause": "Used \"066\" instead of \"097\"",
+      "fix": "Changed 066 → 097",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "h"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T10:25:51.629Z"
+    },
+    {
+      "id": "bug-041",
+      "timestamp": "2026-05-27T10:26:02.710Z",
+      "error_message": "Wrong reference: 066 should be 097",
+      "file": "src/OTGW-firmware/OTGW-Core.ino",
+      "root_cause": "Used \"066\" instead of \"097\"",
+      "fix": "Changed 066 → 097",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 6,
+      "last_seen": "2026-05-27T10:26:44.461Z"
+    },
+    {
+      "id": "bug-042",
+      "timestamp": "2026-05-27T10:28:02.574Z",
+      "error_message": "Wrong reference: 066 should be 097",
+      "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
+      "root_cause": "Used \"066\" instead of \"097\"",
+      "fix": "Changed 066 → 097",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T10:28:02.574Z"
     }
   ]
 }

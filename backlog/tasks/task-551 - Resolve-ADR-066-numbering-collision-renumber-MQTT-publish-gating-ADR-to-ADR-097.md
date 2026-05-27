@@ -3,10 +3,11 @@ id: TASK-551
 title: >-
   Resolve ADR-066 numbering collision: renumber MQTT publish-gating ADR to
   ADR-097
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-05-06 23:58'
-updated_date: '2026-05-07 00:01'
+updated_date: '2026-05-27 10:33'
 labels:
   - adr
   - hygiene
@@ -51,14 +52,14 @@ This is a structural-hygiene task with no behavior change to the firmware. The r
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ADR-066-mqtt-publish-gating-by-source-and-slave-echo.md renamed to ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md
-- [ ] #2 Title heading inside the renumbered ADR updated from "ADR-066" to "ADR-097"; all internal back-references (Verification gates, Related Decisions, References sections) updated consistently
-- [ ] #3 Every textual "ADR-066" reference in docs/, src/, and other ADR files reviewed in context and updated to ADR-097 ONLY where it refers to the publish-gating decision; auto-detect ADR-066 references left untouched
-- [ ] #4 ADR-096 Related Decisions / References sections updated: "refines ADR-066" becomes "refines ADR-097"
-- [ ] #5 ADR-066-thermostat-auto-detection-master-mode.md is NOT modified (Accepted ADR, immutable)
-- [ ] #6 docs/adr/README.md index updated to list ADR-097 instead of duplicate ADR-066
-- [ ] #7 Build still passes (python3 build.py --firmware exit 0) — no functional code change expected, but verify nothing was accidentally broken in MQTTstuff.ino refactor
-- [ ] #8 Evaluator clean (python3 evaluate.py --quick) and ADR-judge does not report broken cross-references
+- [x] #1 ADR-066-mqtt-publish-gating-by-source-and-slave-echo.md renamed to ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md
+- [x] #2 Title heading inside the renumbered ADR updated from "ADR-066" to "ADR-097"; all internal back-references (Verification gates, Related Decisions, References sections) updated consistently
+- [x] #3 Every textual "ADR-066" reference in docs/, src/, and other ADR files reviewed in context and updated to ADR-097 ONLY where it refers to the publish-gating decision; auto-detect ADR-066 references left untouched
+- [x] #4 ADR-096 Related Decisions / References sections updated: "refines ADR-066" becomes "refines ADR-097"
+- [x] #5 ADR-066-thermostat-auto-detection-master-mode.md is NOT modified (Accepted ADR, immutable)
+- [x] #6 docs/adr/README.md index updated to list ADR-097 instead of duplicate ADR-066
+- [x] #7 Build still passes (python3 build.py --firmware exit 0) — no functional code change expected, but verify nothing was accidentally broken in MQTTstuff.ino refactor
+- [x] #8 Evaluator clean (python3 evaluate.py --quick) and ADR-judge does not report broken cross-references
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -123,3 +124,9 @@ Phase C — Verification:
 
 Pure documentation hygiene with zero runtime impact. The collision is invisible to firmware users and tools (the publish-gating ADR is correctly identified by content, not by number). Higher-priority work — hardware verification of TASK-549 / TASK-550 ACs #6 — gates the headline release work. This cleanup is fine to land in a quiet commit window, ideally bundled with another low-risk doc update.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Renumbered ADR-066 publish-gating to ADR-097. Renamed file via git mv, updated heading, and corrected all 9 reference sites (ADR-094/095/096/103, README.md, MQTT.md, MQTTstuff.ino, OTGW-Core.h, OTGW-Core.ino). Auto-detect ADR-066 and its references left untouched. Added missing README entry for ADR-097. Build pass (ESP32+ESP8266), evaluator 63/71 pass 0 fail. OTGW_BUMP_HOOK_DISABLE=1 used (comment-only .ino/.h changes). Commit: e9ace18c.
+<!-- SECTION:FINAL_SUMMARY:END -->
