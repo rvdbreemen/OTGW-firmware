@@ -1,0 +1,385 @@
+#!/usr/bin/env python3
+"""adr-retire: find Accepted ADRs that should be reviewed for retirement.
+
+The command evaluates four independent signals:
+
+1. No status change within the configured age threshold.
+2. Explicit technology terms from the Decision section no longer appear in
+   project source files.
+3. A "Superseded by ADR-NNN" target cannot be found.
+4. An Enforcement block contains risky regex or path-glob patterns.
+
+All processing is deterministic and stdlib-only.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from datetime import date
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Tuple
+
+# Safety cap for repo-wide file scans (tech-removal signal).
+MAX_FILES = 50_000
+
+ADR_FILENAME_RE = re.compile(r"(?i)^ADR-(\d{1,4})-.*\.md$")
+STATUS_HEADING_RE = re.compile(r"^##\s+Status\s*$\n+([^\n]+)", re.IGNORECASE | re.MULTILINE)
+STATUS_LINE_RE = re.compile(r"^Status\s*:?\s*(\w+)", re.IGNORECASE | re.MULTILINE)
+STATUS_BOLD_RE = re.compile(
+    r"^\s*\*\*\s*Status\s*:?\s*\*\*\s*:?\s*([A-Za-z]+)"
+    r"|^\s*\*\*\s*Status\s*:?\s*([A-Za-z]+)\s*\*\*",
+    re.IGNORECASE | re.MULTILINE,
+)
+ENFORCEMENT_BLOCK_RE = re.compile(
+    r"^##\s+Enforcement\s*$\n+(?:.*?\n)*?```json\s*\n(.*?)\n```",
+    re.IGNORECASE | re.MULTILINE | re.DOTALL,
+)
+STATUS_HISTORY_START_RE = re.compile(r"^\s*status_history\s*:\s*$", re.IGNORECASE)
+HISTORY_DATE_RE = re.compile(r"^\s*(?:-\s*)?date\s*:\s*[\"']?(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
+SOURCE_SUFFIXES = {
+    ".c", ".cc", ".cpp", ".go", ".h", ".hpp", ".ino", ".java", ".js",
+    ".json", ".py", ".rs", ".sh", ".ts", ".tsx", ".yaml", ".yml",
+}
+IGNORED_DIRS = {
+    ".git", ".pytest_cache", ".venv", "__pycache__", "docs", "node_modules", "vendor"
+}
+
+
+class RetireError(Exception):
+    """Raised on configuration or input errors."""
+
+
+def load_adr_set(adr_dir: Path) -> List[Tuple[str, Path, str]]:
+    """Return ADR id, path, and UTF-8 content for ADR markdown files."""
+    adrs = []
+    if not adr_dir.is_dir():
+        return adrs
+    for file in sorted(adr_dir.glob("*.md")):
+        match = ADR_FILENAME_RE.match(file.name)
+        if not match:
+            continue
+        adr_id = f"ADR-{int(match.group(1)):03d}"
+        try:
+            adrs.append((adr_id, file, file.read_text(encoding="utf-8")))
+        except OSError as exc:
+            print(f"[adr-retire] WARN: {file}: {exc}", file=sys.stderr)
+    return adrs
+
+
+def extract_status(text: str) -> Optional[str]:
+    """Extract the leading ADR status word from canonical or legacy shapes."""
+    match = STATUS_HEADING_RE.search(text)
+    if match:
+        word = re.match(r"\s*([A-Za-z]+)", match.group(1))
+        return word.group(1) if word else None
+    match = STATUS_BOLD_RE.search(text)
+    if match:
+        return match.group(1) or match.group(2)
+    match = STATUS_LINE_RE.search(text)
+    return match.group(1) if match else None
+
+
+def extract_section(text: str, heading: str) -> str:
+    """Return section content until the next level-two heading."""
+    match = re.search(
+        rf"^##\s+{re.escape(heading)}\s*$\n+(.*?)(?=^##\s+|\Z)",
+        text,
+        re.IGNORECASE | re.MULTILINE | re.DOTALL,
+    )
+    return match.group(1) if match else ""
+
+
+def _status_history_dates(content: str) -> List[date]:
+    dates = []
+    in_history = False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not in_history:
+            if STATUS_HISTORY_START_RE.match(line):
+                in_history = True
+            continue
+        if stripped.startswith("```") or stripped.startswith("## "):
+            break
+        match = HISTORY_DATE_RE.match(line)
+        if match:
+            try:
+                dates.append(date.fromisoformat(match.group(1)))
+            except ValueError:
+                pass
+    return dates
+
+
+def _status_line_date(content: str) -> Optional[date]:
+    status_section = extract_section(content, "Status")
+    match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", status_section)
+    if not match:
+        return None
+    try:
+        return date.fromisoformat(match.group(1))
+    except ValueError:
+        return None
+
+
+def detect_90day_staleness(
+    adr_id: str, content: str, config: Dict, as_of: Optional[date] = None
+) -> float:
+    """Return 1.0 when no known status update occurred within the threshold."""
+    del adr_id
+    threshold = int(config.get("retirement", {}).get("threshold_days", 90))
+    history_dates = _status_history_dates(content)
+    last_change = max(history_dates) if history_dates else _status_line_date(content)
+    if last_change is None:
+        return 0.0
+    age_days = ((as_of or date.today()) - last_change).days
+    return 1.0 if age_days >= threshold else 0.0
+
+
+def _technology_terms(content: str) -> List[str]:
+    """Extract explicit backticked technology identifiers from Decision."""
+    decision = extract_section(content, "Decision")
+    ignored = {"true", "false", "none", "null", "accepted", "proposed"}
+    terms = set()
+    for raw in re.findall(r"`([^`\n]+)`", decision):
+        term = raw.strip()
+        if (
+            re.fullmatch(r"[A-Za-z][A-Za-z0-9_.+#-]{1,49}", term)
+            and term.lower() not in ignored
+        ):
+            terms.add(term)
+    return sorted(terms, key=str.lower)
+
+
+def _walk_repo_files(repo_root: Path, extensions: set) -> List[Path]:
+    """Walk repo without following symlinks, with a file-count safety cap.
+
+    Replaces rglob('*') which would follow symlinks and could fall into
+    infinite cycles or escape the repo root (SEC-LOW).
+    """
+    result: List[Path] = []
+    count = 0
+    skip_dirs = set(IGNORED_DIRS) | {"node_modules", ".tox"}
+    for dirpath, dirnames, filenames in os.walk(repo_root, followlinks=False):
+        # Prune ignored directories in-place so os.walk skips them.
+        dirnames[:] = [d for d in dirnames if d.lower() not in skip_dirs]
+        for fname in filenames:
+            if Path(fname).suffix.lower() in extensions:
+                result.append(Path(dirpath) / fname)
+                count += 1
+                if count >= MAX_FILES:
+                    import warnings
+                    warnings.warn(
+                        f"[adr-retire] File scan capped at {MAX_FILES} files. "
+                        f"Some files may be missed."
+                    )
+                    return result
+    return result
+
+
+def _source_files(repo_root: Path) -> Iterable[Path]:
+    return _walk_repo_files(repo_root, SOURCE_SUFFIXES)
+
+
+def detect_tech_removal(adr_id: str, content: str, repo_root: Path) -> float:
+    """Return 1.0 only when explicit decision terms vanish from source."""
+    del adr_id
+    terms = _technology_terms(content)
+    if not terms:
+        return 0.0
+    lowered = [term.lower() for term in terms]
+    for source_file in _source_files(repo_root):
+        try:
+            source = source_file.read_text(encoding="utf-8", errors="ignore").lower()
+        except OSError:
+            continue
+        if any(term in source for term in lowered):
+            return 0.0
+    return 1.0
+
+
+def detect_supersession_broken(
+    adr_id: str, content: str, all_adr_ids: List[str]
+) -> float:
+    """Return 1.0 when an ADR references a missing superseding ADR."""
+    del adr_id
+    match = re.search(r"Superseded\s+by\s+(ADR-\d{1,4})", content, re.IGNORECASE)
+    if not match:
+        return 0.0
+    target_num = int(re.search(r"\d+", match.group(1)).group(0))
+    return 0.0 if f"ADR-{target_num:03d}" in all_adr_ids else 1.0
+
+
+def _enforcement_rules(content: str) -> Optional[List[Dict]]:
+    match = ENFORCEMENT_BLOCK_RE.search(content)
+    if not match:
+        return []
+    try:
+        enforcement = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None
+    rules = []
+    for key in ("forbid_pattern", "forbid_import", "require_pattern"):
+        value = enforcement.get(key, [])
+        if isinstance(value, list):
+            rules.extend(rule for rule in value if isinstance(rule, dict))
+    return rules
+
+
+def detect_policy_mismatch(adr_id: str, content: str, config: Dict) -> float:
+    """Return the fraction of Enforcement rules containing risky patterns."""
+    del adr_id
+    if config.get("retirement", {}).get("check_policy_mismatch", True) is False:
+        return 0.0
+    rules = _enforcement_rules(content)
+    if rules is None:
+        return 1.0
+    if not rules:
+        return 0.0
+    risky = 0
+    for rule in rules:
+        pattern = str(rule.get("pattern", ""))
+        path_glob = str(rule.get("path_glob", ""))
+        unescaped_dot = re.search(r"(?<!\\)\.(?![*+?{])", pattern)
+        excessive_wildcard = re.search(r"(?<!\\)\.\*(?:.*(?<!\\)\.\*)?", pattern)
+        broad_glob = path_glob in {"*", "**", "**/*", "**/*.*"} or path_glob.startswith("**/")
+        if unescaped_dot or excessive_wildcard or broad_glob:
+            risky += 1
+    return round(risky / len(rules), 2)
+
+
+def score_adr(
+    adr_id: str,
+    content: str,
+    all_adr_ids: List[str],
+    repo_root: Path,
+    config: Dict,
+    as_of: Optional[date] = None,
+) -> Dict:
+    """Return four-signal score and recommendation for one ADR."""
+    status = extract_status(content)
+    signals = {
+        "staleness_90day": 0.0,
+        "tech_removal": 0.0,
+        "broken_supersession": 0.0,
+        "policy_mismatch": 0.0,
+    }
+    if status and config.get("retirement", {}).get("check_supersession", True):
+        signals["broken_supersession"] = detect_supersession_broken(
+            adr_id, content, all_adr_ids
+        )
+    if status and status.lower() == "accepted":
+        signals["staleness_90day"] = detect_90day_staleness(
+            adr_id, content, config, as_of
+        )
+        if config.get("retirement", {}).get("check_tech_removal", True):
+            signals["tech_removal"] = detect_tech_removal(adr_id, content, repo_root)
+        signals["policy_mismatch"] = detect_policy_mismatch(adr_id, content, config)
+    score = round(sum(signals.values()) / 4.0, 2)
+    recommendation = "KEEP"
+    if score >= 0.8:
+        recommendation = "RETIRE"
+    elif score >= 0.6:
+        recommendation = "REVIEW"
+    elif score >= 0.4:
+        recommendation = "MONITOR"
+    return {
+        "adr_id": adr_id,
+        "status": status,
+        "retirement_score": score,
+        "signals": signals,
+        "recommendation": recommendation,
+    }
+
+
+def render_markdown(results: List[Dict]) -> str:
+    lines = ["# ADR Retirement Candidates", ""]
+    if not results:
+        return "\n".join(lines + ["No candidates met the reporting threshold.", ""])
+    for result in results:
+        lines.extend(
+            [
+                f"## {result['adr_id']} - {result['recommendation']}",
+                "",
+                f"Retirement score: **{result['retirement_score']:.2f}**",
+                "",
+                "| Signal | Score |",
+                "| --- | ---: |",
+            ]
+        )
+        lines.extend(
+            f"| {signal} | {score:.2f} |"
+            for signal, score in result["signals"].items()
+        )
+        lines.append("")
+    return "\n".join(lines)
+
+
+def render_text(results: List[Dict]) -> str:
+    if not results:
+        return "No ADR retirement candidates."
+    return "\n".join(
+        f"{result['adr_id']} {result['recommendation']} "
+        f"score={result['retirement_score']:.2f}"
+        for result in results
+    )
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description="Detect ADR retirement candidates.")
+    parser.add_argument("adr_dir", nargs="?", default="docs/adr", help="ADR directory")
+    parser.add_argument(
+        "--format", choices=["json", "markdown", "text"], default="text",
+        help="Output format (default: text)",
+    )
+    parser.add_argument(
+        "--threshold", type=float, default=0.0,
+        help="Minimum retirement score to report (default: 0.0)",
+    )
+    parser.add_argument("--config", type=Path, default=None, help="Path to .adr-kit.json")
+    parser.add_argument("--repo-root", type=Path, default=None, help="Project source root")
+    args = parser.parse_args(argv)
+
+    adr_dir = Path(args.adr_dir).resolve()
+    repo_root = (args.repo_root or adr_dir.parent.parent).resolve()
+    if args.threshold < 0.0 or args.threshold > 1.0:
+        raise RetireError("--threshold must be in the range 0.0 to 1.0")
+
+    config = {}
+    config_candidates = [args.config] if args.config else [
+        adr_dir / ".adr-kit.json",
+        repo_root / ".adr-kit.json",
+    ]
+    config_path = next((path for path in config_candidates if path and path.exists()), None)
+    if config_path:
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise RetireError(f"Malformed config: {config_path}: {exc}") from exc
+
+    adrs = load_adr_set(adr_dir)
+    adr_ids = [adr_id for adr_id, _, _ in adrs]
+    results = [
+        score_adr(adr_id, content, adr_ids, repo_root, config)
+        for adr_id, _, content in adrs
+    ]
+    results = [result for result in results if result["retirement_score"] >= args.threshold]
+    results.sort(key=lambda result: (-result["retirement_score"], result["adr_id"]))
+
+    if args.format == "json":
+        print(json.dumps(results, indent=2))
+    elif args.format == "markdown":
+        print(render_markdown(results))
+    else:
+        print(render_text(results))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except RetireError as exc:
+        print(f"[adr-retire] ERROR: {exc}", file=sys.stderr)
+        sys.exit(2)
