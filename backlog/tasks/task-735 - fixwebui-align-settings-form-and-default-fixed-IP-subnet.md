@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-27 21:59'
-updated_date: '2026-05-27 22:35'
+updated_date: '2026-05-27 22:36'
 labels:
   - webui settings
 dependencies: []
@@ -19,10 +19,10 @@ Settings tab labels and inputs need consistent left alignment, and fixed-IP pref
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All settings labels in the affected settings tab are left aligned like the IP Configuration label.
-- [ ] #2 Input fields in the settings tab start on a consistent left edge and remain visually aligned with each other.
-- [ ] #3 Fixed-IP prefill populates subnet mask from current WiFi settings when available.
-- [ ] #4 When no current subnet mask can be inferred, fixed-IP prefill defaults subnet mask to 255.255.255.0.
+- [x] #1 All settings labels in the affected settings tab are left aligned like the IP Configuration label.
+- [x] #2 Input fields in the settings tab start on a consistent left edge and remain visually aligned with each other.
+- [x] #3 Fixed-IP prefill populates subnet mask from current WiFi settings when available.
+- [x] #4 When no current subnet mask can be inferred, fixed-IP prefill defaults subnet mask to 255.255.255.0.
 <!-- AC:END -->
 
 ## Implementation Plan
