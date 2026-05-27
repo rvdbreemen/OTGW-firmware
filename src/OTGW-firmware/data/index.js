@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.78
+**  Version  : v2.0.0-alpha.80
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3511,8 +3511,8 @@ var SAT_SETTINGS_GROUPS = [
       { key: 'satsystem',      label: 'Heating System',        type: 'select',
         options: [[0,'Gas / Radiators'],[1,'Heat Pump'],[2,'Hybrid'],[3,'Underfloor']] },
       { key: 'satmanufacturer',label: 'Manufacturer',          type: 'select',
-        options: [[0,'Generic'],[1,'Intergas'],[2,'Remeha'],[3,'Nefit'],[4,'Vaillant'],[5,'Bosch'],[6,'Worcester'],[7,'Baxi'],[8,'Ideal'],[9,'Atag']] },
-      { key: 'satcoefficient', label: 'Heating Curve',         type: 'f', min: 0.1, max: 5.0, step: 0.1 },
+        options: [[0,'Auto-detect'],[1,'Atag'],[2,'Baxi'],[3,'Brotge'],[4,'De Dietrich'],[5,'Ferroli'],[6,'Geminox'],[7,'Ideal'],[8,'Immergas'],[9,'Intergas'],[10,'Itho'],[11,'Nefit'],[12,'Radiant'],[13,'Remeha'],[14,'Sime'],[15,'Vaillant'],[16,'Viessmann'],[17,'Worcester Bosch'],[18,'Other']] },
+      { key: 'satcoefficient', label: 'Heating Curve Slope',    type: 'f', min: 0.1, max: 5.0, step: 0.1 },
       { key: 'satdeadband',    label: 'Deadband',              type: 'f', unit: '\u00B0C', min: 0.05, max: 2.0, step: 0.05 },
       { key: 'satinterval',    label: 'Control Interval',      type: 'i', unit: 's', min: 30, max: 600, step: 10 },
       { key: 'satheatingmode', label: 'Heating Mode',          type: 'select',
@@ -3525,8 +3525,8 @@ var SAT_SETTINGS_GROUPS = [
     id: 'sat-grp-pid',
     title: 'PID Tuning',
     fields: [
-      { key: 'satpwmautoswitch',  label: 'Auto Gains',         type: 'b' },
-      { key: 'satautogains',      label: 'Auto Gains Value',   type: 'f', min: 0.1, max: 10.0, step: 0.1 },
+      { key: 'satpwmautoswitch',  label: 'Auto-Switch PWM/Continuous', type: 'b' },
+      { key: 'satautogains',      label: 'Auto-Gains Multiplier',      type: 'f', min: 0.1, max: 10.0, step: 0.1 },
       { key: 'satovershootmargin',label: 'Overshoot Margin',   type: 'f', unit: '\u00B0C', min: 0.5, max: 5.0, step: 0.1 }
     ]
   },
@@ -3613,8 +3613,8 @@ var SAT_SETTINGS_GROUPS = [
       { key: 'satwindowdetect',  label: 'Window Detection',       type: 'b' },
       { key: 'satwindowminsec',  label: 'Window Min Open Time',   type: 'i', unit: 's', min: 10, max: 600, step: 10 },
       { key: 'satpushsetpoint',  label: 'Push Setpoint',          type: 'b' },
-      { key: 'satovpenabled',    label: 'OVP Enabled',            type: 'b' },
-      { key: 'satovpvalue',      label: 'OVP Value',              type: 'f', unit: '\u00B0C', min: 0.0, max: 90.0, step: 0.5 }
+      { key: 'satovpenabled',    label: 'Overshoot Protection',            type: 'b' },
+      { key: 'satovpvalue',      label: 'Overshoot Protection Threshold', type: 'f', unit: '\u00B0C', min: 0.0, max: 90.0, step: 0.5 }
     ]
   },
   {
@@ -3670,9 +3670,9 @@ var SAT_SETTINGS_GROUPS = [
       { key: 'saterrormon',      label: 'Error Monitoring',      type: 'b' },
       { key: 'satflameoffset',   label: 'Flame Off Offset',      type: 'f', unit: '\u00B0C', min: 0.0, max: 5.0, step: 0.1 },
       { key: 'satflowoffset',    label: 'Flow Offset',           type: 'f', unit: '\u00B0C', min: 0.5, max: 10.0, step: 0.1 },
-      { key: 'satmodsupoffset',  label: 'Mod Suppression Offset',type: 'f', unit: '%', min: 0.0, max: 5.0, step: 0.1 },
-      { key: 'satmodsupdelay',   label: 'Mod Suppression Delay', type: 'f', unit: 's', min: 0.0, max: 120.0, step: 1.0 },
-      { key: 'satvalveoffset',   label: 'Valve Offset',          type: 'f', min: -1.0, max: 1.0, step: 0.1 }
+      { key: 'satmodsupoffset',  label: 'Modulation Suppression Offset', type: 'f', unit: '%', min: 0.0, max: 5.0, step: 0.1 },
+      { key: 'satmodsupdelay',   label: 'Modulation Suppression Delay',  type: 'f', unit: 's', min: 0.0, max: 120.0, step: 1.0 },
+      { key: 'satvalveoffset',   label: 'Valve Position Offset',         type: 'f', min: -1.0, max: 1.0, step: 0.1 }
     ]
   }
 ];
@@ -5565,6 +5565,7 @@ function getOriginalPasswordPrefill(field) {
 // first setting that lands in it.
 var SETTINGS_GROUPS = [
   { id: 'system',   title: 'System',            prefixes: ['hostname', 'httppasswd', 'DeviceManufacturer', 'DeviceModel'] },
+  { id: 'network',  title: 'Network / Wi-Fi',   prefixes: ['ssid', 'wifi', 'eth', 'ap'] },
   { id: 'mqtt',     title: 'MQTT',              prefixes: ['MQTT'] },
   { id: 'ntp',      title: 'Time / NTP',        prefixes: ['NTP'] },
   { id: 'behavior', title: 'Behavior',          prefixes: ['LEDblink', 'darktheme', 'nightlyrestart'] },
@@ -5627,6 +5628,12 @@ function refreshSettings() {
       data = json.settings;
       const msgEl = document.getElementById("settingMessage");
       if (msgEl) { msgEl.textContent = ""; msgEl.className = ""; }
+      // Pre-create all known groups in display order so group cards appear in
+      // the right sequence regardless of API key iteration order.
+      var settingsPageEl = document.getElementById('settingsPage');
+      if (settingsPageEl) {
+        SETTINGS_GROUPS.forEach(function(g) { getOrCreateSettingsGroup(settingsPageEl, g.id); });
+      }
       for (const key in data) {
         if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
         const s = data[key]; // s.value, s.type, s.maxlen, s.max, s.min
@@ -5822,10 +5829,14 @@ function refreshSettings() {
       // Hide PIC-related settings rows when no PIC is detected
       applyPICAvailability(picAvailable, otCommandInterfaceAvailable);
       applyOTDirectAvailability(otDirectAvailable);
-      // TASK-585: build WiFi scan panel once, after all other groups are rendered
-      var settingsPageEl = document.getElementById('settingsPage');
+      // Build WiFi scan panel once and insert it right after the Network group card.
       if (settingsPageEl && !document.getElementById('wifi-scan-panel')) {
         buildWifiScanPanel(settingsPageEl);
+        var networkSection = settingsPageEl.querySelector('section.settings-group[data-group-id="network"]');
+        var wifiPanel = document.getElementById('wifi-scan-panel');
+        if (networkSection && wifiPanel) {
+          settingsPageEl.insertBefore(wifiPanel, networkSection.nextSibling);
+        }
       }
     })
     .catch(function (error) {
