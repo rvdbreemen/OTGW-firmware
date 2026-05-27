@@ -635,7 +635,8 @@
   .fixed-ip-row {
     display: flex;
     align-items: center;
-    text-align: right;
+    justify-content: flex-start;
+    text-align: left;
     border-bottom: 1px solid #b0d8f0;
     padding: 3px 0;
   }

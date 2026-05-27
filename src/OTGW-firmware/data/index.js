@@ -4569,7 +4569,7 @@ function renderFixedIPSection(currentIpValue, allSettings) {
   var toggleRow = document.createElement('div');
   toggleRow.className = 'fixed-ip-row';
   var toggleLbl = document.createElement('label');
-  toggleLbl.className = 'settings-field-container';
+  toggleLbl.className = 'settings-field-container fixed-ip-field-label';
   toggleLbl.title = 'When checked the device gets its IP address from your router (DHCP). Uncheck to set a fixed IP.';
   toggleLbl.textContent = 'IP Configuration';
   var toggleInputDiv = document.createElement('div');
