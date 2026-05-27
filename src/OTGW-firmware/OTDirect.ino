@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.78
+**  Version  : v2.0.0-alpha.79
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -446,6 +446,10 @@ static inline uint16_t floatToF88(float celsius) {
 static uint32_t otCSLastCommandMs = 0;
 static uint32_t otC2LastCommandMs = 0;
 static constexpr uint32_t OT_CSC2_EXPIRY_MS = 60000;  // ~1 minute, matches PIC heartbeat window
+// TASK-733: SC= clock command expiry — PIC CommandExpiry clears MsgID 20 override if SC
+// is not refreshed within ~61s (HeartbeatSC flag checked each minute by CommandExpiry).
+static uint32_t otSCLastCommandMs = 0;
+static constexpr uint32_t OT_SC_EXPIRY_MS = 61000;
 
 // Set an override value for a MsgID (activates repeater modification for that ID)
 static void setOverride(uint8_t msgId, uint16_t value) {
@@ -1971,6 +1975,12 @@ void loopOTDirect() {
       clearWriteOverride(8);
       otC2LastCommandMs = 0;
     }
+    // TASK-733: SC= clock sync expires after ~61s (PIC CommandExpiry / InvalidTime pattern)
+    if (otSCLastCommandMs != 0 && (uint32_t)(nowExp - otSCLastCommandMs) > OT_SC_EXPIRY_MS) {
+      OTDDebugTln(F("OTD: SC heartbeat expired, clearing MsgID 20 override"));
+      clearWriteOverride(20);
+      otSCLastCommandMs = 0;
+    }
   }
 
   // Periodic state log — every 30s for diagnostics
@@ -2535,6 +2545,9 @@ void handleOTDirectCommand(const char* buf, int len) {
     float temp = atof(value);
     bool enqueued = true;
     if (temp == 0.0f) {
+      // CS=0 clears the flow setpoint override only. It does NOT touch bit0 (CH enable)
+      // of MsgID 0. gateway.asm SetCtrlSetpoint sets SysCtrlSetpoint on CS=0 but never
+      // modifies bit0. CH= is the sole owner of that bit.
       clearWriteOverride(1);
       otCSLastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
@@ -2716,14 +2729,17 @@ void handleOTDirectCommand(const char* buf, int len) {
       }
     }
   }
-  // SC=HH:MM/DOW — Time sync (MsgID 20 = day/time)
+  // SC=HH:MM/DOW — Time sync (MsgID 20 = day/time, ~61s expiry per PIC CommandExpiry)
   else if (cmd0 == 'S' && cmd1 == 'C') {
     int hh = 0, mm = 0, dow = 0;
     if (sscanf(value, "%d:%d/%d", &hh, &mm, &dow) >= 2) {
       uint16_t data20 = (uint16_t)(((dow & 0x07) << 5 | (hh & 0x1F)) << 8) | (mm & 0x3F);
       enqueueWriteCommand(20, data20, "SC-time");
+      otSCLastCommandMs = millis();
+      if (otSCLastCommandMs == 0) otSCLastCommandMs = 1;  // 0 sentinel reserved
+      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d:%02d/%d"), hh & 0x1F, mm & 0x3F, dow & 0x07);
+      synthesizeResponse(buf, rspBuf);
     }
-    // SC doesn't produce a PIC-style response
   }
 
   // =====================================================================
@@ -3112,7 +3128,11 @@ void handleOTDirectCommand(const char* buf, int len) {
   // Schedule management commands (AA, DA, PM)
   // =====================================================================
 
-  // AA=MsgID — Add alternative: re-enable a disabled schedule entry
+  // AA=MsgID — Add alternative: re-enable a disabled schedule entry.
+  // PIC semantic: adds MsgID to a 32-slot EEPROM ring buffer (persistent, survives reboot).
+  // OTDirect semantic: re-enables an existing otSchedule[] entry (RAM only, lost on restart).
+  // Deliberate deviation: otSchedule already covers all relevant MsgIDs; EEPROM ring not needed.
+  // If MsgID is not in otSchedule, returns "NF" (PIC would add it to the ring).
   else if (cmd0 == 'A' && cmd1 == 'A') {
     uint8_t msgId = atoi(value);
     if (msgId == 0 || msgId > 127) {
@@ -3130,7 +3150,9 @@ void handleOTDirectCommand(const char* buf, int len) {
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
   }
-  // DA=MsgID — Delete alternative: disable a schedule entry
+  // DA=MsgID — Delete alternative: disable a schedule entry.
+  // PIC semantic: removes MsgID from the EEPROM ring buffer.
+  // OTDirect semantic: sets disabled=true in otSchedule[] (entry stays in table).
   else if (cmd0 == 'D' && cmd1 == 'A') {
     uint8_t msgId = atoi(value);
     if (msgId == 0 || msgId > 127) {
