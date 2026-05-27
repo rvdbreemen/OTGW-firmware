@@ -597,7 +597,7 @@
   button { width: 100px; }
   
   .settingDiv {
-    text-align: right;
+    text-align: left;
     min-width: 850px;
     border: thick solid lightblue;
     background: lightblue;

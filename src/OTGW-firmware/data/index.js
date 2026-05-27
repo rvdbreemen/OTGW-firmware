@@ -4459,35 +4459,55 @@ function collapseOctetGroupsForSave() {
 }
 
 function prefillFromDHCP() {
+  function isValidDottedDecimal(value, maxOctet) {
+    if (!value) return false;
+    var parts = value.split('.');
+    if (parts.length !== 4) return false;
+    var numbers = [];
+    var valid = parts.every(function(p) {
+      if (!/^\d{1,3}$/.test(p)) return false;
+      var n = parseInt(p, 10);
+      numbers.push(n);
+      return n >= 0 && n <= maxOctet;
+    });
+    return valid && !numbers.every(function(n) { return n === 0; });
+  }
+  function isValidPrefillIP(value) {
+    return isValidDottedDecimal(value, 254);
+  }
+  function isValidPrefillSubnet(value) {
+    return isValidDottedDecimal(value, 255);
+  }
+  function prefillIfEmpty(fieldKey, value, validator) {
+    if (!validator(value)) return;
+    var inputs = getOctetInputs(fieldKey);
+    if (inputs.length > 0 && inputs.every(function(i) { return i.value === ''; })) {
+      splitIpToOctets(fieldKey, value);
+    }
+  }
+  function prefillDefaultSubnet() {
+    prefillIfEmpty('wifisubnet', '255.255.255.0', isValidPrefillSubnet);
+  }
   fetch(APIGW + 'v2/device/info')
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(json) {
-      if (!json || !json.device) return;
+      if (!json || !json.device) {
+        prefillDefaultSubnet();
+        markFixedIPChanged();
+        return;
+      }
       var d = json.device;
-      function isValidPrefillIP(value) {
-        if (!value) return false;
-        var parts = value.split('.');
-        if (parts.length !== 4) return false;
-        return parts.every(function(p) {
-          var n = parseInt(p, 10);
-          return p !== '' && !isNaN(n) && n >= 0 && n <= 254;
-        });
-      }
-      function prefillIfEmpty(fieldKey, value) {
-        if (!isValidPrefillIP(value)) return;
-        var inputs = getOctetInputs(fieldKey);
-        if (inputs.length > 0 && inputs.every(function(i) { return i.value === ''; })) {
-          splitIpToOctets(fieldKey, value);
-        }
-      }
-      prefillIfEmpty('wifistaticip', d.ipaddress);
-      prefillIfEmpty('wifisubnet',   d.wifi_current_subnet);
-      prefillIfEmpty('wifigateway',  d.wifi_current_gateway);
-      prefillIfEmpty('wifidns1',     d.wifi_current_dns1);
-      prefillIfEmpty('wifidns2',     d.wifi_current_dns2);
+      prefillIfEmpty('wifistaticip', d.ipaddress, isValidPrefillIP);
+      prefillIfEmpty('wifisubnet',   isValidPrefillSubnet(d.wifi_current_subnet) ? d.wifi_current_subnet : '255.255.255.0', isValidPrefillSubnet);
+      prefillIfEmpty('wifigateway',  d.wifi_current_gateway, isValidPrefillIP);
+      prefillIfEmpty('wifidns1',     d.wifi_current_dns1, isValidPrefillIP);
+      prefillIfEmpty('wifidns2',     d.wifi_current_dns2, isValidPrefillIP);
       markFixedIPChanged();
     })
-    .catch(function() {});
+    .catch(function() {
+      prefillDefaultSubnet();
+      markFixedIPChanged();
+    });
 }
 
 function wireOctetGroup(grp) {

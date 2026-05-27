@@ -5,13 +5,26 @@
 ***************************************************************************
 */
 
+.settingDiv:not(.fixed-ip-section) {
+  display: flex;
+  align-items: center;
+}
+
 .settings-field-container {
-  width: 320px;
-  float: left;
-  margin-right: 10px;
+  box-sizing: border-box;
+  flex: 0 0 480px;
+  width: 480px;
+  float: none;
+  margin-right: 0;
+  padding-left: 24px;
+  text-align: left;
 }
 
 .settings-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
   text-align: left;
 }
 
@@ -103,6 +116,7 @@
   }
 
   .settingDiv {
+    display: block;
     min-width: 0;
     width: auto;
     max-width: 100%;
@@ -114,10 +128,16 @@
   }
 
   .settings-field-container {
+    flex: none;
     float: none;
     width: auto;
+    padding-left: 0;
     margin: 0 0 6px 0 !important;
     font-weight: 600;
+  }
+
+  .settings-input-container {
+    display: block;
   }
 
   .settingDiv input[type="text"],

@@ -606,7 +606,7 @@
   button { width: 100px; }
   
   .settingDiv {
-    text-align: right;
+    text-align: left;
     min-width: 850px;
     border: thick solid #2c2c2e;
     background: #2c2c2e;
@@ -641,7 +641,8 @@
   .fixed-ip-row {
     display: flex;
     align-items: center;
-    text-align: right;
+    justify-content: flex-start;
+    text-align: left;
     border-bottom: 1px solid #444;
     padding: 3px 0;
   }
@@ -652,6 +653,11 @@
 
   .fixed-ip-field-label {
     padding-left: 24px;
+    text-align: left;
+  }
+
+  .fixed-ip-section .settings-field-container {
+    text-align: left;
   }
 
   .fixed-ip-dhcp-label {
