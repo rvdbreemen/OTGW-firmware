@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.80
+**  Version  : v2.0.0-alpha.81
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -5499,7 +5499,7 @@ const hiddenSettings = [
   "ui_autoscroll",
   "ui_timestamps",
   "ui_capture",
-  "ui_autoscreenshot", 
+  "ui_autoscreenshot",
   "ui_autodownloadlog",
   "ui_autoexport",
   "ui_graphtimewindow",
@@ -5508,8 +5508,423 @@ const hiddenSettings = [
   "webhookurloff",
   "webhooktriggerbit",
   "webhookpayload",
-  "webhookcontenttype"
+  "webhookcontenttype",
+  // Fixed-IP companions — managed by renderFixedIPSection() instead of the
+  // generic row renderer. The *staticip keys themselves are NOT hidden,
+  // because they trigger the custom section.
+  "wifisubnet", "wifigateway", "wifidns1", "wifidns2",
+  "ethipaddress", "ethsubnet", "ethgateway", "ethdns"
 ];
+
+//============================================================================
+// Fixed IP configuration UI (TASK-725, ported from dev TASK-709)
+// Segmented octet inputs + DHCP toggle, rendered for BOTH WiFi and Ethernet.
+//============================================================================
+var IP_FIELD_DEFS_WIFI = [
+  { key: 'wifistaticip', label: 'IP Address',   required: true  },
+  { key: 'wifisubnet',   label: 'Subnet Mask',  required: true  },
+  { key: 'wifigateway',  label: 'Gateway',      required: true  },
+  { key: 'wifidns1',     label: 'DNS Server 1', required: false },
+  { key: 'wifidns2',     label: 'DNS Server 2', required: false }
+];
+var IP_FIELD_DEFS_ETH = [
+  { key: 'ethipaddress', label: 'IP Address',   required: true  },
+  { key: 'ethsubnet',    label: 'Subnet Mask',  required: true  },
+  { key: 'ethgateway',   label: 'Gateway',      required: true  },
+  { key: 'ethdns',       label: 'DNS Server',   required: false }
+];
+
+// Interface descriptor table — keyed by the "trigger" setting that
+// renderFixedIPSection() dispatches on (refreshSettings checks both keys).
+var IP_IFACES = {
+  wifi: {
+    trigger:      'wifistaticip',     // string setting; empty=DHCP
+    sectionId:    'D_wifistaticip',
+    fields:       IP_FIELD_DEFS_WIFI,
+    // DHCP derivation: WiFi uses string-empty semantics (empty wifistaticip = DHCP).
+    isDhcp:       function(triggerValue, allSettings) { return !triggerValue || triggerValue === ''; },
+    // Current-network keys in device/info for DHCP prefill.
+    curSubnet:    'wifi_current_subnet',
+    curGateway:   'wifi_current_gateway',
+    curDns:       ['wifi_current_dns1', 'wifi_current_dns2'],
+    ipField:      'wifistaticip',
+    subnetField:  'wifisubnet',
+    gatewayField: 'wifigateway',
+    dnsFields:    ['wifidns1', 'wifidns2']
+  },
+  eth: {
+    trigger:      'ethstaticip',      // bool setting; true=static, false=DHCP
+    sectionId:    'D_ethstaticip',
+    fields:       IP_FIELD_DEFS_ETH,
+    // DHCP derivation: Ethernet uses an explicit bool flag.
+    isDhcp:       function(triggerValue) {
+      return triggerValue === false || triggerValue === 'false' || triggerValue === 0 || triggerValue === '0';
+    },
+    curSubnet:    'eth_current_subnet',
+    curGateway:   'eth_current_gateway',
+    curDns:       ['eth_current_dns'],
+    ipField:      'ethipaddress',
+    subnetField:  'ethsubnet',
+    gatewayField: 'ethgateway',
+    dnsFields:    ['ethdns']
+  }
+};
+
+function ipMakeOctetGroup(fieldKey, fieldLabel) {
+  var grp = document.createElement('div');
+  grp.className = 'octet-group';
+  grp.dataset.field = fieldKey;
+  grp.setAttribute('role', 'group');
+  grp.setAttribute('aria-label', fieldLabel);
+  for (var i = 0; i < 4; i++) {
+    if (i > 0) {
+      var dot = document.createElement('span');
+      dot.className = 'octet-dot';
+      dot.textContent = '.';
+      grp.appendChild(dot);
+    }
+    var oct = document.createElement('input');
+    oct.type = 'text';
+    oct.inputMode = 'numeric';
+    oct.pattern = '[0-9]*';
+    oct.maxLength = 3;
+    oct.autocomplete = 'off';
+    oct.setAttribute('enterkeyhint', i < 3 ? 'next' : 'done');
+    oct.className = 'octet-input';
+    oct.dataset.field = fieldKey;
+    oct.dataset.oct = String(i);
+    oct.setAttribute('aria-label', fieldLabel + ' octet ' + String(i + 1));
+    grp.appendChild(oct);
+  }
+  return grp;
+}
+
+function ipGetOctetInputs(fieldKey) {
+  var grp = document.querySelector('.octet-group[data-field="' + fieldKey + '"]');
+  if (!grp) return [];
+  return Array.from(grp.querySelectorAll('.octet-input'));
+}
+
+function ipSplitIpToOctets(fieldKey, ipStr) {
+  var parts = (typeof ipStr === 'string' && ipStr.length > 0) ? ipStr.split('.') : [];
+  ipGetOctetInputs(fieldKey).forEach(function(inp, i) {
+    inp.value = parts[i] !== undefined ? parts[i] : '';
+  });
+}
+
+function ipNormalizeOctetValue(value) {
+  var digits = String(value || '').replace(/\D/g, '').substring(0, 3);
+  if (digits === '') return '';
+  return parseInt(digits, 10) > 255 ? '255' : digits;
+}
+
+function ipJoinOctetsToIp(fieldKey) {
+  var inputs = ipGetOctetInputs(fieldKey);
+  if (inputs.length !== 4) return '';
+  var parts = inputs.map(function(inp) { return inp.value.trim(); });
+  return parts.some(function(p) { return p === ''; }) ? '' : parts.map(function(p) {
+    return String(parseInt(p, 10));
+  }).join('.');
+}
+
+function ipMarkFixedIPChanged(iface) {
+  // Mark all hidden setting fields for this iface as changed so saveSettings
+  // picks them up. Also mark the trigger (ethstaticip checkbox / wifistaticip).
+  var trigEl = document.getElementById(iface.trigger);
+  if (trigEl) trigEl.className = 'input-changed';
+  iface.fields.forEach(function(def) {
+    var h = document.getElementById(def.key);
+    if (h) h.className = 'input-changed';
+  });
+  setVisible('btnSaveSettings', true);
+}
+
+function ipUpdateVisibility(sectionDiv, useDHCP) {
+  var fieldsDiv = sectionDiv.querySelector('.fixed-ip-fields');
+  if (fieldsDiv) fieldsDiv.style.display = useDHCP ? 'none' : '';
+}
+
+function ipValidateFields(iface, useDHCP) {
+  if (useDHCP) return '';
+  for (var i = 0; i < iface.fields.length; i++) {
+    var def = iface.fields[i];
+    var values = ipGetOctetInputs(def.key).map(function(inp) { return inp.value.trim(); });
+    var hasAnyValue = values.some(function(v) { return v !== ''; });
+    var hasInvalid = values.some(function(v) {
+      return v !== '' && (!/^\d{1,3}$/.test(v) || parseInt(v, 10) > 255);
+    });
+    if (hasInvalid || ((def.required || hasAnyValue) && values.some(function(v) { return v === ''; }))) {
+      return def.label + ' must contain four numbers from 0 to 255.';
+    }
+  }
+  return '';
+}
+
+// Collapse octet inputs back into the hidden text fields and synthesize the
+// trigger value (bool for Ethernet, string for WiFi). Called from saveSettings
+// before it iterates inputs. Returns false on validation failure.
+function collapseOctetGroupsForSave() {
+  var keys = Object.keys(IP_IFACES);
+  for (var ki = 0; ki < keys.length; ki++) {
+    var iface = IP_IFACES[keys[ki]];
+    var sectionDiv = document.getElementById(iface.sectionId);
+    if (!sectionDiv) continue;
+    var dhcpCb = sectionDiv.querySelector('.dhcp-toggle-cb');
+    var useDHCP = !dhcpCb || dhcpCb.checked;
+    var msg = ipValidateFields(iface, useDHCP);
+    if (msg) {
+      var msgEl = document.getElementById('settingMessage');
+      if (msgEl) { msgEl.textContent = msg; msgEl.className = 'error'; }
+      return false;
+    }
+    iface.fields.forEach(function(def) {
+      var h = document.getElementById(def.key);
+      if (!h) return;
+      // Only collapse if marked changed (avoid clobbering values we never touched).
+      if (h.className !== 'input-changed') return;
+      h.value = useDHCP ? '' : (ipJoinOctetsToIp(def.key) || '');
+    });
+    // Synthesize the trigger value into its hidden input/checkbox so the
+    // standard saveSettings loop posts it as a regular setting.
+    var trigEl = document.getElementById(iface.trigger);
+    if (trigEl) {
+      if (trigEl.type === 'checkbox') {
+        trigEl.checked = !useDHCP;
+      } else {
+        // wifistaticip (string): empty = DHCP, dotted = static.
+        trigEl.value = useDHCP ? '' : (ipJoinOctetsToIp(iface.ipField) || '');
+      }
+    }
+  }
+  return true;
+}
+
+function ipPrefillFromDHCP(iface) {
+  function isValidDottedDecimal(value, maxOctet) {
+    if (!value) return false;
+    var parts = value.split('.');
+    if (parts.length !== 4) return false;
+    return parts.every(function(p) {
+      var n = parseInt(p, 10);
+      return p !== '' && !isNaN(n) && n >= 0 && n <= maxOctet;
+    });
+  }
+  function isValidPrefillIP(v)     { return isValidDottedDecimal(v, 254); }
+  function isValidPrefillSubnet(v) { return isValidDottedDecimal(v, 255); }
+  function prefillIfEmpty(fieldKey, value, validator) {
+    if (!validator(value)) return;
+    var inputs = ipGetOctetInputs(fieldKey);
+    if (inputs.length > 0 && inputs.every(function(i) { return i.value === ''; })) {
+      ipSplitIpToOctets(fieldKey, value);
+    }
+  }
+  function prefillDefaultSubnet() {
+    prefillIfEmpty(iface.subnetField, '255.255.255.0', isValidPrefillSubnet);
+  }
+  fetch(APIGW + 'v2/device/info')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(json) {
+      if (!json || !json.device) {
+        prefillDefaultSubnet();
+        ipMarkFixedIPChanged(iface);
+        return;
+      }
+      var d = json.device;
+      prefillIfEmpty(iface.ipField,      d.ipaddress, isValidPrefillIP);
+      prefillIfEmpty(iface.subnetField,
+        isValidPrefillSubnet(d[iface.curSubnet]) ? d[iface.curSubnet] : '255.255.255.0',
+        isValidPrefillSubnet);
+      prefillIfEmpty(iface.gatewayField, d[iface.curGateway], isValidPrefillIP);
+      for (var di = 0; di < iface.dnsFields.length; di++) {
+        var ck = iface.curDns[di];
+        if (ck) prefillIfEmpty(iface.dnsFields[di], d[ck], isValidPrefillIP);
+      }
+      ipMarkFixedIPChanged(iface);
+    })
+    .catch(function() {
+      prefillDefaultSubnet();
+      ipMarkFixedIPChanged(iface);
+    });
+}
+
+function ipWireOctetGroup(grp, iface) {
+  var octInputs = Array.from(grp.querySelectorAll('.octet-input'));
+  octInputs.forEach(function(inp, idx) {
+    inp.addEventListener('input', function() {
+      this.value = ipNormalizeOctetValue(this.value);
+      if (this.value.length >= 3 && idx < 3) {
+        octInputs[idx + 1].focus();
+        octInputs[idx + 1].select();
+      }
+      ipMarkFixedIPChanged(iface);
+    });
+    inp.addEventListener('keydown', function(e) {
+      if ((e.key === '.' || e.key === 'Enter' || e.key === 'ArrowRight') && idx < 3 && this.selectionStart === this.value.length) {
+        e.preventDefault();
+        octInputs[idx + 1].focus();
+        octInputs[idx + 1].select();
+      }
+      if (e.key === 'Backspace' && this.value === '' && idx > 0) {
+        e.preventDefault();
+        var prev = octInputs[idx - 1];
+        prev.focus();
+        prev.setSelectionRange(prev.value.length, prev.value.length);
+      }
+      if (e.key === 'ArrowLeft' && idx > 0 && this.selectionStart === 0) {
+        e.preventDefault();
+        var previous = octInputs[idx - 1];
+        previous.focus();
+        previous.setSelectionRange(previous.value.length, previous.value.length);
+      }
+    });
+    inp.addEventListener('paste', function(e) {
+      var txt = (e.clipboardData || window.clipboardData).getData('text');
+      var parts = txt.trim().split('.');
+      if (txt.indexOf('.') >= 0) {
+        e.preventDefault();
+        if (parts.length !== 4 || parts.some(function(p) {
+          return !/^\d{1,3}$/.test(p) || parseInt(p, 10) > 255;
+        })) return;
+        octInputs.forEach(function(o, i) { o.value = String(parseInt(parts[i], 10)); });
+        octInputs[3].focus();
+        octInputs[3].select();
+        ipMarkFixedIPChanged(iface);
+      }
+    });
+  });
+}
+
+// Render (or refresh) the fixed-IP section for the given interface.
+// Called by refreshSettings when it encounters either trigger key.
+function renderFixedIPSection(ifaceKey, triggerValue, allSettings) {
+  var iface = IP_IFACES[ifaceKey];
+  if (!iface) return;
+  var settingsPage = document.getElementById('settingsPage');
+  if (!settingsPage) return;
+  // Place inside the Network group card so layout matches other settings.
+  var groupBody = (typeof getOrCreateSettingsGroup === 'function')
+    ? getOrCreateSettingsGroup(settingsPage, 'network')
+    : settingsPage;
+
+  var useDHCP = iface.isDhcp(triggerValue, allSettings);
+  var existing = document.getElementById(iface.sectionId);
+
+  // The trigger needs a hidden input/checkbox so saveSettings sees it as
+  // a normal field. For WiFi the trigger doubles as the IP-address field.
+  function getOrCreateTrigger() {
+    var t = document.getElementById(iface.trigger);
+    if (t) return t;
+    t = document.createElement('input');
+    t.type = (ifaceKey === 'eth') ? 'checkbox' : 'hidden';
+    t.id = iface.trigger;
+    t.className = 'input-normal';
+    return t;
+  }
+
+  if (existing) {
+    var dhcpCb = existing.querySelector('.dhcp-toggle-cb');
+    if (dhcpCb) dhcpCb.checked = useDHCP;
+    ipUpdateVisibility(existing, useDHCP);
+    iface.fields.forEach(function(def) {
+      var raw = (allSettings[def.key] && allSettings[def.key].value !== undefined) ? allSettings[def.key].value : '';
+      ipSplitIpToOctets(def.key, raw);
+      var h = document.getElementById(def.key);
+      if (h) { h.value = raw; h.className = 'input-normal'; h.setAttribute('data-original', raw); }
+    });
+    var trig = document.getElementById(iface.trigger);
+    if (trig) {
+      if (trig.type === 'checkbox') trig.checked = !useDHCP;
+      else trig.value = useDHCP ? '' : (triggerValue || '');
+      trig.className = 'input-normal';
+    }
+    return;
+  }
+
+  var sectionDiv = document.createElement('div');
+  sectionDiv.id = iface.sectionId;
+  sectionDiv.className = 'settingDiv fixed-ip-section';
+  sectionDiv.setAttribute('data-iface', ifaceKey);
+
+  // DHCP toggle row
+  var toggleRow = document.createElement('div');
+  toggleRow.className = 'fixed-ip-row';
+  var toggleLbl = document.createElement('label');
+  toggleLbl.className = 'settings-field-container fixed-ip-field-label';
+  toggleLbl.title = 'When checked the device gets its IP address from your router (DHCP). Uncheck to set a fixed IP.';
+  toggleLbl.textContent = (ifaceKey === 'eth') ? 'Ethernet IP Configuration' : 'Wi-Fi IP Configuration';
+  var toggleInputDiv = document.createElement('div');
+  toggleInputDiv.className = 'settings-input-container';
+  var dhcpOuterLabel = document.createElement('label');
+  dhcpOuterLabel.className = 'fixed-ip-dhcp-label';
+  var dhcpCb2 = document.createElement('input');
+  dhcpCb2.type = 'checkbox';
+  dhcpCb2.className = 'dhcp-toggle-cb';
+  dhcpCb2.checked = useDHCP;
+  dhcpOuterLabel.appendChild(dhcpCb2);
+  dhcpOuterLabel.appendChild(document.createTextNode(' Use DHCP (automatic IP)'));
+  toggleInputDiv.appendChild(dhcpOuterLabel);
+
+  // Embed the trigger field (hidden for wifi, hidden checkbox for eth) so
+  // saveSettings picks it up via the standard input iterator.
+  var trig = getOrCreateTrigger();
+  trig.style.display = 'none';
+  if (trig.type === 'checkbox') trig.checked = !useDHCP;
+  else trig.value = useDHCP ? '' : (triggerValue || '');
+  toggleInputDiv.appendChild(trig);
+
+  toggleRow.appendChild(toggleLbl);
+  toggleRow.appendChild(toggleInputDiv);
+  sectionDiv.appendChild(toggleRow);
+
+  // Fixed IP fields container
+  var fieldsDiv = document.createElement('div');
+  fieldsDiv.className = 'fixed-ip-fields';
+  fieldsDiv.style.display = useDHCP ? 'none' : '';
+
+  iface.fields.forEach(function(def) {
+    var row = document.createElement('div');
+    row.className = 'fixed-ip-row';
+    var lbl = document.createElement('label');
+    lbl.className = 'settings-field-container fixed-ip-field-label';
+    lbl.textContent = def.label + (def.required ? '' : ' (optional)');
+    var inputDiv = document.createElement('div');
+    inputDiv.className = 'settings-input-container';
+    var grp = ipMakeOctetGroup(def.key, def.label);
+    ipWireOctetGroup(grp, iface);
+    inputDiv.appendChild(grp);
+    var hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.id = def.key;
+    hidden.className = 'input-normal';
+    var initial = (allSettings[def.key] && allSettings[def.key].value !== undefined) ? allSettings[def.key].value : '';
+    hidden.value = initial;
+    hidden.setAttribute('data-original', initial);
+    inputDiv.appendChild(hidden);
+    row.appendChild(lbl);
+    row.appendChild(inputDiv);
+    fieldsDiv.appendChild(row);
+  });
+
+  var notice = document.createElement('div');
+  notice.className = 'fixed-ip-notice';
+  notice.textContent = 'A reboot is required for network changes to take effect.';
+  fieldsDiv.appendChild(notice);
+  sectionDiv.appendChild(fieldsDiv);
+
+  dhcpCb2.addEventListener('change', function() {
+    ipUpdateVisibility(sectionDiv, this.checked);
+    ipMarkFixedIPChanged(iface);
+    if (!this.checked) ipPrefillFromDHCP(iface);
+  });
+
+  groupBody.appendChild(sectionDiv);
+
+  // Initial octet population
+  iface.fields.forEach(function(def) {
+    var initial = (allSettings[def.key] && allSettings[def.key].value !== undefined) ? allSettings[def.key].value : '';
+    ipSplitIpToOctets(def.key, initial);
+  });
+}
 
 const httpPasswordPlaceholderValues = ["notthepassword", "notthispassword"];
 const httpPasswordSavePlaceholder = "notthispassword";
@@ -5640,6 +6055,12 @@ function refreshSettings() {
         console.log("[" + key + "]=>[" + s.value + "]");
         // Skip hidden settings
         if (key.startsWith('#') || hiddenSettings.includes(key)) continue;
+
+        // Fixed IP custom renderer — handles both wifistaticip (string trigger,
+        // empty=DHCP) and ethstaticip (bool trigger). The renderer pulls
+        // companion field values from the `data` map.
+        if (key === 'wifistaticip') { renderFixedIPSection('wifi', s.value, data); continue; }
+        if (key === 'ethstaticip')  { renderFixedIPSection('eth',  s.value, data); continue; }
 
         var settings = document.getElementById('settingsPage');
         if ((document.getElementById("D_" + key)) == null) {
@@ -6015,6 +6436,12 @@ function saveWebhookSettings() {
 //============================================================================  
 function saveSettings() {
   console.log("saveSettings() ...");
+
+  // Collapse octet inputs into hidden setting fields & synthesize the trigger
+  // (wifistaticip string / ethstaticip bool). Validation errors abort save.
+  if (typeof collapseOctetGroupsForSave === 'function' && !collapseOctetGroupsForSave()) {
+    return false;
+  }
 
   //--- has anything changed?
   var page = document.getElementById("settingsPage");

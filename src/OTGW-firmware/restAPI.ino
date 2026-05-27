@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.80
+**  Version  : v2.0.0-alpha.81
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2353,6 +2353,19 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
   sendJsonMapEntry(F("ipaddress"), CSTR(getActiveIP()));
   sendJsonMapEntry(F("macaddress"), CSTR(getActiveMAC()));
+  // Current WiFi network parameters (for DHCP-prefill in the UI). Available
+  // on both ESP8266 and ESP32 via the standard WiFi API.
+  sendJsonMapEntry(F("wifi_current_subnet"),  CSTR(WiFi.subnetMask().toString()));
+  sendJsonMapEntry(F("wifi_current_gateway"), CSTR(WiFi.gatewayIP().toString()));
+  sendJsonMapEntry(F("wifi_current_dns1"),    CSTR(WiFi.dnsIP(0).toString()));
+  sendJsonMapEntry(F("wifi_current_dns2"),    CSTR(WiFi.dnsIP(1).toString()));
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  // Current Ethernet network parameters (for DHCP-prefill in the UI). Reported
+  // via the EthernetESP32 library (Ethernet.* API).
+  sendJsonMapEntry(F("eth_current_subnet"),  CSTR(Ethernet.subnetMask().toString()));
+  sendJsonMapEntry(F("eth_current_gateway"), CSTR(Ethernet.gatewayIP().toString()));
+  sendJsonMapEntry(F("eth_current_dns"),     CSTR(Ethernet.dnsServerIP().toString()));
+#endif
 #if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
     sendJsonMapEntry(F("ssid"), CSTR(state.net.sAPSSID));
@@ -2956,6 +2969,12 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("ethsubnet"), CSTR(settings.eth.sSubnet), "s", 15);
   sendJsonSettingObj(F("ethdns"), CSTR(settings.eth.sDNS), "s", 15);
 #endif
+  // --- WiFi static IP settings (empty = DHCP) ---
+  sendJsonSettingObj(F("wifistaticip"), CSTR(settings.wifi.sStaticIp), "s", 15);
+  sendJsonSettingObj(F("wifisubnet"),   CSTR(settings.wifi.sSubnet),   "s", 15);
+  sendJsonSettingObj(F("wifigateway"),  CSTR(settings.wifi.sGateway),  "s", 15);
+  sendJsonSettingObj(F("wifidns1"),     CSTR(settings.wifi.sDns1),     "s", 15);
+  sendJsonSettingObj(F("wifidns2"),     CSTR(settings.wifi.sDns2),     "s", 15);
   char httpPasswordPlaceholder[sizeof("password=40")];
   snprintf_P(httpPasswordPlaceholder,
              sizeof(httpPasswordPlaceholder),
@@ -3013,6 +3032,7 @@ static const char* const PROGMEM knownSettings[] = {
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
+  "wifidns1", "wifidns2", "wifigateway", "wifistaticip", "wifisubnet",
 };
 
 static bool isKnownSetting(const char* field) {

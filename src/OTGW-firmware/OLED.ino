@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.80
+**  Version  : v2.0.0-alpha.81
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -9,7 +9,7 @@
 **  Works on both ESP8266 (PIC-based OTGW) and ESP32-S3 (OTGW32).
 **  Drives a 128x64 SSD1306 I2C OLED display with runtime detection.
 **  Shows network status, OT-Direct status, device info and temperatures
-**  on 5 pages cycled via the config button (GPIO 9).
+**  on 5 pages cycled via the boot button (GPIO 0 = PIN_BUTTON).
 **
 **  Uses SSD1306Ascii (text-only, no framebuffer) to save ~1KB RAM
 **  compared to Adafruit_SSD1306 which requires a 1024-byte framebuffer.
@@ -17,9 +17,10 @@
 **  Design:
 **  - Runtime I2C probe at 0x3C - if no display, all code is skipped
 **  - Reads values directly from OTcurrentSystemState (no JSON layer)
-**  - Button ISR on PIN_CONFIG_BUTTON (GPIO 9) with software debounce
+**  - Button ISR on PIN_BUTTON (GPIO 0) via FreeRTOS queue with debounce
 **  - Auto-off after 30s of inactivity; button press wakes from off
-**  - 1 Hz display refresh (non-blocking, cooperative)
+**  - 5 s display refresh (non-blocking, cooperative); clear() only on
+**    page change (SSD1306Ascii overwrites in place)
 **
 **  Pages (0=off, 1-5=content):
 **  1 Network   - transport, IP, MQTT broker + status
@@ -38,25 +39,28 @@
 #include <SSD1306Ascii.h>
 #include <SSD1306AsciiWire.h>
 
+#if defined(ESP32)
+  #include <driver/gpio.h>
+  #include <freertos/FreeRTOS.h>
+  #include <freertos/queue.h>
+  #include <esp_timer.h>
+#endif
+
 // Stringification helper for _VERSION_PRERELEASE (which is a bare token, not quoted)
 #define OLED_STR_HELPER(x) #x
 #define OLED_STR(x)        OLED_STR_HELPER(x)
 
-// Button pin: prefer PIN_CONFIG_BUTTON (GPIO 9 on OTGW32); fall back to PIN_BUTTON
-#if defined(PIN_CONFIG_BUTTON)
-  #define OLED_BUTTON_PIN PIN_CONFIG_BUTTON
-#else
-  #define OLED_BUTTON_PIN PIN_BUTTON
-#endif
+// Button pin: boot button (GPIO 0) on OTGW32. Active LOW, pull-up.
+#define OLED_BUTTON_PIN PIN_BUTTON
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 static constexpr uint8_t  OLED_ADDR         = 0x3C;
-static constexpr uint32_t OLED_REFRESH_MS   = 1000;   // 1 Hz refresh
+static constexpr uint32_t OLED_REFRESH_MS   = 5000;   // 5 s refresh (readable, low I2C load)
 static constexpr uint32_t OLED_TIMEOUT_MS   = 30000;  // auto-off after 30s
 static constexpr uint8_t  OLED_NUM_PAGES    = 6;      // 0=off, 1-5=content pages
-static constexpr uint32_t OLED_DEBOUNCE_MS  = 300;
+static constexpr int64_t  OLED_DEBOUNCE_US  = 300000; // 300 ms (microseconds)
 
 // SSD1306Ascii uses row-based positioning (rows of 8 pixels for System5x7 font).
 // 128x64 display = 21 chars wide x 8 rows with System5x7 (6px wide, 8px tall).
@@ -68,20 +72,42 @@ static constexpr uint8_t  OLED_ROWS         = 8;    // text rows (64/8)
 // ---------------------------------------------------------------------------
 static SSD1306AsciiWire oledDisplay;
 static bool     oledPresent       = false;
-static uint8_t  oledPage          = 0;     // 0=off, 1-4=content
+static uint8_t  oledPage          = 0;     // 0=off, 1-5=content
 static uint32_t oledLastActivity  = 0;     // millis of last button press
 static uint32_t oledLastRefresh   = 0;     // millis of last screen draw
-static volatile bool oledButtonPressed = false;
-static uint32_t oledLastDebounce  = 0;
+static uint8_t  oledLastRenderedPage = 0xFF; // track page-change for selective clear()
+static char     oledCachedSSID[33] = "";   // cached WiFi SSID (avoid String in hot path)
+
+#if defined(ESP32)
+static QueueHandle_t _oledBtnQueue = nullptr;
+#endif
 
 // Shared formatting buffer (small, on module level to avoid per-function stack cost)
 static char oledBuf[22];
 
 // ---------------------------------------------------------------------------
-// Button ISR - sets flag for main loop
+// Button ISR - push timestamp into queue; debounce happens in loopOLED()
 // ---------------------------------------------------------------------------
-static void IRAM_ATTR oledButtonISR() {
-  oledButtonPressed = true;
+#if defined(ESP32)
+static void IRAM_ATTR oledButtonISR(void* /*arg*/) {
+  if (gpio_get_level((gpio_num_t)OLED_BUTTON_PIN) == 0) {
+    int64_t t = esp_timer_get_time();
+    xQueueSendFromISR(_oledBtnQueue, &t, nullptr);
+  }
+}
+#endif
+
+// ---------------------------------------------------------------------------
+// fmtFloatOrDash - render float into oledBuf, or "---" if NaN
+// Returns pointer to oledBuf for chained print().
+// ---------------------------------------------------------------------------
+static const char* fmtFloatOrDash(float val) {
+  if (isnan(val)) {
+    strlcpy(oledBuf, "---", sizeof(oledBuf));
+  } else {
+    snprintf_P(oledBuf, sizeof(oledBuf), PSTR("%.1f"), val);
+  }
+  return oledBuf;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,9 +152,9 @@ static void drawPageNetwork() {
 #endif
     {
       oledDisplay.print(F("WiFi: "));
-      // Truncate SSID to 14 chars to fit display
+      // Use cached SSID (refreshed in loopOLED) to avoid String alloc in hot path.
       char ssidBuf[15];
-      strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf));
+      strlcpy(ssidBuf, oledCachedSSID, sizeof(ssidBuf));
       oledDisplay.print(ssidBuf);
     }
 
@@ -187,8 +213,13 @@ static void drawPageOTStatus() {
   oledDisplay.setRow(4);
   oledDisplay.setCol(0);
   if (flameOn) {
-    snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Flame:on  Mod:%.0f%%"), OTcurrentSystemState.RelModLevel);
-    oledDisplay.print(oledBuf);
+    float mod = OTcurrentSystemState.RelModLevel;
+    if (isnan(mod)) {
+      oledDisplay.print(F("Flame:on  Mod:---"));
+    } else {
+      snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Flame:on  Mod:%.0f%%"), mod);
+      oledDisplay.print(oledBuf);
+    }
   } else {
     oledDisplay.print(F("Flame: off"));
   }
@@ -203,11 +234,13 @@ static void drawPageOTStatus() {
   oledDisplay.print(F("DHW:"));
   oledDisplay.print(dhwActive ? F("on")   : F("off"));
 
-  // Setpoint and boiler temp
+  // Setpoint and boiler temp - guard each float independently
   oledDisplay.setRow(6);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Set:%.1f Boil:%.1f"), OTcurrentSystemState.TSet, OTcurrentSystemState.Tboiler);
-  oledDisplay.print(oledBuf);
+  oledDisplay.print(F("Set:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TSet));
+  oledDisplay.print(F(" Boil:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tboiler));
 }
 
 // ---------------------------------------------------------------------------
@@ -266,8 +299,13 @@ static void drawPageDashboard() {
   oledDisplay.setRow(2);
   oledDisplay.setCol(0);
   if (flameOn) {
-    snprintf_P(oledBuf, sizeof(oledBuf), PSTR("* Mod: %.0f%%"), OTcurrentSystemState.RelModLevel);
-    oledDisplay.print(oledBuf);
+    float mod = OTcurrentSystemState.RelModLevel;
+    if (isnan(mod)) {
+      oledDisplay.print(F("* Mod: ---"));
+    } else {
+      snprintf_P(oledBuf, sizeof(oledBuf), PSTR("* Mod: %.0f%%"), mod);
+      oledDisplay.print(oledBuf);
+    }
   } else {
     oledDisplay.print(F("Flame: off"));
   }
@@ -279,20 +317,26 @@ static void drawPageDashboard() {
   // Row 4: Setpoint and boiler temp
   oledDisplay.setRow(4);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Set:%.1f Boil:%.1f"), OTcurrentSystemState.TSet, OTcurrentSystemState.Tboiler);
-  oledDisplay.print(oledBuf);
+  oledDisplay.print(F("Set:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TSet));
+  oledDisplay.print(F(" Boil:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tboiler));
 
   // Row 5: Return and DHW temp
   oledDisplay.setRow(5);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Ret:%.1f DHW :%.1f"), OTcurrentSystemState.Tret, OTcurrentSystemState.Tdhw);
-  oledDisplay.print(oledBuf);
+  oledDisplay.print(F("Ret:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tret));
+  oledDisplay.print(F(" DHW :"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tdhw));
 
   // Row 6: Pressure and outside temp
   oledDisplay.setRow(6);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Bar:%.1f Out :%.1f"), OTcurrentSystemState.CHPressure, OTcurrentSystemState.Toutside);
-  oledDisplay.print(oledBuf);
+  oledDisplay.print(F("Bar:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.CHPressure));
+  oledDisplay.print(F(" Out :"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Toutside));
 }
 
 // ---------------------------------------------------------------------------
@@ -307,18 +351,16 @@ static void drawPageHeating() {
   oledDisplay.print(F("HC1:"));
   oledDisplay.setRow(3);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR(" Set:%.1f Rm:"), OTcurrentSystemState.TrSet);
-  oledDisplay.print(oledBuf);
-  if (isnan(OTcurrentSystemState.Tr)) {
-    oledDisplay.print(F("--"));
-  } else {
-    snprintf_P(oledBuf, sizeof(oledBuf), PSTR("%.1f"), OTcurrentSystemState.Tr);
-    oledDisplay.print(oledBuf);
-  }
+  oledDisplay.print(F(" Set:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TrSet));
+  oledDisplay.print(F(" Rm:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tr));
   oledDisplay.setRow(4);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR(" Flow:%.1f Ret:%.1f"), OTcurrentSystemState.Tboiler, OTcurrentSystemState.Tret);
-  oledDisplay.print(oledBuf);
+  oledDisplay.print(F(" Flow:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tboiler));
+  oledDisplay.print(F(" Ret:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tret));
 
   // HC2
   oledDisplay.setRow(5);
@@ -326,12 +368,14 @@ static void drawPageHeating() {
   oledDisplay.print(F("HC2:"));
   oledDisplay.setRow(6);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR(" Set:%.1f Rm:%.1f"), OTcurrentSystemState.TrSetCH2, OTcurrentSystemState.TRoomCH2);
-  oledDisplay.print(oledBuf);
+  oledDisplay.print(F(" Set:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TrSetCH2));
+  oledDisplay.print(F(" Rm:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TRoomCH2));
   oledDisplay.setRow(7);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR(" Flow:%.1f"), OTcurrentSystemState.TflowCH2);
-  oledDisplay.print(oledBuf);
+  oledDisplay.print(F(" Flow:"));
+  oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TflowCH2));
 }
 
 // ---------------------------------------------------------------------------
@@ -351,6 +395,7 @@ void initOLED() {
   oledPresent = true;
   oledPage = 1;
   oledLastActivity = millis();
+  oledLastRenderedPage = 0xFF;  // force initial clear+render
 
   // Advertise OLED presence in runtime state
   state.hw.bOLEDPresent = true;
@@ -375,10 +420,24 @@ void initOLED() {
   oledDisplay.setCol(0);
   oledDisplay.println(F("Press button for info"));
 
-  // Button ISR for page cycling (GPIO 9 = PIN_CONFIG_BUTTON on OTGW32)
+  // Button ISR for page cycling — ESP-IDF GPIO API + FreeRTOS queue.
+  // Queue carries the press timestamp (us); debounce happens in loopOLED().
+#if defined(ESP32)
+  _oledBtnQueue = xQueueCreate(10, sizeof(int64_t));
+  gpio_set_direction((gpio_num_t)OLED_BUTTON_PIN, GPIO_MODE_INPUT);
+  // Boot button has an external pull-up; ensure internal is also enabled for safety.
+  gpio_set_pull_mode((gpio_num_t)OLED_BUTTON_PIN, GPIO_PULLUP_ONLY);
+  gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+  gpio_set_intr_type((gpio_num_t)OLED_BUTTON_PIN, GPIO_INTR_NEGEDGE);
+  gpio_intr_enable((gpio_num_t)OLED_BUTTON_PIN);
+  gpio_isr_handler_add((gpio_num_t)OLED_BUTTON_PIN, oledButtonISR, nullptr);
+  DebugTf(PSTR("OLED: Button ISR on GPIO %d (FreeRTOS queue)\r\n"), OLED_BUTTON_PIN);
+#else
+  // Non-ESP32 fallback: legacy Arduino API (HAS_OLED_CAPABLE is currently
+  // ESP32-only, so this is belt-and-braces only).
   pinMode(OLED_BUTTON_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(OLED_BUTTON_PIN), oledButtonISR, FALLING);
-  DebugTf(PSTR("OLED: Button ISR on GPIO %d\r\n"), OLED_BUTTON_PIN);
+  DebugTf(PSTR("OLED: Button on GPIO %d (no ISR — non-ESP32 build)\r\n"), OLED_BUTTON_PIN);
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -389,29 +448,44 @@ void loopOLED() {
 
   uint32_t now = millis();
 
-  // Handle button press (debounced)
-  if (oledButtonPressed) {
-    oledButtonPressed = false;
-    if ((now - oledLastDebounce) >= OLED_DEBOUNCE_MS) {
-      oledLastDebounce = now;
-      oledLastActivity = now;
+  // ----- Button drain w/ debounce (debounce check BEFORE state mutation) -----
+#if defined(ESP32)
+  static int64_t _lastBtnTime = 0;
+  int64_t c = 0;
+  while (_oledBtnQueue && xQueueReceive(_oledBtnQueue, &c, 0)) {
+    if ((c - _lastBtnTime) < OLED_DEBOUNCE_US) {
+      _lastBtnTime = c;
+      continue;  // bounce — drop without mutating page state
+    }
+    _lastBtnTime = c;
+    oledLastActivity = now;
 
+    if (oledPage == 0) {
+      // Wake from off: go to page 1 and turn display on
+      oledPage = 1;
+      oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
+      oledLastRefresh = 0;                // force immediate redraw
+    } else {
+      // Cycle to next page; wrap past last content page to 0=off.
+      // OLED_NUM_PAGES = 6 (slots: 0=off, 1..5 content), so 5 -> 0.
+      oledPage = (oledPage + 1) % OLED_NUM_PAGES;
       if (oledPage == 0) {
-        // Wake from off: go to page 1 and turn display on
-        oledPage = 1;
-        oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
-        oledLastRefresh = 0;  // force immediate redraw
+        oledDisplay.ssd1306WriteCmd(0xAE);  // DISPLAYOFF
       } else {
-        // Cycle to next page; wrap to 0=off
-        oledPage = (oledPage + 1) % OLED_NUM_PAGES;
-        if (oledPage == 0) {
-          oledDisplay.ssd1306WriteCmd(0xAE);  // DISPLAYOFF
-        } else {
-          oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
-          oledLastRefresh = 0;  // force immediate redraw
-        }
+        oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
+        oledLastRefresh = 0;                // force immediate redraw
       }
     }
+  }
+#endif
+
+  // ----- SSID cache maintenance (avoid String in hot path, ADR-004) -----
+  if (WiFi.isConnected()) {
+    if (oledCachedSSID[0] == '\0') {
+      strlcpy(oledCachedSSID, WiFi.SSID().c_str(), sizeof(oledCachedSSID));
+    }
+  } else {
+    oledCachedSSID[0] = '\0';
   }
 
   // Auto-off after timeout
@@ -423,11 +497,17 @@ void loopOLED() {
 
   if (oledPage == 0) return;
 
-  // 1 Hz refresh
+  // Throttle render cadence (OLED_REFRESH_MS)
   if ((now - oledLastRefresh) < OLED_REFRESH_MS) return;
   oledLastRefresh = now;
 
-  oledDisplay.clear();
+  // clear() only on page change — SSD1306Ascii overwrites text in place,
+  // so per-second clear() just causes flicker and wastes I2C cycles.
+  if (oledPage != oledLastRenderedPage) {
+    oledDisplay.clear();
+    oledLastRenderedPage = oledPage;
+  }
+
   switch (oledPage) {
     case 1: drawPageNetwork();   break;
     case 2: drawPageOTStatus();  break;

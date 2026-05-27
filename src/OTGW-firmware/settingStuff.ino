@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.80
+**  Version  : v2.0.0-alpha.81
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -437,8 +437,14 @@ void writeSettings(bool show)
   writeJsonStringKV(file, F("ETHipaddress"), settings.eth.sIPaddress, true);
   writeJsonStringKV(file, F("ETHgateway"), settings.eth.sGateway, true);
   writeJsonStringKV(file, F("ETHsubnet"), settings.eth.sSubnet, true);
-  writeJsonStringKV(file, F("ETHdns"), settings.eth.sDNS, false);
+  writeJsonStringKV(file, F("ETHdns"), settings.eth.sDNS, true);
 #endif
+  // WiFi static IP (empty sStaticIp = DHCP)
+  writeJsonStringKV(file, F("WifiStaticIP"), settings.wifi.sStaticIp, true);
+  writeJsonStringKV(file, F("WifiSubnet"),   settings.wifi.sSubnet,   true);
+  writeJsonStringKV(file, F("WifiGateway"),  settings.wifi.sGateway,  true);
+  writeJsonStringKV(file, F("WifiDns1"),     settings.wifi.sDns1,     true);
+  writeJsonStringKV(file, F("WifiDns2"),     settings.wifi.sDns2,     false);
   file.print(F("}\n"));
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
   file.close();  // Close write handle before any subsequent read
@@ -1077,6 +1083,27 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("ETHsubnet")) == 0)       { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.eth.sSubnet, newValue, sizeof(settings.eth.sSubnet)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
   else if (strcasecmp_P(field, PSTR("ETHdns")) == 0)          { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.eth.sDNS, newValue, sizeof(settings.eth.sDNS)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
 #endif
+  // WiFi static IP. Empty string = DHCP. Parse-validate non-empty values.
+  else if (strcasecmp_P(field, PSTR("WifiStaticIP")) == 0) {
+    if (newValue[0] == '\0') { settings.wifi.sStaticIp[0] = '\0'; }
+    else { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.wifi.sStaticIp, newValue, sizeof(settings.wifi.sStaticIp)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
+  }
+  else if (strcasecmp_P(field, PSTR("WifiSubnet")) == 0) {
+    if (newValue[0] == '\0') { settings.wifi.sSubnet[0] = '\0'; }
+    else { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.wifi.sSubnet, newValue, sizeof(settings.wifi.sSubnet)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
+  }
+  else if (strcasecmp_P(field, PSTR("WifiGateway")) == 0) {
+    if (newValue[0] == '\0') { settings.wifi.sGateway[0] = '\0'; }
+    else { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.wifi.sGateway, newValue, sizeof(settings.wifi.sGateway)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
+  }
+  else if (strcasecmp_P(field, PSTR("WifiDns1")) == 0) {
+    if (newValue[0] == '\0') { settings.wifi.sDns1[0] = '\0'; }
+    else { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.wifi.sDns1, newValue, sizeof(settings.wifi.sDns1)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
+  }
+  else if (strcasecmp_P(field, PSTR("WifiDns2")) == 0) {
+    if (newValue[0] == '\0') { settings.wifi.sDns2[0] = '\0'; }
+    else { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.wifi.sDns2, newValue, sizeof(settings.wifi.sDns2)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
+  }
 
   // Side-effect checks — independent if's, multiple can fire
   if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()

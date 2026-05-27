@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Networktypes.h
-**  Version  : v2.0.0-alpha.80
+**  Version  : v2.0.0-alpha.81
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -57,3 +57,14 @@ struct EthernetSection {
   char sDNS[16]        = "0.0.0.0";        // DNS server (0.0.0.0 = use gateway)
 };
 #endif
+
+// WifiSection — persisted static IP for the WiFi STA interface.
+// All fields default to empty string; empty sStaticIp means DHCP (the OS
+// keeps DHCP mode unchanged and the other fields are ignored).
+struct WifiSection {
+  char sStaticIp[16] = "";   // e.g. "192.168.1.100" (empty = DHCP)
+  char sSubnet[16]   = "";   // e.g. "255.255.255.0"
+  char sGateway[16]  = "";   // e.g. "192.168.1.1"
+  char sDns1[16]     = "";   // e.g. "8.8.8.8"
+  char sDns2[16]     = "";   // e.g. "8.8.4.4"
+};

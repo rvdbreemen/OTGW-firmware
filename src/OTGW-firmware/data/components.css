@@ -634,6 +634,64 @@ body.dark .settingDiv,
 }
 .settings-group-body .settingDiv:last-child { margin-bottom: 0; }
 
+/* Fixed IP configuration section (DS:SETTINGS-FIXED-IP) — segmented octet
+ * inputs for static IP entry, with a DHCP toggle that shows/hides the field
+ * group. Used for both WiFi (.fixed-ip-section[data-iface="wifi"]) and
+ * Ethernet (.fixed-ip-section[data-iface="eth"]). All colors via DS tokens. */
+.fixed-ip-section { padding: 0; overflow: hidden; }
+.fixed-ip-row {
+  display: flex; align-items: center; justify-content: flex-start;
+  text-align: left;
+  border-bottom: 1px solid var(--brand-lightblue);
+  padding: var(--space-1) 0;
+}
+.fixed-ip-row:last-child { border-bottom: none; }
+.fixed-ip-field-label {
+  padding-left: var(--space-7);
+  text-align: left;
+}
+.fixed-ip-section .settings-field-container { text-align: left; }
+.fixed-ip-dhcp-label {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  cursor: pointer; font-size: var(--fs-sm);
+}
+.dhcp-toggle-cb { width: auto; cursor: pointer; }
+.fixed-ip-fields {
+  background: var(--brand-faint);
+  border-top: 1px solid var(--brand-lightblue);
+}
+.octet-group {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--fg-4); border-radius: 4px;
+  padding: 1px var(--space-1);
+  background: var(--bg-surface);
+  gap: 1px;
+}
+.octet-input {
+  width: 38px; border: none; outline: none; text-align: center;
+  padding: 2px 0; background: transparent;
+  color: var(--fg-1);
+  font-size: var(--fs-sm);
+  -moz-appearance: textfield;
+}
+.octet-input::-webkit-outer-spin-button,
+.octet-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.octet-input:focus {
+  background: var(--brand-cyan-soft);
+  border-radius: 2px;
+}
+.octet-dot {
+  color: var(--fg-3); font-weight: bold;
+  user-select: none; padding: 0 1px;
+}
+.fixed-ip-notice {
+  text-align: right;
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--fs-xs);
+  color: var(--fg-4);
+  font-style: italic;
+}
+
 /* Settings save-bar (DS:SETTINGS-SAVEBAR) — sticky status footer.
  * Hides itself when empty so it doesn't take space when there's no
  * status to report. saveSettings()/sendPostSetting() drive the text. */
