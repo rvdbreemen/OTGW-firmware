@@ -1,0 +1,52 @@
+---
+id: TASK-639
+title: Inline 'since last public release' digest in beta GitHub release body
+status: Done
+assignee:
+  - '@claude'
+created_date: '2026-05-20 15:36'
+updated_date: '2026-05-25 20:51'
+labels:
+  - release
+  - docs
+  - ci
+dependencies: []
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+The beta-prerelease.yml workflow currently composes a thin release body that only links README.md, CHANGELOG.md, and (if present) RELEASE_NOTES_<base>-beta.md. Field testers reading the release page on mobile want a narrative summary of what changed since the last shipping version, inline. Curate that summary in a new RELEASE_NOTES_1.6.0-beta.md at repo root, use an HTML-comment sentinel to mark a teaser region, and modify the workflow to inline the teaser between the 'What is in this build' section and the 'Compare to the latest public release' section.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 RELEASE_NOTES_1.6.0-beta.md exists at the repo root with a curated 'What's new since v1.5.0-fix2' narrative, grouped by area (MQTT/HA discovery, Web UI/diagnostics, tooling/build, code hygiene, documentation). No em dashes.
+- [x] #2 The notes file contains an HTML-comment digest-end sentinel (e.g. '<!-- digest:end -->') marking the teaser cutoff. Content above the sentinel is the release-page digest; content below is the long-form detail referenced via the existing 'Read full release notes' link.
+- [x] #3 .github/workflows/beta-prerelease.yml inlines the teaser content (lines 1..sentinel, sentinel line stripped) under a new '## What's new since the last public release' heading inside the composed release body, placed between 'What is in this build' and 'Compare to the latest public release'.
+- [x] #4 When no notes file is found at the tagged commit, the workflow falls back to the previous behaviour (no inline summary, no 'Read full release notes' link) without erroring.
+- [x] #5 When the notes file exists but has no digest-end sentinel, the workflow inlines the entire file (best-effort behaviour, documented in the workflow comments).
+- [x] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures on the commit that introduces the change.
+- [x] #7 Changes commit to claude/beta-release-prep-qUipc and a draft PR is opened against dev.
+- [x] #8 .claude/skills/beta-prerelease/SKILL.md is restructured so the README + CHANGELOG check is moved from Phase 2.5 (after bump) to Phase 1 (before bump). The check gates the rest of the flow: if README's 'What's new on dev' or CHANGELOG's [Unreleased] section is stale relative to commits since the last public stable, the skill halts and asks the user to refresh first.
+- [x] #9 Skill text spells out the staleness check explicitly: a deterministic pre-flight that diffs commit log since the latest public stable (gh release view --json tagName) against the bullets already present in README/CHANGELOG, calling out any commit subject not yet narrated. Heuristic, not a hard regex match.
+<!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Restructure .claude/skills/beta-prerelease/SKILL.md so README + CHANGELOG check moves to Phase 1 (before bump). Spell out the deterministic staleness check: git log v<latest-public>..HEAD vs README 'What's new' bullets + CHANGELOG [Unreleased].
+2. Create RELEASE_NOTES_1.6.0-beta.md at the repo root. Top section is the digest (curated summary of changes since v1.5.0-fix2, sourced from the README 'What's new on dev' section, trimmed and adapted for the release page). Sentinel: <!-- digest:end -->. Below the sentinel: full-detail bullets per major area (matching CHANGELOG [Unreleased] but in reader-oriented prose).
+3. Modify .github/workflows/beta-prerelease.yml: in the 'Compose release body' step, after the existing notes-file detection loop, read the file content up to the digest sentinel (sed -n '1,/digest:end/p' minus the marker), then echo it under a new '## What's new since the last public release' heading placed between 'What is in this build' and 'Compare to the latest public release'. Keep the existing 'Release notes for this line' link as the 'read full' affordance.
+4. Build verification: python build.py --firmware (must exit 0).
+5. Evaluator: python evaluate.py --quick (no new failures).
+6. Commit on claude/beta-release-prep-qUipc with conventional message describing all three changes (skill restructure, notes file, workflow inline).
+7. Push branch and open draft PR against dev so the maintainer can review before the next tag push.
+8. Mark all ACs and set status to Done.
+<!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented inline 'since last public release' digest in beta GitHub release body. RELEASE_NOTES_1.6.0-beta.md added at repo root with digest region above '<!-- digest:end -->' sentinel. Workflow (.github/workflows/beta-prerelease.yml) updated to inline digest content under '## What''s new since the last public release' heading. Fallback behaviour for missing file or missing sentinel both handled. SKILL.md restructured: README/CHANGELOG staleness check moved to Phase 1 (before bump), with explicit deterministic pre-flight documented. Merged as PR #612 on 2026-05-20.
+<!-- SECTION:FINAL_SUMMARY:END -->

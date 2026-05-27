@@ -1,8 +1,65 @@
 # OTGW-firmware (ESP8266) for NodoShop OpenTherm Gateway
 
+> ⚠️ **This is the development branch (`dev`)**: the 1.5.x maintenance line, currently tracking the next stable release as **1.6.0** prereleases (`1.6.0-beta.N`).
+> For the current stable release, see the [`main` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/main) or the [v1.5.0 release](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0).
+
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
+
+## What's new on dev (since v1.5.0-fix2)
+
+Dev currently builds as `1.6.0-beta.N` (latest cut: `1.6.0-beta.25`). The list below summarises the user-visible changes that have landed on `dev` since the last public stable, [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2). Field testers can flash these builds from the [Releases page](https://github.com/rvdbreemen/OTGW-firmware/releases) (look for the most recent `v1.6.0-beta.*` prerelease).
+
+**MQTT and Home Assistant discovery**
+- **HA availability now reflects the MQTT link, not the OpenTherm bus** (ADR-074, regression fix). Entities like `DHW Control` and `Thermostat` no longer flap `unavailable` when the boiler stops talking; OT-bus liveness lives on the dedicated `otgw_connected` sensor. **Contract change:** consumers reading the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to `otgw_connected`.
+- **Pure JIT MQTT discovery** (ADR-073, supersedes ADR-041): only non-OT pseudo-IDs queue at boot; OT MsgID discovery configs publish on first MsgID reception. Stalled-discovery edge case fixed by aligning the JIT trigger with the force-path `hasConfig` filter.
+- **Proxy-answer (no-B) routing fix** (ADR-075): MsgIDs without a boiler response now route to the correct worldview topic instead of going silent.
+- **MsgID 0 Status canonical publish gated on boiler-side worldview** so the canonical topic no longer flaps on thermostat-only frames.
+- **HA PIC-control entities**: new `button` and `select` discovery configs under pseudo-ID 251 expose the PIC reset and mode controls as proper HA entities.
+- **Standalone HA discovery topic wiper**: one-shot helper for cleaning stale retained discovery topics out of the broker (TASK-611).
+- **HA capability-flag binary sensors for bits 2-5 no longer stuck at `unknown`** (ADR-076, PR #614): the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so cooling, OTC active, CH2 active, and summer/winter all reach their retained topics on every status change.
+
+**Settings and networking**
+- **Static IP address support with improved UI** (TASK-548, TASK-709): configure a fixed IP, subnet, gateway, and up to two DNS servers in the firmware settings. Persisted across reboots and applied before WiFiManager connects. The settings page shows a "Use DHCP" toggle; unchecking it reveals the IP fields and auto-fills them from the current DHCP lease. Each address uses four segmented inputs (0-255 per octet) with auto-advance and paste support. Octet inputs use `inputMode="numeric"` for correct mobile keyboards, carry ARIA group labels for screen-reader accessibility, validate each field before saving, and the save button stays visible on invalid input.
+
+**Web UI and diagnostics**
+- **Statistics table drag-to-resize columns** (TASK-703): grab any column header edge in the Statistics tab to resize it. Width preferences are saved in localStorage and survive page reloads.
+- **LittleFS size display fixed** (TASK-701): the device-info API and Web UI were showing 1 MB filesystem instead of the correct 2 MB; fixed by reading the partition size from the LittleFS descriptor.
+- **Device-info low-heap precheck corrected** (TASK-723): `/api/v2/device/info` no longer returns a premature `503` solely because its largest contiguous heap block drops below the former 8 KB guard; the endpoint still retains its lower allocation safety guard.
+- **OT log auto-scroll preserved** (TASK-701): switching tabs or navigating back to the main page no longer resets the scroll position in the OT log.
+- **Statistics column proportions and badge styling refined** (TASK-705, TASK-706): column widths are better balanced after the support-map feature landed; the "boiler unsupported" badge is visually consistent.
+- **Bilateral OT-bus support map** (TASK-686, PR #640): the gateway now tracks which OpenTherm MsgIDs are seen from the thermostat side, the boiler side, or both. The telnet view labels each data point "T / B / T+B"; a new `GET /api/v2/otgw/support-map` endpoint exposes the bitmaps; the Web UI shows which data points your system is actually exchanging.
+- **Heap drop counters now show lifetime totals** (TASK-697, PR #642): the per-minute `logHeapStats` line was showing window-scoped drop counters (which reset after each throttle warning) instead of the monotonic lifetime totals. Now consistent with MQTT stats topics and `/api/v2/heap`.
+- **Telnet diagnostic noise reduced** (TASK-683, PR #640): `onNotFound` now logs accurate HTTP status; the firmware-file-list API no longer mirrors its JSON to telnet; `checklittlefshash` is silent on a hash match.
+- **FSexplorer "Update Firmware" button** is visible again on touch-capable desktops; the touch-class media query no longer hides the upload control.
+- **Set-command debug surfacing**: silently-dropped set-commands now appear in the default debug stream instead of being swallowed.
+
+**Tooling and build**
+- **Flash scripts hardened**: `flash_otgw.sh` / `flash_otgw.bat` now mirror spec parity, verify SHA256 integrity, and pick the binary that matches the requested version. The `.bat` variant detects COM ports through the Windows registry and auto-downloads binaries when not found locally.
+- **`build.py` auto-initialises missing git submodules** so a fresh clone or a stale checkout builds without manual `git submodule update`.
+- **`evaluate.py`** false-positive and stale checks fixed; the gate is now meaningful again.
+- **`/beta-prerelease` skill + GitHub Action** for tag-driven (and, after #609, workflow-dispatch-driven) beta publishing, with draft-first asset attachment to satisfy GitHub's immutable-releases policy. The release body now inlines a "What's new since the last public release" digest sourced from `RELEASE_NOTES_<base>-beta.md` above a `<!-- digest:end -->` sentinel, and the `/beta-prerelease` skill gates the README + CHANGELOG staleness check before the version bump (#612).
+
+**Performance**
+- **Mainloop responsiveness audit** (TASK-651, TASK-652, PR #617): all blocking `delay()` / `delayMs()` calls on the cooperative path replaced with non-blocking timer checks so `doBackgroundTasks()` keeps running at full cadence under load.
+- **Mainloop Tier-1 follow-up** (TASK-671, PR #626): `handleOTGW()` drain loops are now bounded (max 4 lines per call) so a noisy PIC cannot starve the rest of the loop; the dead `executeCommand` path is removed; a stray `delay(1)` on the cooperative path is replaced with a `yield()`.
+- **Mainloop Tier-1 follow-up #2** (TASK-673, PR #633): `String` usage removed from hot paths in `helperStuff.ino` / `webhook.ino`; `emergencyHeapRecovery()` is now a real recovery routine (drops the OTGWstream client and pauses the discovery drip for one tick when heap is critical, see ADR-079); the always-on `BGTRACE` instrumentation is dropped from production builds.
+- **Mainloop Tier-2 dispositions** (TASK-674, PR #635): webhook HTTP timeout tightened from 1000 ms to 500 ms; the existing webhook retry state machine absorbs the slack. The remaining synchronous blocker, `MQTTclient.connect()` with a 15 s socket timeout, is documented and accepted in ADR-080 (15 s worst-case stall every 42 s during a broker outage; bounded `handleOTGW()` drains keep the PIC serial path safe).
+
+**Code hygiene**
+- **Dead and orphaned code paths cleaned out of `dev`** (#586, #589): inactive subsystem code and its matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.
+
+**Documentation**
+- New integration guides for **openHAB** and **Domoticz**.
+- New Dutch beginner guide for cleaning up stale MQTT topics in MQTT Explorer.
+- PIC and ESP firmware guides split into EN/NL language variants, with PIC guide scope restored and ESP-flash docs routed to `FLASH_GUIDE.md`.
+- `MQTT_STALE_TOPICS_CLEANUP.md`: added a "Recovering missing HA entities" section distinguishing JIT progressive appearance from upgrade stale-topic cleanup.
+- API and ADR docs refreshed mid-cycle: `docs/api/MQTT.md` documents the boot vs. JIT discovery split per ADR-073, `docs/api/README.md` corrects the `/discovery/verify` endpoint description, and `docs/adr/README.md` gains the ADR-041 (Superseded) and ADR-073 entries.
+- Release-notes housekeeping: `RELEASE_NOTES_1.5.0.md` moved out of the repo root into `docs/releases/`; older `1.3.3` and `1.3.4` notes archived under `docs/releases/archive/`.
+- Documentation link paths normalised; markdown link-validation guardrail introduced (#573) and its CI scope extended to `docs/guides/` and `docs/process/` in `.github/workflows/evaluate.yml` (#581) to keep documentation cross-links honest.
+
+Full per-commit detail lives in [`CHANGELOG.md`](CHANGELOG.md) under `## [Unreleased]`. Architectural rationale lives in the linked ADRs under [`docs/adr/`](docs/adr/).
 
 ## What's New in v1.5.0
 
@@ -18,14 +75,15 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 - **No-Python flash and build scripts**: `flash_otgw.sh` / `flash_otgw.bat` and `build.sh` / `build.bat`.
 - **Arduino Core 2.7.4 baseline**: partition layout retained at `eesz=4M2M` — no filesystem partition reformat needed when upgrading from v1.4.1.
 
-Full release notes: [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md)
+Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.5.0
+## Latest stable release: v1.5.0-fix2
 
-`v1.5.0` is the current stable release. It runs on Arduino Core 2.7.4 and brings sibling-suffix MQTT topics, worldview semantics, human-readable HA discovery entity names, targeted bug fixes for MQTT topic flapping and WiFi DHCP, and reboot reliability hardening. Upgrading from v1.4.1 requires no filesystem partition reformat.
+`v1.5.0-fix2` is the current stable release tag on `main`. It keeps the `v1.5.0` Arduino Core 2.7.4 baseline and includes maintenance fixes on top of the stable 1.5.0 release.
 
-Full release notes: [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md)
+Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
+Maintenance release tags: [v1.5.0-fix](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix), [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2)
 
 ## Previous stable release: v1.4.1
 
@@ -39,23 +97,23 @@ Full release notes: [docs/releases/RELEASE_NOTES_1.4.1.md](docs/releases/RELEASE
 
 ## What was new in v1.3.4
 
-Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](RELEASE_NOTES_1.3.4.md)
+Version 1.3.4 fixes MQTT throttle slot suppression, adds Debug Info tooltips, renames "OTGW Connected" to "OpenTherm Active", and adds thermostat-only MQTT support. Full release notes: [RELEASE_NOTES_1.3.4.md](docs/releases/archive/RELEASE_NOTES_1.3.4.md)
 
 ## What was new in v1.3.3
 
-Version 1.3.3 adds PIC-less OTGW support and fixes the dashboard showing empty values for unsupported OpenTherm message IDs. Full release notes: [RELEASE_NOTES_1.3.3.md](RELEASE_NOTES_1.3.3.md)
+Version 1.3.3 adds PIC-less OTGW support and fixes the dashboard showing empty values for unsupported OpenTherm message IDs. Full release notes: [RELEASE_NOTES_1.3.3.md](docs/releases/archive/RELEASE_NOTES_1.3.3.md)
 
 ## What was new in v1.3.2
 
-Version 1.3.2 fixes the persistent file explorer failures reported after v1.3.1. Full release notes: [RELEASE_NOTES_1.3.2.md](RELEASE_NOTES_1.3.2.md)
+Version 1.3.2 fixes the persistent file explorer failures reported after v1.3.1. Full release notes: [RELEASE_NOTES_1.3.2.md](docs/releases/archive/RELEASE_NOTES_1.3.2.md)
 
 ## What was new in v1.3.1
 
-Version 1.3.1 was a stability release fixing command queue reliability, CS override interference, and serial coordination issues reported after v1.3.0. Full release notes: [RELEASE_NOTES_1.3.1.md](RELEASE_NOTES_1.3.1.md)
+Version 1.3.1 was a stability release fixing command queue reliability, CS override interference, and serial coordination issues reported after v1.3.0. Full release notes: [RELEASE_NOTES_1.3.1.md](docs/releases/archive/RELEASE_NOTES_1.3.1.md)
 
 ## What was new in v1.3.0
 
-Version 1.3.0 is a major feature release building on v1.2.0 with PIC settings visibility, safer upgrades, better recovery, optional admin protection, fuller `PS=1` integration, and significantly lower RAM pressure. Full release notes: [RELEASE_NOTES_1.3.0.md](RELEASE_NOTES_1.3.0.md) / [Breaking Changes Log](docs/BREAKING_CHANGES.md)
+Version 1.3.0 is a major feature release building on v1.2.0 with PIC settings visibility, safer upgrades, better recovery, optional admin protection, fuller `PS=1` integration, and significantly lower RAM pressure. Full release notes: [RELEASE_NOTES_1.3.0.md](docs/releases/archive/RELEASE_NOTES_1.3.0.md) / [Breaking Changes Log](docs/BREAKING_CHANGES.md)
 
 ### Highlights
 
@@ -74,7 +132,7 @@ Version 1.3.0 is a major feature release building on v1.2.0 with PIC settings vi
 
 ## What was new in v1.2.0
 
-Version 1.2.0 was the protocol-alignment and discovery release. It expanded Home Assistant coverage across the OpenTherm specification and tightened MQTT, REST API, and Web UI behavior. Full release notes: [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md)
+Version 1.2.0 was the protocol-alignment and discovery release. It expanded Home Assistant coverage across the OpenTherm specification and tightened MQTT, REST API, and Web UI behavior. Full release notes: [RELEASE_NOTES_1.2.0.md](docs/releases/archive/RELEASE_NOTES_1.2.0.md)
 
 ### Highlights
 
@@ -82,11 +140,11 @@ Version 1.2.0 was the protocol-alignment and discovery release. It expanded Home
 - **OpenTherm v4.2 alignment:** Added missing IDs `39` and `93-97`, corrected types and units, and introduced compatibility handling for legacy IDs `50-63`.
 - **MQTT / webhook / diagnostics improvements:** Added optional source-separated MQTT topics, webhook support, safer MQTT auto-configuration, and richer serial/WebSocket diagnostics.
 - **v2-only API baseline:** `/api/v0/` and `/api/v1/` were removed in favor of `/api/v2/`, with related device-info key updates for raw API consumers.
-- **Upgrade note:** v1.2.0 introduced real migration items for MQTT topics, Home Assistant entities, and some raw API fields. See [RELEASE_NOTES_1.2.0.md](RELEASE_NOTES_1.2.0.md) and [docs/fixes/opentherm-v42-mqtt-breaking-changes.md](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
+- **Upgrade note:** v1.2.0 introduced real migration items for MQTT topics, Home Assistant entities, and some raw API fields. See [RELEASE_NOTES_1.2.0.md](docs/releases/archive/RELEASE_NOTES_1.2.0.md) and [docs/fixes/opentherm-v42-mqtt-breaking-changes.md](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
 
 ## What was new in v1.1.0
 
-Version 1.1.0 builds on the stable v1.0.0 foundation with Dallas temperature sensor enhancements, a complete RESTful API v2, WebUI data persistence, and 20 bug fixes from a comprehensive codebase review. Full release notes: [RELEASE_NOTES_1.1.0.md](RELEASE_NOTES_1.1.0.md)
+Version 1.1.0 builds on the stable v1.0.0 foundation with Dallas temperature sensor enhancements, a complete RESTful API v2, WebUI data persistence, and 20 bug fixes from a comprehensive codebase review. Full release notes: [RELEASE_NOTES_1.1.0.md](docs/releases/archive/RELEASE_NOTES_1.1.0.md)
 
 ### Dallas Sensors, RESTful API v2, and 20-Bug Codebase Overhaul
 
@@ -96,7 +154,7 @@ Version 1.1.0 builds on the stable v1.0.0 foundation with Dallas temperature sen
 - **RESTful API v2** — 13 new endpoints with consistent JSON errors, proper HTTP status codes (202 for async), CORS/OPTIONS support, RESTful resource naming (`messages/{id}`, `commands`, `device/info`). All frontend calls migrated to v2. See [ADR-035](docs/adr/ADR-035-restful-api-compliance-strategy.md).
 - **20-bug codebase review** — Memory safety (OOB write, stack overflow), data integrity (MQTT hour bitmask, −127°C sensor published to MQTT), concurrency (ISR race in S0 counter), security (reflected XSS), reliability (file descriptor leak, null pointer crash, 750ms blocking sensor read), GPIO output feature fix, flash wear reduction (20 writes → 1). Full details: [Codebase Review](docs/reviews/2026-02-13_codebase-review/CODEBASE_REVIEW.md).
 - **WebUI Data Persistence** — Automatic `localStorage` persistence with debounced saves, dynamic memory management, normal/capture modes, and auto-restoration on page load.
-- **Heap Memory Monitoring** — 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control ([ADR-030](docs/adr/ADR-030-heap-memory-monitoring.md)).
+- **Heap Memory Monitoring** — 4-level health system (CRITICAL/WARNING/LOW/HEALTHY) with adaptive throttling and WebSocket backpressure control ([ADR-030](docs/adr/ADR-030-heap-memory-monitoring-emergency-recovery.md)).
 - **Browser Debug Console (`otgwDebug`)** — Full diagnostic toolkit in the browser console: `status()`, `info()`, `settings()`, `wsStatus()`, `logs()`, `api()`, `health()`, `sendCmd()`, `exportLogs()`, and more.
 - **PS Mode detection** — Automatic detection of `PS=1`; hides the OT log section, disables WebSocket streaming, suppresses time-sync commands.
 - **MQTT auth fix** — Whitespace automatically trimmed from MQTT credentials, fixing auth failures when upgrading from v0.10.x.
@@ -109,7 +167,7 @@ No breaking API or MQTT changes. A filesystem flash and hard browser refresh (Ct
 
 Version 1.0.0 was a major milestone delivering improved stability, a modern user interface, and robust integration.
 
-> 📝 Full release notes: [RELEASE_NOTES_1.0.0.md](RELEASE_NOTES_1.0.0.md)
+> 📝 Full release notes: [RELEASE_NOTES_1.0.0.md](docs/releases/archive/RELEASE_NOTES_1.0.0.md)
 
 ### Highlights
 
@@ -291,7 +349,7 @@ This integration provides basic thermostat control but does not expose the full 
 1. **Flash the firmware** to your ESP8266.
    - **Recommended**: Use the included script: `python3 flash_esp.py` (downloads and flashes the latest release).
    - `python3 flash_esp.py --build` to build from source instead.
-   - See [FLASH_GUIDE.md](docs/FLASH_GUIDE.md) for detailed instructions.
+   - See [FLASH_GUIDE.md](docs/guides/FLASH_GUIDE.md) for detailed instructions.
 2. **Connect to WiFi**: The device starts an AP named `<hostname>-<mac>`. Connect and configure your WiFi credentials.
 3. **Open the Web UI** at `http://<device-ip>/` and configure MQTT (see [above](#setting-up-mqtt-with-home-assistant)).
 4. **Check Home Assistant** for auto-discovered entities.
@@ -344,12 +402,14 @@ Read-only monitoring (sensor values, device status, WebSocket connection) stays 
 | MQTT topic reference | [docs/api/MQTT.md](docs/api/MQTT.md) |
 | Dallas sensor labels API | [docs/api/DALLAS_SENSOR_LABELS_API.md](docs/api/DALLAS_SENSOR_LABELS_API.md) |
 | Webhook documentation | [docs/features/webhook.md](docs/features/webhook.md) |
-| Flash guide | [docs/FLASH_GUIDE.md](docs/FLASH_GUIDE.md) |
-| Local build guide | [docs/BUILD.md](docs/BUILD.md) |
-| Code quality checker | [docs/EVALUATION.md](docs/EVALUATION.md) |
+| Flash guide | [docs/guides/FLASH_GUIDE.md](docs/guides/FLASH_GUIDE.md) |
+| Local build guide | [docs/guides/BUILD.md](docs/guides/BUILD.md) |
+| Code quality checker | [docs/process/EVALUATION.md](docs/process/EVALUATION.md) |
 | Architecture Decision Records | [docs/adr/README.md](docs/adr/README.md) |
 | WebSocket architecture | [docs/api/WEBSOCKET_FLOW.md](docs/api/WEBSOCKET_FLOW.md) |
-| Upgrading from 0.9.x / 0.10.y | [docs/upgrade-from-0.x.md](docs/upgrade-from-0.x.md) |
+| Upgrading from 0.9.x / 0.10.y | [docs/archive/upgrade-from-0.x.md](docs/archive/upgrade-from-0.x.md) |
+| Release notes index (current + archive) | [docs/releases/README.md](docs/releases/README.md) |
+| Documentation link policy | [docs/process/DOCUMENTATION_LINKS_POLICY.md](docs/process/DOCUMENTATION_LINKS_POLICY.md) |
 
 ## Important warnings
 
@@ -368,16 +428,18 @@ This project is primarily designed for the NodoShop OTGW hardware with an ESP826
 
 Release notes for all versions are in [docs/releases/](docs/releases/). Prebuilt firmware binaries are on the [GitHub releases page](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
+For historical versions (`v1.3.x` and older), links intentionally point to [docs/releases/archive/](docs/releases/archive/) because those notes are archived.
+
 <details><summary>Version history (click to expand)</summary>
 
 | Version | Highlights |
 | --- | --- |
-| **1.5.x** | LTS line on Arduino Core 2.7.4 (in development): reboot reliability hardening, tighter MQTT publish gating, HA discovery for stats topics, WebUI design system, boot/loop diagnostics. [1.5.0-beta](RELEASE_NOTES_1.5.0-beta.md) |
+| **1.5.x** | Stable LTS line on Arduino Core 2.7.4. `v1.5.0` introduced reboot reliability hardening, tighter MQTT publish gating, HA discovery for stats topics, WebUI design system, and boot/loop diagnostics. [1.5.0](docs/releases/RELEASE_NOTES_1.5.0.md) [v1.5.0-fix2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.5.0-fix2) |
 | **1.4.x** | Arduino Core 3.1.2 baseline, SimpleTelnet migration, MQTT HA discovery streaming rewrite (309 configs / 80+ msgIds), WiFi reconnect hardening, heap-aware discovery drip, retained-discovery self-heal, unified time-boundary dispatcher, OpenTherm v4.2 alignment. [1.4.1](docs/releases/RELEASE_NOTES_1.4.1.md) |
-| **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/RELEASE_NOTES_1.3.4.md) [1.3.5](docs/releases/RELEASE_NOTES_1.3.5.md) |
-| **1.2.0** | Complete HA discovery expansion (309 configs, 80+ message IDs), OpenTherm v4.2 alignment, webhook support, source-separated MQTT topics, v0/v1 API removed. [Notes](docs/releases/RELEASE_NOTES_1.2.0.md) |
-| **1.1.0** | Dallas sensor custom labels and graphs, RESTful API v2 (13 new endpoints), WebUI data persistence, browser debug console, PS mode detection, 20 bug fixes. [Notes](docs/releases/RELEASE_NOTES_1.1.0.md) |
-| **1.0.0** | Milestone release: real-time graphs, modern Web UI with dark mode, WebSocket live log, MQTT auto-discovery, interactive flashing tool, PROGMEM memory safety. [Notes](docs/releases/RELEASE_NOTES_1.0.0.md) |
+| **1.3.x** | PIC gateway settings panel, optional HTTP Basic Auth, configurable MQTT publish gating, full PS=1 integration, triple-reset WiFi recovery, non-blocking WiFi reconnect, MQTT uptime/version publishing, PIC-less OTGW support, ser2net command queue coordination. [1.3.0](docs/releases/archive/RELEASE_NOTES_1.3.0.md) [1.3.1](docs/releases/archive/RELEASE_NOTES_1.3.1.md) [1.3.2](docs/releases/archive/RELEASE_NOTES_1.3.2.md) [1.3.3](docs/releases/archive/RELEASE_NOTES_1.3.3.md) [1.3.4](docs/releases/archive/RELEASE_NOTES_1.3.4.md) [1.3.5](docs/releases/RELEASE_NOTES_1.3.5.md) |
+| **1.2.0** | Complete HA discovery expansion (309 configs, 80+ message IDs), OpenTherm v4.2 alignment, webhook support, source-separated MQTT topics, v0/v1 API removed. [Notes](docs/releases/archive/RELEASE_NOTES_1.2.0.md) |
+| **1.1.0** | Dallas sensor custom labels and graphs, RESTful API v2 (13 new endpoints), WebUI data persistence, browser debug console, PS mode detection, 20 bug fixes. [Notes](docs/releases/archive/RELEASE_NOTES_1.1.0.md) |
+| **1.0.0** | Milestone release: real-time graphs, modern Web UI with dark mode, WebSocket live log, MQTT auto-discovery, interactive flashing tool, PROGMEM memory safety. [Notes](docs/releases/archive/RELEASE_NOTES_1.0.0.md) |
 | 0.10.3 | MQTT password masking, HA discovery template improvements, status function fixes. |
 | 0.10.2 | PIC firmware update fix, filesystem update with latest PIC firmware. |
 | 0.10.1 | Build process improvements, VH status parsing fix, WiFi quality indicator. |

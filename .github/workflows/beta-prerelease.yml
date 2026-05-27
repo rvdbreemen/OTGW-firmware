@@ -1,0 +1,338 @@
+name: Beta prerelease publish
+
+# Fires when a prerelease tag is pushed (any tag with a dash after the
+# version, e.g. v1.6.0-beta.4, v1.6.0-alpha.2, v1.6.0-rc.1). Stable tags
+# (v1.5.0, no dash) are NOT matched; those are handled by the /release
+# skill and the release-assets.yml workflow chains in on release:published.
+#
+# What this workflow does (self-contained, single job):
+#   1. Build firmware + filesystem binaries with build.py.
+#   2. Detect the latest PUBLIC stable release for the diff link
+#      (not the previous beta — testers want to know what changed since
+#      the last shipping version).
+#   3. Generate SHA256SUMS and the OTGW-firmware-<version>-flash-bundle.zip.
+#   4. Compose a release body that links the in-repo README.md, CHANGELOG.md
+#      and RELEASE_NOTES_*.md (if present at the tagged commit) so testers
+#      can read what is in the build straight from the GitHub release page.
+#   5. Create the release as DRAFT with all assets (firmware, filesystem,
+#      SHA256SUMS, flash_otgw.sh, flash_otgw.bat, flash-bundle.zip) attached
+#      in one atomic gh release create call.
+#   6. Flip draft -> published. The repo enforces immutable releases, so
+#      the release locks at this step; doing the asset attach earlier
+#      (against an already-published release) fails with HTTP 422
+#      "Cannot upload assets to an immutable release".
+#
+# Self-contained because GITHUB_TOKEN-created release events do not trigger
+# downstream workflows. The previous version relied on release-assets.yml
+# chaining in on release:published, which silently does not fire for beta
+# tags. SHA256SUMS / flash scripts / bundle are now generated here.
+#
+# Manual re-run: workflow_dispatch with a tag input lets the maintainer
+# re-publish a stuck draft without pushing a new tag.
+#
+# Security model: this workflow publishes a prerelease the moment a tag
+# matching `v*-*.*` is pushed OR a workflow_dispatch run completes — there
+# is no human-approval gate between draft and publish. The "create as
+# draft then flip to live" pattern only works around GitHub's
+# immutable-release upload restriction, NOT as a review checkpoint.
+# Anyone with `contents: write` on the repo can therefore trigger a
+# published prerelease. The `ref` input on workflow_dispatch is
+# hard-restricted (below) to dev / main / explicit commit SHAs to prevent
+# publishing arbitrary PR-head refs.
+# See TASK-656 for the design discussion.
+
+on:
+  push:
+    tags:
+      - 'v*-*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Prerelease tag to (re)publish (e.g. v1.6.0-beta.4). Created at `ref` if missing.'
+        required: true
+        type: string
+      ref:
+        description: 'Branch or commit to tag if `tag` does not yet exist (must be `dev` or a 7-40 char hex SHA — main and PR refs are rejected; stable releases use the /release skill). Ignored when the tag already exists.'
+        required: false
+        default: 'dev'
+        type: string
+
+jobs:
+  build-and-publish:
+    name: Build firmware, publish prerelease, attach assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to create release and upload assets
+
+    steps:
+      - name: Create tag if missing (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          REF="${{ inputs.ref }}"
+          # TASK-656: hard-restrict the ref to dev or a 7-40 char hex SHA.
+          # This workflow is the BETA-prerelease pipeline — stable releases (main)
+          # go through the /release skill and a different workflow chain, so main
+          # is intentionally NOT allowed here. gh api would otherwise resolve
+          # arbitrary refs (refs/pull/<N>/head, feature/...) and a maintainer
+          # dispatch could publish a prerelease from un-reviewed PR code. The
+          # tag-already-exists path is exempt because the tag itself is the
+          # source of truth at that point.
+          if ! gh api "repos/${{ github.repository }}/git/refs/tags/${TAG}" >/dev/null 2>&1; then
+            if ! echo "${REF}" | grep -qE '^(dev|[0-9a-f]{7,40})$'; then
+              echo "ERROR: ref '${REF}' is not allowed. Must be 'dev' or a 7-40 char hex commit SHA."
+              echo "       Beta-prerelease workflow is dev-only; stable releases use the /release skill."
+              echo "       This guard also prevents publishing from arbitrary PR refs (refs/pull/<N>/head)."
+              echo "       See TASK-656."
+              exit 1
+            fi
+            SHA=$(gh api "repos/${{ github.repository }}/commits/${REF}" --jq '.sha')
+            [ -n "${SHA}" ] || { echo "ERROR: could not resolve ref '${REF}' to a commit SHA"; exit 1; }
+            echo "Creating tag ${TAG} at ${REF} (${SHA})"
+            gh api -X POST "repos/${{ github.repository }}/git/refs" \
+              -f ref="refs/tags/${TAG}" -f sha="${SHA}"
+          else
+            echo "Tag ${TAG} already exists on origin, reusing it."
+          fi
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          # Version without the leading 'v', used in bundle filename
+          VERSION="${TAG#v}"
+          # Base version with prerelease suffix stripped (e.g. 1.6.0-beta.4 -> 1.6.0)
+          BASE_VERSION=$(echo "${VERSION}" | sed -E 's/-(beta|rc|alpha)(\.[0-9]+)?$//')
+          echo "tag=${TAG}"                   >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}"           >> "${GITHUB_OUTPUT}"
+          echo "base_version=${BASE_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved tag: ${TAG} (version=${VERSION}, base=${BASE_VERSION})"
+
+      - name: Checkout code at tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0   # needed for previous-release detection
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Build firmware and filesystem
+        run: |
+          python build.py
+          echo "--- build artefacts ---"
+          ls -la build/ || true
+
+      - name: Locate built binaries
+        id: binaries
+        run: |
+          FW=$(ls build/*.ino.bin 2>/dev/null | head -1)
+          FS=$(ls build/*.littlefs.bin 2>/dev/null | head -1)
+          [ -n "${FW}" ] || { echo "ERROR: firmware binary (*.ino.bin) not found in build/"; exit 1; }
+          [ -n "${FS}" ] || { echo "ERROR: filesystem binary (*.littlefs.bin) not found in build/"; exit 1; }
+          echo "firmware=${FW}"   >> "${GITHUB_OUTPUT}"
+          echo "filesystem=${FS}" >> "${GITHUB_OUTPUT}"
+          echo "Firmware:   ${FW}"
+          echo "Filesystem: ${FS}"
+
+      - name: Detect latest PUBLIC stable release (for diff link)
+        id: prev
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # "Latest" on GitHub is by construction a non-prerelease release.
+          # gh release view (no args) returns whichever release carries that flag.
+          # Fallback to the most recent tag without a dash if no release is flagged.
+          if PREV=$(gh release view --json tagName --jq '.tagName' 2>/dev/null) && [ -n "${PREV}" ]; then
+            :
+          else
+            PREV=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+                     | grep -v -- '-' | head -1 || true)
+          fi
+          echo "prev_tag=${PREV}" >> "${GITHUB_OUTPUT}"
+          echo "Latest public release: ${PREV:-<none>}"
+
+      - name: Generate SHA256SUMS for the binaries
+        run: |
+          FW="${{ steps.binaries.outputs.firmware }}"
+          FS="${{ steps.binaries.outputs.filesystem }}"
+          mkdir -p staging
+          cp "${FW}" "${FS}" staging/
+          ( cd staging && sha256sum *.ino.bin *.littlefs.bin ) > SHA256SUMS
+          echo "--- SHA256SUMS ---"
+          cat SHA256SUMS
+
+      - name: Build flash bundle zip
+        id: bundle
+        run: |
+          VERSION="${{ steps.tag.outputs.version }}"
+          BUNDLE_NAME="OTGW-firmware-${VERSION}-flash-bundle"
+          BUNDLE_DIR="${BUNDLE_NAME}"
+          mkdir -p "${BUNDLE_DIR}"
+          cp flash_otgw.sh             "${BUNDLE_DIR}/"
+          cp flash_otgw.bat            "${BUNDLE_DIR}/"
+          cp README.md                 "${BUNDLE_DIR}/"
+          if [ -f docs/guides/FLASH_GUIDE.md ]; then
+            cp docs/guides/FLASH_GUIDE.md "${BUNDLE_DIR}/"
+          fi
+          cp staging/*.ino.bin         "${BUNDLE_DIR}/"
+          cp staging/*.littlefs.bin    "${BUNDLE_DIR}/"
+          cp SHA256SUMS                "${BUNDLE_DIR}/"
+          chmod +x "${BUNDLE_DIR}/flash_otgw.sh"
+          zip -r "${BUNDLE_NAME}.zip" "${BUNDLE_DIR}/"
+          echo "bundle=${BUNDLE_NAME}.zip" >> "${GITHUB_OUTPUT}"
+          echo "Bundle: ${BUNDLE_NAME}.zip"
+
+      - name: Compose release body
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${{ steps.tag.outputs.version }}"
+          BASE_VERSION="${{ steps.tag.outputs.base_version }}"
+          PREV="${{ steps.prev.outputs.prev_tag }}"
+          REPO="${{ github.repository }}"
+
+          # Locate the in-repo release notes file for this build (best-effort).
+          # Prefer the exact version, then the line's beta file, then archived copies.
+          # NOTES_PATH is the on-disk path (used for inlining the digest below).
+          # NOTES_LINK is the GitHub blob URL at the tag (used as the read-full link).
+          NOTES_PATH=""
+          NOTES_LINK=""
+          for candidate in \
+            "RELEASE_NOTES_${VERSION}.md" \
+            "RELEASE_NOTES_${BASE_VERSION}-beta.md" \
+            "docs/releases/RELEASE_NOTES_${VERSION}.md" \
+            "docs/releases/RELEASE_NOTES_${BASE_VERSION}-beta.md"
+          do
+            if [ -f "${candidate}" ]; then
+              NOTES_PATH="${candidate}"
+              NOTES_LINK="https://github.com/${REPO}/blob/${TAG}/${candidate}"
+              echo "Release notes file at tagged commit: ${candidate}"
+              break
+            fi
+          done
+
+          # Extract the digest (content above the '<!-- digest:end -->' sentinel)
+          # for inline preview in the release body. If the sentinel is missing,
+          # inline the whole file. If no notes file was found, the inline
+          # section is omitted entirely (graceful fallback to the pre-digest
+          # release body shape).
+          DIGEST_FILE=""
+          if [ -n "${NOTES_PATH}" ]; then
+            DIGEST_FILE="release_body_digest.md"
+            if grep -q '<!-- digest:end -->' "${NOTES_PATH}"; then
+              awk '/<!-- digest:end -->/{exit} {print}' "${NOTES_PATH}" > "${DIGEST_FILE}"
+              echo "Digest extracted from ${NOTES_PATH} (above '<!-- digest:end -->' marker)."
+            else
+              cp "${NOTES_PATH}" "${DIGEST_FILE}"
+              echo "WARN: ${NOTES_PATH} has no '<!-- digest:end -->' sentinel; inlining the entire file as the release-page digest."
+            fi
+            # Strip the leading H1 if present; the release body provides its own H2 heading.
+            sed -i '1{/^# /d}' "${DIGEST_FILE}"
+          fi
+
+          {
+            echo "Beta prerelease **${TAG}**."
+            echo ""
+            echo "Published automatically from a tag push on the \`dev\` branch."
+            echo ""
+            echo "### What is in this build"
+            echo ""
+            echo "- [\`README.md\`](https://github.com/${REPO}/blob/${TAG}/README.md) — landing page and current dev-line status."
+            echo "- [\`CHANGELOG.md\`](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) — running change log for the next release."
+            if [ -n "${NOTES_LINK}" ]; then
+              echo "- [Read the full release notes for this line](${NOTES_LINK})."
+            fi
+            echo ""
+            if [ -n "${DIGEST_FILE}" ] && [ -s "${DIGEST_FILE}" ]; then
+              echo "## What's new since the last public release"
+              echo ""
+              cat "${DIGEST_FILE}"
+              echo ""
+              if [ -n "${NOTES_LINK}" ]; then
+                echo "_Read the full release notes: [${NOTES_PATH}](${NOTES_LINK})._"
+                echo ""
+              fi
+            fi
+            echo "### Compare to the latest public release"
+            echo ""
+            if [ -n "${PREV}" ]; then
+              echo "Diff vs **${PREV}** (current Latest stable): https://github.com/${REPO}/compare/${PREV}...${TAG}"
+            else
+              echo "No prior public release detected; diff link omitted."
+            fi
+            echo ""
+            echo "### Assets"
+            echo ""
+            echo "- \`*.ino.bin\` — firmware image (flash via Web UI, OTA, or \`flash_otgw.sh\`/\`.bat\`)."
+            echo "- \`*.littlefs.bin\` — filesystem image (Web UI assets, settings template)."
+            echo "- \`SHA256SUMS\` — integrity manifest used by the flash helpers."
+            echo "- \`flash_otgw.sh\` / \`flash_otgw.bat\` — Linux/macOS and Windows flash helpers."
+            echo "- \`OTGW-firmware-${VERSION}-flash-bundle.zip\` — self-contained zip with binaries, scripts, README and SHA256SUMS."
+            echo ""
+            echo "### Field testing"
+            echo ""
+            echo "Beta builds target non-production OTGWs. Please flash and report findings in Discord \`#beta-testing\` (good and bad)."
+          } > release_body.md
+          echo "--- release body ---"
+          cat release_body.md
+
+      - name: Publish prerelease (draft-first, attach assets atomically)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          FW="${{ steps.binaries.outputs.firmware }}"
+          FS="${{ steps.binaries.outputs.filesystem }}"
+          BUNDLE="${{ steps.bundle.outputs.bundle }}"
+
+          # If a draft for this tag already exists from a prior aborted run,
+          # top up assets and body. If it exists AND is already published,
+          # bail out: the repo's immutable-releases policy makes this tag
+          # permanently locked, so the only recovery is to bump the prerelease.
+          if gh release view "${TAG}" --json isDraft --jq '.isDraft' 2>/dev/null | grep -q true; then
+            echo "Existing draft for ${TAG} detected; topping up assets and body."
+            gh release upload "${TAG}" \
+              "${FW}" "${FS}" \
+              SHA256SUMS \
+              flash_otgw.sh \
+              flash_otgw.bat \
+              "${BUNDLE}" \
+              --clobber
+            gh release edit "${TAG}" --prerelease --title "${TAG}" --notes-file release_body.md
+          elif gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "ERROR: ${TAG} already exists as a published release."
+            echo "This repo enforces immutable releases; the tag is reserved permanently."
+            echo "Recovery: bump the prerelease (e.g. beta.N -> beta.N+1) on dev and push the new tag."
+            exit 1
+          else
+            echo "Creating draft prerelease ${TAG} with all assets in one atomic call."
+            gh release create "${TAG}" \
+              --draft \
+              --prerelease \
+              --title "${TAG}" \
+              --notes-file release_body.md \
+              "${FW}" "${FS}" \
+              SHA256SUMS \
+              flash_otgw.sh \
+              flash_otgw.bat \
+              "${BUNDLE}"
+          fi
+
+          # Publish: draft -> live. Immutability locks at this step, after
+          # every asset is already attached.
+          echo "Publishing ${TAG} (draft -> live)."
+          gh release edit "${TAG}" --draft=false
+
+          echo "--- final state of ${TAG} ---"
+          gh release view "${TAG}" \
+            --json tagName,isPrerelease,isDraft,assets \
+            --jq '{tag: .tagName, prerelease: .isPrerelease, draft: .isDraft, assets: [.assets[].name]}'

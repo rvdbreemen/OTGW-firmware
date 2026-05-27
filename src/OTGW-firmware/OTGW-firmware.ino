@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -116,33 +116,6 @@ bool wifiPortalResetWindowExpired() {
   return wifiPortalResetWindowOpen && ((int32_t)(millis() - wifiPortalResetWindowDeadline) >= 0);
 }
 
-// ---------------------------------------------------------------------------
-// TASK-397: always-on BGTRACE instrumentation to diagnose random
-// doBackgroundTasks() stalls introduced somewhere between v1.3.5 and dev.
-// When BGTASKS_TRACE is 1, every handler in the chain emits a one-line
-// telnet log with name, duration (microseconds), free heap, and max free
-// block. Volume is HIGH (hundreds of lines/sec at idle); disable by setting
-// BGTASKS_TRACE to 0 after the culprit has been identified.
-//
-// Stall-detection pattern: the LAST BGTRACE line in the log identifies the
-// previous handler that returned normally. The handler whose name appears
-// NEXT in the code but has NO corresponding BGTRACE line is the one hung.
-// ---------------------------------------------------------------------------
-#define BGTASKS_TRACE 0
-
-#if BGTASKS_TRACE
-  #define BGTRACE(name) do { \
-      uint32_t _now = micros(); \
-      DebugTf(PSTR("[bg] %s %luus heap=%u max=%u\r\n"), \
-              name, (unsigned long)(_now - _bgPrev), \
-              (unsigned)ESP.getFreeHeap(), \
-              (unsigned)ESP.getMaxFreeBlockSize()); \
-      _bgPrev = _now; \
-    } while(0)
-#else
-  #define BGTRACE(name) ((void)0)
-#endif
-
 //=====================================================================
 void setup() {
 
@@ -166,8 +139,10 @@ void setup() {
 
   LittleFSmounted = LittleFS.begin();
   if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
+  cacheBootFlashInfo();   // A: cache static flash/FS values once; used by /api/v2/device/info
   readSettings(true);
   checklittlefshash();
+  loadOtSupportFiles();  // TASK-688: warm the in-RAM support bitmaps from prior-boot knowledge
 
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;
@@ -338,11 +313,29 @@ void doTaskMinuteChanged(){
   // WiFi reconnect is handled by loopWifi() state machine in doBackgroundTasks().
   sendtimecommand(dayFlag, yearFlag);
 
+  // TASK-686: republish boiler unsupported-msgID CSV only when a new id has been
+  // observed since the last publish. After boot warm-up the dirty flag fires a
+  // handful of times then stays clean, so this is at most one extra publish per
+  // minute and zero in steady state.
+  if (getBoilerUnsupportedDirty()) {
+    publishBoilerUnsupportedMsgids();
+    clearBoilerUnsupportedDirty();
+  }
+
   // Hourly consumers. New hourly tasks extend THIS block, never add a second
   // hourChanged() call elsewhere.
   if (hourFlag) {
     runNightlyRestartCheck();     // TASK-345: moved from doTaskEvery60s
     sendMQTTheapdiag();            // TASK-346: moved from doTaskEvery60s
+    // TASK-704: first-run trigger — if verify has never completed (epoch==0) and
+    // auto-verify is on, attempt it every hour until it succeeds. startDiscovery-
+    // Verification() enforces all preconditions (NTP, uptime>3600s, heap, no drip,
+    // MQTT connected) internally and is a no-op when any precondition fails.
+    // Once a verify completes (even aborted), iLastVerifyEpoch becomes non-zero and
+    // this path stays silent; the daily trigger at midnight handles subsequent runs.
+    if (settings.mqtt.bDiscoveryAutoVerify && state.discovery.iLastVerifyEpoch == 0) {
+      startDiscoveryVerification();
+    }
   }
 
   // Daily consumers (TASK-351).
@@ -365,6 +358,15 @@ void do5minevent(){
   sendMQTTversioninfo();
   sendMQTTstateinformation();
   publishAllPICsettings();  // Re-publish cached PIC settings every 5 min
+}
+
+//===[ Do task every 15min — TASK-688 ]===
+// Debounced flush of /ot-thermo.json and /ot-boiler.json. The per-file dirty
+// flag in OTGW-Core.ino gates the actual write, so a quiet boiler/thermostat
+// causes zero filesystem writes. Ceiling: 2 writes per 15-min window per file,
+// roughly 192 writes per day on a part rated 100k+ erase cycles per sector.
+void do15minevent(){
+  saveOtSupportFilesIfDirty();
 }
 
 static void handleEspFlashBackgroundTasks()
@@ -408,19 +410,18 @@ void doBackgroundTasks()
       handlePicFlashBackgroundTasks();
     } else {
       //while connected handle everything that uses network stuff
-      uint32_t _bgPrev = micros();
-      debugTelnet.loop();          BGTRACE("debugTelnet");
-      OTGWstream.loop();           BGTRACE("OTGWstream");
-      handleDebug();               BGTRACE("handleDebug");
-      handleMQTT();                BGTRACE("handleMQTT");
-      handleOTGW();                BGTRACE("handleOTGW");
-      handleWebSocket();           BGTRACE("handleWebSocket");
-      httpServer.handleClient();   BGTRACE("httpServer");
-      MDNS.update();               BGTRACE("mdns");
-      loopNTP();                   BGTRACE("ntp");
+      debugTelnet.loop();
+      OTGWstream.loop();
+      handleDebug();
+      handleMQTT();
+      handleOTGW();
+      handleWebSocket();
+      httpServer.handleClient();
+      MDNS.update();
+      loopNTP();
     }
   } //otherwise, just wait until reconnected gracefully
-  delay(1);
+  yield();
   return;
 }
 
@@ -430,25 +431,24 @@ void loop()
   DECLARE_TIMER_SEC(timer3s, 3, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_MIN(timer15min, 15, CATCH_UP_MISSED_TICKS);  // TASK-688
 
   if (!isFlashing()) {
     // Only run these tasks when NOT flashing firmware (ESP or PIC)
-      if (DUE(timerFlushSettings))      flushSettings();  // coalesced settings write + service restarts
-      if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin
-      if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
-      if (DUE(timer5min))               do5minevent();
-      if (DUE(timer60s))                doTaskEvery60s();
-      if (DUE(timer3s))                 doTaskEvery3s();
-      if (DUE(timer1s))                 doTaskEvery1s();
-      if (minuteChanged())              doTaskMinuteChanged(); //ADR-064: sole minuteChanged() caller; hour/day/year dispatch lives inside
-      {
-        uint32_t _bgPrev = micros();
-        loopMQTTDiscovery();       BGTRACE("loopMQTTDiscovery");
-        evalOutputs();             BGTRACE("evalOutputs");
-        evalWebhook();             BGTRACE("evalWebhook");
-        handlePendingUpgrade();    BGTRACE("handlePendingUpgrade");
-      }
-    }
+    if (DUE(timerFlushSettings))      flushSettings();  // coalesced settings write + service restarts
+    if (DUE(timerpollsensor))         pollSensors();    // poll the temperature sensors connected to 2wire gpio pin
+    if (DUE(timers0counter))          sendS0Counters(); // poll the s0 counter connected to gpio pin when due
+    if (DUE(timer15min))              do15minevent();   // TASK-688: persist /ot-thermo.json + /ot-boiler.json
+    if (DUE(timer5min))               do5minevent();
+    if (DUE(timer60s))                doTaskEvery60s();
+    if (DUE(timer3s))                 doTaskEvery3s();
+    if (DUE(timer1s))                 doTaskEvery1s();
+    if (minuteChanged())              doTaskMinuteChanged(); //ADR-064: sole minuteChanged() caller; hour/day/year dispatch lives inside
+    loopMQTTDiscovery();
+    evalOutputs();
+    evalWebhook();
+    handlePendingUpgrade();
+  }
 
   doBackgroundTasks();              // run background tasks
 

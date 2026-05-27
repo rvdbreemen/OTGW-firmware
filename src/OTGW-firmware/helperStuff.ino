@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -742,10 +742,9 @@ bool checklittlefshash(){
       }
       fh.close();
     }
-    DebugTf(PSTR("Check githash = [%s]\r\n"), _githash);
-    DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), _githash, _VERSION_GITHASH);
     bool match = (strcasecmp(_githash, _VERSION_GITHASH)==0);
     if (!match) {
+      DebugTf(PSTR("FS githash = [%s] | FW githash = [%s]\r\n"), _githash, _VERSION_GITHASH);
       DebugTf(PSTR("WARNING: Firmware version (%s) does not match filesystem version (%s)\r\n"),
               _VERSION_GITHASH, _githash);
       DebugTln(F("This may cause compatibility issues. Flash matching filesystem version."));
@@ -1109,37 +1108,59 @@ void logHeapStats() {
   }
   
   DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u\r\n"),
-          freeHeap, maxBlock, levelStr, webSocketDropCount, mqttDropCount);
+          freeHeap, maxBlock, levelStr,
+          (uint32_t)state.heapdiag.iWsDropsTotal,
+          (uint32_t)state.heapdiag.iMqttDropsTotal);
 }
 
 //===========================================================================================
-// Emergency heap recovery - called when heap is critically low
-// This function tries to free up memory by clearing non-essential buffers
+// Emergency heap recovery - called when heap is critically low.
+// ADR-079: performs three concrete recovery actions in order:
+//   1. Drop all WebSocket clients (browsers reconnect via graph.js).
+//   2. Stop+restart OTGWstream port 25238 (OTmonitor users reconnect manually).
+//   3. Clear MQTT discovery pending bitmap (JIT path repopulates on next status burst).
+// Telnet is intentionally NOT dropped (operators need live diagnostics).
+// MQTT is intentionally NOT disconnected (reconnect cost exceeds heap recovered).
+// 30-second rate-limit caps disruption frequency.
 //===========================================================================================
 void emergencyHeapRecovery() {
   static uint32_t lastRecoveryMs = 0;
   uint32_t now = millis();
-  
+
   // Only attempt recovery once per interval to avoid thrashing
   // Use unsigned arithmetic to handle millis() rollover correctly
   if ((uint32_t)(now - lastRecoveryMs) < EMERGENCY_RECOVERY_INTERVAL_MS) {
     return;
   }
   lastRecoveryMs = now;
-  
+
   uint32_t heapBefore = ESP.getFreeHeap();
-  DebugTf(PSTR("Emergency heap recovery starting (heap=%u bytes)\r\n"), heapBefore);
-  
-  // Yield to allow ESP8266 to do housekeeping
-  yield();
-  delay(10);
-  
+  uint8_t actions = 0;
+
+  // Action 1: drop all WebSocket clients (~2-4 KB lwIP buffer per client).
+  // Wrapper lives in webSocketStuff.ino (same pattern as doWebSocketClose).
+  if (hasWebSocketClients()) {
+    doWebSocketDisconnectAll();
+    actions |= 0x01;
+  }
+
+  // Action 2: drop OTGWstream port 25238 clients by stop+restart of the listener.
+  // startOTGWstream() is idempotent (calls WiFiServer::begin()) and allocation-neutral
+  // on restart — same pattern used by applyLegacyPort25238Setting() at runtime.
+  OTGWstream.stop();
+  startOTGWstream();
+  actions |= 0x02;
+
+  // Action 3: clear MQTT discovery pending bitmap to stop drip allocations
+  // during the critical window. JIT path (ADR-073) re-arms on next status burst.
+  clearMQTTConfigPending();
+  actions |= 0x04;
+
   uint32_t heapAfter = ESP.getFreeHeap();
-  // Calculate recovered bytes safely (handle case where heap decreased)
-  // Use int32_t to avoid overflow and allow negative values
-  int32_t recovered = (int32_t)heapAfter - (int32_t)heapBefore;
-  DebugTf(PSTR("Emergency heap recovery complete (heap=%u bytes, recovered=%ld bytes)\r\n"), 
-          heapAfter, (long)recovered);
+  DebugTf(PSTR("[heap-recovery] before=%u after=%u delta=%+ld actions=0x%02X\r\n"),
+          (unsigned)heapBefore, (unsigned)heapAfter,
+          (long)((int32_t)heapAfter - (int32_t)heapBefore),
+          (unsigned)actions);
 }
 
 //===[ blink status led ]===
@@ -1173,12 +1194,18 @@ void blinkLEDnow(uint8_t led = LED1){
 
 }
 
-//===[ no-blocking delay with running background tasks in ms ]===
+//===[ cooperative delay running background tasks in ms ]===
+// Previously used DECLARE_TIMER_MS, which expands to static locals: init-once
+// semantics made the wait collapse to 0 ms on the first call and freeze at the
+// first interval ever passed on later calls. Use a local timestamp so each call
+// honours its own delay_ms parameter and millis() rollover is handled by the
+// unsigned subtraction.
 void delayms(unsigned long delay_ms)
 {
-  DECLARE_TIMER_MS(timerDelayms, delay_ms);
-  while (DUE(timerDelayms))
+  uint32_t start = millis();
+  while ((uint32_t)(millis() - start) < delay_ms) {
     doBackgroundTasks();
+  }
 }
 
 /***************************************************************************

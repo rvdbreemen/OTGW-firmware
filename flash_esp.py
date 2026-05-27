@@ -645,7 +645,8 @@ def flash_esp8266(port, firmware_file=None, filesystem_file=None, baud=DEFAULT_B
         sys.executable, "-m", "esptool",
         "--port", port,
         "-b", str(baud),
-        "write_flash"
+        "write_flash",
+        "--flash_mode", "dio",
     ]
     
     if firmware_file:

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -843,6 +843,7 @@ let currentMemoryUsageMB = 0;
 let storageQuotaMB = 10; // Default, will be detected
 
 let autoScroll = true;
+let logTabActivatedAt = 0; // timestamp of last Log tab activation, used to suppress spurious scroll events
 let frozenLogStartIndex = null; // Freeze visible slice when auto-scroll is disabled
 let lastRenderedStartIndex = 0;
 let lastRenderedLogText = null;
@@ -2397,8 +2398,13 @@ function setupOTLogControls() {
       
       const container = e.target;
       manualScrollTimeout = setTimeout(function() {
+        // Suppress auto-scroll disable for 300 ms after the Log tab was activated.
+        // Tab switching can trigger a reflow-induced scroll event before the RAF
+        // that scrolls the container to the bottom has a chance to run.
+        if (Date.now() - logTabActivatedAt < 300) return;
+
         const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-      
+
         if (!isAtBottom && autoScroll) {
           // User scrolled up, disable auto-scroll
           autoScroll = false;
@@ -2865,6 +2871,7 @@ function initMainPage() {
 
   renderSharedPageNavShell();
   updateThemeToggle();
+  initStatsColResizers();
 
   function doThemeToggle() {
     var isDark = localStorage.getItem('theme') !== 'dark';  // toggle
@@ -2904,13 +2911,16 @@ function initMainPage() {
   Array.from(document.getElementsByClassName('btnSaveSettings')).forEach(
     function (el, idx, arr) {
       el.addEventListener('click', function () {
+        var canHideSave = true;
         if (document.getElementById("displayWebhookPage").classList.contains('active')) {
           saveWebhookSettings();
         } else {
-          saveSettings();
+          canHideSave = saveSettings();
         }
         toggleHidden('adv_dropdown', true);
-        toggleHidden('btnSaveSettings', true);
+        if (canHideSave !== false) {
+          toggleHidden('btnSaveSettings', true);
+        }
       });
     }
   );
@@ -3070,7 +3080,10 @@ function showMainPage() {
   refreshDevTime();
   
   setActivePageSection('displayMainPage');
-  
+  // If the Log inner tab is active, the scroll container just became visible —
+  // same reflow-scroll race as openLogTab; suppress the handler for 300 ms.
+  if (currentTab === 'Log') logTabActivatedAt = Date.now();
+
   refreshDevInfo();
   refreshOTmonitor();
   
@@ -4272,7 +4285,11 @@ const hiddenSettings = [
   "webhookurloff",
   "webhooktriggerbit",
   "webhookpayload",
-  "webhookcontenttype"
+  "webhookcontenttype",
+  "wifisubnet",
+  "wifigateway",
+  "wifidns1",
+  "wifidns2"
 ];
 
 const httpPasswordPlaceholderValues = ["notthepassword", "notthispassword"];
@@ -4323,6 +4340,322 @@ function getOriginalPasswordPrefill(field) {
   return currentValue;
 }
 
+//============================================================================
+// Fixed IP configuration UI — segmented octet inputs
+//============================================================================
+
+var IP_FIELD_DEFS = [
+  { key: 'wifistaticip', label: 'IP Address',   required: true  },
+  { key: 'wifisubnet',   label: 'Subnet Mask',   required: true  },
+  { key: 'wifigateway',  label: 'Gateway',        required: true  },
+  { key: 'wifidns1',    label: 'DNS Server 1',   required: false },
+  { key: 'wifidns2',    label: 'DNS Server 2',   required: false },
+];
+
+function makeOctetGroup(fieldKey, fieldLabel) {
+  var grp = document.createElement('div');
+  grp.className = 'octet-group';
+  grp.dataset.field = fieldKey;
+  grp.setAttribute('role', 'group');
+  grp.setAttribute('aria-label', fieldLabel);
+  for (var i = 0; i < 4; i++) {
+    if (i > 0) {
+      var dot = document.createElement('span');
+      dot.className = 'octet-dot';
+      dot.textContent = '.';
+      grp.appendChild(dot);
+    }
+    var oct = document.createElement('input');
+    oct.type = 'text';
+    oct.inputMode = 'numeric';
+    oct.pattern = '[0-9]*';
+    oct.maxLength = 3;
+    oct.autocomplete = 'off';
+    oct.setAttribute('enterkeyhint', i < 3 ? 'next' : 'done');
+    oct.className = 'octet-input';
+    oct.dataset.field = fieldKey;
+    oct.dataset.oct = String(i);
+    oct.setAttribute('aria-label', fieldLabel + ' octet ' + String(i + 1));
+    grp.appendChild(oct);
+  }
+  return grp;
+}
+
+function getOctetInputs(fieldKey) {
+  var grp = document.querySelector('.octet-group[data-field="' + fieldKey + '"]');
+  if (!grp) return [];
+  return Array.from(grp.querySelectorAll('.octet-input'));
+}
+
+function splitIpToOctets(fieldKey, ipStr) {
+  var parts = (typeof ipStr === 'string' && ipStr.length > 0) ? ipStr.split('.') : [];
+  getOctetInputs(fieldKey).forEach(function(inp, i) {
+    inp.value = parts[i] !== undefined ? parts[i] : '';
+  });
+}
+
+function normalizeOctetValue(value) {
+  var digits = String(value || '').replace(/\D/g, '').substring(0, 3);
+  if (digits === '') return '';
+  return parseInt(digits, 10) > 255 ? '255' : digits;
+}
+
+function joinOctetsToIp(fieldKey) {
+  var inputs = getOctetInputs(fieldKey);
+  if (inputs.length !== 4) return '';
+  var parts = inputs.map(function(inp) { return inp.value.trim(); });
+  return parts.some(function(p) { return p === ''; }) ? '' : parts.map(function(p) {
+    return String(parseInt(p, 10));
+  }).join('.');
+}
+
+function markFixedIPChanged() {
+  IP_FIELD_DEFS.forEach(function(def) {
+    var h = document.getElementById(def.key);
+    if (h) h.className = 'input-changed';
+  });
+  setVisible('btnSaveSettings', true);
+}
+
+function updateFixedIPVisibility(useDHCP) {
+  var fieldsDiv = document.getElementById('fixed-ip-fields');
+  if (fieldsDiv) fieldsDiv.style.display = useDHCP ? 'none' : '';
+}
+
+function validateFixedIPFields(useDHCP) {
+  if (useDHCP) return '';
+  for (var i = 0; i < IP_FIELD_DEFS.length; i++) {
+    var def = IP_FIELD_DEFS[i];
+    var values = getOctetInputs(def.key).map(function(inp) { return inp.value.trim(); });
+    var hasAnyValue = values.some(function(value) { return value !== ''; });
+    var hasInvalidValue = values.some(function(value) {
+      return value !== '' && (!/^\d{1,3}$/.test(value) || parseInt(value, 10) > 255);
+    });
+    if (hasInvalidValue || ((def.required || hasAnyValue) && values.some(function(value) { return value === ''; }))) {
+      return def.label + ' must contain four numbers from 0 to 255.';
+    }
+  }
+  return '';
+}
+
+function collapseOctetGroupsForSave() {
+  var dhcpCb = document.querySelector('#D_wifistaticip .dhcp-toggle-cb');
+  var useDHCP = !dhcpCb || dhcpCb.checked;
+  var validationMessage = validateFixedIPFields(useDHCP);
+  if (validationMessage) {
+    var msgEl = document.getElementById('settingMessage');
+    if (msgEl) {
+      msgEl.textContent = validationMessage;
+      msgEl.className = 'error';
+    }
+    return false;
+  }
+  IP_FIELD_DEFS.forEach(function(def) {
+    var h = document.getElementById(def.key);
+    if (!h || h.className !== 'input-changed') return;
+    h.value = useDHCP ? '' : (joinOctetsToIp(def.key) || '');
+  });
+  return true;
+}
+
+function prefillFromDHCP() {
+  function isValidDottedDecimal(value, maxOctet) {
+    if (!value) return false;
+    var parts = value.split('.');
+    if (parts.length !== 4) return false;
+    var numbers = [];
+    var valid = parts.every(function(p) {
+      if (!/^\d{1,3}$/.test(p)) return false;
+      var n = parseInt(p, 10);
+      numbers.push(n);
+      return n >= 0 && n <= maxOctet;
+    });
+    return valid && !numbers.every(function(n) { return n === 0; });
+  }
+  function isValidPrefillIP(value) {
+    return isValidDottedDecimal(value, 254);
+  }
+  function isValidPrefillSubnet(value) {
+    return isValidDottedDecimal(value, 255);
+  }
+  function prefillIfEmpty(fieldKey, value, validator) {
+    if (!validator(value)) return;
+    var inputs = getOctetInputs(fieldKey);
+    if (inputs.length > 0 && inputs.every(function(i) { return i.value === ''; })) {
+      splitIpToOctets(fieldKey, value);
+    }
+  }
+  function prefillDefaultSubnet() {
+    prefillIfEmpty('wifisubnet', '255.255.255.0', isValidPrefillSubnet);
+  }
+  fetch(APIGW + 'v2/device/info')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(json) {
+      if (!json || !json.device) {
+        prefillDefaultSubnet();
+        markFixedIPChanged();
+        return;
+      }
+      var d = json.device;
+      prefillIfEmpty('wifistaticip', d.ipaddress, isValidPrefillIP);
+      prefillIfEmpty('wifisubnet',   isValidPrefillSubnet(d.wifi_current_subnet) ? d.wifi_current_subnet : '255.255.255.0', isValidPrefillSubnet);
+      prefillIfEmpty('wifigateway',  d.wifi_current_gateway, isValidPrefillIP);
+      prefillIfEmpty('wifidns1',     d.wifi_current_dns1, isValidPrefillIP);
+      prefillIfEmpty('wifidns2',     d.wifi_current_dns2, isValidPrefillIP);
+      markFixedIPChanged();
+    })
+    .catch(function() {
+      prefillDefaultSubnet();
+      markFixedIPChanged();
+    });
+}
+
+function wireOctetGroup(grp) {
+  var octInputs = Array.from(grp.querySelectorAll('.octet-input'));
+  octInputs.forEach(function(inp, idx) {
+    inp.addEventListener('input', function() {
+      this.value = normalizeOctetValue(this.value);
+      if (this.value.length >= 3 && idx < 3) {
+        octInputs[idx + 1].focus();
+        octInputs[idx + 1].select();
+      }
+      markFixedIPChanged();
+    });
+    inp.addEventListener('keydown', function(e) {
+      if ((e.key === '.' || e.key === 'Enter' || e.key === 'ArrowRight') && idx < 3 && this.selectionStart === this.value.length) {
+        e.preventDefault();
+        octInputs[idx + 1].focus();
+        octInputs[idx + 1].select();
+      }
+      if (e.key === 'Backspace' && this.value === '' && idx > 0) {
+        e.preventDefault();
+        var prev = octInputs[idx - 1];
+        prev.focus();
+        prev.setSelectionRange(prev.value.length, prev.value.length);
+      }
+      if (e.key === 'ArrowLeft' && idx > 0 && this.selectionStart === 0) {
+        e.preventDefault();
+        var previous = octInputs[idx - 1];
+        previous.focus();
+        previous.setSelectionRange(previous.value.length, previous.value.length);
+      }
+    });
+    inp.addEventListener('paste', function(e) {
+      var txt = (e.clipboardData || window.clipboardData).getData('text');
+      var parts = txt.trim().split('.');
+      if (txt.indexOf('.') >= 0) {
+        e.preventDefault();
+        if (parts.length !== 4 || parts.some(function(part) {
+          return !/^\d{1,3}$/.test(part) || parseInt(part, 10) > 255;
+        })) {
+          return;
+        }
+        octInputs.forEach(function(o, i) {
+          o.value = String(parseInt(parts[i], 10));
+        });
+        octInputs[3].focus();
+        octInputs[3].select();
+        markFixedIPChanged();
+      }
+    });
+  });
+}
+
+function renderFixedIPSection(currentIpValue, allSettings) {
+  var settingsPage = document.getElementById('settingsPage');
+  var existing = document.getElementById('D_wifistaticip');
+
+  if (existing) {
+    var useDHCP = !currentIpValue || currentIpValue === '';
+    var dhcpCb = existing.querySelector('.dhcp-toggle-cb');
+    if (dhcpCb) dhcpCb.checked = useDHCP;
+    updateFixedIPVisibility(useDHCP);
+    IP_FIELD_DEFS.forEach(function(def) {
+      var val = def.key === 'wifistaticip' ? (currentIpValue || '') : (allSettings[def.key] ? allSettings[def.key].value : '');
+      splitIpToOctets(def.key, val);
+      var h = document.getElementById(def.key);
+      if (h) { h.value = val; h.className = 'input-normal'; h.setAttribute('data-original', val); }
+    });
+    return;
+  }
+
+  var useDHCP = !currentIpValue || currentIpValue === '';
+
+  var sectionDiv = document.createElement('div');
+  sectionDiv.id = 'D_wifistaticip';
+  sectionDiv.className = 'settingDiv fixed-ip-section';
+
+  // DHCP toggle row
+  var toggleRow = document.createElement('div');
+  toggleRow.className = 'fixed-ip-row';
+  var toggleLbl = document.createElement('label');
+  toggleLbl.className = 'settings-field-container fixed-ip-field-label';
+  toggleLbl.title = 'When checked the device gets its IP address from your router (DHCP). Uncheck to set a fixed IP.';
+  toggleLbl.textContent = 'IP Configuration';
+  var toggleInputDiv = document.createElement('div');
+  toggleInputDiv.className = 'settings-input-container';
+  var dhcpOuterLabel = document.createElement('label');
+  dhcpOuterLabel.className = 'fixed-ip-dhcp-label';
+  var dhcpCb = document.createElement('input');
+  dhcpCb.type = 'checkbox';
+  dhcpCb.className = 'dhcp-toggle-cb';
+  dhcpCb.checked = useDHCP;
+  dhcpOuterLabel.appendChild(dhcpCb);
+  dhcpOuterLabel.appendChild(document.createTextNode(' Use DHCP (automatic IP)'));
+  toggleInputDiv.appendChild(dhcpOuterLabel);
+  toggleRow.appendChild(toggleLbl);
+  toggleRow.appendChild(toggleInputDiv);
+  sectionDiv.appendChild(toggleRow);
+
+  // Fixed IP fields container
+  var fieldsDiv = document.createElement('div');
+  fieldsDiv.id = 'fixed-ip-fields';
+  fieldsDiv.className = 'fixed-ip-fields';
+  fieldsDiv.style.display = useDHCP ? 'none' : '';
+
+  IP_FIELD_DEFS.forEach(function(def) {
+    var row = document.createElement('div');
+    row.className = 'fixed-ip-row';
+    var lbl = document.createElement('label');
+    lbl.className = 'settings-field-container fixed-ip-field-label';
+    lbl.textContent = def.label + (def.required ? '' : ' (optional)');
+    var inputDiv = document.createElement('div');
+    inputDiv.className = 'settings-input-container';
+    var grp = makeOctetGroup(def.key, def.label);
+    wireOctetGroup(grp);
+    inputDiv.appendChild(grp);
+    var hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.id = def.key;
+    hidden.className = 'input-normal';
+    var initialValue = def.key === 'wifistaticip' ? (currentIpValue || '') : (allSettings[def.key] ? allSettings[def.key].value : '');
+    hidden.value = initialValue;
+    hidden.setAttribute('data-original', initialValue);
+    inputDiv.appendChild(hidden);
+    row.appendChild(lbl);
+    row.appendChild(inputDiv);
+    fieldsDiv.appendChild(row);
+  });
+
+  var notice = document.createElement('div');
+  notice.className = 'fixed-ip-notice';
+  notice.textContent = '⚠ A reboot is required for network changes to take effect.';
+  fieldsDiv.appendChild(notice);
+  sectionDiv.appendChild(fieldsDiv);
+
+  dhcpCb.addEventListener('change', function() {
+    updateFixedIPVisibility(this.checked);
+    markFixedIPChanged();
+    if (!this.checked) prefillFromDHCP();
+  });
+
+  settingsPage.appendChild(sectionDiv);
+  IP_FIELD_DEFS.forEach(function(def) {
+    var initialValue = def.key === 'wifistaticip' ? (currentIpValue || '') : (allSettings[def.key] ? allSettings[def.key].value : '');
+    splitIpToOctets(def.key, initialValue);
+  });
+}
+
 function refreshSettings() {
   console.log("refreshSettings() ..");
   data = {};
@@ -4344,6 +4677,9 @@ function refreshSettings() {
         console.log("[" + key + "]=>[" + s.value + "]");
         // Skip hidden settings
         if (key.startsWith('#') || hiddenSettings.includes(key)) continue;
+
+        // Fixed IP section: custom renderer handles wifistaticip and its companions
+        if (key === 'wifistaticip') { renderFixedIPSection(s.value, data); continue; }
 
         var settings = document.getElementById('settingsPage');
         if ((document.getElementById("D_" + key)) == null) {
@@ -4657,6 +4993,9 @@ function saveWebhookSettings() {
 //============================================================================  
 function saveSettings() {
   console.log("saveSettings() ...");
+  if (!collapseOctetGroupsForSave()) {
+    return false;
+  }
   let changes = false;
 
   //--- has anything changed?
@@ -4699,6 +5038,7 @@ function saveSettings() {
       sendPostSetting(field, value);
     }
   }
+  return true;
 } // saveSettings()
 
 
@@ -4723,10 +5063,10 @@ function sendPostSetting(field, value) {
       //return response.text()
       const msgEl = document.getElementById("settingMessage");
       if (response.ok) {
-        if (msgEl) msgEl.textContent = "Saving changes... SUCCESS";
+        if (msgEl) { msgEl.className = "success"; msgEl.textContent = "Saving changes... SUCCESS"; }
         setTimeout(function () {
           const msgEl = document.getElementById("settingMessage");
-          if (msgEl) msgEl.textContent = "";
+          if (msgEl) { msgEl.textContent = ""; msgEl.className = ""; }
         }, 2000); //and clear the message
       } else {
         if (msgEl) msgEl.textContent = "Saving changes... FAILED";
@@ -4929,6 +5269,11 @@ var translateFields = [
   , ["flashchipmode", "Flash Mode"]
   , ["boardtype", "Board Type"]
   , ["ssid", "Wi-Fi Network (SSID)"]
+  , ["wifistaticip", "Static IP Address"]
+  , ["wifisubnet", "Subnet Mask"]
+  , ["wifigateway", "Default Gateway"]
+  , ["wifidns1", "DNS Server 1"]
+  , ["wifidns2", "DNS Server 2"]
   , ["wifirssi", "Wi-Fi Signal Strength (dBm)"]
   , ["wifiquality", "Wi-Fi Quality (%)"]
   , ["wifiquality_text", "Wi-Fi Quality"]
@@ -4988,6 +5333,11 @@ var translateTooltips = [
   , ["httppasswd", "Password for protected admin endpoints such as settings, maintenance actions, file management, reboot, and OTA update. Username is admin."]
   , ["HostName", "Advertised hostname. Add .local when you open the device by mDNS name."]
   , ["ssid", "Read-only name of the Wi-Fi network the gateway is connected to."]
+  , ["wifistaticip", "Static IP address for this device. Leave empty to use DHCP. Requires reboot to take effect."]
+  , ["wifisubnet", "Subnet mask, e.g. 255.255.255.0. Required when static IP is set."]
+  , ["wifigateway", "Default gateway (router) IP address. Required when static IP is set."]
+  , ["wifidns1", "Primary DNS server, e.g. 8.8.8.8. Optional — used when static IP is configured."]
+  , ["wifidns2", "Secondary DNS server, e.g. 8.8.4.4. Optional fallback DNS."]
   , ["mqttconnected", "Read-only MQTT connection state. This should show connected after broker login succeeds."]
   , ["mqttenable", "Turn MQTT publishing on when you use an MQTT broker like Home Assistant."]
   , ["mqttbroker", "Hostname or IP address of your MQTT broker."]
@@ -5434,6 +5784,127 @@ function handleFlashMessage(data) {
 ** Statistics Tab Functions
 ***************************************************************************
 */
+
+// --- Stats table column resize (TASK-703) -------------------------------
+// Drag the right edge of any <th> in #otStatsTable to resize that column.
+// Widths are mirrored onto the matching <col> in the table's <colgroup> and
+// persisted in localStorage so they survive reloads and tab switches.
+var STATS_COL_STORAGE_KEY = 'otStatsColWidths';
+var STATS_COL_MIN_WIDTH = 30;
+var otStatsResizeState = null;
+
+function getStatsTableCols() {
+  var table = document.getElementById('otStatsTable');
+  if (!table) return null;
+  var colgroup = table.querySelector('colgroup');
+  if (!colgroup) return null;
+  return colgroup.querySelectorAll('col');
+}
+
+function loadStatsColWidths() {
+  try {
+    var raw = localStorage.getItem(STATS_COL_STORAGE_KEY);
+    if (!raw) return null;
+    var arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return null;
+    return arr;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveStatsColWidths() {
+  var cols = getStatsTableCols();
+  if (!cols) return;
+  var widths = [];
+  for (var i = 0; i < cols.length; i++) {
+    var w = cols[i].style.width;
+    widths.push(w || '');
+  }
+  try {
+    localStorage.setItem(STATS_COL_STORAGE_KEY, JSON.stringify(widths));
+  } catch (e) { /* quota or disabled storage — ignore */ }
+}
+
+function applyStoredStatsColWidths() {
+  var cols = getStatsTableCols();
+  if (!cols) return;
+  var widths = loadStatsColWidths();
+  if (!widths) return;
+  for (var i = 0; i < cols.length && i < widths.length; i++) {
+    if (widths[i]) cols[i].style.width = widths[i];
+  }
+}
+
+function onStatsResizeMove(e) {
+  if (!otStatsResizeState) return;
+  var dx = e.clientX - otStatsResizeState.startX;
+  var newWidth = otStatsResizeState.startWidth + dx;
+  if (newWidth < STATS_COL_MIN_WIDTH) newWidth = STATS_COL_MIN_WIDTH;
+  otStatsResizeState.col.style.width = newWidth + 'px';
+  e.preventDefault();
+}
+
+function onStatsResizeUp() {
+  if (!otStatsResizeState) return;
+  if (otStatsResizeState.handle) {
+    otStatsResizeState.handle.classList.remove('dragging');
+  }
+  document.body.classList.remove('col-resizing');
+  document.removeEventListener('mousemove', onStatsResizeMove);
+  document.removeEventListener('mouseup', onStatsResizeUp);
+  otStatsResizeState = null;
+  saveStatsColWidths();
+}
+
+function onStatsResizeDown(e) {
+  if (e.button !== 0) return;
+  var handle = e.currentTarget;
+  var th = handle.parentNode;
+  var idx = th.cellIndex;
+  var cols = getStatsTableCols();
+  if (!cols || idx < 0 || idx >= cols.length) return;
+  var col = cols[idx];
+  // Seed from the rendered th width so the first drag doesn't snap.
+  var startWidth = th.getBoundingClientRect().width;
+  col.style.width = startWidth + 'px';
+  otStatsResizeState = {
+    col: col,
+    handle: handle,
+    startX: e.clientX,
+    startWidth: startWidth
+  };
+  handle.classList.add('dragging');
+  document.body.classList.add('col-resizing');
+  document.addEventListener('mousemove', onStatsResizeMove);
+  document.addEventListener('mouseup', onStatsResizeUp);
+  // Don't trigger the th's onclick sort handler.
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function initStatsColResizers() {
+  var table = document.getElementById('otStatsTable');
+  if (!table) return;
+  if (table.getAttribute('data-resizers-init') === '1') {
+    applyStoredStatsColWidths();
+    return;
+  }
+  var ths = table.querySelectorAll('thead th');
+  for (var i = 0; i < ths.length; i++) {
+    // Don't put a resizer on the last column — there's nothing to drag against.
+    if (i === ths.length - 1) continue;
+    var handle = document.createElement('div');
+    handle.className = 'col-resizer';
+    handle.addEventListener('mousedown', onStatsResizeDown);
+    // Swallow clicks so they never reach the th sort handler.
+    handle.addEventListener('click', function(ev) { ev.stopPropagation(); });
+    ths[i].appendChild(handle);
+  }
+  table.setAttribute('data-resizers-init', '1');
+  applyStoredStatsColWidths();
+}
+
 var statsBuffer = {};
 var statsSortCol = 1; // Default sort by Dec ID
 var statsSortAsc = true;
@@ -5518,8 +5989,14 @@ function openLogTab(evt, tabName) {
   document.getElementById(tabName).classList.add('active');
   evt.currentTarget.classList.add('active');
   currentTab = tabName;
-  if (currentTab === 'Statistics') {
+  if (currentTab === 'Log') {
+    logTabActivatedAt = Date.now();
+  } else if (currentTab === 'Statistics') {
+      initStatsColResizers();
       updateStatisticsDisplay();
+      refreshBoilerSupport();
+  } else if (currentTab === 'OTSupport') {
+      refreshOtSupport();
   } else if (currentTab === 'Graph' && typeof OTGraph !== 'undefined') {
       // Ensure the chart resizes when the tab becomes visible
       if (OTGraph.resize) OTGraph.resize();
@@ -5685,6 +6162,91 @@ function sortStats(col) {
         statsSortAsc = true;
     }
     updateStatisticsDisplay();
+}
+
+// TASK-689: render the bilateral OT-support map in the 'OT Support' tab.
+// Sourced from /api/v2/otgw/ot-support which streams one JSON object per
+// observed msgID (compact mode — empty rows are not in the response).
+function refreshOtSupport() {
+    var tbody = document.querySelector('#otSupportTable tbody');
+    var countEl = document.getElementById('otSupportCount');
+    var emptyEl = document.getElementById('otSupportEmpty');
+    if (!tbody) return;
+    fetch(APIGW + "v2/otgw/ot-support")
+        .then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(function (json) {
+            var rows = (json && Array.isArray(json.msgids)) ? json.msgids : [];
+            if (rows.length === 0) {
+                tbody.innerHTML = '';
+                if (countEl) countEl.textContent = '0';
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                return;
+            }
+            if (emptyEl) emptyEl.classList.add('hidden');
+            rows.sort(function (a, b) { return (a.id || 0) - (b.id || 0); });
+            var html = '';
+            rows.forEach(function (r) {
+                var tsParts = [];
+                if (r.tsR) tsParts.push('R');
+                if (r.tsW) tsParts.push('W');
+                var tsCell = tsParts.length ? tsParts.join(' ') : '-';
+                var blParts = [];
+                if (r.blAR) blParts.push('R-ack');
+                if (r.blAW) blParts.push('W-ack');
+                if (r.blUR) blParts.push('⚠ no read support');
+                if (r.blUW) blParts.push('⚠ rejects write');
+                var blCell = blParts.length ? blParts.join(' ') : '-';
+                html += '<tr>';
+                html += '<td>' + escapeHtml(String(r.id)) + '</td>';
+                html += '<td>' + escapeHtml(r.label || 'Unknown') + '</td>';
+                html += '<td>' + escapeHtml(tsCell) + '</td>';
+                html += '<td>' + escapeHtml(blCell) + '</td>';
+                html += '</tr>';
+            });
+            tbody.innerHTML = html;
+            if (countEl) countEl.textContent = String(rows.length);
+        })
+        .catch(function () {
+            // Endpoint missing (older firmware) or fetch failed — keep table as-is.
+            if (emptyEl) emptyEl.classList.remove('hidden');
+        });
+}
+
+// TASK-686: render the "Boiler does not implement" line at the bottom of the
+// Statistics tab. Sourced from /api/v2/otgw/boiler-support, which is populated
+// in real time as the firmware observes slave Unknown-Data-Id responses
+// (processOT → bitmaps in OTGW-Core.ino). Hidden when both arrays are empty so
+// new installs / fresh-boot states do not show an empty banner.
+function refreshBoilerSupport() {
+    var line = document.getElementById('boilerUnsupportedLine');
+    var list = document.getElementById('boilerUnsupportedList');
+    if (!line || !list) return;
+    fetch(APIGW + "v2/otgw/boiler-support")
+        .then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(function (json) {
+            var r = (json && Array.isArray(json.unsupported_read))  ? json.unsupported_read  : [];
+            var w = (json && Array.isArray(json.unsupported_write)) ? json.unsupported_write : [];
+            if (r.length === 0 && w.length === 0) {
+                line.classList.add('hidden');
+                list.textContent = '';
+                return;
+            }
+            var parts = [];
+            r.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', read)'); });
+            w.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', write)'); });
+            list.textContent = parts.join(', ');
+            line.classList.remove('hidden');
+        })
+        .catch(function () {
+            // Endpoint may not exist on older firmware — keep silent.
+            line.classList.add('hidden');
+        });
 }
 
 //============================================================================

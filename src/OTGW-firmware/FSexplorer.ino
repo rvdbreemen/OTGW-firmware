@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -264,20 +264,20 @@ void setupFSexplorer(){
   httpServer.on("/ReBoot", reBootESP);
   httpServer.on("/ResetWireless", resetWirelessButton);
  
-  httpServer.onNotFound([]() 
+  httpServer.onNotFound([]()
   {
     if (httpServer.uri().indexOf("/api/") == 0)
     {
       processAPI();
+      return;
     }
-    else
-    {
-      if (state.debug.bRestAPI) DebugTf(PSTR("onNotFound: handleFile(%s)\r\n"),
-                      String(httpServer.urlDecode(httpServer.uri())).c_str());
-      if (!handleFile(httpServer.urlDecode(httpServer.uri())))
-      {
-        httpServer.send_P(404, PSTR("text/plain"), PSTR("FileNotFound\r\n"));
-      }
+    String path = httpServer.urlDecode(httpServer.uri());
+    const bool served = handleFile(String(path));
+    if (!served) {
+      httpServer.send_P(404, PSTR("text/plain"), PSTR("FileNotFound\r\n"));
+      DebugTf(PSTR("http GET %s => 404\r\n"), path.c_str());
+    } else if (state.debug.bRestAPI) {
+      DebugTf(PSTR("http GET %s => 200 (file)\r\n"), path.c_str());
     }
   });
   
@@ -285,87 +285,85 @@ void setupFSexplorer(){
 
 //=====================================================================================
 void apifirmwarefilelist() {
-  DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
-  
+  const unsigned long startMs = millis();
+  unsigned int entryCount = 0;
+  if (state.debug.bRestAPI) DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
+
   // 150 bytes covers longest entry: path (~30) + version (~32) + fwversion (~32) + JSON overhead
   char entryBuffer[150];
-  String version, fwversion;
+  // ADR-004: stack char[] instead of String to avoid per-iteration heap churn.
+  char version[32]    = {0};
+  char fwversion[32]  = {0};
   Dir dir;
   File f;
   bool firstEntry = true;
 
   String dirpath = "/" + String(state.pic.sDeviceid);
-  DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
-  
+  if (state.debug.bRestAPI) DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
+
   // Start chunked response with JSON array opening
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send(200, F("application/json"), F(""));
   httpServer.sendContent(F("["));
-  
-  // Also stream to debug telnet
-  DebugTln(F("--- Firmware File List (streamed) ---"));
-  DebugTln(F("["));
-  
-  dir = LittleFS.openDir(dirpath);	
+
+  dir = LittleFS.openDir(dirpath);
   while (dir.next()) {
-    DebugTf(PSTR("dir.fileName()=%s\r\n"), dir.fileName().c_str());
     if (dir.fileName().endsWith(".hex")) {
-      version="";
-      fwversion="";
-      String hexfile = dirpath + "/" + dir.fileName();   
+      version[0]   = '\0';
+      fwversion[0] = '\0';
+      String hexfile = dirpath + "/" + dir.fileName();
       String verfile = hexfile;
       verfile.replace(".hex", ".ver");
       f = LittleFS.open(verfile, "r");
       if (f) {
-        version = f.readStringUntil('\n');
-        version.trim();
+        // ADR-004: readBytesUntil into stack buffer (pattern: helperStuff.ino:738, 790).
+        size_t n = f.readBytesUntil('\n', (uint8_t*)version, sizeof(version) - 1);
+        version[n] = '\0';
+        // Trim trailing CR (Windows-style lines) and whitespace.
+        while (n > 0 && (version[n-1] == '\r' || version[n-1] == ' ' || version[n-1] == '\t')) {
+          version[--n] = '\0';
+        }
         f.close();
-      } 
-      
-      char fwversionBuf[32] = {0};
-      GetVersion(hexfile.c_str(), fwversionBuf, sizeof(fwversionBuf));
-      fwversion = fwversionBuf;
-
-      DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion.c_str());  
-      if (fwversion.length() && strcmp(fwversion.c_str(),version.c_str())) {
-        version=fwversion;
-        if (f = LittleFS.open(verfile, "w")) {
-          DebugTf(PSTR("writing %s to %s\r\n"),version.c_str(),verfile.c_str());
-          f.print(version + "\n");
-          f.close();
-        } 
       }
-      Debugln();
-      
+
+      GetVersion(hexfile.c_str(), fwversion, sizeof(fwversion));
+
+      if (state.debug.bRestAPI) DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion);
+      if (fwversion[0] != '\0' && strcmp(fwversion, version) != 0) {
+        strlcpy(version, fwversion, sizeof(version));
+        if (f = LittleFS.open(verfile, "w")) {
+          DebugTf(PSTR("writing %s to %s\r\n"), version, verfile.c_str());
+          f.print(version);
+          f.print('\n');
+          f.close();
+        }
+      }
+
       // Add comma separator after first entry
       if (!firstEntry) {
         httpServer.sendContent(F(","));
-        DebugTln(F(",")); // Also to debug telnet
       }
       firstEntry = false;
-      
+
       // Stream this entry directly (fits in 256-byte buffer)
       // CSTR() macro handles null safety globally - returns "" if null
-      snprintf_P(entryBuffer, sizeof(entryBuffer), 
-                 PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"), 
+      snprintf_P(entryBuffer, sizeof(entryBuffer),
+                 PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"),
                  CSTR(dir.fileName()), CSTR(version), dir.fileSize());
       httpServer.sendContent(entryBuffer);
-      
-      // Also stream entry to debug telnet
-      DebugTf(PSTR("  %s\r\n"), entryBuffer);
-      
+
       feedWatchDog(); // Feed watchdog during potentially long operation
+      entryCount++;
     }
   }
-  
+
   // Close JSON array
   httpServer.sendContent(F("]\r\n"));
   httpServer.sendContent(F("")); // End chunked response
-  
-  // Also close JSON array in debug telnet
-  DebugTln(F("]"));
-  DebugTln(F("--- End of Firmware File List ---"));
+
+  DebugTf(PSTR("api firmware/files: %u entries (%lums)\r\n"),
+          entryCount, (unsigned long)(millis() - startMs));
 }
 
 

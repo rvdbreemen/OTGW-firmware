@@ -1,11 +1,11 @@
 ---
 id: TASK-242
 title: 'Fix: OTGW flapping offline/online with serial overrun and MQTT throttle drops'
-status: In Progress
+status: Done
 assignee:
   - '@number3nl'
 created_date: '2026-04-10 20:34'
-updated_date: '2026-04-10 21:37'
+updated_date: '2026-05-25 21:58'
 labels:
   - bug
   - needs-info
@@ -43,3 +43,9 @@ Fix implemented in v1.3.10-beta on branch fix-mqtt-disconnect-serial-overrun:
 - Three hot-path functions fixed (lines 939, 978, 1064 in MQTTstuff.ino)
 - Build successful
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+User confirmed resolved (2026-05-25). Root cause was heap-protection throttling (canPublishMQ / canSendWebSo) under heavy MQTT load — normal firmware behavior, not a bug. Serial overrun observations were from concurrent busy logging paths. Field-validated stable on current dev build.
+<!-- SECTION:FINAL_SUMMARY:END -->

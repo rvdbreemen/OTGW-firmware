@@ -5,15 +5,14 @@ status: Done
 assignee:
   - '@robert'
 created_date: '2026-05-05 05:45'
-updated_date: '2026-05-05 07:56'
+updated_date: '2026-05-26 16:04'
 labels:
   - mqtt
   - ha-discovery
   - diagnostic
   - port
   - feat-2.0.0
-dependencies:
-  - TASK-540
+dependencies: []
 priority: medium
 ---
 

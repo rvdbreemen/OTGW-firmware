@@ -139,6 +139,10 @@ enum class HaIcon : uint8_t {
     tag,                    // mdi:tag
     tune_variant,           // mdi:tune-variant
     water,                  // mdi:water
+    // Button / select control icons
+    restart,                // mdi:restart
+    pin,                    // mdi:pin
+    led_outline,            // mdi:led-outline
     _count
 };
 
@@ -366,5 +370,15 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
 bool expandAndStreamSensorSources(PubSubClient &client,
                                   const MqttHaSensorCfg &cfg,
                                   HaDiscoveryContext &ctx);
+
+// Button discovery: one entity for resetgateway (pseudo-ID 251)
+bool streamButtonDiscovery(PubSubClient &client,
+                           HaDiscoveryContext &ctx);
+
+// Select discovery: GPIO and LED function selects (pseudo-ID 251)
+// selectIdx: 0=gpioa, 1=gpiob, 2=leda, 3=ledb, 4=ledc, 5=ledd, 6=lede, 7=ledf
+bool streamSelectDiscovery(PubSubClient &client,
+                           uint8_t selectIdx,
+                           HaDiscoveryContext &ctx);
 
 // end of MQTTstuff.h

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.css
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -587,13 +587,17 @@
   display: block;
   background-color: coral;
 }
+#settingMessage.success {
+  display: block;
+  background-color: #4CAF50;
+}
 
   /* define tag selectors () -------------------------------------------------- */
   
   button { width: 100px; }
   
   .settingDiv {
-    text-align: right;
+    text-align: left;
     min-width: 850px;
     border: thick solid lightblue;
     background: lightblue;
@@ -620,6 +624,100 @@
 
   .btn-wifi-reset:hover {
     background: #c62828;
+  }
+
+  /* Fixed IP configuration section */
+  .fixed-ip-section {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .fixed-ip-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left;
+    border-bottom: 1px solid #b0d8f0;
+    padding: 3px 0;
+  }
+
+  .fixed-ip-row:last-child {
+    border-bottom: none;
+  }
+
+  .fixed-ip-field-label {
+    padding-left: 24px;
+    text-align: left;
+  }
+
+  .fixed-ip-section .settings-field-container {
+    text-align: left;
+  }
+
+  .fixed-ip-dhcp-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .dhcp-toggle-cb {
+    width: auto;
+    cursor: pointer;
+  }
+
+  .fixed-ip-fields {
+    background: #dff0fb;
+    border-top: 1px solid #b0d8f0;
+  }
+
+  .octet-group {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+    padding: 1px 4px;
+    background: white;
+    gap: 1px;
+  }
+
+  .octet-input {
+    width: 38px;
+    border: none;
+    outline: none;
+    text-align: center;
+    padding: 2px 0;
+    background: transparent;
+    color: black;
+    font-size: 14px;
+    -moz-appearance: textfield;
+  }
+
+  .octet-input::-webkit-outer-spin-button,
+  .octet-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .octet-input:focus {
+    background: #e8f4ff;
+    border-radius: 2px;
+  }
+
+  .octet-dot {
+    color: #444;
+    font-weight: bold;
+    user-select: none;
+    padding: 0 1px;
+  }
+
+  .fixed-ip-notice {
+    text-align: right;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #c67000;
+    font-style: italic;
   }
 
   /*
@@ -897,6 +995,19 @@
   display: inline-block;
 }
 
+#boilerUnsupportedLine {
+  background: #fff3cd;
+  border: 1px solid #f0ad4e;
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: #7a5800;
+  font-weight: 500;
+  max-width: 75%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
   /* Firmware Upgrade Progress */
   #flashProgressSection {
     margin-top: 12px;
@@ -1006,9 +1117,9 @@ body.disable-interaction {
 .ot-stats-table th:nth-child(1) { width: 40px; }  /* Hex */
 .ot-stats-table th:nth-child(2) { width: 40px; }  /* Dec */
 .ot-stats-table th:nth-child(3) { width: 70px; }  /* Direction */
-.ot-stats-table th:nth-child(4) { width: 200px; } /* Description */
+.ot-stats-table th:nth-child(4) { width: auto; }  /* Description - takes remaining space */
 .ot-stats-table th:nth-child(5) { width: 80px; }  /* Interval */
-.ot-stats-table th:nth-child(6) { width: auto; }  /* Value - takes remaining space */
+.ot-stats-table th:nth-child(6) { width: 180px; } /* Value - fixed; values are short */
 
 .ot-stats-table th, .ot-stats-table td {
   text-align: left;
@@ -1026,6 +1137,31 @@ body.disable-interaction {
   top: 0;
   z-index: 10;
   cursor: pointer;
+}
+
+/* Drag-to-resize handle on right edge of each stats-table header.
+   `position: sticky` already establishes a positioning context, so the
+   absolutely-positioned resizer anchors to the th. */
+.ot-stats-table th .col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 11;
+}
+
+.ot-stats-table th .col-resizer:hover,
+.ot-stats-table th .col-resizer.dragging {
+  background-color: #b8b8b8;
+}
+
+body.col-resizing,
+body.col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .ot-stats-table th:hover {

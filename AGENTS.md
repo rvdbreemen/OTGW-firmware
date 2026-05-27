@@ -29,9 +29,29 @@ Prefer the project build command that produces both artifacts. If using `build.p
 <!-- The full Backlog CLI reference is intentionally extracted to -->
 <!-- .claude/backlog-cli-reference.md to keep this file focused. -->
 
+# Task Management (MANDATORY)
+
+**Every piece of work must have a backlog task before any code or project-file edits are made. No exceptions.**
+
 # Backlog.md task management
 
 All task operations go through the **`backlog` CLI** — never edit task files directly. The CLI owns file naming, frontmatter, AC indexing, and Git tracking; bypassing it desynchronises the project.
 
 Full CLI reference: read `.claude/backlog-cli-reference.md` before any backlog operation.
+
+## Task pickup (MANDATORY)
+
+When Codex picks up a newly created or existing task, its first action before code, research, or project-file reading is:
+
+```powershell
+backlog task edit <id> -s "In Progress" -a '@codex'
+```
+
+Add an implementation plan only after the task is active and assigned. If Codex discovers in-flight work that was started without a task, stop further edits, create or pick up a follow-up task immediately, and document the gap plus the existing implementation and validation evidence there.
+
+## Autonomous task completion
+
+When every acceptance criterion and Definition-of-Done item is satisfied, required validation is green, implementation notes include branch and coding-agent metadata, and a final summary has been added, set the task status to **Done** immediately.
+
+Leave a task at **In Progress** only when an acceptance criterion cannot be self-verified, a required validation or Definition-of-Done item is unmet, or coordinated sibling work requires the transition to wait. Record the blocker in the task notes or final summary.
 <!-- BACKLOG.MD GUIDELINES END -->

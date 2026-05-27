@@ -1,0 +1,116 @@
+#!/bin/sh
+# Git commit-msg hook (OTGW dev) — two enforcement passes:
+#
+# 1. If the commit touches firmware (src/OTGW-firmware/, src/libraries/) or
+#    docs/backlog markdown (docs/, backlog/), require the subject to reference
+#    a TASK-NNN identifier OR an explicit exemption tag.
+#
+# 2. If any TASK-NNN is referenced in the message, require the corresponding
+#    backlog/tasks/task-NNN-*.md file to be tracked or staged.
+#
+# Why: CLAUDE.md policy is "every piece of work must have a backlog task before
+# any code is written. No exceptions." Audit on 2026-05-21 (TASK-653) showed
+# ~70% of dev commits in the v1.5.0..1.6.0-beta.16 window lacked a TASK-NNN
+# reference. The 2.0.0 worktree already enforces pass (2) but not pass (1).
+#
+# Install (one-time per clone): git config core.hooksPath .githooks
+# Bypass for one commit:         git commit --no-verify
+#                                OR: OTGW_TASK_HOOK_DISABLE=1 git commit ...
+# Exemption tags (in subject):   [no-task], chore(housekeeping|release|meta|daily-report):
+
+set -e
+
+msg_file="$1"
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+    exit 0
+fi
+
+if [ "${OTGW_TASK_HOOK_DISABLE:-0}" = "1" ]; then
+    echo "[task-hook] disabled for this commit (OTGW_TASK_HOOK_DISABLE=1)" >&2
+    exit 0
+fi
+
+# Strip the diff scissor section and comment lines so a commented TASK ref in
+# the editor template doesn't trigger pass (2).
+msg=$(sed -n '/^# ------------------------ >8 ------------------------$/q;p' "$msg_file" | grep -v '^#')
+
+# --- Pass 1: require TASK-NNN for firmware/docs commits ---------------------
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)
+trigger=$(printf '%s\n' "$staged" | awk '
+  /^src\/OTGW-firmware\// { print; next }
+  /^src\/libraries\// { print; next }
+  /^docs\// { print; next }
+  /^backlog\// { print; next }
+')
+
+exempt=0
+case "$msg" in
+  *"[no-task]"*) exempt=1 ;;
+esac
+subject=$(printf '%s\n' "$msg" | head -1)
+case "$subject" in
+  "chore(housekeeping):"*|"chore(release):"*|"chore(meta):"*|"chore(daily-report):"*) exempt=1 ;;
+esac
+
+ids=$(printf '%s' "$msg" \
+    | grep -oE '[Tt][Aa][Ss][Kk]-[0-9]+' \
+    | tr '[:lower:]' '[:upper:]' \
+    | sort -u)
+
+if [ -n "$trigger" ] && [ "$exempt" -eq 0 ] && [ -z "$ids" ]; then
+    cat >&2 <<EOF
+commit-msg: blocked — firmware/docs commit lacks TASK-NNN reference.
+
+Staged paths matching firmware/docs:
+$(printf '%s\n' "$trigger" | sed 's/^/  /')
+
+Add a TASK-NNN reference to the subject, e.g.:
+  feat(mqtt): proxy-A routing fix (TASK-626)
+
+Or use an exemption tag for housekeeping commits:
+  [no-task]                              (anywhere in body)
+  chore(housekeeping): ...               (subject prefix)
+  chore(release): ...                    (subject prefix)
+  chore(meta): ...                       (subject prefix)
+  chore(daily-report): ...               (subject prefix)
+
+Bypass for one commit: git commit --no-verify
+EOF
+    exit 1
+fi
+
+# --- Pass 2: TASK-NNN reference must have a staged/tracked task file --------
+
+if [ -n "$ids" ]; then
+    missing=""
+    for id in $ids; do
+        num=$(printf '%s' "$id" | sed 's/TASK-//')
+        matches=$(git ls-files "backlog/tasks/task-${num}.md" "backlog/tasks/task-${num} *.md" "backlog/tasks/task-${num}-*.md" 2>/dev/null)
+        if [ -z "$matches" ]; then
+            missing="$missing $id"
+        fi
+    done
+    if [ -n "$missing" ]; then
+        cat >&2 <<EOF
+commit-msg: blocked — task record(s) not in index for:$missing
+
+The commit references TASK-NNN identifier(s) above, but no matching
+backlog/tasks/task-NNN-*.md file is tracked or staged.
+
+Fix one of these:
+  1. Stage the missing record:
+       git add backlog/tasks/task-NNN-*.md
+       git commit --amend --no-edit
+     (or: git commit -m "..." as a follow-up before retrying)
+  2. Create the task first via 'npx -y backlog.md task create ...', which
+     writes the markdown file, then 'git add' it.
+  3. Drop the unintended TASK-NNN reference from the message.
+
+Bypass once: git commit --no-verify
+EOF
+        exit 1
+    fi
+fi
+
+exit 0

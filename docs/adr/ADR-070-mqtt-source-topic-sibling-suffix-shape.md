@@ -88,7 +88,7 @@ The 2.0.0 line carries the same change under ADR-097 (port).
 - With `bSeparateSources=true`, three entities per dual-source MsgID slightly increases the HA entity registry size (vs. ADR-068's two). Acceptable since opt-in.
 - Users who manually configured HA sensors against the nested topics (e.g. wrote a YAML config for `sensor.boiler_setpoint` pointing at `<base>/value/0/TSet/boiler`) need to re-point them at the suffixed shape. The auto-discovery path handles itself; manual configs are documented as a one-time migration step.
 
-## Related
+## Related Decisions
 
 - **Supersedes ADR-068** (`bSeparateSources` mutual-exclusion rule no longer applies under sibling shape). ADR-068's status line will be updated to `Superseded by ADR-070, 2026-05-07.` after this ADR is Accepted.
 - **Refines ADR-069** (worldview routing semantics retained; only topic shape changes). ADR-069 stays Accepted; this ADR amends it without superseding.

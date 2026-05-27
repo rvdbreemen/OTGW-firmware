@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -275,19 +275,12 @@ static uint16_t mqttlastsentRBPbyte[2]  = {0};  // msgId 6 RBP: 0=transfer_enabl
 static uint16_t mqttlastsentRObit[2]    = {0};  // msgId 100 Remote Override: 0=manual, 1=program
 static uint16_t mqttlastsentRObyte[1]   = {0};  // msgId 100 Remote Override LB flag8
 
-// TASK-402: global rate-gate — enforce MQTT_GATED_PUBLISH_SPACING_MS between
-// any two gated publishes for first-seen, heartbeat, and force paths.
-// Change-detect publishes bypass the gate (priority: bit-flip goes out
-// immediately) and do NOT update the timer, so a subsequent non-change publish
-// honours spacing relative to the previous non-change publish only.
-// Boot sentinel mqttLastGatedPublishMs==0 means "nothing published yet, first
-// pass is free" — earliest bit at boot goes through without waiting.
-// TASK-402 v2: spacing tightened from 1000ms to 250ms per user request.
-// With 44 gated slots across msgId 0/70/5/6/100, boot-time full fanout
-// completes in ~11s; the 60s heartbeat storm spreads over ~4s (16 bits at
-// 250ms each). Still one publish per tick, so handleMQTT peaks stay low.
-static uint32_t mqttLastGatedPublishMs = 0;
-static constexpr uint32_t MQTT_GATED_PUBLISH_SPACING_MS = 250;
+// ADR-076: a global rate-gate (TASK-402's MQTT_GATED_PUBLISH_SPACING_MS) used
+// to live here and was meant to spread the 60s heartbeat storm across slots.
+// Instead it starved per-bit slots inside the same fan-out (the combined byte
+// always grabbed the token first, the bits lost it for the next heartbeat
+// too). Removed under ADR-076 — heap-tier back-pressure via canPublishMQTT()
+// (ADR-030) is now the sole publish throttle.
 
 // Pending MQTT throttle slot update — applied only after successful publish.
 // Prevents the throttle from "burning" a slot when sendMQTTData fails silently.
@@ -432,9 +425,6 @@ static void resetMqttTrackedState()
   mqttlastsentRObit[0]  = TRACKED_TIME_UNSEEN;
   mqttlastsentRObit[1]  = TRACKED_TIME_UNSEEN;
   mqttlastsentRObyte[0] = TRACKED_TIME_UNSEEN;
-  // TASK-402: reset rate-gate sentinel so post-reset the first non-change
-  // publish goes through immediately instead of waiting 1s.
-  mqttLastGatedPublishMs = 0;
 }
 
 struct TrackingStateInitializer {
@@ -870,106 +860,6 @@ void sendOTGWbootcmd(){
   }
 }
 
-//===================[ OTGW Command & Response ]===================
-void executeCommand(const char* sCmd, char* outBuf, size_t outSize, bool mirrorToWebSocket){
-  //send command to OTGW — uses char[] buffers per ADR-004 (no heap allocation)
-  if (outSize > 0) outBuf[0] = '\0';
-  OTGWDebugTf(PSTR("OTGW Send Cmd [%s]\r\n"), sCmd);
-  size_t cmdLen = strlen(sCmd);
-  if (!isPICEnabled()) {
-    OTGWDebugTln(F("executeCommand: No PIC detected - command ignored"));
-    strlcpy(outBuf, "NG - No PIC detected, command ignored.", outSize);
-    if (mirrorToWebSocket && hasWebSocketClients()) {
-      sendEventToWebSocket_P('!', PSTR("NG - No PIC detected, command ignored."));
-    }
-    return;
-  }
-  if (state.debug.bOTGWSimulation) {
-    OTGWDebugTln(F("OTGW simulation active - executeCommand blocked"));
-    strlcpy(outBuf, "SE - OTGW simulation active.", outSize);
-    if (mirrorToWebSocket && hasWebSocketClients()) {
-      sendEventToWebSocket_P('!', PSTR("SE - OTGW simulation active."));
-    }
-    return;
-  }
-  if (cmdLen < 2) {
-    OTGWDebugTln(F("Send command too short"));
-    strlcpy(outBuf, "SE - Command too short.", outSize);
-    if (mirrorToWebSocket && hasWebSocketClients()) {
-      sendEventToWebSocket_P('!', PSTR("SE - Command too short."));
-    }
-    return;
-  }
-  OTGWSerial.setTimeout(1000);
-  DECLARE_TIMER_MS(tmrWaitForIt, 1000);
-  while((OTGWSerial.availableForWrite() < (int)(cmdLen+2)) && !DUE(tmrWaitForIt)){
-    feedWatchDog();
-  }
-  OTGWSerial.write(sCmd);
-  OTGWSerial.write("\r\n");
-  OTGWSerial.flush();
-  if (mirrorToWebSocket && hasWebSocketClients()) {
-    sendEventToWebSocket('>', sCmd);
-  }
-  //wait for response
-  RESTART_TIMER(tmrWaitForIt);
-  while(!OTGWSerial.available() && !DUE(tmrWaitForIt)) {
-    feedWatchDog();
-  }
-  char cmdPrefix[3] = { sCmd[0], sCmd[1], '\0' };
-  OTGWDebugTf(PSTR("Awaiting response prefix: [%s]\r\n"), cmdPrefix);
-  //fetch a line into static buffer (saves 256 bytes of stack)
-  static char line[256];
-  int lineLen = OTGWSerial.readBytesUntil('\n', line, sizeof(line)-1);
-  line[lineLen] = '\0';
-  // Trim trailing whitespace (CR, spaces)
-  while (lineLen > 0 && (line[lineLen-1] == '\r' || line[lineLen-1] == ' ' || line[lineLen-1] == '\t')) {
-    line[--lineLen] = '\0';
-  }
-
-  if (lineLen >= 3 && strncmp(line, cmdPrefix, 2) == 0 && line[2] == ':'){
-    // Responses: When a serial command is accepted by the gateway, it responds with the two letters of the command code, a colon, and the interpreted data value.
-    // Command:   "TT=19.125"
-    // Response:  "TT: 19.13"
-    //            [XX:response string]
-    strlcpy(outBuf, line + 3, outSize);
-  } else if (strncmp(line, "NG", 2) == 0){
-    strlcpy(outBuf, "NG - No Good. The command code is unknown.", outSize);
-  } else if (strncmp(line, "SE", 2) == 0){
-    strlcpy(outBuf, "SE - Syntax Error. The command contained an unexpected character or was incomplete.", outSize);
-  } else if (strncmp(line, "BV", 2) == 0){
-    strlcpy(outBuf, "BV - Bad Value. The command contained a data value that is not allowed.", outSize);
-  } else if (strncmp(line, "OR", 2) == 0){
-    strlcpy(outBuf, "OR - Out of Range. A number was specified outside of the allowed range.", outSize);
-  } else if (strncmp(line, "NS", 2) == 0){
-    strlcpy(outBuf, "NS - No Space. The alternative Data-ID could not be added because the table is full.", outSize);
-  } else if (strncmp(line, "NF", 2) == 0){
-    strlcpy(outBuf, "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.", outSize);
-  } else if (strncmp(line, "OE", 2) == 0){
-    strlcpy(outBuf, "OE - Overrun Error. The processor was busy and failed to process all received characters.", outSize);
-  } else if (lineLen == 0) {
-    //just an empty line... most likely it's a timeout situation
-    strlcpy(outBuf, "TO - Timeout. No response.", outSize);
-  } else {
-    strlcpy(outBuf, line, outSize); //some commands return a string, just return that.
-  }
-  if (mirrorToWebSocket && hasWebSocketClients()) {
-    if (lineLen == 0) {
-      sendEventToWebSocket_P('!', PSTR("TO - Timeout. No response."));
-    } else if ((strncmp(line, "NG", 2) == 0) ||
-               (strncmp(line, "SE", 2) == 0) ||
-               (strncmp(line, "BV", 2) == 0) ||
-               (strncmp(line, "OR", 2) == 0) ||
-               (strncmp(line, "NS", 2) == 0) ||
-               (strncmp(line, "NF", 2) == 0) ||
-               (strncmp(line, "OE", 2) == 0)) {
-      sendEventToWebSocket('!', line);
-    } else {
-      sendEventToWebSocket('<', line);
-    }
-  }
-  OTGWDebugTf(PSTR("Command send [%s]-[%s] - Response line: [%s] - Returned value: [%s]\r\n"), sCmd, cmdPrefix, line, outBuf);
-}
 //===================[ Watchdog OTGW ]===============================
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   // Hardware WatchDog is based on:
@@ -1272,8 +1162,10 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 bool is_value_valid_for_master_topic(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
   if (isMsgIdReservedInActiveProfile(OT.id)) return false;
-  // ADR-069 canonical = boiler-side worldview gates:
-  if (OT.rsptype == OTGW_ANSWER_THERMOSTAT) return false;
+  // ADR-069/ADR-075 canonical = boiler-side worldview gates:
+  // ADR-075: only an answer-override A (a genuine B owns canonical) is blocked. A proxy A
+  // (no preceding B — e.g. MaxTSet/57) IS the boiler-side value and reaches canonical.
+  if (OT.rsptype == OTGW_ANSWER_THERMOSTAT && OT.bAnswerOverride) return false;
   if (OT.rsptype == OTGW_THERMOSTAT && OT.bGatewaySubstituted) return false;
   bool _valid = false;
   _valid = _valid || (OTlookup.msgcmd==OT_READ && OT.type==OT_READ_ACK);
@@ -1543,11 +1435,8 @@ static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlo
   const uint16_t lastTime = trackedSlots[bitSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
-  // TASK-402: change-detect has absolute priority — bit-flips publish
-  // immediately, bypassing the 1s rate-gate. Excludes firstSeen (handled
-  // below as a first-seen publish, not a "flip"). Change-detect publishes
-  // do NOT update mqttLastGatedPublishMs, so a concurrent heartbeat/first-seen
-  // publish schedules against the previous non-change publish, not the flip.
+  // Change-detect has absolute priority — bit-flips publish immediately.
+  // Excludes firstSeen (handled below as a first-seen publish, not a "flip").
   const bool valueChanged = !firstSeen && (newVal != prevVal);
   if (valueChanged) {
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
@@ -1556,16 +1445,10 @@ static bool shouldPublishTrackedStatusBit(uint16_t *trackedSlots, uint8_t bitSlo
   const bool intervalElapsed = !firstSeen
                              && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
   if (firstSeen || forcePublish || intervalElapsed) {
-    // TASK-402: rate-gate — ≥MQTT_GATED_PUBLISH_SPACING_MS since last non-change
-    // publish. Deferred calls return false; the firstSeen/intervalElapsed flags
-    // stay true until our lastTime gets updated, so the bit retries on the next
-    // OT frame automatically.
-    const uint32_t nowMs = millis();
-    if (mqttLastGatedPublishMs != 0 && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
-      return false;
-    }
+    // ADR-076: per-slot heartbeat only. No global cross-slot spacing — that
+    // was TASK-402's MQTT_GATED_PUBLISH_SPACING_MS and it starved the
+    // per-bit slots when the combined byte won the token at every tick.
     mqttPendingBitSlot = {trackedSlots, bitSlot, now, true};
-    mqttLastGatedPublishMs = nowMs;
     return true;
   }
   return false;
@@ -1589,8 +1472,7 @@ static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteS
   const uint16_t lastTime = trackedSlots[byteSlot];
   const bool firstSeen = !hasTrackedTime(lastTime);
   const uint16_t now = currentTrackedSeconds();
-  // TASK-402: change-detect priority — byte changed -> immediate publish,
-  // no spacing check, no spacing-timer update. Same rationale as bit path.
+  // Change-detect priority — byte changed -> immediate publish.
   const bool valueChanged = !firstSeen && (newVal != prevVal);
   if (valueChanged) {
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
@@ -1599,12 +1481,9 @@ static bool shouldPublishTrackedStatusByte(uint16_t *trackedSlots, uint8_t byteS
   const bool intervalElapsed = !firstSeen
                              && (elapsedTrackedSeconds(now, lastTime) >= STATUS_HEARTBEAT_INTERVAL_SEC);
   if (firstSeen || forcePublish || intervalElapsed) {
-    const uint32_t nowMs = millis();
-    if (mqttLastGatedPublishMs != 0 && (nowMs - mqttLastGatedPublishMs) < MQTT_GATED_PUBLISH_SPACING_MS) {
-      return false;
-    }
+    // ADR-076: per-slot heartbeat only — see shouldPublishTrackedStatusBit()
+    // for the rationale on removing the global rate-gate.
     mqttPendingByteSlot = {trackedSlots, byteSlot, now, true};
-    mqttLastGatedPublishMs = nowMs;
     return true;
   }
   return false;
@@ -1629,7 +1508,11 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-347: arm cooldown only for real sends
-  publishMQTTOnOff(topic, newVal);
+  // ADR-076: commit pending bit-slot only when sendMQTTData confirms success.
+  // On any early-return (heap throttle, disconnect) discard the pending so an
+  // unrelated downstream publish cannot silently commit it.
+  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
+  else                                 mqttPendingBitSlot.pending = false;
 }
 
 static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool prevVal,
@@ -1639,7 +1522,8 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
   logMQTTStatusBitDecision(bitSlot, topic, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-354: arm cooldown only for real sends
-  publishMQTTOnOff(topic, newVal);
+  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
+  else                                 mqttPendingBitSlot.pending = false;
 }
 
 // TASK-401: generic gate-wrapped publish helpers for non-Status fan-out
@@ -1654,7 +1538,9 @@ static void publishGatedBitMQTT(uint16_t *trackedSlots, uint8_t bitSlot,
 {
   const bool allowPublish = shouldPublishTrackedStatusBit(trackedSlots, bitSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
-  publishMQTTOnOff(topic, newVal);
+  // ADR-076: commit pending only when sendMQTTData confirms success.
+  if (publishMQTTOnOff(topic, newVal)) confirmMQTTPublishBitSlot();
+  else                                 mqttPendingBitSlot.pending = false;
 }
 
 static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
@@ -1663,7 +1549,9 @@ static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
 {
   const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
-  sendMQTTData(topic, payload);
+  // ADR-076: commit pending only when sendMQTTData confirms success.
+  if (sendMQTTData(topic, payload)) confirmMQTTPublishByteSlot();
+  else                              mqttPendingByteSlot.pending = false;
 }
 
 // Overload for dynamically-built char* topics (e.g. "<msgid>_flag8").
@@ -1673,7 +1561,8 @@ static void publishGatedByteMQTT(uint16_t *trackedSlots, uint8_t byteSlot,
 {
   const bool allowPublish = shouldPublishTrackedStatusByte(trackedSlots, byteSlot, newVal, prevVal, /*forcePublish=*/false);
   OTPublishGate gate(allowPublish);
-  sendMQTTData(topic, payload);
+  if (sendMQTTData(topic, payload)) confirmMQTTPublishByteSlot();
+  else                              mqttPendingByteSlot.pending = false;
 }
 
 static void copyBinaryByteString(uint8_t value, char *dest, size_t destSize)
@@ -1739,7 +1628,9 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData("status_master", statusText);
+    // ADR-076: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData("status_master", statusText)) confirmMQTTPublishByteSlot();
+    else                                           mqttPendingByteSlot.pending = false;
   }
   publishStatusBitMQTT(0, "ch_enable",        (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
   publishStatusBitMQTT(1, "dhw_enable",       (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
@@ -1780,7 +1671,9 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData("status_slave", statusText);
+    // ADR-076: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData("status_slave", statusText)) confirmMQTTPublishByteSlot();
+    else                                          mqttPendingByteSlot.pending = false;
   }
   publishStatusBitMQTT(8,  "fault",                (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
   publishStatusBitMQTT(9,  "centralheating",       (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
@@ -1863,7 +1756,9 @@ static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData(F("status_vh_master"), statusText);
+    // ADR-076: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData(F("status_vh_master"), statusText)) confirmMQTTPublishByteSlot();
+    else                                                 mqttPendingByteSlot.pending = false;
   }
   publishStatusVHBitMQTT(0, "vh_ventilation_enabled",    (valueHB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueHB);
   publishStatusVHBitMQTT(1, "vh_bypass_position",        (valueHB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueHB);
@@ -1901,7 +1796,9 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
   {
     OTPublishGate gate(publishCombined);
     if (publishCombined) incrementStatusBurstPublishCount();
-    sendMQTTData(F("status_vh_slave"), statusText);
+    // ADR-076: commit pending byte-slot only when sendMQTTData confirms success.
+    if (sendMQTTData(F("status_vh_slave"), statusText)) confirmMQTTPublishByteSlot();
+    else                                                mqttPendingByteSlot.pending = false;
   }
   publishStatusVHBitMQTT(0, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
   publishStatusVHBitMQTT(1, "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
@@ -2093,8 +1990,9 @@ void print_status(uint16_t& value)
     AddLog(OTlookupitem.label);
     AddLogf(" = Master [%s]", _flag8_master);
 
-    //Master Status
-    if (is_value_valid(OTdata, OTlookupitem)){
+    //Master Status — ADR-069 boiler-side worldview: suppress canonical for
+    //gateway-substituted T-frames so the HW override is reflected in dhw_enable.
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)){
       publishMasterStatusState(OTdata.valueHB, _flag8_master);
     }
   } else {
@@ -2121,13 +2019,14 @@ void print_status(uint16_t& value)
     AddLog(OTlookupitem.label);
     AddLogf(" = Slave  [%s]", _flag8_slave);
     
-    //Slave Status
-    if (is_value_valid(OTdata, OTlookupitem)){
+    //Slave Status — ADR-069 boiler-side worldview: suppress canonical for
+    //gateway-faked A-frames so the boiler's true DHW mode is what we publish.
+    if (is_value_valid_for_master_topic(OTdata, OTlookupitem)){
       publishSlaveStatusState(OTdata.valueLB, _flag8_slave);
     }
   }
 
-  if (is_value_valid(OTdata, OTlookupitem)){
+  if (is_value_valid_for_master_topic(OTdata, OTlookupitem)){
     // AddLogf("Status u16 [%04x] _value [%04x] hb [%02x] lb [%02x]", OTdata.u16(), _value, OTdata.valueHB, OTdata.valueLB);
     value = (OTcurrentSystemState.MasterStatus<<8) | OTcurrentSystemState.SlaveStatus;
   }
@@ -2305,7 +2204,12 @@ void print_slavememberid(uint16_t& value)
     //     not allowed] 
     // 5:  CH2 present  [CH2 not present, CH2 present] 
     // 6:  Remote water filling function
-    // 7:  Heat/cool mode control 
+    //     NOTE: pyotgw / HA core's opentherm_gw integration names this bit
+    //     DATA_SLAVE_REMOTE_RESET. The OpenTherm 2.2 spec and this firmware's
+    //     label call it "remote_water_filling_function". Both refer to the
+    //     same wire bit (MsgID 3, HB bit 6); HA-side discovery parity is
+    //     audited in docs/audits/2026-05-21-ha-capability-flags-dev.md (TASK-649).
+    // 7:  Heat/cool mode control
 
     sendMQTTData(F("dhw_present"),                             (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
     sendMQTTData(F("control_type_modulation"),                 (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));  
@@ -3712,11 +3616,22 @@ void processPSSummary(const char *buf, int len) {
       if (msgid <= OT_MSGID_MAX) {
         PROGMEM_readAnything(&OTmap[msgid], OTlookupitem);
         const char *label = OTlookupitem.label;
+        // ADR-076 (extended in TASK-644): scope mqttPendingSlot commit to this
+        // frame. shouldPublishMQTTForPSField installs pending; capture the
+        // pre-publish success count, run the publish path, then commit if any
+        // sendMQTTData succeeded — else clear the pending so a later unrelated
+        // publish cannot silently commit it.
+        const uint32_t preSuccessCount = mqttSendSuccessCount;
         OTPublishGate psGate(shouldPublishMQTTForPSField(msgid));
 
         if (publishPSSummaryFieldValue(msgid, OTlookupitem.type, label, fBuf)) {
           ensurePSSummaryDiscovery(msgid);
           logPSSummaryField(label, fBuf);
+        }
+
+        if (mqttPendingSlot.pending) {
+          if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
+          else                                        mqttPendingSlot.pending = false;
         }
       }
     }
@@ -3961,6 +3876,66 @@ static void decodeAndPublishOTValue()
   #define OTTRACE(name) ((void)0)
 #endif
 
+// --- PIC short-token dispatch table (TASK-680) ---------------------------
+// Collapses 12 uniform else-if branches in processOT into one PROGMEM lookup.
+// Each branch was: Debugln(F(msg)) + reportOTGWEvent_P(PSTR(msg), severity, true).
+// Severity '!' = command error, '*' = status notification. All branches set
+// suppressDuringStartup=true; that flag remains hard-coded in the helper.
+static const char OTGW_TOK_NG[]   PROGMEM = "NG";
+static const char OTGW_TOK_SE[]   PROGMEM = "SE";
+static const char OTGW_TOK_BV[]   PROGMEM = "BV";
+static const char OTGW_TOK_OR[]   PROGMEM = "OR";
+static const char OTGW_TOK_NS[]   PROGMEM = "NS";
+static const char OTGW_TOK_NF[]   PROGMEM = "NF";
+static const char OTGW_TOK_OE[]   PROGMEM = "OE";
+static const char OTGW_MSG_NG[]   PROGMEM = "NG - No Good. The command code is unknown.";
+static const char OTGW_MSG_SE[]   PROGMEM = "SE - Syntax Error. The command contained an unexpected character or was incomplete.";
+static const char OTGW_MSG_BV[]   PROGMEM = "BV - Bad Value. The command contained a data value that is not allowed.";
+static const char OTGW_MSG_OR[]   PROGMEM = "OR - Out of Range. A number was specified outside of the allowed range.";
+static const char OTGW_MSG_NS[]   PROGMEM = "NS - No Space. The alternative Data-ID could not be added because the table is full.";
+static const char OTGW_MSG_NF[]   PROGMEM = "NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table.";
+static const char OTGW_MSG_OE[]   PROGMEM = "OE - Overrun Error. The processor was busy and failed to process all received characters.";
+// For these five the on-bus token IS the human message; share one string for both fields.
+static const char OTGW_S_THERMO_DISC[] PROGMEM = "Thermostat disconnected";
+static const char OTGW_S_THERMO_CONN[] PROGMEM = "Thermostat connected";
+static const char OTGW_S_LOW_POWER[]   PROGMEM = "Low power";
+static const char OTGW_S_MED_POWER[]   PROGMEM = "Medium power";
+static const char OTGW_S_HIGH_POWER[]  PROGMEM = "High power";
+
+struct OTGWErrorCode {
+  PGM_P token;     // PROGMEM string to match against buf
+  PGM_P message;   // PROGMEM string fed to Debugln + reportOTGWEvent_P
+  char  severity;  // '!' (command error) or '*' (status)
+};
+
+static const OTGWErrorCode kOTGWErrorCodes[] PROGMEM = {
+  { OTGW_TOK_NG, OTGW_MSG_NG, '!' },
+  { OTGW_TOK_SE, OTGW_MSG_SE, '!' },
+  { OTGW_TOK_BV, OTGW_MSG_BV, '!' },
+  { OTGW_TOK_OR, OTGW_MSG_OR, '!' },
+  { OTGW_TOK_NS, OTGW_MSG_NS, '!' },
+  { OTGW_TOK_NF, OTGW_MSG_NF, '!' },
+  { OTGW_TOK_OE, OTGW_MSG_OE, '!' },
+  { OTGW_S_THERMO_DISC, OTGW_S_THERMO_DISC, '*' },
+  { OTGW_S_THERMO_CONN, OTGW_S_THERMO_CONN, '*' },
+  { OTGW_S_LOW_POWER,   OTGW_S_LOW_POWER,   '*' },
+  { OTGW_S_MED_POWER,   OTGW_S_MED_POWER,   '*' },
+  { OTGW_S_HIGH_POWER,  OTGW_S_HIGH_POWER,  '*' },
+};
+
+static bool handleOTGWErrorCode(const char *buf) {
+  for (size_t i = 0; i < sizeof(kOTGWErrorCodes)/sizeof(kOTGWErrorCodes[0]); ++i) {
+    OTGWErrorCode e;
+    memcpy_P(&e, &kOTGWErrorCodes[i], sizeof(e));
+    if (strcmp_P(buf, e.token) == 0) {
+      Debugln(reinterpret_cast<const __FlashStringHelper*>(e.message));
+      reportOTGWEvent_P(e.message, e.severity, true);
+      return true;
+    }
+  }
+  return false;
+}
+
 /*
   Process OTGW messages coming from the PIC.
   It knows about:
@@ -3968,6 +3943,49 @@ static void decodeAndPublishOTValue()
   - error format
   - ...
 */
+// TASK-684 / TASK-685 / TASK-686 / TASK-688: per-msgID bitmaps recording each
+// side of the OT bus's observed capability. Populated in processOT (idempotent
+// set on every observation). File scope so REST/MQTT/file-persistence layers
+// can read them through the accessors below.
+//
+// Memory: 6 * 32 = 192 B bitmaps + 3 B dirty flags + 32 B scratch = 227 B.
+//
+// Persistence (TASK-688): the *FileDirty flags drive 15-min debounced atomic
+// writes to /ot-thermo.json and /ot-boiler.json (saveOtSupportFilesIfDirty).
+// boilerUnsupportedDirty stays independent because the MQTT republish has its
+// own (1-min) cadence and consumes only the unsupported subset.
+static uint8_t boilerLastMasterWasWrite[32] = {0};  // scratch — not persisted
+static uint8_t boilerUnsupportedRead[32]    = {0};
+static uint8_t boilerUnsupportedWrite[32]   = {0};
+static uint8_t boilerAckedRead[32]          = {0};
+static uint8_t boilerAckedWrite[32]         = {0};
+static uint8_t thermostatSentRead[32]       = {0};
+static uint8_t thermostatSentWrite[32]      = {0};
+static bool boilerUnsupportedDirty = false;  // MQTT CSV republish gate (1-min cadence)
+static bool boilerFileDirty        = false;  // /ot-boiler.json   write gate (15-min cadence)
+static bool thermostatFileDirty    = false;  // /ot-thermo.json   write gate (15-min cadence)
+
+bool isBoilerMsgIdUnsupportedRead(uint8_t id) {
+  return (boilerUnsupportedRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isBoilerMsgIdUnsupportedWrite(uint8_t id) {
+  return (boilerUnsupportedWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isBoilerMsgIdAckedRead(uint8_t id) {
+  return (boilerAckedRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isBoilerMsgIdAckedWrite(uint8_t id) {
+  return (boilerAckedWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isThermostatMsgIdSentRead(uint8_t id) {
+  return (thermostatSentRead[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool isThermostatMsgIdSentWrite(uint8_t id) {
+  return (thermostatSentWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
+}
+bool getBoilerUnsupportedDirty()   { return boilerUnsupportedDirty; }
+void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
+
 void processOT(const char *buf, int len){
   static time_t epochBoilerlastseen = 0;
   static time_t epochThermostatlastseen = 0;
@@ -4026,9 +4044,10 @@ void processOT(const char *buf, int len){
     if ((state.otgw.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
       if (isPICEnabled()) {
         sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
-        sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
       }
-      // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
+      // ADR-074: availability of HA entities reflects MQTT-link state (LWT/birth),
+      // not OT-bus liveness. Do not republish to MQTTPubNamespace on bus state changes —
+      // the LWT/birth pair on <toptopic>/<hostname> owns the availability topic.
       bOTGWpreviousstate = state.otgw.bOnline; //remember state, so we can detect statechanges
     }
 
@@ -4055,9 +4074,16 @@ void processOT(const char *buf, int len){
     OTdata.time = millis();                           // time of reception    
     OTdata.skipthis = false;                          // default: do not skip this message
     OTdata.bGatewaySubstituted = false;               // default: not substituted by gateway
+    OTdata.bAnswerOverride = false;                   // ADR-075: default proxy A (no preceding B)
 
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
-      //just store current message and delay processing
+      // Boot-time one-shot: the very first OT frame has no prior delayed frame to pair
+      // against, so the (B,A) and (T,R) substitution-detection logic below cannot run.
+      // We store the raw frame with bAnswerOverride=false / bGatewaySubstituted=false
+      // initialised above. Worst case: if the first frame happens to be an A that was
+      // already an answer-override on the bus, it would reach _boiler/canonical once;
+      // the next (B,A) pair recomputes correctly and behaviour self-corrects. Bounded,
+      // intentional, one-shot drift — review TASK-665.
       delayedOTdata = OTdata;       //store current msg
       OTGWDebugln(F("delaying first message!"));
     } else {                              //any other message will be processed
@@ -4082,6 +4108,10 @@ void processOT(const char *buf, int len){
       //delay message processing by 1 message, to make sure detection of value decoding is done correctly with R and A message.
       tmpOTdata = delayedOTdata;          //fetch delayed msg
       delayedOTdata = OTdata;             //store current msg
+      // ADR-075: mark the incoming A (now the delayed frame) as an answer-override A iff a
+      // (B,A) pair was just detected. It rides the struct copy to the cycle that publishes
+      // it. A proxy A (no preceding B) keeps the init default 0 → reaches _boiler/canonical.
+      delayedOTdata.bAnswerOverride = bGatewaySubstituted && (delayedOTdata.rsptype == OTGW_ANSWER_THERMOSTAT);
       OTdata = tmpOTdata;                 //then process delayed msg
       OTdata.bGatewaySubstituted = bGatewaySubstituted;  //flag substitution if needed (ADR-069)
 
@@ -4101,16 +4131,80 @@ void processOT(const char *buf, int len){
         OTlookupitem.unit = "";
       }
 
+      // TASK-685 / TASK-686 / TASK-688: maintain the six per-msgID bitmaps that
+      // describe each side of the OT bus. Dirty flags fire only on 0->1
+      // transitions so the periodic publishers (MQTT every minute, file every
+      // 15 min) do work exactly once per newly-discovered (id, direction).
+      {
+        const uint8_t idx  = OTdata.id >> 3;
+        const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
+        if (OTdata.masterslave == 0) {
+          // Master frame — track thermostat-side requests.
+          if (OTdata.type == OT_WRITE_DATA) {
+            boilerLastMasterWasWrite[idx] |= mask;
+            if ((thermostatSentWrite[idx] & mask) == 0) {
+              thermostatSentWrite[idx] |= mask;
+              thermostatFileDirty = true;
+            }
+          } else if (OTdata.type == OT_READ_DATA) {
+            boilerLastMasterWasWrite[idx] &= ~mask;
+            if ((thermostatSentRead[idx] & mask) == 0) {
+              thermostatSentRead[idx] |= mask;
+              thermostatFileDirty = true;
+            }
+          }
+        } else {
+          // Slave frame — track boiler-side response classification.
+          if (OTdata.type == OT_READ_ACK) {
+            if ((boilerAckedRead[idx] & mask) == 0) {
+              boilerAckedRead[idx] |= mask;
+              boilerFileDirty = true;
+            }
+          } else if (OTdata.type == OT_WRITE_ACK) {
+            if ((boilerAckedWrite[idx] & mask) == 0) {
+              boilerAckedWrite[idx] |= mask;
+              boilerFileDirty = true;
+            }
+          } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
+            // Master direction is read from boilerLastMasterWasWrite (set on
+            // the preceding master frame). The slave's type-7 alone doesn't
+            // carry intent.
+            const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
+            uint8_t * const bitmap = isWriteCtx ? boilerUnsupportedWrite : boilerUnsupportedRead;
+            if ((bitmap[idx] & mask) == 0) {
+              bitmap[idx] |= mask;
+              boilerUnsupportedDirty = true;  // MQTT republish (1-min cadence)
+              boilerFileDirty        = true;  // file write     (15-min cadence)
+            }
+          }
+        }
+      }
+
       //keep track of last update time — only for valid responses
       if (is_value_valid(OTdata, OTlookupitem)) {
         setMsgLastUpdated(OTdata.id, currentTrackedSeconds());
       }
 
       // Queue MQTT HA discovery for this OT message ID if not yet published.
-      // Non-blocking: just sets the pending bit; drainOnePendingDiscovery()
-      // (3-second timer in main loop) handles the actual publish.
-      if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable) {
-        if (!getMQTTConfigDone(OTdata.id)) {
+      // Non-blocking: just sets the pending bit; loopMQTTDiscovery() drains it.
+      //
+      // hasConfig filter mirrors markAllMQTTConfigPending() (MQTTstuff.ino:1336-1345)
+      // so JIT and F-force paths enqueue the same ID set. Without it, an OT-bus
+      // message for an ID with a valid OTmap msgcmd but no HA sensor/binsensor
+      // entry would set a pending bit doAutoConfigureMsgid() cannot publish;
+      // the drip loop retains the bit on failure (MQTTstuff.ino:1475-1482) and
+      // re-picks the same lowest-numbered ID forever, stalling all subsequent
+      // drip progress until the operator runs F. (ADR-073)
+      // getMQTTConfigDone() (one bit read) is checked before hasConfig (two
+      // PROGMEM word reads): after warm-up most MsgIDs are already "done" and
+      // arrive frequently, so the cheap done-bit short-circuits the hot path.
+      if (is_value_valid(OTdata, OTlookupitem) && settings.mqtt.bEnable
+          && !getMQTTConfigDone(OTdata.id)) {
+        const bool hasConfig = (readSensorIndex(OTdata.id) != MQTT_HA_INDEX_NONE)
+                            || (readBinSensorIndex(OTdata.id) != MQTT_HA_INDEX_NONE)
+                            || (OTdata.id == 0)   // climate (thermostat + DHW)
+                            || (OTdata.id == 27); // number (Toutside override)
+        if (hasConfig) {
           setMQTTConfigPending(OTdata.id);
         }
       }
@@ -4162,13 +4256,33 @@ void processOT(const char *buf, int len){
       // OTPublishGate RAII: gate closes for this OT slot's throttle decision and
       // is guaranteed to reopen (restore true) when the scope exits, even on early
       // return. Non-OT sends (event_report, etc.) that follow are not affected. (ADR-006)
+      // ADR-076 (extended in TASK-644): scope mqttPendingSlot commit to this OT
+      // frame. shouldPublishMQTTForID installs pending; capture the pre-publish
+      // success count, run decodeAndPublishOTValue, then commit if any
+      // sendMQTTData succeeded — else clear the pending so a later unrelated
+      // publish cannot silently commit it.
       {
+        const uint32_t preSuccessCount = mqttSendSuccessCount;
         OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
         decodeAndPublishOTValue();
+        if (mqttPendingSlot.pending) {
+          if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
+          else                                        mqttPendingSlot.pending = false;
+        }
       }
       OTTRACE("post-decode");
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");
+      // TASK-685: plain-English direction-aware suffix on slave Unknown-Data-Id.
+      // Emitted on every occurrence so a tester who opens telnet after the first
+      // such frame still sees the diagnostic context. The same suffix reaches the
+      // WebSocket OT Monitor via the shared ot_log_buffer.
+      if (OTdata.masterslave == 1 && OTdata.type == OT_UNKNOWN_DATA_ID) {
+        const uint8_t idx  = OTdata.id >> 3;
+        const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
+        const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
+        AddLog(isWriteCtx ? " (boiler rejected write)" : " (boiler does not implement)");
+      }
       AddLogln();
       OTGWDebugT(skipOTLogTimestamp(ot_log_buffer));
       OTTRACE("post-debug");
@@ -4196,42 +4310,9 @@ void processOT(const char *buf, int len){
     }
     Debugln(buf);
     reportOTGWEvent(buf, '<', true);
-  } else if (strcmp_P(buf, PSTR("NG")) == 0) {
-    Debugln(F("NG - No Good. The command code is unknown."));
-    reportOTGWEvent_P(PSTR("NG - No Good. The command code is unknown."), '!', true);
-  } else if (strcmp_P(buf, PSTR("SE")) == 0) {
-    Debugln(F("SE - Syntax Error. The command contained an unexpected character or was incomplete."));
-    reportOTGWEvent_P(PSTR("SE - Syntax Error. The command contained an unexpected character or was incomplete."), '!', true);
-  } else if (strcmp_P(buf, PSTR("BV")) == 0) {
-    Debugln(F("BV - Bad Value. The command contained a data value that is not allowed."));
-    reportOTGWEvent_P(PSTR("BV - Bad Value. The command contained a data value that is not allowed."), '!', true);
-  } else if (strcmp_P(buf, PSTR("OR")) == 0) {
-    Debugln(F("OR - Out of Range. A number was specified outside of the allowed range."));
-    reportOTGWEvent_P(PSTR("OR - Out of Range. A number was specified outside of the allowed range."), '!', true);
-  } else if (strcmp_P(buf, PSTR("NS")) == 0) {
-    Debugln(F("NS - No Space. The alternative Data-ID could not be added because the table is full."));
-    reportOTGWEvent_P(PSTR("NS - No Space. The alternative Data-ID could not be added because the table is full."), '!', true);
-  } else if (strcmp_P(buf, PSTR("NF")) == 0) {
-    Debugln(F("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."));
-    reportOTGWEvent_P(PSTR("NF - Not Found. The specified alternative Data-ID could not be removed because it does not exist in the table."), '!', true);
-  } else if (strcmp_P(buf, PSTR("OE")) == 0) {
-    Debugln(F("OE - Overrun Error. The processor was busy and failed to process all received characters."));
-    reportOTGWEvent_P(PSTR("OE - Overrun Error. The processor was busy and failed to process all received characters."), '!', true);
-  } else if (strcmp_P(buf, PSTR("Thermostat disconnected")) == 0) {
-    Debugln(F("Thermostat disconnected"));
-    reportOTGWEvent_P(PSTR("Thermostat disconnected"), '*', true);
-  } else if (strcmp_P(buf, PSTR("Thermostat connected")) == 0) {
-    Debugln(F("Thermostat connected"));
-    reportOTGWEvent_P(PSTR("Thermostat connected"), '*', true);
-  } else if (strcmp_P(buf, PSTR("Low power")) == 0) {
-    Debugln(F("Low power"));
-    reportOTGWEvent_P(PSTR("Low power"), '*', true);
-  } else if (strcmp_P(buf, PSTR("Medium power")) == 0) {
-    Debugln(F("Medium power"));
-    reportOTGWEvent_P(PSTR("Medium power"), '*', true);
-  } else if (strcmp_P(buf, PSTR("High power")) == 0) {
-    Debugln(F("High power"));
-    reportOTGWEvent_P(PSTR("High power"), '*', true);
+  } else if (handleOTGWErrorCode(buf)) {
+    // Matched a known PIC short-token (NG/SE/BV/OR/NS/NF/OE or status notification);
+    // table dispatch above performed the Debugln + reportOTGWEvent_P. See kOTGWErrorCodes.
   // cMsg SAFETY NOTE: snprintf_P(cMsg,...) → sendEventToWebSocket('!', cMsg) is safe here.
   // sendEventToWebSocket copies cMsg into ot_log_buffer synchronously (AddLog call) before
   // any yield. So even if doBackgroundTasks re-enters via feedWatchDog, cMsg is no longer
@@ -4347,6 +4428,11 @@ void handleOTGW()
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128
+  // TASK-671: per-call cap on completed lines processed by each drain loop.
+  // PIC sends roughly one OT message per second; loop() ticks every few ms,
+  // so 4 lines/tick easily keeps up at steady state and bounds the worst
+  // case (boot dump, ser2net paste) to ~5-10ms instead of 10-50ms stalls.
+  #define HANDLE_OTGW_LINES_PER_CALL 4
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
@@ -4379,7 +4465,13 @@ void handleOTGW()
       reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
     }
     
-    while (OTGWSerial.available()) {
+    // TASK-671: bound the drain so a PIC burst can't stall the mainloop.
+    // Cap at HANDLE_OTGW_LINES_PER_CALL completed lines; remaining bytes stay
+    // in the UART RX buffer and are drained on the next doBackgroundTasks().
+    // No yield() inside this loop: the static sRead/bytes_read state would
+    // be clobbered if handleOTGW() re-entered via yield -> doBackgroundTasks.
+    uint8_t serialLinesProcessed = 0;
+    while (OTGWSerial.available() && serialLinesProcessed < HANDLE_OTGW_LINES_PER_CALL) {
       outByte = OTGWSerial.read();
       if (outByte == '\r' || outByte == '\n') {
         if ((bytes_read == 0) && !discardCurrentReadLine) continue;
@@ -4397,6 +4489,7 @@ void handleOTGW()
 
         bytes_read = 0;
         discardCurrentReadLine = false;
+        serialLinesProcessed++;
       } else if (bytes_read < (MAX_BUFFER_READ-1)) {
         if (!discardCurrentReadLine) {
           sRead[bytes_read++] = outByte;
@@ -4425,7 +4518,12 @@ void handleOTGW()
   }
 
   //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
-  while (OTGWstream.available()){
+  // TASK-671: same per-call cap as the serial drain above. A ser2net echo
+  // storm or large paste from OTmonitor could otherwise spin here for tens
+  // of milliseconds and starve MQTT/WS/HTTP. Static sWrite/bytes_write state
+  // again forbids yielding inside the loop.
+  uint8_t netLinesProcessed = 0;
+  while (OTGWstream.available() && netLinesProcessed < HANDLE_OTGW_LINES_PER_CALL){
     outByte = OTGWstream.read();  // read from port 25238
     if (!state.debug.bOTGWSimulation) {
       OTGWSerial.write(outByte);    // write to serial port
@@ -4473,11 +4571,12 @@ void handleOTGW()
         }
       }
       bytes_write = 0; //start next line
+      netLinesProcessed++;
     } else if  (outByte == '\n')
     {
-      // on LF, skip 
-    } 
-    else 
+      // on LF, skip
+    }
+    else
     {
       if (bytes_write < (MAX_BUFFER_WRITE-1))
         sWrite[bytes_write++] = outByte;
@@ -4940,7 +5039,7 @@ String checkforupdatepic(String filename){
 }
 
 void refreshpic(String filename, String version) {
-  if (strcmp(state.pic.sDeviceid, "unknown") == 0) return; // no pic version found, don't upgrade
+  if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0) return; // no pic version found, don't upgrade
 
   WiFiClient client;
   HTTPClient http;
@@ -4985,21 +5084,23 @@ void refreshpic(String filename, String version) {
 }
 
 // --- Pending Upgrade Logic ---
-String pendingUpgradePath = "";
+// TASK-673 / ADR-004: char[] instead of String to avoid heap fragmentation on the hot path.
+// Worst-case path = "/" + state.pic.sDeviceid (max 32) + "/" + hex filename (~30) + NUL.
+// 80 bytes gives headroom for the truncation-safe snprintf_P below.
+static char pendingUpgradePath[80] = {0};
 
 void handlePendingUpgrade() {
-  if (pendingUpgradePath != F("")) {
-    DebugTln(F(""));
-    DebugTln(F("=== Starting Deferred PIC Upgrade ==="));
-    DebugTf(PSTR("Hex file path: %s\r\n"), pendingUpgradePath.c_str());
-    DebugTf(PSTR("Flash state: state.flash.bESPactive=%d, state.flash.bPICactive=%d\r\n"), state.flash.bESPactive, state.flash.bPICactive);
-    DebugTf(PSTR("Free heap: %d bytes\r\n"), ESP.getFreeHeap());
-    upgradepicnow(pendingUpgradePath.c_str());
-    pendingUpgradePath = "";
-    DebugTln(F("Deferred upgrade initiated, upgrade now runs in background"));
-    DebugTln(F("Monitor progress via telnet or WebUI"));
-    DebugTln(F("======================================="));
-  }
+  if (pendingUpgradePath[0] == '\0') return;
+  DebugTln(F(""));
+  DebugTln(F("=== Starting Deferred PIC Upgrade ==="));
+  DebugTf(PSTR("Hex file path: %s\r\n"), pendingUpgradePath);
+  DebugTf(PSTR("Flash state: state.flash.bESPactive=%d, state.flash.bPICactive=%d\r\n"), state.flash.bESPactive, state.flash.bPICactive);
+  DebugTf(PSTR("Free heap: %d bytes\r\n"), ESP.getFreeHeap());
+  upgradepicnow(pendingUpgradePath);
+  pendingUpgradePath[0] = '\0';
+  DebugTln(F("Deferred upgrade initiated, upgrade now runs in background"));
+  DebugTln(F("Monitor progress via telnet or WebUI"));
+  DebugTln(F("======================================="));
 }
 
 void upgradepic() {
@@ -5008,45 +5109,48 @@ void upgradepic() {
     return;
   }
 
-  const String action = httpServer.arg("action");
-  const String filename = httpServer.arg("name");
-  const String version = httpServer.arg("version");
+  // ADR-004 / TASK-673: stack char[] instead of String for HTTP args.
+  // 80 bytes covers a hex filename + path overhead; truncation via strlcpy is safe.
+  char action[80], filename[80], version[80];
+  strlcpy(action,   httpServer.arg("action").c_str(),  sizeof(action));
+  strlcpy(filename, httpServer.arg("name").c_str(),    sizeof(filename));
+  strlcpy(version,  httpServer.arg("version").c_str(), sizeof(version));
 
   DebugTln(F("=== PIC Flash HTTP Request Received ==="));
-  DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action.c_str(), filename.c_str(), version.c_str());
+  DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action, filename, version);
   DebugTf(PSTR("PIC Device ID: %s\r\n"), state.pic.sDeviceid);
   DebugTf(PSTR("Current state: state.flash.bPICactive=%d, state.flash.bESPactive=%d\r\n"), state.flash.bPICactive, state.flash.bESPactive);
-  
-  if (action.isEmpty() || filename.isEmpty()) {
+
+  if (action[0] == '\0' || filename[0] == '\0') {
     DebugTln(F("ERROR: Missing action or filename parameter"));
     httpServer.send_P(400, PSTR("text/plain"), PSTR("Missing action or name"));
     return;
   }
 
-  if (strcmp(state.pic.sDeviceid, "unknown") == 0) {
+  if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0) {
     DebugTln(F("ERROR: PIC device id is unknown, cannot upgrade"));
     httpServer.send_P(400, PSTR("text/plain"), PSTR("PIC device not detected"));
     return; // no pic version found, don't upgrade
   }
-  
-  if (action == F("upgrade")) {
-    DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+
+  if (strcmp_P(action, PSTR("upgrade")) == 0) {
+    DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename);
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
     httpServer.client().flush();  // Ensure response buffer is sent to client
     DebugTln(F("HTTP response sent and flushed"));
-    
+
     // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
-    pendingUpgradePath = "/" + String(state.pic.sDeviceid) + "/" + filename;
-    DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath.c_str());
+    snprintf_P(pendingUpgradePath, sizeof(pendingUpgradePath), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
+    DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath);
     DebugTln(F("=== HTTP handler complete, upgrade will start in main loop ==="));
     return;
-  } else if (action == F("refresh")) {
-    DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+  } else if (strcmp_P(action, PSTR("refresh")) == 0) {
+    DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename);
     refreshpic(filename, version);
-  } else if (action == F("delete")) {
-    DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename.c_str());
+  } else if (strcmp_P(action, PSTR("delete")) == 0) {
+    DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename);
     char path[64];
-    snprintf_P(path, sizeof(path), PSTR("/%s/%s"), state.pic.sDeviceid, filename.c_str());
+    snprintf_P(path, sizeof(path), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
     LittleFS.remove(path);
     char *ext = strstr(path, ".hex");
     if (ext) {
@@ -5056,6 +5160,152 @@ void upgradepic() {
   }
   httpServer.sendHeader(F("Location"), F("index.html#tabPICflash"), true);
   httpServer.send_P(303, PSTR("text/html; charset=UTF-8"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
+}
+
+// =========================================================================
+// TASK-688: persist the OT-bus support map across reboots.
+//
+// Files (LittleFS):
+//   /ot-thermo.json — {"v":1,"device":"thermostat","sent_read":[...],"sent_write":[...]}
+//   /ot-boiler.json — {"v":1,"device":"boiler","acked_read":[...],"acked_write":[...],
+//                     "unsupported_read":[...],"unsupported_write":[...]}
+//
+// Read on boot (loadOtSupportFiles, called from setup() after LittleFS.begin).
+// Write every 15 min from doTaskMinuteChanged when the per-file dirty flag is
+// set. Atomic: write to <path>.tmp, remove canonical, rename. A power loss
+// mid-write leaves a *.tmp dangling; the next boot ignores it (only the
+// canonical name is loaded) and the next dirty write replaces it.
+//
+// Stream-based reader (Stream::find + parseInt) and writer (file.print per id)
+// — no large RAM buffer at any point.
+// =========================================================================
+
+static const char OT_SUPPORT_FILE_VERSION = '1';
+
+// Read one named integer array from an open File, into a 32-byte bitmap.
+// Streams via Stream::find() + parseInt(); does NOT allocate a buffer.
+// Returns true if the key was found (regardless of how many ids it contained).
+static bool readBitmapArrayFromJson(File &f, const __FlashStringHelper *keyPattern, uint8_t bitmap[32]) {
+  // Stream::find() advances the read cursor past the matched pattern. We
+  // reset to start so multiple calls on the same file find each key.
+  f.seek(0);
+  char patBuf[40];
+  strncpy_P(patBuf, reinterpret_cast<PGM_P>(keyPattern), sizeof(patBuf) - 1);
+  patBuf[sizeof(patBuf) - 1] = '\0';
+  if (!f.find(patBuf)) return false;
+  while (f.available()) {
+    int c = f.peek();
+    if (c == ']') break;
+    if (c >= '0' && c <= '9') {
+      long id = f.parseInt();
+      if (id >= 0 && id <= 255) bitmap[id >> 3] |= (uint8_t)(1u << (id & 7));
+    } else {
+      f.read();  // consume separator (comma / whitespace)
+    }
+  }
+  return true;
+}
+
+// Stream one bitmap as a JSON integer array body (no brackets) to an open File.
+static void writeBitmapArrayToJson(File &f, const uint8_t bitmap[32]) {
+  bool first = true;
+  for (int i = 0; i <= 255; i++) {
+    if ((bitmap[i >> 3] & (uint8_t)(1u << (i & 7))) == 0) continue;
+    if (!first) f.print(',');
+    f.print(i);
+    first = false;
+  }
+}
+
+void loadOtSupportFiles() {
+  // Thermostat side.
+  File f = LittleFS.open("/ot-thermo.json", "r");
+  if (f) {
+    // Magic gate: read the start of the file and verify "v":1 is present.
+    char header[16] = {0};
+    int n = f.read((uint8_t*)header, sizeof(header) - 1);
+    header[n > 0 ? n : 0] = '\0';
+    if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+      readBitmapArrayFromJson(f, F("\"sent_read\":["),  thermostatSentRead);
+      readBitmapArrayFromJson(f, F("\"sent_write\":["), thermostatSentWrite);
+      DebugTln(F("ot-support: thermostat profile loaded from /ot-thermo.json"));
+    } else {
+      DebugTln(F("ot-support: /ot-thermo.json header missing/invalid — starting fresh"));
+    }
+    f.close();
+  }
+  // Boiler side.
+  f = LittleFS.open("/ot-boiler.json", "r");
+  if (f) {
+    char header[16] = {0};
+    int n = f.read((uint8_t*)header, sizeof(header) - 1);
+    header[n > 0 ? n : 0] = '\0';
+    if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+      readBitmapArrayFromJson(f, F("\"acked_read\":["),       boilerAckedRead);
+      readBitmapArrayFromJson(f, F("\"acked_write\":["),      boilerAckedWrite);
+      readBitmapArrayFromJson(f, F("\"unsupported_read\":["), boilerUnsupportedRead);
+      readBitmapArrayFromJson(f, F("\"unsupported_write\":["),boilerUnsupportedWrite);
+      DebugTln(F("ot-support: boiler profile loaded from /ot-boiler.json"));
+    } else {
+      DebugTln(F("ot-support: /ot-boiler.json header missing/invalid — starting fresh"));
+    }
+    f.close();
+  }
+  // We loaded what's on disk, so the on-disk copy matches RAM: not dirty.
+  thermostatFileDirty = false;
+  boilerFileDirty     = false;
+}
+
+// Atomic write: <path>.tmp -> remove canonical -> rename. A power loss between
+// the two final steps leaves only one valid file (either the old canonical or
+// the new *.tmp ignored by loadOtSupportFiles); next dirty write recovers.
+static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
+  File f = LittleFS.open(tmpPath, "w");
+  if (!f) return false;
+  f.print(F("{\"v\":1,\"device\":\"thermostat\",\"sent_read\":["));
+  writeBitmapArrayToJson(f, thermostatSentRead);
+  f.print(F("],\"sent_write\":["));
+  writeBitmapArrayToJson(f, thermostatSentWrite);
+  f.print(F("]}\n"));
+  f.close();
+  LittleFS.remove(canonicalPath);  // no-op if absent
+  return LittleFS.rename(tmpPath, canonicalPath);
+}
+
+static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
+  File f = LittleFS.open(tmpPath, "w");
+  if (!f) return false;
+  f.print(F("{\"v\":1,\"device\":\"boiler\",\"acked_read\":["));
+  writeBitmapArrayToJson(f, boilerAckedRead);
+  f.print(F("],\"acked_write\":["));
+  writeBitmapArrayToJson(f, boilerAckedWrite);
+  f.print(F("],\"unsupported_read\":["));
+  writeBitmapArrayToJson(f, boilerUnsupportedRead);
+  f.print(F("],\"unsupported_write\":["));
+  writeBitmapArrayToJson(f, boilerUnsupportedWrite);
+  f.print(F("]}\n"));
+  f.close();
+  LittleFS.remove(canonicalPath);
+  return LittleFS.rename(tmpPath, canonicalPath);
+}
+
+void saveOtSupportFilesIfDirty() {
+  if (thermostatFileDirty) {
+    if (writeOtThermoFile("/ot-thermo.json", "/ot-thermo.json.tmp")) {
+      thermostatFileDirty = false;
+      DebugTln(F("ot-support: /ot-thermo.json written"));
+    } else {
+      DebugTln(F("ot-support: /ot-thermo.json write FAILED — will retry"));
+    }
+  }
+  if (boilerFileDirty) {
+    if (writeOtBoilerFile("/ot-boiler.json", "/ot-boiler.json.tmp")) {
+      boilerFileDirty = false;
+      DebugTln(F("ot-support: /ot-boiler.json written"));
+    } else {
+      DebugTln(F("ot-support: /ot-boiler.json write FAILED — will retry"));
+    }
+  }
 }
 
 /***************************************************************************

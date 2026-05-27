@@ -1,6 +1,16 @@
-# ESP8266 Flashing Guide
+# ESP8266 Firmware Guide — Language / Taal
 
-This guide covers all methods for flashing OTGW-firmware onto your ESP8266 device (NodeMCU or Wemos D1 mini).
+This guide is available in English and Dutch. Choose your language below.
+
+| Language | Link |
+|---|---|
+| 🇬🇧 English | [FLASH_GUIDE_EN.md](FLASH_GUIDE_EN.md) |
+| 🇳🇱 Nederlands | [FLASH_GUIDE_NL.md](FLASH_GUIDE_NL.md) |
+
+---
+
+> *You were redirected here from a link to `FLASH_GUIDE.md`. The content has been
+> split into language-specific files. Please update your bookmarks.*
 
 ## Flashing tools at a glance
 

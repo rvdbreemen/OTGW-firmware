@@ -1,6 +1,6 @@
 /*********
 **  Program  : webhook.ino
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -198,7 +198,10 @@ static int sendWebhookPost(HTTPClient& http, const char* url, bool stateOn) {
 // See expandPayload() for the full list of supported variables.
 //=======================================================================
 // Attempt to send the webhook. Returns true on HTTP 2xx, false on any error.
-// Timeout reduced from 3000ms to 1000ms (ADR-048: webhook state machine / minimize main loop blocking).
+// Synchronous call into HTTPClient; setTimeout below caps the main-loop stall
+// to 500 ms (ADR-048, TASK-674 Item 5). Local LAN GET/POST typically completes
+// in <50 ms; the WH_PENDING -> WH_RETRY_WAIT retry budget absorbs transient
+// failures so the timeout can stay tight without losing a real state change.
 static bool attemptSendWebhook(bool stateOn) {
   const char* url = stateOn ? settings.webhook.sURLon : settings.webhook.sURLoff;
   if (strlen(url) == 0) {
@@ -219,7 +222,7 @@ static bool attemptSendWebhook(bool stateOn) {
 
   WiFiClient client;
   HTTPClient http;
-  http.setTimeout(1000); // 1-second timeout (was 3s; local LAN should respond <500ms)
+  http.setTimeout(500); // cap main-loop stall; retry budget covers slow LAN responders
 
   if (!http.begin(client, url)) {
     DebugTln(F("Webhook: http.begin() failed (invalid URL?)"));

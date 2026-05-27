@@ -1,0 +1,18 @@
+{
+  "_comment": "adr-kit project policy — see docs/adr/.adr-kit.json schema in plugin for full reference.",
+
+  "strict_from": "ADR-081",
+
+  "severity": {
+    "consistency": "always_strict",
+    "completeness": "advisory_before_strict_from",
+    "evidence":     "advisory_before_strict_from",
+    "clarity":      "always_advisory"
+  },
+
+  "_clarity_note": "Clarity gate is always_advisory because the tool has no acronym whitelist. Project-domain acronyms (MQTT, OTGW, HTTP, REST, PIC, ESP8266, FIFO, ...) are well-known in context and expanding them in 79 existing Accepted ADRs would violate the immutability rule. New ADRs should still avoid bare adjectives and use imperative voice — adr-generator enforces this at authoring time.",
+
+  "judge": {
+    "llm_model": "claude-sonnet-4-6"
+  }
+}

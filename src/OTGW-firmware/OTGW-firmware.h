@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -133,9 +133,22 @@ bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
 
 //prototype
-void sendMQTTData(const char*, const char*, const bool = false);
-void sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
-void sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
+// ADR-076: return true iff the publish reached MQTTclient.endPublish() success.
+// Bit/byte/normal slot helpers use the return value (or the
+// mqttSendSuccessCount counter for the multi-publish normal-msgId path) to
+// commit or discard pending throttle-slot updates so a heap-throttled
+// early-return cannot leave a stale pending that the next unrelated publish
+// silently commits.
+bool sendMQTTData(const char*, const char*, const bool = false);
+bool sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
+bool sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
+// Monotonic counter — sendMQTTData() increments after a confirmed
+// MQTTclient.endPublish() success. Callers that gate-and-publish under an
+// OTPublishGate use it to detect whether *any* downstream publish landed for
+// the current msgId frame, so the matching mqttPendingSlot is committed only
+// when the frame actually emitted at least one MQTT message. (ADR-076 pattern,
+// extended to mqttPendingSlot in TASK-644.)
+extern uint32_t mqttSendSuccessCount;
 // PIC subtree helper -- prepends kPicSubtreePrefix so the otgw-pic/ subtree
 // name has a single source of truth (ADR-065). Used by TASK-390 migrations.
 void sendMQTTDataPic(const __FlashStringHelper* label, const char* value);
@@ -143,6 +156,18 @@ void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper
 void publishToSourceTopic(const char*, const char*, byte);
 void loopMQTTDiscovery();
 void sendMQTTheapdiag();
+// TASK-686 / TASK-688: support-map accessors (state lives in OTGW-Core.ino at file scope).
+bool isBoilerMsgIdUnsupportedRead(uint8_t id);
+bool isBoilerMsgIdUnsupportedWrite(uint8_t id);
+bool isBoilerMsgIdAckedRead(uint8_t id);
+bool isBoilerMsgIdAckedWrite(uint8_t id);
+bool isThermostatMsgIdSentRead(uint8_t id);
+bool isThermostatMsgIdSentWrite(uint8_t id);
+bool getBoilerUnsupportedDirty();
+void clearBoilerUnsupportedDirty();
+void publishBoilerUnsupportedMsgids();     // TASK-686: MQTT retained CSV ("14W,16W,24R,...")
+void loadOtSupportFiles();                  // TASK-688: read /ot-thermo.json and /ot-boiler.json at boot
+void saveOtSupportFilesIfDirty();           // TASK-688: 15-min debounced atomic write
 void doMqttDisconnect();                 // graceful disconnect for reboot path (MQTTclient is file-static)
 void doWebSocketClose();                 // close all WS clients before reboot (webSocket not extern'd in any header)
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
@@ -165,10 +190,6 @@ bool     isDiscoveryVerificationActive();
 uint16_t countPendingDiscoveryIds();
 void     incPublishedTopicCount();    // called by streaming helpers in mqtt_configuratie.cpp (ADR-044 shim)
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
-#if defined(ENABLE_SAT)
-// Alias used by SAT subsystem (name harmonised with OTGW32 branch)
-#define addCommandToQueue addOTWGcmdtoqueue
-#endif
 void sendLogToWebSocket(const char* logMessage);
 
 // Forward declarations for functions defined in later .ino files
@@ -199,40 +220,6 @@ void evalWebhook();
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-054; defined in restAPI.ino)
 extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
 
-#if defined(ENABLE_SAT)
-// SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino
-void initSAT();
-void satControlLoop();
-void satPublishMQTT();
-bool satHandleExternalTemp(const char* value);
-bool satHandleExternalOutdoor(const char* value);
-bool satHandleTargetTemp(const char* value);
-bool satHandleZoneRoomTemp(uint8_t zone, const char* value);
-bool satHandleZoneSetpoint(uint8_t zone, const char* value);
-void satHandleEnabled(const char* value);
-void satDisable();
-void satHandleControlMode(const char* value);
-void satCycleOnFlameChange(bool flameOn);
-void satSendStatusJSON();
-uint32_t satCycleGetFlameOnStartMs();
-uint32_t satCycleGetFlameOffStartMs();
-bool    satCycleIsHourLimitReached();
-uint8_t satCycleGetCyclesThisHour();
-void satHCRSaveState();
-void satHCRLoadState();
-void satHCRReset();
-void satHCRAddSample();
-const char* satHeatingCurveRecommendation();
-void satSaveCycleWindow();
-void satLoadCycleWindow();
-void satFlushCycleWindow();
-void satFlushShortLivedData();
-// SAT Weather forward declarations — defined in SATweather.ino
-void weatherLoop();
-void weatherFetch();
-void weatherSendStatusJSON();
-void weatherPublishMQTT();
-#endif // ENABLE_SAT
 
 //===================[ Runtime State — transient, never persisted (ADR-051) ]===================
 // Sub-section structs for OTGWState — groups runtime state by system component.
@@ -276,9 +263,6 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bNTP                   = true;   // NTP time sync telemetry (on by default for diagnostics)
   bool     bSensorSim             = false;  // was bDebugSensorSimulation
   bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
-#if defined(ENABLE_SAT)
-  bool     bSAT                   = true;   // SAT control loop + cycle + HCR trace (default on)
-#endif
   uint32_t iOTGWSimulationIntervalMs = 750;
   uint32_t iOTGWSimulationNextDueMs  = 0;
 };
@@ -360,220 +344,6 @@ struct PicSettingsSection {    // state.picSettings — settings polled from PIC
   char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)
 };
 
-#if defined(ENABLE_SAT)
-//--- SAT runtime enums and state ---
-enum SATHeatingSystem : uint8_t {
-  SAT_HSYS_AUTO       = 0,  // Auto-detect from OT MsgID 3 system_type bit
-  SAT_HSYS_RADIATORS  = 1,  // Gas boiler + radiators (default if auto-detect fails)
-  SAT_HSYS_HEAT_PUMP  = 2,  // Heat pump (hybrid or standalone)
-  SAT_HSYS_UNDERFLOOR = 3   // Underfloor heating
-};
-enum SATControlMode : uint8_t { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS, SAT_MODE_PWM };
-enum SATCalibPhase  : uint8_t {
-  SAT_CALIB_IDLE = 0, SAT_CALIB_STARTING, SAT_CALIB_WARMING,
-  SAT_CALIB_MEASURING, SAT_CALIB_COOLDOWN, SAT_CALIB_DONE, SAT_CALIB_FAILED
-};
-enum SATPreset : uint8_t {
-  SAT_PRESET_NONE = 0, SAT_PRESET_AWAY, SAT_PRESET_ECO,
-  SAT_PRESET_COMFORT, SAT_PRESET_SLEEP, SAT_PRESET_ACTIVITY,
-  SAT_PRESET_HOME
-};
-enum SATFallbackReason : uint8_t {
-  SAT_FB_NONE = 0, SAT_FB_THERMOSTAT_LOST, SAT_FB_MQTT_LOST
-};
-enum SATCycleClass  : uint8_t {
-  SAT_CYCLE_NONE = 0, SAT_CYCLE_GOOD, SAT_CYCLE_OVERSHOOT,
-  SAT_CYCLE_UNDERHEAT, SAT_CYCLE_SHORT, SAT_CYCLE_UNCERTAIN
-};
-enum SATCycleKind : uint8_t {
-  SAT_CK_UNKNOWN = 0, SAT_CK_CH, SAT_CK_DHW, SAT_CK_MIXED
-};
-enum SATCyclePhase : uint8_t {
-  SAT_CP_IDLE = 0, SAT_CP_STARTUP, SAT_CP_STEADY, SAT_CP_COOLDOWN
-};
-enum SATCurveRecommendation : uint8_t {
-  SAT_CR_INSUFFICIENT = 0, SAT_CR_INCREASE, SAT_CR_DECREASE, SAT_CR_HOLD
-};
-enum SATManufacturer : uint8_t {
-  SAT_MFR_AUTO = 0,
-  SAT_MFR_ATAG,       SAT_MFR_BAXI,      SAT_MFR_BROTGE,
-  SAT_MFR_DEDIETRICH, SAT_MFR_FERROLI,   SAT_MFR_GEMINOX,
-  SAT_MFR_IDEAL,      SAT_MFR_IMMERGAS,  SAT_MFR_INTERGAS,
-  SAT_MFR_ITHO,       SAT_MFR_NEFIT,     SAT_MFR_RADIANT,
-  SAT_MFR_REMEHA,     SAT_MFR_SIME,      SAT_MFR_VAILLANT,
-  SAT_MFR_VIESSMANN,  SAT_MFR_WORCESTER, SAT_MFR_OTHER,
-  SAT_MFR_COUNT
-};
-#define SAT_QUIRK_MIN_MOD_10     0x01  // Geminox: minimum modulation 10%
-#define SAT_QUIRK_IMMERGAS_TP    0x02  // Immergas: extra TP=11:12 command, cap 80%
-#define SAT_QUIRK_NO_REL_MOD     0x04  // Ideal/Intergas/Geminox/Nefit: no relative modulation support
-#define SAT_QUIRK_MI_500_BOOT    0x08  // Ideal/Intergas/Nefit: send MI=500 on boot
-enum SATFlameStatus : uint8_t {
-  SAT_FS_INSUFFICIENT_DATA = 0, SAT_FS_HEALTHY, SAT_FS_IDLE_OK,
-  SAT_FS_STUCK_ON, SAT_FS_STUCK_OFF, SAT_FS_PWM_SHORT, SAT_FS_SHORT_CYCLING
-};
-enum SATBoilerStatus : uint8_t {
-  SAT_BS_OFF = 0, SAT_BS_IDLE, SAT_BS_PREHEATING, SAT_BS_AT_SETPOINT,
-  SAT_BS_MODULATING_UP, SAT_BS_MODULATING_DOWN, SAT_BS_IGNITION_SURGE,
-  SAT_BS_STALLED_IGNITION, SAT_BS_ANTI_CYCLING, SAT_BS_PUMP_STARTING,
-  SAT_BS_WAITING_FLAME, SAT_BS_OVERSHOOT_COOLING, SAT_BS_POST_CYCLE,
-  SAT_BS_HEATING, SAT_BS_COOLING
-};
-
-// ESP8266: 30 slots (~2h at 4-min avg cycle)
-#define SAT_WIN4H_SIZE 30
-
-struct SATWindowRecord {
-  uint32_t endMs;
-  uint32_t onDurationMs;
-  uint32_t offDurationMs;
-  float    p90FlowTemp;
-  float    avgFlowRetDelta;
-  uint8_t  eClass;
-};
-
-struct SATZoneState {
-  float    fRoomTemp     = 0.0f;
-  float    fSetpoint     = 0.0f;
-  float    fPidOutput    = 0.0f;
-  float    fPidIntegral  = 0.0f;
-  float    fPrevError    = 0.0f;
-  uint32_t iLastUpdateMs = 0;
-  bool     bRoomValid    = false;
-  bool     bSpValid      = false;
-};
-
-struct SATRuntimeSection {         // state.sat — SAT thermostat controller state
-  bool            bActive        = false;
-  SATControlMode  eControlMode   = SAT_MODE_OFF;
-  SATBoilerStatus eBoilerStatus  = SAT_BS_OFF;
-  float fHeatingCurveValue       = 0.0f;
-  float fPidOutput               = 0.0f;
-  float fPidP                    = 0.0f;
-  float fPidI                    = 0.0f;
-  float fPidD                    = 0.0f;
-  float fFinalSetpoint           = 0.0f;
-  float fError                   = 0.0f;
-  float fKp                      = 0.0f;
-  float fKi                      = 0.0f;
-  float fKd                      = 0.0f;
-  float fRawDerivative           = 0.0f;
-  SATCycleClass eLastCycleClass  = SAT_CYCLE_NONE;
-  uint32_t iCycleCount           = 0;
-  uint8_t  iCyclesThisHour       = 0;
-  float    fCycleMaxFlow         = 0.0f;
-  float    fCycleOvershootSec    = 0.0f;
-  float    fLastCycleDuration    = 0.0f;
-  SATCycleKind eLastCycleKind    = SAT_CK_UNKNOWN;
-  float    fLastCycleFractionCH  = 0.0f;
-  float    fLastCycleFractionDHW = 0.0f;
-  float    fDutyRatio            = 0.0f;
-  float    fOvershootFraction    = 0.0f;
-  float    fUnderheatFraction    = 0.0f;
-  uint8_t  i4hCycles             = 0;
-  float    f4hAvgOnSec           = 0.0f;
-  float    f4hAvgOffSec          = 0.0f;
-  float    f4hAvgFlow            = 0.0f;
-  float    f4hDutyRatio          = 0.0f;
-  float    f4hOvershootFraction  = 0.0f;
-  float    f4hUnderheatFraction  = 0.0f;
-  float    f4hFlowRetDeltaP50    = 0.0f;
-  float    f4hFlowRetDeltaP90    = 0.0f;
-  float fPwmDutyCycle            = 0.0f;
-  bool  bPwmFlameRequested       = false;
-  SATPreset eActivePreset        = SAT_PRESET_NONE;
-  uint8_t iCurrentModulation     = 100;
-  bool     bDhwActive            = false;
-  bool     bModSuppressed        = false;
-  uint32_t iModSuppressionSinceMs = 0;
-  SATCalibPhase eCalibPhase      = SAT_CALIB_IDLE;
-  float    fCalibMaxTemp         = 0.0f;
-  float    fCalibStartTemp       = 0.0f;
-  uint32_t iCalibStartMs         = 0;
-  uint16_t iCalibSamples         = 0;
-  float fExternalTemp            = 0.0f;
-  float fExternalOutdoor         = 0.0f;
-  bool  bExternalTempValid       = false;
-  bool  bExternalOutdoorValid    = false;
-  uint32_t iLastControlMs        = 0;
-  uint32_t iExternalTempLastMs   = 0;
-  uint32_t iExternalOutdoorLastMs = 0;
-  bool     bSafetyTripped        = false;
-  bool     bFallbackActive       = false;
-  SATFallbackReason eFallbackReason = SAT_FB_NONE;
-  uint8_t  iDetectedHeatingSystem = SAT_HSYS_RADIATORS;
-  uint8_t  iDetectedManufacturer  = SAT_MFR_OTHER;
-  uint8_t  iSlaveMemberID        = 0;
-  bool     bValvesOpen           = true;
-  bool     bWindowOpen           = false;
-  uint32_t iWindowOpenSinceMs    = 0;
-  float    fPreWindowTarget      = 0.0f;
-  uint8_t  iPreWindowPreset      = 0;
-  float    fPreCustomTemp        = 0.0f;
-  float    fPreActivityTemp      = 0.0f;
-  float    fSmoothedPressure     = 0.0f;
-  float    fPressureDropRate     = 0.0f;
-  bool     bPressureAlarm        = false;
-  uint32_t iPressureAlarmSinceMs = 0;
-  bool     bPressureHealthy      = true;
-  float    fLastPressure         = 0.0f;
-  uint32_t iLastPressureMs       = 0;
-  uint32_t iLastSeenPressureMs   = 0;
-  float    fBoilerPressure       = 0.0f;
-  char     sPressureStatus[8]    = "ok";
-  bool     bModulationReliable   = true;
-  uint8_t  iModChangeCount       = 0;
-  SATCurveRecommendation eCurveRecommendation = SAT_CR_INSUFFICIENT;
-  float    fMeanError            = 0.0f;
-  float    fErrorStdDev          = 0.0f;
-  uint8_t  iErrorSampleCount     = 0;
-  char     sHeatCurveRec[13]     = "insufficient";
-  SATFlameStatus eFlameStatus    = SAT_FS_INSUFFICIENT_DATA;
-  bool     bSetpointMismatch     = false;
-  uint32_t iMismatchSinceMs      = 0;
-  struct {
-    float    fTemperature  = 0.0f;
-    float    fHumidity     = 0.0f;
-    float    fWindSpeed    = 0.0f;
-    bool     bValid        = false;
-    uint32_t iLastUpdateMs = 0;
-    uint16_t iFetchErrors  = 0;
-  } weather;
-  float    fCurrentPower         = 0.0f;
-  float    fEnergyTotal          = 0.0f;
-  uint32_t iEnergyLastMs         = 0;
-  float    fEnergyEstimatedKWh   = 0.0f;
-  float    fEstEnergyLastSavedKWh = 0.0f;
-  uint32_t iEstEnergyLastMs      = 0;
-  float    fSimRoomTemp          = 20.0f;
-  float    fSimFlowTemp          = 20.0f;
-  float    fSimOutdoorTemp       = 5.0f;
-  uint32_t iSimLastUpdateMs      = 0;
-  bool     bSimWarmupDone        = false;
-  float    fEstimatedRoom        = 0.0f;
-  float    fLastKnownRoom        = 0.0f;
-  uint32_t iLastKnownRoomMs      = 0;
-  bool     bThermalModelValid    = false;
-  float    fThermalDropRate      = 0.0f;
-  bool     bSolarGainActive      = false;
-  float    fIndoorRiseRate       = 0.0f;
-  float    fSunElevation         = 0.0f;
-  bool     bSunElevationValid    = false;
-  uint32_t iSunElevLastMs        = 0;
-  bool     bSummerActive         = false;
-  float    fSummerHoursAbove     = 0.0f;
-  float    fHumidity             = 0.0f;
-  bool     bHumidityValid        = false;
-  uint32_t iHumidityLastMs       = 0;
-  float    fComfortOffset        = 0.0f;
-  float    fAreaTemp[4]          = {0};
-  bool     bAreaValid[4]         = {false};
-  uint32_t iAreaLastMs[4]        = {0};
-  bool     bAutoTuneActive       = false;
-  uint16_t iAutoTuneCycles       = 0;
-  float    fAutoTuneScore        = 0.0f;
-};
-#endif // ENABLE_SAT
 
 struct OTGWState {
   PICSection         pic;         // state.pic.bAvailable, state.pic.sFwversion
@@ -585,9 +355,6 @@ struct OTGWState {
   HeapDiagSection    heapdiag;    // state.heapdiag.iMqttDropsTotal, ...
   DiscoverySection   discovery;   // state.discovery.iPublishedTopicCount, ... (ADR-062)
   PicSettingsSection picSettings; // state.picSettings — PR=-polled settings from PIC
-#if defined(ENABLE_SAT)
-  SATRuntimeSection  sat;         // state.sat — SAT thermostat controller
-#endif
   StatusMessage      statusMessage = StatusMessage::None;
   bool               bSetupComplete = false;
 };
@@ -599,10 +366,6 @@ OTGWState state;
 // All PIC-related operations (commands, queries, upgrades) check this before proceeding.
 inline bool isPICEnabled() { return state.pic.bAvailable; }
 inline bool isGatewayFirmware() { return strcmp_P(state.pic.sType, PSTR("gateway")) == 0; }
-#if defined(ENABLE_SAT)
-// On ESP8266 dev branch the only OT command interface is the PIC serial link.
-inline bool hasOTCommandInterface() { return isPICEnabled(); }
-#endif
 
 //===================[ Persistent Settings — serialized to LittleFS (ADR-051) ]===================
 // Sub-section structs for OTGWSettings — groups configuration by feature area.
@@ -678,95 +441,20 @@ struct OTGWBootSection {            // PIC boot-time command injection
   char sCommands[129] = "";
 };
 
-#if defined(ENABLE_SAT)
-//--- SAT (Smart Autotune Thermostat) settings ---
-struct SATSection {
-  bool     bEnabled           = false;
-  uint8_t  iHeatingSystem     = SAT_HSYS_AUTO;
-  float    fTargetTemp        = 20.0f;
-  float    fHeatingCurveCoeff = 1.5f;
-  float    fDeadband          = 0.1f;
-  uint16_t iControlInterval   = 30;
-  bool     bUseExternalTemp   = false;
-  float    fPresetComfort     = 21.0f;
-  float    fPresetEco         = 18.0f;
-  float    fPresetAway        = 15.0f;
-  float    fPresetSleep       = 16.0f;
-  float    fPresetActivity    = 10.0f;
-  float    fPresetHome        = 18.0f;
-  bool     bPwmAutoSwitch     = true;
-  uint8_t  iMaxRelModulation  = 100;
-  float    fOvpValue          = 0.0f;
-  bool     bOvpEnabled        = false;
-  float    fOvershootMargin   = 2.0f;
-  float    fModSupDelay       = 20.0f;
-  float    fModSupOffset      = 1.0f;
-  float    fDhwSetpoint       = 0.0f;
-  bool     bDhwEnabled        = false;
-  bool     bPushSetpoint      = false;
-  float    fFlameOffOffset    = 0.0f;
-  bool     bWindowDetection   = false;
-  uint16_t iWindowMinOpenSec  = 60;
-  bool     bForcePWM          = false;
-  float    fFlowOffset        = 2.0f;
-  float    fTargetTempStep    = 0.5f;
-  float    fMinPressure       = 0.8f;
-  float    fMaxPressure       = 2.5f;
-  float    fMaxPressureDrop   = 0.3f;
-  uint8_t  iManufacturer      = SAT_MFR_AUTO;
-  bool     bWeatherEnable     = false;
-  float    fWeatherLat        = 0.0f;
-  float    fWeatherLon        = 0.0f;
-  uint16_t iWeatherInterval   = 900;
-  float    fBoilerCapacity    = 24.0f;
-  float    fBoilerRatedKW     = 0.0f;
-  float    fBoilerEfficiency  = 0.92f;
-  bool     bPresetSync        = false;
-  char     sPresetSyncTopic[65] = "";
-  bool     bSimulation        = false;
-  float    fSimHeatRate       = 0.5f;
-  float    fSimCoolRate       = 0.1f;
-  float    fThermalCoeff      = 0.05f;
-  bool     bSolarGainEnable   = false;
-  float    fSolarMinRiseRate  = 0.5f;
-  float    fSolarSetpointOffset = 2.0f;
-  float    fSolarMinElevation = 12.0f;
-  bool     bSummerSimmer      = false;
-  float    fSummerThreshold   = 18.0f;
-  uint8_t  iSummerMinHours    = 6;
-  bool     bComfortAdjust     = false;
-  float    fComfortHumidity   = 50.0f;
-  float    fComfortMaxOffset  = 1.0f;
-  bool     bMultiArea         = false;
-  uint8_t  iMultiAreaCount    = 0;
-  float    fAreaWeight[4]     = {1.0f, 1.0f, 1.0f, 1.0f};
-  bool     bAutoTune          = false;
-  float    fAutoTuneRate      = 0.02f;
-  float    fMaxSetpoint        = 65.0f;
-  uint32_t iSensorMaxAgeS     = 21600;
-  bool     bErrorMonitoring   = false;
-  float    fAutoGainsValue    = 2.0f;
-  bool     bAutoGains         = true;
-  float    fKpManual          = 5.0f;
-  float    fKiManual          = 0.0005f;
-  float    fKdManual          = 0.0f;
-  bool     bThermalComfort    = false;
-  uint16_t iHumidityTimeoutS  = 1800;
-  uint8_t  iHeatingMode       = 0;
-  uint8_t  iCyclesPerHour     = 3;
-  float    fValveOffset       = 0.0f;
-  bool     bSolarFreezeIntegral = true;
-  uint16_t iSatFlushThresholdH = 24;
-  uint8_t  iZoneCount          = 1;
-  uint16_t iZoneTimeoutS       = 300;
-};
-#endif // ENABLE_SAT
 
 // Hardware identity for HA device registry discovery.
 // Defaults set per platform; user can override via settings.ini or web UI.
 struct DeviceSection {
   char sManufacturer[32] = "NodoShop";
   char sModel[32]        = "OTGW";
+};
+
+struct WifiSection {              // settings.wifi — static IP (all empty = DHCP)
+  char sStaticIp[16] = "";       // e.g. "192.168.1.100"  (empty = DHCP)
+  char sSubnet[16]   = "";       // e.g. "255.255.255.0"
+  char sGateway[16]  = "";       // e.g. "192.168.1.1"
+  char sDns1[16]     = "";       // e.g. "8.8.8.8"
+  char sDns2[16]     = "";       // e.g. "8.8.4.4"
 };
 
 struct OTGWSettings {
@@ -781,6 +469,7 @@ struct OTGWSettings {
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
   DeviceSection       device;
+  WifiSection         wifi;
   MQTTSettingsSection mqtt;
   NTPSection          ntp;
   SensorsSection      sensors;
@@ -789,9 +478,6 @@ struct OTGWSettings {
   WebhookSection      webhook;
   UISection           ui;
   OTGWBootSection     otgw;
-#if defined(ENABLE_SAT)
-  SATSection          sat;
-#endif
 };
 
 OTGWSettings settings;
@@ -860,9 +546,12 @@ byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats
 //   248 — otgw-firmware/{reboot_count,reboot_reason,version,hostname}
 //   249 — otgw-pic/{version,deviceid,firmwaretype,designer,picavailable} (PIC-gated)
 //   250 — otgw-pic/settings/* (15 PR=-polled topics, PIC-gated)
+// PIC control discovery pseudo-ID:
+//   251 — resetgateway button + gpioa/gpiob/leda-f select entities
 byte      OTGWfwinfoid       = 248;
 byte      OTGWpicinfoid      = 249;
 byte      OTGWpicsettingsid  = 250;
+byte      OTGWpiccontrolsid  = 251;
 
 //Now load Debug & network library
 #include "Debug.h"

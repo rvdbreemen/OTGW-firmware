@@ -1,0 +1,410 @@
+#!/usr/bin/env python3
+"""adr-audit: deterministic candidate scanner for /adr-kit:init (v0.12.0+).
+
+Walks a project root looking for decision-shaped artefacts: top-level config
+files (deps, build tools, CI), and documented decisions in README/docs/AGENTS
+(.md). Emits a JSON list of candidates that the /adr-kit:init skill feeds
+into Claude for LLM curation.
+
+This CLI is intentionally dumb on purpose. It surfaces evidence; it does NOT
+decide which decisions deserve ADRs. That call belongs to the human reviewer
+(via the skill) — adr-audit just makes sure no obvious decision is hidden
+behind a config file the agent never opened.
+
+Usage:
+  adr-audit                                 # scan cwd, print JSON to stdout
+  adr-audit --root /path/to/project
+  adr-audit --output docs/adr/.adr-kit-init-candidates.json
+  adr-audit --skip 'vendor/**' --skip 'node_modules/**'
+
+Exit codes:
+  0  scan completed (zero or more candidates emitted)
+  2  I/O error or invalid argument
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Tuple
+
+# Top-level files that, by their mere presence, suggest a tooling decision.
+TOOLING_MARKERS = [
+    ("Makefile", "build", "Project uses Make as build entry point."),
+    ("CMakeLists.txt", "build", "Project uses CMake as build system."),
+    ("meson.build", "build", "Project uses Meson as build system."),
+    ("build.py", "build", "Project uses a custom Python build script."),
+    ("Dockerfile", "runtime", "Project ships a container image."),
+    ("docker-compose.yml", "runtime", "Project uses Docker Compose for local orchestration."),
+    ("docker-compose.yaml", "runtime", "Project uses Docker Compose for local orchestration."),
+    (".pre-commit-config.yaml", "ci", "Project uses pre-commit framework."),
+    ("Procfile", "runtime", "Project deploys with a Procfile-based PaaS."),
+    ("Brewfile", "tooling", "Project depends on Homebrew bundle for dev setup."),
+    ("Vagrantfile", "tooling", "Project provides a Vagrant dev environment."),
+    ("flake.nix", "tooling", "Project uses Nix flakes for reproducible builds."),
+    ("shell.nix", "tooling", "Project uses Nix shell for dev environment."),
+    ("renovate.json", "ci", "Project uses Renovate for dependency updates."),
+    ("dependabot.yml", "ci", "Project uses Dependabot for dependency updates."),
+]
+
+# Files whose contents we extract dependency lists from.
+DEP_FILES = [
+    "package.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "Cargo.toml",
+    "go.mod",
+    "Gemfile",
+    "composer.json",
+    "platformio.ini",
+    "library.properties",
+]
+
+# Documentation files to grep for decision-narrative phrases.
+DOC_FILES_PATTERN = ["README.md", "AGENTS.md", "CLAUDE.md"]
+DOC_DIRS = ["docs"]
+
+# Decision-narrative phrases (case-insensitive). Each match becomes a candidate.
+DOC_PHRASES = [
+    r"\bwe\s+chose\b",
+    r"\bwe\s+picked\b",
+    r"\bwe\s+decided\b",
+    r"\bdecided\s+to\b",
+    r"\bdecided\s+against\b",
+    r"\binstead\s+of\b",
+    r"\brather\s+than\b",
+    r"\bwhy\s+not\b",
+    r"\brejected\b",
+    r"\bsuperseded\s+by\b",
+]
+
+# Default skip globs (non-source / non-doc noise + existing ADR & backlog content).
+# docs/adr is skipped because existing ADRs are already canonical decisions —
+# scanning them just produces grep noise from the Decision sections.
+# backlog/** is skipped because Backlog.md task narratives (decided to, instead
+# of) describe TASK-level choices, not ADR-level architecture.
+DEFAULT_SKIP_GLOBS = [
+    "node_modules/**",
+    "vendor/**",
+    ".git/**",
+    "dist/**",
+    "build/**",
+    "target/**",
+    ".venv/**",
+    "venv/**",
+    "__pycache__/**",
+    ".pytest_cache/**",
+    ".mypy_cache/**",
+    "docs/adr/**",
+    "backlog/**",
+]
+
+
+def glob_to_regex(glob: str) -> re.Pattern:
+    """Same translator as bin/adr-judge. Brace expansion {a,b,c} added in v0.12.2."""
+    out: List[str] = []
+    i = 0
+    while i < len(glob):
+        c = glob[i]
+        if c == "*":
+            if i + 1 < len(glob) and glob[i + 1] == "*":
+                if i + 2 < len(glob) and glob[i + 2] == "/":
+                    out.append("(?:.*/)?")
+                    i += 3
+                else:
+                    out.append(".*")
+                    i += 2
+            else:
+                out.append("[^/]*")
+                i += 1
+        elif c == "?":
+            out.append("[^/]")
+            i += 1
+        elif c == "{":
+            close = glob.find("}", i + 1)
+            if close == -1 or "{" in glob[i + 1:close]:
+                out.append(re.escape(c))
+                i += 1
+            else:
+                inner = glob[i + 1:close]
+                alts = inner.split(",")
+                alt_patterns = [
+                    glob_to_regex(a).pattern.lstrip("^").rstrip("$") if a else ""
+                    for a in alts
+                ]
+                out.append("(?:" + "|".join(alt_patterns) + ")")
+                i = close + 1
+        else:
+            out.append(re.escape(c))
+            i += 1
+    return re.compile("^" + "".join(out) + "$")
+
+
+def any_skip(rel_path: str, skip_regexes: List[re.Pattern]) -> bool:
+    return any(r.match(rel_path) for r in skip_regexes)
+
+
+# ---------- candidate extractors ----------
+
+
+def scan_tooling(root: Path) -> List[Dict]:
+    out: List[Dict] = []
+    for filename, kind, narrative in TOOLING_MARKERS:
+        p = root / filename
+        if p.is_file():
+            out.append(
+                {
+                    "id": f"tooling-{filename.lower().replace('.', '-')}",
+                    "title": narrative,
+                    "decision_type": kind,
+                    "evidence_files": [filename],
+                    "details": {},
+                }
+            )
+    if (root / ".github" / "workflows").is_dir():
+        wfs = sorted(
+            p.name for p in (root / ".github" / "workflows").iterdir() if p.suffix in (".yml", ".yaml")
+        )
+        if wfs:
+            out.append(
+                {
+                    "id": "tooling-github-actions",
+                    "title": "Project uses GitHub Actions for CI.",
+                    "decision_type": "ci",
+                    "evidence_files": [f".github/workflows/{n}" for n in wfs],
+                    "details": {"workflow_count": len(wfs)},
+                }
+            )
+    return out
+
+
+def _safe_read(p: Path, max_bytes: int = 1024 * 256) -> Optional[str]:
+    try:
+        if p.stat().st_size > max_bytes:
+            return None
+        return p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def scan_dependencies(root: Path) -> List[Dict]:
+    out: List[Dict] = []
+    for filename in DEP_FILES:
+        p = root / filename
+        if not p.is_file():
+            continue
+        text = _safe_read(p)
+        if text is None:
+            continue
+        deps = _extract_deps(filename, text)
+        if not deps:
+            # Even an empty extract is informative — surfaces presence.
+            deps = ["(parser produced no dependency list — file present)"]
+        out.append(
+            {
+                "id": f"deps-{filename.lower().replace('.', '-')}",
+                "title": f"Dependency choices in {filename}",
+                "decision_type": "dependency",
+                "evidence_files": [filename],
+                "details": {"sample": deps[:30]},
+            }
+        )
+    return out
+
+
+def _extract_deps(filename: str, text: str) -> List[str]:
+    """Best-effort dependency list per file type. Heuristic, not a parser."""
+    deps: List[str] = []
+    if filename == "package.json":
+        try:
+            data = json.loads(text)
+            for k in ("dependencies", "devDependencies", "peerDependencies"):
+                if isinstance(data.get(k), dict):
+                    deps.extend(sorted(data[k].keys()))
+        except json.JSONDecodeError:
+            pass
+    elif filename == "pyproject.toml":
+        # Cheap regex rather than tomllib (3.11+) — works for both poetry and PEP 621 layouts.
+        for m in re.finditer(r"^([A-Za-z0-9_.-]+)\s*=\s*['\"][^'\"]*['\"]", text, re.MULTILINE):
+            name = m.group(1)
+            if name.lower() in {"name", "version", "description", "readme", "requires-python", "license", "authors"}:
+                continue
+            deps.append(name)
+        for m in re.finditer(r'"([A-Za-z0-9_.-]+)"\s*[,\]]', text):
+            deps.append(m.group(1))
+    elif filename == "requirements.txt":
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            m = re.match(r"^([A-Za-z0-9_.\-\[\]]+)", line)
+            if m:
+                deps.append(m.group(1))
+    elif filename == "Cargo.toml":
+        in_deps = False
+        for line in text.splitlines():
+            s = line.strip()
+            if s.startswith("[dependencies"):
+                in_deps = True
+                continue
+            if s.startswith("["):
+                in_deps = False
+            if in_deps:
+                m = re.match(r"^([A-Za-z0-9_-]+)\s*=", s)
+                if m:
+                    deps.append(m.group(1))
+    elif filename == "go.mod":
+        for m in re.finditer(r"^\s*([\w./-]+)\s+v\d", text, re.MULTILINE):
+            deps.append(m.group(1))
+    elif filename == "Gemfile":
+        for m in re.finditer(r"^\s*gem\s+['\"]([^'\"]+)['\"]", text, re.MULTILINE):
+            deps.append(m.group(1))
+    elif filename == "composer.json":
+        try:
+            data = json.loads(text)
+            for k in ("require", "require-dev"):
+                if isinstance(data.get(k), dict):
+                    deps.extend(sorted(data[k].keys()))
+        except json.JSONDecodeError:
+            pass
+    elif filename == "platformio.ini":
+        for m in re.finditer(r"^\s*lib_deps\s*=\s*(.*)$", text, re.MULTILINE):
+            deps.extend([p.strip() for p in m.group(1).split() if p.strip()])
+        for kw in ("framework", "platform", "board"):
+            m = re.search(rf"^\s*{kw}\s*=\s*(.+)$", text, re.MULTILINE)
+            if m:
+                deps.append(f"{kw}={m.group(1).strip()}")
+    elif filename == "library.properties":
+        for kw in ("name", "version", "depends"):
+            m = re.search(rf"^{kw}\s*=\s*(.+)$", text, re.MULTILINE)
+            if m:
+                deps.append(f"{kw}={m.group(1).strip()}")
+    return deps
+
+
+def scan_doc_decisions(root: Path, skip_regexes: List[re.Pattern]) -> List[Dict]:
+    """Grep README / AGENTS / CLAUDE / docs for decision-narrative phrases.
+
+    Emits ONE candidate per file (not per matching line) with up to 5 example
+    snippets in details.snippets. This prevents long docs from producing dozens
+    of near-duplicate candidates.
+    """
+    out: List[Dict] = []
+    phrase_re = re.compile("|".join(DOC_PHRASES), re.IGNORECASE)
+    candidates_paths: List[Path] = []
+    for n in DOC_FILES_PATTERN:
+        p = root / n
+        if p.is_file():
+            candidates_paths.append(p)
+    for d in DOC_DIRS:
+        dp = root / d
+        if dp.is_dir():
+            for fp in dp.rglob("*.md"):
+                rel = fp.relative_to(root).as_posix()
+                if any_skip(rel, skip_regexes):
+                    continue
+                candidates_paths.append(fp)
+
+    next_id = 1
+    MAX_SNIPPETS_PER_FILE = 5
+    for fp in candidates_paths:
+        text = _safe_read(fp)
+        if not text:
+            continue
+        rel = fp.relative_to(root).as_posix()
+        if any_skip(rel, skip_regexes):
+            continue
+        snippets: List[Dict] = []
+        match_count = 0
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            if phrase_re.search(line):
+                match_count += 1
+                if len(snippets) < MAX_SNIPPETS_PER_FILE:
+                    snippets.append({"line": lineno, "text": line.strip()[:240]})
+        if not snippets:
+            continue
+        out.append(
+            {
+                "id": f"doc-quote-{next_id:03d}",
+                "title": f"Documented decision narrative in {rel}",
+                "decision_type": "documented",
+                "evidence_files": [rel],
+                "details": {
+                    "match_count": match_count,
+                    "snippets": snippets,
+                },
+            }
+        )
+        next_id += 1
+    return out
+
+
+# ---------- top-level ----------
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(
+        prog="adr-audit",
+        description="Scan a project for decision-shaped artefacts (used by /adr-kit:init).",
+    )
+    p.add_argument("--root", default=".", help="Project root to scan. Default: current directory.")
+    p.add_argument(
+        "--output",
+        default=None,
+        help="Write JSON to this path instead of stdout. Use 'docs/adr/.adr-kit-init-candidates.json' to drop next to the ADRs.",
+    )
+    p.add_argument(
+        "--skip",
+        action="append",
+        default=[],
+        help="Glob patterns to skip (in addition to the defaults: node_modules/**, vendor/**, .git/**, etc.). Can be repeated.",
+    )
+    args = p.parse_args()
+
+    try:
+        root = Path(args.root).resolve()
+        if not root.is_dir():
+            print(f"[adr-audit] ERROR: --root not a directory: {root}", file=sys.stderr)
+            return 2
+        skip_globs = list(DEFAULT_SKIP_GLOBS) + list(args.skip)
+        skip_regexes = [glob_to_regex(g) for g in skip_globs]
+
+        candidates: List[Dict] = []
+        candidates.extend(scan_tooling(root))
+        candidates.extend(scan_dependencies(root))
+        candidates.extend(scan_doc_decisions(root, skip_regexes))
+
+        payload = {
+            "scanned_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "repo_root": str(root),
+            "candidate_count": len(candidates),
+            "candidates": candidates,
+        }
+        text = json.dumps(payload, indent=2)
+        if args.output:
+            outp = Path(args.output)
+            if not outp.is_absolute():
+                outp = root / outp
+            outp.parent.mkdir(parents=True, exist_ok=True)
+            outp.write_text(text + "\n", encoding="utf-8")
+            print(
+                f"[adr-audit] wrote {len(candidates)} candidates to {outp.relative_to(root)}",
+                file=sys.stderr,
+            )
+        else:
+            print(text)
+        return 0
+    except KeyboardInterrupt:
+        return 2
+    except OSError as e:
+        print(f"[adr-audit] ERROR: {e}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

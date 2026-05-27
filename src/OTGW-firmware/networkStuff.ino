@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -53,6 +53,23 @@ void resetWiFiSettings(void)
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
+  // TASK-548: apply static IP before any connect attempt.
+  // All fields empty (default) → let the OS keep DHCP mode unchanged.
+  if (strlen(settings.wifi.sStaticIp) > 0) {
+    IPAddress ip, gw, sn, dns1, dns2;
+    if (ip.fromString(settings.wifi.sStaticIp) &&
+        sn.fromString(settings.wifi.sSubnet)   &&
+        gw.fromString(settings.wifi.sGateway)) {
+      if (strlen(settings.wifi.sDns1) > 0) dns1.fromString(settings.wifi.sDns1);
+      if (strlen(settings.wifi.sDns2) > 0) dns2.fromString(settings.wifi.sDns2);
+      WiFi.config(ip, gw, sn, dns1, dns2);
+      DebugTf(PSTR("Static IP: %s / %s gw %s\r\n"),
+              settings.wifi.sStaticIp, settings.wifi.sSubnet, settings.wifi.sGateway);
+    } else {
+      DebugTln(F("Static IP: parse error — falling back to DHCP"));
+    }
+  }
 
   WiFiManager manageWiFi;
   uint32_t lTime = millis();

@@ -3,11 +3,11 @@ id: TASK-431
 title: >-
   Investigate: rapid WebUI page-refresh freezes the OTGW (1.4.2-beta), requires
   network drop to recover
-status: In Progress
+status: Done
 assignee:
   - '@copilot'
 created_date: '2026-04-26 10:16'
-updated_date: '2026-05-05 20:51'
+updated_date: '2026-05-25 21:59'
 labels:
   - bug
   - webui
@@ -108,4 +108,12 @@ The 1.4.2-beta release notes (published a few minutes after crashevans' report) 
 
 - Added focused firmware-side instrumentation in `src/OTGW-firmware/webSocketStuff.ino`: a 5-second burst window now emits a single summary line when rapid reloads cause clustered connect/disconnect/reject/error events. This should make the next telnet capture clearly show whether the fix still hits max-client or low-heap rejects.
 - Current code state is ready for field retest, but task closure is still blocked on AC #1/#4/#5: reproduce or capture a freeze-window telnet log, verify at least 20 rapid reload cycles on a fresh build, then report back in Discord #beta-testing.
+
+Triage 2026-05-22: blocked on field reproduction. Original 1.4.2-beta report from andrebrait (2026-04-23); no further reports in 14+ days against 1.5.x/1.6.0-beta. Re-open when a fresh report reproduces against current beta line or when an ESP heap audit gives a structural lead.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+User confirmed resolved (2026-05-25). Rapid WebUI page-refresh freeze reported by andrebrait on 1.4.2-beta+62fdacd. No longer reproducible on current dev build. Root cause likely addressed by subsequent WebSocket lifecycle and heap-management improvements (ADR-088, ADR-089 era). Closing as stale / field-validated fixed.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -19,6 +19,16 @@ All task operations go through the **`backlog` CLI** — never edit task files d
 
 Full CLI reference: @.claude/backlog-cli-reference.md
 
+## Task pickup (MANDATORY)
+
+When picking up any task from the backlog — whether newly created or already existing — the **first** action before any code, research, or file reading is:
+
+```bash
+backlog task edit <id> -s "In Progress" -a @claude
+```
+
+This makes the task visible in the correct board column immediately. Skipping this step leaves the task in "To Do" while it is actually being worked on, which creates false visibility for the user and breaks board accuracy.
+
 ## Autonomous task completion (project policy)
 
 When you've satisfied all 8 Definition-of-Done items from the reference (every AC checked, every DoD item checked, Final Summary added, build passes, evaluator green, no regressions) — set the task status to **Done** immediately. Do not leave the task at "In Progress" waiting for the user to flip it.
@@ -79,7 +89,7 @@ Single translation unit — Arduino concatenates every `.ino` in `src/OTGW-firmw
 - `loop()` — calls `doBackgroundTasks()` and yields.
 - `doBackgroundTasks()` — the actual work loop: timers, queue draining, watchdog, MQTT publish. **Re-entrant** via `feedWatchDog()` → `yield()` (see "Static buffers, cooperative scheduling" below).
 
-Sibling `.ino` files in the same directory are organised by feature (`MQTTstuff.ino`, `restAPI.ino`, `OTGW-Core.ino`, `SATcontrol.ino`, `networkStuff.ino`, `settingStuff.ino`, …). Each contributes free functions to the single translation unit; there are no class-based modules.
+Sibling `.ino` files in the same directory are organised by feature (`MQTTstuff.ino`, `restAPI.ino`, `OTGW-Core.ino`, `networkStuff.ino`, `settingStuff.ino`, …). Each contributes free functions to the single translation unit; there are no class-based modules.
 
 ## Architecture Decision Records (ADRs)
 
@@ -248,7 +258,7 @@ Generic Anthropic-published skills (`pdf`, `docx`, `refactor`, `webapp-testing`,
 
 ## Superpowers skills
 
-The `superpowers:using-superpowers` skill loads automatically each session and establishes the skill-discovery flow: if any installed skill might apply to the current task — even at low confidence — invoke it via the `Skill` tool before responding. Don't paraphrase a skill from memory; the on-disk version may have evolved.
+**At the start of every conversation, invoke `superpowers:using-superpowers` via the `Skill` tool before doing anything else.** This establishes the skill-discovery flow: if any installed skill might apply to the current task — even at low confidence — invoke it via the `Skill` tool before responding. Don't paraphrase a skill from memory; the on-disk version may have evolved.
 
 Two superpowers skills are particularly useful in this codebase:
 
@@ -273,13 +283,12 @@ When in doubt about whether a push is "logical", err toward asking. The cost of 
 
 ## Versioning policy
 
-Field testers on Discord identify issues by the version string ("on beta.23 I see..."), so each material firmware change must ship under its own prerelease tag (`_VERSION_PRERELEASE` in `src/OTGW-firmware/version.h`, currently `<word>.<N>` form, e.g. `beta.23`). Multiple commits batched under the same tag erase the testers' ability to A/B them.
+Field testers on Discord identify issues by the version string ("on beta.23 I see..."), so each shipped beta carries its own prerelease tag (`_VERSION_PRERELEASE` in `src/OTGW-firmware/version.h`, currently `<word>.<N>` form, e.g. `beta.23`). The bump is **release-prep work, not per-commit work**.
 
-- **What requires a bump** — any commit whose staged paths include `src/OTGW-firmware/**` (excluding `src/OTGW-firmware/version.h` itself) or `src/libraries/**`. The same commit must update `_VERSION_PRERELEASE` (and the cascaded `_SEMVER_*`/`_VERSION` lines and `data/version.hash` that `scripts/autoinc-semver.py` rewrites).
-- **What does not** — docs-only / tooling-only commits: `*.md`, `docs/**`, `backlog/**`, `.claude/**`, `scripts/**`, `bin/**`, `.githooks/**`, top-level `.py`/`.sh`/`.bat`, and `data/version.hash` on its own. These cannot affect firmware behaviour and are exempt.
-- **How to bump** — run `bin/bump-prerelease.sh` from the project root. It parses the current tag (must match `^[a-zA-Z]+\.[0-9]+$`), increments the trailing integer, and calls `scripts/autoinc-semver.py --prerelease <new>` to rewrite `version.h` + `data/version.hash` + the cascaded fields. The helper does NOT git-add — stage `src/OTGW-firmware/version.h` and `src/OTGW-firmware/data/version.hash` yourself alongside the firmware change.
-- **Enforcement** — `.githooks/pre-commit` runs a bump-check after the adr-judge gate. If the staged set triggers and `git diff --cached -- src/OTGW-firmware/version.h` does not show a `+`/`-` pair on the `_VERSION_PRERELEASE` line, the commit is blocked with the path list and remediation hint.
-- **Bypass** — `OTGW_BUMP_HOOK_DISABLE=1 git commit ...` skips the bump-check for one commit. Intended for cherry-picks, merges, or rebases where the bump rides on a separate commit. Do not use it to dodge bumping a real change.
+- **When the bump happens** — once per beta release, as Phase 2 of the `/beta-prerelease` skill (which runs `bin/bump-prerelease.sh` and stages the result alongside the rest of the release prep). Individual commits to `dev` between releases do NOT carry a bump. The next `/beta-prerelease` invocation rolls up whatever has accumulated since the last public release into a single new beta tag.
+- **How to bump** (manual / from the skill) — `bin/bump-prerelease.sh` parses the current tag (must match `^[a-zA-Z]+\.[0-9]+$`), increments the trailing integer, and calls `scripts/autoinc-semver.py --prerelease <new>` to rewrite `version.h` + `data/version.hash` + the cascaded `_SEMVER_*`/`_VERSION` lines and `Version :` banners in `data/*` assets. The helper does NOT `git add` — stage the rewritten paths yourself.
+- **No per-commit enforcement** — `.githooks/pre-commit` does NOT run a bump-check on `dev` (removed by TASK-669). Adding firmware changes to `dev` without a bump is the expected pattern between releases. The 2.0.0 worktree keeps its own per-commit bump-check unchanged; that policy is branch-local.
+- **A/B traceability** — the constraint that each beta tag corresponds to a discrete set of testable changes is preserved by the release cadence, not by per-commit enforcement: a release-prep run that batches too many heterogeneous changes is a release-quality problem, not a commit-time problem.
 
 ## Worktree layout
 
@@ -287,8 +296,8 @@ This project is intentionally checked out into **two parallel git worktrees** so
 
 | Worktree path | Branch | Purpose |
 |---|---|---|
-| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware` | `dev` | 1.5.x release line — the default working tree |
-| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware-2.0.0` | `feature-dev-2.0.0-otgw32-esp32-sat-support` | 2.0.0 ESP32 + SAT feature line |
+| `D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware` | `dev` | 1.5.x release line — the default working tree |
+| `D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware-2.0.0` | `feature-dev-2.0.0-otgw32-esp32-sat-support` | 2.0.0 ESP32 + SAT feature line |
 
 **The 2.0.0 worktree has its own `CLAUDE.md`** with ESP32/SAT-specific rules and a richer toolchain (C4 docs, hooks, adr-kit plugin, discord-mcp server). When working in that tree, those rules supersede this file's guidance. The two files are not synchronised — divergence is intentional, since the platforms and tooling differ.
 
@@ -306,9 +315,19 @@ git worktree add ../OTGW-firmware dev
 
 Verify with `git worktree list`.
 
-**Backlog.md: always use the CLI, never the MCP server.** The `backlog` MCP server (`mcp__backlog__task_*` tools) inherits the launching session's working directory and indexes only that single worktree. Tasks living in a sibling worktree are invisible to `mcp__backlog__task_search`, and `mcp__backlog__task_view` returns cached/stale content for cross-tree tasks (verified 2026-05-05: MCP kept returning the pre-edit "In Progress" snapshot of TASK-514 long after a CLI edit had marked it Done on disk in the 2.0.0 tree). Mixing CLI and MCP on the same task is fragile because MCP caches and does not reflect CLI-side writes without a server restart. **Use `backlog task ...` CLI for every read, edit, create, complete, and archive in this project.**
+**Backlog.md: prefer the `backlog` CLI for all task operations; fall back to `mcp__backlog__*` tools only when the CLI is unavailable.** The MCP server inherits the launching session's working directory and indexes only that single worktree. Tasks living in a sibling worktree are invisible to `mcp__backlog__task_search`, and `mcp__backlog__task_view` returns cached/stale content for cross-tree tasks (verified 2026-05-05: MCP kept returning the pre-edit "In Progress" snapshot of TASK-514 long after a CLI edit had marked it Done on disk in the 2.0.0 tree). Mixing CLI and MCP on the same task is fragile because MCP caches and does not reflect CLI-side writes without a server restart. Use `backlog task ...` CLI for every read, edit, create, complete, and archive.
 
 **CLI cross-tree behaviour.** `backlog task <id> --plain` resolves from either worktree, but `backlog task edit` only writes to the worktree where the task file actually lives. If an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file. SAT / ESP32 / 2.0.0 tasks generally live in the feature worktree's `backlog/tasks/`, not in dev's.
+
+**Fallback when both MCP and CLI are unavailable.** If `mcp__backlog__*` tools are not registered for the session AND `backlog` is not on `PATH` (fresh container, web session, or a worktree where the global install is missing), do NOT fall back to editing task files by hand. Instead, invoke the CLI through `npx`:
+
+```bash
+npx -y backlog.md task list --plain
+npx -y backlog.md task <id> --plain
+npx -y backlog.md task edit <id> -s "In Progress" -a @myself
+```
+
+`npx -y backlog.md` resolves to the same binary as the global `backlog` command and preserves all metadata/Git tracking guarantees. After the first invocation `npx` caches the package, so subsequent calls are fast. Only after `npx` itself fails (no network, no Node) should you escalate to the user — never bypass the CLI by hand-editing markdown.
 
 ### Cross-worktree work — ask first, then plan once, then parallelise
 

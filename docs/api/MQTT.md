@@ -32,11 +32,11 @@ On MQTT connect:
 
 1. **Birth message**: Publishes `"online"` to the publish namespace root (retained)
 2. **Last Will**: Configured to publish `"offline"` to the publish namespace root (retained) when the connection drops
-3. **Discovery reset**: Clears all HA discovery state so JIT discovery re-publishes
+3. **Discovery reset**: Clears the discovery done/pending bitmaps. Non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC info) are immediately queued for drip publication. OT message ID discovery configs are **not** queued here; they publish JIT as each MsgID is first received on the bus (ADR-073).
 4. **Subscribes** to `{TopTopic}/set/{UniqueId}/#` for incoming commands
 5. **Subscribes** to `homeassistant/status` for Home Assistant lifecycle detection
 6. **Publishes** version info, state information, and cached PIC settings
-7. **Conditional OT republish**: Re-publishes all retained OT values only if the offline duration exceeded 5 minutes (the broker-loss threshold). Short outages are treated as network blips — the broker still holds retained topics. First boot and first-enable scenarios do not trigger a republish; the first-seen mechanism publishes each value naturally as it appears on the OT bus.
+7. **Conditional OT republish**: Re-publishes all retained OT values only if the offline duration exceeded 5 minutes (the broker-loss threshold). Short outages are treated as network blips — the broker still holds retained topics. First boot and first-enable scenarios do not trigger a republish; the first-seen mechanism publishes each value naturally as it appears on the OT bus. On assumed broker restart (offline duration exceeded threshold), the discovery done/pending bitmaps are also reset and non-OT configs are re-queued, so JIT re-publishes OT configs as messages arrive.
 
 ---
 
@@ -293,6 +293,48 @@ Published when GPIO sensors are enabled (`settings.sensors.bEnabled`):
 
 Where `{sensor_address}` is the Dallas 1-Wire address (e.g., `28FF64D1841703F1`). The address format depends on the `gpiosensorslegacyformat` setting.
 
+### SAT (Smart Autotune) Topics
+
+Published when the SAT subsystem is active (`settings.sat.bEnabled`). Topics are published under the standard publish namespace, i.e. at `{TopTopic}/value/{UniqueId}/sat/<metric>`.
+
+#### SAT Pressure Topics
+
+| Topic | Value | Description |
+| ----- | ----- | ----------- |
+| `sat/pressure` | `"1.45"` | Current CH water pressure in bar |
+| `sat/pressure_drop_rate` | `"-0.002"` | Pressure drop rate in bar/hour |
+| `sat/pressure_alarm` | `"true"` / `"false"` | Pressure alarm active |
+| `sat/pressure_health` | `"ON"` / `"OFF"` | Pressure health status (retained) |
+
+Note: the `sat/pressure_health_attr` JSON attributes topic was removed in v1.5.1-beta.3. The individual scalar topics (`sat/pressure`, `sat/pressure_drop_rate`, `sat/pressure_alarm`) remain and provide the same data without a JSON bundle.
+
+#### SAT Climate Attributes Topic
+
+| Topic | Value | Description |
+| ----- | ----- | ----------- |
+| `sat/climate_attributes` | JSON object | Extra state attributes for the HA thermostat climate entity; wired as `json_attributes_topic` in the discovery config |
+
+The `sat/climate_attributes` payload is a JSON object containing PID and heating-curve state fields. Home Assistant reads this topic as `json_attributes_topic` on the SAT thermostat entity. Fields published:
+
+| JSON key | Type | Description |
+| -------- | ---- | ----------- |
+| `optimal_coefficient` | float | Heating curve coefficient |
+| `coefficient_derivative` | float | Coefficient derivative (0.0, not tracked) |
+| `minimum_setpoint` | float | Minimum boiler setpoint (SAT_MIN_SETPOINT) |
+| `boiler_flame_timing` | float | Duration of last completed flame cycle in seconds |
+| `boiler_temperature_cold` | float | Boiler temperature when flame is off |
+| `boiler_temperature_tracking` | bool | EMA tracking state (always false) |
+| `boiler_temperature_derivative` | float | Temperature derivative (0.0, not tracked) |
+| `error_source` | string | Error source zone (always `"main"`) |
+| `error_pid` | float | Current PID error (target minus room) |
+| `integral_enabled` | bool | Integral term active |
+| `derivative_enabled` | bool | Derivative term active |
+| `derivative_raw` | float | Raw filtered derivative before PID scaling |
+| `current_kp` | float | Current proportional gain |
+| `current_ki` | float | Current integral gain |
+| `current_kd` | float | Current derivative gain |
+| `relative_modulation_enabled` | bool | Relative modulation active (false when manufacturer quirk disables it) |
+
 ### Source-Separated Topics (Optional)
 
 When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is published to two source-specific sibling topics alongside the canonical topic:
@@ -401,6 +443,16 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `chenable` | `"1"` | `CH=1` | Central heating enable |
 | `chenable2` | `"0"` | `H2=0` | Central heating 2 enable |
 | `ventsetpt` | `"50"` | `VS=50` | Ventilation setpoint |
+| `gpioa` | `"0"` | `GA=0` | GPIO A function (0–7, see PIC firmware docs) |
+| `gpiob` | `"0"` | `GB=0` | GPIO B function (0–7, see PIC firmware docs) |
+| `leda` | `"F"` | `LA=F` | LED A function code (B/C/E/F/H/M/O/P/R/T/W/X) |
+| `ledb` | `"F"` | `LB=F` | LED B function code |
+| `ledc` | `"F"` | `LC=F` | LED C function code |
+| `ledd` | `"F"` | `LD=F` | LED D function code |
+| `lede` | `"F"` | `LE=F` | LED E function code |
+| `ledf` | `"F"` | `LF=F` | LED F function code |
+| `setclock` | `"3/14:30"` | `SC=3/14:30` | Set PIC clock (day 1=Mon…7=Sun, `day/HH:MM`) |
+| `resetgateway` | *(any)* | *(hardware reset)* | Reset the OTGW PIC via hardware reset pin; payload ignored |
 
 #### Advanced Commands
 
@@ -429,13 +481,15 @@ Commands can also be sent using the two-letter OTGW command codes directly as to
 
 | Topic | Description |
 | ----- | ----------- |
-| `homeassistant/status` | Monitors HA lifecycle (`online`/`offline`). On `offline` then `online`, re-publishes all HA discovery configs. |
+| `homeassistant/status` | Monitors HA lifecycle (`online`/`offline`). On HA restart, HA re-reads retained discovery configs from the broker via its `homeassistant/#` subscription. The firmware does not republish configs on this event; retained configs are already on the broker (ADR-073). |
 
 ---
 
 ## Home Assistant Auto-Discovery
 
 The firmware supports Home Assistant MQTT auto-discovery, publishing discovery configuration messages to the `{haprefix}/` topic tree (default: `homeassistant/`).
+
+> **Other consumers of this discovery format:** openHAB and Domoticz both ingest the Home Assistant MQTT Discovery convention directly — no firmware change is needed. See [`docs/guides/OPENHAB.md`](../guides/OPENHAB.md) and [`docs/guides/DOMOTICZ.md`](../guides/DOMOTICZ.md) for setup.
 
 ### Discovery Configuration
 
@@ -452,13 +506,75 @@ Where:
 - `{node_id}` = `settings.mqtt.sUniqueid` (default: `otgw-{MAC}`)
 - `{object_id}` = unique identifier for the entity
 
+### Discovered Entity Types
+
+The firmware publishes discovery configs for the following HA entity types. The
+exact per-type counts track the PROGMEM tables in `mqtt_configuratie.cpp` and
+change as those tables grow, so only the stable pseudo-ID mapping is listed here:
+
+| HA Component | Pseudo-ID | Description |
+|---|---|---|
+| `sensor` | OT IDs 0–253 | OpenTherm numeric and status values |
+| `binary_sensor` | OT IDs 0–253 | OpenTherm flag bits |
+| `climate` | ID 0 | Thermostat (CH) and DHW control |
+| `number` | ID 27 | Outside temperature override |
+| `sensor` (Dallas) | pseudo-ID 246 | Dallas temperature sensors (one per detected address) |
+| `sensor` (stats) | pseudo-ID 247 | Heap and discovery diagnostics |
+| `sensor` (fw info) | pseudo-ID 248 | Firmware version, hostname, reboot info |
+| `sensor` (PIC info) | pseudo-ID 249 | PIC firmware/device info |
+| `sensor` (PIC settings) | pseudo-ID 250 | PIC PR=-polled settings |
+| `button` | pseudo-ID 251 | Reset Gateway |
+| `select` | pseudo-ID 251 | GPIO A/B and LED A–F function selects |
+
+All discovery configs — including the PIC pseudo-IDs 249/250/251 — are published
+**unconditionally** via the drip pipeline regardless of `isPICEnabled()`. The PIC
+dependency is enforced only at the data source: the `otgw-pic/*` state topics
+update only while a PIC is available, and the corresponding set-commands are
+ignored when no PIC is detected. Entities therefore appear in Home Assistant and
+simply show "unavailable" until PIC data flows.
+
+#### PIC Control Entities (pseudo-ID 251)
+
+These entities follow that same rule — the discovery configs are always
+published; the `{set}/…` command topics are ignored when no PIC is detected and
+the `otgw-pic/settings/*` state topics only update while the PIC is available.
+They appear under the OTGW device card in Home Assistant.
+
+**Button:**
+
+| Object ID | HA name | Command topic | Notes |
+|---|---|---|---|
+| `resetgateway` | Reset Gateway | `{set}/resetgateway` | Triggers a hardware PIC reset; payload `"1"` (any value accepted). `entity_category: config`. |
+
+**Selects — GPIO function (options `0`–`7`):**
+
+| Object ID | HA name | State topic | `value_template` | Command topic |
+|---|---|---|---|---|
+| `gpioa` | GPIO A Function | `otgw-pic/settings/gpio` | `{{ value[0] }}` | `{set}/gpioa` |
+| `gpiob` | GPIO B Function | `otgw-pic/settings/gpio` | `{{ value[1] }}` | `{set}/gpiob` |
+
+**Selects — LED function (options `B C E F H M O P R T W X`):**
+
+| Object ID | HA name | State topic | `value_template` | Command topic |
+|---|---|---|---|---|
+| `leda` | LED A Function | `otgw-pic/settings/led` | `{{ value[0] }}` | `{set}/leda` |
+| `ledb` | LED B Function | `otgw-pic/settings/led` | `{{ value[1] }}` | `{set}/ledb` |
+| `ledc` | LED C Function | `otgw-pic/settings/led` | `{{ value[2] }}` | `{set}/ledc` |
+| `ledd` | LED D Function | `otgw-pic/settings/led` | `{{ value[3] }}` | `{set}/ledd` |
+| `lede` | LED E Function | `otgw-pic/settings/led` | `{{ value[4] }}` | `{set}/lede` |
+| `ledf` | LED F Function | `otgw-pic/settings/led` | `{{ value[5] }}` | `{set}/ledf` |
+
+> **State topics** are under `{TopTopic}/value/{UniqueId}/` as for all PIC-settings topics. The select `value_template` reads the single character at the relevant position of the 2-char (GPIO) or 6-char (LED) string published by the PIC. The `{set}` prefix above is `{TopTopic}/set/{UniqueId}`.
+
 ### Discovery Modes
 
 The firmware uses two discovery paths:
 
 1. **Bulk discovery (Path A)**: Triggered manually via REST API (`POST /api/v2/otgw/discovery`) or serial command (`F`). Publishes all configs from the `mqttha.cfg` file.
 
-2. **JIT discovery (Path B)**: Automatically publishes discovery configs the first time an OpenTherm message ID is observed. This avoids publishing configs for message IDs that the specific thermostat/boiler combination never uses.
+2. **JIT discovery (Path B, ADR-073)**: OT message ID discovery configs are published the first time that MsgID is received on the OpenTherm bus. This is now the sole automatic mechanism for OT IDs. Non-OT pseudo-IDs (climate thermostat/DHW control, outside temperature number, Dallas sensors, heap stats, firmware/PIC info, PIC control entities) are queued at boot and published via the normal drip pipeline — they do not wait for a bus message.
+
+   On assumed broker restart (offline duration exceeded 5 minutes), the discovery state resets and the same split applies: non-OT configs are re-queued immediately, OT configs re-publish as each MsgID re-appears on the bus.
 
 ### Source-Separated Discovery
 
@@ -487,7 +603,7 @@ Discovery topics for source variants use sibling-suffix shape, matching the stat
 
 Since 1.4.1 the firmware can actively verify that its retained Home Assistant discovery configs are still present on the broker. This closes the gap where the broker loses retained state while Home Assistant stays connected, such as a `mosquitto` restart without `persistence true`, a volatile-filesystem crash or a manual `mosquitto_pub -r -n` deletion. None of those events fire the `homeassistant/status` offline → online transition, so the legacy reconnect-driven republish paths cannot recover from them. See [ADR-062](../adr/ADR-062-retained-discovery-verification.md) for the mechanism and the memory trade-offs.
 
-**Mechanism**. The firmware subscribes to the node-scoped wildcard `<haprefix>/+/<nodeId>/#` for a 15-second window, counts retained discovery messages that arrive, and compares the total against `state.discovery.iPublishedTopicCount`. If fewer than expected arrive, it calls `markAllMQTTConfigPending()` and the drip re-announces every config. Foreign-nodeId retained configs that happen to pass through the wildcard are counted separately as "orphans" for diagnostics.
+**Mechanism**. The firmware subscribes to the node-scoped wildcard `<haprefix>/+/<nodeId>/#` for a 15-second window, counts retained discovery messages that arrive, and compares the total against `state.discovery.iPublishedTopicCount`. If fewer than expected arrive, it resets the discovery bitmaps and queues non-OT configs for drip re-publication; OT ID configs re-publish JIT as messages arrive (ADR-073). Foreign-nodeId retained configs that happen to pass through the wildcard are counted separately as "orphans" for diagnostics.
 
 **Triggers**. A verify run can start in three ways:
 
@@ -527,8 +643,9 @@ Slug strings (used in `state_topic` paths and `unique_id` fields) are unaffected
 
 ### Discovery Lifecycle
 
-- On MQTT connect: discovery state is reset, JIT re-publishes as messages arrive
-- On Home Assistant restart (detected via `homeassistant/status`): discovery state is reset
+- **On MQTT connect**: discovery bitmaps are reset; non-OT configs are queued for drip publication; OT ID configs publish JIT as each MsgID arrives on the bus (ADR-073).
+- **On assumed broker restart** (offline duration exceeded 5 minutes): same as on connect -- bitmaps reset, non-OT configs queued, OT ID configs publish JIT.
+- **On Home Assistant restart** (detected via `homeassistant/status`): HA reads retained discovery configs from the broker automatically via its `homeassistant/#` subscription. The firmware does not republish on this event (ADR-073). Retained configs are already on the broker from the original publication.
 - Discovery configs are published with `retain = true`
 
 ### Configuration File
@@ -640,7 +757,7 @@ These MQTT-related settings are configurable via the REST API (`/api/v2/settings
 | `mqtttoptopic` | `"OTGW"` | Top-level topic prefix |
 | `mqtthaprefix` | `"homeassistant"` | HA discovery prefix |
 | `mqttuniqueid` | `"otgw-{MAC}"` | Unique device ID |
-| `mqttharebootdetection` | `true` | Re-publish discovery on HA restart |
+| `mqttharebootdetection` | `true` | Detect HA offline/online cycle before acting on `homeassistant/status`. When enabled (default), requires HA to go offline first. When disabled, any `online` message triggers the cycle. Since ADR-073 the online event no longer republishes discovery configs; this setting is retained for compatibility. |
 | `mqttotmessage` | `false` | Publish raw OT messages |
 | `mqttinterval` | `0` | Minimum publish interval (seconds, 0 = no throttle) |
 | `mqttseparatesources` | `false` | Publish to source-separated sub-topics |

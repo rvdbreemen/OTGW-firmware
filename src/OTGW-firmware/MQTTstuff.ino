@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -32,6 +32,8 @@
 void doAutoConfigure();
 void setMQTTConfigPending(const uint8_t MSGid);
 void markAllMQTTConfigPending();
+void clearMQTTConfigPending();
+void publishNonOTDiscoveryConfigs();
 void loopMQTTDiscovery();
 
 // Declare some variables within global scope
@@ -399,6 +401,7 @@ const char s_temp[] PROGMEM = "temp";
 const char s_on[] PROGMEM = "on";
 const char s_level[] PROGMEM = "level";
 const char s_function[] PROGMEM = "function";
+const char s_reset[] PROGMEM = "reset";
 const char s_empty[] PROGMEM = "";
 
 const char s_cmd_command[] PROGMEM = "command";
@@ -430,6 +433,16 @@ const char s_cmd_overridehb[] PROGMEM = "overridehb";
 const char s_cmd_forcethermostat[] PROGMEM = "forcethermostat";
 const char s_cmd_voltageref[] PROGMEM = "voltageref";
 const char s_cmd_debugptr[] PROGMEM = "debugptr";
+const char s_cmd_gpioa[] PROGMEM = "gpioa";
+const char s_cmd_gpiob[] PROGMEM = "gpiob";
+const char s_cmd_leda[] PROGMEM = "leda";
+const char s_cmd_ledb[] PROGMEM = "ledb";
+const char s_cmd_ledc[] PROGMEM = "ledc";
+const char s_cmd_ledd[] PROGMEM = "ledd";
+const char s_cmd_lede[] PROGMEM = "lede";
+const char s_cmd_ledf[] PROGMEM = "ledf";
+const char s_cmd_setclock[] PROGMEM = "setclock";
+const char s_cmd_resetgateway[] PROGMEM = "resetgateway";
 
 // ADR-069: subtopic names "thermostat" and "boiler" are inlined into
 // snprintf_P calls in publishToSourceTopic(). The earlier table-based
@@ -464,6 +477,15 @@ const char s_otgw_OH[] PROGMEM = "OH";
 const char s_otgw_FT[] PROGMEM = "FT";
 const char s_otgw_VR[] PROGMEM = "VR";
 const char s_otgw_DP[] PROGMEM = "DP";
+const char s_otgw_GA[] PROGMEM = "GA";
+const char s_otgw_GB[] PROGMEM = "GB";
+const char s_otgw_LA[] PROGMEM = "LA";
+const char s_otgw_LB[] PROGMEM = "LB";
+const char s_otgw_LC[] PROGMEM = "LC";
+const char s_otgw_LD[] PROGMEM = "LD";
+const char s_otgw_LE[] PROGMEM = "LE";
+const char s_otgw_LF[] PROGMEM = "LF";
+const char s_otgw_SC[] PROGMEM = "SC";
 
 struct MQTT_set_cmd_t
 {
@@ -503,6 +525,17 @@ const MQTT_set_cmd_t setcmds[] PROGMEM = {
   {   s_cmd_forcethermostat, s_otgw_FT, s_function },
   {   s_cmd_voltageref, s_otgw_VR, s_function },
   {   s_cmd_debugptr, s_otgw_DP, s_function },
+  // GPIO / LED / clock / reset — parity with HA Core opentherm_gw named services
+  {   s_cmd_gpioa, s_otgw_GA, s_function },        // GA=0..7 (GPIO A function)
+  {   s_cmd_gpiob, s_otgw_GB, s_function },        // GB=0..7 (GPIO B function)
+  {   s_cmd_leda, s_otgw_LA, s_function },         // LA=B/C/E/F/H/M/O/P/R/T/W/X
+  {   s_cmd_ledb, s_otgw_LB, s_function },
+  {   s_cmd_ledc, s_otgw_LC, s_function },
+  {   s_cmd_ledd, s_otgw_LD, s_function },
+  {   s_cmd_lede, s_otgw_LE, s_function },
+  {   s_cmd_ledf, s_otgw_LF, s_function },
+  {   s_cmd_setclock, s_otgw_SC, s_function },     // SC=day/HH:MM (e.g. "3/14:30")
+  {   s_cmd_resetgateway, s_empty, s_reset },      // hardware PIC reset, payload ignored
 } ;
 
 const int nrcmds = sizeof(setcmds) / sizeof(setcmds[0]);
@@ -551,11 +584,15 @@ void startMQTT()
   MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
   
   stateMQTT = MQTT_STATE_INIT;
-  //setup for mqtt discovery — mark all IDs pending for async drip publish
+  // Rebuild namespaces (also needed when top-topic changes).
   strlcpy(NodeId, CSTR(settings.mqtt.sUniqueid), sizeof(NodeId));
   buildNamespace(MQTTPubNamespace, sizeof(MQTTPubNamespace), CSTR(settings.mqtt.sTopTopic), "value", NodeId);
   buildNamespace(MQTTSubNamespace, sizeof(MQTTSubNamespace), CSTR(settings.mqtt.sTopTopic), "set", NodeId);
-  markAllMQTTConfigPending();  // queue all discovery for async drip publish
+  // Fresh start: clear done/pending bitmaps, then queue only non-OT configs.
+  // OT ID configs publish JIT as each MsgID is received on the bus (ADR-073).
+  clearMQTTConfigDone();
+  clearMQTTConfigPending();
+  publishNonOTDiscoveryConfigs();
   handleMQTT(); //initialize the MQTT statemachine
 }
 
@@ -604,9 +641,8 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
     } else if ((strcasecmp_P(msgPayload, PSTR("online")) == 0) && bHAcycle){
       DebugTln(F("Home Assistant went online!"));
       bHAcycle = false; //clear flag, so it does not trigger again
-      // HA restart does not affect the MQTT broker connection; no reconnect needed.
-      // Mark all discovery pending for async drip re-publish.
-      markAllMQTTConfigPending();
+      // HA restart does not affect the MQTT broker; retained discovery configs are still there.
+      // HA reads them via homeassistant/# subscription on startup — no republish needed (ADR-073).
     } else {
       DebugTf(PSTR("Home Assistant Status=[%s] and HA cycle status [%s]\r\n"), msgPayload, CBOOLEAN(bHAcycle)); 
     }
@@ -652,7 +688,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
       MQTTDebugf(PSTR("%s"), topicToken);
       if (topicToken[0] != '\0') {
         if (!isPICEnabled()) {
-          MQTTDebugln(F(" MQTT command ignored: no PIC detected"));
+          DebugTf(PSTR("MQTT command [%s] dropped: no PIC detected\r\n"), topicToken);
           return;
         }
         const int cmdIndex = findMQTTSetCommandIndex(topicToken);
@@ -665,6 +701,27 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
             snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
             MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
             addOTWGcmdtoqueue(otgwcmd, strlen(otgwcmd), true);
+          } else if (pOtType == s_reset) {
+            // TASK-661: payload validation + rate-limit. Hardware PIC reset is
+            // disruptive (interrupts any in-flight OT command); previously the
+            // payload was ignored entirely. Match HA-discovery payload_press="1".
+            // Rate-limit to once per RESETGATEWAY_COOLDOWN_MS to absorb storms
+            // from misconfigured automations.
+            if (strcmp_P(msgPayload, PSTR("1")) != 0) {
+              MQTTDebugf(PSTR(" command: resetgateway - ignored, payload [%s] != \"1\"\r\n"), msgPayload);
+            } else {
+              static uint32_t lastResetMs = 0;
+              const uint32_t RESETGATEWAY_COOLDOWN_MS = 5000;
+              uint32_t now = millis();
+              if (lastResetMs != 0 && (uint32_t)(now - lastResetMs) < RESETGATEWAY_COOLDOWN_MS) {
+                MQTTDebugTf(PSTR(" command: resetgateway - rate-limited (%lu ms cooldown remaining)\r\n"),
+                            (unsigned long)(RESETGATEWAY_COOLDOWN_MS - (now - lastResetMs)));
+              } else {
+                lastResetMs = now;
+                MQTTDebugTln(F(" found command: resetgateway - resetting PIC"));
+                resetOTGW();
+              }
+            }
           } else {
             //all other commands are <otgwcmd>=<payload message>
             // Copy command string from Flash to temp buffer for snprintf
@@ -679,7 +736,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
         } else {
           //no match found
           MQTTDebugln();
-          MQTTDebugTf(PSTR("No match found for command: [%s]\r\n"), topicToken);
+          DebugTf(PSTR("MQTT command [%s] dropped: no matching OTGW command (check topic spelling)\r\n"), topicToken);
         }
       }
     }
@@ -718,8 +775,13 @@ void handleMQTT()
         MQTTclient.disconnect();
         MQTTclient.setServer(MQTTbrokerIPchar, settings.mqtt.iBrokerPort);
         MQTTclient.setCallback(handleMQTTcallback);
-        MQTTclient.setSocketTimeout(15);  // Increased from 4 to 15 seconds for better stability
-        MQTTclient.setKeepAlive(60);      // Set to 60 seconds (default was 15) to reduce reconnections
+        // 15 s socketTimeout caps the PubSubClient connect() stall during broker
+        // outage (worst case ~15 s, retry-gated to 42 s by timerMQTTwaitforconnect).
+        // Tighter values regress reconnect stability on busy WiFi / slow brokers
+        // — accepted as a known sync-blocker (ADR-080 / TASK-674 Item 6).
+        MQTTclient.setSocketTimeout(15);
+        // 60 s keepalive reduces MQTT reconnect churn vs PubSubClient's 15 s default.
+        MQTTclient.setKeepAlive(60);
         uint8_t mac[6]{0};
         WiFi.macAddress(mac);
         snprintf_P(MQTTclientId, sizeof(MQTTclientId), PSTR("%s%02X%02X%02X%02X%02X%02X"), _HOSTNAME, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -781,8 +843,13 @@ void handleMQTT()
                                ? (millis() - state.mqtt.iLastConnectedMs)
                                : 0;
           if (offlineMs > MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS) {
-            DebugTf(PSTR("[MQTT] offline %lums > threshold, republishing all OT values\r\n"), (unsigned long)offlineMs);
+            DebugTf(PSTR("[MQTT] offline %lums > threshold — broker may have restarted; republishing values + resetting discovery\r\n"), (unsigned long)offlineMs);
             requestMQTTRepublishAll();
+            // Broker restart assumed: retained discovery configs may be gone (ADR-073).
+            // Clear done-bitmap so JIT re-publishes OT configs as messages arrive.
+            clearMQTTConfigDone();
+            clearMQTTConfigPending();
+            publishNonOTDiscoveryConfigs();
           } else {
             DebugTf(PSTR("[MQTT] offline %lums <= threshold, broker retains topics — skipping republish\r\n"), (unsigned long)offlineMs);
           }
@@ -806,6 +873,8 @@ void handleMQTT()
         DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
         sendMQTTversioninfo();
         publishAllPICsettings();
+        publishBoilerUnsupportedMsgids();  // TASK-686: republish the retained CSV so HA/dashboards see it after every reconnect.
+        clearBoilerUnsupportedDirty();
         DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
       }
       else
@@ -902,57 +971,66 @@ void PrintMQTTError(){
   }
 }
 
-/* 
+// ADR-076 (extended in TASK-644): monotonic publish-success counter. Each
+// sendMQTTData() success path increments this exactly once. OTPublishGate
+// callers capture pre/post values to determine whether any send landed during
+// their frame and commit the matching mqttPendingSlot accordingly.
+uint32_t mqttSendSuccessCount = 0;
+
+/*
   topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>
   json:   <string> , payload to send
-  retain: <bool> , retain mqtt message  
+  retain: <bool> , retain mqtt message
 */
-void sendMQTTData(const char* topic, const char *json, const bool retain)
+bool sendMQTTData(const char* topic, const char *json, const bool retain)
 {
-  if (!settings.mqtt.bEnable) return;
-  if (!mqttPublishAllowed) return;
-  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;} 
-  
+  if (!settings.mqtt.bEnable) return false;
+  if (!mqttPublishAllowed) return false;
+  if (!MQTTclient.connected()) { return false; }  // handleMQTT() logs disconnect and manages reconnect
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return false;}
+
   // Check heap health before publishing
   if (!canPublishMQTT()) {
     // Message dropped due to low heap - canPublishMQTT() handles logging
-    return;
+    return false;
   }
-  
+
   char full_topic[MQTT_TOPIC_MAX_LEN];
   snprintf_P(full_topic, sizeof(full_topic), PSTR("%s/"), MQTTPubNamespace);
   strlcat(full_topic, topic, sizeof(full_topic));
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settings.mqtt.sBroker, settings.mqtt.iBrokerPort, full_topic, json);
   const size_t payloadLen = strlen(json);
-  if (!beginMqttPublish(full_topic, payloadLen, retain)) return;
+  if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttChunk(json, payloadLen)) {
     MQTTclient.endPublish();
-    return;
+    return false;
   }
-  if (!MQTTclient.endPublish()) { PrintMQTTError(); return; }
-  // Publish succeeded — confirm any pending throttle slot updates
-  confirmMQTTPublishSlot();
-  confirmMQTTPublishBitSlot();
-  confirmMQTTPublishByteSlot();
+  if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
+  // ADR-076 (extended in TASK-644): no auto-commit of pending slot updates
+  // inside sendMQTTData. Bit/byte slots commit-or-discard in their per-helper
+  // publish path; the normal-msgId mqttPendingSlot is committed-or-discarded
+  // by the OTPublishGate caller using the mqttSendSuccessCount delta to detect
+  // whether any send landed during the frame.
+  ++mqttSendSuccessCount;
   feedWatchDog();//feed the dog
+  return true;
 } // sendMQTTData()
 
-void sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool retain)
+bool sendMQTTData(const __FlashStringHelper *topic, const char *json, const bool retain)
 {
   char topicBuf[MQTT_TOPIC_MAX_LEN];
   strncpy_P(topicBuf, reinterpret_cast<PGM_P>(topic), sizeof(topicBuf) - 1);
   topicBuf[sizeof(topicBuf) - 1] = '\0';
-  sendMQTTData(topicBuf, json, retain);
+  return sendMQTTData(topicBuf, json, retain);
 }
 
-void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *json, const bool retain)
+bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *json, const bool retain)
 {
-  if (!settings.mqtt.bEnable) return;
-  if (!mqttPublishAllowed) return;
-  if (!MQTTclient.connected()) { return; }  // handleMQTT() logs disconnect and manages reconnect
-  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return;}
-  if (!canPublishMQTT()) return;
+  if (!settings.mqtt.bEnable) return false;
+  if (!mqttPublishAllowed) return false;
+  if (!MQTTclient.connected()) { return false; }  // handleMQTT() logs disconnect and manages reconnect
+  if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return false;}
+  if (!canPublishMQTT()) return false;
 
   char topicBuf[MQTT_TOPIC_MAX_LEN];
   char full_topic[MQTT_TOPIC_MAX_LEN];
@@ -970,16 +1048,17 @@ void sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
 
   PGM_P payload = reinterpret_cast<PGM_P>(json);
   const size_t payloadLen = strlen_P(payload);
-  if (!beginMqttPublish(full_topic, payloadLen, retain)) return;
+  if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttProgmemChunk(payload, payloadLen)) {
     MQTTclient.endPublish();
-    return;
+    return false;
   }
-  if (!MQTTclient.endPublish()) { PrintMQTTError(); return; }
-  confirmMQTTPublishSlot();
-  confirmMQTTPublishBitSlot();
-  confirmMQTTPublishByteSlot();
+  if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
+  // ADR-076 (extended in TASK-644): no auto-commit of pending slot updates
+  // inside sendMQTTData. See the corresponding comment in the char* overload.
+  ++mqttSendSuccessCount;
   feedWatchDog();
+  return true;
 }
 
 //===========================================================================================
@@ -1059,6 +1138,35 @@ static void publishStatU32(const __FlashStringHelper *topic, unsigned long value
   sendMQTTData(topic, buf, true);  // retained
 }
 
+// TASK-686: publish the boiler unsupported-msgID map as one MQTT retained CSV.
+// Payload shape: "<id>R" for read-direction Unknown-Data-Id, "<id>W" for write.
+// Examples (typical boiler): "14W,16W,24R,26R,27R,33R,36R". Empty bitmap → "".
+// Single 256-byte stack buffer: realistic boilers flag <20 msgIDs so the buffer
+// is comfortably large. The (pos + 6 > sizeof) guards truncate silently rather
+// than overflow on pathological inputs.
+void publishBoilerUnsupportedMsgids() {
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
+  char csv[256] = {0};
+  size_t pos = 0;
+  for (int i = 0; i <= 255; i++) {
+    if (!isBoilerMsgIdUnsupportedRead((uint8_t)i)) continue;
+    if (pos + 6 > sizeof(csv)) break;  // 6 = ",NNNR" + NUL
+    int n = snprintf_P(csv + pos, sizeof(csv) - pos,
+                       pos == 0 ? PSTR("%dR") : PSTR(",%dR"), i);
+    if (n < 0) break;
+    pos += (size_t)n;
+  }
+  for (int i = 0; i <= 255; i++) {
+    if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
+    if (pos + 6 > sizeof(csv)) break;
+    int n = snprintf_P(csv + pos, sizeof(csv) - pos,
+                       pos == 0 ? PSTR("%dW") : PSTR(",%dW"), i);
+    if (n < 0) break;
+    pos += (size_t)n;
+  }
+  sendMQTTData(F("otgw-firmware/boiler/unsupported_msgids"), csv, true);  // retained
+}
+
 void sendMQTTheapdiag(){
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
@@ -1100,7 +1208,8 @@ void sendMQTTstateinformation(){
     sendMQTTDataPic(F("gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
   }
   sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
-  sendMQTT(MQTTPubNamespace, CONLINEOFFLINE(state.otgw.bOnline));
+  // ADR-074: do NOT write OT-bus state to the MQTT availability topic. The LWT/birth
+  // pair on <toptopic>/<hostname> owns availability and reflects MQTT-link state.
 }
 
 /*
@@ -1128,15 +1237,16 @@ void sendMQTT(const char* topic, const char *json) {
 //===========================================================================================
 
 /**
- * Publish ON/OFF value to MQTT topic
- * Reduces duplicate pattern of boolean-to-string conversion
+ * Publish ON/OFF value to MQTT topic.
+ * ADR-076: returns sendMQTTData()'s success so bit/byte publish helpers can
+ * commit-or-discard their pending throttle-slot records.
  */
-void publishMQTTOnOff(const char* topic, bool value) {
-  sendMQTTData(topic, value ? "ON" : "OFF");
+bool publishMQTTOnOff(const char* topic, bool value) {
+  return sendMQTTData(topic, value ? "ON" : "OFF");
 }
 
-void publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
-  sendMQTTData(topic, value ? "ON" : "OFF");
+bool publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
+  return sendMQTTData(topic, value ? "ON" : "OFF");
 }
 
 /**
@@ -1183,17 +1293,21 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
 //   <topic>_boiler     value the boiler received (R under override, T under
 //                      pass-through) or sent (B)
 //
-// Routing decisions per (rsptype, OTdata.bGatewaySubstituted):
+// Routing decisions per (rsptype, OTdata.bGatewaySubstituted, OTdata.bAnswerOverride):
 //
 //   T  no-override (bGS=false): _thermostat AND _boiler
 //   T  with R-follow (bGS=true): _thermostat only (R wins _boiler)
 //   R                          : _boiler only
 //   B  no-override (bGS=false): _thermostat AND _boiler
 //   B  with A-follow (bGS=true): _boiler only (A wins _thermostat)
-//   A                          : _thermostat only
+//   A  answer-override (bAnswerOverride=true) : _thermostat only (genuine B owns _boiler)
+//   A  proxy answer    (bAnswerOverride=false): _thermostat AND _boiler (no B exists)
 //
 // The bGatewaySubstituted flag is set on the OLDER frame in a (T,R) or (B,A)
-// sequence by processOT() in OTGW-Core.ino:4046+. There is no _gateway suffix;
+// sequence by processOT() in OTGW-Core.ino:4046+. ADR-075: bAnswerOverride is
+// set true only on an A that followed a B (answer-override); a proxy A (no
+// preceding B — e.g. MaxTSet/57) keeps it false so its value reaches _boiler
+// and canonical instead of being starved. There is no _gateway suffix;
 // override visibility is achieved by divergence between _thermostat and
 // _boiler, not by a third topic.
 //
@@ -1228,7 +1342,7 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
   if (inUse) return;
   inUse = true;
 
-  // Worldview routing decision (ADR-069).
+  // Worldview routing decision (ADR-069, refined by ADR-075 for proxy A).
   bool toThermostat = false;
   bool toBoiler = false;
   switch (rsptype) {
@@ -1243,8 +1357,9 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
     case OTGW_REQUEST_BOILER:    // R: gateway-substituted write (only the boiler sees this value)
       toBoiler = true;
       break;
-    case OTGW_ANSWER_THERMOSTAT: // A: gateway-faked answer (only the thermostat sees this value)
+    case OTGW_ANSWER_THERMOSTAT: // A: gateway-faked answer
       toThermostat = true;
+      toBoiler = !OTdata.bAnswerOverride;  // ADR-075: proxy A (no B) → _boiler too; override A → _thermostat only
       break;
     default:                     // parity errors, unknown types
       inUse = false;
@@ -1282,9 +1397,33 @@ void clearMQTTConfigDone()
   state.discovery.iPublishedTopicCount = 0;
 }
 //===========================================================================================
-// Pending-bitmap helpers for async drip-discovery (ADR-pending).
+// Pending-bitmap helpers for async drip-discovery (ADR-073).
 // MQTTautoCfgPendingMap[8] mirrors MQTTautoConfigMap layout: 8 × uint32_t = 256 bits.
 // Setting a bit means "this OT ID needs its discovery config (re-)published".
+//===========================================================================================
+void clearMQTTConfigPending()
+{
+  memset(MQTTautoCfgPendingMap, 0, sizeof(MQTTautoCfgPendingMap));
+}
+//===========================================================================================
+// publishNonOTDiscoveryConfigs() — queue only the non-OT discovery configs for drip publish.
+// Called at boot, top-topic change, and broker restart.
+// OT ID configs are NOT queued here; they publish JIT as each MsgID arrives on the bus.
+//===========================================================================================
+void publishNonOTDiscoveryConfigs()
+{
+  if (!settings.mqtt.bEnable) return;
+  setMQTTConfigPending(0);                  // climate: thermostat + DHW control
+  setMQTTConfigPending(27);                 // number: outside temperature override
+  setMQTTConfigPending(OTGWdallasdataid);   // Dallas temperature sensors
+  setMQTTConfigPending(OTGWheapstatsid);    // heap / discovery statistics
+  setMQTTConfigPending(OTGWfwinfoid);       // firmware info
+  setMQTTConfigPending(OTGWpicinfoid);      // PIC info
+  setMQTTConfigPending(OTGWpicsettingsid);  // PIC settings
+  setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
+  dripDeviceInfoPending = true;
+  MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
+}
 //===========================================================================================
 void setMQTTConfigPending(const uint8_t MSGid)
 {
@@ -1319,6 +1458,10 @@ void markAllMQTTConfigPending()
   setMQTTConfigPending(OTGWfwinfoid);
   setMQTTConfigPending(OTGWpicinfoid);
   setMQTTConfigPending(OTGWpicsettingsid);
+  // PIC control entities (pseudo-ID 251): resetgateway button + gpioa/gpiob/leda-f selects.
+  // Discovery publishes unconditionally (like 248-250); the matching set-commands and
+  // the data topics are PIC-gated at their source, so no isPICEnabled() gate here.
+  setMQTTConfigPending(OTGWpiccontrolsid);
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }
@@ -1540,6 +1683,29 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // Number (OT ID 27)
   if (OTid == 27) {
     if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
+  }
+
+  // PIC control entities (pseudo-ID 251): resetgateway button + GPIO/LED selects.
+  // Published unconditionally — like the other PIC pseudo-IDs (249/250) the entity
+  // is always discovered; the data topics and set-commands are PIC-gated at their
+  // source. Gating discovery on isPICEnabled() here would leave result=false on
+  // PIC-less devices and make loopMQTTDiscovery() retry this ID every drip tick
+  // forever (PR#576 review finding).
+  //
+  // All-or-nothing: the pending bit is cleared only when every one of the nine
+  // configs published this tick. If any single publish fails (transient MQTT/heap),
+  // result stays false so loopMQTTDiscovery() retains the pending bit and retries
+  // the whole set next tick. The configs are retained idempotent publishes, so
+  // re-publishing the ones that already succeeded is harmless.
+  if (OTid == OTGWpiccontrolsid) {
+    bool allOk = streamButtonDiscovery(MQTTclient, ctx);  // resetgateway button
+    feedWatchDog();
+    // gpioa/gpiob + leda-ledf function selects (idx 0-7)
+    for (uint8_t i = 0; i <= 7; i++) {
+      if (!streamSelectDiscovery(MQTTclient, i, ctx)) allOk = false;
+      feedWatchDog();
+    }
+    if (allOk) result = true;
   }
 
   return result;

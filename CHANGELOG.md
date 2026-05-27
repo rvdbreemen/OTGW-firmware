@@ -6,11 +6,73 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 For full release notes per version, see the matching `RELEASE_NOTES_<version>.md` file. Current release notes live at the repository root; previous release notes are archived in [`docs/releases/`](docs/releases/).
 
-The separate ESP32 / SAT v2.0.0 exploration on `feature-dev-2.0.0-otgw32-esp32-sat-support` is tracked outside this changelog; it targets a different platform and lifecycle.
-
 ## [Unreleased]
 
-_No unreleased changes yet. New work on `dev` lands here._
+Tracking the `1.6.0-beta.N` line on `dev`. Promotion target: `1.6.0`.
+
+### Added
+- Static IP address settings: `wifistaticip`, `wifisubnet`, `wifigateway`, `wifidns1`, `wifidns2` are now persisted in settings and applied before WiFiManager connect, enabling DHCP-bypass for environments where the router does not assign predictable addresses (TASK-548)
+- Statistics table columns are now drag-to-resize: a grab handle on each column header lets the user adjust column widths, persisted in localStorage under `otStatsColWidths` so preferences survive page reloads (TASK-703)
+- Fixed IP address settings UI redesigned: a "Use DHCP" toggle hides the IP fields by default; each IP address uses four segmented number inputs (0-255 per octet) with auto-advance, backspace navigation, and full-address paste support; unchecking "Use DHCP" auto-prefills all fields from the current DHCP lease so switching to a fixed IP requires no manual lookup; the device info API now also exposes the current subnet, gateway, and DNS servers for the prefill (TASK-709)
+- Bilateral OT-bus support map: bitmaps tracking which MsgIDs are seen from thermostat side and boiler side, with direction-aware "T/B/T+B" labels in the telnet diagnostic view and a new `GET /api/v2/otgw/support-map` REST endpoint; Web UI shows which data points the gateway has actually observed (TASK-683, TASK-684, TASK-685, TASK-686, TASK-688, #640)
+- HA discovery: PIC-control entities exposed as `button` and `select` under pseudo-ID 251 (TASK-PR#576, #596)
+- Standalone HA discovery topic wiper for cleaning stale retained discovery topics out of the broker (TASK-611, #587)
+- `/beta-prerelease` skill plus `.github/workflows/beta-prerelease.yml` GitHub Action for tag-driven beta publishing; draft-first release creation with all assets attached in one atomic call to satisfy GitHub's immutable-releases policy (#607)
+- `beta-prerelease.yml` `workflow_dispatch` now accepts a `ref` input and creates the tag at that ref if missing, enabling end-to-end beta publishing from the GitHub Actions UI without a local `git push` (#609)
+- `beta-prerelease.yml` release body now inlines a "What's new since the last public release" digest sourced from `RELEASE_NOTES_<base>-beta.md` above a `<!-- digest:end -->` sentinel; the `/beta-prerelease` skill restructured so README + CHANGELOG staleness check runs as Phase 1 (pre-bump) instead of Phase 2.5 (post-bump), preventing stale narrative from locking onto an immutable tagged release; new `RELEASE_NOTES_1.6.0-beta.md` at repo root carries the per-line narrative (TASK-639, #612)
+- Markdown link-validation guardrails for repository documentation (#573); link-check scope extended to `docs/guides/` and `docs/process/` in `.github/workflows/evaluate.yml` (#581) so the `../` link-path rot caught manually during the documentation review is enforced in CI
+
+### Changed
+- Pure JIT MQTT discovery: only non-OT pseudo-IDs (climate, number, Dallas, heap stats, firmware/PIC) are queued at boot; OT MsgID discovery configs publish on first MsgID reception, not on connect (ADR-073, supersedes ADR-041)
+- Dev version line bumped to `1.6.0-beta.N` (was `1.5.x-beta.N`) (#601)
+- Mainloop responsiveness audit: `delay()` / `delayMs()` usages on the cooperative path replaced with non-blocking timer checks so `doBackgroundTasks()` keeps running at full cadence under load (TASK-651, TASK-652, #617)
+- MQTT `resetgateway` command now requires payload `"1"` (matching the HA-discovery `payload_press` value already in use) and is rate-limited to one PIC reset per 5 seconds. Non-matching payloads are logged and ignored; rapid retries inside the cooldown window are silently dropped with a log line. Closes the unauthenticated-LAN reset-storm path raised by the dev review (TASK-661)
+- Mainloop Tier-1 follow-up: `handleOTGW()` PIC drain loops bounded at 4 lines per call, dead `executeCommand` path deleted, and the last stray `delay(1)` on the cooperative path replaced with `yield()` (TASK-671, #626)
+- Mainloop Tier-1 follow-up #2: `String` usage removed from `helperStuff.ino` / `webhook.ino` hot paths; `emergencyHeapRecovery()` reworked to actually free RAM (drops the OTGWstream client and skips one discovery-drip tick when heap is critical, per ADR-079); always-on `BGTRACE` instrumentation dropped from production builds (TASK-673, #633)
+- Mainloop Tier-2 dispositions: webhook HTTP timeout tightened from 1000 ms to 500 ms; the per-sensor OneWire read in `pollSensors()` left as bus-physics-bound; the 15 s MQTT connect socket timeout accepted as a known sync-blocker bounded by the 42 s retry gate (TASK-674, ADR-080, #635)
+- Version-bump policy: per-commit `_VERSION_PRERELEASE` enforcement removed from `.githooks/pre-commit` on `dev`; the bump is now performed once per beta cut by `bin/bump-prerelease.sh` inside the `/beta-prerelease` skill (TASK-669, #624)
+
+### Fixed
+- Fixed IP UI octet inputs switched from `type="number"` to `type="text"` with `inputMode="numeric"` for correct mobile keyboards; ARIA `role="group"` and per-octet `aria-label` added for screen-reader accessibility; paste handler now validates all four octets before applying; `ArrowLeft` navigation added; per-field range validation runs before save and blocks the save button from hiding on invalid input; octet initialisation moved after DOM append so values render correctly on first load; dark-theme and common-theme CSS added for the fixed-IP section (TASK-709)
+- LittleFS filesystem size was reported as 1 MB instead of 2 MB in the device-info API and Web UI; the partition size is now read directly from the LittleFS partition descriptor (TASK-701)
+- Auto-scroll in the OT log was reset when switching tabs and when navigating back to the main page; scroll position is now preserved across tab switches and page revisits (TASK-701)
+- `GET /api/v2/device/info` triggered multiple TCP yield points and excessive heap churn on each call; buffer allocations reduced and yield points consolidated (TASK-701)
+- `/api/v2/device/info` no longer refuses requests under moderate heap fragmentation because its contiguous-block precheck was reduced from an over-conservative 8192-byte gate to the existing pbuf-sized safety threshold (TASK-723)
+- MQTT discovery verify now runs an hourly first-run trigger in addition to the existing force-path, so any entities missed by the JIT pass are recovered automatically without user intervention (TASK-704)
+- Statistics table column widths and the "boiler unsupported" badge were visually unbalanced after the support-map feature landed; column proportions corrected and badge styling refined (TASK-705, TASK-706)
+- `logHeapStats` in `helperStuff.ino` was printing the window drop counters (`webSocketDropCount` / `mqttDropCount`) which reset to 0 after each throttle warning, making the per-minute heap line show ephemeral snapshots instead of monotonic lifetime totals; now prints the correct `state.heapdiag.iWsDropsTotal` / `iMqttDropsTotal` as every other consumer already does (TASK-697, #642)
+- Beta.20 telnet diagnostic noise cleaned up: `onNotFound` handler now emits accurate `200 (file)` / `404` lines; `apifirmwarefilelist` no longer mirrors JSON to telnet; `checklittlefshash` suppressed on match; PROGMEM fixes for `strcmp_P` chains in `OTGW-Core.ino` and FSexplorer path handling (#637)
+- HA capability-flag binary sensors for bits 2-5 (cooling, OTC active, CH2 active, summer/winter) stuck at `unknown` in Home Assistant: the global MQTT status fanout rate gate suppressed per-bit publishes on subsequent MsgID 5 frames; the rate gate is dropped and the per-bit publish is scoped to all three pending types so every bit reaches its retained topic on every status change (ADR-076, TASK-649, #614)
+- HA `DHW Control`, `Thermostat`, and all sensor entities flapping `unavailable` (regression since 1.5.0/TASK-538): HA entity availability (`avty_t`) now reflects only the ESP↔MQTT link (birth/LWT) instead of OpenTherm-bus liveness. OT-bus liveness remains on the dedicated `otgw_connected` sensor. **Contract change:** consumers that read the base `<toptopic>/value/<nodeid>` topic as OT-bus liveness must migrate to the `otgw_connected` sensor (ADR-074, TASK-607)
+- MQTT proxy-answer (no-B) routing: MsgIDs without a boiler response now route to the correct worldview topic instead of going silent; root cause behind PR #565 (ADR-075, #599)
+- MsgID 0 Status canonical publish gated on boiler-side worldview so the canonical topic stops flapping on thermostat-only frames (TASK-633, #604)
+- Silently-dropped MQTT set-commands now surface in the default debug stream instead of being swallowed (#602)
+- JIT MQTT discovery could stall: the just-in-time trigger enqueued any OT MsgID with a valid value, including IDs with no HA sensor/binsensor config; `doAutoConfigureMsgid()` fails for those and the drip loop retains the pending bit, so the per-tick scan re-picked the same phantom ID forever and never published the real entities until the operator pressed `F`. The JIT trigger now applies the same `hasConfig` filter as the force path so both enqueue an identical ID set (ADR-073, TASK-601)
+- FSexplorer **Update Firmware** button hidden on touch-capable desktops: the touch-class CSS media query no longer suppresses the upload control (GitHub #575, #598)
+- `flash_otgw.sh` / `flash_otgw.bat` hardened: spec parity between the two scripts, SHA256 integrity verification, version-aware binary selection (#570)
+- `flash_otgw.bat` COM port detection via registry; PS1 generation; auto-download of binaries when not found locally
+- `build.py` auto-initialises missing git submodules so a fresh clone or stale checkout builds without manual `git submodule update` (#594)
+- `evaluate.py` false-positive and stale-check fixes; CI gate is now meaningful again (#592)
+
+### Documentation
+- `docs/guides/MQTT_STALE_TOPICS_CLEANUP.md`: added a "Recovering missing HA entities" section distinguishing the just-in-time progressive-appearance behaviour and PIC-only-reset semantics from the upgrade stale-topic cleanup, with escalating recovery steps (wait, force re-announce, clear broker + reboot)
+- New integration guides for openHAB and Domoticz (#590)
+- New Dutch beginner guide for cleaning up stale MQTT topics in MQTT Explorer
+- PIC and ESP firmware guides split into EN/NL language variants (#578); PIC guide scope restored and ESP-flash docs routed to `FLASH_GUIDE.md` (#579)
+- Schelte firmware detail links added and PIC summaries aligned (#580)
+- Repository documentation link paths normalised (#573)
+- `CLAUDE.md`: documented `npx -y backlog.md` fallback when both the backlog MCP and the backlog CLI are unavailable (#571)
+- API and ADR documentation refreshed mid-cycle (TASK-596): `docs/api/MQTT.md` documents the boot vs. JIT split per ADR-073; `docs/api/README.md` corrects the `/discovery/verify` REST endpoint description; `docs/adr/README.md` gains the ADR-041 (Superseded) and ADR-073 (Accepted) index entries
+- Release-notes housekeeping (TASK-596): `RELEASE_NOTES_1.5.0.md` and `RELEASE_GITHUB_1.5.0.md` moved from the repo root into `docs/releases/`; the older `1.3.3` and `1.3.4` notes (both `RELEASE_NOTES_*` and `RELEASE_GITHUB_*`) archived under `docs/releases/archive/`
+- Documentation-review findings 1-5 fixed (#581): stale `../` link paths corrected across `docs/guides/BUILD.md`, `docs/guides/FLASH_GUIDE_NL.md`, `docs/guides/PIC_FIRMWARE_EN.md`, `docs/guides/browser-debug-console.md`, and `docs/process/DOCUMENTATION_LINKS_POLICY.md`. The dev README banner was also restored to its dev-line styling in the same PR after a brief main-branch-styling slip introduced upstream in #574
+- ADR-076 accepted: drops the global MQTT status fanout rate gate so all 13 capability-flag bits reach their retained topics on every status change
+- ADR-077 proposed and then superseded by ADR-078: HA-core-style capability-flag aliases (37 opt-in topics) were drafted, implemented behind a feature flag, then reverted from `dev` and deferred to the 2.0.0 line; ADR-078 captures the deferral rationale
+- ADR-079 accepted: `emergencyHeapRecovery()` defined as real recovery (drop OTGWstream client, skip one discovery-drip tick) instead of the previous "yield + log" no-op (TASK-673)
+- ADR-080 accepted: the 15 s `MQTTclient.setSocketTimeout()` documented as a known main-loop sync-blocker bounded by the 42 s retry gate; replacing PubSubClient with an async client is explicitly out of scope for the 1.6.0 line (TASK-674)
+
+### Removed
+- Dead and orphaned code paths cleaned out of `dev` (#586, #589): inactive subsystem code and the matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.
+- Accidentally committed root files removed; `.gitignore` tightened so they cannot return (TASK-635, #606)
 
 ## [1.5.0] - 2026-05-08
 

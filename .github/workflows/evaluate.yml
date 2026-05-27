@@ -34,3 +34,66 @@ jobs:
           name: evaluate-py-report-${{ github.run_id }}
           path: .tmp/evaluation-report.json
           if-no-files-found: warn
+
+      - name: Validate markdown internal links
+        run: |
+          python - <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+          from urllib.parse import unquote
+
+          root = Path(".").resolve()
+          scope = [
+            root / "README.md",
+            root / "docs" / "releases",
+            root / "docs" / "api",
+            root / "docs" / "features",
+            root / "docs" / "guides",
+            root / "docs" / "process",
+          ]
+          md_files = []
+          for item in scope:
+            if item.is_file():
+              md_files.append(item)
+            elif item.is_dir():
+              md_files.extend(sorted(item.rglob("*.md")))
+          link_re = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+          errors = []
+
+          def should_skip(link: str) -> bool:
+            link = link.strip()
+            return (
+              not link
+              or link.startswith("#")
+              or link.startswith("http://")
+              or link.startswith("https://")
+              or link.startswith("mailto:")
+              or link.startswith("data:")
+              or link.startswith("javascript:")
+            )
+
+          for md in md_files:
+            text = md.read_text(encoding="utf-8", errors="ignore")
+            for raw in link_re.findall(text):
+              link = raw.strip().strip("<>").split("#", 1)[0].split("?", 1)[0]
+              if should_skip(link):
+                continue
+              link = unquote(link)
+              target = (md.parent / link).resolve()
+              if not target.exists():
+                rel_md = md.relative_to(root)
+                try:
+                  rel_target = target.relative_to(root)
+                except ValueError:
+                  rel_target = target
+                errors.append(f"{rel_md}: {raw} -> {rel_target} (missing)")
+
+          if errors:
+            print("Broken internal markdown links found:")
+            for err in errors:
+              print(f"- {err}")
+            sys.exit(1)
+
+          print("Markdown internal link check passed.")
+          PY

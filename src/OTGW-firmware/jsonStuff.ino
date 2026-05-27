@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -81,16 +81,14 @@ static void sendEscapedJsonStringContent(const char* src) {
     if (esc) {
       const size_t escLen = strlen(esc);
       if ((chunkIdx + escLen) >= sizeof(chunk)) {
-        chunk[chunkIdx] = '\0';
-        httpServer.sendContent(chunk);
+        jsonBufAppend(chunk, chunkIdx);
         chunkIdx = 0;
       }
       memcpy(chunk + chunkIdx, esc, escLen);
       chunkIdx += escLen;
     } else {
       if ((chunkIdx + 1) >= sizeof(chunk)) {
-        chunk[chunkIdx] = '\0';
-        httpServer.sendContent(chunk);
+        jsonBufAppend(chunk, chunkIdx);
         chunkIdx = 0;
       }
       chunk[chunkIdx++] = *p;
@@ -98,8 +96,7 @@ static void sendEscapedJsonStringContent(const char* src) {
   }
 
   if (chunkIdx > 0) {
-    chunk[chunkIdx] = '\0';
-    httpServer.sendContent(chunk);
+    jsonBufAppend(chunk, chunkIdx);
   }
 }
 
@@ -168,7 +165,32 @@ static inline char unescapeJsonChar(char esc) {
 }
 
 static int iIdentlevel = 0;
-bool bFirst = true; 
+bool bFirst = true;
+
+// B: Coalescing send buffer — routes all httpServer.sendContent calls
+// through a single 512-byte buffer to cut ~300 TCP writes down to ~7-8.
+// Safe as module-static: HTTP handlers are not re-entered by doBackgroundTasks.
+static char    sJsonFlushBuf[512];
+static uint16_t sJsonFlushLen = 0;
+
+static void jsonBufFlush() {
+  if (sJsonFlushLen > 0) {
+    httpServer.sendContent(sJsonFlushBuf, sJsonFlushLen);
+    sJsonFlushLen = 0;
+  }
+}
+
+static void jsonBufAppend(const char* s, size_t len) {
+  while (len > 0) {
+    uint16_t space = sizeof(sJsonFlushBuf) - sJsonFlushLen;
+    if (space == 0) { jsonBufFlush(); space = sizeof(sJsonFlushBuf); }
+    uint16_t copy = (len < space) ? (uint16_t)len : space;
+    memcpy(sJsonFlushBuf + sJsonFlushLen, s, copy);
+    sJsonFlushLen += copy;
+    s += copy;
+    len -= copy;
+  }
+}
 
 //=======================================================================
 void sendStartJsonObj(const char *objName)
@@ -183,7 +205,8 @@ void sendStartJsonObj(const char *objName)
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send_P(200, PSTR("application/json"), PSTR(" "));
-  httpServer.sendContent(sBuff);
+  sJsonFlushLen = 0;
+  jsonBufAppend(sBuff, strlen(sBuff));
   iIdentlevel++;
   bFirst = true;
 
@@ -194,23 +217,23 @@ void sendStartJsonObj(const char *objName)
 void sendEndJsonObj(const char *objName)
 {
   iIdentlevel--;
-  if (strlen(objName)==0){  
-    httpServer.sendContent_P(PSTR("\r\n}\r\n"));
+  if (strlen(objName)==0){
+    jsonBufAppend("\r\n}\r\n", 5);
   } else {
-    httpServer.sendContent_P(PSTR("\r\n]}\r\n"));
+    jsonBufAppend("\r\n]}\r\n", 6);
   }
-
+  jsonBufFlush();
 } // sendEndJsonObj()
 //=======================================================================
 void sendIdent(){
-  for (int i = iIdentlevel; i >0; i--){
-    httpServer.sendContent_P(PSTR("  "));
+  for (int i = iIdentlevel; i > 0; i--){
+    jsonBufAppend("  ", 2);
   }
 }  //sendIdent()
 //=======================================================================
 void sendBeforenext(){
-  if (!bFirst){ 
-    httpServer.sendContent_P(PSTR(",\r\n"));
+  if (!bFirst){
+    jsonBufAppend(",\r\n", 3);
   }
   bFirst = false;
 } //sendBeforenext()
@@ -230,7 +253,8 @@ void sendStartJsonMap(const char *objName)
   httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
   httpServer.send_P(200, PSTR("application/json"), PSTR(" "));
-  httpServer.sendContent(sBuff);
+  sJsonFlushLen = 0;
+  jsonBufAppend(sBuff, strlen(sBuff));
   iIdentlevel++;
   bFirst = true;
 }
@@ -241,56 +265,48 @@ void sendStartJsonMap(const char *objName)
 void sendJsonMapEntry(const char *cName, bool bValue)
 {
   char jsonBuff[120] = "";
-
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), cName, CBOOLEAN(bValue));
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 }
 
 void sendJsonMapEntry(const char *cName, int32_t iValue)
 {
   char jsonBuff[120] = "";
-
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %d"), cName, iValue);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 }
 
 void sendJsonMapEntry(const char *cName, uint32_t uValue)
 {
   char jsonBuff[120] = "";
-
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %u"), cName, uValue);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 }
 
 void sendJsonMapEntry(const char *cName, float fValue)
 {
   char jsonBuff[120] = "";
-
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %.3f"), cName, fValue);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 }
 
 void sendJsonMapEntry(const char *cName, const char *cValue)
 {
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent_P(PSTR("\""));
+  jsonBufAppend("\"", 1);
   sendEscapedJsonStringContent(CSTR(cName));
-  httpServer.sendContent_P(PSTR("\": \""));
+  jsonBufAppend("\": \"", 4);
   sendEscapedJsonStringContent(CSTR(cValue));
-  httpServer.sendContent_P(PSTR("\""));
+  jsonBufAppend("\"", 1);
 }
 
 void sendJsonMapEntry(const char *cName, String sValue)
@@ -306,72 +322,62 @@ void sendJsonMapEntry(const char *cName, String sValue)
 void sendEndJsonMap(const char *objName)
 {
   iIdentlevel--;
-  if (strlen(objName)==0){  
-    httpServer.sendContent_P(PSTR("\r\n}\r\n"));
+  if (strlen(objName)==0){
+    jsonBufAppend("\r\n}\r\n", 5);
   } else {
-    httpServer.sendContent_P(PSTR("\r\n}}\r\n"));
+    jsonBufAppend("\r\n}}\r\n", 6);
   }
+  jsonBufFlush();
 }
 
 void sendJsonOTmonMapEntry(const char *cName, const char *cValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[JSON_ENTRY_BUF] = "";
-  
-  // Compact format: "name": {"value": "val", "unit": "u", "epoch": 123}
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": \"%s\", \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, cValue, cUnit, (uint32_t)epoch);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 }
 
 void sendJsonOTmonMapEntry(const char *cName, int32_t iValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[200] = "";
-  
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %d, \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, iValue, cUnit, (uint32_t)epoch);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 }
 
 void sendJsonOTmonMapEntry(const char *cName, uint32_t uValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[200] = "";
-  
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %u, \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, uValue, cUnit, (uint32_t)epoch);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 }
 
 void sendJsonOTmonMapEntry(const char *cName, float fValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[200] = "";
-  
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.3f, \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, fValue, cUnit, (uint32_t)epoch);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 }
 
 void sendJsonOTmonMapEntry(const char *cName, bool bValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[200] = "";
-  
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %s, \"unit\": \"%s\", \"epoch\": %u}")
                                       , cName, CBOOLEAN(bValue), cUnit, (uint32_t)epoch);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 }
 
 //=======================================================================
@@ -380,25 +386,21 @@ void sendJsonOTmonMapEntry(const char *cName, bool bValue, const char *cUnit, ti
 void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[200] = "";
-  
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%s\", \"type\": \"dallas\", \"epoch\": %u}")
                                       , cName, fValue, cUnit, (uint32_t)epoch);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 } // sendJsonOTmonMapEntryDallasTemp(*char, float, *char, time_t)
 
 void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const __FlashStringHelper *cUnit, time_t epoch)
 {
   char jsonBuff[200] = "";
-
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%S\", \"type\": \"dallas\", \"epoch\": %u}")
                                       , cName, fValue, reinterpret_cast<PGM_P>(cUnit), (uint32_t)epoch);
-
   sendBeforenext();
   sendIdent();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 } // sendJsonOTmonMapEntryDallasTemp(*char, float, *FlashStringHelper, time_t)
 
 //=======================================================================
@@ -407,12 +409,10 @@ void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const __Fl
 void sendJsonSettingObj(const char *cName, int iValue, const char *iType, int minValue, int maxValue)
 {
   char jsonBuff[200] = "";
-
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %d, \"type\": \"%s\", \"min\": %d, \"max\": %d}")
                                       , cName, iValue, iType, minValue, maxValue);
-
   sendBeforenext();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 } // sendJsonSettingObj(*char, int, *char, int, int)
 
 
@@ -424,13 +424,13 @@ void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType
   char jsonBuff[64] = {0};
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": \""), cName);
   sendBeforenext();
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 
   // Send value with JSON string escaping (handles " and \ in payload templates)
   char chunk[32];
   size_t ci = 0;
   for (const char *p = cValue; *p; p++) {
-    if (ci >= sizeof(chunk) - 2) { chunk[ci] = '\0'; httpServer.sendContent(chunk); ci = 0; }
+    if (ci >= sizeof(chunk) - 2) { jsonBufAppend(chunk, ci); ci = 0; }
     char c = *p;
     if      (c == '"')  { chunk[ci++] = '\\'; chunk[ci++] = '"';  }
     else if (c == '\\') { chunk[ci++] = '\\'; chunk[ci++] = '\\'; }
@@ -439,11 +439,11 @@ void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType
     else if (c == '\t') { chunk[ci++] = '\\'; chunk[ci++] = 't';  }
     else                { chunk[ci++] = c; }
   }
-  if (ci > 0) { chunk[ci] = '\0'; httpServer.sendContent(chunk); }
+  if (ci > 0) { jsonBufAppend(chunk, ci); }
 
   // Send suffix
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\", \"type\": \"%s\", \"maxlen\": %d}"), sType, maxLen);
-  httpServer.sendContent(jsonBuff);
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 
 } // sendJsonSettingObj(*char, *char, *char, int, int)
 
@@ -451,13 +451,10 @@ void sendJsonSettingObj(const char *cName, const char *cValue, const char *sType
 void sendJsonSettingObj(const char *cName, bool bValue, const char *sType)
 {
   char jsonBuff[200] = "";
-
   snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("  \"%s\": {\"value\": %s, \"type\": \"%s\"}")
                                       , cName, CBOOLEAN(bValue), sType);
-
   sendBeforenext();
-  httpServer.sendContent(jsonBuff);
- 
+  jsonBufAppend(jsonBuff, strlen(jsonBuff));
 } // sendJsonSettingObj(*char, bool, *char)    
 
 //=======================================================================

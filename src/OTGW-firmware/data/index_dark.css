@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index_dark.css
-**  Version  : v1.5.0
+**  Version  : v1.6.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -606,7 +606,7 @@
   button { width: 100px; }
   
   .settingDiv {
-    text-align: right;
+    text-align: left;
     min-width: 850px;
     border: thick solid #2c2c2e;
     background: #2c2c2e;
@@ -630,6 +630,93 @@
 
   .btn-wifi-reset:hover {
     background: #e53935;
+  }
+
+  /* Fixed IP configuration section */
+  .fixed-ip-section {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .fixed-ip-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left;
+    border-bottom: 1px solid #444;
+    padding: 3px 0;
+  }
+
+  .fixed-ip-row:last-child {
+    border-bottom: none;
+  }
+
+  .fixed-ip-field-label {
+    padding-left: 24px;
+    text-align: left;
+  }
+
+  .fixed-ip-section .settings-field-container {
+    text-align: left;
+  }
+
+  .fixed-ip-dhcp-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .dhcp-toggle-cb {
+    width: auto;
+    cursor: pointer;
+  }
+
+  .fixed-ip-fields {
+    background: #242426;
+    border-top: 1px solid #444;
+  }
+
+  .octet-group {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #666;
+    border-radius: 4px;
+    padding: 1px 4px;
+    background: #1c1c1e;
+    gap: 1px;
+  }
+
+  .octet-input {
+    width: 38px;
+    border: none;
+    outline: none;
+    text-align: center;
+    padding: 2px 0;
+    background: transparent;
+    color: #e0e0e0;
+    font-size: 14px;
+  }
+
+  .octet-input:focus {
+    background: #343a43;
+    border-radius: 2px;
+  }
+
+  .octet-dot {
+    color: #b0b0b0;
+    font-weight: bold;
+    user-select: none;
+    padding: 0 1px;
+  }
+
+  .fixed-ip-notice {
+    text-align: right;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #ffb74d;
+    font-style: italic;
   }
 
   /*

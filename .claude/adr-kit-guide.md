@@ -1,4 +1,4 @@
-<!-- adr-kit-guide v0.12.0 -->
+<!-- adr-kit-guide v0.13.0 -->
 <!-- Canonical project-side ADR guide. Copied from the plugin's templates/adr-kit-guide.md to .claude/adr-kit-guide.md by /adr-kit:init, /adr-kit:upgrade, and /adr-kit:setup. -->
 <!-- This file is plain markdown — readable by Claude Code, headless `claude -p`, shell scripts in pre-commit hooks, evaluator scripts, and any agent that doesn't process @-imports. Do not embed Claude-Code-specific syntax inside this file. -->
 
@@ -17,7 +17,7 @@ ADR files live at `docs/adr/ADR-NNN-kebab-case-title.md`. They are versioned, im
 | Mode | When | Entry point |
 |---|---|---|
 | **Init / bootstrap** | Once per project: scan source + docs, propose a starter ADR set, hook the kit into `CLAUDE.md`, install the pre-commit hook | `/adr-kit:init` |
-| **Per-commit verification** | Every `git commit`: declarative-rule check via `bin/adr-judge`. Default-on once `init` has run. Free-form ADRs (`llm_judge: true`) surface as advisory; deeper review happens in-session | `.githooks/pre-commit` (auto) |
+| **Per-commit verification** | Every `git commit`: declarative-rule check **plus** Claude Sonnet LLM judge for `llm_judge: true` ADRs in one batched call. Default-on as of v0.13.0. Falls back to declarative-only when the `claude` CLI is unavailable | `.githooks/pre-commit` (auto) |
 | **On-demand invocation** | Mid-session: write a new ADR, judge a staged diff, supersede an existing decision | `/adr-kit:adr`, `/adr-kit:judge`, `adr-generator` subagent |
 
 ## Slash commands
@@ -75,19 +75,25 @@ Optional `## Enforcement` section at the end of an ADR. Fenced JSON code block, 
 - `forbid_pattern` — regex must NOT match any added line in the diff (lines starting with `+`, excluding `+++ ` markers).
 - `forbid_import` — same engine as `forbid_pattern`; the separate name documents intent.
 - `require_pattern` — regex must match at least once in the post-diff content of any file matching `path_glob`.
-- `llm_judge: true` — opt the ADR into in-session LLM review. The pre-commit hook surfaces an advisory line but does NOT block. Deep review runs via `/adr-kit:judge` inside a Claude Code session.
+- `llm_judge: true` — Claude Sonnet evaluates the diff against this ADR's `## Decision` text at commit time (default-on as of v0.13.0). The pre-commit hook batches all `llm_judge: true` ADRs into one Sonnet call and blocks the commit on `VIOLATION`. Falls back gracefully (advisory only, exit 0) when the `claude` CLI is missing.
 - ADRs with no Enforcement block are skipped silently by the judge.
 
 **Path globs** support `**` (recursive). Examples: `src/**/*.py`, `tests/**`, `**/Makefile`.
 
 ## Pre-commit hook
 
-After `/adr-kit:init` (or `/adr-kit:install-hooks`), every `git commit` runs `bin/adr-judge` on the staged diff:
+After `/adr-kit:init` (or `/adr-kit:install-hooks`), every `git commit` runs `bin/adr-judge` on the staged diff with two passes:
 
-- Declarative rules → fast, deterministic, no LLM. A violation exits non-zero and blocks the commit.
-- `llm_judge: true` ADRs → advisory line in the hook output. Run `/adr-kit:judge` in your session for full coverage before committing important changes.
+- **Declarative pass** — fast, regex-only, no LLM. A violation exits non-zero and blocks the commit.
+- **LLM pass (Sonnet, default-on as of v0.13.0)** — all `llm_judge: true` ADRs are batched into one `claude -p --model claude-sonnet-4-6` call. Sonnet returns a per-ADR JSON verdict; any `VIOLATION` blocks the commit with the model's one-sentence reason. Falls back gracefully when the `claude` CLI is missing or unauthenticated — never blocks a legitimate commit due to tooling drift.
 
-Disable a single commit: `ADR_KIT_HOOK_DISABLE=1 git commit -m "…"`. Remove permanently: `/adr-kit:install-hooks --uninstall`.
+**Cost shape** (typical project, 50 `llm_judge` ADRs, small diff): roughly $0.10–0.30 per commit on Sonnet 4.6 with prompt caching. Latency 5–10s. Configurable via `judge.llm_model` / `judge.llm_timeout_seconds` / `judge.llm_cmd` in `docs/adr/.adr-kit.json`.
+
+**Knobs:**
+- Disable LLM pass per commit: `ADR_KIT_NO_LLM=1 git commit -m "…"`
+- Disable hook entirely per commit: `ADR_KIT_HOOK_DISABLE=1 git commit -m "…"`
+- Switch model: set `judge.llm_model: "claude-haiku-4-5"` in `.adr-kit.json` for higher throughput at lower cost.
+- Remove permanently: `/adr-kit:install-hooks --uninstall`
 
 ## Supersession (changing a decision)
 
