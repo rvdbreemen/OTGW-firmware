@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.77
+**  Version  : v2.0.0-alpha.78
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1301,11 +1301,32 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   else if (strcasecmp_P(sub, PSTR("markers")) == 0) {
     static const char kSatMarkersFile[] PROGMEM = "/sat_markers.json";
     static const int  kSatMarkersMax    = 20;
+    char fname[24];
+    strlcpy_P(fname, kSatMarkersFile, sizeof(fname));
+
+    // Stream one JSON object {…} from f into buf (nul-terminated).
+    // Advances past any leading whitespace/commas/'['. Returns false at ']' or EOF.
+    auto readObj = [](File& f, char* buf, size_t sz) -> bool {
+      while (f.available()) {
+        char c = (char)f.read();
+        if (c == '{') {
+          buf[0] = '{'; size_t n = 1; int depth = 1;
+          while (f.available() && depth > 0 && n < sz - 1) {
+            char c2 = (char)f.read();
+            buf[n++] = c2;
+            if (c2 == '{') depth++;
+            else if (c2 == '}') depth--;
+          }
+          buf[n] = '\0';
+          return depth == 0;
+        }
+        if (c == ']') return false;
+      }
+      return false;
+    };
 
     if (method == HTTP_GET) {
       // Stream file directly; return empty array if not present
-      char fname[24];
-      strlcpy_P(fname, kSatMarkersFile, sizeof(fname));
       File f = LittleFS.open(fname, "r");
       if (!f) {
         httpServer.send(200, F("application/json"), F("[]"));
@@ -1332,61 +1353,60 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
         sendApiError(400, F("outside_temp (-15..25) and flow_temp (10..90) required"));
         return;
       }
-      // Read existing markers, append, write back (max 20)
-      char fname[24];
-      strlcpy_P(fname, kSatMarkersFile, sizeof(fname));
-      // Load existing JSON array into a simple buffer
-      char markersBuf[2048] = "[]";
-      File rf = LittleFS.open(fname, "r");
-      if (rf) {
-        size_t n = rf.readBytes(markersBuf, sizeof(markersBuf) - 1);
-        markersBuf[n] = '\0';
-        rf.close();
+      // Pass 1: stream existing file to count markers and find max id (~200-byte stack)
+      int mcount = 0, maxId = 0;
+      {
+        char objBuf[200];
+        File rf = LittleFS.open(fname, "r");
+        if (rf) {
+          while (readObj(rf, objBuf, sizeof(objBuf))) {
+            mcount++;
+            const char* idp = strstr(objBuf, "\"id\":");
+            if (idp) {
+              idp += 5; while (*idp == ' ') idp++;
+              int v = atoi(idp); if (v > maxId) maxId = v;
+            }
+          }
+          rf.close();
+        }
       }
-      // Count existing markers
-      int mcount = 0;
-      const char* p = markersBuf;
-      while (*p) { if (*p == '{') mcount++; p++; }
       if (mcount >= kSatMarkersMax) {
         sendApiError(409, F("Maximum markers (20) reached; delete one first"));
         return;
       }
-      // Find max id
-      int maxId = 0;
-      {
-        const char* ip = markersBuf;
-        while ((ip = strstr(ip, "\"id\":")) != nullptr) {
-          ip += 5;
-          while (*ip == ' ') ip++;
-          int v = atoi(ip);
-          if (v > maxId) maxId = v;
-          ip++;
-        }
-      }
       int newId = maxId + 1;
-      // Get current epoch
       time_t now = time(nullptr);
-      // Build new entry
       char entry[192];
-      // Escape label (reject embedded quotes for simplicity)
       for (char* lp = lblBuf; *lp; lp++) { if (*lp == '"' || *lp == '\\') *lp = '_'; }
       snprintf_P(entry, sizeof(entry),
         PSTR("{\"id\":%d,\"outside_temp\":%.1f,\"flow_temp\":%.1f,\"added\":%lu,\"label\":\"%s\"}"),
         newId, ot, ft, (unsigned long)now, lblBuf);
-      // Insert: remove trailing ']', append entry, close
-      size_t mlen = strlen(markersBuf);
-      while (mlen > 0 && markersBuf[mlen - 1] != ']') mlen--;
-      if (mlen > 0) markersBuf[mlen - 1] = '\0';
-      char newBuf[2048];
-      if (strcmp_P(markersBuf, PSTR("[")) == 0 || markersBuf[0] == '\0' || mcount == 0) {
-        snprintf_P(newBuf, sizeof(newBuf), PSTR("[%s]"), entry);
-      } else {
-        snprintf_P(newBuf, sizeof(newBuf), PSTR("%s,%s]"), markersBuf, entry);
+      // Pass 2: write existing markers + new entry to temp file, then rename
+      char tmpname[28];
+      strlcpy_P(tmpname, PSTR("/sat_markers.tmp"), sizeof(tmpname));
+      {
+        char objBuf[200];
+        File wf = LittleFS.open(tmpname, "w");
+        if (!wf) { sendApiError(500, F("Cannot write markers file")); return; }
+        wf.print('[');
+        bool first = true;
+        File rf = LittleFS.open(fname, "r");
+        if (rf) {
+          while (readObj(rf, objBuf, sizeof(objBuf))) {
+            if (!first) wf.print(',');
+            wf.print(objBuf);
+            first = false;
+          }
+          rf.close();
+        }
+        if (!first) wf.print(',');
+        wf.print(entry);
+        wf.print(']');
+        wf.close();
       }
-      File wf = LittleFS.open(fname, "w");
-      if (!wf) { sendApiError(500, F("Cannot write markers file")); return; }
-      wf.print(newBuf);
-      wf.close();
+      if (!LittleFS.rename(tmpname, fname)) {
+        sendApiError(500, F("Cannot finalize markers file")); return;
+      }
       char resp[64];
       snprintf_P(resp, sizeof(resp), PSTR("{\"status\":\"ok\",\"id\":%d}"), newId);
       httpServer.send(201, F("application/json"), resp);
@@ -1396,49 +1416,35 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       if (wc < 6) { sendApiError(400, F("Missing marker id in path")); return; }
       int delId = atoi(words[5]);
       if (delId <= 0) { sendApiError(400, F("Invalid marker id")); return; }
-      char fname[24];
-      strlcpy_P(fname, kSatMarkersFile, sizeof(fname));
       File rf = LittleFS.open(fname, "r");
       if (!rf) { sendApiError(404, F("No markers found")); return; }
-      char inBuf[2048];
-      size_t n = rf.readBytes(inBuf, sizeof(inBuf) - 1);
-      inBuf[n] = '\0';
-      rf.close();
-      // Remove the entry with matching id — find and excise it
-      char outBuf[2048];
-      outBuf[0] = '['; outBuf[1] = '\0';
-      bool found = false;
-      bool firstOut = true;
-      const char* ep = inBuf;
-      while ((ep = strchr(ep, '{')) != nullptr) {
-        // find end of object
-        const char* eEnd = strchr(ep, '}');
-        if (!eEnd) break;
-        // extract id from this object
-        const char* idp = strstr(ep, "\"id\":");
-        if (idp && idp < eEnd) {
-          idp += 5;
-          while (*idp == ' ') idp++;
-          int thisId = atoi(idp);
-          if (thisId == delId) { found = true; ep = eEnd + 1; continue; }
-        }
-        // copy this entry to output
-        char entry2[256];
-        size_t elen = (eEnd - ep) + 1;
-        if (elen >= sizeof(entry2)) elen = sizeof(entry2) - 1;
-        memcpy(entry2, ep, elen);
-        entry2[elen] = '\0';
-        if (!firstOut) strlcat(outBuf, ",", sizeof(outBuf));
-        strlcat(outBuf, entry2, sizeof(outBuf));
-        firstOut = false;
-        ep = eEnd + 1;
+      char tmpname[28];
+      strlcpy_P(tmpname, PSTR("/sat_markers.tmp"), sizeof(tmpname));
+      File wf = LittleFS.open(tmpname, "w");
+      if (!wf) { rf.close(); sendApiError(500, F("Cannot write temp file")); return; }
+      wf.print('[');
+      bool first = true, found = false;
+      char objBuf[200];
+      while (readObj(rf, objBuf, sizeof(objBuf))) {
+        const char* idp = strstr(objBuf, "\"id\":");
+        int thisId = 0;
+        if (idp) { idp += 5; while (*idp == ' ') idp++; thisId = atoi(idp); }
+        if (thisId == delId) { found = true; continue; }
+        if (!first) wf.print(',');
+        wf.print(objBuf);
+        first = false;
       }
-      strlcat(outBuf, "]", sizeof(outBuf));
-      if (!found) { sendApiError(404, F("Marker id not found")); return; }
-      File wf = LittleFS.open(fname, "w");
-      if (!wf) { sendApiError(500, F("Cannot write markers file")); return; }
-      wf.print(outBuf);
+      wf.print(']');
+      rf.close();
       wf.close();
+      if (!found) {
+        LittleFS.remove(tmpname);
+        sendApiError(404, F("Marker id not found"));
+        return;
+      }
+      if (!LittleFS.rename(tmpname, fname)) {
+        sendApiError(500, F("Cannot finalize markers file")); return;
+      }
       httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
     }
     else {
