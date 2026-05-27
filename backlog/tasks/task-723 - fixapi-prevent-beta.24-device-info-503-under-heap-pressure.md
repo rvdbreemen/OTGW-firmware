@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-26 20:18'
-updated_date: '2026-05-26 20:36'
+updated_date: '2026-05-27 09:57'
 labels: []
 dependencies: []
 ---
@@ -48,4 +48,10 @@ Throttle assessment: drops are a real observation but not proof that the MQTT/We
 Validation: `.\.venv\Scripts\python.exe build.py` passed and built both firmware and LittleFS (`OTGW-firmware-1.6.0-beta.25+7cfe4a0.ino.bin`, `OTGW-firmware.1.6.0-beta.25+7cfe4a0.littlefs.bin`); firmware reported 742224 bytes flash and 23092 bytes available dynamic memory. `.\.venv\Scripts\python.exe evaluate.py --quick --no-color` passed: 34 passed, 0 warnings, 0 failed, 2 info. Build completion emitted a non-blocking Windows cleanup warning for a locked `.tmp\echarts\.git\objects\pack` file after artifacts were created.
 
 Blocker for Done: hardware validation on beta.25 under comparable UI/debug load must show the `device/info` 503 symptom is resolved and reveal whether drops remain actionable.
+
+2026-05-27 @codex beta prerelease publication: published `v1.6.0-beta.25` from release commit `cacc9472` through GitHub Actions run `26504163816` (`Beta prerelease publish`, success). The immutable prerelease contains firmware `OTGW-firmware-1.6.0-beta.25+cacc947.ino.bin`, filesystem `OTGW-firmware.1.6.0-beta.25+cacc947.littlefs.bin`, `SHA256SUMS`, both flash helpers, and the flash bundle zip. Its compare link resolves against `v1.5.0-fix2`, after correcting GitHub's stale Latest marker from `v1.5.0-fix` to the newer published stable fix release.
+
+Release gate confirmation: immediately before commit/tag, combined `build.py` passed for firmware plus LittleFS and `evaluate.py --quick --no-color` passed with 34 passed, 0 warnings, 0 failures, 2 info. CI then rebuilt firmware plus filesystem successfully from the tag. CI emitted a non-blocking Node.js 20 deprecation annotation for GitHub standard actions; it did not affect the beta publication.
+
+Task remains In Progress: field validation must flash beta.25 and reproduce comparable REST/debug load to confirm `/api/v2/device/info` no longer emits the premature 503 and to decide whether the independently observed drop totals need separate work.
 <!-- SECTION:NOTES:END -->
