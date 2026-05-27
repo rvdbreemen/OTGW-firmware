@@ -1,7 +1,7 @@
 ---
 id: TASK-713
 title: 'adr-kit Feature 4: Semantic Relevance Ranking'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-26 13:39'
 labels:

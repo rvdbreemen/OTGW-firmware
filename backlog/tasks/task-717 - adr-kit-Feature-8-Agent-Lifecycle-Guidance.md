@@ -1,7 +1,7 @@
 ---
 id: TASK-717
 title: 'adr-kit Feature 8: Agent Lifecycle Guidance'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-26 13:44'
 labels:

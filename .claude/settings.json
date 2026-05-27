@@ -152,5 +152,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "adr-kit@rvdbreemen-adr-kit": true
   }
 }

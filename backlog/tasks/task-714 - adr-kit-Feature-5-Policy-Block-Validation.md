@@ -1,7 +1,7 @@
 ---
 id: TASK-714
 title: 'adr-kit Feature 5: Policy Block Validation'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-26 13:40'
 labels:

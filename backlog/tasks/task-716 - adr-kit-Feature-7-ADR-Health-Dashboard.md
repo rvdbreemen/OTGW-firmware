@@ -1,7 +1,7 @@
 ---
 id: TASK-716
 title: 'adr-kit Feature 7: ADR Health Dashboard'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-26 13:43'
 labels:

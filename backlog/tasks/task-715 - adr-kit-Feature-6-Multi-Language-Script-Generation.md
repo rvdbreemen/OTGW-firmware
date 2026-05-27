@@ -1,7 +1,7 @@
 ---
 id: TASK-715
 title: 'adr-kit Feature 6: Multi-Language Script Generation'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-26 13:42'
 labels:
