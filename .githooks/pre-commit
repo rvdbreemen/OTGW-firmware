@@ -1,41 +1,70 @@
 #!/usr/bin/env bash
 # Pre-commit hook for OTGW-firmware 2.0.0 worktree.
-# Enforces _VERSION_PRERELEASE bump when firmware code is staged.
+# Two independent checks run on every commit:
+#   1. Firmware version-bump check (OTGW-specific)
+#   2. ADR-compliance check via adr-kit
 #
-# Bypass for one commit:  OTGW_BUMP_HOOK_DISABLE=1 git commit ...
+# Per-check bypass:
+#   OTGW_BUMP_HOOK_DISABLE=1 git commit ...   — skip bump check only
+#   ADR_KIT_HOOK_DISABLE=1 git commit ...     — skip ADR check only
+#   ADR_KIT_NO_LLM=1 git commit ...           — skip LLM pass, declarative only
 
 set -e
 
-if [ "${OTGW_BUMP_HOOK_DISABLE:-0}" = "1" ]; then
-  echo "[bump] hook disabled for this commit (OTGW_BUMP_HOOK_DISABLE=1)" >&2
-  exit 0
+# ── 1. OTGW firmware version-bump check ──────────────────────────────────────
+
+if [ "${OTGW_BUMP_HOOK_DISABLE:-0}" != "1" ]; then
+  STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+  TRIGGER=$(echo "$STAGED" | awk '
+    /^src\/OTGW-firmware\/version\.h$/ { next }
+    /^src\/OTGW-firmware\// { print; next }
+    /^src\/libraries\// { print; next }
+  ')
+
+  if [ -n "$TRIGGER" ]; then
+    PRERELEASE_DIFF=$(git diff --cached -- src/OTGW-firmware/version.h | grep -E '^[+-]#define _VERSION_PRERELEASE ' || true)
+    MINUS=$(echo "$PRERELEASE_DIFF" | grep -c '^-' || true)
+    PLUS=$(echo "$PRERELEASE_DIFF" | grep -c '^+' || true)
+
+    if [ "$MINUS" -lt 1 ] || [ "$PLUS" -lt 1 ]; then
+      echo "" >&2
+      echo "[bump] commit touches firmware code but does not bump _VERSION_PRERELEASE." >&2
+      echo "[bump] Run bin/bump-prerelease.sh and stage src/OTGW-firmware/version.h + data/version.hash" >&2
+      echo "[bump] alongside your code change." >&2
+      echo "[bump] Bypass for this commit: OTGW_BUMP_HOOK_DISABLE=1 git commit ..." >&2
+      echo "" >&2
+      echo "[bump] Triggering paths in this commit:" >&2
+      echo "$TRIGGER" | sed 's/^/  /' >&2
+      exit 1
+    fi
+  fi
 fi
 
-STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
-TRIGGER=$(echo "$STAGED" | awk '
-  /^src\/OTGW-firmware\/version\.h$/ { next }
-  /^src\/OTGW-firmware\// { print; next }
-  /^src\/libraries\// { print; next }
-')
+# ── 2. adr-kit ADR-compliance check ──────────────────────────────────────────
+# Resolves adr-judge from the plugin cache dynamically so plugin upgrades
+# don't require re-running install-hooks. Falls back gracefully when the
+# plugin cache is missing — never blocks a commit due to tooling drift.
 
-if [ -z "$TRIGGER" ]; then
-  exit 0
-fi
+if [ "${ADR_KIT_HOOK_DISABLE:-0}" != "1" ]; then
+  ADR_KIT_BASE="${HOME}/.claude/plugins/cache/rvdbreemen-adr-kit/adr-kit"
+  ADR_JUDGE=""
+  if [ -d "$ADR_KIT_BASE" ]; then
+    ADR_JUDGE=$(ls -d "$ADR_KIT_BASE"/*/bin/adr-judge 2>/dev/null | sort -V | tail -1)
+  fi
 
-PRERELEASE_DIFF=$(git diff --cached -- src/OTGW-firmware/version.h | grep -E '^[+-]#define _VERSION_PRERELEASE ' || true)
-MINUS=$(echo "$PRERELEASE_DIFF" | grep -c '^-' || true)
-PLUS=$(echo "$PRERELEASE_DIFF" | grep -c '^+' || true)
-
-if [ "$MINUS" -lt 1 ] || [ "$PLUS" -lt 1 ]; then
-  echo "" >&2
-  echo "[bump] commit touches firmware code but does not bump _VERSION_PRERELEASE." >&2
-  echo "[bump] Run bin/bump-prerelease.sh and stage src/OTGW-firmware/version.h + data/version.hash" >&2
-  echo "[bump] alongside your code change." >&2
-  echo "[bump] Bypass for this commit: OTGW_BUMP_HOOK_DISABLE=1 git commit ..." >&2
-  echo "" >&2
-  echo "[bump] Triggering paths in this commit:" >&2
-  echo "$TRIGGER" | sed 's/^/  /' >&2
-  exit 1
+  if [ -z "$ADR_JUDGE" ] || [ ! -f "$ADR_JUDGE" ]; then
+    echo "[adr-kit] adr-judge not found in plugin cache; skipping ADR check." >&2
+    echo "[adr-kit] Re-install with /adr-kit:install-hooks in a Claude Code session." >&2
+  else
+    ROOT=$(git rev-parse --show-toplevel)
+    DIFF=$(git diff --cached --unified=0)
+    if [ -n "$DIFF" ]; then
+      ADR_OUT=$(echo "$DIFF" | python3 "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/" --llm 2>&1)
+      ADR_EXIT=$?
+      printf '%s\n' "$ADR_OUT" | grep -avE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true" >&2 || true
+      [ "$ADR_EXIT" -ne 0 ] && exit "$ADR_EXIT"
+    fi
+  fi
 fi
 
 exit 0

@@ -1,14 +1,16 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-27T10:54:40.138Z
-> Files: 14 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-05-27T13:22:22.335Z
+> Files: 17 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
 - `build.sh` (~1471 tok)
+- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~36584 tok)
 
 ## .claude/
 
+- `adr-kit-guide.md` — Project-local adr-kit reference guide; used by pre-commit hook and CI agents that lack plugin context (~3500 tok)
 
 ## .claude/commands/
 
@@ -54,6 +56,14 @@
 
 ## .githooks/
 
+- `pre-commit` — Pre-commit hook: firmware version-bump check + adr-kit ADR-compliance check (adr-judge, declarative + LLM pass) (~900 tok)
+
+## bin/
+
+- `bump-prerelease.sh` — Increments the trailing integer in `_VERSION_PRERELEASE` in version.h and regenerates version.hash (~500 tok)
+- `adr-audit` — adr-kit: scans project root for decision-shaped artefacts (config files, docs); feeds /adr-kit:init (~5000 tok)
+- `adr-judge` — adr-kit: checks staged git diff against Enforcement blocks in Accepted ADRs; used by pre-commit hook and /adr-kit:judge (~6000 tok)
+- `adr-lint` — adr-kit: validates ADR file content against the four verification gates (Completeness, Evidence, Clarity, Consistency) (~6000 tok)
 
 ## .github/
 
@@ -341,14 +351,14 @@
 - `ADR-094-ha-discovery-state-reconciliation-on-ota-upgrade.md` — ADR-094: Home Assistant discovery state reconciliation on OTA upgrade (feature-2.0.0 port of ADR-067 (~7153 tok)
 - `ADR-095-bseparatesources-mutually-exclusive-base-and-source-variants.md` — ADR-095: bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive (feature-2.0.0 p (~5773 tok)
 - `ADR-096-mqtt-source-topic-worldview-semantics.md` — ADR-096: MQTT Source-Subtopic Worldview Semantics (~6803 tok)
-- `ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md` — ADR-097: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification (~3353 tok)
+- `ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md` — ADR-097: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification (~3356 tok)
 - `ADR-103-mqtt-source-topic-proxy-answer-routing.md` — ADR-103: MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement (~3192 tok)
 - `ADR-112-pure-jit-mqtt-discovery.md` — ADR-112: Pure JIT MQTT Discovery (2.0.0 sibling of dev ADR-073) (~1235 tok)
 - `README.md` — Project documentation (~10169 tok)
 
 ## docs/api/
 
-- `MQTT.md` — OTGW-firmware MQTT Topic Documentation (~22804 tok)
+- `MQTT.md` — OTGW-firmware MQTT Topic Documentation (~23412 tok)
 
 ## docs/audits/
 
@@ -358,6 +368,7 @@
 
 ## src/OTGW-firmware/
 
+- `MQTTHaDiscovery.cpp` — ======================================================================= (~66032 tok)
 - `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~38556 tok)
 - `OTGW-Core.h` — ifndef OTGWCore_h (~10661 tok)
 - `OTGW-Core.ino` — Declares char (~68038 tok)
