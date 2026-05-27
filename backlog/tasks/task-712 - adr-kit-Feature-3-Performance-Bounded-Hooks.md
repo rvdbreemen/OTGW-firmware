@@ -1,9 +1,11 @@
 ---
 id: TASK-712
 title: 'adr-kit Feature 3: Performance-Bounded Hooks'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-26 13:38'
+updated_date: '2026-05-27 10:01'
 labels:
   - adr-kit
   - phase-2
