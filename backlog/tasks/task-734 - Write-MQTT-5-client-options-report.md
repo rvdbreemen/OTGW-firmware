@@ -1,9 +1,11 @@
 ---
 id: TASK-734
 title: Write MQTT 5 client options report
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-27 21:08'
+updated_date: '2026-05-27 21:09'
 labels: []
 milestone: m-0
 dependencies: []
