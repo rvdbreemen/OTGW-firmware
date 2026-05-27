@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.82
+**  Version  : v2.0.0-alpha.83
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -6252,14 +6252,11 @@ function refreshSettings() {
       // Hide PIC-related settings rows when no PIC is detected
       applyPICAvailability(picAvailable, otCommandInterfaceAvailable);
       applyOTDirectAvailability(otDirectAvailable);
-      // Build WiFi scan panel once and insert it right after the Network group card.
+      // Build WiFi scan panel once and append it inside the Network / Wi-Fi section.
       if (settingsPageEl && !document.getElementById('wifi-scan-panel')) {
-        buildWifiScanPanel(settingsPageEl);
         var networkSection = settingsPageEl.querySelector('section.settings-group[data-group-id="network"]');
-        var wifiPanel = document.getElementById('wifi-scan-panel');
-        if (networkSection && wifiPanel) {
-          settingsPageEl.insertBefore(wifiPanel, networkSection.nextSibling);
-        }
+        var networkBody = networkSection ? networkSection.querySelector('.settings-group-body') : null;
+        buildWifiScanPanel(networkBody || settingsPageEl);
       }
     })
     .catch(function (error) {
@@ -8148,22 +8145,23 @@ function resetWiFiSettingsUI() {
 // Informational: allows user to see available SSIDs without leaving the page.
 // All DOM nodes via createElement/textContent — no innerHTML on user-controlled data.
 function buildWifiScanPanel(parentEl) {
-  var section = document.createElement('section');
-  section.className = 'ds-card settings-group';
-  section.id = 'wifi-scan-panel';
+  var wrapper = document.createElement('div');
+  wrapper.id = 'wifi-scan-panel';
 
-  var heading = document.createElement('h3');
-  heading.className = 'settings-group-title';
-  heading.textContent = 'Available Wi-Fi Networks';
-  section.appendChild(heading);
+  var sep = document.createElement('hr');
+  sep.style.margin = '8px 0';
+  wrapper.appendChild(sep);
 
-  var body = document.createElement('div');
-  body.className = 'settings-group-body';
+  var subHeading = document.createElement('div');
+  subHeading.className = 'settings-field-container';
+  subHeading.style.fontWeight = 'bold';
+  subHeading.textContent = 'Available Wi-Fi Networks';
+  wrapper.appendChild(subHeading);
 
   var info = document.createElement('p');
   info.className = 'settings-field-container';
   info.textContent = 'Scan for nearby Wi-Fi networks. Use the Reset WiFi button on the SSID field above to switch networks.';
-  body.appendChild(info);
+  wrapper.appendChild(info);
 
   var row = document.createElement('div');
   row.className = 'settingDiv';
@@ -8191,9 +8189,8 @@ function buildWifiScanPanel(parentEl) {
   row.appendChild(scanBtn);
   row.appendChild(statusEl);
   row.appendChild(netSel);
-  body.appendChild(row);
-  section.appendChild(body);
-  parentEl.appendChild(section);
+  wrapper.appendChild(row);
+  parentEl.appendChild(wrapper);
 }
 
 var _wifiScanPollTimer = null;
