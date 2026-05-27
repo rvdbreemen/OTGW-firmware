@@ -1,176 +1,150 @@
 # /backlog_discord — Respond to backlog commands from Discord
 
-Monitor a Discord channel for backlog-related requests, execute them via the Backlog MCP, and post results back to Discord.
+Monitor `#dev-sat-mqtt` for backlog-related requests, execute them via the Backlog CLI, and post results back.
+
+## Token-efficiency rules (apply throughout all phases)
+
+- **B1 task list**: Always add a status filter or `--limit 20`. Never call `backlog task list --plain` bare. Default to `-s "In Progress"` unless the user asked for a different status or all tasks.
+- **B2 board**: Do NOT call `backlog board --plain` — it dumps everything. Instead run three targeted queries (To Do / In Progress / Done) with `--limit 5` each and compose a compact summary.
+- **B3 attachments**: Only fetch attachments when the message text contains a bug keyword (`crash|error|issue|broken|doesn't work|werkt niet|fout`). Text files: WebFetch first-pass only. Images: download + Read only if the message says "screenshot of error/UI". Skip everything else.
+- **B4 early-exit**: Read `.claude/discord_backlog_last_checked.txt`. If the timestamp is < 5 minutes old, print "Nothing new (checked < 5 min ago)" and stop — no API call.
+- **B5 compact format**: Keep the formatted response under 1500 characters. Help text: use the short form in the rules below, not a full prose block.
 
 ## Configuration
 
 - **Bot channel**: `#dev-sat-mqtt` — channel ID `1105556725714649128`
 - **Timestamp file**: `.claude/discord_backlog_last_checked.txt`
-- **Bot user ID to ignore**: `384411356616720384` (maintainer, not the bot itself — adjust if needed)
+- **Maintainer user ID to ignore**: `384411356616720384`
 
 ## Workflow
 
-### Phase 1: Connect and read new messages
+### Phase 1: Early-exit + read new messages (B4)
 
-The Discord MCP server is the ExilProductions fork (`discord-mcp-exil`), started as a stdio process by Claude Code via `uv run python -m discord_mcp.main --transport stdio`. There is **no separate login step** — the `DISCORD_TOKEN` is injected via the MCP server config. The first tool call doubles as the connection check. **Tool namespace is `mcp__discord-mcp__*`.** Always use these MCP tools, never curl or direct Discord API calls (curl is fine for the CDN attachment downloads in Phase 1b — see below).
+1. Read `.claude/discord_backlog_last_checked.txt`. If absent, default to 1 hour ago.
+2. **Early-exit (B4)**: if timestamp is < 5 minutes old → print "Nothing new (checked < 5 min ago)" and stop.
+3. Fetch messages: `mcp__discord-mcp__fetch_channel_history` with `channel_id="1105556725714649128"` and `limit=25`.
+4. Filter to messages after the last-checked timestamp. Discard the rest immediately.
+5. Ignore messages from bots and maintainer (user ID `384411356616720384`).
+6. Write current UTC timestamp to `.claude/discord_backlog_last_checked.txt`.
 
-1. **Read the last-checked timestamp** from `.claude/discord_backlog_last_checked.txt`. If the file does not exist, default to the last 1 hour.
-2. **Read messages** from the bot channel using `mcp__discord-mcp__fetch_channel_history` with `channel_id="1105556725714649128"` and `limit=30`. The response payload includes per-message **attachment metadata** (attachment ID, filename, MIME type, size, signed CDN URL).
-3. **Filter** to messages posted after the last-checked timestamp.
-4. **Ignore** messages sent by bots (including yourself).
-5. **Save the current timestamp** to `.claude/discord_backlog_last_checked.txt`.
+**Tool namespace**: `mcp__discord-mcp__*`. No login step — `DISCORD_TOKEN` is injected via MCP config.
 
-### Phase 1b: Fetch attachment contents (when a relevant message has them)
+### Phase 1b: Attachments — conditional only (B3)
 
-If a backlog-actionable message carries attachments, fetch and inspect them. **The bot is no longer blind to logs and screenshots.** Stop replying with "I cannot read attachments through the bot, only message text" — that limitation is obsolete.
+Only process attachments for messages that pass Phase 1 filtering **and** contain a bug keyword in the message text (`crash|error|issue|broken|doesn't work|werkt niet|fout`).
 
-| Type | Goal | How |
-|---|---|---|
-| Text (`.txt`, `.log`, `.json`, `.md`) | AI-summarised quick read | `WebFetch(url, prompt="…")` — small model returns processed answers, not always verbatim |
-| Text (`.txt`, `.log`, `.json`, `.md`) | Verbatim, line-precise diagnosis or `Grep` over content | PowerShell download → `Read` / `Grep` on the local file |
-| Image (`.png`, `.jpg`, `.webp`) | See the screenshot, extract on-screen text | PowerShell download → `Read` on the **Windows path** |
+For qualifying messages:
+- **Text files** (`.txt`, `.log`, `.json`): WebFetch first-pass only:
+  ```
+  WebFetch(url=<CDN URL>, prompt="Does this log show errors or unexpected behavior? Yes/no + one sentence.")
+  ```
+  If "no": skip. If "yes": note the finding in the reply.
+- **Images**: download and Read only if the message explicitly says "screenshot of error/UI":
+  ```powershell
+  $dir = "$env:TEMP\discord-attach"
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  Invoke-WebRequest -Uri "<CDN URL>" -OutFile "$dir\<filename>" -UseBasicParsing
+  ```
+  Then `Read` with the full Windows path.
+- **All other attachments**: skip silently.
 
-**Download recipe (Windows-safe — do NOT use Git-Bash `/tmp/`, the Read tool cannot resolve those paths):**
-
-```powershell
-$dir = "$env:TEMP\discord-attach"
-New-Item -ItemType Directory -Force -Path $dir | Out-Null
-Invoke-WebRequest -Uri "<signed CDN URL from message>" -OutFile "$dir\<filename>" -UseBasicParsing
-```
-
-Then call `Read` with the full Windows path, e.g. `C:\Users\rvdbr\AppData\Local\Temp\discord-attach\<filename>`. Discord CDN URLs are signed with `ex=<hex-epoch>` and expire ~7 days after the message was posted — if 403, fetch a fresh signed URL via `mcp__discord-mcp__fetch_channel_history` (Discord rolls a new one each call).
-
-When the bot uses an attachment to inform a reply, name the finding briefly so the reporter knows the bot actually read their evidence.
+Discord CDN URLs expire ~7 days after posting. On 403: re-call `fetch_channel_history` for a fresh URL.
 
 ### Phase 2: Identify actionable messages
 
-Scan each new message for backlog-related intent. A message is actionable if it:
+A message is actionable if it asks about tasks, backlog, status, or assignments. Ignore general chat.
 
-- Mentions the bot AND asks about tasks, backlog, status, assignments, etc.
-- Contains an explicit command pattern (see below)
-- Is a follow-up reply in a thread where the bot previously responded about a task
+**Supported intents**:
 
-**Supported intents** (match flexibly — these are examples, not exact strings):
-
-| Intent | Example messages |
-|--------|-----------------|
-| List tasks | "list tasks", "what's on the board?", "show backlog", "tasks in progress" |
-| Show task | "show task 42", "details on task 42", "what's task 42 about?" |
-| Task status | "status of task 42", "is task 42 done?" |
+| Intent | Example |
+|--------|---------|
+| List tasks | "list tasks", "show backlog", "tasks in progress" |
+| Show task | "show task 42", "details on task 42" |
 | Update status | "move task 42 to in progress", "mark task 42 done" |
-| Assign task | "assign task 42 to @sara" |
+| Assign | "assign task 42 to @sara" |
 | Add note | "add note to task 42: started refactoring" |
 | Search | "find tasks about mqtt", "search auth" |
-| Board summary | "board", "show the board", "kanban" |
-| Help | "help", "how does this work?", "what can you do?", "commands" |
+| Board | "board", "show the board", "kanban" |
+| Help | "help", "what can you do?" |
 
-If a message is not backlog-related, skip it entirely — do not respond.
+### Phase 3: Execute and respond (B1, B2)
 
-### Phase 3: Execute and respond
+For each actionable message:
 
-For each actionable message, do the following:
+1. Parse intent and extract parameters.
+2. Execute the backlog operation:
 
-1. **Parse the intent** and extract parameters (task ID, status, search query, etc.)
-2. **Execute the corresponding backlog operation**:
-
-   | Intent | Backlog command |
-   |--------|----------------|
-   | List tasks | `backlog task list --plain` (optionally with `-s "Status"`) |
+   | Intent | Command |
+   |--------|---------|
+   | List tasks (default) | `backlog task list -s "In Progress" --plain` (B1) |
+   | List tasks by status | `backlog task list -s "<status>" --plain` |
+   | List all tasks | `backlog task list --plain --limit 20` (B1 — always cap) |
    | Show task | `backlog task <id> --plain` |
    | Update status | `backlog task edit <id> -s "New Status"` |
    | Assign | `backlog task edit <id> -a @name` |
-   | Add note | `backlog task edit <id> --append-notes "note text"` |
+   | Add note | `backlog task edit <id> --append-notes "note"` |
    | Search | `backlog search "query" --plain` |
-   | Board summary | `backlog board --plain` |
-   | Help | No backlog command needed — respond with the help message (see below) |
+   | Board (B2) | Three queries: `backlog task list -s "To Do" --plain --limit 5`, `-s "In Progress" --limit 5`, `-s "Done" --limit 5` |
+   | Help | No command — use the compact help text below |
 
-3. **Format the response for Discord**. Keep it readable:
-   - Use Discord markdown (bold, code blocks, bullet lists)
-   - For task lists: show ID, title, status, assignee — one line per task
-   - For task details: show title, status, assignee, description, and acceptance criteria
-   - For board view: group tasks by status column
-   - Keep responses under 1900 characters (Discord limit is 2000). If longer, summarize and offer to show more.
+3. Format and post the response (see formatting guidelines below).
+4. Post via `mcp__discord-mcp__discord_post_message` with `channel_id="1105556725714649128"`.
 
-4. **Post the response** to the same channel using `mcp__discord-mcp__send_message_to_channel` with `channel_id="1105556725714649128"` and `content="<reply text>"`.
+### Phase 4: Conversational follow-ups
 
-### Phase 4: Handle conversational follow-ups
+If a message is a reply in a thread where the bot posted task details, treat it as a contextual update using the task ID from context:
 
-If a message is a **reply in a thread** where the bot previously posted task details, treat it as a contextual update:
+- "mark AC 1 done" → `backlog task edit <id> --check-ac 1`
+- "assign this to @dev" → `backlog task edit <id> -a @dev`
+- "add a note: fixed the bug" → `backlog task edit <id> --append-notes "fixed the bug"`
+- "what are the open ACs?" → re-fetch and show unchecked ACs only
 
-- "mark AC 1 done" → `backlog task edit <id from context> --check-ac 1`
-- "assign this to @dev" → `backlog task edit <id from context> -a @dev`
-- "add a note: fixed the bug" → `backlog task edit <id from context> --append-notes "fixed the bug"`
-- "what are the open ACs?" → re-fetch and show unchecked acceptance criteria
+## Response formatting guidelines (B5)
 
-Use the task ID from the earlier message in the thread for context.
+Keep all responses under 1500 characters. Use Discord markdown.
 
-## Response formatting guidelines
-
-### Task list response
+**Task list:**
 ```
-**Backlog Tasks** (In Progress)
-
-- **#7** Setup MQTT reconnect — `In Progress` (@rob)
-- **#12** Add REST endpoint for sensors — `In Progress` (@sara)
-- **#15** Fix watchdog timeout — `In Progress` (unassigned)
-
-_3 tasks shown. Say "show task <id>" for details._
+**Tasks — In Progress**
+- **#7** Setup MQTT reconnect (`In Progress`, @rob)
+- **#12** Add REST endpoint (`In Progress`, @sara)
+_2 tasks. "show task <id>" for details._
 ```
 
-### Task detail response
+**Task detail:**
 ```
 **Task #7 — Setup MQTT reconnect**
-**Status:** In Progress | **Assignee:** @rob | **Priority:** high
-
-**Description:**
-Implement automatic MQTT reconnection with exponential backoff.
-
-**Acceptance Criteria:**
-- [ ] #1 Reconnect within 30s of disconnect
-- [x] #2 Exponential backoff (1s, 2s, 4s, max 60s)
-- [ ] #3 Log reconnection attempts via DebugTln
+Status: In Progress | Assignee: @rob | Priority: high
+Implement MQTT reconnect with exponential backoff.
+AC: [ ] #1 Reconnect in 30s  [x] #2 Backoff  [ ] #3 Log attempts
 ```
 
-### Update confirmation
+**Board (B2 — three-column compact):**
 ```
-Done — Task #7 status changed to **Done**.
+**Board**
+To Do (2): #3 Refactor settings, #9 Add OTA check
+In Progress (2): #7 MQTT reconnect (@rob), #12 REST endpoint (@sara)
+Done (last 5): #1, #4, #6, #8, #11
 ```
 
-### Help response
+**Update confirmation:**
 ```
-**Backlog Bot — How it works**
+Done — Task #7 → **In Progress**.
+```
 
-I manage the project task board. You can ask me things in plain language or use short commands. Here's what I can do:
-
-**View tasks**
-- `list tasks` — show all tasks
-- `list tasks in progress` — filter by status (To Do, In Progress, Done)
-- `show task 7` — full details for a specific task
-- `board` — Kanban-style overview
-
-**Search**
-- `search mqtt` — find tasks mentioning a topic
-- `find tasks about reconnect` — same thing, natural language
-
-**Update tasks**
-- `move task 7 to in progress` — change status
-- `assign task 7 to @rob` — assign someone
-- `mark task 7 done` — mark as done
-- `add note to task 7: fixed the timeout issue` — append a note
-
-**In a thread** (after I show a task):
-- `mark AC 1 done` — check acceptance criterion #1
-- `what are the open ACs?` — show remaining criteria
-- `assign this to @sara` — assign the task from context
-
-Just ask — I understand plain language too!
+**Help (compact):**
+```
+**Backlog Bot**
+list tasks | list tasks in progress | show task 7 | board | search mqtt
+move task 7 to in progress | mark task 7 done | assign task 7 to @rob
+add note to task 7: your note here
+In a thread: mark AC 1 done | what are the open ACs?
 ```
 
 ## Important rules
 
-- **Never modify tasks without explicit user request** — read operations are safe, write operations need clear intent
-- **Be concise** — Discord is chat, not a document viewer
-- **Respect the backlog CLI** — always use CLI commands, never edit task files directly
-- **If a command is ambiguous**, ask for clarification in the Discord response rather than guessing
-- **If backlog CLI returns an error**, post a friendly error message (e.g. "Task 99 not found. Use `list tasks` to see available tasks.")
-- **Skip non-backlog messages entirely** — don't respond to general chat
+- **Never modify tasks without explicit user request**
+- **Always use the backlog CLI** — never edit task files directly
+- **If ambiguous**, ask for clarification in Discord rather than guessing
+- **If CLI returns an error**, post a friendly message ("Task 99 not found — use `list tasks` to see available tasks")
+- **Skip non-backlog messages** — do not respond to general chat
