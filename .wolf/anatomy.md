@@ -61,9 +61,14 @@
 ## bin/
 
 - `bump-prerelease.sh` — Increments the trailing integer in `_VERSION_PRERELEASE` in version.h and regenerates version.hash (~500 tok)
-- `adr-audit` — adr-kit: scans project root for decision-shaped artefacts (config files, docs); feeds /adr-kit:init (~5000 tok)
-- `adr-judge` — adr-kit: checks staged git diff against Enforcement blocks in Accepted ADRs; used by pre-commit hook and /adr-kit:judge (~6000 tok)
-- `adr-lint` — adr-kit: validates ADR file content against the four verification gates (Completeness, Evidence, Clarity, Consistency) (~6000 tok)
+- `adr-audit` — adr-kit v0.15.0: scans project root for decision-shaped artefacts; feeds /adr-kit:init (~5000 tok)
+- `adr-context` — adr-kit v0.15.0: generates context summary of relevant ADRs for a given diff (~3000 tok)
+- `adr-generate-scripts` — adr-kit v0.15.0: generates validate.sh shell scripts from Enforcement blocks (~3000 tok)
+- `adr-judge` — adr-kit v0.15.0: checks staged diff against Enforcement blocks; pre-commit hook + /adr-kit:judge; security fixes: llm_cmd allowlist, ReDoS guard, path traversal protection (~6000 tok)
+- `adr-lint` — adr-kit v0.15.0: validates ADR content against four verification gates (~6000 tok)
+- `adr-quality` — adr-kit v0.15.0: quality score per ADR (~3000 tok)
+- `adr-retire` — adr-kit v0.15.0: archives/deprecates an ADR with correct status update (~2000 tok)
+- `adr-status` — adr-kit v0.15.0: overview of ADR statuses in the project (~2000 tok)
 
 ## .github/
 

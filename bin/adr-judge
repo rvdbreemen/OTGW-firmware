@@ -44,6 +44,9 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
+import time
+from datetime import date
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -51,6 +54,85 @@ from typing import Dict, List, Optional, Tuple
 # .adr-kit.json's judge.llm_cmd. Tests inject a fake binary here.
 DEFAULT_LLM_CMD = ["claude", "-p", "--model", "claude-sonnet-4-6"]
 DEFAULT_LLM_TIMEOUT_S = 120
+
+# SEC-HIGH: only these binaries may be specified via repo-tracked
+# .adr-kit.json (judge.llm_cmd). Env (ADR_KIT_LLM_CMD) and CLI (--llm-cmd)
+# remain unrestricted because those are operator-controlled, not
+# arbitrarily-checked-in by collaborators.
+_LLM_CMD_ALLOWLIST = {
+    "claude",
+    "claude-code",
+    "claude-opus-4-7",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
+    "claude-haiku-4-5-20251001",
+}
+
+# PERF-HIGH: cache glob_to_regex translations across rules and files.
+_GLOB_PATTERN_CACHE: Dict[str, re.Pattern] = {}
+
+# PERF-MEDIUM: cache the JSON-schema validator instance so we don't reload
+# and re-parse adr-enforcement.schema.json for every ADR.
+_ENFORCEMENT_VALIDATOR = None
+_ENFORCEMENT_VALIDATOR_LOADED = False
+
+
+def _get_enforcement_validator():
+    """Return a cached Draft7Validator for the enforcement schema, or None.
+
+    Returns None when jsonschema isn't installed or the schema file is missing
+    — callers should treat that as "no deeper validation available" and
+    proceed with the lightweight structural checks.
+    """
+    global _ENFORCEMENT_VALIDATOR, _ENFORCEMENT_VALIDATOR_LOADED
+    if _ENFORCEMENT_VALIDATOR_LOADED:
+        return _ENFORCEMENT_VALIDATOR
+    _ENFORCEMENT_VALIDATOR_LOADED = True
+    try:
+        import jsonschema  # type: ignore
+    except ImportError:
+        return None
+    schema_path = (
+        Path(__file__).resolve().parent.parent
+        / "schemas"
+        / "adr-enforcement.schema.json"
+    )
+    if not schema_path.exists():
+        return None
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    _ENFORCEMENT_VALIDATOR = jsonschema.Draft7Validator(schema)
+    return _ENFORCEMENT_VALIDATOR
+
+
+def _safe_regex_search(
+    pattern: re.Pattern, text: str, timeout_s: float = 1.0
+) -> Optional[re.Match]:
+    """Run pattern.search(text) with a per-call wall-clock timeout.
+
+    Python's `re` engine is backtracking and has no native interrupt; the
+    practical mitigation is to run it on a daemon thread and abandon if it
+    takes too long. The thread keeps consuming CPU until it returns (you
+    can't kill a Python thread mid-regex), but at least the *caller* gets
+    control back so a single ReDoS-prone pattern can't wedge the whole
+    pre-commit hook.
+    """
+    result: List[Optional[re.Match]] = [None]
+    error: List[Optional[BaseException]] = [None]
+
+    def _run() -> None:
+        try:
+            result[0] = pattern.search(text)
+        except BaseException as exc:  # pragma: no cover - defensive
+            error[0] = exc
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout_s)
+    if t.is_alive():
+        raise TimeoutError(f"Regex timed out after {timeout_s}s")
+    if error[0] is not None:
+        raise error[0]
+    return result[0]
 
 
 def _split_cmd(cmd_str: str) -> List[str]:
@@ -90,6 +172,16 @@ STATUS_HEADING_RE = re.compile(
 STATUS_BOLD_INLINE_RE = re.compile(
     r"^\s*\*\*\s*Status\s*:?\s*\*\*\s*:?\s*([A-Za-z]+)|^\s*\*\*\s*Status\s*:?\s*([A-Za-z]+)\s*\*\*",
     re.IGNORECASE | re.MULTILINE,
+)
+STATUS_HISTORY_START_RE = re.compile(r"^\s*status_history\s*:\s*$", re.IGNORECASE)
+STATUS_HISTORY_ITEM_RE = re.compile(r"^\s*-\s*([a-z_]+)\s*:\s*(.*?)\s*$", re.IGNORECASE)
+STATUS_HISTORY_FIELD_RE = re.compile(r"^\s+([a-z_]+)\s*:\s*(.*?)\s*$", re.IGNORECASE)
+STATUS_HISTORY_REQUIRED_FIELDS = (
+    "date",
+    "status",
+    "changed_by",
+    "reason",
+    "changed_via",
 )
 ENFORCEMENT_BLOCK_RE = re.compile(
     r"^##\s+Enforcement\s*$\n+(?:.*?\n)*?```json\s*\n(.*?)\n```",
@@ -131,6 +223,164 @@ def adr_status(text: str) -> Optional[str]:
     return None
 
 
+def _yaml_scalar(value: str) -> str:
+    """Parse the simple scalar values used in status_history entries."""
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            parsed = json.loads(value)
+            return str(parsed)
+        except json.JSONDecodeError:
+            return value[1:-1]
+    if len(value) >= 2 and value[0] == value[-1] == "'":
+        return value[1:-1].replace("''", "'")
+    return value
+
+
+def parse_status_history(text: str) -> List[Dict[str, str]]:
+    """Return status-history entries from the embedded YAML list."""
+    entries: List[Dict[str, str]] = []
+    current: Optional[Dict[str, str]] = None
+    in_history = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not in_history:
+            if STATUS_HISTORY_START_RE.match(line):
+                in_history = True
+            continue
+        if stripped.startswith("```") or stripped.startswith("## "):
+            break
+        if not stripped or stripped.startswith("#"):
+            continue
+        item = STATUS_HISTORY_ITEM_RE.match(line)
+        if item:
+            if current is not None:
+                entries.append(current)
+            current = {item.group(1).lower(): _yaml_scalar(item.group(2))}
+            continue
+        field = STATUS_HISTORY_FIELD_RE.match(line)
+        if field and current is not None:
+            current[field.group(1).lower()] = _yaml_scalar(field.group(2))
+            continue
+        if current is not None:
+            break
+    if current is not None:
+        entries.append(current)
+    return entries
+
+
+def validate_status_history(
+    entries: List[Dict[str, str]],
+    current_status: Optional[str] = None,
+    today: Optional[date] = None,
+) -> List[str]:
+    """Return structural and chronology issues for a status-history chain."""
+    issues: List[str] = []
+    previous: Optional[date] = None
+    check_date = today or date.today()
+    for number, entry in enumerate(entries, start=1):
+        missing = [key for key in STATUS_HISTORY_REQUIRED_FIELDS if not entry.get(key)]
+        if missing:
+            issues.append(f"entry {number} missing fields: {', '.join(missing)}")
+            continue
+        try:
+            entry_date = date.fromisoformat(entry["date"])
+        except ValueError:
+            issues.append(f"entry {number} has invalid date: {entry['date']!r}")
+            continue
+        if entry_date > check_date:
+            issues.append(f"entry {number} has future date: {entry['date']}")
+        if previous is not None and entry_date < previous:
+            issues.append(f"entry {number} is earlier than the preceding entry")
+        previous = entry_date
+    if entries and current_status:
+        last_status = re.match(r"[A-Za-z]+", entries[-1].get("status", ""))
+        if not last_status or last_status.group(0).lower() != current_status.lower():
+            issues.append(
+                "latest history status does not match the ADR Status section "
+                f"({entries[-1].get('status', '')!r} != {current_status!r})"
+            )
+    return issues
+
+
+def _format_history_entry(entry: Dict[str, str]) -> str:
+    lines = []
+    for key in STATUS_HISTORY_REQUIRED_FIELDS:
+        prefix = "  - " if key == "date" else "    "
+        lines.append(f"{prefix}{key}: {json.dumps(str(entry[key]), ensure_ascii=True)}")
+    return "\n".join(lines) + "\n"
+
+
+def append_to_status_history(adr_path: Path, new_entry: Dict[str, str]) -> bool:
+    """Append one validated status transition without changing earlier entries."""
+    if validate_status_history([new_entry]):
+        return False
+    try:
+        text = adr_path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    existing = parse_status_history(text)
+    if existing and validate_status_history(existing):
+        return False
+    if existing:
+        previous = date.fromisoformat(existing[-1]["date"])
+        if date.fromisoformat(new_entry["date"]) < previous:
+            return False
+
+    new_lines = _format_history_entry(new_entry)
+    start = re.search(r"(?im)^\s*status_history\s*:\s*$", text)
+    if start:
+        end = re.search(r"(?m)^```|^##\s+", text[start.end():])
+        insertion = start.end() + (end.start() if end else len(text[start.end():]))
+        prefix = text[:insertion].rstrip() + "\n"
+        suffix = text[insertion:]
+        updated = prefix + new_lines + suffix
+    else:
+        block = "## Status History\n\n```yaml\nstatus_history:\n" + new_lines + "```\n"
+        status_heading = re.search(r"(?im)^##\s+Status\s*$", text)
+        next_heading = (
+            re.search(r"(?im)^##\s+", text[status_heading.end():])
+            if status_heading
+            else None
+        )
+        if status_heading and next_heading:
+            insertion = status_heading.end() + next_heading.start()
+            updated = (
+                text[:insertion].rstrip() + "\n\n" + block + "\n"
+                + text[insertion:].lstrip()
+            )
+        else:
+            updated = text.rstrip() + "\n\n" + block
+    try:
+        adr_path.write_text(updated, encoding="utf-8")
+    except OSError:
+        return False
+    return True
+
+
+def migrate_status_history(adr_path: Path) -> bool:
+    """Create an initial v0.14 status entry for an older ADR when requested."""
+    try:
+        text = adr_path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    if parse_status_history(text):
+        return False
+    status = adr_status(text)
+    if not status:
+        return False
+    return append_to_status_history(
+        adr_path,
+        {
+            "date": date.today().isoformat(),
+            "status": status,
+            "changed_by": "adr-kit/migrate",
+            "reason": "initial status history entry created by migration",
+            "changed_via": "adr-kit:migrate skill",
+        },
+    )
+
+
 def parse_enforcement(adr_text: str, adr_path: Path) -> Optional[Dict]:
     """Extract and parse the JSON inside an ADR's ## Enforcement section.
 
@@ -160,20 +410,12 @@ def parse_enforcement(adr_text: str, adr_path: Path) -> Optional[Dict]:
     if "llm_judge" in data and not isinstance(data["llm_judge"], bool):
         raise JudgeError(f"{adr_path}: Enforcement.llm_judge must be a boolean")
 
-    try:
-        import jsonschema  # type: ignore
-        schema_path = (
-            Path(__file__).resolve().parent.parent
-            / "schemas"
-            / "adr-enforcement.schema.json"
-        )
-        if schema_path.exists():
-            schema = json.loads(schema_path.read_text(encoding="utf-8"))
-            jsonschema.validate(data, schema)
-    except ImportError:
-        pass
-    except Exception as e:
-        raise JudgeError(f"{adr_path}: Enforcement block fails schema validation: {e}")
+    validator = _get_enforcement_validator()
+    if validator is not None:
+        try:
+            validator.validate(data)
+        except Exception as e:
+            raise JudgeError(f"{adr_path}: Enforcement block fails schema validation: {e}")
 
     return data
 
@@ -226,7 +468,13 @@ def glob_to_regex(glob: str) -> re.Pattern:
     Brace expansion ({a,b,c}) was added in v0.12.2 — without it, real-world
     Enforcement-block path_globs that scope to a list of source files
     silently match nothing (regressed from common shell-glob expectations).
+
+    Compiled patterns are cached module-wide (v0.15) — the same glob string
+    typically reappears across every diffed file in the commit.
     """
+    cached = _GLOB_PATTERN_CACHE.get(glob)
+    if cached is not None:
+        return cached
     out: List[str] = []
     i = 0
     while i < len(glob):
@@ -269,7 +517,9 @@ def glob_to_regex(glob: str) -> re.Pattern:
         else:
             out.append(re.escape(c))
             i += 1
-    return re.compile("^" + "".join(out) + "$")
+    compiled = re.compile("^" + "".join(out) + "$")
+    _GLOB_PATTERN_CACHE[glob] = compiled
+    return compiled
 
 
 def path_matches(path: str, glob: Optional[str]) -> bool:
@@ -311,13 +561,19 @@ def apply_rules_to_diff(
                 raise JudgeError(
                     f"{adr_id}: invalid regex in {kind} rule ({pattern!r}): {e}"
                 )
+            timed_out = False
             for path, added in diff_files.items():
                 if any_skip_match(path, skip_files):
                     continue
                 if not path_matches(path, path_glob):
                     continue
                 for lineno, content in added:
-                    if regex.search(content):
+                    try:
+                        match = _safe_regex_search(regex, content)
+                    except TimeoutError:
+                        timed_out = True
+                        break
+                    if match:
                         findings.append(
                             {
                                 "adr": adr_id,
@@ -330,6 +586,24 @@ def apply_rules_to_diff(
                                 "severity": "violation",
                             }
                         )
+                if timed_out:
+                    break
+            if timed_out:
+                findings.append(
+                    {
+                        "adr": adr_id,
+                        "rule": kind,
+                        "pattern": pattern,
+                        "path": None,
+                        "line": None,
+                        "snippet": None,
+                        "message": (
+                            f"Pattern {pattern!r} regex timed out — possible ReDoS. "
+                            f"Check the pattern."
+                        ),
+                        "severity": "advisory",
+                    }
+                )
 
     for rule in enforcement.get("require_pattern", []):
         pattern = rule.get("pattern")
@@ -341,19 +615,37 @@ def apply_rules_to_diff(
             raise JudgeError(
                 f"{adr_id}: invalid regex in require_pattern rule ({pattern!r}): {e}"
             )
+        req_timed_out = False
         for path in diff_files:
             if any_skip_match(path, skip_files):
                 continue
             if not path_matches(path, path_glob):
                 continue
+            # SEC-LOW: reject paths containing .. before constructing file_path,
+            # then double-check the resolved path is still inside repo_root.
+            # Absolute paths in diff headers would otherwise be honoured by
+            # pathlib (Path('/a') / Path('/b') == Path('/b')) and escape the
+            # repo sandbox.
+            if ".." in Path(path).parts:
+                continue
             file_path = repo_root / path
+            try:
+                file_path.resolve().relative_to(repo_root.resolve())
+            except ValueError:
+                # path escapes repo_root — skip this file.
+                continue
             if not file_path.is_file():
                 continue
             try:
                 content = file_path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            if not regex.search(content):
+            try:
+                match = _safe_regex_search(regex, content)
+            except TimeoutError:
+                req_timed_out = True
+                break
+            if not match:
                 findings.append(
                     {
                         "adr": adr_id,
@@ -366,6 +658,22 @@ def apply_rules_to_diff(
                         "severity": "violation",
                     }
                 )
+        if req_timed_out:
+            findings.append(
+                {
+                    "adr": adr_id,
+                    "rule": "require_pattern",
+                    "pattern": pattern,
+                    "path": None,
+                    "line": None,
+                    "snippet": None,
+                    "message": (
+                        f"Pattern {pattern!r} regex timed out — possible ReDoS. "
+                        f"Check the pattern."
+                    ),
+                    "severity": "advisory",
+                }
+            )
 
     if enforcement.get("llm_judge") and not (
         enforcement.get("forbid_pattern")
@@ -563,16 +871,32 @@ def run_llm_batch(
         )
         return None
     if result.returncode != 0:
-        print(
-            f"[adr-judge] WARN: LLM judge command exited {result.returncode}: "
-            f"{result.stderr.strip()[:200]!r}; skipping LLM pass.",
-            file=sys.stderr,
-        )
+        # SEC-LOW: don't leak stderr (may contain tokens, paths, prompts) by
+        # default. Operators can opt in to the full payload via ADR_KIT_DEBUG=1.
+        if os.environ.get("ADR_KIT_DEBUG"):
+            print(
+                f"[adr-judge] WARN: LLM judge command exited {result.returncode}: "
+                f"{result.stderr.strip()[:200]!r}; skipping LLM pass.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "[adr-judge] WARN: LLM judge failed. Rerun with ADR_KIT_DEBUG=1 "
+                "for details.",
+                file=sys.stderr,
+            )
         return None
     try:
         verdicts = parse_llm_response(result.stdout)
     except JudgeError as e:
-        print(f"[adr-judge] WARN: {e}; skipping LLM pass.", file=sys.stderr)
+        if os.environ.get("ADR_KIT_DEBUG"):
+            print(f"[adr-judge] WARN: {e}; skipping LLM pass.", file=sys.stderr)
+        else:
+            print(
+                "[adr-judge] WARN: LLM judge response could not be parsed. "
+                "Rerun with ADR_KIT_DEBUG=1 for details.",
+                file=sys.stderr,
+            )
         return None
     findings: List[Dict] = []
     for t in targets:
@@ -598,6 +922,104 @@ def run_llm_batch(
     return findings
 
 
+# ---------- profiling ----------
+
+
+class ProfileCollector:
+    """Lightweight timing accumulator for --profile output.
+
+    Tracks two buckets:
+      - "declarative": wall time spent in apply_rules_to_diff calls (sum over all ADRs)
+      - "llm":         wall time spent in run_llm_batch (one call)
+
+    Rule-type counts are derived from the findings list after the fact so we
+    don't have to instrument inside apply_rules_to_diff (which would change
+    existing behaviour).
+    """
+
+    def __init__(self) -> None:
+        self.declarative_ms: float = 0.0
+        self.llm_ms: float = 0.0
+        self._t0: Optional[float] = None
+
+    # Context-manager helpers make the call-sites one-liners.
+    def start(self) -> None:
+        self._t0 = time.monotonic()
+
+    def stop_declarative(self) -> None:
+        if self._t0 is not None:
+            self.declarative_ms += (time.monotonic() - self._t0) * 1000.0
+            self._t0 = None
+
+    def stop_llm(self) -> None:
+        if self._t0 is not None:
+            self.llm_ms += (time.monotonic() - self._t0) * 1000.0
+            self._t0 = None
+
+    def print_report(self, all_findings: List[Dict], budget_ms: int) -> None:
+        """Print a formatted timing table to stderr."""
+        # Count findings per rule type.
+        counts: Dict[str, int] = {}
+        for f in all_findings:
+            rule = f.get("rule") or "unknown"
+            counts[rule] = counts.get(rule, 0) + 1
+
+        # Split declarative time proportionally across declarative rule types
+        # (forbid_pattern, forbid_import, require_pattern).  When there are no
+        # declarative findings we still show the total under "declarative".
+        decl_rules = ["forbid_pattern", "forbid_import", "require_pattern"]
+        decl_count_total = sum(counts.get(r, 0) for r in decl_rules)
+
+        rows: List[Tuple[str, float, int]] = []  # (rule, time_ms, count)
+        if decl_count_total > 0:
+            for r in decl_rules:
+                c = counts.get(r, 0)
+                if c == 0:
+                    continue
+                share = self.declarative_ms * (c / decl_count_total)
+                rows.append((r, share, c))
+        else:
+            # No declarative findings — show the bucket as a whole anyway.
+            rows.append(("declarative", self.declarative_ms, 0))
+
+        llm_count = counts.get("llm_judge", 0)
+        rows.append(("llm_judge", self.llm_ms, llm_count))
+
+        total_ms = self.declarative_ms + self.llm_ms
+        total_count = sum(c for _, _, c in rows)
+
+        header = f"{'Rule':<20} {'Time(ms)':>10} {'Count':>6} {'Avg(ms)':>10} {'Budget%':>8}"
+        sep = "-" * len(header)
+        print("[adr-judge] Profile:", file=sys.stderr)
+        print(f"  {header}", file=sys.stderr)
+        print(f"  {sep}", file=sys.stderr)
+        for rule, ms, count in rows:
+            avg = ms / max(count, 1)
+            pct = (ms / budget_ms * 100) if budget_ms else 0.0
+            print(
+                f"  {rule:<20} {ms:>10.1f} {count:>6} {avg:>10.1f} {pct:>7.1f}%",
+                file=sys.stderr,
+            )
+        # TOTAL row
+        avg_total = total_ms / max(total_count, 1)
+        pct_total = (total_ms / budget_ms * 100) if budget_ms else 0.0
+        print(f"  {sep}", file=sys.stderr)
+        print(
+            f"  {'TOTAL':<20} {total_ms:>10.1f} {total_count:>6} {avg_total:>10.1f} {pct_total:>7.1f}%",
+            file=sys.stderr,
+        )
+        print(
+            f"  Budget: pre_commit_timeout_ms={budget_ms}ms, elapsed={total_ms:.1f}ms",
+            file=sys.stderr,
+        )
+        if budget_ms and total_ms > budget_ms:
+            print(
+                f"[adr-judge] WARN: elapsed {total_ms:.1f}ms exceeds "
+                f"pre_commit_timeout_ms={budget_ms}ms",
+                file=sys.stderr,
+            )
+
+
 # ---------- config & top-level orchestration ----------
 
 
@@ -618,12 +1040,28 @@ def adr_id_from_filename(name: str) -> Optional[str]:
     return f"ADR-{int(m.group(1)):03d}"
 
 
-def collect_adrs(adr_dir: Path) -> List[Tuple[str, Path, str]]:
-    """Return [(adr_id, path, body)] for every ADR-*.md file in adr_dir."""
+def collect_adrs(
+    adr_dir: Path, dry_run_target: Optional[str] = None
+) -> List[Tuple[str, Path, str]]:
+    """Return [(adr_id, path, body)] for every ADR-*.md file in adr_dir.
+
+    When ``dry_run_target`` is set (e.g. "ADR-042"), only ADR-042-*.md is
+    scanned first; we fall back to a full scan only when no file matches
+    (e.g. typo in the id) so the caller can report "not found" deterministically.
+    """
     out: List[Tuple[str, Path, str]] = []
     if not adr_dir.is_dir():
         return out
-    for p in sorted(adr_dir.glob("ADR-*.md")):
+    paths: List[Path] = []
+    if dry_run_target:
+        m = re.match(r"ADR-(\d+)", dry_run_target)
+        if m:
+            narrow = sorted(adr_dir.glob(f"ADR-{int(m.group(1)):03d}-*.md"))
+            if narrow:
+                paths = narrow
+    if not paths:
+        paths = sorted(adr_dir.glob("ADR-*.md"))
+    for p in paths:
         adr_id = adr_id_from_filename(p.name)
         if not adr_id:
             continue
@@ -705,6 +1143,12 @@ def main() -> int:
         default=None,
         help="Path to .adr-kit.json. Default: <adr-dir>/.adr-kit.json.",
     )
+    p.add_argument(
+        "--migrate-status-history",
+        action="store_true",
+        help="Explicitly add initial status_history entries to legacy ADRs, "
+        "then exit. Normal judging is always read-only.",
+    )
     p.add_argument("--json", action="store_true", help="Emit JSON to stdout.")
     p.add_argument(
         "--repo-root",
@@ -734,6 +1178,22 @@ def main() -> int:
         help="Per-call timeout for the LLM pass in seconds. Default 120 "
         "(or judge.llm_timeout_seconds in .adr-kit.json).",
     )
+    p.add_argument(
+        "--profile",
+        action="store_true",
+        help="Print per-rule-type timing breakdown after judging. Output goes "
+        "to stderr. Columns: Rule, Time(ms), Count, Avg(ms), Budget%%. "
+        "Budget%% is relative to judge.pre_commit_timeout_ms in .adr-kit.json.",
+    )
+    p.add_argument(
+        "--dry-run-enforcement",
+        metavar="ADR-NNN",
+        default=None,
+        help="Test enforcement of a single ADR (e.g. ADR-001) without "
+        "modifying any state. Loads ADRs normally, processes only the "
+        "specified ADR, prints findings and timing to stderr, then exits. "
+        "Exit 0 = no violations, 1 = violations found, 2 = ADR not found.",
+    )
     args = p.parse_args()
 
     try:
@@ -758,7 +1218,23 @@ def main() -> int:
         elif os.environ.get("ADR_KIT_LLM_CMD"):
             llm_cmd = _split_cmd(os.environ["ADR_KIT_LLM_CMD"])
         elif judge_cfg.get("llm_cmd"):
-            llm_cmd = list(judge_cfg["llm_cmd"]) if isinstance(judge_cfg["llm_cmd"], list) else _split_cmd(judge_cfg["llm_cmd"])
+            raw_cfg_cmd = judge_cfg["llm_cmd"]
+            candidate = list(raw_cfg_cmd) if isinstance(raw_cfg_cmd, list) else _split_cmd(raw_cfg_cmd)
+            # SEC-HIGH: repo-tracked config can be authored by anyone with
+            # commit access; restrict the binary to a known set. Env and CLI
+            # overrides remain unrestricted (operator-controlled).
+            cfg_binary = Path(candidate[0]).name if candidate else ""
+            cfg_binary_stem = Path(candidate[0]).stem if candidate else ""
+            if cfg_binary in _LLM_CMD_ALLOWLIST or cfg_binary_stem in _LLM_CMD_ALLOWLIST:
+                llm_cmd = candidate
+            else:
+                print(
+                    f"[adr-judge] WARN: repo config judge.llm_cmd[0]={cfg_binary!r} "
+                    f"is not in the allowed list. Ignoring repo config — use env "
+                    f"ADR_KIT_LLM_CMD or --llm-cmd to override.",
+                    file=sys.stderr,
+                )
+                llm_cmd = list(DEFAULT_LLM_CMD)
         elif judge_cfg.get("llm_model"):
             # User specified just the model — keep the default `claude -p` shape.
             llm_cmd = ["claude", "-p", "--model", str(judge_cfg["llm_model"])]
@@ -773,8 +1249,38 @@ def main() -> int:
 
         repo_root = Path(args.repo_root).resolve() if args.repo_root else Path.cwd()
 
+        if args.migrate_status_history:
+            migrated = []
+            for adr_id, adr_path, _ in collect_adrs(adr_dir):
+                if migrate_status_history(adr_path):
+                    migrated.append(adr_id)
+            if args.json:
+                json.dump({"migrated": migrated, "count": len(migrated)}, sys.stdout, indent=2)
+                sys.stdout.write("\n")
+            else:
+                print(f"[adr-judge] migrated status history for {len(migrated)} ADR(s)")
+            return 0
+
+        # --dry-run-enforcement: normalise the requested ADR id once up front so
+        # we can do a clean string comparison in the loop below.
+        dry_run_target: Optional[str] = None
+        if args.dry_run_enforcement:
+            raw_target = args.dry_run_enforcement.strip()
+            # Accept "ADR-001", "ADR-1", "001", "1" — normalise to "ADR-NNN".
+            m_target = re.match(r"(?i)(?:ADR-)?(\d{1,4})$", raw_target)
+            if not m_target:
+                print(
+                    f"[adr-judge] ERROR: --dry-run-enforcement requires a value like "
+                    f"'ADR-001' or '42', got {raw_target!r}",
+                    file=sys.stderr,
+                )
+                return 2
+            dry_run_target = f"ADR-{int(m_target.group(1)):03d}"
+
         diff_text = read_diff(args.diff)
-        if max_diff_bytes and len(diff_text.encode("utf-8")) > max_diff_bytes:
+        # PERF-LOW: char count is always <= UTF-8 byte count, so this is a
+        # cheap upper bound that avoids encoding the whole diff just to bail.
+        if max_diff_bytes and len(diff_text) > max_diff_bytes:
             print(
                 f"[adr-judge] diff exceeds max_diff_bytes={max_diff_bytes}; skipping",
                 file=sys.stderr,
@@ -782,10 +1288,31 @@ def main() -> int:
             return 0
         diff_files = parse_diff(diff_text)
 
-        adrs = collect_adrs(adr_dir)
+        adrs = collect_adrs(adr_dir, dry_run_target=dry_run_target)
+
+        # --dry-run-enforcement: verify the ADR exists before doing any work.
+        if dry_run_target is not None:
+            known_ids = {
+                adr_id_from_filename(p.name)
+                for _, p, _ in adrs
+            }
+            if dry_run_target not in known_ids:
+                print(
+                    f"[adr-judge] WARN: --dry-run-enforcement: {dry_run_target} not found "
+                    f"in {adr_dir}",
+                    file=sys.stderr,
+                )
+                return 2
+
+        profiler = ProfileCollector()
+        pre_commit_budget_ms: int = int(judge_cfg.get("pre_commit_timeout_ms", 5000))
+
         all_findings: List[Dict] = []
         adrs_with_enforcement = 0
         for adr_id, adr_path, body in adrs:
+            # --dry-run-enforcement: skip every ADR that isn't the target.
+            if dry_run_target is not None and adr_id != dry_run_target:
+                continue
             status = adr_status(body)
             if status is None or status.lower() != "accepted":
                 continue
@@ -793,12 +1320,14 @@ def main() -> int:
             if enforcement is None:
                 continue
             adrs_with_enforcement += 1
+            profiler.start()
             all_findings.extend(
                 apply_rules_to_diff(
                     adr_id, enforcement, diff_files, repo_root, skip_files,
                     llm_mode_active=llm_mode_active,
                 )
             )
+            profiler.stop_declarative()
 
         # LLM pass — only when the user opted in via --llm (or judge.llm_default).
         # Failures here log a warning and fall through; they NEVER block the
@@ -806,22 +1335,53 @@ def main() -> int:
         # legitimate work.
         llm_findings_emitted = 0
         if llm_mode_active:
-            targets = collect_llm_targets(adrs)
+            # When dry-run-enforcement is active, limit LLM targets to the one ADR.
+            llm_adrs = (
+                [(adr_id, p, b) for adr_id, p, b in adrs if adr_id == dry_run_target]
+                if dry_run_target is not None
+                else adrs
+            )
+            targets = collect_llm_targets(llm_adrs)
             if targets:
                 print(
                     f"[adr-judge] running LLM pass over {len(targets)} "
                     f"llm_judge ADR(s) with {llm_cmd[0]}...",
                     file=sys.stderr,
                 )
+                profiler.start()
                 llm_findings = run_llm_batch(targets, diff_text, llm_cmd, llm_timeout_s)
+                profiler.stop_llm()
                 if llm_findings is not None:
                     all_findings.extend(llm_findings)
                     llm_findings_emitted = len(llm_findings)
+
+        # --dry-run-enforcement: announce we're in dry-run mode before results.
+        if dry_run_target is not None:
+            print(
+                f"[adr-judge] dry-run-enforcement: {dry_run_target} "
+                f"(no state changes written)",
+                file=sys.stderr,
+            )
 
         if args.json:
             emit_json(all_findings, adrs_with_enforcement)
         else:
             emit_text(all_findings, adrs_with_enforcement, advisory_only)
+
+        # --profile: always print the timing report after results, even in
+        # dry-run mode, so the two flags can be combined.
+        if args.profile:
+            profiler.print_report(all_findings, pre_commit_budget_ms)
+        elif warn_on_exceed := judge_cfg.get("warn_on_exceed", True):
+            # Passive budget check: warn even without --profile when config asks.
+            total_ms = profiler.declarative_ms + profiler.llm_ms
+            if pre_commit_budget_ms and total_ms > pre_commit_budget_ms:
+                print(
+                    f"[adr-judge] WARN: elapsed {total_ms:.1f}ms exceeds "
+                    f"pre_commit_timeout_ms={pre_commit_budget_ms}ms "
+                    f"(use --profile for a breakdown)",
+                    file=sys.stderr,
+                )
 
         violations = [f for f in all_findings if f["severity"] == "violation"]
         if violations and not advisory_only:

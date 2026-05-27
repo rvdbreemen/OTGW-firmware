@@ -1,0 +1,473 @@
+#!/usr/bin/env python3
+"""adr-context: find relevant ADRs for a given task query.
+
+Uses heuristic scoring with 5 weighted signals. Returns top N ranked ADRs.
+
+Usage:
+  adr-context "cache invalidation strategy"
+  adr-context --limit 10 "database indexes"
+  adr-context --format json "authentication"
+  adr-context --format text "authentication"
+  adr-context --adr-dir docs/adr "authentication"
+  adr-context --min-score 0.2 "authentication"
+  adr-context --config /path/to/.adr-kit.json "authentication"
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from datetime import date, datetime
+from pathlib import Path
+from typing import Dict, List, Optional
+
+
+# ---------------------------------------------------------------------------
+# Domain keyword sets used by infer_task_domain()
+# ---------------------------------------------------------------------------
+
+_DOMAIN_KEYWORDS: Dict[str, List[str]] = {
+    "frontend": [
+        "react", "css", "html", "ui", "component", "vue", "angular",
+        "frontend", "browser", "dom", "webpack", "vite", "svelte", "typescript",
+        "stylesheet", "layout", "responsive", "accessibility", "a11y",
+    ],
+    "infra": [
+        "docker", "kubernetes", "k8s", "ci", "cd", "deploy", "deployment",
+        "pipeline", "terraform", "helm", "ansible", "nginx", "load", "balancer",
+        "container", "cloud", "aws", "azure", "gcp", "infrastructure",
+        "monitoring", "logging", "observability", "prometheus", "grafana",
+    ],
+    "security": [
+        "auth", "authentication", "authorization", "token", "jwt", "oauth",
+        "ssl", "tls", "cert", "certificate", "rbac", "acl", "permission",
+        "encrypt", "encryption", "secret", "password", "hash", "hmac",
+        "saml", "sso", "mfa", "2fa", "firewall", "cors", "csrf", "xss",
+    ],
+    "data": [
+        "database", "sql", "postgres", "postgresql", "mysql", "sqlite",
+        "cache", "caching", "redis", "memcache", "index", "indexing", "query",
+        "migration", "schema", "orm", "etl", "data", "warehouse", "nosql",
+        "mongodb", "elasticsearch", "kafka", "queue", "stream", "pipeline",
+        "backup", "replication", "sharding", "partitioning",
+    ],
+    "backend": [
+        "api", "rest", "graphql", "grpc", "rpc", "service", "microservice",
+        "server", "backend", "endpoint", "route", "handler", "middleware",
+        "framework", "django", "flask", "fastapi", "spring", "express",
+        "async", "concurrency", "thread", "worker", "task", "job", "queue",
+        "business", "logic", "domain", "model", "entity", "repository",
+    ],
+}
+
+
+# Precompiled per-domain regex: one alternation per domain.
+# Word-boundaries prevent false hits like "cidr" matching "ci".
+_DOMAIN_RE: Dict[str, re.Pattern] = {
+    domain: re.compile(
+        r"\b(?:" + "|".join(map(re.escape, keywords)) + r")\b",
+        re.IGNORECASE,
+    )
+    for domain, keywords in _DOMAIN_KEYWORDS.items()
+}
+
+
+# Precompiled metadata extraction patterns (used by extract_adr_metadata).
+_TITLE_RE = re.compile(r"^#\s+ADR-\d+\s+(.+)$", re.MULTILINE)
+_STATUS_WORD_RE = re.compile(
+    r"^##\s+Status.*?\n+([A-Za-z]+)", re.IGNORECASE | re.MULTILINE
+)
+_STATUS_SECTION_RE = re.compile(
+    r"^##\s+Status(.*?)(?=^##|\Z)", re.IGNORECASE | re.MULTILINE | re.DOTALL
+)
+_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+_DECISION_SECTION_RE = re.compile(
+    r"^##\s+Decision(.*?)(?=^##|\Z)", re.IGNORECASE | re.MULTILINE | re.DOTALL
+)
+_RELATED_SECTION_RE = re.compile(
+    r"^##\s+Related Decisions(.*?)(?=^##|\Z)",
+    re.IGNORECASE | re.MULTILINE | re.DOTALL,
+)
+_ADR_REF_RE = re.compile(r"ADR-(\d{1,4})", re.IGNORECASE)
+_ADR_FILENAME_RE = re.compile(r"ADR-(\d{1,4})", re.IGNORECASE)
+
+
+# ---------------------------------------------------------------------------
+# Keyword extraction
+# ---------------------------------------------------------------------------
+
+def extract_keywords(query: str) -> List[str]:
+    """Parse query into a sorted keyword list.
+
+    Lowercases the query, splits on non-alphanumeric characters, and filters
+    out words shorter than 3 characters.
+    """
+    words = re.split(r"[^a-z0-9]+", query.lower())
+    keywords = sorted({w for w in words if len(w) >= 3})
+    return keywords
+
+
+# ---------------------------------------------------------------------------
+# Domain inference
+# ---------------------------------------------------------------------------
+
+def infer_task_domain(text: str) -> Optional[str]:
+    """Detect domain from text.
+
+    Checks text against per-domain keyword sets using precompiled word-bounded
+    regexes. Returns the domain with the most keyword hits. Returns ``None``
+    when no domain keyword matches (true ambiguity). Callers should treat a
+    ``None`` result as "domain unknown" and award no domain_tag signal credit.
+    """
+    scores: Dict[str, int] = {}
+    for domain, pattern in _DOMAIN_RE.items():
+        count = len(pattern.findall(text))
+        if count > 0:
+            scores[domain] = count
+
+    if not scores:
+        return None
+
+    # Return the domain with the highest hit count; ties broken alphabetically
+    return max(scores, key=lambda d: (scores[d], d))
+
+
+def _domain_has_signal(text: str) -> bool:
+    """Return True if at least one domain keyword appears in text.
+
+    Used to avoid awarding domain_tag credit when neither query nor ADR has
+    any concrete domain evidence.
+    """
+    for pattern in _DOMAIN_RE.values():
+        if pattern.search(text):
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# ADR metadata extraction
+# ---------------------------------------------------------------------------
+
+def extract_adr_metadata(adr_file: Path) -> Dict:
+    """Read ADR file and extract relevant metadata.
+
+    Returns a dict with:
+      - adr_id: "ADR-001"
+      - title: text after "# ADR-NNN "
+      - status: Accepted / Proposed / etc.
+      - domain_tags: inferred domain from title + decision text
+      - related_ids: list of "ADR-NNN" strings from Related Decisions section
+      - date: datetime.date or None (from ## Status section)
+      - decision_text: raw text of ## Decision section (for keyword + domain scoring)
+    """
+    content = adr_file.read_text(encoding="utf-8")
+
+    # ADR ID from filename
+    id_match = _ADR_FILENAME_RE.search(adr_file.name)
+    if id_match:
+        adr_id = f"ADR-{int(id_match.group(1)):03d}"
+    else:
+        adr_id = adr_file.stem
+
+    # Title from first heading
+    title_match = _TITLE_RE.search(content)
+    title = title_match.group(1).strip() if title_match else ""
+
+    # Status from ## Status section (first word after status heading)
+    status_match = _STATUS_WORD_RE.search(content)
+    status = status_match.group(1).capitalize() if status_match else "Unknown"
+
+    # Date: look for YYYY-MM-DD pattern in the ## Status section
+    status_section_match = _STATUS_SECTION_RE.search(content)
+    adr_date: Optional[date] = None
+    if status_section_match:
+        date_match = _DATE_RE.search(status_section_match.group(1))
+        if date_match:
+            try:
+                adr_date = date.fromisoformat(date_match.group(1))
+            except ValueError:
+                adr_date = None
+
+    # Decision text for domain + keyword scoring
+    decision_match = _DECISION_SECTION_RE.search(content)
+    decision_text = decision_match.group(1).strip() if decision_match else ""
+
+    # Related ADR IDs from ## Related Decisions section
+    related_section_match = _RELATED_SECTION_RE.search(content)
+    related_ids: List[str] = []
+    if related_section_match:
+        related_text = related_section_match.group(1)
+        for m in _ADR_REF_RE.finditer(related_text):
+            related_ids.append(f"ADR-{int(m.group(1)):03d}")
+
+    # Domain: infer from title + decision text
+    domain_source = f"{title} {decision_text}"
+    domain_tags = infer_task_domain(domain_source)
+    domain_has_keywords = _domain_has_signal(domain_source)
+
+    return {
+        "adr_id": adr_id,
+        "title": title,
+        "status": status,
+        "domain_tags": domain_tags,
+        "domain_has_keywords": domain_has_keywords,
+        "related_ids": related_ids,
+        "date": adr_date,
+        "decision_text": decision_text,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Scoring
+# ---------------------------------------------------------------------------
+
+def score_adr(query: str, keywords: List[str], domain: Optional[str], metadata: Dict,
+              weights: Optional[Dict[str, float]] = None) -> Dict:
+    """Calculate 5-signal relevance score for an ADR.
+
+    Returns a dict with:
+      - total: float 0.0-1.0 (weighted sum, clamped)
+      - signals: dict with per-signal contribution
+
+    Signal definitions:
+      exact_keyword (weight 0.40): fraction of query keywords that appear in
+        the ADR title or decision text, multiplied by the weight. Each keyword
+        hit contributes weight / len(keywords). If no keywords, 0.
+      domain_tag (weight 0.25): full weight if query domain matches ADR domain
+        AND at least one domain keyword was found in the ADR text. No credit
+        when both sides default to "backend" without keyword evidence.
+      related_decisions (weight 0.15): awarded proportionally to how many
+        related ADR IDs the ADR references (more references = more central).
+        Capped at weight when >= 3 related refs present.
+      acceptance_status (weight 0.10): Accepted=full, Proposed=half, else=0.
+      recency (weight 0.10): linear decay over 5 years from today.
+        No date -> 0.
+    """
+    if weights is None:
+        weights = {
+            "exact_keyword": 0.40,
+            "domain_tag": 0.25,
+            "related_decisions": 0.15,
+            "acceptance_status": 0.10,
+            "recency": 0.10,
+        }
+
+    w_kw = weights.get("exact_keyword", 0.40)
+    w_dom = weights.get("domain_tag", 0.25)
+    w_rel = weights.get("related_decisions", 0.15)
+    w_acc = weights.get("acceptance_status", 0.10)
+    w_rec = weights.get("recency", 0.10)
+
+    signals: Dict[str, float] = {}
+
+    # --- exact_keyword signal ---
+    if keywords:
+        search_text = f"{metadata['title']} {metadata['decision_text']}".lower()
+        hits = sum(1 for kw in keywords if kw in search_text)
+        signals["exact_keyword"] = round(w_kw * (hits / len(keywords)), 4)
+    else:
+        signals["exact_keyword"] = 0.0
+
+    # --- domain_tag signal ---
+    # No credit when the query has no recognisable domain (domain is None) —
+    # avoids awarding fake matches for unknown-vs-unknown.
+    query_domain_has_signal = _domain_has_signal(query)
+    adr_domain_has_keywords = metadata.get("domain_has_keywords", False)
+    adr_domain = metadata.get("domain_tags")
+    if (domain is not None
+            and adr_domain is not None
+            and domain == adr_domain
+            and query_domain_has_signal
+            and adr_domain_has_keywords):
+        signals["domain_tag"] = round(w_dom, 4)
+    else:
+        signals["domain_tag"] = 0.0
+
+    # --- related_decisions signal ---
+    # ADRs with more cross-references are more central to the architecture.
+    # We cap at 3 references for full credit.
+    num_related = len(metadata["related_ids"])
+    if num_related >= 3:
+        rel_fraction = 1.0
+    elif num_related > 0:
+        rel_fraction = num_related / 3.0
+    else:
+        rel_fraction = 0.0
+    signals["related_decisions"] = round(w_rel * rel_fraction, 4)
+
+    # --- acceptance_status signal ---
+    status_lower = metadata["status"].lower()
+    if status_lower == "accepted":
+        signals["acceptance_status"] = round(w_acc, 4)
+    elif status_lower == "proposed":
+        signals["acceptance_status"] = round(w_acc * 0.5, 4)
+    else:
+        signals["acceptance_status"] = 0.0
+
+    # --- recency signal ---
+    adr_date = metadata.get("date")
+    if adr_date is not None:
+        today = date.today()
+        age_days = (today - adr_date).days
+        max_age_days = 5 * 365  # 5 years
+        if age_days <= 0:
+            recency_fraction = 1.0
+        elif age_days >= max_age_days:
+            recency_fraction = 0.0
+        else:
+            recency_fraction = 1.0 - (age_days / max_age_days)
+        signals["recency"] = round(w_rec * recency_fraction, 4)
+    else:
+        signals["recency"] = 0.0
+
+    total = sum(signals.values())
+    total = round(min(1.0, max(0.0, total)), 4)
+
+    return {"total": total, "signals": signals}
+
+
+# ---------------------------------------------------------------------------
+# Main loader
+# ---------------------------------------------------------------------------
+
+def load_adr_context(
+    query: str,
+    adr_dir: Path,
+    limit: int = 5,
+    min_score: float = 0.1,
+    config: Optional[Dict] = None,
+) -> List[Dict]:
+    """Return top N ADRs sorted by relevance score (descending), filtered by min_score.
+
+    Config may contain a "context" key with "weights" and other settings.
+    ADRs with score < min_score are excluded. Results are capped to `limit`.
+    """
+    weights = None
+    if config and "context" in config and "weights" in config["context"]:
+        weights = config["context"]["weights"]
+
+    keywords = extract_keywords(query)
+    domain = infer_task_domain(query)
+
+    results: List[Dict] = []
+
+    for adr_file in sorted(adr_dir.glob("ADR-*.md")):
+        try:
+            metadata = extract_adr_metadata(adr_file)
+            score_result = score_adr(query, keywords, domain, metadata, weights)
+            total = score_result["total"]
+            if total >= min_score:
+                results.append({
+                    "adr_id": metadata["adr_id"],
+                    "title": metadata["title"],
+                    "score": total,
+                    "signals": score_result["signals"],
+                })
+        except Exception as e:
+            # Skip unparseable ADR files but warn so problems are visible.
+            print(f"[adr-context] WARN: {adr_file.name}: {e}", file=sys.stderr)
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results[:limit]
+
+
+# ---------------------------------------------------------------------------
+# Config loading
+# ---------------------------------------------------------------------------
+
+def load_config(config_path: Optional[Path], adr_dir: Path) -> Dict:
+    """Load .adr-kit.json from explicit path or auto-discover near adr_dir."""
+    candidates: List[Path] = []
+    if config_path:
+        candidates.append(config_path)
+    else:
+        # Walk up from adr_dir to find .adr-kit.json
+        current = adr_dir.resolve()
+        for _ in range(5):
+            candidates.append(current / ".adr-kit.json")
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+
+    for path in candidates:
+        if path.exists():
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+    return {}
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Find relevant ADRs for a task query using weighted signals.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    parser.add_argument("query", help="Task description or question")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Maximum number of results (default: 5 or from config)")
+    parser.add_argument("--format", choices=["json", "text"], default="text",
+                        help="Output format (default: text)")
+    parser.add_argument("--adr-dir", default=None,
+                        help="Directory containing ADR-*.md files (default: docs/adr)")
+    parser.add_argument("--min-score", type=float, default=None,
+                        help="Minimum relevance score threshold (default: 0.1 or from config)")
+    parser.add_argument("--config", default=None,
+                        help="Path to .adr-kit.json config file")
+
+    args = parser.parse_args()
+
+    # Resolve config
+    config_path = Path(args.config) if args.config else None
+    adr_dir_raw = args.adr_dir or "docs/adr"
+    adr_dir = Path(adr_dir_raw)
+
+    config = load_config(config_path, adr_dir)
+    ctx_cfg = config.get("context", {})
+
+    # Apply config defaults, CLI flags take priority
+    limit = args.limit if args.limit is not None else ctx_cfg.get("default_limit", 5)
+    # Canonical key is "min_score"; legacy "min_relevance_threshold" was removed.
+    cfg_min_score = ctx_cfg.get("min_score", 0.1)
+    min_score = args.min_score if args.min_score is not None else cfg_min_score
+
+    if not adr_dir.exists():
+        if args.format == "json":
+            print("[]")
+        # In text mode, print nothing for a missing directory
+        sys.exit(0)
+
+    results = load_adr_context(
+        query=args.query,
+        adr_dir=adr_dir,
+        limit=limit,
+        min_score=min_score,
+        config=config,
+    )
+
+    if args.format == "json":
+        output = [
+            {
+                "adr_id": r["adr_id"],
+                "title": r["title"],
+                "score": r["score"],
+                "signals": r["signals"],
+            }
+            for r in results
+        ]
+        print(json.dumps(output, indent=2))
+    else:
+        for r in results:
+            print(f"{r['adr_id']}: {r['title']} (relevance: {r['score']})")
+
+
+if __name__ == "__main__":
+    main()
