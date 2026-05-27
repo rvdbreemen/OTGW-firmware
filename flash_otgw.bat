@@ -290,11 +290,15 @@ REM ===========================================================================
 :find_highest_version
 REM %1 = glob pattern (quoted), %2 = output var name.
 REM Uses PowerShell to sort matches by parsed [Version], picks the highest.
+REM Searches script directory first, then build\ subdirectory as fallback.
 set "OTGW_FHV_DIR=%SCRIPT_DIR%"
+set "OTGW_FHV_BDIR=%SCRIPT_DIR%build"
 set "OTGW_FHV_PATTERN=%~1"
 for /f "usebackq delims=" %%V in (`powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$dir=$env:OTGW_FHV_DIR; $pat=$env:OTGW_FHV_PATTERN;" ^
-    "$files = Get-ChildItem -LiteralPath $dir -Filter $pat -ErrorAction SilentlyContinue;" ^
+    "$dirs = @($env:OTGW_FHV_DIR);" ^
+    "if (Test-Path $env:OTGW_FHV_BDIR) { $dirs += $env:OTGW_FHV_BDIR };" ^
+    "$pat=$env:OTGW_FHV_PATTERN;" ^
+    "$files = $dirs | ForEach-Object { Get-ChildItem -LiteralPath $_ -Filter $pat -ErrorAction SilentlyContinue };" ^
     "if (-not $files) { exit 0 }" ^
     "$ranked = foreach ($f in $files) {" ^
     "  $v = $f.Name -replace '^OTGW-firmware-?', '' -replace '\.(ino|littlefs)\.bin$', '';" ^
@@ -302,10 +306,11 @@ for /f "usebackq delims=" %%V in (`powershell -NoProfile -ExecutionPolicy Bypass
     "  if ([Version]::TryParse($v, [ref]$parsed)) { [pscustomobject]@{ V = $parsed; F = $f.FullName } }" ^
     "  else { [pscustomobject]@{ V = [Version]'0.0.0'; F = $f.FullName } }" ^
     "}" ^
-    "($ranked ^| Sort-Object -Property V -Descending ^| Select-Object -First 1).F"`) do (
+    "($ranked | Sort-Object -Property V -Descending | Select-Object -First 1).F"`) do (
     set "%~2=%%V"
 )
 set "OTGW_FHV_DIR="
+set "OTGW_FHV_BDIR="
 set "OTGW_FHV_PATTERN="
 exit /b 0
 
@@ -329,7 +334,7 @@ set "OTGW_VAS_SUMS=%~2"
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$file = $env:OTGW_VAS_FILE; $sums = $env:OTGW_VAS_SUMS;" ^
     "$fn = Split-Path -Leaf $file;" ^
-    "$line = (Get-Content -LiteralPath $sums) ^| Where-Object { ($_ -split '\s+', 2)[1].TrimStart('*') -eq $fn } ^| Select-Object -First 1;" ^
+    "$line = (Get-Content -LiteralPath $sums) | Where-Object { ($_ -split '\s+', 2)[1].TrimStart('*') -eq $fn } | Select-Object -First 1;" ^
     "if (-not $line) { Write-Host \"[ERROR] No SHA256 entry for $fn in SHA256SUMS\"; exit 1 }" ^
     "$expected = (($line -split '\s+', 2)[0]).ToLower();" ^
     "$actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLower();" ^
@@ -344,13 +349,13 @@ exit /b %_v_err%
 :list_serial_ports
 REM Enumerate USB-serial ports with VID/PID and description via Get-PnpDevice.
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "Get-PnpDevice -Class Ports -PresentOnly -ErrorAction SilentlyContinue ^|" ^
+    "Get-PnpDevice -Class Ports -PresentOnly -ErrorAction SilentlyContinue |" ^
     "ForEach-Object {" ^
     "  $name = $_.FriendlyName;" ^
     "  $port = if ($name -match '\((COM\d+)\)') { $matches[1] } else { '' };" ^
     "  $vidpid = if ($_.InstanceId -match 'VID_([0-9A-Fa-f]{4})&PID_([0-9A-Fa-f]{4})') { ($matches[1] + ':' + $matches[2]).ToLower() } else { '?' };" ^
     "  if ($port) { '{0,-10} {1,-12} {2}' -f $port, $vidpid, $name }" ^
-    "} ^| Sort-Object"
+    "} | Sort-Object"
 exit /b 0
 
 
@@ -359,21 +364,21 @@ REM %1 = output var name. Picks first port whose VID:PID is in USB_VID_PID_LIST,
 REM falls back to the first SERIALCOMM entry.
 set "OTGW_DP_LIST=%USB_VID_PID_LIST%"
 for /f "usebackq delims=" %%P in (`powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$allow = ($env:OTGW_DP_LIST -split ';') ^| ForEach-Object { $_.ToLower() };" ^
-    "$ports = Get-PnpDevice -Class Ports -PresentOnly -ErrorAction SilentlyContinue ^|" ^
+    "$allow = ($env:OTGW_DP_LIST -split ';') | ForEach-Object { $_.ToLower() };" ^
+    "$ports = Get-PnpDevice -Class Ports -PresentOnly -ErrorAction SilentlyContinue |" ^
     "  ForEach-Object {" ^
     "    $name = $_.FriendlyName;" ^
     "    $port = if ($name -match '\((COM\d+)\)') { $matches[1] } else { $null };" ^
     "    $vidpid = if ($_.InstanceId -match 'VID_([0-9A-Fa-f]{4})&PID_([0-9A-Fa-f]{4})') { ($matches[1] + ':' + $matches[2]).ToLower() } else { $null };" ^
     "    if ($port) { [pscustomobject]@{ Port = $port; VidPid = $vidpid } }" ^
     "  };" ^
-    "$matched = $ports ^| Where-Object { $_.VidPid -and ($allow -contains $_.VidPid) } ^| Sort-Object Port ^| Select-Object -First 1;" ^
+    "$matched = $ports | Where-Object { $_.VidPid -and ($allow -contains $_.VidPid) } | Sort-Object Port | Select-Object -First 1;" ^
     "if ($matched) { $matched.Port; exit 0 }" ^
     "$reg = 'HKLM:\HARDWARE\DEVICEMAP\SERIALCOMM';" ^
     "if (Test-Path $reg) {" ^
-    "  $first = Get-ItemProperty $reg ^| Get-Member -MemberType NoteProperty ^|" ^
-    "    Where-Object { $_.Name -notlike 'PS*' } ^|" ^
-    "    ForEach-Object { (Get-ItemProperty $reg).($_.Name) } ^| Sort-Object ^| Select-Object -First 1;" ^
+    "  $first = Get-ItemProperty $reg | Get-Member -MemberType NoteProperty |" ^
+    "    Where-Object { $_.Name -notlike 'PS*' } |" ^
+    "    ForEach-Object { (Get-ItemProperty $reg).($_.Name) } | Sort-Object | Select-Object -First 1;" ^
     "  if ($first) { $first }" ^
     "}"`) do (
     set "%~1=%%P"
@@ -396,7 +401,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$hdr = @{ 'User-Agent' = 'OTGW-Flash-Tool' };" ^
     "$apiOk = $false; $assets = $null;" ^
     "try {" ^
-    "  $rel = Invoke-WebRequest -UseBasicParsing -Uri ('https://api.github.com/repos/' + $repo + '/releases/latest') -Headers $hdr -ErrorAction Stop ^| ConvertFrom-Json;" ^
+    "  $rel = Invoke-WebRequest -UseBasicParsing -Uri ('https://api.github.com/repos/' + $repo + '/releases/latest') -Headers $hdr -ErrorAction Stop | ConvertFrom-Json;" ^
     "  Write-Host ('[INFO] Release: ' + $rel.name);" ^
     "  $assets = $rel.assets; $apiOk = $true;" ^
     "} catch {" ^
@@ -408,7 +413,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "  try {" ^
     "    Invoke-WebRequest -UseBasicParsing -Headers $hdr -Uri ($fallback + '/SHA256SUMS') -OutFile $sumsOut -ErrorAction Stop;" ^
     "  } catch { Write-Host ('[ERROR] Fallback failed: could not fetch SHA256SUMS - ' + $_.Exception.Message); exit 1 }" ^
-    "  $names = Get-Content -LiteralPath $sumsOut ^| ForEach-Object { ($_ -split '\s+', 2)[1].TrimStart('*') } ^| Where-Object { $_ -match '\.(ino|littlefs)\.bin$' };" ^
+    "  $names = Get-Content -LiteralPath $sumsOut | ForEach-Object { ($_ -split '\s+', 2)[1].TrimStart('*') } | Where-Object { $_ -match '\.(ino|littlefs)\.bin$' };" ^
     "  foreach ($n in $names) {" ^
     "    $out = Join-Path $dir $n;" ^
     "    Write-Host ('[INFO] Downloading ' + $n + '...');" ^
