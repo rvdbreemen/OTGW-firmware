@@ -1,6 +1,6 @@
 # ADR-097: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification
 
-**Status:** Proposed
+**Status:** Accepted, 2026-05-27
 **Date:** 2026-04-28
 **Classification:** structural (per ADR-080: no CI gate, manual review at PR time)
 **Decision Maker:** User: Rob van den Breemen (rvdbreemen)
