@@ -3,13 +3,19 @@ id: TASK-724
 title: >-
   fix(webui): static IP field labels right-aligned in flex row — fix flex layout
   and text-align
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-27 13:01'
+updated_date: '2026-05-27 13:02'
 labels:
   - bug
   - webui
 dependencies: []
+references:
+  - 'Discord #beta-testing'
+  - user andrebrait
+  - '2026-05-27T11:20Z'
 priority: medium
 ---
 
