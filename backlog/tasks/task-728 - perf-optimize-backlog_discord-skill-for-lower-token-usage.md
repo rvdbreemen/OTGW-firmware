@@ -1,9 +1,11 @@
 ---
 id: TASK-728
 title: 'perf: optimize backlog_discord skill for lower token usage'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-27 17:51'
+updated_date: '2026-05-27 17:51'
 labels:
   - tooling
   - performance
