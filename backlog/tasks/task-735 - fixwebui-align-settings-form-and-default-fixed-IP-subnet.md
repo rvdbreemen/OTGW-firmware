@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-27 21:59'
-updated_date: '2026-05-27 22:01'
+updated_date: '2026-05-27 22:35'
 labels:
   - webui settings
 dependencies: []
@@ -33,3 +33,11 @@ Settings tab labels and inputs need consistent left alignment, and fixed-IP pref
 3. Update fixed-IP prefill so subnet mask is filled from current WiFi config or defaults to 255.255.255.0.
 4. Run focused checks/build commands that cover the Web UI asset path.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Branch: dev (ahead 8 during validation).
+Coding agent: @codex.
+Implementation: moved the settings form row alignment into index_common.css so light and dark use the same left-aligned label/input grid; set .settingDiv text alignment to left in both index.css and index_dark.css; brought dark fixed-IP row/label alignment in line with light; updated prefillFromDHCP() to accept subnet masks with 255 octets and default empty/invalid subnet data to 255.255.255.0 while ignoring all-zero dotted values.
+<!-- SECTION:NOTES:END -->
