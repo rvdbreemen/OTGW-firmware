@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.83
+**  Version  : v2.0.0-alpha.84
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -5988,6 +5988,7 @@ var SETTINGS_GROUPS = [
   { id: 'sensors',  title: 'GPIO Sensors',      prefixes: ['GPIOSENSORS'] },
   { id: 's0',       title: 'S0 Pulse Counter',  prefixes: ['S0COUNTER'] },
   { id: 'otgw',     title: 'OpenTherm Gateway', prefixes: ['OTGW'] },
+  { id: 'otdirect', title: 'OT-Direct',         prefixes: ['OTD'] },
   { id: 'outputs',  title: 'GPIO Outputs',      prefixes: ['GPIOOUTPUTS'] },
   { id: 'webhook',  title: 'Webhook',           prefixes: ['Webhook'] },
   { id: 'sat',      title: 'SAT',               prefixes: ['SAT'] }
