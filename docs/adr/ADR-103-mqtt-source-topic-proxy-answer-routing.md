@@ -80,7 +80,7 @@ The 1.5.x/dev sibling is **ADR-075** (`docs/adr/ADR-075-mqtt-source-topic-proxy-
 
 - Proxy-answered IDs (MaxTSet/57, and any gateway-served or boiler-unsupported id) become visible on canonical and `_boiler`; default `bSeparateSources = false` users get MaxTSet on the canonical topic again.
 - ADR-096's answer-override invariant is preserved **exactly** — a genuine `B` still owns `_boiler`/canonical; the faked `A` never overwrites it.
-- Minimal surface: one RAM `byte`, one init line, one assignment, one gate predicate, one routing line, plus comment/ADR updates. `T`/`R`/`B` routing and the ADR-066 eligibility gate are untouched. Platform-independent — applies unchanged to ESP8266 and ESP32-S3/OTGW32.
+- Minimal surface: one RAM `byte`, one init line, one assignment, one gate predicate, one routing line, plus comment/ADR updates. `T`/`R`/`B` routing and the ADR-097 eligibility gate are untouched. Platform-independent — applies unchanged to ESP8266 and ESP32-S3/OTGW32.
 
 ### Negative
 
@@ -103,13 +103,13 @@ The 1.5.x/dev sibling is **ADR-075** (`docs/adr/ADR-075-mqtt-source-topic-proxy-
 1. **Completeness:** Status / Context / Decision / Alternatives (4) / Consequences (positive+negative) / Related / References present; filename `ADR-103-mqtt-source-topic-proxy-answer-routing.md` matches the `# ADR-103` heading.
 2. **Evidence:** PR #565 field report (MaxTSet/ID 57 standalone-proxy); concrete feature-line code paths cited with file:line (`MQTTstuff.ino:1658`, `OTGW-Core.ino:1293`, `:4096`/`4102`, `OTGW-Core.h:559`).
 3. **Clarity:** the routing table plus the five named edit sites are the complete implementation spec; single concrete decision (proxy/override split via `bAnswerOverride`), imperative voice, no hedging.
-4. **Consistency:** supersedes ADR-096 (its Status line is set to "Superseded by ADR-103" — body unchanged); preserves ADR-066's eligibility gate and ADR-040; coherent with dev-line ADR-075; ADR-103 is the next free number after 102.
+4. **Consistency:** supersedes ADR-096 (its Status line is set to "Superseded by ADR-103" — body unchanged); preserves ADR-097's eligibility gate and ADR-040; coherent with dev-line ADR-075; ADR-103 is the next free number after 102.
 
 ## Related Decisions
 
 - **ADR-096:** MQTT Source-Subtopic Worldview Semantics (2.0.0 line). **This ADR supersedes ADR-096.** The full worldview routing table is restated here with one added row distinguishing proxy `A` from answer-override `A`. Upon acceptance, ADR-096's Status line is changed (only) to "Superseded by ADR-103, 2026-05-19"; its body remains the historical record.
 - **ADR-075 (dev line):** The 1.5.x sibling of this decision. Identical routing table and discriminator; the decision is coherent across both lines per the cross-worktree convention.
-- **ADR-066:** MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification. Preserved; only which `A` sub-case is eligible for canonical/`_boiler` changes.
+- **ADR-097:** MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification. Preserved; only which `A` sub-case is eligible for canonical/`_boiler` changes.
 - **ADR-040:** MQTT Source-Specific Topics. Unaffected.
 - **PR #565:** The originating field report. Its blanket approach is rejected (Alternative A).
 

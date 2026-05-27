@@ -1148,7 +1148,7 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
   return _valid;
 }
 
-// ADR-066: Master-topic validity check. Mirrors is_value_valid but excludes
+// ADR-097: Master-topic validity check. Mirrors is_value_valid but excludes
 // WRITE-ACK for OT_WRITE / OT_RW messages.
 //
 // ADR-096 refines the canonical interpretation from "thermostat-side intent"
@@ -1168,7 +1168,7 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 // across /thermostat vs /boiler is decided inside publishToSourceTopic() per
 // the ADR-096 worldview rules.
 //
-// See ADR-066 + docs/api/MQTT-message-id-echo-audit.md for the per-MsgID
+// See ADR-097 + docs/api/MQTT-message-id-echo-audit.md for the per-MsgID
 // Write-Ack classification rationale (preserved by this ADR).
 bool is_value_valid_for_master_topic(OpenthermData_t OT, OTlookup_t OTlookup) {
   if (OT.skipthis) return false;
@@ -1186,7 +1186,7 @@ bool is_value_valid_for_master_topic(OpenthermData_t OT, OTlookup_t OTlookup) {
   return _valid;
 }
 
-// ADR-066 (PS=1 amendment, TASK-483 ACs #8-#13): The PS=1 summary stream emits
+// ADR-097 (PS=1 amendment, TASK-483 ACs #8-#13): The PS=1 summary stream emits
 // one value per MsgID, chosen by the PIC from its most recent observation.
 // For OT_WRITE / OT_RW MsgIDs whose slave Write-Ack data byte is per-spec
 // undefined (bSlaveEchoesValue=false in OTmap[]), the PIC may have captured
@@ -1884,7 +1884,7 @@ void print_f88(float& value)
   char _msg[15] {0};
   dtostrf(_value, 3, 2, _msg);
 
-  // ADR-066: gate log decode + state write on master-topic validity. The protocol
+  // ADR-097: gate log decode + state write on master-topic validity. The protocol
   // event stays visible (timestamp/source/msgid/type/indicator are added in processOT);
   // only the per-spec-undefined Write-Ack data byte is suppressed from log + REST state.
   const bool validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem);
@@ -1912,7 +1912,7 @@ void print_s16(int16_t& value)
   char _msg[15] {0};
   itoa(_value, _msg, 10);
 
-  // ADR-066: gate log decode + state write on master-topic validity (see print_f88).
+  // ADR-097: gate log decode + state write on master-topic validity (see print_f88).
   const bool validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem);
   if (validForMaster) {
     AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
@@ -1931,7 +1931,7 @@ void print_s16(int16_t& value)
 
 void print_s8s8(uint16_t& value)
 {
-  // ADR-066: gate log decode + state write on master-topic validity (see print_f88).
+  // ADR-097: gate log decode + state write on master-topic validity (see print_f88).
   const bool validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem);
   if (validForMaster) {
     AddLogf("%s = %3d / %3d %s", OTlookupitem.label, (int8_t)OTdata.valueHB, (int8_t)OTdata.valueLB, OTlookupitem.unit);
@@ -1970,7 +1970,7 @@ void print_u16(uint16_t& value)
   char _msg[15] {0};
   utoa(_value, _msg, 10);
 
-  // ADR-066: gate log decode + state write on master-topic validity (see print_f88).
+  // ADR-097: gate log decode + state write on master-topic validity (see print_f88).
   const bool validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem);
   if (validForMaster) {
     AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
@@ -3510,7 +3510,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
   char valueBuf[12] {0};
   const uint16_t trackedNow = currentTrackedSeconds();
 
-  // ADR-066 (PS=1 amendment): Caller already populated the global OTlookupitem
+  // ADR-097 (PS=1 amendment): Caller already populated the global OTlookupitem
   // via PROGMEM_readAnything(&OTmap[msgid], ...) before invoking us. Use it to
   // gate base-topic publication and OTcurrentSystemState updates so the PS=1
   // path matches the live OT-bus master-topic invariant. setMsgLastUpdated is

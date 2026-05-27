@@ -155,6 +155,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-093: Home Assistant Discovery Retained-Config Orphan Cleanup](ADR-093-ha-discovery-retained-config-orphan-cleanup.md)** 🆕  
   Guideline-level under ADR-080 (one adopter today: BLE roster). When the firmware terminates the lifecycle of a previously advertised HA entity, it publishes a zero-byte retained payload to each discovery config topic via the same streaming primitives as the publish path. Documents the symmetry contract for `satBLEUnpublishDiscovery` in `MQTTstuff.ino` and the `bDiscoveryPublished` gate in `satBLERosterForget`.
 
+- **[ADR-097: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification](ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md)** 🆕  
+  Constrains the legacy base topic to Write-Data only (no Write-Ack) and gates `/boiler` subtopic publication per MsgID via `bSlaveEchoesValue` in the OTlookup table. Prevents base-topic flapping and fake-zero `/boiler` readings for MsgIDs where the OT v4.2 spec defines the Write-Ack data byte as undefined. Refined by ADR-096 (worldview semantics, superseded by ADR-103).
+
 - **[ADR-101: Flat Per-Value MQTT Topics Over Aggregated JSON Payloads](ADR-101-flat-per-value-mqtt-topics-over-aggregated-json-payloads.md)** 🆕  
   Binding decision (owner: Robert van den Breemen, 2026-05-08): OTGW-firmware publishes one plain scalar per topic; aggregated JSON blobs on value topics are forbidden. HA auto-discovery metadata travels separately on `homeassistant/#` config topics. OT-Thing nested-JSON and Tasmota SENSOR-JSON dialects are explicitly not supported. Enforced by `adr-judge` pre-commit hook.
 
@@ -488,7 +491,7 @@ ADR-001 (ESP8266) ──┬──> Establishes: 40KB RAM, no HTTPS, single-core
 13. 2026 Q2: ADR-077 (Streaming HA discovery), ADR-078 (MQTT sub-command dispatch), ADR-079 (Per-component type headers), ADR-080 (Binding ADR rules CI gate), ADR-081 (Types merge into stuff)
 14. 2026 Q2: ADR-082 (Core 2.7.4 LTS pin), ADR-083 (PlatformIO primary), ADR-084 (Generic OT-bus topics), ADR-085 (SAT integration, renumbered), ADR-086 (Time-boundary single caller, renumbered), ADR-087 (Frame Bridge, renumbered)
 15. 2026 Q2: ADR-088 (MQTT status burst windowing), ADR-089 (Heap tier machine contract), ADR-090 (Re-entrancy guard pattern)
-16. 2026 Q2: ADR-093 (HA discovery retained-config orphan cleanup)
+16. 2026 Q2: ADR-093 (HA discovery retained-config orphan cleanup), ADR-097 (MQTT publish gating by source and slave-echo, renumbered from ADR-066)
 
 ## When to Create an ADR
 

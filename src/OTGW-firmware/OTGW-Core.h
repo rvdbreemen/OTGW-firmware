@@ -335,7 +335,7 @@ enum OTLibMessageID {
         const char* label;
         const char* friendlyname;
         const char* unit;
-        bool bSlaveEchoesValue;  // ADR-066: false = slave Write-Ack data byte is per-spec undefined; suppress /boiler publication. Default true.
+        bool bSlaveEchoesValue;  // ADR-097: false = slave Write-Ack data byte is per-spec undefined; suppress /boiler publication. Default true.
     };
 
 	OTlookup_t OTlookupitem;

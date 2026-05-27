@@ -1697,13 +1697,13 @@ void publishMQTTInt(const __FlashStringHelper* topic, int value) {
 // override visibility is achieved by divergence between _thermostat and
 // _boiler, not by a third topic.
 //
-// The ADR-066 Write-Ack gate (bSlaveEchoesValue) suppresses real-boiler
+// The ADR-097 Write-Ack gate (bSlaveEchoesValue) suppresses real-boiler
 // Write-Ack frames whose data byte is per-spec undefined; see the gate
 // comment inside the function for the OTdata.type vs rsptype distinction.
 void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
 {
   if (!settings.mqtt.bSeparateSources || !topic || !json) return;
-  // ADR-066: skip the source subtopics for MsgIDs where the slave's Write-Ack
+  // ADR-097: skip the source subtopics for MsgIDs where the slave's Write-Ack
   // data byte is per-spec undefined. Without this gate, the _thermostat /
   // _boiler topics flap between the Write-Data value and the Ack's protocol-
   // zero (e.g. Tr, TrSet, MaxRelModLevelSetting). The bSlaveEchoesValue flag

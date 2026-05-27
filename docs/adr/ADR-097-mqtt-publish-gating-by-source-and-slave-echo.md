@@ -1,4 +1,4 @@
-# ADR-066: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification
+# ADR-097: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification
 
 **Status:** Proposed
 **Date:** 2026-04-28

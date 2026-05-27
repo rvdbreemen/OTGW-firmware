@@ -617,7 +617,7 @@ Without override, all three publish the same value. `_thermostat` and `_boiler` 
 
 There is no `_gateway` topic — override is visible by comparing `_thermostat` and `_boiler`.
 
-#### Canonical-topic publish gating (ADR-066, preserved)
+#### Canonical-topic publish gating (ADR-097, preserved)
 
 The canonical topic `{TopTopic}/value/{UniqueId}/{label}` does not receive Write-Ack frames. The `_boiler` topic is additionally gated by a per-MsgID `bSlaveEchoesValue` flag in the OTlookup table. For MsgIDs where the OpenTherm v4.2 specification defines the slave's Write-Ack data field as undefined (typically `Tr` 24, `TrSet` 16, `MaxRelModLevelSetting` 14, `TrSetCH2` 23, `TRoomCH2` 37, `RFstrengthbatterylevel` 98), the `_boiler` topic is NOT updated for Write-Ack messages. The slave's acknowledgement carries no measurement; suppressing it avoids polluting the per-source observability surface with fake-zero readings.
 
