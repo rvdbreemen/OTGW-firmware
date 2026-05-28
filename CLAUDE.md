@@ -130,6 +130,58 @@ Files >2 KB: `httpServer.streamFile()`. `index.html` is ~11 KB — never `f.read
 
 Trusted LAN only. REST API works behind HTTPS reverse proxy, but WebSocket assumes plain WS.
 
+### ESP Platform Abstraction — no raw `#ifdef ESP8266`/`ESP32` outside the abstraction layer
+
+The 2.0.0 branch carries an explicit platform abstraction so that
+application code is written against shims and capability flags, never
+against raw platform symbols. **No `#if(def) ESP8266`, `#if(def) ESP32`,
+`#if(def) ARDUINO_ARCH_ESP*`, or `#if(def) BOARD_NODOSHOP_ESP*` may appear
+outside the allowlisted abstraction files.**
+
+Allowlisted files (the only place these conditionals belong):
+
+- `src/OTGW-firmware/platform.h` — dispatcher
+- `src/OTGW-firmware/platform_esp8266.h` — ESP8266 includes, shims, type aliases
+- `src/OTGW-firmware/platform_esp32.h` — ESP32 includes, shims, type aliases
+- `src/OTGW-firmware/boards.h` — pin maps and `HAS_*` capability flags
+- `src/OTGW-firmware/OTGW-ModUpdateServer{.h,-esp32.h,-impl.h}` — parallel mini-abstraction for the firmware update server
+
+Application code MUST instead:
+
+1. **Call `platformXxx()` shims** from `platform_*.h` for any divergent API
+   (heap, hostname, MAC, reset, NTP, LED, JSON tx, WiFi, BLE, …). If a
+   shim does not exist yet for a divergence you need, *add the shim first*
+   in both `platform_esp8266.h` and `platform_esp32.h` — including an
+   inline no-op stub on the platform where the feature is absent — and
+   then call it unguarded from application code.
+2. **Gate optional features with `HAS_*` flags** from `boards.h`
+   (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`,
+   `HAS_SAT_BLE`, `HAS_WEATHER_FORECAST`, etc.). If your feature does not
+   yet have a flag, add one to `boards.h` first.
+3. **Never read raw board macros (`BOARD_NODOSHOP_ESP32`, …) outside
+   `boards.h`.** Those decide which `HAS_*` flags are set; the rest of
+   the firmware sees only the `HAS_*` flags.
+4. **Never call `ESP.getXxx()` directly** when a `platformXxx()` shim
+   already exists (`platformFreeHeap`, `platformMinFreeHeap`,
+   `platformMaxFreeBlock`, `platformHeapFragmentation`, `platformRestart`,
+   `platformChipId`, `platformFlashChip*`, etc.). Skipping the shim is a
+   quieter form of the same leak — it bypasses the platform's substitution
+   point.
+
+When adding a new feature that diverges per platform, the **first** thing
+to write is the shim or the `HAS_*` flag, not the application code that
+needs it. The platform headers are the public API of the abstraction; the
+.ino files are clients.
+
+`evaluate.py::check_esp_abstraction_boundary()` enforces this rule with a
+baseline-ratchet: it FAILs on any new violation above the recorded
+`ESP_ABSTRACTION_BASELINE` and WARNs while any pre-existing violation
+remains. The current baseline and remediation roadmap live in
+`docs/audits/2026-05-28-esp-abstraction-leak-audit.md` (TASK-739) and the
+tier tasks TASK-740..746. **Each tier task must lower
+`ESP_ABSTRACTION_BASELINE` in `evaluate.py` as part of its Definition of
+Done.**
+
 ### Architecture rules
 
 - PIC commands: always `addOTWGcmdtoqueue()`, never direct serial write

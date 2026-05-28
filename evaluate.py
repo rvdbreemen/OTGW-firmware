@@ -493,6 +493,73 @@ def otdirect_25238_bridge_regressions(
     }
 
 
+# === ESP abstraction boundary (TASK-739) =================================
+#
+# The 2.0.0 branch carries an explicit ESP8266/ESP32 abstraction layer
+# (platform.h + platform_esp*.h + boards.h + the OTGW-ModUpdateServer trio).
+# Application code MUST NOT branch on raw ESP8266 / ESP32 / ARDUINO_ARCH_ESP*
+# / BOARD_NODOSHOP_ESP* preprocessor symbols — that work belongs in the
+# abstraction headers, called from application code via platformXxx() shims
+# or gated by HAS_* capability flags from boards.h.
+#
+# Baseline ratchet: ESP_ABSTRACTION_BASELINE is the maximum tolerated count
+# of violating sites. The gate FAILs above the baseline (regression) and
+# WARNs while any violation remains. Each remediation tier task
+# (TASK-740..746) must lower the baseline as part of its DoD.
+
+ESP_ABSTRACTION_ALLOWED_FILES: Tuple[str, ...] = (
+    "src/OTGW-firmware/platform.h",
+    "src/OTGW-firmware/platform_esp8266.h",
+    "src/OTGW-firmware/platform_esp32.h",
+    "src/OTGW-firmware/boards.h",
+    "src/OTGW-firmware/OTGW-ModUpdateServer.h",
+    "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h",
+    "src/OTGW-firmware/OTGW-ModUpdateServer-impl.h",
+)
+
+# Baseline as of 2026-05-28 / commit 9be88a0d. See
+# docs/audits/2026-05-28-esp-abstraction-leak-audit.md.
+ESP_ABSTRACTION_BASELINE: int = 78
+
+_ESP_PLATFORM_PP_RE = re.compile(
+    r'^\s*#\s*(?:if|ifdef|ifndef|elif)\b.*\b'
+    r'(?:ESP8266|ESP32|ARDUINO_ARCH_ESP8266|ARDUINO_ARCH_ESP32'
+    r'|BOARD_NODOSHOP_ESP[A-Za-z0-9_]*)\b'
+)
+
+
+def scan_esp_abstraction_violations(project_dir: Path) -> List[str]:
+    """Return a sorted list of "<relpath>:<line>: <text>" entries for every
+    preprocessor directive outside the abstraction allowlist that branches on
+    a raw ESP platform symbol. Walks src/OTGW-firmware/ (*.ino, *.cpp, *.h
+    excluding the auto-generated *.ino.cpp) and src/libraries/ (*.cpp, *.h)."""
+    allowed = {(project_dir / p).resolve() for p in ESP_ABSTRACTION_ALLOWED_FILES}
+    firmware = project_dir / "src" / "OTGW-firmware"
+    libraries = project_dir / "src" / "libraries"
+
+    files: List[Path] = []
+    files.extend(firmware.glob("*.ino"))
+    files.extend(f for f in firmware.glob("*.cpp") if not f.name.endswith(".ino.cpp"))
+    files.extend(firmware.glob("*.h"))
+    if libraries.exists():
+        files.extend(libraries.rglob("*.cpp"))
+        files.extend(libraries.rglob("*.h"))
+
+    violations: List[str] = []
+    for f in sorted(files):
+        if f.resolve() in allowed:
+            continue
+        try:
+            text = f.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            if _ESP_PLATFORM_PP_RE.match(line):
+                rel = f.relative_to(project_dir).as_posix()
+                violations.append(f"{rel}:{i}: {line.strip()[:80]}")
+    return violations
+
+
 class Colors:
     """ANSI color codes"""
     HEADER = '\033[95m'
@@ -2606,6 +2673,44 @@ class WorkspaceEvaluator:
 
     # ===== BINARY-SAFE COMPARE CHECK =====
 
+    def check_esp_abstraction_boundary(self):
+        """ESP platform abstraction boundary (TASK-739).
+
+        The 2.0.0 branch isolates all ESP8266/ESP32 conditional code behind a
+        platform abstraction layer (platform*.h, boards.h, OTGW-ModUpdateServer
+        trio). This check counts preprocessor sites outside that allowlist
+        that branch on raw ESP platform symbols. The count must never rise
+        above the recorded baseline; the baseline ratchets down task by task
+        as remediation tiers complete (TASK-740..746). See
+        docs/audits/2026-05-28-esp-abstraction-leak-audit.md."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ESP Abstraction Boundary ==={Colors.ENDC}")
+
+        violations = scan_esp_abstraction_violations(self.project_dir)
+        n = len(violations)
+        baseline = ESP_ABSTRACTION_BASELINE
+        details_head = "; ".join(violations[:8])
+
+        if n == 0:
+            self.add_result(EvaluationResult(
+                "Architecture", "ESP abstraction boundary", "PASS",
+                "No platform-conditional code outside the abstraction layer",
+            ))
+        elif n > baseline:
+            self.add_result(EvaluationResult(
+                "Architecture", "ESP abstraction boundary", "FAIL",
+                f"Regression: {n} platform-conditional sites (baseline {baseline}). "
+                f"New code must use platformXxx() shims or HAS_* board flags from boards.h.",
+                details_head,
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Architecture", "ESP abstraction boundary", "WARN",
+                f"{n} platform-conditional sites outside abstraction layer "
+                f"(baseline {baseline}, target 0). Lower ESP_ABSTRACTION_BASELINE "
+                f"after each remediation tier task (TASK-740..746).",
+                details_head,
+            ))
+
     def check_binary_safe_compare(self):
         """INFO: flag every strncmp_P / strstr_P call site. These MUST operate on
         null-terminated text only; running them against binary buffers triggers
@@ -2790,6 +2895,7 @@ class WorkspaceEvaluator:
         self.check_progmem_compliance()
         self.check_no_arduinojson()
         self.check_binary_safe_compare()
+        self.check_esp_abstraction_boundary()       # ESP abstraction guardrail (TASK-739)
         self.check_otdirect_25238_bridge()
         self.check_adr102_otbus_liveness_topic()     # ADR-102 CI gate (TASK-623)
         self.check_sat_publishes_use_helpers()       # ADR-111 CI gate (TASK-722)
