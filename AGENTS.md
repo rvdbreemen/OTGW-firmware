@@ -68,6 +68,21 @@ Stream files instead of loading them into RAM. Files larger than roughly 2 KB sh
 
 Do not add HTTPS or WSS support in firmware. This project targets trusted LAN deployment; REST can sit behind an HTTPS reverse proxy, while WebSocket assumptions remain plain WS.
 
+### ESP Platform Abstraction
+
+The 2.0.0 branch carries an explicit platform abstraction. **No `#if(def) ESP8266`, `#if(def) ESP32`, `#if(def) ARDUINO_ARCH_ESP*`, or `#if(def) BOARD_NODOSHOP_ESP*` may appear outside the allowlisted abstraction files.** The allowlist is: `src/OTGW-firmware/platform.h`, `platform_esp8266.h`, `platform_esp32.h`, `boards.h`, and the `OTGW-ModUpdateServer{.h,-esp32.h,-impl.h}` trio.
+
+Application code must instead:
+
+- Call `platformXxx()` shims from `platform_*.h` for any divergent API (heap, hostname, MAC, reset, NTP, LED, JSON tx, WiFi, BLE, ...). If the shim you need does not exist, **add it first** in both `platform_esp8266.h` and `platform_esp32.h` (use an inline no-op stub on the platform where the feature is absent), then call it unguarded from application code.
+- Gate optional features with `HAS_*` capability flags from `boards.h` (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`, `HAS_SAT_BLE`, `HAS_WEATHER_FORECAST`, etc.). If your feature has no flag yet, add one to `boards.h` first.
+- Never reference raw board macros (`BOARD_NODOSHOP_ESP32`, ...) outside `boards.h`. Those decide which `HAS_*` flags are set; the rest of the firmware sees only the `HAS_*` flags.
+- Never call `ESP.getXxx()` directly when a `platformXxx()` shim exists (`platformFreeHeap`, `platformMinFreeHeap`, `platformMaxFreeBlock`, `platformHeapFragmentation`, `platformRestart`, `platformChipId`, `platformFlashChip*`, ...). Bypassing the shim is a quieter form of the same leak.
+
+When adding a feature that diverges per platform, write the shim or the `HAS_*` flag first, the application code second. Platform headers are the public API of the abstraction; `.ino` files are clients.
+
+`evaluate.py::check_esp_abstraction_boundary()` enforces this with a baseline-ratchet: FAIL on any new violation above `ESP_ABSTRACTION_BASELINE`, WARN while any pre-existing violation remains. The current baseline, full leak inventory, and tiered remediation plan live in `docs/audits/2026-05-28-esp-abstraction-leak-audit.md` (TASK-739) and tasks TASK-740..746. Every remediation tier task must lower `ESP_ABSTRACTION_BASELINE` in `evaluate.py` as part of its Definition of Done.
+
 ### Architecture rules
 
 - PIC commands must go through `addOTWGcmdtoqueue()`. Do not write command bytes directly to the PIC serial path.
