@@ -1,11 +1,11 @@
 ---
 id: TASK-739
 title: 'ESP abstraction audit: persist findings, guardrail, instructions'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-28 08:27'
-updated_date: '2026-05-28 08:37'
+updated_date: '2026-05-28 10:37'
 labels: []
 dependencies: []
 ordinal: 66000
