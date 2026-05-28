@@ -11,6 +11,9 @@
 */
 
 #include <ctype.h>
+#if defined(ESP8266)
+  #include <coredecls.h>   // ESP8266 SDK crc32(); used by updateSetting() no-op detection
+#endif
 
 //=======================================================================
 // Deferred settings write support (Finding #23: reduce flash wear + service restarts)
@@ -617,16 +620,16 @@ void updateSetting(const char *field, const char *newValue)
   // 6 full /settings.ini rewrites in 14 s for a single SAT/BLE form interaction
   // because identical-value writes (satblemac flushed twice with the same empty
   // value; satexternaltemp toggled false→true→false→true) all marked the
-  // settings dirty. Snapshot the entire OTGWSettings struct + pendingSideEffects
-  // before the dispatch cascade runs; if memcmp shows zero diff after, restore
-  // pendingSideEffects and return early without setting settingsDirty or
-  // restarting the debounce timer.
-  //
-  // Static buffer (one per call site, not on stack) — OTGWSettings is ~1-2 KB on
-  // ESP8266 and would otherwise pressure the stack. updateSetting() is not
-  // re-entered (REST handler is sequential), so static is safe.
+  // settings dirty. On ESP8266 the snapshot uses a CRC32 sentinel (~4 B local
+  // vs ~1.7 KB BSS for the previous full-struct memcmp); on ESP32 the full
+  // struct copy is retained because DRAM is plentiful and crc32() isn't part
+  // of the ESP32 core's public API.
+#if defined(ESP8266)
+  const uint32_t _noopCrcBefore = crc32(&settings, sizeof(settings));
+#else
   static OTGWSettings _noopSnapshot;
   memcpy(&_noopSnapshot, &settings, sizeof(settings));
+#endif
   const uint8_t pendingSideEffectsSnapshot = pendingSideEffects;
 
   if (strcasecmp_P(field, PSTR("hostname"))==0)
@@ -1114,7 +1117,11 @@ void updateSetting(const char *field, const char *newValue)
   // NOT restart the debounce timer (which would have triggered a wasted flash
   // rewrite). Verified by smoke test toggling satblemac twice with the same
   // empty value: only one would-be flush fires.
+#if defined(ESP8266)
+  if (crc32(&settings, sizeof(settings)) == _noopCrcBefore) {
+#else
   if (memcmp(&_noopSnapshot, &settings, sizeof(settings)) == 0) {
+#endif
     pendingSideEffects = pendingSideEffectsSnapshot;
     DebugTf(PSTR("[Settings] no-op skip: field[%s] equals current value, no flush scheduled\r\n"), field);
     return;
