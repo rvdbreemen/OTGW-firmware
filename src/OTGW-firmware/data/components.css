@@ -618,21 +618,76 @@ body.dark .settingDiv,
 .settingDiv::after { content: ""; display: table; clear: both; }
 
 /* Settings groups (DS:SETTINGS-GROUP) — wrap related .settingDiv rows
- * in a ds-card with a heading. The .settings-group-body neutralises the
- * outer margin that .settingDiv sets so rows align to the card edges. */
+ * in a ds-card with a heading. Two-column subgrid: column 1 = widest
+ * label (max-content), column 2 = remaining space. Max-width limits the
+ * card to a compact, smartphone-like width. */
 .settings-group {
   margin: 16px;
   padding: var(--space-5);
+  max-width: 520px;
 }
 .settings-group-title {
   margin: 0 0 var(--space-4);
   font-size: var(--fs-h3);
   color: var(--fg-1);
 }
-.settings-group-body .settingDiv {
-  margin: 0 0 var(--space-2);
+/* Parent grid defines two columns; rows inherit via subgrid so every
+ * settingDiv label aligns to the same column edge. */
+.settings-group-body {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  row-gap: 4px;
 }
-.settings-group-body .settingDiv:last-child { margin-bottom: 0; }
+/* Each settingDiv spans both columns and subgrids into them so its
+ * label child lands in col 1 and its input-container in col 2. */
+.settings-group-body .settingDiv {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  margin: 0;
+}
+/* Fixed-IP section has a complex internal structure; keep it as a block
+ * that spans the full width without subgrid interference. */
+.settings-group-body > .fixed-ip-section {
+  display: block;
+  grid-column: 1 / -1;
+}
+/* Col 1: label shrinks to its own content, never wraps */
+.settings-group-body .settingDiv .settings-field-container {
+  float: none;
+  width: auto;
+  white-space: nowrap;
+  padding: var(--space-1) var(--space-4) var(--space-1) 0;
+  background: var(--brand-lightblue);
+  display: flex;
+  align-items: center;
+  padding-top: 0;
+}
+/* Col 2: input + optional button fill the remaining cell */
+.settings-group-body .settingDiv .settings-input-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--brand-lightblue);
+  padding: var(--space-1) 0 var(--space-1) var(--space-3);
+  min-width: 0;
+}
+/* Inputs flex to fill the input-container cell */
+.settings-group-body .settingDiv input[type="text"],
+.settings-group-body .settingDiv input[type="password"],
+.settings-group-body .settingDiv input[type="number"],
+.settings-group-body .settingDiv select {
+  flex: 1;
+  min-width: 80px;
+  width: auto;
+}
+body.dark .settings-group-body .settingDiv .settings-field-container,
+[data-theme="dark"] .settings-group-body .settingDiv .settings-field-container,
+body.dark .settings-group-body .settingDiv .settings-input-container,
+[data-theme="dark"] .settings-group-body .settingDiv .settings-input-container {
+  background: var(--bg-surface);
+  color: var(--fg-2);
+}
 
 /* Fixed IP configuration section (DS:SETTINGS-FIXED-IP) — segmented octet
  * inputs for static IP entry, with a DHCP toggle that shows/hides the field
