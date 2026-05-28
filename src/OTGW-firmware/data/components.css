@@ -635,7 +635,7 @@ body.dark .settingDiv,
  * settingDiv label aligns to the same column edge. */
 .settings-group-body {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: var(--settings-label-w, max-content) 1fr;
   row-gap: 4px;
 }
 /* Each settingDiv spans both columns and subgrids into them so its

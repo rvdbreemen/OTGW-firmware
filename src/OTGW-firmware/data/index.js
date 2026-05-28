@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.84
+**  Version  : v2.0.0-alpha.86
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -6259,6 +6259,7 @@ function refreshSettings() {
         var networkBody = networkSection ? networkSection.querySelector('.settings-group-body') : null;
         buildWifiScanPanel(networkBody || settingsPageEl);
       }
+      normalizeSettingsLabelWidth();
     })
     .catch(function (error) {
       var msgEl = document.getElementById("settingMessage");
@@ -6267,6 +6268,17 @@ function refreshSettings() {
 
 } // refreshSettings()
 
+function normalizeSettingsLabelWidth() {
+  var page = document.getElementById('settingsPage');
+  if (!page) return;
+  requestAnimationFrame(function() {
+    var maxW = 0;
+    page.querySelectorAll('.settings-group-body .settings-field-container').forEach(function(el) {
+      maxW = Math.max(maxW, el.getBoundingClientRect().width);
+    });
+    if (maxW > 0) page.style.setProperty('--settings-label-w', maxW + 'px');
+  });
+}
 
 //============================================================================
 function testWebhookUI(stateOn) {
