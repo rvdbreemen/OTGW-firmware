@@ -1987,7 +1987,12 @@ static const char kRouteDiscovery[]  PROGMEM = "discovery";
 static const char kRouteDebugDump[]  PROGMEM = "debug";
 static const char kRouteNetwork[]    PROGMEM = "network";  // TASK-585
 
-static const ApiRoute kV2Routes[] = {
+// Dispatch table placed in PROGMEM so the ~136 B of {segment, handler}
+// rows live in flash, not DRAM. Same pattern as kSatMqttCmds in
+// MQTTstuff.ino. The segment string pointers reference named PROGMEM
+// constants (kRouteHealth[] PROGMEM = "health", etc.) so they remain
+// usable with strcmp_P after the row is memcpy_P'd into a stack-local.
+static const ApiRoute kV2Routes[] PROGMEM = {
   { kRouteHealth,     handleHealth },
   { kRouteSettings,   handleSettings },
   { kRouteSensors,    handleSensors },
@@ -2062,13 +2067,16 @@ void processAPI()
         if (!checkHttpAuth()) return;
       }
 
-      // Dispatch via route table
+      // Dispatch via route table (table is PROGMEM; copy row into stack-local before reading)
       if (wc > 3) {
-        for (const ApiRoute* r = kV2Routes; r->segment != nullptr; r++) {
-          if (strcmp_P(words[3], r->segment) == 0) {
+        for (size_t i = 0; ; i++) {
+          ApiRoute r;
+          memcpy_P(&r, &kV2Routes[i], sizeof(ApiRoute));
+          if (r.segment == nullptr) break;  // sentinel
+          if (strcmp_P(words[3], r.segment) == 0) {
             restResponseStatus = 200; // default; overwritten by sendApiError if handler fails
-            r->handler(words, wc, method, originalURI);
-            RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r->segment, millis() - startMs);
+            r.handler(words, wc, method, originalURI);
+            RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r.segment, millis() - startMs);
             return;
           }
         }
