@@ -1230,6 +1230,113 @@ class WorkspaceEvaluator:
                 detail
             ))
 
+    # ===== ESP8266 STATIC-DRAM GUARDS (memory audit, PR #644) =====
+
+    def check_no_settings_state_snapshots(self):
+        """Catch regression of the _noopSnapshot anti-pattern.
+
+        Any ``static OTGWSettings <name>`` or ``static OTGWState <name>``
+        declaration outside the canonical global definitions in
+        ``OTGW-firmware.h`` is a multi-KB DRAM consumer on ESP8266 (one
+        full struct copy per declaration). The audit's "Trim 1"
+        eliminated the original instance in ``settingStuff.ino`` by
+        replacing the snapshot with a CRC32 sentinel. This check
+        prevents the pattern from reappearing.
+        """
+        src_dir = config.FIRMWARE_ROOT
+        pat = re.compile(
+            r"^\s*static\s+(OTGWSettings|OTGWState)\s+\w+\s*[;=]",
+            re.MULTILINE,
+        )
+        # Inline allowlist marker (any of these on the same or previous line
+        # exempts the declaration — used for the ESP32 fallback path where
+        # crc32() from ESP8266 core is not available).
+        ALLOW_MARKER = "noqa: settings-snapshot"
+        offenders: List[str] = []
+        for fn in list(src_dir.glob("*.ino")) + list(src_dir.glob("*.cpp")) + list(src_dir.glob("*.h")):
+            if fn.name == "OTGW-firmware.h":
+                continue  # canonical globals live here
+            try:
+                content = fn.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            lines = content.splitlines()
+            for m in pat.finditer(content):
+                line_no = content[: m.start()].count("\n") + 1
+                # Check the matched line and the two lines above for the
+                # marker (covers a short multi-line justification comment).
+                idx = line_no - 1
+                context_lines = lines[max(0, idx - 2) : idx + 1]
+                if any(ALLOW_MARKER in ln for ln in context_lines):
+                    continue
+                offenders.append(f"{fn.name}:{line_no}")
+        if offenders:
+            shown = "; ".join(offenders[:5])
+            if len(offenders) > 5:
+                shown += f"; (+{len(offenders) - 5} more)"
+            self.add_result(EvaluationResult(
+                "Memory", "settings/state snapshot copies", "FAIL",
+                f"Found {len(offenders)} `static OTGW(Settings|State)` declaration(s) outside OTGW-firmware.h",
+                shown + " — use a CRC32 sentinel instead (memory audit Trim 1)"
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Memory", "settings/state snapshot copies", "PASS",
+                "No static OTGWSettings/OTGWState declarations outside OTGW-firmware.h"
+            ))
+
+    def check_dispatch_tables_progmem(self):
+        """Catch dispatch tables placed in .rodata (= DRAM on ESP8266).
+
+        Tables named with the ``k*`` prefix (project convention) and
+        typed as a non-trivial struct (i.e. not a char/byte/int array)
+        must carry the ``PROGMEM`` annotation, otherwise they sit in
+        ``.rodata`` which is DRAM on the ESP8266 linker layout. The
+        rows must then be dispatched via ``memcpy_P`` into stack-locals
+        before reading their fields. See ``kSatMqttCmds`` in
+        ``MQTTstuff.ino`` and ``kV2Routes`` in ``restAPI.ino`` for the
+        canonical pattern (memory audit Trim 2).
+        """
+        src_dir = config.FIRMWARE_ROOT
+        # Match: static const <StructType> k<Name>[] = { ... }   (no PROGMEM)
+        pat = re.compile(
+            r"^\s*static\s+const\s+([A-Za-z_]\w*)\s+(k[A-Za-z_]\w*)\s*\[\s*\]\s*=",
+            re.MULTILINE,
+        )
+        # Element types we deliberately skip — these are char/byte/int arrays
+        # whose string-pool placement on this linker layout is already
+        # PROGMEM-equivalent, or whose individual size is trivially small.
+        skip_types = {
+            "char", "uint8_t", "int", "uint16_t", "uint32_t",
+            "int32_t", "byte", "size_t",
+        }
+        offenders: List[str] = []
+        for fn in list(src_dir.glob("*.ino")) + list(src_dir.glob("*.cpp")):
+            try:
+                content = fn.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for m in pat.finditer(content):
+                element_type = m.group(1)
+                if element_type in skip_types:
+                    continue
+                line_no = content[: m.start()].count("\n") + 1
+                offenders.append(f"{fn.name}:{line_no} {m.group(2)} ({element_type})")
+        if offenders:
+            shown = "; ".join(offenders[:5])
+            if len(offenders) > 5:
+                shown += f"; (+{len(offenders) - 5} more)"
+            self.add_result(EvaluationResult(
+                "Memory", "dispatch tables in PROGMEM", "WARN",
+                f"Found {len(offenders)} dispatch table(s) missing PROGMEM annotation",
+                shown + " — annotate `[] PROGMEM` and dispatch via memcpy_P (audit Trim 2)"
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "Memory", "dispatch tables in PROGMEM", "PASS",
+                "All k* struct-element dispatch tables are PROGMEM-annotated"
+            ))
+
     # ===== STATUS BURST TUNING (TASK-353/368) =====
 
     def check_status_burst_cooldown_bound(self):
@@ -2800,6 +2907,8 @@ class WorkspaceEvaluator:
         self.check_publishedtopic_counter_reset()     # ADR-062 CI gate (TASK-364)
         self.check_ha_sensor_index_consistency()      # HA discovery gate (TASK-392)
         self.check_json_buffer_arithmetic()           # TASK-352/368
+        self.check_no_settings_state_snapshots()      # ESP8266 memory audit PR #644 Trim 1 gate
+        self.check_dispatch_tables_progmem()          # ESP8266 memory audit PR #644 Trim 2 gate
         self.check_status_burst_cooldown_bound()      # TASK-353/368
         self.check_status_publishers_wrap_burst()     # TASK-347/354/368, ADR-088 sub-rule 1
         self.check_drip_consults_deferred()           # TASK-426, ADR-088 sub-rule 3

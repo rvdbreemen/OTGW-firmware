@@ -627,6 +627,8 @@ void updateSetting(const char *field, const char *newValue)
 #if defined(ESP8266)
   const uint32_t _noopCrcBefore = crc32(&settings, sizeof(settings));
 #else
+  // noqa: settings-snapshot — ESP32 has plentiful DRAM; the ESP8266
+  // core's crc32() helper is not part of the ESP32 Arduino API.
   static OTGWSettings _noopSnapshot;
   memcpy(&_noopSnapshot, &settings, sizeof(settings));
 #endif
