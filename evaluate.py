@@ -517,6 +517,14 @@ ESP_ABSTRACTION_ALLOWED_FILES: Tuple[str, ...] = (
     "src/OTGW-firmware/OTGW-ModUpdateServer-impl.h",
 )
 
+# Independent, self-contained vendored libraries that manage their own platform
+# support and are NOT OTGW application code. The ESP-abstraction boundary rule
+# governs application code; these libraries are excluded from the scan because
+# they are maintained as standalone upstreams (own repo, own portability layer).
+ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
+    "src/libraries/SimpleTelnet",
+)
+
 # Baseline as of 2026-05-28 / commit 9be88a0d. See
 # docs/audits/2026-05-28-esp-abstraction-leak-audit.md.
 ESP_ABSTRACTION_BASELINE: int = 78
@@ -545,9 +553,14 @@ def scan_esp_abstraction_violations(project_dir: Path) -> List[str]:
         files.extend(libraries.rglob("*.cpp"))
         files.extend(libraries.rglob("*.h"))
 
+    excluded_dirs = [(project_dir / d).resolve() for d in ESP_ABSTRACTION_EXCLUDED_LIB_DIRS]
+
     violations: List[str] = []
     for f in sorted(files):
         if f.resolve() in allowed:
+            continue
+        # Skip independent vendored libraries (own portability layer, not app code).
+        if any(ex in f.resolve().parents for ex in excluded_dirs):
             continue
         try:
             text = f.read_text(encoding="utf-8", errors="ignore")

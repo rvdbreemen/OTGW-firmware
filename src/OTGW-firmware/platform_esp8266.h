@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp8266.h
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.90
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -32,6 +32,7 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266LLMNR.h>
 #include <LittleFS.h>
+#include <coredecls.h>          // crc32() — used by the settings no-op fingerprint shim
 
 extern "C" {
   #include "user_interface.h"   // wifi_station_dhcpc_stop/start, system_get_rst_info
@@ -246,6 +247,21 @@ inline bool platformSerialHasOverrun(HardwareSerial &serial) {
 
 inline bool platformSerialHasRxError(HardwareSerial &serial) {
   return serial.hasRxError();
+}
+
+// ---- Settings no-op fingerprint (TASK-564) -------------------------------
+// Capture a fingerprint of the settings blob, then test whether a later state
+// is unchanged. ESP8266 uses the SDK crc32() sentinel (~4 B) rather than a full
+// struct snapshot, because DRAM is scarce. Not re-entrant by contract:
+// updateSetting() captures at entry and compares once before returning.
+inline uint32_t &_platformSettingsNoopFp() { static uint32_t fp = 0; return fp; }
+
+inline void platformSettingsNoopCapture(const void *data, size_t len) {
+  _platformSettingsNoopFp() = crc32(data, len);
+}
+
+inline bool platformSettingsNoopUnchanged(const void *data, size_t len) {
+  return crc32(data, len) == _platformSettingsNoopFp();
 }
 
 /***************************************************************************

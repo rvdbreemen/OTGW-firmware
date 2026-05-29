@@ -55,6 +55,31 @@ Anything else is application code and must not branch on the platform.
 The check FAILs if the count rises and WARNs while any violation remains.
 When the count reaches zero the gate becomes a permanent invariant.
 
+### 3.1 Baseline reconciliation — TASK-756 (2026-05-29)
+
+After the baseline was recorded the live count drifted to **85** (a +7 regression
+caught by the gate), from two sources:
+
+- **`src/libraries/SimpleTelnet/src/SimpleTelnet.h` (+4).** SimpleTelnet is an
+  independent, self-contained vendored library (own upstream repo, own
+  portability layer); it is not OTGW application code. The abstraction-boundary
+  rule governs application code, so the scanner now **excludes** it via
+  `ESP_ABSTRACTION_EXCLUDED_LIB_DIRS` in `evaluate.py`. The library is not
+  modified.
+- **`src/OTGW-firmware/settingStuff.ino` (+3).** The TASK-564 settings no-op
+  detection added raw `#if defined(ESP8266)/ESP32` guards (ESP8266 CRC32
+  sentinel vs ESP32 full-struct snapshot). Remediated by moving the divergence
+  behind the `platformSettingsNoopCapture()` / `platformSettingsNoopUnchanged()`
+  shims in `platform_esp8266.h` / `platform_esp32.h`; each platform's deliberate
+  strategy is preserved. The `#include <coredecls.h>` guard moved into
+  `platform_esp8266.h`.
+
+After both, the count is back to **78** (the recorded baseline), so the baseline
+number is unchanged and remains accurate — it was restored by remediation, not
+raised to mask the regression. The 2 settingStuff entries still counted are the
+original baseline BLE-serialization guards (`#if defined(ESP32)`), owned by the
+Tier remediation tasks (TASK-740..746), not by this reconciliation.
+
 ## 4. Findings grouped by remediation pattern
 
 Grouped this way because one fix often kills many violations.

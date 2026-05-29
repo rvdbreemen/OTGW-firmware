@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp32.h
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.90
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -269,6 +269,35 @@ inline bool platformSerialHasOverrun(HardwareSerial &serial) {
 inline bool platformSerialHasRxError(HardwareSerial &serial) {
   (void)serial;
   return false;
+}
+
+// ---- Settings no-op fingerprint (TASK-564) -------------------------------
+// ESP32 retains a full-struct byte snapshot (memcmp) rather than a CRC sentinel:
+// DRAM is plentiful and a byte-exact compare avoids CRC collisions, and the
+// ESP8266 SDK crc32() is not part of the ESP32 Arduino API. The buffer is
+// allocated once (settings size is fixed) and reused. Not re-entrant by
+// contract: updateSetting() captures at entry and compares once before return.
+// Fail-safe: if allocation fails, "unchanged" returns false so the caller
+// treats the settings as dirty and writes them.
+struct _PlatformNoopSnap { uint8_t *buf; size_t len; };
+inline _PlatformNoopSnap &_platformSettingsNoopSnap() {
+  static _PlatformNoopSnap s{nullptr, 0};
+  return s;
+}
+
+inline void platformSettingsNoopCapture(const void *data, size_t len) {
+  _PlatformNoopSnap &s = _platformSettingsNoopSnap();
+  if (s.len != len) {
+    free(s.buf);
+    s.buf = static_cast<uint8_t *>(malloc(len));
+    s.len = s.buf ? len : 0;
+  }
+  if (s.buf) memcpy(s.buf, data, len);
+}
+
+inline bool platformSettingsNoopUnchanged(const void *data, size_t len) {
+  _PlatformNoopSnap &s = _platformSettingsNoopSnap();
+  return s.buf && s.len == len && memcmp(s.buf, data, len) == 0;
 }
 
 /***************************************************************************

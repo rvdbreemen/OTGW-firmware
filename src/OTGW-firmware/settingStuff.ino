@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.90
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -11,9 +11,6 @@
 */
 
 #include <ctype.h>
-#if defined(ESP8266)
-  #include <coredecls.h>   // ESP8266 SDK crc32(); used by updateSetting() no-op detection
-#endif
 
 //=======================================================================
 // Deferred settings write support (Finding #23: reduce flash wear + service restarts)
@@ -620,18 +617,10 @@ void updateSetting(const char *field, const char *newValue)
   // 6 full /settings.ini rewrites in 14 s for a single SAT/BLE form interaction
   // because identical-value writes (satblemac flushed twice with the same empty
   // value; satexternaltemp toggled false→true→false→true) all marked the
-  // settings dirty. On ESP8266 the snapshot uses a CRC32 sentinel (~4 B local
-  // vs ~1.7 KB BSS for the previous full-struct memcmp); on ESP32 the full
-  // struct copy is retained because DRAM is plentiful and crc32() isn't part
-  // of the ESP32 core's public API.
-#if defined(ESP8266)
-  const uint32_t _noopCrcBefore = crc32(&settings, sizeof(settings));
-#else
-  // noqa: settings-snapshot — ESP32 has plentiful DRAM; the ESP8266
-  // core's crc32() helper is not part of the ESP32 Arduino API.
-  static OTGWSettings _noopSnapshot;
-  memcpy(&_noopSnapshot, &settings, sizeof(settings));
-#endif
+  // settings dirty. The per-platform fingerprint strategy (ESP8266 CRC32
+  // sentinel vs ESP32 full-struct snapshot) lives behind platformSettingsNoop*
+  // shims (ADR-113 / TASK-756: no raw platform #if in application code).
+  platformSettingsNoopCapture(&settings, sizeof(settings));
   const uint8_t pendingSideEffectsSnapshot = pendingSideEffects;
 
   if (strcasecmp_P(field, PSTR("hostname"))==0)
@@ -1119,11 +1108,7 @@ void updateSetting(const char *field, const char *newValue)
   // NOT restart the debounce timer (which would have triggered a wasted flash
   // rewrite). Verified by smoke test toggling satblemac twice with the same
   // empty value: only one would-be flush fires.
-#if defined(ESP8266)
-  if (crc32(&settings, sizeof(settings)) == _noopCrcBefore) {
-#else
-  if (memcmp(&_noopSnapshot, &settings, sizeof(settings)) == 0) {
-#endif
+  if (platformSettingsNoopUnchanged(&settings, sizeof(settings))) {
     pendingSideEffects = pendingSideEffectsSnapshot;
     DebugTf(PSTR("[Settings] no-op skip: field[%s] equals current value, no flush scheduled\r\n"), field);
     return;
