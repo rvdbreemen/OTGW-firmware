@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : boards.h
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.100
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -54,6 +54,13 @@
 #define HAS_PIC           1    // Has PIC microcontroller for OpenTherm gateway
 #define HAS_DIRECT_OT     0    // No direct OT master (uses PIC)
 #define HAS_ETH_CAPABLE   0    // No Ethernet support
+// SAT feature flags (ESP-abstraction Tier 0, TASK-740; see
+// docs/audits/2026-05-28-esp-abstraction-leak-audit.md §"Tier 0").
+// Tier 0 only declares these; the raw #if defined(ESP32) gates are
+// switched over in Tiers 1-3. Values reflect current ESP8266 behaviour.
+#define HAS_SAT              0  // Smart Auto Thermostat is an ESP32/OTGW32 capability
+#define HAS_SAT_BLE          0  // No BLE radio on ESP8266 (SATble.ino is ESP32-only)
+#define HAS_WEATHER_FORECAST 0  // Basic weather only; hourly forecast is ESP32-only (independent of HAS_SAT)
 #define HW_TYPE_NAME      "otgw-classic"  // Static hardware-type slug / board class (ADR-113)
 
 // ---------------------------------------------------------------------------
@@ -114,6 +121,13 @@
 #define HAS_DIRECT_OT     1    // Direct OT master/slave via OTDirect library
 #define HAS_ETH_CAPABLE   1    // Has W5500 Ethernet module
 #define HAS_OLED_CAPABLE  1    // Onboard 128x64 SSD1306 I2C OLED (runtime probe at 0x3C)
+// SAT feature flags (ESP-abstraction Tier 0, TASK-740; see
+// docs/audits/2026-05-28-esp-abstraction-leak-audit.md §"Tier 0").
+// Tier 0 only declares these; the raw #if defined(ESP32) gates are
+// switched over in Tiers 1-3. Values reflect current ESP32 behaviour.
+#define HAS_SAT              1  // Smart Auto Thermostat runs on OTGW32 (OTDirect boiler control)
+#define HAS_SAT_BLE          1  // ESP32-S3 BLE radio present (SATble.ino room-sensor support)
+#define HAS_WEATHER_FORECAST 1  // Full weather incl. 24h hourly forecast arrays (independent of HAS_SAT)
 #define HW_TYPE_NAME      "otgw32"        // Static hardware-type slug / board class (ADR-113)
 
 // ---------------------------------------------------------------------------

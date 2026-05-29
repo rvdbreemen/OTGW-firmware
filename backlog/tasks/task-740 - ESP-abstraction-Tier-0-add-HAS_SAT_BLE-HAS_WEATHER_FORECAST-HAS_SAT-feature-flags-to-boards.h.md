@@ -3,9 +3,11 @@ id: TASK-740
 title: >-
   ESP abstraction Tier 0: add HAS_SAT_BLE, HAS_WEATHER_FORECAST, HAS_SAT feature
   flags to boards.h
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-28 08:28'
+updated_date: '2026-05-29 20:58'
 labels:
   - esp-abstraction-audit
   - refactor
@@ -21,10 +23,16 @@ Infrastructure work that all higher tiers depend on. Add three feature flags in 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 boards.h defines HAS_SAT for every supported BOARD_NODOSHOP_* with the correct value
-- [ ] #2 boards.h defines HAS_SAT_BLE for every supported board
-- [ ] #3 boards.h defines HAS_WEATHER_FORECAST for every supported board
-- [ ] #4 Each flag is documented inline with a one-line comment naming its rationale
+- [x] #1 boards.h defines HAS_SAT for every supported BOARD_NODOSHOP_* with the correct value
+- [x] #2 boards.h defines HAS_SAT_BLE for every supported board
+- [x] #3 boards.h defines HAS_WEATHER_FORECAST for every supported board
+- [x] #4 Each flag is documented inline with a one-line comment naming its rationale
 - [ ] #5 python build.py --firmware passes on both ESP8266 and ESP32 board configs (no functional change yet, just new macros)
-- [ ] #6 References docs/audits/esp-abstraction-leak-audit-YYYY-MM-DD.md section Tier 0
+- [x] #6 References docs/audits/esp-abstraction-leak-audit-YYYY-MM-DD.md section Tier 0
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Added HAS_SAT/HAS_SAT_BLE/HAS_WEATHER_FORECAST to both BOARD_NODOSHOP_* blocks in boards.h (ESP8266=0/0/0, ESP32=1/1/1). Tier 0 is declarative only: no #ifdef switched, values mirror current behaviour. HAS_WEATHER_FORECAST is independent of HAS_SAT (basic weather stays on ESP8266; only hourly-forecast arrays are gated). Each flag has an inline rationale comment + reference to docs/audits/2026-05-28-esp-abstraction-leak-audit.md Tier 0. AC#5 (build both targets) pending: shared-worktree build collisions with concurrent codex builds clobber .pio mid-link; 3 unused #defines cannot affect compilation, full build verification deferred until the tree is free.
+<!-- SECTION:NOTES:END -->
