@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.102
+**  Version  : v2.0.0-alpha.103
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1641,15 +1641,10 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("build.githash"), _VERSION_GITHASH);
   sendJsonMapEntry(F("build.date"), _VERSION_DATE);
 
-  sendJsonMapEntry(F("runtime.heap_free"), (uint32_t)ESP.getFreeHeap());
-#if defined(ESP32)
-  sendJsonMapEntry(F("runtime.heap_min_free"), (uint32_t)ESP.getMinFreeHeap());
-  sendJsonMapEntry(F("runtime.heap_max_alloc"), (uint32_t)ESP.getMaxAllocHeap());
-#else
-  sendJsonMapEntry(F("runtime.heap_frag_pct"), (uint32_t)ESP.getHeapFragmentation());
-  sendJsonMapEntry(F("runtime.heap_min_free"), (uint32_t)getMinFreeHeap());
-  sendJsonMapEntry(F("runtime.heap_max_alloc"), (uint32_t)ESP.getMaxFreeBlockSize());
-#endif
+  sendJsonMapEntry(F("runtime.heap_free"), (uint32_t)platformFreeHeap());
+  sendJsonMapEntry(F("runtime.heap_frag_pct"), (uint32_t)platformHeapFragmentation());
+  sendJsonMapEntry(F("runtime.heap_min_free"), (uint32_t)platformMinFreeHeap());
+  sendJsonMapEntry(F("runtime.heap_max_alloc"), (uint32_t)platformMaxFreeBlock());
   sendJsonMapEntry(F("runtime.uptime_sec"), (uint32_t)state.uptime.iSeconds);
   sendJsonMapEntry(F("runtime.reboots"), (uint32_t)state.uptime.iRebootCount);
   sendJsonMapEntry(F("runtime.wifi_connected"), (WiFi.status() == WL_CONNECTED));

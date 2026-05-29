@@ -32,7 +32,7 @@ static const uint16_t WEATHER_OWM_MIN_SEC      = 900;
 
 // Hourly forecast arrays — ESP32 only.
 // ESP8266 does not request hourly data; omitting saves ~240 bytes of BSS.
-#ifndef ESP8266
+#if HAS_WEATHER_FORECAST
 static const uint8_t  WEATHER_FORECAST_HOURS   = 24;
 // temperature_2m: primary thermal load forecast (float — °C)
 static float    _weather_forecastTemp[WEATHER_FORECAST_HOURS];
@@ -43,7 +43,7 @@ static uint8_t  _weather_forecastCloud[WEATHER_FORECAST_HOURS];
 // precipitation_probability: scheduling guard (uint8_t — % 0-100)
 static uint8_t  _weather_forecastPrecipProb[WEATHER_FORECAST_HOURS];
 static uint8_t  _weather_forecastCount = 0;
-#endif  // ifndef ESP8266
+#endif  // HAS_WEATHER_FORECAST
 
 // Timer — fires every 15 min.  SKIP_MISSED_TICKS: if the loop was busy and a
 // tick was missed, fire once then restart the full 15-min window.  Never
@@ -60,7 +60,7 @@ DECLARE_TIMER_SEC(timerWeatherPoll, WEATHER_POLL_DEFAULT_SEC, SKIP_MISSED_TICKS)
 // OpenWeatherMap is platform-agnostic (same URL, same response shape) so the
 // OWM constant lives outside the platform split. PR #559 originally defined
 // kWeatherOwmUrlFmt only in the ESP8266 branch, breaking the ESP32 build.
-#ifdef ESP8266
+#if !HAS_WEATHER_FORECAST
 // Minimal current-conditions request: only the 5 fields SAT actually uses.
 // Produces ~450-byte response — stream-parsed with no heap allocation.
 // HTTP only (no TLS) — firmware never does HTTPS (ADR constraint).
@@ -78,7 +78,7 @@ static const char kWeatherUrlFmt[] PROGMEM =
   ",pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
   "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature"
   ",precipitation_probability,cloud_cover,cloud_cover_low,cloud_cover_mid";
-#endif  // ifdef ESP8266
+#endif  // !HAS_WEATHER_FORECAST
 
 // OpenWeatherMap Current Weather API (HTTP, firmware-side). Key required.
 // Same URL on both platforms; ~400-byte response.
@@ -173,7 +173,7 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
   int  depth        = 0;
   bool inCurrent    = false;
   int  currentDepth = 0;
-#ifndef ESP8266
+#if HAS_WEATHER_FORECAST
   bool inHourly    = false;
   int  hourlyDepth = 0;
   float*   arrFloat = nullptr;
@@ -189,7 +189,7 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
     if (c == '{') { depth++; continue; }
     if (c == '}') {
       if (--depth < currentDepth) inCurrent = false;
-      #ifndef ESP8266
+      #if HAS_WEATHER_FORECAST
       if (  depth < hourlyDepth)  inHourly  = false;
       #endif
       continue;
@@ -220,12 +220,12 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
     } else if (c == '{') {
       depth++;
       if (strcmp_P(keyBuf, PSTR("current")) == 0) { inCurrent = true; currentDepth = depth; }
-      #ifndef ESP8266
+      #if HAS_WEATHER_FORECAST
       else if (strcmp_P(keyBuf, PSTR("hourly"))  == 0) { inHourly  = true; hourlyDepth  = depth; }
       #endif
 
     } else if (c == '[') {
-#ifndef ESP8266
+#if HAS_WEATHER_FORECAST
       if (inHourly) {
         arrFloat = nullptr; arrU8 = nullptr; arrMax = 0; arrPos = 0;
         if      (strcmp_P(keyBuf, PSTR("temperature_2m"))            == 0) { arrFloat = _weather_forecastTemp;        arrMax = WEATHER_FORECAST_HOURS; }
@@ -260,7 +260,7 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
       }
 #else
       wstreamSkipArray(stream, http);
-#endif  // ifndef ESP8266
+#endif  // HAS_WEATHER_FORECAST
 
     } else if ((c >= '0' && c <= '9') || c == '-') {
       // ── Scalar number ──
@@ -272,7 +272,7 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
         else if (strcmp_P(keyBuf, PSTR("relative_humidity_2m")) == 0) state.sat.weather.fHumidity      = val;
         else if (strcmp_P(keyBuf, PSTR("wind_speed_10m"))       == 0) state.sat.weather.fWindSpeed     = val;
         else if (strcmp_P(keyBuf, PSTR("cloud_cover"))          == 0) state.sat.weather.fCloudCover    = val;
-#ifndef ESP8266
+#if HAS_WEATHER_FORECAST
         // Extended fields — ESP32 only (not requested in ESP8266 URL)
         else if (strcmp_P(keyBuf, PSTR("wind_direction_10m"))   == 0) state.sat.weather.fWindDirection = val;
         else if (strcmp_P(keyBuf, PSTR("wind_gusts_10m"))       == 0) state.sat.weather.fWindGusts     = val;
@@ -282,7 +282,7 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
         else if (strcmp_P(keyBuf, PSTR("snowfall"))             == 0) state.sat.weather.fSnowfall      = val;
         else if (strcmp_P(keyBuf, PSTR("weather_code"))         == 0) state.sat.weather.iWeatherCode   = (uint16_t)val;
         else if (strcmp_P(keyBuf, PSTR("is_day"))               == 0) state.sat.weather.bIsDay         = (val > 0.0f);
-#endif  // ifndef ESP8266
+#endif  // HAS_WEATHER_FORECAST
       }
     }
     // else: true/false/null at top level — not needed for weather fields
@@ -393,7 +393,7 @@ static void weatherFetchOpenMeteo()
     state.sat.weather.bValid       = true;
     state.sat.weather.iLastUpdateMs = millis();
 
-#ifdef ESP8266
+#if !HAS_WEATHER_FORECAST
     DebugTf(PSTR("Weather: %.1fC (feels %.1fC), %d%% RH, %.1f km/h wind, %d%% cloud\r\n"),
       state.sat.weather.fTemperature,
       state.sat.weather.fApparentTemp,
@@ -409,7 +409,7 @@ static void weatherFetchOpenMeteo()
       (int)state.sat.weather.fCloudCover,
       (int)state.sat.weather.iWeatherCode,
       _weather_forecastCount);
-#endif  // ifdef ESP8266
+#endif  // !HAS_WEATHER_FORECAST
 
   } else {
     DebugTf(PSTR("Weather: HTTP %d\r\n"), httpCode);
@@ -576,7 +576,7 @@ void weatherSendStatusJSON()
     sendJsonMapEntry(F("wind_speed"),          tmpBuf);
     dtostrf(state.sat.weather.fCloudCover,    1, 0, tmpBuf);
     sendJsonMapEntry(F("cloud_cover"),         tmpBuf);
-#ifndef ESP8266
+#if HAS_WEATHER_FORECAST
     // Extended fields — ESP32 only
     dtostrf(state.sat.weather.fWindDirection, 1, 0, tmpBuf);
     sendJsonMapEntry(F("wind_direction"),      tmpBuf);
@@ -592,7 +592,7 @@ void weatherSendStatusJSON()
     sendJsonMapEntry(F("snowfall"),            tmpBuf);
     sendJsonMapEntry(F("weather_code"),        (int32_t)state.sat.weather.iWeatherCode);
     sendJsonMapEntry(F("is_day"),              state.sat.weather.bIsDay);
-#endif  // ifndef ESP8266
+#endif  // HAS_WEATHER_FORECAST
     dtostrf(settings.sat.fWeatherLat,         1, 4, tmpBuf);
     sendJsonMapEntry(F("latitude"),            tmpBuf);
     dtostrf(settings.sat.fWeatherLon,         1, 4, tmpBuf);
@@ -609,7 +609,7 @@ void weatherSendStatusJSON()
     sendJsonMapEntry(F("age_seconds"), (int32_t)-1);
   }
 
-#ifndef ESP8266
+#if HAS_WEATHER_FORECAST
   // 24-hour forecast arrays — ESP32 only
   {
     char entryBuf[300];
@@ -666,7 +666,7 @@ void weatherSendStatusJSON()
     entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
     sendBeforenext(); restSendContent(entryBuf);
   }
-#endif  // ifndef ESP8266
+#endif  // HAS_WEATHER_FORECAST
 
   sendEndJsonMap(F(""));
 }
@@ -684,12 +684,12 @@ void weatherPublishMQTT()
   // helpers further suppress publishes when the polled values haven't
   // changed since the last poll.
   static SATShadowF s_w_temp, s_w_apparent, s_w_humidity, s_w_wind_speed, s_w_cloud_cover;
-#ifndef ESP8266
+#if HAS_WEATHER_FORECAST
   static SATShadowF s_w_wind_dir, s_w_wind_gusts, s_w_pressure_msl;
   static SATShadowF s_w_precip, s_w_rain, s_w_snowfall;
   static SATShadowI s_w_weather_code;
   static SATShadowB s_w_is_day;
-#endif
+#endif  // HAS_WEATHER_FORECAST
 
   // Core fields — both platforms
   publishIfChangedF(F("sat/weather/temperature"),   state.sat.weather.fTemperature, s_w_temp,        SAT_EPS_TEMP_COARSE, 1, false);
@@ -698,7 +698,7 @@ void weatherPublishMQTT()
   publishIfChangedF(F("sat/weather/wind_speed"),    state.sat.weather.fWindSpeed,   s_w_wind_speed,  SAT_EPS_TEMP_COARSE, 1, false);
   publishIfChangedF(F("sat/weather/cloud_cover"),   state.sat.weather.fCloudCover,  s_w_cloud_cover, SAT_EPS_DURATION,    0, false);
 
-#ifndef ESP8266
+#if HAS_WEATHER_FORECAST
   publishIfChangedF(F("sat/weather/wind_direction"), state.sat.weather.fWindDirection, s_w_wind_dir,     SAT_EPS_DURATION,    0, false);
   publishIfChangedF(F("sat/weather/wind_gusts"),     state.sat.weather.fWindGusts,     s_w_wind_gusts,   SAT_EPS_TEMP_COARSE, 1, false);
   publishIfChangedF(F("sat/weather/pressure_msl"),   state.sat.weather.fPressureMsl,   s_w_pressure_msl, SAT_EPS_TEMP_COARSE, 1, false);
@@ -709,7 +709,7 @@ void weatherPublishMQTT()
 
   // is_day historically uses "1"/"0" payload (not "true"/"false").
   publishIfChangedBStr(F("sat/weather/is_day"), state.sat.weather.bIsDay, s_w_is_day, "1", "0", false);
-#endif  // ifndef ESP8266
+#endif  // HAS_WEATHER_FORECAST
 }
 
 /***************************************************************************

@@ -3,9 +3,11 @@ id: TASK-741
 title: >-
   ESP abstraction Tier 1: collapse SATweather and SATble per-line ifdefs to
   feature-flag gates; switch raw ESP.* calls to existing shims
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-28 08:28'
+updated_date: '2026-05-29 21:47'
 labels:
   - esp-abstraction-audit
   - refactor

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.99
+**  Version  : v2.0.0-alpha.103
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1936,7 +1936,7 @@ static bool discoveryDripIsHeapHealthyForRestore() {
 #else
   // ESP8266: 1KB deadband above HEAP_LOW_THRESHOLD (5120). See declaration
   // in OTGW-firmware.h for sizing rationale.
-  return ESP.getFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD;
+  return platformFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD;
 #endif
 }
 

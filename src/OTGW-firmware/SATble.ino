@@ -21,7 +21,7 @@
 ***************************************************************************
 */
 
-#if defined(ESP32)
+#if HAS_SAT_BLE
 
 #include <NimBLEDevice.h>
 
@@ -908,4 +908,4 @@ bool satBLERosterForget(const char* mac)
   return true;
 }
 
-#endif // defined(ESP32)
+#endif // HAS_SAT_BLE

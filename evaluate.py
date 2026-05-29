@@ -529,7 +529,10 @@ ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
 # docs/audits/2026-05-28-esp-abstraction-leak-audit.md.
 # TASK-758: OLED button ISR/FreeRTOS moved behind a portable polled path,
 # removing 5 raw ESP32 sites from OLED.ino (78 -> 73).
-ESP_ABSTRACTION_BASELINE: int = 73
+# TASK-741 (Tier 1): SATweather.ino (12), SATble.ino (1), restAPI.ino (1),
+# handleDebug.ino (1) moved behind HAS_WEATHER_FORECAST / HAS_SAT_BLE flags
+# and platform heap shims (73 -> 58).
+ESP_ABSTRACTION_BASELINE: int = 58
 
 _ESP_PLATFORM_PP_RE = re.compile(
     r'^\s*#\s*(?:if|ifdef|ifndef|elif)\b.*\b'
@@ -2754,6 +2757,11 @@ class WorkspaceEvaluator:
         violations = []
         for path in sorted(src_root.glob("*.ino")) + sorted(src_root.glob("*.cpp")):
             if path.name in whitelist:
+                continue
+            # Skip the Arduino sketch-concat build artifact (gitignored). The
+            # concat strips // ADR-111 exception: markers, which would falsely
+            # flag the excepted sat/target echo whenever a build is present.
+            if path.name.endswith(".ino.cpp"):
                 continue
             try:
                 lines = path.read_text(encoding='utf-8', errors='ignore').split('\n')

@@ -22,15 +22,10 @@ static void dumpDebugInfo() {
     Debugf(PSTR("date: %s\r\n"), _VERSION_DATE);
 
     Debugln(F("[runtime]"));
-    Debugf(PSTR("heap.free: %u\r\n"), (unsigned)ESP.getFreeHeap());
-#if defined(ESP32)
-    Debugf(PSTR("heap.min_free: %u\r\n"), (unsigned)ESP.getMinFreeHeap());
-    Debugf(PSTR("heap.max_alloc: %u\r\n"), (unsigned)ESP.getMaxAllocHeap());
-#else
-    Debugf(PSTR("heap.frag: %u%%\r\n"), (unsigned)ESP.getHeapFragmentation());
-    Debugf(PSTR("heap.min_free: %u\r\n"), (unsigned)getMinFreeHeap());
-    Debugf(PSTR("heap.max_alloc: %u\r\n"), (unsigned)ESP.getMaxFreeBlockSize());
-#endif
+    Debugf(PSTR("heap.free: %u\r\n"), (unsigned)platformFreeHeap());
+    Debugf(PSTR("heap.frag: %u%%\r\n"), (unsigned)platformHeapFragmentation());
+    Debugf(PSTR("heap.min_free: %u\r\n"), (unsigned)platformMinFreeHeap());
+    Debugf(PSTR("heap.max_alloc: %u\r\n"), (unsigned)platformMaxFreeBlock());
     Debugf(PSTR("uptime.seconds: %lu\r\n"), (unsigned long)state.uptime.iSeconds);
     Debugf(PSTR("uptime.reboots: %lu\r\n"), (unsigned long)state.uptime.iRebootCount);
     Debugf(PSTR("wifi.connected: %s\r\n"), (WiFi.status() == WL_CONNECTED) ? "true" : "false");

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.103
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -326,7 +326,7 @@ static void drawPageDevice() {
   // Free heap and reboot count
   oledDisplay.setRow(6);
   oledDisplay.setCol(0);
-  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Heap: %u B"), (unsigned)ESP.getFreeHeap());
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Heap: %u B"), (unsigned)platformFreeHeap());
   oledDisplay.print(oledBuf);
 
   oledDisplay.setRow(7);
