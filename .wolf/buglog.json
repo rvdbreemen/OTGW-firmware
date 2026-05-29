@@ -955,6 +955,169 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-29"
+    },
+    {
+      "id": "bug-059",
+      "timestamp": "2026-05-29T08:44:45.896Z",
+      "error_message": "Wrong return value",
+      "file": "src/OTGW-firmware/OTGW-firmware.h",
+      "root_cause": "Was returning: strcmp_P(state.pic.sType, PSTR(\"gateway\")) == 0; }",
+      "fix": "Now returns: F(HW_TYPE_NAME);",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "h"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T08:44:45.896Z"
+    },
+    {
+      "id": "bug-060",
+      "timestamp": "2026-05-29T08:45:12.884Z",
+      "error_message": "Incorrect value in code",
+      "file": "src/OTGW-firmware/restAPI.ino",
+      "root_cause": "Had \"hardwaremode\"",
+      "fix": "Changed to \"hardware_type\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T08:45:12.885Z"
+    },
+    {
+      "id": "bug-061",
+      "timestamp": "2026-05-29T08:46:21.829Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/OLED.ino",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 17→23 lines (4 removed) | Also: // Auto-off after timeout; if (oledPage != 0 && (now - oledLastActivity) >= O",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-29T08:47:46.549Z"
+    },
+    {
+      "id": "bug-062",
+      "timestamp": "2026-05-29T08:46:38.216Z",
+      "error_message": "Missing guard clause",
+      "file": "src/OTGW-firmware/OLED.ino",
+      "root_cause": "No early return/throw for edge case: state.net.bAPFallback",
+      "fix": "Added guard clause: if (state.net.bAPFallback)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T08:46:38.216Z"
+    },
+    {
+      "id": "bug-063",
+      "timestamp": "2026-05-29T08:47:03.968Z",
+      "error_message": "Null/undefined access in ",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T08:47:03.968Z"
+    },
+    {
+      "id": "bug-064",
+      "timestamp": "2026-05-29T08:47:44.836Z",
+      "error_message": "Missing guard clause",
+      "file": "src/OTGW-firmware/networkStuff.ino",
+      "root_cause": "No early return/throw for edge case: state.net.eMode == NET_ETHERNET",
+      "fix": "Added guard clause: if (state.net.eMode == NET_ETHERNET)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T08:47:44.836Z"
+    },
+    {
+      "id": "bug-065",
+      "timestamp": "2026-05-29T08:47:49.735Z",
+      "error_message": "Incorrect value in code",
+      "file": "docs/api/MQTT.md",
+      "root_cause": "Had \"esp8266\"",
+      "fix": "Changed to \"otgw-classic\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T08:47:49.735Z"
+    },
+    {
+      "id": "bug-066",
+      "timestamp": "2026-05-29T08:47:57.426Z",
+      "error_message": "Wrong condition in logic",
+      "file": "src/OTGW-firmware/OLED.ino",
+      "root_cause": "Condition was: if (!keepAwake && oledPage != 0 && (now - oledLastActi)",
+      "fix": "Changed to: if (keepAwake && oledPage == 0)",
+      "tags": [
+        "auto-detected",
+        "logic-fix",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T08:47:57.426Z"
+    },
+    {
+      "id": "bug-067",
+      "timestamp": "2026-05-29T09:00:37.944Z",
+      "error_message": "Wrong reference: Proposed should be Accepted",
+      "file": "docs/adr/ADR-113-hardware-type-codepath-selection-contract.md",
+      "root_cause": "Used \"Proposed\" instead of \"Accepted\"",
+      "fix": "Changed Proposed → Accepted",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T09:00:37.944Z"
+    },
+    {
+      "id": "bug-068",
+      "timestamp": "2026-05-29",
+      "error_message": "git commit exit 1; .githooks/pre-commit exits 2 (silent in PowerShell)",
+      "file": ".githooks/pre-commit",
+      "root_cause": "MISDIAGNOSED INITIALLY as a broken python3 WindowsApps alias. Verified false: python3 --version reports Python 3.14.2 and runs adr-judge fine (resolves to pythoncore-3.14-64). The SOLE cause was adr-judge 0.15.0 rejecting ADR-099's enforcement block: the 'guidance' key is not allowed by the v0.14.0+ schema, so the judge aborted (exit 2) before evaluating any diff. Secondary observation (not the failure cause): OTGW's .githooks/pre-commit was a stale copy that hardcoded python3 and lacked the version-validated detection adr-kit's template already ships (>= v0.14.1).",
+      "fix": "Real fix: removed the 'guidance' key from ADR-099's enforcement block (mechanical schema migration; intent preserved in the ## Decision section, which the LLM judge reads). Also re-synced OTGW's pre-commit adr-kit section to mirror the canonical adr-kit template (version-validated Python detection + nullglob SemVer cache pick) to end hook drift. No adr-kit repo change needed: upstream already had robust detection.",
+      "tags": [
+        "adr-kit",
+        "pre-commit",
+        "schema-drift",
+        "ADR-099",
+        "hooks",
+        "misdiagnosis-corrected"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29"
     }
   ]
 }

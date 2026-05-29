@@ -41,28 +41,52 @@ if [ "${OTGW_BUMP_HOOK_DISABLE:-0}" != "1" ]; then
 fi
 
 # ── 2. adr-kit ADR-compliance check ──────────────────────────────────────────
-# Resolves adr-judge from the plugin cache dynamically so plugin upgrades
-# don't require re-running install-hooks. Falls back gracefully when the
-# plugin cache is missing — never blocks a commit due to tooling drift.
+# Mirrors the canonical adr-kit hook template (templates/githooks/pre-commit) so
+# this project's copy stays in sync with upstream: Python 3 detection validated
+# by --version (handles PATH shims that report a real version), SemVer-highest
+# plugin-cache pick via nullglob, and dynamic resolution so plugin upgrades don't
+# require re-running install-hooks. Never blocks a commit due to tooling drift.
 
 if [ "${ADR_KIT_HOOK_DISABLE:-0}" != "1" ]; then
-  ADR_KIT_BASE="${HOME}/.claude/plugins/cache/rvdbreemen-adr-kit/adr-kit"
-  ADR_JUDGE=""
-  if [ -d "$ADR_KIT_BASE" ]; then
-    ADR_JUDGE=$(ls -d "$ADR_KIT_BASE"/*/bin/adr-judge 2>/dev/null | sort -V | tail -1)
-  fi
+  # Find a Python 3 interpreter (adr-judge is a Python 3 script). Validate via
+  # --version rather than presence alone so a non-functional PATH entry is skipped.
+  _PYTHON3=""
+  for _cmd in python3 python py; do
+    if command -v "$_cmd" >/dev/null 2>&1; then
+      _ver=$("$_cmd" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+      _major=$(echo "$_ver" | cut -d. -f1)
+      if [ "${_major:-0}" -ge 3 ] 2>/dev/null; then
+        _PYTHON3="$_cmd"; break
+      fi
+    fi
+  done
 
-  if [ -z "$ADR_JUDGE" ] || [ ! -f "$ADR_JUDGE" ]; then
-    echo "[adr-kit] adr-judge not found in plugin cache; skipping ADR check." >&2
-    echo "[adr-kit] Re-install with /adr-kit:install-hooks in a Claude Code session." >&2
+  if [ -z "$_PYTHON3" ]; then
+    echo "[adr-kit] Python 3 not found; skipping ADR check." >&2
   else
-    ROOT=$(git rev-parse --show-toplevel)
-    DIFF=$(git diff --cached --unified=0)
-    if [ -n "$DIFF" ]; then
-      ADR_OUT=$(echo "$DIFF" | python3 "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/" --llm 2>&1)
-      ADR_EXIT=$?
-      printf '%s\n' "$ADR_OUT" | grep -avE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true" >&2 || true
-      [ "$ADR_EXIT" -ne 0 ] && exit "$ADR_EXIT"
+    ADR_KIT_BASE="${HOME}/.claude/plugins/cache/rvdbreemen-adr-kit/adr-kit"
+    ADR_JUDGE=""
+    if [ -d "$ADR_KIT_BASE" ]; then
+      shopt -s nullglob
+      _candidates=("$ADR_KIT_BASE"/*/bin/adr-judge)
+      shopt -u nullglob
+      if [ ${#_candidates[@]} -gt 0 ]; then
+        ADR_JUDGE=$(printf '%s\n' "${_candidates[@]}" | sort -V | tail -1)
+      fi
+    fi
+
+    if [ -z "$ADR_JUDGE" ] || [ ! -f "$ADR_JUDGE" ]; then
+      echo "[adr-kit] adr-judge not found in plugin cache; skipping ADR check." >&2
+      echo "[adr-kit] Re-install with /adr-kit:install-hooks in a Claude Code session." >&2
+    else
+      ROOT=$(git rev-parse --show-toplevel)
+      DIFF=$(git diff --cached --unified=0)
+      if [ -n "$DIFF" ]; then
+        ADR_OUT=$(echo "$DIFF" | "$_PYTHON3" "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/" --llm 2>&1)
+        ADR_EXIT=$?
+        printf '%s\n' "$ADR_OUT" | grep -avE "^  ADVISORY |^[[:space:]]+ADR has llm_judge:true" >&2 || true
+        [ "$ADR_EXIT" -ne 0 ] && exit "$ADR_EXIT"
+      fi
     fi
   fi
 fi
