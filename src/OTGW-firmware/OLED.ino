@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.92
+**  Version  : v2.0.0-alpha.96
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -17,7 +17,8 @@
 **  Design:
 **  - Runtime I2C probe at 0x3C - if no display, all code is skipped
 **  - Reads values directly from OTcurrentSystemState (no JSON layer)
-**  - Button ISR on PIN_BUTTON (GPIO 0) via FreeRTOS queue with debounce
+**  - Button on PIN_BUTTON (GPIO 0) polled in loopOLED() with debounce
+**    (portable: works on both ESP8266 and ESP32, TASK-758)
 **  - Auto-off after 30s of inactivity; button press wakes from off
 **  - 5 s display refresh (non-blocking, cooperative); clear() only on
 **    page change (SSD1306Ascii overwrites in place)
@@ -37,13 +38,6 @@
 #include <SSD1306Ascii.h>
 #include <SSD1306AsciiWire.h>
 
-#if defined(ESP32)
-  #include <driver/gpio.h>
-  #include <freertos/FreeRTOS.h>
-  #include <freertos/queue.h>
-  #include <esp_timer.h>
-#endif
-
 // Stringification helper for _VERSION_PRERELEASE (which is a bare token, not quoted)
 #define OLED_STR_HELPER(x) #x
 #define OLED_STR(x)        OLED_STR_HELPER(x)
@@ -58,7 +52,7 @@ static constexpr uint8_t  OLED_ADDR         = 0x3C;
 static constexpr uint32_t OLED_REFRESH_MS   = 5000;   // 5 s refresh (readable, low I2C load)
 static constexpr uint32_t OLED_TIMEOUT_MS   = 30000;  // auto-off after 30s
 static constexpr uint8_t  OLED_NUM_PAGES    = 6;      // 0=off, 1-5=content pages
-static constexpr int64_t  OLED_DEBOUNCE_US  = 300000; // 300 ms (microseconds)
+static constexpr uint32_t OLED_DEBOUNCE_MS  = 300;    // 300 ms button debounce
 
 // SSD1306Ascii uses row-based positioning (rows of 8 pixels for System5x7 font).
 // 128x64 display = 21 chars wide x 8 rows with System5x7 (6px wide, 8px tall).
@@ -75,25 +69,11 @@ static uint32_t oledLastActivity  = 0;     // millis of last button press
 static uint32_t oledLastRefresh   = 0;     // millis of last screen draw
 static uint8_t  oledLastRenderedPage = 0xFF; // track page-change for selective clear()
 static char     oledCachedSSID[33] = "";   // cached WiFi SSID (avoid String in hot path)
-
-#if defined(ESP32)
-static QueueHandle_t _oledBtnQueue = nullptr;
-#endif
+static uint8_t  oledLastBtnLevel  = HIGH;  // last sampled button level (active LOW)
+static uint32_t oledLastBtnEdge   = 0;     // millis of last accepted button edge
 
 // Shared formatting buffer (small, on module level to avoid per-function stack cost)
 static char oledBuf[22];
-
-// ---------------------------------------------------------------------------
-// Button ISR - push timestamp into queue; debounce happens in loopOLED()
-// ---------------------------------------------------------------------------
-#if defined(ESP32)
-static void IRAM_ATTR oledButtonISR(void* /*arg*/) {
-  if (gpio_get_level((gpio_num_t)OLED_BUTTON_PIN) == 0) {
-    int64_t t = esp_timer_get_time();
-    xQueueSendFromISR(_oledBtnQueue, &t, nullptr);
-  }
-}
-#endif
 
 // ---------------------------------------------------------------------------
 // fmtFloatOrDash - render float into oledBuf, or "---" if NaN
@@ -496,23 +476,12 @@ void initOLED() {
   // reset-hold, so the hint must name the right gesture for this firmware.
   oledDisplay.println(F("Triple-reset = config"));
 
-  // Button ISR for page cycling — ESP-IDF GPIO API + FreeRTOS queue.
-  // Queue carries the press timestamp (us); debounce happens in loopOLED().
-#if defined(ESP32)
-  _oledBtnQueue = xQueueCreate(10, sizeof(int64_t));
-  gpio_set_direction((gpio_num_t)OLED_BUTTON_PIN, GPIO_MODE_INPUT);
-  // Boot button has an external pull-up; ensure internal is also enabled for safety.
-  gpio_set_pull_mode((gpio_num_t)OLED_BUTTON_PIN, GPIO_PULLUP_ONLY);
-  gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
-  gpio_set_intr_type((gpio_num_t)OLED_BUTTON_PIN, GPIO_INTR_NEGEDGE);
-  gpio_intr_enable((gpio_num_t)OLED_BUTTON_PIN);
-  gpio_isr_handler_add((gpio_num_t)OLED_BUTTON_PIN, oledButtonISR, nullptr);
-  DebugTf(PSTR("OLED: Button ISR on GPIO %d (FreeRTOS queue)\r\n"), OLED_BUTTON_PIN);
-#else
-  // Non-ESP32 fallback: legacy Arduino API. Polling-based; no GPIO ISR.
+  // Button for page cycling — polled in loopOLED() with a millis() debounce.
+  // Portable Arduino API (no ISR / FreeRTOS queue), so it works identically on
+  // ESP8266 and ESP32 (TASK-758). The boot button is active LOW with a pull-up.
   pinMode(OLED_BUTTON_PIN, INPUT_PULLUP);
-  DebugTf(PSTR("OLED: Button on GPIO %d (no ISR — non-ESP32 build)\r\n"), OLED_BUTTON_PIN);
-#endif
+  oledLastBtnLevel = digitalRead(OLED_BUTTON_PIN);
+  DebugTf(PSTR("OLED: Button on GPIO %d (polled, debounced)\r\n"), OLED_BUTTON_PIN);
 }
 
 // ---------------------------------------------------------------------------
@@ -523,16 +492,14 @@ void loopOLED() {
 
   uint32_t now = millis();
 
-  // ----- Button drain w/ debounce (debounce check BEFORE state mutation) -----
-#if defined(ESP32)
-  static int64_t _lastBtnTime = 0;
-  int64_t c = 0;
-  while (_oledBtnQueue && xQueueReceive(_oledBtnQueue, &c, 0)) {
-    if ((c - _lastBtnTime) < OLED_DEBOUNCE_US) {
-      _lastBtnTime = c;
-      continue;  // bounce — drop without mutating page state
-    }
-    _lastBtnTime = c;
+  // ----- Button poll w/ debounce (HIGH->LOW edge = fresh press) -----
+  // Portable replacement for the former ESP32-only ISR+queue (TASK-758): poll
+  // the pin at loop() cadence and accept a falling edge only once per debounce
+  // window. The page cycle is not latency-critical, so polling is reliable.
+  uint8_t btnLevel = digitalRead(OLED_BUTTON_PIN);
+  if (btnLevel == LOW && oledLastBtnLevel == HIGH &&
+      (now - oledLastBtnEdge) >= OLED_DEBOUNCE_MS) {
+    oledLastBtnEdge = now;
     oledLastActivity = now;
 
     if (oledPage == 0) {
@@ -552,7 +519,7 @@ void loopOLED() {
       }
     }
   }
-#endif
+  oledLastBtnLevel = btnLevel;
 
   // ----- SSID cache maintenance (avoid String in hot path, ADR-004) -----
   if (WiFi.isConnected()) {

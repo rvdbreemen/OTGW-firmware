@@ -527,7 +527,9 @@ ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
 
 # Baseline as of 2026-05-28 / commit 9be88a0d. See
 # docs/audits/2026-05-28-esp-abstraction-leak-audit.md.
-ESP_ABSTRACTION_BASELINE: int = 78
+# TASK-758: OLED button ISR/FreeRTOS moved behind a portable polled path,
+# removing 5 raw ESP32 sites from OLED.ino (78 -> 73).
+ESP_ABSTRACTION_BASELINE: int = 73
 
 _ESP_PLATFORM_PP_RE = re.compile(
     r'^\s*#\s*(?:if|ifdef|ifndef|elif)\b.*\b'

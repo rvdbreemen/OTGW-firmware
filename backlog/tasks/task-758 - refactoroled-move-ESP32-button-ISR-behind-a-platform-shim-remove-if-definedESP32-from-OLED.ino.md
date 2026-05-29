@@ -3,9 +3,11 @@ id: TASK-758
 title: >-
   refactor(oled): move ESP32 button ISR behind a platform shim (remove #if
   defined(ESP32) from OLED.ino)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-29 10:10'
+updated_date: '2026-05-29 11:01'
 labels: []
 dependencies: []
 priority: low
