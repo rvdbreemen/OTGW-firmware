@@ -146,6 +146,15 @@ Allowlisted files (the only place these conditionals belong):
 - `src/OTGW-firmware/boards.h` — pin maps and `HAS_*` capability flags
 - `src/OTGW-firmware/OTGW-ModUpdateServer{.h,-esp32.h,-impl.h}` — parallel mini-abstraction for the firmware update server
 
+**Vendored libraries under `src/libraries/**` are OUT OF SCOPE entirely.**
+They are independent upstreams that manage their own platform support and are
+NOT firmware application code. Do NOT pull them into the abstraction: never add
+`platformXxx()` shims into them and never strip their internal
+`#if defined(ESP8266)/(ESP32)`. Examples: `src/libraries/SimpleTelnet`,
+`src/libraries/OTGWSerial` (PIC serial driver). They are listed in
+`evaluate.py::ESP_ABSTRACTION_EXCLUDED_LIB_DIRS` and excluded from the
+abstraction scan. (Maintainer directive, 2026-05-30.)
+
 Application code MUST instead:
 
 1. **Call `platformXxx()` shims** from `platform_*.h` for any divergent API

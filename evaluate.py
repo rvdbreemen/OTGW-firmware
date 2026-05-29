@@ -523,6 +523,11 @@ ESP_ABSTRACTION_ALLOWED_FILES: Tuple[str, ...] = (
 # they are maintained as standalone upstreams (own repo, own portability layer).
 ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
     "src/libraries/SimpleTelnet",
+    # OTGWSerial is an independent vendored library (PIC serial driver) that
+    # manages its own platform support. Maintainer directive (2026-05-30): it is
+    # NOT part of the firmware platform abstraction — treat it like any third-
+    # party upstream, so its internal #if defined(ESP8266/ESP32) are excluded.
+    "src/libraries/OTGWSerial",
 )
 
 # Baseline as of 2026-05-28 / commit 9be88a0d. See
@@ -537,7 +542,10 @@ ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
 # settingStuff.ino, OTGW-firmware.{h,ino}, SATcontrol.ino, handleDebug.ino,
 # networkStuff.ino, restAPI.ino, MQTTstuff.ino removed or moved behind
 # HAS_SAT_BLE / HAS_WEATHER_FORECAST (58 -> 35).
-ESP_ABSTRACTION_BASELINE: int = 35
+# 2026-05-30: OTGWSerial added to the excluded vendored-lib list (maintainer
+# directive — it is an independent library, not firmware abstraction), removing
+# its 2 internal conditionals from the scan (35 -> 33).
+ESP_ABSTRACTION_BASELINE: int = 33
 
 _ESP_PLATFORM_PP_RE = re.compile(
     r'^\s*#\s*(?:if|ifdef|ifndef|elif)\b.*\b'
