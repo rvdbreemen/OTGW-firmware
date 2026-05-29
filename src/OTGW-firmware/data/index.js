@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.101
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -6314,16 +6314,35 @@ function normalizeSettingsLabelWidth() {
   var page = document.getElementById('settingsPage');
   if (!page) return;
   requestAnimationFrame(function() {
-    var maxW = 0;
-    // TASK-763: measure only real setting-row labels (direct .settingDiv
-    // children). The broad '.settings-group-body .settings-field-container'
-    // selector also matched the WiFi-scan panel heading + its full-width <p>
-    // info paragraph (which reuse the class), poisoning --settings-label-w
-    // with a huge px width and blowing out every settings card's grid.
-    page.querySelectorAll('.settings-group-body .settingDiv > .settings-field-container').forEach(function(el) {
-      maxW = Math.max(maxW, el.getBoundingClientRect().width);
+    page.style.removeProperty('--settings-label-w');
+    page.querySelectorAll('.settings-group-body').forEach(function(groupBody) {
+      var maxW = 0;
+      groupBody.style.removeProperty('--settings-label-w');
+
+      Array.prototype.forEach.call(groupBody.children, function(row) {
+        if (!row.classList || !row.classList.contains('settingDiv') || row.classList.contains('fixed-ip-section')) return;
+        var label = row.firstElementChild;
+        if (!label || !label.classList || !label.classList.contains('settings-field-container')) return;
+
+        var probe = label.cloneNode(true);
+        probe.style.position = 'absolute';
+        probe.style.visibility = 'hidden';
+        probe.style.pointerEvents = 'none';
+        probe.style.width = 'auto';
+        probe.style.maxWidth = 'none';
+        probe.style.whiteSpace = 'nowrap';
+        probe.style.gridColumn = 'auto';
+        row.appendChild(probe);
+        maxW = Math.max(maxW, probe.getBoundingClientRect().width);
+        row.removeChild(probe);
+      });
+
+      if (maxW > 0) {
+        var availableW = groupBody.clientWidth || (groupBody.parentElement ? groupBody.parentElement.clientWidth : 0);
+        var capW = availableW > 0 ? Math.max(128, Math.floor(availableW * 0.45)) : maxW;
+        groupBody.style.setProperty('--settings-label-w', Math.min(maxW, capW) + 'px');
+      }
     });
-    if (maxW > 0) page.style.setProperty('--settings-label-w', maxW + 'px');
   });
 }
 
