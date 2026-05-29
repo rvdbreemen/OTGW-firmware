@@ -1,11 +1,11 @@
 ---
 id: TASK-752
 title: 'docs(reset): document triple-reset WiFi-wipe procedure (count + timing)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-29 08:35'
-updated_date: '2026-05-29 10:11'
+updated_date: '2026-05-29 10:47'
 labels: []
 dependencies: []
 priority: low

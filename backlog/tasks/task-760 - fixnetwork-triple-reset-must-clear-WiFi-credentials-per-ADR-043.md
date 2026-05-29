@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-29 10:25'
-updated_date: '2026-05-29 10:28'
+updated_date: '2026-05-29 10:47'
 labels: []
 dependencies: []
 priority: high
@@ -19,8 +19,14 @@ TASK-752 found a code-vs-design discrepancy: ADR-043 (Accepted) specifies the tr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 startWiFi() forcePortal path calls resetSettings() so stored WiFi credentials are erased on triple-reset
-- [ ] #2 Behaviour matches ADR-043 (clear creds, then force portal)
-- [ ] #3 Docs/manuals updated by TASK-752 re-aligned to 'credentials cleared' wording
+- [x] #1 startWiFi() forcePortal path calls resetSettings() so stored WiFi credentials are erased on triple-reset
+- [x] #2 Behaviour matches ADR-043 (clear creds, then force portal)
+- [x] #3 Docs/manuals updated by TASK-752 re-aligned to 'credentials cleared' wording
 - [ ] #4 ESP8266 + ESP32 build green; field-verify triple-reset wipes creds
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented: startWiFi forcePortal now calls manageWiFi.resetSettings() (ADR-043). Built green alpha.92, commit 8b7912f7. AC4 (field-verify wipe) pending hardware.
+<!-- SECTION:NOTES:END -->

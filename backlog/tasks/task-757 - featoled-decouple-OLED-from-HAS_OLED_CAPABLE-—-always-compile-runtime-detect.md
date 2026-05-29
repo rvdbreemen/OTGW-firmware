@@ -3,11 +3,11 @@ id: TASK-757
 title: >-
   feat(oled): decouple OLED from HAS_OLED_CAPABLE — always compile,
   runtime-detect
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-29 10:10'
-updated_date: '2026-05-29 10:11'
+updated_date: '2026-05-29 10:47'
 labels: []
 dependencies: []
 priority: medium
@@ -28,3 +28,9 @@ Per Robert: an OLED should work whenever it is physically connected, independent
 - [ ] #5 evaluate.py shows no NEW abstraction violations (button #if defined(ESP32) is pre-existing, unchanged)
 - [ ] #6 ADR-114 written documenting the runtime-detection-over-compile-gate decision
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OLED decoupled from HAS_OLED_CAPABLE: always compiled + runtime-detected (probeOLED 0x3C). ADR-114. Both targets build green (ESP8266 RAM 88%/Flash 83.5%; ESP32-S3 Flash 95.2%). Shipped alpha.92. boards.h untouched; button #if defined(ESP32) tracked in TASK-758.
+<!-- SECTION:FINAL_SUMMARY:END -->

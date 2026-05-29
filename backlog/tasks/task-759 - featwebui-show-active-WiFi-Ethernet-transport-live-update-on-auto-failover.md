@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-29 10:23'
-updated_date: '2026-05-29 10:28'
+updated_date: '2026-05-29 10:47'
 labels: []
 dependencies: []
 priority: medium
@@ -19,9 +19,15 @@ Per Robert (follow-up to TASK-751): the active network transport (WiFi vs wired 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Web UI prominently shows the active transport (WiFi or Ethernet) and its IP
-- [ ] #2 When ethernet link drops, firmware auto-switches back to WiFi (TASK-751 switchToWiFi) and the UI reflects the change within one poll cycle, no manual reload
-- [ ] #3 When ethernet link comes up, UI shows Ethernet within one poll cycle
-- [ ] #4 networkmode/transport exposed in device-info and consumed by the indicator
+- [x] #1 Web UI prominently shows the active transport (WiFi or Ethernet) and its IP
+- [x] #2 When ethernet link drops, firmware auto-switches back to WiFi (TASK-751 switchToWiFi) and the UI reflects the change within one poll cycle, no manual reload
+- [x] #3 When ethernet link comes up, UI shows Ethernet within one poll cycle
+- [x] #4 networkmode/transport exposed in device-info and consumed by the indicator
 - [ ] #5 Verified on OTGW32 with W5500 plug/unplug (field)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented: sendDeviceTimeV2 emits ipaddress; updateNetworkIndicator shows '<mode> (<ip>)' and live-updates each device/time poll (~1s). Auto-fallback via TASK-751. Built green alpha.92, commit 8b7912f7. AC5 (OTGW32 plug/unplug field) pending hardware.
+<!-- SECTION:NOTES:END -->
