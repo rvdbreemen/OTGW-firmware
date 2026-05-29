@@ -13,6 +13,10 @@ libraries/**
 staging/**
 build/**
 arduino-cli.yaml
+
+# Local tooling artifacts (regenerated on demand; never committed)
+.build-python/
+.playwright-mcp/
 _codeql_detected_source_root
 __pycache__/
 .build-venv/

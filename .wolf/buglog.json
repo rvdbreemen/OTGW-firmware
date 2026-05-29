@@ -802,6 +802,159 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-27T22:25:36.533Z"
+    },
+    {
+      "id": "bug-050",
+      "timestamp": "2026-05-27T23:39:37.235Z",
+      "error_message": "Incorrect value in code",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "Had \"legacyport25238enabled\"",
+      "fix": "Changed to \"mqttuselegacyottopics\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-27T23:39:56.770Z"
+    },
+    {
+      "id": "bug-051",
+      "timestamp": "2026-05-27T23:50:09.904Z",
+      "error_message": "Incorrect value in code",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "Had 'outputs'",
+      "fix": "Changed to 'otdirect'",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-27T23:50:09.904Z"
+    },
+    {
+      "id": "bug-052",
+      "timestamp": "2026-05-28T11:29:20.089Z",
+      "error_message": "CSS fix: margin, padding, color",
+      "file": "src/OTGW-firmware/data/components.css",
+      "root_cause": "margin: 0 0 var(--space-2) → 0 0 var(--space-4); padding: var(--space-5) → var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) → var(--fg-2)",
+      "fix": "Changed margin: 0 0 var(--space-2) → 0 0 var(--space-4); padding: var(--space-5) → var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) → var(--fg-2)",
+      "tags": [
+        "auto-detected",
+        "style-fix",
+        "css"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-28T11:29:20.089Z"
+    },
+    {
+      "id": "bug-053",
+      "timestamp": "2026-05-28T12:05:42.392Z",
+      "error_message": "CSS fix: grid-template-columns",
+      "file": "src/OTGW-firmware/data/components.css",
+      "root_cause": "grid-template-columns: max-content 1fr → var(--settings-label-w, max-content) 1fr",
+      "fix": "Changed grid-template-columns: max-content 1fr → var(--settings-label-w, max-content) 1fr",
+      "tags": [
+        "auto-detected",
+        "style-fix",
+        "css"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-28T12:05:42.392Z"
+    },
+    {
+      "id": "bug-054",
+      "timestamp": "2026-05-28T12:05:57.329Z",
+      "error_message": "Missing guard clause",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "No early return/throw for edge case: !page",
+      "fix": "Added guard clause: if (!page)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-28T12:05:57.329Z"
+    },
+    {
+      "id": "bug-055",
+      "timestamp": "2026-05-29T06:14:20.079Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/data/graph.js",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 5→8 lines (5 removed) | Also: // the --fg-2 design token (ds-tokens.css) so it t; // (light = #4a4d50, dark = #e0e0e0). Fallback han",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-29T06:14:31.977Z"
+    },
+    {
+      "id": "bug-056",
+      "timestamp": "2026-05-29T06:18:37.847Z",
+      "error_message": "Missing error handling in renderBleRosterError",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T06:18:37.847Z"
+    },
+    {
+      "id": "bug-057",
+      "timestamp": "2026-05-29",
+      "error_message": "BLE sensor roster empty in WebUI; user cannot select a BLE sensor (sergeantd, alpha.84, OTGW32/ESP32-S3)",
+      "file": "src/OTGW-firmware/SATble.ino (also restAPI.ino, SATweather.ino)",
+      "root_cause": "ESP32 chunked-JSON byte-ordering. The TASK-529 coalescing TX buffer (sTxBuf, jsonStuff.ino) buffers sendJsonMapEntry/sendStartJsonMap/sendBeforenext via restSendContent and flushes at restFlushContent, but satBLERosterSendJSON wrote the sensors array with raw httpServer.sendContent(_P) which bypasses the buffer and hits the socket immediately. Raw array bytes emitted BEFORE buffered wrapper -> invalid JSON (\"sensors\":[..]{meta..}) -> r.json() rejects -> .catch swallowed -> empty roster. ESP8266 unaffected (no buffer). Same defect in sendSensorStatus (restAPI.ino) and SATweather forecast block.",
+      "fix": "Route the raw array/sub-object writes through restSendContent/restSendContentP so they share the coalescing buffer and byte order is preserved. Also surfaced parse failure in index.js renderBleRoster. Shipped alpha.88 (e57e1cce).",
+      "tags": [
+        "esp32",
+        "json",
+        "rest",
+        "ble",
+        "chunked",
+        "coalescing-buffer",
+        "TASK-747",
+        "TASK-529"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29"
+    },
+    {
+      "id": "bug-058",
+      "timestamp": "2026-05-29",
+      "error_message": "Graph legend + panel-title text unreadable (dark grey) on dark theme; should be white",
+      "file": "src/OTGW-firmware/data/graph.js",
+      "root_cause": "init() derived currentTheme from localStorage(\"theme\"), wrong key. Canonical key driving body.dark + design tokens is \"otgw-theme\". On fresh load with saved dark theme, currentTheme stayed light -> ECharts used light palette/fallback (#4a4d50) on dark surface. Regression of TASK-568 (which only set the color token, not the theme source).",
+      "fix": "Derive currentTheme from document.body.classList.contains(\"dark\"); switch legend+title textStyle from --fg-2 (#e0e0e0) to --fg-1 (white in dark), fallback aligned. Shipped alpha.87 (80b25a80).",
+      "tags": [
+        "webui",
+        "echarts",
+        "dark-theme",
+        "localStorage",
+        "regression",
+        "TASK-748",
+        "TASK-568"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29"
     }
   ]
 }
