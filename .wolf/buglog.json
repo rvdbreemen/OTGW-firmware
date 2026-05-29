@@ -1118,6 +1118,54 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-05-29"
+    },
+    {
+      "id": "bug-069",
+      "timestamp": "2026-05-29T09:29:42.595Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/settingStuff.ino",
+      "root_cause": "12 lines replaced/restructured",
+      "fix": "Rewrote 13→5 lines (12 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T09:29:42.595Z"
+    },
+    {
+      "id": "bug-070",
+      "timestamp": "2026-05-29T09:52:12.844Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/OTGW-firmware.ino",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 7→11 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ino"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T09:52:12.844Z"
+    },
+    {
+      "id": "bug-071",
+      "timestamp": "2026-05-29T10:31:02.251Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/OTGW-firmware/data/index.js",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 6→9 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "js"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-29T10:31:02.251Z"
     }
   ]
 }
