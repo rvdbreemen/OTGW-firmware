@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : graph.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.84
+**  Version  : v2.0.0-alpha.87
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -121,11 +121,14 @@ var OTGraph = {
         var container = document.getElementById('otGraphCanvas');
         if (!container) return; // Wait for DOM
 
-        // Determine theme
-        this.currentTheme = 'light';
-        try {
-            if (localStorage.getItem('theme') === 'dark') this.currentTheme = 'dark';
-        } catch(e) {}
+        // Determine theme from the rendered body state, not a localStorage key.
+        // The whole design-token system (--fg-1, --fg-2, …) keys off body.dark /
+        // [data-theme] (ds-tokens.css), and theme-toggle.js / updateThemeToggle()
+        // set body.dark before OTGraph.init() runs. Reading the old 'theme' key
+        // here diverged from the canonical 'otgw-theme' key, so on a fresh load
+        // with a saved dark theme currentTheme stayed 'light' and the legend/title
+        // colour fell back to the light value against a dark surface.
+        this.currentTheme = document.body.classList.contains('dark') ? 'dark' : 'light';
 
         if (typeof echarts === 'undefined') {
             console.error("ECharts library not loaded");
@@ -625,13 +628,15 @@ var OTGraph = {
 
         // TASK-568: ECharts default legend/title textStyle.color is dark grey,
         // which becomes unreadable on the dark theme. Source the colour from
-        // the --fg-2 design token (ds-tokens.css) so it tracks the body theme
-        // (light = #4a4d50, dark = #e0e0e0). Fallback handles the unlikely
-        // case the token is missing at call time.
+        // the --fg-1 primary-text design token (ds-tokens.css) so it tracks the
+        // body theme (light = #2a2d2f, dark = #ffffff). --fg-1 (white in dark)
+        // is used rather than --fg-2 (#e0e0e0 grey) so the legend letters read
+        // clearly white against the dark surface. Fallback handles the unlikely
+        // case the token is missing at call time and must match the token.
         var fgColor = (typeof getComputedStyle === 'function')
-            ? getComputedStyle(document.body).getPropertyValue('--fg-2').trim()
+            ? getComputedStyle(document.body).getPropertyValue('--fg-1').trim()
             : '';
-        if (!fgColor) fgColor = (this.currentTheme === 'dark' ? '#e0e0e0' : '#4a4d50');
+        if (!fgColor) fgColor = (this.currentTheme === 'dark' ? '#ffffff' : '#2a2d2f');
 
         var option = {
             tooltip: {
