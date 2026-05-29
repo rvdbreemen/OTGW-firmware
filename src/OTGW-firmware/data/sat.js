@@ -714,23 +714,30 @@ var SAT = (function() {
 
   // --- Public API ---
   function start() {
-    renderStatusBanner();
-    initView();
-    initChart();
-    initCurveChart();
-    _initCurveClickHandler();  // TASK-586: click-to-add-marker on curve chart
-    loadMarkers();              // TASK-586: load persisted calibration markers
-    fetchSlaveConfig();  // detect storage tank boiler (MsgID 3 bit 3)
-    fetchDHWBounds();    // get DHW setpoint upper/lower bounds (MsgID 48)
-    fetchStatus(); // immediate first fetch
-    fetchWeather(); // immediate weather fetch
-    // Auto-prefill weather coordinates once when none are configured yet.
-    // This is a best-effort helper: if geolocation is unavailable or blocked,
-    // leave it to the user to click "Detect Location".
-    maybeAutoPrefillWeatherLocation();
-    setTimeout(checkWeatherNeedsSetup, 3000);
+    // TASK-764: run the data path FIRST and unconditionally. Previously
+    // fetchStatus() sat seven calls deep; if any earlier synchronous init threw
+    // (e.g. echarts.init on a partially-loaded ECharts, or a missing element in
+    // a chart/view helper) start() aborted before the first fetch and the poll
+    // timer was never armed, so every dashboard tile stayed stuck at "--".
+    // The temperature/status data must never depend on chart or marker init.
+    fetchStatus();   // immediate first fetch — populates the tiles
+    fetchWeather();  // immediate weather fetch
     _pollTimer = setInterval(fetchStatus, POLL_INTERVAL_MS);
     _weatherTimer = setInterval(fetchWeather, 30000); // weather every 30s
+
+    // Best-effort UI / chart / decoration init. Each is isolated so one
+    // failing piece cannot break the others or the data path above.
+    try { renderStatusBanner(); } catch (e) { console.warn('[SAT] renderStatusBanner failed:', e); }
+    try { initView(); } catch (e) { console.warn('[SAT] initView failed:', e); }
+    try { initChart(); } catch (e) { console.warn('[SAT] initChart failed:', e); }
+    try { initCurveChart(); } catch (e) { console.warn('[SAT] initCurveChart failed:', e); }
+    try { _initCurveClickHandler(); } catch (e) { console.warn('[SAT] curve click handler failed:', e); }  // TASK-586
+    try { loadMarkers(); } catch (e) { console.warn('[SAT] loadMarkers failed:', e); }                      // TASK-586
+    try { fetchSlaveConfig(); } catch (e) { console.warn('[SAT] fetchSlaveConfig failed:', e); }  // storage-tank detect (MsgID 3 bit 3)
+    try { fetchDHWBounds(); } catch (e) { console.warn('[SAT] fetchDHWBounds failed:', e); }      // DHW setpoint bounds (MsgID 48)
+    // Best-effort: prefill weather coordinates once when none configured.
+    try { maybeAutoPrefillWeatherLocation(); } catch (e) { console.warn('[SAT] auto-prefill failed:', e); }
+    try { setTimeout(checkWeatherNeedsSetup, 3000); } catch (e) {}
     window.addEventListener('resize', resizeChart);
   }
 
