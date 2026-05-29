@@ -1,11 +1,11 @@
 ---
 id: TASK-754
 title: 'feat(hw): remove deprecated picavailable topic/field (ADR-113 stage 2)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-29 09:05'
-updated_date: '2026-05-29 20:36'
+updated_date: '2026-05-29 21:46'
 labels: []
 milestone: 2.1.0
 dependencies: []
@@ -19,9 +19,9 @@ ADR-113 deprecated otgw-pic/picavailable (MQTT) and the picavailable REST field 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 picavailable removed from MQTT publish, REST device-info, and HA discovery
-- [ ] #2 index.js no longer references picavailable; selects solely on hardware_type
-- [ ] #3 docs/api/MQTT.md updated; mqttHaSensorIndex consistency PASS; build green; prerelease bump
+- [x] #1 picavailable removed from MQTT publish, REST device-info, and HA discovery
+- [x] #2 index.js no longer references picavailable; selects solely on hardware_type
+- [x] #3 docs/api/MQTT.md updated; mqttHaSensorIndex consistency PASS; build green; prerelease bump
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,3 +40,9 @@ COMMIT 2 (DEFERRED — blocked on index.js availability):
 - index.js: drop picAvailable global (145); applyPICAvailability() drop 'available' param + fallback, select solely on hardwareType==='otgw-classic'; fix routing at ~3303 (if(picAvailable)=>board-class gate, else PIC-flash page unreachable); remove dead picInfo.available (4530); remove 'picavailable' label-map rows (6743,6783); convert all call sites to 2-arg.
 - This set is COUPLED (REST field removal + 3303 fix must ship atomically). Do once index.js is no longer concurrently edited; re-check git status on index.js before editing.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ADR-113 stage 2 complete in two commits. d021e0f (alpha.99): removed picavailable MQTT publish + HA discovery row (mqttHaSensorIndex decremented for ids 250-254; incidental fix: id-254 flame_status now discovered); OTGW-firmware.h + docs/api/MQTT.md cleaned. 5fb9bf38 (alpha.102): removed picavailable from REST /device/info and /health; migrated index.js fully off picavailable to hardware_type-based selection (applyPICAvailability drops 'available' param, #tabPICflash routing gates on hardwareType==='otgw-classic', removed picAvailable global + dead picInfo.available + label-map rows). Split was required because removing the REST field without rewiring index.js routing would make the PIC-flash page unreachable. Build clean on ESP8266 + ESP32-S3 both commits; evaluate HA index consistency PASS; ADR judge clean.
+<!-- SECTION:FINAL_SUMMARY:END -->

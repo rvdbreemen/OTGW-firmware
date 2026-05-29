@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-29 19:43'
-updated_date: '2026-05-29 20:45'
+updated_date: '2026-05-29 21:39'
 labels:
   - webui
   - settings
@@ -79,9 +79,5 @@ Verification: npx playwright test ./tests/webui_settings_layout.spec.js --report
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Fixed the remaining Settings-page overflow regression. The live device was not failing because of stale CSS cache: the page already loaded versioned stylesheets, but normalizeSettingsLabelWidth() still wrote one global page-level --settings-label-w. On the reported OTGW32, the long SAT Manufacturer label measured at about 1573px and that width was inherited by every Settings group, stretching System, Network, MQTT, and NTP rows far outside their 520px cards.
-
-The fix makes label normalization per settings group instead of page-wide, measures only direct real row labels in that group, caps the label column to the card body, and lets long labels wrap. The CSS row rules are now scoped to direct .settings-group-body children so nested WiFi scan rows do not inherit subgrid behavior, fixed-IP rows reset the legacy floated label style, and the WiFi scan panel remains full-width without affecting label sizing.
-
-Regression coverage now includes the real DHCP rows plus a long SAT Manufacturer label, and checks scrollWidth so visual overflow cannot pass just because element rects appear clipped. Validation passed: Playwright Settings layout test 4/4, WebUI asset-versioning test, evaluate.py --quick with 0 failures, test_evaluate.py 47/47, test_build.py 9/9, ESP8266 firmware/filesystem build, and ESP32 firmware/filesystem build after clearing a stale repo-local PlatformIO build cache.
+Per-group settings label-width measurement with hidden clone probe per real .settingDiv label (skips fixed-ip section); width capped at 45% of available group width. components.css pins grid-template-columns to minmax(0, min(var(--settings-label-w), 45%)) and constrains field/input containers incl. dark theme. User-verified fix. Committed 28c2b6f4 (alpha.101).
 <!-- SECTION:FINAL_SUMMARY:END -->

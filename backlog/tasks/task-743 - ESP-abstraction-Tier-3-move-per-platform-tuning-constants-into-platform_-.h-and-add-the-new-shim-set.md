@@ -3,9 +3,11 @@ id: TASK-743
 title: >-
   ESP abstraction Tier 3: move per-platform tuning constants into platform_*.h
   and add the new shim set
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-28 08:28'
+updated_date: '2026-05-29 22:32'
 labels:
   - esp-abstraction-audit
   - refactor
