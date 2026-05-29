@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.93
+**  Version  : v2.0.0-alpha.94
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -6314,7 +6314,12 @@ function normalizeSettingsLabelWidth() {
   if (!page) return;
   requestAnimationFrame(function() {
     var maxW = 0;
-    page.querySelectorAll('.settings-group-body .settings-field-container').forEach(function(el) {
+    // TASK-763: measure only real setting-row labels (direct .settingDiv
+    // children). The broad '.settings-group-body .settings-field-container'
+    // selector also matched the WiFi-scan panel heading + its full-width <p>
+    // info paragraph (which reuse the class), poisoning --settings-label-w
+    // with a huge px width and blowing out every settings card's grid.
+    page.querySelectorAll('.settings-group-body .settingDiv > .settings-field-container').forEach(function(el) {
       maxW = Math.max(maxW, el.getBoundingClientRect().width);
     });
     if (maxW > 0) page.style.setProperty('--settings-label-w', maxW + 'px');

@@ -652,6 +652,14 @@ body.dark .settingDiv,
   display: block;
   grid-column: 1 / -1;
 }
+/* TASK-763: the WiFi-scan panel carries a full-width heading and info
+ * paragraph. As a plain grid item its wide max-content would inflate the
+ * label column track (stretching every label in the card). Span both
+ * columns like the fixed-ip section so it never participates in column
+ * sizing. */
+.settings-group-body > #wifi-scan-panel {
+  grid-column: 1 / -1;
+}
 /* Col 1: label shrinks to its own content, never wraps */
 .settings-group-body .settingDiv .settings-field-container {
   float: none;
