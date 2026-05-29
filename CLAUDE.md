@@ -411,6 +411,16 @@ Verify with `git worktree list`.
 
 **CLI cross-tree behaviour.** `backlog task <id> --plain` resolves from either worktree, but `backlog task edit` only writes to the worktree where the task file actually lives. If an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file. SAT / ESP32 / 2.0.0 tasks generally live in the feature worktree's `backlog/tasks/`, not in dev's.
 
+### One worktree per concurrent session — never share a working tree between two live sessions
+
+Two Claude (or Codex / Gemini) sessions doing git operations in the **same** worktree share one git index and one set of working-tree files. This is fragile and was observed to fail (2026-05-29):
+
+- **Shared-index corruption.** Concurrent `git add`/commit from two sessions corrupts the index: `error: invalid object <hash> for '.claude-plugin/marketplace.json'` / `.gemini/settings.json`, then `error: Error building trees` — every commit is blocked. Recovery: `git reset` (mixed, no args) rebuilds the index from HEAD without touching commits or the working tree, then re-stage only your files and commit. A targeted `git reset -- <path>` only fixes one entry at a time (whack-a-mole when several are corrupt).
+- **`.pio` build collisions.** Two `python build.py` runs in the same tree clobber `.pio/build/`, producing a spurious ESP32 LTO link failure (`undefined reference to setup()/loop()`) **even though `build.py` exits 0** (it does not propagate the per-env PlatformIO failure). Recovery: `rm -rf .pio/build/esp32` and rebuild solo. A background agent that backgrounds its own build and then ends leaves an orphaned build that collides with the next one — have agents NOT build, and let the main thread build once after they finish.
+- **EOL churn is normal, not work.** On Windows every git touch flags `LF will be replaced by CRLF` on ~90 files that show as modified with zero content change. `git diff --ignore-cr-at-eol` reveals the real set; after committing real work, `git checkout -- .` restores the EOL-only files to leave a clean tree.
+
+**Prevention.** Give each concurrent session its OWN worktree (`git worktree add ../wt-<topic> <branch-or-HEAD>`), OR run parallel work as **background sub-agents inside ONE session** (they serialise git through the single main thread, and the convention here is that sub-agents implement + report but do NOT commit/bump/build — the main thread does that once after reviewing). Do not run two top-level sessions in the same tree expecting clean commits.
+
 ### Cross-worktree work — ask first, then plan once, then parallelise
 
 Whenever you take on a bug fix, feature change, or architectural decision, **explicitly ask yourself**: *does this also need to land on the other worktree?* For 1.5.x↔2.0.0 the answer is almost always **yes** when the change touches:
