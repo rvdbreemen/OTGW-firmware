@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-29 07:54'
-updated_date: '2026-05-29 07:54'
+updated_date: '2026-05-29 08:10'
 labels: []
 dependencies: []
 ---
@@ -20,10 +20,16 @@ On ESP32 the TASK-529 coalescing TX buffer (sTxBuf in jsonStuff.ino) buffers sen
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 satBLERosterSendJSON routes all sensors-array writes through restSendContent/restSendContentP (no raw httpServer.sendContent in the function)
-- [ ] #2 sendSensorStatus devices+s0 sub-objects routed through restSendContent/restSendContentP
-- [ ] #3 SATweather forecast arrays routed through restSendContent
-- [ ] #4 index.js renderBleRoster surfaces a visible error row on parse failure (kept from diagnostic)
-- [ ] #5 ESP32-S3 build green (python build.py) and evaluate.py --quick shows no new failures
+- [x] #1 satBLERosterSendJSON routes all sensors-array writes through restSendContent/restSendContentP (no raw httpServer.sendContent in the function)
+- [x] #2 sendSensorStatus devices+s0 sub-objects routed through restSendContent/restSendContentP
+- [x] #3 SATweather forecast arrays routed through restSendContent
+- [x] #4 index.js renderBleRoster surfaces a visible error row on parse failure (kept from diagnostic)
+- [x] #5 ESP32-S3 build green (python build.py) and evaluate.py --quick shows no new failures
 - [ ] #6 Field-validate with sergeantd: BLE roster lists sensors and Select works on ESP32
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented + built green (ESP32-S3 + ESP8266) shipped alpha.88 (commit e57e1cce). Code ACs 1-5 done. AC6 (field-validate roster select with sergeantd on OTGW32) pending hardware confirmation — staying In Progress until George reports.
+<!-- SECTION:NOTES:END -->
