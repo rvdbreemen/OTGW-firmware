@@ -7,6 +7,11 @@
 
   "ignore": [],
 
+  "_comment_judge": "pre_commit_timeout_ms is the budget for the non-blocking perf WARN only. The LLM pass (Sonnet over all llm_judge:true ADRs) legitimately takes ~30s; allow up to 45s so a thorough pass does not trip a spurious warning on every commit. The hard LLM call timeout stays at the adr-kit default (judge.llm_timeout_seconds, 120s) and is not the bottleneck.",
+  "judge": {
+    "pre_commit_timeout_ms": 45000
+  },
+
   "severity": {
     "completeness": "advisory_before_strict_from",
     "evidence": "advisory_before_strict_from",
