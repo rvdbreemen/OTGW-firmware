@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.92
+**  Version  : v2.0.0-alpha.93
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1999,14 +1999,25 @@ void loopOTDirect() {
 
   // TASK-183: PI room compensation — run every 60s
   if ((millis() - otNextPiCtrl) >= OT_PI_INTERVAL_MS || otNextPiCtrl == 0) {
-    loopPiCtrl();
-    // Apply heating curve flow in master mode when CH mode is not fixed
-    if (IS_MASTER_MODE() && settings.otd.iCHMode != 0) {
-      float flow = getFlowTemp();
-      if (flow > 0.0f) {
-        enqueueWriteCommand(1, floatToF88(flow), "heating-curve");
+    // TASK-761: SAT owns the CH setpoint (MsgID 1) via its CS= override when
+    // active. OTDirect must not also drive MsgID 1, otherwise the heating-curve
+    // writer and SAT fight over TSet (observed flip-flop 45<->10 every 60s).
+    // Mirror the loopCHHysteresis() SAT bypass below; keep otNextPiCtrl
+    // advancing so PI/heating-curve resume cleanly when SAT disengages.
+#if defined(HAS_SAT) && HAS_SAT
+    if (!state.sat.bActive) {
+#endif
+      loopPiCtrl();
+      // Apply heating curve flow in master mode when CH mode is not fixed
+      if (IS_MASTER_MODE() && settings.otd.iCHMode != 0) {
+        float flow = getFlowTemp();
+        if (flow > 0.0f) {
+          enqueueWriteCommand(1, floatToF88(flow), "heating-curve");
+        }
       }
+#if defined(HAS_SAT) && HAS_SAT
     }
+#endif
     otNextPiCtrl = millis();
   }
 
