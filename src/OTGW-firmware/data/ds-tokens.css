@@ -83,6 +83,11 @@
   --bg-muted:          #e3e5e7;   /* progress rail, footer strip */
   --bg-header-strip:   #ececee;   /* sticky table heads */
   --bg-row-zebra:      #f5f7f8;
+  /* Form fields — semantic alias built from existing surface tokens (no new
+   * hex). A field must read as distinct from the surface/row it sits on
+   * (TASK-763 follow-up). Light: keep the white field on the light-blue rows. */
+  --input-bg:          var(--bg-surface);   /* white */
+  --input-bg-changed:  var(--bg-muted);     /* unsaved-change highlight */
 
   /* Borders — slightly cooler than pure neutral gray */
   --border-1:          #d8dcde;
@@ -175,6 +180,11 @@ html.dark {
   --bg-muted:          #3a3a3c;
   --bg-header-strip:   #3a3a3c;
   --bg-row-zebra:      #3a3a3c;
+  /* Form fields — one surface step up from the #2c2c2e card/row surface so a
+   * field reads as a field instead of blending in (TASK-763 follow-up). Built
+   * from existing surface tokens, no new hex. */
+  --input-bg:          var(--bg-surface-alt);  /* #3a3a3c, distinct from --bg-surface #2c2c2e */
+  --input-bg-changed:  var(--border-1);        /* #444 — a visibly different shade for unsaved edits */
 
   --border-1:          #444444;
   --border-2:          #555555;

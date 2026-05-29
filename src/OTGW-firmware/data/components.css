@@ -198,7 +198,7 @@ input[type="email"], input[type="url"], input[type="search"],
 select, textarea, .log-search {
   font: inherit; font-size: var(--fs-input);
   padding: var(--space-2) var(--space-4);
-  background: var(--bg-surface); color: var(--fg-2);
+  background: var(--input-bg); color: var(--fg-2);
   border: 1px solid var(--border-2); border-radius: var(--radius-md);
 }
 .log-search { font-size: var(--fs-xs); }
@@ -981,15 +981,15 @@ body.dark .settings-group-body .settingDiv .settings-input-container,
 }
 
 /* --- Settings input states (light-mode equivalents of dark-mode rules) --- */
-.input-changed { background: lightgray; color: black; }
-.input-normal { background: white; color: black; }
-.input-readonly { background: #f0f0f0; color: #666; }
+.input-changed { background: var(--input-bg-changed); color: var(--fg-1); }
+.input-normal { background: var(--input-bg); color: var(--fg-2); }
+.input-readonly { background: var(--bg-muted); color: var(--fg-4); }
 /* Checkboxes and number spinners must not inherit forced background/color:
    native rendering relies on the browser/OS stylesheet, not explicit overrides. */
 input[type="checkbox"].input-normal,
 input[type="checkbox"].input-changed { background: revert; color: revert; }
-input[type="number"].input-normal,
-input[type="number"].input-changed { background: var(--bg-surface); color: var(--fg-2); }
+input[type="number"].input-normal  { background: var(--input-bg); color: var(--fg-2); }
+input[type="number"].input-changed { background: var(--input-bg-changed); color: var(--fg-1); }
 
 /* --- Editable Dallas sensor label inline editor --- */
 .otmoncolumn1.editable-label {
