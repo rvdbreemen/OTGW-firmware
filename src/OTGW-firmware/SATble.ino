@@ -710,8 +710,11 @@ void satBLERosterSendJSON()
   sendJsonMapEntry(F("selected_mac"),       settings.sat.sBleMAC);
 
   // Sensors array — manual JSON since the helpers do not nest arrays.
+  // Route through restSendContent(P) so these bytes share the ESP32
+  // coalescing buffer (jsonStuff.ino sTxBuf): a raw httpServer.sendContent
+  // would flush ahead of the buffered wrapper and scramble the JSON.
   sendBeforenext(); sendIdent();
-  httpServer.sendContent_P(PSTR("\"sensors\": ["));
+  restSendContentP(PSTR("\"sensors\": ["));
 
   bool firstSensor = true;
   for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
@@ -751,10 +754,10 @@ void satBLERosterSendJSON()
                (unsigned)(fresh ? (now - snap.iLastSeenMs) : 0),
                fresh      ? "true" : "false",
                isSelected ? "true" : "false");
-    httpServer.sendContent(buf);
+    restSendContent(buf);
     firstSensor = false;
   }
-  httpServer.sendContent_P(PSTR("]"));
+  restSendContentP(PSTR("]"));
 
   sendEndJsonMap("");
 }

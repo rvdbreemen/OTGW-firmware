@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.84
+**  Version  : v2.0.0-alpha.88
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -300,8 +300,11 @@ static void sendSensorStatus() {
 
   // Individual sensor readings
   if (bSensorsDetected || state.debug.bSensorSim) {
-    // Start "devices" sub-object — use chunked JSON
-    httpServer.sendContent_P(PSTR(",\r\n  \"devices\": {"));
+    // Start "devices" sub-object — use chunked JSON.
+    // restSendContent(P) keeps these bytes in the ESP32 coalescing buffer
+    // (jsonStuff.ino sTxBuf); a raw httpServer.sendContent would flush ahead
+    // of the buffered sendJsonMapEntry wrapper and scramble the JSON.
+    restSendContentP(PSTR(",\r\n  \"devices\": {"));
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char *addr = getDallasAddress(DallasrealDevice[i].addr);
       if (!addr) continue;
@@ -310,13 +313,13 @@ static void sendSensorStatus() {
                  PSTR("%s\r\n    \"%s\": {\"temp\": %4.1f, \"epoch\": %u}"),
                  (i > 0) ? "," : "",
                  addr, DallasrealDevice[i].tempC, (uint32_t)DallasrealDevice[i].lasttime);
-      httpServer.sendContent(entry);
+      restSendContent(entry);
     }
-    httpServer.sendContent_P(PSTR("\r\n  }"));
+    restSendContentP(PSTR("\r\n  }"));
   }
 
   // S0 pulse counter
-  httpServer.sendContent_P(PSTR(",\r\n  \"s0\": {"));
+  restSendContentP(PSTR(",\r\n  \"s0\": {"));
   {
     char s0buf[120];
     snprintf_P(s0buf, sizeof(s0buf),
@@ -327,7 +330,7 @@ static void sendSensorStatus() {
                settings.s0.iPin, settings.s0.iInterval,
                OTGWs0pulseCount, (unsigned long)OTGWs0pulseCountTot,
                OTGWs0powerkw, (uint32_t)OTGWs0lasttime);
-    httpServer.sendContent(s0buf);
+    restSendContent(s0buf);
   }
 
   sendEndJsonMap(F("sensors"));

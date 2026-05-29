@@ -622,7 +622,7 @@ void weatherSendStatusJSON()
       if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
     }
     entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
-    sendBeforenext(); httpServer.sendContent(entryBuf);
+    sendBeforenext(); restSendContent(entryBuf);
   }
 
   {
@@ -636,7 +636,7 @@ void weatherSendStatusJSON()
       if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
     }
     entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
-    sendBeforenext(); httpServer.sendContent(entryBuf);
+    sendBeforenext(); restSendContent(entryBuf);
   }
 
   {
@@ -650,7 +650,7 @@ void weatherSendStatusJSON()
       if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
     }
     entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
-    sendBeforenext(); httpServer.sendContent(entryBuf);
+    sendBeforenext(); restSendContent(entryBuf);
   }
 
   {
@@ -664,7 +664,7 @@ void weatherSendStatusJSON()
       if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
     }
     entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
-    sendBeforenext(); httpServer.sendContent(entryBuf);
+    sendBeforenext(); restSendContent(entryBuf);
   }
 #endif  // ifndef ESP8266
 

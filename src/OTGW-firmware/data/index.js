@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.86
+**  Version  : v2.0.0-alpha.88
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3973,7 +3973,13 @@ function refreshBleRoster() {
       if (!j) return;
       renderBleRoster(j);
     })
-    .catch(function(e) { console.warn('[BLE] discovery fetch:', e); });
+    .catch(function(e) {
+      console.warn('[BLE] discovery fetch:', e);
+      // Surface the failure instead of leaving the panel silently blank.
+      // A parse error here is the visible symptom of a malformed discovery
+      // response (e.g. an out-of-order chunked-JSON body from the device).
+      renderBleRosterError(e);
+    });
 }
 
 // MAC strict-validate: 17 chars, AA:BB:CC:DD:EE:FF only. Defense-in-depth
@@ -4101,6 +4107,25 @@ function renderBleRoster(j) {
       listEl.appendChild(bleRowFor(s));
     });
   }
+}
+
+// Render a visible error state into the roster list when the discovery
+// fetch fails or returns unparseable JSON. Without this the panel just
+// stays blank, which is indistinguishable from "no sensors yet" and hides
+// the real problem (see refreshBleRoster catch handler).
+function renderBleRosterError(err) {
+  var listEl = document.getElementById('ble-roster-list');
+  if (!listEl) return;
+  while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+  var row = document.createElement('div');
+  row.className = 'sat-row';
+  var val = document.createElement('span');
+  val.className = 'sat-value';
+  val.textContent = 'Failed to load BLE sensors (' +
+    (err && err.message ? err.message : 'fetch/parse error') +
+    '). The discovery response could not be read.';
+  row.appendChild(val);
+  listEl.appendChild(row);
 }
 
 // TASK-508: roster action handlers. All POST JSON {mac[, label]}.
