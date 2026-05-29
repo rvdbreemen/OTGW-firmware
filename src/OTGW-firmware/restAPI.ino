@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.91
+**  Version  : v2.0.0-alpha.92
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2353,9 +2353,7 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("hardware_type"), hardwareTypeName());  // ADR-113: static board class for codepath selection
   sendJsonMapEntry(F("hardwaremode"), hardwareModeName());
   sendJsonMapEntry(F("networkmode"), networkModeName());
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
   sendJsonMapEntry(F("oledpresent"), state.hw.bOLEDPresent);
-#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   sendJsonMapEntry(F("ethernetpresent"), state.hw.bEthernetPresent);
   sendJsonMapEntry(F("ethernetlink"), state.net.bEthernetLink);
@@ -2703,6 +2701,7 @@ void sendDeviceTimeV2()
   sendJsonMapEntry(F("freeheap"), platformFreeHeap());
   sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
   sendJsonMapEntry(F("networkmode"), networkModeName());
+  sendJsonMapEntry(F("ipaddress"), CSTR(getActiveIP()));  // TASK-759: live active-transport IP for the header indicator
 #if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
     sendJsonMapEntry(F("apfallback"), true);

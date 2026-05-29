@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Hardwaretypes.h
-**  Version  : v2.0.0-alpha.91
+**  Version  : v2.0.0-alpha.92
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -10,8 +10,9 @@
 **    - OTGWHardwareMode enum (HW_MODE_PIC / OT_DIRECT / DEGRADED / UNKNOWN)
 **    - HardwareSection (state.hw — runtime-detected capabilities)
 **
-**  Requires HAS_OLED_CAPABLE / HAS_ETH_CAPABLE from boards.h; must therefore
-**  be included AFTER boards.h in OTGW-firmware.h.
+**  Requires HAS_ETH_CAPABLE from boards.h; must therefore be included
+**  AFTER boards.h in OTGW-firmware.h. (bOLEDPresent is unconditional: OLED
+**  presence is detected at runtime, not gated at compile time — ADR-114.)
 **
 **  TERMS OF USE: MIT License. See OTGW-firmware.h for the full notice.
 ***************************************************************************
@@ -31,9 +32,7 @@ enum OTGWHardwareMode : uint8_t {
 
 struct HardwareSection {       // state.hw — detected hardware capabilities
   OTGWHardwareMode eMode       = HW_MODE_UNKNOWN;
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
-  bool bOLEDPresent            = false;
-#endif
+  bool bOLEDPresent            = false;   // runtime I2C probe at 0x3C (ADR-114) — any board
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   bool bEthernetPresent        = false;
 #endif

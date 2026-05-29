@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.91
+**  Version  : v2.0.0-alpha.92
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -49,13 +49,12 @@ static void configModeCallback(WiFiManager *myWiFiManager)
   DebugTln(F("Entered config mode\r"));
   DebugTln(WiFi.softAPIP().toString());
   DebugTln(myWiFiManager->getConfigPortalSSID());
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
   // [TASK-750] Paint the "how to connect" screen on the OLED while the (blocking)
   // WiFiManager config portal is open. The portal AP is open, so no password.
+  // oledShowConfigMode is a no-op when no OLED was detected at runtime.
   char oledUrl[28];
   snprintf_P(oledUrl, sizeof(oledUrl), PSTR("http://%s/"), WiFi.softAPIP().toString().c_str());
   oledShowConfigMode(myWiFiManager->getConfigPortalSSID().c_str(), nullptr, oledUrl);
-#endif
 } // configModeCallback()
 
 void resetWiFiSettings(void)
@@ -121,7 +120,13 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   if (forcePortal)
   {
     DebugTln(F("Triple-reset detected, forcing WiFi config portal."));
+    // ADR-043 / TASK-760: the triple-reset is the deliberate credential-recovery
+    // gesture, so actually CLEAR the stored WiFi credentials here — not just force
+    // the portal. Without this, old credentials survive a config-portal timeout,
+    // contradicting ADR-043 ("clear saved WiFi credentials, then force the portal").
+    manageWiFi.resetSettings();
     wifiConnected = false;
+    wifiSaved     = false;   // credentials are gone now; keep downstream logic consistent
   }
   else if (wifiConnected)
   {

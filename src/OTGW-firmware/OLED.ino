@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.91
+**  Version  : v2.0.0-alpha.92
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -32,8 +32,6 @@
 **  TERMS OF USE: MIT License. See bottom of file.
 ***************************************************************************
 */
-
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
 
 #include <Wire.h>
 #include <SSD1306Ascii.h>
@@ -511,8 +509,7 @@ void initOLED() {
   gpio_isr_handler_add((gpio_num_t)OLED_BUTTON_PIN, oledButtonISR, nullptr);
   DebugTf(PSTR("OLED: Button ISR on GPIO %d (FreeRTOS queue)\r\n"), OLED_BUTTON_PIN);
 #else
-  // Non-ESP32 fallback: legacy Arduino API (HAS_OLED_CAPABLE is currently
-  // ESP32-only, so this is belt-and-braces only).
+  // Non-ESP32 fallback: legacy Arduino API. Polling-based; no GPIO ISR.
   pinMode(OLED_BUTTON_PIN, INPUT_PULLUP);
   DebugTf(PSTR("OLED: Button on GPIO %d (no ISR — non-ESP32 build)\r\n"), OLED_BUTTON_PIN);
 #endif
@@ -649,8 +646,6 @@ void oledWake() {
   }
   oledLastActivity = millis();
 }
-
-#endif // defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
 
 /***************************************************************************
 *

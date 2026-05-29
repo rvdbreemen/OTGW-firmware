@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.91
+**  Version  : v2.0.0-alpha.92
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -160,10 +160,8 @@ void setup() {
   // connect" config screen must already be on the display by the time the
   // portal opens. Wire.begin() is idempotent; initWatchDog() re-runs it later
   // for the external watchdog.
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   initOLED();
-#endif
 
   // Connect to and initialise WiFi network
   setLed(LED1, ON);
@@ -662,9 +660,7 @@ void loop()
 #if HAS_PIC
     handlePendingUpgrade();           // Check if we need to start an upgrade
 #endif
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
-    loopOLED();                       // OLED display refresh and button handling (OTGW32 only)
-#endif
+    loopOLED();                       // OLED display refresh and button handling (no-op if no OLED detected)
   }
 
   doBackgroundTasks();              // run background tasks

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.91
+**  Version  : v2.0.0-alpha.92
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -364,7 +364,7 @@ function updateGatewayModeIndicator(value) {
 // Network mode indicator (WiFi / Ethernet icon in header)
 var currentNetworkMode = 'WiFi';
 
-function updateNetworkIndicator(mode, apFallback, quality) {
+function updateNetworkIndicator(mode, apFallback, quality, ip) {
   if (!mode && !apFallback) return;
   if (apFallback) mode = 'AP';
   currentNetworkMode = mode;
@@ -378,12 +378,15 @@ function updateNetworkIndicator(mode, apFallback, quality) {
   var isAP  = (mode === 'AP');
   var cssClass = isEth ? 'net-ethernet' : (isAP ? 'net-ap' : 'net-wifi');
   container.className = 'headercolumn net-status ' + cssClass;
-  var netLabel = isAP ? 'AP Fallback mode (no WiFi)' : ('Network: ' + mode);
+  // TASK-759: show the active IP alongside the transport so WiFi-vs-Ethernet
+  // and the address are both visible, live (the device/time poll carries it).
+  var ipSuffix = (ip && !isAP) ? (' (' + ip + ')') : '';
+  var netLabel = isAP ? 'AP Fallback mode (no WiFi)' : ('Network: ' + mode + ipSuffix);
   container.title = netLabel;
-  container.setAttribute('aria-label', 'Network status: ' + (isAP ? 'AP Fallback' : mode));
+  container.setAttribute('aria-label', 'Network status: ' + (isAP ? 'AP Fallback' : (mode + ipSuffix)));
   wifiIcon.classList.toggle('hidden', isEth);
   ethIcon.classList.toggle('hidden', !isEth);
-  if (textEl) textEl.textContent = isAP ? 'AP MODE' : mode;
+  if (textEl) textEl.textContent = isAP ? 'AP MODE' : (mode + ipSuffix);
 
   // Signal bars: shown for WiFi only; neutral for Ethernet/AP
   var barsEl = document.getElementById('netSignalBars');
@@ -4455,7 +4458,7 @@ function refreshDevTime() {
       if (devtime.freeheap !== undefined)    currentFreeHeap = devtime.freeheap;
       if (devtime.maxfreeblock !== undefined) currentMaxFreeBlock = devtime.maxfreeblock;
       updateHeapDisplay();
-      if (devtime.networkmode || devtime.apfallback) updateNetworkIndicator(devtime.networkmode, devtime.apfallback, devtime.wifiquality);
+      if (devtime.networkmode || devtime.apfallback) updateNetworkIndicator(devtime.networkmode, devtime.apfallback, devtime.wifiquality, devtime.ipaddress);
 
       if (hasPsmode) {
         if (newPSmode !== isPSmode) {
@@ -5157,7 +5160,7 @@ function refreshDevInfo() {
       applyOTGWSimulationState(device.otgwsimulation);
       applyPICAvailability(device.picavailable, device.otcommandinterface, device.hardware_type);
       applyOTDirectAvailability(device.otdirectavailable);
-      updateNetworkIndicator(device.networkmode, device.apfallback, device.wifiquality);
+      updateNetworkIndicator(device.networkmode, device.apfallback, device.wifiquality, device.ipaddress);
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
