@@ -251,6 +251,7 @@ const char ha_lbl_fw_reboot_count[]  PROGMEM = "otgw-firmware/reboot_count";
 const char ha_lbl_fw_reboot_reason[] PROGMEM = "otgw-firmware/reboot_reason";
 const char ha_lbl_fw_version[]       PROGMEM = "otgw-firmware/version";
 const char ha_lbl_fw_hostname[]      PROGMEM = "otgw-firmware/hostname";
+const char ha_lbl_fw_hardware_type[] PROGMEM = "otgw-firmware/hardware_type";  // ADR-113
 // PIC info labels (TASK-540 / TASK-541, faux dataid 249). MQTT_HA_FLAG_IS_PIC_ENTRY auto-prepends "otgw-pic/".
 const char ha_lbl_pic_version[]       PROGMEM = "version";
 const char ha_lbl_pic_deviceid[]      PROGMEM = "deviceid";
@@ -673,6 +674,7 @@ const char ha_name_fw_reboot_count[]  PROGMEM = "Reboot_Count";
 const char ha_name_fw_reboot_reason[] PROGMEM = "Reboot_Reason";
 const char ha_name_fw_version[]       PROGMEM = "Firmware_Version";
 const char ha_name_fw_hostname[]      PROGMEM = "Hostname";
+const char ha_name_fw_hardware_type[] PROGMEM = "Hardware_Type";  // ADR-113
 // PIC info friendly names (TASK-540 / TASK-541, faux dataid 249)
 const char ha_name_pic_version[]       PROGMEM = "PIC_Version";
 const char ha_name_pic_deviceid[]      PROGMEM = "PIC_DeviceID";
@@ -1239,6 +1241,7 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {248, 0x00, ha_lbl_fw_reboot_reason, ha_name_fw_reboot_reason, HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {248, 0x00, ha_lbl_fw_version,       ha_name_fw_version,       HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {248, 0x00, ha_lbl_fw_hostname,      ha_name_fw_hostname,      HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {248, 0x00, ha_lbl_fw_hardware_type, ha_name_fw_hardware_type, HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},  // ADR-113
     // --- Pseudo-ID 249: PIC info (TASK-540 / TASK-541) ---
     // 0x08 = MQTT_HA_FLAG_IS_PIC_ENTRY → "otgw-pic/" prefix added by streamSensorDiscovery
     // and entries are skipped at publish time when isPICEnabled() is false.
@@ -1716,13 +1719,13 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     284, // id 245, 4 entries
     288, // id 246, 1 entry
     289, // id 247, 17 entries
-    306, // id 248, 4 entries (TASK-541 firmware diagnostics)
-    310, // id 249, 5 entries (TASK-541 PIC info)
-    315, // id 250, 15 entries (TASK-541 PIC settings)
-    330, // id 251, 7 entries (TASK-541 OTDirect/SAT diagnostics)
-    337, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
-    369, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    384, // id 254, 1 entry  (TASK-543 SAT flame status)
+    306, // id 248, 5 entries (TASK-541 firmware diagnostics + ADR-113 hardware_type)
+    311, // id 249, 5 entries (TASK-541 PIC info)
+    316, // id 250, 15 entries (TASK-541 PIC settings)
+    331, // id 251, 7 entries (TASK-541 OTDirect/SAT diagnostics)
+    338, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
+    370, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    385, // id 254, 1 entry  (TASK-543 SAT flame status)
     0xFFFF // id 255
 };
 

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : boards.h
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.89
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -54,6 +54,7 @@
 #define HAS_PIC           1    // Has PIC microcontroller for OpenTherm gateway
 #define HAS_DIRECT_OT     0    // No direct OT master (uses PIC)
 #define HAS_ETH_CAPABLE   0    // No Ethernet support
+#define HW_TYPE_NAME      "otgw-classic"  // Static hardware-type slug / board class (ADR-113)
 
 // ---------------------------------------------------------------------------
 #elif defined(BOARD_NODOSHOP_ESP32)
@@ -113,6 +114,7 @@
 #define HAS_DIRECT_OT     1    // Direct OT master/slave via OTDirect library
 #define HAS_ETH_CAPABLE   1    // Has W5500 Ethernet module
 #define HAS_OLED_CAPABLE  1    // Onboard 128x64 SSD1306 I2C OLED (runtime probe at 0x3C)
+#define HW_TYPE_NAME      "otgw32"        // Static hardware-type slug / board class (ADR-113)
 
 // ---------------------------------------------------------------------------
 #else

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.89
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -550,6 +550,19 @@ inline const __FlashStringHelper* boardName() {
   return F("Unknown board");
 #endif
 }
+
+// Returns the static hardware-type slug (board class) — compile-time, machine-readable.
+// Distinct from hardwareModeName() (runtime operational mode) and boardName() (display
+// string). This is the contract codepath/UI selection switches on; see ADR-113.
+// Values: "otgw-classic" (HAS_PIC=1), "otgw32" (HAS_PIC=0), future "ot-thing".
+inline const __FlashStringHelper* hardwareTypeName() {
+  return F(HW_TYPE_NAME);
+}
+
+// Compile-time capability: does this board CLASS carry a PIC co-processor at all?
+// Static property of the hardware variant, NOT runtime PIC liveness (that is
+// isPICEnabled()). A PIC-class board with a dead PIC is still hardwareHasPIC()==true.
+inline constexpr bool hardwareHasPIC() { return HAS_PIC; }
 
 #if HAS_PIC
 inline bool isGatewayFirmware() { return strcmp_P(state.pic.sType, PSTR("gateway")) == 0; }

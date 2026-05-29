@@ -61,6 +61,7 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 | `otgw-firmware/reboot_count` | `"42"` | Number of reboots since first boot |
 | `otgw-firmware/reboot_reason` | `"Software/System restart"` | Last reboot reason |
 | `otgw-firmware/uptime` | `"12345"` | Uptime in seconds (not retained) |
+| `otgw-firmware/hardware_type` | `"otgw-classic"` / `"otgw32"` | Static hardware type (board class), compile-time. Use this for codepath/UI selection instead of `otgw-pic/picavailable` (ADR-113). Future: `"ot-thing"`. Retained. |
 | `otgw-firmware/board` | `"esp8266"` / `"esp32s3"` | Hardware board identifier |
 | `otgw-firmware/hardware_mode` | `"pic"` / `"otdirect"` | Active hardware mode |
 | `otgw-firmware/network_mode` | `"wifi"` / `"ethernet"` / `"ap"` | Active network mode |
@@ -89,7 +90,7 @@ Note: the OT-bus presence values (`boiler_connected`, `thermostat_connected`, `o
 | `otgw-pic/version` | `"5.4"` | PIC firmware version |
 | `otgw-pic/deviceid` | `"gateway"` | PIC device ID |
 | `otgw-pic/firmwaretype` | `"gateway"` | PIC firmware type (gateway/interface/diagnose) |
-| `otgw-pic/picavailable` | `"ON"` / `"OFF"` | Whether PIC is detected |
+| `otgw-pic/picavailable` | `"ON"` / `"OFF"` | Whether the PIC is detected (runtime liveness). **Deprecated (ADR-113)**: for board-class / codepath selection use `otgw-firmware/hardware_type`. Kept one release for compatibility, then removed. |
 | `otgw-pic/gateway_mode` | `"ON"` / `"OFF"` | Gateway mode (ON) vs monitor mode (OFF) |
 
 ### PIC Settings

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.89
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2350,6 +2350,7 @@ void sendDeviceInfoV2()
   // --- Platform & hardware identity ---
   sendJsonMapEntry(F("platform"), F(PLATFORM_NAME));
   sendJsonMapEntry(F("board"), boardName());
+  sendJsonMapEntry(F("hardware_type"), hardwareTypeName());  // ADR-113: static board class for codepath selection
   sendJsonMapEntry(F("hardwaremode"), hardwareModeName());
   sendJsonMapEntry(F("networkmode"), networkModeName());
 #if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE

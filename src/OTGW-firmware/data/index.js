@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.89
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1845,15 +1845,28 @@ function parseSimulationValue(rawValue) {
   return null;
 }
 
+// ADR-113: static hardware-type slug ("otgw-classic" / "otgw32" / "ot-thing").
+// null until the first device-info response is seen.
+var hardwareType = null;
+
 // Hide or show PIC-only and OT-command-capable UI elements based on hardware.
 // Called once after the first /api/v2/device/info response.
-function applyPICAvailability(available, otCommandAvailable) {
+// hwType (ADR-113): the static board class. When provided it is remembered so
+// later re-applies (e.g. after settings render) keep selecting on board class.
+function applyPICAvailability(available, otCommandAvailable, hwType) {
   picAvailable = !!available;
+  if (hwType !== undefined && hwType !== null) hardwareType = hwType;
   // otCommandAvailable is now a string: "PIC", "OT-Direct", or "None" (or legacy bool)
   otCommandInterfaceAvailable = (otCommandAvailable === "PIC" || otCommandAvailable === "OT-Direct" || otCommandAvailable === true || otCommandAvailable === "true");
+  // ADR-113: PIC-specific UI is selected on the static board CLASS (hardware_type),
+  // not on runtime PIC liveness (picAvailable). A PIC-class board with a dead PIC
+  // still shows the PIC UI; picAvailable then drives the "not detected" substatus.
+  // Fallback to picAvailable when hardware_type is absent (firmware predating the field).
+  var isPicClassBoard = (hardwareType === 'otgw-classic') ||
+                        (hardwareType === null && picAvailable);
   // Static HTML elements marked with class "pic-only"
   Array.from(document.getElementsByClassName('pic-only')).forEach(function(el) {
-    if (picAvailable) el.classList.remove('hidden');
+    if (isPicClassBoard) el.classList.remove('hidden');
     else el.classList.add('hidden');
   });
   Array.from(document.getElementsByClassName('ot-command-capable')).forEach(function(el) {
@@ -1874,7 +1887,7 @@ function applyPICAvailability(available, otCommandAvailable) {
   picDevInfoKeys.forEach(function(key) {
     var row = document.getElementById('devinfo_' + key);
     if (row) {
-      if (picAvailable) row.classList.remove('hidden');
+      if (isPicClassBoard) row.classList.remove('hidden');
       else row.classList.add('hidden');
     }
   });
@@ -3282,7 +3295,7 @@ function initMainPage() {
         .then(function(r) { return r.ok ? r.json() : Promise.reject(r.statusText); })
         .then(function(json) {
           var d = json.device || {};
-          applyPICAvailability(d.picavailable, d.otcommandinterface);
+          applyPICAvailability(d.picavailable, d.otcommandinterface, d.hardware_type);
           applyOTDirectAvailability(d.otdirectavailable);
           if (picAvailable) {
             firmwarePage();
@@ -5142,7 +5155,7 @@ function refreshDevInfo() {
 
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
       applyOTGWSimulationState(device.otgwsimulation);
-      applyPICAvailability(device.picavailable, device.otcommandinterface);
+      applyPICAvailability(device.picavailable, device.otcommandinterface, device.hardware_type);
       applyOTDirectAvailability(device.otdirectavailable);
       updateNetworkIndicator(device.networkmode, device.apfallback, device.wifiquality);
 
@@ -5410,7 +5423,7 @@ function refreshDeviceInfo() {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       const device = json.device || {};
       applyOTGWSimulationState(device.otgwsimulation);
-      applyPICAvailability(device.picavailable, device.otcommandinterface);
+      applyPICAvailability(device.picavailable, device.otcommandinterface, device.hardware_type);
       applyOTDirectAvailability(device.otdirectavailable);
       for (let key in device) {
         if (key === 'otgwsimulation') continue;
