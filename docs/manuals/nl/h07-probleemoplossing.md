@@ -484,7 +484,7 @@ Dit wist alle instellingen en herstart het apparaat met standaardwaarden.
 Wilt u alleen de WiFi-verbinding herstellen maar overige instellingen bewaren:
 
 1. Klik op **Reset WiFi** in de Settings-pagina, of
-2. Gebruik de driedubbele hardware-reset (zie paragraaf 6.1).
+2. Gebruik de driedubbele hardware-reset: druk de resetknop 3 keer achter elkaar in, elke druk binnen 10 seconden na de vorige (zie paragraaf 6.1.4). Dit forceert het configuratieportaal zodat u nieuwe gegevens kunt invoeren.
 
 #### Methode 3: Firmware en filesysteem opnieuw flashen (volledige reset)
 

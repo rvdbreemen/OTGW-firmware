@@ -292,8 +292,8 @@ The OTGW32 board supports a W5500 Ethernet module as an alternative to WiFi:
 2. Delete the file `/settings.json`.
 3. Reboot the device.
 
-**Method 2: Triple-reset (WiFi credentials only)**
-Power-cycle the device 3 times within 10 seconds.
+**Method 2: Triple-reset (forces the WiFi config portal)**
+Press and release the hardware reset button 3 times in a row, each press within 10 seconds of the previous one (wait for the board to boot between presses). On the 3rd press the device boots into the WiFiManager config portal so you can enter new credentials. Use the reset button, not a power-cycle, and do not hold it: a held reset cannot be detected on ESP8266. See section 6.1.4 and `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md`.
 
 **Method 3: Telnet debug console**
 Connect on port 23 and type `resetwifi` to clear WiFi credentials only.
