@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : graph.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.90
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
