@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.99
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1491,10 +1491,9 @@ void sendMQTTversioninfo(){
     sendMQTTDataPic(F("firmwaretype"), state.pic.sType);
     sendMQTTDataPic(F("designer"), F("Schelte Bron"));
   }
-  // ADR-113 DEPRECATED: picavailable conflates "is a PIC-class board" with "is the PIC
-  // alive now". Superseded by otgw-firmware/hardware_type (selection) + isPICEnabled()
-  // (liveness). Kept one release for HA dashboard compatibility; remove next release.
-  sendMQTTDataPic(F("picavailable"), CCONOFF(state.pic.bAvailable));
+  // ADR-113 stage 2 (TASK-754): picavailable removed. Selection uses
+  // otgw-firmware/hardware_type; liveness uses isPICEnabled(). Deprecation
+  // window (one release after alpha.89) has passed.
 }
 
 /*

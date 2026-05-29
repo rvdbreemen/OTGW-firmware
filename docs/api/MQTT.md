@@ -90,7 +90,6 @@ Note: the OT-bus presence values (`boiler_connected`, `thermostat_connected`, `o
 | `otgw-pic/version` | `"5.4"` | PIC firmware version |
 | `otgw-pic/deviceid` | `"gateway"` | PIC device ID |
 | `otgw-pic/firmwaretype` | `"gateway"` | PIC firmware type (gateway/interface/diagnose) |
-| `otgw-pic/picavailable` | `"ON"` / `"OFF"` | Whether the PIC is detected (runtime liveness). **Deprecated (ADR-113)**: for board-class / codepath selection use `otgw-firmware/hardware_type`. Kept one release for compatibility, then removed. |
 | `otgw-pic/gateway_mode` | `"ON"` / `"OFF"` | Gateway mode (ON) vs monitor mode (OFF) |
 
 ### PIC Settings

@@ -1,10 +1,13 @@
 ---
 id: TASK-754
 title: 'feat(hw): remove deprecated picavailable topic/field (ADR-113 stage 2)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-29 09:05'
+updated_date: '2026-05-29 20:11'
 labels: []
+milestone: 2.1.0
 dependencies: []
 ---
 

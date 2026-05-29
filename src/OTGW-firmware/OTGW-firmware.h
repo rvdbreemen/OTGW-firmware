@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.99
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -705,7 +705,7 @@ byte      OTGWheapstatsid = 247;                  // foney dataid for heap-stats
 
 // Diagnostic discovery pseudo-IDs (TASK-540 / TASK-541):
 //   248 — otgw-firmware/{reboot_count,reboot_reason,version,hostname}
-//   249 — otgw-pic/{version,deviceid,firmwaretype,designer,picavailable} (PIC-gated)
+//   249 — otgw-pic/{version,deviceid,firmwaretype,designer} (PIC-gated; picavailable removed per ADR-113 stage 2)
 //   250 — otgw-pic/settings/* (15 PR=-polled topics, PIC-gated)
 //   251 — 2.0.0-specific diagnostics: otgw32/flame_*, sat/ble_* health, sat/ch_pressure_status
 //   252 — TASK-543 SAT control/PID/cycle/statistics primaries

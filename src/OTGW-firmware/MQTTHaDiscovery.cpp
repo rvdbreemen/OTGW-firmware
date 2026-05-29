@@ -257,7 +257,7 @@ const char ha_lbl_pic_version[]       PROGMEM = "version";
 const char ha_lbl_pic_deviceid[]      PROGMEM = "deviceid";
 const char ha_lbl_pic_firmwaretype[]  PROGMEM = "firmwaretype";
 const char ha_lbl_pic_designer[]      PROGMEM = "designer";
-const char ha_lbl_pic_available[]     PROGMEM = "picavailable";
+// ADR-113 stage 2 (TASK-754): ha_lbl_pic_available removed.
 // PIC settings labels (TASK-540 / TASK-541, faux dataid 250). IS_PIC flag prepends "otgw-pic/" → "otgw-pic/settings/<x>".
 const char ha_lbl_pic_set_setpoint_override[]   PROGMEM = "settings/setpoint_override";
 const char ha_lbl_pic_set_setback[]              PROGMEM = "settings/setback";
@@ -680,7 +680,7 @@ const char ha_name_pic_version[]       PROGMEM = "PIC_Version";
 const char ha_name_pic_deviceid[]      PROGMEM = "PIC_DeviceID";
 const char ha_name_pic_firmwaretype[]  PROGMEM = "PIC_FirmwareType";
 const char ha_name_pic_designer[]      PROGMEM = "PIC_Designer";
-const char ha_name_pic_available[]     PROGMEM = "PIC_Available";
+// ADR-113 stage 2 (TASK-754): ha_name_pic_available removed.
 // PIC settings friendly names (TASK-540 / TASK-541, faux dataid 250)
 const char ha_name_pic_set_setpoint_override[]  PROGMEM = "PIC_Setpoint_Override";
 const char ha_name_pic_set_setback[]             PROGMEM = "PIC_Setback";
@@ -1249,7 +1249,7 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {249, 0x08, ha_lbl_pic_deviceid,     ha_name_pic_deviceid,     HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {249, 0x08, ha_lbl_pic_firmwaretype, ha_name_pic_firmwaretype, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {249, 0x08, ha_lbl_pic_designer,     ha_name_pic_designer,     HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
-    {249, 0x08, ha_lbl_pic_available,    ha_name_pic_available,    HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    // ADR-113 stage 2 (TASK-754): ha_lbl_pic_available row removed.
     // --- Pseudo-ID 250: PIC settings (TASK-540 / TASK-541) ---
     // 0x08 → "otgw-pic/" prefix; labels start with "settings/" so the final topic is
     // <pubNs>/otgw-pic/settings/<x>. Mirrors publishAllPICsettings() in OTGW-Core.ino.
@@ -1720,12 +1720,12 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     288, // id 246, 1 entry
     289, // id 247, 17 entries
     306, // id 248, 5 entries (TASK-541 firmware diagnostics + ADR-113 hardware_type)
-    311, // id 249, 5 entries (TASK-541 PIC info)
-    316, // id 250, 15 entries (TASK-541 PIC settings)
-    331, // id 251, 7 entries (TASK-541 OTDirect/SAT diagnostics)
-    338, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
-    370, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    385, // id 254, 1 entry  (TASK-543 SAT flame status)
+    311, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
+    315, // id 250, 15 entries (TASK-541 PIC settings)
+    330, // id 251, 7 entries (TASK-541 OTDirect/SAT diagnostics)
+    337, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
+    369, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    384, // id 254, 1 entry  (TASK-543 SAT flame status)
     0xFFFF // id 255
 };
 
