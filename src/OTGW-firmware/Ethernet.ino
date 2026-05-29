@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Ethernet.ino
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.91
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -126,9 +126,14 @@ static bool startEthernet(uint16_t dhcpTimeoutMs) {
 // Switch from WiFi to Ethernet: disconnect WiFi, update state, restart services.
 //=======================================================================
 static void switchToEthernet() {
-  DebugTln(F("Network: switching to Ethernet"));
-  WiFi.disconnect();
+  DebugTln(F("Network: switching to Ethernet — disabling WiFi"));
+  // Set mode FIRST so loopWifi() (gated on eMode) stops driving reconnects, then
+  // power the radio down. WIFI_OFF also neutralizes the SDK setAutoReconnect(true)
+  // set in startWiFi(); a bare WiFi.disconnect() would let auto-reconnect resurrect
+  // the station and fight the wired link.
   state.net.eMode = NET_ETHERNET;
+  WiFi.disconnect();
+  WiFi.mode(WIFI_OFF);
   state.net.bEthernetLink = true;
   ethInitialized = true;
   // Re-register mDNS on the new interface
@@ -147,10 +152,15 @@ static void switchToEthernet() {
 // Service restart happens in loopWifi() WIFI_RECONNECTED state once connected.
 //=======================================================================
 static void switchToWiFi() {
-  DebugTln(F("Network: switching to WiFi"));
+  DebugTln(F("Network: switching to WiFi — re-enabling radio"));
   state.net.eMode = NET_WIFI;
   state.net.bEthernetLink = false;
   ethInitialized = false;
+  // Symmetric undo of switchToEthernet()'s WIFI_OFF: power the station radio
+  // back up and restore SDK auto-reconnect before begin(), otherwise begin()
+  // does nothing while the radio is still off.
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
   WiFi.begin();
   // Note: MQTT/WebSocket restart happens in loopWifi()/WIFI_RECONNECTED once
   // the WiFi association is confirmed. Publishing "wifi" here would race with

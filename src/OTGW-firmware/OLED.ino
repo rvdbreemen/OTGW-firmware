@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.91
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -135,6 +135,78 @@ static void drawHeader(const __FlashStringHelper* title) {
   oledDisplay.setCol(0);
   for (uint8_t i = 0; i < OLED_COLS; i++) oledDisplay.print('-');
 }
+
+// ---------------------------------------------------------------------------
+// Config "how to connect" screen — shared by the AP-fallback page
+// (drawPageConfig) and the one-shot config-portal screen (oledShowConfigMode).
+// drawConfigHeader draws the title + separator; drawConfigBody renders
+// SSID / optional password / setup URL. In drawConfigBody, url and pw may be
+// nullptr (or empty) to fall back to defaults / omit the password line.
+// ---------------------------------------------------------------------------
+static void drawConfigHeader() {
+  // Like drawHeader() but without the page counter — the config screen is not
+  // part of the button-cycled page set, so "n/5" would be misleading here.
+  oledDisplay.setRow(0);
+  oledDisplay.setCol(0);
+  oledDisplay.print(F("WiFi Setup"));
+  oledDisplay.setRow(1);
+  oledDisplay.setCol(0);
+  for (uint8_t i = 0; i < OLED_COLS; i++) oledDisplay.print('-');
+}
+
+static void drawConfigBody(const char* ssid, const char* pw, const char* url) {
+  oledDisplay.setRow(2);
+  oledDisplay.setCol(0);
+  oledDisplay.print(F("Connect to WiFi:"));
+
+  oledDisplay.setRow(3);
+  oledDisplay.setCol(0);
+  oledDisplay.print(F("SSID: "));
+  if (ssid && ssid[0]) {
+    char ssidBuf[OLED_COLS + 1];
+    strlcpy(ssidBuf, ssid, sizeof(ssidBuf));
+    oledDisplay.print(ssidBuf);
+  } else {
+    oledDisplay.print(F("---"));
+  }
+
+  uint8_t row = 4;
+  if (pw && pw[0]) {
+    oledDisplay.setRow(row++);
+    oledDisplay.setCol(0);
+    oledDisplay.print(F("PW:   "));
+    char pwBuf[OLED_COLS + 1];
+    strlcpy(pwBuf, pw, sizeof(pwBuf));
+    oledDisplay.print(pwBuf);
+  }
+
+  oledDisplay.setRow(6);
+  oledDisplay.setCol(0);
+  oledDisplay.print(F("Then open:"));
+  oledDisplay.setRow(7);
+  oledDisplay.setCol(0);
+  if (url && url[0]) {
+    char urlBuf[OLED_COLS + 1];
+    strlcpy(urlBuf, url, sizeof(urlBuf));
+    oledDisplay.print(urlBuf);
+  } else {
+    oledDisplay.print(F("http://192.168.4.1/"));
+  }
+}
+
+#if defined(_VERSION_PRERELEASE)
+// ---------------------------------------------------------------------------
+// drawPageConfig - WiFi-setup / AP-fallback screen (BETA AP fallback only).
+// Shown as the forced first page while state.net.bAPFallback is active so a
+// freshly-booted, WiFi-less device tells the user how to reach the web UI.
+// SSID comes from state.net.sAPSSID; password and IP mirror startAPFallback()
+// in networkStuff.ino ("otgw123" / 192.168.4.1) — kept in sync by hand.
+// ---------------------------------------------------------------------------
+static void drawPageConfig() {
+  drawConfigHeader();
+  drawConfigBody(state.net.sAPSSID, "otgw123", "http://192.168.4.1/");
+}
+#endif
 
 // ---------------------------------------------------------------------------
 // Page 1: Network status - transport, IP, MQTT
@@ -402,15 +474,16 @@ void initOLED() {
 
   DebugTln(F("OLED: Display initialized (128x64 SSD1306Ascii)"));
 
-  // Boot splash
+  // Boot splash. SSD1306Ascii is text-only (no framebuffer / drawBitmap), so
+  // the "flame" is a text glyph rather than a 16x16 bitmap.
   oledDisplay.clear();
   oledDisplay.set2X();
   oledDisplay.setRow(0);
-  oledDisplay.setCol(16);
+  oledDisplay.setCol(10);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  oledDisplay.println(F("OTGW32"));
+  oledDisplay.println(F("* OTGW32"));
 #else
-  oledDisplay.println(F("OTGW"));
+  oledDisplay.println(F("* OTGW"));
 #endif
   oledDisplay.set1X();
   oledDisplay.setRow(3);
@@ -419,6 +492,11 @@ void initOLED() {
   oledDisplay.setRow(5);
   oledDisplay.setCol(0);
   oledDisplay.println(F("Press button for info"));
+  oledDisplay.setRow(6);
+  oledDisplay.setCol(0);
+  // Our WiFi wipe is a triple-reset (shouldForceWifiConfigPortal), not a
+  // reset-hold, so the hint must name the right gesture for this firmware.
+  oledDisplay.println(F("Triple-reset = config"));
 
   // Button ISR for page cycling — ESP-IDF GPIO API + FreeRTOS queue.
   // Queue carries the press timestamp (us); debounce happens in loopOLED().
@@ -488,8 +566,20 @@ void loopOLED() {
     oledCachedSSID[0] = '\0';
   }
 
-  // Auto-off after timeout
-  if (oledPage != 0 && (now - oledLastActivity) >= OLED_TIMEOUT_MS) {
+  // Auto-off after timeout. Suppressed during AP fallback: the "how to connect"
+  // screen must stay visible for a user who walks up long after boot.
+  bool keepAwake = false;
+#if defined(_VERSION_PRERELEASE)
+  keepAwake = state.net.bAPFallback;
+  // If AP fallback engaged while the display was off, wake it so the user sees
+  // the "how to connect" screen without having to press the button.
+  if (keepAwake && oledPage == 0) {
+    oledPage = 1;
+    oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
+    oledLastRefresh = 0;                // force immediate redraw
+  }
+#endif
+  if (!keepAwake && oledPage != 0 && (now - oledLastActivity) >= OLED_TIMEOUT_MS) {
     oledDisplay.ssd1306WriteCmd(0xAE);  // DISPLAYOFF
     oledPage = 0;
     return;
@@ -508,6 +598,15 @@ void loopOLED() {
     oledLastRenderedPage = oledPage;
   }
 
+#if defined(_VERSION_PRERELEASE)
+  // While the BETA AP fallback is active there is no usable network/OT data;
+  // always show the "how to connect" screen so the user can reach the web UI.
+  if (state.net.bAPFallback) {
+    drawPageConfig();
+    return;
+  }
+#endif
+
   switch (oledPage) {
     case 1: drawPageNetwork();   break;
     case 2: drawPageOTStatus();  break;
@@ -515,6 +614,27 @@ void loopOLED() {
     case 4: drawPageDashboard(); break;
     case 5: drawPageHeating();   break;
   }
+}
+
+// ---------------------------------------------------------------------------
+// oledShowConfigMode - one-shot "how to connect" screen for the blocking
+// WiFiManager config portal (first boot / triple-reset). That portal runs its
+// own internal loop and never returns to loopOLED(), so the main thread must
+// call this synchronously from configModeCallback() to paint the screen once.
+// pw may be nullptr (the WiFiManager portal AP is open / passwordless).
+// Safe no-op if the display is absent.
+// ---------------------------------------------------------------------------
+void oledShowConfigMode(const char* ssid, const char* pw, const char* url) {
+  if (!oledPresent) return;
+  oledDisplay.ssd1306WriteCmd(0xAF);  // ensure display is on
+  oledDisplay.clear();
+  drawConfigHeader();
+  drawConfigBody(ssid, pw, url);
+  // Keep this screen visible: mark it active and pin activity so the auto-off
+  // timer does not blank it while the user is reading it during config.
+  oledPage = 1;
+  oledLastRenderedPage = 0xFF;  // force a clean redraw once loopOLED resumes
+  oledLastActivity = millis();
 }
 
 // ---------------------------------------------------------------------------

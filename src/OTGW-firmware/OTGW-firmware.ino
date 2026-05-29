@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.91
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -155,6 +155,16 @@ void setup() {
   // without this early call the DHCP request carries the default "ESP-XXXXXX".
   platformSetHostname(CSTR(settings.sHostname));
 
+  // [TASK-750] Bring up I2C + OLED BEFORE startWiFi(): the WiFiManager config
+  // portal blocks inside startWiFi(), so the boot splash and the "how to
+  // connect" config screen must already be on the display by the time the
+  // portal opens. Wire.begin() is idempotent; initWatchDog() re-runs it later
+  // for the external watchdog.
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  initOLED();
+#endif
+
   // Connect to and initialise WiFi network
   setLed(LED1, ON);
   SetupDebugln(F("Attempting to connect to WiFi network\r"));
@@ -190,12 +200,16 @@ void setup() {
   if (!state.net.bAPFallback)
 #endif
   startMQTT();               // start the MQTT after webserver, always.
- 
-  { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
-  // OLED init after Wire.begin() (called inside initWatchDog on ESP32 path)
-#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
-  initOLED();
+
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  // [TASK-751] Probe the W5500; if a wired link with an IP is present, switch to
+  // Ethernet and disable WiFi. Placed after startMDNS()/startWebSocket()/startMQTT()
+  // because switchToEthernet() rebinds those services to the wired interface —
+  // running it earlier would double-init them. OLED was already brought up above.
+  initEthernet();
 #endif
+
+  { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
   platformResetReason(lastReset, sizeof(lastReset));
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();

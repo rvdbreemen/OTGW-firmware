@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.88
+**  Version  : v2.0.0-alpha.91
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -49,6 +49,13 @@ static void configModeCallback(WiFiManager *myWiFiManager)
   DebugTln(F("Entered config mode\r"));
   DebugTln(WiFi.softAPIP().toString());
   DebugTln(myWiFiManager->getConfigPortalSSID());
+#if defined(HAS_OLED_CAPABLE) && HAS_OLED_CAPABLE
+  // [TASK-750] Paint the "how to connect" screen on the OLED while the (blocking)
+  // WiFiManager config portal is open. The portal AP is open, so no password.
+  char oledUrl[28];
+  snprintf_P(oledUrl, sizeof(oledUrl), PSTR("http://%s/"), WiFi.softAPIP().toString().c_str());
+  oledShowConfigMode(myWiFiManager->getConfigPortalSSID().c_str(), nullptr, oledUrl);
+#endif
 } // configModeCallback()
 
 void resetWiFiSettings(void)
@@ -280,6 +287,16 @@ static WifiState_t wifiState = WIFI_IDLE;
 static int wifiRetryCount = 0;
 
 void loopWifi() {
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  // When wired Ethernet is the active transport, the WiFi radio is powered down
+  // by switchToEthernet() (WIFI_OFF). Do not run the reconnect state machine —
+  // it would call WiFi.begin() and resurrect the station, fighting the wired
+  // link. loopEthernet() owns the transition back to WiFi on cable removal.
+  // A connected wired link also preempts the BETA AP fallback: WIFI_OFF in
+  // switchToEthernet() tears down the softAP, and this early return keeps the
+  // AP-retry states dormant while Ethernet is active.
+  if (state.net.eMode == NET_ETHERNET) return;
+#endif
   DECLARE_TIMER_SEC(timerWifiRetry,  30, CATCH_UP_MISSED_TICKS);
 #if defined(_VERSION_PRERELEASE)
   DECLARE_TIMER_SEC(timerAPRetry,   300, CATCH_UP_MISSED_TICKS);  // 5 min between AP→WiFi retries
