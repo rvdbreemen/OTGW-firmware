@@ -91,4 +91,45 @@ if [ "${ADR_KIT_HOOK_DISABLE:-0}" != "1" ]; then
   fi
 fi
 
+# ── 3. adr-kit ADR-suggestion advisory ───────────────────────────────────────
+# Non-blocking decision detector: runs `adr-suggest` over the staged diff and
+# prints a hint when the change looks like a NEW architectural decision that may
+# warrant an ADR (distinct from section 2, which only enforces EXISTING ADRs).
+# NEVER affects the commit outcome. Requires adr-kit >= 0.16.0 in the plugin
+# cache; silently skips if the bin is absent (e.g. before a plugin upgrade).
+# Disable per-commit with: ADR_KIT_SUGGEST_DISABLE=1 git commit ...
+if [ "${ADR_KIT_SUGGEST_DISABLE:-0}" != "1" ]; then
+  _PYTHON3S=""
+  for _cmd in python3 python py; do
+    if command -v "$_cmd" >/dev/null 2>&1; then
+      _ver=$("$_cmd" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+      _major=$(echo "$_ver" | cut -d. -f1)
+      if [ "${_major:-0}" -ge 3 ] 2>/dev/null; then _PYTHON3S="$_cmd"; break; fi
+    fi
+  done
+
+  if [ -n "$_PYTHON3S" ]; then
+    ADR_KIT_BASE_S="${HOME}/.claude/plugins/cache/rvdbreemen-adr-kit/adr-kit"
+    ADR_SUGGEST=""
+    if [ -d "$ADR_KIT_BASE_S" ]; then
+      shopt -s nullglob
+      _candidates_s=("$ADR_KIT_BASE_S"/*/bin/adr-suggest)
+      shopt -u nullglob
+      if [ ${#_candidates_s[@]} -gt 0 ]; then
+        ADR_SUGGEST=$(printf '%s\n' "${_candidates_s[@]}" | sort -V | tail -1)
+      fi
+    fi
+
+    if [ -n "$ADR_SUGGEST" ] && [ -f "$ADR_SUGGEST" ]; then
+      ROOT_S=$(git rev-parse --show-toplevel)
+      DIFF_S=$(git diff --cached --unified=0)
+      if [ -n "$DIFF_S" ]; then
+        # Advisory text goes to stderr; exit status is always swallowed so a
+        # detector hiccup can never block a commit.
+        echo "$DIFF_S" | "$_PYTHON3S" "$ADR_SUGGEST" --diff - --adr-dir "$ROOT_S/docs/adr/" >&2 || true
+      fi
+    fi
+  fi
+fi
+
 exit 0
