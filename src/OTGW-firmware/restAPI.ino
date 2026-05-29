@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.102
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2319,7 +2319,7 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("fwversion"), _SEMVER_FULL);
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
   sendJsonMapEntry(F("compiled"), cMsg);
-  sendJsonMapEntry(F("picavailable"), state.pic.bAvailable);
+  // ADR-113 stage 2 (TASK-754): picavailable removed; UI selects on hardware_type.
   if (isPICEnabled()) {
     sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
     sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
@@ -2510,7 +2510,6 @@ void sendHealth()
 #endif
   sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
   sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(state.otBus.bOnline));
-  sendJsonMapEntry(F("picavailable"), CBOOLEAN(state.pic.bAvailable));
   sendJsonMapEntry(F("littlefsMounted"), CBOOLEAN(LittleFSmounted));
   
   sendEndJsonMap(F("health"));

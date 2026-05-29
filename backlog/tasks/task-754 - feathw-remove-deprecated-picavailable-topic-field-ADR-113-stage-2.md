@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-29 09:05'
-updated_date: '2026-05-29 20:11'
+updated_date: '2026-05-29 20:36'
 labels: []
 milestone: 2.1.0
 dependencies: []
@@ -23,3 +23,20 @@ ADR-113 deprecated otgw-pic/picavailable (MQTT) and the picavailable REST field 
 - [ ] #2 index.js no longer references picavailable; selects solely on hardware_type
 - [ ] #3 docs/api/MQTT.md updated; mqttHaSensorIndex consistency PASS; build green; prerelease bump
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Stage 2 split into two commits due to concurrent index.js edits (settings-page work holding that file).
+
+COMMIT 1 (done, d021e0f, alpha.99) — MQTT + HA discovery + docs (non-coupled, no index.js):
+- Removed sendMQTTDataPic(picavailable) publish (MQTTstuff.ino).
+- Removed ha_lbl/ha_name_pic_available PROGMEM + pseudo-ID 249 discovery row (MQTTHaDiscovery.cpp); decremented mqttHaSensorIndex[] for ids 250-254 (-1 each); MQTT_HA_SENSOR_COUNT stays 385 (now == true row count). evaluate.py HA Sensor Index Consistency: PASS.
+- Dropped picavailable from OTGW-firmware.h topic comment + docs/api/MQTT.md.
+- Incidental fix: id-254 SAT flame_status sensor was never discovered (386 rows vs COUNT 385 => sIdx<385 excluded it). Now rows==COUNT==385, id 254 discovered correctly (live publisher SATcontrol.ino:2186).
+
+COMMIT 2 (DEFERRED — blocked on index.js availability):
+- restAPI.ino: remove picavailable from /device/info (2322) and /health (2513).
+- index.js: drop picAvailable global (145); applyPICAvailability() drop 'available' param + fallback, select solely on hardwareType==='otgw-classic'; fix routing at ~3303 (if(picAvailable)=>board-class gate, else PIC-flash page unreachable); remove dead picInfo.available (4530); remove 'picavailable' label-map rows (6743,6783); convert all call sites to 2-arg.
+- This set is COUPLED (REST field removal + 3303 fix must ship atomically). Do once index.js is no longer concurrently edited; re-check git status on index.js before editing.
+<!-- SECTION:NOTES:END -->

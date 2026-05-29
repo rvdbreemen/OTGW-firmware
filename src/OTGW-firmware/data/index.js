@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.101
+**  Version  : v2.0.0-alpha.102
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -142,7 +142,8 @@ window.onload = initMainPage;
 let mainPageCompatWarningShown = false;
 let otLogCompatWarningShown = false;
 let picSettingsRefreshTimer = null;
-let picAvailable = false;  // Unknown until /api/v2/device/info confirms PIC is present
+// ADR-113 stage 2 (TASK-754): picAvailable global removed. PIC-class UI selects
+// on hardwareType ('otgw-classic'); PIC liveness uses otCommandInterfaceAvailable.
 let otCommandInterfaceAvailable = false;
 
 const PIC_SETTINGS_REFRESH_INTERVAL_MS = 3000;
@@ -1856,17 +1857,15 @@ var hardwareType = null;
 // Called once after the first /api/v2/device/info response.
 // hwType (ADR-113): the static board class. When provided it is remembered so
 // later re-applies (e.g. after settings render) keep selecting on board class.
-function applyPICAvailability(available, otCommandAvailable, hwType) {
-  picAvailable = !!available;
+function applyPICAvailability(otCommandAvailable, hwType) {
   if (hwType !== undefined && hwType !== null) hardwareType = hwType;
   // otCommandAvailable is now a string: "PIC", "OT-Direct", or "None" (or legacy bool)
   otCommandInterfaceAvailable = (otCommandAvailable === "PIC" || otCommandAvailable === "OT-Direct" || otCommandAvailable === true || otCommandAvailable === "true");
-  // ADR-113: PIC-specific UI is selected on the static board CLASS (hardware_type),
-  // not on runtime PIC liveness (picAvailable). A PIC-class board with a dead PIC
-  // still shows the PIC UI; picAvailable then drives the "not detected" substatus.
-  // Fallback to picAvailable when hardware_type is absent (firmware predating the field).
-  var isPicClassBoard = (hardwareType === 'otgw-classic') ||
-                        (hardwareType === null && picAvailable);
+  // ADR-113 stage 2 (TASK-754): PIC-specific UI is selected solely on the static
+  // board CLASS (hardware_type). A PIC-class board with a dead PIC still shows the
+  // PIC UI (it belongs to the class); runtime PIC liveness is otCommandInterfaceAvailable.
+  // picavailable was removed, so the previous liveness fallback is gone.
+  var isPicClassBoard = (hardwareType === 'otgw-classic');
   // Static HTML elements marked with class "pic-only"
   Array.from(document.getElementsByClassName('pic-only')).forEach(function(el) {
     if (isPicClassBoard) el.classList.remove('hidden');
@@ -1886,7 +1885,7 @@ function applyPICAvailability(available, otCommandAvailable, hwType) {
     }
   });
   // Dynamic device info rows (created by refreshDeviceInfo)
-  var picDevInfoKeys = ['picavailable', 'picfwversion', 'picdeviceid', 'picfwtype'];
+  var picDevInfoKeys = ['picfwversion', 'picdeviceid', 'picfwtype'];
   picDevInfoKeys.forEach(function(key) {
     var row = document.getElementById('devinfo_' + key);
     if (row) {
@@ -3292,15 +3291,15 @@ function initMainPage() {
 
   function startMainPage() {
     if (window.location.hash == "#tabPICflash") {
-      // Must resolve PIC availability before routing to the PIC flash page.
-      // picAvailable defaults to false; fetch device info first.
+      // Must resolve the board class before routing to the PIC flash page.
+      // ADR-113: route on hardware_type (board class), not runtime PIC liveness.
       fetch(APIGW + 'v2/device/info')
         .then(function(r) { return r.ok ? r.json() : Promise.reject(r.statusText); })
         .then(function(json) {
           var d = json.device || {};
-          applyPICAvailability(d.picavailable, d.otcommandinterface, d.hardware_type);
+          applyPICAvailability(d.otcommandinterface, d.hardware_type);
           applyOTDirectAvailability(d.otdirectavailable);
-          if (picAvailable) {
+          if (hardwareType === 'otgw-classic') {
             firmwarePage();
           } else {
             showMainPage();
@@ -4527,7 +4526,6 @@ function refreshFirmware() {
          const d = json.device;
          if (d.picfwtype !== undefined) picInfo.type = d.picfwtype;
          if (d.picfwversion !== undefined) picInfo.version = d.picfwversion;
-         if (d.picavailable !== undefined) picInfo.available = String(d.picavailable);
          if (d.picdeviceid !== undefined) picInfo.device = d.picdeviceid;
        }
        return fetch(APIGW + "v2/firmware/files");
@@ -5159,7 +5157,7 @@ function refreshDevInfo() {
 
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
       applyOTGWSimulationState(device.otgwsimulation);
-      applyPICAvailability(device.picavailable, device.otcommandinterface, device.hardware_type);
+      applyPICAvailability(device.otcommandinterface, device.hardware_type);
       applyOTDirectAvailability(device.otdirectavailable);
       updateNetworkIndicator(device.networkmode, device.apfallback, device.wifiquality, device.ipaddress);
 
@@ -5427,7 +5425,7 @@ function refreshDeviceInfo() {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       const device = json.device || {};
       applyOTGWSimulationState(device.otgwsimulation);
-      applyPICAvailability(device.picavailable, device.otcommandinterface, device.hardware_type);
+      applyPICAvailability(device.otcommandinterface, device.hardware_type);
       applyOTDirectAvailability(device.otdirectavailable);
       for (let key in device) {
         if (key === 'otgwsimulation') continue;
@@ -6292,8 +6290,8 @@ function refreshSettings() {
         }
       }
       //console.log("-->done..");
-      // Hide PIC-related settings rows when no PIC is detected
-      applyPICAvailability(picAvailable, otCommandInterfaceAvailable);
+      // Re-apply PIC-class UI gating after settings render (hardwareType is remembered).
+      applyPICAvailability(otCommandInterfaceAvailable);
       applyOTDirectAvailability(otDirectAvailable);
       // Build WiFi scan panel once and append it inside the Network / Wi-Fi section.
       if (settingsPageEl && !document.getElementById('wifi-scan-panel')) {
@@ -6759,7 +6757,6 @@ var translateFields = [
   , ["waterovertemperature", "Water Over-Temperature"]
   , ["author", "Developer"]
   , ["fwversion", "Firmware Version"]
-  , ["picavailable", "PIC Available"]
   , ["picfwversion", "PIC Firmware Version"]
   , ["picdeviceid", "PIC Device ID"]
   , ["picfwtype", "PIC Firmware Type"]
@@ -6799,7 +6796,6 @@ var translateFields = [
   , ["flashchipspeed", "Flash Chip Speed (MHz)"]
   , ["flashchipmode", "Flash Mode"]
   , ["boardtype", "Board Type"]
-  , ["picavailable", "PIC Co-Processor"]
   , ["otcommandinterface", "OT Interface"]
   , ["otdirectavailable", "OT-Direct Active"]
   , ["otdmode", "OT-Direct Mode"]
