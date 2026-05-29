@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.104
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -533,7 +533,9 @@ static void sendTelnetBanner(const char* ip)
     satCycleClassStr(state.sat.eLastCycleClass),
     state.sat.bFallbackActive ? "ON" : "off",
     state.sat.weather.bValid ? "ok" : "stale");
-#if defined(ESP32)
+#if HAS_SAT_BLE
+  // TASK-742: gate the BLE status line on the capability flag (not raw ESP32)
+  // so a BLE-less board does not print a misleading "sensors 0" line.
   _debugPrintf_P(PSTR("  BLE  : sensors %u   batt %u%%   rssi %d dBm\r\n"),
     (unsigned)state.sat.iBleSensorCount,
     (unsigned)state.sat.iBleBattery,
@@ -549,7 +551,7 @@ static void sendTelnetBanner(const char* ip)
     state.debug.bSensors  ? "1" : "0",
     state.debug.bSAT      ? "1" : "0",
     state.debug.bOTDirect ? "1" : "0");
-#if defined(ESP32)
+#if HAS_SAT_BLE
   _debugPrintf_P(PSTR("    7 SATBLE    [%s]    g MQTTGate  [%s]    n NTP       [%s]\r\n"),
     state.debug.bSATBLE   ? "1" : "0",
     state.debug.bMQTTGate ? "1" : "0",

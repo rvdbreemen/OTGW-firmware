@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.104
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -381,8 +381,9 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATpvboostdeltac"),         settings.sat.fPvBoostDeltaC,         true);
   writeJsonFloatKV(file, F("SATpvboostmaxindoorc"),     settings.sat.fPvBoostMaxIndoorC,     true);
   writeJsonIntKV  (file, F("SATpvboostmaxdurationmin"), settings.sat.iPvBoostMaxDurationMin, false);
-#if defined(ESP32)
-  // BLE temperature sensor (Task #20, ESP32 only)
+  // BLE temperature sensor (Task #20). ESP-abstraction Tier 2 (TASK-742):
+  // serialised unconditionally (fields exist on both platforms) so settings.json
+  // round-trips between ESP8266 and ESP32; on ESP8266 these write zero/empty.
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
   writeJsonBoolKV(file, F("SATblefailover"), settings.sat.bBleFailover, true);
   writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC, true);
@@ -399,7 +400,6 @@ void writeSettings(bool show)
                   (unsigned)i, cMsg);
   }
   writeJsonIntKV(file, F("SATblerostercount"), settings.sat.iBleRosterCount, true);
-#endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
@@ -994,8 +994,9 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpvboostdeltac")) == 0)         settings.sat.fPvBoostDeltaC = constrain(strtof(newValue, nullptr), 0.5f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATpvboostmaxindoorc")) == 0)     settings.sat.fPvBoostMaxIndoorC = constrain(strtof(newValue, nullptr), 18.0f, 28.0f);
   else if (strcasecmp_P(field, PSTR("SATpvboostmaxdurationmin")) == 0) settings.sat.iPvBoostMaxDurationMin = (uint16_t)constrain(atoi(newValue), 30, 1440);
-#if defined(ESP32)
   // --- BLE temperature sensor settings (Task #20) ---
+  // ESP-abstraction Tier 2 (TASK-742): parsed unconditionally so a settings.json
+  // written on either platform round-trips; harmless no-op fields on ESP8266.
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblefailover")) == 0) settings.sat.bBleFailover = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
@@ -1037,7 +1038,6 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATblerostercount")) == 0) {
     settings.sat.iBleRosterCount = (uint8_t)constrain(atoi(newValue), 0, SAT_BLE_MAX_ROSTER);
   }
-#endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);

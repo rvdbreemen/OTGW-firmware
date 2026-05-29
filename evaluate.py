@@ -532,7 +532,12 @@ ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
 # TASK-741 (Tier 1): SATweather.ino (12), SATble.ino (1), restAPI.ino (1),
 # handleDebug.ino (1) moved behind HAS_WEATHER_FORECAST / HAS_SAT_BLE flags
 # and platform heap shims (73 -> 58).
-ESP_ABSTRACTION_BASELINE: int = 58
+# TASK-742 (Tier 2): SAT-BLE struct fields made unconditional + no-op ESP8266
+# stubs; all BLE/weather raw defined(ESP32) call sites in SATtypes.h,
+# settingStuff.ino, OTGW-firmware.{h,ino}, SATcontrol.ino, handleDebug.ino,
+# networkStuff.ino, restAPI.ino, MQTTstuff.ino removed or moved behind
+# HAS_SAT_BLE / HAS_WEATHER_FORECAST (58 -> 35).
+ESP_ABSTRACTION_BASELINE: int = 35
 
 _ESP_PLATFORM_PP_RE = re.compile(
     r'^\s*#\s*(?:if|ifdef|ifndef|elif)\b.*\b'

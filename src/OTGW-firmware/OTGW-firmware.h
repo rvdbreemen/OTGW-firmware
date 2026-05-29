@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.99
+**  Version  : v2.0.0-alpha.104
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -280,8 +280,10 @@ void weatherFetch();
 void weatherSendStatusJSON();
 void weatherPublishMQTT();
 
-// SAT BLE forward declarations — defined in SATble.ino (ESP32 only)
-#if defined(ESP32)
+// SAT BLE forward declarations. ESP-abstraction Tier 2 (TASK-742): declared
+// unconditionally. On ESP32 they are defined in SATble.ino / MQTTstuff.ino;
+// on ESP8266 platform_esp8266.h provides inline no-op stubs (no BLE radio).
+// The label=nullptr default below lives ONLY here, never in the stubs.
 void satBLEInit();
 void satBLELoop();
 void satBLEUpdateState();
@@ -318,7 +320,6 @@ void satBLERosterSendJSON();
 bool satBLERosterSelect(const char* mac);
 bool satBLERosterSetLabel(const char* mac, const char* label);
 bool satBLERosterForget(const char* mac);
-#endif
 
 // SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino
 void initSAT();

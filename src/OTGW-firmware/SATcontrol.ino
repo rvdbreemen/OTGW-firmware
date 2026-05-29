@@ -972,8 +972,9 @@ static float satGetRoomTemp()
   if (settings.sat.bSimulation) {
     return state.sat.fSimRoomTemp;
   }
-#if defined(ESP32)
-  // BLE sensor has highest priority when available (Task #20)
+  // BLE sensor has highest priority when available (Task #20). TASK-742: no
+  // longer #ifdef'd — on ESP8266 bBleEnable/bBleTempValid stay false (no BLE
+  // radio), so this block is naturally inert.
   // Temperature source priority: BLE > MQTT external > OT bus MsgID 24
   if (settings.sat.bBleEnable && state.sat.bBleTempValid) {
     // Check staleness: if no update for 5 min, fall back to next source
@@ -984,7 +985,6 @@ static float satGetRoomTemp()
       return state.sat.fBleTemp;  // BLE has 0.01C precision
     }
   }
-#endif
   // Multi-area weighted average (Task #25) — takes priority when enabled and valid
   if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
     float weighted = satGetWeightedRoomTemp();
@@ -1945,10 +1945,9 @@ void satSendStatusJSON()
       sendBeforenext(); sendIdent(); restSendContent(jsonBuff);
     }
   }
-#if defined(ESP32)
-  // BLE sensor status (Task #20)
+  // BLE sensor status (Task #20). TASK-742: satBLESendStatusJSON() is a no-op
+  // stub on ESP8266 (no BLE radio).
   satBLESendStatusJSON();
-#endif
   sendEndJsonMap("");
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_SAT_STATUS, totalMs);
@@ -2556,10 +2555,9 @@ void satPublishMQTT()
   // Weather data (Task #50) — uses its own helpers internally.
   weatherPublishMQTT();
 
-#if defined(ESP32)
   // BLE sensor data (Task #20) — uses its own helpers internally.
+  // TASK-742: satBLEPublishMQTT() is a no-op stub on ESP8266.
   satBLEPublishMQTT();
-#endif
 }
 
 //=====================================================================
@@ -3039,10 +3037,9 @@ void initSAT()
   // If no OT command interface is ready yet, _sat_bootCS0sent stays false and
   // the control loop will send CS=0 on its first call when one becomes available.
 
-#if defined(ESP32)
-  // Initialize BLE sensor scanning (Task #20)
+  // Initialize BLE sensor scanning (Task #20).
+  // TASK-742: satBLEInit() is a no-op stub on ESP8266 (no BLE radio).
   satBLEInit();
-#endif
 
   // Sync timer to configured interval
   CHANGE_INTERVAL_SEC(timerSATControl, settings.sat.iControlInterval);

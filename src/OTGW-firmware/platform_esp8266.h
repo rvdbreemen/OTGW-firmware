@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp8266.h
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.104
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -263,6 +263,32 @@ inline void platformSettingsNoopCapture(const void *data, size_t len) {
 inline bool platformSettingsNoopUnchanged(const void *data, size_t len) {
   return crc32(data, len) == _platformSettingsNoopFp();
 }
+
+// ---- SAT-BLE no-op stubs (ESP-abstraction Tier 2, TASK-742) --------------
+// The BLE room-sensor subsystem (SATble.ino and the BLE helpers in
+// MQTTstuff.ino) is gated by HAS_SAT_BLE / defined(ESP32) and compiles to
+// nothing on ESP8266 (no BLE radio). These inline no-ops let the shared call
+// sites in SATcontrol.ino / OTGW-firmware.ino / networkStuff.ino /
+// handleDebug.ino / restAPI.ino drop their #if defined(ESP32) guards. Getters
+// return neutral values; the runtime state.sat BLE fields (bBleTempValid,
+// iBleSensorCount, ...) stay zero on ESP8266, so every BLE-dependent code
+// path is naturally inert. Default args (e.g. label=nullptr) live only in the
+// forward declarations in OTGW-firmware.h, never repeated here.
+inline void  satBLEInit() {}
+inline void  satBLELoop() {}
+inline void  satBLEUpdateState() {}
+inline float satBLEGetTemperature() { return 0.0f; }
+inline float satBLEGetHumidity() { return 0.0f; }
+inline void  satBLEPublishMQTT() {}
+inline void  satBLESendStatusJSON() {}
+inline void  satBLEMacToCompact(const char* /*macWithColons*/, char* out, size_t outSize) { if (out && outSize) out[0] = '\0'; }
+inline void  satBLEPublishStateTopics(const char* /*macCompact*/, float /*temp*/, float /*hum*/, uint8_t /*bat*/, int8_t /*rssi*/) {}
+inline bool  satBLEPublishHaDiscovery(const char* /*macCompact*/, const char* /*macWithColons*/, const char* /*label*/) { return false; }
+inline void  satBLEUnpublishDiscovery(const char* /*macCompact*/) {}
+inline void  satBLERosterSendJSON() {}
+inline bool  satBLERosterSelect(const char* /*mac*/) { return false; }
+inline bool  satBLERosterSetLabel(const char* /*mac*/, const char* /*label*/) { return false; }
+inline bool  satBLERosterForget(const char* /*mac*/) { return false; }
 
 /***************************************************************************
 *

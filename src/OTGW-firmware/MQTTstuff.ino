@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.103
+**  Version  : v2.0.0-alpha.104
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2436,9 +2436,11 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
   }
 }
 
-#if defined(ESP32)
+#if HAS_SAT_BLE
 //===========================================================================================
 // TASK-488 BLE HA-discovery helpers (ESP32 / OTGW32 only).
+// TASK-742: guarded by HAS_SAT_BLE (not raw defined(ESP32)); ESP8266 uses the
+// inline no-op stubs in platform_esp8266.h.
 //
 // Caller wiring (lives in SATble.ino, finalised by TASK-487):
 //   In satBLEPublishMQTT(), iterate _bleSensors[] valid slots:

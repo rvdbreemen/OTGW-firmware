@@ -176,7 +176,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("otgw_sim: %s\r\n"), state.debug.bOTGWSimulation ? "true" : "false");
     Debugf(PSTR("sat: %s\r\n"), state.debug.bSAT ? "true" : "false");
     Debugf(PSTR("otdirect: %s\r\n"), state.debug.bOTDirect ? "true" : "false");
-#if defined(ESP32)
+#if HAS_SAT_BLE
     Debugf(PSTR("sat_ble: %s\r\n"), state.debug.bSATBLE ? "true" : "false");
 #endif
 
@@ -228,7 +228,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("weather_humidity: %.0f\r\n"), state.sat.weather.fHumidity);
     Debugf(PSTR("weather_wind: %.1f\r\n"), state.sat.weather.fWindSpeed);
     Debugf(PSTR("weather_cloud: %.0f\r\n"), state.sat.weather.fCloudCover);
-#if defined(ESP32)
+#if HAS_WEATHER_FORECAST
     Debugf(PSTR("weather_pressure: %.1f\r\n"), state.sat.weather.fPressureMsl);
     Debugf(PSTR("weather_is_day: %s\r\n"), state.sat.weather.bIsDay ? "true" : "false");
 #endif
@@ -249,7 +249,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("auto_tune_active: %s\r\n"), state.sat.bAutoTuneActive ? "true" : "false");
     Debugf(PSTR("auto_tune_cycles: %u\r\n"), (unsigned)state.sat.iAutoTuneCycles);
     Debugf(PSTR("auto_tune_score: %.3f\r\n"), state.sat.fAutoTuneScore);
-#if defined(ESP32)
+#if HAS_SAT_BLE
     Debugf(PSTR("ble_temp: %.2f\r\n"), state.sat.fBleTemp);
     Debugf(PSTR("ble_humidity: %.1f\r\n"), state.sat.fBleHumidity);
     Debugf(PSTR("ble_valid: %s\r\n"), state.sat.bBleTempValid ? "true" : "false");
@@ -290,7 +290,7 @@ void handleDebugChar(char c){
                 Debugln(F("  1) OT message parsing       2) REST API handling"));
                 Debugln(F("  3) MQTT module              4) Sensor modules"));
                 Debugln(F("  5) SAT control loop         6) OTDirect frame handling"));
-#if defined(ESP32)
+#if HAS_SAT_BLE
                 Debugln(F("  7) SAT BLE sensor scan"));
 #endif
                 Debugln(F("  g) MQTT interval gating     n) NTP time sync"));
@@ -393,7 +393,7 @@ void handleDebugChar(char c){
                 state.debug.bOTDirect = !state.debug.bOTDirect;
                 DebugTf(PSTR("\r\nDebug OTDirect: %s\r\n"), CBOOLEAN(state.debug.bOTDirect));
                 break;
-#if defined(ESP32)
+#if HAS_SAT_BLE
             case '7':
                 state.debug.bSATBLE = !state.debug.bSATBLE;
                 DebugTf(PSTR("\r\nDebug SAT BLE: %s\r\n"), CBOOLEAN(state.debug.bSATBLE));

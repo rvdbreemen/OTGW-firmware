@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.103
+**  Version  : v2.0.0-alpha.104
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -995,8 +995,9 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     satHandleEnabled(val);
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
-#if defined(ESP32)
+#if HAS_SAT_BLE
   // TASK-508: BLE roster — discovery + select + label + forget.
+  // TASK-742: gated on HAS_SAT_BLE (not raw ESP32); ESP8266 has no BLE roster.
   // Sub-routes:
   //   GET  /api/v2/sat/ble/discovery           — stream the roster as JSON
   //   POST /api/v2/sat/ble/select   {mac}      — promote roster MAC to active sensor
@@ -1782,7 +1783,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("state.debug.otgw_sim"), state.debug.bOTGWSimulation);
   sendJsonMapEntry(F("state.debug.sat"), state.debug.bSAT);
   sendJsonMapEntry(F("state.debug.otdirect"), state.debug.bOTDirect);
-#if defined(ESP32)
+#if HAS_SAT_BLE
   sendJsonMapEntry(F("state.debug.sat_ble"), state.debug.bSATBLE);
 #endif
 
@@ -1831,7 +1832,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("state.sat.weather_humidity"), state.sat.weather.fHumidity);
   sendJsonMapEntry(F("state.sat.weather_wind"), state.sat.weather.fWindSpeed);
   sendJsonMapEntry(F("state.sat.weather_cloud"), state.sat.weather.fCloudCover);
-#if defined(ESP32)
+#if HAS_WEATHER_FORECAST
   sendJsonMapEntry(F("state.sat.weather_pressure"), state.sat.weather.fPressureMsl);
   sendJsonMapEntry(F("state.sat.weather_is_day"), state.sat.weather.bIsDay);
 #endif
@@ -1852,7 +1853,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("state.sat.auto_tune_active"), state.sat.bAutoTuneActive);
   sendJsonMapEntry(F("state.sat.auto_tune_cycles"), (uint32_t)state.sat.iAutoTuneCycles);
   sendJsonMapEntry(F("state.sat.auto_tune_score"), state.sat.fAutoTuneScore);
-#if defined(ESP32)
+#if HAS_SAT_BLE
   sendJsonMapEntry(F("state.sat.ble_temp"), state.sat.fBleTemp);
   sendJsonMapEntry(F("state.sat.ble_humidity"), state.sat.fBleHumidity);
   sendJsonMapEntry(F("state.sat.ble_valid"), state.sat.bBleTempValid);
@@ -2946,8 +2947,8 @@ void sendDeviceSettings()
     sendJsonSettingObj(F("satpvboostmaxindoorc"), tmpBuf, "f", 18, 28);
   }
   sendJsonSettingObj(F("satpvboostmaxdurationmin"), (int32_t)settings.sat.iPvBoostMaxDurationMin, "i", 30, 1440);
-#if defined(ESP32)
-  // --- SAT BLE Sensor settings (Task #20, ESP32 only) ---
+#if HAS_SAT_BLE
+  // --- SAT BLE Sensor settings (Task #20). TASK-742: gated on HAS_SAT_BLE. ---
   sendJsonSettingObj(F("satbleenable"), settings.sat.bBleEnable, "b");
   sendJsonSettingObj(F("satblefailover"), settings.sat.bBleFailover, "b");
   sendJsonSettingObj(F("satblemac"), CSTR(settings.sat.sBleMAC), "s", 17);

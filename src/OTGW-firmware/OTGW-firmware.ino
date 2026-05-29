@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.104
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -653,9 +653,7 @@ void loop()
     evalOutputs();                    // when the bits change, the output gpio bit will follow
     evalWebhook();                    // when the trigger bit changes, fire the webhook
     satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)
-#if defined(ESP32)
-    satBLELoop();                     // BLE temperature sensor scan (timer-guarded, Task #20)
-#endif
+    satBLELoop();                     // BLE temperature sensor scan (timer-guarded, Task #20). TASK-742: no-op stub on ESP8266.
     weatherLoop();                    // Weather data fetch (timer-guarded, Task #50)
 #if HAS_PIC
     handlePendingUpgrade();           // Check if we need to start an upgrade

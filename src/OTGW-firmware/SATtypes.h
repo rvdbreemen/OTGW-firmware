@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.98
+**  Version  : v2.0.0-alpha.104
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -332,8 +332,11 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iLastSentMMMs          = 0;
   uint32_t iLastSentCHMs          = 0;
   uint32_t iLastSentTCMs          = 0;
-#if defined(ESP32)
-  // BLE temperature sensor (Task #20, ESP32 only)
+  // BLE temperature sensor (Task #20). ESP-abstraction Tier 2 (TASK-742):
+  // fields are unconditional so settings/state round-trip across platforms and
+  // downstream code reads them without #ifdef. On ESP8266 they stay zero/false
+  // (no BLE radio; SATble.ino is gated by HAS_SAT_BLE), which keeps every
+  // BLE-dependent code path inert via the bBleTempValid / iBleSensorCount gates.
   float    fBleTemp               = 0.0f;   // BLE sensor temperature (0.01C precision)
   float    fBleHumidity           = 0.0f;   // BLE sensor humidity %
   bool     bBleTempValid          = false;  // BLE reading available and non-stale
@@ -341,7 +344,6 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint8_t  iBleSensorCount        = 0;      // Number of active BLE sensors seen
   uint8_t  iBleBattery            = 0;      // Battery level of primary BLE sensor
   int8_t   iBleRssi               = 0;      // RSSI of primary BLE sensor
-#endif
 };
 
 //====================================================================
@@ -458,8 +460,10 @@ struct SATSection {
   float    fPvBoostDeltaC         = 1.5f;    // Temperature boost delta °C (0.5-5.0)
   float    fPvBoostMaxIndoorC     = 23.0f;   // Indoor max during boost (18.0-28.0 °C)
   uint16_t iPvBoostMaxDurationMin = 240;     // Max continuous boost (30-1440 min)
-#if defined(ESP32)
-  // BLE temperature sensor (Task #20, ESP32 only)
+  // BLE temperature sensor (Task #20). ESP-abstraction Tier 2 (TASK-742):
+  // persisted unconditionally so settings.json round-trips across platforms
+  // (zero/empty on ESP8266, which has no BLE radio). ~360 B of settings/RAM on
+  // ESP8266 — matches the already-unconditional remainder of SATSection.
   bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning
   bool     bBleFailover       = true;          // TASK-762: when the pinned sensor (sBleMAC) goes stale, fall back to another fresh roster sensor (roster order)
   char     sBleMAC[18]        = "";            // Bind to specific sensor MAC (empty = accept all)
@@ -473,5 +477,4 @@ struct SATSection {
   char     sBleLabel[SAT_BLE_MAX_ROSTER][24] = {{0}};   // User-friendly names ("Woonkamer")
   uint8_t  iBleRosterCount                   = 0;       // Count of populated slots
   static_assert(sizeof(sBleLabel[0]) <= 100, "label too long for settingStuff line buffer");
-#endif
 };
