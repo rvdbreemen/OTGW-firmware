@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.94
+**  Version  : v2.0.0-alpha.95
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1224,6 +1224,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATsimulation", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("ble_enable")) == 0) {
       updateSetting("SATbleenable", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("ble_failover")) == 0) {
+      updateSetting("SATblefailover", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("ble_mac")) == 0) {
       updateSetting("SATblemac", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("ble_interval")) == 0) {
@@ -2953,6 +2955,7 @@ void sendDeviceSettings()
 #if defined(ESP32)
   // --- SAT BLE Sensor settings (Task #20, ESP32 only) ---
   sendJsonSettingObj(F("satbleenable"), settings.sat.bBleEnable, "b");
+  sendJsonSettingObj(F("satblefailover"), settings.sat.bBleFailover, "b");
   sendJsonSettingObj(F("satblemac"), CSTR(settings.sat.sBleMAC), "s", 17);
   sendJsonSettingObj(F("satbleinterval"), settings.sat.iBleInterval, "i", 10, 300);
 #endif
@@ -3025,7 +3028,7 @@ static const char* const PROGMEM knownSettings[] = {
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
   "satautotune", "satautotunerate",
-  "satbleenable", "satbleinterval", "satblemac",
+  "satbleenable", "satblefailover", "satbleinterval", "satblemac",
   "satboilercapacity", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
   "satdeadband", "satenabled", "satexternaltemp",
   "satinterval", "satmanufacturer", "satmultiarea", "satmultiareacount",

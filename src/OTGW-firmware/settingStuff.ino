@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.94
+**  Version  : v2.0.0-alpha.95
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -384,6 +384,7 @@ void writeSettings(bool show)
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
+  writeJsonBoolKV(file, F("SATblefailover"), settings.sat.bBleFailover, true);
   writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC, true);
   writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval, true);
   // TASK-508: BLE roster — 8 × {mac, label} + count. Indexed-key pattern
@@ -996,6 +997,7 @@ void updateSetting(const char *field, const char *newValue)
 #if defined(ESP32)
   // --- BLE temperature sensor settings (Task #20) ---
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATblefailover")) == 0) settings.sat.bBleFailover = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
   else if (strcasecmp_P(field, PSTR("SATbleinterval")) == 0) settings.sat.iBleInterval = constrain(atoi(newValue), 10, 300);
   // TASK-508: roster slot keys — SATblemacN / SATblelabelN with N=0..7.

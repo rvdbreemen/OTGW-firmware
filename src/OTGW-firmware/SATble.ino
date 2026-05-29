@@ -92,6 +92,7 @@ static BLERuntime         _bleRuntime[SAT_BLE_MAX_ROSTER] = {};
 static NimBLEScan*        _pBLEScan          = nullptr;
 static uint32_t           _bleLastPublishMs  = 0;
 static bool               _bleInitialized    = false;
+static bool               _bleFailoverActive = false;  // TASK-762: pinned sensor stale, running on a fallback slot
 // TASK-508: BLE host task sets this when it allocates a new roster slot;
 // satBLELoop() drains it (loop task) and triggers settingsDirty=true.
 // Avoids cross-task flash writes from the BLE callback.
@@ -483,8 +484,10 @@ void satBLELoop()
 void satBLEUpdateState()
 {
   uint32_t now = millis();
-  bool found = false;
   uint8_t sensorCount = 0;
+  bool havePin = (settings.sat.sBleMAC[0] != '\0');
+  int pinnedSlot = -1;      // fresh roster slot whose MAC matches the pin
+  int firstFreshSlot = -1;  // first fresh roster slot (roster order)
 
   for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
     // TASK-508: roster-occupied test reads settings (loop-task only writer
@@ -508,32 +511,65 @@ void satBLEUpdateState()
     if ((now - snap.iLastSeenMs) > BLE_STALE_MS) continue;
 
     sensorCount++;
-
-    // Use the configured MAC sensor if set, otherwise use first fresh slot
-    if (!found) {
-      if (settings.sat.sBleMAC[0] == '\0' ||
-          strcasecmp(settings.sat.sBleMac[i], settings.sat.sBleMAC) == 0) {
-        state.sat.fBleTemp       = snap.fTemperature;
-        state.sat.fBleHumidity   = snap.fHumidity;
-        state.sat.iBleBattery    = snap.iBattery;
-        state.sat.iBleRssi       = snap.iRssi;
-        state.sat.bBleTempValid  = true;
-        state.sat.iBleTempLastMs = snap.iLastSeenMs;
-        found = true;
-        SATBLEDebugTf(PSTR("SAT BLE: best sensor slot=%d mac=%s temp=%.2f age=%ums\r\n"),
-                      i, settings.sat.sBleMac[i], snap.fTemperature,
-                      (unsigned)(now - snap.iLastSeenMs));
-      }
+    if (firstFreshSlot < 0) firstFreshSlot = i;
+    if (havePin && pinnedSlot < 0 &&
+        strcasecmp(settings.sat.sBleMac[i], settings.sat.sBleMAC) == 0) {
+      pinnedSlot = i;
     }
   }
 
   state.sat.iBleSensorCount = sensorCount;
 
-  // If no valid sensor found, mark state as invalid
-  if (!found) {
+  // TASK-762: pick which fresh slot drives SAT.
+  //  - no pin set:            first fresh slot in roster order (unchanged).
+  //  - pin set and fresh:     the pinned slot (auto-recovery from failover).
+  //  - pin set but stale:     first fresh slot if failover enabled, else none
+  //                           (strict pin -> SAT loses BLE input as before).
+  int chosen = -1;
+  bool failover = false;
+  if (!havePin) {
+    chosen = firstFreshSlot;
+  } else if (pinnedSlot >= 0) {
+    chosen = pinnedSlot;
+  } else if (settings.sat.bBleFailover && firstFreshSlot >= 0) {
+    chosen = firstFreshSlot;
+    failover = true;
+  }
+
+  if (chosen < 0) {
+    if (state.sat.bBleTempValid) {
+      SATBLEDebugTf(PSTR("SAT BLE: no valid sensor (count=%u, all stale or filter mismatch)\r\n"),
+                    (unsigned)sensorCount);
+    }
     state.sat.bBleTempValid = false;
-    SATBLEDebugTf(PSTR("SAT BLE: no valid sensor (count=%u, all stale or filter mismatch)\r\n"),
-                  (unsigned)sensorCount);
+    _bleFailoverActive = false;
+    return;
+  }
+
+  BLERuntime snap;
+  portENTER_CRITICAL(&_bleSensorsMux);
+  snap = _bleRuntime[chosen];
+  portEXIT_CRITICAL(&_bleSensorsMux);
+  state.sat.fBleTemp       = snap.fTemperature;
+  state.sat.fBleHumidity   = snap.fHumidity;
+  state.sat.iBleBattery    = snap.iBattery;
+  state.sat.iBleRssi       = snap.iRssi;
+  state.sat.bBleTempValid  = true;
+  state.sat.iBleTempLastMs = snap.iLastSeenMs;
+
+  // Log failover/recovery transitions once, not every cycle.
+  if (failover && !_bleFailoverActive) {
+    _bleFailoverActive = true;
+    SATBLEDebugTf(PSTR("SAT BLE: FAILOVER pinned %s stale -> slot=%d mac=%s temp=%.2f\r\n"),
+                  settings.sat.sBleMAC, chosen, settings.sat.sBleMac[chosen], snap.fTemperature);
+  } else if (!failover && _bleFailoverActive) {
+    _bleFailoverActive = false;
+    SATBLEDebugTf(PSTR("SAT BLE: RECOVERED to pinned %s slot=%d\r\n"),
+                  settings.sat.sBleMAC, chosen);
+  } else {
+    SATBLEDebugTf(PSTR("SAT BLE: best sensor slot=%d mac=%s temp=%.2f age=%ums%s\r\n"),
+                  chosen, settings.sat.sBleMac[chosen], snap.fTemperature,
+                  (unsigned)(now - snap.iLastSeenMs), failover ? " (failover)" : "");
   }
 }
 
@@ -650,6 +686,8 @@ void satBLEPublishMQTT()
 void satBLESendStatusJSON()
 {
   sendJsonMapEntry(F("ble_enable"),       settings.sat.bBleEnable);
+  sendJsonMapEntry(F("ble_failover"),     settings.sat.bBleFailover);
+  sendJsonMapEntry(F("ble_failover_active"), _bleFailoverActive);
   sendJsonMapEntry(F("ble_temp_valid"),   state.sat.bBleTempValid);
   if (state.sat.bBleTempValid) {
     { char buf[12]; dtostrf(state.sat.fBleTemp, 1, 2, buf);

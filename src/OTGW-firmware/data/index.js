@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.94
+**  Version  : v2.0.0-alpha.95
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3562,6 +3562,7 @@ var SAT_SETTINGS_GROUPS = [
       { key: 'satexternaltemp',   label: 'Use External Temp',  type: 'b' },
       { key: 'satsensormaxage',   label: 'Sensor Max Age',     type: 'i', unit: 's', min: 60, max: 86400, step: 60 },
       { key: 'satbleenable',      label: 'BLE Enable',         type: 'b' },
+      { key: 'satblefailover',    label: 'BLE Failover',       type: 'b' },
       // TASK-508: legacy field. Managed via the BLE Sensors panel
       // above (auto-discovery + selection). Readonly to avoid
       // duplicate editing.
@@ -6909,6 +6910,7 @@ var translateFields = [
   , ["SATpvboostmaxdurationmin", "SAT PV Boost Max Duration (min)"]
   , ["SATthermalcoeff", "SAT Thermal Drop Coefficient"]
   , ["SATbleenable", "SAT BLE Sensor Enable"]
+  , ["SATblefailover", "SAT BLE Sensor Failover"]
   , ["SATblemac", "SAT BLE Sensor MAC Address"]
   , ["SATbleinterval", "SAT BLE Publish Cadence (sec)"]
   , ["SATweatherenable", "SAT Weather Enable"]
@@ -7026,6 +7028,7 @@ var translateTooltips = [
   , ["SATautotunerate", "Adjustment rate per tuning cycle (0.5%-10%). Default 2%. Lower values make smaller, more conservative adjustments. Higher values converge faster but risk instability."]
   , ["SATthermalcoeff", "Learned thermal drop coefficient (degrees C per hour per degree indoor-outdoor delta). Automatically updated by observing how fast the building cools when the boiler is off. Used during fallback mode to estimate room temperature. Default 0.05, typical range 0.02-0.1 for well-insulated buildings."]
   , ["SATbleenable", "Enable BLE (Bluetooth Low Energy) temperature sensor scanning (ESP32 only). Supports Xiaomi LYWSD03MMC with ATC/pvvx custom firmware and BTHome v2 protocol sensors. Discovered sensors appear in the BLE Sensors panel above where you can name them and pick one. When enabled, BLE temperature becomes the highest priority room temperature source for SAT."]
+  , ["SATblefailover", "When the selected (pinned) BLE sensor stops reporting for more than 5 minutes, automatically fall back to another fresh sensor from the roster (first available in roster order) so SAT keeps a room temperature. Recovers to the pinned sensor when it returns. Enabled by default. Disable this to keep strict single-sensor behaviour (e.g. a dedicated room sensor that must not be substituted). No effect when no sensor is pinned."]
   , ["SATblemac", "(Managed via the BLE Sensors panel above) MAC address of the active BLE sensor. Leave empty for auto-select-if-only-one. Format AA:BB:CC:DD:EE:FF, uppercase."]
   , ["SATbleinterval", "How often the gateway publishes BLE-sensor state (MQTT + state.sat.*) in seconds (10-300). Default 30 seconds. Since 2.0.0 the BLE radio scans continuously on ESP32 (matches OT-Thing); this setting controls publish/state-update cadence, not scan rate."]
   , ["SATweatherenable", "Enable weather data fetching from Open-Meteo API (free, no key needed). Provides outdoor temperature fallback when no OT outdoor sensor is available."]

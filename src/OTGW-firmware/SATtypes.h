@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.94
+**  Version  : v2.0.0-alpha.95
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -461,6 +461,7 @@ struct SATSection {
 #if defined(ESP32)
   // BLE temperature sensor (Task #20, ESP32 only)
   bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning
+  bool     bBleFailover       = true;          // TASK-762: when the pinned sensor (sBleMAC) goes stale, fall back to another fresh roster sensor (roster order)
   char     sBleMAC[18]        = "";            // Bind to specific sensor MAC (empty = accept all)
   uint16_t iBleInterval       = 30;            // Publish/state-update cadence (sec, 10-300). NOT scan rate: TASK-494 made the BLE scan continuous to match OT-Thing.
   // TASK-508: BLE sensor self-discovery roster (max SAT_BLE_MAX_ROSTER known

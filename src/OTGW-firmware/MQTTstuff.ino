@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.94
+**  Version  : v2.0.0-alpha.95
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -714,6 +714,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "comfort_max_offset",     "SATcomfortmaxoffset",  nullptr },
   { "simulation",             "SATsimulation",        nullptr },
   { "ble_enable",             "SATbleenable",         nullptr },
+  { "ble_failover",           "SATblefailover",       nullptr },
   { "ble_mac",                "SATblemac",            nullptr },
   { "ble_interval",           "SATbleinterval",       nullptr },
   { "preset_sync",            "SATpresetsync",        nullptr },

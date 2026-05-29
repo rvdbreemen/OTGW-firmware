@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Webhooktypes.h
-**  Version  : v2.0.0-alpha.94
+**  Version  : v2.0.0-alpha.95
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
