@@ -126,8 +126,14 @@ void startWebserver(){
       httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
       httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
 
-      // Use a fixed-size line buffer instead of String to avoid heap fragmentation.
-      static char lineBuf[512];
+      // Line buffer: 512 B is sized for the longest line in index.html plus the
+      // ?v=<hash> injection slack. Stack-local (not static) because httpServer.
+      // sendContent() can yield via feedWatchDog(), which would let a re-entered
+      // sendIndex() clobber a shared static buffer mid-line. Stack peak of one
+      // extra 512 B frame per concurrent (re-entered) request is within the
+      // ESP8266 ~4 KB cooperative-scheduling budget. Saves 512 B BSS vs the
+      // previous function-static placement.
+      char lineBuf[512];
       while (f.available()) {
         int n = f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
         lineBuf[n] = '\0';

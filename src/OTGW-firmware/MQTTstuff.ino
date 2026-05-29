@@ -662,8 +662,12 @@ struct SatMqttCmdEntry {
 };
 
 // Dispatch table. Terminated by a { nullptr, nullptr, nullptr } sentinel,
-// same convention as kV2Routes[] in restAPI.ino.
-static const SatMqttCmdEntry kSatMqttCmds[] = {
+// same convention as kV2Routes[] in restAPI.ino. Placed in PROGMEM so the
+// ~960 B of struct entries lives in flash, not DRAM. The string literals
+// reachable via cmd/settingKey remain in their default placement (rodata
+// .str pools, which the ESP8266 linker script maps to .irom0.text). Read
+// each row with memcpy_P in the dispatch loop below.
+static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   // --- Typed handlers (payload parsing lives in the handler) ---
   { "target",                 nullptr,                _satTargetTempCmd },
   { "indoor_temp",            nullptr,                _satExtTempCmd },
@@ -757,13 +761,20 @@ static const SatMqttCmdEntry kSatMqttCmds[] = {
 };
 
 // Returns true when the sub-command was found in the table and dispatched.
+// kSatMqttCmds is PROGMEM; copy each row into a stack-local before reading
+// its fields (the pointer values inside the row point at .rodata-string-pool
+// content which is itself in flash; once memcpy'd to RAM they can be passed
+// to strcasecmp / updateSetting like any normal const char*).
 static bool dispatchSatMqttCmd(const char* cmd, const char* payload) {
-  for (const SatMqttCmdEntry* e = kSatMqttCmds; e->cmd != nullptr; e++) {
-    if (strcasecmp(cmd, e->cmd) == 0) {
-      if (e->handler) {
-        e->handler(payload);
-      } else if (e->settingKey) {
-        updateSetting(e->settingKey, payload);
+  for (size_t i = 0; ; i++) {
+    SatMqttCmdEntry e;
+    memcpy_P(&e, &kSatMqttCmds[i], sizeof(SatMqttCmdEntry));
+    if (e.cmd == nullptr) break;  // sentinel
+    if (strcasecmp(cmd, e.cmd) == 0) {
+      if (e.handler) {
+        e.handler(payload);
+      } else if (e.settingKey) {
+        updateSetting(e.settingKey, payload);
       }
       return true;
     }
