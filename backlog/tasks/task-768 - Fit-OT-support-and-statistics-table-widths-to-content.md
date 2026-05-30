@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-30 13:41'
-updated_date: '2026-05-30 13:56'
+updated_date: '2026-05-30 13:57'
 labels: []
 dependencies: []
 ---
@@ -42,3 +42,20 @@ Agent: Codex.
 Implementation: replaced the OpenTherm table min-width update with column-width application that computes each column from the widest rendered header/body text, sets the table width to the computed column sum, and proportionally constrains columns to the parent/viewport width. Preserved drag resizing and capped drag growth to the available table width. Bumped table width storage keys to avoid stale prior sizing data.
 Validation: node --check src\OTGW-firmware\data\index.js; .\.venv\Scripts\python.exe evaluate.py --quick --no-color; Playwright rendered layout check at 800px viewport with normal rows, over-wide rows, and synthetic drag resize.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented dynamic content-fit sizing for the OT support and Statistics tables.
+
+Changes:
+- Column widths are now computed from the widest visible header/body text per column and applied through the table colgroup.
+- Table width is set to the sum of computed column widths instead of filling 100% by default.
+- Computed and dragged widths are capped to the available parent/viewport width so the table does not exceed the visible area.
+- Manual drag resizing remains available and persists under new storage keys so stale prior sizing does not override the new fit.
+
+Validation:
+- node --check src\OTGW-firmware\data\index.js
+- .\.venv\Scripts\python.exe evaluate.py --quick --no-color
+- Playwright rendered layout check for normal rows, over-wide rows, and synthetic drag resize
+<!-- SECTION:FINAL_SUMMARY:END -->
