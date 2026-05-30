@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-30 13:41'
-updated_date: '2026-05-30 20:37'
+updated_date: '2026-05-30 20:38'
 labels: []
 dependencies: []
 ---
@@ -18,9 +18,9 @@ Make the OT support and Statistics tab tables choose column widths from their wi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 Each OT support and Statistics table column sizes from the widest visible header or cell text for that column.
+- [ ] #1 Each OT support and Statistics table column sizes from the widest visible header or cell text for that column.
 - [x] #2 The table total width is derived from the sum of computed column widths instead of a fixed or uniform width.
-- [x] #3 Computed table width is capped to the available viewport/container width so the table never exceeds the visible area.
+- [ ] #3 Computed table width is capped to the available viewport/container width so the table never exceeds the visible area.
 - [x] #4 Existing manual column dragging remains usable after the automatic sizing changes.
 <!-- AC:END -->
 
@@ -41,6 +41,8 @@ Branch: dev (working tree already dirty before this task; unrelated existing cha
 Agent: Codex.
 Implementation: replaced the OpenTherm table min-width update with column-width application that computes each column from the widest rendered header/body text, sets the table width to the computed column sum, and proportionally constrains columns to the parent/viewport width. Preserved drag resizing and capped drag growth to the available table width. Bumped table width storage keys to avoid stale prior sizing data.
 Validation: node --check src\OTGW-firmware\data\index.js; .\.venv\Scripts\python.exe evaluate.py --quick --no-color; Playwright rendered layout check at 800px viewport with normal rows, over-wide rows, and synthetic drag resize.
+
+Follow-up 2026-05-30: user screenshot showed OT Support Boiler cells such as 'no read support...' still visually truncating, so AC #1/#3 need rework. The fix must preserve content-width columns and use horizontal scrolling when the content-fit sum is wider than the available viewport, instead of scaling columns down until text clips. Also apply the correction in the 2.0.0 worktree.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
