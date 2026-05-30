@@ -6,9 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-05-30 21:42'
+updated_date: '2026-05-30 21:45'
 labels:
   - bug
 dependencies: []
+references:
+  - >-
+    Discord #english-support / GeorgeZ83 (geo83_44083) / 2026-05-29..30 / logs:
+    putty-telnet.log + log.txt + mosquitto broker log
 priority: high
 ---
 
@@ -34,3 +39,13 @@ Root cause (code-confirmed, MQTTstuff.ino): the streaming publish path beginMqtt
 - [ ] #5 python evaluate.py --quick shows no new failures
 - [ ] #6 Field validation by GeorgeZ83 on ESP8266 + HA: no malformed-packet/session-taken-over disconnects with web UI open
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Related prior work: TASK-242 (serial overrun + MQTT throttle drops, Done).
+
+Heap tiers at time of report (helperStuff.ino:900-902): CRITICAL=1536 (block), WARNING=3072 (throttle 500ms), LOW=5120 (throttle 100ms); frag-promote when freeHeap in LOW band and maxBlock<1536. Throttle MS: helperStuff.ino:915-918.
+
+User request under evaluation: lower heap-guard thresholds to reduce MQTT drops. RISK: relaxing the guard BEFORE the desync fix makes publishes proceed at lower heap -> more short-writes -> MORE malformed-packet disconnects. Correct order = fix writeMqttChunk desync first, then relax guard.
+<!-- SECTION:NOTES:END -->
