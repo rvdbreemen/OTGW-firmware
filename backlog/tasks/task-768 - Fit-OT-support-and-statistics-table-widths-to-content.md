@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-30 13:41'
-updated_date: '2026-05-30 20:55'
+updated_date: '2026-05-30 20:56'
 labels: []
 dependencies: []
 ---
@@ -27,7 +27,12 @@ Make the OT support and Statistics tab tables choose column widths from their wi
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Locate the OT support and Statistics table rendering and resize logic.\n2. Identify the current automatic column width calculation and how drag-resized widths are stored.\n3. Change automatic sizing so each column measures the widest visible header/cell text and sums those widths for the table.\n4. Keep wide tables contained with the existing horizontal scroll container instead of shrinking columns until text clips.\n5. Preserve manual drag resizing behavior and run syntax, evaluator, and rendered layout checks.\n6. Update Backlog acceptance criteria, notes, and final summary.
+1. Locate the OT support and Statistics table rendering and resize logic.
+2. Identify the current automatic column width calculation and how drag-resized widths are stored.
+3. Change automatic sizing so each column measures the widest visible header/cell text and sums those widths for the table.
+4. Keep wide tables contained with the existing horizontal scroll container instead of shrinking columns until text clips.
+5. Preserve manual drag resizing behavior and run syntax, evaluator, and rendered layout checks.
+6. Update Backlog acceptance criteria, notes, and final summary.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
