@@ -1,9 +1,11 @@
 ---
 id: TASK-768
 title: Fit OT support and statistics table widths to content
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-30 13:41'
+updated_date: '2026-05-30 13:42'
 labels: []
 dependencies: []
 ---
