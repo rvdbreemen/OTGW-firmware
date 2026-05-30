@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp32.h
-**  Version  : v2.0.0-alpha.108
+**  Version  : v2.0.0-alpha.109
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -123,6 +123,21 @@ inline void platformResetReason(char *buf, size_t len) {
 // WiFi scan: is the network at scan index `i` encrypted (not open)?
 inline bool platformWiFiIsEncrypted(uint8_t i) {
   return WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
+}
+
+// Reset cause as an OTGW-style boot-cause char (P/S/E/W/D/B/?) for diagnostics.
+inline char platformGetResetReasonChar() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON:   return 'P';  // Power-on
+    case ESP_RST_SW:        return 'S';  // Software reset
+    case ESP_RST_PANIC:     return 'E';  // Exception/panic
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT:       return 'W';  // Watchdog
+    case ESP_RST_DEEPSLEEP: return 'D';  // Deep sleep wake
+    case ESP_RST_BROWNOUT:  return 'B';  // Brownout
+    default:                return '?';
+  }
 }
 
 // Heap information
