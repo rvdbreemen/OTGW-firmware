@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.104
+**  Version  : v2.0.0-alpha.105
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -13,6 +13,8 @@
 **
 **  Uses SSD1306Ascii (text-only, no framebuffer) to save ~1KB RAM
 **  compared to Adafruit_SSD1306 which requires a 1024-byte framebuffer.
+**  The boot-splash flame is drawn via raw GDDRAM column writes
+**  (ssd1306WriteRam), so a 16x16 bitmap needs no framebuffer.
 **
 **  Design:
 **  - Runtime I2C probe at 0x3C - if no display, all code is skipped
@@ -74,6 +76,31 @@ static uint32_t oledLastBtnEdge   = 0;     // millis of last accepted button edg
 
 // Shared formatting buffer (small, on module level to avoid per-function stack cost)
 static char oledBuf[22];
+
+// ---------------------------------------------------------------------------
+// Boot-splash flame icon — 16x16, column-major, 2 pages of 16 bytes.
+// SSD1306Ascii has no framebuffer / drawBitmap, but ssd1306WriteRam() writes a
+// raw GDDRAM column byte (8 vertical px, LSB = top of page) at the current
+// cursor and advances the column. Two such page rows render a 16x16 bitmap with
+// zero extra RAM — the bytes live in flash (PROGMEM). Layout generated offline
+// and round-trip verified. (TASK-750 AC#2)
+// ---------------------------------------------------------------------------
+static const uint8_t FLAME16[32] PROGMEM = {
+  // page 0 (top 8 rows), columns 0..15
+  0x00, 0x00, 0x80, 0xC0, 0x60, 0x38, 0x9E, 0x9F, 0x9F, 0x30, 0x60, 0xC0, 0x80, 0x00, 0x00, 0x00,
+  // page 1 (bottom 8 rows), columns 0..15
+  0x00, 0x0E, 0x1F, 0x30, 0x66, 0xEF, 0xCF, 0xCF, 0xCF, 0xEF, 0x66, 0x30, 0x1F, 0x0E, 0x00, 0x00,
+};
+
+// Draw the 16x16 flame with its top-left at pixel column `col`, text-row `row`.
+static void oledDrawFlame(uint8_t col, uint8_t row) {
+  for (uint8_t p = 0; p < 2; p++) {
+    oledDisplay.setCursor(col, row + p);
+    for (uint8_t c = 0; c < 16; c++) {
+      oledDisplay.ssd1306WriteRam(pgm_read_byte(&FLAME16[p * 16 + c]));
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // fmtFloatOrDash - render float into oledBuf, or "---" if NaN
@@ -452,29 +479,33 @@ void initOLED() {
 
   DebugTln(F("OLED: Display initialized (128x64 SSD1306Ascii)"));
 
-  // Boot splash. SSD1306Ascii is text-only (no framebuffer / drawBitmap), so
-  // the "flame" is a text glyph rather than a 16x16 bitmap.
+  // Boot splash: a real 16x16 flame bitmap (top-centre) over the title and
+  // setup hints. The flame is drawn via raw GDDRAM column writes (oledDrawFlame),
+  // so it costs no framebuffer RAM (TASK-750 AC#2).
   oledDisplay.clear();
+  oledDrawFlame(56, 0);                 // 16x16 flame centred on rows 0-1 (col 56..71)
+
   oledDisplay.set2X();
-  oledDisplay.setRow(0);
-  oledDisplay.setCol(10);
+  oledDisplay.setRow(2);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  oledDisplay.println(F("* OTGW32"));
+  oledDisplay.setCol(28);               // 2X "OTGW32" = 72px, centred on 128px
+  oledDisplay.print(F("OTGW32"));
 #else
-  oledDisplay.println(F("* OTGW"));
+  oledDisplay.setCol(40);               // 2X "OTGW" = 48px, centred
+  oledDisplay.print(F("OTGW"));
 #endif
   oledDisplay.set1X();
-  oledDisplay.setRow(3);
-  oledDisplay.setCol(0);
-  oledDisplay.println(F("OpenTherm Gateway"));
-  oledDisplay.setRow(5);
+  oledDisplay.setRow(4);
+  oledDisplay.setCol(13);               // "OpenTherm Gateway" = 102px, centred
+  oledDisplay.print(F("OpenTherm Gateway"));
+  oledDisplay.setRow(6);
   oledDisplay.setCol(0);
   oledDisplay.println(F("Press button for info"));
-  oledDisplay.setRow(6);
+  oledDisplay.setRow(7);
   oledDisplay.setCol(0);
   // Our WiFi wipe is a triple-reset (shouldForceWifiConfigPortal), not a
   // reset-hold, so the hint must name the right gesture for this firmware.
-  oledDisplay.println(F("Triple-reset = config"));
+  oledDisplay.print(F("Triple-reset = config"));
 
   // Button for page cycling — polled in loopOLED() with a millis() debounce.
   // Portable Arduino API (no ISR / FreeRTOS queue), so it works identically on
