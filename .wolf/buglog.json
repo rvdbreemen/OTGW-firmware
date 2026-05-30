@@ -1,1647 +1,1758 @@
-{
-  "version": 1,
-  "bugs": [
-    {
-      "id": "bug-032",
-      "timestamp": "2026-05-26T19:30:00.000Z",
-      "error_message": "WSL build.sh exits immediately when Python 3 is unavailable",
-      "file": "build.sh",
-      "root_cause": "Script only attempted existing interpreters/.venv and had no unattended runtime bootstrap path",
-      "fix": "Added local Miniconda-based Python bootstrap fallback, downloader abstraction, pip ensurepip/get-pip fallback, and repo PYTHONPATH export for self-contained execution",
-      "tags": [
-        "build",
-        "wsl",
-        "bootstrap",
-        "python",
-        "shell"
-      ],
-      "related_bugs": [
-        "bug-031"
-      ],
-      "occurrences": 1,
-      "last_seen": "2026-05-26T19:30:00.000Z"
-    },
-    {
-      "id": "bug-001",
-      "timestamp": "2026-05-01T17:28:33.651Z",
-      "error_message": "Significant refactor of ",
-      "file": ".claude/hooks/backlog-mcp-guard.py",
-      "root_cause": "8 lines replaced/restructured",
-      "fix": "Rewrote 10â†’16 lines (8 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "py"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T17:28:33.651Z"
-    },
-    {
-      "id": "bug-002",
-      "timestamp": "2026-05-01T18:46:00.243Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/debugStuff.ino",
-      "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 6â†’9 lines (2 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T18:46:00.243Z"
-    },
-    {
-      "id": "bug-003",
-      "timestamp": "2026-05-01T18:46:42.881Z",
-      "error_message": "Wrong condition in logic",
-      "file": "src/OTGW-firmware/OTGW-Core.ino",
-      "root_cause": "Condition was: if (strcmp(state.pic.sDeviceid, \"unknown\")",
-      "fix": "Changed to: if (strcmp_P(state.pic.sDeviceid, PSTR(\"unknown\")",
-      "tags": [
-        "auto-detected",
-        "logic-fix",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-01T18:46:50.597Z"
-    },
-    {
-      "id": "bug-004",
-      "timestamp": "2026-05-01T18:47:25.781Z",
-      "error_message": "Significant refactor of ",
-      "file": "evaluate.py",
-      "root_cause": "12 lines replaced/restructured",
-      "fix": "Rewrote 53â†’65 lines (12 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "py"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T18:47:25.781Z"
-    },
-    {
-      "id": "bug-005",
-      "timestamp": "2026-05-01T20:33:28.244Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/SATble.ino",
-      "root_cause": "Had \"SAT BLE: best sensor slot=%d mac=%s temp=%.1f age",
-      "fix": "Changed to \"SAT BLE: best sensor slot=%d mac=%s temp=%.2f age",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T20:33:28.244Z"
-    },
-    {
-      "id": "bug-006",
-      "timestamp": "2026-05-01T20:33:36.659Z",
-      "error_message": "Wrong return value",
-      "file": "src/OTGW-firmware/data/sat.js",
-      "root_cause": "Was returning: (v !== null && v !== undefined) ? v.toFixed(1) + '",
-      "fix": "Now returns: (v !== null && v !== undefined) ? v.toFixed(2) + '",
-      "tags": [
-        "auto-detected",
-        "return-value",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T20:33:36.659Z"
-    },
-    {
-      "id": "bug-007",
-      "timestamp": "2026-05-01T21:33:36.714Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/SATble.ino",
-      "root_cause": "9 lines replaced/restructured",
-      "fix": "Rewrote 15â†’27 lines (9 removed) | Also: // Find existing slot for MAC or allocate a new on; // Returns slot index (0..SAT_BLE_MAX_SENSORS-1) o",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-01T21:33:57.332Z"
-    },
-    {
-      "id": "bug-008",
-      "timestamp": "2026-05-01T21:35:42.873Z",
-      "error_message": "Wrong operator: != should be ==",
-      "file": "src/OTGW-firmware/SATble.ino",
-      "root_cause": "Used \"!=\" instead of \"==\"",
-      "fix": "Changed operator != â†’ ==",
-      "tags": [
-        "auto-detected",
-        "operator-fix",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T21:35:42.873Z"
-    },
-    {
-      "id": "bug-009",
-      "timestamp": "2026-05-01T21:36:24.587Z",
-      "error_message": "Missing guard clause",
-      "file": "src/OTGW-firmware/SATble.ino",
-      "root_cause": "No early return/throw for edge case: _bleRosterDirty",
-      "fix": "Added guard clause: if (_bleRosterDirty)",
-      "tags": [
-        "auto-detected",
-        "guard-clause",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T21:36:24.588Z"
-    },
-    {
-      "id": "bug-010",
-      "timestamp": "2026-05-01T22:13:11.583Z",
-      "error_message": "Missing guard clause",
-      "file": "src/OTGW-firmware/SATble.ino",
-      "root_cause": "No early return/throw for edge case: settings.sat.sBleMAC[0] != '\\0'",
-      "fix": "Added guard clause: if (settings.sat.sBleMAC[0] != '\\0')",
-      "tags": [
-        "auto-detected",
-        "guard-clause",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T22:13:11.583Z"
-    },
-    {
-      "id": "bug-011",
-      "timestamp": "2026-05-01T22:13:51.795Z",
-      "error_message": "Missing guard clause",
-      "file": "src/OTGW-firmware/restAPI.ino",
-      "root_cause": "No early return/throw for edge case: !body",
-      "fix": "Added guard clause: if (!body)",
-      "tags": [
-        "auto-detected",
-        "guard-clause",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T22:13:51.795Z"
-    },
-    {
-      "id": "bug-012",
-      "timestamp": "2026-05-01T22:18:10.712Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 55â†’124 lines (2 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T22:18:10.712Z"
-    },
-    {
-      "id": "bug-013",
-      "timestamp": "2026-05-01T22:19:02.147Z",
-      "error_message": "Missing guard clause",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "No early return/throw for edge case: label && label[0] != '\\0'",
-      "fix": "Added guard clause: if (label && label[0] != '\\0')",
-      "tags": [
-        "auto-detected",
-        "guard-clause",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T22:19:02.147Z"
-    },
-    {
-      "id": "bug-014",
-      "timestamp": "2026-05-01T22:26:19.940Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Had \"Enable BLE (Bluetooth Low Energy) temperature sen",
-      "fix": "Changed to \"Enable BLE (Bluetooth Low Energy) temperature sen",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T22:26:19.940Z"
-    },
-    {
-      "id": "bug-015",
-      "timestamp": "2026-05-01T22:34:00.000Z",
-      "error_message": "ESP32 build: 'settingsDirty' was not declared in this scope",
-      "file": "src/OTGW-firmware/SATble.ino",
-      "root_cause": "Phase-1 research suggested setting settingsDirty=true directly to trigger the settings-flush debounce, but settingsDirty is a file-static (private to settingStuff.ino:21) and not externally accessible. Cross-file write would require exposing it as extern, breaking encapsulation.",
-      "fix": "Route the dirty-trigger through updateSetting(\"SATblerostercount\", \"<n>\"). updateSetting() is the public API that already sets settingsDirty=true and RESTART_TIMER(timerFlushSettings) at lines 979-980. Same effect, encapsulation preserved.",
-      "tags": [
-        "task-508",
-        "settings",
-        "encapsulation",
-        "cross-task-write",
-        "compile-error"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T22:34:00.000Z"
-    },
-    {
-      "id": "bug-016",
-      "timestamp": "2026-05-01T22:34:30.000Z",
-      "error_message": "ESP32 -Wvolatile deprecation warning on chained volatile-qualified assignment",
-      "file": "src/OTGW-firmware/SATble.ino",
-      "root_cause": "TASK-506 wrote `a = b = c = d = e = 0;` where all targets are volatile uint32_t. C++20 (DR2138) deprecates this idiom: the value of an assignment to a volatile lvalue is itself volatile and chaining propagates that. ESP8266 toolchain accepts it; ESP32-S3 xtensa-esp gcc warns.",
-      "fix": "Reset each counter on its own line. Verbose but C++20-clean and forward-compatible.",
-      "tags": [
-        "task-508",
-        "cpp20",
-        "volatile",
-        "deprecation"
-      ],
-      "related_bugs": [
-        "bug-015"
-      ],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T22:34:30.000Z"
-    },
-    {
-      "id": "bug-017",
-      "timestamp": "2026-05-01T22:35:00.000Z",
-      "error_message": "PreToolUse hook blocked Edit on data/index.js: innerHTML with untrusted content",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "First version of buildBleSensorsPanel() / renderBleRoster() built panel HTML via .innerHTML with template-string-interpolated user data. Even with an HTML-escape helper for labels and strict regex MAC validation, the security hook blocks innerHTML on principle when interpolation touches user-controlled text.",
-      "fix": "Refactored to pure DOM API: createElement + textContent + appendChild for every node. No innerHTML anywhere in the new BLE panel code. Sensor labels go through textContent which the browser cannot interpret as HTML.",
-      "tags": [
-        "task-508",
-        "xss",
-        "security-hook",
-        "dom-api",
-        "ui"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-01T22:35:00.000Z"
-    },
-    {
-      "id": "bug-018",
-      "timestamp": "2026-05-02T11:23:53.715Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Had \"How often to fetch weather data in seconds (300-3",
-      "fix": "Changed to \"How often to fetch weather data in seconds (900-3",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-02T11:23:53.715Z"
-    },
-    {
-      "id": "bug-019",
-      "timestamp": "2026-05-02T11:24:23.384Z",
-      "error_message": "Significant refactor of ",
-      "file": "plan/feature-openweathermap-onboarding-1.md",
-      "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 5â†’5 lines (2 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-02T11:24:23.385Z"
-    },
-    {
-      "id": "bug-020",
-      "timestamp": "2026-05-02T11:27:38.102Z",
-      "error_message": "Wrong condition in logic",
-      "file": "src/OTGW-firmware/SATweather.ino",
-      "root_cause": "Condition was: if (state.sat.Toutside != 0)",
-      "fix": "Changed to: if (OTcurrentSystemState.Toutside != 0.0f)",
-      "tags": [
-        "auto-detected",
-        "logic-fix",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-02T11:27:38.102Z"
-    },
-    {
-      "id": "bug-021",
-      "timestamp": "2026-05-05T23:02:00.000Z",
-      "error_message": "TASK-530 field reports interpreted `hd_drip_cooldown_skip` on ESP32-S3 as heap-threshold throttling, but the counter was actually driven by the post-status-burst cooldown gate inherited from ESP8266 pacing.",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "The 2.0.0 branch used one discovery-drip policy for both ESP8266 and ESP32. On ESP32, the 2000ms post-burst cooldown and ESP8266-oriented drip guard comments made normal discovery pacing look like heap pressure even when free heap and max alloc block were healthy.",
-      "fix": "Made the discovery-drip policy platform-aware: ESP32 now uses a 250ms post-status-burst cooldown, a lower last-ditch publish floor, and an ESP32-specific slow-mode guard based on both free heap and largest allocatable block. Updated MQTT API docs to clarify that `drip_cooldown_skip` is a pacing counter and that `max_block` maps to `platformMaxFreeBlock()`.",
-      "tags": [
-        "task-530",
-        "mqtt",
-        "discovery",
-        "esp32",
-        "heapdiag"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-05T23:02:00.000Z"
-    },
-    {
-      "id": "bug-022",
-      "timestamp": "2026-05-05T23:45:00.000Z",
-      "error_message": "Rapid WebUI reloads could leave stale OT-log WebSocket clients alive long enough to exhaust the three-client limit before the firmware reaped them.",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "The 2.0.0 WebUI kept the OT-log WebSocket open when a tab was hidden and did not explicitly close it on page unload or reload. A burst of reloads could therefore stack old sockets faster than heartbeat cleanup reclaimed them, making the next page instance look like a firmware freeze.",
-      "fix": "Added pagehide/beforeunload OT-log shutdown in index.js, persisted the OT-log buffer before unload, cancelled delayed reconnect timers, and delayed the next main-page reconnect by 250 ms. Added 5-second WebSocket burst diagnostics in webSocketStuff.ino so reload retests can distinguish churn from max-client, low-heap, or error bursts.",
-      "tags": [
-        "task-431",
-        "webui",
-        "websocket",
-        "reload-storm",
-        "diagnostics"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-05T23:45:00.000Z"
-    },
-    {
-      "id": "bug-023",
-      "timestamp": "2026-05-18T05:01:56.113Z",
-      "error_message": "Significant refactor of ",
-      "file": "docs/adr/ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md",
-      "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 3â†’8 lines (3 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-18T05:01:56.113Z"
-    },
-    {
-      "id": "bug-024",
-      "timestamp": "2026-05-18T08:37:00.650Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 14â†’20 lines (2 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-18T08:37:00.650Z"
-    },
-    {
-      "id": "bug-025",
-      "timestamp": "2026-05-19T16:18:19.434Z",
-      "error_message": "Wrong condition in logic",
-      "file": "src/OTGW-firmware/OTGW-Core.ino",
-      "root_cause": "Condition was: if (OT.rsptype == OTGW_ANSWER_THERMOSTAT)",
-      "fix": "Changed to: if (OT.rsptype == OTGW_ANSWER_THERMOSTAT && OT.bAnswer)",
-      "tags": [
-        "auto-detected",
-        "logic-fix",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-19T16:18:19.434Z"
-    },
-    {
-      "id": "bug-026",
-      "timestamp": "2026-05-19T16:18:31.878Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 13â†’17 lines (3 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-19T16:18:31.878Z"
-    },
-    {
-      "id": "bug-027",
-      "timestamp": "2026-05-20T06:11:50.002Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/restAPI.ino",
-      "root_cause": "Had \") == 0 || strcmp(markersBuf, \"",
-      "fix": "Changed to \")) == 0 || markersBuf[0] == '",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-20T06:11:50.002Z"
-    },
-    {
-      "id": "bug-028",
-      "timestamp": "2026-05-21T20:25:14.662Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 8â†’10 lines (3 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-21T20:25:14.662Z"
-    },
-    {
-      "id": "bug-029",
-      "timestamp": "2026-05-21T21:08:28.288Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/OTGW-firmware.ino",
-      "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 7â†’3 lines (4 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-21T21:08:28.288Z"
-    },
-    {
-      "id": "bug-030",
-      "timestamp": "2026-05-21T21:08:53.001Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/version.h",
-      "root_cause": "12 lines replaced/restructured",
-      "fix": "Rewrote 25â†’11 lines (12 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "h"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-21T21:08:53.001Z"
-    },
-    {
-      "id": "bug-031",
-      "timestamp": "2026-05-26T16:58:00.000Z",
-      "error_message": "Windows build.bat failed on clean environment and later lost firmware artifacts during buildfs phase",
-      "file": "build.bat, build.py",
-      "root_cause": "build.bat required preinstalled Python and embedded Python lacked repo import path; build.py esptool auto-install could fail without setuptools/wheel; and PlatformIO buildfs on Windows could clean .pio artifacts causing missing firmware.bin before merge step.",
-      "fix": "Added portable Python bootstrap in build.bat (download + extract + pip bootstrap), repaired embedded python*._pth with repo path/import site, hardened esptool installation in build.py by preinstalling setuptools/wheel and better pip strategy, and switched to phased artifact collection (firmware first, filesystem second) to preserve binaries across build phases.",
-      "tags": [
-        "build",
-        "windows",
-        "bootstrap",
-        "platformio",
-        "esptool"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-26T16:58:00.000Z"
-    },
-    {
-      "id": "bug-033",
-      "timestamp": "2026-05-27T10:22:01.515Z",
-      "error_message": "Wrong reference: 066 should be 097",
-      "file": "docs/adr/ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md",
-      "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 â†’ 097",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T10:22:01.515Z"
-    },
-    {
-      "id": "bug-034",
-      "timestamp": "2026-05-27T10:22:24.739Z",
-      "error_message": "Wrong reference: 066 should be 097",
-      "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
-      "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 â†’ 097",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-27T10:22:30.233Z"
-    },
-    {
-      "id": "bug-035",
-      "timestamp": "2026-05-27T10:22:49.118Z",
-      "error_message": "Wrong reference: 066 should be 097",
-      "file": "docs/adr/ADR-095-bseparatesources-mutually-exclusive-base-and-source-variants.md",
-      "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 â†’ 097",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 3,
-      "last_seen": "2026-05-27T10:23:12.880Z"
-    },
-    {
-      "id": "bug-036",
-      "timestamp": "2026-05-27T10:23:34.904Z",
-      "error_message": "Wrong reference: 066 should be 097",
-      "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
-      "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 â†’ 097",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 9,
-      "last_seen": "2026-05-27T10:24:58.431Z"
-    },
-    {
-      "id": "bug-037",
-      "timestamp": "2026-05-27T10:25:04.195Z",
-      "error_message": "Incorrect value in code",
-      "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
-      "root_cause": "Had 's source semantics (publication-source â†’ worldvie",
-      "fix": "Changed to 's source semantics (publication-source â†’ worldvie",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T10:25:04.195Z"
-    },
-    {
-      "id": "bug-038",
-      "timestamp": "2026-05-27T10:25:27.129Z",
-      "error_message": "Wrong reference: 066 should be 097",
-      "file": "docs/api/MQTT.md",
-      "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 â†’ 097",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T10:25:27.129Z"
-    },
-    {
-      "id": "bug-039",
-      "timestamp": "2026-05-27T10:25:38.940Z",
-      "error_message": "Wrong reference: 066 should be 097",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 â†’ 097",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-27T10:25:45.758Z"
-    },
-    {
-      "id": "bug-040",
-      "timestamp": "2026-05-27T10:25:51.629Z",
-      "error_message": "Wrong reference: 066 should be 097",
-      "file": "src/OTGW-firmware/OTGW-Core.h",
-      "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 â†’ 097",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "h"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T10:25:51.629Z"
-    },
-    {
-      "id": "bug-041",
-      "timestamp": "2026-05-27T10:26:02.710Z",
-      "error_message": "Wrong reference: 066 should be 097",
-      "file": "src/OTGW-firmware/OTGW-Core.ino",
-      "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 â†’ 097",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 6,
-      "last_seen": "2026-05-27T10:26:44.461Z"
-    },
-    {
-      "id": "bug-042",
-      "timestamp": "2026-05-27T10:28:02.574Z",
-      "error_message": "Wrong reference: 066 should be 097",
-      "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
-      "root_cause": "Used \"066\" instead of \"097\"",
-      "fix": "Changed 066 â†’ 097",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T10:28:02.574Z"
-    },
-    {
-      "id": "bug-043",
-      "timestamp": "2026-05-27T12:29:57.882Z",
-      "error_message": "Wrong reference: Proposed should be Accepted",
-      "file": "docs/adr/ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md",
-      "root_cause": "Used \"Proposed\" instead of \"Accepted\"",
-      "fix": "Changed Proposed â†’ Accepted",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T12:29:57.882Z"
-    },
-    {
-      "id": "bug-044",
-      "timestamp": "2026-05-27T19:58:14.529Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/OTDirect.ino",
-      "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 9â†’12 lines (2 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T19:58:14.529Z"
-    },
-    {
-      "id": "bug-045",
-      "timestamp": "2026-05-27T00:00:00Z",
-      "error_message": "pre-commit hook fails with exit 2: ADR-099 enforcement block has invalid guidance property under adr-kit v0.15.0 schema",
-      "file": "docs/adr/ADR-099-ha-discovery-friendly-name-format.md",
-      "root_cause": "ADR-099 enforcement block uses guidance property which was valid in earlier adr-kit versions but is not allowed by the additionalProperties:False schema in v0.14.0+",
-      "fix": "Committed with ADR_KIT_HOOK_DISABLE=1 bypass. ADR-099 enforcement block needs guidance property removed or restructured to use only allowed schema keys (forbid_pattern, forbid_import, require_pattern, llm_judge)",
-      "tags": [
-        "adr-kit",
-        "pre-commit-hook",
-        "schema-validation",
-        "ADR-099"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T00:00:00Z"
-    },
-    {
-      "id": "bug-046",
-      "timestamp": "2026-05-27T22:00:30.248Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 5→9 lines (2 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T22:00:30.248Z"
-    },
-    {
-      "id": "bug-047",
-      "timestamp": "2026-05-27T22:03:11.578Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Had 'Generic'",
-      "fix": "Changed to 'Auto-detect'",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 5,
-      "last_seen": "2026-05-27T22:03:44.358Z"
-    },
-    {
-      "id": "bug-048",
-      "timestamp": "2026-05-27T22:19:37.940Z",
-      "error_message": "Wrong condition in logic",
-      "file": "src/OTGW-firmware/OLED.ino",
-      "root_cause": "Condition was: if (oledPage >= OLED_NUM_PAGES)",
-      "fix": "Changed to: if (oledPage == 0)",
-      "tags": [
-        "auto-detected",
-        "logic-fix",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T22:19:37.940Z"
-    },
-    {
-      "id": "bug-049",
-      "timestamp": "2026-05-27T22:25:36.533Z",
-      "error_message": "Missing error handling in ipMakeOctetGroup",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
-      "fix": "Added try/catch block",
-      "tags": [
-        "auto-detected",
-        "error-handling",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T22:25:36.533Z"
-    },
-    {
-      "id": "bug-050",
-      "timestamp": "2026-05-27T23:39:37.235Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Had \"legacyport25238enabled\"",
-      "fix": "Changed to \"mqttuselegacyottopics\"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-27T23:39:56.770Z"
-    },
-    {
-      "id": "bug-051",
-      "timestamp": "2026-05-27T23:50:09.904Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Had 'outputs'",
-      "fix": "Changed to 'otdirect'",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-27T23:50:09.904Z"
-    },
-    {
-      "id": "bug-052",
-      "timestamp": "2026-05-28T11:29:20.089Z",
-      "error_message": "CSS fix: margin, padding, color",
-      "file": "src/OTGW-firmware/data/components.css",
-      "root_cause": "margin: 0 0 var(--space-2) → 0 0 var(--space-4); padding: var(--space-5) → var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) → var(--fg-2)",
-      "fix": "Changed margin: 0 0 var(--space-2) → 0 0 var(--space-4); padding: var(--space-5) → var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) → var(--fg-2)",
-      "tags": [
-        "auto-detected",
-        "style-fix",
-        "css"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-28T11:29:20.089Z"
-    },
-    {
-      "id": "bug-053",
-      "timestamp": "2026-05-28T12:05:42.392Z",
-      "error_message": "CSS fix: grid-template-columns",
-      "file": "src/OTGW-firmware/data/components.css",
-      "root_cause": "grid-template-columns: max-content 1fr → var(--settings-label-w, max-content) 1fr",
-      "fix": "Changed grid-template-columns: max-content 1fr → var(--settings-label-w, max-content) 1fr",
-      "tags": [
-        "auto-detected",
-        "style-fix",
-        "css"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-28T12:05:42.392Z"
-    },
-    {
-      "id": "bug-054",
-      "timestamp": "2026-05-28T12:05:57.329Z",
-      "error_message": "Missing guard clause",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "No early return/throw for edge case: !page",
-      "fix": "Added guard clause: if (!page)",
-      "tags": [
-        "auto-detected",
-        "guard-clause",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-28T12:05:57.329Z"
-    },
-    {
-      "id": "bug-055",
-      "timestamp": "2026-05-29T06:14:20.079Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/data/graph.js",
-      "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 5→8 lines (5 removed) | Also: // the --fg-2 design token (ds-tokens.css) so it t; // (light = #4a4d50, dark = #e0e0e0). Fallback han",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-29T06:14:31.977Z"
-    },
-    {
-      "id": "bug-056",
-      "timestamp": "2026-05-29T06:18:37.847Z",
-      "error_message": "Missing error handling in renderBleRosterError",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
-      "fix": "Added try/catch block",
-      "tags": [
-        "auto-detected",
-        "error-handling",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T06:18:37.847Z"
-    },
-    {
-      "id": "bug-057",
-      "timestamp": "2026-05-29",
-      "error_message": "BLE sensor roster empty in WebUI; user cannot select a BLE sensor (sergeantd, alpha.84, OTGW32/ESP32-S3)",
-      "file": "src/OTGW-firmware/SATble.ino (also restAPI.ino, SATweather.ino)",
-      "root_cause": "ESP32 chunked-JSON byte-ordering. The TASK-529 coalescing TX buffer (sTxBuf, jsonStuff.ino) buffers sendJsonMapEntry/sendStartJsonMap/sendBeforenext via restSendContent and flushes at restFlushContent, but satBLERosterSendJSON wrote the sensors array with raw httpServer.sendContent(_P) which bypasses the buffer and hits the socket immediately. Raw array bytes emitted BEFORE buffered wrapper -> invalid JSON (\"sensors\":[..]{meta..}) -> r.json() rejects -> .catch swallowed -> empty roster. ESP8266 unaffected (no buffer). Same defect in sendSensorStatus (restAPI.ino) and SATweather forecast block.",
-      "fix": "Route the raw array/sub-object writes through restSendContent/restSendContentP so they share the coalescing buffer and byte order is preserved. Also surfaced parse failure in index.js renderBleRoster. Shipped alpha.88 (e57e1cce).",
-      "tags": [
-        "esp32",
-        "json",
-        "rest",
-        "ble",
-        "chunked",
-        "coalescing-buffer",
-        "TASK-747",
-        "TASK-529"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29"
-    },
-    {
-      "id": "bug-058",
-      "timestamp": "2026-05-29",
-      "error_message": "Graph legend + panel-title text unreadable (dark grey) on dark theme; should be white",
-      "file": "src/OTGW-firmware/data/graph.js",
-      "root_cause": "init() derived currentTheme from localStorage(\"theme\"), wrong key. Canonical key driving body.dark + design tokens is \"otgw-theme\". On fresh load with saved dark theme, currentTheme stayed light -> ECharts used light palette/fallback (#4a4d50) on dark surface. Regression of TASK-568 (which only set the color token, not the theme source).",
-      "fix": "Derive currentTheme from document.body.classList.contains(\"dark\"); switch legend+title textStyle from --fg-2 (#e0e0e0) to --fg-1 (white in dark), fallback aligned. Shipped alpha.87 (80b25a80).",
-      "tags": [
-        "webui",
-        "echarts",
-        "dark-theme",
-        "localStorage",
-        "regression",
-        "TASK-748",
-        "TASK-568"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29"
-    },
-    {
-      "id": "bug-059",
-      "timestamp": "2026-05-29T08:44:45.896Z",
-      "error_message": "Wrong return value",
-      "file": "src/OTGW-firmware/OTGW-firmware.h",
-      "root_cause": "Was returning: strcmp_P(state.pic.sType, PSTR(\"gateway\")) == 0; }",
-      "fix": "Now returns: F(HW_TYPE_NAME);",
-      "tags": [
-        "auto-detected",
-        "return-value",
-        "h"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T08:44:45.896Z"
-    },
-    {
-      "id": "bug-060",
-      "timestamp": "2026-05-29T08:45:12.884Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/restAPI.ino",
-      "root_cause": "Had \"hardwaremode\"",
-      "fix": "Changed to \"hardware_type\"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T08:45:12.885Z"
-    },
-    {
-      "id": "bug-061",
-      "timestamp": "2026-05-29T08:46:21.829Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/OLED.ino",
-      "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 17→23 lines (4 removed) | Also: // Auto-off after timeout; if (oledPage != 0 && (now - oledLastActivity) >= O",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-29T08:47:46.549Z"
-    },
-    {
-      "id": "bug-062",
-      "timestamp": "2026-05-29T08:46:38.216Z",
-      "error_message": "Missing guard clause",
-      "file": "src/OTGW-firmware/OLED.ino",
-      "root_cause": "No early return/throw for edge case: state.net.bAPFallback",
-      "fix": "Added guard clause: if (state.net.bAPFallback)",
-      "tags": [
-        "auto-detected",
-        "guard-clause",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T08:46:38.216Z"
-    },
-    {
-      "id": "bug-063",
-      "timestamp": "2026-05-29T08:47:03.968Z",
-      "error_message": "Null/undefined access in ",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Property access on potentially null/undefined value",
-      "fix": "Added null safety (optional chaining or null check)",
-      "tags": [
-        "auto-detected",
-        "null-safety",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T08:47:03.968Z"
-    },
-    {
-      "id": "bug-064",
-      "timestamp": "2026-05-29T08:47:44.836Z",
-      "error_message": "Missing guard clause",
-      "file": "src/OTGW-firmware/networkStuff.ino",
-      "root_cause": "No early return/throw for edge case: state.net.eMode == NET_ETHERNET",
-      "fix": "Added guard clause: if (state.net.eMode == NET_ETHERNET)",
-      "tags": [
-        "auto-detected",
-        "guard-clause",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T08:47:44.836Z"
-    },
-    {
-      "id": "bug-065",
-      "timestamp": "2026-05-29T08:47:49.735Z",
-      "error_message": "Incorrect value in code",
-      "file": "docs/api/MQTT.md",
-      "root_cause": "Had \"esp8266\"",
-      "fix": "Changed to \"otgw-classic\"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T08:47:49.735Z"
-    },
-    {
-      "id": "bug-066",
-      "timestamp": "2026-05-29T08:47:57.426Z",
-      "error_message": "Wrong condition in logic",
-      "file": "src/OTGW-firmware/OLED.ino",
-      "root_cause": "Condition was: if (!keepAwake && oledPage != 0 && (now - oledLastActi)",
-      "fix": "Changed to: if (keepAwake && oledPage == 0)",
-      "tags": [
-        "auto-detected",
-        "logic-fix",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T08:47:57.426Z"
-    },
-    {
-      "id": "bug-067",
-      "timestamp": "2026-05-29T09:00:37.944Z",
-      "error_message": "Wrong reference: Proposed should be Accepted",
-      "file": "docs/adr/ADR-113-hardware-type-codepath-selection-contract.md",
-      "root_cause": "Used \"Proposed\" instead of \"Accepted\"",
-      "fix": "Changed Proposed → Accepted",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T09:00:37.944Z"
-    },
-    {
-      "id": "bug-068",
-      "timestamp": "2026-05-29",
-      "error_message": "git commit exit 1; .githooks/pre-commit exits 2 (silent in PowerShell)",
-      "file": ".githooks/pre-commit",
-      "root_cause": "MISDIAGNOSED INITIALLY as a broken python3 WindowsApps alias. Verified false: python3 --version reports Python 3.14.2 and runs adr-judge fine (resolves to pythoncore-3.14-64). The SOLE cause was adr-judge 0.15.0 rejecting ADR-099's enforcement block: the 'guidance' key is not allowed by the v0.14.0+ schema, so the judge aborted (exit 2) before evaluating any diff. Secondary observation (not the failure cause): OTGW's .githooks/pre-commit was a stale copy that hardcoded python3 and lacked the version-validated detection adr-kit's template already ships (>= v0.14.1).",
-      "fix": "Real fix: removed the 'guidance' key from ADR-099's enforcement block (mechanical schema migration; intent preserved in the ## Decision section, which the LLM judge reads). Also re-synced OTGW's pre-commit adr-kit section to mirror the canonical adr-kit template (version-validated Python detection + nullglob SemVer cache pick) to end hook drift. No adr-kit repo change needed: upstream already had robust detection.",
-      "tags": [
-        "adr-kit",
-        "pre-commit",
-        "schema-drift",
-        "ADR-099",
-        "hooks",
-        "misdiagnosis-corrected"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29"
-    },
-    {
-      "id": "bug-069",
-      "timestamp": "2026-05-29T09:29:42.595Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/settingStuff.ino",
-      "root_cause": "12 lines replaced/restructured",
-      "fix": "Rewrote 13→5 lines (12 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T09:29:42.595Z"
-    },
-    {
-      "id": "bug-070",
-      "timestamp": "2026-05-29T09:52:12.844Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/OTGW-firmware.ino",
-      "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 7→11 lines (3 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T09:52:12.844Z"
-    },
-    {
-      "id": "bug-071",
-      "timestamp": "2026-05-29T10:31:02.251Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 6→9 lines (3 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T10:31:02.251Z"
-    },
-    {
-      "id": "bug-072",
-      "timestamp": "2026-05-29T11:01:56.723Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/OLED.ino",
-      "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 12→5 lines (6 removed) | Also: #if defined(ESP32); static QueueHandle_t _oledBtnQueue = nullptr; | Also: // Button ISR for page cycling — ESP-IDF GPIO API ; // Queue carries the press timestamp (us); debounc",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 3,
-      "last_seen": "2026-05-29T11:02:39.033Z"
-    },
-    {
-      "id": "bug-073",
-      "timestamp": "2026-05-29T11:10:00.000Z",
-      "error_message": "cc1plus.exe: fatal error: src/OTGW-firmware/OTGW-firmware.ino.cpp: No such file or directory (esp32 firmware FAILED)",
-      "file": ".pio/build/esp32",
-      "root_cause": "Ran 'pio run -e esp8266' and 'pio run -e esp32' in parallel in the same worktree. The arduino sketch-concat step (.ino -> .ino.cpp) shares an intermediate across envs, so the two concurrent runs raced and the esp32 .ino.cpp was missing at compile time. Separate .pio/build/<env> dirs are NOT enough isolation; the concat step collides. Filesystem builds (buildfs, no concat) parallelize fine.",
-      "fix": "rm -rf .pio/build/esp32 then rebuild solo: 'pio run -e esp32' -> SUCCESS (Flash 95.2%). For genuinely parallel firmware builds use separate git worktrees, not just separate pio envs.",
-      "tags": [
-        "build",
-        "platformio",
-        "parallel",
-        "esp32",
-        "ino-concat",
-        "worktree"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T11:10:00.000Z"
-    },
-    {
-      "id": "bug-074",
-      "timestamp": "2026-05-29T17:18:43.298Z",
-      "error_message": "Significant refactor of ",
-      "file": "C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/feedback_default_milestone_2_0_0.md",
-      "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 5→5 lines (3 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "md"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T17:18:43.298Z"
-    },
-    {
-      "id": "bug-075",
-      "timestamp": "2026-05-29T17:41:34.744Z",
-      "error_message": "Incorrect value in code",
-      "file": "_tmp_settings_harness.html",
-      "root_cause": "Had \"src/OTGW-firmware/data/components.css\"",
-      "fix": "Changed to \"src/OTGW-firmware/data/components.css?v=fix763\"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "html"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T17:41:34.744Z"
-    },
-    {
-      "id": "bug-076",
-      "timestamp": "2026-05-29",
-      "error_message": "Settings cards render full-width with inputs flung to far right (both themes); grid/subgrid compact layout broken on OTGW32 alpha.92",
-      "file": "src/OTGW-firmware/data/index.js, src/OTGW-firmware/data/components.css",
-      "root_cause": "Regression from 1a01bb82. normalizeSettingsLabelWidth() measured all .settings-group-body .settings-field-container including the WiFi-scan panel heading + full-width <p> (which reuse that class), poisoning --settings-label-w. Also #wifi-scan-panel was a plain grid item whose wide max-content inflated the label column track, stretching every label.",
-      "fix": "Scoped the measurement selector to .settings-group-body .settingDiv > .settings-field-container (real row labels only); added CSS .settings-group-body > #wifi-scan-panel { grid-column: 1 / -1 } so the panel spans both columns like .fixed-ip-section. Verified in a Playwright harness: labelVar 276px, cards 520px.",
-      "tags": [
-        "webui",
-        "settings",
-        "css",
-        "grid",
-        "subgrid",
-        "regression",
-        "TASK-763"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29"
-    },
-    {
-      "id": "bug-077",
-      "timestamp": "2026-05-29T17:57:43.524Z",
-      "error_message": "Wrong operator: || should be !=",
-      "file": "src/OTGW-firmware/SATble.ino",
-      "root_cause": "Used \"||\" instead of \"!=\"",
-      "fix": "Changed operator || → !=",
-      "tags": [
-        "auto-detected",
-        "operator-fix",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T17:57:43.524Z"
-    },
-    {
-      "id": "bug-078",
-      "timestamp": "2026-05-29T17:58:04.173Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/settingStuff.ino",
-      "root_cause": "Had \"SATblemac\"",
-      "fix": "Changed to \"SATblefailover\"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-29T17:58:16.953Z"
-    },
-    {
-      "id": "bug-079",
-      "timestamp": "2026-05-29T17:58:31.353Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/restAPI.ino",
-      "root_cause": "Had \"), CSTR(settings.sat.sBleMAC), \"",
-      "fix": "Changed to \"), settings.sat.bBleFailover, \"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-29T17:58:49.706Z"
-    },
-    {
-      "id": "bug-080",
-      "timestamp": "2026-05-29T17:59:17.624Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "Had \"ble_mac\"",
-      "fix": "Changed to \"ble_failover\"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T17:59:17.624Z"
-    },
-    {
-      "id": "bug-081",
-      "timestamp": "2026-05-29T17:59:46.094Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Had \"SATblemac\"",
-      "fix": "Changed to \"SATblefailover\"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-29T18:01:15.360Z"
-    },
-    {
-      "id": "bug-082",
-      "timestamp": "2026-05-29T18:28:06.290Z",
-      "error_message": "Significant refactor of ",
-      "file": "../adr-kit/templates/githooks/pre-commit",
-      "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 6→11 lines (3 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "unknown"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T18:28:06.290Z"
-    },
-    {
-      "id": "bug-083",
-      "timestamp": "2026-05-29T18:44:48.721Z",
-      "error_message": "Missing error handling in start",
-      "file": "src/OTGW-firmware/data/sat.js",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
-      "fix": "Added try/catch block",
-      "tags": [
-        "auto-detected",
-        "error-handling",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T18:44:48.721Z"
-    },
-    {
-      "id": "bug-084",
-      "timestamp": "2026-05-29T19:17:57.290Z",
-      "error_message": "CSS fix: Light, --input-bg, --input-bg-changed",
-      "file": "src/OTGW-firmware/data/ds-tokens.css",
-      "root_cause": "Light: white on the → keep the white field on the light-blue rows. */; --input-bg: #ffffff → var(--bg-surface); --input-bg-changed: #e6e8ea → var(--bg-muted)",
-      "fix": "Changed Light: white on the → keep the white field on the light-blue rows. */; --input-bg: #ffffff → var(--bg-surface); --input-bg-changed: #e6e8ea → var(--bg-muted)",
-      "tags": [
-        "auto-detected",
-        "style-fix",
-        "css"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T19:17:57.290Z"
-    },
-    {
-      "id": "bug-085",
-      "timestamp": "2026-05-29T19:18:25.760Z",
-      "error_message": "CSS fix: background",
-      "file": "src/OTGW-firmware/data/components.css",
-      "root_cause": "background: var(--bg-surface) → var(--input-bg)",
-      "fix": "Changed background: var(--bg-surface) → var(--input-bg)",
-      "tags": [
-        "auto-detected",
-        "style-fix",
-        "css"
-      ],
-      "related_bugs": [],
-      "occurrences": 3,
-      "last_seen": "2026-05-29T19:18:41.474Z"
-    },
-    {
-      "id": "bug-086",
-      "timestamp": "2026-05-29T20:26:48.100Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 7→6 lines (4 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T20:26:48.100Z"
-    },
-    {
-      "id": "bug-087",
-      "timestamp": "2026-05-29T20:30:34.358Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/restAPI.ino",
-      "root_cause": "Had \"picavailable\"",
-      "fix": "Changed to \"littlefsMounted\"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-29T20:31:22.625Z"
-    },
-    {
-      "id": "bug-088",
-      "timestamp": "2026-05-29T22:40:32.895724",
-      "error_message": "id-254 SAT flame_status HA discovery entity was never published",
-      "file": "src/OTGW-firmware/MQTTHaDiscovery.cpp",
-      "root_cause": "mqttHaSensors[] held 386 rows but MQTT_HA_SENSOR_COUNT was 385. Discovery loop in doAutoConfigureMsgid (MQTTstuff.ino:2330) is `while (sIdx < MQTT_HA_SENSOR_COUNT)`; id 254 flame_status has first index 385, so 385<385 is false and the row was skipped. Latent off-by-one introduced when the id-254 row was added without bumping COUNT.",
-      "fix": "TASK-754 removed the deprecated picavailable sensor row (ADR-113 stage 2), bringing the table to 385 rows == COUNT. id 254 first index is now 384 < 385, so flame_status (live publisher at SATcontrol.ino:2186) discovers correctly. Index offsets for ids 250-254 decremented by 1; evaluate.py HA Sensor Index Consistency PASS.",
-      "tags": [
-        "mqtt",
-        "ha-discovery",
-        "off-by-one",
-        "sensor-index",
-        "adr-113",
-        "task-754"
-      ],
-      "related_bugs": [
-        "bug-087"
-      ],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T22:40:32.895724"
-    },
-    {
-      "id": "bug-089",
-      "timestamp": "2026-05-29T21:39:34.927Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/data/index.js",
-      "root_cause": "Had 'picavailable'",
-      "fix": "Changed to 'picfwversion'",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "js"
-      ],
-      "related_bugs": [],
-      "occurrences": 3,
-      "last_seen": "2026-05-29T21:40:42.785Z"
-    },
-    {
-      "id": "bug-090",
-      "timestamp": "2026-05-29T21:41:21.633Z",
-      "error_message": "Incorrect value in code",
-      "file": "src/OTGW-firmware/restAPI.ino",
-      "root_cause": "Had \"picavailable\"",
-      "fix": "Changed to \"littlefsMounted\"",
-      "tags": [
-        "auto-detected",
-        "wrong-value",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T21:41:21.633Z"
-    },
-    {
-      "id": "bug-091",
-      "timestamp": "2026-05-29T21:49:14.792Z",
-      "error_message": "Wrong reference: ESP should be platformFreeHeap",
-      "file": "src/OTGW-firmware/OLED.ino",
-      "root_cause": "Used \"ESP\" instead of \"platformFreeHeap\"",
-      "fix": "Changed ESP → platformFreeHeap",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T21:49:14.792Z"
-    },
-    {
-      "id": "bug-092",
-      "timestamp": "2026-05-29T21:52:00.788Z",
-      "error_message": "Wrong reference: ifndef should be HAS_WEATHER_FORECAST",
-      "file": "src/OTGW-firmware/SATweather.ino",
-      "root_cause": "Used \"ifndef\" instead of \"HAS_WEATHER_FORECAST\"",
-      "fix": "Changed ifndef → HAS_WEATHER_FORECAST",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 4,
-      "last_seen": "2026-05-29T21:54:08.694Z"
-    },
-    {
-      "id": "bug-093",
-      "timestamp": "2026-05-29T21:54:28.901Z",
-      "error_message": "Wrong reference: defined should be HAS_SAT_BLE",
-      "file": "src/OTGW-firmware/SATble.ino",
-      "root_cause": "Used \"defined\" instead of \"HAS_SAT_BLE\"",
-      "fix": "Changed defined → HAS_SAT_BLE",
-      "tags": [
-        "auto-detected",
-        "wrong-reference",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T21:54:28.901Z"
-    },
-    {
-      "id": "bug-094",
-      "timestamp": "2026-05-29T21:54:44.258Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/restAPI.ino",
-      "root_cause": "9 lines replaced/restructured",
-      "fix": "Rewrote 9→4 lines (9 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T21:54:44.258Z"
-    },
-    {
-      "id": "bug-095",
-      "timestamp": "2026-05-29T21:54:52.804Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/handleDebug.ino",
-      "root_cause": "9 lines replaced/restructured",
-      "fix": "Rewrote 9→4 lines (9 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T21:54:52.804Z"
-    },
-    {
-      "id": "bug-096",
-      "timestamp": "2026-05-29T21:54:59.264Z",
-      "error_message": "Wrong return value",
-      "file": "src/OTGW-firmware/MQTTstuff.ino",
-      "root_cause": "Was returning: ESP.getFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD;",
-      "fix": "Now returns: platformFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD;",
-      "tags": [
-        "auto-detected",
-        "return-value",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T21:54:59.264Z"
-    },
-    {
-      "id": "bug-097",
-      "timestamp": "2026-05-29T22:14:23.137Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/SATtypes.h",
-      "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 11→13 lines (3 removed) | Also: #if defined(ESP32); // BLE temperature sensor (Task #20, ESP32 only)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "h"
-      ],
-      "related_bugs": [],
-      "occurrences": 2,
-      "last_seen": "2026-05-29T22:14:34.178Z"
-    },
-    {
-      "id": "bug-098",
-      "timestamp": "2026-05-29T22:14:55.616Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/settingStuff.ino",
-      "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 3→4 lines (2 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T22:14:55.616Z"
-    },
-    {
-      "id": "bug-099",
-      "timestamp": "2026-05-29T22:17:27.561Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/OTGW-firmware.h",
-      "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 4→6 lines (2 removed)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "h"
-      ],
-      "related_bugs": [],
-      "occurrences": 1,
-      "last_seen": "2026-05-29T22:17:27.561Z"
-    },
-    {
-      "id": "bug-100",
-      "timestamp": "2026-05-29T22:18:19.484Z",
-      "error_message": "Significant refactor of ",
-      "file": "src/OTGW-firmware/SATcontrol.ino",
-      "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 5→4 lines (3 removed) | Also: #if defined(ESP32); #endif | Also: #if defined(ESP32); // Initialize BLE sensor scanning (Task #20)",
-      "tags": [
-        "auto-detected",
-        "refactor",
-        "ino"
-      ],
-      "related_bugs": [],
-      "occurrences": 3,
-      "last_seen": "2026-05-29T22:18:32.786Z"
-    }
-  ]
-}
+[
+  {
+    "id": "bug-032",
+    "timestamp": "2026-05-26T19:30:00.000Z",
+    "error_message": "WSL build.sh exits immediately when Python 3 is unavailable",
+    "file": "build.sh",
+    "root_cause": "Script only attempted existing interpreters/.venv and had no unattended runtime bootstrap path",
+    "fix": "Added local Miniconda-based Python bootstrap fallback, downloader abstraction, pip ensurepip/get-pip fallback, and repo PYTHONPATH export for self-contained execution",
+    "tags": [
+      "build",
+      "wsl",
+      "bootstrap",
+      "python",
+      "shell"
+    ],
+    "related_bugs": [
+      "bug-031"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-05-26T19:30:00.000Z"
+  },
+  {
+    "id": "bug-001",
+    "timestamp": "2026-05-01T17:28:33.651Z",
+    "error_message": "Significant refactor of ",
+    "file": ".claude/hooks/backlog-mcp-guard.py",
+    "root_cause": "8 lines replaced/restructured",
+    "fix": "Rewrote 10\u00e2\u2020\u201916 lines (8 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "py"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T17:28:33.651Z"
+  },
+  {
+    "id": "bug-002",
+    "timestamp": "2026-05-01T18:46:00.243Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/debugStuff.ino",
+    "root_cause": "2 lines replaced/restructured",
+    "fix": "Rewrote 6\u00e2\u2020\u20199 lines (2 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T18:46:00.243Z"
+  },
+  {
+    "id": "bug-003",
+    "timestamp": "2026-05-01T18:46:42.881Z",
+    "error_message": "Wrong condition in logic",
+    "file": "src/OTGW-firmware/OTGW-Core.ino",
+    "root_cause": "Condition was: if (strcmp(state.pic.sDeviceid, \"unknown\")",
+    "fix": "Changed to: if (strcmp_P(state.pic.sDeviceid, PSTR(\"unknown\")",
+    "tags": [
+      "auto-detected",
+      "logic-fix",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-01T18:46:50.597Z"
+  },
+  {
+    "id": "bug-004",
+    "timestamp": "2026-05-01T18:47:25.781Z",
+    "error_message": "Significant refactor of ",
+    "file": "evaluate.py",
+    "root_cause": "12 lines replaced/restructured",
+    "fix": "Rewrote 53\u00e2\u2020\u201965 lines (12 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "py"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T18:47:25.781Z"
+  },
+  {
+    "id": "bug-005",
+    "timestamp": "2026-05-01T20:33:28.244Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "Had \"SAT BLE: best sensor slot=%d mac=%s temp=%.1f age",
+    "fix": "Changed to \"SAT BLE: best sensor slot=%d mac=%s temp=%.2f age",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T20:33:28.244Z"
+  },
+  {
+    "id": "bug-006",
+    "timestamp": "2026-05-01T20:33:36.659Z",
+    "error_message": "Wrong return value",
+    "file": "src/OTGW-firmware/data/sat.js",
+    "root_cause": "Was returning: (v !== null && v !== undefined) ? v.toFixed(1) + '",
+    "fix": "Now returns: (v !== null && v !== undefined) ? v.toFixed(2) + '",
+    "tags": [
+      "auto-detected",
+      "return-value",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T20:33:36.659Z"
+  },
+  {
+    "id": "bug-007",
+    "timestamp": "2026-05-01T21:33:36.714Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "9 lines replaced/restructured",
+    "fix": "Rewrote 15\u00e2\u2020\u201927 lines (9 removed) | Also: // Find existing slot for MAC or allocate a new on; // Returns slot index (0..SAT_BLE_MAX_SENSORS-1) o",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-01T21:33:57.332Z"
+  },
+  {
+    "id": "bug-008",
+    "timestamp": "2026-05-01T21:35:42.873Z",
+    "error_message": "Wrong operator: != should be ==",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "Used \"!=\" instead of \"==\"",
+    "fix": "Changed operator != \u00e2\u2020\u2019 ==",
+    "tags": [
+      "auto-detected",
+      "operator-fix",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T21:35:42.873Z"
+  },
+  {
+    "id": "bug-009",
+    "timestamp": "2026-05-01T21:36:24.587Z",
+    "error_message": "Missing guard clause",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "No early return/throw for edge case: _bleRosterDirty",
+    "fix": "Added guard clause: if (_bleRosterDirty)",
+    "tags": [
+      "auto-detected",
+      "guard-clause",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T21:36:24.588Z"
+  },
+  {
+    "id": "bug-010",
+    "timestamp": "2026-05-01T22:13:11.583Z",
+    "error_message": "Missing guard clause",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "No early return/throw for edge case: settings.sat.sBleMAC[0] != '\\0'",
+    "fix": "Added guard clause: if (settings.sat.sBleMAC[0] != '\\0')",
+    "tags": [
+      "auto-detected",
+      "guard-clause",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T22:13:11.583Z"
+  },
+  {
+    "id": "bug-011",
+    "timestamp": "2026-05-01T22:13:51.795Z",
+    "error_message": "Missing guard clause",
+    "file": "src/OTGW-firmware/restAPI.ino",
+    "root_cause": "No early return/throw for edge case: !body",
+    "fix": "Added guard clause: if (!body)",
+    "tags": [
+      "auto-detected",
+      "guard-clause",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T22:13:51.795Z"
+  },
+  {
+    "id": "bug-012",
+    "timestamp": "2026-05-01T22:18:10.712Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "2 lines replaced/restructured",
+    "fix": "Rewrote 55\u00e2\u2020\u2019124 lines (2 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T22:18:10.712Z"
+  },
+  {
+    "id": "bug-013",
+    "timestamp": "2026-05-01T22:19:02.147Z",
+    "error_message": "Missing guard clause",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "No early return/throw for edge case: label && label[0] != '\\0'",
+    "fix": "Added guard clause: if (label && label[0] != '\\0')",
+    "tags": [
+      "auto-detected",
+      "guard-clause",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T22:19:02.147Z"
+  },
+  {
+    "id": "bug-014",
+    "timestamp": "2026-05-01T22:26:19.940Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Had \"Enable BLE (Bluetooth Low Energy) temperature sen",
+    "fix": "Changed to \"Enable BLE (Bluetooth Low Energy) temperature sen",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T22:26:19.940Z"
+  },
+  {
+    "id": "bug-015",
+    "timestamp": "2026-05-01T22:34:00.000Z",
+    "error_message": "ESP32 build: 'settingsDirty' was not declared in this scope",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "Phase-1 research suggested setting settingsDirty=true directly to trigger the settings-flush debounce, but settingsDirty is a file-static (private to settingStuff.ino:21) and not externally accessible. Cross-file write would require exposing it as extern, breaking encapsulation.",
+    "fix": "Route the dirty-trigger through updateSetting(\"SATblerostercount\", \"<n>\"). updateSetting() is the public API that already sets settingsDirty=true and RESTART_TIMER(timerFlushSettings) at lines 979-980. Same effect, encapsulation preserved.",
+    "tags": [
+      "task-508",
+      "settings",
+      "encapsulation",
+      "cross-task-write",
+      "compile-error"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T22:34:00.000Z"
+  },
+  {
+    "id": "bug-016",
+    "timestamp": "2026-05-01T22:34:30.000Z",
+    "error_message": "ESP32 -Wvolatile deprecation warning on chained volatile-qualified assignment",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "TASK-506 wrote `a = b = c = d = e = 0;` where all targets are volatile uint32_t. C++20 (DR2138) deprecates this idiom: the value of an assignment to a volatile lvalue is itself volatile and chaining propagates that. ESP8266 toolchain accepts it; ESP32-S3 xtensa-esp gcc warns.",
+    "fix": "Reset each counter on its own line. Verbose but C++20-clean and forward-compatible.",
+    "tags": [
+      "task-508",
+      "cpp20",
+      "volatile",
+      "deprecation"
+    ],
+    "related_bugs": [
+      "bug-015"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T22:34:30.000Z"
+  },
+  {
+    "id": "bug-017",
+    "timestamp": "2026-05-01T22:35:00.000Z",
+    "error_message": "PreToolUse hook blocked Edit on data/index.js: innerHTML with untrusted content",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "First version of buildBleSensorsPanel() / renderBleRoster() built panel HTML via .innerHTML with template-string-interpolated user data. Even with an HTML-escape helper for labels and strict regex MAC validation, the security hook blocks innerHTML on principle when interpolation touches user-controlled text.",
+    "fix": "Refactored to pure DOM API: createElement + textContent + appendChild for every node. No innerHTML anywhere in the new BLE panel code. Sensor labels go through textContent which the browser cannot interpret as HTML.",
+    "tags": [
+      "task-508",
+      "xss",
+      "security-hook",
+      "dom-api",
+      "ui"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-01T22:35:00.000Z"
+  },
+  {
+    "id": "bug-018",
+    "timestamp": "2026-05-02T11:23:53.715Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Had \"How often to fetch weather data in seconds (300-3",
+    "fix": "Changed to \"How often to fetch weather data in seconds (900-3",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-02T11:23:53.715Z"
+  },
+  {
+    "id": "bug-019",
+    "timestamp": "2026-05-02T11:24:23.384Z",
+    "error_message": "Significant refactor of ",
+    "file": "plan/feature-openweathermap-onboarding-1.md",
+    "root_cause": "2 lines replaced/restructured",
+    "fix": "Rewrote 5\u00e2\u2020\u20195 lines (2 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-02T11:24:23.385Z"
+  },
+  {
+    "id": "bug-020",
+    "timestamp": "2026-05-02T11:27:38.102Z",
+    "error_message": "Wrong condition in logic",
+    "file": "src/OTGW-firmware/SATweather.ino",
+    "root_cause": "Condition was: if (state.sat.Toutside != 0)",
+    "fix": "Changed to: if (OTcurrentSystemState.Toutside != 0.0f)",
+    "tags": [
+      "auto-detected",
+      "logic-fix",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-02T11:27:38.102Z"
+  },
+  {
+    "id": "bug-021",
+    "timestamp": "2026-05-05T23:02:00.000Z",
+    "error_message": "TASK-530 field reports interpreted `hd_drip_cooldown_skip` on ESP32-S3 as heap-threshold throttling, but the counter was actually driven by the post-status-burst cooldown gate inherited from ESP8266 pacing.",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "The 2.0.0 branch used one discovery-drip policy for both ESP8266 and ESP32. On ESP32, the 2000ms post-burst cooldown and ESP8266-oriented drip guard comments made normal discovery pacing look like heap pressure even when free heap and max alloc block were healthy.",
+    "fix": "Made the discovery-drip policy platform-aware: ESP32 now uses a 250ms post-status-burst cooldown, a lower last-ditch publish floor, and an ESP32-specific slow-mode guard based on both free heap and largest allocatable block. Updated MQTT API docs to clarify that `drip_cooldown_skip` is a pacing counter and that `max_block` maps to `platformMaxFreeBlock()`.",
+    "tags": [
+      "task-530",
+      "mqtt",
+      "discovery",
+      "esp32",
+      "heapdiag"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-05T23:02:00.000Z"
+  },
+  {
+    "id": "bug-022",
+    "timestamp": "2026-05-05T23:45:00.000Z",
+    "error_message": "Rapid WebUI reloads could leave stale OT-log WebSocket clients alive long enough to exhaust the three-client limit before the firmware reaped them.",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "The 2.0.0 WebUI kept the OT-log WebSocket open when a tab was hidden and did not explicitly close it on page unload or reload. A burst of reloads could therefore stack old sockets faster than heartbeat cleanup reclaimed them, making the next page instance look like a firmware freeze.",
+    "fix": "Added pagehide/beforeunload OT-log shutdown in index.js, persisted the OT-log buffer before unload, cancelled delayed reconnect timers, and delayed the next main-page reconnect by 250 ms. Added 5-second WebSocket burst diagnostics in webSocketStuff.ino so reload retests can distinguish churn from max-client, low-heap, or error bursts.",
+    "tags": [
+      "task-431",
+      "webui",
+      "websocket",
+      "reload-storm",
+      "diagnostics"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-05T23:45:00.000Z"
+  },
+  {
+    "id": "bug-023",
+    "timestamp": "2026-05-18T05:01:56.113Z",
+    "error_message": "Significant refactor of ",
+    "file": "docs/adr/ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md",
+    "root_cause": "3 lines replaced/restructured",
+    "fix": "Rewrote 3\u00e2\u2020\u20198 lines (3 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-18T05:01:56.113Z"
+  },
+  {
+    "id": "bug-024",
+    "timestamp": "2026-05-18T08:37:00.650Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "2 lines replaced/restructured",
+    "fix": "Rewrote 14\u00e2\u2020\u201920 lines (2 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-18T08:37:00.650Z"
+  },
+  {
+    "id": "bug-025",
+    "timestamp": "2026-05-19T16:18:19.434Z",
+    "error_message": "Wrong condition in logic",
+    "file": "src/OTGW-firmware/OTGW-Core.ino",
+    "root_cause": "Condition was: if (OT.rsptype == OTGW_ANSWER_THERMOSTAT)",
+    "fix": "Changed to: if (OT.rsptype == OTGW_ANSWER_THERMOSTAT && OT.bAnswer)",
+    "tags": [
+      "auto-detected",
+      "logic-fix",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-19T16:18:19.434Z"
+  },
+  {
+    "id": "bug-026",
+    "timestamp": "2026-05-19T16:18:31.878Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "3 lines replaced/restructured",
+    "fix": "Rewrote 13\u00e2\u2020\u201917 lines (3 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-19T16:18:31.878Z"
+  },
+  {
+    "id": "bug-027",
+    "timestamp": "2026-05-20T06:11:50.002Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/restAPI.ino",
+    "root_cause": "Had \") == 0 || strcmp(markersBuf, \"",
+    "fix": "Changed to \")) == 0 || markersBuf[0] == '",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-20T06:11:50.002Z"
+  },
+  {
+    "id": "bug-028",
+    "timestamp": "2026-05-21T20:25:14.662Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "3 lines replaced/restructured",
+    "fix": "Rewrote 8\u00e2\u2020\u201910 lines (3 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-21T20:25:14.662Z"
+  },
+  {
+    "id": "bug-029",
+    "timestamp": "2026-05-21T21:08:28.288Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/OTGW-firmware.ino",
+    "root_cause": "4 lines replaced/restructured",
+    "fix": "Rewrote 7\u00e2\u2020\u20193 lines (4 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-21T21:08:28.288Z"
+  },
+  {
+    "id": "bug-030",
+    "timestamp": "2026-05-21T21:08:53.001Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/version.h",
+    "root_cause": "12 lines replaced/restructured",
+    "fix": "Rewrote 25\u00e2\u2020\u201911 lines (12 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "h"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-21T21:08:53.001Z"
+  },
+  {
+    "id": "bug-031",
+    "timestamp": "2026-05-26T16:58:00.000Z",
+    "error_message": "Windows build.bat failed on clean environment and later lost firmware artifacts during buildfs phase",
+    "file": "build.bat, build.py",
+    "root_cause": "build.bat required preinstalled Python and embedded Python lacked repo import path; build.py esptool auto-install could fail without setuptools/wheel; and PlatformIO buildfs on Windows could clean .pio artifacts causing missing firmware.bin before merge step.",
+    "fix": "Added portable Python bootstrap in build.bat (download + extract + pip bootstrap), repaired embedded python*._pth with repo path/import site, hardened esptool installation in build.py by preinstalling setuptools/wheel and better pip strategy, and switched to phased artifact collection (firmware first, filesystem second) to preserve binaries across build phases.",
+    "tags": [
+      "build",
+      "windows",
+      "bootstrap",
+      "platformio",
+      "esptool"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-26T16:58:00.000Z"
+  },
+  {
+    "id": "bug-033",
+    "timestamp": "2026-05-27T10:22:01.515Z",
+    "error_message": "Wrong reference: 066 should be 097",
+    "file": "docs/adr/ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md",
+    "root_cause": "Used \"066\" instead of \"097\"",
+    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T10:22:01.515Z"
+  },
+  {
+    "id": "bug-034",
+    "timestamp": "2026-05-27T10:22:24.739Z",
+    "error_message": "Wrong reference: 066 should be 097",
+    "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
+    "root_cause": "Used \"066\" instead of \"097\"",
+    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-27T10:22:30.233Z"
+  },
+  {
+    "id": "bug-035",
+    "timestamp": "2026-05-27T10:22:49.118Z",
+    "error_message": "Wrong reference: 066 should be 097",
+    "file": "docs/adr/ADR-095-bseparatesources-mutually-exclusive-base-and-source-variants.md",
+    "root_cause": "Used \"066\" instead of \"097\"",
+    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 3,
+    "last_seen": "2026-05-27T10:23:12.880Z"
+  },
+  {
+    "id": "bug-036",
+    "timestamp": "2026-05-27T10:23:34.904Z",
+    "error_message": "Wrong reference: 066 should be 097",
+    "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
+    "root_cause": "Used \"066\" instead of \"097\"",
+    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 9,
+    "last_seen": "2026-05-27T10:24:58.431Z"
+  },
+  {
+    "id": "bug-037",
+    "timestamp": "2026-05-27T10:25:04.195Z",
+    "error_message": "Incorrect value in code",
+    "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
+    "root_cause": "Had 's source semantics (publication-source \u00e2\u2020\u2019 worldvie",
+    "fix": "Changed to 's source semantics (publication-source \u00e2\u2020\u2019 worldvie",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T10:25:04.195Z"
+  },
+  {
+    "id": "bug-038",
+    "timestamp": "2026-05-27T10:25:27.129Z",
+    "error_message": "Wrong reference: 066 should be 097",
+    "file": "docs/api/MQTT.md",
+    "root_cause": "Used \"066\" instead of \"097\"",
+    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T10:25:27.129Z"
+  },
+  {
+    "id": "bug-039",
+    "timestamp": "2026-05-27T10:25:38.940Z",
+    "error_message": "Wrong reference: 066 should be 097",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "Used \"066\" instead of \"097\"",
+    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-27T10:25:45.758Z"
+  },
+  {
+    "id": "bug-040",
+    "timestamp": "2026-05-27T10:25:51.629Z",
+    "error_message": "Wrong reference: 066 should be 097",
+    "file": "src/OTGW-firmware/OTGW-Core.h",
+    "root_cause": "Used \"066\" instead of \"097\"",
+    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "h"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T10:25:51.629Z"
+  },
+  {
+    "id": "bug-041",
+    "timestamp": "2026-05-27T10:26:02.710Z",
+    "error_message": "Wrong reference: 066 should be 097",
+    "file": "src/OTGW-firmware/OTGW-Core.ino",
+    "root_cause": "Used \"066\" instead of \"097\"",
+    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 6,
+    "last_seen": "2026-05-27T10:26:44.461Z"
+  },
+  {
+    "id": "bug-042",
+    "timestamp": "2026-05-27T10:28:02.574Z",
+    "error_message": "Wrong reference: 066 should be 097",
+    "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
+    "root_cause": "Used \"066\" instead of \"097\"",
+    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T10:28:02.574Z"
+  },
+  {
+    "id": "bug-043",
+    "timestamp": "2026-05-27T12:29:57.882Z",
+    "error_message": "Wrong reference: Proposed should be Accepted",
+    "file": "docs/adr/ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md",
+    "root_cause": "Used \"Proposed\" instead of \"Accepted\"",
+    "fix": "Changed Proposed \u00e2\u2020\u2019 Accepted",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T12:29:57.882Z"
+  },
+  {
+    "id": "bug-044",
+    "timestamp": "2026-05-27T19:58:14.529Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/OTDirect.ino",
+    "root_cause": "2 lines replaced/restructured",
+    "fix": "Rewrote 9\u00e2\u2020\u201912 lines (2 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T19:58:14.529Z"
+  },
+  {
+    "id": "bug-045",
+    "timestamp": "2026-05-27T00:00:00Z",
+    "error_message": "pre-commit hook fails with exit 2: ADR-099 enforcement block has invalid guidance property under adr-kit v0.15.0 schema",
+    "file": "docs/adr/ADR-099-ha-discovery-friendly-name-format.md",
+    "root_cause": "ADR-099 enforcement block uses guidance property which was valid in earlier adr-kit versions but is not allowed by the additionalProperties:False schema in v0.14.0+",
+    "fix": "Committed with ADR_KIT_HOOK_DISABLE=1 bypass. ADR-099 enforcement block needs guidance property removed or restructured to use only allowed schema keys (forbid_pattern, forbid_import, require_pattern, llm_judge)",
+    "tags": [
+      "adr-kit",
+      "pre-commit-hook",
+      "schema-validation",
+      "ADR-099"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T00:00:00Z"
+  },
+  {
+    "id": "bug-046",
+    "timestamp": "2026-05-27T22:00:30.248Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "2 lines replaced/restructured",
+    "fix": "Rewrote 5\u21929 lines (2 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T22:00:30.248Z"
+  },
+  {
+    "id": "bug-047",
+    "timestamp": "2026-05-27T22:03:11.578Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Had 'Generic'",
+    "fix": "Changed to 'Auto-detect'",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 5,
+    "last_seen": "2026-05-27T22:03:44.358Z"
+  },
+  {
+    "id": "bug-048",
+    "timestamp": "2026-05-27T22:19:37.940Z",
+    "error_message": "Wrong condition in logic",
+    "file": "src/OTGW-firmware/OLED.ino",
+    "root_cause": "Condition was: if (oledPage >= OLED_NUM_PAGES)",
+    "fix": "Changed to: if (oledPage == 0)",
+    "tags": [
+      "auto-detected",
+      "logic-fix",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T22:19:37.940Z"
+  },
+  {
+    "id": "bug-049",
+    "timestamp": "2026-05-27T22:25:36.533Z",
+    "error_message": "Missing error handling in ipMakeOctetGroup",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+    "fix": "Added try/catch block",
+    "tags": [
+      "auto-detected",
+      "error-handling",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T22:25:36.533Z"
+  },
+  {
+    "id": "bug-050",
+    "timestamp": "2026-05-27T23:39:37.235Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Had \"legacyport25238enabled\"",
+    "fix": "Changed to \"mqttuselegacyottopics\"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-27T23:39:56.770Z"
+  },
+  {
+    "id": "bug-051",
+    "timestamp": "2026-05-27T23:50:09.904Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Had 'outputs'",
+    "fix": "Changed to 'otdirect'",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-27T23:50:09.904Z"
+  },
+  {
+    "id": "bug-052",
+    "timestamp": "2026-05-28T11:29:20.089Z",
+    "error_message": "CSS fix: margin, padding, color",
+    "file": "src/OTGW-firmware/data/components.css",
+    "root_cause": "margin: 0 0 var(--space-2) \u2192 0 0 var(--space-4); padding: var(--space-5) \u2192 var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) \u2192 var(--fg-2)",
+    "fix": "Changed margin: 0 0 var(--space-2) \u2192 0 0 var(--space-4); padding: var(--space-5) \u2192 var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) \u2192 var(--fg-2)",
+    "tags": [
+      "auto-detected",
+      "style-fix",
+      "css"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-28T11:29:20.089Z"
+  },
+  {
+    "id": "bug-053",
+    "timestamp": "2026-05-28T12:05:42.392Z",
+    "error_message": "CSS fix: grid-template-columns",
+    "file": "src/OTGW-firmware/data/components.css",
+    "root_cause": "grid-template-columns: max-content 1fr \u2192 var(--settings-label-w, max-content) 1fr",
+    "fix": "Changed grid-template-columns: max-content 1fr \u2192 var(--settings-label-w, max-content) 1fr",
+    "tags": [
+      "auto-detected",
+      "style-fix",
+      "css"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-28T12:05:42.392Z"
+  },
+  {
+    "id": "bug-054",
+    "timestamp": "2026-05-28T12:05:57.329Z",
+    "error_message": "Missing guard clause",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "No early return/throw for edge case: !page",
+    "fix": "Added guard clause: if (!page)",
+    "tags": [
+      "auto-detected",
+      "guard-clause",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-28T12:05:57.329Z"
+  },
+  {
+    "id": "bug-055",
+    "timestamp": "2026-05-29T06:14:20.079Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/data/graph.js",
+    "root_cause": "5 lines replaced/restructured",
+    "fix": "Rewrote 5\u21928 lines (5 removed) | Also: // the --fg-2 design token (ds-tokens.css) so it t; // (light = #4a4d50, dark = #e0e0e0). Fallback han",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-29T06:14:31.977Z"
+  },
+  {
+    "id": "bug-056",
+    "timestamp": "2026-05-29T06:18:37.847Z",
+    "error_message": "Missing error handling in renderBleRosterError",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+    "fix": "Added try/catch block",
+    "tags": [
+      "auto-detected",
+      "error-handling",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T06:18:37.847Z"
+  },
+  {
+    "id": "bug-057",
+    "timestamp": "2026-05-29",
+    "error_message": "BLE sensor roster empty in WebUI; user cannot select a BLE sensor (sergeantd, alpha.84, OTGW32/ESP32-S3)",
+    "file": "src/OTGW-firmware/SATble.ino (also restAPI.ino, SATweather.ino)",
+    "root_cause": "ESP32 chunked-JSON byte-ordering. The TASK-529 coalescing TX buffer (sTxBuf, jsonStuff.ino) buffers sendJsonMapEntry/sendStartJsonMap/sendBeforenext via restSendContent and flushes at restFlushContent, but satBLERosterSendJSON wrote the sensors array with raw httpServer.sendContent(_P) which bypasses the buffer and hits the socket immediately. Raw array bytes emitted BEFORE buffered wrapper -> invalid JSON (\"sensors\":[..]{meta..}) -> r.json() rejects -> .catch swallowed -> empty roster. ESP8266 unaffected (no buffer). Same defect in sendSensorStatus (restAPI.ino) and SATweather forecast block.",
+    "fix": "Route the raw array/sub-object writes through restSendContent/restSendContentP so they share the coalescing buffer and byte order is preserved. Also surfaced parse failure in index.js renderBleRoster. Shipped alpha.88 (e57e1cce).",
+    "tags": [
+      "esp32",
+      "json",
+      "rest",
+      "ble",
+      "chunked",
+      "coalescing-buffer",
+      "TASK-747",
+      "TASK-529"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29"
+  },
+  {
+    "id": "bug-058",
+    "timestamp": "2026-05-29",
+    "error_message": "Graph legend + panel-title text unreadable (dark grey) on dark theme; should be white",
+    "file": "src/OTGW-firmware/data/graph.js",
+    "root_cause": "init() derived currentTheme from localStorage(\"theme\"), wrong key. Canonical key driving body.dark + design tokens is \"otgw-theme\". On fresh load with saved dark theme, currentTheme stayed light -> ECharts used light palette/fallback (#4a4d50) on dark surface. Regression of TASK-568 (which only set the color token, not the theme source).",
+    "fix": "Derive currentTheme from document.body.classList.contains(\"dark\"); switch legend+title textStyle from --fg-2 (#e0e0e0) to --fg-1 (white in dark), fallback aligned. Shipped alpha.87 (80b25a80).",
+    "tags": [
+      "webui",
+      "echarts",
+      "dark-theme",
+      "localStorage",
+      "regression",
+      "TASK-748",
+      "TASK-568"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29"
+  },
+  {
+    "id": "bug-059",
+    "timestamp": "2026-05-29T08:44:45.896Z",
+    "error_message": "Wrong return value",
+    "file": "src/OTGW-firmware/OTGW-firmware.h",
+    "root_cause": "Was returning: strcmp_P(state.pic.sType, PSTR(\"gateway\")) == 0; }",
+    "fix": "Now returns: F(HW_TYPE_NAME);",
+    "tags": [
+      "auto-detected",
+      "return-value",
+      "h"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T08:44:45.896Z"
+  },
+  {
+    "id": "bug-060",
+    "timestamp": "2026-05-29T08:45:12.884Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/restAPI.ino",
+    "root_cause": "Had \"hardwaremode\"",
+    "fix": "Changed to \"hardware_type\"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T08:45:12.885Z"
+  },
+  {
+    "id": "bug-061",
+    "timestamp": "2026-05-29T08:46:21.829Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/OLED.ino",
+    "root_cause": "4 lines replaced/restructured",
+    "fix": "Rewrote 17\u219223 lines (4 removed) | Also: // Auto-off after timeout; if (oledPage != 0 && (now - oledLastActivity) >= O",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-29T08:47:46.549Z"
+  },
+  {
+    "id": "bug-062",
+    "timestamp": "2026-05-29T08:46:38.216Z",
+    "error_message": "Missing guard clause",
+    "file": "src/OTGW-firmware/OLED.ino",
+    "root_cause": "No early return/throw for edge case: state.net.bAPFallback",
+    "fix": "Added guard clause: if (state.net.bAPFallback)",
+    "tags": [
+      "auto-detected",
+      "guard-clause",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T08:46:38.216Z"
+  },
+  {
+    "id": "bug-063",
+    "timestamp": "2026-05-29T08:47:03.968Z",
+    "error_message": "Null/undefined access in ",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Property access on potentially null/undefined value",
+    "fix": "Added null safety (optional chaining or null check)",
+    "tags": [
+      "auto-detected",
+      "null-safety",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T08:47:03.968Z"
+  },
+  {
+    "id": "bug-064",
+    "timestamp": "2026-05-29T08:47:44.836Z",
+    "error_message": "Missing guard clause",
+    "file": "src/OTGW-firmware/networkStuff.ino",
+    "root_cause": "No early return/throw for edge case: state.net.eMode == NET_ETHERNET",
+    "fix": "Added guard clause: if (state.net.eMode == NET_ETHERNET)",
+    "tags": [
+      "auto-detected",
+      "guard-clause",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T08:47:44.836Z"
+  },
+  {
+    "id": "bug-065",
+    "timestamp": "2026-05-29T08:47:49.735Z",
+    "error_message": "Incorrect value in code",
+    "file": "docs/api/MQTT.md",
+    "root_cause": "Had \"esp8266\"",
+    "fix": "Changed to \"otgw-classic\"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T08:47:49.735Z"
+  },
+  {
+    "id": "bug-066",
+    "timestamp": "2026-05-29T08:47:57.426Z",
+    "error_message": "Wrong condition in logic",
+    "file": "src/OTGW-firmware/OLED.ino",
+    "root_cause": "Condition was: if (!keepAwake && oledPage != 0 && (now - oledLastActi)",
+    "fix": "Changed to: if (keepAwake && oledPage == 0)",
+    "tags": [
+      "auto-detected",
+      "logic-fix",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T08:47:57.426Z"
+  },
+  {
+    "id": "bug-067",
+    "timestamp": "2026-05-29T09:00:37.944Z",
+    "error_message": "Wrong reference: Proposed should be Accepted",
+    "file": "docs/adr/ADR-113-hardware-type-codepath-selection-contract.md",
+    "root_cause": "Used \"Proposed\" instead of \"Accepted\"",
+    "fix": "Changed Proposed \u2192 Accepted",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T09:00:37.944Z"
+  },
+  {
+    "id": "bug-068",
+    "timestamp": "2026-05-29",
+    "error_message": "git commit exit 1; .githooks/pre-commit exits 2 (silent in PowerShell)",
+    "file": ".githooks/pre-commit",
+    "root_cause": "MISDIAGNOSED INITIALLY as a broken python3 WindowsApps alias. Verified false: python3 --version reports Python 3.14.2 and runs adr-judge fine (resolves to pythoncore-3.14-64). The SOLE cause was adr-judge 0.15.0 rejecting ADR-099's enforcement block: the 'guidance' key is not allowed by the v0.14.0+ schema, so the judge aborted (exit 2) before evaluating any diff. Secondary observation (not the failure cause): OTGW's .githooks/pre-commit was a stale copy that hardcoded python3 and lacked the version-validated detection adr-kit's template already ships (>= v0.14.1).",
+    "fix": "Real fix: removed the 'guidance' key from ADR-099's enforcement block (mechanical schema migration; intent preserved in the ## Decision section, which the LLM judge reads). Also re-synced OTGW's pre-commit adr-kit section to mirror the canonical adr-kit template (version-validated Python detection + nullglob SemVer cache pick) to end hook drift. No adr-kit repo change needed: upstream already had robust detection.",
+    "tags": [
+      "adr-kit",
+      "pre-commit",
+      "schema-drift",
+      "ADR-099",
+      "hooks",
+      "misdiagnosis-corrected"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29"
+  },
+  {
+    "id": "bug-069",
+    "timestamp": "2026-05-29T09:29:42.595Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/settingStuff.ino",
+    "root_cause": "12 lines replaced/restructured",
+    "fix": "Rewrote 13\u21925 lines (12 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T09:29:42.595Z"
+  },
+  {
+    "id": "bug-070",
+    "timestamp": "2026-05-29T09:52:12.844Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/OTGW-firmware.ino",
+    "root_cause": "3 lines replaced/restructured",
+    "fix": "Rewrote 7\u219211 lines (3 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T09:52:12.844Z"
+  },
+  {
+    "id": "bug-071",
+    "timestamp": "2026-05-29T10:31:02.251Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "3 lines replaced/restructured",
+    "fix": "Rewrote 6\u21929 lines (3 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T10:31:02.251Z"
+  },
+  {
+    "id": "bug-072",
+    "timestamp": "2026-05-29T11:01:56.723Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/OLED.ino",
+    "root_cause": "6 lines replaced/restructured",
+    "fix": "Rewrote 12\u21925 lines (6 removed) | Also: #if defined(ESP32); static QueueHandle_t _oledBtnQueue = nullptr; | Also: // Button ISR for page cycling \u2014 ESP-IDF GPIO API ; // Queue carries the press timestamp (us); debounc",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 3,
+    "last_seen": "2026-05-29T11:02:39.033Z"
+  },
+  {
+    "id": "bug-073",
+    "timestamp": "2026-05-29T11:10:00.000Z",
+    "error_message": "cc1plus.exe: fatal error: src/OTGW-firmware/OTGW-firmware.ino.cpp: No such file or directory (esp32 firmware FAILED)",
+    "file": ".pio/build/esp32",
+    "root_cause": "Ran 'pio run -e esp8266' and 'pio run -e esp32' in parallel in the same worktree. The arduino sketch-concat step (.ino -> .ino.cpp) shares an intermediate across envs, so the two concurrent runs raced and the esp32 .ino.cpp was missing at compile time. Separate .pio/build/<env> dirs are NOT enough isolation; the concat step collides. Filesystem builds (buildfs, no concat) parallelize fine.",
+    "fix": "rm -rf .pio/build/esp32 then rebuild solo: 'pio run -e esp32' -> SUCCESS (Flash 95.2%). For genuinely parallel firmware builds use separate git worktrees, not just separate pio envs.",
+    "tags": [
+      "build",
+      "platformio",
+      "parallel",
+      "esp32",
+      "ino-concat",
+      "worktree"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T11:10:00.000Z"
+  },
+  {
+    "id": "bug-074",
+    "timestamp": "2026-05-29T17:18:43.298Z",
+    "error_message": "Significant refactor of ",
+    "file": "C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/feedback_default_milestone_2_0_0.md",
+    "root_cause": "3 lines replaced/restructured",
+    "fix": "Rewrote 5\u21925 lines (3 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T17:18:43.298Z"
+  },
+  {
+    "id": "bug-075",
+    "timestamp": "2026-05-29T17:41:34.744Z",
+    "error_message": "Incorrect value in code",
+    "file": "_tmp_settings_harness.html",
+    "root_cause": "Had \"src/OTGW-firmware/data/components.css\"",
+    "fix": "Changed to \"src/OTGW-firmware/data/components.css?v=fix763\"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "html"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T17:41:34.744Z"
+  },
+  {
+    "id": "bug-076",
+    "timestamp": "2026-05-29",
+    "error_message": "Settings cards render full-width with inputs flung to far right (both themes); grid/subgrid compact layout broken on OTGW32 alpha.92",
+    "file": "src/OTGW-firmware/data/index.js, src/OTGW-firmware/data/components.css",
+    "root_cause": "Regression from 1a01bb82. normalizeSettingsLabelWidth() measured all .settings-group-body .settings-field-container including the WiFi-scan panel heading + full-width <p> (which reuse that class), poisoning --settings-label-w. Also #wifi-scan-panel was a plain grid item whose wide max-content inflated the label column track, stretching every label.",
+    "fix": "Scoped the measurement selector to .settings-group-body .settingDiv > .settings-field-container (real row labels only); added CSS .settings-group-body > #wifi-scan-panel { grid-column: 1 / -1 } so the panel spans both columns like .fixed-ip-section. Verified in a Playwright harness: labelVar 276px, cards 520px.",
+    "tags": [
+      "webui",
+      "settings",
+      "css",
+      "grid",
+      "subgrid",
+      "regression",
+      "TASK-763"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29"
+  },
+  {
+    "id": "bug-077",
+    "timestamp": "2026-05-29T17:57:43.524Z",
+    "error_message": "Wrong operator: || should be !=",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "Used \"||\" instead of \"!=\"",
+    "fix": "Changed operator || \u2192 !=",
+    "tags": [
+      "auto-detected",
+      "operator-fix",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T17:57:43.524Z"
+  },
+  {
+    "id": "bug-078",
+    "timestamp": "2026-05-29T17:58:04.173Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/settingStuff.ino",
+    "root_cause": "Had \"SATblemac\"",
+    "fix": "Changed to \"SATblefailover\"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-29T17:58:16.953Z"
+  },
+  {
+    "id": "bug-079",
+    "timestamp": "2026-05-29T17:58:31.353Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/restAPI.ino",
+    "root_cause": "Had \"), CSTR(settings.sat.sBleMAC), \"",
+    "fix": "Changed to \"), settings.sat.bBleFailover, \"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-29T17:58:49.706Z"
+  },
+  {
+    "id": "bug-080",
+    "timestamp": "2026-05-29T17:59:17.624Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "Had \"ble_mac\"",
+    "fix": "Changed to \"ble_failover\"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T17:59:17.624Z"
+  },
+  {
+    "id": "bug-081",
+    "timestamp": "2026-05-29T17:59:46.094Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Had \"SATblemac\"",
+    "fix": "Changed to \"SATblefailover\"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-29T18:01:15.360Z"
+  },
+  {
+    "id": "bug-082",
+    "timestamp": "2026-05-29T18:28:06.290Z",
+    "error_message": "Significant refactor of ",
+    "file": "../adr-kit/templates/githooks/pre-commit",
+    "root_cause": "3 lines replaced/restructured",
+    "fix": "Rewrote 6\u219211 lines (3 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "unknown"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T18:28:06.290Z"
+  },
+  {
+    "id": "bug-083",
+    "timestamp": "2026-05-29T18:44:48.721Z",
+    "error_message": "Missing error handling in start",
+    "file": "src/OTGW-firmware/data/sat.js",
+    "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+    "fix": "Added try/catch block",
+    "tags": [
+      "auto-detected",
+      "error-handling",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T18:44:48.721Z"
+  },
+  {
+    "id": "bug-084",
+    "timestamp": "2026-05-29T19:17:57.290Z",
+    "error_message": "CSS fix: Light, --input-bg, --input-bg-changed",
+    "file": "src/OTGW-firmware/data/ds-tokens.css",
+    "root_cause": "Light: white on the \u2192 keep the white field on the light-blue rows. */; --input-bg: #ffffff \u2192 var(--bg-surface); --input-bg-changed: #e6e8ea \u2192 var(--bg-muted)",
+    "fix": "Changed Light: white on the \u2192 keep the white field on the light-blue rows. */; --input-bg: #ffffff \u2192 var(--bg-surface); --input-bg-changed: #e6e8ea \u2192 var(--bg-muted)",
+    "tags": [
+      "auto-detected",
+      "style-fix",
+      "css"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T19:17:57.290Z"
+  },
+  {
+    "id": "bug-085",
+    "timestamp": "2026-05-29T19:18:25.760Z",
+    "error_message": "CSS fix: background",
+    "file": "src/OTGW-firmware/data/components.css",
+    "root_cause": "background: var(--bg-surface) \u2192 var(--input-bg)",
+    "fix": "Changed background: var(--bg-surface) \u2192 var(--input-bg)",
+    "tags": [
+      "auto-detected",
+      "style-fix",
+      "css"
+    ],
+    "related_bugs": [],
+    "occurrences": 3,
+    "last_seen": "2026-05-29T19:18:41.474Z"
+  },
+  {
+    "id": "bug-086",
+    "timestamp": "2026-05-29T20:26:48.100Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "4 lines replaced/restructured",
+    "fix": "Rewrote 7\u21926 lines (4 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T20:26:48.100Z"
+  },
+  {
+    "id": "bug-087",
+    "timestamp": "2026-05-29T20:30:34.358Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/restAPI.ino",
+    "root_cause": "Had \"picavailable\"",
+    "fix": "Changed to \"littlefsMounted\"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-29T20:31:22.625Z"
+  },
+  {
+    "id": "bug-088",
+    "timestamp": "2026-05-29T22:40:32.895724",
+    "error_message": "id-254 SAT flame_status HA discovery entity was never published",
+    "file": "src/OTGW-firmware/MQTTHaDiscovery.cpp",
+    "root_cause": "mqttHaSensors[] held 386 rows but MQTT_HA_SENSOR_COUNT was 385. Discovery loop in doAutoConfigureMsgid (MQTTstuff.ino:2330) is `while (sIdx < MQTT_HA_SENSOR_COUNT)`; id 254 flame_status has first index 385, so 385<385 is false and the row was skipped. Latent off-by-one introduced when the id-254 row was added without bumping COUNT.",
+    "fix": "TASK-754 removed the deprecated picavailable sensor row (ADR-113 stage 2), bringing the table to 385 rows == COUNT. id 254 first index is now 384 < 385, so flame_status (live publisher at SATcontrol.ino:2186) discovers correctly. Index offsets for ids 250-254 decremented by 1; evaluate.py HA Sensor Index Consistency PASS.",
+    "tags": [
+      "mqtt",
+      "ha-discovery",
+      "off-by-one",
+      "sensor-index",
+      "adr-113",
+      "task-754"
+    ],
+    "related_bugs": [
+      "bug-087"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T22:40:32.895724"
+  },
+  {
+    "id": "bug-089",
+    "timestamp": "2026-05-29T21:39:34.927Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "Had 'picavailable'",
+    "fix": "Changed to 'picfwversion'",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "js"
+    ],
+    "related_bugs": [],
+    "occurrences": 3,
+    "last_seen": "2026-05-29T21:40:42.785Z"
+  },
+  {
+    "id": "bug-090",
+    "timestamp": "2026-05-29T21:41:21.633Z",
+    "error_message": "Incorrect value in code",
+    "file": "src/OTGW-firmware/restAPI.ino",
+    "root_cause": "Had \"picavailable\"",
+    "fix": "Changed to \"littlefsMounted\"",
+    "tags": [
+      "auto-detected",
+      "wrong-value",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T21:41:21.633Z"
+  },
+  {
+    "id": "bug-091",
+    "timestamp": "2026-05-29T21:49:14.792Z",
+    "error_message": "Wrong reference: ESP should be platformFreeHeap",
+    "file": "src/OTGW-firmware/OLED.ino",
+    "root_cause": "Used \"ESP\" instead of \"platformFreeHeap\"",
+    "fix": "Changed ESP \u2192 platformFreeHeap",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T21:49:14.792Z"
+  },
+  {
+    "id": "bug-092",
+    "timestamp": "2026-05-29T21:52:00.788Z",
+    "error_message": "Wrong reference: ifndef should be HAS_WEATHER_FORECAST",
+    "file": "src/OTGW-firmware/SATweather.ino",
+    "root_cause": "Used \"ifndef\" instead of \"HAS_WEATHER_FORECAST\"",
+    "fix": "Changed ifndef \u2192 HAS_WEATHER_FORECAST",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 4,
+    "last_seen": "2026-05-29T21:54:08.694Z"
+  },
+  {
+    "id": "bug-093",
+    "timestamp": "2026-05-29T21:54:28.901Z",
+    "error_message": "Wrong reference: defined should be HAS_SAT_BLE",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "Used \"defined\" instead of \"HAS_SAT_BLE\"",
+    "fix": "Changed defined \u2192 HAS_SAT_BLE",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T21:54:28.901Z"
+  },
+  {
+    "id": "bug-094",
+    "timestamp": "2026-05-29T21:54:44.258Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/restAPI.ino",
+    "root_cause": "9 lines replaced/restructured",
+    "fix": "Rewrote 9\u21924 lines (9 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T21:54:44.258Z"
+  },
+  {
+    "id": "bug-095",
+    "timestamp": "2026-05-29T21:54:52.804Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/handleDebug.ino",
+    "root_cause": "9 lines replaced/restructured",
+    "fix": "Rewrote 9\u21924 lines (9 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T21:54:52.804Z"
+  },
+  {
+    "id": "bug-096",
+    "timestamp": "2026-05-29T21:54:59.264Z",
+    "error_message": "Wrong return value",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "Was returning: ESP.getFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD;",
+    "fix": "Now returns: platformFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD;",
+    "tags": [
+      "auto-detected",
+      "return-value",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T21:54:59.264Z"
+  },
+  {
+    "id": "bug-097",
+    "timestamp": "2026-05-29T22:14:23.137Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/SATtypes.h",
+    "root_cause": "3 lines replaced/restructured",
+    "fix": "Rewrote 11\u219213 lines (3 removed) | Also: #if defined(ESP32); // BLE temperature sensor (Task #20, ESP32 only)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "h"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-05-29T22:14:34.178Z"
+  },
+  {
+    "id": "bug-098",
+    "timestamp": "2026-05-29T22:14:55.616Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/settingStuff.ino",
+    "root_cause": "2 lines replaced/restructured",
+    "fix": "Rewrote 3\u21924 lines (2 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T22:14:55.616Z"
+  },
+  {
+    "id": "bug-099",
+    "timestamp": "2026-05-29T22:17:27.561Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/OTGW-firmware.h",
+    "root_cause": "2 lines replaced/restructured",
+    "fix": "Rewrote 4\u21926 lines (2 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "h"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-29T22:17:27.561Z"
+  },
+  {
+    "id": "bug-100",
+    "timestamp": "2026-05-29T22:18:19.484Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/SATcontrol.ino",
+    "root_cause": "3 lines replaced/restructured",
+    "fix": "Rewrote 5\u21924 lines (3 removed) | Also: #if defined(ESP32); #endif | Also: #if defined(ESP32); // Initialize BLE sensor scanning (Task #20)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 3,
+    "last_seen": "2026-05-29T22:18:32.786Z"
+  },
+  {
+    "id": "bug-101",
+    "timestamp": "2026-05-30T13:47:18.136Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/OLED.ino",
+    "root_cause": "10 lines replaced/restructured",
+    "fix": "Rewrote 23\u219227 lines (10 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-30T13:47:18.136Z"
+  },
+  {
+    "id": "bug-102",
+    "timestamp": "2026-05-30T20:41:21.074Z",
+    "error_message": "Significant refactor of ",
+    "file": "src/OTGW-firmware/SATcycles.ino",
+    "root_cause": "7 lines replaced/restructured",
+    "fix": "Rewrote 9\u21923 lines (7 removed) | Also: // 180 slots on ESP32 = 180s tail. ESP8266 caps at; #if defined(ESP8266) | Also: // ESP8266:   7 days x 4 bytes =   28 bytes SRAM (; // ESP32:    30 days x 4 bytes =  120 bytes SRAM ( | Also: #if defined(ESP8266); static uint8_t  _flow_sampleHead  = 0;  // next wr | Also: #if defined(ESP8266); static uint8_t  _hcr_sHead    = 0;          // nex",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "ino"
+    ],
+    "related_bugs": [],
+    "occurrences": 5,
+    "last_seen": "2026-05-30T20:43:15.829Z"
+  },
+  {
+    "id": "bug-103",
+    "timestamp": "2026-05-30T20:41:57.411Z",
+    "error_message": "Wrong reference: SAT_WIN4H_SIZE should be buffer",
+    "file": "src/OTGW-firmware/SATtypes.h",
+    "root_cause": "Used \"SAT_WIN4H_SIZE\" instead of \"buffer\"",
+    "fix": "Changed SAT_WIN4H_SIZE \u2192 buffer",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "h"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-30T20:41:57.411Z"
+  },
+  {
+    "id": "bug-104",
+    "timestamp": "2026-05-30T21:24:33.837Z",
+    "error_message": "Wrong reference: 109 should be 061",
+    "file": "docs/adr/ADR-117-per-board-constants-in-boards-h.md",
+    "root_cause": "Used \"109\" instead of \"061\"",
+    "fix": "Changed 109 \u2192 061",
+    "tags": [
+      "auto-detected",
+      "wrong-reference",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 3,
+    "last_seen": "2026-05-30T21:24:40.893Z"
+  },
+  {
+    "id": "bug-105",
+    "timestamp": "2026-05-30T21:28:24.621Z",
+    "error_message": "Significant refactor of ",
+    "file": "docs/adr/ADR-115-per-board-constants-in-boards-h.md",
+    "root_cause": "2 lines replaced/restructured",
+    "fix": "Rewrote 6\u219218 lines (2 removed)",
+    "tags": [
+      "auto-detected",
+      "refactor",
+      "md"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-30T21:28:24.622Z"
+  },
+  {
+    "id": "bug-106",
+    "timestamp": "2026-05-30T21:40:42.533Z",
+    "error_message": "Wrong return value",
+    "file": "src/OTGW-firmware/platform_esp32.h",
+    "root_cause": "Was returning: ESP.getFreeHeap();",
+    "fix": "Now returns: WiFi.encryptionType(i) != WIFI_AUTH_OPEN;",
+    "tags": [
+      "auto-detected",
+      "return-value",
+      "h"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-30T21:40:42.533Z"
+  },
+  {
+    "id": "bug-107",
+    "timestamp": "2026-05-30",
+    "error_message": "Duplicate inline platformWiFiIsEncrypted() in platform_esp32.h committed+pushed (9fa1f6f4); ESP32 redefinition masked by build.py exit 0",
+    "file": "src/OTGW-firmware/platform_esp32.h",
+    "root_cause": "Two Edit calls inserted the same shim at the same anchor (first edit shifted the anchor, second re-inserted). build.py wrapper returns 0 even when a per-env PlatformIO compile fails, so the duplicate-definition error was not surfaced by the wrapper exit code.",
+    "fix": "Removed the duplicate copy; rebuilt and verified per-env: esp8266 SUCCESS AND esp32 SUCCESS by grepping the build log, not trusting the wrapper exit. Lesson: always verify per-env SUCCESS lines in the build log.",
+    "tags": [
+      "build.py",
+      "esp-abstraction",
+      "platform-shim",
+      "redefinition",
+      "TASK-743"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-05-30"
+  }
+]
