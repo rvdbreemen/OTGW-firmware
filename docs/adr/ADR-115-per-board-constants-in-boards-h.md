@@ -1,30 +1,42 @@
 ---
-id: ADR-117
+id: ADR-115
 title: Per-Board Numeric Constants and Typedefs Live in boards.h
-status: Proposed
+status: Accepted
 date: 2026-05-30
 tags: [architecture, esp32, abstraction, portability, boards]
 supersedes: []
 superseded_by: []
-related: [ADR-109, ADR-051, ADR-079]
+related: [ADR-061, ADR-051, ADR-079]
 deciders: [Robert van den Breemen]
 ---
 
-# ADR-117: Per-Board Numeric Constants and Typedefs Live in boards.h
+# ADR-115: Per-Board Numeric Constants and Typedefs Live in boards.h
 
 ## Status
-Proposed
+
+Accepted. Date: 2026-05-30.
+
+**Decision Maker:** User: Robert van den Breemen (requested a new ADR for this Tier 3 choice).
+
+## Status History
+
+status_history:
+  - date: 2026-05-30
+    status: Accepted
+    changed_by: User
+    reason: Documents the boards.h home chosen in TASK-743 Tier 3a; implementation already landed (commit d4be6d4e, alpha.106) and builds green on both targets
+    changed_via: adr-kit
 
 ## Context
 
-ADR-109 established the ESP32 platform abstraction layer and assigned three
-homes for platform-divergent code:
+ADR-061 established the unified ESP8266/ESP32 platform abstraction layer and
+assigned homes for platform-divergent code:
 
 - `platform.h` + `platform_esp8266.h` / `platform_esp32.h` — divergent **APIs**,
   wrapped behind `platformXxx()` shims and type aliases.
 - `boards.h` — board-level **pin maps** and `HAS_*` capability flags.
 
-ADR-109 did not say where a third category belongs: per-board **compile-time
+ADR-061 did not say where a third category belongs: per-board **compile-time
 numeric tuning constants** (buffer sizes, ring depths, heap floors, cooldown
 windows) and the **integer typedefs** whose width depends on those sizes. Before
 TASK-743 these lived inline in the application files behind raw
@@ -63,7 +75,7 @@ them** live in `boards.h`, inside the existing per-board
 `#if defined(BOARD_NODOSHOP_*)` blocks — **not** in `platform_*.h` and **not**
 inline behind raw `#if defined(ESP8266)` in application files.
 
-This amends ADR-109's home assignment as follows:
+This amends ADR-061's home assignment as follows:
 
 | Category | Home |
 |---|---|
@@ -105,13 +117,13 @@ Concrete constants relocated under this decision (TASK-743 Tier 3a):
 
 ## Enforcement
 
-Guideline-level under ADR-080, sharing ADR-109's CI gate:
+Guideline-level under ADR-080, sharing the ESP-abstraction CI gate:
 `evaluate.py::check_esp_abstraction_boundary()`. Moving a constant out of an
 application file into `boards.h` removes its raw `#ifdef` from the scan, so the
 baseline ratchet already rewards compliance and blocks regression. No separate
 gate is added; the existing boundary scan is the mechanism.
 
 ## Related
-- ADR-109: ESP32 Platform Abstraction Layer (this ADR amends its home-assignment)
+- ADR-061: Unified ESP8266/ESP32 Platform Abstraction (this ADR amends its home-assignment for board-numeric constants)
 - ADR-051: Settings/State architecture (Hungarian-prefixed config lives in structs; this ADR covers compile-time board constants, a distinct category)
 - ADR-079: Per-component type headers (`<Component>types.h`); board-sized typedefs that several components share live in `boards.h` rather than any one component header

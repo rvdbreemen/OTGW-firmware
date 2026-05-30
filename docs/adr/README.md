@@ -324,6 +324,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-072: SAT Platform Compatibility Layer — ESP8266 vs OTGW32](ADR-072-sat-platform-compatibility-layer.md)** 🆕  
   ESP8266 vs OTGW32 differences are encapsulated in the SAT subsystem so the controller code stays platform-neutral; drives buffer sizing, peripheral availability, and timing parameters per platform.
 
+- **[ADR-115: Per-Board Numeric Constants and Typedefs Live in boards.h](ADR-115-per-board-constants-in-boards-h.md)** 🆕  
+  Amends ADR-061's home-assignment: per-board compile-time numeric tuning constants (buffer/ring sizes, heap floors, timing windows) and the typedefs whose width depends on them live in `boards.h`, not `platform_*.h` and not inline behind raw `#if defined(ESP8266)`. Dividing line: `platform_*.h` = behaviour, `boards.h` = capacity. Documents the TASK-743 Tier 3a choice.
+
 ### SAT Subsystem
 
 - **[ADR-085: SAT (Smart Autotune Thermostat) Integration](ADR-085-sat-smart-autotune-thermostat-integration.md)** 🆕  
