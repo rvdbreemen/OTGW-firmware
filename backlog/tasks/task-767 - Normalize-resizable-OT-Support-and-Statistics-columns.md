@@ -1,7 +1,7 @@
 ---
 id: TASK-767
 title: Normalize resizable OT Support and Statistics columns
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-30 11:37'
