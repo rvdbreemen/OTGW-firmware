@@ -18,10 +18,10 @@ Make the OT support and Statistics tab tables choose column widths from their wi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each OT support and Statistics table column sizes from the widest visible header or cell text for that column.
-- [ ] #2 The table total width is derived from the sum of computed column widths instead of a fixed or uniform width.
-- [ ] #3 Computed table width is capped to the available viewport/container width so the table never exceeds the visible area.
-- [ ] #4 Existing manual column dragging remains usable after the automatic sizing changes.
+- [x] #1 Each OT support and Statistics table column sizes from the widest visible header or cell text for that column.
+- [x] #2 The table total width is derived from the sum of computed column widths instead of a fixed or uniform width.
+- [x] #3 Computed table width is capped to the available viewport/container width so the table never exceeds the visible area.
+- [x] #4 Existing manual column dragging remains usable after the automatic sizing changes.
 <!-- AC:END -->
 
 ## Implementation Plan
