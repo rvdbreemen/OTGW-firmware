@@ -1,9 +1,11 @@
 ---
 id: TASK-767
 title: Make OT Support columns resizable
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-30 11:37'
+updated_date: '2026-05-30 11:38'
 labels:
   - ui ot-support
 dependencies: []
