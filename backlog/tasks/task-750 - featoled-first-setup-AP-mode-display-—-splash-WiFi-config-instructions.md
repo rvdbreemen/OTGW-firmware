@@ -1,11 +1,11 @@
 ---
 id: TASK-750
 title: 'feat(oled): first-setup / AP-mode display — splash + WiFi config instructions'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-29 08:34'
-updated_date: '2026-05-30 13:47'
+updated_date: '2026-05-30 14:12'
 labels: []
 dependencies: []
 priority: medium
@@ -20,7 +20,7 @@ Field feedback (tjfs, alpha.84, OTGW32): nothing useful on the OLED when booting
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 OLED shows an AP/config-mode screen with the AP SSID and the config URL (192.168.4.1) when unconfigured
-- [ ] #2 Boot splash present (flame icon per Robert's spec)
+- [x] #2 Boot splash present (flame icon per Robert's spec)
 - [x] #3 Distinct display states for first-setup vs boot vs running, per Robert's spec
 - [x] #4 Gated behind HAS_OLED_CAPABLE; ESP8266 unaffected
 <!-- AC:END -->
@@ -34,3 +34,9 @@ Code status after this session: AC#1 (AP/config screen with SSID + http://192.16
 
 alpha.105: AC#2 implemented. Real 16x16 flame bitmap on boot splash via raw GDDRAM column writes (ssd1306WriteRam) — no framebuffer, +0 RAM, no library swap (SSD1306Ascii kept). FLAME16[32] PROGMEM (column-major, 2 pages), oledDrawFlame() helper at OLED.ino. Splash relaid out: flame top-centre rows0-1, 2X title rows2-3, 'OpenTherm Gateway' row4, hints rows6-7. File-header comment corrected (was 'no bitmap'). evaluate.py --quick 0-fail. Build pending. AC#2 code-done; on-hardware 128x64 validation still outstanding.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Boot-splash flame icon shipped in 2.0.0-alpha.105 (commit 53fbcb43). AC#2 done: a real 16x16 flame bitmap now renders top-centre on the boot splash, drawn via raw GDDRAM column writes (ssd1306WriteRam) instead of a framebuffer — +0 RAM, SSD1306Ascii kept (no Adafruit_SSD1306 swap). FLAME16[32] PROGMEM (column-major, offline-generated + round-trip verified) + oledDrawFlame() in OLED.ino; splash relaid out (flame rows0-1, 2X title rows2-3, subtitle row4, hints rows6-7). File-header comment corrected (was 'no bitmap'). All four ACs now code-complete: AC#1/#3/#4 in earlier d27e0c12, AC#2 here. Build green esp8266+esp32 (fw+fs), evaluator 0-fail (health 98.6%). Only remaining item is on-hardware 128x64 SSD1306 visual validation, which is a field check, not a self-verifiable AC — closed per maintainer rule (shipped under an alpha, sole remainder is field validation).
+<!-- SECTION:FINAL_SUMMARY:END -->
