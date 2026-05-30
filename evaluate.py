@@ -1445,11 +1445,14 @@ class WorkspaceEvaluator:
         """
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== STATUS_BURST_COOLDOWN_MS Tuning Bound ==={Colors.ENDC}")
 
-        mqtt_ino = config.FIRMWARE_ROOT / "MQTTstuff.ino"
+        # TASK-743 (ESP-abstraction Tier 3): the per-board cooldown values moved
+        # from MQTTstuff.ino into boards.h as #define-per-board. The gate follows
+        # the constant to boards.h and matches the #define form (no '=').
+        mqtt_ino = config.FIRMWARE_ROOT / "boards.h"
         if not mqtt_ino.exists():
             self.add_result(EvaluationResult(
                 "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "WARN",
-                "MQTTstuff.ino not found"
+                "boards.h not found"
             ))
             return
 
@@ -1458,11 +1461,11 @@ class WorkspaceEvaluator:
         except OSError as e:
             self.add_result(EvaluationResult(
                 "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "FAIL",
-                f"Could not read MQTTstuff.ino: {e}"
+                f"Could not read boards.h: {e}"
             ))
             return
 
-        decl_re = re.compile(r"\bSTATUS_BURST_COOLDOWN_MS\s*=\s*(\d+)")
+        decl_re = re.compile(r"\bSTATUS_BURST_COOLDOWN_MS\s+(\d+)")
         found = False
         for idx, line in enumerate(lines):
             # Skip comments that just mention the constant in prose.

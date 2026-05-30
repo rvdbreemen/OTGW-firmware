@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : boards.h
-**  Version  : v2.0.0-alpha.105
+**  Version  : v2.0.0-alpha.106
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -62,6 +62,24 @@
 #define HAS_SAT_BLE          0  // No BLE radio on ESP8266 (SATble.ino is ESP32-only)
 #define HAS_WEATHER_FORECAST 0  // Basic weather only; hourly forecast is ESP32-only (independent of HAS_SAT)
 #define HW_TYPE_NAME      "otgw-classic"  // Static hardware-type slug / board class (ADR-113)
+
+// SAT per-platform buffer sizing (ESP-abstraction Tier 3, TASK-743). These are
+// compile-time board-capacity tunings (SRAM budget), so they live with the
+// board's HAS_* flags rather than scattered behind raw #if defined(ESP8266) in
+// the SAT .ino files. ESP8266 keeps the tight (~40 KB DRAM) sizes.
+#define SAT_WIN4H_SIZE          30   // rolling 4h cycle window (~2h at 4-min avg cycle)
+#define SAT_FLOW_SAMPLE_SIZE    64   // per-cycle flow sample ring (256 B SRAM, ~5min @5s)
+#define SAT_TAIL_SAMPLE_SIZE    SAT_FLOW_SAMPLE_SIZE  // end-of-cycle tail = 64s @1Hz
+#define HCR_DAYS                7    // heating-curve daily-median ring (one week)
+#define HCR_INTRADAY_SIZE       96   // intra-day samples (15-min intervals, one day)
+#define SAT_CYCLES_FILE_BUF_SIZE 2560  // sat_cycles.json read buffer (30 records)
+// Ring head/count index width: all ESP8266 SAT rings are <=96 slots, so a byte
+// counter suffices and saves SRAM.
+typedef uint8_t SAT_RING_IDX_T;
+
+// MQTT per-platform tuning (ESP-abstraction Tier 3, TASK-743).
+#define MQTT_DISCOVERY_HEAP_MIN   3000   // discovery-publish heap floor (WARNING tier, ~80KB total)
+#define STATUS_BURST_COOLDOWN_MS  2000   // post-burst drip pause (ADR-088; <3s Status cadence)
 
 // ---------------------------------------------------------------------------
 #elif defined(BOARD_NODOSHOP_ESP32)
@@ -129,6 +147,23 @@
 #define HAS_SAT_BLE          1  // ESP32-S3 BLE radio present (SATble.ino room-sensor support)
 #define HAS_WEATHER_FORECAST 1  // Full weather incl. 24h hourly forecast arrays (independent of HAS_SAT)
 #define HW_TYPE_NAME      "otgw32"        // Static hardware-type slug / board class (ADR-113)
+
+// SAT per-platform buffer sizing (ESP-abstraction Tier 3, TASK-743). ESP32-S3
+// has ample SRAM, so the SAT history buffers run much deeper than on ESP8266.
+// Ring indices that exceed 255 slots need uint16_t counters; see SAT_RING_IDX_T.
+#define SAT_WIN4H_SIZE          360  // rolling 4h cycle window (12h of 2-min cycle history)
+#define SAT_FLOW_SAMPLE_SIZE    256  // per-cycle flow sample ring (1024 B SRAM, better p90/p10)
+#define SAT_TAIL_SAMPLE_SIZE    180  // end-of-cycle tail = 180s @1Hz
+#define HCR_DAYS                30   // heating-curve daily-median ring (4-week trend)
+#define HCR_INTRADAY_SIZE       1440 // intra-day samples (per-minute, one day)
+#define SAT_CYCLES_FILE_BUF_SIZE 4896  // sat_cycles.json read buffer (60 records)
+// Ring head/count index width: ESP32 rings reach 1440 slots, so the index
+// counters need a 16-bit type.
+typedef uint16_t SAT_RING_IDX_T;
+
+// MQTT per-platform tuning (ESP-abstraction Tier 3, TASK-743).
+#define MQTT_DISCOVERY_HEAP_MIN   2048   // discovery-publish heap floor (larger DRAM budget)
+#define STATUS_BURST_COOLDOWN_MS  250    // post-burst drip pause (ADR-088; more heap headroom)
 
 // ---------------------------------------------------------------------------
 #else

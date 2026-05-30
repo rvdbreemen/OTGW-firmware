@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.105
+**  Version  : v2.0.0-alpha.106
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -14,7 +14,7 @@
 **    - SAT runtime enums (SATHeatingSystem, SATControlMode, SATPreset,
 **      SATCycleClass, SATManufacturer, SATFlameStatus, SATBoilerStatus,
 **      ...)
-**    - SAT manufacturer quirk-flag defines + SAT_WIN4H_SIZE
+**    - SAT manufacturer quirk-flag defines (buffer sizes live in boards.h)
 **    - SATWindowRecord, SATZoneState (helper structs)
 **    - SATRuntimeSection    (state.sat — transient runtime state)
 **    - SATSection           (settings.sat — persisted configuration)
@@ -95,13 +95,8 @@ enum SATBoilerStatus : uint8_t {
   SAT_BS_HEATING, SAT_BS_COOLING
 };
 
-// --- SAT rolling 4-hour window buffer size (Task #227/#236) ---
-// ESP8266: 30 slots (covers ~2h at 4-min avg cycle); ESP32: 360 slots (covers 12h of 2-min cycle history).
-#if defined(ESP8266)
-  #define SAT_WIN4H_SIZE 30
-#else
-  #define SAT_WIN4H_SIZE 360
-#endif
+// SAT rolling 4-hour window buffer size (Task #227/#236) is defined per board in
+// boards.h (ESP-abstraction Tier 3, TASK-743): 30 slots on ESP8266, 360 on ESP32.
 
 //====================================================================
 //=== SAT helper structs ===

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.105
+**  Version  : v2.0.0-alpha.106
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -51,14 +51,10 @@ constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 // Minimum free heap required before attempting a discovery publish.
 // Streaming HA discovery (ADR-042: streaming JSON, no ArduinoJson) only needs
 // ~200 bytes per chunk, so the guard is an absolute "last safety rail", not a
-// performance throttle. ESP8266 keeps the historical WARNING-tier floor because
-// it only has ~80KB RAM total. ESP32 uses a lower absolute floor because the
-// larger DRAM budget should not block discovery while tens of KB are still free.
-#if defined(ESP32)
-constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 2048;
-#else
-constexpr uint32_t MQTT_DISCOVERY_HEAP_MIN = 3000;  // aligned with WARNING tier on ESP8266
-#endif
+// performance throttle. MQTT_DISCOVERY_HEAP_MIN is board-defined in boards.h
+// (ESP-abstraction Tier 3): 3000 on ESP8266 (WARNING-tier floor, ~80KB RAM
+// total), 2048 on ESP32 (larger DRAM budget should not block discovery while
+// tens of KB are still free).
 constexpr uint32_t MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS = 300000UL;  // 5 minutes
 
 // PIC subtree prefix -- single source of truth for the otgw-pic/ MQTT subtree.
@@ -133,11 +129,10 @@ static unsigned long   burstCooldownUntilMs  = 0;
 static uint32_t        sDripDueAtMs          = 0;   // updated by loopMQTTDiscovery(); read by dripDueWithinMs()
 static bool            dripDeviceInfoPending = false; // true after markAllMQTTConfigPending(); first drip entity carries full device block
 constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
-#if defined(ESP32)
-constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 250;
-#else
-constexpr unsigned long STATUS_BURST_COOLDOWN_MS = 2000;   // TASK-353: 10000->2000; stays under the ~3s Status cadence so the drip gets a window per cycle
-#endif
+// STATUS_BURST_COOLDOWN_MS is board-defined in boards.h (ESP-abstraction Tier 3,
+// ADR-088): 2000 on ESP8266 (TASK-353: stays under the ~3s Status cadence so the
+// drip gets a window per cycle), 250 on ESP32 (more heap headroom to drain a
+// burst). Bound enforced by check_status_burst_cooldown_bound in evaluate.py.
 
 void beginStatusBurst() {
   statusBurstActive = true;

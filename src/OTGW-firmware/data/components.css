@@ -420,16 +420,25 @@ body.dark .otmonrow,
   max-height: 340px; overflow: auto;
   background: var(--bg-surface); border: 1px solid var(--border-1);
 }
-.ot-stats-table { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
+.ot-stats-table {
+  width: auto;
+  max-width: none;
+  border-collapse: collapse;
+  font-size: var(--fs-xs);
+  table-layout: fixed;
+}
 .ot-stats-table th, .ot-stats-table td {
   text-align: left; padding: 4px var(--space-4);
   border-bottom: 1px solid var(--border-1);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ot-stats-table th {
   background: var(--bg-header-strip); color: var(--fg-2);
-  position: sticky; top: 0; z-index: 10; cursor: pointer;
+  position: sticky; top: 0; z-index: 10;
 }
+#otStatsTable th { cursor: pointer; }
 .ot-stats-table tr:hover { background: var(--bg-panel); }
 
 /* Drag-to-resize handle on right edge of each stats-table header. */

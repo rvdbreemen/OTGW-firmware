@@ -40,47 +40,27 @@ static uint8_t  _hourCycleHead  = 0;  // next write position
 static uint8_t  _hourCycleCount = 0;  // valid entries (0..SAT_MAX_CYCLES_PER_HOUR)
 
 // --- Rolling 4-hour cycle window (Task #227) ---
-// SAT_WIN4H_SIZE and SATWindowRecord are defined in OTGW-firmware.h (ahead of all .ino files).
+// SAT_WIN4H_SIZE and SATWindowRecord are defined ahead of all .ino files
+// (the size in boards.h, the record struct in SATtypes.h).
 static const uint32_t SAT_WIN4H_SPAN_MS = 4UL * 3600UL * 1000UL; // 4 hours in ms
 
 static SATWindowRecord _win4h[SAT_WIN4H_SIZE];
-#if defined(ESP8266)
-static uint8_t         _win4hHead  = 0;   // next write position
-static uint8_t         _win4hCount = 0;   // valid entries (0..SAT_WIN4H_SIZE)
-#else
-static uint16_t        _win4hHead  = 0;   // next write position (needs uint16 for ESP32 360-slot ring)
-static uint16_t        _win4hCount = 0;   // valid entries (0..SAT_WIN4H_SIZE)
-#endif
+static SAT_RING_IDX_T  _win4hHead  = 0;   // next write position
+static SAT_RING_IDX_T  _win4hCount = 0;   // valid entries (0..SAT_WIN4H_SIZE)
 
 // Accumulator for flow-return delta during active cycle
 static float    _cycle_sumFlowRetDelta = 0.0f;
 static uint16_t _cycle_deltasamples   = 0;
 
 // --- Per-cycle flow temperature sample buffer (Task #225, p90/p10 classifier) ---
-// ESP8266:  64 slots x 4 bytes =  256 bytes SRAM (~5 min at 5s intervals).
-// ESP32:   256 slots x 4 bytes = 1024 bytes SRAM (better p90/p10 accuracy).
-#if defined(ESP8266)
-  #define SAT_FLOW_SAMPLE_SIZE 64
-#else
-  #define SAT_FLOW_SAMPLE_SIZE 256
-#endif
+// SAT_FLOW_SAMPLE_SIZE is board-defined in boards.h (64 on ESP8266, 256 on ESP32).
 static float    _flow_samples[SAT_FLOW_SAMPLE_SIZE];
-#if defined(ESP8266)
-static uint8_t  _flow_sampleHead  = 0;  // next write position (ring)
-static uint8_t  _flow_sampleCount = 0;  // valid sample count (0..SAT_FLOW_SAMPLE_SIZE)
-#else
-static uint16_t _flow_sampleHead  = 0;  // next write position (needs uint16 for ESP32 256-slot ring)
-static uint16_t _flow_sampleCount = 0;  // valid sample count (0..SAT_FLOW_SAMPLE_SIZE)
-#endif
+static SAT_RING_IDX_T _flow_sampleHead  = 0;  // next write position (ring)
+static SAT_RING_IDX_T _flow_sampleCount = 0;  // valid sample count (0..SAT_FLOW_SAMPLE_SIZE)
 
 // --- Tail ring buffer for end-of-cycle 180s classification window ---
 // Sampled at 1Hz for a true time-based window, independent of loop rate.
-// 180 slots on ESP32 = 180s tail. ESP8266 caps at SAT_FLOW_SAMPLE_SIZE (64s).
-#if defined(ESP8266)
-  #define SAT_TAIL_SAMPLE_SIZE SAT_FLOW_SAMPLE_SIZE   // 64 slots = 64s at 1Hz
-#else
-  #define SAT_TAIL_SAMPLE_SIZE 180                    // 180 slots = 180s at 1Hz
-#endif
+// SAT_TAIL_SAMPLE_SIZE is board-defined in boards.h (64 on ESP8266, 180 on ESP32).
 static float    _tail_samples[SAT_TAIL_SAMPLE_SIZE];
 static uint8_t  _tail_sampleHead  = 0;
 static uint8_t  _tail_sampleCount = 0;
@@ -134,20 +114,9 @@ static uint8_t        _cycleHistoryCount = 0;
 // --- Heating Curve Recommendation (HCR) — buffer declares (Task #228) ---
 // Defined here so satCycleInit() can zero them before _hcrIntraMedian() is defined below.
 
-// ESP8266:   7 days x 4 bytes =   28 bytes SRAM (one week of daily medians).
-// ESP32:    30 days x 4 bytes =  120 bytes SRAM (4-week heating curve trend).
-#if defined(ESP8266)
-  #define HCR_DAYS         7
-#else
-  #define HCR_DAYS         30
-#endif
-// ESP8266:   96 samples x 4 bytes =   384 bytes SRAM (15-min intervals for one day).
-// ESP32:   1440 samples x 4 bytes =  5760 bytes SRAM (per-minute sampling for one day).
-#if defined(ESP8266)
-  #define HCR_INTRADAY_SIZE 96
-#else
-  #define HCR_INTRADAY_SIZE 1440
-#endif
+// HCR_DAYS (daily-median ring) and HCR_INTRADAY_SIZE (intra-day sample ring) are
+// board-defined in boards.h (ESP-abstraction Tier 3): 7/96 on ESP8266, 30/1440
+// on ESP32.
 static const float    HCR_THRESHOLD_C   = 0.5f;  // median error threshold (°C)
 static const uint8_t  HCR_SUSTAIN_DAYS  = 3;     // consecutive days needed for a recommendation
 static const char SAT_HCR_FILE_OLD[] PROGMEM = "/sat_hcr.json";
@@ -161,13 +130,8 @@ static uint8_t  _hcr_count  = 0;            // valid entries (0..HCR_DAYS)
 // Intra-day sample accumulator: collect (room - target) readings until midnight.
 // ESP8266: 96 samples at 15-min intervals = one day. ESP32: 1440 samples at 1-min intervals.
 static float    _hcr_samples[HCR_INTRADAY_SIZE];
-#if defined(ESP8266)
-static uint8_t  _hcr_sHead    = 0;          // next write position
-static uint8_t  _hcr_sCount   = 0;          // valid samples
-#else
-static uint16_t _hcr_sHead    = 0;          // next write position (needs uint16 for ESP32 1440-slot ring)
-static uint16_t _hcr_sCount   = 0;          // valid samples
-#endif
+static SAT_RING_IDX_T _hcr_sHead    = 0;    // next write position
+static SAT_RING_IDX_T _hcr_sCount   = 0;    // valid samples
 static uint32_t _hcr_lastDayNum = 0;        // last calendar day that was committed (time/86400)
 
 //--- Forward declarations for HCR functions ---
@@ -1111,12 +1075,9 @@ void satLoadCycleWindow()
   }
   if (n == 0) return;
 
-  // Re-read full file.
-#if defined(ESP8266)
-  static char fbuf[2560]; // 30 records * ~80 chars + header ~50 = ~2450 bytes
-#else
-  static char fbuf[4896]; // 60 records * ~80 chars + header ~50 = ~4850 bytes
-#endif
+  // Re-read full file. SAT_CYCLES_FILE_BUF_SIZE is board-defined in boards.h
+  // (2560 on ESP8266 / 30 records, 4896 on ESP32 / 60 records).
+  static char fbuf[SAT_CYCLES_FILE_BUF_SIZE];
   f = LittleFS.open(FPSTR(SAT_CYCLES_FILE), "r");
   if (!f) return;
   size_t flen = f.readBytes(fbuf, sizeof(fbuf) - 1);
