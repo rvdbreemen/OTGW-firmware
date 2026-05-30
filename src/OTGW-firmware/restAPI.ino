@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.106
+**  Version  : v2.0.0-alpha.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1940,11 +1940,7 @@ static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
     // Escape quotes in SSID
     for (char* p = ssidBuf; *p; p++) { if (*p == '"' || *p == '\\') *p = '_'; }
     bool isConn = (strcmp(ssidBuf, connectedSsid) == 0);
-    #ifdef ESP32
-    bool secured = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
-    #else
-    bool secured = (WiFi.encryptionType(i) != ENC_TYPE_NONE);
-    #endif
+    bool secured = platformWiFiIsEncrypted(i);
     snprintf_P(chunk, sizeof(chunk),
       PSTR("%s{\"ssid\":\"%s\",\"rssi\":%d,\"channel\":%d,\"secured\":%s,\"connected\":%s}"),
       (i > 0 ? "," : ""),
