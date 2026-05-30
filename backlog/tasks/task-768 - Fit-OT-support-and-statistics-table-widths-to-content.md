@@ -1,11 +1,11 @@
 ---
 id: TASK-768
 title: Fit OT support and statistics table widths to content
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-30 13:41'
-updated_date: '2026-05-30 20:53'
+updated_date: '2026-05-30 20:55'
 labels: []
 dependencies: []
 ---
@@ -18,10 +18,10 @@ Make the OT support and Statistics tab tables choose column widths from their wi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each OT support and Statistics table column sizes from the widest visible header or cell text for that column.
+- [x] #1 Each OT support and Statistics table column sizes from the widest visible header or cell text for that column.
 - [x] #2 The table total width is derived from the sum of computed column widths instead of a fixed or uniform width.
 - [x] #3 Existing manual column dragging remains usable after the automatic sizing changes.
-- [ ] #4 When computed content-fit width is wider than the viewport/container, the OT table scroll container keeps the page contained and the cells keep their measured width instead of clipping text.
+- [x] #4 When computed content-fit width is wider than the viewport/container, the OT table scroll container keeps the page contained and the cells keep their measured width instead of clipping text.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -39,21 +39,12 @@ Implementation: replaced the OpenTherm table min-width update with column-width 
 Validation: node --check src\OTGW-firmware\data\index.js; .\.venv\Scripts\python.exe evaluate.py --quick --no-color; Playwright rendered layout check at 800px viewport with normal rows, over-wide rows, and synthetic drag resize.
 
 Follow-up 2026-05-30: user screenshot showed OT Support Boiler cells such as 'no read support...' still visually truncating, so AC #1/#3 need rework. The fix must preserve content-width columns and use horizontal scrolling when the content-fit sum is wider than the available viewport, instead of scaling columns down until text clips. Also apply the correction in the 2.0.0 worktree.
+
+Follow-up implementation: removed automatic viewport scaling from content-fit widths, changed OT table max-width to none so explicit measured widths are honored inside the horizontal scroll container, added browser scrollWidth as a measurement floor for warning/long-label text, and bumped storage keys to otStatsColWidths.v4 / otSupportColWidths.v3 to avoid stale narrow widths. Validation: node --check src\OTGW-firmware\data\index.js; .\.venv\Scripts\python.exe evaluate.py --quick --no-color; Playwright rendered checks at 816px and 360px confirmed zero clipped OT Support cells including '⚠ no read support' and container scrolling without page overflow; Playwright drag check confirmed manual resize grows the column while table width remains within available width.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Implemented dynamic content-fit sizing for the OT support and Statistics tables.
-
-Changes:
-- Column widths are now computed from the widest visible header/body text per column and applied through the table colgroup.
-- Table width is set to the sum of computed column widths instead of filling 100% by default.
-- Computed and dragged widths are capped to the available parent/viewport width so the table does not exceed the visible area.
-- Manual drag resizing remains available and persists under new storage keys so stale prior sizing does not override the new fit.
-
-Validation:
-- node --check src\OTGW-firmware\data\index.js
-- .\.venv\Scripts\python.exe evaluate.py --quick --no-color
-- Playwright rendered layout check for normal rows, over-wide rows, and synthetic drag resize
+Implemented the follow-up OT table sizing correction for the 1.6.1 dev worktree. Columns now keep their measured content-fit widths instead of being scaled down to the viewport, table max-width no longer defeats explicit column widths, and measurement uses browser scrollWidth as a floor so values like '⚠ no read support' and long message names do not ellipsize. Wider content stays contained by the existing horizontal scroll container. Validation passed: node --check, evaluate.py --quick --no-color, rendered no-clipping checks at 816px and 360px, and a manual drag-resize check.
 <!-- SECTION:FINAL_SUMMARY:END -->
