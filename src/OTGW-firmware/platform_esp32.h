@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp32.h
-**  Version  : v2.0.0-alpha.107
+**  Version  : v2.0.0-alpha.108
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -118,11 +118,6 @@ inline void platformResetReason(char *buf, size_t len) {
     default:               str = "Unknown";          break;
   }
   strlcpy(buf, str, len);
-}
-
-// WiFi scan: is the network at scan index `i` encrypted (not open)?
-inline bool platformWiFiIsEncrypted(uint8_t i) {
-  return WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
 }
 
 // WiFi scan: is the network at scan index `i` encrypted (not open)?
