@@ -28,14 +28,23 @@
  *    "random" values. This defeated the purpose of timer desynchronization.
  *    Timers now start synchronized, but the Spiral of Death protection (#2)
  *    prevents blocking if multiple timers fire simultaneously.
+ * 5. Added optional jitter parameters (jitter_min_ms, jitter_max_ms) to
+ *    DECLARE_TIMER_* macros. When provided, a random offset in [min, max) ms
+ *    is added to the initial _due value. Requires randomSeed() to have been
+ *    called before the first loop() execution (guaranteed by setup() order).
+ *    Example: DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS, 30000, 60000)
  *
  * see: https://arduino.stackexchange.com/questions/12587/how-can-i-handle-the-millis-rollover
  * 
- * DECLARE_TIMER_MIN(timername, interval, <timerType>)     // interval in minutes
- * DECLARE_TIMER_SEC(timername, interval, <timerType>)     // interval in seconds
- * DECLARE_TIMER_MS(timername,  interval, <timerType>)     // interval in milliseconds
- * DECLARE_TIMER(timername,     interval, <timerType>)     // interval in milliseconds
- *  Declares three static vars: 
+ * DECLARE_TIMER_MIN(timername, interval, <timerType>, <jitter_min_ms>, <jitter_max_ms>)
+ * DECLARE_TIMER_SEC(timername, interval, <timerType>, <jitter_min_ms>, <jitter_max_ms>)
+ * DECLARE_TIMER_MS(timername,  interval, <timerType>, <jitter_min_ms>, <jitter_max_ms>)
+ * DECLARE_TIMER(timername,     interval, <timerType>, <jitter_min_ms>, <jitter_max_ms>)
+ *  jitter_min_ms and jitter_max_ms are optional (default 0 = no jitter).
+ *  When provided, a random offset in [jitter_min_ms, jitter_max_ms) is added to
+ *  the initial _due value to desynchronize timers that would otherwise fire together.
+ *  Requires randomSeed() to have been called before the first loop() execution.
+ *  Declares three static vars:
  *    <timername>_due (uint32_t) for next execution
  *    <timername>_interval (uint32_t) for interval in seconds
  *    <timername>_type (byte)
@@ -102,19 +111,22 @@
 #define DECLARE_TIMER_MIN(timerName, ...) \
                       static uint32_t timerName##_interval = (getParam(0, __VA_ARGS__, 0) * 60 * 1000),\
                                       timerName##_due  = millis()                           \
-                                                        +timerName##_interval;              \
+                                                        +timerName##_interval               \
+                                                        +__JitterOffset__(getParam(2, __VA_ARGS__, 0), getParam(3, __VA_ARGS__, 0)); \
                       static byte     timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define DECLARE_TIMER_SEC(timerName, ...) \
                       static uint32_t timerName##_interval = (getParam(0, __VA_ARGS__, 0) * 1000),\
                                       timerName##_due  = millis()                           \
-                                                        +timerName##_interval;              \
+                                                        +timerName##_interval               \
+                                                        +__JitterOffset__(getParam(2, __VA_ARGS__, 0), getParam(3, __VA_ARGS__, 0)); \
                       static byte     timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define DECLARE_TIMER_MS(timerName, ...)  \
                       static uint32_t timerName##_interval = (getParam(0, __VA_ARGS__, 0)), \
                                       timerName##_due  = millis()                           \
-                                                        +timerName##_interval;              \
+                                                        +timerName##_interval               \
+                                                        +__JitterOffset__(getParam(2, __VA_ARGS__, 0), getParam(3, __VA_ARGS__, 0)); \
                       static byte     timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define DECLARE_TIMER   DECLARE_TIMER_MS
@@ -156,6 +168,11 @@
 #define RESTART_TIMER(timerName)      ( timerName##_due = millis()+timerName##_interval ); 
 
 #define DUE(timerName)                ( __Due__(timerName##_due, timerName##_interval, timerName##_type) )
+
+uint32_t __JitterOffset__(uint32_t jitter_min, uint32_t jitter_max) {
+  if (jitter_max <= jitter_min) return 0;
+  return random(jitter_min, jitter_max);
+}
 
 uint32_t __Due__(uint32_t &timer_due, uint32_t timer_interval, byte timerType)
 {
