@@ -53,5 +53,7 @@ Add an implementation plan only after the task is active and assigned. If Codex 
 
 When every acceptance criterion and Definition-of-Done item is satisfied, required validation is green, implementation notes include branch and coding-agent metadata, and a final summary has been added, set the task status to **Done** immediately.
 
+After setting a task to **Done**, commit the completed task changes and push the branch to its configured upstream. Keep commits narrow: stage only files that belong to the completed task and leave unrelated local changes untouched.
+
 Leave a task at **In Progress** only when an acceptance criterion cannot be self-verified, a required validation or Definition-of-Done item is unmet, or coordinated sibling work requires the transition to wait. Record the blocker in the task notes or final summary.
 <!-- BACKLOG.MD GUIDELINES END -->

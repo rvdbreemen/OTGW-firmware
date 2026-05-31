@@ -6462,6 +6462,7 @@ function refreshBoilerSupport() {
     var line = document.getElementById('boilerUnsupportedLine');
     var list = document.getElementById('boilerUnsupportedList');
     if (!line || !list) return;
+    var defaultTitle = 'OT msgIDs the boiler answered with Unknown-Data-Id at least once this session.';
     fetch(APIGW + "v2/otgw/boiler-support")
         .then(function (response) {
             if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -6473,17 +6474,27 @@ function refreshBoilerSupport() {
             if (r.length === 0 && w.length === 0) {
                 line.classList.add('hidden');
                 list.textContent = '';
+                line.removeAttribute('data-tooltip');
+                line.removeAttribute('aria-label');
+                line.title = defaultTitle;
                 return;
             }
             var parts = [];
             r.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', read)'); });
             w.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', write)'); });
             list.textContent = parts.join(', ');
+            var fullText = 'Boiler does not implement: ' + parts.join(', ');
+            line.setAttribute('data-tooltip', fullText);
+            line.setAttribute('aria-label', fullText);
+            line.title = fullText;
             line.classList.remove('hidden');
         })
         .catch(function () {
             // Endpoint may not exist on older firmware — keep silent.
             line.classList.add('hidden');
+            line.removeAttribute('data-tooltip');
+            line.removeAttribute('aria-label');
+            line.title = defaultTitle;
         });
 }
 
