@@ -45,6 +45,7 @@ constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
 constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
+constexpr uint8_t MQTT_WRITE_MAX_RETRIES = 10;  // retry short TCP writes (yield to let lwIP sndbuf drain) before declaring desync
 // Minimum free heap required before attempting a discovery publish.
 // Streaming HA discovery (ADR-042: streaming JSON, no ArduinoJson) only needs
 // ~200 bytes per chunk, so the historical 1200-byte floor is obsolete. Value
@@ -286,7 +287,13 @@ static bool writeMqttChunk(const char *data, size_t len)
   size_t pos = 0;
   while (pos < len) {
     size_t chunkLen = (len - pos) > CHUNK_SIZE ? CHUNK_SIZE : (len - pos);
-    size_t written = MQTTclient.write(reinterpret_cast<const uint8_t*>(data + pos), chunkLen);
+    size_t written = 0;
+    uint8_t attempts = 0;
+    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES) {
+      size_t w = MQTTclient.write(reinterpret_cast<const uint8_t*>(data + pos + written), chunkLen - written);
+      written += w;
+      if (written < chunkLen) { feedWatchDog(); yield(); attempts++; }
+    }
     if (written != chunkLen) {
       PrintMQTTError();
       return false;
@@ -306,7 +313,13 @@ static bool writeMqttProgmemChunk(PGM_P data, size_t len)
     for (size_t i = 0; i < chunkLen; i++) {
       stage[i] = static_cast<char>(pgm_read_byte(data + pos + i));
     }
-    size_t written = MQTTclient.write(reinterpret_cast<const uint8_t*>(stage), chunkLen);
+    size_t written = 0;
+    uint8_t attempts = 0;
+    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES) {
+      size_t w = MQTTclient.write(reinterpret_cast<const uint8_t*>(stage + written), chunkLen - written);
+      written += w;
+      if (written < chunkLen) { feedWatchDog(); yield(); attempts++; }
+    }
     if (written != chunkLen) {
       PrintMQTTError();
       return false;
@@ -1002,7 +1015,8 @@ bool sendMQTTData(const char* topic, const char *json, const bool retain)
   const size_t payloadLen = strlen(json);
   if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttChunk(json, payloadLen)) {
-    MQTTclient.endPublish();
+    // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-769)
+    MQTTclient.disconnect();
     return false;
   }
   if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
@@ -1050,7 +1064,8 @@ bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   const size_t payloadLen = strlen_P(payload);
   if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttProgmemChunk(payload, payloadLen)) {
-    MQTTclient.endPublish();
+    // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-769)
+    MQTTclient.disconnect();
     return false;
   }
   if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
@@ -1227,7 +1242,8 @@ void sendMQTT(const char* topic, const char *json) {
 
   const size_t len = strlen(json);
   if (!beginMqttPublish(topic, len, true)) return;
-  if (!writeMqttChunk(json, len)) { MQTTclient.endPublish(); return; }
+  // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-769)
+  if (!writeMqttChunk(json, len)) { MQTTclient.disconnect(); return; }
   if (!MQTTclient.endPublish()) PrintMQTTError();
   feedWatchDog();
 }
