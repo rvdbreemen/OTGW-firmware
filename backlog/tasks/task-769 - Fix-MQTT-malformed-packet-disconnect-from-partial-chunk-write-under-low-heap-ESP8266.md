@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 09:27'
+updated_date: '2026-05-31 09:31'
 labels:
   - bug
 dependencies: []
@@ -72,4 +72,6 @@ Discovery-path gap found + fixed (2nd commit f8314a0b, mqtt_configuratie.cpp +7/
 2026-05-31 @codex follow-up: user reported scripts/capture-mqtt-debug.ps1 interactive mode never asks for MQTT username/password, so mosquitto_sub runs anonymously and field capture fails on authenticated brokers. Plan: add optional interactive username prompt; when a username is provided interactively or via -Username without -Password, prompt securely for password; keep anonymous brokers working when username is blank; validate with a non-network harness that captures mosquitto_sub arguments and summary output.
 
 2026-05-31 @codex scope update: add script usability hint too. User requested help discoverability (e.g. --help) and explicit instructions for stopping the capture manually. Include this in scripts/capture-mqtt-debug.ps1 and the .bat launcher path while preserving the credential fix.
+
+2026-05-31 @codex script follow-up implemented. scripts/capture-mqtt-debug.ps1 now prompts for an optional MQTT username during interactive host-prompt mode and prompts securely for the password when a username is supplied without -Password. Blank username keeps anonymous mode. Added -Help output with usage, credential behavior, and Ctrl+C/-DurationSeconds stop instructions; scripts/capture-mqtt-debug.bat maps --help and /? to -Help. Validation: pwsh parser OK; ps1 -Help OK; ps1 --help OK; bat --help OK; explicit credential harness passed (-u mqttuser -P mqttpass, password not in summary); interactive Read-Host shim passed for credential mode; anonymous interactive shim passed with no -u/-P.
 <!-- SECTION:NOTES:END -->
