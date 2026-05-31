@@ -33,5 +33,5 @@ if /I "%~1"=="/?" (
     exit /b %ERRORLEVEL%
 )
 
-"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%" %*
+start "OTGW MQTT Capture" /wait "%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%" %*
 exit /b %ERRORLEVEL%

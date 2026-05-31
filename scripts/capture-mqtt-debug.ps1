@@ -10,7 +10,13 @@ param(
     [string]$OutputRoot = "logs/mqtt-diagnostics",
     [int]$DurationSeconds,
     [string]$MosquittoSubPath,
-    [switch]$SkipToolInstall
+    [switch]$SkipToolInstall,
+    [ValidateRange(2, 60)]
+    [int]$TelnetConnectTimeoutSeconds = 6,
+    [ValidateRange(250, 60000)]
+    [int]$TelnetReconnectDelayMilliseconds = 500,
+    [ValidateRange(250, 60000)]
+    [int]$TelnetPostDisconnectDelayMilliseconds = 1000
 )
 
 Set-StrictMode -Version Latest
@@ -19,9 +25,9 @@ $ErrorActionPreference = "Stop"
 $script:SummaryPath = $null
 $script:SummaryLines = New-Object System.Collections.Generic.List[string]
 $telnetPort = 23
-$telnetConnectTimeoutSeconds = 2
-$telnetPostDisconnectDelayMilliseconds = 5000
-$telnetReconnectDelayMilliseconds = 2000
+$telnetConnectTimeoutSeconds = $TelnetConnectTimeoutSeconds
+$telnetPostDisconnectDelayMilliseconds = $TelnetPostDisconnectDelayMilliseconds
+$telnetReconnectDelayMilliseconds = $TelnetReconnectDelayMilliseconds
 
 function Show-Help {
     Write-Host "OTGW MQTT diagnostic capture"
@@ -529,7 +535,7 @@ function Enable-MqttTelnetDebugIfNeeded {
     param(
         [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
         [Parameter(Mandatory = $true)][System.IO.StreamWriter]$Writer,
-        [Parameter(Mandatory = $true)][string]$Banner
+        [Parameter(Mandatory = $true)][AllowEmptyString()][AllowNull()][string]$Banner
     )
 
     if ($Banner -match '(?m)\b3\s+MQTT\s+\[(?<state>[01])\]') {
@@ -577,6 +583,17 @@ function Connect-TelnetCapture {
         Close-TelnetClient -Client $client
         throw
     }
+}
+
+function Get-TelnetEffectiveConnectTimeoutSeconds {
+    param(
+        [Parameter(Mandatory = $true)][int]$BaseTimeoutSeconds,
+        [Parameter(Mandatory = $true)][int]$ReconnectAttempts
+    )
+
+    # Gradually increase timeout for retries so .local/mDNS and reboot windows can recover.
+    $extraSeconds = [Math]::Min([Math]::Max($ReconnectAttempts - 1, 0), 6)
+    return [Math]::Min($BaseTimeoutSeconds + $extraSeconds, 20)
 }
 
 $deviceHostWasBound = $PSBoundParameters.ContainsKey('DeviceHost')
@@ -638,6 +655,7 @@ Add-SummaryLine "Topic: $Topic"
 Add-SummaryLine "Username supplied: $([bool](-not [string]::IsNullOrWhiteSpace($Username)))"
 Add-SummaryLine "DurationSeconds: $(if ($DurationSeconds -gt 0) { $DurationSeconds } else { 'until Ctrl+C' })"
 Add-SummaryLine "SkipToolInstall: $([bool]$SkipToolInstall)"
+Add-SummaryLine "Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)"
 
 $telnetClient = $null
 $stream = $null
@@ -710,19 +728,20 @@ try {
 
             try {
                 $telnetReconnectAttempts++
+                $effectiveConnectTimeoutSeconds = Get-TelnetEffectiveConnectTimeoutSeconds -BaseTimeoutSeconds $telnetConnectTimeoutSeconds -ReconnectAttempts $telnetReconnectAttempts
                 if ($telnetHasConnected) {
                     $reasonSuffix = ""
                     if ($telnetReconnectReason) {
                         $reasonSuffix = " after $telnetReconnectReason"
                     }
-                    Add-SummaryLine "Telnet reconnect attempt #$telnetReconnectAttempts started$reasonSuffix."
+                    Add-SummaryLine "Telnet reconnect attempt #$telnetReconnectAttempts started$reasonSuffix (timeout ${effectiveConnectTimeoutSeconds}s)."
                 }
 
                 $connection = Connect-TelnetCapture `
                     -HostName $DeviceHost `
                     -Port $telnetPort `
                     -Writer $telnetWriter `
-                    -ConnectTimeoutSeconds $telnetConnectTimeoutSeconds
+                    -ConnectTimeoutSeconds $effectiveConnectTimeoutSeconds
                 $telnetClient = $connection.Client
                 $stream = $connection.Stream
                 $telnetRebootScanBuffer = ""
@@ -741,7 +760,7 @@ try {
             }
             catch {
                 $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetReconnectDelayMilliseconds)
-                Write-CaptureStatus "Telnet connect attempt #$telnetReconnectAttempts failed: $($_.Exception.Message) Retrying in $($telnetReconnectDelayMilliseconds / 1000)s."
+                Write-CaptureStatus "Telnet connect attempt #$telnetReconnectAttempts failed (timeout ${effectiveConnectTimeoutSeconds}s): $($_.Exception.Message) Retrying in $($telnetReconnectDelayMilliseconds / 1000)s."
                 continue
             }
         }
