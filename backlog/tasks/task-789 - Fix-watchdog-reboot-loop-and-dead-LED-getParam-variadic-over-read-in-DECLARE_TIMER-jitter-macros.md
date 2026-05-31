@@ -3,11 +3,11 @@ id: TASK-789
 title: >-
   Fix watchdog reboot loop and dead LED: getParam variadic over-read in
   DECLARE_TIMER jitter macros
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 19:08'
-updated_date: '2026-05-31 19:12'
+updated_date: '2026-05-31 19:28'
 labels: []
 dependencies: []
 ---
@@ -25,7 +25,7 @@ Commit 7199e158 (TASK-786) added jitter to the DECLARE_TIMER_* macros via getPar
 - [x] #3 A comment documents why the trailing-zero padding is required so a future edit cannot silently reintroduce the over-read
 - [x] #4 python build.py exits 0 (firmware + filesystem)
 - [x] #5 python evaluate.py --quick shows no new failures
-- [ ] #6 On-device (authoritative): flashed firmware blinks LED1 ~1/s, uptime climbs without reboot loop, no 'Reset by External WD' on subsequent boots
+- [x] #6 On-device (authoritative): flashed firmware blinks LED1 ~1/s, uptime climbs without reboot loop, no 'Reset by External WD' on subsequent boots
 <!-- AC:END -->
 
 ## Final Summary
@@ -43,4 +43,6 @@ Validation:
 - Committed 7e73d79f, pushed to origin/dev.
 
 BLOCKING AC (left In Progress): AC#6 is the only authoritative test for this class of bug (runtime UB invisible to build/lint). Requires flashing to a USB-connected ESP and confirming LED1 blinks ~1/s, uptime climbs without reboot loop, and no 'Reset by External WD' on subsequent boots. Must ship in the same beta build as the TASK-788 MQTT revert (every recent dev build bricks until this lands). No cross-worktree port: 2.0.0 does not carry the jitter commit.
+
+On-device confirmed by maintainer 2026-05-31: fix verified working (watchdog fed, LED blinking, no reboot loop). AC#6 satisfied.
 <!-- SECTION:FINAL_SUMMARY:END -->
