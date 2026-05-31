@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 12:51'
+updated_date: '2026-05-31 12:52'
 labels:
   - bug
 dependencies: []
@@ -35,7 +35,7 @@ Root cause (code-confirmed, MQTTstuff.ino): the streaming publish path beginMqtt
 <!-- AC:BEGIN -->
 - [x] #1 writeMqttChunk/writeMqttProgmemChunk short-write no longer leaves a partial MQTT packet on the wire (broker never sees malformed packet): on unrecoverable short-write the TCP connection is cleanly dropped (MQTTclient.stop) instead of calling endPublish() on a truncated payload
 - [x] #2 Add a bounded retry-with-yield on MQTTclient.write() short-writes so a started publish completes when lwIP sndbuf drains, rather than aborting on the first short write
-- [x] #3 Heap-guard threshold review: document the trade-off (lower guard = fewer drops but more partial-write disconnects) and only relax HEAP_LOW/HEAP_WARNING after the desync fix lands; record chosen values with rationale
+- [ ] #3 Heap-guard threshold review: document the trade-off (lower guard = fewer drops but more partial-write disconnects) and only relax HEAP_LOW/HEAP_WARNING after the desync fix lands; record chosen values with rationale
 - [ ] #4 python build.py --firmware exits 0
 - [x] #5 python evaluate.py --quick shows no new failures
 - [ ] #6 Field validation by GeorgeZ83 on ESP8266 + HA: no malformed-packet/session-taken-over disconnects with web UI open
@@ -96,25 +96,25 @@ AC#3 RESCOPED per user decision: do NOT relax the shared heap ladder. DECOUPLE W
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Fix MQTT malformed-packet disconnect caused by truncated-publish desync under heap pressure on ESP8266.
 
-## Root cause
-Streaming publish path beginPublish(topic,len) -> writeMqttChunk -> endPublish() commits a fixed MQTT remaining-length. Under low heap, MQTTclient.write() short-writes; the chunk helper bailed but callers still called endPublish() on a truncated payload. Broker then parses the next packet header as payload tail -> malformed packet -> disconnect -> reconnect with same client-id -> session taken over -> HA sensors unavailable + web UI freeze. Triple-confirmed in Discord #beta-testing: decode-failure garbage tail differs every time and always involves a discovery config payload = desync, not a framing bug or heap corruption.
+## Root cause (verified)
+Streaming publish beginPublish(topic,len) -> writeMqttChunk -> endPublish() commits a fixed MQTT remaining-length. Under heap fragmentation (free ~5800 but maxBlock ~1300, too small for a ~1.2KB discovery payload) MQTTclient.write() short-writes; the chunk helper bailed but callers still called endPublish() on a truncated payload. Broker parses the next packet header as payload tail -> malformed packet -> disconnect -> reconnect same client-id -> session taken over -> HA sensors unavailable + web UI freeze. Confirmed by: HA Can-t-decode-payload log (user), Georges telnet logs, and #beta-testing chat (Rob+George).
 
-## Changes
-- writeMqttChunk / writeMqttProgmemChunk: bounded retry-with-yield (MQTT_WRITE_MAX_RETRIES=10) so a started publish completes when lwIP sndbuf drains instead of aborting on first short write (AC#2).
-- Status publish path (MQTTstuff.ino, 3 sites) + discovery composer path (mqtt_configuratie.cpp stream*Discovery, 7 sites): on unrecoverable short-write, drop the TCP connection via MQTTclient.disconnect() instead of endPublish() on a truncated payload, so the broker never sees a malformed packet (AC#1, AC#7). Discovery path carries the largest payloads and is most desync-prone.
-- Pushed: dev (e5a26192 + 2de244f2), 2.0.0 sibling TASK-770 (dabc6f71 + 4363246f). Both branches green at commit time.
+## Changes (shipped, both branches)
+- writeMqttChunk / writeMqttProgmemChunk: bounded retry-with-yield (MQTT_WRITE_MAX_RETRIES=10) so a started publish completes when lwIP sndbuf drains (AC#2).
+- Status path (MQTTstuff.ino, 3 sites) + discovery composer path (mqtt_configuratie.cpp stream*Discovery, 7 sites): on unrecoverable short-write, MQTTclient.disconnect() instead of endPublish() on a truncated payload, so the broker never sees a malformed packet (AC#1, AC#7).
+- dev: e5a26192 + 2de244f2. 2.0.0 sibling TASK-770: dabc6f71 + 4363246f (pushed, origin up-to-date).
 
-## AC#3 heap-guard relax: deferred by design
-Documented the trade-off. New Discord signal: the WebSocket live-log is the heap-pressure trigger, and the heap tier ladder gates both WS and MQTT. Relaxing the shared guard would make the WS live-log run hotter = worsen the trigger. Chosen values: keep current thresholds; tune later with real telemetry from Georges repro. WS-connection-reliability root focus spun off to TASK-779.
+## AC#3 (open, rescoped): decouple WS from MQTT
+User decision: do not relax the shared heap ladder (it gates both WS and MQTT; the WS live-log is the actual heap trigger). Instead decouple WS eligibility from the MQTT publish gate, relax MQTT only, keep WS protective. Threshold values pending Georges logHeapStats telemetry (tab open, before failure). Needs a new ADR (ADR-030 Accepted + llm_judge). Impl overlaps TASK-779.
 
 ## User impact
-MQTT corruption + session-takeover replaced by a clean brief reconnect (George ratified this trade-off: prefers reconnect over corrupt sensors). No firmware behaviour change at healthy heap.
+MQTT corruption + session-takeover replaced by a clean brief reconnect (George ratified: prefers reconnect over corrupt sensors).
 
 ## Tests
-- python build.py (firmware + filesystem): green
-- python evaluate.py --quick: no new failures (baseline 0 unsafe patterns)
+- python evaluate.py --quick: 34/36 pass, 0 fail, 100% health.
+- python build.py (firmware+filesystem): running at time of writing; desync commits were green at commit time.
 
-## Risks / follow-ups
-- AC#6 field validation by GeorgeZ83 (NodeMCU v3 + HA, live-log open) pending = task stays In Progress until confirmed. George has a 10-min repro and volunteered.
-- TASK-779: make WebSocket live-log connection reliable under heap pressure (the actual trigger).
+## Open / blocking
+- AC#3 decouple WS/MQTT (needs ADR + Georges telemetry).
+- AC#6 field validation by GeorgeZ83 (NodeMCU v3 + HA, live-log open >1h). Hardware-gated; George testing tonight with the beta. Task stays In Progress.
 <!-- SECTION:FINAL_SUMMARY:END -->
