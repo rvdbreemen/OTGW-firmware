@@ -1,9 +1,11 @@
 ---
 id: TASK-786
 title: Add jitter to timer5min to prevent 60s/5min timer collision
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-31 16:38'
+updated_date: '2026-05-31 16:38'
 labels:
   - mqtt
   - timers
