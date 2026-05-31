@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 16:38'
-updated_date: '2026-05-31 16:40'
+updated_date: '2026-05-31 16:42'
 labels:
   - mqtt
   - timers
@@ -21,11 +21,11 @@ timer5min and timer60s always fire together every 5 minutes (300s = 5x60s). This
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 timer5min_due is shifted by a random 30-59s offset on first loop() run
-- [ ] #2 randomSeed called before jitter is applied (already guaranteed by setup() order)
-- [ ] #3 build passes: python build.py --firmware exits 0
-- [ ] #4 evaluate passes: python evaluate.py --quick shows no new failures
-- [ ] #5 jitter only applied once (static bool guard)
+- [x] #1 timer5min_due is shifted by a random 30-59s offset on first loop() run
+- [x] #2 randomSeed called before jitter is applied (already guaranteed by setup() order)
+- [x] #3 build passes: python build.py --firmware exits 0
+- [x] #4 evaluate passes: python evaluate.py --quick shows no new failures
+- [x] #5 jitter only applied once (static bool guard)
 <!-- AC:END -->
 
 ## Implementation Plan
