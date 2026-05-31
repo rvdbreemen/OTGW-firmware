@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-31 10:04'
-updated_date: '2026-05-31 10:05'
+updated_date: '2026-05-31 10:07'
 labels: []
 dependencies: []
 ---
@@ -23,6 +23,12 @@ Telnet capture in capture-mqtt-debug.bat/ps1 does not reconnect after the ESP re
 - [ ] #3 Each connect attempt times out in under 3 seconds and retries about every 2 seconds until successful.
 - [ ] #4 Successful reconnects are reported in capture output/logging.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Inspect current capture-mqtt-debug telnet connection and reconnect loop.\n2. Patch reconnect timing: initial connect immediately, post-disconnect/reboot wait around 5 seconds, connect timeout under 3 seconds, retry around every 2 seconds.\n3. Detect ESP.restart() reboot marker in captured telnet output and force the reconnect path.\n4. Report reconnect success in summary and console output.\n5. Validate PowerShell parsing/targeted script behavior and update AC/DoD.
+<!-- SECTION:PLAN:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
