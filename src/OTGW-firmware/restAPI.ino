@@ -726,6 +726,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("settings.mqtt.toptopic"),  settings.mqtt.sTopTopic);
   sendJsonMapEntry(F("settings.mqtt.ha_prefix"), settings.mqtt.sHaprefix);
   sendJsonMapEntry(F("settings.mqtt.unique_id"), settings.mqtt.sUniqueid);
+  sendJsonMapEntry(F("settings.mqtt.on_change"), settings.mqtt.bOnChangePublishing);
   sendJsonMapEntry(F("settings.mqtt.interval"),  (int32_t)settings.mqtt.iInterval);
   sendJsonMapEntry(F("settings.mqtt.enabled"),   settings.mqtt.bEnable);
   sendJsonMapEntry(F("settings.mqtt.disc_verify"), settings.mqtt.bDiscoveryAutoVerify);
@@ -1430,7 +1431,7 @@ static const char* const PROGMEM knownSettings[] = {
   "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
   "hostname", "httppasswd", "ledblink", "legacyport25238enabled", "nightlyrestart", "nightlyrestarthour",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
-  "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
+  "mqttinterval", "mqttonchangepublishing", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
   "otgwcommandenable", "otgwcommands",

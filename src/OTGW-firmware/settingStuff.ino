@@ -21,6 +21,7 @@
 #define SIDE_EFFECT_OTGWSTREAM 0x08
 static bool    settingsDirty = false;
 static uint8_t pendingSideEffects = 0;
+static bool    settingsLoading = false;
 
 static bool isHttpPasswordPlaceholder(const char* value)
 {
@@ -245,6 +246,7 @@ bool writeSettings(bool show)
   ok = writeJsonStringKV(file, F("MQTThaprefix"), settings.mqtt.sHaprefix, true) && ok;
   ok = writeJsonStringKV(file, F("MQTTuniqueid"), settings.mqtt.sUniqueid, true) && ok;
   ok = writeJsonBoolKV(file, F("MQTTOTmessage"), settings.mqtt.bOTmessage, true) && ok;
+  ok = writeJsonBoolKV(file, F("MQTTonChangePublishing"), settings.mqtt.bOnChangePublishing, true) && ok;
   ok = writeJsonIntKV(file, F("MQTTinterval"), settings.mqtt.iInterval, true) && ok;
   ok = writeJsonBoolKV(file, F("MQTTseparatesources"), settings.mqtt.bSeparateSources, true) && ok;
   ok = writeJsonBoolKV(file, F("LegacyPort25238Enabled"), settings.mqtt.bLegacyPort25238Enabled, true) && ok;
@@ -340,6 +342,7 @@ void readSettings(bool show)
   char keyBuf[64];
   char valueBuf[201]; // must fit the largest setting value (WebhookPayload: 201 bytes)
 
+  settingsLoading = true;
   while (file.available()) {
     size_t len = file.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
     lineBuf[len] = '\0';
@@ -358,6 +361,7 @@ void readSettings(bool show)
       updateSetting(keyBuf, valueBuf);
     }
   }
+  settingsLoading = false;
   file.close();
 
   // Loading from file must NOT trigger a rewrite or service restarts —
@@ -387,6 +391,17 @@ void readSettings(bool show)
     strlcpy(settings.ntp.sHostname, NTP_HOST_DEFAULT, sizeof(settings.ntp.sHostname));
   if (strcmp_P(settings.otgw.sCommands, PSTR("null")) == 0) settings.otgw.sCommands[0] = 0;
 
+  if (settings.mqtt.bOnChangePublishing && settings.mqtt.iInterval == 0) {
+    DebugTf(PSTR("[Settings] Migrating MQTTinterval from 0 to %u because MQTTonChangePublishing is enabled\r\n"),
+            MQTT_DEFAULT_PUBLISH_INTERVAL_SEC);
+    settings.mqtt.iInterval = MQTT_DEFAULT_PUBLISH_INTERVAL_SEC;
+    if (writeSettings(false)) {
+      settingsMarkClean();
+    } else {
+      DebugTln(F("[Settings] WARNING: MQTTinterval migration could not be saved"));
+    }
+  }
+
   CHANGE_INTERVAL_SEC(timerpollsensor, settings.sensors.iInterval, CATCH_UP_MISSED_TICKS);
   CHANGE_INTERVAL_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS);
 
@@ -410,6 +425,7 @@ void readSettings(bool show)
     Debugf(PSTR("MQTT password set     : %s\r\n"), CBOOLEAN(settings.mqtt.sPasswd[0] != '\0'));
     Debugf(PSTR("MQTT toptopic         : %s\r\n"), CSTR(settings.mqtt.sTopTopic));
     Debugf(PSTR("MQTT uniqueid         : %s\r\n"), CSTR(settings.mqtt.sUniqueid));
+    Debugf(PSTR("MQTT publish on change: %s\r\n"), CBOOLEAN(settings.mqtt.bOnChangePublishing));
     Debugf(PSTR("MQTT separate sources : %s\r\n"), CBOOLEAN(settings.mqtt.bSeparateSources));
     Debugf(PSTR("MQTT interval         : %d\r\n"), settings.mqtt.iInterval);
     Debugf(PSTR("HA prefix             : %s\r\n"), CSTR(settings.mqtt.sHaprefix));
@@ -554,10 +570,19 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settings.mqtt.sUniqueid) == 0)   strlcpy(settings.mqtt.sUniqueid, getUniqueId(), sizeof(settings.mqtt.sUniqueid));
   }
   else if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settings.mqtt.bOTmessage = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("MQTTonChangePublishing"))==0) {
+    settings.mqtt.bOnChangePublishing = EVALBOOLEAN(newValue);
+    if (!settingsLoading && settings.mqtt.bOnChangePublishing && settings.mqtt.iInterval == 0) {
+      settings.mqtt.iInterval = MQTT_DEFAULT_PUBLISH_INTERVAL_SEC;
+    }
+  }
   else if (strcasecmp_P(field, PSTR("MQTTinterval"))==0) {
     int val = atoi(newValue);
     if (val < 0 || val > 65535) { DebugTf(PSTR("WARNING: MQTTinterval %d out of range 0-65535, ignored\r\n"), val); }
-    else settings.mqtt.iInterval = (uint16_t)val;
+    else {
+      settings.mqtt.iInterval = (uint16_t)val;
+      if (!settingsLoading) settings.mqtt.bOnChangePublishing = (settings.mqtt.iInterval > 0);
+    }
   }
   else if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settings.mqtt.bSeparateSources = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("LegacyPort25238Enabled"))==0 ||

@@ -71,6 +71,7 @@ void setLed(int8_t, uint8_t);
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
+#define MQTT_DEFAULT_PUBLISH_INTERVAL_SEC 60
 #define CMSG_SIZE  512   // General-purpose scratch buffer (webhook, REST API, JSON, MQTT topic render).
                          // All known users need ≤512 bytes.  MQTT autoconfig reads templates
                          // directly from PROGMEM pools (no RAM staging needed on ESP8266).
@@ -383,7 +384,8 @@ struct MQTTSettingsSection {
   char    sTopTopic[41]    = "OTGW";
   char    sUniqueid[41]    = "";  // Initialized in readSettings
   bool    bOTmessage       = false;
-  uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
+  bool    bOnChangePublishing = true; // Publish changes immediately, heartbeat unchanged values
+  uint16_t iInterval       = MQTT_DEFAULT_PUBLISH_INTERVAL_SEC; // MQTT unchanged-value heartbeat interval in seconds
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
   bool    bLegacyPort25238Enabled = false; // Opt-in otmonitor TCP stream for legacy clients
   bool    bDiscoveryAutoVerify = true;  // ADR-062: daily auto-heal of retained discovery configs (TASK-351 wires the trigger; TASK-349 ships the field only)

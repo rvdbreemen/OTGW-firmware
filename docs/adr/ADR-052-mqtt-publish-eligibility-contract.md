@@ -99,13 +99,17 @@ Master and slave bits both follow the same rules, but each topic keeps its own i
 
 ### Interpretation of `XX = 0`
 
-When the configured publish interval is `0`, the firmware stays in legacy always-publish mode for compatibility.
+Since v1.6.1, on-change publishing is controlled by the backend `MQTTonChangePublishing` setting and defaults to `true`; the default heartbeat interval is `60` seconds.
+
+When the configured publish interval is `0` or `MQTTonChangePublishing=false`, the firmware stays in legacy always-publish mode for compatibility.
 
 In that mode:
 
 - every observed value is eligible to publish immediately,
 - every observed status byte is eligible to publish immediately,
 - every observed status bit is eligible to publish immediately.
+
+During the v1.6.1 settings load, an existing `MQTTinterval=0` is migrated to `60` and saved immediately when `MQTTonChangePublishing` is enabled or missing from `settings.ini`. Users who intentionally need legacy every-message publishing can set `MQTTonChangePublishing=false`.
 
 ## Alternatives Considered
 

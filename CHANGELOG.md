@@ -8,7 +8,8 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-_No unreleased changes yet. New work on `dev` lands here._
+### Changed
+- MQTT on-change publishing is now the backend default: fresh settings use `MQTTonChangePublishing=true` with `MQTTinterval=60`, and the v1.6.1 settings load migrates an existing `MQTTinterval=0` to `60` unless `MQTTonChangePublishing=false` is present.
 
 ## [1.6.0] - 2026-05-28
 

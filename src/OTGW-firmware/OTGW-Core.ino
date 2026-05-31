@@ -1238,7 +1238,7 @@ static void logMQTTStatusBitDecision(uint8_t bitSlot,
 {
   if (!state.debug.bMQTTGate) return;
   if (!allowPublish) return;  // skips are not interesting
-  if (settings.mqtt.iInterval == 0 && previousValue == currentValue && !forcePublish) return;  // interval=0 always-publish: only log actual changes
+  if ((!settings.mqtt.bOnChangePublishing || settings.mqtt.iInterval == 0) && previousValue == currentValue && !forcePublish) return;  // legacy always-publish: only log actual changes
   const char *reason = forcePublish                    ? "force"
                      : (previousValue != currentValue) ? "changed"
                      :                                   "first-seen";
@@ -1278,6 +1278,11 @@ static bool hasTrackedTime(uint16_t trackedTime)
 static uint16_t getPackedSlotTime(uint32_t packed)
 {
   return static_cast<uint16_t>(packed & 0xFFFFU);
+}
+
+static bool mqttOnChangePublishingActive()
+{
+  return settings.mqtt.bOnChangePublishing && settings.mqtt.iInterval > 0;
 }
 
 static void setPackedSlot(uint8_t idx, uint16_t rawValue, uint16_t trackedNow)
@@ -1359,8 +1364,9 @@ bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue) {
   uint16_t lastVal  = (uint16_t)(packed >> 16);             // bits 31-16: last published u16
   uint16_t lastTime = getPackedSlotTime(packed);            // bits 15-0: rolling seconds-since-boot
   uint16_t now      = currentTrackedSeconds();
-  if (settings.mqtt.iInterval == 0) {
-    logMQTTValueGateDecision(id, masterslave, idx, lastVal, rawValue, firstSeen, rawValue != lastVal, false, lastTime, now, true, F("interval=0"));
+  if (!mqttOnChangePublishingActive()) {
+    logMQTTValueGateDecision(id, masterslave, idx, lastVal, rawValue, firstSeen, rawValue != lastVal, false, lastTime, now, true,
+                             settings.mqtt.bOnChangePublishing ? F("interval=0") : F("on-change disabled"));
     return true;   // legacy: always publish
   }
   bool valueChanged    = (rawValue != lastVal);
@@ -1384,8 +1390,10 @@ bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue) {
 // array with normal OT mode (response slot, masterslave=0) so both paths
 // respect the same per-ID interval regardless of which mode is active. (ADR-006)
 bool shouldPublishMQTTForPSField(byte id) {
-  if (settings.mqtt.iInterval == 0) {
-    CoreMQTTDebugTf(PSTR("MQTT gate PS id=%u => publish [interval=0]\r\n"), id);
+  if (!mqttOnChangePublishingActive()) {
+    CoreMQTTDebugTf(PSTR("MQTT gate PS id=%u => publish [%s]\r\n"),
+                    id,
+                    settings.mqtt.bOnChangePublishing ? "interval=0" : "on-change disabled");
     return true;
   }
   if (id > 127) {
@@ -1605,7 +1613,7 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   const bool forcePublish = shouldForceMasterStatusPublish();
   const bool publishCombined = shouldPublishStatusByte(0, valueHB, previousStatus, forcePublish);
   if (state.debug.bMQTTGate) {
-    const bool logWorthy = forcePublish || (valueHB != previousStatus) || (settings.mqtt.iInterval > 0);
+    const bool logWorthy = forcePublish || (valueHB != previousStatus) || mqttOnChangePublishingActive();
     if (logWorthy) {
       char previousBitsText[9] {0};
       char currentBitsText[9] {0};
@@ -1648,7 +1656,7 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   const bool forcePublish = shouldForceSlaveStatusPublish();
   const bool publishCombined = shouldPublishStatusByte(1, valueLB, previousStatus, forcePublish);
   if (state.debug.bMQTTGate) {
-    const bool logWorthy = forcePublish || (valueLB != previousStatus) || (settings.mqtt.iInterval > 0);
+    const bool logWorthy = forcePublish || (valueLB != previousStatus) || mqttOnChangePublishingActive();
     if (logWorthy) {
       char previousBitsText[9] {0};
       char currentBitsText[9] {0};
@@ -1733,7 +1741,7 @@ static void publishMasterStatusVHState(uint8_t valueHB, const char *statusText)
   const bool forcePublish = shouldForceMasterStatusVHPublish();
   const bool publishCombined = shouldPublishStatusVHByte(0, valueHB, previousStatus, forcePublish);
   if (state.debug.bMQTTGate) {
-    const bool logWorthy = forcePublish || (valueHB != previousStatus) || (settings.mqtt.iInterval > 0);
+    const bool logWorthy = forcePublish || (valueHB != previousStatus) || mqttOnChangePublishingActive();
     if (logWorthy) {
       char previousBitsText[9] {0};
       char currentBitsText[9] {0};
@@ -1773,7 +1781,7 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
   const bool forcePublish = shouldForceSlaveStatusVHPublish();
   const bool publishCombined = shouldPublishStatusVHByte(1, valueLB, previousStatus, forcePublish);
   if (state.debug.bMQTTGate) {
-    const bool logWorthy = forcePublish || (valueLB != previousStatus) || (settings.mqtt.iInterval > 0);
+    const bool logWorthy = forcePublish || (valueLB != previousStatus) || mqttOnChangePublishingActive();
     if (logWorthy) {
       char previousBitsText[9] {0};
       char currentBitsText[9] {0};

@@ -745,7 +745,7 @@ First boot and first-enable scenarios are treated as zero offline duration, so n
 
 ## Configuration Settings
 
-These MQTT-related settings are configurable via the REST API (`/api/v2/settings`) or the Web UI:
+These MQTT-related settings are persisted in `settings.ini`; most are also configurable via the REST API (`/api/v2/settings`) or the Web UI:
 
 | Setting | Default | Description |
 | ------- | ------- | ----------- |
@@ -759,7 +759,8 @@ These MQTT-related settings are configurable via the REST API (`/api/v2/settings
 | `mqttuniqueid` | `"otgw-{MAC}"` | Unique device ID |
 | `mqttharebootdetection` | `true` | Detect HA offline/online cycle before acting on `homeassistant/status`. When enabled (default), requires HA to go offline first. When disabled, any `online` message triggers the cycle. Since ADR-073 the online event no longer republishes discovery configs; this setting is retained for compatibility. |
 | `mqttotmessage` | `false` | Publish raw OT messages |
-| `mqttinterval` | `0` | Minimum publish interval (seconds, 0 = no throttle) |
+| `mqttonchangepublishing` | `true` | Enable on-change publishing with periodic heartbeat refreshes. Missing settings default to `true`. Set to `false` to keep legacy every-message publishing. |
+| `mqttinterval` | `60` | Heartbeat interval in seconds for unchanged values when `mqttonchangepublishing=true`. During the `v1.6.1` settings upgrade, `MQTTinterval=0` is migrated to `60` when on-change publishing is enabled or missing. |
 | `mqttseparatesources` | `false` | Publish to source-separated sub-topics |
 
 ---

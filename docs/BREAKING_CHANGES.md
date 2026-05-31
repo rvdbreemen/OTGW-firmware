@@ -4,6 +4,20 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.6.1
+
+### Behavior change: MQTT publish interval defaults to 60 seconds
+
+MQTT on-change publishing is now enabled by default in the backend. Fresh settings use `MQTTonChangePublishing=true` with `MQTTinterval=60`, so changed OpenTherm values still publish immediately and unchanged values are refreshed once per minute instead of every repeated OpenTherm frame.
+
+During the v1.6.1 settings load, an existing `MQTTinterval=0` is migrated to `60` and saved back to `settings.ini` when `MQTTonChangePublishing` is enabled or missing from the settings file.
+
+**Who is affected:** users or custom consumers that relied on unchanged MQTT topics being republished for every repeated OpenTherm frame.
+
+**Migration:** no action is needed for the new default. To keep legacy every-message publishing, set `MQTTonChangePublishing=false` in `settings.ini` or disable publish-on-change before saving the MQTT settings.
+
+---
+
 ## v1.6.0
 
 ### Breaking: HA entity availability reflects MQTT link, not OT-bus liveness (ADR-074)
