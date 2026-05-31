@@ -1,7 +1,7 @@
 ---
 id: TASK-783
 title: Fix small viewport settings field wrapping
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-31 15:08'
