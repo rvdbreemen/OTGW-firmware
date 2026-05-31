@@ -1,9 +1,11 @@
 ---
 id: TASK-775
 title: 'chore: commit boiler tooltip fix and port to 2.0.0 branch'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-31 08:55'
+updated_date: '2026-05-31 08:56'
 labels:
   - webui
   - process
@@ -25,3 +27,13 @@ Commit and push the completed boiler unsupported badge tooltip fix on dev, add C
 - [ ] #4 The 2.0.0 feature branch changes are committed and pushed to its configured upstream, without staging unrelated worktree changes.
 - [ ] #5 Validation is run for both worktrees where practical, and any unavailable checks are documented.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Update AGENTS.md in dev with explicit completed-task commit/push guidance.
+2. Stage only the dev UI fix, AGENTS.md, and task metadata; commit and push dev.
+3. Apply the same UI fix to the 2.0.0 feature worktree, preserving local unrelated changes.
+4. Validate, commit, and push the feature branch.
+5. Update TASK-775 with exact commit/push/validation results and close it.
+<!-- SECTION:PLAN:END -->
