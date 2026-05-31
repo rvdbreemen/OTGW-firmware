@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-31 16:53'
-updated_date: '2026-05-31 17:03'
+updated_date: '2026-05-31 17:22'
 labels: []
 dependencies: []
 ---
@@ -18,10 +18,10 @@ Change the default MQTT publish interval to 60 seconds and update the user-facin
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Fresh/default configuration uses a 60 second MQTT publish interval.
-- [ ] #2 Documentation that describes MQTT publishing or defaults notes the 60 second default.
-- [ ] #3 Relevant validation is run and recorded in the task notes.
-- [ ] #4 During upgrade to release 1.6.1, an existing backend MQTT publish interval setting of 0 seconds is migrated to 60 seconds.
+- [x] #1 Fresh/default configuration uses a 60 second MQTT publish interval.
+- [x] #2 Documentation that describes MQTT publishing or defaults notes the 60 second default.
+- [x] #3 Relevant validation is run and recorded in the task notes.
+- [x] #4 During upgrade to release 1.6.1, an existing backend MQTT publish interval setting of 0 seconds is migrated to 60 seconds.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -35,3 +35,13 @@ Change the default MQTT publish interval to 60 seconds and update the user-facin
 6. Run focused validation for settings/default behavior and documentation consistency, then record the evidence in TASK-787.
 7. Check acceptance criteria, add a final summary, mark TASK-787 Done if complete, and commit/push only task-owned files.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Branch: dev
+Coding agent: Codex
+Implementation: added backend MQTTonChangePublishing / bOnChangePublishing default true, changed the backend MQTT interval default to 60 seconds, persisted the new setting in settings.ini, and added readSettings migration that saves MQTTinterval=60 when on-change publishing is true and the loaded interval is 0. MQTT gate checks now use the backend flag so MQTTonChangePublishing=false preserves legacy every-message publishing.
+Documentation: updated README, changelog, breaking-change notes, MQTT API docs, REST debug docs/OpenAPI, and ADR-006/ADR-052 to call out the 60 second default and v1.6.1 0-to-60 migration.
+Validation: .\.venv\Scripts\python.exe build.py --no-color passed and built both firmware and LittleFS artifacts. .\.venv\Scripts\python.exe evaluate.py --quick --no-color passed 36/36 checks. git diff --check passed for task-owned files. Build cleanup logged a Windows .tmp access-denied warning after successful artifact generation.
+<!-- SECTION:NOTES:END -->
