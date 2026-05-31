@@ -384,7 +384,8 @@ struct MQTTSettingsSection {
   char    sTopTopic[41]    = "OTGW";
   char    sUniqueid[41]    = "";  // Initialized in readSettings
   bool    bOTmessage       = false;
-  uint16_t iInterval       = MQTT_DEFAULT_PUBLISH_INTERVAL_SEC; // MQTT publish interval in seconds (0 = publish every message)
+  bool    bOnChangePublishing = true; // On-change publishing: publish on change, heartbeat unchanged values every iInterval (ADR-081)
+  uint16_t iInterval       = MQTT_DEFAULT_PUBLISH_INTERVAL_SEC; // Heartbeat interval (s) when on-change active; 0 = legacy publish-every-message
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
   bool    bLegacyPort25238Enabled = false; // Opt-in otmonitor TCP stream for legacy clients
   bool    bDiscoveryAutoVerify = true;  // ADR-062: daily auto-heal of retained discovery configs (TASK-351 wires the trigger; TASK-349 ships the field only)

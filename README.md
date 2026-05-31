@@ -260,13 +260,15 @@ If your boiler supports cooling, solar thermal, ventilation, or a second heating
 
 ### Step 3: Tune the publish interval
 
-By default, the gateway publishes immediately when an OpenTherm value changes and republishes unchanged values every `60` seconds as a heartbeat. This keeps data fresh while avoiding the high MQTT traffic caused by publishing every repeated OpenTherm frame.
+By default, **Publish on change** (Settings > MQTT) is enabled: the gateway publishes immediately when an OpenTherm value changes and republishes unchanged values every `60` seconds as a heartbeat. This keeps data fresh while avoiding the high MQTT traffic of publishing every repeated OpenTherm frame.
 
-Set the **Publish Interval** (under Settings > MQTT) to a value like `60` seconds. The gateway will then:
+With **Publish on change** enabled the gateway will:
 - Publish immediately when a value **changes**.
-- Re-publish unchanged values once per interval as a heartbeat (so Home Assistant does not mark sensors as unavailable).
+- Re-publish unchanged values once per **Publish Interval** as a heartbeat (so Home Assistant does not mark sensors as unavailable).
 
-A value of `10`-`60` is a good starting point. Adjust based on how responsive you need your automations to be. Setting the interval back to `0` restores legacy behaviour: every OpenTherm frame is published as it arrives. Existing devices keep whatever interval they already had after an upgrade; only fresh installs start at `60`.
+A value of `10`-`60` is a good starting point. Adjust based on how responsive you need your automations to be. Unticking **Publish on change** restores legacy behaviour: every OpenTherm frame is published as it arrives.
+
+When upgrading from a release that published every frame (`MQTTinterval=0`), the gateway migrates that setting once to `60` seconds with Publish on change enabled. Untick it afterwards if you prefer the old behaviour.
 
 ### Step 4: Optional -- send commands from Home Assistant
 

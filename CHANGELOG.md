@@ -9,7 +9,7 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 ## [Unreleased]
 
 ### Changed
-- MQTT publish interval now defaults to `60` seconds on fresh installs: changed OpenTherm values publish immediately and unchanged values refresh once per minute. Existing devices keep their stored `MQTTinterval` (`0` = legacy publish-every-message); set it back to `0` any time to restore that behaviour.
+- MQTT on-change publishing is now the default (ADR-081). New setting `MQTTonChangePublishing` defaults to `true`, and the publish interval defaults to `60` seconds: changed OpenTherm values publish immediately, unchanged values refresh once per minute. On upgrade, a config that still has `MQTTinterval=0` is migrated once to `60` (persisted via the deferred settings write). Untick "Publish on change" (or set `MQTTonChangePublishing=false`) to restore legacy publish-every-message behaviour.
 
 ## [1.6.0] - 2026-05-28
 

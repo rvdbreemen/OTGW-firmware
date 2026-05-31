@@ -1385,6 +1385,8 @@ paths:
                         type: string
                       settings.mqtt.unique_id:
                         type: string
+                      settings.mqtt.on_change:
+                        type: boolean
                       settings.mqtt.interval:
                         type: integer
                       settings.mqtt.enabled:
@@ -1458,7 +1460,8 @@ paths:
                   settings.mqtt.toptopic: "OTGW"
                   settings.mqtt.ha_prefix: "homeassistant"
                   settings.mqtt.unique_id: "otgw-1a2b3c"
-                  settings.mqtt.interval: 30
+                  settings.mqtt.on_change: true
+                  settings.mqtt.interval: 60
                   settings.mqtt.enabled: true
                   settings.mqtt.disc_verify: true
                   settings.mqtt.sep_src: false

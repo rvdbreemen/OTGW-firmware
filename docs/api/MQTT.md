@@ -759,7 +759,8 @@ These MQTT-related settings are configurable via the REST API (`/api/v2/settings
 | `mqttuniqueid` | `"otgw-{MAC}"` | Unique device ID |
 | `mqttharebootdetection` | `true` | Detect HA offline/online cycle before acting on `homeassistant/status`. When enabled (default), requires HA to go offline first. When disabled, any `online` message triggers the cycle. Since ADR-073 the online event no longer republishes discovery configs; this setting is retained for compatibility. |
 | `mqttotmessage` | `false` | Publish raw OT messages |
-| `mqttinterval` | `60` | Minimum publish interval (seconds). `0` = legacy publish-every-message (no throttle); `>0` = publish on change with a heartbeat refresh of unchanged values. Default `60` applies to fresh installs; existing devices keep their stored value on upgrade. |
+| `mqttonchangepublishing` | `true` | On-change publishing (ADR-081). When `true`, publish on change with a heartbeat every `mqttinterval` seconds. When `false`, legacy publish-every-message. Absent key (pre-1.6.1 config) loads as `true`. |
+| `mqttinterval` | `60` | Heartbeat interval (seconds) for unchanged values when `mqttonchangepublishing=true`. Default `60`; on upgrade a stored `0` is migrated once to `60`. With `mqttonchangepublishing=false` (or interval `0`) the firmware publishes every message. |
 | `mqttseparatesources` | `false` | Publish to source-separated sub-topics |
 
 ---

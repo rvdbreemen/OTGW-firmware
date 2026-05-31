@@ -245,6 +245,7 @@ bool writeSettings(bool show)
   ok = writeJsonStringKV(file, F("MQTThaprefix"), settings.mqtt.sHaprefix, true) && ok;
   ok = writeJsonStringKV(file, F("MQTTuniqueid"), settings.mqtt.sUniqueid, true) && ok;
   ok = writeJsonBoolKV(file, F("MQTTOTmessage"), settings.mqtt.bOTmessage, true) && ok;
+  ok = writeJsonBoolKV(file, F("MQTTonChangePublishing"), settings.mqtt.bOnChangePublishing, true) && ok;
   ok = writeJsonIntKV(file, F("MQTTinterval"), settings.mqtt.iInterval, true) && ok;
   ok = writeJsonBoolKV(file, F("MQTTseparatesources"), settings.mqtt.bSeparateSources, true) && ok;
   ok = writeJsonBoolKV(file, F("LegacyPort25238Enabled"), settings.mqtt.bLegacyPort25238Enabled, true) && ok;
@@ -387,6 +388,17 @@ void readSettings(bool show)
     strlcpy(settings.ntp.sHostname, NTP_HOST_DEFAULT, sizeof(settings.ntp.sHostname));
   if (strcmp_P(settings.otgw.sCommands, PSTR("null")) == 0) settings.otgw.sCommands[0] = 0;
 
+  // ADR-081 one-time migration: an on-change config that still carries the legacy
+  // interval=0 (pre-1.6.1, where the key is absent so the flag defaults true) is
+  // bumped to a 60s heartbeat. Persist via the deferred flushSettings() path in
+  // loop() — NOT a write here — so the "loading must not rewrite" invariant holds.
+  if (settings.mqtt.bOnChangePublishing && settings.mqtt.iInterval == 0) {
+    DebugTf(PSTR("[Settings] Migrating MQTTinterval 0 -> %u (on-change publishing default)\r\n"),
+            MQTT_DEFAULT_PUBLISH_INTERVAL_SEC);
+    settings.mqtt.iInterval = MQTT_DEFAULT_PUBLISH_INTERVAL_SEC;
+    settingsDirty = true;  // deferred write; no boot-time writeSettings(), no service restart
+  }
+
   CHANGE_INTERVAL_SEC(timerpollsensor, settings.sensors.iInterval, CATCH_UP_MISSED_TICKS);
   CHANGE_INTERVAL_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS);
 
@@ -410,6 +422,7 @@ void readSettings(bool show)
     Debugf(PSTR("MQTT password set     : %s\r\n"), CBOOLEAN(settings.mqtt.sPasswd[0] != '\0'));
     Debugf(PSTR("MQTT toptopic         : %s\r\n"), CSTR(settings.mqtt.sTopTopic));
     Debugf(PSTR("MQTT uniqueid         : %s\r\n"), CSTR(settings.mqtt.sUniqueid));
+    Debugf(PSTR("MQTT publish on change: %s\r\n"), CBOOLEAN(settings.mqtt.bOnChangePublishing));
     Debugf(PSTR("MQTT separate sources : %s\r\n"), CBOOLEAN(settings.mqtt.bSeparateSources));
     Debugf(PSTR("MQTT interval         : %d\r\n"), settings.mqtt.iInterval);
     Debugf(PSTR("HA prefix             : %s\r\n"), CSTR(settings.mqtt.sHaprefix));
@@ -554,6 +567,7 @@ void updateSetting(const char *field, const char *newValue)
     if (strlen(settings.mqtt.sUniqueid) == 0)   strlcpy(settings.mqtt.sUniqueid, getUniqueId(), sizeof(settings.mqtt.sUniqueid));
   }
   else if (strcasecmp_P(field, PSTR("MQTTOTmessage"))==0)   settings.mqtt.bOTmessage = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("MQTTonChangePublishing"))==0) settings.mqtt.bOnChangePublishing = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("MQTTinterval"))==0) {
     int val = atoi(newValue);
     if (val < 0 || val > 65535) { DebugTf(PSTR("WARNING: MQTTinterval %d out of range 0-65535, ignored\r\n"), val); }
