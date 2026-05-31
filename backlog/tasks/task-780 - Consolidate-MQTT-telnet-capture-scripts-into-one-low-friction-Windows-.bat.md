@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 13:09'
-updated_date: '2026-05-31 13:11'
+updated_date: '2026-05-31 13:22'
 labels:
   - tooling
   - windows
@@ -24,12 +24,10 @@ scripts/ currently has four overlapping capture artifacts: capture_mqtt_debug.py
 - [ ] #2 Captures MQTT broker traffic to a timestamped log (subscribes to a configurable topic filter, default # )
 - [ ] #3 Captures OTGW telnet debug (port 23) with auto-reconnect on drop, interleaved/parallel to the MQTT log
 - [ ] #4 Prompts for broker + OTGW host with sane defaults when no args given; accepts args for non-interactive use
-- [ ] #5 Bundles all logs into a single timestamped .zip for sharing
-- [ ] #6 Clear failure messages when a required runtime is missing; Ctrl+C / timed stop both end cleanly and still produce the zip
-- [ ] #7 Companion Python script (stdlib-only, no paho/pip) the maintainer can run directly; raw-socket MQTT subscribe so there is no third-party dependency
-- [ ] #8 Both tools log MQTT subscribe-view + timestamped OTGW telnet debug to the SAME capture so the symptom (message gap) is time-correlated with the firmware side (heap dip, reconnect)
-- [ ] #9 README documents that the malformed-packet bytes live in the broker log + HA MQTT debug log (a subscriber cannot see them) and instructs the tester to collect those too
-- [ ] #10 Redundant scripts removed (launch_capture.bat, mqtt_telnet_capture.ps1, paho capture_mqtt_debug.py); README_capture.md points to the .bat + .py pair
+- [ ] #5 Capture output goes to a timestamped run folder (telnet.log, mqtt.log, summary.txt) under logs/mqtt-diagnostics for sharing
+- [ ] #6 Clear message if PowerShell is missing; Ctrl+C and -DurationSeconds both stop cleanly and still write summary.txt
+- [ ] #7 Standalone capture-mqtt-debug.ps1 removed; the PowerShell worker is embedded in the .bat, extracted to %TEMP% at runtime, ExecutionPolicy bypassed for the child process only
+- [ ] #8 --help and /? print usage and exit 0 (verified end-to-end); the worker MQTT/telnet logic is unchanged from the prior script
 <!-- AC:END -->
 
 ## Implementation Plan
