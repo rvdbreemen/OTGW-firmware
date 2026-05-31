@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.110
+**  Version  : v2.0.0-alpha.112
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -48,6 +48,11 @@ constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
 constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
+// Bounded retries for a short MQTTclient.write() (sndbuf momentarily full).
+// Each retry yields so the TCP stack can drain before we try again, letting a
+// started publish complete instead of leaving a truncated MQTT packet on the
+// wire that the broker rejects as malformed (TASK-770).
+constexpr uint8_t MQTT_WRITE_MAX_RETRIES = 10;
 // Minimum free heap required before attempting a discovery publish.
 // Streaming HA discovery (ADR-042: streaming JSON, no ArduinoJson) only needs
 // ~200 bytes per chunk, so the guard is an absolute "last safety rail", not a
@@ -289,7 +294,15 @@ static bool writeMqttChunk(const char *data, size_t len)
   size_t pos = 0;
   while (pos < len) {
     size_t chunkLen = (len - pos) > CHUNK_SIZE ? CHUNK_SIZE : (len - pos);
-    size_t written = MQTTclient.write(reinterpret_cast<const uint8_t*>(data + pos), chunkLen);
+    // Retry short writes (sndbuf momentarily full), yielding between attempts
+    // so the TCP stack can drain; accumulate partial writes (TASK-770).
+    size_t written = 0;
+    uint8_t attempts = 0;
+    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES) {
+      size_t w = MQTTclient.write(reinterpret_cast<const uint8_t*>(data + pos + written), chunkLen - written);
+      written += w;
+      if (written < chunkLen) { feedWatchDog(); yield(); attempts++; }
+    }
     if (written != chunkLen) {
       PrintMQTTError();
       return false;
@@ -309,7 +322,15 @@ static bool writeMqttProgmemChunk(PGM_P data, size_t len)
     for (size_t i = 0; i < chunkLen; i++) {
       stage[i] = static_cast<char>(pgm_read_byte(data + pos + i));
     }
-    size_t written = MQTTclient.write(reinterpret_cast<const uint8_t*>(stage), chunkLen);
+    // Retry short writes (sndbuf momentarily full), yielding between attempts
+    // so the TCP stack can drain; accumulate partial writes (TASK-770).
+    size_t written = 0;
+    uint8_t attempts = 0;
+    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES) {
+      size_t w = MQTTclient.write(reinterpret_cast<const uint8_t*>(stage + written), chunkLen - written);
+      written += w;
+      if (written < chunkLen) { feedWatchDog(); yield(); attempts++; }
+    }
     if (written != chunkLen) {
       PrintMQTTError();
       return false;
@@ -1271,7 +1292,7 @@ bool sendMQTTData(const char* topic, const char *json, const bool retain)
   const size_t payloadLen = strlen(json);
   if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttChunk(json, payloadLen)) {
-    MQTTclient.endPublish();
+    MQTTclient.disconnect();  // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-770)
     return false;
   }
   if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
@@ -1319,7 +1340,7 @@ bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   const size_t payloadLen = strlen_P(payload);
   if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttProgmemChunk(payload, payloadLen)) {
-    MQTTclient.endPublish();
+    MQTTclient.disconnect();  // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-770)
     return false;
   }
   if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
@@ -1625,7 +1646,7 @@ void sendMQTT(const char* topic, const char *json) {
 
   const size_t len = strlen(json);
   if (!beginMqttPublish(topic, len, true)) return;
-  if (!writeMqttChunk(json, len)) { MQTTclient.endPublish(); return; }
+  if (!writeMqttChunk(json, len)) { MQTTclient.disconnect(); return; }  // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-770)
   if (!MQTTclient.endPublish()) PrintMQTTError();
   feedWatchDog();
 }
@@ -2694,7 +2715,7 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
   // traverse all branches without a single watchdog kick.
   if (!beginMqttPublish(topic, (size_t)n, /*retain=*/true)) { feedWatchDog(); return false; }
   if (!writeMqttChunk(payload, (size_t)n)) {
-    MQTTclient.endPublish();
+    MQTTclient.disconnect();  // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-770)
     feedWatchDog();
     return false;
   }
