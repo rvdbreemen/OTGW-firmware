@@ -3,10 +3,11 @@ id: TASK-769
 title: >-
   Fix: MQTT malformed-packet disconnect from partial chunk write under low heap
   (ESP8266)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-30 21:45'
+updated_date: '2026-05-31 06:49'
 labels:
   - bug
 dependencies: []
@@ -39,6 +40,17 @@ Root cause (code-confirmed, MQTTstuff.ino): the streaming publish path beginMqtt
 - [ ] #5 python evaluate.py --quick shows no new failures
 - [ ] #6 Field validation by GeorgeZ83 on ESP8266 + HA: no malformed-packet/session-taken-over disconnects with web UI open
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. writeMqttChunk + writeMqttProgmemChunk (MQTTstuff.ino:283,300): add bounded retry-with-yield() on short MQTTclient.write() so a started publish completes when lwIP sndbuf drains.
+2. On genuine failure (retries exhausted): callers (sendMQTTData 1004-1008, PROGMEM overload 1052-1056, sendMQTT 1230) must drop the TCP link via MQTTclient.stop() instead of endPublish() on a truncated payload — prevents malformed packet to broker.
+3. Add MQTT_WRITE_MAX_RETRIES constant.
+4. python build.py (full) exit 0; python evaluate.py --quick green.
+5. Commit MQTTstuff.ino only (leave unrelated dirty UI files). Do NOT push — field validation by George pending.
+6. Guard-relax (HEAP_LOW/WARNING) deferred to follow-up after George validates desync fix.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
