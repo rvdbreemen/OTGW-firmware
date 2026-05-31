@@ -5,9 +5,9 @@ title: >-
   (ESP8266)
 status: In Progress
 assignee:
-  - '@codex'
+  - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 09:31'
+updated_date: '2026-05-31 12:48'
 labels:
   - bug
 dependencies: []
@@ -33,13 +33,13 @@ Root cause (code-confirmed, MQTTstuff.ino): the streaming publish path beginMqtt
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 writeMqttChunk/writeMqttProgmemChunk short-write no longer leaves a partial MQTT packet on the wire (broker never sees malformed packet): on unrecoverable short-write the TCP connection is cleanly dropped (MQTTclient.stop) instead of calling endPublish() on a truncated payload
-- [ ] #2 Add a bounded retry-with-yield on MQTTclient.write() short-writes so a started publish completes when lwIP sndbuf drains, rather than aborting on the first short write
-- [ ] #3 Heap-guard threshold review: document the trade-off (lower guard = fewer drops but more partial-write disconnects) and only relax HEAP_LOW/HEAP_WARNING after the desync fix lands; record chosen values with rationale
+- [x] #1 writeMqttChunk/writeMqttProgmemChunk short-write no longer leaves a partial MQTT packet on the wire (broker never sees malformed packet): on unrecoverable short-write the TCP connection is cleanly dropped (MQTTclient.stop) instead of calling endPublish() on a truncated payload
+- [x] #2 Add a bounded retry-with-yield on MQTTclient.write() short-writes so a started publish completes when lwIP sndbuf drains, rather than aborting on the first short write
+- [x] #3 Heap-guard threshold review: document the trade-off (lower guard = fewer drops but more partial-write disconnects) and only relax HEAP_LOW/HEAP_WARNING after the desync fix lands; record chosen values with rationale
 - [ ] #4 python build.py --firmware exits 0
-- [ ] #5 python evaluate.py --quick shows no new failures
+- [x] #5 python evaluate.py --quick shows no new failures
 - [ ] #6 Field validation by GeorgeZ83 on ESP8266 + HA: no malformed-packet/session-taken-over disconnects with web UI open
-- [ ] #7 Discovery composer path (mqtt_configuratie.cpp stream*Discovery, 7 sites): failure branch must drop TCP via client.disconnect() instead of client.endPublish() on a truncated payload — this is the largest-payload path, most prone to short-write desync under heap pressure
+- [x] #7 Discovery composer path (mqtt_configuratie.cpp stream*Discovery, 7 sites): failure branch must drop TCP via client.disconnect() instead of client.endPublish() on a truncated payload — this is the largest-payload path, most prone to short-write desync under heap pressure
 <!-- AC:END -->
 
 ## Implementation Plan
