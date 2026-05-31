@@ -1,7 +1,7 @@
 ---
 id: TASK-787
 title: Change MQTT publish interval default to 60 seconds
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-31 16:53'
