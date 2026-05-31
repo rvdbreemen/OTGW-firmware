@@ -6524,7 +6524,7 @@ function refreshBoilerSupport() {
                 html += '<td class="boiler-unsupported-id">' + escapeHtml(id) + '</td>';
                 html += '<td class="boiler-unsupported-friendly">' + escapeHtml(friendly) + '</td>';
                 html += '<td class="boiler-unsupported-label">' + escapeHtml(label) + '</td>';
-                html += '<td class="boiler-unsupported-mode">' + escapeHtml(mode) + '</td>';
+                html += '<td><span class="boiler-unsupported-pill">' + escapeHtml(mode) + '</span></td>';
                 html += '</tr>';
             }
             r.forEach(function (e) { addUnsupportedItem(e, 'read'); });

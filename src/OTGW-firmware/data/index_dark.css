@@ -1004,19 +1004,29 @@
 .boiler-unsupported-panel {
   background: #3d320c;
   border: 1px solid #d89400;
-  border-radius: 4px;
+  border-left: 4px solid #d89400;
+  border-radius: 6px;
   box-sizing: border-box;
   color: #ffd970;
-  margin-top: 8px;
+  margin-top: 10px;
   max-width: 100%;
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
 
 .boiler-unsupported-summary {
+  align-items: center;
+  display: flex;
   font-weight: 700;
-  margin-bottom: 8px;
+  gap: 8px;
+  letter-spacing: 0.01em;
+  margin-bottom: 10px;
   overflow-wrap: anywhere;
-  white-space: normal;
+}
+
+.boiler-unsupported-summary::before {
+  content: "\26A0";  /* warning sign */
+  font-size: 15px;
+  line-height: 1;
 }
 
 .boiler-unsupported-table {
@@ -1030,39 +1040,55 @@
 .boiler-unsupported-panel .boiler-unsupported-table td {
   background: transparent;
   border: none;
-  border-bottom: 1px solid rgba(216, 148, 0, 0.45);
-  padding: 5px 28px 5px 0;
+  padding: 6px 32px 6px 0;
   text-align: left;
   vertical-align: top;
   white-space: nowrap;
 }
 
-.boiler-unsupported-panel .boiler-unsupported-table th {
-  font-size: 11px;
+.boiler-unsupported-panel .boiler-unsupported-table thead th {
+  border-bottom: 1px solid rgba(255, 217, 112, 0.3);
+  color: rgba(255, 217, 112, 0.8);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding-bottom: 5px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+}
+
+.boiler-unsupported-panel .boiler-unsupported-table tbody tr + tr td {
+  border-top: 1px solid rgba(255, 217, 112, 0.12);
+}
+
+.boiler-unsupported-panel .boiler-unsupported-table tbody tr:hover td {
+  background: rgba(255, 217, 112, 0.07);
 }
 
 .boiler-unsupported-id {
   font-family: var(--font-mono);
   font-weight: 700;
-  white-space: nowrap;
-}
-
-.boiler-unsupported-label {
-  font-family: var(--font-mono);
-  overflow-wrap: anywhere;
 }
 
 .boiler-unsupported-friendly {
   overflow-wrap: anywhere;
+  white-space: normal;
 }
 
-.boiler-unsupported-mode {
-  font-size: 11px;
+.boiler-unsupported-label {
+  color: rgba(255, 217, 112, 0.75);
+  font-family: var(--font-mono);
+}
+
+.boiler-unsupported-pill {
+  background: rgba(255, 217, 112, 0.12);
+  border: 1px solid rgba(255, 217, 112, 0.3);
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 9px;
   text-transform: uppercase;
-  white-space: nowrap;
 }
 
   /* Firmware Upgrade Progress */
