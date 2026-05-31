@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 06:49'
+updated_date: '2026-05-31 07:01'
 labels:
   - bug
 dependencies: []
@@ -60,4 +60,10 @@ Related prior work: TASK-242 (serial overrun + MQTT throttle drops, Done).
 Heap tiers at time of report (helperStuff.ino:900-902): CRITICAL=1536 (block), WARNING=3072 (throttle 500ms), LOW=5120 (throttle 100ms); frag-promote when freeHeap in LOW band and maxBlock<1536. Throttle MS: helperStuff.ino:915-918.
 
 User request under evaluation: lower heap-guard thresholds to reduce MQTT drops. RISK: relaxing the guard BEFORE the desync fix makes publishes proceed at lower heap -> more short-writes -> MORE malformed-packet disconnects. Correct order = fix writeMqttChunk desync first, then relax guard.
+
+Desync fix implemented + committed 7e5a61ed (MQTTstuff.ino only).
+- writeMqttChunk/writeMqttProgmemChunk: bounded retry-with-yield (MQTT_WRITE_MAX_RETRIES=10) on short MQTTclient.write().
+- 3 caller failure branches: MQTTclient.disconnect() instead of endPublish() on truncated payload (agent first used non-existent PubSubClient.stop(); corrected to disconnect()).
+- Build: python build.py exit 0. Evaluate --quick: 34/34 pass, 0 fail, 100%.
+- NOT pushed (field validation by George pending). Guard-relax deferred.
 <!-- SECTION:NOTES:END -->
