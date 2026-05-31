@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 16:38'
-updated_date: '2026-05-31 16:42'
+updated_date: '2026-05-31 16:43'
 labels:
   - mqtt
   - timers
@@ -36,3 +36,9 @@ timer5min and timer60s always fire together every 5 minutes (300s = 5x60s). This
 3. Update DECLARE_TIMER_MIN(timer5min, ...) in loop() with 30000, 60000 jitter
 4. Build + evaluate
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added optional jitter_min_ms / jitter_max_ms parameters to all three DECLARE_TIMER_* macros (MIN, SEC, MS) in safeTimers.h. A new __JitterOffset__(min, max) helper returns random(min, max) when max > min, else 0. Applied to timer5min with 30000-60000ms so it can never align with timer60s (300s = 5×60s) again. All existing callers unaffected — default 0 = no jitter. Build clean, evaluator 100%. Pushed to origin/dev.
+<!-- SECTION:FINAL_SUMMARY:END -->
