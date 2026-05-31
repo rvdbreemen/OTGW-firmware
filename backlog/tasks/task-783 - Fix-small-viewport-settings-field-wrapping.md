@@ -40,3 +40,13 @@ Coding agent: Codex.
 Implementation notes: The mobile settings layout did not stack because the desktop selector `.settingDiv:not(.fixed-ip-section)` has higher specificity than the mobile `.settingDiv` override. Updated the max-width 768px rule in `src/OTGW-firmware/data/index_common.css` to override at matching specificity and made `.settings-field-container` block-level inside that breakpoint so labels occupy their own line before inputs/controls. Desktop flex layout remains governed by the unchanged top-level rule.
 Validation: Rendered a Playwright mobile fixture at 390x844 using the production CSS and verified label -> input -> next card stacking. Rendered the same fixture at 1000x700 and verified desktop label/input alignment remains side-by-side. Ran `python evaluate.py --quick`; result was 36 total checks, 34 passed, 0 warnings, 0 failed, 2 info, health score 100%.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed the small-viewport settings layout without changing desktop behavior.
+
+- Added a max-width 768px override for `.settingDiv:not(.fixed-ip-section)` so non-fixed settings rows stop using the desktop flex layout on phones.
+- Made `.settings-field-container` display as a block at the same breakpoint, forcing label text onto its own line before the associated input/control.
+- Verified mobile stacking and desktop side-by-side alignment with Playwright screenshots, and ran `python evaluate.py --quick` successfully.
+<!-- SECTION:FINAL_SUMMARY:END -->
