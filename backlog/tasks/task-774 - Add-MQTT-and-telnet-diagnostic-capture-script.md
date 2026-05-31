@@ -1,9 +1,11 @@
 ---
 id: TASK-774
 title: Add MQTT and telnet diagnostic capture script
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-31 08:50'
+updated_date: '2026-05-31 08:51'
 labels: []
 dependencies: []
 ---
