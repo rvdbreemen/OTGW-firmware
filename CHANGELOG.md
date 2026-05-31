@@ -9,7 +9,7 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 ## [Unreleased]
 
 ### Changed
-- MQTT on-change publishing is now the backend default: fresh settings use `MQTTonChangePublishing=true` with `MQTTinterval=60`, and the v1.6.1 settings load migrates an existing `MQTTinterval=0` to `60` unless `MQTTonChangePublishing=false` is present.
+- MQTT publish interval now defaults to `60` seconds on fresh installs: changed OpenTherm values publish immediately and unchanged values refresh once per minute. Existing devices keep their stored `MQTTinterval` (`0` = legacy publish-every-message); set it back to `0` any time to restore that behaviour.
 
 ## [1.6.0] - 2026-05-28
 

@@ -65,14 +65,12 @@ enum states_of_MQTT {
 - Eliminates buffer resize cycles
 - Saves 200-400 bytes of heap
 
-**Configurable publish interval (v1.3.0+, `settingMQTTinterval`; default updated in v1.6.1):**
+**Configurable publish interval (v1.3.0+, `settingMQTTinterval`):**
 
-Users with high-traffic MQTT brokers can set a heartbeat interval (seconds) for unchanged values per OpenTherm message ID. The design:
+Users with high-traffic MQTT brokers can set a minimum interval (seconds) between publishes per OpenTherm message ID. The design:
 
-- `MQTTonChangePublishing = true` (default): on-change publishing is enabled. The default `MQTTinterval` is `60`, so changed values publish immediately and unchanged values refresh once per minute.
-- `MQTTonChangePublishing = false`: legacy mode — every normal OT value is published immediately, no interval throttling.
-- `MQTTinterval > 0`: while on-change publishing is enabled, a message is published only if its raw value has changed since last publish, OR the interval has elapsed. This ensures changes are never suppressed and the broker receives a periodic refresh even for stable values.
-- `MQTTinterval = 0`: retained as a compatibility escape hatch; in v1.6.1 settings load migrates `MQTTinterval=0` to `60` when `MQTTonChangePublishing` is enabled or missing from `settings.ini`.
+- `settingMQTTinterval = 0` (default): legacy mode — every OT value published immediately, no throttling.
+- `settingMQTTinterval > 0`: a message is published only if its raw value has changed since last publish, OR the interval has elapsed. This ensures changes are never suppressed and the broker receives a periodic refresh even for stable values.
 - Per-slot state is packed into `mqttlastsent[256]` (1 KB): bits 31–16 hold the last published `uint16_t` value; bits 15–0 hold the seconds-since-boot timestamp (wraps ~18h; safe for intervals ≤ 3600s with `uint16_t` subtraction).
 - **IDs 128–255** (manufacturer-specific/Remeha): always published regardless of interval to prevent cross-slot aliasing (adding 128 to a REQUEST id would collide with RESPONSE slot 0 = Status flags).
 - **Status bits** (OT_Statusflags, id=0): each bit has its own slot in `mqttlastsentstatusbit[16]` (slots 0–7 = master bits, 8–15 = slave bits) so each bit refreshes independently.

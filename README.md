@@ -266,7 +266,7 @@ Set the **Publish Interval** (under Settings > MQTT) to a value like `60` second
 - Publish immediately when a value **changes**.
 - Re-publish unchanged values once per interval as a heartbeat (so Home Assistant does not mark sensors as unavailable).
 
-Upgrading to `v1.6.1` migrates the old backend `MQTTinterval=0` setting to `60` when `MQTTonChangePublishing` is enabled or missing from `settings.ini`. To keep legacy every-message publishing, set `MQTTonChangePublishing=false` in `settings.ini` or disable publish-on-change before saving.
+A value of `10`-`60` is a good starting point. Adjust based on how responsive you need your automations to be. Setting the interval back to `0` restores legacy behaviour: every OpenTherm frame is published as it arrives. Existing devices keep whatever interval they already had after an upgrade; only fresh installs start at `60`.
 
 ### Step 4: Optional -- send commands from Home Assistant
 
