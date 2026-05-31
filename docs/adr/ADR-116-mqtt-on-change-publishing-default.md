@@ -1,7 +1,7 @@
 ---
 id: ADR-116
 title: MQTT On-Change Publishing as the Default with One-Time Interval Migration
-status: Proposed
+status: Accepted
 date: 2026-05-31
 tags: [mqtt, settings, home-assistant, migration, defaults]
 supersedes: []
@@ -14,9 +14,9 @@ deciders: [Robert van den Breemen]
 
 ## Status
 
-Proposed. Date: 2026-05-31.
+Accepted. Date: 2026-05-31.
 
-**Decision Maker:** User: Robert van den Breemen (port of the dev 1.5.x decision into the 2.0.0 line; awaiting acceptance).
+**Decision Maker:** User: Robert van den Breemen (port of the dev 1.5.x decision into the 2.0.0 line; accepted by maintainer).
 
 ## Status History
 
