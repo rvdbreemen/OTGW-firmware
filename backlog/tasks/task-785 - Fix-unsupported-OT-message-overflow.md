@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-31 16:28'
-updated_date: '2026-05-31 16:29'
+updated_date: '2026-05-31 16:32'
 labels:
   - webui ui
 dependencies: []
@@ -35,4 +35,6 @@ Long unsupported OpenTherm status messages, such as 'Boiler does not implement' 
 
 <!-- SECTION:NOTES:BEGIN -->
 Started on branch dev as @codex. User-provided screenshot shows the unsupported OT warning/badge overflowing horizontally instead of presenting a readable list.
+
+Located the issue in src/OTGW-firmware/data/index.html, index.css/index_dark.css, and refreshBoilerSupport() in index.js. The long unsupported list is rendered inside the statistics footer as nested spans, so the generic .ot-log-footer span display rule keeps the dynamic list from wrapping cleanly.
 <!-- SECTION:NOTES:END -->
