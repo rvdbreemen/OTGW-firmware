@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 07:16'
+updated_date: '2026-05-31 07:20'
 labels:
   - bug
 dependencies: []
@@ -67,4 +67,6 @@ Desync fix implemented + committed 7e5a61ed (MQTTstuff.ino only).
 - 3 caller failure branches: MQTTclient.disconnect() instead of endPublish() on truncated payload (agent first used non-existent PubSubClient.stop(); corrected to disconnect()).
 - Build: python build.py exit 0. Evaluate --quick: 34/34 pass, 0 fail, 100%.
 - NOT pushed (field validation by George pending). Guard-relax deferred.
+
+Discovery-path gap found + fixed (2nd commit f8314a0b, mqtt_configuratie.cpp +7/-7). 7 stream*Discovery composers (sensor/binsensor/number/climate-ish/button/select) called client.endPublish() on writer.ok==false (truncated) -> same desync. Now client.disconnect(). This is the largest-payload path, most likely to short-write under George heap pressure. Build exit 0, eval 100%, adr-judge 0 violations. Dev TASK-769 commits: 7e5a61ed + f8314a0b. Not pushed (George field validation pending).
 <!-- SECTION:NOTES:END -->
