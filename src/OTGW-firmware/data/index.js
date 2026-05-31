@@ -6519,7 +6519,6 @@ function refreshBoilerSupport() {
     var line = document.getElementById('boilerUnsupportedLine');
     var list = document.getElementById('boilerUnsupportedList');
     if (!line || !list) return;
-    var defaultTitle = 'OT msgIDs the boiler answered with Unknown-Data-Id at least once this session.';
     fetch(APIGW + "v2/otgw/boiler-support")
         .then(function (response) {
             if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -6533,7 +6532,7 @@ function refreshBoilerSupport() {
                 list.textContent = '';
                 line.removeAttribute('data-tooltip');
                 line.removeAttribute('aria-label');
-                line.title = defaultTitle;
+                line.removeAttribute('title');
                 return;
             }
             var parts = [];
@@ -6541,9 +6540,9 @@ function refreshBoilerSupport() {
             w.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', write)'); });
             list.textContent = parts.join(', ');
             var fullText = 'Boiler does not implement: ' + parts.join(', ');
-            line.setAttribute('data-tooltip', fullText);
+            line.removeAttribute('data-tooltip');
             line.setAttribute('aria-label', fullText);
-            line.title = fullText;
+            line.removeAttribute('title');
             line.classList.remove('hidden');
         })
         .catch(function () {
@@ -6551,7 +6550,7 @@ function refreshBoilerSupport() {
             line.classList.add('hidden');
             line.removeAttribute('data-tooltip');
             line.removeAttribute('aria-label');
-            line.title = defaultTitle;
+            line.removeAttribute('title');
         });
 }
 

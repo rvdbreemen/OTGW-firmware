@@ -987,6 +987,9 @@
 .ot-log-footer {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6px 12px;
   padding: 8px 12px;
   background: #3a3a3c;
   border-radius: 0 0 4px 4px;
@@ -1004,46 +1007,16 @@
   border-radius: 4px;
   padding: 2px 8px;
   color: #ffd970;
-  cursor: help;
   font-weight: 500;
-  max-width: 75%;
-  position: relative;
-}
-
-#boilerUnsupportedLine:focus {
-  outline: 2px solid #f0ad4e;
-  outline-offset: 2px;
+  flex: 1 1 320px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .boiler-unsupported-summary {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#boilerUnsupportedLine[data-tooltip]:hover::after,
-#boilerUnsupportedLine[data-tooltip]:focus::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 1000;
-  box-sizing: border-box;
-  width: max-content;
-  max-width: 520px;
-  max-width: min(520px, 80vw);
-  padding: 8px 10px;
-  background: #26210f;
-  border: 1px solid #d89400;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
-  color: #ffe39a;
-  font-weight: 400;
-  line-height: 1.35;
-  text-align: left;
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
   /* Firmware Upgrade Progress */
