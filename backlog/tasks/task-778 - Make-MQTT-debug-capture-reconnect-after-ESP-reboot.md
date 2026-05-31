@@ -1,9 +1,11 @@
 ---
 id: TASK-778
 title: Make MQTT debug capture reconnect after ESP reboot
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-31 10:04'
+updated_date: '2026-05-31 10:05'
 labels: []
 dependencies: []
 ---
