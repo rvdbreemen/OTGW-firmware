@@ -74,4 +74,14 @@ Discovery-path gap found + fixed (2nd commit f8314a0b, mqtt_configuratie.cpp +7/
 2026-05-31 @codex scope update: add script usability hint too. User requested help discoverability (e.g. --help) and explicit instructions for stopping the capture manually. Include this in scripts/capture-mqtt-debug.ps1 and the .bat launcher path while preserving the credential fix.
 
 2026-05-31 @codex script follow-up implemented. scripts/capture-mqtt-debug.ps1 now prompts for an optional MQTT username during interactive host-prompt mode and prompts securely for the password when a username is supplied without -Password. Blank username keeps anonymous mode. Added -Help output with usage, credential behavior, and Ctrl+C/-DurationSeconds stop instructions; scripts/capture-mqtt-debug.bat maps --help and /? to -Help. Validation: pwsh parser OK; ps1 -Help OK; ps1 --help OK; bat --help OK; explicit credential harness passed (-u mqttuser -P mqttpass, password not in summary); interactive Read-Host shim passed for credential mode; anonymous interactive shim passed with no -u/-P.
+
+## Wrap-up 2026-05-31
+
+Desync fix landed + pushed both branches (dev e5a26192 status path + 2de244f2 discovery path; 2.0.0 dabc6f71 + 4363246f). Root cause triple-confirmed via Discord #beta-testing (George + Rob + Sergeant D): garbage tail DIFFERENT each decode-failure, always a discovery config payload = truncated-publish desync, not framing bug, not heap corruption. The G was a red herring (0x83 = SUBSCRIBE nibble, impossible mid-publish).
+
+### AC#3 decision: defer guard relax to telemetry-driven tuning
+Trade-off documented: lower guard = fewer throttle-drops but more (now-graceful) partial-write disconnects. KEY new signal from Discord: web UI live-log (WebSocket OT-frame push) is the heap-pressure TRIGGER (George: tab closed = stable for hours; open = sensors unavailable in ~10 min). getHeapHealth() feeds ONE tier ladder gating BOTH canSendWebSocket() and canPublishMQTT(). Lowering the shared HEAP_LOW/HEAP_WARNING would relax the WS live-log too, raising heap pressure at exactly the level George crashes = worsens his trigger. CHOSEN VALUES: keep current (CRITICAL 1536 / WARNING 3072 / LOW 5120 / RESTORE 6144) for now; do NOT relax blind. Tune with real heap-dip telemetry from Georges repro after the desync-fix beta. The WS-reliability root focus spun off to TASK-779 (decouple WS throttle from MQTT gate, backpressure live-log, robust reconnect).
+
+### Remaining
+AC#6 = field validation by GeorgeZ83 (NodeMCU v3 + HA, live-log open). Hardware-gated, cannot self-verify. George has a reliable 10-min repro and volunteered to hammer the beta. Task stays In Progress until he confirms no malformed-packet / session-taken-over events.
 <!-- SECTION:NOTES:END -->
