@@ -23,3 +23,9 @@ On narrow screens, settings rows currently keep label text and input/control on 
 - [ ] #3 Desktop settings layout remains unchanged.
 - [ ] #4 Validation covers the affected responsive CSS/markup path.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Locate the settings page markup and responsive CSS controlling label/control rows.\n2. Apply a small-screen-only rule so setting labels and controls stack cleanly without changing desktop layout.\n3. Validate with targeted CSS/UI checks and update TASK-783 acceptance criteria, notes, and final summary.
+<!-- SECTION:PLAN:END -->
