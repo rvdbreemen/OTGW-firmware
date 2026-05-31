@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-31 09:46'
-updated_date: '2026-05-31 09:48'
+updated_date: '2026-05-31 09:54'
 labels:
   - scripts diagnostics bug
 dependencies: []
@@ -33,3 +33,20 @@ Fix the diagnostic capture script so Ctrl+C exits cleanly and telnet logging sur
 3. Keep MQTT capture independent so mosquitto_sub continues while telnet reconnects.
 4. Validate parser behavior and local stop/reconnect flow with loopback test fixtures.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Branch: dev
+Coding agent: Codex
+Files changed: scripts/capture-mqtt-debug.ps1
+
+Implemented a runspace-free .NET Ctrl+C cancel flag so Console.CancelKeyPress no longer invokes a PowerShell scriptblock from the console signal thread. Refactored telnet capture into reconnectable helpers: the MQTT subscriber starts independently, telnet connect/read failures are logged, disconnected sockets are closed, and the loop retries telnet every 2 seconds until Ctrl+C, duration expiry, or mqtt process exit.
+
+Validation evidence:
+- pwsh parser check passed for scripts/capture-mqtt-debug.ps1.
+- Windows PowerShell parser check passed for scripts/capture-mqtt-debug.ps1.
+- Embedded cancel handler validation invoked the handler from a non-PowerShell thread, confirmed the stop flag was set, and confirmed the console cancel event was canceled.
+- Loopback telnet validation connected to a local listener, enabled MQTT debug from 3 MQTT [0], survived a forced disconnect, reconnected to a second listener reporting 3 MQTT [1], captured after-reconnect in telnet.log, and stopped by duration with summary.txt written.
+- git diff --check passed for scripts/capture-mqtt-debug.ps1.
+<!-- SECTION:NOTES:END -->
