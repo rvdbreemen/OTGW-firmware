@@ -6518,12 +6518,14 @@ function refreshBoilerSupport() {
             function addUnsupportedItem(e, mode) {
                 var id = String(e.id);
                 var label = e.label || 'Unknown';
-                parts.push(id + ' (' + label + ', ' + mode + ')');
-                html += '<li>';
-                html += '<span class="boiler-unsupported-id">' + escapeHtml(id) + '</span>';
-                html += '<span class="boiler-unsupported-label">' + escapeHtml(label) + '</span>';
-                html += '<span class="boiler-unsupported-mode">' + escapeHtml(mode) + '</span>';
-                html += '</li>';
+                var friendly = e.friendly || '';
+                parts.push(id + ' ' + (friendly ? friendly + ' ' : '') + '(' + label + ', ' + mode + ')');
+                html += '<tr>';
+                html += '<td class="boiler-unsupported-id">' + escapeHtml(id) + '</td>';
+                html += '<td class="boiler-unsupported-friendly">' + escapeHtml(friendly) + '</td>';
+                html += '<td class="boiler-unsupported-label">' + escapeHtml(label) + '</td>';
+                html += '<td class="boiler-unsupported-mode">' + escapeHtml(mode) + '</td>';
+                html += '</tr>';
             }
             r.forEach(function (e) { addUnsupportedItem(e, 'read'); });
             w.forEach(function (e) { addUnsupportedItem(e, 'write'); });
