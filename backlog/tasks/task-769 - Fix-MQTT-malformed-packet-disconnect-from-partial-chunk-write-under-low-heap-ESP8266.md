@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 09:18'
+updated_date: '2026-05-31 09:27'
 labels:
   - bug
 dependencies: []
@@ -70,4 +70,6 @@ Desync fix implemented + committed 7e5a61ed (MQTTstuff.ino only).
 Discovery-path gap found + fixed (2nd commit f8314a0b, mqtt_configuratie.cpp +7/-7). 7 stream*Discovery composers (sensor/binsensor/number/climate-ish/button/select) called client.endPublish() on writer.ok==false (truncated) -> same desync. Now client.disconnect(). This is the largest-payload path, most likely to short-write under George heap pressure. Build exit 0, eval 100%, adr-judge 0 violations. Dev TASK-769 commits: 7e5a61ed + f8314a0b. Not pushed (George field validation pending).
 
 2026-05-31 @codex follow-up: user reported scripts/capture-mqtt-debug.ps1 interactive mode never asks for MQTT username/password, so mosquitto_sub runs anonymously and field capture fails on authenticated brokers. Plan: add optional interactive username prompt; when a username is provided interactively or via -Username without -Password, prompt securely for password; keep anonymous brokers working when username is blank; validate with a non-network harness that captures mosquitto_sub arguments and summary output.
+
+2026-05-31 @codex scope update: add script usability hint too. User requested help discoverability (e.g. --help) and explicit instructions for stopping the capture manually. Include this in scripts/capture-mqtt-debug.ps1 and the .bat launcher path while preserving the credential fix.
 <!-- SECTION:NOTES:END -->
