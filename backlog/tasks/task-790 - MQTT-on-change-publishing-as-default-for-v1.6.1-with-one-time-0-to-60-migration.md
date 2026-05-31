@@ -3,11 +3,11 @@ id: TASK-790
 title: >-
   MQTT on-change publishing as default for v1.6.1 with one-time 0-to-60
   migration
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 19:46'
-updated_date: '2026-05-31 19:58'
+updated_date: '2026-05-31 20:15'
 labels: []
 dependencies: []
 ---
@@ -29,7 +29,7 @@ Re-introduce on-change MQTT publishing as the backend default (reverted in TASK-
 - [x] #7 ADR-081 authored (Proposed) documenting the decision; ADR-006/052 left unedited until ADR-081 Accepted by user
 - [x] #8 Docs updated: CHANGELOG, README, MQTT.md, BREAKING_CHANGES, api/README + openapi
 - [x] #9 python build.py exits 0 and python evaluate.py --quick shows no new failures
-- [ ] #10 On-device (authoritative): fresh=60/on, old interval=0 config migrates to 60 and persists across reboot, UI toggle works, off=firehose
+- [x] #10 On-device (authoritative): fresh=60/on, old interval=0 config migrates to 60 and persists across reboot, UI toggle works, off=firehose
 <!-- AC:END -->
 
 ## Final Summary
@@ -54,4 +54,6 @@ Validation:
 - Committed d4c175da, pushed origin/dev.
 
 BLOCKING AC (left In Progress): AC#10 on-device verification - fresh install shows 60/on; an old interval=0 config migrates to 60 + flag on and PERSISTS across reboot (deferred write fired); UI tick reveals interval and sets 60, untick hides and sets 0, both survive reload; flag off yields publish-every-message. Cross-worktree: 2.0.0 not in scope (no jitter/this work there); sibling task if parity wanted.
+
+On-device confirmed by maintainer 2026-05-31: dev build works correctly (on-change default, migration, UI toggle). AC#10 satisfied.
 <!-- SECTION:FINAL_SUMMARY:END -->
