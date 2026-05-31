@@ -18,10 +18,10 @@ On narrow screens, settings rows currently keep label text and input/control on 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 At the small viewport breakpoint, label text renders on its own line before the associated input/control.
-- [ ] #2 Each stacked setting keeps the input/control before the next card or row begins.
-- [ ] #3 Desktop settings layout remains unchanged.
-- [ ] #4 Validation covers the affected responsive CSS/markup path.
+- [x] #1 At the small viewport breakpoint, label text renders on its own line before the associated input/control.
+- [x] #2 Each stacked setting keeps the input/control before the next card or row begins.
+- [x] #3 Desktop settings layout remains unchanged.
+- [x] #4 Validation covers the affected responsive CSS/markup path.
 <!-- AC:END -->
 
 ## Implementation Plan
