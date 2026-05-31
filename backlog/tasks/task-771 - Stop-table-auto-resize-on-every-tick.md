@@ -1,11 +1,11 @@
 ---
 id: TASK-771
 title: Stop table auto-resize on every tick
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-31 07:44'
-updated_date: '2026-05-31 07:54'
+updated_date: '2026-05-31 07:55'
 labels:
   - bug web-ui
 dependencies: []
