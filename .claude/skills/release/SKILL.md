@@ -166,7 +166,14 @@ Proceed directly after Phase 4 approval.
    echo "Exit: $?"
    ```
    Fix any issues. Read `.tmp/build_release_final.log` only on failure.
-4. **Commit the release build** and push `main`.
+4. **Commit the FULL release build output** and push `main`.
+   _The clean-version build rewrites `version.h`, `data/version.hash`, AND the `Version :` banner comments across ~24 source/data files. Stage the entire sweep (not just `version.h`) and confirm the tree is clean BEFORE tagging, otherwise the published tag carries stale `-beta` banners in source comments:_
+   ```bash
+   git add src/OTGW-firmware/
+   git commit -m "chore(release): v<version> production build (remove prerelease tag)"
+   git push origin main
+   git status --short   # MUST be clean (no leftover banner/build changes) before creating the tag
+   ```
 5. **Create draft GitHub release**:
    ```bash
    gh release create v<version> --target main \
