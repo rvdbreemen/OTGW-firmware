@@ -395,6 +395,54 @@ body.dark .otmonrow,
   font-size: var(--fs-xxs); color: var(--fg-3);
 }
 
+#boilerUnsupportedLine {
+  background: var(--status-warn-bg);
+  border: 1px solid var(--status-warn);
+  border-radius: var(--radius-md);
+  padding: 2px var(--space-3);
+  color: var(--status-warn-text);
+  cursor: help;
+  font-weight: 600;
+  max-width: 75%;
+  position: relative;
+}
+
+#boilerUnsupportedLine:focus {
+  outline: 2px solid var(--status-warn);
+  outline-offset: 2px;
+}
+
+.boiler-unsupported-summary {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#boilerUnsupportedLine[data-tooltip]:hover::after,
+#boilerUnsupportedLine[data-tooltip]:focus::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-2));
+  z-index: 1000;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 520px;
+  max-width: min(520px, 80vw);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--status-warn);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-dropdown);
+  color: var(--fg-1);
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+}
+
 /* =============================================================
  * 11. TABS + STATS TABLE
  * ============================================================= */
