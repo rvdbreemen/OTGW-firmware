@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 13:09'
-updated_date: '2026-05-31 13:09'
+updated_date: '2026-05-31 13:11'
 labels:
   - tooling
   - windows
@@ -26,5 +26,18 @@ scripts/ currently has four overlapping capture artifacts: capture_mqtt_debug.py
 - [ ] #4 Prompts for broker + OTGW host with sane defaults when no args given; accepts args for non-interactive use
 - [ ] #5 Bundles all logs into a single timestamped .zip for sharing
 - [ ] #6 Clear failure messages when a required runtime is missing; Ctrl+C / timed stop both end cleanly and still produce the zip
-- [ ] #7 README_capture.md updated to point at the single .bat; redundant scripts removed or clearly deprecated
+- [ ] #7 Companion Python script (stdlib-only, no paho/pip) the maintainer can run directly; raw-socket MQTT subscribe so there is no third-party dependency
+- [ ] #8 Both tools log MQTT subscribe-view + timestamped OTGW telnet debug to the SAME capture so the symptom (message gap) is time-correlated with the firmware side (heap dip, reconnect)
+- [ ] #9 README documents that the malformed-packet bytes live in the broker log + HA MQTT debug log (a subscriber cannot see them) and instructs the tester to collect those too
+- [ ] #10 Redundant scripts removed (launch_capture.bat, mqtt_telnet_capture.ps1, paho capture_mqtt_debug.py); README_capture.md points to the .bat + .py pair
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Write scripts/otgw_capture.py: stdlib-only raw-socket MQTT subscribe + telnet(:23) auto-reconnect + zip; logs gaps/timeline; no paho.
+2. Write scripts/otgw_capture.bat: self-contained, extracts embedded PowerShell to %TEMP%, runs -ExecutionPolicy Bypass; raw .NET TcpClient MQTT subscribe + telnet + Compress-Archive; zero deps.
+3. Rewrite README_capture.md: one .bat (testers) + one .py (maintainer); broker-log + HA-debug-log guidance for the actual malformed bytes.
+4. Remove launch_capture.bat, mqtt_telnet_capture.ps1, capture_mqtt_debug.py.
+5. Syntax-check py (python -m py_compile) and PS (extract block, powershell -NoProfile parse).
+<!-- SECTION:PLAN:END -->
