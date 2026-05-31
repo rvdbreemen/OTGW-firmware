@@ -1,9 +1,11 @@
 ---
 id: TASK-781
 title: Fix capture MQTT debug Ctrl+C handling
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-31 13:50'
+updated_date: '2026-05-31 13:50'
 labels: []
 dependencies: []
 ---
