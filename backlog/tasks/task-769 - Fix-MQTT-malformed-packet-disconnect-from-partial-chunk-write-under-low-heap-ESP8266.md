@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 12:48'
+updated_date: '2026-05-31 12:51'
 labels:
   - bug
 dependencies: []
@@ -84,6 +84,11 @@ Trade-off documented: lower guard = fewer throttle-drops but more (now-graceful)
 
 ### Remaining
 AC#6 = field validation by GeorgeZ83 (NodeMCU v3 + HA, live-log open). Hardware-gated, cannot self-verify. George has a reliable 10-min repro and volunteered to hammer the beta. Task stays In Progress until he confirms no malformed-packet / session-taken-over events.
+
+## Correction 2026-05-31 (sourcing + AC#3 rescope)
+Prior wrap-up note overstated Discord sourcing: there is NO Sergeant D in the #beta-testing thread and the tail-differs-each-time point was NOT discussed there. Disregard those. Actual verified sources for root cause: (a) HA Can-t-decode-payload log line (user-provided), (b) Georges telnet logs (free ~5800 / maxBlock ~1300), (c) #beta-testing chat Rob<->George: agree fragmentation -> short-write -> desync, George ratifies brief-reconnect over corrupted-sensors.
+
+AC#3 RESCOPED per user decision: do NOT relax the shared heap ladder. DECOUPLE WebSocket eligibility from the MQTT publish gate; relax MQTT only, keep/tighten WS (the WS live-log is the heap trigger: tab open -> unavailable ~10min, tab closed -> stable all day, on NodeMCU v3). Threshold VALUES pending Georges logHeapStats capture (tab open, just before failure) tonight. Decouple is an architectural change to the single getHeapHealth() tier ladder that gates both canSendWebSocket() and canPublishMQTT() -> needs a new ADR (ADR-030 is Accepted + llm_judge:true). Implementation overlaps TASK-779 (WS live-log reliability).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
