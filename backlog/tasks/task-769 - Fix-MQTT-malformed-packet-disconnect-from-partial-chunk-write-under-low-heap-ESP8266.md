@@ -5,9 +5,9 @@ title: >-
   (ESP8266)
 status: In Progress
 assignee:
-  - '@claude'
+  - '@codex'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 07:20'
+updated_date: '2026-05-31 09:16'
 labels:
   - bug
 dependencies: []
