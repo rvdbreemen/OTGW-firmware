@@ -19,8 +19,8 @@ capture-mqtt-debug.bat currently shows the Windows batch 'Terminate batch job (Y
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Ctrl+C stop path avoids or clearly suppresses the interactive 'Terminate batch job (Y/N)?' prompt where feasible.
-- [ ] #2 Stopping capture still leaves transcript and summary artifacts in the diagnostic folder.
-- [ ] #3 Change is documented or discoverable through the script help/output when a different stop key is required.
+- [x] #2 Stopping capture still leaves transcript and summary artifacts in the diagnostic folder.
+- [x] #3 Change is documented or discoverable through the script help/output when a different stop key is required.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -43,5 +43,5 @@ Commit note: not finalized/committed yet because scripts/capture-mqtt-debug.bat 
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Relevant script validation has been run or a blocker recorded.
+- [x] #1 Relevant script validation has been run or a blocker recorded.
 <!-- DOD:END -->
