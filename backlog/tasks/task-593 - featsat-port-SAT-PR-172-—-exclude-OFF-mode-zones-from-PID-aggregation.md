@@ -1,9 +1,11 @@
 ---
 id: TASK-593
 title: 'feat(sat): port SAT PR #172 — exclude OFF-mode zones from PID aggregation'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-08 18:00'
+updated_date: '2026-05-31 22:15'
 labels: []
 dependencies: []
 priority: medium

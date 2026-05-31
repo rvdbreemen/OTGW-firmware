@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.117
+**  Version  : v2.0.0-alpha.118
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -330,6 +330,7 @@ bool satHandleExternalOutdoor(const char* value);
 bool satHandleTargetTemp(const char* value);
 bool satHandleZoneRoomTemp(uint8_t zone, const char* value);
 bool satHandleZoneSetpoint(uint8_t zone, const char* value);
+bool satHandleZoneMode(uint8_t zone, const char* value);  // TASK-593: HVACMode.OFF per zone
 void satHandleEnabled(const char* value);
 void satHandleHeatingMode(const char* value);
 void satDisable();

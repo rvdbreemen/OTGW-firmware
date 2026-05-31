@@ -1366,26 +1366,72 @@ bool satHandleZoneSetpoint(uint8_t zone, const char* value)
   return true;
 }
 
+// Handler: push HVAC mode for zone n (1-based). TASK-593 / SAT Python PR #172.
+// Accepts an HA-style HVACMode string: "off" marks the zone OFF (excluded from PID
+// + P75 aggregation); any heating mode ("heat", "auto", "heat_cool", ...) clears the
+// OFF flag. The freshness timestamp is updated so a mode message alone keeps the zone
+// from going stale. The actual exclusion happens in satZonePidStep() via z.bOff.
+bool satHandleZoneMode(uint8_t zone, const char* value)
+{
+  if (zone < 1 || zone > SAT_MAX_ZONES) return false;
+  if (!value || !*value) return false;
+  uint8_t idx = zone - 1;
+  bool wasOff = satZones[idx].bOff;
+  bool nowOff = (strcasecmp_P(value, PSTR("off")) == 0);
+  satZones[idx].bOff          = nowOff;
+  satZones[idx].iLastUpdateMs = millis();
+  if (nowOff && !wasOff) {
+    // HEAT -> OFF edge: reset PID memory eagerly (AC#3). The next control cycle's
+    // satZonePidExclude() would reset it anyway, so this only guarantees a clean
+    // integral for any reader in the window before that tick (e.g. diagnostics).
+    satZones[idx].fPidIntegral = 0.0f;
+    satZones[idx].fPrevError   = 0.0f;
+    satZones[idx].fPidOutput   = SAT_MIN_SETPOINT;
+  }
+  SATDebugTf(PSTR("SAT zone %u: mode=%s (off=%d)\r\n"), zone, value, nowOff ? 1 : 0);
+  return true;
+}
+
+// Reset a zone's PID memory so re-activation starts from a clean integral.
+// Called on every early-return (OFF / invalid / stale) so an excluded zone does
+// not carry a stale integral when it later returns to HEAT. Zeroing an already-
+// zero integral is a no-op, so this is safe to call unconditionally (TASK-593).
+static inline float satZonePidExclude(SATZoneState& z)
+{
+  z.fPidIntegral = 0.0f;
+  z.fPrevError   = 0.0f;
+  z.fPidOutput   = SAT_MIN_SETPOINT;  // diagnostics reflect the excluded state
+  return SAT_MIN_SETPOINT;
+}
+
 // Run a simplified PID step for a single zone and return requested CH setpoint.
 // Uses zone-local integral + prev_error state. Reuses heating curve from zone setpoint
 // and shared gain calculation for consistent behavior.
-// Returns SAT_MIN_SETPOINT (10°C) if zone is inactive or inputs are invalid.
+// Returns SAT_MIN_SETPOINT (10°C) if the zone is OFF (HVACMode.OFF), inactive, or
+// its inputs are invalid. Returning SAT_MIN_SETPOINT makes the caller's
+// `zOut > SAT_MIN_SETPOINT` gate (satControlLoop) drop the zone from the P75
+// aggregation, so excluded zones contribute neither output nor overshoot (TASK-593,
+// ports SAT Python PR #172 which returns None for OFF zones in area.py).
 static float satZonePidStep(uint8_t idx, float outsideTemp)
 {
   SATZoneState& z = satZones[idx];
   uint32_t timeoutMs = (uint32_t)settings.sat.iZoneTimeoutS * 1000UL;
   uint32_t now = millis();
 
+  // TASK-593: zone thermostat in HVACMode.OFF -- exclude entirely and reset PID
+  // memory, mirroring SAT Python PR #172 (area.py returns None when HVACMode.OFF).
+  if (z.bOff) return satZonePidExclude(z);
+
   // Mark zone inactive if stale
-  if (!z.bRoomValid || !z.bSpValid) return SAT_MIN_SETPOINT;
-  if ((now - z.iLastUpdateMs) > timeoutMs) return SAT_MIN_SETPOINT;
+  if (!z.bRoomValid || !z.bSpValid) return satZonePidExclude(z);
+  if ((now - z.iLastUpdateMs) > timeoutMs) return satZonePidExclude(z);
 
   float roomTemp = z.fRoomTemp;
   float target   = z.fSetpoint;
 
   // Validate inputs
-  if (roomTemp < -10.0f || roomTemp > 50.0f) return SAT_MIN_SETPOINT;
-  if (target < 5.0f || target > 30.0f) return SAT_MIN_SETPOINT;
+  if (roomTemp < -10.0f || roomTemp > 50.0f) return satZonePidExclude(z);
+  if (target < 5.0f || target > 30.0f) return satZonePidExclude(z);
 
   // Heating curve for this zone's target
   float curveValue = satCalcHeatingCurve(target, outsideTemp);
@@ -1441,7 +1487,9 @@ static void satPublishZoneDiagnostics()
   for (uint8_t i = 0; i < zoneCount; i++) {
     feedWatchDog();
     SATZoneState& z = satZones[i];
-    bool active = z.bRoomValid && z.bSpValid && ((now - z.iLastUpdateMs) <= timeoutMs);
+    // TASK-593: an OFF zone (HVACMode.OFF) reports inactive, matching its exclusion
+    // from PID + P75 aggregation in satZonePidStep().
+    bool active = !z.bOff && z.bRoomValid && z.bSpValid && ((now - z.iLastUpdateMs) <= timeoutMs);
 
     // sat/zone/<n>/active
     snprintf_P(topicBuf, sizeof(topicBuf), PSTR("sat/zone/%u/active"), i + 1);

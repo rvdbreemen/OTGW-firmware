@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.117
+**  Version  : v2.0.0-alpha.118
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -113,7 +113,7 @@ struct SATWindowRecord {
 };
 
 // Per-zone state for multi-zone PID heating control (Task #233)
-// Kept compact: 4 zones × 20 bytes = 80 bytes total on BSS
+// Kept compact: 4 zones × ~21 bytes ≈ 84 bytes total on BSS
 struct SATZoneState {
   float    fRoomTemp     = 0.0f;   // Last received room temperature (°C)
   float    fSetpoint     = 0.0f;   // Last received zone setpoint (°C)
@@ -123,6 +123,10 @@ struct SATZoneState {
   uint32_t iLastUpdateMs = 0;      // millis() of last room_temp or setpoint update
   bool     bRoomValid    = false;  // Room temp has been received at least once
   bool     bSpValid      = false;  // Setpoint has been received at least once
+  bool     bOff          = false;  // TASK-593: zone thermostat is in HVACMode.OFF.
+                                   // Excluded from PID + P75 aggregation while true.
+                                   // Mirrors SAT Python PR #172 (area.py returns None
+                                   // for state/error/weight when HVACMode.OFF).
 };
 
 //====================================================================
