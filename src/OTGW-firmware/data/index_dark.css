@@ -1001,22 +1001,63 @@
   display: inline-block;
 }
 
-#boilerUnsupportedLine {
+.boiler-unsupported-panel {
   background: #3d320c;
   border: 1px solid #d89400;
   border-radius: 4px;
-  padding: 2px 8px;
+  box-sizing: border-box;
   color: #ffd970;
-  font-weight: 500;
-  flex: 1 1 320px;
+  margin-top: 8px;
   max-width: 100%;
-  min-width: 0;
+  padding: 10px 12px;
 }
 
 .boiler-unsupported-summary {
-  display: block;
-  white-space: normal;
+  font-weight: 700;
+  margin-bottom: 8px;
   overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.boiler-unsupported-list {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.boiler-unsupported-list li {
+  align-items: center;
+  background: rgba(255, 217, 112, 0.08);
+  border: 1px solid rgba(216, 148, 0, 0.45);
+  border-radius: 4px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.boiler-unsupported-id {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.boiler-unsupported-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.boiler-unsupported-mode {
+  background: rgba(255, 217, 112, 0.14);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  text-transform: uppercase;
 }
 
   /* Firmware Upgrade Progress */

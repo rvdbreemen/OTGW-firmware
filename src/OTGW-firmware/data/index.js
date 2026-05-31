@@ -6529,17 +6529,28 @@ function refreshBoilerSupport() {
             var w = (json && Array.isArray(json.unsupported_write)) ? json.unsupported_write : [];
             if (r.length === 0 && w.length === 0) {
                 line.classList.add('hidden');
-                list.textContent = '';
+                list.innerHTML = '';
                 line.removeAttribute('data-tooltip');
                 line.removeAttribute('aria-label');
                 line.removeAttribute('title');
                 return;
             }
             var parts = [];
-            r.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', read)'); });
-            w.forEach(function (e) { parts.push(e.id + ' (' + (e.label || 'Unknown') + ', write)'); });
-            list.textContent = parts.join(', ');
-            var fullText = 'Boiler does not implement: ' + parts.join(', ');
+            var html = '';
+            function addUnsupportedItem(e, mode) {
+                var id = String(e.id);
+                var label = e.label || 'Unknown';
+                parts.push(id + ' (' + label + ', ' + mode + ')');
+                html += '<li>';
+                html += '<span class="boiler-unsupported-id">' + escapeHtml(id) + '</span>';
+                html += '<span class="boiler-unsupported-label">' + escapeHtml(label) + '</span>';
+                html += '<span class="boiler-unsupported-mode">' + escapeHtml(mode) + '</span>';
+                html += '</li>';
+            }
+            r.forEach(function (e) { addUnsupportedItem(e, 'read'); });
+            w.forEach(function (e) { addUnsupportedItem(e, 'write'); });
+            list.innerHTML = html;
+            var fullText = 'Boiler does not implement these OpenTherm messages: ' + parts.join(', ');
             line.removeAttribute('data-tooltip');
             line.setAttribute('aria-label', fullText);
             line.removeAttribute('title');
@@ -6548,6 +6559,7 @@ function refreshBoilerSupport() {
         .catch(function () {
             // Endpoint may not exist on older firmware — keep silent.
             line.classList.add('hidden');
+            list.innerHTML = '';
             line.removeAttribute('data-tooltip');
             line.removeAttribute('aria-label');
             line.removeAttribute('title');
