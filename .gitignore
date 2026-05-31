@@ -75,3 +75,6 @@ docs/daily-issue-report.md
 
 # Local build log output
 logs/
+
+# Script-generated diagnostic captures
+scripts/logs/
