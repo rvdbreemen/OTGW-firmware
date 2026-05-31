@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 16:38'
-updated_date: '2026-05-31 16:38'
+updated_date: '2026-05-31 16:40'
 labels:
   - mqtt
   - timers
@@ -27,3 +27,12 @@ timer5min and timer60s always fire together every 5 minutes (300s = 5x60s). This
 - [ ] #4 evaluate passes: python evaluate.py --quick shows no new failures
 - [ ] #5 jitter only applied once (static bool guard)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add __JitterOffset__(min, max) helper to safeTimers.h
+2. Update DECLARE_TIMER_MIN/SEC/MS macros to call __JitterOffset__ with params 2+3
+3. Update DECLARE_TIMER_MIN(timer5min, ...) in loop() with 30000, 60000 jitter
+4. Build + evaluate
+<!-- SECTION:PLAN:END -->
