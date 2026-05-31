@@ -4,6 +4,7 @@ title: Make WebSocket live-log connection more reliable under heap pressure
 status: To Do
 assignee: []
 created_date: '2026-05-31 12:48'
+updated_date: '2026-05-31 12:58'
 labels:
   - bug
   - websocket
@@ -26,4 +27,12 @@ George (geo83_44083) repro in Discord #beta-testing 2026-05-31: with the web UI 
 - [ ] #5 python build.py exits 0 (firmware + filesystem)
 - [ ] #6 python evaluate.py --quick shows no new failures
 - [ ] #7 Field validation by GeorgeZ83 on NodeMCU v3 + HA: live-log open for >1h with no MQTT sensor-unavailable / malformed-packet events
+- [ ] #8 Relax MQTT publish-gate thresholds (telemetry-driven from GeorgeZ83 logHeapStats; CRITICAL OOM floor unchanged) so MQTT drops/throttles less aggressively, decoupled from the WS gate
+- [ ] #9 New ADR for per-consumer heap gating (supersede/amend ADR-030, which is Accepted + llm_judge:true): document the WS-vs-MQTT decoupling decision and the chosen relaxed MQTT values with rationale
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Folded from TASK-769 AC#3 (user decision 2026-05-31): the heap-guard relax + WS/MQTT decouple belong here, the WS live-log being the actual heap trigger. Verified in #beta-testing: Rob told George it is a separate task. Sequence: (1) George flashes 1.6.1-beta, tab open, captures logHeapStats before failure tonight; (2) author per-consumer-gating ADR (Proposed) -> user review/accept; (3) implement decouple + relaxed MQTT values from telemetry; (4) George re-validates. NodeMCU v3, bigger RAM but fragmentation still bites (free ~5800 / maxBlock ~1300 in prior logs).
+<!-- SECTION:NOTES:END -->
