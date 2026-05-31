@@ -85,7 +85,14 @@ Check whether architectural changes since the previous release require new or up
    ```
    If exit code != 0: read `.tmp/build_release.log` for diagnosis, fix, retry.
    If exit code == 0: proceed — do NOT read the full log.
-3. Commit `version.h` changes from build and push.
+3. Commit ALL files the build rewrote, then push.
+   `build.py` runs `autoinc-semver --update-all`, which rewrites `version.h`, `data/version.hash`, AND the `Version :` banner comments across ~24 source/data files. Stage the whole sweep (not just `version.h`) and confirm a clean tree:
+   ```bash
+   git add src/OTGW-firmware/
+   git commit -m "chore(release): build version.h for v<version> release prep"
+   git push origin dev
+   git status --short src/OTGW-firmware/   # MUST be empty
+   ```
 
 **No checkpoint.** Proceed automatically to Phase 3 on success.
 
@@ -223,6 +230,8 @@ Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping st
 
 - **Never use em dashes** in any generated text
 - **Always push to remote after every commit**
+- **Stage the WHOLE build sweep, not just `version.h`**: every `python build.py` runs `autoinc-semver --update-all`, which rewrites `version.h`, `data/version.hash`, and the `Version :` banner comments across ~24 source/data files. After any build-output commit (Phase 2, Phase 5, Phase 6 bump) run `git status --short` and confirm a clean tree before proceeding. Leftover banner changes committed late, or on `main` before tagging, mean the published tag carries stale `-beta` source comments (the binary version stays correct via `version.h`).
+- **Run git mutations SERIALLY, never in parallel tool calls**: `git checkout`, `git stash`, `git merge`, and `git commit` issued concurrently race on the index and working tree and produce corrupt or misleading state. Chain them with `&&` in one command or run them one at a time. Only read-only `git` queries may overlap.
 - **Always create releases as draft first**: upload artifacts, verify, then publish
 - **No CI workflows for releases**: builds done locally via `python build.py`
 - **Only 2 mandatory checkpoints**: Phase 4 (content review) and Phase 6 (Discord messages)
