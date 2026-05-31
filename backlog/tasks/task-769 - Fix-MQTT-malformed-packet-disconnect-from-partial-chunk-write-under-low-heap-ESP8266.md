@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 09:17'
+updated_date: '2026-05-31 09:18'
 labels:
   - bug
 dependencies: []
@@ -45,12 +45,11 @@ Root cause (code-confirmed, MQTTstuff.ino): the streaming publish path beginMqtt
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. writeMqttChunk + writeMqttProgmemChunk (MQTTstuff.ino:283,300): add bounded retry-with-yield() on short MQTTclient.write() so a started publish completes when lwIP sndbuf drains.
-2. On genuine failure (retries exhausted): callers (sendMQTTData 1004-1008, PROGMEM overload 1052-1056, sendMQTT 1230) must drop the TCP link via MQTTclient.stop() instead of endPublish() on a truncated payload — prevents malformed packet to broker.
-3. Add MQTT_WRITE_MAX_RETRIES constant.
-4. python build.py (full) exit 0; python evaluate.py --quick green.
-5. Commit MQTTstuff.ino only (leave unrelated dirty UI files). Do NOT push — field validation by George pending.
-6. Guard-relax (HEAP_LOW/WARNING) deferred to follow-up after George validates desync fix.
+1. writeMqttChunk + writeMqttProgmemChunk (MQTTstuff.ino:283,300): add bounded retry-with-yield() on short MQTTclient.write() so a started publish completes when lwIP sndbuf drains. [done in 7e5a61ed]
+2. On genuine failure (retries exhausted): callers (sendMQTTData 1004-1008, PROGMEM overload 1052-1056, sendMQTT 1230) must drop the TCP link via MQTTclient.disconnect() instead of endPublish() on a truncated payload. [done in 7e5a61ed]
+3. Discovery composers in mqtt_configuratie.cpp: replace endPublish() failure branches with client.disconnect() on truncated payload. [done in f8314a0b]
+4. Field-validation support: fix scripts/capture-mqtt-debug.ps1 interactive mode to ask for an optional MQTT username and a secure password when credentials are needed; keep blank username as anonymous mode. Validate by capturing the mosquitto_sub argument vector with a local fake executable and fake telnet device.
+5. Build/evaluate validation remains firmware-scoped; for script-only follow-up run syntax and harness validation before committing the script change. Do not mark TASK-769 Done until GeorgeZ83 field validation confirms no malformed-packet/session-taken-over disconnects.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
