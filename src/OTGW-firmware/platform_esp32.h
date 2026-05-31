@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp32.h
-**  Version  : v2.0.0-alpha.110
+**  Version  : v2.0.0-alpha.111
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -125,19 +125,27 @@ inline bool platformWiFiIsEncrypted(uint8_t i) {
   return WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
 }
 
-// Reset cause as an OTGW-style boot-cause char (P/S/E/W/D/B/?) for diagnostics.
+// Reset cause as a PIC-compatible boot-code char for the OTDirect PR: Q=
+// response (P=power-on, C=cold/SW-reset, W=watchdog, B=brownout, E=external).
+// OTDirect (ESP32) is the only caller; the vocabulary mirrors the PIC's reset
+// codes so downstream PR-parsing stays identical to the PIC path.
 inline char platformGetResetReasonChar() {
   switch (esp_reset_reason()) {
-    case ESP_RST_POWERON:   return 'P';  // Power-on
-    case ESP_RST_SW:        return 'S';  // Software reset
-    case ESP_RST_PANIC:     return 'E';  // Exception/panic
+    case ESP_RST_SW:        return 'C';  // Software reset -> Cold start
     case ESP_RST_INT_WDT:
     case ESP_RST_TASK_WDT:
     case ESP_RST_WDT:       return 'W';  // Watchdog
-    case ESP_RST_DEEPSLEEP: return 'D';  // Deep sleep wake
     case ESP_RST_BROWNOUT:  return 'B';  // Brownout
-    default:                return '?';
+    case ESP_RST_EXT:       return 'E';  // External reset
+    default:                return 'P';  // Power-on or unknown
   }
+}
+
+// NTP hostname guard. ESP32's configTime() does not touch the WiFi station
+// hostname, so this is a no-op. Call it before and after configTime() so the
+// shared startNTP() code path stays platform-neutral.
+inline void platformNtpHostnameFix(const char *hostname) {
+  (void)hostname;
 }
 
 // Heap information

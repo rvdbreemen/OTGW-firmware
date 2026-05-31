@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp8266.h
-**  Version  : v2.0.0-alpha.110
+**  Version  : v2.0.0-alpha.111
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -97,6 +97,27 @@ inline uint32_t platformChipId() {
 // Reset reason as a C string (copies into caller-supplied buffer)
 inline void platformResetReason(char *buf, size_t len) {
   strlcpy(buf, ESP.getResetReason().c_str(), len);
+}
+
+// WiFi scan: is the network at scan index `i` encrypted (not open)?
+inline bool platformWiFiIsEncrypted(uint8_t i) {
+  return WiFi.encryptionType(i) != ENC_TYPE_NONE;
+}
+
+// PIC-compatible reset-cause char for the OTDirect PR: Q= response. OTDirect is
+// ESP32-only and not built here, so this is a no-op stub for link symmetry.
+inline char platformGetResetReasonChar() {
+  return 'P';
+}
+
+// NTP hostname guard for an ESP8266 SDK bug: configTime() resets the WiFi
+// station hostname to "ESP-XXXXXX" on some SDK versions. Call before and after
+// configTime() to save/restore the configured hostname. The corrected hostname
+// is sent on the next DHCP exchange; no SDK DHCP calls here (a
+// wifi_station_dhcpc_start while connected breaks setAutoReconnect DHCP on later
+// reassociations — see TASK-432).
+inline void platformNtpHostnameFix(const char *hostname) {
+  platformSetHostname(hostname);
 }
 
 // Heap information

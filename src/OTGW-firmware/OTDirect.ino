@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.110
+**  Version  : v2.0.0-alpha.111
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3081,20 +3081,9 @@ void handleOTDirectCommand(const char* buf, int len) {
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'Q': {
-        // Map ESP32 reset reason to PIC-compatible codes:
-        // P=power-on, C=cold(SW reset), W=watchdog, B=brownout, E=external
-        char rc = 'P';
-#if defined(ESP32)
-        switch (esp_reset_reason()) {
-          case ESP_RST_SW:      rc = 'C'; break;  // Software reset → Cold start
-          case ESP_RST_INT_WDT:
-          case ESP_RST_TASK_WDT:
-          case ESP_RST_WDT:     rc = 'W'; break;  // Watchdog
-          case ESP_RST_BROWNOUT: rc = 'B'; break;
-          case ESP_RST_EXT:     rc = 'E'; break;  // External reset
-          default:              rc = 'P'; break;  // Power-on or unknown
-        }
-#endif
+        // PIC-compatible reset-cause code (P/C/W/B/E). The platform shim maps
+        // esp_reset_reason() to the PIC vocabulary; see platform_esp32.h.
+        char rc = platformGetResetReasonChar();
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: Q=%c"), rc);
         otDirectBridgeProcessPRResponse(prBuf);
         break;

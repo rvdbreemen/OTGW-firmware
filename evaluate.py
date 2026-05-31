@@ -545,7 +545,12 @@ ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
 # 2026-05-30: OTGWSerial added to the excluded vendored-lib list (maintainer
 # directive — it is an independent library, not firmware abstraction), removing
 # its 2 internal conditionals from the scan (35 -> 33).
-ESP_ABSTRACTION_BASELINE: int = 33
+# TASK-743 (Tier 3): per-platform tuning constants moved into boards.h (3a:
+# SAT buffer sizes + SAT_RING_IDX_T typedef + MQTT heap/cooldown constants, 11
+# sites) and shims added for the divergent runtime APIs (3b: platformWiFiIsEncrypted,
+# platformGetResetReasonChar, platformNtpHostnameFix — restAPI/OTDirect/networkStuff
+# callers de-ifdef'd, 4 sites). 33 -> 19. ADR-115 documents the boards.h home.
+ESP_ABSTRACTION_BASELINE: int = 19
 
 _ESP_PLATFORM_PP_RE = re.compile(
     r'^\s*#\s*(?:if|ifdef|ifndef|elif)\b.*\b'

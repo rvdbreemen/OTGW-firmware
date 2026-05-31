@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.110
+**  Version  : v2.0.0-alpha.111
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -631,21 +631,12 @@ void startNTP()
   if (strlen(settings.ntp.sTimezone) == 0) strlcpy(settings.ntp.sTimezone, NTP_DEFAULT_TIMEZONE, sizeof(settings.ntp.sTimezone));
   if (strlen(settings.ntp.sHostname) == 0) strlcpy(settings.ntp.sHostname, NTP_HOST_DEFAULT, sizeof(settings.ntp.sHostname));
 
-#if defined(ESP8266)
-  // ESP8266 SDK bug: configTime() resets the WiFi station hostname to "ESP-XXXXXX"
-  // on some SDK versions. Save hostname before and restore after. Not needed on ESP32
-  // (configTime() does not touch the hostname there).
-  platformSetHostname(CSTR(settings.sHostname));
-#endif
+  // platformNtpHostnameFix() guards an ESP8266 SDK bug where configTime()
+  // resets the WiFi station hostname; it is a no-op on ESP32. Call before and
+  // after configTime() so this path stays platform-neutral (see TASK-432).
+  platformNtpHostnameFix(CSTR(settings.sHostname));
   configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr);
-#if defined(ESP8266)
-  // Restore hostname in case configTime() reset it. The corrected hostname
-  // will be sent on the next DHCP exchange (renewal or reconnect). No SDK
-  // DHCP calls here: any wifi_station_dhcpc_start while connected takes DHCP
-  // ownership away from the SDK and breaks setAutoReconnect-driven DHCP on
-  // subsequent reassociations. See TASK-432.
-  platformSetHostname(CSTR(settings.sHostname));
-#endif
+  platformNtpHostnameFix(CSTR(settings.sHostname));
   NtpStatus = TIME_WAITFORSYNC;
 }
 
