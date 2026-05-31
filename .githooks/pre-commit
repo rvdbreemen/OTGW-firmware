@@ -13,6 +13,12 @@
 # Disable hook entirely:        ADR_KIT_HOOK_DISABLE=1 git commit ...
 # Remove permanently:           /adr-kit:install-hooks --uninstall  (in a Claude Code session)
 
+# ── DISABLED 2026-05-31 by user request ──────────────────────────────────────
+# ADR-kit per-commit evaluation (adr-judge, incl. the Claude Sonnet --llm pass)
+# is turned off. The hook now exits 0 immediately and performs no analysis.
+# To re-enable: delete the `exit 0` line below, or re-run /adr-kit:install-hooks.
+exit 0
+
 set -e
 
 if [ "${ADR_KIT_HOOK_DISABLE:-0}" = "1" ]; then

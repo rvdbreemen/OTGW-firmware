@@ -6,7 +6,7 @@
 
 ## Task Management (MANDATORY)
 
-**Every piece of work must have a backlog task before any code is written. No exceptions.**
+**Every work need backlog task before code written. No exceptions.**
 
 <!-- BACKLOG.MD GUIDELINES START -->
 <!-- DO NOT regenerate this block via `backlog agents --update-instructions`. -->
@@ -15,46 +15,46 @@
 
 # Backlog.md task management
 
-All task operations go through the **`backlog` CLI** — never edit task files directly. The CLI owns file naming, frontmatter, AC indexing, and Git tracking; bypassing it desynchronises the project.
+All task ops go through **`backlog` CLI** — never edit task files direct. CLI owns file naming, frontmatter, AC indexing, Git tracking; bypass desyncs project.
 
 Full CLI reference: @.claude/backlog-cli-reference.md
 
 ## Task pickup (MANDATORY)
 
-When picking up any task from the backlog — whether newly created or already existing — the **first** action before any code, research, or file reading is:
+Pick up any task — new or existing — **first** action before code, research, file read:
 
 ```bash
 backlog task edit <id> -s "In Progress" -a @claude
 ```
 
-This makes the task visible in the correct board column immediately. Skipping this step leaves the task in "To Do" while it is actually being worked on, which creates false visibility for the user and breaks board accuracy.
+Makes task visible in right board column now. Skip leaves task "To Do" while worked — false visibility, breaks board accuracy.
 
 ## Autonomous task completion (project policy)
 
-When you've satisfied all 8 Definition-of-Done items from the reference (every AC checked, every DoD item checked, Final Summary added, build passes, evaluator green, no regressions) — set the task status to **Done** immediately. Do not leave the task at "In Progress" waiting for the user to flip it.
+All 8 Definition-of-Done items satisfied (every AC checked, every DoD item checked, Final Summary added, build passes, evaluator green, no regressions) — set task **Done** now. No leave at "In Progress" waiting for user flip.
 
-Rationale: if the AC list is well-designed, "all ACs checked" already means "the task is objectively done". Treating user review as a gating step doubles turnaround. The user audits after the fact via Final Summary and git log.
+Rationale: well-designed AC list means "all ACs checked" already means "task objectively done". User review as gate doubles turnaround. User audits after via Final Summary + git log.
 
-**Exceptions** (leave at "In Progress" only if):
-- An AC genuinely cannot be self-verified (hardware-specific tester feedback, explicit user sign-off as policy, third-party integration approval) — document the blocking AC in the Final Summary.
-- A DoD item is unmet (build failed, regression detected, missing test).
-- Coordinated set where status transitions wait on a sibling.
+**Exceptions** (leave "In Progress" only if):
+- AC genuinely not self-verifiable (hardware-specific tester feedback, explicit user sign-off as policy, third-party integration approval) — document blocking AC in Final Summary.
+- DoD item unmet (build failed, regression, missing test).
+- Coordinated set where status waits on sibling.
 
-If unsure whether an AC is self-verifiable, prefer to **attempt** verification rather than preemptively defer. Trust the AC list; if an AC was truly unverifiable, it shouldn't have been an AC.
+Unsure if AC self-verifiable: prefer **attempt** verify over preempt defer. Trust AC list; truly unverifiable AC shouldn't be AC.
 <!-- BACKLOG.MD GUIDELINES END -->
 
 ---
 
 ## Design Principles
 
-- **KISS**: Simplest solution that works. Share design choices so the user decides on complexity.
-- **YAGNI**: No features for hypothetical future requirements.
-- **Minimal change surface**: Small, focused changes. Each change needs a concrete justification.
-- **Comments about the present only**: Don't write defensive comments about hypothetical future scenarios ("if mode X is ever added, revisit this"). They imply a plan that doesn't exist. Real concerns belong in a backlog task, not a code comment.
-- **Fix the doc, not the identifier**: When a name is correct but a comment/docstring is stale, fix the comment. A rename touching N call sites is rarely a net win when the name itself isn't the bug.
-- **Surface assumptions, don't hide confusion**: When a request is ambiguous or a simpler path exists, say so before coding. Don't pick silently between interpretations — name them and ask.
-- **Verifiable goals over vague intent**: Translate tasks into a check before writing code ("add validation" → "tests for invalid inputs pass"; "fix bug" → "test reproduces it, then passes"). For backlog work, the AC checkboxes are the verification — if an AC is too vague to verify, sharpen it before implementing.
-- For deeper behavioural guardrails (anti-rationalisation, surgical-edit discipline), invoke `/andrej-karpathy-skills:karpathy-guidelines`.
+- **KISS**: Simplest solution that works. Share design choices so user decides complexity.
+- **YAGNI**: No features for hypothetical future.
+- **Minimal change surface**: Small, focused changes. Each change need concrete justification.
+- **Comments about present only**: No defensive comments about hypothetical future ("if mode X ever added, revisit this"). Imply plan that not exist. Real concern belong in backlog task, not code comment.
+- **Fix doc, not identifier**: Name correct but comment/docstring stale — fix comment. Rename touching N call sites rarely net win when name itself not bug.
+- **Surface assumptions, don't hide confusion**: Request ambiguous or simpler path exists — say so before coding. No silent pick between interpretations — name them, ask.
+- **Verifiable goals over vague intent**: Translate task into check before code ("add validation" → "tests for invalid inputs pass"; "fix bug" → "test reproduces it, then passes"). Backlog work: AC checkboxes are verification — AC too vague to verify, sharpen before implement.
+- Deeper behavioural guardrails (anti-rationalisation, surgical-edit discipline): invoke `/andrej-karpathy-skills:karpathy-guidelines`.
 
 ---
 
@@ -62,18 +62,18 @@ If unsure whether an AC is self-verifiable, prefer to **attempt** verification r
 
 ## Project Overview
 
-ESP8266 firmware for the NodoShop OpenTherm Gateway. Provides Web UI, MQTT, REST API, and TCP serial socket with Home Assistant integration focus.
+ESP8266 firmware for NodoShop OpenTherm Gateway. Web UI, MQTT, REST API, TCP serial socket with Home Assistant integration focus.
 
 - **Platform**: ESP8266 (NodeMCU / Wemos D1 mini), ~40KB usable RAM
 - **Language**: Arduino C/C++ (.ino files), single translation unit
-- **Serial**: Reserved exclusively for PIC communication — never write to Serial after init
+- **Serial**: Reserved exclusively for PIC comm — never write Serial after init
 - **Debug output**: Use `DebugTln()`, `DebugTf()`, etc. (telnet port 23), never Serial
-- **This branch (`dev`)** is the 1.5.x maintenance line. The 2.0.0 ESP32/SAT feature line lives in the parallel `feature-dev-2.0.0-otgw32-esp32-sat-support` worktree. Default to the branch you are on; port fixes deliberately, not reflexively.
+- **This branch (`dev`)** is 1.5.x maintenance line. 2.0.0 ESP32/SAT feature line lives in parallel `feature-dev-2.0.0-otgw32-esp32-sat-support` worktree. Default to branch you on; port fixes deliberate, not reflexive.
 
 ## Layout
 
 - `src/OTGW-firmware/` — main firmware sketches (`*.ino`), `version.h`, `OTGWSettings.h`
-- `src/OTGW-firmware/data/` — LittleFS web UI: `index.html`, `index.js`, `index.css`, `graph.js`, `FSexplorer.html/css`, fonts (shipped to device as a filesystem image)
+- `src/OTGW-firmware/data/` — LittleFS web UI: `index.html`, `index.js`, `index.css`, `graph.js`, `FSexplorer.html/css`, fonts (shipped to device as filesystem image)
 - `src/libraries/` — vendored libs: `OTGWSerial`, `SimpleTelnet`, `OpenTherm`, `WebSockets`, …
 - `docs/adr/` — Architecture Decision Records
 - `docs/guides/` — operational guides (BUILD, FLASH, MQTT_LWT, WIFI_RECOVERY, …)
@@ -87,16 +87,16 @@ Single translation unit — Arduino concatenates every `.ino` in `src/OTGW-firmw
 
 - `setup()` — boot sequence: filesystem, settings, WiFi, MQTT, OTGW PIC reset, web/REST handlers.
 - `loop()` — calls `doBackgroundTasks()` and yields.
-- `doBackgroundTasks()` — the actual work loop: timers, queue draining, watchdog, MQTT publish. **Re-entrant** via `feedWatchDog()` → `yield()` (see "Static buffers, cooperative scheduling" below).
+- `doBackgroundTasks()` — actual work loop: timers, queue draining, watchdog, MQTT publish. **Re-entrant** via `feedWatchDog()` → `yield()` (see "Static buffers, cooperative scheduling" below).
 
-Sibling `.ino` files in the same directory are organised by feature (`MQTTstuff.ino`, `restAPI.ino`, `OTGW-Core.ino`, `networkStuff.ino`, `settingStuff.ino`, …). Each contributes free functions to the single translation unit; there are no class-based modules.
+Sibling `.ino` files in same directory organised by feature (`MQTTstuff.ino`, `restAPI.ino`, `OTGW-Core.ino`, `networkStuff.ino`, `settingStuff.ino`, …). Each contributes free functions to single translation unit; no class-based modules.
 
 ## Architecture Decision Records (ADRs)
 
-ADRs live in `docs/adr/`. **Read relevant ADRs before making changes that affect architecture.**
+ADRs live in `docs/adr/`. **Read relevant ADRs before changes affecting architecture.**
 
 ### When to create an ADR
-Create one when a change affects: architecture, NFRs (security/performance/availability), API contracts, new/replaced dependencies, or build/CI tooling.
+Create one when change affects: architecture, NFRs (security/performance/availability), API contracts, new/replaced dependencies, or build/CI tooling.
 
 Do NOT create ADRs for: pure refactors, bug fixes, minor features within existing patterns.
 
@@ -104,18 +104,18 @@ Do NOT create ADRs for: pure refactors, bug fixes, minor features within existin
 
 - **Proposed** → Draft; **Accepted** → Stands; **Deprecated** → No longer recommended; **Superseded** → Replaced
 
-**CRITICAL: NEVER edit an Accepted or Deprecated ADR.** The content of these ADRs is immutable — do not change their text, parameters, numbers, or any other content. The ONLY permitted change to an Accepted/Deprecated ADR is updating its Status field to "Superseded by ADR-XXX".
+**CRITICAL: NEVER edit an Accepted or Deprecated ADR.** Content of these ADRs immutable — do not change text, parameters, numbers, any content. ONLY permitted change to Accepted/Deprecated ADR is updating Status field to "Superseded by ADR-XXX".
 
-To change a decision: create a NEW ADR with the next available number that supersedes the old one, then mark the old ADR's status as "Superseded by ADR-XXX". Only **Proposed** ADRs may be freely edited.
+To change decision: create NEW ADR with next available number that supersedes old one, then mark old ADR status "Superseded by ADR-XXX". Only **Proposed** ADRs may be freely edited.
 
 ### ADR creation workflow (human checkpoints required)
 
-1. **Create** the ADR file with `Status: Proposed`. Include Context, Decision, Consequences, and Related sections.
-2. **Stop and ask the user to review.** Do not proceed until the user explicitly approves or requests changes. Present the key trade-offs and ask for confirmation.
-3. **Iterate** on feedback — edit the Proposed ADR as needed.
-4. **Only set `Status: Accepted` after the user explicitly approves.** Never self-approve an ADR. The user must say the ADR is accepted before you change the status.
+1. **Create** ADR file with `Status: Proposed`. Include Context, Decision, Consequences, Related sections.
+2. **Stop and ask user to review.** Do not proceed until user explicitly approves or requests changes. Present key trade-offs, ask confirmation.
+3. **Iterate** on feedback — edit Proposed ADR as needed.
+4. **Only set `Status: Accepted` after user explicitly approves.** Never self-approve ADR. User must say ADR accepted before you change status.
 
-This applies equally to new ADRs and to ADRs that supersede existing ones.
+Applies equally to new ADRs and ADRs that supersede existing ones.
 
 ### ADR format
 ```
@@ -155,9 +155,9 @@ DebugTf(PSTR("Value: %d\r\n"), value);               // PSTR() for printf-style
 snprintf_P(buf, size, PSTR("Format: %s"), str);      // snprintf_P for all formatting
 const char myStr[] PROGMEM = "Long string";          // PROGMEM for string constants
 ```
-For string comparisons: use `strcmp_P()`, `strcasecmp_P()` with `PSTR()`.
+String comparisons: use `strcmp_P()`, `strcasecmp_P()` with `PSTR()`.
 
-**Post-mortem rule**: If a bug involves `_P` helpers, `PGM_P`, or `__FlashStringHelper`, assume a storage-domain mismatch until proven otherwise. The RAM/flash domain must match the helper — never pass a PROGMEM pointer where RAM is expected or vice versa.
+**Post-mortem rule**: Bug involve `_P` helpers, `PGM_P`, or `__FlashStringHelper` — assume storage-domain mismatch until proven otherwise. RAM/flash domain must match helper — never pass PROGMEM pointer where RAM expected or vice versa.
 
 ### PROGMEM pointer safety on Arduino Core 3.1.2+
 Standard C functions (`strstr`, `strncmp`, `strlen`) may use word-aligned reads internally.
@@ -168,11 +168,11 @@ Use `writeMqttProgmemChunk()` for PROGMEM data to MQTT.
 
 ### No String class in hot paths (ADR-004)
 - Use `char[]` buffers with `strlcpy`, `strncat`, `snprintf_P`
-- `String` is only acceptable in setup/init code or truly one-off contexts
-- Heap fragmentation on ESP8266 is a real stability concern
+- `String` only acceptable in setup/init code or truly one-off contexts
+- Heap fragmentation on ESP8266 is real stability concern
 
 ### No ArduinoJson — build JSON manually
-JSON output uses `snprintf_P` and helpers like `sendJsonMapEntry`. Parsing uses `parseJsonKVLine()`. ArduinoJson's allocator fragments the heap and the streaming-discovery code (ADR-042) explicitly avoids it. Don't introduce it for new JSON paths.
+JSON output uses `snprintf_P` and helpers like `sendJsonMapEntry`. Parsing uses `parseJsonKVLine()`. ArduinoJson allocator fragments heap and streaming-discovery code (ADR-042) explicitly avoids it. Don't introduce for new JSON paths.
 
 ### Binary data: use memcmp_P, never strncmp_P/strstr_P (CRITICAL)
 `strncmp_P`/`strstr_P` on binary data causes Exception (2) crashes. Use:
@@ -192,24 +192,24 @@ This firmware uses plain HTTP and WS protocols only. **Never add HTTPS or WSS su
 - Reverse proxy: REST API works behind HTTPS proxy, but WebSocket (live OT log) assumes plain HTTP
 
 ### Typed internal control flow
-Use `enum class`, numeric IDs, or flags for internal behavior selection — not string tokens. Internal discriminator strings are fragile on ESP8266 and can hide RAM-vs-flash pointer bugs.
+Use `enum class`, numeric IDs, or flags for internal behavior selection — not string tokens. Internal discriminator strings fragile on ESP8266 and can hide RAM-vs-flash pointer bugs.
 
 ### Browser compatibility (frontend code)
-All frontend JavaScript must work in Chrome, Firefox, and Safari (latest + 2 versions back). Always check element existence before DOM access, wrap `JSON.parse()` in try-catch, check `response.ok` on fetch, and add `.catch()` on all async operations.
+All frontend JavaScript must work in Chrome, Firefox, Safari (latest + 2 versions back). Always check element existence before DOM access, wrap `JSON.parse()` in try-catch, check `response.ok` on fetch, add `.catch()` on all async operations.
 
-**Log container contract:** `.ot-log-content` has `white-space: pre` (in `index.css`); `\n` is the line separator. Prefer `textContent` over `innerHTML` for plain text — skips the HTML parser and per-line escape, and avoids accidental injection from log content.
+**Log container contract:** `.ot-log-content` has `white-space: pre` (in `index.css`); `\n` is line separator. Prefer `textContent` over `innerHTML` for plain text — skips HTML parser and per-line escape, avoids accidental injection from log content.
 
 ### Static buffers, cooperative scheduling
 - Re-entrancy: `doBackgroundTasks()` can be re-entered via `feedWatchDog()` → `yield()`
-- Buffers shared across a yield window must be local/static, not global scratch buffers
+- Buffers shared across yield window must be local/static, not global scratch buffers
 - `mqttAutoCfgScratch` and `ot_log_buffer` have documented ownership rules — respect them
 
 ### Timer management
 Use `DECLARE_TIMER_SEC()` / `DECLARE_TIMER_MS()` macros and check with `DUE()`. See `safeTimers.h`.
 
 ### Command queue
-Never send commands directly to the PIC serial port. Always use `addOTWGcmdtoqueue()`.
-Never flash PIC firmware over WiFi using OTmonitor — it can brick the PIC.
+Never send commands direct to PIC serial port. Always use `addOTWGcmdtoqueue()`.
+Never flash PIC firmware over WiFi using OTmonitor — can brick PIC.
 
 ## Testing model
 
@@ -218,11 +218,11 @@ No automated unit/integration tests exist. Validation pipeline:
 2. `python evaluate.py --quick` shows no new failures (PROGMEM/safety lint)
 3. Beta build deployed via OTA; field validation in Discord `#beta-testing`
 
-Don't look for jest/pytest — there isn't a runner. Hardware-in-the-loop is the only behavioural test.
+Don't look for jest/pytest — no runner. Hardware-in-the-loop is only behavioural test.
 
 ## Build Commands
 
-Preferred wrapper (handles venv setup): `./build.sh` (macOS/Linux) or `build.bat` (Windows). Both invoke `build.py` underneath and build firmware + filesystem. Use a direct `python build.py` invocation only when the wrapper is unavailable.
+Preferred wrapper (handles venv setup): `./build.sh` (macOS/Linux) or `build.bat` (Windows). Both invoke `build.py` underneath and build firmware + filesystem. Use direct `python build.py` only when wrapper unavailable.
 
 ```bash
 ./build.sh                   # Preferred — firmware + filesystem (handles venv)
@@ -250,60 +250,60 @@ python evaluate.py --quick   # Fast check
 
 Three OTGW-specific skills under `.claude/skills/`:
 
-- **`adr`** — invoke when authoring or reviewing an Architecture Decision Record (`docs/adr/`).
-- **`flash`** — invoke to build firmware + filesystem and flash to a USB-connected ESP. Auto-detects the serial port; no input required.
-- **`release`** — invoke to prepare and execute a full release following the documented process.
+- **`adr`** — invoke when authoring or reviewing Architecture Decision Record (`docs/adr/`).
+- **`flash`** — invoke to build firmware + filesystem and flash to USB-connected ESP. Auto-detects serial port; no input required.
+- **`release`** — invoke to prepare and execute full release following documented process.
 
-Generic Anthropic-published skills (`pdf`, `docx`, `refactor`, `webapp-testing`, …) live under `.github/skills/` for Copilot. Consult them only when the task is actually about that domain (e.g., extracting from a PIC datasheet PDF).
+Generic Anthropic-published skills (`pdf`, `docx`, `refactor`, `webapp-testing`, …) live under `.github/skills/` for Copilot. Consult only when task actually about that domain (e.g., extracting from PIC datasheet PDF).
 
 ## Superpowers skills
 
-**At the start of every conversation, invoke `superpowers:using-superpowers` via the `Skill` tool before doing anything else.** This establishes the skill-discovery flow: if any installed skill might apply to the current task — even at low confidence — invoke it via the `Skill` tool before responding. Don't paraphrase a skill from memory; the on-disk version may have evolved.
+**At start of every conversation, invoke `superpowers:using-superpowers` via `Skill` tool before anything else.** Establishes skill-discovery flow: any installed skill might apply to current task — even at low confidence — invoke via `Skill` tool before responding. Don't paraphrase skill from memory; on-disk version may have evolved.
 
-Two superpowers skills are particularly useful in this codebase:
+Two superpowers skills particularly useful in this codebase:
 
-- **`superpowers:verification-before-completion`** — invoke before claiming any work done (build green, fix shipped, regression resolved, push complete). This project has many field-validation gates that tempt premature "done" claims; the skill enforces *fresh* evidence (re-run the verification command in the current message, read the actual output) instead of relying on prior runs or extrapolation. Especially relevant before flipping AC checkboxes, marking tasks Done, or pushing to `origin/dev` / `origin/feature-dev-2.0.0-otgw32-esp32-sat-support`.
-- **`superpowers:brainstorming`** — invoke before entering plan mode for any non-trivial feature or refactor. Pairs well with the cross-worktree master-plan rule (Worktree layout § Cross-worktree work) when a change spans both branches.
+- **`superpowers:verification-before-completion`** — invoke before claiming any work done (build green, fix shipped, regression resolved, push complete). Project has many field-validation gates that tempt premature "done" claims; skill enforces *fresh* evidence (re-run verification command in current message, read actual output) instead of relying on prior runs or extrapolation. Especially relevant before flipping AC checkboxes, marking tasks Done, or pushing to `origin/dev` / `origin/feature-dev-2.0.0-otgw32-esp32-sat-support`.
+- **`superpowers:brainstorming`** — invoke before entering plan mode for any non-trivial feature or refactor. Pairs well with cross-worktree master-plan rule (Worktree layout § Cross-worktree work) when change spans both branches.
 
-Other superpowers skills (`debugging`, `frontend-design`, `mcp-builder`, …) — invoke whenever the task description matches the skill's stated domain. The bar is low: a 1% chance of fit means use it.
+Other superpowers skills (`debugging`, `frontend-design`, `mcp-builder`, …) — invoke whenever task description matches skill's stated domain. Bar is low: 1% chance of fit means use it.
 
 ## Git push policy
 
-The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`** and **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
+Default Claude Code instruction is "do not push without explicit user permission". For this project, maintainer (Robert) granted standing permission to push to **`origin/dev`** and **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** when logical to do so. Logical means: clean working state, recent commits self-contained, no pending review checkpoints.
 
-Concrete rules that override the default "ask first":
+Concrete rules that override default "ask first":
 
-- **`origin/dev`** push: allowed once a feature task is committed locally AND the build verifies (`python build.py --firmware` returns exit 0) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
-- **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** push: allowed under the same conditions as `origin/dev` (feature task committed locally, build green for the relevant target, evaluator green; docs-only commits skip both gates). This is the active 2.0.0 development line; auto-push reduces the friction of cross-branch porting work that this branch carries from dev. Mention the push in the user-facing summary.
+- **`origin/dev`** push: allowed once feature task committed locally AND build verifies (`python build.py --firmware` returns exit 0) AND evaluator green (`python evaluate.py --quick` shows no new failures). Mention push in user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — cannot affect firmware compilation.
+- **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** push: allowed under same conditions as `origin/dev` (feature task committed locally, build green for relevant target, evaluator green; docs-only commits skip both gates). This is active 2.0.0 development line; auto-push reduces friction of cross-branch porting work this branch carries from dev. Mention push in user-facing summary.
 - **`origin/main`** push: still requires explicit per-instance confirmation. Main is release-line; never auto-pushed.
-- **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.
-- **Other remote branches** (`feature-*` other than the 2.0.0 line, `fix-*`, etc.): require explicit per-instance confirmation unless the user has granted standing permission for that specific branch in this same section.
+- **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main forbidden regardless.
+- **Other remote branches** (`feature-*` other than 2.0.0 line, `fix-*`, etc.): require explicit per-instance confirmation unless user granted standing permission for that specific branch in this same section.
 
-When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
+In doubt whether push "logical", err toward asking. Cost of one extra prompt small; cost of unwanted force-push large.
 
 ## Versioning policy
 
-Field testers on Discord identify issues by the version string ("on beta.23 I see..."), so each shipped beta carries its own prerelease tag (`_VERSION_PRERELEASE` in `src/OTGW-firmware/version.h`, currently `<word>.<N>` form, e.g. `beta.23`). The bump is **release-prep work, not per-commit work**.
+Field testers on Discord identify issues by version string ("on beta.23 I see..."), so each shipped beta carries own prerelease tag (`_VERSION_PRERELEASE` in `src/OTGW-firmware/version.h`, currently `<word>.<N>` form, e.g. `beta.23`). Bump is **release-prep work, not per-commit work**.
 
-- **When the bump happens** — once per beta release, as Phase 2 of the `/beta-prerelease` skill (which runs `bin/bump-prerelease.sh` and stages the result alongside the rest of the release prep). Individual commits to `dev` between releases do NOT carry a bump. The next `/beta-prerelease` invocation rolls up whatever has accumulated since the last public release into a single new beta tag.
-- **How to bump** (manual / from the skill) — `bin/bump-prerelease.sh` parses the current tag (must match `^[a-zA-Z]+\.[0-9]+$`), increments the trailing integer, and calls `scripts/autoinc-semver.py --prerelease <new>` to rewrite `version.h` + `data/version.hash` + the cascaded `_SEMVER_*`/`_VERSION` lines and `Version :` banners in `data/*` assets. The helper does NOT `git add` — stage the rewritten paths yourself.
-- **No per-commit enforcement** — `.githooks/pre-commit` does NOT run a bump-check on `dev` (removed by TASK-669). Adding firmware changes to `dev` without a bump is the expected pattern between releases. The 2.0.0 worktree keeps its own per-commit bump-check unchanged; that policy is branch-local.
-- **A/B traceability** — the constraint that each beta tag corresponds to a discrete set of testable changes is preserved by the release cadence, not by per-commit enforcement: a release-prep run that batches too many heterogeneous changes is a release-quality problem, not a commit-time problem.
+- **When bump happens** — once per beta release, as Phase 2 of `/beta-prerelease` skill (runs `bin/bump-prerelease.sh` and stages result alongside rest of release prep). Individual commits to `dev` between releases do NOT carry bump. Next `/beta-prerelease` invocation rolls up whatever accumulated since last public release into single new beta tag.
+- **How to bump** (manual / from skill) — `bin/bump-prerelease.sh` parses current tag (must match `^[a-zA-Z]+\.[0-9]+$`), increments trailing integer, and calls `scripts/autoinc-semver.py --prerelease <new>` to rewrite `version.h` + `data/version.hash` + cascaded `_SEMVER_*`/`_VERSION` lines and `Version :` banners in `data/*` assets. Helper does NOT `git add` — stage rewritten paths yourself.
+- **No per-commit enforcement** — `.githooks/pre-commit` does NOT run bump-check on `dev` (removed by TASK-669). Adding firmware changes to `dev` without bump is expected pattern between releases. 2.0.0 worktree keeps own per-commit bump-check unchanged; that policy branch-local.
+- **A/B traceability** — constraint that each beta tag corresponds to discrete set of testable changes preserved by release cadence, not per-commit enforcement: release-prep run that batches too many heterogeneous changes is release-quality problem, not commit-time problem.
 
 ## Worktree layout
 
-This project is intentionally checked out into **two parallel git worktrees** so the 1.5.x release line and the 2.0.0 feature line can be worked on side-by-side without branch-switch churn:
+This project intentionally checked out into **two parallel git worktrees** so 1.5.x release line and 2.0.0 feature line can be worked side-by-side without branch-switch churn:
 
 | Worktree path | Branch | Purpose |
 |---|---|---|
-| `D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware` | `dev` | 1.5.x release line — the default working tree |
+| `D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware` | `dev` | 1.5.x release line — default working tree |
 | `D:\Users\Robert\Documents\GitHub\RvdB\OTGW-firmware-2.0.0` | `feature-dev-2.0.0-otgw32-esp32-sat-support` | 2.0.0 ESP32 + SAT feature line |
 
-**The 2.0.0 worktree has its own `CLAUDE.md`** with ESP32/SAT-specific rules and a richer toolchain (C4 docs, hooks, adr-kit plugin, discord-mcp server). When working in that tree, those rules supersede this file's guidance. The two files are not synchronised — divergence is intentional, since the platforms and tooling differ.
+**The 2.0.0 worktree has own `CLAUDE.md`** with ESP32/SAT-specific rules and richer toolchain (C4 docs, hooks, adr-kit plugin, discord-mcp server). When working in that tree, those rules supersede this file's guidance. Two files not synchronised — divergence intentional, since platforms and tooling differ.
 
-**Rule: keep both worktrees present.** Work that targets one branch (e.g. SAT dashboard / ESP32 / 2.0.0 features) belongs in its own worktree; work targeting `dev` belongs in the dev worktree. Never use `git checkout <other-branch>` inside one worktree to do work that belongs in the other — it defeats the point of the split and risks losing in-flight changes on the original branch.
+**Rule: keep both worktrees present.** Work targeting one branch (e.g. SAT dashboard / ESP32 / 2.0.0 features) belongs in own worktree; work targeting `dev` belongs in dev worktree. Never use `git checkout <other-branch>` inside one worktree to do work belonging in other — defeats point of split and risks losing in-flight changes on original branch.
 
-**If only one worktree exists, create the missing one before starting side-by-side work.** From inside the existing worktree:
+**If only one worktree exists, create missing one before starting side-by-side work.** From inside existing worktree:
 
 ```bash
 # missing the 2.0.0 feature worktree:
@@ -315,11 +315,11 @@ git worktree add ../OTGW-firmware dev
 
 Verify with `git worktree list`.
 
-**Backlog.md: prefer the `backlog` CLI for all task operations; fall back to `mcp__backlog__*` tools only when the CLI is unavailable.** The MCP server inherits the launching session's working directory and indexes only that single worktree. Tasks living in a sibling worktree are invisible to `mcp__backlog__task_search`, and `mcp__backlog__task_view` returns cached/stale content for cross-tree tasks (verified 2026-05-05: MCP kept returning the pre-edit "In Progress" snapshot of TASK-514 long after a CLI edit had marked it Done on disk in the 2.0.0 tree). Mixing CLI and MCP on the same task is fragile because MCP caches and does not reflect CLI-side writes without a server restart. Use `backlog task ...` CLI for every read, edit, create, complete, and archive.
+**Backlog.md: prefer `backlog` CLI for all task ops; fall back to `mcp__backlog__*` tools only when CLI unavailable.** MCP server inherits launching session's working directory and indexes only that single worktree. Tasks living in sibling worktree invisible to `mcp__backlog__task_search`, and `mcp__backlog__task_view` returns cached/stale content for cross-tree tasks (verified 2026-05-05: MCP kept returning pre-edit "In Progress" snapshot of TASK-514 long after CLI edit marked it Done on disk in 2.0.0 tree). Mixing CLI and MCP on same task fragile because MCP caches and does not reflect CLI-side writes without server restart. Use `backlog task ...` CLI for every read, edit, create, complete, archive.
 
-**CLI cross-tree behaviour.** `backlog task <id> --plain` resolves from either worktree, but `backlog task edit` only writes to the worktree where the task file actually lives. If an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file. SAT / ESP32 / 2.0.0 tasks generally live in the feature worktree's `backlog/tasks/`, not in dev's.
+**CLI cross-tree behaviour.** `backlog task <id> --plain` resolves from either worktree, but `backlog task edit` only writes to worktree where task file actually lives. Edit returns `Task not found`: `find` for `task-<id>*` across both worktrees and run edit from worktree holding file. SAT / ESP32 / 2.0.0 tasks generally live in feature worktree's `backlog/tasks/`, not dev's.
 
-**Fallback when both MCP and CLI are unavailable.** If `mcp__backlog__*` tools are not registered for the session AND `backlog` is not on `PATH` (fresh container, web session, or a worktree where the global install is missing), do NOT fall back to editing task files by hand. Instead, invoke the CLI through `npx`:
+**Fallback when both MCP and CLI unavailable.** If `mcp__backlog__*` tools not registered for session AND `backlog` not on `PATH` (fresh container, web session, or worktree where global install missing), do NOT fall back to editing task files by hand. Instead, invoke CLI through `npx`:
 
 ```bash
 npx -y backlog.md task list --plain
@@ -327,39 +327,39 @@ npx -y backlog.md task <id> --plain
 npx -y backlog.md task edit <id> -s "In Progress" -a @myself
 ```
 
-`npx -y backlog.md` resolves to the same binary as the global `backlog` command and preserves all metadata/Git tracking guarantees. After the first invocation `npx` caches the package, so subsequent calls are fast. Only after `npx` itself fails (no network, no Node) should you escalate to the user — never bypass the CLI by hand-editing markdown.
+`npx -y backlog.md` resolves to same binary as global `backlog` command and preserves all metadata/Git tracking guarantees. After first invocation `npx` caches package, so subsequent calls fast. Only after `npx` itself fails (no network, no Node) should you escalate to user — never bypass CLI by hand-editing markdown.
 
 ### Cross-worktree work — ask first, then plan once, then parallelise
 
-Whenever you take on a bug fix, feature change, or architectural decision, **explicitly ask yourself**: *does this also need to land on the other worktree?* For 1.5.x↔2.0.0 the answer is almost always **yes** when the change touches:
+Whenever you take on bug fix, feature change, or architectural decision, **explicitly ask yourself**: *does this also need to land on other worktree?* For 1.5.x↔2.0.0 answer almost always **yes** when change touches:
 
-- Any file under `src/OTGW-firmware/` whose name is the same in both trees (most `.ino`, `.h`, `.cpp` and the LittleFS data assets) — even when the line numbers differ between branches, the architectural fix usually applies to both.
-- ADRs that codify a cross-cutting decision (MQTT topic shape, heap policy, discovery semantics, settings schema). The dev ADR and the 2.0.0 ADR live in their own worktrees and have separate numbering, but the *decision* must be coherent across both.
-- Anything driven by a HA-side, broker-side or PIC-side contract (HA discovery regex, MQTT retained behaviour, OpenTherm message ID semantics) — those are platform-independent and the firmware-side fix must apply on both branches.
+- Any file under `src/OTGW-firmware/` whose name same in both trees (most `.ino`, `.h`, `.cpp` and LittleFS data assets) — even when line numbers differ between branches, architectural fix usually applies to both.
+- ADRs that codify cross-cutting decision (MQTT topic shape, heap policy, discovery semantics, settings schema). Dev ADR and 2.0.0 ADR live in own worktrees and have separate numbering, but *decision* must be coherent across both.
+- Anything driven by HA-side, broker-side or PIC-side contract (HA discovery regex, MQTT retained behaviour, OpenTherm message ID semantics) — those platform-independent and firmware-side fix must apply on both branches.
 
-The answer is usually **no** when the change is genuinely scoped to a feature that only exists on one branch (SAT dashboard, ESP32-S3 board pinning, OTGW32 hardware bring-up → 2.0.0 only; LTS-1.4.x patch backports → only that branch).
+Answer usually **no** when change genuinely scoped to feature that only exists on one branch (SAT dashboard, ESP32-S3 board pinning, OTGW32 hardware bring-up → 2.0.0 only; LTS-1.4.x patch backports → only that branch).
 
 **If both: one master plan, two tasks, two agents.**
 
-1. **Write ONE master plan first**, before creating any task or spawning any agent. The plan covers *both* worktrees in a single document and must contain, for each change:
-   - The desired outcome in plain language (the "what" and "why").
-   - The exact file(s) and line number(s) on **both** branches — they often differ. Read each branch's source to confirm; do not assume parity.
-   - Per-platform considerations explicitly called out for the 2.0.0 side (ESP8266 vs ESP32-S3 deadbands/thresholds, board-specific pin maps, conditional compilation flags).
-   - The full AC list each per-worktree task will inherit (build commands, evaluator commands, field-validation gates, ADR-acceptance gates).
+1. **Write ONE master plan first**, before creating any task or spawning any agent. Plan covers *both* worktrees in single document and must contain, for each change:
+   - Desired outcome in plain language (the "what" and "why").
+   - Exact file(s) and line number(s) on **both** branches — often differ. Read each branch's source to confirm; do not assume parity.
+   - Per-platform considerations explicitly called out for 2.0.0 side (ESP8266 vs ESP32-S3 deadbands/thresholds, board-specific pin maps, conditional compilation flags).
+   - Full AC list each per-worktree task will inherit (build commands, evaluator commands, field-validation gates, ADR-acceptance gates).
    - Cross-tree dependencies and ordering — e.g. dev ADR-N must be Accepted before 2.0.0 ADR-M can be drafted; dev impl can be pushed before 2.0.0 impl is reviewed.
-   - The expected commit message prefix and the push gate per branch (`origin/dev` auto-push allowed under the policy above; 2.0.0 feature branch needs explicit confirmation).
+   - Expected commit message prefix and push gate per branch (`origin/dev` auto-push allowed under policy above; 2.0.0 feature branch needs explicit confirmation).
 
-2. **Share the master plan with the user for approval** before any task creation. The user's "go" on the master plan replaces the per-task plan-review gate that would otherwise apply individually.
+2. **Share master plan with user for approval** before any task creation. User's "go" on master plan replaces per-task plan-review gate that would otherwise apply individually.
 
-3. **Then create two separate backlog tasks**, one per worktree. Use the convention `feat-2.0.0: port TASK-N — <title>` for the 2.0.0 sibling so cross-references stay legible. Each task carries its own AC list derived from the master plan; do not over-share ACs across tasks (each agent must be able to verify its own task in isolation).
+3. **Then create two separate backlog tasks**, one per worktree. Use convention `feat-2.0.0: port TASK-N — <title>` for 2.0.0 sibling so cross-references stay legible. Each task carries own AC list derived from master plan; do not over-share ACs across tasks (each agent must verify own task in isolation).
 
 4. **Spawn two agents in parallel**, one per worktree. Each agent:
-   - Has its own self-contained prompt referencing the master plan (or restating its scope in full).
-   - Works exclusively in its own worktree and explicitly does not touch the other tree.
+   - Has own self-contained prompt referencing master plan (or restating scope in full).
+   - Works exclusively in own worktree and explicitly does not touch other tree.
    - Reports back independently with build/evaluator/commit/push receipts.
 
-5. **Verify both reports**, then report a consolidated summary to the user.
+5. **Verify both reports**, then report consolidated summary to user.
 
-Do **not** sequence (dev first, then 2.0.0 only after dev is fully done) unless there's a hard ordering dependency (e.g. 2.0.0 ADR cites a regex finding from the dev ADR — in that case dev ADR must be Accepted before the 2.0.0 ADR can be drafted, but the 2.0.0 *code* impl can still parallelise once both ADRs are Accepted).
+Do **not** sequence (dev first, then 2.0.0 only after dev fully done) unless hard ordering dependency (e.g. 2.0.0 ADR cites regex finding from dev ADR — in that case dev ADR must be Accepted before 2.0.0 ADR can be drafted, but 2.0.0 *code* impl can still parallelise once both ADRs Accepted).
 
-The benefit of writing the plan once is symmetry: agents see the same intent, the two ADRs cross-reference cleanly, the two commits land within minutes of each other, and the user reviews one design instead of two slightly-divergent designs.
+Benefit of writing plan once is symmetry: agents see same intent, two ADRs cross-reference cleanly, two commits land within minutes of each other, and user reviews one design instead of two slightly-divergent designs.

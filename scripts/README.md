@@ -75,20 +75,22 @@ pwsh -File scripts/branch-hygiene-queue.ps1 -Remote origin -BaseBranch dev -Inac
 4. Adds owner/decision/notes columns for manual review
 5. Exports a sorted review queue CSV for branch governance
 
-## capture-mqtt-debug.ps1
+## capture-mqtt-debug.bat
 
 Captures OTGW telnet debug output and MQTT broker traffic into a timestamped diagnostic folder.
 
+Single-file delivery: `capture-mqtt-debug.bat` is the only file you need. The PowerShell worker is embedded at the bottom of the `.bat` (after the `:::PSPAYLOAD:::` marker) and extracted to a temporary `.ps1` at run time. Double-click it, or run it from `cmd.exe`/`pwsh`. No separate `.ps1` to ship and no execution-policy prompt (Bypass is set for the child process only).
+
 ### MQTT Debug Capture Usage
 
-```powershell
-pwsh -File scripts/capture-mqtt-debug.ps1 -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10 -Topic '#'
-```
-
-From `cmd.exe`, use the batch launcher:
+Double-click for interactive prompts, or from a shell:
 
 ```bat
 scripts\capture-mqtt-debug.bat -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10 -Topic #
+```
+
+```powershell
+.\scripts\capture-mqtt-debug.bat -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10 -Topic '#'
 ```
 
 ### MQTT Debug Capture Options
@@ -99,8 +101,8 @@ scripts\capture-mqtt-debug.bat -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10
 - `-Topic` - MQTT subscription topic (default: `#`)
 - `-Username` / `-Password` - Optional MQTT credentials; password is prompted securely when a username is supplied without a password
 - `-OutputRoot` - Root folder for run logs (default: `logs/mqtt-diagnostics`)
-- `-DurationSeconds` - Optional capture duration; otherwise runs until `Ctrl+C`
+- `-DurationSeconds` - Optional capture duration; otherwise runs until stopped from the console
 - `-MosquittoSubPath` - Optional explicit path to `mosquitto_sub.exe`
 - `-SkipToolInstall` - Do not install Mosquitto if `mosquitto_sub` is missing
 
-Each run writes `telnet.log`, `mqtt.log`, `mqtt.stderr.log`, and `summary.txt`. The script enables OTGW MQTT debug with telnet key `3` only when the banner reports `3 MQTT [0]`.
+Each run leaves one upload artifact: `transcript.txt`. The script uses temporary `summary.txt`, `telnet.log`, `mqtt.log`, and `mqtt.stderr.log` files while capturing, merges them into `transcript.txt`, then removes the separate files after a successful merge. Press `Q` in the capture console to stop cleanly without the Windows batch `Ctrl+C` prompt; `Ctrl+C` and `Ctrl+Break` remain fallback interrupts. The script enables OTGW MQTT debug with telnet key `3` only when the banner reports `3 MQTT [0]`.
