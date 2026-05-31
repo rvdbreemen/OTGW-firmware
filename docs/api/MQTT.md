@@ -1333,7 +1333,8 @@ These MQTT-related settings are configurable via the REST API (`/api/v2/settings
 | `mqttuniqueid` | `"otgw-{MAC}"` | Unique device ID |
 | `mqttharebootdetection` | `true` | Re-publish discovery on HA restart |
 | `mqttotmessage` | `false` | Publish raw OT messages |
-| `mqttinterval` | `0` | Minimum publish interval (seconds, 0 = no throttle) |
+| `mqttonchangepublishing` | `true` | On-change publishing (ADR-116). When `true`, publish on change with a heartbeat every `mqttinterval` seconds. When `false`, legacy publish-every-message. Absent key (older config) loads as `true`. |
+| `mqttinterval` | `60` | Heartbeat interval (seconds) for unchanged values when `mqttonchangepublishing=true`. Default `60`; on upgrade a stored `0` is migrated once to `60`. With `mqttonchangepublishing=false` (or interval `0`) the firmware publishes every message. |
 | `mqttseparatesources` | `false` | Publish to source-separated sub-topics |
 | `mqttuselegacyottopics` | `false` | When `true`, publish the 37 legacy OT-spec-derived binary_sensor names; when `false` (default in 2.0.0), publish the new self-describing HA-core-style aliases instead. The two name sets are mutually exclusive (ADR-106). Toggle triggers cleanup of the retained payloads in the other name set via a persistent bitmap in `/mqtt_topic_cleanup.bin`. |
 

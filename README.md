@@ -205,7 +205,9 @@ After saving, Home Assistant discovers the OTGW device. Go to **Settings > Devic
 
 ### Step 3: Tune the publish interval
 
-The default publish interval (`0`) publishes every OpenTherm message as it arrives. This gives the freshest data but creates high MQTT traffic. Set **Publish Interval** to `10`-`60` seconds to publish on change and re-publish unchanged values as a heartbeat.
+By default, **MQTT Publish On-Change** (Settings > MQTT) is enabled: the gateway publishes immediately when an OpenTherm value changes and republishes unchanged values every `60` seconds as a heartbeat. This keeps data fresh while avoiding the high MQTT traffic of publishing every repeated OpenTherm frame.
+
+With **MQTT Publish On-Change** enabled the gateway will publish immediately when a value **changes** and re-publish unchanged values once per **MQTT Interval** as a heartbeat (so Home Assistant does not mark sensors as unavailable). A value of `10`-`60` seconds is a good starting point. Unticking **MQTT Publish On-Change** restores legacy behaviour: every OpenTherm frame is published as it arrives. When upgrading from a release that published every frame (`MQTTinterval=0`), the gateway migrates that setting once to `60` seconds with Publish On-Change enabled.
 
 ### Step 4: Send commands from Home Assistant
 

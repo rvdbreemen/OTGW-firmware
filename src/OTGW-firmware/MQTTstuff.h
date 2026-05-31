@@ -38,6 +38,12 @@ struct MQTTRuntimeSection {    // state.mqtt -- MQTT broker connection state
   uint32_t iLastConnectedMs = 0;   // millis() when MQTT was last connected (for fallback detection)
 };
 
+// ADR-116: default heartbeat interval (s) used both as the fresh-install
+// MQTTinterval default and as the target of the one-time 0 -> 60 migration.
+#ifndef MQTT_DEFAULT_PUBLISH_INTERVAL_SEC
+#define MQTT_DEFAULT_PUBLISH_INTERVAL_SEC 60
+#endif
+
 struct MQTTSettingsSection {
   bool    bEnable          = true;
   bool    bSecure          = false;
@@ -55,7 +61,8 @@ struct MQTTSettingsSection {
   char    sUniqueid[41]    = "";  // Initialized in readSettings
   static_assert(sizeof(sUniqueid) >= 20, "sUniqueid must fit 'otgw-' + chipId");
   bool    bOTmessage       = false;
-  uint16_t iInterval       = 0;   // MQTT publish interval in seconds (0 = publish every message)
+  bool    bOnChangePublishing = true; // On-change publishing: publish on change, heartbeat unchanged values every iInterval (ADR-116)
+  uint16_t iInterval       = MQTT_DEFAULT_PUBLISH_INTERVAL_SEC; // Heartbeat interval (s) when on-change active; 0 = legacy publish-every-message
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
   bool    bLegacyPort25238Enabled = false;
   bool    bUseLegacyOtTopics = false;  // ADR-106: false (default) → publish new self-describing names (supports_*, fault_indication, ventilation_*, etc.). true → publish legacy OT-spec-derived names. Mutually exclusive — never both at the same time. Toggle triggers cleanup of the OTHER set's retained discovery topics.

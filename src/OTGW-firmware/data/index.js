@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.115
+**  Version  : v2.0.0-alpha.116
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -6110,49 +6110,6 @@ function refreshSettings() {
 
         var settings = document.getElementById('settingsPage');
 
-        // "Publish on change" synthetic checkbox - injected once, just before the mqttinterval row.
-        // Never sent to the backend; it only drives the mqttinterval field value (0 vs 60).
-        if (key === 'mqttinterval' && document.getElementById("D_mqttpublishonchange") == null) {
-          const pocRow = document.createElement("div");
-          pocRow.setAttribute("class", "settingDiv");
-          pocRow.setAttribute("id", "D_mqttpublishonchange");
-          const pocLabel = document.createElement("label");
-          pocLabel.className = 'settings-field-container';
-          pocLabel.setAttribute("for", "mqttpublishonchange");
-          pocLabel.textContent = translateToHuman("mqttpublishonchange");
-          const pocTip = translateTooltip("mqttpublishonchange");
-          if (pocTip) pocLabel.setAttribute("title", pocTip);
-          pocRow.appendChild(pocLabel);
-          const pocInputDiv = document.createElement("div");
-          pocInputDiv.className = 'settings-input-container';
-          const pocCb = document.createElement("input");
-          pocCb.setAttribute("type", "checkbox");
-          pocCb.setAttribute("id", "mqttpublishonchange");
-          pocCb.checked = (parseInt(s.value, 10) !== 0);
-          if (pocTip) pocCb.setAttribute("title", pocTip);
-          pocCb.addEventListener('change', function() {
-            const intervalEl = document.getElementById("mqttinterval");
-            const intervalRow = document.getElementById("D_mqttinterval");
-            if (this.checked) {
-              if (intervalEl && (intervalEl.value === "0" || intervalEl.value === 0 || intervalEl.value === "")) {
-                intervalEl.value = 60;
-              }
-              if (intervalRow) intervalRow.style.display = "";
-            } else {
-              if (intervalEl) intervalEl.value = 0;
-              if (intervalRow) intervalRow.style.display = "none";
-            }
-            if (intervalEl) {
-              intervalEl.className = "input-changed";
-              setVisible('btnSaveSettings', true);
-            }
-          });
-          pocInputDiv.appendChild(pocCb);
-          pocRow.appendChild(pocInputDiv);
-          var pocGroupBody = getOrCreateSettingsGroup(settings, getSettingsGroupId(key));
-          pocGroupBody.appendChild(pocRow);
-        }
-
         if ((document.getElementById("D_" + key)) == null) {
           var rowDiv = document.createElement("div");
           rowDiv.setAttribute("class", "settingDiv");
@@ -6314,8 +6271,30 @@ function refreshSettings() {
           rowDiv.appendChild(inputDiv);
           var groupBody = getOrCreateSettingsGroup(settings, getSettingsGroupId(key));
           groupBody.appendChild(rowDiv);
-          if (key === 'mqttinterval' && parseInt(s.value, 10) === 0) {
-            rowDiv.style.display = 'none';
+          // ADR-116: bind the real on-change-publishing checkbox to the interval row.
+          // Ticked -> reveal interval and default it to 60 (when 0/empty); unticked ->
+          // set interval 0 and hide the row. Renders before mqttinterval, so the
+          // interval handler below can read this checkbox's state.
+          if (key === 'mqttonchangepublishing') {
+            const cb = document.getElementById('mqttonchangepublishing');
+            if (cb) cb.addEventListener('change', function() {
+              const intervalEl = document.getElementById('mqttinterval');
+              const intervalRow = document.getElementById('D_mqttinterval');
+              if (this.checked) {
+                if (intervalEl && (intervalEl.value === '0' || intervalEl.value === 0 || intervalEl.value === '')) intervalEl.value = 60;
+                if (intervalRow) intervalRow.style.display = '';
+              } else {
+                if (intervalEl) intervalEl.value = 0;
+                if (intervalRow) intervalRow.style.display = 'none';
+              }
+              if (intervalEl) { intervalEl.className = 'input-changed'; setVisible('btnSaveSettings', true); }
+            });
+          }
+          // Hide interval row when on-change publishing is off
+          if (key === 'mqttinterval') {
+            const cb = document.getElementById('mqttonchangepublishing');
+            const isOn = cb ? cb.checked : (parseInt(s.value, 10) !== 0);
+            rowDiv.style.display = isOn ? '' : 'none';
           }
         }
         else {
@@ -6336,11 +6315,11 @@ function refreshSettings() {
             if (inputEl.hasAttribute("data-prev-value")) {
               inputEl.setAttribute("data-prev-value", String(s.value));
             }
+            // Sync interval row visibility with the on-change-publishing checkbox on refresh
             if (key === 'mqttinterval') {
-              const pocCb = document.getElementById("mqttpublishonchange");
+              const cb = document.getElementById("mqttonchangepublishing");
               const intervalRow = document.getElementById("D_mqttinterval");
-              const isOn = parseInt(s.value, 10) !== 0;
-              if (pocCb) pocCb.checked = isOn;
+              const isOn = cb ? cb.checked : (parseInt(s.value, 10) !== 0);
               if (intervalRow) intervalRow.style.display = isOn ? "" : "none";
             }
           }
@@ -6904,8 +6883,8 @@ var translateFields = [
   , ["s0powerkw", "S0 Actual Power (kW)"]
   , ["s0intervalcount", "S0 Interval Pulses"]
   , ["s0totalcount", "S0 Total Pulses"]
-  , ["mqttpublishonchange", "Publish on change"]
-  , ["mqttinterval", "Interval (sec)"]
+  , ["mqttonchangepublishing", "MQTT Publish On-Change"]
+  , ["mqttinterval", "MQTT Interval"]
   , ["mqttotmessage", "MQTT Raw OpenTherm Messages"]
   , ["mqttseparatesources", "MQTT Separate Sources"]
   , ["mqttuselegacyottopics", "MQTT Use Legacy OT Topics"]
@@ -7024,8 +7003,8 @@ var translateTooltips = [
   , ["mqttuniqueid", "Unique device ID used for MQTT discovery. Change only if you need a new device identity."]
   , ["mqtthaprefix", "Home Assistant discovery prefix. Keep the default unless your HA setup uses a custom prefix."]
   , ["mqttharebootdetection", "Enable this if Home Assistant should republish discovery after it restarts."]
-  , ["mqttpublishonchange", "When enabled, repeated MQTT publishes are suppressed until the value changes or the interval below has elapsed. Disable to publish every observed OpenTherm message."]
-  , ["mqttinterval", "Minimum time in seconds before republishing an unchanged value."]
+  , ["mqttonchangepublishing", "Recommended. When on, the gateway publishes a value the moment it changes and otherwise only re-sends it once per MQTT Interval as a heartbeat. This keeps Home Assistant fresh while cutting broker traffic. When off, every OpenTherm message is published as it arrives (legacy firehose), which is much noisier. Turning this off sets the interval to 0; turning it on sets a 60 second interval."]
+  , ["mqttinterval", "Heartbeat interval in seconds: how often an unchanged value is re-published so Home Assistant does not flag the sensor as unavailable. Changed values are always published immediately regardless of this setting. Only used when MQTT Publish On-Change is on; 60 is a good default, lower means fresher data but more traffic."]
   , ["mqttotmessage", "Publish raw OpenTherm messages on MQTT for diagnostics and advanced integrations."]
   , ["mqttseparatesources", "Publish thermostat and boiler values on separate MQTT topics when available."]
   , ["legacyport25238enabled", "Enable the legacy otmonitor TCP bridge on port 25238. Leave disabled unless pyotgw, otmonitor, or another external TCP client needs it."]

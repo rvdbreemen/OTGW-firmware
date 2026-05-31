@@ -4,6 +4,20 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## 2.0.0
+
+### Behaviour change: MQTT on-change publishing is the default (ADR-116)
+
+On-change publishing is now enabled by default. Fresh installs use `MQTTonChangePublishing=true` with `MQTTinterval=60`, so changed OpenTherm values still publish immediately while unchanged values refresh once per minute instead of on every repeated frame.
+
+During the first settings load after upgrade, a config that still has `MQTTinterval=0` (the previous publish-every-frame default) is migrated once to `60` and persisted via the deferred settings write; the new `MQTTonChangePublishing` key defaults to `true` when absent.
+
+**Who is affected:** users or custom consumers that relied on every repeated OpenTherm frame being republished to MQTT.
+
+**Migration:** none needed for the new default. To keep legacy every-message publishing, untick **MQTT Publish On-Change** in Settings > MQTT (or set `MQTTonChangePublishing=false`), which also sets the interval to `0`. The TASK-400 status-bit heartbeat is independent and unaffected.
+
+---
+
 ## 🛑 v1.4.2
 
 ### Breaking: heap diagnostic MQTT topic split from one JSON blob into 17 individual retained topics

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.115
+**  Version  : v2.0.0-alpha.116
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1672,6 +1672,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendJsonMapEntry(F("settings.mqtt.top_topic"), settings.mqtt.sTopTopic);
   sendJsonMapEntry(F("settings.mqtt.unique_id"), settings.mqtt.sUniqueid);
   sendJsonMapEntry(F("settings.mqtt.ot_message"), settings.mqtt.bOTmessage);
+  sendJsonMapEntry(F("settings.mqtt.on_change"), settings.mqtt.bOnChangePublishing);
   sendJsonMapEntry(F("settings.mqtt.interval"), (uint32_t)settings.mqtt.iInterval);
   sendJsonMapEntry(F("settings.mqtt.sep_sources"), settings.mqtt.bSeparateSources);
   sendJsonMapEntry(F("settings.mqtt.disc_verify"), settings.mqtt.bDiscoveryAutoVerify);
@@ -2744,6 +2745,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("mqttharebootdetection"), settings.mqtt.bHaRebootDetect, "b");
   sendJsonSettingObj(F("mqttuniqueid"), CSTR(settings.mqtt.sUniqueid), "s", 20);
   sendJsonSettingObj(F("mqttotmessage"), settings.mqtt.bOTmessage, "b");
+  sendJsonSettingObj(F("mqttonchangepublishing"), settings.mqtt.bOnChangePublishing, "b");
   sendJsonSettingObj(F("mqttinterval"), settings.mqtt.iInterval, "i", 0, 3600);
   sendJsonSettingObj(F("mqttseparatesources"), settings.mqtt.bSeparateSources, "b");
   sendJsonSettingObj(F("mqttuselegacyottopics"), settings.mqtt.bUseLegacyOtTopics, "b");
@@ -3010,7 +3012,7 @@ static const char* const PROGMEM knownSettings[] = {
   "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
   "hostname", "httppasswd", "ledblink", "nightlyrestart", "nightlyrestarthour",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
-  "mqttinterval", "mqttotmessage", "mqttpasswd", "mqttseparatesources", "legacyport25238enabled",
+  "mqttinterval", "mqttonchangepublishing", "mqttotmessage", "mqttpasswd", "mqttseparatesources", "legacyport25238enabled",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
   "otdautodetect", "otdenableslave", "otdfailsafe", "otdmode", "otdmsginterval",
