@@ -59,6 +59,31 @@ const char Helper[] PROGMEM =
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
 
+// Serve a CSS asset with revalidation: no-cache + ETag = filesystem hash, mirroring the
+// index.html policy. Avoids the stale-CSS cache-skew where a long max-age copy survives a
+// reflash (browser served old styling for 24h while the no-cache HTML was already fresh).
+// Browser revalidates each load; 304 when the FS hash is unchanged, fresh 200 after a flash.
+static void serveCssRevalidated(const char* path) {
+  File f = LittleFS.open(path, "r");
+  if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
+  const char* fsHash = getFilesystemHash();
+  if (fsHash && fsHash[0] != '\0') {
+    char etag[24];
+    snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
+    if (httpServer.hasHeader(F("If-None-Match")) &&
+        strcmp(httpServer.header(F("If-None-Match")).c_str(), etag) == 0) {
+      f.close();
+      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+      httpServer.sendHeader(F("ETag"), etag);
+      httpServer.send(304);
+      return;
+    }
+    httpServer.sendHeader(F("ETag"), etag);
+  }
+  httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+  httpServer.streamFile(f, F("text/css"));
+  f.close();
+}
 
 //=====================================================================================
 void startWebserver(){
@@ -168,15 +193,13 @@ void startWebserver(){
   } 
   httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
   
-  // Serve CSS and JS files with appropriate caching headers
-  httpServer.on("/index.css", []() {
-    File f = LittleFS.open("/index.css", "r");
-    if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
-    // CSS can be cached for longer periods (1 day)
-    httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
-    httpServer.streamFile(f, F("text/css"));
-    f.close();
-  });
+  // Serve CSS and JS files with appropriate caching headers.
+  // All CSS uses no-cache + ETag (revalidate) so reflashed styling is never masked by a
+  // stale long-lived cache entry (TASK-792). JS uses ?v=<hash> versioned long-term caching.
+  httpServer.on("/index.css",        []() { serveCssRevalidated("/index.css"); });
+  httpServer.on("/index_dark.css",   []() { serveCssRevalidated("/index_dark.css"); });
+  httpServer.on("/index_common.css", []() { serveCssRevalidated("/index_common.css"); });
+  httpServer.on("/ds-tokens.css",    []() { serveCssRevalidated("/ds-tokens.css"); });
   
   httpServer.on("/index.js", []() {
     File f = LittleFS.open("/index.js", "r");
