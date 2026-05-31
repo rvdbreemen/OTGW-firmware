@@ -23,5 +23,15 @@ echo PowerShell was not found on PATH.>&2
 exit /b 1
 
 :run
+if /I "%~1"=="--help" (
+    "%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%" -Help
+    exit /b %ERRORLEVEL%
+)
+
+if /I "%~1"=="/?" (
+    "%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%" -Help
+    exit /b %ERRORLEVEL%
+)
+
 "%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%" %*
 exit /b %ERRORLEVEL%

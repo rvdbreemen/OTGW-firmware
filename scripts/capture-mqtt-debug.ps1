@@ -1,4 +1,6 @@
 param(
+    [Alias("h", "?")]
+    [switch]$Help,
     [string]$DeviceHost,
     [string]$BrokerHost,
     [int]$BrokerPort = 1883,
@@ -17,6 +19,33 @@ $ErrorActionPreference = "Stop"
 $script:StopRequested = $false
 $script:SummaryPath = $null
 $script:SummaryLines = New-Object System.Collections.Generic.List[string]
+
+function Show-Help {
+    Write-Host "OTGW MQTT diagnostic capture"
+    Write-Host ""
+    Write-Host "Usage:"
+    Write-Host "  .\scripts\capture-mqtt-debug.ps1 [-DeviceHost <host>] [-BrokerHost <host>] [-BrokerPort <port>] [-Topic <topic>] [-Username <user>] [-Password <pass>] [-DurationSeconds <seconds>]"
+    Write-Host "  .\scripts\capture-mqtt-debug.bat --help"
+    Write-Host ""
+    Write-Host "Interactive mode:"
+    Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
+    Write-Host "  It then prompts for an optional MQTT username. Leave it blank for anonymous brokers."
+    Write-Host "  If a username is supplied without -Password, the script prompts securely for the MQTT password."
+    Write-Host ""
+    Write-Host "Stopping capture:"
+    Write-Host "  Press Ctrl+C to stop manually. The script still closes the logs and writes summary.txt."
+    Write-Host "  Or pass -DurationSeconds <seconds> to stop automatically after a fixed interval."
+    Write-Host ""
+    Write-Host "Examples:"
+    Write-Host "  .\scripts\capture-mqtt-debug.ps1"
+    Write-Host "  .\scripts\capture-mqtt-debug.ps1 -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10 -Username mqttuser"
+    Write-Host "  .\scripts\capture-mqtt-debug.bat --help"
+}
+
+if ($Help) {
+    Show-Help
+    exit 0
+}
 
 function Add-SummaryLine {
     param([string]$Line)
@@ -375,6 +404,11 @@ function Enable-MqttTelnetDebugIfNeeded {
     return "not sent because MQTT debug state was not found in the telnet banner"
 }
 
+$deviceHostWasBound = $PSBoundParameters.ContainsKey('DeviceHost')
+$brokerHostWasBound = $PSBoundParameters.ContainsKey('BrokerHost')
+$usernameWasBound = $PSBoundParameters.ContainsKey('Username')
+$passwordWasBound = $PSBoundParameters.ContainsKey('Password')
+
 if ([string]::IsNullOrWhiteSpace($DeviceHost)) {
     $DeviceHost = Read-Host "OTGW device host"
 }
@@ -391,7 +425,16 @@ if ([string]::IsNullOrWhiteSpace($BrokerHost)) {
     throw "BrokerHost is required."
 }
 
-if (-not [string]::IsNullOrWhiteSpace($Username) -and -not $PSBoundParameters.ContainsKey('Password')) {
+if (-not $usernameWasBound -and (-not $deviceHostWasBound -or -not $brokerHostWasBound)) {
+    $Username = Read-Host "MQTT username (blank for anonymous)"
+}
+
+if ([string]::IsNullOrWhiteSpace($Username)) {
+    if ($passwordWasBound -and -not [string]::IsNullOrWhiteSpace($Password)) {
+        throw "Username is required when Password is supplied."
+    }
+}
+elseif (-not $passwordWasBound) {
     $securePassword = Read-Host "MQTT password for $Username" -AsSecureString
     $Password = ConvertFrom-SecureStringToPlainText -SecureString $securePassword
 }
@@ -468,7 +511,7 @@ try {
 
     Add-SummaryLine "Capture started: $((Get-Date).ToString('o'))"
     Write-Host "Capturing telnet and MQTT output in $runPath"
-    Write-Host "Press Ctrl+C to stop."
+    Write-Host "Press Ctrl+C to stop and write summary.txt. Run with -Help for options."
 
     while (-not $script:StopRequested -and (Get-Date) -lt $deadline) {
         if (-not $telnetClient.Connected) {
