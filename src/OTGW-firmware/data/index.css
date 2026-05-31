@@ -1017,19 +1017,24 @@
 }
 
 .boiler-unsupported-table {
+  background: transparent;
   border-collapse: collapse;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
 }
 
-.boiler-unsupported-table th,
-.boiler-unsupported-table td {
+.boiler-unsupported-panel .boiler-unsupported-table th,
+.boiler-unsupported-panel .boiler-unsupported-table td {
+  background: transparent;
+  border: none;
   border-bottom: 1px solid rgba(240, 173, 78, 0.45);
-  padding: 4px 10px 4px 0;
+  padding: 5px 28px 5px 0;
   text-align: left;
   vertical-align: top;
+  white-space: nowrap;
 }
 
-.boiler-unsupported-table th {
+.boiler-unsupported-panel .boiler-unsupported-table th {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
