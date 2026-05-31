@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-31 09:46'
-updated_date: '2026-05-31 09:54'
+updated_date: '2026-05-31 09:55'
 labels:
   - scripts diagnostics bug
 dependencies: []
@@ -20,9 +20,9 @@ Fix the diagnostic capture script so Ctrl+C exits cleanly and telnet logging sur
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Ctrl+C stops the capture without a PowerShell unhandled runspace exception and still writes summary.txt.
-- [ ] #2 Telnet capture reconnects after the OTGW device disconnects or reboots and keeps retrying until the user stops the capture.
-- [ ] #3 Local validation exercises the stop/reconnect control flow without requiring changes outside the diagnostic capture script.
+- [x] #1 Ctrl+C stops the capture without a PowerShell unhandled runspace exception and still writes summary.txt.
+- [x] #2 Telnet capture reconnects after the OTGW device disconnects or reboots and keeps retrying until the user stops the capture.
+- [x] #3 Local validation exercises the stop/reconnect control flow without requiring changes outside the diagnostic capture script.
 <!-- AC:END -->
 
 ## Implementation Plan
