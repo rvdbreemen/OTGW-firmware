@@ -31,3 +31,12 @@ On narrow screens, settings rows currently keep label text and input/control on 
 2. Apply a small-screen-only rule so setting labels and controls stack cleanly without changing desktop layout.
 3. Validate with targeted mobile/desktop rendering checks and update TASK-783 acceptance criteria, notes, and final summary.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Branch metadata: branch `dev`, upstream `origin/dev`, implementation commit `2f967ae9`.
+Coding agent: Codex.
+Implementation notes: The mobile settings layout did not stack because the desktop selector `.settingDiv:not(.fixed-ip-section)` has higher specificity than the mobile `.settingDiv` override. Updated the max-width 768px rule in `src/OTGW-firmware/data/index_common.css` to override at matching specificity and made `.settings-field-container` block-level inside that breakpoint so labels occupy their own line before inputs/controls. Desktop flex layout remains governed by the unchanged top-level rule.
+Validation: Rendered a Playwright mobile fixture at 390x844 using the production CSS and verified label -> input -> next card stacking. Rendered the same fixture at 1000x700 and verified desktop label/input alignment remains side-by-side. Ran `python evaluate.py --quick`; result was 36 total checks, 34 passed, 0 warnings, 0 failed, 2 info, health score 100%.
+<!-- SECTION:NOTES:END -->
