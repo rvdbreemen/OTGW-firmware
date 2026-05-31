@@ -1,9 +1,11 @@
 ---
 id: TASK-780
 title: Consolidate MQTT/telnet capture scripts into one low-friction Windows .bat
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-31 13:09'
+updated_date: '2026-05-31 13:09'
 labels:
   - tooling
   - windows
