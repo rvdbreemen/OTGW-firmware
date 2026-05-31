@@ -1,9 +1,11 @@
 ---
 id: TASK-784
 title: Fix crowded tooltip in message support field
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-31 15:55'
+updated_date: '2026-05-31 15:55'
 labels: []
 dependencies: []
 ---
