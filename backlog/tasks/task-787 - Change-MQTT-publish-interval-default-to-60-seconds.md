@@ -45,3 +45,23 @@ Implementation: added backend MQTTonChangePublishing / bOnChangePublishing defau
 Documentation: updated README, changelog, breaking-change notes, MQTT API docs, REST debug docs/OpenAPI, and ADR-006/ADR-052 to call out the 60 second default and v1.6.1 0-to-60 migration.
 Validation: .\.venv\Scripts\python.exe build.py --no-color passed and built both firmware and LittleFS artifacts. .\.venv\Scripts\python.exe evaluate.py --quick --no-color passed 36/36 checks. git diff --check passed for task-owned files. Build cleanup logged a Windows .tmp access-denied warning after successful artifact generation.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented backend MQTT on-change publishing defaults for v1.6.1.
+
+Changes:
+- Added persisted MQTTonChangePublishing / bOnChangePublishing with a backend default of true.
+- Changed fresh backend MQTTinterval default to 60 seconds.
+- Added settings-load migration: when MQTTonChangePublishing is true or missing and MQTTinterval loads as 0, readSettings updates the interval to 60 and immediately saves settings.ini.
+- Kept legacy every-message publishing available through MQTTonChangePublishing=false; runtime MQTTinterval updates keep the backend flag aligned with 0/nonzero interval saves.
+- Updated README, changelog, breaking-change notes, MQTT/API docs, OpenAPI debug schema/example, and ADR-006/ADR-052.
+
+Validation:
+- .\.venv\Scripts\python.exe build.py --no-color (firmware + LittleFS)
+- .\.venv\Scripts\python.exe evaluate.py --quick --no-color
+- git diff --check for task-owned files
+
+Note: the combined build completed successfully but Windows could not remove one locked .tmp generated file during cleanup; artifacts were still produced.
+<!-- SECTION:FINAL_SUMMARY:END -->
