@@ -8,8 +8,24 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+_No unreleased changes yet. New work on `dev` lands here._
+
+## [1.6.1] - 2026-05-31
+
+Focused follow-up to v1.6.0: MQTT on-change publishing as the default, a redesigned boiler-unsupported diagnostics panel, and MQTT/Web UI reliability fixes. Full notes: [RELEASE_NOTES_1.6.1.md](RELEASE_NOTES_1.6.1.md).
+
 ### Changed
 - MQTT on-change publishing is now the default (ADR-081). New setting `MQTTonChangePublishing` defaults to `true`, and the publish interval defaults to `60` seconds: changed OpenTherm values publish immediately, unchanged values refresh once per minute. On upgrade, a config that still has `MQTTinterval=0` is migrated once to `60` (persisted via the deferred settings write). Untick "Publish on change" (or set `MQTTonChangePublishing=false`) to restore legacy publish-every-message behaviour.
+- Boiler-unsupported diagnostics panel on the Statistics tab is now a table (MsgID, Description, OpenTherm Name, Direction) with human-readable names, styled as a notice card in light and dark themes; `/api/v2/otgw/boiler-support` now also returns the friendly name.
+- MQTT periodic publishes are spread with timer jitter so the 5-minute and 60-second timers no longer fire together and cause a burst-publish heap spike.
+
+### Fixed
+- MQTT: a partial or failed chunk write now drops the TCP connection instead of finalising a truncated discovery or value publish.
+- Web UI: CSS is served with `no-cache` + ETag revalidation instead of a long-lived cache, so styling updates appear after a firmware flash (one hard refresh may be needed the first time after upgrading).
+- Mobile settings field labels no longer wrap awkwardly on narrow screens; statistics table column resizing corrected; boiler diagnostics tooltip exposed.
+
+### Added
+- `scripts/capture-mqtt-debug.bat`: Windows helper to capture MQTT debug output for issue reports.
 
 ## [1.6.0] - 2026-05-28
 

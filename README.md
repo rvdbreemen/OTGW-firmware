@@ -4,7 +4,28 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the development branch (`dev`).** Active development for the next release (v1.6.1-beta) happens here. For the latest stable release, see [v1.6.0](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.6.0).
+> ⚠️ **This is the development branch (`dev`).** Active development for the next release (v1.6.2-beta) happens here. For the latest stable release, see [v1.6.1](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.6.1).
+
+## What's New in v1.6.1
+
+v1.6.1 is a focused follow-up to v1.6.0. It makes MQTT on-change publishing the default, redesigns the boiler-unsupported diagnostics panel, and lands a set of MQTT and Web UI reliability fixes.
+
+**MQTT**
+- **On-change publishing is now the default** (ADR-081): the new `MQTTonChangePublishing` setting defaults to `true` with `MQTTinterval=60`. Changed values publish immediately; unchanged values refresh once per minute as a heartbeat instead of on every repeated frame, cutting broker traffic while keeping Home Assistant fresh. A **Publish on change** checkbox and tooltips were added to Settings > MQTT. Existing `MQTTinterval=0` installs are migrated once to `60` on upgrade.
+- **Truncated-publish protection**: a partial or failed chunk write now drops the TCP connection instead of finalising a truncated discovery or value publish.
+- **Publish timing jitter**: periodic timers are spread with a small random offset so they no longer fire together and cause a burst-publish heap spike.
+
+**Web UI and diagnostics**
+- **Redesigned boiler-unsupported panel**: the "Boiler does not implement these OpenTherm messages" notice is now a clean table (MsgID, Description, OpenTherm Name, Direction) with human-readable names, styled as a notice card in light and dark themes.
+- **Styling updates reliably after a flash**: CSS is served with `no-cache` + ETag revalidation instead of a long browser cache (one hard refresh may be needed the first time after upgrading).
+- **Mobile settings layout** and **statistics table column resizing** fixes; boiler tooltip exposed.
+
+**Tooling**
+- **`scripts/capture-mqtt-debug.bat`**: Windows helper to capture MQTT debug output for issue reports.
+
+Full release notes: [RELEASE_NOTES_1.6.1.md](RELEASE_NOTES_1.6.1.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
 
 ## What's New in v1.6.0
 
@@ -53,9 +74,16 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.6.0
+## Latest stable release: v1.6.1
 
-`v1.6.0` is the current stable release on `main`. MQTT and HA reliability overhaul, static IP support, bilateral OT-bus diagnostics, and mainloop performance improvements — shipped after 25 beta builds.
+`v1.6.1` is the current stable release on `main`. MQTT on-change publishing is now the default, with a redesigned boiler-unsupported diagnostics panel and a set of MQTT and Web UI reliability fixes on top of v1.6.0.
+
+Full release notes: [RELEASE_NOTES_1.6.1.md](RELEASE_NOTES_1.6.1.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.6.1)
+
+## Previous stable release: v1.6.0
+
+`v1.6.0` delivered the MQTT and HA reliability overhaul, static IP support, bilateral OT-bus diagnostics, and mainloop performance improvements, shipped after 25 beta builds.
 
 Full release notes: [RELEASE_NOTES_1.6.0.md](RELEASE_NOTES_1.6.0.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.6.0)
