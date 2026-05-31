@@ -16,9 +16,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$script:StopRequested = $false
 $script:SummaryPath = $null
 $script:SummaryLines = New-Object System.Collections.Generic.List[string]
+$telnetPort = 23
+$telnetConnectTimeoutSeconds = 5
+$telnetReconnectDelayMilliseconds = 2000
 
 function Show-Help {
     Write-Host "OTGW MQTT diagnostic capture"
@@ -53,6 +55,65 @@ function Add-SummaryLine {
     $script:SummaryLines.Add($Line) | Out-Null
     if ($script:SummaryPath) {
         Set-Content -Path $script:SummaryPath -Value $script:SummaryLines -Encoding UTF8
+    }
+}
+
+function Initialize-CancelFlag {
+    if (-not ("OtgMqttCapture.CancelFlag" -as [type])) {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Threading;
+
+namespace OtgMqttCapture
+{
+    public static class CancelFlag
+    {
+        private static int stopRequested;
+        private static readonly ConsoleCancelEventHandler cancelHandler = OnCancelKeyPress;
+
+        public static ConsoleCancelEventHandler Handler
+        {
+            get { return cancelHandler; }
+        }
+
+        public static bool StopRequested
+        {
+            get { return Interlocked.CompareExchange(ref stopRequested, 0, 0) != 0; }
+        }
+
+        public static void Reset()
+        {
+            Interlocked.Exchange(ref stopRequested, 0);
+        }
+
+        private static void OnCancelKeyPress(object sender, ConsoleCancelEventArgs eventArgs)
+        {
+            eventArgs.Cancel = true;
+            Interlocked.Exchange(ref stopRequested, 1);
+        }
+    }
+}
+"@
+    }
+
+    [OtgMqttCapture.CancelFlag]::Reset()
+}
+
+function Test-CaptureStopRequested {
+    return [OtgMqttCapture.CancelFlag]::StopRequested
+}
+
+function Wait-CaptureDelay {
+    param([Parameter(Mandatory = $true)][int]$Milliseconds)
+
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($Milliseconds)
+    while (-not (Test-CaptureStopRequested) -and [DateTime]::UtcNow -lt $deadline) {
+        $remaining = [int][Math]::Ceiling(($deadline - [DateTime]::UtcNow).TotalMilliseconds)
+        if ($remaining -le 0) {
+            break
+        }
+
+        Start-Sleep -Milliseconds ([Math]::Min(100, $remaining))
     }
 }
 
@@ -331,6 +392,72 @@ function New-Utf8Writer {
     return New-Object System.IO.StreamWriter -ArgumentList $Path, $true, $utf8NoBom
 }
 
+function New-TelnetClient {
+    param(
+        [Parameter(Mandatory = $true)][string]$HostName,
+        [Parameter(Mandatory = $true)][int]$Port,
+        [Parameter(Mandatory = $true)][int]$TimeoutSeconds
+    )
+
+    $client = New-Object System.Net.Sockets.TcpClient
+    $asyncResult = $null
+
+    try {
+        $asyncResult = $client.BeginConnect($HostName, $Port, $null, $null)
+        if (-not $asyncResult.AsyncWaitHandle.WaitOne([TimeSpan]::FromSeconds($TimeoutSeconds))) {
+            throw "Timed out connecting to $HostName`:$Port after $TimeoutSeconds seconds."
+        }
+
+        $client.EndConnect($asyncResult)
+        return $client
+    }
+    catch {
+        $client.Close()
+        throw
+    }
+    finally {
+        if ($asyncResult -and $asyncResult.AsyncWaitHandle) {
+            $asyncResult.AsyncWaitHandle.Close()
+        }
+    }
+}
+
+function Close-TelnetClient {
+    param([AllowNull()][System.Net.Sockets.TcpClient]$Client)
+
+    if ($Client) {
+        try {
+            $Client.Close()
+        }
+        catch {
+        }
+    }
+}
+
+function Test-TelnetDisconnected {
+    param([AllowNull()][System.Net.Sockets.TcpClient]$Client)
+
+    if (-not $Client) {
+        return $true
+    }
+
+    try {
+        if (-not $Client.Connected) {
+            return $true
+        }
+
+        $socket = $Client.Client
+        if (-not $socket) {
+            return $true
+        }
+
+        return ($socket.Poll(0, [System.Net.Sockets.SelectMode]::SelectRead) -and $socket.Available -eq 0)
+    }
+    catch {
+        return $true
+    }
+}
+
 function Read-TelnetAvailable {
     param(
         [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
@@ -404,6 +531,36 @@ function Enable-MqttTelnetDebugIfNeeded {
     return "not sent because MQTT debug state was not found in the telnet banner"
 }
 
+function Connect-TelnetCapture {
+    param(
+        [Parameter(Mandatory = $true)][string]$HostName,
+        [Parameter(Mandatory = $true)][int]$Port,
+        [Parameter(Mandatory = $true)][System.IO.StreamWriter]$Writer,
+        [Parameter(Mandatory = $true)][int]$ConnectTimeoutSeconds
+    )
+
+    Add-SummaryLine "Telnet connect started: $HostName`:$Port"
+    $client = New-TelnetClient -HostName $HostName -Port $Port -TimeoutSeconds $ConnectTimeoutSeconds
+
+    try {
+        $stream = $client.GetStream()
+        Add-SummaryLine "Telnet connected: $((Get-Date).ToString('o'))"
+
+        $banner = Read-InitialTelnetBanner -Stream $stream -Writer $Writer
+        $toggleAction = Enable-MqttTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
+        Add-SummaryLine "MQTT debug toggle action: $toggleAction"
+
+        return [PSCustomObject]@{
+            Client = $client
+            Stream = $stream
+        }
+    }
+    catch {
+        Close-TelnetClient -Client $client
+        throw
+    }
+}
+
 $deviceHostWasBound = $PSBoundParameters.ContainsKey('DeviceHost')
 $brokerHostWasBound = $PSBoundParameters.ContainsKey('BrokerHost')
 $usernameWasBound = $PSBoundParameters.ContainsKey('Username')
@@ -453,7 +610,7 @@ Add-SummaryLine "OTGW MQTT diagnostic capture"
 Add-SummaryLine "Run folder: $runPath"
 Add-SummaryLine "Started: $((Get-Date).ToString('o'))"
 Add-SummaryLine "DeviceHost: $DeviceHost"
-Add-SummaryLine "TelnetPort: 23"
+Add-SummaryLine "TelnetPort: $telnetPort"
 Add-SummaryLine "BrokerHost: $BrokerHost"
 Add-SummaryLine "BrokerPort: $BrokerPort"
 Add-SummaryLine "Topic: $Topic"
@@ -462,15 +619,14 @@ Add-SummaryLine "DurationSeconds: $(if ($DurationSeconds -gt 0) { $DurationSecon
 Add-SummaryLine "SkipToolInstall: $([bool]$SkipToolInstall)"
 
 $telnetClient = $null
+$stream = $null
 $telnetWriter = $null
 $mqttProcess = $null
-$cancelHandler = [System.ConsoleCancelEventHandler]{
-    param($sender, $eventArgs)
-    $eventArgs.Cancel = $true
-    $script:StopRequested = $true
-}
+$cancelHandler = $null
 
 try {
+    Initialize-CancelFlag
+    $cancelHandler = [OtgMqttCapture.CancelFlag]::Handler
     [System.Console]::add_CancelKeyPress($cancelHandler)
 
     $mosquitto = Resolve-MosquittoSub -ExplicitPath $MosquittoSubPath -SkipInstall:$SkipToolInstall
@@ -481,16 +637,6 @@ try {
     Add-SummaryLine "Mosquitto directory added to user PATH: $($mosquitto.UserPathAdded)"
 
     $telnetWriter = New-Utf8Writer -Path $telnetLog
-    $telnetClient = New-Object System.Net.Sockets.TcpClient
-    Add-SummaryLine "Telnet connect started: $DeviceHost`:23"
-    $telnetClient.Connect($DeviceHost, 23)
-    $stream = $telnetClient.GetStream()
-    Add-SummaryLine "Telnet connected: $((Get-Date).ToString('o'))"
-
-    $banner = Read-InitialTelnetBanner -Stream $stream -Writer $telnetWriter
-    $toggleAction = Enable-MqttTelnetDebugIfNeeded -Stream $stream -Writer $telnetWriter -Banner $banner
-    Add-SummaryLine "MQTT debug toggle action: $toggleAction"
-
     $mqttProcess = Start-MosquittoSub `
         -ExecutablePath $mosquitto.Path `
         -MqttLog $mqttLog `
@@ -513,23 +659,52 @@ try {
     Write-Host "Capturing telnet and MQTT output in $runPath"
     Write-Host "Press Ctrl+C to stop and write summary.txt. Run with -Help for options."
 
-    while (-not $script:StopRequested -and (Get-Date) -lt $deadline) {
-        if (-not $telnetClient.Connected) {
-            Add-SummaryLine "Telnet disconnected before capture stopped."
-            break
-        }
-
-        [void](Read-TelnetAvailable -Stream $stream -Writer $telnetWriter)
-
+    while (-not (Test-CaptureStopRequested) -and (Get-Date) -lt $deadline) {
         if ($mqttProcess.HasExited) {
             Add-SummaryLine "mosquitto_sub exited during capture with code $($mqttProcess.ExitCode)."
             break
         }
 
-        Start-Sleep -Milliseconds 100
+        if (Test-TelnetDisconnected -Client $telnetClient) {
+            if ($telnetClient) {
+                Add-SummaryLine "Telnet disconnected; retrying until capture stops."
+                Close-TelnetClient -Client $telnetClient
+                $telnetClient = $null
+                $stream = $null
+            }
+
+            try {
+                $connection = Connect-TelnetCapture `
+                    -HostName $DeviceHost `
+                    -Port $telnetPort `
+                    -Writer $telnetWriter `
+                    -ConnectTimeoutSeconds $telnetConnectTimeoutSeconds
+                $telnetClient = $connection.Client
+                $stream = $connection.Stream
+            }
+            catch {
+                Add-SummaryLine "Telnet connect failed: $($_.Exception.Message)"
+                Wait-CaptureDelay -Milliseconds $telnetReconnectDelayMilliseconds
+                continue
+            }
+        }
+
+        try {
+            [void](Read-TelnetAvailable -Stream $stream -Writer $telnetWriter)
+        }
+        catch {
+            Add-SummaryLine "Telnet read failed: $($_.Exception.Message); retrying until capture stops."
+            Close-TelnetClient -Client $telnetClient
+            $telnetClient = $null
+            $stream = $null
+            Wait-CaptureDelay -Milliseconds $telnetReconnectDelayMilliseconds
+            continue
+        }
+
+        Wait-CaptureDelay -Milliseconds 100
     }
 
-    Add-SummaryLine "Capture stop reason: $(if ($script:StopRequested) { 'Ctrl+C' } elseif ((Get-Date) -ge $deadline) { 'duration elapsed' } else { 'capture loop ended' })"
+    Add-SummaryLine "Capture stop reason: $(if (Test-CaptureStopRequested) { 'Ctrl+C' } elseif ((Get-Date) -ge $deadline) { 'duration elapsed' } else { 'capture loop ended' })"
 }
 catch {
     Add-SummaryLine "Error: $($_.Exception.Message)"
@@ -557,10 +732,12 @@ finally {
     }
 
     if ($telnetClient) {
-        $telnetClient.Close()
+        Close-TelnetClient -Client $telnetClient
     }
 
-    [System.Console]::remove_CancelKeyPress($cancelHandler)
+    if ($cancelHandler) {
+        [System.Console]::remove_CancelKeyPress($cancelHandler)
+    }
     Add-SummaryLine "Finished: $((Get-Date).ToString('o'))"
     Write-Host "Diagnostic capture folder: $runPath"
 }
