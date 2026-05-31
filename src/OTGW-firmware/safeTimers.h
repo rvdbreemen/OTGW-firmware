@@ -102,19 +102,22 @@
 #define DECLARE_TIMER_MIN(timerName, ...) \
                       static uint32_t timerName##_interval = (getParam(0, __VA_ARGS__, 0) * 60 * 1000),\
                                       timerName##_due  = millis()                           \
-                                                        +timerName##_interval;              \
+                                                        +timerName##_interval               \
+                                                        +__JitterOffset__(getParam(2, __VA_ARGS__, 0, 0, 0), getParam(3, __VA_ARGS__, 0, 0, 0)); \
                       static byte     timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define DECLARE_TIMER_SEC(timerName, ...) \
                       static uint32_t timerName##_interval = (getParam(0, __VA_ARGS__, 0) * 1000),\
                                       timerName##_due  = millis()                           \
-                                                        +timerName##_interval;              \
+                                                        +timerName##_interval               \
+                                                        +__JitterOffset__(getParam(2, __VA_ARGS__, 0, 0, 0), getParam(3, __VA_ARGS__, 0, 0, 0)); \
                       static byte     timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define DECLARE_TIMER_MS(timerName, ...)  \
                       static uint32_t timerName##_interval = (getParam(0, __VA_ARGS__, 0)), \
                                       timerName##_due  = millis()                           \
-                                                        +timerName##_interval;              \
+                                                        +timerName##_interval               \
+                                                        +__JitterOffset__(getParam(2, __VA_ARGS__, 0, 0, 0), getParam(3, __VA_ARGS__, 0, 0, 0)); \
                       static byte     timerName##_type = getParam(1, __VA_ARGS__, 0);
 
 #define DECLARE_TIMER   DECLARE_TIMER_MS
@@ -156,6 +159,21 @@
 #define RESTART_TIMER(timerName)      ( timerName##_due = millis()+timerName##_interval ); 
 
 #define DUE(timerName)                ( __Due__(timerName##_due, timerName##_interval, timerName##_type) )
+
+// jitter_min/jitter_max come from getParam(2)/getParam(3) on the timer's
+// varargs. getParam walks i+1 args, so getParam(3,...) reads the 4th vararg.
+// Callers may pass as few as 1 vararg (interval only), so the DECLARE_TIMER_*
+// macros MUST pad these getParam calls with enough trailing-zero sentinels
+// (currently ", 0, 0, 0") that index 3 always lands on a real 0 and never
+// reads past the supplied varargs. Without that padding getParam(3) hits
+// undefined behaviour and returns stack garbage as jitter_max, which pushed
+// timerWD/timerWDBlink due-times far into the future and bricked the watchdog
+// feed + LED heartbeat (TASK-789). Do not shrink the sentinel padding.
+uint32_t __JitterOffset__(uint32_t jitter_min, uint32_t jitter_max) {
+  if (jitter_max <= jitter_min) return 0;
+  return random(jitter_min, jitter_max);
+}
+
 
 uint32_t __Due__(uint32_t &timer_due, uint32_t timer_interval, byte timerType)
 {
