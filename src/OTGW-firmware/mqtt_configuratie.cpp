@@ -2229,7 +2229,7 @@ bool streamSensorDiscovery(PubSubClient &client,
   // Write pass
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeSensorPayload(writer, cfg, ctx) || !writer.ok) {
-    client.endPublish();
+    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2263,7 +2263,7 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeBinSensorPayload(writer, cfg, ctx) || !writer.ok) {
-    client.endPublish();
+    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2390,7 +2390,7 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
   // Write pass
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
-    client.endPublish();
+    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2643,7 +2643,7 @@ bool streamClimateDiscovery(PubSubClient &client,
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
-    client.endPublish();
+    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2724,7 +2724,7 @@ bool streamNumberDiscovery(PubSubClient &client,
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
-    client.endPublish();
+    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2797,7 +2797,7 @@ bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeButtonPayload(writer, ctx) || !writer.ok) {
-    client.endPublish();
+    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2965,7 +2965,7 @@ bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryC
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeSelectPayload(writer, selectIdx, ctx) || !writer.ok) {
-    client.endPublish();
+    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
