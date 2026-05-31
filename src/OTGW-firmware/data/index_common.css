@@ -138,7 +138,8 @@ body.col-resizing * {
     margin-top: 4px;
   }
 
-  .settingDiv {
+  .settingDiv,
+  .settingDiv:not(.fixed-ip-section) {
     display: block;
     min-width: 0;
     width: auto;
@@ -151,6 +152,7 @@ body.col-resizing * {
   }
 
   .settings-field-container {
+    display: block;
     flex: none;
     float: none;
     width: auto;
