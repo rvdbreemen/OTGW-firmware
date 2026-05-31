@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-31 13:50'
-updated_date: '2026-05-31 14:00'
+updated_date: '2026-05-31 14:04'
 labels: []
 dependencies: []
 ---
@@ -19,9 +19,8 @@ capture-mqtt-debug.bat currently shows the Windows batch 'Terminate batch job (Y
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Ctrl+C stop path avoids or clearly suppresses the interactive 'Terminate batch job (Y/N)?' prompt where feasible.
-- [x] #2 Stopping capture still leaves transcript and summary artifacts in the diagnostic folder.
-- [x] #3 Change is documented or discoverable through the script help/output when a different stop key is required.
-- [ ] #4 After successful finalization, the diagnostic run folder contains transcript.txt only; intermediate telnet, MQTT, stderr, and summary files are removed after being merged.
+- [x] #2 Change is documented or discoverable through the script help/output when a different stop key is required.
+- [ ] #3 After successful finalization, the diagnostic run folder contains transcript.txt only; intermediate telnet, MQTT, stderr, and summary files are removed after being merged.
 <!-- AC:END -->
 
 ## Implementation Plan
