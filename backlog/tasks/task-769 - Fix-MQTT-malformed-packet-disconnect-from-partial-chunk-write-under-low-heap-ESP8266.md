@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 07:01'
+updated_date: '2026-05-31 07:16'
 labels:
   - bug
 dependencies: []
@@ -39,6 +39,7 @@ Root cause (code-confirmed, MQTTstuff.ino): the streaming publish path beginMqtt
 - [ ] #4 python build.py --firmware exits 0
 - [ ] #5 python evaluate.py --quick shows no new failures
 - [ ] #6 Field validation by GeorgeZ83 on ESP8266 + HA: no malformed-packet/session-taken-over disconnects with web UI open
+- [ ] #7 Discovery composer path (mqtt_configuratie.cpp stream*Discovery, 7 sites): failure branch must drop TCP via client.disconnect() instead of client.endPublish() on a truncated payload — this is the largest-payload path, most prone to short-write desync under heap pressure
 <!-- AC:END -->
 
 ## Implementation Plan
