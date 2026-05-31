@@ -19,7 +19,8 @@ $ErrorActionPreference = "Stop"
 $script:SummaryPath = $null
 $script:SummaryLines = New-Object System.Collections.Generic.List[string]
 $telnetPort = 23
-$telnetConnectTimeoutSeconds = 5
+$telnetConnectTimeoutSeconds = 2
+$telnetPostDisconnectDelayMilliseconds = 5000
 $telnetReconnectDelayMilliseconds = 2000
 
 function Show-Help {
@@ -56,6 +57,13 @@ function Add-SummaryLine {
     if ($script:SummaryPath) {
         Set-Content -Path $script:SummaryPath -Value $script:SummaryLines -Encoding UTF8
     }
+}
+
+function Write-CaptureStatus {
+    param([string]$Line)
+
+    Add-SummaryLine -Line $Line
+    Write-Host $Line
 }
 
 function Initialize-CancelFlag {
@@ -458,6 +466,16 @@ function Test-TelnetDisconnected {
     }
 }
 
+function Test-TelnetRebootMarker {
+    param([AllowNull()][string]$Text)
+
+    if ([string]::IsNullOrEmpty($Text)) {
+        return $false
+    }
+
+    return $Text -match 'ESP\.restart\(\)'
+}
+
 function Read-TelnetAvailable {
     param(
         [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
@@ -539,7 +557,7 @@ function Connect-TelnetCapture {
         [Parameter(Mandatory = $true)][int]$ConnectTimeoutSeconds
     )
 
-    Add-SummaryLine "Telnet connect started: $HostName`:$Port"
+    Add-SummaryLine "Telnet connect started: $HostName`:$Port (timeout ${ConnectTimeoutSeconds}s)"
     $client = New-TelnetClient -HostName $HostName -Port $Port -TimeoutSeconds $ConnectTimeoutSeconds
 
     try {
@@ -611,6 +629,9 @@ Add-SummaryLine "Run folder: $runPath"
 Add-SummaryLine "Started: $((Get-Date).ToString('o'))"
 Add-SummaryLine "DeviceHost: $DeviceHost"
 Add-SummaryLine "TelnetPort: $telnetPort"
+Add-SummaryLine "TelnetConnectTimeoutSeconds: $telnetConnectTimeoutSeconds"
+Add-SummaryLine "TelnetPostDisconnectDelayMilliseconds: $telnetPostDisconnectDelayMilliseconds"
+Add-SummaryLine "TelnetReconnectDelayMilliseconds: $telnetReconnectDelayMilliseconds"
 Add-SummaryLine "BrokerHost: $BrokerHost"
 Add-SummaryLine "BrokerPort: $BrokerPort"
 Add-SummaryLine "Topic: $Topic"
@@ -623,6 +644,11 @@ $stream = $null
 $telnetWriter = $null
 $mqttProcess = $null
 $cancelHandler = $null
+$telnetHasConnected = $false
+$telnetReconnectAttempts = 0
+$telnetReconnectReason = $null
+$nextTelnetConnectUtc = [DateTime]::MinValue
+$telnetRebootScanBuffer = ""
 
 try {
     Initialize-CancelFlag
@@ -667,13 +693,31 @@ try {
 
         if (Test-TelnetDisconnected -Client $telnetClient) {
             if ($telnetClient) {
-                Add-SummaryLine "Telnet disconnected; retrying until capture stops."
+                $telnetReconnectReason = "connection closed"
+                $telnetReconnectAttempts = 0
+                $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
+                Write-CaptureStatus "Telnet disconnected; waiting $($telnetPostDisconnectDelayMilliseconds / 1000)s before reconnect attempts."
                 Close-TelnetClient -Client $telnetClient
                 $telnetClient = $null
                 $stream = $null
             }
 
+            if ([DateTime]::UtcNow -lt $nextTelnetConnectUtc) {
+                $remainingMilliseconds = [int][Math]::Ceiling(($nextTelnetConnectUtc - [DateTime]::UtcNow).TotalMilliseconds)
+                Wait-CaptureDelay -Milliseconds ([Math]::Min(250, $remainingMilliseconds))
+                continue
+            }
+
             try {
+                $telnetReconnectAttempts++
+                if ($telnetHasConnected) {
+                    $reasonSuffix = ""
+                    if ($telnetReconnectReason) {
+                        $reasonSuffix = " after $telnetReconnectReason"
+                    }
+                    Add-SummaryLine "Telnet reconnect attempt #$telnetReconnectAttempts started$reasonSuffix."
+                }
+
                 $connection = Connect-TelnetCapture `
                     -HostName $DeviceHost `
                     -Port $telnetPort `
@@ -681,23 +725,56 @@ try {
                     -ConnectTimeoutSeconds $telnetConnectTimeoutSeconds
                 $telnetClient = $connection.Client
                 $stream = $connection.Stream
+                $telnetRebootScanBuffer = ""
+
+                if ($telnetHasConnected) {
+                    Write-CaptureStatus "Telnet reconnected after $telnetReconnectAttempts attempt(s): $((Get-Date).ToString('o'))"
+                }
+                else {
+                    Write-CaptureStatus "Telnet connected: $((Get-Date).ToString('o'))"
+                }
+
+                $telnetHasConnected = $true
+                $telnetReconnectAttempts = 0
+                $telnetReconnectReason = $null
+                $nextTelnetConnectUtc = [DateTime]::MinValue
             }
             catch {
-                Add-SummaryLine "Telnet connect failed: $($_.Exception.Message)"
-                Wait-CaptureDelay -Milliseconds $telnetReconnectDelayMilliseconds
+                $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetReconnectDelayMilliseconds)
+                Write-CaptureStatus "Telnet connect attempt #$telnetReconnectAttempts failed: $($_.Exception.Message) Retrying in $($telnetReconnectDelayMilliseconds / 1000)s."
                 continue
             }
         }
 
         try {
-            [void](Read-TelnetAvailable -Stream $stream -Writer $telnetWriter)
+            $telnetText = Read-TelnetAvailable -Stream $stream -Writer $telnetWriter
+            if (-not [string]::IsNullOrEmpty($telnetText)) {
+                $telnetRebootScanBuffer += $telnetText
+                if ($telnetRebootScanBuffer.Length -gt 512) {
+                    $telnetRebootScanBuffer = $telnetRebootScanBuffer.Substring($telnetRebootScanBuffer.Length - 512)
+                }
+
+                if (Test-TelnetRebootMarker -Text $telnetRebootScanBuffer) {
+                    $telnetReconnectReason = "ESP.restart() marker captured"
+                    $telnetReconnectAttempts = 0
+                    $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
+                    Write-CaptureStatus "Telnet captured ESP.restart(); waiting $($telnetPostDisconnectDelayMilliseconds / 1000)s before reconnect attempts."
+                    Close-TelnetClient -Client $telnetClient
+                    $telnetClient = $null
+                    $stream = $null
+                    $telnetRebootScanBuffer = ""
+                    continue
+                }
+            }
         }
         catch {
-            Add-SummaryLine "Telnet read failed: $($_.Exception.Message); retrying until capture stops."
+            $telnetReconnectReason = "read failed"
+            $telnetReconnectAttempts = 0
+            $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
+            Write-CaptureStatus "Telnet read failed: $($_.Exception.Message); waiting $($telnetPostDisconnectDelayMilliseconds / 1000)s before reconnect attempts."
             Close-TelnetClient -Client $telnetClient
             $telnetClient = $null
             $stream = $null
-            Wait-CaptureDelay -Milliseconds $telnetReconnectDelayMilliseconds
             continue
         }
 
