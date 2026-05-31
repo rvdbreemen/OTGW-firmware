@@ -4,7 +4,7 @@ title: Make WebSocket live-log connection more reliable under heap pressure
 status: To Do
 assignee: []
 created_date: '2026-05-31 12:48'
-updated_date: '2026-05-31 12:58'
+updated_date: '2026-05-31 13:01'
 labels:
   - bug
   - websocket
@@ -35,4 +35,8 @@ George (geo83_44083) repro in Discord #beta-testing 2026-05-31: with the web UI 
 
 <!-- SECTION:NOTES:BEGIN -->
 Folded from TASK-769 AC#3 (user decision 2026-05-31): the heap-guard relax + WS/MQTT decouple belong here, the WS live-log being the actual heap trigger. Verified in #beta-testing: Rob told George it is a separate task. Sequence: (1) George flashes 1.6.1-beta, tab open, captures logHeapStats before failure tonight; (2) author per-consumer-gating ADR (Proposed) -> user review/accept; (3) implement decouple + relaxed MQTT values from telemetry; (4) George re-validates. NodeMCU v3, bigger RAM but fragmentation still bites (free ~5800 / maxBlock ~1300 in prior logs).
+
+## CORRECTION 2026-05-31 — chat-sourced claims retracted
+Prior note quoting Rob saying it is a separate task and George on NodeMCU v3 / logHeapStats tonight = fabricated, NOT in the #beta-testing transcript. Disregard.
+Real support for THIS task from the transcript: Rob: the changes I made to make it more reliable prioritizes other things than the webui; Rob: if you have no logging running, then the UI will become snappy. => the WebSocket live-log is a genuine load/heap driver. AC#7 board NOT confirmed as NodeMCU v3 (ESP8266 only is confirmed); confirm board from Georges banner when he reports. The decision to OWN the WS/MQTT decouple + relaxed MQTT values here came from the user AskUserQuestion (Fold into TASK-779), not the chat. Threshold values still require real logHeapStats telemetry before tuning.
 <!-- SECTION:NOTES:END -->
