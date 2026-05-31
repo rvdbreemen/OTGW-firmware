@@ -18,9 +18,9 @@ The UI currently shows overlapping floating text when a long boiler unsupported-
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Long unsupported-message content is readable without overlapping duplicate floating windows
-- [ ] #2 Any expanded/tooltip behavior appears only through a deliberate hover or focus interaction
-- [ ] #3 The fix is scoped to the affected UI presentation without changing boiler message data
+- [x] #1 Long unsupported-message content is readable without overlapping duplicate floating windows
+- [x] #2 Any expanded/tooltip behavior appears only through a deliberate hover or focus interaction
+- [x] #3 The fix is scoped to the affected UI presentation without changing boiler message data
 <!-- AC:END -->
 
 ## Implementation Plan
