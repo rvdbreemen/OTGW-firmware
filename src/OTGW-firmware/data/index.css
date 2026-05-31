@@ -1107,19 +1107,13 @@ body.disable-interaction {
 
 /* Statistics Table */
 .ot-stats-table {
-  width: 100%;
+  width: auto;
+  max-width: none;
   border-collapse: collapse;
   font-size: 13px;
   background-color: white;
   table-layout: fixed;
 }
-
-.ot-stats-table th:nth-child(1) { width: 40px; }  /* Hex */
-.ot-stats-table th:nth-child(2) { width: 40px; }  /* Dec */
-.ot-stats-table th:nth-child(3) { width: 70px; }  /* Direction */
-.ot-stats-table th:nth-child(4) { width: auto; }  /* Description - takes remaining space */
-.ot-stats-table th:nth-child(5) { width: 80px; }  /* Interval */
-.ot-stats-table th:nth-child(6) { width: 180px; } /* Value - fixed; values are short */
 
 .ot-stats-table th, .ot-stats-table td {
   text-align: left;
@@ -1136,32 +1130,15 @@ body.disable-interaction {
   position: sticky;
   top: 0;
   z-index: 10;
-  cursor: pointer;
 }
 
-/* Drag-to-resize handle on right edge of each stats-table header.
-   `position: sticky` already establishes a positioning context, so the
-   absolutely-positioned resizer anchors to the th. */
-.ot-stats-table th .col-resizer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 6px;
-  height: 100%;
-  cursor: col-resize;
-  user-select: none;
-  z-index: 11;
+#otStatsTable th {
+  cursor: pointer;
 }
 
 .ot-stats-table th .col-resizer:hover,
 .ot-stats-table th .col-resizer.dragging {
   background-color: #b8b8b8;
-}
-
-body.col-resizing,
-body.col-resizing * {
-  cursor: col-resize !important;
-  user-select: none !important;
 }
 
 .ot-stats-table th:hover {

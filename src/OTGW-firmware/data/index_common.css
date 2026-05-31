@@ -29,6 +29,29 @@
 }
 
 /* Shared responsive OT log behavior for phones/tablets */
+
+/* Shared drag-to-resize handles for OpenTherm data tables. */
+.ot-stats-table th .col-resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    user-select: none;
+    z-index: 11;
+}
+
+.ot-stats-table th .col-resizer:hover,
+.ot-stats-table th .col-resizer.dragging {
+    opacity: 1;
+}
+
+body.col-resizing,
+body.col-resizing * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
 @media (max-width: 768px) {
   #otLogSection {
     display: none !important;

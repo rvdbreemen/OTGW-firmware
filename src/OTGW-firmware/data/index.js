@@ -1500,6 +1500,8 @@ function handleOTLogResize() {
   }
   otLogResizeTimer = setTimeout(function() {
     updateOTLogResponsiveState();
+    refreshResizableTableLayout('otStatsTable');
+    refreshResizableTableLayout('otSupportTable');
   }, 200);
 }
 
@@ -2872,6 +2874,7 @@ function initMainPage() {
   renderSharedPageNavShell();
   updateThemeToggle();
   initStatsColResizers();
+  initOtSupportColResizers();
 
   function doThemeToggle() {
     var isDark = localStorage.getItem('theme') !== 'dark';  // toggle
@@ -5785,25 +5788,48 @@ function handleFlashMessage(data) {
 ***************************************************************************
 */
 
-// --- Stats table column resize (TASK-703) -------------------------------
-// Drag the right edge of any <th> in #otStatsTable to resize that column.
-// Widths are mirrored onto the matching <col> in the table's <colgroup> and
-// persisted in localStorage so they survive reloads and tab switches.
-var STATS_COL_STORAGE_KEY = 'otStatsColWidths';
-var STATS_COL_MIN_WIDTH = 30;
-var otStatsResizeState = null;
+// --- OpenTherm table column resize and content-fit defaults (TASK-767/TASK-768) ---
+var OT_TABLE_COL_CONFIGS = {
+  otStatsTable: { storageKey: 'otStatsColWidths.v4', minWidth: 30 },
+  otSupportTable: { storageKey: 'otSupportColWidths.v3', minWidth: 44 }
+};
+var OT_TABLE_COL_FIT_PADDING = 28;
+var otTableResizeState = null;
+var otTableMeasureCanvas = null;
 
-function getStatsTableCols() {
-  var table = document.getElementById('otStatsTable');
-  if (!table) return null;
+function getResizableTable(tableOrId) {
+  if (typeof tableOrId === 'string') return document.getElementById(tableOrId);
+  return tableOrId || null;
+}
+
+function getResizableTableConfig(table) {
+  if (!table || !table.id) return null;
+  return OT_TABLE_COL_CONFIGS[table.id] || null;
+}
+
+function ensureResizableTableColgroup(table) {
+  if (!getResizableTableConfig(table)) return null;
+  var ths = table.querySelectorAll('thead th');
+  if (!ths.length) return null;
   var colgroup = table.querySelector('colgroup');
-  if (!colgroup) return null;
+  if (!colgroup) {
+    colgroup = document.createElement('colgroup');
+    table.insertBefore(colgroup, table.firstChild);
+  }
+  while (colgroup.children.length < ths.length) {
+    colgroup.appendChild(document.createElement('col'));
+  }
+  while (colgroup.children.length > ths.length) {
+    colgroup.removeChild(colgroup.lastElementChild);
+  }
   return colgroup.querySelectorAll('col');
 }
 
-function loadStatsColWidths() {
+function loadTableColWidths(table) {
+  var config = getResizableTableConfig(table);
+  if (!config) return null;
   try {
-    var raw = localStorage.getItem(STATS_COL_STORAGE_KEY);
+    var raw = localStorage.getItem(config.storageKey);
     if (!raw) return null;
     var arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return null;
@@ -5813,96 +5839,304 @@ function loadStatsColWidths() {
   }
 }
 
-function saveStatsColWidths() {
-  var cols = getStatsTableCols();
-  if (!cols) return;
+function tableHasStoredColWidths(table) {
+  var widths = loadTableColWidths(table);
+  if (!widths) return false;
+  for (var i = 0; i < widths.length; i++) {
+    if (widths[i]) return true;
+  }
+  return false;
+}
+
+function sumTableWidths(widths) {
+  var total = 0;
+  for (var i = 0; i < widths.length; i++) {
+    var width = parseFloat(widths[i]);
+    if (Number.isFinite(width)) total += width;
+  }
+  return total;
+}
+
+function getTableAvailableWidth(table) {
+  if (!table) return 0;
+  var viewportWidth = Math.floor(document.documentElement.clientWidth || window.innerWidth || 0);
+  var container = table.parentElement;
+  var containerWidth = container ? Math.floor(container.clientWidth || 0) : 0;
+  var available = containerWidth || viewportWidth;
+  if (available && viewportWidth) available = Math.min(available, viewportWidth);
+  return available > 0 ? available : 0;
+}
+
+function setTableLayoutWidth(table, widths) {
+  var total = Math.floor(sumTableWidths(widths));
+  table.style.minWidth = '';
+  table.style.maxWidth = 'none';
+  table.style.width = total > 0 ? total + 'px' : '';
+}
+
+function applyTableColWidths(table, widths) {
+  var config = getResizableTableConfig(table);
+  var cols = ensureResizableTableColgroup(table);
+  if (!config || !cols) return false;
+  var applied = [];
+  for (var i = 0; i < cols.length; i++) {
+    var width = Math.floor(widths[i] || config.minWidth);
+    if (width < 1) width = 1;
+    cols[i].style.width = width + 'px';
+    applied.push(width);
+  }
+  setTableLayoutWidth(table, applied);
+  return true;
+}
+
+function updateTableLayoutWidth(table) {
+  var config = getResizableTableConfig(table);
+  var cols = ensureResizableTableColgroup(table);
+  if (!config || !cols) return;
+  var widths = [];
+  for (var i = 0; i < cols.length; i++) {
+    var width = parseFloat(cols[i].style.width);
+    widths[i] = Number.isFinite(width) && width > 0 ? width : config.minWidth;
+  }
+  applyTableColWidths(table, widths);
+}
+
+function saveTableColWidths(table) {
+  var config = getResizableTableConfig(table);
+  var cols = ensureResizableTableColgroup(table);
+  if (!config || !cols) return;
   var widths = [];
   for (var i = 0; i < cols.length; i++) {
     var w = cols[i].style.width;
     widths.push(w || '');
   }
   try {
-    localStorage.setItem(STATS_COL_STORAGE_KEY, JSON.stringify(widths));
-  } catch (e) { /* quota or disabled storage — ignore */ }
+    localStorage.setItem(config.storageKey, JSON.stringify(widths));
+  } catch (e) { /* quota or disabled storage - ignore */ }
 }
 
-function applyStoredStatsColWidths() {
-  var cols = getStatsTableCols();
+function applyStoredTableColWidths(table) {
+  var config = getResizableTableConfig(table);
+  var cols = ensureResizableTableColgroup(table);
+  if (!config || !cols) return false;
+  var widths = loadTableColWidths(table);
+  if (!widths) return false;
+  var parsedWidths = [];
+  var applied = false;
+  for (var i = 0; i < cols.length; i++) {
+    var parsedWidth = i < widths.length ? parseFloat(widths[i]) : NaN;
+    if (Number.isFinite(parsedWidth) && parsedWidth > 0) {
+      parsedWidths[i] = Math.max(config.minWidth, parsedWidth);
+      applied = true;
+    } else {
+      parsedWidths[i] = config.minWidth;
+    }
+  }
+  if (applied) applyTableColWidths(table, parsedWidths);
+  return applied;
+}
+
+function getMeasureContext() {
+  if (!otTableMeasureCanvas) otTableMeasureCanvas = document.createElement('canvas');
+  return otTableMeasureCanvas.getContext('2d');
+}
+
+function measureTableCellContentWidth(cell) {
+  var ctx = getMeasureContext();
+  if (!ctx) return 0;
+  var style = window.getComputedStyle(cell);
+  ctx.font = [
+    style.fontStyle,
+    style.fontVariant,
+    style.fontWeight,
+    style.fontSize,
+    style.fontFamily
+  ].join(' ');
+  var text = (cell.textContent || '').trim();
+  var padding =
+    (parseFloat(style.paddingLeft) || 0) +
+    (parseFloat(style.paddingRight) || 0) +
+    (parseFloat(style.borderLeftWidth) || 0) +
+    (parseFloat(style.borderRightWidth) || 0);
+  // Do not read layout widths here. They include any previously applied column
+  // width and would feed the old table width back into the next auto-fit pass.
+  var measuredWidth = ctx.measureText(text).width + padding + OT_TABLE_COL_FIT_PADDING;
+  return measuredWidth;
+}
+
+function fitTableColumnsToContent(tableOrId, force) {
+  var table = getResizableTable(tableOrId);
+  var config = getResizableTableConfig(table);
+  if (!config || (!force && tableHasStoredColWidths(table))) {
+    if (table) applyStoredTableColWidths(table);
+    return;
+  }
+  if (!table.getClientRects().length) return;
+  var cols = ensureResizableTableColgroup(table);
   if (!cols) return;
-  var widths = loadStatsColWidths();
-  if (!widths) return;
-  for (var i = 0; i < cols.length && i < widths.length; i++) {
-    if (widths[i]) cols[i].style.width = widths[i];
+  var rows = table.querySelectorAll('tr');
+  var widths = [];
+  for (var c = 0; c < cols.length; c++) widths[c] = config.minWidth;
+  for (var r = 0; r < rows.length; r++) {
+    var cells = rows[r].children;
+    for (var i = 0; i < cells.length && i < widths.length; i++) {
+      widths[i] = Math.max(widths[i], Math.ceil(measureTableCellContentWidth(cells[i])));
+    }
+  }
+  for (var j = 0; j < cols.length; j++) {
+    widths[j] = Math.ceil(widths[j]);
+  }
+  applyTableColWidths(table, widths);
+}
+
+function fitTableColumnsToContentIfChanged(tableOrId, signature) {
+  var table = getResizableTable(tableOrId);
+  if (!table || !table.getClientRects().length) return;
+  var nextSignature = signature || '';
+  if (table.getAttribute('data-autofit-signature') === nextSignature) return;
+  fitTableColumnsToContent(table);
+  table.setAttribute('data-autofit-signature', nextSignature);
+}
+
+function refreshResizableTableLayout(tableOrId) {
+  var table = getResizableTable(tableOrId);
+  if (!table || !table.getClientRects().length) return;
+  if (!applyStoredTableColWidths(table)) {
+    fitTableColumnsToContent(table, true);
   }
 }
 
-function onStatsResizeMove(e) {
-  if (!otStatsResizeState) return;
-  var dx = e.clientX - otStatsResizeState.startX;
-  var newWidth = otStatsResizeState.startWidth + dx;
-  if (newWidth < STATS_COL_MIN_WIDTH) newWidth = STATS_COL_MIN_WIDTH;
-  otStatsResizeState.col.style.width = newWidth + 'px';
+function getResizeMaxColWidth(table, cols, resizingIndex, minWidth) {
+  var available = getTableAvailableWidth(table);
+  if (!available) return null;
+  var otherTotal = 0;
+  for (var i = 0; i < cols.length; i++) {
+    if (i === resizingIndex) continue;
+    var width = parseFloat(cols[i].style.width);
+    otherTotal += Number.isFinite(width) && width > 0 ? width : minWidth;
+  }
+  return Math.max(minWidth, available - otherTotal);
+}
+
+function onTableResizeMove(e) {
+  if (!otTableResizeState) return;
+  var dx = e.clientX - otTableResizeState.startX;
+  var newWidth = otTableResizeState.startWidth + dx;
+  if (newWidth < otTableResizeState.minWidth) newWidth = otTableResizeState.minWidth;
+  var cols = ensureResizableTableColgroup(otTableResizeState.table);
+  var maxWidth = cols ? getResizeMaxColWidth(
+    otTableResizeState.table,
+    cols,
+    otTableResizeState.colIndex,
+    otTableResizeState.minWidth
+  ) : null;
+  if (Number.isFinite(maxWidth) && newWidth > maxWidth) newWidth = maxWidth;
+  otTableResizeState.col.style.width = newWidth + 'px';
+  updateTableLayoutWidth(otTableResizeState.table);
   e.preventDefault();
 }
 
-function onStatsResizeUp() {
-  if (!otStatsResizeState) return;
-  if (otStatsResizeState.handle) {
-    otStatsResizeState.handle.classList.remove('dragging');
+function onTableResizeUp() {
+  if (!otTableResizeState) return;
+  if (otTableResizeState.handle) {
+    otTableResizeState.handle.classList.remove('dragging');
   }
   document.body.classList.remove('col-resizing');
-  document.removeEventListener('mousemove', onStatsResizeMove);
-  document.removeEventListener('mouseup', onStatsResizeUp);
-  otStatsResizeState = null;
-  saveStatsColWidths();
+  document.removeEventListener('mousemove', onTableResizeMove);
+  document.removeEventListener('mouseup', onTableResizeUp);
+  saveTableColWidths(otTableResizeState.table);
+  otTableResizeState = null;
 }
 
-function onStatsResizeDown(e) {
+function onTableResizeDown(e) {
   if (e.button !== 0) return;
   var handle = e.currentTarget;
   var th = handle.parentNode;
+  var table = th.closest ? th.closest('table') : null;
+  var config = getResizableTableConfig(table);
   var idx = th.cellIndex;
-  var cols = getStatsTableCols();
-  if (!cols || idx < 0 || idx >= cols.length) return;
+  var cols = ensureResizableTableColgroup(table);
+  if (!config || !cols || idx < 0 || idx >= cols.length) return;
   var col = cols[idx];
-  // Seed from the rendered th width so the first drag doesn't snap.
   var startWidth = th.getBoundingClientRect().width;
   col.style.width = startWidth + 'px';
-  otStatsResizeState = {
+  updateTableLayoutWidth(table);
+  otTableResizeState = {
+    table: table,
     col: col,
+    colIndex: idx,
     handle: handle,
     startX: e.clientX,
-    startWidth: startWidth
+    startWidth: startWidth,
+    minWidth: config.minWidth
   };
   handle.classList.add('dragging');
   document.body.classList.add('col-resizing');
-  document.addEventListener('mousemove', onStatsResizeMove);
-  document.addEventListener('mouseup', onStatsResizeUp);
-  // Don't trigger the th's onclick sort handler.
+  document.addEventListener('mousemove', onTableResizeMove);
+  document.addEventListener('mouseup', onTableResizeUp);
   e.preventDefault();
   e.stopPropagation();
 }
 
-function initStatsColResizers() {
-  var table = document.getElementById('otStatsTable');
-  if (!table) return;
-  if (table.getAttribute('data-resizers-init') === '1') {
-    applyStoredStatsColWidths();
-    return;
-  }
+function initResizableTableColumns(tableOrId) {
+  var table = getResizableTable(tableOrId);
+  if (!getResizableTableConfig(table)) return;
   var ths = table.querySelectorAll('thead th');
-  for (var i = 0; i < ths.length; i++) {
-    // Don't put a resizer on the last column — there's nothing to drag against.
-    if (i === ths.length - 1) continue;
-    var handle = document.createElement('div');
-    handle.className = 'col-resizer';
-    handle.addEventListener('mousedown', onStatsResizeDown);
-    // Swallow clicks so they never reach the th sort handler.
-    handle.addEventListener('click', function(ev) { ev.stopPropagation(); });
-    ths[i].appendChild(handle);
+  ensureResizableTableColgroup(table);
+  if (table.getAttribute('data-resizers-init') !== '1') {
+    for (var i = 0; i < ths.length; i++) {
+      if (i === ths.length - 1) continue;
+      var handle = document.createElement('div');
+      handle.className = 'col-resizer';
+      handle.addEventListener('mousedown', onTableResizeDown);
+      handle.addEventListener('click', function(ev) { ev.stopPropagation(); });
+      ths[i].appendChild(handle);
+    }
+    table.setAttribute('data-resizers-init', '1');
   }
-  table.setAttribute('data-resizers-init', '1');
-  applyStoredStatsColWidths();
+  refreshResizableTableLayout(table);
+}
+
+function initStatsColResizers() {
+  initResizableTableColumns('otStatsTable');
+}
+
+function initOtSupportColResizers() {
+  initResizableTableColumns('otSupportTable');
+}
+
+function getStatsTableFitSignature(rows) {
+  var parts = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    parts.push([
+      r.id,
+      r.hex || '',
+      r.dir || '',
+      r.label || ''
+    ].join(':'));
+  }
+  parts.sort();
+  return 'stats|' + rows.length + '|' + parts.join('|');
+}
+
+function getOtSupportTableFitSignature(rows) {
+  var parts = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    parts.push([
+      r.id || 0,
+      r.label || '',
+      r.tsR ? 'tsR' : '',
+      r.tsW ? 'tsW' : '',
+      r.blAR ? 'blAR' : '',
+      r.blAW ? 'blAW' : '',
+      r.blUR ? 'blUR' : '',
+      r.blUW ? 'blUW' : ''
+    ].join(':'));
+  }
+  parts.sort();
+  return 'support|' + rows.length + '|' + parts.join('|');
 }
 
 var statsBuffer = {};
@@ -5996,6 +6230,7 @@ function openLogTab(evt, tabName) {
       updateStatisticsDisplay();
       refreshBoilerSupport();
   } else if (currentTab === 'OTSupport') {
+      initOtSupportColResizers();
       refreshOtSupport();
   } else if (currentTab === 'Graph' && typeof OTGraph !== 'undefined') {
       // Ensure the chart resizes when the tab becomes visible
@@ -6152,6 +6387,7 @@ function updateStatisticsDisplay() {
     
     var countEl = document.getElementById('statsCount');
     if (countEl) countEl.textContent = rows.length;
+    fitTableColumnsToContentIfChanged('otStatsTable', getStatsTableFitSignature(rows));
 }
 
 function sortStats(col) {
@@ -6183,6 +6419,7 @@ function refreshOtSupport() {
                 tbody.innerHTML = '';
                 if (countEl) countEl.textContent = '0';
                 if (emptyEl) emptyEl.classList.remove('hidden');
+                fitTableColumnsToContentIfChanged('otSupportTable', getOtSupportTableFitSignature(rows));
                 return;
             }
             if (emptyEl) emptyEl.classList.add('hidden');
@@ -6208,6 +6445,7 @@ function refreshOtSupport() {
             });
             tbody.innerHTML = html;
             if (countEl) countEl.textContent = String(rows.length);
+            fitTableColumnsToContentIfChanged('otSupportTable', getOtSupportTableFitSignature(rows));
         })
         .catch(function () {
             // Endpoint missing (older firmware) or fetch failed — keep table as-is.
