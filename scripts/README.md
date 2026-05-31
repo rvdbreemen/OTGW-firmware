@@ -74,3 +74,33 @@ pwsh -File scripts/branch-hygiene-queue.ps1 -Remote origin -BaseBranch dev -Inac
 3. Classifies each branch as `active`, `stale-merged`, or `stale-unmerged`
 4. Adds owner/decision/notes columns for manual review
 5. Exports a sorted review queue CSV for branch governance
+
+## capture-mqtt-debug.ps1
+
+Captures OTGW telnet debug output and MQTT broker traffic into a timestamped diagnostic folder.
+
+### MQTT Debug Capture Usage
+
+```powershell
+pwsh -File scripts/capture-mqtt-debug.ps1 -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10 -Topic '#'
+```
+
+From `cmd.exe`, use the batch launcher:
+
+```bat
+scripts\capture-mqtt-debug.bat -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10 -Topic #
+```
+
+### MQTT Debug Capture Options
+
+- `-DeviceHost` - OTGW host or IP; prompted when omitted
+- `-BrokerHost` - MQTT broker host or IP; prompted when omitted
+- `-BrokerPort` - MQTT broker port (default: `1883`)
+- `-Topic` - MQTT subscription topic (default: `#`)
+- `-Username` / `-Password` - Optional MQTT credentials; password is prompted securely when a username is supplied without a password
+- `-OutputRoot` - Root folder for run logs (default: `logs/mqtt-diagnostics`)
+- `-DurationSeconds` - Optional capture duration; otherwise runs until `Ctrl+C`
+- `-MosquittoSubPath` - Optional explicit path to `mosquitto_sub.exe`
+- `-SkipToolInstall` - Do not install Mosquitto if `mosquitto_sub` is missing
+
+Each run writes `telnet.log`, `mqtt.log`, `mqtt.stderr.log`, and `summary.txt`. The script enables OTGW MQTT debug with telnet key `3` only when the banner reports `3 MQTT [0]`.
