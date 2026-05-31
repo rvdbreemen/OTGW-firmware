@@ -24,3 +24,15 @@ Long unsupported OpenTherm status messages, such as 'Boiler does not implement' 
 - [ ] #3 Existing OT support/status table behavior remains intact.
 - [ ] #4 Relevant implementation is validated with a focused local check.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Locate the Web UI code that renders unsupported OT / 'Boiler does not implement' messages and identify why long lists overflow. 2. Implement the smallest layout/data change: prefer inline wrapping, and if the existing table cannot support it cleanly, group unsupported OT messages below the table in a readable separate panel. 3. Validate with focused local checks for the affected Web UI assets and update the task AC/DoD/final summary before closure.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Started on branch dev as @codex. User-provided screenshot shows the unsupported OT warning/badge overflowing horizontally instead of presenting a readable list.
+<!-- SECTION:NOTES:END -->
