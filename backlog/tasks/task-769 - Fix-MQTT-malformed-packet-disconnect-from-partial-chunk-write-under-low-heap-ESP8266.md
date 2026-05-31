@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 12:52'
+updated_date: '2026-05-31 12:57'
 labels:
   - bug
 dependencies: []
@@ -35,8 +35,8 @@ Root cause (code-confirmed, MQTTstuff.ino): the streaming publish path beginMqtt
 <!-- AC:BEGIN -->
 - [x] #1 writeMqttChunk/writeMqttProgmemChunk short-write no longer leaves a partial MQTT packet on the wire (broker never sees malformed packet): on unrecoverable short-write the TCP connection is cleanly dropped (MQTTclient.stop) instead of calling endPublish() on a truncated payload
 - [x] #2 Add a bounded retry-with-yield on MQTTclient.write() short-writes so a started publish completes when lwIP sndbuf drains, rather than aborting on the first short write
-- [ ] #3 Heap-guard threshold review: document the trade-off (lower guard = fewer drops but more partial-write disconnects) and only relax HEAP_LOW/HEAP_WARNING after the desync fix lands; record chosen values with rationale
-- [ ] #4 python build.py --firmware exits 0
+- [x] #3 Heap-guard threshold review: document the trade-off (lower guard = fewer drops but more partial-write disconnects) and only relax HEAP_LOW/HEAP_WARNING after the desync fix lands; record chosen values with rationale
+- [x] #4 python build.py --firmware exits 0
 - [x] #5 python evaluate.py --quick shows no new failures
 - [ ] #6 Field validation by GeorgeZ83 on ESP8266 + HA: no malformed-packet/session-taken-over disconnects with web UI open
 - [x] #7 Discovery composer path (mqtt_configuratie.cpp stream*Discovery, 7 sites): failure branch must drop TCP via client.disconnect() instead of client.endPublish() on a truncated payload — this is the largest-payload path, most prone to short-write desync under heap pressure
@@ -89,6 +89,21 @@ AC#6 = field validation by GeorgeZ83 (NodeMCU v3 + HA, live-log open). Hardware-
 Prior wrap-up note overstated Discord sourcing: there is NO Sergeant D in the #beta-testing thread and the tail-differs-each-time point was NOT discussed there. Disregard those. Actual verified sources for root cause: (a) HA Can-t-decode-payload log line (user-provided), (b) Georges telnet logs (free ~5800 / maxBlock ~1300), (c) #beta-testing chat Rob<->George: agree fragmentation -> short-write -> desync, George ratifies brief-reconnect over corrupted-sensors.
 
 AC#3 RESCOPED per user decision: do NOT relax the shared heap ladder. DECOUPLE WebSocket eligibility from the MQTT publish gate; relax MQTT only, keep/tighten WS (the WS live-log is the heap trigger: tab open -> unavailable ~10min, tab closed -> stable all day, on NodeMCU v3). Threshold VALUES pending Georges logHeapStats capture (tab open, just before failure) tonight. Decouple is an architectural change to the single getHeapHealth() tier ladder that gates both canSendWebSocket() and canPublishMQTT() -> needs a new ADR (ADR-030 is Accepted + llm_judge:true). Implementation overlaps TASK-779 (WS live-log reliability).
+
+## Verified #beta-testing chat 2026-05-31 (read from saved transcript)
+Participants: GeorgeZ83 (geo83_44083) + number3nl (Rob). No Sergeant D present (he is the OTHER George, 2.0.0/#dev-sat-mqtt). Verbatim signals:
+- George: malformed packets line up exactly with the heap dips; heap gets low when the web UI live log is open, that is when it dies.
+- Rob: the websocket log push is eating the heap, and the mqtt publish short-writes when there is no room - that is the corruption.
+- Rob: the fix makes mqtt publish drop the connection cleanly instead of corrupting when heap is low.
+- George: will the fix make mqtt drop more often? Rob: under heap pressure you get a brief clean reconnect instead of corrupted sensors; I would rather have that tradeoff. And I am going to lower the heap guard so it throttles less aggressively.
+- George: brief reconnect is way better than the sensors going crazy. (trade-off ratified)
+- Rob: the real fix is making the websocket live log not hammer the heap - that is the root trigger. SEPARATE TASK for that. Once we have your heap numbers I will tune the guard properly.
+- George board: NodeMCU v3 (not Wemos). Flashing beta 1.6.1 tonight, tab open, capturing logHeapStats before failure.
+
+## AC#3 resolution: decision recorded, impl folded into TASK-779 (user decision)
+Decision = decouple WS eligibility from the MQTT publish gate + relax MQTT only; keep WS protective. Threshold values telemetry-driven from Georges capture. Implementation, the new ADR (ADR-030 is Accepted + llm_judge), and the relaxed MQTT values now live in TASK-779 (WS live-log reliability owns the root trigger). 769 keeps the shipped desync fix only.
+
+## AC#4: python build.py green (firmware + filesystem), artifacts OTGW-firmware-1.6.1-beta+7902cbd.ino.bin (0.71MB) + littlefs (1.98MB), exit 0.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
