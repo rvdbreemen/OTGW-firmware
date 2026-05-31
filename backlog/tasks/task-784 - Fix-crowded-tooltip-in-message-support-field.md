@@ -40,3 +40,20 @@ Coding agent: @codex.
 Implementation: removed the boiler unsupported banner's native title and custom data-tooltip path, cleared stale data-tooltip attributes during refresh, and changed the light/dark footer CSS so long unsupported-message text wraps inline instead of opening floating overlays.
 Validation: Playwright browser render used a simulated long unsupported list at 1760x320 and 390x700; the field had title=null, dataTooltip=null, afterContent=none, white-space=normal, and overflow-wrap=anywhere. Static selector check found no boiler field title/tabindex/data-tooltip setter or boiler-specific tooltip CSS. python evaluate.py --quick passed with 34 passed, 0 failed, 2 info. python build.py passed the combined firmware plus filesystem build and produced OTGW-firmware-1.6.1-beta+ec5e544.ino.bin plus OTGW-firmware.1.6.1-beta+ec5e544.littlefs.bin. Build cleanup warned that .tmp could not be fully removed because an existing echarts pack file returned WinError 5.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed the crowded boiler unsupported-message banner by rendering long content inline instead of through competing tooltip mechanisms.
+
+Changes:
+- Removed the banner's native title/focus affordance and stopped writing the long value into data-tooltip.
+- Cleared stale data-tooltip attributes whenever the support data refreshes.
+- Updated light and dark footer CSS so the warning wraps in the footer with responsive width constraints instead of truncating into an overlay.
+
+Validation:
+- Playwright browser render with a simulated long list at desktop and narrow widths: no title, no data-tooltip, no generated ::after tooltip content, and wrapped text remained visible.
+- Static selector check found no remaining boilerUnsupportedLine title/tabindex/data-tooltip setter or boiler-specific tooltip CSS.
+- python evaluate.py --quick passed: 34 passed, 0 failed, 2 info.
+- python build.py passed using the default combined firmware and filesystem build. It produced firmware and LittleFS artifacts; cleanup still warned about an existing .tmp echarts pack file with WinError 5.
+<!-- SECTION:FINAL_SUMMARY:END -->
