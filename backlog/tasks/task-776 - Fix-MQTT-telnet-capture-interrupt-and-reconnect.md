@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-31 09:46'
-updated_date: '2026-05-31 09:46'
+updated_date: '2026-05-31 09:48'
 labels:
   - scripts diagnostics bug
 dependencies: []
@@ -24,3 +24,12 @@ Fix the diagnostic capture script so Ctrl+C exits cleanly and telnet logging sur
 - [ ] #2 Telnet capture reconnects after the OTGW device disconnects or reboots and keeps retrying until the user stops the capture.
 - [ ] #3 Local validation exercises the stop/reconnect control flow without requiring changes outside the diagnostic capture script.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Replace the PowerShell scriptblock Ctrl+C handler with a runspace-free .NET cancel flag that the capture loop can poll.
+2. Refactor telnet setup into connect/read/disconnect helpers and retry after disconnects or failed connects until stop or duration expiry.
+3. Keep MQTT capture independent so mosquitto_sub continues while telnet reconnects.
+4. Validate parser behavior and local stop/reconnect flow with loopback test fixtures.
+<!-- SECTION:PLAN:END -->
