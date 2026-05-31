@@ -1,9 +1,11 @@
 ---
 id: TASK-776
 title: Fix MQTT/telnet capture interrupt and reconnect
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-31 09:46'
+updated_date: '2026-05-31 09:46'
 labels:
   - scripts diagnostics bug
 dependencies: []
