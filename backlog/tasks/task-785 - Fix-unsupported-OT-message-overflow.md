@@ -1,9 +1,11 @@
 ---
 id: TASK-785
 title: Fix unsupported OT message overflow
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-05-31 16:28'
+updated_date: '2026-05-31 16:29'
 labels:
   - webui ui
 dependencies: []
