@@ -50,3 +50,23 @@ Validation evidence:
 - Loopback telnet validation connected to a local listener, enabled MQTT debug from 3 MQTT [0], survived a forced disconnect, reconnected to a second listener reporting 3 MQTT [1], captured after-reconnect in telnet.log, and stopped by duration with summary.txt written.
 - git diff --check passed for scripts/capture-mqtt-debug.ps1.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed the MQTT/telnet diagnostic capture script so manual stop and OTGW reboot recovery behave correctly.
+
+Changes:
+- Replaced the PowerShell scriptblock Ctrl+C handler with a small .NET cancel flag that is safe when Console.CancelKeyPress fires on a non-runspace thread.
+- Started MQTT capture independently from telnet so MQTT logging continues while telnet reconnects.
+- Added telnet connect/disconnect/read helpers that detect closed sockets, log disconnects and failed reconnect attempts, and retry until Ctrl+C, duration expiry, or mqtt process exit.
+
+Validation:
+- pwsh and Windows PowerShell parser checks passed.
+- Non-runspace cancel-handler probe passed.
+- Loopback telnet reboot-style validation passed, including reconnect and summary.txt output.
+- git diff --check passed for scripts/capture-mqtt-debug.ps1.
+
+Risk:
+- Live OTGW/MQTT hardware validation is still recommended, but the reported crash condition and reconnect control flow are covered locally.
+<!-- SECTION:FINAL_SUMMARY:END -->
