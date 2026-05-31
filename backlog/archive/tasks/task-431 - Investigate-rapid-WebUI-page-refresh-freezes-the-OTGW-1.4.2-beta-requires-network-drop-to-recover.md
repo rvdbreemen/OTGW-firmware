@@ -3,11 +3,11 @@ id: TASK-431
 title: >-
   Investigate: rapid WebUI page-refresh freezes the OTGW (1.4.2-beta), requires
   network drop to recover
-status: In Progress
+status: Done
 assignee:
   - '@copilot'
 created_date: '2026-04-26 10:16'
-updated_date: '2026-05-05 21:47'
+updated_date: '2026-05-29 19:00'
 labels:
   - bug
   - webui
@@ -98,3 +98,9 @@ The 1.4.2-beta release notes (published a few minutes after crashevans' report) 
 - Validation: ./build.sh and .build-venv/bin/python evaluate.py --quick both passed on the 2.0.0 worktree.
 - Still blocked on real hardware/telnet evidence for AC #1/#2/#4 and reporter follow-up for AC #5.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed without full root-cause verification: the original reporter (andrebrait) never provided the hardware/telnet evidence needed to confirm the freeze, so AC#2 (root cause) and AC#4 (reporter validation) cannot be completed. A mitigation for the web UI rapid-refresh freeze shipped on 2.0.0 (commit ca845dd0) and the related WebSocket reconnect dedup landed under TASK-563 (commit 0cf287c5). No further freeze reports have come in. Closing per maintainer decision (no reporter feedback to validate against); reopen with a fresh repro + telnet trace if the freeze recurs on current builds.
+<!-- SECTION:FINAL_SUMMARY:END -->
