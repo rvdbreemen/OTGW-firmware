@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-05-31 16:53'
-updated_date: '2026-05-31 16:54'
+updated_date: '2026-05-31 17:03'
 labels: []
 dependencies: []
 ---
@@ -27,10 +27,11 @@ Change the default MQTT publish interval to 60 seconds and update the user-facin
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Locate the backend MQTT publish interval default, persisted settings load/upgrade path, and all user-facing documentation that states or implies the default.
-2. Change the backend fresh/default configuration value to 60 seconds.
-3. Add release-1.6.1 migration behavior so an existing persisted value of 0 seconds is updated to 60 seconds during settings upgrade, without altering other explicit nonzero values.
-4. Update relevant documentation/release guidance to call out the 60 second default and the 0-to-60 upgrade behavior.
-5. Run focused validation for settings/default behavior and documentation consistency, then record the evidence in TASK-787.
-6. Check the acceptance criteria, add a final summary, mark TASK-787 Done if complete, and commit/push only the task-owned files.
+1. Add a backend MQTT boolean setting named mqttonchangepublishing / MQTTonChangePublishing, defaulting to true in the settings object and persisted in settings.ini.
+2. Parse the new setting from settings.ini so an explicit false value overrides the default, while a missing field remains true for upgrades.
+3. After settings load, if on-change publishing is true and MQTTinterval is 0, migrate MQTTinterval to 60 and immediately write settings.ini so the upgrade is durable.
+4. Keep the change backend-owned; do not depend on the synthetic UI checkbox for migration behavior.
+5. Update backend/API documentation and release guidance to note the 60 second default and the 0-to-60 upgrade behavior.
+6. Run focused validation for settings/default behavior and documentation consistency, then record the evidence in TASK-787.
+7. Check acceptance criteria, add a final summary, mark TASK-787 Done if complete, and commit/push only task-owned files.
 <!-- SECTION:PLAN:END -->
