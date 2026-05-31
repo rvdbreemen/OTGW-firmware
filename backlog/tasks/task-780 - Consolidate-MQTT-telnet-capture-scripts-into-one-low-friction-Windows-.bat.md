@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 13:09'
-updated_date: '2026-05-31 13:36'
+updated_date: '2026-05-31 13:38'
 labels:
   - tooling
   - windows
@@ -28,7 +28,7 @@ scripts/ currently has four overlapping capture artifacts: capture_mqtt_debug.py
 - [x] #6 Clear message if PowerShell is missing; Ctrl+C and -DurationSeconds both stop cleanly and still write summary.txt
 - [x] #7 Standalone capture-mqtt-debug.ps1 removed; the PowerShell worker is embedded in the .bat, extracted to %TEMP% at runtime, ExecutionPolicy bypassed for the child process only
 - [x] #8 --help and /? print usage and exit 0 (verified end-to-end); the worker MQTT/telnet logic is unchanged from the prior script
-- [ ] #9 On completion, merge all capture files (summary.txt, telnet.log, mqtt.log, mqtt.stderr.log) into a single transcript.txt in the run folder, so the tester uploads one file
+- [x] #9 On completion, merge all capture files (summary.txt, telnet.log, mqtt.log, mqtt.stderr.log) into a single transcript.txt in the run folder, so the tester uploads one file
 <!-- AC:END -->
 
 ## Implementation Plan
