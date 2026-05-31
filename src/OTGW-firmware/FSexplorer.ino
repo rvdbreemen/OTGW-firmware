@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.116
+**  Version  : v2.0.0-alpha.117
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -62,6 +62,34 @@ const char Helper[] PROGMEM =
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
 
+// Serve a CSS asset with revalidation: no-cache + ETag = filesystem hash, mirroring the
+// index.html policy in sendIndex(). The browser stores the response but revalidates each
+// load; 304 when the FS hash is unchanged, fresh 200 after a flash. Without an explicit
+// handler these files fall through onNotFound -> handleFile() -> streamFile() with no
+// Cache-Control at all, leaving caching to browser heuristics; this makes a reflash
+// deterministically pick up new styling (TASK-793). An explicit on() handler takes
+// precedence over the onNotFound fallback.
+static void serveCssRevalidated(const char* path) {
+  File f = LittleFS.open(path, "r");
+  if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
+  const char* fsHash = getFilesystemHash();
+  if (fsHash && fsHash[0] != '\0') {
+    char etag[24];
+    snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
+    if (httpServer.hasHeader(F("If-None-Match")) &&
+        strcmp(httpServer.header(F("If-None-Match")).c_str(), etag) == 0) {
+      f.close();
+      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+      httpServer.sendHeader(F("ETag"), etag);
+      httpServer.send(304);
+      return;
+    }
+    httpServer.sendHeader(F("ETag"), etag);
+  }
+  httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+  httpServer.streamFile(f, F("text/css"));
+  f.close();
+}
 
 //=====================================================================================
 void startWebserver(){
@@ -186,7 +214,12 @@ void startWebserver(){
     httpServer.on("/index.html", sendIndex);
   } 
   httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
-  
+
+  // CSS uses no-cache + ETag (revalidate) so reflashed styling is never masked by a
+  // stale browser-cached copy (TASK-793). JS below uses ?v=<hash> versioned caching.
+  httpServer.on("/components.css", []() { serveCssRevalidated("/components.css"); });
+  httpServer.on("/ds-tokens.css",  []() { serveCssRevalidated("/ds-tokens.css"); });
+
   // Serve CSS and JS files with appropriate caching headers
 
   // TASK-304: prefer the .gz sibling (pre-gzipped at build time) with

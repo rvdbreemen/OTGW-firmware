@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.116
+**  Version  : v2.0.0-alpha.117
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -635,14 +635,15 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
     httpServer.send_P(200, PSTR("application/json"), PSTR("{\"unsupported_read\":["));
     bool first = true;
-    char ent[64];
+    char ent[160];
     for (int i = 0; i <= 255; i++) {
       if (!isBoilerMsgIdUnsupportedRead((uint8_t)i)) continue;
       OTlookup_t item;
       const char* label = "Unknown";
-      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; }
+      const char* friendly = "";
+      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
       if (!first) httpServer.sendContent(F(","));
-      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\"}"), i, label);
+      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\",\"friendly\":\"%s\"}"), i, label, friendly);
       httpServer.sendContent(ent);
       first = false;
     }
@@ -652,9 +653,10 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
       OTlookup_t item;
       const char* label = "Unknown";
-      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; }
+      const char* friendly = "";
+      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
       if (!first) httpServer.sendContent(F(","));
-      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\"}"), i, label);
+      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\",\"friendly\":\"%s\"}"), i, label, friendly);
       httpServer.sendContent(ent);
       first = false;
     }
