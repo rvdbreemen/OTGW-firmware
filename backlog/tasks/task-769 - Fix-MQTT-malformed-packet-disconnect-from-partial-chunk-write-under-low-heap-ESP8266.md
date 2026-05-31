@@ -85,3 +85,31 @@ Trade-off documented: lower guard = fewer throttle-drops but more (now-graceful)
 ### Remaining
 AC#6 = field validation by GeorgeZ83 (NodeMCU v3 + HA, live-log open). Hardware-gated, cannot self-verify. George has a reliable 10-min repro and volunteered to hammer the beta. Task stays In Progress until he confirms no malformed-packet / session-taken-over events.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fix MQTT malformed-packet disconnect caused by truncated-publish desync under heap pressure on ESP8266.
+
+## Root cause
+Streaming publish path beginPublish(topic,len) -> writeMqttChunk -> endPublish() commits a fixed MQTT remaining-length. Under low heap, MQTTclient.write() short-writes; the chunk helper bailed but callers still called endPublish() on a truncated payload. Broker then parses the next packet header as payload tail -> malformed packet -> disconnect -> reconnect with same client-id -> session taken over -> HA sensors unavailable + web UI freeze. Triple-confirmed in Discord #beta-testing: decode-failure garbage tail differs every time and always involves a discovery config payload = desync, not a framing bug or heap corruption.
+
+## Changes
+- writeMqttChunk / writeMqttProgmemChunk: bounded retry-with-yield (MQTT_WRITE_MAX_RETRIES=10) so a started publish completes when lwIP sndbuf drains instead of aborting on first short write (AC#2).
+- Status publish path (MQTTstuff.ino, 3 sites) + discovery composer path (mqtt_configuratie.cpp stream*Discovery, 7 sites): on unrecoverable short-write, drop the TCP connection via MQTTclient.disconnect() instead of endPublish() on a truncated payload, so the broker never sees a malformed packet (AC#1, AC#7). Discovery path carries the largest payloads and is most desync-prone.
+- Pushed: dev (e5a26192 + 2de244f2), 2.0.0 sibling TASK-770 (dabc6f71 + 4363246f). Both branches green at commit time.
+
+## AC#3 heap-guard relax: deferred by design
+Documented the trade-off. New Discord signal: the WebSocket live-log is the heap-pressure trigger, and the heap tier ladder gates both WS and MQTT. Relaxing the shared guard would make the WS live-log run hotter = worsen the trigger. Chosen values: keep current thresholds; tune later with real telemetry from Georges repro. WS-connection-reliability root focus spun off to TASK-779.
+
+## User impact
+MQTT corruption + session-takeover replaced by a clean brief reconnect (George ratified this trade-off: prefers reconnect over corrupt sensors). No firmware behaviour change at healthy heap.
+
+## Tests
+- python build.py (firmware + filesystem): green
+- python evaluate.py --quick: no new failures (baseline 0 unsafe patterns)
+
+## Risks / follow-ups
+- AC#6 field validation by GeorgeZ83 (NodeMCU v3 + HA, live-log open) pending = task stays In Progress until confirmed. George has a 10-min repro and volunteered.
+- TASK-779: make WebSocket live-log connection reliable under heap pressure (the actual trigger).
+<!-- SECTION:FINAL_SUMMARY:END -->
