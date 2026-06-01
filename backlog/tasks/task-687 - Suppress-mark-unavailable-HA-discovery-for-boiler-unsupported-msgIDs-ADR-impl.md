@@ -3,9 +3,11 @@ id: TASK-687
 title: >-
   Suppress / mark-unavailable HA discovery for boiler-unsupported msgIDs (ADR +
   impl)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-24 06:47'
+updated_date: '2026-06-01 16:25'
 labels:
   - ha-discovery
   - opentherm
@@ -67,3 +69,33 @@ The recovery problem is shared by A, B, and D: if a previously-unsupported msgID
 - [ ] #8 python build.py --firmware exits 0.
 - [ ] #9 python evaluate.py --quick shows no new failures vs current dev.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Session blocked by tool-output channel failure (Bash/PowerShell/Grep-content/Read all returning empty or truncated). Could not read MQTTHaDiscovery.cpp or the unsupported-msgID tracking in OTGW-Core.ino. No ADR or code written. OTGW-Core.ino also reported modified externally mid-session (possible concurrent agent). Needs a fresh session.
+
+RETRACTION of prior note: earlier 'tool channel failure' was a false alarm from parallel speculative search calls, not a real blocker. Investigation is proceeding normally; MQTTHaDiscovery.cpp and unsupported-msgID tracking located and being read.
+
+INVESTIGATION COMPLETE (design), IMPL BLOCKED by tool-result channel dropping output mid-session (Read/Grep/Bash returning empty since ~mid-session; ADR-077/088 + restAPI + OTGW-Core tracking were read successfully earlier).
+
+== Unsupported tracking (source of truth) ==
+OTGW-Core.ino:3996-4025: boilerUnsupportedRead[32], boilerUnsupportedWrite[32] bitmaps (256 bits each). Set in processOT at OTGW-Core.ino:4214-4224 on OT_UNKNOWN_DATA_ID (msg-type 7), direction from boilerLastMasterWasWrite. Query hooks already exist & are exported in OTGW-firmware.h:218-219: isBoilerMsgIdUnsupportedRead(id), isBoilerMsgIdUnsupportedWrite(id). NO NEW QUERY HOOK NEEDED. NO NEW RAM NEEDED (AC#3).
+Recovery primitive MISSING: bits are set on unknown-data-id but there is no path that CLEARS a bit when a previously-unsupported id later returns READ_ACK/WRITE_ACK (OTGW-Core.ino:4204-4213 sets boilerAckedRead/Write but never clears boilerUnsupported*). AC#5 (recovery within one drip cycle) requires adding a clear-on-ack in that same block.
+
+== Discovery publisher path ==
+Drip lives in MQTTstuff.ino (OUT OF SCOPE for me): MQTTautoCfgPendingMap[8] bitmap, markAllMQTTConfigPending(), loopMQTTDiscovery() drips one OTid/tick -> doAutoConfigureMsgid(OTid). The per-entity stream/compose functions live in MQTTHaDiscovery.cpp (IN SCOPE). The unsupported-gate belongs at the per-id compose entry in MQTTHaDiscovery.cpp so MQTTstuff.ino drip loop is untouched and ADR-088 burst-windowing/ADR-077 streaming stay intact.
+
+== Design recommendation: Option B (mark-unavailable via availability_topic), NOT suppress ==
+Rationale: (a) avoids the retained-topic-cleanup + re-discovery problem that A/D carry (suppress => must publish empty retained payload to delete, and must re-publish full config on recovery); (b) recovery is automatic+cheap: flip availability OFF->ON, no re-stream of the ~300-1200B config; (c) no surprise entity-disappear on upgrade for users with existing automations (matches feedback: minimal surprise); (d) bit-set is a heuristic (some thermostats pre-flight every id once) -> unavailable is the safe, reversible classification, suppress is destructive on a false positive. Cost: HA still creates the entity (dashboard not 100% clean) -> mitigated by HA grouping unavailable entities and by the existing Statistics-panel/REST surface. Maintainer call point: if a pristine dashboard is valued over reversibility, choose A (suppress) instead — that is the genuine values trade-off for the maintainer.
+
+== Open maintainer decisions ==
+1. Suppress (A) vs mark-unavailable (B). I recommend B.
+2. availability mechanism: per-entity availability_topic + an availability publish driven by the unsupported bitmap, vs a shared expire_after. Per-entity availability_topic is cleaner but adds one retained topic per gated entity; expire_after is zero-extra-topic but HA marks unavailable only after the window and cannot distinguish 'boiler offline' from 'msgid unsupported'.
+3. Runtime override (AC#4): MQTT command force-publish-discovery <id>. Dispatch table lives in MQTTstuff.ino (out of my scope) — needs coordination/maintainer assignment.
+4. Milestone is 2.1.0 (not 2.0.0) per task header; confirm this should ship now vs stay parked.
+
+No ADR file or code written this session due to the channel failure (writing without re-Read verification would violate the edit-then-verify contract). Next session: re-read MQTTHaDiscovery.cpp doAutoConfigureMsgid/compose entry, draft docs/adr/ADR-NNN, gate compose on isBoilerMsgIdUnsupportedRead/Write, add clear-on-ack in OTGW-Core.ino:4204-4213.
+
+2026-06-01T18:25:49+02:00: MAINTAINER DECISION 7b — approach B (publish discovery + availability_topic offline; HA renders unavailable, auto-recovers when boiler answers). DEFER to milestone 2.1.0 (task is already milestone 2.1.0). Not pulled into 2.0.0. When picked up: implement B in MQTTHaDiscovery.cpp honouring the unknownLogged bitmaps, + the runtime force-publish override, per the ADR this task still owes (AC#1).
+<!-- SECTION:NOTES:END -->

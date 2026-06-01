@@ -3467,39 +3467,81 @@ static void satUpdateSimulation()
 
   // --- Multi-zone synthetic room model (TASK-798 / plan §12 F3) ---
   // Shared boiler/flow (plan default), per-zone room response, so the P75
-  // aggregation (satControlLoop, iZoneCount>1) runs under simulation. Each
-  // non-OFF zone is given a synthetic room temp + setpoint and driven toward
-  // its target on the shared synthetic flame. OFF zones (TASK-593 bOff) are
-  // left untouched so they stay excluded from P75. A small per-zone offset
-  // makes zones visibly diverge instead of moving in lockstep.
+  // aggregation (satControlLoop, iZoneCount>1) runs under simulation. OFF zones
+  // (TASK-593 bOff) are left untouched so they stay excluded from P75.
+  //
+  // Scheme B (maintainer-confirmed), modelled on a real house: zone 1 is the
+  // living room at the full target; zones 2+ are bedrooms/secondary rooms ~2 °C
+  // lower with a small deterministic per-zone variation. Secondary rooms are
+  // smaller (lower thermal mass) so they heat AND cool faster — they reach
+  // target and switch off sooner, and drop quicker once the flame is off.
   if (settings.sat.iZoneCount > 1) {
     uint8_t zc = settings.sat.iZoneCount;
     if (zc > SAT_MAX_ZONES) zc = SAT_MAX_ZONES;
     for (uint8_t zi = 0; zi < zc; zi++) {
       SATZoneState& z = satZones[zi];
       if (z.bOff) continue;  // TASK-593: OFF zone stays excluded — do not synthesize
-      // Synthesize a setpoint if none was pushed externally: global target with
-      // a small staggered offset per zone so the zones are not identical.
+      // Deterministic per-zone variation (no RNG): -0.3/-0.6/-0.9 °C for zones
+      // 2/3/4 on top of the 2 °C secondary-room drop. Reproducible per index.
+      const float zoneVar = (float)zi * 0.3f;
+      // Synthesize a setpoint if none was pushed externally.
       if (!z.bSpValid) {
-        z.fSetpoint = settings.sat.fTargetTemp - (float)zi * 0.5f;
+        z.fSetpoint = (zi == 0)
+                        ? settings.sat.fTargetTemp                       // living room
+                        : settings.sat.fTargetTemp - 2.0f - zoneVar;     // secondary rooms ~2 °C lower
         z.bSpValid  = true;
       }
+      // Smaller secondary rooms respond faster (lower thermal mass): scale the
+      // shared heat/cool rates up for zones 2+ (1.0 / 1.3 / 1.6 / 1.9x).
+      const float zoneRateMult = (zi == 0) ? 1.0f : (1.0f + 0.3f * (float)zi);
       // Seed room temp on first sim touch from the shared sim room temp.
       if (!z.bRoomValid) z.fRoomTemp = state.sat.fSimRoomTemp;
       // Drive room toward this zone's setpoint on the shared synthetic flame.
       if (state.sat.bSimFlameOn) {
         if (z.fRoomTemp < z.fSetpoint) {
-          z.fRoomTemp += settings.sat.fSimHeatRate * dtMin;
+          z.fRoomTemp += settings.sat.fSimHeatRate * zoneRateMult * dtMin;
           if (z.fRoomTemp > z.fSetpoint) z.fRoomTemp = z.fSetpoint;
         }
       } else {
         if (z.fRoomTemp > state.sat.fSimOutdoorTemp) {
-          z.fRoomTemp -= settings.sat.fSimCoolRate * dtMin;
+          z.fRoomTemp -= settings.sat.fSimCoolRate * zoneRateMult * dtMin;
           if (z.fRoomTemp < state.sat.fSimOutdoorTemp) z.fRoomTemp = state.sat.fSimOutdoorTemp;
         }
       }
       z.bRoomValid    = true;
       z.iLastUpdateMs = now;  // keep fresh so the staleness gate does not drop it
+    }
+  }
+
+  // --- Multi-area synthetic temps (TASK-798 / plan §12 F3, 1a) ---
+  // The multi-AREA path (satGetWeightedRoomTemp) is distinct from multi-ZONE:
+  // it weight-averages several room sensors into ONE PID input. Under sim with
+  // no external area feed every area is invalid, so the weighted average returns
+  // NAN and the multi-area code never runs. Synthesize area temps with the same
+  // house model as zones (area 0 = living room at target, areas 1+ ~2 °C lower
+  // with per-area variation and faster response) so satGetWeightedRoomTemp
+  // exercises under simulation.
+  if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
+    uint8_t ac = settings.sat.iMultiAreaCount;
+    if (ac > SAT_MAX_AREAS) ac = SAT_MAX_AREAS;
+    for (uint8_t ai = 0; ai < ac; ai++) {
+      const float areaSp   = (ai == 0) ? settings.sat.fTargetTemp
+                                       : settings.sat.fTargetTemp - 2.0f - (float)ai * 0.3f;
+      const float rateMult = (ai == 0) ? 1.0f : (1.0f + 0.3f * (float)ai);
+      if (!state.sat.bAreaValid[ai]) state.sat.fAreaTemp[ai] = state.sat.fSimRoomTemp;
+      if (state.sat.bSimFlameOn) {
+        if (state.sat.fAreaTemp[ai] < areaSp) {
+          state.sat.fAreaTemp[ai] += settings.sat.fSimHeatRate * rateMult * dtMin;
+          if (state.sat.fAreaTemp[ai] > areaSp) state.sat.fAreaTemp[ai] = areaSp;
+        }
+      } else {
+        if (state.sat.fAreaTemp[ai] > state.sat.fSimOutdoorTemp) {
+          state.sat.fAreaTemp[ai] -= settings.sat.fSimCoolRate * rateMult * dtMin;
+          if (state.sat.fAreaTemp[ai] < state.sat.fSimOutdoorTemp) state.sat.fAreaTemp[ai] = state.sat.fSimOutdoorTemp;
+        }
+      }
+      state.sat.bAreaValid[ai]  = true;
+      state.sat.iAreaLastMs[ai] = now;  // keep fresh vs SAT_AREA_STALE_MS
     }
   }
 }

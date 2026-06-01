@@ -1,11 +1,11 @@
 ---
 id: TASK-797
 title: 'feat-2.0.0: SAT sim F2 — REST scenario-injection endpoint'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:55'
-updated_date: '2026-06-01 08:20'
+updated_date: '2026-06-01 16:25'
 labels:
   - sat
   - simulation
@@ -57,4 +57,8 @@ VERIFY: build both targets; evaluate --quick; curl each event with bSimulation o
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-06-01T10:19:41+02:00: F2 core shipped 43661b85 (alpha.125, pushed). POST /api/v2/sat/sim/event with window_open + solar_gain. satSimInjectEvent injector + room-model consumption + 409-when-sim-off. Per plan defaults: dhw_demand->F5, pressure_drop deferred (SATpressure coupling), pv_surplus reuses existing endpoint. AC#1-4 (endpoint, events, 409-gate, build) met. OPEN (morning, non-blocking): (a) OpenAPI spec entry not yet added (docs/api) — small doc follow-up; (b) F4 noise/dropouts can hook this same endpoint as its opt-in trigger per F4 plan; (c) extend to dhw_demand/pressure_drop when F5 + SATpressure-coupling decided.
+
+2026-06-01T10:21:05+02:00: OpenAPI documented d283911a (pushed). AC #1/#3/#4/#5 met. AC#2 deliberately LEFT UNCHECKED — endpoint accepts window_open + solar_gain (the additive room-model perturbations), NOT the full 5 the AC lists. dhw_demand needs the F5 DHW model (TASK-800), pressure_drop needs SATpressure coupling, pv_surplus already routes via /v2/sat/pvsurplus. Honest partial: the F2 *framework* is complete and extensible (add an event = one clause in satSimInjectEvent); the remaining 3 events are downstream-task-gated. MAINTAINER DECISION: either (a) accept F2-core as Done and split the 3 remaining events into their owning tasks (F5 etc.), or (b) keep 797 open until all 5 land. Recommend (a) — the others are genuinely different subsystems. Leaving In Progress pending your call.
+
+2026-06-01T18:25:47+02:00: MAINTAINER DECISION 5a — accept F2 core as Done. AC#2 (all 5 events) NOT fully met by design: window_open+solar_gain+sensor_noise implemented; remaining events ROUTED to owning subsystems — dhw_demand -> TASK-800 (F5), pressure_drop -> needs SATpressure coupling (new follow-up if pursued), pv_surplus -> already served by /api/v2/sat/pvsurplus. F2 framework complete + extensible (new event = one clause). Closing Done.
 <!-- SECTION:NOTES:END -->
