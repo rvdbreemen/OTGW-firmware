@@ -3,9 +3,11 @@ id: TASK-807
 title: >-
   docs-security: document intentional unauthenticated network-identity
   disclosure on /api/v2/device/info (F1)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-01 23:04'
+updated_date: '2026-06-01 23:05'
 labels:
   - docs
   - security
