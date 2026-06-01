@@ -1,9 +1,11 @@
 ---
 id: TASK-708
 title: 'chore(adr-kit): run first retirement-audit on dev ADR set once skill available'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-26 11:01'
+updated_date: '2026-06-01 23:08'
 labels:
   - adr-kit
   - tooling
