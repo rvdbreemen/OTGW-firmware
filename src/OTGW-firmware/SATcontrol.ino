@@ -1102,6 +1102,32 @@ static uint8_t satGetActualModulation()
 }
 
 //=====================================================================
+//=== Bus-transmit gate (TASK-795 plan §4.1 + §4.3) ===
+//=== Returns true when the caller must NOT emit on the boiler-side bus. ===
+//=== Side effect (idempotent): records the would-be command for the    ===
+//=== §4.3 trace (telnet + state) so the user sees what the regulator    ===
+//=== decided even though nothing physically left the device.            ===
+//=====================================================================
+// cmd:    short ASCII of what would have gone out (e.g. "CS=42.5" or
+//         "MID=24 VAL=4200"); caller formats, helper does not allocate.
+// source: PROGMEM literal naming the call site ("loop", "gateway", "probe"...).
+// Non-static + prototyped in OTGW-firmware.h: called cross-file from
+// OTDirect.ino / OTGW-Core.ino, which concatenate ahead of this file.
+bool satSimulationBlocksBusTx(const char* cmd,
+                              const __FlashStringHelper* source)
+{
+  if (!(state.debug.bOTGWSimulation || settings.sat.bSimulation)) return false;
+  const char* tag = settings.sat.bSimulation ? "SAT-SIM" : "OTGW-SIM";
+  SATDebugTf(PSTR("%s trace: %s (src=%S)\r\n"), tag, cmd ? cmd : "", source);
+  sendEventToWebSocket_P('!', PSTR("simulation blocked bus tx"));
+  if (settings.sat.bSimulation && cmd) {
+    strlcpy(state.sat.sLastBlockedCmd, cmd, sizeof(state.sat.sLastBlockedCmd));
+    state.sat.iLastBlockedCmdMs = millis();
+  }
+  return true;
+}
+
+//=====================================================================
 //=== External Input Handlers (called from MQTT/REST) ===
 //=====================================================================
 bool satHandleExternalTemp(const char* value)

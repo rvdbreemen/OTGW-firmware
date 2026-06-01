@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.120
+**  Version  : v2.0.0-alpha.121
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -296,6 +296,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fSimReturnTemp         = 20.0f;   // °C
   uint32_t iSimFlameOnSinceMs     = 0;       // millis() of last synthetic flame-ON edge
   uint32_t iSimFlameOffSinceMs    = 0;       // millis() of last synthetic flame-OFF edge
+  // Command trace (TASK-795 plan §4.3): last would-be boiler-side command the
+  // SAT loop tried to emit while simulation blocked the bus.
+  char     sLastBlockedCmd[24]    = {0};
+  uint32_t iLastBlockedCmdMs      = 0;
   // Thermal drop learning (Task #21)
   float    fEstimatedRoom         = 0.0f;   // Estimated room temp during fallback
   float    fLastKnownRoom         = 0.0f;   // Last valid room temp before fallback

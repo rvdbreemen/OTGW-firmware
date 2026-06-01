@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:52'
-updated_date: '2026-06-01 04:12'
+updated_date: '2026-06-01 05:10'
 labels:
   - sat
   - simulation
@@ -25,9 +25,9 @@ Implements plan docs/plan/SAT_SIMULATION_CONTRACT_PLAN.md (sections 4-7). Adds a
 <!-- AC:BEGIN -->
 - [x] #1 satIsFlameOn / satGetFlowTemp / satGetReturnTemp / satGetActualModulation wrappers exist and route via settings.sat.bSimulation
 - [x] #2 All 19 call sites in plan section 7 migrated to wrappers
-- [ ] #3 Synthetic flame edges drive satCycleOnFlameChange and increment iCycleCount; eLastCycleClass reaches non-NONE value
-- [ ] #4 iSimModulation varies between minMod and iMaxRelModulation under varying PID error
-- [ ] #5 fSimReturnTemp = fSimFlowTemp minus delta(mod), floored at fSimRoomTemp
+- [x] #3 Synthetic flame edges drive satCycleOnFlameChange and increment iCycleCount; eLastCycleClass reaches non-NONE value
+- [x] #4 iSimModulation varies between minMod and iMaxRelModulation under varying PID error
+- [x] #5 fSimReturnTemp = fSimFlowTemp minus delta(mod), floored at fSimRoomTemp
 - [ ] #6 All three boiler-side actuation paths gated when bSimulation OR bOTGWSimulation; thermostat-side replies permitted; verified on both HAS_PIC and OTGW32 builds
 - [ ] #7 Command trace appears on telnet (SAT-SIM trace:), MQTT (sat/sim/last_cmd non-retained), REST (last_blocked_cmd + age); covers paths a, b, c
 - [ ] #8 Edge-triggered auto-disable: satOnBoilerDetected fires within <=1s of first slave frame; full teardown (settings flipped+persisted, synthetic reset, trace cleared, MQTT OFF, telnet event); survives reboot; verified on both HAS_PIC and OTGW32
@@ -75,4 +75,8 @@ Suggested atomic approach (operates on disk, not via Read): sed -i 's/OTcurrentS
 STATUS: 593 (shared SATcontrol/SATtypes) committed+pushed a3aa6672, tree clean. F1-F7=TASK-796..802 created. Ready for a clean-tooling session to run commit-1 fast.
 
 2026-06-01T06:12:09+02:00: COMMIT 1/3 DONE — daf99b0f (alpha.119), pushed. 4 wrappers added (satGetFlowTemp/satGetReturnTemp/satIsFlameOn/satGetActualModulation) after satGetOutsideTemp; 28 read sites migrated via disk-level sed (15 Tboiler + 3 Tret + 10 flame-bit), verified zero LHS writes + RelModLevel/Toutside/DHW-0x04 untouched. 3 inert fields (bSimFlameOn/iSimModulation/fSimReturnTemp) in SATRuntimeSection so wrappers compile. AC#1+#2 checked. Build esp8266+esp32 SUCCESS (fw+fs), evaluate --quick 0 failed (had to drop premature ADR-117 refs from comments — ADR authored in commit 3 per plan §15, the ADR-References-Resolve gate FAILs on a cite to a not-yet-existing ADR). NEXT: commit 2 = boiler model (plan §14.2 §5.2-5.6): remaining SATtypes fields (iSimFlameOnSinceMs/iSimFlameOffSinceMs + commit-3's sLastBlockedCmd/iLastBlockedCmdMs), tuning consts, satSimMinMod(), extend satUpdateSimulation() with flame SM + modulation + flow + return + room models.
+
+2026-06-01T06:18:19+02:00: COMMIT 2/3 DONE — pushed (alpha.120). satUpdateSimulation() rewritten: flame SM (satCycleOnFlameChange edges -> iCycleCount), modulation (satSimMinMod..iMaxRelModulation), mod-coupled flow, return temp (flow-delta(mod)), room keyed on synthetic flame. +2 fields (iSimFlameOnSinceMs/iSimFlameOffSinceMs), +5 tuning consts, satSimMinMod() helper. AC#3 (flame edges/cycle), #4 (modulation range), #5 (return temp) checked by construction — behaviour-verify on bench. Build esp8266+esp32 SUCCESS (fw+fs), evaluate --quick 0 failed. Note: bSimWarmupDone now written-once (warmup superseded by flow model) — harmless, left for commit-3 cleanup if needed. F1-F7 (796-802) filled with detailed plans+ACs in this commit. NEXT: commit 3 = simulation contract (plan §4 + §14.3 + §15 ADR-117): satSimulationBlocksBusTx() gate helper, 3 chokepoints (OTGW-Core PIC / OTDirect TX+probe / OTGW32 translation — MAP path c during reading pass, §17 pitfall #4: if a 3rd emit path found, STOP+ask), slave-RX edge hook->bBoilerDetectedFlag->satOnBoilerDetected() deferred to main loop, satBoilerHardwarePresent() dual-signal, REST 409 + sim_available/last_blocked_cmd, MQTT reject + sat/sim/last_cmd, MQTTHaDiscovery sensor, Web UI data-sim-only hide, ADR-117 via /adr-kit:adr (needs sLastBlockedCmd[24]+iLastBlockedCmdMs fields too). Commit-3 is the big/risky one (OTDirect path-c localisation) — best done attended or with verified reads.
+
+2026-06-01T07:10:36+02:00: COMMIT 3/3 STARTED (user awake, authorized). Reading pass to map bus-tx chokepoints (a) PIC serial OTGW-Core, (b) OTDirect master TX + probe, (c) OTGW32 translation/pass-through before any edit.
 <!-- SECTION:NOTES:END -->

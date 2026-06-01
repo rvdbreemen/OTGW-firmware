@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.120
+**  Version  : v2.0.0-alpha.121
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -336,6 +336,7 @@ void satHandleHeatingMode(const char* value);
 void satDisable();
 void satHandleControlMode(const char* value);
 void satCycleOnFlameChange(bool flameOn);
+bool satSimulationBlocksBusTx(const char* cmd, const __FlashStringHelper* source);  // TASK-795 plan §4.1: bus-tx isolation gate
 void satSendStatusJSON();
 uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();

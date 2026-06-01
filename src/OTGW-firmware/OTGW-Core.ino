@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.120
+**  Version  : v2.0.0-alpha.121
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3051,10 +3051,19 @@ void sendPICSerial(const char* buf, int len)
     return;
   }
 #if HAS_PIC
-  if (state.debug.bOTGWSimulation) {
-    OTDebugTln(F("OTGW simulation active - serial send blocked"));
-    sendEventToWebSocket_P('!', PSTR("OTGW simulation blocked serial send"));
-    return;
+  // TASK-795 §4.1 path (a): block PIC serial when EITHER the legacy OTGW
+  // serial-replay sim (bOTGWSimulation) OR the SAT boiler sim (bSimulation)
+  // is active. The shared helper also captures the would-be command for the
+  // §4.3 trace. buf may not be NUL-terminated at len, so copy bounded.
+  {
+    char picCmd[24];
+    int  n = (len < (int)sizeof(picCmd) - 1) ? len : (int)sizeof(picCmd) - 1;
+    if (n < 0) n = 0;
+    memcpy(picCmd, buf, n);
+    picCmd[n] = '\0';
+    // strip a trailing CR/LF so the trace line stays single-line
+    while (n > 0 && (picCmd[n - 1] == '\r' || picCmd[n - 1] == '\n')) picCmd[--n] = '\0';
+    if (satSimulationBlocksBusTx(picCmd, F("pic-serial"))) return;
   }
 
   //Send the buffer to OTGW when the Serial interface is available

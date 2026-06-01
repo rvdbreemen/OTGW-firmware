@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.120
+**  Version  : v2.0.0-alpha.121
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1199,6 +1199,21 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
       otSlave.sendResponse(response);
     }
     return true;  // "completed" instantly
+  }
+
+  // TASK-795 §4.1 paths (b)+(c): block the real boiler-side master TX when SAT
+  // boiler sim (or legacy OTGW sim) is active. This single emitter is shared by
+  // the gateway-origin path (sendMasterRequestAsync callers ~1357/1409) and the
+  // thermostat pass-through/translation path (~1897/1937), so one gate covers
+  // both — no separate path-(c) emitter exists. Loopback mode already returned
+  // above (its synthetic responses never reach the bus). The shared helper also
+  // captures the would-be frame for the §4.3 trace.
+  {
+    char otCmd[24];
+    const uint8_t  mid = (uint8_t)((request >> 16) & 0x7F);
+    const uint16_t val = (uint16_t)(request & 0xFFFF);
+    snprintf_P(otCmd, sizeof(otCmd), PSTR("MID=%u VAL=%u"), mid, val);
+    if (satSimulationBlocksBusTx(otCmd, F("otdirect-tx"))) return false;
   }
 
   if (!otMaster.isReady()) return false;  // bus busy — try again later
