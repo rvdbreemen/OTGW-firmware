@@ -1,10 +1,11 @@
 ---
 id: TASK-801
 title: 'feat-2.0.0: SAT sim F6 — command-trace ring buffer'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-31 22:56'
-updated_date: '2026-06-01 04:16'
+updated_date: '2026-06-01 10:48'
 labels:
   - sat
   - simulation
@@ -19,10 +20,10 @@ Follow-up F6 from SAT simulation plan section 12. Replace the single-slot last_b
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Ring buffer of the last N (default 16) blocked commands replaces the single-slot trace; bounded BSS, no heap
-- [ ] #2 satSimulationBlocksBusTx() pushes into the ring; satOnBoilerDetected() teardown clears the whole ring
-- [ ] #3 REST sat status JSON exposes a last_blocked_cmds array (most-recent-first); MQTT keeps the single newest non-retained
-- [ ] #4 python build.py both targets SUCCESS; evaluate.py --quick clean
+- [x] #1 Ring buffer of the last N (default 16) blocked commands replaces the single-slot trace; bounded BSS, no heap
+- [x] #2 satSimulationBlocksBusTx() pushes into the ring; satOnBoilerDetected() teardown clears the whole ring
+- [x] #3 REST sat status JSON exposes a last_blocked_cmds array (most-recent-first); MQTT keeps the single newest non-retained
+- [x] #4 python build.py both targets SUCCESS; evaluate.py --quick clean
 <!-- AC:END -->
 
 ## Implementation Plan

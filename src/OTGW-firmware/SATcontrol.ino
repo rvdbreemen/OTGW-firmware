@@ -1146,6 +1146,12 @@ bool satSimulationBlocksBusTx(const char* cmd,
   if (settings.sat.bSimulation && cmd) {
     strlcpy(state.sat.sLastBlockedCmd, cmd, sizeof(state.sat.sLastBlockedCmd));
     state.sat.iLastBlockedCmdMs = millis();
+    // TASK-801 F6: also push into the trace ring (newest at head).
+    const uint8_t ring = (uint8_t)(sizeof(state.sat.iSimTraceMs) / sizeof(state.sat.iSimTraceMs[0]));
+    strlcpy(state.sat.sSimTraceCmd[state.sat.iSimTraceHead], cmd, sizeof(state.sat.sSimTraceCmd[0]));
+    state.sat.iSimTraceMs[state.sat.iSimTraceHead] = state.sat.iLastBlockedCmdMs;
+    state.sat.iSimTraceHead = (uint8_t)((state.sat.iSimTraceHead + 1) % ring);
+    if (state.sat.iSimTraceCount < ring) state.sat.iSimTraceCount++;
   }
   return true;
 }
@@ -1198,6 +1204,8 @@ static void satOnBoilerDetected()
   state.sat.iSimLastUpdateMs   = 0;       // forces re-init if user re-enables later
   state.sat.sLastBlockedCmd[0] = '\0';    // the §4.3 trace's meaning ends with sim
   state.sat.iLastBlockedCmdMs  = 0;
+  state.sat.iSimTraceHead      = 0;       // TASK-801 F6: trace ring meaning ends with sim too
+  state.sat.iSimTraceCount     = 0;
 
   OTDebugTln(F("SAT-SIM: boiler appeared on bus — simulation disabled completely"));
   sendEventToWebSocket_P('!', PSTR("SAT-SIM: boiler appeared, simulation off"));
@@ -2113,6 +2121,26 @@ void satSendStatusJSON()
     sendJsonMapEntry(F("last_blocked_cmd_age_ms"),
                      state.sat.iLastBlockedCmdMs == 0 ? (int32_t)0
                        : (int32_t)(millis() - state.sat.iLastBlockedCmdMs));
+    // TASK-801 F6: last_blocked_cmds[] ring, newest-first. Each element
+    // {"cmd":"..","age_ms":N}. Built in one buffer (<=16*~50B) then streamed.
+    {
+      const uint8_t ring  = (uint8_t)(sizeof(state.sat.iSimTraceMs) / sizeof(state.sat.iSimTraceMs[0]));
+      const uint8_t count = state.sat.iSimTraceCount;
+      const uint32_t nowMs = millis();
+      char arrBuf[820];
+      int n = snprintf_P(arrBuf, sizeof(arrBuf), PSTR("\"last_blocked_cmds\": ["));
+      for (uint8_t k = 0; k < count; k++) {
+        // newest-first: head-1-k, wrapping
+        uint8_t idx = (uint8_t)((state.sat.iSimTraceHead + ring - 1 - k) % ring);
+        uint32_t age = (state.sat.iSimTraceMs[idx] == 0) ? 0 : (nowMs - state.sat.iSimTraceMs[idx]);
+        n += snprintf_P(arrBuf + n, sizeof(arrBuf) - n,
+                        PSTR("%s{\"cmd\":\"%s\",\"age_ms\":%lu}"),
+                        (k == 0 ? "" : ","), state.sat.sSimTraceCmd[idx], (unsigned long)age);
+        if (n >= (int)sizeof(arrBuf) - 40) break;  // guard (cannot happen at ring=16, defensive)
+      }
+      snprintf_P(arrBuf + n, sizeof(arrBuf) - n, PSTR("]"));
+      sendBeforenext(); sendIdent(); restSendContent(arrBuf);
+    }
   }
   // PID auto-tuning (Task #27)
   sendJsonMapEntry(F("auto_tune"),             settings.sat.bAutoTune);

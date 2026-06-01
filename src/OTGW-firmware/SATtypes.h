@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.126
+**  Version  : v2.0.0-alpha.127
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -297,9 +297,17 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iSimFlameOnSinceMs     = 0;       // millis() of last synthetic flame-ON edge
   uint32_t iSimFlameOffSinceMs    = 0;       // millis() of last synthetic flame-OFF edge
   // Command trace (TASK-795 plan §4.3): last would-be boiler-side command the
-  // SAT loop tried to emit while simulation blocked the bus.
+  // SAT loop tried to emit while simulation blocked the bus. sLastBlockedCmd
+  // remains the newest-entry alias for the MQTT single-slot + back-compat.
   char     sLastBlockedCmd[24]    = {0};
   uint32_t iLastBlockedCmdMs      = 0;
+  // Command-trace ring (TASK-801 plan §12 F6): last SAT_SIM_TRACE_RING blocked
+  // commands, newest-first when read out. ~16*(24+4)=448 B BSS. Head points at
+  // the slot the NEXT push will write; iSimTraceCount caps at the ring size.
+  char     sSimTraceCmd[16][24]   = {{0}};
+  uint32_t iSimTraceMs[16]        = {0};
+  uint8_t  iSimTraceHead          = 0;
+  uint8_t  iSimTraceCount         = 0;
   // Availability gate (TASK-795 plan §4.2): set by the slave-frame edge hook
   // (interrupt-adjacent), consumed once in the SAT main loop so the heavy
   // writeSettings() teardown runs in cooperative context, not in the hook.
