@@ -3389,11 +3389,69 @@ static void satUpdateSimulation()
       if (state.sat.fSimRoomTemp > target) state.sat.fSimRoomTemp = target;
     }
   } else {
+    // window_open (TASK-797): multiply the cooling rate for the active window.
+    float coolRate = settings.sat.fSimCoolRate;
+    if (state.sat.iSimWindowExpiryMs != 0) coolRate *= state.sat.fSimWindowLossMult;
     if (state.sat.fSimRoomTemp > state.sat.fSimOutdoorTemp) {
-      state.sat.fSimRoomTemp -= settings.sat.fSimCoolRate * dtMin;
+      state.sat.fSimRoomTemp -= coolRate * dtMin;
       if (state.sat.fSimRoomTemp < state.sat.fSimOutdoorTemp) state.sat.fSimRoomTemp = state.sat.fSimOutdoorTemp;
     }
   }
+
+  // --- Scenario injection (TASK-797 / plan §12 F2) ---
+  // solar_gain: additive room warming, independent of flame, while active.
+  if (state.sat.iSimSolarExpiryMs != 0) {
+    state.sat.fSimRoomTemp += state.sat.fSimSolarGainC * dtMin;
+  }
+  // Expire elapsed perturbations (millis()-rollover-safe via signed diff).
+  if (state.sat.iSimWindowExpiryMs != 0 &&
+      (int32_t)(now - state.sat.iSimWindowExpiryMs) >= 0) {
+    state.sat.iSimWindowExpiryMs = 0;
+    state.sat.fSimWindowLossMult = 1.0f;
+    SATDebugTln(F("SAT SIM: window_open expired"));
+  }
+  if (state.sat.iSimSolarExpiryMs != 0 &&
+      (int32_t)(now - state.sat.iSimSolarExpiryMs) >= 0) {
+    state.sat.iSimSolarExpiryMs = 0;
+    state.sat.fSimSolarGainC = 0.0f;
+    SATDebugTln(F("SAT SIM: solar_gain expired"));
+  }
+}
+
+// Scenario-event injector (TASK-797 / plan §12 F2). Called from the REST
+// handler. Returns false on unknown event or when simulation is inactive.
+// value/durationS are pre-parsed; durationS<=0 falls back to a default window.
+bool satSimInjectEvent(const char* event, float value, int32_t durationS)
+{
+  if (!settings.sat.bSimulation || !event) return false;
+  const uint32_t now = millis();
+  const uint32_t durMs = (durationS > 0 ? (uint32_t)durationS : 600U) * 1000UL;  // default 10 min
+
+  if (strcasecmp_P(event, PSTR("window_open")) == 0) {
+    // value = loss multiplier (default 3x); clamp to a sane band.
+    float m = (value > 0.0f) ? value : 3.0f;
+    if (m < 1.0f) m = 1.0f;
+    if (m > 20.0f) m = 20.0f;
+    state.sat.fSimWindowLossMult = m;
+    state.sat.iSimWindowExpiryMs = now + durMs;
+    if (state.sat.iSimWindowExpiryMs == 0) state.sat.iSimWindowExpiryMs = 1;  // avoid the 0 sentinel
+    SATDebugTf(PSTR("SAT SIM: window_open x%.1f for %lds\r\n"), m, (long)(durMs / 1000UL));
+    return true;
+  }
+  if (strcasecmp_P(event, PSTR("solar_gain")) == 0) {
+    // value = additive warming °C/min (default 0.5); clamp.
+    float g = (value != 0.0f) ? value : 0.5f;
+    if (g < 0.0f) g = 0.0f;
+    if (g > 5.0f) g = 5.0f;
+    state.sat.fSimSolarGainC = g;
+    state.sat.iSimSolarExpiryMs = now + durMs;
+    if (state.sat.iSimSolarExpiryMs == 0) state.sat.iSimSolarExpiryMs = 1;
+    SATDebugTf(PSTR("SAT SIM: solar_gain %.2fC/min for %lds\r\n"), g, (long)(durMs / 1000UL));
+    return true;
+  }
+  // dhw_demand / pressure_drop deferred (F5 + SATpressure coupling); pv_surplus
+  // already has its own /api/v2/sat/pvsurplus endpoint. Unknown event -> false.
+  return false;
 }
 
 //=====================================================================

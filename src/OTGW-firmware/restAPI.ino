@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.124
+**  Version  : v2.0.0-alpha.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -855,6 +855,7 @@ static bool satExtractTwoFields(const char* body,
 // POST /api/v2/sat/pvsurplus            — push PV-surplus power in W (TASK-640)
 // POST /api/v2/sat/humidity             — push indoor humidity (0-100%)
 // POST /api/v2/sat/area/<0-3>           — push area temperature (multi-area)
+// POST /api/v2/sat/sim/event            — inject sim scenario (window_open/solar_gain); 409 if sim off
 // POST /api/v2/sat/flush                — flush short-lived data (PID integral + cycle window)
 // POST /api/v2/sat/settings/<name>      — update any SAT setting (mirrors all MQTT sat/* commands)
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
@@ -938,6 +939,36 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     }
     if (!val || !satHandlePvSurplus(val)) {
       sendApiError(400, F("Invalid or missing numeric value (0-50000 W)"));
+      return;
+    }
+    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+  }
+  // POST /api/v2/sat/sim/event — inject a bench scenario (TASK-797 / plan §12 F2).
+  // Body: {"event":"window_open|solar_gain","value":<num>,"duration_s":<int>}.
+  // Honoured only while simulation is active (HTTP 409 otherwise) so it never
+  // perturbs a real-boiler rig. Topic/value parsing via extractJsonField (no
+  // ArduinoJson, per ADR).
+  else if (strcasecmp_P(sub, PSTR("sim")) == 0) {
+    if (wc < 6 || strcasecmp_P(words[5], PSTR("event")) != 0) {
+      sendApiError(404, F("Unknown sim sub-resource (expected sim/event)"));
+      return;
+    }
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (!settings.sat.bSimulation) {
+      sendApiError(409, F("simulation inactive: enable bSimulation before injecting events"));
+      return;
+    }
+    if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+    const char* body = httpServer.arg(F("plain")).c_str();
+    char evtBuf[20], valBuf[16], durBuf[12];
+    if (!extractJsonField(body, F("event"), evtBuf, sizeof(evtBuf))) {
+      sendApiError(400, F("Missing 'event' field"));
+      return;
+    }
+    float   value = extractJsonField(body, F("value"), valBuf, sizeof(valBuf)) ? atof(valBuf) : 0.0f;
+    int32_t durS  = extractJsonField(body, F("duration_s"), durBuf, sizeof(durBuf)) ? atoi(durBuf) : 0;
+    if (!satSimInjectEvent(evtBuf, value, durS)) {
+      sendApiError(400, F("Unknown or unsupported event (window_open, solar_gain)"));
       return;
     }
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));

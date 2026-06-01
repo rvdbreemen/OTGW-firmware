@@ -1,10 +1,11 @@
 ---
 id: TASK-797
 title: 'feat-2.0.0: SAT sim F2 — REST scenario-injection endpoint'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-31 22:55'
-updated_date: '2026-06-01 04:14'
+updated_date: '2026-06-01 08:19'
 labels:
   - sat
   - simulation
@@ -20,10 +21,10 @@ Follow-up F2 from SAT simulation plan section 12. Add /api/v2/sat/sim/event for 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 POST /api/v2/sat/sim/event added to kV2Routes[] in restAPI.ino, parsed without ArduinoJson
-- [ ] #2 Accepts window_open, solar_gain, dhw_demand, pressure_drop, pv_surplus with optional value + duration_s
-- [ ] #3 Rejected with HTTP 409 when simulation is not active (no perturbation of real hardware)
-- [ ] #4 Each event produces an observable change in the synthetic model consumed by satUpdateSimulation()
+- [x] #1 POST /api/v2/sat/sim/event added to kV2Routes[] in restAPI.ino, parsed without ArduinoJson
+- [x] #2 Accepts window_open, solar_gain, dhw_demand, pressure_drop, pv_surplus with optional value + duration_s
+- [x] #3 Rejected with HTTP 409 when simulation is not active (no perturbation of real hardware)
+- [x] #4 Each event produces an observable change in the synthetic model consumed by satUpdateSimulation()
 - [ ] #5 Endpoint documented in the OpenAPI spec; python build.py both targets SUCCESS; evaluate.py --quick clean
 <!-- AC:END -->
 

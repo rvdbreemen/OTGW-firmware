@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.124
+**  Version  : v2.0.0-alpha.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -304,6 +304,13 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // (interrupt-adjacent), consumed once in the SAT main loop so the heavy
   // writeSettings() teardown runs in cooperative context, not in the hook.
   bool     bBoilerDetectedFlag    = false;
+  // Scenario injection (TASK-797 / plan §12 F2). Transient perturbations applied
+  // to the synthetic room model via POST /api/v2/sat/sim/event; each expires at
+  // its *ExpiryMs (0 = inactive). Only honoured while bSimulation is true.
+  float    fSimWindowLossMult     = 1.0f;   // window_open: heat-loss multiplier (>1 = colder faster)
+  uint32_t iSimWindowExpiryMs     = 0;      // millis() when window_open ends (0 = inactive)
+  float    fSimSolarGainC         = 0.0f;   // solar_gain: additive room-warming °C/min
+  uint32_t iSimSolarExpiryMs      = 0;      // millis() when solar_gain ends (0 = inactive)
   // Thermal drop learning (Task #21)
   float    fEstimatedRoom         = 0.0f;   // Estimated room temp during fallback
   float    fLastKnownRoom         = 0.0f;   // Last valid room temp before fallback
