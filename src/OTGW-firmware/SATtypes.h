@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.119
+**  Version  : v2.0.0-alpha.120
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -288,12 +288,14 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fSimOutdoorTemp        = 5.0f;
   uint32_t iSimLastUpdateMs       = 0;
   bool     bSimWarmupDone         = false;
-  // Synthetic boiler-side model (TASK-795, plan §6). Declared inert here in
-  // commit 1 so the simulation wrappers compile; commit 2 drives them. The
-  // simulation-contract ADR is authored in commit 3 (plan §15).
+  // Synthetic boiler-side model (TASK-795, plan §6). Declared inert in commit 1
+  // so the simulation wrappers compile; commit 2 drives them via the boiler
+  // model. The simulation-contract ADR is authored in commit 3 (plan §15).
   bool     bSimFlameOn            = false;
   uint8_t  iSimModulation         = 0;       // 0-100 %
   float    fSimReturnTemp         = 20.0f;   // °C
+  uint32_t iSimFlameOnSinceMs     = 0;       // millis() of last synthetic flame-ON edge
+  uint32_t iSimFlameOffSinceMs    = 0;       // millis() of last synthetic flame-OFF edge
   // Thermal drop learning (Task #21)
   float    fEstimatedRoom         = 0.0f;   // Estimated room temp during fallback
   float    fLastKnownRoom         = 0.0f;   // Last valid room temp before fallback

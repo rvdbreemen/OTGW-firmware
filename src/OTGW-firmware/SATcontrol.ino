@@ -65,6 +65,13 @@ static const float    SAT_SIM_FLOW_HEAT_RATE = 2.0f;    // Flow temp rise rate C
 static const float    SAT_SIM_FLOW_COOL_RATE = 1.0f;    // Flow temp fall rate C/s when off
 static const uint32_t SAT_SIM_WARMUP_MS      = 300000UL; // 5 min warmup period
 
+// --- Synthetic boiler-model constants (TASK-795, plan §5.2-5.5) ---
+static const float    SAT_SIM_FLAME_HYST_LO     = 0.5f;    // °C below setpoint to (re)ignite
+static const uint32_t SAT_SIM_MIN_OFF_MS        = 60000UL; // anti-cycle floor between flame cycles
+static const float    SAT_SIM_MOD_KP            = 20.0f;   // synthetic modulation %% per °C of error
+static const float    SAT_SIM_FLOW_LOSS_K       = 0.02f;   // linear flow heat-loss coefficient
+static const float    SAT_SIM_FLOW_THERMAL_GAIN = 0.4f;    // °C/s per kW net (tuned ~2°C/s at full mod, 24 kW)
+
 // --- Manufacturer Table (PROGMEM) ---
 struct SATMfrEntry {
   uint8_t  memberID;   // OT MemberID code (MsgID 3 valueLB)
@@ -3144,6 +3151,19 @@ void initSAT()
 //=====================================================================
 //=== Simulation Mode (Task #37) ===
 //=====================================================================
+// Synthetic minimum modulation floor: Geminox-class boilers idle at 10%, the
+// rest at 5%. Reuses the manufacturer-quirk infrastructure (plan §5.3).
+static uint8_t satSimMinMod()
+{
+  return (satGetManufacturerQuirks() & SAT_QUIRK_MIN_MOD_10) ? 10 : 5;
+}
+
+// Synthetic boiler model (TASK-795, plan §5.2-§5.6). Drives the boiler-side
+// state that the satGetFlowTemp/satGetReturnTemp/satIsFlameOn/
+// satGetActualModulation wrappers expose, so the cycle classifier, flame
+// health, 4h stats, heating-curve recommendation and OPV calibration run under
+// simulation. No bus traffic and no availability gate here — those land in
+// commit 3 (plan §4).
 static void satUpdateSimulation()
 {
   if (!settings.sat.bSimulation) return;
@@ -3161,61 +3181,63 @@ static void satUpdateSimulation()
   if (dtSec <= 0.0f || dtSec > 60.0f) dtSec = 1.0f; // clamp sanity
   state.sat.iSimLastUpdateMs = now;
 
-  float targetSetpoint = state.sat.fFinalSetpoint;
-  bool  heating = (targetSetpoint > SAT_MIN_SETPOINT + 1.0f) && state.sat.bActive;
+  const float sp = state.sat.fFinalSetpoint;
 
-  // --- Flow temperature model ---
-  if (heating) {
-    // Warmup: first 5 minutes, flow ramps from current toward setpoint at reduced rate
-    if (!state.sat.bSimWarmupDone) {
-      // Check if we've been running for SAT_SIM_WARMUP_MS
-      if (state.sat.fSimFlowTemp >= (targetSetpoint - 1.0f)) {
-        state.sat.bSimWarmupDone = true;
-      } else {
-        // Ramp at half the normal rate during warmup
-        float rampRate = SAT_SIM_FLOW_HEAT_RATE * 0.5f;
-        state.sat.fSimFlowTemp += rampRate * dtSec;
-        if (state.sat.fSimFlowTemp > targetSetpoint)
-          state.sat.fSimFlowTemp = targetSetpoint;
-      }
-    } else {
-      // Normal operation: flow tracks toward setpoint
-      if (state.sat.fSimFlowTemp < targetSetpoint) {
-        state.sat.fSimFlowTemp += SAT_SIM_FLOW_HEAT_RATE * dtSec;
-        if (state.sat.fSimFlowTemp > targetSetpoint)
-          state.sat.fSimFlowTemp = targetSetpoint;
-      } else if (state.sat.fSimFlowTemp > targetSetpoint) {
-        state.sat.fSimFlowTemp -= SAT_SIM_FLOW_COOL_RATE * dtSec;
-        if (state.sat.fSimFlowTemp < targetSetpoint)
-          state.sat.fSimFlowTemp = targetSetpoint;
-      }
+  // --- Flame state machine (plan §5.2) ---
+  const bool heatRequested = state.sat.bActive && sp > (SAT_MIN_SETPOINT + 1.0f);
+  const bool flowBelowSP   = state.sat.fSimFlowTemp <  (sp - SAT_SIM_FLAME_HYST_LO);
+  const bool flowAboveSP   = state.sat.fSimFlowTemp >= (sp + settings.sat.fOvershootMargin);
+  const bool offLongEnough = (now - state.sat.iSimFlameOffSinceMs) >= SAT_SIM_MIN_OFF_MS;
+  if (!state.sat.bSimFlameOn) {
+    if (heatRequested && flowBelowSP && offLongEnough) {
+      state.sat.bSimFlameOn        = true;
+      state.sat.iSimFlameOnSinceMs = now;
+      satCycleOnFlameChange(true);
+      SATDebugTln(F("SAT SIM: flame ON"));
     }
   } else {
-    // Not heating: flow cools toward room temp
-    if (state.sat.fSimFlowTemp > state.sat.fSimRoomTemp) {
-      state.sat.fSimFlowTemp -= SAT_SIM_FLOW_COOL_RATE * dtSec;
-      if (state.sat.fSimFlowTemp < state.sat.fSimRoomTemp)
-        state.sat.fSimFlowTemp = state.sat.fSimRoomTemp;
+    if (!heatRequested || flowAboveSP) {
+      state.sat.bSimFlameOn         = false;
+      state.sat.iSimFlameOffSinceMs = now;
+      satCycleOnFlameChange(false);
+      SATDebugTln(F("SAT SIM: flame OFF"));
     }
-    state.sat.bSimWarmupDone = false; // reset for next heating cycle
   }
 
-  // --- Room temperature model ---
-  float dtMin = dtSec / 60.0f;
-  if (heating) {
-    // Room rises toward target at configured rate
-    float target = settings.sat.fTargetTemp;
+  // --- Modulation (plan §5.3) ---
+  if (state.sat.bSimFlameOn) {
+    float mod = SAT_SIM_MOD_KP * (sp - state.sat.fSimFlowTemp);
+    if (mod < satSimMinMod())                      mod = satSimMinMod();
+    if (mod > settings.sat.iMaxRelModulation)      mod = settings.sat.iMaxRelModulation;
+    state.sat.iSimModulation = (uint8_t)mod;
+  } else {
+    state.sat.iSimModulation = 0;
+  }
+
+  // --- Flow temperature (plan §5.4, modulation-coupled) ---
+  const float power_in  = ((float)state.sat.iSimModulation / 100.0f) * settings.sat.fBoilerCapacity;
+  const float heat_loss = SAT_SIM_FLOW_LOSS_K * (state.sat.fSimFlowTemp - state.sat.fSimRoomTemp);
+  state.sat.fSimFlowTemp += (power_in - heat_loss) * SAT_SIM_FLOW_THERMAL_GAIN * dtSec;
+  if (state.sat.fSimFlowTemp < state.sat.fSimRoomTemp)   state.sat.fSimFlowTemp = state.sat.fSimRoomTemp;
+  if (state.sat.fSimFlowTemp > settings.sat.fMaxSetpoint) state.sat.fSimFlowTemp = settings.sat.fMaxSetpoint;
+
+  // --- Return temperature (plan §5.5) ---
+  const float delta_tr = 5.0f + 15.0f * ((float)state.sat.iSimModulation / 100.0f);
+  state.sat.fSimReturnTemp = state.sat.fSimFlowTemp - delta_tr;
+  if (state.sat.fSimReturnTemp < state.sat.fSimRoomTemp) state.sat.fSimReturnTemp = state.sat.fSimRoomTemp;
+
+  // --- Room temperature (plan §5.6) — heating keyed on the synthetic flame ---
+  const float dtMin = dtSec / 60.0f;
+  if (state.sat.bSimFlameOn) {
+    const float target = settings.sat.fTargetTemp;
     if (state.sat.fSimRoomTemp < target) {
       state.sat.fSimRoomTemp += settings.sat.fSimHeatRate * dtMin;
-      if (state.sat.fSimRoomTemp > target)
-        state.sat.fSimRoomTemp = target;
+      if (state.sat.fSimRoomTemp > target) state.sat.fSimRoomTemp = target;
     }
   } else {
-    // Room decays toward outdoor temp
     if (state.sat.fSimRoomTemp > state.sat.fSimOutdoorTemp) {
       state.sat.fSimRoomTemp -= settings.sat.fSimCoolRate * dtMin;
-      if (state.sat.fSimRoomTemp < state.sat.fSimOutdoorTemp)
-        state.sat.fSimRoomTemp = state.sat.fSimOutdoorTemp;
+      if (state.sat.fSimRoomTemp < state.sat.fSimOutdoorTemp) state.sat.fSimRoomTemp = state.sat.fSimOutdoorTemp;
     }
   }
 }
