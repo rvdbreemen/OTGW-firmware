@@ -1,7 +1,7 @@
 ---
 id: TASK-723
 title: 'fix(api): prevent beta.24 device-info 503 under heap pressure'
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-26 20:18'
