@@ -32,3 +32,26 @@ Design: capture by explicit flags (rsptype==OTGW_ANSWER_THERMOSTAT && bAnswerOve
 - [x] #8 python build.py exits 0 (firmware + filesystem); python evaluate.py --quick shows no new failures
 - [ ] #9 Manual: inject OT=20.5, confirm new WebUI row + /api/v2/otgw/overrides JSON + <base>/Toutside/override MQTT topic appear while canonical /Toutside stays unchanged
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented all surfaces (store+hook, REST, WebUI, MQTT/HA, Toutside_override retarget) + 1.7.0 bump. Build green (esp8266 d1_mini: firmware 746512 bytes, filesystem complete, 0 errors); evaluate.py --quick 34 passed / 0 fail / 0 warn (health 100%). Committed 7d391106, pushed origin/dev. AC#9 (manual: inject OT=20.5 on real hardware, observe new WebUI row + /api/v2/otgw/overrides JSON + <base>/Toutside/override topic while canonical /Toutside unchanged) is hardware-in-the-loop and CANNOT be self-verified; left unchecked, awaiting field validation. Topic alignment verified statically: ctx.mqttPubTopic == MQTTPubNamespace, so published state, discovery stat_t, and retargeted Number stat_t all resolve to <base>/<label>/override (id 27 -> Toutside). AC#2 verified by additive-only diff on OTGW-Core.ino (gate untouched).
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Surface ALL active gateway overrides (answer-override A + thermostat-substituted T) additively across WebUI + REST + MQTT/HA, restoring visibility the ADR-069/075 boiler-side-worldview gate hid, without changing canonical (ADR-082).
+
+What changed:
+- Override store OTOverrideEntry_t{id,kind,value,lastSeen,discovered} x11 (OTGW-Core.h/.ino) with recordOTOverride()/isOTOverrideActive(); populated from print_f88 gated ONLY on the two explicit override flag combos (not !validForMaster). Pure RAM write in the decode hook; ~10min active timeout per entry; never cleared by a subsequent valid frame.
+- REST: additive GET /api/v2/otgw/overrides streamed via handleOtgw branch (label/value/kind/age). No existing route touched.
+- WebUI: Active Overrides table in Statistics tab + refreshOtOverrides() using createElement/textContent, element-existence + .catch/try guards; wired into Statistics tab activation.
+- MQTT/HA: retained <base>/<label>/override from do5minevent (periodic path); JIT streamOverrideSensorDiscovery() once per entry (skips id 27 to avoid double entity); Toutside_override Number stat_t retargeted /Toutside -> /Toutside/override (closes TASK-804).
+- Version 1.7.0 (autoinc-semver cascade + banner sweep).
+
+Verification: python build.py green (esp8266 d1_mini firmware 746512 bytes + filesystem, 0 errors); evaluate.py --quick 34 pass / 0 fail (100%); additive-only diff confirms canonical gate untouched (AC#2); three override topic strings statically verified identical. Commit 7d391106 pushed to origin/dev.
+
+Risk/follow-up: AC#9 manual hardware check (inject OT=20.5, observe new surfaces while canonical /Toutside stays unchanged) awaits field validation on a real device.
+<!-- SECTION:FINAL_SUMMARY:END -->
