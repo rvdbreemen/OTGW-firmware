@@ -3387,12 +3387,20 @@ static void satUpdateSimulation()
   // before the room model consumes it below.
   state.sat.fSimOutdoorTemp = satSimOutdoorTemp();
 
-  const float sp = state.sat.fFinalSetpoint;
+  // TASK-800 F5: during a DHW draw the boiler targets the DHW setpoint, not the
+  // CH setpoint — so synthetic flow climbs toward hot-water temp (AC#2). Use the
+  // configured fDhwSetpoint when valid, else a sane 55 °C default. This effective
+  // sp feeds the flame SM + modulation below, so the whole flow model follows it.
+  const bool dhwDraw = (state.sat.iSimDhwExpiryMs != 0);
+  float sp = state.sat.fFinalSetpoint;
+  if (dhwDraw) {
+    sp = (settings.sat.fDhwSetpoint >= 30.0f && settings.sat.fDhwSetpoint <= 70.0f)
+           ? settings.sat.fDhwSetpoint : 55.0f;
+  }
 
   // --- Flame state machine (plan §5.2) ---
-  // TASK-800 F5: an active DHW draw demands the flame regardless of CH demand
-  // (the boiler fires for hot water), so cycles run even with no heat call.
-  const bool dhwDraw = (state.sat.iSimDhwExpiryMs != 0);
+  // An active DHW draw demands the flame regardless of CH demand (the boiler
+  // fires for hot water), so cycles run even with no heat call.
   const bool heatRequested = dhwDraw ||
                              (state.sat.bActive && sp > (SAT_MIN_SETPOINT + 1.0f));
   const bool flowBelowSP   = state.sat.fSimFlowTemp <  (sp - SAT_SIM_FLAME_HYST_LO);

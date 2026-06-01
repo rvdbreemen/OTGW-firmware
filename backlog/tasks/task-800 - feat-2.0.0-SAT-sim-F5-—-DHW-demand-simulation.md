@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:56'
-updated_date: '2026-06-01 16:36'
+updated_date: '2026-06-01 16:44'
 labels:
   - sat
   - simulation
@@ -20,10 +20,10 @@ Follow-up F5 from SAT simulation plan section 12. Model DHW demand (flame steal,
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Synthetic DHW demand drives the DHW status bit so the cycle classifier tags cycles SAT_CK_DHW / SAT_CK_MIXED under simulation
+- [x] #1 Synthetic DHW demand drives the DHW status bit so the cycle classifier tags cycles SAT_CK_DHW / SAT_CK_MIXED under simulation
 - [ ] #2 Flame-steal: CH contribution suppressed while a synthetic DHW draw is active; flow targets DHW setpoint
-- [ ] #3 DHW draws can be triggered both on a light periodic schedule and via the TASK-797 /sim/event dhw_demand override
-- [ ] #4 No real bus traffic (commit-3 gate honoured); python build.py both targets SUCCESS; evaluate.py --quick clean
+- [x] #3 DHW draws can be triggered both on a light periodic schedule and via the TASK-797 /sim/event dhw_demand override
+- [x] #4 No real bus traffic (commit-3 gate honoured); python build.py both targets SUCCESS; evaluate.py --quick clean
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -43,3 +43,9 @@ OPEN QUESTION (morning): scheduled DHW draws (autonomous, exercises classifier p
 
 VERIFY: build both; evaluate --quick; with bSimulation, trigger a DHW draw -> observe a cycle classified SAT_CK_DHW/MIXED and CH suppressed during the draw.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-01T18:44:38+02:00: F5 core shipped 373a6038 (alpha.131, pushed). Decision 3a+3c. DHW draw forces bDhwActive -> CH suppressed (flame-steal) -> classifier sees SAT_CK_DHW/MIXED; flame demanded regardless of CH. Light 30-min schedule + F2 dhw_demand event. AC#1/#3/#4 met. AC#2 PARTIAL (left unchecked): flame-steal done, but 'flow targets DHW setpoint' NOT implemented — synthetic flow still tracks CH setpoint during draw. Minor follow-up; F5 goal (DHW/MIXED classification) achieved without it. Maintainer: accept F5 with the flow-target as a noted follow-up, or want the DHW-flow-target added before closing 800?
+<!-- SECTION:NOTES:END -->
