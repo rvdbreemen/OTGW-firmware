@@ -1,7 +1,7 @@
 ---
 id: TASK-805
 title: 'feat: surface active gateway-override values in WebUI/REST/MQTT (v1.7.0)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-01 18:33'
