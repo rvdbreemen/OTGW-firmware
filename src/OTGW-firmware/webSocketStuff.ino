@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-alpha.138
+**  Version  : v2.0.0-alpha.139
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -260,10 +260,13 @@ void handleWebSocket() {
 //===========================================================================================
 // Send log message directly to all connected WebSocket clients
 // This is called from OTGW-Core.ino when a new log line is ready
-// Simplified: no queue, no JSON, just direct text broadcasting
+// Simplified: no queue, no JSON, just direct text broadcasting.
+// Heap backpressure: gated by canSendWebSocket() so the live-log throttles/blocks
+// under heap pressure instead of broadcasting every OT frame unconditionally.
+// (Restores parity with dev, where this gate is wired; it had never been ported to 2.0.0.)
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
-  if (hasWebSocketClients() && logMessage != nullptr) {
+  if (hasWebSocketClients() && logMessage != nullptr && canSendWebSocket()) {
     webSocket.broadcastTXT(logMessage);
   }
 }
