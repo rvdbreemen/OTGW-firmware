@@ -1115,7 +1115,9 @@ const char *byte_to_binary(int x)
 /*
   This determines if the value in the OpenTherm message is valid and can be used in the data object, MQTT or REST API.
   Rules are:
-  - if the message is overriden (R and A messages override B and T messages), then the value is not valid for use.
+  - NOTE: is_value_valid does NOT reject gateway overrides by source. R and A frames are validated purely
+    on message type below, so override frames stay valid for use on the source-separated MQTT topics.
+    Excluding an override from the canonical/master value is done separately in is_value_valid_for_master_topic().
   - if the OT message is a READ message, and the received OT msg is being read and acknowledged, then the value is valid.
   - if the OT message is a WRITE message, and the received OT msg is being written (OT_WRITE_DATA) or
     write-acknowledged by the slave (OT_WRITE_ACK), then the value is valid. The slave's WRITE-ACK may contain a
@@ -1866,9 +1868,10 @@ void print_f88(float& value)
   char _msg[15] {0};
   dtostrf(_value, 3, 2, _msg);
 
-  // ADR-066: gate log decode + state write on master-topic validity. The protocol
+  // ADR-066/069/075: gate log decode + state write on master-topic validity. The protocol
   // event stays visible (timestamp/source/msgid/type/indicator are added in processOT);
-  // only the per-spec-undefined Write-Ack data byte is suppressed from log + REST state.
+  // suppressed from the log value + REST/canonical state are the per-spec-undefined Write-Ack
+  // data byte AND gateway-substituted (T) / answer-override (A) frames (boiler-side worldview).
   const bool validForMaster = is_value_valid_for_master_topic(OTdata, OTlookupitem);
   if (validForMaster) {
     AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
