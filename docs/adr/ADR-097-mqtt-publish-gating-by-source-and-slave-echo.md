@@ -6,6 +6,10 @@
 **Decision Maker:** User: Rob van den Breemen (rvdbreemen)
 **Refined by:** ADR-096 (2026-05-07) — worldview semantics: canonical-topic interpretation shifts from "thermostat-side intent" to "boiler-side worldview" while the per-MsgID `bSlaveEchoesValue` Write-Ack gate is preserved.
 
+## Status
+
+Accepted, 2026-05-27. Refined by ADR-096 (2026-05-07).
+
 ## Context
 
 ADR-040 introduced opt-in source-separated MQTT topics (`/thermostat`, `/boiler`, `/gateway` subtopics under each metric) while preserving the legacy "base" topic at `<prefix>/value/<node-id>/<metric>` for backward compatibility. ADR-052 established the publish eligibility contract (first-seen OR value-changed OR stale-refresh).
@@ -52,6 +56,26 @@ Encoded in `docs/api/MQTT-message-id-echo-audit.md`. Initial release marks 6 Msg
 
 All other MsgIDs default to `bSlaveEchoesValue = true`. For MsgIDs without write support (`R/-`) the field is moot but set to `true` for consistency.
 
+## Alternatives Considered
+
+### Do nothing — leave the base topic as the union of Write-Data and Write-Ack
+
+Keep `is_value_valid()` accepting both Write-Data and Write-Ack for the base topic, as shipped from v1.4.1.
+
+**Rejected** because this is precisely the regression. As the Context records, "the base topic became the union of two semantically different streams (master writes a real value; slave acks with undefined value)" and "this caused the base topic to flap between the master's actual value and the slave's protocol-zero. Field reports identified Tr (24), TrSet (16), and MaxRelModLevelSetting (14) as user-visible cases." Doing nothing leaves those entities flapping in Home Assistant.
+
+### Leave the `/boiler` subtopic ungated (accept every Write-Ack regardless of echo)
+
+Keep publishing all Write-Ack values to `/boiler` without consulting any per-MsgID echo classification, as the pre-fix code did.
+
+**Rejected** because, per the Context, "the `/boiler` subtopic accepted Write-Ack values without checking whether the slave's reply had meaningful data. For non-echo MsgIDs the `/boiler` subtopic became a fake-zero stream rather than a useful per-source observability surface." Leaving it ungated keeps polluting `/boiler` with protocol-zeros for the six non-echo MsgIDs.
+
+### Attempt per-frame disambiguation in the PS=1 (Print Summary) path
+
+For the PS=1 summary stream (Amendment 1), try to tell apart a meaningful Write-Data byte from a per-spec-undefined Write-Ack byte on a frame-by-frame basis and publish only the meaningful one.
+
+**Rejected** because, as Amendment 1 states, "the `PS=1` stream emits one value per MsgID, chosen by the PIC from its most recent observation. For MsgIDs with `bSlaveEchoesValue=false`, the PIC may have captured either the meaningful Write-Data or the per-spec undefined Write-Ack byte; the `PS=1` layer cannot distinguish these." The amendment therefore "suppresses publication entirely for non-echo MsgIDs in PS=1 mode, rather than attempting per-frame disambiguation."
+
 ## Consequences
 
 ### Positive
@@ -78,13 +102,18 @@ All other MsgIDs default to `bSlaveEchoesValue = true`. For MsgIDs without write
 3. **Clarity:** the decision is implementable from the text alone (function names, struct field, call-site changes spelled out). The audit doc is unambiguous per MsgID.
 4. **Consistency:** does not contradict ADR-040 (extends it), does not contradict ADR-052 (refines per-topic eligibility within it). No conflict with ADR-006 (MQTT integration), ADR-038 (OT data flow pipeline), ADR-049 (no String in protocol path), ADR-051 (settings/state encapsulation).
 
-## Related
+## Related Decisions
 
 - **ADR-040:** MQTT Source-Specific Topics for OpenTherm Values (this ADR amends scope of "base topic always published" rule).
 - **ADR-052:** MQTT Publish Eligibility and Reconnect Refresh Contract (this ADR refines per-topic-class eligibility).
 - **ADR-051:** Dual Encapsulating Structs (provides the `state.*` / `settings.*` separation that `bSeparateSources` lives in).
 - **ADR-080:** CI-gate meta-rule (this ADR carries `structural` classification: no CI gate, reviewed at PR).
+- **ADR-096:** worldview-routing refinement (canonical-topic interpretation; preserves the `bSlaveEchoesValue` Write-Ack gate).
+
+## References
+
 - **TASK-478:** Implementation task tracking the code changes that realize this decision.
+- **TASK-483:** PS=1 summary-path amendment (see Amendment 1 below).
 - **`docs/api/MQTT-message-id-echo-audit.md`:** the per-MsgID classification table.
 - **OpenTherm v4.2 specification reference:** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md`.
 

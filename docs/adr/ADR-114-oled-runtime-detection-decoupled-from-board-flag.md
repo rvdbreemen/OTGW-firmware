@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-05-29
+Accepted, 2026-06-02.
 
 Guideline-level (per ADR-080): this ADR records a compile-gate-removal
 decision and the runtime-detection discipline that replaces it. There is no
@@ -10,6 +10,20 @@ dedicated `evaluate.py` gate; the rule is enforced by the absence of
 `HAS_OLED_CAPABLE` conditionals around the OLED code path and by the existing
 runtime probe. If a regression reintroduces a compile-time OLED gate, a
 `check_oled_runtime_only` gate could be added and this ADR promoted to binding.
+
+## Status History
+
+status_history:
+  - date: 2026-05-29
+    status: Proposed
+    changed_by: Claude (TASK-757)
+    reason: Records the decision to drop the compile-time HAS_OLED_CAPABLE gate in favour of the existing runtime I2C probe; implementation landed under TASK-757 with the button-ISR follow-up tracked as TASK-758
+    changed_via: adr-kit
+  - date: 2026-06-02
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted; TASK-757 shipped and the TASK-758 button-ISR shim follow-up is complete, so the known exception noted at proposal time is resolved
+    changed_via: adr-kit
 
 ## Context
 
@@ -66,6 +80,25 @@ Concretely:
 - `HAS_OLED_CAPABLE` remains defined in `boards.h` as an *informational* board
   capability flag, but no application code branches on it.
 
+## Alternatives Considered
+
+1. **Keep the compile-time `HAS_OLED_CAPABLE` gate** (status quo, OTGW32-only).
+   Rejected: the OLED is a hot-pluggable I2C peripheral the firmware already
+   detects at runtime (`probeOLED()` at `0x3C`), and the `SSD1306Ascii` library +
+   I2C bus link on both platforms — so a compile gate denies an ESP8266 user with
+   a physically-wired OLED any function, for no hardware reason.
+2. **Make it a user-facing setting** (`oledEnabled` toggle). Rejected: redundant
+   with the existing runtime probe — presence is already self-detecting at `0x3C`;
+   a manual toggle adds config surface for a question the hardware answers itself.
+3. **Treat it like Ethernet (`HAS_ETH_CAPABLE`, stays board-gated).** Rejected as
+   the model here precisely because the cases differ: the W5500's SPI wiring is a
+   static board fact, whereas the OLED rides any board's existing I2C bus. The
+   wiring-determinism distinction is why Ethernet keeps its compile gate and the
+   OLED drops it.
+4. **Runtime detection, no compile gate** (chosen): the OLED compiles
+   unconditionally and every entry point early-returns on `!oledPresent`. Cost is
+   flash + modest RAM on ESP8266, accepted as the price of genuine auto-detection.
+
 ## Consequences
 
 - An SSD1306 connected to any supported board's I2C bus now works, with zero
@@ -83,13 +116,16 @@ Concretely:
   `HAS_OLED_CAPABLE` gates) and is tracked for migration to a platform shim in
   TASK-758. No new raw platform conditionals were introduced by this change.
 
-## Related
+## Related Decisions
 
-- TASK-757 (this change: decouple OLED compilation from `HAS_OLED_CAPABLE`)
-- TASK-758 (follow-up: migrate the button-ISR `#if defined(ESP32)` branch to a
-  platform shim)
 - ADR-113 (hardware-type as codepath-selection contract — same static-vs-runtime
   distinction applied to PIC availability)
 - ADR-080 (binding ADRs must have a CI gate; this one is guideline-level)
-- ESP platform abstraction rule (CLAUDE.md): the button branch is a known
-  pre-existing exception, not a new violation.
+
+## References
+
+- TASK-757 (this change: decouple OLED compilation from `HAS_OLED_CAPABLE`)
+- TASK-758 (follow-up: migrate the button-ISR `#if defined(ESP32)` branch to a
+  platform shim — since completed)
+- ESP platform abstraction rule (CLAUDE.md): the button branch was a known
+  pre-existing exception at the time of writing, not a new violation.

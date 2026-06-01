@@ -1,6 +1,8 @@
 # ADR-089: Heap Tier Machine Contract
 
-**Status:** Accepted. Date: 2026-04-26. Amends ADR-030 (4-state heap health system) by re-baselining tier thresholds on Crashevans field-log evidence (TASK-344), adding fragmentation-aware promotion (HEAP_FRAG_PROMOTE_MAXBLOCK), and adding tier-entry counter instrumentation (TASK-346).
+## Status
+
+Accepted. Date: 2026-04-26. Amends ADR-030 (4-state heap health system) by re-baselining tier thresholds on Crashevans field-log evidence (TASK-344), adding fragmentation-aware promotion (HEAP_FRAG_PROMOTE_MAXBLOCK), and adding tier-entry counter instrumentation (TASK-346).
 
 ## Context
 

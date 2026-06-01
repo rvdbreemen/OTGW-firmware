@@ -21,13 +21,6 @@ Three independent UX failures came out of Discord field testing in early May 202
 
 [ADR-077](ADR-077-streaming-mqtt-ha-discovery-architecture.md) defines the streaming HA discovery architecture (separate translation unit `MQTTHaDiscovery.cpp`) but is silent on what `name` SHOULD look like. Without a written contract every new entity added carried the risk of reintroducing the same defect class — caught only by serial Discord rounds with field testers, weeks after merge. The 2.0.0 line additionally introduces SAT and OTDirect telemetry whose new entities each multiply the regression surface.
 
-### Alternatives considered
-
-- **Status quo: identifier-as-label.** Rejected. Field-validated as confusing; required Andre to translate every entity name before describing problems on Discord.
-- **Compute friendly name in HA's `name_template` Jinja per entity.** Rejected. Pushes UX complexity onto every HA installation, invisible to users who don't author templates, and divergent across users. Firmware should ship clean defaults.
-- **Static lookup table mapping each internal id to a hand-written human label, no transform.** Considered. Equivalent end-result for the current ~250 entities but ~250 hand-written labels would inevitably drift from the canonical slug as new entities are added; we would forget some and the table would rot.
-- **Single helper that applies a uniform transform — chosen.** `writeFriendlyName(MqttJsonWriter&, const char *src)` performs `_` → space + first-letter-of-each-word capitalised, preserving existing capitals. The PROGMEM source string is the single source of truth; helper output is byte-deterministic.
-
 ## Decision
 
 1. **Output format.** HA discovery `name` fields render as Title Case with spaces — no underscores, no glued camelCase, no hostname prefix, with all-caps preserved for known acronyms.
@@ -58,6 +51,13 @@ Three independent UX failures came out of Discord field testing in early May 202
 
 5. **Slug stability.** The `ha_lbl_*` slug strings (used in the MQTT state topic path and HA's `unique_id`) are NOT affected by this decision. Slugs remain stable across friendly-name churn so HA's per-entity entity_id mapping survives an OTA upgrade. [ADR-094](ADR-094-ha-discovery-state-reconciliation-on-ota-upgrade.md) governs entity-id reconciliation; this ADR is purely about the user-visible `name` field.
 
+## Alternatives Considered
+
+- **Status quo: identifier-as-label.** Rejected. Field-validated as confusing; required Andre to translate every entity name before describing problems on Discord.
+- **Compute friendly name in HA's `name_template` Jinja per entity.** Rejected. Pushes UX complexity onto every HA installation, invisible to users who don't author templates, and divergent across users. Firmware should ship clean defaults.
+- **Static lookup table mapping each internal id to a hand-written human label, no transform.** Considered. Equivalent end-result for the current ~250 entities but ~250 hand-written labels would inevitably drift from the canonical slug as new entities are added; we would forget some and the table would rot.
+- **Single helper that applies a uniform transform (chosen).** `writeFriendlyName(MqttJsonWriter&, const char *src)` performs `_` to space + first-letter-of-each-word capitalised, preserving existing capitals. The PROGMEM source string is the single source of truth; helper output is byte-deterministic.
+
 ## Consequences
 
 ### Positive
@@ -79,12 +79,16 @@ Three independent UX failures came out of Discord field testing in early May 202
 - A contributor adding a new entity could bypass the helper and write `name` directly with `writeRam(ctx.hostname) + literal_suffix`, reintroducing both classes of defect. Mitigated by the Enforcement block (count check via `llm_judge`) and code-review checklist.
 - The recognised-acronym list is finite. New 2.0.0 features (SAT BLE protocol revisions, ESP32-S3 board variants, future OpenTherm spec extensions) may introduce acronyms not in the list. Mitigation: extend the list when adding the entity. The ADR's list is illustrative; ADR text will not be re-issued for each acronym addition.
 
-## Related
+## Related Decisions
 
 - [ADR-077](ADR-077-streaming-mqtt-ha-discovery-architecture.md) — streaming HA discovery architecture (`MQTTHaDiscovery.cpp` separate translation unit). This ADR fills a gap left by ADR-077 (which describes HOW discovery is streamed but not WHAT the `name` field looks like).
 - [ADR-094](ADR-094-ha-discovery-state-reconciliation-on-ota-upgrade.md) — entity-id stability across upgrades; the entity-name churn from this decision flows through that mechanism on first OTA after upgrade.
-- TASK-574 — applied this convention to the existing 125 shared PROGMEM friendly-name strings in `MQTTHaDiscovery.cpp` (shipped as `alpha.20`); 2.0.0-only OTDirect_Flame_* + SAT_BLE_* + SAT_CH_* strings already conformed.
 - dev sibling: ADR-072 — codifies the same decision on the dev (1.5.x) worktree (separate file because each worktree has its own ADR numbering; the *decision* is coherent across both).
+
+## References
+
+- TASK-574 — applied this convention to the existing 125 shared PROGMEM friendly-name strings in `MQTTHaDiscovery.cpp` (shipped as `alpha.20`); 2.0.0-only OTDirect_Flame_* + SAT_BLE_* + SAT_CH_* strings already conformed.
+- `src/OTGW-firmware/MQTTHaDiscovery.cpp` — `writeFriendlyName` helper; the single `writeRam(ctx.hostname)` device-card call around `MQTTHaDiscovery.cpp:2095`.
 
 ## Enforcement
 

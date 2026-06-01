@@ -1,11 +1,10 @@
 # ADR-112: Pure JIT MQTT Discovery (2.0.0 sibling of dev ADR-073)
 
-- Status: Accepted, 2026-05-27
-- Classification: structural (per ADR-080: no CI gate; reviewed at PR)
-- Related: ADR-073 (dev origin — SAT MQTT topic structure / JIT discovery boot policy),
-  ADR-077 (streaming MQTT HA discovery architecture),
-  ADR-100 (JIT HA discovery smart reconnect),
-  ADR-041 (original JIT HA discovery decision)
+## Status
+
+Accepted, 2026-05-27
+
+Classification: structural (per ADR-080: no CI gate; reviewed at PR).
 
 ## Context
 
@@ -61,6 +60,24 @@ On the 2.0.0 branch (`feature-dev-2.0.0-otgw32-esp32-sat-support`):
 5. OT ID discovery is emitted by the existing JIT publisher inside the OT
    processing pipeline the first time each MsgID is observed (no change).
 
+## Alternatives Considered
+
+1. **Keep `markAllMQTTConfigPending()` on every boot/reconnect** (status quo).
+   Rejected: it queues the full 256-bit OT ID space + all pseudo entities,
+   producing an ~80–120 retained-config discovery storm at the worst moment
+   (WiFi just up, OT bus unread, heap fragmented from boot).
+2. **Throttle/delay the full boot publish** (spread the same ~120 configs over
+   time). Rejected: still advertises entities for hardware that may never appear
+   (DHW configs on a thermostat-only setup), so the broker retained set stays
+   based on what *could* appear, not what *did* — JIT fixes the set, not just its
+   timing.
+3. **Pure JIT, mirroring dev's ADR-073/TASK-577** (chosen): publish only the
+   small non-OT set at boot; emit each OT ID's config just-in-time on first
+   observation of that MsgID. Boot-storm drops to ~8 publishes; the retained set
+   converges to the actually-installed hardware; reconnect matches dev
+   byte-for-byte. The explicit user "republish all" REST path retains
+   `markAllMQTTConfigPending()` as the escape hatch.
+
 ## Consequences
 
 Positive:
@@ -85,6 +102,23 @@ Negative / trade-offs:
 - The explicit user-triggered "republish HA discovery" REST endpoint
   (`restAPI.ino:1589`) still uses `markAllMQTTConfigPending()` and remains the
   documented escape hatch when a user *wants* the full set re-pushed.
+
+## Related Decisions
+
+- ADR-073 (dev origin — the JIT discovery boot policy this ADR ports to 2.0.0)
+- ADR-077 (streaming MQTT HA discovery architecture — the drip publisher + the
+  device-block-on-first-entity requirement honoured by `dripDeviceInfoPending`)
+- ADR-093 (HA discovery retained-config orphan cleanup — governs the
+  briefly-seen-MsgID retained-config trade-off noted under Consequences)
+- ADR-080 (binding ADRs need a CI gate; this one is structural, reviewed at PR)
+
+## References
+
+- TASK-578 (this 2.0.0 implementation); TASK-577 (the dev-side implementation
+  under ADR-073)
+- `publishNonOTDiscoveryConfigs()` / `markAllMQTTConfigPending()` in
+  `MQTTstuff.ino`; the user-republish escape hatch at `restAPI.ino:1589`;
+  missing-config recovery in `mqtt_discovery_verify.cpp`
 
 ## Verification
 

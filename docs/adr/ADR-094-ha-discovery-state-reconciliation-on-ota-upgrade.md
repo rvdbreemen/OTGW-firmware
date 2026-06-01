@@ -88,7 +88,7 @@ The pattern works because of two properties of the existing settings layer:
 
 The result is a forced one-shot action on first boot of the new firmware, requiring zero user intervention and zero migration-version bookkeeping. The cost is one persistent `bool` per migration that this codebase chooses to do this way. ADR-067 first documented the shape on dev; this ADR adopts it on 2.0.0 unchanged. Future features that need a one-shot post-upgrade action (purge a stale cache, re-derive a key, rebuild an index file, force a SAT recalibration on first boot of a new PID) can reuse the same shape: add a default-true bool, anchor the action behind it, clear and persist inside the action. If the codebase ever accumulates several such flags, that is the right time to consolidate them into a `state.migration.*` block; until then the cost stays where the benefit is.
 
-### Why not the alternatives
+## Alternatives Considered
 
 **A1, OTA-hook only, no default-true.** The flag would be `false` by default, set to `true` only at the OTA-finish hook, then cleared on the next boot. Simpler, but it leaves out every device that already had a discovery-shape mismatch baked in by an earlier firmware: those devices have already booted past their "first boot of new firmware" moment and the OTA hook never re-fires. Default-true catches the broader case at no extra ceremony cost. Same trade-off as ADR-067; same conclusion.
 
@@ -156,7 +156,7 @@ Source variants are emitted **always** regardless of current `bSeparateSources` 
 
 This ADR is **guideline-level**. It is a multi-step lifecycle pattern (settings flag → OTA hook → boot-time wipe → republish) whose correctness depends on the interaction between five files (`MQTTstuff.h`, `MQTTstuff.ino`, `OTGW-ModUpdateServer-impl.h`, `OTGW-ModUpdateServer-esp32.h`, `OTGW-firmware.ino`) and a runtime ordering invariant that only manifests under crash. A static `evaluate.py`-style grep cannot reasonably check that the boot handler runs after `startMQTT()`, that the flag-clear is persisted before `markAllMQTTConfigPending()`, that both OTA hooks set the flag, or that the wipe-side topic templates match the publish-side helpers. An integration-test rig that boots the firmware, fakes an OTA, and watches the broker would cover this; that rig does not exist yet. Until it does, the contract is reviewed at PR. Promotion to pattern-level becomes worthwhile when a third lifecycle event (factory-reset over MQTT, force-rediscover REST endpoint) adopts the same default-true-flag-with-persisted-clear shape.
 
-## Related
+## Related Decisions
 
 - **ADR-040**: MQTT source-specific topics. Amended by **ADR-095** on this branch (the `bSeparateSources` exclusivity flip is the trigger that makes this wipe ADR load-bearing for the 2.0.0 release).
 - **ADR-062**: retained-discovery verification. ADR-062 is the *steady-state* heal loop (daily, count-based, recovers broker-side loss). This ADR is the *firmware-version-transition* heal (one-shot, full wipe, recovers shape changes). The two are complementary; they share `markAllMQTTConfigPending()` as the republish trigger.

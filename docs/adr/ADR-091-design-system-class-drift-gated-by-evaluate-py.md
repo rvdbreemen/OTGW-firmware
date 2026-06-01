@@ -83,9 +83,12 @@ Rejected for now. The firmware Web UI does not otherwise require Node, and the
 literal-class scanner catches the actionable drift class with much less tooling
 surface.
 
-## Related
+## Related Decisions
 
 - ADR-080 Binding ADR rules must have a CI gate.
+
+## References
+
 - TASK-470 Promote design-system drift detector to evaluate.py CI gate.
 - TASK-469 Referenced in TASK-470 metadata as the baseline predecessor.
 - TASK-473 Ported mechanically available legacy/pre-Patch-E CSS selectors.

@@ -7,6 +7,10 @@
 
 Ports the decision from `dev`'s **ADR-068** to the `feature-dev-2.0.0-otgw32-esp32-sat-support` branch. Companion to **ADR-094** (the broker-side cleanup mechanism that makes this semantic flip safe across the upgrade boundary on this branch).
 
+## Status
+
+Superseded by ADR-097, 2026-05-07. Originally Accepted 2026-05-03 (amends ADR-040; structural-level per ADR-080; four verification gates passed: Completeness, Evidence, Clarity, Consistency).
+
 ## Context
 
 ADR-040 introduced `bSeparateSources` (originally `settingMQTTSeparateSources`, migrated into `settings.mqtt.bSeparateSources` per ADR-051; on this branch the field lives at `MQTTstuff.h:59` per ADR-079 / ADR-081) as an opt-in setting that adds per-source MQTT topics (`/thermostat`, `/boiler`, `/gateway`) for OpenTherm message IDs where source-attribution is meaningful. The original implementation was strictly **additive**: when the setting was enabled, the firmware kept publishing the legacy base entity for those MsgIDs and added three source-variant entities on top, expanded from a separate set of HA discovery configs flagged with `MQTT_HA_FLAG_ANY_SOURCE` (cfg flag `0x07`, defined at `src/OTGW-firmware/MQTTstuff.h:233`).
@@ -155,7 +159,7 @@ Without ADR-094, users upgrading from a pre-fix firmware with `bSeparateSources 
 3. **Clarity:** the decision is implementable from the text alone. Function names, branch shape, and the placement-of-`setMQTTConfigDone` invariant are spelled out. The bitmap layout (8 × uint32 = 32 bytes, indexed by `(id >> 5) & 0x07` and bit-tested by `1U << (id & 0x1F)`) is given concretely. Default vs opt-in behaviour stated in one sentence each. The `else if` insertion sites on this branch are pinpointed by line number.
 4. **Consistency:** does not contradict ADR-040; amends its "additive" property explicitly. Refines ADR-097's master-topic invariant by removing one half of the redundancy ADR-097 stabilised. Aligned with ADR-051 / ADR-079 / ADR-081 (`settings.mqtt.bSeparateSources` access pattern; settings struct lives in `MQTTstuff.h`). Consistent with ADR-041 (JIT discovery state-machine integrity preserved by keeping `setMQTTConfigDone` outside the if-chain). Companion to ADR-094 (broker-side cleanup makes the semantic flip safe). Per ADR-080: structural classification, no CI gate required; reviewers should confirm at PR-time that (a) the `else if` ordering keeps `setMQTTConfigDone(cfg.id)` outside the chain in both loops, (b) the bitmap-build is lazy and idempotent, (c) `expandAndStreamSensorSources()` itself is unchanged.
 
-## Related
+## Related Decisions
 
 - **ADR-040:** MQTT Source-Specific Topics for OpenTherm Values. **This ADR amends ADR-040** by changing the "base topic / base entity always published" property to "base entity is suppressed for source-templated MsgIDs when `bSeparateSources = true`". ADR-040's status block on this branch carries an "Amended by: ADR-095" annotation alongside the existing Updated-line history.
 - **ADR-041:** JIT HA Discovery. The `setMQTTConfigDone(cfg.id)` placement decision (kept outside the if-chain) preserves the JIT state-machine invariant that every iterated MsgID is recorded as configured exactly once.

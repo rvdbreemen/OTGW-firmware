@@ -97,6 +97,26 @@ Concrete constants relocated under this decision (TASK-743 Tier 3a):
 `STATUS_BURST_COOLDOWN_MS`, plus the new `SAT_RING_IDX_T` typedef
 (`uint8_t` on ESP8266, `uint16_t` on ESP32).
 
+## Alternatives Considered
+
+1. **Leave the constants inline behind raw `#if defined(ESP8266) / #else` in the
+   application files** (the status quo before TASK-743). Rejected: the TASK-739
+   audit counts each raw platform `#ifdef` in application code as an
+   abstraction-boundary violation; this is precisely the leak the Tier-3 work
+   removes.
+2. **Move the constants into `platform_*.h`** (the literal wording of TASK-743).
+   Rejected: `platform.h` is not pulled in early in the `OTGW-firmware.h` include
+   chain, so relocating SAT/MQTT sizing constants there would force `platform.h`
+   (and with it `WiFi.h` / `WebServer.h` / `LittleFS.h`) ahead of `SATtypes.h`
+   and the consuming `.ino` files — a large include ripple for no benefit. The
+   category is *capacity*, not *behaviour*, so the platform-API home is the wrong
+   fit (see the dividing-line rule above).
+3. **`boards.h` inside the existing per-board blocks** (chosen). It is already
+   included at `OTGW-firmware.h:33` ahead of every `.ino` and of `SATtypes.h`,
+   already on the abstraction allowlist, and already holds the per-board
+   `#if BOARD_NODOSHOP_*` blocks where capacity tunings naturally sit. No new
+   include-order coupling.
+
 ## Consequences
 
 **Positive:**
@@ -123,7 +143,13 @@ application file into `boards.h` removes its raw `#ifdef` from the scan, so the
 baseline ratchet already rewards compliance and blocks regression. No separate
 gate is added; the existing boundary scan is the mechanism.
 
-## Related
+## Related Decisions
 - ADR-061: Unified ESP8266/ESP32 Platform Abstraction (this ADR amends its home-assignment for board-numeric constants)
 - ADR-051: Settings/State architecture (Hungarian-prefixed config lives in structs; this ADR covers compile-time board constants, a distinct category)
 - ADR-079: Per-component type headers (`<Component>types.h`); board-sized typedefs that several components share live in `boards.h` rather than any one component header
+- ADR-080: Binding-ADR-needs-a-CI-gate meta-rule (this ADR is guideline-level, sharing the existing ESP-abstraction boundary gate)
+
+## References
+- TASK-743 (ESP-abstraction Tier 3a — the implementation that relocated the constants); TASK-739 (the abstraction-leak audit that counted the raw `#ifdef` sites)
+- Implementation: commit d4be6d4e (alpha.106), builds green on both targets
+- `evaluate.py::check_esp_abstraction_boundary()` — the boundary-scan gate that ratchets the baseline as constants move to `boards.h`

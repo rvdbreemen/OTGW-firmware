@@ -170,7 +170,7 @@ state — using one for an automated boost confuses the model.
   v2.0.0 and noted it explicitly in §3 above; a per-input expiry can be
   added later if a real user requests it.
 
-## Related
+## Related Decisions
 
 - ADR-051 — Two-struct settings/state model (`settings.sat.*`,
   `state.sat.*`).
@@ -179,4 +179,11 @@ state — using one for an automated boost confuses the model.
 - ADR-085 — SAT integration overview.
 - ADR-100 — JIT HA discovery; new entities slot into the existing
   `streamSatZoneDiscovery` drip path rather than allocating a new pseudo-ID.
-- Backlog: TASK-640.
+
+## References
+
+- Backlog task TASK-640 — feature scope and AC list.
+- `src/OTGW-firmware/SATcontrol.ino` — `satHandleExternalTemp`, `satGetRoomTemp`,
+  the `effectiveTarget` control-loop entry around line 3780.
+- `src/OTGW-firmware/SATtypes.h` — `SATSection` / `SATRuntimeSection`.
+- `src/OTGW-firmware/MQTTstuff.ino` — `kSatMqttCmds[]` dispatch table.

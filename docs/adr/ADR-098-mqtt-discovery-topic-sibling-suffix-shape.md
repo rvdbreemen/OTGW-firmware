@@ -106,7 +106,7 @@ The dev (1.5.x) line carries the same change under ADR-071; this ADR is the expl
 - The `composeSensorPayload` `uniq_id` construction (`MQTTHaDiscovery.cpp:2131-2141`) is already underscore-separated and matches the new discovery-topic suffix. No change required there. HA's identity tracking continues to deduplicate cleanly across the migration.
 - The `stat_t` builder (`MQTTHaDiscovery.cpp:2157-2173`) is already sibling-suffix per ADR-097. Discovery-topic and state-topic shapes will be symmetrically suffixed after this ADR lands.
 
-## Related
+## Related Decisions
 
 - **Supersedes ADR-097** (`MQTT Source-Topic Sibling-Suffix Shape`, the 2.0.0 port of ADR-070). After this ADR is Accepted, ADR-097's Status line will be updated to `Superseded by ADR-098, 2026-05-07.` per project supersession protocol. ADR-097's body remains immutable as the historical record of the original (partially-correct) decision.
 - **Builds on ADR-094** (HA discovery state reconciliation on OTA upgrade — the trigger that delivers the corrected shape to HA without manual user action on the 2.0.0 line).

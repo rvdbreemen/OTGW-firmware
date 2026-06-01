@@ -100,6 +100,24 @@ happens to be false.
 2.0.0 only. OTGW32 exists only on the 2.0.0 line; `dev` (1.5.x) is Classic-only,
 where `hardware_type` is trivially constant. This is not a cross-worktree change.
 
+## Alternatives Considered
+
+1. **Keep conflating board-class and PIC-liveness on `picavailable`** (status
+   quo). Rejected: the two questions ("is this a PIC-class board?" vs "is a PIC
+   responding now?") diverge on OTGW32, where `picavailable` is a permanently
+   false value describing a component that does not exist — confusing in logs,
+   MQTT and HA (field evidence: `otgw-1020BA16C6BC`, alpha.84, publishes
+   `picavailable OFF` on a PIC-less board).
+2. **Reuse the existing `hardwaremode` REST field for selection.** Rejected:
+   `hardwaremode` reflects the *runtime operational mode*
+   (`HW_MODE_PIC` / `HW_MODE_OT_DIRECT` / `HW_MODE_DEGRADED`), which is dynamic —
+   unsuitable as a stable hardware identity to switch codepath/UI on.
+3. **Reuse `boardName()`.** Rejected: it is a human-facing display string, not a
+   machine-readable slug; keying UI logic on display text is brittle.
+4. **Introduce a static `hardware_type` slug from `boards.h`** (chosen):
+   compile-time, machine-readable, zero runtime cost, and extensible — a new
+   board variant adds one `HW_TYPE_NAME` and a table row.
+
 ## Consequences
 
 **Positive**
@@ -125,7 +143,7 @@ where `hardware_type` is trivially constant. This is not a cross-worktree change
   retain their distinct roles; `hardware_type` is the third, machine-identity,
   axis.
 
-## Related
+## Related Decisions
 
 - Supersedes the implicit "picavailable means everything PIC" convention.
 - ADR-051 (settings/state architecture), ADR-079 (per-component type headers) —
@@ -134,4 +152,10 @@ where `hardware_type` is trivially constant. This is not a cross-worktree change
   ADR begins its deprecation.
 - ADR-080 (binding ADRs need a CI gate) — this ADR is guideline-level until a
   gate exists.
-- TASK-753.
+
+## References
+
+- TASK-753 (implementation of the `hardware_type` contract).
+- Field evidence: telnet log of `otgw-1020BA16C6BC`, firmware
+  `2.0.0-alpha.84+9be88a0`, captured 2026-05-29 (`PIC : no pic found` +
+  `picavailable --> OFF` on a PIC-less OTGW32).

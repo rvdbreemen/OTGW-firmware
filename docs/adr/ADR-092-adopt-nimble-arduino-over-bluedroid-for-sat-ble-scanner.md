@@ -6,6 +6,10 @@
 - **Supersedes**: (none)
 - **Superseded by**: (none)
 
+## Status
+
+Accepted, 2026-04-30.
+
 ## Context
 
 TASK-20 added a BLE temperature-sensor scanner to the SAT subsystem
@@ -69,7 +73,7 @@ Specific implementation decisions:
 - Pin to `^2.1.0` so future patch releases auto-apply but a major-version
   bump (3.x) requires a new ADR.
 
-## Alternatives considered
+## Alternatives Considered
 
 ### Stay on Bluedroid, fix only the blocking call
 
@@ -156,7 +160,16 @@ ADR-090 for the canonical pattern; the rationale here is purely
 "NimBLE is the producer of this race, so the cross-reference belongs
 in this ADR too".
 
-## Related
+## Related Decisions
+
+- ADR-004 — no `String` in hot paths
+- ADR-080 — binding ADR rules and CI gates (this ADR is structural;
+  reviewed at PR, no automated gate is feasible since the change is a
+  one-line lib_deps addition plus a file rewrite)
+- ADR-090 — re-entrancy / cross-task guard pattern (amended for
+  FreeRTOS-task case)
+
+## References
 
 - TASK-20 — original BLE temperature-sensor implementation
 - TASK-487 — implementation of this decision
@@ -164,11 +177,5 @@ in this ADR too".
   this ADR landing first)
 - TASK-494 — continuous-scan switch (amended into Decision section)
 - TASK-497 — cross-task `portMUX_TYPE` data-race fix (cross-referenced above)
-- ADR-004 — no `String` in hot paths
-- ADR-080 — binding ADR rules and CI gates (this ADR is structural;
-  reviewed at PR, no automated gate is feasible since the change is a
-  one-line lib_deps addition plus a file rewrite)
-- ADR-090 — re-entrancy / cross-task guard pattern (amended for
-  FreeRTOS-task case)
 - `other-projects/OT-Thing-OTGW32/Firmware/src/sensors.cpp` — reference
   implementation

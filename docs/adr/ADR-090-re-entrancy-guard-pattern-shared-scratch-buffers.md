@@ -1,6 +1,8 @@
 # ADR-090 Re-entrancy Guard Pattern for Shared Scratch Buffers
 
-**Status:** Accepted (guideline-level per ADR-080: 2 instances in 1 file is below the recurrence bar for binding pattern-level enforcement; no CI gate). Date: 2026-04-26.
+## Status
+
+Accepted (guideline-level per ADR-080: 2 instances in 1 file is below the recurrence bar for binding pattern-level enforcement; no CI gate). Date: 2026-04-26.
 
 ## Context
 

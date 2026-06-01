@@ -1,7 +1,8 @@
 # ADR-088: MQTT Status Burst Windowing and Post-Burst Cooldown
 
-**Status:** Accepted
-**Date:** 2026-04-26
+## Status
+
+Accepted, 2026-04-26.
 
 ## Context
 

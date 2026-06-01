@@ -6,6 +6,10 @@
 
 Ports the decision from `dev`'s **ADR-070** to the `feature-dev-2.0.0-otgw32-esp32-sat-support` branch. Supersedes **ADR-095** (bSeparateSources mutual-exclusion rule, no longer applicable under sibling-suffix shape) and refines **ADR-096** (worldview routing semantics retained; only topic shape changes).
 
+## Status
+
+Superseded by ADR-098, 2026-05-07. Original status: Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Reason for supersession: this ADR's discovery-topic carve-out (mirroring dev ADR-070 line 54) was based on the assumption that HA accepts nested discovery topic identifiers and handles `state_topic` deltas in-place. Empirical investigation against `homeassistant/components/mqtt/discovery.py:TOPIC_MATCHER` showed nested discovery topics (object_id containing `/`) are rejected before reaching the subscription layer. ADR-098 corrects the discovery-topic shape on this branch; the state-topic decision recorded here is preserved and remains in force. See dev sibling: ADR-070 → ADR-071 supersession.
+
 ## Context
 
 ADR-096 (Accepted, port of dev's ADR-069) shipped the worldview routing semantics on the 2.0.0 line: each per-source MQTT subtopic shows what that device sees on the OT bus, regardless of which frame type carried the value. ADR-095 (port of dev's ADR-068) made `bSeparateSources` mutually exclusive between base and source-variant entities.
@@ -92,7 +96,7 @@ The dev (1.5.x) line carries the same change under ADR-070; this ADR is the expl
 - With `bSeparateSources=true`, three entities per dual-source MsgID slightly increases the HA entity registry size (vs. ADR-095's two). Acceptable since opt-in.
 - Users who manually configured HA sensors against the nested topics need to re-point them at the suffixed shape. The auto-discovery path handles itself; manual configs are documented as a one-time migration step.
 
-## Related
+## Related Decisions
 
 - **Supersedes ADR-095** (`bSeparateSources` mutual-exclusion rule no longer applies under sibling shape). ADR-095's status is updated to `Superseded by ADR-097, 2026-05-07.`
 - **Refines ADR-096** (worldview routing semantics retained; only topic shape changes). ADR-096 stays Accepted; this ADR amends it without superseding.
