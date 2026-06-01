@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-01 17:50'
-updated_date: '2026-06-01 17:51'
+updated_date: '2026-06-01 18:34'
 labels:
   - bug
   - needs-info
@@ -43,3 +43,9 @@ Decide approach with maintainer before implementing. Code refs: mqtt_configurati
 - [ ] #4 python build.py exits 0 (firmware + filesystem)
 - [ ] #5 python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-01: Absorbed by TASK-805 (dev) / TASK-806 (2.0.0) — the override-state store retargets the Toutside_override number-entity stat_t. Track there; this task superseded by the broader all-overrides feature.
+<!-- SECTION:NOTES:END -->
