@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-alpha.132
+**  Version  : v2.0.0-alpha.133
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -188,11 +188,12 @@ static void restPerfAccumulateSendTime(uint32_t deltaMs)
   state.restperf.iActiveChunkCount++;
 }
 
-#ifdef ESP32
-// ── ESP32 coalescing transmit buffer ──────────────────────────────────────
+#if HAS_REST_TX_COALESCING
+// ── REST coalescing transmit buffer (TASK-743: HAS_REST_TX_COALESCING) ─────
 // The sync WebServer stalls ~9 ms per sendContent() call on ESP32 due to
 // FreeRTOS/lwIP scheduling. Batching into 4 KB chunks (covering most JSON
-// responses in 2–4 flushes) cuts T_send from ~3.8 s to < 100 ms.
+// responses in 2–4 flushes) cuts T_send from ~3.8 s to < 100 ms. Gated on the
+// capability flag, not the platform, so app code carries no raw ESP32 ifdef.
 // Static allocation — safe for the single-threaded sync WebServer.
 static struct {
   char   data[4096];
@@ -224,7 +225,7 @@ static void restTxAppend(const char* s, size_t n) {
 
 static void restSendContent(const char* content)
 {
-#ifdef ESP32
+#if HAS_REST_TX_COALESCING
   restTxAppend(content, strlen(content));
 #else
   const uint32_t startMs = millis();
@@ -235,7 +236,7 @@ static void restSendContent(const char* content)
 
 static void restSendContentP(PGM_P content)
 {
-#ifdef ESP32
+#if HAS_REST_TX_COALESCING
   // On ESP32, PROGMEM strings live in flash-mapped DROM and are accessible
   // via normal pointers — strlen/memcpy are safe.
   restTxAppend(content, strlen(content));
@@ -248,7 +249,7 @@ static void restSendContentP(PGM_P content)
 
 static void restSendP(int code, PGM_P contentType, PGM_P content)
 {
-#ifdef ESP32
+#if HAS_REST_TX_COALESCING
   sTxBuf.len = 0; // discard any stale data before sending new HTTP response
 #endif
   const uint32_t startMs = millis();
@@ -260,7 +261,7 @@ static void restSendP(int code, PGM_P contentType, PGM_P content)
 // On ESP32 this drains the coalescing buffer; on ESP8266 it is a no-op
 // (sendContent flushes inline). Call at the end of each chunked response.
 void restFlushContent() {
-#ifdef ESP32
+#if HAS_REST_TX_COALESCING
   restFlushTxBuf();
 #endif
 }
