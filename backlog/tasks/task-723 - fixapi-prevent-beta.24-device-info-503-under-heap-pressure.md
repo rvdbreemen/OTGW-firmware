@@ -57,3 +57,19 @@ Task remains In Progress: field validation must flash beta.25 and reproduce comp
 
 2026-06-01 @codex on branch dev: close-out after stable 1.6.0 shipment. User confirmed `1.6.0` has shipped, so the beta.25 field-validation blocker is superseded by the final release shipping with the device/info heap-pressure fix. Treat the remaining endpoint failure path as resolved for TASK-723; no separate MQTT/WebSocket drop remediation is required here beyond the assessment already recorded.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed the beta.24 `/api/v2/device/info` 503 regression after the fix shipped in the final `v1.6.0` release.
+
+Changes:
+- Kept the endpoint-specific contiguous-block guard aligned to the existing streaming headroom floor instead of the oversized beta.24 preflight threshold.
+- Preserved the MQTT/WebSocket backpressure thresholds because the beta.24 drop counters were diagnostic signal, not evidence for threshold relaxation.
+- Published and validated beta.25 as the proving release before stable 1.6.0 shipped.
+
+Validation:
+- Combined firmware plus LittleFS build passed before publication.
+- `evaluate.py --quick --no-color` passed.
+- Stable `v1.6.0` shipment closes the remaining field-validation gate for this task.
+<!-- SECTION:FINAL_SUMMARY:END -->
