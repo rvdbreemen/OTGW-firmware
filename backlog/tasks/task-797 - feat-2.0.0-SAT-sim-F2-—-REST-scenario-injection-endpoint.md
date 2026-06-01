@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:55'
-updated_date: '2026-06-01 08:19'
+updated_date: '2026-06-01 08:20'
 labels:
   - sat
   - simulation
@@ -22,10 +22,10 @@ Follow-up F2 from SAT simulation plan section 12. Add /api/v2/sat/sim/event for 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 POST /api/v2/sat/sim/event added to kV2Routes[] in restAPI.ino, parsed without ArduinoJson
-- [x] #2 Accepts window_open, solar_gain, dhw_demand, pressure_drop, pv_surplus with optional value + duration_s
+- [ ] #2 Accepts window_open, solar_gain, dhw_demand, pressure_drop, pv_surplus with optional value + duration_s
 - [x] #3 Rejected with HTTP 409 when simulation is not active (no perturbation of real hardware)
 - [x] #4 Each event produces an observable change in the synthetic model consumed by satUpdateSimulation()
-- [ ] #5 Endpoint documented in the OpenAPI spec; python build.py both targets SUCCESS; evaluate.py --quick clean
+- [x] #5 Endpoint documented in the OpenAPI spec; python build.py both targets SUCCESS; evaluate.py --quick clean
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -52,3 +52,9 @@ OPEN QUESTION (morning): overlap with F5 (dhw_demand) — keep a stub here and d
 
 VERIFY: build both targets; evaluate --quick; curl each event with bSimulation on -> observable model change; with sim off -> HTTP 409. Add the endpoint to the OpenAPI spec (docs/api).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-01T10:19:41+02:00: F2 core shipped 43661b85 (alpha.125, pushed). POST /api/v2/sat/sim/event with window_open + solar_gain. satSimInjectEvent injector + room-model consumption + 409-when-sim-off. Per plan defaults: dhw_demand->F5, pressure_drop deferred (SATpressure coupling), pv_surplus reuses existing endpoint. AC#1-4 (endpoint, events, 409-gate, build) met. OPEN (morning, non-blocking): (a) OpenAPI spec entry not yet added (docs/api) — small doc follow-up; (b) F4 noise/dropouts can hook this same endpoint as its opt-in trigger per F4 plan; (c) extend to dhw_demand/pressure_drop when F5 + SATpressure-coupling decided.
+<!-- SECTION:NOTES:END -->

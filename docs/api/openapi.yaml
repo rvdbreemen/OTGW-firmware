@@ -2366,6 +2366,64 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
+  /v2/sat/sim/event:
+    post:
+      tags:
+        - SAT
+      summary: Inject a simulation scenario event (TASK-797)
+      description: |
+        Perturbs the synthetic room model so testers can exercise SAT responses
+        on a bench without real hardware. Honoured ONLY while simulation is
+        active (`satsimulation` enabled); returns HTTP 409 otherwise, so it can
+        never perturb a real-boiler installation.
+
+        Supported events:
+        - `window_open` — multiplies the room cooling rate for `duration_s`.
+          `value` = loss multiplier (default 3, clamped 1..20).
+        - `solar_gain` — additive room warming for `duration_s`.
+          `value` = °C/min (default 0.5, clamped 0..5).
+
+        `duration_s` is optional (default 600 s). Other events named in the
+        plan (`dhw_demand`, `pressure_drop`, `pv_surplus`) are not handled here:
+        `pv_surplus` has its own `/v2/sat/pvsurplus` endpoint; `dhw_demand` and
+        `pressure_drop` are deferred. Unknown/unsupported events return 400.
+      operationId: injectSatSimEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event]
+              properties:
+                event:
+                  type: string
+                  enum: [window_open, solar_gain]
+                  example: window_open
+                value:
+                  type: number
+                  example: 3
+                duration_s:
+                  type: integer
+                  example: 600
+      responses:
+        '200':
+          description: Scenario event accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '409':
+          description: Simulation inactive — enable satsimulation first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
   /v2/sat/reset_integral:
     post:
       tags:
