@@ -6,10 +6,15 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-01 17:50'
+updated_date: '2026-06-01 17:51'
 labels:
   - bug
   - needs-info
 dependencies: []
+references:
+  - >-
+    Discord #nederlandse-ondersteuning / Richard_HA / 2026-06-01 /
+    Telnet_LOG_OTGW.txt
 priority: medium
 ---
 
