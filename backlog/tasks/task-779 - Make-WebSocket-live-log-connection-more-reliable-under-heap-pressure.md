@@ -1,10 +1,11 @@
 ---
 id: TASK-779
 title: Make WebSocket live-log connection more reliable under heap pressure
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-31 12:48'
-updated_date: '2026-05-31 13:01'
+updated_date: '2026-06-01 23:03'
 labels:
   - bug
   - websocket
