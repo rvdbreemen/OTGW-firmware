@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.136
+**  Version  : v2.0.0-alpha.137
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -600,6 +600,43 @@ struct OpenthermData_t {
 extern OpenthermData_t OTdata;
 extern OpenthermData_t delayedOTdata;
 extern OpenthermData_t tmpOTdata;
+
+// ADR-118: gateway-override visibility store.
+// The boiler-side-worldview gate (ADR-096/103, is_value_valid_for_master_topic)
+// deliberately drops gateway-injected override values from canonical state, which
+// makes a user's own override invisible. This small fixed-size store records the
+// dropped value additively (canonical behaviour is unchanged) so it can be surfaced
+// on WebUI / REST / MQTT. Platform-neutral; no #ifdef needed.
+#define OVERRIDE_STORE_MAX        11        // 9 numeric override-capable ids + headroom
+#define OVERRIDE_ACTIVE_TIMEOUT   600000UL  // ~10 min: an entry not refreshed within this window is stale
+
+// kind discriminator: what the captured value means on each surface.
+//  - ANSWER  : answer-override A frame; value = gateway-forced answer shown to the
+//              thermostat (= the user-injected value). Headline case (e.g. Toutside).
+//  - SUBSTITUTED : substituted T frame; value = the thermostat's original value that
+//              the gateway replaced (the forced R reaches canonical separately).
+enum OTOverrideKind : uint8_t {
+  OT_OVERRIDE_ANSWER       = 0,
+  OT_OVERRIDE_SUBSTITUTED  = 1
+};
+
+struct OTOverrideEntry_t {
+  uint8_t  id;        // OpenTherm message id
+  uint8_t  kind;      // OTOverrideKind
+  float    value;     // captured override value
+  uint32_t lastSeen;  // millis() of last capture; active = (millis()-lastSeen) < OVERRIDE_ACTIVE_TIMEOUT
+};
+
+extern OTOverrideEntry_t otOverrideStore[OVERRIDE_STORE_MAX];
+
+// Capture hook: record (find-or-allocate) an override value for msg id. Pure RAM write.
+void recordOTOverride(uint8_t id, uint8_t kind, float value);
+// True if an entry for id exists and is within the active timeout.
+bool isOTOverrideActive(uint8_t id);
+// PROGMEM-safe label for a kind ("answer" / "substituted").
+const __FlashStringHelper* overrideKindLabel(uint8_t kind);
+// Periodic publisher: emit retained <label>/override per active entry (MQTT path only).
+void publishActiveOverrides();
 
 #endif
 

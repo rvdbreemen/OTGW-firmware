@@ -3032,10 +3032,12 @@ bool streamNumberDiscovery(PubSubClient &client,
     if (!w.writeProgmem(PSTR("/outside\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    // stat_t
+    // stat_t — ADR-118: retargeted from canonical /Toutside to the override state
+    // topic so the number entity reflects the user-injected value (the canonical
+    // /Toutside stays Data-Invalid/0 when the boiler ignores the override).
     if (!w.writeProgmem(PSTR("\"stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
-    if (!w.writeProgmem(PSTR("/Toutside\""))) return false;
+    if (!w.writeProgmem(PSTR("/Toutside/override\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     // unit, min, max, step, mode
@@ -3065,6 +3067,93 @@ bool streamNumberDiscovery(PubSubClient &client,
 
   if (!client.endPublish()) return false;
   incPublishedTopicCount();   // ADR-062 / TASK-349
+  feedWatchDog();
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Sensor: active gateway override (ADR-118).
+// Emits a read-only HA sensor whose stat_t points at <pub>/<label>/override for
+// any override-capable msg id EXCEPT 27 (Toutside is already covered by the
+// retargeted Toutside_override NUMBER entity above; emitting a sensor for 27 too
+// would create two HA entities on the same topic). The override store is the data
+// source; this is additive and does not touch any canonical entity.
+// ---------------------------------------------------------------------------
+bool streamOverrideSensorDiscovery(PubSubClient &client,
+                                   HaDiscoveryContext &ctx,
+                                   uint8_t otid,
+                                   const char* label)
+{
+  if (otid == 27) return false;  // covered by the Toutside_override number entity
+  if (!label || !*label) return false;
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
+
+  char topic[STREAM_TOPIC_MAX];
+  snprintf_P(topic, sizeof(topic), PSTR("%s/sensor/%s/%s_override/config"),
+             ctx.haPrefix, ctx.nodeId, label);
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    // avty_t
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // device block
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // uniq_id "<nodeId>-<label>_override"
+    if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
+    if (!w.writeRam(ctx.nodeId)) return false;
+    if (!w.writeProgmem(PSTR("-"))) return false;
+    if (!w.writeRam(label)) return false;
+    if (!w.writeProgmem(PSTR("_override\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // device_class temperature + name "<label> Override"
+    if (!writeJsonKV_P(w, kDevCls, PSTR("temperature"))) return false;
+    if (!writeJsonComma(w)) return false;
+    if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+    if (!w.writeRam(label)) return false;
+    if (!w.writeProgmem(PSTR(" Override\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // stat_t "<pub>/<label>/override"
+    if (!w.writeProgmem(PSTR("\"stat_t\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (!w.writeProgmem(PSTR("/"))) return false;
+    if (!w.writeRam(label)) return false;
+    if (!w.writeProgmem(PSTR("/override\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // unit + icon
+    if (!w.writeProgmem(PSTR("\"unit_of_measurement\":\"\xC2\xB0""C\""))) return false;
+    if (!writeJsonComma(w)) return false;
+    if (!writeJsonKV_P(w, kIcon, PSTR("mdi:thermometer-alert"))) return false;
+
+    // origin
+    if (!writeJsonComma(w)) return false;
+    if (!writeOriginBlock(w, ctx)) return false;
+
+    return writeJsonClose(w);
+  };
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.disconnect();
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  incPublishedTopicCount();
   feedWatchDog();
   return true;
 }

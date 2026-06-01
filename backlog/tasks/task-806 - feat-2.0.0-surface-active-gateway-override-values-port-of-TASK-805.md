@@ -1,9 +1,11 @@
 ---
 id: TASK-806
 title: 'feat-2.0.0: surface active gateway-override values (port of TASK-805)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-01 18:34'
+updated_date: '2026-06-01 19:50'
 labels:
   - enhancement
 dependencies: []
@@ -30,3 +32,15 @@ priority: high
 - [ ] #8 python build.py per 2.0.0 targets: grep per-env SUCCESS lines (build.py masks per-env fails); python evaluate.py --quick no new failures
 - [ ] #9 Manual: inject override, confirm new WebUI view + REST endpoint + MQTT override topic appear while canonical stays unchanged
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. OTGW-Core.h: add OTOverrideEntry_t struct + OVERRIDE_STORE_MAX 11 + extern store + recordOTOverride/isOTOverrideActive/overrideKindLabel protos
+2. OTGW-Core.ino: define store + helpers; capture hook in print_f88 gated on explicit (OTGW_ANSWER_THERMOSTAT&&bAnswerOverride)|(OTGW_THERMOSTAT&&bGatewaySubstituted); periodic publish of <label>/override retained from publish path
+3. restAPI.ino: GET /api/v2/otgw/overrides streamed branch in handleOtgw (mirror boiler-support)
+4. MQTTHaDiscovery.cpp: streamOverrideSensorDiscovery + retarget Toutside_override stat_t to /Toutside/override
+5. MQTTstuff.ino doAutoConfigureMsgid: dispatch override discovery per id
+6. data/index.html + index.js: Active Overrides panel in Statistics + refreshOtOverrides poller (escapeHtml/textContent)
+7. bump-prerelease.sh, stage version.h+version.hash; build.py full; evaluate.py --quick; commit+push
+<!-- SECTION:PLAN:END -->

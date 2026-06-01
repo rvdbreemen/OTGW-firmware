@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.136
+**  Version  : v2.0.0-alpha.137
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -693,6 +693,39 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
                  tsR  ? "true" : "false", tsW  ? "true" : "false",
                  blAR ? "true" : "false", blAW ? "true" : "false",
                  blUR ? "true" : "false", blUW ? "true" : "false");
+      httpServer.sendContent(row);
+      first = false;
+    }
+    httpServer.sendContent_P(PSTR("]}"));
+    httpServer.sendContent(F(""));
+  } else if (strcmp_P(words[4], PSTR("overrides")) == 0) {
+    // ADR-118: GET /api/v2/otgw/overrides -> active gateway-override values that the
+    // boiler-side-worldview gate (ADR-096/103) drops from canonical. Additive surface;
+    // distinct from the OT-Direct overrides under /api/v2/otdirect/overrides. Streamed
+    // one JSON object per active entry so no large stack buffer is needed.
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendCorsOriginHeader();
+    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"overrides\":["));
+    const uint32_t now = millis();
+    bool first = true;
+    char row[200];
+    char valbuf[15];
+    for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
+      if (otOverrideStore[i].lastSeen == 0) continue;
+      if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) continue;
+      const uint8_t id = otOverrideStore[i].id;
+      OTlookup_t item;
+      const char* label = "Unknown";
+      const char* friendly = "";
+      if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; friendly = item.friendlyname; }
+      dtostrf(otOverrideStore[i].value, 3, 2, valbuf);
+      if (!first) httpServer.sendContent(F(","));
+      snprintf_P(row, sizeof(row),
+                 PSTR("{\"id\":%u,\"label\":\"%s\",\"friendly\":\"%s\",\"kind\":\"%s\",\"value\":%s,\"age_s\":%lu}"),
+                 id, label, friendly,
+                 (otOverrideStore[i].kind == OT_OVERRIDE_ANSWER) ? "answer" : "substituted",
+                 valbuf, (unsigned long)((now - otOverrideStore[i].lastSeen) / 1000UL));
       httpServer.sendContent(row);
       first = false;
     }

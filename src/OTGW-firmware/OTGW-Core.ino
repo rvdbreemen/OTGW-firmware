@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.136
+**  Version  : v2.0.0-alpha.137
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -218,6 +218,9 @@ static const char* skipOTLogTimestamp(const char* logLine)
 //===================[ Global Data Arrays & Variables ]================
 //some variable's
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
+
+// ADR-118: gateway-override visibility store (see OTGW-Core.h). ~132 bytes static.
+OTOverrideEntry_t otOverrideStore[OVERRIDE_STORE_MAX] = {};
 
 static constexpr uint8_t MQTT_TRACKED_RESPONSE_ID_COUNT = 128; // linear msgid slots for IDs 0-127
 static constexpr uint16_t MQTT_TRACKED_SLOT_COUNT = MQTT_TRACKED_RESPONSE_ID_COUNT * 2; // response + request view
@@ -1885,6 +1888,66 @@ static uint16_t publishRBPFlagsState(uint8_t transferEnableFlags, uint8_t readWr
   return ((uint16_t)transferEnableFlags << 8) | readWriteFlags;
 }
 
+//===================[ ADR-118 Gateway-Override Store ]=========
+// Additive visibility for gateway-injected overrides that the boiler-side-worldview
+// gate (ADR-096/103) drops from canonical. Pure RAM; no MQTT publish or yield in the
+// capture path (publication happens on the periodic MQTT path, REST reads on request).
+
+// Find-or-allocate: refresh an existing entry for `id`, else claim the first free
+// or stalest slot. Linear scan over <=11 entries (cold path). lastSeen is updated
+// ONLY here, so an active override is never cleared by a subsequent valid frame.
+void recordOTOverride(uint8_t id, uint8_t kind, float value) {
+  const uint32_t now = millis();
+  int slot = -1;
+  int freeSlot = -1;
+  int stalestSlot = 0;
+  uint32_t stalestAge = 0;
+  for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
+    if (otOverrideStore[i].lastSeen != 0 && otOverrideStore[i].id == id) { slot = i; break; }
+    if (otOverrideStore[i].lastSeen == 0 && freeSlot < 0) freeSlot = i;
+    const uint32_t age = now - otOverrideStore[i].lastSeen;
+    if (age >= stalestAge) { stalestAge = age; stalestSlot = i; }
+  }
+  if (slot < 0) slot = (freeSlot >= 0) ? freeSlot : stalestSlot;
+  otOverrideStore[slot].id       = id;
+  otOverrideStore[slot].kind     = kind;
+  otOverrideStore[slot].value    = value;
+  otOverrideStore[slot].lastSeen = (now == 0) ? 1 : now;  // 0 reserved as "empty" sentinel
+}
+
+bool isOTOverrideActive(uint8_t id) {
+  const uint32_t now = millis();
+  for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
+    if (otOverrideStore[i].lastSeen != 0 && otOverrideStore[i].id == id) {
+      return (now - otOverrideStore[i].lastSeen) < OVERRIDE_ACTIVE_TIMEOUT;
+    }
+  }
+  return false;
+}
+
+const __FlashStringHelper* overrideKindLabel(uint8_t kind) {
+  return (kind == OT_OVERRIDE_ANSWER) ? F("answer") : F("substituted");
+}
+
+// Periodic publisher (called from the MQTT periodic path, NOT from the decode hook).
+// Publishes one retained `<label>/override` topic per active override entry so HA
+// and dashboards reflect the injected value. Canonical topics are untouched.
+void publishActiveOverrides() {
+  if (!settings.mqtt.bEnable) return;
+  const uint32_t now = millis();
+  char leaf[64];
+  char val[15];
+  for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
+    if (otOverrideStore[i].lastSeen == 0) continue;
+    if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) continue;
+    const char* label = messageIDToString(static_cast<OTLibMessageID>(otOverrideStore[i].id));
+    snprintf_P(leaf, sizeof(leaf), PSTR("%s/override"), label);
+    dtostrf(otOverrideStore[i].value, 3, 2, val);
+    sendMQTTData(leaf, val, /*retain=*/true);
+    feedWatchDog();
+  }
+}
+
 //===================[ OT Message Field Formatters ]=========
 
 void print_f88(float& value)
@@ -1903,6 +1966,15 @@ void print_f88(float& value)
     AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   } else {
     AddLogf("%s", OTlookupitem.label);
+  }
+
+  // ADR-118: capture gateway-injected override (additive; does NOT affect canonical).
+  // Gated on the explicit suppression flags only, NOT !validForMaster (which is also
+  // false for non-override reasons). Pure RAM write — no MQTT publish, no yield.
+  if ((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && OTdata.bAnswerOverride) {
+    recordOTOverride(OTdata.id, OT_OVERRIDE_ANSWER, _value);
+  } else if ((OTdata.rsptype == OTGW_THERMOSTAT) && OTdata.bGatewaySubstituted) {
+    recordOTOverride(OTdata.id, OT_OVERRIDE_SUBSTITUTED, _value);
   }
 
   //SendMQTT

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.136
+**  Version  : v2.0.0-alpha.137
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1033,6 +1033,7 @@ void handleMQTT()
   DECLARE_TIMER_SEC(timerMQTTdebugerrorstate, 13);
   DECLARE_TIMER_SEC(timerMQTTdebugwaitconnectionattempt, 1);
   DECLARE_TIMER_SEC(timerMQTTdebugisconnected, 60);
+  DECLARE_TIMER_SEC(timerMQTToverridepublish, 60);  // ADR-118: refresh retained <label>/override topics
   
   if (MQTTclient.connected()) MQTTclient.loop();  //always do a MQTTclient.loop() first
 
@@ -1189,6 +1190,9 @@ void handleMQTT()
       { //if the MQTT client is connected, then please do a .loop call...
         MQTTclient.loop();
         state.mqtt.iLastConnectedMs = millis();  // stamp each confirmed-live tick for offline-duration tracking
+        // ADR-118: periodically refresh the retained gateway-override topics so HA / dashboards
+        // reflect active overrides even when no new override frame arrived this minute.
+        if (DUE(timerMQTToverridepublish)) publishActiveOverrides();
       }
       else
       { //else go and wait 10 minutes, before trying again.
@@ -2402,6 +2406,17 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // Number (OT ID 27)
   if (OTid == 27) {
     if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
+  }
+
+  // ADR-118: active-gateway-override sensor for the override-capable numeric ids.
+  // 27 is excluded (covered by the Toutside_override number entity above).
+  switch (OTid) {
+    case 1: case 8: case 9: case 14: case 16: case 39: case 56: case 57: {
+      const char* ovrLabel = messageIDToString(static_cast<OTLibMessageID>(OTid));
+      if (streamOverrideSensorDiscovery(MQTTclient, ctx, OTid, ovrLabel)) result = true;
+      break;
+    }
+    default: break;
   }
 
   if (OTid == OTGWsatzoneid) {

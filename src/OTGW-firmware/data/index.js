@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.136
+**  Version  : v2.0.0-alpha.137
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -7901,6 +7901,7 @@ function openLogTab(evt, tabName) {
       initStatsColResizers();
       updateStatisticsDisplay();
       refreshBoilerSupport();
+      refreshOtOverrides();
   } else if (currentTab === 'OTSupport') {
       initOtSupportColResizers();
       refreshOtSupport();
@@ -8123,6 +8124,52 @@ function refreshOtSupport() {
         .catch(function () {
             // Endpoint missing (older firmware) or fetch failed — keep table as-is.
             if (emptyEl) emptyEl.classList.remove('hidden');
+        });
+}
+
+// ADR-118: render the "Active gateway overrides" panel in the Statistics tab.
+// Sourced from /api/v2/otgw/overrides (the gateway-override store — a SEPARATE
+// concept from the OT-Direct overrides under /api/v2/otdirect/overrides). Rows are
+// built with createElement + textContent (no innerHTML) so log/label content cannot
+// inject markup. Panel is hidden when no override is active.
+function refreshOtOverrides() {
+    var panel = document.getElementById('otOverridesPanel');
+    var list = document.getElementById('otOverridesList');
+    if (!panel || !list) return;
+    fetch(APIGW + "v2/otgw/overrides")
+        .then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(function (json) {
+            var rows = (json && Array.isArray(json.overrides)) ? json.overrides : [];
+            while (list.firstChild) list.removeChild(list.firstChild);
+            if (rows.length === 0) {
+                panel.classList.add('hidden');
+                return;
+            }
+            panel.classList.remove('hidden');
+            rows.sort(function (a, b) { return (a.id || 0) - (b.id || 0); });
+            rows.forEach(function (r) {
+                var tr = document.createElement('tr');
+                var cells = [
+                    String(r.id),
+                    (r.friendly && r.friendly.length) ? r.friendly : (r.label || 'Unknown'),
+                    (r.kind === 'answer') ? 'answer (injected)' : 'substituted (replaced)',
+                    (typeof r.value === 'number') ? r.value.toFixed(2) : String(r.value),
+                    String(r.age_s)
+                ];
+                cells.forEach(function (text) {
+                    var td = document.createElement('td');
+                    td.textContent = text;
+                    tr.appendChild(td);
+                });
+                list.appendChild(tr);
+            });
+        })
+        .catch(function () {
+            // Endpoint missing (older firmware) or fetch failed — hide the panel.
+            if (panel) panel.classList.add('hidden');
         });
 }
 

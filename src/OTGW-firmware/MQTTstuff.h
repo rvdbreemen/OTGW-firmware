@@ -451,6 +451,13 @@ bool streamClimateDiscovery(PubSubClient &client,
 bool streamNumberDiscovery(PubSubClient &client,
                            HaDiscoveryContext &ctx);
 
+// ADR-118: active gateway-override sensor (per msg id, except 27 which uses the number entity).
+// label is the OTmap label (resolved by the caller, which sees OTmap).
+bool streamOverrideSensorDiscovery(PubSubClient &client,
+                                   HaDiscoveryContext &ctx,
+                                   uint8_t otid,
+                                   const char* label);
+
 // SAT enable/disable switches (boolean settings). switchIdx = 0..12, see implementation.
 bool streamSatSwitchDiscovery(PubSubClient &client,
                               uint8_t switchIdx,
