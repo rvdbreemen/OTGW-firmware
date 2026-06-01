@@ -3464,6 +3464,44 @@ static void satUpdateSimulation()
     state.sat.fSimNoiseAmplitudeC = 0.0f;
     SATDebugTln(F("SAT SIM: sensor_noise expired"));
   }
+
+  // --- Multi-zone synthetic room model (TASK-798 / plan §12 F3) ---
+  // Shared boiler/flow (plan default), per-zone room response, so the P75
+  // aggregation (satControlLoop, iZoneCount>1) runs under simulation. Each
+  // non-OFF zone is given a synthetic room temp + setpoint and driven toward
+  // its target on the shared synthetic flame. OFF zones (TASK-593 bOff) are
+  // left untouched so they stay excluded from P75. A small per-zone offset
+  // makes zones visibly diverge instead of moving in lockstep.
+  if (settings.sat.iZoneCount > 1) {
+    uint8_t zc = settings.sat.iZoneCount;
+    if (zc > SAT_MAX_ZONES) zc = SAT_MAX_ZONES;
+    for (uint8_t zi = 0; zi < zc; zi++) {
+      SATZoneState& z = satZones[zi];
+      if (z.bOff) continue;  // TASK-593: OFF zone stays excluded — do not synthesize
+      // Synthesize a setpoint if none was pushed externally: global target with
+      // a small staggered offset per zone so the zones are not identical.
+      if (!z.bSpValid) {
+        z.fSetpoint = settings.sat.fTargetTemp - (float)zi * 0.5f;
+        z.bSpValid  = true;
+      }
+      // Seed room temp on first sim touch from the shared sim room temp.
+      if (!z.bRoomValid) z.fRoomTemp = state.sat.fSimRoomTemp;
+      // Drive room toward this zone's setpoint on the shared synthetic flame.
+      if (state.sat.bSimFlameOn) {
+        if (z.fRoomTemp < z.fSetpoint) {
+          z.fRoomTemp += settings.sat.fSimHeatRate * dtMin;
+          if (z.fRoomTemp > z.fSetpoint) z.fRoomTemp = z.fSetpoint;
+        }
+      } else {
+        if (z.fRoomTemp > state.sat.fSimOutdoorTemp) {
+          z.fRoomTemp -= settings.sat.fSimCoolRate * dtMin;
+          if (z.fRoomTemp < state.sat.fSimOutdoorTemp) z.fRoomTemp = state.sat.fSimOutdoorTemp;
+        }
+      }
+      z.bRoomValid    = true;
+      z.iLastUpdateMs = now;  // keep fresh so the staleness gate does not drop it
+    }
+  }
 }
 
 // Scenario-event injector (TASK-797 / plan §12 F2). Called from the REST
