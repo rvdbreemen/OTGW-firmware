@@ -986,6 +986,12 @@ static float satGetRoomTemp()
 {
   // Simulation mode overrides all other sources
   if (settings.sat.bSimulation) {
+    // TASK-799 F4 (2b): sensor_dropout window — return NAN so the real
+    // ghost-Tr / fallback path (TASK-521/522) exercises under simulation.
+    if (state.sat.iSimDropoutExpiryMs != 0 &&
+        (int32_t)(millis() - state.sat.iSimDropoutExpiryMs) < 0) {
+      return NAN;
+    }
     return state.sat.fSimRoomTemp;
   }
   // BLE sensor has highest priority when available (Task #20). TASK-742: no
@@ -3464,6 +3470,11 @@ static void satUpdateSimulation()
     state.sat.fSimNoiseAmplitudeC = 0.0f;
     SATDebugTln(F("SAT SIM: sensor_noise expired"));
   }
+  if (state.sat.iSimDropoutExpiryMs != 0 &&
+      (int32_t)(now - state.sat.iSimDropoutExpiryMs) >= 0) {
+    state.sat.iSimDropoutExpiryMs = 0;
+    SATDebugTln(F("SAT SIM: sensor_dropout expired"));
+  }
 
   // --- Multi-zone synthetic room model (TASK-798 / plan §12 F3) ---
   // Shared boiler/flow (plan default), per-zone room response, so the P75
@@ -3591,6 +3602,19 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS)
       state.sat.iSimNoiseExpiryMs = now + durMs;
       if (state.sat.iSimNoiseExpiryMs == 0) state.sat.iSimNoiseExpiryMs = 1;
       SATDebugTf(PSTR("SAT SIM: sensor_noise +/-%.2fC for %lds\r\n"), a, (long)(durMs / 1000UL));
+    }
+    return true;
+  }
+  if (strcasecmp_P(event, PSTR("sensor_dropout")) == 0) {
+    // TASK-799 F4 (2b): drop the room sensor for duration_s — satGetRoomTemp
+    // returns NAN, exercising the ghost-Tr / fallback path. value 0 = cancel.
+    if (value == 0.0f && durationS == 0) {
+      state.sat.iSimDropoutExpiryMs = 0;
+      SATDebugTln(F("SAT SIM: sensor_dropout off"));
+    } else {
+      state.sat.iSimDropoutExpiryMs = now + durMs;
+      if (state.sat.iSimDropoutExpiryMs == 0) state.sat.iSimDropoutExpiryMs = 1;
+      SATDebugTf(PSTR("SAT SIM: sensor_dropout for %lds\r\n"), (long)(durMs / 1000UL));
     }
     return true;
   }

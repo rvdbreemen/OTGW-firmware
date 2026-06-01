@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.129
+**  Version  : v2.0.0-alpha.130
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -855,7 +855,7 @@ static bool satExtractTwoFields(const char* body,
 // POST /api/v2/sat/pvsurplus            — push PV-surplus power in W (TASK-640)
 // POST /api/v2/sat/humidity             — push indoor humidity (0-100%)
 // POST /api/v2/sat/area/<0-3>           — push area temperature (multi-area)
-// POST /api/v2/sat/sim/event            — inject sim scenario (window_open/solar_gain/sensor_noise); 409 if sim off
+// POST /api/v2/sat/sim/event            — inject sim scenario (window_open/solar_gain/sensor_noise/sensor_dropout); 409 if sim off
 // POST /api/v2/sat/flush                — flush short-lived data (PID integral + cycle window)
 // POST /api/v2/sat/settings/<name>      — update any SAT setting (mirrors all MQTT sat/* commands)
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
@@ -968,7 +968,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     float   value = extractJsonField(body, F("value"), valBuf, sizeof(valBuf)) ? atof(valBuf) : 0.0f;
     int32_t durS  = extractJsonField(body, F("duration_s"), durBuf, sizeof(durBuf)) ? atoi(durBuf) : 0;
     if (!satSimInjectEvent(evtBuf, value, durS)) {
-      sendApiError(400, F("Unknown or unsupported event (window_open, solar_gain, sensor_noise)"));
+      sendApiError(400, F("Unknown or unsupported event (window_open, solar_gain, sensor_noise, sensor_dropout)"));
       return;
     }
     httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));

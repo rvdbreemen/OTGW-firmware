@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.129
+**  Version  : v2.0.0-alpha.130
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -325,6 +325,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fSimNoiseAmplitudeC    = 0.0f;   // ± noise band on flow/return/room (°C); 0 = off
   uint32_t iSimNoiseExpiryMs      = 0;      // millis() when noise ends (0 = inactive)
   uint32_t iSimNoiseLcg           = 0x1234567U;  // LCG state for cheap deterministic noise
+  // Sensor dropout (TASK-799 / plan §12 F4, 2b). During the window the room-temp
+  // wrapper returns NAN — driving the real TASK-521/522 ghost-Tr / fallback path
+  // — so stale-detection and thermal-estimate fallbacks exercise under sim.
+  uint32_t iSimDropoutExpiryMs    = 0;      // millis() when sensor_dropout ends (0 = inactive)
   // Thermal drop learning (Task #21)
   float    fEstimatedRoom         = 0.0f;   // Estimated room temp during fallback
   float    fLastKnownRoom         = 0.0f;   // Last valid room temp before fallback
