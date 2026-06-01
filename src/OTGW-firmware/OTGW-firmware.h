@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.121
+**  Version  : v2.0.0-alpha.122
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -71,6 +71,7 @@ void handleOTDirectBridgeStream();
 void handleOTDirectCommand(const char* buf, int len);
 void sendOTDirectOverridesJSON();
 void sendPICSerial(const char* buf, int len);
+bool otDirectBoilerPresent();  // TASK-795 §4.2: real boiler answered MsgID 3 (excludes loopback)
 // TASK-183: PI room compensation
 float getFlowTemp();
 // TASK-184: flame ratio metrics
@@ -337,6 +338,8 @@ void satDisable();
 void satHandleControlMode(const char* value);
 void satCycleOnFlameChange(bool flameOn);
 bool satSimulationBlocksBusTx(const char* cmd, const __FlashStringHelper* source);  // TASK-795 plan §4.1: bus-tx isolation gate
+void satNotifyBoilerFrameSeen();  // TASK-795 plan §4.2: slave-frame edge hook → deferred auto-disable
+bool satBoilerHardwarePresent();  // TASK-795 plan §4.2: real boiler on bus (REST 409 / MQTT reject guard)
 void satSendStatusJSON();
 uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();

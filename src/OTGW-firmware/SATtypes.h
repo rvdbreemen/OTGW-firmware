@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.121
+**  Version  : v2.0.0-alpha.122
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -300,6 +300,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // SAT loop tried to emit while simulation blocked the bus.
   char     sLastBlockedCmd[24]    = {0};
   uint32_t iLastBlockedCmdMs      = 0;
+  // Availability gate (TASK-795 plan §4.2): set by the slave-frame edge hook
+  // (interrupt-adjacent), consumed once in the SAT main loop so the heavy
+  // writeSettings() teardown runs in cooperative context, not in the hook.
+  bool     bBoilerDetectedFlag    = false;
   // Thermal drop learning (Task #21)
   float    fEstimatedRoom         = 0.0f;   // Estimated room temp during fallback
   float    fLastKnownRoom         = 0.0f;   // Last valid room temp before fallback

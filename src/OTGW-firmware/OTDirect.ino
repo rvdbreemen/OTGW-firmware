@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.121
+**  Version  : v2.0.0-alpha.122
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -281,6 +281,17 @@ static inline bool otIsVentSlave() {
   uint8_t slaveCfgHB = (otBoilerCache[3] >> 8) & 0xFF;
   // bits 6-7 == 0b11 → ventilation/HRV application per OT spec
   return ((slaveCfgHB & 0xC0) == 0xC0);
+}
+
+// TASK-795 §4.2: real boiler-slave presence on the OT-direct bus. A boiler is
+// "present" once it has answered MsgID 3 (Slave Config/MemberID) — otBoilerCache[3]
+// valid. Loopback mode synthesises that cache entry, so it is explicitly excluded:
+// the availability gate must read a signal that synthetic-online does NOT set,
+// otherwise enabling simulation would immediately disable itself. Called cross-file
+// from satBoilerHardwarePresent() in SATcontrol.ino.
+bool otDirectBoilerPresent() {
+  if (IS_LOOPBACK_MODE()) return false;   // synthetic responses are not a real boiler
+  return otBoilerCacheValid[3];
 }
 
 // Command ring buffer — queues frames from handleOTDirectCommand() and
@@ -1249,6 +1260,12 @@ static void handleMasterResponse() {
       otBoilerCache[cacheId] = response & 0xFFFF;
       otBoilerCacheValid[cacheId] = true;
     }
+
+    // TASK-795 §4.2: a real boiler answered on the OT-direct bus. If SAT
+    // simulation is active, trip the edge hook (deferred auto-disable). Not in
+    // loopback — loopback responses are synthesised in sendMasterRequestAsync
+    // and never reach handleMasterResponse.
+    satNotifyBoilerFrameSeen();
 
     // TASK-184: update flame ratio state from MsgID 0 slave status byte
     // Flame bit = bit 3 of slave status LB (bit 3 of response byte 0)

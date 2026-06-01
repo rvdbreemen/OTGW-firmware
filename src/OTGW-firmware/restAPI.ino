@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.121
+**  Version  : v2.0.0-alpha.122
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1224,6 +1224,12 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     } else if (strcasecmp_P(settingName, PSTR("comfort_max_offset")) == 0) {
       updateSetting("SATcomfortmaxoffset", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("simulation")) == 0) {
+      // TASK-795 §4.2: refuse to enable simulation while a real boiler is on the
+      // bus — sim is a boiler-absent bench mode, not a co-existence mode.
+      if (EVALBOOLEAN(val) && satBoilerHardwarePresent()) {
+        sendApiError(409, F("simulation unavailable: boiler hardware detected"));
+        return;
+      }
       updateSetting("SATsimulation", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("ble_enable")) == 0) {
       updateSetting("SATbleenable", val); handled = true;

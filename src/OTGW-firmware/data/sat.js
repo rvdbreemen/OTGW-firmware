@@ -362,6 +362,22 @@ var SAT = (function() {
     setText('sat-diag-simulation', d.simulation ? 'ACTIVE' : 'Off');
     setText('sat-diag-sim-room', d.simulation ? fmtTemp(d.sim_room_temp) : '--');
     setText('sat-diag-sim-flow', d.simulation ? fmtTemp(d.sim_flow_temp) : '--');
+    // TASK-795 §4.2: hide simulation controls when a real boiler is present
+    // (sim_available mirrors !satBoilerHardwarePresent()). Default-visible if
+    // the field is absent (older firmware) so we never hide on missing data.
+    var simAvail = (d.sim_available !== false);
+    var simOnly = document.querySelectorAll('[data-sim-only]');
+    for (var i = 0; i < simOnly.length; i++) simOnly[i].hidden = !simAvail;
+    // TASK-795 §4.3: command trace (last would-be blocked command + age)
+    setText('sat-diag-sim-return', d.simulation ? fmtTemp(d.sim_return_temp) : '--');
+    setText('sat-diag-sim-flame', d.simulation ? (d.sim_flame_on ? 'ON' : 'off') : '--');
+    setText('sat-diag-sim-mod', d.simulation && (d.sim_modulation != null) ? (d.sim_modulation + '%') : '--');
+    if (d.simulation && d.last_blocked_cmd) {
+      var ageS = Math.round((d.last_blocked_cmd_age_ms || 0) / 1000);
+      setText('sat-diag-sim-lastcmd', d.last_blocked_cmd + ' (' + ageS + 's ago)');
+    } else {
+      setText('sat-diag-sim-lastcmd', '--');
+    }
     setText('sat-diag-ovp-phase', d.ovp_calib_phase || '0');
     setText('sat-diag-ovp-value', d.ovp_value ? d.ovp_value.toFixed(1) + ' C' : '0.0 C');
     setText('sat-diag-fallback', d.fallback_active ? 'Yes' : 'No');

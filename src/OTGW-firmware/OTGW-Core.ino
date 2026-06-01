@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.121
+**  Version  : v2.0.0-alpha.122
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4070,8 +4070,11 @@ void processOT(const char *buf, int len, bool suppressOutput){
 
     // source of otmsg
     if (buf[0]=='B'){
-      epochBoilerlastseen = now; 
+      epochBoilerlastseen = now;
       OTdata.rsptype = OTGW_BOILER;
+      // TASK-795 §4.2: a real boiler frame arrived on the PIC bus. If SAT
+      // simulation is active, trip the edge hook (deferred auto-disable).
+      satNotifyBoilerFrameSeen();
     } else if (buf[0]=='T'){
       epochThermostatlastseen = now;
       OTdata.rsptype = OTGW_THERMOSTAT;

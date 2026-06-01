@@ -1,0 +1,15 @@
+{
+  "cheap_tier": {
+    "last_run": null,
+    "drift_violations": 0,
+    "retire_candidates": 0,
+    "lint": "0F/0A"
+  },
+  "llm_tier": {
+    "last_run": null,
+    "suggest_hits": 0,
+    "audit_findings": 0
+  },
+  "retire_seen": [],
+  "last_nudged": "2026-05-31T22:10:15.648786+00:00"
+}

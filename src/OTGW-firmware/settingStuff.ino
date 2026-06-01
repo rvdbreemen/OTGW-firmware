@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.121
+**  Version  : v2.0.0-alpha.122
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -947,10 +947,22 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpresetsync")) == 0) settings.sat.bPresetSync = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATpresetsynctopic")) == 0) strlcpy(settings.sat.sPresetSyncTopic, newValue, sizeof(settings.sat.sPresetSyncTopic));
   else if (strcasecmp_P(field, PSTR("SATsimulation")) == 0) {
-    settings.sat.bSimulation = EVALBOOLEAN(newValue);
-    if (settings.sat.bSimulation) {
-      state.sat.iSimLastUpdateMs = 0;  // reset on enable
-      state.sat.bSimWarmupDone = false;
+    bool wantSim = EVALBOOLEAN(newValue);
+    // TASK-795 §4.2: availability gate. Simulation is a boiler-absent bench
+    // mode. Refuse to enable it while a real boiler is on the bus, regardless
+    // of the request source (MQTT, settings restore, REST — REST also returns
+    // HTTP 409 earlier for a clearer client error). This is the single
+    // chokepoint that every writer funnels through.
+    if (wantSim && satBoilerHardwarePresent()) {
+      DebugTln(F("SAT-SIM: enable rejected — boiler hardware present"));
+      sendEventToWebSocket_P('!', PSTR("SAT-SIM: enable rejected, boiler present"));
+      settings.sat.bSimulation = false;
+    } else {
+      settings.sat.bSimulation = wantSim;
+      if (settings.sat.bSimulation) {
+        state.sat.iSimLastUpdateMs = 0;  // reset on enable
+        state.sat.bSimWarmupDone = false;
+      }
     }
   }
   else if (strcasecmp_P(field, PSTR("SATsimheatrate")) == 0) settings.sat.fSimHeatRate = constrain(atof(newValue), 0.01f, 5.0f);

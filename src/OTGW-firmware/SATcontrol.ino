@@ -1128,6 +1128,76 @@ bool satSimulationBlocksBusTx(const char* cmd,
 }
 
 //=====================================================================
+//=== Availability gate (TASK-795 plan §4.2) ===
+//=== Simulation requires boiler-absence. A standalone bench rig with  ===
+//=== no boiler is the intended use case. The moment a real boiler     ===
+//=== answers the bus, simulation is forcibly disabled.                ===
+//=====================================================================
+// Real boiler-slave presence. Reads a DIFFERENT signal than the synthetic
+// boilerOnline that probeOTBus()/loopback raise during simulation, so
+// synthetic-online cannot feed back and self-disable sim (plan §4.2 dual-signal
+// rule). PIC path: state.otBus.bBoilerState (set from real boiler frames, 30s
+// window, OTGW-Core). OT-direct path: otDirectBoilerPresent() (boiler answered
+// MsgID 3, loopback excluded). Capability-gated via HAS_* flags per the ESP
+// abstraction rules — no raw platform ifdefs.
+// Non-static + prototyped in OTGW-firmware.h: the REST 409 guard and the MQTT
+// enable-reject (both concatenated ahead of this file) call it cross-file.
+bool satBoilerHardwarePresent()
+{
+#if HAS_PIC
+  if (state.otBus.bBoilerState) return true;
+#endif
+#if HAS_DIRECT_OT
+  if (otDirectBoilerPresent()) return true;
+#endif
+  return false;
+}
+
+// Complete teardown when a real boiler appears while sim is active. One-way:
+// re-enabling needs boiler-absence again (reboot with no boiler, or the bus
+// layer clears its presence signal). Deferred out of the slave-RX edge hook
+// (which is interrupt-adjacent) into satControlLoop via bBoilerDetectedFlag, so
+// the heavy writeSettings() flush runs in cooperative context. Idempotent.
+static void satOnBoilerDetected()
+{
+  if (!settings.sat.bSimulation) return;  // already off — nothing to tear down
+
+  settings.sat.bSimulation = false;
+  writeSettings(false);                   // LittleFS flush — survives reboot
+
+  // Tear down synthetic boiler state; adopt the real readings.
+  state.sat.bSimFlameOn        = false;
+  state.sat.iSimModulation     = 0;
+  state.sat.fSimFlowTemp       = OTcurrentSystemState.Tboiler;
+  state.sat.fSimReturnTemp     = OTcurrentSystemState.Tret;
+  state.sat.iSimFlameOnSinceMs = 0;
+  state.sat.iSimFlameOffSinceMs = 0;
+  state.sat.iSimLastUpdateMs   = 0;       // forces re-init if user re-enables later
+  state.sat.sLastBlockedCmd[0] = '\0';    // the §4.3 trace's meaning ends with sim
+  state.sat.iLastBlockedCmdMs  = 0;
+
+  OTDebugTln(F("SAT-SIM: boiler appeared on bus — simulation disabled completely"));
+  sendEventToWebSocket_P('!', PSTR("SAT-SIM: boiler appeared, simulation off"));
+  // MQTT state topic flips OFF on the next sat-publisher tick (shadow detects it).
+}
+
+// Edge hook — called from the slave-frame RX path of both transports. Cheap and
+// interrupt-safe: just raises a flag if sim is active. Defers the real work
+// (writeSettings) to satConsumeBoilerDetected() in the cooperative SAT loop.
+void satNotifyBoilerFrameSeen()
+{
+  if (settings.sat.bSimulation) state.sat.bBoilerDetectedFlag = true;
+}
+
+// Drains the edge-hook flag in cooperative context (called from satControlLoop).
+static void satConsumeBoilerDetected()
+{
+  if (!state.sat.bBoilerDetectedFlag) return;
+  state.sat.bBoilerDetectedFlag = false;
+  satOnBoilerDetected();
+}
+
+//=====================================================================
 //=== External Input Handlers (called from MQTT/REST) ===
 //=====================================================================
 bool satHandleExternalTemp(const char* value)
@@ -2003,12 +2073,23 @@ void satSendStatusJSON()
   satSendJsonFloat(F("comfort_offset"),        state.sat.fComfortOffset, 2);
   satSendJsonFloat(F("comfort_ref_humidity"),  settings.sat.fComfortHumidity, 0);
   satSendJsonFloat(F("comfort_max_offset"),    settings.sat.fComfortMaxOffset, 1);
-  // Simulation (Task #37)
+  // Simulation (Task #37 + TASK-795)
   sendJsonMapEntry(F("simulation"),            settings.sat.bSimulation);
+  // §4.2: mirrors !satBoilerHardwarePresent() so the Web UI can hide the
+  // simulation card when a real boiler is attached.
+  sendJsonMapEntry(F("sim_available"),         !satBoilerHardwarePresent());
   if (settings.sat.bSimulation) {
     satSendJsonFloat(F("sim_room_temp"),        state.sat.fSimRoomTemp, 1);
     satSendJsonFloat(F("sim_flow_temp"),        state.sat.fSimFlowTemp, 1);
     satSendJsonFloat(F("sim_outdoor_temp"),     state.sat.fSimOutdoorTemp, 1);
+    satSendJsonFloat(F("sim_return_temp"),      state.sat.fSimReturnTemp, 1);
+    sendJsonMapEntry(F("sim_flame_on"),         state.sat.bSimFlameOn);
+    sendJsonMapEntry(F("sim_modulation"),       (int32_t)state.sat.iSimModulation);
+    // §4.3 command trace
+    sendJsonMapEntry(F("last_blocked_cmd"),     state.sat.sLastBlockedCmd);
+    sendJsonMapEntry(F("last_blocked_cmd_age_ms"),
+                     state.sat.iLastBlockedCmdMs == 0 ? (int32_t)0
+                       : (int32_t)(millis() - state.sat.iLastBlockedCmdMs));
   }
   // PID auto-tuning (Task #27)
   sendJsonMapEntry(F("auto_tune"),             settings.sat.bAutoTune);
@@ -2159,6 +2240,7 @@ void satPublishMQTT()
   static SATShadowB s_solar_gain_active, s_summer_active;
   static SATShadowB s_humidity_valid;
   static SATShadowB s_simulation, s_auto_tune, s_auto_tune_active;
+  static SATShadowS s_sim_last_cmd;  // TASK-795 §4.3: sat/sim/last_cmd trace
   static SATShadowB s_error_monitoring, s_solar_freeze_integral;
   static SATShadowB s_device_health, s_cycle_health;
   static SATShadowB s_setpoint_sync, s_modulation_sync, s_ch_sync;
@@ -2419,6 +2501,11 @@ void satPublishMQTT()
   // Simulation, auto-tune. Both use "ON"/"OFF" payloads historically.
   // ---------------------------------------------------------------------------
   publishIfChangedBStr(F("sat/simulation"), settings.sat.bSimulation, s_simulation, "ON", "OFF", true);
+  // TASK-795 §4.3: surface the last would-be (blocked) command while simulating.
+  // Publish-on-change, NOT retained — its meaning is transient and ends with sim.
+  if (settings.sat.bSimulation) {
+    publishIfChangedS(F("sat/sim/last_cmd"), state.sat.sLastBlockedCmd, s_sim_last_cmd, false);
+  }
   publishIfChangedBStr(F("sat/auto_tune"),  settings.sat.bAutoTune,   s_auto_tune,  "ON", "OFF", true);
   if (settings.sat.bAutoTune) {
     publishIfChangedF(F("sat/auto_tune_score"),  state.sat.fAutoTuneScore,    s_auto_tune_score,  SAT_EPS_FRACTION, 2, false);
@@ -3679,6 +3766,13 @@ void satControlLoop()
     _pidStateRestoreAttempted = true;
     satLoadPidState();
   }
+
+  // TASK-795 §4.2: drain the boiler-detected edge flag in cooperative context.
+  // Runs the heavy writeSettings() teardown here, not in the RX edge hook. Also
+  // a defensive backstop: re-checks presence each loop in case the edge hook was
+  // missed (e.g. a frame type not routed through it).
+  satConsumeBoilerDetected();
+  if (settings.sat.bSimulation && satBoilerHardwarePresent()) satOnBoilerDetected();
 
   // TASK-565: detect OT-bus offline->online edge and reset write-on-change
   // cache so a recovering boiler immediately receives the current SAT state
