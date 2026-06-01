@@ -1086,15 +1086,29 @@ static float satGetOutsideTemp()
 //=== Mirrors the satGetRoomTemp()/satGetOutsideTemp() pattern above.     ===
 //=== The simulation-contract ADR is authored in commit 3 (plan §15).    ===
 //=====================================================================
+
+// Sensor noise (TASK-799 / plan §12 F4). Returns a ± noise offset in °C when the
+// sensor_noise scenario is active, else 0. Applied at the wrapper read so it is
+// transient per-read and never written back into the model (cannot accumulate).
+// Cheap deterministic LCG (Numerical Recipes constants) — no heavy RNG lib.
+static float satSimNoiseOffset()
+{
+  if (!settings.sat.bSimulation || state.sat.iSimNoiseExpiryMs == 0) return 0.0f;
+  state.sat.iSimNoiseLcg = state.sat.iSimNoiseLcg * 1664525U + 1013904223U;
+  // top 16 bits -> [-1, +1)
+  float u = ((float)(state.sat.iSimNoiseLcg >> 16) / 32768.0f) - 1.0f;
+  return u * state.sat.fSimNoiseAmplitudeC;
+}
+
 static float satGetFlowTemp()
 {
-  if (settings.sat.bSimulation) return state.sat.fSimFlowTemp;
+  if (settings.sat.bSimulation) return state.sat.fSimFlowTemp + satSimNoiseOffset();
   return OTcurrentSystemState.Tboiler;     // OT MsgID 25 (flow water temp)
 }
 
 static float satGetReturnTemp()
 {
-  if (settings.sat.bSimulation) return state.sat.fSimReturnTemp;
+  if (settings.sat.bSimulation) return state.sat.fSimReturnTemp + satSimNoiseOffset();
   return OTcurrentSystemState.Tret;        // OT MsgID 28 (return water temp)
 }
 
@@ -3416,6 +3430,12 @@ static void satUpdateSimulation()
     state.sat.fSimSolarGainC = 0.0f;
     SATDebugTln(F("SAT SIM: solar_gain expired"));
   }
+  if (state.sat.iSimNoiseExpiryMs != 0 &&
+      (int32_t)(now - state.sat.iSimNoiseExpiryMs) >= 0) {
+    state.sat.iSimNoiseExpiryMs = 0;
+    state.sat.fSimNoiseAmplitudeC = 0.0f;
+    SATDebugTln(F("SAT SIM: sensor_noise expired"));
+  }
 }
 
 // Scenario-event injector (TASK-797 / plan §12 F2). Called from the REST
@@ -3447,6 +3467,23 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS)
     state.sat.iSimSolarExpiryMs = now + durMs;
     if (state.sat.iSimSolarExpiryMs == 0) state.sat.iSimSolarExpiryMs = 1;
     SATDebugTf(PSTR("SAT SIM: solar_gain %.2fC/min for %lds\r\n"), g, (long)(durMs / 1000UL));
+    return true;
+  }
+  if (strcasecmp_P(event, PSTR("sensor_noise")) == 0) {
+    // value = ± noise amplitude °C on flow/return reads (default 0.5); clamp.
+    // value 0 with an explicit event turns noise OFF immediately.
+    float a = (value != 0.0f) ? value : 0.5f;
+    if (a < 0.0f) a = 0.0f;
+    if (a > 5.0f) a = 5.0f;
+    state.sat.fSimNoiseAmplitudeC = a;
+    if (a == 0.0f) {
+      state.sat.iSimNoiseExpiryMs = 0;  // off
+      SATDebugTln(F("SAT SIM: sensor_noise off"));
+    } else {
+      state.sat.iSimNoiseExpiryMs = now + durMs;
+      if (state.sat.iSimNoiseExpiryMs == 0) state.sat.iSimNoiseExpiryMs = 1;
+      SATDebugTf(PSTR("SAT SIM: sensor_noise +/-%.2fC for %lds\r\n"), a, (long)(durMs / 1000UL));
+    }
     return true;
   }
   // dhw_demand / pressure_drop deferred (F5 + SATpressure coupling); pv_surplus

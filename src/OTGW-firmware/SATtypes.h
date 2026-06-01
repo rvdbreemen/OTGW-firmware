@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.125
+**  Version  : v2.0.0-alpha.126
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -311,6 +311,12 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iSimWindowExpiryMs     = 0;      // millis() when window_open ends (0 = inactive)
   float    fSimSolarGainC         = 0.0f;   // solar_gain: additive room-warming °C/min
   uint32_t iSimSolarExpiryMs      = 0;      // millis() when solar_gain ends (0 = inactive)
+  // Sensor noise + dropouts (TASK-799 / plan §12 F4). Opt-in via the F2
+  // sensor_noise event. Noise is applied at the wrapper read (transient, never
+  // written back into the model state, so it cannot accumulate/diverge).
+  float    fSimNoiseAmplitudeC    = 0.0f;   // ± noise band on flow/return/room (°C); 0 = off
+  uint32_t iSimNoiseExpiryMs      = 0;      // millis() when noise ends (0 = inactive)
+  uint32_t iSimNoiseLcg           = 0x1234567U;  // LCG state for cheap deterministic noise
   // Thermal drop learning (Task #21)
   float    fEstimatedRoom         = 0.0f;   // Estimated room temp during fallback
   float    fLastKnownRoom         = 0.0f;   // Last valid room temp before fallback

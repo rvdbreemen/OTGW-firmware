@@ -2382,6 +2382,9 @@ paths:
           `value` = loss multiplier (default 3, clamped 1..20).
         - `solar_gain` — additive room warming for `duration_s`.
           `value` = °C/min (default 0.5, clamped 0..5).
+        - `sensor_noise` — adds ± noise to flow/return sensor reads for
+          `duration_s` (TASK-799), exercising staleness/EMA paths. `value` =
+          amplitude °C (default 0.5, clamped 0..5); `value` 0 turns noise off.
 
         `duration_s` is optional (default 600 s). Other events named in the
         plan (`dhw_demand`, `pressure_drop`, `pv_surplus`) are not handled here:
@@ -2398,7 +2401,7 @@ paths:
               properties:
                 event:
                   type: string
-                  enum: [window_open, solar_gain]
+                  enum: [window_open, solar_gain, sensor_noise]
                   example: window_open
                 value:
                   type: number
