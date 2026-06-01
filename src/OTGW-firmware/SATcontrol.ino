@@ -81,6 +81,10 @@ static const float   SAT_SIM_OUTDOOR_MEAN      = 8.0f;   // °C, daily mean
 static const float   SAT_SIM_OUTDOOR_AMPLITUDE = 6.0f;   // °C, peak deviation (2..14 °C swing)
 static const uint8_t SAT_SIM_OUTDOOR_MIN_HOUR  = 5;      // hour-of-day of the coldest point (~05:00)
 
+// --- Synthetic DHW-draw schedule (TASK-800 / plan §12 F5) ---
+static const uint32_t SAT_SIM_DHW_PERIOD_MS = 1800000UL; // 30 min between light scheduled draws
+static const uint32_t SAT_SIM_DHW_DRAW_MS   = 120000UL;  // 2 min draw length (default; F2 event can override)
+
 // --- Manufacturer Table (PROGMEM) ---
 struct SATMfrEntry {
   uint8_t  memberID;   // OT MemberID code (MsgID 3 valueLB)
@@ -3386,7 +3390,11 @@ static void satUpdateSimulation()
   const float sp = state.sat.fFinalSetpoint;
 
   // --- Flame state machine (plan §5.2) ---
-  const bool heatRequested = state.sat.bActive && sp > (SAT_MIN_SETPOINT + 1.0f);
+  // TASK-800 F5: an active DHW draw demands the flame regardless of CH demand
+  // (the boiler fires for hot water), so cycles run even with no heat call.
+  const bool dhwDraw = (state.sat.iSimDhwExpiryMs != 0);
+  const bool heatRequested = dhwDraw ||
+                             (state.sat.bActive && sp > (SAT_MIN_SETPOINT + 1.0f));
   const bool flowBelowSP   = state.sat.fSimFlowTemp <  (sp - SAT_SIM_FLAME_HYST_LO);
   const bool flowAboveSP   = state.sat.fSimFlowTemp >= (sp + settings.sat.fOvershootMargin);
   const bool offLongEnough = (now - state.sat.iSimFlameOffSinceMs) >= SAT_SIM_MIN_OFF_MS;
@@ -3474,6 +3482,25 @@ static void satUpdateSimulation()
       (int32_t)(now - state.sat.iSimDropoutExpiryMs) >= 0) {
     state.sat.iSimDropoutExpiryMs = 0;
     SATDebugTln(F("SAT SIM: sensor_dropout expired"));
+  }
+
+  // --- DHW demand (TASK-800 F5): light periodic schedule + expiry ---
+  // A short DHW draw every SAT_SIM_DHW_PERIOD_MS keeps the classifier seeing
+  // DHW/MIXED cycles passively; the F2 dhw_demand event can also trigger one.
+  if (state.sat.iSimDhwNextSchedMs == 0) {
+    state.sat.iSimDhwNextSchedMs = now + SAT_SIM_DHW_PERIOD_MS;  // seed first draw
+  }
+  if (state.sat.iSimDhwExpiryMs == 0 &&
+      (int32_t)(now - state.sat.iSimDhwNextSchedMs) >= 0) {
+    state.sat.iSimDhwExpiryMs    = now + SAT_SIM_DHW_DRAW_MS;
+    if (state.sat.iSimDhwExpiryMs == 0) state.sat.iSimDhwExpiryMs = 1;
+    state.sat.iSimDhwNextSchedMs = now + SAT_SIM_DHW_PERIOD_MS;
+    SATDebugTln(F("SAT SIM: scheduled DHW draw start"));
+  }
+  if (state.sat.iSimDhwExpiryMs != 0 &&
+      (int32_t)(now - state.sat.iSimDhwExpiryMs) >= 0) {
+    state.sat.iSimDhwExpiryMs = 0;
+    SATDebugTln(F("SAT SIM: DHW draw end"));
   }
 
   // --- Multi-zone synthetic room model (TASK-798 / plan §12 F3) ---
@@ -3618,8 +3645,23 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS)
     }
     return true;
   }
-  // dhw_demand / pressure_drop deferred (F5 + SATpressure coupling); pv_surplus
-  // already has its own /api/v2/sat/pvsurplus endpoint. Unknown event -> false.
+  if (strcasecmp_P(event, PSTR("dhw_demand")) == 0) {
+    // TASK-800 F5: trigger a DHW draw for duration_s (default 2 min). Forces
+    // DHW-active in satControlLoop (flame-steal, CH suppressed) so the cycle
+    // classifier sees DHW/MIXED. value 0 + no duration cancels an active draw.
+    if (value == 0.0f && durationS == 0) {
+      state.sat.iSimDhwExpiryMs = 0;
+      SATDebugTln(F("SAT SIM: dhw_demand off"));
+    } else {
+      uint32_t d = (durationS > 0 ? (uint32_t)durationS * 1000UL : SAT_SIM_DHW_DRAW_MS);
+      state.sat.iSimDhwExpiryMs = now + d;
+      if (state.sat.iSimDhwExpiryMs == 0) state.sat.iSimDhwExpiryMs = 1;
+      SATDebugTf(PSTR("SAT SIM: dhw_demand for %lds\r\n"), (long)(d / 1000UL));
+    }
+    return true;
+  }
+  // pressure_drop deferred (SATpressure coupling); pv_surplus already has its
+  // own /api/v2/sat/pvsurplus endpoint. Unknown event -> false.
   return false;
 }
 
@@ -4132,7 +4174,14 @@ void satControlLoop()
   }
 
   // --- DHW detection (Task #3): skip CH control when DHW is active ---
-  state.sat.bDhwActive = (OTcurrentSystemState.SlaveStatus & 0x04) != 0; // Bit 2 = DHW active
+  // TASK-800 F5: under simulation, a synthetic DHW draw (F2 dhw_demand event or
+  // the light schedule, both managed in satUpdateSimulation) forces DHW-active
+  // so CH is suppressed (flame-steal) and the cycle classifier sees DHW/MIXED.
+  if (settings.sat.bSimulation && state.sat.iSimDhwExpiryMs != 0) {
+    state.sat.bDhwActive = true;
+  } else {
+    state.sat.bDhwActive = (OTcurrentSystemState.SlaveStatus & 0x04) != 0; // Bit 2 = DHW active
+  }
   if (state.sat.bDhwActive) {
     // DHW has priority - don't adjust CH setpoint, boiler manages itself.
     // TASK-437: On transition into DHW mode, send SW= (DHW setpoint, MsgID 56).

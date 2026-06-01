@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.130
+**  Version  : v2.0.0-alpha.131
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -329,6 +329,12 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // wrapper returns NAN — driving the real TASK-521/522 ghost-Tr / fallback path
   // — so stale-detection and thermal-estimate fallbacks exercise under sim.
   uint32_t iSimDropoutExpiryMs    = 0;      // millis() when sensor_dropout ends (0 = inactive)
+  // DHW demand (TASK-800 / plan §12 F5). While active the synthetic boiler is in
+  // DHW mode: bDhwActive is forced true (flame-steal — CH suppressed) so the
+  // cycle classifier tags cycles SAT_CK_DHW / SAT_CK_MIXED. Triggered by the F2
+  // dhw_demand event or a light periodic schedule.
+  uint32_t iSimDhwExpiryMs        = 0;      // millis() when the DHW draw ends (0 = inactive)
+  uint32_t iSimDhwNextSchedMs     = 0;      // millis() of the next scheduled light draw (0 = unseeded)
   // Thermal drop learning (Task #21)
   float    fEstimatedRoom         = 0.0f;   // Estimated room temp during fallback
   float    fLastKnownRoom         = 0.0f;   // Last valid room temp before fallback

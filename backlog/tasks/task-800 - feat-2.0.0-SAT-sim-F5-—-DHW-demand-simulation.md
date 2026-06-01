@@ -1,10 +1,11 @@
 ---
 id: TASK-800
 title: 'feat-2.0.0: SAT sim F5 — DHW demand simulation'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-31 22:56'
-updated_date: '2026-06-01 04:15'
+updated_date: '2026-06-01 16:36'
 labels:
   - sat
   - simulation
