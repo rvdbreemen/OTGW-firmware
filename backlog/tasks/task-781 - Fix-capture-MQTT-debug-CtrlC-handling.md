@@ -1,11 +1,11 @@
 ---
 id: TASK-781
 title: Fix capture MQTT debug Ctrl+C handling
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-05-31 13:50'
-updated_date: '2026-05-31 14:04'
+updated_date: '2026-06-01 21:03'
 labels: []
 dependencies: []
 ---
@@ -18,7 +18,7 @@ capture-mqtt-debug.bat currently shows the Windows batch 'Terminate batch job (Y
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Ctrl+C stop path avoids or clearly suppresses the interactive 'Terminate batch job (Y/N)?' prompt where feasible.
+- [x] #1 Ctrl+C stop path avoids or clearly suppresses the interactive 'Terminate batch job (Y/N)?' prompt where feasible.
 - [x] #2 Change is documented or discoverable through the script help/output when a different stop key is required.
 - [x] #3 After successful finalization, the diagnostic run folder contains transcript.txt only; intermediate telnet, MQTT, stderr, and summary files are removed after being merged.
 <!-- AC:END -->
@@ -44,7 +44,15 @@ Commit note: not finalized/committed yet because scripts/capture-mqtt-debug.bat 
 Scope update from user: cleanup separate per-stream files after the merge so the completed run leaves transcript.txt as the only capture artifact in the run folder.
 
 Implemented cleanup of intermediate capture files after New-MergedTranscript succeeds. summary.txt, telnet.log, mqtt.log, and mqtt.stderr.log remain temporary during capture/finalization, then are removed so the run folder leaves transcript.txt only. Hardened the extracted temporary PowerShell payload filename with a timestamp plus extra random values after validation exposed a collision when two wrapper invocations were launched in parallel. Validation: .\capture-mqtt-debug.bat --help succeeded; timed dry run to $env:TEMP\otgw-mqtt-capture-single-transcript succeeded and the final run folder contained only transcript.txt (2129 bytes) with the summary section included.
+
+Closed after delivery confirmation. The implemented clean-stop behavior uses the documented Q-key stop path to avoid the Windows batch Ctrl+C prompt where feasible, keeps Ctrl+C/Ctrl+Break as fallback interrupts, and preserves the merged transcript-only run folder behavior already validated in this task.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as delivered. The capture MQTT debug wrapper now provides a documented Q-key clean stop path so users can finalize capture without the Windows batch 'Terminate batch job (Y/N)?' prompt where feasible; Ctrl+C/Ctrl+Break remain fallback interrupts. The finalization path merges summary, telnet, MQTT, and stderr content into transcript.txt and removes intermediate capture files so the completed run folder contains the uploadable transcript only. Validation recorded in the task covered help output and timed dry runs, including final folder contents.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
