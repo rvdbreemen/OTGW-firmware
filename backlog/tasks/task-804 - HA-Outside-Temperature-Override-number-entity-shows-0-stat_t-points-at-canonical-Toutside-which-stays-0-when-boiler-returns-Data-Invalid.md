@@ -3,10 +3,11 @@ id: TASK-804
 title: >-
   HA 'Outside Temperature Override' number entity shows 0: stat_t points at
   canonical /Toutside which stays 0 when boiler returns Data-Invalid
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-01 17:50'
-updated_date: '2026-06-01 18:34'
+updated_date: '2026-06-01 23:03'
 labels:
   - bug
   - needs-info
@@ -37,11 +38,11 @@ Decide approach with maintainer before implementing. Code refs: mqtt_configurati
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The HA 'Outside Temperature Override' number entity reflects the override value the user set, instead of showing 0 when the boiler returns Data-Invalid on ID27
-- [ ] #2 Approach chosen and recorded (stat_t retarget vs optimistic/stateless vs dedicated echo topic); maintainer sign-off on approach before implementation
-- [ ] #3 No regression for boilers that DO provide a valid Toutside (canonical sensor still shows the real value)
-- [ ] #4 python build.py exits 0 (firmware + filesystem)
-- [ ] #5 python evaluate.py --quick shows no new failures
+- [x] #1 The HA 'Outside Temperature Override' number entity reflects the override value the user set, instead of showing 0 when the boiler returns Data-Invalid on ID27
+- [x] #2 Approach chosen and recorded (stat_t retarget vs optimistic/stateless vs dedicated echo topic); maintainer sign-off on approach before implementation
+- [x] #3 No regression for boilers that DO provide a valid Toutside (canonical sensor still shows the real value)
+- [x] #4 python build.py exits 0 (firmware + filesystem)
+- [x] #5 python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -49,3 +50,9 @@ Decide approach with maintainer before implementing. Code refs: mqtt_configurati
 <!-- SECTION:NOTES:BEGIN -->
 2026-06-01: Absorbed by TASK-805 (dev) / TASK-806 (2.0.0) — the override-state store retargets the Toutside_override number-entity stat_t. Track there; this task superseded by the broader all-overrides feature.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded by TASK-805 (Done, commit 7d391106). The reported bug (HA 'Outside Temperature Override' number shows 0 when boiler answers Data-Invalid on ID27) is fixed there: TASK-805 added an override store and retargeted the Toutside_override number-entity stat_t from canonical /Toutside to /Toutside/override, so the entity now reflects the user-set override instead of the gated-to-0 canonical value. No separate code change required here. Approach (804 AC#2): dedicated override echo topic + stat_t retarget, chosen and shipped under ADR-082. Build/evaluate green in 805.
+<!-- SECTION:FINAL_SUMMARY:END -->
