@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp8266.h
-**  Version  : v2.0.0-alpha.122
+**  Version  : v2.0.0-alpha.123
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -102,6 +102,14 @@ inline void platformResetReason(char *buf, size_t len) {
 // WiFi scan: is the network at scan index `i` encrypted (not open)?
 inline bool platformWiFiIsEncrypted(uint8_t i) {
   return WiFi.encryptionType(i) != ENC_TYPE_NONE;
+}
+
+// Put the MQTT WiFiClient in synchronous-write mode (TASK-743). On ESP8266 this
+// eliminates the TCP_SND_BUF temporary copy (~1KB) — writes flush straight to
+// lwIP. The ESP32 NetworkClient has no equivalent and already streams without
+// that copy, so its shim is a no-op (see platform_esp32.h).
+inline void platformWiFiClientSetSync(WiFiClient& c) {
+  c.setSync(true);
 }
 
 // PIC-compatible reset-cause char for the OTDirect PR: Q= response. OTDirect is

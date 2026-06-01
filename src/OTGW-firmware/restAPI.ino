@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.122
+**  Version  : v2.0.0-alpha.123
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -830,10 +830,11 @@ static bool satRequestHasDetailFull()
       && httpServer.arg(F("detail")) == F("full");
 }
 
-#if defined(ESP32)
+#if HAS_SAT_BLE
 // TASK-508: pull two named fields from a JSON body in one call. Trivial
 // wrapper over extractJsonField() (line 2167) so handleSAT label/forget
-// branches stay short.
+// branches stay short. TASK-743: gated on the HAS_SAT_BLE capability flag
+// (not raw ESP32) to match its only caller (the BLE label/forget branch).
 static bool satExtractTwoFields(const char* body,
                                 const __FlashStringHelper* k1, char* v1, size_t sz1,
                                 const __FlashStringHelper* k2, char* v2, size_t sz2)

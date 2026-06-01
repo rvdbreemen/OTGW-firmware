@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform_esp32.h
-**  Version  : v2.0.0-alpha.122
+**  Version  : v2.0.0-alpha.123
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -123,6 +123,12 @@ inline void platformResetReason(char *buf, size_t len) {
 // WiFi scan: is the network at scan index `i` encrypted (not open)?
 inline bool platformWiFiIsEncrypted(uint8_t i) {
   return WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
+}
+
+// No-op: the ESP32 NetworkClient has no setSync() and already streams writes
+// without the ESP8266 TCP_SND_BUF temporary copy (TASK-743). Stub for link
+// symmetry so the caller stays unguarded.
+inline void platformWiFiClientSetSync(WiFiClient&) {
 }
 
 // Reset cause as a PIC-compatible boot-code char for the OTDirect PR: Q=

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.122
+**  Version  : v2.0.0-alpha.123
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -599,11 +599,8 @@ void startMQTT()
 
   // Eliminate the TCP_SND_BUF temporary copy in WiFiClient (~1072 bytes saved).
   // With sync mode, writes flush directly to lwIP without intermediate buffering.
-  // setSync is ESP8266-only: the ESP32 NetworkClient has no equivalent API, and
-  // ESP32 already streams writes without the same intermediate copy.
-#ifdef ARDUINO_ARCH_ESP8266
-  wifiClient.setSync(true);
-#endif
+  // Platform-divergent (setSync is ESP8266-only); behind a shim (TASK-743).
+  platformWiFiClientSetSync(wifiClient);
   wifiClient.setNoDelay(true);
 
   // Outbound publishes stream via beginPublish/write/endPublish.
