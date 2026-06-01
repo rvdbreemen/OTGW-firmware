@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-alpha.135
+**  Version  : v2.0.0-alpha.136
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -387,7 +387,7 @@ void sendJsonMapEntry(const char *cName, int32_t iValue)
 
 // Extra overloads to resolve type ambiguity on ESP32 where int/int32_t and
 // unsigned int/uint32_t are distinct types (int32_t = long on xtensa-esp32).
-#if defined(ESP32)
+#if PLATFORM_INT_DISTINCT_FROM_INT32
 void sendJsonMapEntry(const char *cName, int iValue) {
   sendJsonMapEntry(cName, (int32_t)iValue);
 }
@@ -485,7 +485,7 @@ void sendJsonOTmonMapEntry(const char *cName, int32_t iValue, const char *cUnit,
 }
 
 // Extra overloads to resolve type ambiguity on ESP32
-#if defined(ESP32)
+#if PLATFORM_INT_DISTINCT_FROM_INT32
 void sendJsonOTmonMapEntry(const char *cName, int iValue, const char *cUnit, time_t epoch) {
   sendJsonOTmonMapEntry(cName, (int32_t)iValue, cUnit, epoch);
 }
@@ -658,7 +658,7 @@ void sendJsonMapEntry(const __FlashStringHelper* cName, int32_t iValue) {
 }
 
 // Extra overloads to resolve type ambiguity on ESP32 (see char* overloads above)
-#if defined(ESP32)
+#if PLATFORM_INT_DISTINCT_FROM_INT32
 void sendJsonMapEntry(const __FlashStringHelper* cName, int iValue) {
   sendJsonMapEntry(cName, (int32_t)iValue);
 }

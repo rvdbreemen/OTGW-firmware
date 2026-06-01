@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : platform.h
-**  Version  : v2.0.0-alpha.135
+**  Version  : v2.0.0-alpha.136
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -25,6 +25,20 @@
   #include "platform_esp32.h"
 #else
   #error "Unsupported platform — only ESP8266 and ESP32 are supported."
+#endif
+
+// ---- Integer-type model (TASK-745) ----------------------------------------
+// On xtensa-esp32, int32_t is `long` — a DISTINCT type from `int` (both 32-bit),
+// so sendJsonMapEntry(int) / (unsigned int) need their own overloads alongside
+// the int32_t/uint32_t ones. On ESP8266 (and any target where int32_t IS int)
+// those extra overloads would be duplicate definitions. jsonStuff.ino gates the
+// extra overloads on this flag instead of a raw #if defined(ESP32), keeping the
+// platform conditional inside the abstraction layer. Defined here (the
+// dispatcher) so both platform sub-headers share one definition.
+#if defined(ESP32)
+  #define PLATFORM_INT_DISTINCT_FROM_INT32 1
+#else
+  #define PLATFORM_INT_DISTINCT_FROM_INT32 0
 #endif
 
 // ---- Common includes (identical API on both platforms) --------------------

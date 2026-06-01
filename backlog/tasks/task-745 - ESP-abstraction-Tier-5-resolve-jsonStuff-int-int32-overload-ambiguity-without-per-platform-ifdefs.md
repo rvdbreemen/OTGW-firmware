@@ -3,9 +3,11 @@ id: TASK-745
 title: >-
   ESP abstraction Tier 5: resolve jsonStuff int/int32 overload ambiguity without
   per-platform ifdefs
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-28 08:29'
+updated_date: '2026-06-01 19:11'
 labels:
   - esp-abstraction-audit
   - refactor
