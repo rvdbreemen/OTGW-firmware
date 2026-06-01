@@ -1,11 +1,11 @@
 ---
 id: TASK-384
 title: 'Fresh-flash bootloop on Wemos D1 mini (no-shield, multiple FW versions)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-22 20:53'
-updated_date: '2026-05-26 09:56'
+updated_date: '2026-06-01 21:06'
 labels:
   - bug
   - needs-info
@@ -55,10 +55,12 @@ dvd77 (GitHub #554, 2026-04-29): tested on v1.3.5, v1.4.1, and v1.5.0-beta — a
 Fix applied (commit bb1758b3): added --flash_mode dio explicitly to flash_otgw.sh, flash_otgw.bat, and flash_esp.py. Also added Boya troubleshooting note to .sh and .bat help output.
 
 AC #2 and #4 still open: need dvd77 serial log during bootloop (AC#2) and reporter confirmation of fix (AC#4). GitHub #554 comment posted explaining root cause and asking for retesting.
+
+2026-06-01 @codex: Administrative stale closure by maintainer decision. The remaining feedback-dependent criteria were not re-verified: no new serial/telnet bootloop capture and no fresh reporter/lab verification arrived. The issue has been inactive through later release lines, and the task is closed to keep the board aligned with current reality. Reopen only with new fresh-flash bootloop evidence on current firmware and serial-during-boot details.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Fresh-flash bootloop investigated across two reporters (ArnoudPJ, dvd77) on GitHub #554. Root cause: power/brownout behaviour specific to certain Wemos D1 mini batches without OTGW shield attached. Workaround: attach shield, or flash 1.4.1 first then OTA. No code change made. Closing with assumption that 1.5.0+ (Core 2.7.4 + updated partition layout) resolves the symptom; reporters to reopen with serial evidence if issue persists on 1.5.0+.
+Closed as stale by maintainer decision. The Wemos D1 mini fresh-flash bootloop investigation produced enough evidence to treat the original reports as flash-mode/hardware/power related rather than an actionable current firmware defect, and later releases shipped without renewed reporter feedback. The remaining serial-capture and reporter/lab-verification criteria were not satisfied; they are intentionally superseded by stale administrative closure. Reopen only if the symptom resurfaces on current firmware with serial boot evidence.
 <!-- SECTION:FINAL_SUMMARY:END -->
