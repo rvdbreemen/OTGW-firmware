@@ -1136,6 +1136,10 @@ void sendDeviceInfoV2()
   }
 
   // --- Network identity ---
+  // This endpoint is intentionally unauthenticated (ADR-032, trusted-LAN model).
+  // Network identity, including LAN topology (subnet/gateway/DNS), is exposed by
+  // design alongside the already-public IP/MAC/SSID/chipid fields. Do not add an
+  // auth gate here without revisiting ADR-032.
   sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
   sendJsonMapEntry(F("ipaddress"),            CSTR(WiFi.localIP().toString()));
   sendJsonMapEntry(F("wifi_current_subnet"),  CSTR(WiFi.subnetMask().toString()));

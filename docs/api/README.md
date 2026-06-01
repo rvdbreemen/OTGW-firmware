@@ -129,6 +129,10 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "compiled": "Mar 26 2026 10:30:00",
     "hostname": "OTGW",
     "ipaddress": "192.168.1.100",
+    "wifi_current_subnet": "255.255.255.0",
+    "wifi_current_gateway": "192.168.1.1",
+    "wifi_current_dns1": "192.168.1.1",
+    "wifi_current_dns2": "0.0.0.0",
     "macaddress": "AA:BB:CC:DD:EE:FF",
     "freeheap": 25600,
     "maxfreeblock": 20480,
@@ -162,6 +166,8 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
   }
 }
 ```
+
+> **Security note**: This endpoint is intentionally unauthenticated and exposes full network identity, including LAN topology (`wifi_current_subnet`, `wifi_current_gateway`, `wifi_current_dns1`, `wifi_current_dns2`) alongside `ipaddress`, `macaddress`, `ssid` and `chipid`. This is by design under the trusted-LAN security model (ADR-032: no authentication on the local network). Keep the device off the public internet and use a VPN for remote access.
 
 #### `GET /api/v2/device/time`
 
