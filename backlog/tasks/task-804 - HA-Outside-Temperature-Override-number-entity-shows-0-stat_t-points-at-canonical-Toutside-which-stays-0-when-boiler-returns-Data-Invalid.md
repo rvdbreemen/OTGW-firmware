@@ -3,7 +3,7 @@ id: TASK-804
 title: >-
   HA 'Outside Temperature Override' number entity shows 0: stat_t points at
   canonical /Toutside which stays 0 when boiler returns Data-Invalid
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-01 17:50'
