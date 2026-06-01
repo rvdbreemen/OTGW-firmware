@@ -19,10 +19,10 @@ Hardware capture log-issues/OTGW_1.6_beta_24.txt from firmware 1.6.0-beta.24+a16
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Document beta.24 reproduction evidence and root cause for /api/v2/device/info returning 503.
-- [ ] #2 Apply a minimal fix so the identified device-info failure path no longer returns 503 under the reproduced heap-pressure condition.
+- [x] #2 Apply a minimal fix so the identified device-info failure path no longer returns 503 under the reproduced heap-pressure condition.
 - [x] #3 Assess the observed MQTT/WebSocket drop growth and record whether additional remediation is required.
 - [x] #4 Run required validation including firmware plus filesystem artifact build in one validation pass and relevant evaluator/tests.
-- [ ] #5 Record branch, coding agent, implementation notes, and final summary before completion.
+- [x] #5 Record branch, coding agent, implementation notes, and final summary before completion.
 <!-- AC:END -->
 
 ## Implementation Plan
