@@ -158,6 +158,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-097: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification](ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md)** 🆕  
   Constrains the legacy base topic to Write-Data only (no Write-Ack) and gates `/boiler` subtopic publication per MsgID via `bSlaveEchoesValue` in the OTlookup table. Prevents base-topic flapping and fake-zero `/boiler` readings for MsgIDs where the OT v4.2 spec defines the Write-Ack data byte as undefined. Refined by ADR-096 (worldview semantics, superseded by ADR-103).
 
+- **[ADR-119: MQTT Source-Topic Sibling-Suffix Shape (renumbered from ADR-097)](ADR-119-mqtt-source-topic-sibling-suffix-shape.md)**  
+  Superseded by ADR-098. **Number disambiguation:** originally filed as ADR-097, colliding with the still-live publish-gating ADR-097 directly above. Renumbered to ADR-119 on 2026-06-02 — the publish-gating ADR keeps 097 (it has ~13 firmware source refs and was itself already renumbered once, ADR-066 → ADR-097). Older Accepted/Superseded ADRs (095/096/098/101/105) and docs (`docs/api/MQTT.md`, the manuals, Domoticz/openHAB guides) still cite this decision as "ADR-097"; where the reference concerns **source-topic / discovery sibling-suffix shape** it means this document, ADR-119. Those frozen bodies are not rewritten, per the ADR immutability rule.
+
 - **[ADR-101: Flat Per-Value MQTT Topics Over Aggregated JSON Payloads](ADR-101-flat-per-value-mqtt-topics-over-aggregated-json-payloads.md)** 🆕  
   Binding decision (owner: Robert van den Breemen, 2026-05-08): OTGW-firmware publishes one plain scalar per topic; aggregated JSON blobs on value topics are forbidden. HA auto-discovery metadata travels separately on `homeassistant/#` config topics. OT-Thing nested-JSON and Tasmota SENSOR-JSON dialects are explicitly not supported. Enforced by `adr-judge` pre-commit hook.
 

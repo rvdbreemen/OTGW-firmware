@@ -1,4 +1,20 @@
-# ADR-097: MQTT Source-Topic Sibling-Suffix Shape (feature-2.0.0 port of ADR-070)
+# ADR-119: MQTT Source-Topic Sibling-Suffix Shape (feature-2.0.0 port of ADR-070; renumbered from ADR-097)
+
+> **Renumber note (2026-06-02):** this ADR was originally filed as **ADR-097**.
+> The number collided with a second, unrelated and still-live decision also filed
+> as ADR-097 (*MQTT Publish Gating by Source and Slave-Echo*). The publish-gating
+> ADR keeps the 097 number because it is cited by ~13 firmware source lines and
+> was itself already renumbered once (ADR-066 → ADR-097). This dead, superseded
+> ADR was the cheaper one to move, so it became **ADR-119** on 2026-06-02.
+> The body below is preserved verbatim as the frozen historical record from
+> 2026-05-07, so its internal prose (and cross-refs in the Accepted/Superseded
+> ADRs that cite it — ADR-095, ADR-096, ADR-098, ADR-101, ADR-105 — and in
+> `docs/api/MQTT.md`, the manuals, and the Domoticz/openHAB guides) still say
+> "ADR-097". Where those refer to **source-topic / discovery sibling-suffix
+> shape**, they mean *this* document (ADR-119); refs to **publish gating,
+> master-topic validity, or slave-echo** mean the other ADR-097. Per the ADR
+> immutability rule (CLAUDE.md; quoted in ADR-098 line 83) those historical
+> bodies are not rewritten.
 
 **Status:** Superseded by ADR-098, 2026-05-07. Original status: Accepted, 2026-05-07 (four verification gates passed: Completeness, Evidence, Clarity, Consistency). Reason for supersession: this ADR's discovery-topic carve-out (mirroring dev ADR-070 line 54) was based on the assumption that HA accepts nested discovery topic identifiers and handles `state_topic` deltas in-place. Empirical investigation against `homeassistant/components/mqtt/discovery.py:TOPIC_MATCHER` showed nested discovery topics (object_id containing `/`) are rejected before reaching the subscription layer. ADR-098 corrects the discovery-topic shape on this branch; the state-topic decision recorded here is preserved and remains in force. See dev sibling: ADR-070 → ADR-071 supersession.
 **Date:** 2026-05-07
@@ -120,7 +136,7 @@ The dev (1.5.x) line carries the same change under ADR-070; this ADR is the expl
     {
       "pattern": "PSTR\\(\"%s/(thermostat|boiler)\"\\)",
       "path_glob": "src/OTGW-firmware/MQTTstuff.ino",
-      "message": "Source state topics use sibling-suffix shape (`%s_thermostat`, `%s_boiler`) per ADR-097. Nested children pattern was retired."
+      "message": "Source state topics use sibling-suffix shape (`%s_thermostat`, `%s_boiler`) per ADR-119 (originally ADR-097). Nested children pattern was retired."
     }
   ],
   "llm_judge": false
