@@ -1,11 +1,11 @@
 ---
 id: TASK-485
 title: 'Fix: ''AP not found'' on Netgear Orbi after upgrading to 1.4.1 (aagorine)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-29 23:49'
-updated_date: '2026-05-26 09:56'
+updated_date: '2026-06-01 21:07'
 labels:
   - bug
   - needs-info
@@ -42,4 +42,12 @@ Maintainer advised trying 1.5.0-beta.2 (DHCP fix); tester response: 'Not yet, bu
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-05-26: Current published beta is 1.6.0-beta.21 (version.h confirmed). Previous note recommended retest on beta.15 (2026-05-05). Since then the project has moved through betas 16-21, with no new reports from aagorine. AC#3 still needs tester retest — aagorine should now retest on 1.6.0-beta.21. The WiFiManager downgrade to 2.0.15-rc.1 (commit 38e37f6e, 2026-05-04) is now included in this beta and is the most likely fix candidate for AP-related WiFi issues, as the 2.0.17 version had known portal TCP abort regressions.
+
+2026-06-01 @codex: Administrative stale closure by maintainer decision. The remaining criteria depended on renewed reporter feedback and Orbi-specific retesting, but no new data arrived after later firmware lines shipped. Close as stale/no-feedback rather than as a reproduced firmware fix. Reopen only if the AP-not-found symptom recurs on current firmware with serial/AP-scan evidence.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as stale by maintainer decision. The Netgear Orbi AP-not-found report remained feedback-dependent: no serial/AP-scan log, no confirmed mesh-driver interaction, and no current-firmware retest arrived from the reporter. Later firmware lines shipped without renewed reports, so there is no actionable current defect to keep on the active board. Reopen only with a current-firmware reproduction and scan/connect logs.
+<!-- SECTION:FINAL_SUMMARY:END -->
