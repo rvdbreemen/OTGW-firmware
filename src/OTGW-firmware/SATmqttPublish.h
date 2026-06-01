@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-alpha.134
+**  Version  : v2.0.0-alpha.135
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -43,13 +43,11 @@
 #include <string.h>
 #include <stdint.h>
 
-#if defined(ESP32)
-  #include <esp_system.h>   // esp_random()
-#endif
-// ESP8266: os_random() (return type 'unsigned long') is declared in osapi.h,
-// which is transitively pulled in by <Arduino.h> via the ESP8266 core's
-// pgmspace.h. No forward declaration needed — and adding one trips an
-// ambiguous-overload (uint32_t vs unsigned long, same size but distinct types).
+// TASK-743: the random source diverges per platform (esp_random vs os_random).
+// Use platformHardwareRandom() instead of a raw platform conditional. platform.h
+// is self-contained (pragma once, only needs Arduino.h) so it is safe to pull in
+// here even though SATmqttPublish.h is included early in OTGW-firmware.h.
+#include "platform.h"
 
 // ---------------------------------------------------------------------------
 // Heartbeat jitter window (per ADR-111 sub-rule 3).
@@ -60,11 +58,7 @@ static constexpr uint32_t SAT_HEARTBEAT_MAX_MS = 11UL * 60UL * 1000UL;   //  660
 static constexpr uint32_t SAT_BOOT_SCATTER_MAX_MS = 11UL * 60UL * 1000UL;
 
 static inline uint32_t satRandomU32() {
-#if defined(ESP32)
-  return esp_random();
-#else
-  return (uint32_t)os_random();
-#endif
+  return platformHardwareRandom();  // TASK-743: esp_random / os_random behind the shim
 }
 
 // Uniform random in [SAT_HEARTBEAT_MIN_MS, SAT_HEARTBEAT_MAX_MS] inclusive.
