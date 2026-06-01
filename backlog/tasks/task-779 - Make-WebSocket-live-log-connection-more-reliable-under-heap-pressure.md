@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 12:48'
-updated_date: '2026-06-01 23:03'
+updated_date: '2026-06-01 23:06'
 labels:
   - bug
   - websocket
@@ -40,4 +40,18 @@ Folded from TASK-769 AC#3 (user decision 2026-05-31): the heap-guard relax + WS/
 ## CORRECTION 2026-05-31 — chat-sourced claims retracted
 Prior note quoting Rob saying it is a separate task and George on NodeMCU v3 / logHeapStats tonight = fabricated, NOT in the #beta-testing transcript. Disregard.
 Real support for THIS task from the transcript: Rob: the changes I made to make it more reliable prioritizes other things than the webui; Rob: if you have no logging running, then the UI will become snappy. => the WebSocket live-log is a genuine load/heap driver. AC#7 board NOT confirmed as NodeMCU v3 (ESP8266 only is confirmed); confirm board from Georges banner when he reports. The decision to OWN the WS/MQTT decouple + relaxed MQTT values here came from the user AskUserQuestion (Fold into TASK-779), not the chat. Threshold values still require real logHeapStats telemetry before tuning.
+
+2026-06-02 (investigate + draft-ADR scope, per user decision):
+- Read heap-gating path: getHeapHealth() helperStuff.ino:940 feeds BOTH canSendWebSocket() (989) and canPublishMQTT() (1043). Key finding: throttle INTERVALS already split (WEBSOCKET_THROTTLE_MS_* vs MQTT_THROTTLE_MS_*, lines 915-918); only the TIER BOUNDARIES are shared. So the decouple is at threshold-ladder level, not interval level.
+- WS allocation (AC#1 partial, static): sendLogToWebSocket -> webSocket.broadcastTXT (webSocketStuff.ino:264-267); broadcastTXT copies payload per client x MAX_WEBSOCKET_CLIENTS=3 -> dominant per-frame heap cost. Producer=live-log, victim=MQTT. Quantitative per-frame numbers still need George logHeapStats (live-log open vs closed) on real device.
+- ADR-030 thresholds documented (3072/5120/8192) are STALE vs code (1536/3072/5120 + maxBlock promote). New ADR revisits the single-ladder DECISION, not the numbers.
+- Authored docs/adr/ADR-083-per-consumer-heap-gating.md (Status: Proposed): per-consumer threshold ladders + shared CRITICAL OOM floor + WS drop-to-latest coalescing. Strict lint gates pass (completeness/consistency/evidence); clarity advisory only (standard acronyms).
+
+BLOCKED ACs (not self-verifiable here):
+- AC#1 quantitative heap measurement: needs field logHeapStats.
+- AC#7 field validation by GeorgeZ83 on bench (>1h).
+- AC#8 relaxed MQTT threshold VALUES: deferred in ADR-083 pending telemetry (structure decided, numbers not invented).
+- AC#9 ADR: drafted Proposed; NOT Accepted (maintainer sign-off required; relaxed-values portion telemetry-gated). Leave unchecked until accepted.
+
+Impl of decouple code (AC#2/#3) intentionally NOT done in this scope (user chose investigate+draft-ADR-only); unblocks once ADR-083 Accepted + telemetry in.
 <!-- SECTION:NOTES:END -->
