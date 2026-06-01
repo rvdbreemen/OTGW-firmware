@@ -330,8 +330,8 @@ static const uint16_t SAT_CALIB_MIN_SAMPLES   = 40;        // Minimum samples be
 // OPV calibration state machine - called from control loop when calibration is active
 static void satOvpCalibrate()
 {
-  float boilerTemp = OTcurrentSystemState.Tboiler;
-  bool  flameOn    = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+  float boilerTemp = satGetFlowTemp();
+  bool  flameOn    = satIsFlameOn();
   uint32_t elapsed = millis() - state.sat.iCalibStartMs;
 
   switch (state.sat.eCalibPhase) {
@@ -479,9 +479,9 @@ static const float    BS_IGNITION_SURGE_RATE      = 0.5f;      // 0.5C/s temp ri
 
 static void satUpdateBoilerStatus()
 {
-  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+  bool flame = satIsFlameOn();
   float mod = OTcurrentSystemState.RelModLevel;
-  float boilerTemp = OTcurrentSystemState.Tboiler;
+  float boilerTemp = satGetFlowTemp();
   float setpoint = state.sat.fFinalSetpoint;
   uint32_t now = millis();
   SATBoilerStatus prev = state.sat.eBoilerStatus;
@@ -665,8 +665,8 @@ static float satApplyPWM(float pidOutput)
   uint32_t maxMs     = upperMs * 2;                      // Max cycle time
 
   // --- Effective temperature tracking (EMA during first 30s of flame-on) ---
-  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
-  float boilerTemp = OTcurrentSystemState.Tboiler;
+  bool flame = satIsFlameOn();
+  float boilerTemp = satGetFlowTemp();
   if (flame && !_pwm_waitingForFlame) {
     uint32_t sinceFlamOn = millis() - _pwm_flameOnMs;
     if (sinceFlamOn < 30000UL) {
@@ -752,7 +752,7 @@ static float satApplyPWM(float pidOutput)
         _pwm_flameOffHoldSetpoint = 0.0f;
         return SAT_MIN_SETPOINT;
       }
-      float cs = OTcurrentSystemState.Tret + settings.sat.fFlameOffOffset;
+      float cs = satGetReturnTemp() + settings.sat.fFlameOffOffset;
       if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
       if (cs > maxSetpoint) cs = maxSetpoint;
       _pwm_flameOffHoldSetpoint = cs;
@@ -765,7 +765,7 @@ static float satApplyPWM(float pidOutput)
     }
     // Step 4: flame stable, after fModSupDelay - apply modulation suppression setpoint
     {
-      float cs = OTcurrentSystemState.Tboiler - settings.sat.fModSupOffset;
+      float cs = satGetFlowTemp() - settings.sat.fModSupOffset;
       if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
       if (cs > maxSetpoint) cs = maxSetpoint;
       _pwm_flameOffHoldSetpoint = 0.0f;
@@ -936,12 +936,12 @@ static float satApplyContinuous(float pidOutput)
   //   3. boilerTemp <= pidOutput -- setpoint already above boiler temp, no clamping needed
 
   // Case 1: flame is off -- return pidOutput directly
-  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+  bool flame = satIsFlameOn();
   if (!flame) {
     return pidOutput;
   }
 
-  float boilerTemp = OTcurrentSystemState.Tboiler;
+  float boilerTemp = satGetFlowTemp();
 
   // Case 2: boilerTemp invalid / unavailable (sensor absent or not yet received)
   if (boilerTemp <= 0.0f || boilerTemp > 100.0f) {
@@ -1062,6 +1062,36 @@ static float satGetOutsideTemp()
     return state.sat.weather.fTemperature;
   }
   return OTcurrentSystemState.Toutside;  // OT message ID 27
+}
+
+//=====================================================================
+//=== SAT boiler-side wrappers (TASK-795: simulation contract) ===
+//=== Return synthetic state when bSimulation, otherwise the real OT bus. ===
+//=== Mirrors the satGetRoomTemp()/satGetOutsideTemp() pattern above.     ===
+//=== The simulation-contract ADR is authored in commit 3 (plan §15).    ===
+//=====================================================================
+static float satGetFlowTemp()
+{
+  if (settings.sat.bSimulation) return state.sat.fSimFlowTemp;
+  return OTcurrentSystemState.Tboiler;     // OT MsgID 25 (flow water temp)
+}
+
+static float satGetReturnTemp()
+{
+  if (settings.sat.bSimulation) return state.sat.fSimReturnTemp;
+  return OTcurrentSystemState.Tret;        // OT MsgID 28 (return water temp)
+}
+
+static bool satIsFlameOn()
+{
+  if (settings.sat.bSimulation) return state.sat.bSimFlameOn;
+  return (OTcurrentSystemState.Statusflags & 0x08) != 0;  // status bit 3 = flame
+}
+
+static uint8_t satGetActualModulation()
+{
+  if (settings.sat.bSimulation) return state.sat.iSimModulation;
+  return (uint8_t)OTcurrentSystemState.RelModLevel;  // OT MsgID 17 (rel. modulation %)
 }
 
 //=====================================================================
@@ -2421,7 +2451,7 @@ void satPublishMQTT()
         modState = "HOT_WATER";
       } else if (state.sat.eControlMode == SAT_MODE_PWM && !state.sat.bPwmFlameRequested) {
         modState = "PWM_OFF";
-      } else if (OTcurrentSystemState.Tboiler < 22.0f) {
+      } else if (satGetFlowTemp() < 22.0f) {
         modState = "COLD";
       } else {
         modState = "ACTIVE";
@@ -2460,7 +2490,7 @@ void satPublishMQTT()
     float maxCons = 0.0f;
     if (minCons > 0 && maxCons > 0) {
       float consumption = 0.0f;
-      bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+      bool flame = satIsFlameOn();
       if (state.sat.bActive && flame) {
         float modFrac = OTcurrentSystemState.RelModLevel / 100.0f;
         consumption = minCons + (modFrac * (maxCons - minCons));
@@ -2576,7 +2606,7 @@ void satPublishMQTT()
     dtostrf(SAT_MIN_SETPOINT, 1, 1, fBuf);
     pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"minimum_setpoint\":%s"), fBuf);
     pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"boiler_flame_timing\":%.1f"), state.sat.fLastCycleDuration);
-    dtostrf(OTcurrentSystemState.Tboiler, 1, 1, fBuf);
+    dtostrf(satGetFlowTemp(), 1, 1, fBuf);
     pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"boiler_temperature_cold\":%s"), fBuf);
     pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"boiler_temperature_tracking\":false"));
     pos += snprintf_P(climAttrBuf + pos, sizeof(climAttrBuf) - pos, PSTR(",\"boiler_temperature_derivative\":0.0"));
@@ -2643,7 +2673,7 @@ static void satUpdateComfort()
 static void satUpdatePowerEnergy()
 {
   float modulation = OTcurrentSystemState.RelModLevel;
-  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+  bool flame = satIsFlameOn();
 
   // Power = modulation% * capacity (only when flame is on)
   if (flame && modulation > 0.0f) {
@@ -2675,8 +2705,8 @@ static void satUpdatePowerEnergy()
     // Prefer thermal power from flow rate (MsgID 19, DHW circuit) if available.
     // DHWFlowRate is in L/min; convert to L/s for P = m_dot * Cp * dT.
     float flowLmin = OTcurrentSystemState.DHWFlowRate;
-    float tFlow    = OTcurrentSystemState.Tboiler; // flow water temp (MsgID 25)
-    float tRet     = OTcurrentSystemState.Tret;    // return water temp (MsgID 28)
+    float tFlow    = satGetFlowTemp(); // flow water temp (MsgID 25)
+    float tRet     = satGetReturnTemp();    // return water temp (MsgID 28)
     if (flowLmin > 0.1f && tFlow > 0.0f && tRet > 0.0f && (tFlow - tRet) > 0.5f) {
       // P_thermal (kW) = (L/min / 60) * 4186 J/(kg·K) * dT / 1000
       float flowLs = flowLmin / 60.0f;
@@ -3007,7 +3037,7 @@ static void satUpdateFlameStatus()
     return;
   }
 
-  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;  // Bit 3 = flame
+  bool flame = satIsFlameOn();  // Bit 3 = flame
 
   if (!state.sat.bActive) {
     state.sat.eFlameStatus = SAT_FS_IDLE_OK;
@@ -3198,7 +3228,7 @@ static void satUpdateThermalLearning()
   if (!settings.sat.bEnabled && !state.sat.bFallbackActive) return;
 
   uint32_t now = millis();
-  bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+  bool flame = satIsFlameOn();
   float roomTemp = satGetRoomTemp();
   float outsideTemp = satGetOutsideTemp();
   bool roomValid = (roomTemp > -10.0f && roomTemp < 50.0f);
@@ -3669,7 +3699,7 @@ void satControlLoop()
   }
 
   // Flame edge detection — always process, independent of timer
-  bool currentFlame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+  bool currentFlame = satIsFlameOn();
   if (currentFlame != _sat_prevFlameState) {
     satCycleOnFlameChange(currentFlame);
     _sat_prevFlameState = currentFlame;
@@ -3865,7 +3895,7 @@ void satControlLoop()
   float curveValue = satCalcHeatingCurve(effectiveTarget, outsideTemp);
 
   // --- Calculate PID output (includes heating curve value) ---
-  float pidOutput = satPidUpdate(roomTemp, effectiveTarget, curveValue, OTcurrentSystemState.Tboiler);
+  float pidOutput = satPidUpdate(roomTemp, effectiveTarget, curveValue, satGetFlowTemp());
 
   // --- Multi-zone PID override (Task #233) ---
   // When sat_zone_count > 1: run each zone's PID and use the most-demanding setpoint.
@@ -4021,7 +4051,7 @@ void satControlLoop()
 
   // --- Flame-off setpoint offset (anti-cycling hysteresis, Task #32) ---
   if (settings.sat.fFlameOffOffset > 0.001f) {
-    bool flame = (OTcurrentSystemState.Statusflags & 0x08) != 0;
+    bool flame = satIsFlameOn();
     if (!flame) {
       finalSetpoint += settings.sat.fFlameOffOffset;
       if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;

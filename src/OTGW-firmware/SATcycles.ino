@@ -512,8 +512,8 @@ void satCycleOnFlameChange(bool flameOn)
     // Flame just turned ON — start new cycle
     _cycle_flameOn = true;
     _cycle_flameOnStartMs = now;
-    _cycle_maxFlowTemp = OTcurrentSystemState.Tboiler;
-    _cycle_minFlowTemp = OTcurrentSystemState.Tboiler;
+    _cycle_maxFlowTemp = satGetFlowTemp();
+    _cycle_minFlowTemp = satGetFlowTemp();
     _cycle_setpointAtStart = state.sat.fFinalSetpoint;
     _cycle_overshootSec = 0.0f;
     _cycle_lastSampleMs = now;
@@ -523,7 +523,7 @@ void satCycleOnFlameChange(bool flameOn)
     _hourCountRecord(now);
     state.sat.iCyclesThisHour = _hourCountGet(now);
     SATDebugTf(PSTR("SAT cycle: flame ON flow=%.1f sp=%.1f cycles/hr=%u\r\n"),
-               OTcurrentSystemState.Tboiler, _cycle_setpointAtStart,
+               satGetFlowTemp(), _cycle_setpointAtStart,
                (unsigned)state.sat.iCyclesThisHour);
     {
       static char _wsMsg[80];
@@ -534,7 +534,7 @@ void satCycleOnFlameChange(bool flameOn)
     _flow_sampleHead  = 0;
     _flow_sampleCount = 0;
     // Seed with current boiler temp so we have at least one sample
-    _flow_samples[_flow_sampleHead] = OTcurrentSystemState.Tboiler;
+    _flow_samples[_flow_sampleHead] = satGetFlowTemp();
     _flow_sampleHead = (_flow_sampleHead + 1) % SAT_FLOW_SAMPLE_SIZE;
     _flow_sampleCount = 1;
     // Reset tail ring buffer (Task #590: 180s end-of-cycle window)
@@ -610,14 +610,14 @@ void satCycleSample()
   if (!_cycle_flameOn) return;
 
   uint32_t now = millis();
-  float flowTemp = OTcurrentSystemState.Tboiler;
+  float flowTemp = satGetFlowTemp();
 
   if (flowTemp > _cycle_maxFlowTemp) _cycle_maxFlowTemp = flowTemp;
   if (flowTemp < _cycle_minFlowTemp) _cycle_minFlowTemp = flowTemp;
 
   // Accumulate flow-return delta for 4-hour window record (Task #227)
   // Tret may be 0 when return temp sensor is absent; only accumulate when plausible.
-  float retTemp = OTcurrentSystemState.Tret;
+  float retTemp = satGetReturnTemp();
   if (retTemp > 10.0f && retTemp < 100.0f) {
     _cycle_sumFlowRetDelta += (flowTemp - retTemp);
     _cycle_deltasamples++;
@@ -684,7 +684,7 @@ bool satCycleCheckAutoSwitch()
   _sustain_lastCheckMs = now;
   if (dt <= 0.0f || dt > 60.0f) return false; // Skip on first call or large gaps
 
-  float flowTemp = OTcurrentSystemState.Tboiler;
+  float flowTemp = satGetFlowTemp();
   float setpoint = state.sat.fFinalSetpoint;
 
   SATDebugTf(PSTR("SAT autoswitch: mode=%d flow=%.1f sp=%.1f os=%.0fs uh=%.0fs\r\n"),
