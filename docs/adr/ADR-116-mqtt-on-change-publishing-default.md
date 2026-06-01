@@ -26,6 +26,11 @@ status_history:
     changed_by: Claude (TASK-791)
     reason: Ports the dev-branch MQTT on-change-publishing default into 2.0.0; documents the 2.0.0 implementation (MQTTstuff.h struct, deferred flushSettings migration, flag-aware value-topic gate)
     changed_via: adr-kit
+  - date: 2026-05-31
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted the ported decision; implementation shipped on the 2.0.0 line (commit 5f846c38). Status section flipped to Accepted; this entry records the matching transition.
+    changed_via: adr-kit
 
 ## Context
 
