@@ -72,6 +72,15 @@ static const float    SAT_SIM_MOD_KP            = 20.0f;   // synthetic modulati
 static const float    SAT_SIM_FLOW_LOSS_K       = 0.02f;   // linear flow heat-loss coefficient
 static const float    SAT_SIM_FLOW_THERMAL_GAIN = 0.4f;    // °C/s per kW net (tuned ~2°C/s at full mod, 24 kW)
 
+// --- Synthetic diurnal outdoor-temperature model (TASK-796 / plan §12 F1) ---
+// Triangle wave (no transcendental — cheap, and the params read directly):
+// coldest at SAT_SIM_OUTDOOR_MIN_HOUR, warmest 12 h later, swinging
+// MEAN ± AMPLITUDE. When the weather feed is valid it wins over the synthetic
+// curve (mirrors the real satGetOutsideTemp() precedence).
+static const float   SAT_SIM_OUTDOOR_MEAN      = 8.0f;   // °C, daily mean
+static const float   SAT_SIM_OUTDOOR_AMPLITUDE = 6.0f;   // °C, peak deviation (2..14 °C swing)
+static const uint8_t SAT_SIM_OUTDOOR_MIN_HOUR  = 5;      // hour-of-day of the coldest point (~05:00)
+
 // --- Manufacturer Table (PROGMEM) ---
 struct SATMfrEntry {
   uint8_t  memberID;   // OT MemberID code (MsgID 3 valueLB)
@@ -3277,6 +3286,34 @@ static uint8_t satSimMinMod()
 // health, 4h stats, heating-curve recommendation and OPV calibration run under
 // simulation. No bus traffic and no availability gate here — those land in
 // commit 3 (plan §4).
+// Synthetic outdoor temperature (TASK-796 / plan §12 F1). Returns the weather
+// feed when valid, otherwise a triangle-wave diurnal curve. Fractional
+// hour-of-day comes from wall-clock when NTP is set; otherwise a free-running
+// 24 h phase off millis() so a bench rig with no NTP still oscillates.
+static float satSimOutdoorTemp()
+{
+  if (state.sat.weather.bValid) return state.sat.weather.fTemperature;
+
+  float hod;  // hour-of-day in [0,24)
+  if (isNTPtimeSet()) {
+    time_t ts = time(nullptr);
+    struct tm lt;
+    localtime_r(&ts, &lt);
+    hod = lt.tm_hour + lt.tm_min / 60.0f;
+  } else {
+    // Free-running: map a 24 h period onto millis() so the curve still moves.
+    hod = (float)((millis() / 1000UL) % 86400UL) / 3600.0f;
+  }
+
+  // Triangle wave: 0 at the coldest hour, peak 1 twelve hours later, back to 0.
+  float ph = hod - (float)SAT_SIM_OUTDOOR_MIN_HOUR;   // hours past the coldest point
+  while (ph < 0.0f)   ph += 24.0f;
+  while (ph >= 24.0f) ph -= 24.0f;
+  // tri in [-1, +1]: -1 at ph=0 (coldest), +1 at ph=12 (warmest), linear between
+  float tri = (ph <= 12.0f) ? (-1.0f + ph / 6.0f) : (3.0f - ph / 6.0f);
+  return SAT_SIM_OUTDOOR_MEAN + SAT_SIM_OUTDOOR_AMPLITUDE * tri;
+}
+
 static void satUpdateSimulation()
 {
   if (!settings.sat.bSimulation) return;
@@ -3293,6 +3330,10 @@ static void satUpdateSimulation()
   float dtSec = (float)(now - state.sat.iSimLastUpdateMs) / 1000.0f;
   if (dtSec <= 0.0f || dtSec > 60.0f) dtSec = 1.0f; // clamp sanity
   state.sat.iSimLastUpdateMs = now;
+
+  // TASK-796: drive the synthetic outdoor temperature (diurnal or weather feed)
+  // before the room model consumes it below.
+  state.sat.fSimOutdoorTemp = satSimOutdoorTemp();
 
   const float sp = state.sat.fFinalSetpoint;
 

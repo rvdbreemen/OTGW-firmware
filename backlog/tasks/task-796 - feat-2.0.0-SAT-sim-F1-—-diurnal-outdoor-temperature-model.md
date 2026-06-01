@@ -1,10 +1,11 @@
 ---
 id: TASK-796
 title: 'feat-2.0.0: SAT sim F1 — diurnal outdoor temperature model'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-31 22:55'
-updated_date: '2026-06-01 04:14'
+updated_date: '2026-06-01 06:54'
 labels:
   - sat
   - simulation
@@ -19,10 +20,10 @@ Follow-up F1 from SAT simulation plan (docs/plan/SAT_SIMULATION_CONTRACT_PLAN.md
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 fSimOutdoorTemp follows a diurnal sine (configurable mean/amplitude/phase consts) in satUpdateSimulation() when bSimulation=true and no valid weather data
-- [ ] #2 When state.sat.weather.bValid, the fetched weather temperature takes precedence over the synthetic sine (mirrors satGetOutsideTemp real-path precedence)
-- [ ] #3 No NTP dependency hard-failure: falls back to a free-running phase if wall-clock time is unavailable
-- [ ] #4 python build.py both targets per-env SUCCESS; evaluate.py --quick no new findings
+- [x] #1 fSimOutdoorTemp follows a diurnal sine (configurable mean/amplitude/phase consts) in satUpdateSimulation() when bSimulation=true and no valid weather data
+- [x] #2 When state.sat.weather.bValid, the fetched weather temperature takes precedence over the synthetic sine (mirrors satGetOutsideTemp real-path precedence)
+- [x] #3 No NTP dependency hard-failure: falls back to a free-running phase if wall-clock time is unavailable
+- [x] #4 python build.py both targets per-env SUCCESS; evaluate.py --quick no new findings
 <!-- AC:END -->
 
 ## Implementation Plan
