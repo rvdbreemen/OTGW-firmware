@@ -3,9 +3,11 @@ id: TASK-803
 title: >-
   Fix stale comments in OTGW-Core.ino: is_value_valid override-rejection +
   print_f88 Write-Ack-only suppression
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-01 17:44'
+updated_date: '2026-06-01 17:44'
 labels:
   - bug
 dependencies: []
