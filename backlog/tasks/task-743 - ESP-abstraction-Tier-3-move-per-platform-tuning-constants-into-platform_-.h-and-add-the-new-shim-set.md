@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-28 08:28'
-updated_date: '2026-06-01 18:06'
+updated_date: '2026-06-01 18:28'
 labels:
   - esp-abstraction-audit
   - refactor
@@ -51,4 +51,6 @@ RECOVERED + repaired (alpha.111, commit 8360e35d, pushed, BUILD GREEN per-env es
 2026-06-01T19:42:44+02:00: jsonStuff RECON (read-only, no edits — attended push still pending per maintainer 6a). SCOPE CORRECTION: of the 8 jsonStuff #ifdef sites, only the FIVE at 191/227/238/251/263 belong to 743 — they are the ESP32 REST-TX coalescing buffer (sTxBuf[4096] struct + restTxAppend/restFlushTxBuf, dispatched from restSendContent/restSendContentP/restSendP/restFlushContent). The OTHER THREE (389/487/660) are NOT a platform-API divergence — they are int-vs-int32_t OVERLOAD AMBIGUITY resolution (xtensa-esp32: int32_t=long != int), which is explicitly TASK-745's scope (Tier 5), needing a cast/template fix, NOT a platform shim. Do not fold them into 743.
 
 PLAN for the 5 TX-buffer sites (attended): move sTxBuf + restTxAppend + restFlushTxBuf into platform_esp32.h as platformRestTx{Append,Flush,Reset} shims (ESP8266 = inline direct-send / no-op so restSendContent streams inline as today); then restSendContent/restSendContentP/restSendP/restFlushContent call the shims UNGUARDED. RISK: this is the TASK-747 byte-order class — restSendContentP feeds PROGMEM via strlen/memcpy (ESP32 DROM-safe); must preserve exact append order + the restSendP stale-discard (sTxBuf.len=0). Baseline 16 -> 11 after these 5. Build BOTH targets + verify JSON byte-order on a real ESP32 REST response before trusting. NOT done unattended.
+
+2026-06-01T20:13:53+02:00: jsonStuff TX-coalescing cluster DONE (attended) — b6f3c903 (alpha.133, pushed). 5 sites (191/227/238/251/263) gated on new HAS_REST_TX_COALESCING flag (NOT platform_*.h shims — buffer calls app-side httpServer/restPerf which can't live in a platform header; capability-flag is the correct abstraction per CLAUDE.md rule 2). Zero behaviour change (flag = ESP32-on/ESP8266-off, identical compile). Baseline 16->11. Build both SUCCESS, eval 0-fail. The 3 remaining jsonStuff sites (389/487/660) are int/int32 overload ambiguity = TASK-745 (Tier 5), explicitly NOT 743. REMAINING 743 sites (11 total): MQTTstuff heap-pressure pair (1931/1946, app-side getHeapHealth coupling), SATmqttPublish os_random/esp_random (46/63, include-order before platform.h), helperStuff watermark global (398, ODR-necessary guard), MQTTstuff:604 done earlier, restAPI:833 done earlier. Those remaining are each their own design judgement — see prior notes.
 <!-- SECTION:NOTES:END -->

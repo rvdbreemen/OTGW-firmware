@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : boards.h
-**  Version  : v2.0.0-alpha.133
+**  Version  : v2.0.0-alpha.134
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -62,6 +62,7 @@
 #define HAS_SAT_BLE          0  // No BLE radio on ESP8266 (SATble.ino is ESP32-only)
 #define HAS_WEATHER_FORECAST 0  // Basic weather only; hourly forecast is ESP32-only (independent of HAS_SAT)
 #define HAS_REST_TX_COALESCING 0  // ESP8266 sendContent flushes inline; no coalescing buffer needed (TASK-743)
+#define HAS_FRAGMENTATION_AWARE_HEAP_GATE 0  // ESP8266 discovery drip uses the ADR-089 heap-tier machine (getHeapHealth) (TASK-743)
 #define HW_TYPE_NAME      "otgw-classic"  // Static hardware-type slug / board class (ADR-113)
 
 // SAT per-platform buffer sizing (ESP-abstraction Tier 3, TASK-743). These are
@@ -148,6 +149,7 @@ typedef uint8_t SAT_RING_IDX_T;
 #define HAS_SAT_BLE          1  // ESP32-S3 BLE radio present (SATble.ino room-sensor support)
 #define HAS_WEATHER_FORECAST 1  // Full weather incl. 24h hourly forecast arrays (independent of HAS_SAT)
 #define HAS_REST_TX_COALESCING 1  // sync WebServer stalls ~9ms/sendContent on ESP32; coalesce into 4KB chunks (TASK-743)
+#define HAS_FRAGMENTATION_AWARE_HEAP_GATE 1  // ESP32-S3: gate drip on freeHeap+maxAllocBlock, not the ESP8266 tier machine (TASK-743)
 #define HW_TYPE_NAME      "otgw32"        // Static hardware-type slug / board class (ADR-113)
 
 // SAT per-platform buffer sizing (ESP-abstraction Tier 3, TASK-743). ESP32-S3
