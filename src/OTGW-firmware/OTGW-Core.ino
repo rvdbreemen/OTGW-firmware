@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.6.2-beta
+**  Version  : v1.7.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -237,6 +237,38 @@ static const char* skipOTLogTimestamp(const char* logLine)
 //===================[ Global Data Arrays & Variables ]================
 //some variable's
 OpenthermData_t OTdata, delayedOTdata, tmpOTdata;
+
+// ADR-082: gateway-override state store (see OTGW-Core.h for rationale).
+OTOverrideEntry_t otOverrideStore[OVERRIDE_STORE_MAX] = {};
+
+// recordOTOverride(): linear find-or-allocate. Pure RAM write, called only from
+// print_f88() on an explicit override frame. No yield, no shared buffer.
+// Find-or-allocate by msgid; if the store is full a new id is dropped (≤11 ids
+// can be overridden in practice, see OVERRIDE_STORE_MAX). discovered=false on a
+// fresh slot so the periodic publisher emits JIT HA discovery once.
+void recordOTOverride(uint8_t id, uint8_t kind, float value) {
+  int slot = -1;
+  for (uint8_t i = 0; i < OVERRIDE_STORE_MAX; i++) {
+    if (otOverrideStore[i].lastSeen != 0 && otOverrideStore[i].id == id) { slot = i; break; }
+    if (slot < 0 && otOverrideStore[i].lastSeen == 0) slot = i;
+  }
+  if (slot < 0) return;  // store full
+  const bool fresh = (otOverrideStore[slot].lastSeen == 0 || otOverrideStore[slot].id != id);
+  otOverrideStore[slot].id    = id;
+  otOverrideStore[slot].kind  = kind;
+  otOverrideStore[slot].value = value;
+  otOverrideStore[slot].lastSeen = millis();
+  if (millis() == 0) otOverrideStore[slot].lastSeen = 1;  // 0 marks an empty slot; never store 0
+  if (fresh) otOverrideStore[slot].discovered = false;
+}
+
+// isOTOverrideActive(): active = seen within OVERRIDE_ACTIVE_TIMEOUT. The store
+// is never cleared by a subsequent valid frame (the real boiler B passes the
+// canonical gate every poll during an active answer-override).
+bool isOTOverrideActive(const OTOverrideEntry_t &entry) {
+  if (entry.lastSeen == 0) return false;
+  return (millis() - entry.lastSeen) < OVERRIDE_ACTIVE_TIMEOUT;
+}
 
 static constexpr uint8_t MQTT_TRACKED_RESPONSE_ID_COUNT = 128; // linear msgid slots for IDs 0-127
 static constexpr uint16_t MQTT_TRACKED_SLOT_COUNT = MQTT_TRACKED_RESPONSE_ID_COUNT * 2; // response + request view
@@ -1877,6 +1909,16 @@ void print_f88(float& value)
     AddLogf("%s = %s %s", OTlookupitem.label, _msg, OTlookupitem.unit);
   } else {
     AddLogf("%s", OTlookupitem.label);
+  }
+
+  // ADR-082: additive capture of gateway overrides the worldview gate drops.
+  // All 9 numeric override-capable ids are ot_f88, so this is the only capture site.
+  // Gated ONLY on the two explicit override flag combinations (not !validForMaster,
+  // which is also false for non-override reasons). Pure RAM write — no publish here.
+  if (OTdata.rsptype == OTGW_ANSWER_THERMOSTAT && OTdata.bAnswerOverride) {
+    recordOTOverride(OTdata.id, OVERRIDE_KIND_ANSWER, _value);
+  } else if (OTdata.rsptype == OTGW_THERMOSTAT && OTdata.bGatewaySubstituted) {
+    recordOTOverride(OTdata.id, OVERRIDE_KIND_SUBSTITUTED, _value);
   }
 
   //SendMQTT

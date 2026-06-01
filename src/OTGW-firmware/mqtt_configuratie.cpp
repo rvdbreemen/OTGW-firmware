@@ -2402,6 +2402,100 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
 }
 
 // ---------------------------------------------------------------------------
+// Public API: streamOverrideSensorDiscovery (ADR-082 / TASK-805)
+// JIT HA sensor discovery for an active gateway override. The state topic is
+// <mqttPubTopic>/<label>/override (matching publishOverrideStates() and the
+// retargeted Toutside_override Number entity for id 27). id 27 is skipped here
+// because the existing Toutside_override Number entity already surfaces it;
+// emitting a sensor too would double the entity in HA.
+// `label` is the runtime msgid label (RAM string, e.g. "Toutside").
+// ---------------------------------------------------------------------------
+bool streamOverrideSensorDiscovery(PubSubClient &client,
+                                   uint8_t id,
+                                   const char *label,
+                                   HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (!label || label[0] == '\0') return false;
+  if (id == 27) return true;  // already surfaced by the Toutside_override Number entity
+
+  // Topic: <haPrefix>/sensor/<nodeId>/<label>_override/config
+  char topic[STREAM_TOPIC_MAX];
+  int n = snprintf_P(topic, sizeof(topic), PSTR("%s/sensor/%s/%s_override/config"),
+                     ctx.haPrefix, ctx.nodeId, label);
+  if (n <= 0 || static_cast<size_t>(n) >= sizeof(topic)) return false;
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    // avty_t
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // device block
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // uniq_id : "<nodeId>-<label>_override"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kUniqId)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeRam(ctx.nodeId)) return false;
+    if (!w.writeChar('-')) return false;
+    if (!w.writeRam(label)) return false;
+    if (!w.writeProgmem(PSTR("_override\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // name : "<label> Override"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kName)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeRam(label)) return false;
+    if (!w.writeProgmem(PSTR(" Override\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // stat_t : "<mqttPubTopic>/<label>/override"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kStatT)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (!w.writeChar('/')) return false;
+    if (!w.writeRam(label)) return false;
+    if (!w.writeProgmem(PSTR("/override\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // icon
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kIcon)) return false;
+    if (!w.writeProgmem(PSTR("\":\"mdi:auto-fix\""))) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // origin block
+    if (!writeOriginBlock(w, ctx)) return false;
+
+    return writeJsonClose(w);
+  };
+
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
+  feedWatchDog();
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // expandAndStreamSensorSources()
 // Expands a source-template sensor into per-source variants and streams each
 // via streamSensorDiscovery(). For 0x07-flagged sensors, two variants are
@@ -2697,10 +2791,13 @@ bool streamNumberDiscovery(PubSubClient &client,
     if (!w.writeProgmem(PSTR("/outside\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    // stat_t
+    // stat_t — ADR-082 / TASK-804: retargeted from canonical /Toutside to the
+    // gateway-override state topic so the entity reflects the injected value
+    // (canonical /Toutside shows boiler-side reality, which is 0 / Data-Invalid
+    // when the boiler ignores the override).
     if (!w.writeProgmem(PSTR("\"stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
-    if (!w.writeProgmem(PSTR("/Toutside\""))) return false;
+    if (!w.writeProgmem(PSTR("/Toutside/override\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     // unit, min, max, step, mode

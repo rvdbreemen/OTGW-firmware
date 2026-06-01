@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.6.2-beta
+**  Version  : v1.7.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -35,6 +35,7 @@ void markAllMQTTConfigPending();
 void clearMQTTConfigPending();
 void publishNonOTDiscoveryConfigs();
 void loopMQTTDiscovery();
+static HaDiscoveryContext buildDiscoveryContext(bool isFirst);  // ADR-082: used by publishOverrideStates() before its definition
 
 // Declare some variables within global scope
 
@@ -1225,6 +1226,35 @@ void sendMQTTstateinformation(){
   sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
   // ADR-074: do NOT write OT-bus state to the MQTT availability topic. The LWT/birth
   // pair on <toptopic>/<hostname> owns availability and reflects MQTT-link state.
+}
+
+// ADR-082 / TASK-805: publish active gateway overrides from the periodic path.
+// For each active store entry, emit JIT HA discovery once (entry.discovered),
+// then publish the retained state topic <label>/override. sendMQTTData prepends
+// the publish namespace, so the value lands at <base>/<label>/override — the
+// same topic the discovery stat_t and the retargeted Toutside_override Number
+// entity point at. Reads the store written by recordOTOverride() in print_f88;
+// this is the publish side (the decode hook never publishes), respecting the
+// re-entrancy / buffer discipline.
+void publishOverrideStates(){
+  if (!settings.mqtt.bEnable) return;
+  if (!MQTTclient.connected()) return;
+  HaDiscoveryContext ctx = buildDiscoveryContext(false);
+  char topic[MQTT_TOPIC_MAX_LEN];
+  char val[16];
+  for (uint8_t i = 0; i < OVERRIDE_STORE_MAX; i++) {
+    OTOverrideEntry_t &e = otOverrideStore[i];
+    if (!isOTOverrideActive(e)) continue;
+    const char* label = messageIDToString(static_cast<OpenThermMessageID>(e.id));
+    if (!label || label[0] == '\0') continue;
+    if (!e.discovered) {
+      if (streamOverrideSensorDiscovery(MQTTclient, e.id, label, ctx)) e.discovered = true;
+    }
+    snprintf_P(topic, sizeof(topic), PSTR("%s/override"), label);
+    dtostrf(e.value, 3, 2, val);
+    sendMQTTData(topic, val, true);  // retained
+    feedWatchDog();
+  }
 }
 
 /*

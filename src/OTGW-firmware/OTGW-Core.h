@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v1.6.2-beta
+**  Version  : v1.7.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -590,6 +590,30 @@ struct OpenthermData_t {
 extern OpenthermData_t OTdata;
 extern OpenthermData_t delayedOTdata;
 extern OpenthermData_t tmpOTdata;
+
+// ADR-082: additive gateway-override state store.
+// Records the user-injected override value that the boiler-side-worldview gate
+// (is_value_valid_for_master_topic, ADR-069/075) deliberately drops from
+// canonical, so the override stays visible on WebUI / REST / MQTT without
+// changing canonical behaviour. Pure RAM; written only by recordOTOverride()
+// from the print_f88 decode hook (no yield, no shared buffer).
+#define OVERRIDE_STORE_MAX        11
+#define OVERRIDE_KIND_ANSWER      0   // answer-override A frame: gateway-forced answer (= user-injected value)
+#define OVERRIDE_KIND_SUBSTITUTED 1   // substituted T frame: thermostat's original value that was replaced
+#define OVERRIDE_ACTIVE_TIMEOUT   (10UL * 60UL * 1000UL)  // ~10 min; entry stale after this since lastSeen
+
+struct OTOverrideEntry_t {
+  uint8_t  id;
+  uint8_t  kind;
+  float    value;
+  uint32_t lastSeen;
+  bool     discovered;   // ADR-082: JIT HA discovery already emitted for this entry
+};
+
+extern OTOverrideEntry_t otOverrideStore[OVERRIDE_STORE_MAX];
+
+void recordOTOverride(uint8_t id, uint8_t kind, float value);
+bool isOTOverrideActive(const OTOverrideEntry_t &entry);
 
 #endif
 

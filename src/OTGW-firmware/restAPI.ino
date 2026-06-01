@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.6.2-beta
+**  Version  : v1.7.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -508,6 +508,35 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
                        : PSTR(",{\"id\":%d,\"label\":\"%s\",\"friendly\":\"%s\"}"),
                  i, label, friendly);
       httpServer.sendContent(ent);
+      first = false;
+    }
+    httpServer.sendContent_P(PSTR("]}"));
+    httpServer.sendContent(F(""));
+  } else if (strcmp_P(words[4], PSTR("overrides")) == 0) {
+    // ADR-082 / TASK-805: GET /api/v2/otgw/overrides → active gateway overrides
+    // (answer-override A frames + thermostat-substituted T frames) that the
+    // boiler-side-worldview gate drops from canonical. Additive; canonical
+    // endpoints are unchanged. Streamed one row per active entry (≤11).
+    if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendCorsOriginHeader();
+    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"overrides\":["));
+    bool first = true;
+    char row[160];
+    char valbuf[16];
+    for (uint8_t i = 0; i < OVERRIDE_STORE_MAX; i++) {
+      const OTOverrideEntry_t &e = otOverrideStore[i];
+      if (!isOTOverrideActive(e)) continue;
+      const char* label = messageIDToString(static_cast<OpenThermMessageID>(e.id));
+      dtostrf(e.value, 3, 2, valbuf);
+      const uint32_t ageSec = (millis() - e.lastSeen) / 1000UL;
+      snprintf_P(row, sizeof(row),
+                 first ? PSTR("{\"id\":%u,\"label\":\"%s\",\"value\":%s,\"kind\":\"%s\",\"age\":%lu}")
+                       : PSTR(",{\"id\":%u,\"label\":\"%s\",\"value\":%s,\"kind\":\"%s\",\"age\":%lu}"),
+                 e.id, label, valbuf,
+                 (e.kind == OVERRIDE_KIND_ANSWER) ? "answer" : "substituted",
+                 (unsigned long)ageSec);
+      httpServer.sendContent(row);
       first = false;
     }
     httpServer.sendContent_P(PSTR("]}"));

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.6.2-beta
+**  Version  : v1.7.0-beta
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -357,6 +357,7 @@ void do5minevent(){
   sendMQTTuptime();
   sendMQTTversioninfo();
   sendMQTTstateinformation();
+  publishOverrideStates();   // ADR-082: surface active gateway overrides on MQTT/HA
   publishAllPICsettings();  // Re-publish cached PIC settings every 5 min
 }
 

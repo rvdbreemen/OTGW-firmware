@@ -367,6 +367,12 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
                                  const char *sensorAddress,
                                  HaDiscoveryContext &ctx);
 
+// ADR-082 / TASK-805: JIT HA sensor discovery for an active gateway override.
+bool streamOverrideSensorDiscovery(PubSubClient &client,
+                                   uint8_t id,
+                                   const char *label,
+                                   HaDiscoveryContext &ctx);
+
 bool expandAndStreamSensorSources(PubSubClient &client,
                                   const MqttHaSensorCfg &cfg,
                                   HaDiscoveryContext &ctx);

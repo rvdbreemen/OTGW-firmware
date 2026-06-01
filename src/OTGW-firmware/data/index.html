@@ -166,6 +166,15 @@
                   <tbody id="boilerUnsupportedList"></tbody>
                 </table>
               </div>
+              <div id="otOverridesPanel" class="boiler-unsupported-panel hidden" aria-live="polite">
+                <div class="boiler-unsupported-summary" title="Values the gateway injects (OT=, TT=, SW=, ...). These stay visible here even when the boiler ignores them, so the canonical value can read 0 / Data-Invalid.">Active gateway overrides</div>
+                <table class="boiler-unsupported-table" id="otOverridesTable">
+                  <thead>
+                    <tr><th>MsgID</th><th>Name</th><th>Override value</th><th>Kind</th><th>Age (s)</th></tr>
+                  </thead>
+                  <tbody id="otOverridesList"></tbody>
+                </table>
+              </div>
         </div>
 
         <div id="OTSupport" class="tab-content">
