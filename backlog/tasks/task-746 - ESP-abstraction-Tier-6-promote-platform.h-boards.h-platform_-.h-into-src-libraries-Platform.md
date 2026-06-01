@@ -3,11 +3,11 @@ id: TASK-746
 title: >-
   ESP abstraction Tier 6: promote platform.h / boards.h / platform_*.h into
   src/libraries/Platform/
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-28 08:29'
-updated_date: '2026-06-01 22:52'
+updated_date: '2026-06-01 22:58'
 labels:
   - esp-abstraction-audit
   - refactor
@@ -54,4 +54,26 @@ Implementation landed (structural only):
 - Build of both targets in progress; ESP8266 reached link stage (sketch compiled clean = include path resolves).
 
 Build: both targets SUCCESS (log /tmp/build746.log). esp8266 line273 [SUCCESS], 84.7% flash, EXIT8266=0. esp32 line957 [SUCCESS], 95.7% flash (1881795/1966080), EXIT32=0. AC#1-4 checked. AC#5 (ADR-120) Proposed, awaiting user Accept.
+
+2026-06-02 (loop triage): implementation is committed AND pushed as c880a020 (refactor(platform): promote ESP abstraction into src/libraries/Platform library), version bumped alpha.137 -> alpha.138. Verified: 0 ahead / 0 behind origin. All 5 code ACs checked; build was verified at commit time (version-header stamps + version.hash committed = build.py ran; prior notes recorded esp8266+esp32 both SUCCESS). Task remains In Progress on the sole gate AC#5: ADR-120 (Proposed) awaits maintainer Accept. OPEN QUESTION FOR MORNING: Accept ADR-120 (docs/adr/ADR-120-platform-abstraction-promoted-to-library.md)? On Accept, flip ADR-120 status and mark this task Done. Nothing else blocks.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Promoted the ESP8266/ESP32 platform abstraction from application-tier neighbour headers into a first-class library at src/libraries/Platform/, making the boundary physical rather than nominal.
+
+What changed:
+- git mv platform.h, platform_esp8266.h, platform_esp32.h, boards.h -> src/libraries/Platform/src/ (history preserved at 100pct similarity).
+- Added minimal library.properties (name=Platform, architectures=esp8266,esp32), matching SimpleTelnet/OpenTherm convention so both arduino-cli (--libraries) and PlatformIO (lib_extra_dirs) resolve <platform.h>/<boards.h> on the include path.
+- Repointed all 6 application include sites from relative quotes to angle-bracket form; no relative include into src/OTGW-firmware remains.
+- evaluate.py ESP_ABSTRACTION_ALLOWED_FILES repointed to src/libraries/Platform/src/*.h (load-bearing: the boundary scan rglobs src/libraries/, so without the repoint the relocated headers own #if defined(ESP8266/ESP32) would be miscounted as leaks). Baseline unchanged at 4.
+- ADR-120 (Accepted) documents the move and the split-home abstraction contract (Platform lib for the core shims; OTGW-ModUpdateServer trio stays in the app tier).
+
+Verification:
+- evaluate.py --quick: abstraction gate 4 sites = baseline 4, 0 failures.
+- Build both targets SUCCESS: esp8266 84.7pct flash, esp32 95.7pct flash.
+- Commit c880a020 pushed to origin/feature-dev-2.0.0-otgw32-esp32-sat-support (prerelease bumped alpha.137 to alpha.138).
+
+Purely structural: no shim/constant/conditional logic changed. ADR numbered 120 because 119 was already taken.
+<!-- SECTION:FINAL_SUMMARY:END -->

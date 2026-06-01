@@ -2,15 +2,16 @@
 
 ## Status
 
-Proposed, 2026-06-02.
+Accepted (Option B), 2026-06-02. Decision Maker: Robert van den Breemen.
 
-Classification on Accept (per ADR-080): if the maintainer selects an option that
-changes the heap-tier contract or adds per-consumer thresholds, this ADR becomes
-a binding amendment to ADR-089 and MUST name a CI gate (candidate:
-`check_per_consumer_heap_gate` in `evaluate.py`). If the maintainer keeps the
-single shared ladder (Option A), this ADR is guideline-level and records the
-diagnosis + the restored gate only. The classification is part of the Accept
-decision, not pre-judged here.
+Classification: **binding** amendment to ADR-089. Option B adds per-consumer heap
+thresholds, which changes the tier contract, so per ADR-080 this ADR MUST have a
+CI gate: `check_per_consumer_heap_gate` in `evaluate.py`. That gate and the Option
+B implementation land together under TASK-779 and are a committed
+Definition-of-Done item of that work, not optional. The concrete WS-strict /
+MQTT-relaxed threshold *values* are telemetry-gated (George's `logHeapStats` on
+the failing scenario, AC#8) and will be set in the implementation commit; the
+*structure* (two independent ladders) is the decision recorded here.
 
 ## Status History
 
@@ -19,6 +20,11 @@ status_history:
     status: Proposed
     changed_by: Claude (TASK-779)
     reason: Records the corrected diagnosis (the dev WebSocket heap-gate was never ported to 2.0.0, leaving the live-log ungated) and proposes the per-consumer gating model for maintainer decision. The parity-restoring gate port shipped in the same commit; the decouple options + telemetry-driven MQTT values are deferred to Accept.
+    changed_via: adr-kit
+  - date: 2026-06-02
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer selected Option B (independent per-consumer heap thresholds) so relaxing the MQTT gate cannot loosen the WebSocket gate. Binding amendment to ADR-089; CI gate check_per_consumer_heap_gate + the implementation land under TASK-779. Concrete WS-strict/MQTT-relaxed values are telemetry-gated (George's logHeapStats, AC#8).
     changed_via: adr-kit
 
 ## Context
@@ -76,23 +82,32 @@ There are two distinct problems, and they must not be conflated:
 
 ## Decision
 
-This ADR has shipped the parity floor and **proposes, without yet selecting**,
-the per-consumer gating model; the selection is the maintainer's to make on
-Accept.
+**Accepted: Option B (independent per-consumer heap thresholds).** The WebSocket
+live-log gate and the MQTT publish gate each get their own threshold ladder, so
+relaxing the MQTT side can never loosen the WS side (the coupling that defeated
+the original single-ladder approach). The parity floor (the restored gate)
+already shipped in alpha.139; Option B is the decouple layered on top of it.
 
 **Shipped (floor):** `sendLogToWebSocket()` now calls `canSendWebSocket()`,
 restoring 2.0.0 to dev's gating behaviour. This is a cross-branch port of a
 proven fix, not a new design, and it closes no gated acceptance criterion of
 TASK-779.
 
-**Proposed (open decision):** the way to keep the WS gate from being loosened
-when the MQTT gate is relaxed. The candidate options are laid out under
-Alternatives Considered. The maintainer picks one on Accept. The concrete
-relaxed MQTT threshold values (AC#8) are deliberately **not chosen in this ADR**:
-they require real `logHeapStats` telemetry captured on a build that already has
-the gate restored (so the numbers reflect the post-fix heap profile, not the
-ungated one). Choosing values from pre-fix logs would re-baseline against the bug
-this ADR removes.
+**Decided (Option B):** the WS gate and the MQTT gate use independent threshold
+ladders instead of the shared `getHeapHealth()` tiers, so relaxing the MQTT side
+(AC#8) cannot loosen the WS side. Option B was chosen over the other candidates
+(see Alternatives Considered) by the maintainer on 2026-06-02. The implementation
+adds the per-consumer threshold sets plus the `check_per_consumer_heap_gate`
+CI gate, under TASK-779.
+
+The concrete relaxed-MQTT / stricter-WS threshold **values** are deliberately
+**not fixed in this ADR**: they require real `logHeapStats` telemetry captured on
+a gate-restored build (alpha.139+) so the numbers reflect the post-fix heap
+profile, not the ungated one. Choosing values from pre-fix logs would re-baseline
+against the bug this ADR removes. The implementation therefore lands in two
+steps: (1) the independent-ladder structure (behaviour-equivalent to today until
+values diverge), (2) the value tuning once George's telemetry is in. Step 1 may
+ship before step 2; step 2 must not be guessed.
 
 ## Alternatives Considered
 

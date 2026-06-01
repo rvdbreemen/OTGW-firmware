@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 12:48'
-updated_date: '2026-06-01 23:16'
+updated_date: '2026-06-01 23:43'
 labels:
   - bug
   - websocket
@@ -71,4 +71,14 @@ OPEN QUESTIONS FOR MORNING (maintainer):
 3. AC#7 board: confirm George's exact board (ESP8266 confirmed; NodeMCU v3 not yet confirmed in transcript).
 
 Still gated/open ACs: #1 (measurement), #2/#3 (decouple impl — pending option pick), #4/#7 (bench+field), #8 (telemetry), #9 (ADR Accept). Task stays In Progress.
+
+RECEIPT 2026-06-02: parity floor shipped. Build BOTH targets SUCCESS (esp8266 fw+fs, esp32 fw+fs; 8 SUCCESS 0 FAILED; esp32 flash within budget). evaluate.py --quick: Passed 61 / Failed 0 (abstraction WARN baseline 4 = expected, not new). Committed 96d09170 (46 files: gate + alpha.139 bump + ADR-121 + this task file), pushed to origin/feature-dev-2.0.0. alpha.138 (ungated) vs alpha.139 (gated) = the field A/B pair. Task stays In Progress on the deferred decouple/ADR-accept/telemetry/field gates.
+
+2026-06-02 — ADR-121 ACCEPTED, Option B (maintainer). Decouple design locked: WebSocket and MQTT gates get INDEPENDENT per-consumer heap threshold ladders (not the shared getHeapHealth tiers), so relaxing MQTT (AC#8) can never loosen the WS gate. Binding amendment to ADR-089; impl must add CI gate check_per_consumer_heap_gate (ADR-080 / AC#9).
+
+IMPL SEQUENCE (per ADR-121 Decision):
+1. Structure: split canSendWebSocket/canPublishMQTT onto independent threshold sets, preserving ADR-089 fragmentation-promotion + tier-entry counters. Behaviour-equivalent until values diverge. + check_per_consumer_heap_gate.
+2. Values: tune WS-stricter / MQTT-relaxed from George's logHeapStats. GATED on telemetry — requested from George (geo83_44083) in #beta-testing 2026-06-02 (free heap, maxBlock, level, WS_drops, MQTT_drops; live-log open vs closed; board+fw). Step 2 must NOT be guessed.
+
+AC status: #9 ADR authored + Accepted (values portion pending telemetry, leave unchecked). #2/#3 design unblocked, structure implementable now / values pending. #8 blocked on George telemetry. #1/#4/#7 hardware/field. Task stays In Progress.
 <!-- SECTION:NOTES:END -->
