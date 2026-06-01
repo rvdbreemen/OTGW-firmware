@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.137
+**  Version  : v2.0.0-alpha.138
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -30,7 +30,7 @@ extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 // enums are tightly coupled; see SATtypes.h preamble for the rationale.
 #include "SATtypes.h"
 #include "SATmqttPublish.h"     // ADR-111: on-change + jittered heartbeat helpers
-#include "boards.h"             // Board-specific pin maps and feature flags (HAS_PIC, HAS_DIRECT_OT)
+#include <boards.h>             // Board-specific pin maps and feature flags (HAS_PIC, HAS_DIRECT_OT)
 // OTDirecttypes.h must follow boards.h because its contents are gated on HAS_DIRECT_OT (ADR-079).
 #include "OTDirecttypes.h"
 #include "OTGWLogMacros.h"

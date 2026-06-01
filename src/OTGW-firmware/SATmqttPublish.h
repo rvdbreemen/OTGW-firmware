@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-alpha.137
+**  Version  : v2.0.0-alpha.138
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -47,7 +47,7 @@
 // Use platformHardwareRandom() instead of a raw platform conditional. platform.h
 // is self-contained (pragma once, only needs Arduino.h) so it is safe to pull in
 // here even though SATmqttPublish.h is included early in OTGW-firmware.h.
-#include "platform.h"
+#include <platform.h>
 
 // ---------------------------------------------------------------------------
 // Heartbeat jitter window (per ADR-111 sub-rule 3).

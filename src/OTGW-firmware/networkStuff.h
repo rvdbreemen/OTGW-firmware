@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v2.0.0-alpha.137
+**  Version  : v2.0.0-alpha.138
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -28,7 +28,7 @@
 #ifndef NETWORKSTUFF_H
 #define NETWORKSTUFF_H
 
-#include "platform.h"           // Unified ESP8266/ESP32 abstraction layer
+#include <platform.h>           // Unified ESP8266/ESP32 abstraction layer
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
 #include "updateServerHtml.h"
 // Disable WiFiManager debug: the debug block in handleWifiSave() builds Strings

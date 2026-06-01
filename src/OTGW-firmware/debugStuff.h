@@ -33,7 +33,7 @@
 
 #pragma once
 
-#include "platform.h"
+#include <platform.h>
 
 // ============================================================================
 // Types (ADR-081 — merged from former Debugtypes.h)

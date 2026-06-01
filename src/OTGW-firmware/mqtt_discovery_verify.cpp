@@ -19,7 +19,7 @@
 #include "mqtt_discovery_verify.h"
 
 #include <Arduino.h>          // millis(), platformFreeHeap()
-#include "platform.h"         // platformMaxFreeBlock() (ESP8266 + ESP32)
+#include <platform.h>         // platformMaxFreeBlock() (ESP8266 + ESP32)
 #include <pgmspace.h>
 #include <string.h>
 #include <time.h>             // time(nullptr) for iLastVerifyEpoch

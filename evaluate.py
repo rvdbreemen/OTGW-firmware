@@ -495,8 +495,10 @@ def otdirect_25238_bridge_regressions(
 
 # === ESP abstraction boundary (TASK-739) =================================
 #
-# The 2.0.0 branch carries an explicit ESP8266/ESP32 abstraction layer
-# (platform.h + platform_esp*.h + boards.h + the OTGW-ModUpdateServer trio).
+# The 2.0.0 branch carries an explicit ESP8266/ESP32 abstraction layer. As of
+# TASK-746 (ADR-119) its core lives in the src/libraries/Platform/ library
+# (platform.h + platform_esp*.h + boards.h); the OTGW-ModUpdateServer trio
+# remains in the application tier under src/OTGW-firmware/.
 # Application code MUST NOT branch on raw ESP8266 / ESP32 / ARDUINO_ARCH_ESP*
 # / BOARD_NODOSHOP_ESP* preprocessor symbols — that work belongs in the
 # abstraction headers, called from application code via platformXxx() shims
@@ -508,10 +510,10 @@ def otdirect_25238_bridge_regressions(
 # (TASK-740..746) must lower the baseline as part of its DoD.
 
 ESP_ABSTRACTION_ALLOWED_FILES: Tuple[str, ...] = (
-    "src/OTGW-firmware/platform.h",
-    "src/OTGW-firmware/platform_esp8266.h",
-    "src/OTGW-firmware/platform_esp32.h",
-    "src/OTGW-firmware/boards.h",
+    "src/libraries/Platform/src/platform.h",
+    "src/libraries/Platform/src/platform_esp8266.h",
+    "src/libraries/Platform/src/platform_esp32.h",
+    "src/libraries/Platform/src/boards.h",
     "src/OTGW-firmware/OTGW-ModUpdateServer.h",
     "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h",
     "src/OTGW-firmware/OTGW-ModUpdateServer-impl.h",

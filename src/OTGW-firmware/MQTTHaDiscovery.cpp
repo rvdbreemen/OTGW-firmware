@@ -27,7 +27,7 @@
 //   Number         : 1 entries
 
 #include "MQTTstuff.h"
-#include "platform.h"          // platformFreeHeap() / platformMaxFreeBlock() (ESP8266 + ESP32)
+#include <platform.h>          // platformFreeHeap() / platformMaxFreeBlock() (ESP8266 + ESP32)
 
 // ========== Named PROGMEM strings: Labels ==========
 const char ha_lbl_status_master[] PROGMEM = "status_master";
