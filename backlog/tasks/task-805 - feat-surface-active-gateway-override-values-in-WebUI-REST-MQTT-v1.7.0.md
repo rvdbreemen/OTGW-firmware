@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-01 18:33'
-updated_date: '2026-06-01 19:47'
+updated_date: '2026-06-01 20:02'
 labels:
   - enhancement
 dependencies: []
@@ -22,13 +22,13 @@ Design: capture by explicit flags (rsptype==OTGW_ANSWER_THERMOSTAT && bAnswerOve
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Override store added (OTOverrideEntry_t, ~132B static, ADR-004 compliant) with recordOTOverride()/isOTOverrideActive(); populated from print_f88 by explicit override flags only (not !validForMaster), with kind byte (A-forced vs T-substituted) and per-entry lastSeen + ~10min active timeout
-- [ ] #2 Canonical behaviour unchanged: existing OTcurrentSystemState fields, existing REST endpoints, and existing MQTT canonical topics produce byte-identical output as before for non-override and override traffic
-- [ ] #3 New additive REST endpoint GET /api/v2/otgw/overrides returns active overrides as JSON via streaming helpers; no existing route modified
-- [ ] #4 New WebUI 'Active Overrides' section shows active overrides (label, value, kind, age); renders with textContent + element-existence checks; existing tabs unaffected
-- [ ] #5 MQTT: retained <base>/<label>/override published from the periodic path; HA discovery streamOverrideSensorDiscovery dispatched via publishDiscoveryFor; Toutside_override number-entity stat_t retargeted to the override state topic (TASK-804 closed)
-- [ ] #6 ADR-082 'Surface gateway overrides as distinct override state' authored, reviewed, and Accepted by maintainer before code merges
-- [ ] #7 Version bumped to 1.7.0 (scripts/autoinc-semver.py + version.h)
-- [ ] #8 python build.py exits 0 (firmware + filesystem); python evaluate.py --quick shows no new failures
+- [x] #1 Override store added (OTOverrideEntry_t, ~132B static, ADR-004 compliant) with recordOTOverride()/isOTOverrideActive(); populated from print_f88 by explicit override flags only (not !validForMaster), with kind byte (A-forced vs T-substituted) and per-entry lastSeen + ~10min active timeout
+- [x] #2 Canonical behaviour unchanged: existing OTcurrentSystemState fields, existing REST endpoints, and existing MQTT canonical topics produce byte-identical output as before for non-override and override traffic
+- [x] #3 New additive REST endpoint GET /api/v2/otgw/overrides returns active overrides as JSON via streaming helpers; no existing route modified
+- [x] #4 New WebUI 'Active Overrides' section shows active overrides (label, value, kind, age); renders with textContent + element-existence checks; existing tabs unaffected
+- [x] #5 MQTT: retained <base>/<label>/override published from the periodic path; HA discovery streamOverrideSensorDiscovery dispatched via publishDiscoveryFor; Toutside_override number-entity stat_t retargeted to the override state topic (TASK-804 closed)
+- [x] #6 ADR-082 'Surface gateway overrides as distinct override state' authored, reviewed, and Accepted by maintainer before code merges
+- [x] #7 Version bumped to 1.7.0 (scripts/autoinc-semver.py + version.h)
+- [x] #8 python build.py exits 0 (firmware + filesystem); python evaluate.py --quick shows no new failures
 - [ ] #9 Manual: inject OT=20.5, confirm new WebUI row + /api/v2/otgw/overrides JSON + <base>/Toutside/override MQTT topic appear while canonical /Toutside stays unchanged
 <!-- AC:END -->
