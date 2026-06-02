@@ -60,6 +60,15 @@ inline const char* platformGetHostname() {
   return WiFi.getHostname();
 }
 
+// Disable WiFi modem power-save. ESP32 defaults to WIFI_PS_MIN_MODEM, which
+// parks the radio between DTIM beacons and adds 100 ms-1 s of latency to every
+// inbound packet (and drops buffered packets under burst) - the root cause of
+// the "web page takes seconds to load, sometimes never" symptom on OTGW32.
+// Costs a few mA extra; on a mains-powered gateway that is the right trade.
+inline void platformWifiDisableSleep() {
+  WiFi.setSleep(false);
+}
+
 // LittleFS info (ESP32: construct from totalBytes/usedBytes)
 inline bool platformFSInfo(FSInfo &info) {
   info.totalBytes    = LittleFS.totalBytes();

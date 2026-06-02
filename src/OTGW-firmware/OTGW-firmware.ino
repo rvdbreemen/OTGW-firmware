@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.146
+**  Version  : v2.0.0-alpha.148
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -607,7 +607,15 @@ void doBackgroundTasks()
       loopOTDirect();               // OT-direct GPIO poll (OTGW32 only)
 #endif
       handleWebSocket();            // WebSocket handling for OT log streaming
-      httpServer.handleClient();
+      // TASK-817: drain several pending connections per loop. The sync WebServer
+      // accepts+serves ONE socket per handleClient() call; a browser opens 6+
+      // parallel sockets for one page (html+js+css+...). Serving one per full
+      // loop turn stretched the page load across many iterations. The bound (4)
+      // caps worst-case loop time so OT/MQTT never starve; watchdog fed each pass.
+      for (uint8_t httpDrain = 0; httpDrain < 4; httpDrain++) {
+        httpServer.handleClient();
+        feedWatchDog();
+      }
     #if MDNS_NEEDS_UPDATE
   MDNS.update();
 #endif

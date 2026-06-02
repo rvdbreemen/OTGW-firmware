@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.146
+**  Version  : v2.0.0-alpha.148
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -214,6 +214,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   // loopWifi() (ADR-047) is the fallback for longer outages.
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
+  platformWifiDisableSleep();  // keep radio always-on for a responsive web UI (TASK-817)
 
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   if (WiFi.status() != WL_CONNECTED)
@@ -372,6 +373,7 @@ void loopWifi() {
       stopAPFallback();  // tear down AP if it was active
 #endif
       platformSetHostname(CSTR(settings.sHostname));
+      platformWifiDisableSleep();  // re-assert: modem-sleep can reset across reassociation (TASK-817)
       startTelnet();
       // OTGWstream is auto-started by handleOTGW() in the main loop
       startMQTT();

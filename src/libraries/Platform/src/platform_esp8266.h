@@ -62,6 +62,14 @@ inline const char* platformGetHostname() {
   return _hn;
 }
 
+// Disable WiFi modem power-save. ESP8266 defaults to a modem-sleep mode that
+// parks the radio between DTIM beacons, adding latency to every inbound packet.
+// WIFI_NONE_SLEEP keeps the radio always-on for a responsive web UI. Costs a
+// few mA extra; acceptable on a mains-powered gateway.
+inline void platformWifiDisableSleep() {
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+}
+
 // LittleFS info (native on ESP8266)
 inline bool platformFSInfo(FSInfo &info) {
   return LittleFS.info(info);
