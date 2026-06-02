@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.149
+**  Version  : v2.0.0-alpha.150
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -926,6 +926,8 @@ let lastRenderedLogText = null;
 let scrollToBottomScheduled = false;
 let showTimestamps = true;
 let searchTerm = '';
+let satOnlyFilter = false;   // "SAT only" toggle (TASK-815): keep only S-prefixed narration lines
+const SAT_LINE_RE = /^\d\d:\d\d:\d\d\s+S\s/;   // "HH:MM:SS S ..." narration prefix
 let updatePending = false;
 let otLogControlsInitialized = false;
 let isFlashing = false;
@@ -2238,9 +2240,12 @@ function parseLogLine(line) {
   }
   
   // Detect event prefix lines produced by sendEventToWebSocket:
-  // Format: HH:MM:SS.mmmmmm {prefix} {content}  where prefix is >, <, !, or *
+  // Format: HH:MM:SS.mmmmmm {prefix} {content}  where prefix is >, <, !, *,
+  // or S (S = SAT test-observability narration, TASK-815). Without S here a
+  // narration line would fall through to the fixed-width OT-frame parser and
+  // be mis-read as a garbled frame.
   const rest = line.substring(offset);
-  const eventMatch = rest.match(/^([><!*]) (.*)/);
+  const eventMatch = rest.match(/^([><!*S]) (.*)/);
   if (eventMatch) {
     return {
       time: obj.time,
@@ -2372,11 +2377,24 @@ function scheduleDisplayUpdate() {
 
 //============================================================================
 function updateFilteredBuffer() {
+  // SAT-only pre-filter (TASK-815): keep only SAT narration lines. parseLogLine
+  // tags them as events with prefix 'S' (production form, entry.data is always a
+  // parsed object via addLogLine). The string branch supports raw-string seeds
+  // used by the headless filter test.
+  let base = otLogBuffer;
+  if (satOnlyFilter) {
+    base = base.filter(entry => {
+      const d = entry.data;
+      if (d && typeof d === 'object') return d.isEvent === true && d.prefix === 'S';
+      if (typeof d === 'string')      return SAT_LINE_RE.test(d);
+      return false;
+    });
+  }
   if (!searchTerm || searchTerm.trim() === '') {
-    otLogFilteredBuffer = otLogBuffer;
+    otLogFilteredBuffer = base;
   } else {
     const term = searchTerm.toLowerCase();
-    otLogFilteredBuffer = otLogBuffer.filter(entry => 
+    otLogFilteredBuffer = base.filter(entry =>
       formatLogLine(entry.data).toLowerCase().includes(term)
     );
   }
@@ -2685,6 +2703,16 @@ function setupOTLogControls() {
     });
   }
   
+  // SAT-only filter toggle (TASK-815)
+  const satToggle = document.getElementById('satOnlyToggle');
+  if (satToggle) {
+    satToggle.addEventListener('change', (e) => {
+      satOnlyFilter = e.target.checked;
+      updateFilteredBuffer();
+      scheduleDisplayUpdate();
+    });
+  }
+
   // Toggle timestamps
   const chkShowTimestamp = document.getElementById('chkShowTimestamp');
   if (chkShowTimestamp) {
