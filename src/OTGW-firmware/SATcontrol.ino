@@ -925,12 +925,14 @@ void satHandleWindow(bool isOpen)
   if (isOpen && !state.sat.bWindowOpen) {
     // Window just opened - start timer
     state.sat.bWindowOpen = true;
+    satNarrate_P(PSTR("Window open detected: heating paused"));
     state.sat.iWindowOpenSinceMs = millis();
     SATDebugTln(F("SAT: window opened, starting timer"));
   }
   else if (!isOpen && state.sat.bWindowOpen) {
     // Window closed - restore previous state
     state.sat.bWindowOpen = false;
+    satNarrate_P(PSTR("Window closed: heating resumes"));
     state.sat.iWindowOpenSinceMs = 0;
     if (state.sat.fPreWindowTarget > 0.0f) {
       settings.sat.fTargetTemp = state.sat.fPreWindowTarget;
@@ -1243,6 +1245,7 @@ static void satOnBoilerDetected()
 
   OTDebugTln(F("SAT-SIM: boiler appeared on bus — simulation disabled completely"));
   sendEventToWebSocket_P('!', PSTR("SAT-SIM: boiler appeared, simulation off"));
+  satNarrate_P(PSTR("Real boiler detected on bus: simulation disabled"));
   // MQTT state topic flips OFF on the next sat-publisher tick (shadow detects it).
 }
 
@@ -1747,6 +1750,7 @@ void satHandleEnabled(const char* value)
   if (enabled) {
     // Clear safety trip so SAT can resume
     state.sat.bSafetyTripped = false;
+    satNarrate_P(PSTR("Safety cleared: SAT may resume"));
     _sat_consecutiveSkips = 0;
     _sat_picFailCount = 0;
   }
@@ -1979,6 +1983,11 @@ void satHandleControlMode(const char* value)
   SATDebugTf(PSTR("SAT: control mode %d -> %d (value='%s')\r\n"),
              prevMode, (int)state.sat.eControlMode, value);
   if ((int)state.sat.eControlMode != prevMode) {
+    // Transition-only narration: fire on an actual mode change, not every set call.
+    satNarratef_P(PSTR("Control mode: %s"),
+                  (state.sat.eControlMode == SAT_MODE_PWM)        ? "PWM"
+                  : (state.sat.eControlMode == SAT_MODE_CONTINUOUS) ? "Continuous"
+                  :                                                   "Off");
     const char* modeName = (state.sat.eControlMode == SAT_MODE_PWM) ? "pwm"
                          : (state.sat.eControlMode == SAT_MODE_CONTINUOUS) ? "continuous"
                          : "off";
@@ -3400,6 +3409,7 @@ static void satUpdateSimulation()
     state.sat.iSimLastUpdateMs = now;
     state.sat.bSimWarmupDone = false;
     SATDebugTln(F("SAT SIM: simulation started"));
+    satNarrate_P(PSTR("Simulation started: synthetic boiler, no bus traffic"));
     return;
   }
 
@@ -3634,6 +3644,7 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS)
     state.sat.iSimWindowExpiryMs = now + durMs;
     if (state.sat.iSimWindowExpiryMs == 0) state.sat.iSimWindowExpiryMs = 1;  // avoid the 0 sentinel
     SATDebugTf(PSTR("SAT SIM: window_open x%.1f for %lds\r\n"), m, (long)(durMs / 1000UL));
+    satNarratef_P(PSTR("Scenario: window-open x%.1f for %lds"), m, (long)(durMs/1000UL));
     return true;
   }
   if (strcasecmp_P(event, PSTR("solar_gain")) == 0) {
@@ -3645,6 +3656,7 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS)
     state.sat.iSimSolarExpiryMs = now + durMs;
     if (state.sat.iSimSolarExpiryMs == 0) state.sat.iSimSolarExpiryMs = 1;
     SATDebugTf(PSTR("SAT SIM: solar_gain %.2fC/min for %lds\r\n"), g, (long)(durMs / 1000UL));
+    satNarratef_P(PSTR("Scenario: solar gain %.2fC/min for %lds"), g, (long)(durMs/1000UL));
     return true;
   }
   if (strcasecmp_P(event, PSTR("sensor_noise")) == 0) {
@@ -3661,6 +3673,7 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS)
       state.sat.iSimNoiseExpiryMs = now + durMs;
       if (state.sat.iSimNoiseExpiryMs == 0) state.sat.iSimNoiseExpiryMs = 1;
       SATDebugTf(PSTR("SAT SIM: sensor_noise +/-%.2fC for %lds\r\n"), a, (long)(durMs / 1000UL));
+      satNarratef_P(PSTR("Scenario: sensor noise +/-%.2fC for %lds"), a, (long)(durMs/1000UL));
     }
     return true;
   }
@@ -3689,6 +3702,7 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS)
       state.sat.iSimDhwExpiryMs = now + d;
       if (state.sat.iSimDhwExpiryMs == 0) state.sat.iSimDhwExpiryMs = 1;
       SATDebugTf(PSTR("SAT SIM: dhw_demand for %lds\r\n"), (long)(d / 1000UL));
+      satNarrate_P(PSTR("Scenario: DHW draw simulated"));
     }
     return true;
   }
@@ -4256,6 +4270,7 @@ void satControlLoop()
     if (_sat_consecutiveSkips >= SAT_MAX_SKIP_COUNT) {
       DebugTln(F("SAT SAFETY: too many invalid room temp readings, disabling"));
       state.sat.bSafetyTripped = true;
+      satNarrate_P(PSTR("SAFETY TRIPPED: SAT regulation halted"));
       satDisable();
     }
     return;
@@ -4574,6 +4589,7 @@ void satControlLoop()
     if (_sat_picFailCount >= SAT_MAX_PIC_FAILS) {
       DebugTln(F("SAT SAFETY: PIC unavailable for too long, disabling"));
       state.sat.bSafetyTripped = true;
+      satNarrate_P(PSTR("SAFETY TRIPPED: SAT regulation halted"));
       satDisable();
       return;
     }
