@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.145
+**  Version  : v2.0.0-alpha.146
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -337,6 +337,10 @@ void satHandleHeatingMode(const char* value);
 void satDisable();
 void satHandleControlMode(const char* value);
 void satCycleOnFlameChange(bool flameOn);
+// SAT test-observability narration (TASK-815): one source, two sinks
+// (Telnet via DebugTf + Web UI live-log via sendEventToWebSocket('S',...)).
+void satNarrate_P(PGM_P msg_P);
+void satNarratef_P(PGM_P fmt_P, ...);
 bool satSimulationBlocksBusTx(const char* cmd, const __FlashStringHelper* source);  // TASK-795 plan §4.1: bus-tx isolation gate
 void satNotifyBoilerFrameSeen();  // TASK-795 plan §4.2: slave-frame edge hook → deferred auto-disable
 bool satBoilerHardwarePresent();  // TASK-795 plan §4.2: real boiler on bus (REST 409 / MQTT reject guard)

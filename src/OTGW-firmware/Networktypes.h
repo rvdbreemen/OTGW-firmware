@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Networktypes.h
-**  Version  : v2.0.0-alpha.145
+**  Version  : v2.0.0-alpha.146
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

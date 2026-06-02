@@ -21,6 +21,30 @@
 #define SATDebugTln(s)        do { if (state.debug.bSAT) DebugTln(s);                  } while(0)
 #define SATDebugf(fmt, ...)   do { if (state.debug.bSAT) Debugf(fmt,   ##__VA_ARGS__); } while(0)
 
+// --- SAT test-observability narration (TASK-815) ---
+// Emits one plain-language line to BOTH sinks so Telnet and the Web UI live-log
+// never drift. Always-on (NOT gated by state.debug.bSAT) but transition-only at
+// the call sites, so volume stays low. Web UI lines carry prefix 'S'.
+// sendEventToWebSocket() is a file-static in OTGW-Core.ino, visible across the TU.
+#define SAT_NARRATE_BUF 96
+void satNarrate_P(PGM_P msg_P) {
+  if (!msg_P) return;
+  char buf[SAT_NARRATE_BUF];
+  snprintf_P(buf, sizeof(buf), PSTR("%s"), msg_P);
+  DebugTf(PSTR("SAT: %s\r\n"), buf);          // Telnet sink
+  sendEventToWebSocket('S', buf);             // Web UI live-log sink (prefix 'S')
+}
+void satNarratef_P(PGM_P fmt_P, ...) {
+  if (!fmt_P) return;
+  char buf[SAT_NARRATE_BUF];
+  va_list args;
+  va_start(args, fmt_P);
+  vsnprintf_P(buf, sizeof(buf), fmt_P, args);
+  va_end(args);
+  DebugTf(PSTR("SAT: %s\r\n"), buf);          // Telnet sink
+  sendEventToWebSocket('S', buf);             // Web UI live-log sink (prefix 'S')
+}
+
 // --- Heating Curve Constants ---
 static const float SAT_HC_BASE_OFFSET_FLOOR  = 20.0f;   // Underfloor base offset
 static const float SAT_HC_BASE_OFFSET_RAD    = 27.2f;   // Radiator base offset
