@@ -26,8 +26,6 @@ Field feedback: HA discovery currently lumps OpenTherm diagnostics, ESP/firmware
 - [x] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -39,3 +37,14 @@ Field feedback: HA discovery currently lumps OpenTherm diagnostics, ESP/firmware
 6. Commit to claude/pic-firmware-diagnostics-split-axwtP, push, open draft PR.
 7. Create 2.0.0 sibling task for the cross-worktree port (cannot push 2.0.0 from this branch-scoped session).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented ADR-084 multi-device topology on dev branch.
+- MQTTstuff.h: HaDeviceGroup enum + HaDiscoveryContext.deviceGroup field.
+- mqtt_configuratie.cpp: writeSubDeviceBlock() + writeDeviceBlock() sub-device branch (identifiers/name/via_device).
+- MQTTstuff.ino: doAutoConfigureMsgid routes 247/248->esp, 249/250/251->pic.
+Helper inlined at call site (not free function) to dodge Arduino auto-prototype emitting forward-decl above MQTTstuff.h include (HaDeviceGroup not-a-type build error first hit, then fixed).
+Build: python build.py --firmware exit 0. Evaluator: python evaluate.py --quick 34 passed / 0 failed / 100%.
+<!-- SECTION:NOTES:END -->
