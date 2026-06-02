@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-02 05:27'
-updated_date: '2026-06-02 05:27'
+updated_date: '2026-06-02 16:28'
 labels:
   - sat
   - webui
@@ -30,3 +30,9 @@ Field report @sergeantd (alpha.99, OTGW32, 2026-05-30, immediately after a devic
 - [ ] #3 python build.py green (fw+fs); evaluate.py --quick no new failures
 - [ ] #4 Field-confirmed by @sergeantd on OTGW32
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-02 11:26 — @sergeantd confirmed STILL PRESENT on 2.0.0-alpha.139+c880a02 (replied to his original 'outside temp + setpoint null after refresh' finding). So it is a real persistent bug, not a one-off transient. Note: alpha.139 does NOT contain any SAT-dashboard fix (it is the WS heap-gate build); root-cause still needs the raw /api/v2/sat/status JSON right after a refresh (to confirm null-at-source vs client-drop) — to be captured with @sergeantd tonight.
+<!-- SECTION:NOTES:END -->
