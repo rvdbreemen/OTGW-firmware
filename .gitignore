@@ -87,3 +87,6 @@ docs/daily-issue-report.md
 .wolf/designqc-report.json
 .wolf/designqc-captures/
 .wolf/hooks/_session.json
+
+# Superpowers brainstorm artifacts (transient)
+.superpowers/
