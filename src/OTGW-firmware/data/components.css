@@ -874,11 +874,22 @@ body.dark .settings-group-body > .settingDiv > .settings-input-container,
 .settings-group-body > .settingDiv .octet-group .octet-input {
   flex: 0 0 auto;
   min-width: 0;
-  width: 42px;
-  /* Also re-assert the compact font: the generic '.settingDiv input[type="text"]'
-   * rule sets 12pt, which outweighs '.octet-input { font-size: var(--fs-sm) }' and
-   * makes three-digit octets (192, 255) clip to two characters. */
+  width: 36px;
+  box-sizing: border-box;
+  /* Re-assert the borderless/transparent compact octet look. The base
+   * `input[type="text"]` rule (border + radius + space-4 padding + input-bg,
+   * specificity 0,1,1) outweighs `.octet-input` (0,1,0), so without these the
+   * four octets render as separate full-width boxes instead of one segmented
+   * field. This higher-specificity reset restores the single-box group. */
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 2px 0;
   font-size: var(--fs-sm);
+}
+.settings-group-body > .settingDiv .octet-group .octet-input:focus {
+  background: var(--brand-cyan-soft);
+  border-radius: 2px;
 }
 .fixed-ip-fields .fixed-ip-row > .fixed-ip-field-label {
   flex: 1 1 auto;

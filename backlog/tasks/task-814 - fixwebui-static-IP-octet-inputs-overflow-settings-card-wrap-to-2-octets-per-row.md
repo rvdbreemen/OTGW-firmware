@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-02 17:14'
-updated_date: '2026-06-02 21:28'
+updated_date: '2026-06-02 21:48'
 labels: []
 dependencies: []
 ---
@@ -31,10 +31,12 @@ On the 2.0.0 settings page the WiFi/Ethernet fixed-IP rows render four segmented
 
 <!-- SECTION:NOTES:BEGIN -->
 Follow-up (alpha.144): first fix made the four octets fit one row, but 3-digit values (192, 255) clipped to two chars. Generic '.settingDiv input[type=text] { font-size:12pt }' (specificity 0,2,1) outweighs '.octet-input { font-size: var(--fs-sm) }' (0,1,0), so octets rendered at 12pt and overflowed the 38px box. Re-asserted font-size:var(--fs-sm) in the high-specificity reset and bumped width 38->42px.
+
+Polish (alpha.145): octets showed full digits but rendered as 4 fat separate bordered boxes. Base 'input[type=text]' rule (border+radius+space-4 padding+input-bg, 0,1,1) beat '.octet-input' (0,1,0). Folded border:none/border-radius:0/background:transparent/padding:2px 0/box-sizing:border-box into the high-spec reset (+focus rule), width 42->36px, so the four octets sit borderless inside the single .octet-group border = compact segmented field.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Added a higher-specificity CSS reset in components.css so the broad '.settings-group-body > .settingDiv input[type=text]' fill rule no longer stretches the nested static-IP octet inputs: '.settings-group-body > .settingDiv .octet-group .octet-input { flex:0 0 auto; min-width:0; width:38px }', plus '.fixed-ip-fields .fixed-ip-row > .fixed-ip-field-label { flex:1 1 auto; min-width:0 }' to give the label the row slack so the compact octet box right-aligns. All four octets now fit one box; labels stop wrapping. No new DS classes (ADR-091 drift gate green). Shipped as alpha.143; esp32+esp8266 build clean, evaluator 0-fail. Visual confirmation on device welcome.
+Two-part fix. (1) alpha.143: higher-specificity reset stops the broad input-fill rule stretching the octets so all four fit one row. (2) alpha.144: re-assert font-size:var(--fs-sm) (the generic 12pt rule was winning and clipping 3-digit octets) and widen 38->42px. Octets now show full 192/255 values. ADR-091 drift gate green, evaluator 0-fail.
 <!-- SECTION:FINAL_SUMMARY:END -->
