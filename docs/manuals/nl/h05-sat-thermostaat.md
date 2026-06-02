@@ -242,16 +242,44 @@ SAT implementeert zes onafhankelijke verdedigingslagen. Bij elke activering van 
 
 ### 5.7 Simulatiemodus
 
-SAT beschikt over een simulatiemodus voor testen zonder een echte ketel. In simulatiemodus:
+In simulatiemodus draait de volledige SAT-regellus tegen een **gesimuleerde ketel** in
+plaats van een echte, zodat het hele algoritme getest en bekeken kan worden zonder
+verwarmingshardware. In simulatiemodus:
 - Berekent SAT alle setpoints en PID-waarden normaal.
-- Stuurt SAT de opdrachten **niet** naar de PIC.
+- Verstuurt SAT **geen** OpenTherm-opdrachten op de bus (bus-tx-isolatie). De uitvoer van
+  de regelaar wordt vastgelegd als *command trace* (de laatste zou-verstuurde opdracht is
+  zichtbaar) in plaats van naar de PIC/ketel gestuurd.
 - Zijn alle MQTT-topics en REST API-waarden beschikbaar met gesimuleerde data.
-- Reageert de gesimuleerde ruimtetemperatuur op het berekende setpoint met instelbare verwarmings- en afkoelsnelheden (`fSimHeatRate`, `fSimCoolRate`).
+
+Anders dan de vroege experimentele versie (die alleen de ruimtetemperatuur modelleerde)
+modelleert de simulator nu ook de **ketelzijde**, zodat de cyclusclassificatie, de
+vlam-toestandsmachine, de 4-uurs-statistieken, de dagelijkse verwarmingscurve-aanbeveling
+en OPV-kalibratie allemaal onder simulatie draaien:
+
+- **Vlam-toestandsmachine** — de gesimuleerde vlam ontsteekt en dooft op basis van
+  aanvoer versus setpoint, met realistische minimale aan/uit-tijden.
+- **Modulatie en aanvoer/retour-temperaturen** — modulatie volgt de vraag; de
+  aanvoertemperatuur stijgt tijdens branden en de retour volgt met een
+  belastingsafhankelijke ΔT.
+- **Ruimtetemperatuur** — reageert op de gesimuleerde vlam met instelbare verwarmings- en
+  afkoelsnelheden (`fSimHeatRate`, `fSimCoolRate`).
+- **Dag/nacht-buitentemperatuur** — een etmaalcurve voedt de weersafhankelijke
+  verwarmingscurve (of de echte weerfeed wanneer geldig).
+- **Scenario-injectie** — korte testscenario's (bijv. sensorruis, een warmwatertapping)
+  kunnen worden geïnjecteerd om specifieke codepaden te beproeven.
+
+**Veiligheid bij ketelafwezigheid:** simulatie vereist dat geen echte ketel op de bus
+antwoordt. Wordt er tijdens simulatie tóch een echte ketel gedetecteerd, dan wordt
+simulatie **automatisch uitgeschakeld**, zodat SAT nooit regelt tegen gesimuleerde
+toestand terwijl een echte ketel meeluistert.
 
 De simulatiemodus is nuttig voor:
 - Testen van Home Assistant-automatiseringen
 - Controleren of de verwarmingscurve logische waarden geeft
+- Valideren van de cyclus-/vlamlogica
 - Demonstraties zonder actieve verwarmingsinstallatie
+
+Het volledige contract staat in [ADR-117](../../adr/ADR-117-sat-simulation-contract.md).
 
 Activeren via instellingen (`satsimulation = true`) of REST API:
 ```bash

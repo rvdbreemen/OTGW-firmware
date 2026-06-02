@@ -214,13 +214,40 @@ SAT implements six independent safety layers. Any single layer tripping sends `C
 
 ### 5.8 Simulation Mode
 
-Simulation mode lets you run the SAT control loop without sending real commands to the PIC. In simulation mode:
-- SAT calculates all setpoints and PID values normally.
-- SAT does NOT send commands to the PIC.
-- All MQTT topics and REST API values are available with simulated data.
-- The simulated room temperature responds to the calculated setpoint using configurable heating and cooling rates (`fSimHeatRate`, `fSimCoolRate`).
+Simulation mode runs the full SAT control loop against a **synthetic boiler** instead of a
+real one, so the entire algorithm can be exercised and observed without any heating
+hardware. In simulation mode:
 
-Useful for testing Home Assistant automations, verifying that the heating curve produces logical values, and demonstrations without an active heating system.
+- SAT calculates all setpoints and PID values normally.
+- SAT does **not** transmit any OpenTherm commands on the bus (bus-tx isolation). The
+  regulator's output is recorded as a *command trace* (the last would-be command is
+  surfaced) instead of being sent to the PIC/boiler.
+- All MQTT topics and REST API values are available, driven by simulated data.
+
+Unlike the early experimental version (which modelled only room temperature), the
+simulator now models the **boiler side** too, so the cycle classifier, flame-health state
+machine, 4-hour statistics, the daily heating-curve recommendation, and OPV calibration
+all run under simulation:
+
+- **Flame state machine** — the synthetic flame ignites and extinguishes based on flow
+  versus setpoint, with realistic minimum on/off timing.
+- **Modulation and flow/return temperatures** — modulation tracks demand; flow climbs
+  while firing and the return follows with a load-dependent ΔT.
+- **Room temperature** — responds to the synthetic flame using configurable heating and
+  cooling rates (`fSimHeatRate`, `fSimCoolRate`).
+- **Diurnal outdoor temperature** — a day/night curve drives the weather-dependent
+  heating curve (or the real weather feed when valid).
+- **Scenario injection** — short test scenarios (e.g. sensor noise, a DHW draw) can be
+  injected to exercise specific code paths.
+
+**Boiler-absence safety:** simulation requires that no real boiler answers the bus. If a
+real boiler is detected while simulation is on, simulation is **automatically disabled**
+so SAT never regulates against synthetic state while a live boiler is listening.
+
+Useful for testing Home Assistant automations, verifying that the heating curve produces
+logical values, validating the cycle/flame logic, and demonstrations without an active
+heating system. The full contract is documented in
+[ADR-117](../../adr/ADR-117-sat-simulation-contract.md).
 
 ```bash
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/simulation" -m "ON"
