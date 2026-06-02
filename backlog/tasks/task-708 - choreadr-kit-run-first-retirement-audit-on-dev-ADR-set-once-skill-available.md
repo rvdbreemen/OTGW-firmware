@@ -5,11 +5,10 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-26 11:01'
-updated_date: '2026-06-01 23:08'
+updated_date: '2026-06-02 16:14'
 labels:
   - adr-kit
   - tooling
-  - blocked
 dependencies: []
 ---
 
@@ -26,3 +25,14 @@ Blocked on rvdbreemen/adr-kit issue #8 landing.\n\nOnce /adr-kit:retirement-audi
 - [ ] #3 ADR-078 specifically evaluated: deprecate or supersede as appropriate
 - [ ] #4 Same audit run on 2.0.0 worktree (111 ADRs)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-02 audit run (adr-kit 0.19.0 bin/adr-retire, dev docs/adr, 83 ADRs):
+- Result: 0 RETIRE, 0 REVIEW, 2 MONITOR(0.50), rest KEEP.
+- MONITOR ADR-017 (WiFiManager) + ADR-025 (Safari WS upload): both = staleness(1.0)+tech_removal(1.0). Verified BOTH false positives: WiFiManager live (captive portal, pinned 2.0.15-rc.1); Safari WS handling live in webSocketStuff.ino + index.js/css. tech_removal is a case-sensitive single-token grep that misses multiword/versioned terms.
+- ADR-078 evaluated: KEEP 0.00. Task hypothesis FALSIFIED - ADR-078 is about HA-Core alias topics (supersedes ADR-077), NOT SAT; it is the live record of the dev revert and must be kept.
+- Conclusion dev: no deprecation/archival action warranted.
+- Blocker cleared: /adr-kit retire skill + bin/adr-retire now present in plugin cache (0.13.3-0.19.0); adr-kit issue #8 landed.
+<!-- SECTION:NOTES:END -->
