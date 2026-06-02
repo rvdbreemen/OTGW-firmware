@@ -1898,6 +1898,7 @@ static bool writeFriendlyName(MqttJsonWriter &w, const char *s) {
 static const char kAvtyT[]    PROGMEM = "avty_t";
 static const char kDev[]      PROGMEM = "dev";
 static const char kIds[]      PROGMEM = "identifiers";
+static const char kViaDevice[] PROGMEM = "via_device";
 static const char kMfr[]      PROGMEM = "manufacturer";
 static const char kModel[]    PROGMEM = "model";
 static const char kSwVer[]    PROGMEM = "sw_version";
@@ -1921,12 +1922,54 @@ static const char kOriginName[] PROGMEM = "OTGW-firmware";
 static const char kOriginUrl[]  PROGMEM = "https://github.com/rvdbreemen/OTGW-firmware";
 
 // ---------------------------------------------------------------------------
-// Device block: full (first entity) or minimal (subsequent)
+// Device block (ADR-084: multi-device topology)
+//
+//  - main: the OpenTherm Gateway device. Full block on the first entity
+//    (manufacturer/model/name/sw_version), minimal {identifiers} after.
+//  - esp/pic: sub-devices nested under main via `via_device`. The full block
+//    (identifiers + name + via_device) is emitted on EVERY entity because drip
+//    publishing (ADR-041) emits entities individually and HA processes each
+//    retained config independently — there is no reliable "first" entity for a
+//    sub-device.
 // ---------------------------------------------------------------------------
+static bool writeSubDeviceBlock(MqttJsonWriter &w, const HaDiscoveryContext &ctx,
+                                PGM_P idSuffix, PGM_P namePrefix) {
+  // "identifiers":"<nodeId><idSuffix>"  (e.g. "<nodeId>-pic")
+  if (!w.writeChar('"')) return false;
+  if (!w.writeProgmem(kIds)) return false;
+  if (!w.writeProgmem(PSTR("\":\""))) return false;
+  if (!w.writeRam(ctx.nodeId)) return false;
+  if (!w.writeProgmem(idSuffix)) return false;
+  if (!w.writeChar('"')) return false;
+  if (!writeJsonComma(w)) return false;
+  // "name":"<namePrefix> (<hostname>)"  (e.g. "OTGW PIC (mygw)")
+  if (!w.writeChar('"')) return false;
+  if (!w.writeProgmem(kDevName)) return false;
+  if (!w.writeProgmem(PSTR("\":\""))) return false;
+  if (!w.writeProgmem(namePrefix)) return false;
+  if (!w.writeProgmem(PSTR(" ("))) return false;
+  if (!w.writeRam(ctx.hostname)) return false;
+  if (!w.writeProgmem(PSTR(")\""))) return false;
+  if (!writeJsonComma(w)) return false;
+  // "via_device":"<nodeId>" — nests this device under the main gateway.
+  return writeJsonKV(w, kViaDevice, ctx.nodeId);
+}
+
 static bool writeDeviceBlock(MqttJsonWriter &w, const HaDiscoveryContext &ctx) {
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kDev)) return false;
   if (!w.writeProgmem(PSTR("\":{"))) return false;
+
+  if (ctx.deviceGroup == HaDeviceGroup::pic) {
+    if (!writeSubDeviceBlock(w, ctx, PSTR("-pic"), PSTR("OTGW PIC"))) return false;
+    return w.writeChar('}');
+  }
+  if (ctx.deviceGroup == HaDeviceGroup::esp) {
+    if (!writeSubDeviceBlock(w, ctx, PSTR("-esp"), PSTR("OTGW ESP"))) return false;
+    return w.writeChar('}');
+  }
+
+  // Main gateway device.
   if (!writeJsonKV(w, kIds, ctx.nodeId)) return false;
 
   if (ctx.isFirstEntity) {

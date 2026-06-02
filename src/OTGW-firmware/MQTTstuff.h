@@ -154,6 +154,17 @@ enum class HaEntityCat : uint8_t {
     _count
 };
 
+// HA device grouping (ADR-084). Selects which discovery `device` block an
+// entity is published under. The main gateway device is the root; the esp and
+// pic devices nest beneath it via `via_device`. Group selection is by message
+// ID (see doAutoConfigureMsgid in MQTTstuff.ino) — not overloaded onto
+// MQTT_HA_FLAG_IS_PIC_ENTRY, which keeps its otgw-pic/ topic-prefix role.
+enum class HaDeviceGroup : uint8_t {
+    main = 0,           // OpenTherm Gateway — OT values + OT diagnostics
+    esp,                // OTGW ESP — heap/discovery stats + firmware info
+    pic                 // OTGW PIC — PIC info/settings/controls
+};
+
 // ---------------------------------------------------------------------------
 // Enum-to-string lookup functions -- return PGM_P (flash pointer)
 // Returns nullptr for ::none values (caller should omit the JSON key).
@@ -274,6 +285,7 @@ struct HaDiscoveryContext {
     const char *manufacturer;      // Hardware manufacturer (from settings.device)
     const char *model;             // Hardware model (from settings.device)
     bool        isFirstEntity;
+    HaDeviceGroup deviceGroup = HaDeviceGroup::main; // ADR-084: which device block to emit
     // Source template expansion (set per-source iteration)
     const char *sourceSuffix;
     const char *sourceName;

@@ -1690,6 +1690,17 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   bool result = false;
   HaDiscoveryContext ctx = buildDiscoveryContext(isFirst);
 
+  // ADR-084: route the diagnostic pseudo-IDs to their HA sub-devices. Heap/
+  // discovery stats (247) and firmware info (248) go on the ESP sub-device;
+  // PIC info (249), PIC settings (250) and PIC controls (251) go on the PIC
+  // sub-device. Everything else (real OT message IDs, climate, number, Dallas)
+  // stays on the main gateway device. Single decision point for device grouping.
+  if (OTid == OTGWheapstatsid || OTid == OTGWfwinfoid) {
+    ctx.deviceGroup = HaDeviceGroup::esp;
+  } else if (OTid == OTGWpicinfoid || OTid == OTGWpicsettingsid || OTid == OTGWpiccontrolsid) {
+    ctx.deviceGroup = HaDeviceGroup::pic;
+  }
+
   // Sensors
   uint16_t sIdx = readSensorIndex(OTid);
   if (sIdx != MQTT_HA_INDEX_NONE) {
