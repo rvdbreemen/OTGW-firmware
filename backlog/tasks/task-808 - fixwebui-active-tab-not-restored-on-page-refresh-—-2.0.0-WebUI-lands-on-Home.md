@@ -3,10 +3,11 @@ id: TASK-808
 title: >-
   fix(webui): active tab not restored on page refresh — 2.0.0 WebUI lands on
   Home
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-02 05:25'
-updated_date: '2026-06-02 05:26'
+updated_date: '2026-06-02 05:33'
 labels:
   - webui
   - field-report
@@ -29,3 +30,19 @@ Field report @sergeantd (alpha.99, OTGW32, 2026-05-30): "when I hit refresh and 
 - [ ] #3 python build.py green (firmware + filesystem); evaluate.py --quick no new failures
 - [ ] #4 Field-confirmed by @sergeantd on OTGW32
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-02 (loop) — implemented. Root cause confirmed in data/index.js: startMainPage() (init) only special-cased window.location.hash=='#tabPICflash'; every other load fell through to showMainPage() (Home). No active-page persistence existed (hash was only read for the PIC-flash deep-link).
+
+Fix (frontend-only, data/index.js):
+1. setActivePageSection() now persists the active page to the URL hash via history.replaceState (PAGE_SECTION_HASH map: ''=Home, #sat, #settings, #deviceinfo, #satsettings, #tabPICflash). replaceState = no history pollution; no hashchange handler exists so it does not re-navigate. Wrapped in try/catch (best-effort).
+2. startMainPage() restore: on load, dispatches the hash to the matching page fn (satPage/settingsPage/deviceinfoPage/satSettingsPage), keeps the existing #tabPICflash board-class branch, defaults Home on empty/unknown hash. try/catch falls back to Home.
+
+Cold-routing to non-Home pages is proven safe by the pre-existing #tabPICflash->firmwarePage() path; all page fns are parameterless + self-contained.
+
+NOT persisted: webhookPage() (it hand-toggles classes, bypasses setActivePageSection) — niche Advanced sub-page, left as-is (refresh there still lands Home, unchanged).
+
+Verified: node --check index.js clean (build.py does not lint JS). Bumped alpha.139->140. Full build in progress. AC#1-3 self-verifiable; AC#4 (field-confirm by @sergeantd on OTGW32) pending — ship alpha.140 for him to test.
+<!-- SECTION:NOTES:END -->

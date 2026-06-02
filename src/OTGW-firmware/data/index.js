@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.139
+**  Version  : v2.0.0-alpha.140
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -292,6 +292,20 @@ function stopTimeUpdates() {
   }
 }
 
+// TASK-808: map each top-level page section to a URL hash token so the active
+// page survives a browser refresh. Home uses no hash (clean URL); the others
+// each get a stable token. #tabPICflash is kept as-is for the existing deep-link.
+// webhookPage() bypasses setActivePageSection (hand-toggles classes), so it is
+// intentionally not persisted here.
+var PAGE_SECTION_HASH = {
+  displayMainPage: '',
+  displaySATPage: '#sat',
+  displaySettingsPage: '#settings',
+  displayDeviceInfo: '#deviceinfo',
+  displaySATSettingsPage: '#satsettings',
+  displayPICflash: '#tabPICflash'
+};
+
 function setActivePageSection(activeId) {
   ['displayMainPage', 'displaySettingsPage', 'displayDeviceInfo', 'displayPICflash', 'displayWebhookPage', 'displaySATPage', 'displaySATSettingsPage'].forEach(function(id) {
     var section = document.getElementById(id);
@@ -306,6 +320,15 @@ function setActivePageSection(activeId) {
   if (activeId !== 'displaySATPage' && typeof SAT !== 'undefined') {
     SAT.stop();
   }
+
+  // TASK-808: persist the active page in the URL hash (replaceState = no history
+  // pollution, no hashchange handler exists so this does not re-navigate).
+  try {
+    var token = PAGE_SECTION_HASH[activeId];
+    if (token !== undefined && window.history && typeof window.history.replaceState === 'function') {
+      window.history.replaceState(null, '', token || (window.location.pathname + window.location.search));
+    }
+  } catch (e) { /* hash persistence is best-effort */ }
 }
 
 document.addEventListener('visibilitychange', function () {
@@ -3310,7 +3333,20 @@ function initMainPage() {
         })
         .catch(function() { showMainPage(); });
     } else {
-      showMainPage();
+      // TASK-808: restore the active top-level page from the URL hash so a
+      // browser refresh keeps you on the page you were viewing instead of
+      // dropping back to Home. Unknown/empty hash falls through to Home.
+      var h = window.location.hash;
+      try {
+        if (h === "#sat") { satPage(); }
+        else if (h === "#settings") { settingsPage(); }
+        else if (h === "#deviceinfo") { deviceinfoPage(); }
+        else if (h === "#satsettings") { satSettingsPage(); }
+        else { showMainPage(); }
+      } catch (e) {
+        console.warn('Page restore failed, falling back to Home:', e && e.message);
+        showMainPage();
+      }
     }
   }
 
