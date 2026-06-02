@@ -20,9 +20,9 @@ Blocked on rvdbreemen/adr-kit issue #8 landing.\n\nOnce /adr-kit:retirement-audi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 /adr-kit:retirement-audit skill is available in installed adr-kit version
-- [ ] #2 Audit run on dev worktree; all candidates reviewed with user
-- [ ] #3 ADR-078 specifically evaluated: deprecate or supersede as appropriate
+- [x] #1 /adr-kit:retirement-audit skill is available in installed adr-kit version
+- [x] #2 Audit run on dev worktree; all candidates reviewed with user
+- [x] #3 ADR-078 specifically evaluated: deprecate or supersede as appropriate
 - [ ] #4 Same audit run on 2.0.0 worktree (111 ADRs)
 <!-- AC:END -->
 
