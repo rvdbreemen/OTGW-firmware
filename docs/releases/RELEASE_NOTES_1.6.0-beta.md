@@ -44,7 +44,7 @@ The bullets below summarise the user-visible changes that have landed on `dev` s
 **Code hygiene**
 - **Dead and orphaned code paths cleaned out of `dev`**: inactive subsystem code and its matching scaffolding in `OTGW-firmware.h` removed, since neither is reachable on the 1.5.x / 1.6.x line.
 
-For per-commit detail see [`CHANGELOG.md`](CHANGELOG.md) under `## [Unreleased]`. For architectural rationale see the linked ADRs under [`docs/adr/`](docs/adr/).
+For per-commit detail see [`CHANGELOG.md`](../../CHANGELOG.md) under `## [Unreleased]`. For architectural rationale see the linked ADRs under [`docs/adr/`](../adr/).
 
 <!-- digest:end -->
 
@@ -122,7 +122,7 @@ Below is the long-form version of the digest above, with one section per area an
 
 ## Where to read more
 
-- [`CHANGELOG.md`](CHANGELOG.md): per-commit running log under `## [Unreleased]`.
+- [`CHANGELOG.md`](../../CHANGELOG.md): per-commit running log under `## [Unreleased]`.
 - [`README.md`](README.md): landing page, "What's new on dev" section.
-- [`docs/adr/`](docs/adr/): architectural rationale, in particular ADR-073 (JIT discovery), ADR-074 (HA availability), ADR-075 (proxy-answer routing).
-- [`docs/guides/`](docs/guides/): flash, build, MQTT, and integration guides.
+- [`docs/adr/`](../adr/): architectural rationale, in particular ADR-073 (JIT discovery), ADR-074 (HA availability), ADR-075 (proxy-answer routing).
+- [`docs/guides/`](../guides/): flash, build, MQTT, and integration guides.
