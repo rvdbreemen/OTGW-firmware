@@ -3,10 +3,11 @@ id: TASK-809
 title: >-
   investigate(sat-webui): outside temp + boiler setpoint read null after page
   refresh (OTGW32)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-02 05:27'
-updated_date: '2026-06-02 16:28'
+updated_date: '2026-06-02 16:50'
 labels:
   - sat
   - webui
@@ -35,4 +36,18 @@ Field report @sergeantd (alpha.99, OTGW32, 2026-05-30, immediately after a devic
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-06-02 11:26 — @sergeantd confirmed STILL PRESENT on 2.0.0-alpha.139+c880a02 (replied to his original 'outside temp + setpoint null after refresh' finding). So it is a real persistent bug, not a one-off transient. Note: alpha.139 does NOT contain any SAT-dashboard fix (it is the WS heap-gate build); root-cause still needs the raw /api/v2/sat/status JSON right after a refresh (to confirm null-at-source vs client-drop) — to be captured with @sergeantd tonight.
+
+2026-06-02 (loop) — CODE INVESTIGATION (read-only, agent inv809). Conclusion: backend null-at-source (NaN), NOT a client drop. Confidence high on client-exoneration, moderate on exact NaN trigger.
+
+CLIENT EXONERATED: data/sat.js has one HTTP-only path (fetchStatus, sat.js:146, called once on load sat.js:739 + poll timer sat.js:741; no WebSocket/partial-update path). All four temp tiles set identically via fmtTemp at sat.js:204-207; fmtTemp(null) returns '--' (sat.js:139-143). One identical client path writes all 4 tiles, so the client cannot drop only 2 — the asymmetry is in the JSON values.
+
+BACKEND MECHANISM: satSendJsonFloat() (SATcontrol.ino:1972-1988) emits literal JSON null when the float is NaN/inf (line 1978-1979). satSendStatusJSON() sends outside_temp <- satGetOutsideTemp() (SATcontrol.ino:2002) and final_setpoint <- state.sat.fFinalSetpoint (SATcontrol.ino:2005). Both null tiles map to NaN at those sources.
+
+ASYMMETRY (key clue): target_temp = settings.sat.fTargetTemp (persisted, never NaN); room_temp = satGetRoomTemp() (independent sensor, renders fine). outside_temp + final_setpoint are the heating-curve-computed pair, and a NaN outsideTemp propagates into the setpoint: range clamps at SATcontrol.ino:4247, 4448-4449, 4473-4474 use </> comparisons that NaN slips past (all NaN comparisons are false), so NaN flows satCalcHeatingCurve (4362->468-483) -> fFinalSetpoint=NaN (4481). heating_curve/pid_output also go NaN but are not on the 4-tile simple dashboard (index.html:378-394), so only 2 of 4 show null.
+
+OPEN TENSION: no code path found that makes satGetOutsideTemp() return NaN on a COLD restart — all sources init 0.0f (OTGW-Core.h:57 Toutside, state.sat.fExternalOutdoor, weather.fTemperature, fFinalSetpoint SATtypes.h:146). Cold restart should show 0.00C, not null. So NaN is introduced at RUNTIME via the unguarded propagation chain once some upstream produces a NaN. Field JSON capture needed to confirm trigger.
+
+NEEDS FROM @sergeantd (tonight): raw Response body of /api/v2/sat/status captured immediately after the refresh (DevTools > Network > status > Response). If outside_temp/final_setpoint are literally null -> backend NaN confirmed, instrument upstream. If numeric -> unlikely, would point at stale/empty first response.
+
+FIX DIRECTION (hold until capture): add explicit isnan() guard alongside the range clamp at SATcontrol.ino:4247 (treat isnan(outsideTemp) as the safe-fallback the comment already intends), stopping one NaN outside reading from poisoning final_setpoint/heating_curve/pid_output. Confirm trigger first so the fix targets the cause, not masks it.
 <!-- SECTION:NOTES:END -->

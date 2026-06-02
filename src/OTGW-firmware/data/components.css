@@ -1570,6 +1570,48 @@ body.dark .sat-dashboard.sat-panel,
   transform: rotate(-90deg);
 }
 
+/* TASK-812: SAT settings rows (.settingDiv built by buildSatSettings in
+ * index.js) live inside .sat-settings-group-body, which is NOT the grid
+ * container that the main settings page (.settings-group-body) is. They
+ * therefore fall back to the legacy float-based .settingDiv layout
+ * (fixed 320px floated label + uncapped input/select), which overflows a
+ * narrow group body instead of wrapping to fit. Mirror the main page's
+ * float-neutralisation here without subgrid (the parent is not a grid):
+ * the label wraps, the input/select fills and is capped, so the row
+ * always sizes to the panel. Notably the legacy rule omits `select`, so a
+ * <select> with a long option (e.g. a manual sensor address) would push
+ * the row wider than its container. */
+.sat-settings-group-body > .settingDiv {
+  float: none;
+  width: auto;
+  min-width: 0;
+  margin: 0 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.sat-settings-group-body > .settingDiv > .settings-field-container {
+  float: none;
+  width: auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sat-settings-group-body > .settingDiv > .settings-input-container {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+.sat-settings-group-body > .settingDiv input[type="text"],
+.sat-settings-group-body > .settingDiv input[type="password"],
+.sat-settings-group-body > .settingDiv input[type="number"],
+.sat-settings-group-body > .settingDiv select {
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+}
+
 .sat-settings-nav-btn {
   /* Inherits .sat-btn; small visual nudge to read as a nav action */
   font-size: var(--fs-sm);
