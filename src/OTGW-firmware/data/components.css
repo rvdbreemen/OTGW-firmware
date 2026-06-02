@@ -864,6 +864,22 @@ body.dark .settings-group-body > .settingDiv > .settings-input-container,
   background: var(--bg-surface);
   gap: 1px;
 }
+/* TASK-814: the fixed-IP section is a .settingDiv child of .settings-group-body,
+ * so the broad input-fill rule (`.settings-group-body > .settingDiv input[type="text"]`
+ * → flex:1; min-width:80px) leaks onto the nested octet inputs. Left unchecked the
+ * four octets stretch past the card and wrap to two per row (the rest clipped by
+ * `.fixed-ip-section { overflow:hidden }`). Restore their compact fixed width with a
+ * higher-specificity reset, and let the field label take the row slack so the octet
+ * box stays compact and right-aligned. */
+.settings-group-body > .settingDiv .octet-group .octet-input {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 38px;
+}
+.fixed-ip-fields .fixed-ip-row > .fixed-ip-field-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .octet-input {
   width: 38px; border: none; outline: none; text-align: center;
   padding: 2px 0; background: transparent;
