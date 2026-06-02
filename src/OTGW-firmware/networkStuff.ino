@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.141
+**  Version  : v2.0.0-alpha.142
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -91,8 +91,15 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   char thisAP[64];
   strlcpy(thisAP, hostname, sizeof(thisAP));
   strlcat(thisAP, "-", sizeof(thisAP));
-  // Use eFuse MAC (always valid) — WiFi.macAddress() returns 00:00:00:00:00:00 before WiFi.begin()
-  strlcat(thisAP, getMacAddress() + 6, sizeof(thisAP)); // last 6 chars = last 3 MAC bytes (e.g. "21B4F8")
+  // Full 6-byte MAC with colons to match the 1.x.x captive-portal naming scheme
+  // (e.g. "OTGW-A4:CF:12:21:B4:F8"). Sourced from the eFuse MAC, which is always
+  // valid — WiFi.macAddress() returns 00:00:00:00:00:00 before WiFi.begin() on ESP32.
+  uint8_t apMac[6];
+  platformGetMacAddress(apMac);
+  char apMacStr[18];
+  snprintf_P(apMacStr, sizeof(apMacStr), PSTR("%02X:%02X:%02X:%02X:%02X:%02X"),
+             apMac[0], apMac[1], apMac[2], apMac[3], apMac[4], apMac[5]);
+  strlcat(thisAP, apMacStr, sizeof(thisAP));
 
   DebugTln(F("\nStart Wifi ..."));
   manageWiFi.setDebugOutput(true);
