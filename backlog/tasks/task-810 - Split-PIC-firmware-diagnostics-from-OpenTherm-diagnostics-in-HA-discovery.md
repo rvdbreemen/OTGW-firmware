@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-02 06:20'
-updated_date: '2026-06-02 06:26'
+updated_date: '2026-06-02 06:49'
 labels: []
 dependencies: []
 ---
@@ -18,13 +18,15 @@ Field feedback: HA discovery currently lumps OpenTherm diagnostics, ESP/firmware
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ADR-084 reviewed and accepted by user before merge
-- [ ] #2 PIC info/settings/controls (pseudo-IDs 249/250/251) register under a distinct OTGW PIC HA device via via_device
-- [ ] #3 ESP stats + firmware diagnostics (pseudo-IDs 247/248) register under a distinct OTGW ESP HA device via via_device
-- [ ] #4 OpenTherm diagnostics and all OT values remain on the main OpenTherm Gateway device
-- [ ] #5 unique_id, MQTT topic paths, and entity_category values are unchanged (entity history + ADR-062 verification preserved)
-- [ ] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [x] #1 ADR-084 reviewed and accepted by user before merge
+- [x] #2 PIC info/settings/controls (pseudo-IDs 249/250/251) register under a distinct OTGW PIC HA device via via_device
+- [x] #3 ESP stats + firmware diagnostics (pseudo-IDs 247/248) register under a distinct OTGW ESP HA device via via_device
+- [x] #4 OpenTherm diagnostics and all OT values remain on the main OpenTherm Gateway device
+- [x] #5 unique_id, MQTT topic paths, and entity_category values are unchanged (entity history + ADR-062 verification preserved)
+- [x] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
