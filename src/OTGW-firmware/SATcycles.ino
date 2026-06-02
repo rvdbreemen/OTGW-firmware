@@ -525,6 +525,8 @@ void satCycleOnFlameChange(bool flameOn)
     SATDebugTf(PSTR("SAT cycle: flame ON flow=%.1f sp=%.1f cycles/hr=%u\r\n"),
                satGetFlowTemp(), _cycle_setpointAtStart,
                (unsigned)state.sat.iCyclesThisHour);
+    satNarratef_P(PSTR("Flame lit: flow %.0f\xc2\xb0""C, setpoint %.0f\xc2\xb0""C"),
+                  satGetFlowTemp(), state.sat.fFinalSetpoint);
     {
       static char _wsMsg[80];
       snprintf_P(_wsMsg, sizeof(_wsMsg), PSTR("{\"type\":\"status\",\"msg\":\"Heating active, setpoint %.1f deg C\"}"), _cycle_setpointAtStart);
@@ -578,6 +580,15 @@ void satCycleOnFlameChange(bool flameOn)
     SATCycleClass cls = _cycleClassify(durationSec, tailP90, tailP10,
                                         _cycle_setpointAtStart, _cycle_overshootSec);
     _cycleRecord(cls, durationSec, _cycle_maxFlowTemp, _cycle_overshootSec);
+    {
+      // Map the cycle class enum to a plain word for the observer.
+      static const char *const _satCycleWord[] = { "none", "GOOD", "overshoot",
+                                                   "underheat", "short", "uncertain" };
+      const char *verdict = ((uint8_t)cls < (sizeof(_satCycleWord)/sizeof(_satCycleWord[0])))
+                            ? _satCycleWord[(uint8_t)cls] : "?";
+      satNarratef_P(PSTR("Flame off: cycle %s, %.0fs on, peak flow %.0f\xc2\xb0""C"),
+                    verdict, durationSec, _cycle_maxFlowTemp);
+    }
 
     // Record completed cycle into the rolling 4-hour window (Task #227)
     {
