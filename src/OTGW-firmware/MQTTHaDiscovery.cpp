@@ -3774,3 +3774,210 @@ bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryC
   feedWatchDog();
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// TASK-648 Task 6: topology-migration cleanup helper
+// ---------------------------------------------------------------------------
+// Publishes empty retained payloads to all discovery config topics that were
+// emitted under the STALE topology scheme for the given OT ID. HA interprets
+// an empty retained payload as "remove this entity", which is exactly what we
+// want when the device-topology changes (modern <-> legacy).
+//
+// staleIsLegacy=true  — the OLD scheme was legacy (bare <label> topics exist).
+//                       We are now in modern mode; clear the legacy topics.
+// staleIsLegacy=false — the OLD scheme was modern (<device>_<label> topics).
+//                       We are now in legacy mode; clear the modern topics.
+//
+// Only sensor/ and binary_sensor/ config topics are affected; other component
+// types (climate, number, button, select, switch, override sensors, SAT zone,
+// SAT BLE) use topic formats that do not include the device prefix and are
+// therefore unchanged by topology migration.
+//
+// Returns the number of topics successfully cleared (0 means no sensor/binsensor
+// entries for this OT ID, or MQTT was momentarily unable to publish).
+// ---------------------------------------------------------------------------
+
+// Local helper: publish one empty retained message. Returns true on success.
+// Does NOT call incPublishedTopicCount (empty = entity removal, not a new pub).
+static bool publishEmptyRetained(PubSubClient &client, const char *topic) {
+  if (!client.connected()) return false;
+  if (!client.beginPublish(topic, 0, /*retain=*/true)) return false;
+  if (!client.endPublish()) return false;
+  return true;
+}
+
+// Local helper: device short name for topology clearing (mirrors haDeviceShortName
+// but without legacyMode context — always returns the concrete device segment).
+static const char *topoDeviceName(HaDevice d) {
+  switch (d) {
+    case HaDevice::Boiler:     return "boiler";
+    case HaDevice::Thermostat: return "thermostat";
+    case HaDevice::Gateway:    return "gateway";
+    case HaDevice::Esp:        return "esp";
+    case HaDevice::Sat:        return "sat";
+  }
+  return "esp";
+}
+
+// Derive the single owning device for a pseudo-ID (128..255). Returns Esp for
+// unknowns. Mirrors deviceForOTId() in MQTTstuff.ino (that function is static
+// there; this local copy exists solely to avoid cross-TU access to a static).
+static HaDevice topoDeviceForPseudoId(uint8_t otId) {
+  switch (otId) {
+    case 244: return HaDevice::Gateway;
+    case 246: return HaDevice::Esp;
+    case 247: return HaDevice::Esp;
+    case 248: return HaDevice::Esp;
+    case 249: return HaDevice::Gateway;
+    case 250: return HaDevice::Gateway;
+    case 251: return HaDevice::Sat;
+    case 252: return HaDevice::Sat;
+    case 253: return HaDevice::Sat;
+    case 254: return HaDevice::Sat;
+    case 255: return HaDevice::Sat;
+    default:  return HaDevice::Esp;
+  }
+}
+
+uint8_t clearTopologyDiscoveryForOTId(PubSubClient &client,
+                                      uint8_t otId,
+                                      bool staleIsLegacy,
+                                      const char *haPrefix,
+                                      const char *nodeId,
+                                      bool separateSources)
+{
+  uint8_t cleared = 0;
+  char topic[STREAM_TOPIC_MAX];
+
+  // --- Sensors ---
+  const uint16_t sStart = readSensorIndex(otId);
+  if (sStart != MQTT_HA_INDEX_NONE) {
+    // Determine which device segment(s) to clear for the stale modern topology.
+    // Bilateral IDs (0..127) were published under both boiler and thermostat.
+    // Pseudo-IDs (128..255) were published under a single device.
+    HaDevice devices[2];
+    uint8_t  devCount = 0;
+    if (!staleIsLegacy) {
+      if (otId <= 127) {
+        devices[0] = HaDevice::Boiler;
+        devices[1] = HaDevice::Thermostat;
+        devCount = 2;
+      } else {
+        devices[0] = topoDeviceForPseudoId(otId);
+        devCount = 1;
+      }
+    }
+
+    uint16_t i = sStart;
+    while (i < MQTT_HA_SENSOR_COUNT) {
+      MqttHaSensorCfg cfg = readSensorCfg(i);
+      if (cfg.id != otId) break;
+      i++;
+
+      if (staleIsLegacy) {
+        // Old scheme: bare label (no device prefix).
+        // Rows with MQTT_HA_FLAG_ANY_SOURCE are source-variant-only rows:
+        //   bSeparateSources=true  → _thermostat and _boiler variants were published.
+        //   bSeparateSources=false → nothing was published for this row; skip.
+        // Rows without MQTT_HA_FLAG_ANY_SOURCE are base entries: always published.
+        if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
+          if (separateSources) {
+            if (buildSensorDiscoveryTopic(topic, sizeof(topic),
+                  haPrefix, nodeId, cfg.label, "thermostat", nullptr))
+              if (publishEmptyRetained(client, topic)) cleared++;
+            if (buildSensorDiscoveryTopic(topic, sizeof(topic),
+                  haPrefix, nodeId, cfg.label, "boiler", nullptr))
+              if (publishEmptyRetained(client, topic)) cleared++;
+          }
+          // No base entry for source-variant rows.
+        } else {
+          if (buildSensorDiscoveryTopic(topic, sizeof(topic),
+                haPrefix, nodeId, cfg.label, nullptr, nullptr))
+            if (publishEmptyRetained(client, topic)) cleared++;
+        }
+      } else {
+        // Old scheme: modern — <device>_<label> for each device that was used.
+        for (uint8_t d = 0; d < devCount; d++) {
+          const char *devSeg = topoDeviceName(devices[d]);
+          if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
+            if (separateSources) {
+              if (buildSensorDiscoveryTopic(topic, sizeof(topic),
+                    haPrefix, nodeId, cfg.label, "thermostat", devSeg))
+                if (publishEmptyRetained(client, topic)) cleared++;
+              if (buildSensorDiscoveryTopic(topic, sizeof(topic),
+                    haPrefix, nodeId, cfg.label, "boiler", devSeg))
+                if (publishEmptyRetained(client, topic)) cleared++;
+            }
+            // No base entry for source-variant rows in modern mode either.
+          } else {
+            if (buildSensorDiscoveryTopic(topic, sizeof(topic),
+                  haPrefix, nodeId, cfg.label, nullptr, devSeg))
+              if (publishEmptyRetained(client, topic)) cleared++;
+          }
+        }
+      }
+      feedWatchDog();
+    }
+  }
+
+  // --- Binary sensors ---
+  const uint16_t bStart = readBinSensorIndex(otId);
+  if (bStart != MQTT_HA_INDEX_NONE) {
+    HaDevice devices[2];
+    uint8_t  devCount = 0;
+    if (!staleIsLegacy) {
+      if (otId <= 127) {
+        devices[0] = HaDevice::Boiler;
+        devices[1] = HaDevice::Thermostat;
+        devCount = 2;
+      } else {
+        devices[0] = topoDeviceForPseudoId(otId);
+        devCount = 1;
+      }
+    }
+
+    // Indexed range (mirrors doAutoConfigureMsgid binsensor logic):
+    //   staleIsLegacy=true  → ALL indexed rows were published (no flag filter in legacy mode)
+    //   staleIsLegacy=false → SKIP rows flagged MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS
+    uint16_t i = bStart;
+    while (i < MQTT_HA_BINSENSOR_INDEXED_COUNT) {
+      MqttHaBinSensorCfg cfg = readBinSensorCfg(i);
+      if (cfg.id != otId) break;
+      i++;
+
+      if (!staleIsLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS)) continue;
+
+      if (staleIsLegacy) {
+        if (buildBinSensorDiscoveryTopic(topic, sizeof(topic),
+              haPrefix, nodeId, cfg.label, nullptr))
+          if (publishEmptyRetained(client, topic)) cleared++;
+      } else {
+        for (uint8_t d = 0; d < devCount; d++) {
+          const char *devSeg = topoDeviceName(devices[d]);
+          if (buildBinSensorDiscoveryTopic(topic, sizeof(topic),
+                haPrefix, nodeId, cfg.label, devSeg))
+            if (publishEmptyRetained(client, topic)) cleared++;
+        }
+      }
+      feedWatchDog();
+    }
+
+    // Alias tail (rows >= MQTT_HA_BINSENSOR_INDEXED_COUNT): only published in modern mode.
+    // Clear these only when the stale scheme was modern (!staleIsLegacy).
+    if (!staleIsLegacy) {
+      for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
+        MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
+        if (cfg.id != otId) continue;
+        for (uint8_t d = 0; d < devCount; d++) {
+          const char *devSeg = topoDeviceName(devices[d]);
+          if (buildBinSensorDiscoveryTopic(topic, sizeof(topic),
+                haPrefix, nodeId, cfg.label, devSeg))
+            if (publishEmptyRetained(client, topic)) cleared++;
+        }
+        feedWatchDog();
+      }
+    }
+  }
+
+  return cleared;
+}

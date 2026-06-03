@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.158
+**  Version  : v2.0.0-alpha.159
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -253,6 +253,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("MQTTharebootdetection"), settings.mqtt.bHaRebootDetect, true);
   writeJsonBoolKV(file, F("MQTTdiscoveryAutoVerify"), settings.mqtt.bDiscoveryAutoVerify, true);
   writeJsonBoolKV(file, F("MQTTuseLegacyOtTopics"), settings.mqtt.bUseLegacyOtTopics, true);
+  writeJsonBoolKV(file, F("MQTTlastPublishedLegacy"), settings.mqtt.bLastPublishedLegacy, true);  // TASK-648 Task 6: topology stamp
   writeJsonBoolKV(file, F("NTPenable"), settings.ntp.bEnable, true);
   writeJsonStringKV(file, F("NTPtimezone"), settings.ntp.sTimezone, true);
   writeJsonStringKV(file, F("NTPhostname"), settings.ntp.sHostname, true);
@@ -536,6 +537,13 @@ void readSettings(bool show)
     strlcpy(settings.mqtt.sUniqueid, getUniqueId(), sizeof(settings.mqtt.sUniqueid));
   // TASK-648: bUseLegacyOtTopics is subsumed by bLegacyMode. Honour an old config once.
   if (settings.mqtt.bUseLegacyOtTopics) settings.mqtt.bLegacyMode = true;
+  // TASK-648 Task 6: NO stamp seeding here. bLastPublishedLegacy=false on a
+  // legacy upgrade boot means "stamp says modern, but mode is now legacy" —
+  // that IS a real migration that needs cleanup. Let the first boot do one
+  // benign migration pass (empty-publish to nonexistent modern topics = broker
+  // no-op) and stamp true on drain completion. Seeding would silently suppress
+  // the migration check and leave modern ghosts after a real switch.
+  // See TASK-648 Task 6 design notes for the full invariant.
   if (strlen(settings.ntp.sTimezone) == 0 || strcmp_P(settings.ntp.sTimezone, PSTR("null")) == 0)
     strlcpy(settings.ntp.sTimezone, "Europe/Amsterdam", sizeof(settings.ntp.sTimezone));
   if (strlen(settings.ntp.sHostname) == 0 || strcmp_P(settings.ntp.sHostname, PSTR("null")) == 0)
@@ -720,7 +728,13 @@ void updateSetting(const char *field, const char *newValue)
     const bool newVal = EVALBOOLEAN(newValue);
     settings.mqtt.bUseLegacyOtTopics = newVal;
     settings.mqtt.bLegacyMode = newVal;  // TASK-648: keep the umbrella in sync with the live toggle until a dedicated bLegacyMode control exists
-    if (oldVal != newVal) armTopicCleanupOnLegacyToggle(newVal);
+    if (oldVal != newVal) {
+      armTopicCleanupOnLegacyToggle(newVal);
+      // TASK-648 Task 6: arm topology migration cleanup and queue full republish
+      // under the new scheme. markAllMQTTConfigPending() detects bLastPublishedLegacy !=
+      // bLegacyMode and calls armTopologyCleanup() automatically, then requeues all IDs.
+      markAllMQTTConfigPending();
+    }
   }
   else if (strcasecmp_P(field, PSTR("MQTTuniqueid")) == 0)  {
     strlcpy(settings.mqtt.sUniqueid, newValue, sizeof(settings.mqtt.sUniqueid));
@@ -734,6 +748,7 @@ void updateSetting(const char *field, const char *newValue)
     else settings.mqtt.iInterval = (uint16_t)val;
   }
   else if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settings.mqtt.bSeparateSources = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("MQTTlastPublishedLegacy"))==0) settings.mqtt.bLastPublishedLegacy = EVALBOOLEAN(newValue);  // TASK-648 Task 6
   else if (strcasecmp_P(field, PSTR("LegacyPort25238Enabled"))==0) {
     settings.mqtt.bLegacyPort25238Enabled = EVALBOOLEAN(newValue);
     pendingSideEffects |= SIDE_EFFECT_OTGWSTREAM;

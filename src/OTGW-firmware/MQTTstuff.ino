@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.158
+**  Version  : v2.0.0-alpha.159
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -38,6 +38,9 @@ void loopMQTTDiscovery();
 // ADR-106: topic-naming-mode cleanup helpers
 void armTopicCleanupOnLegacyToggle(bool newUseLegacy);
 void runTopicCleanupStep();
+// TASK-648 Task 6: device-topology migration cleanup
+static void armTopologyCleanup(bool staleIsLegacy);
+static void runTopologyCleanupStep();
 
 // Declare some variables within global scope
 
@@ -1854,6 +1857,20 @@ void clearMQTTConfigPending()
 void publishNonOTDiscoveryConfigs()
 {
   if (!settings.mqtt.bEnable) return;
+  // TASK-648 Task 6: detect topology migration (legacy<->modern scheme change).
+  // Compare the stored stamp against the current effective mode. If different,
+  // a scheme migration occurred (either via runtime toggle + reboot, or
+  // config-file edit + reboot). Arm stale-topic cleanup and force a full
+  // discovery republish under the new scheme so HA rebuilds its entity set.
+  if (settings.mqtt.bLastPublishedLegacy != settings.mqtt.bLegacyMode) {
+    DebugTf(PSTR("[TASK-648] topology migration detected: stamp=%d -> mode=%d; arming stale cleanup\r\n"),
+            (int)settings.mqtt.bLastPublishedLegacy, (int)settings.mqtt.bLegacyMode);
+    armTopologyCleanup(settings.mqtt.bLastPublishedLegacy);
+    markAllMQTTConfigPending();  // republish everything under the new scheme
+    // markAllMQTTConfigPending resets dripDeviceInfoPending and g_haDeviceIntroduced,
+    // so we return here; it will have queued the non-OT IDs too.
+    return;
+  }
   setMQTTConfigPending(0);                  // climate: thermostat + DHW control
   setMQTTConfigPending(27);                 // number: outside temperature override
   setMQTTConfigPending(OTGWdallasdataid);   // Dallas temperature sensors
@@ -1880,6 +1897,14 @@ void markAllMQTTConfigPending()
 {
   // Mark every OT ID that appears in the PROGMEM discovery tables as pending.
   // Also clears the "published" bitmap so drainOnePendingDiscovery re-publishes.
+  // TASK-648 Task 6: arm topology cleanup if the scheme has changed since last publish.
+  // This covers the F-key / API force-republish path. publishNonOTDiscoveryConfigs()
+  // already calls this function when it detects a migration, so the check is idempotent.
+  if (settings.mqtt.bLastPublishedLegacy != settings.mqtt.bLegacyMode) {
+    DebugTf(PSTR("[TASK-648] topology migration (via markAll): stamp=%d -> mode=%d\r\n"),
+            (int)settings.mqtt.bLastPublishedLegacy, (int)settings.mqtt.bLegacyMode);
+    armTopologyCleanup(settings.mqtt.bLastPublishedLegacy);
+  }
   clearMQTTConfigDone();
   memset(MQTTautoCfgPendingMap, 0, sizeof(MQTTautoCfgPendingMap));
   for (uint16_t i = 0; i < 256; i++) {
@@ -3292,7 +3317,12 @@ static bool publishEmptyDiscoveryFor(const MqttHaBinSensorCfg &cfg) {
 
 // Drain one bit per call from doBackgroundTasks(). Total work = up to 37
 // successful publishes per toggle, paced by the loop tick cadence.
+// TASK-648 Task 6: also drives the topology cleanup state machine (folded here
+// so OTGW-firmware.ino needs no new call sites).
 void runTopicCleanupStep() {
+  // TASK-648 Task 6: topology cleanup runs regardless of label-cleanup state.
+  runTopologyCleanupStep();
+
   readTopicCleanupStateOnce();
   if (g_topicCleanup.mode == TOPIC_CLEANUP_MODE_IDLE) return;
   if (!MQTTclient.connected()) return;  // resume on next connect
@@ -3336,6 +3366,102 @@ void runTopicCleanupStep() {
     feedWatchDog();
   }
   // On failure: leave bit set, retry next tick.
+}
+
+// ============================================================================
+// TASK-648 Task 6: device-topology migration cleanup machinery
+// ============================================================================
+// When settings.mqtt.bLegacyMode changes (modern<->legacy), the OTHER scheme's
+// HA discovery config topics must be erased (empty retained publish) so HA
+// removes the stale entities. This is separate from the ADR-106 label-set
+// cleanup above: ADR-106 clears stale OT-topic LABEL names; this clears stale
+// DEVICE-topology paths (<device>_<label> vs bare <label> config topics).
+//
+// State: 1 byte mode + 32-byte OT-ID bitmap (256 bits, RAM-only).
+//   mode 0  = idle
+//   mode 1  = clearing modern discovery  (was modern, now legacy)
+//   mode 2  = clearing legacy discovery  (was legacy, now modern)
+// Each bit N in the bitmap = "OT ID N still needs stale topic(s) cleared".
+//
+// Bitmap is RAM-only — reboot resumes because bLastPublishedLegacy != bLegacyMode
+// is still true until the drain completes and stamps bLastPublishedLegacy.
+// bLastPublishedLegacy is updated (and persisted via writeSettings) ONLY after
+// the full drain completes to preserve the invariant across reboots.
+// ----------------------------------------------------------------------------
+
+constexpr uint8_t TOPO_CLEANUP_MODE_IDLE          = 0;
+constexpr uint8_t TOPO_CLEANUP_MODE_CLEAR_MODERN  = 1;  // was modern → entering legacy
+constexpr uint8_t TOPO_CLEANUP_MODE_CLEAR_LEGACY  = 2;  // was legacy → entering modern
+
+struct TopoCleanupState {
+  uint8_t  mode;
+  uint32_t bitmap[8];   // 256 bits, one per OT ID
+};
+static TopoCleanupState g_topoCleanup = {TOPO_CLEANUP_MODE_IDLE, {0,0,0,0,0,0,0,0}};
+
+// Arm: populate the bitmap with every OT ID that has sensor or binary_sensor
+// table entries — the only component types whose config-topic format changes
+// with the topology (modern adds a <device>_ prefix; legacy uses bare labels).
+//
+// Special-case entities that do NOT change topic format with topology are
+// intentionally excluded: climate (ID 0), number (ID 27), button/selects
+// (ID 244), SAT zone (ID 255), override sensors (IDs 1,8,9,14,16,39,56,57
+// — these DO have sensor rows and will be picked up by the table walk anyway),
+// SAT BLE topics (keyed by MAC, not by topology device prefix).
+static void armTopologyCleanup(bool staleIsLegacy) {
+  g_topoCleanup.mode = staleIsLegacy ? TOPO_CLEANUP_MODE_CLEAR_LEGACY
+                                     : TOPO_CLEANUP_MODE_CLEAR_MODERN;
+  memset(g_topoCleanup.bitmap, 0, sizeof(g_topoCleanup.bitmap));
+  // Walk all 256 OT IDs and set bits for those with sensor or binsensor entries.
+  // The same walk as markAllMQTTConfigPending() — consistent set of IDs.
+  for (uint16_t i = 0; i < 256; i++) {
+    uint16_t sIdx = readSensorIndex(static_cast<uint8_t>(i));
+    uint16_t bIdx = readBinSensorIndex(static_cast<uint8_t>(i));
+    if (sIdx != MQTT_HA_INDEX_NONE || bIdx != MQTT_HA_INDEX_NONE) {
+      g_topoCleanup.bitmap[i >> 5] |= (1UL << (i & 31));
+    }
+  }
+  DebugTf(PSTR("[TASK-648] topology cleanup armed (stale=%s)\r\n"),
+          staleIsLegacy ? "legacy" : "modern");
+}
+
+// Drain one OT ID per call. For each armed bit, calls the .cpp helper to
+// publish empty retained to all stale config topics for that ID.
+// On full drain: stamps bLastPublishedLegacy and persists via writeSettings().
+static void runTopologyCleanupStep() {
+  if (g_topoCleanup.mode == TOPO_CLEANUP_MODE_IDLE) return;
+  if (!MQTTclient.connected()) return;
+  if (!canPublishMQTT()) return;
+
+  // Find the lowest set bit.
+  int16_t otId = -1;
+  for (uint16_t i = 0; i < 256; i++) {
+    if (g_topoCleanup.bitmap[i >> 5] & (1UL << (i & 31))) { otId = (int16_t)i; break; }
+  }
+  if (otId < 0) {
+    // Drain complete: stamp the topology and persist.
+    DebugTln(F("[TASK-648] topology cleanup complete; stamping bLastPublishedLegacy"));
+    g_topoCleanup.mode = TOPO_CLEANUP_MODE_IDLE;
+    settings.mqtt.bLastPublishedLegacy = settings.mqtt.bLegacyMode;
+    writeSettings(false);  // persist the stamp so reboot does not re-arm
+    return;
+  }
+
+  const bool staleIsLegacy = (g_topoCleanup.mode == TOPO_CLEANUP_MODE_CLEAR_LEGACY);
+  uint8_t cleared = clearTopologyDiscoveryForOTId(
+    MQTTclient,
+    static_cast<uint8_t>(otId),
+    staleIsLegacy,
+    CSTR(settings.mqtt.sHaprefix),
+    CSTR(settings.mqtt.sUniqueid),
+    settings.mqtt.bSeparateSources);
+
+  // Clear the bit and move on regardless of cleared count.
+  // A cleared==0 on a real ID means MQTT was not ready for this specific
+  // topic; the canPublishMQTT() gate above already guards the session, so
+  // this is an internal skip (no-sensor match for this ID). Move on.
+  g_topoCleanup.bitmap[otId >> 5] &= ~(1UL << (otId & 31));
+  if (cleared > 0) feedWatchDog();
 }
 
 

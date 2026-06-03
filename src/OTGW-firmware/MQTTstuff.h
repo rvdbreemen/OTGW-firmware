@@ -71,6 +71,13 @@ struct MQTTSettingsSection {
   // new self-describing OT-topic names). true = legacy 1.x.x. Subsumes
   // bUseLegacyOtTopics (kept as a deprecated load-time alias for one release).
   bool    bLegacyMode = false;
+  // TASK-648 Task 6: persisted topology stamp. Tracks which topology scheme
+  // was in effect the last time discovery was fully published. On the next
+  // discovery cycle, if bLastPublishedLegacy != bLegacyMode a topology
+  // migration is detected and stale config topics from the OLD scheme are
+  // erased with empty retained publishes so HA removes those entities.
+  // Updated (and persisted) only after the stale-topic drain completes.
+  bool    bLastPublishedLegacy = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -521,5 +528,17 @@ bool streamButtonDiscovery(PubSubClient &client,
 bool streamSelectDiscovery(PubSubClient &client,
                            uint8_t selectIdx,
                            HaDiscoveryContext &ctx);
+
+// TASK-648 Task 6: topology-migration cleanup helper (defined in MQTTHaDiscovery.cpp).
+// Clears (empty-retained-publishes) all discovery config topics for one OT ID
+// under the STALE scheme. staleIsLegacy=true clears legacy bare-label topics;
+// staleIsLegacy=false clears modern device_label topics.
+// Returns the number of topics successfully cleared (0 on MQTT failure).
+uint8_t clearTopologyDiscoveryForOTId(PubSubClient &client,
+                                      uint8_t otId,
+                                      bool staleIsLegacy,
+                                      const char *haPrefix,
+                                      const char *nodeId,
+                                      bool separateSources);
 
 // end of MQTTstuff.h
