@@ -2214,15 +2214,47 @@ static const char kOriginName[] PROGMEM = "OTGW-firmware";
 static const char kOriginUrl[]  PROGMEM = "https://github.com/rvdbreemen/OTGW-firmware";
 
 // ---------------------------------------------------------------------------
-// Device block: full (first entity) or minimal (subsequent)
+// TASK-648: modern device-identifier suffix per HaDevice; legacy uses bare nodeId.
 // ---------------------------------------------------------------------------
-static bool writeDeviceBlock(MqttJsonWriter &w, const HaDiscoveryContext &ctx) {
+static PGM_P haDeviceSuffix(HaDevice d) {
+  switch (d) {
+    case HaDevice::Boiler:     return PSTR("-boiler");
+    case HaDevice::Thermostat: return PSTR("-thermostat");
+    case HaDevice::Gateway:    return PSTR("-gateway");
+    case HaDevice::Esp:        return PSTR("-esp");
+    case HaDevice::Sat:        return PSTR("-sat");
+  }
+  return PSTR("-esp");
+}
+
+// ---------------------------------------------------------------------------
+// Device block: full (first-per-device) or minimal (subsequent).
+// In legacy mode: bare nodeId identifier, gated by ctx.isFirstEntity (unchanged).
+// In modern mode: nodeId+suffix identifier, gated by ctx.firstSeen[device].
+// ctx is non-const so firstSeen can be cleared after emitting the full block.
+// ---------------------------------------------------------------------------
+static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
+  const bool useLegacy = ctx.legacyMode;
+
+  // Determine whether to emit the full block for this entity.
+  const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
+  const bool emitFull = useLegacy ? ctx.isFirstEntity : ctx.firstSeen[devIdx];
+
+  // Open device object and emit identifier string.
+  // Legacy: bare nodeId.  Modern: nodeId + device suffix.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kDev)) return false;
   if (!w.writeProgmem(PSTR("\":{"))) return false;
-  if (!writeJsonKV(w, kIds, ctx.nodeId)) return false;
+  if (!w.writeChar('"')) return false;
+  if (!w.writeProgmem(kIds)) return false;
+  if (!w.writeProgmem(PSTR("\":\""))) return false;
+  if (!w.writeRam(ctx.nodeId)) return false;
+  if (!useLegacy) {
+    if (!w.writeProgmem(haDeviceSuffix(ctx.device))) return false;
+  }
+  if (!w.writeChar('"')) return false;
 
-  if (ctx.isFirstEntity) {
+  if (emitFull) {
     if (!writeJsonComma(w)) return false;
     if (!writeJsonKV(w, kMfr, ctx.manufacturer)) return false;
     if (!writeJsonComma(w)) return false;
@@ -2235,6 +2267,8 @@ static bool writeDeviceBlock(MqttJsonWriter &w, const HaDiscoveryContext &ctx) {
     if (!w.writeProgmem(PSTR(")\""))) return false;
     if (!writeJsonComma(w)) return false;
     if (!writeJsonKV(w, kSwVer, ctx.version)) return false;
+    // Clear the per-device flag so subsequent entities get the minimal block.
+    if (!useLegacy) ctx.firstSeen[devIdx] = false;
   }
 
   return w.writeChar('}');
@@ -2273,7 +2307,7 @@ static void sanitizeHaObjectId(char *s) {
 // ---------------------------------------------------------------------------
 static bool composeSensorPayload(MqttJsonWriter &w,
                                  const MqttHaSensorCfg &cfg,
-                                 const HaDiscoveryContext &ctx)
+                                 HaDiscoveryContext &ctx)
 {
   char label[48];
   char idLabel[48];
@@ -2392,7 +2426,7 @@ static bool composeSensorPayload(MqttJsonWriter &w,
 // ---------------------------------------------------------------------------
 static bool composeBinSensorPayload(MqttJsonWriter &w,
                                     const MqttHaBinSensorCfg &cfg,
-                                    const HaDiscoveryContext &ctx)
+                                    HaDiscoveryContext &ctx)
 {
   char label[48];
   char friendlyName[80];

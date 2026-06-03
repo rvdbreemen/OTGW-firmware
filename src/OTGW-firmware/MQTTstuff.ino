@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.154
+**  Version  : v2.0.0-alpha.155
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2067,6 +2067,12 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   ctx.manufacturer = settings.device.sManufacturer;
   ctx.model = settings.device.sModel;
   ctx.isFirstEntity = isFirst;
+  ctx.legacyMode = settings.mqtt.bLegacyMode;  // TASK-648: thread the umbrella flag into the .cpp TU (it cannot see globals)
+  // TASK-648: per-device firstSeen mirrors isFirstEntity so the full device
+  // block is emitted once per discovery cycle, matching the legacy gate.
+  // (Unconditional true would re-emit full metadata on every drip tick.)
+  for (uint8_t i = 0; i < 5; i++) ctx.firstSeen[i] = isFirst;
+  ctx.device = HaDevice::Esp;          // default; Task 3 routes per entity
   ctx.sourceSuffix = "";
   ctx.sourceName = "";
   ctx.sourceTopicSegment = "";
@@ -2091,15 +2097,42 @@ static bool publishDiscoveryJson(PubSubClient &client,
 
 static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryContext &ctx)
 {
+  // TASK-648: modern mode appends a device suffix to the identifier.
+  // Legacy mode keeps bare nodeId and isFirstEntity gate (byte-identical to pre-648).
+  const bool useLegacy = settings.mqtt.bLegacyMode;
+  const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
+  const bool emitFull  = useLegacy ? ctx.isFirstEntity : ctx.firstSeen[devIdx];
+
   int n;
-  if (ctx.isFirstEntity) {
-    n = snprintf_P(dest, destSize,
-                   PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"OpenTherm Gateway (%s)\",\"sw_version\":\"%s\"}"),
-                   ctx.nodeId, ctx.manufacturer, ctx.model, ctx.hostname, ctx.version);
+  if (useLegacy) {
+    if (emitFull) {
+      n = snprintf_P(dest, destSize,
+                     PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"OpenTherm Gateway (%s)\",\"sw_version\":\"%s\"}"),
+                     ctx.nodeId, ctx.manufacturer, ctx.model, ctx.hostname, ctx.version);
+    } else {
+      n = snprintf_P(dest, destSize,
+                     PSTR("\"dev\":{\"identifiers\":\"%s\"}"),
+                     ctx.nodeId);
+    }
   } else {
-    n = snprintf_P(dest, destSize,
-                   PSTR("\"dev\":{\"identifiers\":\"%s\"}"),
-                   ctx.nodeId);
+    // Build identifier = nodeId + suffix into a small RAM buffer for snprintf_P %s.
+    static const char * const kSuffixes[] = {
+      "-boiler", "-thermostat", "-gateway", "-esp", "-sat"
+    };
+    const char *suffix = (devIdx < 5) ? kSuffixes[devIdx] : "-esp";
+    char identifier[sizeof(settings.mqtt.sUniqueid) + 16];
+    snprintf(identifier, sizeof(identifier), "%s%s", ctx.nodeId, suffix);
+    if (emitFull) {
+      n = snprintf_P(dest, destSize,
+                     PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"OpenTherm Gateway (%s)\",\"sw_version\":\"%s\"}"),
+                     identifier, ctx.manufacturer, ctx.model, ctx.hostname, ctx.version);
+      // Clear per-device flag after emitting full block.
+      ctx.firstSeen[devIdx] = false;
+    } else {
+      n = snprintf_P(dest, destSize,
+                     PSTR("\"dev\":{\"identifiers\":\"%s\"}"),
+                     identifier);
+    }
   }
   return (n > 0 && static_cast<size_t>(n) < destSize);
 }

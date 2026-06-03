@@ -354,6 +354,10 @@ constexpr uint32_t VERIFICATION_MIN_HEAP_START = 6000;
 // ---------------------------------------------------------------------------
 // Discovery context -- runtime state passed to streaming functions
 // ---------------------------------------------------------------------------
+
+// TASK-648: HA discovery device topology (five-device split).
+enum class HaDevice : uint8_t { Boiler = 0, Thermostat, Gateway, Esp, Sat };
+
 struct HaDiscoveryContext {
     const char *nodeId;
     const char *hostname;
@@ -364,6 +368,9 @@ struct HaDiscoveryContext {
     const char *manufacturer;      // Hardware manufacturer (from settings.device)
     const char *model;             // Hardware model (from settings.device)
     bool        isFirstEntity;
+    bool        legacyMode = false;           // TASK-648: settings.mqtt.bLegacyMode, threaded in (the .cpp TU cannot see globals)
+    HaDevice    device = HaDevice::Esp;       // owning device for the current entity
+    bool        firstSeen[5] = { true, true, true, true, true };  // per-device "full block once"
     // Source template expansion (set per-source iteration)
     const char *sourceSuffix;
     const char *sourceName;
