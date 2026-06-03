@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:56'
-updated_date: '2026-06-03 16:15'
+updated_date: '2026-06-03 17:41'
 labels:
   - sat
   - simulation
@@ -54,4 +54,6 @@ VERIFY: run the emulator against an OTGW32 in bSimulation -> firmware logs 'boil
 CONCLUSION: F7 as specified (host TCP->OT bridge trips the §4.2 gate) is not achievable without a firmware change. THREE OPTIONS for maintainer: (A) add a debug-only REST/MQTT command 'force boiler-present' that sets a test flag satBoilerHardwarePresent() ORs in — small firmware hook, makes the gate self-testable, but adds a test backdoor to prod; (B) emulate at the GPIO level with a 2nd ESP/Arduino acting as an OT slave on the bus pins (real HW, most faithful, no firmware change); (C) drop F7, accept the §4.2 gate is hardware-validation-only (the OTGW32 with a real boiler attached). Recommend B for fidelity or A if a guarded #if-DEBUG test hook is acceptable. NOT picking unattended — adds either a prod backdoor (A) or needs HW (B). Reverting to To Do.
 
 2026-06-03: script written (scripts/sat_boiler_emulator.py, stdlib-only) + scripts/README. AC#1 (single-file frame emitter) and AC#4 (host-only, PowerShell-launchable, documented, no fw change) met; dry-run builds a correct MsgID 3 READ-ACK (B40030004 for member-id 4) and MsgID 0 status frame, syntax-clean. FINDING (verified in OTDirect.ino:651-703): port 25238 INPUT is relayed straight to the PIC via sendPICSerial(); it is NOT injected into otBoilerCacheValid[3]. That cache (-> satBoilerHardwarePresent -> satOnBoilerDetected edge) is set only from real OT-bus boiler responses in handleMasterResponse. So the OTDirect-TCP-bridge approach CANNOT trip the TASK-795 availability gate -> AC#2/#3 are NOT achievable via TCP. The plan's deferred 'open question' is answered: a serial-level PIC emulator OR a dedicated firmware test-injection hook is required. Script kept as a correct frame-builder/dry-run reference + documents the dead-end. Task stays In Progress pending a design decision on the emulation path.
+
+2026-06-03: PARKED (maintainer decision, Option C). Options for resuming F7 captured in docs/plan/SAT_SIM_F7_BOILER_EMULATOR_OPTIONS.md: (A) serial-level PIC emulator [faithful, needs hardware], (B) firmware test-injection hook [pure host-side, recommended], (C) park [current]. Frame-builder script scripts/sat_boiler_emulator.py stays as a reference. Resume by picking A or B.
 <!-- SECTION:NOTES:END -->
