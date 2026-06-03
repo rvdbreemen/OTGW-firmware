@@ -1241,6 +1241,90 @@ Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is han
 
 ---
 
+## HA Discovery Five-Device Topology (ADR-122, since 2.0.0)
+
+Introduced in 2.0.0 per ADR-122 (`docs/adr/ADR-122-ha-discovery-five-device-topology.md`).
+
+In 2.0.0 the firmware publishes Home Assistant MQTT discovery configs across five separate HA devices instead of the single device card used in 1.x.x. The topology is the 2.0.0 default. A single `bLegacyMode` setting restores 1.x.x behaviour completely.
+
+### The five devices
+
+| # | Device | Identifier | Manufacturer | Model | sw / hw | Primary entities |
+|---|---|---|---|---|---|---|
+| 1 | Boiler | `{nodeId}-boiler` | `SLAVE_MEMBERID` | `SLAVE_PRODUCT_TYPE` | sw=`SLAVE_OT_VERSION`, hw=`SLAVE_PRODUCT_VERSION` | Slave fault/capability flags, boiler temps, pressures, counters, slave setpoint limits, OEM diagnostics |
+| 2 | Thermostat | `{nodeId}-thermostat` | `MASTER_MEMBERID` | `MASTER_PRODUCT_TYPE` | sw=`MASTER_OT_VERSION`, hw=`MASTER_PRODUCT_VERSION` | Climate entity, master flags, `cancel_room_setpoint_override` button |
+| 3 | Gateway | `{nodeId}-gateway` | See note below | See note below | See note below | OTGW internals: operating mode, DHW override, LED A-F, GPIO A/B and states, setback temp, setpoint-override mode, smart-power, thermostat-detect, Vref, ignore-transitions, override-HB, PIC reset button, CH1/CH2 override switches |
+| 4 | OTGW-firmware (ESP) | `{nodeId}-esp` | "Espressif" (or board vendor) | Board name (NodeMCU / Wemos D1 / OTGW32) | sw=firmware version, hw=chip | Free heap, min-heap, max-block, WiFi RSSI/SSID, IP, MAC, uptime, reboot reason, OTA, MQTT/WS health, Dallas temps, S0 pulse counter, OLED presence |
+| 5 | SAT | `{nodeId}-sat` | "OTGW-firmware" | "Smart Autotune Thermostat" | sw=firmware version | `sat/*` setpoint, control mode, cycle verdict, autotune score, comfort/window/summer state, simulation |
+
+`{nodeId}` is `settings.mqtt.sUniqueid` (default `otgw-{MAC}`).
+
+Devices 1-3 are the HA core trio, authoritative per HA core `opentherm_gw` 2024.10 (PR #124869). Devices 4-5 are firmware-native; HA core has no equivalent.
+
+**Gateway device identity (PIC xor OTDirect):** a setup uses exactly one bus driver. Both map to the same `{nodeId}-gateway` identifier so toggling hardware does not orphan the device in HA:
+
+- PIC present: manufacturer = "Schelte Bron", model = "OpenTherm Gateway", sw = PIC `PR=A` string from index 18.
+- OTDirect active: manufacturer = "OTGW-firmware", model = "OpenTherm Gateway (OTDirect)", sw = firmware version.
+
+### unique_id scheme
+
+| Mode | unique_id pattern | Example |
+|---|---|---|
+| Modern (default, 2.0.0) | `{nodeId}-{device}-{label}` | `otgw-aabbcc-boiler-TSet` |
+| Legacy (opt-in, `bLegacyMode = true`) | `{nodeId}-{label}` | `otgw-aabbcc-TSet` |
+
+`{device}` is the lowercase short-name: `boiler`, `thermostat`, `gateway`, `esp`, or `sat`.
+
+### Per-entity-category device routing
+
+Routing is determined by a central function `haDeviceForEntity(category, key)` that returns the owning device enum. The table below gives category-level rules:
+
+| Entity category | Routing |
+|---|---|
+| **OT msgID-derived sensors and binary_sensors** (`DATA_*` keys) | **Bilateral: replicated on both Boiler AND Thermostat.** Two discovery configs are emitted with distinct device-prefixed unique_ids. This covers all OT numeric values (temperatures, pressures, setpoints, modulation, counters) and all OT status/config/flag bits. See research reference for the full bilateral key list. |
+| Climate entity | Thermostat only (reads all three data sources at runtime but is registered under Thermostat). |
+| `cancel_room_setpoint_override` button | Thermostat. |
+| `OTGW_*` internals (operating mode, LED A-F, GPIO A/B, setback, DHW override, setpoint-override mode, smart-power, thermostat-detect, Vref, ignore-transitions, override-HB), CH1/CH2 override switches, PIC reset button | Gateway. |
+| ESP-node diagnostics and hardware sensors (heap, WiFi, uptime, IP, MAC, OTA, MQTT/WS health, Dallas temps, S0 pulse counter, OLED presence) | OTGW-firmware (ESP). |
+| `sat/*` entities (by topic prefix or SAT emitter) | SAT. |
+
+**Bilateral note:** all `DATA_*` sensor keys (46 keys) and all `DATA_*` binary sensor keys (23 keys) are bilateral, including room setpoint/temp (`TrSet`, `Tr`), outside temp, and the remote-override priority flags. This adds approximately 55-70 extra discovery entities versus the 1.x.x single-device layout. Discovery is already streamed (ADR-077) and burst-windowed (ADR-088).
+
+### Umbrella legacy mode (`bLegacyMode`)
+
+`settings.mqtt.bLegacyMode` (default `false`) is a single setting that governs three axes together:
+
+| Axis | Modern (`false`, default) | Legacy (`true`) |
+|---|---|---|
+| Device topology | Five devices as above | Single device (`{nodeId}`, the 1.x.x behaviour) |
+| unique_id scheme | `{nodeId}-{device}-{label}` | `{nodeId}-{label}` |
+| Topic naming | Self-describing names (ADR-106 default) | OT-spec legacy names (ADR-106 legacy toggle) |
+
+`bLegacyMode` subsumes and replaces the former standalone `bUseLegacyOtTopics` flag. On settings load, a stored `bUseLegacyOtTopics = true` is silently mapped to `bLegacyMode = true` for one release cycle. See also the settings table entry for `mqttuselegacyottopics` and ADR-122.
+
+Toggling the flag triggers a one-way republish-and-clean cycle: discovery configs are republished under the new scheme and the old scheme's retained discovery payloads are cleared via the ADR-070 orphan-cleanup path (empty retained payload to every stale discovery topic). The cleanup state is persisted to LittleFS so a power cut mid-drain resumes correctly on next boot.
+
+### Value topics and payloads are unchanged
+
+**Only HA discovery grouping and unique_ids change.** MQTT value topics, payloads, and retain flags are identical in both modes. Any MQTT consumer subscribing to `{TopTopic}/value/{UniqueId}/...` topics is unaffected by the topology mode.
+
+### Migration on 2.0.0 upgrade
+
+An upgrading user running 1.x.x firmware (single-device mode) sees the following on first 2.0.0 boot in modern mode:
+
+1. The firmware republishes all discovery configs under the five-device scheme with modern unique_ids.
+2. The ADR-070 orphan-cleanup path clears old single-device retained discovery payloads; HA removes stale single-device entities.
+3. HA re-registers entities under the new device cards with new unique_ids. Automations pinned to old HA entity_ids (derived from old unique_ids) must be repointed at the new ones.
+4. MQTT value topics and payloads are unchanged; non-HA consumers see no change.
+
+Users who do not want entity_id churn: set `bLegacyMode = true` before or immediately after upgrade. This gives zero entity_id churn and is the full escape hatch.
+
+### Research reference
+
+The authoritative per-key device assignment is transcribed from HA core `opentherm_gw` 2024.10 into a PROGMEM routing table during TASK-648 implementation. A detailed per-key table (sensor, binary_sensor, switch, select, button, climate) with firmware MQTT topic labels is in `docs/research/2026-06-03-ha-core-opentherm-device-routing.md`.
+
+---
+
 ## Heap diagnostic telemetry
 
 The firmware publishes heap-pressure and discovery counters as 17 individual retained topics under `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/*`. Each metric lives on its own topic (no JSON bundling) so consumers can subscribe to a single counter, expose it as a Home Assistant sensor without JSON path templating, or graph it directly in Grafana.
@@ -1336,7 +1420,7 @@ These MQTT-related settings are configurable via the REST API (`/api/v2/settings
 | `mqttonchangepublishing` | `true` | On-change publishing (ADR-116). When `true`, publish on change with a heartbeat every `mqttinterval` seconds. When `false`, legacy publish-every-message. Absent key (older config) loads as `true`. |
 | `mqttinterval` | `60` | Heartbeat interval (seconds) for unchanged values when `mqttonchangepublishing=true`. Default `60`; on upgrade a stored `0` is migrated once to `60`. With `mqttonchangepublishing=false` (or interval `0`) the firmware publishes every message. |
 | `mqttseparatesources` | `false` | Publish to source-separated sub-topics |
-| `mqttuselegacyottopics` | `false` | When `true`, publish the 37 legacy OT-spec-derived binary_sensor names; when `false` (default in 2.0.0), publish the new self-describing HA-core-style aliases instead. The two name sets are mutually exclusive (ADR-106). Toggle triggers cleanup of the retained payloads in the other name set via a persistent bitmap in `/mqtt_topic_cleanup.bin`. |
+| `mqttuselegacyottopics` | `false` | **Deprecated alias for `bLegacyMode` (ADR-122).** On settings load a stored `true` is silently mapped to `bLegacyMode = true`. When `true`, publish the 37 legacy OT-spec-derived binary_sensor names; when `false` (default in 2.0.0), publish the new self-describing HA-core-style aliases instead. The two name sets are mutually exclusive (ADR-106). Toggle triggers cleanup of the retained payloads in the other name set via a persistent bitmap in `/mqtt_topic_cleanup.bin`. See [HA Discovery Five-Device Topology](#ha-discovery-five-device-topology-adr-122-since-200) for the umbrella `bLegacyMode` setting that replaces this flag. |
 
 ---
 
