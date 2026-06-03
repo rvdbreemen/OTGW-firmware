@@ -2,14 +2,16 @@
 id: TASK-802
 title: 'feat-2.0.0: SAT sim F7 — host-side boiler-emulator script'
 status: To Do
-assignee: []
+assignee:
+  - '@claude'
 created_date: '2026-05-31 22:56'
-updated_date: '2026-06-01 04:16'
+updated_date: '2026-06-03 16:15'
 labels:
   - sat
   - simulation
   - tooling
 dependencies: []
+ordinal: 76000
 ---
 
 ## Description
@@ -43,3 +45,13 @@ OPEN QUESTION (morning): emulate via the OTDirect TCP bridge (ESP32, no extra HW
 
 VERIFY: run the emulator against an OTGW32 in bSimulation -> firmware logs 'boiler appeared, simulation off' within ~1s, bSimulation flips false + persists, REST 409 on re-enable. (This is the tool that makes TASK-795 AC#8/#9/#10 self-verifiable without hardware.)
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-01T09:13:23+02:00: BLOCKED — investigated, host-side emulator cannot work as the plan assumed. FINDING (verified in OTDirect.ino): otBoilerCacheValid[3] (the signal satBoilerHardwarePresent/otDirectBoilerPresent reads) is set ONLY inside handleMasterResponse() — line 1206 (loopback synthetic) and 1261 (real boiler answering on the OT GPIO pins via otMaster async). The port-25238 TCP bridge INPUT (handleOTDirectBridgeStream, line 651) routes host bytes to sendPICSerial()->handleOTDirectCommand() = PIC-style COMMANDS sent OUT toward the boiler; it is NOT a boiler-response injection point. So a TCP client on 25238 cannot make the firmware believe a boiler answered — there is no software path from the network into otBoilerCacheValid[]/bBoilerState. The serial-PIC-emulator alternative needs real hardware (serial loopback or a 2nd device driving the PIC), which defeats 'no extra HW'. 
+
+CONCLUSION: F7 as specified (host TCP->OT bridge trips the §4.2 gate) is not achievable without a firmware change. THREE OPTIONS for maintainer: (A) add a debug-only REST/MQTT command 'force boiler-present' that sets a test flag satBoilerHardwarePresent() ORs in — small firmware hook, makes the gate self-testable, but adds a test backdoor to prod; (B) emulate at the GPIO level with a 2nd ESP/Arduino acting as an OT slave on the bus pins (real HW, most faithful, no firmware change); (C) drop F7, accept the §4.2 gate is hardware-validation-only (the OTGW32 with a real boiler attached). Recommend B for fidelity or A if a guarded #if-DEBUG test hook is acceptable. NOT picking unattended — adds either a prod backdoor (A) or needs HW (B). Reverting to To Do.
+
+2026-06-03: script written (scripts/sat_boiler_emulator.py, stdlib-only) + scripts/README. AC#1 (single-file frame emitter) and AC#4 (host-only, PowerShell-launchable, documented, no fw change) met; dry-run builds a correct MsgID 3 READ-ACK (B40030004 for member-id 4) and MsgID 0 status frame, syntax-clean. FINDING (verified in OTDirect.ino:651-703): port 25238 INPUT is relayed straight to the PIC via sendPICSerial(); it is NOT injected into otBoilerCacheValid[3]. That cache (-> satBoilerHardwarePresent -> satOnBoilerDetected edge) is set only from real OT-bus boiler responses in handleMasterResponse. So the OTDirect-TCP-bridge approach CANNOT trip the TASK-795 availability gate -> AC#2/#3 are NOT achievable via TCP. The plan's deferred 'open question' is answered: a serial-level PIC emulator OR a dedicated firmware test-injection hook is required. Script kept as a correct frame-builder/dry-run reference + documents the dead-end. Task stays In Progress pending a design decision on the emulation path.
+<!-- SECTION:NOTES:END -->

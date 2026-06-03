@@ -74,3 +74,82 @@ pwsh -File scripts/branch-hygiene-queue.ps1 -Remote origin -BaseBranch dev -Inac
 3. Classifies each branch as `active`, `stale-merged`, or `stale-unmerged`
 4. Adds owner/decision/notes columns for manual review
 5. Exports a sorted review queue CSV for branch governance
+
+## sat_boiler_emulator.py
+
+Host-side synthetic boiler emulator for OTGW32 bench testing (TASK-802). Connects to
+the OTDirect TCP bridge on port 25238 and periodically sends synthetic OpenTherm frames
+in OTGW monitor-stream format so the TASK-795 simulation availability gate
+(satOnBoilerDetected / SAT simulation contract §4.2) can be exercised without a
+physical boiler wired to the OT bus.
+
+Requires Python 3 only (standard library: socket, argparse, time, sys). No pip deps.
+
+### Quick start
+
+```powershell
+# Dry-run: print computed frames and exit (no socket opened)
+python scripts\sat_boiler_emulator.py --dry-run
+
+# Dry-run with specific member-id and slave config flags
+python scripts\sat_boiler_emulator.py --dry-run --member-id 4 --slave-config 0x01
+
+# Connect and emit frames every second
+python scripts\sat_boiler_emulator.py --host 192.168.1.x
+
+# Connect with custom interval and member-id
+python scripts\sat_boiler_emulator.py --host 192.168.1.x --port 25238 --member-id 4 --interval 2.0
+```
+
+### Options
+
+| Option | Default | Description |
+|---|---|---|
+| `--host HOST` | (required unless `--dry-run`) | OTGW32 hostname or IP address |
+| `--port PORT` | `25238` | TCP port of the OTDirect bridge |
+| `--member-id N` | `4` | Slave MemberID code (0-255; 0=customer non-specific) |
+| `--slave-config FLAGS` | `0x00` | Slave configuration flags byte for MsgID 3 HB (decimal/hex/binary) |
+| `--interval SEC` | `1.0` | Seconds between frame bursts |
+| `--dry-run` | off | Print frames and exit without connecting |
+
+### Frames emitted
+
+**MsgID 3 - Slave Configuration / MemberID (READ-ACK)**
+
+The key frame for the §4.2 availability gate: `otDirectBoilerPresent()` in
+`OTDirect.ino:292-295` returns `otBoilerCacheValid[3]`, which is set in
+`handleMasterResponse()` when a real boiler ACKs MsgID 3.
+
+Frame layout (32 bits, MSB first):
+
+```
+bit31   bits30-28   bits27-24   bits23-16   bits15-8           bits7-0
+Parity  MsgType     Spare       Data-ID     HB (slave cfg)     LB (MemberID)
+  0     100(=4)     0000        0x03        0x00               member_id
+```
+
+For `--member-id 4 --slave-config 0x00`: wire line `B40030004`
+For `--member-id 4 --slave-config 0x01` (DHW present): wire line `BC0030104`
+
+**MsgID 0 - Status (READ-ACK, all-zero slave status)**
+
+Wire line `BC0000000` (healthy idle boiler: no fault, no flame, no active CH/DHW).
+
+### Port 25238 input/output asymmetry - bench validation required
+
+The OTGW32 port 25238 bridge is bidirectional but asymmetric:
+
+- **Output** (firmware to client): monitor-stream lines with `B`/`T`/`R`/`A` prefixes
+- **Input** (client to firmware): PIC-style commands (`XX=value` format)
+
+A raw `B40030004` line sent as INPUT does not match the `XX=value` parser, so it will
+NOT populate `otBoilerCacheValid[3]` via the TCP path.
+
+**AC#2 and AC#3 of TASK-795** (actual §4.2 edge-trip on a real OTGW32: simulation
+auto-disables within 1 second of first boiler slave frame) require bench validation by
+the maintainer with actual OT bus hardware. The script is intended to provide:
+
+1. A reference for what a correctly-formed slave-response frame looks like.
+2. A TCP connection harness so bench state can be observed over the monitor stream.
+3. A starting point for adapting to an OT-bus hardware slave device (e.g. via a
+   USB-to-OT adapter or a microcontroller wired to the OTGW32 OT master pins).
