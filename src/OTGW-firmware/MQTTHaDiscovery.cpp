@@ -2530,32 +2530,70 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
 // topic" and silently discarded — affecting both ESP8266 and ESP32-S3 builds.
 // Canonical (no source) keeps the bare label as the object_id, which has
 // always matched the regex. Mirrors dev ADR-071 / TASK-556.
+// TASK-648 Task 4: derive a short device name (RAM string, no leading dash)
+// from HaDevice for use as config-topic object-id prefix in modern mode.
+// Returns "" in legacy mode so callers can use it unconditionally.
+static const char *haDeviceShortName(const HaDiscoveryContext &ctx) {
+  if (ctx.legacyMode) return "";
+  switch (ctx.device) {
+    case HaDevice::Boiler:     return "boiler";
+    case HaDevice::Thermostat: return "thermostat";
+    case HaDevice::Gateway:    return "gateway";
+    case HaDevice::Esp:        return "esp";
+    case HaDevice::Sat:        return "sat";
+  }
+  return "esp";
+}
+
+// TASK-648 Task 4: modern config topics prefix the objectId with
+// <deviceShortName>_ so bilateral entities never share a config topic.
+// deviceSegment is "" (or nullptr) in legacy mode — produces byte-identical topics.
 static bool buildSensorDiscoveryTopic(char *dest, size_t destSize,
                                       const char *haPrefix, const char *nodeId,
-                                      PGM_P label, const char *sourceTopicSegment)
+                                      PGM_P label, const char *sourceTopicSegment,
+                                      const char *deviceSegment)
 {
   char labelBuf[48];
   strlcpy_P(labelBuf, label, sizeof(labelBuf));
   sanitizeHaObjectId(labelBuf);
   int n;
+  const bool hasDevice = (deviceSegment && deviceSegment[0] != '\0');
   if (sourceTopicSegment && sourceTopicSegment[0]) {
-    n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s_%s/config"),
-                   haPrefix, nodeId, labelBuf, sourceTopicSegment);
+    if (hasDevice) {
+      n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s_%s_%s/config"),
+                     haPrefix, nodeId, deviceSegment, labelBuf, sourceTopicSegment);
+    } else {
+      n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s_%s/config"),
+                     haPrefix, nodeId, labelBuf, sourceTopicSegment);
+    }
   } else {
-    n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s/config"),
-                   haPrefix, nodeId, labelBuf);
+    if (hasDevice) {
+      n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s_%s/config"),
+                     haPrefix, nodeId, deviceSegment, labelBuf);
+    } else {
+      n = snprintf_P(dest, destSize, PSTR("%s/sensor/%s/%s/config"),
+                     haPrefix, nodeId, labelBuf);
+    }
   }
   return (n > 0 && static_cast<size_t>(n) < destSize);
 }
 
 static bool buildBinSensorDiscoveryTopic(char *dest, size_t destSize,
                                          const char *haPrefix, const char *nodeId,
-                                         PGM_P label)
+                                         PGM_P label,
+                                         const char *deviceSegment)
 {
   char labelBuf[48];
   strlcpy_P(labelBuf, label, sizeof(labelBuf));
-  int n = snprintf_P(dest, destSize, PSTR("%s/binary_sensor/%s/%s/config"),
-                     haPrefix, nodeId, labelBuf);
+  const bool hasDevice = (deviceSegment && deviceSegment[0] != '\0');
+  int n;
+  if (hasDevice) {
+    n = snprintf_P(dest, destSize, PSTR("%s/binary_sensor/%s/%s_%s/config"),
+                   haPrefix, nodeId, deviceSegment, labelBuf);
+  } else {
+    n = snprintf_P(dest, destSize, PSTR("%s/binary_sensor/%s/%s/config"),
+                   haPrefix, nodeId, labelBuf);
+  }
   return (n > 0 && static_cast<size_t>(n) < destSize);
 }
 
@@ -2578,9 +2616,14 @@ bool streamSensorDiscovery(PubSubClient &client,
 
   bool hasSrc = (ctx.sourceSuffix && ctx.sourceSuffix[0] != '\0');
 
+  // TASK-648 Task 4: modern mode config topic includes device segment so bilateral
+  // Boiler/Thermostat entities never collide on the same retained config path.
+  const char *devSeg = haDeviceShortName(ctx);  // "" in legacy mode
+
   char topic[STREAM_TOPIC_MAX];
   if (!buildSensorDiscoveryTopic(topic, sizeof(topic), ctx.haPrefix, ctx.nodeId,
-                                 cfg.label, hasSrc ? ctx.sourceTopicSegment : nullptr))
+                                 cfg.label, hasSrc ? ctx.sourceTopicSegment : nullptr,
+                                 devSeg))
     return false;
 
   // Measure pass
@@ -2615,9 +2658,12 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
+  // TASK-648 Task 4: modern mode config topic includes device segment.
+  const char *devSeg = haDeviceShortName(ctx);  // "" in legacy mode
+
   char topic[STREAM_TOPIC_MAX];
   if (!buildBinSensorDiscoveryTopic(topic, sizeof(topic), ctx.haPrefix, ctx.nodeId,
-                                    cfg.label))
+                                    cfg.label, devSeg))
     return false;
 
   MqttJsonWriter measure(MqttJsonWriter::MEASURE);

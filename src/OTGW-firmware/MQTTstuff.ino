@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.156
+**  Version  : v2.0.0-alpha.157
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2394,6 +2394,59 @@ void doAutoConfigure(){
   markAllMQTTConfigPending();
 }
 //===========================================================================================
+// TASK-648 Task 4: per-OT-ID / per-category device routing.
+//
+// Bilateral rule (HA-core faithful): all real OT message IDs (0..127, i.e. DATA_*)
+// produce two entity instances in modern mode — one under Boiler, one under Thermostat.
+// This matches HA-core sensor.py / binary_sensor.py where every DATA_* entry appears
+// twice (BOILER_DEVICE_DESCRIPTION + THERMOSTAT_DEVICE_DESCRIPTION). Legacy mode
+// emits once with no device suffix (byte-identical to pre-Task-4 behaviour).
+//
+// Non-OT pseudo-IDs route to a single fixed device:
+//   244 (piccontrols) : Gateway   — resetgateway button, GPIO/LED selects
+//   246 (dallas)      : Esp       — external temperature sensors
+//   247 (heapstats)   : Esp       — firmware heap & discovery statistics
+//   248 (fwinfo)      : Esp       — firmware version, hostname, hardware type
+//   249 (picinfo)     : Gateway   — PIC version, device id, firmware type
+//   250 (picsettings) : Gateway   — PIC settings (setpoint override, LED, GPIO…)
+//   251 (diag200)     : Sat       — OTDirect flame metrics + SAT BLE health (majority SAT;
+//                                   note: otdirect_flame_* entries are gateway internals
+//                                   bundled in this pseudo-ID for historical reasons)
+//   252 (satcore)     : Sat       — SAT control, PID, cycle statistics
+//   253 (satble)      : Sat       — SAT BLE sensor primaries + weather
+//   254 (satbinary)   : Sat       — SAT flame status
+//   255 (satzone)     : Sat       — SAT zone discovery
+//
+// Climate (piggybacked on OT ID 0): Thermostat (both thermostat + DHW control entities).
+// DHW control (climateIdx=1) stays on Thermostat: it is a setpoint-control entity whose
+// command side lives at the thermostat side of the OT bus.
+//
+// SAT switches/select (piggybacked on OT ID 0): Sat.
+// Number entity (OT ID 27, Toutside_override): Thermostat.
+// Override sensors (ADR-118, IDs 1,8,9,14,16,39,56,57): Gateway (OTGW-internal overrides).
+//
+static HaDevice deviceForOTId(byte OTid) {
+  // Real OT message IDs (DATA_*): bilateral — caller handles double-emit.
+  // This function returns the PRIMARY device for single-device entities.
+  // For bilateral IDs (0..127) the function returns Boiler; bilateral
+  // logic in doAutoConfigureMsgid() runs a second pass with Thermostat.
+  if (OTid <= 127) return HaDevice::Boiler;  // bilateral, see doAutoConfigureMsgid
+  switch (OTid) {
+    case 244: return HaDevice::Gateway;  // piccontrols
+    case 246: return HaDevice::Esp;      // dallas
+    case 247: return HaDevice::Esp;      // heapstats
+    case 248: return HaDevice::Esp;      // fwinfo
+    case 249: return HaDevice::Gateway;  // picinfo
+    case 250: return HaDevice::Gateway;  // picsettings
+    case 251: return HaDevice::Sat;      // diag200 (OTDirect + SAT BLE health)
+    case 252: return HaDevice::Sat;      // satcore
+    case 253: return HaDevice::Sat;      // satble + weather
+    case 254: return HaDevice::Sat;      // satbinary (flame status)
+    case 255: return HaDevice::Sat;      // satzone
+    default:  return HaDevice::Esp;
+  }
+}
+
 bool doAutoConfigureMsgid(byte OTid, bool isFirst)
 {
   // Dallas sensors have their own discovery path
@@ -2412,58 +2465,88 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   bool result = false;
   HaDiscoveryContext ctx = buildDiscoveryContext(isFirst);
 
-  // Sensors
+  const bool useLegacy = settings.mqtt.bLegacyMode;
+
+  // TASK-648 Task 4: bilateral flag — real OT IDs (0..127) emit sensors/binary_sensors
+  // twice in modern mode (Boiler then Thermostat). Legacy mode: single pass (unchanged).
+  const bool isBilateral = !useLegacy && (OTid <= 127);
+
+  // Set ctx.device for single-device non-bilateral paths.
+  // The bilateral sensor loop overrides this per pass.
+  ctx.device = deviceForOTId(OTid);
+
+  // Sensors — bilateral: run two passes (Boiler, Thermostat) in modern mode.
   uint16_t sIdx = readSensorIndex(OTid);
   if (sIdx != MQTT_HA_INDEX_NONE) {
-    while (sIdx < MQTT_HA_SENSOR_COUNT) {
-      MqttHaSensorCfg cfg = readSensorCfg(sIdx);
-      if (cfg.id != OTid) break;
-      if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
-        if (settings.mqtt.bSeparateSources) {
-          if (expandAndStreamSensorSources(MQTTclient, cfg, ctx)) result = true;
+    const uint8_t passes = isBilateral ? 2 : 1;
+    for (uint8_t pass = 0; pass < passes; pass++) {
+      if (isBilateral) ctx.device = (pass == 0) ? HaDevice::Boiler : HaDevice::Thermostat;
+      uint16_t i = sIdx;
+      while (i < MQTT_HA_SENSOR_COUNT) {
+        MqttHaSensorCfg cfg = readSensorCfg(i);
+        if (cfg.id != OTid) break;
+        if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
+          // Source variants (bSeparateSources): emit once per pass with current device.
+          // In bilateral mode they are emitted on both passes (Boiler + Thermostat)
+          // so users see source-qualified variants under both devices.
+          if (settings.mqtt.bSeparateSources) {
+            if (expandAndStreamSensorSources(MQTTclient, cfg, ctx)) result = true;
+          }
+        } else {
+          // ADR-097: base entity always emitted.
+          if (streamSensorDiscovery(MQTTclient, cfg, ctx)) result = true;
         }
-      } else {
-        // ADR-097: base entity always emitted (ADR-095 suppression dropped).
-        if (streamSensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+        i++;
+        feedWatchDog();
       }
-      sIdx++;
-      feedWatchDog();
     }
   }
+  // Restore device after bilateral sensor loop so subsequent sections see the right value.
+  if (isBilateral) ctx.device = HaDevice::Boiler;
 
   // Binary sensors — indexed range. ADR-106: filter by naming mode.
-  // - new mode (default, bUseLegacyOtTopics=false): SKIP rows flagged
-  //   MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS (they have an alias replacement).
-  // - legacy mode (bUseLegacyOtTopics=true): publish all indexed rows.
-  const bool useLegacy = settings.mqtt.bLegacyMode;
-  uint16_t bIdx = readBinSensorIndex(OTid);
-  if (bIdx != MQTT_HA_INDEX_NONE) {
-    while (bIdx < MQTT_HA_BINSENSOR_INDEXED_COUNT) {
-      MqttHaBinSensorCfg cfg = readBinSensorCfg(bIdx);
-      if (cfg.id != OTid) break;
-      const bool skipReplaced = !useLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS);
-      if (!skipReplaced) {
-        if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+  // - new mode (default): SKIP rows flagged MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS.
+  // - legacy mode: publish all indexed rows.
+  // Bilateral: two passes (Boiler, Thermostat) in modern mode.
+  {
+    const uint8_t passes = isBilateral ? 2 : 1;
+    for (uint8_t pass = 0; pass < passes; pass++) {
+      if (isBilateral) ctx.device = (pass == 0) ? HaDevice::Boiler : HaDevice::Thermostat;
+      uint16_t bIdx = readBinSensorIndex(OTid);
+      if (bIdx != MQTT_HA_INDEX_NONE) {
+        while (bIdx < MQTT_HA_BINSENSOR_INDEXED_COUNT) {
+          MqttHaBinSensorCfg cfg = readBinSensorCfg(bIdx);
+          if (cfg.id != OTid) break;
+          const bool skipReplaced = !useLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS);
+          if (!skipReplaced) {
+            if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+          }
+          bIdx++;
+          feedWatchDog();
+        }
       }
-      bIdx++;
-      feedWatchDog();
+      // ADR-106: alias tail (non-contiguous; not covered by index). Walked only in new mode.
+      if (!useLegacy) {
+        for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
+          MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
+          if (cfg.id != OTid) continue;
+          if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+          feedWatchDog();
+        }
+      }
     }
   }
-  // ADR-106: alias tail (non-contiguous; not covered by index). Walked only
-  // in new mode — these are the new defaults. Legacy mode skips them entirely.
-  if (!useLegacy) {
-    for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
-      MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
-      if (cfg.id != OTid) continue;
-      if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
-      feedWatchDog();
-    }
-  }
+  // Restore device after bilateral binary sensor loop.
+  if (isBilateral) ctx.device = HaDevice::Boiler;
 
-  // Climate + SAT switches/select (OT ID 0 — TASK-284 piggyback)
+  // Climate + SAT switches/select (OT ID 0 — TASK-284 piggyback).
+  // Climate: Thermostat (both climateIdx=0 thermostat and climateIdx=1 DHW control).
+  // SAT switches/select: Sat.
   if (OTid == 0) {
+    ctx.device = HaDevice::Thermostat;
     if (streamClimateDiscovery(MQTTclient, 0, ctx)) result = true;
     if (streamClimateDiscovery(MQTTclient, 1, ctx)) result = true;
+    ctx.device = HaDevice::Sat;
     // TASK-516: idx 13 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
     const bool dhwEnableSwitchAllowed =
         (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
@@ -2475,15 +2558,18 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     feedWatchDog();
     if (streamSatSelectDiscovery(MQTTclient, 0, ctx)) result = true;
   }
-  // Number (OT ID 27)
+  // Number (OT ID 27): Thermostat (room temperature outside override is thermostat-side).
   if (OTid == 27) {
+    ctx.device = HaDevice::Thermostat;
     if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
   }
 
   // ADR-118: active-gateway-override sensor for the override-capable numeric ids.
   // 27 is excluded (covered by the Toutside_override number entity above).
+  // These are OTGW-internal override states: Gateway device.
   switch (OTid) {
     case 1: case 8: case 9: case 14: case 16: case 39: case 56: case 57: {
+      ctx.device = HaDevice::Gateway;
       const char* ovrLabel = messageIDToString(static_cast<OTLibMessageID>(OTid));
       if (streamOverrideSensorDiscovery(MQTTclient, ctx, OTid, ovrLabel)) result = true;
       break;
@@ -2492,6 +2578,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   }
 
   if (OTid == OTGWsatzoneid) {
+    ctx.device = HaDevice::Sat;
     if (streamSatZoneDiscovery(MQTTclient, ctx)) result = true;
   }
 
@@ -2507,6 +2594,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // stays false so loopMQTTDiscovery() retains the pending bit and retries the whole
   // set next tick (retained idempotent re-publish). Mirrors dev PR #596.
   if (OTid == OTGWpiccontrolsid) {
+    ctx.device = HaDevice::Gateway;
     bool allOk = streamButtonDiscovery(MQTTclient, ctx);
     feedWatchDog();
     for (uint8_t i = 0; i <= 7; i++) {
@@ -2527,6 +2615,7 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
   if (!cfgSensorId || cfgSensorId[0] == '\0') return;
 
   HaDiscoveryContext ctx = buildDiscoveryContext();
+  ctx.device = HaDevice::Esp;  // TASK-648 Task 4: Dallas sensors belong to the ESP device
   bool success = streamDallasSensorDiscovery(MQTTclient, cfgSensorId, ctx);
   if (success) {
     MQTTDebugTf(PSTR("Dallas discovery sent for [%s]\r\n"), cfgSensorId);
