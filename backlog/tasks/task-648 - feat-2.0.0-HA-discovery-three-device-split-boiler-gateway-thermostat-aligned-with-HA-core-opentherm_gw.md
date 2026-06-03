@@ -3,9 +3,11 @@ id: TASK-648
 title: >-
   feat-2.0.0: HA discovery three-device split (boiler/gateway/thermostat)
   aligned with HA core opentherm_gw
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-21 08:42'
+updated_date: '2026-06-03 20:20'
 labels:
   - milestone-v2.1.0
   - deferred-from-v2.0.0
@@ -51,3 +53,9 @@ Reference research: see in-conversation HA OTGW dashboard inventory (2026-05-21)
 - [ ] #12 MQTT.md updated with the new setting and the per-entity device routing table
 - [ ] #13 build.py --firmware exits 0; evaluate.py --quick shows no new findings
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-03: re-scoped to 2.0.0 and to a FIVE-device model (was 3, deferred-v2.1.0). Brainstorm complete; spec at docs/superpowers/specs/2026-06-03-ha-discovery-five-device-split-design.md. Key decisions: 5 devices (boiler/thermostat/gateway/ESP-firmware/SAT); MODERN is the 2.0.0 default (not opt-in); ONE umbrella legacy switch (bLegacyMode, subsumes ADR-106 bUseLegacyOtTopics) restores 1.x.x byte-for-byte; modern unique_ids {nodeId}-{device}-{label} (HA-core scheme), legacy {nodeId}-{label}; bilateral OT values REPLICATED on both boiler+thermostat (HA-core-exact); gateway device = PIC xor OTDirect; NO via_device (HA core dropped it -> overrides original AC#6); HA core authoritative for OT-entity device routing. Supersedes the original 3-device ACs.
+<!-- SECTION:NOTES:END -->
