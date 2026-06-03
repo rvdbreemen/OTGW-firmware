@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.153
+**  Version  : v2.0.0-alpha.154
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -534,6 +534,8 @@ void readSettings(bool show)
     strlcpy(settings.mqtt.sHaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settings.mqtt.sHaprefix));
   if (strlen(settings.mqtt.sUniqueid) == 0 || strcmp_P(settings.mqtt.sUniqueid, PSTR("null")) == 0)
     strlcpy(settings.mqtt.sUniqueid, getUniqueId(), sizeof(settings.mqtt.sUniqueid));
+  // TASK-648: bUseLegacyOtTopics is subsumed by bLegacyMode. Honour an old config once.
+  if (settings.mqtt.bUseLegacyOtTopics) settings.mqtt.bLegacyMode = true;
   if (strlen(settings.ntp.sTimezone) == 0 || strcmp_P(settings.ntp.sTimezone, PSTR("null")) == 0)
     strlcpy(settings.ntp.sTimezone, "Europe/Amsterdam", sizeof(settings.ntp.sTimezone));
   if (strlen(settings.ntp.sHostname) == 0 || strcmp_P(settings.ntp.sHostname, PSTR("null")) == 0)
@@ -717,6 +719,7 @@ void updateSetting(const char *field, const char *newValue)
     const bool oldVal = settings.mqtt.bUseLegacyOtTopics;
     const bool newVal = EVALBOOLEAN(newValue);
     settings.mqtt.bUseLegacyOtTopics = newVal;
+    settings.mqtt.bLegacyMode = newVal;  // TASK-648: keep the umbrella in sync with the live toggle until a dedicated bLegacyMode control exists
     if (oldVal != newVal) armTopicCleanupOnLegacyToggle(newVal);
   }
   else if (strcasecmp_P(field, PSTR("MQTTuniqueid")) == 0)  {

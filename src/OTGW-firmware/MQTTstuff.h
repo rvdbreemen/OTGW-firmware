@@ -66,6 +66,11 @@ struct MQTTSettingsSection {
   bool    bSeparateSources = false; // ADR-040: publish source-specific topics
   bool    bLegacyPort25238Enabled = false;
   bool    bUseLegacyOtTopics = false;  // ADR-106: false (default) → publish new self-describing names (supports_*, fault_indication, ventilation_*, etc.). true → publish legacy OT-spec-derived names. Mutually exclusive — never both at the same time. Toggle triggers cleanup of the OTHER set's retained discovery topics.
+  // TASK-648: umbrella 1.x.x compatibility mode. false (default) = modern
+  // (HA-core five-device topology + {nodeId}-{device}-{label} unique_ids +
+  // new self-describing OT-topic names). true = legacy 1.x.x. Subsumes
+  // bUseLegacyOtTopics (kept as a deprecated load-time alias for one release).
+  bool    bLegacyMode = false;
 };
 
 // ---------------------------------------------------------------------------

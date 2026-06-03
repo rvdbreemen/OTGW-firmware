@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.153
+**  Version  : v2.0.0-alpha.154
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2363,7 +2363,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // - new mode (default, bUseLegacyOtTopics=false): SKIP rows flagged
   //   MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS (they have an alias replacement).
   // - legacy mode (bUseLegacyOtTopics=true): publish all indexed rows.
-  const bool useLegacy = settings.mqtt.bUseLegacyOtTopics;
+  const bool useLegacy = settings.mqtt.bLegacyMode;
   uint16_t bIdx = readBinSensorIndex(OTid);
   if (bIdx != MQTT_HA_INDEX_NONE) {
     while (bIdx < MQTT_HA_BINSENSOR_INDEXED_COUNT) {
