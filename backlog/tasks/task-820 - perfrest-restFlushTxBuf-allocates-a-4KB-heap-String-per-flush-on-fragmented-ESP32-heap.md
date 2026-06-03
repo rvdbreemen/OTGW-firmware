@@ -3,9 +3,11 @@ id: TASK-820
 title: >-
   perf(rest): restFlushTxBuf allocates a 4KB heap String per flush on fragmented
   ESP32 heap
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-03 16:09'
+updated_date: '2026-06-03 20:16'
 labels: []
 dependencies: []
 ---

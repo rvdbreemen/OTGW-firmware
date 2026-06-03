@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-alpha.152
+**  Version  : v2.0.0-alpha.153
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -202,9 +202,13 @@ static struct {
 
 static void restFlushTxBuf() {
   if (sTxBuf.len == 0) return;
-  sTxBuf.data[sTxBuf.len] = '\0';
   const uint32_t t0 = millis();
-  httpServer.sendContent(sTxBuf.data);
+  // Length-based overload (WebServer.cpp): the single-arg sendContent(const
+  // char*) would bind to sendContent(const String&) and construct a ~4KB heap
+  // String temporary per flush -- wasteful on the fragmented ESP32-S3 heap, and
+  // a failed alloc would yield length()==0 -> a 0-length chunk that ends the
+  // chunked response early. Passing the explicit length avoids both (TASK-820).
+  httpServer.sendContent(sTxBuf.data, sTxBuf.len);
   restPerfAccumulateSendTime(millis() - t0);
   sTxBuf.len = 0;
 }
