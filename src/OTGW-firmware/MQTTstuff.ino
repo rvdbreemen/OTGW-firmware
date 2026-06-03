@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.155
+**  Version  : v2.0.0-alpha.156
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -133,6 +133,10 @@ static uint16_t        statusBurstPublishCount = 0;
 static unsigned long   burstCooldownUntilMs  = 0;
 static uint32_t        sDripDueAtMs          = 0;   // updated by loopMQTTDiscovery(); read by dripDueWithinMs()
 static bool            dripDeviceInfoPending = false; // true after markAllMQTTConfigPending(); first drip entity carries full device block
+// TASK-648 Job B: persistent per-device "full block once" gate, one entry per HaDevice (5 total).
+// false = not yet introduced this cycle; true = full block already emitted for this device.
+// Reset alongside dripDeviceInfoPending so re-running discovery re-introduces all devices.
+static bool            g_haDeviceIntroduced[5] = { false, false, false, false, false };
 constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
 // STATUS_BURST_COOLDOWN_MS is board-defined in boards.h (ESP-abstraction Tier 3,
 // ADR-088): 2000 on ESP8266 (TASK-353: stays under the ~3s Status cadence so the
@@ -1843,6 +1847,7 @@ void publishNonOTDiscoveryConfigs()
   setMQTTConfigPending(OTGWpicsettingsid);  // PIC settings
   setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
   dripDeviceInfoPending = true;
+  memset(g_haDeviceIntroduced, 0, sizeof(g_haDeviceIntroduced));  // TASK-648: reset per-device introduced flags for new cycle
   MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
 }
 //===========================================================================================
@@ -1889,6 +1894,7 @@ void markAllMQTTConfigPending()
   // Platform/runtime-specific publishers decide whether entities show live state.
   setMQTTConfigPending(OTGWsatzoneid);
   dripDeviceInfoPending = true;
+  memset(g_haDeviceIntroduced, 0, sizeof(g_haDeviceIntroduced));  // TASK-648: reset per-device introduced flags for new cycle
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }
 //===========================================================================================
@@ -2068,11 +2074,13 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   ctx.model = settings.device.sModel;
   ctx.isFirstEntity = isFirst;
   ctx.legacyMode = settings.mqtt.bLegacyMode;  // TASK-648: thread the umbrella flag into the .cpp TU (it cannot see globals)
-  // TASK-648: per-device firstSeen mirrors isFirstEntity so the full device
-  // block is emitted once per discovery cycle, matching the legacy gate.
-  // (Unconditional true would re-emit full metadata on every drip tick.)
-  for (uint8_t i = 0; i < 5; i++) ctx.firstSeen[i] = isFirst;
-  ctx.device = HaDevice::Esp;          // default; Task 3 routes per entity
+  // TASK-648 Job B: point ctx at the persistent per-device introduced flags.
+  // g_haDeviceIntroduced is reset to all-false at the start of each discovery
+  // cycle (at both dripDeviceInfoPending = true sites). The ctx pointer gives
+  // both device-block builders (writeDeviceBlock in .cpp and
+  // buildDiscoveryDeviceBlock here) access to the same persistent array.
+  ctx.deviceIntroduced = g_haDeviceIntroduced;
+  ctx.device = HaDevice::Esp;          // default; Task 4 routes per entity
   ctx.sourceSuffix = "";
   ctx.sourceName = "";
   ctx.sourceTopicSegment = "";
@@ -2101,7 +2109,9 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
   // Legacy mode keeps bare nodeId and isFirstEntity gate (byte-identical to pre-648).
   const bool useLegacy = settings.mqtt.bLegacyMode;
   const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
-  const bool emitFull  = useLegacy ? ctx.isFirstEntity : ctx.firstSeen[devIdx];
+  // TASK-648 Job B: use persistent deviceIntroduced array (never-emit-full when already introduced).
+  const bool emitFull  = useLegacy ? ctx.isFirstEntity
+                                   : (ctx.deviceIntroduced ? !ctx.deviceIntroduced[devIdx] : false);
 
   int n;
   if (useLegacy) {
@@ -2126,8 +2136,8 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
       n = snprintf_P(dest, destSize,
                      PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"OpenTherm Gateway (%s)\",\"sw_version\":\"%s\"}"),
                      identifier, ctx.manufacturer, ctx.model, ctx.hostname, ctx.version);
-      // Clear per-device flag after emitting full block.
-      ctx.firstSeen[devIdx] = false;
+      // Mark device as introduced so subsequent entities get the minimal block.
+      if (ctx.deviceIntroduced) ctx.deviceIntroduced[devIdx] = true;
     } else {
       n = snprintf_P(dest, destSize,
                      PSTR("\"dev\":{\"identifiers\":\"%s\"}"),
@@ -2151,6 +2161,21 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
   char payload[768];
   char deviceBlock[256];
 
+  // TASK-648 Job A: pre-compute the uniq_id prefix for snprintf-built payloads.
+  // Modern: nodeId + device suffix (e.g. "otgw-abc123-sat").
+  // Legacy: bare nodeId (byte-identical to pre-648).
+  char idPrefix[sizeof(settings.mqtt.sUniqueid) + 16];
+  if (!ctx.legacyMode) {
+    static const char * const kSuffixes[] = {
+      "-boiler", "-thermostat", "-gateway", "-esp", "-sat"
+    };
+    const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
+    const char *suffix = (devIdx < 5) ? kSuffixes[devIdx] : "-esp";
+    snprintf(idPrefix, sizeof(idPrefix), "%s%s", ctx.nodeId, suffix);
+  } else {
+    strlcpy(idPrefix, ctx.nodeId, sizeof(idPrefix));
+  }
+
   auto publishZoneSensor = [&](uint8_t zoneNumber,
                                const char *metric,
                                const char *friendlySuffix,
@@ -2165,7 +2190,7 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
     if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
     int payloadLen = snprintf_P(payload, sizeof(payload),
                                 PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_zone_%u_%s\",\"name\":\"%s_SAT_Zone_%u_%s\",\"stat_t\":\"%s/sat/zone/%u/%s\",\"device_class\":\"%s\",\"unit_of_measurement\":\"%s\",\"state_class\":\"%s\",\"icon\":\"mdi:%s\",\"value_template\":\"{{ value }}\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
-                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, zoneNumber, metric,
+                                ctx.mqttPubTopic, deviceBlock, idPrefix, zoneNumber, metric,  // TASK-648: idPrefix (nodeId+suffix in modern, bare nodeId in legacy)
                                 ctx.hostname, zoneNumber, friendlySuffix,
                                 ctx.mqttPubTopic, zoneNumber, metric,
                                 deviceClass, unit, stateClass, icon, ctx.version);
@@ -2186,7 +2211,7 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
     if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
     int payloadLen = snprintf_P(payload, sizeof(payload),
                                 PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_zone_%u_%s\",\"name\":\"%s_SAT_Zone_%u_%s\",\"stat_t\":\"%s/sat/zone/%u/%s\",\"pl_on\":\"true\",\"pl_off\":\"false\",\"stat_on\":\"true\",\"stat_off\":\"false\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
-                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, zoneNumber, metric,
+                                ctx.mqttPubTopic, deviceBlock, idPrefix, zoneNumber, metric,  // TASK-648: idPrefix
                                 ctx.hostname, zoneNumber, friendlySuffix,
                                 ctx.mqttPubTopic, zoneNumber, metric,
                                 icon, ctx.version);
@@ -2230,6 +2255,20 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
   char payload[768];
   char deviceBlock[256];
 
+  // TASK-648 Job A: pre-compute the uniq_id prefix for snprintf-built payloads.
+  // Modern: nodeId + device suffix. Legacy: bare nodeId.
+  char idPrefix[sizeof(settings.mqtt.sUniqueid) + 16];
+  if (!ctx.legacyMode) {
+    static const char * const kSuffixes[] = {
+      "-boiler", "-thermostat", "-gateway", "-esp", "-sat"
+    };
+    const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
+    const char *suffix = (devIdx < 5) ? kSuffixes[devIdx] : "-esp";
+    snprintf(idPrefix, sizeof(idPrefix), "%s%s", ctx.nodeId, suffix);
+  } else {
+    strlcpy(idPrefix, ctx.nodeId, sizeof(idPrefix));
+  }
+
   auto publishSensor = [&](const char *metric,
                            const char *friendlySuffix,
                            const char *unit,
@@ -2243,7 +2282,7 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
     if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
     int payloadLen = snprintf_P(payload, sizeof(payload),
                                 PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/pv_%s\",\"device_class\":\"%s\",\"unit_of_measurement\":\"%s\",\"state_class\":\"%s\",\"icon\":\"mdi:%s\",\"value_template\":\"{{ value }}\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
-                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, metric,
+                                ctx.mqttPubTopic, deviceBlock, idPrefix, metric,  // TASK-648: idPrefix
                                 ctx.hostname, friendlySuffix,
                                 ctx.mqttPubTopic, metric,
                                 deviceClass, unit, stateClass, icon, ctx.version);
@@ -2263,7 +2302,7 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
     if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
     int payloadLen = snprintf_P(payload, sizeof(payload),
                                 PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/pv_%s\",\"pl_on\":\"true\",\"pl_off\":\"false\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
-                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, metric,
+                                ctx.mqttPubTopic, deviceBlock, idPrefix, metric,  // TASK-648: idPrefix
                                 ctx.hostname, friendlySuffix,
                                 ctx.mqttPubTopic, metric,
                                 icon, ctx.version);
@@ -2283,7 +2322,7 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
     if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
     int payloadLen = snprintf_P(payload, sizeof(payload),
                                 PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/%s\",\"cmd_t\":\"%s/sat/%s\",\"pl_on\":\"1\",\"pl_off\":\"0\",\"stat_on\":\"1\",\"stat_off\":\"0\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
-                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, metric,
+                                ctx.mqttPubTopic, deviceBlock, idPrefix, metric,  // TASK-648: idPrefix
                                 ctx.hostname, friendlySuffix,
                                 ctx.mqttPubTopic, metric,
                                 ctx.mqttSubTopic, metric,
@@ -2310,7 +2349,7 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
     dtostrf(step,   1, 2, stepBuf);
     int payloadLen = snprintf_P(payload, sizeof(payload),
                                 PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/%s\",\"cmd_t\":\"%s/sat/%s\",\"min\":%s,\"max\":%s,\"step\":%s,\"unit_of_measurement\":\"%s\",\"mode\":\"box\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
-                                ctx.mqttPubTopic, deviceBlock, ctx.nodeId, metric,
+                                ctx.mqttPubTopic, deviceBlock, idPrefix, metric,  // TASK-648: idPrefix
                                 ctx.hostname, friendlySuffix,
                                 ctx.mqttPubTopic, metric,
                                 ctx.mqttSubTopic, metric,

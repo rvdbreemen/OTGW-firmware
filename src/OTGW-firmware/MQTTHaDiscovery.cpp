@@ -2230,15 +2230,17 @@ static PGM_P haDeviceSuffix(HaDevice d) {
 // ---------------------------------------------------------------------------
 // Device block: full (first-per-device) or minimal (subsequent).
 // In legacy mode: bare nodeId identifier, gated by ctx.isFirstEntity (unchanged).
-// In modern mode: nodeId+suffix identifier, gated by ctx.firstSeen[device].
-// ctx is non-const so firstSeen can be cleared after emitting the full block.
+// In modern mode: nodeId+suffix identifier, gated by ctx.deviceIntroduced[device].
+// ctx is non-const so deviceIntroduced can be set after emitting the full block.
 // ---------------------------------------------------------------------------
 static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
   const bool useLegacy = ctx.legacyMode;
 
   // Determine whether to emit the full block for this entity.
   const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
-  const bool emitFull = useLegacy ? ctx.isFirstEntity : ctx.firstSeen[devIdx];
+  // TASK-648 Job B: deviceIntroduced[devIdx] false = not yet introduced; emit full block.
+  const bool emitFull = useLegacy ? ctx.isFirstEntity
+                                  : (ctx.deviceIntroduced ? !ctx.deviceIntroduced[devIdx] : false);
 
   // Open device object and emit identifier string.
   // Legacy: bare nodeId.  Modern: nodeId + device suffix.
@@ -2267,8 +2269,8 @@ static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
     if (!w.writeProgmem(PSTR(")\""))) return false;
     if (!writeJsonComma(w)) return false;
     if (!writeJsonKV(w, kSwVer, ctx.version)) return false;
-    // Clear the per-device flag so subsequent entities get the minimal block.
-    if (!useLegacy) ctx.firstSeen[devIdx] = false;
+    // Mark device as introduced so subsequent entities get the minimal block.
+    if (!useLegacy && ctx.deviceIntroduced) ctx.deviceIntroduced[devIdx] = true;
   }
 
   return w.writeChar('}');
@@ -2328,12 +2330,14 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   if (!writeDeviceBlock(w, ctx)) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "uniq_id":"<nodeId>-<label>[<sourceSuffix>]"
+  // "uniq_id":"<nodeId>[-<device>]-<label>[<sourceSuffix>]"
+  // Modern mode: nodeId + device suffix + label. Legacy: nodeId + label (byte-identical to pre-648).
   // Uses idLabel (sanitized) so HA-forbidden characters like '/' become '_'.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kUniqId)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
+  if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
   if (!w.writeChar('-')) return false;
   if (!w.writeRam(idLabel)) return false;
   if (hasSrc) { if (!w.writeRam(ctx.sourceSuffix)) return false; }
@@ -2441,11 +2445,13 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
   if (!writeDeviceBlock(w, ctx)) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "uniq_id":"<nodeId>-<label>"
+  // "uniq_id":"<nodeId>[-<device>]-<label>"
+  // Modern: nodeId + device suffix + label. Legacy: nodeId + label (byte-identical to pre-648).
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kUniqId)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
+  if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
   if (!w.writeChar('-')) return false;
   if (!w.writeRam(label)) return false;
   if (!w.writeChar('"')) return false;
@@ -2681,11 +2687,13 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // "uniq_id":"<nodeId>-<sensorAddress>"
+    // "uniq_id":"<nodeId>[-<device>]-<sensorAddress>"
+    // Modern: nodeId + device suffix + address. Legacy: nodeId + address.
     if (!w.writeChar('"')) return false;
     if (!w.writeProgmem(kUniqId)) return false;
     if (!w.writeProgmem(PSTR("\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
     if (!w.writeChar('-')) return false;
     if (!w.writeRam(sensorAddress)) return false;
     if (!w.writeChar('"')) return false;
@@ -2887,17 +2895,20 @@ bool streamClimateDiscovery(PubSubClient &client,
     if (!writeJsonComma(w)) return false;
 
     // name + uniq_id (hostname dropped from name per Andre 2026-05-07; uniq_id keeps it)
+    // TASK-648: modern mode inserts device suffix after nodeId in uniq_id.
     if (climateIdx == 0) {
       if (!w.writeProgmem(PSTR("\"name\":\"Thermostat\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
       if (!w.writeRam(ctx.nodeId)) return false;
+      if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
       if (!w.writeProgmem(PSTR("-thermostat\""))) return false;
     } else {
       if (!w.writeProgmem(PSTR("\"name\":\"DHW Control\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
       if (!w.writeRam(ctx.nodeId)) return false;
+      if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
       if (!w.writeProgmem(PSTR("-dhw_control\""))) return false;
     }
     if (!writeJsonComma(w)) return false;
@@ -3047,9 +3058,10 @@ bool streamNumberDiscovery(PubSubClient &client,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // uniq_id
+    // uniq_id: modern inserts device suffix, legacy is bare nodeId
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(PSTR("-Toutside_override\""))) return false;
     if (!writeJsonComma(w)) return false;
 
@@ -3139,9 +3151,11 @@ bool streamOverrideSensorDiscovery(PubSubClient &client,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // uniq_id "<nodeId>-<label>_override"
+    // uniq_id "<nodeId>[-<device>]-<label>_override"
+    // Modern: device suffix inserted after nodeId. Legacy: bare nodeId + label.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(PSTR("-"))) return false;
     if (!w.writeRam(label)) return false;
     if (!w.writeProgmem(PSTR("_override\""))) return false;
@@ -3241,8 +3255,10 @@ static bool streamSatBoolSwitch(PubSubClient &client,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
+    // uniq_id: modern inserts device suffix between nodeId and the entity suffix.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(uniqSuffix)) return false;
     if (!w.writeProgmem(PSTR("\""))) return false;
     if (!writeJsonComma(w)) return false;
@@ -3422,8 +3438,10 @@ bool streamSatSelectDiscovery(PubSubClient &client,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
+    // uniq_id: modern inserts device suffix after nodeId.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(PSTR("-sat-heating-system\""))) return false;
     if (!writeJsonComma(w)) return false;
 
@@ -3499,8 +3517,10 @@ bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
+    // uniq_id: modern inserts device suffix after nodeId.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(PSTR("-resetgateway\""))) return false;
     if (!writeJsonComma(w)) return false;
 
@@ -3602,8 +3622,10 @@ bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryC
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
+    // uniq_id: modern inserts device suffix after nodeId.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
     if (!w.writeChar('-')) return false;
     if (!w.writeRam(label)) return false;
     if (!w.writeChar('"')) return false;

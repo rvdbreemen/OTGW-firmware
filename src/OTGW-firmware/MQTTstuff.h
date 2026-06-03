@@ -370,7 +370,13 @@ struct HaDiscoveryContext {
     bool        isFirstEntity;
     bool        legacyMode = false;           // TASK-648: settings.mqtt.bLegacyMode, threaded in (the .cpp TU cannot see globals)
     HaDevice    device = HaDevice::Esp;       // owning device for the current entity
-    bool        firstSeen[5] = { true, true, true, true, true };  // per-device "full block once"
+    // TASK-648 Job B: persistent per-device "full block once" gate.
+    // Points at the file-static g_haDeviceIntroduced[5] in MQTTstuff.ino.
+    // nullptr is the safe default (both builders guard with a null-check).
+    // Semantics: false = not yet introduced this cycle (emit full block), true = already done.
+    // Reset to all-false when a new discovery cycle starts (markAllMQTTConfigPending /
+    // setMQTTConfigAllPending arm dripDeviceInfoPending — same two sites).
+    bool       *deviceIntroduced = nullptr;   // per-device introduced flags (5 entries)
     // Source template expansion (set per-source iteration)
     const char *sourceSuffix;
     const char *sourceName;
