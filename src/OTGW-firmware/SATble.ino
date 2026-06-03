@@ -690,14 +690,19 @@ void satBLESendStatusJSON()
   sendJsonMapEntry(F("ble_failover_active"), _bleFailoverActive);
   sendJsonMapEntry(F("ble_temp_valid"),   state.sat.bBleTempValid);
   if (state.sat.bBleTempValid) {
+    // Route through restSendContent so these bytes share the ESP32 coalescing
+    // buffer (jsonStuff.ino sTxBuf). A raw httpServer.sendContent would flush
+    // ahead of the buffered wrapper and scramble the JSON (same gotcha already
+    // fixed in satBLERosterSendJSON below) -- on ESP32 that truncated the
+    // >4KB sat/status response mid-number, blanking the SAT dashboard tiles.
     { char buf[12]; dtostrf(state.sat.fBleTemp, 1, 2, buf);
       sendBeforenext(); sendIdent();
       char json[40]; snprintf_P(json, sizeof(json), PSTR("\"ble_temp\": %s"), buf);
-      httpServer.sendContent(json); }
+      restSendContent(json); }
     { char buf[12]; dtostrf(state.sat.fBleHumidity, 1, 2, buf);
       sendBeforenext(); sendIdent();
       char json[40]; snprintf_P(json, sizeof(json), PSTR("\"ble_humidity\": %s"), buf);
-      httpServer.sendContent(json); }
+      restSendContent(json); }
     sendJsonMapEntry(F("ble_rssi"),        (int32_t)state.sat.iBleRssi);
     sendJsonMapEntry(F("ble_battery"),     (int32_t)state.sat.iBleBattery);
   }
