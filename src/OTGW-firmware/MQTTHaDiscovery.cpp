@@ -2193,6 +2193,7 @@ static const char kIds[]      PROGMEM = "identifiers";
 static const char kMfr[]      PROGMEM = "manufacturer";
 static const char kModel[]    PROGMEM = "model";
 static const char kSwVer[]    PROGMEM = "sw_version";
+static const char kHwVer[]    PROGMEM = "hw_version";
 static const char kDevName[]  PROGMEM = "name";
 static const char kUniqId[]   PROGMEM = "uniq_id";
 static const char kName[]     PROGMEM = "name";
@@ -2230,7 +2231,11 @@ static PGM_P haDeviceSuffix(HaDevice d) {
 // ---------------------------------------------------------------------------
 // Device block: full (first-per-device) or minimal (subsequent).
 // In legacy mode: bare nodeId identifier, gated by ctx.isFirstEntity (unchanged).
+//   Full legacy block is byte-identical to the pre-Task-5 output.
 // In modern mode: nodeId+suffix identifier, gated by ctx.deviceIntroduced[device].
+//   Full modern block uses per-device metadata from ctx.devMeta[devIdx] when
+//   available, falling back to legacy strings so the emitter never crashes on
+//   a nullptr devMeta pointer.
 // ctx is non-const so deviceIntroduced can be set after emitting the full block.
 // ---------------------------------------------------------------------------
 static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
@@ -2257,20 +2262,56 @@ static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
   if (!w.writeChar('"')) return false;
 
   if (emitFull) {
-    if (!writeJsonComma(w)) return false;
-    if (!writeJsonKV(w, kMfr, ctx.manufacturer)) return false;
-    if (!writeJsonComma(w)) return false;
-    if (!writeJsonKV(w, kModel, ctx.model)) return false;
-    if (!writeJsonComma(w)) return false;
-    if (!w.writeChar('"')) return false;
-    if (!w.writeProgmem(kDevName)) return false;
-    if (!w.writeProgmem(PSTR("\":\"OpenTherm Gateway ("))) return false;
-    if (!w.writeRam(ctx.hostname)) return false;
-    if (!w.writeProgmem(PSTR(")\""))) return false;
-    if (!writeJsonComma(w)) return false;
-    if (!writeJsonKV(w, kSwVer, ctx.version)) return false;
-    // Mark device as introduced so subsequent entities get the minimal block.
-    if (!useLegacy && ctx.deviceIntroduced) ctx.deviceIntroduced[devIdx] = true;
+    if (useLegacy) {
+      // LEGACY: byte-identical to pre-Task-5 output.
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV(w, kMfr, ctx.manufacturer)) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV(w, kModel, ctx.model)) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeChar('"')) return false;
+      if (!w.writeProgmem(kDevName)) return false;
+      if (!w.writeProgmem(PSTR("\":\"OpenTherm Gateway ("))) return false;
+      if (!w.writeRam(ctx.hostname)) return false;
+      if (!w.writeProgmem(PSTR(")\""))) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV(w, kSwVer, ctx.version)) return false;
+    } else {
+      // MODERN (Task 5): per-device metadata from ctx.devMeta[devIdx].
+      // Fall back to legacy strings when devMeta is nullptr (safe default).
+      const HaDeviceMeta *meta = (ctx.devMeta && devIdx < 5) ? &ctx.devMeta[devIdx] : nullptr;
+      const char *mfr   = meta ? meta->devManufacturer : ctx.manufacturer;
+      const char *model = meta ? meta->devModel        : ctx.model;
+      const char *sw    = meta ? meta->devSwVersion    : ctx.version;
+      // name: "DeviceType (hostname)" from meta->devName when available.
+      // devName already contains the full "Boiler (host)" string (built in MQTTstuff.ino).
+      const char *name  = (meta && meta->devName && meta->devName[0]) ? meta->devName : nullptr;
+      const char *hw    = (meta && meta->devHwVersion && meta->devHwVersion[0]) ? meta->devHwVersion : nullptr;
+
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV(w, kMfr, mfr)) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV(w, kModel, model)) return false;
+      if (!writeJsonComma(w)) return false;
+      if (name) {
+        if (!writeJsonKV(w, kDevName, name)) return false;
+      } else {
+        // Fallback: construct "OpenTherm Gateway (<hostname>)"
+        if (!w.writeChar('"')) return false;
+        if (!w.writeProgmem(kDevName)) return false;
+        if (!w.writeProgmem(PSTR("\":\"OpenTherm Gateway ("))) return false;
+        if (!w.writeRam(ctx.hostname)) return false;
+        if (!w.writeProgmem(PSTR(")\""))) return false;
+      }
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV(w, kSwVer, sw)) return false;
+      if (hw) {
+        if (!writeJsonComma(w)) return false;
+        if (!writeJsonKV(w, kHwVer, hw)) return false;
+      }
+      // Mark device as introduced so subsequent entities get the minimal block.
+      if (ctx.deviceIntroduced) ctx.deviceIntroduced[devIdx] = true;
+    }
   }
 
   return w.writeChar('}');

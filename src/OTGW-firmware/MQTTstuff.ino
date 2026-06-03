@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.157
+**  Version  : v2.0.0-alpha.158
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -137,6 +137,22 @@ static bool            dripDeviceInfoPending = false; // true after markAllMQTTC
 // false = not yet introduced this cycle; true = full block already emitted for this device.
 // Reset alongside dripDeviceInfoPending so re-running discovery re-introduces all devices.
 static bool            g_haDeviceIntroduced[5] = { false, false, false, false, false };
+
+// TASK-648 Task 5: per-device metadata cache, one entry per HaDevice ordinal (Boiler=0 .. Sat=4).
+// Populated once per discovery cycle by buildAllHaDeviceMeta() at the two reset sites below.
+// All char* pointers inside each struct point into the file-static buffers declared there.
+// Both device-block emitters (writeDeviceBlock in .cpp, buildDiscoveryDeviceBlock here)
+// index this array via ctx.devMeta so they emit identical metadata regardless of which
+// emitter runs first for a given device.
+struct HaDeviceMetaBufs {
+  char devName[64];         // "Boiler (hostname)" etc.
+  char devManufacturer[48]; // "MemberID 131" / "Schelte Bron" / "Espressif"
+  char devModel[64];        // "ProductType 3" / "OpenTherm Gateway" / board name
+  char devSwVersion[32];    // OT version float / PIC fw string / firmware version
+  char devHwVersion[24];    // product version byte / chip id hex; empty = omit
+};
+static HaDeviceMetaBufs  g_haDeviceMetaBufs[5];
+static HaDeviceMeta      g_haDeviceMeta[5];
 constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
 // STATUS_BURST_COOLDOWN_MS is board-defined in boards.h (ESP-abstraction Tier 3,
 // ADR-088): 2000 on ESP8266 (TASK-353: stays under the ~3s Status cadence so the
@@ -1848,6 +1864,7 @@ void publishNonOTDiscoveryConfigs()
   setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
   dripDeviceInfoPending = true;
   memset(g_haDeviceIntroduced, 0, sizeof(g_haDeviceIntroduced));  // TASK-648: reset per-device introduced flags for new cycle
+  buildAllHaDeviceMeta(CSTR(settings.sHostname));  // TASK-648 Task 5: populate per-device metadata cache
   MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
 }
 //===========================================================================================
@@ -1895,6 +1912,7 @@ void markAllMQTTConfigPending()
   setMQTTConfigPending(OTGWsatzoneid);
   dripDeviceInfoPending = true;
   memset(g_haDeviceIntroduced, 0, sizeof(g_haDeviceIntroduced));  // TASK-648: reset per-device introduced flags for new cycle
+  buildAllHaDeviceMeta(CSTR(settings.sHostname));  // TASK-648 Task 5: populate per-device metadata cache
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }
 //===========================================================================================
@@ -2060,6 +2078,121 @@ void loopMQTTDiscovery()
   }
 }
 //===========================================================================================
+// TASK-648 Task 5: fill g_haDeviceMetaBufs[devIdx] + g_haDeviceMeta[devIdx] from live OT
+// data, settings, and platform state for the given device.
+// Called once per discovery cycle (at the two reset sites) for all 5 devices.
+// Uses dtostrf for floats (Arduino-safe, no snprintf %f on ESP8266).
+// MsgID 126/127 (MasterVersion/SlaveVersion): HB = product type, LB = product version.
+// MsgID 124/125 (OpenThermVersionMaster/Slave): f8.8 OT protocol version (stored as float).
+// MemberID: LB of MasterConfigMemberIDcode / SlaveConfigMemberIDcode.
+static void buildAllHaDeviceMeta(const char *hostname) {
+  // Helper: fill one entry and wire its struct pointers to the bufs.
+  auto fill = [&](uint8_t idx, const char *name, const char *mfr, const char *model,
+                  const char *sw, const char *hw) {
+    HaDeviceMetaBufs &b = g_haDeviceMetaBufs[idx];
+    strlcpy(b.devName,         name  ? name  : "",  sizeof(b.devName));
+    strlcpy(b.devManufacturer, mfr   ? mfr   : "",  sizeof(b.devManufacturer));
+    strlcpy(b.devModel,        model ? model : "",  sizeof(b.devModel));
+    strlcpy(b.devSwVersion,    sw    ? sw    : "",  sizeof(b.devSwVersion));
+    strlcpy(b.devHwVersion,    hw    ? hw    : "",  sizeof(b.devHwVersion));
+    g_haDeviceMeta[idx].devName        = b.devName;
+    g_haDeviceMeta[idx].devManufacturer= b.devManufacturer;
+    g_haDeviceMeta[idx].devModel       = b.devModel;
+    g_haDeviceMeta[idx].devSwVersion   = b.devSwVersion;
+    g_haDeviceMeta[idx].devHwVersion   = b.devHwVersion;
+  };
+
+  char tmpName[64];
+  char tmpMfr[48];
+  char tmpModel[64];
+  char tmpSw[32];
+  char tmpHw[24];
+
+  // --- Boiler (0): slave MemberID/product/OT-version ---
+  {
+    const uint8_t slaveMemberId = OTcurrentSystemState.SlaveConfigMemberIDcode & 0xFF;
+    const uint8_t slaveProductType    = (OTcurrentSystemState.SlaveVersion >> 8) & 0xFF;
+    const uint8_t slaveProductVersion = OTcurrentSystemState.SlaveVersion & 0xFF;
+    snprintf_P(tmpName,  sizeof(tmpName),  PSTR("Boiler (%s)"),   hostname);
+    snprintf_P(tmpMfr,   sizeof(tmpMfr),   PSTR("MemberID %u"),   slaveMemberId);
+    snprintf_P(tmpModel, sizeof(tmpModel), PSTR("ProductType %u"), slaveProductType);
+    if (OTcurrentSystemState.OpenThermVersionSlave != 0.0f) {
+      dtostrf(OTcurrentSystemState.OpenThermVersionSlave, 1, 1, tmpSw);
+    } else {
+      strlcpy_P(tmpSw, PSTR("Unknown"), sizeof(tmpSw));
+    }
+    if (slaveProductVersion != 0) {
+      snprintf_P(tmpHw, sizeof(tmpHw), PSTR("%u"), slaveProductVersion);
+    } else {
+      tmpHw[0] = '\0';  // omit hw_version when not polled yet
+    }
+    fill(static_cast<uint8_t>(HaDevice::Boiler), tmpName, tmpMfr, tmpModel, tmpSw, tmpHw);
+  }
+
+  // --- Thermostat (1): master MemberID/product/OT-version ---
+  {
+    const uint8_t masterMemberId = OTcurrentSystemState.MasterConfigMemberIDcode & 0xFF;
+    const uint8_t masterProductType    = (OTcurrentSystemState.MasterVersion >> 8) & 0xFF;
+    const uint8_t masterProductVersion = OTcurrentSystemState.MasterVersion & 0xFF;
+    snprintf_P(tmpName,  sizeof(tmpName),  PSTR("Thermostat (%s)"), hostname);
+    snprintf_P(tmpMfr,   sizeof(tmpMfr),   PSTR("MemberID %u"),     masterMemberId);
+    snprintf_P(tmpModel, sizeof(tmpModel), PSTR("ProductType %u"),   masterProductType);
+    if (OTcurrentSystemState.OpenThermVersionMaster != 0.0f) {
+      dtostrf(OTcurrentSystemState.OpenThermVersionMaster, 1, 1, tmpSw);
+    } else {
+      strlcpy_P(tmpSw, PSTR("Unknown"), sizeof(tmpSw));
+    }
+    if (masterProductVersion != 0) {
+      snprintf_P(tmpHw, sizeof(tmpHw), PSTR("%u"), masterProductVersion);
+    } else {
+      tmpHw[0] = '\0';
+    }
+    fill(static_cast<uint8_t>(HaDevice::Thermostat), tmpName, tmpMfr, tmpModel, tmpSw, tmpHw);
+  }
+
+  // --- Gateway (2): PIC xor OTDirect identity ---
+  {
+    snprintf_P(tmpName, sizeof(tmpName), PSTR("Gateway (%s)"), hostname);
+    if (isPICEnabled()) {
+      // PIC present: use Schelte Bron identity; sw = state.pic.sFwversion (already parsed by handlePRresponse)
+      strlcpy_P(tmpMfr,   PSTR("Schelte Bron"),         sizeof(tmpMfr));
+      strlcpy_P(tmpModel, PSTR("OpenTherm Gateway"),     sizeof(tmpModel));
+      strlcpy(tmpSw, state.pic.sFwversion,               sizeof(tmpSw));
+    } else {
+      // OTDirect (no PIC): firmware identity
+      strlcpy_P(tmpMfr,   PSTR("OTGW-firmware"),                      sizeof(tmpMfr));
+      strlcpy_P(tmpModel, PSTR("OpenTherm Gateway (OTDirect)"),        sizeof(tmpModel));
+      strlcpy(tmpSw, _VERSION,                                         sizeof(tmpSw));
+    }
+    tmpHw[0] = '\0';  // no hw_version for gateway
+    fill(static_cast<uint8_t>(HaDevice::Gateway), tmpName, tmpMfr, tmpModel, tmpSw, tmpHw);
+  }
+
+  // --- ESP (3): board/platform identity ---
+  {
+    snprintf_P(tmpName, sizeof(tmpName), PSTR("OTGW-firmware (%s)"), hostname);
+    strlcpy_P(tmpMfr, PSTR("Espressif"), sizeof(tmpMfr));
+    // boardName() returns __FlashStringHelper* — copy via strncpy_P
+    strncpy_P(tmpModel, (PGM_P)boardName(), sizeof(tmpModel) - 1);
+    tmpModel[sizeof(tmpModel) - 1] = '\0';
+    strlcpy(tmpSw, _VERSION, sizeof(tmpSw));
+    // hw_version: chip ID as hex string (same format as settings init uses)
+    snprintf_P(tmpHw, sizeof(tmpHw), PSTR("%06X"), (unsigned int)platformChipId());
+    fill(static_cast<uint8_t>(HaDevice::Esp), tmpName, tmpMfr, tmpModel, tmpSw, tmpHw);
+  }
+
+  // --- SAT (4): firmware-native virtual thermostat ---
+  {
+    snprintf_P(tmpName, sizeof(tmpName), PSTR("SAT (%s)"), hostname);
+    strlcpy_P(tmpMfr,   PSTR("OTGW-firmware"),              sizeof(tmpMfr));
+    strlcpy_P(tmpModel, PSTR("Smart Autotune Thermostat"),   sizeof(tmpModel));
+    strlcpy(tmpSw, _VERSION, sizeof(tmpSw));
+    tmpHw[0] = '\0';
+    fill(static_cast<uint8_t>(HaDevice::Sat), tmpName, tmpMfr, tmpModel, tmpSw, tmpHw);
+  }
+}
+
+//===========================================================================================
 // Build a discovery context from the current MQTT state.
 // Caller sets ctx.isFirstEntity as appropriate.
 static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
@@ -2080,6 +2213,11 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   // both device-block builders (writeDeviceBlock in .cpp and
   // buildDiscoveryDeviceBlock here) access to the same persistent array.
   ctx.deviceIntroduced = g_haDeviceIntroduced;
+  // TASK-648 Task 5: thread per-device metadata into the context so both
+  // emitters (.cpp writeDeviceBlock and .ino buildDiscoveryDeviceBlock) use
+  // the same values.  g_haDeviceMeta[] is populated at cycle-start by
+  // buildAllHaDeviceMeta().
+  ctx.devMeta = g_haDeviceMeta;
   ctx.device = HaDevice::Esp;          // default; Task 4 routes per entity
   ctx.sourceSuffix = "";
   ctx.sourceName = "";
@@ -2115,6 +2253,7 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
 
   int n;
   if (useLegacy) {
+    // LEGACY: byte-identical to pre-Task-5 output.
     if (emitFull) {
       n = snprintf_P(dest, destSize,
                      PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"OpenTherm Gateway (%s)\",\"sw_version\":\"%s\"}"),
@@ -2125,7 +2264,7 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
                      ctx.nodeId);
     }
   } else {
-    // Build identifier = nodeId + suffix into a small RAM buffer for snprintf_P %s.
+    // MODERN (Task 5): per-device metadata from ctx.devMeta[devIdx].
     static const char * const kSuffixes[] = {
       "-boiler", "-thermostat", "-gateway", "-esp", "-sat"
     };
@@ -2133,9 +2272,36 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
     char identifier[sizeof(settings.mqtt.sUniqueid) + 16];
     snprintf(identifier, sizeof(identifier), "%s%s", ctx.nodeId, suffix);
     if (emitFull) {
-      n = snprintf_P(dest, destSize,
-                     PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"OpenTherm Gateway (%s)\",\"sw_version\":\"%s\"}"),
-                     identifier, ctx.manufacturer, ctx.model, ctx.hostname, ctx.version);
+      const HaDeviceMeta *meta = (ctx.devMeta && devIdx < 5) ? &ctx.devMeta[devIdx] : nullptr;
+      const char *mfr   = meta ? meta->devManufacturer : ctx.manufacturer;
+      const char *model = meta ? meta->devModel        : ctx.model;
+      const char *name  = (meta && meta->devName && meta->devName[0]) ? meta->devName : nullptr;
+      const char *sw    = meta ? meta->devSwVersion    : ctx.version;
+      const char *hw    = (meta && meta->devHwVersion && meta->devHwVersion[0]) ? meta->devHwVersion : nullptr;
+
+      if (hw) {
+        // Full block with hw_version field.
+        // name: use devName (e.g. "Boiler (host)") or fall back to "OpenTherm Gateway (host)".
+        char nameBuf[72];
+        if (name) {
+          strlcpy(nameBuf, name, sizeof(nameBuf));
+        } else {
+          snprintf_P(nameBuf, sizeof(nameBuf), PSTR("OpenTherm Gateway (%s)"), ctx.hostname);
+        }
+        n = snprintf_P(dest, destSize,
+                       PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"%s\",\"sw_version\":\"%s\",\"hw_version\":\"%s\"}"),
+                       identifier, mfr, model, nameBuf, sw, hw);
+      } else {
+        char nameBuf[72];
+        if (name) {
+          strlcpy(nameBuf, name, sizeof(nameBuf));
+        } else {
+          snprintf_P(nameBuf, sizeof(nameBuf), PSTR("OpenTherm Gateway (%s)"), ctx.hostname);
+        }
+        n = snprintf_P(dest, destSize,
+                       PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"%s\",\"sw_version\":\"%s\"}"),
+                       identifier, mfr, model, nameBuf, sw);
+      }
       // Mark device as introduced so subsequent entities get the minimal block.
       if (ctx.deviceIntroduced) ctx.deviceIntroduced[devIdx] = true;
     } else {

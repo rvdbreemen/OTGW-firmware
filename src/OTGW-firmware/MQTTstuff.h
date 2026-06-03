@@ -358,6 +358,20 @@ constexpr uint32_t VERIFICATION_MIN_HEAP_START = 6000;
 // TASK-648: HA discovery device topology (five-device split).
 enum class HaDevice : uint8_t { Boiler = 0, Thermostat, Gateway, Esp, Sat };
 
+// TASK-648 Task 5: per-device metadata threaded through the context so
+// MQTTHaDiscovery.cpp (a separate TU that cannot see globals) can emit
+// device-specific manufacturer/model/sw/hw/name in the full device block.
+// All pointer members point into file-static buffers in MQTTstuff.ino;
+// they remain valid for the entire discovery cycle.
+// nullptr/empty devHwVersion means "omit hw_version from the block".
+struct HaDeviceMeta {
+    const char *devName;           // e.g. "Boiler (myhostname)"
+    const char *devManufacturer;   // e.g. "MemberID 131" / "Schelte Bron"
+    const char *devModel;          // e.g. "ProductType 3" / "OpenTherm Gateway"
+    const char *devSwVersion;      // e.g. "2.3" / "5.8" / firmware version
+    const char *devHwVersion;      // e.g. "1" / chip id hex; nullptr = omit
+};
+
 struct HaDiscoveryContext {
     const char *nodeId;
     const char *hostname;
@@ -365,8 +379,8 @@ struct HaDiscoveryContext {
     const char *mqttPubTopic;
     const char *mqttSubTopic;
     const char *haPrefix;
-    const char *manufacturer;      // Hardware manufacturer (from settings.device)
-    const char *model;             // Hardware model (from settings.device)
+    const char *manufacturer;      // Hardware manufacturer (from settings.device) — legacy only
+    const char *model;             // Hardware model (from settings.device) — legacy only
     bool        isFirstEntity;
     bool        legacyMode = false;           // TASK-648: settings.mqtt.bLegacyMode, threaded in (the .cpp TU cannot see globals)
     HaDevice    device = HaDevice::Esp;       // owning device for the current entity
@@ -376,7 +390,11 @@ struct HaDiscoveryContext {
     // Semantics: false = not yet introduced this cycle (emit full block), true = already done.
     // Reset to all-false when a new discovery cycle starts (markAllMQTTConfigPending /
     // setMQTTConfigAllPending arm dripDeviceInfoPending — same two sites).
-    bool       *deviceIntroduced = nullptr;   // per-device introduced flags (5 entries)
+    bool            *deviceIntroduced = nullptr;   // per-device introduced flags (5 entries)
+    // TASK-648 Task 5: per-device metadata cache, indexed by HaDevice ordinal.
+    // Points at the file-static g_haDeviceMeta[5] in MQTTstuff.ino.
+    // nullptr is safe — both emitters guard with a null-check and fall back to legacy strings.
+    const HaDeviceMeta *devMeta = nullptr;         // per-device metadata (5 entries)
     // Source template expansion (set per-source iteration)
     const char *sourceSuffix;
     const char *sourceName;
