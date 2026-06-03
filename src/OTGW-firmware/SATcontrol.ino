@@ -1178,7 +1178,10 @@ bool satSimulationBlocksBusTx(const char* cmd,
   if (!(state.debug.bOTGWSimulation || settings.sat.bSimulation)) return false;
   const char* tag = settings.sat.bSimulation ? "SAT-SIM" : "OTGW-SIM";
   SATDebugTf(PSTR("%s trace: %s (src=%S)\r\n"), tag, cmd ? cmd : "", source);
-  sendEventToWebSocket_P('!', PSTR("simulation blocked bus tx"));
+  // TASK-818: no per-tx WS event here — it fired ~10x/sec and flooded the
+  // live-log. Isolation is already visible via the telnet trace above, the
+  // last-blocked-cmd + trace ring below (SAT dashboard), and the TASK-815
+  // sim-start narration ("no bus traffic").
   if (settings.sat.bSimulation && cmd) {
     strlcpy(state.sat.sLastBlockedCmd, cmd, sizeof(state.sat.sLastBlockedCmd));
     state.sat.iLastBlockedCmdMs = millis();
