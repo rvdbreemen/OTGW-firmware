@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-02 16:28'
-updated_date: '2026-06-02 16:53'
+updated_date: '2026-06-02 17:02'
 labels:
   - sat
   - webui
@@ -30,7 +30,7 @@ NOTE: this bug was mistakenly dismissed as fixed during a 2026-06-02 /backlog_di
 <!-- AC:BEGIN -->
 - [ ] #1 Root cause identified: which SAT control/setting toggles the manual view and why the container does not resize (with repro from @sergeantd screenshot)
 - [ ] #2 When manual settings are selected, the SAT panel resizes to fit the manual controls with no overflow/clipping, on the browsers we support
-- [ ] #3 python build.py green (fw+fs); evaluate.py --quick no new failures
+- [x] #3 python build.py green (fw+fs); evaluate.py --quick no new failures
 - [ ] #4 Field-confirmed by @sergeantd on OTGW32
 <!-- AC:END -->
 
@@ -48,4 +48,6 @@ HONESTY BOUNDARY: exact control @sergeantd hit is UNCONFIRMED. No reveal-on-sele
 DISCRIMINATOR the screenshot must resolve: is George on the SAT SETTINGS page (this fix applies) or the SAT DASHBOARD (this fix does nothing; a dashboard no-resize would more likely be an ECharts .resize() gap, already handled sat.js:722 switchView + sat.js:700 toggleCurve). Screenshot must show which page + which control.
 
 AC#1 (repro from screenshot) + AC#4 (field-confirm) PENDING @sergeantd. AC#2 NOT confirmed yet. buglog bug-033 logged.
+
+2026-06-02 (loop) — committed 6cb41f51, pushed origin/feature-dev-2.0.0-otgw32-esp32-sat-support. Build green both targets (esp8266 + esp32, fw+fs SUCCESS); evaluate.py --quick 61 passed / 0 failed / 2 pre-existing warnings. Bumped alpha.140->141. AC#3 checked. AC#1/#2/#4 pending @sergeantd screenshot (which page + control) to confirm repro + visual fix.
 <!-- SECTION:NOTES:END -->
