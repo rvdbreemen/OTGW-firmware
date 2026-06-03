@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-02 05:25'
-updated_date: '2026-06-02 05:33'
+updated_date: '2026-06-02 16:06'
 labels:
   - webui
   - field-report
@@ -27,7 +27,7 @@ Field report @sergeantd (alpha.99, OTGW32, 2026-05-30): "when I hit refresh and 
 <!-- AC:BEGIN -->
 - [ ] #1 Active tab is restored after a browser refresh (you land back on the tab you were viewing, not Home)
 - [ ] #2 Home remains the default on first load / when no tab state is present; no console errors
-- [ ] #3 python build.py green (firmware + filesystem); evaluate.py --quick no new failures
+- [x] #3 python build.py green (firmware + filesystem); evaluate.py --quick no new failures
 - [ ] #4 Field-confirmed by @sergeantd on OTGW32
 <!-- AC:END -->
 
@@ -45,4 +45,6 @@ Cold-routing to non-Home pages is proven safe by the pre-existing #tabPICflash->
 NOT persisted: webhookPage() (it hand-toggles classes, bypasses setActivePageSection) — niche Advanced sub-page, left as-is (refresh there still lands Home, unchanged).
 
 Verified: node --check index.js clean (build.py does not lint JS). Bumped alpha.139->140. Full build in progress. AC#1-3 self-verifiable; AC#4 (field-confirm by @sergeantd on OTGW32) pending — ship alpha.140 for him to test.
+
+Shipped in alpha.140 (commit d6195940, pushed). AC#3 verified (build both targets SUCCESS, evaluate.py --quick 61/0). AC#1/#2 (active-tab-restored / Home-default behavior) implemented + node-syntax-clean but need a browser to confirm; AC#4 = field-confirm by @sergeantd. Per maintainer 2026-06-02: do NOT announce the build to @sergeantd — builds are published tonight together with the user (zip upload). Task stays In Progress pending browser/field confirmation.
 <!-- SECTION:NOTES:END -->
