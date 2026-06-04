@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.160
+**  Version  : v2.0.0-alpha.161
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -62,33 +62,57 @@ const char Helper[] PROGMEM =
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
 
-// Serve a CSS asset with revalidation: no-cache + ETag = filesystem hash, mirroring the
-// index.html policy in sendIndex(). The browser stores the response but revalidates each
-// load; 304 when the FS hash is unchanged, fresh 200 after a flash. Without an explicit
-// handler these files fall through onNotFound -> handleFile() -> streamFile() with no
-// Cache-Control at all, leaving caching to browser heuristics; this makes a reflash
-// deterministically pick up new styling (TASK-793). An explicit on() handler takes
-// precedence over the onNotFound fallback.
-static void serveCssRevalidated(const char* path) {
-  File f = LittleFS.open(path, "r");
-  if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
+// Inject ?v=<fsHash> immediately before the closing quote of a versioned asset URL on
+// the current index.html line, if the token is present. Token is the full src="..." /
+// href="..." attribute INCLUDING its closing quote (e.g. PSTR("src=\"./sat.js\"")).
+// Returns true and streams the rewritten line when it matched; returns false and emits
+// nothing when the token is not on this line, so callers chain with || and fall through
+// to a verbatim sendContent(). One asset per line is assumed (true for index.html).
+static bool injectVersionedAsset(char* lineBuf, PGM_P token, const char* fsHash) {
+  char* pos = strstr_P(lineBuf, token);
+  if (!pos) return false;
+  size_t tlen = strlen_P(token);
+  char* closingQuote = pos + tlen - 1;     // the trailing '"' of the attribute
+  *closingQuote = '\0';                     // lineBuf is now prefix + attr-without-quote
+  httpServer.sendContent(lineBuf);
+  httpServer.sendContent(F("?v="));
+  httpServer.sendContent(fsHash);
+  httpServer.sendContent(F("\""));
+  const char* suffix = closingQuote + 1;    // remainder of the line after the quote
+  if (*suffix != '\0') httpServer.sendContent(suffix);
+  return true;
+}
+
+// Serve a static webui asset with versioned long-term caching. When the request carries
+// ?v=<fsHash> matching the current filesystem hash, the URL is immutable for this build,
+// so Cache-Control: max-age lets the browser skip the request entirely on warm reloads.
+// Without a matching ?v (a stale cached index.html, or a direct hit) fall back to
+// no-cache so a reflash is always picked up deterministically. Prefers a pre-gzipped .gz
+// sibling when present (TASK-304); streamFile() emits Content-Encoding: gzip itself from
+// the .gz suffix, so it must NOT be set manually (TASK-433). TASK-822: this generic form
+// replaces the per-asset /index.js + /graph.js copies and the CSS revalidate handler so
+// every JS+CSS asset shares one versioned-cache policy; on the single-connection ESP32
+// WebServer that turns an 8-round-trip reload into ~1 request (index.html revalidate).
+static void serveVersionedAsset(const char* path, const __FlashStringHelper* mime) {
   const char* fsHash = getFilesystemHash();
-  if (fsHash && fsHash[0] != '\0') {
-    char etag[24];
-    snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
-    if (httpServer.hasHeader(F("If-None-Match")) &&
-        strcmp(httpServer.header(F("If-None-Match")).c_str(), etag) == 0) {
-      f.close();
-      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-      httpServer.sendHeader(F("ETag"), etag);
-      httpServer.send(304);
-      return;
-    }
-    httpServer.sendHeader(F("ETag"), etag);
+  if (httpServer.hasArg("v") && fsHash[0] != '\0' &&
+      strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
+    httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
+  } else {
+    httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
   }
-  httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-  httpServer.streamFile(f, F("text/css"));
-  f.close();
+  char gzPath[64];
+  snprintf_P(gzPath, sizeof(gzPath), PSTR("%s.gz"), path);
+  if (LittleFS.exists(gzPath)) {
+    File f = LittleFS.open(gzPath, "r");
+    httpServer.streamFile(f, mime);
+    f.close();
+  } else {
+    File f = LittleFS.open(path, "r");
+    if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
+    httpServer.streamFile(f, mime);
+    f.close();
+  }
 }
 
 //=====================================================================================
@@ -175,32 +199,18 @@ void startWebserver(){
           continue;
         }
 
-        // Inject ?v=<hash> into JS asset URLs for cache-busting.
-        if (hasHash && strstr_P(lineBuf, PSTR("src=\"./index.js\""))) {
-          char* pos = strstr(lineBuf, "src=\"./index.js\"");
-          *pos = '\0'; // terminate prefix
-          if (lineBuf[0] != '\0') {
-            httpServer.sendContent(lineBuf);
-          }
-          httpServer.sendContent(F("src=\"./index.js?v="));
-          httpServer.sendContent(fsHash);
-          httpServer.sendContent(F("\""));
-          if (*(pos + 16) != '\0') {
-            httpServer.sendContent(pos + 16);
-          }
-        } else if (hasHash && strstr_P(lineBuf, PSTR("src=\"./graph.js\""))) {
-          char* pos = strstr(lineBuf, "src=\"./graph.js\"");
-          *pos = '\0';
-          if (lineBuf[0] != '\0') {
-            httpServer.sendContent(lineBuf);
-          }
-          httpServer.sendContent(F("src=\"./graph.js?v="));
-          httpServer.sendContent(fsHash);
-          httpServer.sendContent(F("\""));
-          if (*(pos + 16) != '\0') {
-            httpServer.sendContent(pos + 16);
-          }
-        } else {
+        // Inject ?v=<hash> into every versioned asset URL for cache-busting (TASK-822).
+        // One asset per line; the || chain rewrites the line on first match and
+        // short-circuits, otherwise the line streams verbatim.
+        if (!hasHash ||
+            !( injectVersionedAsset(lineBuf, PSTR("src=\"./index.js\""),         fsHash) ||
+               injectVersionedAsset(lineBuf, PSTR("src=\"./graph.js\""),         fsHash) ||
+               injectVersionedAsset(lineBuf, PSTR("src=\"./sat.js\""),           fsHash) ||
+               injectVersionedAsset(lineBuf, PSTR("src=\"./sat-slider.js\""),    fsHash) ||
+               injectVersionedAsset(lineBuf, PSTR("src=\"./echarts-theme.js\""), fsHash) ||
+               injectVersionedAsset(lineBuf, PSTR("src=\"./theme-toggle.js\""),  fsHash) ||
+               injectVersionedAsset(lineBuf, PSTR("href=\"ds-tokens.css\""),     fsHash) ||
+               injectVersionedAsset(lineBuf, PSTR("href=\"components.css\""),    fsHash) )) {
           httpServer.sendContent(lineBuf);
         }
         httpServer.sendContent(F("\n"));
@@ -215,59 +225,21 @@ void startWebserver(){
   } 
   httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
 
-  // CSS uses no-cache + ETag (revalidate) so reflashed styling is never masked by a
-  // stale browser-cached copy (TASK-793). JS below uses ?v=<hash> versioned caching.
-  httpServer.on("/components.css", []() { serveCssRevalidated("/components.css"); });
-  httpServer.on("/ds-tokens.css",  []() { serveCssRevalidated("/ds-tokens.css"); });
-
-  // Serve CSS and JS files with appropriate caching headers
-
-  // TASK-304: prefer the .gz sibling (pre-gzipped at build time) with
-  // Content-Encoding: gzip when present. All target browsers (Chrome/FF/
-  // Safari latest +2) accept gzip unconditionally; no Accept-Encoding
-  // negotiation needed.
-  httpServer.on("/index.js", []() {
-    const char* fsHash = getFilesystemHash();
-    if (httpServer.hasArg("v") && fsHash[0] != '\0' && strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
-      httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
-    } else {
-      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-    }
-    if (LittleFS.exists("/index.js.gz")) {
-      // streamFile() auto-detects the .gz suffix and emits Content-Encoding: gzip
-      // itself; do NOT also send it manually or the browser receives it twice and
-      // decompression silently produces an empty body (TASK-433).
-      File f = LittleFS.open("/index.js.gz", "r");
-      httpServer.streamFile(f, F("application/javascript"));
-      f.close();
-    } else {
-      File f = LittleFS.open("/index.js", "r");
-      httpServer.streamFile(f, F("application/javascript"));
-      f.close();
-    }
-  });
-
-  httpServer.on("/graph.js", []() {
-    // Same versioned-URL caching + gzip-preference strategy as /index.js (see above).
-    const char* fsHash = getFilesystemHash();
-    if (httpServer.hasArg("v") && fsHash[0] != '\0' && strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
-      httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
-    } else {
-      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-    }
-    if (LittleFS.exists("/graph.js.gz")) {
-      // streamFile() auto-detects the .gz suffix and emits Content-Encoding: gzip
-      // itself; manually adding it again sends it twice and breaks the browser's
-      // decompression flow (TASK-433).
-      File f = LittleFS.open("/graph.js.gz", "r");
-      httpServer.streamFile(f, F("application/javascript"));
-      f.close();
-    } else {
-      File f = LittleFS.open("/graph.js", "r");
-      httpServer.streamFile(f, F("application/javascript"));
-      f.close();
-    }
-  });
+  // Versioned long-term caching for every static webui asset (TASK-822 completes the
+  // TASK-793 rollout). Previously only index.js + graph.js were versioned; the other JS
+  // fell through onNotFound -> streamFile() with no Cache-Control and the CSS revalidated
+  // each visit, so every page load was 8 serialized round-trips on the single-connection
+  // ESP32 WebServer. With ?v=<hash> injected on all 8 URLs (see sendIndex) and a matching
+  // max-age here, a warm reload collapses to ~1 request (index.html revalidate). serve
+  // path prefers the pre-gzipped .gz sibling when present (TASK-304/TASK-433).
+  httpServer.on("/index.js",         []() { serveVersionedAsset("/index.js",         F("application/javascript")); });
+  httpServer.on("/graph.js",         []() { serveVersionedAsset("/graph.js",         F("application/javascript")); });
+  httpServer.on("/sat.js",           []() { serveVersionedAsset("/sat.js",           F("application/javascript")); });
+  httpServer.on("/sat-slider.js",    []() { serveVersionedAsset("/sat-slider.js",    F("application/javascript")); });
+  httpServer.on("/echarts-theme.js", []() { serveVersionedAsset("/echarts-theme.js", F("application/javascript")); });
+  httpServer.on("/theme-toggle.js",  []() { serveVersionedAsset("/theme-toggle.js",  F("application/javascript")); });
+  httpServer.on("/components.css",   []() { serveVersionedAsset("/components.css",   F("text/css")); });
+  httpServer.on("/ds-tokens.css",    []() { serveVersionedAsset("/ds-tokens.css",    F("text/css")); });
 #if HAS_PIC
   //otgw pic functions
   httpServer.on("/pic", upgradepic);
