@@ -70,7 +70,11 @@ param(
     [ValidateRange(250, 60000)]
     [int]$TelnetReconnectDelayMilliseconds = 500,
     [ValidateRange(250, 60000)]
-    [int]$TelnetPostDisconnectDelayMilliseconds = 1000
+    [int]$TelnetPostDisconnectDelayMilliseconds = 1000,
+    [switch]$SkipBrowserCapture,
+    [string]$BrowserUrl,
+    [int]$BrowserDebugPort = 9222,
+    [string]$BrowserPath
 )
 
 Set-StrictMode -Version Latest
@@ -95,6 +99,14 @@ function Show-Help {
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
     Write-Host "  It then prompts for an optional MQTT username. Leave it blank for anonymous brokers."
     Write-Host "  If a username is supplied without -Password, the script prompts securely for the MQTT password."
+    Write-Host ""
+    Write-Host "Browser devtools capture (console + exceptions + resource 404s + network timings):"
+    Write-Host "  Enabled by default. A headless Microsoft Edge (or Chrome) instance loads the OTGW web UI over the"
+    Write-Host "  Chrome DevTools Protocol and its console/network output is written to browser.log, merged into transcript.txt."
+    Write-Host "  -SkipBrowserCapture            Disable the browser capture entirely (telnet + MQTT only)."
+    Write-Host "  -BrowserUrl <url>             Page to load (default http://<DeviceHost>/)."
+    Write-Host "  -BrowserDebugPort <port>     CDP remote-debugging port (default 9222; auto-bumped if busy)."
+    Write-Host "  -BrowserPath <path>          Explicit msedge.exe/chrome.exe path (default: auto-detect)."
     Write-Host ""
     Write-Host "Stopping capture:"
     Write-Host "  Press Q in the console to stop cleanly. The script closes the logs and leaves transcript.txt."
@@ -512,10 +524,11 @@ function New-MergedTranscript {
     # abort the whole merge.
     $mergedPath = Join-Path -Path $RunPath -ChildPath "transcript.txt"
     $parts = @(
-        @{ Title = "SUMMARY (summary.txt)";         File = "summary.txt" },
-        @{ Title = "OTGW TELNET DEBUG (telnet.log)"; File = "telnet.log" },
-        @{ Title = "MQTT BROKER STREAM (mqtt.log)";  File = "mqtt.log" },
-        @{ Title = "MQTT STDERR (mqtt.stderr.log)";  File = "mqtt.stderr.log" }
+        @{ Title = "SUMMARY (summary.txt)";          File = "summary.txt" },
+        @{ Title = "OTGW TELNET DEBUG (telnet.log)";  File = "telnet.log" },
+        @{ Title = "MQTT BROKER STREAM (mqtt.log)";   File = "mqtt.log" },
+        @{ Title = "MQTT STDERR (mqtt.stderr.log)";   File = "mqtt.stderr.log" },
+        @{ Title = "BROWSER DEVTOOLS (browser.log)";  File = "browser.log" }
     )
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
@@ -567,7 +580,7 @@ function Remove-IntermediateCaptureFiles {
     $transcriptFullPath = [System.IO.Path]::GetFullPath($TranscriptPath)
     $removed = New-Object System.Collections.Generic.List[string]
 
-    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log")) {
+    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log")) {
         $path = Join-Path -Path $RunPath -ChildPath $file
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             continue
@@ -775,6 +788,349 @@ function Get-TelnetEffectiveConnectTimeoutSeconds {
     return [Math]::Min($BaseTimeoutSeconds + $extraSeconds, 20)
 }
 
+function Find-Browser {
+    param([string]$ExplicitPath)
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitPath)) {
+        if (Test-Path -LiteralPath $ExplicitPath -PathType Leaf) {
+            return $ExplicitPath
+        }
+        throw "Explicit -BrowserPath was not found: $ExplicitPath"
+    }
+
+    foreach ($cmd in @("msedge", "chrome")) {
+        $found = Get-Command -Name $cmd -ErrorAction SilentlyContinue
+        if ($found -and $found.Source) {
+            return $found.Source
+        }
+    }
+
+    $candidates = @(
+        (Join-Path -Path $env:ProgramFiles -ChildPath "Microsoft\Edge\Application\msedge.exe"),
+        (Join-Path -Path ${env:ProgramFiles(x86)} -ChildPath "Microsoft\Edge\Application\msedge.exe"),
+        (Join-Path -Path $env:ProgramFiles -ChildPath "Google\Chrome\Application\chrome.exe"),
+        (Join-Path -Path ${env:ProgramFiles(x86)} -ChildPath "Google\Chrome\Application\chrome.exe")
+    )
+    foreach ($candidate in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Test-TcpPortFree {
+    param([int]$Port)
+
+    try {
+        $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $Port)
+        $listener.Start()
+        $listener.Stop()
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+function Select-DebugPort {
+    param([int]$Preferred)
+
+    for ($port = $Preferred; $port -lt ($Preferred + 12); $port++) {
+        if (Test-TcpPortFree -Port $port) {
+            return $port
+        }
+    }
+
+    return $Preferred
+}
+
+# The browser worker runs in its own runspace (separate thread, same process) so it
+# can pump the CDP websocket concurrently with the telnet/MQTT capture loop. It shares
+# the in-process [OtgMqttCapture.CancelFlag] static for the stop signal, writes its own
+# browser.log (no contention with the main thread), and returns a one-line status string
+# that the main thread folds into summary.txt.
+$script:BrowserWorkerScript = {
+    param(
+        [string]$BrowserPath,
+        [string]$DeviceUrl,
+        [int]$DebugPort,
+        [string]$TempProfile,
+        [string]$BrowserLog
+    )
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+    $log = New-Object System.IO.StreamWriter -ArgumentList $BrowserLog, $false, $utf8NoBom
+    $log.AutoFlush = $true
+
+    function Write-BrowserLine {
+        param([string]$Line)
+        $log.WriteLine("$((Get-Date).ToString('HH:mm:ss.fff'))  $Line")
+    }
+
+    $edge = $null
+    $cws = $null
+    $script:cdpId = 0
+    $summary = "Browser capture: completed normally."
+
+    function Send-Cdp {
+        param([string]$Method, $Params)
+        $script:cdpId++
+        $payload = @{ id = $script:cdpId; method = $Method }
+        if ($Params) { $payload.params = $Params }
+        $json = $payload | ConvertTo-Json -Compress -Depth 12
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+        $segment = New-Object System.ArraySegment[byte] -ArgumentList (, $bytes)
+        [void]$cws.SendAsync($segment, [System.Net.WebSockets.WebSocketMessageType]::Text, $true, [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
+    }
+
+    try {
+        Write-BrowserLine "browser executable: $BrowserPath"
+        Write-BrowserLine "device url: $DeviceUrl   cdp port: $DebugPort"
+
+        $browserArgs = @(
+            "--headless=new",
+            "--disable-gpu",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--mute-audio",
+            "--remote-allow-origins=*",
+            "--remote-debugging-port=$DebugPort",
+            "--user-data-dir=$TempProfile",
+            "about:blank"
+        )
+        $edge = Start-Process -FilePath $BrowserPath -ArgumentList $browserArgs -PassThru -WindowStyle Hidden
+
+        # Attach to the about:blank page target FIRST, then navigate, so page-load console
+        # logs and resource requests are captured from the very start.
+        $wsUrl = $null
+        $deadline = (Get-Date).AddSeconds(15)
+        while ((Get-Date) -lt $deadline -and -not [OtgMqttCapture.CancelFlag]::StopRequested) {
+            try {
+                $raw = (New-Object System.Net.WebClient).DownloadString("http://127.0.0.1:$DebugPort/json")
+                $targets = $raw | ConvertFrom-Json
+                $page = $targets | Where-Object { $_.type -eq "page" -and $_.webSocketDebuggerUrl } | Select-Object -First 1
+                if ($page) {
+                    $wsUrl = $page.webSocketDebuggerUrl
+                    break
+                }
+            }
+            catch {
+                Start-Sleep -Milliseconds 300
+            }
+            Start-Sleep -Milliseconds 200
+        }
+
+        if ([string]::IsNullOrWhiteSpace($wsUrl)) {
+            throw "CDP page target not found on port $DebugPort within 15s"
+        }
+        Write-BrowserLine "cdp websocket: $wsUrl"
+
+        $cws = New-Object System.Net.WebSockets.ClientWebSocket
+        $cws.ConnectAsync([Uri]$wsUrl, [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
+        Write-BrowserLine "cdp connected"
+
+        Send-Cdp -Method "Network.enable"
+        Send-Cdp -Method "Runtime.enable"
+        Send-Cdp -Method "Log.enable"
+        Send-Cdp -Method "Page.enable"
+        Send-Cdp -Method "Page.navigate" -Params @{ url = $DeviceUrl }
+        Write-BrowserLine "domains enabled; navigating to $DeviceUrl"
+
+        $requests = @{}
+        $buffer = New-Object byte[] 16384
+        $segment = New-Object System.ArraySegment[byte] -ArgumentList (, $buffer)
+
+        while (-not [OtgMqttCapture.CancelFlag]::StopRequested) {
+            $builder = New-Object System.Text.StringBuilder
+            $complete = $false
+            $closed = $false
+
+            while (-not $complete) {
+                $receiveCts = New-Object System.Threading.CancellationTokenSource
+                $receiveCts.CancelAfter(750)
+                try {
+                    $result = $cws.ReceiveAsync($segment, $receiveCts.Token).GetAwaiter().GetResult()
+                }
+                catch {
+                    # Timeout (idle between messages) or stop: re-check the flag. The websocket
+                    # stream position is preserved, so a mid-message timeout simply retries.
+                    if ([OtgMqttCapture.CancelFlag]::StopRequested) { $closed = $true; break }
+                    continue
+                }
+                finally {
+                    $receiveCts.Dispose()
+                }
+
+                if ($result.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) {
+                    $closed = $true
+                    break
+                }
+
+                [void]$builder.Append([System.Text.Encoding]::UTF8.GetString($buffer, 0, $result.Count))
+                if ($result.EndOfMessage) { $complete = $true }
+            }
+
+            if ($closed) { break }
+            if ($builder.Length -eq 0) { continue }
+
+            try {
+                $evt = $builder.ToString() | ConvertFrom-Json
+            }
+            catch {
+                continue
+            }
+            if (-not $evt.method) { continue }
+
+            switch ($evt.method) {
+                "Runtime.consoleAPICalled" {
+                    $parts = @()
+                    foreach ($arg in $evt.params.args) {
+                        if ($null -ne $arg.value) { $parts += [string]$arg.value }
+                        elseif ($arg.description) { $parts += [string]$arg.description }
+                        elseif ($arg.unserializableValue) { $parts += [string]$arg.unserializableValue }
+                        else { $parts += "[$($arg.type)]" }
+                    }
+                    Write-BrowserLine ("[console.$($evt.params.type)] " + ($parts -join " "))
+                }
+                "Runtime.exceptionThrown" {
+                    $details = $evt.params.exceptionDetails
+                    $text = $details.exception.description
+                    if (-not $text) { $text = $details.text }
+                    Write-BrowserLine "[exception] $text"
+                }
+                "Log.entryAdded" {
+                    $entry = $evt.params.entry
+                    $where = if ($entry.url) { " ($($entry.url))" } else { "" }
+                    Write-BrowserLine "[log.$($entry.level)] $($entry.text)$where"
+                }
+                "Network.requestWillBeSent" {
+                    $requests[$evt.params.requestId] = @{
+                        url    = $evt.params.request.url
+                        start  = [double]$evt.params.timestamp
+                        status = ""
+                    }
+                }
+                "Network.responseReceived" {
+                    if ($requests.ContainsKey($evt.params.requestId)) {
+                        $requests[$evt.params.requestId].status = [string]$evt.params.response.status
+                    }
+                }
+                "Network.loadingFinished" {
+                    $id = $evt.params.requestId
+                    if ($requests.ContainsKey($id)) {
+                        $record = $requests[$id]
+                        $ms = [int]((([double]$evt.params.timestamp) - $record.start) * 1000)
+                        Write-BrowserLine ("[net] {0,6} ms  {1,3}  {2}" -f $ms, $record.status, $record.url)
+                        $requests.Remove($id)
+                    }
+                }
+                "Network.loadingFailed" {
+                    $id = $evt.params.requestId
+                    if ($requests.ContainsKey($id)) {
+                        $record = $requests[$id]
+                        Write-BrowserLine ("[net] FAILED      {0}  {1}" -f $evt.params.errorText, $record.url)
+                        $requests.Remove($id)
+                    }
+                }
+            }
+        }
+
+        # Flush requests that started but never finished. On the OTGW these are the
+        # smoking gun for the single-threaded webserver stalling under load (the XHR
+        # latency ramp), so they are far more diagnostic than a silent omission.
+        foreach ($pending in $requests.GetEnumerator()) {
+            $statusText = if ($pending.Value.status) { $pending.Value.status } else { "no-response" }
+            Write-BrowserLine ("[net] PENDING     {0,3}  {1}  (started, never finished)" -f $statusText, $pending.Value.url)
+        }
+
+        Write-BrowserLine "stop requested; closing capture"
+    }
+    catch {
+        $summary = "Browser capture: error - $($_.Exception.Message)"
+        try { Write-BrowserLine "[worker-error] $($_.Exception.Message)" } catch { }
+    }
+    finally {
+        if ($cws) {
+            try { $cws.Abort() } catch { }
+            try { $cws.Dispose() } catch { }
+        }
+        if ($edge -and -not $edge.HasExited) {
+            try { Stop-Process -Id $edge.Id -Force -ErrorAction Stop } catch { }
+        }
+        try { $log.Flush(); $log.Dispose() } catch { }
+        if (-not [string]::IsNullOrWhiteSpace($TempProfile)) {
+            try {
+                if (Test-Path -LiteralPath $TempProfile) {
+                    Remove-Item -LiteralPath $TempProfile -Recurse -Force -ErrorAction SilentlyContinue
+                }
+            }
+            catch { }
+        }
+    }
+
+    return $summary
+}
+
+function Start-BrowserCapture {
+    param(
+        [Parameter(Mandatory = $true)][string]$BrowserPath,
+        [Parameter(Mandatory = $true)][string]$DeviceUrl,
+        [Parameter(Mandatory = $true)][int]$DebugPort,
+        [Parameter(Mandatory = $true)][string]$TempProfile,
+        [Parameter(Mandatory = $true)][string]$BrowserLog
+    )
+
+    $worker = [powershell]::Create()
+    [void]$worker.AddScript($script:BrowserWorkerScript)
+    [void]$worker.AddParameter("BrowserPath", $BrowserPath)
+    [void]$worker.AddParameter("DeviceUrl", $DeviceUrl)
+    [void]$worker.AddParameter("DebugPort", $DebugPort)
+    [void]$worker.AddParameter("TempProfile", $TempProfile)
+    [void]$worker.AddParameter("BrowserLog", $BrowserLog)
+    $async = $worker.BeginInvoke()
+
+    return [PSCustomObject]@{
+        Worker = $worker
+        Async  = $async
+    }
+}
+
+function Stop-BrowserCapture {
+    param(
+        [AllowNull()]$Handle,
+        [int]$TimeoutSeconds = 8
+    )
+
+    if (-not $Handle) {
+        return $null
+    }
+
+    $summary = $null
+    try {
+        if (-not $Handle.Async.AsyncWaitHandle.WaitOne([TimeSpan]::FromSeconds($TimeoutSeconds))) {
+            [void]$Handle.Worker.Stop()
+        }
+        else {
+            $output = $Handle.Worker.EndInvoke($Handle.Async)
+            if ($output -and $output.Count -gt 0) {
+                $summary = [string]$output[$output.Count - 1]
+            }
+        }
+    }
+    catch {
+        $summary = "Browser capture: stop error - $($_.Exception.Message)"
+    }
+    finally {
+        try { $Handle.Worker.Dispose() } catch { }
+    }
+
+    return $summary
+}
+
 $deviceHostWasBound = $PSBoundParameters.ContainsKey('DeviceHost')
 $brokerHostWasBound = $PSBoundParameters.ContainsKey('BrokerHost')
 $usernameWasBound = $PSBoundParameters.ContainsKey('Username')
@@ -818,6 +1174,7 @@ New-Item -Path $runPath -ItemType Directory -Force | Out-Null
 $telnetLog = Join-Path -Path $runPath -ChildPath "telnet.log"
 $mqttLog = Join-Path -Path $runPath -ChildPath "mqtt.log"
 $mqttErrorLog = Join-Path -Path $runPath -ChildPath "mqtt.stderr.log"
+$browserLog = Join-Path -Path $runPath -ChildPath "browser.log"
 $script:SummaryPath = Join-Path -Path $runPath -ChildPath "summary.txt"
 
 Add-SummaryLine "OTGW MQTT diagnostic capture"
@@ -846,11 +1203,48 @@ $telnetReconnectAttempts = 0
 $telnetReconnectReason = $null
 $nextTelnetConnectUtc = [DateTime]::MinValue
 $telnetRebootScanBuffer = ""
+$browserHandle = $null
 
 try {
     Initialize-CancelFlag
     $cancelHandler = [OtgMqttCapture.CancelFlag]::Handler
     [System.Console]::add_CancelKeyPress($cancelHandler)
+
+    if ($SkipBrowserCapture) {
+        Add-SummaryLine "Browser capture: disabled (-SkipBrowserCapture)."
+    }
+    else {
+        try {
+            $resolvedBrowser = Find-Browser -ExplicitPath $BrowserPath
+            if ([string]::IsNullOrWhiteSpace($resolvedBrowser)) {
+                Add-SummaryLine "Browser capture: skipped - no Edge/Chrome found (pass -BrowserPath or -SkipBrowserCapture)."
+            }
+            else {
+                if ([string]::IsNullOrWhiteSpace($BrowserUrl)) {
+                    $BrowserUrl = "http://$DeviceHost/"
+                }
+                $chosenPort = Select-DebugPort -Preferred $BrowserDebugPort
+                $browserProfile = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ("otgw-edge-" + [System.IO.Path]::GetRandomFileName())
+                New-Item -Path $browserProfile -ItemType Directory -Force | Out-Null
+
+                Add-SummaryLine "Browser capture: $resolvedBrowser"
+                Add-SummaryLine "Browser url: $BrowserUrl"
+                Add-SummaryLine "Browser CDP port: $chosenPort"
+
+                $browserHandle = Start-BrowserCapture `
+                    -BrowserPath $resolvedBrowser `
+                    -DeviceUrl $BrowserUrl `
+                    -DebugPort $chosenPort `
+                    -TempProfile $browserProfile `
+                    -BrowserLog $browserLog
+                Add-SummaryLine "Browser capture started (headless, writing browser.log)."
+            }
+        }
+        catch {
+            Add-SummaryLine "Browser capture: failed to start - $($_.Exception.Message)"
+            $browserHandle = $null
+        }
+    }
 
     $mosquitto = Resolve-MosquittoSub -ExplicitPath $MosquittoSubPath -SkipInstall:$SkipToolInstall
     Add-SummaryLine "mosquitto_sub: $($mosquitto.Path)"
@@ -1009,6 +1403,15 @@ finally {
 
     if ($telnetClient) {
         Close-TelnetClient -Client $telnetClient
+    }
+
+    if ($browserHandle) {
+        # Ensure the worker sees the stop signal even on an error-driven exit, then drain it.
+        Request-CaptureStop -Reason "capture shutdown"
+        $browserSummary = Stop-BrowserCapture -Handle $browserHandle -TimeoutSeconds 10
+        if ($browserSummary) {
+            Add-SummaryLine $browserSummary
+        }
     }
 
     if ($cancelHandler) {
