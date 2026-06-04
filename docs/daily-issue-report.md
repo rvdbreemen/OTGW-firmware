@@ -1,7 +1,7 @@
-# Daily Issue Report — 2026-05-30
+# Daily Issue Report — 2026-06-04
 
-**Generated:** 2026-05-30T07:09:23Z
-**GitHub window:** since 2026-05-29T00:00:00Z
+**Generated:** 2026-06-04T00:00:00Z
+**GitHub window:** since 2026-06-03T00:00:00Z
 **Tweakers window:** N/A (feed blocked by egress policy)
 **Discord window:** N/A (MCP server not available in this environment)
 
@@ -9,7 +9,7 @@
 
 No new issues in the last 24 hours.
 
-- **GitHub**: 0 new or updated open issues since 2026-05-29T00:00:00Z.
+- **GitHub**: 0 new or updated open issues since 2026-06-03T00:00:00Z. (Most recently updated open issue was #154 on 2026-05-09.)
 - **Tweakers**: Feed unavailable — `gathering.tweakers.net` blocked by egress policy in this execution environment.
 - **Discord**: MCP server not configured in this execution environment.
 
@@ -27,7 +27,18 @@ No new issues in the last 24 hours.
 
 ---
 
+## Open Issues Reference (all open, for context)
+
+| # | Title | Labels | Last updated |
+|---|-------|--------|-------------|
+| [#557](https://github.com/rvdbreemen/OTGW-firmware/issues/557) | Settings / Run Boot Command and PIC missing | bug, question | 2026-05-06 |
+| [#561](https://github.com/rvdbreemen/OTGW-firmware/issues/561) | [Feature] Static IP address settings | enhancement | 2026-05-06 |
+| [#154](https://github.com/rvdbreemen/OTGW-firmware/issues/154) | [Request] Suggestions to improve security | enhancement | 2026-05-09 |
+| [#10](https://github.com/rvdbreemen/OTGW-firmware/issues/10) | Human readable ASF, RBP-flags, TSP, FHB-values… | enhancement | 2022-10-09 |
+
+---
+
 ## Timestamps Updated
 
-- GitHub last check: 2026-05-30T07:09:23Z
-- Tweakers last check: 2026-05-30T07:09:23Z (timestamp advanced; feed still blocked)
+- GitHub last check: 2026-06-04T00:00:00Z
+- Tweakers last check: 2026-06-04T00:00:00Z (timestamp advanced; feed still blocked)
