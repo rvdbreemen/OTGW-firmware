@@ -34,10 +34,7 @@ STATUS_BOLD_RE = re.compile(
     r"|^\s*\*\*\s*Status\s*:?\s*([A-Za-z]+)\s*\*\*",
     re.IGNORECASE | re.MULTILINE,
 )
-ENFORCEMENT_BLOCK_RE = re.compile(
-    r"^##\s+Enforcement\s*$\n+(?:.*?\n)*?```json\s*\n(.*?)\n```",
-    re.IGNORECASE | re.MULTILINE | re.DOTALL,
-)
+JSON_FENCE_RE = re.compile(r"```json\s*\n(.*?)\n```", re.IGNORECASE | re.DOTALL)
 STATUS_HISTORY_START_RE = re.compile(r"^\s*status_history\s*:\s*$", re.IGNORECASE)
 HISTORY_DATE_RE = re.compile(r"^\s*(?:-\s*)?date\s*:\s*[\"']?(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
 SOURCE_SUFFIXES = {
@@ -213,7 +210,10 @@ def detect_supersession_broken(
 
 
 def _enforcement_rules(content: str) -> Optional[List[Dict]]:
-    match = ENFORCEMENT_BLOCK_RE.search(content)
+    section = extract_section(content, "Enforcement")
+    if not section:
+        return []
+    match = JSON_FENCE_RE.search(section)
     if not match:
         return []
     try:
