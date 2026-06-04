@@ -2,8 +2,11 @@
 
 ## Status
 
-Proposed — drafted 2026-06-04, awaiting maintainer (Robert) approval. Do not treat
-as binding until accepted.
+Proposed — drafted 2026-06-04. Direction confirmed by the maintainer (Robert) on
+2026-06-04: the **hybrid model is adopted**, and the long-term ESP8266 dual-target
+disposition is **deferred** (revisit after Phase 1). Awaiting explicit acceptance
+of this amended text before the status flips to Accepted; do not treat as binding
+until then.
 
 ## Context
 
@@ -89,11 +92,21 @@ compile time behind the existing platform abstraction (ADR-061/072/120).
    state fields directly. This discipline is the load-bearing part of the decision
    and the main source of risk.
 
-### ESP8266 target
+### ESP8266 target — unchanged during rollout; long-term fate deferred
 
-Retains the cooperative single-loop model unchanged (ADR-007/010/011/047/048/058).
-All FreeRTOS-task and AsyncTCP code is compiled out behind the platform
-abstraction. ESP8266 behaviour is intended to be byte-for-byte what it is today.
+For the duration of the rollout the ESP8266 target retains the cooperative
+single-loop model unchanged (ADR-007/010/011/047/048/058); all FreeRTOS-task and
+AsyncTCP code is compiled out behind the platform abstraction, so ESP8266 behaviour
+stays byte-for-byte what it is today. The FreeRTOS PIC task and the AsyncTCP stack
+are inherently ESP32-only (the ESP8266 has no preemptive multicore scheduler), so
+the ESP32 work does not touch the ESP8266 path.
+
+**Deferred sub-decision (open).** Whether ESP8266 remains a first-class 2.0.0
+target indefinitely — permanent platform-divergent concurrency, honouring ADR-082's
+LTS pin — or is eventually phased out so 2.0.0 converges on a single async path is
+**not decided here** (maintainer choice, 2026-06-04). Phase 1 (the ESP32 PIC task)
+does not depend on that answer, so the call is deferred to a follow-up ADR taken
+after Phase 1 lands. Until then, ESP8266 is retained as-is.
 
 ### Rollout
 
@@ -169,8 +182,9 @@ Make 2.0.0 async everywhere by dropping the ESP8266 target.
 **Pros:** one (async) code path; no platform divergence; simplest async story.
 **Cons:** breaks ADR-082's explicit LTS-pin commitment to keep ESP8266 building on
 2.0.0, and contradicts the ADR-061/072 dual-target design.
-**Rejected:** not the maintainer's stated direction; would strand existing ESP8266
-hardware on the 1.x line.
+**Deferred, not rejected:** the maintainer chose (2026-06-04) to leave the ESP8266
+disposition open. This stays a live option to revisit via a follow-up ADR after
+Phase 1; it is not foreclosed, but it is not adopted now.
 
 ### Alternative 5 — ESP-IDF-native rewrite (drop Arduino)
 Rebuild on ESP-IDF to get first-class FreeRTOS/event-loop primitives.
@@ -200,7 +214,9 @@ maintenance team.
 ### Negative
 - **Two concurrency models to maintain** behind the platform abstraction — the
   ESP32 async/task path and the ESP8266 cooperative path — for as long as 2.0.0
-  ships ESP8266. This is the real, recurring cost of keeping ADR-082.
+  ships ESP8266. Whether that burden is permanent (keep ESP8266) or temporary
+  (eventually drop it) is the deferred sub-decision above; this ADR commits only to
+  carrying both during the rollout.
 - **Thread-safety is now a first-class concern.** `OTGWState` is touched from the
   PIC task, the AsyncTCP task, and the loop. Getting the single-writer/mutex
   discipline wrong yields exactly the hard-to-field-debug races this project's
