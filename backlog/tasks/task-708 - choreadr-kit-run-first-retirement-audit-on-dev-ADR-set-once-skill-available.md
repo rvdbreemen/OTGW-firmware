@@ -1,7 +1,7 @@
 ---
 id: TASK-708
 title: 'chore(adr-kit): run first retirement-audit on dev ADR set once skill available'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-26 11:01'
