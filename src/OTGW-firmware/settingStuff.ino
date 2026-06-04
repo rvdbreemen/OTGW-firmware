@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.159
+**  Version  : v2.0.0-alpha.160
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -466,9 +466,14 @@ void writeSettings(bool show)
 
 
 //=======================================================================
+// TASK-648: set true while parsing if the file carries the MQTTuseLegacyOtTopics key.
+// Absent on a 1.x.x config (predates ADR-106) -> readSettings defaults to legacy topics.
+static bool g_sawLegacyTopicsKey = false;
+
 void readSettings(bool show)
 {
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
+  g_sawLegacyTopicsKey = false;  // reset per parse; updateSetting() sets it when the key is seen
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
@@ -535,8 +540,17 @@ void readSettings(bool show)
     strlcpy(settings.mqtt.sHaprefix, HOME_ASSISTANT_DISCOVERY_PREFIX, sizeof(settings.mqtt.sHaprefix));
   if (strlen(settings.mqtt.sUniqueid) == 0 || strcmp_P(settings.mqtt.sUniqueid, PSTR("null")) == 0)
     strlcpy(settings.mqtt.sUniqueid, getUniqueId(), sizeof(settings.mqtt.sUniqueid));
-  // TASK-648: bUseLegacyOtTopics is subsumed by bLegacyMode. Honour an old config once.
-  if (settings.mqtt.bUseLegacyOtTopics) settings.mqtt.bLegacyMode = true;
+  // TASK-648: topic naming (bUseLegacyOtTopics) and device topology (bLegacyMode) are
+  // INDEPENDENT axes. Device topology defaults to modern five-device for everyone.
+  // Topic naming defaults to LEGACY for a 1.x.x upgrade (its config predates ADR-106, so
+  // the MQTTuseLegacyOtTopics key was absent from the file) and to NEW for fresh installs
+  // and existing 2.0.0 configs (which carry the key, written by writeSettings). The key's
+  // presence is its own sentinel: g_sawLegacyTopicsKey is set when the key is parsed.
+  if (!g_sawLegacyTopicsKey) {
+    settings.mqtt.bUseLegacyOtTopics = true;   // 1.x.x upgrade: keep old topic names so existing automations survive
+    settingsDirty = true;                      // deferred persist; the key then exists on the next boot
+    DebugTln(F("[Settings] 1.x.x upgrade detected (no MQTTuseLegacyOtTopics key): defaulting to legacy OT topics. Opt in to new topics in settings."));
+  }
   // TASK-648 Task 6: NO stamp seeding here. bLastPublishedLegacy=false on a
   // legacy upgrade boot means "stamp says modern, but mode is now legacy" —
   // that IS a real migration that needs cleanup. Let the first boot do one
@@ -723,16 +737,18 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("MQTTharebootdetection"))==0)      settings.mqtt.bHaRebootDetect = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("MQTTdiscoveryAutoVerify"))==0)    settings.mqtt.bDiscoveryAutoVerify = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("MQTTuseLegacyOtTopics"))==0) {
-    // ADR-106: detect transition and arm cleanup of the OTHER set's retained discovery topics.
+    // TASK-648: this key being present marks a config that already knows the topic-naming
+    // axis (fresh install / existing 2.0.0), so the 1.x.x-upgrade legacy default is NOT applied.
+    g_sawLegacyTopicsKey = true;
+    // ADR-106: detect transition and arm cleanup of the OTHER label-set's retained discovery topics.
     const bool oldVal = settings.mqtt.bUseLegacyOtTopics;
     const bool newVal = EVALBOOLEAN(newValue);
     settings.mqtt.bUseLegacyOtTopics = newVal;
-    settings.mqtt.bLegacyMode = newVal;  // TASK-648: keep the umbrella in sync with the live toggle until a dedicated bLegacyMode control exists
     if (oldVal != newVal) {
       armTopicCleanupOnLegacyToggle(newVal);
-      // TASK-648 Task 6: arm topology migration cleanup and queue full republish
-      // under the new scheme. markAllMQTTConfigPending() detects bLastPublishedLegacy !=
-      // bLegacyMode and calls armTopologyCleanup() automatically, then requeues all IDs.
+      // Republish all discovery configs under the new label set (their topics/object_ids
+      // carry the chosen label). This is the topic-naming axis only; device topology
+      // (bLegacyMode) is unaffected, so the topology migration is not triggered here.
       markAllMQTTConfigPending();
     }
   }

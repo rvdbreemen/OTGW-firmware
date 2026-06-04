@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.159
+**  Version  : v2.0.0-alpha.160
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2656,10 +2656,16 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   bool result = false;
   HaDiscoveryContext ctx = buildDiscoveryContext(isFirst);
 
-  const bool useLegacy = settings.mqtt.bLegacyMode;
+  // TASK-648: two orthogonal axes.
+  //  - bLegacyMode        = device topology (single device vs five-device + bilateral).
+  //  - bUseLegacyOtTopics = OT-topic label naming (ADR-106 legacy names vs new aliases).
+  // Device topology defaults to modern (five-device) for everyone; topic naming defaults
+  // to legacy for 1.x.x upgraders (see readSettings migration) and new for fresh installs.
+  const bool useLegacy   = settings.mqtt.bLegacyMode;          // device-topology axis
+  const bool topicLegacy = settings.mqtt.bUseLegacyOtTopics;   // ADR-106 label axis
 
   // TASK-648 Task 4: bilateral flag — real OT IDs (0..127) emit sensors/binary_sensors
-  // twice in modern mode (Boiler then Thermostat). Legacy mode: single pass (unchanged).
+  // twice in modern mode (Boiler then Thermostat). Legacy topology: single pass (unchanged).
   const bool isBilateral = !useLegacy && (OTid <= 127);
 
   // Set ctx.device for single-device non-bilateral paths.
@@ -2708,7 +2714,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
         while (bIdx < MQTT_HA_BINSENSOR_INDEXED_COUNT) {
           MqttHaBinSensorCfg cfg = readBinSensorCfg(bIdx);
           if (cfg.id != OTid) break;
-          const bool skipReplaced = !useLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS);
+          const bool skipReplaced = !topicLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS);
           if (!skipReplaced) {
             if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
           }
@@ -2716,8 +2722,8 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
           feedWatchDog();
         }
       }
-      // ADR-106: alias tail (non-contiguous; not covered by index). Walked only in new mode.
-      if (!useLegacy) {
+      // ADR-106: alias tail (non-contiguous; not covered by index). Walked only in new topic-naming mode.
+      if (!topicLegacy) {
         for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
           MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
           if (cfg.id != OTid) continue;

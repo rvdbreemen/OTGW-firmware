@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.159
+**  Version  : v2.0.0-alpha.160
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1535,7 +1535,7 @@ void publishStatusBitMQTT(uint8_t bitSlot, const char* topic, bool newVal, bool 
   const bool allowPublish = shouldPublishStatusBit(bitSlot, newVal, prevVal, forcePublish);
   // ADR-106: pick exactly one label — alias in new mode (default), legacy in legacy mode.
   // If aliasLabel is nullptr the bit has no alias replacement and topic always wins.
-  const char* labelToPublish = (aliasLabel && !settings.mqtt.bLegacyMode) ? aliasLabel : topic;
+  const char* labelToPublish = (aliasLabel && !settings.mqtt.bUseLegacyOtTopics) ? aliasLabel : topic;
   logMQTTStatusBitDecision(bitSlot, labelToPublish, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-347: arm cooldown only for real sends
@@ -1550,7 +1550,7 @@ static void publishStatusVHBitMQTT(uint8_t bitSlot, const char* topic, bool newV
 {
   const bool allowPublish = shouldPublishStatusVHBit(bitSlot, newVal, prevVal, forcePublish);
   // ADR-106: pick exactly one label.
-  const char* labelToPublish = (aliasLabel && !settings.mqtt.bLegacyMode) ? aliasLabel : topic;
+  const char* labelToPublish = (aliasLabel && !settings.mqtt.bUseLegacyOtTopics) ? aliasLabel : topic;
   logMQTTStatusBitDecision(bitSlot, labelToPublish, prevVal, newVal, forcePublish, allowPublish);
   OTPublishGate gate(allowPublish);
   if (allowPublish) incrementStatusBurstPublishCount();  // TASK-354: arm cooldown only for real sends
@@ -1572,7 +1572,7 @@ static void publishGatedBitMQTT(uint16_t *trackedSlots, uint8_t bitSlot,
   const bool allowPublish = shouldPublishTrackedStatusBit(trackedSlots, bitSlot, newVal, prevVal, /*forcePublish=*/false);
   // ADR-106: pick exactly one label — alias in new mode (default), legacy in legacy mode.
   const __FlashStringHelper *labelToPublish =
-      (aliasLabel && !settings.mqtt.bLegacyMode) ? aliasLabel : topic;
+      (aliasLabel && !settings.mqtt.bUseLegacyOtTopics) ? aliasLabel : topic;
   OTPublishGate gate(allowPublish);
   // ADR-104: commit pending only when sendMQTTData confirms success.
   if (publishMQTTOnOff(labelToPublish, newVal)) confirmMQTTPublishBitSlot();
@@ -2168,7 +2168,7 @@ void print_solar_storage_status(uint16_t& value)
     AddLogf("\r\n%s = Slave Solar Status [%d] ", OTlookupitem.label, SlaveSolarStatus);
     if (is_value_valid(OTdata, OTlookupitem)){
       // ADR-106: pick legacy vs new label.
-      sendMQTTData(settings.mqtt.bLegacyMode ? F("solar_storage_slave_fault_indicator")
+      sendMQTTData(settings.mqtt.bUseLegacyOtTopics ? F("solar_storage_slave_fault_indicator")
                                                     : F("solar_storage_fault"),
                    ((SlaveSolarFaultIndicator) ? "ON" : "OFF"));
       sendMQTTData(F("solar_storage_mode_status"), itoa(SlaveSolarModeStatus, _msg, 10));  
@@ -2326,7 +2326,7 @@ void print_slavememberid(uint16_t& value)
 
     // ADR-106: pick legacy vs new label per bit. Heat_cool_mode_control (HB7) has no alias and always publishes its legacy name.
     {
-      const bool useLegacy = settings.mqtt.bLegacyMode;
+      const bool useLegacy = settings.mqtt.bUseLegacyOtTopics;
       sendMQTTData(useLegacy ? F("dhw_present")                          : F("supports_hot_water"),     (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
       sendMQTTData(useLegacy ? F("control_type_modulation")              : F("control_type"),           (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
       sendMQTTData(useLegacy ? F("cooling_config")                       : F("supports_cooling"),       (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
@@ -2350,7 +2350,7 @@ void print_mastermemberid(uint16_t& value)
     char _msg[15] {0};
     sendMQTTData(F("master_configuration"), byte_to_binary(OTdata.valueHB));
     // ADR-106: pick legacy vs new label.
-    sendMQTTData(settings.mqtt.bLegacyMode ? F("master_configuration_smart_power")
+    sendMQTTData(settings.mqtt.bUseLegacyOtTopics ? F("master_configuration_smart_power")
                                                   : F("supports_master_smart_power"),
                  (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));  
     
@@ -2369,7 +2369,7 @@ void print_vh_configmemberid(uint16_t& value)
     sendMQTTData(F("vh_configuration"), byte_to_binary(OTdata.valueHB)); 
     // ADR-106: pick legacy vs new label per bit.
     {
-      const bool useLegacy = settings.mqtt.bLegacyMode;
+      const bool useLegacy = settings.mqtt.bUseLegacyOtTopics;
       sendMQTTData(useLegacy ? F("vh_configuration_system_type")   : F("ventilation_system_type"),         (((OTdata.valueHB) & 0x01) ? "ON" : "OFF"));
       sendMQTTData(useLegacy ? F("vh_configuration_bypass")        : F("supports_ventilation_bypass"),     (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
       sendMQTTData(useLegacy ? F("vh_configuration_speed_control") : F("ventilation_speed_control_type"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
