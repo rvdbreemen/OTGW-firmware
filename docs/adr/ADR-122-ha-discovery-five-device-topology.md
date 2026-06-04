@@ -32,7 +32,7 @@ status_history:
   - date: 2026-06-03
     status: Proposed
     changed_by: Claude (TASK-648)
-    reason: Documents the five-device HA discovery topology design, the umbrella legacy mode that subsumes ADR-106's standalone flag, and the HA-core-authoritative OT entity routing. Spec approved by maintainer before ADR was filed.
+    reason: Documents the five-device HA discovery topology design, the two independent legacy-mode axes (bLegacyMode for topology/unique_id; bUseLegacyOtTopics standalone for topic naming), and the HA-core-authoritative OT entity routing. Spec approved by maintainer before ADR was filed.
     changed_via: adr-kit
 
 ## Context
@@ -75,20 +75,13 @@ fixed here.
 ### ADR-106 standalone-flag context
 
 ADR-106 (Accepted, 2026-05-21) shipped `settings.mqtt.bUseLegacyOtTopics`
-(default `false`) as a standalone toggle: when true it restores legacy OT-spec
-topic names; when false it uses the self-describing 2.0.0 names. That flag was
-intentionally scoped to topic naming only. This ADR introduces a wider concept
-— device topology — that needs a companion compatibility switch. Rather than
-stacking a second independent toggle (`bUseLegacyDeviceTopology`) that users
-must keep in sync, this ADR introduces one umbrella flag `bLegacyMode` that
-governs topic naming AND device topology AND unique_id scheme together,
-superseding ADR-106's standalone-flag decision while fully preserving the
-behaviour ADR-106 ratified: modern-default, legacy-opt-in.
-
-`bUseLegacyOtTopics` is retained as a deprecated alias for exactly one release:
-on settings load, if `bUseLegacyOtTopics == true` it is silently mapped to
-`bLegacyMode = true`. This preserves alpha-channel testers' settings without
-requiring manual migration. After one release cycle the alias may be removed.
+as a standalone toggle: when true it restores legacy OT-spec topic names; when
+false it uses the self-describing 2.0.0 names. That flag is intentionally scoped
+to topic naming only and remains a standalone switch. This ADR introduces a
+separate concept, device topology, governed by its own flag `bLegacyMode`. The
+two flags are independent and default differently depending on install context
+(see Section 5). ADR-106's standalone-flag decision is not superseded by this ADR;
+the two ADRs complement each other with separate concerns.
 
 ## Decision
 
@@ -167,33 +160,61 @@ and SAT) are rule-based (topic prefix / emitter) and require no table lookup.
 - **Legacy (opt-in, `settings.mqtt.bLegacyMode = true`):** `{nodeId}-{label}`,
   reproducing the 1.x.x scheme exactly.
 
-### 5. Umbrella legacy mode
+### 5. Two independent legacy-mode axes
 
-`settings.mqtt.bLegacyMode` (type `bool`, default `false`, persisted in
-`OTGWSettings`) governs three orthogonal axes together:
+The design uses two independent settings for two separate compatibility concerns.
+They default differently and are toggled independently.
 
-| Axis | Modern (`false`) | Legacy (`true`) |
+**Axis 1: Device topology (`settings.mqtt.bLegacyMode`, default `false` for
+everyone)**
+
+`bLegacyMode` governs device topology and the coupled unique_id scheme:
+
+| `bLegacyMode` | Device topology | unique_id scheme |
 |---|---|---|
-| Device topology | Five devices | Single device (`{nodeId}`) |
-| unique_id scheme | `{nodeId}-{device}-{label}` | `{nodeId}-{label}` |
-| Topic naming | Self-describing names (ADR-106 default) | OT-spec legacy names (ADR-106 legacy toggle) |
+| `false` (default) | Five devices as above | `{nodeId}-{device}-{label}` |
+| `true` (advanced opt-in) | Single device (`{nodeId}`) | `{nodeId}-{label}` |
 
-Changing the flag triggers a one-way republish-and-clean cycle: all discovery
-configs are republished under the new scheme, and the old scheme's retained
-discovery payloads are cleared via the ADR-070 orphan-cleanup path (empty
-retained payload published to every stale discovery topic). The cleanup state is
-persisted to LittleFS so a power cut mid-drain resumes correctly on next boot
-(carrying forward ADR-106's cleanup-bitmap design).
+Default is `false` for all users, including users upgrading from 1.x.x. Upgraders
+see entities re-registered under the five-device scheme on first 2.0.0 boot.
+`bLegacyMode = true` is the advanced escape hatch for users who want to stay on the
+1.x.x single-device layout and avoid any entity_id churn.
 
-`bUseLegacyOtTopics` is retained as a deprecated alias: if `true` on settings
-load, it is silently mapped to `bLegacyMode = true`. The alias may be removed
-after one release cycle.
+Changing `bLegacyMode` triggers a republish-and-clean cycle: all discovery configs
+are republished under the new scheme, and the old scheme's retained discovery
+payloads are cleared via the ADR-070 orphan-cleanup path (empty retained payload
+published to every stale discovery topic). The cleanup state is persisted to
+LittleFS so a power cut mid-drain resumes correctly on next boot.
 
-### 6. Migration on 2.0.0 upgrade (modern default)
+**Axis 2: OT-topic label naming (`settings.mqtt.bUseLegacyOtTopics`, upgrade-aware
+default)**
 
-An upgrading user whose 1.x.x firmware was running in single-device mode (which
-is everyone upgrading from 1.x.x) sees the following on first 2.0.0 boot in
-modern mode:
+`bUseLegacyOtTopics` governs whether legacy OT-spec-derived topic names or the
+new self-describing 2.0.0 aliases are used (ADR-106). It is a standalone setting,
+not absorbed into `bLegacyMode`. The default is upgrade-aware:
+
+- **Fresh install (2.0.0 config):** `false`. The key `MQTTuseLegacyOtTopics` is
+  written by `writeSettings`, so it is present in the settings file and its stored
+  or default value (`false`) is honoured. New users get self-describing topic names.
+- **1.x.x upgrade:** `true`. A 1.x.x settings file predates ADR-106, so the key
+  `MQTTuseLegacyOtTopics` is absent. `readSettings` detects the absent key and
+  defaults to `true`, preserving legacy topic names. Existing MQTT automations and
+  dashboards continue to work without changes. The user opts in to the new names
+  explicitly.
+- **Existing 2.0.0 alpha config:** the key is present; stored value is honoured
+  as-is. No regression for current alpha testers.
+
+Toggling `bUseLegacyOtTopics` triggers cleanup of the retained payloads in the
+other name set via the persistent bitmap in `/mqtt_topic_cleanup.bin`
+(ADR-106's cleanup-bitmap design).
+
+### 6. Migration on 2.0.0 upgrade
+
+The two axes produce two independent migration outcomes.
+
+**Device topology (Axis 1, `bLegacyMode = false` default for all):**
+
+An upgrading user sees the following on first 2.0.0 boot:
 
 1. The firmware republishes all discovery configs under the five-device scheme
    with modern unique_ids.
@@ -202,13 +223,24 @@ modern mode:
    leaving ghosts.
 3. HA re-registers the entities under the new device cards and new unique_ids.
    Automations pinned to old HA entity_ids (which are derived from old unique_ids)
-   will break until repointed.
+   will need to be repointed.
 4. MQTT state (value) topics and payloads are **unchanged** — any MQTT consumer
    subscribing to value topics is unaffected. Only HA's entity registry changes.
 
-Users who do not want the churn flip `bLegacyMode = true` before or immediately
-after upgrade and stay on 1.x.x device topology + unique_ids. The entity_id
-churn is then zero. This is the full escape hatch.
+Users who do not want device-topology churn: set `bLegacyMode = true` before or
+immediately after upgrade. Entity_id churn is then zero.
+
+**OT-topic label naming (Axis 2, `bUseLegacyOtTopics = true` default on upgrade):**
+
+A 1.x.x settings file does not contain the `MQTTuseLegacyOtTopics` key (it
+predates ADR-106). On upgrade `readSettings` detects the absent key and defaults
+`bUseLegacyOtTopics = true`, so legacy OT-spec topic names remain in use. No MQTT
+automations or dashboards break. The user can switch to self-describing names
+explicitly by setting `bUseLegacyOtTopics = false` in the Web UI or via the REST API.
+
+**Net effect for a 1.x.x upgrader:** entities re-register once into the new
+five-device cards (a one-time HA entity_id event), but MQTT state topic names are
+unchanged. The two axes can be toggled independently after upgrade.
 
 ### 7. Bilateral replication: resource note
 
@@ -245,12 +277,15 @@ the original TASK-648 AC#6, which predated confirming HA core had dropped
    in the gateway or boiler device would be semantically wrong and surprising to
    users.
 
-3. **Per-axis legacy toggles (three independent flags).** Rejected: users would
-   need to set three flags to restore 1.x.x behaviour; flags can drift out of
-   sync and produce incoherent states (e.g. legacy unique_ids with modern device
-   topology). One umbrella flag eliminates the coherence problem and reduces the
-   settings surface. ADR-106's standalone `bUseLegacyOtTopics` was already this
-   problem in miniature.
+3. **Fully independent flags for all three axes.** The design settles on two flags,
+   not three. Device topology and unique_id scheme are kept coupled under
+   `bLegacyMode` because they are coherent as a pair: legacy topology with modern
+   unique_ids or vice versa produces incoherent states (entities in the wrong device
+   card, orphaned HA entity_ids). Topic naming (`bUseLegacyOtTopics`) is kept as a
+   standalone flag because its upgrade-aware default differs from topology: upgraders
+   benefit from keeping legacy topic names while getting the new five-device grouping.
+   Coupling topic naming into `bLegacyMode` would force all upgraders to choose between
+   topology churn and topic-name churn together, which is unnecessarily coarse.
 
 4. **`via_device` chaining (firmware → gateway, boiler → gateway, etc.).**
    Rejected: HA core 2024.10 dropped `via_device`. Adding it to firmware
@@ -271,8 +306,10 @@ the original TASK-648 AC#6, which predated confirming HA core had dropped
   with the SAT card. Matches HA core's publicly shipped topology for the OT trio.
 - Firmware-native entities (ESP, SAT) have semantically correct homes with no
   ambiguity.
-- One umbrella `bLegacyMode` gives users a single knob to restore 1.x.x
-  behaviour; zero partial-migration states possible.
+- `bLegacyMode` gives users a single knob to restore 1.x.x device topology and
+  unique_ids; topology and unique_id coherence is preserved (the two are always
+  changed together). `bUseLegacyOtTopics` is a separate knob for topic naming,
+  defaulting to legacy on upgrade so existing automations keep working.
 - MQTT value topics and payloads are untouched; non-HA MQTT consumers see no
   change regardless of the topology mode.
 - `haDeviceForEntity()` is a single, CI-gated, auditable routing table. No
@@ -280,10 +317,11 @@ the original TASK-648 AC#6, which predated confirming HA core had dropped
 
 **Negative / trade-offs:**
 
-- **One-time HA entity_id churn on 2.0.0 upgrade** for users who do not opt in to
-  legacy mode. Automations pinned to old entity_ids must be repointed. This is
-  the expected cost of a major-version release and is fully escapable via
-  `bLegacyMode`.
+- **One-time HA entity_id churn on 2.0.0 upgrade** for topology (all upgraders get
+  five-device by default). Automations pinned to old entity_ids must be repointed.
+  This is the expected cost of a major-version release and is fully escapable via
+  `bLegacyMode = true`. MQTT state topic names are unaffected for upgraders
+  (`bUseLegacyOtTopics` defaults legacy on upgrade).
 - **~55 extra discovery entities** from bilateral replication. Burst-windowed
   (ADR-088); cost is tolerable on ESP32-S3. ESP8266 requires implementation
   measurement; a platform fallback is defined if needed.
@@ -316,13 +354,13 @@ the original TASK-648 AC#6, which predated confirming HA core had dropped
   global `isFirstEntity` flag.
 - **ADR-070** (Orphan cleanup of stale discovery topics): the migration on mode
   toggle relies on ADR-070's orphan-cleanup path to clear stale retained payloads.
-- **ADR-106** (MQTT Topic Naming Mode, Accepted 2026-05-21): this ADR supersedes
-  ADR-106's standalone `bUseLegacyOtTopics` flag decision — that flag is absorbed
-  into `bLegacyMode` as one of its three axes. ADR-106's actual behaviour
-  (modern-default, legacy-opt-in topic naming) is preserved in full; only the
-  flag identity changes. ADR-106 is **superseded in part** (standalone-flag
-  decision only); its per-key naming table (ADR-105 mapping, 37 alias rows) is
-  unaffected.
+- **ADR-106** (MQTT Topic Naming Mode, Accepted 2026-05-21): this ADR complements
+  ADR-106; it does not supersede it. ADR-106's `bUseLegacyOtTopics` remains a
+  standalone flag governing topic naming independently of the device topology
+  introduced here. The two flags coexist with separate defaults: `bLegacyMode`
+  defaults modern for all (five-device); `bUseLegacyOtTopics` defaults legacy on
+  1.x.x upgrade (key-absence detection). ADR-106's per-key naming table (37 alias
+  rows) and cleanup-bitmap design are unchanged.
 - **ADR-096 / ADR-103** (Worldview routing / publish gating by source and
   slave-echo): the per-entity device routing in this ADR is purely additive to the
   worldview; the canonical/override distinction and publish-gating rules are
@@ -340,4 +378,4 @@ the original TASK-648 AC#6, which predated confirming HA core had dropped
 - HA core reference: `home-assistant/core` `opentherm_gw` 2024.10 (PR #124869) —
   `__init__.py`, `entity.py`, `sensor.py`, `binary_sensor.py`, `climate.py`,
   `switch.py`, `select.py`, `button.py`.
-- ADR-106 (superseded-in-part): `docs/adr/ADR-106-mqtt-topic-naming-mode-new-default-legacy-toggle.md`.
+- ADR-106 (standalone, complementary): `docs/adr/ADR-106-mqtt-topic-naming-mode-new-default-legacy-toggle.md`.
