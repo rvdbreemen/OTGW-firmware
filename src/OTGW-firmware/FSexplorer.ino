@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.161
+**  Version  : v2.0.0-alpha.162
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -61,27 +61,6 @@ const char Helper[] PROGMEM =
   "</form>\n";
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
-
-// Inject ?v=<fsHash> immediately before the closing quote of a versioned asset URL on
-// the current index.html line, if the token is present. Token is the full src="..." /
-// href="..." attribute INCLUDING its closing quote (e.g. PSTR("src=\"./sat.js\"")).
-// Returns true and streams the rewritten line when it matched; returns false and emits
-// nothing when the token is not on this line, so callers chain with || and fall through
-// to a verbatim sendContent(). One asset per line is assumed (true for index.html).
-static bool injectVersionedAsset(char* lineBuf, PGM_P token, const char* fsHash) {
-  char* pos = strstr_P(lineBuf, token);
-  if (!pos) return false;
-  size_t tlen = strlen_P(token);
-  char* closingQuote = pos + tlen - 1;     // the trailing '"' of the attribute
-  *closingQuote = '\0';                     // lineBuf is now prefix + attr-without-quote
-  httpServer.sendContent(lineBuf);
-  httpServer.sendContent(F("?v="));
-  httpServer.sendContent(fsHash);
-  httpServer.sendContent(F("\""));
-  const char* suffix = closingQuote + 1;    // remainder of the line after the quote
-  if (*suffix != '\0') httpServer.sendContent(suffix);
-  return true;
-}
 
 // Serve a static webui asset with versioned long-term caching. When the request carries
 // ?v=<fsHash> matching the current filesystem hash, the URL is immutable for this build,
@@ -174,47 +153,77 @@ void startWebserver(){
       // no-cache + ETag: browser stores the response but revalidates each visit.
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
 
-      // Stream line-by-line to inject ?v=<hash> into JS asset URLs.
       httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
       httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
+      // Disable Nagle on the serve socket: the chunked writes below must not be
+      // coalesced/delayed by ~200 ms delayed-ACK round-trips (TASK-823).
+      httpServer.client().setNoDelay(true);
 
-      // Line buffer: 512 B is sized for the longest line in index.html plus the
-      // ?v=<hash> injection slack. Stack-local (not static) because httpServer.
-      // sendContent() can yield via feedWatchDog(), which would let a re-entered
-      // sendIndex() clobber a shared static buffer mid-line. Stack peak of one
-      // extra 512 B frame per concurrent (re-entered) request is within the
-      // ESP8266 ~4 KB cooperative-scheduling budget. Saves 512 B BSS vs the
-      // previous function-static placement.
+      // Stream the rewritten index.html (?v=<hash> injected before each versioned asset
+      // URL's closing quote) through a 1 KB accumulation buffer flushed in chunks, NOT
+      // line-by-line. The previous per-line sendContent() emitted ~2000 tiny chunked
+      // writes for the ~39 KB page, each its own TCP segment throttled by delayed-ACK to
+      // ~2.5 KB/s (~16 s isolated, and a Task-watchdog reboot trigger under cold-load).
+      // Batching to ~1 KB collapses that to ~40 writes. (TASK-823)
+      //
+      // txbuf/lineBuf are stack-local (not static): emit/flush can yield via feedWatchDog()
+      // which may re-enter sendIndex(); a shared static buffer would be clobbered mid-page.
+      // 1 KB + 512 B per frame keeps a re-entered call within the ESP8266 ~4 KB CONT stack.
+      char   txbuf[1024];
+      size_t txlen = 0;
+      auto flushTx = [&]() {
+        if (txlen) {
+          httpServer.sendContent(txbuf, txlen);
+          txlen = 0;
+          feedWatchDog();
+        }
+      };
+      auto emitTx = [&](const char* s, size_t len) {
+        while (len) {
+          if (txlen == sizeof(txbuf)) flushTx();
+          size_t room = sizeof(txbuf) - txlen;
+          size_t take = (len < room) ? len : room;
+          memcpy(txbuf + txlen, s, take);
+          txlen += take; s += take; len -= take;
+        }
+      };
+
+      // Versioned asset tokens: the full src="..." / href="..." attribute INCLUDING its
+      // closing quote; ?v=<hash> is inserted just before that quote. One asset per line.
+      PGM_P toks[8] = {
+        PSTR("src=\"./index.js\""),         PSTR("src=\"./graph.js\""),
+        PSTR("src=\"./sat.js\""),           PSTR("src=\"./sat-slider.js\""),
+        PSTR("src=\"./echarts-theme.js\""), PSTR("src=\"./theme-toggle.js\""),
+        PSTR("href=\"ds-tokens.css\""),     PSTR("href=\"components.css\"")
+      };
+      const size_t hashLen = hasHash ? strlen(fsHash) : 0;
+
       char lineBuf[512];
       while (f.available()) {
         int n = f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
         lineBuf[n] = '\0';
-        // Strip trailing CR if present
         if (n > 0 && lineBuf[n - 1] == '\r') lineBuf[--n] = '\0';
 
-        // In chunked mode an empty sendContent() marks end-of-response.
-        // Blank HTML lines must therefore emit only a newline chunk.
-        if (n == 0) {
-          httpServer.sendContent(F("\n"));
-          continue;
+        bool injected = false;
+        if (hasHash) {
+          for (uint8_t k = 0; k < 8; k++) {
+            const char* pos = strstr_P(lineBuf, toks[k]);
+            if (!pos) continue;
+            size_t tlen = strlen_P(toks[k]);
+            emitTx(lineBuf, (size_t)(pos - lineBuf) + tlen - 1); // prefix + attr without closing quote
+            emitTx("?v=", 3);
+            emitTx(fsHash, hashLen);
+            emitTx("\"", 1);
+            const char* suffix = pos + tlen;                      // remainder after the closing quote
+            emitTx(suffix, strlen(suffix));
+            injected = true;
+            break;
+          }
         }
-
-        // Inject ?v=<hash> into every versioned asset URL for cache-busting (TASK-822).
-        // One asset per line; the || chain rewrites the line on first match and
-        // short-circuits, otherwise the line streams verbatim.
-        if (!hasHash ||
-            !( injectVersionedAsset(lineBuf, PSTR("src=\"./index.js\""),         fsHash) ||
-               injectVersionedAsset(lineBuf, PSTR("src=\"./graph.js\""),         fsHash) ||
-               injectVersionedAsset(lineBuf, PSTR("src=\"./sat.js\""),           fsHash) ||
-               injectVersionedAsset(lineBuf, PSTR("src=\"./sat-slider.js\""),    fsHash) ||
-               injectVersionedAsset(lineBuf, PSTR("src=\"./echarts-theme.js\""), fsHash) ||
-               injectVersionedAsset(lineBuf, PSTR("src=\"./theme-toggle.js\""),  fsHash) ||
-               injectVersionedAsset(lineBuf, PSTR("href=\"ds-tokens.css\""),     fsHash) ||
-               injectVersionedAsset(lineBuf, PSTR("href=\"components.css\""),    fsHash) )) {
-          httpServer.sendContent(lineBuf);
-        }
-        httpServer.sendContent(F("\n"));
+        if (!injected) emitTx(lineBuf, (size_t)n);
+        emitTx("\n", 1);
       }
+      flushTx();
       httpServer.sendContent(F("")); // End chunked stream
       f.close();
     };
