@@ -5,8 +5,8 @@ status: Proposed
 date: 2026-06-03
 tags: [mqtt, ha-discovery, topology, legacy-mode, sat, esp, gateway, boiler, thermostat]
 supersedes: []
-superseded_by: []
-related: [ADR-077, ADR-070, ADR-106, ADR-096, ADR-103, ADR-088, ADR-080]
+superseded_by: [ADR-124]
+related: [ADR-077, ADR-070, ADR-106, ADR-096, ADR-103, ADR-088, ADR-080, ADR-124]
 deciders: [Robert van den Breemen]
 ---
 
@@ -14,7 +14,16 @@ deciders: [Robert van den Breemen]
 
 ## Status
 
-Proposed. **Binding** (per ADR-080): the golden-file discovery test in `tests/`
+**Superseded by [ADR-124](ADR-124-ha-discovery-seven-device-topology.md)**
+(2026-06-05): the topology is revised to seven devices (dedicated OT-Core and
+Sensors devices) with a Gateway `via_device` hub. The routing engine
+(`haDeviceForEntity()`), the two-axis legacy model, bilateral replication, and
+the migration/orphan-cleanup design below are carried forward unchanged by
+ADR-124; only the device set, the OT-core/sensors placement, and the
+`via_device` omission (§8) are revised. The original decision text is preserved
+unmodified below.
+
+Originally: Proposed. **Binding** (per ADR-080): the golden-file discovery test in `tests/`
 plus `haDeviceForEntity()` as the single auditable PROGMEM routing map are the
 CI gate for this ADR. Those artifacts and the gate itself are committed
 Definition-of-Done items of TASK-648; they must land in the same implementation
@@ -33,6 +42,11 @@ status_history:
     status: Proposed
     changed_by: Claude (TASK-648)
     reason: Documents the five-device HA discovery topology design, the two independent legacy-mode axes (bLegacyMode for topology/unique_id; bUseLegacyOtTopics standalone for topic naming), and the HA-core-authoritative OT entity routing. Spec approved by maintainer before ADR was filed.
+    changed_via: adr-kit
+  - date: 2026-06-05
+    status: Superseded by ADR-124
+    changed_by: Claude (TASK-826)
+    reason: Maintainer (Robert van den Breemen) revised the topology to seven devices — splitting the OpenTherm-core (PIC/OTDirect) and the physical hardware sensors (Dallas + S0) into their own devices and adding a Gateway via_device hub (a deliberate divergence from the HA-core parity that motivated §8's via_device omission). Carried-forward parts of this ADR remain authoritative as referenced by ADR-124.
     changed_via: adr-kit
 
 ## Context
