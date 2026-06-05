@@ -2024,13 +2024,6 @@ def build_filesystem_pio(project_dir, target):
         "MINGW_PREFIX", "MINGW_CHOST", "MINGW_PACKAGE_PREFIX",
     })
     pio_env = {k: v for k, v in os.environ.items() if k not in _MSYS_KEYS}
-    # TASK-825: PlatformIO's buildfs packs `data_dir` (platformio.ini) directly.
-    # Point it at a staged copy with the 8 webui assets bundled into 3 by overriding
-    # PLATFORMIO_DATA_DIR, so the flashed image ships the bundles. data/ is untouched.
-    # (build_filesystem() above is the standalone-mklittlefs path; this pio path is the
-    # one the default build actually uses, so the override MUST live here.)
-    staging = prepare_bundle_staging(config.DATA_DIR, config.BUILD_DIR)
-    pio_env["PLATFORMIO_DATA_DIR"] = str(staging.resolve())
     run_command(["pio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir, env=pio_env)
     # TASK-337: same fail-fast pattern as build_firmware_pio. The buildfs target
     # can also be silently skipped on toolchain misconfiguration.
