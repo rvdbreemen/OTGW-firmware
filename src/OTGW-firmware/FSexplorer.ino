@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.163
+**  Version  : v2.0.0-alpha.162
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -190,12 +190,11 @@ void startWebserver(){
 
       // Versioned asset tokens: the full src="..." / href="..." attribute INCLUDING its
       // closing quote; ?v=<hash> is inserted just before that quote. One asset per line.
-      // TASK-825: the served index.html is the staged/bundled one (build.py concatenates
-      // the 8 sources into these 3), so only the 3 bundle tags appear here.
-      PGM_P toks[3] = {
-        PSTR("href=\"styles.css\""),
-        PSTR("src=\"./app.js\""),
-        PSTR("src=\"./deferred.js\"")
+      PGM_P toks[8] = {
+        PSTR("src=\"./index.js\""),         PSTR("src=\"./graph.js\""),
+        PSTR("src=\"./sat.js\""),           PSTR("src=\"./sat-slider.js\""),
+        PSTR("src=\"./echarts-theme.js\""), PSTR("src=\"./theme-toggle.js\""),
+        PSTR("href=\"ds-tokens.css\""),     PSTR("href=\"components.css\"")
       };
       const size_t hashLen = hasHash ? strlen(fsHash) : 0;
 
@@ -207,7 +206,7 @@ void startWebserver(){
 
         bool injected = false;
         if (hasHash) {
-          for (uint8_t k = 0; k < 3; k++) {
+          for (uint8_t k = 0; k < 8; k++) {
             const char* pos = strstr_P(lineBuf, toks[k]);
             if (!pos) continue;
             size_t tlen = strlen_P(toks[k]);
@@ -242,10 +241,14 @@ void startWebserver(){
   // ESP32 WebServer. With ?v=<hash> injected on all 8 URLs (see sendIndex) and a matching
   // max-age here, a warm reload collapses to ~1 request (index.html revalidate). serve
   // path prefers the pre-gzipped .gz sibling when present (TASK-304/TASK-433).
-  // TASK-825: the image ships 3 bundles (build.py concatenates the 8 sources).
-  httpServer.on("/app.js",      []() { serveVersionedAsset("/app.js",      F("application/javascript")); });
-  httpServer.on("/deferred.js", []() { serveVersionedAsset("/deferred.js", F("application/javascript")); });
-  httpServer.on("/styles.css",  []() { serveVersionedAsset("/styles.css",  F("text/css")); });
+  httpServer.on("/index.js",         []() { serveVersionedAsset("/index.js",         F("application/javascript")); });
+  httpServer.on("/graph.js",         []() { serveVersionedAsset("/graph.js",         F("application/javascript")); });
+  httpServer.on("/sat.js",           []() { serveVersionedAsset("/sat.js",           F("application/javascript")); });
+  httpServer.on("/sat-slider.js",    []() { serveVersionedAsset("/sat-slider.js",    F("application/javascript")); });
+  httpServer.on("/echarts-theme.js", []() { serveVersionedAsset("/echarts-theme.js", F("application/javascript")); });
+  httpServer.on("/theme-toggle.js",  []() { serveVersionedAsset("/theme-toggle.js",  F("application/javascript")); });
+  httpServer.on("/components.css",   []() { serveVersionedAsset("/components.css",   F("text/css")); });
+  httpServer.on("/ds-tokens.css",    []() { serveVersionedAsset("/ds-tokens.css",    F("text/css")); });
 #if HAS_PIC
   //otgw pic functions
   httpServer.on("/pic", upgradepic);
