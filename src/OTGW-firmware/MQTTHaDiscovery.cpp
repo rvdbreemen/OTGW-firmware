@@ -2745,24 +2745,9 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
                      ctx.haPrefix, ctx.nodeId, sensorAddress);
   if (n <= 0 || static_cast<size_t>(n) >= sizeof(topic)) return false;
 
-  // Build a temporary config struct with the runtime address
-  static const char dallasFriendlyName[] PROGMEM = "Temperature";
-  MqttHaSensorCfg cfg;
-  cfg.id = 246;  // OTGWdallasdataid
-  cfg.flags = 0;
-  cfg.label = nullptr;  // not used directly -- we override stat_t below
-  cfg.friendlyName = dallasFriendlyName;
-  cfg.deviceClass = HaDeviceClass::temperature;
-  cfg.unit = HaUnit::degC;
-  cfg.stateClass = HaStateClass::measurement;
-  cfg.icon = HaIcon::thermometer;
-  cfg.entityCat = HaEntityCat::none;
-  cfg.enabledByDefault = true;
-
-  // We need a custom compose since the label is a runtime RAM string, not PROGMEM.
-  // Use the standard composer but with a patched context that has the address as sensorId.
-  // Actually, we compose inline here for clarity.
-
+  // Dallas sensors are discovered at runtime by address, so the discovery payload is
+  // composed inline below: the standard PROGMEM-table composer cannot take a runtime
+  // RAM-string label or a per-address stat_t. (No MqttHaSensorCfg needed here.)
   auto compose = [&](MqttJsonWriter &w) -> bool {
     if (!writeJsonOpen(w)) return false;
 
