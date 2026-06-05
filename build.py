@@ -721,6 +721,83 @@ def prepare_gzip_assets(data_dir):
         print_success(f"Prepared {gz_count} gzip asset(s)")
 
 
+# TASK-825: webui asset bundles. Each tuple is (output bundle, [sources in concat
+# order]). This MUST stay in sync with two other places:
+#   - the index.html rewrite in prepare_bundle_staging() below, and
+#   - the ?v= token list + serveVersionedAsset handlers in FSexplorer.ino.
+# Concat order matters: ds-tokens before components (CSS custom properties defined
+# before use); app.js keeps the index/graph/sat blocking-script order; deferred.js
+# keeps the defer group (echarts-theme/theme-toggle/sat-slider) which DOM-hook and
+# must stay deferred -> a separate bundle from the blocking app.js.
+BUNDLE_MANIFEST = [
+    ("styles.css",  ["ds-tokens.css", "components.css"]),
+    ("app.js",      ["index.js", "graph.js", "sat.js"]),
+    ("deferred.js", ["echarts-theme.js", "theme-toggle.js", "sat-slider.js"]),
+]
+
+# index.html asset-tag rewrites (8 tags -> 3 bundles). Patterns use \n line joins
+# (read_text normalises CRLF to \n) and assume the exact 4-space-indented tag block.
+BUNDLE_INDEX_REWRITES = [
+    ('<link rel="stylesheet" href="ds-tokens.css">\n'
+     '    <link rel="stylesheet" href="components.css">',
+     '<link rel="stylesheet" href="styles.css">'),
+    ('<script src="./echarts-theme.js" defer></script>\n'
+     '    <script src="./theme-toggle.js" defer></script>\n'
+     '    <script src="./sat-slider.js" defer></script>',
+     '<script src="./deferred.js" defer></script>'),
+    ('<script src="./index.js"></script>\n'
+     '    <script src="./graph.js"></script>\n'
+     '    <script src="./sat.js"></script>',
+     '<script src="./app.js"></script>'),
+]
+
+
+def prepare_bundle_staging(data_dir, build_dir):
+    """Stage a copy of data/ with the 8 static webui assets concatenated into 3
+    bundles (TASK-825). The LittleFS image is built from this staging dir, so the
+    browser opens 3 local requests instead of 8 on a cold page load -- the serial
+    single-connection ESP32 WebServer otherwise starves the parallel JS requests.
+    data/ itself is left untouched (8 sources + 8-tag index.html) so local dev
+    (webui_launcher.py) and source editing keep working; only the staged copy is
+    bundled. Returns the staging dir path for mklittlefs."""
+    print_step("Staging bundled webui assets")
+    staging = build_dir / "fs-staging"
+    build_dir.mkdir(exist_ok=True)
+    if staging.exists():
+        shutil.rmtree(staging)
+    shutil.copytree(data_dir, staging)
+
+    for bundle_name, sources in BUNDLE_MANIFEST:
+        parts = []
+        for src in sources:
+            sp = staging / src
+            if not sp.exists():
+                print_error(f"bundle source missing: {src} (update BUNDLE_MANIFEST)")
+                sys.exit(1)
+            parts.append(sp.read_text(encoding="utf-8"))
+        # Newline between parts: a source without a trailing newline must not merge
+        # its last statement/line with the first of the next file.
+        (staging / bundle_name).write_text("\n".join(parts) + "\n", encoding="utf-8")
+        for src in sources:
+            (staging / src).unlink()
+
+    idx = staging / "index.html"
+    html = idx.read_text(encoding="utf-8")
+    for old, new in BUNDLE_INDEX_REWRITES:
+        if old not in html:
+            print_error(
+                "bundle index.html rewrite: tag pattern not found -- index.html "
+                "asset tags changed; update BUNDLE_INDEX_REWRITES/BUNDLE_MANIFEST"
+            )
+            sys.exit(1)
+        html = html.replace(old, new)
+    idx.write_text(html, encoding="utf-8")
+
+    print_success(f"Staged {len(BUNDLE_MANIFEST)} webui bundle(s): "
+                  + ", ".join(b for b, _ in BUNDLE_MANIFEST))
+    return staging
+
+
 def build_filesystem(project_dir, config_file, target):
     """Build filesystem using mklittlefs for the given target"""
     tcfg = TARGETS[target]
@@ -750,7 +827,9 @@ def build_filesystem(project_dir, config_file, target):
 
     print_info(f"Using mklittlefs: {mklittlefs_path}")
 
-    fs_dir = config.DATA_DIR
+    # TASK-825: build the image from a staged copy with the 8 webui assets bundled
+    # into 3 (styles.css + app.js + deferred.js), not from data/ directly.
+    fs_dir = prepare_bundle_staging(config.DATA_DIR, config.BUILD_DIR)
     output_file = config.BUILD_DIR / f"{config.PROJECT_NAME}-{target}.littlefs.bin"
 
     # Ensure build dir exists
