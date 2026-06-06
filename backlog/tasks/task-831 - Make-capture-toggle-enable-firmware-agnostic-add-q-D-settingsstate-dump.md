@@ -1,9 +1,11 @@
 ---
 id: TASK-831
 title: Make capture toggle-enable firmware-agnostic + add q/D settings+state dump
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-06 08:41'
+updated_date: '2026-06-06 08:41'
 labels:
   - tooling
   - diagnostics
