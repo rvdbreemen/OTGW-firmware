@@ -1,9 +1,11 @@
 ---
 id: TASK-834
 title: 'feat(debug): add WiFi quality (%/text) to telnet welcome banner'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-06 15:55'
+updated_date: '2026-06-06 15:55'
 labels: []
 dependencies: []
 ---
