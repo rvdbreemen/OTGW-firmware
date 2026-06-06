@@ -114,6 +114,8 @@ function Show-Help {
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
     Write-Host "  It then prompts for an optional MQTT username. Leave it blank for anonymous brokers."
     Write-Host "  If a username is supplied without -Password, the script prompts securely for the MQTT password."
+    Write-Host "  Host/broker/username answers are remembered and pre-filled next run ([default]; Enter accepts)."
+    Write-Host "  The MQTT password is never saved."
     Write-Host ""
     Write-Host "Browser devtools capture (console + exceptions + resource 404s + network timings):"
     Write-Host "  Enabled by default. A headless Microsoft Edge (or Chrome) instance loads the OTGW web UI over the"
@@ -1224,17 +1226,84 @@ function Stop-BrowserCapture {
     return $summary
 }
 
+function Get-CaptureSettingsPath {
+    $base = $env:LOCALAPPDATA
+    if ([string]::IsNullOrWhiteSpace($base)) { $base = $env:TEMP }
+    return (Join-Path -Path $base -ChildPath "OTGW-capture\capture-settings.json")
+}
+
+function Import-CaptureSettings {
+    # Best-effort: a missing/corrupt file must never abort the capture.
+    try {
+        $p = Get-CaptureSettingsPath
+        if (Test-Path -LiteralPath $p -PathType Leaf) {
+            return (Get-Content -LiteralPath $p -Raw | ConvertFrom-Json)
+        }
+    }
+    catch { }
+    return $null
+}
+
+function Save-CaptureSettings {
+    param(
+        [string]$DeviceHost,
+        [string]$BrokerHost,
+        [int]$BrokerPort,
+        [string]$Topic,
+        [string]$Username
+    )
+
+    # Persist last-used values so the next run can pre-fill the prompts. The MQTT
+    # password is a secret and is deliberately NEVER written here. Best-effort: a
+    # write failure must never abort the capture.
+    try {
+        $p = Get-CaptureSettingsPath
+        $dir = Split-Path -Path $p -Parent
+        if (-not (Test-Path -LiteralPath $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        }
+        [PSCustomObject]@{
+            DeviceHost = $DeviceHost
+            BrokerHost = $BrokerHost
+            BrokerPort = $BrokerPort
+            Topic      = $Topic
+            Username   = $Username
+        } | ConvertTo-Json | Set-Content -LiteralPath $p -Encoding UTF8
+        return $p
+    }
+    catch {
+        return $null
+    }
+}
+
+function Read-HostWithDefault {
+    param(
+        [Parameter(Mandatory = $true)][string]$Prompt,
+        [string]$Default
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Default)) {
+        $answer = Read-Host "$Prompt [$Default]"
+        if ([string]::IsNullOrWhiteSpace($answer)) { return $Default }
+        return $answer
+    }
+    return (Read-Host $Prompt)
+}
+
 $deviceHostWasBound = $PSBoundParameters.ContainsKey('DeviceHost')
 $brokerHostWasBound = $PSBoundParameters.ContainsKey('BrokerHost')
 $usernameWasBound = $PSBoundParameters.ContainsKey('Username')
 $passwordWasBound = $PSBoundParameters.ContainsKey('Password')
 
+# Pre-fill interactive prompts from the last saved run (password excluded).
+$savedSettings = Import-CaptureSettings
+
 if ([string]::IsNullOrWhiteSpace($DeviceHost)) {
-    $DeviceHost = Read-Host "OTGW device host"
+    $DeviceHost = Read-HostWithDefault -Prompt "OTGW device host" -Default $(if ($savedSettings) { [string]$savedSettings.DeviceHost } else { "" })
 }
 
 if ([string]::IsNullOrWhiteSpace($BrokerHost)) {
-    $BrokerHost = Read-Host "MQTT broker host"
+    $BrokerHost = Read-HostWithDefault -Prompt "MQTT broker host" -Default $(if ($savedSettings) { [string]$savedSettings.BrokerHost } else { "" })
 }
 
 if ([string]::IsNullOrWhiteSpace($DeviceHost)) {
@@ -1246,7 +1315,7 @@ if ([string]::IsNullOrWhiteSpace($BrokerHost)) {
 }
 
 if (-not $usernameWasBound -and (-not $deviceHostWasBound -or -not $brokerHostWasBound)) {
-    $Username = Read-Host "MQTT username (blank for anonymous)"
+    $Username = Read-HostWithDefault -Prompt "MQTT username (blank for anonymous)" -Default $(if ($savedSettings) { [string]$savedSettings.Username } else { "" })
 }
 
 if ([string]::IsNullOrWhiteSpace($Username)) {
@@ -1258,6 +1327,9 @@ elseif (-not $passwordWasBound) {
     $securePassword = Read-Host "MQTT password for $Username" -AsSecureString
     $Password = ConvertFrom-SecureStringToPlainText -SecureString $securePassword
 }
+
+# Remember the resolved settings for next run's prompt pre-fill (never the password).
+$savedSettingsPath = Save-CaptureSettings -DeviceHost $DeviceHost -BrokerHost $BrokerHost -BrokerPort $BrokerPort -Topic $Topic -Username $Username
 
 $outputRootPath = Get-FullPath -Path $OutputRoot
 $runName = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -1284,6 +1356,7 @@ Add-SummaryLine "Topic: $Topic"
 Add-SummaryLine "Username supplied: $([bool](-not [string]::IsNullOrWhiteSpace($Username)))"
 Add-SummaryLine "DurationSeconds: $(if ($DurationSeconds -gt 0) { $DurationSeconds } else { 'until manual stop' })"
 Add-SummaryLine "SkipToolInstall: $([bool]$SkipToolInstall)"
+if ($savedSettingsPath) { Add-SummaryLine "Settings prefill saved: $savedSettingsPath" }
 Add-SummaryLine "Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)"
 
 $telnetClient = $null
