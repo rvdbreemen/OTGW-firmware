@@ -12,6 +12,10 @@
 #include <pgmspace.h>
 #include <stdint.h>
 #include <PubSubClient.h>
+#include <boards.h>   // HAS_PIC / HAS_DIRECT_OT capability flags — needed in BOTH TUs
+                      // (the standalone MQTTHaDiscovery.cpp does not pull OTGW-firmware.h,
+                      // so it would otherwise see HAS_PIC undefined; the OT-Core device's
+                      // user-facing name/suffix is rendered per hardware via these flags).
 
 // MQTTstuff.h is included by both the main Arduino translation unit (via
 // OTGW-firmware.h, which defines HOME_ASSISTANT_DISCOVERY_PREFIX) and by the
@@ -362,8 +366,28 @@ constexpr uint32_t VERIFICATION_MIN_HEAP_START = 6000;
 // Discovery context -- runtime state passed to streaming functions
 // ---------------------------------------------------------------------------
 
-// TASK-648: HA discovery device topology (five-device split).
-enum class HaDevice : uint8_t { Boiler = 0, Thermostat, Gateway, Esp, Sat };
+// ADR-124 (TASK-826): HA discovery device topology (seven-device split).
+// Order is load-bearing: every per-device array (g_haDeviceIntroduced[],
+// g_haDeviceMeta[], kHaDeviceSuffixes[]) and the device-block emitters index by
+// this ordinal. OtCore sits between Esp and Sat (Sat moved 4->5 vs the old
+// 5-device layout); Sensors is last. The enum value is hardware-agnostic
+// (OtCore = the OpenTherm bus driver slot); it is rendered per hardware in HA.
+enum class HaDevice : uint8_t { Boiler = 0, Thermostat, Gateway, Esp, OtCore, Sat, Sensors };
+constexpr uint8_t HA_DEVICE_COUNT = 7;
+
+// ADR-124 §2: the OT-Core device is one enum slot (HaDevice::OtCore) whose
+// USER-FACING name/suffix is rendered per hardware so the model is obvious in
+// HA — "pic" on a PIC build (HAS_PIC, classic OTGW), "ot-direct" on an OTGW32
+// direct-OT build (HAS_DIRECT_OT). A build links exactly one bus driver, so the
+// choice is compile-time. boards.h (included above) makes HAS_PIC visible in
+// both TUs (the standalone MQTTHaDiscovery.cpp cannot see OTGW-firmware.h).
+#if defined(HAS_PIC) && HAS_PIC
+  #define HA_OTCORE_NAME    "pic"
+  #define HA_OTCORE_SUFFIX  "-pic"
+#else
+  #define HA_OTCORE_NAME    "ot-direct"
+  #define HA_OTCORE_SUFFIX  "-ot-direct"
+#endif
 
 // TASK-648 Task 5: per-device metadata threaded through the context so
 // MQTTHaDiscovery.cpp (a separate TU that cannot see globals) can emit
@@ -392,16 +416,16 @@ struct HaDiscoveryContext {
     bool        legacyMode = false;           // TASK-648: settings.mqtt.bLegacyMode, threaded in (the .cpp TU cannot see globals)
     HaDevice    device = HaDevice::Esp;       // owning device for the current entity
     // TASK-648 Job B: persistent per-device "full block once" gate.
-    // Points at the file-static g_haDeviceIntroduced[5] in MQTTstuff.ino.
+    // Points at the file-static g_haDeviceIntroduced[HA_DEVICE_COUNT] in MQTTstuff.ino.
     // nullptr is the safe default (both builders guard with a null-check).
     // Semantics: false = not yet introduced this cycle (emit full block), true = already done.
     // Reset to all-false when a new discovery cycle starts (markAllMQTTConfigPending /
     // setMQTTConfigAllPending arm dripDeviceInfoPending — same two sites).
-    bool            *deviceIntroduced = nullptr;   // per-device introduced flags (5 entries)
+    bool            *deviceIntroduced = nullptr;   // per-device introduced flags (HA_DEVICE_COUNT entries)
     // TASK-648 Task 5: per-device metadata cache, indexed by HaDevice ordinal.
-    // Points at the file-static g_haDeviceMeta[5] in MQTTstuff.ino.
+    // Points at the file-static g_haDeviceMeta[HA_DEVICE_COUNT] in MQTTstuff.ino.
     // nullptr is safe — both emitters guard with a null-check and fall back to legacy strings.
-    const HaDeviceMeta *devMeta = nullptr;         // per-device metadata (5 entries)
+    const HaDeviceMeta *devMeta = nullptr;         // per-device metadata (HA_DEVICE_COUNT entries)
     // Source template expansion (set per-source iteration)
     const char *sourceSuffix;
     const char *sourceName;

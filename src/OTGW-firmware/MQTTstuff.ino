@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.163
+**  Version  : v2.0.0-alpha.164
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -139,9 +139,9 @@ static bool            dripDeviceInfoPending = false; // true after markAllMQTTC
 // TASK-648 Job B: persistent per-device "full block once" gate, one entry per HaDevice (5 total).
 // false = not yet introduced this cycle; true = full block already emitted for this device.
 // Reset alongside dripDeviceInfoPending so re-running discovery re-introduces all devices.
-static bool            g_haDeviceIntroduced[5] = { false, false, false, false, false };
+static bool            g_haDeviceIntroduced[HA_DEVICE_COUNT] = { false, false, false, false, false, false, false };
 
-// TASK-648 Task 5: per-device metadata cache, one entry per HaDevice ordinal (Boiler=0 .. Sat=4).
+// TASK-648 Task 5 / ADR-124: per-device metadata cache, one entry per HaDevice ordinal (Boiler=0 .. Sensors=6).
 // Populated once per discovery cycle by buildAllHaDeviceMeta() at the two reset sites below.
 // All char* pointers inside each struct point into the file-static buffers declared there.
 // Both device-block emitters (writeDeviceBlock in .cpp, buildDiscoveryDeviceBlock here)
@@ -154,8 +154,16 @@ struct HaDeviceMetaBufs {
   char devSwVersion[32];    // OT version float / PIC fw string / firmware version
   char devHwVersion[24];    // product version byte / chip id hex; empty = omit
 };
-static HaDeviceMetaBufs  g_haDeviceMetaBufs[5];
-static HaDeviceMeta      g_haDeviceMeta[5];
+static HaDeviceMetaBufs  g_haDeviceMetaBufs[HA_DEVICE_COUNT];
+static HaDeviceMeta      g_haDeviceMeta[HA_DEVICE_COUNT];
+
+// ADR-124: single source of truth for the per-device identifier suffix, indexed
+// by HaDevice ordinal. Replaces the three duplicate kSuffixes[] tables that
+// previously lived inside buildDiscoveryDeviceBlock()/composeSwitchPayload()/etc.
+// The OT-Core slot is compile-time "-pic" or "-otdirect" (HA_OTCORE_SUFFIX).
+static const char * const kHaDeviceSuffixes[HA_DEVICE_COUNT] = {
+  "-boiler", "-thermostat", "-gateway", "-esp", HA_OTCORE_SUFFIX, "-sat", "-sensors"
+};
 constexpr unsigned long STATUS_BURST_TIMEOUT_MS  = 500;
 // STATUS_BURST_COOLDOWN_MS is board-defined in boards.h (ESP-abstraction Tier 3,
 // ADR-088): 2000 on ESP8266 (TASK-353: stays under the ~3s Status cadence so the
@@ -1930,7 +1938,9 @@ void markAllMQTTConfigPending()
   // selects. Discovery unconditional like the other PIC pseudo-IDs; the
   // set-commands and otgw-pic/ state topics are PIC-gated at their source.
   setMQTTConfigPending(OTGWpiccontrolsid);
-  // 2.0.0-specific diagnostic discovery (TASK-541): OTDirect flame metrics + SAT BLE/pressure health.
+  // ADR-124: OTDirect flame metrics (split out of 251) -> OT-Core (Pic) device.
+  setMQTTConfigPending(OTGWotdirectid);
+  // 2.0.0-specific diagnostic discovery (TASK-541): SAT BLE/pressure health.
   setMQTTConfigPending(OTGWdiag200id);
   // TASK-543: SAT user-facing discovery stays unconditional on this dual-target branch.
   // Platform/runtime-specific publishers decide whether entities show live state.
@@ -2206,7 +2216,27 @@ static void buildAllHaDeviceMeta(const char *hostname) {
     fill(static_cast<uint8_t>(HaDevice::Esp), tmpName, tmpMfr, tmpModel, tmpSw, tmpHw);
   }
 
-  // --- SAT (4): firmware-native virtual thermostat ---
+  // --- OT-Core (4): ADR-124 — the OpenTherm bus driver as its own device ---
+  // The user-facing name differentiates the hardware model (PIC vs OTDirect) so
+  // it is obvious in HA; the enum slot itself is the hardware-agnostic OtCore.
+  {
+    if (isPICEnabled()) {
+      snprintf_P(tmpName, sizeof(tmpName), PSTR("OT-Core PIC (%s)"), hostname);
+      strlcpy_P(tmpMfr,   PSTR("Schelte Bron"),       sizeof(tmpMfr));
+      strlcpy(tmpModel, state.pic.sType,              sizeof(tmpModel));
+      strlcpy(tmpSw,    state.pic.sFwversion,         sizeof(tmpSw));
+      strlcpy(tmpHw,    state.pic.sDeviceid,          sizeof(tmpHw));
+    } else {
+      snprintf_P(tmpName, sizeof(tmpName), PSTR("OT-Core OTDirect (%s)"), hostname);
+      strlcpy_P(tmpMfr,   PSTR("OTGW-firmware"),          sizeof(tmpMfr));
+      strlcpy_P(tmpModel, PSTR("OpenTherm Direct Core"),   sizeof(tmpModel));
+      strlcpy(tmpSw, _VERSION,                            sizeof(tmpSw));
+      tmpHw[0] = '\0';
+    }
+    fill(static_cast<uint8_t>(HaDevice::OtCore), tmpName, tmpMfr, tmpModel, tmpSw, tmpHw);
+  }
+
+  // --- SAT (5): firmware-native virtual thermostat ---
   {
     snprintf_P(tmpName, sizeof(tmpName), PSTR("SAT (%s)"), hostname);
     strlcpy_P(tmpMfr,   PSTR("OTGW-firmware"),              sizeof(tmpMfr));
@@ -2214,6 +2244,16 @@ static void buildAllHaDeviceMeta(const char *hostname) {
     strlcpy(tmpSw, _VERSION, sizeof(tmpSw));
     tmpHw[0] = '\0';
     fill(static_cast<uint8_t>(HaDevice::Sat), tmpName, tmpMfr, tmpModel, tmpSw, tmpHw);
+  }
+
+  // --- Sensors (6): ADR-124 — physical hardware sensors (Dallas 1-wire + S0 pulse) ---
+  {
+    snprintf_P(tmpName, sizeof(tmpName), PSTR("Sensors (%s)"), hostname);
+    strlcpy_P(tmpMfr,   PSTR("OTGW-firmware"),       sizeof(tmpMfr));
+    strlcpy_P(tmpModel, PSTR("Hardware Sensors"),     sizeof(tmpModel));
+    strlcpy(tmpSw, _VERSION, sizeof(tmpSw));
+    tmpHw[0] = '\0';
+    fill(static_cast<uint8_t>(HaDevice::Sensors), tmpName, tmpMfr, tmpModel, tmpSw, tmpHw);
   }
 }
 
@@ -2289,15 +2329,18 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
                      ctx.nodeId);
     }
   } else {
-    // MODERN (Task 5): per-device metadata from ctx.devMeta[devIdx].
-    static const char * const kSuffixes[] = {
-      "-boiler", "-thermostat", "-gateway", "-esp", "-sat"
-    };
-    const char *suffix = (devIdx < 5) ? kSuffixes[devIdx] : "-esp";
+    // MODERN (Task 5 / ADR-124): per-device metadata from ctx.devMeta[devIdx].
+    const char *suffix = (devIdx < HA_DEVICE_COUNT) ? kHaDeviceSuffixes[devIdx] : "-esp";
     char identifier[sizeof(settings.mqtt.sUniqueid) + 16];
     snprintf(identifier, sizeof(identifier), "%s%s", ctx.nodeId, suffix);
+    // ADR-124 §3: Gateway is the via_device hub; every other device nests under it.
+    char viaBuf[sizeof(settings.mqtt.sUniqueid) + 24];
+    viaBuf[0] = '\0';
+    if (ctx.device != HaDevice::Gateway) {
+      snprintf_P(viaBuf, sizeof(viaBuf), PSTR(",\"via_device\":\"%s-gateway\""), ctx.nodeId);
+    }
     if (emitFull) {
-      const HaDeviceMeta *meta = (ctx.devMeta && devIdx < 5) ? &ctx.devMeta[devIdx] : nullptr;
+      const HaDeviceMeta *meta = (ctx.devMeta && devIdx < HA_DEVICE_COUNT) ? &ctx.devMeta[devIdx] : nullptr;
       const char *mfr   = meta ? meta->devManufacturer : ctx.manufacturer;
       const char *model = meta ? meta->devModel        : ctx.model;
       const char *name  = (meta && meta->devName && meta->devName[0]) ? meta->devName : nullptr;
@@ -2314,8 +2357,8 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
           snprintf_P(nameBuf, sizeof(nameBuf), PSTR("OpenTherm Gateway (%s)"), ctx.hostname);
         }
         n = snprintf_P(dest, destSize,
-                       PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"%s\",\"sw_version\":\"%s\",\"hw_version\":\"%s\"}"),
-                       identifier, mfr, model, nameBuf, sw, hw);
+                       PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"%s\",\"sw_version\":\"%s\",\"hw_version\":\"%s\"%s}"),
+                       identifier, mfr, model, nameBuf, sw, hw, viaBuf);
       } else {
         char nameBuf[72];
         if (name) {
@@ -2324,8 +2367,8 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
           snprintf_P(nameBuf, sizeof(nameBuf), PSTR("OpenTherm Gateway (%s)"), ctx.hostname);
         }
         n = snprintf_P(dest, destSize,
-                       PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"%s\",\"sw_version\":\"%s\"}"),
-                       identifier, mfr, model, nameBuf, sw);
+                       PSTR("\"dev\":{\"identifiers\":\"%s\",\"manufacturer\":\"%s\",\"model\":\"%s\",\"name\":\"%s\",\"sw_version\":\"%s\"%s}"),
+                       identifier, mfr, model, nameBuf, sw, viaBuf);
       }
       // Mark device as introduced so subsequent entities get the minimal block.
       if (ctx.deviceIntroduced) ctx.deviceIntroduced[devIdx] = true;
@@ -2350,18 +2393,15 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
 
   char topic[160];
   char payload[768];
-  char deviceBlock[256];
+  char deviceBlock[320];   // ADR-124: headroom for the added via_device key
 
   // TASK-648 Job A: pre-compute the uniq_id prefix for snprintf-built payloads.
   // Modern: nodeId + device suffix (e.g. "otgw-abc123-sat").
   // Legacy: bare nodeId (byte-identical to pre-648).
   char idPrefix[sizeof(settings.mqtt.sUniqueid) + 16];
   if (!ctx.legacyMode) {
-    static const char * const kSuffixes[] = {
-      "-boiler", "-thermostat", "-gateway", "-esp", "-sat"
-    };
     const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
-    const char *suffix = (devIdx < 5) ? kSuffixes[devIdx] : "-esp";
+    const char *suffix = (devIdx < HA_DEVICE_COUNT) ? kHaDeviceSuffixes[devIdx] : "-esp";
     snprintf(idPrefix, sizeof(idPrefix), "%s%s", ctx.nodeId, suffix);
   } else {
     strlcpy(idPrefix, ctx.nodeId, sizeof(idPrefix));
@@ -2444,17 +2484,14 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
 
   char topic[180];
   char payload[768];
-  char deviceBlock[256];
+  char deviceBlock[320];   // ADR-124: headroom for the added via_device key
 
   // TASK-648 Job A: pre-compute the uniq_id prefix for snprintf-built payloads.
   // Modern: nodeId + device suffix. Legacy: bare nodeId.
   char idPrefix[sizeof(settings.mqtt.sUniqueid) + 16];
   if (!ctx.legacyMode) {
-    static const char * const kSuffixes[] = {
-      "-boiler", "-thermostat", "-gateway", "-esp", "-sat"
-    };
     const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
-    const char *suffix = (devIdx < 5) ? kSuffixes[devIdx] : "-esp";
+    const char *suffix = (devIdx < HA_DEVICE_COUNT) ? kHaDeviceSuffixes[devIdx] : "-esp";
     snprintf(idPrefix, sizeof(idPrefix), "%s%s", ctx.nodeId, suffix);
   } else {
     strlcpy(idPrefix, ctx.nodeId, sizeof(idPrefix));
@@ -2593,16 +2630,16 @@ void doAutoConfigure(){
 // twice (BOILER_DEVICE_DESCRIPTION + THERMOSTAT_DEVICE_DESCRIPTION). Legacy mode
 // emits once with no device suffix (byte-identical to pre-Task-4 behaviour).
 //
-// Non-OT pseudo-IDs route to a single fixed device:
+// Non-OT pseudo-IDs route to a single fixed device (ADR-124 seven-device topology):
+//   243 (otdirect)    : OtCore    — OTDirect flame metrics (split out of 251; Ot-Core device)
 //   244 (piccontrols) : Gateway   — resetgateway button, GPIO/LED selects
-//   246 (dallas)      : Esp       — external temperature sensors
+//   245 (s0)          : Sensors   — S0 pulse counter (physical hardware sensor)
+//   246 (dallas)      : Sensors   — external 1-wire temperature sensors (was Esp)
 //   247 (heapstats)   : Esp       — firmware heap & discovery statistics
 //   248 (fwinfo)      : Esp       — firmware version, hostname, hardware type
-//   249 (picinfo)     : Gateway   — PIC version, device id, firmware type
+//   249 (picinfo)     : OtCore    — PIC version, device id, firmware type (was Gateway)
 //   250 (picsettings) : Gateway   — PIC settings (setpoint override, LED, GPIO…)
-//   251 (diag200)     : Sat       — OTDirect flame metrics + SAT BLE health (majority SAT;
-//                                   note: otdirect_flame_* entries are gateway internals
-//                                   bundled in this pseudo-ID for historical reasons)
+//   251 (diag200)     : Sat       — SAT BLE health/availability + SAT pressure status
 //   252 (satcore)     : Sat       — SAT control, PID, cycle statistics
 //   253 (satble)      : Sat       — SAT BLE sensor primaries + weather
 //   254 (satbinary)   : Sat       — SAT flame status
@@ -2623,13 +2660,15 @@ static HaDevice deviceForOTId(byte OTid) {
   // logic in doAutoConfigureMsgid() runs a second pass with Thermostat.
   if (OTid <= 127) return HaDevice::Boiler;  // bilateral, see doAutoConfigureMsgid
   switch (OTid) {
+    case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-124)
     case 244: return HaDevice::Gateway;  // piccontrols
-    case 246: return HaDevice::Esp;      // dallas
+    case 245: return HaDevice::Sensors;  // s0 pulse counter (ADR-124)
+    case 246: return HaDevice::Sensors;  // dallas 1-wire temps (ADR-124, was Esp)
     case 247: return HaDevice::Esp;      // heapstats
     case 248: return HaDevice::Esp;      // fwinfo
-    case 249: return HaDevice::Gateway;  // picinfo
+    case 249: return HaDevice::OtCore;      // picinfo (ADR-124, was Gateway)
     case 250: return HaDevice::Gateway;  // picsettings
-    case 251: return HaDevice::Sat;      // diag200 (OTDirect + SAT BLE health)
+    case 251: return HaDevice::Sat;      // diag200 (SAT BLE health)
     case 252: return HaDevice::Sat;      // satcore
     case 253: return HaDevice::Sat;      // satble + weather
     case 254: return HaDevice::Sat;      // satbinary (flame status)
@@ -2812,7 +2851,7 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
   if (!cfgSensorId || cfgSensorId[0] == '\0') return;
 
   HaDiscoveryContext ctx = buildDiscoveryContext();
-  ctx.device = HaDevice::Esp;  // TASK-648 Task 4: Dallas sensors belong to the ESP device
+  ctx.device = HaDevice::Sensors;  // ADR-124: Dallas temps are physical hardware sensors (was Esp)
   bool success = streamDallasSensorDiscovery(MQTTclient, cfgSensorId, ctx);
   if (success) {
     MQTTDebugTf(PSTR("Dallas discovery sent for [%s]\r\n"), cfgSensorId);

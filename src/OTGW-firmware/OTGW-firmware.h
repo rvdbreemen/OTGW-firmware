@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.163
+**  Version  : v2.0.0-alpha.164
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -734,6 +734,7 @@ byte      OTGWpiccontrolsid  = 244;
 byte      OTGWfwinfoid       = 248;
 byte      OTGWpicinfoid      = 249;
 byte      OTGWpicsettingsid  = 250;
+byte      OTGWotdirectid     = 243;   // ADR-124: OTDirect flame metrics, split out of 251 -> OT-Core (Pic) device
 byte      OTGWdiag200id      = 251;
 byte      OTGWsatcoreid      = 252;
 byte      OTGWsatweatherid   = 253;

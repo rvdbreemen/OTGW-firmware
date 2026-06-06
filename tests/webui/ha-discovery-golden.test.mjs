@@ -142,15 +142,24 @@ if (!legacyDumpPath && !legacyGoldenPath) {
 }
 
 // ---------------------------------------------------------------------------
-// Block B: Modern mode five-device split + naming + no via_device
+// Block B: Modern mode seven-device split + naming + via_device hub (ADR-124)
 // ---------------------------------------------------------------------------
 
-console.log('\n--- Block B: Modern mode five-device assertions ---');
+console.log('\n--- Block B: Modern mode seven-device assertions (ADR-124) ---');
 
 const modernDumpPath = process.env.MODERN_DUMP;
 const nodeId         = process.env.NODE_ID;
 
-const EXPECTED_SUFFIXES = ['boiler', 'thermostat', 'gateway', 'esp', 'sat'];
+// ADR-124 seven-device topology. The OT-Core device (enum HaDevice::OtCore) is
+// rendered per hardware so the model is obvious in HA: "pic" on a PIC build,
+// "ot-direct" on an OTGW32 direct-OT build — exactly one is present in any given
+// dump. boiler/thermostat/gateway/esp/sat are always present; sensors is present
+// only when the unit has Dallas/S0 hardware (reported, not required).
+const CORE_SUFFIXES     = ['boiler', 'thermostat', 'gateway', 'esp', 'sat'];
+const OTCORE_SUFFIXES   = ['pic', 'ot-direct'];
+// Full device-segment alternation used by the uniq_id / bilateral regexes.
+// ot-direct is listed before the short tokens so the alternation prefers it.
+const DEVICE_SEG_ALT    = '(boiler|thermostat|gateway|ot-direct|esp|pic|sat|sensors)';
 
 if (!modernDumpPath && !nodeId) {
   log(null, 'Modern mode checks (MODERN_DUMP and NODE_ID not set)');
@@ -167,7 +176,8 @@ if (!modernDumpPath && !nodeId) {
     const entries = parseDump(modernText);
     log(entries.length > 0, `Parsed ${entries.length} entries from modern dump`);
 
-    // B-1: Five distinct device identifiers
+    // B-1: distinct device identifiers — core five always present, exactly one
+    // OT-core (pic xor otdirect), sensors reported when present.
     const identifierRe = /"identifiers"\s*:\s*"([^"]+)"/g;
     const foundDevices = new Set();
     for (const { payload } of entries) {
@@ -179,17 +189,28 @@ if (!modernDumpPath && !nodeId) {
       }
     }
 
-    for (const suffix of EXPECTED_SUFFIXES) {
+    for (const suffix of CORE_SUFFIXES) {
       const expected = `${nodeId}-${suffix}`;
       log(
         foundDevices.has(expected),
         `Device identifier "${expected}" present in payloads (found: ${[...foundDevices].join(', ') || 'none'})`
       );
     }
+    // Exactly one OT-Core device (pic on a PIC build, ot-direct on OTGW32).
+    const otCorePresent = OTCORE_SUFFIXES.filter((s) => foundDevices.has(`${nodeId}-${s}`));
+    log(
+      otCorePresent.length === 1,
+      `Exactly one OT-Core device present (pic xor ot-direct) — found: ${otCorePresent.join(', ') || 'none'}`
+    );
+    // sensors is hardware-conditional: report only.
+    log(
+      null,
+      `Sensors device ${foundDevices.has(`${nodeId}-sensors`) ? 'present' : 'absent (no Dallas/S0 hardware in this dump)'}`
+    );
 
-    // B-2: Every uniq_id / unique_id matches ^{nodeId}-(boiler|thermostat|gateway|esp|sat)-
+    // B-2: Every uniq_id / unique_id matches ^{nodeId}-<device-segment>-
     const uniqIdPattern = new RegExp(
-      `^${nodeId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}-(boiler|thermostat|gateway|esp|sat)-`
+      `^${nodeId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}-${DEVICE_SEG_ALT}-`
     );
     const uniqIdRe = /"(?:uniq_id|unique_id)"\s*:\s*"([^"]+)"/g;
 
@@ -217,16 +238,44 @@ if (!modernDumpPath && !nodeId) {
       }
       log(
         badUniqIds === 0,
-        `All ${totalUniqIds} uniq_id/unique_id values match ^${nodeId}-(boiler|thermostat|gateway|esp|sat)-`
+        `All ${totalUniqIds} uniq_id/unique_id values match ^${nodeId}-${DEVICE_SEG_ALT}-`
       );
     }
 
-    // B-3: No payload contains "via_device"
-    const viaDevicePayloads = entries.filter(({ payload }) => /"via_device"/.test(payload));
-    if (viaDevicePayloads.length > 0) {
-      console.log(`  hint: via_device found in topics: ${viaDevicePayloads.slice(0, 3).map(e => e.topic).join(', ')}`);
+    // B-3: ADR-124 §3 — Gateway is the via_device hub.
+    //   (a) via_device is present (the hierarchy is emitted at all),
+    //   (b) every via_device value equals "<nodeId>-gateway",
+    //   (c) the Gateway's own device block never carries via_device.
+    const viaDeviceRe = /"via_device"\s*:\s*"([^"]+)"/g;
+    const expectedVia = `${nodeId}-gateway`;
+    let viaTotal = 0;
+    let viaBad   = 0;
+    const viaBadExamples = [];
+    for (const { payload } of entries) {
+      viaDeviceRe.lastIndex = 0;
+      let m;
+      while ((m = viaDeviceRe.exec(payload)) !== null) {
+        viaTotal++;
+        if (m[1] !== expectedVia) {
+          viaBad++;
+          if (viaBadExamples.length < 3) viaBadExamples.push(m[1]);
+        }
+      }
     }
-    log(viaDevicePayloads.length === 0, `No payload contains "via_device" key (found ${viaDevicePayloads.length})`);
+    log(viaTotal > 0, `via_device hierarchy emitted (found ${viaTotal} via_device keys)`);
+    if (viaBad > 0) console.log(`  hint: non-conforming via_device values: ${viaBadExamples.join(', ')}`);
+    log(viaBad === 0, `All via_device values equal "${expectedVia}" (bad: ${viaBad})`);
+    // (c) The gateway's own full device block must not point at itself.
+    const gatewayIdRe = new RegExp(
+      `"identifiers"\\s*:\\s*"${nodeId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}-gateway"`
+    );
+    const gatewaySelfVia = entries.filter(
+      ({ payload }) => gatewayIdRe.test(payload) && /"via_device"/.test(payload)
+    );
+    log(
+      gatewaySelfVia.length === 0,
+      `Gateway device block carries no via_device (found ${gatewaySelfVia.length})`
+    );
 
     // ---------------------------------------------------------------------------
     // Block C: Bilateral sensor check (optional)
@@ -243,7 +292,7 @@ if (!modernDumpPath && !nodeId) {
       // Build a map: label -> set of device-type segments that own it
       // We look for uniq_ids that contain the label and extract the device segment.
       const deviceSegRe = new RegExp(
-        `^${nodeId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}-(boiler|thermostat|gateway|esp|sat)-(.+)$`
+        `^${nodeId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}-${DEVICE_SEG_ALT}-(.+)$`
       );
 
       for (const label of labels) {

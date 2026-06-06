@@ -1,7 +1,7 @@
 ---
 id: ADR-124
 title: HA Discovery Seven-Device Topology — Dedicated OT-Core and Sensors Devices, Gateway via_device Hub
-status: Proposed
+status: Accepted
 date: 2026-06-05
 tags: [mqtt, ha-discovery, topology, via-device, pic, otdirect, sensors, dallas, s0, esp, gateway]
 supersedes: [ADR-122]
@@ -14,7 +14,7 @@ deciders: [Robert van den Breemen]
 
 ## Status
 
-Proposed. Date: 2026-06-05. **Supersedes ADR-122** (five-device topology).
+Accepted. Date: 2026-06-06 (Proposed 2026-06-05). **Supersedes ADR-122** (five-device topology).
 
 **Decision Maker:** User: Robert van den Breemen. This is a maintainer decision
 revising the device split based on field insight after living with the
@@ -22,12 +22,23 @@ five-device layout; it overrides three specific points of ADR-122 (the Gateway's
 absorption of the OT-core identity, the placement of hardware sensors on the Esp
 device, and the deliberate omission of `via_device`).
 
-**Binding** (per ADR-080): the same golden-file discovery test + `evaluate.py`
-gate that ADR-122 introduced (`check_ha_discovery_device_routing`) is the CI gate
-for this ADR; it must be updated in the implementing commit (TASK-826) to assert
-(a) **seven** device blocks, (b) the new OT-Core and Sensors routing, and (c) a
-`via_device` pointing at `<nodeId>-gateway` on every non-Gateway device. Legacy
+**Binding** (per ADR-080): the gate is the golden-file discovery test
+(`tests/webui/ha-discovery-golden.test.mjs`), updated in the implementing commit
+(TASK-826) to assert (a) the **seven** device identifiers, (b) the new OT-Core
+and Sensors routing, and (c) a `via_device` pointing at `<nodeId>-gateway` on
+every non-Gateway device while the Gateway block carries none. Legacy
 single-device mode (`bLegacyMode = true`) remains byte-identical and is unchanged.
+
+**Gate caveat (honest status):** the golden test is **dump-driven** — its
+assertions execute only when run against a captured discovery dump
+(`MODERN_DUMP` + `NODE_ID`); with no dump it SKIPs and reports PASS. There is
+**no compile-time `evaluate.py` check** for device routing today: the
+`check_ha_discovery_device_routing` name referenced in earlier drafts and in the
+adr-kit policy block below does **not** exist in `evaluate.py`. So enforcement is
+currently **field-validation only** (capture a dump on a real device, run the
+golden test). Adding a static `evaluate.py` gate that parses the routing tables
+is tracked as a follow-up; until it lands, this ADR is binding-by-review +
+field-test, not binding-by-CI.
 
 ## Status History
 
@@ -37,6 +48,11 @@ status_history:
     changed_by: Claude (TASK-826)
     reason: Maintainer revised the five-device topology (ADR-122) to seven devices — splitting the OpenTherm-core (PIC/OTDirect) into its own device, giving the physical hardware sensors (Dallas + S0) their own device, and adding a Gateway-as-hub via_device hierarchy. Decision taken by Robert van den Breemen.
     changed_via: adr-kit
+  - date: 2026-06-06
+    status: Accepted
+    changed_by: Claude (TASK-826)
+    reason: Implementation landed — seven-device HaDevice enum, OT-Core (pic/otdirect) + Sensors devices, Gateway via_device hub, OTDirect flame metrics split to pseudo-ID 243. Golden-file discovery test updated for seven devices + via_device; esp32 + esp8266 builds green; evaluate.py --quick green. Gates satisfied (Completeness, Evidence, Clarity, Consistency).
+    changed_via: manual
 
 ## Context
 
@@ -78,7 +94,7 @@ Expand the topology from five to **seven** devices and add a Gateway-rooted
 `via_device` hierarchy:
 
 ```
-HaDevice { Boiler, Thermostat, Gateway, Esp, Pic, Sat, Sensors }
+HaDevice { Boiler, Thermostat, Gateway, Esp, OtCore, Sat, Sensors }
 ```
 
 ### 1. Seven devices
@@ -89,17 +105,22 @@ HaDevice { Boiler, Thermostat, Gateway, Esp, Pic, Sat, Sensors }
 | 2 | Thermostat | `<nodeId>-thermostat` | `thermostat` | (unchanged — master-origin) | — |
 | 3 | Gateway | `<nodeId>-gateway` | `gateway` | OTGW *config* internals: operating mode, LED A-F, GPIO A/B + states, setback, override mode, smart-power, Vref, etc. | OT-core identity moves OUT (see #5) |
 | 4 | Esp | `<nodeId>-esp` | `esp` | ESP-node diagnostics only: heap, WiFi, uptime, IP, MAC, OTA, MQTT/WS health, OLED presence | Dallas + S0 move OUT (see #7) |
-| 5 | OT-Core | `<nodeId>-pic` **or** `<nodeId>-otdirect` | `pic` (HAS_PIC) / `otdirect` (HAS_DIRECT_OT) | PIC firmware version / device-id / fw-type (PIC) **or** OT-Direct mode / status (OTDirect) | **NEW** |
+| 5 | OT-Core (`HaDevice::OtCore`) | `<nodeId>-pic` **or** `<nodeId>-ot-direct` | `pic` (HAS_PIC) / `ot-direct` (HAS_DIRECT_OT) | PIC firmware version / device-id / fw-type (PIC) **or** OT-Direct mode / status (OTDirect) | **NEW** |
 | 6 | Sat | `<nodeId>-sat` | `sat` | (unchanged — `sat/*`) | — |
 | 7 | Sensors | `<nodeId>-sensors` | `sensors` | Dallas 1-wire temperatures + S0 pulse counter (+ future discrete hardware sensors) | **NEW** |
 
 ### 2. OT-Core device named per hardware (one enum slot, not two)
 
-The OT-Core device is a single `HaDevice` value rendered as `pic` on a `HAS_PIC`
-build and `otdirect` on a `HAS_DIRECT_OT` build — never both, because a build
-links exactly one bus driver. The platform-conditional name lives in
-`haDeviceSuffix()` / the device-name switch, gated by the existing `HAS_PIC` /
-`HAS_DIRECT_OT` capability flags (no raw `#ifdef` outside the platform layer).
+The OT-Core device is a single hardware-agnostic enum value (`HaDevice::OtCore`)
+whose **user-facing** name and identifier suffix are rendered per hardware so the
+bus-driver model is obvious in HA — `pic` (suffix `-pic`) on a `HAS_PIC` build
+and `ot-direct` (suffix `-ot-direct`) on a `HAS_DIRECT_OT` build — never both,
+because a build links exactly one bus driver. The internal code name stays
+`OtCore` (hardware-agnostic); only the rendered name/suffix differentiate. The
+compile-time choice lives in the `HA_OTCORE_NAME` / `HA_OTCORE_SUFFIX` macros
+(MQTTstuff.h) gated by the existing `HAS_PIC` / `HAS_DIRECT_OT` capability flags
+(no raw `#ifdef` outside the platform layer), consumed by `haDeviceSuffix()` and
+the device-name switches.
 
 ### 3. Gateway as `via_device` hub
 
@@ -112,8 +133,8 @@ is unchanged.
 
 `haDeviceForEntity()` (the single auditable map) gains the two new buckets:
 
-- PIC firmware-info entities → `HaDevice::Pic` on `HAS_PIC`; OT-Direct status
-  entities → `HaDevice::Pic` on `HAS_DIRECT_OT`.
+- PIC firmware-info entities → `HaDevice::OtCore` on `HAS_PIC`; OT-Direct status
+  entities → `HaDevice::OtCore` on `HAS_DIRECT_OT`.
 - Dallas temps + S0 pulse counter → `HaDevice::Sensors` (was `HaDevice::Esp`).
 
 All other routing from ADR-122 (slave→Boiler, master→Thermostat, bilateral→both,
@@ -182,11 +203,14 @@ merging them would reproduce the same "wrong bucket" problem one level over.
 
 - *Risk:* the golden-file discovery test still asserts five device blocks and
   fails, or worse, is updated carelessly and stops guarding routing.
-  *Mitigation:* TASK-826 updates `check_ha_discovery_device_routing` to seven
-  devices + via_device as a Definition-of-Done item in the same commit (ADR-080).
+  *Mitigation:* TASK-826 updates `tests/webui/ha-discovery-golden.test.mjs` to
+  seven devices + via_device in the same commit. NOTE: the test is dump-driven
+  (field-validation), not a compile-time CI gate — see the Gate caveat in Status.
 - *Risk:* a contributor adds a sensor entity and forgets it now routes to
-  `Sensors`, dropping it back onto Esp. *Mitigation:* routing remains centralized
-  in `haDeviceForEntity()`; the CI gate checks the entity-set routing.
+  `Sensors`, dropping it back onto Esp. *Mitigation:* routing stays centralized in
+  the two mirrored maps (`deviceForOTId` in MQTTstuff.ino, `topoDeviceForPseudoId`
+  in MQTTHaDiscovery.cpp); a future static `evaluate.py` gate (follow-up) should
+  assert the entity-set routing so this is caught at CI rather than in the field.
 - *Risk:* the per-hardware OT-Core name leaks a raw `#ifdef` into discovery code.
   *Mitigation:* gate on the existing `HAS_PIC` / `HAS_DIRECT_OT` capability flags
   inside the platform-allowed switch, per the ESP-abstraction rule.
@@ -196,7 +220,7 @@ merging them would reproduce the same "wrong bucket" problem one level over.
 ```json
 {
   "llm_judge": true,
-  "guidance": "MQTT HA discovery device topology MUST be the seven-device set {Boiler, Thermostat, Gateway, Esp, Pic, Sat, Sensors} in modern mode. Flag changes that: (a) add or remove a HaDevice enum value without superseding this ADR; (b) route Dallas temperature or S0 pulse-counter entities to any device other than HaDevice::Sensors; (c) route PIC firmware-info or OT-Direct status entities to any device other than HaDevice::Pic; (d) emit a non-Gateway device block without via_device:<nodeId>-gateway in modern mode; or (e) emit via_device in legacy (bLegacyMode) mode. The golden-file discovery test in tests/ and check_ha_discovery_device_routing in evaluate.py are the authoritative gate; changes to device routing must update both."
+  "guidance": "MQTT HA discovery device topology MUST be the seven-device set {Boiler, Thermostat, Gateway, Esp, OtCore, Sat, Sensors} in modern mode. Flag changes that: (a) add or remove a HaDevice enum value without superseding this ADR; (b) route Dallas temperature or S0 pulse-counter entities to any device other than HaDevice::Sensors; (c) route PIC firmware-info or OT-Direct status entities to any device other than HaDevice::OtCore; (d) emit a non-Gateway device block without via_device:<nodeId>-gateway in modern mode; or (e) emit via_device in legacy (bLegacyMode) mode. The golden-file discovery test (tests/webui/ha-discovery-golden.test.mjs) is the authoritative gate; it is dump-driven (field-validation), so changes to device routing must update it and be confirmed against a captured discovery dump. A compile-time evaluate.py gate is a tracked follow-up, not yet implemented."
 }
 ```
 

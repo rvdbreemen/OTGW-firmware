@@ -1268,13 +1268,17 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {250, 0x08, ha_lbl_pic_set_reset_cause,         ha_name_pic_set_reset_cause,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {250, 0x08, ha_lbl_pic_set_standalone_interval, ha_name_pic_set_standalone_interval, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {250, 0x08, ha_lbl_pic_set_voltage_ref,         ha_name_pic_set_voltage_ref,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    // --- Pseudo-ID 243: OTDirect OT-core metrics (ADR-124 / TASK-826) ---
+    // Split out of 251 so they route to the dedicated OT-Core ("otdirect") device.
+    // These rows are physically out of numeric order (243 after 250); that is fine —
+    // mqttHaSensorIndex[] is a direct LUT, only per-id contiguity matters, not global sort.
+    {243, 0x00, ha_lbl_otdirect_flame_duty_pct,       ha_name_otdirect_flame_duty_pct,       HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::gauge,               HaEntityCat::diagnostic, true},
+    {243, 0x00, ha_lbl_otdirect_flame_cycles_per_hr,  ha_name_otdirect_flame_cycles_per_hr,  HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement, HaIcon::counter,             HaEntityCat::diagnostic, true},
     // --- Pseudo-ID 251: 2.0.0-specific diagnostics (TASK-541) ---
-    // OTDirect flame metrics + SAT BLE health/availability + SAT pressure status string.
+    // SAT BLE health/availability + SAT pressure status string.
     // SAT measurement primaries (ble_temp/humidity, ch_pressure) and the wider SAT
     // control/PID/cycle/weather/zone surface live in TASK-543 — a dedicated discovery
     // task because those are user-facing primaries, not diagnostics.
-    {251, 0x00, ha_lbl_otdirect_flame_duty_pct,       ha_name_otdirect_flame_duty_pct,       HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::gauge,               HaEntityCat::diagnostic, true},
-    {251, 0x00, ha_lbl_otdirect_flame_cycles_per_hr,  ha_name_otdirect_flame_cycles_per_hr,  HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement, HaIcon::counter,             HaEntityCat::diagnostic, true},
     {251, 0x00, ha_lbl_sat_ble_sensor_rssi,           ha_name_sat_ble_sensor_rssi,           HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {251, 0x00, ha_lbl_sat_ble_battery,               ha_name_sat_ble_battery,               HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {251, 0x00, ha_lbl_sat_ble_sensor_count,          ha_name_sat_ble_sensor_count,          HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement, HaIcon::counter,             HaEntityCat::diagnostic, true},
@@ -1714,7 +1718,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 240
     0xFFFF, // id 241
     0xFFFF, // id 242
-    0xFFFF, // id 243
+    330, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
     288, // id 246, 1 entry
@@ -1722,7 +1726,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     306, // id 248, 5 entries (TASK-541 firmware diagnostics + ADR-113 hardware_type)
     311, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
     315, // id 250, 15 entries (TASK-541 PIC settings)
-    330, // id 251, 7 entries (TASK-541 OTDirect/SAT diagnostics)
+    332, // id 251, 5 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
     337, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
     369, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
     384, // id 254, 1 entry  (TASK-543 SAT flame status)
@@ -2223,7 +2227,9 @@ static PGM_P haDeviceSuffix(HaDevice d) {
     case HaDevice::Thermostat: return PSTR("-thermostat");
     case HaDevice::Gateway:    return PSTR("-gateway");
     case HaDevice::Esp:        return PSTR("-esp");
+    case HaDevice::OtCore:        return PSTR(HA_OTCORE_SUFFIX);  // ADR-124: -pic or -ot-direct
     case HaDevice::Sat:        return PSTR("-sat");
+    case HaDevice::Sensors:    return PSTR("-sensors");
   }
   return PSTR("-esp");
 }
@@ -2279,7 +2285,7 @@ static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
     } else {
       // MODERN (Task 5): per-device metadata from ctx.devMeta[devIdx].
       // Fall back to legacy strings when devMeta is nullptr (safe default).
-      const HaDeviceMeta *meta = (ctx.devMeta && devIdx < 5) ? &ctx.devMeta[devIdx] : nullptr;
+      const HaDeviceMeta *meta = (ctx.devMeta && devIdx < HA_DEVICE_COUNT) ? &ctx.devMeta[devIdx] : nullptr;
       const char *mfr   = meta ? meta->devManufacturer : ctx.manufacturer;
       const char *model = meta ? meta->devModel        : ctx.model;
       const char *sw    = meta ? meta->devSwVersion    : ctx.version;
@@ -2308,6 +2314,13 @@ static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
       if (hw) {
         if (!writeJsonComma(w)) return false;
         if (!writeJsonKV(w, kHwVer, hw)) return false;
+      }
+      // ADR-124 §3: Gateway is the hub; every other device nests under it via_device.
+      if (ctx.device != HaDevice::Gateway) {
+        if (!writeJsonComma(w)) return false;
+        if (!w.writeProgmem(PSTR("\"via_device\":\""))) return false;
+        if (!w.writeRam(ctx.nodeId)) return false;
+        if (!w.writeProgmem(PSTR("-gateway\""))) return false;
       }
       // Mark device as introduced so subsequent entities get the minimal block.
       if (ctx.deviceIntroduced) ctx.deviceIntroduced[devIdx] = true;
@@ -2581,7 +2594,9 @@ static const char *haDeviceShortName(const HaDiscoveryContext &ctx) {
     case HaDevice::Thermostat: return "thermostat";
     case HaDevice::Gateway:    return "gateway";
     case HaDevice::Esp:        return "esp";
+    case HaDevice::OtCore:        return HA_OTCORE_NAME;  // ADR-124: pic or ot-direct
     case HaDevice::Sat:        return "sat";
+    case HaDevice::Sensors:    return "sensors";
   }
   return "esp";
 }
@@ -3799,7 +3814,9 @@ static const char *topoDeviceName(HaDevice d) {
     case HaDevice::Thermostat: return "thermostat";
     case HaDevice::Gateway:    return "gateway";
     case HaDevice::Esp:        return "esp";
+    case HaDevice::OtCore:        return HA_OTCORE_NAME;  // ADR-124: pic or ot-direct
     case HaDevice::Sat:        return "sat";
+    case HaDevice::Sensors:    return "sensors";
   }
   return "esp";
 }
@@ -3809,11 +3826,13 @@ static const char *topoDeviceName(HaDevice d) {
 // there; this local copy exists solely to avoid cross-TU access to a static).
 static HaDevice topoDeviceForPseudoId(uint8_t otId) {
   switch (otId) {
+    case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-124)
     case 244: return HaDevice::Gateway;
-    case 246: return HaDevice::Esp;
+    case 245: return HaDevice::Sensors;  // s0 pulse counter (ADR-124)
+    case 246: return HaDevice::Sensors;  // dallas (ADR-124, was Esp)
     case 247: return HaDevice::Esp;
     case 248: return HaDevice::Esp;
-    case 249: return HaDevice::Gateway;
+    case 249: return HaDevice::OtCore;      // picinfo (ADR-124, was Gateway)
     case 250: return HaDevice::Gateway;
     case 251: return HaDevice::Sat;
     case 252: return HaDevice::Sat;
