@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-06 16:04'
-updated_date: '2026-06-06 16:11'
+updated_date: '2026-06-06 16:12'
 labels: []
 dependencies: []
 ---
@@ -25,3 +25,13 @@ The mqtt-debug capture script reads the coarse MQTT reboot_reason topic (just 'E
 - [x] #5 New -SkipCrashlogCapture switch and -CrashlogPollSeconds param (default 30) exist; --help documents them
 - [x] #6 Existing capture behaviour (telnet/mqtt/browser) unchanged when new flags are default
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added a crash-log poller to capture-mqtt-debug.bat so the decoded ESP exception (exccause + epc1/epc2/epc3/excvaddr/depc) is captured automatically, not just the coarse MQTT reboot_reason string.
+
+Implementation mirrors the existing browser-capture runspace: a [powershell]::Create() worker shares the CancelFlag stop signal, polls http://<DeviceHost>/api/v2/device/crashlog plus the raw /reboot_log.txt ring buffer via HttpWebRequest (explicit Timeout against a stalling device), and writes timestamped, change-deduped entries to crashlog.log. The log is merged into transcript.txt and removed as an intermediate. New -SkipCrashlogCapture switch and -CrashlogPollSeconds param (default 30); --help documents both.
+
+Graceful across firmware: 404 (1.2.0 lacks the endpoint) and timeouts are logged, never abort the capture. Verified: payload parses clean (ParseFile, 0 errors), --help renders the new section, Invoke-HttpGet swallows unreachable-host errors, and an 8s live run against an unreachable device produced crashlog.log with poll entries merged into transcript and intermediate files removed.
+<!-- SECTION:FINAL_SUMMARY:END -->
