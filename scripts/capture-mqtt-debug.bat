@@ -88,12 +88,27 @@ $telnetConnectTimeoutSeconds = $TelnetConnectTimeoutSeconds
 $telnetPostDisconnectDelayMilliseconds = $TelnetPostDisconnectDelayMilliseconds
 $telnetReconnectDelayMilliseconds = $TelnetReconnectDelayMilliseconds
 
+# Telnet debug toggles are parsed dynamically from the banner "Debug toggles"
+# block, so the same code works across firmware families. 1.x and 2.0.0/OTGW32
+# use different keys (1.x: 4=MQTTGate, 6=NTP; 2.0.0: g=MQTTGate, n=NTP, plus
+# 5=SAT, 6=OTDirect, 7=SATBLE). Each toggle is a press-key-to-flip switch, so we
+# only send the key when its state is [0]. Simulator toggles inject fake data,
+# not log, and are excluded by label.
+$script:DebugToggleSimulators = @('SensorSim', 'OTGW-Sim')
+
 function Show-Help {
     Write-Host "OTGW MQTT diagnostic capture"
     Write-Host ""
     Write-Host "Usage:"
     Write-Host "  .\scripts\capture-mqtt-debug.bat [-DeviceHost <host>] [-BrokerHost <host>] [-BrokerPort <port>] [-Topic <topic>] [-Username <user>] [-Password <pass>] [-DurationSeconds <seconds>]"
     Write-Host "  .\scripts\capture-mqtt-debug.bat --help"
+    Write-Host ""
+    Write-Host "Debug logging:"
+    Write-Host "  On connect (and after every reconnect/reboot) the script enables ALL telnet logging"
+    Write-Host "  toggles that are off: OTmsg, REST API, MQTT, MQTTGate, Sensors, NTP. Toggles already"
+    Write-Host "  on are left as-is. Simulator toggles (SensorSim, OTGW-Sim) are never touched. Toggle keys"
+    Write-Host "  are parsed from the banner, so 1.x and 2.0.0/OTGW32 layouts both work."
+    Write-Host "  It then sends 'q' (read settings) and 'D' (dump settings/state) so they land in telnet.log."
     Write-Host ""
     Write-Host "Interactive mode:"
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
@@ -708,10 +723,13 @@ function Read-InitialTelnetBanner {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $banner = ""
 
+    # Break on the end-of-banner footer (after the full "Debug toggles" block) so
+    # every logging toggle 1-6 is present before we parse states. Breaking on the
+    # MQTT line (toggle 3) would miss toggles 4-6 printed on the following lines.
     while ((Get-Date) -lt $deadline) {
         if ($Stream.DataAvailable) {
             $banner += Read-TelnetAvailable -Stream $Stream -Writer $Writer
-            if ($banner -match '(?m)\b3\s+MQTT\s+\[(?<state>[01])\]') {
+            if ($banner -match "Press 'h' for command menu" -or $banner -match '(?m)\bOTGW-Sim\b') {
                 break
             }
         }
@@ -723,28 +741,100 @@ function Read-InitialTelnetBanner {
     return $banner
 }
 
-function Enable-MqttTelnetDebugIfNeeded {
+function Enable-AllTelnetDebugIfNeeded {
     param(
         [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
         [Parameter(Mandatory = $true)][System.IO.StreamWriter]$Writer,
         [Parameter(Mandatory = $true)][AllowEmptyString()][AllowNull()][string]$Banner
     )
 
-    if ($Banner -match '(?m)\b3\s+MQTT\s+\[(?<state>[01])\]') {
-        $state = $Matches['state']
-        if ($state -eq "0") {
-            $bytes = [System.Text.Encoding]::ASCII.GetBytes("3")
-            $Stream.Write($bytes, 0, $bytes.Length)
-            $Stream.Flush()
-            Start-Sleep -Milliseconds 500
-            [void](Read-TelnetAvailable -Stream $Stream -Writer $Writer)
-            return "sent key 3 because MQTT debug was off"
+    # Parse the "Debug toggles" block from the connect-time banner dynamically and
+    # flip every toggle showing [0] by sending its key. Matching "<key> <Label>
+    # [<0|1>]" triplets makes this firmware-agnostic. Status flags such as
+    # "[-D---W--]" never match because the bracket must hold a single 0 or 1.
+    $results = New-Object System.Collections.Generic.List[string]
+    $pattern = '(?:^|\s)(?<key>\S)\s+(?<label>[A-Za-z][A-Za-z0-9 /]*?)\s*\[(?<state>[01])\]'
+    $seen = New-Object System.Collections.Generic.HashSet[string]
+
+    foreach ($m in [regex]::Matches($Banner, $pattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)) {
+        $key = $m.Groups['key'].Value
+        $label = $m.Groups['label'].Value.Trim()
+        $state = $m.Groups['state'].Value
+        if ([string]::IsNullOrWhiteSpace($label)) { continue }
+        if (-not $seen.Add($label)) { continue }
+
+        if ($script:DebugToggleSimulators -contains $label) {
+            $results.Add("$label=skipped (simulator)") | Out-Null
+            continue
         }
 
-        return "not sent because MQTT debug was already on"
+        if ($state -eq "0") {
+            $bytes = [System.Text.Encoding]::ASCII.GetBytes($key)
+            $Stream.Write($bytes, 0, $bytes.Length)
+            $Stream.Flush()
+            Start-Sleep -Milliseconds 300
+            [void](Read-TelnetAvailable -Stream $Stream -Writer $Writer)
+            $results.Add("$label=on (sent '$key')") | Out-Null
+        }
+        else {
+            $results.Add("$label=already-on") | Out-Null
+        }
     }
 
-    return "not sent because MQTT debug state was not found in the telnet banner"
+    if ($results.Count -eq 0) {
+        return "no debug toggles found in banner"
+    }
+    return ($results -join "; ")
+}
+
+function Send-TelnetKeyAndDrain {
+    param(
+        [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
+        [Parameter(Mandatory = $true)][System.IO.StreamWriter]$Writer,
+        [Parameter(Mandatory = $true)][string]$Key,
+        [int]$TimeoutSeconds = 5,
+        [int]$IdleMilliseconds = 800
+    )
+
+    # Send a single command key, then drain the multi-line response into telnet.log
+    # until the stream stays quiet for IdleMilliseconds, with a hard timeout cap so
+    # a stalled device cannot block capture.
+    $bytes = [System.Text.Encoding]::ASCII.GetBytes($Key)
+    $Stream.Write($bytes, 0, $bytes.Length)
+    $Stream.Flush()
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $idle = 0
+    while ((Get-Date) -lt $deadline) {
+        if ($Stream.DataAvailable) {
+            [void](Read-TelnetAvailable -Stream $Stream -Writer $Writer)
+            $idle = 0
+        }
+        else {
+            Start-Sleep -Milliseconds 100
+            $idle += 100
+            if ($idle -ge $IdleMilliseconds) {
+                break
+            }
+        }
+    }
+}
+
+function Request-SettingsDump {
+    param(
+        [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
+        [Parameter(Mandatory = $true)][System.IO.StreamWriter]$Writer
+    )
+
+    # Capture device settings + state at session start. Firmware command keys:
+    #   'q' = force read settings (re-read from filesystem)
+    #   'D' = dump full debug info (settings + state) on 2.0.0; full INI dump on 1.x
+    # Both stream multi-line output into telnet.log. Unknown keys are ignored by the
+    # firmware, so sending both is safe across firmware families.
+    Send-TelnetKeyAndDrain -Stream $Stream -Writer $Writer -Key "q"
+    Send-TelnetKeyAndDrain -Stream $Stream -Writer $Writer -Key "D"
+
+    return "sent 'q' (read settings) + 'D' (dump settings/state)"
 }
 
 function Connect-TelnetCapture {
@@ -763,8 +853,11 @@ function Connect-TelnetCapture {
         Add-SummaryLine "Telnet connected: $((Get-Date).ToString('o'))"
 
         $banner = Read-InitialTelnetBanner -Stream $stream -Writer $Writer
-        $toggleAction = Enable-MqttTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
-        Add-SummaryLine "MQTT debug toggle action: $toggleAction"
+        $toggleAction = Enable-AllTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
+        Add-SummaryLine "Debug toggle actions: $toggleAction"
+
+        $dumpAction = Request-SettingsDump -Stream $stream -Writer $Writer
+        Add-SummaryLine "Settings dump: $dumpAction"
 
         return [PSCustomObject]@{
             Client = $client
