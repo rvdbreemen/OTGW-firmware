@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-06 16:04'
-updated_date: '2026-06-06 16:06'
+updated_date: '2026-06-06 16:11'
 labels: []
 dependencies: []
 ---
@@ -18,10 +18,10 @@ The mqtt-debug capture script reads the coarse MQTT reboot_reason topic (just 'E
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Script polls http://<DeviceHost>/api/v2/device/crashlog on an interval and appends JSON results to crashlog.log
-- [ ] #2 Poller runs as a runspace sharing the CancelFlag stop signal, started in try and drained in finally, same shape as the browser worker
-- [ ] #3 404/non-JSON/timeout responses are logged but never abort the capture (graceful across 1.2.0 which lacks the endpoint)
-- [ ] #4 crashlog.log is folded into transcript.txt and removed as an intermediate file
-- [ ] #5 New -SkipCrashlogCapture switch and -CrashlogPollSeconds param (default 30) exist; --help documents them
-- [ ] #6 Existing capture behaviour (telnet/mqtt/browser) unchanged when new flags are default
+- [x] #1 Script polls http://<DeviceHost>/api/v2/device/crashlog on an interval and appends JSON results to crashlog.log
+- [x] #2 Poller runs as a runspace sharing the CancelFlag stop signal, started in try and drained in finally, same shape as the browser worker
+- [x] #3 404/non-JSON/timeout responses are logged but never abort the capture (graceful across 1.2.0 which lacks the endpoint)
+- [x] #4 crashlog.log is folded into transcript.txt and removed as an intermediate file
+- [x] #5 New -SkipCrashlogCapture switch and -CrashlogPollSeconds param (default 30) exist; --help documents them
+- [x] #6 Existing capture behaviour (telnet/mqtt/browser) unchanged when new flags are default
 <!-- AC:END -->
