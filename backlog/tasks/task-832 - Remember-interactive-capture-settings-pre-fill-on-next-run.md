@@ -1,7 +1,7 @@
 ---
 id: TASK-832
 title: Remember interactive capture settings (pre-fill on next run)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-06 08:55'
