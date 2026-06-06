@@ -84,12 +84,30 @@ $telnetConnectTimeoutSeconds = $TelnetConnectTimeoutSeconds
 $telnetPostDisconnectDelayMilliseconds = $TelnetPostDisconnectDelayMilliseconds
 $telnetReconnectDelayMilliseconds = $TelnetReconnectDelayMilliseconds
 
+# Telnet debug toggles that produce LOG output (banner "Debug toggles" block).
+# Each is a press-key-to-flip switch, so we only send the key when its state is
+# [0]; sending it when already [1] would turn the log OFF. The simulator toggles
+# (SensorSim, OTGW-Sim) are deliberately excluded: they inject fake data, not log.
+$script:DebugToggles = @(
+    [PSCustomObject]@{ Key = "1"; Label = "OTmsg" },
+    [PSCustomObject]@{ Key = "2"; Label = "REST API" },
+    [PSCustomObject]@{ Key = "3"; Label = "MQTT" },
+    [PSCustomObject]@{ Key = "4"; Label = "MQTTGate" },
+    [PSCustomObject]@{ Key = "5"; Label = "Sensors" },
+    [PSCustomObject]@{ Key = "6"; Label = "NTP" }
+)
+
 function Show-Help {
     Write-Host "OTGW MQTT diagnostic capture"
     Write-Host ""
     Write-Host "Usage:"
     Write-Host "  .\scripts\capture-mqtt-debug.bat [-DeviceHost <host>] [-BrokerHost <host>] [-BrokerPort <port>] [-Topic <topic>] [-Username <user>] [-Password <pass>] [-DurationSeconds <seconds>]"
     Write-Host "  .\scripts\capture-mqtt-debug.bat --help"
+    Write-Host ""
+    Write-Host "Debug logging:"
+    Write-Host "  On connect (and after every reconnect/reboot) the script enables ALL telnet logging"
+    Write-Host "  toggles that are off: OTmsg, REST API, MQTT, MQTTGate, Sensors, NTP. Toggles already"
+    Write-Host "  on are left as-is. Simulator toggles (SensorSim, OTGW-Sim) are never touched."
     Write-Host ""
     Write-Host "Interactive mode:"
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
@@ -695,10 +713,13 @@ function Read-InitialTelnetBanner {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $banner = ""
 
+    # Break on the end-of-banner footer (after the full "Debug toggles" block) so
+    # every logging toggle 1-6 is present before we parse states. Breaking on the
+    # MQTT line (toggle 3) would miss toggles 4-6 printed on the following lines.
     while ((Get-Date) -lt $deadline) {
         if ($Stream.DataAvailable) {
             $banner += Read-TelnetAvailable -Stream $Stream -Writer $Writer
-            if ($banner -match '(?m)\b3\s+MQTT\s+\[(?<state>[01])\]') {
+            if ($banner -match "Press 'h' for command menu" -or $banner -match '(?m)\bOTGW-Sim\b') {
                 break
             }
         }
@@ -710,28 +731,40 @@ function Read-InitialTelnetBanner {
     return $banner
 }
 
-function Enable-MqttTelnetDebugIfNeeded {
+function Enable-AllTelnetDebugIfNeeded {
     param(
         [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
         [Parameter(Mandatory = $true)][System.IO.StreamWriter]$Writer,
         [Parameter(Mandatory = $true)][AllowEmptyString()][AllowNull()][string]$Banner
     )
 
-    if ($Banner -match '(?m)\b3\s+MQTT\s+\[(?<state>[01])\]') {
-        $state = $Matches['state']
-        if ($state -eq "0") {
-            $bytes = [System.Text.Encoding]::ASCII.GetBytes("3")
-            $Stream.Write($bytes, 0, $bytes.Length)
-            $Stream.Flush()
-            Start-Sleep -Milliseconds 500
-            [void](Read-TelnetAvailable -Stream $Stream -Writer $Writer)
-            return "sent key 3 because MQTT debug was off"
-        }
+    # Enable every logging toggle that is currently OFF. States are read from the
+    # connect-time banner (a single snapshot); we send a key only for toggles
+    # showing [0]. Each keypress is followed by a short read so its confirmation
+    # line lands in telnet.log.
+    $results = New-Object System.Collections.Generic.List[string]
 
-        return "not sent because MQTT debug was already on"
+    foreach ($toggle in $script:DebugToggles) {
+        $pattern = '(?m)\b' + [regex]::Escape($toggle.Key) + '\s+' + [regex]::Escape($toggle.Label) + '\s+\[(?<state>[01])\]'
+        if ($Banner -match $pattern) {
+            if ($Matches['state'] -eq "0") {
+                $bytes = [System.Text.Encoding]::ASCII.GetBytes($toggle.Key)
+                $Stream.Write($bytes, 0, $bytes.Length)
+                $Stream.Flush()
+                Start-Sleep -Milliseconds 300
+                [void](Read-TelnetAvailable -Stream $Stream -Writer $Writer)
+                $results.Add("$($toggle.Label)=on (sent '$($toggle.Key)')") | Out-Null
+            }
+            else {
+                $results.Add("$($toggle.Label)=already-on") | Out-Null
+            }
+        }
+        else {
+            $results.Add("$($toggle.Label)=not-found") | Out-Null
+        }
     }
 
-    return "not sent because MQTT debug state was not found in the telnet banner"
+    return ($results -join "; ")
 }
 
 function Connect-TelnetCapture {
@@ -750,8 +783,8 @@ function Connect-TelnetCapture {
         Add-SummaryLine "Telnet connected: $((Get-Date).ToString('o'))"
 
         $banner = Read-InitialTelnetBanner -Stream $stream -Writer $Writer
-        $toggleAction = Enable-MqttTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
-        Add-SummaryLine "MQTT debug toggle action: $toggleAction"
+        $toggleAction = Enable-AllTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
+        Add-SummaryLine "Debug toggle actions: $toggleAction"
 
         return [PSCustomObject]@{
             Client = $client
