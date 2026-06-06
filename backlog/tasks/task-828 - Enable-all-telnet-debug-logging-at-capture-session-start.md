@@ -1,11 +1,11 @@
 ---
 id: TASK-828
 title: Enable all telnet debug logging at capture session start
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-06 05:50'
-updated_date: '2026-06-06 05:52'
+updated_date: '2026-06-06 05:53'
 labels:
   - tooling
   - diagnostics
