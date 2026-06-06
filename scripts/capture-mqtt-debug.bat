@@ -108,6 +108,7 @@ function Show-Help {
     Write-Host "  On connect (and after every reconnect/reboot) the script enables ALL telnet logging"
     Write-Host "  toggles that are off: OTmsg, REST API, MQTT, MQTTGate, Sensors, NTP. Toggles already"
     Write-Host "  on are left as-is. Simulator toggles (SensorSim, OTGW-Sim) are never touched."
+    Write-Host "  It then sends 'D' (full INI dump) so the device settings are recorded in telnet.log."
     Write-Host ""
     Write-Host "Interactive mode:"
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
@@ -767,6 +768,40 @@ function Enable-AllTelnetDebugIfNeeded {
     return ($results -join "; ")
 }
 
+function Request-SettingsDump {
+    param(
+        [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
+        [Parameter(Mandatory = $true)][System.IO.StreamWriter]$Writer,
+        [int]$TimeoutSeconds = 5
+    )
+
+    # Send 'D' (full INI dump, per the telnet menu footer) so telnet.log records
+    # the device settings at the start of the session. The dump is multi-line and
+    # streams asynchronously; drain until the stream stays quiet for a short idle
+    # window, with a hard timeout cap so a stalled device cannot block capture.
+    $bytes = [System.Text.Encoding]::ASCII.GetBytes("D")
+    $Stream.Write($bytes, 0, $bytes.Length)
+    $Stream.Flush()
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $idleMilliseconds = 0
+    while ((Get-Date) -lt $deadline) {
+        if ($Stream.DataAvailable) {
+            [void](Read-TelnetAvailable -Stream $Stream -Writer $Writer)
+            $idleMilliseconds = 0
+        }
+        else {
+            Start-Sleep -Milliseconds 100
+            $idleMilliseconds += 100
+            if ($idleMilliseconds -ge 800) {
+                break
+            }
+        }
+    }
+
+    return "sent 'D' (full INI dump)"
+}
+
 function Connect-TelnetCapture {
     param(
         [Parameter(Mandatory = $true)][string]$HostName,
@@ -785,6 +820,9 @@ function Connect-TelnetCapture {
         $banner = Read-InitialTelnetBanner -Stream $stream -Writer $Writer
         $toggleAction = Enable-AllTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
         Add-SummaryLine "Debug toggle actions: $toggleAction"
+
+        $dumpAction = Request-SettingsDump -Stream $stream -Writer $Writer
+        Add-SummaryLine "Settings dump: $dumpAction"
 
         return [PSCustomObject]@{
             Client = $client
