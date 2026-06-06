@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.164
+**  Version  : v2.0.0-alpha.165
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -492,8 +492,10 @@ static void sendTelnetBanner(const char* ip)
   } else
 #endif
   {
-    _debugPrintf_P(PSTR("   SSID %s   RSSI %d dBm   IP %s\r\n"),
-      WiFi.SSID().c_str(), WiFi.RSSI(), getActiveIP().c_str());
+    const int wifiRssi = WiFi.RSSI();
+    _debugPrintf_P(PSTR("   SSID %s   RSSI %d dBm (%d%% %s)   IP %s\r\n"),
+      WiFi.SSID().c_str(), wifiRssi, signal_quality_perc_quad(wifiRssi),
+      dBmtoQuality(wifiRssi).c_str(), getActiveIP().c_str());
   }
 #if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
