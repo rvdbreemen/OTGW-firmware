@@ -1,9 +1,11 @@
 ---
 id: TASK-828
 title: Enable all telnet debug logging at capture session start
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-06 05:50'
+updated_date: '2026-06-06 05:50'
 labels:
   - tooling
   - diagnostics
@@ -25,3 +27,9 @@ capture-mqtt-debug.bat only toggles MQTT debug (key 3) on connect. For full diag
 - [ ] #4 Banner reader captures the full toggle block before parsing (breaks on footer, not on the MQTT line)
 - [ ] #5 summary.txt records per-toggle action (sent/already-on/not-found)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add $script:DebugToggles table (keys 1-6 -> labels)\n2. Replace Enable-MqttTelnetDebugIfNeeded with Enable-AllTelnetDebugIfNeeded (parse each toggle state from banner, send key only when [0])\n3. Fix Read-InitialTelnetBanner to break on footer (Press 'h' / OTGW-Sim) so full toggle block is captured\n4. Update Connect-TelnetCapture call + summary line\n5. Update Show-Help text
+<!-- SECTION:PLAN:END -->
