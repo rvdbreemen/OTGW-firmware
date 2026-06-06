@@ -1,7 +1,7 @@
 ---
 id: TASK-829
 title: Dump OTGW settings (INI) at capture session start
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-06 06:02'
