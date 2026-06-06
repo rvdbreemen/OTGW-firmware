@@ -74,7 +74,11 @@ param(
     [switch]$SkipBrowserCapture,
     [string]$BrowserUrl,
     [int]$BrowserDebugPort = 9222,
-    [string]$BrowserPath
+    [string]$BrowserPath,
+    [switch]$SkipCrashlogCapture,
+    [string]$CrashlogUrl,
+    [ValidateRange(5, 3600)]
+    [int]$CrashlogPollSeconds = 30
 )
 
 Set-StrictMode -Version Latest
@@ -124,6 +128,16 @@ function Show-Help {
     Write-Host "  -BrowserUrl <url>             Page to load (default http://<DeviceHost>/)."
     Write-Host "  -BrowserDebugPort <port>     CDP remote-debugging port (default 9222; auto-bumped if busy)."
     Write-Host "  -BrowserPath <path>          Explicit msedge.exe/chrome.exe path (default: auto-detect)."
+    Write-Host ""
+    Write-Host "Crash-log capture (decoded ESP exception: exccause + epc1/excvaddr registers):"
+    Write-Host "  Enabled by default. Polls the firmware REST endpoint http://<DeviceHost>/api/v2/device/crashlog"
+    Write-Host "  plus the raw /reboot_log.txt ring buffer, writing both to crashlog.log (merged into transcript.txt)."
+    Write-Host "  This is the reliable way to capture the decoded crash reason without a USB serial console: the"
+    Write-Host "  firmware reads rst_info at boot and persists it to flash, so a single poll between reboots catches it."
+    Write-Host "  Devices without the endpoint (e.g. firmware 1.2.0) simply log a 404 and the capture continues."
+    Write-Host "  -SkipCrashlogCapture          Disable the crash-log poll entirely."
+    Write-Host "  -CrashlogUrl <url>           Crash-log endpoint (default http://<DeviceHost>/api/v2/device/crashlog)."
+    Write-Host "  -CrashlogPollSeconds <n>     Poll interval in seconds (default 30, range 5-3600)."
     Write-Host ""
     Write-Host "Stopping capture:"
     Write-Host "  Press Q in the console to stop cleanly. The script closes the logs and leaves transcript.txt."
@@ -545,7 +559,8 @@ function New-MergedTranscript {
         @{ Title = "OTGW TELNET DEBUG (telnet.log)";  File = "telnet.log" },
         @{ Title = "MQTT BROKER STREAM (mqtt.log)";   File = "mqtt.log" },
         @{ Title = "MQTT STDERR (mqtt.stderr.log)";   File = "mqtt.stderr.log" },
-        @{ Title = "BROWSER DEVTOOLS (browser.log)";  File = "browser.log" }
+        @{ Title = "BROWSER DEVTOOLS (browser.log)";  File = "browser.log" },
+        @{ Title = "DEVICE CRASH LOG (crashlog.log)"; File = "crashlog.log" }
     )
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
@@ -597,7 +612,7 @@ function Remove-IntermediateCaptureFiles {
     $transcriptFullPath = [System.IO.Path]::GetFullPath($TranscriptPath)
     $removed = New-Object System.Collections.Generic.List[string]
 
-    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log")) {
+    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log", "crashlog.log")) {
         $path = Join-Path -Path $RunPath -ChildPath $file
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             continue
@@ -1232,6 +1247,196 @@ function Stop-BrowserCapture {
     return $summary
 }
 
+# The crash-log worker runs in its own runspace (same model as the browser worker) so it
+# can poll the device REST endpoint concurrently with the telnet/MQTT capture loop without
+# blocking it. It shares the in-process [OtgMqttCapture.CancelFlag] static for the stop
+# signal, writes its own crashlog.log (no contention with the main thread), and returns a
+# one-line status string that the main thread folds into summary.txt.
+#
+# Why poll instead of relying on the MQTT reboot_reason topic: that topic only carries the
+# coarse string ("Exception"). The decoded crash (exccause + epc1/epc2/epc3/excvaddr/depc)
+# lives in the firmware's /reboot_log.txt ring buffer, exposed JSON-wrapped at
+# /api/v2/device/crashlog. The firmware reads rst_info once at boot and persists it to flash,
+# so a single successful poll between two reboots captures the decode for a crash-looping unit.
+$script:CrashlogWorkerScript = {
+    param(
+        [string]$CrashlogUrl,
+        [string]$RebootLogUrl,
+        [int]$PollSeconds,
+        [string]$CrashlogLog
+    )
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+    $log = New-Object System.IO.StreamWriter -ArgumentList $CrashlogLog, $false, $utf8NoBom
+    $log.AutoFlush = $true
+
+    function Write-CrashLine {
+        param([string]$Line)
+        $log.WriteLine("$((Get-Date).ToString('HH:mm:ss.fff'))  $Line")
+    }
+
+    # HttpWebRequest (not WebClient/Invoke-RestMethod) because it exposes an explicit Timeout,
+    # which is essential against a crash-looping device that may accept the socket then stall.
+    function Invoke-HttpGet {
+        param([string]$Url, [int]$TimeoutMs = 5000)
+        try {
+            $req = [System.Net.HttpWebRequest]::Create($Url)
+            $req.Method = "GET"
+            $req.Timeout = $TimeoutMs
+            $req.ReadWriteTimeout = $TimeoutMs
+            $req.KeepAlive = $false
+            $resp = $req.GetResponse()
+            try {
+                $status = [int]$resp.StatusCode
+                $reader = New-Object System.IO.StreamReader($resp.GetResponseStream())
+                try { $body = $reader.ReadToEnd() } finally { $reader.Dispose() }
+                return @{ Status = $status; Body = $body; Error = $null }
+            }
+            finally { $resp.Dispose() }
+        }
+        catch [System.Net.WebException] {
+            $we = $_.Exception
+            $status = $null
+            if ($we.Response) {
+                try {
+                    $status = [int]([System.Net.HttpWebResponse]$we.Response).StatusCode
+                    $reader = New-Object System.IO.StreamReader($we.Response.GetResponseStream())
+                    try { $body = $reader.ReadToEnd() } finally { $reader.Dispose() }
+                    return @{ Status = $status; Body = $body; Error = $we.Message }
+                }
+                catch { }
+            }
+            return @{ Status = $status; Body = $null; Error = $we.Message }
+        }
+        catch {
+            return @{ Status = $null; Body = $null; Error = $_.Exception.Message }
+        }
+    }
+
+    $summary = "Crash-log capture: completed normally."
+    $polls = 0
+    $lastCrashBody = $null
+    $lastRebootBody = $null
+
+    try {
+        Write-CrashLine "crashlog endpoint: $CrashlogUrl"
+        Write-CrashLine "reboot-log file:   $RebootLogUrl"
+        Write-CrashLine "poll interval:     ${PollSeconds}s"
+
+        # Poll once up front, then on the interval. Each poll grabs the decoded REST endpoint
+        # plus the raw ring-buffer file; both are logged only when their content changes, so a
+        # stable device does not flood the log while a crash-looping one records every new entry.
+        while ($true) {
+            $polls++
+
+            $crash = Invoke-HttpGet -Url $CrashlogUrl
+            if ($crash.Status -eq 200 -and $crash.Body) {
+                $trimmed = $crash.Body.Trim()
+                if ($trimmed -ne $lastCrashBody) {
+                    Write-CrashLine "[crashlog #$polls CHANGED] $trimmed"
+                    $lastCrashBody = $trimmed
+                }
+            }
+            elseif ($null -ne $crash.Status) {
+                # 404 on 1.2.0 (endpoint absent) - record once-ish, do not abort.
+                if ("status-$($crash.Status)" -ne $lastCrashBody) {
+                    Write-CrashLine "[crashlog #$polls] HTTP $($crash.Status) (endpoint unavailable on this firmware?)"
+                    $lastCrashBody = "status-$($crash.Status)"
+                }
+            }
+            else {
+                Write-CrashLine "[crashlog #$polls] request failed: $($crash.Error)"
+            }
+
+            $reboot = Invoke-HttpGet -Url $RebootLogUrl
+            if ($reboot.Status -eq 200 -and $reboot.Body) {
+                $trimmed = $reboot.Body.Trim()
+                if ($trimmed -and $trimmed -ne $lastRebootBody) {
+                    Write-CrashLine "[reboot_log.txt #$polls CHANGED]"
+                    foreach ($line in ($trimmed -split "`r?`n")) {
+                        if ($line.Trim()) { Write-CrashLine "  | $line" }
+                    }
+                    $lastRebootBody = $trimmed
+                }
+            }
+
+            # Sleep the interval in small slices so a stop request is honoured promptly.
+            $elapsed = 0
+            while ($elapsed -lt ($PollSeconds * 1000)) {
+                if ([OtgMqttCapture.CancelFlag]::StopRequested) { break }
+                Start-Sleep -Milliseconds 200
+                $elapsed += 200
+            }
+            if ([OtgMqttCapture.CancelFlag]::StopRequested) { break }
+        }
+
+        Write-CrashLine "stop requested; closing crash-log capture ($polls polls)"
+    }
+    catch {
+        $summary = "Crash-log capture: error - $($_.Exception.Message)"
+        try { Write-CrashLine "[worker-error] $($_.Exception.Message)" } catch { }
+    }
+    finally {
+        try { $log.Flush(); $log.Dispose() } catch { }
+    }
+
+    return $summary
+}
+
+function Start-CrashlogCapture {
+    param(
+        [Parameter(Mandatory = $true)][string]$CrashlogUrl,
+        [Parameter(Mandatory = $true)][string]$RebootLogUrl,
+        [Parameter(Mandatory = $true)][int]$PollSeconds,
+        [Parameter(Mandatory = $true)][string]$CrashlogLog
+    )
+
+    $worker = [powershell]::Create()
+    [void]$worker.AddScript($script:CrashlogWorkerScript)
+    [void]$worker.AddParameter("CrashlogUrl", $CrashlogUrl)
+    [void]$worker.AddParameter("RebootLogUrl", $RebootLogUrl)
+    [void]$worker.AddParameter("PollSeconds", $PollSeconds)
+    [void]$worker.AddParameter("CrashlogLog", $CrashlogLog)
+    $async = $worker.BeginInvoke()
+
+    return [PSCustomObject]@{
+        Worker = $worker
+        Async  = $async
+    }
+}
+
+function Stop-CrashlogCapture {
+    param(
+        [AllowNull()]$Handle,
+        [int]$TimeoutSeconds = 8
+    )
+
+    if (-not $Handle) {
+        return $null
+    }
+
+    $summary = $null
+    try {
+        if (-not $Handle.Async.AsyncWaitHandle.WaitOne([TimeSpan]::FromSeconds($TimeoutSeconds))) {
+            [void]$Handle.Worker.Stop()
+        }
+        else {
+            $output = $Handle.Worker.EndInvoke($Handle.Async)
+            if ($output -and $output.Count -gt 0) {
+                $summary = [string]$output[$output.Count - 1]
+            }
+        }
+    }
+    catch {
+        $summary = "Crash-log capture: stop error - $($_.Exception.Message)"
+    }
+    finally {
+        try { $Handle.Worker.Dispose() } catch { }
+    }
+
+    return $summary
+}
+
 function Get-CaptureSettingsPath {
     $base = $env:LOCALAPPDATA
     if ([string]::IsNullOrWhiteSpace($base)) { $base = $env:TEMP }
@@ -1346,6 +1551,7 @@ $telnetLog = Join-Path -Path $runPath -ChildPath "telnet.log"
 $mqttLog = Join-Path -Path $runPath -ChildPath "mqtt.log"
 $mqttErrorLog = Join-Path -Path $runPath -ChildPath "mqtt.stderr.log"
 $browserLog = Join-Path -Path $runPath -ChildPath "browser.log"
+$crashlogLog = Join-Path -Path $runPath -ChildPath "crashlog.log"
 $script:SummaryPath = Join-Path -Path $runPath -ChildPath "summary.txt"
 
 Add-SummaryLine "OTGW MQTT diagnostic capture"
@@ -1376,6 +1582,7 @@ $telnetReconnectReason = $null
 $nextTelnetConnectUtc = [DateTime]::MinValue
 $telnetRebootScanBuffer = ""
 $browserHandle = $null
+$crashlogHandle = $null
 
 try {
     Initialize-CancelFlag
@@ -1415,6 +1622,33 @@ try {
         catch {
             Add-SummaryLine "Browser capture: failed to start - $($_.Exception.Message)"
             $browserHandle = $null
+        }
+    }
+
+    if ($SkipCrashlogCapture) {
+        Add-SummaryLine "Crash-log capture: disabled (-SkipCrashlogCapture)."
+    }
+    else {
+        try {
+            if ([string]::IsNullOrWhiteSpace($CrashlogUrl)) {
+                $CrashlogUrl = "http://$DeviceHost/api/v2/device/crashlog"
+            }
+            $rebootLogUrl = "http://$DeviceHost/reboot_log.txt"
+
+            Add-SummaryLine "Crash-log endpoint: $CrashlogUrl"
+            Add-SummaryLine "Crash-log reboot-log file: $rebootLogUrl"
+            Add-SummaryLine "Crash-log poll interval: ${CrashlogPollSeconds}s"
+
+            $crashlogHandle = Start-CrashlogCapture `
+                -CrashlogUrl $CrashlogUrl `
+                -RebootLogUrl $rebootLogUrl `
+                -PollSeconds $CrashlogPollSeconds `
+                -CrashlogLog $crashlogLog
+            Add-SummaryLine "Crash-log capture started (polling, writing crashlog.log)."
+        }
+        catch {
+            Add-SummaryLine "Crash-log capture: failed to start - $($_.Exception.Message)"
+            $crashlogHandle = $null
         }
     }
 
@@ -1583,6 +1817,15 @@ finally {
         $browserSummary = Stop-BrowserCapture -Handle $browserHandle -TimeoutSeconds 10
         if ($browserSummary) {
             Add-SummaryLine $browserSummary
+        }
+    }
+
+    if ($crashlogHandle) {
+        # Ensure the worker sees the stop signal even on an error-driven exit, then drain it.
+        Request-CaptureStop -Reason "capture shutdown"
+        $crashlogSummary = Stop-CrashlogCapture -Handle $crashlogHandle -TimeoutSeconds 10
+        if ($crashlogSummary) {
+            Add-SummaryLine $crashlogSummary
         }
     }
 
