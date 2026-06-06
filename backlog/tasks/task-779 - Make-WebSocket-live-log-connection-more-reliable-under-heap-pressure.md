@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 12:48'
-updated_date: '2026-06-01 23:06'
+updated_date: '2026-06-06 05:41'
 labels:
   - bug
   - websocket
@@ -54,4 +54,11 @@ BLOCKED ACs (not self-verifiable here):
 - AC#9 ADR: drafted Proposed; NOT Accepted (maintainer sign-off required; relaxed-values portion telemetry-gated). Leave unchecked until accepted.
 
 Impl of decouple code (AC#2/#3) intentionally NOT done in this scope (user chose investigate+draft-ADR-only); unblocks once ADR-083 Accepted + telemetry in.
+
+2026-06-05 field report (GeorgeZ83, #beta-testing) — 1.7.0-beta+6b79d62, MQTT DISABLED, 12-min telnet capture (putty-telnet.log):
+- Banner heap: free 2008B, maxBlk 648B, frag 56%, minFree 1088B, Reboots 13.
+- emergencyHeapRecovery fired: before=1456 after=3832 delta=+2376 actions=0x07 (near-OOM).
+- WS client 192.168.0.102 (browser) flap-reconnect loop; WS[0]->WS[1] handoff; canSendWebSocket throttled continuously (heap=3536 maxBlock=904 ...).
+- KEY: MQTT off and behaviour identical => confirms WS live-log is the heap hog independent of MQTT (supports AC#2/#3 decoupling thesis). No exception in this capture but Reboots=13.
+- OUTLIER: richard_ha_ and crashevans both report 1.7.0 CLEAN. George+maintainer suspect dying/clone Wemos (he offered to swap ESP). Suggest A/B: (a) keep live-log tab closed, (b) fresh genuine Wemos — isolates SW churn vs marginal HW in one session.
 <!-- SECTION:NOTES:END -->
