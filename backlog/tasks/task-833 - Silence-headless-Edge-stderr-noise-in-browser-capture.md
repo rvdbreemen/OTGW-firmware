@@ -1,7 +1,7 @@
 ---
 id: TASK-833
 title: Silence headless Edge stderr noise in browser capture
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-06 09:09'
