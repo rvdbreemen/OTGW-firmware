@@ -1,0 +1,27 @@
+---
+id: TASK-828
+title: Enable all telnet debug logging at capture session start
+status: To Do
+assignee: []
+created_date: '2026-06-06 05:50'
+labels:
+  - tooling
+  - diagnostics
+dependencies: []
+priority: medium
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+capture-mqtt-debug.bat only toggles MQTT debug (key 3) on connect. For full diagnostics (heap/WS/REST/sensor investigations like George's TASK-779), the capture should enable ALL logging toggles (1 OTmsg, 2 REST API, 3 MQTT, 4 MQTTGate, 5 Sensors, 6 NTP) at session start, re-applying after each reconnect/reboot. Simulator toggles (SensorSim, OTGW-Sim) are intentionally excluded (they inject fake data).
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 On telnet connect, every OFF logging toggle (1-6) is flipped ON; toggles already ON are left untouched (no accidental flip-off)
+- [ ] #2 Simulator toggles (SensorSim, OTGW-Sim) are NOT touched
+- [ ] #3 Re-applied on every reconnect (post-reboot toggles reset to defaults)
+- [ ] #4 Banner reader captures the full toggle block before parsing (breaks on footer, not on the MQTT line)
+- [ ] #5 summary.txt records per-toggle action (sent/already-on/not-found)
+<!-- AC:END -->
