@@ -1,7 +1,7 @@
 ---
 id: TASK-835
 title: Add crash-log REST polling to capture-mqtt-debug script
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-06 16:04'
