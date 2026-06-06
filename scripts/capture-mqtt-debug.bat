@@ -992,6 +992,12 @@ $script:BrowserWorkerScript = {
             "--disable-extensions",
             "--disable-background-networking",
             "--mute-audio",
+            # Silence Chromium's stderr logging sink (task-manager fallback, USB
+            # device_event_log, SmartScreen DNS timeout) so it does not mix with
+            # the capture status on the console. CDP browser.log is unaffected.
+            "--disable-logging",
+            "--log-level=3",
+            "--disable-features=msSmartScreenProtection",
             "--remote-allow-origins=*",
             "--remote-debugging-port=$DebugPort",
             "--user-data-dir=$TempProfile",
