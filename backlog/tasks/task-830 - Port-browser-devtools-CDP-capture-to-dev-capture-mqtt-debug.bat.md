@@ -1,7 +1,7 @@
 ---
 id: TASK-830
 title: Port browser-devtools (CDP) capture to dev capture-mqtt-debug.bat
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-06 06:13'
