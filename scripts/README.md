@@ -75,6 +75,53 @@ pwsh -File scripts/branch-hygiene-queue.ps1 -Remote origin -BaseBranch dev -Inac
 4. Adds owner/decision/notes columns for manual review
 5. Exports a sorted review queue CSV for branch governance
 
+## capture-mqtt-debug-macos.sh
+
+macOS/Linux equivalent of `capture-mqtt-debug.bat` for collecting OTGW telnet
+debug output, MQTT broker traffic, and browser DevTools output into one
+uploadable transcript.
+
+### MQTT Debug Capture Usage
+
+```bash
+scripts/capture-mqtt-debug-macos.sh
+scripts/capture-mqtt-debug-macos.sh --device 192.168.1.50 --broker 192.168.1.10
+scripts/capture-mqtt-debug-macos.sh --device 192.168.1.50 --broker 192.168.1.10 --duration 120
+```
+
+The script prompts for the OTGW device host, MQTT broker host, and optional MQTT
+credentials when they are not supplied. Use `--no-prompt` for unattended runs.
+
+### MQTT Debug Capture Options
+
+- `--device` / `-DeviceHost` - OTGW device IP address or hostname
+- `--broker` / `-BrokerHost` - MQTT broker IP address or hostname
+- `--broker-port` / `-BrokerPort` - MQTT broker port (default: `1883`)
+- `--topic` / `-Topic` - MQTT topic filter (default: `#`)
+- `--user` / `-Username` - MQTT username
+- `--password` / `-Password` - MQTT password
+- `--duration` / `-DurationSeconds` - Stop automatically after fixed seconds
+- `--output-root` / `-OutputRoot` - Output folder root (default: `logs/mqtt-diagnostics`)
+- `--mosquitto-sub-path` / `-MosquittoSubPath` - Explicit `mosquitto_sub` path
+- `--skip-tool-install` / `-SkipToolInstall` - Do not attempt Homebrew install
+- `--skip-browser-capture` / `-SkipBrowserCapture` - Disable browser capture
+- `--browser-url` / `-BrowserUrl` - Page to load (default: `http://<device>/`)
+- `--browser-debug-port` / `-BrowserDebugPort` - CDP port (default: `9222`)
+- `--browser-path` / `-BrowserPath` - Explicit Chrome/Edge executable path
+
+### MQTT Debug Capture Notes
+
+The script requires `python3` and `mosquitto_sub`. On macOS, it can install the
+Mosquitto client with Homebrew unless `--skip-tool-install` is passed. Press `Q`
+or use Ctrl+C to stop manually; timed captures also stop the MQTT, telnet, and
+browser workers cleanly before writing `transcript.txt`.
+
+Browser DevTools capture is enabled by default when Microsoft Edge, Google Chrome,
+or Chromium can be found. On macOS, the script checks the standard `.app`
+locations under `/Applications` and `~/Applications`; use `--browser-path` if the
+browser is installed elsewhere. Browser output is written to `browser.log` and
+merged into `transcript.txt`.
+
 ## sat_boiler_emulator.py
 
 Host-side synthetic boiler emulator for OTGW32 bench testing (TASK-802). Connects to

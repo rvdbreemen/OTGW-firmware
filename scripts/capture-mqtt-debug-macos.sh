@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
 # capture-mqtt-debug-macos.sh
-# OTGW MQTT + telnet diagnostic capture for macOS/Linux
+# OTGW MQTT + telnet + browser diagnostic capture for macOS/Linux
 #
 # Single-file delivery. Bash handles prompts, process supervision, mosquitto_sub,
-# cleanup, and transcript merging. An embedded Python worker handles reconnecting
-# telnet capture.
+# cleanup, and transcript merging. Embedded Python workers handle reconnecting
+# telnet capture and optional Chrome/Edge DevTools capture.
 # =============================================================================
 
 set -u
@@ -23,6 +23,10 @@ SKIP_TOOL_INSTALL=0
 TELNET_CONNECT_TIMEOUT_SECONDS=6
 TELNET_RECONNECT_DELAY_MILLISECONDS=500
 TELNET_POST_DISCONNECT_DELAY_MILLISECONDS=1000
+SKIP_BROWSER_CAPTURE=0
+BROWSER_URL=""
+BROWSER_DEBUG_PORT=9222
+BROWSER_PATH=""
 NO_PROMPT=0
 
 RUN_PATH=""
@@ -30,10 +34,13 @@ SUMMARY_LOG=""
 TELNET_LOG=""
 MQTT_LOG=""
 MQTT_ERR_LOG=""
+BROWSER_LOG=""
 TRANSCRIPT=""
 STOP_FILE=""
 MQTT_PID=""
 TELNET_PID=""
+BROWSER_PID=""
+BROWSER_PROFILE=""
 CLEANED_UP=0
 CAPTURE_STOP_REASON=""
 
@@ -63,13 +70,21 @@ Telnet options:
   --telnet-reconnect-delay-ms <n>         Delay after failed connect, default 500
   --telnet-post-disconnect-delay-ms <n>   Delay after disconnect/reboot marker, default 1000
 
+Browser DevTools capture:
+  Enabled by default when Chrome or Edge can be found. It records console output,
+  exceptions, resource failures, and network timings to browser.log.
+  --skip-browser-capture                  Disable browser capture
+  --browser-url <url>                     Page to load, default http://<device>/
+  --browser-debug-port <port>             CDP port, default 9222; auto-bumped if busy
+  --browser-path <path>                   Explicit Chrome/Edge executable path
+
 Stop:
   Press Q to stop cleanly and create transcript.txt.
   Ctrl+C also stops cleanly.
 
 Aliases:
   Windows-style aliases are accepted, for example -DeviceHost, -BrokerHost,
-  -DurationSeconds, and -MosquittoSubPath.
+  -DurationSeconds, -MosquittoSubPath, and -SkipBrowserCapture.
 
 Security:
   Supplying --password can expose the password in the process list while the
@@ -124,7 +139,7 @@ find_python3() {
     return 0
   fi
 
-  fail "python3 is required for telnet capture on macOS/Linux."
+  fail "python3 is required for telnet/browser capture on macOS/Linux."
 }
 
 find_mosquitto_sub() {
@@ -187,6 +202,64 @@ ensure_mosquitto_sub() {
   fail "Mosquitto installation completed, but mosquitto_sub still could not be found."
 }
 
+port_is_free() {
+  local port="$1"
+
+  if command -v lsof >/dev/null 2>&1; then
+    ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+    return
+  fi
+
+  return 0
+}
+
+select_debug_port() {
+  local preferred="$1"
+  local port
+
+  for ((port = preferred; port < preferred + 12; port++)); do
+    if port_is_free "$port"; then
+      printf '%s\n' "$port"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "$preferred"
+}
+
+find_browser() {
+  if [[ -n "$BROWSER_PATH" ]]; then
+    if [[ -x "$BROWSER_PATH" ]]; then
+      printf '%s\n' "$BROWSER_PATH"
+      return 0
+    fi
+    fail "Explicit --browser-path was not found or is not executable: $BROWSER_PATH"
+  fi
+
+  local candidate
+  for candidate in \
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" \
+    "$HOME/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" \
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+    "$HOME/Applications/Chromium.app/Contents/MacOS/Chromium"; do
+    if [[ -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  for candidate in microsoft-edge msedge google-chrome chrome chromium; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      command -v "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 merge_transcript() {
   {
     echo "OTGW capture - merged transcript"
@@ -199,7 +272,8 @@ merge_transcript() {
       "SUMMARY (summary.txt)|$SUMMARY_LOG" \
       "OTGW TELNET DEBUG (telnet.log)|$TELNET_LOG" \
       "MQTT BROKER STREAM (mqtt.log)|$MQTT_LOG" \
-      "MQTT STDERR (mqtt.stderr.log)|$MQTT_ERR_LOG"; do
+      "MQTT STDERR (mqtt.stderr.log)|$MQTT_ERR_LOG" \
+      "BROWSER DEVTOOLS (browser.log)|$BROWSER_LOG"; do
       local title="${item%%|*}"
       local file="${item#*|}"
       echo "============================================================"
@@ -273,17 +347,21 @@ cleanup() {
 
   stop_child "mosquitto_sub" "${MQTT_PID:-}"
   stop_child "Telnet capture worker" "${TELNET_PID:-}" 20
+  stop_child "Browser capture worker" "${BROWSER_PID:-}" 20
 
   write_summary "Finished: $(timestamp)"
 
   merge_transcript
 
-  for file in "$SUMMARY_LOG" "$TELNET_LOG" "$MQTT_LOG" "$MQTT_ERR_LOG"; do
+  for file in "$SUMMARY_LOG" "$TELNET_LOG" "$MQTT_LOG" "$MQTT_ERR_LOG" "$BROWSER_LOG"; do
     if [[ -f "$file" ]]; then
       rm -f "$file"
     fi
   done
 
+  if [[ -n "$BROWSER_PROFILE" && -d "$BROWSER_PROFILE" ]]; then
+    rm -rf "$BROWSER_PROFILE"
+  fi
   if [[ -n "$STOP_FILE" && -f "$STOP_FILE" ]]; then
     rm -f "$STOP_FILE"
   fi
@@ -482,6 +560,267 @@ PY
   TELNET_PID=$!
 }
 
+start_browser_capture() {
+  local python="$1"
+  local resolved_browser="$2"
+  local chosen_port="$3"
+
+  "$python" - "$resolved_browser" "$BROWSER_URL" "$chosen_port" "$BROWSER_PROFILE" "$BROWSER_LOG" "$SUMMARY_LOG" "$STOP_FILE" <<'PY' &
+import base64
+import json
+import os
+import socket
+import struct
+import subprocess
+import sys
+import time
+import urllib.request
+from datetime import datetime
+
+browser_path, device_url, debug_port, temp_profile, browser_log, summary_log, stop_file = sys.argv[1:8]
+debug_port = int(debug_port)
+
+def stopped():
+    return os.path.exists(stop_file)
+
+def log(line):
+    with open(browser_log, "a", encoding="utf-8") as f:
+        f.write(datetime.now().strftime("%H:%M:%S.%f")[:-3] + "  " + line + "\n")
+
+def summary(line):
+    with open(summary_log, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+class WebSocket:
+    def __init__(self, url):
+        rest = url.split("://", 1)[1]
+        host_port, path = rest.split("/", 1)
+        host, port = host_port, 80
+        if ":" in host_port:
+            host, port_text = host_port.rsplit(":", 1)
+            port = int(port_text)
+        self.sock = socket.create_connection((host, port), timeout=10)
+        self.sock.settimeout(1)
+        key = base64.b64encode(os.urandom(16)).decode("ascii")
+        request = (
+            f"GET /{path} HTTP/1.1\r\n"
+            f"Host: {host_port}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\n"
+            "Sec-WebSocket-Version: 13\r\n\r\n"
+        )
+        self.sock.sendall(request.encode("ascii"))
+        response = b""
+        while b"\r\n\r\n" not in response:
+            response += self.sock.recv(4096)
+        if b" 101 " not in response.split(b"\r\n", 1)[0]:
+            raise RuntimeError("websocket upgrade failed")
+
+    def send_json(self, payload):
+        data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        mask = os.urandom(4)
+        header = bytearray([0x81])
+        length = len(data)
+        if length < 126:
+            header.append(0x80 | length)
+        elif length < 65536:
+            header.append(0x80 | 126)
+            header.extend(struct.pack("!H", length))
+        else:
+            header.append(0x80 | 127)
+            header.extend(struct.pack("!Q", length))
+        header.extend(mask)
+        masked = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+        self.sock.sendall(bytes(header) + masked)
+
+    def recv_text(self):
+        chunks = []
+        while True:
+            first = self._read_exact(2)
+            fin = first[0] & 0x80
+            opcode = first[0] & 0x0F
+            masked = first[1] & 0x80
+            length = first[1] & 0x7F
+            if length == 126:
+                length = struct.unpack("!H", self._read_exact(2))[0]
+            elif length == 127:
+                length = struct.unpack("!Q", self._read_exact(8))[0]
+            mask = self._read_exact(4) if masked else b""
+            data = self._read_exact(length) if length else b""
+            if masked:
+                data = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+            if opcode == 8:
+                return None
+            if opcode in (1, 0):
+                chunks.append(data)
+            if fin:
+                return b"".join(chunks).decode("utf-8", "replace")
+
+    def _read_exact(self, count):
+        data = b""
+        while len(data) < count:
+            chunk = self.sock.recv(count - len(data))
+            if not chunk:
+                raise ConnectionError("websocket closed")
+            data += chunk
+        return data
+
+    def close(self):
+        try:
+            self.sock.close()
+        except Exception:
+            pass
+
+proc = None
+ws = None
+requests = {}
+cdp_id = 0
+capture_summary = "Browser capture: completed normally."
+
+def send(method, params=None):
+    global cdp_id
+    cdp_id += 1
+    payload = {"id": cdp_id, "method": method}
+    if params:
+        payload["params"] = params
+    ws.send_json(payload)
+
+try:
+    log(f"browser executable: {browser_path}")
+    log(f"device url: {device_url}   cdp port: {debug_port}")
+    args = [
+        browser_path,
+        "--headless=new",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--mute-audio",
+        "--remote-allow-origins=*",
+        f"--remote-debugging-port={debug_port}",
+        f"--user-data-dir={temp_profile}",
+        "about:blank",
+    ]
+    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+    ws_url = None
+    deadline = time.monotonic() + 15
+    while not stopped() and time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{debug_port}/json", timeout=1) as response:
+                targets = json.loads(response.read().decode("utf-8"))
+            for target in targets:
+                if target.get("type") == "page" and target.get("webSocketDebuggerUrl"):
+                    ws_url = target["webSocketDebuggerUrl"]
+                    break
+            if ws_url:
+                break
+        except Exception:
+            time.sleep(0.3)
+        time.sleep(0.2)
+    if not ws_url:
+        if stopped():
+            capture_summary = "Browser capture: stopped before CDP page target was ready."
+            log("stop requested before cdp page target was ready")
+            raise SystemExit(0)
+        raise RuntimeError(f"CDP page target not found on port {debug_port} within 15s")
+
+    log(f"cdp websocket: {ws_url}")
+    ws = WebSocket(ws_url)
+    log("cdp connected")
+    send("Network.enable")
+    send("Runtime.enable")
+    send("Log.enable")
+    send("Page.enable")
+    send("Page.navigate", {"url": device_url})
+    log(f"domains enabled; navigating to {device_url}")
+
+    while not stopped():
+        try:
+            text = ws.recv_text()
+        except socket.timeout:
+            continue
+        if text is None:
+            break
+        try:
+            evt = json.loads(text)
+        except Exception:
+            continue
+        method = evt.get("method")
+        params = evt.get("params", {})
+        if not method:
+            continue
+
+        if method == "Runtime.consoleAPICalled":
+            parts = []
+            for arg in params.get("args", []):
+                if "value" in arg:
+                    parts.append(str(arg["value"]))
+                elif arg.get("description"):
+                    parts.append(str(arg["description"]))
+                elif arg.get("unserializableValue"):
+                    parts.append(str(arg["unserializableValue"]))
+                else:
+                    parts.append(f"[{arg.get('type', 'unknown')}]")
+            log(f"[console.{params.get('type', 'log')}] " + " ".join(parts))
+        elif method == "Runtime.exceptionThrown":
+            details = params.get("exceptionDetails", {})
+            exc = details.get("exception", {})
+            log("[exception] " + str(exc.get("description") or details.get("text") or "unknown exception"))
+        elif method == "Log.entryAdded":
+            entry = params.get("entry", {})
+            where = f" ({entry.get('url')})" if entry.get("url") else ""
+            log(f"[log.{entry.get('level')}] {entry.get('text')}{where}")
+        elif method == "Network.requestWillBeSent":
+            request_id = params.get("requestId")
+            req = params.get("request", {})
+            if request_id:
+                requests[request_id] = {"url": req.get("url", ""), "start": float(params.get("timestamp", 0)), "status": ""}
+        elif method == "Network.responseReceived":
+            request_id = params.get("requestId")
+            if request_id in requests:
+                requests[request_id]["status"] = str(params.get("response", {}).get("status", ""))
+        elif method == "Network.loadingFinished":
+            request_id = params.get("requestId")
+            record = requests.pop(request_id, None)
+            if record:
+                ms = int((float(params.get("timestamp", 0)) - record["start"]) * 1000)
+                log(f"[net] {ms:6d} ms  {record['status']:>3}  {record['url']}")
+        elif method == "Network.loadingFailed":
+            request_id = params.get("requestId")
+            record = requests.pop(request_id, None)
+            if record:
+                log(f"[net] FAILED      {params.get('errorText')}  {record['url']}")
+
+    for record in requests.values():
+        status = record["status"] or "no-response"
+        log(f"[net] PENDING     {status:>3}  {record['url']}  (started, never finished)")
+    log("stop requested; closing capture")
+except Exception as exc:
+    capture_summary = f"Browser capture: error - {exc}"
+    try:
+        log(f"[worker-error] {exc}")
+    except Exception:
+        pass
+finally:
+    if ws:
+        ws.close()
+    if proc and proc.poll() is None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=3)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+    summary(capture_summary)
+PY
+  BROWSER_PID=$!
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --device|-DeviceHost)
@@ -510,6 +849,14 @@ while [[ $# -gt 0 ]]; do
       require_option_value "$1" "${2-}"; TELNET_RECONNECT_DELAY_MILLISECONDS="$2"; shift 2 ;;
     --telnet-post-disconnect-delay-ms|--telnet-post-disconnect-delay-milliseconds|-TelnetPostDisconnectDelayMilliseconds)
       require_option_value "$1" "${2-}"; TELNET_POST_DISCONNECT_DELAY_MILLISECONDS="$2"; shift 2 ;;
+    --skip-browser-capture|-SkipBrowserCapture)
+      SKIP_BROWSER_CAPTURE=1; shift ;;
+    --browser-url|-BrowserUrl)
+      require_option_value "$1" "${2-}"; BROWSER_URL="$2"; shift 2 ;;
+    --browser-debug-port|-BrowserDebugPort)
+      require_option_value "$1" "${2-}"; BROWSER_DEBUG_PORT="$2"; shift 2 ;;
+    --browser-path|-BrowserPath)
+      require_option_value "$1" "${2-}"; BROWSER_PATH="$2"; shift 2 ;;
     --no-prompt)
       NO_PROMPT=1; shift ;;
     --help|-h|-Help|-\?)
@@ -528,6 +875,7 @@ fi
 validate_range "--telnet-connect-timeout-seconds" "$TELNET_CONNECT_TIMEOUT_SECONDS" 2 60
 validate_range "--telnet-reconnect-delay-ms" "$TELNET_RECONNECT_DELAY_MILLISECONDS" 250 60000
 validate_range "--telnet-post-disconnect-delay-ms" "$TELNET_POST_DISCONNECT_DELAY_MILLISECONDS" 250 60000
+validate_range "--browser-debug-port" "$BROWSER_DEBUG_PORT" 1 65535
 
 if [[ "$NO_PROMPT" -eq 0 ]]; then
   if [[ -z "$DEVICE_HOST" ]]; then
@@ -557,6 +905,9 @@ fi
 if [[ -z "$USERNAME" && -n "$PASSWORD" ]]; then
   fail "Username is required when password is supplied."
 fi
+if [[ -z "$BROWSER_URL" ]]; then
+  BROWSER_URL="http://$DEVICE_HOST/"
+fi
 PYTHON="$(find_python3)"
 RUN_NAME="$(date +"%Y%m%d-%H%M%S")"
 RUN_PATH="$OUTPUT_ROOT/$RUN_NAME"
@@ -566,6 +917,7 @@ SUMMARY_LOG="$RUN_PATH/summary.txt"
 TELNET_LOG="$RUN_PATH/telnet.log"
 MQTT_LOG="$RUN_PATH/mqtt.log"
 MQTT_ERR_LOG="$RUN_PATH/mqtt.stderr.log"
+BROWSER_LOG="$RUN_PATH/browser.log"
 TRANSCRIPT="$RUN_PATH/transcript.txt"
 STOP_FILE="$RUN_PATH/.stop"
 
@@ -573,6 +925,7 @@ STOP_FILE="$RUN_PATH/.stop"
 : > "$TELNET_LOG"
 : > "$MQTT_LOG"
 : > "$MQTT_ERR_LOG"
+: > "$BROWSER_LOG"
 
 trap cleanup EXIT
 trap on_signal INT TERM
@@ -598,7 +951,22 @@ if command -v sw_vers >/dev/null 2>&1; then
   write_summary "macOS: $(sw_vers -productVersion 2>/dev/null || echo unknown)"
 fi
 
-write_summary "Browser capture: not implemented in this script."
+if [[ "$SKIP_BROWSER_CAPTURE" -eq 1 ]]; then
+  write_summary "Browser capture: disabled (--skip-browser-capture)."
+else
+  if resolved_browser="$(find_browser 2>/dev/null)"; then
+    chosen_port="$(select_debug_port "$BROWSER_DEBUG_PORT")"
+    BROWSER_PROFILE="${TMPDIR:-/tmp}/otgw-browser-$RUN_NAME-$$"
+    mkdir -p "$BROWSER_PROFILE"
+    write_summary "Browser capture: $resolved_browser"
+    write_summary "Browser url: $BROWSER_URL"
+    write_summary "Browser CDP port: $chosen_port"
+    start_browser_capture "$PYTHON" "$resolved_browser" "$chosen_port"
+    write_summary "Browser capture started (headless, writing browser.log)."
+  else
+    write_summary "Browser capture: skipped - no Edge/Chrome found (pass --browser-path or --skip-browser-capture)."
+  fi
+fi
 
 MOSQUITTO_SUB="$(ensure_mosquitto_sub)"
 write_summary "mosquitto_sub: $MOSQUITTO_SUB"
@@ -626,7 +994,7 @@ start_telnet_capture "$PYTHON"
 write_summary "Telnet capture worker started: pid $TELNET_PID"
 write_summary "Capture started: $(timestamp)"
 
-echo "Capturing telnet and MQTT output in $RUN_PATH"
+echo "Capturing telnet, MQTT, and browser output in $RUN_PATH"
 echo "Press Q to stop cleanly and leave transcript.txt. Ctrl+C also stops capture."
 
 START_SECONDS="$(date +%s)"
