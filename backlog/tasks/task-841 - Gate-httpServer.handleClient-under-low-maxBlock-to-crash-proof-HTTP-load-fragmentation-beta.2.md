@@ -3,11 +3,11 @@ id: TASK-841
 title: >-
   Gate httpServer.handleClient() under low maxBlock to crash-proof HTTP-load
   fragmentation (beta.2)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-07 16:19'
-updated_date: '2026-06-07 16:26'
+updated_date: '2026-06-07 16:54'
 labels: []
 dependencies: []
 ---
