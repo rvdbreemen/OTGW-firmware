@@ -25,3 +25,13 @@ Zero-browser A/B (transcript-20260607-164812) proved HTTP request serving is the
 - [x] #3 New iHttpFragSkips counter, surfaced on telnet logHeapStats and MQTT stats
 - [x] #4 python build.py --firmware exits 0 and evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added canServeHttp() maxBlock gate on the steady-state HTTP serving path (commit e6bec34c, pushed origin/dev). Crash-proofs the confirmed HTTP-load fragmentation: the zero-browser A/B (transcript-20260607-164812) showed beta.1 stable for 41 min without HTTP (maxBlock floor 4408) but collapsing to ~264 and faulting under browser load (memcpy to NULL, epc1=0x4000df64 excvaddr=0).
+
+Implementation: canServeHttp() returns true when heap is HEALTHY (cheap, no free-list walk); otherwise skips handleClient() when ESP.getMaxFreeBlockSize() < MQTT_PUBLISH_MIN_MAXBLOCK (1536), letting the heap coalesce while clients retry. Gated ONLY the main-loop serve (OTGW-firmware.ino:422). The OTA and PIC flash-upload handlers (handleEspFlashBackgroundTasks / handlePicFlashBackgroundTasks) are deliberately left ungated so an in-progress flash completes. New iHttpFragSkips counter on telnet logHeapStats (HTTP_fragskips=) and MQTT stats (otgw-firmware/stats/http_fragskips).
+
+Verified: build.py --firmware exit 0; evaluate.py --quick 34 passed / 0 failed / 100
+<!-- SECTION:FINAL_SUMMARY:END -->
