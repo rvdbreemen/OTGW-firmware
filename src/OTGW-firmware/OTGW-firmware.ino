@@ -419,7 +419,11 @@ void doBackgroundTasks()
       handleMQTT();
       handleOTGW();
       handleWebSocket();
-      httpServer.handleClient();
+      // Gate steady-state HTTP serving on heap fragmentation (TASK-841): under heavy
+      // browser/dashboard load the webserver fragments the heap until a later alloc
+      // faults. Skip serving while maxBlock is too low so the heap can coalesce; clients
+      // retry. Flash-upload handlers (handleEsp/PicFlashBackgroundTasks) are NOT gated.
+      if (canServeHttp()) httpServer.handleClient();
       MDNS.update();
       loopNTP();
     }

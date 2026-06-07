@@ -1211,6 +1211,7 @@ void sendMQTTheapdiag(){
   publishStatU32(F("otgw-firmware/stats/mqtt_drops"),            (unsigned long)state.heapdiag.iMqttDropsTotal);
   publishStatU32(F("otgw-firmware/stats/ws_fragskips"),          (unsigned long)state.heapdiag.iWsMaxBlockSkips);
   publishStatU32(F("otgw-firmware/stats/mqtt_fragskips"),        (unsigned long)state.heapdiag.iMqttMaxBlockSkips);
+  publishStatU32(F("otgw-firmware/stats/http_fragskips"),        (unsigned long)state.heapdiag.iHttpFragSkips);
   publishStatU32(F("otgw-firmware/stats/enter_low"),             (unsigned long)state.heapdiag.iEnteredLowCount);
   publishStatU32(F("otgw-firmware/stats/enter_warning"),         (unsigned long)state.heapdiag.iEnteredWarningCount);
   publishStatU32(F("otgw-firmware/stats/enter_critical"),        (unsigned long)state.heapdiag.iEnteredCriticalCount);

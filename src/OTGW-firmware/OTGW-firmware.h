@@ -125,6 +125,7 @@ HeapHealthLevel getHeapHealth();
 uint8_t getHeapFragmentation();
 bool canSendWebSocket();
 bool canPublishMQTT();
+bool canServeHttp();
 void logHeapStats();
 void emergencyHeapRecovery();
 // Status-frame burst quiesce (TASK-342): suppress MQTT discovery drip during
@@ -320,6 +321,7 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
   uint32_t iMqttMaxBlockSkips       = 0; // MQTT publishes skipped by the maxBlock pre-flight gate (fragmentation guard)
   uint32_t iWsMaxBlockSkips         = 0; // WebSocket sends skipped by the maxBlock pre-flight gate (fragmentation guard)
+  uint32_t iHttpFragSkips           = 0; // httpServer.handleClient() ticks skipped by the maxBlock gate (HTTP-load fragmentation guard)
   uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
   uint32_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier
   uint32_t iEnteredCriticalCount    = 0; // transitions into HEAP_CRITICAL tier

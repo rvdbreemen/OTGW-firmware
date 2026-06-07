@@ -1126,6 +1126,34 @@ bool canPublishMQTT() {
 }
 
 //===========================================================================================
+// Check if it is safe to serve an HTTP request (maxBlock fragmentation gate)
+//
+// HTTP request serving (ESP8266WebServer + the ~17KB web UI) is the dominant heap
+// fragmenter on this device (field A/B, TASK-841): under sustained browser/dashboard
+// load the largest contiguous block collapses and a later publish/socket allocation
+// returns NULL and faults (ROM memcpy to a NULL dest). Skipping handleClient() while
+// fragmented lets the heap coalesce; the browser/HA simply retries. ONLY the steady-state
+// main-loop serve is gated — the OTA/PIC flash-upload handlers keep serving (they must
+// finish the in-progress flash). getMaxFreeBlockSize() is only walked when not HEALTHY.
+//===========================================================================================
+bool canServeHttp() {
+  if (getHeapHealth() == HEAP_HEALTHY) return true;
+  if (ESP.getMaxFreeBlockSize() < MQTT_PUBLISH_MIN_MAXBLOCK) {
+    state.heapdiag.iHttpFragSkips++;
+    static uint32_t lastHttpFragWarnMs = 0;
+    uint32_t now = millis();
+    if ((uint32_t)(now - lastHttpFragWarnMs) > WARNING_LOG_INTERVAL_MS) {
+      DebugTf(PSTR("HEAP-FRAG: skip HTTP serve (maxBlock=%u < %u, heap=%u, skips=%u)\r\n"),
+              ESP.getMaxFreeBlockSize(), (unsigned)MQTT_PUBLISH_MIN_MAXBLOCK,
+              ESP.getFreeHeap(), (unsigned)state.heapdiag.iHttpFragSkips);
+      lastHttpFragWarnMs = now;
+    }
+    return false;
+  }
+  return true;
+}
+
+//===========================================================================================
 // Get heap statistics for debugging
 //===========================================================================================
 void logHeapStats() {
@@ -1141,12 +1169,13 @@ void logHeapStats() {
     case HEAP_CRITICAL: levelStr = "CRITICAL"; break;
   }
   
-  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u, WS_fragskips=%u, MQTT_fragskips=%u\r\n"),
+  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u, WS_fragskips=%u, MQTT_fragskips=%u, HTTP_fragskips=%u\r\n"),
           freeHeap, maxBlock, levelStr,
           (uint32_t)state.heapdiag.iWsDropsTotal,
           (uint32_t)state.heapdiag.iMqttDropsTotal,
           (uint32_t)state.heapdiag.iWsMaxBlockSkips,
-          (uint32_t)state.heapdiag.iMqttMaxBlockSkips);
+          (uint32_t)state.heapdiag.iMqttMaxBlockSkips,
+          (uint32_t)state.heapdiag.iHttpFragSkips);
 }
 
 //===========================================================================================
