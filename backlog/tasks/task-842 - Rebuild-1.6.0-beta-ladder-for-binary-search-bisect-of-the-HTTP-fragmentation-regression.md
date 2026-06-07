@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-07 18:03'
-updated_date: '2026-06-07 18:03'
+updated_date: '2026-06-07 18:46'
 labels: []
 dependencies: []
 ---
@@ -20,7 +20,7 @@ Root cause (HTTP-serving heap fragmentation) is contained by the beta.2 gate, bu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All 12 betas + 2 anchors built firmware+filesystem from their in-line dev commits in an isolated worktree; dev working tree untouched
-- [ ] #2 Artifacts labeled by beta number (.ino.bin + .littlefs.bin + version) under a single root testset folder, which is gitignored
-- [ ] #3 A binary-search worksheet (order + BAD-go-earlier / GOOD-go-later rule + GOOD/BAD criterion) is provided for George
+- [x] #1 All 12 betas + 2 anchors built firmware+filesystem from their in-line dev commits in an isolated worktree; dev working tree untouched
+- [x] #2 Artifacts labeled by beta number (.ino.bin + .littlefs.bin + version) under a single root testset folder, which is gitignored
+- [x] #3 A binary-search worksheet (order + BAD-go-earlier / GOOD-go-later rule + GOOD/BAD criterion) is provided for George
 <!-- AC:END -->
