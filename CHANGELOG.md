@@ -8,7 +8,18 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-_No unreleased changes yet. New work on `dev` lands here._
+First beta of the 1.7.0 cycle (1.7.0-beta.1). Headlined by a heap-fragmentation crash fix for long-running devices.
+
+### Fixed
+- Heap-fragmentation crash-loop on long-running ESP8266 devices. A 6-version field-bisect showed the largest contiguous heap block collapsing to a few hundred bytes within a minute (while total free still looked adequate), after which the next contiguous allocation returned NULL and was written, faulting the device. The publish and socket paths are now crash-proofed: MQTT and WebSocket sends gate on the largest contiguous block (not just total free) and skip gracefully when it is too small, emergency heap recovery no longer allocates a listener socket while heap is critical (it stops the OTGWstream listener and re-arms it once heap recovers), and MQTT reconnect now uses exponential back-off to cut lwIP socket churn during an outage. New `mqtt_fragskips` and `ws_fragskips` counters are exposed on telnet and MQTT stats. (TASK-837)
+
+### Added
+- Active gateway overrides are now surfaced over MQTT and in the Web UI, so override state set on the PIC is visible to Home Assistant and the dashboard (7d391106).
+- WiFi signal quality (percentage and label) is shown alongside RSSI in the telnet welcome banner (TASK-834).
+
+### Documentation
+- Documented the intentional unauthenticated network identity exposed on `/api/v2/device/info` (trusted-LAN security model) (TASK-807).
+- Corrected stale `is_value_valid` and `print_f88` source comments.
 
 ## [1.6.1] - 2026-05-31
 
