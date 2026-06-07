@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-07 16:19'
-updated_date: '2026-06-07 16:19'
+updated_date: '2026-06-07 16:26'
 labels: []
 dependencies: []
 ---
@@ -20,8 +20,8 @@ Zero-browser A/B (transcript-20260607-164812) proved HTTP request serving is the
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New canServeHttp() helper gates on ESP.getMaxFreeBlockSize() >= MQTT_PUBLISH_MIN_MAXBLOCK; getMaxFreeBlockSize() only walked when heap tier != HEALTHY
-- [ ] #2 Normal serving handleClient() sites (OTGW-firmware.ino main loop, OTGW-Core.ino) are gated by canServeHttp(); the OTA-upload handleClient (processes flash chunks) is NOT gated
-- [ ] #3 New iHttpFragSkips counter, surfaced on telnet logHeapStats and MQTT stats
-- [ ] #4 python build.py --firmware exits 0 and evaluate.py --quick shows no new failures
+- [x] #1 New canServeHttp() helper gates on ESP.getMaxFreeBlockSize() >= MQTT_PUBLISH_MIN_MAXBLOCK; getMaxFreeBlockSize() only walked when heap tier != HEALTHY
+- [x] #2 Normal serving handleClient() sites (OTGW-firmware.ino main loop, OTGW-Core.ino) are gated by canServeHttp(); the OTA-upload handleClient (processes flash chunks) is NOT gated
+- [x] #3 New iHttpFragSkips counter, surfaced on telnet logHeapStats and MQTT stats
+- [x] #4 python build.py --firmware exits 0 and evaluate.py --quick shows no new failures
 <!-- AC:END -->
