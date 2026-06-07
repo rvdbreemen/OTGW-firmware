@@ -1,7 +1,7 @@
 ---
 id: TASK-836
 title: Create capture-usb-serial script for ESP crash-dump capture over USB
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-06 19:56'
