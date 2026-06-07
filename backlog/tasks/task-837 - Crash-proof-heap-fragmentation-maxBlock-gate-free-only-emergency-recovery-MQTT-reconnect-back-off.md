@@ -30,6 +30,12 @@ George's Wemos D1 crash-loops on firmware >=1.6.0 (clean on 1.2.0-1.5.0). 6-vers
 - [x] #8 python build.py exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented + committed (c715ba8c) + pushed to origin/dev (c143b8da). Build+evaluator green. Staged only the 6 fix files; networkStuff.ino (TASK-834) and auto-gen version.h/hash deliberately left uncommitted. Left In Progress: code ACs all met, but no-regressions DoD is field-gated (George 24h) and the lwIP fragmenter is unpinned pending epc1 decode.
+<!-- SECTION:NOTES:END -->
+
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
