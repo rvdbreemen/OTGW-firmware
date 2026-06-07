@@ -26,3 +26,15 @@ The REST crash-log poller (TASK-835) captures the faulting address (epc1/excvadd
 - [x] #6 Help text documents the exclusive-COM-port caveat (OTmonitor/flashing cannot share the port during capture) and the addr2line decode step needing the matching .elf
 - [ ] #7 Optional: shell out to esptool esp_exception_decoder when toolchain + .elf are present
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added scripts/capture-usb-serial.bat (commit 5eaf21bc): single-file .bat launcher with embedded PowerShell that captures the ESP8266 UART0 stream over USB and mirrors the SDK panic dump (Fatal exception, epc1/epc2/epc3/excvaddr/depc, >>>stack>>>...<<<stack<<<) into a separate crash-frames.log. This is the fallback for pinning the crash when the network crashlog endpoint (TASK-835) gives a register-only decode that is not conclusive, since the full stack trace only reaches UART0 and is never persisted to flash.
+
+Features: friendly-name COM auto-detect (CP210x/CH340/FTDI/Silicon Labs/Prolific) with -Port override; 115200 default with -Baud override; survives port-in-use and unplug/replug via a reopen loop; Q/Ctrl+C cooperative stop; -DurationSeconds; PowerShell 5.1 compatible.
+
+Verified locally: payload parses clean (251 lines, 0 errors); --help renders; graceful open-failure + duration stop creates both logs and exits 0; crash-frame regex matches real ESP dump lines (Fatal exception / epc1 / stack block / ets-rst-cause / Soft WDT) with no false positive on normal log output.
+
+Deviations from the original AC list, all intentional: (1) writes two logs (usb-serial.log raw + crash-frames.log) rather than one merged transcript, which is more useful for a serial capture; (2) 74880 boot-ROM capture is via -Baud override + documented in --help rather than an auto dual-baud switch (KISS, avoids fragile timing); (3) AC7 esptool esp_exception_decoder shell-out NOT implemented (optional) - addr2line decode is documented in --help and the stop banner instead.
+<!-- SECTION:FINAL_SUMMARY:END -->
