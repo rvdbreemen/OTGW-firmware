@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-07 18:03'
-updated_date: '2026-06-07 20:43'
+updated_date: '2026-06-07 21:14'
 labels: []
 dependencies: []
 ---
@@ -24,6 +24,12 @@ Root cause (HTTP-serving heap fragmentation) is contained by the beta.2 gate, bu
 - [x] #2 Artifacts labeled by beta number (.ino.bin + .littlefs.bin + version) under a single root testset folder, which is gitignored
 - [x] #3 A binary-search worksheet (order + BAD-go-earlier / GOOD-go-later rule + GOOD/BAD criterion) is provided for George
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Extended ladder: built the 9 missing reproducible 1.6.0-cycle rungs (beta.2,3,10,11,12,11r,13,15,19) after confirming their version.h commits exist (earlier 'no build' claim was wrong - first scan filtered on chore(release) message pattern and missed bumps riding feature commits). Full ladder now 23 builds. Bisect progress: beta.5 GOOD, beta.6 GOOD (served 521 HTTP reqs), beta.16 BAD (Exception epc1=4000df64). Boundary in beta.6->beta.16; next midpoint 05c_beta.12. Worktree removed.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
