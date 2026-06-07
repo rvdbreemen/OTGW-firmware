@@ -3,9 +3,11 @@ id: TASK-842
 title: >-
   Rebuild 1.6.0 beta ladder for binary-search bisect of the HTTP-fragmentation
   regression
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-07 18:03'
+updated_date: '2026-06-07 18:03'
 labels: []
 dependencies: []
 ---
