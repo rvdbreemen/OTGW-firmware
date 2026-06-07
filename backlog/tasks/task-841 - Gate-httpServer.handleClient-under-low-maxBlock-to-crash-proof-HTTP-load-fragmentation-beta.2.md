@@ -26,6 +26,12 @@ Zero-browser A/B (transcript-20260607-164812) proved HTTP request serving is the
 - [x] #4 python build.py --firmware exits 0 and evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC#2 wording correction: OTGW-Core.ino:553 turned out to be the PIC-flash upload handler (handlePicFlashBackgroundTasks), not a normal-serving site. Per the AC's intent (gate normal serving, never gate flash-upload), it was left UNGATED alongside the ESP-flash handler. Only OTGW-firmware.ino:422 (main-loop serve) is gated. AC checked on intent, not the literal file list.
+<!-- SECTION:NOTES:END -->
+
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
