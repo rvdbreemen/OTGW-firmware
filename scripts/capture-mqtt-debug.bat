@@ -142,7 +142,7 @@ function Show-Help {
     Write-Host ""
     Write-Host "Stopping capture:"
     Write-Host "  Press Q in the console to stop cleanly. The script closes the logs and leaves"
-    Write-Host "  <date-time>-<hostname>-<uniqueid>.txt plus error.txt."
+    Write-Host "  transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt plus error.txt."
     Write-Host "  Ctrl+C and Ctrl+Break remain fallback interrupts, but cmd.exe may show its batch-job prompt after Ctrl+C."
     Write-Host "  Or pass -DurationSeconds <seconds> to stop automatically after a fixed interval."
     Write-Host ""
@@ -682,6 +682,11 @@ function Update-CaptureMetadataFromTelnetLog {
                 continue
             }
 
+            if ($line -match '^\s*version:\s*(.+?)\s*$') {
+                Add-CaptureMetadataValue -Metadata $Metadata -Name "FirmwareVersion" -Value $matches[1] -Source "telnet.log" -PreferExisting
+                continue
+            }
+
             if ($line -match '^\s*unique_id:\s*(.+?)\s*$') {
                 Add-CaptureMetadataValue -Metadata $Metadata -Name "UniqueId" -Value $matches[1] -Source "telnet.log"
                 continue
@@ -705,6 +710,7 @@ function Get-CaptureDeviceMetadata {
 
     $metadata = [ordered]@{
         Hostname    = $null
+        FirmwareVersion = $null
         UniqueId    = $null
         PicDeviceId = $null
         Sources     = New-Object System.Collections.Generic.List[string]
@@ -714,6 +720,7 @@ function Get-CaptureDeviceMetadata {
     Update-CaptureMetadataFromTelnetLog -Metadata $metadata -TelnetLog $TelnetLog
 
     if ((Test-UsableCaptureValue -Value $metadata["Hostname"]) -and
+        (Test-UsableCaptureValue -Value $metadata["FirmwareVersion"]) -and
         (Test-UsableCaptureValue -Value $metadata["UniqueId"])) {
         return [PSCustomObject]$metadata
     }
@@ -724,6 +731,7 @@ function Get-CaptureDeviceMetadata {
         $debugResponse = Invoke-RestMethod -Uri "$baseUri/api/v2/debug" -TimeoutSec 2 -ErrorAction Stop
         $debug = Get-JsonPropertyValue -Object $debugResponse -Name "debug"
         Add-CaptureMetadataValue -Metadata $metadata -Name "Hostname" -Value (Get-JsonPropertyValue -Object $debug -Name "settings.hostname") -Source "/api/v2/debug" -PreferExisting
+        Add-CaptureMetadataValue -Metadata $metadata -Name "FirmwareVersion" -Value (Get-JsonPropertyValue -Object $debug -Name "build.version") -Source "/api/v2/debug" -PreferExisting
         Add-CaptureMetadataValue -Metadata $metadata -Name "UniqueId" -Value (Get-JsonPropertyValue -Object $debug -Name "settings.mqtt.unique_id") -Source "/api/v2/debug"
     }
     catch {
@@ -746,6 +754,7 @@ function Get-CaptureDeviceMetadata {
         $deviceResponse = Invoke-RestMethod -Uri "$baseUri/api/v2/device/info" -TimeoutSec 2 -ErrorAction Stop
         $device = Get-JsonPropertyValue -Object $deviceResponse -Name "device"
         Add-CaptureMetadataValue -Metadata $metadata -Name "Hostname" -Value (Get-JsonPropertyValue -Object $device -Name "hostname") -Source "/api/v2/device/info" -PreferExisting
+        Add-CaptureMetadataValue -Metadata $metadata -Name "FirmwareVersion" -Value (Get-JsonPropertyValue -Object $device -Name "fwversion") -Source "/api/v2/device/info" -PreferExisting
 
         if (-not (Test-UsableCaptureValue -Value $metadata["UniqueId"])) {
             $macAddress = Get-JsonPropertyValue -Object $device -Name "macaddress"
@@ -773,12 +782,13 @@ function Get-CaptureTranscriptPath {
     )
 
     $hostPart = ConvertTo-SafeFileNamePart -Value $Metadata.Hostname -Fallback $DeviceHost
+    $versionPart = ConvertTo-SafeFileNamePart -Value $Metadata.FirmwareVersion -Fallback "unknown-version"
     $idValue = $Metadata.UniqueId
     if (-not (Test-UsableCaptureValue -Value $idValue)) {
         $idValue = $Metadata.PicDeviceId
     }
     $idPart = ConvertTo-SafeFileNamePart -Value $idValue -Fallback "unknown-id"
-    return (Join-Path -Path $RunPath -ChildPath "$RunName-$hostPart-$idPart.txt")
+    return (Join-Path -Path $RunPath -ChildPath "transcript-$RunName-$versionPart-$hostPart-$idPart.txt")
 }
 
 function New-ToolErrorLog {
@@ -1986,7 +1996,7 @@ try {
 
     Add-SummaryLine "Capture started: $((Get-Date).ToString('o'))"
     Write-Host "Capturing telnet and MQTT output in $runPath"
-    Write-Host "Press Q to stop cleanly and leave a timestamp-host-uniqueid transcript. Run with -Help for options."
+    Write-Host "Press Q to stop cleanly and leave a transcript timestamp-version-host-uniqueid file. Run with -Help for options."
     Write-Host "Ctrl+C and Ctrl+Break also stop capture; Ctrl+C may still trigger a cmd.exe batch-job prompt."
 
     while (-not (Test-CaptureStopRequested) -and (Get-Date) -lt $deadline) {
@@ -2142,8 +2152,10 @@ finally {
 
     $captureMetadata = Get-CaptureDeviceMetadata -DeviceHost $DeviceHost -TelnetLog $telnetLog
     $resolvedHostname = if (Test-UsableCaptureValue -Value $captureMetadata.Hostname) { $captureMetadata.Hostname } else { $DeviceHost }
+    $resolvedFirmwareVersion = if (Test-UsableCaptureValue -Value $captureMetadata.FirmwareVersion) { $captureMetadata.FirmwareVersion } else { "unknown-version" }
     $resolvedDeviceId = if (Test-UsableCaptureValue -Value $captureMetadata.UniqueId) { $captureMetadata.UniqueId } elseif (Test-UsableCaptureValue -Value $captureMetadata.PicDeviceId) { $captureMetadata.PicDeviceId } else { "unknown-id" }
     Add-SummaryLine "ResolvedHostname: $resolvedHostname"
+    Add-SummaryLine "ResolvedFirmwareVersion: $resolvedFirmwareVersion"
     Add-SummaryLine "ResolvedUniqueId: $(if (Test-UsableCaptureValue -Value $captureMetadata.UniqueId) { $captureMetadata.UniqueId } else { '(unknown)' })"
     Add-SummaryLine "ResolvedPicDeviceId: $(if (Test-UsableCaptureValue -Value $captureMetadata.PicDeviceId) { $captureMetadata.PicDeviceId } else { '(unknown)' })"
     Add-SummaryLine "ResolvedDeviceIdForFilename: $resolvedDeviceId"
