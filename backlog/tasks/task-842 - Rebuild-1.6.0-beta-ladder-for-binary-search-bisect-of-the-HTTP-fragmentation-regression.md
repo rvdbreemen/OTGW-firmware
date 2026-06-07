@@ -24,3 +24,9 @@ Root cause (HTTP-serving heap fragmentation) is contained by the beta.2 gate, bu
 - [x] #2 Artifacts labeled by beta number (.ino.bin + .littlefs.bin + version) under a single root testset folder, which is gitignored
 - [x] #3 A binary-search worksheet (order + BAD-go-earlier / GOOD-go-later rule + GOOD/BAD criterion) is provided for George
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Built the full 1.6.0 beta bisect ladder (14 points: anchors 1.5.0 GOOD + 1.6.0 BAD, plus the 12 rebuildable in-line dev betas 1,4,5,6,7,16,20,21,22,23,24,25), firmware+filesystem each, in an isolated detached worktree (../OTGW-firmware-bisect, since removed) so the dirty dev tree was never touched. Artifacts labeled 00_..13_ by chronological order under bisect-testset/ (gitignored, 46MB, 2 bins each) with a README.txt giving the flash steps, GOOD/BAD criterion (maxBlock floor + reboot_log) and the binary-search rule (BAD=go earlier, GOOD=go later). 13/14 built first pass; 1.5.0 failed on a worktree nested-lib population race and was rebuilt to complete 14/14. Binary search starts at 06_beta.16. Each build self-identifies via its 1.6.0-beta.N+<sha> version banner.
+<!-- SECTION:FINAL_SUMMARY:END -->
