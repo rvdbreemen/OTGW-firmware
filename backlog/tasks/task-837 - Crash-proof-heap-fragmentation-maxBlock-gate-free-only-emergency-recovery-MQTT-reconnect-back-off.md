@@ -3,9 +3,11 @@ id: TASK-837
 title: >-
   Crash-proof heap fragmentation: maxBlock gate + free-only emergency recovery +
   MQTT reconnect back-off
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-07 08:35'
+updated_date: '2026-06-07 08:35'
 labels: []
 dependencies: []
 ---
