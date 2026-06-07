@@ -333,6 +333,14 @@ static bool writeMqttProgmemChunk(PGM_P data, size_t len)
 
 static bool beginMqttPublish(const char *topic, size_t len, bool retain)
 {
+  // Defense-in-depth maxBlock pre-flight: covers any publish path that reaches
+  // here without going through canPublishMQTT(). PubSubClient/lwIP need a
+  // contiguous buffer; refuse (graceful skip, NOT an error) when the largest
+  // block is below the floor rather than let the alloc fail and fault.
+  if (ESP.getMaxFreeBlockSize() < MQTT_PUBLISH_MIN_MAXBLOCK) {
+    state.heapdiag.iMqttMaxBlockSkips++;
+    return false;
+  }
   if (!MQTTclient.beginPublish(topic, len, retain)) {
     PrintMQTTError();
     return false;
@@ -837,6 +845,8 @@ void handleMQTT()
       if (MQTTclient.connected())
       {
         reconnectAttempts = 0;
+        // Reset the retry back-off to its 3 s base so the next outage starts fresh.
+        CHANGE_INTERVAL_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);
         MQTTDebugln(F(" .. connected\r"));
         Debugln(F("MQTT connected"));
         stateMQTT = MQTT_STATE_IS_CONNECTED;
@@ -893,9 +903,18 @@ void handleMQTT()
       }
       else
       { // no connection, try again, do a non-blocking wait for 3 seconds.
+        // Exponential back-off between connect attempts (3,6,12,24,48 s) to cut
+        // lwIP socket alloc/free churn during a broker/WiFi outage, which is the
+        // leading heap-fragmentation suspect. Capped at 48 s; after 5 attempts the
+        // state machine drops to WAIT_FOR_RECONNECT (42 s) anyway. NOT publish
+        // spacing — ADR-076 deliberately removed that; this is connection spacing.
+        int8_t backoffShift = (reconnectAttempts > 5 ? 5 : reconnectAttempts) - 1;
+        if (backoffShift < 0) backoffShift = 0;
+        uint32_t backoffSec = 3u << backoffShift;
+        if (backoffSec > 48u) backoffSec = 48u;
         MQTTDebugln(F(" .. \r"));
-        MQTTDebugTf(PSTR("failed, retrycount=[%d], rc=[%d] ..  try again in 3 seconds\r\n"), reconnectAttempts, MQTTclient.state());
-        RESTART_TIMER(timerMQTTwaitforretry);
+        MQTTDebugTf(PSTR("failed, retrycount=[%d], rc=[%d] .. back-off, try again in %u seconds\r\n"), reconnectAttempts, MQTTclient.state(), (unsigned)backoffSec);
+        CHANGE_INTERVAL_SEC(timerMQTTwaitforretry, backoffSec, CATCH_UP_MISSED_TICKS);
         stateMQTT = MQTT_STATE_WAIT_CONNECTION_ATTEMPT;  // if the re-connect did not work, then return to wait for reconnect
         MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_CONNECTION_ATTEMPT"));
       }
@@ -1190,6 +1209,8 @@ void sendMQTTheapdiag(){
   // Heap pressure tier transitions and drop counters
   publishStatU32(F("otgw-firmware/stats/ws_drops"),              (unsigned long)state.heapdiag.iWsDropsTotal);
   publishStatU32(F("otgw-firmware/stats/mqtt_drops"),            (unsigned long)state.heapdiag.iMqttDropsTotal);
+  publishStatU32(F("otgw-firmware/stats/ws_fragskips"),          (unsigned long)state.heapdiag.iWsMaxBlockSkips);
+  publishStatU32(F("otgw-firmware/stats/mqtt_fragskips"),        (unsigned long)state.heapdiag.iMqttMaxBlockSkips);
   publishStatU32(F("otgw-firmware/stats/enter_low"),             (unsigned long)state.heapdiag.iEnteredLowCount);
   publishStatU32(F("otgw-firmware/stats/enter_warning"),         (unsigned long)state.heapdiag.iEnteredWarningCount);
   publishStatU32(F("otgw-firmware/stats/enter_critical"),        (unsigned long)state.heapdiag.iEnteredCriticalCount);

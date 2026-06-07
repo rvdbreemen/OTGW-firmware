@@ -403,6 +403,8 @@ void doBackgroundTasks()
   if (getHeapHealth() == HEAP_CRITICAL) {
     emergencyHeapRecovery();
   }
+  // Re-arm the OTGWstream listener if recovery stopped it (deferred until HEALTHY).
+  serviceDeferredStreamRearm();
 
   if (WiFi.status() == WL_CONNECTED) {
     if (state.flash.bESPactive) {

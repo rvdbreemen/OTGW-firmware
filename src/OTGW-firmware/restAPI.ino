@@ -42,7 +42,10 @@ static const char* httpMethodToStr(HTTPMethod m) {
 // H3: Send dynamic CORS Allow-Origin header echoing the request Origin,
 // instead of a wildcard. Only sends the header when Origin is present.
 static void sendCorsOriginHeader() {
-  String origin = httpServer.header("Origin");
+  // Reference-bind (no copy): header() returns const String&, and sendHeader()
+  // takes const String&. Avoids a per-response heap String allocation across
+  // ~17 call sites — pure heap-churn reduction, identical behavior.
+  const String& origin = httpServer.header("Origin");
   if (origin.length() > 0) {
     httpServer.sendHeader(F("Access-Control-Allow-Origin"), origin);
   }

@@ -910,6 +910,10 @@ static uint32_t lastWebSocketWarningMs = 0;
 static uint32_t lastMQTTWarningMs = 0;
 static uint32_t webSocketDropCount = 0;
 static uint32_t mqttDropCount = 0;
+// Set by emergencyHeapRecovery() when it stops OTGWstream under CRITICAL without
+// restarting it (restart allocates). serviceDeferredStreamRearm() re-arms the
+// listener once heap is HEALTHY again. Avoids allocating during the crisis.
+static bool sOTGWstreamRearmPending = false;
 
 // Minimum intervals when heap is under pressure (milliseconds)
 #define WEBSOCKET_THROTTLE_MS_WARNING  50   // 50ms = max 20 msg/sec when heap is low
@@ -989,7 +993,22 @@ uint8_t getHeapFragmentation() {
 bool canSendWebSocket() {
   HeapHealthLevel heapLevel = getHeapHealth();
   uint32_t now = millis();
-  
+
+  // Fragmentation pre-flight: free heap can pass the tier gate while the largest
+  // contiguous block is too small for the next lwIP/WebSocket allocation, which
+  // would return NULL and fault (StoreProhibited). Skip gracefully instead.
+  // Only walk the free list when not HEALTHY (cost control, like getHeapHealth).
+  if (heapLevel != HEAP_HEALTHY && ESP.getMaxFreeBlockSize() < MQTT_PUBLISH_MIN_MAXBLOCK) {
+    state.heapdiag.iWsMaxBlockSkips++;
+    if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
+      DebugTf(PSTR("HEAP-FRAG: skip WebSocket (maxBlock=%u < %u, heap=%u, skips=%u)\r\n"),
+              ESP.getMaxFreeBlockSize(), (unsigned)MQTT_PUBLISH_MIN_MAXBLOCK,
+              ESP.getFreeHeap(), (unsigned)state.heapdiag.iWsMaxBlockSkips);
+      lastWebSocketWarningMs = now;
+    }
+    return false;
+  }
+
   // Critical: block WebSocket messages completely
   if (heapLevel == HEAP_CRITICAL) {
     webSocketDropCount++;
@@ -1043,7 +1062,22 @@ bool canSendWebSocket() {
 bool canPublishMQTT() {
   HeapHealthLevel heapLevel = getHeapHealth();
   uint32_t now = millis();
-  
+
+  // Fragmentation pre-flight: free heap can pass the tier gate while the largest
+  // contiguous block is too small for the PubSubClient/lwIP publish allocation,
+  // which would return NULL and fault (StoreProhibited). Skip gracefully instead.
+  // Only walk the free list when not HEALTHY (cost control, like getHeapHealth).
+  if (heapLevel != HEAP_HEALTHY && ESP.getMaxFreeBlockSize() < MQTT_PUBLISH_MIN_MAXBLOCK) {
+    state.heapdiag.iMqttMaxBlockSkips++;
+    if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
+      DebugTf(PSTR("HEAP-FRAG: skip MQTT (maxBlock=%u < %u, heap=%u, skips=%u)\r\n"),
+              ESP.getMaxFreeBlockSize(), (unsigned)MQTT_PUBLISH_MIN_MAXBLOCK,
+              ESP.getFreeHeap(), (unsigned)state.heapdiag.iMqttMaxBlockSkips);
+      lastMQTTWarningMs = now;
+    }
+    return false;
+  }
+
   // Critical: block MQTT messages completely
   if (heapLevel == HEAP_CRITICAL) {
     mqttDropCount++;
@@ -1107,17 +1141,20 @@ void logHeapStats() {
     case HEAP_CRITICAL: levelStr = "CRITICAL"; break;
   }
   
-  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u\r\n"),
+  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u, WS_fragskips=%u, MQTT_fragskips=%u\r\n"),
           freeHeap, maxBlock, levelStr,
           (uint32_t)state.heapdiag.iWsDropsTotal,
-          (uint32_t)state.heapdiag.iMqttDropsTotal);
+          (uint32_t)state.heapdiag.iMqttDropsTotal,
+          (uint32_t)state.heapdiag.iWsMaxBlockSkips,
+          (uint32_t)state.heapdiag.iMqttMaxBlockSkips);
 }
 
 //===========================================================================================
 // Emergency heap recovery - called when heap is critically low.
 // ADR-079: performs three concrete recovery actions in order:
 //   1. Drop all WebSocket clients (browsers reconnect via graph.js).
-//   2. Stop+restart OTGWstream port 25238 (OTmonitor users reconnect manually).
+//   2. Stop OTGWstream port 25238 (re-armed later once heap recovers; restart
+//      allocates a listen socket and must not run while heap is CRITICAL).
 //   3. Clear MQTT discovery pending bitmap (JIT path repopulates on next status burst).
 // Telnet is intentionally NOT dropped (operators need live diagnostics).
 // MQTT is intentionally NOT disconnected (reconnect cost exceeds heap recovered).
@@ -1144,11 +1181,13 @@ void emergencyHeapRecovery() {
     actions |= 0x01;
   }
 
-  // Action 2: drop OTGWstream port 25238 clients by stop+restart of the listener.
-  // startOTGWstream() is idempotent (calls WiFiServer::begin()) and allocation-neutral
-  // on restart — same pattern used by applyLegacyPort25238Setting() at runtime.
+  // Action 2: drop OTGWstream port 25238 clients to free their lwIP buffers.
+  // STOP ONLY — do NOT restart here. startOTGWstream() -> WiFiServer::begin()
+  // ALLOCATES a listen socket, which is self-defeating (and a candidate fault
+  // site) while heap is CRITICAL and the largest block is ~300 B. The listener
+  // is re-armed later by serviceDeferredStreamRearm() once heap is HEALTHY again.
   OTGWstream.stop();
-  startOTGWstream();
+  if (settings.mqtt.bLegacyPort25238Enabled) sOTGWstreamRearmPending = true;
   actions |= 0x02;
 
   // Action 3: clear MQTT discovery pending bitmap to stop drip allocations
@@ -1161,6 +1200,19 @@ void emergencyHeapRecovery() {
           (unsigned)heapBefore, (unsigned)heapAfter,
           (long)((int32_t)heapAfter - (int32_t)heapBefore),
           (unsigned)actions);
+}
+
+//===========================================================================================
+// Re-arm the OTGWstream listener that emergencyHeapRecovery() stopped under CRITICAL.
+// Deferred until heap is HEALTHY so the WiFiServer::begin() allocation has room to
+// succeed. Called every doBackgroundTasks() tick; cheap no-op when nothing pending.
+//===========================================================================================
+void serviceDeferredStreamRearm() {
+  if (!sOTGWstreamRearmPending) return;
+  if (getHeapHealth() != HEAP_HEALTHY) return;   // wait for real headroom before allocating
+  sOTGWstreamRearmPending = false;
+  applyLegacyPort25238Setting();                 // honours the enabled setting; re-binds the listener
+  DebugTln(F("[heap-recovery] OTGWstream listener re-armed after heap recovery"));
 }
 
 //===[ blink status led ]===

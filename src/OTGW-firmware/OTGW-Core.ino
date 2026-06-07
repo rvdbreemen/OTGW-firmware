@@ -4775,6 +4775,16 @@ void startOTGWstream()
     return;
   }
 
+  // Defense-in-depth: WiFiServer::begin() allocates a listen socket. Refuse to
+  // allocate when the largest contiguous block is below the publish floor — a
+  // failed socket alloc here is a candidate StoreProhibited. Recovery path
+  // (serviceDeferredStreamRearm) only calls this once heap is HEALTHY anyway.
+  if (ESP.getMaxFreeBlockSize() < MQTT_PUBLISH_MIN_MAXBLOCK) {
+    DebugTf(PSTR("[OTGWstream] start deferred: maxBlock=%u < %u\r\n"),
+            (unsigned)ESP.getMaxFreeBlockSize(), (unsigned)MQTT_PUBLISH_MIN_MAXBLOCK);
+    return;
+  }
+
   if (OTGWstream.begin(false)) {    // false = skip WiFi check; bind unconditionally
     DebugTln(F("[OTGWstream] legacy port 25238 enabled"));
   } else {

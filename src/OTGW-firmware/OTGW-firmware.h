@@ -113,6 +113,14 @@ enum HeapHealthLevel {
 // before helperStuff.ino in the Arduino sketch build, so a #define in
 // helperStuff would not be visible to MQTTstuff.
 #define HEAP_LOW_RESTORE_THRESHOLD 6144  // bytes (HEAP_LOW_THRESHOLD + 1024)
+// Minimum largest-contiguous-block required before attempting an MQTT/WS publish
+// or a PubSubClient/lwIP allocation. umm_malloc has no compaction: free heap can
+// look adequate while the largest block is too small for the next contiguous
+// alloc, which then returns NULL and (unchecked) faults as a StoreProhibited.
+// Gating on maxBlock converts that crash into a logged graceful skip. Matched to
+// HEAP_FRAG_PROMOTE_MAXBLOCK (1536) for coherence with the tier-promote rule.
+// Declared here (not helperStuff.ino) so MQTTstuff.ino, concatenated earlier, sees it.
+#define MQTT_PUBLISH_MIN_MAXBLOCK 1536   // bytes
 HeapHealthLevel getHeapHealth();
 uint8_t getHeapFragmentation();
 bool canSendWebSocket();
@@ -310,6 +318,8 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
   uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
+  uint32_t iMqttMaxBlockSkips       = 0; // MQTT publishes skipped by the maxBlock pre-flight gate (fragmentation guard)
+  uint32_t iWsMaxBlockSkips         = 0; // WebSocket sends skipped by the maxBlock pre-flight gate (fragmentation guard)
   uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
   uint32_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier
   uint32_t iEnteredCriticalCount    = 0; // transitions into HEAP_CRITICAL tier
