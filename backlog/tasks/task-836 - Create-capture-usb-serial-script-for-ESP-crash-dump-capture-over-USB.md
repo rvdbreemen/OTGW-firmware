@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-06 19:56'
-updated_date: '2026-06-07 09:27'
+updated_date: '2026-06-07 09:31'
 labels: []
 dependencies: []
 ---
@@ -18,11 +18,11 @@ The REST crash-log poller (TASK-835) captures the faulting address (epc1/excvadd
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Standalone single-file .bat launcher with embedded PowerShell payload, same pattern as capture-mqtt-debug.bat (Q-to-stop, CancelFlag, merged transcript)
-- [ ] #2 Auto-detects the OTGW COM port via WMI friendly-name match (CP210x/CH340/USB Serial), with -Port COMn override
-- [ ] #3 Opens the port at 115200 by default with a -Baud override and an optional 74880 boot-ROM pass for the reset-cause banner
-- [ ] #4 Logs all UART0 bytes timestamped to usb-serial.log; flags crash frames (Exception (, epc1=, >>>stack>>>...<<<stack<<<, rst cause) into a separate crash-frames.log
-- [ ] #5 Gracefully handles port-in-use / device-absent / unplug-replug without aborting the capture
-- [ ] #6 Help text documents the exclusive-COM-port caveat (OTmonitor/flashing cannot share the port during capture) and the addr2line decode step needing the matching .elf
+- [x] #1 Standalone single-file .bat launcher with embedded PowerShell payload, same pattern as capture-mqtt-debug.bat (Q-to-stop, CancelFlag, merged transcript)
+- [x] #2 Auto-detects the OTGW COM port via WMI friendly-name match (CP210x/CH340/USB Serial), with -Port COMn override
+- [x] #3 Opens the port at 115200 by default with a -Baud override and an optional 74880 boot-ROM pass for the reset-cause banner
+- [x] #4 Logs all UART0 bytes timestamped to usb-serial.log; flags crash frames (Exception (, epc1=, >>>stack>>>...<<<stack<<<, rst cause) into a separate crash-frames.log
+- [x] #5 Gracefully handles port-in-use / device-absent / unplug-replug without aborting the capture
+- [x] #6 Help text documents the exclusive-COM-port caveat (OTmonitor/flashing cannot share the port during capture) and the addr2line decode step needing the matching .elf
 - [ ] #7 Optional: shell out to esptool esp_exception_decoder when toolchain + .elf are present
 <!-- AC:END -->
