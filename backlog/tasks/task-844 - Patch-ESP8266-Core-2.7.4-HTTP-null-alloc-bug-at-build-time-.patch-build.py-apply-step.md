@@ -25,3 +25,9 @@ Confirmed root cause of George's crash: ESP8266 Core 2.7.4 BufferedStreamDataSou
 - [x] #3 ADR created (Proposed) documenting the core-patch decision, alternatives (fork, firmware gate, upstream), and consequences; not self-accepted
 - [x] #4 python build.py applies the patch and compiles clean (exit 0); evaluate.py --quick no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Patch + build.py apply-step shipped (commits d581780d, 51f79e45). Verified: pristine core -> build.py auto-applies -> compiles clean. Idempotent + loud-fail-on-drift. *.patch pinned LF via .gitattributes. ADR-084 Proposed - awaiting user sign-off before Accepted (do not self-accept).
+<!-- SECTION:NOTES:END -->
