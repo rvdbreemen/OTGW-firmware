@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.166
+**  Version  : v2.0.0-alpha.168
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -581,12 +581,19 @@ inline const __FlashStringHelper* boardName() {
 #endif
 }
 
-// Returns the static hardware-type slug (board class) — compile-time, machine-readable.
-// Distinct from hardwareModeName() (runtime operational mode) and boardName() (display
-// string). This is the contract codepath/UI selection switches on; see ADR-113.
-// Values: "otgw-classic" (HAS_PIC=1), "otgw32" (HAS_PIC=0), future "ot-thing".
+// Returns the hardware-type slug (board class) — machine-readable. Distinct from
+// hardwareModeName() (runtime operational mode) and boardName() (display string).
+// This is the contract codepath/UI selection switches on; see ADR-113.
+// Values: "otgw-classic" (PIC) or "otgw32" (OTDirect); future "ot-thing".
+// On the two fixed boards this is the compile-time HW_TYPE_NAME. On the combo
+// board (ADR-125 §6, amending ADR-113 §1) it follows the boot-detected mode, so
+// a combo in PIC mode advertises "otgw-classic" and in OTDirect mode "otgw32".
 inline const __FlashStringHelper* hardwareTypeName() {
+#if HAS_RUNTIME_HW_DETECT
+  return (state.hw.eMode == HW_MODE_PIC) ? F("otgw-classic") : F("otgw32");
+#else
   return F(HW_TYPE_NAME);
+#endif
 }
 
 // Compile-time capability: does this board CLASS carry a PIC co-processor at all?
