@@ -8,7 +8,10 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-1.7.0 cycle (latest beta: 1.7.0-beta.3). Headlined by a heap-fragmentation crash fix for long-running devices; beta.3 pins the exact crash site and gates it correctly.
+1.7.0 cycle (latest beta: 1.7.0-beta.4). Headlined by a heap-fragmentation crash fix for long-running devices; beta.4 fixes the root cause in the ESP8266 core itself.
+
+### Fixed
+- HTTP static-file serving crash, fixed at the source (beta.4). The firmware-side heap gates in beta.2/beta.3 fired but could not stop the crash, because the faulting allocation is a per-TCP-segment `new uint8_t[~1460]` *inside* the ESP8266 core's `streamFile` loop: serving a large asset (e.g. the ~250 KB `index.js`) fragments the heap mid-transfer, a later chunk's unchecked `new[]` returns NULL, and the core writes to it (the `0x4000df64` ROM `memcpy` fault). A firmware entry-gate cannot see between the core's per-chunk allocations. beta.4 patches the core at build time (ADR-084): `BufferedStreamDataSource::get_buffer()` now returns NULL instead of copying into a failed allocation, and `ClientContext::_write_some()` treats that as "retry later", so a mid-transfer low-memory moment drops/retries the connection instead of crashing. The core is a board-manager install reapplied by `build.py` on every build. (TASK-844)
 
 ### Fixed
 - HTTP static-file serving crash under heap fragmentation (precise root-cause fix, beta.3). Analysis pinned the fault to the ESP8266 core: serving a static asset (`streamFile()`) makes the core's `BufferedStreamDataSource` allocate one TCP segment (~1460 bytes) per chunk with an unchecked, non-throwing `new[]`; under heap fragmentation that returns NULL and the following copy writes to a NULL destination (the ROM `memcpy` fault seen in the field). Static-file serving is now gated on the largest contiguous block (`HTTP_SERVE_MIN_MAXBLOCK`, 2048 bytes, sized just above the ~1460-byte allocation): when the contiguous block is too small the request gets a `503` to retry, instead of crashing. This replaces the beta.2 gate, whose threshold sat right at the cliff. (TASK-843)
