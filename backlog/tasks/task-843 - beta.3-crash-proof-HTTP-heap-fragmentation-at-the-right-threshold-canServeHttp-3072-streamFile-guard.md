@@ -25,3 +25,9 @@ Parallel-debugging ACH confirmed the crash site: unchecked non-throwing new[] in
 - [x] #3 MQTT/WS maxBlock gates unchanged (still 1536); only the HTTP-serve path uses the higher 3072 threshold
 - [x] #4 python build.py --firmware exit 0; evaluate.py --quick no new failures
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+beta.3 crash-proof shipped (commit 7f869dc1). Root cause (ACH-confirmed): ESP8266 Core 2.7.4 streamFile -> BufferedStreamDataSource::get_buffer unchecked new uint8_t[~1460] returns NULL under fragmentation -> memcpy(NULL) StoreProhibited (epc1=0x4000df64). Added HTTP_SERVE_MIN_MAXBLOCK=2048 (above the ~1460 cliff, below beta.6's working 1944 floor); canServeHttp() raised 1536->2048 to gate handleClient (parse+serve); streamFileGuarded() helper at the 6 FSexplorer streamFile sites sends 503 when maxBlock<2048. MQTT/WS gates unchanged (1536). Build+evaluator green. Supersedes beta.2 (which gated at 1536 ~= the cliff and per-loop, so requests slipped through and faulted per-chunk). Field validation pending: George flashes beta.3, browser ON, expect HTTP_fragskips/503s instead of Exception, 0 crashes.
+<!-- SECTION:FINAL_SUMMARY:END -->
