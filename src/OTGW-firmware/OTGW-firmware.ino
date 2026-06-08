@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.166
+**  Version  : v2.0.0-alpha.167
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -635,8 +635,14 @@ void doBackgroundTasks()
       handleMQTT();                 // MQTT transmissions
       handlePICSerial();            // OTGW/PIC handling
 #if HAS_DIRECT_OT
-      handleOTDirectBridgeStream(); // OTGW32/TCP 25238 command bridge
-      loopOTDirect();               // OT-direct GPIO poll (OTGW32 only)
+      // ADR-125: run the OT-direct engine only when the board is in OT-direct
+      // mode. On the fixed OTGW32 isOTDirectEnabled() is always true; on a combo
+      // booted in PIC mode this skips the OT-direct poll + bridge (and its
+      // otgw32/* MQTT topics), letting the PIC path own the OT bus.
+      if (isOTDirectEnabled()) {
+        handleOTDirectBridgeStream(); // OTGW32/TCP 25238 command bridge
+        loopOTDirect();               // OT-direct GPIO poll
+      }
 #endif
       handleWebSocket();            // WebSocket handling for OT log streaming
       // TASK-817: drain several pending connections per loop. The sync WebServer

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.165
+**  Version  : v2.0.0-alpha.167
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -487,13 +487,16 @@ void initOLED() {
 
   oledDisplay.set2X();
   oledDisplay.setRow(2);
-#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  oledDisplay.setCol(28);               // 2X "OTGW32" = 72px, centred on 128px
-  oledDisplay.print(F("OTGW32"));
-#else
-  oledDisplay.setCol(40);               // 2X "OTGW" = 48px, centred
-  oledDisplay.print(F("OTGW"));
-#endif
+  // ADR-125: name follows the boot-detected mode (set before initOLED()).
+  // isOTDirectEnabled() is compile-time false on the fixed ESP8266 and true on
+  // the fixed OTGW32, so the fixed boards render exactly as before.
+  if (isOTDirectEnabled()) {
+    oledDisplay.setCol(28);             // 2X "OTGW32" = 72px, centred on 128px
+    oledDisplay.print(F("OTGW32"));
+  } else {
+    oledDisplay.setCol(40);             // 2X "OTGW" = 48px, centred
+    oledDisplay.print(F("OTGW"));
+  }
   oledDisplay.set1X();
   oledDisplay.setRow(4);
   oledDisplay.setCol(13);               // "OpenTherm Gateway" = 102px, centred

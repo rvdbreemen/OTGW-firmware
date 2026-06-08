@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.166
+**  Version  : v2.0.0-alpha.167
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4536,9 +4536,11 @@ void processOT(const char *buf, int len, bool suppressOutput){
 */
 void handlePICSerial()
 {
-#if !HAS_PIC
-  return;  // No PIC serial on OTGW32 — OT-direct uses loopOTDirect() instead
-#else
+#if HAS_PIC
+  // ADR-125: the combo links the PIC serial path in but must skip it when the
+  // board booted in OT-direct mode. On the fixed OTGW32 (HAS_PIC=0) this whole
+  // block is excluded, so handlePICSerial() is an empty no-op there as before.
+  if (!isPICEnabled()) return;
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128
