@@ -3,9 +3,11 @@ id: TASK-844
 title: >-
   Patch ESP8266 Core 2.7.4 HTTP null-alloc bug at build time (.patch + build.py
   apply-step)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-08 19:43'
+updated_date: '2026-06-08 19:43'
 labels: []
 dependencies: []
 ---
