@@ -2,6 +2,9 @@
 * text=auto
 *.bat text eol=crlf
 *.sh  text eol=lf
+# Core patches must stay LF so `git apply` matches the LF core source on every
+# platform (build.py apply_core_patches, ADR-084). CRLF here breaks patch context.
+*.patch text eol=lf
 
 # CI-generated version assets — always keep our local copy during merges/rebases
 src/OTGW-firmware/version.h    merge=ours
