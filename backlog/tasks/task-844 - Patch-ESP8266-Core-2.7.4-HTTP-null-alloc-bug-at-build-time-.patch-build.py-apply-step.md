@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-08 19:43'
-updated_date: '2026-06-08 19:43'
+updated_date: '2026-06-08 19:53'
 labels: []
 dependencies: []
 ---
@@ -20,8 +20,8 @@ Confirmed root cause of George's crash: ESP8266 Core 2.7.4 BufferedStreamDataSou
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A unified-diff .patch under patches/ adds: DataSource.h get_buffer -> new(std::nothrow)+return nullptr on OOM; ClientContext.h _write_some -> break on null get_buffer()
-- [ ] #2 build.py applies the patch to the installed core after core install: idempotent (skip if already applied), errors loudly if context does not match (wrong core version), logs clearly
-- [ ] #3 ADR created (Proposed) documenting the core-patch decision, alternatives (fork, firmware gate, upstream), and consequences; not self-accepted
-- [ ] #4 python build.py applies the patch and compiles clean (exit 0); evaluate.py --quick no new failures
+- [x] #1 A unified-diff .patch under patches/ adds: DataSource.h get_buffer -> new(std::nothrow)+return nullptr on OOM; ClientContext.h _write_some -> break on null get_buffer()
+- [x] #2 build.py applies the patch to the installed core after core install: idempotent (skip if already applied), errors loudly if context does not match (wrong core version), logs clearly
+- [x] #3 ADR created (Proposed) documenting the core-patch decision, alternatives (fork, firmware gate, upstream), and consequences; not self-accepted
+- [x] #4 python build.py applies the patch and compiles clean (exit 0); evaluate.py --quick no new failures
 <!-- AC:END -->
