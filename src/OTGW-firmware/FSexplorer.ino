@@ -58,6 +58,31 @@ const char Helper[] PROGMEM =
   "</form>\n";
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
+// Heap-fragmentation guard for static-file serving (TASK-843, confirmed root cause).
+// ESP8266WebServer streamFile() -> BufferedStreamDataSource::get_buffer() does an
+// UNCHECKED `new uint8_t[~1460]` per TCP segment; on Core 2.7.4 (-fno-exceptions) that
+// returns NULL under fragmentation and the following memcpy/readBytes writes to NULL
+// -> Exception StoreProhibited (ROM memcpy 0x4000df64, excvaddr=0). Refuse with 503 when
+// the largest contiguous block is below the safe floor so the client retries once the
+// heap recovers, instead of crashing. Two overloads preserve the no-alloc PROGMEM mime
+// path (F()) and accept a String mime (contentType()).
+static bool streamFileGuarded(File &f, const __FlashStringHelper *mime) {
+  if (ESP.getMaxFreeBlockSize() < HTTP_SERVE_MIN_MAXBLOCK) {
+    httpServer.send(503, F("text/plain"), F("Low memory, please retry"));
+    return false;
+  }
+  httpServer.streamFile(f, mime);
+  return true;
+}
+static bool streamFileGuarded(File &f, const String &mime) {
+  if (ESP.getMaxFreeBlockSize() < HTTP_SERVE_MIN_MAXBLOCK) {
+    httpServer.send(503, F("text/plain"), F("Low memory, please retry"));
+    return false;
+  }
+  httpServer.streamFile(f, mime);
+  return true;
+}
+
 
 // Serve a CSS asset with revalidation: no-cache + ETag = filesystem hash, mirroring the
 // index.html policy. Avoids the stale-CSS cache-skew where a long max-age copy survives a
@@ -81,7 +106,7 @@ static void serveCssRevalidated(const char* path) {
     httpServer.sendHeader(F("ETag"), etag);
   }
   httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-  httpServer.streamFile(f, F("text/css"));
+  streamFileGuarded(f, F("text/css"));
   f.close();
 }
 
@@ -212,7 +237,7 @@ void startWebserver(){
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
-    httpServer.streamFile(f, F("application/javascript"));
+    streamFileGuarded(f, F("application/javascript"));
     f.close();
   });
 
@@ -226,7 +251,7 @@ void startWebserver(){
     } else {
       httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
     }
-    httpServer.streamFile(f, F("application/javascript"));
+    streamFileGuarded(f, F("application/javascript"));
     f.close();
   });
   //otgw pic functions
@@ -255,13 +280,13 @@ void setupFSexplorer(){
     httpServer.on("/FSexplorer.html", []() {
       File f = LittleFS.open("/FSexplorer.html", "r");
       if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      streamFileGuarded(f, F("text/html; charset=UTF-8"));
       f.close();
     });
     httpServer.on("/FSexplorer", []() {
       File f = LittleFS.open("/FSexplorer.html", "r");
       if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
+      streamFileGuarded(f, F("text/html; charset=UTF-8"));
       f.close();
     });
   }
@@ -495,7 +520,7 @@ bool handleFile(String&& path)
   }
   if (!LittleFS.exists("/FSexplorer.html")) httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper); //Upload the FSexplorer.html
   if (path.endsWith("/")) path += F("index.html");
-  return LittleFS.exists(path) ? ({File f = LittleFS.open(path, "r"); httpServer.streamFile(f, contentType(path)); f.close(); true;}) : false;
+  return LittleFS.exists(path) ? ({File f = LittleFS.open(path, "r"); streamFileGuarded(f, contentType(path)); f.close(); true;}) : false;
 
 } // handleFile()
 

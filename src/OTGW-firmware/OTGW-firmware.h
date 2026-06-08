@@ -121,6 +121,15 @@ enum HeapHealthLevel {
 // HEAP_FRAG_PROMOTE_MAXBLOCK (1536) for coherence with the tier-promote rule.
 // Declared here (not helperStuff.ino) so MQTTstuff.ino, concatenated earlier, sees it.
 #define MQTT_PUBLISH_MIN_MAXBLOCK 1536   // bytes
+// HTTP serving needs a bigger contiguous block than MQTT: ESP8266WebServer's
+// streamFile() path (BufferedStreamDataSource::get_buffer in the core) does an
+// UNCHECKED `new uint8_t[~1460]` per TCP segment; on Core 2.7.4 -fno-exceptions
+// that returns NULL under fragmentation and the following memcpy/readBytes faults
+// (StoreProhibited, ROM memcpy 0x4000df64, excvaddr=0 — confirmed root cause).
+// Gate the HTTP-serve path above that ~1460 cliff with margin for mid-request dips.
+// Field calibration: beta.6 served 521 requests fine at maxBlock floor 1944, so the
+// gate sits just above the cliff (2048), not so high it refuses healthy serving.
+#define HTTP_SERVE_MIN_MAXBLOCK 2048     // bytes
 HeapHealthLevel getHeapHealth();
 uint8_t getHeapFragmentation();
 bool canSendWebSocket();

@@ -1138,13 +1138,13 @@ bool canPublishMQTT() {
 //===========================================================================================
 bool canServeHttp() {
   if (getHeapHealth() == HEAP_HEALTHY) return true;
-  if (ESP.getMaxFreeBlockSize() < MQTT_PUBLISH_MIN_MAXBLOCK) {
+  if (ESP.getMaxFreeBlockSize() < HTTP_SERVE_MIN_MAXBLOCK) {
     state.heapdiag.iHttpFragSkips++;
     static uint32_t lastHttpFragWarnMs = 0;
     uint32_t now = millis();
     if ((uint32_t)(now - lastHttpFragWarnMs) > WARNING_LOG_INTERVAL_MS) {
       DebugTf(PSTR("HEAP-FRAG: skip HTTP serve (maxBlock=%u < %u, heap=%u, skips=%u)\r\n"),
-              ESP.getMaxFreeBlockSize(), (unsigned)MQTT_PUBLISH_MIN_MAXBLOCK,
+              ESP.getMaxFreeBlockSize(), (unsigned)HTTP_SERVE_MIN_MAXBLOCK,
               ESP.getFreeHeap(), (unsigned)state.heapdiag.iHttpFragSkips);
       lastHttpFragWarnMs = now;
     }
