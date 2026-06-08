@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.165
+**  Version  : v2.0.0-alpha.166
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -486,6 +486,25 @@ inline bool hasOTCommandInterface() {
   return isPICEnabled() || isOTDirectEnabled();
 }
 
+// Active I2C pins for OLED/sensors. On the combo board (ADR-125) the PIC-mode
+// wiring puts the OLED on the D1-mini-footprint I2C pins (PIN_PIC_I2C_*),
+// distinct from the OTGW32 OLED pins (PIN_I2C_*); boot detection picks which.
+// On the two fixed boards there is only one I2C pair. Call AFTER detection.
+inline int activeI2cSda() {
+#if HAS_RUNTIME_HW_DETECT
+  return isPICEnabled() ? PIN_PIC_I2C_SDA : PIN_I2C_SDA;
+#else
+  return PIN_I2C_SDA;
+#endif
+}
+inline int activeI2cScl() {
+#if HAS_RUNTIME_HW_DETECT
+  return isPICEnabled() ? PIN_PIC_I2C_SCL : PIN_I2C_SCL;
+#else
+  return PIN_I2C_SCL;
+#endif
+}
+
 // Returns a PROGMEM string describing the hardware mode for display/MQTT/REST.
 inline const __FlashStringHelper* hardwareModeName() {
   switch (state.hw.eMode) {
@@ -626,6 +645,10 @@ struct OTGWSettings {
   bool bMyDEBUG      = false;
   bool bNightlyRestart = false;  // scheduled daily restart for heap recovery
   uint8_t iRestartHour = 4;     // hour (0-23) for nightly restart
+  // Combo board (ADR-125) persisted hardware-mode selector / override.
+  // 0 = auto (boot-detect PIC vs OTDirect, then cache the result here),
+  // 1 = force PIC, 2 = force OTDirect. Ignored on the two fixed boards.
+  uint8_t iBoardMode = 0;
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
   DeviceSection       device;

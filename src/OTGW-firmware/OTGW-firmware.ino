@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.165
+**  Version  : v2.0.0-alpha.166
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -131,10 +131,9 @@ void setup() {
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf(PSTR("Booting....[%s]\r\n\r\n"), _VERSION);
 
-  detectPIC();
-#if HAS_DIRECT_OT
-  initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)
-#endif
+  // Hardware-mode detection moved below, AFTER LittleFS+readSettings, so the
+  // combo board (ADR-125) can read its persisted settings.iBoardMode before
+  // deciding whether to probe. On the two fixed boards behaviour is unchanged.
 
   //setup randomseed the right way
   randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
@@ -150,6 +149,36 @@ void setup() {
   checklittlefshash();
   loadOtSupportFiles();  // TASK-693 port: warm the in-RAM support bitmaps from prior-boot knowledge
 
+  // ===== Hardware-mode resolution (ADR-125) =====
+  // Fixed boards: detect PIC, then init OTDirect if compiled in (unchanged).
+  // Combo board: honour the persisted settings.iBoardMode override, else
+  // PIC-probe-first (the PIC is the only reliable discriminator; OLED/W5500 are
+  // optional on OTGW32) and cache the resolved mode so later boots skip probing.
+#if HAS_RUNTIME_HW_DETECT
+  if (settings.iBoardMode == 2) {
+    SetupDebugln(F("Board mode: forced OT-Direct (no PIC probe)"));
+    initOTDirect();
+  } else if (settings.iBoardMode == 1) {
+    SetupDebugln(F("Board mode: forced PIC"));
+    detectPIC();                 // sets HW_MODE_PIC, or HW_MODE_DEGRADED if dead
+  } else {
+    SetupDebugln(F("Board mode: auto — PIC-probe-first"));
+    detectPIC();                 // drives only the PIC pins; benign on OTGW32
+    if (isPICEnabled()) {
+      settings.iBoardMode = 1;   // cache: this is a PIC (Classic) board
+    } else {
+      initOTDirect();            // no PIC → OTDirect; sets HW_MODE_OT_DIRECT
+      if (state.hw.eMode == HW_MODE_OT_DIRECT) settings.iBoardMode = 2;  // cache
+    }
+    if (settings.iBoardMode != 0) writeSettings(false);  // persist the decision
+  }
+#else
+  detectPIC();
+  #if HAS_DIRECT_OT
+  initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)
+  #endif
+#endif
+
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;
   // without this early call the DHCP request carries the default "ESP-XXXXXX".
@@ -160,7 +189,7 @@ void setup() {
   // connect" config screen must already be on the display by the time the
   // portal opens. Wire.begin() is idempotent; initWatchDog() re-runs it later
   // for the external watchdog.
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  Wire.begin(activeI2cSda(), activeI2cScl());  // ADR-125: combo PIC mode uses D1-mini I2C pins
   initOLED();
 
   // Connect to and initialise WiFi network
@@ -204,7 +233,10 @@ void setup() {
   // Ethernet and disable WiFi. Placed after startMDNS()/startWebSocket()/startMQTT()
   // because switchToEthernet() rebinds those services to the wired interface —
   // running it earlier would double-init them. OLED was already brought up above.
-  initEthernet();
+  // ADR-125: skip W5500 in combo PIC mode — its SPI pins are the PIC wiring on a
+  // Classic board, and a Classic PCB has no Ethernet. isPICEnabled() is false on
+  // the fixed OTGW32, so this is a no-op there.
+  if (!isPICEnabled()) initEthernet();
 #endif
 
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog

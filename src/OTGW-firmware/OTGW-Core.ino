@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.165
+**  Version  : v2.0.0-alpha.166
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -57,18 +57,20 @@
 #define OTGW_RESET  PIN_PIC_RST
 #endif
 
-#if HAS_PIC
-//external watchdog (PIC board I2C watchdog at 0x26)
+#if HAS_PIC_WATCHDOG
+//external watchdog (Classic ESP8266 I2C watchdog board at 0x26) — ADR-125
 #define EXT_WD_I2C_ADDRESS 0x26
 
-//used by update firmware functions
+//Macro to Feed the Watchdog
+#define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
+#endif
+
+#if HAS_PIC
+//used by update firmware functions (PIC self-programming over HTTP)
 const char *hexheaders[] = {
   "Last-Modified",
   "X-Version"
 };
-
-//Macro to Feed the Watchdog
-#define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
 #endif
 
 /* --- PRINTF_BYTE_TO_BINARY macro's --- */
@@ -836,8 +838,9 @@ void sendPICBootCommands(){
 }
 
 //===================[ Watchdog OTGW ]===============================
-#if HAS_PIC
-// External I2C watchdog at 0x26 — PIC-based Nodoshop boards only
+#if HAS_PIC_WATCHDOG
+// External I2C watchdog at 0x26 — Classic ESP8266 Nodoshop board only (ADR-125).
+// Combo + OTGW32 (HAS_PIC_WATCHDOG=0) use the ESP32 Task Watchdog below.
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   // Hardware WatchDog is based on:
   // https://github.com/rvdbreemen/ESPEasySlaves/tree/master/TinyI2CWatchdog
@@ -902,13 +905,13 @@ void feedWatchDog() {
   //yield();
 }
 
-#else  // !HAS_PIC — OTGW32: use ESP32 Task Watchdog Timer
+#else  // !HAS_PIC_WATCHDOG — OTGW32 + combo (ESP32-S3): use ESP32 Task Watchdog Timer
 #include <esp_task_wdt.h>
 
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   if (reasonSize > 0) reasonBuf[0] = '\0';
   OTDebugTln(F("Setup ESP32 Task Watchdog"));
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  // I2C bus for OLED/sensors
+  Wire.begin(activeI2cSda(), activeI2cScl());  // I2C bus for OLED/sensors (ADR-125 combo-aware)
   const esp_task_wdt_config_t twdtConfig = {
     .timeout_ms = 30000,
     .idle_core_mask = 0,

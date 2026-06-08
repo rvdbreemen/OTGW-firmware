@@ -4,6 +4,13 @@
 
 Accepted, 2026-05-29
 
+Amended by ADR-125 (2026-06-08): for the combo board class
+(`BOARD_NODOSHOP_ESP32_COMBO`), `hardware_type` is resolved at boot detection
+(runtime) rather than compile time, and the "OTGW32 ... there never can be a
+PIC" scope statement is lifted to "PIC-less by default, unless the combo board
+detects one". The rest of this ADR (picavailable deprecation, frontend
+migration, capability-vs-liveness invariant) stands unchanged.
+
 Guideline-level (per ADR-080): this ADR defines a published contract and a
 selection discipline. There is no dedicated `evaluate.py` gate yet; if new
 `picavailable`-based selection regressions appear, a `check_hardware_type_selection`

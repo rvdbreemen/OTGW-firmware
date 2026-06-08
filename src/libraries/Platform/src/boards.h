@@ -18,10 +18,20 @@
 
 // ---- Board selection ------------------------------------------------------
 // Build flags should define exactly one BOARD_* macro, e.g.:
-//   -DBOARD_NODOSHOP_ESP8266   (current Nodoshop OTGW with D1 mini)
-//   -DBOARD_NODOSHOP_ESP32     (future Nodoshop OTGW with ESP32)
+//   -DBOARD_NODOSHOP_ESP8266       (current Nodoshop OTGW with D1 mini)
+//   -DBOARD_NODOSHOP_ESP32         (Nodoshop OTGW32 with ESP32-S3, OTDirect)
+//   -DBOARD_NODOSHOP_ESP32_COMBO   (one binary: PIC *or* OTDirect, boot-detected — ADR-125)
 //
 // When no board is explicitly selected, auto-detect from the platform.
+
+// The combo board (ADR-125) is a single ESP32-S3 binary that runs on EITHER an
+// OTGW Classic PCB (PIC present) OR an OTGW32 (OTDirect). It reuses the full
+// OTGW32 (ESP32-S3) pin map + capability set as its base and layers the PIC
+// serial pins + HAS_PIC on top (see the "combo delta" block at end of file).
+// So it derives the ESP32 base board here, BEFORE the auto-detect guard.
+#if defined(BOARD_NODOSHOP_ESP32_COMBO) && !defined(BOARD_NODOSHOP_ESP32)
+  #define BOARD_NODOSHOP_ESP32
+#endif
 
 #if !defined(BOARD_NODOSHOP_ESP8266) && !defined(BOARD_NODOSHOP_ESP32)
   #if defined(ESP8266)
@@ -52,6 +62,8 @@
 
 // Feature flags for ESP8266 Nodoshop OTGW
 #define HAS_PIC           1    // Has PIC microcontroller for OpenTherm gateway
+#define HAS_PIC_WATCHDOG  1    // External I2C watchdog board at 0x26 (Classic ESP8266 only) — ADR-125
+#define HAS_RUNTIME_HW_DETECT 0  // Single board class: no boot-time PIC/OTDirect selection — ADR-125
 #define HAS_DIRECT_OT     0    // No direct OT master (uses PIC)
 #define HAS_ETH_CAPABLE   0    // No Ethernet support
 // SAT feature flags (ESP-abstraction Tier 0, TASK-740; see
@@ -138,6 +150,8 @@ typedef uint8_t SAT_RING_IDX_T;
 
 // Feature flags for Nodoshop OTGW32
 #define HAS_PIC           0    // No PIC: OT protocol handled by OTDirect (ESP32-S3 native)
+#define HAS_PIC_WATCHDOG  0    // No external 0x26 watchdog board on OTGW32 — ADR-125
+#define HAS_RUNTIME_HW_DETECT 0  // Single board class: no boot-time PIC/OTDirect selection — ADR-125
 #define HAS_DIRECT_OT     1    // Direct OT master/slave via OTDirect library
 #define HAS_ETH_CAPABLE   1    // Has W5500 Ethernet module
 #define HAS_OLED_CAPABLE  1    // Onboard 128x64 SSD1306 I2C OLED (runtime probe at 0x3C)
@@ -172,6 +186,49 @@ typedef uint16_t SAT_RING_IDX_T;
 // ---------------------------------------------------------------------------
 #else
   #error "No board defined. Set BOARD_NODOSHOP_ESP8266 or BOARD_NODOSHOP_ESP32."
+#endif
+
+// ---------------------------------------------------------------------------
+// Combo board delta (ADR-125) — applied ON TOP of the OTGW32 (ESP32-S3) base.
+//
+// One ESP32-S3 binary that boot-detects PIC (OTGW Classic PCB) vs OTDirect
+// (OTGW32) and drives the matching subsystem. The OTGW32 peripheral pin map +
+// capability flags above are the base; here we add the PIC serial pins and
+// flip HAS_PIC on. Runtime selection (state.hw.eMode / isPICEnabled()) decides
+// which subsystem is initialized, so each shared GPIO has one live owner/boot.
+// ---------------------------------------------------------------------------
+#if defined(BOARD_NODOSHOP_ESP32_COMBO)
+  // Both OT engines are compiled in; the mutual-exclusion of HAS_PIC /
+  // HAS_DIRECT_OT used by the two fixed boards is replaced by runtime gating.
+  #undef  HAS_PIC
+  #define HAS_PIC           1    // PIC serial driver (OTGWSerial) is linked in
+  #undef  HAS_RUNTIME_HW_DETECT
+  #define HAS_RUNTIME_HW_DETECT 1  // boot-detect PIC vs OTDirect + dual I2C pin map
+  // HAS_PIC_WATCHDOG stays 0 (inherited from the OTGW32 base): the combo boards
+  // have no external 0x26 watchdog. HAS_DIRECT_OT stays 1 (OTDirect linked in).
+  // Application code (.ino/.h) gates combo behaviour on HAS_RUNTIME_HW_DETECT,
+  // never on the raw BOARD_NODOSHOP_ESP32_COMBO macro (ESP-abstraction rule).
+
+  // ---- PIC pins for the S3-in-Classic-D1mini-socket wiring -----------------
+  // !!! CONFIRM-BEFORE-FLASH !!!  These are the LOLIN S3 Mini GPIOs that sit at
+  // the D1-mini footprint positions the OTGW Classic uses for the PIC. Derived
+  // from the LOLIN S3 Mini labelled pins (TX=GPIO43, RX=GPIO44, SDA=GPIO35,
+  // SCL=GPIO36; espboards.dev / esp32pins.com). PIN_PIC_RST is the D5 footprint
+  // position and is a CANDIDATE only — verify against the board before flashing.
+  // None of these collide with the OTGW32 base map (0,1,2,4,6,7,8,9,10,11,12,
+  // 13,14,15,16,17,18,21,47,48), so both subsystems hold distinct GPIOs.
+  #define PIN_PIC_RST       5    // CANDIDATE — D1-mini "D5"/reset position (CONFIRM)
+  #define PIN_PIC_RX        44   // LOLIN S3 Mini "RX"  (ESP RX  <- PIC TX) (CONFIRM)
+  #define PIN_PIC_TX        43   // LOLIN S3 Mini "TX"  (ESP TX  -> PIC RX) (CONFIRM)
+
+  // PIC-mode OLED/I2C lives on the D1-mini footprint I2C position (like the
+  // Wemos D1 mini), distinct from the OTGW32 OLED pins (17/18). Boot detection
+  // selects which pair Wire.begin() uses (see OTGW-firmware.ino setup()).
+  #define PIN_PIC_I2C_SDA   35   // LOLIN S3 Mini "SDA" (CONFIRM)
+  #define PIN_PIC_I2C_SCL   36   // LOLIN S3 Mini "SCL" (CONFIRM)
+
+  // OTGWSerial(resetPin, progressLed) is instantiated with PIN_PIC_RST; the
+  // UART uses PIN_PIC_RX/PIN_PIC_TX via HardwareSerial::begin (OTGWSerial.cpp).
 #endif
 
 /***************************************************************************

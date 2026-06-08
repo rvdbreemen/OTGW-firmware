@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.165
+**  Version  : v2.0.0-alpha.166
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -836,11 +836,18 @@ void initOTDirect() {
     OTDDebugTln(F("OT-direct: Slave interface started"));
   }
 
-  // 6. Always set OT_DIRECT mode — this is OTGW32 hardware.
+  // 6. Set OT_DIRECT mode — unless a PIC was already detected on a combo board.
+  //    On the fixed OTGW32 isPICEnabled() is always false, so this is
+  //    unconditional there. On the combo board (ADR-125) detectPIC() may have
+  //    found a PIC first; do NOT clobber HW_MODE_PIC in that case.
   //    Bus liveness is tracked via state.otBus.bOnline, not eMode.
   //    The OT-direct loop must keep running so it can retry/recover.
-  state.hw.eMode = HW_MODE_OT_DIRECT;
-  OTDDebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
+  if (!isPICEnabled()) {
+    state.hw.eMode = HW_MODE_OT_DIRECT;
+    OTDDebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
+  } else {
+    OTDDebugTln(F("OT-direct: PIC already active — leaving HW_MODE_PIC (combo board)"));
+  }
 
   if (!busPresent) {
     DebugTln(F("OT-direct: WARNING — OT bus not idle, boiler may be disconnected"));
