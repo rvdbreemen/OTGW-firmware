@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-08 18:22'
-updated_date: '2026-06-08 18:22'
+updated_date: '2026-06-08 18:30'
 labels: []
 dependencies: []
 ---
@@ -20,8 +20,8 @@ Parallel-debugging ACH confirmed the crash site: unchecked non-throwing new[] in
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New HTTP_SERVE_MIN_MAXBLOCK=3072 constant; canServeHttp() gates on it (raised from MQTT_PUBLISH_MIN_MAXBLOCK 1536)
-- [ ] #2 streamFile() call sites in FSexplorer.ino are guarded: when maxBlock < HTTP_SERVE_MIN_MAXBLOCK, send 503 + skip streaming instead of letting the core new[] return NULL
-- [ ] #3 MQTT/WS maxBlock gates unchanged (still 1536); only the HTTP-serve path uses the higher 3072 threshold
-- [ ] #4 python build.py --firmware exit 0; evaluate.py --quick no new failures
+- [x] #1 New HTTP_SERVE_MIN_MAXBLOCK=3072 constant; canServeHttp() gates on it (raised from MQTT_PUBLISH_MIN_MAXBLOCK 1536)
+- [x] #2 streamFile() call sites in FSexplorer.ino are guarded: when maxBlock < HTTP_SERVE_MIN_MAXBLOCK, send 503 + skip streaming instead of letting the core new[] return NULL
+- [x] #3 MQTT/WS maxBlock gates unchanged (still 1536); only the HTTP-serve path uses the higher 3072 threshold
+- [x] #4 python build.py --firmware exit 0; evaluate.py --quick no new failures
 <!-- AC:END -->
