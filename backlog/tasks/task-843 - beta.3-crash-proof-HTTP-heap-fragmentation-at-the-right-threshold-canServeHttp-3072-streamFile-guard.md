@@ -3,7 +3,7 @@ id: TASK-843
 title: >-
   beta.3: crash-proof HTTP heap-fragmentation at the right threshold
   (canServeHttp 3072 + streamFile guard)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-08 18:22'
