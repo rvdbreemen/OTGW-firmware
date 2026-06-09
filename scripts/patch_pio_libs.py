@@ -40,7 +40,11 @@ import os
 # added.  We prepend it here so `pio run -t buildfs` can find mklittlefs.exe.
 # There can be multiple tool-mklittlefs packages; scan all of them (including
 # versioned src-xxx dirs) for the one that actually contains mklittlefs.exe.
-if env.get("PIOENV") == "esp32":
+# Applies to every ESP32-S3 env on the pioarduino platform: esp32 AND the
+# esp32-combo env (ADR-125), which extends esp32 and needs the same mklittlefs
+# on PATH for `-t buildfs`. startswith("esp32") matches both but not esp8266
+# (which uses its own, already-on-PATH ESP8266 mklittlefs).
+if env.get("PIOENV", "").startswith("esp32"):
     packages_dir = env["PROJECT_PACKAGES_DIR"]
     mklittlefs_found = False
     for entry in sorted(os.listdir(packages_dir)):

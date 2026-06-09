@@ -211,12 +211,6 @@ ensure_esptool() {
 ensure_esptool
 
 # ---- Step 3: locate firmware bin -------------------------------------------
-find_first_match() {
-    local pattern="$1"
-    # shellcheck disable=SC2012  # ls -1 sort order is fine here
-    ls -1 $pattern 2>/dev/null | head -n 1
-}
-
 find_bin() {
     if [ -n "$ARG_BIN" ]; then
         if [ ! -f "$ARG_BIN" ]; then
@@ -227,19 +221,55 @@ find_bin() {
         return 0
     fi
 
-    local cand=""
+    # Collect all merged-full candidates from the first dir that has any. A
+    # release zip carries exactly one bin -> single match -> auto-selected. When
+    # several coexist (e.g. both ESP32-S3 targets, esp32 and esp32-combo, in
+    # build/) we list them and let the user choose instead of silently taking
+    # the first.
+    local cands=() dir f
     for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
-        cand="$(find_first_match "$dir/OTGW-firmware-*-merged-full.bin")"
-        [ -n "$cand" ] && break
+        for f in "$dir"/OTGW-firmware-*-merged-full.bin; do
+            [ -f "$f" ] && cands+=("$f")
+        done
+        [ ${#cands[@]} -gt 0 ] && break
     done
-    if [ -z "$cand" ]; then
+
+    if [ ${#cands[@]} -eq 0 ]; then
         err "No merged-full bin found."
         err "        Expected in: $SCRIPT_DIR"
         err "                 or: $SCRIPT_DIR/build"
         err "        Use --bin to specify a path."
         exit 1
     fi
-    echo "$cand"
+
+    if [ ${#cands[@]} -eq 1 ]; then
+        echo "${cands[0]}"
+        return 0
+    fi
+
+    # Multiple candidates. Prompt on stderr and read from the tty so the chosen
+    # path stays the only thing on stdout (this function's output is captured).
+    {
+        echo ""
+        echo "[INFO] Multiple firmware images found:"
+        local i=1
+        for f in "${cands[@]}"; do
+            echo "  [$i] $(basename "$f")"
+            i=$((i + 1))
+        done
+        echo ""
+        printf "Select firmware number [1-%d]: " "${#cands[@]}"
+    } >&2
+    local choice=""
+    read -r choice < /dev/tty
+    case "$choice" in
+        ''|*[!0-9]*) err "Invalid firmware selection."; exit 1 ;;
+    esac
+    if [ "$choice" -lt 1 ] || [ "$choice" -gt ${#cands[@]} ]; then
+        err "Invalid firmware selection."
+        exit 1
+    fi
+    echo "${cands[$((choice - 1))]}"
 }
 
 BIN_FILE="$(find_bin)"
