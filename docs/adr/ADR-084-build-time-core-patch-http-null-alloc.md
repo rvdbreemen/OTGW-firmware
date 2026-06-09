@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Rejected (2026-06-10). Never moved past Proposed. The build-time core patch was implemented and shipped in 1.7.0-beta.4, but field testing falsified its premise: beta.4, with the patch confirmed present in the binary (local `build.bat` log shows "Core patch already applied"; CI log shows "Applied core patch"), still faulted with the identical `epc1=0x4000df64` / `excvaddr=0`. So the streamFile / `BufferedStreamDataSource::get_buffer()` site this patch guarded is NOT the faulting allocation. Combined with the maintainer's preference to avoid patching core libraries, this decision is reverted: the `build.py` apply-step, `apply_core_patches()`, and the patch file are removed. The crash will be fixed firmware-side once a USB stack trace pins the actual `memcpy(NULL)` caller; a new ADR will record that decision (this one is not "superseded" in the ADR sense because no replacement decision exists yet — it was tried, falsified, and withdrawn). The firmware-side heap gates (TASK-837/841/843) remain as harmless defense-in-depth.
 
 ## Context
 

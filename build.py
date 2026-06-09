@@ -252,47 +252,6 @@ def setup_arduino_config(project_dir):
     return config_file
 
 
-def apply_core_patches(project_dir):
-    """Re-apply OTGW source patches to the freshly-installed ESP8266 core.
-
-    The core lives under arduino/ (gitignored) and is reinstalled clean on every
-    CI run, so patches committed under patches/ must be re-applied at build time.
-    Idempotent: skips a patch that is already applied. Fails LOUDLY if a patch
-    does not apply (e.g. the core version changed) rather than silently shipping
-    an unpatched core. Patches are headers-only, so no toolchain/SDK rebuild.
-    """
-    print_step("Applying core patches")
-    patch_dir = project_dir / "patches"
-    patches = sorted(patch_dir.glob("*.patch")) if patch_dir.is_dir() else []
-    if not patches:
-        print_info("No core patches to apply.")
-        return
-
-    core_base = project_dir / "arduino" / "packages" / "esp8266" / "hardware" / "esp8266"
-    core_dirs = [d for d in core_base.glob("*") if d.is_dir()] if core_base.is_dir() else []
-    if not core_dirs:
-        print_error("ESP8266 core directory not found; cannot apply core patches.")
-        sys.exit(1)
-
-    for core_dir in core_dirs:
-        for patch in patches:
-            # Already applied? (reverse-apply check succeeds)
-            rev = run_command(["git", "apply", "-p1", "-R", "--check", str(patch)],
-                              cwd=str(core_dir), check=False, show_output=False)
-            if rev.returncode == 0:
-                print_info(f"Core patch already applied: {patch.name}")
-                continue
-            # Can it apply cleanly?
-            chk = run_command(["git", "apply", "-p1", "--check", str(patch)],
-                              cwd=str(core_dir), check=False, show_output=False)
-            if chk.returncode != 0:
-                print_error(f"Core patch {patch.name} does not apply to core {core_dir.name} "
-                            f"(core content mismatch?). Refusing to build an unpatched core.")
-                sys.exit(1)
-            run_command(["git", "apply", "-p1", str(patch)], cwd=str(core_dir))
-            print_success(f"Applied core patch: {patch.name} -> esp8266 {core_dir.name}")
-
-
 def install_dependencies(project_dir, config_file):
     """Install core and libraries"""
     print_step("Installing dependencies")
@@ -306,12 +265,6 @@ def install_dependencies(project_dir, config_file):
     # Install core
     print_info("Installing ESP8266 core...")
     run_command(cmd_base + ["core", "install", "esp8266:esp8266"])
-
-    # Re-apply OTGW core patches (TASK-844 / ADR). The ESP8266 core is a
-    # board-manager install (gitignored, reinstalled fresh on CI), so source-level
-    # fixes to it must be re-applied after every core install. Currently fixes the
-    # unchecked HTTP new[] NULL-deref crash (DataSource.h / ClientContext.h).
-    apply_core_patches(project_dir)
 
     # Update lib index
     print_info("Updating library index...")
