@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-08 21:30'
-updated_date: '2026-06-08 21:57'
+updated_date: '2026-06-09 17:19'
 labels: []
 dependencies: []
 ---
@@ -19,11 +19,11 @@ Single ESP32-S3 binary supporting both PIC (OTGW Classic) and OTDirect (OTGW32).
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 New ADR supersedes ADR-113, passes 4 adr-kit gates
-- [ ] #2 BOARD_NODOSHOP_ESP32_COMBO in boards.h: HAS_PIC=1 AND HAS_DIRECT_OT=1, both pin sets, HAS_PIC_WATCHDOG flag
-- [ ] #3 env:esp32-combo in platformio.ini lib_ignores neither OTGWSerial nor OpenTherm; type-stubs resolved; builds clean
-- [ ] #4 settings.hw.iBoardMode persisted field (0=auto,1=pic,2=otdirect)
-- [ ] #5 Boot reads persisted mode or runs PIC-probe-first detect, writes result back
-- [ ] #6 initOTDirect no longer clobbers PIC eMode unconditionally
+- [x] #2 BOARD_NODOSHOP_ESP32_COMBO in boards.h: HAS_PIC=1 AND HAS_DIRECT_OT=1, both pin sets, HAS_PIC_WATCHDOG flag
+- [x] #3 env:esp32-combo in platformio.ini lib_ignores neither OTGWSerial nor OpenTherm; type-stubs resolved; builds clean
+- [x] #4 settings.hw.iBoardMode persisted field (0=auto,1=pic,2=otdirect)
+- [x] #5 Boot reads persisted mode or runs PIC-probe-first detect, writes result back
+- [x] #6 initOTDirect no longer clobbers PIC eMode unconditionally
 - [ ] #7 Web-UI/REST manual override sets iBoardMode + reboots
 - [ ] #8 Field-validated on both hardwares: correct hardwaremode reported and persisted
 <!-- AC:END -->
@@ -42,4 +42,8 @@ Phase 1 impl (pin-independent + combo board):
 - W5500 initEthernet() skipped in PIC mode.
 - platformio.ini: env:esp32-combo (extends esp32, drops -DOTGWFirmware=int, lib_ignore cleared).
 Pending: build.py combo target; web-UI override control; Phase 2 (runtime #if->if conversions) + Phase 3 (runtime HA identity) gated on field validation.
+
+Phase 1 committed 6dcbd395 + pushed. Combo build green (Flash 98.1%, RAM 35.2%), evaluator 0 failures (abstraction back to baseline 4 via new HAS_RUNTIME_HW_DETECT flag). Remaining: AC7 dedicated web-UI override control (mechanism already reachable via settings API), AC8 field validation on real hardware + PIC pin confirmation. Phase 2=TASK-846, Phase 3=TASK-847.
+
+Field fix (alpha.169): LOLIN S3 Mini in OTGW Classic socket booted but parked in WiFi portal with starved webserver + task_wdt spam. Fixes: PIN_PIC_RST 5->12 (D5 hole = S3 SCK=GPIO12, corroborated by OT-Thing W5500 SCK=12); feedWatchDog guarded behind TWDT-ready flag (kills 'task not found' spam); OTGWSerial.end() on no-PIC before initOTDirect (kills floating-UART RX-storm webserver-starvation suspect); boot detection result logged via log_e to USB/IDF console for ground truth. New doc docs/hardware/combo-esp32-s3-pinout.md (D1-mini<->S3-Mini footprint cross-reference). Combo build green.
 <!-- SECTION:NOTES:END -->

@@ -217,9 +217,15 @@ typedef uint16_t SAT_RING_IDX_T;
   // position and is a CANDIDATE only — verify against the board before flashing.
   // None of these collide with the OTGW32 base map (0,1,2,4,6,7,8,9,10,11,12,
   // 13,14,15,16,17,18,21,47,48), so both subsystems hold distinct GPIOs.
-  #define PIN_PIC_RST       5    // CANDIDATE — D1-mini "D5"/reset position (CONFIRM)
-  #define PIN_PIC_RX        44   // LOLIN S3 Mini "RX"  (ESP RX  <- PIC TX) (CONFIRM)
-  #define PIN_PIC_TX        43   // LOLIN S3 Mini "TX"  (ESP TX  -> PIC RX) (CONFIRM)
+  // Cross-referenced from the D1-mini footprint the OTGW Classic socket uses:
+  //   D5 hole (SCK fn) -> LOLIN S3 SCK = GPIO12  -> PIC reset
+  //   TX/RX holes      -> LOLIN S3 TX/RX = 43/44 -> PIC UART
+  //   D1/D2 holes      -> LOLIN S3 SCL/SDA = 36/35 -> PIC-mode I2C (below)
+  // GPIO12 is not an S3 strapping pin (0/3/45/46). Confirm against hardware via
+  // the boot detection log (log_e in setup()).
+  #define PIN_PIC_RST       12   // D1-mini "D5" hole -> LOLIN S3 SCK (GPIO12)
+  #define PIN_PIC_RX        44   // LOLIN S3 Mini "RX"  (ESP RX  <- PIC TX)
+  #define PIN_PIC_TX        43   // LOLIN S3 Mini "TX"  (ESP TX  -> PIC RX)
 
   // PIC-mode OLED/I2C lives on the D1-mini footprint I2C position (like the
   // Wemos D1 mini), distinct from the OTGW32 OLED pins (17/18). Boot detection

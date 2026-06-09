@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.167
+**  Version  : v2.0.0-alpha.169
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -908,6 +908,13 @@ void feedWatchDog() {
 #else  // !HAS_PIC_WATCHDOG — OTGW32 + combo (ESP32-S3): use ESP32 Task Watchdog Timer
 #include <esp_task_wdt.h>
 
+// True once the loop task is registered with the TWDT (initWatchDog ran).
+// feedWatchDog() is called all through early setup() — long BEFORE initWatchDog()
+// (which sits after the network bring-up) — so resetting the TWDT before the
+// task is subscribed spams "esp_task_wdt_reset: task not found" on the console.
+// Guard on this flag: no spam, and the WD simply isn't armed until it's set up.
+static bool s_twdtReady = false;
+
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   if (reasonSize > 0) reasonBuf[0] = '\0';
   OTDebugTln(F("Setup ESP32 Task Watchdog"));
@@ -928,6 +935,7 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
   if (esp_task_wdt_status(NULL) != ESP_OK) {
     esp_task_wdt_add(NULL);
   }
+  s_twdtReady = true;  // from here feedWatchDog() may safely reset the TWDT
 }
 
 void WatchDogEnabled(byte stateWatchdog) {
@@ -937,7 +945,7 @@ void WatchDogEnabled(byte stateWatchdog) {
 
 void feedWatchDog() {
   DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
-  if DUE(timerWD) {
+  if (DUE(timerWD) && s_twdtReady) {
     esp_task_wdt_reset();
   }
   DECLARE_TIMER_MS(timerWDBlink, 1000, SKIP_MISSED_TICKS);

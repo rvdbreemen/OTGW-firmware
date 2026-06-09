@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.167
+**  Version  : v2.0.0-alpha.169
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -157,6 +157,7 @@ void setup() {
 #if HAS_RUNTIME_HW_DETECT
   if (settings.iBoardMode == 2) {
     SetupDebugln(F("Board mode: forced OT-Direct (no PIC probe)"));
+    OTGWSerial.end();            // release UART1 opened by the global ctor (no PIC here)
     initOTDirect();
   } else if (settings.iBoardMode == 1) {
     SetupDebugln(F("Board mode: forced PIC"));
@@ -167,11 +168,21 @@ void setup() {
     if (isPICEnabled()) {
       settings.iBoardMode = 1;   // cache: this is a PIC (Classic) board
     } else {
+      // No PIC: tear down UART1 (opened by the OTGWSerial global ctor / detectPIC)
+      // BEFORE OT-direct, so a floating PIC-RX pin can't drive an RX interrupt
+      // storm that starves the cooperative web server (ADR-125 field finding).
+      OTGWSerial.end();
       initOTDirect();            // no PIC → OTDirect; sets HW_MODE_OT_DIRECT
       if (state.hw.eMode == HW_MODE_OT_DIRECT) settings.iBoardMode = 2;  // cache
     }
     if (settings.iBoardMode != 0) writeSettings(false);  // persist the decision
   }
+  // Boot-time detection result to the ESP-IDF/USB console (ERROR level = always
+  // printed, regardless of CORE_DEBUG_LEVEL; appears next to any task_wdt lines).
+  // This is the ground-truth probe: did detection find the PIC, on which pins?
+  log_e("[combo] detect: eMode=%d picEnabled=%d boardMode=%d (RST=%d RX=%d TX=%d I2C(pic)=%d/%d)",
+        (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode,
+        PIN_PIC_RST, PIN_PIC_RX, PIN_PIC_TX, PIN_PIC_I2C_SDA, PIN_PIC_I2C_SCL);
 #else
   detectPIC();
   #if HAS_DIRECT_OT
