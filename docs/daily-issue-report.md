@@ -1,7 +1,7 @@
-# Daily Issue Report — 2026-06-07
+# Daily Issue Report — 2026-06-09
 
-**Generated:** 2026-06-07T07:05:39Z
-**GitHub window:** since 2026-06-06T00:00:00Z
+**Generated:** 2026-06-09T00:00:00Z
+**GitHub window:** since 2026-06-08T00:00:00Z
 **Tweakers window:** N/A (feed blocked by egress policy)
 **Discord window:** N/A (MCP server not available in this environment)
 
@@ -9,7 +9,7 @@
 
 No new issues in the last 24 hours.
 
-- **GitHub**: 0 new or updated open issues since 2026-06-06T00:00:00Z. Most recently updated open issue was [#656](https://github.com/rvdbreemen/OTGW-firmware/issues/656) on 2026-06-05 (question about upgrade procedure for v1.6.1, by @sanderlv).
+- **GitHub**: 0 new or updated open issues since 2026-06-08T00:00:00Z.
 - **Tweakers**: Feed unavailable — `gathering.tweakers.net` blocked by egress policy in this execution environment.
 - **Discord**: MCP server not configured in this execution environment.
 
@@ -41,5 +41,5 @@ No new issues in the last 24 hours.
 
 ## Timestamps Updated
 
-- GitHub last check: 2026-06-07T07:05:39Z
-- Tweakers last check: 2026-06-07T07:05:39Z (timestamp advanced; feed still blocked)
+- GitHub last check: 2026-06-09T00:00:00Z
+- Tweakers last check: N/A (blocked)
