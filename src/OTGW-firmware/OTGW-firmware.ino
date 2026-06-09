@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.169
+**  Version  : v2.0.0-alpha.170
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -119,6 +119,76 @@ bool wifiPortalResetWindowExpired() {
   return wifiPortalResetWindowOpen && ((int32_t)(millis() - wifiPortalResetWindowDeadline) >= 0);
 }
 
+#if HAS_RUNTIME_HW_DETECT
+// ADR-125 / TASK-848: persist the boot hardware-detection result to a capped,
+// rolling LittleFS log so it can be read after the fact via FSexplorer when no
+// USB/IDF console is attached. The same data goes to the console via log_e();
+// this is the durable copy. Newest entry first, oldest trimmed at the cap
+// (mirrors updateRebootLog() in helperStuff.ino).
+static void appendBootDetectLog()
+{
+  #define BOOTDETECT_FILE     "/bootdetect.log"
+  #define BOOTDETECT_TMP      "/bootdetect.t.log"
+  #define BOOTDETECT_LINES    30
+  #define BOOTDETECT_LINE_LEN 128
+
+  if (!LittleFSmounted) return;
+
+  // Monotonic boot number: parse the newest existing entry (first line) and +1.
+  // Self-contained — survives independently of the global reboot counter, which
+  // is not updated until later in setup().
+  unsigned int bootNum = 1;
+  File infh = LittleFS.open(BOOTDETECT_FILE, "r");
+  if (infh) {
+    char first[BOOTDETECT_LINE_LEN] = {0};
+    int n = infh.readBytesUntil('\n', first, sizeof(first) - 1);
+    first[n] = '\0';
+    unsigned int prev = 0;
+    // sscanf_P does not exist on ESP32 (this code is HAS_RUNTIME_HW_DETECT /
+    // combo only). PSTR() is a no-op on ESP32, so plain sscanf is correct here.
+    if (sscanf(first, PSTR("boot#%u"), &prev) == 1) bootNum = prev + 1;
+    infh.close();
+  }
+
+  // Build the new detection line (mirrors the log_e console format).
+  char newline[BOOTDETECT_LINE_LEN] = {0};
+  snprintf_P(newline, sizeof(newline),
+    PSTR("boot#%u t=%lums eMode=%d pic=%d mode=%d RST=%d RX=%d TX=%d I2C(pic)=%d/%d\n"),
+    bootNum, (unsigned long)millis(),
+    (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode,
+    PIN_PIC_RST, PIN_PIC_RX, PIN_PIC_TX, PIN_PIC_I2C_SDA, PIN_PIC_I2C_SCL);
+
+  // Write newest-first into a temp file, then append up to LINES-1 prior lines.
+  File outfh = LittleFS.open(BOOTDETECT_TMP, "w");
+  if (!outfh) {
+    SetupDebugln(F("*** WARN: bootdetect log: temp open failed"));
+    return;
+  }
+  outfh.print(newline);
+
+  File oldfh = LittleFS.open(BOOTDETECT_FILE, "r");
+  if (oldfh) {
+    int i = 1;
+    while (oldfh.available() && (i < BOOTDETECT_LINES)) {
+      char line[BOOTDETECT_LINE_LEN] = {0};
+      int n = oldfh.readBytesUntil('\n', line, sizeof(line) - 1);
+      line[n] = '\0';
+      if (n > 3) {                 // skip empty/short lines, keep file clean
+        outfh.print(line);
+        outfh.print('\n');
+      }
+      i++;
+    }
+    oldfh.close();
+  }
+  outfh.close();
+
+  // Swap temp -> live (mirrors updateRebootLog()).
+  if (LittleFS.exists(BOOTDETECT_FILE)) LittleFS.remove(BOOTDETECT_FILE);
+  LittleFS.rename(BOOTDETECT_TMP, BOOTDETECT_FILE);
+}
+#endif // HAS_RUNTIME_HW_DETECT
+
 //=====================================================================
 void setup() {
 
@@ -183,6 +253,9 @@ void setup() {
   log_e("[combo] detect: eMode=%d picEnabled=%d boardMode=%d (RST=%d RX=%d TX=%d I2C(pic)=%d/%d)",
         (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode,
         PIN_PIC_RST, PIN_PIC_RX, PIN_PIC_TX, PIN_PIC_I2C_SDA, PIN_PIC_I2C_SCL);
+  // TASK-848: durable copy of the detection result to LittleFS (/bootdetect.log),
+  // readable via FSexplorer after a power cycle when no console is attached.
+  appendBootDetectLog();
 #else
   detectPIC();
   #if HAS_DIRECT_OT
