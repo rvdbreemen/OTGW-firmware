@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.172
+**  Version  : v2.0.0-alpha.173
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -969,9 +969,7 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
         // --- OTGW32 OT-direct MQTT commands: set/<nodeId>/otgw32/<sub-command> ---
         if (strcasecmp_P(topicToken, PSTR("otgw32")) == 0) {
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-          // ADR-125: combo links OT-direct in but must reject otgw32 commands
-          // when it booted in PIC mode. isOTDirectEnabled() is true on the fixed
-          // OTGW32, so its behaviour is unchanged.
+          // Reject otgw32 commands when the OT-direct hardware is not active.
           if (isOTDirectEnabled()) {
             char otgw32Cmd[20];
             if (readMQTTTopicToken(topicCursor, otgw32Cmd, sizeof(otgw32Cmd))) {

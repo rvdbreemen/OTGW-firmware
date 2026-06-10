@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, 2026-06-08
+Superseded by ADR-126, 2026-06-10 (was: Accepted, 2026-06-08)
 
 Guideline-level (per ADR-080): this ADR defines a board class and a boot
 discipline. Enforcement is the existing ESP-abstraction boundary gate

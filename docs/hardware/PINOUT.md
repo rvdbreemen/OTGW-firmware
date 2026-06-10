@@ -4,8 +4,9 @@ Canonical GPIO map for every supported OTGW hardware variant. Three configuratio
 
 1. **OTGW Classic (PIC)** — Wemos D1 mini (ESP8266) + PIC microcontroller.
 2. **OTGW32** — OT-Thing OTGW32 PCB, ESP32-S3, native OTDirect (no PIC).
-3. **Combo (S3 in Classic socket)** — LOLIN S3 Mini / S3 Mini Pro dropped into the
-   Classic D1-mini socket; one binary boot-detects PIC vs OTDirect (ADR-125).
+3. **esp32-classic (S3 in Classic socket)** — LOLIN S3 Mini dropped into the
+   Classic D1-mini socket; fixed compile-time PIC build (ADR-126, supersedes
+   the ADR-125 combo experiment).
 
 ## Sources of truth
 
@@ -13,11 +14,11 @@ Canonical GPIO map for every supported OTGW hardware variant. Three configuratio
 |---|---|---|
 | OTGW Classic (PIC) | **dev branch pin defines** | `dev:src/OTGW-firmware/OTGW-firmware.h` (`#define I2CSCL D1` …) |
 | OTGW32 (OTDirect) | **OT-Thing OTGW32 hwdef** (`#ifdef NODO`) | `boards.h` → `BOARD_NODOSHOP_ESP32` |
-| Combo | ADR-125 delta on the OTGW32 base | `boards.h` → `BOARD_NODOSHOP_ESP32_COMBO` |
+| esp32-classic | ADR-126 standalone section | `boards.h` → `BOARD_NODOSHOP_ESP32_CLASSIC` |
 
 The S3 Mini / S3 Mini Pro are **pin-compatible with the Wemos D1 mini footprint**:
 a shield (or the OTGW Classic socket) drives the same physical holes, only the GPIO
-behind each hole changes. That is what makes the combo board possible.
+behind each hole changes. That is what makes the esp32-classic build possible.
 
 ---
 
@@ -81,11 +82,11 @@ Truth = OT-Thing `hwdef.h` (`#ifdef NODO`), mirrored into `boards.h`
 
 ---
 
-## 3. Combo — S3 Mini in the Classic D1-mini socket (ADR-125)
+## 3. esp32-classic — S3 Mini in the Classic D1-mini socket (ADR-126)
 
-One ESP32-S3 binary that runs on **either** PCB. It uses the OTGW32 map (table 2)
-as its base and layers PIC pins on top; **runtime detection** picks which subsystem
-is live, so a shared GPIO has exactly one owner per boot.
+Fixed compile-time PIC build (`BOARD_NODOSHOP_ESP32_CLASSIC`): the same Classic
+PCB as table 1, with the S3 Mini GPIO behind each D1-mini hole. No OTDirect, no
+runtime detection (ADR-126).
 
 ### 3a. Footprint mapping (D1-mini hole → S3 Mini GPIO)
 
@@ -116,45 +117,22 @@ Cross-checked against the Arduino core variant
 (`variants/lolin_s3_mini/pins_arduino.h`: TX=43, RX=44, SDA=35, SCL=36,
 SCK=12, MISO=13, MOSI=11, SS=10).
 
-### 3b. PIC-mode pins (`BOARD_NODOSHOP_ESP32_COMBO` delta)
+### 3b. esp32-classic pin map (`boards.h` → `BOARD_NODOSHOP_ESP32_CLASSIC`)
 
-| Combo macro | S3 GPIO | From hole |
-|---|---|---|
-| `PIN_PIC_RST` | **12** | D5 |
-| `PIN_PIC_RX` | **44** | RX |
-| `PIN_PIC_TX` | **43** | TX |
-| `PIN_PIC_I2C_SCL` | **36** | D1 |
-| `PIN_PIC_I2C_SDA` | **35** | D2 |
+| Macro | S3 GPIO | From hole | Classic signal |
+|---|---|---|---|
+| `PIN_PIC_RST` | **12** | D5 | PIC reset |
+| `PIN_PIC_RX` | **44** | RX | PIC UART (ESP RX ← PIC TX) |
+| `PIN_PIC_TX` | **43** | TX | PIC UART (ESP TX → PIC RX) |
+| `PIN_I2C_SCL` | **36** | D1 | I2C SCL (watchdog 0x26 + OLED) |
+| `PIN_I2C_SDA` | **35** | D2 | I2C SDA |
+| `PIN_BUTTON` | **18** | D3 | Config/reset button |
+| `PIN_LED1` | **16** | D4 | LED1 (active LOW) |
+| `PIN_LED2` | **4** | D0 | LED2 (active LOW) |
 
-### 3c. Conflict check (PIC pins vs OTGW32 map)
+Capabilities: `HAS_PIC=1`, `HAS_PIC_WATCHDOG=1` (the Classic PCB carries the
+external 0x26 I2C watchdog and this build feeds it), `HAS_DIRECT_OT=0`,
+`HAS_ETH_CAPABLE=0`, `HAS_OLED_CAPABLE=1`, SAT/BLE/weather enabled with the
+ESP32 buffer sizing.
 
-PIC-mode pins `{12, 43, 44, 35, 36}` vs OTGW32 pins
-`{0,1,2,4,6,7,8,9,10,11,13,14,15,16,17,18,21,47,48}`:
-
-- **12** overlaps W5500-SCK — intentional, runtime-gated (one owner per mode).
-- **43, 44, 35, 36** do not overlap — distinct GPIOs, no contention.
-
-If PIC mode is ever wired to the Classic LEDs/button through the socket, the
-auxiliary holes also overlap the OTGW32 map and need the same runtime gating:
-
-- Button (D3 hole) → S3 GPIO **18** = OTGW32 I2C SDA.
-- LED1 (D4 hole) → S3 GPIO **16** = OTGW32 W5500 RST.
-- LED2 (D0 hole) → S3 GPIO **4** = OTGW32 1-Wire.
-
-The combo currently inherits the OTGW32 LED/button pins (2/8/48, 0/9), which sit
-on *different* holes in the Classic socket — so the Classic PCB's own LEDs and
-button are not driven in PIC mode today. Known cosmetic follow-up.
-
-### 3d. Boot verification
-
-The combo logs detection to the USB/IDF console (ERROR level):
-
-```
-[combo] detect: eMode=1 picEnabled=1 boardMode=1 (RST=12 RX=44 TX=43 I2C(pic)=35/36)
-```
-
-- `picEnabled=1, eMode=1` → PIC found → Classic mode. Correct.
-- `picEnabled=0, eMode=2` → PIC not found → either a pin is wrong or the wiring
-  differs; re-check against table 3a/3b.
-
-For the full combo rationale see `docs/hardware/combo-esp32-s3-pinout.md` and ADR-125.
+Historical combo rationale (superseded): `docs/hardware/combo-esp32-s3-pinout.md`, ADR-125 → ADR-126.

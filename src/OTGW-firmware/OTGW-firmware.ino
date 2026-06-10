@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.172
+**  Version  : v2.0.0-alpha.173
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -68,6 +68,14 @@ bool writeWifiPortalResetState(const WifiPortalResetState &portalState) {
 }
 
 void clearWifiPortalResetState() {
+  // Skip the write when the stored state is already cleared: on ESP32 this is
+  // an NVS commit, and a normal boot would otherwise burn a no-op flash write
+  // every cycle (platform_esp32.h: call platformRtcWrite() infrequently).
+  WifiPortalResetState storedState = { 0, 0 };
+  if (readWifiPortalResetState(storedState) &&
+      storedState.magic == WIFI_PORTAL_RESET_MAGIC && storedState.resetCount == 0) {
+    return;
+  }
   WifiPortalResetState portalState = { WIFI_PORTAL_RESET_MAGIC, 0 };
   writeWifiPortalResetState(portalState);
 }
@@ -111,83 +119,18 @@ bool shouldForceWifiConfigPortal() {
     wifiPortalResetWindowDeadline = 0;
   }
 
-  writeWifiPortalResetState(portalState);
+  // Only persist when something actually changed — on a normal power-on boot
+  // (no external reset, count already 0) this skips an NVS commit on ESP32.
+  if (portalState.magic != storedState.magic ||
+      portalState.resetCount != storedState.resetCount) {
+    writeWifiPortalResetState(portalState);
+  }
   return forcePortal;
 }
 
 bool wifiPortalResetWindowExpired() {
   return wifiPortalResetWindowOpen && ((int32_t)(millis() - wifiPortalResetWindowDeadline) >= 0);
 }
-
-#if HAS_RUNTIME_HW_DETECT
-// ADR-125 / TASK-848: persist the boot hardware-detection result to a capped,
-// rolling LittleFS log so it can be read after the fact via FSexplorer when no
-// USB/IDF console is attached. The same data goes to the console via log_e();
-// this is the durable copy. Newest entry first, oldest trimmed at the cap
-// (mirrors updateRebootLog() in helperStuff.ino).
-static void appendBootDetectLog()
-{
-  #define BOOTDETECT_FILE     "/bootdetect.log"
-  #define BOOTDETECT_TMP      "/bootdetect.t.log"
-  #define BOOTDETECT_LINES    30
-  #define BOOTDETECT_LINE_LEN 128
-
-  if (!LittleFSmounted) return;
-
-  // Monotonic boot number: parse the newest existing entry (first line) and +1.
-  // Self-contained — survives independently of the global reboot counter, which
-  // is not updated until later in setup().
-  unsigned int bootNum = 1;
-  File infh = LittleFS.open(BOOTDETECT_FILE, "r");
-  if (infh) {
-    char first[BOOTDETECT_LINE_LEN] = {0};
-    int n = infh.readBytesUntil('\n', first, sizeof(first) - 1);
-    first[n] = '\0';
-    unsigned int prev = 0;
-    // sscanf_P does not exist on ESP32 (this code is HAS_RUNTIME_HW_DETECT /
-    // combo only). PSTR() is a no-op on ESP32, so plain sscanf is correct here.
-    if (sscanf(first, PSTR("boot#%u"), &prev) == 1) bootNum = prev + 1;
-    infh.close();
-  }
-
-  // Build the new detection line (mirrors the log_e console format).
-  char newline[BOOTDETECT_LINE_LEN] = {0};
-  snprintf_P(newline, sizeof(newline),
-    PSTR("boot#%u t=%lums eMode=%d pic=%d mode=%d RST=%d RX=%d TX=%d I2C(pic)=%d/%d\n"),
-    bootNum, (unsigned long)millis(),
-    (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode,
-    PIN_PIC_RST, PIN_PIC_RX, PIN_PIC_TX, PIN_PIC_I2C_SDA, PIN_PIC_I2C_SCL);
-
-  // Write newest-first into a temp file, then append up to LINES-1 prior lines.
-  File outfh = LittleFS.open(BOOTDETECT_TMP, "w");
-  if (!outfh) {
-    SetupDebugln(F("*** WARN: bootdetect log: temp open failed"));
-    return;
-  }
-  outfh.print(newline);
-
-  File oldfh = LittleFS.open(BOOTDETECT_FILE, "r");
-  if (oldfh) {
-    int i = 1;
-    while (oldfh.available() && (i < BOOTDETECT_LINES)) {
-      char line[BOOTDETECT_LINE_LEN] = {0};
-      int n = oldfh.readBytesUntil('\n', line, sizeof(line) - 1);
-      line[n] = '\0';
-      if (n > 3) {                 // skip empty/short lines, keep file clean
-        outfh.print(line);
-        outfh.print('\n');
-      }
-      i++;
-    }
-    oldfh.close();
-  }
-  outfh.close();
-
-  // Swap temp -> live (mirrors updateRebootLog()).
-  if (LittleFS.exists(BOOTDETECT_FILE)) LittleFS.remove(BOOTDETECT_FILE);
-  LittleFS.rename(BOOTDETECT_TMP, BOOTDETECT_FILE);
-}
-#endif // HAS_RUNTIME_HW_DETECT
 
 //=====================================================================
 void setup() {
@@ -196,14 +139,18 @@ void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
+
+  // I2C must be on the board's pins BEFORE the watchdog-disarm below. On the
+  // ESP8266 the Wire defaults happen to equal PIN_I2C_SDA/SCL (4/5), but on the
+  // ESP32-S3 Classic they do not (35/36 vs core defaults) — without this the
+  // 0x26 disarm goes out on the wrong pins and an armed watchdog from the
+  // previous session can reset the board mid-WiFi-portal. Wire.begin() is
+  // idempotent; initWatchDog() re-runs it later.
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   WatchDogEnabled(0); // turn off watchdog
 
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf(PSTR("Booting....[%s]\r\n\r\n"), _VERSION);
-
-  // Hardware-mode detection moved below, AFTER LittleFS+readSettings, so the
-  // combo board (ADR-125) can read its persisted settings.iBoardMode before
-  // deciding whether to probe. On the two fixed boards behaviour is unchanged.
 
   //setup randomseed the right way
   randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
@@ -219,30 +166,15 @@ void setup() {
   checklittlefshash();
   loadOtSupportFiles();  // TASK-693 port: warm the in-RAM support bitmaps from prior-boot knowledge
 
-  // Hardware-mode resolution (ADR-125) runs AFTER startWiFi() — TASK-853:
-  // WiFi configuration (captive portal on a fresh flash) must come before
-  // anything else, so a wrong PIC probe or a starved UART can never block the
-  // portal. See the "Hardware-mode resolution" block below.
-
-#if HAS_RUNTIME_HW_DETECT
-  // Tear down UART1 (opened by the OTGWSerial global ctor) BEFORE the WiFi
-  // portal: on an OTGW32 the PIC-RX pin floats and an RX interrupt storm can
-  // starve the cooperative portal web server (ADR-125 field finding). The
-  // hardware-mode block below re-opens it for the PIC probe.
-  OTGWSerial.end();
-#endif
-
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;
   // without this early call the DHCP request carries the default "ESP-XXXXXX".
   platformSetHostname(CSTR(settings.sHostname));
 
-  // [TASK-750] Bring up I2C + OLED BEFORE startWiFi(): the WiFiManager config
+  // [TASK-750] Bring up the OLED BEFORE startWiFi(): the WiFiManager config
   // portal blocks inside startWiFi(), so the boot splash and the "how to
   // connect" config screen must already be on the display by the time the
-  // portal opens. Wire.begin() is idempotent; initWatchDog() re-runs it later
-  // for the external watchdog.
-  Wire.begin(activeI2cSda(), activeI2cScl());  // ADR-125: combo PIC mode uses D1-mini I2C pins
+  // portal opens. I2C is already up (top of setup, before the watchdog disarm).
   initOLED();
 
   // Connect to and initialise WiFi network
@@ -258,52 +190,12 @@ void setup() {
   }
 #endif
 
-  // ===== Hardware-mode resolution (ADR-125) =====
-  // Runs AFTER WiFi configuration (TASK-853): the captive portal on a fresh
-  // flash must never be blocked by the PIC probe or a starved UART.
-  // Fixed boards: detect PIC, then init OTDirect if compiled in (unchanged).
-  // Combo board: honour the persisted settings.iBoardMode override, else
-  // PIC-probe-first (the PIC is the only reliable discriminator; OLED/W5500 are
-  // optional on OTGW32) and cache the resolved mode so later boots skip probing.
-#if HAS_RUNTIME_HW_DETECT
-  if (settings.iBoardMode == 2) {
-    SetupDebugln(F("Board mode: forced OT-Direct (no PIC probe)"));
-    initOTDirect();              // UART1 already torn down before startWiFi()
-  } else {
-    // UART1 was closed before the WiFi portal; re-open it for the PIC probe.
-    OTGWSerial.begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX);
-    if (settings.iBoardMode == 1) {
-      SetupDebugln(F("Board mode: forced PIC"));
-      detectPIC();               // sets HW_MODE_PIC, or HW_MODE_DEGRADED if dead
-    } else {
-      SetupDebugln(F("Board mode: auto — PIC-probe-first"));
-      detectPIC();               // drives only the PIC pins; benign on OTGW32
-      if (isPICEnabled()) {
-        settings.iBoardMode = 1; // cache: this is a PIC (Classic) board
-      } else {
-        // No PIC: tear down UART1 again BEFORE OT-direct, so a floating PIC-RX
-        // pin can't drive an RX interrupt storm (ADR-125 field finding).
-        OTGWSerial.end();
-        initOTDirect();          // no PIC → OTDirect; sets HW_MODE_OT_DIRECT
-        if (state.hw.eMode == HW_MODE_OT_DIRECT) settings.iBoardMode = 2;  // cache
-      }
-      if (settings.iBoardMode != 0) writeSettings(false);  // persist the decision
-    }
-  }
-  // Boot-time detection result to the ESP-IDF/USB console (ERROR level = always
-  // printed, regardless of CORE_DEBUG_LEVEL; appears next to any task_wdt lines).
-  // This is the ground-truth probe: did detection find the PIC, on which pins?
-  log_e("[combo] detect: eMode=%d picEnabled=%d boardMode=%d (RST=%d RX=%d TX=%d I2C(pic)=%d/%d)",
-        (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode,
-        PIN_PIC_RST, PIN_PIC_RX, PIN_PIC_TX, PIN_PIC_I2C_SDA, PIN_PIC_I2C_SCL);
-  // TASK-848: durable copy of the detection result to LittleFS (/bootdetect.log),
-  // readable via FSexplorer after a power cycle when no console is attached.
-  appendBootDetectLog();
-#else
+  // PIC / OT-direct bring-up. Runs AFTER WiFi configuration (TASK-853): the
+  // captive portal on a fresh flash must never be blocked by the PIC probe.
+  // Each board class is fixed at compile time (no runtime hardware detection).
   detectPIC();
-  #if HAS_DIRECT_OT
+#if HAS_DIRECT_OT
   initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)
-  #endif
 #endif
 
   //setup NTP after WiFi; startNTP() restores hostname after configTime()
@@ -334,10 +226,7 @@ void setup() {
   // Ethernet and disable WiFi. Placed after startMDNS()/startWebSocket()/startMQTT()
   // because switchToEthernet() rebinds those services to the wired interface —
   // running it earlier would double-init them. OLED was already brought up above.
-  // ADR-125: skip W5500 in combo PIC mode — its SPI pins are the PIC wiring on a
-  // Classic board, and a Classic PCB has no Ethernet. isPICEnabled() is false on
-  // the fixed OTGW32, so this is a no-op there.
-  if (!isPICEnabled()) initEthernet();
+  initEthernet();
 #endif
 
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
@@ -389,9 +278,9 @@ void setup() {
 
 //===[ blink status led ]===
 
-#if defined(BOARD_NODOSHOP_ESP32)
+#if HAS_LEDC_LED
 // --- ESP32-S3: PWM-dimmed LEDs via ledc ------------------------------------
-// LED1 (GPIO2, OT Red) and LED2 (GPIO8, Status) are active LOW.
+// Active-LOW status LEDs (PIN_LED1/PIN_LED2 from boards.h).
 // ledc output inversion: duty=0 → pin HIGH → LED off;
 //                        duty=LED_BRIGHTNESS → pin briefly LOW → LED dim on.
 // Same technique as OT-Thing firmware (LED_BRIGHTNESS=5, ~2% on-time).
@@ -435,7 +324,7 @@ void blinkLEDnow(uint8_t led) {
   }
 }
 
-#else  // ESP8266 --------------------------------------------------------------
+#else  // plain digitalWrite LEDs (ESP8266) ------------------------------------
 
 void setLed(uint8_t led, uint8_t status){
   pinMode(led, OUTPUT);
@@ -449,7 +338,7 @@ void blinkLEDnow(uint8_t led){
   } else setLed(led, OFF);
 }
 
-#endif  // BOARD_NODOSHOP_ESP32
+#endif  // HAS_LEDC_LED
 
 // Zero-argument wrapper — calls LED1 variant. Defined once for both boards.
 void blinkLEDnow() { blinkLEDnow(LED1); }
@@ -736,10 +625,8 @@ void doBackgroundTasks()
       handleMQTT();                 // MQTT transmissions
       handlePICSerial();            // OTGW/PIC handling
 #if HAS_DIRECT_OT
-      // ADR-125: run the OT-direct engine only when the board is in OT-direct
-      // mode. On the fixed OTGW32 isOTDirectEnabled() is always true; on a combo
-      // booted in PIC mode this skips the OT-direct poll + bridge (and its
-      // otgw32/* MQTT topics), letting the PIC path own the OT bus.
+      // Run the OT-direct engine only when the OT-direct hardware is active
+      // (guards against a degraded init on the fixed OTGW32).
       if (isOTDirectEnabled()) {
         handleOTDirectBridgeStream(); // OTGW32/TCP 25238 command bridge
         loopOTDirect();               // OT-direct GPIO poll

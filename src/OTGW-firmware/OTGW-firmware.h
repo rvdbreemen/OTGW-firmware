@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.172
+**  Version  : v2.0.0-alpha.173
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -486,10 +486,6 @@ inline bool hasOTCommandInterface() {
   return isPICEnabled() || isOTDirectEnabled();
 }
 
-// activeI2cSda()/activeI2cScl() are defined below, after the `settings`
-// instantiation — they consult settings.iBoardMode (WiFi-portal-first boot,
-// TASK-853).
-
 // Returns a PROGMEM string describing the hardware mode for display/MQTT/REST.
 inline const __FlashStringHelper* hardwareModeName() {
   switch (state.hw.eMode) {
@@ -553,32 +549,21 @@ inline String getActiveMAC() {
   return WiFi.macAddress();
 }
 
-// Returns a PROGMEM string describing the board variant.
+// Returns a PROGMEM string describing the board variant. BOARD_NAME comes from
+// the board's section in boards.h (same pattern as HW_TYPE_NAME), so no raw
+// BOARD_* conditionals are needed here (ESP-abstraction rule).
 inline const __FlashStringHelper* boardName() {
-#if defined(BOARD_NODOSHOP_ESP8266)
-  return F("Nodoshop OTGW (ESP8266)");
-#elif defined(BOARD_NODOSHOP_ESP32)
-  return F("Nodoshop OTGW32 (ESP32-S3)");
-#elif defined(BOARD_SEEGEL_OTTHING)
-  return F("OT-Thing Seegel (ESP32-S3)");
-#else
-  return F("Unknown board");
-#endif
+  return F(BOARD_NAME);
 }
 
 // Returns the hardware-type slug (board class) — machine-readable. Distinct from
 // hardwareModeName() (runtime operational mode) and boardName() (display string).
 // This is the contract codepath/UI selection switches on; see ADR-113.
 // Values: "otgw-classic" (PIC) or "otgw32" (OTDirect); future "ot-thing".
-// On the two fixed boards this is the compile-time HW_TYPE_NAME. On the combo
-// board (ADR-125 §6, amending ADR-113 §1) it follows the boot-detected mode, so
-// a combo in PIC mode advertises "otgw-classic" and in OTDirect mode "otgw32".
+// Compile-time per board class — every board is a fixed build (no runtime
+// hardware detection; the ADR-125 combo experiment is superseded).
 inline const __FlashStringHelper* hardwareTypeName() {
-#if HAS_RUNTIME_HW_DETECT
-  return (state.hw.eMode == HW_MODE_PIC) ? F("otgw-classic") : F("otgw32");
-#else
   return F(HW_TYPE_NAME);
-#endif
 }
 
 // Compile-time capability: does this board CLASS carry a PIC co-processor at all?
@@ -637,10 +622,6 @@ struct OTGWSettings {
   bool bMyDEBUG      = false;
   bool bNightlyRestart = false;  // scheduled daily restart for heap recovery
   uint8_t iRestartHour = 4;     // hour (0-23) for nightly restart
-  // Combo board (ADR-125) persisted hardware-mode selector / override.
-  // 0 = auto (boot-detect PIC vs OTDirect, then cache the result here),
-  // 1 = force PIC, 2 = force OTDirect. Ignored on the two fixed boards.
-  uint8_t iBoardMode = 0;
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
   DeviceSection       device;
@@ -663,31 +644,6 @@ struct OTGWSettings {
 };
 
 OTGWSettings settings;
-
-// Active I2C pins for OLED/sensors. On the combo board (ADR-125) the PIC-mode
-// wiring puts the OLED on the D1-mini-footprint I2C pins (PIN_PIC_I2C_*),
-// distinct from the OTGW32 OLED pins (PIN_I2C_*). The OLED comes up BEFORE
-// hardware detection (WiFi-portal-first boot, TASK-853), so resolve from the
-// persisted settings.iBoardMode as well as the live mode: every boot after the
-// first detection has the persisted mode and picks the right pins. Only the
-// very first boot of a Classic-socketed combo (iBoardMode still 0=auto) uses
-// the OTGW32 pins and misses the splash; detection then persists mode 1.
-// On the two fixed boards there is only one I2C pair. Defined here (not next
-// to the other hw helpers) because it needs the `settings` instantiation.
-inline int activeI2cSda() {
-#if HAS_RUNTIME_HW_DETECT
-  return (isPICEnabled() || settings.iBoardMode == 1) ? PIN_PIC_I2C_SDA : PIN_I2C_SDA;
-#else
-  return PIN_I2C_SDA;
-#endif
-}
-inline int activeI2cScl() {
-#if HAS_RUNTIME_HW_DETECT
-  return (isPICEnabled() || settings.iBoardMode == 1) ? PIN_PIC_I2C_SCL : PIN_I2C_SCL;
-#else
-  return PIN_I2C_SCL;
-#endif
-}
 
 //===================[ Global variables — not part of settings or state ]===================
 WiFiClient  wifiClient;

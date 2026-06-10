@@ -1,3 +1,8 @@
+> **SUPERSEDED (ADR-126, 2026-06-10):** the combo board and its runtime
+> detection are retired. The S3-in-Classic configuration is now the fixed
+> compile-time `esp32-classic` build; the footprint mapping below remains
+> valid and is mirrored in `PINOUT.md`.
+
 # Combo ESP32-S3 pinout — OTGW Classic (PIC) and OTGW32 (OTDirect)
 
 Reference pin map for the **combo board** (ADR-125): a single ESP32-S3 binary

@@ -107,20 +107,19 @@ TARGETS = {
     },
 }
 
-# esp32-combo (ADR-125): same ESP32-S3 hardware as esp32, but the PlatformIO
-# env links in BOTH OT engines (PIC OTGWSerial + OTDirect) and boot-detects which
-# to drive (HAS_RUNTIME_HW_DETECT). It shares every hardware constant with esp32
-# (chip, flash mode/freq/size, partitions, offsets, fs geometry) so the merge and
-# packaging path — which is keyed on these tcfg fields, not the target name —
-# treats it identically. Cloning the dict keeps the two in lockstep; only the
-# display name and the board macro differ. Assets stay distinct because every
-# output filename is built from the target key ("esp32-combo"). The combo's own
-# PlatformIO env (esp32-combo, registered in PIO_ENV_MAP) supplies the real
-# link-set; the build_flags below only matter to the legacy arduino-cli backend.
-TARGETS["esp32-combo"] = {
+# esp32-classic: LOLIN S3 Mini in the OTGW Classic D1-mini socket. Same
+# ESP32-S3 silicon as esp32 (chip, flash mode/freq/size, partitions, offsets,
+# fs geometry), so the merge and packaging path - keyed on these tcfg fields,
+# not the target name - treats it identically. Fixed compile-time PIC gateway:
+# HAS_PIC=1, no OTDirect, no runtime detection (supersedes the ADR-125 combo).
+# Assets stay distinct because every output filename is built from the target
+# key ("esp32-classic"). The PlatformIO env (esp32-classic, registered in
+# PIO_ENV_MAP) supplies the real link-set; the build_flags below only matter
+# to the legacy arduino-cli backend.
+TARGETS["esp32-classic"] = {
     **TARGETS["esp32"],
-    "name": "ESP32-S3 Combo",
-    "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32_COMBO",
+    "name": "ESP32-S3 Classic",
+    "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32_CLASSIC",
 }
 
 class Colors:
@@ -1052,7 +1051,7 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
     (_HOSTNAME = "OTGW") combined with the last three MAC bytes; see the
     AP construction in networkStuff.ino startWiFi().
     """
-    is_esp32 = (tcfg.get("chip") == "esp32s3")  # esp32 + esp32-combo are both ESP32-S3
+    is_esp32 = (tcfg.get("chip") == "esp32s3")  # esp32 + esp32-classic are both ESP32-S3
     boot_hint = (
         "On the OTGW32 you usually do NOT need to press anything; the\n"
         "     built-in USB-Serial JTAG can put the chip in download mode\n"
@@ -1281,7 +1280,7 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
     (per project conventie); gebruikt dubbelepunten, punten, komma's en
     haakjes als alternatief.
     """
-    is_esp32 = (tcfg.get("chip") == "esp32s3")  # esp32 + esp32-combo are both ESP32-S3
+    is_esp32 = (tcfg.get("chip") == "esp32s3")  # esp32 + esp32-classic are both ESP32-S3
     boot_hint = (
         "Bij de OTGW32 hoef je meestal niets in te drukken; de\n"
         "     ingebouwde USB-Serial JTAG kan de chip zelf in download-\n"
@@ -1850,7 +1849,7 @@ def cleanup_temp_directory(project_dir):
 PIO_ENV_MAP = {
     "esp8266": "esp8266",
     "esp32": "esp32",
-    "esp32-combo": "esp32-combo",
+    "esp32-classic": "esp32-classic",
 }
 
 
@@ -2016,7 +2015,7 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
             print_info(f"Copied: firmware.elf -> {elf_dest.name}")
             collected.append(elf_dest)
 
-    # ESP32 extras needed for merged binary (esp32 + esp32-combo: both ESP32-S3,
+    # ESP32 extras needed for merged binary (esp32 + esp32-classic: both ESP32-S3,
     # both carry a separate bootloader + partition table). Keyed on the presence
     # of bootloader_offset so it follows the esp32 family, not a literal name.
     if "bootloader_offset" in tcfg and want_firmware:
@@ -2388,9 +2387,9 @@ Examples:
     )
     parser.add_argument(
         "--target",
-        choices=["esp8266", "esp32", "esp32-combo", "all"],
+        choices=["esp8266", "esp32", "esp32-classic", "all"],
         default="all",
-        help="Target platform: esp8266, esp32, esp32-combo, or all (default = all three)"
+        help="Target platform: esp8266, esp32, esp32-classic, or all (default = all three)"
     )
     parser.add_argument(
         "--no-install-cli",

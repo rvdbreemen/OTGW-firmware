@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.172
+**  Version  : v2.0.0-alpha.173
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -905,7 +905,7 @@ void feedWatchDog() {
   //yield();
 }
 
-#else  // !HAS_PIC_WATCHDOG — OTGW32 + combo (ESP32-S3): use ESP32 Task Watchdog Timer
+#else  // !HAS_PIC_WATCHDOG — OTGW32 (ESP32-S3): use ESP32 Task Watchdog Timer
 #include <esp_task_wdt.h>
 
 // True once the loop task is registered with the TWDT (initWatchDog ran).
@@ -918,7 +918,7 @@ static bool s_twdtReady = false;
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   if (reasonSize > 0) reasonBuf[0] = '\0';
   OTDebugTln(F("Setup ESP32 Task Watchdog"));
-  Wire.begin(activeI2cSda(), activeI2cScl());  // I2C bus for OLED/sensors (ADR-125 combo-aware)
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  // I2C bus for OLED/sensors
   const esp_task_wdt_config_t twdtConfig = {
     .timeout_ms = 30000,
     .idle_core_mask = 0,
@@ -4545,9 +4545,8 @@ void processOT(const char *buf, int len, bool suppressOutput){
 void handlePICSerial()
 {
 #if HAS_PIC
-  // ADR-125: the combo links the PIC serial path in but must skip it when the
-  // board booted in OT-direct mode. On the fixed OTGW32 (HAS_PIC=0) this whole
-  // block is excluded, so handlePICSerial() is an empty no-op there as before.
+  // Skip when the PIC is unavailable (dead/undetected). On the OTGW32
+  // (HAS_PIC=0) this whole block is excluded and handlePICSerial() is a no-op.
   if (!isPICEnabled()) return;
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
