@@ -1,11 +1,11 @@
 ---
 id: TASK-851
 title: 'tooling(version): bump-prerelease must stage all banner updates in one go'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-10 19:51'
-updated_date: '2026-06-10 19:54'
+updated_date: '2026-06-10 19:56'
 labels: []
 dependencies: []
 ---
@@ -23,3 +23,15 @@ bump-prerelease.sh calls autoinc-semver.py which updates version.h AND all sourc
 - [x] #3 CLAUDE.md versioning section no longer instructs staging only version.h + version.hash
 - [x] #4 pending alpha.171 banner drift committed in a single sync commit
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+End-to-end verified: bump run staged 44 files in one go (alpha.171->172 test, reverted). Found+fixed CRLF gotcha: Windows Python prints \r\n, bash read kept the \r and git add failed on 'version.h\r' pathspec; strip CR in the while-read loop.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+bump-prerelease.sh now syncs ALL version banners (autoinc-semver.py --update-all) and stages every touched file itself (--print-updated + git add loop, CR-stripped for Windows Python). CLAUDE.md bump instructions updated. Pending alpha.171 banner drift committed as one sync commit (18a5cc96).
+<!-- SECTION:FINAL_SUMMARY:END -->

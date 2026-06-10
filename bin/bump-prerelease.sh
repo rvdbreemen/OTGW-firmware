@@ -24,6 +24,7 @@ UPDATED=$(python3 "$ROOT/scripts/autoinc-semver.py" "$ROOT/src/OTGW-firmware" --
 
 STAGED=0
 while IFS= read -r f; do
+  f=${f%$'\r'}   # strip CR from Windows Python output
   [ -n "$f" ] || continue
   git -C "$ROOT" add "src/OTGW-firmware/$f"
   STAGED=$((STAGED + 1))
