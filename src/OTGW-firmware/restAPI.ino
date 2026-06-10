@@ -1553,8 +1553,10 @@ void getDallasLabels() {
     return;
   }
   
-  // Stream the file content directly to response
-  httpServer.streamFile(labelsFile, F("application/json"));
+  // Stream the file content directly to response (heap-guarded like every
+  // other file-serving caller: streamFileGuarded sends 503 when the largest
+  // contiguous block is below HTTP_SERVE_MIN_MAXBLOCK instead of serving).
+  streamFileGuarded(labelsFile, F("application/json"));
   labelsFile.close();
 }
 
