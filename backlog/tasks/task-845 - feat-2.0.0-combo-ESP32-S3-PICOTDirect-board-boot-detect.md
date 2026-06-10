@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-08 21:30'
-updated_date: '2026-06-09 17:19'
+updated_date: '2026-06-10 19:17'
 labels: []
 dependencies: []
 ---
@@ -46,4 +46,6 @@ Pending: build.py combo target; web-UI override control; Phase 2 (runtime #if->i
 Phase 1 committed 6dcbd395 + pushed. Combo build green (Flash 98.1%, RAM 35.2%), evaluator 0 failures (abstraction back to baseline 4 via new HAS_RUNTIME_HW_DETECT flag). Remaining: AC7 dedicated web-UI override control (mechanism already reachable via settings API), AC8 field validation on real hardware + PIC pin confirmation. Phase 2=TASK-846, Phase 3=TASK-847.
 
 Field fix (alpha.169): LOLIN S3 Mini in OTGW Classic socket booted but parked in WiFi portal with starved webserver + task_wdt spam. Fixes: PIN_PIC_RST 5->12 (D5 hole = S3 SCK=GPIO12, corroborated by OT-Thing W5500 SCK=12); feedWatchDog guarded behind TWDT-ready flag (kills 'task not found' spam); OTGWSerial.end() on no-PIC before initOTDirect (kills floating-UART RX-storm webserver-starvation suspect); boot detection result logged via log_e to USB/IDF console for ground truth. New doc docs/hardware/combo-esp32-s3-pinout.md (D1-mini<->S3-Mini footprint cross-reference). Combo build green.
+
+Pinout docs completed: all D1-mini footprint holes confirmed from official LOLIN S3 Mini pin diagram (A0=2, D0=4, D3=18, D4=16, D8=10). Boot-critical pins unchanged. Auxiliary-hole overlaps with OTGW32 map documented (button 18=I2C SDA, LED1 16=W5500 RST, LED2 4=1-Wire); Classic LEDs/button not driven in PIC mode today.
 <!-- SECTION:NOTES:END -->

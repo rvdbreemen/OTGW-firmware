@@ -33,16 +33,18 @@ holes; the right-hand column is the ESP32-S3 GPIO at each hole.
 | D5 | SPI SCK | GPIO14 | **12** | high (LOLIN "SCK" = OT-Thing W5500 SCK) |
 | D6 | SPI MISO | GPIO12 | **13** | high (LOLIN "MISO") |
 | D7 | SPI MOSI | GPIO13 | **11** | high (LOLIN "MOSI") |
-| D8 | SPI SS | GPIO15 | _TBD_ | confirm from S3 Mini diagram |
-| D0 | IO | GPIO16 | _TBD_ | confirm |
-| D3 | IO (boot) | GPIO0 | _TBD_ | confirm (likely GPIO0) |
-| D4 | IO (LED) | GPIO2 | _TBD_ | confirm |
-| A0 | ADC | A0 | _TBD_ | confirm |
+| D8 | SPI SS | GPIO15 | **10** | high (LOLIN "SS", variant `pins_arduino.h`) |
+| D0 | IO (LED2) | GPIO16 | **4** | high (S3 Mini pin diagram, outer row) |
+| D3 | IO (button) | GPIO0 | **18** | high (S3 Mini pin diagram, outer row) |
+| D4 | IO (LED1) | GPIO2 | **16** | high (S3 Mini pin diagram, outer row) |
+| A0 | ADC | A0 | **2** | high (S3 Mini pin diagram, outer row) |
+| RST | reset | RST | EN | high (S3 Mini pin diagram) |
 
-The boot-critical signals (PIC reset, PIC UART, I2C) are all **high-confidence**.
-The _TBD_ rows are LED/button/ADC holes — cosmetic for detection; fill them
-from the S3 Mini pinout diagram before relying on the on-device LEDs/button in
-PIC mode.
+All rows confirmed against the official LOLIN S3 Mini pin diagram
+(`s3_mini_v1.0.0_4_16x9.jpg`, wemos.cc): the **outer** pin row is the
+D1-mini-compatible footprint, the inner row carries extra S3 GPIOs. Also
+cross-checked against the Arduino core variant
+(`variants/lolin_s3_mini/pins_arduino.h`).
 
 ---
 
@@ -57,9 +59,9 @@ From dev `boards.h` (`BOARD_NODOSHOP_ESP8266`) + the hole each uses:
 | PIC serial TX (`PIN_PIC_TX`) | TX | 1 | **43** |
 | I2C SCL (watchdog 0x26 + OLED) | D1 | 5 | **36** |
 | I2C SDA | D2 | 4 | **35** |
-| Button | D3 | 0 | _TBD_ |
-| LED1 | D4 | 2 | _TBD_ |
-| LED2 | D0 | 16 | _TBD_ |
+| Button | D3 | 0 | **18** (= OTGW32 I2C SDA — needs runtime gating if wired) |
+| LED1 | D4 | 2 | **16** (= OTGW32 W5500 RST — needs runtime gating if wired) |
+| LED2 | D0 | 16 | **4** (= OTGW32 1-Wire — needs runtime gating if wired) |
 
 > Note: the Classic PCB also carries the external **0x26 I2C watchdog** on the
 > I2C bus. The combo currently runs the ESP32 Task Watchdog instead

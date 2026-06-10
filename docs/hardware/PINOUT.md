@@ -102,14 +102,19 @@ an independent confirmation of the footprint).
 | D5 | SPI SCK | 14 | **12** | high (= OT-Thing W5500 SCK) |
 | D6 | SPI MISO | 12 | **13** | high (LOLIN "MISO") |
 | D7 | SPI MOSI | 13 | **11** | high (LOLIN "MOSI") |
-| D8 | SPI SS | 15 | _TBD_ | confirm from S3 Mini diagram |
-| D0 | IO | 16 | _TBD_ | confirm |
-| D3 | IO (boot) | 0 | _TBD_ | confirm |
-| D4 | IO (LED) | 2 | _TBD_ | confirm |
-| A0 | ADC | A0 | _TBD_ | confirm |
+| D8 | SPI SS | 15 | **10** | high (LOLIN "SS", variant `pins_arduino.h`) |
+| D0 | IO (LED2) | 16 | **4** | high (S3 Mini pin diagram, outer row) |
+| D3 | IO (button) | 0 | **18** | high (S3 Mini pin diagram, outer row) |
+| D4 | IO (LED1) | 2 | **16** | high (S3 Mini pin diagram, outer row) |
+| A0 | ADC | A0 | **2** | high (S3 Mini pin diagram, outer row) |
+| RST | reset | RST | EN | high (S3 Mini pin diagram) |
 
-The _TBD_ rows are LED/button/ADC holes — not boot-critical. Fill them from the
-LOLIN S3 Mini diagram before relying on the on-device LEDs/button in PIC mode.
+All rows confirmed against the official LOLIN S3 Mini pin diagram
+(`s3_mini_v1.0.0_4_16x9.jpg`, wemos.cc) — the **outer** pin row is the
+D1-mini-compatible footprint; the inner row carries extra S3 GPIOs.
+Cross-checked against the Arduino core variant
+(`variants/lolin_s3_mini/pins_arduino.h`: TX=43, RX=44, SDA=35, SCL=36,
+SCK=12, MISO=13, MOSI=11, SS=10).
 
 ### 3b. PIC-mode pins (`BOARD_NODOSHOP_ESP32_COMBO` delta)
 
@@ -128,6 +133,17 @@ PIC-mode pins `{12, 43, 44, 35, 36}` vs OTGW32 pins
 
 - **12** overlaps W5500-SCK — intentional, runtime-gated (one owner per mode).
 - **43, 44, 35, 36** do not overlap — distinct GPIOs, no contention.
+
+If PIC mode is ever wired to the Classic LEDs/button through the socket, the
+auxiliary holes also overlap the OTGW32 map and need the same runtime gating:
+
+- Button (D3 hole) → S3 GPIO **18** = OTGW32 I2C SDA.
+- LED1 (D4 hole) → S3 GPIO **16** = OTGW32 W5500 RST.
+- LED2 (D0 hole) → S3 GPIO **4** = OTGW32 1-Wire.
+
+The combo currently inherits the OTGW32 LED/button pins (2/8/48, 0/9), which sit
+on *different* holes in the Classic socket — so the Classic PCB's own LEDs and
+button are not driven in PIC mode today. Known cosmetic follow-up.
 
 ### 3d. Boot verification
 
