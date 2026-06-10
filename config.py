@@ -13,3 +13,7 @@ DATA_DIR = FIRMWARE_ROOT / "data"
 # Allows overriding build directory via environment variable
 BUILD_DIR = PROJECT_DIR / os.getenv("OTGW_BUILD_DIR", "build")
 TEMP_DIR = PROJECT_DIR / ".tmp"
+# Per-build archive: every build's artifacts (.bin + .elf) are copied into a
+# subfolder keyed by _SEMVER_FULL (semver + git short hash) so the exact .elf
+# for any build can be recovered later to decode a panic stack.
+ARCHIVE_DIR = PROJECT_DIR / os.getenv("OTGW_ARCHIVE_DIR", "build-archive")

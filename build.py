@@ -24,6 +24,7 @@ import io
 import multiprocessing
 import os
 import platform
+import re
 import shutil
 import ssl
 import stat
@@ -600,15 +601,17 @@ def consolidate_build_artifacts(project_dir):
             return True
         return False
 
-    # Move artifacts from temporary build directory
+    # Move artifacts from temporary build directory.
+    # .ino.elf is kept too: it carries the debug symbols addr2line needs to
+    # decode an ESP8266 panic stack (epc1 / >>>stack>>>) back to file:line.
     if temp_build_dir.exists():
-        patterns = ["**/*.ino.bin"]
+        patterns = ["**/*.ino.bin", "**/*.ino.elf"]
         for pattern in patterns:
             for file_path in temp_build_dir.glob(pattern):
                 process_artifact(file_path, build_dir)
 
     # Move artifacts from subdirectories in build/ (if any)
-    patterns = ["**/*.ino.bin", "**/*.littlefs.bin"]
+    patterns = ["**/*.ino.bin", "**/*.ino.elf", "**/*.littlefs.bin"]
     for pattern in patterns:
         for file_path in build_dir.glob(pattern):
             # Skip files already in build root
@@ -655,7 +658,16 @@ def rename_build_artifacts(project_dir, semver):
             file_path.rename(new_path)
             renamed.append(new_path)
             print_info(f"Renamed: {file_path.name} -> {new_name}")
-    
+
+    # Rename and keep the .elf (debug symbols) so a panic stack can be decoded
+    # later with xtensa-lx106-elf-addr2line against the exact build that shipped.
+    for file_path in build_dir.glob("*.ino.elf"):
+        new_name = file_path.stem.replace(".ino", "") + f"-{semver}.ino.elf"
+        new_path = file_path.parent / new_name
+        file_path.rename(new_path)
+        renamed.append(new_path)
+        print_info(f"Renamed: {file_path.name} -> {new_name}")
+
     # Rename filesystem
     for file_path in build_dir.glob("*.littlefs.bin"):
         # Handle both *.ino.littlefs.bin and *.littlefs.bin patterns
@@ -674,6 +686,49 @@ def rename_build_artifacts(project_dir, semver):
         print_success(f"Renamed {len(renamed)} artifact(s)")
     
     return renamed
+
+
+def archive_build_artifacts(project_dir, semver):
+    """Copy every build artifact into a per-build archive keyed by semver+githash.
+
+    _SEMVER_FULL already embeds the git short hash (e.g. 1.7.0-beta.4+84918da),
+    so each build lands in its own immutable folder under build-archive/. This
+    keeps the exact .elf for any shipped or bisect build so an ESP8266 panic
+    stack (epc1 / >>>stack>>>) can be decoded with addr2line long after the
+    working build/ dir has been overwritten by a later build.
+    """
+    print_step("Archiving build")
+
+    build_dir = config.BUILD_DIR
+    if not build_dir.exists():
+        print_warning("Build directory not found, skipping archive")
+        return None
+
+    # Sanitize semver for use as a directory name (defensive; _SEMVER_FULL is
+    # normally filesystem-safe). Empty/unknown still gets a stable folder.
+    safe = re.sub(r'[\\/:*?"<>|]', '_', semver).strip() or "unknown"
+    archive_dir = config.ARCHIVE_DIR / safe
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    artifacts = list(build_dir.glob("*.bin")) + list(build_dir.glob("*.elf"))
+    if not artifacts:
+        print_warning("No artifacts to archive")
+        return None
+
+    count = 0
+    for art in artifacts:
+        try:
+            shutil.copy2(str(art), str(archive_dir / art.name))
+            count += 1
+        except OSError as e:
+            print_warning(f"Could not archive {art.name}: {e}")
+
+    try:
+        rel = archive_dir.relative_to(project_dir)
+    except ValueError:
+        rel = archive_dir
+    print_success(f"Archived {count} artifact(s) -> {rel}")
+    return archive_dir
 
 
 def list_build_artifacts(project_dir):
@@ -1051,6 +1106,9 @@ Examples:
         print_info(f"Merged binary ready for flashing: {merged_file.name}")
         print_info("Flash command: esptool.py --port <PORT> -b 460800 write_flash 0x0 " + str(merged_file))
     
+    # Archive this build (unique per semver+githash) before listing
+    archive_build_artifacts(project_dir, semver)
+
     # List build artifacts
     list_build_artifacts(project_dir)
     
