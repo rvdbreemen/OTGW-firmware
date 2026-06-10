@@ -18,5 +18,15 @@ WORD="${BASH_REMATCH[1]}"
 N="${BASH_REMATCH[2]}"
 NEW="${WORD}.$((N + 1))"
 
-python3 "$ROOT/scripts/autoinc-semver.py" "$ROOT/src/OTGW-firmware" --prerelease "$NEW" >/dev/null
-echo "$CURRENT → $NEW"
+# --update-all keeps every source-file version banner in sync with version.h;
+# --print-updated lists each modified file so the whole bump can be staged in one go.
+UPDATED=$(python3 "$ROOT/scripts/autoinc-semver.py" "$ROOT/src/OTGW-firmware" --prerelease "$NEW" --update-all --print-updated)
+
+STAGED=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  git -C "$ROOT" add "src/OTGW-firmware/$f"
+  STAGED=$((STAGED + 1))
+done <<< "$UPDATED"
+
+echo "$CURRENT → $NEW (staged $STAGED files)"

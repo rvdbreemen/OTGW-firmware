@@ -376,10 +376,16 @@ Field-test users on Discord identify which build they are running by the prerele
 **How to bump.** From the project root:
 
 ```bash
-bin/bump-prerelease.sh        # parses current tag, increments trailing integer
-git add src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash
+bin/bump-prerelease.sh        # bumps tag, syncs ALL version banners, stages everything it touched
 git commit -m "..."
 ```
+
+The bump script updates `version.h`, `data/version.hash`, **and every
+source-file version banner** (via `autoinc-semver.py --update-all`), then
+stages all of them itself. Do NOT hand-stage only `version.h` + `version.hash`
+— that leaves the ~43 banner updates uncommitted and the headers drift out of
+sync with the version file (observed: banners at alpha.165 while version.h was
+at alpha.170). The whole bump lands in one commit, banner churn included.
 
 The helper requires the current tag to match `^[a-zA-Z]+\.[0-9]+$` (so `alpha.6` → `alpha.7`, `beta.23` → `beta.24`). If you need to change the alpha/beta word itself, edit `version.h` by hand and let `scripts/autoinc-semver.py` handle the rest.
 

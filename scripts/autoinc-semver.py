@@ -262,15 +262,16 @@ def should_skip_path(path, base_dir):
     return False
 
 
-def update_files(directory, version_info, ext_list, check_only=False):
+def update_files(directory, version_info, ext_list, check_only=False, updated_paths=None):
     """Update version in files within the specified directory.
-    
+
     Args:
         directory: Root directory to search
         version_info: Dictionary with version information from version.h
         ext_list: List of file extensions to process
         check_only: If True, only check if updates are needed without making changes
-        
+        updated_paths: Optional list; relpaths of updated files are appended to it
+
     Returns:
         Number of files updated (or that would be updated if check_only=True)
     """
@@ -319,10 +320,12 @@ def update_files(directory, version_info, ext_list, check_only=False):
                             files_updated += 1
                         else:
                             if update_version_in_file(filepath, version_info):
-                                logging.info("Updated %s: %s -> %s", 
+                                logging.info("Updated %s: %s -> %s",
                                            os.path.relpath(filepath, directory),
                                            current_version, expected_version)
                                 files_updated += 1
+                                if updated_paths is not None:
+                                    updated_paths.append(os.path.relpath(filepath, directory))
                 except Exception as exc:
                     logging.warning("Failed to process %s: %s", 
                                   os.path.relpath(filepath, directory), exc)
@@ -348,9 +351,10 @@ def git_commit_changes(directory, version):
     subprocess.run(["git", "tag", f"auto-update-version-{version}"], cwd=directory, check=False)
 
 
-def main(directory, filename, git_enabled, increment, githash_override, githash_len, prerelease_override, update_all):
+def main(directory, filename, git_enabled, increment, githash_override, githash_len, prerelease_override, update_all, print_updated=False):
     directory = os.path.abspath(directory)
     os.chdir(directory)
+    updated_paths = [filename, os.path.join("data", "version.hash")]
 
     # Parse the current version.h to get the authoritative version
     version_info = parse_version_file(filename)
@@ -418,13 +422,18 @@ def main(directory, filename, git_enabled, increment, githash_override, githash_
     if update_all or needs_update:
         if needs_update and not update_all:
             logging.info("Version mismatch detected, automatically updating all project files")
-        
-        files_updated = update_files(directory, version_info, ext_list, check_only=False)
-        
+
+        files_updated = update_files(directory, version_info, ext_list, check_only=False,
+                                     updated_paths=updated_paths)
+
         if files_updated > 0:
             logging.info("Updated version strings in %d file(s)", files_updated)
         else:
             logging.info("No files needed version updates")
+
+    if print_updated:
+        for path in updated_paths:
+            print(path.replace(os.sep, "/"))
 
     if git_enabled:
         git_commit_changes(
@@ -475,6 +484,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Update version strings in all project files (automatically enabled on semver changes)",
     )
+    parser.add_argument(
+        "--print-updated",
+        action="store_true",
+        help="Print the relative path of every file modified (for staging in one commit)",
+    )
     args = parser.parse_args()
     main(
         args.directory,
@@ -485,4 +499,5 @@ if __name__ == "__main__":
         args.githash_length,
         args.prerelease,
         args.update_all,
+        args.print_updated,
     )
