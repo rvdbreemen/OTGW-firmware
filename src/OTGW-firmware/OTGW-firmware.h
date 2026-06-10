@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.171
+**  Version  : v2.0.0-alpha.172
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -486,24 +486,9 @@ inline bool hasOTCommandInterface() {
   return isPICEnabled() || isOTDirectEnabled();
 }
 
-// Active I2C pins for OLED/sensors. On the combo board (ADR-125) the PIC-mode
-// wiring puts the OLED on the D1-mini-footprint I2C pins (PIN_PIC_I2C_*),
-// distinct from the OTGW32 OLED pins (PIN_I2C_*); boot detection picks which.
-// On the two fixed boards there is only one I2C pair. Call AFTER detection.
-inline int activeI2cSda() {
-#if HAS_RUNTIME_HW_DETECT
-  return isPICEnabled() ? PIN_PIC_I2C_SDA : PIN_I2C_SDA;
-#else
-  return PIN_I2C_SDA;
-#endif
-}
-inline int activeI2cScl() {
-#if HAS_RUNTIME_HW_DETECT
-  return isPICEnabled() ? PIN_PIC_I2C_SCL : PIN_I2C_SCL;
-#else
-  return PIN_I2C_SCL;
-#endif
-}
+// activeI2cSda()/activeI2cScl() are defined below, after the `settings`
+// instantiation — they consult settings.iBoardMode (WiFi-portal-first boot,
+// TASK-853).
 
 // Returns a PROGMEM string describing the hardware mode for display/MQTT/REST.
 inline const __FlashStringHelper* hardwareModeName() {
@@ -678,6 +663,31 @@ struct OTGWSettings {
 };
 
 OTGWSettings settings;
+
+// Active I2C pins for OLED/sensors. On the combo board (ADR-125) the PIC-mode
+// wiring puts the OLED on the D1-mini-footprint I2C pins (PIN_PIC_I2C_*),
+// distinct from the OTGW32 OLED pins (PIN_I2C_*). The OLED comes up BEFORE
+// hardware detection (WiFi-portal-first boot, TASK-853), so resolve from the
+// persisted settings.iBoardMode as well as the live mode: every boot after the
+// first detection has the persisted mode and picks the right pins. Only the
+// very first boot of a Classic-socketed combo (iBoardMode still 0=auto) uses
+// the OTGW32 pins and misses the splash; detection then persists mode 1.
+// On the two fixed boards there is only one I2C pair. Defined here (not next
+// to the other hw helpers) because it needs the `settings` instantiation.
+inline int activeI2cSda() {
+#if HAS_RUNTIME_HW_DETECT
+  return (isPICEnabled() || settings.iBoardMode == 1) ? PIN_PIC_I2C_SDA : PIN_I2C_SDA;
+#else
+  return PIN_I2C_SDA;
+#endif
+}
+inline int activeI2cScl() {
+#if HAS_RUNTIME_HW_DETECT
+  return (isPICEnabled() || settings.iBoardMode == 1) ? PIN_PIC_I2C_SCL : PIN_I2C_SCL;
+#else
+  return PIN_I2C_SCL;
+#endif
+}
 
 //===================[ Global variables — not part of settings or state ]===================
 WiFiClient  wifiClient;

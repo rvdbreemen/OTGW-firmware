@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.171
+**  Version  : v2.0.0-alpha.172
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -219,48 +219,17 @@ void setup() {
   checklittlefshash();
   loadOtSupportFiles();  // TASK-693 port: warm the in-RAM support bitmaps from prior-boot knowledge
 
-  // ===== Hardware-mode resolution (ADR-125) =====
-  // Fixed boards: detect PIC, then init OTDirect if compiled in (unchanged).
-  // Combo board: honour the persisted settings.iBoardMode override, else
-  // PIC-probe-first (the PIC is the only reliable discriminator; OLED/W5500 are
-  // optional on OTGW32) and cache the resolved mode so later boots skip probing.
+  // Hardware-mode resolution (ADR-125) runs AFTER startWiFi() — TASK-853:
+  // WiFi configuration (captive portal on a fresh flash) must come before
+  // anything else, so a wrong PIC probe or a starved UART can never block the
+  // portal. See the "Hardware-mode resolution" block below.
+
 #if HAS_RUNTIME_HW_DETECT
-  if (settings.iBoardMode == 2) {
-    SetupDebugln(F("Board mode: forced OT-Direct (no PIC probe)"));
-    OTGWSerial.end();            // release UART1 opened by the global ctor (no PIC here)
-    initOTDirect();
-  } else if (settings.iBoardMode == 1) {
-    SetupDebugln(F("Board mode: forced PIC"));
-    detectPIC();                 // sets HW_MODE_PIC, or HW_MODE_DEGRADED if dead
-  } else {
-    SetupDebugln(F("Board mode: auto — PIC-probe-first"));
-    detectPIC();                 // drives only the PIC pins; benign on OTGW32
-    if (isPICEnabled()) {
-      settings.iBoardMode = 1;   // cache: this is a PIC (Classic) board
-    } else {
-      // No PIC: tear down UART1 (opened by the OTGWSerial global ctor / detectPIC)
-      // BEFORE OT-direct, so a floating PIC-RX pin can't drive an RX interrupt
-      // storm that starves the cooperative web server (ADR-125 field finding).
-      OTGWSerial.end();
-      initOTDirect();            // no PIC → OTDirect; sets HW_MODE_OT_DIRECT
-      if (state.hw.eMode == HW_MODE_OT_DIRECT) settings.iBoardMode = 2;  // cache
-    }
-    if (settings.iBoardMode != 0) writeSettings(false);  // persist the decision
-  }
-  // Boot-time detection result to the ESP-IDF/USB console (ERROR level = always
-  // printed, regardless of CORE_DEBUG_LEVEL; appears next to any task_wdt lines).
-  // This is the ground-truth probe: did detection find the PIC, on which pins?
-  log_e("[combo] detect: eMode=%d picEnabled=%d boardMode=%d (RST=%d RX=%d TX=%d I2C(pic)=%d/%d)",
-        (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode,
-        PIN_PIC_RST, PIN_PIC_RX, PIN_PIC_TX, PIN_PIC_I2C_SDA, PIN_PIC_I2C_SCL);
-  // TASK-848: durable copy of the detection result to LittleFS (/bootdetect.log),
-  // readable via FSexplorer after a power cycle when no console is attached.
-  appendBootDetectLog();
-#else
-  detectPIC();
-  #if HAS_DIRECT_OT
-  initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)
-  #endif
+  // Tear down UART1 (opened by the OTGWSerial global ctor) BEFORE the WiFi
+  // portal: on an OTGW32 the PIC-RX pin floats and an RX interrupt storm can
+  // starve the cooperative portal web server (ADR-125 field finding). The
+  // hardware-mode block below re-opens it for the PIC probe.
+  OTGWSerial.end();
 #endif
 
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
@@ -287,6 +256,54 @@ void setup() {
   if (state.net.bAPFallback) {
     SetupDebugf(PSTR("BETA: running in AP fallback mode, SSID=[%s]\r\n"), state.net.sAPSSID);
   }
+#endif
+
+  // ===== Hardware-mode resolution (ADR-125) =====
+  // Runs AFTER WiFi configuration (TASK-853): the captive portal on a fresh
+  // flash must never be blocked by the PIC probe or a starved UART.
+  // Fixed boards: detect PIC, then init OTDirect if compiled in (unchanged).
+  // Combo board: honour the persisted settings.iBoardMode override, else
+  // PIC-probe-first (the PIC is the only reliable discriminator; OLED/W5500 are
+  // optional on OTGW32) and cache the resolved mode so later boots skip probing.
+#if HAS_RUNTIME_HW_DETECT
+  if (settings.iBoardMode == 2) {
+    SetupDebugln(F("Board mode: forced OT-Direct (no PIC probe)"));
+    initOTDirect();              // UART1 already torn down before startWiFi()
+  } else {
+    // UART1 was closed before the WiFi portal; re-open it for the PIC probe.
+    OTGWSerial.begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX);
+    if (settings.iBoardMode == 1) {
+      SetupDebugln(F("Board mode: forced PIC"));
+      detectPIC();               // sets HW_MODE_PIC, or HW_MODE_DEGRADED if dead
+    } else {
+      SetupDebugln(F("Board mode: auto — PIC-probe-first"));
+      detectPIC();               // drives only the PIC pins; benign on OTGW32
+      if (isPICEnabled()) {
+        settings.iBoardMode = 1; // cache: this is a PIC (Classic) board
+      } else {
+        // No PIC: tear down UART1 again BEFORE OT-direct, so a floating PIC-RX
+        // pin can't drive an RX interrupt storm (ADR-125 field finding).
+        OTGWSerial.end();
+        initOTDirect();          // no PIC → OTDirect; sets HW_MODE_OT_DIRECT
+        if (state.hw.eMode == HW_MODE_OT_DIRECT) settings.iBoardMode = 2;  // cache
+      }
+      if (settings.iBoardMode != 0) writeSettings(false);  // persist the decision
+    }
+  }
+  // Boot-time detection result to the ESP-IDF/USB console (ERROR level = always
+  // printed, regardless of CORE_DEBUG_LEVEL; appears next to any task_wdt lines).
+  // This is the ground-truth probe: did detection find the PIC, on which pins?
+  log_e("[combo] detect: eMode=%d picEnabled=%d boardMode=%d (RST=%d RX=%d TX=%d I2C(pic)=%d/%d)",
+        (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode,
+        PIN_PIC_RST, PIN_PIC_RX, PIN_PIC_TX, PIN_PIC_I2C_SDA, PIN_PIC_I2C_SCL);
+  // TASK-848: durable copy of the detection result to LittleFS (/bootdetect.log),
+  // readable via FSexplorer after a power cycle when no console is attached.
+  appendBootDetectLog();
+#else
+  detectPIC();
+  #if HAS_DIRECT_OT
+  initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)
+  #endif
 #endif
 
   //setup NTP after WiFi; startNTP() restores hostname after configTime()
