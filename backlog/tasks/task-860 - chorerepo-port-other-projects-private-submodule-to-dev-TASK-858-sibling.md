@@ -1,7 +1,7 @@
 ---
 id: TASK-860
 title: 'chore(repo): port other-projects private submodule to dev (TASK-858 sibling)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-11 19:59'
