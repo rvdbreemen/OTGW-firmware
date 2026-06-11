@@ -263,12 +263,26 @@ Preferred wrapper (handles venv setup): `./build.sh` (macOS/Linux) or `build.bat
 
 ```bash
 ./build.sh                   # Preferred — firmware + filesystem (handles venv)
-python build.py              # Build firmware + filesystem (no venv handling)
+python build.py              # Build firmware + filesystem, all three targets
+python build.py --target esp32-classic   # One target: esp8266 | esp32 | esp32-classic
 python build.py --firmware   # Firmware only (also the push-policy gate)
 python build.py --clean      # Clean build
 python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
 python evaluate.py --quick   # Fast check
 ```
+
+Three fixed build targets (ADR-126 — no runtime hardware detection):
+
+| Target | Hardware | Asset name token |
+|---|---|---|
+| `esp8266` | OTGW Classic + Wemos D1 mini (PIC) | `esp8266` |
+| `esp32` | OTGW32 / OT-Thing PCB (OTDirect) | `esp32-otgw32` |
+| `esp32-classic` | OTGW Classic + LOLIN S3 Mini (PIC) | `esp32-classic` |
+
+Asset naming: `OTGW-firmware-<token>-<semver>+<githash>-flash.zip` (plus
+`.ino.bin`, `.littlefs.bin`, merged bins and `.elf`). Never run two builds
+concurrently in one worktree — shared `.pio/build/` corrupts (bug-034 class);
+wipe the affected `.pio/build/<env>` dir and rebuild solo to recover.
 
 ---
 

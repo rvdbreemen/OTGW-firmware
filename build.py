@@ -74,6 +74,7 @@ TARGETS = {
     },
     "esp32": {
         "name": "ESP32-S3",
+        "slug": "esp32-otgw32",  # hardware-board token in asset filenames (TASK-856)
         "core": "esp32:esp32",
         "board_manager_url": "https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json",
         "fqbn": "esp32:esp32:esp32s3:PartitionScheme=custom",
@@ -121,6 +122,13 @@ TARGETS["esp32-classic"] = {
     "name": "ESP32-S3 Classic",
     "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32_CLASSIC",
 }
+
+def asset_slug(target):
+    """Filename token for a target: OTGW-firmware-<slug>-<semver>-*. Defaults to
+    the target key; the esp32 (OTGW32) target overrides it with esp32-otgw32 so
+    every ESP32 asset name carries its hardware board (TASK-856)."""
+    return TARGETS.get(target, {}).get("slug", target)
+
 
 class Colors:
     """ANSI color codes for terminal output"""
@@ -766,7 +774,7 @@ def build_filesystem(project_dir, config_file, target):
     print_info(f"Using mklittlefs: {mklittlefs_path}")
 
     fs_dir = config.DATA_DIR
-    output_file = config.BUILD_DIR / f"{config.PROJECT_NAME}-{target}.littlefs.bin"
+    output_file = config.BUILD_DIR / f"{config.PROJECT_NAME}-{asset_slug(target)}.littlefs.bin"
 
     # Ensure build dir exists
     output_file.parent.mkdir(exist_ok=True)
@@ -827,7 +835,7 @@ def consolidate_build_artifacts(project_dir, target):
     if temp_build_dir.exists():
         for file_path in temp_build_dir.glob("**/*.ino.bin"):
             # Rename: OTGW-firmware.ino.bin -> OTGW-firmware-esp8266.ino.bin
-            new_name = file_path.name.replace(".ino.bin", f"-{target}.ino.bin")
+            new_name = file_path.name.replace(".ino.bin", f"-{asset_slug(target)}.ino.bin")
             process_artifact(file_path, build_dir, rename_to=new_name)
 
     # Move any remaining artifacts from subdirectories in build/
@@ -865,7 +873,7 @@ def rename_build_artifacts(project_dir, semver, target):
     renamed = []
 
     # Rename firmware binaries that belong to this target
-    for file_path in build_dir.glob(f"*-{target}.ino.bin"):
+    for file_path in build_dir.glob(f"*-{asset_slug(target)}.ino.bin"):
         new_name = file_path.stem.replace(".ino", "") + f"-{semver}.ino.bin"
         new_path = file_path.parent / new_name
         file_path.rename(new_path)
@@ -873,7 +881,7 @@ def rename_build_artifacts(project_dir, semver, target):
         print_info(f"Renamed: {file_path.name} -> {new_name}")
 
     # Rename filesystem binaries that belong to this target
-    for file_path in build_dir.glob(f"*-{target}.littlefs.bin"):
+    for file_path in build_dir.glob(f"*-{asset_slug(target)}.littlefs.bin"):
         base_name = file_path.stem.replace(".littlefs", "")
         new_name = base_name + f"-{semver}.littlefs.bin"
         new_path = file_path.parent / new_name
@@ -882,7 +890,7 @@ def rename_build_artifacts(project_dir, semver, target):
         print_info(f"Renamed: {file_path.name} -> {new_name}")
 
     # Rename ELF file that belongs to this target
-    for file_path in build_dir.glob(f"*-{target}.elf"):
+    for file_path in build_dir.glob(f"*-{asset_slug(target)}.elf"):
         new_name = file_path.stem + f"-{semver}.elf"
         new_path = file_path.parent / new_name
         file_path.rename(new_path)
@@ -949,13 +957,13 @@ def create_distribution_zip(project_dir, semver, target):
 
     # Locate merged-full bin produced earlier in this build run.
     if semver and semver != "unknown":
-        merged_pattern = f"OTGW-firmware-{target}-{semver}-merged-full.bin"
+        merged_pattern = f"OTGW-firmware-{asset_slug(target)}-{semver}-merged-full.bin"
     else:
-        merged_pattern = f"OTGW-firmware-{target}-merged-full.bin"
+        merged_pattern = f"OTGW-firmware-{asset_slug(target)}-merged-full.bin"
     merged_full = build_dir / merged_pattern
 
     if not merged_full.exists():
-        candidates = sorted(build_dir.glob(f"OTGW-firmware-{target}-*-merged-full.bin"))
+        candidates = sorted(build_dir.glob(f"OTGW-firmware-{asset_slug(target)}-*-merged-full.bin"))
         if candidates:
             merged_full = candidates[-1]
         else:
@@ -976,8 +984,8 @@ def create_distribution_zip(project_dir, semver, target):
         )
         return None
 
-    zip_name = f"OTGW-firmware-{target}-{semver}-flash.zip" if semver and semver != "unknown" \
-               else f"OTGW-firmware-{target}-flash.zip"
+    zip_name = f"OTGW-firmware-{asset_slug(target)}-{semver}-flash.zip" if semver and semver != "unknown" \
+               else f"OTGW-firmware-{asset_slug(target)}-flash.zip"
     zip_path = build_dir / zip_name
 
     print_step(f"Creating distribution zip [{tcfg['name']}]")
@@ -1586,14 +1594,14 @@ def create_merged_binary(project_dir, semver, target, compress=False, include_fi
     firmware_file = None
     filesystem_file = None
 
-    for pattern in [f"*-{target}-{semver}*.ino.bin", f"*-{target}*.ino.bin"]:
+    for pattern in [f"*-{asset_slug(target)}-{semver}*.ino.bin", f"*-{asset_slug(target)}*.ino.bin"]:
         matches = list(build_dir.glob(pattern))
         matches = [m for m in matches if "littlefs" not in m.name.lower() and "merged" not in m.name.lower()]
         if matches:
             firmware_file = sorted(matches)[0]
             break
 
-    for pattern in [f"*-{target}-{semver}*.littlefs.bin", f"*-{target}*.littlefs.bin"]:
+    for pattern in [f"*-{asset_slug(target)}-{semver}*.littlefs.bin", f"*-{asset_slug(target)}*.littlefs.bin"]:
         matches = list(build_dir.glob(pattern))
         if matches:
             filesystem_file = sorted(matches)[0]
@@ -1616,9 +1624,9 @@ def create_merged_binary(project_dir, semver, target, compress=False, include_fi
     # -merged.bin       = bootloader + partitions + app only (preserves existing filesystem)
     suffix = "merged-full" if include_filesystem else "merged"
     if semver and semver != "unknown":
-        merged_name = f"OTGW-firmware-{target}-{semver}-{suffix}.bin"
+        merged_name = f"OTGW-firmware-{asset_slug(target)}-{semver}-{suffix}.bin"
     else:
-        merged_name = f"OTGW-firmware-{target}-{suffix}.bin"
+        merged_name = f"OTGW-firmware-{asset_slug(target)}-{suffix}.bin"
 
     merged_file = build_dir / merged_name
 
@@ -1992,7 +2000,7 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
     if want_firmware:
         fw_src = pio_build_dir / "firmware.bin"
         if fw_src.exists():
-            fw_dest = build_dir / f"{config.PROJECT_NAME}-{target}.ino.bin"
+            fw_dest = build_dir / f"{config.PROJECT_NAME}-{asset_slug(target)}.ino.bin"
             shutil.copy2(fw_src, fw_dest)
             print_info(f"Copied: firmware.bin -> {fw_dest.name}")
             collected.append(fw_dest)
@@ -2001,7 +2009,7 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
     if want_filesystem:
         fs_src = pio_build_dir / "littlefs.bin"
         if fs_src.exists():
-            fs_dest = build_dir / f"{config.PROJECT_NAME}-{target}.littlefs.bin"
+            fs_dest = build_dir / f"{config.PROJECT_NAME}-{asset_slug(target)}.littlefs.bin"
             shutil.copy2(fs_src, fs_dest)
             print_info(f"Copied: littlefs.bin -> {fs_dest.name}")
             collected.append(fs_dest)
@@ -2010,7 +2018,7 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
     if want_elf:
         elf_src = pio_build_dir / "firmware.elf"
         if elf_src.exists():
-            elf_dest = build_dir / f"{config.PROJECT_NAME}-{target}.elf"
+            elf_dest = build_dir / f"{config.PROJECT_NAME}-{asset_slug(target)}.elf"
             shutil.copy2(elf_src, elf_dest)
             print_info(f"Copied: firmware.elf -> {elf_dest.name}")
             collected.append(elf_dest)
