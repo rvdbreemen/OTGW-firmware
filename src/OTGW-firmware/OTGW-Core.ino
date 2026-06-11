@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.173
+**  Version  : v2.0.0-alpha.174
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4545,9 +4545,9 @@ void processOT(const char *buf, int len, bool suppressOutput){
 void handlePICSerial()
 {
 #if HAS_PIC
-  // Skip when the PIC is unavailable (dead/undetected). On the OTGW32
-  // (HAS_PIC=0) this whole block is excluded and handlePICSerial() is a no-op.
-  if (!isPICEnabled()) return;
+  // Always drain the PIC UART on PIC-capable builds. ADR-060 recovery sends a
+  // direct PR=A probe after a missed boot ETX; the banner can only re-enable PIC
+  // functions if this reader keeps running while state.pic.bAvailable is false.
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128
@@ -4634,7 +4634,7 @@ void handlePICSerial()
     }
   }
 
-  if (settings.mqtt.bLegacyPort25238Enabled) {
+  if (isPICEnabled() && settings.mqtt.bLegacyPort25238Enabled) {
     //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
     size_t cmdsProcessed = 0;
     while (OTGWstream.available() && cmdsProcessed < kMaxLinesPerDrain){
