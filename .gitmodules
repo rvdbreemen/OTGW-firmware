@@ -10,3 +10,6 @@
 [submodule "src/libraries/OpenTherm"]
 	path = src/libraries/OpenTherm
 	url = https://github.com/Phunkafizer/opentherm_library
+[submodule "other-projects"]
+	path = other-projects
+	url = https://github.com/rvdbreemen/OTGW-other-projects.git
