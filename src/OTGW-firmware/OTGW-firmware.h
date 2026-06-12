@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.174
+**  Version  : v2.0.0-alpha.175
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -52,7 +52,9 @@ extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 #if HAS_PIC
 #define PICRST  PIN_PIC_RST
 #define PICFIRMWARE "/gateway.hex"
-OTGWSerial OTGWSerial(PICRST, LED2);
+// rx/tx: PIC UART pins from boards.h — must be passed here because the
+// OTGWSerial library TU cannot see board pin macros (TASK-862, bug-119).
+OTGWSerial OTGWSerial(PICRST, LED2, PIN_PIC_RX, PIN_PIC_TX);
 void fwupgradestart(const char *hexfile);
 void handlePendingUpgrade();
 #endif

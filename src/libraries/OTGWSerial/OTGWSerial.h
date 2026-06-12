@@ -140,7 +140,7 @@ protected:
 class OTGWSerial: public HardwareSerial {
    friend class OTGWUpgrade;
 public:
-   OTGWSerial(int resetPin = -1, int progressLed = -1);
+   OTGWSerial(int resetPin = -1, int progressLed = -1, int rxPin = -1, int txPin = -1);
    int available();
    int read();
    int availableForWrite();

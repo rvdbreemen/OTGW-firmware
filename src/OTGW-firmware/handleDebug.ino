@@ -325,7 +325,7 @@ void handleDebugChar(char c){
                 break;
             case 'a':
 #if HAS_PIC
-                if (isPICEnabled()) {          // ADR-125: combo gates on runtime mode
+                if (isPICEnabled()) {          // skip when the PIC is unavailable
                   DebugTln(F("Send PR=A command, to ID the chip"));
                   getpicfwversion();
                   DebugTln(F("Debug --> PR=A report firmware version, type"));

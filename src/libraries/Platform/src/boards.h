@@ -52,6 +52,8 @@
 #define PIN_PIC_RST       14   // D5
 #define PIN_LED1          2    // D4
 #define PIN_LED2          16   // D0
+#define PIN_PIC_RX        -1   // UART0 fixed pins on ESP8266 (RX=GPIO3); -1 = not remappable
+#define PIN_PIC_TX        -1   // UART0 fixed pins on ESP8266 (TX=GPIO1); -1 = not remappable
 
 // Feature flags for ESP8266 Nodoshop OTGW
 #define HAS_PIC           1    // Has PIC microcontroller for OpenTherm gateway
