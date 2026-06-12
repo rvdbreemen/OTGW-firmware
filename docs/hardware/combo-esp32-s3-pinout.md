@@ -1,7 +1,10 @@
-> **SUPERSEDED (ADR-126, 2026-06-10):** the combo board and its runtime
-> detection are retired. The S3-in-Classic configuration is now the fixed
-> compile-time `esp32-classic` build; the footprint mapping below remains
-> valid and is mirrored in `PINOUT.md`.
+> **REVIVED (ADR-127, 2026-06-12):** the combo board returned as the
+> `esp32-combo` build after the ADR-125 detection failure was root-caused
+> (OTGWSerial probed on default UART pins 16/17 instead of 43/44; fixed by
+> passing rx/tx pins into the constructor). Current canonical map:
+> `PINOUT.md` §4 + `boards.h` → `BOARD_NODOSHOP_ESP32_COMBO`. The fixed
+> `esp32-classic` build (ADR-126) also remains. The historical mapping
+> rationale below is still valid.
 
 # Combo ESP32-S3 pinout — OTGW Classic (PIC) and OTGW32 (OTDirect)
 

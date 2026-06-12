@@ -2,7 +2,10 @@
 
 ## Status
 
-Superseded by ADR-126, 2026-06-10 (was: Accepted, 2026-06-08)
+Superseded by ADR-126, 2026-06-10 (was: Accepted, 2026-06-08).
+Forward note: the design recorded here was revived by ADR-127 (2026-06-12)
+after the boot-probe failures were root-caused to a pin-plumbing bug
+(TASK-862/bug-119), not to the detection concept.
 
 Guideline-level (per ADR-080): this ADR defines a board class and a boot
 discipline. Enforcement is the existing ESP-abstraction boundary gate

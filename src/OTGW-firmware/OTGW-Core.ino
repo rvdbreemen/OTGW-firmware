@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.175
+**  Version  : v2.0.0-alpha.176
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -838,9 +838,14 @@ void sendPICBootCommands(){
 }
 
 //===================[ Watchdog OTGW ]===============================
-#if HAS_PIC_WATCHDOG
-// External I2C watchdog at 0x26 — Classic ESP8266 Nodoshop board only (ADR-125).
-// Combo + OTGW32 (HAS_PIC_WATCHDOG=0) use the ESP32 Task Watchdog below.
+// Three shapes (ADR-127):
+//   1. HAS_PIC_WATCHDOG fixed boards (esp8266, esp32-classic): external 0x26
+//      I2C watchdog only — unchanged.
+//   2. Combo (HAS_PIC_WATCHDOG + HAS_RUNTIME_HW_DETECT): ESP32 TWDT always,
+//      plus the 0x26 feed at runtime when the PIC (Classic PCB) was detected.
+//   3. OTGW32 (no HAS_PIC_WATCHDOG): ESP32 TWDT only — unchanged.
+#if HAS_PIC_WATCHDOG && !HAS_RUNTIME_HW_DETECT
+// External I2C watchdog at 0x26 — OTGW Classic PCB (ESP8266 + esp32-classic).
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   // Hardware WatchDog is based on:
   // https://github.com/rvdbreemen/ESPEasySlaves/tree/master/TinyI2CWatchdog
@@ -905,6 +910,79 @@ void feedWatchDog() {
   //yield();
 }
 
+#elif HAS_PIC_WATCHDOG && HAS_RUNTIME_HW_DETECT
+// Combo (ADR-127): ESP32 TWDT is the always-on safety net; the external 0x26
+// watchdog exists only on the Classic PCB, so its feed is gated at runtime on
+// isPICEnabled(). A 0x26 write in OTDirect mode would land on the OTGW32 OLED
+// I2C bus at an unused address — a NACKed no-op — but skipping it keeps the
+// bus quiet.
+#include <esp_task_wdt.h>
+
+// See the OTGW32 block below for the s_twdtReady rationale (early feed calls).
+static bool s_twdtReady = false;
+
+void initWatchDog(char* reasonBuf, size_t reasonSize) {
+  if (reasonSize > 0) reasonBuf[0] = '\0';
+  OTDebugTln(F("Setup ESP32 Task Watchdog (combo)"));
+  Wire.begin(activeI2cSda(), activeI2cScl());  // I2C for OLED/sensors/0x26 (resolved pins)
+  const esp_task_wdt_config_t twdtConfig = {
+    .timeout_ms = 30000,
+    .idle_core_mask = 0,
+    .trigger_panic = true,
+  };
+  esp_err_t err = esp_task_wdt_reconfigure(&twdtConfig);
+  if (err == ESP_ERR_INVALID_STATE) {
+    esp_task_wdt_init(&twdtConfig);
+  }
+  if (esp_task_wdt_status(NULL) != ESP_OK) {
+    esp_task_wdt_add(NULL);
+  }
+  s_twdtReady = true;
+
+  if (isPICEnabled()) {
+    // Classic PCB: read the 0x26 boot-status register (reset-by-WD flag).
+    delay(100);
+    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);
+    Wire.write(0x83);             // command to set pointer
+    Wire.write(17);               // pointer value to status byte
+    Wire.endTransmission();
+    Wire.requestFrom((uint8_t)EXT_WD_I2C_ADDRESS, (uint8_t)1);
+    if (Wire.available()) {
+      byte status = Wire.read();
+      if (status & 0x1) {
+        OTDebugTln(F("INIT : Reset by WD!"));
+        strlcpy(reasonBuf, "Reset by External WD\r\n", reasonSize);
+      }
+    }
+  }
+}
+
+void WatchDogEnabled(byte stateWatchdog) {
+  // 0x26 arm/disarm goes out regardless of mode: the boot-time disarm runs
+  // BEFORE detection (and a stray write on an OTGW32 is a NACKed no-op).
+  // The TWDT itself is always running and has no enable/disable.
+  Wire.beginTransmission(EXT_WD_I2C_ADDRESS);
+  Wire.write(7);                                // action register
+  Wire.write(stateWatchdog);                    // 1 = armed, 0 = off
+  Wire.endTransmission();
+}
+
+void feedWatchDog() {
+  DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
+  if (DUE(timerWD)) {
+    if (s_twdtReady) esp_task_wdt_reset();
+    if (isPICEnabled()) {
+      Wire.beginTransmission(EXT_WD_I2C_ADDRESS);
+      Wire.write(0xA5);                         // feed the dog, before it bites
+      Wire.endTransmission();
+    }
+  }
+  DECLARE_TIMER_MS(timerWDBlink, 1000, SKIP_MISSED_TICKS);
+  if DUE(timerWDBlink) {
+    blinkLEDnow(LED1);
+  }
+}
+
 #else  // !HAS_PIC_WATCHDOG — OTGW32 (ESP32-S3): use ESP32 Task Watchdog Timer
 #include <esp_task_wdt.h>
 
@@ -953,7 +1031,7 @@ void feedWatchDog() {
     blinkLEDnow(LED1);
   }
 }
-#endif // HAS_PIC
+#endif // watchdog shape dispatch (ADR-127)
 
 //===================[ END Watchdog OTGW ]===============================
 
@@ -4476,6 +4554,15 @@ void processOT(const char *buf, int len, bool suppressOutput){
       state.pic.bAvailable = true;
       state.hw.eMode = HW_MODE_PIC;
       DebugTln(F("PIC detected via banner — PIC functions re-enabled"));
+#if HAS_RUNTIME_HW_DETECT
+      // ADR-127 re-detect safety net: a degraded combo boot that recovers via
+      // the banner is by definition a Classic board — persist that so the next
+      // boot skips the (previously missed) probe and starts in PIC mode.
+      if (settings.iBoardMode != 1) {
+        settings.iBoardMode = 1;
+        writeSettings(false);
+      }
+#endif
     }
     strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
     OTDebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
@@ -4548,6 +4635,10 @@ void handlePICSerial()
   // Always drain the PIC UART on PIC-capable builds. ADR-060 recovery sends a
   // direct PR=A probe after a missed boot ETX; the banner can only re-enable PIC
   // functions if this reader keeps running while state.pic.bAvailable is false.
+  // ADR-127: on a combo running OTDirect the UART is closed and OTDirect owns
+  // the OT path — skip the drain entirely. Compile-time false on fixed PIC
+  // boards, so behaviour there is unchanged.
+  if (isOTDirectEnabled()) return;
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128

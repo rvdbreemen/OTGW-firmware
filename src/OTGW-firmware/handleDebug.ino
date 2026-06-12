@@ -320,8 +320,14 @@ void handleDebugChar(char c){
                 dumpDebugInfo();
                 break;
             case 'p':
-                DebugTln(F("Manual reset PIC"));
-                detectPIC();
+                // ADR-127: on a combo running OTDirect the PIC reset line is
+                // the W5500 SPI clock — never pulse it in that mode.
+                if (isOTDirectEnabled()) {
+                  DebugTln(F("PIC reset skipped: board is in OT-Direct mode"));
+                } else {
+                  DebugTln(F("Manual reset PIC"));
+                  detectPIC();
+                }
                 break;
             case 'a':
 #if HAS_PIC

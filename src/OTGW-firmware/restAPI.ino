@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.175
+**  Version  : v2.0.0-alpha.176
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2831,6 +2831,10 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("darktheme"), settings.bDarkTheme, "b");
   sendJsonSettingObj(F("nightlyrestart"), settings.bNightlyRestart, "b");
   sendJsonSettingObj(F("nightlyrestarthour"), (int)settings.iRestartHour, "i", 0, 23);
+#if HAS_RUNTIME_HW_DETECT
+  // ADR-127 combo: persisted hardware-mode selector (0=auto, 1=pic, 2=otdirect).
+  sendJsonSettingObj(F("boardmode"), (int)settings.iBoardMode, "i", 0, 2);
+#endif
   sendJsonSettingObj(F("ui_autoscroll"), settings.ui.bAutoScroll, "b");
   sendJsonSettingObj(F("ui_timestamps"), settings.ui.bShowTimestamp, "b");
   sendJsonSettingObj(F("ui_capture"), settings.ui.bCaptureMode, "b");
@@ -3077,6 +3081,9 @@ void sendDeviceSettings()
 // PROGMEM whitelist of recognised setting field names (canonical lower-case).
 // Keep sorted alphabetically for readability; lookup is linear (small list).
 static const char* const PROGMEM knownSettings[] = {
+#if HAS_RUNTIME_HW_DETECT
+  "boardmode",  // ADR-127 combo hardware-mode override
+#endif
   "darktheme",
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   "ethdns", "ethgateway", "ethipaddress", "ethstaticip", "ethsubnet",

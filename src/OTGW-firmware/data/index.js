@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.175
+**  Version  : v2.0.0-alpha.176
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -6086,7 +6086,7 @@ function getOriginalPasswordPrefill(field) {
 // (settingStuff.ino), since each group container is created lazily on the
 // first setting that lands in it.
 var SETTINGS_GROUPS = [
-  { id: 'system',   title: 'System',            prefixes: ['hostname', 'httppasswd', 'DeviceManufacturer', 'DeviceModel'] },
+  { id: 'system',   title: 'System',            prefixes: ['hostname', 'httppasswd', 'boardmode', 'DeviceManufacturer', 'DeviceModel'] },
   { id: 'network',  title: 'Network / Wi-Fi',   prefixes: ['ssid', 'wifi', 'eth', 'ap'] },
   { id: 'mqtt',     title: 'MQTT',              prefixes: ['MQTT'] },
   { id: 'ntp',      title: 'Time / NTP',        prefixes: ['NTP'] },
@@ -6207,6 +6207,14 @@ function refreshSettings() {
               [2, "Monitor (transparent pass-through)"],
               [3, "Master / Standalone (no thermostat)"],
               [4, "Loopback Test (simulated boiler)"]
+            ],
+            // ADR-127 combo board: persisted hardware-mode selector. The API
+            // only exposes this key on the combo build, so the row never
+            // renders on fixed boards.
+            "boardmode": [
+              [0, "Auto-detect (probe PIC at boot)"],
+              [1, "PIC (OTGW Classic PCB)"],
+              [2, "OT-Direct (OTGW32 PCB)"]
             ]
           };
 
@@ -6298,6 +6306,13 @@ function refreshSettings() {
                 };
                 var warning = modeWarnings[this.value];
                 if (warning && !confirm(warning)) {
+                  this.value = this.getAttribute("data-prev-value");
+                  return;
+                }
+                this.setAttribute("data-prev-value", this.value);
+              }
+              if (fieldName === "boardmode") {
+                if (!confirm("Board mode takes effect after a reboot. Forcing the wrong mode leaves the gateway non-functional until you set it back (or to Auto-detect). Continue?")) {
                   this.value = this.getAttribute("data-prev-value");
                   return;
                 }
@@ -6934,6 +6949,7 @@ var translateFields = [
   , ["darktheme", "Dark Theme"]
   , ["nightlyrestart", "Scheduled Nightly Restart"]
   , ["nightlyrestarthour", "Nightly Restart Hour (0-23)"]
+  , ["boardmode", "Board Mode"]
   , ["gpiosensorsenabled", "GPIO Sensors Enabled"]
   , ["gpiosensorslegacyformat", "GPIO Sensors Legacy Format"]
   , ["gpiosensorsinterval", "GPIO Publish Interval (sec)"]
@@ -7080,6 +7096,7 @@ var translateTooltips = [
   , ["darktheme", "Use the dark color theme in the web interface."]
   , ["nightlyrestart", "Restart the device once a day at the configured hour to recover heap memory. Causes a brief (~30 second) service interruption."]
   , ["nightlyrestarthour", "Local hour (0-23) when the nightly restart runs. Default is 4 (04:00). Only active when NTP is enabled and synced."]
+  , ["boardmode", "Combo build only: which OpenTherm hardware this board drives. Auto-detect probes for a PIC at boot and caches the result; PIC forces the OTGW Classic path, OT-Direct forces the OTGW32 path. Takes effect after a reboot."]
   , ["gpiosensorsenabled", "Enable 1-Wire temperature sensors connected to the selected GPIO pin."]
   , ["gpiosensorslegacyformat", "Use the older MQTT payload format only if an existing setup depends on it."]
   , ["gpiosensorsinterval", "Seconds between GPIO sensor updates. Use a higher value to reduce MQTT traffic."]

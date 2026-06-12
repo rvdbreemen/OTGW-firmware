@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.175
+**  Version  : v2.0.0-alpha.176
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -45,16 +45,38 @@ extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 // (and any user forks) keeps compiling without search-and-replace churn.
 #define I2CSCL  PIN_I2C_SCL
 #define I2CSDA  PIN_I2C_SDA
+#if HAS_RUNTIME_HW_DETECT
+// Combo board (ADR-127): the LED and button positions differ between the two
+// physical boards (Classic-on-S3 vs OTGW32), so the legacy aliases resolve at
+// runtime. The accessors are defined below, after the `settings` instantiation
+// (they consult settings.iBoardMode); declaring them here is enough because
+// the aliases only expand at call sites in the .ino files.
+inline int activeButton();
+inline int activeLed1();
+inline int activeLed2();
+#define BUTTON  activeButton()
+#define LED1    activeLed1()
+#define LED2    activeLed2()
+#else
 #define BUTTON  PIN_BUTTON
 #define LED1    PIN_LED1
 #define LED2    PIN_LED2
+#endif
 
 #if HAS_PIC
 #define PICRST  PIN_PIC_RST
 #define PICFIRMWARE "/gateway.hex"
 // rx/tx: PIC UART pins from boards.h — must be passed here because the
 // OTGWSerial library TU cannot see board pin macros (TASK-862, bug-119).
+#if HAS_RUNTIME_HW_DETECT
+// Combo: this is a global constructor — it runs before settings are read, so
+// the runtime LED2 alias cannot be used. The PIC (and its firmware-upgrade
+// progress LED) exist only in Classic mode, so the fixed Classic LED2 pin is
+// correct by construction.
+OTGWSerial OTGWSerial(PICRST, PIN_CLASSIC_LED2, PIN_PIC_RX, PIN_PIC_TX);
+#else
 OTGWSerial OTGWSerial(PICRST, LED2, PIN_PIC_RX, PIN_PIC_TX);
+#endif
 void fwupgradestart(const char *hexfile);
 void handlePendingUpgrade();
 #endif
@@ -562,10 +584,16 @@ inline const __FlashStringHelper* boardName() {
 // hardwareModeName() (runtime operational mode) and boardName() (display string).
 // This is the contract codepath/UI selection switches on; see ADR-113.
 // Values: "otgw-classic" (PIC) or "otgw32" (OTDirect); future "ot-thing".
-// Compile-time per board class — every board is a fixed build (no runtime
-// hardware detection; the ADR-125 combo experiment is superseded).
+// On the fixed boards this is the compile-time HW_TYPE_NAME. On the combo
+// board (ADR-127 §runtime identity, amending ADR-113 §1) it follows the
+// boot-detected mode, so a combo in PIC mode advertises "otgw-classic" and in
+// OTDirect mode "otgw32".
 inline const __FlashStringHelper* hardwareTypeName() {
+#if HAS_RUNTIME_HW_DETECT
+  return (state.hw.eMode == HW_MODE_PIC) ? F("otgw-classic") : F("otgw32");
+#else
   return F(HW_TYPE_NAME);
+#endif
 }
 
 // Compile-time capability: does this board CLASS carry a PIC co-processor at all?
@@ -624,6 +652,10 @@ struct OTGWSettings {
   bool bMyDEBUG      = false;
   bool bNightlyRestart = false;  // scheduled daily restart for heap recovery
   uint8_t iRestartHour = 4;     // hour (0-23) for nightly restart
+  // Combo board (ADR-127) persisted hardware-mode selector / override.
+  // 0 = auto (boot-detect PIC vs OTDirect, then cache the result here),
+  // 1 = force PIC, 2 = force OTDirect. Ignored on the fixed boards.
+  uint8_t iBoardMode = 0;
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
   DeviceSection       device;
@@ -646,6 +678,48 @@ struct OTGWSettings {
 };
 
 OTGWSettings settings;
+
+// ---- Combo runtime pin resolution (ADR-127) --------------------------------
+// The combo board carries two pin maps (Classic-on-S3 and OTGW32); these
+// accessors pick the live one. Defined here (not next to the other hw helpers)
+// because they need the `settings` instantiation: peripherals come up BEFORE
+// hardware detection (WiFi-portal-first boot, TASK-853), so resolution falls
+// back to the persisted settings.iBoardMode — every boot after the first
+// detection has the cached mode and picks the right pins immediately.
+// Unresolved auto (very first boot) defaults to the CLASSIC pins: the 0x26
+// watchdog disarm at the top of setup() is the safety-critical consumer, and a
+// stray I2C/LED write on the OTGW32 (where those GPIOs are re-initialized
+// after detection) is benign. On the fixed boards everything folds to the
+// single compile-time pin map.
+inline bool comboClassicPinsActive() {
+#if HAS_RUNTIME_HW_DETECT
+  if (settings.iBoardMode == 1) return true;
+  if (settings.iBoardMode == 2) return false;
+  // auto: follow the live mode once detected; default Classic until then
+  return (state.hw.eMode != HW_MODE_OT_DIRECT);
+#else
+  return false;  // fixed boards: single pin map, value unused
+#endif
+}
+inline int activeI2cSda() {
+#if HAS_RUNTIME_HW_DETECT
+  return comboClassicPinsActive() ? PIN_CLASSIC_I2C_SDA : PIN_I2C_SDA;
+#else
+  return PIN_I2C_SDA;
+#endif
+}
+inline int activeI2cScl() {
+#if HAS_RUNTIME_HW_DETECT
+  return comboClassicPinsActive() ? PIN_CLASSIC_I2C_SCL : PIN_I2C_SCL;
+#else
+  return PIN_I2C_SCL;
+#endif
+}
+#if HAS_RUNTIME_HW_DETECT
+inline int activeButton() { return comboClassicPinsActive() ? PIN_CLASSIC_BUTTON : PIN_BUTTON; }
+inline int activeLed1()   { return comboClassicPinsActive() ? PIN_CLASSIC_LED1   : PIN_LED1; }
+inline int activeLed2()   { return comboClassicPinsActive() ? PIN_CLASSIC_LED2   : PIN_LED2; }
+#endif
 
 //===================[ Global variables — not part of settings or state ]===================
 WiFiClient  wifiClient;

@@ -125,6 +125,18 @@ TARGETS["esp32-classic"] = {
     "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32_CLASSIC",
 }
 
+# esp32-combo (ADR-127, revives ADR-125): same ESP32-S3 silicon as esp32, but
+# the PlatformIO env links BOTH OT engines (PIC OTGWSerial + OTDirect) and
+# boot-detects which to drive (HAS_RUNTIME_HW_DETECT). Transitional 4th target:
+# esp32 and esp32-classic stay until the combo is field-validated. Same tcfg
+# spread/slug pattern as esp32-classic above.
+TARGETS["esp32-combo"] = {
+    **TARGETS["esp32"],
+    "name": "ESP32-S3 Combo",
+    "slug": "esp32-combo",
+    "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32_COMBO",
+}
+
 def asset_slug(target):
     """Filename token for a target: OTGW-firmware-<slug>-<semver>-*. Defaults to
     the target key; the esp32 (OTGW32) target overrides it with esp32-otgw32 so
@@ -1860,6 +1872,7 @@ PIO_ENV_MAP = {
     "esp8266": "esp8266",
     "esp32": "esp32",
     "esp32-classic": "esp32-classic",
+    "esp32-combo": "esp32-combo",
 }
 
 
@@ -2397,9 +2410,9 @@ Examples:
     )
     parser.add_argument(
         "--target",
-        choices=["esp8266", "esp32", "esp32-classic", "all"],
+        choices=["esp8266", "esp32", "esp32-classic", "esp32-combo", "all"],
         default="all",
-        help="Target platform: esp8266, esp32, esp32-classic, or all (default = all three)"
+        help="Target platform: esp8266, esp32, esp32-classic, esp32-combo, or all (default = all four)"
     )
     parser.add_argument(
         "--no-install-cli",

@@ -336,6 +336,15 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-115: Per-Board Numeric Constants and Typedefs Live in boards.h](ADR-115-per-board-constants-in-boards-h.md)** 🆕  
   Amends ADR-061's home-assignment: per-board compile-time numeric tuning constants (buffer/ring sizes, heap floors, timing windows) and the typedefs whose width depends on them live in `boards.h`, not `platform_*.h` and not inline behind raw `#if defined(ESP8266)`. Dividing line: `platform_*.h` = behaviour, `boards.h` = capacity. Documents the TASK-743 Tier 3a choice.
 
+- **[ADR-125: Combo ESP32-S3 Board: One Binary, Runtime PIC/OTDirect Selection](ADR-125-combo-esp32-pic-otdirect-board-boot-detection.md)**  
+  **Superseded by ADR-126** (2026-06-10); design revived by ADR-127 (2026-06-12). Original combo board class with PIC-probe-first boot detection persisted to `settings.iBoardMode`; withdrawn after field failures that ADR-127 later root-caused to a pin-plumbing bug.
+
+- **[ADR-126: Fixed esp32-classic Build Supersedes Combo Runtime Detection](ADR-126-fixed-esp32-classic-build-supersedes-combo-runtime-detection.md)**  
+  **Superseded by ADR-127** (2026-06-12). Dropped runtime detection for three fixed compile-time builds; established the field-verified Classic-on-S3 pin map (`BOARD_NODOSHOP_ESP32_CLASSIC`) and the WiFi-portal-first boot order, both retained by ADR-127.
+
+- **[ADR-127: Combo ESP32-S3 Single Binary Revived: Runtime PIC/OTDirect Boot Detection](ADR-127-combo-esp32-s3-single-binary-revived-runtime-boot-detection.md)** 🆕  
+  Accepted (2026-06-12). **Supersedes ADR-126**, revives the ADR-125 design with all four field objections root-caused and fixed (portal-first boot order, OTGWSerial constructor pin fix TASK-862/bug-119, dual-path 0x26+TWDT watchdog, bounded runtime indirection). Transitional fourth build target `esp32-combo`; fixed S3 targets remain until field validation. Amends ADR-113 §1 (runtime `hardware_type` slug on the combo class only). Guideline-level per ADR-080.
+
 ### SAT Subsystem
 
 - **[ADR-085: SAT (Smart Autotune Thermostat) Integration](ADR-085-sat-smart-autotune-thermostat-integration.md)** 🆕  

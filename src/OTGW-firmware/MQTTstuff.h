@@ -378,9 +378,14 @@ constexpr uint8_t HA_DEVICE_COUNT = 7;
 // ADR-124 §2: the OT-Core device is one enum slot (HaDevice::OtCore) whose
 // USER-FACING name/suffix is rendered per hardware so the model is obvious in
 // HA — "pic" on a PIC build (HAS_PIC, classic OTGW), "ot-direct" on an OTGW32
-// direct-OT build (HAS_DIRECT_OT). A build links exactly one bus driver, so the
-// choice is compile-time. boards.h (included above) makes HAS_PIC visible in
-// both TUs (the standalone MQTTHaDiscovery.cpp cannot see OTGW-firmware.h).
+// direct-OT build (HAS_DIRECT_OT). The fixed builds link exactly one bus
+// driver, so the choice is compile-time. boards.h (included above) makes
+// HAS_PIC visible in both TUs (the standalone MQTTHaDiscovery.cpp cannot see
+// OTGW-firmware.h).
+// KNOWN GAP on the combo board (ADR-127, deferred — TASK-847): HAS_PIC=1
+// there, so a combo running in OTDirect mode still advertises its OtCore
+// device as "pic". Cosmetic only; making this runtime touches ~17 sites in
+// two TUs and is scoped as a follow-up.
 #if defined(HAS_PIC) && HAS_PIC
   #define HA_OTCORE_NAME    "pic"
   #define HA_OTCORE_SUFFIX  "-pic"

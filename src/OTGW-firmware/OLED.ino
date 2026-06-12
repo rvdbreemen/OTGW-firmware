@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.175
+**  Version  : v2.0.0-alpha.176
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -44,8 +44,10 @@
 #define OLED_STR_HELPER(x) #x
 #define OLED_STR(x)        OLED_STR_HELPER(x)
 
-// Button pin: boot button (GPIO 0) on OTGW32. Active LOW, pull-up.
-#define OLED_BUTTON_PIN PIN_BUTTON
+// Button pin: boot button (GPIO 0) on OTGW32, D3-hole (GPIO 18) on the
+// Classic-on-S3 boards. Active LOW, pull-up. The BUTTON alias resolves at
+// runtime on the combo board (ADR-127) and to PIN_BUTTON everywhere else.
+#define OLED_BUTTON_PIN BUTTON
 
 // ---------------------------------------------------------------------------
 // Constants

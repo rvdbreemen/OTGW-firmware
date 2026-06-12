@@ -1,12 +1,14 @@
 # OTGW Pinout Reference
 
-Canonical GPIO map for every supported OTGW hardware variant. Three configurations:
+Canonical GPIO map for every supported OTGW hardware variant. Four configurations:
 
 1. **OTGW Classic (PIC)** — Wemos D1 mini (ESP8266) + PIC microcontroller.
 2. **OTGW32** — OT-Thing OTGW32 PCB, ESP32-S3, native OTDirect (no PIC).
 3. **esp32-classic (S3 in Classic socket)** — LOLIN S3 Mini dropped into the
-   Classic D1-mini socket; fixed compile-time PIC build (ADR-126, supersedes
-   the ADR-125 combo experiment).
+   Classic D1-mini socket; fixed compile-time PIC build (ADR-126).
+4. **esp32-combo (ADR-127)** — one ESP32-S3 binary that carries the OTGW32 map
+   (table 2) *and* the Classic-on-S3 map (table 3) and boot-detects which board
+   it is running on. See section 4.
 
 ## Sources of truth
 
@@ -15,6 +17,7 @@ Canonical GPIO map for every supported OTGW hardware variant. Three configuratio
 | OTGW Classic (PIC) | **dev branch pin defines** | `dev:src/OTGW-firmware/OTGW-firmware.h` (`#define I2CSCL D1` …) |
 | OTGW32 (OTDirect) | **OT-Thing OTGW32 hwdef** (`#ifdef NODO`) | `boards.h` → `BOARD_NODOSHOP_ESP32` |
 | esp32-classic | ADR-126 standalone section | `boards.h` → `BOARD_NODOSHOP_ESP32_CLASSIC` |
+| esp32-combo | ADR-127 combo delta | `boards.h` → `BOARD_NODOSHOP_ESP32_COMBO` |
 
 The S3 Mini / S3 Mini Pro are **pin-compatible with the Wemos D1 mini footprint**:
 a shield (or the OTGW Classic socket) drives the same physical holes, only the GPIO
@@ -135,4 +138,35 @@ external 0x26 I2C watchdog and this build feeds it), `HAS_DIRECT_OT=0`,
 `HAS_ETH_CAPABLE=0`, `HAS_OLED_CAPABLE=1`, SAT/BLE/weather enabled with the
 ESP32 buffer sizing.
 
-Historical combo rationale (superseded): `docs/hardware/combo-esp32-s3-pinout.md`, ADR-125 → ADR-126.
+---
+
+## 4. esp32-combo — one binary, boot-detected (ADR-127)
+
+`BOARD_NODOSHOP_ESP32_COMBO` derives the full OTGW32 map (table 2) as its base
+and layers the verified Classic-on-S3 pins (table 3b) on top under the
+`PIN_CLASSIC_*` / `PIN_PIC_*` macros. Boot detection (PIC-probe-first,
+persisted in `settings.iBoardMode`) decides which map is live; runtime
+accessors (`activeI2cSda/Scl()`, `activeLed1/2()`, `activeButton()`) resolve
+the conflicting positions.
+
+Conflicting GPIO positions between the two physical boards:
+
+| GPIO | Classic-on-S3 | OTGW32 |
+|---|---|---|
+| 12 | PIC reset | W5500 SPI SCK |
+| 16 | LED1 | W5500 RST |
+| 4 | LED2 | 1-Wire (Dallas) |
+| 18 | Config button | I2C SDA (OLED) |
+
+The PIC UART (43/44) and the Classic I2C pair (35/36) are unused on the
+OTGW32, so the boot probe and the early 0x26 watchdog disarm are harmless
+there. Pre-detection default is the **Classic** map (the 0x26 disarm is the
+safety-critical consumer); after detection `applyResolvedComboPins()` re-pins
+I2C, the ledc LED channels and the OLED button onto the live map.
+
+Capabilities: `HAS_PIC=1`, `HAS_DIRECT_OT=1`, `HAS_PIC_WATCHDOG=1` (0x26 feed
+runtime-gated on PIC mode; ESP32 TWDT always on), `HAS_RUNTIME_HW_DETECT=1`,
+OTGW32 peripheral set (Ethernet/OLED/SAT/BLE/weather).
+
+Historical combo rationale: `docs/hardware/combo-esp32-s3-pinout.md`,
+ADR-125 → ADR-126 → revived as ADR-127.

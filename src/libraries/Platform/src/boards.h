@@ -23,8 +23,20 @@
 //   -DBOARD_NODOSHOP_ESP32_CLASSIC  (LOLIN S3 Mini in the OTGW Classic D1-mini
 //                                    socket: PIC gateway, compile-time — no
 //                                    runtime detection)
+//   -DBOARD_NODOSHOP_ESP32_COMBO    (one ESP32-S3 binary: PIC *or* OTDirect,
+//                                    boot-detected — ADR-127)
 //
 // When no board is explicitly selected, auto-detect from the platform.
+
+// The combo board (ADR-127, reviving ADR-125 with the verified Classic-on-S3
+// pin map) is a single ESP32-S3 binary that runs on EITHER an OTGW Classic PCB
+// (PIC present) OR an OTGW32 (OTDirect). It reuses the full OTGW32 pin map +
+// capability set as its base and layers the verified Classic pins + HAS_PIC on
+// top (see the "combo delta" block at end of file). So it derives the ESP32
+// base board here, BEFORE the auto-detect guard.
+#if defined(BOARD_NODOSHOP_ESP32_COMBO) && !defined(BOARD_NODOSHOP_ESP32)
+  #define BOARD_NODOSHOP_ESP32
+#endif
 
 #if !defined(BOARD_NODOSHOP_ESP8266) && !defined(BOARD_NODOSHOP_ESP32) && !defined(BOARD_NODOSHOP_ESP32_CLASSIC)
   #if defined(ESP8266)
@@ -248,13 +260,78 @@ typedef uint16_t SAT_RING_IDX_T;
 
 // ---------------------------------------------------------------------------
 #else
-  #error "No board defined. Set BOARD_NODOSHOP_ESP8266, BOARD_NODOSHOP_ESP32 or BOARD_NODOSHOP_ESP32_CLASSIC."
+  #error "No board defined. Set BOARD_NODOSHOP_ESP8266, BOARD_NODOSHOP_ESP32, BOARD_NODOSHOP_ESP32_CLASSIC or BOARD_NODOSHOP_ESP32_COMBO."
 #endif
 
-// HAS_RUNTIME_HW_DETECT is retired (ADR-125 combo experiment, superseded):
-// every board is a fixed compile-time class. Keep the flag defined 0 so any
-// straggling reference fails soft rather than failing to compile.
+// ---------------------------------------------------------------------------
+// Combo board delta (ADR-127) — applied ON TOP of the OTGW32 (ESP32-S3) base.
+//
+// One ESP32-S3 binary that boot-detects PIC (OTGW Classic PCB) vs OTDirect
+// (OTGW32) and drives the matching subsystem. The OTGW32 peripheral pin map +
+// capability flags above are the base; here we add the field-verified
+// Classic-on-S3 pins (same map as BOARD_NODOSHOP_ESP32_CLASSIC above) and flip
+// HAS_PIC on. Runtime selection (state.hw.eMode / isPICEnabled()) decides
+// which subsystem is initialized, so each shared GPIO has one live owner per
+// boot. Conflicting positions between the two physical boards:
+//
+//   GPIO  Classic-on-S3        OTGW32
+//   12    PIC reset            SPI SCK (W5500)
+//   16    LED1                 SPI RST (W5500)
+//   4     LED2                 1-Wire (Dallas)
+//   18    Config button        I2C SDA (OLED)
+//
+// The PIC UART (43/44) and the Classic I2C pair (35/36) are unused on the
+// OTGW32, so the boot probe and the early 0x26 watchdog disarm are harmless
+// there. Application code resolves the conflicting positions through the
+// runtime accessors activeI2cSda()/activeI2cScl()/activeLed1()/activeLed2()/
+// activeButton() (OTGW-firmware.h) and gates combo behaviour on
+// HAS_RUNTIME_HW_DETECT, never on the raw board macro (ESP-abstraction rule).
+// ---------------------------------------------------------------------------
+#if defined(BOARD_NODOSHOP_ESP32_COMBO)
+  // Both OT engines are compiled in; the mutual-exclusion of HAS_PIC /
+  // HAS_DIRECT_OT used by the fixed boards is replaced by runtime gating.
+  #undef  HAS_PIC
+  #define HAS_PIC           1    // PIC serial driver (OTGWSerial) is linked in
+  // The Classic PCB carries the external 0x26 I2C watchdog; the combo feeds it
+  // at runtime only when the PIC was detected (isPICEnabled()). On an OTGW32
+  // the feed is a NACKed no-op on floating pins.
+  #undef  HAS_PIC_WATCHDOG
+  #define HAS_PIC_WATCHDOG  1
+  // HAS_DIRECT_OT stays 1 (OTDirect linked in, from the OTGW32 base).
+  #define HAS_RUNTIME_HW_DETECT 1  // boot-detect PIC vs OTDirect + dual pin map
+
+  // Override the display/board identity. HW_TYPE_NAME stays defined from the
+  // base (otgw32) but is unused on the combo: hardwareTypeName() resolves the
+  // slug at runtime from state.hw.eMode (ADR-127).
+  #undef  BOARD_NAME
+  #define BOARD_NAME        "Nodoshop OTGW Combo (ESP32-S3)"
+
+  // ---- Classic-on-S3 pins (field-verified, same as ESP32_CLASSIC above) ----
+  //   hole  D1-mini GPIO  S3 GPIO  signal
+  //   TX    1             43       PIC UART (ESP TX -> PIC RX)
+  //   RX    3             44       PIC UART (ESP RX <- PIC TX)
+  //   D1    5             36       I2C SCL (watchdog 0x26 + OLED)
+  //   D2    4             35       I2C SDA
+  //   D3    0             18       Config/reset button
+  //   D4    2             16       LED1
+  //   D5    14            12       PIC reset
+  //   D0    16            4        LED2
+  #define PIN_PIC_RST          12   // D5 hole
+  #define PIN_PIC_RX           44   // RX hole (ESP RX <- PIC TX)
+  #define PIN_PIC_TX           43   // TX hole (ESP TX -> PIC RX)
+  #define PIN_CLASSIC_I2C_SCL  36   // D1 hole (0x26 watchdog + OLED in PIC mode)
+  #define PIN_CLASSIC_I2C_SDA  35   // D2 hole
+  #define PIN_CLASSIC_BUTTON   18   // D3 hole (active LOW)
+  #define PIN_CLASSIC_LED1     16   // D4 hole (active LOW)
+  #define PIN_CLASSIC_LED2     4    // D0 hole (active LOW)
+#endif
+
+// HAS_RUNTIME_HW_DETECT: 1 only on the combo board class (ADR-127); every
+// other board is a fixed compile-time class. Defined 0 here so application
+// code can gate on it unconditionally.
+#ifndef HAS_RUNTIME_HW_DETECT
 #define HAS_RUNTIME_HW_DETECT 0
+#endif
 
 /***************************************************************************
 *

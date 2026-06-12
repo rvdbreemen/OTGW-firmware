@@ -2,9 +2,11 @@
 
 ## Status
 
-Accepted, 2026-06-10
+Superseded by ADR-127, 2026-06-12 (was: Accepted, 2026-06-10)
 
-Supersedes ADR-125. Guideline-level (per ADR-080): this ADR removes a board
+Supersedes ADR-125. ADR-127 revives the ADR-125 combo design with the
+objections below root-caused and fixed; the `esp32-classic` board class, its
+verified pin map, and the portal-first boot order defined here are retained. Guideline-level (per ADR-080): this ADR removes a board
 class and a boot discipline; the existing ESP-abstraction boundary gate
 (`evaluate.py::check_esp_abstraction_boundary`) continues to enforce the
 flag-based layering. No new dedicated gate is introduced.
