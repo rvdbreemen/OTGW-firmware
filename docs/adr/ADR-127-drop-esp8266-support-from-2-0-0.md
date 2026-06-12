@@ -2,9 +2,8 @@
 
 ## Status
 
-Proposed — drafted 2026-06-12, decision by the maintainer (Robert), awaiting his
-explicit acceptance. On acceptance, ADR-082's Status line becomes "Superseded by
-ADR-127, 2026-06-12" (only that line changes). Do not treat as binding until accepted.
+Accepted, 2026-06-12. Decision by the maintainer (Robert). On acceptance, ADR-082's
+Status line becomes "Superseded by ADR-127, 2026-06-12" (only that line changes).
 
 ## Context
 

@@ -2,12 +2,12 @@
 
 ## Status
 
-Proposed — drafted 2026-06-04; amended 2026-06-12. The maintainer (Robert) confirmed
-the **hybrid model** (2026-06-04) and then decided (2026-06-12) to **stop ESP8266
-support to simplify the codebase**, making 2.0.0 **ESP32-S3 only**. The previously
-deferred ESP8266 sub-decision is therefore resolved: ESP8266 is dropped. Acceptance
-of this ADR depends on **ADR-127** (drop ESP8266 support; supersedes ADR-082).
-Awaiting explicit acceptance of this amended text; do not treat as binding until then.
+Accepted, 2026-06-12. Drafted 2026-06-04; amended 2026-06-12. The maintainer (Robert)
+confirmed the **hybrid model** (2026-06-04) and then decided (2026-06-12) to **stop
+ESP8266 support to simplify the codebase**, making 2.0.0 **ESP32-S3 only**. The
+previously deferred ESP8266 sub-decision is therefore resolved: ESP8266 is dropped.
+This decision depends on **ADR-127** (drop ESP8266 support; supersedes ADR-082),
+accepted the same day.
 
 ## Context
 

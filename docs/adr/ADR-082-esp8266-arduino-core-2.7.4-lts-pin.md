@@ -9,7 +9,7 @@
 
 ## Status
 
-Accepted, 2026-04-24.
+Superseded by ADR-127, 2026-06-12.
 
 ## Context
 
