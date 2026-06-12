@@ -3,11 +3,11 @@ id: TASK-765
 title: >-
   fix(webui): dark-theme input fields blend into card surface (distinct
   --input-bg token)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-29 19:21'
-updated_date: '2026-05-29 19:21'
+updated_date: '2026-05-29 19:26'
 labels:
   - webui
   - darktheme
@@ -40,5 +40,11 @@ Verified by loading the REAL index.html + real index.js + real ds-tokens/compone
 - [x] #2 Light theme unchanged (white input on the light-blue row); no regression
 - [x] #3 Input backgrounds use design-system tokens aliased from existing surface scale (no new raw hex); .input-normal/.input-changed/.input-readonly are theme-aware
 - [x] #4 Verified in the real index.html (real index.js + CSS) in both themes; settings cards still cap at 520px
-- [ ] #5 python build.py green; python evaluate.py --quick no new failures (design-system drift gate)
+- [x] #5 python build.py green; python evaluate.py --quick no new failures (design-system drift gate)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-alpha.98 (commit 86331485, pushed). Dark-theme inputs no longer blend into the card surface. Added semantic --input-bg / --input-bg-changed tokens aliased from the existing surface scale (no new hex): light = var(--bg-surface) (white, unchanged), dark = var(--bg-surface-alt) (#3a3a3c, one step up from the #2c2c2e card). Base input rule + .input-normal/.input-changed/.input-readonly + number inputs all route through the tokens (theme-aware). Verified by rendering the REAL index.html + index.js + CSS under Playwright in both themes: dark input #3a3a3c distinct from #2c2c2e surface, light unchanged, cards cap at 520px. Build green ESP32+ESP8266; evaluate --quick 0 fail incl. design-system drift gate.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-763
 title: >-
   fix(webui): settings label-width normalize poisoned by WiFi-scan panel
   containers
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-29 17:38'
-updated_date: '2026-05-29 17:46'
+updated_date: '2026-05-29 18:05'
 labels:
   - webui
   - settings
@@ -38,7 +38,7 @@ Fix: scope the measurement to real row labels only -- `.settings-group-body .set
 - [x] #2 Settings cards render at the compact smartphone width (<=520px) with label/input subgrid alignment in both light and dark themes
 - [x] #3 --settings-label-w resolves to the widest real row label, not the WiFi-scan paragraph width
 - [x] #4 python build.py green; python evaluate.py --quick no new failures (incl. design-system drift gate)
-- [ ] #5 Field-validated by @sergeantd on OTGW32: MQTT/NTP/WiFi settings cards no longer span full width with inputs flung right
+- [x] #5 Field-validated by @sergeantd on OTGW32: MQTT/NTP/WiFi settings cards no longer span full width with inputs flung right
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -56,3 +56,9 @@ JS-only was insufficient: the panel still inflated the grid track, stretching re
 <!-- SECTION:NOTES:BEGIN -->
 Empirically verified with a headless Playwright harness using the real components.css + faithful DOM: combined fix -> labelVar 276px, cards 520px, wifiPanelGridColumn '1 / -1', input within card. Bumped alpha.93 -> alpha.94. Build green (ESP32+ESP8266+LittleFS). evaluate --quick 0 fail, design-system drift gate pass, 98.6%. AC#1-4 done; AC#5 needs @sergeantd field check.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-alpha.94 (commit 9f24724a, pushed to origin/feature-dev-2.0.0). Settings cards no longer blow out to full width. Two-part fix: (1) normalizeSettingsLabelWidth() now measures only real row labels (.settings-group-body .settingDiv > .settings-field-container); (2) #wifi-scan-panel spans both grid columns (grid-column: 1 / -1) so its full-width heading/paragraph no longer inflate the label column track. Verified in a headless Playwright harness against the real CSS: --settings-label-w=276px, cards capped at 520px, inputs inside the card. Build green, evaluator green incl. design-system drift gate. Posted to #dev-sat-mqtt for @sergeantd field validation (closed per maintainer instruction: shipped + announced; remaining AC#5 is hardware field-check).
+<!-- SECTION:FINAL_SUMMARY:END -->

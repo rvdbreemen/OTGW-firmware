@@ -1,11 +1,11 @@
 ---
 id: TASK-798
 title: 'feat-2.0.0: SAT sim F3 — multi-zone / multi-area room model'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:55'
-updated_date: '2026-06-01 16:26'
+updated_date: '2026-06-01 16:27'
 labels:
   - sat
   - simulation

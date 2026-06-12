@@ -3,11 +3,11 @@ id: TASK-743
 title: >-
   ESP abstraction Tier 3: move per-platform tuning constants into platform_*.h
   and add the new shim set
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-28 08:28'
-updated_date: '2026-06-01 18:28'
+updated_date: '2026-06-01 18:48'
 labels:
   - esp-abstraction-audit
   - refactor
@@ -53,4 +53,6 @@ RECOVERED + repaired (alpha.111, commit 8360e35d, pushed, BUILD GREEN per-env es
 PLAN for the 5 TX-buffer sites (attended): move sTxBuf + restTxAppend + restFlushTxBuf into platform_esp32.h as platformRestTx{Append,Flush,Reset} shims (ESP8266 = inline direct-send / no-op so restSendContent streams inline as today); then restSendContent/restSendContentP/restSendP/restFlushContent call the shims UNGUARDED. RISK: this is the TASK-747 byte-order class — restSendContentP feeds PROGMEM via strlen/memcpy (ESP32 DROM-safe); must preserve exact append order + the restSendP stale-discard (sTxBuf.len=0). Baseline 16 -> 11 after these 5. Build BOTH targets + verify JSON byte-order on a real ESP32 REST response before trusting. NOT done unattended.
 
 2026-06-01T20:13:53+02:00: jsonStuff TX-coalescing cluster DONE (attended) — b6f3c903 (alpha.133, pushed). 5 sites (191/227/238/251/263) gated on new HAS_REST_TX_COALESCING flag (NOT platform_*.h shims — buffer calls app-side httpServer/restPerf which can't live in a platform header; capability-flag is the correct abstraction per CLAUDE.md rule 2). Zero behaviour change (flag = ESP32-on/ESP8266-off, identical compile). Baseline 16->11. Build both SUCCESS, eval 0-fail. The 3 remaining jsonStuff sites (389/487/660) are int/int32 overload ambiguity = TASK-745 (Tier 5), explicitly NOT 743. REMAINING 743 sites (11 total): MQTTstuff heap-pressure pair (1931/1946, app-side getHeapHealth coupling), SATmqttPublish os_random/esp_random (46/63, include-order before platform.h), helperStuff watermark global (398, ODR-necessary guard), MQTTstuff:604 done earlier, restAPI:833 done earlier. Those remaining are each their own design judgement — see prior notes.
+
+2026-06-01T20:48:29+02:00: 743 COMPLETE at baseline 7 (from 35 at task start). This session's chunks: REST-TX coalescing (HAS_REST_TX_COALESCING, b6f3c903, 16->11), discovery heap-pair (HAS_FRAGMENTATION_AWARE_HEAP_GATE, d9ec73fa, 11->9), SAT random (platformHardwareRandom, 3b366309, 9->7). The final 7 sites are NOT 743's scope: helperStuff:398 (ODR-necessary global-def guard — structurally required, not a leak), jsonStuff 390/488/661 (int/int32 overload ambiguity = TASK-745 Tier 5), and OTGW-firmware.h/.ino BOARD_NODOSHOP_* dispatch (the boards.h selection pattern itself, legitimately kept). 743's targetable application-code leaks are all removed. Remaining baseline reduction belongs to TASK-744 (OLED) + TASK-745 (overloads). Closing Done.
 <!-- SECTION:NOTES:END -->

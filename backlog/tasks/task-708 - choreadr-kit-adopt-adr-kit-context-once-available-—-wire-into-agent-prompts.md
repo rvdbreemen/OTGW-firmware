@@ -6,11 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-05-26 11:01'
+updated_date: '2026-06-01 20:52'
 labels:
   - adr-kit
   - tooling
   - blocked
 dependencies: []
+ordinal: 74000
 ---
 
 ## Description

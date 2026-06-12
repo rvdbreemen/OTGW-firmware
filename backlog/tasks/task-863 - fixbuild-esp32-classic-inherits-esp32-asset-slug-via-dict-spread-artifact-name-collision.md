@@ -3,11 +3,11 @@ id: TASK-863
 title: >-
   fix(build): esp32-classic inherits esp32 asset slug via dict spread, artifact
   name collision
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-12 04:53'
-updated_date: '2026-06-12 05:03'
+updated_date: '2026-06-12 05:49'
 labels: []
 dependencies: []
 ---
@@ -24,3 +24,9 @@ TARGETS['esp32-classic'] = {**TARGETS['esp32'], ...} (build.py:120) inherits slu
 - [x] #2 Stale distinctness comment corrected
 - [x] #3 python build.py completes all three targets with distinct asset names
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+TARGETS['esp32-classic'] inherited slug='esp32-otgw32' through the dict spread when the slug key was added to the esp32 entry, so Classic artifacts overwrote OTGW32 asset names and the versioned rename failed (FileExistsError WinError 183). Fixed with an explicit slug 'esp32-classic' plus corrected stale distinctness comment. Verified: python build.py completes all three targets with distinct asset names (esp32-classic / esp32-otgw32 / esp8266 zips). Commit f160c4db. Root cause record: bug-120.
+<!-- SECTION:FINAL_SUMMARY:END -->

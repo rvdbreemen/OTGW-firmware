@@ -3,11 +3,11 @@ id: TASK-817
 title: >-
   perf(network): disable ESP32 WiFi modem-sleep + drain HTTP multi-connect per
   loop for webui responsiveness
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-02 22:38'
-updated_date: '2026-06-02 22:55'
+updated_date: '2026-06-02 23:24'
 labels: []
 dependencies: []
 ---
@@ -21,13 +21,13 @@ Initial web page serving on OTGW32 (ESP32) takes seconds, sometimes never respon
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 platformWifiDisableSleep() shim added to platform_esp32.h (WiFi.setSleep(false)) and platform_esp8266.h (no-op inline stub); called once after WiFi/ETH is up; no raw ifdef ESP32 outside abstraction
-- [ ] #2 Steady-state HTTP drain: handleClient() serves pending connections in a bounded loop (max N iterations, watchdog-fed) so multi-asset page loads complete in 1-2 loop turns; bound documented to prevent loop starvation
-- [ ] #3 Weather per-read busy-wait cap reviewed; tightened only if zero risk to fetch correctness, else left with rationale
-- [ ] #4 TCP_NODELAY / Nagle on the WebServer client investigated; finding documented (implemented if a clean abstraction-safe API exists, else recorded as dead-end with reason)
+- [x] #2 Steady-state HTTP drain: handleClient() serves pending connections in a bounded loop (max N iterations, watchdog-fed) so multi-asset page loads complete in 1-2 loop turns; bound documented to prevent loop starvation
+- [x] #3 Weather per-read busy-wait cap reviewed; tightened only if zero risk to fetch correctness, else left with rationale
+- [x] #4 TCP_NODELAY / Nagle on the WebServer client investigated; finding documented (implemented if a clean abstraction-safe API exists, else recorded as dead-end with reason)
 - [x] #5 MQTT 5s socketTimeout left UNCHANGED (ADR-108); documented as out-of-scope not-a-finding
-- [ ] #6 python build.py exits 0 for esp32 AND esp8266 envs (grep per-env SUCCESS lines)
-- [ ] #7 python evaluate.py --quick reports no new failures incl ESP-abstraction boundary gate
-- [ ] #8 Prerelease tag bumped (src/OTGW-firmware/** touched)
+- [x] #6 python build.py exits 0 for esp32 AND esp8266 envs (grep per-env SUCCESS lines)
+- [x] #7 python evaluate.py --quick reports no new failures incl ESP-abstraction boundary gate
+- [x] #8 Prerelease tag bumped (src/OTGW-firmware/** touched)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -55,3 +55,9 @@ NO telemetry pre-capture (user opted to ship #1+#2 directly).
 <!-- SECTION:NOTES:BEGIN -->
 Impl: #1 platformWifiDisableSleep() added to BOTH platform_esp32.h (WiFi.setSleep(false)) and platform_esp8266.h (WiFi.setSleepMode(WIFI_NONE_SLEEP)) per user 'disable on both'. Called in startWiFi() after connect + loopWifi() WIFI_RECONNECTED. #2 bounded HTTP drain loop (bound=4, watchdog-fed) replaces single handleClient() at OTGW-firmware.ino:610. #3 weather 5s busy-wait LEFT (triple-guarded, tighter cap risks dropping slow-but-valid OWM responses; minimal-change-surface). #5 Nagle/NoDelay = DEAD-END: ESP8266WebServer(2.7.4) and ESP32 WebServer expose no public setNoDelay; only per-handler client().setNoDelay (invasive) or vendored-core patch (barred). Marginal once #1+#2 land. evaluate.py --quick: 0 failed, 97.1%.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Two structural webui-latency fixes behind the platform abstraction. (1) platformWifiDisableSleep() shim added to platform_esp32.h (WiFi.setSleep(false)) + platform_esp8266.h (WIFI_NONE_SLEEP), called after connect in startWiFi() and on loopWifi() WIFI_RECONNECTED; kills ESP32 WIFI_PS_MIN_MODEM per-packet 100ms-1s latency. (2) Bounded HTTP drain loop (4 iters, watchdog-fed) at OTGW-firmware.ino replaces single handleClient(), so a 6-asset page load completes in 1-2 loop turns instead of 6+. Hot-path analysis: ALL delay() are boot/reboot/hardware-settle (zero in steady-state loop) -> left as-is (KISS). MQTT 5s (ADR-108) + webhook 500ms (ADR-048) unchanged. Weather 5s busy-wait left (triple-guarded, minimal-change-surface). Nagle/NoDelay = dead-end (no public API on ESP8266WebServer/ESP32 WebServer; only vendored-core patch, barred). Both envs build green (esp8266 + esp32-s3); evaluate.py --quick 0 failed (97.1%). Commit 9c51d80d, pushed. Field-confirmation pending: user flashes OTGW32 and confirms page-load speedup.
+<!-- SECTION:FINAL_SUMMARY:END -->

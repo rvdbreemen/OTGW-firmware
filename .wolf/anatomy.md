@@ -1,11 +1,38 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-05-29T10:40:58.192Z
-> Files: 26 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-12T23:45:02.972Z
+> Files: 41 tracked | Anatomy hits: 0 | Misses: 0
+
+## ../OTGW-firmware/.claude/
+
+
+## ../OTGW-firmware/src/OTGW-firmware/
+
+- `networkStuff.ino` — Declares char (~7451 tok)
+
+## ../adr-kit/
+
+
+## ../adr-kit/bin/
+
+
+## ../adr-kit/schemas/
+
+
+## ../adr-kit/templates/githooks/
+
+
+## ../adr-kit/tests/
+
 
 ## ./
 
-- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~39784 tok)
+- `.gitignore` — Git ignore rules (~610 tok)
+- `build.py` — Colors: asset_slug, disable, print_step, print_success + 7 more (~32705 tok)
+- `CLAUDE.md` — OpenWolf (~9008 tok)
+- `flash_otgw.bat` (~2912 tok)
+- `flash_otgw.sh` — ============================================================================= (~3585 tok)
+- `platformio.ini` — Declares names (~3390 tok)
 
 ## .claude/
 
@@ -54,7 +81,6 @@
 
 ## .githooks/
 
-- `pre-commit` — Pre-commit hook for OTGW-firmware 2.0.0 worktree. (~1019 tok)
 
 ## .github/
 
@@ -329,68 +355,114 @@
 ## .pio/libdeps/esp32/AceSorting/examples/WorstCaseBenchmark/
 
 
+## .superpowers/brainstorm/9590-1780437552/content/
+
+
 ## .wolf/
+
+
+## C:/Users/rvdbr/.claude/
 
 
 ## C:/Users/rvdbr/.claude/plans/
 
+- `so-now-that-we-memoized-flame.md` — ADR-127: Combo ESP32-S3 single binary — revival van runtime PIC/OTDirect boot-detectie (~2519 tok)
+- `so-on-the-feature-mighty-bee.md` — Plan: Single ESP32-S3 binary — PIC + OTDirect, boot-detect + persist (~2815 tok)
 
 ## C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/
 
+- `feedback_otgwserial_exception.md` — stay read-only (~254 tok)
+- `MEMORY.md` — OTGW-firmware Project Memory (~4512 tok)
+- `project_adr124_seven_device_topology.md` (~608 tok)
+- `project_buildpy_skips_combo_env.md` (~421 tok)
 
 ## C:/Users/rvdbr/AppData/Local/Temp/
 
 
+## C:/Users/rvdbr/AppData/Local/Temp/otgw-iptest/
+
+
 ## bin/
 
+- `bump-prerelease.sh` (~363 tok)
 
 ## docs/adr/
 
-- `.adr-kit.json` (~518 tok)
-- `ADR-113-hardware-type-codepath-selection-contract.md` — ADR-113 Hardware-type as codepath-selection contract (~1626 tok)
-- `ADR-114-oled-runtime-detection-decoupled-from-board-flag.md` — ADR-114 OLED runtime detection decoupled from the board flag (~1253 tok)
+- `ADR-113-hardware-type-codepath-selection-contract.md` — ADR-113 Hardware-type as codepath-selection contract (~2116 tok)
+- `ADR-124-ha-discovery-seven-device-topology.md` — ADR-124: HA Discovery Seven-Device Topology — Dedicated OT-Core and Sensors Devices, Gateway via_dev (~3715 tok)
+- `ADR-125-combo-esp32-pic-otdirect-board-boot-detection.md` — ADR-125 Combo ESP32-S3 board: one binary, runtime PIC/OTDirect selection (~2824 tok)
+- `ADR-126-fixed-esp32-classic-build-supersedes-combo-runtime-detection.md` — ADR-126 Fixed esp32-classic build supersedes combo runtime detection (~1278 tok)
+- `ADR-127-combo-esp32-s3-single-binary-revived-runtime-boot-detection.md` — ADR-127 Combo ESP32-S3 single binary revived: runtime PIC/OTDirect boot detection (supersedes ADR-12 (~3603 tok)
+- `README.md` — Project documentation (~11241 tok)
 
 ## docs/api/
 
-- `MQTT.md` — OTGW-firmware MQTT Topic Documentation (~23513 tok)
 
 ## docs/audits/
 
-- `2026-05-28-esp-abstraction-leak-audit.md` — ESP Abstraction Leak Audit — feature-dev-2.0.0-otgw32-esp32-sat-support (~3512 tok)
 
 ## docs/guides/
 
-- `WIFI_RECOVERY_TRIPLE_RESET.md` — WiFi Recovery: Force Config Portal with Triple Reset (~966 tok)
+
+## docs/hardware/
+
+- `combo-esp32-s3-pinout.md` — Combo ESP32-S3 pinout — OTGW Classic (PIC) and OTGW32 (OTDirect) (~1513 tok)
+- `PINOUT.md` — OTGW Pinout Reference (~1798 tok)
 
 ## docs/manuals/en/
 
-- `ch06-network.md` — Chapter 6: Network Configuration (~3721 tok)
-- `ch07-troubleshooting.md` — Chapter 7: Troubleshooting (~4510 tok)
 
 ## docs/manuals/nl/
 
-- `h06-netwerk.md` — Hoofdstuk 6: Netwerkconfiguratie (~4259 tok)
-- `h07-probleemoplossing.md` — Hoofdstuk 7: Probleemoplossing (~7531 tok)
+
+## docs/plan/
+
+
+## docs/research/
+
+
+## docs/superpowers/plans/
+
+
+## docs/superpowers/specs/
+
 
 ## plan/
 
 
+## scripts/
+
+- `autoinc-semver.py` — This script is part of the autoinc-semver project. (~5351 tok)
+- `patch_pio_libs.py` — hasn: patch_file (~2076 tok)
+
 ## src/OTGW-firmware/
 
-- `boards.h` — ************************************************************************ (~1674 tok)
-- `Ethernet.ino` — ************************************************************************ (~3039 tok)
-- `Hardwaretypes.h` — Declares OTGWHardwareMode (~433 tok)
-- `MQTTHaDiscovery.cpp` — ======================================================================= (~66139 tok)
-- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~38879 tok)
-- `networkStuff.ino` — Declares char (~9764 tok)
-- `OLED.ino` — Declares stack (~6877 tok)
-- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~9799 tok)
-- `OTGW-firmware.ino` — Declares WifiPortalResetState (~7591 tok)
-- `platform_esp32.h` — ************************************************************************ (~3060 tok)
-- `platform_esp8266.h` — ************************************************************************ (~2890 tok)
-- `restAPI.ino` — include <string.h> (~44289 tok)
-- `settingStuff.ino` — include <ctype.h> (~19292 tok)
+- `handleDebug.ino` — Forward declaration — defined in SATweather.ino. (~7455 tok)
+- `MQTTHaDiscovery.cpp` — ======================================================================= (~72083 tok)
+- `MQTTstuff.h` — MQTTstuff.h -- HA MQTT Discovery data layer (~7112 tok)
+- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~47160 tok)
+- `networkStuff.ino` — Declares char (~9865 tok)
+- `OLED.ino` — Declares stack (~7193 tok)
+- `OTDirect.ino` — Declares instances (~41490 tok)
+- `OTGW-Core.ino` — Declares char (~70545 tok)
+- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~11078 tok)
+- `OTGW-firmware.ino` — Declares WifiPortalResetState (~10275 tok)
+- `restAPI.ino` — include <string.h> (~45552 tok)
+- `settingStuff.ino` — include <ctype.h> (~20687 tok)
 
 ## src/OTGW-firmware/data/
 
-- `index.js` — Safely parse JSON with validation and error handling (~93506 tok)
+- `index.js` — Safely parse JSON with validation and error handling (~98937 tok)
+
+## src/libraries/OTGWSerial/
+
+- `OTGWSerial.cpp` — Declares char (~9116 tok)
+- `OTGWSerial.h` — Declares char (~1931 tok)
+
+## src/libraries/Platform/src/
+
+- `boards.h` — slug: button (~5179 tok)
+
+## tests/webui/
+
+- `ha-discovery-golden.test.mjs` — Log a single assertion result. (~3732 tok)

@@ -9,6 +9,9 @@
 <!-- How the user likes things done. Code style, tools, patterns, communication. -->
 
 ## Key Learnings
+- **Combo flash budget (ADR-127)**: esp32-combo zit op 98.4% van het 1.875MB app-slot (~30KB over). Elke feature op de combo eerst tegen dit target meten; -flto staat al aan.
+- **backlog CLI auto-commit in dev-worktree**: `backlog task edit` in de dev tree commit zelf ("Update task TASK-NNN"); in de 2.0.0 tree niet. Na CLI-edits in dev: niets meer te stagen, alleen pushen.
+
 
 - **Settings page layout (DS:SETTINGS-GROUP):** `.settings-group-body` is a 2-col grid (`var(--settings-label-w, max-content) 1fr`); rows subgrid into it. Anything appended into a `.settings-group-body` becomes a grid item — wide content (e.g. the WiFi-scan panel's full-width `<p>`) inflates the shared col-1 `max-content` track and stretches every label. Full-width sub-panels MUST use `grid-column: 1 / -1` (like `.fixed-ip-section` and now `#wifi-scan-panel`). And `normalizeSettingsLabelWidth()` must measure ONLY real row labels (`.settings-group-body .settingDiv > .settings-field-container`), never the broad descendant selector. (TASK-763, bug-076)
 - **Project:** OTGW-firmware
@@ -19,6 +22,8 @@
 - **The HA discovery sensor loop bound is exact, not slack.** `doAutoConfigureMsgid()` iterates `while (sIdx < MQTT_HA_SENSOR_COUNT)` and breaks on id-change, so `MQTT_HA_SENSOR_COUNT` MUST equal the row count of `mqttHaSensors[]`. If COUNT < rows, the trailing OT-id's entries are silently never discovered (found id-254 flame_status dark this way, bug-088). When adding/removing a row, update COUNT and the `mqttHaSensorIndex[]` offsets together; `evaluate.py check_ha_sensor_index_consistency` validates the index but NOT the COUNT.
 
 ## Do-Not-Repeat
+- **2026-06-13**: Bij het herleven van een removal-commit (revert-reconstructie zoals ec55a1fb): loop ALLE hunks van de removal-diff af als checklist; de `if (!isPICEnabled()) initEthernet()`-gate zat in een ander deel van setup() dan het detectieblok en werd gemist (bug-121). Gevangen door ADR-verificatiepass (code-vs-claim).
+
 
 <!-- Mistakes made and corrected. Each entry prevents the same mistake recurring. -->
 - **2026-05-26**: For WSL/Linux build reliability, do not assume system Python/pip exists or that package-manager installs are acceptable. `build.sh` must self-bootstrap an isolated local Python runtime and pip non-interactively when needed.
@@ -34,3 +39,19 @@
 - 2026-05-05: MQTT discovery drip policy is platform-aware on 2.0.0. ESP8266 keeps the existing `HEAP_LOW` / 2000ms cooldown behavior; ESP32 uses a shorter status-burst cooldown and only enters discovery slow-mode when both free heap and largest allocatable block are genuinely low.
 
 <!-- Significant technical decisions with rationale. Why X was chosen over Y. -->
+- (2026-06-10) LOLIN S3 Mini D1-mini footprint map (outer pin row, from official diagram): RST=EN, A0=2, D0=4, D1=36(SCL), D2=35(SDA), D3=18, D4=16, D5=12(SCK), D6=13(MISO), D7=11(MOSI), D8=10(SS), TX=43, RX=44. Inner row = extra S3 GPIOs, NOT footprint. Variant file: ~/.platformio/packages/framework-arduinoespressif32/variants/lolin_s3_mini/pins_arduino.h (A0..A17 there are ADC aliases, not holes).
+- (2026-06-10) Version bump MUST land as one changeset: bin/bump-prerelease.sh stages version.h + version.hash + all ~42 banner files itself (autoinc-semver.py --print-updated). Never hand-stage only version.h. Gotcha: Windows Python stdout is CRLF; bash read loops must strip \r before git add.
+- (2026-06-10) NEVER pipe build.py through 'Select-Object -First N' (or any early-terminating filter): PowerShell kills the pipeline after N matches but the build process tree keeps running detached -> orphaned concurrent build, .pio collisions (bug-034 class), false 'failed exit 1'. Run build.py with '*> logfile' and grep the log afterwards.
+- (2026-06-11) other-projects/ is a git SUBMODULE of private repo rvdbreemen/OTGW-other-projects (2.0.0 branch). Never commit its content into the main repo; update flow: commit+push inside other-projects/, then commit the new gitlink in the parent. Dev worktree still has a plain (non-submodule) copy until wired.
+- (2026-06-11) Dev-worktree backlog CLI AUTO-COMMITS elke task create/edit (eigen git commits, reset-stage cyclus wist je index!). 2.0.0-worktree niet. Op dev: NOOIT iets gestaged laten staan tijdens backlog-CLI calls; stage pas na de laatste task edit. Dev commit-msg hook eist taakfile voor ELK TASK-NNN token - cite geen 2.0.0-taaknummers in dev-commits (al bekend, opnieuw bevestigd).
+
+### TU-visibility: vendored libs zien boards.h niet (2026-06-12)
+- `src/libraries/**` translation units compilen ZONDER boards.h in hun include-keten. Een `#if defined(PIN_XXX)` in vendored-lib code valt dus altijd terug op de fallback, ook al staat de macro netjes in boards.h.
+- Pinconfiguratie moet vendored libs bereiken via `-D` build_flags in platformio.ini per env (of via constructor-argumenten vanuit een app-TU, zoals PICRST al doet).
+- Verificatiemethode: grep de `.pio/build/<env>/.../<lib>.cpp.d` dependency file — staat boards.h er niet in, dan zag de preprocessor de macro niet. (bug-119, PIC-detect esp32-classic)
+
+### OTGWSerial = enige bewerkbare vendored lib (2026-06-12)
+- Robert gaf expliciete uitzondering: `src/libraries/OTGWSerial/` mag direct aangepast worden. Alle andere `src/libraries/**` blijven read-only. Context: PIC UART pin-binding fix (bug-119, TASK-862).
+
+### Dict-spread in TARGETS erft later toegevoegde keys (2026-06-12)
+- `TARGETS['esp32-classic'] = {**TARGETS['esp32'], ...}` erfde stilletjes `slug='esp32-otgw32'` toen TASK-856 die key aan de esp32-entry toevoegde — artifact-namen botsten (bug-120). Bij toevoegen van een key aan een TARGETS-entry: check alle spread-afgeleiden en zet daar een expliciete waarde.

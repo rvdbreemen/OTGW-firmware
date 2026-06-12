@@ -1,11 +1,11 @@
 ---
 id: TASK-800
 title: 'feat-2.0.0: SAT sim F5 — DHW demand simulation'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:56'
-updated_date: '2026-06-01 16:44'
+updated_date: '2026-06-01 17:16'
 labels:
   - sat
   - simulation
@@ -21,7 +21,7 @@ Follow-up F5 from SAT simulation plan section 12. Model DHW demand (flame steal,
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Synthetic DHW demand drives the DHW status bit so the cycle classifier tags cycles SAT_CK_DHW / SAT_CK_MIXED under simulation
-- [ ] #2 Flame-steal: CH contribution suppressed while a synthetic DHW draw is active; flow targets DHW setpoint
+- [x] #2 Flame-steal: CH contribution suppressed while a synthetic DHW draw is active; flow targets DHW setpoint
 - [x] #3 DHW draws can be triggered both on a light periodic schedule and via the TASK-797 /sim/event dhw_demand override
 - [x] #4 No real bus traffic (commit-3 gate honoured); python build.py both targets SUCCESS; evaluate.py --quick clean
 <!-- AC:END -->

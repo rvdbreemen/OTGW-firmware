@@ -3,11 +3,11 @@ id: TASK-819
 title: >-
   fix(sat-ble): ble_temp/ble_humidity raw sendContent scrambles SAT status JSON
   on ESP32
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-03 16:08'
-updated_date: '2026-06-03 16:15'
+updated_date: '2026-06-03 17:40'
 labels: []
 dependencies: []
 ---
@@ -31,3 +31,9 @@ Field report @sergeantd (OTGW32, alpha.150): SAT dashboard tiles all show -- (Na
 <!-- SECTION:NOTES:BEGIN -->
 Root cause confirmed by code + the project's own documented gotcha (SATble.ino:750-753). Fix: SATble.ino:696,700 raw httpServer.sendContent -> restSendContent so ble_temp/ble_humidity share the sTxBuf coalescing buffer. Firmware-wide grep triaged: only interleaving sites; all other raw sendContent are pure-raw response paths (sTxBuf empty). Build green esp8266 fw+fs + esp32 fw+fs; evaluate --quick 0 fail (2 pre-existing warnings). Bumped alpha.151->alpha.152. AC#4 (field-confirm by @sergeantd on OTGW32) is the sole remaining gate; needs his retest. Distinct from TASK-764 (client-side init-order, alpha.97). Logged .wolf/buglog.json bug-112. Follow-up TASK-820 for the separate restFlushTxBuf String-temporary fragility.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-alpha.152 (commit d5c656c0, pushed to origin/feature-dev-2.0.0). Root cause: satBLESendStatusJSON() (SATble.ino:696,700) emitted ble_temp/ble_humidity via raw httpServer.sendContent, bypassing the ESP32 coalescing buffer (sTxBuf). The raw chunks flushed ahead of the ~4KB of buffered SAT fields, putting the sat/status JSON on the wire out of order; the browser hit malformed JSON near the 4095-byte flush boundary (sat.js: Unterminated fractional number at position 4096), JSON.parse threw, and every SAT dashboard tile fell back to '--'. ESP32-only (ESP8266 flushes inline), only on the >4KB sat/status response, only once a BLE sensor is selected (bBleTempValid). Server data was always valid (200/chunks=3). Sibling satBLERosterSendJSON was already fixed for this gotcha (SATble.ino:750-753); this fn was missed. Fix: restSendContent() for both fields. Evidence: George's browser console (otgw.log) + firmware debug log + the project's own documented gotcha. Build green esp8266 fw+fs + esp32 fw+fs; evaluate --quick 0 fail. Distinct from TASK-764 (client-side init-order, alpha.97, which wrongly ruled out this JSON-malformed class). AC#4 (field-confirm by @sergeantd on real OTGW32) is the sole remaining gate; closed per maintainer rule (shipped+pushed, field-validation only remainder).
+<!-- SECTION:FINAL_SUMMARY:END -->

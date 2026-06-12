@@ -3,11 +3,11 @@ id: TASK-820
 title: >-
   perf(rest): restFlushTxBuf allocates a 4KB heap String per flush on fragmented
   ESP32 heap
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-03 16:09'
-updated_date: '2026-06-03 20:16'
+updated_date: '2026-06-03 20:23'
 labels: []
 dependencies: []
 ---
@@ -20,6 +20,12 @@ restFlushTxBuf (jsonStuff.ino:207) calls httpServer.sendContent(sTxBuf.data). Th
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 restFlushTxBuf uses the two-arg sendContent(const char*, size_t) overload; no String temporary allocated per flush
-- [ ] #2 Build green ESP32 + ESP8266; evaluate --quick no new failures
+- [x] #1 restFlushTxBuf uses the two-arg sendContent(const char*, size_t) overload; no String temporary allocated per flush
+- [x] #2 Build green ESP32 + ESP8266; evaluate --quick no new failures
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-alpha.153 (commit e10d7e69, pushed origin/feature-dev-2.0.0). restFlushTxBuf() sent the coalescing buffer via single-arg httpServer.sendContent(sTxBuf.data), binding to sendContent(const String&) -> a ~4KB heap String temporary per flush on the no-PSRAM ESP32-S3 (~53KB free heap, 40-50% frag). A failed alloc would give length()==0 -> 0-length chunk -> early-terminated chunked response (silent truncation). Fixed by the explicit-length overload sendContent(sTxBuf.data, sTxBuf.len): no alloc, no String, no truncation failure mode; dropped the now-redundant NUL write. ESP32-only (HAS_REST_TX_COALESCING); ESP8266 untouched. Build green esp8266 fw+fs + esp32 fw+fs; evaluate --quick 0 fail. Decided AGAINST growing the buffer / whole-response Content-Length approach: RAM is the scarce resource on this board (no PSRAM, ~53KB free), and the existing 4KB coalescing already solved the perf problem (send times tens of ms).
+<!-- SECTION:FINAL_SUMMARY:END -->

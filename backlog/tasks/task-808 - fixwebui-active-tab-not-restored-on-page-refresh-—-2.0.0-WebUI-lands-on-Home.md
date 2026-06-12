@@ -3,11 +3,11 @@ id: TASK-808
 title: >-
   fix(webui): active tab not restored on page refresh — 2.0.0 WebUI lands on
   Home
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-02 05:25'
-updated_date: '2026-06-02 16:06'
+updated_date: '2026-06-03 21:13'
 labels:
   - webui
   - field-report
@@ -25,8 +25,8 @@ Field report @sergeantd (alpha.99, OTGW32, 2026-05-30): "when I hit refresh and 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Active tab is restored after a browser refresh (you land back on the tab you were viewing, not Home)
-- [ ] #2 Home remains the default on first load / when no tab state is present; no console errors
+- [x] #1 Active tab is restored after a browser refresh (you land back on the tab you were viewing, not Home)
+- [x] #2 Home remains the default on first load / when no tab state is present; no console errors
 - [x] #3 python build.py green (firmware + filesystem); evaluate.py --quick no new failures
 - [ ] #4 Field-confirmed by @sergeantd on OTGW32
 <!-- AC:END -->
@@ -47,4 +47,12 @@ NOT persisted: webhookPage() (it hand-toggles classes, bypasses setActivePageSec
 Verified: node --check index.js clean (build.py does not lint JS). Bumped alpha.139->140. Full build in progress. AC#1-3 self-verifiable; AC#4 (field-confirm by @sergeantd on OTGW32) pending — ship alpha.140 for him to test.
 
 Shipped in alpha.140 (commit d6195940, pushed). AC#3 verified (build both targets SUCCESS, evaluate.py --quick 61/0). AC#1/#2 (active-tab-restored / Home-default behavior) implemented + node-syntax-clean but need a browser to confirm; AC#4 = field-confirm by @sergeantd. Per maintainer 2026-06-02: do NOT announce the build to @sergeantd — builds are published tonight together with the user (zip upload). Task stays In Progress pending browser/field confirmation.
+
+2026-06-03: added tests/webui/tab-restore.test.mjs (Playwright + Chrome). 6/6 pass against the real index.js: #settings/#sat hashes restore the matching page-section (active class), no-hash and unknown-hash default to Home, and setActivePageSection writes the expected hash. AC#1/#2 now have automated proof. AC#4 (field-confirm by @sergeantd on OTGW32) remains the only open item.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped alpha.140 (commit d6195940). Active tab now persisted to URL hash via history.replaceState (setActivePageSection) and restored on load in startMainPage() (dispatch hash -> page fn; Home default on empty/unknown; #tabPICflash branch kept). Frontend-only data/index.js. AC#1/#2 proven by tests/webui/tab-restore.test.mjs (Playwright+Chrome, 6/6: #settings/#sat restore active section, no-hash/unknown default Home, hash written). AC#3 build both targets SUCCESS + evaluate 61/0. Closed per maintainer rule: AC#4 field-confirm by @sergeantd on OTGW32 is the sole remainder.
+<!-- SECTION:FINAL_SUMMARY:END -->

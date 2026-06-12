@@ -1,7 +1,73 @@
 [
   {
+    "id": "bug-035",
+    "timestamp": "2026-06-10T00:00:00Z",
+    "error_message": "OTGW-firmware.ino:147:9: error: 'sscanf_P' was not declared in this scope; did you mean 'sscanf'? (env:esp32-combo only)",
+    "file": "src/OTGW-firmware/OTGW-firmware.ino",
+    "root_cause": "sscanf_P is an ESP8266/AVR pgmspace helper; it does not exist in the ESP32 Arduino core. The new appendBootDetectLog() helper (TASK-848) is compiled only under HAS_RUNTIME_HW_DETECT, which is the combo (ESP32-S3) board. The esp8266 and plain esp32 envs skip the helper entirely (#if'd out), so build.py's default esp8266+esp32 pass was green and masked it; only env:esp32-combo actually compiles the code.",
+    "fix": "Use plain sscanf() instead of sscanf_P(). PSTR() is a no-op on ESP32 so the format-string-in-flash convention is preserved (sscanf(first, PSTR(\"boot#%u\"), &prev)). Also a process note: combo-only code must be built with `pio run -e esp32-combo` (via ~/.platformio/penv pio) — build.py only targets esp8266+esp32, so HAS_RUNTIME_HW_DETECT paths are NOT covered by the default build.",
+    "tags": [
+      "build",
+      "esp32",
+      "esp32-combo",
+      "pgmspace",
+      "sscanf_P",
+      "HAS_RUNTIME_HW_DETECT",
+      "TASK-848",
+      "2.0.0"
+    ],
+    "related_bugs": [
+      "bug-034"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-06-10T00:00:00Z"
+  },
+  {
+    "id": "bug-034",
+    "timestamp": "2026-06-06T00:00:00Z",
+    "error_message": "build.bat 'broke' — esp32 produces no assets while esp8266 builds fine. Symptoms: 'Assembler messages: Fatal error: can't create .pio/build/esp32/.../FCString.cpp.o: No such file or directory', 'fatal error: opening dependency file .../X.cpp.d: No such file or directory', missing library headers (wm_strings_en.h, copyReplace.h, KString.h, NetApiHelpers.h), and 'FileNotFoundError: ...\\.pio\\build\\esp32\\.sconsign311.tmp'. On a later run: 'tool-esptoolpy ... PackageException: Could not install package' and tool-esptoolpy dropped out of the PACKAGES list.",
+    "file": "(environment, not source) ~/.platformio + .pio shared between two concurrent builds",
+    "root_cause": "NOT a source commit. build.py at HEAD (== fb641d26, ADR-124 fully reverted) is intact. A SECOND build was running concurrently in the same worktree: PID 39868 'C:\\...\\Python314\\python.exe build.py' (full build under system Python 3.14, bypassing build.bat which pins .build-python 3.12). Two 'pio run -e esp32' processes shared one ~/.platformio package cache AND one .pio/build/esp32 + .pio/libdeps/esp32 tree. They shredded each other's intermediate .o/.d files, headers, scons sign db, and raced on tool-esptoolpy (re)install -> the package cache itself corrupted (esp32s3.py/esp8266.py target files vanished). Exactly the 'two sessions, one worktree' collision documented in CLAUDE.md/memory. The masked 'exit 0' from the first `cmd /c build.bat > log` run was a red herring: Git Bash `cmd /c build.bat` does not redirect build.py output (log captured only the cmd banner), so that exit code was meaningless.",
+    "fix": "Kill the rogue concurrent build (taskkill /PID 39868 /T /F killed the whole pio/scons tree), then `rm -rf .pio/build/esp32` and rebuild SOLO. A single `.build-python\\python.exe build.py` (no flags) then completed green: 4 pio envs succeeded, both targets produced firmware + littlefs + merged + flash.zip. Prevention: never run two builds in the same worktree; one worktree per concurrent session, or background sub-agents serialised through one main thread (per CLAUDE.md). Diagnosis tool: `Get-CimInstance Win32_Process` filtered on python.exe/pio.exe/scons to spot the second build.",
+    "tags": [
+      "build",
+      "platformio",
+      "esp32",
+      "concurrency",
+      "pio-collision",
+      "toolchain-cache",
+      "windows",
+      "false-alarm-not-a-commit",
+      "2.0.0"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-06T00:00:00Z"
+  },
+  {
+    "id": "bug-033",
+    "timestamp": "2026-06-02T00:00:00Z",
+    "error_message": "SAT view: when manual settings are selected the panel does not resize to fit the revealed controls (overflow/clipping). Field report @sergeantd, OTGW32, alpha.99, still present alpha.139 (TASK-812).",
+    "file": "src/OTGW-firmware/data/components.css",
+    "root_cause": "SAT settings rows (.settingDiv built in index.js buildSatSettings) live inside .sat-settings-group-body, which is NOT a grid container. The main settings page wraps the same .settingDiv inside .settings-group-body and applies float-neutralisation + responsive flex/grid overrides (components.css:769-798). The SAT body has no equivalent override, so SAT rows fall back to the legacy float-based .settingDiv layout: a fixed 320px float:left label plus an uncapped input/select. The legacy width rule (.settingDiv input[...], line 711-713) lists only text/password/number and OMITS select, so a <select> with a long option (e.g. a manual sensor address like 'AA:BB:.. (manual)') grows to its widest option and pushes the row wider than a narrow group body -> horizontal overflow, no wrap. NOTE: the exact control @sergeantd hit is unconfirmed (no reveal-on-select logic exists; phrasing is his). This is a proven layout-asymmetry fix and the best match to the symptom class, not a screenshot-confirmed repro.",
+    "fix": "Added .sat-settings-group-body > .settingDiv override block in components.css mirroring the main-settings float-neutralisation WITHOUT subgrid (parent is not a grid): float:none, width:auto, min-width:0, flex-wrap on the row; label wraps (overflow-wrap:anywhere); input AND select get min-width:0 / max-width:100% so the row sizes to the panel. Did not copy the main page's grid subgrid rules (would break on a non-grid parent).",
+    "tags": [
+      "sat",
+      "webui",
+      "css",
+      "layout",
+      "overflow",
+      "settings",
+      "field-report",
+      "2.0.0"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-02T00:00:00Z"
+  },
+  {
     "id": "bug-032",
-    "timestamp": "2026-05-26T19:30:00.000Z",
+    "timestamp": "2026-05-26T19:30:00Z",
     "error_message": "WSL build.sh exits immediately when Python 3 is unavailable",
     "file": "build.sh",
     "root_cause": "Script only attempted existing interpreters/.venv and had no unattended runtime bootstrap path",
@@ -17,7 +83,7 @@
       "bug-031"
     ],
     "occurrences": 1,
-    "last_seen": "2026-05-26T19:30:00.000Z"
+    "last_seen": "2026-05-26T19:30:00Z"
   },
   {
     "id": "bug-001",
@@ -25,7 +91,7 @@
     "error_message": "Significant refactor of ",
     "file": ".claude/hooks/backlog-mcp-guard.py",
     "root_cause": "8 lines replaced/restructured",
-    "fix": "Rewrote 10\u00e2\u2020\u201916 lines (8 removed)",
+    "fix": "Rewrote 10Ã¢â€ â€™16 lines (8 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -41,7 +107,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/debugStuff.ino",
     "root_cause": "2 lines replaced/restructured",
-    "fix": "Rewrote 6\u00e2\u2020\u20199 lines (2 removed)",
+    "fix": "Rewrote 6Ã¢â€ â€™9 lines (2 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -73,7 +139,7 @@
     "error_message": "Significant refactor of ",
     "file": "evaluate.py",
     "root_cause": "12 lines replaced/restructured",
-    "fix": "Rewrote 53\u00e2\u2020\u201965 lines (12 removed)",
+    "fix": "Rewrote 53Ã¢â€ â€™65 lines (12 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -121,7 +187,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/SATble.ino",
     "root_cause": "9 lines replaced/restructured",
-    "fix": "Rewrote 15\u00e2\u2020\u201927 lines (9 removed) | Also: // Find existing slot for MAC or allocate a new on; // Returns slot index (0..SAT_BLE_MAX_SENSORS-1) o",
+    "fix": "Rewrote 15Ã¢â€ â€™27 lines (9 removed) | Also: // Find existing slot for MAC or allocate a new on; // Returns slot index (0..SAT_BLE_MAX_SENSORS-1) o",
     "tags": [
       "auto-detected",
       "refactor",
@@ -137,7 +203,7 @@
     "error_message": "Wrong operator: != should be ==",
     "file": "src/OTGW-firmware/SATble.ino",
     "root_cause": "Used \"!=\" instead of \"==\"",
-    "fix": "Changed operator != \u00e2\u2020\u2019 ==",
+    "fix": "Changed operator != Ã¢â€ â€™ ==",
     "tags": [
       "auto-detected",
       "operator-fix",
@@ -201,7 +267,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/MQTTstuff.ino",
     "root_cause": "2 lines replaced/restructured",
-    "fix": "Rewrote 55\u00e2\u2020\u2019124 lines (2 removed)",
+    "fix": "Rewrote 55Ã¢â€ â€™124 lines (2 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -229,7 +295,7 @@
   },
   {
     "id": "bug-014",
-    "timestamp": "2026-05-01T22:26:19.940Z",
+    "timestamp": "2026-05-01T22:26:19.94Z",
     "error_message": "Incorrect value in code",
     "file": "src/OTGW-firmware/data/index.js",
     "root_cause": "Had \"Enable BLE (Bluetooth Low Energy) temperature sen",
@@ -241,11 +307,11 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-01T22:26:19.940Z"
+    "last_seen": "2026-05-01T22:26:19.94Z"
   },
   {
     "id": "bug-015",
-    "timestamp": "2026-05-01T22:34:00.000Z",
+    "timestamp": "2026-05-01T22:34:00Z",
     "error_message": "ESP32 build: 'settingsDirty' was not declared in this scope",
     "file": "src/OTGW-firmware/SATble.ino",
     "root_cause": "Phase-1 research suggested setting settingsDirty=true directly to trigger the settings-flush debounce, but settingsDirty is a file-static (private to settingStuff.ino:21) and not externally accessible. Cross-file write would require exposing it as extern, breaking encapsulation.",
@@ -259,11 +325,11 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-01T22:34:00.000Z"
+    "last_seen": "2026-05-01T22:34:00Z"
   },
   {
     "id": "bug-016",
-    "timestamp": "2026-05-01T22:34:30.000Z",
+    "timestamp": "2026-05-01T22:34:30Z",
     "error_message": "ESP32 -Wvolatile deprecation warning on chained volatile-qualified assignment",
     "file": "src/OTGW-firmware/SATble.ino",
     "root_cause": "TASK-506 wrote `a = b = c = d = e = 0;` where all targets are volatile uint32_t. C++20 (DR2138) deprecates this idiom: the value of an assignment to a volatile lvalue is itself volatile and chaining propagates that. ESP8266 toolchain accepts it; ESP32-S3 xtensa-esp gcc warns.",
@@ -278,11 +344,11 @@
       "bug-015"
     ],
     "occurrences": 1,
-    "last_seen": "2026-05-01T22:34:30.000Z"
+    "last_seen": "2026-05-01T22:34:30Z"
   },
   {
     "id": "bug-017",
-    "timestamp": "2026-05-01T22:35:00.000Z",
+    "timestamp": "2026-05-01T22:35:00Z",
     "error_message": "PreToolUse hook blocked Edit on data/index.js: innerHTML with untrusted content",
     "file": "src/OTGW-firmware/data/index.js",
     "root_cause": "First version of buildBleSensorsPanel() / renderBleRoster() built panel HTML via .innerHTML with template-string-interpolated user data. Even with an HTML-escape helper for labels and strict regex MAC validation, the security hook blocks innerHTML on principle when interpolation touches user-controlled text.",
@@ -296,7 +362,7 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-01T22:35:00.000Z"
+    "last_seen": "2026-05-01T22:35:00Z"
   },
   {
     "id": "bug-018",
@@ -320,7 +386,7 @@
     "error_message": "Significant refactor of ",
     "file": "plan/feature-openweathermap-onboarding-1.md",
     "root_cause": "2 lines replaced/restructured",
-    "fix": "Rewrote 5\u00e2\u2020\u20195 lines (2 removed)",
+    "fix": "Rewrote 5Ã¢â€ â€™5 lines (2 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -348,7 +414,7 @@
   },
   {
     "id": "bug-021",
-    "timestamp": "2026-05-05T23:02:00.000Z",
+    "timestamp": "2026-05-05T23:02:00Z",
     "error_message": "TASK-530 field reports interpreted `hd_drip_cooldown_skip` on ESP32-S3 as heap-threshold throttling, but the counter was actually driven by the post-status-burst cooldown gate inherited from ESP8266 pacing.",
     "file": "src/OTGW-firmware/MQTTstuff.ino",
     "root_cause": "The 2.0.0 branch used one discovery-drip policy for both ESP8266 and ESP32. On ESP32, the 2000ms post-burst cooldown and ESP8266-oriented drip guard comments made normal discovery pacing look like heap pressure even when free heap and max alloc block were healthy.",
@@ -362,11 +428,11 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-05T23:02:00.000Z"
+    "last_seen": "2026-05-05T23:02:00Z"
   },
   {
     "id": "bug-022",
-    "timestamp": "2026-05-05T23:45:00.000Z",
+    "timestamp": "2026-05-05T23:45:00Z",
     "error_message": "Rapid WebUI reloads could leave stale OT-log WebSocket clients alive long enough to exhaust the three-client limit before the firmware reaped them.",
     "file": "src/OTGW-firmware/data/index.js",
     "root_cause": "The 2.0.0 WebUI kept the OT-log WebSocket open when a tab was hidden and did not explicitly close it on page unload or reload. A burst of reloads could therefore stack old sockets faster than heartbeat cleanup reclaimed them, making the next page instance look like a firmware freeze.",
@@ -380,7 +446,7 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-05T23:45:00.000Z"
+    "last_seen": "2026-05-05T23:45:00Z"
   },
   {
     "id": "bug-023",
@@ -388,7 +454,7 @@
     "error_message": "Significant refactor of ",
     "file": "docs/adr/ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md",
     "root_cause": "3 lines replaced/restructured",
-    "fix": "Rewrote 3\u00e2\u2020\u20198 lines (3 removed)",
+    "fix": "Rewrote 3Ã¢â€ â€™8 lines (3 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -400,11 +466,11 @@
   },
   {
     "id": "bug-024",
-    "timestamp": "2026-05-18T08:37:00.650Z",
+    "timestamp": "2026-05-18T08:37:00.65Z",
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/MQTTstuff.ino",
     "root_cause": "2 lines replaced/restructured",
-    "fix": "Rewrote 14\u00e2\u2020\u201920 lines (2 removed)",
+    "fix": "Rewrote 14Ã¢â€ â€™20 lines (2 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -412,7 +478,7 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-18T08:37:00.650Z"
+    "last_seen": "2026-05-18T08:37:00.65Z"
   },
   {
     "id": "bug-025",
@@ -436,7 +502,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/MQTTstuff.ino",
     "root_cause": "3 lines replaced/restructured",
-    "fix": "Rewrote 13\u00e2\u2020\u201917 lines (3 removed)",
+    "fix": "Rewrote 13Ã¢â€ â€™17 lines (3 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -468,7 +534,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/MQTTstuff.ino",
     "root_cause": "3 lines replaced/restructured",
-    "fix": "Rewrote 8\u00e2\u2020\u201910 lines (3 removed)",
+    "fix": "Rewrote 8Ã¢â€ â€™10 lines (3 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -484,7 +550,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/OTGW-firmware.ino",
     "root_cause": "4 lines replaced/restructured",
-    "fix": "Rewrote 7\u00e2\u2020\u20193 lines (4 removed)",
+    "fix": "Rewrote 7Ã¢â€ â€™3 lines (4 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -500,7 +566,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/version.h",
     "root_cause": "12 lines replaced/restructured",
-    "fix": "Rewrote 25\u00e2\u2020\u201911 lines (12 removed)",
+    "fix": "Rewrote 25Ã¢â€ â€™11 lines (12 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -512,7 +578,7 @@
   },
   {
     "id": "bug-031",
-    "timestamp": "2026-05-26T16:58:00.000Z",
+    "timestamp": "2026-05-26T16:58:00Z",
     "error_message": "Windows build.bat failed on clean environment and later lost firmware artifacts during buildfs phase",
     "file": "build.bat, build.py",
     "root_cause": "build.bat required preinstalled Python and embedded Python lacked repo import path; build.py esptool auto-install could fail without setuptools/wheel; and PlatformIO buildfs on Windows could clean .pio artifacts causing missing firmware.bin before merge step.",
@@ -526,7 +592,7 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-26T16:58:00.000Z"
+    "last_seen": "2026-05-26T16:58:00Z"
   },
   {
     "id": "bug-033",
@@ -534,7 +600,7 @@
     "error_message": "Wrong reference: 066 should be 097",
     "file": "docs/adr/ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md",
     "root_cause": "Used \"066\" instead of \"097\"",
-    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "fix": "Changed 066 Ã¢â€ â€™ 097",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -550,7 +616,7 @@
     "error_message": "Wrong reference: 066 should be 097",
     "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
     "root_cause": "Used \"066\" instead of \"097\"",
-    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "fix": "Changed 066 Ã¢â€ â€™ 097",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -566,7 +632,7 @@
     "error_message": "Wrong reference: 066 should be 097",
     "file": "docs/adr/ADR-095-bseparatesources-mutually-exclusive-base-and-source-variants.md",
     "root_cause": "Used \"066\" instead of \"097\"",
-    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "fix": "Changed 066 Ã¢â€ â€™ 097",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -574,7 +640,7 @@
     ],
     "related_bugs": [],
     "occurrences": 3,
-    "last_seen": "2026-05-27T10:23:12.880Z"
+    "last_seen": "2026-05-27T10:23:12.88Z"
   },
   {
     "id": "bug-036",
@@ -582,7 +648,7 @@
     "error_message": "Wrong reference: 066 should be 097",
     "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
     "root_cause": "Used \"066\" instead of \"097\"",
-    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "fix": "Changed 066 Ã¢â€ â€™ 097",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -597,8 +663,8 @@
     "timestamp": "2026-05-27T10:25:04.195Z",
     "error_message": "Incorrect value in code",
     "file": "docs/adr/ADR-096-mqtt-source-topic-worldview-semantics.md",
-    "root_cause": "Had 's source semantics (publication-source \u00e2\u2020\u2019 worldvie",
-    "fix": "Changed to 's source semantics (publication-source \u00e2\u2020\u2019 worldvie",
+    "root_cause": "Had 's source semantics (publication-source Ã¢â€ â€™ worldvie",
+    "fix": "Changed to 's source semantics (publication-source Ã¢â€ â€™ worldvie",
     "tags": [
       "auto-detected",
       "wrong-value",
@@ -614,7 +680,7 @@
     "error_message": "Wrong reference: 066 should be 097",
     "file": "docs/api/MQTT.md",
     "root_cause": "Used \"066\" instead of \"097\"",
-    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "fix": "Changed 066 Ã¢â€ â€™ 097",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -626,11 +692,11 @@
   },
   {
     "id": "bug-039",
-    "timestamp": "2026-05-27T10:25:38.940Z",
+    "timestamp": "2026-05-27T10:25:38.94Z",
     "error_message": "Wrong reference: 066 should be 097",
     "file": "src/OTGW-firmware/MQTTstuff.ino",
     "root_cause": "Used \"066\" instead of \"097\"",
-    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "fix": "Changed 066 Ã¢â€ â€™ 097",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -646,7 +712,7 @@
     "error_message": "Wrong reference: 066 should be 097",
     "file": "src/OTGW-firmware/OTGW-Core.h",
     "root_cause": "Used \"066\" instead of \"097\"",
-    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "fix": "Changed 066 Ã¢â€ â€™ 097",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -658,11 +724,11 @@
   },
   {
     "id": "bug-041",
-    "timestamp": "2026-05-27T10:26:02.710Z",
+    "timestamp": "2026-05-27T10:26:02.71Z",
     "error_message": "Wrong reference: 066 should be 097",
     "file": "src/OTGW-firmware/OTGW-Core.ino",
     "root_cause": "Used \"066\" instead of \"097\"",
-    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "fix": "Changed 066 Ã¢â€ â€™ 097",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -678,7 +744,7 @@
     "error_message": "Wrong reference: 066 should be 097",
     "file": "docs/adr/ADR-103-mqtt-source-topic-proxy-answer-routing.md",
     "root_cause": "Used \"066\" instead of \"097\"",
-    "fix": "Changed 066 \u00e2\u2020\u2019 097",
+    "fix": "Changed 066 Ã¢â€ â€™ 097",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -694,7 +760,7 @@
     "error_message": "Wrong reference: Proposed should be Accepted",
     "file": "docs/adr/ADR-097-mqtt-publish-gating-by-source-and-slave-echo.md",
     "root_cause": "Used \"Proposed\" instead of \"Accepted\"",
-    "fix": "Changed Proposed \u00e2\u2020\u2019 Accepted",
+    "fix": "Changed Proposed Ã¢â€ â€™ Accepted",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -710,7 +776,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/OTDirect.ino",
     "root_cause": "2 lines replaced/restructured",
-    "fix": "Rewrote 9\u00e2\u2020\u201912 lines (2 removed)",
+    "fix": "Rewrote 9Ã¢â€ â€™12 lines (2 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -743,7 +809,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/data/index.js",
     "root_cause": "2 lines replaced/restructured",
-    "fix": "Rewrote 5\u21929 lines (2 removed)",
+    "fix": "Rewrote 5â†’9 lines (2 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -771,7 +837,7 @@
   },
   {
     "id": "bug-048",
-    "timestamp": "2026-05-27T22:19:37.940Z",
+    "timestamp": "2026-05-27T22:19:37.94Z",
     "error_message": "Wrong condition in logic",
     "file": "src/OTGW-firmware/OLED.ino",
     "root_cause": "Condition was: if (oledPage >= OLED_NUM_PAGES)",
@@ -783,14 +849,14 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-27T22:19:37.940Z"
+    "last_seen": "2026-05-27T22:19:37.94Z"
   },
   {
     "id": "bug-049",
     "timestamp": "2026-05-27T22:25:36.533Z",
     "error_message": "Missing error handling in ipMakeOctetGroup",
     "file": "src/OTGW-firmware/data/index.js",
-    "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+    "root_cause": "Code path had no error handling â€” exceptions would propagate uncaught",
     "fix": "Added try/catch block",
     "tags": [
       "auto-detected",
@@ -815,7 +881,7 @@
     ],
     "related_bugs": [],
     "occurrences": 2,
-    "last_seen": "2026-05-27T23:39:56.770Z"
+    "last_seen": "2026-05-27T23:39:56.77Z"
   },
   {
     "id": "bug-051",
@@ -838,8 +904,8 @@
     "timestamp": "2026-05-28T11:29:20.089Z",
     "error_message": "CSS fix: margin, padding, color",
     "file": "src/OTGW-firmware/data/components.css",
-    "root_cause": "margin: 0 0 var(--space-2) \u2192 0 0 var(--space-4); padding: var(--space-5) \u2192 var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) \u2192 var(--fg-2)",
-    "fix": "Changed margin: 0 0 var(--space-2) \u2192 0 0 var(--space-4); padding: var(--space-5) \u2192 var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) \u2192 var(--fg-2)",
+    "root_cause": "margin: 0 0 var(--space-2) â†’ 0 0 var(--space-4); padding: var(--space-5) â†’ var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) â†’ var(--fg-2)",
+    "fix": "Changed margin: 0 0 var(--space-2) â†’ 0 0 var(--space-4); padding: var(--space-5) â†’ var(--space-1) var(--space-4) var(--space-1) var(--space-2); color: var(--fg-1) â†’ var(--fg-2)",
     "tags": [
       "auto-detected",
       "style-fix",
@@ -854,8 +920,8 @@
     "timestamp": "2026-05-28T12:05:42.392Z",
     "error_message": "CSS fix: grid-template-columns",
     "file": "src/OTGW-firmware/data/components.css",
-    "root_cause": "grid-template-columns: max-content 1fr \u2192 var(--settings-label-w, max-content) 1fr",
-    "fix": "Changed grid-template-columns: max-content 1fr \u2192 var(--settings-label-w, max-content) 1fr",
+    "root_cause": "grid-template-columns: max-content 1fr â†’ var(--settings-label-w, max-content) 1fr",
+    "fix": "Changed grid-template-columns: max-content 1fr â†’ var(--settings-label-w, max-content) 1fr",
     "tags": [
       "auto-detected",
       "style-fix",
@@ -887,7 +953,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/data/graph.js",
     "root_cause": "5 lines replaced/restructured",
-    "fix": "Rewrote 5\u21928 lines (5 removed) | Also: // the --fg-2 design token (ds-tokens.css) so it t; // (light = #4a4d50, dark = #e0e0e0). Fallback han",
+    "fix": "Rewrote 5â†’8 lines (5 removed) | Also: // the --fg-2 design token (ds-tokens.css) so it t; // (light = #4a4d50, dark = #e0e0e0). Fallback han",
     "tags": [
       "auto-detected",
       "refactor",
@@ -902,7 +968,7 @@
     "timestamp": "2026-05-29T06:18:37.847Z",
     "error_message": "Missing error handling in renderBleRosterError",
     "file": "src/OTGW-firmware/data/index.js",
-    "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+    "root_cause": "Code path had no error handling â€” exceptions would propagate uncaught",
     "fix": "Added try/catch block",
     "tags": [
       "auto-detected",
@@ -992,7 +1058,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/OLED.ino",
     "root_cause": "4 lines replaced/restructured",
-    "fix": "Rewrote 17\u219223 lines (4 removed) | Also: // Auto-off after timeout; if (oledPage != 0 && (now - oledLastActivity) >= O",
+    "fix": "Rewrote 17â†’23 lines (4 removed) | Also: // Auto-off after timeout; if (oledPage != 0 && (now - oledLastActivity) >= O",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1088,7 +1154,7 @@
     "error_message": "Wrong reference: Proposed should be Accepted",
     "file": "docs/adr/ADR-113-hardware-type-codepath-selection-contract.md",
     "root_cause": "Used \"Proposed\" instead of \"Accepted\"",
-    "fix": "Changed Proposed \u2192 Accepted",
+    "fix": "Changed Proposed â†’ Accepted",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -1123,7 +1189,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/settingStuff.ino",
     "root_cause": "12 lines replaced/restructured",
-    "fix": "Rewrote 13\u21925 lines (12 removed)",
+    "fix": "Rewrote 13â†’5 lines (12 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1139,7 +1205,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/OTGW-firmware.ino",
     "root_cause": "3 lines replaced/restructured",
-    "fix": "Rewrote 7\u219211 lines (3 removed)",
+    "fix": "Rewrote 7â†’11 lines (3 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1155,7 +1221,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/data/index.js",
     "root_cause": "3 lines replaced/restructured",
-    "fix": "Rewrote 6\u21929 lines (3 removed)",
+    "fix": "Rewrote 6â†’9 lines (3 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1171,7 +1237,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/OLED.ino",
     "root_cause": "6 lines replaced/restructured",
-    "fix": "Rewrote 12\u21925 lines (6 removed) | Also: #if defined(ESP32); static QueueHandle_t _oledBtnQueue = nullptr; | Also: // Button ISR for page cycling \u2014 ESP-IDF GPIO API ; // Queue carries the press timestamp (us); debounc",
+    "fix": "Rewrote 12â†’5 lines (6 removed) | Also: #if defined(ESP32); static QueueHandle_t _oledBtnQueue = nullptr; | Also: // Button ISR for page cycling â€” ESP-IDF GPIO API ; // Queue carries the press timestamp (us); debounc",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1183,7 +1249,7 @@
   },
   {
     "id": "bug-073",
-    "timestamp": "2026-05-29T11:10:00.000Z",
+    "timestamp": "2026-05-29T11:10:00Z",
     "error_message": "cc1plus.exe: fatal error: src/OTGW-firmware/OTGW-firmware.ino.cpp: No such file or directory (esp32 firmware FAILED)",
     "file": ".pio/build/esp32",
     "root_cause": "Ran 'pio run -e esp8266' and 'pio run -e esp32' in parallel in the same worktree. The arduino sketch-concat step (.ino -> .ino.cpp) shares an intermediate across envs, so the two concurrent runs raced and the esp32 .ino.cpp was missing at compile time. Separate .pio/build/<env> dirs are NOT enough isolation; the concat step collides. Filesystem builds (buildfs, no concat) parallelize fine.",
@@ -1198,7 +1264,7 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-29T11:10:00.000Z"
+    "last_seen": "2026-05-29T11:10:00Z"
   },
   {
     "id": "bug-074",
@@ -1206,7 +1272,7 @@
     "error_message": "Significant refactor of ",
     "file": "C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/feedback_default_milestone_2_0_0.md",
     "root_cause": "3 lines replaced/restructured",
-    "fix": "Rewrote 5\u21925 lines (3 removed)",
+    "fix": "Rewrote 5â†’5 lines (3 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1258,7 +1324,7 @@
     "error_message": "Wrong operator: || should be !=",
     "file": "src/OTGW-firmware/SATble.ino",
     "root_cause": "Used \"||\" instead of \"!=\"",
-    "fix": "Changed operator || \u2192 !=",
+    "fix": "Changed operator || â†’ !=",
     "tags": [
       "auto-detected",
       "operator-fix",
@@ -1330,15 +1396,15 @@
     ],
     "related_bugs": [],
     "occurrences": 2,
-    "last_seen": "2026-05-29T18:01:15.360Z"
+    "last_seen": "2026-05-29T18:01:15.36Z"
   },
   {
     "id": "bug-082",
-    "timestamp": "2026-05-29T18:28:06.290Z",
+    "timestamp": "2026-05-29T18:28:06.29Z",
     "error_message": "Significant refactor of ",
     "file": "../adr-kit/templates/githooks/pre-commit",
     "root_cause": "3 lines replaced/restructured",
-    "fix": "Rewrote 6\u219211 lines (3 removed)",
+    "fix": "Rewrote 6â†’11 lines (3 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1346,14 +1412,14 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-29T18:28:06.290Z"
+    "last_seen": "2026-05-29T18:28:06.29Z"
   },
   {
     "id": "bug-083",
     "timestamp": "2026-05-29T18:44:48.721Z",
     "error_message": "Missing error handling in start",
     "file": "src/OTGW-firmware/data/sat.js",
-    "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+    "root_cause": "Code path had no error handling â€” exceptions would propagate uncaught",
     "fix": "Added try/catch block",
     "tags": [
       "auto-detected",
@@ -1366,11 +1432,11 @@
   },
   {
     "id": "bug-084",
-    "timestamp": "2026-05-29T19:17:57.290Z",
+    "timestamp": "2026-05-29T19:17:57.29Z",
     "error_message": "CSS fix: Light, --input-bg, --input-bg-changed",
     "file": "src/OTGW-firmware/data/ds-tokens.css",
-    "root_cause": "Light: white on the \u2192 keep the white field on the light-blue rows. */; --input-bg: #ffffff \u2192 var(--bg-surface); --input-bg-changed: #e6e8ea \u2192 var(--bg-muted)",
-    "fix": "Changed Light: white on the \u2192 keep the white field on the light-blue rows. */; --input-bg: #ffffff \u2192 var(--bg-surface); --input-bg-changed: #e6e8ea \u2192 var(--bg-muted)",
+    "root_cause": "Light: white on the â†’ keep the white field on the light-blue rows. */; --input-bg: #ffffff â†’ var(--bg-surface); --input-bg-changed: #e6e8ea â†’ var(--bg-muted)",
+    "fix": "Changed Light: white on the â†’ keep the white field on the light-blue rows. */; --input-bg: #ffffff â†’ var(--bg-surface); --input-bg-changed: #e6e8ea â†’ var(--bg-muted)",
     "tags": [
       "auto-detected",
       "style-fix",
@@ -1378,15 +1444,15 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-29T19:17:57.290Z"
+    "last_seen": "2026-05-29T19:17:57.29Z"
   },
   {
     "id": "bug-085",
-    "timestamp": "2026-05-29T19:18:25.760Z",
+    "timestamp": "2026-05-29T19:18:25.76Z",
     "error_message": "CSS fix: background",
     "file": "src/OTGW-firmware/data/components.css",
-    "root_cause": "background: var(--bg-surface) \u2192 var(--input-bg)",
-    "fix": "Changed background: var(--bg-surface) \u2192 var(--input-bg)",
+    "root_cause": "background: var(--bg-surface) â†’ var(--input-bg)",
+    "fix": "Changed background: var(--bg-surface) â†’ var(--input-bg)",
     "tags": [
       "auto-detected",
       "style-fix",
@@ -1398,11 +1464,11 @@
   },
   {
     "id": "bug-086",
-    "timestamp": "2026-05-29T20:26:48.100Z",
+    "timestamp": "2026-05-29T20:26:48.1Z",
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/MQTTstuff.ino",
     "root_cause": "4 lines replaced/restructured",
-    "fix": "Rewrote 7\u21926 lines (4 removed)",
+    "fix": "Rewrote 7â†’6 lines (4 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1410,7 +1476,7 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-05-29T20:26:48.100Z"
+    "last_seen": "2026-05-29T20:26:48.1Z"
   },
   {
     "id": "bug-087",
@@ -1487,7 +1553,7 @@
     "error_message": "Wrong reference: ESP should be platformFreeHeap",
     "file": "src/OTGW-firmware/OLED.ino",
     "root_cause": "Used \"ESP\" instead of \"platformFreeHeap\"",
-    "fix": "Changed ESP \u2192 platformFreeHeap",
+    "fix": "Changed ESP â†’ platformFreeHeap",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -1503,7 +1569,7 @@
     "error_message": "Wrong reference: ifndef should be HAS_WEATHER_FORECAST",
     "file": "src/OTGW-firmware/SATweather.ino",
     "root_cause": "Used \"ifndef\" instead of \"HAS_WEATHER_FORECAST\"",
-    "fix": "Changed ifndef \u2192 HAS_WEATHER_FORECAST",
+    "fix": "Changed ifndef â†’ HAS_WEATHER_FORECAST",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -1519,7 +1585,7 @@
     "error_message": "Wrong reference: defined should be HAS_SAT_BLE",
     "file": "src/OTGW-firmware/SATble.ino",
     "root_cause": "Used \"defined\" instead of \"HAS_SAT_BLE\"",
-    "fix": "Changed defined \u2192 HAS_SAT_BLE",
+    "fix": "Changed defined â†’ HAS_SAT_BLE",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -1535,7 +1601,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/restAPI.ino",
     "root_cause": "9 lines replaced/restructured",
-    "fix": "Rewrote 9\u21924 lines (9 removed)",
+    "fix": "Rewrote 9â†’4 lines (9 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1551,7 +1617,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/handleDebug.ino",
     "root_cause": "9 lines replaced/restructured",
-    "fix": "Rewrote 9\u21924 lines (9 removed)",
+    "fix": "Rewrote 9â†’4 lines (9 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1583,7 +1649,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/SATtypes.h",
     "root_cause": "3 lines replaced/restructured",
-    "fix": "Rewrote 11\u219213 lines (3 removed) | Also: #if defined(ESP32); // BLE temperature sensor (Task #20, ESP32 only)",
+    "fix": "Rewrote 11â†’13 lines (3 removed) | Also: #if defined(ESP32); // BLE temperature sensor (Task #20, ESP32 only)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1599,7 +1665,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/settingStuff.ino",
     "root_cause": "2 lines replaced/restructured",
-    "fix": "Rewrote 3\u21924 lines (2 removed)",
+    "fix": "Rewrote 3â†’4 lines (2 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1615,7 +1681,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/OTGW-firmware.h",
     "root_cause": "2 lines replaced/restructured",
-    "fix": "Rewrote 4\u21926 lines (2 removed)",
+    "fix": "Rewrote 4â†’6 lines (2 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1631,7 +1697,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/SATcontrol.ino",
     "root_cause": "3 lines replaced/restructured",
-    "fix": "Rewrote 5\u21924 lines (3 removed) | Also: #if defined(ESP32); #endif | Also: #if defined(ESP32); // Initialize BLE sensor scanning (Task #20)",
+    "fix": "Rewrote 5â†’4 lines (3 removed) | Also: #if defined(ESP32); #endif | Also: #if defined(ESP32); // Initialize BLE sensor scanning (Task #20)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1647,7 +1713,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/OLED.ino",
     "root_cause": "10 lines replaced/restructured",
-    "fix": "Rewrote 23\u219227 lines (10 removed)",
+    "fix": "Rewrote 23â†’27 lines (10 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1663,7 +1729,7 @@
     "error_message": "Significant refactor of ",
     "file": "src/OTGW-firmware/SATcycles.ino",
     "root_cause": "7 lines replaced/restructured",
-    "fix": "Rewrote 9\u21923 lines (7 removed) | Also: // 180 slots on ESP32 = 180s tail. ESP8266 caps at; #if defined(ESP8266) | Also: // ESP8266:   7 days x 4 bytes =   28 bytes SRAM (; // ESP32:    30 days x 4 bytes =  120 bytes SRAM ( | Also: #if defined(ESP8266); static uint8_t  _flow_sampleHead  = 0;  // next wr | Also: #if defined(ESP8266); static uint8_t  _hcr_sHead    = 0;          // nex",
+    "fix": "Rewrote 9â†’3 lines (7 removed) | Also: // 180 slots on ESP32 = 180s tail. ESP8266 caps at; #if defined(ESP8266) | Also: // ESP8266:   7 days x 4 bytes =   28 bytes SRAM (; // ESP32:    30 days x 4 bytes =  120 bytes SRAM ( | Also: #if defined(ESP8266); static uint8_t  _flow_sampleHead  = 0;  // next wr | Also: #if defined(ESP8266); static uint8_t  _hcr_sHead    = 0;          // nex",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1679,7 +1745,7 @@
     "error_message": "Wrong reference: SAT_WIN4H_SIZE should be buffer",
     "file": "src/OTGW-firmware/SATtypes.h",
     "root_cause": "Used \"SAT_WIN4H_SIZE\" instead of \"buffer\"",
-    "fix": "Changed SAT_WIN4H_SIZE \u2192 buffer",
+    "fix": "Changed SAT_WIN4H_SIZE â†’ buffer",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -1695,7 +1761,7 @@
     "error_message": "Wrong reference: 109 should be 061",
     "file": "docs/adr/ADR-117-per-board-constants-in-boards-h.md",
     "root_cause": "Used \"109\" instead of \"061\"",
-    "fix": "Changed 109 \u2192 061",
+    "fix": "Changed 109 â†’ 061",
     "tags": [
       "auto-detected",
       "wrong-reference",
@@ -1711,7 +1777,7 @@
     "error_message": "Significant refactor of ",
     "file": "docs/adr/ADR-115-per-board-constants-in-boards-h.md",
     "root_cause": "2 lines replaced/restructured",
-    "fix": "Rewrote 6\u219218 lines (2 removed)",
+    "fix": "Rewrote 6â†’18 lines (2 removed)",
     "tags": [
       "auto-detected",
       "refactor",
@@ -1754,5 +1820,227 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-05-30"
+  },
+  {
+    "id": "bug-108",
+    "timestamp": "2026-06-01T20:30:00Z",
+    "error_message": "MQTTHaDiscovery.cpp: 'OTlookup_t'/'OTmap'/'OT_MSGID_MAX'/'PROGMEM_readAnything' was not declared in this scope (esp8266 FAILED, build.py exited 0 masking it)",
+    "file": "src/OTGW-firmware/MQTTHaDiscovery.cpp",
+    "root_cause": "MQTTHaDiscovery.cpp is a separate .cpp translation unit that only includes MQTTstuff.h + platform.h, NOT OTGW-Core.h, so OTmap and the OTlookup helpers (visible to .ino files in the single Arduino TU) are not declared there.",
+    "fix": "Do not resolve the OTmap label inside the .cpp. Pass the label string as a const char* parameter to streamOverrideSensorDiscovery; the dispatcher in MQTTstuff.ino (a .ino, sees OTmap) resolves it via messageIDToString and passes it in.",
+    "tags": [
+      "build",
+      "translation-unit",
+      "cpp-vs-ino",
+      "OTmap",
+      "ADR-118",
+      "TASK-806"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-01T20:30:00Z"
+  },
+  {
+    "id": "bug-109",
+    "timestamp": "2026-06-02T19:20:00Z",
+    "error_message": "Settings page: static-IP rows show only 2 of 4 octet inputs, octets stretched, field labels wrap to two lines",
+    "file": "src/OTGW-firmware/data/components.css",
+    "root_cause": ".fixed-ip-section is a .settingDiv direct child of .settings-group-body, so the broad fill rule \".settings-group-body > .settingDiv input[type=text] { flex:1; min-width:80px }\" (components.css:791) matches the nested .octet-input fields and overrides their 38px width. Four stretched octets overflow the 520px card and wrap; .fixed-ip-section overflow:hidden clips the second row.",
+    "fix": "Added higher-specificity reset \".settings-group-body > .settingDiv .octet-group .octet-input { flex:0 0 auto; min-width:0; width:38px }\" plus \".fixed-ip-fields .fixed-ip-row > .fixed-ip-field-label { flex:1 1 auto; min-width:0 }\" so the four octets fit one compact box and the label takes the row slack.",
+    "tags": [
+      "webui",
+      "css",
+      "settings",
+      "static-ip",
+      "octet",
+      "overflow",
+      "TASK-814"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-02T19:20:00Z"
+  },
+  {
+    "id": "bug-110",
+    "timestamp": "2026-06-02T20:05:00Z",
+    "error_message": "Static-IP octet inputs clip 3-digit values (192 shows 19, 255 shows 25) after the overflow fix",
+    "file": "src/OTGW-firmware/data/components.css",
+    "root_cause": "Generic .settingDiv input[type=text] { font-size:12pt } (specificity 0,2,1) outweighs .octet-input { font-size: var(--fs-sm) } (0,1,0). Octets rendered at 12pt and overran the 38px box, hiding the third digit.",
+    "fix": "Added font-size:var(--fs-sm) to the higher-specificity octet reset (.settings-group-body > .settingDiv .octet-group .octet-input) and widened width 38px->42px.",
+    "tags": [
+      "webui",
+      "css",
+      "settings",
+      "static-ip",
+      "octet",
+      "font-size",
+      "specificity",
+      "TASK-814"
+    ],
+    "related_bugs": [
+      "bug-109"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-06-02T20:05:00Z"
+  },
+  {
+    "id": "bug-111",
+    "timestamp": "2026-06-03T12:00:00Z",
+    "error_message": "SAT narration lines (prefix S) would mis-parse as garbled OT frames in the Web UI live-log; SAT-only filter predicate (d.source===S) never matched",
+    "file": "src/OTGW-firmware/data/index.js",
+    "root_cause": "parseLogLine event-prefix regex only recognized > < ! * — not S. SAT lines fell through to the fixed-width OT-frame column parser, so source became the first 18 chars, not S, and the line rendered as a malformed frame.",
+    "fix": "Extended the event regex to /^([><!*S]) (.*)/ so S lines parse as events {isEvent:true, prefix:S, label:msg}; filter predicate became isEvent && prefix===S. Caught because the original Playwright test only seeded strings (false confidence); rewrote it to seed production parsed objects.",
+    "tags": [
+      "webui",
+      "log-parser",
+      "sat",
+      "TASK-815",
+      "test-coverage",
+      "false-confidence"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-03T12:00:00Z"
+  },
+  {
+    "id": "bug-112",
+    "timestamp": "2026-06-03T16:00:00Z",
+    "error_message": "OTGW32 SAT dashboard tiles all show '--' (NaN). Browser console: sat.js:156 [SAT] fetch error: SyntaxError: Unterminated fractional number in JSON at position 4096 / Expected ',' or '}' after property value. Field report @sergeantd, alpha.150, only after enabling+selecting a BLE sensor. Values fill briefly then disappear. (TASK-764)",
+    "file": "src/OTGW-firmware/SATble.ino",
+    "root_cause": "satBLESendStatusJSON() (called mid-stream by satSendStatusJSON) emitted ble_temp and ble_humidity via raw httpServer.sendContent(json) instead of restSendContent(json). On ESP32 (HAS_REST_TX_COALESCING=1) REST output is batched into a 4096-byte coalescing buffer (sTxBuf, jsonStuff.ino). A raw httpServer.sendContent flushes its chunk to the wire IMMEDIATELY, jumping ahead of the ~4KB of SAT fields still buffered in sTxBuf, so the JSON bytes hit the wire OUT OF ORDER -> scrambled JSON -> JSON.parse fails around the 4095-byte flush boundary (~position 4096). Only manifests on ESP32 (ESP8266 flushes inline, same order), only on the >4KB SAT status response, and only when state.sat.bBleTempValid is true (raw branch executes). Server logs 200/chunks=3 with valid data (room=19.5 outside=8.4) -- only wire order was wrong, not the data. The sibling satBLERosterSendJSON() was already fixed for this exact gotcha (its comment at SATble.ino:750-753 documents it); satBLESendStatusJSON was missed.",
+    "fix": "Replaced the two raw httpServer.sendContent(json) calls at SATble.ino:696 and :700 with restSendContent(json) so ble_temp/ble_humidity route through the same coalescing buffer as every other field, preserving wire order.",
+    "tags": [
+      "sat",
+      "ble",
+      "webui",
+      "esp32",
+      "otgw32",
+      "rest-api",
+      "json",
+      "coalescing-buffer",
+      "out-of-order",
+      "field-report",
+      "TASK-764",
+      "2.0.0"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-03T16:00:00Z"
+  },
+  {
+    "id": "bug-113",
+    "timestamp": "2026-06-05T00:40:00Z",
+    "error_message": "OTGW32 web UI 'cannot find sat-slider.js' (and index.js, sat.js, css) - resources never load in the browser, alpha.160.",
+    "file": "src/OTGW-firmware (webserver, not the filesystem)",
+    "root_cause": "NOT a 404 / not a stale LittleFS image. sat-slider.js fetched in isolation returns 200/1736 bytes/679ms - the file is present and serves fine. The browser fires ~8 local sub-resource requests in parallel after index.html; the OTGW32 single-threaded webserver starves and the sub-resource requests stall and never complete (no-response) while the page document (200) and the external echarts CDN (274ms) succeed. Same root as the XHR latency ramp (/device/time + /otgw/otmonitor climbing 85ms->7000ms). Proven via the new headless-Edge CDP capture: every local .css/.js shows PENDING/never-finished in a 30s window.",
+    "fix": "Diagnosis only (TASK-821 added the capture tooling that proved it). Real fix is server-side webui responsiveness / HTTP multi-connect drain - TASK-817 territory, not the filesystem. Do NOT chase this as a missing-file/rebuild-LittleFS problem.",
+    "tags": [
+      "webui",
+      "esp32",
+      "otgw32",
+      "webserver",
+      "starvation",
+      "latency-ramp",
+      "sat-slider",
+      "diagnosis",
+      "TASK-821",
+      "TASK-817",
+      "2.0.0"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-05T00:40:00Z"
+  },
+  {
+    "id": "bug-117",
+    "timestamp": "2026-06-10",
+    "error_message": "Version banners drifted (alpha.165 in headers vs alpha.170 in version.h); user saw different build numbers",
+    "file": "bin/bump-prerelease.sh, CLAUDE.md",
+    "root_cause": "Documented bump commit step staged only version.h + data/version.hash; banner updates autoinc-semver.py wrote into ~43 files stayed uncommitted",
+    "fix": "bump-prerelease.sh runs autoinc-semver.py --update-all --print-updated and git-adds every touched file; CLAUDE.md instructions updated; pending drift committed as sync commit 18a5cc96",
+    "tags": [
+      "versioning",
+      "tooling",
+      "semver",
+      "drift"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-10"
+  },
+  {
+    "id": "bug-118",
+    "timestamp": "2026-06-10",
+    "error_message": "fatal: pathspec 'src/OTGW-firmware/version.h?' did not match any files",
+    "file": "bin/bump-prerelease.sh",
+    "root_cause": "Windows Python prints \\r\\n; bash while-read kept trailing \\r in filename, git add pathspec failed",
+    "fix": "strip CR in read loop: f=${f%$'\\r'}",
+    "tags": [
+      "bash",
+      "windows",
+      "crlf",
+      "tooling"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-10"
+  },
+  {
+    "id": "bug-119",
+    "timestamp": "2026-06-12T00:00:00+02:00",
+    "error_message": "PIC not recognized at all on 2.0.0 esp32-classic (LOLIN S3 Mini on OTGW Classic): 'no pic found', HW_MODE_DEGRADED, zero OT frames over 14.9h, ~893 unanswered PR=A probes",
+    "file": "platformio.ini / src/libraries/OTGWSerial/OTGWSerial.cpp:842-845",
+    "root_cause": "OTGWSerial.cpp ESP32 branch guards UART pin choice with #if defined(PIN_PIC_RX)&&defined(PIN_PIC_TX), but boards.h is not in that translation unit's include chain and [env:esp32-classic] passes no -DPIN_PIC_RX/-DPIN_PIC_TX, so the fallback begin(9600,SERIAL_8N1,16,17) compiled in: GPIO16=PIN_LED1 (ledc PWM fights RX), GPIO17=inner-row unconnected. boards.h map itself (RX=44,TX=43) is correct per footprint. Proven via .pio/build/esp32-classic/lib244/OTGWSerial/OTGWSerial.cpp.d containing zero boards.h entries. Also explains why ADR-125 combo detection never converged (combo env equally lacked the flags).",
+    "fix": "PROPOSED (not yet applied): add -DPIN_PIC_RX=44 -DPIN_PIC_TX=43 to [env:esp32-classic] build_flags in platformio.ini; no vendored-lib edit needed",
+    "tags": [
+      "esp32-classic",
+      "pic-detect",
+      "uart",
+      "translation-unit",
+      "boards.h",
+      "platformio",
+      "vendored-lib"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-12T00:00:00+02:00"
+  },
+  {
+    "id": "bug-120",
+    "timestamp": "2026-06-12T00:40:00+02:00",
+    "error_message": "python build.py failed: FileExistsError WinError 183 renaming OTGW-firmware-esp32-otgw32.ino.bin to versioned name during esp32-classic artifact collection",
+    "file": "build.py:120-124",
+    "root_cause": "TARGETS['esp32-classic'] built via {**TARGETS['esp32'], ...} dict spread inherited slug='esp32-otgw32' (slug added by TASK-856 after the spread was written in TASK-854). asset_slug('esp32-classic') returned the otgw32 token, so Classic artifacts copied over the OTGW32 asset names and the version-rename collided. Stale comment claimed filenames derive from the target key.",
+    "fix": "Explicit slug 'esp32-classic' added to the esp32-classic TARGETS entry + comment corrected (TASK-863)",
+    "tags": [
+      "build.py",
+      "asset-naming",
+      "dict-spread-inheritance",
+      "esp32-classic",
+      "TASK-856",
+      "TASK-863"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-12T00:40:00+02:00"
+  },
+  {
+    "id": "bug-121",
+    "timestamp": "2026-06-13T00:00:00",
+    "error_message": "TASK-864 combo revival: planned 'if (!isPICEnabled()) initEthernet()' gate not restored; ungated W5500 probe clocks GPIO12 = PIC reset hole on Classic PCB",
+    "file": "src/OTGW-firmware/OTGW-firmware.ino",
+    "root_cause": "Revival reconstructed detection block from ec55a1fb diff but the Ethernet-gate hunk sat in a different section of setup(); missed during manual revert-adaptation",
+    "fix": "Restored explicit isPICEnabled() gate around initEthernet(); ADR-127 Decision 6 updated. Caught by adr-generator verification pass (code-vs-claim check)",
+    "tags": [
+      "combo",
+      "ADR-127",
+      "ethernet",
+      "GPIO12",
+      "pic-reset",
+      "revert-reconstruction"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-13T00:00:00"
   }
 ]

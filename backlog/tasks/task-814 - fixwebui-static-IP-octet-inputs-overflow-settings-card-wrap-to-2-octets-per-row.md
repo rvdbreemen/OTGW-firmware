@@ -3,11 +3,11 @@ id: TASK-814
 title: >-
   fix(webui): static-IP octet inputs overflow settings card, wrap to 2 octets
   per row
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-02 17:14'
-updated_date: '2026-06-02 21:48'
+updated_date: '2026-06-02 21:58'
 labels: []
 dependencies: []
 ---
@@ -38,5 +38,5 @@ Polish (alpha.145): octets showed full digits but rendered as 4 fat separate bor
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Two-part fix. (1) alpha.143: higher-specificity reset stops the broad input-fill rule stretching the octets so all four fit one row. (2) alpha.144: re-assert font-size:var(--fs-sm) (the generic 12pt rule was winning and clipping 3-digit octets) and widen 38->42px. Octets now show full 192/255 values. ADR-091 drift gate green, evaluator 0-fail.
+Three iterations to the right look (alpha.143/144/145). Final: higher-specificity octet reset stops the broad input-fill rule AND the base input[type=text] border/padding/bg/font from leaking onto octets; the four octets render borderless inside one .octet-group border = compact '192 . 168 . 88 . 16' segmented field, right-aligned, no clipping. Playwright+Chrome validated across mobile/tablet/desktop (values, no clip, single border, fits card, edit+save round-trips dotted IP). Touch-target advisory (36x26px) noted for optional later mobile bump.
 <!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,7 +1,7 @@
 ---
 id: TASK-801
 title: 'feat-2.0.0: SAT sim F6 — command-trace ring buffer'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:56'
@@ -43,3 +43,9 @@ OPEN QUESTION (morning): ring size 16 vs 10; expose full ring over REST array or
 
 VERIFY: build both; evaluate --quick; with bSimulation, issue >16 blocked commands and confirm the ring holds the last 16 in order via REST.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-01T12:48:49+02:00: DONE — shipped 30340ea6 (alpha.127, pushed). 16-slot trace ring in SATRuntimeSection; push at gate write-site; teardown clears it; REST last_blocked_cmds[] newest-first array. MQTT single-slot unchanged (plan default). All 4 ACs met, build esp8266+esp32 SUCCESS fw+fs, eval 0-fail. No hardware gate (REST-observable). NOTE: one typo caught by build (sSimTraceMs vs iSimTraceMs at the push-site sizeof) — fixed, rebuilt green.
+<!-- SECTION:NOTES:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-761
 title: 'fix(sat/otdirect): SAT must be sole TSet (MsgID 1) writer when active'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-29 17:17'
-updated_date: '2026-05-29 17:27'
+updated_date: '2026-05-29 18:05'
 labels:
   - sat
   - otdirect
@@ -40,7 +40,7 @@ Root cause located: loopCHHysteresis() ALREADY bypasses when state.sat.bActive (
 - [x] #2 When SAT is inactive, OTDirect TSet control is unchanged (no regression to PIC-parity room-comp / heating-curve behaviour)
 - [x] #3 Guard mirrors the existing loopCHHysteresis() SAT bypass (state.sat.bActive, gated by HAS_SAT)
 - [x] #4 python build.py green for ESP32 (OTGW32) and ESP8266; python evaluate.py --quick shows no new failures
-- [ ] #5 Field-validated by @sergeantd on OTGW32: with SAT enabled, TSet no longer flip-flops (single writer); recovers normal OTDirect control when SAT disabled
+- [x] #5 Field-validated by @sergeantd on OTGW32: with SAT enabled, TSet no longer flip-flops (single writer); recovers normal OTDirect control when SAT disabled
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -58,3 +58,9 @@ Implemented SAT bypass guard in doOTDirectLoop() (OTDirect.ino:2000). Bumped pre
 
 Build green: ESP32 .ino.bin 1.79MB + ESP8266 .ino.bin 0.84MB + both LittleFS images produced (alpha.93+a0b4fc2). AC#1-4 done. AC#5 field-blocked on @sergeantd.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-alpha.93 (commit 45d95a22, pushed to origin/feature-dev-2.0.0). SAT is now the sole MsgID 1 (TSet) writer when active: the OTDirect heating-curve/PI block in doOTDirectLoop() is gated behind HAS_SAT + !state.sat.bActive, mirroring the existing loopCHHysteresis() bypass. Eliminates the 45<->10 TSet flip-flop reported by @sergeantd. SAT-inactive path unchanged. Build green (ESP32+ESP8266), evaluator green. Posted to #dev-sat-mqtt for @sergeantd field validation (closed per maintainer instruction: shipped + announced; remaining AC#5 is hardware field-check).
+<!-- SECTION:FINAL_SUMMARY:END -->

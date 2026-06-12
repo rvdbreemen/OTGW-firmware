@@ -3,11 +3,11 @@ id: TASK-745
 title: >-
   ESP abstraction Tier 5: resolve jsonStuff int/int32 overload ambiguity without
   per-platform ifdefs
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-28 08:29'
-updated_date: '2026-06-01 19:11'
+updated_date: '2026-06-01 19:17'
 labels:
   - esp-abstraction-audit
   - refactor
@@ -27,3 +27,9 @@ jsonStuff.ino:389, 487, 660 define extra sendJsonMapEntry(int) / (unsigned int) 
 - [ ] #2 Resolution approach is documented in an ADR if the strategy isn't obvious from the diff
 - [ ] #3 python build.py --firmware exits 0 on both platforms; no warnings about ambiguous overload resolution
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-06-01T21:17:53+02:00: DONE — 3b... overload sites gated on PLATFORM_INT_DISTINCT_FROM_INT32 (platform.h). Option 2 chosen (macro, not ~594-callsite cast). Baseline 7->4. Build both SUCCESS (ESP8266 no dup-def confirms it), eval 0-fail.
+<!-- SECTION:NOTES:END -->

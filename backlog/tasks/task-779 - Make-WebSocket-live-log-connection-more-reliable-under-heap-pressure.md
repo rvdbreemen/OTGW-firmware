@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 12:48'
-updated_date: '2026-06-01 23:43'
+updated_date: '2026-06-01 23:47'
 labels:
   - bug
   - websocket
@@ -81,4 +81,9 @@ IMPL SEQUENCE (per ADR-121 Decision):
 2. Values: tune WS-stricter / MQTT-relaxed from George's logHeapStats. GATED on telemetry — requested from George (geo83_44083) in #beta-testing 2026-06-02 (free heap, maxBlock, level, WS_drops, MQTT_drops; live-log open vs closed; board+fw). Step 2 must NOT be guessed.
 
 AC status: #9 ADR authored + Accepted (values portion pending telemetry, leave unchecked). #2/#3 design unblocked, structure implementable now / values pending. #8 blocked on George telemetry. #1/#4/#7 hardware/field. Task stays In Progress.
+
+2026-06-02 (loop fire 3) — IDLE, awaiting two inputs:
+  (A) MAINTAINER DECISION (asked in chat, unanswered): land Option B STEP 1 (independent-ladder structure + check_per_consumer_heap_gate, behaviour-equivalent at current values) now, OR hold the whole decouple until George's telemetry so structure+values ship together? Not preempting this autonomously: it is a refactor of the binding ADR-089 heap machine + a field push.
+  (B) George's logHeapStats telemetry (requested #beta-testing 2026-06-02) — gates STEP 2 values regardless of (A).
+No other 2.0.0 work is code-actionable: To Do all excluded (2.1.0: 641/648/687; blocked: 708, 802; needs-info/hw: 484/486; future-2.3.0: 409). TASK-779 stays In Progress.
 <!-- SECTION:NOTES:END -->

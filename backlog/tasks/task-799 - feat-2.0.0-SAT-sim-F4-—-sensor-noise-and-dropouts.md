@@ -1,7 +1,7 @@
 ---
 id: TASK-799
 title: 'feat-2.0.0: SAT sim F4 — sensor noise and dropouts'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:55'

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-12 04:40'
-updated_date: '2026-06-12 04:43'
+updated_date: '2026-06-12 05:49'
 labels: []
 dependencies: []
 ---
@@ -22,8 +22,8 @@ PIC never detected on esp32-classic: OTGWSerial.cpp ESP32 branch guards UART pin
 <!-- AC:BEGIN -->
 - [x] #1 OTGWSerial constructor accepts rxPin/txPin (default -1 = legacy behaviour), ESP32 branch binds those pins when >= 0
 - [x] #2 Application instantiation passes PIN_PIC_RX/PIN_PIC_TX from boards.h; all three boards.h sections define them (ESP8266: -1 sentinel)
-- [ ] #3 All three build targets compile clean (python build.py)
-- [ ] #4 evaluate.py --quick green, no new violations
+- [x] #3 All three build targets compile clean (python build.py)
+- [x] #4 evaluate.py --quick green, no new violations
 - [ ] #5 Field validation: PIC detected on LOLIN S3 Mini in OTGW Classic socket (user hardware test)
 <!-- AC:END -->
 
@@ -41,4 +41,6 @@ PIC never detected on esp32-classic: OTGWSerial.cpp ESP32 branch guards UART pin
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented. Files: OTGWSerial.h:143 (signature), OTGWSerial.cpp:834-858 (ctor branches), boards.h ESP8266 section (+2 sentinel defines), OTGW-firmware.h:55-57 (instantiation passes pins). Maintainer granted OTGWSerial as the sole editable vendored lib (2026-06-12). evaluate.py --quick: 0 failed / 2 pre-existing warnings, health 97.1%. Root cause record: bug-119 in .wolf/buglog.json.
+
+Build green all three targets after slug fix (TASK-863 unblocked the gate). Commits: 77f084b0 (fix + alpha.175 bump), pushed to origin. handleDebug.ino comment correction (stale ADR-125 reference) rode along in the bump commit. AC5 (field validation on S3 Mini hardware) remains open: flash alpha.175 esp32-classic and confirm PIC detect.
 <!-- SECTION:NOTES:END -->

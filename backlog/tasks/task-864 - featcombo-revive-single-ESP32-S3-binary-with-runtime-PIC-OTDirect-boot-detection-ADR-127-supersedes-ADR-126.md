@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-12 22:14'
-updated_date: '2026-06-12 22:54'
+updated_date: '2026-06-12 23:37'
 labels: []
 dependencies: []
 ---
@@ -40,4 +40,6 @@ Approved master plan at C:/Users/rvdbr/.claude/plans/so-now-that-we-memoized-fla
 Phase 1+2+UI implemented. esp32-combo links: Flash 98.4% (1935391/1966080, ~30KB headroom), RAM 35.3%. Key deltas vs ADR-125 era: PIN_CLASSIC_* prefixed pin set + comboClassicPinsActive() resolution (LED/button/I2C all runtime now, Classic default pre-detection); applyResolvedComboPins() re-mux after detection (Wire end+begin, ledc re-attach, initOLED re-run); watchdog three-way dispatch (combo = TWDT + 0x26 gated on isPICEnabled); handlePICSerial drain + 60s PR=A retry gated on !isOTDirectEnabled (banner recovery TASK-861 preserved on PIC-mode/degraded boots); banner recovery persists iBoardMode=1 on combo; telnet 'p' blocked in OTDirect mode (PIC_RST=GPIO12=SPI SCK). boardmode exposed via REST (combo-only) + UI dropdown in System group with reboot-confirm. Regression builds of fixed targets + ADR-127 authoring in flight.
 
 Committed c2aef89c (alpha.176), pushed to origin/feature-dev-2.0.0. ADR-127 Accepted (quality 0.86/A); ADR verification pass caught one omission (Ethernet gate if (!isPICEnabled()) initEthernet() missing) — restored, combo rebuilt green 98.4%. Evaluator: 0 failed / 97.1%. Remaining: AC6 field validation (Classic PCB + OTGW32 hardware matrix). Full build.py packaging run in background.
+
+Field validation Classic PCB (S3 Mini, combo build, 2026-06-13): PASS on first matrix leg. /bootdetect.log: boot#1 fresh-flash detect at t=130948ms (portal-first order confirmed working, detection after WiFi config), eMode=1 pic=1 mode=1 persisted; boot#2 fast-path detect at t=4477ms via persisted mode=1. Pins verified live: RST=12 RX=44 TX=43 I2C(classic)=35/36. PIC fully functional: PR=G/I/L/T/D/M round-trips, gateway mode ON, settings readout cycle, gateway.hex 6.6 recognized. Heap healthy 92-133KB, 0 drops, no resets over 3.5min window. 0x26 watchdog feed in PIC mode confirmed implicitly: >=3.5min armed without external-WD reset. MQTT first-seen log spam explained: no broker connected, ADR-104 slots never confirm — by design, not a bug (optional cosmetic: mute gate-log while MQTT disconnected). REMAINING matrix: OLED splash on 36/35 (if OLED fitted), LEDs 16/4 + button 18, PIC fw upgrade via ModUpdateServer, REST hardware_type=otgw-classic check, combo on OTGW32 leg, boardmode override round-trip.
 <!-- SECTION:NOTES:END -->

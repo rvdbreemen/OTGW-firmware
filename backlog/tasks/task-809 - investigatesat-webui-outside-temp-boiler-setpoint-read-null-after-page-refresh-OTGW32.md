@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-02 05:27'
-updated_date: '2026-06-02 16:50'
+updated_date: '2026-06-03 21:15'
 labels:
   - sat
   - webui
@@ -50,4 +50,6 @@ OPEN TENSION: no code path found that makes satGetOutsideTemp() return NaN on a 
 NEEDS FROM @sergeantd (tonight): raw Response body of /api/v2/sat/status captured immediately after the refresh (DevTools > Network > status > Response). If outside_temp/final_setpoint are literally null -> backend NaN confirmed, instrument upstream. If numeric -> unlikely, would point at stale/empty first response.
 
 FIX DIRECTION (hold until capture): add explicit isnan() guard alongside the range clamp at SATcontrol.ino:4247 (treat isnan(outsideTemp) as the safe-fallback the comment already intends), stopping one NaN outside reading from poisoning final_setpoint/heating_curve/pid_output. Confirm trigger first so the fix targets the cause, not masks it.
+
+2026-06-03 (afronden-poging) — leading hypothesis DISPROVEN. The backend-NaN-via-push theory is dead: satHandleExternalOutdoor (SATcontrol.ino:1411) gates on 'temp > -50.0f && temp < 100.0f', and NaN fails that range test (all NaN comparisons are false) -> a NaN/garbage HA push is REJECTED, cannot poison fExternalOutdoor. Same range guard on externaltemp/humidity/area-temps. So no confirmed NaN source for outside_temp remains (OT-bus Toutside inits 0.0, weather-parse, external-push all guarded). Combined with the original 'no cold-restart NaN path' tension, there is NO confirmed root cause and NO fix. Cannot honestly close Done. ALSO: since this was filed, TASK-819 shipped (alpha.152) fixing a JSON-scramble that blanked SAT tiles on ESP32 once a BLE sensor is selected -- George's 'tiles null' class may be partly subsumed by that. RECOMMEND: George re-tests on alpha.152+ (has the 819 fix); if outside_temp+final_setpoint STILL read null after a refresh, capture the raw /api/v2/sat/status Response body (DevTools>Network) to confirm null-at-source vs not. Holding In Progress, blocked on that field input. Did NOT ship a defensive isnan() guard: with the input paths already range-guarded it would likely be dead code and would mask an un-understood cause rather than fix it.
 <!-- SECTION:NOTES:END -->

@@ -3,11 +3,11 @@ id: TASK-813
 title: >-
   fix(network): restore 1.x.x captive-portal AP SSID naming (full MAC with
   colons) on 2.0.0
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-02 17:10'
-updated_date: '2026-06-02 17:10'
+updated_date: '2026-06-02 17:16'
 labels: []
 dependencies: []
 ---
@@ -20,8 +20,14 @@ On 2.0.0 the WiFi config portal AP SSID is OTGW-<last3MACbytes> (e.g. OTGW-21B4F
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Config portal AP SSID is hostname + '-' + full 6-byte MAC formatted with colons (OTGW-AA:BB:CC:DD:EE:FF)
-- [ ] #2 MAC still sourced from eFuse via platformGetMacAddress (no revert to WiFi.macAddress())
-- [ ] #3 Build green (python build.py --firmware) and evaluate.py --quick shows no new failures
-- [ ] #4 Prerelease tag bumped per versioning policy
+- [x] #1 Config portal AP SSID is hostname + '-' + full 6-byte MAC formatted with colons (OTGW-AA:BB:CC:DD:EE:FF)
+- [x] #2 MAC still sourced from eFuse via platformGetMacAddress (no revert to WiFi.macAddress())
+- [x] #3 Build green (python build.py --firmware) and evaluate.py --quick shows no new failures
+- [x] #4 Prerelease tag bumped per versioning policy
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Changed startWiFi() in networkStuff.ino to build the config-portal AP SSID suffix from the full 6-byte eFuse MAC formatted with colons (OTGW-AA:BB:CC:DD:EE:FF), matching the v1.x.x scheme. Kept platformGetMacAddress() (eFuse) as the source since WiFi.macAddress() returns zeros before WiFi.begin() on ESP32. Shipped as alpha.142; esp32+esp8266 both build clean, evaluator green.
+<!-- SECTION:FINAL_SUMMARY:END -->

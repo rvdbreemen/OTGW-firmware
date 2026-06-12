@@ -1,11 +1,11 @@
 ---
 id: TASK-849
 title: 'tooling(build): package esp32-combo as a third default asset set'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-09 22:15'
-updated_date: '2026-06-09 22:47'
+updated_date: '2026-06-09 22:48'
 labels: []
 dependencies: []
 ---

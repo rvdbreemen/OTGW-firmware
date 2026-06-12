@@ -35,6 +35,7 @@ src/OTGW-firmware/data/*.gz
 .claude/worktrees/
 .mcp.json
 logs-issue/*
+logs/
 /src/OTGW-firmware/build
 *.ino.map
 *.ino.cpp

@@ -1,7 +1,7 @@
 ---
 id: TASK-796
 title: 'feat-2.0.0: SAT sim F1 — diurnal outdoor temperature model'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:55'

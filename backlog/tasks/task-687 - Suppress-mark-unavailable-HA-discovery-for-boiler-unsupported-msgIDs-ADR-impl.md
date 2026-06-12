@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-24 06:47'
-updated_date: '2026-06-01 16:25'
+updated_date: '2026-06-04 21:46'
 labels:
   - ha-discovery
   - opentherm
@@ -18,6 +18,7 @@ labels:
 milestone: 2.1.0
 dependencies: []
 priority: medium
+ordinal: 59000
 ---
 
 ## Description

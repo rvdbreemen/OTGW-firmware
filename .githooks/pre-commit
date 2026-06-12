@@ -47,7 +47,10 @@ fi
 # plugin-cache pick via nullglob, and dynamic resolution so plugin upgrades don't
 # require re-running install-hooks. Never blocks a commit due to tooling drift.
 
-if [ "${ADR_KIT_HOOK_DISABLE:-0}" != "1" ]; then
+# DISABLED 2026-05-31 by user request: default flipped to 1 so the ADR-judge
+# (incl. the --llm Sonnet pass) is skipped. Bump-check above stays active.
+# Re-enable: change `:-1` back to `:-0`, or run: ADR_KIT_HOOK_DISABLE=0 git commit
+if [ "${ADR_KIT_HOOK_DISABLE:-1}" != "1" ]; then
   # Find a Python 3 interpreter (adr-judge is a Python 3 script). Validate via
   # --version rather than presence alone so a non-functional PATH entry is skipped.
   _PYTHON3=""
@@ -98,7 +101,10 @@ fi
 # NEVER affects the commit outcome. Requires adr-kit >= 0.16.0 in the plugin
 # cache; silently skips if the bin is absent (e.g. before a plugin upgrade).
 # Disable per-commit with: ADR_KIT_SUGGEST_DISABLE=1 git commit ...
-if [ "${ADR_KIT_SUGGEST_DISABLE:-0}" != "1" ]; then
+# DISABLED 2026-05-31 by user request: default flipped to 1 so the ADR-suggest
+# advisory (which analyses every staged diff) is skipped.
+# Re-enable: change `:-1` back to `:-0`.
+if [ "${ADR_KIT_SUGGEST_DISABLE:-1}" != "1" ]; then
   _PYTHON3S=""
   for _cmd in python3 python py; do
     if command -v "$_cmd" >/dev/null 2>&1; then

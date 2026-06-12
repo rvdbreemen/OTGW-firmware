@@ -3,11 +3,11 @@ id: TASK-821
 title: >-
   tooling(capture): add headless-Edge CDP browser-log capture to
   capture-mqtt-debug.bat
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-04 22:23'
-updated_date: '2026-06-04 22:37'
+updated_date: '2026-06-04 22:38'
 labels: []
 dependencies: []
 ---
@@ -35,3 +35,9 @@ Extend the single-file capture-mqtt-debug.bat so it also captures browser devtoo
 <!-- SECTION:NOTES:BEGIN -->
 Validated end-to-end against live OTGW32 (192.168.88.64, alpha.160). browser.log captured CDP connect, echarts CDN load (274ms,200), and every local sub-resource PENDING/never-finished in a 30s window (sat-slider.js, index.js, sat.js, css). Confirms webserver sub-resource starvation = same root as XHR latency ramp. Standalone fetch of sat-slider.js returned 200/1736 bytes/679ms, proving the file is present and the browser 'cannot find' it only due to concurrent-load stall, not a 404. Smoke-tested: CDP send/receive/parse sequence, cross-runspace CancelFlag stop + EndInvoke summary, merge+cleanup. Payload parses clean (Parser::ParseFile, 0 errors). Note: navigate to device IP more reliable than otgw.local (mDNS) for headless sub-resource resolution.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added headless-Edge CDP browser-devtools capture to capture-mqtt-debug.bat (single-file preserved; concurrent runspace). Captures console/exceptions/Log-domain 404s/network timings + end-of-capture PENDING flush for stalled requests, merged into transcript.txt. New switches -SkipBrowserCapture/-BrowserUrl/-BrowserDebugPort/-BrowserPath. Validated end-to-end on live OTGW32.
+<!-- SECTION:FINAL_SUMMARY:END -->
