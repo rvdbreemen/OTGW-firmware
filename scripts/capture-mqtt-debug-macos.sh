@@ -82,6 +82,11 @@ Stop:
   Press Q to stop cleanly and create transcript.txt.
   Ctrl+C also stops cleanly.
 
+Telnet debug logging:
+  On every connection, the script enables all logging toggles that are off,
+  excluding simulator toggles such as SensorSim and OTGW-Sim. It then sends q
+  and D so the current settings and state are captured in telnet.log.
+
 Aliases:
   Windows-style aliases are accepted, for example -DeviceHost, -BrokerHost,
   -DurationSeconds, -MosquittoSubPath, and -SkipBrowserCapture.
@@ -261,7 +266,9 @@ find_browser() {
 }
 
 merge_transcript() {
-  {
+  local temp_transcript="$TRANSCRIPT.tmp"
+
+  if ! {
     echo "OTGW capture - merged transcript"
     echo "Generated: $(timestamp)"
     echo "Run folder: $RUN_PATH"
@@ -286,7 +293,15 @@ merge_transcript() {
       fi
       echo
     done
-  } > "$TRANSCRIPT"
+  } > "$temp_transcript"; then
+    rm -f "$temp_transcript"
+    return 1
+  fi
+
+  if ! mv "$temp_transcript" "$TRANSCRIPT"; then
+    rm -f "$temp_transcript"
+    return 1
+  fi
 }
 
 stop_child() {
@@ -351,13 +366,16 @@ cleanup() {
 
   write_summary "Finished: $(timestamp)"
 
-  merge_transcript
-
-  for file in "$SUMMARY_LOG" "$TELNET_LOG" "$MQTT_LOG" "$MQTT_ERR_LOG" "$BROWSER_LOG"; do
-    if [[ -f "$file" ]]; then
-      rm -f "$file"
-    fi
-  done
+  if merge_transcript; then
+    for file in "$SUMMARY_LOG" "$TELNET_LOG" "$MQTT_LOG" "$MQTT_ERR_LOG" "$BROWSER_LOG"; do
+      if [[ -f "$file" ]]; then
+        rm -f "$file"
+      fi
+    done
+    echo "Merged transcript (single upload): $TRANSCRIPT"
+  else
+    echo "Could not build merged transcript; intermediate capture files were preserved." >&2
+  fi
 
   if [[ -n "$BROWSER_PROFILE" && -d "$BROWSER_PROFILE" ]]; then
     rm -rf "$BROWSER_PROFILE"
@@ -366,7 +384,6 @@ cleanup() {
     rm -f "$STOP_FILE"
   fi
 
-  echo "Merged transcript (single upload): $TRANSCRIPT"
   echo "Diagnostic capture folder: $RUN_PATH"
 }
 
@@ -400,7 +417,14 @@ base_timeout = int(sys.argv[6])
 reconnect_delay = int(sys.argv[7]) / 1000.0
 post_disconnect_delay = int(sys.argv[8]) / 1000.0
 reboot_marker = re.compile(r"ESP\.restart\(\)")
-debug_state = re.compile(r"(?m)\b3\s+MQTT\s+\[(?P<state>[01])\]")
+banner_footer = re.compile(r"Press 'h' for command menu|\bOTGW-Sim\b", re.MULTILINE)
+debug_toggle = re.compile(
+    r"(?:^|\s)(?P<key>\S)\s+"
+    r"(?P<label>[A-Za-z][A-Za-z0-9 /]*?)\s*"
+    r"\[(?P<state>[01])\]",
+    re.MULTILINE,
+)
+simulator_labels = {"SensorSim", "OTGW-Sim"}
 
 def now():
     return datetime.now(timezone.utc).astimezone().isoformat()
@@ -432,6 +456,67 @@ def read_available(sock, writer):
         chunks.append(text)
     return "".join(chunks)
 
+def read_initial_banner(sock, writer):
+    chunks = []
+    end = time.monotonic() + base_timeout
+    while not stopped() and time.monotonic() < end:
+        try:
+            text = read_available(sock, writer)
+            if text:
+                chunks.append(text)
+                if banner_footer.search("".join(chunks)):
+                    break
+        except BlockingIOError:
+            pass
+        wait_delay(0.1)
+    return "".join(chunks)
+
+def enable_debug_toggles(sock, writer, banner):
+    results = []
+    seen = set()
+    for match in debug_toggle.finditer(banner):
+        key = match.group("key")
+        label = match.group("label").strip()
+        state = match.group("state")
+        if not label or label in seen:
+            continue
+        seen.add(label)
+
+        if label in simulator_labels:
+            results.append(f"{label}=skipped (simulator)")
+        elif state == "0":
+            sock.sendall(key.encode("ascii"))
+            wait_delay(0.3)
+            try:
+                read_available(sock, writer)
+            except BlockingIOError:
+                pass
+            results.append(f"{label}=on (sent '{key}')")
+        else:
+            results.append(f"{label}=already-on")
+
+    return "; ".join(results) if results else "no debug toggles found in banner"
+
+def send_key_and_drain(sock, writer, key, timeout=5.0, idle_seconds=0.8):
+    sock.sendall(key.encode("ascii"))
+    deadline = time.monotonic() + timeout
+    last_data = time.monotonic()
+    while not stopped() and time.monotonic() < deadline:
+        try:
+            text = read_available(sock, writer)
+        except BlockingIOError:
+            text = ""
+        if text:
+            last_data = time.monotonic()
+        elif time.monotonic() - last_data >= idle_seconds:
+            break
+        wait_delay(0.1)
+
+def request_settings_dump(sock, writer):
+    send_key_and_drain(sock, writer, "q")
+    send_key_and_drain(sock, writer, "D")
+    return "sent 'q' (read settings) + 'D' (dump settings/state)"
+
 def effective_timeout(attempt):
     return min(base_timeout + min(max(attempt - 1, 0), 6), 20)
 
@@ -442,35 +527,9 @@ def connect_capture(writer, attempt):
     sock.setblocking(False)
     add_summary(f"Telnet connected: {now()}")
 
-    banner = []
-    end = time.monotonic() + base_timeout
-    while not stopped() and time.monotonic() < end:
-        try:
-            text = read_available(sock, writer)
-            if text:
-                banner.append(text)
-                if debug_state.search("".join(banner)):
-                    break
-        except BlockingIOError:
-            pass
-        time.sleep(0.1)
-
-    banner_text = "".join(banner)
-    match = debug_state.search(banner_text)
-    if match:
-        if match.group("state") == "0":
-            sock.sendall(b"3")
-            wait_delay(0.5)
-            try:
-                read_available(sock, writer)
-            except Exception:
-                pass
-            action = "sent key 3 because MQTT debug was off"
-        else:
-            action = "not sent because MQTT debug was already on"
-    else:
-        action = "not sent because MQTT debug state was not found in the telnet banner"
-    add_summary(f"MQTT debug toggle action: {action}")
+    banner = read_initial_banner(sock, writer)
+    add_summary(f"Debug toggle actions: {enable_debug_toggles(sock, writer, banner)}")
+    add_summary(f"Settings dump: {request_settings_dump(sock, writer)}")
     return sock
 
 sock = None

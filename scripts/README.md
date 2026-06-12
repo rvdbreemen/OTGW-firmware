@@ -116,11 +116,18 @@ Mosquitto client with Homebrew unless `--skip-tool-install` is passed. Press `Q`
 or use Ctrl+C to stop manually; timed captures also stop the MQTT, telnet, and
 browser workers cleanly before writing `transcript.txt`.
 
+On each Telnet connection, including reconnects after a disconnect or reboot,
+the script parses the firmware's debug-toggle banner and enables every logging
+toggle that is currently off. It supports the different 1.x and 2.0.0/OTGW32
+toggle keys and leaves simulator options such as `SensorSim` and `OTGW-Sim`
+unchanged. It then sends `q` and `D` to capture the current settings and state.
+
 Browser DevTools capture is enabled by default when Microsoft Edge, Google Chrome,
 or Chromium can be found. On macOS, the script checks the standard `.app`
 locations under `/Applications` and `~/Applications`; use `--browser-path` if the
 browser is installed elsewhere. Browser output is written to `browser.log` and
-merged into `transcript.txt`.
+merged into `transcript.txt`. After a successful merge, the intermediate capture
+files are removed; upload only `transcript.txt`.
 
 ## sat_boiler_emulator.py
 
