@@ -1,12 +1,13 @@
-# ADR-123: 2.0.0 Concurrency Model — Hybrid FreeRTOS PIC Task + Event-Driven Async Networking on ESP32, Cooperative Loop Retained on ESP8266
+# ADR-123: 2.0.0 Concurrency Model — FreeRTOS PIC Task + Event-Driven Async Networking (ESP32-S3 only, ESP8266 dropped)
 
 ## Status
 
-Proposed — drafted 2026-06-04. Direction confirmed by the maintainer (Robert) on
-2026-06-04: the **hybrid model is adopted**, and the long-term ESP8266 dual-target
-disposition is **deferred** (revisit after Phase 1). Awaiting explicit acceptance
-of this amended text before the status flips to Accepted; do not treat as binding
-until then.
+Proposed — drafted 2026-06-04; amended 2026-06-12. The maintainer (Robert) confirmed
+the **hybrid model** (2026-06-04) and then decided (2026-06-12) to **stop ESP8266
+support to simplify the codebase**, making 2.0.0 **ESP32-S3 only**. The previously
+deferred ESP8266 sub-decision is therefore resolved: ESP8266 is dropped. Acceptance
+of this ADR depends on **ADR-127** (drop ESP8266 support; supersedes ADR-082).
+Awaiting explicit acceptance of this amended text; do not treat as binding until then.
 
 ## Context
 
@@ -32,23 +33,24 @@ the ESP8266 lacked: a dual-core **FreeRTOS** preemptive scheduler, and ~320 KB+ 
 the cooperative model. The supporting research is in
 `docs/research/2.0.0-async-modernization.md`.
 
-### The decisive constraint: 2.0.0 is dual-target
+### The decisive constraint: 2.0.0 is ESP32-S3 only
 
-2.0.0 is **not** ESP32-only. It is a dual-target line that still builds and ships
-for the ESP8266 *and* the ESP32/OTGW32 (ADR-061 unified platform abstraction,
-ADR-072 SAT compatibility layer, ADR-082 ESP8266 Arduino-Core LTS pin, ADR-083
-PlatformIO dual-target; CI builds both `pio run -e esp8266` and `pio run -e esp32`).
-The event-driven async stack (`AsyncTCP`/`ESPAsyncWebServer`) is ESP32-centric;
-the ESP8266 equivalent (`ESPAsyncTCP`) is poorly maintained and historically
-crash-prone. "Fully async" therefore *cannot* be applied uniformly to both
-targets. Any decision here is really a decision about the **platform-abstraction
-boundary**, not about "2.0.0 vs dev".
+When first drafted this ADR treated 2.0.0 as a dual-target line (ESP8266 +
+ESP32/OTGW32). The maintainer's decision of 2026-06-12 — *"stop ESP8266 support to
+simplify the codebase"* — removes that constraint: 2.0.0 targets the **ESP32-S3**
+(LOLIN/Wemos S3 mini / mini pro, drop-in board swap; build targets `esp32` and
+`esp32-classic`, ADR-126) and ESP8266 is dropped. The event-driven async stack
+(`AsyncTCP`/`ESPAsyncWebServer`) is ESP32-centric and the ESP8266 equivalent
+(`ESPAsyncTCP`) is poorly maintained, so single-targeting ESP32-S3 is exactly what
+makes "fully async" clean. Dropping ESP8266 supersedes the Accepted ADR-082 and
+reshapes ADR-061/072/083/126; that is handled by **ADR-127** (Proposed), on which
+this ADR depends.
 
 ### Constraints
 
-- **Dual-target.** ESP8266 must keep building and behaving as today (ADR-082 pins
-  its toolchain). The async path is ESP32-only and must sit behind the platform
-  abstraction (ADR-061/072/120).
+- **Single target.** 2.0.0 is ESP32-S3 only (ADR-127); there is no ESP8266 path to
+  keep compatible. This removes the platform-divergence an earlier draft had to
+  design around.
 - **The PIC UART is safety-critical and bursty.** OT frames arrive ~1 Hz but in
   bursts; the RX FIFO must never overrun. Today `handleOTGW()` is bounded to four
   lines per call (TASK-671) precisely so a noisy PIC cannot starve the loop.
@@ -65,10 +67,10 @@ boundary**, not about "2.0.0 vs dev".
 
 ## Decision
 
-Adopt a **platform-conditional hybrid concurrency model** for 2.0.0, selected at
-compile time behind the existing platform abstraction (ADR-061/072/120).
+Adopt a **hybrid concurrency model** for 2.0.0 (ESP32-S3 only): a dedicated FreeRTOS
+task for the PIC UART plus event-driven async networking.
 
-### ESP32 / OTGW32 target
+### Concurrency model (ESP32-S3)
 
 1. **Dedicated FreeRTOS task for the PIC UART.** A single high-priority task,
    pinned to the application core (core 1 / `APP_CPU`), is the *only* code that
@@ -92,21 +94,13 @@ compile time behind the existing platform abstraction (ADR-061/072/120).
    state fields directly. This discipline is the load-bearing part of the decision
    and the main source of risk.
 
-### ESP8266 target — unchanged during rollout; long-term fate deferred
+### ESP8266 support dropped
 
-For the duration of the rollout the ESP8266 target retains the cooperative
-single-loop model unchanged (ADR-007/010/011/047/048/058); all FreeRTOS-task and
-AsyncTCP code is compiled out behind the platform abstraction, so ESP8266 behaviour
-stays byte-for-byte what it is today. The FreeRTOS PIC task and the AsyncTCP stack
-are inherently ESP32-only (the ESP8266 has no preemptive multicore scheduler), so
-the ESP32 work does not touch the ESP8266 path.
-
-**Deferred sub-decision (open).** Whether ESP8266 remains a first-class 2.0.0
-target indefinitely — permanent platform-divergent concurrency, honouring ADR-082's
-LTS pin — or is eventually phased out so 2.0.0 converges on a single async path is
-**not decided here** (maintainer choice, 2026-06-04). Phase 1 (the ESP32 PIC task)
-does not depend on that answer, so the call is deferred to a follow-up ADR taken
-after Phase 1 lands. Until then, ESP8266 is retained as-is.
+There is no ESP8266 path to retain. The maintainer's 2026-06-12 decision drops
+ESP8266 from 2.0.0 (formalised by ADR-127), so this ADR carries no cooperative-loop
+fallback and no platform-conditional compilation — the model above is simply *the*
+2.0.0 concurrency model. Removing the ESP8266 build env and code paths is a separate,
+phased implementation effort tracked under ADR-127, not part of this decision.
 
 ### Rollout
 
@@ -124,12 +118,11 @@ and ADR supersession where it lands:
 ### Why this choice
 
 The hybrid puts preemption exactly where the cooperative model is weakest — the
-safety-critical PIC UART — while using event-driven async for the
-network-fan-out problem the AsyncTCP stack was built for. It keeps the dual-target
-promise (ADR-082) by confining all of it to the ESP32 side of the platform
-abstraction. It matches the proven shape of EMS-ESP32, an architecturally near-
-identical project (ESP32, HA discovery, MQTT, async web UI) that runs
-`ESPAsyncWebServer` + `espMqttClient` + FreeRTOS tasks.
+safety-critical PIC UART — while using event-driven async for the network-fan-out
+problem the AsyncTCP stack was built for. With ESP8266 dropped there is a single
+code path and no platform-divergence to maintain. It matches the proven shape of
+EMS-ESP32, an architecturally near-identical project (ESP32, HA discovery, MQTT,
+async web UI) that runs `ESPAsyncWebServer` + `espMqttClient` + FreeRTOS tasks.
 
 ### Enforcement
 
@@ -176,15 +169,16 @@ WebSocket/SSE/auth.
 AsyncTCP fork's maintenance risk (see Consequences) materialises — the task-based
 shape is reusable.
 
-### Alternative 4 — ESP32-only async; drop ESP8266 from 2.0.0
+### Alternative 4 — ESP32-only async; drop ESP8266 from 2.0.0 (ADOPTED)
 Make 2.0.0 async everywhere by dropping the ESP8266 target.
 
 **Pros:** one (async) code path; no platform divergence; simplest async story.
-**Cons:** breaks ADR-082's explicit LTS-pin commitment to keep ESP8266 building on
-2.0.0, and contradicts the ADR-061/072 dual-target design.
-**Deferred, not rejected:** the maintainer chose (2026-06-04) to leave the ESP8266
-disposition open. This stays a live option to revisit via a follow-up ADR after
-Phase 1; it is not foreclosed, but it is not adopted now.
+**Cons:** breaks ADR-082's LTS-pin commitment to keep ESP8266 building on 2.0.0
+(handled by superseding it via ADR-127); existing ESP8266 hardware must migrate to an
+ESP32-S3 board.
+**Adopted (2026-06-12):** the maintainer chose to stop ESP8266 support to simplify the
+codebase. This is now the line's direction; ADR-127 supersedes ADR-082 and reshapes
+ADR-061/072/083/126. The earlier "deferred" framing is resolved.
 
 ### Alternative 5 — ESP-IDF-native rewrite (drop Arduino)
 Rebuild on ESP-IDF to get first-class FreeRTOS/event-loop primitives.
@@ -212,11 +206,10 @@ maintenance team.
   posture on the ESP32 path (ADR-004/042 remain in force on ESP8266).
 
 ### Negative
-- **Two concurrency models to maintain** behind the platform abstraction — the
-  ESP32 async/task path and the ESP8266 cooperative path — for as long as 2.0.0
-  ships ESP8266. Whether that burden is permanent (keep ESP8266) or temporary
-  (eventually drop it) is the deferred sub-decision above; this ADR commits only to
-  carrying both during the rollout.
+- **ESP8266 hardware must be replaced.** Dropping ESP8266 means existing
+  ESP8266-based OTGW users cannot run 2.0.0 without swapping to an ESP32-S3 board
+  (S3 mini drop-in; header-less boards need headers soldered). The 1.x line remains
+  their migrate-from baseline. This migration burden is owned by ADR-127.
 - **Thread-safety is now a first-class concern.** `OTGWState` is touched from the
   PIC task, the AsyncTCP task, and the loop. Getting the single-writer/mutex
   discipline wrong yields exactly the hard-to-field-debug races this project's
@@ -236,18 +229,17 @@ maintenance team.
   **Mitigation:** single-writer-per-field rule + mutex on shared fields, codified
   and enforced per-phase; queue-based hand-off for OT frames; land Phase 1 (PIC
   task) first in isolation to prove the pattern before networking changes.
-- **Risk:** ESP8266 regressions from platform-abstraction churn.
-  **Mitigation:** ESP8266 path compiled unchanged; CI keeps `pio run -e esp8266`
-  green as the guard.
+- **Risk:** dropping ESP8266 strands users who cannot or will not swap hardware.
+  **Mitigation:** the 1.x ESP8266 line stays available as the migrate-from baseline;
+  ADR-127 documents the board-swap migration path (S3 mini drop-in).
 
 ## Related Decisions
 
-- **Builds on / constrained by:** ADR-061 (unified ESP8266/ESP32 abstraction),
-  ADR-072 (SAT platform compatibility layer), ADR-082 (ESP8266 Core LTS pin),
-  ADR-083 (PlatformIO dual-target build), ADR-120 (platform abstraction headers),
-  ADR-013 (Arduino over ESP-IDF).
-- **Expected to supersede (ESP32 side, per phase):** ADR-047, ADR-048, ADR-058,
-  ADR-108; re-scopes ADR-007, ADR-010, ADR-011.
+- **Depends on:** ADR-127 (drop ESP8266 support; supersedes ADR-082, reshapes
+  ADR-061/072/083/126). This ADR assumes the ESP32-S3-only target ADR-127 establishes.
+- **Builds on:** ADR-120 (platform abstraction headers), ADR-013 (Arduino over ESP-IDF).
+- **Expected to supersede (per phase):** ADR-047, ADR-048, ADR-058, ADR-108;
+  re-scopes ADR-007, ADR-010, ADR-011.
 - **Re-validation touch-points:** ADR-005/025 (WebSocket), ADR-006/041/052/077/088/
   096/097/102/104 (MQTT + HA discovery), ADR-121 (per-consumer heap gating).
 - **Research input:** `docs/research/2.0.0-async-modernization.md`.
@@ -259,3 +251,5 @@ maintenance team.
 - espMqttClient (bertmelis): <https://www.emelis.net/espMqttClient/>
 - EMS-ESP32 — AsyncMqttClient → espMqttClient migration (#1178): <https://github.com/emsesp/EMS-ESP32/issues/1178>
 - ESP-IDF FreeRTOS SMP / `xTaskCreatePinnedToCore`: <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/freertos.html>
+- ADR-127 — Drop ESP8266 support from the 2.0.0 line (supersedes ADR-082).
+- Maintainer announcement (Discord, June 2026) + decision 2026-06-12 "stop ESP8266 support".
