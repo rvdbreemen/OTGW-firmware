@@ -113,13 +113,15 @@ TARGETS = {
 # fs geometry), so the merge and packaging path - keyed on these tcfg fields,
 # not the target name - treats it identically. Fixed compile-time PIC gateway:
 # HAS_PIC=1, no OTDirect, no runtime detection (supersedes the ADR-125 combo).
-# Assets stay distinct because every output filename is built from the target
-# key ("esp32-classic"). The PlatformIO env (esp32-classic, registered in
-# PIO_ENV_MAP) supplies the real link-set; the build_flags below only matter
-# to the legacy arduino-cli backend.
+# Assets stay distinct because the entry carries its own "slug" — the dict
+# spread would otherwise inherit esp32's "esp32-otgw32" token and the Classic
+# artifacts would overwrite the OTGW32 ones (TASK-863). The PlatformIO env
+# (esp32-classic, registered in PIO_ENV_MAP) supplies the real link-set; the
+# build_flags below only matter to the legacy arduino-cli backend.
 TARGETS["esp32-classic"] = {
     **TARGETS["esp32"],
     "name": "ESP32-S3 Classic",
+    "slug": "esp32-classic",
     "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32_CLASSIC",
 }
 
