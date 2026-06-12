@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.164
+**  Version  : v2.0.0-alpha.175
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -969,19 +969,24 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
         // --- OTGW32 OT-direct MQTT commands: set/<nodeId>/otgw32/<sub-command> ---
         if (strcasecmp_P(topicToken, PSTR("otgw32")) == 0) {
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-          char otgw32Cmd[20];
-          if (readMQTTTopicToken(topicCursor, otgw32Cmd, sizeof(otgw32Cmd))) {
-            MQTTDebugTf(PSTR("MQTT OTGW32 cmd: %s [%s]\r\n"), otgw32Cmd, msgPayload);
-            float val = atof(msgPayload);
-            if (strcasecmp_P(otgw32Cmd, PSTR("room_temp")) == 0) {
-              otdMqttSetRoomTemp(val);
-            } else if (strcasecmp_P(otgw32Cmd, PSTR("room_setpoint")) == 0) {
-              otdMqttSetRoomSetpoint(val);
+          // Reject otgw32 commands when the OT-direct hardware is not active.
+          if (isOTDirectEnabled()) {
+            char otgw32Cmd[20];
+            if (readMQTTTopicToken(topicCursor, otgw32Cmd, sizeof(otgw32Cmd))) {
+              MQTTDebugTf(PSTR("MQTT OTGW32 cmd: %s [%s]\r\n"), otgw32Cmd, msgPayload);
+              float val = atof(msgPayload);
+              if (strcasecmp_P(otgw32Cmd, PSTR("room_temp")) == 0) {
+                otdMqttSetRoomTemp(val);
+              } else if (strcasecmp_P(otgw32Cmd, PSTR("room_setpoint")) == 0) {
+                otdMqttSetRoomSetpoint(val);
+              } else {
+                MQTTDebugTf(PSTR("OTGW32: unknown sub-command [%s]\r\n"), otgw32Cmd);
+              }
             } else {
-              MQTTDebugTf(PSTR("OTGW32: unknown sub-command [%s]\r\n"), otgw32Cmd);
+              MQTTDebugTln(F("MQTT OTGW32: missing sub-command"));
             }
           } else {
-            MQTTDebugTln(F("MQTT OTGW32: missing sub-command"));
+            MQTTDebugTln(F("MQTT OTGW32: OT-direct not active in this mode"));
           }
 #else
           MQTTDebugTln(F("MQTT OTGW32: OT-direct not available on this build"));

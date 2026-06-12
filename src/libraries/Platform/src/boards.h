@@ -18,12 +18,15 @@
 
 // ---- Board selection ------------------------------------------------------
 // Build flags should define exactly one BOARD_* macro, e.g.:
-//   -DBOARD_NODOSHOP_ESP8266   (current Nodoshop OTGW with D1 mini)
-//   -DBOARD_NODOSHOP_ESP32     (future Nodoshop OTGW with ESP32)
+//   -DBOARD_NODOSHOP_ESP8266        (Nodoshop OTGW Classic with Wemos D1 mini)
+//   -DBOARD_NODOSHOP_ESP32          (Nodoshop OTGW32 with ESP32-S3, OTDirect)
+//   -DBOARD_NODOSHOP_ESP32_CLASSIC  (LOLIN S3 Mini in the OTGW Classic D1-mini
+//                                    socket: PIC gateway, compile-time — no
+//                                    runtime detection)
 //
 // When no board is explicitly selected, auto-detect from the platform.
 
-#if !defined(BOARD_NODOSHOP_ESP8266) && !defined(BOARD_NODOSHOP_ESP32)
+#if !defined(BOARD_NODOSHOP_ESP8266) && !defined(BOARD_NODOSHOP_ESP32) && !defined(BOARD_NODOSHOP_ESP32_CLASSIC)
   #if defined(ESP8266)
     #define BOARD_NODOSHOP_ESP8266
   #elif defined(ESP32)
@@ -49,9 +52,12 @@
 #define PIN_PIC_RST       14   // D5
 #define PIN_LED1          2    // D4
 #define PIN_LED2          16   // D0
+#define PIN_PIC_RX        -1   // UART0 fixed pins on ESP8266 (RX=GPIO3); -1 = not remappable
+#define PIN_PIC_TX        -1   // UART0 fixed pins on ESP8266 (TX=GPIO1); -1 = not remappable
 
 // Feature flags for ESP8266 Nodoshop OTGW
 #define HAS_PIC           1    // Has PIC microcontroller for OpenTherm gateway
+#define HAS_PIC_WATCHDOG  1    // External I2C watchdog board at 0x26
 #define HAS_DIRECT_OT     0    // No direct OT master (uses PIC)
 #define HAS_ETH_CAPABLE   0    // No Ethernet support
 // SAT feature flags (ESP-abstraction Tier 0, TASK-740; see
@@ -64,6 +70,8 @@
 #define HAS_REST_TX_COALESCING 0  // ESP8266 sendContent flushes inline; no coalescing buffer needed (TASK-743)
 #define HAS_FRAGMENTATION_AWARE_HEAP_GATE 0  // ESP8266 discovery drip uses the ADR-089 heap-tier machine (getHeapHealth) (TASK-743)
 #define HW_TYPE_NAME      "otgw-classic"  // Static hardware-type slug / board class (ADR-113)
+#define BOARD_NAME        "Nodoshop OTGW (ESP8266)"  // Display string (boardName())
+#define HAS_LEDC_LED      0    // LEDs via digitalWrite (no ledc PWM dimming on ESP8266)
 
 // SAT per-platform buffer sizing (ESP-abstraction Tier 3, TASK-743). These are
 // compile-time board-capacity tunings (SRAM budget), so they live with the
@@ -138,6 +146,7 @@ typedef uint8_t SAT_RING_IDX_T;
 
 // Feature flags for Nodoshop OTGW32
 #define HAS_PIC           0    // No PIC: OT protocol handled by OTDirect (ESP32-S3 native)
+#define HAS_PIC_WATCHDOG  0    // No external 0x26 watchdog board on OTGW32 (TWDT instead)
 #define HAS_DIRECT_OT     1    // Direct OT master/slave via OTDirect library
 #define HAS_ETH_CAPABLE   1    // Has W5500 Ethernet module
 #define HAS_OLED_CAPABLE  1    // Onboard 128x64 SSD1306 I2C OLED (runtime probe at 0x3C)
@@ -151,6 +160,8 @@ typedef uint8_t SAT_RING_IDX_T;
 #define HAS_REST_TX_COALESCING 1  // sync WebServer stalls ~9ms/sendContent on ESP32; coalesce into 4KB chunks (TASK-743)
 #define HAS_FRAGMENTATION_AWARE_HEAP_GATE 1  // ESP32-S3: gate drip on freeHeap+maxAllocBlock, not the ESP8266 tier machine (TASK-743)
 #define HW_TYPE_NAME      "otgw32"        // Static hardware-type slug / board class (ADR-113)
+#define BOARD_NAME        "Nodoshop OTGW32 (ESP32-S3)"  // Display string (boardName())
+#define HAS_LEDC_LED      1    // LEDs PWM-dimmed via ledc (LED_BRIGHTNESS above)
 
 // SAT per-platform buffer sizing (ESP-abstraction Tier 3, TASK-743). ESP32-S3
 // has ample SRAM, so the SAT history buffers run much deeper than on ESP8266.
@@ -170,9 +181,80 @@ typedef uint16_t SAT_RING_IDX_T;
 #define STATUS_BURST_COOLDOWN_MS  250    // post-burst drip pause (ADR-088; more heap headroom)
 
 // ---------------------------------------------------------------------------
+#elif defined(BOARD_NODOSHOP_ESP32_CLASSIC)
+// ---------------------------------------------------------------------------
+// OTGW Classic PCB with a LOLIN S3 Mini (ESP32-S3) in the D1-mini socket.
+//
+// Same Nodoshop Classic hardware as the ESP8266 board above — PIC gateway,
+// 0x26 I2C watchdog, optional I2C OLED — but with an S3 Mini instead of a
+// D1 mini. The S3 Mini is footprint-compatible: each Classic signal lands on
+// the S3 GPIO at the matching D1-mini hole. Mapping verified against the
+// official LOLIN S3 Mini pin diagram + Arduino variant pins_arduino.h
+// (docs/hardware/PINOUT.md):
+//
+//   hole  D1-mini GPIO  S3 GPIO  signal
+//   TX    1             43       PIC UART (ESP TX -> PIC RX)
+//   RX    3             44       PIC UART (ESP RX <- PIC TX)
+//   D1    5             36       I2C SCL (watchdog 0x26 + OLED)
+//   D2    4             35       I2C SDA
+//   D3    0             18       Config/reset button
+//   D4    2             16       LED1
+//   D5    14            12       PIC reset
+//   D0    16            4        LED2
+//
+// This is a fixed, compile-time board: HAS_PIC=1, no OTDirect, no runtime
+// hardware detection (supersedes the ADR-125 combo experiment).
+
+#define PIN_I2C_SCL       36   // D1 hole
+#define PIN_I2C_SDA       35   // D2 hole
+#define PIN_BUTTON        18   // D3 hole (active LOW)
+#define PIN_PIC_RST       12   // D5 hole
+#define PIN_LED1          16   // D4 hole (active LOW)
+#define PIN_LED2          4    // D0 hole (active LOW)
+#define PIN_PIC_RX        44   // RX hole (ESP RX <- PIC TX)
+#define PIN_PIC_TX        43   // TX hole (ESP TX -> PIC RX)
+
+// Feature flags — Classic gateway capabilities on an S3 Mini
+#define HAS_PIC           1    // PIC microcontroller drives the OT bus
+#define HAS_PIC_WATCHDOG  1    // Classic PCB carries the external 0x26 I2C watchdog
+#define HAS_DIRECT_OT     0    // No OT-direct hardware on the Classic PCB
+#define HAS_ETH_CAPABLE   0    // No W5500 on the Classic PCB
+#define HAS_OLED_CAPABLE  1    // Optional I2C OLED on the Classic I2C header
+// SAT runs fine on the S3 (RAM/BLE present); boiler control goes via the PIC
+// command queue, which SAT already uses on this hardware class.
+#define HAS_SAT              1
+#define HAS_SAT_BLE          1  // S3 BLE radio present (SATble room sensors)
+#define HAS_WEATHER_FORECAST 1  // S3 RAM budget allows the hourly forecast arrays
+#define HAS_REST_TX_COALESCING 1  // same sync-WebServer stall as OTGW32 (TASK-743)
+#define HAS_FRAGMENTATION_AWARE_HEAP_GATE 1  // ESP32-S3 heap gating (TASK-743)
+#define HW_TYPE_NAME      "otgw-classic"  // Static hardware-type slug / board class (ADR-113)
+#define BOARD_NAME        "Nodoshop OTGW Classic (ESP32-S3)"  // Display string (boardName())
+#define HAS_LEDC_LED      1    // S3 ledc PWM dimming, same as OTGW32
+// LED PWM brightness (ledc, 8-bit; active-LOW LEDs use output inversion)
+#define LED_BRIGHTNESS    5
+
+// SAT per-platform buffer sizing — ESP32-S3 SRAM budget (same as OTGW32).
+#define SAT_WIN4H_SIZE          360
+#define SAT_FLOW_SAMPLE_SIZE    256
+#define SAT_TAIL_SAMPLE_SIZE    180
+#define HCR_DAYS                30
+#define HCR_INTRADAY_SIZE       1440
+#define SAT_CYCLES_FILE_BUF_SIZE 4896
+typedef uint16_t SAT_RING_IDX_T;
+
+// MQTT per-platform tuning — ESP32-S3 values (same as OTGW32).
+#define MQTT_DISCOVERY_HEAP_MIN   2048
+#define STATUS_BURST_COOLDOWN_MS  250
+
+// ---------------------------------------------------------------------------
 #else
-  #error "No board defined. Set BOARD_NODOSHOP_ESP8266 or BOARD_NODOSHOP_ESP32."
+  #error "No board defined. Set BOARD_NODOSHOP_ESP8266, BOARD_NODOSHOP_ESP32 or BOARD_NODOSHOP_ESP32_CLASSIC."
 #endif
+
+// HAS_RUNTIME_HW_DETECT is retired (ADR-125 combo experiment, superseded):
+// every board is a fixed compile-time class. Keep the flag defined 0 so any
+// straggling reference fails soft rather than failing to compile.
+#define HAS_RUNTIME_HW_DETECT 0
 
 /***************************************************************************
 *

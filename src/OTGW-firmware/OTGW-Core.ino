@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.164
+**  Version  : v2.0.0-alpha.175
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -57,18 +57,20 @@
 #define OTGW_RESET  PIN_PIC_RST
 #endif
 
-#if HAS_PIC
-//external watchdog (PIC board I2C watchdog at 0x26)
+#if HAS_PIC_WATCHDOG
+//external watchdog (Classic ESP8266 I2C watchdog board at 0x26) — ADR-125
 #define EXT_WD_I2C_ADDRESS 0x26
 
-//used by update firmware functions
+//Macro to Feed the Watchdog
+#define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
+#endif
+
+#if HAS_PIC
+//used by update firmware functions (PIC self-programming over HTTP)
 const char *hexheaders[] = {
   "Last-Modified",
   "X-Version"
 };
-
-//Macro to Feed the Watchdog
-#define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
 #endif
 
 /* --- PRINTF_BYTE_TO_BINARY macro's --- */
@@ -836,8 +838,9 @@ void sendPICBootCommands(){
 }
 
 //===================[ Watchdog OTGW ]===============================
-#if HAS_PIC
-// External I2C watchdog at 0x26 — PIC-based Nodoshop boards only
+#if HAS_PIC_WATCHDOG
+// External I2C watchdog at 0x26 — Classic ESP8266 Nodoshop board only (ADR-125).
+// Combo + OTGW32 (HAS_PIC_WATCHDOG=0) use the ESP32 Task Watchdog below.
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   // Hardware WatchDog is based on:
   // https://github.com/rvdbreemen/ESPEasySlaves/tree/master/TinyI2CWatchdog
@@ -902,8 +905,15 @@ void feedWatchDog() {
   //yield();
 }
 
-#else  // !HAS_PIC — OTGW32: use ESP32 Task Watchdog Timer
+#else  // !HAS_PIC_WATCHDOG — OTGW32 (ESP32-S3): use ESP32 Task Watchdog Timer
 #include <esp_task_wdt.h>
+
+// True once the loop task is registered with the TWDT (initWatchDog ran).
+// feedWatchDog() is called all through early setup() — long BEFORE initWatchDog()
+// (which sits after the network bring-up) — so resetting the TWDT before the
+// task is subscribed spams "esp_task_wdt_reset: task not found" on the console.
+// Guard on this flag: no spam, and the WD simply isn't armed until it's set up.
+static bool s_twdtReady = false;
 
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   if (reasonSize > 0) reasonBuf[0] = '\0';
@@ -925,6 +935,7 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
   if (esp_task_wdt_status(NULL) != ESP_OK) {
     esp_task_wdt_add(NULL);
   }
+  s_twdtReady = true;  // from here feedWatchDog() may safely reset the TWDT
 }
 
 void WatchDogEnabled(byte stateWatchdog) {
@@ -934,7 +945,7 @@ void WatchDogEnabled(byte stateWatchdog) {
 
 void feedWatchDog() {
   DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
-  if DUE(timerWD) {
+  if (DUE(timerWD) && s_twdtReady) {
     esp_task_wdt_reset();
   }
   DECLARE_TIMER_MS(timerWDBlink, 1000, SKIP_MISSED_TICKS);
@@ -4533,9 +4544,10 @@ void processOT(const char *buf, int len, bool suppressOutput){
 */
 void handlePICSerial()
 {
-#if !HAS_PIC
-  return;  // No PIC serial on OTGW32 — OT-direct uses loopOTDirect() instead
-#else
+#if HAS_PIC
+  // Always drain the PIC UART on PIC-capable builds. ADR-060 recovery sends a
+  // direct PR=A probe after a missed boot ETX; the banner can only re-enable PIC
+  // functions if this reader keeps running while state.pic.bAvailable is false.
   //handle serial communication and line processing
   #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
   #define MAX_BUFFER_WRITE 128
@@ -4622,7 +4634,7 @@ void handlePICSerial()
     }
   }
 
-  if (settings.mqtt.bLegacyPort25238Enabled) {
+  if (isPICEnabled() && settings.mqtt.bLegacyPort25238Enabled) {
     //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
     size_t cmdsProcessed = 0;
     while (OTGWstream.available() && cmdsProcessed < kMaxLinesPerDrain){

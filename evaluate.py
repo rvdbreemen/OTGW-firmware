@@ -552,7 +552,9 @@ ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
 # sites) and shims added for the divergent runtime APIs (3b: platformWiFiIsEncrypted,
 # platformGetResetReasonChar, platformNtpHostnameFix — restAPI/OTDirect/networkStuff
 # callers de-ifdef'd, 4 sites). 33 -> 19. ADR-115 documents the boards.h home.
-ESP_ABSTRACTION_BASELINE: int = 4
+# TASK-854: boardName() collapsed onto boards.h BOARD_NAME and the ledc LED
+# driver re-gated on HAS_LEDC_LED (boards.h flag) - 4 -> 1.
+ESP_ABSTRACTION_BASELINE: int = 1
 
 _ESP_PLATFORM_PP_RE = re.compile(
     r'^\s*#\s*(?:if|ifdef|ifndef|elif)\b.*\b'

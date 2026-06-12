@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.164
+**  Version  : v2.0.0-alpha.175
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -836,9 +836,8 @@ void initOTDirect() {
     OTDDebugTln(F("OT-direct: Slave interface started"));
   }
 
-  // 6. Always set OT_DIRECT mode — this is OTGW32 hardware.
-  //    Bus liveness is tracked via state.otBus.bOnline, not eMode.
-  //    The OT-direct loop must keep running so it can retry/recover.
+  // 6. Set OT_DIRECT mode. Bus liveness is tracked via state.otBus.bOnline,
+  //    not eMode; the OT-direct loop must keep running so it can retry/recover.
   state.hw.eMode = HW_MODE_OT_DIRECT;
   OTDDebugTln(F("OT-direct: Hardware mode set to OT_DIRECT"));
 

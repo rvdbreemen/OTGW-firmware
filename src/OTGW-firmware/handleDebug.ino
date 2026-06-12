@@ -325,15 +325,19 @@ void handleDebugChar(char c){
                 break;
             case 'a':
 #if HAS_PIC
-                DebugTln(F("Send PR=A command, to ID the chip"));
-                getpicfwversion();
-                DebugTln(F("Debug --> PR=A report firmware version, type"));
-                strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
-                OTDebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
-                strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
-                OTDebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
-                strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
-                OTDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
+                if (isPICEnabled()) {          // skip when the PIC is unavailable
+                  DebugTln(F("Send PR=A command, to ID the chip"));
+                  getpicfwversion();
+                  DebugTln(F("Debug --> PR=A report firmware version, type"));
+                  strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
+                  OTDebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
+                  strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
+                  OTDebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
+                  strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
+                  OTDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
+                } else {
+                  DebugTln(F("PIC not available or not active in this mode"));
+                }
 #else
                 DebugTln(F("PIC not available on this hardware"));
 #endif

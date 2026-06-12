@@ -221,29 +221,58 @@ exit /b 2
 
 :select_bin
 set "BIN_FILE="
-if "%ARG_BIN%"=="" (
-    for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do (
-        if not defined BIN_FILE set "BIN_FILE=%%F"
-    )
-    if not defined BIN_FILE (
-        for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do (
-            if not defined BIN_FILE set "BIN_FILE=%%F"
-        )
-    )
-    if not defined BIN_FILE (
-        echo [ERROR] No merged-full bin found.
-        echo         Expected in: %SCRIPT_DIR%
-        echo                  or: %SCRIPT_DIR%build\
-        echo         Use --bin to specify a path.
-        exit /b 1
-    )
-) else (
+
+REM Explicit --bin always wins, no enumeration.
+if not "%ARG_BIN%"=="" (
     if not exist "%ARG_BIN%" (
         echo [ERROR] Specified --bin file does not exist: %ARG_BIN%
         exit /b 1
     )
     set "BIN_FILE=%ARG_BIN%"
+    exit /b 0
 )
+
+REM Collect all merged-full candidates. Prefer the script dir; fall back to build\.
+REM A release zip carries exactly one bin -> single match -> auto-selected. When
+REM several coexist (e.g. both ESP32-S3 targets, esp32 and esp32-combo, in build\)
+REM we list them and let the user choose instead of silently grabbing the first.
+set "BIN_COUNT=0"
+for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-merged-full.bin") do call :add_bin "%%F"
+if !BIN_COUNT! EQU 0 (
+    for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-merged-full.bin") do call :add_bin "%%F"
+)
+
+if !BIN_COUNT! EQU 0 (
+    echo [ERROR] No merged-full bin found.
+    echo         Expected in: %SCRIPT_DIR%
+    echo                  or: %SCRIPT_DIR%build\
+    echo         Use --bin to specify a path.
+    exit /b 1
+)
+
+if !BIN_COUNT! EQU 1 (
+    set "BIN_FILE=!BIN_1!"
+    exit /b 0
+)
+
+echo.
+echo [INFO] Multiple firmware images found:
+for /l %%I in (1,1,!BIN_COUNT!) do echo   [%%I] !BIN_%%I_NAME!
+echo.
+set /p "BIN_CHOICE=Select firmware number [1-!BIN_COUNT!]: "
+call set "BIN_FILE=%%BIN_!BIN_CHOICE!%%"
+if "!BIN_FILE!"=="" (
+    echo [ERROR] Invalid firmware selection.
+    exit /b 1
+)
+exit /b 0
+
+
+:add_bin
+REM Append one bin path to the indexed BIN_<n> / BIN_<n>_NAME lists.
+set /a BIN_COUNT+=1
+set "BIN_!BIN_COUNT!=%~1"
+for %%N in ("%~1") do set "BIN_!BIN_COUNT!_NAME=%%~nxN"
 exit /b 0
 
 

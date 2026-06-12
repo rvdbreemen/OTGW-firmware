@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.164
+**  Version  : v2.0.0-alpha.175
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -52,7 +52,9 @@ extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 #if HAS_PIC
 #define PICRST  PIN_PIC_RST
 #define PICFIRMWARE "/gateway.hex"
-OTGWSerial OTGWSerial(PICRST, LED2);
+// rx/tx: PIC UART pins from boards.h — must be passed here because the
+// OTGWSerial library TU cannot see board pin macros (TASK-862, bug-119).
+OTGWSerial OTGWSerial(PICRST, LED2, PIN_PIC_RX, PIN_PIC_TX);
 void fwupgradestart(const char *hexfile);
 void handlePendingUpgrade();
 #endif
@@ -549,23 +551,19 @@ inline String getActiveMAC() {
   return WiFi.macAddress();
 }
 
-// Returns a PROGMEM string describing the board variant.
+// Returns a PROGMEM string describing the board variant. BOARD_NAME comes from
+// the board's section in boards.h (same pattern as HW_TYPE_NAME), so no raw
+// BOARD_* conditionals are needed here (ESP-abstraction rule).
 inline const __FlashStringHelper* boardName() {
-#if defined(BOARD_NODOSHOP_ESP8266)
-  return F("Nodoshop OTGW (ESP8266)");
-#elif defined(BOARD_NODOSHOP_ESP32)
-  return F("Nodoshop OTGW32 (ESP32-S3)");
-#elif defined(BOARD_SEEGEL_OTTHING)
-  return F("OT-Thing Seegel (ESP32-S3)");
-#else
-  return F("Unknown board");
-#endif
+  return F(BOARD_NAME);
 }
 
-// Returns the static hardware-type slug (board class) — compile-time, machine-readable.
-// Distinct from hardwareModeName() (runtime operational mode) and boardName() (display
-// string). This is the contract codepath/UI selection switches on; see ADR-113.
-// Values: "otgw-classic" (HAS_PIC=1), "otgw32" (HAS_PIC=0), future "ot-thing".
+// Returns the hardware-type slug (board class) — machine-readable. Distinct from
+// hardwareModeName() (runtime operational mode) and boardName() (display string).
+// This is the contract codepath/UI selection switches on; see ADR-113.
+// Values: "otgw-classic" (PIC) or "otgw32" (OTDirect); future "ot-thing".
+// Compile-time per board class — every board is a fixed build (no runtime
+// hardware detection; the ADR-125 combo experiment is superseded).
 inline const __FlashStringHelper* hardwareTypeName() {
   return F(HW_TYPE_NAME);
 }

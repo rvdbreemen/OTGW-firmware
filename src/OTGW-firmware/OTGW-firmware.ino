@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.164
+**  Version  : v2.0.0-alpha.175
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -68,6 +68,14 @@ bool writeWifiPortalResetState(const WifiPortalResetState &portalState) {
 }
 
 void clearWifiPortalResetState() {
+  // Skip the write when the stored state is already cleared: on ESP32 this is
+  // an NVS commit, and a normal boot would otherwise burn a no-op flash write
+  // every cycle (platform_esp32.h: call platformRtcWrite() infrequently).
+  WifiPortalResetState storedState = { 0, 0 };
+  if (readWifiPortalResetState(storedState) &&
+      storedState.magic == WIFI_PORTAL_RESET_MAGIC && storedState.resetCount == 0) {
+    return;
+  }
   WifiPortalResetState portalState = { WIFI_PORTAL_RESET_MAGIC, 0 };
   writeWifiPortalResetState(portalState);
 }
@@ -111,7 +119,12 @@ bool shouldForceWifiConfigPortal() {
     wifiPortalResetWindowDeadline = 0;
   }
 
-  writeWifiPortalResetState(portalState);
+  // Only persist when something actually changed — on a normal power-on boot
+  // (no external reset, count already 0) this skips an NVS commit on ESP32.
+  if (portalState.magic != storedState.magic ||
+      portalState.resetCount != storedState.resetCount) {
+    writeWifiPortalResetState(portalState);
+  }
   return forcePortal;
 }
 
@@ -126,15 +139,18 @@ void setup() {
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
+
+  // I2C must be on the board's pins BEFORE the watchdog-disarm below. On the
+  // ESP8266 the Wire defaults happen to equal PIN_I2C_SDA/SCL (4/5), but on the
+  // ESP32-S3 Classic they do not (35/36 vs core defaults) — without this the
+  // 0x26 disarm goes out on the wrong pins and an armed watchdog from the
+  // previous session can reset the board mid-WiFi-portal. Wire.begin() is
+  // idempotent; initWatchDog() re-runs it later.
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   WatchDogEnabled(0); // turn off watchdog
 
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf(PSTR("Booting....[%s]\r\n\r\n"), _VERSION);
-
-  detectPIC();
-#if HAS_DIRECT_OT
-  initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)
-#endif
 
   //setup randomseed the right way
   randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
@@ -155,12 +171,10 @@ void setup() {
   // without this early call the DHCP request carries the default "ESP-XXXXXX".
   platformSetHostname(CSTR(settings.sHostname));
 
-  // [TASK-750] Bring up I2C + OLED BEFORE startWiFi(): the WiFiManager config
+  // [TASK-750] Bring up the OLED BEFORE startWiFi(): the WiFiManager config
   // portal blocks inside startWiFi(), so the boot splash and the "how to
   // connect" config screen must already be on the display by the time the
-  // portal opens. Wire.begin() is idempotent; initWatchDog() re-runs it later
-  // for the external watchdog.
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  // portal opens. I2C is already up (top of setup, before the watchdog disarm).
   initOLED();
 
   // Connect to and initialise WiFi network
@@ -174,6 +188,14 @@ void setup() {
   if (state.net.bAPFallback) {
     SetupDebugf(PSTR("BETA: running in AP fallback mode, SSID=[%s]\r\n"), state.net.sAPSSID);
   }
+#endif
+
+  // PIC / OT-direct bring-up. Runs AFTER WiFi configuration (TASK-853): the
+  // captive portal on a fresh flash must never be blocked by the PIC probe.
+  // Each board class is fixed at compile time (no runtime hardware detection).
+  detectPIC();
+#if HAS_DIRECT_OT
+  initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)
 #endif
 
   //setup NTP after WiFi; startNTP() restores hostname after configTime()
@@ -256,9 +278,9 @@ void setup() {
 
 //===[ blink status led ]===
 
-#if defined(BOARD_NODOSHOP_ESP32)
+#if HAS_LEDC_LED
 // --- ESP32-S3: PWM-dimmed LEDs via ledc ------------------------------------
-// LED1 (GPIO2, OT Red) and LED2 (GPIO8, Status) are active LOW.
+// Active-LOW status LEDs (PIN_LED1/PIN_LED2 from boards.h).
 // ledc output inversion: duty=0 → pin HIGH → LED off;
 //                        duty=LED_BRIGHTNESS → pin briefly LOW → LED dim on.
 // Same technique as OT-Thing firmware (LED_BRIGHTNESS=5, ~2% on-time).
@@ -302,7 +324,7 @@ void blinkLEDnow(uint8_t led) {
   }
 }
 
-#else  // ESP8266 --------------------------------------------------------------
+#else  // plain digitalWrite LEDs (ESP8266) ------------------------------------
 
 void setLed(uint8_t led, uint8_t status){
   pinMode(led, OUTPUT);
@@ -316,7 +338,7 @@ void blinkLEDnow(uint8_t led){
   } else setLed(led, OFF);
 }
 
-#endif  // BOARD_NODOSHOP_ESP32
+#endif  // HAS_LEDC_LED
 
 // Zero-argument wrapper — calls LED1 variant. Defined once for both boards.
 void blinkLEDnow() { blinkLEDnow(LED1); }
@@ -603,8 +625,12 @@ void doBackgroundTasks()
       handleMQTT();                 // MQTT transmissions
       handlePICSerial();            // OTGW/PIC handling
 #if HAS_DIRECT_OT
-      handleOTDirectBridgeStream(); // OTGW32/TCP 25238 command bridge
-      loopOTDirect();               // OT-direct GPIO poll (OTGW32 only)
+      // Run the OT-direct engine only when the OT-direct hardware is active
+      // (guards against a degraded init on the fixed OTGW32).
+      if (isOTDirectEnabled()) {
+        handleOTDirectBridgeStream(); // OTGW32/TCP 25238 command bridge
+        loopOTDirect();               // OT-direct GPIO poll
+      }
 #endif
       handleWebSocket();            // WebSocket handling for OT log streaming
       // TASK-817: drain several pending connections per loop. The sync WebServer
