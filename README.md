@@ -4,13 +4,13 @@
 [![GitHub release](https://img.shields.io/github/v/release/rvdbreemen/OTGW-firmware?style=flat-square)](https://github.com/rvdbreemen/OTGW-firmware/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
-OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on the ESP8266 or ESP32 Wi-Fi module inside the OTGW device, monitors the OpenTherm bus between your thermostat and boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API. With v2.0.0, the firmware also runs natively on the OTGW32 board with an ESP32, adding direct GPIO OpenTherm control, Ethernet, BLE room sensors, and a OLED display.
+OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on the ESP32 Wi-Fi module inside the OTGW device, monitors the OpenTherm bus between your thermostat and boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API. With v2.0.0, the firmware also runs natively on the OTGW32 board with an ESP32, adding direct GPIO OpenTherm control, Ethernet, BLE room sensors, and a OLED display.
 
 ---
 
 ## What's New in v2.0.0
 
-Version 2.0.0 is a major platform release. It ships full ESP32/OTGW32 support alongside the established ESP8266/OTGW path in a single unified codebase. Both platforms build from the same source tree via PlatformIO.
+Version 2.0.0 is a major platform release. It targets the ESP32/OTGW32 platform; the ESP8266 is no longer a 2.0.0 build target. The firmware builds from a single source tree via PlatformIO. If you are coming from a v1.x ESP8266 build, see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x).
 
 ### Highlights
 
@@ -22,7 +22,7 @@ Version 2.0.0 is a major platform release. It ships full ESP32/OTGW32 support al
 - **SAT enhancements**: Summer Simmer Index, improved solar gain compensation, expanded multi-zone support, and BLE sensor integration.
 - **250+ Home Assistant entities**: Full climate entity, all SAT entities, pressure monitoring, BLE sensor entities, and OLED status — all via MQTT auto-discovery.
 - **Wi-Fi resilience**: AP fallback mode (beta) keeps the web UI reachable when the home network is unavailable. Wi-Fi signal quality indicator in the web UI header. Triple-reset credential recovery.
-- **PlatformIO build**: Unified `platformio.ini` with `esp8266` and `esp32` environments. Arduino IDE still works for ESP8266.
+- **PlatformIO build**: `platformio.ini` builds the `esp32` environment (default). The whole codebase builds from a single source tree.
 
 **One small MQTT breaking change**: three OT-bus presence topics (`boiler_connected`, `thermostat_connected`, `otgw_connected`) moved out of the hardware-specific `otgw-pic/*` and `otgw-otdirect/*` subtrees into the generic value namespace, regardless of hardware variant. Home Assistant users are unaffected (entity `unique_id`s are stable, discovery auto-republishes). The firmware self-heals retained payloads on the deprecated topics at first MQTT reconnect. Custom MQTT consumers should update their topic patterns: see the [migration guide](docs/api/MQTT.md#migration-from-14x--pre-release-200-ot-bus-state-topics) and [ADR-084](docs/adr/ADR-084-generic-ot-bus-state-topics.md). REST API and `settings.ini` format are unchanged from v1.x.
 
@@ -30,7 +30,7 @@ Version 2.0.0 is a major platform release. It ships full ESP32/OTGW32 support al
 
 ## Features at a Glance
 
-### Both platforms (ESP8266 and ESP32)
+### Core features
 
 - Full OpenTherm bus monitoring: all 80+ message IDs decoded in real time
 - MQTT integration with 250+ Home Assistant auto-discovery entities
@@ -47,7 +47,7 @@ Version 2.0.0 is a major platform release. It ships full ESP32/OTGW32 support al
 - Triple-reset Wi-Fi credential recovery
 - Optional HTTP Basic Auth for settings and maintenance endpoints
 
-### ESP32 / OTGW32 only
+### OTGW32 hardware features
 
 - OTDirect: direct GPIO OpenTherm with five operating modes (no PIC required)
 - W5500 Ethernet with auto-failover to/from Wi-Fi
@@ -60,7 +60,7 @@ Version 2.0.0 is a major platform release. It ships full ESP32/OTGW32 support al
 
 ### Platform overview
 
-| Feature | ESP8266 (NodeMCU / Wemos D1 mini) | ESP32 / OTGW32 |
+| Feature | ESP32 OTGW (with PIC) | ESP32 / OTGW32 |
 |---|---|---|
 | OpenTherm via PIC co-processor | Yes (required) | Yes (optional) |
 | OpenTherm via direct GPIO (OTDirect) | No | Yes |
@@ -72,12 +72,16 @@ Version 2.0.0 is a major platform release. It ships full ESP32/OTGW32 support al
 | Dallas sensors | Yes | Yes |
 | S0 pulse counter | Yes | Yes |
 
-### NodoShop OTGW board variants
+### Migrating from ESP8266 (1.x)
 
-| NodoShop OTGW version | ESP8266 module |
+Firmware v1.x ran on the ESP8266 module that shipped on earlier NodoShop OTGW boards:
+
+| NodoShop OTGW version | ESP8266 module (v1.x) |
 |---|---|
 | 1.x through 2.0 | NodeMCU ESP8266 |
 | 2.3 and later | Wemos D1 mini ESP8266 |
+
+The ESP8266 is no longer a 2.0.0 build target. To move an existing OTGW to v2.0.0, swap the Wemos D1 mini ESP8266 for a LOLIN S3 Mini (ESP32-S3) drop-in: it keeps the same OTGW board and PIC co-processor, and the firmware builds for it from the same source tree. Settings files from v1.3.x load without modification.
 
 The OTGW32 is a separate board from NodoShop with an ESP32 and onboard OpenTherm interface. It can run with or without the PIC firmware chip installed.
 
@@ -153,8 +157,7 @@ python3 flash_esp.py
 Build from source and flash:
 
 ```bash
-pio run -e esp8266 --target upload    # ESP8266
-pio run -e esp32   --target upload    # ESP32 / OTGW32
+pio run -e esp32 --target upload    # ESP32 / OTGW32
 ```
 
 See [docs/FLASH_GUIDE.md](docs/FLASH_GUIDE.md) for full instructions including filesystem flashing.
@@ -323,9 +326,9 @@ Live monitoring, sensor values, and the WebSocket stream remain open without aut
 
 ## History and Scope
 
-The OpenTherm Gateway hardware and PIC firmware originate from **Schelte Bron's OTGW project** (<https://otgw.tclcode.com/>). This firmware builds on that ecosystem by running on the ESP8266 or ESP32 inside the NodoShop OTGW to expose the gateway's data and controls over the network.
+The OpenTherm Gateway hardware and PIC firmware originate from **Schelte Bron's OTGW project** (<https://otgw.tclcode.com/>). This firmware builds on that ecosystem by running on the ESP32 inside the NodoShop OTGW to expose the gateway's data and controls over the network.
 
-Primary hardware targets are the NodoShop OTGW (ESP8266, NodeMCU or Wemos D1 mini) and the NodoShop OTGW32 (ESP32). Other boards may work, but these are the tested and supported configurations.
+Primary hardware targets are the NodoShop OTGW with an ESP32-S3 (LOLIN S3 Mini) and the NodoShop OTGW32 (ESP32). Earlier ESP8266 boards ran firmware v1.x; see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x). Other boards may work, but these are the tested and supported configurations.
 
 ---
 

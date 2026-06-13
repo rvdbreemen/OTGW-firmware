@@ -1,9 +1,11 @@
 ---
 id: TASK-865.3
 title: 'docs: reconcile README/MANUAL/BUILD and ADR-082 status to ESP32-S3-only'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-06-13 05:42'
+updated_date: '2026-06-13 09:18'
 labels:
   - async-esp32s3
 dependencies: []
@@ -29,3 +31,9 @@ README/MANUAL/BUILD say ESP8266 "alongside" ESP32; reconcile to ESP32-S3-only. K
 - grep: ADR-082 Status == "Superseded by ADR-128, 2026-06-12", no other ADR-082 line changed.
 - build: docs-only diff (only *.md), no src/ touched -> no prerelease bump.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Landed docs reconciliation to ESP32-S3-only: README.md, docs/MANUAL.md, docs/guides/BUILD.md. All four binding ACs verified empirically (no 'alongside the established ESP8266'; no 'pio run -e esp8266'/'--target esp8266'; ADR-082 Status='Superseded by ADR-128, 2026-06-12'; docs-only diff, no src/ touched, no prerelease bump). No field-validation ACs remain. Non-blocking follow-up recommended: scrub docs/MANUAL.md Appendix H 'PlatformIO Environment Summary' + dual-platform prose (lines ~1545/1599/3477/3550) which still reference the deleted esp8266 env but trip no binding gate.
+<!-- SECTION:NOTES:END -->

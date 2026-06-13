@@ -126,8 +126,8 @@ This removes all build artifacts and downloaded dependencies.
 ### Additional Options
 
 ```bash
-build --target esp8266   # Build ESP8266 only
-build --target esp32     # Build ESP32 only
+build --target esp32          # Build OTGW32 (OTDirect) only
+build --target esp32-classic  # Build S3-in-Classic-socket (PIC) only
 build --no-merged        # Skip merged binary generation
 build --no-zip           # Skip distribution zip generation
 build --arduino-cli      # Use the legacy arduino-cli backend
