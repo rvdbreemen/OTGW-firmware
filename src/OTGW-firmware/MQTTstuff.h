@@ -382,10 +382,14 @@ constexpr uint8_t HA_DEVICE_COUNT = 7;
 // driver, so the choice is compile-time. boards.h (included above) makes
 // HAS_PIC visible in both TUs (the standalone MQTTHaDiscovery.cpp cannot see
 // OTGW-firmware.h).
-// KNOWN GAP on the combo board (ADR-127, deferred — TASK-847): HAS_PIC=1
-// there, so a combo running in OTDirect mode still advertises its OtCore
-// device as "pic". Cosmetic only; making this runtime touches ~17 sites in
-// two TUs and is scoped as a follow-up.
+// On fixed boards HAS_PIC=1 (classic OTGW) or HAS_DIRECT_OT=1 (OTGW32); the
+// compile-time macros below resolve correctly at build time.
+// On the combo board (HAS_RUNTIME_HW_DETECT=1, ADR-127) both flags are set but
+// only one bus is active at runtime. TASK-847 threads the runtime slug through
+// HaDiscoveryContext.otCoreSuffix / .otCoreName so normal discovery emits the
+// correct device identity per mode. The topology-clear path (topoDeviceName())
+// still uses the compile-time macro; topics orphaned by a mode-switch are
+// accepted as manual-cleanup (ADR-124 §alpha).
 #if defined(HAS_PIC) && HAS_PIC
   #define HA_OTCORE_NAME    "pic"
   #define HA_OTCORE_SUFFIX  "-pic"
@@ -431,6 +435,11 @@ struct HaDiscoveryContext {
     // Points at the file-static g_haDeviceMeta[HA_DEVICE_COUNT] in MQTTstuff.ino.
     // nullptr is safe — both emitters guard with a null-check and fall back to legacy strings.
     const HaDeviceMeta *devMeta = nullptr;         // per-device metadata (HA_DEVICE_COUNT entries)
+    // TASK-847: OtCore device suffix/name — set unconditionally in buildDiscoveryContext().
+    // Fixed boards: compile-time HA_OTCORE_SUFFIX / HA_OTCORE_NAME.
+    // Combo (HAS_RUNTIME_HW_DETECT=1): runtime from state.hw.eMode.
+    PGM_P       otCoreSuffix;    // PROGMEM ptr: "-pic" or "-ot-direct"
+    const char *otCoreName;      // RAM ptr: "pic" or "ot-direct"
     // Source template expansion (set per-source iteration)
     const char *sourceSuffix;
     const char *sourceName;

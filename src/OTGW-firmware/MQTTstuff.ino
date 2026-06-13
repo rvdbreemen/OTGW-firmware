@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.176
+**  Version  : v2.0.0-alpha.177
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2292,6 +2292,14 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   ctx.sourceSuffix = "";
   ctx.sourceName = "";
   ctx.sourceTopicSegment = "";
+  // TASK-847: OtCore device suffix/name — runtime on combo, compile-time on fixed boards.
+#if HAS_RUNTIME_HW_DETECT
+  ctx.otCoreSuffix = (state.hw.eMode == HW_MODE_OT_DIRECT) ? PSTR("-ot-direct") : PSTR("-pic");
+  ctx.otCoreName   = (state.hw.eMode == HW_MODE_OT_DIRECT) ? "ot-direct" : "pic";
+#else
+  ctx.otCoreSuffix = PSTR(HA_OTCORE_SUFFIX);
+  ctx.otCoreName   = HA_OTCORE_NAME;
+#endif
   return ctx;
 }
 
@@ -2335,7 +2343,15 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
     }
   } else {
     // MODERN (Task 5 / ADR-124): per-device metadata from ctx.devMeta[devIdx].
+    // TASK-847: on combo, OtCore suffix is runtime; fixed boards fold to kHaDeviceSuffixes[].
+#if HAS_RUNTIME_HW_DETECT
+    const char *otCoreSuffixRam = (state.hw.eMode == HW_MODE_OT_DIRECT) ? "-ot-direct" : "-pic";
+    const char *suffix = (devIdx < HA_DEVICE_COUNT)
+      ? ((devIdx == static_cast<uint8_t>(HaDevice::OtCore)) ? otCoreSuffixRam : kHaDeviceSuffixes[devIdx])
+      : "-esp";
+#else
     const char *suffix = (devIdx < HA_DEVICE_COUNT) ? kHaDeviceSuffixes[devIdx] : "-esp";
+#endif
     char identifier[sizeof(settings.mqtt.sUniqueid) + 16];
     snprintf(identifier, sizeof(identifier), "%s%s", ctx.nodeId, suffix);
     // ADR-124 §3: Gateway is the via_device hub; every other device nests under it.

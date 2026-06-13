@@ -2221,13 +2221,13 @@ static const char kOriginUrl[]  PROGMEM = "https://github.com/rvdbreemen/OTGW-fi
 // ---------------------------------------------------------------------------
 // TASK-648: modern device-identifier suffix per HaDevice; legacy uses bare nodeId.
 // ---------------------------------------------------------------------------
-static PGM_P haDeviceSuffix(HaDevice d) {
+static PGM_P haDeviceSuffix(HaDevice d, const HaDiscoveryContext &ctx) {
   switch (d) {
     case HaDevice::Boiler:     return PSTR("-boiler");
     case HaDevice::Thermostat: return PSTR("-thermostat");
     case HaDevice::Gateway:    return PSTR("-gateway");
     case HaDevice::Esp:        return PSTR("-esp");
-    case HaDevice::OtCore:        return PSTR(HA_OTCORE_SUFFIX);  // ADR-124: -pic or -ot-direct
+    case HaDevice::OtCore:     return ctx.otCoreSuffix;  // TASK-847: runtime on combo, compile-time elsewhere
     case HaDevice::Sat:        return PSTR("-sat");
     case HaDevice::Sensors:    return PSTR("-sensors");
   }
@@ -2263,7 +2263,7 @@ static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
   if (!useLegacy) {
-    if (!w.writeProgmem(haDeviceSuffix(ctx.device))) return false;
+    if (!w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;
   }
   if (!w.writeChar('"')) return false;
 
@@ -2391,7 +2391,7 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   if (!w.writeProgmem(kUniqId)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
-  if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+  if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
   if (!w.writeChar('-')) return false;
   if (!w.writeRam(idLabel)) return false;
   if (hasSrc) { if (!w.writeRam(ctx.sourceSuffix)) return false; }
@@ -2505,7 +2505,7 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
   if (!w.writeProgmem(kUniqId)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
-  if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+  if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
   if (!w.writeChar('-')) return false;
   if (!w.writeRam(label)) return false;
   if (!w.writeChar('"')) return false;
@@ -2594,7 +2594,7 @@ static const char *haDeviceShortName(const HaDiscoveryContext &ctx) {
     case HaDevice::Thermostat: return "thermostat";
     case HaDevice::Gateway:    return "gateway";
     case HaDevice::Esp:        return "esp";
-    case HaDevice::OtCore:        return HA_OTCORE_NAME;  // ADR-124: pic or ot-direct
+    case HaDevice::OtCore:     return ctx.otCoreName;  // TASK-847: runtime on combo, compile-time elsewhere
     case HaDevice::Sat:        return "sat";
     case HaDevice::Sensors:    return "sensors";
   }
@@ -2780,7 +2780,7 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
     if (!w.writeProgmem(kUniqId)) return false;
     if (!w.writeProgmem(PSTR("\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
     if (!w.writeChar('-')) return false;
     if (!w.writeRam(sensorAddress)) return false;
     if (!w.writeChar('"')) return false;
@@ -2988,14 +2988,14 @@ bool streamClimateDiscovery(PubSubClient &client,
       if (!writeJsonComma(w)) return false;
       if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
       if (!w.writeRam(ctx.nodeId)) return false;
-      if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+      if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
       if (!w.writeProgmem(PSTR("-thermostat\""))) return false;
     } else {
       if (!w.writeProgmem(PSTR("\"name\":\"DHW Control\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
       if (!w.writeRam(ctx.nodeId)) return false;
-      if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+      if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
       if (!w.writeProgmem(PSTR("-dhw_control\""))) return false;
     }
     if (!writeJsonComma(w)) return false;
@@ -3148,7 +3148,7 @@ bool streamNumberDiscovery(PubSubClient &client,
     // uniq_id: modern inserts device suffix, legacy is bare nodeId
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(PSTR("-Toutside_override\""))) return false;
     if (!writeJsonComma(w)) return false;
 
@@ -3242,7 +3242,7 @@ bool streamOverrideSensorDiscovery(PubSubClient &client,
     // Modern: device suffix inserted after nodeId. Legacy: bare nodeId + label.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(PSTR("-"))) return false;
     if (!w.writeRam(label)) return false;
     if (!w.writeProgmem(PSTR("_override\""))) return false;
@@ -3345,7 +3345,7 @@ static bool streamSatBoolSwitch(PubSubClient &client,
     // uniq_id: modern inserts device suffix between nodeId and the entity suffix.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(uniqSuffix)) return false;
     if (!w.writeProgmem(PSTR("\""))) return false;
     if (!writeJsonComma(w)) return false;
@@ -3528,7 +3528,7 @@ bool streamSatSelectDiscovery(PubSubClient &client,
     // uniq_id: modern inserts device suffix after nodeId.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(PSTR("-sat-heating-system\""))) return false;
     if (!writeJsonComma(w)) return false;
 
@@ -3607,7 +3607,7 @@ bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
     // uniq_id: modern inserts device suffix after nodeId.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
     if (!w.writeProgmem(PSTR("-resetgateway\""))) return false;
     if (!writeJsonComma(w)) return false;
 
@@ -3712,7 +3712,7 @@ bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryC
     // uniq_id: modern inserts device suffix after nodeId.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device))) return false;  // TASK-648: -<device>
+    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
     if (!w.writeChar('-')) return false;
     if (!w.writeRam(label)) return false;
     if (!w.writeChar('"')) return false;
@@ -3808,13 +3808,16 @@ static bool publishEmptyRetained(PubSubClient &client, const char *topic) {
 
 // Local helper: device short name for topology clearing (mirrors haDeviceShortName
 // but without legacyMode context — always returns the concrete device segment).
+// OtCore uses the compile-time HA_OTCORE_NAME intentionally: topology-clear runs at
+// topology-version boundaries, not at mode-switch time. A mode switch always reboots;
+// topics from the prior mode are accepted as manual-cleanup (ADR-124 §alpha).
 static const char *topoDeviceName(HaDevice d) {
   switch (d) {
     case HaDevice::Boiler:     return "boiler";
     case HaDevice::Thermostat: return "thermostat";
     case HaDevice::Gateway:    return "gateway";
     case HaDevice::Esp:        return "esp";
-    case HaDevice::OtCore:        return HA_OTCORE_NAME;  // ADR-124: pic or ot-direct
+    case HaDevice::OtCore:     return HA_OTCORE_NAME;  // compile-time; see comment above
     case HaDevice::Sat:        return "sat";
     case HaDevice::Sensors:    return "sensors";
   }
