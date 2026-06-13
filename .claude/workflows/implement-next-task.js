@@ -106,6 +106,7 @@ const selPrompt =
   (TARGET
     ? `PINNED LANE: select EXACTLY ${TARGET}. Verify it is "To Do" and every dependency is "Done"/"In Review"; set none=false and return it. Do NOT auto-pick another task and do NOT apply a single-flight guard (this is an intentional parallel lane).\n`
     : `List backlog/tasks/task-865.*.md (label async-esp32s3, parent TASK-865); read status + dependencies via \`backlog task <id> --plain\`. SINGLE-FLIGHT GUARD (this worktree only): if ANY task-865.* is already "In Progress", another lane owns this worktree -> return none=true. Otherwise pick the LOWEST dotted seq (865.1<865.2<...<865.13) that is "To Do" AND every dependency is "Done"/"In Review". Skip the epic + anything In Review/Done.\n`) +
+  `READ-ONLY: do NOT run \`backlog task edit\` or change ANY task's status here — only the Implement phase claims a task by setting it In Progress. Just read and report.\n` +
   `Return none + the task's id/title/full Description body/build targets/srcTouched(touches src/**)/fieldValidationRemains(any hardware AC)/alsoActionable (other To-Do tasks whose deps are met AND whose files are disjoint from this one).`
 const implPrompt = (sel, extra) =>
   `Implement this backlog task end-to-end in ${REPO} (branch ${BRANCH}).\n${RULES}\n\n` +
