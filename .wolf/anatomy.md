@@ -1,7 +1,31 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-13T04:48:27.462Z
-> Files: 43 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-13T06:50:25.207Z
+> Files: 65 tracked | Anatomy hits: 0 | Misses: 0
+
+## ../OTGW-firmware-esp32s3-async/
+
+- `build.py` — Colors: asset_slug, disable, print_step, print_success + 7 more (~31852 tok)
+- `flash_otgw.bat` (~2804 tok)
+- `flash_otgw.sh` — ============================================================================= (~3159 tok)
+- `platformio.ini` — Declares used (~2362 tok)
+
+## ../OTGW-firmware-esp32s3-async/.claude/skills/implement-next-task/
+
+- `SKILL.md` — implement-next-task (~852 tok)
+
+## ../OTGW-firmware-esp32s3-async/.claude/workflows/
+
+- `implement-next-task.js` — and src/libraries/OTGWSerial/OTGWSerial.cpp are OUT OF SCOPE (do not strip their internal ESP8266 if (~3713 tok)
+
+## ../OTGW-firmware-esp32s3-async/.github/workflows/
+
+- `build.yml` — CI: PlatformIO firmware build (~478 tok)
+- `dependency-scan.yml` — CI: PlatformIO dependency scan (~886 tok)
+
+## ../OTGW-firmware-esp32s3-async/scripts/
+
+- `patch_pio_libs.py` (~612 tok)
 
 ## ../OTGW-firmware/.claude/
 
@@ -366,13 +390,15 @@
 
 ## C:/Users/rvdbr/.claude/plans/
 
+- `jolly-growing-pillow.md` — Plan: ESP32-S3-only async+FreeRTOS taskset + autonomous implement-loop (~1663 tok)
 - `so-now-that-we-memoized-flame.md` — ADR-127: Combo ESP32-S3 single binary — revival van runtime PIC/OTDirect boot-detectie (~2519 tok)
 - `so-on-the-feature-mighty-bee.md` — Plan: Single ESP32-S3 binary — PIC + OTDirect, boot-detect + persist (~2815 tok)
 
 ## C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/
 
+- `feedback_discord_alpha_channel.md` (~268 tok)
 - `feedback_otgwserial_exception.md` — stay read-only (~254 tok)
-- `MEMORY.md` — OTGW-firmware Project Memory (~4512 tok)
+- `MEMORY.md` — OTGW-firmware Project Memory (~4676 tok)
 - `project_adr124_seven_device_topology.md` (~608 tok)
 - `project_buildpy_skips_combo_env.md` (~421 tok)
 
@@ -381,6 +407,19 @@
 
 ## C:/Users/rvdbr/AppData/Local/Temp/otgw-iptest/
 
+
+## C:/Users/rvdbr/AppData/Local/Temp/otgw_tasks/
+
+- `epic.md` — Decisions (Accepted 2026-06-12) (~333 tok)
+- `s10.md` — Why (ADR-123 Phase 3; WS; depends seq9 = TASK-865.9) (~863 tok)
+- `s11.md` — Why (ADR-123 Phase 3; OTA; depends seq9 = TASK-865.9) (~773 tok)
+- `s12.md` — Why (ADR-123 Phase 4; watchdog; depends seq2=TASK-865.2, seq6=TASK-865.6) (~728 tok)
+- `s13.md` — Why (ADR-123 Phase 4; depends seq2=TASK-865.2, seq6=TASK-865.6, seq9=TASK-865.9) (~1029 tok)
+- `s5.md` — Why (ADR-123 foundation; thread-safety primitives; depends seq2 = TASK-865.2) (~726 tok)
+- `s6.md` — Why (ADR-123 Phase 1, first/lowest-risk; depends seq2=TASK-865.2, seq5=TASK-865.5) (~681 tok)
+- `s7.md` — Why (ADR-123 Phase 2; engine; depends seq4=TASK-865.4, seq6=TASK-865.6) (~843 tok)
+- `s8.md` — Why (ADR-123 Phase 2; HA discovery; depends seq7 = TASK-865.7) (~650 tok)
+- `s9.md` — Why (ADR-123 Phase 3; web; depends seq2=TASK-865.2, seq4=TASK-865.4) (~1142 tok)
 
 ## bin/
 
@@ -429,6 +468,10 @@
 ## docs/superpowers/specs/
 
 
+## other-projects/
+
+- `README.md` — Project documentation (~4404 tok)
+
 ## plan/
 
 
@@ -440,9 +483,9 @@
 ## src/OTGW-firmware/
 
 - `handleDebug.ino` — Forward declaration — defined in SATweather.ino. (~7455 tok)
-- `MQTTHaDiscovery.cpp` — ======================================================================= (~72083 tok)
-- `MQTTstuff.h` — MQTTstuff.h -- HA MQTT Discovery data layer (~7112 tok)
-- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~47160 tok)
+- `MQTTHaDiscovery.cpp` — ======================================================================= (~72190 tok)
+- `MQTTstuff.h` — MQTTstuff.h -- HA MQTT Discovery data layer (~7298 tok)
+- `MQTTstuff.ino` — include <PubSubClient.h>           // MQTT client publish and subscribe functionality (~47341 tok)
 - `networkStuff.ino` — Declares char (~9865 tok)
 - `OLED.ino` — Declares stack (~7193 tok)
 - `OTDirect.ino` — Declares instances (~41490 tok)
