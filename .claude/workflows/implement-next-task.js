@@ -71,7 +71,19 @@ const implPrompt = (extra) =>
   `Steps: (1) \`backlog task edit ${sel.taskId} -s "In Progress" -a @claude\`. (2) Implement per the ## Acceptance Criteria, reading the real code at the cited anchors first (anchors may have drifted — re-grep). (3) Build: \`python build.py --target <each of ${JSON.stringify(sel.buildTargets)}>\` and GREP the log for the per-env SUCCESS line. (4) \`python evaluate.py --quick\` — no NEW failures. (5) Do NOT commit, bump, or change task status here (the Land phase does that). Only satisfy the build/evaluator-verifiable ACs; field-validation ACs are out of scope (no hardware).\n` +
   (extra || '') +
   `Return what changed, whether build + evaluator passed, which build/evaluator ACs are met with evidence, and any blockers.`
+// agent() returns null when a subagent dies on a terminal API error after retries
+// (e.g. transient server rate-limiting). Don't crash and don't leave the task stuck
+// In Progress: clean the tree, reset it To Do, and bail so the next tick retries.
+const abortRetry = async (why) => {
+  log(`ABORT (retriable): ${why}. Resetting ${sel.taskId} to To Do and discarding partial edits.`)
+  await agent(
+    `A workflow iteration for ${sel.taskId} aborted mid-run (${why}). Clean up in ${REPO} so the next tick can retry from a clean tree: run \`git -C ${REPO} checkout -- src/ backlog/tasks/\` to revert partial tracked edits; remove any partial NEW untracked source files this attempt created under src/OTGW-firmware or src/libraries (use \`git -C ${REPO} status --porcelain\` to find \`??\` entries; do NOT remove other-projects/ or the copied OpenTherm/SimpleTelnet lib dirs); then \`backlog task edit ${sel.taskId} -s "To Do" -a @claude\`. Confirm the src/ and backlog/tasks/ trees are clean.`,
+    { label: `abort-cleanup:${sel.taskId}`, phase: 'Implement' }
+  )
+  return { done: false, task: sel.taskId, title: sel.title, status: 'To Do', aborted: true, reason: why }
+}
 let impl = await agent(implPrompt(), { label: `impl:${sel.taskId}`, phase: 'Implement', schema: IMPL })
+if (!impl) return await abortRetry('implement agent died (transient API error / rate limit)')
 
 // ---- Phase: Review ---------------------------------------------------------
 phase('Review')
@@ -88,10 +100,13 @@ const revPrompt =
   `TASK body (the contract):\n${sel.body}\n\n` +
   `Run \`git -C ${REPO} diff\` (and \`git -C ${REPO} status\`). Check: (a) every build/evaluator-verifiable AC is actually met (re-run build/evaluate if unsure — build.py masks per-env failures, grep the SUCCESS line); (b) no binding ADR or CLAUDE rule is violated (PROGMEM, no-String-hot-path, raw-ifdef abstraction boundary, vendored-lib scope, no direct task-file edits); (c) scope discipline — only the task's files changed, no stray edits to other sessions' work. Default to pass=false if a build/evaluator AC is unproven. Be specific in issues.`
 let rev = await agent(revPrompt, { label: `review:${sel.taskId}`, phase: 'Review', schema: REV })
+if (!rev) return await abortRetry('review agent died (transient API error / rate limit)')
 if (!rev.pass) {
   log(`Review found issues — one fix pass: ${rev.issues}`)
   impl = await agent(implPrompt(`A prior review FAILED with these issues — fix them specifically:\n${rev.issues}\n`), { label: `fix:${sel.taskId}`, phase: 'Implement', schema: IMPL })
+  if (!impl) return await abortRetry('fix agent died (transient API error / rate limit)')
   rev = await agent(revPrompt, { label: `re-review:${sel.taskId}`, phase: 'Review', schema: REV })
+  if (!rev) return await abortRetry('re-review agent died (transient API error / rate limit)')
 }
 
 // ---- Phase: ADR (document architectural decisions) ------------------------
@@ -116,6 +131,7 @@ if (rev.pass) {
     `Use the next free ADR number (check docs/adr/). Return the action, the file paths for Land to stage, and a one-line summary.`,
     { label: `adr:${sel.taskId}`, phase: 'ADR', schema: ADR, agentType: 'adr-kit:adr-generator' }
   )
+  if (!adr) adr = { adrAction: 'none', adrFiles: [], summary: 'ADR agent unavailable (transient); skipped this iteration' }
   if (adr.adrAction !== 'none') log(`ADR ${adr.adrAction}: ${adr.adrFiles.join(', ')}`)
 }
 
@@ -145,5 +161,6 @@ const land = await agent(
   `Return commit hash, push result, the new status, a one-line note, and featureSummary.`,
   { label: `land:${sel.taskId}`, phase: 'Land', schema: LAND }
 )
+if (!land) return { done: false, task: sel.taskId, title: sel.title, status: 'In Progress', landFailed: true, reason: 'land agent died (transient API error / rate limit) after commit-ready work; needs manual land + status set' }
 
 return { done: false, task: sel.taskId, title: sel.title, build: impl.buildPassed, eval: impl.evalPassed, reviewPass: rev.pass, adr: adr.adrAction, adrFiles: adr.adrFiles, status: land.newStatus, commit: land.commitHash, pushed: land.pushed, srcTouched: sel.srcTouched, featureSummary: land.featureSummary, note: land.note, blockers: impl.blockers }
