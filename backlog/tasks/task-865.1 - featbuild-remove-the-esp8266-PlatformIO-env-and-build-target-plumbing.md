@@ -1,11 +1,11 @@
 ---
 id: TASK-865.1
 title: 'feat(build): remove the esp8266 PlatformIO env and build-target plumbing'
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:41'
-updated_date: '2026-06-13 06:54'
+updated_date: '2026-06-13 07:16'
 labels:
   - async-esp32s3
 dependencies: []
@@ -45,4 +45,6 @@ Build-plumbing esp8266 removal implemented: platformio.ini ([env:esp8266] delete
 VERIFIED: python build.py (all targets, single sequential process) emitted 6 per-env SUCCESS lines (esp32/esp32-classic/esp32-combo firmware ~7min + filesystem ~40s each), 0 FAILED, 0 esp8266 references in log. Three flash zips only: esp32-otgw32, esp32-classic, esp32-combo (no esp8266 zip). firmware.bin present per env (1.89/1.84/1.94 MB). PlatformIO config parse reports exactly 3 envs. --target esp8266 rejected (argparse exit 2). evaluate.py --quick: 61 pass / 2 warn (unchanged baseline: ESP-abstraction-baseline-1, STATUS_BURST_COOLDOWN boards.h-not-found) / 0 fail — no NEW failures. Forbidden-token grep ([env:esp8266], TARGETS[esp8266], PIO_ENV_MAP[esp8266]) empty. build.yml matrix=[esp32,esp32-classic,esp32-combo]; dependency-scan nodemcuv2 count=0. Field-validation AC (flash on S3 HW) out of scope (no hardware). Not committed/bumped/status-changed — Land phase.
 
 Broad host-side sweep (.github, bin, scripts, top-level tooling) found two residual esp8266 references OUTSIDE this task's anchor list, both deliberately deferred: (1) flash_esp.py carries an esp8266 board dict + --board esp8266 — it is a standalone developer flasher (downloads/flashes a published release), NOT wired into build.py/CI/dist-zip (dist zip bundles flash_otgw.sh/.bat only) and its bare 'esp8266': key does not match the AC grep tokens; recommend folding into the code-cut task or a follow-up. (2) scripts/fix_satcycles.py is a source-fixture generator, not build plumbing. evaluate.py esp8266 hits are the evaluator's own source-memory-model checks (code-cut task domain). Also fixed one in-scope stale comment: platformio.ini esp32 lib_ignore 'mirrors the ESP8266' reworded (comment-only, no rebuild needed).
+
+Landed in commit b9263957 (pushed to origin/feature-2.0.0-esp32s3-async). esp8266 PlatformIO env + build-target plumbing removed: platformio.ini parses to exactly 3 envs (esp32, esp32-classic, esp32-combo), default_envs=esp32; build.py, build.yml, dependency-scan.yml, flash_otgw.sh/.bat, patch_pio_libs.py de-esp8266'd. Build/evaluator-verifiable ACs PASS first-hand: all 3 esp32* envs compile (honest per-env exit 0, firmware.bin present), --target esp8266 rejected by argparse, forbidden esp8266 tokens absent, evaluate.py --quick 61 pass / 2 pre-existing-baseline warn / 0 fail. version.h/.hash build churn deliberately NOT committed (bump-owned as a unit, no prerelease bump warranted: srcTouched=false). Scope-guard: .claude/workflows+skills implement-next-task changes excluded (orchestrator-harness, not task content). REMAINING FIELD-VALIDATION AC (cannot self-certify, no hardware): flash esp32-classic + esp32-combo merged-full.bin on S3 hardware, confirm boot + AP + web UI (merged offsets changed). Reported as In Review (project backlog schema has no In Review state; on-disk status stays In Progress) pending that hardware sign-off.
 <!-- SECTION:NOTES:END -->

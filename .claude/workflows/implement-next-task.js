@@ -5,7 +5,8 @@ export const meta = {
     { title: 'Select', detail: 'pick lowest-seq To Do task whose deps are Done/In Review' },
     { title: 'Implement', detail: 'one coding agent, build + evaluator gated' },
     { title: 'Review', detail: 'adversarial check vs ACs + binding ADRs' },
-    { title: 'Land', detail: 'bump (if src) + commit + push + set status' },
+    { title: 'ADR', detail: 'document architectural decisions as a Proposed ADR' },
+    { title: 'Land', detail: 'bump (if src) + commit (incl. ADR) + push + set status' },
   ],
 }
 
@@ -41,7 +42,9 @@ const SEL = {
 }
 const sel = await agent(
   `Select the next actionable backlog task for the async ESP32-S3 migration.\n${RULES}\n\n` +
-  `In ${REPO}: list backlog/tasks/task-865.*.md (these carry label async-esp32s3, parent TASK-865). For each read frontmatter (id, status, dependencies) via the backlog CLI: \`backlog task <id> --plain\`. Pick the LOWEST dotted seq (865.1 < 865.2 < ... 865.13) whose status is "To Do" AND every dependency is "Done" or "In Review". Skip the epic TASK-865 itself and anything already In Progress/In Review/Done.\n` +
+  `In ${REPO}: list backlog/tasks/task-865.*.md (these carry label async-esp32s3, parent TASK-865). Read each frontmatter (id, status, dependencies) via the backlog CLI: \`backlog task <id> --plain\`.\n` +
+  `SINGLE-FLIGHT GUARD (check FIRST): if ANY task-865.* already has status "In Progress", a prior iteration is still running in this shared worktree — return none=true immediately. Do NOT start a concurrent iteration (two agents editing the same worktree corrupt the git index and .pio build).\n` +
+  `Otherwise pick the LOWEST dotted seq (865.1 < 865.2 < ... 865.13) whose status is "To Do" AND every dependency is "Done" or "In Review". Skip the epic TASK-865 itself and anything In Review/Done.\n` +
   `Return none=true if nothing qualifies. Otherwise return that task's id, title, the full Description body (for the implementer), the build targets its ACs name, whether it touches src/** (needs a version bump), and whether it has any field-validation AC (=> ends In Review).`,
   { label: 'select-next', phase: 'Select', schema: SEL }
 )
@@ -91,17 +94,43 @@ if (!rev.pass) {
   rev = await agent(revPrompt, { label: `re-review:${sel.taskId}`, phase: 'Review', schema: REV })
 }
 
+// ---- Phase: ADR (document architectural decisions) ------------------------
+phase('ADR')
+const ADR = {
+  type: 'object',
+  required: ['adrAction', 'adrFiles', 'summary'],
+  properties: {
+    adrAction: { type: 'string', enum: ['none', 'created', 'amended', 'superseding'], description: 'what happened to the ADR corpus this iteration' },
+    adrFiles: { type: 'array', items: { type: 'string' }, description: 'docs/adr/*.md paths created/changed for Land to stage; empty if none' },
+    summary: { type: 'string', description: 'the decision documented, or a one-line why-no-ADR' },
+  },
+}
+let adr = { adrAction: 'none', adrFiles: [], summary: 'skipped (review did not pass)' }
+if (rev.pass) {
+  adr = await agent(
+    `Document the architectural decisions in the working-tree diff for TASK ${sel.taskId} in ${REPO}, per this project's adr-kit discipline.\n${RULES}\n\n` +
+    `TASK body (its ACs may explicitly REQUIRE ADR work, e.g. supersede ADR-108/011/047/048/058 or add a new ADR):\n${sel.body}\n\n` +
+    `Run \`git -C ${REPO} diff\`. Apply the adr.review.md checks: did this change make or alter an architectural decision (new pattern, new dependency, API/MQTT/topic contract change, concurrency/threading model, supersession of an Accepted ADR)?\n` +
+    `- If YES (or the task ACs require it): author a NEW ADR (or amend a still-Proposed one) at docs/adr/ADR-NNN-kebab.md using adr-kit conventions: Status MUST be "Proposed" (NEVER flip to Accepted; that is the maintainer's human checkpoint), with Context / Decision / Alternatives Considered (>=2) / Consequences (positive+negative) / Related / References. To supersede an Accepted ADR, write a NEW superseding ADR; do NOT edit the old body, and do NOT change its Status line (the maintainer sets "Superseded by ADR-NNN" only after accepting the new one).\n` +
+    `- If NO architectural decision: adrAction="none" with a one-line reason.\n` +
+    `Use the next free ADR number (check docs/adr/). Return the action, the file paths for Land to stage, and a one-line summary.`,
+    { label: `adr:${sel.taskId}`, phase: 'ADR', schema: ADR, agentType: 'adr-kit:adr-generator' }
+  )
+  if (adr.adrAction !== 'none') log(`ADR ${adr.adrAction}: ${adr.adrFiles.join(', ')}`)
+}
+
 // ---- Phase: Land -----------------------------------------------------------
 phase('Land')
 const LAND = {
   type: 'object',
-  required: ['committed', 'commitHash', 'pushed', 'newStatus', 'note'],
+  required: ['committed', 'commitHash', 'pushed', 'newStatus', 'note', 'featureSummary'],
   properties: {
     committed: { type: 'boolean' },
     commitHash: { type: 'string' },
     pushed: { type: 'boolean' },
     newStatus: { type: 'string', description: 'In Review or Done' },
     note: { type: 'string' },
+    featureSummary: { type: 'string', description: '1-2 plain-language sentences on the user-facing feature/improvement this task delivered, for an #alpha-testing announcement; empty if nothing committed' },
   },
 }
 const land = await agent(
@@ -109,11 +138,12 @@ const land = await agent(
   `Pre-state: build/evaluator review pass=${rev.pass}; issues=${rev.issues || 'none'}. srcTouched=${sel.srcTouched}; fieldValidationRemains=${sel.fieldValidationRemains}.\n` +
   `Steps:\n` +
   `1. If review did NOT pass: do NOT commit. Set the task back to "To Do", append a note with the blocking issues, and return committed=false, newStatus="To Do".\n` +
-  `2. If review passed: if srcTouched, run \`bin/bump-prerelease.sh\` (it stages version.h + banners). Stage ONLY this task's changed paths plus the bump (use \`git add <explicit paths>\`; NEVER \`git add -A\` — the worktree may hold other in-flight work). Also \`git add\` the task's backlog/tasks/*.md status change.\n` +
+  `2. If review passed: if srcTouched, run \`bin/bump-prerelease.sh\` (it stages version.h + banners). Stage ONLY this task's changed paths plus the bump (use \`git add <explicit paths>\`; NEVER \`git add -A\` — the worktree may hold other in-flight work). Also \`git add\` the task's backlog/tasks/*.md status change AND any ADR files from the ADR phase: ${JSON.stringify(adr.adrFiles)} (the Proposed ADR ships in the same commit so the decision is documented with the code).\n` +
   `3. Commit: subject \`<type>(<scope>): <imperative> (${sel.taskId})\` referencing the task id (satisfies the commit-msg hook). No em dashes. Co-author trailer per project. \`git push -u origin ${BRANCH}\` with retry.\n` +
   `4. Task status: if fieldValidationRemains is true, set status to "In Review" (hardware/user-sign-off ACs cannot be self-certified). If false (docs/build-config only, no field AC), set "Done". Use \`backlog task edit ${sel.taskId} -s "<status>" --append-notes "<what landed + commit hash + which field-validation ACs remain>"\`.\n` +
-  `Return commit hash, push result, the new status, and a one-line note.`,
+  `5. Produce featureSummary: 1-2 plain-language sentences on the user-facing feature/improvement this task delivered (for an #alpha-testing semver-step announcement). Empty if nothing was committed.\n` +
+  `Return commit hash, push result, the new status, a one-line note, and featureSummary.`,
   { label: `land:${sel.taskId}`, phase: 'Land', schema: LAND }
 )
 
-return { done: false, task: sel.taskId, title: sel.title, build: impl.buildPassed, eval: impl.evalPassed, reviewPass: rev.pass, status: land.newStatus, commit: land.commitHash, pushed: land.pushed, note: land.note, blockers: impl.blockers }
+return { done: false, task: sel.taskId, title: sel.title, build: impl.buildPassed, eval: impl.evalPassed, reviewPass: rev.pass, adr: adr.adrAction, adrFiles: adr.adrFiles, status: land.newStatus, commit: land.commitHash, pushed: land.pushed, srcTouched: sel.srcTouched, featureSummary: land.featureSummary, note: land.note, blockers: impl.blockers }
