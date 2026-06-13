@@ -152,12 +152,13 @@ const LAND = {
 const land = await agent(
   `Land the completed work for TASK ${sel.taskId} in ${REPO} (branch ${BRANCH}).\n${RULES}\n\n` +
   `Pre-state: build/evaluator review pass=${rev.pass}; issues=${rev.issues || 'none'}. srcTouched=${sel.srcTouched}; fieldValidationRemains=${sel.fieldValidationRemains}.\n` +
-  `Steps:\n` +
-  `1. If review did NOT pass: do NOT commit. Set the task back to "To Do", append a note with the blocking issues, and return committed=false, newStatus="To Do".\n` +
-  `2. If review passed: if srcTouched, run \`bin/bump-prerelease.sh\` (it stages version.h + banners). Stage ONLY this task's changed paths plus the bump (use \`git add <explicit paths>\`; NEVER \`git add -A\` — the worktree may hold other in-flight work). Also \`git add\` the task's backlog/tasks/*.md status change AND any ADR files from the ADR phase: ${JSON.stringify(adr.adrFiles)} (the Proposed ADR ships in the same commit so the decision is documented with the code).\n` +
-  `3. Commit: subject \`<type>(<scope>): <imperative> (${sel.taskId})\` referencing the task id (satisfies the commit-msg hook). No em dashes. Co-author trailer per project. \`git push -u origin ${BRANCH}\` with retry.\n` +
-  `4. Task status: if fieldValidationRemains is true, set status to "In Review" (hardware/user-sign-off ACs cannot be self-certified). If false (docs/build-config only, no field AC), set "Done". Use \`backlog task edit ${sel.taskId} -s "<status>" --append-notes "<what landed + commit hash + which field-validation ACs remain>"\`.\n` +
-  `5. Produce featureSummary: 1-2 plain-language sentences on the user-facing feature/improvement this task delivered (for an #alpha-testing semver-step announcement). Empty if nothing was committed.\n` +
+  `Steps (ORDER MATTERS — the status must land INSIDE the commit so a later git checkout cannot revert it):\n` +
+  `1. If review did NOT pass: do NOT commit. Set the task to "To Do", append a note with the blocking issues, return committed=false, newStatus="To Do".\n` +
+  `2. Set the final status FIRST (before staging): if fieldValidationRemains set "In Review" (hardware/user-sign-off ACs cannot be self-certified), else (docs/build-config only) set "Done". \`backlog task edit ${sel.taskId} -s "<status>" --append-notes "<what landed + remaining field-validation ACs>"\`.\n` +
+  `3. If srcTouched, run \`bin/bump-prerelease.sh\` (it stages version.h + banners).\n` +
+  `4. Stage ONLY this task's changed paths via \`git add <explicit paths>\` (NEVER \`git add -A\`): its source/doc files, the bump files, any ADR files (${JSON.stringify(adr.adrFiles)}), AND the task's own backlog/tasks/*.md now carrying the new status. Do NOT stage sibling task notes or other in-flight work.\n` +
+  `5. Commit: subject \`<type>(<scope>): <imperative> (${sel.taskId})\` (satisfies the commit-msg hook). No em dashes. Co-author trailer. \`git push -u origin ${BRANCH}\` with retry.\n` +
+  `6. Produce featureSummary: 1-2 plain-language sentences on the user-facing feature/improvement (for an #alpha-testing semver-step announcement). Empty if nothing committed.\n` +
   `Return commit hash, push result, the new status, a one-line note, and featureSummary.`,
   { label: `land:${sel.taskId}`, phase: 'Land', schema: LAND }
 )

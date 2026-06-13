@@ -3,11 +3,11 @@ id: TASK-865.4
 title: >-
   feat(build): add async/FreeRTOS lib stack to ESP32 lib_deps with a gated
   link-proof smoke
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:42'
-updated_date: '2026-06-13 10:11'
+updated_date: '2026-06-13 11:23'
 labels:
   - async-esp32s3
 dependencies: []
