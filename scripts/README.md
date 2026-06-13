@@ -75,18 +75,19 @@ pwsh -File scripts/branch-hygiene-queue.ps1 -Remote origin -BaseBranch dev -Inac
 4. Adds owner/decision/notes columns for manual review
 5. Exports a sorted review queue CSV for branch governance
 
-## capture-mqtt-debug-macos.sh
+## capture-mqtt-debug.sh
 
 macOS/Linux equivalent of `capture-mqtt-debug.bat` for collecting OTGW telnet
 debug output, MQTT broker traffic, and browser DevTools output into one
-uploadable transcript.
+uploadable transcript. Both launchers use the shared `capture-mqtt-debug`
+basename; only the platform-specific `.bat` / `.sh` extension differs.
 
 ### MQTT Debug Capture Usage
 
 ```bash
-scripts/capture-mqtt-debug-macos.sh
-scripts/capture-mqtt-debug-macos.sh --device 192.168.1.50 --broker 192.168.1.10
-scripts/capture-mqtt-debug-macos.sh --device 192.168.1.50 --broker 192.168.1.10 --duration 120
+scripts/capture-mqtt-debug.sh
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --duration 120
 ```
 
 The script prompts for the OTGW device host, MQTT broker host, and optional MQTT
@@ -114,7 +115,7 @@ credentials when they are not supplied. Use `--no-prompt` for unattended runs.
 The script requires `python3` and `mosquitto_sub`. On macOS, it can install the
 Mosquitto client with Homebrew unless `--skip-tool-install` is passed. Press `Q`
 or use Ctrl+C to stop manually; timed captures also stop the MQTT, telnet, and
-browser workers cleanly before writing `transcript.txt`.
+browser workers cleanly before writing the final transcript.
 
 On each Telnet connection, including reconnects after a disconnect or reboot,
 the script parses the firmware's debug-toggle banner and enables every logging
@@ -126,8 +127,19 @@ Browser DevTools capture is enabled by default when Microsoft Edge, Google Chrom
 or Chromium can be found. On macOS, the script checks the standard `.app`
 locations under `/Applications` and `~/Applications`; use `--browser-path` if the
 browser is installed elsewhere. Browser output is written to `browser.log` and
-merged into `transcript.txt`. After a successful merge, the intermediate capture
-files are removed; upload only `transcript.txt`.
+merged into
+`transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt`. The
+working files use the same names as the Windows capture:
+`summary.txt`, `telnet.log`, `mqtt.log`, `mqtt.stderr.log`, and `browser.log`,
+under `logs/mqtt-diagnostics/<yyyyMMdd-HHmmss>/`. After a successful merge,
+those intermediate files are removed; upload only the named transcript.
+
+The deliberate platform differences are the launcher extension (`.sh` instead
+of `.bat`), command-line option style, Homebrew-based Mosquitto installation,
+and macOS/Linux browser executable paths. The newer Windows capture also has
+separate `error.txt` and crash-log capture features; the shell port continues
+to merge its existing `mqtt.stderr.log` directly into the transcript because
+adding those capture sources is outside this naming-alignment change.
 
 ## sat_boiler_emulator.py
 

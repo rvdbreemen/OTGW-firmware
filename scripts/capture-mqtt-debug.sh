@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# capture-mqtt-debug-macos.sh
+# capture-mqtt-debug.sh
 # OTGW MQTT + telnet + browser diagnostic capture for macOS/Linux
 #
 # Single-file delivery. Bash handles prompts, process supervision, mosquitto_sub,
@@ -49,8 +49,8 @@ show_help() {
 OTGW MQTT diagnostic capture for macOS/Linux
 
 Usage:
-  ./capture-mqtt-debug-macos.sh [options]
-  ./capture-mqtt-debug-macos.sh --help
+  ./capture-mqtt-debug.sh [options]
+  ./capture-mqtt-debug.sh --help
 
 Core options:
   --device <host>                         OTGW device IP/hostname
@@ -79,7 +79,8 @@ Browser DevTools capture:
   --browser-path <path>                   Explicit Chrome/Edge executable path
 
 Stop:
-  Press Q to stop cleanly and create transcript.txt.
+  Press Q to stop cleanly and create:
+  transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt
   Ctrl+C also stops cleanly.
 
 Telnet debug logging:
@@ -304,6 +305,125 @@ merge_transcript() {
   fi
 }
 
+resolve_capture_metadata() {
+  "$PYTHON" - "$DEVICE_HOST" "$TELNET_LOG" "$RUN_NAME" <<'PY'
+import json
+import re
+import sys
+import urllib.request
+
+device_host, telnet_log, run_name = sys.argv[1:4]
+metadata = {
+    "hostname": "",
+    "firmware_version": "",
+    "unique_id": "",
+    "pic_device_id": "",
+}
+sources = []
+
+def usable(value):
+    text = "" if value is None else str(value).strip()
+    return text.lower() not in {"", "null", "unknown", "(not set)"}
+
+def add(name, value, source, prefer_existing=False):
+    if not usable(value) or (prefer_existing and usable(metadata[name])):
+        return
+    metadata[name] = str(value).strip()
+    sources.append(f"{name}={source}")
+
+def get_property(value, name):
+    return value.get(name) if isinstance(value, dict) else None
+
+def get_setting(settings, name):
+    entry = get_property(settings, name)
+    if isinstance(entry, dict) and "value" in entry:
+        return entry["value"]
+    return entry
+
+def fetch_json(path):
+    request = urllib.request.Request(f"http://{device_host}{path}")
+    with urllib.request.urlopen(request, timeout=2) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+try:
+    patterns = {
+        "hostname": re.compile(r"^\s*hostname:\s*(.+?)\s*$", re.IGNORECASE),
+        "firmware_version": re.compile(r"^\s*version:\s*(.+?)\s*$", re.IGNORECASE),
+        "unique_id": re.compile(r"^\s*unique_id:\s*(.+?)\s*$", re.IGNORECASE),
+        "pic_device_id": re.compile(r"^\s*device_id:\s*(.+?)\s*$", re.IGNORECASE),
+    }
+    with open(telnet_log, "r", encoding="utf-8", errors="replace") as capture:
+        for line in capture:
+            for name, pattern in patterns.items():
+                match = pattern.match(line)
+                if match:
+                    add(name, match.group(1), "telnet.log", prefer_existing=name in {"hostname", "firmware_version"})
+except OSError:
+    pass
+
+needs_api = not all(usable(metadata[name]) for name in ("hostname", "firmware_version", "unique_id"))
+
+if needs_api:
+    try:
+        debug = get_property(fetch_json("/api/v2/debug"), "debug")
+        add("hostname", get_property(debug, "settings.hostname"), "/api/v2/debug", prefer_existing=True)
+        add("firmware_version", get_property(debug, "build.version"), "/api/v2/debug", prefer_existing=True)
+        add("unique_id", get_property(debug, "settings.mqtt.unique_id"), "/api/v2/debug")
+    except Exception:
+        pass
+
+if needs_api and not usable(metadata["unique_id"]):
+    try:
+        settings = get_property(fetch_json("/api/v2/settings"), "settings")
+        add("hostname", get_setting(settings, "hostname"), "/api/v2/settings", prefer_existing=True)
+        add("unique_id", get_setting(settings, "mqttuniqueid"), "/api/v2/settings")
+    except Exception:
+        pass
+
+if needs_api:
+    try:
+        device = get_property(fetch_json("/api/v2/device/info"), "device")
+        add("hostname", get_property(device, "hostname"), "/api/v2/device/info", prefer_existing=True)
+        add("firmware_version", get_property(device, "fwversion"), "/api/v2/device/info", prefer_existing=True)
+        if not usable(metadata["unique_id"]):
+            mac = re.sub(r"[^0-9A-Fa-f]", "", str(get_property(device, "macaddress") or ""))
+            if mac:
+                add("unique_id", f"otgw-{mac.upper()}", "/api/v2/device/info macaddress")
+    except Exception:
+        pass
+
+def safe_part(value, fallback, max_length=64):
+    part = str(value).strip() if usable(value) else fallback
+    part = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", part)
+    part = re.sub(r"\s+", "-", part)
+    part = re.sub(r"-+", "-", part).strip(".-")
+    if not part:
+        part = fallback
+    return part[:max_length].strip(".-") or fallback
+
+hostname = metadata["hostname"] if usable(metadata["hostname"]) else device_host
+firmware_version = metadata["firmware_version"] if usable(metadata["firmware_version"]) else "unknown-version"
+device_id = metadata["unique_id"] if usable(metadata["unique_id"]) else metadata["pic_device_id"]
+if not usable(device_id):
+    device_id = "unknown-id"
+
+filename = "transcript-{}-{}-{}-{}.txt".format(
+    run_name,
+    safe_part(firmware_version, "unknown-version"),
+    safe_part(hostname, device_host),
+    safe_part(device_id, "unknown-id"),
+)
+
+print(filename)
+print(hostname)
+print(firmware_version)
+print(metadata["unique_id"] if usable(metadata["unique_id"]) else "(unknown)")
+print(metadata["pic_device_id"] if usable(metadata["pic_device_id"]) else "(unknown)")
+print(device_id)
+print(", ".join(sources) if sources else "(none)")
+PY
+}
+
 stop_child() {
   local name="$1"
   local pid="$2"
@@ -347,6 +467,15 @@ stop_child() {
 }
 
 cleanup() {
+  local metadata_output
+  local transcript_filename
+  local resolved_hostname
+  local resolved_firmware_version
+  local resolved_unique_id
+  local resolved_pic_device_id
+  local resolved_device_id
+  local metadata_sources
+
   if [[ "$CLEANED_UP" -eq 1 ]]; then
     return
   fi
@@ -364,6 +493,39 @@ cleanup() {
   stop_child "Telnet capture worker" "${TELNET_PID:-}" 20
   stop_child "Browser capture worker" "${BROWSER_PID:-}" 20
 
+  if ! metadata_output="$(resolve_capture_metadata)"; then
+    metadata_output="$(printf '%s\n' \
+      "transcript-$RUN_NAME-unknown-version-$DEVICE_HOST-unknown-id.txt" \
+      "$DEVICE_HOST" \
+      "unknown-version" \
+      "(unknown)" \
+      "(unknown)" \
+      "unknown-id" \
+      "(metadata resolution failed)")"
+  fi
+  transcript_filename="$(printf '%s\n' "$metadata_output" | sed -n '1p')"
+  resolved_hostname="$(printf '%s\n' "$metadata_output" | sed -n '2p')"
+  resolved_firmware_version="$(printf '%s\n' "$metadata_output" | sed -n '3p')"
+  resolved_unique_id="$(printf '%s\n' "$metadata_output" | sed -n '4p')"
+  resolved_pic_device_id="$(printf '%s\n' "$metadata_output" | sed -n '5p')"
+  resolved_device_id="$(printf '%s\n' "$metadata_output" | sed -n '6p')"
+  metadata_sources="$(printf '%s\n' "$metadata_output" | sed -n '7p')"
+  transcript_filename="${transcript_filename:-transcript-$RUN_NAME-unknown-version-$DEVICE_HOST-unknown-id.txt}"
+  resolved_hostname="${resolved_hostname:-$DEVICE_HOST}"
+  resolved_firmware_version="${resolved_firmware_version:-unknown-version}"
+  resolved_unique_id="${resolved_unique_id:-(unknown)}"
+  resolved_pic_device_id="${resolved_pic_device_id:-(unknown)}"
+  resolved_device_id="${resolved_device_id:-unknown-id}"
+  metadata_sources="${metadata_sources:-(none)}"
+  TRANSCRIPT="$RUN_PATH/$transcript_filename"
+
+  write_summary "ResolvedHostname: $resolved_hostname"
+  write_summary "ResolvedFirmwareVersion: $resolved_firmware_version"
+  write_summary "ResolvedUniqueId: $resolved_unique_id"
+  write_summary "ResolvedPicDeviceId: $resolved_pic_device_id"
+  write_summary "ResolvedDeviceIdForFilename: $resolved_device_id"
+  write_summary "Metadata sources: $metadata_sources"
+  write_summary "Transcript filename: $transcript_filename"
   write_summary "Finished: $(timestamp)"
 
   if merge_transcript; then
@@ -977,7 +1139,6 @@ TELNET_LOG="$RUN_PATH/telnet.log"
 MQTT_LOG="$RUN_PATH/mqtt.log"
 MQTT_ERR_LOG="$RUN_PATH/mqtt.stderr.log"
 BROWSER_LOG="$RUN_PATH/browser.log"
-TRANSCRIPT="$RUN_PATH/transcript.txt"
 STOP_FILE="$RUN_PATH/.stop"
 
 : > "$SUMMARY_LOG"
@@ -1054,7 +1215,8 @@ write_summary "Telnet capture worker started: pid $TELNET_PID"
 write_summary "Capture started: $(timestamp)"
 
 echo "Capturing telnet, MQTT, and browser output in $RUN_PATH"
-echo "Press Q to stop cleanly and leave transcript.txt. Ctrl+C also stops capture."
+echo "Press Q to stop cleanly and leave a transcript timestamp-version-host-uniqueid file."
+echo "Ctrl+C also stops capture."
 
 START_SECONDS="$(date +%s)"
 while true; do
