@@ -10,10 +10,9 @@
 #
 #  Usage:
 #    ./flash_otgw.sh
-#    ./flash_otgw.sh --port /dev/ttyUSB0
+#    ./flash_otgw.sh --port /dev/ttyACM0
 #    ./flash_otgw.sh --bin <merged-full.bin>
-#    ./flash_otgw.sh --board esp8266
-#    ./flash_otgw.sh --board esp32       (Nodoshop OTGW32)
+#    ./flash_otgw.sh --board esp32       (Nodoshop OTGW32 / ESP32-S3)
 #    ./flash_otgw.sh --baud N
 #    ./flash_otgw.sh --help
 # =============================================================================
@@ -65,13 +64,12 @@ Default:
   merged-full image. WiFi credentials and settings are removed.
 
 Targeting:
-  --port <dev>         Serial port (e.g. /dev/ttyUSB0, /dev/cu.usbserial-XXXX).
-                       For esp32 the script falls back to USB VID/PID filter
-                       (303A:1001) when no --port is given.
+  --port <dev>         Serial port (e.g. /dev/cu.usbmodem-XXXX). The script
+                       falls back to the USB VID/PID filter (303A:1001) when
+                       no --port is given.
   --bin <file>         Firmware path. Use a merged-full image.
-  --board esp8266      Force board type.
-  --board esp32        (Nodoshop OTGW32 = ESP32-S3)
-  --baud N             Override baud rate (default: 460800/921600).
+  --board esp32        Force board type (Nodoshop OTGW32 = ESP32-S3).
+  --baud N             Override baud rate (default: 921600).
 
 Other:
   --help, -h           Show this help.
@@ -276,30 +274,26 @@ BIN_FILE="$(find_bin)"
 BIN_NAME="$(basename "$BIN_FILE")"
 
 # ---- Step 4: derive board from filename (or user override) -----------------
+# All 2.0.0 targets are ESP32-S3 (esp32-otgw32, esp32-classic, esp32-combo),
+# so any merged-full image maps to the esp32 board.
 if [ -z "$ARG_BOARD" ]; then
     case "$BIN_NAME" in
-        *-esp8266-*) ARG_BOARD="esp8266" ;;
-        *-esp32-*)   ARG_BOARD="esp32" ;;
+        *-esp32-*) ARG_BOARD="esp32" ;;
     esac
 fi
 
 case "$ARG_BOARD" in
-    esp8266)
-        ESPTOOL_CHIP="esp8266"
-        BOARD_NAME="Nodoshop OTGW WiFi (ESP8266)"
-        [ -z "$ARG_BAUD" ] && ARG_BAUD="460800"
-        ;;
     esp32)
         ESPTOOL_CHIP="esp32s3"
         BOARD_NAME="Nodoshop OTGW32 (ESP32-S3)"
         [ -z "$ARG_BAUD" ] && ARG_BAUD="921600"
         ;;
     "")
-        err "Could not detect board from filename. Use --board esp8266 | esp32"
+        err "Could not detect board from filename. Use --board esp32"
         exit 1
         ;;
     *)
-        err "Unknown board: $ARG_BOARD (expected esp8266 or esp32)"
+        err "Unknown board: $ARG_BOARD (expected esp32)"
         exit 1
         ;;
 esac
@@ -308,61 +302,15 @@ ok "Board:    $BOARD_NAME"
 ok "Baud:     $ARG_BAUD"
 
 # ---- Step 5: locate serial port --------------------------------------------
-# ESP32-S3 has a fixed USB VID/PID, so esptool can find it itself. ESP8266
-# boards vary too much in USB-serial chip choice for a clean filter; enumerate.
+# ESP32-S3 has a fixed USB VID/PID (303A:1001 = built-in USB-Serial JTAG), so
+# esptool can find it itself via --port-filter when no explicit --port is given.
 PORT_ARGS=""
 if [ -n "$ARG_PORT" ]; then
     PORT_ARGS="--port $ARG_PORT"
     ok "Port:     $ARG_PORT"
-elif [ "$ARG_BOARD" = "esp32" ]; then
+else
     PORT_ARGS="--port-filter vid=0x303A --port-filter pid=0x1001"
     ok "Port:     auto-detect via USB VID/PID 303A:1001"
-else
-    list_ports() {
-        case "$(uname -s)" in
-            Linux)
-                ls -1 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
-                ;;
-            Darwin)
-                ls -1 /dev/cu.usbserial-* /dev/cu.usbmodem* /dev/cu.SLAB_USBtoUART /dev/cu.wchusbserial* 2>/dev/null
-                ;;
-        esac
-    }
-
-    info "Detecting available serial ports..."
-    PORTS=()
-    while IFS= read -r p; do
-        [ -n "$p" ] && PORTS+=("$p")
-    done < <(list_ports)
-
-    if [ ${#PORTS[@]} -eq 0 ]; then
-        err "No serial ports found. Connect your OTGW via USB."
-        err "        Linux:  expect /dev/ttyUSB* or /dev/ttyACM*"
-        err "        macOS:  expect /dev/cu.usbserial-* or /dev/cu.usbmodem*"
-        exit 1
-    fi
-
-    if [ ${#PORTS[@]} -eq 1 ]; then
-        ARG_PORT="${PORTS[0]}"
-        ok "Auto-selected port: $ARG_PORT"
-    else
-        echo
-        i=1
-        for p in "${PORTS[@]}"; do
-            printf "  [%d] %s\n" "$i" "$p"
-            i=$((i+1))
-        done
-        echo
-        printf "Select port number [1-%d]: " "${#PORTS[@]}"
-        read -r CHOICE
-        if ! echo "$CHOICE" | grep -qE '^[0-9]+$' || [ "$CHOICE" -lt 1 ] || [ "$CHOICE" -gt "${#PORTS[@]}" ]; then
-            err "Invalid port selection."
-            exit 1
-        fi
-        ARG_PORT="${PORTS[$((CHOICE-1))]}"
-    fi
-    PORT_ARGS="--port $ARG_PORT"
-    ok "Port:     $ARG_PORT"
 fi
 
 ok "Firmware: $BIN_NAME"

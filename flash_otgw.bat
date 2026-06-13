@@ -15,8 +15,7 @@ REM  Usage:
 REM    flash_otgw.bat
 REM    flash_otgw.bat --port COMx
 REM    flash_otgw.bat --bin <merged-full.bin>
-REM    flash_otgw.bat --board esp8266
-REM    flash_otgw.bat --board esp32       (Nodoshop OTGW32)
+REM    flash_otgw.bat --board esp32       (Nodoshop OTGW32 / ESP32-S3)
 REM    flash_otgw.bat --baud N
 REM    flash_otgw.bat --help
 REM ============================================================================
@@ -91,25 +90,19 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 for %%F in ("%BIN_FILE%") do set "BIN_NAME=%%~nxF"
 
 REM ---- Step 3: derive board from filename (or user override) ----------------
+REM All 2.0.0 targets are ESP32-S3 (esp32-otgw32, esp32-classic, esp32-combo),
+REM so any merged-full image maps to the esp32 board.
 if "%ARG_BOARD%"=="" (
-    echo %BIN_NAME% | findstr /I /C:"-esp8266-" >nul && set "ARG_BOARD=esp8266"
     echo %BIN_NAME% | findstr /I /C:"-esp32-" >nul && set "ARG_BOARD=esp32"
 )
 if "%ARG_BOARD%"=="" (
-    echo [ERROR] Could not detect board from filename. Use --board esp8266 ^| esp32
+    echo [ERROR] Could not detect board from filename. Use --board esp32
     exit /b 1
 )
 
-if /I "%ARG_BOARD%"=="esp8266" goto board_esp8266
 if /I "%ARG_BOARD%"=="esp32"   goto board_esp32
-echo [ERROR] Unknown board: %ARG_BOARD% (expected esp8266 or esp32)
+echo [ERROR] Unknown board: %ARG_BOARD% (expected esp32)
 exit /b 1
-
-:board_esp8266
-set "ESPTOOL_CHIP=esp8266"
-set "BOARD_NAME=Nodoshop OTGW WiFi (ESP8266)"
-if "%ARG_BAUD%"=="" set "ARG_BAUD=460800"
-goto board_done
 
 :board_esp32
 set "ESPTOOL_CHIP=esp32s3"
@@ -123,9 +116,8 @@ echo [OK] Baud:     %ARG_BAUD%
 
 REM ---- Step 4: locate serial port -------------------------------------------
 REM   ESP32-S3 has a fixed USB VID/PID (303A:1001 = built-in USB-Serial JTAG),
-REM   so esptool can find it itself via --port-filter. ESP8266 boards use
-REM   varied USB-serial chips (CH340 / CP2102 / FTDI), which makes a clean
-REM   filter impractical; fall back to enumeration there.
+REM   so esptool can find it itself via --port-filter when no explicit --port
+REM   is given.
 if "%ARG_PORT%"=="" (
     if /I "%ARG_BOARD%"=="esp32" (
         set "ESPTOOL_PORT_ARGS=--port-filter vid=0x303A --port-filter pid=0x1001"
@@ -287,12 +279,10 @@ echo   Factory reset: erase flash, then write firmware and filesystem from
 echo   the merged-full image. WiFi credentials and settings are removed.
 echo.
 echo Targeting:
-echo   --port COMx          Serial port (auto-detected for esp32 via USB VID/PID,
-echo                        port menu for esp8266).
+echo   --port COMx          Serial port (auto-detected via USB VID/PID 303A:1001).
 echo   --bin ^<file^>         Firmware path. Use a merged-full image.
-echo   --board esp8266      Force board type.
-echo   --board esp32        (Nodoshop OTGW32 = ESP32-S3)
-echo   --baud N             Override baud rate (default: 460800/921600).
+echo   --board esp32        Force board type (Nodoshop OTGW32 = ESP32-S3).
+echo   --baud N             Override baud rate (default: 921600).
 echo.
 echo Other:
 echo   --help, -h           Show this help.

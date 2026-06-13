@@ -1,9 +1,11 @@
 ---
 id: TASK-865.1
 title: 'feat(build): remove the esp8266 PlatformIO env and build-target plumbing'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-13 05:41'
+updated_date: '2026-06-13 06:54'
 labels:
   - async-esp32s3
 dependencies: []
@@ -34,3 +36,13 @@ Drop the ESP8266 build target so 2.0.0 builds only ESP32-S3: `esp32` (OTGW32/OTD
 - evaluator: `python evaluate.py --quick` no new failures.
 - field: flash esp32-classic + esp32-combo merged-full.bin on S3 hardware, boot+AP+web UI (merged offsets changed).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Build-plumbing esp8266 removal implemented: platformio.ini ([env:esp8266] deleted, default_envs=esp32, header+classic/combo comments reworded), build.py (TARGETS/PIO_ENV_MAP/argparse/merge-branch/README-gen all de-esp8266'd), scripts/patch_pio_libs.py (Patch1+Patch2 dropped, orphaned patch_file helper removed, Patch3 mklittlefs PATH kept), .github/workflows/build.yml (matrix=[esp32,esp32-classic,esp32-combo]), dependency-scan.yml (-e esp32 -e esp32-classic -e esp32-combo), flash_otgw.sh/.bat (esp8266 board+autodetect removed). Evaluator: 61 pass / 2 warn (baseline) / 0 fail — no new failures. PlatformIO config parse: exactly 3 envs (esp32/esp32-classic/esp32-combo), no esp8266. --target esp8266 rejected (argparse exit 2). Full build running.
+
+VERIFIED: python build.py (all targets, single sequential process) emitted 6 per-env SUCCESS lines (esp32/esp32-classic/esp32-combo firmware ~7min + filesystem ~40s each), 0 FAILED, 0 esp8266 references in log. Three flash zips only: esp32-otgw32, esp32-classic, esp32-combo (no esp8266 zip). firmware.bin present per env (1.89/1.84/1.94 MB). PlatformIO config parse reports exactly 3 envs. --target esp8266 rejected (argparse exit 2). evaluate.py --quick: 61 pass / 2 warn (unchanged baseline: ESP-abstraction-baseline-1, STATUS_BURST_COOLDOWN boards.h-not-found) / 0 fail — no NEW failures. Forbidden-token grep ([env:esp8266], TARGETS[esp8266], PIO_ENV_MAP[esp8266]) empty. build.yml matrix=[esp32,esp32-classic,esp32-combo]; dependency-scan nodemcuv2 count=0. Field-validation AC (flash on S3 HW) out of scope (no hardware). Not committed/bumped/status-changed — Land phase.
+
+Broad host-side sweep (.github, bin, scripts, top-level tooling) found two residual esp8266 references OUTSIDE this task's anchor list, both deliberately deferred: (1) flash_esp.py carries an esp8266 board dict + --board esp8266 — it is a standalone developer flasher (downloads/flashes a published release), NOT wired into build.py/CI/dist-zip (dist zip bundles flash_otgw.sh/.bat only) and its bare 'esp8266': key does not match the AC grep tokens; recommend folding into the code-cut task or a follow-up. (2) scripts/fix_satcycles.py is a source-fixture generator, not build plumbing. evaluate.py esp8266 hits are the evaluator's own source-memory-model checks (code-cut task domain). Also fixed one in-scope stale comment: platformio.ini esp32 lib_ignore 'mirrors the ESP8266' reworded (comment-only, no rebuild needed).
+<!-- SECTION:NOTES:END -->

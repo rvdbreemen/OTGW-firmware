@@ -2,7 +2,7 @@ name: PlatformIO firmware build
 
 # 4B-H2: PR-time compile gate. Catches build breakage before merge so
 # evaluate.py-clean code that nevertheless fails to compile cannot
-# silently land. Runs both ESP8266 and ESP32 targets in parallel.
+# silently land. Runs all three ESP32-S3 targets in parallel.
 
 on:
   pull_request:
@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [esp8266, esp32]
+        env: [esp32, esp32-classic, esp32-combo]
 
     steps:
       - name: Checkout code

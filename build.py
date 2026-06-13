@@ -12,8 +12,8 @@ Requirements:
 Usage:
     build                                # Full build on Windows Command Prompt
     ./build.sh                           # Full build on Linux/macOS shells
-    build --target esp8266               # Build for ESP8266 only
-    build --target esp32                 # Build for ESP32 only
+    build --target esp32                 # Build for OTGW32 (OTDirect) only
+    build --target esp32-classic         # Build for S3-in-Classic-socket (PIC) only
     build --firmware                     # Build firmware only
     build --filesystem                   # Build filesystem only
     build --clean                        # Clean build artifacts
@@ -55,23 +55,6 @@ import config
 # Target definitions — one entry per supported chip family
 # =============================================================================
 TARGETS = {
-    "esp8266": {
-        "name": "ESP8266",
-        "core": "esp8266:esp8266",
-        "board_manager_url": "https://github.com/esp8266/Arduino/releases/download/3.1.2/package_esp8266com_index.json",
-        "fqbn": "esp8266:esp8266:d1_mini:eesz=4M2M,xtal=160,ip=lm2f",
-        "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP8266",
-        "chip": "esp8266",
-        "flash_mode": "dio",
-        "flash_freq": "40m",
-        "flash_size": "4MB",
-        "firmware_offset": "0x0",
-        "fs_offset": "0x200000",
-        "fs_tool_path": "esp8266/tools/mklittlefs",
-        "fs_block": 8192,
-        "fs_page": 256,
-        "fs_size": 2072576,    # FS_PHYS_SIZE from eagle.flash.4m2m.ld (0x1FA000)
-    },
     "esp32": {
         "name": "ESP32-S3",
         "slug": "esp32-otgw32",  # hardware-board token in asset filenames (TASK-856)
@@ -771,7 +754,7 @@ def build_filesystem(project_dir, config_file, target):
     # prepare_gzip_assets(config.DATA_DIR)  # intentionally disabled
 
     # Find mklittlefs under the target's tool path
-    # e.g. arduino/packages/esp8266/tools/mklittlefs/*/mklittlefs(.exe)
+    # e.g. arduino/packages/esp32/tools/mklittlefs/*/mklittlefs(.exe)
     tools_dir = project_dir / "arduino" / "packages" / tcfg["fs_tool_path"]
 
     mklittlefs_path = None
@@ -848,7 +831,7 @@ def consolidate_build_artifacts(project_dir, target):
     # Move firmware .bin from temp build dir, renaming to include target
     if temp_build_dir.exists():
         for file_path in temp_build_dir.glob("**/*.ino.bin"):
-            # Rename: OTGW-firmware.ino.bin -> OTGW-firmware-esp8266.ino.bin
+            # Rename: OTGW-firmware.ino.bin -> OTGW-firmware-esp32-otgw32.ino.bin
             new_name = file_path.name.replace(".ino.bin", f"-{asset_slug(target)}.ino.bin")
             process_artifact(file_path, build_dir, rename_to=new_name)
 
@@ -1073,18 +1056,12 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
     (_HOSTNAME = "OTGW") combined with the last three MAC bytes; see the
     AP construction in networkStuff.ino startWiFi().
     """
-    is_esp32 = (tcfg.get("chip") == "esp32s3")  # esp32 + esp32-classic are both ESP32-S3
     boot_hint = (
         "On the OTGW32 you usually do NOT need to press anything; the\n"
         "     built-in USB-Serial JTAG can put the chip in download mode\n"
         "     on its own. If the script reports 'no serial data' or\n"
         "     'failed to connect', hold the BOOT button while plugging\n"
         "     the USB cable in, then release BOOT and re-run the script."
-    ) if is_esp32 else (
-        "The OTGW WiFi (ESP8266) auto-resets via DTR/RTS, so no button\n"
-        "     press is normally required. If the script can't connect,\n"
-        "     try a different USB cable (some are charge-only) or hold\n"
-        "     the on-board reset/flash button briefly."
     )
 
     return (
@@ -1100,9 +1077,8 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"and override what happens. This firmware adds a Web UI, an MQTT\n"
         f"bridge, a REST API, and Home Assistant auto-discovery on top.\n"
         f"\n"
-        f"  OTGW WiFi   ESP8266 hardware (NodeMCU / Wemos D1 mini class).\n"
-        f"  OTGW32      ESP32-S3 hardware. Newer, more flash, more RAM,\n"
-        f"              native USB, BLE for SAT integration.\n"
+        f"  OTGW32      ESP32-S3 hardware: more flash, more RAM, native\n"
+        f"              USB, BLE for SAT integration.\n"
         f"\n"
         f"This archive flashes the {tcfg['name']} over USB. No Python\n"
         f"required; the flash script self-downloads Espressif's standalone\n"
@@ -1117,7 +1093,6 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"        Linux / macOS:  ./flash_otgw.sh   (in a terminal)\n"
         f"     Optional targeting flags:\n"
         f"        --port <port>   choose the serial port\n"
-        f"        --board <type>  choose esp8266 or esp32\n"
         f"        --baud <rate>   override the default baud rate\n"
         f"        --bin <file>    use a specific merged-full image\n"
         f"  3) The script downloads esptool (~8 MB) on first run,\n"
@@ -1201,11 +1176,10 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      have no data lines) or a different USB port.\n"
         f"\n"
         f"  Windows: 'No driver found' or no COM port appears\n"
-        f"      OTGW WiFi (ESP8266) needs a CH340 or CP2102 USB-serial\n"
-        f"      driver. Install the driver from the chip vendor's site,\n"
-        f"      then re-plug the USB cable. OTGW32 (ESP32-S3) uses a\n"
-        f"      built-in USB-Serial JTAG and works without an external\n"
-        f"      driver on Windows 10/11.\n"
+        f"      OTGW32 (ESP32-S3) uses a built-in USB-Serial JTAG and\n"
+        f"      works without an external driver on Windows 10/11. If no\n"
+        f"      COM port appears, try a different USB cable (some are\n"
+        f"      charge-only) or a different USB port.\n"
         f"\n"
         f"  Linux: 'Permission denied' on /dev/ttyUSB0 or /dev/ttyACM0\n"
         f"      The script auto-escalates to sudo if your user is not\n"
@@ -1214,10 +1188,10 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      then log out and back in (or run 'newgrp dialout') so\n"
         f"      the new group membership takes effect.\n"
         f"\n"
-        f"  macOS: 'cu.usbserial-* not found'\n"
-        f"      Install the CH340 driver if you have an ESP8266 with\n"
-        f"      a CH340 chip. The OTGW32 (ESP32-S3) appears as\n"
-        f"      /dev/cu.usbmodem* without any driver install.\n"
+        f"  macOS: 'cu.usbmodem* not found'\n"
+        f"      The OTGW32 (ESP32-S3) appears as /dev/cu.usbmodem*\n"
+        f"      without any driver install. If it does not show up, try\n"
+        f"      a different USB cable or port.\n"
         f"\n"
         f"  Flash succeeds but the board never connects to WiFi\n"
         f"      The flash script removes WiFi credentials. Connect to the\n"
@@ -1248,11 +1222,10 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"\n"
         f"Frequently Asked Questions\n"
         f"--------------------------\n"
-        f"  Q: How is OTGW WiFi different from OTGW32?\n"
-        f"  A: OTGW WiFi runs ESP8266 hardware with ~80 KB RAM and 4 MB\n"
-        f"     flash. OTGW32 runs ESP32-S3 with much more of both, plus\n"
-        f"     native USB and Bluetooth (used for SAT integration). The\n"
-        f"     firmware codebase is shared; build flags pick the target.\n"
+        f"  Q: Which hardware does this firmware run on?\n"
+        f"  A: OTGW32 (ESP32-S3): plenty of RAM and flash, native USB,\n"
+        f"     and Bluetooth (used for SAT integration). Build flags pick\n"
+        f"     the variant (OTDirect, PIC, or combo).\n"
         f"\n"
         f"  Q: Can I OTA-upgrade once the board is on WiFi?\n"
         f"  A: Yes. The GitHub release page also publishes the loose\n"
@@ -1302,7 +1275,6 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
     (per project conventie); gebruikt dubbelepunten, punten, komma's en
     haakjes als alternatief.
     """
-    is_esp32 = (tcfg.get("chip") == "esp32s3")  # esp32 + esp32-classic are both ESP32-S3
     boot_hint = (
         "Bij de OTGW32 hoef je meestal niets in te drukken; de\n"
         "     ingebouwde USB-Serial JTAG kan de chip zelf in download-\n"
@@ -1310,12 +1282,6 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         "     'failed to connect', houd dan de BOOT-knop ingedrukt\n"
         "     terwijl je de USB-kabel insteekt, laat BOOT los en draai\n"
         "     het script opnieuw."
-    ) if is_esp32 else (
-        "De OTGW WiFi (ESP8266) reset zichzelf via DTR/RTS, dus een\n"
-        "     druk op een knop is normaal niet nodig. Als het script\n"
-        "     toch geen verbinding krijgt, probeer een andere USB-kabel\n"
-        "     (sommige zijn alleen voor opladen) of houd de reset/flash\n"
-        "     knop op het bord kort vast."
     )
 
     return (
@@ -1333,9 +1299,8 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"MQTT-bridge, een REST API en Home Assistant auto-discovery\n"
         f"aan toe.\n"
         f"\n"
-        f"  OTGW WiFi   ESP8266-hardware (NodeMCU / Wemos D1 mini).\n"
-        f"  OTGW32      ESP32-S3 hardware. Nieuwer, meer flash, meer RAM,\n"
-        f"              native USB, BLE voor SAT-integratie.\n"
+        f"  OTGW32      ESP32-S3-hardware: meer flash, meer RAM, native\n"
+        f"              USB, BLE voor SAT-integratie.\n"
         f"\n"
         f"Dit archief flasht de {tcfg['name']} via USB. Geen Python\n"
         f"vereist; het flash-script downloadt Espressif's standalone\n"
@@ -1350,7 +1315,6 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"        Linux / macOS:  ./flash_otgw.sh   (in een terminal)\n"
         f"     Optionele doel-vlaggen:\n"
         f"        --port <poort>  kies de seriele poort\n"
-        f"        --board <type>  kies esp8266 of esp32\n"
         f"        --baud <rate>   overschrijf de standaard baudrate\n"
         f"        --bin <file>    gebruik een specifieke merged-full image\n"
         f"  3) Het script downloadt esptool (~8 MB) bij de eerste keer,\n"
@@ -1440,11 +1404,10 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      poort.\n"
         f"\n"
         f"  Windows: 'No driver found' of geen COM-poort zichtbaar\n"
-        f"      OTGW WiFi (ESP8266) heeft een CH340- of CP2102-driver\n"
-        f"      nodig. Installeer de driver van de chipfabrikant en\n"
-        f"      sluit USB opnieuw aan. OTGW32 (ESP32-S3) gebruikt een\n"
-        f"      ingebouwde USB-Serial JTAG en werkt zonder externe\n"
-        f"      driver op Windows 10/11.\n"
+        f"      OTGW32 (ESP32-S3) gebruikt een ingebouwde USB-Serial\n"
+        f"      JTAG en werkt zonder externe driver op Windows 10/11.\n"
+        f"      Verschijnt er geen COM-poort, probeer dan een andere\n"
+        f"      USB-kabel (sommige zijn alleen voor opladen) of poort.\n"
         f"\n"
         f"  Linux: 'Permission denied' op /dev/ttyUSB0 of /dev/ttyACM0\n"
         f"      Het script escaleert automatisch naar sudo als je niet\n"
@@ -1454,10 +1417,10 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      draaien) zodat de nieuwe groepslidmaatschap actief\n"
         f"      wordt.\n"
         f"\n"
-        f"  macOS: 'cu.usbserial-* not found'\n"
-        f"      Installeer de CH340-driver als je een ESP8266 met een\n"
-        f"      CH340-chip hebt. De OTGW32 (ESP32-S3) verschijnt als\n"
-        f"      /dev/cu.usbmodem* zonder driver-installatie.\n"
+        f"  macOS: 'cu.usbmodem* not found'\n"
+        f"      De OTGW32 (ESP32-S3) verschijnt als /dev/cu.usbmodem*\n"
+        f"      zonder driver-installatie. Verschijnt hij niet, probeer\n"
+        f"      dan een andere USB-kabel of poort.\n"
         f"\n"
         f"  Flash lukt, maar het bord komt niet op WiFi\n"
         f"      Het flash-script verwijdert WiFi-credentials. Verbind\n"
@@ -1491,12 +1454,10 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"\n"
         f"Veelgestelde vragen\n"
         f"-------------------\n"
-        f"  V: Wat is het verschil tussen OTGW WiFi en OTGW32?\n"
-        f"  A: OTGW WiFi draait op ESP8266-hardware met ~80 KB RAM en\n"
-        f"     4 MB flash. OTGW32 draait op ESP32-S3 met aanzienlijk\n"
-        f"     meer van beide, plus native USB en Bluetooth (gebruikt\n"
-        f"     voor SAT-integratie). De firmware-codebase is gedeeld;\n"
-        f"     build-vlaggen kiezen het target.\n"
+        f"  V: Op welke hardware draait deze firmware?\n"
+        f"  A: OTGW32 (ESP32-S3): ruim RAM en flash, native USB en\n"
+        f"     Bluetooth (gebruikt voor SAT-integratie). Build-vlaggen\n"
+        f"     kiezen de variant (OTDirect, PIC of combo).\n"
         f"\n"
         f"  V: Kan ik OTA upgraden zodra het bord op WiFi zit?\n"
         f"  A: Ja. De GitHub release-pagina publiceert ook de losse\n"
@@ -1586,7 +1547,7 @@ def create_merged_binary(project_dir, semver, target, compress=False, include_fi
     Args:
         project_dir:        Project directory path
         semver:             Semantic version string
-        target:             Target key ("esp8266" or "esp32")
+        target:             Target key ("esp32", "esp32-classic", or "esp32-combo")
         compress:           If True, also create a gzip-compressed version
         include_filesystem: If True, include the LittleFS image (full factory binary).
                             If False, produce bootloader + partitions + app only
@@ -1869,7 +1830,6 @@ def cleanup_temp_directory(project_dir):
 
 # Map target names to PlatformIO environment names
 PIO_ENV_MAP = {
-    "esp8266": "esp8266",
     "esp32": "esp32",
     "esp32-classic": "esp32-classic",
     "esp32-combo": "esp32-combo",
@@ -2187,9 +2147,8 @@ def verify_flash_on_device(project_dir, target, port):
     """Run `esptool verify-flash` against a connected device for the produced
     bootloader + partitions + app + filesystem binaries. Returns True on pass.
 
-    Covers AC #2 of TASK-290. Only meaningful for ESP32/ESP32-S3 targets where
-    multiple artifacts land at documented offsets; ESP8266 has a single merged
-    image and is out of scope.
+    Covers AC #2 of TASK-290. Meaningful for the ESP32-S3 targets where
+    multiple artifacts land at documented offsets.
     """
     tcfg = TARGETS[target]
     if "bootloader_offset" not in tcfg:
@@ -2314,8 +2273,8 @@ def main():
 Examples:
   build                                      # Full build on Windows Command Prompt
   ./build.sh                                 # Full build on Linux/macOS shells
-  build --target esp8266                     # ESP8266 only
-  build --target esp32                       # ESP32 only
+  build --target esp32                       # OTGW32 (OTDirect) only
+  build --target esp32-classic               # S3-in-Classic-socket (PIC) only
   build --firmware                           # Build firmware only
   build --filesystem                         # Build filesystem only
   build                                      # Default: full build, merged bins, distribution zip
@@ -2410,9 +2369,9 @@ Examples:
     )
     parser.add_argument(
         "--target",
-        choices=["esp8266", "esp32", "esp32-classic", "esp32-combo", "all"],
+        choices=["esp32", "esp32-classic", "esp32-combo", "all"],
         default="all",
-        help="Target platform: esp8266, esp32, esp32-classic, esp32-combo, or all (default = all four)"
+        help="Target platform: esp32, esp32-classic, esp32-combo, or all (default = all three)"
     )
     parser.add_argument(
         "--no-install-cli",
@@ -2573,33 +2532,24 @@ Examples:
                 print_error("esptool is required for creating merged binaries")
                 sys.exit(1)
 
-            flash_offset = "0x0" if target == "esp8266" else tcfg.get("bootloader_offset", "0x0")
+            flash_offset = tcfg.get("bootloader_offset", "0x0")
 
-            if target == "esp8266":
-                # ESP8266 has no separate bootloader — one merged binary covers all cases
-                merged_file = create_merged_binary(project_dir, semver, target,
-                                                   compress=args.compress, include_filesystem=True)
-                if not merged_file:
-                    print_error(f"Failed to create merged binary for {tcfg['name']}")
-                    sys.exit(1)
-                print_info(f"Flash command: esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {merged_file}")
-            else:
-                # ESP32: produce both variants
-                # 1) firmware-only merged (preserves existing filesystem/settings on flash)
-                fw_merged = create_merged_binary(project_dir, semver, target,
-                                                 compress=False, include_filesystem=False)
-                if not fw_merged:
-                    print_error(f"Failed to create firmware-only merged binary for {tcfg['name']}")
-                    sys.exit(1)
-                print_info(f"Firmware flash:  esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {fw_merged.name}")
+            # ESP32-S3: produce both variants
+            # 1) firmware-only merged (preserves existing filesystem/settings on flash)
+            fw_merged = create_merged_binary(project_dir, semver, target,
+                                             compress=False, include_filesystem=False)
+            if not fw_merged:
+                print_error(f"Failed to create firmware-only merged binary for {tcfg['name']}")
+                sys.exit(1)
+            print_info(f"Firmware flash:  esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {fw_merged.name}")
 
-                # 2) full merged (bootloader + partitions + app + filesystem, for factory install)
-                full_merged = create_merged_binary(project_dir, semver, target,
-                                                   compress=args.compress, include_filesystem=True)
-                if not full_merged:
-                    print_error(f"Failed to create full merged binary for {tcfg['name']}")
-                    sys.exit(1)
-                print_info(f"Factory flash:   esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {full_merged.name}")
+            # 2) full merged (bootloader + partitions + app + filesystem, for factory install)
+            full_merged = create_merged_binary(project_dir, semver, target,
+                                               compress=args.compress, include_filesystem=True)
+            if not full_merged:
+                print_error(f"Failed to create full merged binary for {tcfg['name']}")
+                sys.exit(1)
+            print_info(f"Factory flash:   esptool.py --chip {tcfg['chip']} --port <PORT> -b 460800 write_flash {flash_offset} {full_merged.name}")
 
         # Per-target distribution zip: bundle the merged-full bin together
         # with the cross-platform flash scripts. Requires --merged to have

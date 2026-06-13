@@ -49,12 +49,12 @@ jobs:
       - name: List outdated packages
         run: |
           set -o pipefail
-          (pio pkg outdated -e nodemcuv2 -e esp32 2>&1 | tee outdated.txt) || true
+          (pio pkg outdated -e esp32 -e esp32-classic -e esp32-combo 2>&1 | tee outdated.txt) || true
 
       - name: List installed packages
         run: |
           set -o pipefail
-          (pio pkg list -e nodemcuv2 -e esp32 2>&1 | tee pkglist.txt) || true
+          (pio pkg list -e esp32 -e esp32-classic -e esp32-combo 2>&1 | tee pkglist.txt) || true
 
       - name: Build dependency-scan summary
         run: |
