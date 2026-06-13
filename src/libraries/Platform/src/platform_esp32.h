@@ -28,8 +28,48 @@
 #include <esp_netif.h>
 #include <esp_flash.h>
 
+// ---- ADR-123 async/FreeRTOS stack (TASK-865.4) ---------------------------
+// Foundation headers for the 2.0.0 ESP32-S3 event-driven migration. Included
+// here (the platform include aggregator) ungated so every ESP32 env compiles
+// against them and PlatformIO's LDF pulls the libraries. The lib_deps pins live
+// in [env:esp32].lib_deps (inherited by esp32-classic/esp32-combo via extends).
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>   // also declares AsyncWebSocket
+#include <espMqttClient.h>
+
 // ---- Platform name -------------------------------------------------------
 #define PLATFORM_NAME "ESP32"
+
+// ---- ADR-123 async-stack link-proof smoke (TASK-865.4) -------------------
+// A bare #include only proves the headers compile, not that each library's
+// compiled object actually LINKS. This function instantiates one class per
+// async lib, which forces their out-of-line constructors (and therefore the
+// libraries' .cpp objects) to be pulled in at link time — confirmable by
+// grepping the .map for AsyncClient / AsyncWebSocket / espMqttClient.
+//
+// __attribute__((used)) defeats -flto dead-stripping: without it an uncalled
+// static function (and its references) would be eliminated and prove nothing.
+// The whole proof is gated on ASYNC_LINK_PROOF, set ONLY in [env:esp32]
+// build_flags. esp32-classic/esp32-combo do not see that flag (they rebuild
+// build_flags from the global [env]), so the smoke and its flash cost vanish
+// there — keeping the ~98.4 %-full combo binary inside its 1.875 MB app slot.
+// The function is never called: it exists purely so the linker resolves the
+// symbols. ASYNC_LINK_PROOF is a feature flag, not a platform/board macro, so
+// it does not trip the ESP-abstraction boundary check.
+#if defined(ASYNC_LINK_PROOF)
+// `inline` (not `static`) so the several .cpp TUs that include platform.h share
+// ONE COMDAT-folded definition instead of each retaining its own copy.
+inline __attribute__((used)) void platformAsyncLinkProof() {
+  volatile void *sink;
+  AsyncClient    asyncTcpProof;                 // AsyncTCP
+  AsyncWebSocket asyncWsProof("/_linkproof");   // ESPAsyncWebServer (WebSocket)
+  espMqttClient  mqttProof;                      // espMqttClient (plain, non-async)
+  sink = &asyncTcpProof;
+  sink = &asyncWsProof;
+  sink = &mqttProof;
+  (void)sink;
+}
+#endif
 
 // ---- Feature flags -------------------------------------------------------
 #define HAS_LLMNR           0    // ESP32 does not have LLMNR
