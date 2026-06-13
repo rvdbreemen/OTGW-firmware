@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Date: 2026-06-13.
+Accepted, 2026-06-13. Proposed 2026-06-13; accepted by the maintainer (Robert).
 
 This is the **Phase 1 task-lift** that ADR-123 (the 2.0.0 concurrency-model
 decision) named as the first phase to land, and the first **consumer** of the
