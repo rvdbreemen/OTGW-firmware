@@ -208,6 +208,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-086: Time-Boundary Helpers MUST Have Exactly One Call Site](ADR-086-time-boundary-single-caller-contract.md)** 🆕  
   `minuteChanged()` / `hourChanged()` / `dayChanged()` / `yearChanged()` are consume-on-read; calling them from more than one site silently drops boundary events. Renumbered from earlier ADR-064 to resolve duplicate numbering.
 
+- **[ADR-130: PIC-UART Dedicated FreeRTOS Task as Sole OTGWSerial Owner (ADR-123 Phase 1)](ADR-130-pic-uart-dedicated-task-sole-serial-owner.md)** 🆕  
+  Proposed (2026-06-13). Lifts the PIC UART runtime byte I/O onto a dedicated FreeRTOS task pinned to the app core, the sole runtime owner of `OTGWSerial` read/write; deletes the four-lines-per-call bound (`kMaxLinesPerDrain`, TASK-671). RX assembles lines onto the ADR-129 frame queue; TX uses a new value-copy `otTxQueue`; RX errors are detected in the task but reported loop-side to keep `OTGWState` single-writer. Task parks during a PIC flash (ADR-012 handshake) and on an OTDirect boot (ADR-127), gating on `isOTDirectEnabled()` so ADR-060 banner recovery survives. Refines ADR-123 §model-1's "high-priority task" to equal-to-loop priority for the Phase-1 (still-synchronous-networking) environment. First consumer of ADR-129; supersedes nothing. New CI gate `check_pic_uart_task_owns_serial`.
+
 ### Hardware and Reliability
 
 - **[ADR-011: External Hardware Watchdog for Reliability](ADR-011-external-hardware-watchdog.md)**  

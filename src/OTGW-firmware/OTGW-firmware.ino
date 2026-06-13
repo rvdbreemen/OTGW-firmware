@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.180
+**  Version  : v2.0.0-alpha.181
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -406,7 +406,14 @@ void setup() {
   // and switch to telnet port 23 for debug purposed. 
   // Setup the OTGW PIC
   resetOTGW();          // reset the OTGW pic
-  startPICStream();    // start port 25238 
+  startPICStream();    // start port 25238
+  // TASK-865.6 (ADR-123 Phase-1): hand the PIC UART to its dedicated FreeRTOS
+  // task. Started AFTER resetOTGW()/detectPIC() so boot-time control I/O
+  // (resetPic/find/version readout) has already run loop-side; from here the
+  // task is the sole runtime owner of OTGWSerial byte I/O. On an OTDirect combo
+  // boot the task immediately parks (picSerialTaskShouldPark) and never touches
+  // the closed UART. No-op on a no-PIC build.
+  startPICSerialTask();
  // initSensors();        // init DS18B20 (after MQ is up! )
   initOutputs();
   
@@ -642,8 +649,10 @@ void doTaskEvery60s(){
       || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
       || (state.pic.sDeviceid[0] == '\0'))) {
     DebugTln(F("PIC is unknown, probe pic using PR=A"));
-    OTGWSerial.write("PR=A\r\n");
-    OTGWSerial.flush();
+    // TASK-865.6: route through the PIC task's TX queue (sole UART writer)
+    // instead of writing OTGWSerial directly.
+    static const uint8_t kProbePRA[] = { 'P','R','=','A','\r','\n' };
+    enqueuePICTx(kProbePRA, sizeof(kProbePRA));
   }
 #endif
   
@@ -758,7 +767,13 @@ static void handlePicFlashBackgroundTasks()
 #if MDNS_NEEDS_UPDATE
   MDNS.update();
 #endif              // Keep MDNS active for network discovery
-  handlePICSerial();               // REQUIRED for PIC flash - processes serial communication
+#if HAS_PIC
+  // TASK-865.6: the dedicated PIC task is parked during a flash; the loop-side
+  // path must drive the OTGWSerial upgrade state machine. A single available()
+  // poll per call ticks upgradeTick() (OTGWSerial byte-I/O short-circuits to the
+  // upgrade FSM while busy()). This REPLACES the old handlePICSerial() drain.
+  picSerialPumpUpgrade();
+#endif
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
 

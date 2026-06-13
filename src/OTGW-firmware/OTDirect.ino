@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.180
+**  Version  : v2.0.0-alpha.181
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -716,9 +716,11 @@ static void bridgeFrameToParser(char prefix, unsigned long frame) {
   otDirectBridgeWriteLine(buf, 9);
   // TASK-865.5: OTDirect producer. Enqueue the 9-char frame instead of calling
   // processOT() inline; the consumer (drainOTFrameQueue) parses it in loop()
-  // context. otDirectBridgeWriteLine above stays producer-side. suppressOutput
-  // rides the queue item as otHideReports (PS=1 raw-frame suppression).
-  enqueueOTFrame(buf, 9, otHideReports);
+  // context. otDirectBridgeWriteLine above already does the OTDirect ser2net
+  // mirror producer-side, so tag source=OTDIRECT: the consumer must NOT mirror
+  // it again to 25238 (TASK-865.6). suppressOutput rides the queue item as
+  // otHideReports (PS=1 raw-frame suppression).
+  enqueueOTFrame(buf, 9, otHideReports, OTFRAME_SRC_OTDIRECT);
 }
 
 // ---------------------------------------------------------------------------

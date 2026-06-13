@@ -448,6 +448,41 @@ inline bool platformQueueReceive(PlatformQueue q, void *item, uint32_t timeoutMs
   return xQueueReceive(q, item, ticks) == pdTRUE;
 }
 
+// ---- ADR-123 dedicated-task primitives (TASK-865.6) ----------------------
+// The PIC UART moves onto its own FreeRTOS task pinned to the application core.
+// Application code uses these shims and the opaque PlatformTask handle, never
+// the raw xTaskCreatePinnedToCore / vTaskDelay symbols, so the dedicated-task
+// machinery stays behind the platform abstraction (no raw FreeRTOS in *.ino).
+using PlatformTask = TaskHandle_t;
+
+// Pin the task to the application core. APP_CPU_NUM is core 1 on a dual-core
+// ESP32-S3; the protocol core (0) is left for the WiFi/BT stack and AsyncTCP.
+// stackBytes is in BYTES (xTaskCreate wants words for some ports but the IDF
+// Arduino wrapper takes a byte count). priority 1 keeps it just above the idle
+// task; the loop()/Arduino task runs at priority 1 too, so the PIC task does
+// not pre-empt it indefinitely (both yield via the task delay below).
+// Returns nullptr on creation failure.
+inline PlatformTask platformTaskCreatePinned(void (*fn)(void *),
+                                             const char *name,
+                                             uint32_t stackBytes,
+                                             void *arg,
+                                             unsigned int priority) {
+  TaskHandle_t h = nullptr;
+  BaseType_t ok = xTaskCreatePinnedToCore(fn, name, stackBytes, arg,
+                                          (UBaseType_t)priority, &h, APP_CPU_NUM);
+  return (ok == pdPASS) ? h : nullptr;
+}
+
+// Block the calling task for ms milliseconds. This is the cooperative yield
+// point inside the PIC task loop: it MUST block (vTaskDelay) between drains so
+// it never busy-polls available() and starves the core / trips the TWDT. A 0 ms
+// delay still yields one tick (vTaskDelay(0) is a no-op, so clamp to >=1 tick).
+inline void platformTaskDelay(uint32_t ms) {
+  TickType_t ticks = pdMS_TO_TICKS(ms);
+  if (ticks == 0) ticks = 1;
+  vTaskDelay(ticks);
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

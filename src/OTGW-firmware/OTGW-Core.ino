@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.180
+**  Version  : v2.0.0-alpha.181
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -447,12 +447,16 @@ void setupOTConcurrency() {
   if (otFrameQueue == nullptr) {
     otFrameQueue = platformQueueCreate(OT_FRAME_QUEUE_DEPTH, sizeof(OTFrameMsg));
   }
+  // TASK-865.6: PIC-UART TX queue (loop-side producers -> dedicated task writer).
+  if (otTxQueue == nullptr) {
+    otTxQueue = platformQueueCreate(OT_TX_QUEUE_DEPTH, sizeof(OTTxMsg));
+  }
 }
 
 // enqueueOTFrame — producer-side. Copy the line (null-terminated), enqueue by
 // value. The ONLY two callers are the frame producers (dispatchOTGWInputLine,
 // bridgeFrameToParser). Returns false on a full queue (diagnostic drop).
-bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput) {
+bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput, uint8_t source) {
   if (otFrameQueue == nullptr || buf == nullptr || len == 0) return false;
   OTFrameMsg msg;
   if (len > sizeof(msg.line) - 1) len = sizeof(msg.line) - 1;  // clamp (defensive)
@@ -460,6 +464,7 @@ bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput) {
   msg.line[len] = '\0';                       // processOT's non-OT branches need a terminator
   msg.len = (uint16_t)len;
   msg.suppressOutput = suppressOutput;
+  msg.source = source;
   if (!platformQueueSend(otFrameQueue, &msg)) {
     otFrameQueueDrops++;
     return false;
@@ -467,20 +472,280 @@ bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput) {
   return true;
 }
 
+// Forward decl: reportPendingPICRxErrors() is defined after picSerialDrainOnce
+// but called from drainOTFrameQueue below (static fns are not auto-prototyped by
+// the Arduino preprocessor, so the prototype must precede the first use).
+#if HAS_PIC
+static void reportPendingPICRxErrors();
+#endif
+
 // drainOTFrameQueue — consumer-side. Dequeue every pending frame and parse it
 // under the OTStateLock (writer side). Called from loop() AFTER
 // doBackgroundTasks() so it never nests with the re-entrant
 // doAutoConfigure->handleOTGW enqueue path.
 void drainOTFrameQueue() {
+#if HAS_PIC
+  // TASK-865.6: report the RX-error signals the PIC task detected (it only sets
+  // plain volatile flags/counters — no MQTT/WS/OTGWState writes happen in task
+  // context). Done here, loop-side, so all network + OTGWState writes stay on the
+  // single (loop) thread.
+  reportPendingPICRxErrors();
+#endif
   if (otFrameQueue == nullptr) return;
   OTFrameMsg msg;
   while (platformQueueReceive(otFrameQueue, &msg, 0)) {
+    // PIC-only loop-side side-effects (moved off the PIC task, TASK-865.6):
+    // the LED blink and the ser2net 25238 mirror used to run producer-side in
+    // dispatchOTGWInputLine. OTDirect mirrors producer-side itself, so gate on
+    // source to avoid double-emitting OTDirect frames to 25238.
+    if (msg.source == OTFRAME_SRC_PIC) {
+      blinkLEDnow(LED2);
+      if (settings.mqtt.bLegacyPort25238Enabled) {
+        OTGWstream.write(reinterpret_cast<const uint8_t*>(msg.line), msg.len);
+        OTGWstream.write('\r');
+        OTGWstream.write('\n');
+      }
+    }
     // processOT() acquires OTStateLock internally (writer side), covering all
     // five processOT call sites uniformly — not just this consumer. Do NOT wrap
     // here too: the lock is non-recursive and would self-deadlock.
     processOT(msg.line, msg.len, msg.suppressOutput);
     feedWatchDog();                            // bound worst-case drain time
   }
+}
+
+// ===== ADR-123 Phase-1 PIC-UART dedicated task (TASK-865.6) ================
+// Definitions for the TX queue (declared in OTGW-Core.h) and the dedicated
+// FreeRTOS PIC-UART task. See the header for the full design rationale.
+PlatformQueue otTxQueue = nullptr;            // raw-byte loop->task TX queue
+
+#if HAS_PIC
+static PlatformTask    g_picSerialTask  = nullptr;  // dedicated PIC-UART task handle
+static volatile bool   g_picTaskParked  = false;    // task->loop park acknowledgement
+static uint32_t        otTxQueueDrops   = 0;         // diagnostic: full-TX-queue drops
+
+// TASK-865.6: RX-error signals DETECTED in the PIC task but REPORTED loop-side.
+// The task only sets these plain volatile flags/counters; the loop-side
+// reportPendingPICRxErrors() does the actual OTGWState write + MQTT/WS publish
+// under OTStateLock, keeping OTGWState single-writer and the network stack
+// single-threaded. The read/clear race is benign for diagnostics (no atomics).
+static volatile bool     g_picRxOverrunPending  = false;  // UART HW overrun seen
+static volatile bool     g_picRxErrorPending    = false;  // UART HW framing/parity error seen
+static volatile uint32_t g_picRxOverflowPending = 0;      // line-buffer overflows since last report
+#endif
+
+// enqueuePICTx — producer-side. Copy the bytes verbatim and queue by value for
+// the PIC task to write. Returns false on a full queue (diagnostic drop) or when
+// the TX path is not available (no PIC build / queue not yet created).
+bool enqueuePICTx(const uint8_t *buf, size_t len) {
+#if HAS_PIC
+  if (otTxQueue == nullptr || buf == nullptr || len == 0) return false;
+  OTTxMsg msg;
+  if (len > sizeof(msg.bytes)) len = sizeof(msg.bytes);   // clamp (defensive)
+  memcpy(msg.bytes, buf, len);
+  msg.len = (uint16_t)len;
+  if (!platformQueueSend(otTxQueue, &msg)) {
+    otTxQueueDrops++;
+    return false;
+  }
+  return true;
+#else
+  (void)buf; (void)len;
+  return false;
+#endif
+}
+
+#if HAS_PIC
+// picSerialFlushRx — OWNER FN. Discard any pending RX bytes from the PIC UART.
+// Used by the OTGW-replay simulation path (which feeds the parser from a file and
+// must not also ingest live PIC bytes). Runs only while the dedicated task is
+// parked (simulation implies no concurrent task drain). Byte-I/O owner: sole
+// place the simulation flush touches OTGWSerial.read()/available().
+void picSerialFlushRx() {
+  while (OTGWSerial.available()) {
+    OTGWSerial.read();
+    feedWatchDog();
+  }
+}
+
+// picSerialPumpUpgrade — OWNER FN. While a PIC/ESP flash is in progress the task
+// is parked and the loop-side flash FSM owns the UART. The OTGWSerial upgrade
+// state machine is driven from inside its byte-I/O methods (available()/read()
+// short-circuit to upgradeTick() while busy()), so a single available() poll per
+// loop keeps the upgrade ticking. Byte-I/O owner: the only loop-side UART touch
+// during a flash.
+void picSerialPumpUpgrade() {
+  // available() internally calls upgradeEvent()->upgradeTick() when an upgrade
+  // is active; the returned byte count is irrelevant (and 0 during an upgrade).
+  (void)OTGWSerial.available();
+}
+
+// picSerialDrainOnce — OWNER FN. The task body's single work unit: drain the RX
+// FIFO into complete CR/LF lines (enqueued onto the OTFrame queue with
+// source=PIC) and drain the TX queue out to the UART. This is the SOLE runtime
+// owner of OTGWSerial.read()/.write()/.availableForWrite()/.flush(). No per-call
+// line cap (kMaxLinesPerDrain is gone): the task runs on its own core slice, so
+// it can fully empty the FIFO each pass without starving the network/web stack.
+//
+// Strict byte-I/O-only mandate (TASK-865.6): this runs in TASK context, so it
+// performs NO network/MQTT/WebSocket I/O and NO OTGWState writes. RX errors are
+// DETECTED here (UART access) but only flagged via plain volatile vars; the
+// loop-side reportPendingPICRxErrors() (called from drainOTFrameQueue) does the
+// actual reporting + OTGWState write under OTStateLock. The LED blink and the
+// ser2net 25238 mirror likewise moved to the loop-side consumer.
+void picSerialDrainOnce() {
+  // ---- RX: read bytes, assemble lines, enqueue each complete line ----------
+  static char    sRead[MAX_BUFFER_READ];
+  static size_t  bytes_read = 0;
+  static bool    discardCurrentReadLine = false;
+  static uint32_t droppedReadLines = 0;
+
+  // Detect-only (no reporting in task context): set flags, report loop-side.
+  if (platformSerialHasOverrun(OTGWSerial)) g_picRxOverrunPending = true;
+  if (platformSerialHasRxError(OTGWSerial)) g_picRxErrorPending   = true;
+
+  while (OTGWSerial.available()) {
+    uint8_t outByte = OTGWSerial.read();
+    if (outByte == '\r' || outByte == '\n') {
+      if ((bytes_read == 0) && !discardCurrentReadLine) continue;
+
+      if (discardCurrentReadLine) {
+        droppedReadLines++;
+        DebugTf(PSTR("Serial line dropped after overflow. Dropped lines total: %lu\r\n"),
+                static_cast<unsigned long>(droppedReadLines));
+      }
+
+      if (!discardCurrentReadLine) {
+        sRead[bytes_read] = '\0';
+        // Pure byte->frame seam: enqueue directly (value-copy queue, thread-safe).
+        // LED + 25238 mirror are applied loop-side by the consumer (source=PIC).
+        enqueueOTFrame(sRead, bytes_read, false, OTFRAME_SRC_PIC);
+      }
+
+      bytes_read = 0;
+      discardCurrentReadLine = false;
+    } else if (bytes_read < (MAX_BUFFER_READ - 1)) {
+      if (!discardCurrentReadLine) {
+        sRead[bytes_read++] = outByte;
+      }
+    } else {
+      // Buffer overflow detected - discard this complete line. Flag only; the
+      // loop-side reporter does the OTGWState bump + MQTT/WS publish.
+      // (non-compound assign: volatile++ is deprecated in C++20 -Wvolatile)
+      g_picRxOverflowPending = g_picRxOverflowPending + 1;
+      DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes.\r\n"), bytes_read);
+      // Drop this line until next CR/LF to avoid forwarding partial/corrupted data
+      bytes_read = 0;
+      discardCurrentReadLine = true;
+    }
+    feedWatchDog();
+  }
+
+  // ---- TX: drain the command/relay byte queue out to the UART --------------
+  OTTxMsg tx;
+  while (platformQueueReceive(otTxQueue, &tx, 0)) {
+    // availableForWrite() is the only flow-control we have; if the UART TX
+    // buffer is full this pass, the bytes wait in the queue for the next tick.
+    if (OTGWSerial.availableForWrite() >= tx.len) {
+      OTGWSerial.write(tx.bytes, tx.len);
+      OTGWSerial.flush();
+    } else {
+      // Re-queue at the back and stop draining this pass; preserves order
+      // because only the task pops, and we stop after the first short write.
+      platformQueueSend(otTxQueue, &tx);
+      break;
+    }
+    feedWatchDog();
+  }
+}
+
+// reportPendingPICRxErrors — loop-side. Consume the RX-error signals the PIC
+// task flagged and do the actual reporting: OTGWState write (single-writer,
+// loop-side) + telnet + MQTT/WS publish. Read-and-clear; the tiny race with the
+// task setting a flag again is acceptable for diagnostics.
+#if HAS_PIC
+static void reportPendingPICRxErrors() {
+  if (g_picRxOverrunPending) {
+    g_picRxOverrunPending = false;
+    DebugT(F("Serial Overrun\r\n"));
+    reportOTGWEvent_P(PSTR("Serial Overrun"), '!', true);
+  }
+  if (g_picRxErrorPending) {
+    g_picRxErrorPending = false;
+    DebugT(F("Serial Rx Error\r\n"));
+    reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
+  }
+  uint32_t overflows = g_picRxOverflowPending;
+  if (overflows) {
+    g_picRxOverflowPending = 0;
+    OTcurrentSystemState.errorBufferOverflow += overflows;   // single-writer (loop)
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("Serial overflow [%u]"), OTcurrentSystemState.errorBufferOverflow);
+    sendEventToWebSocket('!', cMsg);
+    char overflowCountBuf[12] = {0};
+    utoa(OTcurrentSystemState.errorBufferOverflow, overflowCountBuf, 10);
+    sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
+  }
+}
+#endif
+
+// The dedicated PIC-UART task body. Blocks between drains via platformTaskDelay()
+// (the cooperative yield) so it never busy-polls available() — a tight no-yield
+// poll would starve the core and trip the Task Watchdog. While parked it raises
+// the ack flag and sleeps longer; the loop-side flash FSM waits on that ack
+// before driving the UART (waitForPICTaskParked).
+static void picSerialTaskBody(void *arg) {
+  (void)arg;
+  for (;;) {
+    if (picSerialTaskShouldPark()) {
+      g_picTaskParked = true;
+      platformTaskDelay(20);            // parked: idle, do not touch the UART
+      continue;
+    }
+    g_picTaskParked = false;
+    picSerialDrainOnce();
+    platformTaskDelay(2);               // yield ~1 tick; FIFO refills meanwhile
+  }
+}
+#endif // HAS_PIC
+
+// picSerialTaskShouldPark — see header. true => task releases the UART. Defined
+// unconditionally (references only isOTDirectEnabled/isFlashing/simulation, all
+// available on every build) so the symbol exists regardless of HAS_PIC.
+// Also parks during the OTGW replay simulation: the simulation feeds the parser
+// from a file and flushes the live UART loop-side (picSerialFlushRx), so the
+// task must not drain it concurrently.
+bool picSerialTaskShouldPark() {
+  return isOTDirectEnabled() || isFlashing() || state.debug.bOTGWSimulation;
+}
+
+// startPICSerialTask — create the dedicated PIC task once (ADR-044). On a no-PIC
+// build the body is empty; on a combo that boots into OTDirect the task is still
+// created but immediately parks (picSerialTaskShouldPark()==true), so it never
+// touches the closed UART — it just sleeps.
+void startPICSerialTask() {
+#if HAS_PIC
+  if (g_picSerialTask != nullptr) return;        // create exactly once
+  g_picSerialTask = platformTaskCreatePinned(
+      picSerialTaskBody, "picSerial", 4096, nullptr, 1);
+  if (g_picSerialTask == nullptr) {
+    DebugTln(F("ERROR: failed to create PIC serial task"));
+  } else {
+    DebugTln(F("PIC serial task started (pinned to app core)"));
+  }
+#endif
+}
+
+// waitForPICTaskParked — loop-side handshake before the flash FSM drives the UART.
+void waitForPICTaskParked() {
+#if HAS_PIC
+  if (g_picSerialTask == nullptr) return;        // task never created => nothing to wait for
+  // Bounded spin: the task tick is 2 ms, so it parks within a few ms once
+  // shouldPark flips. Cap at ~200 ms so a wedged task can never hang the flash.
+  for (uint16_t i = 0; i < 100 && !g_picTaskParked; i++) {
+    feedWatchDog();
+    delay(2);
+  }
+#endif
 }
 
 #define OTGW_BANNER "OpenTherm Gateway"
@@ -3284,39 +3549,43 @@ void sendPICSerial(const char* buf, int len)
     if (satSimulationBlocksBusTx(picCmd, F("pic-serial"))) return;
   }
 
-  //Send the buffer to OTGW when the Serial interface is available
-  if (OTGWSerial.availableForWrite()>=len+2) {
+  // TASK-865.6: the dedicated PIC task is the sole UART writer. Build the full
+  // command (payload + CR/LF) into one chunk and enqueue it; the task pops it
+  // and calls OTGWSerial.write()+flush(). The availableForWrite() flow-control
+  // moves into the task (picSerialDrainOnce). Keep the WS '>' echo loop-side —
+  // it is not byte I/O and preserves the existing OT-log surface.
+  {
+    uint8_t txbuf[OT_TX_CHUNK_MAX];
+    int n = len;
+    if (n > (int)sizeof(txbuf) - 2) n = (int)sizeof(txbuf) - 2;   // clamp (defensive)
+    if (n < 0) n = 0;
+    memcpy(txbuf, buf, n);
+    txbuf[n]   = '\r';
+    txbuf[n+1] = '\n';
     OTDebugT(F("Sending to Serial ["));
     for (int i = 0; i < len; i++) {
       OTDebug((char)buf[i]);
     }
     OTDebug(F("] (")); OTDebug(len); OTDebug(F(")")); OTDebugln();
 
-    //write buffer to serial
-    OTGWSerial.write(buf, len);
-    OTGWSerial.write('\r');
-    OTGWSerial.write('\n');
-    OTGWSerial.flush();
-    sendEventToWebSocket('>', buf, len);
-  } else OTDebugln(F("Error: Write buffer not big enough!"));
+    if (enqueuePICTx(txbuf, n + 2)) {
+      sendEventToWebSocket('>', buf, len);
+    } else {
+      OTDebugln(F("Error: PIC TX queue full!"));
+    }
+  }
 #endif
 }
 
+// dispatchOTGWInputLine — loop-side PIC-line enqueue helper. Used by the OTGW
+// replay simulation path (the live PIC reader now enqueues directly from the
+// dedicated task). Tags source=PIC; the consumer (drainOTFrameQueue) applies the
+// LED blink + ser2net 25238 mirror, so both the live and simulated PIC paths get
+// identical side-effects without the task touching the network/LED (TASK-865.6).
 static void dispatchOTGWInputLine(const char* buf, size_t len)
 {
   if (len == 0) return;
-
-  blinkLEDnow(LED2);
-  if (settings.mqtt.bLegacyPort25238Enabled) {
-    OTGWstream.write(reinterpret_cast<const uint8_t*>(buf), len);
-    OTGWstream.write('\r');
-    OTGWstream.write('\n');
-  }
-  // TASK-865.5: PIC producer. Enqueue the raw line instead of calling
-  // processOT() inline; the consumer (drainOTFrameQueue) parses it in loop()
-  // context. The LED + legacy-port writes above stay producer-side (not OT-log
-  // or MQTT output, so FIFO/byte-identical surface is unaffected).
-  enqueueOTFrame(buf, len, false);
+  enqueueOTFrame(buf, len, false, OTFRAME_SRC_PIC);
 }
 
 static bool readOTGWSimulationLine(File& replayFile, char* buffer, size_t bufferSize, size_t& lineLen)
@@ -3423,10 +3692,9 @@ static bool handlePICSerialSimulation(File& otgwSimulationFile,
   }
 
   #if HAS_PIC
-  while (OTGWSerial.available()) {
-    OTGWSerial.read();
-    feedWatchDog();
-  }
+  // TASK-865.6: discard live PIC RX while the replay simulation feeds the parser
+  // from a file. Routed through the owner fn so all UART byte-I/O stays confined.
+  picSerialFlushRx();
   #endif
 
   if (!LittleFSmounted) {
@@ -4706,26 +4974,22 @@ void processOT(const char *buf, int len, bool suppressOutput){
 void handlePICSerial()
 {
 #if HAS_PIC
-  // Always drain the PIC UART on PIC-capable builds. ADR-060 recovery sends a
-  // direct PR=A probe after a missed boot ETX; the banner can only re-enable PIC
-  // functions if this reader keeps running while state.pic.bAvailable is false.
+  // TASK-865.6: the RX drain + UART read loop now lives in the dedicated PIC
+  // task (picSerialDrainOnce). handlePICSerial() keeps only the loop-side work
+  // that does NOT touch the UART directly: the OTGW replay simulation and the
+  // ser2net (net->serial) relay. The latter reads from the TCP stream and now
+  // ENQUEUES bytes onto otTxQueue for the task to write (no direct OTGWSerial
+  // write here). The old kMaxLinesPerDrain per-call cap is gone — the task owns
+  // a full FIFO drain on its own core slice, so the network/web stack can no
+  // longer starve the reader.
+  //
   // ADR-127: on a combo running OTDirect the UART is closed and OTDirect owns
-  // the OT path — skip the drain entirely. Compile-time false on fixed PIC
-  // boards, so behaviour there is unchanged.
+  // the OT path — skip entirely. Compile-time false on fixed PIC boards.
   if (isOTDirectEnabled()) return;
-  //handle serial communication and line processing
-  // MAX_BUFFER_READ / MAX_BUFFER_WRITE are defined in OTGW-Core.h (TASK-865.5)
-  // so the OT-frame queue item and this read loop share one size.
-  // Sync webserver: bound work per call so a burst of OT lines or net→serial
-  // commands cannot starve httpServer.handleClient(). Pending bytes drain on
-  // the next call.
-  static constexpr size_t kMaxLinesPerDrain = 4;
-  static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
-  static size_t bytes_read = 0;
+  static size_t bytes_read = 0;   // unused by the relay; kept for the sim signature
   static size_t bytes_write = 0;
   static bool discardCurrentReadLine = false;
-  static uint32_t droppedReadLines = 0;
   static uint8_t outByte;
   static File otgwSimulationFile;
   static bool otgwSimulationWasEnabled = false;
@@ -4741,71 +5005,13 @@ void handlePICSerial()
     return;
   }
 
-  //Handle incoming data from OTGW through serial port (READ BUFFER)
-  if (!state.debug.bOTGWSimulation) {
-    if (platformSerialHasOverrun(OTGWSerial)) {
-      DebugT(F("Serial Overrun\r\n"));
-      reportOTGWEvent_P(PSTR("Serial Overrun"), '!', true);
-    }
-    if (platformSerialHasRxError(OTGWSerial)) {
-      DebugT(F("Serial Rx Error\r\n"));
-      reportOTGWEvent_P(PSTR("Serial Rx Error"), '!', true);
-    }
-    
-    size_t linesProcessed = 0;
-    while (OTGWSerial.available() && linesProcessed < kMaxLinesPerDrain) {
-      outByte = OTGWSerial.read();
-      if (outByte == '\r' || outByte == '\n') {
-        if ((bytes_read == 0) && !discardCurrentReadLine) continue;
-
-        if (discardCurrentReadLine) {
-          droppedReadLines++;
-          DebugTf(PSTR("Serial line dropped after overflow. Dropped lines total: %lu\r\n"),
-                  static_cast<unsigned long>(droppedReadLines));
-        }
-
-        if (!discardCurrentReadLine) {
-          sRead[bytes_read] = '\0';
-          dispatchOTGWInputLine(sRead, bytes_read);
-        }
-
-        bytes_read = 0;
-        discardCurrentReadLine = false;
-        linesProcessed++;
-      } else if (bytes_read < (MAX_BUFFER_READ-1)) {
-        if (!discardCurrentReadLine) {
-          sRead[bytes_read++] = outByte;
-        }
-      } else {
-        // Buffer overflow detected - discard this complete line and log error
-        OTcurrentSystemState.errorBufferOverflow++;
-        DebugTf(PSTR("Serial Buffer Overflow! Discarding %d bytes. Total overflows: %d\r\n"),
-                bytes_read, OTcurrentSystemState.errorBufferOverflow);
-        snprintf_P(cMsg, sizeof(cMsg), PSTR("Serial overflow [%u]"), OTcurrentSystemState.errorBufferOverflow);
-        sendEventToWebSocket('!', cMsg);
-        // Rate limit MQTT notifications - only send every 10 overflows to avoid overwhelming broker
-        static uint8_t overflowsSinceLastReport = 0;
-        overflowsSinceLastReport++;
-        if (overflowsSinceLastReport >= 10) {
-          char overflowCountBuf[12] = {0};
-          utoa(OTcurrentSystemState.errorBufferOverflow, overflowCountBuf, 10);
-          sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
-          overflowsSinceLastReport = 0;
-        }
-        // Drop this line until next CR/LF to avoid forwarding partial/corrupted data
-        bytes_read = 0;
-        discardCurrentReadLine = true;
-      }
-    }
-  }
-
   if (isPICEnabled() && settings.mqtt.bLegacyPort25238Enabled) {
     //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
-    size_t cmdsProcessed = 0;
-    while (OTGWstream.available() && cmdsProcessed < kMaxLinesPerDrain){
+    while (OTGWstream.available()){
       outByte = OTGWstream.read();  // read from port 25238
       if (!state.debug.bOTGWSimulation) {
-        OTGWSerial.write(outByte);    // write to serial port
+        // TASK-865.6: enqueue for the PIC task to write (no direct UART write).
+        enqueuePICTx(&outByte, 1);
       }
       if (outByte == '\r')
       { //on CR, do something...
@@ -4850,7 +5056,6 @@ void handlePICSerial()
           }
         }
         bytes_write = 0; //start next line
-        cmdsProcessed++;
       } else if  (outByte == '\n')
       {
         // on LF, skip 
@@ -5191,6 +5396,13 @@ void fwupgradestart(const char *hexfile) {
   state.flash.iPICprogress = 0;
   state.flash.sError[0] = '\0'; // Clear previous error
   DebugTln(F("Flash state set: state.flash.bPICactive=true, progress=0"));
+
+  // TASK-865.6: bPICactive now makes picSerialTaskShouldPark() true. Wait for
+  // the dedicated PIC task to acknowledge it has released the UART before the
+  // flash FSM drives it, so the task never read()s mid-upgrade. The loop-side
+  // flash path (handlePicFlashBackgroundTasks -> picSerialPumpUpgrade) keeps the
+  // upgrade state machine ticking from here on.
+  waitForPICTaskParked();
 
   // Turn on LED to indicate flashing
   digitalWrite(LED1, LOW);

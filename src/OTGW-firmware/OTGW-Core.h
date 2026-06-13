@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.180
+**  Version  : v2.0.0-alpha.181
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -540,10 +540,21 @@ void processOT(const char *buf, int len, bool suppressOutput = false);
 //    it byte-for-byte. The producer MUST null-terminate line[len] before
 //    enqueue: processOT()'s non-OT branches use strstr/strchr/strcasecmp_P,
 //    which read until a terminator.
+// Frame source: which producer enqueued the line. The consumer applies
+// PIC-specific loop-side side-effects (LED blink + ser2net 25238 mirror) ONLY
+// for PIC-sourced frames — OTDirect already mirrors producer-side via
+// otDirectBridgeWriteLine(), so mirroring it again in the consumer would
+// double-emit to 25238. (TASK-865.6: side-effects moved off the PIC task.)
+enum OTFrameSource : uint8_t {
+  OTFRAME_SRC_PIC      = 0,   // PIC UART line (dispatchOTGWInputLine / PIC task)
+  OTFRAME_SRC_OTDIRECT = 1,   // OTDirect bridged frame (bridgeFrameToParser)
+};
+
 struct OTFrameMsg {
   char     line[MAX_BUFFER_READ];  // null-terminated raw PIC/OTDirect line
   uint16_t len;                    // payload length (excludes terminator); up to 511
   bool     suppressOutput;         // PIC path: false; OTDirect path: otHideReports
+  uint8_t  source;                 // OTFrameSource: who produced this line
 };
 static_assert(std::is_trivially_copyable<OTFrameMsg>::value,
               "OTFrameMsg must be trivially copyable for value-copy FreeRTOS queue");
@@ -559,9 +570,11 @@ extern PlatformMutex otStateMutex;      // guards the decoded OTGWState snapshot
 // enqueueOTFrame — producer-side helper. Copies up to MAX_BUFFER_READ-1 bytes,
 // null-terminates, and sends by value. Returns false on a full queue (counted
 // as a diagnostic drop; never falls back to inline processOT, which would
-// reorder the FIFO). The ONLY call sites are the two frame producers
-// (dispatchOTGWInputLine, bridgeFrameToParser) — enforced by evaluate.py.
-bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput);
+// reorder the FIFO). source tags the producer so the consumer can apply
+// PIC-only side-effects. The ONLY call sites are the frame producers
+// (the PIC task / dispatchOTGWInputLine, bridgeFrameToParser) — enforced by evaluate.py.
+bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput,
+                    uint8_t source = OTFRAME_SRC_PIC);
 
 // drainOTFrameQueue — consumer-side. Dequeues every pending OTFrameMsg and
 // calls processOT() under the OTStateLock (writer side). Runs in loop()
@@ -589,6 +602,68 @@ struct OTStateLock {
   OTStateLock(const OTStateLock&) = delete;
   OTStateLock& operator=(const OTStateLock&) = delete;
 };
+
+// ===== ADR-123 Phase-1 PIC-UART dedicated task (TASK-865.6) ================
+//
+// The PIC UART (OTGWSerial) moves onto a dedicated FreeRTOS task pinned to the
+// application core. The task is the SOLE owner of runtime byte I/O on the UART:
+// every .read()/.write()/.available()/.availableForWrite()/.flush() at runtime
+// lives inside picSerialDrainOnce() / picSerialPumpUpgrade() / picSerialFlushRx()
+// (all in OTGW-Core.ino). This drains the RX FIFO regardless of network load,
+// so a burst of HTTP/MQTT work can no longer stall the reader into a Serial
+// Buffer Overflow — which is why the old 4-lines-per-call bound (kMaxLinesPerDrain,
+// TASK-671) is deleted.
+//
+// Split of responsibilities (keeps OTGWState single-writer, no hot-path mutex):
+//   - RX: the task reads bytes, assembles CR/LF lines, and pushes each line onto
+//     the OTFrameMsg queue via dispatchOTGWInputLine (the seq5 enqueue helper).
+//     The consumer (drainOTFrameQueue, loop() context) still parses via processOT.
+//   - TX: handleCommandQueue()/checkCommandResponse()/cmdqueue[] stay loop-side;
+//     sendPICSerial() and the ser2net net->serial relay no longer call
+//     OTGWSerial.write() directly — they enqueue raw bytes onto otTxQueue, and
+//     the task pops + writes them.
+//
+// TX message: a small POD chunk. Commands are <= MAX_BUFFER_WRITE; sendPICSerial
+// appends CR/LF (+2). ser2net relays one byte at a time. 132 bytes covers both.
+#define OT_TX_CHUNK_MAX (MAX_BUFFER_WRITE + 4)
+struct OTTxMsg {
+  uint8_t  bytes[OT_TX_CHUNK_MAX];  // raw bytes to write verbatim to the PIC UART
+  uint16_t len;                     // payload length (1..OT_TX_CHUNK_MAX)
+};
+static_assert(std::is_trivially_copyable<OTTxMsg>::value,
+              "OTTxMsg must be trivially copyable for value-copy FreeRTOS queue");
+
+// Depth: command retries fire ~1/s and ser2net is interactive, so the TX queue
+// is effectively drained every task tick (2 ms). 32 leaves slack for a ser2net
+// command burst relayed byte-by-byte without ever filling.
+#define OT_TX_QUEUE_DEPTH 32
+extern PlatformQueue otTxQueue;   // raw-byte producer(loop)->consumer(task) TX queue
+
+// enqueuePICTx — producer-side helper. Copies up to OT_TX_CHUNK_MAX bytes and
+// sends by value to the PIC task. Returns false on a full queue (diagnostic
+// drop). The ONLY runtime writers to the PIC UART are the task popping this
+// queue; callers never touch OTGWSerial.write() themselves.
+bool enqueuePICTx(const uint8_t *buf, size_t len);
+
+// startPICSerialTask — create the dedicated PIC-UART task exactly once (ADR-044),
+// called once from setup(). No-op on builds without a PIC (HAS_PIC==0): the
+// function and its single call site exist so the abstraction is unconditional,
+// but the body creates nothing.
+void startPICSerialTask();
+
+// picSerialTaskShouldPark — true when the task must release the UART to the
+// loop-side code: during an OTDirect boot (combo: UART closed, OTDirect owns the
+// OT path) or during a PIC/ESP flash (the loop-side flash FSM drives the UART
+// and the OTGWSerial upgrade callbacks). Gated on isOTDirectEnabled() (NOT
+// isPICEnabled()) so banner recovery after a boot-miss still runs the reader
+// while state.pic.bAvailable is briefly false.
+bool picSerialTaskShouldPark();
+
+// waitForPICTaskParked — loop-side handshake. Spins (bounded, watchdog-fed)
+// until the PIC task has acknowledged it is parked, so the flash FSM never
+// drives the UART while the task is mid-read. Safe no-op if the task was never
+// created (OTDirect boot / no PIC).
+void waitForPICTaskParked();
 
 // RAII guard for the MQTT publish gate. Saves/restores mqttPublishAllowed on scope exit
 // so nested or interrupted gate operations can never leave the gate stuck false.

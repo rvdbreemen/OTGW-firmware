@@ -2978,12 +2978,17 @@ class WorkspaceEvaluator:
         for f in collect_firmware_source_files(src_dir):
             if f.name == "OTGW-Core.ino":
                 continue  # producer file: ingest read loop lives here
+            if f.suffix in (".h", ".hpp"):
+                continue  # headers carry only declarations/comments, no UART drain
             try:
                 lines = f.read_text(encoding='utf-8', errors='ignore').splitlines()
             except OSError:
                 continue
             for i, line in enumerate(lines, 1):
-                if ingest_re.search(line):
+                # Strip // comments before scanning so prose mentioning the API
+                # (e.g. seq6 comments referencing OTGWSerial.available()) is ignored.
+                code = _strip_line_comments(line)
+                if ingest_re.search(code):
                     stray_ingest.append(f"{f.name}:{i}: {line.strip()[:70]}")
 
         problems: List[str] = []
@@ -3017,6 +3022,156 @@ class WorkspaceEvaluator:
                 f"({enqueue_call_count} call sites); queue+mutex created once; "
                 f"processOT acquires OTStateLock (writer side); OTGWSerial ingest "
                 f"surface confined to producer; OTStateLock present"
+            ))
+
+    def check_pic_uart_task_owns_serial(self):
+        """ADR-123 Phase-1 PIC-UART task sole-owner gate (TASK-865.6).
+
+        seq6 lifts the PIC UART byte I/O onto a dedicated FreeRTOS task. The
+        invariant: every RUNTIME OTGWSerial byte-I/O call
+        (.read/.write/.available/.availableForWrite/.flush/.peek) must live ONLY
+        inside the task-owner functions in OTGW-Core.ino:
+
+          picSerialDrainOnce  — the RX/TX pump (task body helper)
+          picSerialPumpUpgrade — loop-side drain while the task is parked (flash)
+          picSerialFlushRx    — simulation-path UART discard (task parked)
+
+        Everything else that touches OTGWSerial uses CONTROL methods (begin/end/
+        resetPic/startUpgrade/firmwareVersion/processorToString/firmwareToString/
+        registerXxxCallback) — those are the allowlisted setup / version-readout /
+        upgrade / instantiation sites and are NOT byte I/O, so they are out of
+        scope here. A byte-I/O call anywhere else means a second UART owner
+        slipped in and the FIFO-drain guarantee (no Serial Buffer Overflow under
+        load) is broken.
+
+        Also asserts:
+          - kMaxLinesPerDrain is gone from handlePICSerial() (the 4-lines/call
+            bound is deleted; TASK-671/651 cap removed).
+          - the task is created via platformTaskCreatePinned() exactly once, in
+            startPICSerialTask(), called once from setup().
+          - the task lifecycle is gated on isOTDirectEnabled() (NOT isPICEnabled())
+            so banner recovery during a boot-miss still works.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-123 PIC-UART Task Sole-Owner ==={Colors.ENDC}")
+
+        src_dir = config.FIRMWARE_ROOT
+        # Runtime byte-I/O methods (NOT control methods like begin/end/resetPic).
+        byteio_re = re.compile(
+            r'OTGWSerial\s*\.\s*(?:read|write|available|availableForWrite|flush|peek)\s*\(')
+        # The only functions allowed to contain runtime byte I/O.
+        owner_fns = ("picSerialDrainOnce", "picSerialPumpUpgrade", "picSerialFlushRx")
+
+        core_text = ""
+        try:
+            core_text = (src_dir / "OTGW-Core.ino").read_text(encoding='utf-8', errors='ignore')
+        except OSError:
+            pass
+
+        # Compute the [start,end) byte span of each owner function body so we can
+        # attribute each byte-I/O call to its enclosing function by offset.
+        def _fn_span(text: str, name: str):
+            m = re.search(r'(?:static\s+)?\w[\w:*&<> ]*\b' + re.escape(name) + r'\s*\([^;{]*\)\s*\{', text)
+            if not m:
+                return None
+            i = text.index('{', m.start())
+            depth = 0
+            for j in range(i, len(text)):
+                if text[j] == '{':
+                    depth += 1
+                elif text[j] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        return (m.start(), j + 1)
+            return (m.start(), len(text))
+
+        owner_spans = []
+        missing_owner = []
+        for fn in owner_fns:
+            sp = _fn_span(core_text, fn)
+            if sp is None:
+                missing_owner.append(fn)
+            else:
+                owner_spans.append(sp)
+
+        def _in_owner(off: int) -> bool:
+            return any(s <= off < e for (s, e) in owner_spans)
+
+        # (1) Every byte-I/O call across all firmware files must be inside an
+        #     owner function in OTGW-Core.ino.
+        stray_byteio: List[str] = []
+        byteio_total = 0
+        for f in collect_firmware_source_files(src_dir):
+            try:
+                text = f.read_text(encoding='utf-8', errors='ignore')
+            except OSError:
+                continue
+            for m in byteio_re.finditer(text):
+                # ignore matches inside a // line comment or a "string literal"
+                # (e.g. the DebugTln(F("... OTGWSerial.available() ...")) banner).
+                line_start = text.rfind('\n', 0, m.start()) + 1
+                prefix = text[line_start:m.start()]
+                if '//' in prefix:
+                    continue
+                if prefix.count('"') % 2 == 1:   # odd quotes => inside a string
+                    continue
+                byteio_total += 1
+                if f.name == "OTGW-Core.ino" and _in_owner(m.start()):
+                    continue
+                ln = text.count('\n', 0, m.start()) + 1
+                stray_byteio.append(f"{f.name}:{ln}")
+
+        # (2) kMaxLinesPerDrain removed from handlePICSerial() (the actual cap, not
+        #     a comment explaining it was removed). Strip // comments first.
+        hps = _fn_span(core_text, "handlePICSerial")
+        hps_body = core_text[hps[0]:hps[1]] if hps else ""
+        hps_code = "\n".join(_strip_line_comments(l) for l in hps_body.splitlines())
+        max_lines_in_hps = "kMaxLinesPerDrain" in hps_code
+
+        # (3) task created once via the shim, in startPICSerialTask, called once
+        #     from setup().
+        firmware_text = ""
+        try:
+            firmware_text = (src_dir / "OTGW-firmware.ino").read_text(encoding='utf-8', errors='ignore')
+        except OSError:
+            pass
+        has_task_create = "platformTaskCreatePinned(" in core_text
+        start_task_def = bool(re.search(r'\bvoid\s+startPICSerialTask\s*\(', core_text))
+        start_task_calls = len(re.findall(r'(?<![\w])startPICSerialTask\s*\(\s*\)', firmware_text))
+
+        # (4) lifecycle gated on isOTDirectEnabled(), not isPICEnabled().
+        spark = _fn_span(core_text, "picSerialTaskShouldPark")
+        spark_body = core_text[spark[0]:spark[1]] if spark else ""
+        park_gates_otdirect = "isOTDirectEnabled()" in spark_body
+
+        problems: List[str] = []
+        if missing_owner:
+            problems.append(f"owner fn(s) not found in OTGW-Core.ino: {missing_owner}")
+        if stray_byteio:
+            problems.append(f"OTGWSerial byte-I/O outside task-owner fns: {stray_byteio[:5]}")
+        if max_lines_in_hps:
+            problems.append("kMaxLinesPerDrain still present in handlePICSerial() (RX bound not removed)")
+        if not has_task_create:
+            problems.append("PIC task not created via platformTaskCreatePinned() in OTGW-Core.ino")
+        if not start_task_def:
+            problems.append("startPICSerialTask() definition missing in OTGW-Core.ino")
+        if start_task_calls != 1:
+            problems.append(f"startPICSerialTask() must be called exactly once from setup(); found {start_task_calls}")
+        if not park_gates_otdirect:
+            problems.append("picSerialTaskShouldPark() must gate on isOTDirectEnabled() (banner-recovery invariant)")
+
+        if problems:
+            self.add_result(EvaluationResult(
+                "ADR-123", "PIC-UART task sole-owner", "FAIL",
+                "; ".join(problems[:5]),
+                "; ".join(stray_byteio[:8])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-123", "PIC-UART task sole-owner", "PASS",
+                f"all {byteio_total} OTGWSerial byte-I/O calls confined to "
+                f"{list(owner_fns)} in OTGW-Core.ino; kMaxLinesPerDrain removed from "
+                f"handlePICSerial; task created once via platformTaskCreatePinned in "
+                f"startPICSerialTask (1 setup() call); park gates on isOTDirectEnabled"
             ))
 
     def check_binary_safe_compare(self):
@@ -3205,6 +3360,7 @@ class WorkspaceEvaluator:
         self.check_binary_safe_compare()
         self.check_esp_abstraction_boundary()       # ESP abstraction guardrail (TASK-739)
         self.check_ot_frame_queue_producer_region()  # ADR-123 Phase-1 producer/consumer seam (TASK-865.5)
+        self.check_pic_uart_task_owns_serial()       # ADR-123 Phase-1 PIC-UART task sole-owner (TASK-865.6)
         self.check_otdirect_25238_bridge()
         self.check_adr102_otbus_liveness_topic()     # ADR-102 CI gate (TASK-623)
         self.check_sat_publishes_use_helpers()       # ADR-111 CI gate (TASK-722)
