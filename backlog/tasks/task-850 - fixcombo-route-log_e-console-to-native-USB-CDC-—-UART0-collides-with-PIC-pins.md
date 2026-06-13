@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-10 05:25'
-updated_date: '2026-06-12 22:57'
+updated_date: '2026-06-13 05:25'
 labels: []
 dependencies: []
 ---
@@ -20,8 +20,8 @@ Combo env has no ARDUINO_USB_CDC_ON_BOOT; default S3 console = UART0 on GPIO43/4
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 env:esp32-combo build_flags carry ARDUINO_USB_MODE=1 and ARDUINO_USB_CDC_ON_BOOT=1
-- [ ] #2 esp32-combo build green; esp8266 and esp32 envs unchanged and green
+- [x] #1 env:esp32-combo build_flags carry ARDUINO_USB_MODE=1 and ARDUINO_USB_CDC_ON_BOOT=1
+- [x] #2 esp32-combo build green; esp8266 and esp32 envs unchanged and green
 - [ ] #3 Field: log_e boot-detect line visible on USB CDC console of LOLIN S3 Mini
 <!-- AC:END -->
 
