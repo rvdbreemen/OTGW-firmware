@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-12T23:45:02.972Z
-> Files: 41 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-13T04:48:27.462Z
+> Files: 43 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../OTGW-firmware/.claude/
 
@@ -388,11 +388,13 @@
 
 ## docs/adr/
 
+- `ADR-082-esp8266-arduino-core-2.7.4-lts-pin.md` — ADR-082: ESP8266 Arduino Core 2.7.4 LTS pin for the 2.0.0 line (~2399 tok)
 - `ADR-113-hardware-type-codepath-selection-contract.md` — ADR-113 Hardware-type as codepath-selection contract (~2116 tok)
 - `ADR-124-ha-discovery-seven-device-topology.md` — ADR-124: HA Discovery Seven-Device Topology — Dedicated OT-Core and Sensors Devices, Gateway via_dev (~3715 tok)
 - `ADR-125-combo-esp32-pic-otdirect-board-boot-detection.md` — ADR-125 Combo ESP32-S3 board: one binary, runtime PIC/OTDirect selection (~2824 tok)
 - `ADR-126-fixed-esp32-classic-build-supersedes-combo-runtime-detection.md` — ADR-126 Fixed esp32-classic build supersedes combo runtime detection (~1278 tok)
 - `ADR-127-combo-esp32-s3-single-binary-revived-runtime-boot-detection.md` — ADR-127 Combo ESP32-S3 single binary revived: runtime PIC/OTDirect boot detection (supersedes ADR-12 (~3603 tok)
+- `ADR-128-drop-esp8266-support-from-2-0-0.md` — ADR-128: Drop ESP8266 Support from the 2.0.0 Line (Supersedes ADR-082) (~1965 tok)
 - `README.md` — Project documentation (~11241 tok)
 
 ## docs/api/

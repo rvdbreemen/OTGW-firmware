@@ -3,11 +3,11 @@ id: TASK-862
 title: >-
   fix(esp32-classic): PIC UART pin binding via OTGWSerial constructor args
   (TU-visibility bug)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-12 04:40'
-updated_date: '2026-06-12 05:49'
+updated_date: '2026-06-13 05:05'
 labels: []
 dependencies: []
 ---
@@ -24,7 +24,7 @@ PIC never detected on esp32-classic: OTGWSerial.cpp ESP32 branch guards UART pin
 - [x] #2 Application instantiation passes PIN_PIC_RX/PIN_PIC_TX from boards.h; all three boards.h sections define them (ESP8266: -1 sentinel)
 - [x] #3 All three build targets compile clean (python build.py)
 - [x] #4 evaluate.py --quick green, no new violations
-- [ ] #5 Field validation: PIC detected on LOLIN S3 Mini in OTGW Classic socket (user hardware test)
+- [x] #5 Field validation: PIC detected on LOLIN S3 Mini in OTGW Classic socket (user hardware test)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,9 @@ Implemented. Files: OTGWSerial.h:143 (signature), OTGWSerial.cpp:834-858 (ctor b
 
 Build green all three targets after slug fix (TASK-863 unblocked the gate). Commits: 77f084b0 (fix + alpha.175 bump), pushed to origin. handleDebug.ino comment correction (stale ADR-125 reference) rode along in the bump commit. AC5 (field validation on S3 Mini hardware) remains open: flash alpha.175 esp32-classic and confirm PIC detect.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OTGWSerial constructor extended with rxPin/txPin parameters. Application TU passes PIN_PIC_RX/PIN_PIC_TX from boards.h. Field validated via combo build (alpha.176) on Classic PCB (S3 Mini): eMode=1 pic=1, PIC detected on GPIO43/44, full PR round-trips confirmed. The esp32-classic build carries identical fix (commit 77f084b0); pins/detection path are identical between esp32-classic and esp32-combo.
+<!-- SECTION:FINAL_SUMMARY:END -->

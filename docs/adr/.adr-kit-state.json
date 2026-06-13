@@ -11,5 +11,16 @@
     "audit_findings": 0
   },
   "retire_seen": [],
-  "last_nudged": "2026-06-12T20:37:18.249512+00:00"
+  "last_nudged": "2026-06-12T20:37:18.249512+00:00",
+  "watch": {
+    "nudges": {
+      "ADR-128|docs/adr/ADR-128-drop-esp8266-support-from-2-0-0.md": "2026-06-13T04:47:49.573347+00:00",
+      "ADR-006|docs/adr/ADR-128-drop-esp8266-support-from-2-0-0.md": "2026-06-13T04:47:49.573347+00:00",
+      "ADR-104|docs/adr/ADR-128-drop-esp8266-support-from-2-0-0.md": "2026-06-13T04:47:49.573347+00:00",
+      "ADR-107|docs/adr/ADR-128-drop-esp8266-support-from-2-0-0.md": "2026-06-13T04:48:15.242822+00:00",
+      "ADR-083|docs/adr/ADR-082-esp8266-arduino-core-2.7.4-lts-pin.md": "2026-06-13T04:48:29.192773+00:00",
+      "ADR-090|docs/adr/ADR-082-esp8266-arduino-core-2.7.4-lts-pin.md": "2026-06-13T04:48:29.192773+00:00",
+      "ADR-092|docs/adr/ADR-082-esp8266-arduino-core-2.7.4-lts-pin.md": "2026-06-13T04:48:29.192773+00:00"
+    }
+  }
 }
