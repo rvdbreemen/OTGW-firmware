@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.181
+**  Version  : v2.0.0-alpha.182
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -208,8 +208,10 @@ bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
 
 //prototype
-// ADR-104 (2.0.0 sibling of dev's ADR-076): return true iff the publish reached
-// MQTTclient.endPublish() success. Bit/byte/normal slot helpers use the return
+// ADR-104 (2.0.0 sibling of dev's ADR-076): return true iff the publish was
+// queued into the espMqttClient Outbox (TASK-865.7: was "reached endPublish()"
+// under PubSubClient; the async client has no synchronous on-wire signal, so
+// "queued" is the commit point). Bit/byte/normal slot helpers use the return
 // value (or the mqttSendSuccessCount counter for the multi-publish normal-msgId
 // path) to commit or discard pending throttle-slot updates so a heap-throttled
 // early-return cannot leave a stale pending that the next unrelated publish
@@ -217,11 +219,11 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
 bool sendMQTTData(const char*, const char*, const bool = false);
 bool sendMQTTData(const __FlashStringHelper*, const char*, const bool = false);
 bool sendMQTTData(const __FlashStringHelper*, const __FlashStringHelper*, const bool = false);
-// Monotonic counter — sendMQTTData() increments after a confirmed
-// MQTTclient.endPublish() success. OTPublishGate callers use it to detect
-// whether *any* downstream publish landed for the current msgId frame, so the
-// matching mqttPendingSlot is committed only when the frame actually emitted
-// at least one MQTT message. (ADR-104 Decision item 7 / dev TASK-644.)
+// Monotonic counter — sendMQTTData() increments after a publish is queued into
+// the espMqttClient Outbox (TASK-865.7: was "confirmed endPublish()"). OTPublishGate
+// callers use it to detect whether *any* downstream publish landed for the current
+// msgId frame, so the matching mqttPendingSlot is committed only when the frame
+// actually emitted at least one MQTT message. (ADR-104 Decision item 7 / dev TASK-644.)
 extern uint32_t mqttSendSuccessCount;
 // PIC subtree helper -- prepends kPicSubtreePrefix so the otgw-pic/ subtree
 // name has a single source of truth (ADR-065). Used by TASK-390 migrations.

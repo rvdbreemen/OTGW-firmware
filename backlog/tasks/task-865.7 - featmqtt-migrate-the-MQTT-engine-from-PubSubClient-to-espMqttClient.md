@@ -1,9 +1,11 @@
 ---
 id: TASK-865.7
 title: 'feat(mqtt): migrate the MQTT engine from PubSubClient to espMqttClient'
-status: To Do
-assignee: []
+status: In Review
+assignee:
+  - '@claude'
 created_date: '2026-06-13 05:49'
+updated_date: '2026-06-13 22:25'
 labels:
   - async-esp32s3
 dependencies:
@@ -38,3 +40,9 @@ Replace PubSubClient with non-blocking espMqttClient (bertmelis), the client EMS
 - evaluator: evaluate.py --quick no new failures; ADR-108 forbid_pattern not tripped by line removal; ADR-108 superseded/annotated; ADR consistency green.
 - field: broker kill -> WebUI/graph stays responsive (no 5s stall); HA avty_t online(birth)/offline(LWT within keepalive); set/<nodeId>/<cmd> still reaches the PIC/OTDirect queue.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Landed espMqttClient migration: PubSubClient removed from lib_deps + sources; espMqttClient @ 1.7.2 linked. handleMQTT() async (no 5s sync stall); onConnect/onDisconnect/onMessage wired; setWill() LWT before connect() with pointer-lifetime contract; single mqttPublishRaw() chokepoint replaces the 128B ESP8266 chunker. ADR-131 supersedes ADR-108. Verified: esp32 build [SUCCESS] x2 (firmware+fs), evaluate.py --quick 0 failures (ADR-108 forbid not tripped). Remaining field-validation ACs: (1) broker kill -> WebUI/graph stays responsive (no 5s stall); (2) HA avty_t online(birth)/offline(LWT within keepalive); (3) set/<nodeId>/<cmd> still reaches the PIC/OTDirect queue.
+<!-- SECTION:NOTES:END -->

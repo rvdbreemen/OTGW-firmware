@@ -2080,5 +2080,25 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-06-13T13:55:00"
+  },
+  {
+    "id": "bug-124",
+    "timestamp": "2026-06-13T23:50:51.097419",
+    "error_message": "espMqttClient migration (TASK-865.7): handleMQTT() pumped MQTTclient.loop() only when connected(); with the async client connect() merely queues and loop() is the SOLE driver of the connect handshake, so MQTT would never come up (connected() stays false -> loop() skipped -> handshake never advances).",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "PubSubClient.connect() was synchronous (link up on return), so the 'if (connected()) loop()' guard was correct. espMqttClient::connect() is async; loop() advances connectingTcp->connectingMqtt->CONNACK->onConnect. Gating loop() on connected() deadlocks the handshake.",
+    "fix": "Pump MQTTclient.loop() UNCONDITIONALLY at top of handleMQTT() (safe no-op when idle). Removed the redundant loop() call inside MQTT_STATE_IS_CONNECTED. Verified against other-projects/EMS-ESP32-dev/lib/espMqttClient/src/MqttClient.cpp.",
+    "tags": [
+      "mqtt",
+      "espMqttClient",
+      "async",
+      "ADR-123",
+      "TASK-865.7",
+      "loop",
+      "handshake"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-13T23:50:51.097419"
   }
 ]

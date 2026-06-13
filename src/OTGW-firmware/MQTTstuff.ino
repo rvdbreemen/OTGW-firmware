@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.181
+**  Version  : v2.0.0-alpha.182
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -10,17 +10,20 @@
 ***************************************************************************      
 */
 
-#include <PubSubClient.h>           // MQTT client publish and subscribe functionality
+#include <espMqttClient.h>          // bertmelis async MQTT client (ADR-123 Phase 2, TASK-865.7)
 #include <ctype.h>
 #include <pgmspace.h>
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
 #include "MQTTstuff.h"              // Structured discovery data layer (enums, structs, streaming API)
 #include "mqtt_discovery_verify.h"  // Discovery-verify state machine (TASK-363: separate TU)
 
-// MQTT Streaming Mode - ALWAYS ENABLED
-// Large auto-discovery messages are sent in 128-byte chunks instead of
-// requiring a large buffer resize. This prevents heap fragmentation on ESP8266.
-// Similar to ESPHome's chunked MQTT publishing strategy.
+// MQTT publish model (TASK-865.7 / ADR-123): espMqttClient frames every publish
+// atomically — it copies (topic + payload) into its Outbox at publish() time,
+// then drives the bytes onto the wire from loop(). There is no streaming
+// beginPublish/write/endPublish API. Outbound publishes go through the single
+// mqttPublishRaw() chokepoint; discovery payloads are buffered into a transient
+// heap buffer first (~900 B worst case, trivial on the ESP32-S3). The old
+// 128-byte ESP8266-only chunker is gone.
 
 #define MQTTDebugTln(...) ({ if (state.debug.bMQTT) DebugTln(__VA_ARGS__);    })
 #define MQTTDebugln(...)  ({ if (state.debug.bMQTT) Debugln(__VA_ARGS__);    })
@@ -49,17 +52,11 @@ static char       MQTTbrokerIPchar[20];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
-constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
-constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
-// Bounded retries for a short MQTTclient.write() (sndbuf momentarily full).
-// Each retry yields so the TCP stack can drain before we try again, letting a
-// started publish complete instead of leaving a truncated MQTT packet on the
-// wire that the broker rejects as malformed (TASK-770).
-constexpr uint8_t MQTT_WRITE_MAX_RETRIES = 10;
 // Minimum free heap required before attempting a discovery publish.
-// Streaming HA discovery (ADR-042: streaming JSON, no ArduinoJson) only needs
-// ~200 bytes per chunk, so the guard is an absolute "last safety rail", not a
-// performance throttle. MQTT_DISCOVERY_HEAP_MIN is board-defined in boards.h
+// HA discovery (ADR-042: streaming JSON composer, no ArduinoJson) buffers one
+// payload (~900 B worst case) into a transient heap allocation, so the guard is
+// an absolute "last safety rail", not a performance throttle.
+// MQTT_DISCOVERY_HEAP_MIN is board-defined in boards.h
 // (ESP-abstraction Tier 3): 3000 on ESP8266 (WARNING-tier floor, ~80KB RAM
 // total), 2048 on ESP32 (larger DRAM budget should not block discovery while
 // tens of KB are still free).
@@ -219,7 +216,31 @@ static bool isDripDeferred() {
 // MQTT auto-discovery verification implementation lives below the MQTTclient +
 // NodeId static declarations (search for "MQTT auto-discovery verification (ADR-062").
 
-static            PubSubClient MQTTclient(wifiClient);
+// espMqttClient instance (TASK-865.7 / ADR-123 Phase 2). UseInternalTask::NO is
+// load-bearing: the no-arg / (priority,core) ctors would spawn an internal
+// FreeRTOS task that fires onConnect/onMessage off the main loop, detonating
+// every static-buffer + re-entrancy assumption in this single-threaded
+// firmware. With NO, the engine is pumped only by our explicit MQTTclient.loop()
+// from handleMQTT() (and prepareForReboot's drain), so callbacks run on the
+// same cooperative loop as the rest of doBackgroundTasks(). If MQTT later moves
+// to its own task (seq9/10/11), that task becomes the sole loop() pumper and
+// the re-entrancy contract must be re-evaluated there.
+// ClientSync owns its own TCP socket, so the old WiFiClient injection is gone.
+static espMqttClient MQTTclient(espMqttClientTypes::UseInternalTask::NO);
+
+// onConnect/onDisconnect handlers (defined below) need a forward declaration so
+// they can be wired with onConnect()/onDisconnect() in startMQTT().
+static void onMqttConnect(bool sessionPresent);
+static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason);
+static void onMqttMessage(const espMqttClientTypes::MessageProperties& properties,
+                          const char* topic, const uint8_t* payload,
+                          size_t len, size_t index, size_t total);
+
+// Thin wrapper around the espMqttClient async connect. Kept as the only call
+// site so the engine has a single, named entry point for "begin connecting"
+// (and so the synchronous PubSubClient-style connect(clientId, ...) signature
+// never reappears in application code). Returns the library's queued-bool.
+static inline bool mqttBeginConnect() { return MQTTclient.connect(); }
 
 int8_t            reconnectAttempts = 0;
 char              lastMQTTtimestamp[15] = "";
@@ -298,17 +319,23 @@ void        verifyAccessorSetLastMissingCount(uint16_t missing){ state.discovery
 void        verifyAccessorSetLastOrphanCount(uint16_t orphan)  { state.discovery.iLastOrphanCount = orphan; }
 void        verifyAccessorMarkAllMQTTConfigPending()           { markAllMQTTConfigPending(); }
 
+// TASK-865.7: espMqttClient has no settable RX buffer — EMC_RX_BUFFER_SIZE is a
+// fixed 1440 bytes, comfortably above the verify window's old 1024 B target and
+// the ~900 B worst-case retained discovery config. The grow/shrink dance the
+// PubSubClient path needed is therefore a no-op; both accessors report success
+// so the verify state machine proceeds unchanged.
 bool        verifyAccessorSetMqttBufferSize(uint16_t sizeBytes) {
-  return MQTTclient.setBufferSize(sizeBytes);
+  (void)sizeBytes;
+  return true;
 }
 bool        verifyAccessorRestoreMqttBufferSize() {
-  return MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
+  return true;
 }
 bool        verifyAccessorMqttSubscribe(const char *topic) {
-  return MQTTclient.subscribe(topic, 0);
+  return MQTTclient.subscribe(topic, 0) != 0;   // packetId 0 == not queued
 }
 bool        verifyAccessorMqttUnsubscribe(const char *topic) {
-  return MQTTclient.unsubscribe(topic);
+  return MQTTclient.unsubscribe(topic) != 0;
 }
 
 // Logging bridge: accept a pre-formatted RAM string and dispatch through
@@ -319,82 +346,28 @@ void verifyAccessorLogLine(const char* ramMessage) {
   if (ramMessage != nullptr) DebugTln(ramMessage);
 }
 
-static bool writeMqttChunk(const char *data, size_t len)
-{
-  const size_t CHUNK_SIZE = 128;
-  size_t pos = 0;
-  while (pos < len) {
-    size_t chunkLen = (len - pos) > CHUNK_SIZE ? CHUNK_SIZE : (len - pos);
-    // Retry short writes (sndbuf momentarily full), yielding between attempts
-    // so the TCP stack can drain; accumulate partial writes (TASK-770).
-    size_t written = 0;
-    uint8_t attempts = 0;
-    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES) {
-      size_t w = MQTTclient.write(reinterpret_cast<const uint8_t*>(data + pos + written), chunkLen - written);
-      written += w;
-      if (written < chunkLen) { feedWatchDog(); yield(); attempts++; }
-    }
-    if (written != chunkLen) {
-      PrintMQTTError();
-      return false;
-    }
-    pos += chunkLen;
-    feedWatchDog();
-  }
-  return true;
-}
-
-static bool writeMqttProgmemChunk(PGM_P data, size_t len)
-{
-  char stage[MQTT_PROGMEM_STAGE_LEN + 1];
-  size_t pos = 0;
-  while (pos < len) {
-    size_t chunkLen = (len - pos) > MQTT_PROGMEM_STAGE_LEN ? MQTT_PROGMEM_STAGE_LEN : (len - pos);
-    for (size_t i = 0; i < chunkLen; i++) {
-      stage[i] = static_cast<char>(pgm_read_byte(data + pos + i));
-    }
-    // Retry short writes (sndbuf momentarily full), yielding between attempts
-    // so the TCP stack can drain; accumulate partial writes (TASK-770).
-    size_t written = 0;
-    uint8_t attempts = 0;
-    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES) {
-      size_t w = MQTTclient.write(reinterpret_cast<const uint8_t*>(stage + written), chunkLen - written);
-      written += w;
-      if (written < chunkLen) { feedWatchDog(); yield(); attempts++; }
-    }
-    if (written != chunkLen) {
-      PrintMQTTError();
-      return false;
-    }
-    pos += chunkLen;
-    feedWatchDog();
-  }
-  return true;
-}
-
-static bool beginMqttPublish(const char *topic, size_t len, bool retain)
-{
-  if (!MQTTclient.beginPublish(topic, len, retain)) {
-    PrintMQTTError();
-    return false;
-  }
-  return true;
-}
-
 // ---------------------------------------------------------------------------
-// Forwarding functions for MqttJsonWriter (MQTTstuff.h).
-// Bridge to the file-static writeMqttChunk helpers and MQTTclient.
+// mqttPublishRaw -- the single MQTT publish chokepoint (TASK-865.7 / ADR-123).
+// Declared in MQTTstuff.h. Every outbound publish in the firmware funnels here.
+//
+// espMqttClient frames the publish atomically: publish() copies topic+payload
+// into its Outbox (see Packets/Packet.cpp memcpy) and queues it, so the caller's
+// payload buffer can be freed the instant this returns — no streaming, no
+// truncated-packet desync window (the TASK-770 disconnect-on-short-write guard
+// is therefore obsolete). QoS 0 (fire-and-forget, matches the old behaviour).
+// Returns true when the publish was queued (packetId != 0). packetId 0 means
+// the client was not connected or the Outbox was out of memory.
 // ---------------------------------------------------------------------------
-bool writeMqttChunkExt(const char *data, size_t len) {
-  return writeMqttChunk(data, len);
+bool mqttPublishRaw(const char* topic, const uint8_t* payload, size_t len, bool retain) {
+  uint16_t packetId = MQTTclient.publish(topic, /*qos=*/0, retain, payload, len);
+  feedWatchDog();
+  return packetId != 0;
 }
 
-bool writeMqttProgmemChunkExt(PGM_P data, size_t len) {
-  return writeMqttProgmemChunk(data, len);
-}
-
-bool writeMqttByteExt(uint8_t b) {
-  return MQTTclient.write(b) == 1;
+// Cross-TU connected accessor (TASK-865.7). MQTTHaDiscovery.cpp cannot see the
+// file-static MQTTclient, so it tests link state through this narrow bridge.
+bool mqttIsConnected() {
+  return MQTTclient.connected();
 }
 
 // ---------------------------------------------------------------------------
@@ -628,16 +601,13 @@ void startMQTT()
 {
   if (!settings.mqtt.bEnable) return;
 
-  // Eliminate the TCP_SND_BUF temporary copy in WiFiClient (~1072 bytes saved).
-  // With sync mode, writes flush directly to lwIP without intermediate buffering.
-  // Platform-divergent (setSync is ESP8266-only); behind a shim (TASK-743).
-  platformWiFiClientSetSync(wifiClient);
-  wifiClient.setNoDelay(true);
+  // Wire the async event callbacks once. espMqttClient keeps a single callback
+  // (EMC_MULTIPLE_CALLBACKS off), so re-registering on every startMQTT() just
+  // overwrites the same slot — idempotent and cheap.
+  MQTTclient.onConnect(onMqttConnect);
+  MQTTclient.onDisconnect(onMqttDisconnect);
+  MQTTclient.onMessage(onMqttMessage);
 
-  // Outbound publishes stream via beginPublish/write/endPublish.
-  // Keep only enough client buffer for inbound subscribed topics and payloads.
-  MQTTclient.setBufferSize(MQTT_CLIENT_BUFFER_SIZE);
-  
   stateMQTT = MQTT_STATE_INIT;
   // Rebuild namespaces (also needed when top-topic changes).
   strlcpy(NodeId, CSTR(settings.mqtt.sUniqueid), sizeof(NodeId));
@@ -828,7 +798,7 @@ static bool dispatchSatMqttCmd(const char* cmd, const char* payload) {
 }
 
 // handles MQTT subscribe incoming stuff
-void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
+static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
 
   if (state.debug.bMQTT) {
     DebugT(F("Message arrived on topic [")); Debug(topic); Debug(F("] = ["));
@@ -1056,6 +1026,33 @@ void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
+// espMqttClient onMessage shim (TASK-865.7). The library delivers inbound
+// messages as (props, const char* topic, const uint8_t* payload, len, index,
+// total) and CAN split a large payload across calls (index/total cursor).
+//
+// Every topic we subscribe to is tiny: set/<nodeId>/<cmd> commands are a few
+// bytes, homeassistant/status is "online"/"offline", and the verify-window
+// filter (<haprefix>/+/<nodeId>/#) inspects only the topic NAME, never the
+// payload bytes. The fixed RX buffer (EMC_RX_BUFFER_SIZE = 1440) dwarfs all of
+// these, so a real inbound message always arrives whole (index==0 && len==total).
+// We still gate on index==0 so a pathological oversize/chunked payload drops its
+// continuation chunks instead of double-dispatching, and pass `len` (== total
+// for the first-and-only chunk) on to the legacy char*/byte* dispatcher.
+static void onMqttMessage(const espMqttClientTypes::MessageProperties& properties,
+                          const char* topic, const uint8_t* payload,
+                          size_t len, size_t index, size_t total) {
+  (void)properties;
+  (void)total;
+  if (index != 0) return;  // ignore continuation chunks of an oversize payload
+
+  // The legacy dispatcher takes a mutable char* topic (it never writes through
+  // it — only strcmp/strcasecmp_P and a read-only cursor walk). Copy into a
+  // bounded buffer so we hand it a real char* without const_cast surprises.
+  char topicBuf[MQTT_TOPIC_MAX_LEN];
+  strlcpy(topicBuf, topic ? topic : "", sizeof(topicBuf));
+  handleMQTTcallback(topicBuf, const_cast<byte*>(payload), (unsigned int)len);
+}
+
 void sendMQTT(const char* topic, const char *json);
 
 void handleMQTT() 
@@ -1071,7 +1068,15 @@ void handleMQTT()
   DECLARE_TIMER_SEC(timerMQTTdebugisconnected, 60);
   DECLARE_TIMER_SEC(timerMQTToverridepublish, 60);  // ADR-118: refresh retained <label>/override topics
   
-  if (MQTTclient.connected()) MQTTclient.loop();  //always do a MQTTclient.loop() first
+  // Pump the espMqttClient engine EVERY tick, unconditionally (TASK-865.7).
+  // With UseInternalTask::NO, loop() is the SOLE driver of the connection state
+  // machine: connect() only queues the CONNECT packet and sets state to
+  // connectingTcp1; loop() advances connectingTcp -> connectingMqtt -> CONNACK
+  // -> onConnect, pumps the outbox, reads incoming, and sends keepalive pings.
+  // Gating it on connected() (as the synchronous PubSubClient path did) would
+  // stall the handshake forever — connected() never becomes true because the
+  // thing that makes it true is loop() itself. It is a safe no-op when idle.
+  MQTTclient.loop();
 
   // Poll the discovery-verify window closer (ADR-062). Handles timeout,
   // MQTT-disconnect fast-close, and heap-abort.
@@ -1084,29 +1089,44 @@ void handleMQTT()
 
   switch(stateMQTT) 
   {
-    case MQTT_STATE_INIT:  
-      MQTTDebugTln(F("MQTT State: MQTT Initializing")); 
+    case MQTT_STATE_INIT:
+      MQTTDebugTln(F("MQTT State: MQTT Initializing"));
       WiFi.hostByName(CSTR(settings.mqtt.sBroker), MQTTbrokerIP);  // lookup the MQTTbroker convert to IP
       snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
-      if (isValidIP(MQTTbrokerIP))  
+      if (isValidIP(MQTTbrokerIP))
       {
         MQTTDebugTf(PSTR("[%s] => setServer(%s, %d)\r\n"), CSTR(settings.mqtt.sBroker), MQTTbrokerIPchar, settings.mqtt.iBrokerPort);
         MQTTclient.disconnect();
-        MQTTclient.setServer(MQTTbrokerIPchar, settings.mqtt.iBrokerPort);
-        MQTTclient.setCallback(handleMQTTcallback);
-        // Sync webserver: socket timeout caps the worst-case freeze when the
-        // broker is unreachable (PubSubClient.connect() blocks for this long).
-        // 5s keeps HTTP/WS responsive during outages; the state machine still
-        // backs off cleanly via timerMQTTwaitforretry between attempts and
-        // falls back to a 10-minute wait after 5 failures.
-        // Accepted sync-blocker — see ADR-108 (sibling of dev ADR-080).
-        MQTTclient.setSocketTimeout(5);
-        MQTTclient.setKeepAlive(60);      // Set to 60 seconds (default was 15) to reduce reconnections
+        // setServer(IPAddress, port) stores the IP by value — no lifetime concern.
+        MQTTclient.setServer(MQTTbrokerIP, settings.mqtt.iBrokerPort);
+        MQTTclient.setKeepAlive(60);       // 60s (default 15) to reduce reconnections; maps over from PubSubClient.
+        MQTTclient.setCleanSession(true);  // fresh session each connect (matches old PubSubClient default)
+
         uint8_t mac[6]{0};
         WiFi.macAddress(mac);
         snprintf_P(MQTTclientId, sizeof(MQTTclientId), PSTR("%s%02X%02X%02X%02X%02X%02X"), _HOSTNAME, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        //skip try to connect
-        reconnectAttempts =0;
+        // POINTER-LIFETIME CONTRACT (espMqttClient stores pointers, never copies
+        // them until connect() builds the CONNECT packet):
+        //  - setClientId(MQTTclientId): MQTTclientId is the file-static buffer at
+        //    file scope — valid for the whole program.
+        //  - setWill(MQTTPubNamespace, ...): MQTTPubNamespace is the file-static
+        //    namespace buffer (rebuilt in startMQTT) + the literal "offline" in
+        //    .rodata; both outlive every connect() call. The library memcpys the
+        //    will topic+payload into the CONNECT packet at connect() time
+        //    (Packets/Packet.cpp), so the pointers only need to be alive here.
+        //  - setCredentials(sUser, sPasswd): point into the persistent
+        //    settings.mqtt struct (never a stack temporary).
+        // The LWT MUST be set BEFORE connect() so it is embedded in the CONNECT
+        // packet. Birth ("online", retained) is published from onMqttConnect().
+        MQTTclient.setClientId(MQTTclientId);
+        MQTTclient.setWill(MQTTPubNamespace, 0, true, (const uint8_t*)"offline", 7);
+        if (strlen(settings.mqtt.sUser) == 0) {
+          MQTTclient.setCredentials(nullptr, nullptr);  // anonymous
+        } else {
+          MQTTclient.setCredentials(CSTR(settings.mqtt.sUser), CSTR(settings.mqtt.sPasswd));
+        }
+
+        reconnectAttempts = 0;
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
       }
       else
@@ -1114,8 +1134,8 @@ void handleMQTT()
         MQTTDebugTf(PSTR("ERROR: [%s] => is not a valid URL\r\n"), CSTR(settings.mqtt.sBroker));
         stateMQTT = MQTT_STATE_ERROR;
         //DebugTln(F("Next State: MQTT_STATE_ERROR"));
-      }    
-      RESTART_TIMER(timerMQTTwaitforconnect); 
+      }
+      RESTART_TIMER(timerMQTTwaitforconnect);
     break;
 
     case MQTT_STATE_TRY_TO_CONNECT:
@@ -1126,90 +1146,27 @@ void handleMQTT()
       MQTTDebugT(F("Attempting MQTT connection .. "));
       reconnectAttempts++;
 
-      //If no username, then anonymous connection to broker, otherwise assume username/password.
-      if (strlen(settings.mqtt.sUser) == 0)
-      {
+      // ADR-123 Phase 2: connect() is ASYNC — it queues the TCP+CONNECT work and
+      // returns immediately. There is NO 5s sync stall (ADR-108's premise is
+      // gone, superseded under ADR-123). The result arrives later via
+      // onMqttConnect (success -> MQTT_STATE_IS_CONNECTED) or onMqttDisconnect
+      // (failure/refused). We back off non-blockingly while we wait.
+      if (strlen(settings.mqtt.sUser) == 0) {
         MQTTDebug(F("without a Username/Password "));
-        if(!MQTTclient.connect(MQTTclientId, MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
-      }
-      else
-      {
+      } else {
         MQTTDebugf(PSTR("Username [%s] "), CSTR(settings.mqtt.sUser));
-        if(!MQTTclient.connect(MQTTclientId, CSTR(settings.mqtt.sUser), CSTR(settings.mqtt.sPasswd), MQTTPubNamespace, 0, true, "offline")) PrintMQTTError();
       }
-      DebugTf(PSTR("[HEAP] post-connect: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+      mqttBeginConnect();
+      DebugTf(PSTR("[HEAP] post-connect-queue: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
 
-      //If connection was made succesful, move on to next state...
-      if (MQTTclient.connected())
-      {
-        reconnectAttempts = 0;
-        MQTTDebugln(F(" .. connected\r"));
-        Debugln(F("MQTT connected"));
-        stateMQTT = MQTT_STATE_IS_CONNECTED;
-        MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
-        // birth message, sendMQTT retains  by default
-        sendMQTT(MQTTPubNamespace, "online");
-        DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+      // Arm the per-attempt wait (3s, 6s, 9s, 12s backoff). If onMqttConnect
+      // fires before it expires, the state is already IS_CONNECTED and the
+      // WAIT branch becomes a no-op. Inline timer-bump (vs CHANGE_INTERVAL_SEC)
+      // to save flash; safeTimers.h DUE() only reads _due.
+      timerMQTTwaitforretry_due = millis() + (3000UL * reconnectAttempts);
+      MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_CONNECTION_ATTEMPT"));
+      stateMQTT = MQTT_STATE_WAIT_CONNECTION_ATTEMPT;
 
-        // Republish OT retained topics and reset discovery only if offline long enough
-        // that the broker may have lost its retained state (e.g. broker restart without
-        // persistence). Short outages are network blips — broker still holds everything.
-        // iLastConnectedMs == 0 means never connected (first boot): skip republish.
-        {
-          uint32_t offlineMs = (state.mqtt.iLastConnectedMs > 0)
-                               ? (millis() - state.mqtt.iLastConnectedMs)
-                               : 0;
-          if (offlineMs > MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS) {
-            DebugTf(PSTR("[MQTT] offline %lums > threshold — broker may have restarted; republishing values + resetting discovery\r\n"), (unsigned long)offlineMs);
-            requestMQTTRepublishAll();
-            // Broker restart assumed: retained discovery configs may be gone (ADR-100).
-            clearMQTTConfigDone();
-            clearMQTTConfigPending();
-            publishNonOTDiscoveryConfigs();
-          } else {
-            DebugTf(PSTR("[MQTT] offline %lums <= threshold, broker retains topics — skipping republish\r\n"), (unsigned long)offlineMs);
-          }
-        }
-        DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
-
-        //Subscribe to topics
-        char topic[MQTT_TOPIC_MAX_LEN];
-        strlcpy(topic, MQTTSubNamespace, sizeof(topic));
-        strlcat(topic, "/#", sizeof(topic));
-        MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
-        if (MQTTclient.subscribe(topic)){
-          MQTTDebugTf(PSTR("MQTT: Subscribed successfully to TopicId [%s]\r\n"), topic);
-        }
-        else
-        {
-          MQTTDebugTf(PSTR("MQTT: Subscribe TopicId [%s] FAILED! \r\n"), topic);
-          PrintMQTTError();
-        }
-        MQTTclient.subscribe("homeassistant/status");
-        // TASK-410 / ADR-084: briefly subscribe to the six deprecated OT-bus
-        // topics so the broker delivers any lingering retained payloads from
-        // pre-2.0.0 firmware. The callback clears them; mqttV2MigrationTick()
-        // closes the window a few seconds later. No-op on clean brokers.
-        mqttV2MigrationOnConnect();
-        DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
-        sendMQTTversioninfo();
-        publishAllPICsettings();
-        publishBoilerUnsupportedMsgids();  // TASK-692 port: republish the retained CSV so HA/dashboards see it after every reconnect.
-        clearBoilerUnsupportedDirty();
-        DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
-      }
-      else
-      { // no connection, back off non-blockingly (3s, 6s, 9s, 12s between attempts)
-        // so HTTP/WebSocket keep getting served between connect tries.
-        // Inline timer-bump (vs CHANGE_INTERVAL_SEC) to save ~50 bytes of flash
-        // on ESP32; safeTimers.h DUE() only reads _due, so this is sufficient.
-        timerMQTTwaitforretry_due = millis() + (3000UL * reconnectAttempts);
-        MQTTDebugln(F(" .. \r"));
-        MQTTDebugTf(PSTR("failed, retrycount=[%d], rc=[%d] ..  try again\r\n"), reconnectAttempts, MQTTclient.state());
-        stateMQTT = MQTT_STATE_WAIT_CONNECTION_ATTEMPT;  // if the re-connect did not work, then return to wait for reconnect
-        MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_CONNECTION_ATTEMPT"));
-      }
-      
       //After 5 attempts... go wait for a while.
       if (reconnectAttempts >= 5)
       {
@@ -1217,33 +1174,41 @@ void handleMQTT()
         RESTART_TIMER(timerMQTTwaitforconnect);
         stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;  // if the re-connect did not work, then return to wait for reconnect
         MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
-      }   
+      }
     break;
-    
+
     case MQTT_STATE_IS_CONNECTED:
       if DUE(timerMQTTdebugisconnected) MQTTDebugTln(F("MQTT State: MQTT is Connected"));
       if (MQTTclient.connected())
-      { //if the MQTT client is connected, then please do a .loop call...
-        MQTTclient.loop();
+      { // engine already pumped by the unconditional loop() at top of handleMQTT()
         state.mqtt.iLastConnectedMs = millis();  // stamp each confirmed-live tick for offline-duration tracking
         // ADR-118: periodically refresh the retained gateway-override topics so HA / dashboards
         // reflect active overrides even when no new override frame arrived this minute.
         if (DUE(timerMQTToverridepublish)) publishActiveOverrides();
       }
       else
-      { //else go and wait 10 minutes, before trying again.
+      { //onMqttDisconnect cleared the live flag — wait 10 minutes before retrying.
+        //RESTART_TIMER stays here (not in the callback) because timerMQTTwaitforconnect
+        //is a handleMQTT()-local DECLARE_TIMER_SEC and only in scope on this path.
         RESTART_TIMER(timerMQTTwaitforconnect);
         stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;
         MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
-      }  
+      }
     break;
 
     case MQTT_STATE_WAIT_CONNECTION_ATTEMPT:
-      //do non-blocking wait for 3 seconds
+      //non-blocking wait for the async connect to land; retry after the backoff
       if  DUE(timerMQTTdebugwaitconnectionattempt) MQTTDebugTln(F("MQTT State: MQTT_WAIT_CONNECTION_ATTEMPT"));
-      if (DUE(timerMQTTwaitforretry))
+      if (MQTTclient.connected())
       {
-        //Try again... after waitforretry non-blocking delay
+        // onMqttConnect should have advanced us already; guard against a missed
+        // edge by syncing here.
+        stateMQTT = MQTT_STATE_IS_CONNECTED;
+      }
+      else if (DUE(timerMQTTwaitforretry))
+      {
+        //async connect did not land in time -> try again
+        MQTTDebugTf(PSTR("connect attempt %d not yet connected .. retry\r\n"), reconnectAttempts);
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
         MQTTDebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
       }
@@ -1277,25 +1242,121 @@ void handleMQTT()
       DebugTln(F("Next State: MQTT_STATE_INIT"));
     break;
   }
+  // Backstop sync: onMqttConnect/onMqttDisconnect are the authoritative writers
+  // of state.mqtt.bConnected (they fire from MQTTclient.loop()), but mirror the
+  // live client flag here too so a missed callback edge cannot leave the rest of
+  // the firmware reading a stale value.
   state.mqtt.bConnected = MQTTclient.connected();
 } // handleMQTT()
 
+// Last disconnect reason captured by onMqttDisconnect(), surfaced by
+// PrintMQTTError() (espMqttClient has no PubSubClient-style state() code).
+static espMqttClientTypes::DisconnectReason lastMqttDisconnectReason =
+    espMqttClientTypes::DisconnectReason::TCP_DISCONNECTED;
+
 void PrintMQTTError(){
   MQTTDebugln();
-  switch (MQTTclient.state())
+  switch (lastMqttDisconnectReason)
   {
-    case MQTT_CONNECTION_TIMEOUT     : MQTTDebugTln(F("Error: MQTT connection timeout"));break;
-    case MQTT_CONNECTION_LOST        : MQTTDebugTln(F("Error: MQTT connections lost"));break;
-    case MQTT_CONNECT_FAILED         : MQTTDebugTln(F("Error: MQTT connection failed"));break;
-    case MQTT_DISCONNECTED           : MQTTDebugTln(F("Error: MQTT disconnected"));break;
-    case MQTT_CONNECTED              : MQTTDebugTln(F("Error: MQTT connected"));break;
-    case MQTT_CONNECT_BAD_PROTOCOL   : MQTTDebugTln(F("Error: MQTT connect bad protocol"));break;
-    case MQTT_CONNECT_BAD_CLIENT_ID  : MQTTDebugTln(F("Error: MQTT connect bad client id"));break;
-    case MQTT_CONNECT_UNAVAILABLE    : MQTTDebugTln(F("Error: MQTT connect unavailable"));break;
-    case MQTT_CONNECT_BAD_CREDENTIALS: MQTTDebugTln(F("Error: MQTT connect bad credentials"));break;
-    case MQTT_CONNECT_UNAUTHORIZED   : MQTTDebugTln(F("Error: MQTT connect unauthorized"));break;
+    case espMqttClientTypes::DisconnectReason::USER_OK:
+      MQTTDebugTln(F("Error: MQTT user disconnect"));break;
+    case espMqttClientTypes::DisconnectReason::MQTT_UNACCEPTABLE_PROTOCOL_VERSION:
+      MQTTDebugTln(F("Error: MQTT connect bad protocol"));break;
+    case espMqttClientTypes::DisconnectReason::MQTT_IDENTIFIER_REJECTED:
+      MQTTDebugTln(F("Error: MQTT connect bad client id"));break;
+    case espMqttClientTypes::DisconnectReason::MQTT_SERVER_UNAVAILABLE:
+      MQTTDebugTln(F("Error: MQTT connect unavailable"));break;
+    case espMqttClientTypes::DisconnectReason::MQTT_MALFORMED_CREDENTIALS:
+      MQTTDebugTln(F("Error: MQTT connect bad credentials"));break;
+    case espMqttClientTypes::DisconnectReason::MQTT_NOT_AUTHORIZED:
+      MQTTDebugTln(F("Error: MQTT connect unauthorized"));break;
+    case espMqttClientTypes::DisconnectReason::TLS_BAD_FINGERPRINT:
+      MQTTDebugTln(F("Error: MQTT TLS bad fingerprint"));break;
+    case espMqttClientTypes::DisconnectReason::TCP_DISCONNECTED:
+      MQTTDebugTln(F("Error: MQTT TCP disconnected"));break;
     default: MQTTDebugTln(F("Error: MQTT unknown error"));
   }
+}
+
+// =====================================================================
+// espMqttClient async event handlers (TASK-865.7 / ADR-123 Phase 2)
+// =====================================================================
+
+// Birth + subscribe + republish + versioninfo. PubSubClient ran this inline in
+// MQTT_STATE_TRY_TO_CONNECT once connect() returned true; with the async client
+// it runs here, when the broker's CONNACK actually lands. sessionPresent is
+// unused (we always setCleanSession(true)).
+static void onMqttConnect(bool sessionPresent) {
+  (void)sessionPresent;
+  reconnectAttempts = 0;
+  state.mqtt.bConnected = true;
+  stateMQTT = MQTT_STATE_IS_CONNECTED;
+  MQTTDebugln(F(" .. connected\r"));
+  Debugln(F("MQTT connected"));
+  MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
+
+  // Birth message (retained "online" on the HA availability topic).
+  sendMQTT(MQTTPubNamespace, "online");
+  DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+
+  // Republish OT retained topics and reset discovery only if offline long enough
+  // that the broker may have lost its retained state (e.g. broker restart without
+  // persistence). Short outages are network blips — broker still holds everything.
+  // iLastConnectedMs == 0 means never connected (first boot): skip republish.
+  {
+    uint32_t offlineMs = (state.mqtt.iLastConnectedMs > 0)
+                         ? (millis() - state.mqtt.iLastConnectedMs)
+                         : 0;
+    if (offlineMs > MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS) {
+      DebugTf(PSTR("[MQTT] offline %lums > threshold — broker may have restarted; republishing values + resetting discovery\r\n"), (unsigned long)offlineMs);
+      requestMQTTRepublishAll();
+      // Broker restart assumed: retained discovery configs may be gone (ADR-100).
+      clearMQTTConfigDone();
+      clearMQTTConfigPending();
+      publishNonOTDiscoveryConfigs();
+    } else {
+      DebugTf(PSTR("[MQTT] offline %lums <= threshold, broker retains topics — skipping republish\r\n"), (unsigned long)offlineMs);
+    }
+  }
+  DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+
+  //Subscribe to topics
+  char topic[MQTT_TOPIC_MAX_LEN];
+  strlcpy(topic, MQTTSubNamespace, sizeof(topic));
+  strlcat(topic, "/#", sizeof(topic));
+  MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
+  if (MQTTclient.subscribe(topic, 0)) {
+    MQTTDebugTf(PSTR("MQTT: Subscribed successfully to TopicId [%s]\r\n"), topic);
+  } else {
+    MQTTDebugTf(PSTR("MQTT: Subscribe TopicId [%s] FAILED! \r\n"), topic);
+    PrintMQTTError();
+  }
+  MQTTclient.subscribe("homeassistant/status", 0);
+  // TASK-410 / ADR-084: briefly subscribe to the six deprecated OT-bus topics so
+  // the broker delivers any lingering retained payloads from pre-2.0.0 firmware.
+  // The callback clears them; mqttV2MigrationTick() closes the window. No-op on
+  // clean brokers.
+  mqttV2MigrationOnConnect();
+  DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+  sendMQTTversioninfo();
+  publishAllPICsettings();
+  publishBoilerUnsupportedMsgids();  // TASK-692 port: republish the retained CSV so HA/dashboards see it after every reconnect.
+  clearBoilerUnsupportedDirty();
+  DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+}
+
+// Disconnect / connect-refused. Records the reason for PrintMQTTError() and
+// clears the connected flag. It does NOT drive the state machine: the timer
+// restarts (timerMQTTwaitforconnect) live inside handleMQTT() where the
+// DECLARE_TIMER_SEC locals are in scope. The next handleMQTT() tick observes
+// !connected() and takes the matching branch:
+//   - from MQTT_STATE_IS_CONNECTED -> RESTART_TIMER + WAIT_FOR_RECONNECT (10 min)
+//   - from MQTT_STATE_WAIT_CONNECTION_ATTEMPT -> retry after the per-attempt
+//     backoff, with the 5-attempts-then-10-minute fallback preserved.
+static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
+  lastMqttDisconnectReason = reason;
+  state.mqtt.bConnected = false;
+  PrintMQTTError();
 }
 
 // ADR-104 Decision item 7: monotonic publish-success counter. Each
@@ -1327,19 +1388,22 @@ bool sendMQTTData(const char* topic, const char *json, const bool retain)
   strlcat(full_topic, topic, sizeof(full_topic));
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settings.mqtt.sBroker, settings.mqtt.iBrokerPort, full_topic, json);
   const size_t payloadLen = strlen(json);
-  if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
-  if (!writeMqttChunk(json, payloadLen)) {
-    MQTTclient.disconnect();  // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-770)
+  // espMqttClient frames atomically (copies topic+payload into its Outbox); the
+  // TASK-770 disconnect-on-truncated-write guard is obsolete.
+  if (!mqttPublishRaw(full_topic, reinterpret_cast<const uint8_t*>(json), payloadLen, retain)) {
+    PrintMQTTError();
     return false;
   }
-  if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
   // ADR-104 Decision item 7: no auto-commit of pending slot updates inside
   // sendMQTTData. Bit/byte slots commit-or-discard in their per-helper publish
   // path; the normal-msgId mqttPendingSlot is committed-or-discarded by the
   // OTPublishGate caller using the mqttSendSuccessCount delta to detect
   // whether any send landed during the frame.
+  // NOTE (TASK-865.7): mqttSendSuccessCount now counts publishes QUEUED into the
+  // espMqttClient Outbox, not bytes confirmed on the wire (the async client has
+  // no synchronous "sent" signal). The OTPublishGate slot-commit semantics are
+  // unchanged: a queued publish is the commit point.
   ++mqttSendSuccessCount;
-  feedWatchDog();//feed the dog
   return true;
 } // sendMQTTData()
 
@@ -1373,17 +1437,19 @@ bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   MQTTDebug(json);
   MQTTDebugln(F("]"));
 
+  // espMqttClient::publish memcpys the payload from RAM, so stage the PROGMEM
+  // value into a stack buffer first. These F()-literal payloads are short
+  // (birth "online", version strings); MQTT_TOPIC_MAX_LEN is comfortable.
   PGM_P payload = reinterpret_cast<PGM_P>(json);
-  const size_t payloadLen = strlen_P(payload);
-  if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
-  if (!writeMqttProgmemChunk(payload, payloadLen)) {
-    MQTTclient.disconnect();  // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-770)
+  char payloadBuf[MQTT_TOPIC_MAX_LEN];
+  strlcpy_P(payloadBuf, payload, sizeof(payloadBuf));
+  const size_t payloadLen = strlen(payloadBuf);
+  if (!mqttPublishRaw(full_topic, reinterpret_cast<const uint8_t*>(payloadBuf), payloadLen, retain)) {
+    PrintMQTTError();
     return false;
   }
-  if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
   // ADR-104 Decision item 7: no auto-commit. See char* overload comment.
   ++mqttSendSuccessCount;
-  feedWatchDog();
   return true;
 }
 
@@ -1473,7 +1539,7 @@ static void mqttV2MigrationOnConnect() {
   for (size_t i = 0; i < kV2DeprecatedCount; ++i) {
     PGM_P leaf = reinterpret_cast<PGM_P>(pgm_read_ptr(&kV2DeprecatedTopics[i]));
     v2MigrationBuildFullTopic(fullTopic, sizeof(fullTopic), leaf);
-    MQTTclient.subscribe(fullTopic);
+    MQTTclient.subscribe(fullTopic, 0);
   }
   v2MigrationSubscribed = true;
   v2MigrationSubscribeMs = millis();
@@ -1489,7 +1555,7 @@ static bool mqttV2MigrationHandleIfDeprecated(const char* topic) {
     if (strcmp(topic, fullTopic) == 0) {
       // Publish zero-length retained payload => broker deletes the retained
       // entry for this topic (MQTT 3.1.1 section 3.3.1.3).
-      MQTTclient.publish(fullTopic, (const uint8_t*)nullptr, 0, /*retain=*/true);
+      mqttPublishRaw(fullTopic, nullptr, 0, /*retain=*/true);
       MQTTclient.unsubscribe(fullTopic);
       DebugTf(PSTR("V2 migration: cleared retained on %s\r\n"), fullTopic);
       return true;
@@ -1673,8 +1739,9 @@ void sendMQTTstateinformation(){
 * json:   <string> , payload to send
 */
 //===========================================================================================
-// Streaming version - sends message in 128-byte chunks to avoid buffer reallocation
-// This prevents heap fragmentation on ESP8266 (similar to ESPHome's approach)
+// Publishes the topic verbatim (no namespace prefix), retained. Used for the
+// birth message and a few absolute-topic publishes. Funnels through the single
+// mqttPublishRaw chokepoint (espMqttClient buffers the publish atomically).
 void sendMQTT(const char* topic, const char *json) {
   if (!settings.mqtt.bEnable) return;
   if (!MQTTclient.connected()) return;
@@ -1682,10 +1749,7 @@ void sendMQTT(const char* topic, const char *json) {
   if (!canPublishMQTT()) return;
 
   const size_t len = strlen(json);
-  if (!beginMqttPublish(topic, len, true)) return;
-  if (!writeMqttChunk(json, len)) { MQTTclient.disconnect(); return; }  // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-770)
-  if (!MQTTclient.endPublish()) PrintMQTTError();
-  feedWatchDog();
+  if (!mqttPublishRaw(topic, reinterpret_cast<const uint8_t*>(json), len, true)) PrintMQTTError();
 }
 
 //===========================================================================================
@@ -2303,19 +2367,14 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   return ctx;
 }
 
-static bool publishDiscoveryJson(PubSubClient &client,
-                                 const char *topic,
+static bool publishDiscoveryJson(const char *topic,
                                  const char *payload,
                                  size_t payloadLen)
 {
-  if (!client.beginPublish(topic, payloadLen, true)) return false;
-  if (client.write(reinterpret_cast<const uint8_t*>(payload), payloadLen) != payloadLen) {
-    client.endPublish();
-    return false;
-  }
-  if (!client.endPublish()) return false;
+  // payload is already fully composed in a caller-owned buffer; hand it to the
+  // single mqttPublishRaw chokepoint (espMqttClient frames it atomically).
+  if (!mqttPublishRaw(topic, reinterpret_cast<const uint8_t*>(payload), payloadLen, /*retain=*/true)) return false;
   incPublishedTopicCount();
-  feedWatchDog();
   return true;
 }
 
@@ -2403,11 +2462,11 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
 }
 
 // Forward declaration — defined just below streamSatZoneDiscovery (TASK-640).
-static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &ctx);
+static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx);
 
-bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
+bool streamSatZoneDiscovery(HaDiscoveryContext &ctx)
 {
-  if (!client.connected()) return false;
+  if (!MQTTclient.connected()) return false;
   if (!canPublishMQTT()) return false;
 
   const uint8_t maxZones = satGetMaxZones();
@@ -2447,7 +2506,7 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
                                 ctx.mqttPubTopic, zoneNumber, metric,
                                 deviceClass, unit, stateClass, icon, ctx.version);
     if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
-    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    if (!publishDiscoveryJson(topic, payload, static_cast<size_t>(payloadLen))) return false;
     ctx.isFirstEntity = false;
     return true;
   };
@@ -2468,7 +2527,7 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
                                 ctx.mqttPubTopic, zoneNumber, metric,
                                 icon, ctx.version);
     if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
-    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    if (!publishDiscoveryJson(topic, payload, static_cast<size_t>(payloadLen))) return false;
     ctx.isFirstEntity = false;
     return true;
   };
@@ -2488,7 +2547,7 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
   // entities are emitted unconditionally (so users can enable the feature from
   // HA); the sensor / binary_sensor entities are emitted only when enabled to
   // keep the dashboard clean for users who don't use it.
-  if (!streamSatPvBoostDiscovery(client, ctx)) return false;
+  if (!streamSatPvBoostDiscovery(ctx)) return false;
 
   return true;
 }
@@ -2498,9 +2557,9 @@ bool streamSatZoneDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
 // stamp out sensor/binary_sensor/switch/number configs with the shared device
 // block + origin block. All entities live under the unique-id namespace
 // "<nodeId>-sat_pv_boost_*" so HA aggregates them under the OTGW device.
-static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
+static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx)
 {
-  if (!client.connected()) return false;
+  if (!MQTTclient.connected()) return false;
   if (!canPublishMQTT()) return false;
 
   char topic[180];
@@ -2536,7 +2595,7 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
                                 ctx.mqttPubTopic, metric,
                                 deviceClass, unit, stateClass, icon, ctx.version);
     if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
-    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    if (!publishDiscoveryJson(topic, payload, static_cast<size_t>(payloadLen))) return false;
     ctx.isFirstEntity = false;
     return true;
   };
@@ -2556,7 +2615,7 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
                                 ctx.mqttPubTopic, metric,
                                 icon, ctx.version);
     if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
-    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    if (!publishDiscoveryJson(topic, payload, static_cast<size_t>(payloadLen))) return false;
     ctx.isFirstEntity = false;
     return true;
   };
@@ -2577,7 +2636,7 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
                                 ctx.mqttSubTopic, metric,
                                 icon, ctx.version);
     if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
-    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    if (!publishDiscoveryJson(topic, payload, static_cast<size_t>(payloadLen))) return false;
     ctx.isFirstEntity = false;
     return true;
   };
@@ -2604,7 +2663,7 @@ static bool streamSatPvBoostDiscovery(PubSubClient &client, HaDiscoveryContext &
                                 ctx.mqttSubTopic, metric,
                                 minBuf, maxBuf, stepBuf, unit, icon, ctx.version);
     if (payloadLen <= 0 || static_cast<size_t>(payloadLen) >= sizeof(payload)) return false;
-    if (!publishDiscoveryJson(client, topic, payload, static_cast<size_t>(payloadLen))) return false;
+    if (!publishDiscoveryJson(topic, payload, static_cast<size_t>(payloadLen))) return false;
     ctx.isFirstEntity = false;
     return true;
   };
@@ -2747,11 +2806,11 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
           // In bilateral mode they are emitted on both passes (Boiler + Thermostat)
           // so users see source-qualified variants under both devices.
           if (settings.mqtt.bSeparateSources) {
-            if (expandAndStreamSensorSources(MQTTclient, cfg, ctx)) result = true;
+            if (expandAndStreamSensorSources(cfg, ctx)) result = true;
           }
         } else {
           // ADR-097: base entity always emitted.
-          if (streamSensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+          if (streamSensorDiscovery(cfg, ctx)) result = true;
         }
         i++;
         feedWatchDog();
@@ -2776,7 +2835,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
           if (cfg.id != OTid) break;
           const bool skipReplaced = !topicLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS);
           if (!skipReplaced) {
-            if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+            if (streamBinarySensorDiscovery(cfg, ctx)) result = true;
           }
           bIdx++;
           feedWatchDog();
@@ -2787,7 +2846,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
         for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
           MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
           if (cfg.id != OTid) continue;
-          if (streamBinarySensorDiscovery(MQTTclient, cfg, ctx)) result = true;
+          if (streamBinarySensorDiscovery(cfg, ctx)) result = true;
           feedWatchDog();
         }
       }
@@ -2801,8 +2860,8 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // SAT switches/select: Sat.
   if (OTid == 0) {
     ctx.device = HaDevice::Thermostat;
-    if (streamClimateDiscovery(MQTTclient, 0, ctx)) result = true;
-    if (streamClimateDiscovery(MQTTclient, 1, ctx)) result = true;
+    if (streamClimateDiscovery(0, ctx)) result = true;
+    if (streamClimateDiscovery(1, ctx)) result = true;
     ctx.device = HaDevice::Sat;
     // TASK-516: idx 13 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
     const bool dhwEnableSwitchAllowed =
@@ -2810,15 +2869,15 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     for (uint8_t swIdx = 0; swIdx < 14; swIdx++) {
       if (swIdx == 13 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
-      if (streamSatSwitchDiscovery(MQTTclient, swIdx, ctx)) result = true;
+      if (streamSatSwitchDiscovery(swIdx, ctx)) result = true;
     }
     feedWatchDog();
-    if (streamSatSelectDiscovery(MQTTclient, 0, ctx)) result = true;
+    if (streamSatSelectDiscovery(0, ctx)) result = true;
   }
   // Number (OT ID 27): Thermostat (room temperature outside override is thermostat-side).
   if (OTid == 27) {
     ctx.device = HaDevice::Thermostat;
-    if (streamNumberDiscovery(MQTTclient, ctx)) result = true;
+    if (streamNumberDiscovery(ctx)) result = true;
   }
 
   // ADR-118: active-gateway-override sensor for the override-capable numeric ids.
@@ -2828,7 +2887,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     case 1: case 8: case 9: case 14: case 16: case 39: case 56: case 57: {
       ctx.device = HaDevice::Gateway;
       const char* ovrLabel = messageIDToString(static_cast<OTLibMessageID>(OTid));
-      if (streamOverrideSensorDiscovery(MQTTclient, ctx, OTid, ovrLabel)) result = true;
+      if (streamOverrideSensorDiscovery(ctx, OTid, ovrLabel)) result = true;
       break;
     }
     default: break;
@@ -2836,7 +2895,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
 
   if (OTid == OTGWsatzoneid) {
     ctx.device = HaDevice::Sat;
-    if (streamSatZoneDiscovery(MQTTclient, ctx)) result = true;
+    if (streamSatZoneDiscovery(ctx)) result = true;
   }
 
   // PIC control entities (pseudo-ID 244): resetgateway button + GPIO/LED selects.
@@ -2852,10 +2911,10 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // set next tick (retained idempotent re-publish). Mirrors dev PR #596.
   if (OTid == OTGWpiccontrolsid) {
     ctx.device = HaDevice::Gateway;
-    bool allOk = streamButtonDiscovery(MQTTclient, ctx);
+    bool allOk = streamButtonDiscovery(ctx);
     feedWatchDog();
     for (uint8_t i = 0; i <= 7; i++) {
-      if (!streamSelectDiscovery(MQTTclient, i, ctx)) allOk = false;
+      if (!streamSelectDiscovery(i, ctx)) allOk = false;
       feedWatchDog();
     }
     if (allOk) result = true;
@@ -2873,7 +2932,7 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
 
   HaDiscoveryContext ctx = buildDiscoveryContext();
   ctx.device = HaDevice::Sensors;  // ADR-124: Dallas temps are physical hardware sensors (was Esp)
-  bool success = streamDallasSensorDiscovery(MQTTclient, cfgSensorId, ctx);
+  bool success = streamDallasSensorDiscovery(cfgSensorId, ctx);
   if (success) {
     MQTTDebugTf(PSTR("Dallas discovery sent for [%s]\r\n"), cfgSensorId);
     if (finishflag) setMQTTConfigDone(dataid);
@@ -2897,13 +2956,12 @@ void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId =
 //     3. Call satBLEPublishStateTopics(macCompact, slot.fTemperature, ...)
 //   The bDiscoveryPublished flag must be added to BLESensorData by TASK-487.
 //
-// ADR-077 conformance: HA discovery configs are emitted via the existing
-// streaming primitives (beginMqttPublish + writeMqttChunk + endPublish)
-// using a SINGLE-buffer publish per the bounded-payload exception — the
-// per-config payload is statically capped at 768 bytes and all four BLE
-// configs comfortably fit. ADR-077 normally prescribes a two-pass
-// MEASURE-then-WRITE for unbounded payloads; the bounded case is the
-// addendum codified in ADR-077 (TASK-499 / 1B-M1).
+// ADR-077 conformance: HA discovery configs are emitted via a SINGLE-buffer
+// publish through mqttPublishRaw() (TASK-865.7) per the bounded-payload
+// exception — the per-config payload is statically capped at 768 bytes and all
+// four BLE configs comfortably fit. ADR-077 normally prescribes a two-pass
+// MEASURE-then-WRITE for unbounded payloads; the bounded case is the addendum
+// codified in ADR-077 (TASK-499 / 1B-M1).
 // The 256-bit OT-ID drip bitmap (MQTTautoCfgPendingMap) does not apply
 // here: BLE MACs are not OT IDs. Drip pacing is provided by the caller
 // cadence (one BLE scan per iBleInterval, typically 30 s) plus the
@@ -3140,16 +3198,14 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
   }
 
   // TASK-496 (2B-H1): every return path that follows a network attempt feeds
-  // the watchdog. PubSubClient sockets can stall up to ~15 s on a flaky broker,
-  // and a 16-publish first-scan burst (4 sensors × 4 configs) can otherwise
-  // traverse all branches without a single watchdog kick.
-  if (!beginMqttPublish(topic, (size_t)n, /*retain=*/true)) { feedWatchDog(); return false; }
-  if (!writeMqttChunk(payload, (size_t)n)) {
-    MQTTclient.disconnect();  // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-770)
+  // the watchdog. The payload is already composed in `payload`; mqttPublishRaw
+  // buffers it atomically (and feeds the dog itself), so the truncated-write
+  // desync guard (TASK-770) is gone.
+  if (!mqttPublishRaw(topic, reinterpret_cast<const uint8_t*>(payload), (size_t)n, /*retain=*/true)) {
+    PrintMQTTError();
     feedWatchDog();
     return false;
   }
-  if (!MQTTclient.endPublish()) { PrintMQTTError(); feedWatchDog(); return false; }
   feedWatchDog();
   return true;
 }
@@ -3258,13 +3314,10 @@ void satBLEUnpublishDiscovery(const char* macCompact)
     snprintf_P(topic, sizeof(topic),
                PSTR("%s/sensor/%s_ble_%s_%s/config"),
                haPrefix, uniqueId, macCompact, kKinds[k]);
-    // Zero-length retained payload via the streaming primitives — same
-    // path as the publish side, so retain semantics are identical.
-    if (beginMqttPublish(topic, 0, /*retain=*/true)) {
-      // No writeMqttChunk needed for empty payload.
-      if (!MQTTclient.endPublish()) {
-        PrintMQTTError();
-      }
+    // Zero-length retained payload deletes the retained config — same path as
+    // the publish side, so retain semantics are identical.
+    if (!mqttPublishRaw(topic, nullptr, 0, /*retain=*/true)) {
+      PrintMQTTError();
     }
     feedWatchDog();
   }
@@ -3374,11 +3427,9 @@ static bool publishEmptyDiscoveryFor(const MqttHaBinSensorCfg &cfg) {
   char topic[MQTT_TOPIC_MAX_LEN];
   snprintf_P(topic, sizeof(topic), PSTR("%s/binary_sensor/%s/%s/config"),
              CSTR(settings.mqtt.sHaprefix), CSTR(settings.mqtt.sUniqueid), labelBuf);
-  // Zero-length retained payload via the streaming primitives — same path
-  // as the deregister code in mqttSatBLEUnpublishHaDiscoveryForMac().
-  if (!beginMqttPublish(topic, 0, /*retain=*/true)) return false;
-  if (!MQTTclient.endPublish()) return false;
-  return true;
+  // Zero-length retained payload deletes the retained config — same path as the
+  // deregister code in mqttSatBLEUnpublishHaDiscoveryForMac().
+  return mqttPublishRaw(topic, nullptr, 0, /*retain=*/true);
 }
 
 // Drain one bit per call from doBackgroundTasks(). Total work = up to 37
@@ -3515,7 +3566,6 @@ static void runTopologyCleanupStep() {
 
   const bool staleIsLegacy = (g_topoCleanup.mode == TOPO_CLEANUP_MODE_CLEAR_LEGACY);
   uint8_t cleared = clearTopologyDiscoveryForOTId(
-    MQTTclient,
     static_cast<uint8_t>(otId),
     staleIsLegacy,
     CSTR(settings.mqtt.sHaprefix),

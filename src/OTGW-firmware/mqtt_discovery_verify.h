@@ -88,11 +88,11 @@ void         verifyAccessorMarkAllMQTTConfigPending();
 // c-string; the accessor prepends the usual BOL prefix and writes to telnet.
 void         verifyAccessorLogLine(const char* ramMessage);
 
-// MQTT client operations exposed without surfacing PubSubClient in this header.
-// Raises the PubSubClient RX buffer to the verify window size; returns true
-// on success. Matches PubSubClient::setBufferSize semantics.
+// MQTT client operations exposed without surfacing the MQTT client type here.
+// TASK-865.7: under espMqttClient the RX buffer is a fixed EMC_RX_BUFFER_SIZE
+// (1440 B), larger than the old verify window target, so these two are now
+// no-ops that always report success — the verify state machine is unchanged.
 bool         verifyAccessorSetMqttBufferSize(uint16_t sizeBytes);
-// Restores the RX buffer to the sketch's default client-buffer size.
 bool         verifyAccessorRestoreMqttBufferSize();
 // Subscribe/unsubscribe to/from the verify wildcard (QoS 0).
 bool         verifyAccessorMqttSubscribe(const char *topic);

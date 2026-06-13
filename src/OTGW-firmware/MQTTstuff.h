@@ -11,7 +11,8 @@
 #pragma once
 #include <pgmspace.h>
 #include <stdint.h>
-#include <PubSubClient.h>
+#include <stddef.h>
+#include <string.h>   // memcpy / strlen — MqttJsonWriter WRITE buffer + readSensorCfg memcpy_P
 #include <boards.h>   // HAS_PIC / HAS_DIRECT_OT capability flags — needed in BOTH TUs
                       // (the standalone MQTTHaDiscovery.cpp does not pull OTGW-firmware.h,
                       // so it would otherwise see HAS_PIC undefined; the OT-Core device's
@@ -447,124 +448,137 @@ struct HaDiscoveryContext {
 };
 
 // ---------------------------------------------------------------------------
-// MqttJsonWriter -- dual-mode writer for streaming JSON to MQTT
+// mqttPublishRaw -- the single MQTT publish chokepoint (TASK-865.7 / ADR-123).
 //
-// In MEASURE mode: no MQTT I/O; just accumulates byte count.
-// In WRITE mode: writes chunks via the global writeMqttChunk helpers.
+// espMqttClient frames a publish atomically: it copies (topic + payload) into
+// its Outbox at publish() time, then pumps the bytes onto the wire from loop().
+// There is no streaming beginPublish/write/endPublish API as PubSubClient had,
+// so every outbound publish in the firmware buffers its payload (already the
+// case for the small per-message helpers; the discovery composer measures the
+// payload, mallocs a transient heap buffer, fills it once, then calls this).
 //
-// This allows the same composition function to first measure the payload
-// (for PubSubClient::beginPublish) and then write it, keeping the two
-// passes perfectly in sync without duplicating the JSON structure logic.
-//
-// Defined in the header so Arduino's auto-prototype generation knows
-// the type before it generates forward declarations for functions that
-// use MqttJsonWriter& parameters.
+// On the ESP32-S3 the worst-case discovery payload is ~900 B — trivial against
+// the DRAM budget — so the 128 B ESP8266-only chunker the old code carried is
+// gone. payload may be nullptr when len==0 (empty retained publish = delete).
+// Returns true when the publish was queued (packetId != 0), false otherwise
+// (not connected / out of outbox memory). Defined in MQTTstuff.ino.
 // ---------------------------------------------------------------------------
+bool mqttPublishRaw(const char* topic, const uint8_t* payload, size_t len, bool retain);
 
-// Forward declarations for chunk writers (defined in MQTTstuff.ino)
-bool writeMqttChunkExt(const char *data, size_t len);
-bool writeMqttProgmemChunkExt(PGM_P data, size_t len);
-bool writeMqttByteExt(uint8_t b);
-
+// ---------------------------------------------------------------------------
+// MqttJsonWriter -- dual-mode writer for composing HA discovery JSON
+//
+// In MEASURE mode: no output; just accumulates byteCount so the caller can
+// size the publish buffer exactly.
+// In WRITE mode: appends bytes into a caller-supplied heap buffer (buf/cap).
+//
+// The same composition function runs twice — first MEASURE to learn the
+// length, then WRITE into a malloc'd buffer of that length — keeping the two
+// passes perfectly in sync without duplicating the JSON structure logic.
+// The filled buffer is then handed to mqttPublishRaw() as one atomic publish.
+//
+// Defined in the header so Arduino's auto-prototype generation knows the type
+// before it generates forward declarations for functions that take a
+// MqttJsonWriter& parameter.
+// ---------------------------------------------------------------------------
 struct MqttJsonWriter {
   enum Mode : uint8_t { MEASURE = 0, WRITE = 1 };
   Mode   mode;
   size_t byteCount;
   bool   ok;
+  char  *buf;   // WRITE target (nullptr in MEASURE mode)
+  size_t cap;   // capacity of buf (excluding the NUL we never need)
 
-  MqttJsonWriter(Mode m) : mode(m), byteCount(0), ok(true) {}
+  explicit MqttJsonWriter(Mode m) : mode(m), byteCount(0), ok(true), buf(nullptr), cap(0) {}
+  MqttJsonWriter(char *target, size_t capacity)
+    : mode(WRITE), byteCount(0), ok(true), buf(target), cap(capacity) {}
+
+  // Append len bytes from RAM source s into buf, guarding against overrun.
+  bool appendRam(const char *s, size_t len) {
+    if (mode == WRITE && len > 0) {
+      if (byteCount + len > cap) { ok = false; return false; }
+      memcpy(buf + byteCount, s, len);
+    }
+    byteCount += len;
+    return true;
+  }
 
   bool writeRam(const char *s) {
     if (!s) return true;
-    size_t len = strlen(s);
-    byteCount += len;
-    if (mode == WRITE && len > 0) {
-      if (!writeMqttChunkExt(s, len)) { ok = false; return false; }
-    }
-    return true;
+    return appendRam(s, strlen(s));
   }
 
   bool writeProgmem(PGM_P s) {
     if (!s) return true;
     size_t len = strlen_P(s);
-    byteCount += len;
     if (mode == WRITE && len > 0) {
-      if (!writeMqttProgmemChunkExt(s, len)) { ok = false; return false; }
+      if (byteCount + len > cap) { ok = false; return false; }
+      memcpy_P(buf + byteCount, s, len);
     }
+    byteCount += len;
     return true;
   }
 
   bool writeChar(char c) {
-    byteCount += 1;
     if (mode == WRITE) {
-      if (!writeMqttByteExt(static_cast<uint8_t>(c))) { ok = false; return false; }
+      if (byteCount + 1 > cap) { ok = false; return false; }
+      buf[byteCount] = c;
     }
+    byteCount += 1;
     return true;
   }
 
   bool writeRamN(const char *s, size_t len) {
-    byteCount += len;
-    if (mode == WRITE && len > 0) {
-      if (!writeMqttChunkExt(s, len)) { ok = false; return false; }
-    }
-    return true;
+    return appendRam(s, len);
   }
 };
 
 // ---------------------------------------------------------------------------
 // Streaming discovery functions (defined in MQTTHaDiscovery.cpp)
+//
+// TASK-865.7: the PubSubClient &client parameter is gone. Each function now
+// measures its payload, mallocs a transient buffer, fills it via MqttJsonWriter
+// WRITE mode, and hands it to mqttPublishRaw() (the single publish chokepoint).
 // ---------------------------------------------------------------------------
-bool streamSensorDiscovery(PubSubClient &client,
-                           const MqttHaSensorCfg &cfg,
+bool streamSensorDiscovery(const MqttHaSensorCfg &cfg,
                            HaDiscoveryContext &ctx);
 
-bool streamBinarySensorDiscovery(PubSubClient &client,
-                                 const MqttHaBinSensorCfg &cfg,
+bool streamBinarySensorDiscovery(const MqttHaBinSensorCfg &cfg,
                                  HaDiscoveryContext &ctx);
 
-bool streamSatZoneDiscovery(PubSubClient &client,
+bool streamSatZoneDiscovery(HaDiscoveryContext &ctx);
+
+bool streamClimateDiscovery(uint8_t climateIdx,
                             HaDiscoveryContext &ctx);
 
-bool streamClimateDiscovery(PubSubClient &client,
-                            uint8_t climateIdx,
-                            HaDiscoveryContext &ctx);
-
-bool streamNumberDiscovery(PubSubClient &client,
-                           HaDiscoveryContext &ctx);
+bool streamNumberDiscovery(HaDiscoveryContext &ctx);
 
 // ADR-118: active gateway-override sensor (per msg id, except 27 which uses the number entity).
 // label is the OTmap label (resolved by the caller, which sees OTmap).
-bool streamOverrideSensorDiscovery(PubSubClient &client,
-                                   HaDiscoveryContext &ctx,
+bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
                                    uint8_t otid,
                                    const char* label);
 
 // SAT enable/disable switches (boolean settings). switchIdx = 0..12, see implementation.
-bool streamSatSwitchDiscovery(PubSubClient &client,
-                              uint8_t switchIdx,
+bool streamSatSwitchDiscovery(uint8_t switchIdx,
                               HaDiscoveryContext &ctx);
 
 // SAT select entities (dropdowns). selectIdx = 0 (sat_heating_system) for now.
-bool streamSatSelectDiscovery(PubSubClient &client,
-                              uint8_t selectIdx,
+bool streamSatSelectDiscovery(uint8_t selectIdx,
                               HaDiscoveryContext &ctx);
 
-bool streamDallasSensorDiscovery(PubSubClient &client,
-                                 const char *sensorAddress,
+bool streamDallasSensorDiscovery(const char *sensorAddress,
                                  HaDiscoveryContext &ctx);
 
-bool expandAndStreamSensorSources(PubSubClient &client,
-                                  const MqttHaSensorCfg &cfg,
+bool expandAndStreamSensorSources(const MqttHaSensorCfg &cfg,
                                   HaDiscoveryContext &ctx);
 
 // Button discovery: one entity for resetgateway (pseudo-ID 244)
-bool streamButtonDiscovery(PubSubClient &client,
-                           HaDiscoveryContext &ctx);
+bool streamButtonDiscovery(HaDiscoveryContext &ctx);
 
 // Select discovery: GPIO and LED function selects (pseudo-ID 244)
 // selectIdx: 0=gpioa, 1=gpiob, 2=leda, 3=ledb, 4=ledc, 5=ledd, 6=lede, 7=ledf
-bool streamSelectDiscovery(PubSubClient &client,
-                           uint8_t selectIdx,
+bool streamSelectDiscovery(uint8_t selectIdx,
                            HaDiscoveryContext &ctx);
 
 // TASK-648 Task 6: topology-migration cleanup helper (defined in MQTTHaDiscovery.cpp).
@@ -572,8 +586,7 @@ bool streamSelectDiscovery(PubSubClient &client,
 // under the STALE scheme. staleIsLegacy=true clears legacy bare-label topics;
 // staleIsLegacy=false clears modern device_label topics.
 // Returns the number of topics successfully cleared (0 on MQTT failure).
-uint8_t clearTopologyDiscoveryForOTId(PubSubClient &client,
-                                      uint8_t otId,
+uint8_t clearTopologyDiscoveryForOTId(uint8_t otId,
                                       bool staleIsLegacy,
                                       const char *haPrefix,
                                       const char *nodeId,

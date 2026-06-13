@@ -2115,10 +2115,10 @@ PGM_P haEntityCatStr(HaEntityCat ec) {
 // ---------------------------------------------------------------------------
 // Streaming HA MQTT discovery JSON composer
 //
-// Builds HA discovery JSON payloads at runtime and writes them directly
-// to MQTT via PubSubClient::beginPublish/write/endPublish. Uses a
-// dual-mode writer (MqttJsonWriter) that first measures the payload
-// length, then writes it -- keeping the two passes in perfect sync.
+// Builds HA discovery JSON payloads at runtime. Uses a dual-mode writer
+// (MqttJsonWriter) that first measures the payload length, then writes it into
+// a transient heap buffer -- keeping the two passes in perfect sync -- which is
+// then published atomically via mqttPublishRaw (TASK-865.7 / ADR-123).
 //
 // Lives in a .cpp file (not .ino) to avoid Arduino's auto-prototype
 // generator injecting broken forward declarations for functions with
@@ -2137,6 +2137,53 @@ PGM_P haEntityCatStr(HaEntityCat ec) {
 extern bool canPublishMQTT();
 extern void feedWatchDog();
 extern void incPublishedTopicCount();   // ADR-062 / TASK-349: called after every successful retained discovery publish
+// TASK-865.7: the MQTT client is a file-static in MQTTstuff.ino (espMqttClient),
+// so this TU reaches its connected state through a narrow accessor instead of a
+// passed-in client reference.
+extern bool mqttIsConnected();
+
+// ---------------------------------------------------------------------------
+// measureMallocPublish() — TASK-865.7 / ADR-123 publish scaffold.
+//
+// espMqttClient has no streaming beginPublish/write/endPublish API; it frames a
+// publish atomically from one buffer. So every discovery payload is composed
+// twice with the dual-mode MqttJsonWriter: MEASURE to learn the exact length,
+// then WRITE into a transient malloc'd heap buffer of that length, which is
+// handed to mqttPublishRaw() (the single publish chokepoint) and freed
+// immediately — espMqttClient copies it into its Outbox at publish() time, so
+// the buffer can go right away.
+//
+// `compose` is invoked twice and MUST be deterministic between the two passes
+// (the MQTTstuff.h MqttJsonWriter guards every WRITE append against the measured
+// capacity, and the byteCount==len assertion below catches any drift). All
+// discovery payloads here are bounded (~900 B worst case), trivial on the S3.
+// Returns true only when the publish was queued. Always retained (HA configs).
+//
+// Deliberately does NOT call incPublishedTopicCount(): per ADR-062 (gated by
+// evaluate.py::check_discovery_counter_instrumented) every stream*Discovery
+// helper must carry its own incPublishedTopicCount() so a new helper that
+// forgets it fails the gate rather than silently under-counting. Centralising
+// the count here would defeat that guard, so each caller increments on its own
+// success path right after this returns true.
+// ---------------------------------------------------------------------------
+template <typename ComposeFn>
+static bool measureMallocPublish(const char *topic, ComposeFn &&compose) {
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+  const size_t len = measure.byteCount;
+
+  char *buf = static_cast<char *>(malloc(len ? len : 1));
+  if (!buf) return false;
+
+  MqttJsonWriter writer(buf, len);
+  const bool composed = compose(writer) && writer.ok && writer.byteCount == len;
+  const bool published = composed &&
+      mqttPublishRaw(topic, reinterpret_cast<const uint8_t *>(buf), len, /*retain=*/true);
+  free(buf);
+
+  if (published) feedWatchDog();
+  return published;
+}
 
 // ---------------------------------------------------------------------------
 // JSON streaming helpers
@@ -2662,11 +2709,10 @@ static constexpr size_t   STREAM_TOPIC_MAX = 200;
 // ---------------------------------------------------------------------------
 // Public API: streamSensorDiscovery
 // ---------------------------------------------------------------------------
-bool streamSensorDiscovery(PubSubClient &client,
-                           const MqttHaSensorCfg &cfg,
+bool streamSensorDiscovery(const MqttHaSensorCfg &cfg,
                            HaDiscoveryContext &ctx)
 {
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
@@ -2682,35 +2728,20 @@ bool streamSensorDiscovery(PubSubClient &client,
                                  devSeg))
     return false;
 
-  // Measure pass
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!composeSensorPayload(measure, cfg, ctx)) return false;
-
-  // Begin publish with exact payload length
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  // Write pass
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!composeSensorPayload(writer, cfg, ctx) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-770)
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
-
+  if (!measureMallocPublish(topic, [&](MqttJsonWriter &w) {
+        return composeSensorPayload(w, cfg, ctx);
+      })) return false;
   incPublishedTopicCount();   // ADR-062 / TASK-349
-  feedWatchDog();
   return true;
 }
 
 // ---------------------------------------------------------------------------
 // Public API: streamBinarySensorDiscovery
 // ---------------------------------------------------------------------------
-bool streamBinarySensorDiscovery(PubSubClient &client,
-                                 const MqttHaBinSensorCfg &cfg,
+bool streamBinarySensorDiscovery(const MqttHaBinSensorCfg &cfg,
                                  HaDiscoveryContext &ctx)
 {
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
@@ -2722,21 +2753,10 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
                                     cfg.label, devSeg))
     return false;
 
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!composeBinSensorPayload(measure, cfg, ctx)) return false;
-
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!composeBinSensorPayload(writer, cfg, ctx) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-770)
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
-
+  if (!measureMallocPublish(topic, [&](MqttJsonWriter &w) {
+        return composeBinSensorPayload(w, cfg, ctx);
+      })) return false;
   incPublishedTopicCount();   // ADR-062 / TASK-349
-  feedWatchDog();
   return true;
 }
 
@@ -2745,11 +2765,10 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
 // Dallas temperature sensors have dynamic addresses known only at runtime.
 // This function builds a sensor discovery payload using the address as label.
 // ---------------------------------------------------------------------------
-bool streamDallasSensorDiscovery(PubSubClient &client,
-                                 const char *sensorAddress,
+bool streamDallasSensorDiscovery(const char *sensorAddress,
                                  HaDiscoveryContext &ctx)
 {
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
   if (!sensorAddress || sensorAddress[0] == '\0') return false;
@@ -2834,23 +2853,8 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
     return writeJsonClose(w);
   };
 
-  // Measure pass
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!compose(measure)) return false;
-
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  // Write pass
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-770)
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
-
+  if (!measureMallocPublish(topic, compose)) return false;
   incPublishedTopicCount();   // ADR-062 / TASK-349
-  feedWatchDog();
   return true;
 }
 
@@ -2880,8 +2884,7 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
 // Lives here (not in MQTTstuff.ino) to avoid Arduino auto-prototyper
 // mangling custom-type parameters.
 // ---------------------------------------------------------------------------
-bool expandAndStreamSensorSources(PubSubClient &client,
-                                  const MqttHaSensorCfg &cfg,
+bool expandAndStreamSensorSources(const MqttHaSensorCfg &cfg,
                                   HaDiscoveryContext &ctx)
 {
   static const char src_suffix_thermostat[] PROGMEM = "_thermostat";
@@ -2914,7 +2917,7 @@ bool expandAndStreamSensorSources(PubSubClient &client,
     ctx.sourceName = nameBuf;
     ctx.sourceTopicSegment = segBuf;
 
-    if (streamSensorDiscovery(client, cfg, ctx)) published = true;
+    if (streamSensorDiscovery(cfg, ctx)) published = true;
     feedWatchDog();
   }
 
@@ -2932,11 +2935,10 @@ bool expandAndStreamSensorSources(PubSubClient &client,
 // ---------------------------------------------------------------------------
 // Climate: Thermostat (climateIdx=0) and DHW Control (climateIdx=1)
 // ---------------------------------------------------------------------------
-bool streamClimateDiscovery(PubSubClient &client,
-                            uint8_t climateIdx,
+bool streamClimateDiscovery(uint8_t climateIdx,
                             HaDiscoveryContext &ctx)
 {
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
   if (climateIdx > 1) return false;
@@ -3103,30 +3105,17 @@ bool streamClimateDiscovery(PubSubClient &client,
     return writeJsonClose(w);
   };
 
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!compose(measure)) return false;
-
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-770)
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
+  if (!measureMallocPublish(topic, compose)) return false;
   incPublishedTopicCount();   // ADR-062 / TASK-349
-  feedWatchDog();
   return true;
 }
 
 // ---------------------------------------------------------------------------
 // Number: Outside Temperature Override (OT ID 27)
 // ---------------------------------------------------------------------------
-bool streamNumberDiscovery(PubSubClient &client,
-                           HaDiscoveryContext &ctx)
+bool streamNumberDiscovery(HaDiscoveryContext &ctx)
 {
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
@@ -3187,20 +3176,8 @@ bool streamNumberDiscovery(PubSubClient &client,
     return writeJsonClose(w);
   };
 
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!compose(measure)) return false;
-
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-770)
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
+  if (!measureMallocPublish(topic, compose)) return false;
   incPublishedTopicCount();   // ADR-062 / TASK-349
-  feedWatchDog();
   return true;
 }
 
@@ -3212,14 +3189,13 @@ bool streamNumberDiscovery(PubSubClient &client,
 // would create two HA entities on the same topic). The override store is the data
 // source; this is additive and does not touch any canonical entity.
 // ---------------------------------------------------------------------------
-bool streamOverrideSensorDiscovery(PubSubClient &client,
-                                   HaDiscoveryContext &ctx,
+bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
                                    uint8_t otid,
                                    const char* label)
 {
   if (otid == 27) return false;  // covered by the Toutside_override number entity
   if (!label || !*label) return false;
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
@@ -3276,20 +3252,8 @@ bool streamOverrideSensorDiscovery(PubSubClient &client,
     return writeJsonClose(w);
   };
 
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!compose(measure)) return false;
-
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!compose(writer) || !writer.ok) {
-    client.disconnect();
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
-  incPublishedTopicCount();
-  feedWatchDog();
+  if (!measureMallocPublish(topic, compose)) return false;
+  incPublishedTopicCount();   // ADR-062 / TASK-349
   return true;
 }
 
@@ -3301,15 +3265,14 @@ bool streamOverrideSensorDiscovery(PubSubClient &client,
 // so they route through a single streamSatBoolSwitch() helper.
 // ---------------------------------------------------------------------------
 
-static bool streamSatBoolSwitch(PubSubClient &client,
-                                HaDiscoveryContext &ctx,
+static bool streamSatBoolSwitch(HaDiscoveryContext &ctx,
                                 PGM_P uniqSuffix,
                                 PGM_P nameSuffix,
                                 PGM_P cmdSub,
                                 PGM_P statSub,
                                 PGM_P icon)
 {
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
@@ -3387,103 +3350,92 @@ static bool streamSatBoolSwitch(PubSubClient &client,
     return writeJsonClose(w);
   };
 
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!compose(measure)) return false;
-
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-770)
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
-  feedWatchDog();
-  return true;
+  // No incPublishedTopicCount() here: streamSatBoolSwitch is a private helper
+  // (not a stream*Discovery entry point), and its caller streamSatSwitchDiscovery
+  // increments the published counter exactly once for the whole switch.
+  return measureMallocPublish(topic, compose);
 }
 
-bool streamSatSwitchDiscovery(PubSubClient &client,
-                              uint8_t switchIdx,
+bool streamSatSwitchDiscovery(uint8_t switchIdx,
                               HaDiscoveryContext &ctx)
 {
   // uniqSuffix, nameSuffix, cmdSub, statSub, icon
   bool published = false;
   switch (switchIdx) {
     case 0:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-solar-gain-enable"),       PSTR("_SAT_Solar_Gain"),
         PSTR("/sat/solar_gain"),              PSTR("/sat/solar_gain_enable"),
         PSTR("mdi:white-balance-sunny"));
       break;
     case 1:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-summer-simmer-enable"),    PSTR("_SAT_Summer_Simmer"),
         PSTR("/sat/summer_simmer"),           PSTR("/sat/summer_simmer_enable"),
         PSTR("mdi:weather-sunny-alert"));
       break;
     case 2:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-comfort-adjust-enable"),   PSTR("_SAT_Comfort_Adjust"),
         PSTR("/sat/comfort_adjust"),          PSTR("/sat/comfort_adjust_enable"),
         PSTR("mdi:water-thermometer"));
       break;
     case 3:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-multi-area-enable"),       PSTR("_SAT_Multi_Area"),
         PSTR("/sat/multi_area"),              PSTR("/sat/multi_area_enable"),
         PSTR("mdi:home-group"));
       break;
     case 4:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-auto-tune-enable"),        PSTR("_SAT_Auto_Tune"),
         PSTR("/sat/auto_tune"),               PSTR("/sat/auto_tune_enable"),
         PSTR("mdi:auto-fix"));
       break;
     case 5:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-simulation-enable"),       PSTR("_SAT_Simulation"),
         PSTR("/sat/simulation"),              PSTR("/sat/simulation_enable"),
         PSTR("mdi:flask"));
       break;
     case 6:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-window-detection-enable"), PSTR("_SAT_Window_Detection"),
         PSTR("/sat/window_detection"),        PSTR("/sat/window_detection_enable"),
         PSTR("mdi:window-open-variant"));
       break;
     case 7:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-force-pwm-enable"),        PSTR("_SAT_Force_PWM"),
         PSTR("/sat/force_pwm"),               PSTR("/sat/force_pwm_enable"),
         PSTR("mdi:pulse"));
       break;
     case 8:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-push-setpoint-enable"),    PSTR("_SAT_Push_Setpoint"),
         PSTR("/sat/push_setpoint"),           PSTR("/sat/push_setpoint_enable"),
         PSTR("mdi:upload"));
       break;
     case 9:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-ovp-enabled"),             PSTR("_SAT_OVP_Enabled"),
         PSTR("/sat/ovp_enabled"),             PSTR("/sat/ovp_enabled"),
         PSTR("mdi:shield-check"));
       break;
     case 10:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-preset-sync-enable"),      PSTR("_SAT_Preset_Sync"),
         PSTR("/sat/preset_sync"),             PSTR("/sat/preset_sync_enable"),
         PSTR("mdi:sync"));
       break;
     case 11:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-dhw-enabled"),             PSTR("_SAT_DHW_Enabled"),
         PSTR("/sat/dhw_enabled"),             PSTR("/sat/dhw_enabled"),
         PSTR("mdi:water-boiler"));
       break;
     case 12:
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-pwm-auto-switch-enable"),  PSTR("_SAT_PWM_Auto_Switch"),
         PSTR("/sat/pwm_auto_switch"),         PSTR("/sat/pwm_auto_switch_enable"),
         PSTR("mdi:swap-horizontal"));
@@ -3491,7 +3443,7 @@ bool streamSatSwitchDiscovery(PubSubClient &client,
     case 13:
       // TASK-516: master DHW enable (HW= command). Only emitted by the caller
       // when MsgID 3 HB3=1 (storage tank); combi boilers get no inert entity.
-      published = streamSatBoolSwitch(client, ctx,
+      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-dhw-enable"),              PSTR("_SAT_DHW_Enable"),
         PSTR("/sat/dhw_enable"),              PSTR("/sat/dhw_enable"),
         PSTR("mdi:water-boiler"));
@@ -3503,12 +3455,11 @@ bool streamSatSwitchDiscovery(PubSubClient &client,
   return published;
 }
 
-bool streamSatSelectDiscovery(PubSubClient &client,
-                              uint8_t selectIdx,
+bool streamSatSelectDiscovery(uint8_t selectIdx,
                               HaDiscoveryContext &ctx)
 {
   if (selectIdx != 0) return false;
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
@@ -3556,20 +3507,8 @@ bool streamSatSelectDiscovery(PubSubClient &client,
     return writeJsonClose(w);
   };
 
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!compose(measure)) return false;
-
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-770)
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
+  if (!measureMallocPublish(topic, compose)) return false;
   incPublishedTopicCount();   // ADR-062 / TASK-349
-  feedWatchDog();
   return true;
 }
 
@@ -3585,9 +3524,9 @@ bool streamSatSelectDiscovery(PubSubClient &client,
 // ---------------------------------------------------------------------------
 
 // resetgateway -> HA button. No stat_t; cmd_t + payload_press only.
-bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
+bool streamButtonDiscovery(HaDiscoveryContext &ctx)
 {
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
@@ -3632,20 +3571,8 @@ bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
     return writeJsonClose(w);
   };
 
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!compose(measure)) return false;
-
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-770)
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
+  if (!measureMallocPublish(topic, compose)) return false;
   incPublishedTopicCount();   // ADR-062 / TASK-349
-  feedWatchDog();
   return true;
 }
 
@@ -3681,10 +3608,10 @@ static const char* const kSelNames[] PROGMEM = {
 static const char kSelGpioOptions[] PROGMEM = "[\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\"]";
 static const char kSelLedOptions[]  PROGMEM = "[\"B\",\"C\",\"E\",\"F\",\"H\",\"M\",\"O\",\"P\",\"R\",\"T\",\"W\",\"X\"]";
 
-bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryContext &ctx)
+bool streamSelectDiscovery(uint8_t selectIdx, HaDiscoveryContext &ctx)
 {
   if (selectIdx > 7) return false;
-  if (!client.connected()) return false;
+  if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
@@ -3758,20 +3685,8 @@ bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryC
     return writeJsonClose(w);
   };
 
-  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
-  if (!compose(measure)) return false;
-
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
-
-  MqttJsonWriter writer(MqttJsonWriter::WRITE);
-  if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-770)
-    return false;
-  }
-
-  if (!client.endPublish()) return false;
+  if (!measureMallocPublish(topic, compose)) return false;
   incPublishedTopicCount();   // ADR-062 / TASK-349
-  feedWatchDog();
   return true;
 }
 
@@ -3799,11 +3714,9 @@ bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryC
 
 // Local helper: publish one empty retained message. Returns true on success.
 // Does NOT call incPublishedTopicCount (empty = entity removal, not a new pub).
-static bool publishEmptyRetained(PubSubClient &client, const char *topic) {
-  if (!client.connected()) return false;
-  if (!client.beginPublish(topic, 0, /*retain=*/true)) return false;
-  if (!client.endPublish()) return false;
-  return true;
+static bool publishEmptyRetained(const char *topic) {
+  if (!mqttIsConnected()) return false;
+  return mqttPublishRaw(topic, nullptr, 0, /*retain=*/true);
 }
 
 // Local helper: device short name for topology clearing (mirrors haDeviceShortName
@@ -3846,8 +3759,7 @@ static HaDevice topoDeviceForPseudoId(uint8_t otId) {
   }
 }
 
-uint8_t clearTopologyDiscoveryForOTId(PubSubClient &client,
-                                      uint8_t otId,
+uint8_t clearTopologyDiscoveryForOTId(uint8_t otId,
                                       bool staleIsLegacy,
                                       const char *haPrefix,
                                       const char *nodeId,
@@ -3891,16 +3803,16 @@ uint8_t clearTopologyDiscoveryForOTId(PubSubClient &client,
           if (separateSources) {
             if (buildSensorDiscoveryTopic(topic, sizeof(topic),
                   haPrefix, nodeId, cfg.label, "thermostat", nullptr))
-              if (publishEmptyRetained(client, topic)) cleared++;
+              if (publishEmptyRetained(topic)) cleared++;
             if (buildSensorDiscoveryTopic(topic, sizeof(topic),
                   haPrefix, nodeId, cfg.label, "boiler", nullptr))
-              if (publishEmptyRetained(client, topic)) cleared++;
+              if (publishEmptyRetained(topic)) cleared++;
           }
           // No base entry for source-variant rows.
         } else {
           if (buildSensorDiscoveryTopic(topic, sizeof(topic),
                 haPrefix, nodeId, cfg.label, nullptr, nullptr))
-            if (publishEmptyRetained(client, topic)) cleared++;
+            if (publishEmptyRetained(topic)) cleared++;
         }
       } else {
         // Old scheme: modern — <device>_<label> for each device that was used.
@@ -3910,16 +3822,16 @@ uint8_t clearTopologyDiscoveryForOTId(PubSubClient &client,
             if (separateSources) {
               if (buildSensorDiscoveryTopic(topic, sizeof(topic),
                     haPrefix, nodeId, cfg.label, "thermostat", devSeg))
-                if (publishEmptyRetained(client, topic)) cleared++;
+                if (publishEmptyRetained(topic)) cleared++;
               if (buildSensorDiscoveryTopic(topic, sizeof(topic),
                     haPrefix, nodeId, cfg.label, "boiler", devSeg))
-                if (publishEmptyRetained(client, topic)) cleared++;
+                if (publishEmptyRetained(topic)) cleared++;
             }
             // No base entry for source-variant rows in modern mode either.
           } else {
             if (buildSensorDiscoveryTopic(topic, sizeof(topic),
                   haPrefix, nodeId, cfg.label, nullptr, devSeg))
-              if (publishEmptyRetained(client, topic)) cleared++;
+              if (publishEmptyRetained(topic)) cleared++;
           }
         }
       }
@@ -3957,13 +3869,13 @@ uint8_t clearTopologyDiscoveryForOTId(PubSubClient &client,
       if (staleIsLegacy) {
         if (buildBinSensorDiscoveryTopic(topic, sizeof(topic),
               haPrefix, nodeId, cfg.label, nullptr))
-          if (publishEmptyRetained(client, topic)) cleared++;
+          if (publishEmptyRetained(topic)) cleared++;
       } else {
         for (uint8_t d = 0; d < devCount; d++) {
           const char *devSeg = topoDeviceName(devices[d]);
           if (buildBinSensorDiscoveryTopic(topic, sizeof(topic),
                 haPrefix, nodeId, cfg.label, devSeg))
-            if (publishEmptyRetained(client, topic)) cleared++;
+            if (publishEmptyRetained(topic)) cleared++;
         }
       }
       feedWatchDog();
@@ -3979,7 +3891,7 @@ uint8_t clearTopologyDiscoveryForOTId(PubSubClient &client,
           const char *devSeg = topoDeviceName(devices[d]);
           if (buildBinSensorDiscoveryTopic(topic, sizeof(topic),
                 haPrefix, nodeId, cfg.label, devSeg))
-            if (publishEmptyRetained(client, topic)) cleared++;
+            if (publishEmptyRetained(topic)) cleared++;
         }
         feedWatchDog();
       }
