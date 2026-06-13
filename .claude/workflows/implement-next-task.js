@@ -1,0 +1,119 @@
+export const meta = {
+  name: 'implement-next-task',
+  description: 'Implement the next actionable async-esp32s3 backlog task: select -> implement -> build/eval -> adversarial review -> bump+commit+push',
+  phases: [
+    { title: 'Select', detail: 'pick lowest-seq To Do task whose deps are Done/In Review' },
+    { title: 'Implement', detail: 'one coding agent, build + evaluator gated' },
+    { title: 'Review', detail: 'adversarial check vs ACs + binding ADRs' },
+    { title: 'Land', detail: 'bump (if src) + commit + push + set status' },
+  ],
+}
+
+const REPO = 'D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware-esp32s3-async'
+const BRANCH = 'feature-2.0.0-esp32s3-async'
+
+const RULES =
+  `Project rules (CLAUDE.md, binding):\n` +
+  `- Run ALL commands in the worktree ${REPO} (branch ${BRANCH}). Never touch dev or feature-dev-2.0.0-otgw32-esp32-sat-support.\n` +
+  `- PROGMEM: all string literals via F()/PSTR()/snprintf_P; strcmp_P/strcasecmp_P; memcmp_P for binary.\n` +
+  `- No ArduinoJson. No String in hot paths (ADR-004). char[] + strlcpy/snprintf_P.\n` +
+  `- No raw #if(def) ESP8266/ESP32/ARDUINO_ARCH_ESP*/BOARD_NODOSHOP_ESP* outside the allowlisted abstraction files (platform*.h, boards.h, OTGW-ModUpdateServer*). Add a platformXxx() shim or HAS_* flag FIRST, then call it unguarded.\n` +
+  `- Vendored src/libraries/SimpleTelnet/** and src/libraries/OTGWSerial/OTGWSerial.cpp are OUT OF SCOPE (do not strip their internal ESP8266 ifdefs) unless the task explicitly says otherwise.\n` +
+  `- PIC commands via addOTWGcmdtoqueue(); never raw Serial writes. feedWatchDog() in long loops.\n` +
+  `- Use the backlog CLI for task status; never edit backlog/tasks/*.md directly.\n` +
+  `- Architecture references (read-only): other-projects/EMS-ESP32-dev (async+FreeRTOS+espMqttClient blueprint), other-projects/OT-Thing-OTGW32. Never modify other-projects/.\n` +
+  `- build.py masks per-env failures: ALWAYS grep the build log for the per-env SUCCESS line; do not trust exit 0 alone.`
+
+// ---- Phase: Select ---------------------------------------------------------
+phase('Select')
+const SEL = {
+  type: 'object',
+  required: ['none', 'taskId', 'title', 'body', 'buildTargets', 'srcTouched', 'fieldValidationRemains'],
+  properties: {
+    none: { type: 'boolean', description: 'true if no actionable task remains' },
+    taskId: { type: 'string', description: 'e.g. TASK-865.1, empty if none' },
+    title: { type: 'string' },
+    body: { type: 'string', description: 'the full task description markdown (## Why ... ## Acceptance Criteria ...)' },
+    buildTargets: { type: 'array', items: { type: 'string' }, description: 'pio/build targets the ACs require, e.g. ["esp32","esp32-classic"]' },
+    srcTouched: { type: 'boolean', description: 'true if the task changes src/OTGW-firmware/** or src/libraries/** (=> needs a prerelease bump)' },
+    fieldValidationRemains: { type: 'boolean', description: 'true if the task has any field-validation AC that cannot be closed without hardware (=> end state is In Review, not Done)' },
+  },
+}
+const sel = await agent(
+  `Select the next actionable backlog task for the async ESP32-S3 migration.\n${RULES}\n\n` +
+  `In ${REPO}: list backlog/tasks/task-865.*.md (these carry label async-esp32s3, parent TASK-865). For each read frontmatter (id, status, dependencies) via the backlog CLI: \`backlog task <id> --plain\`. Pick the LOWEST dotted seq (865.1 < 865.2 < ... 865.13) whose status is "To Do" AND every dependency is "Done" or "In Review". Skip the epic TASK-865 itself and anything already In Progress/In Review/Done.\n` +
+  `Return none=true if nothing qualifies. Otherwise return that task's id, title, the full Description body (for the implementer), the build targets its ACs name, whether it touches src/** (needs a version bump), and whether it has any field-validation AC (=> ends In Review).`,
+  { label: 'select-next', phase: 'Select', schema: SEL }
+)
+if (sel.none || !sel.taskId) { log('No actionable task — all done or blocked on deps/field-validation.'); return { done: true } }
+log(`Selected ${sel.taskId}: ${sel.title}`)
+
+// ---- Phase: Implement ------------------------------------------------------
+phase('Implement')
+const IMPL = {
+  type: 'object',
+  required: ['summary', 'filesChanged', 'buildPassed', 'evalPassed', 'acsMetBuildEval', 'blockers'],
+  properties: {
+    summary: { type: 'string' },
+    filesChanged: { type: 'array', items: { type: 'string' } },
+    buildPassed: { type: 'boolean', description: 'all required pio targets show the per-env SUCCESS line' },
+    evalPassed: { type: 'boolean', description: 'python evaluate.py --quick has no NEW failures vs baseline' },
+    acsMetBuildEval: { type: 'string', description: 'per-AC: which build/evaluator-verifiable ACs are met, with evidence' },
+    blockers: { type: 'string', description: 'what is unresolved; empty if clean' },
+  },
+}
+const implPrompt = (extra) =>
+  `Implement this backlog task end-to-end in ${REPO} (branch ${BRANCH}).\n${RULES}\n\n` +
+  `TASK ${sel.taskId}: ${sel.title}\n\n${sel.body}\n\n` +
+  `Steps: (1) \`backlog task edit ${sel.taskId} -s "In Progress" -a @claude\`. (2) Implement per the ## Acceptance Criteria, reading the real code at the cited anchors first (anchors may have drifted — re-grep). (3) Build: \`python build.py --target <each of ${JSON.stringify(sel.buildTargets)}>\` and GREP the log for the per-env SUCCESS line. (4) \`python evaluate.py --quick\` — no NEW failures. (5) Do NOT commit, bump, or change task status here (the Land phase does that). Only satisfy the build/evaluator-verifiable ACs; field-validation ACs are out of scope (no hardware).\n` +
+  (extra || '') +
+  `Return what changed, whether build + evaluator passed, which build/evaluator ACs are met with evidence, and any blockers.`
+let impl = await agent(implPrompt(), { label: `impl:${sel.taskId}`, phase: 'Implement', schema: IMPL })
+
+// ---- Phase: Review ---------------------------------------------------------
+phase('Review')
+const REV = {
+  type: 'object',
+  required: ['pass', 'issues'],
+  properties: {
+    pass: { type: 'boolean', description: 'true if the diff satisfies the build/evaluator ACs and violates no binding ADR/CLAUDE rule' },
+    issues: { type: 'string', description: 'concrete, actionable problems; empty if pass' },
+  },
+}
+const revPrompt =
+  `Adversarially review the working-tree diff in ${REPO} for TASK ${sel.taskId}.\n${RULES}\n\n` +
+  `TASK body (the contract):\n${sel.body}\n\n` +
+  `Run \`git -C ${REPO} diff\` (and \`git -C ${REPO} status\`). Check: (a) every build/evaluator-verifiable AC is actually met (re-run build/evaluate if unsure — build.py masks per-env failures, grep the SUCCESS line); (b) no binding ADR or CLAUDE rule is violated (PROGMEM, no-String-hot-path, raw-ifdef abstraction boundary, vendored-lib scope, no direct task-file edits); (c) scope discipline — only the task's files changed, no stray edits to other sessions' work. Default to pass=false if a build/evaluator AC is unproven. Be specific in issues.`
+let rev = await agent(revPrompt, { label: `review:${sel.taskId}`, phase: 'Review', schema: REV })
+if (!rev.pass) {
+  log(`Review found issues — one fix pass: ${rev.issues}`)
+  impl = await agent(implPrompt(`A prior review FAILED with these issues — fix them specifically:\n${rev.issues}\n`), { label: `fix:${sel.taskId}`, phase: 'Implement', schema: IMPL })
+  rev = await agent(revPrompt, { label: `re-review:${sel.taskId}`, phase: 'Review', schema: REV })
+}
+
+// ---- Phase: Land -----------------------------------------------------------
+phase('Land')
+const LAND = {
+  type: 'object',
+  required: ['committed', 'commitHash', 'pushed', 'newStatus', 'note'],
+  properties: {
+    committed: { type: 'boolean' },
+    commitHash: { type: 'string' },
+    pushed: { type: 'boolean' },
+    newStatus: { type: 'string', description: 'In Review or Done' },
+    note: { type: 'string' },
+  },
+}
+const land = await agent(
+  `Land the completed work for TASK ${sel.taskId} in ${REPO} (branch ${BRANCH}).\n${RULES}\n\n` +
+  `Pre-state: build/evaluator review pass=${rev.pass}; issues=${rev.issues || 'none'}. srcTouched=${sel.srcTouched}; fieldValidationRemains=${sel.fieldValidationRemains}.\n` +
+  `Steps:\n` +
+  `1. If review did NOT pass: do NOT commit. Set the task back to "To Do", append a note with the blocking issues, and return committed=false, newStatus="To Do".\n` +
+  `2. If review passed: if srcTouched, run \`bin/bump-prerelease.sh\` (it stages version.h + banners). Stage ONLY this task's changed paths plus the bump (use \`git add <explicit paths>\`; NEVER \`git add -A\` — the worktree may hold other in-flight work). Also \`git add\` the task's backlog/tasks/*.md status change.\n` +
+  `3. Commit: subject \`<type>(<scope>): <imperative> (${sel.taskId})\` referencing the task id (satisfies the commit-msg hook). No em dashes. Co-author trailer per project. \`git push -u origin ${BRANCH}\` with retry.\n` +
+  `4. Task status: if fieldValidationRemains is true, set status to "In Review" (hardware/user-sign-off ACs cannot be self-certified). If false (docs/build-config only, no field AC), set "Done". Use \`backlog task edit ${sel.taskId} -s "<status>" --append-notes "<what landed + commit hash + which field-validation ACs remain>"\`.\n` +
+  `Return commit hash, push result, the new status, and a one-line note.`,
+  { label: `land:${sel.taskId}`, phase: 'Land', schema: LAND }
+)
+
+return { done: false, task: sel.taskId, title: sel.title, build: impl.buildPassed, eval: impl.evalPassed, reviewPass: rev.pass, status: land.newStatus, commit: land.commitHash, pushed: land.pushed, note: land.note, blockers: impl.blockers }
