@@ -153,13 +153,13 @@ for (let n = 0; n < MAX_TASKS; n++) {
 
   phase('Review')
   let rev = await agent(revPrompt(sel), { label: `review:${sel.taskId}`, phase: 'Review', schema: REV })
-  if (!rev) { await cleanup(sel.taskId, 'review agent died (transient)'); endReason = `transient abort on ${sel.taskId}`; break }
+  if (!rev) { endReason = `review agent died AFTER a successful impl on ${sel.taskId} — IMPL PRESERVED (worktree left dirty, task left In Progress); needs manual review+land, do NOT discard.`; break }
   if (!rev.pass) {
     log(`Review issues on ${sel.taskId} — one fix pass: ${rev.issues}`)
     impl = await agent(implPrompt(sel, `A prior review FAILED — fix these specifically:\n${rev.issues}\n`), { label: `fix:${sel.taskId}`, phase: 'Implement', schema: IMPL })
     if (!impl) { await cleanup(sel.taskId, 'fix agent died (transient)'); endReason = `transient abort on ${sel.taskId}`; break }
     rev = await agent(revPrompt(sel), { label: `re-review:${sel.taskId}`, phase: 'Review', schema: REV })
-    if (!rev) { await cleanup(sel.taskId, 're-review agent died (transient)'); endReason = `transient abort on ${sel.taskId}`; break }
+    if (!rev) { endReason = `re-review agent died AFTER a fix on ${sel.taskId} — IMPL PRESERVED for manual review+land, do NOT discard.`; break }
     if (!rev.pass) { await cleanup(sel.taskId, `review failed twice: ${rev.issues}`); endReason = `${sel.taskId} failed review twice (needs attention): ${rev.issues}`; break }
   }
 
