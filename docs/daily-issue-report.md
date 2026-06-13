@@ -1,7 +1,7 @@
-# Daily Issue Report — 2026-06-11
+# Daily Issue Report — 2026-06-13
 
-**Generated:** 2026-06-11T07:07:16Z
-**GitHub window:** since 2026-06-10T00:00:00Z (last 24 hours)
+**Generated:** 2026-06-13T00:00:00Z
+**GitHub window:** since 2026-06-12T00:00:00Z (last 24 hours)
 **Tweakers window:** N/A (feed blocked by egress policy)
 **Discord window:** N/A (MCP server not available in this environment)
 
@@ -9,7 +9,7 @@
 
 No new issues in the last 24 hours.
 
-- **GitHub**: 0 new or updated open issues since 2026-06-10T00:00:00Z.
+- **GitHub**: 0 new or updated open issues since 2026-06-12T00:00:00Z.
 - **Tweakers**: Feed unavailable — `gathering.tweakers.net` blocked by egress policy in this execution environment.
 - **Discord**: MCP server not configured in this execution environment.
 
@@ -32,15 +32,18 @@ No new issues in the last 24 hours.
 | # | Title | Labels | Last updated |
 |---|-------|--------|-------------|
 | [#656](https://github.com/rvdbreemen/OTGW-firmware/issues/656) | Proper way to update | — | 2026-06-05 |
-| [#557](https://github.com/rvdbreemen/OTGW-firmware/issues/557) | Settings / Run Boot Command and PIC missing | bug, question | 2026-05-06 |
-| [#561](https://github.com/rvdbreemen/OTGW-firmware/issues/561) | [Feature] Static IP address settings | enhancement | 2026-05-06 |
 | [#154](https://github.com/rvdbreemen/OTGW-firmware/issues/154) | [Request] Suggestions to improve security | enhancement | 2026-05-09 |
-| [#10](https://github.com/rvdbreemen/OTGW-firmware/issues/10) | Human readable ASF, RBP-flags, TSP, FHB-values… | enhancement | 2022-10-09 |
+| [#557](https://github.com/rvdbreemen/OTGW-firmware/issues/557) | Settings / Run Boot Command and PIC missing | bug, question | 2026-05-06 |
+| [#10](https://github.com/rvdbreemen/OTGW-firmware/issues/10) | Human readable ASF, RBP-flags, TSP, FHB-values… | enhancement, good first issue | 2022-10-09 |
+
+### Change since last report (2026-06-11)
+
+- Issue [#561](https://github.com/rvdbreemen/OTGW-firmware/issues/561) "[Feature] Static IP address settings" no longer appears in the open issues list — likely closed between 2026-06-11 and 2026-06-13.
 
 ---
 
 ## Timestamps Updated
 
-- GitHub last check: 2026-06-11T07:07:16Z
+- GitHub last check: 2026-06-13T00:00:00Z
 - Tweakers last check: N/A (blocked)
 - Discord last check: N/A (MCP unavailable)
