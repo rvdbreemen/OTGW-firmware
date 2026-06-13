@@ -132,10 +132,17 @@ the `PubSubClient` entry is removed from `platformio.ini`.)
    synchronous on-wire signal, so `mqttSendSuccessCount` (and therefore the
    ADR-104 / OTPublishGate slot commit-or-discard point) now counts publishes
    **queued into the Outbox**. The slot semantics are unchanged: a queued publish
-   is the commit point. The verify-window RX-buffer grow/shrink (ADR-062) becomes a
-   no-op (espMqttClient's RX buffer is a fixed `EMC_RX_BUFFER_SIZE`, 1440 B,
-   already larger than the old verify target and the ~900 B retained config), so
-   `verifyAccessorSetMqttBufferSize` / `…Restore…` always report success.
+   is the commit point. The verify-window RX-buffer grow/shrink (ADR-062) is
+   obsolete (espMqttClient's RX buffer is a fixed `EMC_RX_BUFFER_SIZE`, 1440 B,
+   already larger than the old verify target and the ~900 B retained config). The
+   seq7 step left `verifyAccessorSetMqttBufferSize` / `…Restore…` as success-stubs;
+   **TASK-865.8 (seq8) removes them entirely**, along with the
+   `VERIFICATION_BUFFER_BYTES` constant and the `startDiscoveryVerification()`
+   contiguous-max-block preflight (old precondition 8) that existed only to survive
+   the prior engine's RX-buffer realloc. `VERIFICATION_MIN_HEAP_START` is retained.
+   The verify filter (`handleDiscoveryVerifyMessage`) matches on the topic NAME only
+   and ignores the payload length, so a retained config delivered chunked (see
+   item 8) is dispatched once on its first chunk and counted exactly once.
 
 8. **Inbound via `onMessage` shim.** The library delivers messages as
    `(props, topic, payload, len, index, total)` and may split an oversize payload
@@ -255,17 +262,36 @@ deferred to ADR-123 Phase 3+ where the locking contract is designed for it.
 - **Re-validated against (unchanged behaviour, re-anchored to the new client):**
   ADR-041 / ADR-052 / ADR-077 / ADR-088 / ADR-096 / ADR-097 / ADR-102 (HA discovery
   + retained state), ADR-104 (publish-success commit point, semantics shifted to
-  "queued"; Decision item 7), ADR-062 (verify-window RX buffer, now a no-op),
+  "queued"; Decision item 7), ADR-062 (retained-discovery verification: the
+  RAM-tuned RX-buffer resize mechanism is removed under espMqttClient's fixed
+  buffer: seq7 stubbed the accessors, seq8/TASK-865.8 deleted them plus the
+  `VERIFICATION_BUFFER_BYTES` constant and the max-block preflight; the
+  verification *behaviour* (wildcard subscribe, topic-only match, count vs.
+  expected, republish-on-MISSING) is unchanged. ADR-062 is Accepted; its body is
+  left untouched per the immutable-ADR rule and this ADR records the forward
+  relationship),
   ADR-042 (streaming JSON / no ArduinoJson; composer retained, output buffered),
   ADR-100 (broker-restart discovery reset, runs in `onConnect`),
   ADR-084 (V2 deprecated-topic migration window, runs in `onConnect`),
   ADR-118 (active-override retained refresh).
 - **Depends on:** seq4 (TASK-865.4) for the `lib_deps` addition, seq6 (TASK-865.6)
   per the ADR-123 phase ordering.
+- **Followed through by:** seq8 (TASK-865.8): the HA-discovery / retained-verify
+  pipeline finishing step that removes the verify-window RX-buffer stubs and the
+  max-block preflight this engine swap rendered obsolete (Decision item 7), and
+  confirms the verify filter tolerates espMqttClient chunked inbound via the
+  item-8 `index==0` shim.
 
 ## References
 
 - TASK-865.7: this migration (Phase 2 / seq7).
+- TASK-865.8 (seq8): HA-discovery / retained-verify pipeline follow-through.
+  `src/OTGW-firmware/mqtt_discovery_verify.{cpp,h}`: removes
+  `verifyAccessorSetMqttBufferSize` / `…Restore…`, `VERIFICATION_BUFFER_BYTES`, and
+  the `startDiscoveryVerification()` max-block preflight (old precondition 8);
+  `handleDiscoveryVerifyMessage(topic, /*length ignored*/)` matches on topic only.
+  `src/OTGW-firmware/MQTTstuff.ino`: drops the two buffer-resize accessor
+  definitions (verify state machine otherwise unchanged).
 - `src/OTGW-firmware/MQTTstuff.ino:229`: espMqttClient instance
   (`UseInternalTask::NO`).
 - `src/OTGW-firmware/MQTTstuff.ino:361`: `mqttPublishRaw` definition (single

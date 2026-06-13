@@ -89,11 +89,8 @@ void         verifyAccessorMarkAllMQTTConfigPending();
 void         verifyAccessorLogLine(const char* ramMessage);
 
 // MQTT client operations exposed without surfacing the MQTT client type here.
-// TASK-865.7: under espMqttClient the RX buffer is a fixed EMC_RX_BUFFER_SIZE
-// (1440 B), larger than the old verify window target, so these two are now
-// no-ops that always report success — the verify state machine is unchanged.
-bool         verifyAccessorSetMqttBufferSize(uint16_t sizeBytes);
-bool         verifyAccessorRestoreMqttBufferSize();
+// TASK-865.8: the setBufferSize/restore pair was removed: under espMqttClient
+// the RX buffer is a fixed EMC_RX_BUFFER_SIZE (1440 B) with no per-window resize.
 // Subscribe/unsubscribe to/from the verify wildcard (QoS 0).
 bool         verifyAccessorMqttSubscribe(const char *topic);
 bool         verifyAccessorMqttUnsubscribe(const char *topic);

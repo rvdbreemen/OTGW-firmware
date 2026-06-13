@@ -2145,7 +2145,7 @@ extern bool mqttIsConnected();
 // ---------------------------------------------------------------------------
 // measureMallocPublish() — TASK-865.7 / ADR-123 publish scaffold.
 //
-// espMqttClient has no streaming beginPublish/write/endPublish API; it frames a
+// espMqttClient has no streaming (begin/write/end) publish API; it frames a
 // publish atomically from one buffer. So every discovery payload is composed
 // twice with the dual-mode MqttJsonWriter: MEASURE to learn the exact length,
 // then WRITE into a transient malloc'd heap buffer of that length, which is

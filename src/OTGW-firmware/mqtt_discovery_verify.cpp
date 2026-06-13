@@ -18,8 +18,8 @@
 
 #include "mqtt_discovery_verify.h"
 
-#include <Arduino.h>          // millis(), platformFreeHeap()
-#include <platform.h>         // platformMaxFreeBlock() (ESP8266 + ESP32)
+#include <Arduino.h>          // millis()
+#include <platform.h>         // platformFreeHeap() (heap-abort gate)
 #include <pgmspace.h>
 #include <string.h>
 #include <time.h>             // time(nullptr) for iLastVerifyEpoch
@@ -45,14 +45,17 @@ namespace {
 // Subscribe briefly to <haprefix>/+/<nodeId>/# and count retained configs
 // delivered by the broker. If received < expected, trigger a full re-announce.
 //
-// RAM-tuned: PubSubClient RX buffer raised 384->1024 only during the 15s
-// window, then restored. Peak transient delta: +640 bytes.
+// TASK-865.8: the engine is now espMqttClient, whose RX buffer is a fixed
+// EMC_RX_BUFFER_SIZE (1440 B). There is no per-window buffer resize anymore;
+// the verification filter inspects only the topic NAME and never the payload
+// bytes, so an oversize retained config delivered CHUNKED across onMessage()
+// calls (index/total cursor) is matched on its first chunk (topic is parsed
+// into the variable header before any payload chunk) and counted exactly once.
 // =====================================================================
 static bool            verifyActive          = false;
 static unsigned long   verifyStartMs         = 0;
 static uint16_t        verifyReceivedCount   = 0;
 static uint16_t        verifyOrphanCount     = 0;
-static bool            verifyBufferResized   = false;
 // sHaprefix[41] + "/+/" + sUniqueid[41] + "/#" + NUL = 88 bytes worst case.
 // Sized to 128 gives comfortable headroom for any future field-size bump.
 static char            verifyWildcard[128]   = "";
@@ -65,7 +68,9 @@ static size_t          verifyNodeLen         = 0;
 // ADR-062 tuning table: see docs/adr/ADR-062-retained-discovery-verification.md.
 // Per-line rationale below; values are co-tuned with HEAP_LOW=5120 / HEAP_WARNING=3072.
 static constexpr unsigned long VERIFICATION_WINDOW_MS      = 15000; // accommodates slow brokers; early-close fires when received>=expected
-static constexpr uint16_t      VERIFICATION_BUFFER_BYTES   = 1024;  // worst realistic retained-config payload ~900B; +~100B headroom
+// TASK-865.8: VERIFICATION_BUFFER_BYTES is gone: espMqttClient's RX buffer is a
+// fixed EMC_RX_BUFFER_SIZE (1440 B), so there is no per-window resize to size or
+// to preflight a contiguous block for.
 // VERIFICATION_MIN_HEAP_START lives in MQTTstuff.h (cross-TU: restAPI.ino needs it).
 // Value: 6000. clears the 1024B buffer-resize with comfortable margin above the ABORT floor.
 // We read it here by re-declaring the same constant; keeping it file-local
@@ -94,8 +99,9 @@ static void endDiscoveryVerification();
 //      startup drip storm when discovery topics are still being published.
 //   6. No drip pending (countPendingDiscoveryIds() == 0) -- drip-race guard.
 //   7. Heap headroom >= VERIFICATION_MIN_HEAP_START.
-//   8. Contiguous max-block >= VERIFICATION_BUFFER_BYTES + 256 so the
-//      PubSubClient buffer realloc does not fragment the heap further.
+// TASK-865.8: the old precondition 8 (contiguous max-block >= buffer+256 to
+// survive the prior engine's RX-buffer realloc) is gone: espMqttClient never
+// resizes its RX buffer, so there is no realloc to preflight.
 bool startDiscoveryVerification() {
   if (verifyActive) return false;
   if (!verifyAccessorMqttConnected()) return false;
@@ -104,10 +110,6 @@ bool startDiscoveryVerification() {
   if (verifyAccessorUptimeSeconds() < 3600) return false;                     // TASK-359
   if (verifyAccessorCountPendingDiscoveryIds() > 0) return false;             // drip-race guard
   if (platformFreeHeap() < VERIFICATION_MIN_HEAP_START_LOCAL) return false;
-  // Max-block precheck: umm_malloc realloc of PubSubClient's buffer needs a
-  // contiguous 1024-byte block. Avoid the realloc entirely when the heap is
-  // fragmented (Perf review: setBufferSize grow/shrink fragments over long uptime).
-  if (platformMaxFreeBlock() < (VERIFICATION_BUFFER_BYTES + 256U)) return false;
 
   const char* haPrefix = verifyAccessorHaPrefix();
   const char* nodeId   = verifyAccessorNodeId();
@@ -131,17 +133,10 @@ bool startDiscoveryVerification() {
   verifyPrefixLen = haPrefix ? strlen(haPrefix) : 0;
   verifyNodeLen   = nodeId   ? strlen(nodeId)   : 0;
 
-  // Raise RX buffer BEFORE subscribe so oversize configs fit.
-  if (!verifyAccessorSetMqttBufferSize(VERIFICATION_BUFFER_BYTES)) {
-    verifyAccessorLogLine("[verify] setBufferSize failed");
-    return false;
-  }
-  verifyBufferResized = true;
-
+  // TASK-865.8: no RX-buffer resize before subscribe: espMqttClient's RX buffer
+  // is fixed (EMC_RX_BUFFER_SIZE), and the verify filter reads only the topic.
   if (!verifyAccessorMqttSubscribe(verifyWildcard)) {
     verifyAccessorLogLine("[verify] subscribe failed");
-    verifyAccessorRestoreMqttBufferSize();
-    verifyBufferResized = false;
     return false;
   }
 
@@ -193,10 +188,6 @@ static void endDiscoveryVerification() {
   if (verifyAccessorMqttConnected()) {
     verifyAccessorMqttUnsubscribe(verifyWildcard);
   }
-  if (verifyBufferResized) {
-    verifyAccessorRestoreMqttBufferSize();
-    verifyBufferResized = false;
-  }
 
   const uint8_t outcome = verifyAccessorGetOutcome();
   {
@@ -222,16 +213,10 @@ static void endDiscoveryVerification() {
 void tickDiscoveryVerification() {
   if (!verifyActive) return;
   if (!verifyAccessorMqttConnected()) {
-    // Fast-path close. Restore the buffer defensively even on a dead client:
-    // setBufferSize is a local realloc, safe when not connected. Prevents the
-    // 1024B allocation from leaking across a reconnect path that does not
-    // re-size (Arch/Sec review finding).
+    // Fast-path close on a dead client.
     // TASK-361: report the honest outcome for telemetry; still skip the
     // full reconcile/republish path (MQTT is dead anyway).
-    if (verifyBufferResized) {
-      verifyAccessorRestoreMqttBufferSize();
-      verifyBufferResized = false;
-    }
+    // TASK-865.8: nothing to restore: there is no per-window RX-buffer resize.
     verifyAccessorSetOutcome(OUTCOME_ABORTED_DISCONNECT);
     verifyAccessorSetLastVerifyEpoch((uint32_t)time(nullptr));
     verifyActive = false;
@@ -276,6 +261,14 @@ bool isDiscoveryVerificationActive() { return verifyActive; }
 //   sneak into the command path. Any substructure that is not a well-formed
 //   <haprefix>/<component>/<nodeId>/... shape is counted as an orphan and
 //   consumed here.
+//
+// TASK-865.8 (chunked inbound): the match keys ENTIRELY on the topic name; the
+// `length` argument is deliberately ignored, so it does not matter whether the
+// retained config arrived whole or split across espMqttClient onMessage chunks.
+// The onMessage shim in MQTTstuff.ino dispatches only the first chunk
+// (index==0), which already carries the complete topic (the variable-header
+// topic is fully parsed before any payload chunk), so each retained config is
+// matched and counted exactly once regardless of payload size.
 bool handleDiscoveryVerifyMessage(const char *topic, unsigned int /*length*/) {
   if (!verifyActive || verifyPrefixLen == 0 || topic == nullptr) return false;
   const char* haPrefix = verifyAccessorHaPrefix();

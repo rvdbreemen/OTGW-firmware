@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.182
+**  Version  : v2.0.0-alpha.183
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -319,18 +319,11 @@ void        verifyAccessorSetLastMissingCount(uint16_t missing){ state.discovery
 void        verifyAccessorSetLastOrphanCount(uint16_t orphan)  { state.discovery.iLastOrphanCount = orphan; }
 void        verifyAccessorMarkAllMQTTConfigPending()           { markAllMQTTConfigPending(); }
 
-// TASK-865.7: espMqttClient has no settable RX buffer — EMC_RX_BUFFER_SIZE is a
-// fixed 1440 bytes, comfortably above the verify window's old 1024 B target and
-// the ~900 B worst-case retained discovery config. The grow/shrink dance the
-// PubSubClient path needed is therefore a no-op; both accessors report success
-// so the verify state machine proceeds unchanged.
-bool        verifyAccessorSetMqttBufferSize(uint16_t sizeBytes) {
-  (void)sizeBytes;
-  return true;
-}
-bool        verifyAccessorRestoreMqttBufferSize() {
-  return true;
-}
+// TASK-865.8: the verify window no longer resizes the RX buffer. espMqttClient
+// has no settable RX buffer: EMC_RX_BUFFER_SIZE is a fixed 1440 bytes,
+// comfortably above the ~900 B worst-case retained discovery config, and the
+// verify filter inspects only the topic name. The setBufferSize/restore
+// accessors the PubSubClient grow/shrink dance needed are therefore gone.
 bool        verifyAccessorMqttSubscribe(const char *topic) {
   return MQTTclient.subscribe(topic, 0) != 0;   // packetId 0 == not queued
 }

@@ -2100,5 +2100,25 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-06-13T23:50:51.097419"
+  },
+  {
+    "id": "note-865-8-verify-chunked",
+    "timestamp": "2026-06-14T00:51:34.065461",
+    "error_message": "TASK-865.8: verify-window discovery counting must tolerate espMqttClient chunked inbound (onMessage index/total) without inflating verifyReceivedCount",
+    "file": "src/OTGW-firmware/mqtt_discovery_verify.cpp",
+    "root_cause": "espMqttClient delivers payloads >=EMC_PAYLOAD_BUFFER_SIZE (32B) in chunks; a naive 'count per onMessage call' would count one ~900B retained config N times, masking genuinely-missing configs and defeating ADR-062.",
+    "fix": "handleDiscoveryVerifyMessage matches on TOPIC only (ignores length); the onMessage shim's index==0 gate dispatches only the first chunk, which already carries the full topic (variable-header topic parsed before any payload chunk), so each config counts exactly once. Do NOT hoist the verify filter before the index!=0 gate. Also removed the now-defunct RX-buffer resize (setBufferSize/restore no-ops) and max-block preflight; kept VERIFICATION_MIN_HEAP_START.",
+    "tags": [
+      "mqtt",
+      "espMqttClient",
+      "discovery-verify",
+      "ADR-062",
+      "ADR-131",
+      "TASK-865.8",
+      "chunked-inbound"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-14T00:51:34.065497"
   }
 ]
