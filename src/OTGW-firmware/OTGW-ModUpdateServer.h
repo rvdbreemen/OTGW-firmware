@@ -20,92 +20,11 @@
 #ifndef __HTTP_UPDATE_SERVER_H
 #define __HTTP_UPDATE_SERVER_H
 
-#if defined(ESP8266)
-// ---- ESP8266 implementation (original, template-based) --------------------
-
-#include <ESP8266WebServer.h>
-#include <WiFiClient.h>
-
-namespace esp8266httpupdateserver {
-using namespace esp8266webserver;
-
-template <typename ServerType>
-class ESP8266HTTPUpdateServerTemplate
-{
-  public:
-    ESP8266HTTPUpdateServerTemplate(bool serial_debug=false);
-
-    void setup(ESP8266WebServerTemplate<ServerType> *server)
-    {
-      setup(server, emptyString, emptyString);
-    }
-
-    void setup(ESP8266WebServerTemplate<ServerType> *server, const String& path)
-    {
-      setup(server, path, emptyString, emptyString);
-    }
-
-    void setup(ESP8266WebServerTemplate<ServerType> *server, const String& username, const String& password)
-    {
-      setup(server, "/update", username, password);
-    }
-
-    void setup(ESP8266WebServerTemplate<ServerType> *server, const String& path, const String& username, const String& password);
-
-    void updateCredentials(const String& username, const String& password)
-    {
-      _username = username;
-      _password = password;
-    }
-
-    void setIndexPage(const char *indexPage);
-    void setSuccessPage(const char *succesPage);
-
-  protected:
-    void _setUpdaterError();
-
-  private:
-    void _resetUploadTracking();
-    size_t _parseUploadTotalSize() const;
-    void _beginFilesystemUpload(HTTPUpload& upload, size_t uploadTotal);
-    void _beginFirmwareUpload(HTTPUpload& upload, size_t uploadTotal);
-    void _handleUploadStart(HTTPUpload& upload);
-    void _handleUploadWrite(HTTPUpload& upload);
-    void _handleUploadEnd(HTTPUpload& upload);
-    void _handleUploadAbort(HTTPUpload& upload);
-
-    bool _serial_output;
-    ESP8266WebServerTemplate<ServerType> *_server;
-    String _username;
-    String _password;
-    bool _authenticated;
-    String _updaterError;
-    String _uploadTarget;   // "filesystem" or "firmware" — set in UPLOAD_FILE_START
-    size_t _uploadExpectedBytes;
-    size_t _uploadWrittenBytes;
-    uint32_t _uploadBlockIndex;
-    const char *_serverIndex;
-    const char *_serverSuccess;
-};
-
-};
-
-#include "OTGW-ModUpdateServer-impl.h"
-
-
-using ESP8266HTTPUpdateServer = esp8266httpupdateserver::ESP8266HTTPUpdateServerTemplate<WiFiServer>;
-// Unified alias used by the rest of the firmware
-using OTGWUpdateServer = ESP8266HTTPUpdateServer;
-
-namespace BearSSL {
-using ESP8266HTTPUpdateServerSecure = esp8266httpupdateserver::ESP8266HTTPUpdateServerTemplate<WiFiServerSecure>;
-};
-
-#elif defined(ESP32)
 // ---- ESP32 implementation -------------------------------------------------
+// ESP32-S3 is the only supported target; the update server is the ESP32
+// WebServer-based implementation. (The original ESP8266 template lived here
+// behind an #if defined(ESP8266) guard and was removed with the ESP8266 port.)
 
 #include "OTGW-ModUpdateServer-esp32.h"
-
-#endif // ESP8266 / ESP32
 
 #endif // __HTTP_UPDATE_SERVER_H

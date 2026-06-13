@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.177
+**  Version  : v2.0.0-alpha.178
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -389,15 +389,6 @@ bool updateRebootLog(String text)
 // greppable across the telnet log. After debugTelnet.stop() runs inside
 // prepareForReboot(), subsequent Debug* calls silently drop — we flush before
 // that point so the last-seen state is always visible to an external logger.
-
-// Heap watermark storage. ESP8266 has no native min-free-heap API so we
-// maintain our own watermark; the global is declared extern in
-// platform_esp8266.h and used by platformMinFreeHeap()/platformUpdateMinFreeHeap().
-// ESP32 has ESP.getMinFreeHeap() natively, so the watermark isn't needed
-// there — hence the guard.
-#ifdef ESP8266
-uint32_t g_platformMinFreeHeapWatermark = 0xFFFFFFFFUL;
-#endif
 
 // Deferred reboot pending-flag. Set by requestDeferredReboot() (typically
 // from an HTTP or timer callback), observed by the main loop which fires

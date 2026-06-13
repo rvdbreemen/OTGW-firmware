@@ -511,12 +511,10 @@ def otdirect_25238_bridge_regressions(
 
 ESP_ABSTRACTION_ALLOWED_FILES: Tuple[str, ...] = (
     "src/libraries/Platform/src/platform.h",
-    "src/libraries/Platform/src/platform_esp8266.h",
     "src/libraries/Platform/src/platform_esp32.h",
     "src/libraries/Platform/src/boards.h",
     "src/OTGW-firmware/OTGW-ModUpdateServer.h",
     "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h",
-    "src/OTGW-firmware/OTGW-ModUpdateServer-impl.h",
 )
 
 # Independent, self-contained vendored libraries that manage their own platform
@@ -554,7 +552,11 @@ ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
 # callers de-ifdef'd, 4 sites). 33 -> 19. ADR-115 documents the boards.h home.
 # TASK-854: boardName() collapsed onto boards.h BOARD_NAME and the ledc LED
 # driver re-gated on HAS_LEDC_LED (boards.h flag) - 4 -> 1.
-ESP_ABSTRACTION_BASELINE: int = 1
+# TASK-865.2 (ADR-128, drop-esp8266 source-side): the ESP8266 port was removed
+# (platform_esp8266.h + OTGW-ModUpdateServer-impl.h deleted, ESP8266 branches in
+# platform.h/boards.h/OTGW-ModUpdateServer.h collapsed to ESP32-only, the last
+# raw #ifdef ESP8266 site in helperStuff.ino dropped) - 1 -> 0.
+ESP_ABSTRACTION_BASELINE: int = 0
 
 _ESP_PLATFORM_PP_RE = re.compile(
     r'^\s*#\s*(?:if|ifdef|ifndef|elif)\b.*\b'

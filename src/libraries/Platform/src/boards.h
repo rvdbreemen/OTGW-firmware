@@ -18,7 +18,6 @@
 
 // ---- Board selection ------------------------------------------------------
 // Build flags should define exactly one BOARD_* macro, e.g.:
-//   -DBOARD_NODOSHOP_ESP8266        (Nodoshop OTGW Classic with Wemos D1 mini)
 //   -DBOARD_NODOSHOP_ESP32          (Nodoshop OTGW32 with ESP32-S3, OTDirect)
 //   -DBOARD_NODOSHOP_ESP32_CLASSIC  (LOLIN S3 Mini in the OTGW Classic D1-mini
 //                                    socket: PIC gateway, compile-time — no
@@ -38,73 +37,14 @@
   #define BOARD_NODOSHOP_ESP32
 #endif
 
-#if !defined(BOARD_NODOSHOP_ESP8266) && !defined(BOARD_NODOSHOP_ESP32) && !defined(BOARD_NODOSHOP_ESP32_CLASSIC)
-  #if defined(ESP8266)
-    #define BOARD_NODOSHOP_ESP8266
-  #elif defined(ESP32)
+#if !defined(BOARD_NODOSHOP_ESP32) && !defined(BOARD_NODOSHOP_ESP32_CLASSIC)
+  #if defined(ESP32)
     #define BOARD_NODOSHOP_ESP32
   #endif
 #endif
 
 // ---------------------------------------------------------------------------
-#if defined(BOARD_NODOSHOP_ESP8266)
-// ---------------------------------------------------------------------------
-// Nodoshop OTGW v1.x — Wemos D1 mini (ESP8266)
-//
-//  D0 = GPIO16  LED2 (active LOW)
-//  D1 = GPIO5   I2C SCL (watchdog + sensors)
-//  D2 = GPIO4   I2C SDA
-//  D3 = GPIO0   Config/reset button (active LOW, has pull-up)
-//  D4 = GPIO2   LED1 (active LOW, also onboard LED)
-//  D5 = GPIO14  PIC reset line
-
-#define PIN_I2C_SCL       5    // D1
-#define PIN_I2C_SDA       4    // D2
-#define PIN_BUTTON        0    // D3
-#define PIN_PIC_RST       14   // D5
-#define PIN_LED1          2    // D4
-#define PIN_LED2          16   // D0
-#define PIN_PIC_RX        -1   // UART0 fixed pins on ESP8266 (RX=GPIO3); -1 = not remappable
-#define PIN_PIC_TX        -1   // UART0 fixed pins on ESP8266 (TX=GPIO1); -1 = not remappable
-
-// Feature flags for ESP8266 Nodoshop OTGW
-#define HAS_PIC           1    // Has PIC microcontroller for OpenTherm gateway
-#define HAS_PIC_WATCHDOG  1    // External I2C watchdog board at 0x26
-#define HAS_DIRECT_OT     0    // No direct OT master (uses PIC)
-#define HAS_ETH_CAPABLE   0    // No Ethernet support
-// SAT feature flags (ESP-abstraction Tier 0, TASK-740; see
-// docs/audits/2026-05-28-esp-abstraction-leak-audit.md §"Tier 0").
-// Tier 0 only declares these; the raw #if defined(ESP32) gates are
-// switched over in Tiers 1-3. Values reflect current ESP8266 behaviour.
-#define HAS_SAT              0  // Smart Auto Thermostat is an ESP32/OTGW32 capability
-#define HAS_SAT_BLE          0  // No BLE radio on ESP8266 (SATble.ino is ESP32-only)
-#define HAS_WEATHER_FORECAST 0  // Basic weather only; hourly forecast is ESP32-only (independent of HAS_SAT)
-#define HAS_REST_TX_COALESCING 0  // ESP8266 sendContent flushes inline; no coalescing buffer needed (TASK-743)
-#define HAS_FRAGMENTATION_AWARE_HEAP_GATE 0  // ESP8266 discovery drip uses the ADR-089 heap-tier machine (getHeapHealth) (TASK-743)
-#define HW_TYPE_NAME      "otgw-classic"  // Static hardware-type slug / board class (ADR-113)
-#define BOARD_NAME        "Nodoshop OTGW (ESP8266)"  // Display string (boardName())
-#define HAS_LEDC_LED      0    // LEDs via digitalWrite (no ledc PWM dimming on ESP8266)
-
-// SAT per-platform buffer sizing (ESP-abstraction Tier 3, TASK-743). These are
-// compile-time board-capacity tunings (SRAM budget), so they live with the
-// board's HAS_* flags rather than scattered behind raw #if defined(ESP8266) in
-// the SAT .ino files. ESP8266 keeps the tight (~40 KB DRAM) sizes.
-#define SAT_WIN4H_SIZE          30   // rolling 4h cycle window (~2h at 4-min avg cycle)
-#define SAT_FLOW_SAMPLE_SIZE    64   // per-cycle flow sample ring (256 B SRAM, ~5min @5s)
-#define SAT_TAIL_SAMPLE_SIZE    SAT_FLOW_SAMPLE_SIZE  // end-of-cycle tail = 64s @1Hz
-#define HCR_DAYS                7    // heating-curve daily-median ring (one week)
-#define HCR_INTRADAY_SIZE       96   // intra-day samples (15-min intervals, one day)
-#define SAT_CYCLES_FILE_BUF_SIZE 2560  // sat_cycles.json read buffer (30 records)
-// Ring head/count index width: all ESP8266 SAT rings are <=96 slots, so a byte
-// counter suffices and saves SRAM.
-typedef uint8_t SAT_RING_IDX_T;
-
-// MQTT per-platform tuning (ESP-abstraction Tier 3, TASK-743).
-#define MQTT_DISCOVERY_HEAP_MIN   3000   // discovery-publish heap floor (WARNING tier, ~80KB total)
-#define STATUS_BURST_COOLDOWN_MS  2000   // post-burst drip pause (ADR-088; <3s Status cadence)
-
-// ---------------------------------------------------------------------------
-#elif defined(BOARD_NODOSHOP_ESP32)
+#if defined(BOARD_NODOSHOP_ESP32)
 // ---------------------------------------------------------------------------
 // Nodoshop OTGW32 — ESP32-S3 (4 MB flash)
 //
@@ -260,7 +200,7 @@ typedef uint16_t SAT_RING_IDX_T;
 
 // ---------------------------------------------------------------------------
 #else
-  #error "No board defined. Set BOARD_NODOSHOP_ESP8266, BOARD_NODOSHOP_ESP32, BOARD_NODOSHOP_ESP32_CLASSIC or BOARD_NODOSHOP_ESP32_COMBO."
+  #error "No board defined. Set BOARD_NODOSHOP_ESP32, BOARD_NODOSHOP_ESP32_CLASSIC or BOARD_NODOSHOP_ESP32_COMBO."
 #endif
 
 // ---------------------------------------------------------------------------

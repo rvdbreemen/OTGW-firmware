@@ -19,104 +19,66 @@
 #include <Arduino.h>
 
 // ---- Platform selection ---------------------------------------------------
-#if defined(ESP8266)
-  #include "platform_esp8266.h"
-#elif defined(ESP32)
+#if defined(ESP32)
   #include "platform_esp32.h"
 #else
-  #error "Unsupported platform — only ESP8266 and ESP32 are supported."
+  #error "Unsupported platform — only ESP32 is supported."
 #endif
 
 // ---- Integer-type model (TASK-745) ----------------------------------------
 // On xtensa-esp32, int32_t is `long` — a DISTINCT type from `int` (both 32-bit),
 // so sendJsonMapEntry(int) / (unsigned int) need their own overloads alongside
-// the int32_t/uint32_t ones. On ESP8266 (and any target where int32_t IS int)
-// those extra overloads would be duplicate definitions. jsonStuff.ino gates the
-// extra overloads on this flag instead of a raw #if defined(ESP32), keeping the
-// platform conditional inside the abstraction layer. Defined here (the
-// dispatcher) so both platform sub-headers share one definition.
-#if defined(ESP32)
-  #define PLATFORM_INT_DISTINCT_FROM_INT32 1
-#else
-  #define PLATFORM_INT_DISTINCT_FROM_INT32 0
-#endif
+// the int32_t/uint32_t ones. jsonStuff.ino gates the extra overloads on this
+// flag, keeping the platform conditional inside the abstraction layer. Always 1
+// on ESP32 (the only supported target).
+#define PLATFORM_INT_DISTINCT_FROM_INT32 1
 
 // ---- Common includes (identical API on both platforms) --------------------
 #include <WiFiUdp.h>
 #include <WiFiClient.h>
 
 // ---- Unified directory iteration -----------------------------------------
-// Wraps ESP8266 Dir and ESP32 File-based directory APIs into one interface.
+// Wraps the ESP32 File-based directory API into a small iteration interface.
 class PlatformDir {
 public:
   explicit PlatformDir(const char* path)
-#if defined(ESP8266)
-    : _dir(LittleFS.openDir(path)) {}
-#elif defined(ESP32)
   {
     _dirFile = LittleFS.open(path);
   }
-#endif
 
-#if defined(ESP32)
   ~PlatformDir() {
     if (_entry) _entry.close();
     if (_dirFile) _dirFile.close();
   }
-#endif
 
   bool valid() {
-#if defined(ESP8266)
-    return true;  // ESP8266 Dir is always valid; empty dir has no entries
-#elif defined(ESP32)
     return (_dirFile && _dirFile.isDirectory());
-#endif
   }
 
   bool next() {
-#if defined(ESP8266)
-    return _dir.next();
-#elif defined(ESP32)
     if (_entry) _entry.close();  // close previous entry before opening next
     _entry = _dirFile.openNextFile();
     return (bool)_entry;
-#endif
   }
 
   String fileName() {
-#if defined(ESP8266)
-    return _dir.fileName();
-#elif defined(ESP32)
     // ESP32 File::name() returns full path; strip to basename for consistency
     const char* name = _entry.name();
     const char* slash = strrchr(name, '/');
     return String(slash ? slash + 1 : name);
-#endif
   }
 
   size_t fileSize() {
-#if defined(ESP8266)
-    return _dir.fileSize();
-#elif defined(ESP32)
     return _entry.size();
-#endif
   }
 
   bool isDirectory() {
-#if defined(ESP8266)
-    return _dir.isDirectory();
-#elif defined(ESP32)
     return _entry.isDirectory();
-#endif
   }
 
 private:
-#if defined(ESP8266)
-  Dir _dir;
-#elif defined(ESP32)
   File _dirFile;
   File _entry;
-#endif
 };
 
 /***************************************************************************
