@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.179
+**  Version  : v2.0.0-alpha.180
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2283,9 +2283,18 @@ void sendEndJsonMap(const __FlashStringHelper* objName) {
 }
 //=======================================================================
 
-void sendOTmonitorV2() 
+void sendOTmonitorV2()
 {
   time_t now = time(nullptr); // needed for Dallas sensor display
+
+  // TASK-865.5 (ADR-123 Phase-1): this is the cross-task READER of the decoded
+  // OTGWState snapshot (OTcurrentSystemState.*). Acquire the OTStateLock so the
+  // writer (processOT, via drainOTFrameQueue) cannot tear a multi-byte field
+  // mid-read once the producer is lifted into a FreeRTOS task (seq6). In Phase 1
+  // (cooperative loop) the writer runs in the same thread, so the lock is
+  // uncontended; it is the foundation seq6 builds on. processOT is never called
+  // from here, so the non-recursive mutex cannot self-deadlock.
+  OTStateLock stateLock;
 
   sendStartJsonMap(F("otmonitor"));
 

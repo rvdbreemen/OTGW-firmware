@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.179
+**  Version  : v2.0.0-alpha.180
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -14,14 +14,30 @@
 #ifndef OTGWCore_h
 #define OTGWCore_h
 
+#include <type_traits>   // std::is_trivially_copyable for OTFrameMsg static_assert (TASK-865.5)
+#include <platform.h>    // PlatformQueue/PlatformMutex + platformQueue*/platformMutex* shims (TASK-865.5)
+
 // OTGW Serial 2 network port
 // SimpleTelnet<2> in streaming mode — drop-in replacement for TelnetStreamClass
 // Two clients: enough for HA + one debug consumer; saves heap vs <4> on lwIP 2.x.
 #define OTGW_SERIAL_PORT 25238     // changed the port to original default of OTmonitor
 SimpleTelnet<2> OTGWstream(OTGW_SERIAL_PORT);
 
-//Depends on the library 
+//Depends on the library
 #define OTGW_COMMAND_TOPIC "command"
+
+// PIC serial line buffer sizes. Hoisted here (TASK-865.5) from inside
+// handlePICSerial() so the OT-frame producer/consumer queue (OTFrameMsg.line)
+// and the serial read loop share ONE source of truth. MAX_BUFFER_READ is 512
+// because a PS=1 summary line (and some banners) can exceed 256 bytes; the
+// frame queue must carry the full line, not just a 9-char OT frame, because
+// processOT() also handles banners, '='-echoes and PS=1 summaries.
+#ifndef MAX_BUFFER_READ
+#define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
+#endif
+#ifndef MAX_BUFFER_WRITE
+#define MAX_BUFFER_WRITE 128
+#endif
 
 typedef struct {
 	uint16_t 	Statusflags = 0; // flag8 / flag8  Master and Slave Status flags. 
@@ -502,6 +518,77 @@ void confirmMQTTPublishByteSlot();         // confirm pending status-byte slot u
 // state updates, decoded value publishing, and connected-state flag writes.
 // Used by OT-direct bridgeFrameToParser() during PS=1 (TASK-293).
 void processOT(const char *buf, int len, bool suppressOutput = false);
+
+// ===== ADR-123 Phase-1 concurrency foundation (TASK-865.5) ================
+//
+// 1) OT-frame producer/consumer queue. The two frame sources (PIC serial via
+//    dispatchOTGWInputLine(), and OTDirect via bridgeFrameToParser()) no longer
+//    call processOT() inline; instead they enqueue the raw line as an OTFrameMsg
+//    and a single consumer in loop() dequeues + calls processOT(). The queue
+//    copies by value (FreeRTOS), so no mutex is needed for the frame flow and
+//    FIFO order is preserved (byte-identical OT-log/MQTT output).
+//
+//    Why line[MAX_BUFFER_READ] and not [10]: processOT() is fed the FULL PIC
+//    line, not only 9-char OT frames — banners, '='-command-echoes and PS=1
+//    summaries (>256 bytes) all route through its else-if branches and produce
+//    observable output. A 9-char item would truncate them and break
+//    byte-identical replay. (Spec said line[10]; primary-source evidence at
+//    OTGW-Core.ino dispatchOTGWInputLine/processOT overrides it. Documented in
+//    the TASK-865.5 single-writer-map appendix.)
+//
+//    POD by contract (static_assert trivially_copyable) so xQueueSend can copy
+//    it byte-for-byte. The producer MUST null-terminate line[len] before
+//    enqueue: processOT()'s non-OT branches use strstr/strchr/strcasecmp_P,
+//    which read until a terminator.
+struct OTFrameMsg {
+  char     line[MAX_BUFFER_READ];  // null-terminated raw PIC/OTDirect line
+  uint16_t len;                    // payload length (excludes terminator); up to 511
+  bool     suppressOutput;         // PIC path: false; OTDirect path: otHideReports
+};
+static_assert(std::is_trivially_copyable<OTFrameMsg>::value,
+              "OTFrameMsg must be trivially copyable for value-copy FreeRTOS queue");
+
+// Created once in setup() (ADR-044). Depth 16 of 512-byte items (~8 KB SRAM):
+// the producer and consumer are co-resident in one loop iteration in Phase 1,
+// so the queue is effectively pass-through and cannot accumulate beyond a
+// single drain cycle. Sized so it never fills under the per-poll burst.
+#define OT_FRAME_QUEUE_DEPTH 16
+extern PlatformQueue otFrameQueue;      // OTFrameMsg producer->consumer queue
+extern PlatformMutex otStateMutex;      // guards the decoded OTGWState snapshot
+
+// enqueueOTFrame — producer-side helper. Copies up to MAX_BUFFER_READ-1 bytes,
+// null-terminates, and sends by value. Returns false on a full queue (counted
+// as a diagnostic drop; never falls back to inline processOT, which would
+// reorder the FIFO). The ONLY call sites are the two frame producers
+// (dispatchOTGWInputLine, bridgeFrameToParser) — enforced by evaluate.py.
+bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput);
+
+// drainOTFrameQueue — consumer-side. Dequeues every pending OTFrameMsg and
+// calls processOT() under the OTStateLock (writer side). Runs in loop()
+// context (NOT inside doBackgroundTasks(), which re-enters via doAutoConfigure's
+// file-reading loop). seq6 lifts the producer into a FreeRTOS task; the consumer
+// stays here.
+void drainOTFrameQueue();
+
+// 2) OTGWState snapshot mutex + RAII lock. processOT() (the cross-task writer)
+//    and restAPI.ino readers acquire OTStateLock around their access to the
+//    decoded snapshot (OTcurrentSystemState, state.otBus.*, state.sat.*). The
+//    lock is NON-RECURSIVE: a single call chain must never take it twice. It is
+//    held at exactly one writer site (the consumer's processOT() call) and at
+//    reader sites in restAPI.ino — never nested. Mirrors
+//    MQTTAutoConfigSessionLock (MQTTstuff.ino). A null mutex (failed create)
+//    degrades to no-op (unprotected) rather than deadlocked.
+struct OTStateLock {
+  bool locked = false;
+  explicit OTStateLock(uint32_t timeoutMs = 0) {
+    locked = platformMutexLock(otStateMutex, timeoutMs);
+  }
+  ~OTStateLock() {
+    if (locked) platformMutexUnlock(otStateMutex);
+  }
+  OTStateLock(const OTStateLock&) = delete;
+  OTStateLock& operator=(const OTStateLock&) = delete;
+};
 
 // RAII guard for the MQTT publish gate. Saves/restores mqttPublishAllowed on scope exit
 // so nested or interrupted gate operations can never leave the gate stuck false.

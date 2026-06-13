@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.179
+**  Version  : v2.0.0-alpha.180
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -239,7 +239,13 @@ void setup() {
 
   //setup randomseed the right way
   randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG
- 
+
+  // TASK-865.5 (ADR-123 Phase-1): create the OT-frame queue + OTGWState mutex
+  // ONCE, before any OT path can enqueue a frame. doBackgroundTasks() is gated
+  // on bSetupComplete, so nothing parses OT before setup() finishes, but the
+  // queue/mutex must exist so the very first drain in loop() has its handles.
+  setupOTConcurrency();
+
   //setup the status LED
   setLed(LED1, ON);
   setLed(LED2, ON);
@@ -867,6 +873,13 @@ void loop()
   }
 
   doBackgroundTasks();              // run background tasks
+
+  // TASK-865.5 (ADR-123 Phase-1): consume OT frames produced this iteration.
+  // handlePICSerial()/loopOTDirect() ran inside doBackgroundTasks() and enqueued
+  // frames; drain them HERE (loop() proper) — never inside doBackgroundTasks(),
+  // which re-enters via doAutoConfigure's file-reading loop and could nest the
+  // OTStateLock. processOT() runs from loop() context (not a task) in Phase 1.
+  drainOTFrameQueue();
 
   // TASK-396: heap watermark tick + deferred-reboot gate. The watermark runs
   // every loop so slow leaks are visible in the minHeap field of the boot

@@ -2060,5 +2060,25 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-06-13T12:11:56.081787"
+  },
+  {
+    "id": "bug-123",
+    "timestamp": "2026-06-13T13:55:00",
+    "error_message": "TASK-865.5 spec said OTFrameMsg.line[10] (9-char OT frame); would truncate PIC lines and break byte-identical output",
+    "file": "src/OTGW-firmware/OTGW-Core.h",
+    "root_cause": "processOT() is fed the FULL PIC line, not just 9-char OT frames: banners, '='-command-echoes, and PS=1 comma-summaries (>256 bytes, MAX_BUFFER_READ=512) route through its else-if branches and produce observable MQTT/WebSocket/OT-log output. A 10-byte queue item truncates them.",
+    "fix": "OTFrameMsg.line = char[MAX_BUFFER_READ] (512), len = uint16_t (511>255), producer null-terminates line[len] (non-OT branches use strstr/strchr/strcasecmp_P which need a terminator). Hoisted MAX_BUFFER_READ from inside handlePICSerial() to OTGW-Core.h so struct + read loop share one size.",
+    "tags": [
+      "freertos",
+      "queue",
+      "adr-123",
+      "byte-identical",
+      "processOT",
+      "buffer-size",
+      "task-865.5"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-13T13:55:00"
   }
 ]

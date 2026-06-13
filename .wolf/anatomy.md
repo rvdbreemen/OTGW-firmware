@@ -395,6 +395,7 @@
 - `ADR-126-fixed-esp32-classic-build-supersedes-combo-runtime-detection.md` — ADR-126 Fixed esp32-classic build supersedes combo runtime detection (~1278 tok)
 - `ADR-127-combo-esp32-s3-single-binary-revived-runtime-boot-detection.md` — ADR-127 Combo ESP32-S3 single binary revived: runtime PIC/OTDirect boot detection (supersedes ADR-12 (~3603 tok)
 - `ADR-128-drop-esp8266-support-from-2-0-0.md` — ADR-128: Drop ESP8266 Support from the 2.0.0 Line (Supersedes ADR-082) (~1965 tok)
+- `ADR-129-ot-frame-queue-and-state-mutex-foundation.md` — ADR-129 OT-Frame Queue and OTGWState Mutex Foundation (ADR-123 Phase 1); Proposed (~2600 tok)
 - `README.md` — Project documentation (~11241 tok)
 
 ## docs/api/
@@ -402,6 +403,7 @@
 
 ## docs/audits/
 
+- `2026-06-13-adr-123-phase1-single-writer-map.md` — ADR-123 Phase-1 appendix (TASK-865.5): single-writer-per-field map for OTcurrentSystemState/state.otBus/state.sat, producer-seam rationale, line[512] justification. ~250 lines, ~3k tokens.
 
 ## docs/guides/
 

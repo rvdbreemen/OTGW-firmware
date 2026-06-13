@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.179
+**  Version  : v2.0.0-alpha.180
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -714,7 +714,11 @@ static void bridgeFrameToParser(char prefix, unsigned long frame) {
   char buf[10];
   snprintf_P(buf, sizeof(buf), PSTR("%c%08lX"), prefix, frame);
   otDirectBridgeWriteLine(buf, 9);
-  processOT(buf, 9, otHideReports);
+  // TASK-865.5: OTDirect producer. Enqueue the 9-char frame instead of calling
+  // processOT() inline; the consumer (drainOTFrameQueue) parses it in loop()
+  // context. otDirectBridgeWriteLine above stays producer-side. suppressOutput
+  // rides the queue item as otHideReports (PS=1 raw-frame suppression).
+  enqueueOTFrame(buf, 9, otHideReports);
 }
 
 // ---------------------------------------------------------------------------

@@ -383,6 +383,71 @@ inline bool platformSettingsNoopUnchanged(const void *data, size_t len) {
   return s.buf && s.len == len && memcmp(s.buf, data, len) == 0;
 }
 
+// ---- ADR-123 concurrency primitives (TASK-865.5) -------------------------
+// FreeRTOS-backed mutex and value-copy queue shims. Application code uses the
+// opaque PlatformMutex / PlatformQueue handles and the platformXxx() calls
+// below, never the raw FreeRTOS API — so the OTGWState mutex and the OT-frame
+// producer/consumer queue stay platform-neutral. On ESP32 these map directly
+// onto the IDF FreeRTOS objects (freertos/FreeRTOS.h is pulled in by Arduino.h).
+//
+// Phase 1 (this task) creates ONE mutex and ONE queue in setup() (ADR-044) and
+// runs the consumer cooperatively from loop(); seq6 lifts the producer into a
+// FreeRTOS task. The shims already provide the real synchronisation so that
+// lift needs no further primitive work.
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include <freertos/queue.h>
+
+using PlatformMutex = SemaphoreHandle_t;
+using PlatformQueue = QueueHandle_t;
+
+// Create a non-recursive mutex. Returns nullptr on allocation failure; callers
+// must treat that as fatal-at-setup (a missing mutex means no cross-task
+// protection). Non-recursive by design: a single call chain must never take it
+// twice (would self-deadlock even single-threaded).
+inline PlatformMutex platformMutexCreate() {
+  return xSemaphoreCreateMutex();
+}
+
+// Take the mutex, blocking up to timeoutMs. timeoutMs == 0 means block forever
+// (portMAX_DELAY). Returns true if acquired. A nullptr handle returns true
+// (no-op lock) so a failed-create path degrades to "unprotected" rather than
+// "always blocked".
+inline bool platformMutexLock(PlatformMutex m, uint32_t timeoutMs = 0) {
+  if (m == nullptr) return true;
+  TickType_t ticks = (timeoutMs == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeoutMs);
+  return xSemaphoreTake(m, ticks) == pdTRUE;
+}
+
+inline void platformMutexUnlock(PlatformMutex m) {
+  if (m == nullptr) return;
+  xSemaphoreGive(m);
+}
+
+// Create a value-copy queue of `length` items, each `itemSize` bytes. The queue
+// copies by value on send/receive (no shared pointers, no mutex needed for the
+// item flow). Returns nullptr on allocation failure.
+inline PlatformQueue platformQueueCreate(size_t length, size_t itemSize) {
+  return xQueueCreate((UBaseType_t)length, (UBaseType_t)itemSize);
+}
+
+// Non-blocking send (copy `item` into the queue). Returns false if the queue is
+// full or the handle is null. Callers size the queue so it cannot fill in
+// normal operation and treat a false result as a diagnostic drop, never a
+// fall-back to direct processing (which would reorder the FIFO).
+inline bool platformQueueSend(PlatformQueue q, const void *item) {
+  if (q == nullptr) return false;
+  return xQueueSend(q, item, 0) == pdTRUE;
+}
+
+// Receive one item (copy out). timeoutMs == 0 polls without blocking. Returns
+// true if an item was dequeued.
+inline bool platformQueueReceive(PlatformQueue q, void *item, uint32_t timeoutMs = 0) {
+  if (q == nullptr) return false;
+  TickType_t ticks = (timeoutMs == 0) ? 0 : pdMS_TO_TICKS(timeoutMs);
+  return xQueueReceive(q, item, ticks) == pdTRUE;
+}
+
 /***************************************************************************
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

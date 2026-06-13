@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.179
+**  Version  : v2.0.0-alpha.180
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -425,6 +425,63 @@ struct TrackingStateInitializer {
 static TrackingStateInitializer gTrackingStateInitializer;
 struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
 int cmdQueueSize = 0;  // fill-pointer: entries are 0..cmdQueueSize-1, left-shift on deletion
+
+// ===== ADR-123 Phase-1 concurrency foundation (TASK-865.5) ================
+// Definitions for the OT-frame producer/consumer queue and the OTGWState mutex
+// declared in OTGW-Core.h. Both handles are created ONCE in setupOTConcurrency()
+// (called from setup(), ADR-044). Until then they are nullptr and the shims
+// degrade gracefully (enqueue drops, lock is a no-op).
+PlatformQueue otFrameQueue = nullptr;   // OTFrameMsg producer->consumer queue
+PlatformMutex otStateMutex = nullptr;   // guards the decoded OTGWState snapshot
+
+// Diagnostic counter: OTFrameMsg producers that hit a full queue. Should stay 0
+// in Phase 1 (producer+consumer co-resident per loop iteration). A non-zero
+// value means the depth/drain assumption broke and frames were lost — surfaced
+// for the field-soak AC, never used as a fall-back trigger.
+static uint32_t otFrameQueueDrops = 0;
+
+// setupOTConcurrency — create the mutex and frame queue exactly once (ADR-044).
+// Safe to call before WiFi/MQTT are up; pure FreeRTOS object allocation.
+void setupOTConcurrency() {
+  if (otStateMutex == nullptr) otStateMutex = platformMutexCreate();
+  if (otFrameQueue == nullptr) {
+    otFrameQueue = platformQueueCreate(OT_FRAME_QUEUE_DEPTH, sizeof(OTFrameMsg));
+  }
+}
+
+// enqueueOTFrame — producer-side. Copy the line (null-terminated), enqueue by
+// value. The ONLY two callers are the frame producers (dispatchOTGWInputLine,
+// bridgeFrameToParser). Returns false on a full queue (diagnostic drop).
+bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput) {
+  if (otFrameQueue == nullptr || buf == nullptr || len == 0) return false;
+  OTFrameMsg msg;
+  if (len > sizeof(msg.line) - 1) len = sizeof(msg.line) - 1;  // clamp (defensive)
+  memcpy(msg.line, buf, len);
+  msg.line[len] = '\0';                       // processOT's non-OT branches need a terminator
+  msg.len = (uint16_t)len;
+  msg.suppressOutput = suppressOutput;
+  if (!platformQueueSend(otFrameQueue, &msg)) {
+    otFrameQueueDrops++;
+    return false;
+  }
+  return true;
+}
+
+// drainOTFrameQueue — consumer-side. Dequeue every pending frame and parse it
+// under the OTStateLock (writer side). Called from loop() AFTER
+// doBackgroundTasks() so it never nests with the re-entrant
+// doAutoConfigure->handleOTGW enqueue path.
+void drainOTFrameQueue() {
+  if (otFrameQueue == nullptr) return;
+  OTFrameMsg msg;
+  while (platformQueueReceive(otFrameQueue, &msg, 0)) {
+    // processOT() acquires OTStateLock internally (writer side), covering all
+    // five processOT call sites uniformly — not just this consumer. Do NOT wrap
+    // here too: the lock is non-recursive and would self-deadlock.
+    processOT(msg.line, msg.len, msg.suppressOutput);
+    feedWatchDog();                            // bound worst-case drain time
+  }
+}
 
 #define OTGW_BANNER "OpenTherm Gateway"
 
@@ -3255,7 +3312,11 @@ static void dispatchOTGWInputLine(const char* buf, size_t len)
     OTGWstream.write('\r');
     OTGWstream.write('\n');
   }
-  processOT(buf, len);
+  // TASK-865.5: PIC producer. Enqueue the raw line instead of calling
+  // processOT() inline; the consumer (drainOTFrameQueue) parses it in loop()
+  // context. The LED + legacy-port writes above stay producer-side (not OT-log
+  // or MQTT output, so FIFO/byte-identical surface is unaffected).
+  enqueueOTFrame(buf, len, false);
 }
 
 static bool readOTGWSimulationLine(File& replayFile, char* buffer, size_t bufferSize, size_t& lineLen)
@@ -4195,6 +4256,19 @@ bool getBoilerUnsupportedDirty()   { return boilerUnsupportedDirty; }
 void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 
 void processOT(const char *buf, int len, bool suppressOutput){
+  // TASK-865.5 (ADR-123 Phase-1): processOT() is THE writer of the decoded
+  // OTGWState snapshot (OTcurrentSystemState.*, state.otBus.*). Acquire the
+  // OTStateLock here — covering ALL processOT call sites uniformly: the queue
+  // consumer (drainOTFrameQueue) AND the four OTDirect command-response
+  // synthesis sites (otDirectBridgeProcessStatus, stats-line builder,
+  // synthesizeResponse, otDirectBridgeProcessPRResponse) that call processOT()
+  // directly. In seq6 the consumer runs on the PIC task while those synthesis
+  // calls run on the loop task, so processOT executes from two tasks — the lock
+  // serialises them against each other and against the restAPI reader.
+  // Non-recursive: processOT's callees must NOT re-take OTStateLock (verified:
+  // only sendOTmonitorV2 acquires it, and processOT does not call it).
+  OTStateLock stateLock;
+
   // suppressOutput (TASK-293): when true, skip per-frame output paths and the
   // auto-leave-PS-mode heuristic. State updates, decoded value publishing,
   // and OT state flag writes still run so MQTT/SAT/WebUI values stay fresh.
@@ -4640,8 +4714,8 @@ void handlePICSerial()
   // boards, so behaviour there is unchanged.
   if (isOTDirectEnabled()) return;
   //handle serial communication and line processing
-  #define MAX_BUFFER_READ 512       //PS=1 summary lines can exceed 256 bytes
-  #define MAX_BUFFER_WRITE 128
+  // MAX_BUFFER_READ / MAX_BUFFER_WRITE are defined in OTGW-Core.h (TASK-865.5)
+  // so the OT-frame queue item and this read loop share one size.
   // Sync webserver: bound work per call so a burst of OT lines or net→serial
   // commands cannot starve httpServer.handleClient(). Pending bytes drain on
   // the next call.

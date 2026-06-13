@@ -2868,6 +2868,157 @@ class WorkspaceEvaluator:
                 details_head,
             ))
 
+    def check_ot_frame_queue_producer_region(self):
+        """ADR-123 Phase-1 producer/consumer confinement (TASK-865.5).
+
+        The OT-frame queue has exactly two producer sites: the PIC serial path
+        (dispatchOTGWInputLine in OTGW-Core.ino) and the OTDirect path
+        (bridgeFrameToParser in OTDirect.ino). Both enqueue via enqueueOTFrame()
+        and the single consumer (drainOTFrameQueue) calls processOT() from
+        loop(). This gate keeps the seam from drifting:
+
+          1. enqueueOTFrame() CALL sites appear ONLY in the two producer files
+             (OTGW-Core.ino, OTDirect.ino). A call anywhere else means a third
+             producer slipped in, breaking the single-seam contract seq6 relies on.
+          2. The mutex + queue are each created exactly once via
+             setupOTConcurrency() (ADR-044 single-point-of-instantiation), called
+             from setup().
+          3. The OTStateLock RAII helper exists AND processOT() (the writer)
+             acquires it in its body — so ALL five processOT call sites (the
+             queue consumer plus the four OTDirect synth sites) are covered, not
+             just the consumer.
+          4. The OTGWSerial frame-INGEST surface (.available()/.read()) is
+             confined to the producer file (OTGW-Core.ino / handlePICSerial).
+
+        NOTE on scope: OTGWSerial as a whole is used across the firmware (reset,
+        PIC flash, command send, banner detect) and CANNOT be globally confined,
+        so the ENQUEUE SYMBOL (enqueueOTFrame) is the primary confinement
+        assertion. The "only the PIC task may reference OTGWSerial" rule
+        (ADR-123 §Enforcement) lands fully in seq6 (the PIC-task phase); here we
+        confine only the ingest READ surface as a partial down-payment.
+
+        NOTE on processOT(): this gate does NOT assert processOT() has a single
+        call site. The two named frame producers (dispatchOTGWInputLine,
+        bridgeFrameToParser) now enqueue, but four OTDirect command-RESPONSE
+        synthesis sites (otDirectBridgeProcessStatus, the stats-line builder,
+        synthesizeResponse, otDirectBridgeProcessPRResponse) keep calling
+        processOT() directly BY DESIGN — they feed command echoes / PR= responses
+        whose state updates must stay synchronous with the command path
+        (OTDirect.ino synthesizeResponse comment). Queuing them would defer those
+        updates to loop-end and change command-path behaviour. seq6 owns any
+        further task-lift ordering. See the TASK-865.5 single-writer-map
+        appendix."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-123 OT-Frame Queue Producer Region ==={Colors.ENDC}")
+
+        src_dir = config.FIRMWARE_ROOT
+        producer_files = {"OTGW-Core.ino", "OTDirect.ino"}
+
+        # --- (1) enqueueOTFrame() call sites only in producer files ----------
+        enqueue_call = re.compile(r'\benqueueOTFrame\s*\(')
+        # Declaration in OTGW-Core.h and definition in OTGW-Core.ino are NOT
+        # calls; the definition line is "bool enqueueOTFrame(" (return type prefix).
+        enqueue_def_or_decl = re.compile(r'\b(?:bool)\s+enqueueOTFrame\s*\(')
+        stray_enqueue: List[str] = []
+        enqueue_call_count = 0
+        for f in collect_firmware_source_files(src_dir):
+            try:
+                lines = f.read_text(encoding='utf-8', errors='ignore').splitlines()
+            except OSError:
+                continue
+            for i, line in enumerate(lines, 1):
+                if not enqueue_call.search(line):
+                    continue
+                if enqueue_def_or_decl.search(line):
+                    continue  # the function definition / forward decl, not a call
+                if f.name in producer_files:
+                    enqueue_call_count += 1
+                else:
+                    stray_enqueue.append(f"{f.name}:{i}: {line.strip()[:70]}")
+
+        # --- (2) setupOTConcurrency() created once + called from setup() ------
+        core_text = ""
+        firmware_text = ""
+        try:
+            core_text = (src_dir / "OTGW-Core.ino").read_text(encoding='utf-8', errors='ignore')
+        except OSError:
+            pass
+        try:
+            firmware_text = (src_dir / "OTGW-firmware.ino").read_text(encoding='utf-8', errors='ignore')
+        except OSError:
+            pass
+
+        has_setup_def = bool(re.search(r'\bvoid\s+setupOTConcurrency\s*\(', core_text))
+        setup_calls = len(re.findall(r'(?<![\w])setupOTConcurrency\s*\(\s*\)', firmware_text))
+        queue_create = "platformQueueCreate(" in core_text
+        mutex_create = "platformMutexCreate(" in core_text
+
+        # --- (3) OTStateLock RAII helper exists + processOT acquires it -------
+        core_h_text = ""
+        try:
+            core_h_text = (src_dir / "OTGW-Core.h").read_text(encoding='utf-8', errors='ignore')
+        except OSError:
+            pass
+        has_otstatelock = bool(re.search(r'\bstruct\s+OTStateLock\b', core_h_text))
+        # The writer side: processOT() must take the lock so ALL five processOT
+        # call sites (consumer + the four OTDirect synth sites) are covered. We
+        # assert an OTStateLock is constructed in the processOT() body.
+        processot_body = ""
+        m = re.search(r'void\s+processOT\s*\([^)]*\)\s*\{', core_text)
+        if m:
+            processot_body = core_text[m.end():m.end() + 1500]  # first ~1500 chars of body
+        processot_locks = bool(re.search(r'\bOTStateLock\b', processot_body))
+
+        # --- (4) OTGWSerial frame-INGEST surface confined to the producer file -
+        # OTGWSerial is firmware-wide (reset, flash, command-send, banner-detect)
+        # and CANNOT be globally confined, but the frame-ingest READ surface
+        # (.available()/.read()) belongs only in handlePICSerial() (OTGW-Core.ino).
+        # A read/available elsewhere means a second ingest path slipped in.
+        ingest_re = re.compile(r'OTGWSerial\s*\.\s*(?:available|read)\s*\(')
+        stray_ingest: List[str] = []
+        for f in collect_firmware_source_files(src_dir):
+            if f.name == "OTGW-Core.ino":
+                continue  # producer file: ingest read loop lives here
+            try:
+                lines = f.read_text(encoding='utf-8', errors='ignore').splitlines()
+            except OSError:
+                continue
+            for i, line in enumerate(lines, 1):
+                if ingest_re.search(line):
+                    stray_ingest.append(f"{f.name}:{i}: {line.strip()[:70]}")
+
+        problems: List[str] = []
+        if stray_enqueue:
+            problems.append(f"enqueueOTFrame() called outside producer files: {stray_enqueue[:3]}")
+        if enqueue_call_count < 2:
+            problems.append(f"expected >=2 enqueueOTFrame() call sites in producers, found {enqueue_call_count}")
+        if not has_setup_def:
+            problems.append("setupOTConcurrency() definition missing in OTGW-Core.ino")
+        if not (queue_create and mutex_create):
+            problems.append("queue/mutex not created via platformQueueCreate/platformMutexCreate in OTGW-Core.ino")
+        if setup_calls != 1:
+            problems.append(f"setupOTConcurrency() must be called exactly once from setup(); found {setup_calls}")
+        if not has_otstatelock:
+            problems.append("OTStateLock RAII helper missing from OTGW-Core.h")
+        if not processot_locks:
+            problems.append("processOT() body does not acquire OTStateLock (writer side)")
+        if stray_ingest:
+            problems.append(f"OTGWSerial frame-ingest (.available()/.read()) outside producer file: {stray_ingest[:3]}")
+
+        if problems:
+            self.add_result(EvaluationResult(
+                "ADR-123", "OT-frame queue producer region", "FAIL",
+                "; ".join(problems[:5]),
+                "; ".join(stray_enqueue[:5] + stray_ingest[:5])
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-123", "OT-frame queue producer region", "PASS",
+                f"enqueueOTFrame confined to {sorted(producer_files)} "
+                f"({enqueue_call_count} call sites); queue+mutex created once; "
+                f"processOT acquires OTStateLock (writer side); OTGWSerial ingest "
+                f"surface confined to producer; OTStateLock present"
+            ))
+
     def check_binary_safe_compare(self):
         """INFO: flag every strncmp_P / strstr_P call site. These MUST operate on
         null-terminated text only; running them against binary buffers triggers
@@ -3053,6 +3204,7 @@ class WorkspaceEvaluator:
         self.check_no_arduinojson()
         self.check_binary_safe_compare()
         self.check_esp_abstraction_boundary()       # ESP abstraction guardrail (TASK-739)
+        self.check_ot_frame_queue_producer_region()  # ADR-123 Phase-1 producer/consumer seam (TASK-865.5)
         self.check_otdirect_25238_bridge()
         self.check_adr102_otbus_liveness_topic()     # ADR-102 CI gate (TASK-623)
         self.check_sat_publishes_use_helpers()       # ADR-111 CI gate (TASK-722)
