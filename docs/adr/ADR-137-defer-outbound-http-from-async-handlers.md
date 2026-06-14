@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-06-14.
+Accepted, 2026-06-14. Proposed 2026-06-14; accepted by the maintainer 2026-06-14.
 
 This ADR amends ADR-132 (HTTP stack on ESPAsyncWebServer with an imperative-push to
 async-pull bridge). ADR-132 stays in force and Accepted; this ADR generalizes one of
@@ -23,6 +23,11 @@ status_history:
     changed_by: Agent
     reason: "Generalize ADR-132's no-blocking-on-the-AsyncTCP-task rule to cover OUTBOUND HTTP initiated from an async handler. After the TASK-865.9 async web migration, two PIC seams (update-check HEAD, refresh GET+writeToStream) still ran blocking HTTPClient calls on the AsyncTCP task, freezing the whole web stack for the request duration. Defer both to loop() context via the existing handlePendingUpgrade() bridge. Delivered by TASK-865.14; amends ADR-132, cross-refs ADR-134, depends on ADR-135."
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted the generalization of the ADR-132 bridge to outbound HTTP from async handlers (PIC update-check + refresh deferred to loop); amends ADR-132
+    changed_via: manual
 
 ## Context
 
