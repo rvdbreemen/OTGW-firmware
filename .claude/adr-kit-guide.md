@@ -1,4 +1,4 @@
-<!-- adr-kit-guide v0.13.0 -->
+<!-- adr-kit-guide v0.30.5 -->
 <!-- Canonical project-side ADR guide. Copied from the plugin's templates/adr-kit-guide.md to .claude/adr-kit-guide.md by /adr-kit:init, /adr-kit:upgrade, and /adr-kit:setup. -->
 <!-- This file is plain markdown — readable by Claude Code, headless `claude -p`, shell scripts in pre-commit hooks, evaluator scripts, and any agent that doesn't process @-imports. Do not embed Claude-Code-specific syntax inside this file. -->
 
@@ -17,8 +17,9 @@ ADR files live at `docs/adr/ADR-NNN-kebab-case-title.md`. They are versioned, im
 | Mode | When | Entry point |
 |---|---|---|
 | **Init / bootstrap** | Once per project: scan source + docs, propose a starter ADR set, hook the kit into `CLAUDE.md`, install the pre-commit hook | `/adr-kit:init` |
-| **Per-commit verification** | Every `git commit`: declarative-rule check **plus** Claude Sonnet LLM judge for `llm_judge: true` ADRs in one batched call. Default-on as of v0.13.0. Falls back to declarative-only when the `claude` CLI is unavailable | `.githooks/pre-commit` (auto) |
+| **Per-commit verification** | Every `git commit`: declarative-rule check (always-on, free). Claude Sonnet LLM judge for `llm_judge: true` ADRs is opt-in as of v0.17.0 (enable via `judge.llm_enabled:true` or `ADR_KIT_LLM=1`). Falls back to declarative-only when the `claude` CLI is unavailable | `.githooks/pre-commit` (auto) |
 | **On-demand invocation** | Mid-session: write a new ADR, judge a staged diff, supersede an existing decision | `/adr-kit:adr`, `/adr-kit:judge`, `adr-generator` subagent |
+| **Guardian (v0.18+)** | Periodic staleness detector at SessionStart; in-session model runs due health tiers | `bin/adr-guardian` (hook, free) + `/adr-kit:guardian` (sweep) |
 
 ## Slash commands
 
@@ -31,7 +32,8 @@ ADR files live at `docs/adr/ADR-NNN-kebab-case-title.md`. They are versioned, im
 | `/adr-kit:migrate` | Rewrite legacy ADRs into canonical format. | yes |
 | `/adr-kit:setup` | Append `## ADR Kit` block to `CLAUDE.md` (idempotent). | yes |
 | `/adr-kit:upgrade` | Migrate v0.11 → v0.12 footprint without re-running the heavy audit. | yes |
-| `/adr-kit:install-hooks` | Install or uninstall the pre-commit hook. | yes |
+| `/adr-kit:install-hooks` | Install or uninstall the pre-commit hook; also manages the guardian's project-scoped SessionStart hook. | yes |
+| `/adr-kit:guardian` | Run the ADR-set health sweep for due tier(s). Cheap tier is free; LLM tier confirms cost first. | no — model can self-call |
 
 ## The four verification gates
 
@@ -50,7 +52,7 @@ An ADR cannot move from `Proposed` to `Accepted` until all four pass.
 2. Invoke `/adr-kit:adr` (or the `adr-generator` subagent). Provide: title, context with concrete forces, ≥ 2 alternatives with rejection reasons, consequences (both directions), related ADRs.
 3. The agent applies the four gates and writes `docs/adr/ADR-NNN-…md` with `Status: Proposed`.
 4. Human review. Iterate until all gates pass.
-5. Flip Status to `Accepted, YYYY-MM-DD` after explicit human approval. **Never self-approve.**
+5. Flip Status to `Accepted, YYYY-MM-DD` after explicit human approval and append the matching transition to `## Status History`. **Never self-approve.**
 6. If the decision touches code in a mechanically expressible way, add an `Enforcement` block (see below) so the pre-commit hook can guard the boundary.
 
 ## Enforcement block (v0.12+)
@@ -75,7 +77,7 @@ Optional `## Enforcement` section at the end of an ADR. Fenced JSON code block, 
 - `forbid_pattern` — regex must NOT match any added line in the diff (lines starting with `+`, excluding `+++ ` markers).
 - `forbid_import` — same engine as `forbid_pattern`; the separate name documents intent.
 - `require_pattern` — regex must match at least once in the post-diff content of any file matching `path_glob`.
-- `llm_judge: true` — Claude Sonnet evaluates the diff against this ADR's `## Decision` text at commit time (default-on as of v0.13.0). The pre-commit hook batches all `llm_judge: true` ADRs into one Sonnet call and blocks the commit on `VIOLATION`. Falls back gracefully (advisory only, exit 0) when the `claude` CLI is missing.
+- `llm_judge: true` — Claude Sonnet evaluates the diff against this ADR's `## Decision` text when the LLM pass is active. The pre-commit hook batches all `llm_judge: true` ADRs into one Sonnet call and blocks the commit on `VIOLATION`. The LLM pass is opt-in as of v0.17.0 (enable via `judge.llm_enabled:true` in `.adr-kit.json`, or `ADR_KIT_LLM=1` per-commit). Falls back gracefully (advisory only, exit 0) when the `claude` CLI is missing.
 - ADRs with no Enforcement block are skipped silently by the judge.
 
 **Path globs** support `**` (recursive). Examples: `src/**/*.py`, `tests/**`, `**/Makefile`.
@@ -84,12 +86,14 @@ Optional `## Enforcement` section at the end of an ADR. Fenced JSON code block, 
 
 After `/adr-kit:init` (or `/adr-kit:install-hooks`), every `git commit` runs `bin/adr-judge` on the staged diff with two passes:
 
-- **Declarative pass** — fast, regex-only, no LLM. A violation exits non-zero and blocks the commit.
-- **LLM pass (Sonnet, default-on as of v0.13.0)** — all `llm_judge: true` ADRs are batched into one `claude -p --model claude-sonnet-4-6` call. Sonnet returns a per-ADR JSON verdict; any `VIOLATION` blocks the commit with the model's one-sentence reason. Falls back gracefully when the `claude` CLI is missing or unauthenticated — never blocks a legitimate commit due to tooling drift.
+- **Declarative pass** — always-on; fast, regex-only, no LLM. A violation exits non-zero and blocks the commit.
+- **LLM pass (Sonnet, opt-in as of v0.17.0)** — all `llm_judge: true` ADRs are batched into one `claude -p --model claude-sonnet-4-6` call. Sonnet returns a per-ADR JSON verdict; any `VIOLATION` blocks the commit with the model's one-sentence reason. Falls back gracefully when the `claude` CLI is missing or unauthenticated — never blocks a legitimate commit due to tooling drift.
 
 **Cost shape** (typical project, 50 `llm_judge` ADRs, small diff): roughly $0.10–0.30 per commit on Sonnet 4.6 with prompt caching. Latency 5–10s. Configurable via `judge.llm_model` / `judge.llm_timeout_seconds` / `judge.llm_cmd` in `docs/adr/.adr-kit.json`.
 
 **Knobs:**
+- Enable LLM pass per commit: `ADR_KIT_LLM=1 git commit -m "…"`
+- Enable LLM pass project-wide: set `judge.llm_enabled: true` in `docs/adr/.adr-kit.json`
 - Disable LLM pass per commit: `ADR_KIT_NO_LLM=1 git commit -m "…"`
 - Disable hook entirely per commit: `ADR_KIT_HOOK_DISABLE=1 git commit -m "…"`
 - Switch model: set `judge.llm_model: "claude-haiku-4-5"` in `.adr-kit.json` for higher throughput at lower cost.
@@ -101,9 +105,9 @@ Accepted ADRs are immutable. To change a decision:
 
 1. Author a new ADR with the next number. Status `Proposed`. The Decision should explain what changes and why now.
 2. In its Related Decisions: `Supersedes ADR-OLD`.
-3. After the new ADR is `Accepted`: edit ONLY the old ADR's Status line to `Superseded by ADR-NEW, YYYY-MM-DD.` Leave every other section untouched — the old decision's content is the historical record.
+3. After the new ADR is `Accepted`: edit the old ADR's Status line to `Superseded by ADR-NEW, YYYY-MM-DD.` and append that transition to its `## Status History`. Leave every other section and all earlier history entries untouched: the old decision's content is the historical record.
 
-Never edit Decision, Context, Consequences, or Alternatives of an Accepted/Deprecated ADR. The Status line is the only permitted change.
+Never edit Decision, Context, Consequences, or Alternatives of an Accepted/Deprecated ADR. Only the Status line and an appended Status History transition may change.
 
 ## Code review checks
 
@@ -130,6 +134,50 @@ When `/adr-kit:adr` is asked to write or accept an ADR, it actively pushes back 
 - "It's reversible" — most architecture is partially reversible; the ADR captures the *current* commitment.
 - "It's a refactor" — pure refactors don't need ADRs; *new patterns* introduced during refactoring do.
 - "We don't have time" — opportunity cost of skipping is a future maintainer hunting for the why.
+
+## Guardian (v0.18.0+)
+
+The ADR Guardian is a periodic staleness detector that injects an `[adr-guardian]` nudge block at Claude Code SessionStart when a health tier is due. It never blocks session start, never runs an LLM, and emits nothing when nothing is due.
+
+**Two-tier cadence:**
+
+| Tier | Default cadence | Tools | Cost |
+|---|---|---|---|
+| **cheap** | Daily (`drift_stale_days: 1`) | `adr-judge` (declarative), `adr-retire`, `adr-lint`/`adr-status` | Free |
+| **llm** | Bi-weekly (`llm_stale_days: 14`) | `adr-suggest` (missing-ADR), `adr-judge --llm` (audit) | ~$0.10–0.30 |
+
+**On seeing an `[adr-guardian] ... DUE` block at session start:**
+1. Identify which tier(s) are marked `DUE`.
+2. For the cheap tier: offer "ADR drift/health check is due — run `/adr-kit:guardian cheap` to sweep (free, ~30s)?"
+3. For the LLM tier: offer "ADR semantic check is due (bi-weekly) — run `/adr-kit:guardian llm`? This will confirm cost (~$0.10–0.30) before spending."
+4. Confirm cost before the LLM tier. Never run LLM-tier work without explicit user confirmation (unless `guardian.llm_autorun: true` in `.adr-kit.json`).
+
+**Mix-by-finding-type responses:**
+
+| Finding | Response |
+|---|---|
+| **Drift** — code violates an Accepted ADR | Surface prominently. List violations with file:line + ADR. Offer fix or task. |
+| **Missing ADR** — new decision not recorded | Passive. List candidates; offer to author via `adr-generator`. User picks. |
+| **Stale ADR** — tech removed/superseded/policy drift | Draft retirement/supersession for review. Never auto-apply. |
+| **Health** — gate failures, broken chains | Report PASS/ADVISORY/FAIL. Offer to fix FAILs via `adr-generator`. |
+
+**Config** (`docs/adr/.adr-kit.json`, `guardian` block):
+
+```json
+"guardian": {
+  "enabled": true,
+  "drift_stale_days": 1,
+  "llm_stale_days": 14,
+  "nudge_cooldown_hours": 24,
+  "llm_autorun": false
+}
+```
+
+**Hook install paths (both are shipped):**
+- Plugin-level (default): the adr-kit plugin declares a `SessionStart` hook in `.claude-plugin/plugin.json`. Auto-registers when the plugin is enabled. Self-guards (no-ops in non-ADR projects).
+- Project-scoped (explicit): `/adr-kit:install-hooks` adds a `SessionStart` entry to the project's `.claude/settings.json`. Idempotent add and clean remove (JSON-structural, never clobbers other hooks).
+
+State file: `docs/adr/.adr-kit-state.json` (gitignored, per-machine).
 
 ## Plugin-side deep dives
 
