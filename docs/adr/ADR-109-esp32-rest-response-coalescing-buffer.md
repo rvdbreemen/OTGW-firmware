@@ -1,7 +1,9 @@
 # ADR-109 — ESP32 REST response coalescing buffer
 
 ## Status
-Accepted, 2026-05-26
+Superseded by ADR-132 (2026-06-14). Accepted 2026-05-26.
+
+This ADR's decision was explicitly "do NOT migrate the sync WebServer to AsyncWebServer", keeping a coalescing buffer on the synchronous server instead. That objection rested on ESP8266 parity and the cost of the async migration. Once ESP8266 was dropped (ADR-128) and the web stack moved to ESPAsyncWebServer (TASK-865.9), the coalescing buffer is obsolete: the async server streams responses without the sync-server latency this ADR worked around. See ADR-132.
 
 ## Context
 

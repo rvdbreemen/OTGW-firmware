@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Date: 2026-06-14.
+Accepted, 2026-06-14. Proposed 2026-06-14; accepted by the maintainer 2026-06-14.
 
 This is the **Phase 3** networking step that ADR-123 (the 2.0.0 concurrency-model
 decision) anticipated: move the web stack off the cooperative `loop()` and onto the
@@ -12,8 +12,9 @@ that lands the phase. This ADR carries that surface and **supersedes ADR-109**
 migrate the sync WebServer to AsyncWebServer". That objection no longer holds once
 ESP8266 is dropped (ADR-128), so the decision flips here.
 
-Status is Proposed: it is the maintainer's checkpoint. The migration is delivered
-by TASK-865.9; field validation on ESP32-S3 hardware is still open (see Risks).
+Accepted by the maintainer. The migration is delivered by TASK-865.9; field
+validation on ESP32-S3 hardware is still open (see Risks) and is tracked under
+epic TASK-865, separate from this architectural acceptance.
 
 ## Status History
 
@@ -23,6 +24,11 @@ status_history:
     changed_by: Agent
     reason: Document the ADR-123 Phase-3 HTTP stack move (sync WebServer to ESPAsyncWebServer) and the imperative-push to async-pull bridge delivered by TASK-865.9; supersede ADR-109
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted the Phase-3 HTTP move to ESPAsyncWebServer with the imperative-push to async-pull bridge; supersedes ADR-109
+    changed_via: manual
 
 ## Context
 
