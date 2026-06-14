@@ -715,50 +715,15 @@ def build_firmware(project_dir, config_file, target):
     print_success(f"Firmware build complete [{tcfg['name']}]")
 
 
-def prepare_gzip_assets(data_dir):
-    """Pre-gzip large static assets (*.js) in data_dir so FSexplorer.ino can
-    serve the .gz sibling with Content-Encoding: gzip. ~70% size reduction on
-    typical text assets, shrinking page-load cost and LittleFS footprint.
-
-    Only *.js files > 2 KB are gzipped. index.html is served through
-    sendIndex() with runtime template expansion (%name% placeholders), so
-    pre-gzipping would break that substitution -- left untouched on purpose.
-
-    Idempotent: regenerates the .gz only when the source is newer than the
-    existing .gz (mtime comparison). Safe to run on every build.
-    """
-    if not data_dir.exists():
-        return
-    print_step("Preparing gzip assets")
-    gz_count = 0
-    for src in data_dir.glob("*.js"):
-        if src.stat().st_size < 2048:
-            continue
-        dst = src.with_suffix(src.suffix + ".gz")
-        if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime:
-            continue
-        with open(src, "rb") as rf, gzip.open(dst, "wb", compresslevel=9) as wf:
-            shutil.copyfileobj(rf, wf)
-        reduction = (1.0 - dst.stat().st_size / src.stat().st_size) * 100.0
-        print_info(f"Gzipped {src.name} -> {dst.name} ({src.stat().st_size} -> {dst.stat().st_size} B, {reduction:.0f}% smaller)")
-        gz_count += 1
-    if gz_count == 0:
-        print_info("No gzip assets needed updating")
-    else:
-        print_success(f"Prepared {gz_count} gzip asset(s)")
-
-
 def build_filesystem(project_dir, config_file, target):
     """Build filesystem using mklittlefs for the given target"""
     tcfg = TARGETS[target]
     print_step(f"Building filesystem [{tcfg['name']}]")
-    # TASK-433: gzip pre-compression disabled. Plain .js files are served via the
-    # FSexplorer handlers (which fall through to the non-.gz branch when no .gz
-    # sibling exists). Removing the .gz artefacts eliminates the duplicate
-    # Content-Encoding header bug class entirely (was: streamFile auto-detected
-    # .gz AND the handler manually added Content-Encoding: gzip → browser saw
-    # the header twice and produced an empty body). See FSexplorer.ino comments.
-    # prepare_gzip_assets(config.DATA_DIR)  # intentionally disabled
+    # Web UI assets ship as plain readable files: no gzip, no .gz siblings, no
+    # build-time archives (maintainer directive). Cache-busting is handled at
+    # serve time via ETag (ADR-139); the former prepare_gzip_assets step is
+    # removed entirely (it had been disabled under TASK-433 to kill a
+    # double-Content-Encoding bug, and gzip is no longer wanted at all).
 
     # Find mklittlefs under the target's tool path
     # e.g. arduino/packages/esp32/tools/mklittlefs/*/mklittlefs(.exe)
@@ -1944,8 +1909,7 @@ def build_filesystem_pio(project_dir, target):
     tcfg = TARGETS[target]
     env_name = PIO_ENV_MAP[target]
     print_step(f"Building filesystem [{tcfg['name']}] (PlatformIO)")
-    # TASK-433: gzip pre-compression disabled (see build_filesystem above for rationale).
-    # prepare_gzip_assets(config.DATA_DIR)  # intentionally disabled
+    # Web UI assets ship as plain readable files (no gzip); see build_filesystem above.
     _MSYS_KEYS = frozenset({
         "MSYSTEM", "MSYSTEM_PREFIX", "MSYSTEM_CHOST", "MSYSTEM_CARCH",
         "MINGW_PREFIX", "MINGW_CHOST", "MINGW_PACKAGE_PREFIX",

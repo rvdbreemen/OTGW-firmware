@@ -74,7 +74,10 @@ param(
     [switch]$SkipBrowserCapture,
     [string]$BrowserUrl,
     [int]$BrowserDebugPort = 9222,
-    [string]$BrowserPath
+    [string]$BrowserPath,
+    [switch]$SkipHttpProbes,
+    [ValidateRange(1, 60)]
+    [int]$HttpProbeTimeoutSeconds = 10
 )
 
 Set-StrictMode -Version Latest
@@ -124,6 +127,14 @@ function Show-Help {
     Write-Host "  -BrowserUrl <url>             Page to load (default http://<DeviceHost>/)."
     Write-Host "  -BrowserDebugPort <port>     CDP remote-debugging port (default 9222; auto-bumped if busy)."
     Write-Host "  -BrowserPath <path>          Explicit msedge.exe/chrome.exe path (default: auto-detect)."
+    Write-Host ""
+    Write-Host "HTTP probes (curl):"
+    Write-Host "  After the live capture stops (connection broken), the script runs a short series of curl.exe"
+    Write-Host "  requests against the device (root page + key REST endpoints incl. /api/v2/device/info) and writes"
+    Write-Host "  the per-request status/time/size to curl-probes.log, merged into transcript.txt. Each request is"
+    Write-Host "  time-bounded so a hanging endpoint is recorded as TIMEOUT instead of stalling the script."
+    Write-Host "  -SkipHttpProbes              Disable the post-capture curl probes."
+    Write-Host "  -HttpProbeTimeoutSeconds <n> Per-request timeout in seconds (default 10, range 1-60)."
     Write-Host ""
     Write-Host "Stopping capture:"
     Write-Host "  Press Q in the console to stop cleanly. The script closes the logs and leaves transcript.txt."
@@ -532,6 +543,94 @@ function New-Utf8Writer {
     return New-Object System.IO.StreamWriter -ArgumentList $Path, $true, $utf8NoBom
 }
 
+function Invoke-HttpProbes {
+    # Post-capture sanity sweep: hit the root page and a handful of REST endpoints
+    # with real curl.exe (NOT PowerShell's Invoke-WebRequest alias, which throws on
+    # 4xx and confuses status reporting). Each request is time-bounded with --max-time
+    # so a hanging endpoint (e.g. a stalled chunked "/" response) is recorded as a
+    # TIMEOUT line instead of blocking the script. Runs after the live capture stops.
+    param(
+        [Parameter(Mandatory = $true)][string]$DeviceHost,
+        [Parameter(Mandatory = $true)][string]$ProbeLog,
+        [int]$TimeoutSeconds = 10,
+        [string[]]$Paths
+    )
+
+    $writer = New-Utf8Writer -Path $ProbeLog
+    try {
+        $curl = (Get-Command curl.exe -ErrorAction SilentlyContinue).Source
+        if (-not $curl) {
+            $writer.WriteLine("curl.exe not found on PATH; HTTP probes skipped.")
+            Add-SummaryLine "HTTP probes: skipped (curl.exe not found)."
+            return
+        }
+
+        $writer.WriteLine("HTTP probes via $curl")
+        $writer.WriteLine("Target host : $DeviceHost")
+        $writer.WriteLine("Per-request timeout: ${TimeoutSeconds}s (--max-time)")
+        $writer.WriteLine("Started: $((Get-Date).ToString('o'))")
+        $writer.WriteLine("Columns: <time>  <result>  <http_code> <time_total> <size> <content_type>  <url>")
+        $writer.WriteLine("")
+
+        foreach ($path in $Paths) {
+            if ([string]::IsNullOrWhiteSpace($path)) { continue }
+            $url = "http://$DeviceHost$path"
+            $bodyTmp = [System.IO.Path]::GetTempFileName()
+            $stamp = (Get-Date).ToString('HH:mm:ss.fff')
+            try {
+                $curlArgs = @(
+                    '--silent', '--show-error',
+                    '--max-time', "$TimeoutSeconds",
+                    '--output', $bodyTmp,
+                    '--write-out', '%{http_code} %{time_total}s %{size_download}B %{content_type}',
+                    $url
+                )
+                $out = & $curl @curlArgs 2>&1
+                $exit = $LASTEXITCODE
+                $metrics = ($out | Out-String).Trim()
+
+                $snippet = ""
+                if (Test-Path -LiteralPath $bodyTmp -PathType Leaf) {
+                    $raw = Get-Content -LiteralPath $bodyTmp -Raw -ErrorAction SilentlyContinue
+                    if ($raw) {
+                        $snippet = ($raw -replace '\s+', ' ').Trim()
+                        if ($snippet.Length -gt 200) { $snippet = $snippet.Substring(0, 200) + '...' }
+                    }
+                }
+
+                if ($exit -eq 0) {
+                    $writer.WriteLine("$stamp  OK       $metrics  $url")
+                    if ($snippet) { $writer.WriteLine("              body: $snippet") }
+                }
+                elseif ($exit -eq 28) {
+                    $writer.WriteLine("$stamp  TIMEOUT  no response within ${TimeoutSeconds}s [curl exit 28]  $url")
+                }
+                else {
+                    $writer.WriteLine("$stamp  ERROR    curl exit $exit  $metrics  $url")
+                }
+            }
+            catch {
+                $writer.WriteLine("$stamp  EXCEPTION  $($_.Exception.Message)  $url")
+            }
+            finally {
+                Remove-Item -LiteralPath $bodyTmp -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        $writer.WriteLine("")
+        $writer.WriteLine("Finished: $((Get-Date).ToString('o'))")
+        Add-SummaryLine "HTTP probes: ran $(@($Paths).Count) request(s) -> curl-probes.log"
+    }
+    finally {
+        $writer.Flush()
+        $writer.Dispose()
+        # A probe TIMEOUT/ERROR is captured data, not a tool failure. Reset the native
+        # exit code so a non-zero curl exit (e.g. 28) does not leak into the script's
+        # overall exit code via pwsh -File. Per-probe outcomes are logged above.
+        $global:LASTEXITCODE = 0
+    }
+}
+
 function New-MergedTranscript {
     param([Parameter(Mandatory = $true)][string]$RunPath)
 
@@ -545,7 +644,8 @@ function New-MergedTranscript {
         @{ Title = "OTGW TELNET DEBUG (telnet.log)";  File = "telnet.log" },
         @{ Title = "MQTT BROKER STREAM (mqtt.log)";   File = "mqtt.log" },
         @{ Title = "MQTT STDERR (mqtt.stderr.log)";   File = "mqtt.stderr.log" },
-        @{ Title = "BROWSER DEVTOOLS (browser.log)";  File = "browser.log" }
+        @{ Title = "BROWSER DEVTOOLS (browser.log)";  File = "browser.log" },
+        @{ Title = "HTTP PROBES (curl-probes.log)";   File = "curl-probes.log" }
     )
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
@@ -597,7 +697,7 @@ function Remove-IntermediateCaptureFiles {
     $transcriptFullPath = [System.IO.Path]::GetFullPath($TranscriptPath)
     $removed = New-Object System.Collections.Generic.List[string]
 
-    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log")) {
+    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log", "curl-probes.log")) {
         $path = Join-Path -Path $RunPath -ChildPath $file
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             continue
@@ -1346,6 +1446,7 @@ $telnetLog = Join-Path -Path $runPath -ChildPath "telnet.log"
 $mqttLog = Join-Path -Path $runPath -ChildPath "mqtt.log"
 $mqttErrorLog = Join-Path -Path $runPath -ChildPath "mqtt.stderr.log"
 $browserLog = Join-Path -Path $runPath -ChildPath "browser.log"
+$httpProbeLog = Join-Path -Path $runPath -ChildPath "curl-probes.log"
 $script:SummaryPath = Join-Path -Path $runPath -ChildPath "summary.txt"
 
 Add-SummaryLine "OTGW MQTT diagnostic capture"
@@ -1584,6 +1685,31 @@ finally {
         if ($browserSummary) {
             Add-SummaryLine $browserSummary
         }
+    }
+
+    # Post-capture HTTP probes: now that telnet/browser/MQTT are torn down, sweep the
+    # device's web endpoints with curl so we can see which respond and which hang.
+    if (-not $SkipHttpProbes) {
+        try {
+            $httpProbePaths = @(
+                '/',                         # root page (chunked index emitter - the suspect)
+                '/index.html',
+                '/index.js',
+                '/api/v2/health',
+                '/api/v2/device/info',       # the real devinfo endpoint (NOT /api/v2/devinfo)
+                '/api/v2/device/time',
+                '/api/v2/flash/status',
+                '/api/v2/sat/status'
+            )
+            Write-Host "Running post-capture HTTP probes (curl) -> curl-probes.log"
+            Invoke-HttpProbes -DeviceHost $DeviceHost -ProbeLog $httpProbeLog -TimeoutSeconds $HttpProbeTimeoutSeconds -Paths $httpProbePaths
+        }
+        catch {
+            Add-SummaryLine "HTTP probes: failed - $($_.Exception.Message)"
+        }
+    }
+    else {
+        Add-SummaryLine "HTTP probes: disabled (-SkipHttpProbes)."
     }
 
     if ($cancelHandler) {

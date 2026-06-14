@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.193
+**  Version  : v2.0.0-alpha.195
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -58,35 +58,34 @@ const char Helper[] PROGMEM =
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
 
-// Serve a static webui asset with versioned long-term caching. When the request carries
-// ?v=<fsHash> matching the current filesystem hash, the URL is immutable for this build,
-// so Cache-Control: max-age lets the browser skip the request entirely on warm reloads.
-// Without a matching ?v (a stale cached index.html, or a direct hit) fall back to
-// no-cache so a reflash is always picked up deterministically. Prefers a pre-gzipped .gz
-// sibling when present (TASK-304); streamFile() emits Content-Encoding: gzip itself from
-// the .gz suffix, so it must NOT be set manually (TASK-433). TASK-822: this generic form
-// replaces the per-asset /index.js + /graph.js copies and the CSS revalidate handler so
-// every JS+CSS asset shares one versioned-cache policy; on the single-connection ESP32
-// WebServer that turns an 8-round-trip reload into ~1 request (index.html revalidate).
+// Serve a static webui asset with ETag-based cache validation (ADR-139). Stable
+// URLs, no ?v= query versioning: the ETag is the filesystem hash, paired with a
+// bounded Cache-Control: max-age. Inside the window the browser serves from cache
+// with no request; once it expires a conditional GET returns 304 when the FS is
+// unchanged (headers only, no body). A reflash changes the hash, so the next
+// revalidation picks up the new build. max-age is the one tunable knob: kept short
+// (60s) so a reflash is visible quickly, traded against a periodic revalidation
+// burst on the single-connection ESP32 server (see ADR-139 / bug-113). Assets are
+// stored as plain readable files on LittleFS (no build-time gzip, maintainer
+// directive); streamed straight from flash via AsyncFileResponse, never buffered
+// whole on the fragmented S3 heap.
 static void serveVersionedAsset(const char* path, const __FlashStringHelper* mime) {
   const char* fsHash = getFilesystemHash();
-  if (hasArgCompat("v") && fsHash[0] != '\0' &&
-      strcmp(argCompat("v"), fsHash) == 0) {
-    webPushHeader(F("Cache-Control"), F("public, max-age=86400"));
-  } else {
-    webPushHeader(F("Cache-Control"), F("no-cache"));
+  if (fsHash && fsHash[0] != '\0') {
+    char etag[24];
+    snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
+    if (hasHeaderCompat(F("If-None-Match")) &&
+        strcmp(headerCompat(F("If-None-Match")), etag) == 0) {
+      webPushHeader(F("Cache-Control"), F("public, max-age=60"));
+      webPushHeader(F("ETag"), etag);
+      webSendStatus(304);
+      return;
+    }
+    webPushHeader(F("ETag"), etag);
   }
-  char gzPath[64];
-  snprintf_P(gzPath, sizeof(gzPath), PSTR("%s.gz"), path);
-  // request->send(LittleFS, ...) streams the file straight from flash on the
-  // async task — the ~39 KB assets never get buffered whole in RAM. The .gz
-  // sibling is served with an explicit Content-Encoding: gzip (TASK-304/433).
-  if (LittleFS.exists(gzPath)) {
-    webSendFile(gzPath, mime, /*gzip=*/true);
-  } else {
-    if (!LittleFS.exists(path)) { webSend(404, F("text/plain"), F("File not found")); return; }
-    webSendFile(path, mime, /*gzip=*/false);
-  }
+  webPushHeader(F("Cache-Control"), F("public, max-age=60"));
+  if (!LittleFS.exists(path)) { webSend(404, F("text/plain"), F("File not found")); return; }
+  webSendFile(path, mime, /*gzip=*/false);
 }
 
 // Serve /FSexplorer.html for the no-index fallback routes (/, /index, /index.html).
@@ -95,135 +94,18 @@ static void sendFSexplorerFallback(AsyncWebServerRequest *request) {
   webSendFile("/FSexplorer.html", F("text/html; charset=UTF-8"), /*gzip=*/false);
 }
 
-// ── Chunked index.html emitter (TASK-865.9) ─────────────────────────────────
-// The ~39 KB index.html is streamed via beginChunkedResponse: ESPAsyncWebServer
-// PULLS bytes through the filler below, so the page is NEVER buffered whole on
-// the fragmented S3 heap (the recorded "do NOT route index.html through
-// AsyncResponseStream" constraint). The filler preserves the exact ?v=<fsHash>
-// versioned-asset injection: it reads index.html line-by-line, rewrites each
-// versioned src=/href= attribute to carry ?v=<hash> before its closing quote,
-// and emits the result. State that must survive across filler calls (the open
-// File, a residual carry buffer for a rewritten line that did not fit the
-// caller's buffer) lives in a heap struct owned by a shared_ptr captured in the
-// filler closure; it is freed when the response (and the closure) is destroyed.
-struct IndexEmitState {
-  File     f;
-  char     carry[640];   // a rewritten line can exceed the source line (?v=<hash> added 8x)
-  size_t   carryLen = 0;
-  size_t   carryPos = 0;
-  bool     done     = false;
-};
-
+// Serve the web UI shell (index.html). ADR-139: the bespoke chunked
+// beginChunkedResponse emitter that rewrote ?v=<fsHash> into asset URLs line by
+// line is retired. The shell is now a plain static file served from flash via
+// AsyncFileResponse with ETag validation, identical to every other asset, so it
+// is never buffered whole on the fragmented S3 heap and shares one cache policy.
 static void sendIndex(AsyncWebServerRequest *request) {
   webBeginRequest(request);
-
   // Auth guard: if a password is configured, require it upfront so the browser
-  // caches credentials before any API calls are made — avoids mid-session popup.
+  // caches credentials before any API call is made (ADR-056), avoiding a
+  // mid-session popup. checkHttpAuth() sends the 401 challenge on failure.
   if (!checkHttpAuth()) return;
-
-  if (!LittleFS.exists("/index.html")) {
-    webSend(404, F("text/plain"), F("File not found"));
-    return;
-  }
-
-  const char* fsHash = getFilesystemHash();
-  const bool  hasHash = (fsHash && fsHash[0] != '\0');
-
-  char etag[24] = {0};
-  if (hasHash) {
-    // ETags must be double-quoted per RFC 7232.
-    snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
-    // Conditional GET: return 304 if the browser's cached copy is still current.
-    if (hasHeaderCompat(F("If-None-Match")) &&
-        strcmp(headerCompat(F("If-None-Match")), etag) == 0) {
-      webPushHeader(F("Cache-Control"), F("no-cache"));
-      webPushHeader(F("ETag"), etag);
-      webSendStatus(304);
-      return;
-    }
-    webPushHeader(F("ETag"), etag);
-  }
-  // no-cache + ETag: browser stores the response but revalidates each visit.
-  webPushHeader(F("Cache-Control"), F("no-cache"));
-
-  auto st = std::make_shared<IndexEmitState>();
-  st->f = LittleFS.open("/index.html", "r");
-  if (!st->f) { webSend(404, F("text/plain"), F("File not found")); return; }
-
-  // The versioned-asset tokens: the full src="..."/href="..." attribute INCLUDING
-  // its closing quote; ?v=<hash> is inserted just before that quote.
-  AsyncWebServerResponse *response = request->beginChunkedResponse(
-    "text/html; charset=UTF-8",
-    [st, fsHash, hasHash](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-      static const char *const toks[8] = {
-        "src=\"./index.js\"",         "src=\"./graph.js\"",
-        "src=\"./sat.js\"",           "src=\"./sat-slider.js\"",
-        "src=\"./echarts-theme.js\"", "src=\"./theme-toggle.js\"",
-        "href=\"ds-tokens.css\"",     "href=\"components.css\""
-      };
-      const size_t hashLen = hasHash ? strlen(fsHash) : 0;
-      size_t written = 0;
-
-      while (written < maxLen) {
-        // Drain any carry left from a previous call first.
-        if (st->carryPos < st->carryLen) {
-          size_t n = st->carryLen - st->carryPos;
-          size_t room = maxLen - written;
-          if (n > room) n = room;
-          memcpy(buffer + written, st->carry + st->carryPos, n);
-          written += n;
-          st->carryPos += n;
-          continue;
-        }
-        if (st->done) break;
-        if (!st->f.available()) { st->done = true; break; }
-
-        // Read one source line into the carry buffer, then rewrite in place.
-        char lineBuf[512];
-        int rd = st->f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
-        lineBuf[rd] = '\0';
-        if (rd > 0 && lineBuf[rd - 1] == '\r') lineBuf[--rd] = '\0';
-
-        // Build the rewritten line in st->carry (with the trailing '\n').
-        size_t c = 0;
-        auto put = [&](const char *s, size_t len) {
-          if (c + len > sizeof(st->carry)) len = sizeof(st->carry) - c;
-          memcpy(st->carry + c, s, len); c += len;
-        };
-        bool injected = false;
-        if (hasHash) {
-          for (uint8_t k = 0; k < 8; k++) {
-            const char *pos = strstr(lineBuf, toks[k]);
-            if (!pos) continue;
-            size_t tlen = strlen(toks[k]);
-            put(lineBuf, (size_t)(pos - lineBuf) + tlen - 1); // prefix + attr without closing quote
-            put("?v=", 3);
-            put(fsHash, hashLen);
-            put("\"", 1);
-            const char *suffix = pos + tlen;
-            put(suffix, strlen(suffix));
-            injected = true;
-            break;
-          }
-        }
-        if (!injected) put(lineBuf, (size_t)rd);
-        put("\n", 1);
-
-        st->carry[c < sizeof(st->carry) ? c : sizeof(st->carry) - 1] = '\0';
-        st->carryLen = c;
-        st->carryPos = 0;
-        feedWatchDog();
-      }
-
-      if (written == 0 && st->done && st->carryPos >= st->carryLen) {
-        st->f.close();
-        return 0;  // end of stream
-      }
-      return written;
-    });
-  webApplyHeaders(response);
-  request->send(response);
-  g_responseSent = true;
+  serveVersionedAsset("/index.html", F("text/html; charset=UTF-8"));
 }
 
 //=====================================================================================
@@ -235,19 +117,19 @@ void startWebserver(){
     server.on("/index",      HTTP_GET, sendFSexplorerFallback);
     server.on("/index.html", HTTP_GET, sendFSexplorerFallback);
   } else {
-    // Serve index.html with ETag-based caching:
-    //  - Browser caches index.html but always revalidates via If-None-Match (ETag = fsHash).
+    // Serve index.html with ETag-based caching (ADR-139):
+    //  - Browser caches within Cache-Control max-age, then revalidates via If-None-Match (ETag = fsHash).
     //  - Unchanged FS → server replies 304 Not Modified (headers only, no body re-download).
     //  - FS upgraded → ETag changes → server replies 200 with fresh content.
-    //  - JS assets use ?v=<fsHash> versioned URLs for independent long-term caching.
+    //  - JS/CSS assets share the same stable-path + ETag policy (no ?v= query versioning).
     server.on("/",           HTTP_GET, sendIndex);
     server.on("/index",      HTTP_GET, sendIndex);
     server.on("/index.html", HTTP_GET, sendIndex);
   }
   server.serveStatic("/FSexplorer.png", LittleFS, "/FSexplorer.png");
 
-  // Versioned long-term caching for every static webui asset (TASK-822). serve
-  // path prefers the pre-gzipped .gz sibling when present (TASK-304/TASK-433).
+  // ETag + bounded max-age caching for every static webui asset (ADR-139). Plain
+  // readable files served from flash via AsyncFileResponse; no gzip, no ?v= query.
   server.on("/index.js",         HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/index.js",         F("application/javascript")); });
   server.on("/graph.js",         HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/graph.js",         F("application/javascript")); });
   server.on("/sat.js",           HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/sat.js",           F("application/javascript")); });

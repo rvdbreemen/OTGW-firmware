@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.193
+**  Version  : v2.0.0-alpha.195
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -286,6 +286,16 @@ inline void webSendP(int code, PGM_P contentType, PGM_P body) {
 // the response). Drains pending headers, sends once.
 inline void webSendFile(const char* path, const char* contentType, bool gzip) {
   if (!currentRequest || g_responseSent) return;
+  // Missing-file guard (ADR-139): beginResponse(LittleFS, <missing>) yields an
+  // invalid-source response that send() turns into a 500 (or a hung connection on
+  // some ESPAsyncWebServer forks), never a clean 404. Check first.
+  if (!LittleFS.exists(path)) {
+    AsyncWebServerResponse* nf = currentRequest->beginResponse(404, String(F("text/plain")), String(F("File not found")));
+    webApplyHeaders(nf);
+    currentRequest->send(nf);
+    g_responseSent = true;
+    return;
+  }
   AsyncWebServerResponse* resp = currentRequest->beginResponse(LittleFS, path, contentType);
   if (gzip) resp->addHeader(F("Content-Encoding"), F("gzip"));
   webApplyHeaders(resp);
@@ -309,10 +319,25 @@ inline void webRequestAuth() {
 // restBeginStream() lazily opens the AsyncResponseStream the restSend* helpers
 // write into; restFinalize() sends it exactly once. Both are no-ops if already
 // done, so an early-return handler that already sent (auth fail etc.) is safe.
+//
+// Initial cbuf size. ESPAsyncWebServer's default is RESPONSE_STREAM_BUFFER_SIZE
+// = 1460 (one TCP MSS); the cbuf auto-grows (realloc + copy) as the response is
+// written. On the ESP8266 a 1-MSS start was forced by the ~40 KB heap. On the
+// ESP32-S3 (327 KB internal RAM) we can start larger so our big JSON endpoints
+// (device/info, otmonitor, BLE roster) serialize in one allocation instead of
+// 2-3 realloc growth steps, which matters because this firmware is sensitive to
+// heap fragmentation (ADR-089 heap tiers). Reference async-ESP32 projects do NOT
+// tune this (EMS-ESP32 uses ArduinoJson + AsyncJsonResponse; OT-Thing uses the
+// 1460 default), so this is a project-specific fragmentation optimization, not a
+// blueprint match. The wire still sends in MSS-sized segments regardless; only
+// the staging buffer changes. AsyncTCP serializes handlers, so only one cbuf of
+// this size is live at a time. Responses larger than this still work (the cbuf
+// grows); the value just covers the common large case in a single alloc.
+#define REST_STREAM_BUFFER_SIZE 4096
 inline AsyncResponseStream* restBeginStream(const char* contentType) {
   if (!currentRequest || g_responseSent) return nullptr;
   if (!g_restStream) {
-    g_restStream = currentRequest->beginResponseStream(contentType);
+    g_restStream = currentRequest->beginResponseStream(contentType, REST_STREAM_BUFFER_SIZE);
     webApplyHeaders(g_restStream);
   }
   return g_restStream;
