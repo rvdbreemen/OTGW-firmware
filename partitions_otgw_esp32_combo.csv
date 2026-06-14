@@ -1,0 +1,20 @@
+# OTGW-firmware ESP32-S3 COMBO partition table — single app (no OTA), 4MB flash
+# The combo target (ADR-127) links BOTH OT engines (PIC OTGWSerial + OTDirect)
+# and boot-detects which to drive, so its binary is larger than the single-engine
+# esp32/esp32-classic builds and overflowed the shared 1.875 MB app slot in
+# partitions_otgw_esp32.csv (101%, 1986399 > 1966080 B). This combo-only table
+# swaps the app/fs split: 2.0 MB app + 1.875 MB LittleFS. The shared table is left
+# UNTOUCHED so OTA upgrades of existing esp32/esp32-classic devices keep their
+# LittleFS at the original 0x1F0000 offset (no filesystem-data corruption).
+# TASK-865.16.
+#
+# 4MB flash layout:
+#   2.0 MB app (ota_0) + 1.875 MB LittleFS (label "spiffs") + 64 KB coredump
+#
+# Bootloader: 0x0 (ESP32-S3 specific — differs from original ESP32 which uses 0x1000)
+# Name,   Type, SubType, Offset,  Size,    Flags
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xE000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x200000,
+spiffs,   data, spiffs,  0x210000,0x1E0000,
+coredump, data, coredump,0x3F0000,0x10000,
