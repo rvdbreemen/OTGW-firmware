@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Date: 2026-06-14.
+Accepted, 2026-06-14. Proposed 2026-06-14; accepted by the maintainer 2026-06-14.
 
 This is the **OTA half of Phase 3** of the 2.0.0 concurrency-model rollout
 (ADR-123), the third and final sub-phase after ADR-132 (HTTP/REST, seq9) and
@@ -24,10 +24,11 @@ health-check redirect) is preserved, and the ADR-011 hardware-watchdog feed
 (I2C `0x26`/`0xA5` per write chunk) is preserved. Only the server-side argument
 plumbing and the upload lifecycle dispatch change.
 
-Status is Proposed: it is the maintainer's checkpoint. Field validation on
-ESP32-S3 hardware (plain `.ino.bin` and merged-binary firmware OTA, filesystem-image
-OTA, the watchdog fed through a multi-MB upload, and the flash-progress WebSocket
-still flowing during the async upload) is still open (see Risks).
+Accepted by the maintainer. Field validation on ESP32-S3 hardware (plain `.ino.bin`
+and merged-binary firmware OTA, filesystem-image OTA, the watchdog fed through a
+multi-MB upload, and the flash-progress WebSocket still flowing during the async
+upload) is still open (see Risks) and is tracked under epic TASK-865, separate from
+this architectural acceptance.
 
 ## Status History
 
@@ -37,6 +38,11 @@ status_history:
     changed_by: Agent
     reason: Document the ADR-123 Phase-3 OTA move (sync HTTPUpload lifecycle to AsyncWebServer onUpload, /update attached once to the shared port-80 server) delivered by TASK-865.11; closes the OTA seam ADR-132 opened; supersedes nothing
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted the Phase-3 OTA upload move onto AsyncWebServer onUpload, closing the OTA seam; carries the ADR-029/ADR-011 flash logic unchanged
+    changed_via: manual
 
 ## Context
 
