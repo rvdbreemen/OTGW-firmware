@@ -1011,6 +1011,12 @@ PR-style summary of what was implemented.
 | Add Final Summary       | `backlog task edit 42 --final-summary "PR-style summary"` |
 | Append Final Summary    | `backlog task edit 42 --append-final-summary "Another detail"` |
 | Clear Final Summary     | `backlog task edit 42 --clear-final-summary` |
+| Add Comment (new v1.46) | `backlog task edit 42 --comment "Review note" --comment-author "@claude"` |
+| Track modified file (new v1.45) | `backlog task edit 42 --modified-file src/OTGW-firmware/MQTTstuff.ino` |
+| Add label (incremental) | `backlog task edit 42 --add-label backend` |
+| Remove label            | `backlog task edit 42 --remove-label api` |
+| Set milestone           | `backlog task edit 42 -m "2.0.0"` |
+| Clear milestone         | `backlog task edit 42 --clear-milestone` |
 
 ---
 
@@ -1338,6 +1344,8 @@ backlog search "bug" --priority high --plain
 | With references  | `backlog task create "Title" --ref src/api.ts --ref https://github.com/issue/123`   |
 | With documentation | `backlog task create "Title" --doc https://design-docs.example.com`               |
 | With all options | `backlog task create "Title" -d "Desc" -a @sara -s "To Do" -l auth --priority high --ref src/api.ts --doc docs/spec.md` |
+| With milestone   | `backlog task create "Title" -m "2.0.0"`                                            |
+| With modified files | `backlog task create "Title" --modified-file src/OTGW-firmware/MQTTstuff.ino`    |
 | Create draft     | `backlog task create "Title" --draft`                                               |
 | Create subtask   | `backlog task create "Title" -p 42`                                                 |
 
@@ -1440,6 +1448,12 @@ Tests:
 | Search with filter | `backlog search "api" --status "To Do" --plain` |
 | Filter by status   | `backlog task list -s "In Progress" --plain` |
 | Filter by assignee | `backlog task list -a @sara --plain`         |
+| Filter by milestone (new v1.40) | `backlog task list -m "2.0.0" --plain` |
+| Filter by priority (new v1.45) | `backlog task list --priority high --plain` |
+| Filter by parent   | `backlog task list -p 865 --plain`           |
+| Sort by priority   | `backlog task list --sort priority --plain`  |
+| Search by file (new v1.45) | `backlog search --modified-file MQTTstuff --plain` |
+| Search with limit  | `backlog search "heap" --limit 10 --plain`   |
 | Archive task       | `backlog task archive 42`                    |
 | Demote to draft    | `backlog task demote 42`                     |
 

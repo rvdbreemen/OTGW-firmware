@@ -2,6 +2,8 @@
 
 Full CLI reference for task management in this project. Read this when you need command details.
 
+> CLI version: **backlog.md v1.46.1** — updated from v1.40.0; notable additions: task comments, modified-file tracking, label management, milestone filter on task list, enhanced search filters.
+
 ---
 
 ## The Golden Rule
@@ -29,7 +31,10 @@ backlog task edit <id> --plan $'1. Analyze\n2. Implement\n3. Test'
 backlog task edit <id> --check-ac 1 --check-ac 2
 backlog task edit <id> --append-notes $'- Completed X\n- Next: Y'
 
-# 5. Finish
+# 5. Record files touched (new v1.45)
+backlog task edit <id> --modified-file src/OTGW-firmware/MQTTstuff.ino
+
+# 6. Finish
 backlog task edit <id> --final-summary "PR description"
 backlog task edit <id> -s Done
 ```
@@ -88,8 +93,12 @@ Historic tasks (closed without Test Plan) should be retrofitted when reopened.
 | Basic | `backlog task create "Title"` |
 | With description | `backlog task create "Title" -d "Description"` |
 | With AC | `backlog task create "Title" --ac "Criterion 1" --ac "Criterion 2"` |
+| With milestone | `backlog task create "Title" -m "2.0.0"` |
+| With priority | `backlog task create "Title" --priority high` |
 | With references | `backlog task create "Title" --ref src/api.ts --ref https://github.com/...` |
+| With modified files | `backlog task create "Title" --modified-file src/OTGW-firmware/MQTTstuff.ino` |
 | With documentation | `backlog task create "Title" --doc https://design-docs.example.com` |
+| With custom order | `backlog task create "Title" --ordinal 5` |
 | Create draft | `backlog task create "Title" --draft` |
 | Create subtask | `backlog task create "Title" -p 42` |
 | No DoD defaults | `backlog task create "Title" --no-dod-defaults` |
@@ -104,13 +113,21 @@ Historic tasks (closed without Test Plan) should be retrofitted when reopened.
 | Edit description | `backlog task edit 42 -d "New description"` |
 | Change status | `backlog task edit 42 -s "In Progress"` |
 | Assign | `backlog task edit 42 -a @claude` |
-| Add labels | `backlog task edit 42 -l backend,api` |
+| Set labels (replace all) | `backlog task edit 42 -l backend,api` |
+| Add label | `backlog task edit 42 --add-label backend` |
+| Remove label | `backlog task edit 42 --remove-label api` |
 | Set priority | `backlog task edit 42 --priority high` |
+| Set milestone | `backlog task edit 42 -m "2.0.0"` |
+| Clear milestone | `backlog task edit 42 --clear-milestone` |
+| Set ordinal | `backlog task edit 42 --ordinal 3` |
 | Add plan | `backlog task edit 42 --plan $'1. Step one\n2. Step two'` |
 | Add notes (replace) | `backlog task edit 42 --notes "What I did"` |
 | Append notes | `backlog task edit 42 --append-notes $'- Did X\n- Did Y'` |
 | Add final summary | `backlog task edit 42 --final-summary "PR description"` |
 | Append final summary | `backlog task edit 42 --append-final-summary "More details"` |
+| Add comment (new v1.46) | `backlog task edit 42 --comment "Review note"` |
+| Add comment with author | `backlog task edit 42 --comment "Note" --comment-author "@claude"` |
+| Track modified file (new v1.45) | `backlog task edit 42 --modified-file src/OTGW-firmware/MQTTstuff.ino` |
 | Add dependencies | `backlog task edit 42 --dep task-1 --dep task-2` |
 
 ---
@@ -163,6 +180,41 @@ The rule of thumb: if a reviewer looking at your commit a year later can't tell 
 
 ---
 
+## Task Comments (new v1.46)
+
+Comments are timestamped entries appended to a task, separate from implementation notes. Use for review feedback, field observations, or async coordination.
+
+```bash
+# Append a comment
+backlog task edit 42 --comment "Field test passed on LOLIN S3 Mini, log_e visible on USB CDC."
+
+# Comment with explicit author
+backlog task edit 42 --comment "Needs AC3 field validation." --comment-author "@sergeantd"
+
+# Multiple comments in one call
+backlog task edit 42 --comment "First note" --comment "Second note"
+```
+
+Comments appear in the task file under a `## Comments` section and are visible in `backlog task 42 --plain`.
+
+---
+
+## Modified File Tracking (new v1.45)
+
+Record which source files a task touches. Enables file-based search across tasks.
+
+```bash
+# During or after implementation
+backlog task edit 42 --modified-file src/OTGW-firmware/MQTTstuff.ino
+backlog task edit 42 --modified-file src/OTGW-firmware/MQTTHaDiscovery.cpp
+
+# Search tasks by file (useful for "what tasks touched this file?")
+backlog search --modified-file MQTTstuff --plain
+backlog search --modified-file platform.h --plain
+```
+
+---
+
 ## Viewing and Searching
 
 | Action | Command |
@@ -171,9 +223,17 @@ The rule of thumb: if a reviewer looking at your commit a year later can't tell 
 | List tasks | `backlog task list --plain` |
 | Filter by status | `backlog task list -s "In Progress" --plain` |
 | Filter by assignee | `backlog task list -a @claude --plain` |
+| Filter by milestone | `backlog task list -m "2.0.0" --plain` |
+| Filter by priority | `backlog task list --priority high --plain` |
+| Filter by parent | `backlog task list -p 865 --plain` |
+| Sort by priority | `backlog task list --sort priority --plain` |
+| Sort by id | `backlog task list --sort id --plain` |
 | Search | `backlog search "auth" --plain` |
-| Search in tasks only | `backlog search "login" --type task --plain` |
+| Search tasks only | `backlog search "login" --type task --plain` |
 | Search with status | `backlog search "api" --status "To Do" --plain` |
+| Search by priority | `backlog search "mqtt" --priority high --plain` |
+| Search by file | `backlog search --modified-file MQTTstuff.ino --plain` |
+| Limit results | `backlog search "heap" --limit 10 --plain` |
 | Archive | `backlog task archive 42` |
 
 **Known bug:** `backlog task list` sometimes returns empty. Use `backlog task <id> --plain` or read `backlog/tasks/` directly as a fallback.
@@ -193,7 +253,7 @@ backlog task edit 42 --final-summary $'Implemented X.\n\nChanges:\n- Added Y\n- 
 # POSIX portable
 backlog task edit 42 --notes "$(printf 'Line1\nLine2')"
 
-# PowerShell
+# PowerShell (shell completion available via: backlog completion powershell)
 backlog task edit 42 --notes "Line1`nLine2"
 ```
 
@@ -227,3 +287,4 @@ No breaking changes to MQTT topics or REST API.
 | AC won't check | `backlog task 42 --plain` to see correct AC index numbers |
 | Changes not saving | Ensure using CLI, not editing files directly |
 | Metadata out of sync | Re-edit via CLI: `backlog task edit 42 -s <current-status>` |
+| Label replace vs add | `-l` replaces all labels; use `--add-label`/`--remove-label` for incremental changes |
