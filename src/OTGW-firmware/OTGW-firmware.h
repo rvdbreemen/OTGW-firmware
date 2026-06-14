@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.188
+**  Version  : v2.0.0-alpha.189
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -79,9 +79,18 @@ OTGWSerial OTGWSerial(PICRST, LED2, PIN_PIC_RX, PIN_PIC_TX);
 #endif
 void fwupgradestart(const char *hexfile);
 void handlePendingUpgrade();
+// TASK-865.14: handlePendingPicHttp() is only invoked from loop() inside #if HAS_PIC,
+// so its declaration belongs here with the other PIC-only loop hooks.
+void handlePendingPicHttp();
 #endif
 
 String checkforupdatepic(String filename);
+// TASK-865.14: the queue entry points are referenced from the always-compiled
+// REST handler (sendPICUpdateCheck) and upgradepic(), so they are declared
+// unconditionally — mirroring checkforupdatepic above. The definitions live under
+// #if HAS_PIC in OTGW-Core.ino (the call sites are runtime-gated by isPICEnabled()).
+bool queuePicUpdateCheck();
+bool queuePicRefresh(const char *filename, const char *version);
 
 #if HAS_DIRECT_OT
 enum class OpenThermResponseStatus : byte;

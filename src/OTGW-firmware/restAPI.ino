@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.188
+**  Version  : v2.0.0-alpha.189
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2709,24 +2709,49 @@ void sendPICUpdateCheck()
 {
   // On-demand PIC firmware update check.
   // Only called when the user opens the PIC firmware tab — never on a timer.
-  // Makes an outbound HTTP HEAD request to otgw.tclcode.com.
-  String latest = "";
-  if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) != 0 && state.pic.sDeviceid[0] != '\0') {
-    String picFile;
-    if (strcmp_P(state.pic.sType, PSTR("diagnose")) == 0) {
-      picFile = F("diagnose.hex");
-    } else if (strcmp_P(state.pic.sType, PSTR("interface")) == 0) {
-      picFile = F("interface.hex");
-    } else {
-      picFile = F("gateway.hex");
-    }
-    latest = checkforupdatepic(picFile);
+  //
+  // TASK-865.14: the outbound HTTP HEAD to otgw.tclcode.com is BLOCKING and this
+  // handler runs on the AsyncTCP task (ADR-132). Running it here froze all HTTP +
+  // the ADR-133 WebSocket for the request's duration. Instead this endpoint is a
+  // pure STATUS QUERY: it kicks a fresh check only from the IDLE state and returns
+  // the cached result + a status flag. The loop()-context worker
+  // (handlePendingPicHttp) performs the outbound HTTP. The frontend re-polls while
+  // status=="checking".
+  //
+  // The result is sticky for the rest of this boot once it lands (READY/ERROR), so
+  // a plain poll never re-hits the server. To force a fresh outbound check (the
+  // original "re-check on every tab open" behaviour) the caller passes ?recheck=1,
+  // which resets the cache to IDLE so the kick below re-queues exactly one check.
+  bool havePic = (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) != 0 && state.pic.sDeviceid[0] != '\0');
+
+  if (havePic && hasArgCompat("recheck") && state.pic.iUpdateCheck != PIC_UPDATE_CHECKING) {
+    state.pic.iUpdateCheck = PIC_UPDATE_IDLE;   // explicit re-check request
   }
-  bool updateAvailable = (latest.length() > 0 && latest != String(state.pic.sFwversion));
+
+  // Kick off a fresh check only from IDLE. queuePicUpdateCheck() flips the state to
+  // CHECKING (and is a no-op returning false if a PIC HTTP job is already pending),
+  // so READY and ERROR are both stable and reportable below — no re-queue per poll.
+  if (havePic && state.pic.iUpdateCheck == PIC_UPDATE_IDLE) {
+    queuePicUpdateCheck();
+  }
+
+  const char *latest = (state.pic.iUpdateCheck == PIC_UPDATE_READY) ? state.pic.sLatestFw : "";
+  bool updateAvailable = (state.pic.iUpdateCheck == PIC_UPDATE_READY &&
+                          latest[0] != '\0' &&
+                          strcmp(latest, state.pic.sFwversion) != 0);
+
+  // status: "ready" | "checking" | "error" | "unavailable"
+  const char *status;
+  if (!havePic)                                         status = "unavailable";
+  else if (state.pic.iUpdateCheck == PIC_UPDATE_READY)  status = "ready";
+  else if (state.pic.iUpdateCheck == PIC_UPDATE_ERROR)  status = "error";
+  else                                                  status = "checking";
+
   sendStartJsonMap(F("pic_update"));
   sendJsonMapEntry(F("current"), state.pic.sFwversion);
-  sendJsonMapEntry(F("latest"), latest.c_str());
+  sendJsonMapEntry(F("latest"), latest);
   sendJsonMapEntry(F("update_available"), updateAvailable);
+  sendJsonMapEntry(F("status"), status);
   sendEndJsonMap(F("pic_update"));
 } // sendPICUpdateCheck()
 

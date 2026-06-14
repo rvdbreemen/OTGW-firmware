@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : PICtypes.h
-**  Version  : v2.0.0-alpha.188
+**  Version  : v2.0.0-alpha.189
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -19,11 +19,30 @@
 
 #include <Arduino.h>
 
+// TASK-865.14: state of the deferred (loop-context) PIC firmware update-check.
+// The outbound HTTP HEAD to otgw.tclcode.com is no longer run on the AsyncTCP
+// task; the async handler queues a check and the loop() worker fills these in.
+// Values are small ints so the struct stays POD and ADR-004 char[]-only.
+enum PicUpdateCheck : uint8_t {
+  PIC_UPDATE_IDLE     = 0,  // no check requested / result consumed
+  PIC_UPDATE_CHECKING = 1,  // queued or in flight on the loop worker
+  PIC_UPDATE_READY    = 2,  // sLatestFw holds a fresh result
+  PIC_UPDATE_ERROR    = 3,  // last check failed (host unreachable / non-200)
+};
+
 struct PICSection {            // state.pic — PIC microcontroller identity/status
   bool bAvailable     = false;           // was bPICavailable
   char sFwversion[32] = "no pic found";  // was sPICfwversion
   char sDeviceid[32]  = "no pic found";  // was sPICdeviceid
   char sType[32]      = "no pic found";  // was sPICtype
+
+  // TASK-865.14: deferred update-check result cache. Written by the loop()-context
+  // worker (handlePendingPicHttp) and read by the AsyncTCP REST handler
+  // (sendPICUpdateCheck) with no barrier. This is intentionally eventual-consistent:
+  // a torn read just yields one extra "checking" poll and self-heals on the next
+  // one — same pattern as the accepted pendingUpgradePath single-slot bridge.
+  char    sLatestFw[32]    = "";                 // latest version from the server ("" until first OK check)
+  uint8_t iUpdateCheck     = PIC_UPDATE_IDLE;    // PicUpdateCheck state
 };
 
 struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands

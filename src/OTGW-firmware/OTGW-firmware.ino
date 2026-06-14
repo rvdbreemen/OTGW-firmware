@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.188
+**  Version  : v2.0.0-alpha.189
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -892,6 +892,7 @@ void loop()
     weatherLoop();                    // Weather data fetch (timer-guarded, Task #50)
 #if HAS_PIC
     handlePendingUpgrade();           // Check if we need to start an upgrade
+    handlePendingPicHttp();           // TASK-865.14: run deferred PIC update-check/refresh outbound HTTP off the AsyncTCP task
 #endif
     loopOLED();                       // OLED display refresh and button handling (no-op if no OLED detected)
   }

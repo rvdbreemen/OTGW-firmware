@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.188
+**  Version  : v2.0.0-alpha.189
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5189,6 +5189,14 @@ void applyLegacyPort25238Setting()
 
 //---------[ Upgrade PIC stuff taken from Schelte Bron's NodeMCU Firmware ]---------
 #if HAS_PIC
+// TASK-865.14: bounds on the deferred outbound HTTPClient calls. These now run from
+// loop() context under the 30s ESP32 TWDT (ADR-135). The connect + HEAD read use a
+// 5s cap so the unreachable-host worst case stays well under the window; the refresh
+// GET body uses a larger 15s read cap (a full-hex download needs room on a slow link)
+// while still leaving generous TWDT headroom.
+static const uint16_t PIC_HTTP_TIMEOUT_MS          = 5000;
+static const uint16_t PIC_HTTP_DOWNLOAD_TIMEOUT_MS = 15000;
+
 void upgradepicnow(const char *filename) {
   if (!isPICEnabled()) {
     DebugTln(F("PIC upgrade rejected: no PIC detected"));
@@ -5464,11 +5472,19 @@ String checkforupdatepic(String filename){
   // Security note: download is over unencrypted HTTP; ensure device is on a
   // trusted local network and is not reachable from untrusted networks.
   http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
+  // TASK-865.14: this runs in loop() context (deferred off the AsyncTCP task) and
+  // loop() is subscribed to the 30s ESP32 TWDT (ADR-135). Bound the connect+read
+  // timeouts so an unreachable host (the AC#5 worst case) costs ~5s, not a full
+  // default stack timeout, and stays comfortably under the watchdog window.
+  http.setConnectTimeout(PIC_HTTP_TIMEOUT_MS);
+  http.setTimeout(PIC_HTTP_TIMEOUT_MS);
   char useragent[40] = "esp8266-otgw-firmware/";
   strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
   http.setUserAgent(useragent);
   http.collectHeaders(hexheaders, 2);
+  feedWatchDog();              // before the blocking call
   code = http.sendRequest("HEAD");
+  feedWatchDog();              // and after, before header iteration
   if (code == HTTP_CODE_OK) {
     for (int i = 0; i< http.headers(); i++) {
       DebugTf(PSTR("%s: %s\r\n"), hexheaders[i], http.header(i).c_str());
@@ -5495,16 +5511,27 @@ void refreshpic(String filename, String version) {
     OTDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), state.pic.sDeviceid, filename.c_str(), version.c_str(), latest.c_str());
     OTDebugTln(F("NOTE: PIC firmware is downloaded over plain HTTP (no TLS); ensure device is on a trusted local network."));
     http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
+    // TASK-865.14: bounded timeouts — deferred to loop() context, under the 30s TWDT.
+    // The connect bound stays at the 5s HEAD value, but the read bound is larger
+    // here: this GET streams a full Intel-HEX (~30-60 KB) to LittleFS, so a tight
+    // 5s read could truncate it on a slow link (validateIntelHex would then discard
+    // it). PIC_HTTP_DOWNLOAD_TIMEOUT_MS (15s) gives the body room while staying well
+    // under the watchdog window.
+    http.setConnectTimeout(PIC_HTTP_TIMEOUT_MS);
+    http.setTimeout(PIC_HTTP_DOWNLOAD_TIMEOUT_MS);
     char useragent[40] = "esp8266-otgw-firmware/";
     strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
     http.setUserAgent(useragent);
+    feedWatchDog();            // before the blocking GET
     code = http.GET();
+    feedWatchDog();            // and after, before the stream write
     if (code == HTTP_CODE_OK) {
       String hexpath = "/" + String(state.pic.sDeviceid) + "/" + filename;
       File f = LittleFS.open(hexpath, "w");
       if (f) {
         http.writeToStream(&f);
         f.close();
+        feedWatchDog();        // after writing the full hex to LittleFS
         // Validate the downloaded file is a well-formed Intel HEX before accepting it.
         // This rejects truncated or non-HEX responses that could corrupt the PIC.
         if (!validateIntelHex(hexpath.c_str())) {
@@ -5541,6 +5568,81 @@ void handlePendingUpgrade() {
   DebugTln(F("Deferred upgrade initiated, upgrade now runs in background"));
   DebugTln(F("Monitor progress via telnet or WebUI"));
   DebugTln(F("======================================="));
+}
+
+// --- Deferred PIC outbound-HTTP logic (TASK-865.14, ADR-132 amendment) ---
+//
+// checkforupdatepic()/refreshpic() make BLOCKING outbound HTTPClient calls to
+// http://otgw.tclcode.com. Under ADR-132 the web stack runs every handler on the
+// single AsyncTCP service task, so calling them from an async handler froze ALL
+// HTTP + the ADR-133 WebSocket for the request's duration (worst case: the full
+// DNS/connect timeout when the host is unreachable). This mirrors the existing
+// handlePendingUpgrade() bridge: the async handler validates + QUEUES the job and
+// returns immediately; this loop()-context worker performs the HTTPClient work.
+//
+// One single-flight slot. A second request while a job is queued/in-flight is
+// rejected at the queue functions below (they return false), so the slot is never
+// silently overwritten and the two outbound calls never overlap.
+enum class PicHttpJob : uint8_t { None, UpdateCheck, Refresh };
+static PicHttpJob pendingPicHttpJob = PicHttpJob::None;
+static char       pendingPicFile[64] = {0};   // refresh: hex filename
+static char       pendingPicVer[32]  = {0};   // refresh: current on-disk version
+
+// queuePicUpdateCheck — request an outbound HEAD update-check from loop() context.
+// Returns false (and changes nothing) if a PIC HTTP job is already pending.
+bool queuePicUpdateCheck() {
+  if (pendingPicHttpJob != PicHttpJob::None) return false;
+  pendingPicHttpJob = PicHttpJob::UpdateCheck;
+  state.pic.iUpdateCheck = PIC_UPDATE_CHECKING;
+  return true;
+}
+
+// queuePicRefresh — request an outbound GET+download of `filename` from loop()
+// context. Returns false if a PIC HTTP job is already pending.
+bool queuePicRefresh(const char *filename, const char *version) {
+  if (pendingPicHttpJob != PicHttpJob::None) return false;
+  if (filename == nullptr || filename[0] == '\0') return false;
+  strlcpy(pendingPicFile, filename, sizeof(pendingPicFile));
+  strlcpy(pendingPicVer,  version ? version : "", sizeof(pendingPicVer));
+  pendingPicHttpJob = PicHttpJob::Refresh;
+  return true;
+}
+
+void handlePendingPicHttp() {
+  if (pendingPicHttpJob == PicHttpJob::None) return;
+  // Snapshot + clear the slot first so a re-entrant doBackgroundTasks() (via
+  // doAutoConfigure's file-reading loop) cannot re-dispatch the same job.
+  const PicHttpJob job = pendingPicHttpJob;
+  pendingPicHttpJob = PicHttpJob::None;
+
+  if (job == PicHttpJob::UpdateCheck) {
+    DebugTln(F("=== Deferred PIC update-check (outbound HEAD) ==="));
+    String picFile;
+    if (strcmp_P(state.pic.sType, PSTR("diagnose")) == 0) {
+      picFile = F("diagnose.hex");
+    } else if (strcmp_P(state.pic.sType, PSTR("interface")) == 0) {
+      picFile = F("interface.hex");
+    } else {
+      picFile = F("gateway.hex");
+    }
+    String latest = checkforupdatepic(picFile);
+    if (latest.length() > 0) {
+      strlcpy(state.pic.sLatestFw, latest.c_str(), sizeof(state.pic.sLatestFw));
+      state.pic.iUpdateCheck = PIC_UPDATE_READY;
+      DebugTf(PSTR("Update-check result: %s\r\n"), state.pic.sLatestFw);
+    } else {
+      state.pic.iUpdateCheck = PIC_UPDATE_ERROR;
+      DebugTln(F("Update-check failed (host unreachable or non-200)"));
+    }
+  } else if (job == PicHttpJob::Refresh) {
+    DebugTf(PSTR("=== Deferred PIC refresh (outbound GET): %s ===\r\n"), pendingPicFile);
+    // refreshpic still takes String args; the implicit String(const char*) ctor at
+    // the call site keeps the change scoped to this worker.
+    refreshpic(pendingPicFile, pendingPicVer);
+    pendingPicFile[0] = '\0';
+    pendingPicVer[0]  = '\0';
+    DebugTln(F("Deferred refresh complete"));
+  }
 }
 
 void upgradepic(AsyncWebServerRequest *request) {
@@ -5590,9 +5692,19 @@ void upgradepic(AsyncWebServerRequest *request) {
     return;
   } else if (strcmp_P(action, PSTR("refresh")) == 0) {
     DebugTf(PSTR("Refresh %s/%s\r\n"), state.pic.sDeviceid, filename);
-    // refreshpic still takes String args; the implicit String(const char*)
-    // ctor at the call site keeps the change scoped to this handler.
-    refreshpic(filename, version);
+    // TASK-865.14: refreshpic() does a BLOCKING outbound GET + writeToStream of a
+    // full hex to LittleFS. This handler runs on the AsyncTCP task (ADR-132), so
+    // do NOT run it here. Queue the download for the loop() worker
+    // (handlePendingPicHttp) and return immediately, mirroring the action=upgrade
+    // deferral above. The frontend polls firmware/files until the version changes.
+    if (queuePicRefresh(filename, version)) {
+      DebugTln(F("Refresh queued for loop() context"));
+      webSendP(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
+    } else {
+      DebugTln(F("Refresh rejected: a PIC HTTP job is already pending"));
+      webSendP(409, PSTR("application/json"), PSTR("{\"status\":\"busy\"}"));
+    }
+    return;
   } else if (strcmp_P(action, PSTR("delete")) == 0) {
     DebugTf(PSTR("Delete %s/%s\r\n"), state.pic.sDeviceid, filename);
     char path[64];

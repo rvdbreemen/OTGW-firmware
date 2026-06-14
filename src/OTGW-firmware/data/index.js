@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.188
+**  Version  : v2.0.0-alpha.189
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4722,17 +4722,15 @@ function refreshFirmware() {
           e.preventDefault();
           refreshImg.style.opacity = '0.5';
           refreshImg.style.cursor = 'wait';
+          // TASK-865.14: /pic?action=refresh now QUEUES the outbound download and
+          // returns {"status":"started"} immediately (the GET+writeToStream runs in
+          // loop() context, off the AsyncTCP task per the ADR-132 amendment). The
+          // new version is therefore NOT on disk when this response resolves, so we
+          // poll firmware/files until the version changes (or give up after a cap).
           fetch(localURL + '/pic?action=refresh&name=' + refreshName + '&version=' + refreshVersion)
-            .then(function() { return fetch(APIGW + "v2/firmware/files"); })
-            .then(function(r) { return r.json(); })
-            .then(function(updatedFiles) {
-              var entry = updatedFiles.find(function(f) { return f.name === refreshName; });
-              if (entry) {
-                var versionEl = document.getElementById('firmware_version_' + refreshName);
-                if (versionEl) versionEl.textContent = entry.version;
-              }
-              refreshImg.style.opacity = '';
-              refreshImg.style.cursor = '';
+            .then(function(r) {
+              if (r.status === 409) throw new Error('busy');   // another PIC HTTP job in flight
+              pollPICRefresh(refreshName, refreshVersion, refreshImg, 0);
             })
             .catch(function(err) {
               console.error('Refresh failed:', err);
@@ -4800,33 +4798,12 @@ function refreshFirmware() {
       // Populate gateway settings now that the container exists
       refreshPICsettings();
 
-      // Fire off the on-demand update check — makes an outbound call so may take a moment
-      fetch(APIGW + "v2/pic/update-check")
-        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-        .then(function(data) {
-          var pu = data && data.pic_update;
-          var banner = document.getElementById('pic-update-banner');
-          if (!banner || !pu) return;
-          if (pu.update_available) {
-            banner.className = 'pic-update-banner update-available';
-            banner.textContent = 'New PIC firmware available: ' + pu.current + ' \u2192 ' + pu.latest + '. Click \u21ba to download, then \u2193 to flash.';
-            var verSpan = document.getElementById('pic_version_display');
-            if (verSpan) verSpan.className = 'pic-version-outdated';
-          } else if (pu.latest) {
-            banner.className = 'pic-update-banner up-to-date';
-            banner.textContent = 'PIC firmware is up to date (' + pu.current + ')';
-          } else {
-            banner.className = 'pic-update-banner checking';
-            banner.textContent = 'Could not check for updates';
-          }
-        })
-        .catch(function() {
-          var banner = document.getElementById('pic-update-banner');
-          if (banner) {
-            banner.className = 'pic-update-banner checking';
-            banner.textContent = 'Could not check for updates';
-          }
-        });
+      // Fire off the on-demand update check.
+      // TASK-865.14: the firmware now DEFERS the outbound HEAD off the AsyncTCP
+      // task (ADR-132 amendment), so the first response may carry status
+      // "checking" with no result yet. pollPICUpdateCheck re-polls until the
+      // loop() worker reports "ready"/"error" (or after a few attempts gives up).
+      pollPICUpdateCheck(0);
 
     })
     .catch(function (error) {
@@ -4837,6 +4814,96 @@ function refreshFirmware() {
     });
 
 
+}
+
+//============================================================================
+// TASK-865.14: poll the deferred PIC update-check.
+// The firmware queues the outbound HEAD off the AsyncTCP task (ADR-132 amendment)
+// and reports a "status" field: "checking" (still running on the loop worker),
+// "ready" (latest version resolved), "error" (host unreachable / non-200), or
+// "unavailable" (no PIC detected). While "checking" we re-poll a few times with a
+// short backoff; after the cap we leave the banner on the last message instead of
+// hanging the UI. The outbound HTTP itself never runs on the network task, so the
+// live-log WebSocket keeps flowing throughout.
+function pollPICUpdateCheck(attempt) {
+  var MAX_ATTEMPTS = 6;        // ~6 * 1.5s ≈ 9s, comfortably over the 5s HTTP cap
+  var RETRY_MS = 1500;
+  // First call forces a fresh outbound check (?recheck=1 resets the server cache to
+  // IDLE so it re-queues once — preserves the original "check on every tab open").
+  // Re-polls are pure status queries that read the in-flight/cached result.
+  var url = APIGW + "v2/pic/update-check" + (attempt === 0 ? "?recheck=1" : "");
+  fetch(url)
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+    .then(function(data) {
+      var pu = data && data.pic_update;
+      var banner = document.getElementById('pic-update-banner');
+      if (!banner || !pu) return;
+
+      // Still running on the loop worker — re-poll until ready/error or the cap.
+      if (pu.status === 'checking') {
+        if (attempt < MAX_ATTEMPTS) {
+          banner.className = 'pic-update-banner checking';
+          banner.textContent = 'Checking for update…';
+          setTimeout(function() { pollPICUpdateCheck(attempt + 1); }, RETRY_MS);
+          return;
+        }
+        // Gave up waiting — fall through to the "could not check" message below.
+      }
+
+      if (pu.update_available) {
+        banner.className = 'pic-update-banner update-available';
+        banner.textContent = 'New PIC firmware available: ' + pu.current + ' → ' + pu.latest + '. Click ↺ to download, then ↓ to flash.';
+        var verSpan = document.getElementById('pic_version_display');
+        if (verSpan) verSpan.className = 'pic-version-outdated';
+      } else if (pu.status === 'ready' && pu.latest) {
+        banner.className = 'pic-update-banner up-to-date';
+        banner.textContent = 'PIC firmware is up to date (' + pu.current + ')';
+      } else {
+        banner.className = 'pic-update-banner checking';
+        banner.textContent = 'Could not check for updates';
+      }
+    })
+    .catch(function() {
+      var banner = document.getElementById('pic-update-banner');
+      if (banner) {
+        banner.className = 'pic-update-banner checking';
+        banner.textContent = 'Could not check for updates';
+      }
+    });
+}
+
+//============================================================================
+// TASK-865.14: poll firmware/files after a deferred PIC refresh download.
+// The refresh download runs in loop() context, so the new on-disk version is not
+// available the instant /pic?action=refresh returns. Re-poll firmware/files until
+// the listed version differs from the pre-refresh value (download finished) or the
+// attempt cap is hit, then restore the icon either way. The download is bounded by
+// the firmware-side 5s HTTP timeout, so a handful of 1.5s polls covers it.
+function pollPICRefresh(name, oldVersion, iconEl, attempt) {
+  // Budget must exceed the firmware download worst case (~5s connect + 15s read =
+  // PIC_HTTP_DOWNLOAD_TIMEOUT_MS) so the spinner does not stop before the version
+  // updates: 16 * 1.5s = 24s > 20s.
+  var MAX_ATTEMPTS = 16;
+  var RETRY_MS = 1500;
+  fetch(APIGW + "v2/firmware/files")
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+    .then(function(updatedFiles) {
+      var entry = updatedFiles.find(function(f) { return f.name === name; });
+      var changed = entry && entry.version && entry.version !== oldVersion;
+      if (!changed && attempt < MAX_ATTEMPTS) {
+        setTimeout(function() { pollPICRefresh(name, oldVersion, iconEl, attempt + 1); }, RETRY_MS);
+        return;
+      }
+      if (entry) {
+        var versionEl = document.getElementById('firmware_version_' + name);
+        if (versionEl) versionEl.textContent = entry.version;
+      }
+      if (iconEl) { iconEl.style.opacity = ''; iconEl.style.cursor = ''; }
+    })
+    .catch(function(err) {
+      console.error('Refresh poll failed:', err);
+      if (iconEl) { iconEl.style.opacity = ''; iconEl.style.cursor = ''; }
+    });
 }
 
 
