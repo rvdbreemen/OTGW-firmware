@@ -443,6 +443,16 @@ inline bool platformQueueSend(PlatformQueue q, const void *item) {
   return xQueueSend(q, item, 0) == pdTRUE;
 }
 
+// Non-blocking send to the FRONT of the queue (copy `item` ahead of every item
+// already queued). Returns false if the queue is full or the handle is null.
+// Used to restore FIFO order after a flow-control short write: the popped chunk
+// is put back at the head so it is the next thing written, never reordered
+// behind chunks that were enqueued after it (TASK-865.15 TX-ordering invariant).
+inline bool platformQueueSendToFront(PlatformQueue q, const void *item) {
+  if (q == nullptr) return false;
+  return xQueueSendToFront(q, item, 0) == pdTRUE;
+}
+
 // Sentinel for platformQueueReceive: block indefinitely until an item arrives
 // (FreeRTOS portMAX_DELAY). An event-consumer task that idles with zero CPU
 // between events (e.g. the webhook sender task, TASK-865.13) passes this instead

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.189
+**  Version  : v2.0.0-alpha.190
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -517,6 +517,16 @@ void drainOTFrameQueue() {
 // FreeRTOS PIC-UART task. See the header for the full design rationale.
 PlatformQueue otTxQueue = nullptr;            // raw-byte loop->task TX queue
 
+// TASK-865.15: loop-side park request for the resetPic() direct UART write.
+// resetPic() (vendored OTGWSerial.cpp) writes "GW=R\r" straight to the UART and
+// toggles the reset GPIO with a delay(100); it bypasses otTxQueue and is not
+// gated by any park condition. resetOTGW() raises this flag so the PIC task
+// parks (releases the UART) for the duration of the direct write, avoiding a
+// second concurrent UART owner. Declared UNCONDITIONALLY (not under #if HAS_PIC)
+// because picSerialTaskShouldPark() — which reads it — is itself compiled on
+// every build (incl. HAS_PIC==0), and resetOTGW() is a no-op there anyway.
+static volatile bool g_picResetInProgress = false;
+
 #if HAS_PIC
 static PlatformTask    g_picSerialTask  = nullptr;  // dedicated PIC-UART task handle
 static volatile bool   g_picTaskParked  = false;    // task->loop park acknowledgement
@@ -648,9 +658,13 @@ void picSerialDrainOnce() {
       OTGWSerial.write(tx.bytes, tx.len);
       OTGWSerial.flush();
     } else {
-      // Re-queue at the back and stop draining this pass; preserves order
-      // because only the task pops, and we stop after the first short write.
-      platformQueueSend(otTxQueue, &tx);
+      // TX buffer can't take this chunk this pass. Re-queue it to the FRONT and
+      // stop draining: the loop-side ser2net relay (enqueuePICTx, 1 byte each)
+      // can enqueue concurrently between our pop and re-queue, so a re-queue to
+      // the BACK would let a relay byte jump ahead of this popped chunk and
+      // interleave a command's bytes (TASK-865.15). Sending to front keeps the
+      // popped chunk as the next thing written, preserving strict FIFO order.
+      platformQueueSendToFront(otTxQueue, &tx);
       break;
     }
     feedWatchDog();
@@ -713,7 +727,11 @@ static void picSerialTaskBody(void *arg) {
 // from a file and flushes the live UART loop-side (picSerialFlushRx), so the
 // task must not drain it concurrently.
 bool picSerialTaskShouldPark() {
-  return isOTDirectEnabled() || isFlashing() || state.debug.bOTGWSimulation;
+  // g_picResetInProgress parks the task during resetOTGW()'s direct GW=R write
+  // (TASK-865.15), so the loop-side reset is never a second concurrent UART
+  // owner alongside the task drain.
+  return isOTDirectEnabled() || isFlashing() || state.debug.bOTGWSimulation
+         || g_picResetInProgress;
 }
 
 // startPICSerialTask — create the dedicated PIC task once (ADR-044). On a no-PIC
@@ -819,7 +837,19 @@ static void appendProgmemSuffix(char *dst, size_t dstSize, PGM_P suffix)
 void resetOTGW() {
   if (!isPICEnabled()) return;
   scheduleOTGWStartupQuietPeriod();
+  // TASK-865.15: resetPic() does a direct UART write of "GW=R\r" + a reset-GPIO
+  // toggle (delay(100)), bypassing otTxQueue. The ser2net GW=R path and the MQTT
+  // resetgateway command both call this loop-side WHILE THE PIC TASK IS UNPARKED
+  // (reset flips no other park condition), making the loop a second concurrent
+  // UART owner. Park the task for the duration so the direct write has the UART
+  // to itself. The GPIO toggle + delay live in the vendored resetPic(), so we
+  // cannot queue it; parking the task is the in-scope fix. At boot resetOTGW()
+  // runs before startPICSerialTask(), so waitForPICTaskParked() returns
+  // immediately (no task yet) and this adds no startup latency.
+  g_picResetInProgress = true;
+  waitForPICTaskParked();
   OTGWSerial.resetPic();
+  g_picResetInProgress = false;
 }
 
 /*
@@ -829,8 +859,20 @@ void resetOTGW() {
 void detectPIC(){
   OTGWSerial.registerFirmwareCallback(fwreportinfo); //register the callback to report version, type en device ID
   scheduleOTGWStartupQuietPeriod();
+  // TASK-865.15: detectPIC drives the UART directly twice in a row outside the
+  // task-owner functions — resetPic() (direct GW=R write) and find(ETX) (an
+  // inherited Stream read loop = concurrent UART byte-I/O). At boot both run
+  // before startPICSerialTask() so there is no task to race, but the manual 'p'
+  // telnet command reaches detectPIC() at runtime while the PIC task is unparked,
+  // making the loop a second concurrent UART owner for the whole reset+probe.
+  // Park the task for the entire span (same flag resetOTGW() uses) so the direct
+  // write AND the ETX read have the UART to themselves. waitForPICTaskParked()
+  // returns immediately at boot (no task yet), so this adds no startup latency.
+  g_picResetInProgress = true;
+  waitForPICTaskParked();
   OTGWSerial.resetPic(); // make sure it the firmware is detected
   state.pic.bAvailable = OTGWSerial.find(ETX);
+  g_picResetInProgress = false;
   if (state.pic.bAvailable) {
       state.hw.eMode = HW_MODE_PIC;
       DebugTln(F("ETX found after reset: Pic detected!"));
@@ -3658,6 +3700,13 @@ static bool handlePICSerialSimulation(File& otgwSimulationFile,
   #if HAS_PIC
   // TASK-865.6: discard live PIC RX while the replay simulation feeds the parser
   // from a file. Routed through the owner fn so all UART byte-I/O stays confined.
+  // TASK-865.15: park the dedicated PIC task BEFORE the loop-side flush. On the
+  // sim-mode entry tick bOTGWSimulation has only just flipped true, so the task
+  // may still be mid-drain; without this handshake the loop-side flush and the
+  // task drain race on OTGWSerial.read() for one tick. bOTGWSimulation is already
+  // in picSerialTaskShouldPark(), so once parked waitForPICTaskParked() returns
+  // on the first poll at zero cost on later ticks.
+  waitForPICTaskParked();
   picSerialFlushRx();
   #endif
 
@@ -5312,22 +5361,44 @@ void fwupgradestep(int pct) {
     DebugTf(PSTR("Upgrade progress: %d%%\r\n"), pct);
     lastReportedPct = pct;
   }
-  
+
   // Update progress for polling API
   state.flash.iPICprogress = pct;
-  
+
 #ifndef DISABLE_WEBSOCKET
+  // TASK-865.15: dedupe the WebSocket progress broadcast on integer-pct change.
+  // OTGWSerial fires this callback many times per percent during a flash; each
+  // sendWebSocketJSON()->otLogWs.textAll() is a per-client heap alloc on AsyncTCP
+  // during the most heap-sensitive op of the firmware. Sending once per distinct
+  // pct cuts the firehose to <=101 broadcasts over the whole flash (~2/s).
+  //
+  // Heap-gate trade-off (ADR-133): the progress path deliberately does NOT route
+  // through canSendWebSocket() (the ADR-121 gate that sendLogToWebSocket honors).
+  // Post-dedupe it is no longer a firehose; flash progress is user-visible
+  // operation state, not a droppable log line; and dropping intermediates under
+  // heap pressure would freeze the progress bar (e.g. stuck at 99%). The terminal
+  // "end"/"error" message is sent independently by fwupgradedone(), so completion
+  // is reliable regardless of any dropped intermediate frame.
+  // pct==0 is the per-flash "start" frame and always passes: lastSentPct is a
+  // function-local static that survives across flashes, so a retried flash whose
+  // predecessor also ended on 0 (e.g. failed before any pct>0) would otherwise
+  // have its "start" suppressed. Bypassing the dedupe for 0 keeps "start" airtight
+  // while every >0 frame is deduped on integer-pct change.
+  static int lastSentPct = -1;
+  if (pct != 0 && pct == lastSentPct) return;
+  lastSentPct = pct;
+
   // Send progress message in format frontend expects
   // Use percentage as flash_written for progress display
   char buf[256]; // Sized for escaped filename (129) + JSON overhead (~90)
   char filenameEsc[129]; // state.flash.sPICfile is 65 chars, doubled for worst-case escaping
   jsonEscape(state.flash.sPICfile, filenameEsc, sizeof(filenameEsc));
-  
+
   const char *state = (pct == 0) ? "start" : "write";
-  int written = snprintf_P(buf, sizeof(buf), 
+  int written = snprintf_P(buf, sizeof(buf),
     PSTR("{\"state\":\"%s\",\"flash_written\":%d,\"flash_total\":100,\"filename\":\"%s\"}"),
     state, pct, filenameEsc);
-  
+
   if (written > 0 && written < (int)sizeof(buf)) {
     sendWebSocketJSON(buf);
   }
