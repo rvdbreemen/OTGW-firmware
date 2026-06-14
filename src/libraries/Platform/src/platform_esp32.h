@@ -443,11 +443,26 @@ inline bool platformQueueSend(PlatformQueue q, const void *item) {
   return xQueueSend(q, item, 0) == pdTRUE;
 }
 
-// Receive one item (copy out). timeoutMs == 0 polls without blocking. Returns
-// true if an item was dequeued.
+// Sentinel for platformQueueReceive: block indefinitely until an item arrives
+// (FreeRTOS portMAX_DELAY). An event-consumer task that idles with zero CPU
+// between events (e.g. the webhook sender task, TASK-865.13) passes this instead
+// of a finite poll. pdMS_TO_TICKS(UINT32_MAX) would overflow to a garbage tick
+// count, so the sentinel maps straight to portMAX_DELAY rather than converting.
+#define PLATFORM_QUEUE_WAIT_FOREVER 0xFFFFFFFFUL
+
+// Receive one item (copy out). timeoutMs == 0 polls without blocking;
+// timeoutMs == PLATFORM_QUEUE_WAIT_FOREVER blocks indefinitely. Returns true if
+// an item was dequeued.
 inline bool platformQueueReceive(PlatformQueue q, void *item, uint32_t timeoutMs = 0) {
   if (q == nullptr) return false;
-  TickType_t ticks = (timeoutMs == 0) ? 0 : pdMS_TO_TICKS(timeoutMs);
+  TickType_t ticks;
+  if (timeoutMs == 0) {
+    ticks = 0;
+  } else if (timeoutMs == PLATFORM_QUEUE_WAIT_FOREVER) {
+    ticks = portMAX_DELAY;
+  } else {
+    ticks = pdMS_TO_TICKS(timeoutMs);
+  }
   return xQueueReceive(q, item, ticks) == pdTRUE;
 }
 

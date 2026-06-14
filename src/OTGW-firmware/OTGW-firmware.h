@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.187
+**  Version  : v2.0.0-alpha.188
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -298,6 +298,7 @@ void applyLegacyPort25238Setting();
 void handleOTGWstream();
 void testWebhook(bool testOn);
 void evalWebhook();
+void startWebhookTask();  // ADR-123 Phase-4: create the webhook sender task once (webhook.ino)
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-056; defined in restAPI.ino)
 extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
 

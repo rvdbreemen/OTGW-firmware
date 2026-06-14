@@ -1,6 +1,6 @@
 /*********
 **  Program  : webhook.ino
-**  Version  : v2.0.0-alpha.187
+**  Version  : v2.0.0-alpha.188
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -162,83 +162,106 @@ static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 }
 
 //=======================================================================
-// Expand and send the configured payload body for a POST webhook.
-// Uses the global cMsg scratch buffer (CMSG_SIZE bytes) for the expanded payload —
-// avoids a large stack allocation in the HTTP call chain (ESP8266 CONT-stack = 4 KB).
+// ADR-123 Phase-4 webhook sender task plumbing. WebhookJob (the value-copy
+// queue item) is declared in Webhooktypes.h so the type precedes the Arduino
+// auto-generated prototypes for the helpers below. The sender touches NOTHING
+// but the job — no settings, no OTGWState, no lock — so it can block on the HTTP
+// round-trip without stalling drainOTFrameQueue or the AsyncTCP task (the
+// load-bearing rule: never hold the ADR-129 mutex across blocking I/O).
 //=======================================================================
-static int sendWebhookPost(HTTPClient& http, const char* url, bool stateOn) {
-  bool wasTruncated = expandPayload(settings.webhook.sPayload, cMsg, sizeof(cMsg), stateOn);
-  if (wasTruncated) {
-    DebugTf(PSTR("Webhook: expanded payload truncated to %u bytes for %s\r\n"),
-            static_cast<unsigned int>(sizeof(cMsg) - 1), url);
-  }
-  DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), url, cMsg);
-
-  const char* ct = (settings.webhook.sContentType[0] != '\0')
-                   ? settings.webhook.sContentType
-                   : "application/json";
-  http.addHeader(F("Content-Type"), ct);
-  return http.POST(reinterpret_cast<uint8_t*>(cMsg), strlen(cMsg));
-}
+// Depth 2: at most one edge is ever "in flight" (the webhookInFlight gate in
+// evalWebhook() enforces ADR-057 §5 one-pending-at-a-time), and the test
+// endpoint may enqueue once independently. 2 leaves slack without retaining a
+// backlog the best-effort contract never promised.
+#define WEBHOOK_QUEUE_DEPTH 2
+static PlatformQueue webhookQueue   = nullptr;  // loop/AsyncTCP producer -> webhook task
+static PlatformTask  g_webhookTask  = nullptr;  // dedicated sender task handle
+static volatile bool webhookInFlight = false;   // ADR-057 §5: one pending transition at a time
 
 //=======================================================================
-// Send the webhook for the given state, regardless of current state.
-// Used by the test endpoint and called from evalWebhook() on change.
+// Build a WebhookJob for the given state. Reads settings + live OpenTherm
+// state and expands the payload template HERE (at enqueue time) so the sender
+// task never reads cross-task state. Returns false when there is nothing to
+// send (no URL configured for this state) — a non-error "nothing to do".
 //
-// Behaviour:
-//   - settings.webhook.sPayload empty  → HTTP GET (compatible with Shelly
-//     and other devices that accept URL-encoded commands)
-//   - settings.webhook.sPayload set    → HTTP POST with Content-Type:
-//     application/json; {variable} placeholders in the template are
-//     expanded to live OpenTherm values before sending.
-//
-// Example payload for a local Home Assistant webhook:
-//   {"state":"{state}","tboiler":{tboiler},"tr":{tr}}
-//
-// See expandPayload() for the full list of supported variables.
+// MUST be called with OpenTherm state reads consistent: loop context (where
+// the OT consumer also runs) needs no lock; the AsyncTCP test endpoint wraps
+// this in an OTStateLock. expandPayload() only READS OTcurrentSystemState.
 //=======================================================================
-// Attempt to send the webhook. Returns true on HTTP 2xx, false on any error.
-// Synchronous call into HTTPClient; setTimeout below caps the main-loop stall
-// to 500 ms (ADR-048, TASK-676 Item 5). Local LAN GET/POST typically completes
-// in <50 ms; the WH_PENDING -> WH_RETRY_WAIT retry budget absorbs transient
-// failures so the timeout can stay tight without losing a real state change.
-static bool attemptSendWebhook(bool stateOn) {
+static bool buildWebhookJob(bool stateOn, WebhookJob& job) {
   const char* url = stateOn ? settings.webhook.sURLon : settings.webhook.sURLoff;
   if (strlen(url) == 0) {
     DebugTf(PSTR("Webhook: no URL configured for state %s\r\n"), stateOn ? "ON" : "OFF");
-    return true; // nothing to send is "success"
+    return false; // nothing to send
   }
 
-  // Enforce local-network-only policy (ADR-003/ADR-032)
-  if (!isLocalUrl(url)) {
+  job.stateOn    = stateOn;
+  strlcpy(job.sURL, url, sizeof(job.sURL));
+
+  job.hasPayload = (settings.webhook.sPayload[0] != '\0');
+  if (job.hasPayload) {
+    bool wasTruncated = expandPayload(settings.webhook.sPayload,
+                                      job.sPayloadExpanded, sizeof(job.sPayloadExpanded),
+                                      stateOn);
+    if (wasTruncated) {
+      DebugTf(PSTR("Webhook: expanded payload truncated to %u bytes for %s\r\n"),
+              static_cast<unsigned int>(sizeof(job.sPayloadExpanded) - 1), url);
+    }
+    const char* ct = (settings.webhook.sContentType[0] != '\0')
+                     ? settings.webhook.sContentType
+                     : "application/json";
+    strlcpy(job.sContentType, ct, sizeof(job.sContentType));
+  } else {
+    job.sPayloadExpanded[0] = '\0';
+    job.sContentType[0]     = '\0';
+  }
+  return true;
+}
+
+//=======================================================================
+// Send one already-built webhook job. Returns true on HTTP 2xx, false on any
+// retryable error. Pure sender: reads only the job, no settings/OTGWState/lock.
+//
+// Runs ON THE WEBHOOK TASK, which MAY block freely now (ADR-123 Phase-4) — so
+// the cooperative-era 500 ms loop-stall cap is gone; a 1000 ms timeout (the
+// ADR-057 §4 contract value) is used, with the 3-attempt/30s backoff above it.
+//
+// Behaviour preserved from the cooperative path:
+//   - hasPayload == false → HTTP GET  (Shelly-style URL-encoded command)
+//   - hasPayload == true  → HTTP POST with the pre-expanded body
+//   - isLocalUrl() enforced before EVERY send (ADR-003/ADR-032, ADR-057 §3);
+//     a policy block is non-retryable and reported as success.
+//   - ADR-004 error path: no String from http.errorToString().
+//=======================================================================
+static bool sendWebhookJob(const WebhookJob& job) {
+  // Enforce local-network-only policy on every send (ADR-003/ADR-032, ADR-057 §3)
+  if (!isLocalUrl(job.sURL)) {
     DebugTln(F("Webhook: blocked (must target local subnet; see ADR-032)"));
     return true; // policy block is not a retryable error
   }
 
-  bool hasPayload = (settings.webhook.sPayload[0] != '\0');
-  if (!hasPayload) {
-    DebugTf(PSTR("Webhook: GET  [%s] (state=%s)\r\n"), url, stateOn ? "ON" : "OFF");
-  }
-
   WiFiClient client;
   HTTPClient http;
-  http.setTimeout(500); // cap main-loop stall; retry budget covers slow LAN responders
+  http.setTimeout(1000); // ADR-057 §4; the webhook task may block, no loop stall
 
-  if (!http.begin(client, url)) {
+  if (!http.begin(client, job.sURL)) {
     DebugTln(F("Webhook: http.begin() failed (invalid URL?)"));
     return false;
   }
 
-  yield();
   int code;
-  if (hasPayload) {
-    code = sendWebhookPost(http, url, stateOn);
+  if (job.hasPayload) {
+    DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), job.sURL, job.sPayloadExpanded);
+    http.addHeader(F("Content-Type"), job.sContentType);
+    // HTTPClient::POST(uint8_t*, size_t) takes a non-const pointer but does not
+    // modify the buffer; the cast is safe and mirrors the pre-Phase-4 cMsg path.
+    code = http.POST(const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(job.sPayloadExpanded)),
+                     strlen(job.sPayloadExpanded));
   } else {
+    DebugTf(PSTR("Webhook: GET  [%s] (state=%s)\r\n"), job.sURL, job.stateOn ? "ON" : "OFF");
     code = http.GET();
   }
-  yield();
   http.end();
-  feedWatchDog();
 
   if (code >= 200 && code < 300) {
     DebugTf(PSTR("Webhook: HTTP response code: %d\r\n"), code);
@@ -248,16 +271,92 @@ static bool attemptSendWebhook(bool stateOn) {
   char errBuf[32];
   snprintf_P(errBuf, sizeof(errBuf), PSTR("HTTP error %d"), code);
   DebugTf(PSTR("Webhook: %s %s failed: %s\r\n"),
-          hasPayload ? "POST" : "GET", url, errBuf);
+          job.hasPayload ? "POST" : "GET", job.sURL, errBuf);
   return false;
 }
 
 //=======================================================================
+// The dedicated webhook sender task (ADR-123 Phase-4). Blocks on the job queue
+// and, per job, runs the ADR-057 §5 retry contract: up to 3 attempts, 30 s
+// backoff between them. Because the task blocks, the retry "wait" is a real
+// vTaskDelay (platformTaskDelay), not a loop-spread WH_RETRY_WAIT state.
+//
+// "Latest-state-supersedes": a fresh edge that arrives while a retry is pending
+// already replaced webhookLastState loop-side, and the in-flight gate keeps a
+// second job out of the queue until this one finishes — so the device always
+// ends in the most recently observed state without queueing a backlog.
+//=======================================================================
+static void webhookTaskBody(void *arg) {
+  (void)arg;
+  WebhookJob job;
+  for (;;) {
+    // Block indefinitely until an edge is enqueued; zero CPU while idle.
+    if (!platformQueueReceive(webhookQueue, &job, PLATFORM_QUEUE_WAIT_FOREVER)) {
+      continue;
+    }
+    bool sent = false;
+    for (uint8_t attempt = 1; attempt <= 3 && !sent; attempt++) {
+      sent = sendWebhookJob(job);
+      if (sent) break;
+      if (attempt < 3) {
+        DebugTf(PSTR("Webhook: send failed, retry %u/3 in 30s\r\n"), attempt);
+        platformTaskDelay(30000); // 30 s backoff (ADR-057 §5); task blocks, loop unaffected
+      } else {
+        DebugTln(F("Webhook: max retries reached, giving up"));
+      }
+    }
+    webhookInFlight = false; // release the gate so the next edge can enqueue
+  }
+}
+
+//=======================================================================
+// startWebhookTask — create the job queue + sender task exactly once (ADR-044),
+// called once from setup(). Safe to call before settings load: the task simply
+// blocks on an empty queue until evalWebhook()/testWebhook() enqueue a job.
+//=======================================================================
+void startWebhookTask() {
+  if (g_webhookTask != nullptr) return;                 // create exactly once
+  if (webhookQueue == nullptr) {
+    webhookQueue = platformQueueCreate(WEBHOOK_QUEUE_DEPTH, sizeof(WebhookJob));
+  }
+  if (webhookQueue == nullptr) {
+    DebugTln(F("ERROR: failed to create webhook queue"));
+    return;
+  }
+  // 8192-byte stack: the HTTPClient GET/POST + TLS-free WiFiClient chain is
+  // deeper than the PIC task's shallow serial byte-I/O, and the task body also
+  // holds a ~644-byte WebhookJob local. This matches the Arduino loop task's
+  // default 8 KB stack the send previously ran on (pre-Phase-4).
+  g_webhookTask = platformTaskCreatePinned(
+      webhookTaskBody, "webhook", 8192, nullptr, 1);
+  if (g_webhookTask == nullptr) {
+    DebugTln(F("ERROR: failed to create webhook task"));
+  } else {
+    DebugTln(F("Webhook sender task started"));
+  }
+}
+
+//=======================================================================
 // Fire the webhook for a specific state on demand (for testing).
+// Called from the AsyncTCP web-server task (restAPI test endpoint), so the
+// OpenTherm-state read inside buildWebhookJob() is wrapped in an OTStateLock.
+// Enqueues a job and returns immediately — the blocking send happens on the
+// webhook task, never on the AsyncTCP task.
 //=======================================================================
 void testWebhook(bool testOn) {
   DebugTf(PSTR("Webhook: test requested for state %s\r\n"), testOn ? "ON" : "OFF");
-  attemptSendWebhook(testOn);
+  if (webhookQueue == nullptr) return;
+  WebhookJob job;
+  bool built;
+  {
+    OTStateLock stateLock;            // brief: only the payload expansion, no I/O held
+    built = buildWebhookJob(testOn, job);
+  }
+  if (built) {
+    if (!platformQueueSend(webhookQueue, &job)) {
+      DebugTln(F("Webhook: test enqueue dropped (queue full)"));
+    }
+  }
 }
 
 //=======================================================================
@@ -278,65 +377,62 @@ static bool evalTriggerBit() {
 }
 
 //=======================================================================
-// Non-blocking webhook state machine with retry (ADR-048)
-// Replaces evalWebhook() — decouples detection from sending.
-// States: WH_IDLE -> WH_PENDING -> WH_RETRY_WAIT -> WH_IDLE
+// Edge detection + enqueue (ADR-123 Phase-4; supersedes the cooperative
+// WH_IDLE/WH_PENDING/WH_RETRY_WAIT state machine of ADR-048).
+//
+// What SURVIVES from ADR-048/057, here in the loop:
+//   - evalTriggerBit() change detection (intrinsic, cheap, no I/O)
+//   - edge-triggered semantics: fire only on OFF->ON / ON->OFF transitions
+//   - latest-state-supersedes / convergence: webhookLastState is the last
+//     state we ACTED on (enqueued), not merely the last bit observed. It is
+//     latched ONLY when a job is enqueued — never while a send is in flight —
+//     so once the in-flight gate clears the next tick re-detects the LIVE bit
+//     and converges on it. This mirrors the old FSM, which assigned
+//     webhookLastState only in WH_IDLE (never during PENDING/RETRY_WAIT).
+//   - one-pending-transition-at-a-time (ADR-057 §5): the webhookInFlight gate
+//     keeps a second job out of the queue until the task finishes the current
+//     send+retry cycle; no backlog is built (best-effort contract).
+//
+// What COLLAPSED into the task (webhookTaskBody): the loop-spread retry/backoff
+// and the blocking HTTP send. evalWebhook() no longer touches HTTPClient and
+// never blocks; it runs in the same loop context as the OT consumer so its
+// OpenTherm-state reads need no OTStateLock.
 //=======================================================================
-enum WebhookState_t { WH_IDLE, WH_PENDING, WH_RETRY_WAIT };
-static WebhookState_t webhookState = WH_IDLE;
-static bool    webhookPendingStateOn = false;
-static uint8_t webhookRetryCount = 0;
-
 void evalWebhook() {
   if (!settings.webhook.bEnabled) return;
   if (strlen(settings.webhook.sURLon) == 0 && strlen(settings.webhook.sURLoff) == 0) return;
+  if (webhookQueue == nullptr) return;  // task not started yet
 
-  DECLARE_TIMER_SEC(timerWebhookRetry, 30, SKIP_MISSED_TICKS);
-
-  // Always evaluate trigger bit (track latest state even during retry wait)
   bool bitState = evalTriggerBit();
 
-  switch (webhookState) {
-    case WH_IDLE:
-      if (!webhookInitialized) {
-        webhookLastState = bitState;
-        webhookInitialized = true;
-        break;
-      }
-      if (bitState != webhookLastState) {
-        webhookLastState = bitState;
-        webhookPendingStateOn = bitState;
-        webhookRetryCount = 0;
-        webhookState = WH_PENDING;
-        DebugTf(PSTR("Webhook: bit changed -> %s, queuing send\r\n"),
-                bitState ? "ON" : "OFF");
-      }
-      break;
+  // Prime on first observation: latch the initial level without firing.
+  if (!webhookInitialized) {
+    webhookLastState = bitState;
+    webhookInitialized = true;
+    return;
+  }
 
-    case WH_PENDING:
-      if (WiFi.status() != WL_CONNECTED) break; // wait for WiFi
-      {
-        bool ok = attemptSendWebhook(webhookPendingStateOn);
-        if (ok) {
-          webhookState = WH_IDLE;
-          webhookRetryCount = 0;
-        } else {
-          webhookRetryCount++;
-          if (webhookRetryCount >= 3) {
-            DebugTln(F("Webhook: max retries reached, giving up"));
-            webhookState = WH_IDLE;
-          } else {
-            RESTART_TIMER(timerWebhookRetry);
-            webhookState = WH_RETRY_WAIT;
-            DebugTf(PSTR("Webhook: send failed, retry %d/3 in 30s\r\n"), webhookRetryCount);
-          }
-        }
-      }
-      break;
+  // Compare against the last ACTED-ON state (not the last bit observed).
+  if (bitState == webhookLastState) return;  // no edge vs last delivered state
 
-    case WH_RETRY_WAIT:
-      if (DUE(timerWebhookRetry)) webhookState = WH_PENDING;
-      break;
+  // A send+retry cycle is still running. Do NOT latch: leave webhookLastState at
+  // the last acted state so that when the gate clears the next tick re-detects
+  // the live bit and converges on it (handles a toggle during a long retry).
+  if (webhookInFlight) return;
+
+  // Free to act on this edge. Latch NOW (matches the old FSM, which latched on
+  // the IDLE->PENDING transition). A missing URL for this state is "nothing to
+  // send" — still latched, so it does not re-fire the same edge every tick.
+  webhookLastState = bitState;
+
+  WebhookJob job;
+  if (!buildWebhookJob(bitState, job)) return;  // no URL configured for this state
+
+  DebugTf(PSTR("Webhook: bit changed -> %s, queuing send\r\n"), bitState ? "ON" : "OFF");
+  webhookInFlight = true;
+  if (!platformQueueSend(webhookQueue, &job)) {
+    DebugTln(F("Webhook: enqueue dropped (queue full)"));
+    webhookInFlight = false;
   }
 }
 

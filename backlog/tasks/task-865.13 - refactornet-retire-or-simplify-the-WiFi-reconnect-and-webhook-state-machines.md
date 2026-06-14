@@ -3,9 +3,11 @@ id: TASK-865.13
 title: >-
   refactor(net): retire or simplify the WiFi-reconnect and webhook state
   machines
-status: To Do
-assignee: []
+status: In Review
+assignee:
+  - '@claude'
 created_date: '2026-06-13 05:57'
+updated_date: '2026-06-14 10:47'
 labels:
   - async-esp32s3
 dependencies:
@@ -40,3 +42,9 @@ Retire/simplify the manual non-blocking state machines that exist only because t
 - field: force a WiFi outage (power-cycle AP) -> reconnect, retry-cap-reboot, BETA AP captive fallback all work; Ethernet cable insert/remove preempts WiFi on the esp32 (W5500) board.
 - field: trigger a webhook bit change to a local Shelly/HA endpoint -> GET + POST ({variable} payload) fire, retry on a down target, and never block the PIC UART / web UI under the new model.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ADR-123 Phase-4 landed: webhook synchronous HTTPClient send moved off the cooperative loop onto a dedicated FreeRTOS 'webhook' task (8KB stack). evalWebhook() keeps loop-side evalTriggerBit() edge detection + latest-state-supersedes and enqueues a self-contained value-copy WebhookJob; lock-free sender runs the 3-attempt/30s backoff as real platformTaskDelay, expands {vars} at enqueue time (brief OTStateLock for the AsyncTCP test endpoint) so OTStateLock is never held across the HTTP round-trip. testWebhook() now enqueues instead of blocking AsyncTCP. webhookInFlight preserves ADR-057 one-pending-at-a-time; isLocalUrl per send + ADR-004 (no String) error path preserved. WiFi (ADR-047): no code change, stays in loop (WiFi.begin async); all four invariants intact (bounded-retry-then-reboot, BETA AP fallback, NET_ETHERNET preempt, no platformRestartDHCP). PIC PR= (ADR-058): no code change, queue is now the PIC task TX ingress. ADR-136 supersedes ADR-048, amends ADR-047, records ADR-058 satisfied; ADR-057 re-validated. platform_esp32.h: added PLATFORM_QUEUE_WAIT_FOREVER sentinel for indefinite blocking receive. Remaining field-validation ACs: (1) force WiFi outage -> reconnect/retry-cap-reboot/BETA captive AP fallback, plus Ethernet insert/remove preempts WiFi on W5500; (2) trigger webhook bit change to a local Shelly/HA endpoint -> GET+POST fire, retry on down target, never block PIC UART/web UI.
+<!-- SECTION:NOTES:END -->

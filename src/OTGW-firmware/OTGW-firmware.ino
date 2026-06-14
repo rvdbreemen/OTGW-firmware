@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.187
+**  Version  : v2.0.0-alpha.188
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -414,6 +414,11 @@ void setup() {
   // boot the task immediately parks (picSerialTaskShouldPark) and never touches
   // the closed UART. No-op on a no-PIC build.
   startPICSerialTask();
+  // TASK-865.13 (ADR-123 Phase-4): start the dedicated webhook sender task. It
+  // owns the blocking HTTPClient send off the loop; evalWebhook() and the REST
+  // test endpoint only detect+enqueue. Created once (ADR-044); blocks on an
+  // empty queue until an edge fires, so order vs settings load is immaterial.
+  startWebhookTask();
  // initSensors();        // init DS18B20 (after MQ is up! )
   initOutputs();
   
