@@ -111,16 +111,20 @@ Concretely:
    TWDT (`esp_task_wdt_reset()`, gated on `s_twdtReady` so early-setup feeds before
    subscription do not spam "task not found"), rate-limited to 100 ms.
 
-3. **The external 0x26 chip is a SECONDARY layer.** Its feed and boot-status read
-   are gated on `secondaryWatchdogActive()`:
-   - `esp32-classic` (`HAS_RUNTIME_HW_DETECT==0`): the expression
-     `(!HAS_RUNTIME_HW_DETECT) || isPICEnabled()` folds to `true` at compile time,
-     so the chip is fed **unconditionally** — preserving ADR-011's
-     always-fed behaviour on a board that always carries the chip, even if PIC
-     detection transiently fails.
-   - combo (`HAS_RUNTIME_HW_DETECT==1`): gated on `isPICEnabled()`, because the
-     chip exists only in PIC mode; a 0x26 write in OTDirect mode is a NACKed no-op
-     on floating pins.
+3. **The external 0x26 chip is a SECONDARY layer, fed UNCONDITIONALLY.** On every
+   `HAS_PIC_WATCHDOG` build (esp32-classic AND combo) the 0x26 arm, feed and
+   boot-status read all run unconditionally — never gated on `isPICEnabled()`.
+   Rationale (maintainer directive 2026-06-14): 0x26 presence is **not reliably
+   detectable** — later NodoShop Classic revisions dropped the chip, and an I2C
+   ACK is not proof of board type — while arming/feeding an absent 0x26 is a
+   harmless NACKed no-op on floating pins. The only correctness hazard is the
+   converse: NOT feeding a chip that IS present resets a healthy board. An earlier
+   draft of this ADR gated the combo feed on `isPICEnabled()` while leaving the arm
+   unconditional; that asymmetry would let a combo on an old Classic PCB with a
+   dead/undetected PIC **arm the chip but never feed it -> spurious reset loop**
+   (which also blocks web-UI recovery). Symmetric unconditional arm+feed+boot-read
+   avoids it and matches the original ESP8266 NodoShop firmware. The sole
+   PIC-presence probe remains `detectPIC()` (reset -> ETX), never the 0x26 bus.
 
 4. **`WatchDogEnabled()` keeps ADR-011 semantics for the secondary chip; no-op on
    OTGW32.** On `HAS_PIC_WATCHDOG` boards it arms/disarms the 0x26 chip (the
@@ -221,10 +225,12 @@ task if field evidence shows the PIC task hanging in isolation.
   **Mitigation:** 30 s is intentionally generous to avoid false positives during
   legitimate long operations (flash, WiFi bring-up); the field AC validates an
   induced hang triggers a panic-reset within the timeout.
-- **Risk:** the secondary feed regresses on `esp32-classic` if mis-gated.
-  **Mitigation:** the `(!HAS_RUNTIME_HW_DETECT) || isPICEnabled()` expression folds
-  to a compile-time `true` on the fixed board, so the chip is fed unconditionally
-  there exactly as before; verified by the grep gate below.
+- **Risk:** a combo on an old Classic PCB (0x26 present) whose PIC is dead or
+  undetected could be reset-looped if the chip were armed but not fed.
+  **Mitigation:** the 0x26 arm, feed and boot-read all run unconditionally on every
+  `HAS_PIC_WATCHDOG` build (no `isPICEnabled()` gate), so a present chip is always
+  fed and an absent one only NACKs; arm and feed are symmetric. The field AC
+  validates no spurious 0x26 reset in normal combo/classic operation.
 
 ## Related Decisions
 
@@ -233,9 +239,9 @@ task if field evidence shows the PIC task hanging in isolation.
   re-scoped here.
 - **Depends on:** ADR-128 (drop ESP8266 — retires the single-failure-domain
   premise), ADR-130 (PIC-UART dedicated task — defines the multi-task context).
-- **Coexists with:** ADR-127 (combo ESP32-S3 single binary — the runtime
-  PIC/OTDirect gating that `secondaryWatchdogActive()` keys off), ADR-134 (async
-  OTA handler — where the per-chunk 0x26 feed now lives).
+- **Coexists with:** ADR-127 (combo ESP32-S3 single binary — runtime PIC/OTDirect
+  boot detection; the 0x26 feed is intentionally NOT keyed off it, see Decision §3),
+  ADR-134 (async OTA handler — where the per-chunk 0x26 feed now lives).
 - **Related:** ADR-029 (XHR OTA flash — watchdog coordination), ADR-030 (heap
   recovery — complementary software-level recovery), ADR-036 (boot sequence —
   watchdog enable/disable ordering), ADR-080 (binding ADRs need a CI gate).
@@ -244,8 +250,8 @@ task if field evidence shows the PIC task hanging in isolation.
 
 ### Implementation files
 - `src/OTGW-firmware/OTGW-Core.ino` — watchdog block (`#if HAS_PIC_WATCHDOG` /
-  `#else`): `initWatchDog()`, `WatchDogEnabled()`, `feedWatchDog()`,
-  `secondaryWatchdogActive()`, `EXT_WD_I2C_ADDRESS`.
+  `#else`): `initWatchDog()`, `WatchDogEnabled()`, `feedWatchDog()` (0x26
+  arm/feed/boot-read all unconditional), `EXT_WD_I2C_ADDRESS`.
 - `src/libraries/Platform/src/boards.h` — `HAS_PIC_WATCHDOG` /
   `HAS_RUNTIME_HW_DETECT` per board (OTGW32 / esp32-classic / combo).
 - `src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h` — per-chunk 0x26 secondary feed
