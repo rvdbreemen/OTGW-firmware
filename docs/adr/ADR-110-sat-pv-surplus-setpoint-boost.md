@@ -2,7 +2,21 @@
 
 ## Status
 
-Proposed, 2026-05-26
+Accepted, 2026-06-14. Proposed 2026-05-26; accepted by the maintainer 2026-06-14.
+
+## Status History
+
+status_history:
+  - date: 2026-05-26
+    status: Proposed
+    changed_by: Agent
+    reason: Document the SAT PV-surplus setpoint-boost design delivered by TASK-640
+    changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted the SAT PV-surplus additive setpoint-boost (TASK-640, Done) — additive boost on effectiveTarget, never mutates target; hold-time activation + hysteresis deactivation; reuses iSensorMaxAgeS for stale expiry
+    changed_via: manual
 
 ## Context
 
