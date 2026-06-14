@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Date: 2026-06-13.
+Accepted, 2026-06-14. Proposed 2026-06-13; accepted by the maintainer 2026-06-14.
 
 This is the **Phase 1** concurrency-primitive foundation that ADR-123 (the 2.0.0
 concurrency-model decision) anticipated. ADR-123 §Enforcement stated "each rollout
@@ -17,6 +17,11 @@ status_history:
     changed_by: Agent
     reason: Document the ADR-123 Phase-1 concurrency primitives (queue + mutex) delivered in isolation by TASK-865.5
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted the Phase-1 queue + OTGWState mutex foundation
+    changed_via: manual
 
 ## Context
 
