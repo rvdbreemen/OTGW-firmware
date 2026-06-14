@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.193
+**  Version  : v2.0.0-alpha.194
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3084,12 +3084,21 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("otdhasbypassrelay"), settings.otd.bHasBypassRelay, "b");
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  // --- Ethernet settings (OTGW32 only) ---
-  sendJsonSettingObj(F("ethstaticip"), settings.eth.bStaticIP, "b");
-  sendJsonSettingObj(F("ethipaddress"), CSTR(settings.eth.sIPaddress), "s", 15);
-  sendJsonSettingObj(F("ethgateway"), CSTR(settings.eth.sGateway), "s", 15);
-  sendJsonSettingObj(F("ethsubnet"), CSTR(settings.eth.sSubnet), "s", 15);
-  sendJsonSettingObj(F("ethdns"), CSTR(settings.eth.sDNS), "s", 15);
+  // --- Ethernet settings (only when a W5500 was actually probed) ---
+  // The driver is always compiled in on Ethernet-capable boards, but on the
+  // combo running in PIC/Classic mode there is no W5500 (initEthernet() is
+  // skipped, probeW5500() never runs) so bEthernetPresent stays false. Gate the
+  // EXPOSURE on that runtime fact (TASK-865.18): a Classic-mode combo then sees
+  // no dead Ethernet fields, while a real OTGW32 (probe succeeded) still does.
+  // Omitting "ethstaticip" here keeps the whole eth UI section out of the web
+  // page — index.js only renders it when that trigger key is present.
+  if (state.hw.bEthernetPresent) {
+    sendJsonSettingObj(F("ethstaticip"), settings.eth.bStaticIP, "b");
+    sendJsonSettingObj(F("ethipaddress"), CSTR(settings.eth.sIPaddress), "s", 15);
+    sendJsonSettingObj(F("ethgateway"), CSTR(settings.eth.sGateway), "s", 15);
+    sendJsonSettingObj(F("ethsubnet"), CSTR(settings.eth.sSubnet), "s", 15);
+    sendJsonSettingObj(F("ethdns"), CSTR(settings.eth.sDNS), "s", 15);
+  }
 #endif
   // --- WiFi static IP settings (empty = DHCP) ---
   sendJsonSettingObj(F("wifistaticip"), CSTR(settings.wifi.sStaticIp), "s", 15);

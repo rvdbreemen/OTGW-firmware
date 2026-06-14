@@ -234,8 +234,9 @@ typedef uint16_t SAT_RING_IDX_T;
   #define HAS_PIC           1    // PIC serial driver (OTGWSerial) is linked in
   // The Classic PCB carries the external 0x26 I2C watchdog as an OPTIONAL
   // SECONDARY layer (the ESP32 TWDT is the primary watchdog, ADR-135); the combo
-  // feeds it at runtime only when the PIC was detected (isPICEnabled()). On an
-  // OTGW32 the feed is a NACKed no-op on floating pins.
+  // feeds it UNCONDITIONALLY (no isPICEnabled() gate, see OTGW-Core.ino
+  // feedWatchDog), because 0x26 presence is not reliably detectable. On an
+  // OTGW32 (or a Classic without the chip) the feed is a harmless NACKed no-op.
   #undef  HAS_PIC_WATCHDOG
   #define HAS_PIC_WATCHDOG  1
   // HAS_DIRECT_OT stays 1 (OTDirect linked in, from the OTGW32 base).

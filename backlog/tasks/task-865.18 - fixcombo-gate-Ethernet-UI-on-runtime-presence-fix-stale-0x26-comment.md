@@ -1,9 +1,11 @@
 ---
 id: TASK-865.18
 title: 'fix(combo): gate Ethernet UI on runtime presence, fix stale 0x26 comment'
-status: To Do
-assignee: []
+status: In Review
+assignee:
+  - '@claude'
 created_date: '2026-06-14 20:11'
+updated_date: '2026-06-14 23:18'
 labels:
   - async-esp32s3
 dependencies:
@@ -34,3 +36,9 @@ ordinal: 81000
 - [ ] #3 boards.h 0x26 comment matches the unconditional NAK-safe feed (no isPICEnabled gate claim)
 - [ ] #4 FIELD (epic TASK-865): combo on Classic shows no Ethernet fields; combo on OTGW32 shows them and Ethernet still works
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Landed: restAPI.ino gates the Ethernet settings/UI exposure on runtime state.hw.bEthernetPresent (omitting the ethstaticip trigger key so index.js suppresses the whole eth section client-side) instead of the compile-time HAS_ETH_CAPABLE flag; the driver stays compiled in. boards.h 0x26 watchdog comment updated to match the unconditional NAK-safe feed (no isPICEnabled gate claim). AC#2 and AC#3 verified by inspection. AC#1 (esp32 + esp32-classic + esp32-combo 3-target build + evaluate.py --quick) and AC#4 (field: combo on Classic shows no eth fields; combo on OTGW32 shows them and Ethernet works) remain open: build deferred to the main-thread (this tree carries sibling WIP incl. task-866 async webserver work, building the union here is unsafe), field check needs hardware. Change is compile-safe by inspection: comment-only edit plus an if-guard on an existing bool already read elsewhere in the same HAS_ETH_CAPABLE block.
+<!-- SECTION:NOTES:END -->
