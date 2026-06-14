@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-06-14.
+Accepted, 2026-06-14. Proposed 2026-06-14; accepted by the maintainer 2026-06-14.
 
 This ADR amends two Accepted ADRs. It tightens **ADR-130** (PIC-UART dedicated
 FreeRTOS task as sole OTGWSerial owner) with two invariants its sole-owner CI gate
@@ -28,6 +28,11 @@ status_history:
     changed_by: Agent
     reason: "ADR-130 follow-up (recon 2026-06-14). Close residual PIC-UART task-coupling gaps the sole-owner gate does not catch: (A) control-method UART access (resetPic()'s direct GW=R write and detectPIC()'s resetPic()+find(ETX) probe) must run under the waitForPICTaskParked() handshake so the loop is never a second concurrent UART owner; (B) the TX short-write requeue must go to the FRONT of otTxQueue (xQueueSendToFront) so a concurrently-enqueued ser2net relay byte cannot jump ahead of a popped command chunk and interleave its bytes. Also adds the sim-mode-entry park and the fwupgradestep integer-pct WebSocket dedupe, and records the ADR-133 progress-path heap-gate decision. Delivered by TASK-865.15; amends ADR-130 and ADR-133."
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted the PIC-UART control-method park handshake, TX requeue-to-front ordering, sim-mode park, progress dedupe, and the ADR-133 progress-path heap-gate note; amends ADR-130 and ADR-133
+    changed_via: manual
 
 ## Context
 
