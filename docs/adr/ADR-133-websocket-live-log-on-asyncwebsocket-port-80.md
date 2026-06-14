@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Date: 2026-06-14.
+Accepted, 2026-06-14. Proposed 2026-06-14; accepted by the maintainer 2026-06-14.
 
 This is the **WebSocket half of Phase 3** of the 2.0.0 concurrency-model rollout
 (ADR-123). ADR-123 anticipated it directly: "its built-in `AsyncWebSocket`
@@ -14,9 +14,10 @@ and **supersedes ADR-005** (WebSocket on a dedicated port 81 via the Links2004
 `WebSocketsServer` library), whose load-bearing decision (dedicated port + separate
 listener + that library) is reversed here.
 
-Status is Proposed: it is the maintainer's checkpoint. Field validation on
-ESP32-S3 hardware (live-log over `ws://<host>/ws`, reconnect across WiFi/Ethernet
-transitions, Safari upload-progress per ADR-025) is still open (see Risks).
+Accepted by the maintainer. Field validation on ESP32-S3 hardware (live-log over
+`ws://<host>/ws`, reconnect across WiFi/Ethernet transitions, Safari upload-progress
+per ADR-025) is still open (see Risks) and is tracked under epic TASK-865, separate
+from this architectural acceptance.
 
 ## Status History
 
@@ -26,6 +27,11 @@ status_history:
     changed_by: Agent
     reason: Document the ADR-123 Phase-3 WebSocket consolidation (retire the port-81 WebSocketsServer, attach AsyncWebSocket at /ws to the shared port-80 AsyncWebServer from ADR-132) delivered by TASK-865.10; supersede ADR-005
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted the Phase-3 WebSocket consolidation onto AsyncWebSocket at /ws on port 80; supersedes ADR-005
+    changed_via: manual
 
 ## Context
 

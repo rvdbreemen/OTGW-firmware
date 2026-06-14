@@ -1,8 +1,10 @@
 # ADR-005: WebSocket for Real-Time Streaming
 
-**Status:** Accepted  
+**Status:** Superseded by ADR-133 (2026-06-14)  
 **Date:** 2019-06-01 (Estimated)  
-**Updated:** 2026-02-04 (OTA Flash Note)
+**Updated:** 2026-06-14 (Superseded)
+
+**Superseded:** ADR-133 (2026-06-14) moves the live-log WebSocket onto the built-in `AsyncWebSocket` at `/ws` on port 80, retiring the dedicated port-81 `WebSocketsServer` (Links2004) that this ADR chose. The real-time-streaming decision itself stands; only the transport (dedicated port + separate listener + that library) is reversed on the 2.0.0 ESP32-S3 line. See ADR-133.
 
 **Note:** As of ADR-029 (2026-02-04), OTA firmware flash no longer uses WebSocket for progress updates. WebSocket is now used exclusively for OpenTherm message streaming.
 
