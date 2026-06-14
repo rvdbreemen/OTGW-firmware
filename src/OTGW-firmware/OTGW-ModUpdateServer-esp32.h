@@ -1,13 +1,33 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.185
+**  Version  : v2.0.0-alpha.186
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
 **
-**  Uses the ESP32 WebServer + Update libraries directly (no template
-**  indirection like the ESP8266 variant).
+**  TASK-865.11 (ADR-123 Phase 3): rewritten against ESPAsyncWebServer.
+**  The OTA endpoint moved from the synchronous upload model (the
+**  START/WRITE/END/ABORTED lifecycle polled by the loop() client pump) onto
+**  the AsyncWebServer onUpload(filename,index,data,len,final) callback. The
+**  callback runs on the single AsyncTCP service task; handlers are serialized
+**  on that task, so the per-request member state below is safe (no concurrency,
+**  no overlap between two uploads). The load-bearing flash logic — merged-binary
+**  app-slot extraction, the I2C hardware-watchdog feed per write chunk, the
+**  filesystem-vs-firmware target split, and the deferred-reboot-from-loop()
+**  contract — is carried over unchanged; only the argument plumbing differs.
+**
+**  Async vs sync mapping notes:
+**    - index==0 is UPLOAD_FILE_START; final==true is UPLOAD_FILE_END. The final
+**      chunk carries BOTH data and final==true, so we write first, then finalize.
+**    - There is no UPLOAD_FILE_ABORTED callback. request->onDisconnect() runs the
+**      abort cleanup, guarded so it does not double-act after a clean upload.
+**    - The async upload callback delivers the UPLOADED FILE's name (firmware.bin /
+**      littlefs.bin), NOT the multipart form-field name the sync server exposed via
+**      upload.name. Target detection therefore keys off the `cmd` query param the
+**      form posts (cmd=0 firmware, cmd=100 filesystem) — reliably present at
+**      index==0 — instead of the field name. The uploaded filename's
+**      ".littlefs.bin" suffix is used as a fallback signal.
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -18,13 +38,14 @@
 #ifndef OTGW_MOD_UPDATE_SERVER_ESP32_H
 #define OTGW_MOD_UPDATE_SERVER_ESP32_H
 
-#include <WebServer.h>
+#include <ESPAsyncWebServer.h>
 #include <Update.h>
 #include <StreamString.h>
 #include <LittleFS.h>
 #include "Wire.h"
+#include "webServerCompat.h"   // webBeginRequest / webSendP / webSend / g_responseSent
 
-// External declarations (same as ESP8266 variant)
+// External declarations (same as the sync variant)
 extern OTGWState state;
 extern bool LittleFSmounted;
 extern bool updateLittleFSStatus(const char *probePath);
@@ -45,6 +66,7 @@ public:
 
   OTGWUpdateServer(bool serial_debug = false)
     : _serial_output(serial_debug), _server(nullptr), _authenticated(false),
+      _routesRegistered(false), _updateFinalized(false),
       _serverIndex(nullptr), _serverSuccess(nullptr),
       _uploadTarget(UploadTarget::None),
       _uploadExpectedBytes(0), _uploadWrittenBytes(0), _uploadBlockIndex(0),
@@ -52,75 +74,84 @@ public:
     _updaterError[0] = '\0';
   }
 
-  void setup(WebServer *server) {
+  void setup(AsyncWebServer *server) {
     setup(server, emptyString, emptyString);
   }
 
-  void setup(WebServer *server, const String& path) {
+  void setup(AsyncWebServer *server, const String& path) {
     setup(server, path, emptyString, emptyString);
   }
 
-  void setup(WebServer *server, const String& username, const String& password) {
+  void setup(AsyncWebServer *server, const String& username, const String& password) {
     setup(server, "/update", username, password);
   }
 
-  void setup(WebServer *server, const String& path, const String& username, const String& password) {
+  void setup(AsyncWebServer *server, const String& path, const String& username, const String& password) {
     _server = server;
     _username = username;
     _password = password;
     _resetUploadTracking();
 
-    // Handler for the update form page (GET)
-    _server->on(path.c_str(), HTTP_GET, [&]() {
+    // Idempotent: AsyncWebServer::on() APPENDS handlers, so registering more than
+    // once would stack duplicate /update routes (the wiring is re-touched on every
+    // WiFi/Ethernet transition). Mirror startWebSocket(): register exactly once,
+    // and let updateCredentials() carry credential changes on subsequent calls.
+    if (_routesRegistered) return;
+    _routesRegistered = true;
+
+    AsyncWebServer &srv = *_server;
+
+    // GET /update — serve the upload form page.
+    srv.on(path.c_str(), HTTP_GET, [this](AsyncWebServerRequest *request) {
+      webBeginRequest(request);
       if (_username.length() && _password.length() &&
-          !_server->authenticate(_username.c_str(), _password.c_str()))
-        return _server->requestAuthentication();
-      _server->send_P(200, PSTR("text/html"), _serverIndex);
+          !request->authenticate(_username.c_str(), _password.c_str())) {
+        webRequestAuth();
+        return;
+      }
+      webSendP(200, PSTR("text/html"), _serverIndex);
     });
 
-    // Handler for the update form POST (after upload completes)
-    _server->on(path.c_str(), HTTP_POST, [&]() {
-      if (!_authenticated)
-        return _server->requestAuthentication();
-      if (Update.hasError() || _updaterError[0] != '\0') {
-        ::state.flash.bESPactive = false;
-        if (!LittleFSmounted && _uploadTarget == UploadTarget::Filesystem) {
-          LittleFSmounted = LittleFS.begin();
+    // POST /update — completion handler (runs after the upload finished) + the
+    // per-chunk upload callback. Auth is re-checked independently in each: the
+    // sync model's _authenticated handoff from END into the done-lambda does not
+    // map onto the async ordering, so we follow FSexplorer's /upload pattern of
+    // two independent checks.
+    srv.on(path.c_str(), HTTP_POST,
+      [this](AsyncWebServerRequest *request) {
+        webBeginRequest(request);
+        if (!_uploadAuthorized(request)) {
+          webRequestAuth();
+          return;
         }
-        char errMsg[192];
-        snprintf_P(errMsg, sizeof(errMsg), PSTR("Flash error: %s"), _updaterError);
-        _server->send(200, F("text/html"), errMsg);
-      } else {
-        _server->client().setNoDelay(true);
-        _server->send_P(200, PSTR("text/html"), _serverSuccess);
-        _server->client().stop();
-        // Defer the reboot to the next loop() tick instead of calling doRestart()
-        // directly from inside the HTTP callback. Rationale (mirrors ESP8266 at
-        // OTGW-ModUpdateServer-impl.h): doRestart() calls prepareForReboot()
-        // which tears down MQTT/WS/OTGWstream while we are still inside the
-        // request handler. On slow/congested links the HTTP 200 success body
-        // may not have fully drained. requestDeferredReboot() sets a flag that
-        // loop() observes via isRebootPending() && !isFlashing() and then fires
-        // performDeferredReboot() from the main loop — giving lwIP 10-100ms to
-        // finish the response before cleanup begins. The service-cleanup path
-        // is identical to the direct-call variant, just invoked from loop().
-        logBootSignature("[OTA] pre-reboot");    // fourth/final OTA probe, parity with ESP8266
-        requestDeferredReboot("[OTA] Rebooting...");
-      }
-    }, [&]() {
-      // Upload handler
-      HTTPUpload& upload = _server->upload();
-      if (upload.status == UPLOAD_FILE_START) {
-        _handleUploadStart(upload);
-      } else if (_authenticated && upload.status == UPLOAD_FILE_WRITE && _updaterError[0] == '\0') {
-        _handleUploadWrite(upload);
-      } else if (_authenticated && upload.status == UPLOAD_FILE_END && _updaterError[0] == '\0') {
-        _handleUploadEnd(upload);
-      } else if (_authenticated && upload.status == UPLOAD_FILE_ABORTED) {
-        _handleUploadAbort(upload);
-      }
-      delay(0);
-    });
+        if (Update.hasError() || _updaterError[0] != '\0') {
+          ::state.flash.bESPactive = false;
+          if (!LittleFSmounted && _uploadTarget == UploadTarget::Filesystem) {
+            LittleFSmounted = LittleFS.begin();
+          }
+          char errMsg[192];
+          snprintf_P(errMsg, sizeof(errMsg), PSTR("Flash error: %s"), _updaterError);
+          webSend(200, F("text/html"), errMsg);
+        } else {
+          webSendP(200, PSTR("text/html"), _serverSuccess);
+          // Defer the reboot to the next loop() tick instead of calling doRestart()
+          // directly from inside the async callback. Rationale (mirrors ESP8266 at
+          // OTGW-ModUpdateServer-impl.h): doRestart() calls prepareForReboot()
+          // which tears down MQTT/WS/OTGWstream while we are still inside the
+          // request handler — and here we are on the AsyncTCP task, which must not
+          // block. On slow/congested links the HTTP 200 success body may not have
+          // fully drained. requestDeferredReboot() sets a flag that loop() observes
+          // via isRebootPending() && !isFlashing() and then fires
+          // performDeferredReboot() from the main loop — giving lwIP time to finish
+          // the response before cleanup begins.
+          logBootSignature("[OTA] pre-reboot");    // fourth/final OTA probe, parity with ESP8266
+          requestDeferredReboot("[OTA] Rebooting...");
+        }
+      },
+      [this](AsyncWebServerRequest *request, const String &filename,
+             size_t index, uint8_t *data, size_t len, bool final) {
+        _handleUpload(request, filename, index, data, len, final);
+      });
   }
 
   void updateCredentials(const String& username, const String& password) {
@@ -133,7 +164,7 @@ public:
 
 private:
   // Merged binary layout (from partitions_otgw_esp32.csv)
-  // 4B-H3: app0 slot size MUST match the active partition table value
+  // app0 slot size MUST match the active partition table value
   // (`app, ota_0, 0x10000, 0x1E0000` in partitions_otgw_esp32.csv).
   // Earlier value (0x2E0000) would trip Update.begin() range-check on
   // merged-binary OTA uploads since the writeable region is smaller.
@@ -149,38 +180,81 @@ private:
     _mergedWriteLimit = 0;
   }
 
-  size_t _parseUploadTotalSize() const {
-    size_t uploadTotal = 0;
-    String sizeArg = _server->arg("size");
-    if (sizeArg.length()) {
-      long parsedSize = sizeArg.toInt();
-      if (parsedSize > 0) uploadTotal = static_cast<size_t>(parsedSize);
-    }
-    return uploadTotal;
+  // Auth helper. Empty credentials == open (no auth configured).
+  bool _uploadAuthorized(AsyncWebServerRequest *request) const {
+    return (_username.length() == 0 || _password.length() == 0 ||
+            request->authenticate(_username.c_str(), _password.c_str()));
   }
 
-  void _handleUploadStart(HTTPUpload& upload) {
+  // Total upload size. The form posts `size=<file.size>` on the query string
+  // (see updateServerHtml.h); fall back to the multipart content length when the
+  // param is absent so merged-binary detection still has a figure to compare.
+  size_t _parseUploadTotalSize(AsyncWebServerRequest *request) const {
+    const AsyncWebParameter *p = request->getParam("size", false);  // query string
+    if (p) {
+      long parsedSize = p->value().toInt();
+      if (parsedSize > 0) return static_cast<size_t>(parsedSize);
+    }
+    size_t cl = request->contentLength();
+    return cl;
+  }
+
+  // Target detection. The form action carries cmd=0 (firmware) / cmd=100
+  // (filesystem) on the query string — reliably present at index==0, unlike the
+  // multipart field name the async callback does not deliver. Fall back to the
+  // uploaded filename's ".littlefs.bin" suffix when cmd is absent (e.g. a direct
+  // curl upload without the form).
+  bool _isFilesystemTarget(AsyncWebServerRequest *request, const String &filename) const {
+    const AsyncWebParameter *p = request->getParam("cmd", false);  // query string
+    if (p) return p->value().toInt() == 100;
+    return filename.endsWith(F("littlefs.bin")) || filename.endsWith(F("filesystem.bin"));
+  }
+
+  // The async upload lifecycle dispatcher. Carries the START/WRITE/END logic of
+  // the sync handler; abort is handled separately via request->onDisconnect().
+  void _handleUpload(AsyncWebServerRequest *request, const String &filename,
+                     size_t index, uint8_t *data, size_t len, bool final) {
+    if (index == 0) {
+      _handleUploadStart(request, filename);
+    }
+
+    // Stop early on auth failure or a sticky error from begin(); the completion
+    // handler emits the 401 / error page.
+    if (_authenticated && _updaterError[0] == '\0') {
+      _handleUploadWrite(data, len);
+    }
+
+    if (final && _authenticated && _updaterError[0] == '\0') {
+      _handleUploadEnd(index + len);
+    }
+  }
+
+  void _handleUploadStart(AsyncWebServerRequest *request, const String &filename) {
     _updaterError[0] = '\0';
     _resetUploadTracking();
-    _authenticated = (_username.length() == 0 || _password.length() == 0 ||
-                      _server->authenticate(_username.c_str(), _password.c_str()));
+    _updateFinalized = false;
+    _authenticated = _uploadAuthorized(request);
     if (!_authenticated) {
       if (_serial_output) DebugTln(F("Unauthenticated Update"));
       return;
     }
 
     if (_serial_output) {
-      DebugTf(PSTR("[OTA] Flash start: %s (size: %s)\r\n"),
-              upload.filename.c_str(), _server->arg("size").c_str());
+      DebugTf(PSTR("[OTA] Flash start: %s\r\n"), filename.c_str());
     }
 
     logBootSignature("[OTA] pre-begin");    // first of four OTA lifecycle probes, parity with ESP8266
     ::state.flash.bESPactive = true;
 
-    size_t uploadTotal = _parseUploadTotalSize();
+    // Run the abort cleanup if the client disconnects before the upload finalizes.
+    // onDisconnect fires on normal close too, so the handler guards on
+    // _updateFinalized to avoid double-acting after a clean upload.
+    request->onDisconnect([this]() { _handleUploadAbort(); });
+
+    size_t uploadTotal = _parseUploadTotalSize(request);
     _uploadExpectedBytes = uploadTotal;
 
-    if (upload.name == F("filesystem")) {
+    if (_isFilesystemTarget(request, filename)) {
       _uploadTarget = UploadTarget::Filesystem;
       size_t fsSize = LittleFS.totalBytes();
       if (_serial_output) {
@@ -222,16 +296,17 @@ private:
     }
   }
 
-  void _handleUploadWrite(HTTPUpload& upload) {
+  void _handleUploadWrite(uint8_t *data, size_t len) {
+    if (len == 0) return;
     if (_serial_output) blinkLEDnow(PIN_LED1);
 
-    // Feed hardware watchdog (I2C address 0x26)
+    // Feed hardware watchdog (I2C address 0x26). Short Wire transaction, safe on
+    // the AsyncTCP task; must fire per write chunk through a multi-MB upload.
     Wire.beginTransmission(0x26);
     Wire.write(0xA5);
     Wire.endTransmission();
 
-    uint8_t *buf = upload.buf;
-    size_t   len = upload.currentSize;
+    uint8_t *buf = data;
 
     // Merged binary: skip the bootloader + partition table header
     if (_mergedSkipBytes > 0) {
@@ -273,12 +348,12 @@ private:
     }
   }
 
-  void _handleUploadEnd(HTTPUpload& upload) {
+  void _handleUploadEnd(size_t totalSize) {
     if (_serial_output) DebugTln(F("[OTA] End: finalizing flash..."));
 
     bool updateOk = Update.end(true);
     if (updateOk) {
-      if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), upload.totalSize);
+      if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), static_cast<unsigned>(totalSize));
       logBootSignature("[OTA] post-end");    // second probe: after Update.end(true) commits the image
       if (_uploadTarget == UploadTarget::Filesystem) {
         LittleFSmounted = LittleFS.begin();
@@ -300,17 +375,25 @@ private:
     } else {
       _setUpdaterError();
     }
+    _updateFinalized = true;   // suppress the onDisconnect abort cleanup on the clean close
     ::state.flash.bESPactive = false;
     _authenticated = false;  // force re-authentication on next upload
     _resetUploadTracking();
   }
 
-  void _handleUploadAbort(HTTPUpload& upload) {
+  // Abort path. Async has no UPLOAD_FILE_ABORTED; request->onDisconnect() drives
+  // this. onDisconnect also fires on a normal close after a clean upload, so the
+  // _updateFinalized guard makes this a no-op in that case.
+  void _handleUploadAbort() {
+    if (_updateFinalized) return;   // clean upload already finalized — nothing to abort
+    if (!::state.flash.bESPactive) return;  // never started / already cleaned up
+
     Update.end();
     if (_serial_output) {
       DebugTf(PSTR("[OTA] Abort: after %u bytes\r\n"), static_cast<unsigned>(_uploadWrittenBytes));
     }
-    // Remount LittleFS if a filesystem upload was aborted mid-flight
+    // Remount LittleFS if a filesystem upload was aborted mid-flight (we called
+    // LittleFS.end() at start, so a dropped FS upload leaves assets gone).
     if (_uploadTarget == UploadTarget::Filesystem && !LittleFSmounted) {
       LittleFSmounted = LittleFS.begin();
       if (_serial_output) {
@@ -337,10 +420,12 @@ private:
   }
 
   bool _serial_output;
-  WebServer *_server;
+  AsyncWebServer *_server;
   String _username;
   String _password;
   bool _authenticated;
+  bool _routesRegistered;   // guard: register /update routes exactly once
+  bool _updateFinalized;    // set in END; suppresses onDisconnect abort on clean close
   char _updaterError[128];
   UploadTarget _uploadTarget;
   size_t _uploadExpectedBytes;

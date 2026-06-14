@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.185
+**  Version  : v2.0.0-alpha.186
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -317,6 +317,17 @@ void setupFSexplorer(){
     handleFileUpload);
   server.on("/ReBoot",        HTTP_ANY, reBootESP);
   server.on("/ResetWireless", HTTP_ANY, resetWirelessButton);
+
+  // TASK-865.11: register the OTA /update endpoint on the AsyncWebServer here,
+  // alongside the other routes and before startWebserver()'s server.begin().
+  // setup() is idempotent (guarded by _routesRegistered), so the per-connect
+  // updateCredentials() calls in startWiFi() never re-register the route.
+  httpUpdater.setup(&server);
+  httpUpdater.setIndexPage(UpdateServerIndex);
+  httpUpdater.setSuccessPage(UpdateServerSuccess);
+  if (settings.sHTTPpasswd[0] != '\0') {
+    httpUpdater.updateCredentials("admin", settings.sHTTPpasswd);
+  }
 
   server.onNotFound([](AsyncWebServerRequest *request) {
     webBeginRequest(request);

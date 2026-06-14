@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.185
+**  Version  : v2.0.0-alpha.186
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -200,10 +200,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
       // instead of blocking in the config portal.
       DebugTln(F("BETA: WiFi unavailable at boot, skipping config portal → AP fallback"));
       startAPFallback();
-      // TASK-865.11: OTA re-attaches here on AsyncWebServer. The OTGWUpdateServer
-      // still binds the synchronous WebServer type (OTGW-ModUpdateServer-esp32.h)
-      // and there is no sync server to attach to between 865.9 and 865.11, so the
-      // wiring is intentionally removed. OTA is dark across this task seam.
+      // TASK-865.11: the OTA /update route is registered once on the
+      // AsyncWebServer in setupFSexplorer() (idempotent, guarded by
+      // _routesRegistered). Here we only keep the HTTP Basic Auth credentials
+      // current so a password change applies without re-registering the route.
       if (settings.sHTTPpasswd[0] != '\0') {
         httpUpdater.updateCredentials("admin", settings.sHTTPpasswd);
       }
@@ -253,11 +253,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   // for why the catch-all DHCP re-announce was removed.
   platformSetHostname(hostname);
 
-  // TASK-865.11: OTA re-attaches here on AsyncWebServer. The OTGWUpdateServer
-  // still binds the synchronous WebServer type (OTGW-ModUpdateServer-esp32.h),
-  // retired by seq11; there is no sync server to attach to between 865.9 and
-  // 865.11, so the wiring is intentionally removed. OTA is dark across this seam.
-  // Credentials are still kept current so seq11's re-wire needs no settings work.
+  // TASK-865.11: the OTA /update route is registered once on the AsyncWebServer
+  // in setupFSexplorer() (idempotent, guarded by _routesRegistered). Here we only
+  // keep the HTTP Basic Auth credentials current so a password change applies
+  // without re-registering the route.
   if (settings.sHTTPpasswd[0] != '\0') {
     httpUpdater.updateCredentials("admin", settings.sHTTPpasswd);
   }
