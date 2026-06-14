@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.192
+**  Version  : v2.0.0-alpha.193
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -347,6 +347,14 @@ void setup() {
   initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)
   #endif
 #endif
+
+  // TASK-865.17: universal human-readable boot banner for the resolved hardware
+  // mode on the telnet/debug stream (all three targets). The combo's log_e above
+  // only reaches the USB console; detectPIC()/initOTDirect() log their own
+  // detail but not one clean resolved-mode line. The indicator must be VISIBLE,
+  // not a silent guess (combo board-delta audit). Mirrors the retained MQTT
+  // otgw-firmware/hardware_mode topic published from sendMQTTversioninfo().
+  SetupDebugf(PSTR("Hardware mode: %S\r\n"), (PGM_P)hardwareModeName());
 
   //setup NTP after WiFi; startNTP() restores hostname after configTime()
 #if defined(_VERSION_PRERELEASE)

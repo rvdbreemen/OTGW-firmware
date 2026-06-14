@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.192
+**  Version  : v2.0.0-alpha.193
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -523,12 +523,15 @@ inline bool hasOTCommandInterface() {
 }
 
 // Returns a PROGMEM string describing the hardware mode for display/MQTT/REST.
+// TASK-865.17: HW_MODE_UNKNOWN reports "Detecting" so the boot-mode indicator
+// reads naturally before detection resolves (the AC's third state). By the time
+// the web UI / MQTT load, eMode is normally already resolved to PIC/OT-Direct.
 inline const __FlashStringHelper* hardwareModeName() {
   switch (state.hw.eMode) {
     case HW_MODE_PIC:        return F("PIC");
     case HW_MODE_OT_DIRECT:  return F("OT-Direct");
     case HW_MODE_DEGRADED:   return F("Degraded");
-    default:                 return F("Unknown");
+    default:                 return F("Detecting");
   }
 }
 

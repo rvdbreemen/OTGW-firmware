@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.192
+**  Version  : v2.0.0-alpha.193
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1597,6 +1597,10 @@ void sendMQTTversioninfo(){
   // ADR-113: static, machine-readable hardware-type slug (board class). Retained so
   // HA/UI can select codepath on hardware identity instead of runtime PIC liveness.
   sendMQTTData(F("otgw-firmware/hardware_type"), hardwareTypeName(), true);
+  // TASK-865.17: runtime-resolved hardware mode (PIC / OT-Direct / Degraded /
+  // Detecting). Plain retained topic alongside hardware_type — no HA-discovery
+  // entry (KISS; hardware_type already carries the board-class slug to HA).
+  sendMQTTData(F("otgw-firmware/hardware_mode"), hardwareModeName(), true);
   if (isPICEnabled()) {
     sendMQTTDataPic(F("version"), state.pic.sFwversion);
     sendMQTTDataPic(F("deviceid"), state.pic.sDeviceid);
