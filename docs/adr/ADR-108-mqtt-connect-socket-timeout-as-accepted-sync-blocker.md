@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Superseded by ADR-131 (2026-06-14). The premise of this ADR (PubSubClient's synchronous `connect()` accepted as a bounded loop-blocker, capped by `setSocketTimeout(5)`) no longer holds: TASK-865.7 replaced PubSubClient with espMqttClient, whose `connect()` is asynchronous, so there is no synchronous connect-stall to bound and `setSocketTimeout` was removed. See ADR-131.
 
 ## Context
 

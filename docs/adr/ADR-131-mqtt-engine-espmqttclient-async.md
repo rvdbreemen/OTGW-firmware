@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Date: 2026-06-13.
+Accepted, 2026-06-14. Proposed 2026-06-13; accepted by the maintainer 2026-06-14.
 
 This is the **Phase 2** networking step that ADR-123 (the 2.0.0 concurrency-model
 decision) anticipated: *"MQTT to espMqttClient (ESP32 path); re-validate the HA
@@ -19,6 +19,11 @@ status_history:
     changed_by: Agent
     reason: Document the ADR-123 Phase-2 MQTT engine swap (PubSubClient to espMqttClient) delivered by TASK-865.7; supersede ADR-108
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted espMqttClient with UseInternalTask::NO as the Phase-2 MQTT engine (async connect, single-threaded loop-pumped); discussed and confirmed the deferral of a dedicated MQTT task to Phase 3+
+    changed_via: manual
 
 ## Context
 
