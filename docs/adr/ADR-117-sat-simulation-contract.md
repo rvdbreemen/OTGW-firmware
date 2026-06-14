@@ -31,6 +31,11 @@ status_history:
     changed_by: Claude (TASK-795)
     reason: Documents the SAT simulation contract implemented in commits 1-3 on the 2.0.0 line (wrappers, synthetic boiler model, bus-tx isolation, edge-triggered availability gate, command trace).
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Proposed
+    changed_by: Robert van den Breemen
+    reason: "Update the bus-path description and self-checks to the ESP32-S3-only reality: the ESP8266 + PIC path was dropped by ADR-128 / TASK-865.x, so HAS_PIC now means esp32-classic + combo-in-PIC-mode. Runtime contract unchanged; stays Proposed."
+    changed_via: manual
 
 ## Context
 
@@ -56,8 +61,9 @@ Two further problems existed:
 This branch drives the boiler-side OT bus through **two** distinct hardware
 paths, both of which must be safe under simulation:
 
-- **`HAS_PIC` builds** (ESP8266 + OTGW PIC, and ESP32-S3 + PIC variants) talk to
-  the PIC over UART via `sendPICSerial()` in `OTGW-Core.ino`.
+- **`HAS_PIC` builds** (ESP32-S3 + OTGW PIC — `esp32-classic` and the combo
+  binary booted in PIC mode; the original ESP8266 + PIC path was dropped by
+  ADR-128) talk to the PIC over UART via `sendPICSerial()` in `OTGW-Core.ino`.
 - **OTGW32** (ESP32-S3 native, `HAS_DIRECT_OT`) drives the bus directly via
   OTDirect; a single emitter, `sendMasterRequestAsync()` in `OTDirect.ino`,
   carries **both** gateway-origin commands and the thermostat-to-boiler
@@ -191,8 +197,8 @@ Negative / risks:
 
 ## Self-checks (in lieu of a dedicated CI gate)
 
-- `python build.py` green on both `HAS_PIC` (ESP8266) and `HAS_DIRECT_OT`
-  (ESP32-S3) targets — the gate helper, edge hook, and presence predicate are
+- `python build.py` green on both `HAS_PIC` (`esp32-classic`) and `HAS_DIRECT_OT`
+  (ESP32-S3 OTGW32) targets — the gate helper, edge hook, and presence predicate are
   capability-gated with `HAS_*` flags, never raw platform `#ifdef`s, so both
   compile.
 - `python evaluate.py --quick` shows no new failures, including the
