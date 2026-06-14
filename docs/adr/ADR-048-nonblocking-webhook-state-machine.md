@@ -1,7 +1,8 @@
 # ADR-048: Non-Blocking Webhook State Machine with Retry
 
-**Status:** Accepted
+**Status:** Superseded by ADR-136 (2026-06-14) on the 2.0.0 ESP32-S3 line
 **Date:** 2026-03-01
+**Superseded:** ADR-136 (2026-06-14, TASK-865.13) collapses this hand-rolled non-blocking `WH_*` state machine onto a dedicated FreeRTOS webhook task: once the webhook send runs off the cooperative loop it MAY block, so the FSM built only to avoid blocking is deleted. The product-level delivery contract (ADR-057) and the timeout params (ADR-075) are unchanged; only the cooperative-FSM mechanism is retired on the 2.0.0 line. See ADR-136 §3.
 **Relates to:** ADR-007 (Timer-Based Task Scheduling), ADR-047 (WiFi State Machine)
 **Clarification:** 2026-03-21 - This ADR remains the mechanism-level decision for cooperative webhook retry. The current implementation retains one pending transition at a time and does not queue or guarantee preservation of every intermediate state change during a retry cycle. See ADR-057 for the policy-level delivery contract.
 

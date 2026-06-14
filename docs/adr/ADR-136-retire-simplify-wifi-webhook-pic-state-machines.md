@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-06-14.
+Accepted, 2026-06-14. Proposed 2026-06-14; accepted by the maintainer 2026-06-14.
 
 This is the **Phase 4 cleanup** that ADR-123 (the 2.0.0 concurrency-model
 decision) named in its §Rollout: "Retire the now-redundant ESP32-side manual
@@ -28,6 +28,11 @@ status_history:
     changed_by: Agent
     reason: Document the ADR-123 Phase-4 retirement/simplification of ADR-047/048/058 delivered by TASK-865.13
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted the Phase-4 per-machine verdict (webhook FSM collapsed onto a dedicated task; WiFi-reconnect and PIC PR= machines retained with rationale); supersedes ADR-048 on the 2.0.0 line
+    changed_via: manual
 
 ## Context
 
