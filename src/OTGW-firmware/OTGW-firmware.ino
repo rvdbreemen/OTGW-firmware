@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.184
+**  Version  : v2.0.0-alpha.185
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -754,10 +754,11 @@ static void handleEspFlashBackgroundTasks()
 {
   handleDebug();              // Keep telnet debug active for monitoring
   // TASK-865.9: HTTP runs on the AsyncTCP task — no handleClient() pump needed.
+  // TASK-865.10: WebSocket is serviced on the AsyncTCP task too — no handleWebSocket()
+  // pump needed during flash. fwupgradestep() progress messages keep the socket warm.
 #if MDNS_NEEDS_UPDATE
   MDNS.update();
 #endif              // Keep MDNS active for network discovery
-  handleWebSocket();          // Keep WebSocket service responsive during flash
 }
 
 static void handlePicFlashBackgroundTasks()
@@ -774,7 +775,8 @@ static void handlePicFlashBackgroundTasks()
   // upgrade FSM while busy()). This REPLACES the old handlePICSerial() drain.
   picSerialPumpUpgrade();
 #endif
-  handleWebSocket();          // Keep WebSocket service responsive during flash
+  // TASK-865.10: WebSocket runs on the AsyncTCP task — no handleWebSocket() pump
+  // needed during flash. fwupgradestep() progress messages keep the socket warm.
 }
 
 
@@ -824,7 +826,14 @@ void doBackgroundTasks()
         loopOTDirect();               // OT-direct GPIO poll
       }
 #endif
-      handleWebSocket();            // WebSocket handling for OT log streaming
+      // TASK-865.10: WebSocket serving moved onto the AsyncTCP service task — there
+      // is no longer a per-loop library poll pump. handleWebSocket() now only does
+      // periodic housekeeping (cleanupClients + 30s keepalive), so it runs on a 1s
+      // timer rather than every loop turn.
+      {
+        DECLARE_TIMER_SEC(timerWsHousekeeping, 1, SKIP_MISSED_TICKS);
+        if (DUE(timerWsHousekeeping)) handleWebSocket();
+      }
       // TASK-865.9: HTTP serving moved onto the AsyncTCP service task — there is
       // no longer a per-loop handleClient() drain. The sat-slider stall / XHR
       // latency ramp (TASK-817) is gone because every parallel socket is served

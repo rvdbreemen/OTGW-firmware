@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-alpha.184
+**  Version  : v2.0.0-alpha.185
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -13,53 +13,55 @@
 **  using WebSockets. Simplified version with direct text broadcasting.
 **
 **  Features:
-**  - WebSocket server on port 81 (separate from HTTP)
+**  - AsyncWebSocket attached to the shared port-80 AsyncWebServer at path /ws
+**    (TASK-865.10, ADR-123 Phase 3): no separate TCP listener, no dedicated port, no loop poll
 **  - Broadcasts log messages directly to all connected clients
 **  - Minimal memory footprint
-**  - Auto-cleanup of disconnected clients
+**  - Auto-cleanup of disconnected clients (cleanupClients() from a periodic timer)
 **
 **  Security:
-**  - The WebSocket server is UNAUTHENTICATED: any client on the reachable
-**    network can connect and receive OpenTherm log messages.
+**  - The WebSocket endpoint is UNAUTHENTICATED: any client on the reachable
+**    network can connect to ws://<host>/ws and receive OpenTherm log messages.
 **  - This is intended for use ONLY on trusted local networks. Do NOT expose
-**    port 81 directly to the internet or untrusted networks.
+**    the /ws endpoint directly to the internet or untrusted networks.
 **  - OpenTherm logs may reveal details about your heating system usage and
 **    configuration. Protect network access accordingly (firewall, VLAN, etc.).
 ***************************************************************************
 */
 
-#include <WebSocketsServer.h>
 #include <TelnetStream.h>
 #include "debugStuff.h"
+#include "webServerCompat.h"   // extern AsyncWebServer server (port 80, TASK-865.9)
 
-// WebSocket server on port 81 (no built-in authentication; local network use only)
-WebSocketsServer webSocket = WebSocketsServer(81);
+// AsyncWebSocket live-log endpoint at path /ws on the shared port-80 server.
+// AsyncWebSocket is NOT a server: startWebSocket() attaches it via
+// server.addHandler(&otLogWs). No built-in authentication; local network use only.
+AsyncWebSocket otLogWs("/ws");
 
-// Close wrapper for prepareForReboot() in helperStuff.ino. The webSocket global
-// is defined here (not extern'd in a header) because it needs WebSocketsServer.h
+// Close wrapper for prepareForReboot() in helperStuff.ino. The otLogWs global
+// is defined here (not extern'd in a header) because it needs ESPAsyncWebServer
 // visibility; wrapping the call keeps helperStuff.ino free of that include chain.
 // Same pattern as doMqttDisconnect() in MQTTstuff.ino.
 void doWebSocketClose() {
-  webSocket.close();
+  otLogWs.closeAll();
 }
 
 // Disconnect-all wrapper for emergencyHeapRecovery() in helperStuff.ino (ADR-107
-// action #1). Same scoping rationale as doWebSocketClose() above. disconnect()
-// without a client index closes all connected WS clients, releasing their
-// lwIP buffers (~2-4 KB each). Browsers reconnect via the graph.js auto-reconnect.
+// action #1). Same scoping rationale as doWebSocketClose() above. closeAll()
+// closes all connected WS clients, releasing their lwIP buffers (~2-4 KB each).
+// Browsers reconnect via the graph.js auto-reconnect.
 void doWebSocketDisconnectAll() {
-  webSocket.disconnect();
+  otLogWs.closeAll();
 }
-
-// Track number of connected WebSocket clients
-static uint8_t wsClientCount = 0;
 
 // Maximum number of simultaneous WebSocket clients
 // Rationale: Each client uses ~700 bytes (256 byte buffer + overhead)
 // Limiting to 3 clients prevents heap exhaustion (3 × 700 = 2100 bytes max)
 #define MAX_WEBSOCKET_CLIENTS 3
 
-// Track WebSocket initialization state
+// Track WebSocket initialization state. Also enforces startWebSocket()
+// idempotency: the handler is attached to the persistent port-80 server exactly
+// once, even though startWebSocket() is called on every WiFi/Ethernet transition.
 static bool wsInitialized = false;
 
 // Application-level keepalive tracking
@@ -127,7 +129,7 @@ static void noteWebSocketBurstEvent(uint8_t eventType) {
             wsBurstMaxRejects,
             wsBurstHeapRejects,
             wsBurstErrors,
-            wsClientCount,
+            (unsigned)otLogWs.count(),
             platformFreeHeap(),
             platformMaxFreeBlock());
     wsBurstLogged = true;
@@ -135,79 +137,73 @@ static void noteWebSocketBurstEvent(uint8_t eventType) {
 }
 
 bool hasWebSocketClients() {
-  return wsInitialized && (wsClientCount > 0);
+  return wsInitialized && (otLogWs.count() > 0);
 }
 
 //===========================================================================================
-// WebSocket event handler
+// WebSocket event handler (AsyncWebSocket AwsEventHandler signature)
 //===========================================================================================
-void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
-  switch(type) {
-    case WStype_DISCONNECTED:
-      wsClientCount = (wsClientCount > 0) ? (wsClientCount - 1) : 0;
+// NOTE: AsyncWebSocket maintains its own client list (otLogWs.count()), so there is
+// no parallel wsClientCount to keep in sync. The new client is already in the list
+// when WS_EVT_CONNECT fires (AsyncWebSocket.cpp: _clients.emplace_back() precedes
+// the event dispatch), so the cap test is "count() > MAX" — count() already includes
+// the just-arrived client.
+void webSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
+                    AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  switch (type) {
+    case WS_EVT_DISCONNECT:
       noteWebSocketBurstEvent(WS_BURST_DISCONNECTED);
-      DebugTf(PSTR("[%lu] WebSocket[%u] disconnected. Clients: %u\r\n"), millis(), num, wsClientCount);
+      DebugTf(PSTR("[%lu] WebSocket[%u] disconnected. Clients: %u\r\n"),
+              millis(), client->id(), (unsigned)otLogWs.count());
       break;
-      
-    case WStype_CONNECTED:
+
+    case WS_EVT_CONNECT:
       {
-        // Check client limit before accepting connection
-        if (wsClientCount >= MAX_WEBSOCKET_CLIENTS) {
+        // Check client limit. count() already includes this new client.
+        if (otLogWs.count() > MAX_WEBSOCKET_CLIENTS) {
           noteWebSocketBurstEvent(WS_BURST_REJECTED_MAX);
-          DebugTf(PSTR("[%lu] WebSocket[%u]: Max clients (%u) reached, rejecting connection\r\n"), 
-            millis(), num, MAX_WEBSOCKET_CLIENTS);
-          webSocket.disconnect(num);
+          DebugTf(PSTR("[%lu] WebSocket[%u]: Max clients (%u) reached, rejecting connection\r\n"),
+            millis(), client->id(), MAX_WEBSOCKET_CLIENTS);
+          client->close();
           return;
         }
-        
-        // Check heap health before accepting connection
-        // Use WARNING threshold to be conservative
+
+        // Check heap health before accepting connection.
+        // Use WARNING threshold to be conservative.
         if (platformFreeHeap() < HEAP_WARNING_THRESHOLD) {
           noteWebSocketBurstEvent(WS_BURST_REJECTED_HEAP);
-          DebugTf(PSTR("[%lu] WebSocket[%u]: Low heap (%u bytes), rejecting connection\r\n"), 
-            millis(), num, platformFreeHeap());
-          webSocket.disconnect(num);
+          DebugTf(PSTR("[%lu] WebSocket[%u]: Low heap (%u bytes), rejecting connection\r\n"),
+            millis(), client->id(), platformFreeHeap());
+          client->close();
           return;
         }
-        
-        IPAddress ip = webSocket.remoteIP(num);
-        wsClientCount++;
+
+        IPAddress ip = client->remoteIP();
         noteWebSocketBurstEvent(WS_BURST_CONNECTED);
-        DebugTf(PSTR("[%lu] WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"), 
-          millis(), num, ip[0], ip[1], ip[2], ip[3], wsClientCount);
+        DebugTf(PSTR("[%lu] WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"),
+          millis(), client->id(), ip[0], ip[1], ip[2], ip[3], (unsigned)otLogWs.count());
       }
       break;
-      
-    case WStype_TEXT:
-      // Handle incoming text from client (currently not used, but available for future commands)
-      DebugTf(PSTR("[%lu] WebSocket[%u] received text (%u bytes)\r\n"),
-              millis(), num, static_cast<unsigned>(length));
+
+    case WS_EVT_DATA:
+      // Handle incoming data from client (currently not used, but available for future commands)
+      DebugTf(PSTR("[%lu] WebSocket[%u] received data (%u bytes)\r\n"),
+              millis(), client->id(), static_cast<unsigned>(len));
       break;
-      
-    case WStype_BIN:
-      // Binary data not supported
-      break;
-      
-    case WStype_ERROR:
+
+    case WS_EVT_ERROR:
       noteWebSocketBurstEvent(WS_BURST_ERROR);
-      DebugTf(PSTR("[%lu] WebSocket[%u] error\r\n"), millis(), num);
+      DebugTf(PSTR("[%lu] WebSocket[%u] error\r\n"), millis(), client->id());
       break;
-      
-    case WStype_FRAGMENT_TEXT_START:
-    case WStype_FRAGMENT_BIN_START:
-    case WStype_FRAGMENT:
-    case WStype_FRAGMENT_FIN:
-      // Fragmented messages not used
+
+    case WS_EVT_PING:
+      // Ping/pong handled automatically by the library
+      DebugTf(PSTR("[%lu] WebSocket[%u] ping\r\n"), millis(), client->id());
       break;
-      
-    case WStype_PING:
-      // Ping/pong handled automatically by library
-      DebugTf(PSTR("[%lu] WebSocket[%u] ping\r\n"), millis(), num);
-      break;
-      
-    case WStype_PONG:
-      // Ping/pong handled automatically by library
-      DebugTf(PSTR("[%lu] WebSocket[%u] pong\r\n"), millis(), num);
+
+    case WS_EVT_PONG:
+      // Ping/pong handled automatically by the library
+      DebugTf(PSTR("[%lu] WebSocket[%u] pong\r\n"), millis(), client->id());
       break;
   }
 }
@@ -217,42 +213,51 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 // Used only for firmware upgrade progress notifications
 //===========================================================================================
 void sendWebSocketJSON(const char *json) {
-  if (wsClientCount > 0) {
+  if (otLogWs.count() > 0) {
     Debugf(PSTR("[%lu] WebSocket broadcast JSON (%u bytes)\r\n"),
            millis(), static_cast<unsigned>(strlen(json)));
-    webSocket.broadcastTXT(json);
+    otLogWs.textAll(json);
   }
 }
 
 //===========================================================================================
-// Start WebSocket server
+// Start WebSocket endpoint (attach the /ws AsyncWebSocket to the port-80 server)
 //===========================================================================================
+// Idempotent: attaches the handler to the persistent port-80 AsyncWebServer exactly
+// once. Called from setup() (OTGW-firmware.ino) and again on every WiFi/Ethernet
+// transition (networkStuff.ino, Ethernet.ino). Those transitions do NOT tear down
+// the AsyncWebServer (they never call startWebserver()/server.begin() again), so the
+// handler survives across them — re-binding would be the bug, the no-op is correct.
+// addHandler() after server.begin() is safe: begin() only starts the TCP listener;
+// _handlers is consulted live per request (ESPAsyncWebServer WebServer.cpp).
 void startWebSocket() {
-  webSocket.begin();
-  webSocket.onEvent(webSocketEvent);
-  
-  // Enable heartbeat to keep connections alive and detect dead connections
-  // Ping every 15 seconds, expect pong within 3 seconds, disconnect after 2 missed pongs
-  // This prevents NAT/firewall timeout and detects stale connections
-  webSocket.enableHeartbeat(15000, 3000, 2);
-  
+  if (wsInitialized) return;
+
+  otLogWs.onEvent(webSocketEvent);
+  server.addHandler(&otLogWs);
+
   wsInitialized = true;
-  Debugf(PSTR("[%lu] WebSocket server started on port 81 with heartbeat enabled\r\n"), millis());
+  Debugf(PSTR("[%lu] WebSocket endpoint attached at ws://<host>/ws (port 80)\r\n"), millis());
 }
 
 //===========================================================================================
-// Handle WebSocket events (call from main loop)
+// Periodic WebSocket housekeeping (call from the main loop / background tasks)
 //===========================================================================================
+// AsyncWebSocket is serviced on the AsyncTCP task — there is no per-loop library poll.
+// This timer-driven helper only does the two things the library cannot do on its own:
+//  1. cleanupClients() reaps closed/stale client slots, capped at MAX_WEBSOCKET_CLIENTS.
+//  2. A 30s application-level keepalive keeps watchdogs fed when no OT log flows and
+//     works around Safari WebSocket ping/pong quirks (ADR-025). Shape is identical to
+//     the old broadcast so index.js's keepalive handling is unchanged.
 void handleWebSocket() {
-  webSocket.loop();
-  
-  // Send application-level keepalive every 30 seconds
-  // This ensures watchdog timers stay alive even when no OTGW log messages flow
-  // Also works around Safari WebSocket ping/pong quirks
+  if (!wsInitialized) return;
+
+  otLogWs.cleanupClients(MAX_WEBSOCKET_CLIENTS);
+
   unsigned long now = millis();
-  if (wsInitialized && wsClientCount > 0 && 
+  if (otLogWs.count() > 0 &&
       (now - lastKeepaliveMs) >= KEEPALIVE_INTERVAL_MS) {
-    webSocket.broadcastTXT("{\"type\":\"keepalive\"}");
+    otLogWs.textAll("{\"type\":\"keepalive\"}");
     lastKeepaliveMs = now;
   }
 }
@@ -267,7 +272,7 @@ void handleWebSocket() {
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
   if (hasWebSocketClients() && logMessage != nullptr && canSendWebSocket()) {
-    webSocket.broadcastTXT(logMessage);
+    otLogWs.textAll(logMessage);
   }
 }
 

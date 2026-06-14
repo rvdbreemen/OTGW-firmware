@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.184
+**  Version  : v2.0.0-alpha.185
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -254,7 +254,7 @@ void publishBoilerUnsupportedMsgids();    // MQTT retained CSV ("14W,16W,24R,...
 void loadOtSupportFiles();                 // read /ot-thermo.json and /ot-boiler.json at boot
 void saveOtSupportFilesIfDirty();          // 15-min debounced atomic write
 void doMqttDisconnect();                 // graceful disconnect for reboot path (MQTTclient is file-static)
-void doWebSocketClose();                 // close all WS clients before reboot (webSocket not extern'd in any header)
+void doWebSocketClose();                 // close all WS clients before reboot (otLogWs not extern'd in any header)
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
 // MQTT discovery verification (ADR-062, TASK-349): state machine lives in
 // mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.

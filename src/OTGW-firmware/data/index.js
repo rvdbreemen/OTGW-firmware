@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.184
+**  Version  : v2.0.0-alpha.185
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -978,8 +978,10 @@ window.saveBlobToLogDir = async function(filename, blob) {
 };
 
 
-// WebSocket configuration: must match the WebSocket port used in webSocketStuff.ino (currently hardcoded as 81 in the WebSocketsServer constructor).
-const WEBSOCKET_PORT = 81;
+// WebSocket configuration: the OT live-log endpoint is the AsyncWebSocket at
+// path /ws on the same port-80 server as the web UI (TASK-865.10, ADR-123 Phase 3).
+// No dedicated port any more — the URL is ws://<host>/ws on the page's own port.
+const WEBSOCKET_PATH = '/ws';
 let wsReconnectTimer = null;
 let wsWatchdogTimer = null;
 let wsConnectDelayTimer = null;
@@ -1639,9 +1641,8 @@ function initOTLogWebSocket(force) {
     wsWatchdogTimer = null;
   }
 
-  const wsHost = window.location.hostname;
-  const wsPort = WEBSOCKET_PORT;
-  const wsURL = 'ws://' + wsHost + ':' + wsPort + '/';
+  const wsHost = window.location.host; // host:port as served (default :80, so no :port)
+  const wsURL = 'ws://' + wsHost + WEBSOCKET_PATH;
   console.log('[WebSocket] Connecting to ' + wsURL);
   
   // Increment connection attempt counter

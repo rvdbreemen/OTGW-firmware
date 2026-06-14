@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v2.0.0-alpha.184
+**  Version  : v2.0.0-alpha.185
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -40,24 +40,19 @@
 #define WM_NODEBUG
 #include <WiFiManager.h>        // version 2.0.4-beta
 
-// WebSocket per-client buffer is 15 KiB (WebSockets library default).
-// The library defines WEBSOCKETS_MAX_DATA_SIZE unconditionally without an
-// #ifndef guard (WebSockets.h), so any pre-define here is overwritten on
-// include and only produces a "redefined" warning. To shrink the buffer
-// the library itself must be patched.
-#include <WebSocketsServer.h>   // WebSocket server for streaming OT log messages to WebUI
-
 /*
  * WebSocket log viewer
  * --------------------
- * The firmware exposes a WebSocket endpoint that streams OpenTherm Gateway log
- * messages to the Web UI. The browser connects to this WebSocket and receives
- * a live feed of OTGW traffic without polling.
+ * The firmware exposes an AsyncWebSocket endpoint at ws://<host>/ws (TASK-865.10,
+ * ADR-123 Phase 3) attached to the shared port-80 AsyncWebServer. It streams
+ * OpenTherm Gateway log messages to the Web UI: the browser connects and receives
+ * a live feed of OTGW traffic without polling. The endpoint and its global
+ * (otLogWs) live in webSocketStuff.ino.
  *
  * Security considerations:
  * - The WebSocket log stream is intended for LOCAL NETWORK USE ONLY.
  * - There is no authentication on the WebSocket endpoint.
- * - Do NOT expose the OTGW HTTP/WebSocket ports directly to the internet.
+ * - Do NOT expose the OTGW HTTP/WebSocket port directly to the internet.
  */
 
 //=====[ Types ]===============================================================
