@@ -2,7 +2,8 @@
 
 ## Status
 
-Proposed, 2026-06-14.
+Accepted, 2026-06-14. Proposed 2026-06-14; accepted by the maintainer 2026-06-14,
+with the unconditional-0x26-feed fix folded into TASK-865.12 (see Decision §3).
 
 This is the **watchdog half of Phase 4** of the 2.0.0 concurrency-model rollout
 (ADR-123), landing after the ESP8266 source drop (ADR-128, TASK-865.2) and the
@@ -29,6 +30,11 @@ status_history:
     changed_by: Agent
     reason: Re-scope the watchdog (ADR-011) onto the ESP32 TWDT as primary and demote the external 0x26 I2C chip to optional secondary, after the ESP8266 drop (ADR-128) retired the single-failure-domain rationale; delivered by TASK-865.12; cross-refs ADR-123/127/128/130
     changed_via: adr-kit
+  - date: 2026-06-14
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "Maintainer accepted after folding the unconditional-0x26-feed fix into TASK-865.12: arm, feed and boot-read now all run unconditionally on HAS_PIC_WATCHDOG (no isPICEnabled() gate), removing the arm-unconditional/feed-gated asymmetry that could spurious-reset-loop a combo on an old Classic PCB with a dead PIC. Amends ADR-011."
+    changed_via: manual
 
 ## Context
 

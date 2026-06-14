@@ -1,8 +1,10 @@
 # ADR-011: External Hardware Watchdog for Reliability
 
-**Status:** Accepted  
+**Status:** Amended by ADR-135 (2026-06-14) on the 2.0.0 ESP32-S3 line  
 **Date:** 2018-01-01 (Estimated - initial hardware design)  
-**Updated:** 2026-01-28 (Documentation)
+**Updated:** 2026-06-14 (Amended by ADR-135)
+
+**Amended:** On the 2.0.0 ESP32-S3 line, ADR-135 re-scopes the watchdog: the ESP32 Task Watchdog Timer (TWDT) is the primary recovery mechanism and the external 0x26 I2C chip is demoted to an OPTIONAL SECONDARY layer (fed unconditionally on every `HAS_PIC_WATCHDOG` build, absent = harmless NACK). This ADR's 0x26 I2C protocol mechanics stay authoritative as the chip reference; only the architectural premise (external chip as primary because the ESP8266 software watchdog shares the firmware's failure domain) is retired, since ADR-128 dropped ESP8266. See ADR-135.
 
 ## Context
 
