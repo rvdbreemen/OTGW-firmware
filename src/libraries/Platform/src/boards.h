@@ -168,7 +168,7 @@ typedef uint16_t SAT_RING_IDX_T;
 
 // Feature flags — Classic gateway capabilities on an S3 Mini
 #define HAS_PIC           1    // PIC microcontroller drives the OT bus
-#define HAS_PIC_WATCHDOG  1    // Classic PCB carries the external 0x26 I2C watchdog
+#define HAS_PIC_WATCHDOG  1    // Classic PCB carries the external 0x26 I2C watchdog (optional SECONDARY; ESP32 TWDT is primary, ADR-135)
 #define HAS_DIRECT_OT     0    // No OT-direct hardware on the Classic PCB
 #define HAS_ETH_CAPABLE   0    // No W5500 on the Classic PCB
 #define HAS_OLED_CAPABLE  1    // Optional I2C OLED on the Classic I2C header
@@ -232,9 +232,10 @@ typedef uint16_t SAT_RING_IDX_T;
   // HAS_DIRECT_OT used by the fixed boards is replaced by runtime gating.
   #undef  HAS_PIC
   #define HAS_PIC           1    // PIC serial driver (OTGWSerial) is linked in
-  // The Classic PCB carries the external 0x26 I2C watchdog; the combo feeds it
-  // at runtime only when the PIC was detected (isPICEnabled()). On an OTGW32
-  // the feed is a NACKed no-op on floating pins.
+  // The Classic PCB carries the external 0x26 I2C watchdog as an OPTIONAL
+  // SECONDARY layer (the ESP32 TWDT is the primary watchdog, ADR-135); the combo
+  // feeds it at runtime only when the PIC was detected (isPICEnabled()). On an
+  // OTGW32 the feed is a NACKed no-op on floating pins.
   #undef  HAS_PIC_WATCHDOG
   #define HAS_PIC_WATCHDOG  1
   // HAS_DIRECT_OT stays 1 (OTDirect linked in, from the OTGW32 base).

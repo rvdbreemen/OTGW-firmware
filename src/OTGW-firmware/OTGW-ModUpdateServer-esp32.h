@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.186
+**  Version  : v2.0.0-alpha.187
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -300,8 +300,12 @@ private:
     if (len == 0) return;
     if (_serial_output) blinkLEDnow(PIN_LED1);
 
-    // Feed hardware watchdog (I2C address 0x26). Short Wire transaction, safe on
-    // the AsyncTCP task; must fire per write chunk through a multi-MB upload.
+    // Feed the SECONDARY external 0x26 watchdog (Classic PCB) per write chunk
+    // through a multi-MB upload. The PRIMARY ESP32 TWDT (ADR-135) watches the
+    // loop task, which keeps resetting via doBackgroundTasks()->feedWatchDog()
+    // while this async chunk write runs, so the TWDT needs no reset here. Short
+    // Wire transaction, safe on the AsyncTCP task; a NACKed no-op on an OTGW32
+    // where the 0x26 pins float.
     Wire.beginTransmission(0x26);
     Wire.write(0xA5);
     Wire.endTransmission();

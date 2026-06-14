@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.186
+**  Version  : v2.0.0-alpha.187
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -58,11 +58,9 @@
 #endif
 
 #if HAS_PIC_WATCHDOG
-//external watchdog (Classic ESP8266 I2C watchdog board at 0x26) — ADR-125
+// External secondary I2C watchdog at 0x26 on the OTGW Classic PCB (esp32-classic
+// + combo-in-PIC-mode). The ESP32 TWDT is the primary watchdog (ADR-135).
 #define EXT_WD_I2C_ADDRESS 0x26
-
-//Macro to Feed the Watchdog
-#define FEEDWATCHDOGNOW   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   Wire.write(0xA5);   Wire.endTransmission();
 #endif
 
 #if HAS_PIC
@@ -1160,111 +1158,70 @@ void sendPICBootCommands(){
 }
 
 //===================[ Watchdog OTGW ]===============================
-// Three shapes (ADR-127):
-//   1. HAS_PIC_WATCHDOG fixed boards (esp8266, esp32-classic): external 0x26
-//      I2C watchdog only — unchanged.
-//   2. Combo (HAS_PIC_WATCHDOG + HAS_RUNTIME_HW_DETECT): ESP32 TWDT always,
-//      plus the 0x26 feed at runtime when the PIC (Classic PCB) was detected.
-//   3. OTGW32 (no HAS_PIC_WATCHDOG): ESP32 TWDT only — unchanged.
-#if HAS_PIC_WATCHDOG && !HAS_RUNTIME_HW_DETECT
-// External I2C watchdog at 0x26 — OTGW Classic PCB (ESP8266 + esp32-classic).
-void initWatchDog(char* reasonBuf, size_t reasonSize) {
-  // Hardware WatchDog is based on:
-  // https://github.com/rvdbreemen/ESPEasySlaves/tree/master/TinyI2CWatchdog
-  // Code here is based on ESPEasy code, modified to work in the project.
-
-  // configure hardware pins according to eeprom settings.
-  if (reasonSize > 0) reasonBuf[0] = '\0';
-  OTDebugTln(F("Setup Watchdog"));
-  OTDebugTln(F("INIT : I2C"));
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);  //configure the I2C bus
-  //=============================================
-  // I2C Watchdog boot status check
-  delay(100);
-  Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   // OTGW WD address
-  Wire.write(0x83);             // command to set pointer
-  Wire.write(17);               // pointer value to status byte
-  Wire.endTransmission();
-
-  Wire.requestFrom((uint8_t)EXT_WD_I2C_ADDRESS, (uint8_t)1);
-  if (Wire.available())
-  {
-    byte status = Wire.read();
-    if (status & 0x1)
-    {
-      OTDebugTln(F("INIT : Reset by WD!"));
-      strlcpy(reasonBuf, "Reset by External WD\r\n", reasonSize);
-      //lastReset = BOOT_CAUSE_EXT_WD;
-    }
-  }
-  //===========================================
-}
-
-void WatchDogEnabled(byte stateWatchdog){
-    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
-    Wire.write(7);                                //Write to register 7, the action register
-    Wire.write(stateWatchdog);                    //1 = armed to reset, 0 = turned off     
-    Wire.endTransmission();                       //That's all there is...
-}
-
-//===[ Feed the WatchDog before it bites! ]===
-void feedWatchDog() {
-  //Feed the watchdog at most every 100ms to prevent hardware watchdog resets
-  //during blocking operations while limiting I2C bus traffic
-  //==== feed the WD over I2C ==== 
-  // Address: 0x26
-  // I2C Watchdog feed - rate limited to 100ms
-  DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
-  if DUE(timerWD)
-  {
-    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
-    Wire.write(0xA5);                             //Feed the dog, before it bites.
-    Wire.endTransmission();                       //That's all there is...
-
-  }
-
-  //==== blink LED1 once a second to show we are alive ====
-  DECLARE_TIMER_MS(timerWDBlink, 1000, SKIP_MISSED_TICKS);
-  if DUE(timerWDBlink)
-  {
-    blinkLEDnow(LED1);
-  }
-  //yield();
-}
-
-#elif HAS_PIC_WATCHDOG && HAS_RUNTIME_HW_DETECT
-// Combo (ADR-127): ESP32 TWDT is the always-on safety net; the external 0x26
-// watchdog exists only on the Classic PCB, so its feed is gated at runtime on
-// isPICEnabled(). A 0x26 write in OTDirect mode would land on the OTGW32 OLED
-// I2C bus at an unused address — a NACKed no-op — but skipping it keeps the
-// bus quiet.
+// Two shapes after the ESP8266 drop (ADR-128) + TWDT re-scope (ADR-135):
+//   1. HAS_PIC_WATCHDOG (esp32-classic + combo): the ESP32 Task Watchdog Timer
+//      (TWDT) is the ALWAYS-ON primary safety net; the external 0x26 I2C
+//      watchdog on the OTGW Classic PCB is an OPTIONAL SECONDARY layer.
+//      - esp32-classic (fixed, HAS_RUNTIME_HW_DETECT=0): the PCB always carries
+//        the 0x26 chip, so its feed/boot-read run unconditionally.
+//      - combo (HAS_RUNTIME_HW_DETECT=1): the 0x26 chip exists only when booted
+//        into PIC mode (Classic PCB), so its feed/boot-read are runtime-gated on
+//        isPICEnabled(). A 0x26 write in OTDirect mode would land on the OTGW32
+//        OLED I2C bus at an unused address — a NACKed no-op — but skipping it
+//        keeps the bus quiet.
+//   2. !HAS_PIC_WATCHDOG (OTGW32): ESP32 TWDT only — no external chip.
+// The TWDT subscribes the loop task only (esp_task_wdt_add(NULL) from the loop
+// context); see ADR-135 §"PIC task subscription" for the explicit decision not
+// to subscribe the dedicated PIC-UART task.
+#if HAS_PIC_WATCHDOG
+// esp32-classic + combo: TWDT primary, external 0x26 optional secondary.
 #include <esp_task_wdt.h>
 
-// See the OTGW32 block below for the s_twdtReady rationale (early feed calls).
+// True once the loop task is registered with the TWDT (initWatchDog ran).
+// feedWatchDog() is called all through early setup() — long BEFORE initWatchDog()
+// (which sits after the network bring-up) — so resetting the TWDT before the
+// loop task is subscribed spams "esp_task_wdt_reset: task not found". Guard on
+// this flag: no spam, and the TWDT simply isn't armed until it's set up.
 static bool s_twdtReady = false;
+
+// secondaryWatchdogActive — true when the external 0x26 chip is physically
+// present and should be driven this build/boot. On a fixed esp32-classic the PCB
+// always carries it (unconditional). On the combo it exists only in PIC mode, so
+// gate on isPICEnabled() there (a 0x26 write in OTDirect mode is a NACKed no-op
+// on floating pins). HAS_RUNTIME_HW_DETECT is a compile-time constant, so the
+// fixed-board branch folds to `true` at compile time (no isPICEnabled() call).
+static inline bool secondaryWatchdogActive() {
+  return (!HAS_RUNTIME_HW_DETECT) || isPICEnabled();
+}
 
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   if (reasonSize > 0) reasonBuf[0] = '\0';
-  OTDebugTln(F("Setup ESP32 Task Watchdog (combo)"));
+  OTDebugTln(F("Setup ESP32 Task Watchdog (primary) + external 0x26 (secondary)"));
   Wire.begin(activeI2cSda(), activeI2cScl());  // I2C for OLED/sensors/0x26 (resolved pins)
+  // ---- PRIMARY: arm the ESP32 TWDT (loop task) -----------------------------
   const esp_task_wdt_config_t twdtConfig = {
     .timeout_ms = 30000,
     .idle_core_mask = 0,
     .trigger_panic = true,
   };
+  // Arduino-ESP32 may have already initialized the TWDT before setup() runs.
+  // Try reconfigure first; fall back to init if not yet running.
   esp_err_t err = esp_task_wdt_reconfigure(&twdtConfig);
   if (err == ESP_ERR_INVALID_STATE) {
     esp_task_wdt_init(&twdtConfig);
   }
+  // Subscribe the loop task only if not already subscribed (ADR-135).
   if (esp_task_wdt_status(NULL) != ESP_OK) {
     esp_task_wdt_add(NULL);
   }
-  s_twdtReady = true;
+  s_twdtReady = true;  // from here feedWatchDog() may safely reset the TWDT
 
-  if (isPICEnabled()) {
-    // Classic PCB: read the 0x26 boot-status register (reset-by-WD flag).
+  // ---- SECONDARY: read the external 0x26 boot-status (reset-by-WD flag) -----
+  // Hardware WatchDog is based on:
+  // https://github.com/rvdbreemen/ESPEasySlaves/tree/master/TinyI2CWatchdog
+  if (secondaryWatchdogActive()) {
     delay(100);
-    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);
+    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   // OTGW WD address
     Wire.write(0x83);             // command to set pointer
     Wire.write(17);               // pointer value to status byte
     Wire.endTransmission();
@@ -1272,7 +1229,7 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
     if (Wire.available()) {
       byte status = Wire.read();
       if (status & 0x1) {
-        OTDebugTln(F("INIT : Reset by WD!"));
+        OTDebugTln(F("INIT : Reset by external WD!"));
         strlcpy(reasonBuf, "Reset by External WD\r\n", reasonSize);
       }
     }
@@ -1280,25 +1237,32 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
 }
 
 void WatchDogEnabled(byte stateWatchdog) {
-  // 0x26 arm/disarm goes out regardless of mode: the boot-time disarm runs
-  // BEFORE detection (and a stray write on an OTGW32 is a NACKed no-op).
-  // The TWDT itself is always running and has no enable/disable.
-  Wire.beginTransmission(EXT_WD_I2C_ADDRESS);
-  Wire.write(7);                                // action register
-  Wire.write(stateWatchdog);                    // 1 = armed, 0 = off
-  Wire.endTransmission();
+  // SECONDARY only. The TWDT is always running and has no enable/disable; this
+  // arms/disarms the external 0x26 chip (OTA flash disarm, boot-time disarm).
+  // On the combo the boot-time disarm runs BEFORE detection and a stray write on
+  // an OTGW32 is a NACKed no-op, so the arm/disarm goes out regardless of mode.
+  Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
+  Wire.write(7);                                //Write to register 7, the action register
+  Wire.write(stateWatchdog);                    //1 = armed to reset, 0 = turned off
+  Wire.endTransmission();                       //That's all there is...
 }
 
+//===[ Feed the WatchDog before it bites! ]===
 void feedWatchDog() {
+  // Rate-limit to at most every 100ms: bounds I2C bus traffic to the 0x26 chip
+  // and the TWDT reset rate during long blocking operations.
   DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
   if (DUE(timerWD)) {
+    // PRIMARY: reset the ESP32 TWDT (loop task).
     if (s_twdtReady) esp_task_wdt_reset();
-    if (isPICEnabled()) {
-      Wire.beginTransmission(EXT_WD_I2C_ADDRESS);
-      Wire.write(0xA5);                         // feed the dog, before it bites
-      Wire.endTransmission();
+    // SECONDARY: feed the external 0x26 chip when present.
+    if (secondaryWatchdogActive()) {
+      Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
+      Wire.write(0xA5);                             //Feed the dog, before it bites.
+      Wire.endTransmission();                       //That's all there is...
     }
   }
+  //==== blink LED1 once a second to show we are alive ====
   DECLARE_TIMER_MS(timerWDBlink, 1000, SKIP_MISSED_TICKS);
   if DUE(timerWDBlink) {
     blinkLEDnow(LED1);
@@ -1353,7 +1317,7 @@ void feedWatchDog() {
     blinkLEDnow(LED1);
   }
 }
-#endif // watchdog shape dispatch (ADR-127)
+#endif // watchdog shape dispatch (ADR-127 / ADR-135 TWDT re-scope)
 
 //===================[ END Watchdog OTGW ]===============================
 

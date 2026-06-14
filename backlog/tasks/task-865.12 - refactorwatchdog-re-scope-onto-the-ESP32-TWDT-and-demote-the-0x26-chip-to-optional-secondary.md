@@ -3,9 +3,11 @@ id: TASK-865.12
 title: >-
   refactor(watchdog): re-scope onto the ESP32 TWDT and demote the 0x26 chip to
   optional secondary
-status: To Do
-assignee: []
+status: In Review
+assignee:
+  - '@claude'
 created_date: '2026-06-13 05:56'
+updated_date: '2026-06-14 09:22'
 labels:
   - async-esp32s3
 dependencies:
@@ -35,3 +37,9 @@ Note: OTGW-ModUpdateServer-impl.h (flash-feed ~206) is DELETED by seq2; the ESP3
 - A superseding/amending ADR (2.0.0 numbering) for ADR-011 is Accepted: TWDT-primary + optional-secondary-0x26 + retired single-failure-domain rationale, cross-ref ADR-123/127.
 - field: on esp32 (OTGW32) + esp32-classic, an induced loop hang triggers a TWDT panic-reset within timeout; on esp32-classic the 0x26 chip does NOT spuriously reset in normal operation; OTA + PIC-flash complete without a watchdog reset on both.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Landed TWDT re-scope (ADR-135): three watchdog shapes collapsed to two. #if HAS_PIC_WATCHDOG (esp32-classic + combo) now arms the ESP32 TWDT as PRIMARY with the external 0x26 I2C chip demoted to optional SECONDARY via secondaryWatchdogActive() = (!HAS_RUNTIME_HW_DETECT) || isPICEnabled(); #else (OTGW32) is TWDT-only. The retired esp8266-only external-only (no-TWDT) branch is gone (grep: 0 matches for 'HAS_PIC_WATCHDOG && !HAS_RUNTIME_HW_DETECT'). WatchDogEnabled() arms/disarms 0x26 on PCB boards, no-op on OTGW32. OTA per-chunk feed re-pointed from the deleted OTGW-ModUpdateServer-impl.h to OTGW-ModUpdateServer-esp32.h async handler; loop-task TWDT needs no reset there (loop keeps feeding via doBackgroundTasks). TWDT subscribes the loop task only (explicit decision; PIC-UART task deliberately not subscribed, residual gap recorded in ADR-135 Alternative 3). VERIFIED: esp32 + esp32-classic builds exit 0 (per-env [SUCCESS] grep-confirmed, not just wrapper exit); evaluate.py --quick 0 failures (1 pre-existing boards.h-path warning, present on clean tree). REMAINING (field-validation, blocks Done): (a) induced loop hang triggers TWDT panic-reset within timeout on esp32 + esp32-classic; (b) on esp32-classic the 0x26 chip does NOT spuriously reset in normal operation; (c) OTA + PIC-flash complete without a watchdog reset on both. SEPARATE: ADR-135 acceptance is pending maintainer ratification (Proposed; accepted in a later docs(adr) commit per repo convention, like ADR-131..134).
+<!-- SECTION:NOTES:END -->
