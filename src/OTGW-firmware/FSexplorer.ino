@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.183
+**  Version  : v2.0.0-alpha.184
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -25,23 +25,19 @@
 **      
 **      setup()
 **      {
-**        setupFSexplorer();
-**        httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
-**        httpServer.on("/",          sendIndexPage);
-**        httpServer.on("/index",     sendIndexPage);
-**        httpServer.on("/index.html",sendIndexPage);
-**        httpServer.begin();
+**        setupFSexplorer();   // registers routes on the AsyncWebServer `server`
+**        startWebserver();    // serveStatic + index routes + server.begin()
 **      }
-**      
+**
 **      loop()
 **      {
-**        httpServer.handleClient();
-**        .
-**        .
+**        // No handleClient() — ESPAsyncWebServer serves on the AsyncTCP task.
 **      }
 */
 // forward declaration — contentType is defined later in this file (line ~565)
 const String &contentType(String& filename);
+// forward declaration — used in setupFSexplorer() before its definition below.
+static void sendFSexplorerRedirect();
 
 #define MAX_FILES_IN_LIST   40
 
@@ -74,263 +70,278 @@ const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCa
 // WebServer that turns an 8-round-trip reload into ~1 request (index.html revalidate).
 static void serveVersionedAsset(const char* path, const __FlashStringHelper* mime) {
   const char* fsHash = getFilesystemHash();
-  if (httpServer.hasArg("v") && fsHash[0] != '\0' &&
-      strcmp(httpServer.arg("v").c_str(), fsHash) == 0) {
-    httpServer.sendHeader(F("Cache-Control"), F("public, max-age=86400"));
+  if (hasArgCompat("v") && fsHash[0] != '\0' &&
+      strcmp(argCompat("v"), fsHash) == 0) {
+    webPushHeader(F("Cache-Control"), F("public, max-age=86400"));
   } else {
-    httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+    webPushHeader(F("Cache-Control"), F("no-cache"));
   }
   char gzPath[64];
   snprintf_P(gzPath, sizeof(gzPath), PSTR("%s.gz"), path);
+  // request->send(LittleFS, ...) streams the file straight from flash on the
+  // async task — the ~39 KB assets never get buffered whole in RAM. The .gz
+  // sibling is served with an explicit Content-Encoding: gzip (TASK-304/433).
   if (LittleFS.exists(gzPath)) {
-    File f = LittleFS.open(gzPath, "r");
-    httpServer.streamFile(f, mime);
-    f.close();
+    webSendFile(gzPath, mime, /*gzip=*/true);
   } else {
-    File f = LittleFS.open(path, "r");
-    if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
-    httpServer.streamFile(f, mime);
-    f.close();
+    if (!LittleFS.exists(path)) { webSend(404, F("text/plain"), F("File not found")); return; }
+    webSendFile(path, mime, /*gzip=*/false);
   }
+}
+
+// Serve /FSexplorer.html for the no-index fallback routes (/, /index, /index.html).
+static void sendFSexplorerFallback(AsyncWebServerRequest *request) {
+  webBeginRequest(request);
+  webSendFile("/FSexplorer.html", F("text/html; charset=UTF-8"), /*gzip=*/false);
+}
+
+// ── Chunked index.html emitter (TASK-865.9) ─────────────────────────────────
+// The ~39 KB index.html is streamed via beginChunkedResponse: ESPAsyncWebServer
+// PULLS bytes through the filler below, so the page is NEVER buffered whole on
+// the fragmented S3 heap (the recorded "do NOT route index.html through
+// AsyncResponseStream" constraint). The filler preserves the exact ?v=<fsHash>
+// versioned-asset injection: it reads index.html line-by-line, rewrites each
+// versioned src=/href= attribute to carry ?v=<hash> before its closing quote,
+// and emits the result. State that must survive across filler calls (the open
+// File, a residual carry buffer for a rewritten line that did not fit the
+// caller's buffer) lives in a heap struct owned by a shared_ptr captured in the
+// filler closure; it is freed when the response (and the closure) is destroyed.
+struct IndexEmitState {
+  File     f;
+  char     carry[640];   // a rewritten line can exceed the source line (?v=<hash> added 8x)
+  size_t   carryLen = 0;
+  size_t   carryPos = 0;
+  bool     done     = false;
+};
+
+static void sendIndex(AsyncWebServerRequest *request) {
+  webBeginRequest(request);
+
+  // Auth guard: if a password is configured, require it upfront so the browser
+  // caches credentials before any API calls are made — avoids mid-session popup.
+  if (!checkHttpAuth()) return;
+
+  if (!LittleFS.exists("/index.html")) {
+    webSend(404, F("text/plain"), F("File not found"));
+    return;
+  }
+
+  const char* fsHash = getFilesystemHash();
+  const bool  hasHash = (fsHash && fsHash[0] != '\0');
+
+  char etag[24] = {0};
+  if (hasHash) {
+    // ETags must be double-quoted per RFC 7232.
+    snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
+    // Conditional GET: return 304 if the browser's cached copy is still current.
+    if (hasHeaderCompat(F("If-None-Match")) &&
+        strcmp(headerCompat(F("If-None-Match")), etag) == 0) {
+      webPushHeader(F("Cache-Control"), F("no-cache"));
+      webPushHeader(F("ETag"), etag);
+      webSendStatus(304);
+      return;
+    }
+    webPushHeader(F("ETag"), etag);
+  }
+  // no-cache + ETag: browser stores the response but revalidates each visit.
+  webPushHeader(F("Cache-Control"), F("no-cache"));
+
+  auto st = std::make_shared<IndexEmitState>();
+  st->f = LittleFS.open("/index.html", "r");
+  if (!st->f) { webSend(404, F("text/plain"), F("File not found")); return; }
+
+  // The versioned-asset tokens: the full src="..."/href="..." attribute INCLUDING
+  // its closing quote; ?v=<hash> is inserted just before that quote.
+  AsyncWebServerResponse *response = request->beginChunkedResponse(
+    "text/html; charset=UTF-8",
+    [st, fsHash, hasHash](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+      static const char *const toks[8] = {
+        "src=\"./index.js\"",         "src=\"./graph.js\"",
+        "src=\"./sat.js\"",           "src=\"./sat-slider.js\"",
+        "src=\"./echarts-theme.js\"", "src=\"./theme-toggle.js\"",
+        "href=\"ds-tokens.css\"",     "href=\"components.css\""
+      };
+      const size_t hashLen = hasHash ? strlen(fsHash) : 0;
+      size_t written = 0;
+
+      while (written < maxLen) {
+        // Drain any carry left from a previous call first.
+        if (st->carryPos < st->carryLen) {
+          size_t n = st->carryLen - st->carryPos;
+          size_t room = maxLen - written;
+          if (n > room) n = room;
+          memcpy(buffer + written, st->carry + st->carryPos, n);
+          written += n;
+          st->carryPos += n;
+          continue;
+        }
+        if (st->done) break;
+        if (!st->f.available()) { st->done = true; break; }
+
+        // Read one source line into the carry buffer, then rewrite in place.
+        char lineBuf[512];
+        int rd = st->f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
+        lineBuf[rd] = '\0';
+        if (rd > 0 && lineBuf[rd - 1] == '\r') lineBuf[--rd] = '\0';
+
+        // Build the rewritten line in st->carry (with the trailing '\n').
+        size_t c = 0;
+        auto put = [&](const char *s, size_t len) {
+          if (c + len > sizeof(st->carry)) len = sizeof(st->carry) - c;
+          memcpy(st->carry + c, s, len); c += len;
+        };
+        bool injected = false;
+        if (hasHash) {
+          for (uint8_t k = 0; k < 8; k++) {
+            const char *pos = strstr(lineBuf, toks[k]);
+            if (!pos) continue;
+            size_t tlen = strlen(toks[k]);
+            put(lineBuf, (size_t)(pos - lineBuf) + tlen - 1); // prefix + attr without closing quote
+            put("?v=", 3);
+            put(fsHash, hashLen);
+            put("\"", 1);
+            const char *suffix = pos + tlen;
+            put(suffix, strlen(suffix));
+            injected = true;
+            break;
+          }
+        }
+        if (!injected) put(lineBuf, (size_t)rd);
+        put("\n", 1);
+
+        st->carry[c < sizeof(st->carry) ? c : sizeof(st->carry) - 1] = '\0';
+        st->carryLen = c;
+        st->carryPos = 0;
+        feedWatchDog();
+      }
+
+      if (written == 0 && st->done && st->carryPos >= st->carryLen) {
+        st->f.close();
+        return 0;  // end of stream
+      }
+      return written;
+    });
+  webApplyHeaders(response);
+  request->send(response);
+  g_responseSent = true;
 }
 
 //=====================================================================================
 void startWebserver(){
+  // Versioned-asset helpers register one handler per asset; the lambda binds the
+  // request context before delegating to serveVersionedAsset().
   if (!LittleFS.exists("/index.html")) {
-    httpServer.on("/", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
-    httpServer.on("/index", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
-    httpServer.on("/index.html", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
-  } else{
+    server.on("/",           HTTP_GET, sendFSexplorerFallback);
+    server.on("/index",      HTTP_GET, sendFSexplorerFallback);
+    server.on("/index.html", HTTP_GET, sendFSexplorerFallback);
+  } else {
     // Serve index.html with ETag-based caching:
     //  - Browser caches index.html but always revalidates via If-None-Match (ETag = fsHash).
     //  - Unchanged FS → server replies 304 Not Modified (headers only, no body re-download).
     //  - FS upgraded → ETag changes → server replies 200 with fresh content.
     //  - JS assets use ?v=<fsHash> versioned URLs for independent long-term caching.
-    auto sendIndex = []() {
-      // Auth guard: if a password is configured, require it upfront so the browser
-      // caches credentials before any API calls are made — avoids mid-session popup.
-      if (!checkHttpAuth()) return;
+    server.on("/",           HTTP_GET, sendIndex);
+    server.on("/index",      HTTP_GET, sendIndex);
+    server.on("/index.html", HTTP_GET, sendIndex);
+  }
+  server.serveStatic("/FSexplorer.png", LittleFS, "/FSexplorer.png");
 
-      File f = LittleFS.open("/index.html", "r");
-      if (!f) {
-        httpServer.send(404, F("text/plain"), F("File not found"));
-        return;
-      }
-
-      const char* fsHash = getFilesystemHash();
-      bool hasHash = (fsHash && fsHash[0] != '\0');
-
-      if (hasHash) {
-        // ETags must be double-quoted per RFC 7232.
-        char etag[24];
-        snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
-
-        // Conditional GET: return 304 if browser's cached copy is still current.
-        if (httpServer.hasHeader(F("If-None-Match")) &&
-            strcmp(httpServer.header(F("If-None-Match")).c_str(), etag) == 0) {
-          f.close();
-          httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-          httpServer.sendHeader(F("ETag"), etag);
-          httpServer.send(304);
-          return;
-        }
-
-        httpServer.sendHeader(F("ETag"), etag);
-      }
-
-      // no-cache + ETag: browser stores the response but revalidates each visit.
-      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-
-      httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-      httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
-      // Disable Nagle on the serve socket: the chunked writes below must not be
-      // coalesced/delayed by ~200 ms delayed-ACK round-trips (TASK-823).
-      httpServer.client().setNoDelay(true);
-
-      // Stream the rewritten index.html (?v=<hash> injected before each versioned asset
-      // URL's closing quote) through a 1 KB accumulation buffer flushed in chunks, NOT
-      // line-by-line. The previous per-line sendContent() emitted ~2000 tiny chunked
-      // writes for the ~39 KB page, each its own TCP segment throttled by delayed-ACK to
-      // ~2.5 KB/s (~16 s isolated, and a Task-watchdog reboot trigger under cold-load).
-      // Batching to ~1 KB collapses that to ~40 writes. (TASK-823)
-      //
-      // txbuf/lineBuf are stack-local (not static): emit/flush can yield via feedWatchDog()
-      // which may re-enter sendIndex(); a shared static buffer would be clobbered mid-page.
-      // 1 KB + 512 B per frame keeps a re-entered call within the ESP8266 ~4 KB CONT stack.
-      char   txbuf[1024];
-      size_t txlen = 0;
-      auto flushTx = [&]() {
-        if (txlen) {
-          httpServer.sendContent(txbuf, txlen);
-          txlen = 0;
-          feedWatchDog();
-        }
-      };
-      auto emitTx = [&](const char* s, size_t len) {
-        while (len) {
-          if (txlen == sizeof(txbuf)) flushTx();
-          size_t room = sizeof(txbuf) - txlen;
-          size_t take = (len < room) ? len : room;
-          memcpy(txbuf + txlen, s, take);
-          txlen += take; s += take; len -= take;
-        }
-      };
-
-      // Versioned asset tokens: the full src="..." / href="..." attribute INCLUDING its
-      // closing quote; ?v=<hash> is inserted just before that quote. One asset per line.
-      PGM_P toks[8] = {
-        PSTR("src=\"./index.js\""),         PSTR("src=\"./graph.js\""),
-        PSTR("src=\"./sat.js\""),           PSTR("src=\"./sat-slider.js\""),
-        PSTR("src=\"./echarts-theme.js\""), PSTR("src=\"./theme-toggle.js\""),
-        PSTR("href=\"ds-tokens.css\""),     PSTR("href=\"components.css\"")
-      };
-      const size_t hashLen = hasHash ? strlen(fsHash) : 0;
-
-      char lineBuf[512];
-      while (f.available()) {
-        int n = f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
-        lineBuf[n] = '\0';
-        if (n > 0 && lineBuf[n - 1] == '\r') lineBuf[--n] = '\0';
-
-        bool injected = false;
-        if (hasHash) {
-          for (uint8_t k = 0; k < 8; k++) {
-            const char* pos = strstr_P(lineBuf, toks[k]);
-            if (!pos) continue;
-            size_t tlen = strlen_P(toks[k]);
-            emitTx(lineBuf, (size_t)(pos - lineBuf) + tlen - 1); // prefix + attr without closing quote
-            emitTx("?v=", 3);
-            emitTx(fsHash, hashLen);
-            emitTx("\"", 1);
-            const char* suffix = pos + tlen;                      // remainder after the closing quote
-            emitTx(suffix, strlen(suffix));
-            injected = true;
-            break;
-          }
-        }
-        if (!injected) emitTx(lineBuf, (size_t)n);
-        emitTx("\n", 1);
-      }
-      flushTx();
-      httpServer.sendContent(F("")); // End chunked stream
-      f.close();
-    };
-    
-    httpServer.on("/", sendIndex);
-    httpServer.on("/index", sendIndex);
-    httpServer.on("/index.html", sendIndex);
-  } 
-  httpServer.serveStatic("/FSexplorer.png",   LittleFS, "/FSexplorer.png");
-
-  // Versioned long-term caching for every static webui asset (TASK-822 completes the
-  // TASK-793 rollout). Previously only index.js + graph.js were versioned; the other JS
-  // fell through onNotFound -> streamFile() with no Cache-Control and the CSS revalidated
-  // each visit, so every page load was 8 serialized round-trips on the single-connection
-  // ESP32 WebServer. With ?v=<hash> injected on all 8 URLs (see sendIndex) and a matching
-  // max-age here, a warm reload collapses to ~1 request (index.html revalidate). serve
+  // Versioned long-term caching for every static webui asset (TASK-822). serve
   // path prefers the pre-gzipped .gz sibling when present (TASK-304/TASK-433).
-  httpServer.on("/index.js",         []() { serveVersionedAsset("/index.js",         F("application/javascript")); });
-  httpServer.on("/graph.js",         []() { serveVersionedAsset("/graph.js",         F("application/javascript")); });
-  httpServer.on("/sat.js",           []() { serveVersionedAsset("/sat.js",           F("application/javascript")); });
-  httpServer.on("/sat-slider.js",    []() { serveVersionedAsset("/sat-slider.js",    F("application/javascript")); });
-  httpServer.on("/echarts-theme.js", []() { serveVersionedAsset("/echarts-theme.js", F("application/javascript")); });
-  httpServer.on("/theme-toggle.js",  []() { serveVersionedAsset("/theme-toggle.js",  F("application/javascript")); });
-  httpServer.on("/components.css",   []() { serveVersionedAsset("/components.css",   F("text/css")); });
-  httpServer.on("/ds-tokens.css",    []() { serveVersionedAsset("/ds-tokens.css",    F("text/css")); });
+  server.on("/index.js",         HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/index.js",         F("application/javascript")); });
+  server.on("/graph.js",         HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/graph.js",         F("application/javascript")); });
+  server.on("/sat.js",           HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/sat.js",           F("application/javascript")); });
+  server.on("/sat-slider.js",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/sat-slider.js",    F("application/javascript")); });
+  server.on("/echarts-theme.js", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/echarts-theme.js", F("application/javascript")); });
+  server.on("/theme-toggle.js",  HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/theme-toggle.js",  F("application/javascript")); });
+  server.on("/components.css",   HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/components.css",   F("text/css")); });
+  server.on("/ds-tokens.css",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/ds-tokens.css",    F("text/css")); });
 #if HAS_PIC
   //otgw pic functions
-  httpServer.on("/pic", upgradepic);
+  server.on("/pic", HTTP_ANY, upgradepic);
 #endif
-  // all other api calls are catched in FSexplorer onNotFounD!
-  httpServer.on("/api", HTTP_ANY, processAPI);  //was only HTTP_GET (20210110)
+  // all other api calls are caught in the FSexplorer onNotFound catch-all; the
+  // explicit /api prefix is also routed to processAPI for any method.
+  server.on("/api", HTTP_ANY, processAPI);
 
-  // Enable collection of headers the API layer needs:
-  //   - If-None-Match: ETag conditional requests (index.html cache)
-  //   - Origin / Referer: CSRF same-origin check in restAPI.ino (ADR-056 §2).
-  //     Without these, httpServer.header("Origin") always returns empty and
-  //     isSameOriginRequest() treats every browser request as "non-browser",
-  //     silently disabling CSRF protection.
-  // Use the array+count form: portable across ESP8266 Core 2.7.4 (LTS), Core 3.x,
-  // and ESP32 WebServer. The variadic template overload exists only on ESP8266
-  // Core 3.x — keeping the array form is the lowest common denominator.
-  // ESP8266WebServer stores these pointers by value (no PROGMEM copy-out),
-  // so plain RAM string literals are correct here — not F()/PSTR().
-  {
-    static const char* collectHeaderKeys[] = {"If-None-Match", "Origin", "Referer"};
-    httpServer.collectHeaders(collectHeaderKeys, 3);
-  }
+  // ESPAsyncWebServer keeps ALL request headers available on the request object
+  // (no collectHeaders() allowlist needed, unlike the sync WebServer). The
+  // If-None-Match / Origin / Referer headers the cache + CSRF logic reads are
+  // therefore always present via headerCompat().
 
-  httpServer.begin();
+  // Global POST/PUT body capture (TASK-865.9): the sync WebServer surfaced the
+  // raw body as arg("plain")/arg(0); the async server streams it through this
+  // hook. webCaptureBody() accumulates it into g_requestBody, read back by the
+  // REST handlers via bodyCompat(). Fires before the matching route handler runs.
+  server.onRequestBody([](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    webCaptureBody(request, data, len, index, total);
+  });
+
+  server.begin();
   // Set up first message as the IP address
-  DebugTln(F("\nHTTP Server started\r"));  
+  DebugTln(F("\nHTTP Server started\r"));
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%03d.%03d.%d.%d"), WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   DebugTf(PSTR("\nAssigned IP=%s\r\n"), cMsg);
 }
+// Serve /FSexplorer.html (static file).
+static void sendFSexplorerHtml(AsyncWebServerRequest *request) {
+  webBeginRequest(request);
+  if (LittleFS.exists("/FSexplorer.html")) {
+    webSendFile("/FSexplorer.html", F("text/html; charset=UTF-8"), /*gzip=*/false);
+  } else {
+    webSendP(200, PSTR("text/html; charset=UTF-8"), Helper);  // prompt to upload FSexplorer.html
+  }
+}
+
 //=====================================================================================
-void setupFSexplorer(){    
+void setupFSexplorer(){
   LittleFS.begin();
-  if (LittleFS.exists("/FSexplorer.html")) 
-  {
-    httpServer.on("/FSexplorer.html", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
-    httpServer.on("/FSexplorer", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      httpServer.streamFile(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
-  }
-  else 
-  {
-    httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper); //Upload the FSexplorer.html
-  }
-  httpServer.on("/api/firmwarefilelist", apifirmwarefilelist);  // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
-  httpServer.on("/api/listfiles", apilistfiles);               // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
-  // httpServer.on("/LittleFSformat", formatLittleFS);
-  httpServer.on("/upload", HTTP_POST, []() {
-    // If auth failed, handleFileUpload skipped the write; send 401 challenge here.
-    // If auth succeeded, the 303 redirect was already sent by handleFileUpload.
-    checkHttpAuth();
-  }, handleFileUpload);
-  httpServer.on("/ReBoot", reBootESP);
-  httpServer.on("/ResetWireless", resetWirelessButton);
- 
-  httpServer.onNotFound([]()
-  {
-    if (httpServer.uri().indexOf("/api/") == 0)
-    {
-      processAPI();
+  server.on("/FSexplorer.html", HTTP_GET, sendFSexplorerHtml);
+  server.on("/FSexplorer",      HTTP_GET, sendFSexplorerHtml);
+
+  server.on("/api/firmwarefilelist", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); apifirmwarefilelist(); });  // DEPRECATED: unversioned (ADR-035)
+  server.on("/api/listfiles",        HTTP_ANY, [](AsyncWebServerRequest *r){ webBeginRequest(r); apilistfiles(); });         // DEPRECATED: unversioned (ADR-035)
+  // server.on("/LittleFSformat", HTTP_GET, formatLittleFS);
+  // /upload: the body completion handler runs after the upload finished. If
+  // auth failed, handleFileUpload skipped the write; send the 401 challenge here.
+  // If auth succeeded, handleFileUpload already queued the 303 redirect body.
+  server.on("/upload", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      webBeginRequest(request);
+      // checkHttpAuth() sends a 401 challenge when auth is required and failed.
+      // On success, redirect back to FSexplorer.html (303 + Location) — the same
+      // outcome the sync server produced with the raw `Header` literal.
+      if (!checkHttpAuth()) return;
+      if (!g_responseSent) sendFSexplorerRedirect();
+    },
+    handleFileUpload);
+  server.on("/ReBoot",        HTTP_ANY, reBootESP);
+  server.on("/ResetWireless", HTTP_ANY, resetWirelessButton);
+
+  server.onNotFound([](AsyncWebServerRequest *request) {
+    webBeginRequest(request);
+    if (strncmp_P(request->url().c_str(), PSTR("/api/"), 5) == 0) {
+      processAPI(request);
       return;
     }
     // TASK-683 port: emit one outcome-bearing line per static request — 200
     // gated on bRestAPI (chatty debug surface), 404 always-on (actionable).
-    String path = httpServer.urlDecode(httpServer.uri());
+    String path = request->urlDecode(request->url());
     const bool served = handleFile(String(path));
     if (!served) {
-      httpServer.send_P(404, PSTR("text/plain"), PSTR("FileNotFound\r\n"));
+      webSendP(404, PSTR("text/plain"), PSTR("FileNotFound\r\n"));
       DebugTf(PSTR("http GET %s => 404\r\n"), path.c_str());
     } else if (state.debug.bRestAPI) {
       DebugTf(PSTR("http GET %s => 200 (file)\r\n"), path.c_str());
     }
   });
-  
+
 } // setupFSexplorer()
 
 //=====================================================================================
+// Parameterless: reads the already-bound currentRequest. Reached both from the
+// /api/firmwarefilelist route (wrapped to bind the request) and from the v2
+// dispatch handleFirmware() where the context is already bound.
 void apifirmwarefilelist() {
   // TASK-683 port: drop JSON-mirror-to-telnet noise. Function-entry trace and
   // per-file GetVersion result lines are gated on bRestAPI; one always-on
@@ -350,16 +361,17 @@ void apifirmwarefilelist() {
   String dirpath = "/" + String(state.pic.sDeviceid);
   if (state.debug.bRestAPI) DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
 
-  // Start chunked response with JSON array opening
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send(200, F("application/json"), F(""));
-  httpServer.sendContent(F("["));
+  // Bounded JSON array (<= MAX_FILES_IN_LIST hex entries) into the per-request
+  // response stream; finalized once at the end (TASK-865.9).
+  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
+  AsyncResponseStream *s = restBeginStream("application/json");
+  if (!s) return;
+  s->print(F("["));
 
   PlatformDir dir(dirpath.c_str());
   if (!dir.valid()) {
-    httpServer.sendContent(F("]\r\n"));
-    httpServer.sendContent(F(""));
+    s->print(F("]\r\n"));
+    restFinalize();
     DebugTf(PSTR("api firmware/files: 0 entries (%lums)\r\n"),
             (unsigned long)(millis() - startMs));
     return;
@@ -400,7 +412,7 @@ void apifirmwarefilelist() {
 
       // Add comma separator after first entry
       if (!firstEntry) {
-        httpServer.sendContent(F(","));
+        s->print(F(","));
       }
       firstEntry = false;
 
@@ -409,7 +421,7 @@ void apifirmwarefilelist() {
       snprintf_P(entryBuffer, sizeof(entryBuffer),
                  PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"),
                  CSTR(entryName), CSTR(version), (int)entrySize);
-      httpServer.sendContent(entryBuffer);
+      s->print(entryBuffer);
 
       feedWatchDog(); // Feed watchdog during potentially long operation
       entryCount++;
@@ -417,8 +429,8 @@ void apifirmwarefilelist() {
   }
 
   // Close JSON array
-  httpServer.sendContent(F("]\r\n"));
-  httpServer.sendContent(F("")); // End chunked response
+  s->print(F("]\r\n"));
+  restFinalize();
 
   DebugTf(PSTR("api firmware/files: %u entries (%lums)\r\n"),
           entryCount, (unsigned long)(millis() - startMs));
@@ -428,13 +440,14 @@ void apifirmwarefilelist() {
 //=====================================================================================
 
 
+// Parameterless: reads the already-bound currentRequest (see apifirmwarefilelist).
 void apilistfiles()
 {
   // --- Delete handler: local buffer instead of global cMsg ---
-  if (httpServer.hasArg("delete")) {
+  if (hasArgCompat("delete")) {
     if (!checkHttpAuth()) return;  // 401 already sent
     char deletePath[34];  // LittleFS paths are max 31 chars + '/' prefix + '\0'
-    strlcpy(deletePath, httpServer.arg("delete").c_str(), sizeof(deletePath));
+    strlcpy(deletePath, argCompat("delete"), sizeof(deletePath));
     // Normalize: LittleFS paths must start with '/'
     if (deletePath[0] != '/' && deletePath[0] != '\0') {
       size_t len = strnlen(deletePath, sizeof(deletePath) - 2);
@@ -443,26 +456,26 @@ void apilistfiles()
     }
     DebugTf(PSTR("Delete -> [%s]\r\n"), deletePath);
     if (!LittleFS.exists(deletePath)) {
-      httpServer.send(404, F("text/plain"), F("File not found"));
+      webSend(404, F("text/plain"), F("File not found"));
     } else if (LittleFS.remove(deletePath)) {
-      httpServer.send(200, F("text/plain"), F("File deleted"));
+      webSend(200, F("text/plain"), F("File deleted"));
     } else {
-      httpServer.send(500, F("text/plain"), F("Delete failed"));
+      webSend(500, F("text/plain"), F("Delete failed"));
     }
     return;
   }
 
-  // --- File listing: stream directly from LittleFS, no buffering/sorting ---
+  // --- File listing: bounded JSON array into the per-request response stream ---
   // Sorting and size formatting are handled by the frontend (FSexplorer.html).
   String path = "/";
-  if (httpServer.hasArg("path")) {
-    path = httpServer.arg("path");
+  if (hasArgCompat("path")) {
+    path = argCompat("path");
   }
 
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send(200, F("application/json"), F(""));
-  httpServer.sendContent(F("["));
+  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
+  AsyncResponseStream *s = restBeginStream("application/json");
+  if (!s) return;
+  s->print(F("["));
 
   char buf[100];
   bool first = true;
@@ -471,8 +484,8 @@ void apilistfiles()
 
   PlatformDir dir(path.c_str());
   if (!dir.valid()) {
-    httpServer.sendContent(F("]\r\n"));
-    httpServer.sendContent(F(""));
+    s->print(F("]\r\n"));
+    restFinalize();
     return;
   }
   while (dir.next()) {
@@ -485,14 +498,14 @@ void apilistfiles()
       continue;
     }
     if (fileCount >= MAX_FILES_IN_LIST) { truncated = true; break; }
-    if (!first) httpServer.sendContent(F(","));
+    if (!first) s->print(F(","));
     first = false;
 
     snprintf_P(buf, sizeof(buf),
       PSTR("{\"name\":\"%s\",\"size\":%ld,\"type\":\"%s\"}"),
       fname.c_str(), fsize,
       isDir ? "dir" : "file");
-    httpServer.sendContent(buf);
+    s->print(buf);
     fileCount++;
   }
 
@@ -501,94 +514,112 @@ void apilistfiles()
   platformFSInfo(fsInfo);
   unsigned long totalBytes = fsInfo.totalBytes;
   unsigned long usedBytesRaw = fsInfo.usedBytes;
-  if (!first) httpServer.sendContent(F(","));
+  if (!first) s->print(F(","));
   unsigned long usedBytes = (unsigned long)(usedBytesRaw * 1.05);
   unsigned long freeBytes = totalBytes - usedBytes;
   snprintf_P(buf, sizeof(buf),
     PSTR("{\"usedBytes\":%lu,\"totalBytes\":%lu,\"freeBytes\":%lu,\"truncated\":%s}"),
     usedBytes, totalBytes, freeBytes,
     truncated ? "true" : "false");
-  httpServer.sendContent(buf);
+  s->print(buf);
 
-  httpServer.sendContent(F("]\r\n"));
-  httpServer.sendContent(F(""));
+  s->print(F("]\r\n"));
+  restFinalize();
 
 } // apilistfiles()
 
 
+// 303 redirect back to FSexplorer.html (replaces the raw `Header` HTTP literal
+// the sync server wrote with sendContent()).
+static void sendFSexplorerRedirect() {
+  webPushHeader(F("Location"), F("FSexplorer.html"));
+  webPushHeader(F("Cache-Control"), F("no-cache"));
+  webSendStatus(303);
+}
+
 //=====================================================================================
-bool handleFile(String&& path) 
+// Called from the onNotFound catch-all; currentRequest is already bound there.
+bool handleFile(String&& path)
 {
-  if (httpServer.hasArg("delete")) 
+  if (hasArgCompat("delete"))
   {
     if (!checkHttpAuth()) return false;
-    DebugTf(PSTR("Delete -> [%s]\n\r"),  httpServer.arg("delete").c_str());
-    LittleFS.remove(httpServer.arg("delete"));    // Datei löschen
-    httpServer.sendContent(Header);
+    DebugTf(PSTR("Delete -> [%s]\n\r"), argCompat("delete"));
+    LittleFS.remove(argCompat("delete"));    // Datei löschen
+    sendFSexplorerRedirect();
     return true;
   }
-  if (!LittleFS.exists("/FSexplorer.html")) httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper); //Upload the FSexplorer.html
+  if (!LittleFS.exists("/FSexplorer.html")) { webSendP(200, PSTR("text/html; charset=UTF-8"), (PGM_P)Helper); return true; }
   if (path.endsWith("/")) path += F("index.html");
-  return LittleFS.exists(path) ? ({File f = LittleFS.open(path, "r"); httpServer.streamFile(f, contentType(path)); f.close(); true;}) : false;
+  if (!LittleFS.exists(path)) return false;
+  // contentType() mutates its argument into the mime string, so snapshot the
+  // file path first, then derive the mime from a throwaway copy.
+  String filePath = path;
+  String mime = path;            // contentType() rewrites this copy in place
+  webSendFile(filePath.c_str(), contentType(mime).c_str(), /*gzip=*/false);
+  return true;
 
 } // handleFile()
 
 
 //=====================================================================================
-void handleFileUpload() 
+// Async upload handler. ESPAsyncWebServer calls this per chunk:
+//   (request, filename, index, data, len, final)
+// index==0 marks the first chunk (== UPLOAD_FILE_START), final==true the last
+// (== UPLOAD_FILE_END). The 303 redirect body is queued by the /upload POST
+// completion handler in setupFSexplorer(), not here.
+void handleFileUpload(AsyncWebServerRequest *request, const String &filename,
+                      size_t index, uint8_t *data, size_t len, bool final)
 {
   static File fsUploadFile;
   static bool uploadAuthorized = true;
-  HTTPUpload& upload = httpServer.upload();
-  if (upload.status == UPLOAD_FILE_START) 
+
+  if (index == 0)
   {
-    // Check auth by reading headers only - does NOT send a response.
-    // If auth is required and fails, skip the file open so nothing is written.
-    uploadAuthorized = (settings.sHTTPpasswd[0] == '\0' || httpServer.authenticate("admin", settings.sHTTPpasswd));
+    // Auth: do NOT send a response here (the POST completion handler does).
+    // If auth fails, skip the open so nothing is written.
+    uploadAuthorized = (settings.sHTTPpasswd[0] == '\0' ||
+                        request->authenticate("admin", settings.sHTTPpasswd));
     if (!uploadAuthorized) return;
 
-    if (upload.filename.length() > 30) 
-    {
-      upload.filename = upload.filename.substring(upload.filename.length() - 30, upload.filename.length());  // Dateinamen auf 30 Zeichen kürzen
-    }
+    String fn = filename;
+    if (fn.length() > 30) fn = fn.substring(fn.length() - 30, fn.length());  // trim to 30 chars
     String path = "/";
-    if (httpServer.hasArg("path")) {
-        path = httpServer.arg("path");
-        if (!path.endsWith("/")) path += F("/");
-    }
-    String filename = path + httpServer.urlDecode(upload.filename);
-    if(filename.startsWith("//")) filename = filename.substring(1);
-    
-    DebugT(F("FileUpload Name: ")); Debugln(filename);
-    fsUploadFile = LittleFS.open(filename, "w");
-  } 
-  else if (upload.status == UPLOAD_FILE_WRITE) 
+    const AsyncWebParameter *pp = request->getParam("path", true);
+    if (!pp) pp = request->getParam("path", false);
+    if (pp) { path = pp->value(); if (!path.endsWith("/")) path += F("/"); }
+    String fullname = path + request->urlDecode(fn);
+    if (fullname.startsWith("//")) fullname = fullname.substring(1);
+
+    DebugT(F("FileUpload Name: ")); Debugln(fullname);
+    fsUploadFile = LittleFS.open(fullname, "w");
+  }
+
+  if (uploadAuthorized && len && fsUploadFile)
   {
-    DebugT(F("FileUpload Data: ")); Debugln((String)upload.currentSize);
-    if (fsUploadFile)
-      fsUploadFile.write(upload.buf, upload.currentSize);
-  } 
-  else if (upload.status == UPLOAD_FILE_END) 
+    fsUploadFile.write(data, len);
+  }
+
+  if (final)
   {
-    if (fsUploadFile)
-      fsUploadFile.close();
+    if (fsUploadFile) fsUploadFile.close();
     if (uploadAuthorized) {
-      DebugT(F("FileUpload Size: ")); Debugln((String)upload.totalSize);
-      httpServer.sendContent(Header);
+      DebugT(F("FileUpload Size: ")); Debugln((String)(index + len));
     }
   }
-  
-} // handleFileUpload() 
+
+} // handleFileUpload()
 
 
 //=====================================================================================
-void formatLittleFS() 
+void formatLittleFS(AsyncWebServerRequest *request)
 {       //Formatiert den Speicher
+  webBeginRequest(request);
   if (!LittleFS.exists("/!format")) return;
   DebugTln(F("Format LittleFS"));
   LittleFS.format();
-  httpServer.sendContent(Header);
-  
+  sendFSexplorerRedirect();
+
 } // formatLittleFS()
 
 //=====================================================================================
@@ -631,21 +662,29 @@ bool freeSpace(uint16_t const& printsize)
 } // freeSpace()
 
 //=====================================================================================
-void reBootESP()
+void reBootESP(AsyncWebServerRequest *request)
 {
+  webBeginRequest(request);
   if (!checkHttpAuth()) return;
   DebugTln(F("Redirect and ReBoot .."));
-  doRedirect("Reboot OTGW firmware ..", 120, "/", true);   
+  doRedirect("Reboot OTGW firmware ..", 120, "/", true);
 } // reBootESP()
 
-void resetWirelessButton()
+void resetWirelessButton(AsyncWebServerRequest *request)
 {
+  webBeginRequest(request);
   if (!checkHttpAuth()) return;
   DebugTln(F("Reset Wireless settings.."));
   resetWiFiSettings();
-  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "/", true);   
+  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "/", true);
 }
 //=====================================================================================
+// Emits the bounded redirect/countdown page into the per-request response stream
+// and queues the Refresh header. When reboot==true the restart is DEFERRED to the
+// next loop() tick (requestDeferredReboot): the async response is only queued —
+// not yet drained to the socket — when this returns, so tearing the services down
+// here (doRestart) would truncate the body. loop() fires the reboot once
+// !isFlashing(), giving lwIP time to flush (mirrors the OTA path).
 void doRedirect(String msg, int wait, const char* URL, bool reboot)
 {
   // clamp wait to sane bounds
@@ -663,31 +702,31 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   safeURL.replace("'", "%27");
   safeURL.replace("\"", "%22");
 
-  
   DebugTln(msg);
-  // add non-JS fallback for redirect
-  httpServer.sendHeader(F("Refresh"), String(safeWait) + F(";url=") + safeURL);
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
+  // non-JS fallback for redirect
+  webPushHeader(F("Refresh"), (String(safeWait) + F(";url=") + safeURL).c_str());
+
+  AsyncResponseStream *s = restBeginStream("text/html; charset=UTF-8");
+  if (!s) return;
 
   char waitBuf[12];
   snprintf_P(waitBuf, sizeof(waitBuf), PSTR("%d"), safeWait);
 
-  httpServer.sendContent_P(PSTR("<!DOCTYPE HTML><html lang='en-US'><head><meta charset='UTF-8'>"));
-  httpServer.sendContent_P(PSTR("<style type='text/css'>body {background-color: lightblue;}</style>"));
-  httpServer.sendContent_P(PSTR("<title>Redirect to ...</title></head><body><h1>FSexplorer</h1><h3>"));
-  httpServer.sendContent(safeMsg);
-  httpServer.sendContent_P(PSTR("</h3><br><div style='width: 500px; position: relative; font-size: 25px;'>"));
-  httpServer.sendContent_P(PSTR("<div style='float: left;'>Redirect in &nbsp;</div><div style='float: left;' id='counter'>"));
-  httpServer.sendContent(waitBuf);
-  httpServer.sendContent_P(PSTR("</div><div style='float: left;'>&nbsp; seconds ...</div><div style='float: right;'>&nbsp;</div></div>"));
-  httpServer.sendContent_P(PSTR("<br><br><hr>Wait for the redirect. In case you are not redirected automatically, then click this <a href='"));
-  httpServer.sendContent(safeURL);
-  httpServer.sendContent_P(PSTR("'>link to continue</a>."));
-  httpServer.sendContent_P(PSTR("<script>setInterval(function(){var div=document.querySelector('#counter');var count=div.textContent*1-1;div.textContent=count;if(count<=0){window.location.replace('"));
-  httpServer.sendContent(safeURL);
-  httpServer.sendContent_P(PSTR("');}},1000);</script></body></html>\r\n"));
-  httpServer.sendContent(F(""));
-  if (reboot) doRestart("Reboot after upgrade");
-  
+  s->print(F("<!DOCTYPE HTML><html lang='en-US'><head><meta charset='UTF-8'>"));
+  s->print(F("<style type='text/css'>body {background-color: lightblue;}</style>"));
+  s->print(F("<title>Redirect to ...</title></head><body><h1>FSexplorer</h1><h3>"));
+  s->print(safeMsg);
+  s->print(F("</h3><br><div style='width: 500px; position: relative; font-size: 25px;'>"));
+  s->print(F("<div style='float: left;'>Redirect in &nbsp;</div><div style='float: left;' id='counter'>"));
+  s->print(waitBuf);
+  s->print(F("</div><div style='float: left;'>&nbsp; seconds ...</div><div style='float: right;'>&nbsp;</div></div>"));
+  s->print(F("<br><br><hr>Wait for the redirect. In case you are not redirected automatically, then click this <a href='"));
+  s->print(safeURL);
+  s->print(F("'>link to continue</a>."));
+  s->print(F("<script>setInterval(function(){var div=document.querySelector('#counter');var count=div.textContent*1-1;div.textContent=count;if(count<=0){window.location.replace('"));
+  s->print(safeURL);
+  s->print(F("');}},1000);</script></body></html>\r\n"));
+  restFinalize();
+  if (reboot) requestDeferredReboot("Reboot after upgrade");
+
 } // doRedirect()

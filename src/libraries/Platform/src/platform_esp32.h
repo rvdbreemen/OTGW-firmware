@@ -76,7 +76,10 @@ inline __attribute__((used)) void platformAsyncLinkProof() {
 #define MDNS_NEEDS_UPDATE   0    // ESP32 mDNS runs on a background task
 
 // ---- Unified type aliases ------------------------------------------------
-using OTGWWebServer = WebServer;
+// (OTGWWebServer = WebServer removed in TASK-865.9: the HTTP server moved to
+//  ESPAsyncWebServer. The sync WebServer type now survives only inside
+//  OTGW-ModUpdateServer-esp32.h, which includes <WebServer.h> itself; seq11
+//  ports OTA onto AsyncWebServer and retires that last consumer.)
 
 // ---- FSInfo compatibility ------------------------------------------------
 // ESP8266 uses FSInfo struct natively. Define it here for ESP32.

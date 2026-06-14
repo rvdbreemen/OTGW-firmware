@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v2.0.0-alpha.183
+**  Version  : v2.0.0-alpha.184
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -13,13 +13,13 @@
 **        startTelnet();
 **        startWiFi(_HOSTNAME, 240);  // timeout 4 minuten
 **        startMDNS(_HOSTNAME);
-**        httpServer.on("/index", <sendIndexPage>);
-**        httpServer.begin();
+**        setupFSexplorer();   // registers routes on AsyncWebServer `server`
+**        startWebserver();    // server.begin()
 **      }
 **      loop() {
 **        handleWiFi();
 **        MDNS.update();
-**        httpServer.handleClient();
+**        // No handleClient() — HTTP serves on the AsyncTCP task.
 **      }
 **
 **  Implementations live in networkStuff.ino.
@@ -29,6 +29,7 @@
 #define NETWORKSTUFF_H
 
 #include <platform.h>           // Unified ESP8266/ESP32 abstraction layer
+#include "webServerCompat.h"        // ESPAsyncWebServer bridge (TASK-865.9): AsyncWebServer server(80)
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
 #include "updateServerHtml.h"
 // Disable WiFiManager debug: the debug block in handleWifiSave() builds Strings
@@ -82,7 +83,8 @@ static const time_t EPOCH_2038_01_19 = 2147483647UL;
 
 extern NtpStatus_t       NtpStatus;
 extern time_t            NtpLastSync;
-extern OTGWWebServer     httpServer;
+// AsyncWebServer server(80) is declared in webServerCompat.h (extern) and
+// defined in networkStuff.ino. seq10 (WebSocket) and seq11 (OTA) attach to it.
 extern OTGWUpdateServer  httpUpdater;
 extern FSInfo            LittleFSinfo;
 extern bool              LittleFSmounted;

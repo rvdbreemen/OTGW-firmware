@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.183
+**  Version  : v2.0.0-alpha.184
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -753,7 +753,7 @@ void do15minevent(){
 static void handleEspFlashBackgroundTasks()
 {
   handleDebug();              // Keep telnet debug active for monitoring
-  httpServer.handleClient();  // MUST continue - processes upload chunks
+  // TASK-865.9: HTTP runs on the AsyncTCP task — no handleClient() pump needed.
 #if MDNS_NEEDS_UPDATE
   MDNS.update();
 #endif              // Keep MDNS active for network discovery
@@ -763,7 +763,7 @@ static void handleEspFlashBackgroundTasks()
 static void handlePicFlashBackgroundTasks()
 {
   handleDebug();              // Keep telnet debug active for monitoring
-  httpServer.handleClient();  // Keep HTTP active
+  // TASK-865.9: HTTP runs on the AsyncTCP task — no handleClient() pump needed.
 #if MDNS_NEEDS_UPDATE
   MDNS.update();
 #endif              // Keep MDNS active for network discovery
@@ -825,15 +825,10 @@ void doBackgroundTasks()
       }
 #endif
       handleWebSocket();            // WebSocket handling for OT log streaming
-      // TASK-817: drain several pending connections per loop. The sync WebServer
-      // accepts+serves ONE socket per handleClient() call; a browser opens 6+
-      // parallel sockets for one page (html+js+css+...). Serving one per full
-      // loop turn stretched the page load across many iterations. The bound (4)
-      // caps worst-case loop time so OT/MQTT never starve; watchdog fed each pass.
-      for (uint8_t httpDrain = 0; httpDrain < 4; httpDrain++) {
-        httpServer.handleClient();
-        feedWatchDog();
-      }
+      // TASK-865.9: HTTP serving moved onto the AsyncTCP service task — there is
+      // no longer a per-loop handleClient() drain. The sat-slider stall / XHR
+      // latency ramp (TASK-817) is gone because every parallel socket is served
+      // on the async task instead of one-per-loop-turn here.
     #if MDNS_NEEDS_UPDATE
   MDNS.update();
 #endif

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.183
+**  Version  : v2.0.0-alpha.184
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -653,9 +653,10 @@ void handleOTDirectBridgeStream() {
   if (!settings.mqtt.bLegacyPort25238Enabled) return;
 
   static constexpr size_t kMaxBridgeWrite = 128;
-  // Sync webserver: bound dispatched commands per call so a flooded TCP client
-  // on port 25238 cannot starve httpServer.handleClient(). Pending bytes drain
-  // on the next call.
+  // Bound dispatched commands per call so a flooded TCP client on port 25238
+  // cannot starve the rest of doBackgroundTasks(). Pending bytes drain on the
+  // next call. (HTTP now serves on the AsyncTCP task; this bound protects the
+  // cooperative loop, not handleClient().)
   static constexpr size_t kMaxLinesPerDrain = 4;
   static char sWrite[kMaxBridgeWrite];
   static size_t bytes_write = 0;
@@ -998,44 +999,47 @@ void updateOTDirectStatus() {
 void sendOTDirectOverridesJSON() {
   char chunk[48];
 
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send_P(200, PSTR("application/json"), PSTR(""));
-  httpServer.sendContent_P(PSTR("{\"overrides\":{\"write\":["));
+  // Bounded JSON into the per-request response stream (TASK-865.9). The caller
+  // (restAPI handleOTDirect) has already queued the CORS header via
+  // sendCorsOriginHeader() before calling this.
+  AsyncResponseStream *s = restBeginStream("application/json");
+  if (!s) return;
+  s->print(F("{\"overrides\":{\"write\":["));
 
   bool first = true;
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
     if (!otOverrides[i].active) continue;
     snprintf_P(chunk, sizeof(chunk), PSTR("%s{\"msgid\":%u,\"value\":%u}"),
                first ? "" : ",", otOverrides[i].msgId, otOverrides[i].overrideValue);
-    httpServer.sendContent(chunk);
+    s->print(chunk);
     first = false;
   }
 
-  httpServer.sendContent_P(PSTR("],\"response\":["));
+  s->print(F("],\"response\":["));
   first = true;
   for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
     if (!otResponseOverrides[i].active) continue;
     snprintf_P(chunk, sizeof(chunk), PSTR("%s{\"msgid\":%u,\"value\":%u}"),
                first ? "" : ",", otResponseOverrides[i].msgId, otResponseOverrides[i].value);
-    httpServer.sendContent(chunk);
+    s->print(chunk);
     first = false;
   }
 
-  httpServer.sendContent_P(PSTR("],\"modify\":["));
+  s->print(F("],\"modify\":["));
   first = true;
   for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
     if (!otResponseModifiers[i].active) continue;
     snprintf_P(chunk, sizeof(chunk), PSTR("%s{\"msgid\":%u,\"value\":%u}"),
                first ? "" : ",", otResponseModifiers[i].msgId, otResponseModifiers[i].value);
-    httpServer.sendContent(chunk);
+    s->print(chunk);
     first = false;
   }
 
-  httpServer.sendContent_P(PSTR("],\"unknown\":["));
+  s->print(F("],\"unknown\":["));
   first = true;
   for (uint8_t i = 0; i < otUnknownIdCount; i++) {
     snprintf_P(chunk, sizeof(chunk), PSTR("%s%u"), first ? "" : ",", otUnknownIds[i]);
-    httpServer.sendContent(chunk);
+    s->print(chunk);
     first = false;
   }
 
@@ -1049,8 +1053,8 @@ void sendOTDirectOverridesJSON() {
              (unsigned)otCmdQueueDepth(),
              (unsigned)otCmdQueueHighWater,
              (unsigned)OT_CMD_QUEUE_SIZE);
-  httpServer.sendContent(chunk);
-  httpServer.sendContent(F(""));  // end chunked stream
+  s->print(chunk);
+  restFinalize();
 }
 
 // ---------------------------------------------------------------------------

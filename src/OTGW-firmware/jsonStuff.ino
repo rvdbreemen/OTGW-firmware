@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-alpha.183
+**  Version  : v2.0.0-alpha.184
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -188,86 +188,47 @@ static void restPerfAccumulateSendTime(uint32_t deltaMs)
   state.restperf.iActiveChunkCount++;
 }
 
-#if HAS_REST_TX_COALESCING
-// ── REST coalescing transmit buffer (TASK-743: HAS_REST_TX_COALESCING) ─────
-// The sync WebServer stalls ~9 ms per sendContent() call on ESP32 due to
-// FreeRTOS/lwIP scheduling. Batching into 4 KB chunks (covering most JSON
-// responses in 2–4 flushes) cuts T_send from ~3.8 s to < 100 ms. Gated on the
-// capability flag, not the platform, so app code carries no raw ESP32 ifdef.
-// Static allocation — safe for the single-threaded sync WebServer.
-static struct {
-  char   data[4096];
-  size_t len;
-} sTxBuf;
-
-static void restFlushTxBuf() {
-  if (sTxBuf.len == 0) return;
-  const uint32_t t0 = millis();
-  // Length-based overload (WebServer.cpp): the single-arg sendContent(const
-  // char*) would bind to sendContent(const String&) and construct a ~4KB heap
-  // String temporary per flush -- wasteful on the fragmented ESP32-S3 heap, and
-  // a failed alloc would yield length()==0 -> a 0-length chunk that ends the
-  // chunked response early. Passing the explicit length avoids both (TASK-820).
-  httpServer.sendContent(sTxBuf.data, sTxBuf.len);
-  restPerfAccumulateSendTime(millis() - t0);
-  sTxBuf.len = 0;
-}
-
-static void restTxAppend(const char* s, size_t n) {
-  while (n > 0) {
-    size_t space = (sizeof(sTxBuf.data) - 1) - sTxBuf.len;
-    if (space == 0) { restFlushTxBuf(); space = sizeof(sTxBuf.data) - 1; }
-    size_t copy = (n <= space) ? n : space;
-    memcpy(sTxBuf.data + sTxBuf.len, s, copy);
-    sTxBuf.len += copy;
-    s += copy;
-    n -= copy;
-  }
-}
-// ─────────────────────────────────────────────────────────────────────────
-#endif
-
+// TASK-865.9: the restSend* layer is the imperative-push -> async-pull bridge.
+// Every restSendContent(P) write lands in the per-request AsyncResponseStream
+// (webServerCompat.h g_restStream), which is opened lazily on the first write
+// and flushed exactly once by restFlushContent() at the end of the response.
+// AsyncResponseStream buffers internally, so the old HAS_REST_TX_COALESCING
+// sTxBuf path (which existed to batch the sync WebServer's ~9 ms/sendContent
+// stalls) is no longer used on the write path.
 static void restSendContent(const char* content)
 {
-#if HAS_REST_TX_COALESCING
-  restTxAppend(content, strlen(content));
-#else
   const uint32_t startMs = millis();
-  httpServer.sendContent(content);
+  AsyncResponseStream* s = restBeginStream("application/json");
+  if (s) s->print(content);
   restPerfAccumulateSendTime(millis() - startMs);
-#endif
 }
 
 static void restSendContentP(PGM_P content)
 {
-#if HAS_REST_TX_COALESCING
-  // On ESP32, PROGMEM strings live in flash-mapped DROM and are accessible
-  // via normal pointers — strlen/memcpy are safe.
-  restTxAppend(content, strlen(content));
-#else
   const uint32_t startMs = millis();
-  httpServer.sendContent_P(content);
+  AsyncResponseStream* s = restBeginStream("application/json");
+  // On ESP32, PROGMEM strings live in flash-mapped DROM and are accessible
+  // via normal pointers — FPSTR()/print handles them.
+  if (s) s->print(FPSTR(content));
   restPerfAccumulateSendTime(millis() - startMs);
-#endif
 }
 
+// Begin a fresh JSON response. The sync WebServer needed an explicit status +
+// content-type line here; the async stream carries the content type from
+// beginResponseStream() and the status defaults to 200, so this just opens the
+// stream and (defensively) discards any stale buffered bytes.
 static void restSendP(int code, PGM_P contentType, PGM_P content)
 {
-#if HAS_REST_TX_COALESCING
-  sTxBuf.len = 0; // discard any stale data before sending new HTTP response
-#endif
+  (void)code; (void)content;
   const uint32_t startMs = millis();
-  httpServer.send_P(code, contentType, content);
+  restBeginStream(contentType);
   restPerfAccumulateSendTime(millis() - startMs);
 }
 
-// Flush any buffered transmit data to the HTTP client.
-// On ESP32 this drains the coalescing buffer; on ESP8266 it is a no-op
-// (sendContent flushes inline). Call at the end of each chunked response.
+// Flush the buffered JSON response to the client — sends the AsyncResponseStream
+// exactly once. Call at the end of each chunked response (sendEndJsonMap/Obj).
 void restFlushContent() {
-#if HAS_REST_TX_COALESCING
-  restFlushTxBuf();
-#endif
+  restFinalize();
 }
 
 void restPerfBegin(RestPerfTarget target)
@@ -303,13 +264,13 @@ void sendStartJsonObj(const char *objName)
 {
   char sBuff[50] = "";
 
-  if (strlen(objName)==0){  
+  if (strlen(objName)==0){
     snprintf_P(sBuff, sizeof(sBuff), PSTR("{\r\n"));
   }else {
     snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"%s\":[\r\n"), objName);
   }
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  // CORS header is queued before the stream opens so it lands on the response.
+  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
   restSendP(200, PSTR("application/json"), PSTR(" "));
   restSendContent(sBuff);
   iIdentlevel++;
@@ -351,13 +312,13 @@ void sendStartJsonMap(const char *objName)
 {
   char sBuff[50] = "";
 
-  if (strlen(objName)==0){  
+  if (strlen(objName)==0){
     snprintf_P(sBuff, sizeof(sBuff), PSTR("{\r\n"));
   }else {
     snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"%s\":{\r\n"), objName);
   }
-  httpServer.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  // CORS header is queued before the stream opens so it lands on the response.
+  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
   restSendP(200, PSTR("application/json"), PSTR(" "));
   restSendContent(sBuff);
   iIdentlevel++;

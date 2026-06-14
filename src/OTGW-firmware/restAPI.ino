@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.183
+**  Version  : v2.0.0-alpha.184
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -42,12 +42,12 @@ static const char* httpMethodToStr(HTTPMethod m) {
 // H3: Send dynamic CORS Allow-Origin header echoing the request Origin,
 // instead of a wildcard. Only sends the header when Origin is present.
 static void sendCorsOriginHeader() {
-  // httpServer.header() returns const String& (no allocation); strlcpy into a
-  // static buffer keeps this allocation-free on the request hot path.
+  // headerCompat() returns a pointer into a static buffer (no allocation);
+  // strlcpy into our own static keeps this allocation-free on the hot path.
   static char originBuf[128];
-  strlcpy(originBuf, httpServer.header(F("Origin")).c_str(), sizeof(originBuf));
+  strlcpy(originBuf, headerCompat(F("Origin")), sizeof(originBuf));
   if (originBuf[0] != '\0') {
-    httpServer.sendHeader(F("Access-Control-Allow-Origin"), originBuf);
+    webPushHeader(F("Access-Control-Allow-Origin"), originBuf);
   }
 }
 
@@ -62,12 +62,12 @@ static void sendApiError(int httpCode, const __FlashStringHelper* message) {
     PSTR("{\"error\":{\"status\":%d,\"message\":\"%S\"}}"),
     httpCode, (PGM_P)message);
   sendCorsOriginHeader();
-  httpServer.send(httpCode, F("application/json"), jsonBuff);
+  webSend(httpCode, F("application/json"), jsonBuff);
 }
 
 // T44: 405 responses with RFC 7231 §6.5.5 Allow header
 static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
-  httpServer.sendHeader(F("Allow"), allowedMethods);
+  webPushHeader(F("Allow"), allowedMethods);
   sendApiError(405, F("Method not allowed"));
 }
 
@@ -110,13 +110,13 @@ static bool isSameOriginRequest() {
   static char originBuf[128];
   static char hostBuf[64];
 
-  strlcpy(originBuf, httpServer.header(F("Origin")).c_str(), sizeof(originBuf));
+  strlcpy(originBuf, headerCompat(F("Origin")), sizeof(originBuf));
   if (originBuf[0] == '\0') {
-    strlcpy(originBuf, httpServer.header(F("Referer")).c_str(), sizeof(originBuf));
+    strlcpy(originBuf, headerCompat(F("Referer")), sizeof(originBuf));
   }
   if (originBuf[0] == '\0') return true;  // no origin header — allow (non-browser client)
 
-  strlcpy(hostBuf, httpServer.hostHeader().c_str(), sizeof(hostBuf));
+  strlcpy(hostBuf, hostHeaderCompat(), sizeof(hostBuf));
   if (hostBuf[0] == '\0') return true;  // can't validate without Host header
 
   const char* schemeSep = strstr(originBuf, "://");
@@ -142,10 +142,10 @@ static bool isSameOriginRequest() {
 bool checkHttpAuth() {
   if (settings.sHTTPpasswd[0] == '\0') return true;  // auth disabled
 
-  if (httpServer.method() == HTTP_OPTIONS) return true;  // allow CORS preflight
+  if (methodCompat() == HTTP_OPTIONS) return true;  // allow CORS preflight
 
-  if (!httpServer.authenticate("admin", settings.sHTTPpasswd)) {
-    httpServer.requestAuthentication();
+  if (!authenticateCompat("admin", settings.sHTTPpasswd)) {
+    webRequestAuth();
     return false;
   }
 
@@ -211,10 +211,10 @@ void sendApiNotFound(const char *URI);
 // Common OPTIONS/CORS preflight response for all v2 endpoints
 static void sendApiOptions() {
   sendCorsOriginHeader();
-  httpServer.sendHeader(F("Access-Control-Allow-Methods"), F("GET, POST, PUT, OPTIONS"));
-  httpServer.sendHeader(F("Access-Control-Allow-Headers"), F("Content-Type"));
-  httpServer.sendHeader(F("Access-Control-Max-Age"), F("86400"));
-  httpServer.send(204);
+  webPushHeader(F("Access-Control-Allow-Methods"), F("GET, POST, PUT, OPTIONS"));
+  webPushHeader(F("Access-Control-Allow-Headers"), F("Content-Type"));
+  webPushHeader(F("Access-Control-Max-Age"), F("86400"));
+  webSendStatus(204);
 }
 
 // Helper to queue a command from URL segment or request body, with validation
@@ -243,7 +243,7 @@ static void handleCommandSubmit(const char* cmdStr) {
   }
   addCommandToQueue(cmdStr, static_cast<int>(cmdLen));
   sendCorsOriginHeader();
-  httpServer.send(202, F("application/json"), F("{\"status\":\"queued\"}"));
+  webSend(202, F("application/json"), F("{\"status\":\"queued\"}"));
 }
 
 static void sendSimulationStatus() {
@@ -255,7 +255,7 @@ static void sendSimulationStatus() {
              reinterpret_cast<PGM_P>(kOTGWSimulationFile),
              static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
   sendCorsOriginHeader();
-  httpServer.send(200, F("application/json"), jsonBuf);
+  webSend(200, F("application/json"), jsonBuf);
 }
 
 static void setOTGWSimulationEnabled(bool enabled) {
@@ -302,7 +302,7 @@ static void sendSensorStatus() {
   if (bSensorsDetected || state.debug.bSensorSim) {
     // Start "devices" sub-object — use chunked JSON.
     // restSendContent(P) keeps these bytes in the ESP32 coalescing buffer
-    // (jsonStuff.ino sTxBuf); a raw httpServer.sendContent would flush ahead
+    // (jsonStuff.ino g_restStream); a raw write outside the stream would flush ahead
     // of the buffered sendJsonMapEntry wrapper and scramble the JSON.
     restSendContentP(PSTR(",\r\n  \"devices\": {"));
     for (int i = 0; i < DallasrealDeviceCount; i++) {
@@ -401,8 +401,8 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   // POST /api/v2/otdirect/mode?mode=gateway|monitor|bypass
   else if (wc > 4 && strcmp_P(words[4], PSTR("mode")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
-    if (!httpServer.hasArg("mode")) { sendApiError(400, F("Missing 'mode' parameter")); return; }
-    String modeStr = httpServer.arg("mode");
+    if (!hasArgCompat("mode")) { sendApiError(400, F("Missing 'mode' parameter")); return; }
+    String modeStr = argCompat("mode");
     // TASK-438: GW=0 is now monitor (PIC parity); bypass moved to GW=P alias.
     if (modeStr == F("gateway"))       addCommandToQueue("GW=1", 4, true);
     else if (modeStr == F("monitor"))  addCommandToQueue("GW=0", 4, true);
@@ -444,29 +444,29 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       sendJsonMapEntry(F("vent_setpoint"),    (int)settings.otd.iVentSetpoint);
       sendEndJsonMap(F("otdirect_settings"));
     } else if (method == HTTP_POST || method == HTTP_PUT) {
-      if (httpServer.hasArg("setbacktemp"))    updateSetting("OTDsetbacktemp", httpServer.arg("setbacktemp").c_str());
-      if (httpServer.hasArg("setbacktimeout")) updateSetting("OTDsetbacktimeout", httpServer.arg("setbacktimeout").c_str());
+      if (hasArgCompat("setbacktemp"))    updateSetting("OTDsetbacktemp", argCompat("setbacktemp"));
+      if (hasArgCompat("setbacktimeout")) updateSetting("OTDsetbacktimeout", argCompat("setbacktimeout"));
       // TASK-183: PI room compensation + heating curve settings
-      if (httpServer.hasArg("chmode"))       updateSetting("OTDchmode", httpServer.arg("chmode").c_str());
-      if (httpServer.hasArg("flowtemp"))     updateSetting("OTDflowtemp", httpServer.arg("flowtemp").c_str());
-      if (httpServer.hasArg("flowmax"))      updateSetting("OTDflowmax", httpServer.arg("flowmax").c_str());
-      if (httpServer.hasArg("roomsetpoint")) updateSetting("OTDroomsetpoint", httpServer.arg("roomsetpoint").c_str());
-      if (httpServer.hasArg("gradient"))     updateSetting("OTDgradient", httpServer.arg("gradient").c_str());
-      if (httpServer.hasArg("exponent"))     updateSetting("OTDexponent", httpServer.arg("exponent").c_str());
-      if (httpServer.hasArg("offset"))       updateSetting("OTDoffset", httpServer.arg("offset").c_str());
-      if (httpServer.hasArg("roomcomp"))     updateSetting("OTDroomcomp", httpServer.arg("roomcomp").c_str());
-      if (httpServer.hasArg("kp"))           updateSetting("OTDkp", httpServer.arg("kp").c_str());
-      if (httpServer.hasArg("ki"))           updateSetting("OTDki", httpServer.arg("ki").c_str());
-      if (httpServer.hasArg("kboost"))       updateSetting("OTDkboost", httpServer.arg("kboost").c_str());
+      if (hasArgCompat("chmode"))       updateSetting("OTDchmode", argCompat("chmode"));
+      if (hasArgCompat("flowtemp"))     updateSetting("OTDflowtemp", argCompat("flowtemp"));
+      if (hasArgCompat("flowmax"))      updateSetting("OTDflowmax", argCompat("flowmax"));
+      if (hasArgCompat("roomsetpoint")) updateSetting("OTDroomsetpoint", argCompat("roomsetpoint"));
+      if (hasArgCompat("gradient"))     updateSetting("OTDgradient", argCompat("gradient"));
+      if (hasArgCompat("exponent"))     updateSetting("OTDexponent", argCompat("exponent"));
+      if (hasArgCompat("offset"))       updateSetting("OTDoffset", argCompat("offset"));
+      if (hasArgCompat("roomcomp"))     updateSetting("OTDroomcomp", argCompat("roomcomp"));
+      if (hasArgCompat("kp"))           updateSetting("OTDkp", argCompat("kp"));
+      if (hasArgCompat("ki"))           updateSetting("OTDki", argCompat("ki"));
+      if (hasArgCompat("kboost"))       updateSetting("OTDkboost", argCompat("kboost"));
       // TASK-582: CH hysteresis deadband settings
-      if (httpServer.hasArg("hysteresisenable")) updateSetting("OTDhysteresisenable", httpServer.arg("hysteresisenable").c_str());
-      if (httpServer.hasArg("hysteresis"))       updateSetting("OTDhysteresis", httpServer.arg("hysteresis").c_str());
+      if (hasArgCompat("hysteresisenable")) updateSetting("OTDhysteresisenable", argCompat("hysteresisenable"));
+      if (hasArgCompat("hysteresis"))       updateSetting("OTDhysteresis", argCompat("hysteresis"));
       // TASK-584: ventilation override persistence settings
-      if (httpServer.hasArg("ventenable"))    updateSetting("OTDventenable", httpServer.arg("ventenable").c_str());
-      if (httpServer.hasArg("openbypass"))    updateSetting("OTDopenbypass", httpServer.arg("openbypass").c_str());
-      if (httpServer.hasArg("autobypass"))    updateSetting("OTDautobypass", httpServer.arg("autobypass").c_str());
-      if (httpServer.hasArg("freeventenable")) updateSetting("OTDfreeventenable", httpServer.arg("freeventenable").c_str());
-      if (httpServer.hasArg("ventsetpoint"))  updateSetting("OTDventsetpoint", httpServer.arg("ventsetpoint").c_str());
+      if (hasArgCompat("ventenable"))    updateSetting("OTDventenable", argCompat("ventenable"));
+      if (hasArgCompat("openbypass"))    updateSetting("OTDopenbypass", argCompat("openbypass"));
+      if (hasArgCompat("autobypass"))    updateSetting("OTDautobypass", argCompat("autobypass"));
+      if (hasArgCompat("freeventenable")) updateSetting("OTDfreeventenable", argCompat("freeventenable"));
+      if (hasArgCompat("ventsetpoint"))  updateSetting("OTDventsetpoint", argCompat("ventsetpoint"));
       sendOTDirectStatus();
     } else {
       sendApiMethodNotAllowed(F("GET, POST"));
@@ -484,11 +484,11 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       sendCorsOriginHeader();
       sendOTDirectOverridesJSON();
     } else if (method == HTTP_POST || method == HTTP_PUT) {
-      if (!httpServer.hasArg("action") || !httpServer.hasArg("msgid")) {
+      if (!hasArgCompat("action") || !hasArgCompat("msgid")) {
         sendApiError(400, F("Missing 'action' and/or 'msgid' parameter")); return;
       }
       // Validate msgid is numeric 0-127
-      const char* msgidRaw = httpServer.arg("msgid").c_str();
+      const char* msgidRaw = argCompat("msgid");
       long msgidVal = strtol(msgidRaw, nullptr, 10);
       if (msgidVal < 0 || msgidVal > 127) {
         sendApiError(400, F("Invalid msgid (0-127)")); return;
@@ -496,11 +496,11 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       char msgidBuf[4];
       strlcpy(msgidBuf, msgidRaw, sizeof(msgidBuf));
 
-      const char* actionRaw = httpServer.arg("action").c_str();
+      const char* actionRaw = argCompat("action");
       char cmdBuf[16];
       if (strcmp_P(actionRaw, PSTR("sr")) == 0 || strcmp_P(actionRaw, PSTR("rm")) == 0) {
-        if (!httpServer.hasArg("value")) { sendApiError(400, F("Missing 'value' parameter")); return; }
-        const char* valRaw = httpServer.arg("value").c_str();
+        if (!hasArgCompat("value")) { sendApiError(400, F("Missing 'value' parameter")); return; }
+        const char* valRaw = argCompat("value");
         // Validate value is hex, max 4 chars
         size_t vLen = strlen(valRaw);
         if (vLen == 0 || vLen > 4) { sendApiError(400, F("Invalid value (hex, 1-4 chars)")); return; }
@@ -602,10 +602,10 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   } else if (strcmp_P(words[4], PSTR("commands")) == 0) {
     // POST /api/v2/otgw/commands — command in body, 202 Accepted
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    const String& body = httpServer.arg(0);
+    const char* body = bodyCompat();
     char cmdBuf[64] = "";
-    if (!extractJsonField(body, F("command"), cmdBuf, sizeof(cmdBuf))) {
-      strlcpy(cmdBuf, body.c_str(), sizeof(cmdBuf));
+    if (!extractJsonField(String(body), F("command"), cmdBuf, sizeof(cmdBuf))) {
+      strlcpy(cmdBuf, body, sizeof(cmdBuf));
     }
     handleCommandSubmit(cmdBuf);
   } else if (strcmp_P(words[4], PSTR("command")) == 0) {
@@ -617,7 +617,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // POST /api/v2/otgw/discovery (or /autoconfigure compat alias)
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     sendCorsOriginHeader();
-    httpServer.send(202, F("application/json"), F("{\"status\":\"accepted\"}"));
+    webSend(202, F("application/json"), F("{\"status\":\"accepted\"}"));
     doAutoConfigure();
   } else if (strcmp_P(words[4], PSTR("label")) == 0) {
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
@@ -632,8 +632,9 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // PSTR format string per row instead of two — saves flash on ESP32.
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
-    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"unsupported_read\":["));
+    AsyncResponseStream *s = restBeginStream("application/json");
+    if (!s) return;
+    s->print(F("{\"unsupported_read\":["));
     bool first = true;
     char ent[160];
     for (int i = 0; i <= 255; i++) {
@@ -642,12 +643,12 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       const char* label = "Unknown";
       const char* friendly = "";
       if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
-      if (!first) httpServer.sendContent(F(","));
+      if (!first) s->print(F(","));
       snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\",\"friendly\":\"%s\"}"), i, label, friendly);
-      httpServer.sendContent(ent);
+      s->print(ent);
       first = false;
     }
-    httpServer.sendContent_P(PSTR("],\"unsupported_write\":["));
+    s->print(F("],\"unsupported_write\":["));
     first = true;
     for (int i = 0; i <= 255; i++) {
       if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
@@ -655,13 +656,13 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       const char* label = "Unknown";
       const char* friendly = "";
       if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
-      if (!first) httpServer.sendContent(F(","));
+      if (!first) s->print(F(","));
       snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\",\"friendly\":\"%s\"}"), i, label, friendly);
-      httpServer.sendContent(ent);
+      s->print(ent);
       first = false;
     }
-    httpServer.sendContent_P(PSTR("]}"));
-    httpServer.sendContent(F(""));
+    s->print(F("]}"));
+    restFinalize();
   } else if (strcmp_P(words[4], PSTR("ot-support")) == 0) {
     // TASK-694 port (dev TASK-689): GET /api/v2/otgw/ot-support -> bilateral
     // OT support map. Compact mode — only msgIDs where at least one of the
@@ -670,8 +671,9 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // TASK-696: single PSTR format per row (leading comma via sendContent).
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
-    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"msgids\":["));
+    AsyncResponseStream *s = restBeginStream("application/json");
+    if (!s) return;
+    s->print(F("{\"msgids\":["));
     bool first = true;
     char row[160];
     for (int i = 0; i <= 255; i++) {
@@ -686,18 +688,18 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       OTlookup_t item;
       const char* label = "Unknown";
       if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; }
-      if (!first) httpServer.sendContent(F(","));
+      if (!first) s->print(F(","));
       snprintf_P(row, sizeof(row),
                  PSTR("{\"id\":%u,\"label\":\"%s\",\"tsR\":%s,\"tsW\":%s,\"blAR\":%s,\"blAW\":%s,\"blUR\":%s,\"blUW\":%s}"),
                  id, label,
                  tsR  ? "true" : "false", tsW  ? "true" : "false",
                  blAR ? "true" : "false", blAW ? "true" : "false",
                  blUR ? "true" : "false", blUW ? "true" : "false");
-      httpServer.sendContent(row);
+      s->print(row);
       first = false;
     }
-    httpServer.sendContent_P(PSTR("]}"));
-    httpServer.sendContent(F(""));
+    s->print(F("]}"));
+    restFinalize();
   } else if (strcmp_P(words[4], PSTR("overrides")) == 0) {
     // ADR-118: GET /api/v2/otgw/overrides -> active gateway-override values that the
     // boiler-side-worldview gate (ADR-096/103) drops from canonical. Additive surface;
@@ -705,8 +707,9 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // one JSON object per active entry so no large stack buffer is needed.
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
-    httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"overrides\":["));
+    AsyncResponseStream *s = restBeginStream("application/json");
+    if (!s) return;
+    s->print(F("{\"overrides\":["));
     const uint32_t now = millis();
     bool first = true;
     char row[200];
@@ -720,17 +723,17 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       const char* friendly = "";
       if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; friendly = item.friendlyname; }
       dtostrf(otOverrideStore[i].value, 3, 2, valbuf);
-      if (!first) httpServer.sendContent(F(","));
+      if (!first) s->print(F(","));
       snprintf_P(row, sizeof(row),
                  PSTR("{\"id\":%u,\"label\":\"%s\",\"friendly\":\"%s\",\"kind\":\"%s\",\"value\":%s,\"age_s\":%lu}"),
                  id, label, friendly,
                  (otOverrideStore[i].kind == OT_OVERRIDE_ANSWER) ? "answer" : "substituted",
                  valbuf, (unsigned long)((now - otOverrideStore[i].lastSeen) / 1000UL));
-      httpServer.sendContent(row);
+      s->print(row);
       first = false;
     }
-    httpServer.sendContent_P(PSTR("]}"));
-    httpServer.sendContent(F(""));
+    s->print(F("]}"));
+    restFinalize();
   } else {
     sendApiNotFound(originalURI);
   }
@@ -739,7 +742,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (wc > 4 && strcmp_P(words[4], PSTR("test")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
-    String stateParam = httpServer.arg(F("state"));
+    String stateParam = argCompat(F("state"));
     if (!stateParam.length()) {
       sendApiError(400, F("Missing required 'state' parameter; expected on|1 or off|0"));
       return;
@@ -752,7 +755,7 @@ static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
     }
     testWebhook(isOn);
     sendCorsOriginHeader();
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   } else {
     sendApiNotFound(originalURI);
   }
@@ -859,8 +862,8 @@ static void satSendHealthJSON()
 // Check whether the current request carries ?detail=full
 static bool satRequestHasDetailFull()
 {
-  return httpServer.hasArg(F("detail"))
-      && httpServer.arg(F("detail")) == F("full");
+  return hasArgCompat(F("detail"))
+      && strcmp_P(argCompat(F("detail")), PSTR("full")) == 0;
 }
 
 #if HAS_SAT_BLE
@@ -898,7 +901,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   if (wc <= 4) {
     // GET /api/v2/sat — default to status
     if (method == HTTP_GET) {
-      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+      webPushHeader(F("Cache-Control"), F("no-cache"));
       if (satRequestHasDetailFull()) { satSendHealthJSON(); }
       else                           { satSendStatusJSON(); }
     } else {
@@ -910,7 +913,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   const char* sub = words[4];
   if (strcasecmp_P(sub, PSTR("status")) == 0) {
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
-    httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+    webPushHeader(F("Cache-Control"), F("no-cache"));
     if (satRequestHasDetailFull()) { satSendHealthJSON(); }
     else                           { satSendStatusJSON(); }
   }
@@ -918,8 +921,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     char valBuf[16];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
       val = words[5];
     }
@@ -927,14 +930,14 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       sendApiError(400, F("Invalid or missing value (5.0-30.0)"));
       return;
     }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("externaltemp")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     char valBuf[16];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
       val = words[5];
     }
@@ -942,14 +945,14 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       sendApiError(400, F("Invalid or missing numeric value"));
       return;
     }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("externaloutdoor")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     char valBuf[16];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
       val = words[5];
     }
@@ -957,7 +960,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       sendApiError(400, F("Invalid or missing numeric value"));
       return;
     }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   // POST /api/v2/sat/pvsurplus — push PV-surplus power (TASK-640).
   // Body: "1500" or {"value":"1500"} or {"value":1500}. Range 0-50000 W.
@@ -965,8 +968,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     char valBuf[16];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
       val = words[5];
     }
@@ -974,7 +977,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       sendApiError(400, F("Invalid or missing numeric value (0-50000 W)"));
       return;
     }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   // POST /api/v2/sat/sim/event — inject a bench scenario (TASK-797 / plan §12 F2).
   // Body: {"event":"window_open|solar_gain","value":<num>,"duration_s":<int>}.
@@ -991,8 +994,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       sendApiError(409, F("simulation inactive: enable bSimulation before injecting events"));
       return;
     }
-    if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
-    const char* body = httpServer.arg(F("plain")).c_str();
+    if (!hasArgCompat(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+    const char* body = argCompat(F("plain"));
     char evtBuf[20], valBuf[16], durBuf[12];
     if (!extractJsonField(body, F("event"), evtBuf, sizeof(evtBuf))) {
       sendApiError(400, F("Missing 'event' field"));
@@ -1004,25 +1007,25 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       sendApiError(400, F("Unknown or unsupported event (window_open, solar_gain, sensor_noise, sensor_dropout, dhw_demand)"));
       return;
     }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("reset_integral")) == 0) {
     if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
     satResetIntegral();
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\",\"integral\":0}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\",\"integral\":0}"));
   }
   else if (strcasecmp_P(sub, PSTR("flush")) == 0) {
     // POST /api/v2/sat/flush — clear short-lived SAT data (PID integral + cycle window) (Task #237)
     if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
     satFlushShortLivedData();
-    httpServer.send(200, F("application/json"), F("{\"result\":\"ok\",\"flushed\":[\"pid\",\"cycles\"]}"));
+    webSend(200, F("application/json"), F("{\"result\":\"ok\",\"flushed\":[\"pid\",\"cycles\"]}"));
   }
   else if (strcasecmp_P(sub, PSTR("window")) == 0) {
     if (method == HTTP_POST || method == HTTP_PUT) {
       char valBuf[16];
       const char* val = nullptr;
-      if (httpServer.hasArg(F("plain"))) {
-        val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+      if (hasArgCompat(F("plain"))) {
+        val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
       } else if (wc > 5) {
         val = words[5];
       }
@@ -1031,7 +1034,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
                     strcasecmp_P(val, PSTR("1")) == 0 ||
                     strcasecmp_P(val, PSTR("ON")) == 0);
       satHandleWindow(isOpen);
-      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
     } else {
       sendApiMethodNotAllowed(F("POST, PUT"));
     }
@@ -1040,27 +1043,27 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     char valBuf[16];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
       val = words[5];
     }
     if (!val) { sendApiError(400, F("Missing preset name (away/eco/comfort/sleep/activity/home)")); return; }
     satHandlePreset(val);
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("enable")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     char valBuf[16];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
       val = words[5];
     }
     if (!val) { sendApiError(400, F("Missing value (0/1)")); return; }
     satHandleEnabled(val);
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
 #if HAS_SAT_BLE
   // TASK-508: BLE roster — discovery + select + label + forget.
@@ -1076,14 +1079,14 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
 
     if (strcasecmp_P(act, PSTR("discovery")) == 0) {
       if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
-      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+      webPushHeader(F("Cache-Control"), F("no-cache"));
       satBLERosterSendJSON();
     }
     else if (strcasecmp_P(act, PSTR("select")) == 0) {
       if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      if (!hasArgCompat(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
       char macBuf[18];
-      if (!extractJsonField(httpServer.arg(F("plain")).c_str(),
+      if (!extractJsonField(argCompat(F("plain")),
                             F("mac"), macBuf, sizeof(macBuf))) {
         sendApiError(400, F("Missing 'mac' field"));
         return;
@@ -1092,14 +1095,14 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
         sendApiError(404, F("MAC not in roster"));
         return;
       }
-      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
     }
     else if (strcasecmp_P(act, PSTR("label")) == 0) {
       if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      if (!hasArgCompat(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
       char macBuf[18];
       char labelBuf[32];
-      if (!satExtractTwoFields(httpServer.arg(F("plain")).c_str(),
+      if (!satExtractTwoFields(argCompat(F("plain")),
                                 F("mac"),   macBuf,   sizeof(macBuf),
                                 F("label"), labelBuf, sizeof(labelBuf))) {
         sendApiError(400, F("Missing 'mac' or 'label' field"));
@@ -1109,7 +1112,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
         sendApiError(404, F("MAC not in roster"));
         return;
       }
-      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
     }
     else if (strcasecmp_P(act, PSTR("forget")) == 0) {
       if (method != HTTP_POST && method != HTTP_PUT && method != HTTP_DELETE) {
@@ -1117,8 +1120,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
         return;
       }
       char macBuf[18];
-      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
-      if (!extractJsonField(httpServer.arg(F("plain")).c_str(),
+      if (!hasArgCompat(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      if (!extractJsonField(argCompat(F("plain")),
                             F("mac"), macBuf, sizeof(macBuf))) {
         sendApiError(400, F("Missing 'mac' field"));
         return;
@@ -1127,7 +1130,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
         sendApiError(404, F("MAC not in roster"));
         return;
       }
-      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
     }
     else {
       sendApiError(404, F("Unknown BLE sub-action (discovery/select/label/forget)"));
@@ -1138,21 +1141,21 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     char valBuf[16];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
       val = words[5];
     }
     if (!val) { sendApiError(400, F("Missing mode (continuous/pwm)")); return; }
     satHandleControlMode(val);
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("humidity")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     char valBuf[16];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 5) {
       val = words[5];
     }
@@ -1160,7 +1163,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       sendApiError(400, F("Invalid or missing value (0-100)"));
       return;
     }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("weather")) == 0) {
     if (wc == 5 && strcasecmp_P(words[5], PSTR("needs-setup")) == 0) {
@@ -1173,7 +1176,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       const bool needs = (millis() >= 300000UL)
                       && (OTcurrentSystemState.Toutside == 0.0f)
                       && (!state.sat.weather.bValid);
-      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+      webPushHeader(F("Cache-Control"), F("no-cache"));
       sendStartJsonMap(F(""));
       sendJsonMapEntry(F("needs_setup"), needs);
       sendJsonMapEntry(F("has_key"), (settings.sat.sWeatherApiKey[0] != '\0'));
@@ -1181,7 +1184,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       return;
     }
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
-    httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+    webPushHeader(F("Cache-Control"), F("no-cache"));
     weatherSendStatusJSON();
   }
   else if (strcasecmp_P(sub, PSTR("area")) == 0) {
@@ -1192,8 +1195,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     if (area < 0 || area >= 4) { sendApiError(400, F("Area index must be 0-3")); return; }
     char valBuf[16];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 6) {
       val = words[6];
     }
@@ -1201,7 +1204,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       sendApiError(400, F("Invalid or missing numeric value"));
       return;
     }
-    httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("settings")) == 0) {
     // POST/PUT /api/v2/sat/settings/<setting-name> — mirrors all MQTT sat/<sub-command> handlers
@@ -1210,8 +1213,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     const char* settingName = words[5];
     char valBuf[64];
     const char* val = nullptr;
-    if (httpServer.hasArg(F("plain"))) {
-      val = satExtractPostValue(httpServer.arg(F("plain")).c_str(), valBuf, sizeof(valBuf));
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
     } else if (wc > 6) {
       val = words[6];
     }
@@ -1229,7 +1232,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       handled = true; needsVal = false;
     }
     if (handled && !needsVal) {
-      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
       return;
     }
     // All remaining commands require a value
@@ -1371,7 +1374,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     }
     char respBuf[96];
     snprintf_P(respBuf, sizeof(respBuf), PSTR("{\"status\":\"ok\",\"setting\":\"%s\",\"value\":\"%s\"}"), settingName, val);
-    httpServer.send(200, F("application/json"), respBuf);
+    webSend(200, F("application/json"), respBuf);
   }
   // --- TASK-586: Heating curve calibration markers ---
   // GET  /api/v2/sat/markers           — return all markers as JSON array
@@ -1406,20 +1409,17 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
 
     if (method == HTTP_GET) {
       // Stream file directly; return empty array if not present
-      File f = LittleFS.open(fname, "r");
-      if (!f) {
-        httpServer.send(200, F("application/json"), F("[]"));
+      if (!LittleFS.exists(fname)) {
+        webSend(200, F("application/json"), F("[]"));
       } else {
-        httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-        httpServer.streamFile(f, F("application/json"));
-        f.close();
+        webPushHeader(F("Cache-Control"), F("no-cache"));
+        webSendFile(fname, F("application/json"), /*gzip=*/false);
       }
     }
     else if (method == HTTP_POST) {
       // Parse outside_temp, flow_temp, optional label from JSON body
-      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
-      const String& bodyStr = httpServer.arg(F("plain"));
-      const char* body = bodyStr.c_str();
+      if (!hasArgCompat(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      const char* body = bodyCompat();
       char otBuf[10], ftBuf[10], lblBuf[32];
       otBuf[0] = '\0'; ftBuf[0] = '\0'; lblBuf[0] = '\0';
       extractJsonField(body, F("outside_temp"), otBuf, sizeof(otBuf));
@@ -1488,7 +1488,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       }
       char resp[64];
       snprintf_P(resp, sizeof(resp), PSTR("{\"status\":\"ok\",\"id\":%d}"), newId);
-      httpServer.send(201, F("application/json"), resp);
+      webSend(201, F("application/json"), resp);
     }
     else if (method == HTTP_DELETE) {
       // DELETE /api/v2/sat/markers/<id>
@@ -1524,7 +1524,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       if (!LittleFS.rename(tmpname, fname)) {
         sendApiError(500, F("Cannot finalize markers file")); return;
       }
-      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
     }
     else {
       sendApiMethodNotAllowed(F("GET, POST, DELETE"));
@@ -1535,7 +1535,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   // PATCH /api/v2/sat/sensor-areas         — body: {"area":0,"sensor":"AABBCCDD11223344"} (empty sensor clears)
   else if (strcasecmp_P(sub, PSTR("sensor-areas")) == 0) {
     if (method == HTTP_GET) {
-      httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
+      webPushHeader(F("Cache-Control"), F("no-cache"));
       char resp[256];
       snprintf_P(resp, sizeof(resp),
         PSTR("{\"areas\":["
@@ -1548,12 +1548,11 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
         settings.sat.sSensorArea[1],
         settings.sat.sSensorArea[2],
         settings.sat.sSensorArea[3]);
-      httpServer.send(200, F("application/json"), resp);
+      webSend(200, F("application/json"), resp);
     }
     else if (method == HTTP_PATCH || method == HTTP_POST || method == HTTP_PUT) {
-      if (!httpServer.hasArg(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
-      const String& bodyStr = httpServer.arg(F("plain"));
-      const char* body = bodyStr.c_str();
+      if (!hasArgCompat(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      const char* body = bodyCompat();
       char areaBuf[4], sensorBuf[18];
       areaBuf[0] = '\0'; sensorBuf[0] = '\0';
       extractJsonField(body, F("area"),   areaBuf,   sizeof(areaBuf));
@@ -1577,7 +1576,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       char settingKey[16];
       snprintf_P(settingKey, sizeof(settingKey), PSTR("SATsensorarea%d"), areaIdx);
       updateSetting(settingKey, sensorBuf);
-      httpServer.send(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
     }
     else {
       sendApiMethodNotAllowed(F("GET, PATCH, POST, PUT"));
@@ -1622,7 +1621,7 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
       (unsigned long)state.discovery.iRepublishTriggeredCount,
       settings.mqtt.bDiscoveryAutoVerify ? "true" : "false");
     sendCorsOriginHeader();
-    httpServer.send(200, F("application/json"), msg);
+    webSend(200, F("application/json"), msg);
     return;
   }
 
@@ -1639,7 +1638,7 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
       PSTR("{\"status\":\"verification_started\",\"expected\":%lu,\"window_ms\":15000}"),
       (unsigned long)state.discovery.iPublishedTopicCount);
     sendCorsOriginHeader();
-    httpServer.send(202, F("application/json"), msg);
+    webSend(202, F("application/json"), msg);
     return;
   }
 
@@ -1666,7 +1665,7 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
           PSTR("{\"error\":{\"status\":429,\"message\":\"Republish cooldown active, retry in %lus\"}}"),
           remaining);
         sendCorsOriginHeader();
-        httpServer.send(429, F("application/json"), jsonBuff);
+        webSend(429, F("application/json"), jsonBuff);
         return;
       }
     }
@@ -1678,7 +1677,7 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
       (unsigned)countPendingDiscoveryIds());
     lastRepublishMs = millis();  // stamp only after work commits
     sendCorsOriginHeader();
-    httpServer.send(200, F("application/json"), msg);
+    webSend(200, F("application/json"), msg);
     return;
   }
 
@@ -1982,7 +1981,7 @@ static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
 
   if (scanResult == WIFI_SCAN_RUNNING) {
     // Scan in progress — report scanning
-    httpServer.send(200, F("application/json"), F("{\"status\":\"scanning\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"scanning\"}"));
     return;
   }
 
@@ -1990,7 +1989,7 @@ static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
     // Start async scan (non-blocking)
     WiFi.scanNetworks(true /*async*/);
     _wifiScanStarted = true;
-    httpServer.send(200, F("application/json"), F("{\"status\":\"scanning\"}"));
+    webSend(200, F("application/json"), F("{\"status\":\"scanning\"}"));
     return;
   }
 
@@ -2000,13 +1999,13 @@ static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
   char connectedSsid[33];
   strlcpy(connectedSsid, WiFi.SSID().c_str(), sizeof(connectedSsid));
 
-  httpServer.sendHeader(F("Cache-Control"), F("no-cache"));
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send(200, F("application/json"), F(""));
+  webPushHeader(F("Cache-Control"), F("no-cache"));
+  AsyncResponseStream *s = restBeginStream("application/json");
+  if (!s) return;
 
   char chunk[256];
   snprintf_P(chunk, sizeof(chunk), PSTR("{\"status\":\"ready\",\"count\":%d,\"networks\":["), scanResult);
-  httpServer.sendContent(chunk);
+  s->print(chunk);
 
   for (int16_t i = 0; i < scanResult; i++) {
     char ssidBuf[33];
@@ -2021,10 +2020,10 @@ static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
       ssidBuf, WiFi.RSSI(i), WiFi.channel(i),
       secured ? "true" : "false",
       isConn ? "true" : "false");
-    httpServer.sendContent(chunk);
+    s->print(chunk);
   }
-  httpServer.sendContent(F("]}"));
-  httpServer.sendContent(F(""));  // terminate chunked transfer
+  s->print(F("]}"));
+  restFinalize();
 
   // Release scan memory
   WiFi.scanDelete();
@@ -2086,29 +2085,34 @@ static const ApiRoute kV2Routes[] PROGMEM = {
 };
 
 //=======================================================================
-void processAPI()
+void processAPI(AsyncWebServerRequest *request)
 {
-  // Static buffers save ~356 bytes of stack (not re-entrant in cooperative scheduler)
+  // Bind the per-request context. processAPI is reached from the /api route AND
+  // the onNotFound catch-all (which already bound it); rebinding is idempotent.
+  webBeginRequest(request);
+
+  // Static buffers save ~356 bytes of stack. Safe under ESPAsyncWebServer's
+  // single-task (async_tcp) handler serialization — no concurrent re-entry.
   static char URI[50];
   static char words[API_MAX_WORDS][API_WORD_LEN];
   static char originalURI[sizeof(URI)];
   URI[0] = '\0';
   memset(words, 0, sizeof(words));
 
-  const HTTPMethod method = httpServer.method();
+  const HTTPMethod method = methodCompat();
   const unsigned long startMs = millis();
-  const size_t uriLen = strlcpy(URI, httpServer.uri().c_str(), sizeof(URI));
+  const size_t uriLen = strlcpy(URI, uriCompat(), sizeof(URI));
   strlcpy(originalURI, URI, sizeof(originalURI));
 
   if (uriLen >= sizeof(URI)) {
     RESTDebugTf(PSTR("REST %s %s => 414 URI too long\r\n"), httpMethodToStr(method), originalURI);
-    httpServer.send_P(414, PSTR("text/plain"), PSTR("414: URI too long\r\n"));
+    webSendP(414, PSTR("text/plain"), PSTR("414: URI too long\r\n"));
     return;
   }
 
   if (platformFreeHeap() < 4096) {
     RESTDebugTf(PSTR("REST %s %s => 500 low heap (%u)\r\n"), httpMethodToStr(method), originalURI, platformFreeHeap());
-    httpServer.send_P(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n"));
+    webSendP(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n"));
     return;
   }
 
@@ -3146,28 +3150,28 @@ void postSettings()
   // json string: {"name":"settings.sHostname","value":"abc"}
   // json string: {"name":"darktheme","value":true}
   //------------------------------------------------------------
-  const String& body = httpServer.arg(0);
-  if (body.length() == 0 || !body.startsWith("{")) {
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Invalid JSON\"}"));
+  const char* body = bodyCompat();
+  if (body[0] == '\0' || body[0] != '{') {
+    webSend(400, F("application/json"), F("{\"error\":\"Invalid JSON\"}"));
     return;
   }
 
   char field[50];
   if (!extractJsonField(body, F("name"), field, sizeof(field))) {
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing name\"}"));
+    webSend(400, F("application/json"), F("{\"error\":\"Missing name\"}"));
     return;
   }
 
   if (!isKnownSetting(field)) {
     DebugTf(PSTR("postSettings: unknown field [%s], rejected\r\n"), field);
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Unknown setting name\"}"));
+    webSend(400, F("application/json"), F("{\"error\":\"Unknown setting name\"}"));
     return;
   }
 
   // 150 bytes covers the largest setting value (settingOTGWcommands, max 128 chars).
   char newValue[150];
   if (!extractJsonField(body, F("value"), newValue, sizeof(newValue))) {
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
+    webSend(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
     return;
   }
 
@@ -3192,7 +3196,7 @@ void postSettings()
   // (TASK-508). Pre-reboot durability is preserved by doRestart() in
   // helperStuff.ino, which still calls flushSettings() synchronously before
   // esp.restart().
-  httpServer.send(200, F("application/json"), body);
+  webSend(200, F("application/json"), body);
 
 } // postSettings()
 
@@ -3203,62 +3207,61 @@ void postSettings()
 // GET /api/v1/sensors/label?address=28FF64D1841703F1
 // Get all Dallas sensor labels from file (bulk read)
 void getDallasLabels() {
-  File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "r");
-  
-  if (!labelsFile) {
+  if (!LittleFS.exists(F("/dallas_labels.ini"))) {
     // No file exists - return empty JSON object
-    httpServer.send(200, F("application/json"), F("{}"));
+    webSend(200, F("application/json"), F("{}"));
     return;
   }
-  
+
   // Stream the file content directly to response
-  httpServer.streamFile(labelsFile, F("application/json"));
-  labelsFile.close();
+  webSendFile("/dallas_labels.ini", F("application/json"), /*gzip=*/false);
 }
 
 // Update all Dallas sensor labels in file (bulk operation)
 void updateAllDallasLabels() {
-  const String& body = httpServer.arg(F("plain"));
+  const char* body = bodyCompat();
 
   // Validate: body must be a non-empty JSON object (starts with '{', ends with '}')
-  size_t bodyLen = body.length();
+  size_t bodyLen = strlen(body);
   if (bodyLen == 0 || body[0] != '{' || body[bodyLen - 1] != '}') {
-    httpServer.send(400, F("application/json"),
+    webSend(400, F("application/json"),
       F("{\"success\":false,\"error\":\"Empty or invalid JSON body\"}"));
     return;
   }
-  // Limit file size to prevent filling LittleFS (labels are short strings)
+  // Limit file size to prevent filling LittleFS (labels are short strings).
+  // Note: the captured body buffer is WEB_BODY_MAX_LEN; a payload larger than
+  // that is truncated at capture, so this also reflects the capture ceiling.
   if (bodyLen > 2048) {
-    httpServer.send(400, F("application/json"),
+    webSend(400, F("application/json"),
       F("{\"success\":false,\"error\":\"Body too large (max 2048 bytes)\"}"));
     return;
   }
   // Basic structural check: all keys and values must be quoted strings.
   // Scan for unquoted colons preceded/followed by quoted strings.
   {
-    const char* p = body.c_str() + 1; // skip opening '{'
+    const char* p = body + 1; // skip opening '{'
     while (*p && *p != '}') {
       while (*p == ' ' || *p == '\r' || *p == '\n' || *p == ',') p++;
       if (*p == '}') break;
       if (*p != '"') {
-        httpServer.send(400, F("application/json"),
+        webSend(400, F("application/json"),
           F("{\"success\":false,\"error\":\"Invalid JSON: expected quoted key\"}"));
         return;
       }
       // skip key string
       p++;
       while (*p && *p != '"') { if (*p == '\\' && *(p+1)) p++; p++; }
-      if (*p != '"') { httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: unterminated key\"}")); return; }
+      if (*p != '"') { webSend(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: unterminated key\"}")); return; }
       p++; // skip closing quote
       while (*p == ' ') p++;
-      if (*p != ':') { httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: expected colon\"}")); return; }
+      if (*p != ':') { webSend(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: expected colon\"}")); return; }
       p++; // skip colon
       while (*p == ' ') p++;
-      if (*p != '"') { httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: expected quoted value\"}")); return; }
+      if (*p != '"') { webSend(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: expected quoted value\"}")); return; }
       // skip value string
       p++;
       while (*p && *p != '"') { if (*p == '\\' && *(p+1)) p++; p++; }
-      if (*p != '"') { httpServer.send(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: unterminated value\"}")); return; }
+      if (*p != '"') { webSend(400, F("application/json"), F("{\"success\":false,\"error\":\"Invalid JSON: unterminated value\"}")); return; }
       p++; // skip closing quote
     }
   }
@@ -3266,7 +3269,7 @@ void updateAllDallasLabels() {
   // Write validated JSON to file
   File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "w");
   if (!labelsFile) {
-    httpServer.send_P(500, PSTR("application/json"),
+    webSendP(500, PSTR("application/json"),
       PSTR("{\"success\":false,\"error\":\"Failed to open file for writing\"}"));
     return;
   }
@@ -3274,7 +3277,7 @@ void updateAllDallasLabels() {
   labelsFile.print(body);
   labelsFile.close();
 
-  httpServer.send(200, F("application/json"), F("{\"success\":true}"));
+  webSend(200, F("application/json"), F("{\"success\":true}"));
 }
 
 //====================================================
@@ -3288,12 +3291,15 @@ void sendApiNotFound(const char *URI)
 
   // For non-API routes, return HTML 404 (legacy behavior)
   sendCorsOriginHeader();
-  httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  httpServer.send_P(404, PSTR("text/html; charset=UTF-8"), PSTR("<!DOCTYPE HTML><html><head>"));
-
-  httpServer.sendContent_P(PSTR("<style>body { background-color: lightgray; font-size: 15pt;}</style></head><body>"));
-  httpServer.sendContent_P(PSTR("<h1>OTGW firmware</h1><b1>"));
-  httpServer.sendContent_P(PSTR("<br>[<b>"));
+  AsyncResponseStream *s = restBeginStream("text/html; charset=UTF-8");
+  if (!s) return;
+  // restBeginStream defaults the status to 200; set 404 explicitly is not
+  // exposed on AsyncResponseStream, so emit via setCode below.
+  s->setCode(404);
+  s->print(F("<!DOCTYPE HTML><html><head>"));
+  s->print(F("<style>body { background-color: lightgray; font-size: 15pt;}</style></head><body>"));
+  s->print(F("<h1>OTGW firmware</h1><b1>"));
+  s->print(F("<br>[<b>"));
   // HTML-escape URI to prevent reflected XSS
   String escapedURI = String(URI);
   escapedURI.replace(F("&"), F("&amp;"));
@@ -3301,9 +3307,10 @@ void sendApiNotFound(const char *URI)
   escapedURI.replace(F(">"), F("&gt;"));
   escapedURI.replace(F("\""), F("&quot;"));
   escapedURI.replace(F("'"), F("&#39;"));
-  httpServer.sendContent(escapedURI);
-  httpServer.sendContent_P(PSTR("</b>] is not a valid "));
-  httpServer.sendContent_P(PSTR("</body></html>\r\n"));
+  s->print(escapedURI);
+  s->print(F("</b>] is not a valid "));
+  s->print(F("</body></html>\r\n"));
+  restFinalize();
 
 } // sendApiNotFound()
 

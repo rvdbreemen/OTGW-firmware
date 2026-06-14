@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.183
+**  Version  : v2.0.0-alpha.184
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5579,9 +5579,10 @@ void handlePendingUpgrade() {
   DebugTln(F("======================================="));
 }
 
-void upgradepic() {
+void upgradepic(AsyncWebServerRequest *request) {
+  webBeginRequest(request);
   if (!isPICEnabled()) {
-    httpServer.send_P(400, PSTR("text/plain"), PSTR("No PIC detected - PIC functions disabled"));
+    webSendP(400, PSTR("text/plain"), PSTR("No PIC detected - PIC functions disabled"));
     return;
   }
 
@@ -5591,9 +5592,9 @@ void upgradepic() {
   char action[80];
   char filename[80];
   char version[80];
-  strlcpy(action,   httpServer.arg("action").c_str(),  sizeof(action));
-  strlcpy(filename, httpServer.arg("name").c_str(),    sizeof(filename));
-  strlcpy(version,  httpServer.arg("version").c_str(), sizeof(version));
+  strlcpy(action,   argCompat("action"),  sizeof(action));
+  strlcpy(filename, argCompat("name"),     sizeof(filename));
+  strlcpy(version,  argCompat("version"),  sizeof(version));
 
   DebugTln(F("=== PIC Flash HTTP Request Received ==="));
   DebugTf(PSTR("Action: %s, File: %s, Version: %s\r\n"), action, filename, version);
@@ -5602,23 +5603,23 @@ void upgradepic() {
 
   if (action[0] == '\0' || filename[0] == '\0') {
     DebugTln(F("ERROR: Missing action or filename parameter"));
-    httpServer.send_P(400, PSTR("text/plain"), PSTR("Missing action or name"));
+    webSendP(400, PSTR("text/plain"), PSTR("Missing action or name"));
     return;
   }
 
   if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0) {
     DebugTln(F("ERROR: PIC device id is unknown, cannot upgrade"));
-    httpServer.send_P(400, PSTR("text/plain"), PSTR("PIC device not detected"));
+    webSendP(400, PSTR("text/plain"), PSTR("PIC device not detected"));
     return; // no pic version found, don't upgrade
   }
 
   if (strcmp_P(action, PSTR("upgrade")) == 0) {
     DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename);
-    httpServer.send_P(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
-    httpServer.client().flush();  // Ensure response buffer is sent to client
-    DebugTln(F("HTTP response sent and flushed"));
+    // The async response is queued here; the actual upgrade is deferred to the
+    // main loop so lwIP can drain the response before the PIC flash begins.
+    webSendP(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));
+    DebugTln(F("HTTP response queued"));
 
-    // Defer the actual upgrade start to the main loop to ensure HTTP response is sent
     snprintf_P(pendingUpgradePath, sizeof(pendingUpgradePath), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
     DebugTf(PSTR("Pending upgrade queued: [%s]\r\n"), pendingUpgradePath);
     DebugTln(F("=== HTTP handler complete, upgrade will start in main loop ==="));
@@ -5639,8 +5640,8 @@ void upgradepic() {
       LittleFS.remove(path);
     }
   }
-  httpServer.sendHeader(F("Location"), F("index.html#tabPICflash"), true);
-  httpServer.send_P(303, PSTR("text/html; charset=UTF-8"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
+  webPushHeader(F("Location"), F("index.html#tabPICflash"));
+  webSendP(303, PSTR("text/html; charset=UTF-8"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
 }
 #endif // HAS_PIC — end of PIC firmware upgrade functions
 

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.183
+**  Version  : v2.0.0-alpha.184
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -32,8 +32,21 @@ time_t      NtpLastSync = 0;
 // Port is fixed in the constructor; begin() needs no port argument.
 SimpleTelnet<1> debugTelnet(23);
 
-OTGWWebServer           httpServer(80);
+// TASK-865.9 (ADR-123 Phase 3): the synchronous WebServer moved to
+// ESPAsyncWebServer. The async server runs every handler on the AsyncTCP
+// service task (no loop() handleClient() polling). seq10 (WebSocket) and
+// seq11 (OTA) attach to this same instance.
+AsyncWebServer          server(80);
 OTGWUpdateServer        httpUpdater(true);
+
+// Per-request context for the async bridge (webServerCompat.h). Single point
+// of definition (ADR-044). Safe as file-static because ESPAsyncWebServer
+// serializes all handlers on the one async_tcp task.
+AsyncWebServerRequest*  currentRequest  = nullptr;
+AsyncResponseStream*    g_restStream    = nullptr;
+bool                    g_responseSent  = false;
+WebPendingHeaders       g_pendingHeaders{};
+WebRequestBody          g_requestBody{};
 
 FSInfo LittleFSinfo;
 bool   LittleFSmounted = false;
@@ -187,10 +200,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
       // instead of blocking in the config portal.
       DebugTln(F("BETA: WiFi unavailable at boot, skipping config portal → AP fallback"));
       startAPFallback();
-      // Set up OTA updater so firmware flashing works from AP mode
-      httpUpdater.setup(&httpServer);
-      httpUpdater.setIndexPage(UpdateServerIndex);
-      httpUpdater.setSuccessPage(UpdateServerSuccess);
+      // TASK-865.11: OTA re-attaches here on AsyncWebServer. The OTGWUpdateServer
+      // still binds the synchronous WebServer type (OTGW-ModUpdateServer-esp32.h)
+      // and there is no sync server to attach to between 865.9 and 865.11, so the
+      // wiring is intentionally removed. OTA is dark across this task seam.
       if (settings.sHTTPpasswd[0] != '\0') {
         httpUpdater.updateCredentials("admin", settings.sHTTPpasswd);
       }
@@ -240,10 +253,11 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   // for why the catch-all DHCP re-announce was removed.
   platformSetHostname(hostname);
 
-  httpUpdater.setup(&httpServer);
-  httpUpdater.setIndexPage(UpdateServerIndex);
-  httpUpdater.setSuccessPage(UpdateServerSuccess);
-  // Apply HTTP Basic Auth credentials to OTA update server if password is configured
+  // TASK-865.11: OTA re-attaches here on AsyncWebServer. The OTGWUpdateServer
+  // still binds the synchronous WebServer type (OTGW-ModUpdateServer-esp32.h),
+  // retired by seq11; there is no sync server to attach to between 865.9 and
+  // 865.11, so the wiring is intentionally removed. OTA is dark across this seam.
+  // Credentials are still kept current so seq11's re-wire needs no settings work.
   if (settings.sHTTPpasswd[0] != '\0') {
     httpUpdater.updateCredentials("admin", settings.sHTTPpasswd);
   }
