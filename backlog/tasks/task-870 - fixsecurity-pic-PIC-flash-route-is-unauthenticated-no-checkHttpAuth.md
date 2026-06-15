@@ -1,9 +1,10 @@
 ---
 id: TASK-870
 title: 'fix(security): /pic PIC-flash route is unauthenticated (no checkHttpAuth)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-15 06:06'
+updated_date: '2026-06-15 06:48'
 labels: []
 dependencies: []
 ordinal: 86000
@@ -21,3 +22,9 @@ Found during the TASK-869 team review (adjacent finding). The /pic route (server
 - [ ] #2 Web UI PIC-flash still works (browser sends cached Basic Auth)
 - [ ] #3 Build green 3 targets; evaluate.py --quick no new failures
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+WONT-FIX / BY DESIGN. Maintainer confirmed (2026-06-15) that unauthenticated PIC updates are intentional: it is the current security model (trusted LAN). /pic (upgradepic) deliberately does not call checkHttpAuth(). This is an accepted carve-out from ADR-056 for now, not a defect. No code change. Recorded so future code reviews do not re-flag it.
+<!-- SECTION:FINAL_SUMMARY:END -->
