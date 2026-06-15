@@ -2,12 +2,13 @@
 
 ## Status
 
-Proposed, 2026-06-14. Guideline-level (per ADR-080): this is a
+Accepted, 2026-06-15. Proposed 2026-06-14; accepted by the maintainer
+(Robert van den Breemen) 2026-06-15. Guideline-level (per ADR-080): this is a
 pattern/idiom decision with no automated CI gate planned, so it is enforced at
 PR review, not by `evaluate.py` or `bin/adr-judge`.
 
-This ADR **proposes to amend ADR-132** (Accepted 2026-06-14) and **to supersede
-ADR-026** (Accepted 2026-01-31):
+This ADR **amends ADR-132** (Accepted 2026-06-14) and **supersedes ADR-026**
+(Accepted 2026-01-31):
 
 - It **amends ADR-132** by narrowing the "Body-size routing" sub-decision: how
   the web UI static assets are served. The rest of ADR-132 (the imperative-push
@@ -22,11 +23,10 @@ ADR-026** (Accepted 2026-01-31):
   efficiently when versions match. ADR-026's most acute motivation, Safari's
   24h+ stale-cache window, is bounded to 60 s and then ETag-revalidated.
 
-ONLY ON ACCEPTANCE (a human maintainer action, not yet done) will the
-back-references be recorded as status lines on the affected ADRs (the sanctioned
-exception to immutability): ADR-132 would gain "Amended by ADR-139" and ADR-026
-would gain "Superseded by ADR-139". Their decision bodies are not otherwise
-edited. While this ADR is Proposed those back-references are NOT applied.
+On acceptance (the maintainer action recorded below) the back-references are
+recorded as status lines on the affected ADRs (the sanctioned exception to
+immutability): ADR-132 gains "Amended by ADR-139" and ADR-026 gains "Superseded
+by ADR-139". Their decision bodies are not otherwise edited.
 
 ## Status History
 
@@ -36,6 +36,11 @@ status_history:
     changed_by: Agent
     reason: Amend ADR-132 body-size routing and supersede ADR-026's ?v= mechanism; make ETag + bounded max-age the project-wide cache-busting standard for all web UI static assets, serve plain readable files via library-managed AsyncFileResponse streaming (no gzip), retire the chunked index rewriter; align AsyncTCP task config (core affinity) with the EMS-ESP32 blueprint
     changed_via: adr-kit
+  - date: 2026-06-15
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted ADR-139 by name in session after the agent reverted the loop's premature self-acceptance and presented the decision. ETag + bounded max-age=60 adopted as the project-wide web-asset cache-busting standard; the chunked index rewriter retired in favour of library-managed AsyncFileResponse streaming. The out-of-scope REST_STREAM_BUFFER_SIZE change was pulled out of this ADR's code surface as a separate decision. Back-references applied to ADR-132 (Amended by) and ADR-026 (Superseded by). Hardware confirmation of the /-hang fix remains field-validation (TASK-866).
+    changed_via: manual
 
 ## Context
 
@@ -102,9 +107,10 @@ was never needed for the "do not buffer 39 KB" concern.
 
 Per maintainer directive, the LittleFS image holds **plain, readable** HTML / JS
 / CSS files, and the build phase produces **no archives or `.gz` siblings**. The
-gzip build step (`prepare_gzip_assets`, `build.py:718-748`) stays disabled at its
-call site (`build.py:755-761`, TASK-433); this ADR **affirms** that disable
-rather than reversing it. (TASK-433 originally disabled gzip because shipping a
+gzip build step (`prepare_gzip_assets`) was already disabled at its call site
+(TASK-433); this ADR's implementation **removes the function and its commented-out
+call site from `build.py` entirely** rather than leaving dead disabled code, so
+no gzip is produced. (TASK-433 originally disabled gzip because shipping a
 `.gz` while the handler also set `Content-Encoding: gzip` manually produced a
 doubled header browsers rejected; with no `.gz` served, that failure mode is
 out of scope entirely.)
@@ -366,8 +372,8 @@ and lighter on the async task.
   `AsyncFileResponse::_fillBuffer` reads `len`-sized chunks on demand (`len`
   bounded by the TCP send buffer, lines 453/482/530), so the file is streamed
   incrementally and never buffered whole.
-- `build.py:718-748`: `prepare_gzip_assets`; `build.py:755-761`: its disabled
-  call site (TASK-433), which this ADR affirms (no gzip, plain readable files).
+- `build.py`: `prepare_gzip_assets` and its commented-out call site are removed
+  entirely (TASK-433); the build produces no gzip, only plain readable files.
 - `src/OTGW-firmware/data/index.html`: 39,791 bytes uncompressed (measured),
   served as a plain readable file.
 - `platformio.ini:45`: global `[env].build_flags` now carrying

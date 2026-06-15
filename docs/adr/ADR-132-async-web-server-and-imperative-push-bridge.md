@@ -4,6 +4,12 @@
 
 Accepted, 2026-06-14. Proposed 2026-06-14; accepted by the maintainer 2026-06-14.
 
+Amended by ADR-139 (2026-06-15): the "Body-size routing" sub-decision for web UI
+static assets is superseded by an ETag + bounded max-age standard (index.html and
+JS/CSS served as plain files via AsyncFileResponse, no `?v=` query versioning, no
+chunked index rewriter). The rest of this ADR (imperative-push to async-pull
+bridge, send-once invariant, REST `AsyncResponseStream` routing) stands unchanged.
+
 This is the **Phase 3** networking step that ADR-123 (the 2.0.0 concurrency-model
 decision) anticipated: move the web stack off the cooperative `loop()` and onto the
 event-driven async server. ADR-123 deferred the concrete HTTP surface to the ADR

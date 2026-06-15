@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.195
+**  Version  : v2.0.0-alpha.196
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -70,6 +70,18 @@ const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCa
 // directive); streamed straight from flash via AsyncFileResponse, never buffered
 // whole on the fragmented S3 heap.
 static void serveVersionedAsset(const char* path, const __FlashStringHelper* mime) {
+  // Existence first, before any ETag / max-age is staged and before the 304
+  // short-circuit. A missing asset must NOT be cached: the ETag is the filesystem
+  // hash, which only changes on a reflash, so a 404 tagged with it (or answered
+  // 304 against it) would be reused for the whole firmware session and would even
+  // survive a manual FSexplorer re-upload of the file (an upload does not bump the
+  // hash). So a miss returns a no-cache 404 with no validator, matching the
+  // pre-ETag behaviour and refetching every time.
+  if (!LittleFS.exists(path)) {
+    webPushHeader(F("Cache-Control"), F("no-cache"));
+    webSend(404, F("text/plain"), F("File not found"));
+    return;
+  }
   const char* fsHash = getFilesystemHash();
   if (fsHash && fsHash[0] != '\0') {
     char etag[24];
@@ -84,7 +96,6 @@ static void serveVersionedAsset(const char* path, const __FlashStringHelper* mim
     webPushHeader(F("ETag"), etag);
   }
   webPushHeader(F("Cache-Control"), F("public, max-age=60"));
-  if (!LittleFS.exists(path)) { webSend(404, F("text/plain"), F("File not found")); return; }
   webSendFile(path, mime, /*gzip=*/false);
 }
 
