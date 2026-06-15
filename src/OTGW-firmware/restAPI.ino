@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.196
+**  Version  : v2.0.0-alpha.197
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -142,7 +142,14 @@ static bool isSameOriginRequest() {
 bool checkHttpAuth() {
   if (settings.sHTTPpasswd[0] == '\0') return true;  // auth disabled
 
-  if (methodCompat() == HTTP_OPTIONS) return true;  // allow CORS preflight
+  // SECURITY (ADR-056): do NOT short-circuit OPTIONS here. The /api/v2 CORS
+  // preflight is already answered upstream in processAPI (OPTIONS -> sendApiOptions
+  // -> 204, before any handler or this auth check). A blanket "OPTIONS returns
+  // true" would let a cross-origin CORS preflight bypass Basic Auth AND the
+  // same-origin CSRF check on the HTTP_ANY admin routes (/ReBoot, /ResetWireless,
+  // /pic) whose handlers reach their side effect directly: a malicious LAN page's
+  // preflight could wipe WiFi credentials or reboot the device. OPTIONS therefore
+  // falls through to the same auth + same-origin gate as every other method.
 
   if (!authenticateCompat("admin", settings.sHTTPpasswd)) {
     webRequestAuth();

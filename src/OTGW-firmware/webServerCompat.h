@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.196
+**  Version  : v2.0.0-alpha.197
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -232,8 +232,26 @@ inline const char* hostHeaderCompat() {
   return buf;
 }
 
+// Map the ESPAsyncWebServer request method to the firmware's HTTPMethod. These
+// are TWO DIFFERENT enums that share member names but NOT values: ESPAsyncWebServer
+// AsyncWebRequestMethod is a namespaced bitmask (GET=1<<1=2, POST=1<<3=8, ...),
+// while HTTPMethod is http_parser's sequential enum http_method (GET=1, POST=3, ...).
+// A raw `(HTTPMethod)request->method()` cast therefore mislabels every request: a
+// GET (async 2) became http_parser HTTP_HEAD(2), so every GET-guarded /api/v2
+// endpoint returned 405 and POST/PUT auth checks misfired (405/403 storm, TASK-869).
+// Map by NAME via a switch so it stays correct if either enum is renumbered.
 inline HTTPMethod methodCompat() {
-  return currentRequest ? (HTTPMethod)currentRequest->method() : HTTP_GET;
+  if (!currentRequest) return HTTP_GET;
+  switch (currentRequest->method()) {
+    case AsyncWebRequestMethod::HTTP_GET:     return HTTP_GET;
+    case AsyncWebRequestMethod::HTTP_POST:    return HTTP_POST;
+    case AsyncWebRequestMethod::HTTP_PUT:     return HTTP_PUT;
+    case AsyncWebRequestMethod::HTTP_DELETE:  return HTTP_DELETE;
+    case AsyncWebRequestMethod::HTTP_PATCH:   return HTTP_PATCH;
+    case AsyncWebRequestMethod::HTTP_HEAD:    return HTTP_HEAD;
+    case AsyncWebRequestMethod::HTTP_OPTIONS: return HTTP_OPTIONS;
+    default:                                  return HTTP_ANY;
+  }
 }
 inline const char* uriCompat() {
   static char buf[80];
