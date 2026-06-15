@@ -1,14 +1,23 @@
-# ADR-140: Single-Device HA Discovery Topology with Seven Categories in One Device (align 2.0.0 with the 1.6.x single-device model)
+# ADR-140: Single-Device HA Discovery Topology with Source-Prefix Entity Clustering in One Device (align 2.0.0 with the 1.6.x single-device model)
 
 ## Status
 
-Proposed, 2026-06-15. Guideline-level (per ADR-080): the discovery payload shape
-is verified by field validation (a captured discovery dump on a real device), not
-by a clean `evaluate.py` forbid/require pattern. **Supersedes ADR-124** (Seven-Device
+Accepted, 2026-06-15 (Proposed 2026-06-15; accepted by the maintainer 2026-06-15).
+Guideline-level (per ADR-080): the discovery payload shape is verified by field
+validation (a captured discovery dump on a real device), not by a clean
+`evaluate.py` forbid/require pattern. **Supersedes ADR-124** (Seven-Device
 Topology) and, transitively, the multi-device line ADR-124 sits on (ADR-122
-five-device). On acceptance, a "Superseded by ADR-140" status line is added to
-ADR-124 (the sanctioned immutability exception); ADR-124's body is not edited.
-While this ADR is Proposed those back-references are NOT applied.
+five-device). On acceptance (applied now), a "Superseded by ADR-140" status line
+is added to ADR-124 (the sanctioned immutability exception); ADR-124's body is not
+edited.
+
+**Acceptance note (2026-06-15):** acceptance incorporates the maintainer's naming
+directive — the in-device clustering is **five source/engine prefixes**
+(`esp_`, `pic_`, `otd_`, `sat_`, `sensors_`), NOT the seven functional categories
+(no `boiler_` / `thermostat_` / `gateway_` prefixes). §2 below is the accepted
+clustering scheme; the original Proposed draft's "seven categories" wording is
+superseded by it within this same ADR (the revision was applied while Proposed,
+before the flip to Accepted).
 
 ## Status History
 
@@ -17,6 +26,11 @@ status_history:
     status: Proposed
     changed_by: Agent
     reason: After field testing, revert the 2.0.0 multi-device HA topology (ADR-124 seven-device split with via_device hub) back to ONE device per hardware OTGW with entity_category clustering, matching the 1.6.x/dev model. The multi-device layout is confusing in practice; the seven-device path is also the source of the F1 two-pass determinism bug (ADR-077 Risks materialized). Hard-remove the seven-device code; single-device becomes the only model.
+    changed_via: manual
+  - date: 2026-06-15
+    status: Accepted
+    changed_by: maintainer (Robert van den Breemen)
+    reason: Accepted with the maintainer naming directive folded into §2 — in-device clustering uses five source/engine prefixes (esp_/pic_/otd_/sat_/sensors_), not the seven functional categories. Boiler/thermostat disambiguation moves to the 1.x bilateral _boiler/_thermostat suffix; gateway/OT-core fold onto the active engine prefix (pic_ or otd_). Supersedes ADR-124.
     changed_via: manual
 
 ## Context
@@ -81,23 +95,46 @@ Concrete shape:
    `identifiers`. No `via_device`, no multi-device split, no per-device suffix or
    metadata.
 
-2. **Clustering = seven categories inside the one device.** The seven former device
-   groupings (Boiler, Thermostat, Gateway, ESP, OT-Core, SAT, Sensors) survive as seven
-   CATEGORIES within the single device, not as seven devices. The existing
-   `deviceForOTId` classification (which already assigns every entity to one of the seven)
-   is repurposed from device-selection to category-selection, and the category is
-   rendered as an entity-name prefix (e.g. "Boiler Control Setpoint", "Thermostat Room
-   Setpoint", "ESP Free Heap"), so HA visibly groups the entities by category in the
-   device entity list and in any dashboard filter.
+2. **Clustering = five source/engine prefixes inside the one device (maintainer
+   directive 2026-06-15).** Every entity is prefixed by the SOURCE/ENGINE that produced
+   it, drawn from exactly five values — and the functional-role labels `boiler_`,
+   `thermostat_`, `gateway_` are **NOT** used as prefixes:
+
+   | Prefix | Source / engine |
+   |---|---|
+   | `esp_` | ESP32 firmware + diagnostics (heap, wifi, uptime, version, …) |
+   | `pic_` | OpenTherm values mediated by the OTGW Classic **PIC** firmware |
+   | `otd_` | OpenTherm values produced by the **OTDirect** engine (OTGW32) |
+   | `sat_` | Smart Autotune Thermostat subsystem, **including its BLE sensors** |
+   | `sensors_` | on-board hardware sensors (Dallas DS18B20, S0 pulse counter) |
+
+   The prefix is the engine/source, not the OpenTherm direction. Exactly one OT command
+   interface is active per build — `pic_` on the esp32-classic PIC build, `otd_` on the
+   esp32/OTGW32 OTDirect build, resolved at boot on esp32-combo — so every OT value
+   carries `pic_` or `otd_` accordingly. The former Boiler / Thermostat / Gateway /
+   OT-Core groupings all collapse onto the single source prefix of the active engine.
+   `deviceForOTId` and the `HaDevice` enum are RETAINED but repurposed to select this
+   source prefix instead of a device.
+
+   **Boiler vs thermostat disambiguation** (the bilateral case — one OT value reported by
+   both the thermostat side and the boiler side) is preserved by the existing 1.x
+   bilateral **suffix** `_boiler` / `_thermostat` on the entity id, NOT by a prefix. Both
+   readings stay distinct under the same source prefix without reintroducing a role prefix.
+
+   **Sensor recognizability (maintainer directive):** Dallas probes are `sensors_`-prefixed
+   with the probe address (or its configured label) in the entity name and a stable
+   per-address `unique_id`, so each physical probe is individually identifiable and
+   re-discovery does not duplicate. BLE sensors are `sat_`-prefixed and keep a `BLE` token
+   in the entity name (e.g. `sat_ble_temp` → "SAT BLE Temp").
 
    **HA constraint (why a name prefix, not native sections):** Home Assistant has only
    THREE native within-device sections (primary / Configuration / Diagnostic, via
-   `entity_category`). Seven native collapsible sections are not possible. The seven
-   categories are therefore a naming-prefix grouping (and optionally an HA label per
-   category for dashboard filtering). `entity_category` (`config` for writable settings,
+   `entity_category`). More native collapsible sections are not possible. The five source
+   prefixes are therefore a naming-prefix grouping (and optionally an HA label per source
+   for dashboard filtering). `entity_category` (`config` for writable settings,
    `diagnostic` for fault/counter/connectivity/PIC-settings readbacks) remains an
    ORTHOGONAL secondary layer that drops those entities into HA's native Config/Diagnostic
-   sections where it adds value, independent of the seven-category prefix.
+   sections where it adds value, independent of the source prefix.
 
 3. **Typing.** `device_class` + `unit_of_measurement` + `state_class` are set per entity
    for icon/unit/precision/statistics. Names are self-describing `friendlyName`
@@ -117,10 +154,11 @@ Concrete shape:
    seven-DEVICE output is deleted: the seven separate `dev` blocks, `via_device`, the
    per-device suffix/metadata tables, and the `deviceIntroduced[]` per-device array all
    go. The `HaDevice` seven-value enum and the `deviceForOTId` map are RETAINED but
-   repurposed to drive the category name-prefix (point 2) instead of device selection.
-   The bilateral Boiler/Thermostat handling is kept (a single OT value reported by both
-   sides still yields a Boiler-category and a Thermostat-category entity), now setting
-   the category prefix rather than a second device. Single-device is the only topology;
+   repurposed to drive the source name-prefix (point 2) instead of device selection.
+   The bilateral boiler/thermostat handling is kept (a single OT value reported by both
+   sides still yields two distinct entities), now disambiguated by the `_boiler` /
+   `_thermostat` SUFFIX under the same source prefix rather than by a second device or a
+   role prefix. Single-device is the only topology;
    the former `bLegacyMode` topology axis is retired (it was never persisted or parsed).
    The orthogonal topic-naming axis `bUseLegacyOtTopics` (ADR-106) is untouched.
 
@@ -153,8 +191,8 @@ driver-set first-entity gate.
 
 **Benefits**
 - Adopts the proven 1.6.x single-device topology (one device per hardware OTGW, easy to
-  read), while preserving the seven former groupings as in-device categories so no
-  classification information is lost.
+  read), while preserving entity grouping via five source/engine prefixes
+  (`esp_`/`pic_`/`otd_`/`sat_`/`sensors_`) so no source information is lost.
 - Removes finding F1 by construction (driver-set first-entity gate, no compose mutation).
 - Net code reduction: the `HaDevice` split, `deviceForOTId`, bilateral two-pass,
   `via_device`, per-device metadata, and `deviceIntroduced[]` all go.
