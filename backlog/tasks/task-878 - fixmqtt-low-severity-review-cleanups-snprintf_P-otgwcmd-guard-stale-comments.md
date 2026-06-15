@@ -3,9 +3,11 @@ id: TASK-878
 title: >-
   fix(mqtt): low-severity review cleanups (snprintf_P, otgwcmd guard, stale
   comments)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-15 14:32'
+updated_date: '2026-06-15 20:07'
 labels: []
 dependencies: []
 ordinal: 94000
@@ -19,8 +21,15 @@ MQTT review LOW batch. (1) 4x bare snprintf (non-_P) with RAM format-string lite
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Bare snprintf sites converted to snprintf_P+PSTR
-- [ ] #2 otgwcmd truncation guarded against sizeof(otgwcmd)
-- [ ] #3 Stale ESP8266 re-entrancy + 10-minute-timer comments corrected
+- [x] #1 Bare snprintf sites converted to snprintf_P+PSTR
+- [x] #2 otgwcmd truncation guarded against sizeof(otgwcmd)
+- [x] #3 Stale ESP8266 re-entrancy + 10-minute-timer comments corrected
 - [ ] #4 Build green 3 targets; evaluate.py --quick no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+LOWs: 4 bare snprintf->snprintf_P+PSTR; otgwcmd[51] truncation guarded at both sinks; stale ESP8266 re-entrancy + 10-min timer comments corrected.
+Implemented on branch claude/mqtt-reliability-phase3 (off feature-2.0.0-esp32s3-async). evaluate.py --quick green (0 failures). ESP32 build NOT verifiable in this container (network policy blocks PlatformIO framework-arduinoespressif32 download); build + field ACs left for maintainer verification.
+<!-- SECTION:NOTES:END -->

@@ -1,17 +1,18 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-alpha.197
+**  Version  : v2.0.0-alpha.198
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
 **  Implementation of the on-change + jittered-heartbeat SAT MQTT publish
 **  helpers declared in SATmqttPublish.h (ADR-111).
 **
-**  Re-entrancy contract: every helper updates `shadow` BEFORE calling
-**  sendMQTTData. sendMQTTData internally calls feedWatchDog() which may
-**  yield on ESP8266; without the pre-write, a re-entered doBackgroundTasks
-**  could observe shadow.valid==false and double-publish.
+**  Re-entrancy contract (precautionary): every helper updates `shadow` BEFORE
+**  calling sendMQTTData. On ESP32 (ADR-128 dropped ESP8266) feedWatchDog() does
+**  not yield and doAutoConfigure runs async, so sendMQTTData no longer re-enters
+**  doBackgroundTasks cooperatively; the shadow-before-publish ordering is kept so
+**  any future yielding path still cannot observe a stale shadow and double-publish.
 **
 ***************************************************************************
 */
