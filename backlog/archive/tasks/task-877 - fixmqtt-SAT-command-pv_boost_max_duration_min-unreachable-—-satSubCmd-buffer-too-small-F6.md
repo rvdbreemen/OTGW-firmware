@@ -1,0 +1,25 @@
+---
+id: TASK-877
+title: >-
+  fix(mqtt): SAT command pv_boost_max_duration_min unreachable — satSubCmd
+  buffer too small (F6)
+status: To Do
+assignee: []
+created_date: '2026-06-15 14:31'
+labels: []
+dependencies: []
+ordinal: 93000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+MQTT review F6 (MEDIUM). The SAT sub-command token is read into satSubCmd[24] (MQTTstuff.ino:893/930); readMQTTTopicToken truncates to 23 chars, so the 25-char command pv_boost_max_duration_min (TASK-640/ADR-110) truncates to pv_boost_max_duration_m, never matches the dispatch table (MQTTstuff.ino:766), and is silently dropped. Exactly the TASK-292 silent-miss class ADR-078 dispatch tables were meant to make obvious; the stale buffer comment claims 'longest is solar_freeze_integral at 21'. REST still writes the setting (workaround). Fix: enlarge satSubCmd to >=32, add a static_assert tying the buffer size to the longest kSatMqttCmds token, fix the stale comment.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 satSubCmd sized >= longest-command+1 (>=32) with a static_assert against the dispatch table
+- [ ] #2 set/<nodeId>/sat/pv_boost_max_duration_min reaches the handler and applies
+- [ ] #3 Build green 3 targets; evaluate.py --quick no new failures
+<!-- AC:END -->
