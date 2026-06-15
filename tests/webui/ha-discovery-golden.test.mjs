@@ -5,10 +5,13 @@
 //   `topic<TAB>payload`, one per line), assert:
 //     (a) LEGACY MODE: the dump is byte-for-byte equal to the committed
 //         golden fixture.
-//     (b) MODERN MODE: the dump contains exactly the five expected device
-//         identifiers, all unique_ids follow the naming convention, no
-//         via_device leakage, and any bilateral labels appear under exactly
-//         two sides.
+//     (b) MODERN MODE: the dump uses a single HA device (ADR-140), all
+//         non-BLE unique_ids carry a source-engine prefix (esp_/pic_/otd_/
+//         sat_/sensors_), any via_device present nests under the bare nodeId,
+//         and bilateral labels appear under both _boiler and _thermostat
+//         suffixes. BLE sensors are kept as their own child HA devices
+//         (identifier "<uniqueId>_ble_<mac>", via_device == nodeId) and are
+//         carved out of the single-device and prefix assertions.
 //
 // CAPTURE PROCEDURE
 //   On a live device running discovery-republish mode, subscribe to
@@ -30,12 +33,12 @@
 //   MODERN_DUMP     Path to the captured modern-mode dump file.
 //   NODE_ID         The device node_id prefix used in HA discovery (e.g.
 //                   "otgw-abc123"). When both MODERN_DUMP and NODE_ID are set,
-//                   the five-device and unique_id assertions run.
+//                   the single-device and unique_id-prefix assertions run.
 //
 //   BILATERAL_CSV   Optional comma-separated list of firmware sensor labels
-//                   (e.g. "TSet,TBoiler"). When set, each label must appear
-//                   in exactly one boiler uniq_id AND exactly one thermostat
-//                   uniq_id. Omit or leave empty to skip this check.
+//                   (e.g. "TSet,TBoiler"). When set, each label must appear in a
+//                   uniq_id ending in "_boiler" AND a uniq_id ending in
+//                   "_thermostat". Omit or leave empty to skip this check.
 //
 // USAGE
 //   node tests/webui/ha-discovery-golden.test.mjs
@@ -142,24 +145,40 @@ if (!legacyDumpPath && !legacyGoldenPath) {
 }
 
 // ---------------------------------------------------------------------------
-// Block B: Modern mode seven-device split + naming + via_device hub (ADR-124)
+// Block B: Modern mode SINGLE-device topology + uniq_id prefixes + via_device
+// nests under nodeId (ADR-140). BLE child devices are carved out (ADR-140).
 // ---------------------------------------------------------------------------
 
-console.log('\n--- Block B: Modern mode seven-device assertions (ADR-124) ---');
+console.log('\n--- Block B: Modern mode single-device assertions (ADR-140) ---');
 
 const modernDumpPath = process.env.MODERN_DUMP;
 const nodeId         = process.env.NODE_ID;
 
-// ADR-124 seven-device topology. The OT-Core device (enum HaDevice::OtCore) is
-// rendered per hardware so the model is obvious in HA: "pic" on a PIC build,
-// "ot-direct" on an OTGW32 direct-OT build — exactly one is present in any given
-// dump. boiler/thermostat/gateway/esp/sat are always present; sensors is present
-// only when the unit has Dallas/S0 hardware (reported, not required).
-const CORE_SUFFIXES     = ['boiler', 'thermostat', 'gateway', 'esp', 'sat'];
-const OTCORE_SUFFIXES   = ['pic', 'ot-direct'];
-// Full device-segment alternation used by the uniq_id / bilateral regexes.
-// ot-direct is listed before the short tokens so the alternation prefers it.
-const DEVICE_SEG_ALT    = '(boiler|thermostat|gateway|ot-direct|esp|pic|sat|sensors)';
+// ADR-140 single-device topology (supersedes ADR-124 seven-device). Everything
+// the gateway exposes is ONE HA device whose identifier is the bare nodeId. The
+// seven former device groupings survive only as uniq_id source-prefixes:
+//   esp_       -> ESP diagnostics
+//   pic_/otd_  -> the active OT engine (Boiler/Thermostat/Gateway/OtCore all
+//                 route through pic_ on a PIC build or otd_ on an OTDirect build)
+//   sat_       -> SAT entities
+//   sensors_   -> Dallas/S0 sensor entities
+// BLE sensors are the one deliberate exception: each stays its own child HA
+// device ("<uniqueId>_ble_<mac>", via_device == nodeId, uniq_id
+// "<uniqueId>_ble_<mac>_<kind>") and is carved out of B-1/B-2 below.
+// CORE_SUFFIXES: the bilateral suffixes a single OT value reported by both sides
+// yields (one uniq_id ending "_boiler", one ending "_thermostat"); no second
+// device is created. (Block C consumes this.)
+const CORE_SUFFIXES     = ['_boiler', '_thermostat'];
+// DEVICE_SEG_ALT: the source-prefix alternation used by the uniq_id / bilateral
+// regexes. The trailing underscore in every prefix is load-bearing.
+const DEVICE_SEG_ALT    = '(esp_|pic_|otd_|sat_|sensors_)';
+// FORBIDDEN_ID_SEG: identifier suffixes that must NOT appear in single-device
+// mode. Anchored with `$` at the use site so "ot-direct" is rejected without the
+// alternation-ordering trap the old (ot-direct|...|ot) ordering needed.
+const FORBIDDEN_ID_SEG  = '(boiler|thermostat|gateway|esp|pic|ot-direct|sat|sensors)';
+
+// Reusable: escape nodeId for safe interpolation into a RegExp.
+const escNodeId = nodeId ? nodeId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') : '';
 
 if (!modernDumpPath && !nodeId) {
   log(null, 'Modern mode checks (MODERN_DUMP and NODE_ID not set)');
@@ -176,8 +195,8 @@ if (!modernDumpPath && !nodeId) {
     const entries = parseDump(modernText);
     log(entries.length > 0, `Parsed ${entries.length} entries from modern dump`);
 
-    // B-1: distinct device identifiers — core five always present, exactly one
-    // OT-core (pic xor otdirect), sensors reported when present.
+    // B-1: ADR-140 single device. Collect every distinct "identifiers" value.
+    // (kIds expands to the full word "identifiers" in firmware, so this matches.)
     const identifierRe = /"identifiers"\s*:\s*"([^"]+)"/g;
     const foundDevices = new Set();
     for (const { payload } of entries) {
@@ -189,29 +208,35 @@ if (!modernDumpPath && !nodeId) {
       }
     }
 
-    for (const suffix of CORE_SUFFIXES) {
-      const expected = `${nodeId}-${suffix}`;
-      log(
-        foundDevices.has(expected),
-        `Device identifier "${expected}" present in payloads (found: ${[...foundDevices].join(', ') || 'none'})`
-      );
-    }
-    // Exactly one OT-Core device (pic on a PIC build, ot-direct on OTGW32).
-    const otCorePresent = OTCORE_SUFFIXES.filter((s) => foundDevices.has(`${nodeId}-${s}`));
+    // B-1 positive: ADR-140 single device, with a BLE carve-out. BLE sensors are
+    // legitimately their own child HA devices, each with an identifier of the form
+    // "<uniqueId>_ble_<mac>" nested under the single device via via_device. So the
+    // gateway itself must contribute exactly ONE non-`_ble_` identifier and it must
+    // equal the bare nodeId; any number of `_ble_` child identifiers may coexist.
+    const nonBleDevices = [...foundDevices].filter((id) => !/_ble_/.test(id));
     log(
-      otCorePresent.length === 1,
-      `Exactly one OT-Core device present (pic xor ot-direct) — found: ${otCorePresent.join(', ') || 'none'}`
-    );
-    // sensors is hardware-conditional: report only.
-    log(
-      null,
-      `Sensors device ${foundDevices.has(`${nodeId}-sensors`) ? 'present' : 'absent (no Dallas/S0 hardware in this dump)'}`
+      nonBleDevices.length === 1 && nonBleDevices[0] === nodeId,
+      `Exactly one non-BLE device identifier, equal to bare nodeId "${nodeId}" (non-BLE found: ${nonBleDevices.join(', ') || 'none'}; BLE children allowed)`
     );
 
-    // B-2: Every uniq_id / unique_id matches ^{nodeId}-<device-segment>-
-    const uniqIdPattern = new RegExp(
-      `^${nodeId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}-${DEVICE_SEG_ALT}-`
+    // B-1 negative: NO multi-device suffix identifiers leaked. The `$` anchor
+    // means a bare "<nodeId>-ot-direct" etc. is rejected outright.
+    const forbiddenIdRe = new RegExp(`^${escNodeId}-${FORBIDDEN_ID_SEG}$`);
+    const leakedDevices = [...foundDevices].filter((id) => forbiddenIdRe.test(id));
+    if (leakedDevices.length > 0) {
+      console.log(`  hint: leaked per-device identifiers: ${leakedDevices.join(', ')}`);
+    }
+    log(
+      leakedDevices.length === 0,
+      `No "${nodeId}-(boiler|thermostat|gateway|esp|pic|ot-direct|sat|sensors)" identifiers present (leaked: ${leakedDevices.length})`
     );
+
+    // B-2: ADR-140 — every uniq_id / unique_id matches ^{nodeId}-<source-prefix>
+    // where the prefix already carries its trailing underscore (esp_, pic_, ...).
+    // BLE carve-out: BLE child entities use uniq_ids of the form
+    // "<uniqueId>_ble_<mac>_<kind>" which do not carry a source-engine prefix;
+    // they are exempt from this naming convention (skipped, not failed).
+    const uniqIdPattern = new RegExp(`^${escNodeId}-${DEVICE_SEG_ALT}`);
     const uniqIdRe = /"(?:uniq_id|unique_id)"\s*:\s*"([^"]+)"/g;
 
     let totalUniqIds    = 0;
@@ -222,6 +247,7 @@ if (!modernDumpPath && !nodeId) {
       uniqIdRe.lastIndex = 0;
       let m;
       while ((m = uniqIdRe.exec(payload)) !== null) {
+        if (/_ble_/.test(m[1])) continue;  // BLE child entity — exempt
         totalUniqIds++;
         if (!uniqIdPattern.test(m[1])) {
           badUniqIds++;
@@ -238,44 +264,32 @@ if (!modernDumpPath && !nodeId) {
       }
       log(
         badUniqIds === 0,
-        `All ${totalUniqIds} uniq_id/unique_id values match ^${nodeId}-${DEVICE_SEG_ALT}-`
+        `All ${totalUniqIds} uniq_id/unique_id values match ^${nodeId}-${DEVICE_SEG_ALT}`
       );
     }
 
-    // B-3: ADR-124 §3 — Gateway is the via_device hub.
-    //   (a) via_device is present (the hierarchy is emitted at all),
-    //   (b) every via_device value equals "<nodeId>-gateway",
-    //   (c) the Gateway's own device block never carries via_device.
+    // B-3: ADR-140 — the gateway is a single device, so the only legitimate
+    // via_device is the one BLE child entities use to nest under it: every
+    // via_device value MUST equal the bare nodeId. Zero via_device keys also
+    // passes (a build with no BLE sensors). The check FAILS only if a via_device
+    // points somewhere other than nodeId (e.g. a stale ADR-124 per-device parent).
     const viaDeviceRe = /"via_device"\s*:\s*"([^"]+)"/g;
-    const expectedVia = `${nodeId}-gateway`;
     let viaTotal = 0;
-    let viaBad   = 0;
-    const viaBadExamples = [];
+    let viaForeign = 0;
+    const viaForeignExamples = [];
     for (const { payload } of entries) {
       viaDeviceRe.lastIndex = 0;
       let m;
       while ((m = viaDeviceRe.exec(payload)) !== null) {
         viaTotal++;
-        if (m[1] !== expectedVia) {
-          viaBad++;
-          if (viaBadExamples.length < 3) viaBadExamples.push(m[1]);
+        if (m[1] !== nodeId) {
+          viaForeign++;
+          if (viaForeignExamples.length < 3) viaForeignExamples.push(m[1]);
         }
       }
     }
-    log(viaTotal > 0, `via_device hierarchy emitted (found ${viaTotal} via_device keys)`);
-    if (viaBad > 0) console.log(`  hint: non-conforming via_device values: ${viaBadExamples.join(', ')}`);
-    log(viaBad === 0, `All via_device values equal "${expectedVia}" (bad: ${viaBad})`);
-    // (c) The gateway's own full device block must not point at itself.
-    const gatewayIdRe = new RegExp(
-      `"identifiers"\\s*:\\s*"${nodeId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}-gateway"`
-    );
-    const gatewaySelfVia = entries.filter(
-      ({ payload }) => gatewayIdRe.test(payload) && /"via_device"/.test(payload)
-    );
-    log(
-      gatewaySelfVia.length === 0,
-      `Gateway device block carries no via_device (found ${gatewaySelfVia.length})`
-    );
+    if (viaForeign > 0) console.log(`  hint: foreign via_device values: ${viaForeignExamples.join(', ')}`);
+    log(viaForeign === 0, `Every via_device equals bare nodeId "${nodeId}" (total ${viaTotal}, foreign ${viaForeign})`);
 
     // ---------------------------------------------------------------------------
     // Block C: Bilateral sensor check (optional)
@@ -289,14 +303,17 @@ if (!modernDumpPath && !nodeId) {
     } else {
       const labels = bilateralCsv.split(',').map(s => s.trim()).filter(Boolean);
 
-      // Build a map: label -> set of device-type segments that own it
-      // We look for uniq_ids that contain the label and extract the device segment.
+      // ADR-140: bilateral entities share one device; they are distinguished by a
+      // trailing _boiler / _thermostat SUFFIX on the uniq_id. The shape is
+      //   <nodeId>-<source-prefix><label><suffix>
+      // so strip the "<nodeId>-<prefix>" head, then test for the suffix and the
+      // label in the remaining body. deviceSegRe captures (prefix, body).
       const deviceSegRe = new RegExp(
-        `^${nodeId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}-${DEVICE_SEG_ALT}-(.+)$`
+        `^${escNodeId}-${DEVICE_SEG_ALT}(.+)$`
       );
 
       for (const label of labels) {
-        const owningSegments = new Set();
+        const owningSuffixes = new Set();
 
         for (const { payload } of entries) {
           uniqIdRe.lastIndex = 0;
@@ -305,26 +322,29 @@ if (!modernDumpPath && !nodeId) {
             const uniqId = m[1];
             const segMatch = deviceSegRe.exec(uniqId);
             if (segMatch) {
-              const segment  = segMatch[1]; // e.g. "boiler" or "thermostat"
-              const labelPart = segMatch[2]; // e.g. "TSet" or "tset-..."
-              // Match if the label part starts with the label (case-insensitive)
-              if (labelPart.toLowerCase().startsWith(label.toLowerCase())) {
-                owningSegments.add(segment);
+              const body = segMatch[2]; // e.g. "tset_boiler" or "TSet_thermostat"
+              for (const suffix of CORE_SUFFIXES) {           // '_boiler', '_thermostat'
+                if (!body.toLowerCase().endsWith(suffix)) continue;
+                // labelPart = body with the suffix stripped (e.g. "tset")
+                const labelPart = body.slice(0, body.length - suffix.length);
+                if (labelPart.toLowerCase().startsWith(label.toLowerCase())) {
+                  owningSuffixes.add(suffix);
+                }
               }
             }
           }
         }
 
-        const hasBoiler      = owningSegments.has('boiler');
-        const hasThermostat  = owningSegments.has('thermostat');
-        const exactlyTwo     = owningSegments.size === 2 && hasBoiler && hasThermostat;
+        const hasBoiler      = owningSuffixes.has('_boiler');
+        const hasThermostat  = owningSuffixes.has('_thermostat');
+        const exactlyBoth    = owningSuffixes.size === 2 && hasBoiler && hasThermostat;
 
-        if (!exactlyTwo) {
-          console.log(`  hint: label "${label}" found under segments: ${[...owningSegments].join(', ') || 'none'}`);
+        if (!exactlyBoth) {
+          console.log(`  hint: label "${label}" found with suffixes: ${[...owningSuffixes].join(', ') || 'none'}`);
         }
         log(
-          exactlyTwo,
-          `Bilateral label "${label}" appears under both -boiler- and -thermostat- (found: ${[...owningSegments].join(', ') || 'none'})`
+          exactlyBoth,
+          `Bilateral label "${label}" appears under both _boiler and _thermostat suffixes (found: ${[...owningSuffixes].join(', ') || 'none'})`
         );
       }
     }
