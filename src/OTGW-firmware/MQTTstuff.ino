@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.197
+**  Version  : v2.0.0-alpha.198
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -887,10 +887,16 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) 
       if (topicToken[0] != '\0') {
         // --- SAT MQTT commands: set/<nodeId>/sat/<sub-command> ---
         if (strcasecmp_P(topicToken, PSTR("sat")) == 0) {
-          // Must hold the longest sub-command name + NUL. Current longest is
-          // "solar_freeze_integral" at 21 chars (TASK-292). 24 gives headroom
-          // for future SAT MQTT command names without another resize.
-          char satSubCmd[24];
+          // F6 (TASK-876): must hold the longest kSatMqttCmds token + NUL. The
+          // longest is "pv_boost_max_duration_min" at 25 chars (TASK-640); the
+          // old 24-byte buffer truncated it to "pv_boost_max_duration_m" so it
+          // never matched the dispatch table and was silently dropped. The
+          // static_assert ties the buffer to the actual longest literal token
+          // (sizeof(literal) == length+1, compile-time) so a longer future
+          // command fails the build instead of silently truncating.
+          char satSubCmd[32];
+          static_assert(sizeof("pv_boost_max_duration_min") <= sizeof(satSubCmd),
+                        "satSubCmd too small for the longest kSatMqttCmds token");
           if (readMQTTTopicToken(topicCursor, satSubCmd, sizeof(satSubCmd))) {
             MQTTDebugTf(PSTR("MQTT SAT cmd: %s [%s]\r\n"), satSubCmd, msgPayload);
             // ADR-078 dispatch. Sub-token commands (area, zone) cannot fit the
@@ -973,9 +979,17 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) 
 
           if (pOtType == s_raw){
             //raw command
-            snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
-            MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-            addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
+            // TASK-878: guard the otgwcmd[51] sink. snprintf_P truncates silently;
+            // msgPayload is up to 127 chars, so a long raw payload would be sent
+            // truncated. snprintf_P returns the length it WOULD have written —
+            // drop+log instead of queueing a corrupted command.
+            int n = snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s"), msgPayload);
+            if (n < 0 || (size_t)n >= sizeof(otgwcmd)) {
+              DebugTf(PSTR("MQTT raw command dropped: payload too long (%d >= %u)\r\n"), n, (unsigned)sizeof(otgwcmd));
+            } else {
+              MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
+              addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
+            }
           } else if (pOtType == s_reset) {
             // TASK-669 (port of dev TASK-661): payload validation + rate-limit.
             // Hardware PIC reset is disruptive (interrupts any in-flight OT
@@ -1005,9 +1019,15 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) 
             strncpy_P(cmdBuf, pOtgwCmd, sizeof(cmdBuf));
             cmdBuf[sizeof(cmdBuf)-1] = 0; // Ensure null termination
 
-            snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), cmdBuf, msgPayload);
-            MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-            addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
+            // TASK-878: guard the otgwcmd[51] sink against silent truncation of
+            // the composed "<cmd>=<payload>" (msgPayload is up to 127 chars).
+            int n = snprintf_P(otgwcmd, sizeof(otgwcmd), PSTR("%s=%s"), cmdBuf, msgPayload);
+            if (n < 0 || (size_t)n >= sizeof(otgwcmd)) {
+              DebugTf(PSTR("MQTT command [%s] dropped: composed command too long (%d >= %u)\r\n"), cmdBuf, n, (unsigned)sizeof(otgwcmd));
+            } else {
+              MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
+              addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
+            }
           }
         } else {
           //no match found
@@ -1028,15 +1048,16 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) 
 // filter (<haprefix>/+/<nodeId>/#) inspects only the topic NAME, never the
 // payload bytes. The fixed RX buffer (EMC_RX_BUFFER_SIZE = 1440) dwarfs all of
 // these, so a real inbound message always arrives whole (index==0 && len==total).
-// We still gate on index==0 so a pathological oversize/chunked payload drops its
-// continuation chunks instead of double-dispatching, and pass `len` (== total
-// for the first-and-only chunk) on to the legacy char*/byte* dispatcher.
+// F4 (TASK-875, ADR-131 item 8): gate on the FULL first-and-only-chunk condition
+// (index==0 && len==total). espMqttClient splits a PUBLISH payload on TCP read
+// boundaries, so a payload can arrive as several onMessage calls even below
+// EMC_RX_BUFFER_SIZE; an index==0/len<total first chunk would otherwise be
+// dispatched truncated with the rest dropped. Anything chunked is dropped whole.
 static void onMqttMessage(const espMqttClientTypes::MessageProperties& properties,
                           const char* topic, const uint8_t* payload,
                           size_t len, size_t index, size_t total) {
   (void)properties;
-  (void)total;
-  if (index != 0) return;  // ignore continuation chunks of an oversize payload
+  if (index != 0 || len != total) return;  // only the first-and-only chunk of a whole payload
 
   // The legacy dispatcher takes a mutable char* topic (it never writes through
   // it — only strcmp/strcasecmp_P and a read-only cursor walk). Copy into a
@@ -1047,9 +1068,10 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties& propertie
 }
 
 void sendMQTT(const char* topic, const char *json);
+void publishBirthOnline();  // F3 (TASK-874): gate-bypassing retained availability birth
 
-void handleMQTT() 
-{  
+void handleMQTT()
+{
   if (!settings.mqtt.bEnable) return;
   DECLARE_TIMER_SEC(timerMQTTwaitforconnect, 42, CATCH_UP_MISSED_TICKS);   // wait before trying to connect again
   DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // wait for retry
@@ -1060,6 +1082,7 @@ void handleMQTT()
   DECLARE_TIMER_SEC(timerMQTTdebugwaitconnectionattempt, 1);
   DECLARE_TIMER_SEC(timerMQTTdebugisconnected, 60);
   DECLARE_TIMER_SEC(timerMQTToverridepublish, 60);  // ADR-118: refresh retained <label>/override topics
+  DECLARE_TIMER_SEC(timerMQTTbirthreassert, 300);   // F3 (TASK-874): re-assert retained availability "online"
   
   // Pump the espMqttClient engine EVERY tick, unconditionally (TASK-865.7).
   // With UseInternalTask::NO, loop() is the SOLE driver of the connection state
@@ -1163,7 +1186,7 @@ void handleMQTT()
       //After 5 attempts... go wait for a while.
       if (reconnectAttempts >= 5)
       {
-        MQTTDebugTln(F("5 attempts have failed. Retry wait for next reconnect in 10 minutes\r"));
+        MQTTDebugTln(F("5 attempts have failed. Retry wait for next reconnect (42s)\r"));
         RESTART_TIMER(timerMQTTwaitforconnect);
         stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;  // if the re-connect did not work, then return to wait for reconnect
         MQTTDebugTln(F("Next State: MQTT_STATE_WAIT_FOR_RECONNECT"));
@@ -1178,9 +1201,15 @@ void handleMQTT()
         // ADR-118: periodically refresh the retained gateway-override topics so HA / dashboards
         // reflect active overrides even when no new override frame arrived this minute.
         if (DUE(timerMQTToverridepublish)) publishActiveOverrides();
+        // F3 (TASK-874): backstop re-assert of the retained availability birth.
+        // The on-connect birth can be lost (async outbox full at CONNACK); without
+        // a re-assert the retained LWT "offline" strands the whole device
+        // "unavailable" in HA while the link stays up. publishBirthOnline() bypasses
+        // the heap/throttle gate so a low-heap moment cannot drop it again.
+        if (DUE(timerMQTTbirthreassert)) publishBirthOnline();
       }
       else
-      { //onMqttDisconnect cleared the live flag — wait 10 minutes before retrying.
+      { //onMqttDisconnect cleared the live flag — wait for next reconnect (42s).
         //RESTART_TIMER stays here (not in the callback) because timerMQTTwaitforconnect
         //is a handleMQTT()-local DECLARE_TIMER_SEC and only in scope on this path.
         RESTART_TIMER(timerMQTTwaitforconnect);
@@ -1208,20 +1237,24 @@ void handleMQTT()
     break;
     
     case MQTT_STATE_WAIT_FOR_RECONNECT:
-      //do non-blocking wait for 10 minutes, then try to connect again. 
+      //do non-blocking wait (timerMQTTwaitforconnect, 42s), then try to connect again.
       if DUE(timerMQTTdebugwaitforreconnect) MQTTDebugTln(F("MQTT State: MQTT wait for reconnect"));
       if (DUE(timerMQTTwaitforconnect))
       {
         //remember when you tried last time to reconnect
         RESTART_TIMER(timerMQTTwaitforretry);
-        reconnectAttempts = 0; 
-        stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
-        MQTTDebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
+        reconnectAttempts = 0;
+        // F2 (TASK-873): re-enter INIT (not TRY_TO_CONNECT) so WiFi.hostByName()+
+        // setServer() re-run every reconnect cycle. Recovers a boot-time DNS miss
+        // (resolver/mDNS not yet up), a broker that changed IP via DHCP, and a
+        // first INIT pass that landed in MQTT_STATE_ERROR with no server ever set.
+        stateMQTT = MQTT_STATE_INIT;
+        MQTTDebugTln(F("Next State: MQTT_STATE_INIT"));
       }
     break;
 
     case MQTT_STATE_ERROR:
-      if DUE(timerMQTTdebugerrorstate) MQTTDebugTln(F("MQTT State: MQTT ERROR, wait for 10 minutes, before trying again"));
+      if DUE(timerMQTTdebugerrorstate) MQTTDebugTln(F("MQTT State: MQTT ERROR, wait for next reconnect (42s) before trying again"));
       //wait for next retry
       RESTART_TIMER(timerMQTTwaitforconnect);
       stateMQTT = MQTT_STATE_WAIT_FOR_RECONNECT;
@@ -1289,7 +1322,10 @@ static void onMqttConnect(bool sessionPresent) {
   MQTTDebugTln(F("Next State: MQTT_STATE_IS_CONNECTED"));
 
   // Birth message (retained "online" on the HA availability topic).
-  sendMQTT(MQTTPubNamespace, "online");
+  // F3 (TASK-874): gate-bypassing publish so a low-heap CONNACK cannot drop the
+  // birth and strand HA at the retained LWT "offline". A periodic re-assert in
+  // MQTT_STATE_IS_CONNECTED backstops a transient outbox-full at this instant.
+  publishBirthOnline();
   DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
 
   // Republish OT retained topics and reset discovery only if offline long enough
@@ -1749,6 +1785,22 @@ void sendMQTT(const char* topic, const char *json) {
   if (!mqttPublishRaw(topic, reinterpret_cast<const uint8_t*>(json), len, true)) PrintMQTTError();
 }
 
+// F3 (TASK-874): publish the retained availability birth "online" to the base
+// namespace (== the LWT topic set in MQTT_STATE_INIT). Deliberately BYPASSES the
+// canPublishMQTT() heap gate that sendMQTT() applies: the birth is a 7-byte
+// control-plane message and dropping it strands every entity "unavailable" in HA
+// behind the retained LWT "offline". Called once from onMqttConnect() and then
+// periodically re-asserted while connected, so a transient outbox-full or a
+// low-heap moment self-heals on the next tick.
+void publishBirthOnline() {
+  if (!settings.mqtt.bEnable) return;
+  if (!MQTTclient.connected()) return;
+  if (!isValidIP(MQTTbrokerIP)) return;
+  if (!mqttPublishRaw(MQTTPubNamespace, reinterpret_cast<const uint8_t*>("online"), 6, true)) {
+    PrintMQTTError();
+  }
+}
+
 //===========================================================================================
 // Helper functions to reduce duplicated MQTT topic building patterns
 //===========================================================================================
@@ -1854,8 +1906,10 @@ void publishToSourceTopic(const char* topic, const char* json, byte rsptype)
   if (OTdata.type == OT_WRITE_ACK
       && rsptype == OTGW_BOILER
       && !OTlookupitem.bSlaveEchoesValue) return;
-  // Re-entrancy guard: sendMQTTData may yield via feedWatchDog, allowing
-  // a second processOT call to overwrite the static buffer mid-publish.
+  // Re-entrancy guard (precautionary). On ESP32 (ADR-128 dropped ESP8266)
+  // feedWatchDog() does not yield and doAutoConfigure runs async, so sendMQTTData
+  // no longer re-enters this path cooperatively — but the guard is kept cheap so a
+  // future yielding publish path cannot overwrite the static buffer mid-publish.
   static bool inUse = false;
   if (inUse) return;
   inUse = true;
@@ -2409,7 +2463,7 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
     const char *suffix = (devIdx < HA_DEVICE_COUNT) ? kHaDeviceSuffixes[devIdx] : "-esp";
 #endif
     char identifier[sizeof(settings.mqtt.sUniqueid) + 16];
-    snprintf(identifier, sizeof(identifier), "%s%s", ctx.nodeId, suffix);
+    snprintf_P(identifier, sizeof(identifier), PSTR("%s%s"), ctx.nodeId, suffix);
     // ADR-124 §3: Gateway is the via_device hub; every other device nests under it.
     char viaBuf[sizeof(settings.mqtt.sUniqueid) + 24];
     viaBuf[0] = '\0';
@@ -2479,7 +2533,7 @@ bool streamSatZoneDiscovery(HaDiscoveryContext &ctx)
   if (!ctx.legacyMode) {
     const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
     const char *suffix = (devIdx < HA_DEVICE_COUNT) ? kHaDeviceSuffixes[devIdx] : "-esp";
-    snprintf(idPrefix, sizeof(idPrefix), "%s%s", ctx.nodeId, suffix);
+    snprintf_P(idPrefix, sizeof(idPrefix), PSTR("%s%s"), ctx.nodeId, suffix);
   } else {
     strlcpy(idPrefix, ctx.nodeId, sizeof(idPrefix));
   }
@@ -2569,7 +2623,7 @@ static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx)
   if (!ctx.legacyMode) {
     const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
     const char *suffix = (devIdx < HA_DEVICE_COUNT) ? kHaDeviceSuffixes[devIdx] : "-esp";
-    snprintf(idPrefix, sizeof(idPrefix), "%s%s", ctx.nodeId, suffix);
+    snprintf_P(idPrefix, sizeof(idPrefix), PSTR("%s%s"), ctx.nodeId, suffix);
   } else {
     strlcpy(idPrefix, ctx.nodeId, sizeof(idPrefix));
   }
@@ -3083,7 +3137,7 @@ static void mqttJsonEscape(const char* src, char* dst, size_t dstSize)
       dst[di++] = c;
     } else if ((unsigned char)c < 0x20) {
       if (di + 6 >= dstSize) break;
-      di += snprintf(dst + di, dstSize - di, "\\u%04x", (unsigned)c);
+      di += snprintf_P(dst + di, dstSize - di, PSTR("\\u%04x"), (unsigned)c);
     } else {
       dst[di++] = c;
     }

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-alpha.197
+**  Version  : v2.0.0-alpha.198
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -28,9 +28,10 @@
 **  Memory cost: ~12 B per float/int shadow, ~8 B per bool, ~32 B per
 **  string. Approximately 1 KB BSS total for the full SAT topic surface.
 **
-**  Re-entrancy: shadow write MUST happen before the sendMQTTData call so
-**  that a re-entered doBackgroundTasks (via feedWatchDog → yield in older
-**  paths) cannot double-publish the same field.
+**  Re-entrancy (precautionary): shadow write happens before the sendMQTTData
+**  call. On ESP32 (ADR-128 dropped ESP8266) feedWatchDog() no longer yields and
+**  doAutoConfigure is async, so this path is not re-entered cooperatively today;
+**  the ordering is kept so any future yielding path cannot double-publish a field.
 **
 **  See: ADR-111, ADR-073, ADR-101, ADR-052 (not reused — own contract).
 **

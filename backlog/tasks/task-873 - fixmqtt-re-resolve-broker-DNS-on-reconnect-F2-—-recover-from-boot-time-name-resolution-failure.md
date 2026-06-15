@@ -3,9 +3,11 @@ id: TASK-873
 title: >-
   fix(mqtt): re-resolve broker DNS on reconnect (F2) — recover from boot-time
   name-resolution failure
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-15 14:28'
+updated_date: '2026-06-15 20:07'
 labels: []
 dependencies: []
 ordinal: 89000
@@ -19,8 +21,15 @@ MQTT review F2 (HIGH). WiFi.hostByName()+setServer() run ONLY in MQTT_STATE_INIT
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On reconnect after a DNS failure, hostByName+setServer re-run and the client connects once the name resolves
-- [ ] #2 A device booted before its resolver is up self-recovers without WiFi bounce/reboot
+- [x] #1 On reconnect after a DNS failure, hostByName+setServer re-run and the client connects once the name resolves
+- [x] #2 A device booted before its resolver is up self-recovers without WiFi bounce/reboot
 - [ ] #3 Build green 3 targets; evaluate.py --quick no new failures
 - [ ] #4 Field-validation: induce a boot-time DNS miss, confirm HA goes available after the resolver comes up
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+F2: MQTT_STATE_WAIT_FOR_RECONNECT now re-enters MQTT_STATE_INIT so WiFi.hostByName()+setServer() re-run each reconnect cycle.
+Implemented on branch claude/mqtt-reliability-phase3 (off feature-2.0.0-esp32s3-async). evaluate.py --quick green (0 failures). ESP32 build NOT verifiable in this container (network policy blocks PlatformIO framework-arduinoespressif32 download); build + field ACs left for maintainer verification.
+<!-- SECTION:NOTES:END -->
