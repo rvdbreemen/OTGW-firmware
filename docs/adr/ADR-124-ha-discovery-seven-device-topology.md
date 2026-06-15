@@ -1,11 +1,11 @@
 ---
 id: ADR-124
 title: HA Discovery Seven-Device Topology — Dedicated OT-Core and Sensors Devices, Gateway via_device Hub
-status: Accepted
+status: Superseded
 date: 2026-06-05
 tags: [mqtt, ha-discovery, topology, via-device, pic, otdirect, sensors, dallas, s0, esp, gateway]
 supersedes: [ADR-122]
-superseded_by: []
+superseded_by: [ADR-140]
 related: [ADR-122, ADR-077, ADR-070, ADR-106, ADR-088, ADR-080]
 deciders: [Robert van den Breemen]
 ---
@@ -13,6 +13,8 @@ deciders: [Robert van den Breemen]
 # ADR-124: HA Discovery Seven-Device Topology — Dedicated OT-Core and Sensors Devices, Gateway via_device Hub
 
 ## Status
+
+**Superseded by [ADR-140](ADR-140-single-device-ha-topology-entity-category-clustering.md) (2026-06-15)** — 2.0.0 returns to a single-device HA topology with source-prefix entity clustering; the seven-device split and `via_device` hub are removed. This status line is the sanctioned immutability exception (ADR body below is unedited).
 
 Accepted. Date: 2026-06-06 (Proposed 2026-06-05). **Supersedes ADR-122** (five-device topology).
 
