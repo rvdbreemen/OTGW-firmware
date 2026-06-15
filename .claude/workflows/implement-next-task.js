@@ -91,6 +91,10 @@ const ADR = {
   type: 'object', required: ['adrAction', 'adrFiles', 'summary'],
   properties: { adrAction: { type: 'string', enum: ['none', 'created', 'amended', 'superseding'] }, adrFiles: { type: 'array', items: { type: 'string' } }, summary: { type: 'string' } },
 }
+const ADRGUARD = {
+  type: 'object', required: ['changed', 'note'],
+  properties: { changed: { type: 'array', items: { type: 'string' }, description: 'files where Accepted->Proposed or a premature back-reference revert was applied; empty if all already Proposed' }, note: { type: 'string' } },
+}
 const LAND = {
   type: 'object', required: ['committed', 'commitHash', 'pushed', 'newStatus', 'prereleaseTag', 'featureSummary', 'note'],
   properties: {
@@ -118,7 +122,7 @@ const revPrompt = (sel) =>
   `\`git -C ${REPO} diff\`/\`status\`. Check: (a) every build/evaluator AC actually met (re-run build/evaluate if unsure; grep the SUCCESS line); (b) no binding ADR/CLAUDE rule violated; (c) scope discipline (only this task's files; no stray edits). Default pass=false if any build/evaluator AC is unproven. Be specific.`
 const adrPrompt = (sel) =>
   `Document architectural decisions in the diff for TASK ${sel.taskId} in ${REPO}, per adr-kit.\n${RULES}\n\nTASK body (may REQUIRE ADR work, e.g. supersede ADR-108/011/047/048/058):\n${sel.body}\n\n` +
-  `\`git -C ${REPO} diff\`. If the change makes/alters an architectural decision (new pattern/dependency, API/MQTT/topic contract, concurrency model, supersession): author a NEW (or amend a still-Proposed) ADR at docs/adr/ADR-NNN-kebab.md, Status MUST be "Proposed" (NEVER Accepted; maintainer's checkpoint), with Context/Decision/Alternatives(>=2)/Consequences/Related/References; to supersede an Accepted ADR write a NEW one and do NOT touch the old body/Status. Else adrAction="none". Use the next free ADR number. Return action + file paths for Land to stage + one-line summary.`
+  `\`git -C ${REPO} diff\`. If the change makes/alters an architectural decision (new pattern/dependency, API/MQTT/topic contract, concurrency model, supersession): author a NEW (or amend a still-Proposed) ADR at docs/adr/ADR-NNN-kebab.md, Status MUST be "Proposed" (NEVER Accepted; maintainer's checkpoint). CRITICAL: the adr-kit:adr-generator definition DEFAULTS to "Accepted" for already-implemented decisions and its template pre-fills "status: Accepted" (agents/adr-generator.md:52,174) — you MUST OVERRIDE that. Emit Status "Proposed" and a SINGLE status_history entry (status: Proposed, changed_by: Agent, changed_via: adr-kit). NEVER write "status: Accepted" and NEVER fabricate a maintainer/manual acceptance entry. Include Context/Decision/Alternatives(>=2)/Consequences/Related/References; to supersede an Accepted ADR write a NEW one and do NOT touch the old body/Status (no "Superseded by"/"Amended by" back-reference on the old ADR while the new one is still Proposed). Else adrAction="none". Use the next free ADR number. Return action + file paths for Land to stage + one-line summary.`
 const landPrompt = (sel, adr) =>
   `Land the reviewed work for TASK ${sel.taskId} in ${REPO} (branch ${BRANCH}).\n${RULES}\n\nsrcTouched=${sel.srcTouched}; fieldValidationRemains=${sel.fieldValidationRemains}; skipBump=${SKIP_BUMP}.\n` +
   `Steps (ORDER MATTERS — status must be INSIDE the commit so a checkout cannot revert it):\n` +
@@ -126,7 +130,7 @@ const landPrompt = (sel, adr) =>
   (SKIP_BUMP
     ? `2. Do NOT bump the prerelease (parallel lane; the bump+tag happens at serial integration when this sub-branch merges). prereleaseTag="".\n`
     : `2. If srcTouched, run \`bin/bump-prerelease.sh\` (stages version.h + banners); record the new tag (e.g. alpha.182) as prereleaseTag. Else prereleaseTag="".\n`) +
-  `3. Stage ONLY this task's changed paths via \`git add <explicit paths>\` (NEVER \`git add -A\`): its source/doc files, the bump files (if any), ADR files (${JSON.stringify(adr.adrFiles)}), AND the task's own backlog/tasks/*.md (now carrying the new status). Do NOT stage sibling task notes or other in-flight work.\n` +
+  `3. ADR GOVERNANCE GATE (fail-closed) FIRST: for each ADR file in ${JSON.stringify(adr.adrFiles)}, grep its \`## Status\`; if ANY reads "Accepted", STOP — do NOT commit, return committed=false with note "ADR self-accept slipped past the guard: <file> (acceptance is the maintainer's manual checkpoint)". Then stage ONLY this task's changed paths via \`git add <explicit paths>\` (NEVER \`git add -A\`): its source/doc files, the bump files (if any), ADR files (${JSON.stringify(adr.adrFiles)}), AND the task's own backlog/tasks/*.md (now carrying the new status). Do NOT stage sibling task notes or other in-flight work.\n` +
   `4. Commit subject \`<type>(<scope>): <imperative> (${sel.taskId})\`. No em dashes. Co-author trailer. \`git push origin ${BRANCH}\` with retry.\n` +
   `5. featureSummary: 1-2 plain sentences on the user-facing feature/improvement (for #alpha-testing). Empty if nothing committed.\n` +
   `Return committed/commitHash/pushed/newStatus/prereleaseTag/featureSummary/note.`
@@ -167,6 +171,28 @@ for (let n = 0; n < MAX_TASKS; n++) {
   let adr = await agent(adrPrompt(sel), { label: `adr:${sel.taskId}`, phase: 'ADR', schema: ADR, agentType: 'adr-kit:adr-generator' })
   if (!adr) adr = { adrAction: 'none', adrFiles: [], summary: 'ADR agent unavailable (transient); skipped' }
   if (adr.adrAction !== 'none') log(`ADR ${adr.adrAction}: ${adr.adrFiles.join(', ')}`)
+
+  // GOVERNANCE GUARD (loop self-accept fix, 2026-06-15). The adr-kit:adr-generator
+  // agent DEFAULTS to "Accepted" for already-implemented decisions and its template
+  // pre-fills `status: Accepted` (agents/adr-generator.md:52,174). The loop runs the
+  // ADR phase AFTER implementing, so every ADR is "already-implemented"; the agent's
+  // default overrode the "Proposed only" prompt and self-accepted ADRs, fabricating a
+  // maintainer status_history entry (observed on ADR-139: `changed_via: manual`,
+  // `changed_by: <git user>`). Acceptance is a HUMAN checkpoint. A prompt does not
+  // reliably beat the agent's hardcoded default, so this DETERMINISTIC post-step forces
+  // every loop-authored/amended ADR back to Proposed regardless of what the generator did.
+  if (adr.adrAction !== 'none' && adr.adrFiles && adr.adrFiles.length) {
+    const guard = await agent(
+      `MECHANICAL GOVERNANCE GUARD in ${REPO}. NO judgment, NO content authoring, ONLY enforce ADR status. For EACH ADR file in ${JSON.stringify(adr.adrFiles)}:\n` +
+      `1. In its \`## Status\` section: if the status is "Accepted" (or anything other than Proposed / "Superseded by ADR-*" / "Amended by ADR-*"), REWRITE it to "Proposed, <the date already in the file>." Leave a genuine Superseded-by/Amended-by status of a DIFFERENT, older ADR alone.\n` +
+      `2. In \`## Status History\`: DELETE every entry whose \`status:\` is \`Accepted\`, and any fabricated maintainer entry (e.g. \`changed_via: manual\` with a human \`changed_by\`). Keep exactly the Proposed entry (status: Proposed, changed_by: Agent, changed_via: adr-kit); if none exists, write one with today's date.\n` +
+      `3. If this new/amended ADR supersedes or amends an EXISTING Accepted ADR and the generator already wrote a "Superseded by ADR-NNN"/"Amended by ADR-NNN" back-reference onto that OLD ADR (or flipped its Status), REVERT the old ADR: \`git -C ${REPO} diff <oldAdrFile>\` then restore it. Back-references are applied ONLY on real human acceptance, never while the new ADR is Proposed.\n` +
+      `4. Fix docs/adr/README.md: if the new ADR's row says "Accepted", set it to "Proposed".\n` +
+      `Do not reword or improve any other content. Report each file changed and what you changed (empty list if all were already correctly Proposed). The loop NEVER accepts an ADR; acceptance is the maintainer's manual checkpoint.`,
+      { label: `adr-guard:${sel.taskId}`, phase: 'ADR', schema: ADRGUARD }
+    )
+    if (guard && guard.changed && guard.changed.length) log(`ADR self-accept guard forced Proposed: ${guard.changed.join('; ')}`)
+  }
 
   phase('Land')
   const land = await agent(landPrompt(sel, adr), { label: `land:${sel.taskId}`, phase: 'Land', schema: LAND })
