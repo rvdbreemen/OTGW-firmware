@@ -4,7 +4,7 @@ title: 'fix(security): /pic PIC-flash route is unauthenticated (no checkHttpAuth
 status: Done
 assignee: []
 created_date: '2026-06-15 06:06'
-updated_date: '2026-06-15 06:48'
+updated_date: '2026-06-15 09:13'
 labels: []
 dependencies: []
 ordinal: 86000
@@ -22,6 +22,12 @@ Found during the TASK-869 team review (adjacent finding). The /pic route (server
 - [ ] #2 Web UI PIC-flash still works (browser sends cached Basic Auth)
 - [ ] #3 Build green 3 targets; evaluate.py --quick no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+GOVERNING ADR: ADR-032 (No Authentication Pattern — Local Network Security Model), Accepted 2026-02-07, unchanged. Decision: do NOT authenticate any network interface; rely on network-level security. ADR-032 explicitly remains the baseline for unauthenticated local-network interfaces outside the ADR-056 protected boundary. /pic sits on that ADR-032 baseline by design; it is NOT a carve-out from ADR-056 (ADR-056 is the exception that protects a subset, e.g. /ReBoot, /ResetWireless). Related: ADR-003 (HTTP-only), ADR-012 (PIC firmware upgrade via web).
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
