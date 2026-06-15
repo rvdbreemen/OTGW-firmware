@@ -1,7 +1,7 @@
-# Daily Issue Report — 2026-06-14
+# Daily Issue Report — 2026-06-15
 
-**Generated:** 2026-06-14T00:00:00Z
-**GitHub window:** since 2026-06-13T00:00:00Z (last 24 hours)
+**Generated:** 2026-06-15T00:00:00Z
+**GitHub window:** since 2026-06-14T00:00:00Z (last 24 hours)
 **Tweakers window:** N/A (feed blocked by egress policy)
 **Discord window:** N/A (MCP server not available in this environment)
 
@@ -9,7 +9,7 @@
 
 No new issues in the last 24 hours.
 
-- **GitHub**: 0 new or updated open issues since 2026-06-13T00:00:00Z.
+- **GitHub**: 0 new or updated open issues since 2026-06-14T00:00:00Z.
 - **Tweakers**: Feed unavailable — `gathering.tweakers.net` blocked by egress policy in this execution environment.
 - **Discord**: MCP server not configured in this execution environment.
 
@@ -36,7 +36,7 @@ No new issues in the last 24 hours.
 | [#557](https://github.com/rvdbreemen/OTGW-firmware/issues/557) | Settings / Run Boot Command and PIC missing | bug, question | 2026-05-06 |
 | [#10](https://github.com/rvdbreemen/OTGW-firmware/issues/10) | Human readable ASF, RBP-flags, TSP, FHB-values… | enhancement, good first issue | 2022-10-09 |
 
-### Change since last report (2026-06-13)
+### Change since last report (2026-06-14)
 
 No changes — same 4 open issues, none updated in the last 24 hours.
 
@@ -44,6 +44,6 @@ No changes — same 4 open issues, none updated in the last 24 hours.
 
 ## Timestamps Updated
 
-- GitHub last check: 2026-06-14T00:00:00Z
+- GitHub last check: 2026-06-15T00:00:00Z
 - Tweakers last check: N/A (blocked)
 - Discord last check: N/A (MCP unavailable)
