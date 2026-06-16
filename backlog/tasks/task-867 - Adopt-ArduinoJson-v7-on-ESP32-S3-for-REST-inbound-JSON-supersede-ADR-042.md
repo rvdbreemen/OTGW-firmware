@@ -1,10 +1,10 @@
 ---
 id: TASK-867
 title: Adopt ArduinoJson v7 on ESP32-S3 for REST + inbound JSON (supersede ADR-042)
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-06-14 22:58'
-updated_date: '2026-06-14 23:00'
+updated_date: '2026-06-16 05:10'
 labels: []
 dependencies: []
 ordinal: 83000
@@ -18,7 +18,7 @@ PLAN ONLY - do not execute yet (maintainer directive 2026-06-15). Revisit the AD
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GO/NO-GO flash delta measured on esp32-combo (binding target) via a one-endpoint spike BEFORE any wholesale migration
+- [x] #1 GO/NO-GO flash delta measured on esp32-combo (binding target) via a one-endpoint spike BEFORE any wholesale migration
 - [ ] #2 Superseding ADR Accepted: supersedes ADR-042; amends ADR-053 static-buffer scope to permit ArduinoJson v7 on ESP32-S3 for REST responses + inbound parsing; settings-persistence stays manual
 - [ ] #3 evaluate.py check_no_arduinojson updated (allow REST/parse use; keep ArduinoJson OUT of the settings-persistence path if that boundary is retained)
 - [ ] #4 REST v2 endpoints serve byte-identical JSON contracts (docs/api) via AsyncJsonResponse; restBeginStream/sendJsonMapEntry layer + REST_STREAM_BUFFER_SIZE removed once migrated
@@ -62,3 +62,9 @@ PLAN ONLY — not for execution yet. Phased so each phase is independently shipp
 - ADR-139 (ETag serving, AsyncTCP core-pin) is independent and already implemented; not blocked by and does not block this migration.
 - Reference precedent for the serving model: EMS-ESP32 ESP32React.cpp (AsyncJsonResponse + setLength) and OT-Thing-OTGW32 portal.cpp (beginResponseStream). We cannot copy EMS verbatim (ArduinoJson types throughout) but the AsyncJsonResponse serving shape is the target.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC#1 GO/NO-GO flash spike (esp32-combo) = GO. Baseline 1981939 B -> spiked 1986291 B (one flat REST object via JsonDocument+serializeJson routed to live sink). Delta +4352 B; free_after 110861 B (>>40KB margin). ArduinoJson 7.4.3 compiled clean on combo. Caveat: header-only lib, +4.3KB is a lower bound (deserialization not exercised; cost scales with usage breadth) but headroom ample. AC#2 (superseding ADR) already satisfied by ADR-141 (Accepted, #660). Remaining: AC#3 evaluate.py gate, AC#4 REST v2 -> AsyncJson, AC#5 inbound deserializeJson, AC#7 build 3 targets, AC#8 hardware heap (field).
+<!-- SECTION:NOTES:END -->

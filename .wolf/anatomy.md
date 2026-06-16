@@ -1,16 +1,13 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-15T00:00:56.955Z
-> Files: 17 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-16T08:42:26.559Z
+> Files: 7 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/01-raw/sessies/
 
-- `raw-sessie-2026-06-15-otgw-async-webserver-etag-adr139.md` — Sessie-log 2026-06-15 OTGW async webserver ETag (ADR-139) (~1583 tok)
 
 ## ../../../Claude/Projects/Kluis/02-wiki/
 
-- `arduino-esp8266-json-libraries.md` — JSON-libraries voor Arduino en ESP8266 (~1805 tok)
-- `espasyncwebserver-serving-idioom.md` — ESPAsyncWebServer serving-idioom (~1294 tok)
 
 ## ../OTGW-firmware/.claude/
 
@@ -20,14 +17,12 @@
 
 ## ../adr-kit/
 
-- `CHANGELOG.md` — Changelog (~21582 tok)
 
 ## ../adr-kit/bin/
 
 
 ## ../adr-kit/schemas/
 
-- `adr-kit-config.schema.json` — ', 'docs/**', 'vendor/**'. ADR-level path_globs still take precedence; this is a project-wide pre-fi (~4932 tok)
 
 ## ../adr-kit/templates/githooks/
 
@@ -37,8 +32,6 @@
 
 ## ./
 
-- `build.py` — Colors: asset_slug, disable, print_step, print_success + 7 more (~31508 tok)
-- `platformio.ini` — Declares used (~3225 tok)
 
 ## .claude/
 
@@ -372,10 +365,12 @@
 
 ## C:/Users/rvdbr/.claude/plans/
 
-- `federated-leaping-moonbeam.md` — Diagnose: async webserver reageert niet op esp32-combo (alpha.192) (~2709 tok)
 
 ## C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/
 
+- `MEMORY.md` — OTGW-firmware Project Memory (~5202 tok)
+- `project_loop_adr_self_accept_bug.md` (~1771 tok)
+- `project_task879_twdt_core1_starvation.md` (~1229 tok)
 
 ## C:/Users/rvdbr/AppData/Local/Temp/
 
@@ -388,12 +383,6 @@
 
 ## docs/adr/
 
-- `.adr-kit-state.json` (~1012 tok)
-- `ADR-026-conditional-javascript-cache-busting.md` — ADR-026: Conditional JavaScript Cache-Busting for Firmware/Filesystem Version Mismatches (~3150 tok)
-- `ADR-132-async-web-server-and-imperative-push-bridge.md` — ADR-132 HTTP Stack on ESPAsyncWebServer with an Imperative-Push to Async-Pull Bridge (ADR-123 Phase (~4868 tok)
-- `ADR-139-etag-cache-busting-standard-and-asynctcp-task-config.md` — ADR-139 ETag + Bounded max-age as the Project-Wide Cache-Busting Standard for Web UI Static Assets ( (~5977 tok)
-- `ADR-139-gzip-static-index-shell-and-asynctcp-task-config.md` — ADR-139 ETag + Bounded max-age as the Project-Wide Cache-Busting Standard for Web UI Static Assets ( (~5894 tok)
-- `README.md` — Project documentation (~15434 tok)
 
 ## docs/api/
 
@@ -430,12 +419,13 @@
 
 ## scripts/
 
-- `capture-mqtt-debug.bat` — Declares Show (~17942 tok)
 
 ## src/OTGW-firmware/
 
-- `FSexplorer.ino` — Declares String (~7497 tok)
-- `webServerCompat.h` — Declares uint8_t (~4499 tok)
+- `handleDebug.ino` — Forward declaration — defined in SATweather.ino. (~7479 tok)
+- `networkStuff.ino` — Declares char (~10114 tok)
+- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~11431 tok)
+- `OTGW-firmware.ino` — Declares WifiPortalResetState (~11353 tok)
 
 ## src/OTGW-firmware/data/
 

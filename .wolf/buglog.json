@@ -2219,8 +2219,8 @@
     "timestamp": "2026-06-16",
     "error_message": "OTGW32 alpha.199: webserver does not respond / boot-detect+MQTT reported broken",
     "file": "src/OTGW-firmware/OTGW-Core.ino (TWDT loop-task) / OTDirect.ino / async webserver stack",
-    "root_cause": "Loop task blocks core 1 for seconds (worst right after boot). AsyncTCP is pinned to core 1 (CONFIG_ASYNC_TCP_RUNNING_CORE=1) and Arduino loopTask runs on core 1 too, so a blocking loop section starves AsyncTCP (HTTP 4-8s late, root / exceeds 10s) and, when it blocks >=30s without feedWatchDog()->esp_task_wdt_reset(), trips the loop-task TWDT (timeout 30s, panic) -> Boot: Task watchdog reboot loop. Heap is HEALTHY (~92KB free fresh boot) so it is CPU starvation, not heap exhaustion. Reported boot-detect + MQTT symptoms were NOT bugs: hardware.mode=OT-Direct correct; MQTT settings.enabled=false (disabled by config).",
-    "fix": "DIAGNOSED, not yet fixed. Tracked in TASK-879 (reframed). Next: USB-serial TWDT panic backtrace + instrument loop with section-timing (>500ms) to pinpoint the >=30s blocking section. Suspects: blocking NTP/DNS/WiFi settle on early boot, synchronous otMaster.sendRequest() in OTDirect handshake (OTDirect.ino:920/930), LittleFS/schedule-init.",
+    "root_cause": "Loop task blocks core 1 via SYNCHRONOUS SimpleTelnet/WiFiClient writes (debug port 23 + ser2net port 25238). Every Debug* macro + every OT-frame mirror -> SimpleTelnet::write -> ESP32 NetworkClient::write, which blocks ~10s/write on a stalled/half-open client (select 1s x 10 retries, no feedWatchDog inside; partial progress resets retry). Debug-all-on + alpha auto-enable = dense stream. AsyncTCP shares core 1 -> starved -> HTTP 4-8s late; 3-4 chained ~10s writes in one inter-feedWatchDog window cross the 30s loop-task TWDT -> Boot:Task watchdog reboot. OBSERVER-COUPLED: stall exists only while a telnet/ser2net client is connected (write early-returns at _connectedCount==0) and the capture is taken over telnet -> the measurement induces the symptom; failed telnet reconnects leave half-open sockets explaining post-teardown slowness. Heap healthy (~92KB) = CPU/socket starvation not heap. a-priori MQTT-broker-DNS + NTP-DNS ELIMINATED by code. Hunt: workflow wf_79e88a89-6f8 (16 agents).",
+    "fix": "DIAGNOSED, not yet fixed. KILL-TEST first (no code): power-cycle, connect nothing to 23/25238, curl http://<ip>/ -> floor vanishes confirms. Fix touches vendored SimpleTelnet (read-only per policy, maintainer decision): gate SimpleTelnet::write on availableForWrite() and drop overflow bytes (lossy ok for debug), OR move debug+ser2net emission to a dedicated FreeRTOS task with a ring buffer the loop enqueues into (mirror webhook offload). Do NOT just add feedWatchDog inside the write (masks reboot, leaves latency). Loop-stall detector shipped alpha.200 (bc84b9b7) - iMaxLoopGapMs watermark is the clean readout (the [loop-stall] telnet line itself lags on the same socket). Tracked TASK-866/879.",
     "tags": [
       "esp32s3",
       "task-watchdog",
@@ -2230,7 +2230,12 @@
       "webserver",
       "otgw32",
       "starvation",
-      "TASK-879"
+      "TASK-879",
+      "simpletelnet",
+      "networkclient-write",
+      "observer-coupling",
+      "ser2net",
+      "half-open-socket"
     ],
     "related_bugs": [],
     "occurrences": 1,
