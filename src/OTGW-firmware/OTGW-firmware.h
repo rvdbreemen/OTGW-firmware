@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.200
+**  Version  : v2.0.0-alpha.201
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -19,8 +19,8 @@
 // DEBUGGING: Uncomment the next line to disable WebSocket functionality
 // #define DISABLE_WEBSOCKET
 
-#include <SimpleTelnet.h>       // https://github.com/RvdB/SimpleTelnet — unified multi-client telnet (replaces TelnetStream + ESPTelnet)
-extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
+#include <AsyncSimpleTelnet.h>  // https://github.com/rvdbreemen/SimpleTelnet — AsyncTCP transport (non-blocking writes, TX backpressure); replaces the blocking sync SimpleTelnet write path (TASK-866/879)
+extern AsyncSimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 #include "Wire.h"
 #include "safeTimers.h"
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.200
+**  Version  : v2.0.0-alpha.201
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5213,6 +5213,9 @@ void startPICStream()
   }
 
   DebugTln(F("[OTGW] Starting legacy TCP port 25238"));
+  // Raw serial bridge for OTmonitor: disable telnet IAC handling so binary 0xFF
+  // bytes pass through untouched (lib default NEG_REFUSE would strip them). TASK-866/879.
+  OTGWstream.setTelnetNegotiation(AsyncSimpleTelnet<2>::NEG_OFF);
   OTGWstream.begin(false);    // false = skip WiFi check; bind unconditionally
 }
 

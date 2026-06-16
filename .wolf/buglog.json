@@ -2240,5 +2240,48 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-06-16"
+  },
+  {
+    "id": "bug-131",
+    "timestamp": "2026-06-17",
+    "error_message": "Submodule SimpleTelnet: git checkout 55512dc moved HEAD but working tree stayed at cc4c88e content (AsyncSimpleTelnet.h/SimpleTelnetCore.h missing, library.json still 1.0.0); git status reported clean; checkout-index -f -a wrote nothing.",
+    "file": "src/libraries/SimpleTelnet (submodule)",
+    "root_cause": "Submodule .git gitdir pointer resolves to a SHARED multi-worktree modules path (gitdir: ../../../../OTGW-firmware/.git/worktrees/OTGW-firmware-2.0.0/modules/src/libraries/SimpleTelnet). The submodule git metadata/index is tied to a different linked worktree, so a normal checkout in THIS worktree updates the ref but the stat-cache/index believes the working tree already matches and refuses to rewrite files (Windows + shared modules dir).",
+    "fix": "Bypass the working-tree checkout: extract each needed blob straight from the object DB with git show HEAD:<path> > <path> (src/AsyncSimpleTelnet.h, SimpleTelnetCore.h, SimpleTelnet.h, SimpleTelnet_impl.tpp, library.json/.properties). The parent gitlink (submodule HEAD=55512dc) is correct for the commit regardless of working-tree file state, so the committed submodule pointer is right and a fresh clone elsewhere gets the proper files.",
+    "tags": [
+      "submodule",
+      "git-worktree",
+      "shared-gitdir",
+      "simpletelnet",
+      "windows",
+      "checkout",
+      "TASK-879"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-17"
+  },
+  {
+    "id": "bug-132",
+    "timestamp": "2026-06-17",
+    "error_message": "'C:\\Users\\rvdbr\\.platformio\\penv\\Scripts\\esptool.exe' is not recognized; *** [.pio\\build\\esp32\\bootloader.bin] Error 1 (all 3 esp32 targets). build.py wrapper still exits 0.",
+    "file": "PlatformIO penv (toolchain, not firmware)",
+    "root_cause": "esptool in the PlatformIO penv drifted to 5.1.0 (concurrent pip/pio action during a parallel workflow). esptool 5.x did not (re)install the Scripts/esptool.exe console-script wrapper, but the pinned pioarduino platform (55.03.35) bootloader-build action invokes esptool.exe by path. python -m esptool worked (package present); only the .exe entry-point was missing. Wiping .pio/build did NOT fix it (env-level, not build-cache).",
+    "fix": "Regenerate the console script without changing version/deps: penv/Scripts/python.exe -m pip install --force-reinstall --no-deps esptool==5.1.0 -> recreates Scripts/esptool.exe (108KB). Then rebuild. All C++ (incl. AsyncSimpleTelnet) compiled fine throughout; this was purely the bootloader-assembly esptool call.",
+    "tags": [
+      "platformio",
+      "esptool",
+      "toolchain-drift",
+      "bootloader",
+      "env",
+      "build",
+      "penv",
+      "TASK-879"
+    ],
+    "related_bugs": [
+      "bug-131"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-06-17"
   }
 ]

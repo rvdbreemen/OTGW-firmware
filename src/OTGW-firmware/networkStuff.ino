@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.200
+**  Version  : v2.0.0-alpha.201
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -30,7 +30,7 @@ time_t      NtpLastSync = 0;
 
 // Debug telnet instance (port 23). SimpleTelnet replaces ESPTelnet for debug output.
 // Port is fixed in the constructor; begin() needs no port argument.
-SimpleTelnet<1> debugTelnet(23);
+AsyncSimpleTelnet<1> debugTelnet(23);
 
 // TASK-865.9 (ADR-123 Phase 3): the synchronous WebServer moved to
 // ESPAsyncWebServer. The async server runs every handler on the AsyncTCP
