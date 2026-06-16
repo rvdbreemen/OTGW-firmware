@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.199
+**  Version  : v2.0.0-alpha.200
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -447,6 +447,7 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iDripActiveBurstSkipCount = 0; // drip ticks skipped DURING active Status-burst (TASK-342)
   uint32_t iDripCooldownSkipCount   = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
   uint32_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure
+  uint32_t iMaxLoopGapMs            = 0; // TASK-866/879: longest gap between loop() entries since boot (loop-stall / core-1 starvation watermark; see loop() detector)
 };
 
 enum RestPerfTarget : uint8_t {

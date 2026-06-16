@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.199
+**  Version  : v2.0.0-alpha.200
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -863,6 +863,25 @@ void doBackgroundTasks()
 
 void loop()
 {
+  // TASK-866/879 loop-stall detector. AsyncTCP runs on core 1
+  // (CONFIG_ASYNC_TCP_RUNNING_CORE=1) where the Arduino loopTask also runs, so a
+  // long synchronous section in this loop starves AsyncTCP (multi-second HTTP
+  // latency) and, past the 30s loop-task TWDT, panics into a 'Boot: Task watchdog'
+  // reboot. Measure the wall-clock gap between consecutive loop() entries: keep the
+  // max as a banner watermark, and timestamp any gap >200ms so the preceding
+  // per-section debug line names the culprit. Unsigned subtraction is millis()
+  // rollover-safe.
+  {
+    static uint32_t s_lastLoopMs = 0;
+    uint32_t nowMs = millis();
+    if (s_lastLoopMs != 0) {
+      uint32_t gapMs = nowMs - s_lastLoopMs;
+      if (gapMs > state.heapdiag.iMaxLoopGapMs) state.heapdiag.iMaxLoopGapMs = gapMs;
+      if (gapMs > 200) DebugTf(PSTR("[loop-stall] %lu ms gap\r\n"), (unsigned long)gapMs);
+    }
+    s_lastLoopMs = nowMs;
+  }
+
   DECLARE_TIMER_SEC(timer1s,   1,   SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer3s,   3,   SKIP_MISSED_TICKS);
   DECLARE_TIMER_MS(timer500ms, 500, SKIP_MISSED_TICKS);

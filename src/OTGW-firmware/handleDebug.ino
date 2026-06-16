@@ -187,6 +187,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("entered_warning: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredWarningCount);
     Debugf(PSTR("entered_critical: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredCriticalCount);
     Debugf(PSTR("drip_slow_mode: %lu\r\n"), (unsigned long)state.heapdiag.iDripSlowModeCount);
+    Debugf(PSTR("max_loop_gap_ms: %lu\r\n"), (unsigned long)state.heapdiag.iMaxLoopGapMs);
 
     Debugln(F("[state.discovery]"));
     Debugf(PSTR("published_topics: %lu\r\n"), (unsigned long)state.discovery.iPublishedTopicCount);

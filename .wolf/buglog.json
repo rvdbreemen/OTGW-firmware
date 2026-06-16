@@ -2213,5 +2213,27 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-06-14T12:19:56.353535"
+  },
+  {
+    "id": "bug-130",
+    "timestamp": "2026-06-16",
+    "error_message": "OTGW32 alpha.199: webserver does not respond / boot-detect+MQTT reported broken",
+    "file": "src/OTGW-firmware/OTGW-Core.ino (TWDT loop-task) / OTDirect.ino / async webserver stack",
+    "root_cause": "Loop task blocks core 1 for seconds (worst right after boot). AsyncTCP is pinned to core 1 (CONFIG_ASYNC_TCP_RUNNING_CORE=1) and Arduino loopTask runs on core 1 too, so a blocking loop section starves AsyncTCP (HTTP 4-8s late, root / exceeds 10s) and, when it blocks >=30s without feedWatchDog()->esp_task_wdt_reset(), trips the loop-task TWDT (timeout 30s, panic) -> Boot: Task watchdog reboot loop. Heap is HEALTHY (~92KB free fresh boot) so it is CPU starvation, not heap exhaustion. Reported boot-detect + MQTT symptoms were NOT bugs: hardware.mode=OT-Direct correct; MQTT settings.enabled=false (disabled by config).",
+    "fix": "DIAGNOSED, not yet fixed. Tracked in TASK-879 (reframed). Next: USB-serial TWDT panic backtrace + instrument loop with section-timing (>500ms) to pinpoint the >=30s blocking section. Suspects: blocking NTP/DNS/WiFi settle on early boot, synchronous otMaster.sendRequest() in OTDirect handshake (OTDirect.ino:920/930), LittleFS/schedule-init.",
+    "tags": [
+      "esp32s3",
+      "task-watchdog",
+      "twdt",
+      "asynctcp",
+      "core-pinning",
+      "webserver",
+      "otgw32",
+      "starvation",
+      "TASK-879"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-16"
   }
 ]
