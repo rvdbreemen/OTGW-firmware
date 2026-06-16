@@ -1,7 +1,7 @@
 ---
 id: ADR-117
 title: SAT Simulation Contract — Bus Isolation, Boiler-Absence Availability, Command Trace
-status: Proposed
+status: Accepted
 date: 2026-06-01
 tags: [sat, simulation, safety, opentherm, otgw32]
 supersedes: []
@@ -14,7 +14,7 @@ deciders: [Robert van den Breemen]
 
 ## Status
 
-Proposed. Guideline-level (per ADR-080): this ADR documents a runtime
+Accepted, 2026-06-16 (Proposed 2026-06-01; accepted by the maintainer Robert van den Breemen 2026-06-16). Guideline-level (per ADR-080): this ADR documents a runtime
 contract and a code convention. It is enforced by code review plus the
 self-checks below, not by a dedicated `evaluate.py` gate in this release. A
 follow-up may promote the wrapper-usage convention to a CI `forbid_pattern`
@@ -35,6 +35,11 @@ status_history:
     status: Proposed
     changed_by: Robert van den Breemen
     reason: "Update the bus-path description and self-checks to the ESP32-S3-only reality: the ESP8266 + PIC path was dropped by ADR-128 / TASK-865.x, so HAS_PIC now means esp32-classic + combo-in-PIC-mode. Runtime contract unchanged; stays Proposed."
+    changed_via: manual
+  - date: 2026-06-16
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Accepted by the maintainer. The SAT simulation contract (bus-tx isolation, boiler-absence edge-triggered availability gate, command trace, wrapper read convention) is in place on the ESP32-S3 line; enforced by code review + the documented self-checks (guideline-level per ADR-080).
     changed_via: manual
 
 ## Context

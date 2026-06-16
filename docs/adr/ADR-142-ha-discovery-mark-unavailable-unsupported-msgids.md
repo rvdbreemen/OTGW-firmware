@@ -1,5 +1,5 @@
 ---
-id: ADR-123
+id: ADR-142
 title: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List
 status: Proposed
 date: 2026-06-04
@@ -10,7 +10,7 @@ related: [ADR-077, ADR-088, ADR-093, ADR-102, ADR-122, ADR-080]
 deciders: [Robert van den Breemen]
 ---
 
-# ADR-123: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List
+# ADR-142: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List
 
 ## Status
 
@@ -411,7 +411,7 @@ Unknown-Data-Id to arrive before HA marks them unavailable.
 - **ADR-102** (HA Entity Availability Reflects MQTT Link, Not OT Bus): this ADR
   adds a second availability entry alongside ADR-102's LWT entry; it does NOT
   overwrite or replace the LWT entry. The reconciliation is detailed in Context.
-  ADR-102 governs transient liveness; ADR-123 adds a persistent capability fact.
+  ADR-102 governs transient liveness; ADR-142 adds a persistent capability fact.
   Both apply, independently, under `availability_mode: all`.
 - **ADR-122** (HA Discovery Five-Device Topology, Proposed): the per-msgID
   availability list composes with ADR-122's per-device unique_id routing without
