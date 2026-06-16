@@ -3,9 +3,10 @@ id: TASK-872
 title: >-
   feat(mqtt): render the 7 OTGW groupings as in-device categories via
   entity-name prefix (ADR-140)
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-06-15 14:26'
+updated_date: '2026-06-16 04:22'
 labels: []
 dependencies:
   - TASK-871

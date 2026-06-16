@@ -3,10 +3,10 @@ id: TASK-871
 title: >-
   feat(mqtt): collapse HA discovery to single device per hardware (ADR-140), fix
   F1+F5
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-06-15 14:21'
-updated_date: '2026-06-15 14:26'
+updated_date: '2026-06-16 04:22'
 labels: []
 dependencies: []
 ordinal: 87000
