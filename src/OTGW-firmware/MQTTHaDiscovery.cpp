@@ -2244,7 +2244,6 @@ static const char kIds[]      PROGMEM = "identifiers";
 static const char kMfr[]      PROGMEM = "manufacturer";
 static const char kModel[]    PROGMEM = "model";
 static const char kSwVer[]    PROGMEM = "sw_version";
-static const char kHwVer[]    PROGMEM = "hw_version";
 static const char kDevName[]  PROGMEM = "name";
 static const char kUniqId[]   PROGMEM = "uniq_id";
 static const char kName[]     PROGMEM = "name";
@@ -2266,114 +2265,48 @@ static const char kOriginName[] PROGMEM = "OTGW-firmware";
 static const char kOriginUrl[]  PROGMEM = "https://github.com/rvdbreemen/OTGW-firmware";
 
 // ---------------------------------------------------------------------------
-// TASK-648: modern device-identifier suffix per HaDevice; legacy uses bare nodeId.
+// ADR-140: single-device topology -- source/engine prefix for uniq_id only.
+// The prefix lives in uniq_id/entity_id, never in the visible display name.
+// This replaces the per-device suffix scheme from TASK-648.
+// Boiler/Thermostat/Gateway/OtCore all route through the active OT engine
+// (pic or ot-direct); Esp/Sat/Sensors have their own fixed prefix.
 // ---------------------------------------------------------------------------
-static PGM_P haDeviceSuffix(HaDevice d, const HaDiscoveryContext &ctx) {
+static PGM_P haSourcePrefix(HaDevice d, const HaDiscoveryContext &ctx) {
   switch (d) {
-    case HaDevice::Boiler:     return PSTR("-boiler");
-    case HaDevice::Thermostat: return PSTR("-thermostat");
-    case HaDevice::Gateway:    return PSTR("-gateway");
-    case HaDevice::Esp:        return PSTR("-esp");
-    case HaDevice::OtCore:     return ctx.otCoreSuffix;  // TASK-847: runtime on combo, compile-time elsewhere
-    case HaDevice::Sat:        return PSTR("-sat");
-    case HaDevice::Sensors:    return PSTR("-sensors");
+    case HaDevice::Esp:     return PSTR("esp_");
+    case HaDevice::Sat:     return PSTR("sat_");
+    case HaDevice::Sensors: return PSTR("sensors_");
+    default: break;  // Boiler/Thermostat/Gateway/OtCore -> active OT engine
   }
-  return PSTR("-esp");
+  return (ctx.otCoreName && strcmp_P(ctx.otCoreName, PSTR("pic")) == 0) ? PSTR("pic_") : PSTR("otd_");
 }
 
 // ---------------------------------------------------------------------------
-// Device block: full (first-per-device) or minimal (subsequent).
-// In legacy mode: bare nodeId identifier, gated by ctx.isFirstEntity (unchanged).
-//   Full legacy block is byte-identical to the pre-Task-5 output.
-// In modern mode: nodeId+suffix identifier, gated by ctx.deviceIntroduced[device].
-//   Full modern block uses per-device metadata from ctx.devMeta[devIdx] when
-//   available, falling back to legacy strings so the emitter never crashes on
-//   a nullptr devMeta pointer.
-// ctx is non-const so deviceIntroduced can be set after emitting the full block.
+// Device block: single device, full on first entity (ctx.isFirstEntity=true),
+// minimal (ids only) on subsequent entities. Identifier is bare nodeId.
+// ADR-140: via_device, per-device metadata, and deviceIntroduced are removed;
+// manufacturer/model/hostname/version use writeRamEscaped for JSON safety.
 // ---------------------------------------------------------------------------
 static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
-  const bool useLegacy = ctx.legacyMode;
-
-  // Determine whether to emit the full block for this entity.
-  const uint8_t devIdx = static_cast<uint8_t>(ctx.device);
-  // TASK-648 Job B: deviceIntroduced[devIdx] false = not yet introduced; emit full block.
-  const bool emitFull = useLegacy ? ctx.isFirstEntity
-                                  : (ctx.deviceIntroduced ? !ctx.deviceIntroduced[devIdx] : false);
-
-  // Open device object and emit identifier string.
-  // Legacy: bare nodeId.  Modern: nodeId + device suffix.
-  if (!w.writeChar('"')) return false;
+  if (!w.writeChar('"'  )) return false;
   if (!w.writeProgmem(kDev)) return false;
   if (!w.writeProgmem(PSTR("\":{"))) return false;
-  if (!w.writeChar('"')) return false;
+  if (!w.writeChar('"'  )) return false;
   if (!w.writeProgmem(kIds)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
-  if (!useLegacy) {
-    if (!w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;
+  if (!w.writeChar('"'  )) return false;
+  if (ctx.isFirstEntity) {
+    if (!writeJsonComma(w)) return false;
+    if (!w.writeChar('"'  ) || !w.writeProgmem(kMfr)   || !w.writeProgmem(PSTR("\":\"")) || !w.writeRamEscaped(ctx.manufacturer) || !w.writeChar('"'  )) return false;
+    if (!writeJsonComma(w)) return false;
+    if (!w.writeChar('"'  ) || !w.writeProgmem(kModel) || !w.writeProgmem(PSTR("\":\"")) || !w.writeRamEscaped(ctx.model) || !w.writeChar('"'  )) return false;
+    if (!writeJsonComma(w)) return false;
+    if (!w.writeChar('"'  ) || !w.writeProgmem(kDevName) || !w.writeProgmem(PSTR("\":\"OpenTherm Gateway ("))) return false;
+    if (!w.writeRamEscaped(ctx.hostname) || !w.writeProgmem(PSTR(")\""))) return false;
+    if (!writeJsonComma(w)) return false;
+    if (!w.writeChar('"'  ) || !w.writeProgmem(kSwVer) || !w.writeProgmem(PSTR("\":\"")) || !w.writeRamEscaped(ctx.version) || !w.writeChar('"'  )) return false;
   }
-  if (!w.writeChar('"')) return false;
-
-  if (emitFull) {
-    if (useLegacy) {
-      // LEGACY: byte-identical to pre-Task-5 output.
-      if (!writeJsonComma(w)) return false;
-      if (!writeJsonKV(w, kMfr, ctx.manufacturer)) return false;
-      if (!writeJsonComma(w)) return false;
-      if (!writeJsonKV(w, kModel, ctx.model)) return false;
-      if (!writeJsonComma(w)) return false;
-      if (!w.writeChar('"')) return false;
-      if (!w.writeProgmem(kDevName)) return false;
-      if (!w.writeProgmem(PSTR("\":\"OpenTherm Gateway ("))) return false;
-      if (!w.writeRam(ctx.hostname)) return false;
-      if (!w.writeProgmem(PSTR(")\""))) return false;
-      if (!writeJsonComma(w)) return false;
-      if (!writeJsonKV(w, kSwVer, ctx.version)) return false;
-    } else {
-      // MODERN (Task 5): per-device metadata from ctx.devMeta[devIdx].
-      // Fall back to legacy strings when devMeta is nullptr (safe default).
-      const HaDeviceMeta *meta = (ctx.devMeta && devIdx < HA_DEVICE_COUNT) ? &ctx.devMeta[devIdx] : nullptr;
-      const char *mfr   = meta ? meta->devManufacturer : ctx.manufacturer;
-      const char *model = meta ? meta->devModel        : ctx.model;
-      const char *sw    = meta ? meta->devSwVersion    : ctx.version;
-      // name: "DeviceType (hostname)" from meta->devName when available.
-      // devName already contains the full "Boiler (host)" string (built in MQTTstuff.ino).
-      const char *name  = (meta && meta->devName && meta->devName[0]) ? meta->devName : nullptr;
-      const char *hw    = (meta && meta->devHwVersion && meta->devHwVersion[0]) ? meta->devHwVersion : nullptr;
-
-      if (!writeJsonComma(w)) return false;
-      if (!writeJsonKV(w, kMfr, mfr)) return false;
-      if (!writeJsonComma(w)) return false;
-      if (!writeJsonKV(w, kModel, model)) return false;
-      if (!writeJsonComma(w)) return false;
-      if (name) {
-        if (!writeJsonKV(w, kDevName, name)) return false;
-      } else {
-        // Fallback: construct "OpenTherm Gateway (<hostname>)"
-        if (!w.writeChar('"')) return false;
-        if (!w.writeProgmem(kDevName)) return false;
-        if (!w.writeProgmem(PSTR("\":\"OpenTherm Gateway ("))) return false;
-        if (!w.writeRam(ctx.hostname)) return false;
-        if (!w.writeProgmem(PSTR(")\""))) return false;
-      }
-      if (!writeJsonComma(w)) return false;
-      if (!writeJsonKV(w, kSwVer, sw)) return false;
-      if (hw) {
-        if (!writeJsonComma(w)) return false;
-        if (!writeJsonKV(w, kHwVer, hw)) return false;
-      }
-      // ADR-124 §3: Gateway is the hub; every other device nests under it via_device.
-      if (ctx.device != HaDevice::Gateway) {
-        if (!writeJsonComma(w)) return false;
-        if (!w.writeProgmem(PSTR("\"via_device\":\""))) return false;
-        if (!w.writeRam(ctx.nodeId)) return false;
-        if (!w.writeProgmem(PSTR("-gateway\""))) return false;
-      }
-      // Mark device as introduced so subsequent entities get the minimal block.
-      if (ctx.deviceIntroduced) ctx.deviceIntroduced[devIdx] = true;
-    }
-  }
-
   return w.writeChar('}');
 }
 
@@ -2431,24 +2364,22 @@ static bool composeSensorPayload(MqttJsonWriter &w,
   if (!writeDeviceBlock(w, ctx)) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "uniq_id":"<nodeId>[-<device>]-<label>[<sourceSuffix>]"
-  // Modern mode: nodeId + device suffix + label. Legacy: nodeId + label (byte-identical to pre-648).
+  // "uniq_id":"<nodeId>-<sourcePrefix><label>[<sourceSuffix>]"
+  // ADR-140: source prefix + label; idLabel sanitized for HA object_id restrictions.
   // Uses idLabel (sanitized) so HA-forbidden characters like '/' become '_'.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kUniqId)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
-  if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
   if (!w.writeChar('-')) return false;
+  if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
   if (!w.writeRam(idLabel)) return false;
   if (hasSrc) { if (!w.writeRam(ctx.sourceSuffix)) return false; }
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
   // "name":"<friendlyName>[ <sourceName>]"
-  // Hostname dropped (device card title shows "OpenTherm Gateway (<hostname>)"
-  // already, so prepending hostname to entity name is redundant). writeFriendlyName
-  // applies '_' -> ' ' + Title Case for consistent rendering. (Andre 2026-05-07.)
+  // ADR-140: trailing sourceName bilateral append unchanged.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kName)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
@@ -2546,19 +2477,19 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
   if (!writeDeviceBlock(w, ctx)) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "uniq_id":"<nodeId>[-<device>]-<label>"
-  // Modern: nodeId + device suffix + label. Legacy: nodeId + label (byte-identical to pre-648).
+  // "uniq_id":"<nodeId>-<sourcePrefix><label>"
+  // ADR-140: source prefix replaces per-device suffix.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kUniqId)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
-  if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
   if (!w.writeChar('-')) return false;
+  if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
   if (!w.writeRam(label)) return false;
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
-  // "name":"<friendlyName>" (hostname dropped, '_' -> ' ' + Title Case)
+  // "name":"<friendlyName>"
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kName)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
@@ -2793,22 +2724,23 @@ bool streamDallasSensorDiscovery(const char *sensorAddress,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // "uniq_id":"<nodeId>[-<device>]-<sensorAddress>"
-    // Modern: nodeId + device suffix + address. Legacy: nodeId + address.
+    // "uniq_id":"<nodeId>-<sourcePrefix><sensorAddress>"
+    // ADR-140: source prefix replaces per-device suffix.
     if (!w.writeChar('"')) return false;
     if (!w.writeProgmem(kUniqId)) return false;
     if (!w.writeProgmem(PSTR("\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
     if (!w.writeChar('-')) return false;
+    if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
     if (!w.writeRam(sensorAddress)) return false;
     if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
 
-    // "name":"Temperature <sensorAddress>" (hostname dropped per Andre 2026-05-07)
+    // "name":"Temperature <sensorAddress>"
     if (!w.writeChar('"')) return false;
     if (!w.writeProgmem(kName)) return false;
-    if (!w.writeProgmem(PSTR("\":\"Temperature "))) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeProgmem(PSTR("Temperature "))) return false;
     if (!w.writeRam(sensorAddress)) return false;
     if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
@@ -2983,22 +2915,25 @@ bool streamClimateDiscovery(uint8_t climateIdx,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // name + uniq_id (hostname dropped from name per Andre 2026-05-07; uniq_id keeps it)
-    // TASK-648: modern mode inserts device suffix after nodeId in uniq_id.
+    // name + uniq_id (ADR-140: source prefix in uniq_id; name is the clean label)
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("\"name\":\"Thermostat\""))) return false;
+      if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+      if (!w.writeProgmem(PSTR("Thermostat\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
       if (!w.writeRam(ctx.nodeId)) return false;
-      if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
-      if (!w.writeProgmem(PSTR("-thermostat\""))) return false;
+      if (!w.writeChar('-')) return false;
+      if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
+      if (!w.writeProgmem(PSTR("thermostat\""))) return false;
     } else {
-      if (!w.writeProgmem(PSTR("\"name\":\"DHW Control\""))) return false;
+      if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+      if (!w.writeProgmem(PSTR("DHW Control\""))) return false;
       if (!writeJsonComma(w)) return false;
       if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
       if (!w.writeRam(ctx.nodeId)) return false;
-      if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
-      if (!w.writeProgmem(PSTR("-dhw_control\""))) return false;
+      if (!w.writeChar('-')) return false;
+      if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
+      if (!w.writeProgmem(PSTR("dhw_control\""))) return false;
     }
     if (!writeJsonComma(w)) return false;
 
@@ -3134,18 +3069,20 @@ bool streamNumberDiscovery(HaDiscoveryContext &ctx)
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // uniq_id: modern inserts device suffix, legacy is bare nodeId
+
+    // uniq_id: ADR-140 source prefix replaces per-device suffix
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
-    if (!w.writeProgmem(PSTR("-Toutside_override\""))) return false;
+    if (!w.writeChar('-')) return false;
+    if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
+    if (!w.writeProgmem(PSTR("Toutside_override\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     // device_class + name
     if (!writeJsonKV_P(w, kDevCls, PSTR("temperature"))) return false;
     if (!writeJsonComma(w)) return false;
-    // hostname dropped from name (Andre 2026-05-07)
-    if (!w.writeProgmem(PSTR("\"name\":\"Outside Temperature Override\""))) return false;
+    if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+    if (!w.writeProgmem(PSTR("Outside Temperature Override\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     // cmd_t
@@ -3214,12 +3151,11 @@ bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // uniq_id "<nodeId>[-<device>]-<label>_override"
-    // Modern: device suffix inserted after nodeId. Legacy: bare nodeId + label.
+    // uniq_id: ADR-140 source prefix replaces per-device suffix
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
-    if (!w.writeProgmem(PSTR("-"))) return false;
+    if (!w.writeChar('-')) return false;
+    if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
     if (!w.writeRam(label)) return false;
     if (!w.writeProgmem(PSTR("_override\""))) return false;
     if (!writeJsonComma(w)) return false;
@@ -3305,17 +3241,20 @@ static bool streamSatBoolSwitch(HaDiscoveryContext &ctx,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // uniq_id: modern inserts device suffix between nodeId and the entity suffix.
+    // uniq_id: ADR-140 source prefix; uniqSuffix starts with '-' so skip it.
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
-    if (!w.writeProgmem(uniqSuffix)) return false;
-    if (!w.writeProgmem(PSTR("\""))) return false;
+    {
+      PGM_P uniqBody = uniqSuffix;
+      if (pgm_read_byte(uniqBody) == '-') uniqBody++;
+      if (!w.writeChar('-')) return false;
+      if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
+      if (!w.writeProgmem(uniqBody)) return false;
+    }
+    if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
 
-    // hostname dropped from name (Andre 2026-05-07). nameSuffix is PROGMEM and
-    // typically starts with '_'; copy to a small RAM buffer with leading '_' stripped
-    // so writeFriendlyName can apply '_' -> ' ' + Title Case uniformly.
+    // ADR-140: clean name; nameSuffix starts with '_' which is stripped.
     if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
     {
       char nameBuf[48];
@@ -3323,7 +3262,7 @@ static bool streamSatBoolSwitch(HaDiscoveryContext &ctx,
       const char *src = nameBuf[0] == '_' ? &nameBuf[1] : nameBuf;
       if (!writeFriendlyName(w, src)) return false;
     }
-    if (!w.writeProgmem(PSTR("\""))) return false;
+    if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
 
     if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
@@ -3476,18 +3415,19 @@ bool streamSatSelectDiscovery(uint8_t selectIdx,
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // uniq_id: modern inserts device suffix after nodeId.
+    // uniq_id: ADR-140 source prefix replaces per-device suffix
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
-    if (!w.writeProgmem(PSTR("-sat-heating-system\""))) return false;
+    if (!w.writeChar('-')) return false;
+    if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
+    if (!w.writeProgmem(PSTR("sat-heating-system\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    // hostname dropped from name (Andre 2026-05-07)
-    if (!w.writeProgmem(PSTR("\"name\":\"SAT Heating System\""))) return false;
+    // ADR-140: clean name (no source prefix in display name)
+    if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+    if (!w.writeProgmem(PSTR("SAT Heating System\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttSubTopic)) return false;
     if (!w.writeProgmem(PSTR("/sat/heating_system\""))) return false;
     if (!writeJsonComma(w)) return false;
@@ -3543,17 +3483,18 @@ bool streamButtonDiscovery(HaDiscoveryContext &ctx)
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // uniq_id: modern inserts device suffix after nodeId.
+    // uniq_id: ADR-140 source prefix replaces per-device suffix
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
-    if (!w.writeProgmem(PSTR("-resetgateway\""))) return false;
+    if (!w.writeChar('-')) return false;
+    if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
+    if (!w.writeProgmem(PSTR("resetgateway\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    if (!w.writeProgmem(PSTR("\"name\":\"Reset Gateway\""))) return false;
+    if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
+    if (!w.writeProgmem(PSTR("Reset Gateway\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttSubTopic)) return false;
     if (!w.writeProgmem(PSTR("/resetgateway\""))) return false;
     if (!writeJsonComma(w)) return false;
@@ -3636,15 +3577,16 @@ bool streamSelectDiscovery(uint8_t selectIdx, HaDiscoveryContext &ctx)
     if (!writeDeviceBlock(w, ctx)) return false;
     if (!writeJsonComma(w)) return false;
 
-    // uniq_id: modern inserts device suffix after nodeId.
+    // uniq_id: ADR-140 source prefix replaces per-device suffix
     if (!w.writeProgmem(PSTR("\"uniq_id\":\""))) return false;
     if (!w.writeRam(ctx.nodeId)) return false;
-    if (!ctx.legacyMode && !w.writeProgmem(haDeviceSuffix(ctx.device, ctx))) return false;  // TASK-648: -<device>
     if (!w.writeChar('-')) return false;
+    if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
     if (!w.writeRam(label)) return false;
     if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
 
+    // ADR-140: clean entity name (no source prefix in display name)
     if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
     if (!w.writeRam(name)) return false;
     if (!w.writeChar('"')) return false;

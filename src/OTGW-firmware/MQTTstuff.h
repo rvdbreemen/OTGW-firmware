@@ -12,6 +12,7 @@
 #include <pgmspace.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdio.h>    // snprintf — snprintf_P expands to snprintf on ESP32 (writeRamEscaped \uXXXX)
 #include <string.h>   // memcpy / strlen — MqttJsonWriter WRITE buffer + readSensorCfg memcpy_P
 #include <boards.h>   // HAS_PIC / HAS_DIRECT_OT capability flags — needed in BOTH TUs
                       // (the standalone MQTTHaDiscovery.cpp does not pull OTGW-firmware.h,
@@ -367,14 +368,14 @@ constexpr uint32_t VERIFICATION_MIN_HEAP_START = 6000;
 // Discovery context -- runtime state passed to streaming functions
 // ---------------------------------------------------------------------------
 
-// ADR-124 (TASK-826): HA discovery device topology (seven-device split).
-// Order is load-bearing: every per-device array (g_haDeviceIntroduced[],
-// g_haDeviceMeta[], kHaDeviceSuffixes[]) and the device-block emitters index by
-// this ordinal. OtCore sits between Esp and Sat (Sat moved 4->5 vs the old
-// 5-device layout); Sensors is last. The enum value is hardware-agnostic
-// (OtCore = the OpenTherm bus driver slot); it is rendered per hardware in HA.
+// ADR-124 (TASK-826) / ADR-140: HA device routing ordinal.
+// Single-device topology (ADR-140): there is one HA device (bare nodeId). The
+// HaDevice enum no longer selects a per-device identifier; it now only selects
+// the entity SOURCE prefix (haSourcePrefix/haSourceNamePrefix in
+// MQTTHaDiscovery.cpp) so OT-engine entities read "pic_"/"otd_" and the
+// firmware-native groups read "esp_"/"sat_"/"sensors_". OtCore = the OpenTherm
+// bus driver slot, rendered per hardware via ctx.otCoreName.
 enum class HaDevice : uint8_t { Boiler = 0, Thermostat, Gateway, Esp, OtCore, Sat, Sensors };
-constexpr uint8_t HA_DEVICE_COUNT = 7;
 
 // ADR-124 §2: the OT-Core device is one enum slot (HaDevice::OtCore) whose
 // USER-FACING name/suffix is rendered per hardware so the model is obvious in
@@ -399,20 +400,6 @@ constexpr uint8_t HA_DEVICE_COUNT = 7;
   #define HA_OTCORE_SUFFIX  "-ot-direct"
 #endif
 
-// TASK-648 Task 5: per-device metadata threaded through the context so
-// MQTTHaDiscovery.cpp (a separate TU that cannot see globals) can emit
-// device-specific manufacturer/model/sw/hw/name in the full device block.
-// All pointer members point into file-static buffers in MQTTstuff.ino;
-// they remain valid for the entire discovery cycle.
-// nullptr/empty devHwVersion means "omit hw_version from the block".
-struct HaDeviceMeta {
-    const char *devName;           // e.g. "Boiler (myhostname)"
-    const char *devManufacturer;   // e.g. "MemberID 131" / "Schelte Bron"
-    const char *devModel;          // e.g. "ProductType 3" / "OpenTherm Gateway"
-    const char *devSwVersion;      // e.g. "2.3" / "5.8" / firmware version
-    const char *devHwVersion;      // e.g. "1" / chip id hex; nullptr = omit
-};
-
 struct HaDiscoveryContext {
     const char *nodeId;
     const char *hostname;
@@ -423,19 +410,8 @@ struct HaDiscoveryContext {
     const char *manufacturer;      // Hardware manufacturer (from settings.device) — legacy only
     const char *model;             // Hardware model (from settings.device) — legacy only
     bool        isFirstEntity;
-    bool        legacyMode = false;           // TASK-648: settings.mqtt.bLegacyMode, threaded in (the .cpp TU cannot see globals)
-    HaDevice    device = HaDevice::Esp;       // owning device for the current entity
-    // TASK-648 Job B: persistent per-device "full block once" gate.
-    // Points at the file-static g_haDeviceIntroduced[HA_DEVICE_COUNT] in MQTTstuff.ino.
-    // nullptr is the safe default (both builders guard with a null-check).
-    // Semantics: false = not yet introduced this cycle (emit full block), true = already done.
-    // Reset to all-false when a new discovery cycle starts (markAllMQTTConfigPending /
-    // setMQTTConfigAllPending arm dripDeviceInfoPending — same two sites).
-    bool            *deviceIntroduced = nullptr;   // per-device introduced flags (HA_DEVICE_COUNT entries)
-    // TASK-648 Task 5: per-device metadata cache, indexed by HaDevice ordinal.
-    // Points at the file-static g_haDeviceMeta[HA_DEVICE_COUNT] in MQTTstuff.ino.
-    // nullptr is safe — both emitters guard with a null-check and fall back to legacy strings.
-    const HaDeviceMeta *devMeta = nullptr;         // per-device metadata (HA_DEVICE_COUNT entries)
+    bool        legacyMode = false;           // settings.mqtt.bLegacyMode, threaded in (the .cpp TU cannot see globals)
+    HaDevice    device = HaDevice::Esp;       // routing ordinal: selects the entity source prefix (ADR-140), not a device id
     // TASK-847: OtCore device suffix/name — set unconditionally in buildDiscoveryContext().
     // Fixed boards: compile-time HA_OTCORE_SUFFIX / HA_OTCORE_NAME.
     // Combo (HAS_RUNTIME_HW_DETECT=1): runtime from state.hw.eMode.
@@ -506,6 +482,20 @@ struct MqttJsonWriter {
   bool writeRam(const char *s) {
     if (!s) return true;
     return appendRam(s, strlen(s));
+  }
+
+  bool writeRamEscaped(const char *s) {
+    if (!s) return true;
+    for (const char *p = s; *p; ++p) {
+      char c = *p;
+      if (c == '"' || c == '\\') { if (!writeChar('\\') || !writeChar(c)) return false; }
+      else if (c == '\n') { if (!writeChar('\\') || !writeChar('n')) return false; }
+      else if (c == '\r') { if (!writeChar('\\') || !writeChar('r')) return false; }
+      else if (c == '\t') { if (!writeChar('\\') || !writeChar('t')) return false; }
+      else if ((unsigned char)c < 0x20) { char b[7]; snprintf_P(b, sizeof(b), PSTR("\\u%04x"), (unsigned)(unsigned char)c); if (!writeRam(b)) return false; }
+      else { if (!writeChar(c)) return false; }
+    }
+    return true;
   }
 
   bool writeProgmem(PGM_P s) {
