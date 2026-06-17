@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-16T08:42:26.559Z
-> Files: 7 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-17T04:04:44.111Z
+> Files: 10 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/01-raw/sessies/
 
@@ -370,7 +370,7 @@
 
 - `MEMORY.md` — OTGW-firmware Project Memory (~5202 tok)
 - `project_loop_adr_self_accept_bug.md` (~1771 tok)
-- `project_task879_twdt_core1_starvation.md` (~1229 tok)
+- `project_task879_twdt_core1_starvation.md` (~1466 tok)
 
 ## C:/Users/rvdbr/AppData/Local/Temp/
 
@@ -383,6 +383,7 @@
 
 ## docs/adr/
 
+- `ADR-143-async-telnet-ser2net-transport-asynctcp.md` — ADR-143: Telnet + ser2net transport on AsyncTCP (AsyncSimpleTelnet) to remove loop-task socket-write (~2217 tok)
 
 ## docs/api/
 
@@ -423,8 +424,10 @@
 ## src/OTGW-firmware/
 
 - `handleDebug.ino` — Forward declaration — defined in SATweather.ino. (~7479 tok)
-- `networkStuff.ino` — Declares char (~10114 tok)
-- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~11431 tok)
+- `networkStuff.ino` — Declares char (~10115 tok)
+- `OTGW-Core.h` — ifndef OTGWCore_h (~13753 tok)
+- `OTGW-Core.ino` — Declares char (~77291 tok)
+- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~11450 tok)
 - `OTGW-firmware.ino` — Declares WifiPortalResetState (~11353 tok)
 
 ## src/OTGW-firmware/data/

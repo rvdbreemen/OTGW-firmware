@@ -3,11 +3,11 @@ id: TASK-879
 title: >-
   fix(esp32): Task-Watchdog reboot loop + core-1 starvation (slow webserver),
   OTGW32 alpha.199
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-16 05:38'
-updated_date: '2026-06-16 22:10'
+updated_date: '2026-06-16 23:10'
 labels: []
 dependencies: []
 ordinal: 95000
@@ -58,4 +58,6 @@ ELIMINATED by code (do not re-chase): MQTT broker DNS WiFi.hostByName (MQTTstuff
 KILL-TEST (decisive, hand to field, no code): power-cycle the OTGW32, connect NOTHING to port 23 or 25238 (no telnet, no OTmonitor/ser2net), then curl http://<device-ip>/ a few times from a machine that never opened telnet to it. Floor VANISHES -> rank-1 CONFIRMED (loop-task socket writes). Floor PERSISTS -> compute/LittleFS-bound, reopen loopMQTTDiscovery/do5+15minevent/doTaskEvery*/loopOLED. The kill-test beats any [loop-stall] line because the detector's own DebugTf blocks on the same stalled socket.
 
 FIX (primary, needs decision - touches vendored SimpleTelnet which is READ-ONLY per policy): gate SimpleTelnet::write on availableForWrite() and DROP bytes that don't fit (lossy is fine for a debug stream) instead of the 10x1s select loop; OR move debug emission + the ser2net mirror onto a dedicated FreeRTOS task fed by a ring buffer the loop only enqueues into (mirrors the existing webhook offload pattern). Do NOT just add feedWatchDog() inside the write - masks the reboot, leaves the AsyncTCP latency floor. Full report: workflow wf_79e88a89-6f8 output.
+
+FIX SHIPPED (commit a125fbf7, 2.0.0-alpha.201, ADR-143 Accepted). Implemented option C: telnet (debugTelnet port 23) + ser2net (OTGWstream port 25238) migrated from synchronous SimpleTelnet to AsyncSimpleTelnet (AsyncTCP transport, SimpleTelnet submodule -> 55512dc). Non-blocking writes with TX backpressure (drained on onAck) => loop task never blocks on a socket write, removing both the 4-8s HTTP latency floor and the >=30s TWDT-reboot chain at the shared source. OTGWstream forced to NEG_OFF (raw OTmonitor bridge; lib default NEG_REFUSE would strip binary 0xFF as IAC). Build green all 3 targets (esp32 98.7% / classic 96.0% / combo 94.8% flash, async +~5KB); evaluate.py --quick clean. Toolchain note: build initially failed on a PlatformIO esptool console-script drift (esptool 5.1.0 dropped penv/Scripts/esptool.exe), fixed by pip --force-reinstall (bug-132), unrelated to the code. IN REVIEW pending the field KILL-TEST: power-cycle the OTGW32, connect nothing to port 23/25238, curl http://<ip>/ -> latency sub-second + maxLoopGap ~0 confirms; AsyncSimpleTelnet is an upstream prototype so hardware validation is required before Done.
 <!-- SECTION:NOTES:END -->
