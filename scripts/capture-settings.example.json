@@ -1,0 +1,13 @@
+{
+  "_comment": "TEMPLATE ONLY. The REAL file lives at %LOCALAPPDATA%\\OTGW-capture\\capture-settings.json (outside the repo, never synced to GitHub). capture-mqtt-debug.bat writes DeviceHost/BrokerHost/BrokerPort/Topic/Username automatically; pass -SaveSecrets once to also persist MqttPassword there for unattended runs. Add WifiSsid/WifiPassword/Hardware by hand if you want the test scripts to use them. Every key can also be supplied via an env var (see scripts/_secrets.py).",
+  "DeviceHost": "OTGW.local",
+  "BrokerHost": "homeassistant.local",
+  "BrokerPort": 1883,
+  "Topic": "#",
+  "Username": "your-mqtt-user",
+  "MqttPassword": "set-via -SaveSecrets, never commit a real value",
+  "WifiSsid": "your-wifi-ssid",
+  "WifiPassword": "your-wifi-password",
+  "Hardware": "otgw32",
+  "ComPort": "COM4"
+}

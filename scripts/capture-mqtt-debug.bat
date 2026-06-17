@@ -61,6 +61,7 @@ param(
     [string]$Topic = "#",
     [string]$Username,
     [string]$Password,
+    [switch]$SaveSecrets,
     [string]$OutputRoot = "logs/mqtt-diagnostics",
     [int]$DurationSeconds,
     [string]$MosquittoSubPath,
@@ -638,7 +639,27 @@ function New-MergedTranscript {
     # single file. Order: summary first (metadata + event timeline), then the
     # raw streams. Each file is read defensively so a missing/locked file cannot
     # abort the whole merge.
-    $mergedPath = Join-Path -Path $RunPath -ChildPath "transcript.txt"
+    #
+    # Naming convention (shared with capture-serial.py):
+    #   transcript-<hostname>-<uniqueid>-<hardware>-<datetime>.txt
+    # Identity is parsed from the captured telnet banner / 'D' state dump; each
+    # field falls back to a safe default when the device did not report it.
+    $idHost = "OTGW"; $idUid = "unknown"; $idHw = "esp32"
+    $telnetPath = Join-Path -Path $RunPath -ChildPath "telnet.log"
+    if (Test-Path -LiteralPath $telnetPath -PathType Leaf) {
+        $bannerLines = Get-Content -LiteralPath $telnetPath -TotalCount 600 -ErrorAction SilentlyContinue
+        foreach ($line in $bannerLines) {
+            if     ($line -match 'Host\s*:\s*(\S+)')          { $idHost = $Matches[1] }
+            elseif ($line -match 'unique_id:\s*(\S+)')        { $idUid  = $Matches[1] }
+            elseif ($line -match 'MQTT uniqueid\s*:\s*(\S+)') { $idUid  = $Matches[1] }
+            elseif ($line -match 'hardware\.mode:\s*(\S+)')   { $idHw   = $Matches[1] }
+        }
+    }
+    $sanitize = { param($s) (($s -replace '[^A-Za-z0-9._-]', '_')) }
+    $idHost = & $sanitize $idHost; $idUid = & $sanitize $idUid; $idHw = & $sanitize $idHw
+    $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+    $mergedName = "transcript-$idHost-$idUid-$idHw-$stamp.txt"
+    $mergedPath = Join-Path -Path $RunPath -ChildPath $mergedName
     $parts = @(
         @{ Title = "SUMMARY (summary.txt)";          File = "summary.txt" },
         @{ Title = "OTGW TELNET DEBUG (telnet.log)";  File = "telnet.log" },
@@ -1356,25 +1377,48 @@ function Save-CaptureSettings {
         [string]$BrokerHost,
         [int]$BrokerPort,
         [string]$Topic,
-        [string]$Username
+        [string]$Username,
+        [string]$MqttPassword,
+        [switch]$PersistPassword
     )
 
-    # Persist last-used values so the next run can pre-fill the prompts. The MQTT
-    # password is a secret and is deliberately NEVER written here. Best-effort: a
-    # write failure must never abort the capture.
+    # Persist last-used values so the next run can pre-fill the prompts. This file
+    # lives in %LOCALAPPDATA%\OTGW-capture\ — OUTSIDE the git repo, so it is never
+    # synced to GitHub. The MQTT password is written ONLY when -PersistPassword is
+    # set (opt-in, for unattended/autonomous runs); otherwise a previously stored
+    # secret is preserved untouched. Best-effort: a write failure never aborts the
+    # capture.
     try {
         $p = Get-CaptureSettingsPath
         $dir = Split-Path -Path $p -Parent
         if (-not (Test-Path -LiteralPath $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
-        [PSCustomObject]@{
+        # Carry over any previously stored secret unless we are explicitly writing one.
+        $pwToWrite = $null
+        if ($PersistPassword) {
+            $pwToWrite = $MqttPassword
+        }
+        elseif (Test-Path -LiteralPath $p) {
+            try {
+                $prev = Get-Content -LiteralPath $p -Raw | ConvertFrom-Json
+                if ($prev.PSObject.Properties.Name -contains 'MqttPassword') {
+                    $pwToWrite = [string]$prev.MqttPassword
+                }
+            }
+            catch { }
+        }
+        $obj = [ordered]@{
             DeviceHost = $DeviceHost
             BrokerHost = $BrokerHost
             BrokerPort = $BrokerPort
             Topic      = $Topic
             Username   = $Username
-        } | ConvertTo-Json | Set-Content -LiteralPath $p -Encoding UTF8
+        }
+        if (-not [string]::IsNullOrWhiteSpace($pwToWrite)) {
+            $obj['MqttPassword'] = $pwToWrite
+        }
+        [PSCustomObject]$obj | ConvertTo-Json | Set-Content -LiteralPath $p -Encoding UTF8
         return $p
     }
     catch {
@@ -1430,12 +1474,27 @@ if ([string]::IsNullOrWhiteSpace($Username)) {
     }
 }
 elseif (-not $passwordWasBound) {
-    $securePassword = Read-Host "MQTT password for $Username" -AsSecureString
-    $Password = ConvertFrom-SecureStringToPlainText -SecureString $securePassword
+    # Opt-in autonomous mode: reuse a password previously stored (via -SaveSecrets)
+    # in the out-of-repo capture-settings.json, so an unattended run does not block
+    # on the prompt. Falls back to a secure prompt when no stored secret exists.
+    $storedPw = $null
+    if ($savedSettings -and ($savedSettings.PSObject.Properties.Name -contains 'MqttPassword')) {
+        $storedPw = [string]$savedSettings.MqttPassword
+    }
+    if (-not [string]::IsNullOrWhiteSpace($storedPw)) {
+        $Password = $storedPw
+        Write-Host "MQTT password: loaded from capture-settings.json (out-of-repo secret store)."
+    }
+    else {
+        $securePassword = Read-Host "MQTT password for $Username" -AsSecureString
+        $Password = ConvertFrom-SecureStringToPlainText -SecureString $securePassword
+    }
 }
 
-# Remember the resolved settings for next run's prompt pre-fill (never the password).
-$savedSettingsPath = Save-CaptureSettings -DeviceHost $DeviceHost -BrokerHost $BrokerHost -BrokerPort $BrokerPort -Topic $Topic -Username $Username
+# Remember the resolved settings for next run's prompt pre-fill. The password is
+# persisted ONLY when -SaveSecrets is passed (opt-in), and ONLY to the out-of-repo
+# capture-settings.json; a previously stored secret is preserved across normal runs.
+$savedSettingsPath = Save-CaptureSettings -DeviceHost $DeviceHost -BrokerHost $BrokerHost -BrokerPort $BrokerPort -Topic $Topic -Username $Username -MqttPassword $Password -PersistPassword:$SaveSecrets
 
 $outputRootPath = Get-FullPath -Path $OutputRoot
 $runName = Get-Date -Format "yyyyMMdd-HHmmss"

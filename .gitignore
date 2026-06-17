@@ -92,3 +92,10 @@ docs/daily-issue-report.md
 
 # Superpowers brainstorm artifacts (transient)
 .superpowers/
+
+# Secrets — the real store lives in %LOCALAPPDATA%\OTGW-capture\capture-settings.json
+# (outside the repo, never synced). Belt-and-suspenders if a copy ever lands here:
+capture-settings.json
+*.secrets.json
+*.secret.json
+.env
