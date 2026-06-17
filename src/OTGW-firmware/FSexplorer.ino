@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.202
+**  Version  : v2.0.0-alpha.203
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -155,7 +155,19 @@ void startWebserver(){
 #endif
   // all other api calls are caught in the FSexplorer onNotFound catch-all; the
   // explicit /api prefix is also routed to processAPI for any method.
-  server.on("/api", HTTP_ANY, processAPI);
+  //
+  // TASK-879: the POST/PUT body MUST be captured on THIS handler. The global
+  // server.onRequestBody() below is the CATCH-ALL handler's onBody
+  // (AsyncWebServer::onRequestBody -> _catchAllHandler->onBody, WebServer.cpp), so
+  // it fires ONLY for requests that fall through to the catch-all. /api/* matches
+  // this explicit handler first, so without an onBody here the body was silently
+  // dropped and every POST /api/v2/settings returned 400 "Invalid JSON" (the async
+  // web UI's settings save was broken). Attach the same capture as this handler's
+  // own onBody.
+  server.on("/api", HTTP_ANY, processAPI, nullptr,
+    [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      webCaptureBody(request, data, len, index, total);
+    });
 
   // ESPAsyncWebServer keeps ALL request headers available on the request object
   // (no collectHeaders() allowlist needed, unlike the sync WebServer). The
