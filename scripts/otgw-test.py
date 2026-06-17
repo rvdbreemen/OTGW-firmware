@@ -91,6 +91,7 @@ def main():
     ap.add_argument("--minutes", type=float, default=5.0, help="capture/test window (max 15)")
     ap.add_argument("--build", action="store_true", help="run python build.py first")
     ap.add_argument("--no-flash", action="store_true", help="skip flashing (test current firmware)")
+    ap.add_argument("--no-provision", action="store_true", help="skip MQTT provisioning (API upload + reboot)")
     ap.add_argument("--port", default=_secrets.get("com_port", "COM4"))
     ap.add_argument("--skip-serial", action="store_true", help="skip the (usually empty) USB serial monitor")
     ap.add_argument("--tests", default="webserver", help="comma list of scripts/tests/test_<name>.py to run")
@@ -108,6 +109,17 @@ def main():
         do_flash(args.port)
         log("waiting 8s for the device to boot + rejoin WiFi...")
         time.sleep(8)
+
+    # Provision MQTT via the REST API + reboot, so the device-under-test is actually
+    # connected to the broker before the monitors subscribe (otherwise mosquitto_sub
+    # sees no traffic from this OTGW). Active step -> separate script. Reboots + the
+    # capture tool's telnet reconnect re-attach afterwards.
+    if not args.no_provision:
+        log("PROVISION: uploading MQTT settings via API + reboot...")
+        prov = os.path.join(HERE, "tests", "provision_mqtt.py")
+        r = subprocess.run([sys.executable, prov], cwd=ROOT)
+        if r.returncode != 0:
+            log("PROVISION: WARNING — device did not report mqttconnected (continuing; check broker/creds)")
 
     # --- start passive monitors in parallel (non-blocking) ---
     host = _secrets.get("device_host", "OTGW.local")
