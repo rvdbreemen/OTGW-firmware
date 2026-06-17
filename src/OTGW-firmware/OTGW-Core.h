@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.201
+**  Version  : v2.0.0-alpha.202
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -594,6 +594,11 @@ void drainOTFrameQueue();
 //    reader sites in restAPI.ino — never nested. Mirrors
 //    MQTTAutoConfigSessionLock (MQTTstuff.ino). A null mutex (failed create)
 //    degrades to no-op (unprotected) rather than deadlocked.
+// TASK-879: request-thread (async_tcp) readers MUST pass a bounded timeout, never
+// the default 0 (== portMAX_DELAY, wait forever). The loop-task writer (processOT)
+// holds otStateMutex across per-frame I/O, so an unbounded wait on the async_tcp
+// task can wedge the WDT-subscribed service task and stall every HTTP request.
+#define OT_STATE_READ_LOCK_MS 100   // bounded acquire for async REST readers
 struct OTStateLock {
   bool locked = false;
   explicit OTStateLock(uint32_t timeoutMs = 0) {
