@@ -12,6 +12,90 @@ export PYTHONUNBUFFERED=1
 bootstrap_py_dir="$script_dir/.build-python"
 bootstrap_py_exe="$bootstrap_py_dir/bin/python"
 
+# ---- Detect and clean Windows toolchain -------------------------------------
+echo "============================================================"
+echo " OTGW-firmware Build Script (Unix/Linux/macOS/WSL)"
+echo "============================================================"
+echo
+
+# Check if Windows toolchain is present (look for .exe files in arduino/packages)
+if [ -d "$script_dir/arduino/packages" ]; then
+    if find "$script_dir/arduino/packages" -name "*.exe" -o -name "*.bat" | head -n 1 | grep -q .; then
+        echo "[INFO] Detected Windows toolchain in arduino/packages"
+        echo "[INFO] Running in Unix environment - cleaning Windows binaries..."
+        rm -rf "$script_dir/arduino/packages"
+        rm -rf "$script_dir/arduino/staging"
+        rm -rf "$script_dir/.tmp"
+        echo "[OK]   Windows toolchain removed"
+        echo
+    fi
+fi
+
+# ---- Bootstrap dependencies for Unix platforms ------------------------------
+bootstrap_dependencies() {
+    local missing=""
+    local platform=""
+    
+    # Check for required tools
+    command -v python3 >/dev/null 2>&1 || missing="$missing python3"
+    command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || missing="$missing curl"
+    
+    [ -z "$missing" ] && return 0
+    
+    echo "[INFO] Missing required tools:$missing"
+    
+    # Detect platform and package manager
+    if [ "$(uname -s)" = "Linux" ]; then
+        if command -v apt-get >/dev/null 2>&1; then
+            platform="apt-get"
+        elif command -v yum >/dev/null 2>&1; then
+            platform="yum"
+        fi
+    elif [ "$(uname -s)" = "Darwin" ]; then
+        if command -v brew >/dev/null 2>&1; then
+            platform="brew"
+        fi
+    fi
+    
+    if [ -z "$platform" ]; then
+        echo "ERROR: Cannot auto-install dependencies. Please install:$missing" >&2
+        exit 1
+    fi
+    
+    echo "[INFO] Installing dependencies using $platform..."
+    
+    case "$platform" in
+        apt-get)
+            if sudo -n apt-get update >/dev/null 2>&1 && sudo -n apt-get install -y $missing >/dev/null 2>&1; then
+                echo "[OK]   Dependencies installed"
+                return 0
+            fi
+            echo "[WARN] Need sudo password to install dependencies"
+            sudo apt-get update && sudo apt-get install -y $missing || {
+                echo "ERROR: Failed to install dependencies" >&2
+                exit 1
+            }
+            ;;
+        yum)
+            sudo yum install -y $missing || {
+                echo "ERROR: Failed to install dependencies" >&2
+                exit 1
+            }
+            ;;
+        brew)
+            brew install $missing || {
+                echo "ERROR: Failed to install dependencies" >&2
+                exit 1
+            }
+            ;;
+    esac
+    
+    echo "[OK]   Dependencies installed"
+}
+
+bootstrap_dependencies
+echo
+
 python_exe=""
 
 use_python_if_valid() {
