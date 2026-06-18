@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.204
+**  Version  : v2.0.0-alpha.205
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2587,25 +2587,31 @@ void sendDeviceInfoV2()
 //=======================================================================
 // Sends health status as JSON object (map format)
 // Returns: {"health": {"status": "UP", "uptime": "...", ...}}
-void sendHealth() 
+void sendHealth()
 {
-  sendStartJsonMap(F("health"));
-
   updateLittleFSStatus(F("/.health"));
-  sendJsonMapEntry(F("status"), LittleFSmounted ? F("UP") : F("DEGRADED"));
-  sendJsonMapEntry(F("uptime"), upTime());
-  sendJsonMapEntry(F("heap"), platformFreeHeap());
-  sendJsonMapEntry(F("networkmode"), networkModeName());
+
+  // ADR-141: ArduinoJson v7. Native types replace the hand-rolled streaming map,
+  // which emitted booleans as quoted strings ("false") via CBOOLEAN — now real
+  // JSON booleans. uptime/networkmode are copied into the doc (String / flash).
+  JsonDocument doc;
+  JsonObject h = doc[F("health")].to<JsonObject>();
+  h[F("status")]         = LittleFSmounted ? "UP" : "DEGRADED";
+  h[F("uptime")]         = upTime();
+  h[F("heap")]           = platformFreeHeap();
+  h[F("networkmode")]    = networkModeName();
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  sendJsonMapEntry(F("wifirssi"), (state.net.eMode == NET_ETHERNET) ? 0 : WiFi.RSSI());
+  h[F("wifirssi")]       = (state.net.eMode == NET_ETHERNET) ? 0 : WiFi.RSSI();
 #else
-  sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
+  h[F("wifirssi")]       = WiFi.RSSI();
 #endif
-  sendJsonMapEntry(F("mqttconnected"), CBOOLEAN(state.mqtt.bConnected));
-  sendJsonMapEntry(F("otgwconnected"), CBOOLEAN(state.otBus.bOnline));
-  sendJsonMapEntry(F("littlefsMounted"), CBOOLEAN(LittleFSmounted));
-  
-  sendEndJsonMap(F("health"));
+  h[F("mqttconnected")]  = state.mqtt.bConnected;
+  h[F("otgwconnected")]  = state.otBus.bOnline;
+  h[F("littlefsMounted")] = LittleFSmounted;
+
+  AsyncResponseStream *s = restBeginStream("application/json");
+  if (s) serializeJson(doc, *s);
+  restFinalize();
 
 } // sendHealth()
 

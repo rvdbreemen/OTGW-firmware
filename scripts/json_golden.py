@@ -25,11 +25,20 @@ ENDPOINTS = [
 # Volatile keys: change run-to-run regardless of serialization. Exact names + prefixes.
 VOLATILE_EXACT = {
  "uptime","bootcount","lastreset","compiled","fwversion","coreversion","sdkversion",
- "freeheap","maxfreeblock","minfreeheap","hd_fragmentation_pct","sketchsize",
+ "freeheap","heap","maxfreeblock","minfreeheap","hd_fragmentation_pct","sketchsize",
  "freesketchspace","wifirssi","wifiquality","wifiquality_text","time","datetime",
- "epoch","timestamp","millis","now","flashchipmode","lastreset",
+ "dateTime","epoch","timestamp","millis","now","flashchipmode","lastreset",
+ # flash/version artifacts (app-only flash -> fw githash changes, fs unchanged):
+ "fw_hash","fs_hash","match","message",
+ # filesystem totals + reboot/discovery counters shift on every reboot:
+ "usedBytes","freeBytes","pending_ids",
 }
 VOLATILE_PREFIX = ("perf_","hd_","disc_")
+
+# Strings the manual JSON emitted for booleans; ArduinoJson now emits real bools.
+# Normalising both sides means the intended string->bool improvement is transparent
+# (a genuine true<->false value flip still fails).
+_BOOLSTR = {"true": True, "false": False}
 
 def is_volatile(k):
     return k in VOLATILE_EXACT or any(k.startswith(p) for p in VOLATILE_PREFIX)
@@ -54,6 +63,8 @@ def strip_volatile(obj):
         return [strip_volatile(x) for x in obj]
     if isinstance(obj, float) and obj.is_integer():
         return int(obj)  # 20.0 == 20 for semantic compare
+    if isinstance(obj, str) and obj.lower() in _BOOLSTR:
+        return _BOOLSTR[obj.lower()]  # "false" (old) == false (new): intended improvement
     return obj
 
 def capture(host, outdir):
