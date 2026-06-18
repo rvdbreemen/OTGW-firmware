@@ -298,6 +298,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     post:
+      security:
+        - basicAuth: []
       tags:
         - Settings
       summary: Update a single device setting
@@ -338,6 +340,8 @@ paths:
         '403':
           description: CSRF protection - invalid origin
     put:
+      security:
+        - basicAuth: []
       tags:
         - Settings
       summary: Update a single device setting (PUT alias)
@@ -448,6 +452,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     post:
+      security:
+        - basicAuth: []
       tags:
         - Sensors
       summary: Update all Dallas sensor labels
@@ -480,11 +486,21 @@ paths:
         - Device Info
       summary: Get comprehensive device information
       description: |
-        Returns device information as a flat JSON map. Boolean values are
-        proper JSON booleans (not strings) in this endpoint.
+        Returns device information wrapped in a top-level `device` object. Boolean
+        values are proper JSON booleans (not strings) in this endpoint.
 
-        Includes firmware version, PIC details, network info, memory,
-        connectivity status, and gateway mode.
+        Includes firmware version, network info, memory, connectivity status, and
+        gateway/OT-Direct mode.
+
+        The field set is **board-conditional and non-exhaustive**:
+        - PIC fields (`picavailable`, `picfwversion`, `picdeviceid`, `picfwtype`,
+          `otgwmode`) appear only on PIC/Classic hardware.
+        - OT-Direct fields (`otd*`) appear only on the OTGW32 / OT-Direct board.
+        - Diagnostic counters (`perf_*`, `hd_*`, `disc_*`) and per-interface
+          network fields (`wifi_current_*`, `eth_current_*`) are also present;
+          they are covered by `additionalProperties` rather than enumerated here.
+
+        Consumers must ignore unknown keys.
       operationId: getDeviceInfo
       responses:
         '200':
@@ -496,19 +512,42 @@ paths:
                 properties:
                   device:
                     type: object
+                    additionalProperties: true
                     properties:
                       author:
                         type: string
                       fwversion:
                         type: string
+                      platform:
+                        type: string
+                        description: 'Chip platform ("ESP8266" or "ESP32")'
+                      board:
+                        type: string
+                        description: Human-readable board name
+                      hardware_type:
+                        type: string
+                        description: 'Board codepath token ("otgw32", "esp8266", "esp32-classic")'
+                      oledpresent:
+                        type: boolean
+                        description: OLED display present on this board
+                      ethernetpresent:
+                        type: boolean
+                        description: Ethernet hardware present on this board
+                      ethernetlink:
+                        type: boolean
+                        description: Ethernet link is up
                       picavailable:
                         type: boolean
+                        description: PIC co-processor present (PIC/Classic hardware only)
                       picfwversion:
                         type: string
+                        description: PIC firmware version (PIC/Classic hardware only)
                       picdeviceid:
                         type: string
+                        description: PIC device ID (PIC/Classic hardware only)
                       picfwtype:
                         type: string
+                        description: PIC firmware type (PIC/Classic hardware only)
                       compiled:
                         type: string
                       hostname:
@@ -799,6 +838,8 @@ paths:
                         type: string
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+        '503':
+          $ref: '#/components/responses/PicUnavailable'
 
   /v2/pic/update-check:
     get:
@@ -831,6 +872,8 @@ paths:
                         type: boolean
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+        '503':
+          $ref: '#/components/responses/PicUnavailable'
 
   /v2/pic/settings:
     get:
@@ -922,6 +965,8 @@ paths:
                   voltage_ref: "3.3"
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+        '503':
+          $ref: '#/components/responses/PicUnavailable'
 
   /v2/firmware/files:
     get:
@@ -967,7 +1012,7 @@ paths:
               schema:
                 type: array
                 items:
-                  oneOf:
+                  anyOf:
                     - type: object
                       description: File or directory entry
                       properties:
@@ -1078,6 +1123,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - Simulation
       summary: Start OTGW simulation (PUT alias)
@@ -1112,6 +1159,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - Simulation
       summary: Stop OTGW simulation (PUT alias)
@@ -1266,6 +1315,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
     put:
+      security:
+        - basicAuth: []
       tags:
         - OTGW Commands
       summary: Send command (PUT alias)
@@ -1566,6 +1617,8 @@ paths:
 
   /v2/webhook/test:
     post:
+      security:
+        - basicAuth: []
       tags:
         - Webhook
       summary: Test webhook delivery
@@ -1603,6 +1656,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - Webhook
       summary: Test webhook delivery (PUT alias)
@@ -1671,6 +1726,8 @@ paths:
 
   /v2/otdirect/mode:
     post:
+      security:
+        - basicAuth: []
       tags:
         - OT Direct (OTGW32)
       summary: Set OT Direct operating mode
@@ -1739,6 +1796,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - OT Direct (OTGW32)
       summary: Set OT Direct operating mode (PUT alias)
@@ -1849,6 +1908,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     post:
+      security:
+        - basicAuth: []
       tags:
         - OT Direct (OTGW32)
       summary: Update OT Direct settings
@@ -1922,6 +1983,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - OT Direct (OTGW32)
       summary: Update OT Direct settings (PUT alias)
@@ -1970,6 +2033,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     post:
+      security:
+        - basicAuth: []
       tags:
         - OT Direct (OTGW32)
       summary: Manage OT Direct overrides
@@ -2043,6 +2108,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - OT Direct (OTGW32)
       summary: Manage OT Direct overrides (PUT alias)
@@ -2166,6 +2233,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
     put:
+      security:
+        - basicAuth: []
       tags:
         - OTGW Commands
       summary: Send OTGW command via URL path (PUT alias)
@@ -2186,6 +2255,8 @@ paths:
 
   /v2/otgw/autoconfigure:
     post:
+      security:
+        - basicAuth: []
       tags:
         - OTGW Commands
       summary: Trigger MQTT autodiscovery (alias)
@@ -2208,6 +2279,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - OTGW Commands
       summary: Trigger MQTT autodiscovery (PUT alias)
@@ -2271,7 +2344,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
+                anyOf:
                   - $ref: '#/components/schemas/SatStatus'
                   - $ref: '#/components/schemas/SatHealth'
         '405':
@@ -2279,6 +2352,8 @@ paths:
 
   /v2/sat/target:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Set SAT target temperature
@@ -2316,6 +2391,8 @@ paths:
 
   /v2/sat/externaltemp:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Push indoor temperature from external sensor
@@ -2345,6 +2422,8 @@ paths:
 
   /v2/sat/externaloutdoor:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Push outdoor temperature from external source
@@ -2373,6 +2452,8 @@ paths:
 
   /v2/sat/pvsurplus:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Push PV-surplus power (TASK-640)
@@ -2405,6 +2486,8 @@ paths:
 
   /v2/sat/sim/event:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Inject a simulation scenario event (TASK-797)
@@ -2471,6 +2554,8 @@ paths:
 
   /v2/sat/reset_integral:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Reset PID integral accumulator
@@ -2490,6 +2575,8 @@ paths:
 
   /v2/sat/flush:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Flush short-lived SAT data
@@ -2521,6 +2608,8 @@ paths:
 
   /v2/sat/window:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Set window open/closed state
@@ -2550,6 +2639,8 @@ paths:
 
   /v2/sat/preset:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Activate a named preset
@@ -2579,6 +2670,8 @@ paths:
 
   /v2/sat/enable:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Enable or disable SAT controller
@@ -2607,6 +2700,8 @@ paths:
 
   /v2/sat/mode:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Set SAT control mode
@@ -2636,6 +2731,8 @@ paths:
 
   /v2/sat/humidity:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Push indoor humidity
@@ -2684,6 +2781,8 @@ paths:
 
   /v2/sat/area/{index}:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Push area temperature for multi-area control
@@ -2777,6 +2876,8 @@ paths:
 
   /v2/sat/ble/select:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Promote a roster MAC to the active BLE sensor (ESP32 only)
@@ -2814,6 +2915,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Promote a roster MAC (PUT alias)
@@ -2832,6 +2935,8 @@ paths:
 
   /v2/sat/ble/label:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Set the persistent label on a roster slot (ESP32 only)
@@ -2872,6 +2977,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Set roster label (PUT alias)
@@ -2890,6 +2997,8 @@ paths:
 
   /v2/sat/ble/forget:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Drop a roster slot and its HA discovery (ESP32 only)
@@ -2927,6 +3036,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Drop a roster slot (PUT alias)
@@ -2995,6 +3106,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Add a heating-curve calibration marker
@@ -3177,6 +3290,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Update one Dallas-to-SAT-area mapping (POST alias)
@@ -3191,6 +3306,8 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Update one Dallas-to-SAT-area mapping (PUT alias)
@@ -3207,6 +3324,8 @@ paths:
 
   /v2/sat/settings/{name}:
     post:
+      security:
+        - basicAuth: []
       tags:
         - SAT
       summary: Update a SAT setting
@@ -4139,6 +4258,20 @@ components:
             error:
               status: 500
               message: "Internal server error (low heap)"
+
+    PicUnavailable:
+      description: |
+        No PIC is present, so PIC gateway functions are disabled. Returned by all
+        `/v2/pic/*` routes on hardware without a PIC (e.g. the OTGW32 / OT-Direct
+        board, which talks OpenTherm directly and has no PIC co-processor).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            error:
+              status: 503
+              message: "No PIC detected - PIC functions disabled"
 
 x-api-design-notes: |
   **API Version**: v2 only. v0 and v1 have been removed and return 410 Gone.
