@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-alpha.210
+**  Version  : v2.0.0-alpha.211
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -742,46 +742,30 @@ bool extractJsonField(const char* json, const __FlashStringHelper* key,
                       char* result, size_t resultSize) {
   if (!json || !result || resultSize == 0) return false;
   result[0] = '\0';
-  // Build search pattern: "keyname"
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("\"%S\""), (PGM_P)key);
-  const char* found = strstr(json, cMsg);
-  if (!found) return false;
-
-  const char* colon = strchr(found + strlen(cMsg), ':');
-  if (!colon) return false;
-
-  const char* p = colon + 1;
-  while (*p == ' ') p++;
-  if (*p == '\0') return false;
-
-  if (*p == '"') {
-    // Quoted string value — scan for closing quote respecting backslash escapes
-    p++; // skip opening quote
-    size_t ri = 0;
-    while (*p != '\0') {
-      if (*p == '\\' && *(p + 1) != '\0') {
-        p++;
-        if (ri < resultSize - 1) result[ri++] = unescapeJsonChar(*p);
-        p++;
-        continue;
-      }
-      if (*p == '"') break;
-      if (ri < resultSize - 1) result[ri++] = *p;
-      p++;
-    }
-    if (*p != '"') return false; // no closing quote found
-    result[ri] = '\0';
-    return true;
-  } else {
-    // Unquoted value: bool literal (true/false) or number
-    const char* end = p;
-    while (*end && *end != ',' && *end != '}' && *end != ' ' && *end != '\r' && *end != '\n') end++;
-    size_t n = end - p;
-    if (n == 0 || n + 1 > resultSize) return false;
-    memcpy(result, p, n);
-    result[n] = '\0';
+  // ADR-141 (TASK-867 AC#5): parse with ArduinoJson instead of the old
+  // strstr + hand-rolled scanner. The scanner false-matched a key that appeared
+  // inside a string VALUE (e.g. {"other":"value","value":5}), and only handled
+  // a flat object. deserializeJson handles quoting, backslash-escapes, nested
+  // objects, JSON null and whitespace correctly. Settings persistence keeps its
+  // own manual parseJsonKVLine (TASK-867 AC#6) and is unaffected.
+  JsonDocument doc;
+  if (deserializeJson(doc, json)) return false;   // parse error / not valid JSON
+  char keyBuf[48];
+  strncpy_P(keyBuf, (PGM_P)key, sizeof(keyBuf));
+  keyBuf[sizeof(keyBuf) - 1] = '\0';
+  JsonVariant v = doc[keyBuf];
+  if (v.isNull()) return false;                    // field absent or explicit null
+  if (v.is<const char*>()) {                       // string value (already unescaped)
+    strlcpy(result, v.as<const char*>(), resultSize);
     return true;
   }
+  if (v.is<bool>()) {                              // bool literal -> "true"/"false"
+    strlcpy(result, v.as<bool>() ? "true" : "false", resultSize);
+    return true;
+  }
+  // numeric (or other scalar): serialize the token, e.g. 42 -> "42", 1.5 -> "1.5"
+  size_t n = serializeJson(v, result, resultSize);
+  return (n > 0 && n < resultSize);
 }
 
 // Convenience wrapper accepting Arduino String (delegates to const char* version)

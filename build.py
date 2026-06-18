@@ -76,17 +76,17 @@ TARGETS = {
         "flash_freq": "80m",
         "flash_size": "4MB",
         "firmware_offset": "0x10000",
-        "fs_offset": "0x1F0000",   # from partitions_otgw_esp32.csv ("spiffs" label = LittleFS for begin() compat)
+        "fs_offset": "0x270000",   # from partitions_otgw_esp32.csv ("spiffs" label = LittleFS for begin() compat); moved up after the +0.5 MB app grow (TASK-867)
         "fs_tool_path": "esp32/tools/mklittlefs",
         "fs_block": 4096,
         "fs_page": 256,
-        "fs_size": 2097152,       # 0x200000 = 2 MB — matches partitions_otgw_esp32.csv
-        "app_size": 1966080,      # 0x1E0000 = 1.875 MB — matches factory app slot in
+        "fs_size": 1572864,       # 0x180000 = 1.5 MB — matches partitions_otgw_esp32.csv (TASK-867)
+        "app_size": 2490368,      # 0x260000 = 2.375 MB — matches factory app slot in
                                   # partitions_otgw_esp32.csv. Overrides PartitionScheme=custom
                                   # default of 16 MB so the size check reflects reality (TASK-288).
-                                  # Was 0x2E0000 (2.875 MB) before the 4M2M layout switch; the
-                                  # full ESP32-S3 firmware is ~1.81 MB so this leaves ~150 KB
-                                  # of headroom for future growth.
+                                  # Grown +0.5 MB from 0x1E0000 (1.875 MB) in TASK-867 to fit the
+                                  # ArduinoJson v7 footprint; the LittleFS partition shrank 2.0->1.5 MB
+                                  # to free the space (web assets use ~0.95 MB).
         "bootloader_offset": "0x0",  # ESP32-S3 bootloader is at 0x0 (not 0x1000)
     },
 }

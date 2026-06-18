@@ -4,13 +4,15 @@
 # nibbling at the firmware budget. To enable proper OTA (two app slots) a
 # board with 8MB flash is required.
 #
-# 4MB flash layout:
-#   1.875 MB app (ota_0) + 2.0 MB LittleFS (label "spiffs") + 64 KB coredump
+# 4MB flash layout (TASK-867: app grown +0.5 MB for the ArduinoJson v7 footprint):
+#   2.375 MB app (ota_0) + 1.5 MB LittleFS (label "spiffs") + 64 KB coredump
+#   The web UI assets use ~0.95 MB, so 1.5 MB still leaves ample filesystem room
+#   while the firmware (with ArduinoJson + async stack) gets real headroom again.
 #
 # Bootloader: 0x0 (ESP32-S3 specific — differs from original ESP32 which uses 0x1000)
 # Name,   Type, SubType, Offset,  Size,    Flags
 nvs,      data, nvs,     0x9000,  0x5000,
 otadata,  data, ota,     0xE000,  0x2000,
-app0,     app,  ota_0,   0x10000, 0x1E0000,
-spiffs,   data, spiffs,  0x1F0000,0x200000,
+app0,     app,  ota_0,   0x10000, 0x260000,
+spiffs,   data, spiffs,  0x270000,0x180000,
 coredump, data, coredump,0x3F0000,0x10000,
