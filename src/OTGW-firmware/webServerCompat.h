@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.212
+**  Version  : v2.0.0-alpha.213
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -39,6 +39,7 @@
 #define WEBSERVERCOMPAT_H
 
 #include <Arduino.h>
+#include <memory>          // restSendJson() owns the streamed JsonDocument via std::shared_ptr (TASK-883 chunked path)
 #include <ArduinoJson.h>   // restSendJson() takes JsonDocument& (ADR-141); include here so the helper compiles regardless of TU include order
 #include <ESPAsyncWebServer.h>
 
@@ -356,29 +357,74 @@ inline void restFinalize() {
   }
 }
 
-// ADR-141: canonical ArduinoJson v7 output path. Replaces the
+// TASK-883: a Print sink that captures only the byte window [start, start+cap)
+// of whatever is serialized into it and discards the rest. Lets restSendJson()
+// re-serialize a JsonDocument once per TCP chunk, emitting only the slice the
+// async server asked for, so the full response is NEVER buffered contiguously.
+struct JsonChunkWindow : public Print {
+  size_t   start;       // first byte offset this chunk wants (AsyncWebServer index)
+  uint8_t* out;         // chunk output buffer (server-owned)
+  size_t   cap;         // chunk capacity (maxLen)
+  size_t   seen;        // total bytes the serializer has produced so far
+  size_t   put;         // bytes copied into out
+  JsonChunkWindow(size_t s, uint8_t* o, size_t c) : start(s), out(o), cap(c), seen(0), put(0) {}
+  size_t write(uint8_t b) override {
+    if (seen >= start && put < cap) out[put++] = b;
+    seen++;
+    return 1;
+  }
+  size_t write(const uint8_t* data, size_t len) override {
+    // copy only the overlap of [seen, seen+len) with the window [start, start+cap)
+    const size_t winEnd = start + cap;
+    const size_t segEnd = seen + len;
+    if (seen < winEnd && segEnd > start) {
+      const size_t from = (seen   > start) ? seen   : start;   // max(seen, start)
+      const size_t to   = (segEnd < winEnd) ? segEnd : winEnd; // min(segEnd, winEnd)
+      if (to > from) { memcpy(out + (from - start), data + (from - seen), to - from); put += (to - from); }
+    }
+    seen += len;
+    return len;
+  }
+};
+
+// Owns the document for the lifetime of the chunked response (the async server
+// streams it AFTER the handler returns). total is cached so the filler can tell
+// "stream complete" (index == total -> return 0) apart from "no room this tick".
+struct RestJsonStream { JsonDocument doc; size_t total; };
+
+// ADR-141 canonical ArduinoJson v7 output path. Replaces the
 // sendStartJsonMap -> N x sendJsonMapEntry -> sendEndJsonMap layer. No-op if a
-// response was already sent (auth fail / early return), matching restFinalize.
+// response was already sent (auth fail / early return).
 //
-// TASK-883: PRE-SIZE the response buffer to the exact serialized length.
-// serializeJson() writes the document one byte at a time, and
-// AsyncResponseStream::write() grows its cbuf by only the deficit
-// (resizeAdd -> cbuf::resize), which REBUILDS the whole FreeRTOS RingBuffer
-// (xRingbufferCreate + malloc temp + full copy + delete old) on every growth.
-// Left at the 1460-byte default, an ~8.6 KB response (e.g. /v2/settings) triggers
-// thousands of full-buffer reallocs synchronously on the async_tcp task, which
-// pins it past the 30 s IDF Task-Watchdog under concurrent load and reboots the
-// device (a controlled A/B proved this is what the migration worsened vs the old
-// one-pass snprintf path). measureJson(doc) sizes the buffer once up front, so
-// every write finds room and resizeAdd is never called: O(2n) (measure + write)
-// instead of O(n^2). measureJson MUST pair with the non-pretty serializeJson.
+// TASK-883: stream the JSON via a CHUNKED pull response instead of buffering it
+// whole. The old path (serializeJson into an AsyncResponseStream) accumulated the
+// entire response in one contiguous FreeRTOS RingBuffer; under concurrent load the
+// heap fragments below the response size, the alloc fails, and AsyncResponseStream::
+// write() then logs "Failed to allocate" per byte through the slow esp_diagnostics
+// hook until async_tcp misses the 30 s IDF Task-Watchdog and the device reboots
+// (root cause confirmed by two decoded panic backtraces). Here the document is moved
+// onto the heap (shared_ptr, kept alive by the filler lambda until the last chunk)
+// and re-serialized once per TCP-window-sized chunk via JsonChunkWindow: O(1) extra
+// RAM, NO large contiguous buffer, so it cannot fail-and-storm. CPU is O(n * chunks)
+// (~6 re-serializes for an 8.6 KB response), still sub-ms and far under the watchdog.
 inline void restSendJson(JsonDocument& doc) {
-  const size_t len = measureJson(doc);
-  // +64 absorbs FreeRTOS RingBuffer overhead so cbuf::size() >= len (guarantees
-  // zero resizes even if xRingbufferCreate reserves a few bytes of structure).
-  AsyncResponseStream* s = restBeginStream("application/json", len + 64);
-  if (s) serializeJson(doc, *s);
-  restFinalize();
+  if (!currentRequest || g_responseSent) return;
+  auto st = std::make_shared<RestJsonStream>();
+  st->doc   = std::move(doc);
+  st->total = measureJson(st->doc);
+  AsyncWebServerResponse* resp = currentRequest->beginChunkedResponse(
+    "application/json",
+    [st](uint8_t* buffer, size_t maxLen, size_t index) -> size_t {
+      if (index >= st->total) return 0;                 // whole document sent -> done
+      if (maxLen == 0)        return RESPONSE_TRY_AGAIN; // no room this tick, retry
+      JsonChunkWindow w(index, buffer, maxLen);
+      serializeJson(st->doc, w);                        // re-emit only [index, index+maxLen)
+      return w.put;                                     // > 0 because index < total
+    });
+  if (!resp) return;        // response alloc failed; nothing sent (handler already returned headers? no)
+  webApplyHeaders(resp);
+  currentRequest->send(resp);
+  g_responseSent = true;
 }
 
 #endif // WEBSERVERCOMPAT_H

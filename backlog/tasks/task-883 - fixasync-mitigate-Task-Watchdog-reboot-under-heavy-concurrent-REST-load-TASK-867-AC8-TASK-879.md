@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-18 09:24'
-updated_date: '2026-06-18 13:47'
+updated_date: '2026-06-18 14:12'
 labels: []
 dependencies: []
 ordinal: 99000
@@ -22,10 +22,12 @@ scripts/tests/test_load.py (the AC#8 heap-under-load tool) surfaced a real edge:
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Device survives the 8-worker test_load.py run (>=1 min) with bootcount delta 0 (no TWDT reboot)
-- [ ] #2 Mitigation does not regress single-request latency or the <=4-worker heap-recovery behaviour
-- [ ] #3 evaluate.py green; esp32 build + flash-fit
+- [x] #2 Mitigation does not regress single-request latency or the <=4-worker heap-recovery behaviour
+- [x] #3 evaluate.py green; esp32 build + flash-fit
 - [x] #4 A/B causation check: flash pre-migration build (b54c0890~1), run identical 8-worker test_load.py; record whether the TWDT threshold differs from the migrated build (proves/refutes migration involvement). Until done, the migration is NOT implicated.
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
@@ -36,4 +38,8 @@ FLOOD (8 workers, --delay 0): Arm A survived 1 min AND 2 min, and even survived 
 VERDICT: the ArduinoJson v7 migration MEASURABLY LOWERED the flood/abuse TWDT threshold. This OVERTURNS the earlier 'causation unmeasured / pre-existing only' framing and the static CPU-delta prediction (which expected 'marginal, both arms behave the same'). The migration IS implicated for the flood case. Mechanism: two-pass build-then-serialize JsonDocument + heap-pool alloc/free churn holds core 1 (async_tcp pri 10) longer per request -> starves loopTask (pri 1, core 1) past the 30s TWDT under sustained 8-way concurrency. Heap axis itself stayed clean on both (no leak, 0 ADR-089 tier entries, frag recovers). TASK-879's web-dead TWDT (alpha.199) was a DISTINCT pre-migration manifestation; what the migration shifted is the flood threshold. AC#1 (8-worker survive) now has a concrete repro + a confirmed pre-migration baseline. Recommended fix #1 (async_tcp -> core 0, amend ADR-139) would address BOTH the pre-existing web-dead TWDT and this migration-worsened flood case. Note: test_load.py hardened to retry the cooldown snapshot and use bootcount (not a failed snapshot) as the only reboot signal (the 16w arm-A run initially false-positived 'rebooted' from a saturated snapshot).
 
 FIX ATTEMPTS (hardware-verified, both FAILED to stop the flood reboot): (1) async_tcp -> core 0 (ADR-144): device still rebooted (3x in a 1.5-min 8w flood); decoded panic named async_tcp itself as the trip task, loopTask healthy on CPU 1 -> loopTask-starvation hypothesis REFUTED, ADR-144 Rejected, RUNNING_CORE restored to ADR-139's 1. (2) Pre-size the AsyncResponseStream buffer to measureJson(doc) in restSendJson (webServerCompat.h): still rebooted (boot 11->13, 13->15). Second decoded panic: async_tcp stuck in serializeJson -> AsyncResponseStream::write -> async_ws_log_e('Failed to allocate') (WebResponses.cpp:937) via the esp_diagnostics log hook. ROOT CAUSE (architectural): AsyncResponseStream buffers the WHOLE response in one contiguous FreeRTOS RingBuffer; under 8-way concurrency the heap fragments below the response size (maxblock floor ~8.7KB < 8.6KB settings), the (pre-sized OR incremental) alloc fails, and write() then logs 'Failed to allocate' PER BYTE through the slow diagnostics hook -> thousands of log calls -> async_tcp >30s -> WDT. Core affinity and pre-sizing cannot fix this; AsyncJsonResponse cannot either (also contiguous). DECISION (maintainer, 2026-06-18): implement TRUE chunked/pull-based JSON streaming (serialize incrementally to the socket, bounded to the TCP window, never a large contiguous buffer) as the real fix - fixes the flood AND the plausible same-root TASK-879 field 'web dead' report. Pre-size kept as a separate common-case heap improvement (alpha.212): eliminates the O(n^2) ringbuffer rebuild for responses >1460B when the heap is healthy (single/light load), only fails to help under flood-fragmentation. Realistic throttled load (4 workers) passes clean on both builds throughout. Panic-capture tool added: scripts/tests/_serialcap.py.
+
+REAL FIX implemented (alpha.213, ADR-145 Proposed): restSendJson() now serves JSON via beginChunkedResponse with a pull filler that RE-SERIALIZES one TCP-window slice per chunk (JsonChunkWindow Print sink captures only [index,index+maxLen)). The JsonDocument is moved onto the heap behind a shared_ptr captured by the filler lambda (lives until the last chunk, then freed); total=measureJson cached so the filler returns 0 exactly at end vs RESPONSE_TRY_AGAIN when maxLen==0. Result: NO whole-response contiguous buffer -> the alloc-fail + per-byte 'Failed to allocate' log storm that tripped the watchdog cannot happen. O(1) RAM beyond the (smaller, fragmentation-tolerant) doc pool; CPU O(n*chunks) ~6 re-serializes per 8.6KB response (sub-ms). ZERO changes at the ~40 restSendJson call sites (signature preserved; doc moved internally). Verified lib semantics first: beginChunkedResponse filler gets index=_filledLength (cumulative offset), return 0 (!=RESPONSE_TRY_AGAIN) -> terminating chunk. Build + hardware-flood verification pending. AC#1 (8-worker survive) is the gate.
+
+RESOLUTION (alpha.213, ADR-145): the chunked-streaming fix ELIMINATES the IDF Task-Watchdog reboot that is the subject of this task. Hardware-verified: chunked build = 0 watchdog panics under the same 8-worker flood that gave all-watchdog panics on the buffered build; heap stays healthy (maxblock floor ~31KB vs ~8.7KB, frag peak 33% vs 81%); json_golden semantic-equal (heavy multi-chunk endpoints byte-identical); realistic 4-worker load PASS (bootcount delta 0, 535 req 100%, no ADR-089 tier breach). AC#2/#3/#4 met; AC#1's literal 'bootcount delta 0 under the 8-worker flood' is NOT met because, with the watchdog gone, the abusive flood now aborts via a DIFFERENT path -- unhandled std::bad_alloc in AsyncWebServerResponse::addHeader (cause NOT pinned: 46KB free / 31KB block at the time, so not simple exhaustion). That residual is split out to TASK-884 (connection/concurrency backpressure category, a fresh architectural call for the maintainer; per-path tweaks won't win the flood). Do NOT claim a 'capacity DoS' -- the free-heap numbers contradict it. Status -> In Review: the watchdog mechanism is fixed and shipped; field validation + the TASK-884 residual remain. Five fix iterations recorded above (core-0 rejected ADR-144, pre-size kept alpha.212, chunked shipped alpha.213).
 <!-- SECTION:NOTES:END -->
